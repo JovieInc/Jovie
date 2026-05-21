@@ -2,7 +2,7 @@ import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { getDashboardData } from '@/app/app/(shell)/dashboard/actions';
 import { APP_ROUTES } from '@/constants/routes';
-import { AuthLayout } from '@/features/auth';
+
 import { CanonicalUserState, resolveUserState } from '@/lib/auth/gate';
 import type { PlanIntentTier } from '@/lib/auth/plan-intent';
 import {
@@ -146,24 +146,17 @@ export default async function OnboardingCheckoutPage({
   }
 
   return (
-    <AuthLayout
-      formTitle='Upgrade your profile'
-      showFooterPrompt={false}
-      showFormTitle={false}
-      logoSpinDelayMs={10000}
-    >
-      <OnboardingCheckoutClient
-        plan={planIntent}
-        monthlyPriceId={pricing.monthlyPriceId}
-        annualPriceId={pricing.annualPriceId}
-        monthlyAmount={pricing.monthlyAmount}
-        annualAmount={pricing.annualAmount}
-        displayName={profileData.displayName}
-        username={profileData.username}
-        avatarUrl={profileData.avatarUrl}
-        spotifyFollowers={profileData.spotifyFollowers}
-        isDefaultUpsell={isDefaultUpsell}
-      />
-    </AuthLayout>
+    <OnboardingCheckoutClient
+      plan={planIntent}
+      monthlyPriceId={pricing.monthlyPriceId}
+      annualPriceId={pricing.annualPriceId}
+      monthlyAmount={pricing.monthlyAmount}
+      annualAmount={pricing.annualAmount}
+      displayName={profileData.displayName}
+      username={profileData.username}
+      avatarUrl={profileData.avatarUrl}
+      spotifyFollowers={profileData.spotifyFollowers}
+      isDefaultUpsell={isDefaultUpsell}
+    />
   );
 }

@@ -29,8 +29,10 @@ test.describe('Tim White Profile Showcase', () => {
       page.getByTestId('tim-white-cards-playlist-fallback')
     ).toHaveAttribute('data-state', 'playlist_fallback');
     await expect(
-      page.getByTestId('tim-white-cards-listen-fallback')
-    ).toHaveAttribute('data-state', 'listen_fallback');
+      page
+        .getByTestId('tim-white-cards-alerts-fallback')
+        .getByTestId('profile-home-alerts-fallback-card')
+    ).toBeVisible();
   });
 
   test('renders the subscribe showcase board', async ({ page }) => {
@@ -83,7 +85,7 @@ test.describe('Tim White Profile Showcase', () => {
     await expect(
       page
         .getByTestId('homepage-phone-state-mock-home')
-        .getByTestId('profile-home-rail-release')
+        .getByTestId('profile-home-primary-action-card')
     ).toHaveAttribute('data-state', 'release_live');
   });
 });

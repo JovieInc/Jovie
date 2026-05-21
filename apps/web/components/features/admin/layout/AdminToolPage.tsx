@@ -1,8 +1,5 @@
 import type { ReactNode } from 'react';
-import { ContentSectionHeader } from '@/components/molecules/ContentSectionHeader';
-import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
-import { PageContent, PageShell } from '@/components/organisms/PageShell';
-import { cn } from '@/lib/utils';
+import { AdminPage } from './AdminPage';
 
 interface AdminToolPageProps {
   readonly title?: string;
@@ -13,6 +10,15 @@ interface AdminToolPageProps {
   readonly className?: string;
 }
 
+/**
+ * @deprecated Use `AdminPage` from `@/components/features/admin/layout/AdminPage` instead.
+ *
+ * `AdminToolPage` is preserved as a thin shim so the 17+ existing admin pages
+ * continue to render while they migrate. New code MUST import `AdminPage`
+ * directly. The deprecation ratchet
+ * (`apps/web/tests/unit/admin-shell-deprecation.test.ts`) enforces that the
+ * importer count of this module only decreases.
+ */
 export function AdminToolPage({
   title,
   description,
@@ -22,29 +28,14 @@ export function AdminToolPage({
   className,
 }: AdminToolPageProps) {
   return (
-    <PageShell>
-      <PageContent noPadding>
-        <div
-          className={cn(
-            'space-y-4 px-(--linear-app-content-padding-x) py-(--linear-app-content-padding-y)',
-            className
-          )}
-          data-testid={testId}
-        >
-          {title || description ? (
-            <ContentSurfaceCard className='overflow-hidden'>
-              <ContentSectionHeader
-                title={title}
-                subtitle={description}
-                actions={actions}
-                className='min-h-0 px-(--linear-app-header-padding-x) py-3'
-                actionsClassName='shrink-0'
-              />
-            </ContentSurfaceCard>
-          ) : null}
-          {children}
-        </div>
-      </PageContent>
-    </PageShell>
+    <AdminPage
+      title={title ?? ''}
+      description={description}
+      actions={actions}
+      testId={testId}
+      className={className}
+    >
+      {children}
+    </AdminPage>
   );
 }

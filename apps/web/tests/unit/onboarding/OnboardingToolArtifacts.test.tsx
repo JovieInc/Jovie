@@ -1,6 +1,7 @@
 import { fireEvent, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
+  formatGenreLabel,
   OnboardingArtistConfirmedCard,
   OnboardingHandleCheckCard,
   OnboardingSocialLinkCard,
@@ -92,6 +93,32 @@ describe('onboarding tool artifacts', () => {
     );
   });
 
+  it('renders Spotify search failures as an actionable retry state', () => {
+    mocks.artistSearch.error =
+      'Request failed due to a temporary server issue. Please try again.';
+    mocks.artistSearch.query = 'Test Artist';
+
+    fastRender(
+      <OnboardingSpotifyArtistPickerCard
+        state='output-available'
+        output={{ action: 'open_artist_picker', query: 'Test Artist' }}
+        onSelectArtist={vi.fn()}
+      />
+    );
+
+    expect(screen.getByText('Spotify search is having trouble')).toBeDefined();
+    expect(
+      screen.getByText('Try again, or paste the Spotify artist link in chat.')
+    ).toBeDefined();
+    expect(screen.queryByText(/Request failed due/u)).toBeNull();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
+
+    expect(mocks.artistSearch.searchImmediate).toHaveBeenCalledWith(
+      'Test Artist'
+    );
+  });
+
   it('renders confirmed Spotify data as a compact artifact', () => {
     fastRender(
       <OnboardingArtistConfirmedCard
@@ -113,9 +140,42 @@ describe('onboarding tool artifacts', () => {
 
     expect(screen.getByTestId('onboarding-artist-confirmed')).toBeDefined();
     expect(screen.getByText('Test Artist')).toBeDefined();
-    expect(screen.getByText('1.2K followers')).toBeDefined();
-    expect(screen.getByText('Popularity 42')).toBeDefined();
+    expect(screen.getByTitle('1,234 Spotify followers')).toBeDefined();
+    expect(screen.getByText('1,234 Spotify followers')).toBeDefined();
+    expect(screen.getByText('1.2K')).toBeDefined();
+    expect(screen.getByTitle('Popularity score: 42 out of 100')).toBeDefined();
+    expect(screen.getByText('Popularity score: 42 out of 100')).toBeDefined();
+    expect(screen.getByText('42')).toBeDefined();
+    expect(screen.getByText('Genre: Indie Pop')).toBeDefined();
+    expect(screen.getByText('Indie Pop')).toBeDefined();
     expect(screen.queryByText('confirmSpotifyArtist')).toBeNull();
+  });
+
+  it('formats genre labels without shouting', () => {
+    expect(formatGenreLabel('progressive house')).toBe('Progressive House');
+    expect(formatGenreLabel('alt-pop')).toBe('Alt-Pop');
+  });
+
+  it('does not render unsafe Spotify profile links', () => {
+    fastRender(
+      <OnboardingArtistConfirmedCard
+        state='output-available'
+        output={{
+          action: 'spotify_artist_confirmed',
+          spotifyArtistId: 'artist-1',
+          artist: {
+            id: 'artist-1',
+            name: 'Test Artist',
+            url: 'javascript:alert(1)',
+            followers: 1_234,
+            popularity: 42,
+            genres: ['indie pop'],
+          },
+        }}
+      />
+    );
+
+    expect(screen.queryByLabelText('Open Test Artist on Spotify')).toBeNull();
   });
 
   it('renders handle availability without leaking the tool name', () => {

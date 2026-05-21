@@ -10,7 +10,7 @@ import {
   waitForNetworkIdle,
 } from './utils/smoke-test-utils';
 
-const REAL_ROUTE = '/app/dashboard/releases';
+const REAL_ROUTE = '/app/releases';
 const DEMO_ROUTE = '/demo/showcase/releases';
 const RELEASES_ROUTE_BUDGET_MS = 12_000;
 

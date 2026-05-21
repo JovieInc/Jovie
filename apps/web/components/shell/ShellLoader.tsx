@@ -1,4 +1,4 @@
-import { BrandLogo } from '@/components/atoms/BrandLogo';
+import { JovieMarkElectric } from '@/components/atoms/JovieMarkElectric';
 import { cn } from '@/lib/utils';
 
 // Cinematic ease — same curve used across the shell for layout-revealing
@@ -47,22 +47,17 @@ export function ShellLoader({
       )}
       style={{
         backgroundColor: isReveal ? 'rgba(6,7,10,0)' : 'rgba(6,7,10,1)',
-        transition: `background-color 480ms ${EASE_CINEMATIC}`,
+        transition: `background-color var(--ds-motion-cinematic-duration) ${EASE_CINEMATIC}`,
       }}
     >
       <div
         style={{
           transform: isReveal ? 'scale(1.08)' : 'scale(1)',
           opacity: isReveal ? 0 : 1,
-          transition: `transform 520ms ${EASE_CINEMATIC}, opacity 380ms ${EASE_CINEMATIC}`,
+          transition: `transform var(--ds-motion-cinematic-duration) ${EASE_CINEMATIC}, opacity var(--ds-motion-cinematic-duration) ${EASE_CINEMATIC}`,
         }}
       >
-        <BrandLogo
-          size={48}
-          rounded={false}
-          className='text-primary-token'
-          aria-hidden
-        />
+        <JovieMarkElectric size={48} spark={!isReveal} />
       </div>
     </div>
   );

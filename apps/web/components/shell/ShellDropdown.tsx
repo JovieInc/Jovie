@@ -110,7 +110,7 @@ const ENTITY_CLOSE_DELAY_MS = 120;
 // ---------------------------------------------------------------------------
 
 const CONTENT_CLASSES = cn(
-  'z-[70] min-w-[--w] max-w-[calc(100vw-16px)]',
+  'z-[90] min-w-[--w] max-w-[calc(100vw-16px)]',
   'rounded-xl border border-(--linear-app-shell-border)',
   'bg-(--linear-app-content-surface)/95 backdrop-blur-xl',
   'shadow-[0_12px_40px_rgba(0,0,0,0.32)] p-1',
@@ -120,7 +120,7 @@ const CONTENT_CLASSES = cn(
   'data-[state=open]:zoom-in-95 data-[state=closed]:zoom-out-95',
   'data-[side=bottom]:slide-in-from-top-1 data-[side=top]:slide-in-from-bottom-1',
   'data-[side=right]:slide-in-from-left-1 data-[side=left]:slide-in-from-right-1',
-  'duration-150 ease-out',
+  'duration-subtle ease-subtle',
   'will-change-transform'
 );
 
@@ -133,7 +133,7 @@ const ROW_BASE = cn(
   'relative flex items-center gap-2.5 h-7 px-2 rounded-md select-none',
   'text-[12.5px] font-caption text-secondary-token',
   'outline-none cursor-default',
-  'transition-colors duration-150 ease-out',
+  'transition-colors duration-subtle ease-subtle',
   // Highlight (hover or keyboard nav) — Radix sets data-highlighted
   'data-[highlighted]:bg-surface-1 data-[highlighted]:text-primary-token',
   // Disabled
@@ -150,7 +150,7 @@ const ROW_SELECTED = cn(
   "before:content-['']",
   'before:absolute before:left-0.5 before:top-1/2 before:-translate-y-1/2',
   'before:h-3.5 before:w-[3px] before:rounded-full',
-  'before:transition-colors before:duration-150 before:ease-out',
+  'before:transition-colors before:duration-subtle before:ease-subtle',
   'before:bg-cyan-300/0',
   'data-[state=checked]:before:bg-cyan-300/85',
   'data-[state=checked]:bg-surface-1/60',
@@ -399,7 +399,7 @@ function FilterInput({
           'flex items-center gap-1.5 h-7 px-2 rounded-md',
           'bg-surface-0/60 border border-transparent',
           'focus-within:border-(--linear-app-shell-border)',
-          'transition-colors duration-150 ease-out'
+          'transition-colors duration-subtle ease-subtle'
         )}
       >
         <Search className='h-3 w-3 text-tertiary-token' strokeWidth={2.25} />
@@ -427,7 +427,7 @@ function FilterInput({
             type='button'
             onClick={() => onChange('')}
             aria-label='Clear filter'
-            className='h-4 px-1 rounded-[3px] inline-flex items-center text-[10px] uppercase tracking-[0.04em] text-tertiary-token hover:text-primary-token hover:bg-surface-1/60 transition-colors duration-150 ease-out'
+            className='h-4 px-1 rounded-[3px] inline-flex items-center text-[10px] uppercase tracking-[0.04em] text-tertiary-token hover:text-primary-token hover:bg-surface-1/60 transition-colors duration-subtle ease-subtle'
           >
             <X className='h-3 w-3' strokeWidth={2.25} />
           </button>
@@ -654,7 +654,7 @@ const ShellDropdownCheckboxItem = forwardRef<
             'h-3.5 w-3.5 shrink-0 grid place-items-center rounded-[3px]',
             'border border-(--linear-app-shell-border)',
             'group-data-[state=checked]:bg-cyan-300/85 group-data-[state=checked]:border-cyan-300/85',
-            'transition-colors duration-150 ease-out'
+            'transition-colors duration-subtle ease-subtle'
           )}
         >
           <DropdownMenuPrimitive.ItemIndicator>

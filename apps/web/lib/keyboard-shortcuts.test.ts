@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { APP_ROUTES } from '@/constants/routes';
 import {
   KEYBOARD_SHORTCUTS,
   NAV_SHORTCUTS,
@@ -97,6 +98,14 @@ describe('keyboard-shortcuts definitions', () => {
       expect(ids).toContain('nav-earnings');
       expect(ids).toContain('nav-chat');
       expect(ids).toContain('nav-settings');
+    });
+
+    it('uses the canonical releases route for release navigation', () => {
+      expect(NAV_SHORTCUTS.releases.href).toBe(APP_ROUTES.RELEASES);
+    });
+
+    it('uses the canonical audience route for audience navigation', () => {
+      expect(NAV_SHORTCUTS.audience.href).toBe(APP_ROUTES.AUDIENCE);
     });
   });
 

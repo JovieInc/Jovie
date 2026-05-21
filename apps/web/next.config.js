@@ -234,6 +234,18 @@ const nextConfig = {
         source: '/(.*)',
         headers: [...securityHeaders, cacheHeaders.revalidate],
       },
+      // Canonical pitch-deck static HTML (apps/web/public/pitch/**) is
+      // embedded as a same-origin iframe from the /pitch wrapper page.
+      // Override X-Frame-Options DENY → SAMEORIGIN for these assets only,
+      // AFTER the catch-all (Next.js merges headers; later rules win).
+      // The wrapper page itself (/pitch) stays DENY via the catch-all.
+      {
+        source: '/pitch/:path+',
+        headers: [
+          { key: 'X-Frame-Options', value: 'SAMEORIGIN' },
+          { key: 'Cache-Control', value: cacheHeaders.immutable.value },
+        ],
+      },
     ];
   },
   async redirects() {
@@ -248,47 +260,14 @@ const nextConfig = {
     ];
 
     const legacyAppRedirects = [
-      { source: '/app/contact', destination: '/app/settings/contacts' },
-      { source: '/app/profile', destination: '/app/chat?panel=profile' },
-      { source: '/app/contacts', destination: '/app/settings/contacts' },
-      {
-        source: '/app/earnings',
-        destination: '/app/settings/artist-profile?tab=earn#pay',
-      },
-      {
-        source: '/app/tipping',
-        destination: '/app/settings/artist-profile?tab=earn#pay',
-      },
-      { source: '/app/tour-dates', destination: '/app/settings/touring' },
       { source: '/app/dashboard', destination: '/app' },
       { source: '/app/dashboard/overview', destination: '/app' },
-      // NOTE: /app/dashboard/earnings intentionally omitted here.
-      // The earnings page.tsx handles auth-aware redirection: unauthenticated
-      // users are sent to /signin?redirect_url=/app/dashboard/earnings so they
-      // return to this deep-link after sign-in, not to the settings page.
-      // Putting a static redirect here bypasses Clerk middleware and sends
-      // unauthenticated users to /app/settings/artist-profile instead of /signin.
-      {
-        source: '/app/dashboard/links',
-        destination: '/app/chat?panel=profile',
-      },
-      {
-        source: '/app/dashboard/tipping',
-        destination: '/app/settings/artist-profile?tab=earn#pay',
-      },
-      {
-        source: '/app/dashboard/profile',
-        destination: '/app/chat?panel=profile',
-      },
+      // NOTE: shell-owned aliases such as /app/profile, /app/tipping,
+      // /app/earnings, /app/contacts, /app/tour-dates, and dashboard profile
+      // aliases are intentionally omitted here. App Router pages handle their
+      // final destination so middleware can preserve the requested deep link
+      // for unauthenticated users.
       { source: '/app/dashboard/chat', destination: '/app/chat' },
-      {
-        source: '/app/dashboard/contacts',
-        destination: '/app/settings/contacts',
-      },
-      {
-        source: '/app/dashboard/tour-dates',
-        destination: '/app/settings/touring',
-      },
       { source: '/app/settings', destination: '/app/settings/account' },
       {
         source: '/app/settings/profile',
@@ -385,13 +364,23 @@ const nextConfig = {
         permanent: true,
       },
       {
+        source: '/sign-up',
+        destination: '/signup',
+        permanent: true,
+      },
+      {
+        source: '/sign-in',
+        destination: '/signin',
+        permanent: true,
+      },
+      {
         source: '/app/analytics',
-        destination: '/app/dashboard/audience',
+        destination: '/app/audience',
         permanent: false,
       },
       {
         source: '/app/dashboard/analytics',
-        destination: '/app/dashboard/audience',
+        destination: '/app/audience',
         permanent: false,
       },
       ...legacyAppRedirects,
@@ -423,25 +412,7 @@ const nextConfig = {
     ];
   },
   async rewrites() {
-    return [
-      // Rewrite /app/* to /app/dashboard/* for cleaner URLs
-      {
-        source: '/app/releases',
-        destination: '/app/dashboard/releases',
-      },
-      {
-        source: '/app/audience',
-        destination: '/app/dashboard/audience',
-      },
-      {
-        source: '/app/insights',
-        destination: '/app/dashboard/insights',
-      },
-      {
-        source: '/app/presence',
-        destination: '/app/dashboard/presence',
-      },
-    ];
+    return [];
   },
   env: {
     // Build-time env vars — these get inlined into client bundles by Next.js
@@ -470,6 +441,15 @@ const nextConfig = {
       }
     })(),
   },
+  // Keep @statsig/statsig-node-core external so Next.js does not webpack-bundle
+  // the NAPI package. When bundled, the hash-prefixed import path that Next.js
+  // generates (`@statsig/statsig-node-core-<hash>`) cannot be resolved at
+  // runtime on Vercel — Vercel file-tracing cannot follow hashed require()
+  // paths to locate the platform-native .node binary. Marking it external
+  // restores the original require path so Vercel's tracer includes the correct
+  // linux-x64 or linux-arm64 binary in the serverless function bundle.
+  // See JOV-2322.
+  serverExternalPackages: ['@statsig/statsig-node-core'],
   experimental: {
     // Note: PPR (ppr: 'incremental') was deprecated in Next.js 15.3
     // cacheComponents: true requires additional configuration, disabled for now

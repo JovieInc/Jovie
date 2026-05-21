@@ -1,6 +1,6 @@
 import { neon } from '@neondatabase/serverless';
 import { type Browser, type BrowserContext, chromium } from '@playwright/test';
-import { APP_ROUTES } from '../constants/routes';
+import { APP_ROUTES, buildReleaseTasksRoute } from '../constants/routes';
 import type {
   PerfResolveContext,
   PerfRouteDefinition,
@@ -90,19 +90,28 @@ async function withResolverTimeout<T>(
 }
 
 function resolveReleaseTasksPathname(pathname: string, search = '') {
-  const releaseTasksPrefix = `${APP_ROUTES.DASHBOARD_RELEASES}/`;
-  if (
-    !pathname.startsWith(releaseTasksPrefix) ||
-    !pathname.endsWith('/tasks')
-  ) {
+  if (!pathname.endsWith('/tasks')) {
     return null;
   }
 
-  const releaseId = pathname
+  const releaseTasksPrefix = [
+    APP_ROUTES.RELEASES,
+    APP_ROUTES.DASHBOARD_RELEASES,
+  ]
+    .map(prefix => `${prefix}/`)
+    .find(prefix => pathname.startsWith(prefix));
+
+  if (!releaseTasksPrefix) {
+    return null;
+  }
+
+  const resolvedReleaseId = pathname
     .slice(releaseTasksPrefix.length, -'/tasks'.length)
     .replace(/^\/+|\/+$/g, '');
 
-  return releaseId ? `${pathname}${search}` : null;
+  return resolvedReleaseId
+    ? `${buildReleaseTasksRoute(resolvedReleaseId)}${search}`
+    : null;
 }
 
 async function queryProfileHandle(handle: string) {
@@ -357,7 +366,7 @@ async function resolveReleaseTasksViaApp(context: PerfResolveContext) {
       });
     }
 
-    await page.goto(`${baseUrl}${APP_ROUTES.DASHBOARD_RELEASES}`, {
+    await page.goto(`${baseUrl}${APP_ROUTES.RELEASES}`, {
       waitUntil: 'domcontentloaded',
     });
 
@@ -377,7 +386,7 @@ async function resolveReleaseTasksViaApp(context: PerfResolveContext) {
 
     const mobileReleaseId = mobileRowTestId?.replace('mobile-release-row-', '');
     if (mobileReleaseId) {
-      return `${APP_ROUTES.DASHBOARD_RELEASES}/${mobileReleaseId}/tasks`;
+      return buildReleaseTasksRoute(mobileReleaseId);
     }
 
     const finalUrl = new URL(page.url());
@@ -501,7 +510,7 @@ export async function resolveChatConversationPerfPath(
 }
 
 export async function resolveReleaseTasksPerfPath(
-  route: PerfRouteDefinition,
+  _route: PerfRouteDefinition,
   context: PerfResolveContext
 ): Promise<string> {
   const sql = getSqlClient();
@@ -551,5 +560,5 @@ export async function resolveReleaseTasksPerfPath(
     throw new Error('No seeded release found for the active E2E user.');
   }
 
-  return replaceRouteToken(route.path, 'releaseId', resolvedReleaseId);
+  return buildReleaseTasksRoute(resolvedReleaseId);
 }

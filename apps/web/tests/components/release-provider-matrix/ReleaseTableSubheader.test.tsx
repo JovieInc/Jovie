@@ -40,13 +40,7 @@ vi.mock('@/components/atoms/Icon', () => ({
   Icon: ({ name }: { name: string }) => <span>{name}</span>,
 }));
 
-vi.mock('@/components/molecules/HeaderSearchAction', () => ({
-  HeaderSearchAction: () => (
-    <button type='button' data-testid='toolbar-search'>
-      Search
-    </button>
-  ),
-}));
+// HeaderSearchAction mock removed — search UI deleted from subheader (duplicate search removal for shell convergence)
 
 vi.mock('@/components/atoms/AppSegmentControl', () => ({
   AppSegmentControl: () => <div data-testid='segment-control' />,
@@ -133,8 +127,6 @@ describe('ReleaseTableSubheader', () => {
         onFiltersChange={() => undefined}
         releaseView='tracks'
         onReleaseViewChange={() => undefined}
-        searchQuery=''
-        onSearchQueryChange={() => undefined}
       />
     );
 
@@ -143,7 +135,7 @@ describe('ReleaseTableSubheader', () => {
     );
   });
 
-  it('orders toolbar controls as search, filters, export, and preview', () => {
+  it('orders toolbar controls as filters, export, and preview (search removed to eliminate duplicate with shell command palette)', () => {
     render(
       <ReleaseTableSubheader
         releases={[] as ReleaseViewModel[]}
@@ -153,13 +145,10 @@ describe('ReleaseTableSubheader', () => {
         onFiltersChange={() => undefined}
         releaseView='tracks'
         onReleaseViewChange={() => undefined}
-        searchQuery=''
-        onSearchQueryChange={() => undefined}
       />
     );
 
     const controls = [
-      screen.getByTestId('toolbar-search'),
       screen.getByRole('button', { name: 'Filters' }),
       screen.getByRole('button', { name: 'Export' }),
       screen.getByTestId('drawer-toggle-button'),

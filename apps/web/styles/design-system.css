@@ -43,6 +43,17 @@
   --profile-drawer-radius-mobile: 24px;
   --profile-drawer-radius-desktop: 20px;
   --profile-action-radius: 14px;
+  --page-pad: clamp(16px, 4vw, 32px);
+  --section-gap: clamp(16px, 3vw, 28px);
+  --card-pad: clamp(14px, 3vw, 24px);
+  --avatar-size: clamp(88px, 22vw, 144px);
+  --cover-height: clamp(320px, min(112vw, 56svh), 500px);
+  --content-max: 720px;
+  --profile-bottom-nav-height: calc(
+    3.5rem +
+    max(12px, env(safe-area-inset-bottom)) +
+    24px
+  );
 
   /* DS_FOUNDATION_V1: canonical semantic aliases (do not redefine downstream) */
   --ds-public-content-max: 1298px; /* canonical public/marketing width */
@@ -68,6 +79,79 @@
   /* Derived base lightness for light mode */
   --theme-base-l: 99%;
   /* Near white for light mode */
+}
+
+.profile-viewport {
+  --page-pad: clamp(16px, 4vw, 32px);
+  --section-gap: clamp(16px, 3vw, 28px);
+  --card-pad: clamp(14px, 3vw, 24px);
+  --avatar-size: clamp(88px, 22vw, 144px);
+  --cover-height: clamp(320px, min(112vw, 56svh), 500px);
+  --content-max: 720px;
+}
+
+.public-profile-layout-frame {
+  height: 100%;
+  max-width: min(100%, var(--content-max));
+  padding-left: max(var(--page-pad), env(safe-area-inset-left));
+  padding-right: max(var(--page-pad), env(safe-area-inset-right));
+}
+
+.public-profile-layout-frame--desktop {
+  max-width: min(
+    100%,
+    calc(var(--profile-shell-max-width) + (var(--page-pad) * 2))
+  );
+  padding-block: clamp(16px, 2vw, 24px);
+}
+
+.public-profile-layout-frame--compact {
+  max-width: min(100%, calc(var(--content-max) + (var(--page-pad) * 2)));
+}
+
+.public-profile-layout-compact-slot {
+  display: flex;
+  height: 100%;
+  min-width: 0;
+  width: 100%;
+  flex-direction: column;
+}
+
+.public-profile-layout-desktop-shell {
+  display: none;
+  min-width: 0;
+  width: 100%;
+}
+
+.public-profile-layout-desktop-placeholder {
+  height: min(940px, calc(100dvh - 48px));
+  width: 100%;
+  overflow: hidden;
+  border-radius: 28px;
+  background: rgba(8, 10, 14, 0.76);
+}
+
+.public-profile-compact-shell {
+  max-width: min(var(--profile-shell-max-width), 100%);
+}
+
+@media (min-width: 768px) {
+  .public-profile-compact-shell {
+    --cover-height: 340px;
+    height: min(740px, calc(100dvh - (var(--page-pad) * 2)));
+  }
+}
+
+@media (min-width: 1180px) {
+  /* Match desktop max-width so SSR compact class produces the same frame width
+     as the JS-switched desktop class, eliminating layout shift on hydration. */
+  .public-profile-layout-frame--compact {
+    max-width: min(
+      100%,
+      calc(var(--profile-shell-max-width) + (var(--page-pad) * 2))
+    );
+    padding-block: clamp(16px, 2vw, 24px);
+  }
 }
 
 :root.dark {
@@ -306,8 +390,8 @@
 
   /* Focus ring — Jovie/Linear keyboard focus token */
   --color-focus-ring: var(--linear-border-focus);
-  --focus-ring-width: 2px;
-  --focus-ring-offset: 2px;
+  --focus-ring-width: 1px;
+  --focus-ring-offset: 0px;
 
   /* Font size scale — extracted from Linear CSS vars (2026-02-17)
      --font-size-micro: 11px, --font-size-mini: 12px, --font-size-small: 13px,
@@ -1261,9 +1345,12 @@
 [data-theme="linear"],
 .linear-marketing {
   /* Marketing typography: Satoshi (display/buttons) + DM Sans (body) */
-  font-family: var(--font-body);
-  --marketing-font-display: var(--font-display);
-  --marketing-font-body: var(--font-body);
+  font-family:
+    var(--font-dm-sans), "DM Sans", -apple-system, "system-ui", sans-serif;
+  --marketing-font-display:
+    var(--font-satoshi), "Satoshi", -apple-system, "system-ui", sans-serif;
+  --marketing-font-body:
+    var(--font-dm-sans), "DM Sans", -apple-system, "system-ui", sans-serif;
 
   /* Map Linear text colors to design system */
   --color-text-primary-token: var(--linear-text-primary);
@@ -1310,21 +1397,46 @@
   letter-spacing: -0.01em;
 }
 
-/* Keyboard focus fallback — tokenized Jovie focus halo instead of the
-   browser's default ring. Uses box-shadow so it inherits the element's
-   border-radius automatically.
-   :where() keeps specificity at 0 so component-level focus styles
-   (Clerk inputs, etc.) keep overriding this default. */
+/* Keyboard focus fallback — canonical visible focus ring (WCAG SC 2.4.7).
+   Design-system consistent recipe used across shell/chrome (smallwin + a11y polish):
+     focus-visible:outline-none
+     focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/55
+     focus-visible:ring-offset-2 focus-visible:ring-offset-(--linear-bg-page)
+   Box-shadow equivalent ensures global application to any :focus-visible without
+   explicit treatment. :where() keeps specificity at 0 so component-level overrides
+   (stronger CTA rings, public-action-*, Clerk, surface-specific offsets, input borders)
+   win cleanly. Eliminates all browser default outline artifacts.
+   Subtle gray ring provides visible keyboard focus on every surface without
+   clashing with Linear/Jovie app accents. Primary marketing CTAs and key actions
+   layer explicit stronger variants on top where emphasis is required. */
 :where(:focus-visible) {
   outline: none;
   box-shadow:
-    0 0 0 var(--focus-ring-width)
-    color-mix(in oklab, var(--color-focus-ring) 58%, transparent),
-    0 0 0 calc(var(--focus-ring-width) + var(--focus-ring-offset))
-    color-mix(in oklab, var(--color-focus-ring) 18%, transparent);
+    0 0 0 2px var(--linear-bg-page),
+    0 0 0 4px color-mix(in oklab, var(--linear-border-focus) 55%, transparent);
   transition:
     box-shadow 150ms cubic-bezier(0.32, 0.72, 0, 1),
     border-color 150ms cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+:where(
+    input,
+    textarea,
+    select,
+    [contenteditable="true"],
+    [role="textbox"]
+  ):focus {
+  outline: none;
+}
+
+:where(
+    input,
+    textarea,
+    select,
+    [contenteditable="true"],
+    [role="textbox"]
+  ):focus-visible {
+  box-shadow: none;
 }
 
 /* ============================================

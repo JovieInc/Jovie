@@ -1,7 +1,11 @@
-import { afterEach, describe, expect, it } from 'vitest';
+import { fireEvent } from '@testing-library/react';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { DashboardData } from '@/app/app/(shell)/dashboard/actions/dashboard-data';
+import { OPEN_COMMAND_PALETTE_EVENT } from '@/components/organisms/command-palette-events';
 import { APP_ROUTES } from '@/constants/routes';
 import {
+  mockRouterPush,
+  mockUseChatConversationsQuery,
   mockUsePathname,
   mockUsePlanGate,
   mockUseTaskStatsQuery,
@@ -22,7 +26,9 @@ describe('DashboardNav', () => {
 
     expect(getByRole('button', { name: 'Profile' })).toBeDefined();
     expect(getByRole('link', { name: 'Releases' })).toBeDefined();
-    expect(getByRole('link', { name: 'Tasks' })).toBeDefined();
+    expect(getByRole('link', { name: 'Tasks' }).getAttribute('href')).toBe(
+      APP_ROUTES.TASKS
+    );
     expect(getByRole('link', { name: 'Audience' })).toBeDefined();
     expect(getByRole('link', { name: 'Library' })).toBeDefined();
     expect(queryByRole('link', { name: 'Earnings' })).toBeNull();
@@ -47,15 +53,64 @@ describe('DashboardNav', () => {
     expect(activeLink.getAttribute('aria-current')).toBe('page');
   });
 
+  it('keeps the legacy releases dashboard alias active', () => {
+    mockUsePathname.mockReturnValueOnce(APP_ROUTES.DASHBOARD_RELEASES);
+    const { getByRole } = renderDashboardNav({ renderFn: fastRender });
+
+    const releasesLink = getByRole('link', { name: 'Releases' });
+    expect(releasesLink.getAttribute('href')).toBe(APP_ROUTES.RELEASES);
+    expect(releasesLink.getAttribute('aria-current')).toBe('page');
+  });
+
+  it('only marks New thread active on the chat root', () => {
+    mockUsePathname.mockReturnValueOnce(`${APP_ROUTES.CHAT}/thread-123`);
+
+    const { getByRole } = renderDashboardNav({
+      renderFn: fastRender,
+      appFlags: { SHELL_CHAT_V1: true },
+    });
+
+    expect(
+      getByRole('link', { name: 'New thread' }).getAttribute('aria-current')
+    ).toBeNull();
+  });
+
+  it('opens the global command palette from Search instead of navigating', () => {
+    const onOpenPalette = vi.fn();
+    globalThis.addEventListener(OPEN_COMMAND_PALETTE_EVENT, onOpenPalette);
+
+    try {
+      const { getByRole, queryByRole } = renderDashboardNav({
+        renderFn: fastRender,
+        appFlags: { DESIGN_V1: true },
+      });
+
+      const searchButton = getByRole('button', { name: 'Search' });
+      expect(queryByRole('link', { name: 'Search' })).toBeNull();
+
+      fireEvent.click(searchButton);
+
+      expect(onOpenPalette).toHaveBeenCalledTimes(1);
+      expect(mockRouterPush).not.toHaveBeenCalled();
+    } finally {
+      globalThis.removeEventListener(OPEN_COMMAND_PALETTE_EVENT, onOpenPalette);
+    }
+  });
+
   it('handles collapsed state', () => {
     const { container } = renderDashboardNav({
       renderFn: fastRender,
       sidebarProps: { defaultOpen: false },
+      appFlags: { DESIGN_V1: true },
     });
 
     const profileButton = container.querySelector('button[aria-pressed]');
     expect(profileButton).toBeTruthy();
     expect(profileButton?.className).toContain('justify-center');
+    expect(mockUseChatConversationsQuery).toHaveBeenCalledWith({
+      limit: 10,
+      enabled: false,
+    });
   });
 
   it('differentiates primary and secondary nav styling', () => {

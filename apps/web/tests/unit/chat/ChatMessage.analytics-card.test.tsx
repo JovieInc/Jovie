@@ -92,10 +92,20 @@ describe('ChatMessage analytics cards', () => {
     fastRender(<ChatMessage {...messageProps} />);
 
     expect(screen.getByTestId('chat-analytics-card')).toBeTruthy();
+    const carousel = screen.getByTestId('chat-analytics-signal-carousel');
+    expect(carousel).toBeTruthy();
+    expect(carousel.className).toContain('md:grid-cols-3');
+    const signalCard = screen.getByTestId('chat-analytics-signal-card');
+    expect(signalCard).toBeTruthy();
+    expect(signalCard.className).toContain('min-w-[min(20rem,84vw)]');
     expect(screen.getByText('Top signals')).toBeTruthy();
     expect(
       screen.getByText('Subscribers are picking up in Chicago')
     ).toBeTruthy();
+    expect(
+      screen.getByText('Send your next release update to that segment.')
+    ).toBeTruthy();
+    expect(screen.queryByText('high')).toBeNull();
   });
 
   it('renders a compact error row for unknown failed tools', () => {

@@ -14,10 +14,15 @@ import {
   initializeDb,
   setInternalDb,
 } from './connection';
-import { isActiveConnectionsRow, isTableExistsRow } from './guards';
+import {
+  isActiveConnectionsRow,
+  isColumnExistsRow,
+  isTableExistsRow,
+} from './guards';
 import { logDbError, logDbInfo } from './logging';
 import { DB_CONFIG, isRetryableError, withRetry } from './retry';
 import type {
+  ColumnExistsRow,
   ConnectionValidationResult,
   HealthCheckResult,
   PerformanceCheckResult,
@@ -26,6 +31,10 @@ import type {
 
 // Cache with TTL for both positive and negative results
 const tableExistenceCache = new Map<
+  string,
+  { exists: boolean; timestamp: number }
+>();
+const columnExistenceCache = new Map<
   string,
   { exists: boolean; timestamp: number }
 >();
@@ -38,6 +47,14 @@ const TABLE_EXISTENCE_CACHE_TTL_MS = 60_000;
 // Neon cold starts can take 10-15s, so use a 15s timeout to avoid false negatives.
 const TABLE_EXISTS_TIMEOUT_MS = 15_000;
 
+function clearExistenceCachesIfDatabaseChanged() {
+  if (env.DATABASE_URL && env.DATABASE_URL !== lastTableExistenceDatabaseUrl) {
+    tableExistenceCache.clear();
+    columnExistenceCache.clear();
+    lastTableExistenceDatabaseUrl = env.DATABASE_URL;
+  }
+}
+
 /**
  * Check if a table exists in the database.
  * Uses a TTL-based cache for both positive and negative results to avoid
@@ -48,11 +65,7 @@ const TABLE_EXISTS_TIMEOUT_MS = 15_000;
  * profile routes while still allowing Neon cold starts. See JOV-1218.
  */
 export async function doesTableExist(tableName: string): Promise<boolean> {
-  // Clear cache if database URL changes
-  if (env.DATABASE_URL && env.DATABASE_URL !== lastTableExistenceDatabaseUrl) {
-    tableExistenceCache.clear();
-    lastTableExistenceDatabaseUrl = env.DATABASE_URL;
-  }
+  clearExistenceCachesIfDatabaseChanged();
 
   // Check cache (both positive and negative results)
   const cached = tableExistenceCache.get(tableName);
@@ -112,6 +125,76 @@ export async function doesTableExist(tableName: string): Promise<boolean> {
     // likely exists but the connection failed transiently.
     if (!isRetryableError(error)) {
       tableExistenceCache.set(tableName, {
+        exists: false,
+        timestamp: Date.now(),
+      });
+    }
+    return false;
+  }
+}
+
+/**
+ * Check if a column exists in a public table.
+ * Uses the same TTL cache, retry, and timeout policy as doesTableExist so
+ * public routes can avoid issuing schema-incompatible writes during rollout.
+ */
+export async function doesColumnExist(
+  tableName: string,
+  columnName: string
+): Promise<boolean> {
+  clearExistenceCachesIfDatabaseChanged();
+
+  const cacheKey = `${tableName}.${columnName}`;
+  const cached = columnExistenceCache.get(cacheKey);
+  if (cached && Date.now() - cached.timestamp < TABLE_EXISTENCE_CACHE_TTL_MS) {
+    return cached.exists;
+  }
+
+  if (!env.DATABASE_URL) {
+    return false;
+  }
+
+  try {
+    const db = getDb();
+    const result = await withRetry(
+      () =>
+        Promise.race([
+          db.execute(
+            drizzleSql<ColumnExistsRow>`
+              SELECT EXISTS (
+                SELECT 1
+                FROM information_schema.columns
+                WHERE table_schema = 'public'
+                  AND table_name = ${tableName}
+                  AND column_name = ${columnName}
+              ) AS column_exists
+            `
+          ),
+          new Promise<never>((_, reject) =>
+            setTimeout(
+              () =>
+                reject(
+                  new Error(
+                    `columnExists timeout after ${TABLE_EXISTS_TIMEOUT_MS}ms`
+                  )
+                ),
+              TABLE_EXISTS_TIMEOUT_MS
+            )
+          ),
+        ]),
+      `columnExists(${cacheKey})`
+    );
+
+    const firstRow = result.rows[0];
+    const exists = isColumnExistsRow(firstRow) ? firstRow.column_exists : false;
+
+    columnExistenceCache.set(cacheKey, { exists, timestamp: Date.now() });
+
+    return exists;
+  } catch (error) {
+    logDbError('columnExists', error, { tableName, columnName });
+    if (!isRetryableError(error)) {
+      columnExistenceCache.set(cacheKey, {
         exists: false,
         timestamp: Date.now(),
       });

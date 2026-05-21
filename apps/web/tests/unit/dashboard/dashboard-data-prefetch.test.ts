@@ -161,6 +161,7 @@ vi.mock('@/lib/db', () => ({
     }),
     execute: vi.fn().mockResolvedValue({}),
   },
+  doesTableExist: vi.fn(async () => false),
 }));
 
 vi.mock('@/lib/db/query-timeout', () => ({
@@ -189,6 +190,7 @@ vi.mock('@/lib/db/schema/auth', () => ({
 vi.mock('@/lib/db/schema/links', () => ({
   socialLinks: {
     creatorProfileId: 'creatorProfileId',
+    isActive: 'isActive',
     state: 'state',
     platformType: 'platformType',
     platform: 'platform',
@@ -196,6 +198,12 @@ vi.mock('@/lib/db/schema/links', () => ({
 }));
 
 vi.mock('@/lib/db/schema/profiles', () => ({
+  creatorDistributionEvents: {
+    createdAt: 'createdAt',
+    creatorProfileId: 'creatorProfileId',
+    eventType: 'eventType',
+    platform: 'platform',
+  },
   creatorProfiles: { userId: 'userId', id: 'id', createdAt: 'createdAt' },
 }));
 

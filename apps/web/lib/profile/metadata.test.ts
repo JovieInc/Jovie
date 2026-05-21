@@ -41,6 +41,10 @@ describe('sanitizeMetadataText', () => {
     expect(sanitizeMetadataText('Hello   world')).toBe('Hello world');
   });
 
+  it('keeps plain text less-than symbols', () => {
+    expect(sanitizeMetadataText('I <3 music')).toBe('I <3 music');
+  });
+
   it('trims leading and trailing whitespace', () => {
     expect(sanitizeMetadataText('  Hello  ')).toBe('Hello');
   });
@@ -59,6 +63,10 @@ describe('sanitizeMetadataText', () => {
     expect(sanitizeMetadataText('<img src=x onerror=alert(1)>Bio text')).toBe(
       'Bio text'
     );
+  });
+
+  it('drops text inside an unterminated tag', () => {
+    expect(sanitizeMetadataText('Visible <broken hidden text')).toBe('Visible');
   });
 
   it('returns plain text unchanged (modulo trim)', () => {
@@ -262,6 +270,21 @@ describe('buildPublicProfileMetadata', () => {
     });
     expect(String(meta.title)).not.toContain('<b>');
     expect(String(meta.title)).toContain('myartist');
+  });
+
+  it('does not fall back to raw username when it sanitizes to empty', () => {
+    const meta = buildPublicProfileMetadata({
+      profile: {
+        ...minimalProfile,
+        username: '<img src=x onerror=alert(1)>',
+        username_normalized: 'artist',
+        display_name: null,
+      },
+      genres: null,
+    });
+
+    expect(meta.title).toBe('Jovie');
+    expect(String(meta.openGraph?.title)).not.toContain('<img');
   });
 
   it('sets alternates.canonical to the normalized profile URL', () => {

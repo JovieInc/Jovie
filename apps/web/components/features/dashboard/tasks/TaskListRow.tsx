@@ -2,8 +2,9 @@
 
 import { UserAvatar } from '@jovie/ui';
 import { Disc3 } from 'lucide-react';
-import type { ReactNode } from 'react';
-import { ReleaseDueBadge } from '@/components/molecules/ReleaseDueBadge';
+import { memo, type ReactNode } from 'react';
+import { ShellListRowFrame } from '@/components/organisms/table';
+import { DueChip } from '@/components/shell/DueChip';
 import type { TaskView } from '@/lib/tasks/types';
 import { getAccentCssVars } from '@/lib/ui/accent-palette';
 import { cn } from '@/lib/utils';
@@ -106,7 +107,7 @@ function TaskAssigneeInline({
   );
 }
 
-export function TaskListRow({
+export const TaskListRow = memo(function TaskListRow({
   task,
   artistName,
   onOpenRelease,
@@ -118,15 +119,12 @@ export function TaskListRow({
   const isCancelled = task.status === 'cancelled';
 
   return (
-    <div
-      data-selected={isSelected ? 'true' : undefined}
+    <ShellListRowFrame
       data-testid={`task-list-row-${task.id}`}
+      isSelected={isSelected}
+      interaction='task-row-group'
       className={cn(
-        'grid h-full min-w-0 grid-cols-[1.25rem_minmax(0,1fr)_4.75rem] items-center gap-3 rounded-xl border border-transparent px-2.5 py-2 transition-[background-color,border-color,box-shadow,opacity]',
-        'group-hover/task-row:bg-[color-mix(in_oklab,var(--linear-row-hover)_72%,transparent)]',
-        'group-focus-visible/task-row:border-[color-mix(in_oklab,var(--linear-border-focus)_58%,transparent)] group-focus-visible/task-row:bg-[color-mix(in_oklab,var(--linear-row-hover)_66%,var(--linear-app-content-surface))] group-focus-visible/task-row:shadow-[inset_0_0_0_1px_var(--linear-border-focus)]',
-        isSelected &&
-          'border-[color-mix(in_oklab,var(--linear-app-frame-seam)_82%,transparent)] bg-[color-mix(in_oklab,var(--linear-row-hover)_66%,var(--linear-app-content-surface))] shadow-[inset_0_0_0_1px_color-mix(in_oklab,var(--color-accent-blue)_12%,transparent),inset_0_1px_0_rgba(255,255,255,0.03)]',
+        'group/row grid h-full grid-cols-[1.25rem_minmax(0,1fr)_auto] items-center gap-3 px-3 py-1.5 transition-[opacity] duration-subtle ease-subtle',
         isDone && !isSelected && 'opacity-75',
         isCancelled && !isSelected && 'opacity-60'
       )}
@@ -167,7 +165,7 @@ export function TaskListRow({
                 event.stopPropagation();
                 onOpenRelease(task);
               }}
-              className='inline-flex min-w-0 max-w-full items-center gap-1 text-secondary-token transition-colors hover:text-primary-token focus-visible:outline-none focus-visible:text-primary-token'
+              className='inline-flex min-w-0 max-w-full items-center gap-1 text-secondary-token transition-colors duration-subtle ease-subtle hover:text-primary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/55 focus-visible:ring-offset-2 focus-visible:ring-offset-(--linear-bg-page) focus-visible:text-primary-token'
               title={task.releaseTitle}
             >
               <Disc3 className='h-3 w-3 shrink-0 text-tertiary-token' />
@@ -177,18 +175,17 @@ export function TaskListRow({
         </div>
       </div>
 
-      <div className='flex min-w-[4.75rem] shrink-0 items-center justify-end gap-1.5'>
-        <div className='flex min-w-0 flex-1 items-center justify-end overflow-hidden'>
+      <div className='flex shrink-0 items-center justify-end gap-1.5'>
+        <div className='flex shrink-0 items-center justify-end'>
           {task.dueAt ? (
-            <ReleaseDueBadge
-              dueDate={task.dueAt}
-              dueDaysOffset={null}
-              isCompleted={isDone || isCancelled}
+            <DueChip
+              dueIso={task.dueAt.toISOString()}
+              muted={isDone || isCancelled}
             />
           ) : null}
         </div>
         <div className='shrink-0'>{actionSlot}</div>
       </div>
-    </div>
+    </ShellListRowFrame>
   );
-}
+});

@@ -20,7 +20,8 @@ import {
   waitForHydration,
 } from './utils/smoke-test-utils';
 
-const PALETTE_INPUT = 'input[placeholder="Jump to a page, thread, or action…"]';
+const PALETTE_INPUT =
+  'input[placeholder="Jump to a page, skill, release, or thread…"]';
 
 test.describe('Command palette — Cmd+K contract', () => {
   test.beforeAll(() => {
@@ -33,7 +34,7 @@ test.describe('Command palette — Cmd+K contract', () => {
     page,
   }) => {
     await ensureSignedInUser(page);
-    await smokeNavigateWithRetry(page, APP_ROUTES.DASHBOARD_RELEASES, {
+    await smokeNavigateWithRetry(page, APP_ROUTES.RELEASES, {
       timeout: 60_000,
     });
     await waitForHydration(page);
@@ -73,5 +74,21 @@ test.describe('Command palette — Cmd+K contract', () => {
     // Escape closes the palette.
     await page.keyboard.press('Escape');
     await expect(page.locator(PALETTE_INPUT)).toBeHidden({ timeout: 5_000 });
+  });
+
+  test('sidebar Search opens the canonical command palette', async ({
+    page,
+  }) => {
+    await ensureSignedInUser(page);
+    await smokeNavigateWithRetry(page, APP_ROUTES.RELEASES, {
+      timeout: 60_000,
+    });
+    await waitForHydration(page);
+
+    await page.getByRole('button', { name: /^Search$/ }).click();
+
+    const paletteInput = page.locator(PALETTE_INPUT);
+    await expect(paletteInput).toBeVisible({ timeout: 10_000 });
+    await expect(paletteInput).toBeFocused();
   });
 });

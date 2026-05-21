@@ -1,25 +1,24 @@
+'use client';
+
 import { ContentSectionHeaderSkeleton } from '@/components/molecules/ContentSectionHeaderSkeleton';
 import { LoadingSkeleton } from '@/components/molecules/LoadingSkeleton';
-import { PageToolbar } from '@/components/organisms/table';
+import {
+  PageToolbar,
+  UnifiedTableSkeleton,
+} from '@/components/organisms/table';
 import { SKELETON_ROW_COUNT, TABLE_ROW_HEIGHTS } from '@/lib/constants/layout';
+import {
+  AUDIENCE_TABLE_CONTAINER_CLASS,
+  AUDIENCE_TABLE_SKELETON_COLUMN_CONFIG,
+  buildAudienceMemberColumns,
+} from './table-config';
 
 const AUDIENCE_LOADING_TAB_KEYS = ['all', 'identified', 'anonymous'] as const;
-const AUDIENCE_TABLE_HEADER_KEYS = Array.from(
-  { length: 7 },
-  (_, i) => `audience-header-${i + 1}`
-);
-const AUDIENCE_TABLE_ROW_KEYS = Array.from(
-  { length: SKELETON_ROW_COUNT.TABLE },
-  (_, i) => `audience-row-${i + 1}`
-);
-const AUDIENCE_TABLE_COL_KEYS = Array.from(
-  { length: 7 },
-  (_, i) => `audience-col-${i + 1}`
-);
 const AUDIENCE_MOBILE_ROW_KEYS = Array.from(
   { length: SKELETON_ROW_COUNT.MOBILE },
   (_, i) => `audience-mobile-${i + 1}`
 );
+const AUDIENCE_LOADING_COLUMNS = buildAudienceMemberColumns('members');
 
 export function AudienceTableLoadingShell() {
   return (
@@ -81,39 +80,15 @@ export function AudienceTableLoadingShell() {
           </div>
 
           <div className='max-sm:hidden flex-1 min-h-0 overflow-hidden'>
-            <div className='px-4 py-4 sm:px-6'>
-              <div className='overflow-hidden rounded-xl border border-subtle bg-(--linear-app-content-surface) shadow-subtle-bottom dark:shadow-inset-highlight'>
-                <div className='grid grid-cols-7 gap-4 border-b border-subtle px-4 py-3'>
-                  {AUDIENCE_TABLE_HEADER_KEYS.map(key => (
-                    <LoadingSkeleton
-                      key={key}
-                      height='h-4'
-                      width='w-24'
-                      rounded='md'
-                    />
-                  ))}
-                </div>
-                <ul>
-                  {AUDIENCE_TABLE_ROW_KEYS.map(rowKey => (
-                    <li
-                      key={rowKey}
-                      className='grid grid-cols-7 items-center gap-4 border-b border-subtle px-4 last:border-b-0'
-                      style={{ height: `${TABLE_ROW_HEIGHTS.STANDARD + 4}px` }}
-                      aria-hidden='true'
-                    >
-                      {AUDIENCE_TABLE_COL_KEYS.map(colKey => (
-                        <LoadingSkeleton
-                          key={`${rowKey}-${colKey}`}
-                          height='h-4'
-                          width='w-full'
-                          rounded='md'
-                        />
-                      ))}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            </div>
+            <UnifiedTableSkeleton
+              columns={AUDIENCE_LOADING_COLUMNS}
+              skeletonRows={SKELETON_ROW_COUNT.TABLE}
+              skeletonColumnConfig={AUDIENCE_TABLE_SKELETON_COLUMN_CONFIG}
+              rowHeight={TABLE_ROW_HEIGHTS.STANDARD}
+              minWidth='800px'
+              className='text-app'
+              containerClassName={AUDIENCE_TABLE_CONTAINER_CLASS}
+            />
           </div>
 
           <div className='sticky bottom-0 z-20 flex flex-wrap items-center justify-between gap-3 border-t border-subtle bg-(--linear-app-content-surface)/95 px-4 py-2 text-xs text-secondary-token backdrop-blur-md sm:px-6 supports-[backdrop-filter]:bg-(--linear-app-content-surface)/85'>

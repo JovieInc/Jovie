@@ -241,24 +241,17 @@ export const SCREENSHOT_SCENARIOS: readonly ScreenshotScenario[] = [
       viewport: 'mobile',
     },
     {
-      id: 'tim-white-profile-tour-nearby-mobile',
-      title: 'Tim White Profile — Nearby Tour',
-      route: '/demo/showcase/tim-white-profile?state=tour-nearby',
-      waitFor: '[data-testid="demo-showcase-tim-white-profile-state"]',
-      viewport: 'mobile',
-    },
-    {
       id: 'tim-white-profile-live-desktop',
       title: 'Tim White Profile — Latest Release Desktop',
       route: '/demo/showcase/tim-white-profile?release=live',
-      waitFor: '[data-testid="profile-desktop-surface"]',
+      waitFor: '[data-testid="profile-compact-shell"]',
       publicExportPath: 'tim-white-profile-live-desktop.png',
     },
     {
       id: 'tim-white-profile-mainstream-desktop',
       title: 'Tim White Profile — Mainstream Desktop',
       route: '/demo/showcase/tim-white-profile?archetype=mainstream',
-      waitFor: '[data-testid="profile-desktop-surface"]',
+      waitFor: '[data-testid="profile-compact-shell"]',
       publicExportPath: 'tim-white-profile-mainstream-desktop.png',
     },
     {
@@ -294,6 +287,38 @@ export const SCREENSHOT_SCENARIOS: readonly ScreenshotScenario[] = [
   ]),
   ...defineScenarios('marketing', ADMIN_MARKETING_AND_INVESTOR, [
     ...TIM_WHITE_PROFILE_MOBILE_VARIANTS.map(timWhiteProfileMobile),
+    {
+      id: 'tim-white-profile-tour-nearby-mobile',
+      title: 'Tim White Profile — Nearby Tour',
+      route: '/demo/showcase/tim-white-profile?state=tour-nearby',
+      waitFor: '[data-testid="demo-showcase-tim-white-profile-state"]',
+      viewport: 'mobile',
+      publicExportPath: 'tim-white-profile-tour-nearby-phone.png',
+    },
+    {
+      id: 'tim-white-profile-alerts-fallback-mobile',
+      title: 'Tim White Profile — Alerts Fallback',
+      route: '/demo/showcase/tim-white-profile?state=alerts-fallback',
+      waitFor: '[data-testid="profile-home-alerts-fallback-card"]',
+      viewport: 'mobile',
+      publicExportPath: 'tim-white-profile-alerts-fallback-phone.png',
+    },
+    {
+      id: 'tim-white-profile-events-empty-mobile',
+      title: 'Tim White Profile — Events Empty',
+      route: '/demo/showcase/tim-white-profile?state=events-empty',
+      waitFor: '[data-testid="tour-drawer-content"]',
+      viewport: 'mobile',
+      publicExportPath: 'tim-white-profile-events-empty-phone.png',
+    },
+    {
+      id: 'tim-white-profile-more-menu-mobile',
+      title: 'Tim White Profile — More Menu',
+      route: '/demo/showcase/tim-white-profile?state=more-menu',
+      waitFor: '[data-testid="profile-menu-drawer"]',
+      viewport: 'mobile',
+      publicExportPath: 'tim-white-profile-more-menu-phone.png',
+    },
     {
       id: 'tim-white-profile-presave-mobile',
       title: 'Tim White Profile — Presave Countdown',
@@ -499,10 +524,13 @@ export const SCREENSHOT_SCENARIOS: readonly ScreenshotScenario[] = [
       id: 'public-profile-desktop',
       title: 'Public Profile',
       route: '/demo/showcase/public-profile',
-      // The desktop-layout switch happens in a useEffect (matchMedia >=1180px)
-      // after first paint. Wait for the desktop surface specifically so the
-      // capture isn't of the pre-hydration phone-shaped fallback.
-      waitFor: '[data-testid="profile-desktop-surface"]',
+      // Wait for the stable profile-compact-shell (always present on the inner
+      // content div rendered by ProfileCompactTemplate via StaticArtistPage for
+      // the demo surfaces). This is the reliable post-hydration marker used for
+      // desktop marketing captures (tim-white live/mainstream + public profile)
+      // across shell waves; avoids pre-hydration phone fallback and stale
+      // data-layout attr after UnifiedSidebar / compact template changes.
+      waitFor: '[data-testid="profile-compact-shell"]',
       publicExportPath: 'profile-desktop.png',
     },
     {

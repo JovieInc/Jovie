@@ -5,6 +5,279 @@
      5|The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
      6|and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.5.36] - 2026-05-21
+
+> Chat home no longer advertises album-art generation when the provider is down or feature-flagged off — the suggestion pill is hidden instead of showing as a disabled button, and the "Draft album-art brief" fallback takes its place. Pro upsells stay visible.
+
+### Changed
+
+- **Chat suggestions: hide unavailable album-art capability (JOV-2524)**: `SuggestedPrompts` now omits the "Generate album art" pill entirely when `albumArtCapability.reasonCode` is `PROVIDER_UNAVAILABLE` or `FEATURE_DISABLED`, surfacing the "Draft album-art brief" suggestion in its place. Plan-gated (`PLAN_UNAVAILABLE`) and onboarding-pending (`PROFILE_REQUIRED`) reasons retain the existing disabled-with-tooltip behavior so the upsell affordance is preserved. Sourced from prod chat audit (JOV-2524).
+
+## [26.5.34.1] - 2026-05-21
+
+> The investor pitch deck at `/pitch` now opens straight into the slides with a quiet presentation chrome instead of the consumer marketing nav, and a handful of slides got line-break and alignment cleanup so headlines stop orphaning words.
+
+### Changed
+
+- **`/pitch` page world-class redesign**: moved the route out of the `(marketing)` group so the marketing header no longer renders above the investor deck. New `apps/web/app/pitch/layout.tsx` is a minimal dark pass-through. `apps/web/app/pitch/page.tsx` is rewritten as a 44px presentation top bar (Jovie wordmark on the left, `Present` and `PDF` chrome links on the right) above a full-bleed iframe that lets the deck's own 16:9 letterboxing create the framing. A mobile fallback below `sm` shows the wordmark, a "Designed for desktop" message, and Download PDF + email CTAs.
+
+### Fixed
+
+- **Pitch deck inline-style cleanup (no copy changes)** in `apps/web/public/pitch/index.html`: removed a broken `width: 100px` on `.suno-title` that was crushing the heading and dropped the font from 150px to 132px so slide 2 stops orphaning "people" onto its own line; removed redundant inline `font-size` + `margin` on the `<span class="dim">` inside `.problem-title`; deleted the empty `<p class="problem-sub">` that was leaving a hairline gap on slide 3; removed a broken `width: 140px` on `.bs-title` that was crushing the bad-solutions headline.
+
+## [26.5.34] - 2026-05-21
+
+> Fixed a layout shift on public artist profile pages that caused Lighthouse CLS scores of 0.317, unblocking the Lighthouse CI gate.
+
+### Fixed
+
+- **[internal] Profile page CLS regression (JOV-2514)**: three `useState` calls in `ProfileCompactTemplate` were initializing with SSR-safe defaults (`'standalone'`, `false`, `'profile'`) and updating via `useEffect` after first paint. At Lighthouse's 1350×940 desktop viewport, the hero switched from ~500px to ~56px tall on `?mode=listen` routes. Converted all three to lazy initializers that read `matchMedia` and `location.search` synchronously on the client, eliminating the post-paint layout shift.
+
+## [26.5.33] - 2026-05-21
+
+> [internal] Removed a duplicate search button from the admin panel header; the sidebar search is now the single entry point for admin search.
+
+### Fixed
+
+- **Admin header duplicate search (JOV-2121)**: removed the `HeaderSearchAction` injection from the three admin table wrappers (`AdminUsersTableUnified`, `AdminReleasesPageWrapper`, `AdminCreatorsPageWrapper`) that duplicated the sidebar's search entry point. `DrawerToggleButton`, `BatchIngestButton`, and `IngestProfileDropdown` are preserved.
+
+## [26.5.32] - 2026-05-21
+
+> [internal] Electron desktop titlebar now has a single unified sidebar toggle and pill-style nav controls, with the sidebar rail correctly aligned to the titlebar column.
+
+### Changed
+
+- **[internal] Electron titlebar unification (JOV-2504)**: sidebar toggle is now the single canonical toggle in Electron mode — the in-sidebar dock button is hidden via CSS when inside the desktop runtime. Back/forward navigation buttons are grouped in a pill-shaped container in the main titlebar cell. Titlebar sidebar-cell `padding-left` is aligned to the shell gap so the column precisely tracks the sidebar rail in shellChatV1 mode. Geometry Playwright tests added to verify DOM structure, no-duplicate-toggle invariant, and sidebar-cell width vs CSS token.
+
+## [26.5.29] - 2026-05-18
+
+> [internal] Profile music/releases scroll is now hardware-accelerated for smooth native-feel scrolling on touch devices.
+
+### Fixed
+
+- **Profile scroll jank (JOV-1983)**: added `touch-action: pan-y`, `will-change: scroll-position`, and `contain: layout style` to all profile scroll containers — compact surface, desktop surface, drawer shell, and the releases list — eliminating scroll jank on iOS and Android.
+
+## [26.5.28] - 2026-05-18
+
+> [internal] Desktop dictation bridge payloads are now validated before the web app trusts them.
+
+### Fixed
+
+- **Desktop dictation bridge hardening (JOV-2402)**: validates `getDictationStatus()` IPC payloads before storing them in renderer state, pins the desktop contract test to the main-process handler registration, and keeps Web Speech feature detection scoped through the shared browser window reference.
+
+## [26.5.27] - 2026-05-18
+
+> [internal] Desktop dictation is now guarded by an explicit Electron bridge so stale desktop builds fail closed instead of showing a broken microphone.
+
+### Fixed
+
+- **Desktop dictation bridge (JOV-2277)**: added a guarded Electron dictation capability probe and preload/main IPC contract. Browser contexts keep the normal Web Speech path, stale Electron builds disable dictation quietly, and the desktop media permission handler now only allows audio-only requests from the trusted Jovie app origin.
+
+## [26.5.26] - 2026-05-17
+
+> First-run cinematic boot: the very first time you land in the app each tab, Jovie greets you with a soft cinematic — logo cinematic fade, gentle reverse spin, frame settles, sidebar slides in, welcome content appears. Subsequent navigations skip straight to the skeleton — no repeat motion.
+
+### Added
+
+- **Cinematic app boot — first-mount-per-tab (JOV-2364)**: new `CinematicAppBoot` organism wraps the `(shell)/layout.tsx` Suspense fallback. On the first shell mount of each browser tab, plays a 2.4s forward-only cinematic over a dark canvas (Jovie mark fades in → reverse spin → mark fades off → frame fades in → sidebar slides in → welcome content fades up). On subsequent shell suspensions in the same tab the cinematic is skipped and the route-specific skeleton renders directly. SSR-safe via a `mounted` guard, honors `prefers-reduced-motion`, and gates per-tab via the `jovie:cinematic-boot-played` sessionStorage flag. Final composed state mirrors the post-resolve `AppShellFrame` so the natural unmount-on-resolve is visually seamless. New atomic vitest suite (5 assertions) covers the gating logic.
+
+## [26.5.25] - 2026-05-17
+
+> [internal] Auth reliability: middleware 503 paths now return HTML for browser navigation, and Sentry rate-limiting uses atomic Redis operations to prevent silent alert suppression.
+
+### Fixed
+
+- **[internal] Middleware 503 paths return HTML for browser requests**: when Clerk auth is degraded and the proxy returns a 503, requests from browsers (identified via `Accept: text/html`) now receive a styled HTML page rather than a JSON error response. This means users who navigate directly to a protected page during a Clerk outage see a readable "service temporarily unavailable" message instead of raw JSON. JSON responses are preserved for API clients and background fetch calls. (JOV-2393)
+- **[internal] Sentry rate-limit is now atomic**: replaced the previous non-atomic `INCR` + `EXPIRE` pair with a single atomic `SET NX EX` operation. The old implementation had a gap where `INCR` succeeded but `EXPIRE` failed, leaving the Redis key without a TTL — this permanently silenced Sentry alerts for that hostname until the key was manually removed. The new implementation writes the key and its 60-second TTL in one operation, eliminating the race. (JOV-2393)
+- **[internal] Waitlist error boundary no longer triggers on Stripe/DB auth errors**: narrowed the `isAuthDegradedError` heuristic from the broad `msg.includes('auth')` (which matched Stripe, JWT, and database auth errors) to `msg.includes('authentication service')`, which is specific to Clerk error messages. (JOV-2393)
+
+## [26.5.24] - 2026-05-17
+
+> The Jovie pitch deck is now available at jov.ie/pitch with a one-click PDF download.
+
+### Added
+
+- **Public pitch deck route at `/pitch`**: 10-slide investor deck reusing the existing slide viewer, with keyboard, swipe, and dot navigation, a fullscreen mode, and a one-click PDF download of the same content. The page is search-engine hidden (NOINDEX) so it only shows up when shared directly. (JOV-2357)
+
+### Fixed
+
+- **Investor portal deck now actually renders**: the slide manifest in the web app's content directory had no slides listed, so both `/investor-portal` and the new `/pitch` route were silently rendering an empty "No slides yet — check back soon" state. Mirrored the 10 canonical slide markdown files plus the updated manifest into `apps/web/content/investors/` so the deck loads everywhere. (JOV-2357)
+
+## [26.5.22] - 2026-05-17
+
+> The empty Ask Jovie screen now wears a soft electric outline of the Jovie mark behind your input — a subtle glow that reads as ambient atmosphere, not chrome.
+
+### Changed
+
+- **Empty chat state — electric Jovie mark backdrop**: replaced the static giant "j" glyph behind the Ask Jovie empty state with a faint outline of the Jovie mark, softened by a radial mask and accented with a slow traveling spark when motion is permitted. Reduced-motion users see the same outline without the spark, preserving the visual idiom. The mark sits at `clamp(220px, 44vw, 440px)` so it scales gracefully from phone to desktop. Reuses canonical design tokens; no new accent colors introduced. Follow-ups tracked as JOV-2364 (first-run-only cinematic boot) and JOV-2365 (reuse `JovieMarkElectric` in other empty/loading surfaces).
+
+## [26.5.21] - 2026-05-17
+
+> [internal] Design polish: stripped banned uppercase tracking eyebrow text from dashboard surfaces and fixed title case in upgrade interstitials.
+
+### Fixed
+
+- [internal] **Remove uppercase tracking eyebrow text from dashboard surfaces (JOV-2250, JOV-2251, JOV-2252, JOV-2249, JOV-2248, JOV-2257, JOV-2258)**: stripped `uppercase tracking-*` Tailwind classes from settings sidebar group labels, ad pixels field labels, profile photo section labels, preview panel section headers, MetadataAgent card headers, and release-plan track number label. Also fixed title case in `ReleasePlanPromptDialog`, `ReleasePlanUpgradeInterstitial`, and `CompactReleasePlanUpgradeCard` headings — "Upgrade to Generate a Release Plan" (not all-caps title case).
+
+## [26.5.15] - 2026-05-16
+
+> [internal] Observability: AI responses now flow into the Braintrust "Jovie" project when the API key is configured, so we can see model traces and run evals against production.
+
+### Added
+
+- [internal] **Braintrust LLM observability**: every Vercel AI SDK call (`streamText`, `generateText`, `generateObject`, `streamObject`) is wrapped through `apps/web/lib/ai/sdk.ts` and every direct Anthropic SDK call goes through `getAnthropicClient()` in `apps/web/lib/ai/anthropic.ts`. Wiring includes `initLogger` in `apps/web/instrumentation.ts` (Node runtime only, fail-open on init), the `braintrust/webpack-loader` rule in `apps/web/next.config.js`, the `braintrust@^3.10.0` dependency, a `BRAINTRUST_API_KEY` slot in `apps/web/lib/env-server-schema.ts`, and an MCP server entry in `.mcp.json` (`https://api.braintrust.dev/mcp`) so agents can query traces. Wrapper functions are lazy so partial `vi.mock('ai')` calls in unit tests don't fault on sibling exports they never invoke.
+
+## [26.5.14] - 2026-05-16
+
+> [internal] Desktop shell identity hardening: added a branded Electron recovery screen and bumped the DMG release version.
+
+### Fixed
+
+- [internal] **Desktop shell identity and failure fallback (JOV-2314)**: Electron launch failures now render a branded Jovie Desktop recovery surface with retry affordance instead of a blank or generic web failure. The desktop app name is set explicitly for production/staging, and the desktop release version is bumped so the next DMG carries the current app-shell identity.
+
+## [26.5.13] - 2026-05-16
+
+> [internal] Security: drop unauthenticated scanner traffic at the edge so off-platform probe URLs no longer reach the page handler or generate observability warnings.
+
+### Fixed
+
+- [internal] Drop unauthenticated scanner traffic at the edge so off-platform probe URLs no longer reach the page handler or generate observability warnings.
+
+## [26.5.11] - 2026-05-16
+
+> [internal] Desktop release bump for the Electron app-shell launch fix and a guard that prevents future desktop code from landing without DMG release handling.
+
+### Fixed
+
+- [internal] **Desktop DMG app-shell release guard (JOV-2295)**: Bumped desktop release metadata so the shipped DMG includes the Electron `/app` launch behavior. Added a CI guard that fails when `apps/desktop/**` changes without either a `VERSION` bump or an explicit update to `.github/workflows/desktop-release.yml`, preventing desktop-only fixes from landing without a publish trigger.
+
+## [26.5.10] - 2026-05-16
+
+> [internal] Bug fix: the onboarding claim endpoint no longer fires twice on a single /start page visit when Clerk's auth state updates mid-effect.
+
+### Fixed
+
+- [internal] **`useOnboardingClaim` duplicate request guard (JOV-2203)**: React 18 re-runs `useEffect` whenever any dependency changes. When Clerk's auth state transitions (`isLoaded false→true`, then `isSignedIn false→true`) on the same `claimTrigger` value, the effect could fire twice before the first `POST /api/onboarding/claim` resolved — sending a duplicate request. Added an `inflightTriggersRef` (`useRef<Set<number>>`) that gates the async work synchronously before the first `await`. The guard is cleared only after the fetch settles, not in the effect cleanup. Three Vitest tests verify: (1) sequential trigger advancement fires exactly once per trigger, (2) concurrent re-renders with a slow in-flight fetch fire exactly once, (3) retrying a signed-in user after chat activity advances the trigger correctly.
+
+## [26.5.9] - 2026-05-16
+
+> [internal] Homepage hydration fix — eliminates React mismatch warning on the homepage workspace section.
+
+### Fixed
+
+- [internal] **Homepage hydration mismatch in `HomepageWorkspaceSection`**: Framer Motion scroll-linked `MotionValue` style props were serialised differently during SSR vs. the initial client render, producing a React hydration warning on every page load. Added an `isMounted` guard so both the server render and the first client paint use `style={undefined}` on `motion.div` and `motion.li`; MotionValues wire up after mount. Also fixes a secondary mismatch for visitors with `prefers-reduced-motion`: `useReducedMotion()` now reads `false` on both server and initial hydration (before mount), matching the SSR output.
+
+## [26.5.8] - 2026-05-16
+
+> [internal] AI Connector v1 — approve/reject/execute backend for the Gmail → Google Calendar booking flow. Closed beta only (flag-gated, default off). Artists never see this; it will be allowlisted for design-partner DJs post-merge.
+
+### Added
+
+- **[internal] Approve endpoint (`POST /api/connectors/suggested-actions/[id]/approve`)**: CAS transition `pending → accepted`, inserts a `workflow_runs` row, returns the new run ID. Idempotent on CAS miss (409).
+- **[internal] Reject endpoint (`POST /api/connectors/suggested-actions/[id]/reject`)**: CAS transition `pending → dismissed`. No follow-up work. Idempotent on CAS miss (409).
+- **[internal] Workflow cron (`POST /api/cron/process-workflow-runs`, every minute)**: Claims up to 20 `pending` runs with a two-step SELECT+CAS UPDATE, processes up to 5 concurrently, fails unknown kinds immediately (fail-closed).
+- **[internal] `executeApprovedAction` executor**: Loads `workflow_runs` row, extracts `approvalId` + `eventPayload` from `stepOutputs`, delegates to `createCalendarEvent`, CAS-transitions `running → completed | failed`.
+- **[internal] Precision eval harness**: 14 scenario fixtures covering booking-confirmed, booking-cancelled, multi-booking, Asia-Pacific, Europe tour, DJ sets, already-present, and edge cases; `precision.test.ts` asserts extraction scores ≥0.9 against all fixtures.
+- **[internal] `ai_connectors_beta` Statsig gate** registered in `contracts.ts`, `registry.ts`, `STATSIG_FEATURE_GATES.md`, and `FEATURE_REGISTRY.md` — default off, closed beta.
+
+## [26.5.7] - 2026-05-16
+
+> [internal] Bug fix: release plan demo page is now reachable in dev and preview without a manual flag override.
+
+### Fixed
+
+- [internal] **Release plan demo page 404 in dev/preview**: `RELEASE_PLAN_DEMO` feature flag now returns `true` in all non-production environments. The flag's `decide()` in `registry.ts` returns `!IS_VERCEL_PRODUCTION`, matching the same env-aware pattern used by `shouldHonorClientFlagOverrides`. Production keeps the flag off (default `false`) and can be unlocked via the DevToolbar or `localStorage` override.
+
+## [26.5.6] - 2026-05-16
+
+> Connect Gmail and Google Calendar to your Jovie account. Once connected, Jovie scans your inbox for confirmed booking emails and proposes calendar events — all reviewable before anything is added.
+
+### Added
+
+- **Gmail + Google Calendar OAuth connector**: Connect your Google accounts from Settings → Connectors. The OAuth flow requests read-only Gmail and Calendar access, stores encrypted tokens, and shows connection status with the connected email address.
+- **AI booking extractor**: New `extractEventSignal` function uses Claude to identify confirmed DJ booking emails from your inbox and extract event details (title, venue, city, dates, confidence score). Prompt-injection defense and Zod-validated structured output prevent malformed data from reaching the UI.
+- **Suggested actions UI**: Extracted events surface as pending action cards on the Connectors settings page. Each card shows event title, dates, venue, rationale, and the source email subject — ready to accept or dismiss.
+- **Token vault**: Encrypted storage layer (`token-vault.ts`) for OAuth access and refresh tokens using AES-256-GCM, with automatic refresh-if-expired logic.
+- **Admin agent runs page**: New `/app/admin/agent-runs/[id]` page for inspecting AI extraction runs, including prompt, token usage, cost, and status.
+- **Dev fixtures**: Dev-only seed endpoint (`/api/dev/connectors/seed-fixtures`) populates mock Gmail and Calendar accounts with realistic booking email fixtures so the extraction pipeline can be tested without real OAuth credentials.
+
+### Fixed
+
+- **[internal] Connector routes use `getCachedAuth()` instead of `auth()` directly**: All connector API routes and the settings page now use the canonical `getCachedAuth()` helper, which supports the dev test-auth bypass. Direct `auth()` calls were crashing the settings page and all connector API routes in the dev environment.
+- **[internal] Static `node:crypto` import in `extract-event-signal.ts`**: Replaced dynamic `require('node:crypto')` inside `buildDigest()` with a static top-level import. The file has `import 'server-only'` making the original edge-runtime concern moot.
+
+## [26.5.5] - 2026-05-16
+
+> Rich chips in chat now render cleanly on the white user bubble, lift artwork from cached release data, and reveal a richer preview on hover. Image attachments use the same chip language, so a message with a release reference and a dragged-in image reads as one coherent strip.
+
+### Fixed
+
+- **Chat user-message chips no longer render as dark rectangles on the white bubble**: `EntityChip` is now surface-aware (`tone='onLight' | 'onDark'`) and uses neutral text with accent-tinted thumbnail/dot/border on light, so release/artist/track/event chips stay readable inside the user bubble without candy-coloring across kinds.
+
+### Changed
+
+- **Rich chips reveal details on hover/tap/focus**: Transcript chips wrap in a popover trigger with full keyboard (Enter/Space/Escape), touch (tap), and pointer-hover (200ms open, 120ms close) affordances. Popover body shows artwork + kind eyebrow + label + compact stats, with an "Open release" CTA when the side-panel flag is enabled.
+- **Image attachments render as inline chips with full-preview popover**: User messages no longer drop a 128×128 grid; pasted/dragged images render as compact `ImageAttachmentChip`s matching the rich-chip visual language, and the full image (max 480×480) appears in a hover/tap popover with filename caption.
+- **Transcript chips lift artwork from already-loaded cache**: New `EntityResolutionProvider` consults `queryClient.getQueryData` for releases and events without triggering fetches, so chips light up with artwork whenever the slash menu has loaded data and degrade gracefully (label + accent dot) when it hasn't or when no provider is mounted (e.g. onboarding chat).
+- **Skill input pills extracted into shared `SkillChip`**: `ChipTray` no longer duplicates ~30 lines of input-pill styling; future chip-style changes touch one place.
+
+## [26.5.4] - 2026-05-16
+
+> Public artist profiles now load roughly 400 KB less JavaScript for anonymous visitors. Faster first paint on every fan-facing profile page.
+
+### Changed
+
+- **Public profile pages skip Clerk auth bundle**: `app/[username]/layout.tsx` now bypasses ClerkProvider on the public profile route, so anonymous visitors no longer download the ~400 KB Clerk JS runtime they never use. Sign-in flows are unaffected — they live in a separate route group with their own provider. The single client-side Clerk consumer in the profile subtree (`ProfileInlineNotificationsCTA`) already degrades gracefully when Clerk is bypassed (JOV-2268).
+
+## [26.5.3] - 2026-05-15
+
+> [internal] Security: fix middleware matcher dot-escape bug that allowed WordPress scanner paths to bypass auth middleware.
+
+### Fixed
+
+- **[internal] Middleware matcher dot-escape (JOV-2236)**: Dots inside the `proxy.ts` matcher pattern were single-escaped (`\.`) which a JS string silently strips to a bare `.` (any-character wildcard). Paths like `/wp-json`, `/wp-json/wp/v2/users`, and `/a-css/foo` bypassed middleware entirely. Fixed by double-escaping to `\\.` so the compiled regex sees literal-dot separators. Added 35 integration tests covering WordPress scanning paths and true static-asset bypass.
+
+## [26.5.2] - 2026-05-15
+
+> [internal] Marketing page performance: remove an unnecessary 68 KB font preload and reduce hero screenshot file size.
+
+### Changed
+
+- **[internal] DM Sans preload removed**: DM Sans is only used in below-fold marketing sections. Setting `preload: false` eliminates a 68 KB early-load hint emitted on every page without affecting visual quality — `display: optional` already suppresses FOUT (JOV-2267).
+- **[internal] Hero screenshot quality reduced**: Homepage hero product screenshots lowered from `quality=100` to `quality=85`. Next.js image compression cuts ~30–40% off JPEG/WebP bytes at this setting with no perceptible quality loss at marketing-page viewing distance (JOV-2264).
+
+## [26.5.1] - 2026-05-15
+
+> [internal] Foundation schema and encrypted token vault for AI connector v1 (OAuth token storage, per-account refresh lock, 8 new tables, 7 new enums). Admin design-system polish: Title Case labels, no ALL-CAPS CSS transforms, and visible metric cards.
+
+### Added
+
+- **[internal] AI Connector schema (v1)**: 8 new Drizzle ORM tables — `connector_accounts`, `connector_sync_states`, `external_objects`, `webhook_deliveries`, `context_facts`, `agent_runs`, `suggested_actions`, `workflow_runs` — plus 7 enums covering connector provider, status, webhook provider, context fact kind, suggested action status, agent run status, and workflow run status.
+- **[internal] Token vault**: `storeTokens`, `loadDecryptedToken`, and `withRefreshLock` helpers encrypt OAuth tokens at rest (AES-256-GCM) and implement a row-level CAS refresh lock in `connector_sync_states` to prevent concurrent token refreshes per account.
+- **[internal] Idempotent migration 0048**: All `CREATE TYPE` and `CREATE TABLE` statements are wrapped in `IF NOT EXISTS` guards so the migration is safe to replay.
+
+### Fixed
+
+- **[internal] Admin KPI label casing**: LeadGtmInsights KpiItem titles corrected from ALL-CAPS to Title Case per design-system rules (JOV-2170).
+- **[internal] Admin uppercase CSS utility removed**: Dropped `uppercase tracking-[0.08em]` from GtmFunnel section sub-labels and TimActionRequiredSection issue identifier/priority badge, which were visually forcing Title Case strings to ALL-CAPS (JOV-2171).
+- **[internal] ContentMetricCard surface elevation**: Removed `bg-surface-0 shadow-none` override from ContentMetricCard usage in GrowthStatusPanel (4 cards) and CampaignSettingsPanel (1 card) — those cards sit inside a surface-1 parent and were invisible without a visible background and border (JOV-2172).
+
+## [26.5.0] - 2026-05-15
+
+> Chat now uses the dark app-native composer across shell surfaces, with hardened focus, picker, attachment, and typed-entity states.
+
+### Changed
+
+- **Chat composer surface and controls**: Replaced the white command-style composer with a dark System B surface, two-zone text/toolbar layout, stable 36px controls, corrected focus affordances, bounded multiline autosize, inline structured chips, and Geist-accented entity chips.
+- **App shell chat chrome**: Aligned the Electron titlebar controls with the Codex-style back/forward layout, moved New thread into the sidebar navigation, tightened chat message presentation, and removed assistant avatars from the chat transcript.
+- **Attachment and picker polish**: Hardened the attachment menu, slash picker, entity picker, and dropzone layering so menus float without clipping and composer layout remains stable across empty, typing, mobile, and compact states.
+
+### Fixed
+
+- **Textarea focus-ring leakage**: Suppressed raw textarea focus outlines in chat and task document fields while preserving compound-widget focus states at the containing surface.
+- **Chat shell loading and thinking states**: Added a dark conversation-loading skeleton, smoother pending/thinking placeholders, verbose dev-only tool state output, and stable drag cursors for Kanban/task cards.
+- **Composer regression coverage**: Expanded unit and Playwright coverage for focus preservation, button states, chip layout, text contrast, picker ARIA paths, attachment clipping, and mobile composer geometry.
+
 ## [26.4.248] - 2026-05-14
 
 > Onboarding now opens in the canonical app-shell chat front door with hardened tool artifacts, picker stability, and performance gates.

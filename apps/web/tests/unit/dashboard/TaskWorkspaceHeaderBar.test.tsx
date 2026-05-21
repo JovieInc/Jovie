@@ -17,32 +17,90 @@ vi.mock('@jovie/ui', () => ({
   ),
 }));
 
-vi.mock('@/components/molecules/AppSearchField', () => ({
-  AppSearchField: ({
-    value,
-    onChange,
-    ariaLabel,
-    placeholder,
-  }: {
-    readonly value: string;
-    readonly onChange: (value: string) => void;
-    readonly ariaLabel: string;
-    readonly placeholder?: string;
-  }) => (
-    <input
-      aria-label={ariaLabel}
-      value={value}
-      placeholder={placeholder}
-      onChange={event => onChange(event.target.value)}
-    />
-  ),
-}));
-
 vi.mock('@/components/molecules/filters', () => ({
   TableFilterDropdown: () => <button type='button'>Filters</button>,
 }));
 
+vi.mock('@/components/molecules/HeaderSearchAction', () => ({
+  HeaderSearchAction: ({
+    searchValue,
+    onSearchValueChange,
+    onClearAction,
+    ariaLabel,
+    submitAriaLabel,
+    placeholder,
+  }: {
+    readonly searchValue: string;
+    readonly onSearchValueChange: (value: string) => void;
+    readonly onClearAction?: () => void;
+    readonly ariaLabel: string;
+    readonly submitAriaLabel: string;
+    readonly placeholder: string;
+  }) =>
+    searchValue.length > 0 ? (
+      <div>
+        <input
+          type='search'
+          value={searchValue}
+          onChange={event => onSearchValueChange(event.target.value)}
+          placeholder={placeholder}
+          aria-label={ariaLabel}
+        />
+        <button type='button' aria-label='Close search' onClick={onClearAction}>
+          Close search
+        </button>
+      </div>
+    ) : (
+      <button type='button' aria-label={submitAriaLabel}>
+        Search
+      </button>
+    ),
+}));
+
+vi.mock('@/components/molecules/tab-bar/TabBar', () => ({
+  TabBar: ({
+    value,
+    onValueChange,
+    options,
+    ariaLabel,
+  }: {
+    readonly value: string;
+    readonly onValueChange: (value: string) => void;
+    readonly options: ReadonlyArray<{
+      readonly value: string;
+      readonly label: ReactNode;
+    }>;
+    readonly ariaLabel: string;
+  }) => (
+    <div role='tablist' aria-label={ariaLabel}>
+      {options.map(option => (
+        <button
+          key={option.value}
+          type='button'
+          role='tab'
+          aria-selected={value === option.value}
+          onClick={() => onValueChange(option.value)}
+        >
+          {option.label}
+        </button>
+      ))}
+    </div>
+  ),
+}));
+
 vi.mock('@/components/organisms/table', () => ({
+  PageToolbar: ({
+    start,
+    end,
+  }: {
+    readonly start: ReactNode;
+    readonly end?: ReactNode;
+  }) => (
+    <div>
+      <div>{start}</div>
+      <div>{end}</div>
+    </div>
+  ),
   PageToolbarActionButton: ({
     ariaLabel,
     label,
@@ -58,9 +116,25 @@ vi.mock('@/components/organisms/table', () => ({
   ),
 }));
 
+vi.mock('@/components/organisms/table/molecules/DisplayMenuDropdown', () => ({
+  DisplayMenuDropdown: ({
+    trigger,
+    onViewModeChange,
+  }: {
+    readonly trigger: ReactNode;
+    readonly onViewModeChange?: (viewMode: 'board' | 'list') => void;
+  }) => (
+    <div>
+      {trigger}
+      <button type='button' onClick={() => onViewModeChange?.('list')}>
+        List view
+      </button>
+    </div>
+  ),
+}));
+
 function createBaseProps() {
   return {
-    search: '',
     draftTitle: '',
     taskCount: 2,
     subviews: [
@@ -70,17 +144,21 @@ function createBaseProps() {
     ],
     activeSubview: 'all',
     onSubviewChange: vi.fn(),
-    onSearchChange: vi.fn(),
     onDraftTitleChange: vi.fn(),
-    onEnterSearch: vi.fn(),
-    onExitSearch: vi.fn(),
     onCancelCreate: vi.fn(),
     onSubmitCreate: vi.fn((event: FormEvent<HTMLFormElement>) =>
       event.preventDefault()
     ),
     createPending: false,
+    searchValue: '',
+    onSearchValueChange: vi.fn(),
+    onClearSearch: vi.fn(),
     filterCategories: [],
     onClearFilters: vi.fn(),
+    viewMode: 'board',
+    onViewModeChange: vi.fn(),
+    showCancelledColumn: false,
+    onShowCancelledColumnChange: vi.fn(),
     showTaskNavigation: false,
     canSelectPrevious: false,
     canSelectNext: false,
@@ -109,6 +187,9 @@ describe('TaskWorkspaceHeaderBar', () => {
       screen.getByRole('button', { name: 'Search tasks' })
     ).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Filters' })).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'Display options' })
+    ).toBeInTheDocument();
   });
 
   it('emits subview changes from the compact tab strip', () => {
@@ -121,18 +202,30 @@ describe('TaskWorkspaceHeaderBar', () => {
     expect(props.onSubviewChange).toHaveBeenCalledWith('jovie');
   });
 
-  it('renders search mode controls without reintroducing the divider', () => {
+  it('emits display mode changes from the display menu trigger', () => {
     const props = createBaseProps();
 
-    render(<TaskWorkspaceHeaderBar {...props} mode='search' />);
+    render(<TaskWorkspaceHeaderBar {...props} mode='default' />);
 
-    const subheader = screen.getByTestId('tasks-workspace-subheader');
-    expect(subheader).not.toHaveClass('border-b');
-    expect(screen.getByRole('textbox', { name: 'Search tasks' })).toHaveValue(
-      ''
+    fireEvent.click(screen.getByRole('button', { name: 'List view' }));
+
+    expect(props.onViewModeChange).toHaveBeenCalledWith('list');
+  });
+
+  it('emits compact task search changes and clears the field', () => {
+    const props = createBaseProps();
+
+    render(
+      <TaskWorkspaceHeaderBar {...props} mode='default' searchValue='press' />
     );
+
+    fireEvent.change(screen.getByRole('searchbox', { name: 'Search tasks' }), {
+      target: { value: 'metadata' },
+    });
     fireEvent.click(screen.getByRole('button', { name: 'Close search' }));
-    expect(props.onExitSearch).toHaveBeenCalledTimes(1);
+
+    expect(props.onSearchValueChange).toHaveBeenCalledWith('metadata');
+    expect(props.onClearSearch).toHaveBeenCalledTimes(1);
   });
 
   it('renders create mode controls and submits the draft form', () => {

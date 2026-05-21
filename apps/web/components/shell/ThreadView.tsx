@@ -95,9 +95,9 @@ export function ThreadView({
         onScroll={checkAtBottom}
         className='absolute inset-0 overflow-y-auto'
       >
-        <div className='max-w-3xl mx-auto px-8 pt-6 pb-32'>
+        <div className='mx-auto w-full max-w-[44rem] px-(--linear-app-header-padding-x) pb-[9rem] pt-5 sm:pt-6'>
           <header>
-            <h1 className='text-[24px] font-semibold leading-tight text-primary-token tracking-[-0.018em]'>
+            <h1 className='text-[24px] font-semibold leading-tight text-primary-token'>
               {thread.title}
             </h1>
             {thread.entityKind && thread.entityId && (
@@ -116,17 +116,17 @@ export function ThreadView({
 
       <div
         aria-hidden='true'
-        className='pointer-events-none absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-(--linear-app-content-surface) via-(--linear-app-content-surface)/80 to-transparent'
+        className='pointer-events-none absolute inset-x-0 bottom-0 h-28 bg-gradient-to-t from-(--linear-app-content-surface) via-(--linear-app-content-surface)/80 to-transparent'
       />
       <div className='absolute inset-x-0 bottom-0'>
-        <div className='relative max-w-3xl mx-auto px-8 pb-4'>
+        <div className='relative mx-auto w-full max-w-[44rem] px-(--linear-app-header-padding-x) pb-[calc(1rem+env(safe-area-inset-bottom))]'>
           {!atBottom && (
             <button
               type='button'
               onClick={scrollToBottom}
               aria-label='Scroll to bottom'
               className={cn(
-                'absolute left-1/2 -translate-x-1/2 -top-10 h-8 w-8 rounded-full grid place-items-center text-secondary-token bg-(--linear-app-content-surface) border border-(--linear-app-shell-border) shadow-[0_2px_8px_rgba(0,0,0,0.18)] hover:text-primary-token hover:bg-surface-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-token transition-all duration-200 ease-out z-10'
+                'absolute left-1/2 -top-10 z-10 grid h-8 w-8 -translate-x-1/2 place-items-center rounded-full border border-(--linear-app-shell-border) bg-(--linear-app-content-surface) text-secondary-token shadow-popover transition-colors duration-subtle ease-subtle hover:bg-surface-1 hover:text-primary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/55'
               )}
             >
               <ArrowDown className='h-3.5 w-3.5' strokeWidth={2.25} />

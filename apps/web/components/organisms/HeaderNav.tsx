@@ -35,6 +35,7 @@ export interface HeaderNavProps {
   readonly includePublicLoginInMobileNav?: boolean;
   readonly mobilePublicCtaHref?: string;
   readonly mobilePublicCtaLabel?: string;
+  readonly publicCtaLabel?: string;
   readonly presentation?: 'default' | 'homepage-embedded' | 'marketing-glass';
   readonly flyoutMenus?: readonly HeaderFlyoutMenu[];
   readonly showContactLink?: boolean;
@@ -54,11 +55,13 @@ export interface HeaderFlyoutMenu {
 type PublicAuthActionsProps = Readonly<{
   readonly minimal?: boolean;
   readonly minimalVariant?: 'link' | 'pill';
+  readonly publicCtaLabel?: string;
 }>;
 
 function PublicAuthActions({
   minimal = false,
   minimalVariant = 'link',
+  publicCtaLabel = 'Request Access',
 }: PublicAuthActionsProps = {}) {
   if (minimal) {
     if (minimalVariant === 'pill') {
@@ -89,15 +92,16 @@ function PublicAuthActions({
           className: 'focus-ring-themed shrink-0 whitespace-nowrap',
         })}
       >
-        Request Access
+        {publicCtaLabel}
       </Link>
     </div>
   );
 }
 
 function GlassAuthActions({
+  publicCtaLabel = 'Start Free Trial',
   showContactLink = true,
-}: Readonly<{ showContactLink?: boolean }>) {
+}: Readonly<{ publicCtaLabel?: string; showContactLink?: boolean }>) {
   return (
     <div className='flex items-center gap-1'>
       {showContactLink ? (
@@ -118,7 +122,7 @@ function GlassAuthActions({
         href={APP_ROUTES.SIGNUP}
         className='marketing-glass-header__cta focus-ring-themed'
       >
-        Start Free Trial
+        {publicCtaLabel}
       </Link>
     </div>
   );
@@ -155,15 +159,29 @@ function MarketingGlassFlyout({
   menu: HeaderFlyoutMenu;
   open: boolean;
 }>) {
+  const [animateOpen, setAnimateOpen] = useState(false);
+
+  useEffect(() => {
+    if (!open) {
+      setAnimateOpen(false);
+      return;
+    }
+
+    const frame = requestAnimationFrame(() => setAnimateOpen(true));
+    return () => cancelAnimationFrame(frame);
+  }, [open]);
+
+  if (!open) {
+    return null;
+  }
+
   return (
     <div
       id={`marketing-header-flyout-${menu.id}`}
       className={cn(
         'marketing-glass-header__flyout',
-        open && 'marketing-glass-header__flyout--open'
+        animateOpen && 'marketing-glass-header__flyout--open'
       )}
-      aria-hidden={!open}
-      inert={!open}
     >
       <div className='marketing-glass-header__flyout-inner'>
         <p className='marketing-glass-header__flyout-heading'>{menu.heading}</p>
@@ -173,7 +191,6 @@ function MarketingGlassFlyout({
               href={link.href}
               key={`${menu.id}-${link.label}`}
               className='marketing-glass-header__flyout-link focus-ring-themed'
-              tabIndex={open ? undefined : -1}
             >
               <span
                 className='marketing-glass-header__flyout-number'
@@ -268,6 +285,7 @@ export function HeaderNav({
   includePublicLoginInMobileNav = true,
   mobilePublicCtaHref,
   mobilePublicCtaLabel,
+  publicCtaLabel,
   presentation = 'default',
   flyoutMenus,
   showContactLink = true,
@@ -551,11 +569,15 @@ export function HeaderNav({
             )}
           >
             {authMode === 'public-static' && isMarketingGlass ? (
-              <GlassAuthActions showContactLink={showContactLink} />
+              <GlassAuthActions
+                publicCtaLabel={publicCtaLabel}
+                showContactLink={showContactLink}
+              />
             ) : authMode === 'public-static' ? (
               <PublicAuthActions
                 minimal={minimalAuth}
                 minimalVariant={minimalAuthVariant}
+                publicCtaLabel={publicCtaLabel}
               />
             ) : (
               <AuthActions />

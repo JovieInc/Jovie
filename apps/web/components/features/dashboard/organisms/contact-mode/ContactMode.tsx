@@ -11,7 +11,7 @@ import {
 } from '@jovie/ui';
 import { Mail, Phone } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import { useCallback } from 'react';
+import { memo, useCallback } from 'react';
 import { toast } from 'sonner';
 import { ContentSectionHeader } from '@/components/molecules/ContentSectionHeader';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
@@ -34,7 +34,7 @@ interface ContactListItemProps {
   readonly onCopyPhone: (phone: string) => void;
 }
 
-function ContactListItem({
+const ContactListItem = memo(function ContactListItem({
   contact,
   onCopyEmail,
   onCopyPhone,
@@ -58,7 +58,7 @@ function ContactListItem({
   return (
     <ContextMenu>
       <ContextMenuTrigger asChild>
-        <ContentSurfaceCard className='group flex items-center justify-between gap-4 px-4 py-3 transition-[background-color,border-color,box-shadow] duration-150 hover:border-default hover:bg-surface-1'>
+        <ContentSurfaceCard className='group flex items-center justify-between gap-4 px-4 py-3 transition-[background-color,border-color,box-shadow] duration-subtle ease-subtle hover:border-default hover:bg-surface-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/55 focus-visible:ring-offset-2 focus-visible:ring-offset-(--linear-bg-page)'>
           <div className='min-w-0 flex-1'>
             <div className='flex items-center gap-2'>
               <p className='text-app font-caption text-primary-token'>
@@ -82,7 +82,7 @@ function ContactListItem({
                   size='sm'
                   variant='ghost'
                   asChild
-                  className='h-8 w-8 p-0 text-tertiary-token hover:bg-surface-2 hover:text-primary-token'
+                  className='h-8 w-8 p-0 text-tertiary-token transition-[color,background-color] duration-subtle ease-subtle hover:bg-surface-2 hover:text-primary-token focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)/50 focus-visible:ring-offset-1'
                   title={`Email ${contact.email}`}
                 >
                   <a href={emailHref ?? '#'}>
@@ -96,7 +96,7 @@ function ContactListItem({
                   size='sm'
                   variant='ghost'
                   asChild
-                  className='h-8 w-8 p-0 text-tertiary-token hover:bg-surface-2 hover:text-primary-token'
+                  className='h-8 w-8 p-0 text-tertiary-token transition-[color,background-color] duration-subtle ease-subtle hover:bg-surface-2 hover:text-primary-token focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)/50 focus-visible:ring-offset-1'
                   title={`Call ${contact.phone}`}
                 >
                   <a href={phoneHref ?? '#'}>
@@ -135,7 +135,7 @@ function ContactListItem({
       </ContextMenuContent>
     </ContextMenu>
   );
-}
+});
 
 export function ContactMode({
   artistName,

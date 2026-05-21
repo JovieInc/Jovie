@@ -27,12 +27,27 @@ export const alignment = {
 // Row Selection Colors — aligned with Linear design tokens
 export const selection = {
   unchecked:
-    'hover:bg-(--linear-row-hover) focus-within:bg-(--linear-row-hover) transition-[background-color,box-shadow] duration-150',
+    'hover:bg-(--linear-row-hover) focus-within:bg-(--linear-row-hover) transition-[background-color,box-shadow] duration-subtle',
   checked:
     'bg-(--linear-row-selected) hover:bg-(--linear-row-selected) focus-within:bg-(--linear-row-selected) shadow-[inset_0_0_0_1px_color-mix(in_oklab,var(--linear-border-focus)_28%,transparent)]',
   selected:
     'bg-(--linear-row-selected) shadow-[inset_0_0_0_1px_color-mix(in_oklab,var(--linear-border-focus)_24%,transparent)]',
   hover: 'hover:bg-(--linear-row-hover)',
+} as const;
+
+export const rowState = {
+  base: 'transition-[background-color,box-shadow] duration-subtle ease-out',
+  hover: 'hover:bg-(--linear-row-hover)',
+  focusVisible:
+    'focus-visible:outline-none focus-visible:bg-(--linear-row-hover) focus-visible:shadow-[inset_0_0_0_1px_color-mix(in_oklab,var(--linear-border-focus)_45%,transparent)]',
+  focusWithin:
+    'focus-within:bg-(--linear-row-hover) focus-within:shadow-[inset_0_0_0_1px_color-mix(in_oklab,var(--linear-border-focus)_45%,transparent)]',
+  focused:
+    'bg-(--linear-row-hover) shadow-[inset_0_0_0_1px_color-mix(in_oklab,var(--linear-border-focus)_35%,transparent)]',
+  selected:
+    'bg-(--linear-row-selected) hover:bg-(--linear-row-selected) shadow-[inset_0_0_0_1px_color-mix(in_oklab,var(--linear-border-focus)_24%,transparent)]',
+  checked:
+    'bg-(--linear-row-selected) hover:bg-(--linear-row-selected) shadow-[inset_0_0_0_1px_color-mix(in_oklab,var(--linear-border-focus)_28%,transparent)]',
 } as const;
 
 // Icon Colors (use CSS variables where possible)
@@ -51,9 +66,9 @@ export const zIndex = {
 
 // Transition Timings — Linear uses 160ms cubic-bezier for bg
 export const transitions = {
-  fast: 'transition-colors duration-100 ease-out',
-  standard: 'transition-colors duration-150 ease-out',
-  slow: 'transition-colors duration-300 ease-out',
+  fast: 'transition-colors duration-fast ease-out',
+  standard: 'transition-colors duration-subtle ease-out',
+  slow: 'transition-colors duration-slow ease-out',
 } as const;
 
 // Column Widths (Standard)
@@ -135,9 +150,10 @@ export const presets = {
   tableRow: cn(
     alignment.rowHeight,
     'border-b border-[color-mix(in_oklab,var(--linear-app-frame-seam)_60%,transparent)]',
-    selection.unchecked,
-    'last:border-b-0',
-    'focus-within:shadow-[inset_0_0_0_1px_color-mix(in_oklab,var(--linear-border-focus)_45%,transparent)]'
+    rowState.base,
+    rowState.hover,
+    rowState.focusWithin,
+    'last:border-b-0'
   ),
   tableCell: cn(alignment.cellPadding, typography.cellPrimary, 'align-middle'),
   tableHeader: cn(alignment.headerPadding, typography.tableHeader, 'text-left'),

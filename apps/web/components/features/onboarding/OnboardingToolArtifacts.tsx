@@ -5,13 +5,16 @@ import {
   AtSign,
   Check,
   ExternalLink,
+  Gauge,
   Link2,
   Loader2,
   Search,
+  Users,
 } from 'lucide-react';
 import Image from 'next/image';
 import type { ReactNode } from 'react';
 import { useEffect, useMemo, useState } from 'react';
+import { SocialIcon } from '@/components/atoms/SocialIcon';
 import type { SpotifyArtistResult } from '@/lib/contracts/api';
 import { useArtistSearchQuery } from '@/lib/queries/useArtistSearchQuery';
 import { useHandleAvailabilityQuery } from '@/lib/queries/useHandleAvailabilityQuery';
@@ -78,17 +81,94 @@ function isFailed(state: ToolState): boolean {
   return state === 'output-error' || state === 'output-denied';
 }
 
-function formatFollowers(count: number | null | undefined): string | null {
+export function formatCompactCount(
+  count: number | null | undefined
+): string | null {
   if (typeof count !== 'number' || !Number.isFinite(count)) return null;
-  if (count >= 1_000_000) return `${(count / 1_000_000).toFixed(1)}M followers`;
-  if (count >= 1_000) return `${(count / 1_000).toFixed(1)}K followers`;
-  return `${count.toLocaleString('en-US')} followers`;
+  if (count >= 1_000_000) return `${(count / 1_000_000).toFixed(1)}M`;
+  if (count >= 1_000) return `${(count / 1_000).toFixed(1)}K`;
+  return count.toLocaleString('en-US');
+}
+
+export function formatExactCount(
+  count: number | null | undefined
+): string | null {
+  if (typeof count !== 'number' || !Number.isFinite(count)) return null;
+  return count.toLocaleString('en-US');
+}
+
+export function formatGenreLabel(genre: string): string {
+  return genre
+    .trim()
+    .replaceAll(/\s+/g, ' ')
+    .split(' ')
+    .map(word =>
+      word
+        .split('-')
+        .map(part =>
+          part
+            ? `${part.charAt(0).toUpperCase()}${part.slice(1).toLowerCase()}`
+            : part
+        )
+        .join('-')
+    )
+    .join(' ');
+}
+
+function formatFollowers(count: number | null | undefined): string | null {
+  const compact = formatCompactCount(count);
+  return compact ? `${compact} followers` : null;
+}
+
+function getArtistSearchFailureCopy(error: string | null): {
+  title: string;
+  body: string;
+} {
+  const normalizedError = error?.toLowerCase() ?? '';
+
+  if (normalizedError.includes('too many')) {
+    return {
+      title: 'Too many Spotify searches',
+      body: 'Give it a moment, then try again.',
+    };
+  }
+
+  if (
+    normalizedError.includes('unavailable') ||
+    normalizedError.includes('temporary') ||
+    normalizedError.includes('server')
+  ) {
+    return {
+      title: 'Spotify search is having trouble',
+      body: 'Try again, or paste the Spotify artist link in chat.',
+    };
+  }
+
+  return {
+    title: 'Spotify search did not finish',
+    body: 'Check the artist name and try again.',
+  };
 }
 
 function hostnameFor(url: string | undefined): string | null {
   if (!url) return null;
   try {
     return new URL(url).hostname.replace(/^www\./, '');
+  } catch {
+    return null;
+  }
+}
+
+export function getSafeSpotifyArtistUrl(
+  url: string | null | undefined
+): string | null {
+  if (!url) return null;
+  try {
+    const parsed = new URL(url);
+    if (parsed.protocol !== 'https:') return null;
+    if (parsed.hostname !== 'open.spotify.com') return null;
+    if (!parsed.pathname.startsWith('/artist/')) return null;
+    return parsed.toString();
   } catch {
     return null;
   }
@@ -120,9 +200,9 @@ function StatusShell({
       <div className='flex items-start gap-3'>
         <span
           className={cn(
-            'mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-subtle bg-surface-0 text-secondary-token',
-            tone === 'error' && 'border-red-500/20 text-red-400',
-            tone === 'success' && 'border-green-500/20 text-green-500'
+            'mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center text-secondary-token',
+            tone === 'error' && 'text-red-400',
+            tone === 'success' && 'text-green-500'
           )}
         >
           {icon}
@@ -192,6 +272,40 @@ function ArtistAvatar({
   );
 }
 
+function MetadataChip({
+  children,
+  icon,
+  title,
+}: {
+  readonly children: ReactNode;
+  readonly icon?: ReactNode;
+  readonly title: string;
+}) {
+  return (
+    <span
+      title={title}
+      className='inline-flex h-6 items-center gap-1 rounded-full border border-subtle bg-surface-0 px-2 text-[11.5px] leading-none text-secondary-token'
+    >
+      {icon ? (
+        <span className='shrink-0 text-tertiary-token' aria-hidden>
+          {icon}
+        </span>
+      ) : null}
+      <span className='sr-only'>{title}</span>
+      <span aria-hidden>{children}</span>
+    </span>
+  );
+}
+
+function SpotifyMatchBadge({ label }: { readonly label: string }) {
+  return (
+    <span className='inline-flex h-5 shrink-0 items-center gap-1 rounded-full border border-green-500/20 px-1.5 text-[10.5px] font-medium text-green-500'>
+      <SocialIcon platform='spotify' className='h-3 w-3' aria-hidden />
+      <span>{label}</span>
+    </span>
+  );
+}
+
 export function OnboardingSpotifyArtistPickerCard({
   state,
   output,
@@ -212,7 +326,7 @@ export function OnboardingSpotifyArtistPickerCard({
     limit: 5,
     minQueryLength: 1,
   });
-  const { search, clear } = artistSearch;
+  const { search, searchImmediate, clear } = artistSearch;
 
   useEffect(() => {
     const trimmed = query.trim();
@@ -253,7 +367,7 @@ export function OnboardingSpotifyArtistPickerCard({
 
   return (
     <div
-      className='w-full max-w-[440px] rounded-xl border border-subtle bg-surface-1 p-3.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.035)]'
+      className='min-h-[192px] w-full max-w-[440px] rounded-xl border border-subtle bg-surface-1 p-3.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.035)]'
       data-testid='onboarding-artist-picker'
     >
       <div className='flex items-start gap-3 px-0.5'>
@@ -292,11 +406,28 @@ export function OnboardingSpotifyArtistPickerCard({
 
         {!isSearching && artistSearch.error ? (
           <div
-            className='flex items-start gap-2 rounded-lg border border-red-500/20 px-2.5 py-2.5 text-[12.5px] leading-5 text-secondary-token'
+            className='flex items-start gap-2 rounded-lg border border-subtle bg-surface-0/70 px-2.5 py-2.5 text-[12.5px] leading-5 text-secondary-token'
             role='alert'
           >
-            <AlertCircle className='mt-0.5 h-3.5 w-3.5 shrink-0 text-error' />
-            <span>{artistSearch.error}</span>
+            <AlertCircle className='mt-0.5 h-3.5 w-3.5 shrink-0 text-warning' />
+            <span className='min-w-0 flex-1'>
+              <span className='block font-medium text-primary-token'>
+                {getArtistSearchFailureCopy(artistSearch.error).title}
+              </span>
+              <span className='mt-0.5 block'>
+                {getArtistSearchFailureCopy(artistSearch.error).body}
+              </span>
+            </span>
+            {hasQuery ? (
+              <button
+                type='button'
+                onClick={() => searchImmediate(query.trim())}
+                disabled={disabled}
+                className='mt-0.5 shrink-0 rounded-full border border-subtle px-2 py-0.5 text-[11.5px] font-medium text-secondary-token transition-colors duration-fast hover:border-white/15 hover:text-primary-token focus-visible:outline-none disabled:opacity-50'
+              >
+                Retry
+              </button>
+            ) : null}
           </div>
         ) : null}
 
@@ -431,15 +562,14 @@ export function OnboardingArtistConfirmedCard({
     );
   }
 
-  const followers = formatFollowers(artist.followers);
+  const followers = formatCompactCount(artist.followers);
+  const exactFollowers = formatExactCount(artist.followers);
   const genres = artist.genres?.slice(0, 2) ?? [];
-  const chips = [
-    followers,
-    typeof artist.popularity === 'number'
-      ? `Popularity ${artist.popularity}`
-      : null,
-    ...genres,
-  ].filter((value): value is string => Boolean(value));
+  const safeArtistUrl = getSafeSpotifyArtistUrl(artist.url);
+  const hasMetadata =
+    Boolean(followers) ||
+    typeof artist.popularity === 'number' ||
+    genres.length > 0;
 
   return (
     <div
@@ -453,32 +583,48 @@ export function OnboardingArtistConfirmedCard({
             <p className='truncate text-[14.5px] font-semibold leading-5 tracking-[-0.01em] text-primary-token'>
               {artist.name}
             </p>
-            <span className='inline-flex h-5 shrink-0 items-center rounded-full border border-green-500/20 px-1.5 text-[10.5px] font-medium text-green-500'>
-              Matched
-            </span>
+            <SpotifyMatchBadge label='Matched' />
           </div>
-          {chips.length > 0 ? (
+          {hasMetadata ? (
             <div className='mt-2 flex flex-wrap gap-1.5'>
-              {chips.map(chip => (
-                <span
-                  key={chip}
-                  className='rounded-full border border-subtle bg-surface-0 px-2 py-0.5 text-[11.5px] leading-5 text-secondary-token'
+              {followers ? (
+                <MetadataChip
+                  title={`${exactFollowers ?? followers} Spotify followers`}
+                  icon={<Users className='h-3 w-3' />}
                 >
-                  {chip}
-                </span>
-              ))}
+                  {followers}
+                </MetadataChip>
+              ) : null}
+              {typeof artist.popularity === 'number' ? (
+                <MetadataChip
+                  title={`Popularity score: ${artist.popularity} out of 100`}
+                  icon={<Gauge className='h-3 w-3' />}
+                >
+                  {artist.popularity}
+                </MetadataChip>
+              ) : null}
+              {genres.map(genre => {
+                const label = formatGenreLabel(genre);
+                return (
+                  <MetadataChip key={genre} title={`Genre: ${label}`}>
+                    {label}
+                  </MetadataChip>
+                );
+              })}
             </div>
           ) : null}
         </div>
-        <a
-          href={artist.url}
-          target='_blank'
-          rel='noreferrer'
-          className='inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-subtle text-secondary-token transition-colors duration-fast hover:bg-surface-2 hover:text-primary-token focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-white/20'
-          aria-label={`Open ${artist.name} on Spotify`}
-        >
-          <ExternalLink className='h-3.5 w-3.5' />
-        </a>
+        {safeArtistUrl ? (
+          <a
+            href={safeArtistUrl}
+            target='_blank'
+            rel='noreferrer'
+            className='inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-subtle text-secondary-token transition-colors duration-fast hover:bg-surface-2 hover:text-primary-token focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-white/20'
+            aria-label={`Open ${artist.name} on Spotify`}
+          >
+            <ExternalLink className='h-3.5 w-3.5' />
+          </a>
+        ) : null}
       </div>
     </div>
   );
@@ -597,7 +743,7 @@ export function OnboardingSocialLinkCard({
 export function useArtistSelectionMessage() {
   return useMemo(
     () => (artist: OnboardingArtistSelection) =>
-      `I picked ${artist.name} on Spotify: ${artist.url}.`,
+      `I picked ${artist.name} on Spotify. Let's build my artist profile from that match.`,
     []
   );
 }

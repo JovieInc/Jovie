@@ -16,6 +16,9 @@ const TIM_WHITE_PROFILE_SCREENSHOT_IDS = [
   'tim-white-profile-listen-mobile',
   'tim-white-profile-playlist-fallback-mobile',
   'tim-white-profile-listen-fallback-mobile',
+  'tim-white-profile-alerts-fallback-mobile',
+  'tim-white-profile-events-empty-mobile',
+  'tim-white-profile-more-menu-mobile',
 ] as const;
 
 describe('screenshot registry', () => {
@@ -132,6 +135,22 @@ describe('screenshot registry', () => {
       expect(
         scenario.publicExportPath?.startsWith('artist-profile-mode-') ?? false
       ).toBe(false);
+    }
+  });
+
+  it('waits for compact profile shell on desktop captures (stable post-shell-migration selector)', () => {
+    const desktopProfileIds = [
+      'tim-white-profile-live-desktop',
+      'tim-white-profile-mainstream-desktop',
+      'public-profile-desktop',
+    ];
+
+    for (const id of desktopProfileIds) {
+      const scenario = SCREENSHOT_SCENARIOS.find(
+        currentScenario => currentScenario.id === id
+      );
+
+      expect(scenario?.waitFor).toBe('[data-testid="profile-compact-shell"]');
     }
   });
 

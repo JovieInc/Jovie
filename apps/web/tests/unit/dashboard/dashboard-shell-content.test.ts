@@ -73,20 +73,46 @@ describe('@critical DashboardShellContent behavior contracts', () => {
     });
 
     it('releases routes use essential shell data', () => {
+      expect(shouldUseEssentialShellData(APP_ROUTES.RELEASES)).toBe(true);
       expect(shouldUseEssentialShellData('/app/dashboard/releases')).toBe(true);
     });
 
-    it('lyrics and library routes use essential shell data', () => {
+    it('lyrics, library, tasks, insights, presence, and audience routes use essential shell data', () => {
       expect(shouldUseEssentialShellData(APP_ROUTES.LYRICS)).toBe(true);
       expect(shouldUseEssentialShellData(APP_ROUTES.LIBRARY)).toBe(true);
+      expect(shouldUseEssentialShellData(APP_ROUTES.TASKS)).toBe(true);
+      expect(shouldUseEssentialShellData(APP_ROUTES.DASHBOARD_TASKS)).toBe(
+        true
+      );
+      expect(shouldUseEssentialShellData(APP_ROUTES.INSIGHTS)).toBe(true);
+      expect(shouldUseEssentialShellData(APP_ROUTES.PRESENCE)).toBe(true);
+      expect(shouldUseEssentialShellData(APP_ROUTES.AUDIENCE)).toBe(true);
+      expect(shouldUseEssentialShellData(APP_ROUTES.DASHBOARD_AUDIENCE)).toBe(
+        true
+      );
     });
 
     it('dashboard root uses essential shell data', () => {
       expect(shouldUseEssentialShellData('/app')).toBe(true);
     });
 
-    it('settings routes use full dashboard data', () => {
-      expect(shouldUseEssentialShellData('/app/settings')).toBe(false);
+    it('optimized settings routes use essential shell data', () => {
+      expect(shouldUseEssentialShellData(APP_ROUTES.SETTINGS)).toBe(true);
+      expect(shouldUseEssentialShellData(APP_ROUTES.SETTINGS_ACCOUNT)).toBe(
+        true
+      );
+      expect(shouldUseEssentialShellData(APP_ROUTES.SETTINGS_CONTACTS)).toBe(
+        true
+      );
+      expect(shouldUseEssentialShellData(APP_ROUTES.SETTINGS_TOURING)).toBe(
+        true
+      );
+    });
+
+    it('artist profile settings routes use essential shell data', () => {
+      expect(
+        shouldUseEssentialShellData(APP_ROUTES.SETTINGS_ARTIST_PROFILE)
+      ).toBe(true);
     });
 
     it('null pathname uses full dashboard data', () => {
@@ -114,15 +140,30 @@ describe('@critical DashboardShellContent behavior contracts', () => {
     });
   });
 
-  describe('essential shell skips HydrateClient wrapper', () => {
-    it('chat route is essential (no HydrateClient/FeatureFlagsProvider)', () => {
+  describe('shell hydration wrapper is stable for frame persistence (Wave 3)', () => {
+    it('all shell routes (essential or full) now share identical client tree root via HydrateClient for no-remount warm nav', () => {
+      // Critical for shell frame persistence: DashboardShellContent always returns
+      // <HydrateClient> <AppFlagProvider> ... <AuthShellWrapper> <AppShellFrame> ...
+      // regardless of useEssentialShell. This prevents remount of the chrome on
+      // transitions between lightweight routes (chat/library/releases/...) and
+      // full-data routes (earnings, etc.). Sidebar state, audio, and shell UI
+      // survive client-side /app/* navigation with no blank/dark frames.
+      expect(shouldUseEssentialShellData('/app/chat')).toBe(true);
+      expect(shouldUseEssentialShellData(APP_ROUTES.EARNINGS)).toBe(false);
       expect(isChatShellRoute('/app/chat')).toBe(true);
-      // The component renders shellContents directly for essential routes
-      // instead of wrapping in HydrateClient + FeatureFlagsProvider
     });
 
-    it('settings route is not essential (gets HydrateClient wrapper)', () => {
-      expect(isChatShellRoute('/app/settings')).toBe(false);
+    it('optimized settings route is essential (fast path) but still gets stable wrapper', () => {
+      expect(shouldUseEssentialShellData(APP_ROUTES.SETTINGS_CONTACTS)).toBe(
+        true
+      );
+      expect(isChatShellRoute(APP_ROUTES.SETTINGS_CONTACTS)).toBe(false);
+    });
+
+    it('artist profile settings route uses essential data + stable hydration root', () => {
+      expect(
+        shouldUseEssentialShellData(APP_ROUTES.SETTINGS_ARTIST_PROFILE)
+      ).toBe(true);
     });
   });
 });

@@ -25,26 +25,50 @@ export interface DashboardHeaderProps {
   readonly className?: string;
 }
 
+const MOBILE_HEADER_PADDING = 'px-4 pb-2 pt-3';
+
 function MobileHeader({
   currentLabel,
+  breadcrumbSuffix,
   action,
+  searchSurface,
+  isSearchActive,
   mobileProfileSlot,
 }: {
   readonly currentLabel: string;
+  readonly breadcrumbSuffix?: ReactNode;
   readonly action?: ReactNode;
+  readonly searchSurface?: ReactNode;
+  readonly isSearchActive: boolean;
   readonly mobileProfileSlot?: ReactNode;
 }) {
+  if (searchSurface && isSearchActive) {
+    return (
+      <div className={cn('hidden max-sm:flex', MOBILE_HEADER_PADDING)}>
+        {searchSurface}
+      </div>
+    );
+  }
+
   return (
-    <div className='hidden max-sm:flex items-center justify-between px-4 pb-2 pt-3'>
+    <div
+      className={cn(
+        'hidden max-sm:flex items-center justify-between',
+        MOBILE_HEADER_PADDING
+      )}
+    >
       <h1 className='text-[17px] font-semibold leading-tight tracking-[-0.018em] text-primary-token'>
-        {currentLabel}
+        {breadcrumbSuffix ?? currentLabel}
       </h1>
       <div className='flex items-center gap-2'>
+        {searchSurface ? (
+          <div className='flex items-center'>{searchSurface}</div>
+        ) : null}
         {action ? (
           <div className='flex items-center gap-1 [&_button]:h-8 [&_button]:rounded-full [&_button]:shadow-none [&_button>svg]:h-4 [&_button>svg]:w-4'>
             {action}
           </div>
-        ) : (
+        ) : searchSurface ? null : (
           mobileProfileSlot
         )}
       </div>
@@ -80,7 +104,7 @@ function BreadcrumbTrail({
           </span>
           <ChevronRight className='size-3 shrink-0 text-quaternary-token/85' />
           {breadcrumbSuffix ? (
-            <div className='min-w-0 truncate text-xs tracking-[-0.01em] text-secondary-token'>
+            <div className='min-w-0 truncate text-xs font-semibold tracking-[-0.01em] text-primary-token'>
               {breadcrumbSuffix}
             </div>
           ) : (
@@ -91,7 +115,7 @@ function BreadcrumbTrail({
         </>
       )}
       {showInlineSearch ? (
-        <div className='ml-2 flex items-center'>{searchSurface}</div>
+        <div className='ml-1.5 flex min-w-0 items-center'>{searchSurface}</div>
       ) : null}
     </>
   );
@@ -124,7 +148,10 @@ export function DashboardHeader({
     >
       <MobileHeader
         currentLabel={currentLabel}
+        breadcrumbSuffix={breadcrumbSuffix}
         action={action}
+        searchSurface={searchSurface}
+        isSearchActive={searchTakesOver}
         mobileProfileSlot={mobileProfileSlot}
       />
       <div className='relative max-sm:hidden h-(--linear-app-header-height-compact) w-full items-center gap-2 px-2.5 sm:flex'>

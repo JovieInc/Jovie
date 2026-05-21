@@ -70,4 +70,20 @@ describe('AppShellFrame', () => {
       'lg:gap-[var(--linear-app-shell-gap)]'
     );
   });
+
+  it('renders the shared audio player slot inside the shell frame', () => {
+    render(
+      <AppShellFrame
+        sidebar={<aside>Sidebar</aside>}
+        header={<header>Header</header>}
+        main={<div>Main Content</div>}
+        audioPlayer={<div data-testid='audio-player'>Player</div>}
+      />
+    );
+
+    expect(screen.getByTestId('audio-player')).toBeInTheDocument();
+    expect(screen.getByRole('main')).toContainElement(
+      screen.getByTestId('audio-player')
+    );
+  });
 });

@@ -2,9 +2,10 @@
 
 import type { LucideIcon } from 'lucide-react';
 import { AlarmClock, Bell, Clock, Sparkles } from 'lucide-react';
-import { usePathname } from 'next/navigation';
-import { useCallback, useEffect, useMemo, useRef } from 'react';
-import { isDemoRoutePath } from '@/constants/routes';
+import { usePathname, useRouter } from 'next/navigation';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { InstallBanner } from '@/components/shell/InstallBanner';
+import { APP_ROUTES, isDemoRoutePath } from '@/constants/routes';
 import { track } from '@/lib/analytics';
 import {
   formatVerifiedPriceLabel,
@@ -14,7 +15,6 @@ import { TRIAL_NOTIFICATION_RECIPIENT_LIMIT } from '@/lib/entitlements/registry'
 import { env } from '@/lib/env-client';
 import { useCheckoutMutation, usePricingOptionsQuery } from '@/lib/queries';
 import { type NudgeState, usePlanGate } from '@/lib/queries/usePlanGate';
-import { cn } from '@/lib/utils';
 
 type Urgency = 'calm' | 'building' | 'high';
 
@@ -37,6 +37,11 @@ const TRIAL_NOTIFICATION_CAP = TRIAL_NOTIFICATION_RECIPIENT_LIMIT;
 const TRIAL_NOTIFICATION_WARNING_THRESHOLD = Math.floor(
   TRIAL_NOTIFICATION_CAP * 0.8
 );
+const DISMISSAL_KEY_PREFIX = 'jovie-sidebar-upgrade-dismissed';
+
+function getDismissalKey(state: NudgeState): string {
+  return `${DISMISSAL_KEY_PREFIX}:${state}`;
+}
 
 function buildVariant(input: {
   state: NudgeState;
@@ -163,20 +168,15 @@ function buildVariant(input: {
   }
 }
 
-const URGENCY_CLASSES: Record<Urgency, string> = {
-  calm: 'border-sidebar-border/70 bg-sidebar-accent/12',
-  building: 'border-(--linear-accent)/30 bg-(--linear-accent)/5',
-  high: 'border-(--linear-accent)/50 bg-(--linear-accent)/8',
-};
-
-const TEXT_TONE: Record<Urgency, string> = {
-  calm: 'text-sidebar-item-foreground/75',
-  building: 'text-sidebar-item-foreground',
-  high: 'text-sidebar-item-foreground',
+const ICON_TONE: Record<Urgency, string> = {
+  calm: 'text-cyan-300/85',
+  building: 'text-(--linear-accent)',
+  high: 'text-(--linear-accent)',
 };
 
 export function SidebarUpgradeBanner() {
   const pathname = usePathname();
+  const router = useRouter();
   // Only gate render on NODE_ENV=test (unit tests). IS_E2E mode (dev:local:browse,
   // playwright runs) needs the banner visible so we can verify it. The pricing
   // query keeps its own gate to skip the network call under test runtimes.
@@ -188,6 +188,7 @@ export function SidebarUpgradeBanner() {
     enabled: !isPassiveRuntime && !isDemoRoute && !env.IS_E2E,
   });
   const checkoutMutation = useCheckoutMutation();
+  const [dismissedState, setDismissedState] = useState<NudgeState | null>(null);
 
   const selectedPrice = useMemo(
     () => getPreferredVerifiedPrice(pricing.data?.options ?? []),
@@ -213,20 +214,34 @@ export function SidebarUpgradeBanner() {
     ]
   );
 
+  useEffect(() => {
+    if (!variant) return;
+    try {
+      setDismissedState(
+        sessionStorage.getItem(getDismissalKey(variant.state)) === 'true'
+          ? variant.state
+          : null
+      );
+    } catch {
+      setDismissedState(null);
+    }
+  }, [variant]);
+
   // Fire impression once per state transition while the banner is mounted.
   const lastImpressionState = useRef<NudgeState | null>(null);
   useEffect(() => {
     if (!variant) return;
+    if (dismissedState === variant.state) return;
     if (lastImpressionState.current === variant.state) return;
     lastImpressionState.current = variant.state;
     track('billing_upgrade_banner_impression', {
       surface: 'sidebar_upgrade_banner',
       state: variant.state,
     });
-  }, [variant]);
+  }, [dismissedState, variant]);
 
   const handleUpgrade = useCallback(async () => {
-    if (!selectedPrice?.priceId || checkoutMutation.isPending || !variant) {
+    if (checkoutMutation.isPending || !variant) {
       return;
     }
 
@@ -235,6 +250,11 @@ export function SidebarUpgradeBanner() {
       placement: 'sidebar_bottom',
       state: variant.state,
     });
+
+    if (!selectedPrice?.priceId) {
+      router.push(APP_ROUTES.PRICING);
+      return;
+    }
 
     const checkout = await checkoutMutation.mutateAsync({
       priceId: selectedPrice.priceId,
@@ -248,7 +268,21 @@ export function SidebarUpgradeBanner() {
     });
 
     globalThis.location.href = checkout.url;
-  }, [checkoutMutation, selectedPrice, variant]);
+  }, [checkoutMutation, router, selectedPrice, variant]);
+
+  const handleDismiss = useCallback(() => {
+    if (!variant) return;
+    try {
+      sessionStorage.setItem(getDismissalKey(variant.state), 'true');
+    } catch {
+      // Session storage may be unavailable in restricted browsers.
+    }
+    setDismissedState(variant.state);
+    track('billing_upgrade_banner_dismissed', {
+      surface: 'sidebar_upgrade_banner',
+      state: variant.state,
+    });
+  }, [variant]);
 
   // isError → hide the banner. Otherwise paid Pro/Max users would see
   // "Try Pro free for 14 days" during a billing API outage because nudgeState
@@ -258,54 +292,31 @@ export function SidebarUpgradeBanner() {
     isDemoRoute ||
     planGate.isLoading ||
     planGate.isError ||
-    !variant
+    !variant ||
+    dismissedState === variant.state
   ) {
     return null;
   }
 
   const Icon = variant.icon;
+  const title =
+    variant.showPrice && priceLabel
+      ? `${variant.headline} - ${priceLabel}`
+      : variant.headline;
 
   return (
-    <div className='group-data-[collapsible=icon]:hidden px-2.5 pb-1.5'>
-      <div
-        className={cn(
-          'rounded-xl border px-2.5 py-2 text-sidebar-muted',
-          URGENCY_CLASSES[variant.urgency]
-        )}
-      >
-        <div className='flex items-start gap-1.5'>
-          <Icon
-            className={cn(
-              'mt-0.5 size-3 shrink-0',
-              variant.urgency === 'calm'
-                ? 'text-sidebar-item-icon/60'
-                : 'text-(--linear-accent)'
-            )}
-          />
-          <div className='min-w-0'>
-            <p
-              className={cn(
-                'text-2xs font-medium tracking-[-0.01em]',
-                TEXT_TONE[variant.urgency]
-              )}
-            >
-              {variant.headline}
-              {variant.showPrice && priceLabel ? ` — ${priceLabel}` : null}
-            </p>
-            <p className='mt-0.5 text-[10px] leading-[1.35] text-sidebar-muted/80'>
-              {variant.body}
-            </p>
-            <button
-              type='button'
-              onClick={() => handleUpgrade()}
-              disabled={!selectedPrice?.priceId || checkoutMutation.isPending}
-              className='mt-1 inline-flex min-h-6 items-center rounded-full bg-transparent px-1.5 text-[10px] font-medium text-sidebar-item-foreground/70 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-sidebar-ring disabled:cursor-not-allowed disabled:opacity-60'
-            >
-              {checkoutMutation.isPending ? 'Opening…' : variant.cta}
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
+    <InstallBanner
+      open
+      icon={Icon}
+      title={title}
+      description={variant.body}
+      ctaLabel={checkoutMutation.isPending ? 'Opening…' : variant.cta}
+      ctaIcon={null}
+      onCta={handleUpgrade}
+      onDismiss={handleDismiss}
+      ctaDisabled={checkoutMutation.isPending}
+      iconClassName={ICON_TONE[variant.urgency]}
+      className='group-data-[collapsible=icon]:hidden'
+    />
   );
 }

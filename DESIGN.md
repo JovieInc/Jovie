@@ -641,6 +641,47 @@ All full-screen takeover screens (offline, global error, root error, public erro
 
 ---
 
+## Layout Shift Prevention (Visual Stability)
+
+**Mandatory standing rule for every agent and every change.**
+
+Before editing or authoring any component, organism, feature surface, empty state, loading state, error state, composer, banner, or conditional UI, the agent **must**:
+
+1. Explicitly enumerate **all possible visual states** the element or page can render:
+   - Loading / awaiting / securing / initializing
+   - Empty / zero-data / first-use / intro
+   - Error / partial / degraded / retry
+   - Success / populated / streaming / ongoing conversation
+   - Authenticated vs anonymous
+   - With vs without status lines, banners, chips, tool cards, rails
+   - Mobile vs desktop vs tablet breakpoints
+   - Collapsed / expanded / picker-open / picker-closed
+   - First-message flow vs subsequent turns
+   - Any progressive disclosure or progressive builder states
+
+2. For **every state transition**, verify **zero layout shift**:
+   - No vertical or horizontal push of sibling/parent content.
+   - Containers maintain stable dimensions (use `min-height`, grid-template, flex basis, or reserved slots).
+   - Scroll containers preserve user scroll position.
+   - No reflow that moves interactive elements (buttons, inputs, CTAs) under the cursor or changes hit targets.
+
+3. When a transition would add/remove height-affecting content:
+   - **Reserve space in advance** (min-height on the status container, always-mounted placeholder div with matching metrics, skeleton that matches final height, or a fixed-status slot).
+   - Prefer **opacity/visibility/scale/transform-only** transitions inside a height-stable wrapper.
+   - Never rely on conditional `{cond ? <p>text</p> : null}` directly above/below variable-height siblings without a reserved slot.
+
+4. Add or update tests for non-trivial surfaces:
+   - Playwright bounding-box assertions on key containers across states.
+   - Visual regression (Chromatic / snapshot) covering the transitions.
+   - CLS / layout-shift metrics in performance tests where relevant.
+   - E2E that exercises the full state machine (e.g. `/start` onboarding first-token flow).
+
+This rule is non-negotiable. It directly implements the subtraction principle and DESIGN_V1 stability goals. Violations are blocked at design review and landing. Cross-references: `.claude/rules/ui.md` (Taste Rules), `docs/TESTING_GUIDELINES.md` (Risk-Based Testing), `AGENTS.md` (Verification).
+
+The `/start` onboarding composer fix (JOV-2496 follow-up) is the canonical example: the explicit "Securing chat..." paragraphs were removed in favor of the ChatInput placeholder; parent containers now have constant child structure so the input never jumps on token arrival.
+
+---
+
 ## Text Casing
 
 | Context | Convention | Example |

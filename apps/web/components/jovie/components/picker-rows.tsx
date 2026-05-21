@@ -23,13 +23,16 @@ import {
   Music,
   Music2,
   Settings,
+  Sparkles,
   UserCircle,
   Users,
 } from 'lucide-react';
 import Image from 'next/image';
+import { memo } from 'react';
 import type { EntityKind } from '@/lib/chat/tokens';
 import type { EntityRef } from '@/lib/commands/entities';
 import type { NavCommand, SkillCommand } from '@/lib/commands/registry';
+
 import { cn } from '@/lib/utils';
 
 const ICON_MAP: Record<string, LucideIcon> = {
@@ -60,7 +63,21 @@ export interface PickerNavItem {
   readonly nav: NavCommand;
 }
 
-export type PickerItem = PickerSkillItem | PickerEntityItem | PickerNavItem;
+export interface PickerPromptItem {
+  readonly kind: 'prompt';
+  readonly prompt: {
+    readonly id: string;
+    readonly label: string;
+    readonly description: string;
+    readonly prompt: string;
+  };
+}
+
+export type PickerItem =
+  | PickerSkillItem
+  | PickerEntityItem
+  | PickerNavItem
+  | PickerPromptItem;
 
 function entityKindLabel(kind: EntityKind): string {
   if (kind === 'release') return 'Release';
@@ -80,7 +97,11 @@ export function formatRowMeta(entity: EntityRef): string | null {
   return meta.subtitle ?? 'Track';
 }
 
-export function ReleaseArt({ entity }: { readonly entity: EntityRef }) {
+export const ReleaseArt = memo(function ReleaseArt({
+  entity,
+}: {
+  readonly entity: EntityRef;
+}) {
   if (entity.thumbnail) {
     return (
       <div className='relative h-9 w-9 shrink-0 overflow-hidden rounded-md shadow-[inset_0_0_0_0.5px_rgba(255,255,255,0.05)]'>
@@ -98,9 +119,13 @@ export function ReleaseArt({ entity }: { readonly entity: EntityRef }) {
   return (
     <div className='h-9 w-9 shrink-0 rounded-md bg-gradient-to-br from-[#2a2a2f] to-[#16161a] shadow-[inset_0_0_0_0.5px_rgba(255,255,255,0.05)]' />
   );
-}
+});
 
-export function ArtistArt({ entity }: { readonly entity: EntityRef }) {
+export const ArtistArt = memo(function ArtistArt({
+  entity,
+}: {
+  readonly entity: EntityRef;
+}) {
   if (entity.thumbnail) {
     return (
       <div className='relative h-9 w-9 shrink-0 overflow-hidden rounded-full shadow-[inset_0_0_0_0.5px_rgba(255,255,255,0.05)]'>
@@ -126,29 +151,50 @@ export function ArtistArt({ entity }: { readonly entity: EntityRef }) {
       {initials || '·'}
     </div>
   );
-}
+});
 
-export function SkillArt({ skill }: { readonly skill: SkillCommand }) {
+export const SkillArt = memo(function SkillArt({
+  skill,
+}: {
+  readonly skill: SkillCommand;
+}) {
   const Icon = ICON_MAP[skill.iconName] ?? Calendar;
   return (
     <div className='flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-surface-2 text-secondary-token shadow-[inset_0_0.5px_0_rgba(255,255,255,0.06),inset_0_0_0_0.5px_rgba(255,255,255,0.04)]'>
       <Icon className='h-[14px] w-[14px]' strokeWidth={1.5} />
     </div>
   );
-}
+});
 
-export function NavArt({ nav }: { readonly nav: NavCommand }) {
+export const NavArt = memo(function NavArt({
+  nav,
+}: {
+  readonly nav: NavCommand;
+}) {
   const Icon = ICON_MAP[nav.iconName] ?? Calendar;
   return (
     <div className='flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-surface-2 text-secondary-token shadow-[inset_0_0.5px_0_rgba(255,255,255,0.06),inset_0_0_0_0.5px_rgba(255,255,255,0.04)]'>
       <Icon className='h-[14px] w-[14px]' strokeWidth={1.5} />
     </div>
   );
-}
+});
 
-export function RowVisual({ item }: { readonly item: PickerItem }) {
+export const PromptArt = memo(function PromptArt() {
+  return (
+    <div className='flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-surface-2 text-secondary-token shadow-[inset_0_0.5px_0_rgba(255,255,255,0.06),inset_0_0_0_0.5px_rgba(255,255,255,0.04)]'>
+      <Sparkles className='h-[14px] w-[14px]' strokeWidth={1.5} />
+    </div>
+  );
+});
+
+export const RowVisual = memo(function RowVisual({
+  item,
+}: {
+  readonly item: PickerItem;
+}) {
   if (item.kind === 'skill') return <SkillArt skill={item.skill} />;
   if (item.kind === 'nav') return <NavArt nav={item.nav} />;
+  if (item.kind === 'prompt') return <PromptArt />;
   if (item.entity.kind === 'release')
     return <ReleaseArt entity={item.entity} />;
   if (item.entity.kind === 'artist') return <ArtistArt entity={item.entity} />;
@@ -164,9 +210,13 @@ export function RowVisual({ item }: { readonly item: PickerItem }) {
       <Music2 className='h-[14px] w-[14px]' strokeWidth={1.5} />
     </div>
   );
-}
+});
 
-export function RowBody({ item }: { readonly item: PickerItem }) {
+export const RowBody = memo(function RowBody({
+  item,
+}: {
+  readonly item: PickerItem;
+}) {
   if (item.kind === 'skill') {
     return (
       <div className='min-w-0 flex-1'>
@@ -191,6 +241,18 @@ export function RowBody({ item }: { readonly item: PickerItem }) {
       </div>
     );
   }
+  if (item.kind === 'prompt') {
+    return (
+      <div className='min-w-0 flex-1'>
+        <p className='truncate text-[13.5px] font-medium leading-tight tracking-[-0.005em] text-primary-token'>
+          {item.prompt.label}
+        </p>
+        <p className='mt-[3px] truncate text-[11.5px] text-tertiary-token'>
+          {item.prompt.description}
+        </p>
+      </div>
+    );
+  }
   const meta = formatRowMeta(item.entity);
   return (
     <div className='min-w-0 flex-1'>
@@ -204,11 +266,12 @@ export function RowBody({ item }: { readonly item: PickerItem }) {
       ) : null}
     </div>
   );
-}
+});
 
 export function pickerItemKey(item: PickerItem): string {
   if (item.kind === 'skill') return `skill:${item.skill.id}`;
   if (item.kind === 'nav') return `nav:${item.nav.id}`;
+  if (item.kind === 'prompt') return `prompt:${item.prompt.id}`;
   return `entity:${item.entity.kind}:${item.entity.id}`;
 }
 
@@ -222,7 +285,7 @@ interface PickerRowProps {
   readonly rowId?: string;
 }
 
-export function PickerRow({
+export const PickerRow = memo(function PickerRow({
   item,
   index,
   isActive,
@@ -243,7 +306,7 @@ export function PickerRow({
         onCommit(index);
       }}
       className={cn(
-        'flex w-full items-center gap-[10px] rounded-lg px-[9px] py-[7px] text-left transition-colors duration-fast',
+        'flex w-full items-center gap-[10px] rounded-lg px-[9px] py-[7px] text-left transition-colors duration-subtle ease-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/55 focus-visible:ring-offset-2 focus-visible:ring-offset-(--linear-bg-page) outline-none',
         isActive
           ? 'bg-white/[0.06] shadow-[inset_0_0_0_0.5px_rgba(255,255,255,0.05)]'
           : 'hover:bg-white/[0.035]'
@@ -253,4 +316,4 @@ export function PickerRow({
       <RowBody item={item} />
     </button>
   );
-}
+});

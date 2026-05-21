@@ -8,8 +8,8 @@
  *
  * Why: Apple OAuth has been shipping broken in production ("invalid client")
  * because nothing stopped the provider button from rendering when credentials
- * were missing. This guard is the single chokepoint — both the AuthShell page
- * and the AuthModal use it, so a provider cannot silently re-appear.
+ * were missing. This guard is the single chokepoint for AuthShell, so a
+ * provider cannot silently re-appear.
  *
  * See JOV-2062.
  */
@@ -21,6 +21,34 @@ export type ClerkOAuthProvider =
   | 'github'
   | 'spotify'
   | 'tiktok';
+
+export type PrimaryAuthOAuthProvider = Extract<
+  ClerkOAuthProvider,
+  'apple' | 'google'
+>;
+
+export const AUTH_OAUTH_PROVIDER_ORDER = [
+  'apple',
+  'google',
+] as const satisfies readonly PrimaryAuthOAuthProvider[];
+
+export const AUTH_OAUTH_PROVIDER_LABELS = {
+  apple: 'Continue with Apple',
+  google: 'Continue with Google',
+} as const satisfies Record<PrimaryAuthOAuthProvider, string>;
+
+export const CLERK_SOCIAL_BUTTON_LABEL_TEMPLATE =
+  'Continue with {{provider|titleize}}' as const;
+
+export function getAuthOAuthProviderLabel(
+  provider: PrimaryAuthOAuthProvider
+): string {
+  return AUTH_OAUTH_PROVIDER_LABELS[provider];
+}
+
+export function getEnabledAuthOAuthProviders(): readonly PrimaryAuthOAuthProvider[] {
+  return AUTH_OAUTH_PROVIDER_ORDER.filter(isOAuthProviderEnabled);
+}
 
 /**
  * Per-provider enablement check.
@@ -69,7 +97,7 @@ export function isOAuthProviderEnabled(provider: ClerkOAuthProvider): boolean {
  * `socialButtonsIconButton__<provider>` for the icon-only variant).
  *
  * Even if a provider is mistakenly left enabled in the Clerk dashboard, this
- * hides its button at the rendering layer — so the env flag is the final gate.
+ * hides its button at the rendering layer — so this helper is the final gate.
  */
 export function buildDisabledOAuthProviderElements(): Record<string, string> {
   const allProviders: readonly ClerkOAuthProvider[] = [

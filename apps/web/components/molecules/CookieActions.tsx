@@ -7,6 +7,9 @@ export interface CookieActionsProps {
   readonly onReject: () => void;
   readonly onCustomize: () => void;
   readonly className?: string;
+  readonly disabled?: boolean;
+  /** Compact mode for floating card: always row, tighter spacing/fonts to fit narrow container. Defaults preserve full bar behavior. */
+  readonly compact?: boolean;
 }
 
 const secondaryButtonStyle: CSSProperties = {
@@ -37,26 +40,60 @@ export function CookieActions({
   onReject,
   onCustomize,
   className = '',
+  disabled = false,
+  compact = false,
 }: CookieActionsProps) {
+  const containerClass = compact
+    ? `flex shrink-0 flex-row items-center flex-wrap gap-1.5 ${className}`
+    : `flex shrink-0 flex-col sm:flex-row sm:flex-wrap ${className}`;
+  const containerGap = compact ? '6px' : 'var(--linear-space-2)';
+
+  const secStyle: CSSProperties = compact
+    ? {
+        ...secondaryButtonStyle,
+        fontSize: '12px',
+        padding: '6px 10px',
+        height: '36px',
+      }
+    : secondaryButtonStyle;
+  const priStyle: CSSProperties = compact
+    ? {
+        ...primaryButtonStyle,
+        fontSize: '12px',
+        padding: '6px 12px',
+        height: '36px',
+      }
+    : primaryButtonStyle;
+
+  const btnBase =
+    'transition-opacity hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-accent';
+  const rejectClass = compact ? btnBase : `${btnBase} flex-1 sm:flex-none`;
+  const customClass = compact ? btnBase : `${btnBase} flex-1 sm:flex-none`;
+  const acceptClass = compact
+    ? `${btnBase} shrink-0`
+    : `${btnBase} w-full sm:w-auto hover:opacity-90`;
+
   return (
-    <div
-      className={`flex shrink-0 flex-col sm:flex-row sm:flex-wrap ${className}`}
-      style={{ gap: 'var(--linear-space-2)' }}
-    >
-      <div className='flex' style={{ gap: 'var(--linear-space-2)' }}>
+    <div className={containerClass} style={{ gap: containerGap }}>
+      <div
+        className='flex'
+        style={{ gap: compact ? '6px' : 'var(--linear-space-2)' }}
+      >
         <button
           type='button'
           onClick={onReject}
-          className='flex-1 sm:flex-none transition-opacity hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-accent'
-          style={secondaryButtonStyle}
+          disabled={disabled}
+          className={rejectClass}
+          style={secStyle}
         >
           Reject
         </button>
         <button
           type='button'
           onClick={onCustomize}
-          className='flex-1 sm:flex-none transition-opacity hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-accent'
-          style={secondaryButtonStyle}
+          disabled={disabled}
+          className={customClass}
+          style={secStyle}
         >
           Customize
         </button>
@@ -64,8 +101,9 @@ export function CookieActions({
       <button
         type='button'
         onClick={onAcceptAll}
-        className='w-full sm:w-auto transition-opacity hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-accent'
-        style={primaryButtonStyle}
+        disabled={disabled}
+        className={acceptClass}
+        style={priStyle}
       >
         Accept All
       </button>

@@ -1,4 +1,4 @@
-import { BrandLogo } from '@/components/atoms/BrandLogo';
+import { JovieMarkElectric } from '@/components/atoms/JovieMarkElectric';
 
 /**
  * Generic "service unavailable" page shown to blocked users.
@@ -25,7 +25,7 @@ export function UnavailablePage() {
 
       <div className='w-full max-w-[420px] relative z-10 flex flex-col items-center'>
         <div className='mb-6 sm:mb-8' aria-hidden='true'>
-          <BrandLogo size={32} tone='auto' />
+          <JovieMarkElectric size={32} />
         </div>
 
         <h1 className='text-[18px] leading-[22px] font-medium text-primary-token text-center mb-4'>

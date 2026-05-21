@@ -2,6 +2,7 @@
 
 import type * as React from 'react';
 import { useMemo } from 'react';
+import { rowState } from '@/components/organisms/table/table.styles';
 import { cn } from '@/lib/utils';
 
 export interface TableRowProps {
@@ -50,22 +51,19 @@ export function TableRow({
       data-index={dataIndex}
       className={cn(
         // Base styles
-        'group border-b border-subtle transition-[background-color,box-shadow] duration-150 last:border-b-0',
+        'group border-b border-subtle transition-[background-color,box-shadow] duration-subtle last:border-b-0',
         // Fixed height to prevent layout shift
         'h-[60px]',
         // Hover and selected states — aligned with Linear design tokens
         (() => {
-          if (checked)
-            return 'bg-(--linear-row-selected) shadow-[inset_0_0_0_1px_color-mix(in_oklab,var(--linear-border-focus)_28%,transparent)]';
-          if (selected)
-            return 'bg-(--linear-row-selected) shadow-[inset_0_0_0_1px_color-mix(in_oklab,var(--linear-border-focus)_24%,transparent)]';
-          return 'hover:bg-(--linear-row-hover)';
+          if (checked) return rowState.checked;
+          if (selected) return rowState.selected;
+          return rowState.hover;
         })(),
         // Clickable cursor
         onClick && 'cursor-pointer',
         // Remove focus outline for clickable rows
-        onClick &&
-          'focus-visible:outline-none focus-visible:bg-(--linear-row-hover) focus-visible:shadow-[inset_0_0_0_1px_color-mix(in_oklab,var(--linear-border-focus)_45%,transparent)]',
+        onClick && rowState.focusVisible,
         // Virtual positioning
         isVirtual && 'absolute left-0 right-0',
         // Custom classes

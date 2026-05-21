@@ -23,6 +23,15 @@ const RANGE_OPTIONS: Array<{ value: Range; label: string }> = [
   { value: '1y', label: '1Y' },
 ];
 
+const SERIES_COLORS = {
+  merged: 'var(--color-accent)',
+  opened: 'var(--color-success)',
+  closed: 'var(--color-error)',
+} as const;
+
+const CHART_DOT_STROKE = 'var(--color-bg-surface-1)';
+const CHART_CURSOR_STROKE = 'var(--color-border-subtle)';
+
 function formatCachedAgo(cachedAt: string): string {
   const diff = Date.now() - new Date(cachedAt).getTime();
   const minutes = Math.floor(diff / 60000);
@@ -49,7 +58,10 @@ const SKELETON_LINE_KEYS = ['skel-a', 'skel-b', 'skel-c'];
 
 function ChartSkeleton() {
   return (
-    <div className='h-[200px] w-full rounded-lg bg-black/40' aria-hidden='true'>
+    <div
+      className='h-[200px] w-full rounded-lg bg-surface-0'
+      aria-hidden='true'
+    >
       <svg
         role='img'
         aria-label='Loading chart'
@@ -67,7 +79,11 @@ function ChartSkeleton() {
               key={key}
               d={path}
               stroke={
-                index === 0 ? '#8B5CF6' : index === 1 ? '#22C55E' : '#EF4444'
+                index === 0
+                  ? SERIES_COLORS.merged
+                  : index === 1
+                    ? SERIES_COLORS.opened
+                    : SERIES_COLORS.closed
               }
               strokeWidth='1.5'
               fill='none'
@@ -110,11 +126,11 @@ function CustomTooltip({
   if (parts.length === 0) return null;
 
   return (
-    <div className='rounded-lg border border-white/10 bg-[#0f0f0f] px-3 py-2 shadow-lg'>
-      <p className='mb-1 text-[11px] font-semibold text-white/60'>
+    <div className='rounded-lg border border-subtle bg-surface-1 px-3 py-2 shadow-card'>
+      <p className='mb-1 text-[11px] font-semibold text-secondary-token'>
         {dateLabel}
       </p>
-      <p className='text-[12px] text-white/90'>{parts.join(', ')}</p>
+      <p className='text-[12px] text-primary-token'>{parts.join(', ')}</p>
     </div>
   );
 }
@@ -170,8 +186,16 @@ const LazyVelocityChart = dynamic(
             >
               <defs>
                 <linearGradient id='mergedGradient' x1='0' y1='0' x2='0' y2='1'>
-                  <stop offset='5%' stopColor='#8B5CF6' stopOpacity={0.08} />
-                  <stop offset='95%' stopColor='#8B5CF6' stopOpacity={0} />
+                  <stop
+                    offset='5%'
+                    stopColor={SERIES_COLORS.merged}
+                    stopOpacity={0.08}
+                  />
+                  <stop
+                    offset='95%'
+                    stopColor={SERIES_COLORS.merged}
+                    stopOpacity={0}
+                  />
                 </linearGradient>
               </defs>
 
@@ -184,21 +208,21 @@ const LazyVelocityChart = dynamic(
 
               <Tooltip
                 content={<CustomTooltip />}
-                cursor={{ stroke: 'rgba(255,255,255,0.08)', strokeWidth: 1 }}
+                cursor={{ stroke: CHART_CURSOR_STROKE, strokeWidth: 1 }}
               />
 
               {/* Merged PRs — hero series (purple) */}
               <Area
                 type='monotone'
                 dataKey='merged'
-                stroke='#8B5CF6'
+                stroke={SERIES_COLORS.merged}
                 strokeWidth={2.5}
                 fill='url(#mergedGradient)'
                 dot={false}
                 activeDot={{
                   r: 4,
-                  fill: '#8B5CF6',
-                  stroke: '#0a0a0a',
+                  fill: SERIES_COLORS.merged,
+                  stroke: CHART_DOT_STROKE,
                   strokeWidth: 2,
                   onClick: () => onLineClick('merged'),
                 }}
@@ -211,14 +235,14 @@ const LazyVelocityChart = dynamic(
               <Area
                 type='monotone'
                 dataKey='opened'
-                stroke='#22C55E'
+                stroke={SERIES_COLORS.opened}
                 strokeWidth={1.5}
                 fill='none'
                 dot={false}
                 activeDot={{
                   r: 3,
-                  fill: '#22C55E',
-                  stroke: '#0a0a0a',
+                  fill: SERIES_COLORS.opened,
+                  stroke: CHART_DOT_STROKE,
                   strokeWidth: 2,
                   onClick: () => onLineClick('opened'),
                 }}
@@ -232,14 +256,14 @@ const LazyVelocityChart = dynamic(
                 <Area
                   type='monotone'
                   dataKey='closed'
-                  stroke='#EF4444'
+                  stroke={SERIES_COLORS.closed}
                   strokeWidth={1.5}
                   fill='none'
                   dot={false}
                   activeDot={{
                     r: 3,
-                    fill: '#EF4444',
-                    stroke: '#0a0a0a',
+                    fill: SERIES_COLORS.closed,
+                    stroke: CHART_DOT_STROKE,
                     strokeWidth: 2,
                     onClick: () => onLineClick('closed'),
                   }}
@@ -321,11 +345,11 @@ export function ShippingVelocityChart({
     data.every(d => d.merged === 0 && d.opened === 0 && d.closed === 0);
 
   return (
-    <div className='rounded-xl bg-[#0a0a0a] p-4'>
+    <div className='p-4'>
       {/* Header row */}
       <div className='mb-3 flex items-center justify-between gap-3'>
         <div className='flex items-center gap-3'>
-          <p className='text-[11px] font-semibold uppercase tracking-[0.16em] text-white/40'>
+          <p className='text-[11px] font-semibold tracking-normal text-secondary-token'>
             Shipping Velocity
           </p>
           {/* Legend */}
@@ -338,9 +362,9 @@ export function ShippingVelocityChart({
             >
               <span
                 className='block h-[2px] w-3 rounded-full'
-                style={{ backgroundColor: '#8B5CF6' }}
+                style={{ backgroundColor: SERIES_COLORS.merged }}
               />
-              <span className='text-[10px] text-white/40'>Merged</span>
+              <span className='text-[10px] text-tertiary-token'>Merged</span>
             </button>
             <button
               type='button'
@@ -350,9 +374,9 @@ export function ShippingVelocityChart({
             >
               <span
                 className='block h-[2px] w-3 rounded-full'
-                style={{ backgroundColor: '#22C55E' }}
+                style={{ backgroundColor: SERIES_COLORS.opened }}
               />
-              <span className='text-[10px] text-white/40'>Opened</span>
+              <span className='text-[10px] text-tertiary-token'>Opened</span>
             </button>
             <button
               type='button'
@@ -363,15 +387,15 @@ export function ShippingVelocityChart({
             >
               <span
                 className='block h-[2px] w-3 rounded-full'
-                style={{ backgroundColor: '#EF4444' }}
+                style={{ backgroundColor: SERIES_COLORS.closed }}
               />
-              <span className='text-[10px] text-white/40'>Closed</span>
+              <span className='text-[10px] text-tertiary-token'>Closed</span>
             </button>
           </div>
         </div>
 
         {/* Range toggle */}
-        <div className='flex items-center gap-0.5 rounded-lg bg-white/5 p-0.5'>
+        <div className='flex items-center gap-0.5 rounded-lg border border-subtle bg-surface-0 p-0.5'>
           {RANGE_OPTIONS.map(opt => (
             <button
               key={opt.value}
@@ -379,8 +403,8 @@ export function ShippingVelocityChart({
               onClick={() => handleRangeChange(opt.value)}
               className={
                 range === opt.value
-                  ? 'rounded-md bg-white/10 px-2.5 py-1 text-[11px] font-semibold text-white'
-                  : 'rounded-md px-2.5 py-1 text-[11px] font-medium text-white/40 transition-colors hover:text-white/70'
+                  ? 'rounded-md bg-surface-2 px-2.5 py-1 text-[11px] font-semibold text-primary-token'
+                  : 'rounded-md px-2.5 py-1 text-[11px] font-medium text-tertiary-token transition-colors hover:text-secondary-token'
               }
               aria-pressed={range === opt.value}
             >
@@ -395,9 +419,9 @@ export function ShippingVelocityChart({
         <ChartSkeleton />
       ) : error ? (
         <div className='flex h-[200px] flex-col items-center justify-center gap-2'>
-          <p className='text-[13px] text-white/40'>{error}</p>
+          <p className='text-[13px] text-secondary-token'>{error}</p>
           {cachedAt ? (
-            <p className='text-[11px] text-white/25'>
+            <p className='text-[11px] text-tertiary-token'>
               Last updated {formatCachedAgo(cachedAt)}
             </p>
           ) : null}
@@ -406,14 +430,16 @@ export function ShippingVelocityChart({
             onClick={() => {
               fetchData(range).catch(() => {});
             }}
-            className='mt-1 rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-[11px] font-medium text-white/60 transition-colors hover:bg-white/10 hover:text-white/80'
+            className='mt-1 rounded-lg border border-subtle bg-surface-0 px-3 py-1.5 text-[11px] font-medium text-secondary-token transition-colors hover:bg-surface-2 hover:text-primary-token'
           >
             Retry
           </button>
         </div>
       ) : isEmpty ? (
         <div className='flex h-[200px] items-center justify-center'>
-          <p className='text-[13px] text-white/30'>No PRs in this period</p>
+          <p className='text-[13px] text-tertiary-token'>
+            No PRs in this period
+          </p>
         </div>
       ) : (
         <LazyVelocityChart
@@ -427,7 +453,7 @@ export function ShippingVelocityChart({
 
       {/* Footer */}
       {cachedAt && !isLoading && !error ? (
-        <p className='mt-2 text-right text-[10px] text-white/20'>
+        <p className='mt-2 text-right text-[10px] text-tertiary-token'>
           Updated {formatCachedAgo(cachedAt)}
         </p>
       ) : null}

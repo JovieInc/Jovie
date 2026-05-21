@@ -1,5 +1,6 @@
 'use client';
 
+import { memo } from 'react';
 import { cn } from '@/lib/utils';
 
 export interface LyricsListLine {
@@ -21,12 +22,46 @@ export interface LyricsListProps {
   readonly className?: string;
 }
 
+/**
+ * Formats seconds to a `m:ss` string for lyric timestamps.
+ * Returns '0:00' for non-finite or negative inputs (defensive for prod data).
+ */
 function formatLyricsTime(seconds: number): string {
   if (!Number.isFinite(seconds) || seconds < 0) return '0:00';
   const m = Math.floor(seconds / 60);
   const s = Math.floor(seconds % 60);
   return `${m}:${String(s).padStart(2, '0')}`;
 }
+
+/**
+ * Memoized row renderer for a single lyric line in the drawer.
+ * Renders a timestamp + text as a focusable seek button.
+ * Applies canonical shell focus ring (with offset) + DESIGN.md subtle motion.
+ * Extracted + memoized to avoid re-renders on high-churn lyric lists over real prod data.
+ */
+const LyricListRow = memo(function LyricListRow({
+  line,
+  onSeek,
+  disabled,
+}: {
+  readonly line: LyricsListLine;
+  readonly onSeek?: (sec: number) => void;
+  readonly disabled: boolean;
+}) {
+  return (
+    <button
+      type='button'
+      onClick={() => onSeek?.(line.at)}
+      disabled={disabled}
+      className='group/lyric w-full flex items-start gap-2 px-2 py-1.5 rounded-md text-[12.5px] text-secondary-token hover:bg-surface-1/40 hover:text-primary-token disabled:cursor-default disabled:hover:bg-transparent disabled:hover:text-secondary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/55 focus-visible:ring-offset-2 focus-visible:ring-offset-(--linear-bg-page) transition-colors duration-subtle ease-subtle text-left'
+    >
+      <span className='shrink-0 w-9 pt-0.5 text-[10.5px] tabular-nums text-quaternary-token group-hover/lyric:text-tertiary-token transition-colors duration-subtle ease-subtle'>
+        {formatLyricsTime(line.at)}
+      </span>
+      <span className='flex-1 leading-snug'>{line.text}</span>
+    </button>
+  );
+});
 
 /**
  * LyricsList — drawer-embedded lyric lines with click-to-seek
@@ -65,7 +100,7 @@ export function LyricsList({
           <button
             type='button'
             onClick={onEdit}
-            className='text-[10.5px] uppercase tracking-[0.06em] text-quaternary-token hover:text-primary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-token rounded transition-colors duration-150 ease-out'
+            className='text-[10.5px] uppercase tracking-[0.06em] text-quaternary-token hover:text-primary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/55 focus-visible:ring-offset-2 focus-visible:ring-offset-(--linear-bg-page) rounded transition-colors duration-subtle ease-subtle'
           >
             {editLabel}
           </button>
@@ -74,17 +109,7 @@ export function LyricsList({
       <ol className='flex flex-col -mx-2'>
         {lines.map(line => (
           <li key={`${line.at}-${line.text}`}>
-            <button
-              type='button'
-              onClick={() => onSeek?.(line.at)}
-              disabled={!onSeek}
-              className='group/lyric w-full flex items-start gap-2 px-2 py-1.5 rounded-md text-[12.5px] text-secondary-token hover:bg-surface-1/40 hover:text-primary-token disabled:cursor-default disabled:hover:bg-transparent disabled:hover:text-secondary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-token transition-colors duration-150 ease-out text-left'
-            >
-              <span className='shrink-0 w-9 pt-0.5 text-[10.5px] tabular-nums text-quaternary-token group-hover/lyric:text-tertiary-token transition-colors duration-150 ease-out'>
-                {formatLyricsTime(line.at)}
-              </span>
-              <span className='flex-1 leading-snug'>{line.text}</span>
-            </button>
+            <LyricListRow line={line} onSeek={onSeek} disabled={!onSeek} />
           </li>
         ))}
       </ol>

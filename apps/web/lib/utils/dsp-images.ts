@@ -20,6 +20,19 @@ import { getDspCdnDomains } from '@/constants/platforms/cdn-domains';
 const DSP_CDN_DOMAINS = getDspCdnDomains();
 
 /**
+ * DSP CDN domains that are declared in next.config.js remotePatterns and
+ * can therefore be proxied through /_next/image for AVIF/WebP conversion
+ * and resizing. These domains must NOT bypass optimization.
+ *
+ * Keep in sync with the remotePatterns in next.config.js.
+ */
+const PROXIABLE_DSP_DOMAINS: readonly string[] = [
+  'i.scdn.co', // Spotify (exact)
+  'scdn.co', // Spotify CDN wildcard base (*.scdn.co)
+  'spotifycdn.com', // Spotify CDN wildcard base (*.spotifycdn.com)
+];
+
+/**
  * Checks if an image URL is from a known DSP CDN.
  *
  * Images from these CDNs should be served unoptimized as they are
@@ -40,14 +53,32 @@ export function isExternalDspImage(url: string | null | undefined): boolean {
 }
 
 /**
+ * Returns true if the DSP CDN URL can be proxied through /_next/image
+ * (i.e. is declared in next.config.js remotePatterns). Proxiable domains
+ * benefit from AVIF/WebP conversion and viewport-appropriate resizing.
+ */
+function isProxiableDspDomain(url: string): boolean {
+  return PROXIABLE_DSP_DOMAINS.some(domain => url.includes(domain));
+}
+
+/**
  * Shared image optimization bypass for sources that do not benefit from
  * Next's image proxying during QA or production.
+ *
+ * DSP CDN domains that are declared in next.config.js remotePatterns
+ * (Spotify) are intentionally excluded from the bypass so they receive
+ * AVIF/WebP conversion and mobile-appropriate resizing — critical for LCP
+ * performance on /[username] profile pages (JOV-2261).
  */
 export function shouldBypassImageOptimization(
   url: string | null | undefined
 ): boolean {
   if (!url) return false;
-  if (isExternalDspImage(url)) return true;
+  if (isExternalDspImage(url)) {
+    // Proxiable DSP domains benefit from Next/Image optimization — do not bypass.
+    if (isProxiableDspDomain(url)) return false;
+    return true;
+  }
 
   try {
     const parsed = new URL(url);

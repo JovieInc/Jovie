@@ -26,6 +26,9 @@ function setCookie(value: string) {
 }
 
 describe('CookieBannerSection consent sync', () => {
+  // Floating card redesign (bottom-right compact surface) preserves all action handlers,
+  // persistence, error paths, and modal open. New render tested in sibling cookie-banner.test.tsx
+  // (positioning, classes, height var, no Manage chrome, compact actions prop).
   beforeEach(() => {
     vi.resetModules();
     mockSaveConsent.mockResolvedValue(undefined);
@@ -54,7 +57,7 @@ describe('CookieBannerSection consent sync', () => {
     });
   });
 
-  it('hides banner immediately on acceptAll even if saveConsent rejects', async () => {
+  it('keeps banner visible on acceptAll when saveConsent rejects', async () => {
     mockSaveConsent.mockRejectedValue(new Error('server error'));
     const mod = await import('@/components/organisms/CookieBannerSection');
     setCookie('jv_cc_required=1');
@@ -65,26 +68,30 @@ describe('CookieBannerSection consent sync', () => {
     const btn = screen.getByRole('button', { name: /accept all/i });
     fireEvent.click(btn);
 
-    // Banner must disappear even if the server action fails.
     await vi.waitFor(() => {
-      expect(screen.queryByTestId('cookie-banner')).not.toBeInTheDocument();
+      expect(screen.getByRole('alert')).toHaveTextContent(
+        /could not save preferences/i
+      );
     });
+    expect(screen.getByTestId('cookie-banner')).toBeInTheDocument();
+    expect(localStorage.getItem('jv_cc')).toBeNull();
   });
 
-  it('persists consent to localStorage before server action on acceptAll', async () => {
+  it('persists consent to localStorage after server action on acceptAll', async () => {
     const mod = await import('@/components/organisms/CookieBannerSection');
     setCookie('jv_cc_required=1');
     render(<mod.CookieBannerSection />);
 
     fireEvent.click(screen.getByRole('button', { name: /accept all/i }));
 
-    // localStorage must be written synchronously (before the SA resolves).
-    const saved = localStorage.getItem('jv_cc');
-    expect(saved).toBeTruthy();
-    expect(JSON.parse(saved!)).toMatchObject({
-      essential: true,
-      analytics: true,
-      marketing: true,
+    await vi.waitFor(() => {
+      const saved = localStorage.getItem('jv_cc');
+      expect(saved).toBeTruthy();
+      expect(JSON.parse(saved!)).toMatchObject({
+        essential: true,
+        analytics: true,
+        marketing: true,
+      });
     });
   });
 
@@ -106,7 +113,7 @@ describe('CookieBannerSection consent sync', () => {
     });
   });
 
-  it('hides banner immediately on reject even if saveConsent rejects', async () => {
+  it('keeps banner visible on reject when saveConsent rejects', async () => {
     mockSaveConsent.mockRejectedValue(new Error('server error'));
     const mod = await import('@/components/organisms/CookieBannerSection');
     setCookie('jv_cc_required=1');
@@ -117,12 +124,20 @@ describe('CookieBannerSection consent sync', () => {
     fireEvent.click(screen.getByRole('button', { name: /reject/i }));
 
     await vi.waitFor(() => {
-      expect(screen.queryByTestId('cookie-banner')).not.toBeInTheDocument();
+      expect(screen.getByRole('alert')).toHaveTextContent(
+        /could not save preferences/i
+      );
     });
+    expect(screen.getByTestId('cookie-banner')).toBeInTheDocument();
+    expect(localStorage.getItem('jv_cc')).toBeNull();
   });
 });
 
 describe('CookieModal loads saved preferences', () => {
+  beforeEach(() => {
+    mockSaveConsent.mockResolvedValue(undefined);
+  });
+
   beforeEach(() => {
     localStorage.clear();
   });
@@ -167,7 +182,22 @@ describe('CookieModal loads saved preferences', () => {
     );
   });
 
-  it('calls onSave and onClose when Save Preferences clicked even if saveConsent rejects', async () => {
+  it('calls onSave and onClose when Save Preferences succeeds', async () => {
+    const onSave = vi.fn();
+    const onClose = vi.fn();
+
+    const { CookieModal } = await import('@/components/organisms/CookieModal');
+    render(<CookieModal open onClose={onClose} onSave={onSave} />);
+
+    fireEvent.click(screen.getByRole('button', { name: /save preferences/i }));
+
+    await vi.waitFor(() => {
+      expect(onSave).toHaveBeenCalledTimes(1);
+      expect(onClose).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  it('keeps preferences open when saveConsent rejects', async () => {
     mockSaveConsent.mockRejectedValue(new Error('server error'));
     const onSave = vi.fn();
     const onClose = vi.fn();
@@ -177,9 +207,13 @@ describe('CookieModal loads saved preferences', () => {
 
     fireEvent.click(screen.getByRole('button', { name: /save preferences/i }));
 
-    // onSave and onClose must be called synchronously, before the server action resolves.
-    expect(onSave).toHaveBeenCalledTimes(1);
-    expect(onClose).toHaveBeenCalledTimes(1);
+    await vi.waitFor(() => {
+      expect(screen.getByRole('alert')).toHaveTextContent(
+        /could not save preferences/i
+      );
+    });
+    expect(onSave).not.toHaveBeenCalled();
+    expect(onClose).not.toHaveBeenCalled();
   });
 });
 

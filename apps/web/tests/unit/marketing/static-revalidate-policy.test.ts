@@ -3,6 +3,7 @@ import { join, relative } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 const STATIC_ROUTE_ROOTS = [
+  'app/brand',
   'app/(home)',
   'app/(marketing)',
   'app/(dynamic)/legal',

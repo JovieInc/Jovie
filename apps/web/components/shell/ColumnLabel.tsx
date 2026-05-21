@@ -70,7 +70,7 @@ export function ColumnLabel<F extends string>({
       type='button'
       onClick={() => onSort(field)}
       className={cn(
-        'group/col h-6 px-1 -mx-1 rounded-md text-[9.5px] uppercase tracking-[0.12em] font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-token transition-colors duration-150 ease-out',
+        'group/col h-6 px-1 -mx-1 rounded-md text-[9.5px] uppercase tracking-[0.12em] font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/55 focus-visible:ring-offset-2 focus-visible:ring-offset-(--linear-bg-page) transition-colors duration-subtle ease-subtle',
         flex ? 'flex-1 min-w-0' : (width ?? ''),
         'shrink-0 inline-flex items-center gap-1',
         align === 'right' && 'flex-row-reverse',
@@ -84,7 +84,7 @@ export function ColumnLabel<F extends string>({
       <span
         aria-hidden='true'
         className={cn(
-          'inline-flex items-center transition-opacity duration-150 ease-out',
+          'inline-flex items-center transition-opacity duration-subtle ease-subtle',
           active ? 'opacity-100' : 'opacity-0 group-hover/col:opacity-60'
         )}
       >

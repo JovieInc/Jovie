@@ -175,14 +175,14 @@ export const COMMANDS: readonly Command[] = [
     'Releases',
     'Manage your release catalog and smart links.',
     'Music',
-    APP_ROUTES.DASHBOARD_RELEASES
+    APP_ROUTES.RELEASES
   ),
   nav(
     'go-audience',
     'Audience',
     'Understand your audience demographics.',
     'Users',
-    APP_ROUTES.DASHBOARD_AUDIENCE
+    APP_ROUTES.AUDIENCE
   ),
   nav(
     'go-tasks',

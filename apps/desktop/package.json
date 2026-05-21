@@ -1,15 +1,20 @@
 {
   "name": "@jovie/desktop",
-  "version": "26.4.223",
+  "version": "26.5.14",
   "description": "Jovie desktop app",
-  "author": "Jovie Inc.",
+  "author": "Jovie Technology Inc.",
   "private": true,
   "main": "dist-electron/main.js",
   "scripts": {
-    "predev": "node scripts/write-env.mjs",
+    "predev": "cross-env ELECTRON_ENV=local node scripts/write-env.mjs",
     "dev": "tsc && electron .",
     "prepare:assets": "node scripts/prepare-icons.mjs && node scripts/generate-dmg-background.mjs",
     "prepare:dmg-background": "node scripts/generate-dmg-background.mjs",
+    "test": "node --test scripts/desktop-icon-contract.test.mjs && node --test scripts/desktop-shell-contract.test.mjs && node --test scripts/generate-dmg-background.test.mjs && node --test ../../scripts/desktop-release-guard.test.mjs",
+    "test:desktop-icon": "node --test scripts/desktop-icon-contract.test.mjs",
+    "test:desktop-shell": "node --test scripts/desktop-shell-contract.test.mjs",
+    "test:dmg-background": "node --test scripts/generate-dmg-background.test.mjs",
+    "test:release-guard": "node --test ../../scripts/desktop-release-guard.test.mjs",
     "prebuild:staging": "node scripts/sync-version.mjs && cross-env ELECTRON_ENV=staging node scripts/write-env.mjs && pnpm run prepare:assets",
     "build:staging": "tsc && electron-builder --config electron-builder.staging.yml --publish always",
     "prebuild:production": "node scripts/sync-version.mjs && cross-env ELECTRON_ENV=production node scripts/write-env.mjs && pnpm run prepare:assets",
@@ -30,7 +35,7 @@
     "cross-env": "^7.0.3",
     "electron": "^42.0.0",
     "electron-builder": "^25.0.0",
-    "sharp": "^0.33.0",
+    "sharp": "^0.34.5",
     "typescript": "^5.7.0"
   }
 }

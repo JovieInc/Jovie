@@ -9,6 +9,7 @@ vi.mock('next/headers', () => ({
 import {
   resolveClerkKeys,
   resolvePublishableKeyFromHeaders,
+  resolvePublishableKeyStaticFirst,
 } from '@/lib/auth/staging-clerk-keys';
 
 const ORIGINAL_ENV = {
@@ -206,5 +207,88 @@ describe('staging Clerk key resolution', () => {
     await expect(resolvePublishableKeyFromHeaders()).resolves.toBe(
       'pk_live_injected_example'
     );
+  });
+});
+
+describe('resolvePublishableKeyStaticFirst', () => {
+  const ORIGINAL_VERCEL_ENV = process.env.VERCEL_ENV;
+
+  beforeEach(() => {
+    headersMock.mockReset();
+    process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY =
+      'pk_live_production_example';
+    process.env.CLERK_SECRET_KEY = 'sk_live_production_example';
+    delete process.env.CLERK_PUBLISHABLE_KEY_STAGING;
+    delete process.env.CLERK_SECRET_KEY_STAGING;
+  });
+
+  afterEach(() => {
+    if (ORIGINAL_VERCEL_ENV === undefined) {
+      delete process.env.VERCEL_ENV;
+    } else {
+      process.env.VERCEL_ENV = ORIGINAL_VERCEL_ENV;
+    }
+    if (
+      process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY ===
+      'pk_live_production_example'
+    ) {
+      delete process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
+    }
+    if (process.env.CLERK_SECRET_KEY === 'sk_live_production_example') {
+      delete process.env.CLERK_SECRET_KEY;
+    }
+  });
+
+  it('returns the build-time key on production without calling headers()', async () => {
+    process.env.VERCEL_ENV = 'production';
+
+    const result = await resolvePublishableKeyStaticFirst();
+    expect(result).toBe('pk_live_production_example');
+    // headers() must NOT have been called — this is the core of the static-marketing fix
+    expect(headersMock).not.toHaveBeenCalled();
+  });
+
+  it('returns undefined on production when the secret key is missing', async () => {
+    process.env.VERCEL_ENV = 'production';
+    delete process.env.CLERK_SECRET_KEY;
+
+    const result = await resolvePublishableKeyStaticFirst();
+    expect(result).toBeUndefined();
+    expect(headersMock).not.toHaveBeenCalled();
+  });
+
+  it('returns undefined on production when the publishable key is missing', async () => {
+    process.env.VERCEL_ENV = 'production';
+    delete process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
+
+    const result = await resolvePublishableKeyStaticFirst();
+    expect(result).toBeUndefined();
+    expect(headersMock).not.toHaveBeenCalled();
+  });
+
+  it('falls back to headers() on staging (VERCEL_ENV=preview)', async () => {
+    process.env.VERCEL_ENV = 'preview';
+    headersMock.mockResolvedValue(
+      new Headers({
+        'x-clerk-publishable-key': 'pk_live_staging_example',
+      })
+    );
+
+    const result = await resolvePublishableKeyStaticFirst();
+    expect(result).toBe('pk_live_staging_example');
+    expect(headersMock).toHaveBeenCalledOnce();
+  });
+
+  it('falls back to headers() in local dev (VERCEL_ENV unset)', async () => {
+    delete process.env.VERCEL_ENV;
+    headersMock.mockResolvedValue(
+      new Headers({
+        'x-clerk-publishable-key': 'pk_test_local_example',
+      })
+    );
+
+    const result = await resolvePublishableKeyStaticFirst();
+    expect(result).toBe('pk_test_local_example');
+    expect(headersMock).toHaveBeenCalledOnce();
   });
 });

@@ -10,6 +10,9 @@ Controller file for AI agents working in this repo. `AGENTS.md` is a symlink to 
 - Don't invent commands, env vars, routes, tables, services, or design tokens.
 - Don't hide failing checks. Report exact failures and the likely cause.
 - Ask before destructive operations: data deletion, irreversible migrations, credential changes, dependency replacement, auth/payment changes, or production-impacting scripts.
+- **Decisions are systems, not events** (when quantifiable). For decisions whose cost or benefit is measurable, format as **Ship now / Re-evaluate when / Then** with the trigger tied to revenue/cost/perf unit economics (per-unit cost OR build cost = CI minutes × runner $/min + agent minutes × $/hr-of-intelligence). For taste, identity, security, or "this is just wrong" decisions, tag `EVENT:` and skip the trigger — some decisions are permanent. Reject phrasing like "premature", "later", "future work" without a Linear ID. See `.claude/rules/code-style.md` → "Conditional decisions" (added 2026-05-18) and `~/.claude/projects/.../memory/feedback_conditional_decisions.md`. Enforcement hook: `.claude/hooks/conditional-decision-lint.sh` (warn-mode through 2026-06-01, then error).
+
+The four canon principles (Ship Fast, Run Experiments, Document Everything, MRR Is King) are in [`docs/company/operating-principles.md`](docs/company/operating-principles.md). They supersede [`docs/company/core-values.md`](docs/company/core-values.md) when in conflict.
 
 ## Agent Role Boundary
 
@@ -111,6 +114,7 @@ Run the narrowest relevant checks:
 - Lint/format for edited packages: `pnpm biome check --write apps/web`
 - Unit/integration tests for changed logic: `pnpm --filter web exec vitest run <file>`
 - Build for routing/config/cross-package changes
+- **Layout shift audit (mandatory):** Before any UI edit, enumerate all visual states of the component/surface and verify (via inspection, manual dev run, Playwright bounding boxes, or visual regression) that **no state transition causes layout shift**. Reserve space with min-height or stable wrappers for conditional content. Update relevant tests. This is non-negotiable (see `.claude/rules/ui.md` → "Layout Shift Prevention", `DESIGN.md` → "Layout Shift Prevention", `docs/TESTING_GUIDELINES.md`, and `apps/web/tests/TESTING.md`).
 
 If checks are unavailable or fail for unrelated reasons, say so clearly. Paste passing output as evidence in the PR description.
 
@@ -134,6 +138,7 @@ Read the file for the topic you're touching. More-local instructions override th
 | [`.claude/rules/linear.md`](.claude/rules/linear.md) | Issue gating, ownership contract |
 | [`.claude/rules/gstack.md`](.claude/rules/gstack.md) | Vendored toolkit, skill routing |
 | [`.claude/rules/swarm.md`](.claude/rules/swarm.md) | Ruflo-coordinated parallel swarms (pre-created worktrees, claims, ship recipe) |
+| [`.claude/rules/hermes-air.md`](.claude/rules/hermes-air.md) | Always-on Hermes node (MacBook Air): voice/Telegram intake, ops crons, Linear-as-bus contract |
 
 ## Skill routing
 
@@ -173,3 +178,5 @@ Examples:
 - `apps/web/tests/TESTING.md` is the deep test reference.
 - `LESSONS.md` collects post-mortems from human corrections.
 - `docs/` holds reference indexes (schema map, API map, cron registry, etc.).
+- `docs/company/operating-principles.md` is the four-principle canon (Ship Fast, Experiments, Document, MRR Is King).
+- `docs/company/PRICING-PHILOSOPHY.md` is the canon for how pricing decisions are made; `docs/company/PRICING-STRATEGY.md` is the current snapshot; `docs/company/pricing-trends-summary.md` is the Stripe data behind the philosophy.

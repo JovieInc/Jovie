@@ -25,4 +25,17 @@ describe('admin playlists surface guard', () => {
       "className='rounded-lg border border-white/[0.06] bg-white/[0.02] p-4'"
     );
   });
+
+  it('keeps row actions and metadata on shared tokens', () => {
+    const contents = readFileSync(ADMIN_PLAYLISTS_ROUTE, 'utf8');
+
+    expect(contents).toContain("import { Button } from '@jovie/ui';");
+    expect(contents).toContain('text-primary-token');
+    expect(contents).toContain('text-tertiary-token');
+    expect(contents).not.toContain('bg-[#1DB954]');
+    expect(contents).not.toContain('text-[#1DB954]');
+    expect(contents).not.toContain('text-white/40');
+    expect(contents).not.toContain('bg-white/5');
+    expect(contents).not.toContain('hover:bg-white/10');
+  });
 });

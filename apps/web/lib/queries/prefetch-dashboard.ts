@@ -1,7 +1,8 @@
 import type { QueryClient } from '@tanstack/react-query';
 import { loadDspPresenceForProfile } from '@/app/app/(shell)/dashboard/presence/actions';
-import { loadReleaseMatrix } from '@/app/app/(shell)/dashboard/releases/actions';
 import { getTasks } from '@/app/app/(shell)/dashboard/tasks/task-actions';
+import { loadReleaseMatrix } from '@/lib/releases/release-matrix-loader';
+import { DEFAULT_TASK_WORKSPACE_FILTERS } from '@/lib/tasks/query-defaults';
 import { FREQUENT_CACHE } from './cache-strategies';
 import { createQueryFn, fetchWithTimeout } from './fetch';
 import { queryKeys } from './keys';
@@ -25,6 +26,7 @@ export function prefetchForRoute(
   const { staleTime } = FREQUENT_CACHE;
 
   switch (routeId) {
+    case 'library':
     case 'releases':
       queryClient.prefetchQuery({
         queryKey: queryKeys.releases.matrix(profileId),
@@ -60,8 +62,11 @@ export function prefetchForRoute(
       break;
     case 'tasks':
       queryClient.prefetchQuery({
-        queryKey: queryKeys.tasks.list(profileId),
-        queryFn: () => getTasks(),
+        queryKey: queryKeys.tasks.list(
+          profileId,
+          DEFAULT_TASK_WORKSPACE_FILTERS
+        ),
+        queryFn: () => getTasks(DEFAULT_TASK_WORKSPACE_FILTERS),
         staleTime,
       });
       break;

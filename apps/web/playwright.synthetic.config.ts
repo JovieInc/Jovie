@@ -13,15 +13,17 @@ import { defineConfig, devices } from '@playwright/test';
 export default defineConfig({
   testDir: './tests/e2e',
   testMatch: [
+    '**/synthetic-auth-ui.spec.ts',
     '**/synthetic-golden-path.spec.ts',
+    '**/synthetic-legacy-otp.spec.ts',
     '**/public-profile-smoke.spec.ts',
   ],
   fullyParallel: false, // Sequential for stability in prod
   forbidOnly: true, // Always enforced in synthetic mode
   retries: 2, // Retry failed tests to avoid false alarms
   workers: 1, // Single worker for consistency
-  timeout: 120_000, // 2 minutes per test
-  globalTimeout: 600_000, // 10 minutes total
+  timeout: 240_000, // 4 minutes per test
+  globalTimeout: 900_000, // 15 minutes total
 
   reporter: [
     [

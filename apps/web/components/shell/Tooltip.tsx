@@ -4,7 +4,9 @@ import { cn } from '@/lib/utils';
 // Tooltip — small, dark, glassy popover with the action label + an
 // optional kbd chip on the right. Pass a `shortcut` object to surface the
 // key combo. CSS-only (no portal); uses group/tip + delay for a Linear-
-// feeling late reveal that snaps in over 150ms once it commits.
+// feeling late reveal via pure opacity fade (no decorative translate/slide
+// motion per DESIGN.md + .claude/rules/ui.md "no decorative hover motion").
+// z raised to sit above new shell chrome.
 
 export interface TooltipProps {
   readonly children: React.ReactNode;
@@ -27,12 +29,12 @@ export function Tooltip({
 }: TooltipProps) {
   const sideClasses =
     side === 'bottom'
-      ? 'top-full left-1/2 -translate-x-1/2 mt-1.5 translate-y-0.5 group-hover/tip:translate-y-0 group-focus-within/tip:translate-y-0'
+      ? 'top-full left-1/2 -translate-x-1/2 mt-1.5'
       : side === 'top'
-        ? 'bottom-full left-1/2 -translate-x-1/2 mb-1.5 -translate-y-0.5 group-hover/tip:translate-y-0 group-focus-within/tip:translate-y-0'
+        ? 'bottom-full left-1/2 -translate-x-1/2 mb-1.5'
         : side === 'right'
-          ? 'left-full top-1/2 -translate-y-1/2 ml-1.5 -translate-x-0.5 group-hover/tip:translate-x-0 group-focus-within/tip:translate-x-0'
-          : 'right-full top-1/2 -translate-y-1/2 mr-1.5 translate-x-0.5 group-hover/tip:translate-x-0 group-focus-within/tip:translate-x-0';
+          ? 'left-full top-1/2 -translate-y-1/2 ml-1.5'
+          : 'right-full top-1/2 -translate-y-1/2 mr-1.5';
 
   return (
     <span
@@ -46,9 +48,11 @@ export function Tooltip({
       <span
         role='tooltip'
         className={cn(
-          'pointer-events-none absolute z-50 whitespace-nowrap',
+          // z-[100] to sit above new shell chrome (UnifiedSidebar z-~10-40, PersistentAudioBar/NowPlaying ~z-30, drawers ~z-50) while near cursor.
+          'pointer-events-none absolute z-[100] whitespace-nowrap',
           'opacity-0 group-hover/tip:opacity-100 group-focus-within/tip:opacity-100',
-          'transition-[opacity,transform] duration-150 ease-out delay-[400ms] group-hover/tip:delay-[400ms] group-focus-within/tip:delay-[80ms]',
+          'transition-opacity duration-subtle ease-subtle delay-[400ms] group-hover/tip:delay-[400ms] group-focus-within/tip:delay-[80ms]',
+          'motion-reduce:transition-none motion-reduce:delay-0',
           sideClasses
         )}
       >

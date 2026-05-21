@@ -9,23 +9,36 @@ import './globals.css';
 // canonical declaration; Next.js's not-found.tsx CSS extraction doesn't always
 // traverse client-component CSS imports, so we ground the bundle here too.
 import '@/components/organisms/HeaderNav.css';
+import '@/components/site/MarketingFooter.css';
 import { CookieBannerMount } from '@/components/organisms/CookieBannerMount';
 import { InstantlyPixel } from '@/components/providers/InstantlyPixel';
 import { getRootLayoutChromeState } from '@/lib/demo-recording';
 import { publicEnv } from '@/lib/env-public';
 
 const inter = localFont({
-  src: '../public/fonts/Inter-Variable.woff2',
+  src: '../public/fonts/Inter-Latin.woff2',
   variable: '--font-inter',
-  display: 'swap',
+  display: 'optional',
   weight: '100 900',
 });
 
 const satoshi = localFont({
-  src: '../public/fonts/Satoshi-Variable.woff2',
+  src: '../public/fonts/Satoshi-Latin.woff2',
   variable: '--font-satoshi',
-  display: 'swap',
+  display: 'optional',
   weight: '300 900',
+});
+
+// JOV-2267: DM Sans is only used in below-fold marketing sections
+// (HomeLoopDiagramSection, HomeStatQuoteSection, HomeBentoPairs) via
+// --marketing-font-body. Setting preload:false prevents a 68KB preload hint
+// on every page; display:'optional' already suppresses FOUT.
+const dmSans = localFont({
+  src: '../public/fonts/DMSans-Latin.woff2',
+  variable: '--font-dm-sans',
+  display: 'optional',
+  preload: false,
+  weight: '100 1000',
 });
 
 export const metadata: Metadata = {
@@ -192,7 +205,7 @@ export default async function RootLayout({
     );
   }
 
-  const bodyClassName = `${inter.variable} ${satoshi.variable} font-sans antialiased bg-base text-primary-token`;
+  const bodyClassName = `${inter.variable} ${satoshi.variable} ${dmSans.variable} font-sans antialiased bg-base text-primary-token`;
 
   const content = (
     <>
@@ -219,6 +232,8 @@ export default async function RootLayout({
       suppressHydrationWarning
     >
       <head suppressHydrationWarning>
+        {/* eslint-disable-next-line @next/next/no-sync-scripts -- Electron runtime marker must run before first paint. */}
+        <script src='/electron-runtime-init.js' />
         {/* eslint-disable-next-line @next/next/no-sync-scripts -- Theme init must run before first paint and stays static in /public. */}
         <script src='/theme-init.js' />
       </head>

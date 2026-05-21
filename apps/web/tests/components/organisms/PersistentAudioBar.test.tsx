@@ -1,8 +1,16 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { ReactNode } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { buildLyricsRoute } from '@/constants/routes';
+import {
+  getAudioChromeSnapshot,
+  resetAudioChromeSnapshot,
+} from '@/components/organisms/audio-chrome-state';
+import {
+  APP_ROUTES,
+  buildLyricsRoute,
+  resolveLyricsReturnRoute,
+} from '@/constants/routes';
 import { AppFlagProvider } from '@/lib/flags/client';
 import { APP_FLAG_DEFAULTS } from '@/lib/flags/contracts';
 
@@ -12,6 +20,7 @@ const seek = vi.fn();
 const onError = vi.fn().mockReturnValue(() => {});
 const push = vi.fn();
 let pathname = '/app';
+let searchParams = new URLSearchParams();
 
 const basePlaybackState = {
   activeTrackId: null as string | null,
@@ -46,6 +55,7 @@ vi.mock('@/components/organisms/release-sidebar/useTrackAudioPlayer', () => ({
 
 vi.mock('next/navigation', () => ({
   usePathname: () => pathname,
+  useSearchParams: () => searchParams,
   useRouter: () => ({ push }),
 }));
 
@@ -108,7 +118,9 @@ describe('PersistentAudioBar', () => {
     onError.mockClear().mockReturnValue(() => {});
     push.mockClear();
     pathname = '/app';
+    searchParams = new URLSearchParams();
     mockPlaybackState = { ...basePlaybackState };
+    resetAudioChromeSnapshot();
   });
 
   it('renders nothing when no track is active', () => {
@@ -265,11 +277,21 @@ describe('PersistentAudioBar', () => {
     expect(
       screen.getByRole('button', { name: 'Hide waveform' })
     ).toBeInTheDocument();
+    expect(screen.getByTestId('audio-surface-expanded-shell')).toHaveAttribute(
+      'aria-hidden',
+      'false'
+    );
+    expect(screen.getByTestId('audio-surface-compact-shell')).toHaveAttribute(
+      'aria-hidden',
+      'true'
+    );
   });
 
   it('links the shell V1 lyrics button to the active track when DESIGN_V1 is enabled', async () => {
     const user = userEvent.setup();
     setPlaying({ artistName: 'DJ Cool', hasLyrics: true });
+    pathname = '/app/chat/thread-1';
+    searchParams = new URLSearchParams('panel=profile');
 
     render(
       <AppFlagProvider initialFlags={{ ...APP_FLAG_DEFAULTS, DESIGN_V1: true }}>
@@ -279,7 +301,63 @@ describe('PersistentAudioBar', () => {
 
     await user.click(screen.getByRole('button', { name: 'Lyrics' }));
 
-    expect(push).toHaveBeenCalledWith(buildLyricsRoute('track-1'));
+    expect(push).toHaveBeenCalledWith(
+      buildLyricsRoute('track-1', {
+        from: '/app/chat/thread-1?panel=profile',
+      })
+    );
+  });
+
+  it('closes the shell V1 lyrics button back to the last non-lyrics route', async () => {
+    const user = userEvent.setup();
+    setPlaying({ artistName: 'DJ Cool', hasLyrics: true });
+    pathname = APP_ROUTES.RELEASES;
+
+    const { rerender } = render(
+      <AppFlagProvider initialFlags={{ ...APP_FLAG_DEFAULTS, DESIGN_V1: true }}>
+        <PersistentAudioBar variant='shellChatV1' />
+      </AppFlagProvider>
+    );
+
+    pathname = buildLyricsRoute('track-1');
+    searchParams = new URLSearchParams(
+      `from=${encodeURIComponent(APP_ROUTES.RELEASES)}`
+    );
+    rerender(
+      <AppFlagProvider initialFlags={{ ...APP_FLAG_DEFAULTS, DESIGN_V1: true }}>
+        <PersistentAudioBar variant='shellChatV1' />
+      </AppFlagProvider>
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Close lyrics' }));
+
+    expect(push).toHaveBeenCalledWith(APP_ROUTES.RELEASES);
+  });
+
+  it('prefers the explicit lyrics return route when closing from the shell V1 player', async () => {
+    const user = userEvent.setup();
+    setPlaying({ artistName: 'DJ Cool', hasLyrics: true });
+    pathname = APP_ROUTES.CHAT;
+
+    const { rerender } = render(
+      <AppFlagProvider initialFlags={{ ...APP_FLAG_DEFAULTS, DESIGN_V1: true }}>
+        <PersistentAudioBar variant='shellChatV1' />
+      </AppFlagProvider>
+    );
+
+    pathname = buildLyricsRoute('track-1');
+    searchParams = new URLSearchParams(
+      'from=%2Fapp%2Freleases%3Ftab%3Dscheduled'
+    );
+    rerender(
+      <AppFlagProvider initialFlags={{ ...APP_FLAG_DEFAULTS, DESIGN_V1: true }}>
+        <PersistentAudioBar variant='shellChatV1' />
+      </AppFlagProvider>
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Close lyrics' }));
+
+    expect(push).toHaveBeenCalledWith('/app/releases?tab=scheduled');
   });
 
   it('keeps the shell V1 lyrics button hidden when the active track has no lyrics', () => {
@@ -324,8 +402,58 @@ describe('PersistentAudioBar', () => {
     });
   });
 
+  it('swaps shell audio surfaces when the player is minimized', async () => {
+    const user = userEvent.setup();
+    setPlaying({ artistName: 'DJ Cool' });
+
+    render(<PersistentAudioBar variant='shellChatV1' />);
+
+    const expandedSurface = screen.getByTestId('audio-surface-expanded-shell');
+    const compactSurface = screen.getByTestId('audio-surface-compact-shell');
+
+    expect(expandedSurface).toHaveAttribute('aria-hidden', 'false');
+    expect(compactSurface).toHaveAttribute('aria-hidden', 'true');
+
+    await user.click(screen.getByRole('button', { name: 'Minimize player' }));
+
+    expect(expandedSurface).toHaveAttribute('aria-hidden', 'true');
+    expect(compactSurface).toHaveAttribute('aria-hidden', 'false');
+  });
+
+  it('publishes compact shell V1 chrome state while minimized and clears on unmount', async () => {
+    const user = userEvent.setup();
+    setPlaying({ artistName: 'DJ Cool' });
+
+    const { unmount } = render(<PersistentAudioBar variant='shellChatV1' />);
+
+    expect(getAudioChromeSnapshot()).toEqual({
+      activeTrackId: 'track-1',
+      compactPlayerVisible: false,
+      fullPlayerVisible: true,
+    });
+
+    await user.click(screen.getByRole('button', { name: 'Minimize player' }));
+
+    await waitFor(() => {
+      expect(getAudioChromeSnapshot()).toEqual({
+        activeTrackId: 'track-1',
+        compactPlayerVisible: true,
+        fullPlayerVisible: false,
+      });
+    });
+
+    unmount();
+
+    expect(getAudioChromeSnapshot()).toEqual({
+      activeTrackId: null,
+      compactPlayerVisible: false,
+      fullPlayerVisible: false,
+    });
+  });
+
   it('handles shell V1 active-track keyboard shortcuts', () => {
     setPlaying({ artistName: 'DJ Cool', hasLyrics: true });
+    pathname = APP_ROUTES.CHAT;
 
     render(
       <AppFlagProvider initialFlags={{ ...APP_FLAG_DEFAULTS, DESIGN_V1: true }}>
@@ -345,9 +473,38 @@ describe('PersistentAudioBar', () => {
     ).toBeInTheDocument();
 
     fireEvent.keyDown(globalThis, { key: 'l' });
-    expect(push).toHaveBeenCalledWith(buildLyricsRoute('track-1'));
+    expect(push).toHaveBeenCalledWith(
+      buildLyricsRoute('track-1', { from: APP_ROUTES.CHAT })
+    );
 
     fireEvent.keyDown(globalThis, { key: '`' });
     expect(screen.getByRole('button', { name: 'Pause' })).toBeInTheDocument();
+  });
+
+  it('closes the lyrics route with Escape when an active track is present', () => {
+    setPlaying({ artistName: 'DJ Cool', hasLyrics: true });
+    pathname = APP_ROUTES.CHAT;
+
+    const { rerender } = render(
+      <AppFlagProvider initialFlags={{ ...APP_FLAG_DEFAULTS, DESIGN_V1: true }}>
+        <PersistentAudioBar variant='shellChatV1' />
+      </AppFlagProvider>
+    );
+
+    pathname = buildLyricsRoute('track-1');
+    searchParams = new URLSearchParams(
+      `from=${encodeURIComponent(APP_ROUTES.CHAT)}`
+    );
+    rerender(
+      <AppFlagProvider initialFlags={{ ...APP_FLAG_DEFAULTS, DESIGN_V1: true }}>
+        <PersistentAudioBar variant='shellChatV1' />
+      </AppFlagProvider>
+    );
+
+    fireEvent.keyDown(globalThis, { key: 'Escape' });
+
+    expect(push).toHaveBeenCalledWith(
+      resolveLyricsReturnRoute(searchParams.get('from'), APP_ROUTES.CHAT)
+    );
   });
 });

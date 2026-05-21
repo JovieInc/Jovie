@@ -85,9 +85,34 @@ export const adminSystemSettings = pgTable('admin_system_settings', {
     .notNull(),
   playlistLastGeneratedAt: timestamp('playlist_last_generated_at'),
   playlistNextEligibleAt: timestamp('playlist_next_eligible_at'),
+  costsLastRefreshedAt: timestamp('costs_last_refreshed_at'),
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 });
+
+// Admin costs (manual/lagging line items for v1 per G-Brain naming.admin-operational-surfaces)
+export const adminCosts = pgTable(
+  'admin_costs',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    label: text('label').notNull(),
+    monthlyUsd: numeric('monthly_usd', { precision: 12, scale: 2 })
+      .default('0')
+      .notNull(),
+    observed30dUsd: numeric('observed_30d_usd', { precision: 12, scale: 2 })
+      .default('0')
+      .notNull(),
+    period: text('period').default('monthly').notNull(),
+    notes: text('notes').default('').notNull(),
+    externalUrl: text('external_url'),
+    isActive: boolean('is_active').default(true).notNull(),
+    updatedAt: timestamp('updated_at').defaultNow().notNull(),
+  },
+  table => ({
+    labelIdx: index('idx_admin_costs_label').on(table.label),
+    activeIdx: index('idx_admin_costs_is_active').on(table.isActive),
+  })
+);
 
 // Schema validations
 export const insertAdminAuditLogSchema = createInsertSchema(adminAuditLog);
@@ -102,6 +127,9 @@ export const insertAdminSystemSettingsSchema =
 export const selectAdminSystemSettingsSchema =
   createSelectSchema(adminSystemSettings);
 
+export const insertAdminCostsSchema = createInsertSchema(adminCosts);
+export const selectAdminCostsSchema = createSelectSchema(adminCosts);
+
 // Types
 export type AdminAuditLog = typeof adminAuditLog.$inferSelect;
 export type NewAdminAuditLog = typeof adminAuditLog.$inferInsert;
@@ -110,3 +138,6 @@ export type CampaignSettings = typeof campaignSettings.$inferSelect;
 export type NewCampaignSettings = typeof campaignSettings.$inferInsert;
 export type AdminSystemSettings = typeof adminSystemSettings.$inferSelect;
 export type NewAdminSystemSettings = typeof adminSystemSettings.$inferInsert;
+
+export type AdminCost = typeof adminCosts.$inferSelect;
+export type NewAdminCost = typeof adminCosts.$inferInsert;

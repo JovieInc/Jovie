@@ -430,14 +430,11 @@ describe('ProfileCompactTemplate', () => {
     );
 
     const bottomNav = screen.getByTestId('profile-bottom-nav');
-    for (const label of ['Home', 'Music', 'Alerts', 'More options']) {
+    for (const label of ['Home', 'Music', 'Events', 'Alerts', 'More options']) {
       expect(
         within(bottomNav).getByRole('button', { name: label })
       ).toBeInTheDocument();
     }
-    expect(
-      within(bottomNav).queryByRole('button', { name: 'Events' })
-    ).not.toBeInTheDocument();
     expect(
       within(bottomNav).queryByRole('button', { name: 'Profile' })
     ).not.toBeInTheDocument();
@@ -625,18 +622,18 @@ describe('ProfileCompactTemplate', () => {
       />
     );
 
-    expect(screen.getByTestId('profile-hero-alerts-row')).toHaveTextContent(
-      'Alerts Off'
+    expect(screen.getByTestId('profile-home-alerts-row')).toHaveTextContent(
+      'Get Test Artist alerts'
     );
-    expect(screen.getByTestId('profile-home-rail-tour')).toHaveTextContent(
-      'Get tickets'
-    );
+    expect(
+      screen.getByTestId('profile-home-primary-action-card')
+    ).toHaveTextContent('Tickets');
     expect(
       screen.queryByTestId('profile-hero-status-pill')
     ).not.toBeInTheDocument();
   });
 
-  it('falls back to the listen CTA without rendering release metadata in the hero', async () => {
+  it('renders the compact latest release card without release metadata in the hero', async () => {
     render(
       <ProfileCompactTemplate
         mode='profile'
@@ -653,15 +650,32 @@ describe('ProfileCompactTemplate', () => {
       />
     );
 
-    expect(screen.getByTestId('profile-hero-alerts-row')).toHaveTextContent(
-      'Alerts Off'
+    expect(screen.getByTestId('profile-home-alerts-row')).toHaveTextContent(
+      'Get Test Artist alerts'
     );
-    expect(screen.getByTestId('profile-home-latest-card')).toHaveTextContent(
-      'Listen Now'
-    );
+    expect(
+      screen.getByTestId('profile-home-primary-action-card')
+    ).toHaveTextContent('Listen');
     expect(
       screen.queryByTestId('profile-hero-status-pill')
     ).not.toBeInTheDocument();
+  });
+
+  it('shows the newest catalog release on Home when latestRelease is not provided', async () => {
+    render(
+      <ProfileCompactTemplate
+        mode='profile'
+        artist={mockArtist}
+        socialLinks={[]}
+        contacts={[]}
+        releases={mockReleases}
+      />
+    );
+
+    const homeCard = screen.getByTestId('profile-home-primary-action-card');
+    expect(homeCard).toHaveAttribute('data-state', 'release_live');
+    expect(homeCard).toHaveTextContent("Don't Look Down");
+    expect(homeCard).not.toHaveTextContent('Holding On');
   });
 
   it('opens the alerts tab from the compact hero alerts row', async () => {
@@ -674,8 +688,8 @@ describe('ProfileCompactTemplate', () => {
       />
     );
 
-    const alertsRow = screen.getByTestId('profile-hero-alerts-row');
-    expect(alertsRow).toHaveTextContent('Alerts Off');
+    const alertsRow = screen.getByTestId('profile-home-alerts-fallback-card');
+    expect(alertsRow).toHaveTextContent('Get Test Artist alerts');
     expect(alertsRow).not.toHaveTextContent('New music and shows');
 
     fireEvent.click(alertsRow);
@@ -717,15 +731,17 @@ describe('ProfileCompactTemplate', () => {
       />
     );
 
-    fireEvent.click(screen.getByTestId('profile-hero-alerts-row'));
+    fireEvent.click(screen.getByTestId('profile-home-alerts-fallback-card'));
 
-    expect(revealNotifications).toHaveBeenCalledTimes(1);
+    await waitFor(() => {
+      expect(revealNotifications).toHaveBeenCalledTimes(1);
+    });
     expect(
       screen.queryByTestId('mock-primary-tab-panel')
     ).not.toBeInTheDocument();
   });
 
-  it('hides the compact hero alerts row for returning subscribers', async () => {
+  it('shows the alerts fallback as on for returning subscribers', async () => {
     mockUseProfileShell.mockImplementation(() => ({
       notificationsContextValue: {
         subscribedChannels: { email: true },
@@ -749,8 +765,8 @@ describe('ProfileCompactTemplate', () => {
     );
 
     expect(
-      screen.queryByTestId('profile-hero-alerts-row')
-    ).not.toBeInTheDocument();
+      screen.getByTestId('profile-home-alerts-fallback-card')
+    ).toHaveTextContent('Alerts On');
   });
 
   it('keeps the compact hero alerts row on after activation in the current session', async () => {
@@ -794,9 +810,9 @@ describe('ProfileCompactTemplate', () => {
 
     view.rerender(renderProfile());
 
-    expect(screen.getByTestId('profile-hero-alerts-row')).toHaveTextContent(
-      'Alerts On'
-    );
+    expect(
+      screen.getByTestId('profile-home-alerts-fallback-card')
+    ).toHaveTextContent('Alerts On');
   });
 
   it('falls back to the mode prop when the URL has no mode param', async () => {
@@ -980,7 +996,7 @@ describe('ProfileCompactTemplate', () => {
       'href',
       'https://open.spotify.com/playlist/37i9dQZF1DZ06evO2SKVTu'
     );
-    expect(screen.getByText('Featured Playlist')).toBeInTheDocument();
+    expect(screen.getByText('Open playlist')).toBeInTheDocument();
   });
 
   it('keeps optional hero role metadata out of the mobile hero chrome', async () => {
@@ -1044,7 +1060,9 @@ describe('ProfileCompactTemplate', () => {
       />
     );
 
-    expect(screen.getByTestId('profile-home-rail-tour')).toBeInTheDocument();
+    expect(
+      screen.getByTestId('profile-home-primary-action-card')
+    ).toHaveAttribute('data-state', 'tour_next');
     expect(
       screen.queryByRole('link', {
         name: `Open This Is playlist for ${mockArtist.name}`,
@@ -1155,7 +1173,7 @@ describe('ProfileCompactTemplate', () => {
     });
   });
 
-  it('renders the drawer at desktop widths', async () => {
+  it('renders the compact profile shell at desktop widths', async () => {
     const restoreViewport = mockViewport('desktop');
 
     render(
@@ -1168,13 +1186,14 @@ describe('ProfileCompactTemplate', () => {
     );
 
     await waitFor(() => {
-      expect(mockProfileDesktopSurface).toHaveBeenCalled();
+      expect(screen.getByTestId('profile-compact-shell')).toBeInTheDocument();
+      expect(mockProfileDesktopSurface).not.toHaveBeenCalled();
     });
 
     restoreViewport();
   });
 
-  it('passes pay, contact, tour, subscribe, and release variants into the desktop smoke surface', async () => {
+  it('keeps desktop widths on the compact surface across profile variants', async () => {
     const restoreViewport = mockViewport('desktop');
 
     const variantProps = {
@@ -1228,24 +1247,8 @@ describe('ProfileCompactTemplate', () => {
     );
 
     await waitFor(() => {
-      expect(mockProfileDesktopSurface).toHaveBeenCalledWith(
-        expect.objectContaining({
-          activeMode: 'pay',
-          contacts: mockContacts,
-          latestRelease: expect.objectContaining({
-            title: "Don't Look Down",
-            slug: 'dont-look-down',
-          }),
-          showPayButton: true,
-          tourDates: expect.arrayContaining([
-            expect.objectContaining({
-              venueName: 'The Echo',
-              ticketUrl: 'https://tickets.example.com/show',
-            }),
-          ]),
-          releases: mockReleases,
-        })
-      );
+      expect(screen.getByTestId('profile-compact-shell')).toBeInTheDocument();
+      expect(mockProfileDesktopSurface).not.toHaveBeenCalled();
     });
 
     view.rerender(
@@ -1253,22 +1256,90 @@ describe('ProfileCompactTemplate', () => {
     );
 
     await waitFor(() => {
-      expect(mockProfileDesktopSurface).toHaveBeenCalledWith(
+      expect(mockProfilePrimaryTabPanel).toHaveBeenCalledWith(
         expect.objectContaining({
-          activeMode: 'subscribe',
-          contacts: mockContacts,
-          latestRelease: expect.objectContaining({
-            title: "Don't Look Down",
-          }),
-          tourDates: expect.arrayContaining([
-            expect.objectContaining({
-              venueName: 'The Echo',
-            }),
-          ]),
+          mode: 'subscribe',
         })
       );
+      expect(mockProfileDesktopSurface).not.toHaveBeenCalled();
     });
 
     restoreViewport();
+  });
+
+  describe('CLS prevention — lazy state initializers', () => {
+    // Regression: JOV-2514 — requestedMode and isDesktopLayout must be read
+    // from the environment synchronously during React's first render pass, not
+    // in a useEffect that fires after first paint. A useEffect-driven update
+    // causes layout shift (CLS 0.317 on Lighthouse desktop preset, 1350×940px).
+    // Found by /qa on 2026-05-21
+    // Report: .gstack/qa-reports/
+
+    it('reads ?mode=listen from the URL on the first render without needing a useEffect flush', () => {
+      // Regression: if getInitialModeFromLocation is called with readWindowLocation=false
+      // (the old default), requestedMode starts as 'profile' and only updates to 'listen'
+      // in a useEffect — causing CLS. With the lazy initializer fix, modeOverride must
+      // already be 'listen' on the very first render call to useProfileShell.
+      mockCanonicalProfileDSPs.mockReturnValue([{ platform: 'spotify' }]);
+      window.history.replaceState(null, '', '/test-artist?mode=listen');
+
+      render(
+        <ProfileCompactTemplate
+          mode='profile'
+          artist={mockArtist}
+          socialLinks={[]}
+          contacts={[]}
+        />
+      );
+
+      // Assert on the FIRST render call (index 0), not the last — no act/waitFor.
+      // If the lazy initializer doesn't read the URL, this will be 'profile'.
+      const firstCallArgs = mockUseProfileShell.mock.calls[0]?.[0];
+      expect(firstCallArgs).toMatchObject({ modeOverride: 'listen' });
+    });
+
+    it('reads ?mode=subscribe from the URL on the first render without needing a useEffect flush', () => {
+      mockCanonicalProfileDSPs.mockReturnValue([{ platform: 'spotify' }]);
+      window.history.replaceState(null, '', '/test-artist?mode=subscribe');
+
+      render(
+        <ProfileCompactTemplate
+          mode='profile'
+          artist={mockArtist}
+          socialLinks={[]}
+          contacts={[]}
+        />
+      );
+
+      const firstCallArgs = mockUseProfileShell.mock.calls[0]?.[0];
+      expect(firstCallArgs).toMatchObject({ modeOverride: 'subscribe' });
+    });
+
+    it('reads drawerPresentation from matchMedia on the first render at desktop viewport', () => {
+      // Regression: if drawerPresentation starts as 'standalone' and updates via
+      // useEffect, the drawer presentation changes post-paint at 1350px (Lighthouse
+      // desktop preset), contributing to CLS. The lazy initializer must return
+      // 'modal' immediately at >=1180px without needing a useEffect flush.
+      const restoreViewport = mockViewport('desktop');
+
+      render(
+        <ProfileCompactTemplate
+          mode='profile'
+          artist={mockArtist}
+          socialLinks={[]}
+          contacts={[]}
+        />
+      );
+
+      // drawerPresentation is passed to the mock drawer as data-presentation.
+      // On the first render with the lazy initializer fix, the mock should have
+      // been called with presentation='modal' immediately (not 'standalone').
+      const firstDrawerCall = mockProfileUnifiedDrawer.mock.calls[0]?.[0] as
+        | { presentation?: string }
+        | undefined;
+      expect(firstDrawerCall?.presentation).toBe('modal');
+
+      restoreViewport();
+    });
   });
 });

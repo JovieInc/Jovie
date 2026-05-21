@@ -30,6 +30,7 @@ export {
   db,
   // Retry logic
   dbCircuitBreaker,
+  doesColumnExist,
   doesTableExist,
   getDb,
   getDbConfig,

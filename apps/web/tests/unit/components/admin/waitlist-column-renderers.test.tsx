@@ -1,8 +1,39 @@
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
-import { renderStatusCell } from '@/features/admin/waitlist-table/utils/column-renderers';
+import {
+  renderEmailCell,
+  renderHeardAboutCell,
+  renderNameCell,
+  renderStatusCell,
+} from '@/features/admin/waitlist-table/utils/column-renderers';
 
-describe('renderStatusCell', () => {
+describe('waitlist column renderers', () => {
+  it('renders name and email cells with canonical table tokens', () => {
+    const { rerender } = render(renderNameCell('Ari Lane'));
+
+    expect(screen.getByText('Ari Lane').className).toContain(
+      'text-primary-token'
+    );
+
+    rerender(renderEmailCell('ari@example.com'));
+
+    const emailLink = screen.getByRole('link', { name: 'ari@example.com' });
+    expect(emailLink.className).toContain('text-secondary-token');
+    expect(emailLink).toHaveAttribute('href', 'mailto:ari@example.com');
+  });
+
+  it('renders heard-about cells with secondary text and a tertiary empty state', () => {
+    const { rerender } = render(renderHeardAboutCell('Instagram'));
+
+    expect(screen.getByText('Instagram').className).toContain(
+      'text-secondary-token'
+    );
+
+    rerender(renderHeardAboutCell(null));
+
+    expect(screen.getByText('—').className).toContain('text-tertiary-token');
+  });
+
   it.each([
     ['new', 'Waitlisted', 'text-(--linear-text-tertiary)'],
     ['chat_started', 'Chat started', 'text-(--linear-text-tertiary)'],

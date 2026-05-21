@@ -181,4 +181,74 @@ describe('electron-bridge — defensive guards', () => {
     expect(installUpdateAndRestart).toHaveBeenCalledTimes(1);
     expect(windowOpenSpy).not.toHaveBeenCalled();
   });
+
+  it('safeGetDictationStatus allows browser Web Speech outside Electron', async () => {
+    await expect(__testing.safeGetDictationStatus()).resolves.toMatchObject({
+      ok: true,
+      mode: 'web-speech',
+      webSpeechFallbackAllowed: true,
+    });
+    expect(captureWarningMock).not.toHaveBeenCalled();
+  });
+
+  it('safeGetDictationStatus disables stale Electron binaries quietly', async () => {
+    setElectronAPI({
+      versions: { app: '0.1.0' },
+    });
+
+    await expect(__testing.safeGetDictationStatus()).resolves.toMatchObject({
+      ok: false,
+      mode: 'unavailable',
+      webSpeechFallbackAllowed: false,
+    });
+    expect(captureWarningMock).toHaveBeenCalledTimes(1);
+    const [message, , context] = captureWarningMock.mock.calls[0];
+    expect(message).toContain('getDictationStatus');
+    expect(context).toMatchObject({
+      route: 'desktop/electron-bridge',
+      bridgeMethod: 'getDictationStatus',
+      installedAppVersion: '0.1.0',
+    });
+  });
+
+  it('safeGetDictationStatus invokes the desktop bridge when present', async () => {
+    const getDictationStatus = vi.fn().mockResolvedValue({
+      ok: true,
+      nativeAvailable: false,
+      webSpeechFallbackAllowed: true,
+      mode: 'web-speech',
+      reason: 'native-unavailable',
+    });
+    setElectronAPI({ getDictationStatus });
+
+    await expect(__testing.safeGetDictationStatus()).resolves.toMatchObject({
+      ok: true,
+      mode: 'web-speech',
+      webSpeechFallbackAllowed: true,
+    });
+    expect(getDictationStatus).toHaveBeenCalledTimes(1);
+    expect(captureWarningMock).not.toHaveBeenCalled();
+  });
+
+  it('safeGetDictationStatus rejects malformed bridge payloads', async () => {
+    const getDictationStatus = vi.fn().mockResolvedValue({
+      ok: true,
+      mode: 'web-speech',
+    });
+    setElectronAPI({ getDictationStatus });
+
+    await expect(__testing.safeGetDictationStatus()).resolves.toMatchObject({
+      ok: false,
+      mode: 'unavailable',
+      webSpeechFallbackAllowed: false,
+    });
+    expect(getDictationStatus).toHaveBeenCalledTimes(1);
+    expect(captureWarningMock).toHaveBeenCalledTimes(1);
+    const [message, , context] = captureWarningMock.mock.calls[0];
+    expect(message).toContain('invalid payload');
+    expect(context).toMatchObject({
+      route: 'desktop/electron-bridge',
+      bridgeMethod: 'getDictationStatus',
+    });
+  });
 });

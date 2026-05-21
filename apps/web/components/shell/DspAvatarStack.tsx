@@ -125,9 +125,9 @@ export function DspAvatarStack({
       <div
         role='tooltip'
         className={cn(
-          'pointer-events-none absolute right-0 top-full mt-1.5 z-40 w-[220px]',
-          'opacity-0 translate-y-1 group-hover/dsps:opacity-100 group-hover/dsps:translate-y-0 group-hover/dsps:pointer-events-auto',
-          'transition-[opacity,transform] duration-150 ease-out delay-[400ms] group-hover/dsps:delay-[400ms]'
+          'pointer-events-none absolute right-0 top-full mt-1.5 z-[100] w-[220px]',
+          'opacity-0 group-hover/dsps:opacity-100 group-hover/dsps:pointer-events-auto',
+          'transition-[opacity] duration-subtle ease-subtle delay-[400ms] group-hover/dsps:delay-[400ms]'
         )}
       >
         <div className='rounded-md border border-(--linear-app-shell-border) bg-(--linear-app-content-surface)/95 backdrop-blur-xl shadow-[0_8px_28px_rgba(0,0,0,0.32)] overflow-hidden'>

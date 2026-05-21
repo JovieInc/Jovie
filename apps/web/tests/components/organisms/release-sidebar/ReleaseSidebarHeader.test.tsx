@@ -2,6 +2,14 @@ import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+const mockRouterRefresh = vi.fn();
+
+vi.mock('next/navigation', () => ({
+  useRouter: () => ({
+    refresh: mockRouterRefresh,
+  }),
+}));
+
 const { useReleaseHeaderParts } = await import(
   '@/components/organisms/release-sidebar/ReleaseSidebarHeader'
 );
@@ -79,5 +87,14 @@ describe('useReleaseHeaderParts', () => {
     expect(
       screen.getByRole('button', { name: /copy release id/i })
     ).toBeInTheDocument();
+  });
+
+  it('falls back to app router refresh when no refresh callback is provided', async () => {
+    const user = userEvent.setup();
+    render(<TestHarness release={release} hasRelease />);
+
+    await user.click(screen.getByRole('button', { name: /refresh release/i }));
+
+    expect(mockRouterRefresh).toHaveBeenCalledTimes(1);
   });
 });

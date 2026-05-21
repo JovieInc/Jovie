@@ -121,23 +121,163 @@ export const FOUNDER_DEMO_PERSONA: DemoPersona = {
     genres: ['Electronic', 'Dance'],
     spotifyArtistId: TIM_WHITE_PROFILE.spotifyArtistId,
     spotifyUrl: TIM_WHITE_PROFILE.spotifyUrl,
-    appleMusicUrl: null,
+    appleMusicUrl: 'https://music.apple.com/us/search?term=Tim%20White',
     appleMusicArtistId: null,
-    youtubeUrl: null,
+    youtubeUrl: 'https://www.youtube.com/@timwhite',
     youtubeMusicArtistId: null,
     deezerArtistId: null,
     tidalArtistId: null,
     soundcloudArtistId: null,
     bandsintownArtistName: null,
-    venmoHandle: null,
+    venmoHandle: 'timwhite',
     activeSinceYear: 2021,
     spotifyFollowers: 12450,
     spotifyPopularity: 62,
     isFeaturedByDefault: true,
     isClaimedByDefault: true,
   },
-  socialLinks: [],
-  releases: [],
+  socialLinks: [
+    {
+      platform: 'spotify',
+      platformType: 'music_streaming',
+      url: TIM_WHITE_PROFILE.spotifyUrl,
+      displayText: 'Listen on Spotify',
+      sortOrder: 1,
+    },
+    {
+      platform: 'apple_music',
+      platformType: 'music_streaming',
+      url: 'https://music.apple.com/us/search?term=Tim%20White',
+      displayText: 'Listen on Apple Music',
+      sortOrder: 2,
+    },
+    {
+      platform: 'instagram',
+      platformType: 'social',
+      url: 'https://instagram.com/timwhite',
+      displayText: 'Instagram',
+      sortOrder: 3,
+    },
+    {
+      platform: 'website',
+      platformType: 'website',
+      url: 'https://jov.ie/tim',
+      displayText: 'Jovie profile',
+      sortOrder: 4,
+    },
+  ],
+  releases: [
+    {
+      id: 'tim-the-deep-end',
+      title: 'The Deep End',
+      slug: 'the-deep-end',
+      releaseType: 'single',
+      releaseDate: '2026-05-08',
+      artworkUrl: '/img/releases/the-deep-end.jpg',
+      totalTracks: 1,
+      totalDurationMs: 214000,
+      upc: '196871050815',
+      label: 'Jovie Demo',
+      spotifyPopularity: 68,
+      artistNames: ['Tim White', 'Cosmic Gate'],
+      genres: ['Trance', 'Electronic'],
+      primaryIsrc: 'USJV12605081',
+      providerUrls: {
+        spotify:
+          'https://open.spotify.com/search/The%20Deep%20End%20Tim%20White%20Cosmic%20Gate',
+        apple_music:
+          'https://music.apple.com/us/search?term=The%20Deep%20End%20Tim%20White%20Cosmic%20Gate',
+        youtube_music:
+          'https://music.youtube.com/search?q=The+Deep+End+Tim+White+Cosmic+Gate',
+        amazon_music:
+          'https://music.amazon.com/search/The%20Deep%20End%20Tim%20White%20Cosmic%20Gate',
+        tidal:
+          'https://listen.tidal.com/search?q=The%20Deep%20End%20Tim%20White%20Cosmic%20Gate',
+      },
+      tracks: [
+        {
+          title: 'The Deep End',
+          slug: 'the-deep-end',
+          trackNumber: 1,
+          discNumber: 1,
+          durationMs: 214000,
+          isrc: 'USJV12605081',
+        },
+      ],
+    },
+    {
+      id: 'tim-never-say-a-word',
+      title: 'Never Say a Word',
+      slug: 'never-say-a-word',
+      releaseType: 'music_video',
+      releaseDate: '2026-03-27',
+      artworkUrl: '/img/releases/never-say-a-word.jpg',
+      totalTracks: 1,
+      totalDurationMs: 197000,
+      upc: '196871032706',
+      label: 'Jovie Demo',
+      spotifyPopularity: 58,
+      artistNames: ['Tim White'],
+      genres: ['Electronic', 'Pop'],
+      primaryIsrc: 'USJV12603271',
+      providerUrls: {
+        spotify:
+          'https://open.spotify.com/search/Never%20Say%20a%20Word%20Tim%20White',
+        apple_music:
+          'https://music.apple.com/us/search?term=Never%20Say%20a%20Word%20Tim%20White',
+        youtube_music:
+          'https://music.youtube.com/search?q=Never+Say+a+Word+Tim+White',
+        amazon_music:
+          'https://music.amazon.com/search/Never%20Say%20a%20Word%20Tim%20White',
+      },
+      tracks: [
+        {
+          title: 'Never Say a Word',
+          slug: 'never-say-a-word',
+          trackNumber: 1,
+          discNumber: 1,
+          durationMs: 197000,
+          isrc: 'USJV12603271',
+        },
+      ],
+    },
+    {
+      id: 'tim-take-me-over',
+      title: 'Take Me Over',
+      slug: 'take-me-over',
+      releaseType: 'single',
+      releaseDate: '2025-11-14',
+      artworkUrl: '/img/releases/take-me-over.jpg',
+      totalTracks: 1,
+      totalDurationMs: 188000,
+      upc: '196871111409',
+      label: 'Jovie Demo',
+      spotifyPopularity: 54,
+      artistNames: ['Tim White'],
+      genres: ['Electronic', 'Dance'],
+      primaryIsrc: 'USJV12511141',
+      providerUrls: {
+        spotify:
+          'https://open.spotify.com/search/Take%20Me%20Over%20Tim%20White',
+        apple_music:
+          'https://music.apple.com/us/search?term=Take%20Me%20Over%20Tim%20White',
+        youtube_music:
+          'https://music.youtube.com/search?q=Take+Me+Over+Tim+White',
+        amazon_music:
+          'https://music.amazon.com/search/Take%20Me%20Over%20Tim%20White',
+      },
+      tracks: [
+        {
+          title: 'Take Me Over',
+          slug: 'take-me-over',
+          trackNumber: 1,
+          discNumber: 1,
+          durationMs: 188000,
+          isrc: 'USJV12511141',
+        },
+      ],
+    },
+  ],
   tourDates: [],
 };
 

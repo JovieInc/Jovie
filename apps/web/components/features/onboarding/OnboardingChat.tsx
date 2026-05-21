@@ -2,6 +2,7 @@
 
 import { useChat } from '@ai-sdk/react';
 import { DefaultChatTransport, type UIMessage } from 'ai';
+import { AnimatePresence } from 'motion/react';
 import type { ReactNode } from 'react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
@@ -10,6 +11,10 @@ import {
   ErrorDisplay,
 } from '@/components/jovie/components';
 import { useChatJankMonitor, useStickToBottom } from '@/components/jovie/hooks';
+import {
+  composeMessage,
+  useChipTray,
+} from '@/components/jovie/hooks/useChipTray';
 import { ToolPartsRenderer } from '@/components/jovie/tool-ui';
 import type { ChatError, MessagePart } from '@/components/jovie/types';
 import {
@@ -27,6 +32,10 @@ import {
   ChatProposeNextStepCard,
   type NextStepCardPayload,
 } from './ChatProposeNextStepCard';
+import type {
+  OnboardingProfileArtist,
+  OnboardingProfileBuilderState,
+} from './OnboardingProfileRail';
 import {
   type ArtistConfirmedOutput,
   type ArtistPickerOutput,
@@ -39,6 +48,7 @@ import {
   type SocialLinkOutput,
   useArtistSelectionMessage,
 } from './OnboardingToolArtifacts';
+import type { OnboardingTurnstileStatus } from './OnboardingTurnstile';
 
 /**
  * Anonymous onboarding chat client (JOV-2132 PR 3).
@@ -52,12 +62,35 @@ import {
 interface OnboardingChatProps {
   /** Turnstile token from the widget. Required on first message. */
   readonly turnstileToken: string | null;
+  /** Current Turnstile widget state for first-message gating. */
+  readonly turnstileStatus?: OnboardingTurnstileStatus;
+  /** Visible Turnstile challenge panel rendered near the composer. */
+  readonly turnstilePanel?: ReactNode;
+  /** Requests the visible Turnstile panel when a send needs verification. */
+  readonly onTurnstileRequired?: (message?: string) => void;
+  /** Clears stale verification after the server rejects a token. */
+  readonly onTurnstileRejected?: () => void;
   /** Fires after a submitted user turn reaches the ready state. */
   readonly onConversationActivity?: () => void;
+  /** Emits selected/matched profile state for the progressive builder rail. */
+  readonly onProfileBuilderChange?: (
+    state: OnboardingProfileBuilderState
+  ) => void;
 }
 
 /** Pull the user-visible text out of a UIMessage's parts. */
 const THINKING_PLACEHOLDER_ID = 'thinking-placeholder';
+const ONBOARDING_INTRO_MESSAGE_ID = 'onboarding-intro';
+const ONBOARDING_INTRO_MESSAGE = {
+  id: ONBOARDING_INTRO_MESSAGE_ID,
+  role: 'assistant',
+  parts: [
+    {
+      type: 'text',
+      text: "Hey, I'm Jovie. What are you working on?",
+    },
+  ],
+} satisfies UIMessage;
 
 function getMessageText(message: UIMessage): string {
   return (message.parts ?? [])
@@ -169,6 +202,7 @@ function findLastAssistantMessageId(messages: readonly UIMessage[]) {
     const message = messages[i];
     if (
       message.role === 'assistant' &&
+      message.id !== ONBOARDING_INTRO_MESSAGE_ID &&
       message.id !== THINKING_PLACEHOLDER_ID
     ) {
       return message.id;
@@ -182,6 +216,83 @@ function getOnboardingErrorMessage(message: string): string {
     return 'Jovie is still connecting. Try again in a moment.';
   }
   return message;
+}
+
+function artistFromSelection(
+  artist: OnboardingArtistSelection | null
+): OnboardingProfileArtist | null {
+  if (!artist) return null;
+  return {
+    id: artist.id,
+    name: artist.name,
+    url: artist.url,
+    imageUrl: artist.imageUrl ?? null,
+    followers: artist.followers ?? null,
+    popularity: artist.popularity ?? null,
+    genres: [],
+  };
+}
+
+function artistFromConfirmedOutput(
+  output: ArtistConfirmedOutput
+): OnboardingProfileArtist | null {
+  const artist = output.artist;
+  if (!artist) return null;
+  return {
+    id: artist.id,
+    name: artist.name,
+    url: artist.url,
+    imageUrl: artist.imageUrl ?? null,
+    followers: artist.followers ?? null,
+    popularity: artist.popularity ?? null,
+    genres: artist.genres ?? [],
+  };
+}
+
+function cleanHandle(handle: string | undefined): string | null {
+  const cleaned = handle?.replace(/^@/, '').trim().toLowerCase();
+  return cleaned || null;
+}
+
+function deriveProfileBuilderState({
+  messages,
+  selectedArtist,
+}: {
+  readonly messages: readonly UIMessage[];
+  readonly selectedArtist: OnboardingArtistSelection | null;
+}): OnboardingProfileBuilderState {
+  let artist = artistFromSelection(selectedArtist);
+  let artistConfirmed = false;
+  let handle: string | null = null;
+  const socialLinks: string[] = [];
+
+  for (const message of messages) {
+    for (const part of getToolParts(message)) {
+      const output = part.output;
+
+      if (isArtistConfirmedOutput(output)) {
+        const confirmedArtist = artistFromConfirmedOutput(output);
+        artist = confirmedArtist ?? artist;
+        artistConfirmed =
+          Boolean(confirmedArtist) || Boolean(output.spotifyArtistId);
+      }
+
+      if (isHandleCheckOutput(output)) {
+        handle = cleanHandle(output.handle) ?? handle;
+      }
+
+      if (isSocialLinkOutput(output) && output.url) {
+        socialLinks.push(output.url);
+      }
+    }
+  }
+
+  return {
+    artist,
+    artistConfirmed,
+    handle,
+    socialLinks,
+  };
 }
 
 const renderSearchSpotifyArtist: OnboardingToolRenderer = ({
@@ -345,12 +456,14 @@ function renderOnboardingTools({
 
 function OnboardingMessageList({
   displayMessages,
+  hideIntroMessage,
   isStreaming,
   lastAssistantMessageId,
   isBusy,
   onSelectArtist,
 }: {
   readonly displayMessages: readonly UIMessage[];
+  readonly hideIntroMessage: boolean;
   readonly isStreaming: boolean;
   readonly lastAssistantMessageId: string | null;
   readonly isBusy: boolean;
@@ -362,11 +475,25 @@ function OnboardingMessageList({
         const text = getMessageText(message);
         const toolParts = getToolParts(message);
         const isThinking = message.id === THINKING_PLACEHOLDER_ID;
+        const isIntroHidden =
+          hideIntroMessage && message.id === ONBOARDING_INTRO_MESSAGE_ID;
         const shouldRenderMessage =
           isThinking || Boolean(text) || toolParts.length === 0;
 
         return (
-          <div key={message.id} className='pb-5'>
+          <div
+            key={message.id}
+            className={cn(
+              'pb-5 transition-opacity duration-fast',
+              isIntroHidden && 'pointer-events-none opacity-0'
+            )}
+            aria-hidden={isIntroHidden ? 'true' : undefined}
+            data-testid={
+              message.id === ONBOARDING_INTRO_MESSAGE_ID
+                ? 'onboarding-intro-message'
+                : undefined
+            }
+          >
             {shouldRenderMessage ? (
               <ChatMessage
                 id={message.id}
@@ -395,14 +522,42 @@ function OnboardingMessageList({
   );
 }
 
+function OnboardingInitialIntro({ hidden }: { readonly hidden: boolean }) {
+  return (
+    <div
+      className={cn(
+        'mx-auto flex w-full max-w-[34rem] flex-col items-center pb-1 text-center transition-opacity duration-fast',
+        hidden && 'pointer-events-none opacity-0'
+      )}
+      aria-hidden={hidden ? 'true' : undefined}
+      data-testid='onboarding-intro-message'
+    >
+      <p className='text-[2rem] font-semibold leading-[1.08] tracking-[-0.035em] text-primary-token sm:text-[2.4rem]'>
+        Hey, I&apos;m Jovie.
+      </p>
+      <p className='mt-2 max-w-[24rem] text-[15px] leading-6 text-secondary-token'>
+        What are you working on?
+      </p>
+    </div>
+  );
+}
+
 export function OnboardingChat({
   onConversationActivity,
+  onProfileBuilderChange,
+  onTurnstileRejected,
+  onTurnstileRequired,
+  turnstilePanel,
+  turnstileStatus,
   turnstileToken,
 }: OnboardingChatProps) {
   const [input, setInput] = useState('');
   const [hasSentFirst, setHasSentFirst] = useState(false);
   const [chatError, setChatError] = useState<ChatError | null>(null);
   const [composerPickerOpen, setComposerPickerOpen] = useState(false);
+  const [selectedArtist, setSelectedArtist] =
+    useState<OnboardingArtistSelection | null>(null);
+  const chipTray = useChipTray();
   const completedUserTurnsRef = useRef(0);
   const lastAttemptedMessageRef = useRef<string | null>(null);
   const formatArtistSelectionMessage = useArtistSelectionMessage();
@@ -443,6 +598,10 @@ export function OnboardingChat({
       if (lastAttemptedMessageRef.current) {
         setInput(lastAttemptedMessageRef.current);
       }
+      if (metadata.errorCode === 'TURNSTILE_REQUIRED') {
+        setHasSentFirst(false);
+        onTurnstileRejected?.();
+      }
     },
   });
 
@@ -450,12 +609,20 @@ export function OnboardingChat({
   const isStreaming = status === 'streaming';
   const isBusy = isSubmitted || isStreaming;
   const requiresTurnstile = process.env.NODE_ENV !== 'development';
+  const isTurnstileTokenUsable =
+    Boolean(turnstileToken) &&
+    turnstileStatus !== 'expired' &&
+    turnstileStatus !== 'timeout' &&
+    turnstileStatus !== 'error' &&
+    turnstileStatus !== 'unsupported' &&
+    turnstileStatus !== 'unconfigured';
   const isAwaitingFirstToken =
-    requiresTurnstile && !hasSentFirst && !turnstileToken;
+    requiresTurnstile && !hasSentFirst && !isTurnstileTokenUsable;
   const lastMessage = messages[messages.length - 1];
   const shouldShowThinking = isBusy && lastMessage?.role === 'user';
   const displayMessages: readonly UIMessage[] = shouldShowThinking
     ? [
+        ONBOARDING_INTRO_MESSAGE,
         ...messages,
         {
           id: THINKING_PLACEHOLDER_ID,
@@ -463,7 +630,7 @@ export function OnboardingChat({
           parts: [],
         },
       ]
-    : messages;
+    : [ONBOARDING_INTRO_MESSAGE, ...messages];
   const lastAssistantMessageId = findLastAssistantMessageId(displayMessages);
   const { isStuckToBottom, onScroll, totalSizeRef, scrollContainerRef } =
     useStickToBottom({ messageCount: displayMessages.length });
@@ -479,21 +646,29 @@ export function OnboardingChat({
 
   const submitText = useCallback(
     (rawText: string) => {
-      const text = rawText.trim();
+      const text = composeMessage(chipTray.chips, rawText).trim();
       if (!text || isBusy) return;
       if (isAwaitingFirstToken) {
-        // Turnstile hasn't issued a token yet; the widget normally resolves
-        // within ~500ms. Silently no-op so the user can retry.
+        setChatError(null);
+        onTurnstileRequired?.('Verify you are human to send');
         return;
       }
       lastAttemptedMessageRef.current = text;
       setChatError(null);
       notifyJankSend();
       sendMessage({ text });
+      chipTray.clear();
       setHasSentFirst(true);
       setInput('');
     },
-    [isAwaitingFirstToken, isBusy, notifyJankSend, sendMessage]
+    [
+      chipTray,
+      isAwaitingFirstToken,
+      isBusy,
+      notifyJankSend,
+      onTurnstileRequired,
+      sendMessage,
+    ]
   );
 
   const handleSubmit = useCallback(
@@ -512,10 +687,24 @@ export function OnboardingChat({
 
   const handleArtistSelect = useCallback(
     (artist: OnboardingArtistSelection) => {
+      setSelectedArtist(artist);
       submitText(formatArtistSelectionMessage(artist));
     },
     [formatArtistSelectionMessage, submitText]
   );
+
+  const profileBuilderState = useMemo(
+    () =>
+      onProfileBuilderChange
+        ? deriveProfileBuilderState({ messages, selectedArtist })
+        : null,
+    [messages, onProfileBuilderChange, selectedArtist]
+  );
+
+  useEffect(() => {
+    if (!profileBuilderState) return;
+    onProfileBuilderChange?.(profileBuilderState);
+  }, [onProfileBuilderChange, profileBuilderState]);
 
   useEffect(() => {
     if (status !== 'ready') return;
@@ -540,6 +729,32 @@ export function OnboardingChat({
       </div>
     ) : null;
 
+  // Persistent bottom dock composer: showInitialComposer now only controls
+  // the *upper* morphing content (intro vs messages). The composer itself is
+  // always rendered in the bottom dock for zero structural jump on first turn.
+  const showInitialComposer = messages.length === 0 && !hasSentFirst;
+
+  const onboardingChatInputProps = {
+    value: input,
+    onChange: setInput,
+    onSubmit: handleSubmit,
+    isLoading: isBusy,
+    isSubmitting: isSubmitted,
+    isStreaming,
+    onStop: stop,
+    // Raw "Securing chat..." text is replaced in follow-up pass with
+    // statusBanner skeleton treatment; placeholder stays stable.
+    placeholder: 'Ask Jovie...',
+    onPickerOpenChange: setComposerPickerOpen,
+    chips: chipTray.chips,
+    onRemoveChipAt: chipTray.removeAt,
+    onRemoveLastChip: chipTray.removeLast,
+    onAddSkill: chipTray.addSkill,
+    onAddEntity: chipTray.addEntity,
+    shellChatV1: true,
+    statusBanner: composerStatusBanner,
+  } as const;
+
   return (
     <section
       className='relative flex h-full min-h-0 flex-1 flex-col overflow-hidden bg-(--linear-app-content-surface)'
@@ -560,6 +775,7 @@ export function OnboardingChat({
         </div>
       ) : null}
 
+      {/* Scroll area (flex-1) — upper content morphs on first message */}
       <div
         ref={scrollContainerRef}
         onScroll={onScroll}
@@ -570,57 +786,37 @@ export function OnboardingChat({
           ref={totalSizeRef}
           className='mx-auto flex min-h-full w-full max-w-[44rem] flex-col'
         >
-          {messages.length === 0 ? (
-            <div className='flex flex-1 items-center justify-center py-12'>
-              <h1
-                className={cn(
-                  'text-balance text-center text-[2.25rem] font-semibold leading-[1.08] tracking-[-0.035em] text-primary-token transition-opacity duration-fast sm:text-[3rem]',
-                  composerPickerOpen && 'opacity-0'
-                )}
-                aria-hidden={composerPickerOpen}
-              >
-                What are you working on?
-              </h1>
-            </div>
-          ) : (
-            <OnboardingMessageList
-              displayMessages={displayMessages}
-              isStreaming={isStreaming}
-              lastAssistantMessageId={lastAssistantMessageId}
-              isBusy={isBusy}
-              onSelectArtist={handleArtistSelect}
-            />
-          )}
+          <AnimatePresence mode='popLayout' initial={false}>
+            {showInitialComposer ? (
+              <div key='onboarding-empty-upper'>
+                <OnboardingInitialIntro hidden={composerPickerOpen} />
+              </div>
+            ) : (
+              <div key='onboarding-messages'>
+                <OnboardingMessageList
+                  displayMessages={displayMessages}
+                  hideIntroMessage={composerPickerOpen}
+                  isStreaming={isStreaming}
+                  lastAssistantMessageId={lastAssistantMessageId}
+                  isBusy={isBusy}
+                  onSelectArtist={handleArtistSelect}
+                />
+              </div>
+            )}
+          </AnimatePresence>
         </div>
       </div>
 
+      {/* Persistent always-bottom composer dock (Hyp 1 stabilization).
+          No more conditional render or justify-center teleport for the input.
+          The motion surface inside ChatInput (with layoutId) + stable dock
+          position guarantees zero layout shift on first user message. */}
       <div className='shrink-0 bg-(--linear-app-content-surface) px-4 pb-4 pt-2 sm:px-6 sm:pb-5 sm:pt-2.5 lg:px-8'>
-        <div className='mx-auto w-full max-w-[34rem]'>
-          {isAwaitingFirstToken ? (
-            <p
-              className='mb-1.5 text-center text-xs text-tertiary-token'
-              role='status'
-              aria-live='polite'
-            >
-              Securing chat...
-            </p>
+        <div className='mx-auto w-full max-w-[45rem]'>
+          {turnstilePanel ? (
+            <div data-testid='onboarding-turnstile-slot'>{turnstilePanel}</div>
           ) : null}
-
-          <ChatInput
-            value={input}
-            onChange={setInput}
-            onSubmit={handleSubmit}
-            isLoading={isBusy}
-            isSubmitting={isSubmitted || isAwaitingFirstToken}
-            isStreaming={isStreaming}
-            onStop={stop}
-            placeholder={
-              isAwaitingFirstToken ? 'Securing chat...' : 'Ask Jovie...'
-            }
-            onPickerOpenChange={setComposerPickerOpen}
-            shellChatV1
-            statusBanner={composerStatusBanner}
-          />
+          <ChatInput {...onboardingChatInputProps} />
         </div>
       </div>
     </section>

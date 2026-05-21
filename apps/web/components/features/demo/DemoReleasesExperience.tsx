@@ -7,14 +7,21 @@ import {
   providerConfig,
 } from '@/app/app/(shell)/dashboard/releases/config';
 import { ReleasesExperience } from '@/features/dashboard/organisms/release-provider-matrix';
-import { INTERNAL_DJ_DEMO_PERSONA } from '@/lib/demo-personas';
+import {
+  FOUNDER_DEMO_PERSONA,
+  INTERNAL_DJ_DEMO_PERSONA,
+} from '@/lib/demo-personas';
 import type { ReleaseViewModel } from '@/lib/discography/types';
 import type { CanvasStatus } from '@/lib/services/canvas/types';
 import { DemoAuthShell } from './DemoAuthShell';
 import {
   DEMO_RELEASE_SIDEBAR_FIXTURES,
   DEMO_RELEASE_VIEW_MODELS,
+  FOUNDER_DEMO_RELEASE_SIDEBAR_FIXTURES,
+  FOUNDER_DEMO_RELEASE_VIEW_MODELS,
 } from './mock-release-data';
+
+type DemoReleasesExperienceVariant = 'internal-dj' | 'founder';
 
 async function copyDemoLink(path: string, label: string, _testId: string) {
   const origin = globalThis.location?.origin ?? 'https://jov.ie';
@@ -78,19 +85,32 @@ async function updateDemoCanvasStatus(
  */
 export function DemoReleasesExperience({
   dashboardData,
+  variant = 'internal-dj',
 }: {
   readonly dashboardData?: DashboardData;
+  readonly variant?: DemoReleasesExperienceVariant;
 } = {}) {
+  const persona =
+    variant === 'founder' ? FOUNDER_DEMO_PERSONA : INTERNAL_DJ_DEMO_PERSONA;
+  const releases =
+    variant === 'founder'
+      ? FOUNDER_DEMO_RELEASE_VIEW_MODELS
+      : DEMO_RELEASE_VIEW_MODELS;
+  const sidebarDataByReleaseId =
+    variant === 'founder'
+      ? FOUNDER_DEMO_RELEASE_SIDEBAR_FIXTURES
+      : DEMO_RELEASE_SIDEBAR_FIXTURES;
+
   return (
-    <DemoAuthShell dashboardData={dashboardData}>
+    <DemoAuthShell dashboardData={dashboardData} releasesForQuery={releases}>
       <ReleasesExperience
-        releases={DEMO_RELEASE_VIEW_MODELS}
+        releases={releases}
         providerConfig={providerConfig}
         primaryProviders={primaryProviderKeys}
         spotifyConnected
-        spotifyArtistName={INTERNAL_DJ_DEMO_PERSONA.profile.displayName}
+        spotifyArtistName={persona.profile.displayName}
         appleMusicConnected
-        appleMusicArtistName={INTERNAL_DJ_DEMO_PERSONA.profile.displayName}
+        appleMusicArtistName={persona.profile.displayName}
         allowArtworkDownloads
         experienceAdapter={{
           mode: 'demo',
@@ -107,9 +127,7 @@ export function DemoReleasesExperience({
           onSync: () =>
             notifyDemoAction('Spotify sync is disabled in demo mode'),
           onRefreshRelease: releaseId => {
-            const release = DEMO_RELEASE_VIEW_MODELS.find(
-              item => item.id === releaseId
-            );
+            const release = releases.find(item => item.id === releaseId);
             notifyDemoAction(
               `Refresh is disabled for ${release?.title ?? 'this release'} in demo mode`
             );
@@ -130,7 +148,7 @@ export function DemoReleasesExperience({
                 ? 'Artwork downloads enabled (demo only)'
                 : 'Artwork downloads disabled (demo only)'
             ),
-          sidebarDataByReleaseId: DEMO_RELEASE_SIDEBAR_FIXTURES,
+          sidebarDataByReleaseId,
         }}
       />
     </DemoAuthShell>

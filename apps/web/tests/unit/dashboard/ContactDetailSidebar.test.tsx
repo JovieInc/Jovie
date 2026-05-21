@@ -14,15 +14,20 @@ vi.mock('@/components/molecules/drawer', async importOriginal => {
     EntitySidebarShell: ({
       children,
       entityHeader,
+      entityHeaderSurface,
       tabs,
       title,
     }: {
       children: ReactNode;
       entityHeader?: ReactNode;
+      entityHeaderSurface?: string;
       tabs?: ReactNode;
       title: ReactNode;
     }) => (
-      <div>
+      <div
+        data-entity-header-surface={entityHeaderSurface ?? 'card'}
+        data-testid='entity-sidebar-shell'
+      >
         <div>{title}</div>
         {entityHeader}
         {tabs}
@@ -68,6 +73,11 @@ describe('ContactDetailSidebar', () => {
 
     expect(screen.getAllByText('Alex Rivera').length).toBeGreaterThan(0);
     expect(screen.getAllByText('Management').length).toBeGreaterThan(0);
+    expect(screen.getByTestId('entity-sidebar-shell')).toHaveAttribute(
+      'data-entity-header-surface',
+      'flat'
+    );
+    expect(screen.queryByText('Contact')).not.toBeInTheDocument();
     expect(screen.getByText('Contact Info')).toBeInTheDocument();
     expect(screen.getByText('Role')).toBeInTheDocument();
   });

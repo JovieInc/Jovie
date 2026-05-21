@@ -2,13 +2,17 @@ import { render, screen, waitFor } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { clerkSignInMock, routerPrefetchMock, searchParamsState } = vi.hoisted(
-  () => ({
-    clerkSignInMock: vi.fn(),
-    routerPrefetchMock: vi.fn(),
-    searchParamsState: { value: '' },
-  })
-);
+const {
+  authLayoutMock,
+  clerkSignInMock,
+  routerPrefetchMock,
+  searchParamsState,
+} = vi.hoisted(() => ({
+  authLayoutMock: vi.fn(),
+  clerkSignInMock: vi.fn(),
+  routerPrefetchMock: vi.fn(),
+  searchParamsState: { value: '' },
+}));
 
 vi.mock('@clerk/nextjs', () => ({
   SignIn: (props: unknown) => {
@@ -24,12 +28,14 @@ vi.mock('next/navigation', () => ({
 vi.mock('@/features/auth', async () => {
   const reactModule = await import('react');
   return {
-    AuthLayout: ({ children }: { children: ReactNode }) =>
-      reactModule.createElement(
+    AuthLayout: (props: { children: ReactNode }) => {
+      authLayoutMock(props);
+      return reactModule.createElement(
         'div',
         { 'data-testid': 'auth-layout' },
-        children
-      ),
+        props.children
+      );
+    },
     AuthRoutePrefetch: ({ href }: { href: string }) => {
       routerPrefetchMock(href);
       return null;
@@ -43,7 +49,12 @@ import { APP_ROUTES } from '@/constants/routes';
 import SignInPage from '../../../app/(auth)/signin/page';
 
 describe('signin page', () => {
+  function fullAuthUrl(path: string) {
+    return new URL(path, globalThis.location.origin).toString();
+  }
+
   beforeEach(() => {
+    authLayoutMock.mockReset();
     clerkSignInMock.mockReset();
     routerPrefetchMock.mockReset();
     searchParamsState.value = '';
@@ -57,13 +68,26 @@ describe('signin page', () => {
     });
 
     expect(screen.getByTestId('clerk-sign-in')).toBeInTheDocument();
+    expect(authLayoutMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        formTitle: 'Sign in',
+        showFormTitle: false,
+        showFooterPrompt: false,
+        layoutVariant: 'split',
+      })
+    );
+    expect(
+      screen.queryByText('Welcome back to Jovie.')
+    ).not.toBeInTheDocument();
     expect(routerPrefetchMock).toHaveBeenCalledWith(APP_ROUTES.SIGNUP);
     expect(clerkSignInMock).toHaveBeenCalledWith(
       expect.objectContaining({
         routing: 'path',
         path: '/signin',
         oauthFlow: 'redirect',
-        signUpUrl: APP_ROUTES.SIGNUP,
+        // Cross-link for sign-in → /support (Need help?). SSO-only — waitlist
+        // is a dead end for returnees who lost their SSO session (JOV-2446).
+        signUpUrl: fullAuthUrl(APP_ROUTES.SUPPORT),
         fallbackRedirectUrl: APP_ROUTES.DASHBOARD,
         initialValues: undefined,
       })
@@ -102,6 +126,54 @@ describe('signin page', () => {
     );
   });
 
+  it('passes oidcPrompt=select_account to Clerk SignIn so account chooser always appears', async () => {
+    render(<SignInPage />);
+
+    await waitFor(() => {
+      expect(clerkSignInMock).toHaveBeenCalledTimes(1);
+    });
+
+    expect(clerkSignInMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        oidcPrompt: 'select_account',
+      })
+    );
+  });
+
+  it('shows access_denied banner when oauth_error=access_denied', async () => {
+    searchParamsState.value = 'oauth_error=access_denied';
+    globalThis.history.replaceState(
+      null,
+      '',
+      '/signin?oauth_error=access_denied'
+    );
+
+    render(<SignInPage />);
+
+    expect(screen.getByRole('alert')).toHaveTextContent(
+      'Sign-in was cancelled. Try again, or pick a different method.'
+    );
+
+    await waitFor(() => {
+      expect(globalThis.location.search).not.toContain('oauth_error');
+    });
+  });
+
+  it('shows a generic banner for unknown oauth_error values', async () => {
+    searchParamsState.value = 'oauth_error=server_error';
+    globalThis.history.replaceState(
+      null,
+      '',
+      '/signin?oauth_error=server_error'
+    );
+
+    render(<SignInPage />);
+
+    expect(screen.getByRole('alert')).toHaveTextContent(
+      'Something went wrong with sign-in. Please try again.'
+    );
+  });
+
   it('preserves redirect_url when linking from sign in to sign up', async () => {
     searchParamsState.value = 'redirect_url=%2Fonboarding';
 
@@ -113,7 +185,8 @@ describe('signin page', () => {
 
     expect(clerkSignInMock).toHaveBeenCalledWith(
       expect.objectContaining({
-        signUpUrl: '/signup?redirect_url=%2Fonboarding',
+        // Cross-link for sign-in preserves redirect params toward /support (JOV-2446).
+        signUpUrl: fullAuthUrl('/support?redirect_url=%2Fonboarding'),
       })
     );
   });

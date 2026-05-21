@@ -19,20 +19,22 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ChatEntityPanelProvider } from '@/app/app/(shell)/chat/ChatEntityPanelContext';
 import { ChatEntityRightPanelHost } from '@/app/app/(shell)/chat/ChatEntityRightPanelHost';
+import type { DashboardData } from '@/app/app/(shell)/dashboard/actions/dashboard-data';
 import { useDashboardData } from '@/app/app/(shell)/dashboard/DashboardDataContext';
 import {
   type PreviewPanelLink,
   usePreviewPanelData,
   usePreviewPanelState,
 } from '@/app/app/(shell)/dashboard/PreviewPanelContext';
-import { LoadingSpinner } from '@/components/atoms/LoadingSpinner';
+import { AppIconButton } from '@/components/atoms/AppIconButton';
 import { ChatWorkspaceSurface } from '@/components/jovie/ChatWorkspaceSurface';
 import { JovieChat } from '@/components/jovie/JovieChat';
+import type { ChatActionCard } from '@/components/jovie/types';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
-import { DRAWER_HEADER_ICON_BUTTON_CLASSNAME } from '@/components/molecules/drawer-header/DrawerHeaderActions';
 import { ErrorBoundary } from '@/components/providers/ErrorBoundary';
 import { APP_ROUTES } from '@/constants/routes';
 import { useSetHeaderActions } from '@/contexts/HeaderActionsContext';
+import { DASHBOARD_HEADER_ACTION_ICON_BUTTON_CLASS } from '@/features/dashboard/atoms/DashboardHeaderActionButton';
 import { useClipboard } from '@/hooks/useClipboard';
 import { env } from '@/lib/env-client';
 import { useAppFlag } from '@/lib/flags/client';
@@ -50,6 +52,7 @@ import { getHometownFromSettings } from '@/types/db';
 
 interface ChatPageClientProps {
   readonly conversationId?: string;
+  readonly initialConversationTitle?: string | null;
   readonly isFirstSession?: boolean;
 }
 
@@ -61,6 +64,91 @@ type WelcomeChatBootstrapState =
   | 'scheduled'
   | 'done'
   | 'failed';
+
+type ChatActionProfile = NonNullable<DashboardData['selectedProfile']>;
+type ChatActionProfileCompletionSteps =
+  DashboardData['profileCompletion']['steps'];
+
+function normalizeCompletionPercentage(percentage: number): number {
+  if (!Number.isFinite(percentage)) {
+    return 0;
+  }
+
+  return Math.min(100, Math.max(0, Math.round(percentage)));
+}
+
+function profileDisplayName(profile: ChatActionProfile): string {
+  return (
+    profile.displayName?.trim() || profile.username?.trim() || 'this artist'
+  );
+}
+
+function hasProfileValue(value: string | null | undefined): boolean {
+  return typeof value === 'string' && value.trim().length > 0;
+}
+
+function hasConnectedMusicCatalog(profile: ChatActionProfile): boolean {
+  return (
+    hasProfileValue(profile.spotifyUrl) ||
+    hasProfileValue(profile.appleMusicUrl) ||
+    hasProfileValue(profile.youtubeUrl) ||
+    hasProfileValue(profile.spotifyId) ||
+    hasProfileValue(profile.appleMusicId) ||
+    hasProfileValue(profile.youtubeMusicId)
+  );
+}
+
+function buildChatActionCards({
+  profile,
+  profileCompletionPercentage,
+  profileCompletionSteps,
+}: {
+  readonly profile: ChatActionProfile;
+  readonly profileCompletionPercentage: number;
+  readonly profileCompletionSteps: ChatActionProfileCompletionSteps;
+}): readonly ChatActionCard[] {
+  const artistName = profileDisplayName(profile);
+  const completion = normalizeCompletionPercentage(profileCompletionPercentage);
+  const nextSetupStep = profileCompletionSteps[0]?.label;
+
+  if (!hasConnectedMusicCatalog(profile)) {
+    return [
+      {
+        id: 'connect-music-catalog',
+        title: 'Connect Your Music Catalog',
+        body: 'Add Spotify, Apple Music, or YouTube Music so Jovie can plan from real releases.',
+        actionLabel: 'Plan Setup',
+        prompt: `Help me connect my music catalog for ${artistName}. Use the current profile context and give me the next setup step.`,
+      },
+    ];
+  }
+
+  if (completion < 100) {
+    const body = nextSetupStep
+      ? `Your profile is ${completion}% complete. Next setup step: ${nextSetupStep}.`
+      : `Your profile is ${completion}% complete. Tighten the missing setup steps before the next share.`;
+
+    return [
+      {
+        id: 'finish-artist-profile',
+        title: 'Complete Your Artist Profile',
+        body,
+        actionLabel: 'Review Gaps',
+        prompt: `Review my artist profile for ${artistName}. Prioritize the missing setup steps and tell me the single highest-impact update to make next.`,
+      },
+    ];
+  }
+
+  return [
+    {
+      id: 'plan-next-move',
+      title: 'Plan Your Next Move',
+      body: `Use ${artistName}'s profile and catalog context to choose one concrete action for this week.`,
+      actionLabel: 'Plan Move',
+      prompt: `Use my artist profile, music catalog, and dashboard context for ${artistName} to recommend the single most useful action I should take this week. Include the first step.`,
+    },
+  ];
+}
 
 export function shouldRetryWelcomeChatBootstrap(
   status: number | null
@@ -84,18 +172,13 @@ export function resetWelcomeChatBootstrapState(
 }
 
 /**
- * Header badge that displays the conversation title as a subtle breadcrumb suffix.
+ * Header badge that displays the conversation title as the breadcrumb suffix.
  * Rendered inside the DashboardHeader via HeaderActionsContext.
  */
 function ChatTitleBadge({ title }: { readonly title: string }) {
   return (
-    <span className='flex min-w-0 items-center gap-2 rounded-xl border border-(--linear-app-frame-seam) bg-(--linear-app-content-surface) px-2.5 py-1.5'>
-      <span className='shrink-0 text-2xs font-semibold tracking-normal text-tertiary-token'>
-        Thread
-      </span>
-      <span className='block max-w-[220px] truncate text-xs font-caption text-primary-token'>
-        {title}
-      </span>
+    <span className='block max-w-full truncate' title={title}>
+      {title}
     </span>
   );
 }
@@ -122,10 +205,14 @@ function ChatProfileFallback({
       <ChatWorkspaceSurface>
         <div className='flex h-full items-center justify-center p-6'>
           <ContentSurfaceCard className='flex max-w-sm flex-col items-center gap-3 px-6 py-8 text-center'>
-            <LoadingSpinner size='lg' tone='muted' />
-            <p className='text-sm text-secondary-token'>
-              Taking you to onboarding…
-            </p>
+            <div
+              className='h-8 w-8 rounded-full skeleton motion-reduce:animate-none'
+              aria-hidden='true'
+            />
+            <div
+              className='h-4 w-44 rounded skeleton motion-reduce:animate-none'
+              aria-hidden='true'
+            />
           </ContentSurfaceCard>
         </div>
       </ChatWorkspaceSurface>
@@ -141,26 +228,38 @@ function ChatProfileFallback({
       <div className='flex h-full items-center justify-center p-6'>
         <ContentSurfaceCard className='flex max-w-sm flex-col items-center gap-3 px-6 py-8 text-center'>
           {isProfileSetupRace ? (
-            <LoadingSpinner size='lg' tone='muted' />
+            <>
+              <div
+                className='h-8 w-8 rounded-full skeleton motion-reduce:animate-none'
+                aria-hidden='true'
+              />
+              <div
+                className='h-4 w-48 rounded skeleton motion-reduce:animate-none'
+                aria-hidden='true'
+              />
+              {canAutoRetry && (
+                <div
+                  className='h-3 w-60 rounded skeleton motion-reduce:animate-none'
+                  aria-hidden='true'
+                />
+              )}
+            </>
           ) : (
             <AlertCircle className='h-8 w-8 text-tertiary-token' />
           )}
-          <p className='text-sm text-secondary-token'>{profileMessage}</p>
-          {isProfileSetupRace && canAutoRetry && (
-            <p className='text-xs text-tertiary-token'>
-              Retrying automatically in 3 seconds ({autoRetryCount + 1}/3)…
-            </p>
-          )}
           {!isProfileSetupRace && (
-            <Button
-              onClick={onRetry}
-              variant='secondary'
-              size='sm'
-              className='gap-2'
-            >
-              <RefreshCw className='h-4 w-4' />
-              Retry
-            </Button>
+            <>
+              <p className='text-sm text-secondary-token'>{profileMessage}</p>
+              <Button
+                onClick={onRetry}
+                variant='secondary'
+                size='sm'
+                className='gap-2'
+              >
+                <RefreshCw className='h-4 w-4' />
+                Retry
+              </Button>
+            </>
           )}
         </ContentSurfaceCard>
       </div>
@@ -170,6 +269,7 @@ function ChatProfileFallback({
 
 export function ChatPageClient({
   conversationId,
+  initialConversationTitle = null,
   isFirstSession = false,
 }: ChatPageClientProps) {
   const {
@@ -178,10 +278,10 @@ export function ChatPageClient({
     needsOnboarding,
     dashboardLoadError,
     isFirstSession: dashboardIsFirstSession,
+    profileCompletion,
   } = useDashboardData();
   const { setPreviewData } = usePreviewPanelData();
-  const { isOpen: isPreviewPanelOpen, open: openPreviewPanel } =
-    usePreviewPanelState();
+  const { open: openPreviewPanel } = usePreviewPanelState();
   const router = useRouter();
   const searchParams = useSearchParams();
   const notifications = useNotifications();
@@ -189,14 +289,14 @@ export function ChatPageClient({
   const { setHeaderBadge, setHeaderActions } = useSetHeaderActions();
   const [autoRetryCount, setAutoRetryCount] = useState(0);
   const [currentThreadTitle, setCurrentThreadTitle] = useState<string | null>(
-    null
+    initialConversationTitle
   );
   // Reset the thread title when the conversation changes so the previous
   // thread's title doesn't leak into a fresh conversation while the new
   // conversation's metadata is loading.
   useEffect(() => {
-    setCurrentThreadTitle(null);
-  }, [conversationId]);
+    setCurrentThreadTitle(initialConversationTitle);
+  }, [conversationId, initialConversationTitle]);
   const [_welcomeChatBootstrapState, setWelcomeChatBootstrapState] =
     useState<WelcomeChatBootstrapState>('idle');
   const welcomeChatBootstrapStateRef =
@@ -226,11 +326,10 @@ export function ChatPageClient({
   const fromOnboarding = searchParams.get('from') === 'onboarding';
   const panelParam = searchParams.get('panel');
   const designV1ChatEntitiesEnabled = useAppFlag('DESIGN_V1');
-  // Hydrate only when the panel is open, deep-linked, or onboarding requested it.
-  // This keeps closed chat routes cheap while allowing sidebar/mobile profile clicks.
+  // Hydrate the profile panel only for explicit profile entry. Entity mentions
+  // use ChatEntityPanelContext and do not need the profile preview fallback.
   const shouldHydratePreviewPanel =
-    enablePreviewPanel &&
-    (isPreviewPanelOpen || panelParam === 'profile' || fromOnboarding);
+    enablePreviewPanel && panelParam === 'profile';
 
   useEffect(() => {
     if (shouldHydratePreviewPanel) return;
@@ -355,13 +454,12 @@ export function ChatPageClient({
     return (
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <button
-            type='button'
-            className={DRAWER_HEADER_ICON_BUTTON_CLASSNAME}
-            aria-label='Thread options'
+          <AppIconButton
+            ariaLabel='Thread options'
+            className={DASHBOARD_HEADER_ACTION_ICON_BUTTON_CLASS}
           >
             <Ellipsis aria-hidden='true' className='size-4' />
-          </button>
+          </AppIconButton>
         </DropdownMenuTrigger>
         <DropdownMenuContent align='end'>
           <DropdownMenuItem onClick={handleCopyConversationId}>
@@ -387,26 +485,43 @@ export function ChatPageClient({
   ]);
 
   const handleConversationCreate = useCallback(
-    (newConversationId: string) => {
-      router.replace(`${APP_ROUTES.CHAT}/${newConversationId}`, {
-        scroll: false,
-      });
+    (
+      newConversationId: string,
+      phase: 'reserved' | 'completed' = 'completed'
+    ) => {
+      const nextRoute = `${APP_ROUTES.CHAT}/${encodeURIComponent(newConversationId)}`;
+      const currentPath = globalThis.location?.pathname;
+
+      if (currentPath === APP_ROUTES.CHAT) {
+        globalThis.history?.replaceState(
+          globalThis.history.state,
+          '',
+          nextRoute
+        );
+      }
+
+      if (phase === 'completed') {
+        router.replace(nextRoute, {
+          scroll: false,
+        });
+      }
     },
     [router]
   );
 
   // Update the header badge when the conversation title changes
-  const handleTitleChange = useCallback(
-    (title: string | null) => {
-      setCurrentThreadTitle(title);
-      if (title) {
-        setHeaderBadge(<ChatTitleBadge title={title} />);
-      } else {
-        setHeaderBadge(null);
-      }
-    },
-    [setHeaderBadge]
-  );
+  const handleTitleChange = useCallback((title: string | null) => {
+    setCurrentThreadTitle(title);
+  }, []);
+
+  useEffect(() => {
+    if (currentThreadTitle) {
+      setHeaderBadge(<ChatTitleBadge title={currentThreadTitle} />);
+      return;
+    }
+
+    setHeaderBadge(null);
+  }, [currentThreadTitle, setHeaderBadge]);
 
   // Clean up header badge when leaving the chat page
   useEffect(() => {
@@ -436,6 +551,18 @@ export function ChatPageClient({
   // We pass it as initialQuery so JovieChat can auto-submit it.
   const initialQuery =
     !env.IS_E2E && !initialQueryHandled && !conversationId ? rawQuery : null;
+
+  const chatActionCards = useMemo(
+    () =>
+      activeProfile
+        ? buildChatActionCards({
+            profile: activeProfile,
+            profileCompletionPercentage: profileCompletion.percentage,
+            profileCompletionSteps: profileCompletion.steps,
+          })
+        : [],
+    [activeProfile, profileCompletion.percentage, profileCompletion.steps]
+  );
 
   // Mark as handled after first render so re-renders don't re-submit
   useEffect(() => {
@@ -714,6 +841,7 @@ export function ChatPageClient({
             avatarUrl={activeProfile.avatarUrl}
             username={activeProfile.username ?? undefined}
             isFirstSession={isFirstSession || dashboardIsFirstSession || false}
+            actionCards={chatActionCards}
           />
         </ChatWorkspaceSurface>
       </ErrorBoundary>

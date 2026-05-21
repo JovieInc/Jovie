@@ -15,7 +15,9 @@ const { previewPanelProviderMock, useAuthRouteConfigMock } = vi.hoisted(() => ({
     showMobileTabs: false,
     isTableRoute: false,
     isDemoRoute: false,
+    isChatRoute: false,
     showChatUsageIndicator: false,
+    isLyricsRoute: false,
   })),
 }));
 // AuthShellWrapper pulls in context providers, @jovie/ui Sheet components,
@@ -123,7 +125,9 @@ describe('AuthShellWrapper', () => {
       showMobileTabs: false,
       isTableRoute: false,
       isDemoRoute: false,
+      isChatRoute: false,
       showChatUsageIndicator: false,
+      isLyricsRoute: false,
     });
   });
 
@@ -159,7 +163,9 @@ describe('AuthShellWrapper', () => {
       showMobileTabs: false,
       isTableRoute: false,
       isDemoRoute: false,
+      isChatRoute: false,
       showChatUsageIndicator: false,
+      isLyricsRoute: false,
     });
 
     render(
@@ -170,6 +176,31 @@ describe('AuthShellWrapper', () => {
 
     expect(previewPanelProviderMock).toHaveBeenCalledWith(
       expect.objectContaining({ defaultOpen: false, enabled: false }),
+      undefined
+    );
+  });
+
+  it('does not default-open preview panel on chat routes', () => {
+    useAuthRouteConfigMock.mockReturnValue({
+      section: 'dashboard',
+      isArtistProfileSettings: false,
+      breadcrumbs: [],
+      showMobileTabs: false,
+      isTableRoute: false,
+      isDemoRoute: false,
+      isChatRoute: true,
+      showChatUsageIndicator: true,
+      isLyricsRoute: false,
+    });
+
+    render(
+      <AuthShellWrapper previewPanelDefaultOpen>
+        <div>child content</div>
+      </AuthShellWrapper>
+    );
+
+    expect(previewPanelProviderMock).toHaveBeenCalledWith(
+      expect.objectContaining({ defaultOpen: false, enabled: true }),
       undefined
     );
   });

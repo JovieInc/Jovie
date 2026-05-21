@@ -17,6 +17,7 @@ const noDirectElectronBridgeRule = require('./eslint-rules/no-direct-electron-br
 const noBannedMarketingCopyRule = require('./eslint-rules/no-banned-marketing-copy');
 const noRawFocusRingRule = require('./eslint-rules/no-raw-focus-ring');
 const noAdHocCurrencyRule = require('./eslint-rules/no-ad-hoc-currency');
+const clerkOauthOptionsMustIncludePromptRule = require('./eslint-rules/clerk-oauth-options-must-include-prompt');
 
 const [nextBase, nextTypescript, nextIgnores] = nextConfig;
 
@@ -42,6 +43,8 @@ const baseConfig = {
         'no-banned-marketing-copy': noBannedMarketingCopyRule,
         'no-raw-focus-ring': noRawFocusRingRule,
         'no-ad-hoc-currency': noAdHocCurrencyRule,
+        'clerk-oauth-options-must-include-prompt':
+          clerkOauthOptionsMustIncludePromptRule,
       },
     },
   },
@@ -195,6 +198,10 @@ const baseConfig = {
     // canonical focus-ring-themed or focus-visible:* utilities
     '@jovie/no-raw-focus-ring': 'warn',
     '@jovie/no-ad-hoc-currency': 'error',
+    // clerk-oauth-options-must-include-prompt is scoped to app/(auth)/** via
+    // its internal file-path check, so setting 'error' globally is safe — it
+    // will only fire on files under app/(auth)/.
+    '@jovie/clerk-oauth-options-must-include-prompt': 'error',
   },
 };
 

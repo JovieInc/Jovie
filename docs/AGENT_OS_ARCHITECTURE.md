@@ -122,3 +122,15 @@ Every implementation PR after this ADR must run the narrowest relevant local che
 5. Release conductor runs `/land-and-deploy` after CI and bot-review gates pass.
 
 Workflow, GitHub Actions, Hermes, and WDK PRs require `needs-human` if compile behavior, runner availability, or gate publication is ambiguous.
+
+## Hermes-Air Node (always-on orchestration)
+
+A dedicated 16 GB MacBook Air runs `hermes serve` 24/7 as the always-on orchestration node. It ingests brain dumps (Telegram + macOS Voice Memos via iCloud), persists them to gbrain (Air-hosted, exposed to the Pro over Tailscale), classifies actionable spans, and files Linear issues using the canonical follow-up shape. **Engineering work flows through Linear** — the Pro's existing Hermes issue runner picks up issues automatically; the Air never opens `repository_dispatch` events.
+
+- Operating contract: [`.claude/rules/hermes-air.md`](../.claude/rules/hermes-air.md)
+- Operator runbook: [`docs/HERMES_AIR.md`](./HERMES_AIR.md)
+- Bootstrap: `scripts/hermes/bootstrap-air.sh`
+- Cost target: $0/mo via OpenRouter free-model rotation + local Ollama Qwen 3 4B fallback. Sentinel kill switch trips on any paid spend.
+- `HermesAiOpsSource` includes the value `'hermes-air'` so the HUD attributes dispatches that originate from the Air separately from product/CI sources.
+
+Profiles on the Air (`chief`, `cfo`, `founder-os`, `code-orchestrator`) are Hermes sub-agents, not coding agents. They are gated by the same `JOVIE_AGENT_PROFILE` policy enforced in `.claude/hooks/orchestrator-boundary-check.sh`.

@@ -19,6 +19,8 @@ export {
   AdminPlatformStatsSectionSkeleton,
 } from './AdminPlatformStatsSection';
 export {
+  AdminHeroMetrics,
+  AdminHeroMetricsSkeleton,
   AdminScoreboardSection,
   AdminScoreboardSectionSkeleton,
 } from './AdminScoreboardSection';

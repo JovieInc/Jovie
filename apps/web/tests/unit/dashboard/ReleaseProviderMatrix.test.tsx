@@ -353,7 +353,7 @@ vi.mock(
               ? 'Release Plan'
               : canGenerateReleasePlans
                 ? 'Generate Release Plan'
-                : 'Upgrade To Generate A Release Plan'}
+                : 'Upgrade to Generate a Release Plan'}
           </h2>
           <p>
             {isGateLoading
@@ -824,7 +824,7 @@ describe('ReleaseProviderMatrix', () => {
       expect(screen.queryByTestId('release-sidebar')).not.toBeInTheDocument();
       expect(
         await screen.findByRole('heading', {
-          name: 'Upgrade To Generate A Release Plan',
+          name: 'Upgrade to Generate a Release Plan',
         })
       ).toBeInTheDocument();
       expect(mockRouterRefresh).not.toHaveBeenCalled();
@@ -854,7 +854,7 @@ describe('ReleaseProviderMatrix', () => {
 
       expect(
         await screen.findByRole('heading', {
-          name: 'Upgrade To Generate A Release Plan',
+          name: 'Upgrade to Generate a Release Plan',
         })
       ).toBeInTheDocument();
       expect(
@@ -911,7 +911,7 @@ describe('ReleaseProviderMatrix', () => {
         );
       });
       expect(mockRouterPush).toHaveBeenCalledWith(
-        '/app/dashboard/releases/created-release/tasks'
+        '/app/releases/created-release/tasks'
       );
     });
 
@@ -949,7 +949,7 @@ describe('ReleaseProviderMatrix', () => {
 
       expect(
         await screen.findByRole('heading', {
-          name: 'Upgrade To Generate A Release Plan',
+          name: 'Upgrade to Generate a Release Plan',
         })
       ).toBeInTheDocument();
       expect(
@@ -1000,7 +1000,7 @@ describe('ReleaseProviderMatrix', () => {
       expect(screen.getByRole('button', { name: 'Loading...' })).toBeDisabled();
       expect(
         screen.queryByRole('heading', {
-          name: 'Upgrade To Generate A Release Plan',
+          name: 'Upgrade to Generate a Release Plan',
         })
       ).not.toBeInTheDocument();
     });
@@ -1033,7 +1033,7 @@ describe('ReleaseProviderMatrix', () => {
       await waitFor(() => {
         expect(
           screen.queryByRole('heading', {
-            name: 'Upgrade To Generate A Release Plan',
+            name: 'Upgrade to Generate a Release Plan',
           })
         ).not.toBeInTheDocument();
       });
@@ -1069,7 +1069,7 @@ describe('ReleaseProviderMatrix', () => {
       await waitFor(() => {
         expect(
           screen.getByRole('heading', {
-            name: 'Upgrade To Generate A Release Plan',
+            name: 'Upgrade to Generate a Release Plan',
           })
         ).toBeInTheDocument();
       });
@@ -1117,7 +1117,7 @@ describe('ReleaseProviderMatrix', () => {
       await waitFor(() => {
         expect(
           screen.getByRole('heading', {
-            name: 'Upgrade To Generate A Release Plan',
+            name: 'Upgrade to Generate a Release Plan',
           })
         ).toBeInTheDocument();
       });

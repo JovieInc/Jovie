@@ -2,11 +2,29 @@ import { expect, test } from '@playwright/test';
 import { setTestAuthBypassSession } from '../helpers/clerk-auth';
 import {
   isClerkRedirectUrl,
+  RETRY_CONFIG,
   SMOKE_TIMEOUTS,
   smokeNavigateWithRetry,
 } from './utils/smoke-test-utils';
 
 const USE_TEST_AUTH_BYPASS = process.env.E2E_USE_TEST_AUTH_BYPASS === '1';
+const AUTHENTICATED_APP_SHELL_NAVIGATION_TIMEOUT = 120_000;
+const AUTHENTICATED_APP_SHELL_NAVIGATION_RETRIES = 1;
+const AUTHENTICATED_APP_SHELL_NAVIGATION_RETRY_DELAY_BUDGET =
+  RETRY_CONFIG.BACKOFF_INTERVALS.slice(
+    0,
+    AUTHENTICATED_APP_SHELL_NAVIGATION_RETRIES
+  ).reduce((total, delay) => total + delay, 0);
+const WELCOME_CHAT_BOOTSTRAP_REQUEST_TIMEOUT = 30_000;
+const AUTHENTICATED_WELCOME_CHAT_SMOKE_BUFFER = 10_000;
+const AUTHENTICATED_WELCOME_CHAT_SMOKE_TIMEOUT =
+  AUTHENTICATED_APP_SHELL_NAVIGATION_TIMEOUT *
+    (AUTHENTICATED_APP_SHELL_NAVIGATION_RETRIES + 1) +
+  AUTHENTICATED_APP_SHELL_NAVIGATION_RETRY_DELAY_BUDGET +
+  WELCOME_CHAT_BOOTSTRAP_REQUEST_TIMEOUT +
+  SMOKE_TIMEOUTS.URL_STABLE +
+  SMOKE_TIMEOUTS.VISIBILITY +
+  AUTHENTICATED_WELCOME_CHAT_SMOKE_BUFFER;
 
 test.describe('Signup Funnel Smoke @smoke', () => {
   test.use({ storageState: { cookies: [], origins: [] } });
@@ -84,6 +102,8 @@ test.describe('Signup Funnel Smoke @smoke', () => {
   test('authenticated creator shell and welcome chat bootstrap stay healthy under auth bypass', async ({
     page,
   }) => {
+    test.setTimeout(AUTHENTICATED_WELCOME_CHAT_SMOKE_TIMEOUT);
+
     if (!USE_TEST_AUTH_BYPASS) {
       test.skip(true, 'Run with E2E_USE_TEST_AUTH_BYPASS=1');
       return;
@@ -96,8 +116,8 @@ test.describe('Signup Funnel Smoke @smoke', () => {
     );
 
     const appResponse = await smokeNavigateWithRetry(page, '/app/chat', {
-      timeout: 120_000,
-      retries: 2,
+      timeout: AUTHENTICATED_APP_SHELL_NAVIGATION_TIMEOUT,
+      retries: AUTHENTICATED_APP_SHELL_NAVIGATION_RETRIES,
     });
 
     expect(appResponse?.status() ?? 0).toBeLessThan(500);
@@ -115,6 +135,7 @@ test.describe('Signup Funnel Smoke @smoke', () => {
       '/api/onboarding/welcome-chat',
       {
         data: { initialReply: 'Smoke test bootstrap' },
+        timeout: WELCOME_CHAT_BOOTSTRAP_REQUEST_TIMEOUT,
       }
     );
 

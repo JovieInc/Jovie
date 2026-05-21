@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import {
+  AUTH_OAUTH_PROVIDER_LABELS,
   buildDisabledOAuthProviderElements,
+  CLERK_SOCIAL_BUTTON_LABEL_TEMPLATE,
+  getEnabledAuthOAuthProviders,
   isOAuthProviderEnabled,
 } from '@/lib/auth/oauth-providers';
 
@@ -67,6 +70,20 @@ describe('OAuth provider guard', () => {
         .filter(([, v]) => v === 'hidden')
         .map(([k]) => k);
       expect(hiddenKeys).toHaveLength(8);
+    });
+  });
+
+  describe('shared provider button copy', () => {
+    it('uses full provider labels for the enabled auth providers', () => {
+      expect(getEnabledAuthOAuthProviders()).toEqual(['apple', 'google']);
+      expect(AUTH_OAUTH_PROVIDER_LABELS.google).toBe('Continue with Google');
+      expect(AUTH_OAUTH_PROVIDER_LABELS.apple).toBe('Continue with Apple');
+    });
+
+    it('forces Clerk compact multi-provider labels to keep the full copy', () => {
+      expect(CLERK_SOCIAL_BUTTON_LABEL_TEMPLATE).toBe(
+        'Continue with {{provider|titleize}}'
+      );
     });
   });
 });

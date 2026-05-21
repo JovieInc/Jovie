@@ -145,11 +145,17 @@ export default function PricingPage() {
         {safeJsonLdStringify(PRICING_SCHEMA)}
       </script>
 
-      <section className='pb-16 pt-[5.9rem] sm:pb-20 sm:pt-[6.4rem] lg:pb-24'>
+      <section
+        aria-labelledby='pricing-hero-heading'
+        className='pb-16 pt-[5.9rem] sm:pb-20 sm:pt-[6.4rem] lg:pb-24'
+      >
         <MarketingContainer width='page'>
           <div className='grid gap-10 lg:grid-cols-[minmax(0,0.82fr)_minmax(0,1.18fr)] lg:items-start'>
             <div className='max-w-[33rem]'>
-              <h1 className='marketing-h1-linear text-primary-token'>
+              <h1
+                id='pricing-hero-heading'
+                className='marketing-h1-linear text-primary-token'
+              >
                 Pricing
               </h1>
               <p className='marketing-lead-linear mt-5 max-w-[30rem] text-secondary-token'>
@@ -193,11 +199,17 @@ export default function PricingPage() {
         </MarketingContainer>
       </section>
 
-      <section className='border-t border-subtle py-20 md:py-24'>
+      <section
+        aria-labelledby='pricing-compare-heading'
+        className='border-t border-subtle py-20 md:py-24'
+      >
         <MarketingContainer width='page'>
           <div className='mx-auto max-w-[58rem]'>
             <div className='max-w-[30rem]'>
-              <h2 className='text-[clamp(2.15rem,3.6vw,3.25rem)] font-semibold tracking-[-0.04em] text-primary-token'>
+              <h2
+                id='pricing-compare-heading'
+                className='text-[clamp(2.15rem,3.6vw,3.25rem)] font-semibold tracking-[-0.04em] text-primary-token'
+              >
                 Compare all features
               </h2>
               <p className='mt-4 text-[15px] leading-[1.7] text-secondary-token'>
@@ -212,10 +224,16 @@ export default function PricingPage() {
         </MarketingContainer>
       </section>
 
-      <section className='border-t border-subtle py-20 md:py-28'>
+      <section
+        aria-labelledby='pricing-get-started-heading'
+        className='border-t border-subtle py-20 md:py-28'
+      >
         <MarketingContainer width='page'>
           <div className='text-center'>
-            <h2 className='text-[clamp(2.1rem,3.6vw,3.25rem)] font-semibold tracking-[-0.04em] text-primary-token'>
+            <h2
+              id='pricing-get-started-heading'
+              className='text-[clamp(2.1rem,3.6vw,3.25rem)] font-semibold tracking-[-0.04em] text-primary-token'
+            >
               Get Started
             </h2>
             <p className='mx-auto mt-4 max-w-[30rem] text-[15px] leading-[1.7] text-secondary-token'>

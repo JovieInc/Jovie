@@ -637,7 +637,7 @@ export function extractDashboardSample(
       coerceNumber(page.rawTimings['cumulative-layout-shift']),
       4
     ),
-    finalUrl: page.url ?? APP_ROUTES.DASHBOARD_RELEASES,
+    finalUrl: page.url ?? APP_ROUTES.RELEASES,
   };
 }
 
@@ -692,7 +692,7 @@ export function buildDashboardBudgetGuardArgs(
   if (routeId) {
     args.push('--route-id', routeId);
   } else {
-    args.push('--path', route || APP_ROUTES.DASHBOARD_RELEASES);
+    args.push('--path', route || APP_ROUTES.RELEASES);
   }
 
   if (resolvedAuthPath) {
@@ -961,7 +961,7 @@ export function buildOptimizerPrompt(options: {
     'Primary metric:',
     state.config.mode === 'homepage'
       ? '- Lighthouse performance score for / with LCP <= 2500ms, FCP <= 1800ms, TBT <= 200ms, CLS <= 0.05, and no accessibility/SEO regression.'
-      : `- Route performance for ${state.config.routeId ?? state.config.route ?? APP_ROUTES.DASHBOARD_RELEASES} with TTFB <= 500ms and skeleton-to-content <= 300ms.`,
+      : `- Route performance for ${state.config.routeId ?? state.config.route ?? APP_ROUTES.RELEASES} with TTFB <= 500ms and skeleton-to-content <= 300ms.`,
   ];
 
   if (nextHypothesis) {

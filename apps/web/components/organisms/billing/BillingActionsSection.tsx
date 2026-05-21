@@ -74,8 +74,8 @@ export function BillingActionsSection({
                 <AlertDialogDescription asChild>
                   <div className='space-y-3'>
                     <p>
-                      If you cancel, you will immediately lose access to these
-                      features:
+                      Your Pro access continues until the end of your current
+                      billing period. After that, you&apos;ll lose access to:
                     </p>
                     <ul className='space-y-2'>
                       <li className='flex items-start gap-2 text-app'>
@@ -115,7 +115,7 @@ export function BillingActionsSection({
                       </li>
                     </ul>
                     <p className='text-secondary-token'>
-                      This takes effect immediately. You can re-subscribe at any
+                      You won&apos;t be charged again. You can re-subscribe any
                       time.
                     </p>
                   </div>

@@ -20,9 +20,18 @@ updates:
       - 'dependencies'
       - 'automated'
     ignore:
-      # Ignore major version updates for critical packages
+      # Ignore ALL automated Clerk SDK updates — element-key naming drifts
+      # silently between minor versions and breaks the AuthShell SSO-only
+      # `appearance.elements` map (JOV-2446). Manually bump Clerk packages
+      # in dedicated PRs that include a dogfooded /signin smoke + the
+      # `clerk-config-audit` cron output.
       - dependency-name: '@clerk/nextjs'
-        update-types: ['version-update:semver-major']
+      - dependency-name: '@clerk/backend'
+      - dependency-name: '@clerk/clerk-js'
+      - dependency-name: '@clerk/ui'
+      - dependency-name: '@clerk/testing'
+      - dependency-name: '@clerk/shared'
+      - dependency-name: '@clerk/localizations'
       - dependency-name: 'next'
         update-types: ['version-update:semver-major']
       - dependency-name: 'react'

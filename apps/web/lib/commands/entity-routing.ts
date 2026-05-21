@@ -12,12 +12,12 @@
  * silently dropping the user on an unrelated screen.
  */
 
-import { APP_ROUTES } from '@/constants/routes';
+import { buildReleaseTasksRoute } from '@/constants/routes';
 import type { EntityRef } from '@/lib/commands/entities';
 
 export function resolveEntityHref(entity: EntityRef): string | null {
   if (entity.kind === 'release') {
-    return `${APP_ROUTES.DASHBOARD_RELEASES}/${entity.id}/tasks`;
+    return buildReleaseTasksRoute(entity.id);
   }
   // Artists and tracks don't have per-entity detail pages yet.
   return null;

@@ -5,13 +5,11 @@ import {
   unstable_noStore as noStore,
   revalidatePath,
   revalidateTag,
-  unstable_cache,
 } from 'next/cache';
 import { redirect } from 'next/navigation';
-import { cache } from 'react';
 import { APP_ROUTES } from '@/constants/routes';
 import { getCachedAuth } from '@/lib/auth/cached';
-import { CACHE_TTL, createSmartLinkContentTag } from '@/lib/cache/tags';
+import { createSmartLinkContentTag } from '@/lib/cache/tags';
 import { db } from '@/lib/db';
 import { isUniqueViolation } from '@/lib/db/errors';
 import {
@@ -27,11 +25,9 @@ import { validateProviderUrl } from '@/lib/discography/provider-domains';
 import {
   getProviderLink,
   getReleaseById,
-  getReleaseForProfileById,
   getReleasesForProfile as getReleasesFromDb,
   getReleaseTracksForReleaseWithProviders,
   getTracksForRelease,
-  type ReleaseWithProviders,
   resetProviderLink as resetProviderLinkDb,
   upsertProviderLink,
   upsertRecording,
@@ -47,12 +43,7 @@ import type {
   ReleaseViewModel,
   TrackViewModel,
 } from '@/lib/discography/types';
-import { buildSmartLinkPath } from '@/lib/discography/utils';
-import { VIDEO_PROVIDER_KEYS } from '@/lib/discography/video-providers';
-import {
-  buildProviderLabels,
-  mapProviderLinksToViewModel,
-} from '@/lib/discography/view-models';
+import { buildProviderLabels } from '@/lib/discography/view-models';
 import {
   type AggregateEnrichmentStatus,
   applyTtlToEnrichmentStatus,
@@ -76,17 +67,22 @@ import {
   checkReleaseRefreshRateLimit,
   formatTimeRemaining,
 } from '@/lib/rate-limit';
-import { trackServerEvent } from '@/lib/server-analytics';
 import {
-  buildCanvasMetadata,
-  getCanvasStatusFromMetadata,
-} from '@/lib/services/canvas/service';
+  loadReleaseEntity as loadReleaseEntityFromLoader,
+  loadReleaseMatrixForProfile as loadReleaseMatrixForProfileFromLoader,
+  loadReleaseMatrix as loadReleaseMatrixFromLoader,
+} from '@/lib/releases/release-matrix-loader';
+import type { ReleaseProfileContext } from '@/lib/releases/release-types';
+import { mapReleaseToViewModel } from '@/lib/releases/release-view-models';
+import { trackServerEvent } from '@/lib/server-analytics';
+import { buildCanvasMetadata } from '@/lib/services/canvas/service';
 import type { CanvasStatus } from '@/lib/services/canvas/types';
 import { slugify } from '@/lib/utils';
-import { toISOStringOrNull } from '@/lib/utils/date';
 import { throwIfRedirect } from '@/lib/utils/redirect-error';
 import { targetPlaylistsSchema } from '@/lib/validation/schemas/dashboard/profile';
-import { getDashboardData, getDashboardShellData } from '../actions';
+import { getDashboardDataEssential, getDashboardShellData } from '../actions';
+
+export type { ReleaseProfileContext } from '@/lib/releases/release-types';
 
 const SPOTIFY_ALREADY_CLAIMED_MESSAGE =
   'This Spotify artist is already linked to another Jovie account. Please sign in with the original account or choose a different artist.';
@@ -185,25 +181,19 @@ function deriveSpotifyImportStatus(result: SpotifyImportResult) {
   return 'failed' as const;
 }
 
-async function requireProfile(profileId?: string): Promise<{
+async function requireProfile(): Promise<{
   id: string;
   spotifyId: string | null;
   handle: string;
 }> {
-  const data = await getDashboardData();
+  const data = await getDashboardDataEssential();
 
   if (data.needsOnboarding && !data.dashboardLoadError) {
     redirect(APP_ROUTES.START);
   }
 
-  let profile = data.selectedProfile;
+  const profile = data.selectedProfile;
 
-  // If a specific profile is requested, ensure the user owns it
-  if (profileId) {
-    profile = data.creatorProfiles.find(p => p.id === profileId) ?? null;
-  }
-
-  // Redirect to onboarding if no profile exists (new users, mid-onboarding, or load errors)
   if (!profile) {
     redirect(APP_ROUTES.START);
   }
@@ -215,207 +205,21 @@ async function requireProfile(profileId?: string): Promise<{
   };
 }
 
-/**
- * Extract genres from release metadata
- */
-function extractGenres(metadata: Record<string, unknown> | null): string[] {
-  if (!metadata) return [];
-
-  // Try common genre field names from various sources
-  const genreField =
-    metadata.genres ??
-    metadata.genre ??
-    metadata.spotifyGenres ??
-    metadata.spotify_genres;
-
-  if (Array.isArray(genreField)) {
-    return genreField.filter((g): g is string => typeof g === 'string');
-  }
-
-  if (typeof genreField === 'string') {
-    return [genreField];
-  }
-
-  return [];
+export async function loadReleaseMatrix(profileId?: string) {
+  return loadReleaseMatrixFromLoader(profileId);
 }
 
-/**
- * Map database release to view model
- */
-function mapReleaseToViewModel(
-  release: ReleaseWithProviders,
-  _providerLabels: Record<ProviderKey, string>,
-  profileId: string,
-  profileHandle: string
-): ReleaseViewModel {
-  // Use the new short URL format: /{handle}/{slug}
-  const slug = release.slug;
-
-  return {
-    profileId,
-    id: release.id,
-    title: release.title,
-    artistNames: release.artistNames,
-    releaseDate: toISOStringOrNull(release.releaseDate) ?? undefined,
-    status: (release.status as ReleaseStatusValue) ?? 'released',
-    revealDate: toISOStringOrNull(release.revealDate) ?? undefined,
-    deletedAt: toISOStringOrNull(release.deletedAt) ?? undefined,
-    artworkUrl: release.artworkUrl ?? undefined,
-    slug,
-    smartLinkPath: buildSmartLinkPath(profileHandle, slug),
-    spotifyPopularity: release.spotifyPopularity,
-    providers: mapProviderLinksToViewModel({
-      providerLinks: release.providerLinks,
-      profileHandle,
-      slug,
-    }),
-    // Extended fields
-    releaseType: release.releaseType,
-    isExplicit: release.isExplicit,
-    upc: release.upc,
-    label: release.label,
-    totalTracks: release.totalTracks,
-    totalDurationMs: release.trackSummary?.totalDurationMs ?? null,
-    primaryIsrc: release.trackSummary?.primaryIsrc ?? null,
-    genres:
-      release.genres && release.genres.length > 0
-        ? release.genres
-        : extractGenres(release.metadata),
-    targetPlaylists: release.targetPlaylists ?? [],
-    copyrightLine: release.copyrightLine ?? null,
-    distributor: release.distributor ?? null,
-    canvasStatus: getCanvasStatusFromMetadata(release.metadata),
-    originalArtworkUrl: (release.metadata as Record<string, unknown> | null)
-      ?.originalArtworkUrl as string | undefined,
-    hasVideoLinks: release.providerLinks.some(link =>
-      (VIDEO_PROVIDER_KEYS as string[]).includes(link.providerId)
-    ),
-    lyrics:
-      (
-        release.metadata as Record<string, unknown> | null
-      )?.lyrics?.toString() || undefined,
-    previewUrl: release.trackSummary?.primaryPreviewUrl || null,
-  };
-}
-
-/**
- * Core release matrix fetch logic (cacheable)
- */
-async function fetchReleaseMatrixCore(
-  profileId: string,
-  profileHandle: string
-): Promise<ReleaseViewModel[]> {
-  const providerLabels = buildProviderLabels();
-  const releases = await getReleasesFromDb(profileId, { includeDrafts: true });
-
-  return releases.map(release =>
-    mapReleaseToViewModel(release, providerLabels, profileId, profileHandle)
-  );
-}
-
-async function fetchReleaseEntityCore(
-  profileId: string,
-  profileHandle: string,
-  releaseId: string
-): Promise<ReleaseViewModel | null> {
-  const providerLabels = buildProviderLabels();
-  const release = await getReleaseForProfileById(profileId, releaseId, {
-    includeDrafts: true,
-  });
-
-  return release
-    ? mapReleaseToViewModel(release, providerLabels, profileId, profileHandle)
-    : null;
-}
-
-export interface ReleaseProfileContext {
-  readonly userId: string;
-  readonly profileId: string;
-  readonly profileHandle: string;
-  readonly spotifyId: string | null;
-  readonly appleMusicId: string | null;
-  readonly settings: Record<string, unknown> | null;
-}
-
-/**
- * Core release matrix loading logic (cacheable).
- * Cache is invalidated on mutations (save/reset provider links, Spotify sync)
- */
-async function resolveReleaseMatrix(
-  profileId?: string
-): Promise<ReleaseViewModel[]> {
-  const { userId } = await getCachedAuth();
-
-  if (!userId) {
-    redirect(`${APP_ROUTES.SIGNIN}?redirect_url=${APP_ROUTES.RELEASES}`);
-  }
-
-  const profile = await requireProfile(profileId);
-
-  // Cache with 5min TTL and tags for invalidation.
-  // Releases only change on import/sync — tag-based invalidation handles mutations.
-  return unstable_cache(
-    () => fetchReleaseMatrixCore(profile.id, profile.handle),
-    ['releases-matrix', userId, profile.id],
-    {
-      revalidate: CACHE_TTL.MEDIUM,
-      tags: [`releases:${userId}:${profile.id}`],
-    }
-  )();
-}
-
-/**
- * Cached loader for release matrix.
- * Uses React's cache() for request-level deduplication.
- */
-export const loadReleaseMatrix = cache(resolveReleaseMatrix);
-
-async function resolveReleaseEntity(params: {
+export async function loadReleaseEntity(params: {
   readonly profileId: string;
   readonly releaseId: string;
-}): Promise<ReleaseViewModel | null> {
-  const { userId } = await getCachedAuth();
-
-  if (!userId) {
-    redirect(`${APP_ROUTES.SIGNIN}?redirect_url=${APP_ROUTES.RELEASES}`);
-  }
-
-  const profile = await requireProfile(params.profileId);
-
-  return unstable_cache(
-    () => fetchReleaseEntityCore(profile.id, profile.handle, params.releaseId),
-    ['release-entity', userId, profile.id, params.releaseId],
-    {
-      revalidate: CACHE_TTL.MEDIUM,
-      tags: [`releases:${userId}:${profile.id}`],
-    }
-  )();
+}) {
+  return loadReleaseEntityFromLoader(params);
 }
-
-export const loadReleaseEntity = cache(resolveReleaseEntity);
 
 export async function loadReleaseMatrixForProfile(
   profile: ReleaseProfileContext
-): Promise<ReleaseViewModel[]> {
-  // Auth guard: verify caller owns this profile
-  const { userId } = await getCachedAuth();
-  if (!userId || userId !== profile.userId) {
-    throw new Error('Unauthorized');
-  }
-
-  return unstable_cache(
-    () => fetchReleaseMatrixCore(profile.profileId, profile.profileHandle),
-    [
-      'releases-matrix',
-      profile.userId,
-      profile.profileId,
-      profile.profileHandle,
-    ],
-    {
-      revalidate: CACHE_TTL.MEDIUM,
-      tags: [`releases:${profile.userId}:${profile.profileId}`],
-    }
-  )();
+) {
+  return loadReleaseMatrixForProfileFromLoader(profile);
 }
 
 export async function saveProviderOverride(params: {
@@ -1242,7 +1046,7 @@ export async function checkSpotifyConnection(): Promise<{
   }
 
   try {
-    const data = await getDashboardData();
+    const data = await getDashboardDataEssential();
 
     if (data.needsOnboarding || !data.selectedProfile) {
       return { connected: false, spotifyId: null, artistName: null };

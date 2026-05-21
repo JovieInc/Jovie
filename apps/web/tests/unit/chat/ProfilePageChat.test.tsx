@@ -1,15 +1,19 @@
+import { fireEvent } from '@testing-library/react';
 import React from 'react';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { DashboardData } from '@/app/app/(shell)/dashboard/actions/dashboard-data';
 import { DashboardDataProvider } from '@/app/app/(shell)/dashboard/DashboardDataContext';
 import { ProfilePageChat } from '@/app/app/(shell)/dashboard/profile/ProfilePageChat';
 import { fastRender } from '@/tests/utils/fast-render';
 
+const mockRouterRefresh = vi.fn();
+let shouldThrowChatRender = false;
+
 vi.mock('next/navigation', () => ({
   useRouter: () => ({
     push: vi.fn(),
     replace: vi.fn(),
-    refresh: vi.fn(),
+    refresh: mockRouterRefresh,
     back: vi.fn(),
   }),
   useSearchParams: () => new URLSearchParams(),
@@ -22,14 +26,19 @@ vi.mock('@/components/jovie/JovieChat', () => ({
     displayName?: string;
     avatarUrl?: string | null;
     username?: string;
-  }) =>
-    React.createElement('div', {
+  }) => {
+    if (shouldThrowChatRender) {
+      throw new Error('chat render failed');
+    }
+
+    return React.createElement('div', {
       'data-testid': 'jovie-chat',
       'data-profile-id': props.profileId,
       'data-display-name': props.displayName ?? '',
       'data-avatar-url': props.avatarUrl ?? '',
       'data-username': props.username ?? '',
-    }),
+    });
+  },
 }));
 
 const baseDashboardData: DashboardData = {
@@ -78,6 +87,15 @@ function renderProfilePageChat(data: DashboardData = baseDashboardData) {
 }
 
 describe('ProfilePageChat', () => {
+  beforeEach(() => {
+    mockRouterRefresh.mockClear();
+    shouldThrowChatRender = false;
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
   it('passes selected profile identity props to JovieChat', () => {
     const { getByTestId } = renderProfilePageChat();
 
@@ -126,5 +144,16 @@ describe('ProfilePageChat', () => {
     const retryButton = container.querySelector('button');
     expect(retryButton).not.toBeNull();
     expect(retryButton?.textContent).toContain('Retry');
+  });
+
+  it('refreshes the app route instead of reloading the document from the error fallback', () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    shouldThrowChatRender = true;
+
+    const { getByRole } = renderProfilePageChat();
+
+    fireEvent.click(getByRole('button', { name: 'Reload chat' }));
+
+    expect(mockRouterRefresh).toHaveBeenCalledTimes(1);
   });
 });

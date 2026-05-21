@@ -5,6 +5,7 @@ import { memo, useCallback } from 'react';
 import { toast } from 'sonner';
 import type { AudienceMember } from '@/types';
 import { useAudienceTableStableContext } from '../AudienceTableContext';
+import { isAudienceMemberReachable } from '../row-contract';
 
 export interface AudienceActionCellProps {
   readonly member: AudienceMember;
@@ -14,11 +15,7 @@ export const AudienceActionCell = memo(function AudienceActionCell({
   member,
 }: AudienceActionCellProps) {
   const { onSendNotification } = useAudienceTableStableContext();
-  // Gate the email channel on `emailVisibleToArtist` so a fan whose email is
-  // hidden from the artist (e.g. opt-in not confirmed) doesn't get exposed by
-  // the Message button enabling and forwarding `member.email` downstream.
-  const emailVisible = member.emailVisibleToArtist !== false;
-  const reachable = Boolean((emailVisible && member.email) || member.phone);
+  const reachable = isAudienceMemberReachable(member);
 
   const handleClick = useCallback(
     (event: React.MouseEvent<HTMLButtonElement>) => {

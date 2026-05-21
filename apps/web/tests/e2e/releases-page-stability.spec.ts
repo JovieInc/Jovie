@@ -24,7 +24,7 @@ import { expect, test } from '@playwright/test';
 import { assertDomStable } from '../helpers/dom-stability';
 
 const BYPASS_URL =
-  '/api/dev/test-auth/enter?persona=creator-ready&redirect=/app/dashboard/releases';
+  '/api/dev/test-auth/enter?persona=creator-ready&redirect=/app/releases';
 
 test.use({ storageState: { cookies: [], origins: [] } });
 
@@ -40,9 +40,7 @@ test('releases page stays stable during background query invalidation', async ({
   await page.goto(BYPASS_URL, { waitUntil: 'domcontentloaded' });
   await page.waitForURL(/\/app\/dashboard\/releases/, { timeout: 60_000 });
 
-  // Wait for the releases view to be fully rendered (no skeleton)
-  // ShellReleasesView renders data-testid="shell-releases-view" when DESIGN_V1 is on.
-  // ReleasesExperience is the legacy path. Either way, wait for the skeleton to be gone.
+  // Wait for the releases view to be fully rendered (no skeleton).
   await expect(page.locator('[data-testid="releases-loading"]')).toHaveCount(
     0,
     {
@@ -50,16 +48,9 @@ test('releases page stays stable during background query invalidation', async ({
     }
   );
 
-  // Confirm the page has a releases view rendered (shell view or legacy matrix)
-  const hasShellView = await page
-    .locator('[data-testid="shell-releases-view"]')
-    .count();
-  if (hasShellView === 0) {
-    // Legacy provider matrix path — ensure any content container is present
-    await expect(page.locator('[role="main"]')).toBeVisible({
-      timeout: 15_000,
-    });
-  }
+  await expect(page.getByTestId('releases-matrix')).toBeVisible({
+    timeout: 15_000,
+  });
 
   // Trigger a background invalidation via the E2E hook and assert no skeleton appears
   await assertDomStable(page, {

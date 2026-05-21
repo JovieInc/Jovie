@@ -1,10 +1,5 @@
-import { notFound, redirect } from 'next/navigation';
-import { APP_ROUTES } from '@/constants/routes';
-import { PageErrorState } from '@/features/feedback/PageErrorState';
-import { getCachedAuth } from '@/lib/auth/cached';
-import { captureError } from '@/lib/error-tracking';
-import { getAppFlagValue } from '@/lib/flags/server';
-import { getDashboardShellData } from '../../dashboard/actions';
+import { notFound } from 'next/navigation';
+import { loadAppShellRouteContext } from '../../app-shell-route-context';
 import { LyricsPageClient } from './LyricsPageClient';
 import { loadLyricsRouteTrack } from './lyrics-data';
 import { plainLyricsToLines } from './lyrics-lines';
@@ -24,30 +19,18 @@ interface Props {
  */
 export default async function LyricsPage({ params }: Props) {
   const { trackId } = await params;
-  const { userId } = await getCachedAuth();
-  const lyricsEnabled = await getAppFlagValue('DESIGN_V1', { userId });
-
-  if (!userId || !lyricsEnabled) {
-    notFound();
+  const routeContext = await loadAppShellRouteContext({
+    route: `/app/lyrics/${trackId}`,
+    authFailure: 'notFound',
+    requiredFlag: 'DESIGN_V1',
+    dashboardErrorLogMessage: 'Dashboard data load failed on lyrics page',
+    dashboardErrorMessage: 'Failed to load lyrics. Please refresh the page.',
+  });
+  if (!routeContext.ok) {
+    return routeContext.error;
   }
 
-  const dashboardData = await getDashboardShellData(userId);
-  if (dashboardData.dashboardLoadError) {
-    await captureError(
-      'Dashboard data load failed on lyrics page',
-      dashboardData.dashboardLoadError,
-      { route: `/app/lyrics/${trackId}` }
-    );
-    return (
-      <PageErrorState message='Failed to load lyrics. Please refresh the page.' />
-    );
-  }
-
-  if (dashboardData.needsOnboarding) {
-    redirect(APP_ROUTES.START);
-  }
-
-  const selectedProfile = dashboardData.selectedProfile;
+  const selectedProfile = routeContext.dashboardData.selectedProfile;
   if (!selectedProfile) {
     notFound();
   }

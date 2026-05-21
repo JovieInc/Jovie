@@ -9,6 +9,7 @@
 
 import type { CommonDropdownItem } from '@jovie/ui';
 import { Activity, Pause, Play, Plus, RefreshCw } from 'lucide-react';
+import { useRouter } from 'next/navigation';
 import {
   type ReactNode,
   useCallback,
@@ -48,7 +49,7 @@ import {
   StatusBadge,
 } from '@/components/shell/StatusBadge';
 import { TypeBadge } from '@/components/shell/TypeBadge';
-import { APP_ROUTES } from '@/constants/routes';
+import { buildReleaseTasksRoute } from '@/constants/routes';
 import { buildReleaseActions } from '@/features/dashboard/organisms/releases/release-actions';
 import { CompactReleasePlanUpgradeCard } from '@/features/dashboard/tasks/TasksUpgradeInterstitial';
 import {
@@ -196,7 +197,7 @@ function renderArtistLine(
       <button
         type='button'
         onClick={() => onArtistClick(fallback)}
-        className='rounded-sm hover:underline focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-(--linear-focus-ring)'
+        className='rounded-sm hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/55 focus-visible:ring-offset-2 focus-visible:ring-offset-(--linear-bg-page)'
       >
         {fallback}
       </button>
@@ -220,7 +221,7 @@ function renderArtistLine(
         key={key}
         type='button'
         onClick={() => onArtistClick(part.value)}
-        className='rounded-sm hover:underline focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-(--linear-focus-ring)'
+        className='rounded-sm hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/55 focus-visible:ring-offset-2 focus-visible:ring-offset-(--linear-bg-page)'
       >
         {part.value}
       </button>
@@ -561,6 +562,7 @@ export function ReleaseSidebar({
   designV1 = false,
   onTrackClick,
 }: ReleaseSidebarProps) {
+  const router = useRouter();
   const {
     isAddingLink,
     setIsAddingLink,
@@ -735,7 +737,7 @@ export function ReleaseSidebar({
             onRefresh();
             return;
           }
-          globalThis.location.reload();
+          router.refresh();
         },
         disabled: isRefreshing,
       },
@@ -748,6 +750,7 @@ export function ReleaseSidebar({
     onGenerateAlbumArt,
     isRefreshing,
     onRefresh,
+    router,
     setIsAddingLink,
   ]);
 
@@ -805,11 +808,8 @@ export function ReleaseSidebar({
       return;
     }
 
-    globalThis.location.href = APP_ROUTES.DASHBOARD_RELEASE_TASKS.replace(
-      '[releaseId]',
-      release.id
-    );
-  }, [release]);
+    router.push(buildReleaseTasksRoute(release.id));
+  }, [release, router]);
 
   const handleDismissTasksUpgrade = useCallback(() => {
     setShowTasksUpgrade(false);
@@ -971,10 +971,13 @@ export function ReleaseSidebar({
         <div data-testid='release-tasks-card'>
           {isTasksWorkspaceGateLoading ? (
             <div
-              className='animate-pulse px-1 py-1.5 text-xs text-secondary-token'
+              className='px-1 py-1.5'
               data-testid='release-tasks-loading-state'
             >
-              Loading tasks...
+              <div
+                className='h-3 w-24 rounded skeleton motion-reduce:animate-none'
+                aria-hidden='true'
+              />
             </div>
           ) : null}
           {!isTasksWorkspaceGateLoading && canAccessTasksWorkspace ? (

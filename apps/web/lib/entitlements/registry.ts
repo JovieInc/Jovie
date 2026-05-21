@@ -47,14 +47,16 @@ export type BooleanEntitlement =
   | 'canAccessTeamManagement'
   | 'canAccessWebhooks'
   | 'canAccessWhiteLabel'
-  | 'canAccessAbTesting';
+  | 'canAccessAbTesting'
+  | 'canAccessAiRetouching';
 
 export type NumericEntitlement =
   | 'analyticsRetentionDays'
   | 'contactsLimit'
   | 'smartLinksLimit'
   | 'aiDailyMessageLimit'
-  | 'aiPitchGenPerRelease';
+  | 'aiPitchGenPerRelease'
+  | 'aiRetouchDailyLimit';
 
 // ---------------------------------------------------------------------------
 // Plan entitlements shape
@@ -68,6 +70,8 @@ export interface PlanEntitlements {
     smartLinksLimit: number | null;
     aiDailyMessageLimit: number;
     aiPitchGenPerRelease: number | null;
+    /** Max AI retouch operations per day. Null = no access (free). */
+    aiRetouchDailyLimit: number | null;
   };
   marketing: {
     displayName: string;
@@ -108,6 +112,7 @@ const PRO_BOOLEANS: Record<BooleanEntitlement, boolean> = {
   canAccessWebhooks: false,
   canAccessWhiteLabel: false,
   canAccessAbTesting: false,
+  canAccessAiRetouching: true,
 };
 
 const PRO_LIMITS: PlanEntitlements['limits'] = {
@@ -116,6 +121,7 @@ const PRO_LIMITS: PlanEntitlements['limits'] = {
   smartLinksLimit: null,
   aiDailyMessageLimit: 100,
   aiPitchGenPerRelease: 5,
+  aiRetouchDailyLimit: 10,
 };
 
 const PRO_FEATURES: readonly string[] = [
@@ -173,6 +179,7 @@ export const ENTITLEMENT_REGISTRY: Record<PlanId, PlanEntitlements> = {
       canAccessWebhooks: false,
       canAccessWhiteLabel: false,
       canAccessAbTesting: false,
+      canAccessAiRetouching: false,
     },
     limits: {
       analyticsRetentionDays: 30,
@@ -180,6 +187,7 @@ export const ENTITLEMENT_REGISTRY: Record<PlanId, PlanEntitlements> = {
       smartLinksLimit: null,
       aiDailyMessageLimit: 10,
       aiPitchGenPerRelease: 1,
+      aiRetouchDailyLimit: null,
     },
     marketing: {
       displayName: 'Free',
@@ -251,6 +259,7 @@ export const ENTITLEMENT_REGISTRY: Record<PlanId, PlanEntitlements> = {
       canAccessWebhooks: true,
       canAccessWhiteLabel: true,
       canAccessAbTesting: true,
+      canAccessAiRetouching: true,
     },
     limits: {
       analyticsRetentionDays: null,
@@ -258,6 +267,7 @@ export const ENTITLEMENT_REGISTRY: Record<PlanId, PlanEntitlements> = {
       smartLinksLimit: null,
       aiDailyMessageLimit: 500,
       aiPitchGenPerRelease: null,
+      aiRetouchDailyLimit: 50,
     },
     marketing: {
       displayName: 'Max',
@@ -294,6 +304,7 @@ export const ENTITLEMENT_REGISTRY: Record<PlanId, PlanEntitlements> = {
       smartLinksLimit: null,
       aiDailyMessageLimit: 25,
       aiPitchGenPerRelease: 3,
+      aiRetouchDailyLimit: 10,
     },
     marketing: {
       displayName: 'Pro Trial',

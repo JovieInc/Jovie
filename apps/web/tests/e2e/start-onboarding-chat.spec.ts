@@ -58,6 +58,43 @@ function collectConsoleFailures(page: Page) {
   return failures;
 }
 
+async function suppressDevToolbar(page: Page) {
+  await page.addInitScript(() => {
+    localStorage.setItem('__dev_toolbar_hidden', '1');
+
+    const resetToolbarHeight = () => {
+      document.documentElement?.style.setProperty(
+        '--dev-toolbar-height',
+        '0px'
+      );
+    };
+
+    resetToolbarHeight();
+
+    const hideToolbar = () => {
+      resetToolbarHeight();
+      if (
+        !document.head ||
+        document.getElementById('jovie-e2e-hide-dev-toolbar')
+      ) {
+        return;
+      }
+      const style = document.createElement('style');
+      style.id = 'jovie-e2e-hide-dev-toolbar';
+      style.textContent = '[data-testid="dev-toolbar"]{display:none!important}';
+      document.head.appendChild(style);
+    };
+
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', hideToolbar, {
+        once: true,
+      });
+    } else {
+      hideToolbar();
+    }
+  });
+}
+
 function relevantConsoleFailures(failures: readonly string[]) {
   return failures.filter(
     failure => !IGNORABLE_CONSOLE_ERRORS.some(pattern => pattern.test(failure))
@@ -164,7 +201,7 @@ async function mockOnboardingChat(page: import('@playwright/test').Page) {
                 imageUrl: null,
                 followers: 12_300,
                 popularity: 48,
-                genres: ['indie pop'],
+                genres: ['progressive house'],
               },
               summary: 'Test Artist matched on Spotify.',
             },
@@ -200,6 +237,10 @@ async function mockOnboardingChatFailure(
 }
 
 test.describe('canonical /start onboarding chat', () => {
+  test.beforeEach(async ({ page }) => {
+    await suppressDevToolbar(page);
+  });
+
   test('redirect shims land on /start without loops', async ({ page }) => {
     const navigations: string[] = [];
     page.on('framenavigated', frame => {
@@ -229,6 +270,7 @@ test.describe('canonical /start onboarding chat', () => {
       )
     ).toBeVisible();
     await expect(page.locator(CHAT_PANEL)).toBeVisible();
+    await expect(page.getByText("Hey, I'm Jovie.")).toBeVisible();
     const mainBox = await page.locator('#main-content').boundingBox();
     const chatBox = await page.locator(CHAT_PANEL).boundingBox();
     expect(mainBox).not.toBeNull();
@@ -251,6 +293,9 @@ test.describe('canonical /start onboarding chat', () => {
     await expect(
       page.locator('[data-testid="slash-command-menu"]')
     ).toBeVisible();
+    await expect(
+      page.getByRole('option', { name: /send feedback/i })
+    ).toBeVisible();
     const after = await surface.boundingBox();
     expect(before).not.toBeNull();
     expect(after).not.toBeNull();
@@ -266,23 +311,77 @@ test.describe('canonical /start onboarding chat', () => {
     ).toEqual([]);
   });
 
-  test('empty narrow screen hides the headline behind the root picker', async ({
+  test('narrow screen keeps the intro and feedback slash command usable', async ({
     page,
   }) => {
     await page.setViewportSize({ width: 615, height: 407 });
     await page.goto('/start', { waitUntil: 'domcontentloaded' });
     await waitForHydration(page);
+    await expect(page.getByText("Hey, I'm Jovie.")).toBeVisible();
 
     const textarea = page.locator(COMPOSER_TEXTAREA);
-    await textarea.fill('/');
+    await textarea.fill('/feed');
     await expect(
       page.locator('[data-testid="slash-command-menu"]')
     ).toBeVisible();
-    await expect(page.locator('h1')).toHaveCSS('opacity', '0');
+    await expect(page.getByTestId('onboarding-intro-message')).toHaveCSS(
+      'opacity',
+      '0'
+    );
+    await expect(
+      page.getByRole('option', { name: /send feedback/i })
+    ).toBeVisible();
 
     await expect(page).toHaveScreenshot('start-empty-picker-narrow.png', {
       maxDiffPixelRatio: 0.04,
     });
+
+    await page.getByRole('option', { name: /send feedback/i }).click();
+    await expect(page.getByTestId('chat-input-chip-tray')).toContainText(
+      'Send feedback'
+    );
+    await expect(
+      page.getByRole('button', { name: 'Send message' })
+    ).toBeEnabled();
+  });
+
+  test('submitted user turn stays compact and clear of the composer on mobile', async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await mockOnboardingChat(page);
+    await page.goto('/start', { waitUntil: 'domcontentloaded' });
+    await waitForHydration(page);
+
+    await page.locator(COMPOSER_TEXTAREA).fill('yes music artist and writer');
+    await page.getByRole('button', { name: 'Send message' }).click();
+
+    const bubble = page.getByTestId('chat-user-bubble').first();
+    await expect(bubble).toBeVisible();
+    await expect(bubble).toHaveCSS('padding-top', '6px');
+    await expect(bubble).toHaveCSS('padding-right', '12px');
+    await expect(bubble).toHaveCSS('padding-bottom', '6px');
+    await expect(bubble).toHaveCSS('padding-left', '12px');
+
+    const bubbleBox = await bubble.boundingBox();
+    const composerBox = await page.locator(COMPOSER_SURFACE).boundingBox();
+    expect(bubbleBox).not.toBeNull();
+    expect(composerBox).not.toBeNull();
+    if (bubbleBox && composerBox) {
+      expect(bubbleBox.height).toBeLessThanOrEqual(40);
+      expect(bubbleBox.y + bubbleBox.height).toBeLessThan(composerBox.y);
+    }
+
+    const overflow = await page.evaluate(
+      () =>
+        document.documentElement.scrollWidth -
+        document.documentElement.clientWidth
+    );
+    expect(overflow).toBeLessThanOrEqual(0);
+    await expect(page.getByTestId('onboarding-profile-rail')).toHaveCount(0);
+    await expect(
+      page.getByTestId('onboarding-profile-rail-inline')
+    ).toHaveCount(0);
   });
 
   test('auth error and slash picker do not collide at narrow desktop size', async ({
@@ -342,8 +441,12 @@ test.describe('canonical /start onboarding chat', () => {
     ).toBeEnabled();
 
     const firstChatResponse = page.waitForResponse('**/api/chat');
+    const yBefore =
+      (await page.locator(COMPOSER_SURFACE).boundingBox())?.y ?? 0;
     await page.getByRole('button', { name: 'Send message' }).click();
     await firstChatResponse;
+    const yAfter = (await page.locator(COMPOSER_SURFACE).boundingBox())?.y ?? 0;
+    expect(Math.abs(yAfter - yBefore)).toBeLessThanOrEqual(5); // Addresses journey jank audit 20260519 + testing.md explicit CLS requirement for conditional UI (composer morph, row replace, cinematic fallback)
 
     await expect(
       page.getByText('find the exact Spotify profile')
@@ -363,8 +466,22 @@ test.describe('canonical /start onboarding chat', () => {
     await expect(
       page
         .getByTestId('onboarding-artist-confirmed')
-        .getByText('12.3K followers')
+        .getByTitle('12,300 Spotify followers')
     ).toBeVisible();
+    await expect(
+      page
+        .getByTestId('onboarding-artist-confirmed')
+        .getByTitle('Popularity score: 48 out of 100')
+    ).toBeVisible();
+    await expect(
+      page
+        .getByTestId('onboarding-artist-confirmed')
+        .getByText('Progressive House', { exact: true })
+    ).toBeVisible();
+    await expect(page.getByTestId('onboarding-profile-rail')).toHaveCount(0);
+    await expect(
+      page.getByTestId('onboarding-profile-rail-inline')
+    ).toHaveCount(0);
     await expect(
       page.getByText('find the exact Spotify profile')
     ).toBeVisible();
@@ -376,6 +493,7 @@ test.describe('canonical /start onboarding chat', () => {
     expect(bodyText).not.toContain('searchSpotifyArtist');
     expect(bodyText).not.toContain('confirmSpotifyArtist');
     expect(bodyText).not.toContain('recordInterviewSignal');
+    expect(bodyText).not.toContain('open.spotify.com');
     expect(getChatRequestCount()).toBe(2);
 
     const cookies = await page.context().cookies();

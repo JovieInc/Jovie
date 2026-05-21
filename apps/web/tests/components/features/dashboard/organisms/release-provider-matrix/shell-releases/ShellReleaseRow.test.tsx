@@ -56,6 +56,48 @@ function fakeRelease(
 }
 
 describe('ShellReleaseRow audio affordance', () => {
+  it('uses shared row state tokens for selected releases', () => {
+    const { container } = render(
+      <ShellReleaseRow
+        release={fakeRelease({
+          id: 'r1',
+          title: 'Lost in the Light',
+          previewUrl: null,
+        })}
+        isSelected
+        onSelect={() => undefined}
+      />
+    );
+
+    const row = container.querySelector('[data-shell-release-row]');
+    expect(row).toHaveAttribute('aria-selected', 'true');
+    expect(row).toHaveAttribute('data-selected', 'true');
+    expect(row?.className).toContain('bg-(--linear-row-selected)');
+    expect(row?.className).toContain('--linear-border-focus');
+  });
+
+  it('uses the shell typography tokens for the release title and subtitle', () => {
+    render(
+      <ShellReleaseRow
+        release={fakeRelease({
+          id: 'r1',
+          title: 'Lost in the Light',
+          previewUrl: null,
+        })}
+        isSelected={false}
+        onSelect={() => undefined}
+      />
+    );
+
+    expect(screen.getByText('Lost in the Light').className).toContain(
+      'text-[13px]'
+    );
+    expect(screen.getByText('Lost in the Light').className).toContain(
+      'font-caption'
+    );
+    expect(screen.getByText('Bahamas').className).toContain('text-[11px]');
+  });
+
   it('omits the play overlay when the release has no preview URL', () => {
     render(
       <ShellReleaseRow

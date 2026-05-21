@@ -27,6 +27,9 @@ on:
       canary_status:
         description: 'Canary verification status: verified, failed'
         value: ${{ jobs.canary-health-gate.outputs.canary_status }}
+      verified_deployment_url:
+        description: Verified deployment URL after build-info commit verification.
+        value: ${{ jobs.canary-health-gate.outputs.verified_deployment_url }}
     secrets:
       VERCEL_AUTOMATION_BYPASS_SECRET:
         required: false
@@ -41,9 +44,10 @@ jobs:
   canary-health-gate:
     name: Canary health gate
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 20
     outputs:
-      canary_status: ${{ steps.canary-check.outputs.canary_status }}
+      canary_status: ${{ steps.canary-status.outputs.canary_status || steps.canary-check.outputs.canary_status }}
+      verified_deployment_url: ${{ steps.canary-check.outputs.verified_deployment_url }}
     steps:
       - name: Canary health check
         id: canary-check
@@ -113,6 +117,7 @@ jobs:
             echo "canary_status=failed" >> "$GITHUB_OUTPUT"
             exit 1
           fi
+          public_deployment_url="${deployment_url%/}"
 
           if [[ "$health_url_fallback" = /* ]]; then
             health_url_fallback="${deployment_url%/}${health_url_fallback}"
@@ -139,15 +144,17 @@ jobs:
               -b "$COOKIE_JAR"
             )
           else
-            echo "⚠ VERCEL_AUTOMATION_BYPASS_SECRET not set; canary may hit Vercel Security Checkpoint (HTTP 429)."
+            echo "❌ Canary failed: VERCEL_AUTOMATION_BYPASS_SECRET is required for deterministic staging verification."
+            echo "canary_status=failed_config" >> "$GITHUB_OUTPUT"
+            exit 1
           fi
+          CURL_TIMEOUT_ARGS=(--connect-timeout 5 --max-time 15)
 
           attempt=1
           max_attempts=8
           response_code="000"
-          canary_inconclusive="false"
           while [ $attempt -le $max_attempts ]; do
-            response=$(curl -s -L -A "$USER_AGENT" -H "Accept: application/json" -H "Cache-Control: no-cache, no-store, must-revalidate" -H "Pragma: no-cache" "${BYPASS_ARGS[@]}" -w "\n%{http_code}" "${health_url}$( [[ "$health_url" == *"?"* ]] && echo '&' || echo '?' )_cb=$(date +%s%N)" || echo "\n000")
+            response=$(curl -s -L "${CURL_TIMEOUT_ARGS[@]}" -A "$USER_AGENT" -H "Accept: application/json" -H "Cache-Control: no-cache, no-store, must-revalidate" -H "Pragma: no-cache" "${BYPASS_ARGS[@]}" -w "\n%{http_code}" "${health_url}$( [[ "$health_url" == *"?"* ]] && echo '&' || echo '?' )_cb=$(date +%s%N)" || printf '\n000')
             response_code="${response##*$'\n'}"
 
             if [ "$response_code" = "200" ]; then
@@ -177,22 +184,15 @@ jobs:
 
           if [ "$response_code" != "200" ] && [ -n "$resolved_commit_deployment_url" ] && [ "${deployment_url%/}" != "${resolved_commit_deployment_url%/}" ]; then
             echo "⚠ Canary primary URL failed with HTTP $response_code. Retrying commit deployment URL ${resolved_commit_deployment_url}..."
-            deployment_url="$resolved_commit_deployment_url"
+            diagnostic_deployment_url="$resolved_commit_deployment_url"
 
-            if [[ "$FALLBACK_HEALTH_URL" = /* ]]; then
-              health_url_fallback="${deployment_url%/}${FALLBACK_HEALTH_URL}"
-            else
-              health_url_fallback="${FALLBACK_HEALTH_URL}"
-            fi
-
-            health_url_primary="${deployment_url%/}/api/health"
-            health_url="$health_url_primary"
+            diagnostic_health_url="${diagnostic_deployment_url%/}/api/health"
 
             attempt=1
             max_attempts=5
             response_code="000"
             while [ $attempt -le $max_attempts ]; do
-              response=$(curl -s -L -A "$USER_AGENT" -H "Accept: application/json" -H "Cache-Control: no-cache, no-store, must-revalidate" -H "Pragma: no-cache" "${BYPASS_ARGS[@]}" -w "\n%{http_code}" "${health_url}$( [[ "$health_url" == *"?"* ]] && echo '&' || echo '?' )_cb=$(date +%s%N)" || echo "\n000")
+              response=$(curl -s -L "${CURL_TIMEOUT_ARGS[@]}" -A "$USER_AGENT" -H "Accept: application/json" -H "Cache-Control: no-cache, no-store, must-revalidate" -H "Pragma: no-cache" "${BYPASS_ARGS[@]}" -w "\n%{http_code}" "${diagnostic_health_url}$( [[ "$diagnostic_health_url" == *"?"* ]] && echo '&' || echo '?' )_cb=$(date +%s%N)" || printf '\n000')
               response_code="${response##*$'\n'}"
 
               if [ "$response_code" = "200" ]; then
@@ -230,7 +230,7 @@ jobs:
               max_attempts=5
               response_code="000"
               while [ $attempt -le $max_attempts ]; do
-                response=$(curl -s -L -A "$USER_AGENT" -H "Accept: application/json" -H "Cache-Control: no-cache, no-store, must-revalidate" -H "Pragma: no-cache" "${BYPASS_ARGS[@]}" -w "\n%{http_code}" "${health_url}$( [[ "$health_url" == *"?"* ]] && echo '&' || echo '?' )_cb=$(date +%s%N)" || echo "\n000")
+                response=$(curl -s -L "${CURL_TIMEOUT_ARGS[@]}" -A "$USER_AGENT" -H "Accept: application/json" -H "Cache-Control: no-cache, no-store, must-revalidate" -H "Pragma: no-cache" "${BYPASS_ARGS[@]}" -w "\n%{http_code}" "${health_url}$( [[ "$health_url" == *"?"* ]] && echo '&' || echo '?' )_cb=$(date +%s%N)" || printf '\n000')
                 response_code="${response##*$'\n'}"
 
                 if [ "$response_code" = "200" ]; then
@@ -263,17 +263,9 @@ jobs:
 
               if [ "$response_code" != "200" ]; then
                 if [ "$response_code" = "429" ]; then
-                  if [ -z "$BYPASS_SECRET" ]; then
-                    echo "⚠️ Canary INCONCLUSIVE: Vercel returned HTTP 429 Security Checkpoint after retries."
-                    echo "⚠️ Cannot verify deployment health without VERCEL_AUTOMATION_BYPASS_SECRET."
-                    echo "⚠️ ACTION REQUIRED: Set VERCEL_AUTOMATION_BYPASS_SECRET to enable proper canary verification."
-                    echo "canary_status=verified" >> "$GITHUB_OUTPUT"
-                    exit 0
-                  else
-                    echo "❌ Canary failed: HTTP 429 Security Checkpoint even though bypass secret is set."
-                    echo "canary_status=failed" >> "$GITHUB_OUTPUT"
-                    exit 1
-                  fi
+                  echo "❌ Canary failed: HTTP 429 after retries even though bypass secret is set."
+                  echo "canary_status=failed" >> "$GITHUB_OUTPUT"
+                  exit 1
                 else
                   echo "❌ Canary fallback failed after retries: HTTP $response_code"
                   echo "canary_status=failed" >> "$GITHUB_OUTPUT"
@@ -287,9 +279,79 @@ jobs:
             fi
           fi
 
-          # Note: canary_inconclusive is no longer used - we fail fast on unverified deployments
+          verify_build_info_serves_commit() {
+            local base_url="$1"
+            local expected_commit="${COMMIT_SHA:0:7}"
+            local build_info_url="${base_url%/}/api/health/build-info"
+            local attempt=1
+            local max_attempts=30
+            local response status body actual
 
-          health_content=$(curl -s -L -A "$USER_AGENT" -H "Accept: application/json" -H "Cache-Control: no-cache, no-store, must-revalidate" -H "Pragma: no-cache" "${BYPASS_ARGS[@]}" "${health_url}$( [[ "$health_url" == *"?"* ]] && echo '&' || echo '?' )_cb=$(date +%s%N)" || echo "")
+            echo "Verifying ${base_url%/} serves commit ${expected_commit}..."
+
+            while [ "$attempt" -le "$max_attempts" ]; do
+              if [ "$attempt" -gt 1 ]; then
+                sleep 10
+              fi
+
+              response=$(curl -sS -L \
+                --connect-timeout 5 \
+                --max-time 10 \
+                -A "$USER_AGENT" \
+                -H "Accept: application/json" \
+                -H "Cache-Control: no-cache, no-store, must-revalidate" \
+                -H "Pragma: no-cache" \
+                "${BYPASS_ARGS[@]}" \
+                -w "\n%{http_code}" \
+                "${build_info_url}?_cb=$(date +%s%N)" 2>/dev/null || printf '\n000')
+              status="${response##*$'\n'}"
+              body="${response%$'\n'*}"
+
+              if [ "$status" != "200" ]; then
+                echo "  attempt ${attempt}/${max_attempts}: build-info returned HTTP ${status}"
+                attempt=$((attempt + 1))
+                continue
+              fi
+
+              actual=$(BODY="$body" python3 - <<'PY'
+          import json
+          import os
+          import sys
+
+          try:
+              payload = json.loads(os.environ.get("BODY", ""))
+          except json.JSONDecodeError:
+              print("", end="")
+              sys.exit(0)
+
+          print(payload.get("commitSha") or "", end="")
+          PY
+              )
+
+              if [ -z "$actual" ]; then
+                echo "  attempt ${attempt}/${max_attempts}: build-info returned 200 without commitSha"
+                attempt=$((attempt + 1))
+                continue
+              fi
+
+              echo "  attempt ${attempt}/${max_attempts}: build-info commitSha=${actual}"
+              if [ "$actual" = "$expected_commit" ]; then
+                echo "✅ ${base_url%/} serves ${expected_commit}"
+                return 0
+              fi
+
+              attempt=$((attempt + 1))
+            done
+
+            echo "❌ Canary failed: ${base_url%/} did not serve commit ${expected_commit} within the retry window."
+            echo "canary_status=failed_build_info" >> "$GITHUB_OUTPUT"
+            exit 1
+          }
+
+          verify_build_info_serves_commit "$public_deployment_url"
+          echo "verified_deployment_url=${public_deployment_url}" >> "$GITHUB_OUTPUT"
+
+          health_content=$(curl -s -L "${CURL_TIMEOUT_ARGS[@]}" -A "$USER_AGENT" -H "Accept: application/json" -H "Cache-Control: no-cache, no-store, must-revalidate" -H "Pragma: no-cache" "${BYPASS_ARGS[@]}" "${health_url}$( [[ "$health_url" == *"?"* ]] && echo '&' || echo '?' )_cb=$(date +%s%N)" || echo "")
           if [[ "$health_content" != *'"status":"ok"'* ]]; then
             echo "❌ Canary failed: Health status not ok"
             echo "Health response: $health_content"
@@ -319,7 +381,7 @@ jobs:
           # CRITICAL: Verify homepage renders (not just API health)
           echo "Checking homepage renders..."
           homepage_url="${deployment_url%/}/"
-          homepage_response=$(curl -s -L -A "$USER_AGENT" -H "Cache-Control: no-cache, no-store, must-revalidate" -H "Pragma: no-cache" "${BYPASS_ARGS[@]}" -w "\n%{http_code}" "${homepage_url}$( [[ "$homepage_url" == *"?"* ]] && echo '&' || echo '?' )_cb=$(date +%s%N)" || echo "\n000")
+          homepage_response=$(curl -s -L "${CURL_TIMEOUT_ARGS[@]}" -A "$USER_AGENT" -H "Cache-Control: no-cache, no-store, must-revalidate" -H "Pragma: no-cache" "${BYPASS_ARGS[@]}" -w "\n%{http_code}" "${homepage_url}$( [[ "$homepage_url" == *"?"* ]] && echo '&' || echo '?' )_cb=$(date +%s%N)" || printf '\n000')
           homepage_code="${homepage_response##*$'\n'}"
           homepage_body="${homepage_response%$'\n'*}"
 
@@ -358,11 +420,11 @@ jobs:
             echo "Checking ${route_label} route renders..."
 
             while [ "$attempt" -le "$max_attempts" ]; do
-              response=$(curl -s -L -A "$USER_AGENT" -H "Cache-Control: no-cache, no-store, must-revalidate" -H "Pragma: no-cache" "${BYPASS_ARGS[@]}" -w "\n%{http_code}" "${route_url}$( [[ "$route_url" == *"?"* ]] && echo '&' || echo '?' )_cb=$(date +%s%N)" || echo "\n000")
+              response=$(curl -s -L "${CURL_TIMEOUT_ARGS[@]}" -A "$USER_AGENT" -H "Cache-Control: no-cache, no-store, must-revalidate" -H "Pragma: no-cache" "${BYPASS_ARGS[@]}" -w "\n%{http_code}" "${route_url}$( [[ "$route_url" == *"?"* ]] && echo '&' || echo '?' )_cb=$(date +%s%N)" || printf '\n000')
               route_code="${response##*$'\n'}"
               route_body="${response%$'\n'*}"
 
-              if [ "$route_code" = "200" ] && [ ${#route_body} -ge "$min_chars" ] && ! echo "$route_body" | grep -qi "application error\|internal server error\|something went wrong\|error occurred\|this page could not be found\|temporarily unavailable\|auth unavailable"; then
+              if [ "$route_code" = "200" ] && [ ${#route_body} -ge "$min_chars" ] && ! echo "$route_body" | grep -qi "application error\|internal server error\|something went wrong\|error occurred\|this page could not be found\|temporarily unavailable\|auth unavailable\|turnstile is not configured"; then
                 echo "✅ ${route_label} renders correctly"
                 return 0
               fi
@@ -397,6 +459,34 @@ jobs:
           # Verify signin still renders because staging auth must stay healthy.
           check_route_renders "Signin" "/signin" 500 "failed_signin"
 
+          # Verify anonymous onboarding chat can render without Turnstile configuration errors.
+          check_route_renders "Start onboarding chat" "/start" 500 "failed_start"
+
+          # Verify /start chat is not accidentally disabled by a default-off
+          # feature flag. This intentionally omits a Turnstile token: a healthy
+          # production build should reach the bot gate and return 403
+          # TURNSTILE_REQUIRED, not 503 ONBOARDING_CHAT_DISABLED.
+          echo "Checking onboarding chat reaches the bot gate..."
+          onboarding_chat_url="${deployment_url%/}/api/chat"
+          onboarding_chat_response=$(curl -s -L "${CURL_TIMEOUT_ARGS[@]}" -A "$USER_AGENT" -X POST -H "Content-Type: application/json" -H "Accept: application/json" -H "Cache-Control: no-cache, no-store, must-revalidate" -H "Pragma: no-cache" "${BYPASS_ARGS[@]}" -d '{"mode":"onboarding","messages":[{"id":"canary-onboarding","role":"user","parts":[{"type":"text","text":"canary"}]}]}' -w "\n%{http_code}" "${onboarding_chat_url}" || printf '\n000')
+          onboarding_chat_code="${onboarding_chat_response##*$'\n'}"
+          onboarding_chat_body="${onboarding_chat_response%$'\n'*}"
+
+          if echo "$onboarding_chat_body" | grep -q '"errorCode":"ONBOARDING_CHAT_DISABLED"'; then
+            echo "❌ Canary failed: onboarding chat is disabled by runtime gate"
+            echo "canary_status=failed_onboarding_chat" >> "$GITHUB_OUTPUT"
+            exit 1
+          fi
+
+          if [ "$onboarding_chat_code" = "403" ] && echo "$onboarding_chat_body" | grep -q '"errorCode":"TURNSTILE_REQUIRED"'; then
+            echo "✅ Onboarding chat reached Turnstile gate"
+          else
+            echo "❌ Canary failed: onboarding chat expected 403 TURNSTILE_REQUIRED, got HTTP $onboarding_chat_code"
+            echo "Response preview: ${onboarding_chat_body:0:300}"
+            echo "canary_status=failed_onboarding_chat" >> "$GITHUB_OUTPUT"
+            exit 1
+          fi
+
           # Verify /api/chat is reachable and auth-gated.
           #
           # NOTE: This probe has shown intermittent false positives on staging
@@ -404,7 +494,7 @@ jobs:
           # this check informational so canary does not block healthy deployments.
           echo "Checking /api/chat is reachable and auth-gated (informational)..."
           chat_url="${deployment_url%/}/api/chat"
-          chat_response=$(curl -s -L -A "$USER_AGENT" -X POST -H "Content-Type: application/json" -H "Cache-Control: no-cache, no-store, must-revalidate" -H "Pragma: no-cache" "${BYPASS_ARGS[@]}" -d '{"messages":[{"id":"1","role":"user","parts":[{"type":"text","text":"hi"}]}]}' -w "\n%{http_code}" "${chat_url}" || printf '\n000')
+          chat_response=$(curl -s -L "${CURL_TIMEOUT_ARGS[@]}" -A "$USER_AGENT" -X POST -H "Content-Type: application/json" -H "Cache-Control: no-cache, no-store, must-revalidate" -H "Pragma: no-cache" "${BYPASS_ARGS[@]}" -d '{"messages":[{"id":"1","role":"user","parts":[{"type":"text","text":"hi"}]}]}' -w "\n%{http_code}" "${chat_url}" || printf '\n000')
           chat_code="${chat_response##*$'\n'}"
 
           # The chat route checks auth before body parsing, so unauthenticated
@@ -420,7 +510,7 @@ jobs:
           # not a code regression), so only block on 5xx or actual error pages.
           echo "Checking public profile route renders..."
           profile_url="${deployment_url%/}/tim"
-          profile_response=$(curl -s -L -A "$USER_AGENT" -H "Cache-Control: no-cache, no-store, must-revalidate" -H "Pragma: no-cache" "${BYPASS_ARGS[@]}" -w "\n%{http_code}" "${profile_url}$( [[ "$profile_url" == *"?"* ]] && echo '&' || echo '?' )_cb=$(date +%s%N)" || echo "\n000")
+          profile_response=$(curl -s -L "${CURL_TIMEOUT_ARGS[@]}" -A "$USER_AGENT" -H "Cache-Control: no-cache, no-store, must-revalidate" -H "Pragma: no-cache" "${BYPASS_ARGS[@]}" -w "\n%{http_code}" "${profile_url}$( [[ "$profile_url" == *"?"* ]] && echo '&' || echo '?' )_cb=$(date +%s%N)" || printf '\n000')
           profile_code="${profile_response##*$'\n'}"
           profile_body="${profile_response%$'\n'*}"
 
@@ -448,5 +538,50 @@ jobs:
             echo "✅ /tim profile renders with content"
           fi
 
-          echo "✅ Canary passed: Deployment healthy and homepage renders"
-          echo "canary_status=verified" >> "$GITHUB_OUTPUT"
+          echo "✅ HTTP canary passed: Deployment healthy and homepage renders"
+
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 1
+
+      - uses: ./.github/actions/setup-node-pnpm
+
+      - name: Cache Playwright Browsers
+        uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-chromium-${{ hashFiles('pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-playwright-chromium-
+
+      - name: Install Playwright (Chromium)
+        run: pnpm --filter=@jovie/web exec playwright install chromium
+
+      - name: Verify public auth controls are interactive
+        run: |
+          cd apps/web
+          mkdir -p tests/.auth
+          echo '{"cookies":[],"origins":[]}' > tests/.auth/user.json
+          auth_smoke_attempt=1
+          auth_smoke_max_attempts=3
+
+          # The HTTP canary uses Vercel bypass headers above, but this browser
+          # smoke must match real public user traffic. Passing bypass headers into
+          # Playwright keeps Clerk from reaching an interactive ready state.
+          until CI=true SMOKE_ONLY=1 BASE_URL="${DEPLOYMENT_URL}" pnpm exec playwright test tests/e2e/auth-public-ready.spec.ts --project=chromium --reporter=line; do
+            if [ "$auth_smoke_attempt" -ge "$auth_smoke_max_attempts" ]; then
+              echo "❌ Public auth controls failed after ${auth_smoke_max_attempts} attempts."
+              exit 1
+            fi
+
+            sleep_seconds=$((auth_smoke_attempt * 30))
+            echo "⚠ Public auth controls were not interactive on attempt ${auth_smoke_attempt}/${auth_smoke_max_attempts}. Retrying in ${sleep_seconds}s..."
+            sleep "$sleep_seconds"
+            auth_smoke_attempt=$((auth_smoke_attempt + 1))
+          done
+        env:
+          DEPLOYMENT_URL: ${{ steps.canary-check.outputs.verified_deployment_url || inputs.deployment_url }}
+
+      - name: Mark canary verified
+        id: canary-status
+        run: echo "canary_status=verified" >> "$GITHUB_OUTPUT"

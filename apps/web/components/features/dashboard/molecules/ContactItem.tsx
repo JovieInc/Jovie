@@ -50,7 +50,7 @@ export const ContactItem = memo(function ContactItem({
   const hasEmailAndPhone = Boolean(contact.email) && Boolean(contact.phone);
 
   return (
-    <div className='rounded-[10px] border border-(--linear-app-frame-seam) bg-(--linear-app-content-surface) p-4'>
+    <div className='rounded-[10px] border border-subtle bg-surface-1 p-4'>
       <div className='flex items-start justify-between gap-3'>
         <div>
           <p className='text-app font-semibold text-primary-token'>

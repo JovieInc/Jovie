@@ -104,11 +104,13 @@ surfaces:
     last_incident: null
     lessons_ref: null
     notes: >-
-      MUST fail closed in production. Test:
-      - VERCEL_ENV=production → 404 on every endpoint
-      - NODE_ENV=production → 404
-      - Spoofable headers (x-vercel-env) → 404 regardless
-      - persona param accepts only allowlist
+      MUST fail closed in production (defence-in-depth for E2E test bypass).
+      getDevTestAuthAvailability + route handlers enforce:
+      - NODE_ENV=production && VERCEL_ENV=production → disabled (reason: 'Not available in production').
+        Mutating endpoints (enter/POST/DELETE) return 403 + error; GET /session returns disabled payload (active:false).
+      - Spoofable headers (x-vercel-env or similar in x-forwarded-host/host) have no effect — prod guard reads process.env only.
+      - persona param accepts only allowlist via parseDevTestAuthPersona (creator | creator-ready | admin); invalid → 400 error.
+      Contract tests cover the prod/spoof/allowlist cases + trusted host matrix + error branches.
     last_reviewed: 2026-05-10
 
   - id: api-routes-contract
@@ -181,10 +183,8 @@ surfaces:
     last_incident: null
     lessons_ref: null
     notes: >-
-      Includes profile claim race condition handling. Plan assignment correctness
-      at onboarding completion. Already has e2e/onboarding.spec.ts as golden path.
-      Source: apps/web/app/onboarding/** + apps/web/app/claim/** + apps/web/app/api/onboarding/**.
-    last_reviewed: 2026-05-10
+      Includes profile claim race condition handling (CAS on chat claim, concurrent 409 on partial unique, alreadyClaimed soft success, retryAfterWebhook for clerk mirror race). Plan assignment correctness at onboarding completion. Contract tests cover key paths in claim/[token], api/onboarding/{intake,claim} (auth, zod parse failure, rate limit dev/prod, email verify gate, best-effort outcome attach non-fatal, deriveFullName fallbacks, 500 paths, property tests for recency/idempotency/races/409). e2e/onboarding.spec.ts golden path + unit matrix. Source: apps/web/app/onboarding/** + apps/web/app/claim/** + apps/web/app/api/onboarding/**.
+    last_reviewed: 2026-05-20
 
   - id: marketing-static
     surface: Marketing pages (must be fully static)
@@ -227,7 +227,7 @@ surfaces:
 # Test Risk Register
 
 > **Question this answers:** "Which surfaces in the codebase carry the highest blast radius if they break, and what coverage do they require?"
->
+
 > This file is the **input taxonomy** for the risk-based testing strategy. The auto-generated heatmap at [`TEST_COVERAGE_HEATMAP.md`](TEST_COVERAGE_HEATMAP.md) joins these rows with measured coverage to produce a prioritized action list.
 
 ## Scoring

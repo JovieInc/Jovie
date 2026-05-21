@@ -1,13 +1,6 @@
-import { TasksPageClient } from '@/components/features/dashboard/tasks/TasksPageClient';
-import { TasksWorkspaceUpgradeInterstitial } from '@/components/features/dashboard/tasks/TasksUpgradeInterstitial';
-import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
+import { redirect } from 'next/navigation';
+import { APP_ROUTES } from '@/constants/routes';
 
-export default async function TasksPage() {
-  const entitlements = await getCurrentUserEntitlements();
-
-  if (!entitlements.canAccessTasksWorkspace) {
-    return <TasksWorkspaceUpgradeInterstitial />;
-  }
-
-  return <TasksPageClient />;
+export default function LegacyDashboardTasksPage() {
+  redirect(APP_ROUTES.TASKS);
 }

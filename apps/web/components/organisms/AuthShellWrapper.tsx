@@ -1,7 +1,6 @@
 'use client';
 
 import { TooltipProvider } from '@jovie/ui';
-import { Search } from 'lucide-react';
 import type { ReactNode } from 'react';
 import {
   useCallback,
@@ -14,7 +13,6 @@ import {
 import { PreviewPanelProvider } from '@/app/app/(shell)/dashboard/PreviewPanelContext';
 import { UpdateAvailablePill } from '@/components/atoms/UpdateAvailablePill';
 import { ErrorBoundary } from '@/components/providers/ErrorBoundary';
-import { HeaderSearchSurface } from '@/components/shell/HeaderSearchSurface';
 import {
   HeaderActionsProvider,
   useHeaderActions,
@@ -24,6 +22,7 @@ import {
   useKeyboardShortcuts,
 } from '@/contexts/KeyboardShortcutsContext';
 import { RightPanelProvider } from '@/contexts/RightPanelContext';
+import { ShellSidebarOverrideProvider } from '@/contexts/ShellSidebarOverrideContext';
 import {
   type TableMeta,
   TableMetaContext,
@@ -31,16 +30,12 @@ import {
   useTableMeta,
 } from '@/contexts/TableMetaContext';
 import { HeaderChatUsageIndicator } from '@/features/dashboard/atoms/HeaderChatUsageIndicator';
-import { HeaderProfileProgress } from '@/features/dashboard/atoms/HeaderProfileProgress';
 import { useAuthRouteConfig } from '@/hooks/useAuthRouteConfig';
 import { useDashboardShortcuts } from '@/hooks/useDashboardShortcuts';
 import { useGlobalShortcutActions } from '@/hooks/useGlobalShortcutActions';
 import { useIsElectronRuntime } from '@/lib/desktop/electron-bridge';
-import { useAppFlag } from '@/lib/flags/client';
-import { isFormElement } from '@/lib/utils/keyboard';
 import { AuthShell } from './AuthShell';
 import { CommandPalette } from './CommandPalette';
-import { OPEN_COMMAND_PALETTE_EVENT } from './command-palette-events';
 import { KeyboardShortcutsSheet } from './keyboard-shortcuts-sheet';
 import {
   PendingShellContext,
@@ -67,26 +62,6 @@ function KeyboardShortcutsHandler() {
   return <KeyboardShortcutsSheet />;
 }
 
-function HeaderCommandSearchButton() {
-  const openCommandPalette = useCallback(() => {
-    globalThis.dispatchEvent(new Event(OPEN_COMMAND_PALETTE_EVENT));
-  }, []);
-
-  return (
-    <button
-      type='button'
-      data-app-search-trigger='true'
-      onClick={openCommandPalette}
-      className='inline-flex h-7 items-center gap-1.5 rounded-md border border-(--linear-app-shell-border) bg-[color-mix(in_oklab,var(--linear-app-content-surface)_94%,transparent)] px-2 text-[12px] text-secondary-token transition-[background-color,border-color,color] duration-subtle hover:bg-surface-1 hover:text-primary-token focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)'
-      aria-label='Search Jovie'
-    >
-      <Search className='h-3.5 w-3.5' aria-hidden='true' />
-      <span className='hidden sm:inline'>Search</span>
-      <span className='hidden text-tertiary-token lg:inline'>/</span>
-    </button>
-  );
-}
-
 /**
  * AuthShellWrapperInner - Inner component with access to HeaderActionsContext
  */
@@ -103,11 +78,7 @@ function AuthShellWrapperInner({
 }>) {
   const config = useAuthRouteConfig();
   const headerActions = useHeaderActions();
-  const designV1Enabled = useAppFlag('DESIGN_V1');
-  const shellChatV1Enabled = useAppFlag('SHELL_CHAT_V1');
   const isElectron = useIsElectronRuntime();
-  const { headerSearchAdapter, isSearchOpen, openSearch, closeSearch } =
-    headerActions;
   const [, startTransition] = useTransition();
   const [pendingShellRoute, setPendingShellRoute] =
     useState<PendingShellRoute>(null);
@@ -126,27 +97,25 @@ function AuthShellWrapperInner({
   const previewEnabled =
     config.section === 'dashboard' || config.isArtistProfileSettings;
   const shouldDefaultOpenPreviewPanel =
-    config.section === 'dashboard' && previewPanelDefaultOpen;
+    config.section === 'dashboard' &&
+    !config.isChatRoute &&
+    previewPanelDefaultOpen;
+  const previewPanelScope = config.isArtistProfileSettings
+    ? 'artist-profile-settings'
+    : 'app-shell';
 
   // Determine header action: use custom actions from context if available,
   // otherwise fall back to default based on route type
   const defaultHeaderAction = useMemo(
     () => (
       <>
-        {designV1Enabled ? <HeaderCommandSearchButton /> : null}
         {config.showChatUsageIndicator && !config.isDemoRoute ? (
           <HeaderChatUsageIndicator />
         ) : null}
-        <HeaderProfileProgress />
         {isElectron ? null : <UpdateAvailablePill />}
       </>
     ),
-    [
-      config.isDemoRoute,
-      config.showChatUsageIndicator,
-      designV1Enabled,
-      isElectron,
-    ]
+    [config.isDemoRoute, config.showChatUsageIndicator, isElectron]
   );
   // Wrap page-injected header elements in ErrorBoundary so a throwing badge/action
   // degrades gracefully (renders nothing + toast) instead of crashing the shell.
@@ -160,81 +129,6 @@ function AuthShellWrapperInner({
   const headerBadge = rawHeaderBadge ? (
     <ErrorBoundary fallback={null}>{rawHeaderBadge}</ErrorBoundary>
   ) : null;
-
-  // Shell-owned search surface: when SHELL_CHAT_V1 is on and the route has
-  // registered an adapter, render the morphing pill search/trigger in the
-  // breadcrumb slot. The header owns the open/closed transition so that
-  // global shortcuts (/, Cmd/Ctrl+K, Escape) drive the same surface.
-  const headerSearchEnabled =
-    shellChatV1Enabled && Boolean(headerSearchAdapter);
-  const headerSearchSurface = useMemo(() => {
-    if (!headerSearchEnabled || !headerSearchAdapter) return null;
-    return (
-      <ErrorBoundary fallback={null}>
-        <HeaderSearchSurface
-          adapter={headerSearchAdapter}
-          isOpen={isSearchOpen}
-          onOpen={openSearch}
-          onClose={closeSearch}
-        />
-      </ErrorBoundary>
-    );
-  }, [
-    closeSearch,
-    headerSearchAdapter,
-    headerSearchEnabled,
-    isSearchOpen,
-    openSearch,
-  ]);
-
-  // Global key bindings for the shell search surface:
-  //   /         → open (and let the existing SearchKeyboardShortcut focus the input)
-  //   Cmd/Ctrl+K → open / focus
-  //   Escape    → collapse the open pill surface back to the breadcrumb
-  useEffect(() => {
-    if (!headerSearchEnabled) return undefined;
-
-    function onKeyDown(event: KeyboardEvent) {
-      if (event.defaultPrevented) return;
-
-      const isCmdK =
-        (event.metaKey || event.ctrlKey) &&
-        !event.altKey &&
-        !event.shiftKey &&
-        event.key?.toLowerCase() === 'k';
-
-      if (isCmdK) {
-        if (isFormElement(event.target)) {
-          // Allow Cmd/Ctrl+K inside a search input only when the input belongs
-          // to the shell search itself; outside, fall through so generic
-          // text inputs keep their native bindings.
-          const target = event.target as HTMLElement | null;
-          if (!target?.matches('[data-app-search-field="true"]')) {
-            return;
-          }
-        }
-        event.preventDefault();
-        // Prevent the command-palette listener (also registered on globalThis)
-        // from toggling itself on top of the shell search.
-        event.stopImmediatePropagation();
-        openSearch();
-        return;
-      }
-
-      if (event.key === 'Escape' && isSearchOpen) {
-        // PillSearch already handles Escape on its own input; only close from
-        // the shell when the user is *not* focused inside the input (otherwise
-        // we double-fire and break the "Esc clears text first" behavior).
-        const target = event.target as HTMLElement | null;
-        if (target?.matches('[data-app-search-field="true"]')) return;
-        event.preventDefault();
-        closeSearch();
-      }
-    }
-
-    globalThis.addEventListener('keydown', onKeyDown);
-    return () => globalThis.removeEventListener('keydown', onKeyDown);
-  }, [closeSearch, headerSearchEnabled, isSearchOpen, openSearch]);
 
   // Memoize the sidebar open change handler to prevent context value changes
   // that would cause infinite re-render loops in sidebar consumers.
@@ -355,7 +249,7 @@ function AuthShellWrapperInner({
       <PendingShellContext.Provider value={pendingShellContextValue}>
         <RightPanelProvider>
           <PreviewPanelProvider
-            key={config.section}
+            key={previewPanelScope}
             defaultOpen={shouldDefaultOpenPreviewPanel}
             enabled={previewEnabled}
           >
@@ -364,10 +258,9 @@ function AuthShellWrapperInner({
               breadcrumbs={config.breadcrumbs}
               headerBadge={headerBadge}
               headerAction={headerAction}
-              headerSearchSurface={headerSearchSurface}
-              isHeaderSearchActive={headerSearchEnabled ? isSearchOpen : false}
               showMobileTabs={config.showMobileTabs}
               isTableRoute={config.isTableRoute}
+              isLyricsRoute={config.isLyricsRoute}
               onSidebarOpenChange={
                 persistSidebarCollapsed ? handleSidebarOpenChange : undefined
               }
@@ -404,15 +297,17 @@ export function AuthShellWrapper({
     <TooltipProvider delayDuration={1200}>
       <KeyboardShortcutsProvider>
         <HeaderActionsProvider>
-          <AuthShellWrapperInner
-            persistSidebarCollapsed={persistSidebarCollapsed}
-            sidebarDefaultOpen={sidebarDefaultOpen}
-            previewPanelDefaultOpen={previewPanelDefaultOpen}
-          >
-            {children}
-          </AuthShellWrapperInner>
-          <KeyboardShortcutsHandler />
-          <CommandPalette />
+          <ShellSidebarOverrideProvider>
+            <AuthShellWrapperInner
+              persistSidebarCollapsed={persistSidebarCollapsed}
+              sidebarDefaultOpen={sidebarDefaultOpen}
+              previewPanelDefaultOpen={previewPanelDefaultOpen}
+            >
+              {children}
+            </AuthShellWrapperInner>
+            <KeyboardShortcutsHandler />
+            <CommandPalette />
+          </ShellSidebarOverrideProvider>
         </HeaderActionsProvider>
       </KeyboardShortcutsProvider>
     </TooltipProvider>

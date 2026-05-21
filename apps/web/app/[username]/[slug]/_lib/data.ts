@@ -8,7 +8,7 @@
 import { and, sql as drizzleSql, eq, isNotNull } from 'drizzle-orm';
 import { unstable_cache } from 'next/cache';
 import { cache } from 'react';
-import { db } from '@/lib/db';
+import { db, doesColumnExist } from '@/lib/db';
 import {
   type ArtistRole,
   artists,
@@ -258,22 +258,38 @@ export interface CachedContentData {
  * Fetch creator by normalized username.
  */
 const fetchCreatorByUsername = async (usernameNormalized: string) => {
+  const smartLinkCreatorSelect = {
+    id: creatorProfiles.id,
+    userId: creatorProfiles.userId,
+    displayName: creatorProfiles.displayName,
+    username: creatorProfiles.username,
+    usernameNormalized: creatorProfiles.usernameNormalized,
+    avatarUrl: creatorProfiles.avatarUrl,
+    settings: creatorProfiles.settings,
+  };
+
+  if (await doesColumnExist('creator_profiles', 'is_claimed')) {
+    const [creator] = await db
+      .select({
+        ...smartLinkCreatorSelect,
+        isClaimed: creatorProfiles.isClaimed,
+      })
+      .from(creatorProfiles)
+      .where(eq(creatorProfiles.usernameNormalized, usernameNormalized))
+      .limit(1);
+
+    return creator ?? null;
+  }
+
   const [creator] = await db
-    .select({
-      id: creatorProfiles.id,
-      userId: creatorProfiles.userId,
-      displayName: creatorProfiles.displayName,
-      username: creatorProfiles.username,
-      usernameNormalized: creatorProfiles.usernameNormalized,
-      avatarUrl: creatorProfiles.avatarUrl,
-      settings: creatorProfiles.settings,
-      isClaimed: creatorProfiles.isClaimed,
-    })
+    .select(smartLinkCreatorSelect)
     .from(creatorProfiles)
     .where(eq(creatorProfiles.usernameNormalized, usernameNormalized))
     .limit(1);
 
-  return creator ?? null;
+  // Schema-rollout fallback only: this is not canonical profile state.
+  // Revisit once creator_profiles.is_claimed exists in every environment.
+  return creator ? { ...creator, isClaimed: true } : null;
 };
 
 /**

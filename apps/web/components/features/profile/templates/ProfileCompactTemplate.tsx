@@ -1,6 +1,5 @@
 'use client';
 
-import dynamic from 'next/dynamic';
 import {
   type CSSProperties,
   useCallback,
@@ -9,7 +8,6 @@ import {
   useRef,
   useState,
 } from 'react';
-import { ImageWithFallback } from '@/components/atoms/ImageWithFallback';
 import { AnonCookieBootstrap } from '@/components/features/profile/AnonCookieBootstrap';
 import {
   ProfileNotificationsContext,
@@ -41,7 +39,6 @@ import {
   useUpdateContentPreferencesMutation,
 } from '@/lib/queries/useNotificationStatusQuery';
 import type { TourDateViewModel } from '@/lib/tour-dates/types';
-import { cn } from '@/lib/utils';
 import type { AvatarSize } from '@/lib/utils/avatar-sizes';
 import { isDefaultAvatarUrl } from '@/lib/utils/dsp-images';
 import type { PublicContact } from '@/types/contacts';
@@ -49,22 +46,7 @@ import type { Artist, LegacySocialLink } from '@/types/db';
 import type { NotificationContentType } from '@/types/notifications';
 import type { PressPhoto } from '@/types/press-photos';
 import { ProfileCompactSurface } from './ProfileCompactSurface';
-
-const ProfileDesktopSurface = dynamic(
-  () =>
-    import('./ProfileDesktopSurface').then(mod => ({
-      default: mod.ProfileDesktopSurface,
-    })),
-  {
-    ssr: false,
-    loading: () => (
-      <div
-        data-testid='profile-desktop-surface-loading'
-        className='h-[min(940px,calc(100dvh-48px))] w-full rounded-[36px] border border-white/8 bg-[rgba(8,10,14,0.9)]'
-      />
-    ),
-  }
-);
+import { PublicProfileLayoutShell } from './PublicProfileLayoutShell';
 
 interface ProfileCompactTemplateProps {
   readonly mode: ProfileMode;
@@ -150,8 +132,11 @@ function unwrapNextImageUrl(url: string | null | undefined): string | null {
 
 const DRAWER_CLOSE_RESET_DELAY_MS = 200;
 
-function getInitialModeFromLocation(fallbackMode: ProfileMode): ProfileMode {
-  if (globalThis.window === undefined) {
+function getInitialModeFromLocation(
+  fallbackMode: ProfileMode,
+  readWindowLocation = false
+): ProfileMode {
+  if (!readWindowLocation || globalThis.window === undefined) {
     return fallbackMode;
   }
 
@@ -230,10 +215,19 @@ export function ProfileCompactTemplate({
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [drawerView, setDrawerView] = useState<DrawerView>('menu');
   const [drawerPresentation, setDrawerPresentation] =
-    useState<ProfileSurfacePresentation>('standalone');
-  const [isDesktopLayout, setIsDesktopLayout] = useState(false);
+    useState<ProfileSurfacePresentation>(() => {
+      if (globalThis.window === undefined) return 'standalone';
+      if (globalThis.matchMedia('(min-width: 1180px)').matches) return 'modal';
+      if (globalThis.matchMedia('(min-width: 768px)').matches)
+        return 'embedded';
+      return 'standalone';
+    });
+  const [isDesktopLayout, setIsDesktopLayout] = useState(() => {
+    if (globalThis.window === undefined) return false;
+    return globalThis.matchMedia('(min-width: 1180px)').matches;
+  });
   const [requestedMode, setRequestedMode] = useState<ProfileMode>(() =>
-    getInitialModeFromLocation(mode)
+    getInitialModeFromLocation(mode, true)
   );
   const revealNotificationsRef = useRef<(() => void) | null>(null);
   const closeResetTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -482,7 +476,7 @@ export function ProfileCompactTemplate({
 
   const syncRequestedModeFromLocation = useCallback(() => {
     setRequestedMode(currentMode => {
-      const nextMode = getInitialModeFromLocation(mode);
+      const nextMode = getInitialModeFromLocation(mode, true);
       if (currentMode !== nextMode) {
         suppressNextHistorySyncRef.current = true;
         initialLocationModeAlignedRef.current = false;
@@ -677,17 +671,16 @@ export function ProfileCompactTemplate({
     setRequestedMode('profile');
   }, [artist.handle, artist.name]);
 
-  const hasTourDates = tourDates.length > 0;
   const compactSurfaceShowsModeHeading = drawerOpen
     ? drawerView === 'listen' ||
       drawerView === 'releases' ||
       drawerView === 'subscribe' ||
       drawerView === 'notifications' ||
-      (drawerView === 'tour' && hasTourDates)
+      drawerView === 'tour'
     : requestedMode === 'listen' ||
       requestedMode === 'releases' ||
       requestedMode === 'subscribe' ||
-      (requestedMode === 'tour' && hasTourDates);
+      requestedMode === 'tour';
   const shouldRenderTemplateHeading = isDesktopLayout
     ? true
     : compactSurfaceShowsModeHeading;
@@ -697,151 +690,78 @@ export function ProfileCompactTemplate({
       {/* Resolves the per-user jv_aid variant client-side after ISR hydration.
           Renders null; updates resolvedAlertOptInVariant state on mount. */}
       <AnonCookieBootstrap onVariantResolved={setResolvedAlertOptInVariant} />
-      <div
-        className={cn(
-          'profile-viewport relative h-[100dvh] overflow-hidden bg-[color:var(--profile-stage-bg)] text-primary-token'
-        )}
-        style={profileAccentStyle}
-      >
-        <div className='absolute inset-0' aria-hidden='true'>
-          <div className='absolute inset-[-10%]'>
-            {heroImageUrl && !heroImageError ? (
-              <ImageWithFallback
-                src={heroImageUrl}
-                alt={`${artist.name} background`}
-                fill
-                sizes='(max-width: 767px) 100vw, 680px'
-                className='scale-[1.05] object-cover opacity-28 blur-[84px] saturate-[0.88]'
-                fallbackVariant='avatar'
-                fallbackClassName='bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.06),transparent_48%)]'
-                onLoadError={() => setHeroImageError(true)}
-              />
-            ) : (
-              <div className='h-full w-full bg-[radial-gradient(circle_at_top,var(--profile-stage-glow-a),transparent_44%)] opacity-50' />
-            )}
+      <PublicProfileLayoutShell
+        artistName={artist.name}
+        heroImageUrl={heroImageUrl}
+        heroImageError={heroImageError}
+        onHeroImageLoadError={() => setHeroImageError(true)}
+        isDesktopLayout={isDesktopLayout}
+        shouldRenderHeading={shouldRenderTemplateHeading}
+        profileAccentStyle={profileAccentStyle}
+        compactSurface={
+          <div
+            className='public-profile-compact-shell relative flex h-full min-w-0 w-full flex-col overflow-hidden bg-[color:var(--profile-content-bg)] md:mx-auto md:rounded-[var(--profile-shell-card-radius)] md:border md:border-[color:var(--profile-panel-border)] md:shadow-[var(--profile-panel-shadow)]'
+            data-testid='profile-compact-shell'
+          >
+            <ProfileCompactSurface
+              renderMode='interactive'
+              presentation={drawerPresentation}
+              artist={artist}
+              socialLinks={socialLinks}
+              contacts={contacts}
+              showPayButton={showPayButton}
+              latestRelease={latestRelease}
+              profileSettings={profileSettings}
+              featuredPlaylistFallback={featuredPlaylistFallback}
+              enableDynamicEngagement={enableDynamicEngagement}
+              subscribeTwoStep={subscribeTwoStep}
+              alertOptInVariant={resolvedAlertOptInVariant}
+              genres={genres}
+              pressPhotos={pressPhotos}
+              allowPhotoDownloads={allowPhotoDownloads}
+              photoDownloadSizes={photoDownloadSizes}
+              tourDates={tourDates}
+              showSubscriptionConfirmedBanner={showSubscriptionConfirmedBanner}
+              viewerCountryCode={viewerCountryCode}
+              hideJovieBranding={hideJovieBranding}
+              hideMoreMenu={hideMoreMenu}
+              renderInteractiveOverlays
+              renderSemanticHeading={!isDesktopLayout}
+              drawerOpen={drawerOpen}
+              drawerView={drawerView}
+              activeMode={requestedMode}
+              onModeSelect={nextMode => {
+                clearCloseResetTimer();
+                setRequestedMode(nextMode);
+              }}
+              onDrawerOpenChange={handleDrawerOpenChange}
+              onDrawerViewChange={handleDrawerViewChange}
+              onBack={handleBack}
+              onOpenMenu={() => openDrawerMode('menu')}
+              onPlayClick={handlePlayClick}
+              onShare={handleShare}
+              profileHref={profileHref}
+              artistProfilesHref={APP_ROUTES.ARTIST_PROFILES}
+              isSubscribed={isSubscribed}
+              contentPrefs={contentPrefs}
+              onTogglePref={handleTogglePref}
+              onUnsubscribe={handleUnsubscribe}
+              isUnsubscribing={unsubMutation.isPending}
+              onManageNotifications={() => {
+                clearCloseResetTimer();
+                setRequestedMode('subscribe');
+              }}
+              onRegisterReveal={fn => {
+                revealNotificationsRef.current = fn;
+              }}
+              onRevealNotifications={() => {
+                revealNotificationsRef.current?.();
+              }}
+              releases={releases}
+            />
           </div>
-          <div className='absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.06),transparent_26%),linear-gradient(180deg,rgba(6,8,13,0.34)_0%,rgba(7,8,10,0.82)_42%,rgba(8,9,10,0.98)_100%)]' />
-        </div>
-
-        <div
-          className={cn(
-            'relative mx-auto flex w-full items-stretch justify-center',
-            isDesktopLayout
-              ? 'h-full max-w-[1540px] px-4 py-4 md:px-6 md:py-6'
-              : 'h-full max-w-[680px] md:items-center md:px-6 md:py-8'
-          )}
-        >
-          <main className='relative flex h-full w-full items-stretch md:items-center'>
-            {shouldRenderTemplateHeading ? (
-              <h1 className='sr-only'>{artist.name}</h1>
-            ) : null}
-            {isDesktopLayout ? (
-              <div className='w-full' data-testid='profile-compact-shell'>
-                <ProfileDesktopSurface
-                  presentation={drawerPresentation}
-                  artist={artist}
-                  socialLinks={socialLinks}
-                  contacts={contacts}
-                  showPayButton={showPayButton}
-                  latestRelease={latestRelease}
-                  profileSettings={profileSettings}
-                  alertOptInVariant={resolvedAlertOptInVariant}
-                  genres={genres}
-                  pressPhotos={pressPhotos}
-                  allowPhotoDownloads={allowPhotoDownloads}
-                  photoDownloadSizes={photoDownloadSizes}
-                  tourDates={tourDates}
-                  viewerCountryCode={viewerCountryCode}
-                  drawerOpen={drawerOpen}
-                  drawerView={drawerView}
-                  activeMode={requestedMode}
-                  onModeSelect={nextMode => {
-                    clearCloseResetTimer();
-                    setRequestedMode(nextMode);
-                  }}
-                  onAlertsModalClose={() => {
-                    clearCloseResetTimer();
-                    setRequestedMode(lastPrimaryModeRef.current);
-                  }}
-                  onDrawerOpenChange={handleDrawerOpenChange}
-                  onDrawerViewChange={handleDrawerViewChange}
-                  onOpenMenu={() => openDrawerMode('menu')}
-                  onPlayClick={handlePlayClick}
-                  profileHref={profileHref}
-                  isSubscribed={isSubscribed}
-                  contentPrefs={contentPrefs}
-                  onTogglePref={handleTogglePref}
-                  onUnsubscribe={handleUnsubscribe}
-                  isUnsubscribing={unsubMutation.isPending}
-                  releases={releases}
-                />
-              </div>
-            ) : (
-              <div
-                className='relative flex h-full w-full max-w-(--profile-shell-max-width) flex-col overflow-hidden bg-[color:var(--profile-content-bg)] md:mx-auto md:h-[740px] md:rounded-[var(--profile-shell-card-radius)] md:border md:border-[color:var(--profile-panel-border)] md:shadow-[var(--profile-panel-shadow)]'
-                data-testid='profile-compact-shell'
-              >
-                <ProfileCompactSurface
-                  renderMode='interactive'
-                  presentation={drawerPresentation}
-                  artist={artist}
-                  socialLinks={socialLinks}
-                  contacts={contacts}
-                  showPayButton={showPayButton}
-                  latestRelease={latestRelease}
-                  profileSettings={profileSettings}
-                  featuredPlaylistFallback={featuredPlaylistFallback}
-                  enableDynamicEngagement={enableDynamicEngagement}
-                  subscribeTwoStep={subscribeTwoStep}
-                  alertOptInVariant={resolvedAlertOptInVariant}
-                  genres={genres}
-                  pressPhotos={pressPhotos}
-                  allowPhotoDownloads={allowPhotoDownloads}
-                  photoDownloadSizes={photoDownloadSizes}
-                  tourDates={tourDates}
-                  showSubscriptionConfirmedBanner={
-                    showSubscriptionConfirmedBanner
-                  }
-                  viewerCountryCode={viewerCountryCode}
-                  hideJovieBranding={hideJovieBranding}
-                  hideMoreMenu={hideMoreMenu}
-                  drawerOpen={drawerOpen}
-                  drawerView={drawerView}
-                  activeMode={requestedMode}
-                  onModeSelect={nextMode => {
-                    clearCloseResetTimer();
-                    setRequestedMode(nextMode);
-                  }}
-                  onDrawerOpenChange={handleDrawerOpenChange}
-                  onDrawerViewChange={handleDrawerViewChange}
-                  onBack={handleBack}
-                  onOpenMenu={() => openDrawerMode('menu')}
-                  onPlayClick={handlePlayClick}
-                  onShare={handleShare}
-                  profileHref={profileHref}
-                  artistProfilesHref={APP_ROUTES.ARTIST_PROFILES}
-                  isSubscribed={isSubscribed}
-                  contentPrefs={contentPrefs}
-                  onTogglePref={handleTogglePref}
-                  onUnsubscribe={handleUnsubscribe}
-                  isUnsubscribing={unsubMutation.isPending}
-                  onManageNotifications={() => {
-                    clearCloseResetTimer();
-                    setRequestedMode('subscribe');
-                  }}
-                  onRegisterReveal={fn => {
-                    revealNotificationsRef.current = fn;
-                  }}
-                  onRevealNotifications={() => {
-                    revealNotificationsRef.current?.();
-                  }}
-                  releases={releases}
-                />
-              </div>
-            )}
-          </main>
-        </div>
-      </div>
+        }
+      />
     </ProfileNotificationsContext.Provider>
   );
 }

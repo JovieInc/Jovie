@@ -1,10 +1,12 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { Play } from 'lucide-react';
+import Image from 'next/image';
+import { useCallback, useRef, useState } from 'react';
 import { BrowserFrame } from './BrowserFrame';
 import { ProductDemoCarousel } from './ProductDemoCarousel';
 
-type VideoState = 'loading' | 'playing' | 'error';
+type VideoState = 'ready' | 'error';
 
 export function DemoVideoPlayer({
   videoUrl,
@@ -19,48 +21,29 @@ export function DemoVideoPlayer({
   readonly controls?: boolean;
   readonly label?: string;
 }) {
+  const [state, setState] = useState<VideoState>(videoUrl ? 'ready' : 'error');
+  const [hasStarted, setHasStarted] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
-  const [state, setState] = useState<VideoState>(
-    videoUrl ? 'loading' : 'error'
-  );
-  const handleLoadedData = useCallback(() => {
-    setState('playing');
-  }, []);
-
+  const shouldShowPlayButton = !hasStarted && (Boolean(posterUrl) || !controls);
   const handleError = useCallback(() => {
     setState('error');
   }, []);
-
-  useEffect(() => {
-    setState(videoUrl ? 'loading' : 'error');
-  }, [videoUrl]);
-
-  useEffect(() => {
-    if (!(videoUrl && state === 'loading')) {
-      return;
-    }
-
+  const handlePlay = useCallback(() => {
     const video = videoRef.current;
     if (!video) {
       return;
     }
 
-    if (video.readyState >= HTMLMediaElement.HAVE_METADATA) {
-      setState('playing');
-      return;
-    }
-
-    const pollId = window.setInterval(() => {
-      if (video.readyState >= HTMLMediaElement.HAVE_METADATA) {
-        setState('playing');
-        window.clearInterval(pollId);
-      }
-    }, 250);
-
-    return () => {
-      window.clearInterval(pollId);
-    };
-  }, [state, videoUrl]);
+    void video
+      .play()
+      .then(() => {
+        setHasStarted(true);
+      })
+      .catch(() => {
+        // Keep the custom CTA available so the user can retry playback.
+        setHasStarted(false);
+      });
+  }, []);
 
   // No video URL configured — show carousel directly
   if (!videoUrl) {
@@ -69,44 +52,57 @@ export function DemoVideoPlayer({
 
   return (
     <BrowserFrame>
-      {/* Loading skeleton */}
-      {state === 'loading' && (
-        <div className='flex aspect-[1280/720] w-full items-center justify-center bg-black'>
-          <div className='flex flex-col items-center gap-3'>
-            <div className='size-8 animate-spin rounded-full border-2 border-white/20 border-t-white/80' />
-            <p className='text-sm text-white/40'>Loading demo...</p>
-          </div>
-        </div>
-      )}
-
-      {/* Video player */}
       {state !== 'error' && (
-        <video
-          ref={videoRef}
-          aria-label={label}
-          className={`aspect-[1280/720] w-full bg-black object-contain ${
-            state === 'loading' ? 'hidden' : ''
-          }`}
-          src={videoUrl}
-          poster={posterUrl}
-          controls={controls}
-          muted
-          loop
-          playsInline
-          preload='auto'
-          onLoadedMetadata={handleLoadedData}
-          onLoadedData={handleLoadedData}
-          onCanPlay={handleLoadedData}
-          onError={handleError}
+        <div
+          className='relative aspect-[1280/720] w-full overflow-hidden bg-black'
+          data-testid='demo-video-visual'
         >
-          <track
-            kind='captions'
-            src={captionsUrl}
-            srcLang='en'
-            label='English'
-            default
-          />
-        </video>
+          {posterUrl ? (
+            <Image
+              alt=''
+              aria-hidden='true'
+              className='object-cover'
+              data-testid='demo-video-poster'
+              fill
+              priority
+              sizes='1280px'
+              src={posterUrl}
+              unoptimized
+            />
+          ) : null}
+          <video
+            aria-label={label}
+            className={`relative z-10 aspect-[1280/720] w-full bg-transparent object-contain transition-opacity duration-subtle ${
+              hasStarted || !posterUrl ? 'opacity-100' : 'opacity-0'
+            }`}
+            controls={controls}
+            onError={handleError}
+            onPlay={() => setHasStarted(true)}
+            playsInline
+            poster={posterUrl}
+            preload='none'
+            ref={videoRef}
+            src={videoUrl}
+          >
+            <track
+              kind='captions'
+              src={captionsUrl}
+              srcLang='en'
+              label='English'
+              default
+            />
+          </video>
+          {shouldShowPlayButton ? (
+            <button
+              type='button'
+              aria-label='Play Jovie demo video'
+              className='absolute left-1/2 top-1/2 z-20 inline-flex size-16 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full bg-white text-black shadow-2xl shadow-black/40 transition-colors hover:bg-white/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-black'
+              onClick={handlePlay}
+            >
+              <Play aria-hidden='true' className='ml-1 size-7 fill-current' />
+            </button>
+          ) : null}
+        </div>
       )}
 
       {/* Error fallback — show carousel */}

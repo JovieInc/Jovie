@@ -19,10 +19,10 @@ import {
   DrawerSurfaceCard,
   DrawerTabbedCard,
   DrawerTabs,
-  EntityHeaderCard,
   EntitySidebarShell,
 } from '@/components/molecules/drawer';
 import { DrawerSection } from '@/components/molecules/drawer/DrawerSection';
+import { DrawerHero } from '@/components/shell/DrawerHero';
 import type { EditableContact } from '@/features/dashboard/hooks/useContactsManager';
 import {
   CONTACT_ROLE_OPTIONS,
@@ -241,38 +241,39 @@ export const ContactDetailSidebar = memo(function ContactDetailSidebar({
       onClose={hasContact ? undefined : handleClose}
       headerMode='minimal'
       hideMinimalHeaderBar={hasContact}
+      entityHeaderSurface='flat'
       contextMenuItems={contextMenuItems}
       isEmpty={!hasContact}
       emptyMessage='Select a contact to view details'
       entityHeader={
         contact ? (
-          <DrawerSurfaceCard variant='card' className='overflow-hidden p-3'>
-            <EntityHeaderCard
-              eyebrow='Contact'
-              title={contactDisplayName}
-              subtitle={roleLabel}
-              actions={
-                <DrawerCardActionBar
-                  primaryActions={primaryActions}
-                  menuItems={contextMenuItems}
-                  onClose={handleClose}
-                  overflowTriggerPlacement='card-top-right'
-                />
-              }
-              meta={
-                territorySummary ? (
-                  <div className='flex flex-wrap items-center gap-1.5 text-2xs text-tertiary-token'>
-                    <Badge
-                      size='sm'
-                      className='rounded-md border border-subtle bg-surface-0 px-1.5 text-3xs text-secondary-token'
-                    >
-                      {territorySummary}
-                    </Badge>
-                  </div>
-                ) : null
-              }
-              bodyClassName='pr-9'
-            />
+          <DrawerSurfaceCard variant='card' className='overflow-hidden'>
+            <div className='relative'>
+              <DrawerCardActionBar
+                primaryActions={primaryActions}
+                menuItems={contextMenuItems}
+                onClose={handleClose}
+                overflowTriggerPlacement='card-top-right'
+                className='border-0 bg-transparent px-0 py-0'
+              />
+              <DrawerHero
+                title={contactDisplayName}
+                subtitle={roleLabel}
+                meta={
+                  territorySummary ? (
+                    <div className='flex flex-wrap items-center gap-1.5 text-2xs text-tertiary-token'>
+                      <Badge
+                        size='sm'
+                        className='rounded-md border border-subtle bg-surface-0 px-1.5 text-3xs text-secondary-token'
+                      >
+                        {territorySummary}
+                      </Badge>
+                    </div>
+                  ) : undefined
+                }
+                className='[&_h2]:pr-9'
+              />
+            </div>
           </DrawerSurfaceCard>
         ) : undefined
       }
@@ -418,7 +419,7 @@ export const ContactDetailSidebar = memo(function ContactDetailSidebar({
                         aria-pressed={isSelected}
                         title={territory}
                         className={cn(
-                          'inline-flex h-6 max-w-full shrink-0 items-center whitespace-nowrap rounded-md border px-2 text-2xs font-caption leading-none transition-[background-color,border-color,color] duration-150 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)',
+                          'inline-flex h-6 max-w-full shrink-0 items-center whitespace-nowrap rounded-md border px-2 text-2xs font-caption leading-none transition-[background-color,border-color,color] duration-subtle focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)',
                           isSelected
                             ? 'border-(--linear-border-focus)/35 bg-surface-1 text-primary-token'
                             : 'border-(--linear-app-frame-seam) bg-surface-0 text-secondary-token hover:bg-surface-1 hover:text-primary-token'

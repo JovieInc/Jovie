@@ -5,23 +5,41 @@ import type { AvailableDSP } from '@/lib/dsp';
 import type { Artist } from '@/types/db';
 import type { NotificationContentType } from '@/types/notifications';
 
-vi.mock('@/features/profile/views/ReleasesView', () => ({
-  ReleasesView: () => <div data-testid='mock-releases-view'>Releases</div>,
+const { releasesViewMock } = vi.hoisted(() => ({
+  releasesViewMock: vi.fn(),
 }));
 
+vi.mock('@/features/profile/views/ReleasesView', () => ({
+  ReleasesView: (props: { readonly artistId: string }) => {
+    releasesViewMock(props);
+    return (
+      <div data-artist-id={props.artistId} data-testid='mock-releases-view'>
+        Releases
+      </div>
+    );
+  },
+}));
+
+vi.mock(
+  '@/features/profile/artist-notifications-cta/ArtistNotificationsCTA',
+  () => ({
+    ArtistNotificationsCTA: ({
+      triggerLabel,
+      source,
+    }: {
+      readonly triggerLabel?: string;
+      readonly source?: string;
+    }) => (
+      <button data-source={source} data-testid='mock-alert-cta' type='button'>
+        {triggerLabel ?? 'Get alerts'}
+      </button>
+    ),
+  })
+);
+
 vi.mock('@/features/profile/StaticListenInterface', () => ({
-  StaticListenInterface: ({
-    dspsOverride = [],
-  }: {
-    readonly dspsOverride?: ReadonlyArray<AvailableDSP>;
-  }) => (
-    <div data-testid='mock-static-listen-interface'>
-      {dspsOverride.map(dsp => (
-        <button key={dsp.key} type='button'>
-          {dsp.name}
-        </button>
-      ))}
-    </div>
+  StaticListenInterface: () => (
+    <div data-testid='mock-static-listen-interface'>Listen providers</div>
   ),
 }));
 
@@ -67,7 +85,7 @@ const dsps: AvailableDSP[] = [
 ];
 
 describe('ProfilePrimaryTabPanel listen mode', () => {
-  it('renders releases and DSP actions together', () => {
+  it('renders releases as the Music tab surface without redundant DSP actions', () => {
     render(
       <ProfilePrimaryTabPanel
         mode='listen'
@@ -93,7 +111,36 @@ describe('ProfilePrimaryTabPanel listen mode', () => {
     );
 
     expect(screen.getByTestId('mock-releases-view')).toBeVisible();
-    expect(screen.getByTestId('mock-static-listen-interface')).toBeVisible();
-    expect(screen.getByRole('button', { name: 'Spotify' })).toBeVisible();
+    expect(screen.getByTestId('mock-releases-view')).toHaveAttribute(
+      'data-artist-id',
+      'artist-1'
+    );
+    expect(
+      screen.queryByTestId('mock-static-listen-interface')
+    ).not.toBeInTheDocument();
+    expect(releasesViewMock).toHaveBeenCalledWith(
+      expect.objectContaining({ artistId: 'artist-1' })
+    );
+  });
+
+  it('renders a sparse no-music alert empty state', () => {
+    render(
+      <ProfilePrimaryTabPanel
+        mode='listen'
+        artist={artist}
+        dsps={dsps}
+        isSubscribed={false}
+        contentPrefs={contentPrefs}
+        onTogglePref={vi.fn()}
+        onUnsubscribe={vi.fn()}
+        isUnsubscribing={false}
+        releases={[]}
+      />
+    );
+
+    expect(screen.getByText('No music yet.')).toBeVisible();
+    expect(
+      screen.getByRole('button', { name: 'Turn on alerts' })
+    ).toHaveAttribute('data-source', 'music_empty_state');
   });
 });

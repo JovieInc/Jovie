@@ -376,9 +376,7 @@ export default function CheckoutSuccessPage() {
             </Button>
             {isOnboardingUpgrade ? null : (
               <Button asChild variant='ghost' size='sm'>
-                <Link href={APP_ROUTES.DASHBOARD_RELEASES}>
-                  View your releases
-                </Link>
+                <Link href={APP_ROUTES.RELEASES}>View your releases</Link>
               </Button>
             )}
 

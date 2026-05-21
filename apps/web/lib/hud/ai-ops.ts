@@ -358,6 +358,7 @@ export async function getHudAiOpsSummary(
         linear: sourceStatus(false, 0),
         sentry: sourceStatus(false, 0),
         hermes: sourceStatus(true, recommendations.length),
+        'hermes-air': sourceStatus(false, 0),
         ci: sourceStatus(false, 0),
       },
       errorMessage: 'GitHub HUD source not configured.',
@@ -437,6 +438,7 @@ export async function getHudAiOpsSummary(
       linear: sourceStatus(false, 0),
       sentry: sourceStatus(false, 0),
       hermes: sourceStatus(true, recommendations.length),
+      'hermes-air': sourceStatus(false, 0),
       ci: sourceStatus(
         true,
         runItems.length,

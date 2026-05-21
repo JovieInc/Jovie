@@ -1,13 +1,20 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { Suspense, useCallback, useEffect, useMemo, useState } from 'react';
+import {
+  type RefObject,
+  Suspense,
+  useCallback,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import { Icon } from '@/components/atoms/Icon';
 import {
   DrawerButton,
   DrawerLoadingSkeleton,
-  DrawerSurfaceCard,
 } from '@/components/molecules/drawer';
+import { PageShell } from '@/components/organisms/PageShell';
 import type {
   ReleaseSidebarProps,
   TrackSidebarData,
@@ -16,12 +23,14 @@ import {
   convertContextMenuItems,
   useAmbientListSelection,
 } from '@/components/organisms/table';
-import { PillSearch } from '@/components/shell/PillSearch';
 import type {
   FilterField,
   FilterPill,
 } from '@/components/shell/pill-search.types';
-import { useSetHeaderActions } from '@/contexts/HeaderActionsContext';
+import {
+  useRegisterHeaderActions,
+  useRegisterHeaderSearch,
+} from '@/contexts/HeaderActionsContext';
 import { buildReleaseActions } from '@/features/dashboard/organisms/releases/release-actions';
 import { useRegisterRightPanel } from '@/hooks/useRegisterRightPanel';
 import { openChatWithPrompt } from '@/lib/chat/open-chat-with-prompt';
@@ -29,7 +38,6 @@ import type { ProviderKey, ReleaseViewModel } from '@/lib/discography/types';
 import { useAppFlag } from '@/lib/flags/client';
 import { usePlanGate } from '@/lib/queries';
 import { cn } from '@/lib/utils';
-import { isFormElement } from '@/lib/utils/keyboard';
 import {
   type AppleMusicArtistSelection,
   connectSelectedAppleMusicArtist,
@@ -130,11 +138,6 @@ function distinctValues(
   return [...seen];
 }
 
-function formatReleaseCountSuffix(visibleCount: number, totalCount: number) {
-  if (visibleCount === totalCount) return '';
-  return ` of ${totalCount}`;
-}
-
 // ── Empty / list content ───────────────────────────────────────────────────────
 
 interface ReleasesListContentProps {
@@ -156,6 +159,8 @@ interface ReleasesListContentProps {
   readonly onSync: () => void;
   readonly onSelect: (release: ReleaseViewModel) => void;
   readonly onClearFilters: () => void;
+  /** Ref forwarded to the listbox element for keyboard-nav focus scoping. */
+  readonly listboxRef?: RefObject<HTMLDivElement | null>;
 }
 
 function ReleasesListContent({
@@ -174,6 +179,7 @@ function ReleasesListContent({
   onSync,
   onSelect,
   onClearFilters,
+  listboxRef,
 }: ReleasesListContentProps) {
   if (showEmptyState) {
     return (
@@ -215,18 +221,10 @@ function ReleasesListContent({
   if (showConnectedEmptyState) {
     return (
       <div className='py-12 grid place-items-center text-center'>
-        <DrawerSurfaceCard
-          variant='card'
-          className='flex min-h-[212px] flex-col items-center justify-center px-5 py-9 text-center'
-          testId='shell-releases-empty-state-connected'
+        <div
+          className='max-w-sm'
+          data-testid='shell-releases-empty-state-connected'
         >
-          <div className='mb-2.5 flex h-9 w-9 items-center justify-center rounded-[10px] border border-subtle bg-surface-1'>
-            <Icon
-              name='Disc3'
-              className='h-4 w-4 text-tertiary-token'
-              aria-hidden='true'
-            />
-          </div>
           <h3 className='text-app font-caption text-primary-token'>
             No releases yet
           </h3>
@@ -264,7 +262,7 @@ function ReleasesListContent({
               </DrawerButton>
             )}
           </div>
-        </DrawerSurfaceCard>
+        </div>
       </div>
     );
   }
@@ -280,7 +278,7 @@ function ReleasesListContent({
             <button
               type='button'
               onClick={onClearFilters}
-              className='mt-2 text-[11px] text-cyan-400 hover:text-cyan-300 transition-colors duration-subtle ease-out'
+              className='mt-2 text-[11px] text-cyan-400 hover:text-cyan-300 transition-colors duration-subtle ease-subtle'
             >
               Clear filters
             </button>
@@ -292,6 +290,7 @@ function ReleasesListContent({
 
   return (
     <div
+      ref={listboxRef}
       role='listbox'
       aria-label='Releases'
       className='py-1.5 space-y-px px-2'
@@ -332,7 +331,7 @@ export interface ShellReleasesViewProps {
  *
  * Restores parity with the production `ReleaseProviderMatrix` (create / sync /
  * import progress / Apple Music sync / soft-cap gates / smart-link locks)
- * while keeping the shell-style row list, PillSearch header, and production
+ * while keeping the shell-style row list, shell-owned filter header, and production
  * release drawer.
  */
 export function ShellReleasesView({
@@ -358,10 +357,8 @@ export function ShellReleasesView({
     router,
     captureContext: 'shell-releases-view',
   });
-  const { setHeaderActions } = useSetHeaderActions();
   const albumArtFlagEnabled = useAppFlag('ALBUM_ART_GENERATION');
 
-  const [searchOpen, setSearchOpen] = useState(false);
   const [pills, setPills] = useState<FilterPill[]>([]);
   const [isConnected, setIsConnected] = useState(spotifyConnected);
   const [artistName, setArtistName] = useState<string | null>(
@@ -484,11 +481,34 @@ export function ShellReleasesView({
     [openEditor, visibleReleases]
   );
 
+  /**
+   * Enter key drill-in: opens the release sidebar for the currently selected
+   * (highlighted) release. Unlike J/K which call `openEditor` (a toggle), this
+   * is non-destructive — it opens the sidebar only when the release is not
+   * already being edited, preventing Enter from accidentally closing the panel.
+   */
+  const handleAmbientActivate = useCallback(
+    (index: number) => {
+      const target = visibleReleases[index];
+      if (!target) return;
+      // Only open if not already editing this release — avoids toggle-close.
+      if (editingRelease?.id !== target.id) {
+        openEditor(target);
+      }
+    },
+    [editingRelease, openEditor, visibleReleases]
+  );
+
+  /** Ref for the listbox container — used to scope J/K nav to the releases list. */
+  const listboxRef = useRef<HTMLDivElement>(null);
+
   useAmbientListSelection({
     enabled: visibleReleases.length > 0,
     count: visibleReleases.length,
     selectedIndex: selectedReleaseIndex,
     onSelect: handleAmbientSelect,
+    onActivate: handleAmbientActivate,
+    containerRef: listboxRef,
   });
 
   const openTrackDrawer = useCallback(
@@ -794,58 +814,44 @@ export function ShellReleasesView({
 
   useRegisterRightPanel(sidebarPanel);
 
-  // ── Header actions: NewReleaseHeaderAction + search trigger / PillSearch ──
+  // ── Header actions: NewReleaseHeaderAction + secondary filter control ──
 
   const selectedReleaseId = editingRelease?.id ?? null;
-  const releaseCountSuffix = formatReleaseCountSuffix(
-    visibleReleases.length,
-    rows.length
-  );
 
   const handleClearFilters = useCallback(() => {
     setPills([]);
   }, []);
 
-  const headerActions = useMemo(() => {
-    const searchNode = searchOpen ? (
-      <div className='w-[min(560px,calc(100vw-2rem))] rounded-lg border border-(--linear-app-shell-border) bg-[color-mix(in_oklab,var(--linear-app-content-surface)_96%,var(--linear-bg-surface-0))] px-2 py-1 shadow-[0_10px_32px_rgba(0,0,0,0.16)] sm:w-[440px] lg:w-[520px]'>
-        <PillSearch
-          active={searchOpen}
-          pills={pills}
-          onPillsChange={setPills}
-          artistOptions={artistOptions}
-          titleOptions={titleOptions}
-          albumOptions={albumOptions}
-          ariaLabel='Filter releases'
-          placeholder='Filter releases — / for fields'
-          onClose={() => {
-            setSearchOpen(false);
-            setPills([]);
-          }}
-        />
-      </div>
-    ) : (
-      <button
-        type='button'
-        data-app-search-trigger='true'
-        onClick={() => setSearchOpen(true)}
-        className='inline-flex h-7 items-center gap-1.5 rounded-md border border-(--linear-app-shell-border) bg-[color-mix(in_oklab,var(--linear-app-content-surface)_94%,transparent)] px-2 text-[12px] text-secondary-token transition-[background-color,border-color,color] duration-subtle hover:bg-surface-1 hover:text-primary-token focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)'
-        aria-label='Search releases'
-        title='Search releases (/)'
-      >
-        <Icon name='Search' className='h-3.5 w-3.5' aria-hidden='true' />
-        <span className='hidden sm:inline'>Search Releases</span>
-        <span className='hidden text-tertiary-token lg:inline'>/</span>
-        <span className='tabular-nums text-tertiary-token'>
-          {visibleReleases.length}
-          {releaseCountSuffix}
-        </span>
-      </button>
-    );
+  const headerSearchAdapter = useMemo(
+    () => ({
+      key: 'shell-releases',
+      pills,
+      onPillsChange: setPills,
+      artistOptions,
+      titleOptions,
+      albumOptions,
+      totalCount: rows.length,
+      visibleCount: visibleReleases.length,
+      triggerLabel: 'Filter',
+      ariaLabel: 'Filter releases',
+      placeholder: 'Filter releases',
+      allowedFields: ['artist', 'title', 'album', 'status', 'has'] as const,
+    }),
+    [
+      albumOptions,
+      artistOptions,
+      pills,
+      rows.length,
+      titleOptions,
+      visibleReleases.length,
+    ]
+  );
 
+  useRegisterHeaderSearch(headerSearchAdapter);
+
+  const headerActions = useMemo(() => {
     return (
       <div className='flex items-center gap-2'>
-        {searchNode}
         <NewReleaseHeaderAction
           canCreateManualReleases={canCreateManualReleases}
           isSyncing={isSyncing}
@@ -854,50 +860,9 @@ export function ShellReleasesView({
         />
       </div>
     );
-  }, [
-    albumOptions,
-    artistOptions,
-    canCreateManualReleases,
-    handleNewRelease,
-    handleSync,
-    isSyncing,
-    pills,
-    releaseCountSuffix,
-    searchOpen,
-    titleOptions,
-    visibleReleases.length,
-  ]);
+  }, [canCreateManualReleases, handleNewRelease, handleSync, isSyncing]);
 
-  useEffect(() => {
-    setHeaderActions(headerActions);
-    return () => setHeaderActions(null);
-  }, [headerActions, setHeaderActions]);
-
-  useEffect(() => {
-    function onKeyDown(event: KeyboardEvent) {
-      if (event.defaultPrevented) return;
-
-      const hasModifier =
-        event.metaKey || event.ctrlKey || event.altKey || event.shiftKey;
-
-      if (event.key === '/' && !hasModifier) {
-        if (isFormElement(event.target)) return;
-        event.preventDefault();
-        setSearchOpen(true);
-        return;
-      }
-
-      if (event.key === 'Escape' && searchOpen) {
-        const target = event.target as HTMLElement | null;
-        if (target?.matches('[data-app-search-field="true"]')) return;
-        event.preventDefault();
-        setSearchOpen(false);
-      }
-    }
-
-    globalThis.addEventListener('keydown', onKeyDown);
-    return () => globalThis.removeEventListener('keydown', onKeyDown);
-  }, [searchOpen]);
+  useRegisterHeaderActions(headerActions);
 
   useReleaseRightPanelTableMeta({
     rows,
@@ -918,9 +883,11 @@ export function ShellReleasesView({
 
   return (
     <>
-      <section
+      <PageShell
         aria-label='Releases'
-        className='flex h-full flex-col focus:outline-none'
+        frame='content-container'
+        contentPadding='none'
+        className='h-full focus:outline-none'
         data-design-v1-releases='true'
         data-testid='shell-releases-view'
       >
@@ -958,9 +925,10 @@ export function ShellReleasesView({
             onSync={handleSync}
             onSelect={handleSelect}
             onClearFilters={handleClearFilters}
+            listboxRef={listboxRef}
           />
         </div>
-      </section>
+      </PageShell>
 
       <ReleaseWorkflowOverlays
         amPaletteOpen={amPaletteOpen}

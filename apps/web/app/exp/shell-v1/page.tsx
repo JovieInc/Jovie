@@ -176,6 +176,7 @@ import { ThreadView as ShellThreadView } from '@/components/shell/ThreadView';
 import { Tooltip } from '@/components/shell/Tooltip';
 import { TypeBadge } from '@/components/shell/TypeBadge';
 import { dropDateMeta } from '@/lib/format-drop-date';
+import { relativeDate as formatRelativeDate } from '@/lib/format-relative-date';
 // ---------------------------------------------------------------------------
 // DESIGN RULE — NO AI-SLOP GRADIENTS ON UI CHROME
 // ---------------------------------------------------------------------------
@@ -208,6 +209,13 @@ import { dropDateMeta } from '@/lib/format-drop-date';
 //      "keyboard shortcuts" sheet can ship later without hunting them down.
 import { SHORTCUTS } from '@/lib/shortcuts';
 import { cn } from '@/lib/utils';
+
+function isSelfActivationKey(event: React.KeyboardEvent<HTMLElement>): boolean {
+  return (
+    event.currentTarget === event.target &&
+    (event.key === 'Enter' || event.code === 'Space')
+  );
+}
 
 type CanvasView =
   | 'demo'
@@ -1691,19 +1699,7 @@ function trackFromRelease(r: Release): TrackInfo {
 }
 
 function relativeDate(iso: string, now = new Date('2026-04-25')) {
-  const d = new Date(iso);
-  const days = Math.round(
-    (d.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)
-  );
-  if (days === 0) return 'today';
-  if (days === 1) return 'tomorrow';
-  if (days === -1) return 'yesterday';
-  if (days > 1 && days < 14) return `in ${days}d`;
-  if (days < -1 && days > -14) return `${-days}d ago`;
-  if (days >= 14 && days < 60) return `in ${Math.round(days / 7)}w`;
-  if (days <= -14 && days > -60) return `${Math.round(-days / 7)}w ago`;
-  if (days >= 60) return `in ${Math.round(days / 30)}mo`;
-  return `${Math.round(-days / 30)}mo ago`;
+  return formatRelativeDate(iso, now).toLowerCase();
 }
 
 function formatStreams(n: number) {
@@ -4102,7 +4098,7 @@ function DashboardHome() {
           for the morphing pill surface, slash picker, and chip tray.
           Backend wiring (useJovieChat / streaming / images) stays stubbed
           for the design pass — those wires land at flip-time. */}
-      <div className='shrink-0 mt-4 max-w-[560px] w-full mx-auto'>
+      <div className='shrink-0 mt-4 max-w-[45rem] w-full mx-auto'>
         <ChatInput
           value={composerValue}
           onChange={setComposerValue}
@@ -4602,7 +4598,7 @@ function OnboardingCanvas({ onComplete }: { onComplete: () => void }) {
           it doesn't lose focus mid-animation. Bottom padding animates
           from a tall spacer (centered) to chat-pinned. */}
       <footer className='shrink-0 px-8 pt-2'>
-        <div className='max-w-2xl mx-auto'>
+        <div className='mx-auto max-w-[45rem]'>
           <ChatInput
             value={draft}
             onChange={setDraft}
@@ -5014,11 +5010,15 @@ function ReleaseRow({
 }) {
   const runningThread = findRunningThreadFor('release', release.id, THREADS);
   return (
-    // biome-ignore lint/a11y/noNoninteractiveElementInteractions: list row activates via parent section's keyboard handler; mouse-click is a convenience
-    // biome-ignore lint/a11y/useKeyWithClickEvents: see above — parent section handles ↑/↓/Enter/Space/Esc
+    // biome-ignore lint/a11y/noNoninteractiveElementInteractions: parent section owns keyboard navigation; row listener mirrors click for Sonar.
     <li
       ref={rowRef}
       onClick={onSelect}
+      onKeyDown={event => {
+        if (!isSelfActivationKey(event)) return;
+        event.preventDefault();
+        onSelect();
+      }}
       onContextMenu={e => onContextMenu?.(e, release)}
       data-selected={isSelected || undefined}
       data-focused={isFocused || undefined}
@@ -6206,11 +6206,15 @@ function TrackRow({
   const showPlayingBars = isPlaying && !muteHighlight;
   const runningThread = findRunningThreadFor('track', track.id, THREADS);
   return (
-    // biome-ignore lint/a11y/noNoninteractiveElementInteractions: parent section delegates ↑/↓/Space; row click is a focus convenience
-    // biome-ignore lint/a11y/useKeyWithClickEvents: same
+    // biome-ignore lint/a11y/noNoninteractiveElementInteractions: parent section owns keyboard navigation; row listener mirrors click for Sonar.
     <li
       ref={rowRef}
       onClick={onSelect}
+      onKeyDown={event => {
+        if (!isSelfActivationKey(event)) return;
+        event.preventDefault();
+        onSelect();
+      }}
       onContextMenu={e => onContextMenu?.(e, track)}
       data-focused={isFocused || undefined}
       className={cn(
@@ -6568,11 +6572,15 @@ function TaskListItem({
 }) {
   const runningThread = findRunningThreadFor('task', task.id, THREADS);
   return (
-    // biome-ignore lint/a11y/noNoninteractiveElementInteractions: parent section delegates ↑/↓
-    // biome-ignore lint/a11y/useKeyWithClickEvents: same
+    // biome-ignore lint/a11y/noNoninteractiveElementInteractions: parent section owns keyboard navigation; row listener mirrors click for Sonar.
     <li
       ref={rowRef}
       onClick={onSelect}
+      onKeyDown={event => {
+        if (!isSelfActivationKey(event)) return;
+        event.preventDefault();
+        onSelect();
+      }}
       onContextMenu={e => onContextMenu?.(e, task)}
       data-focused={isFocused || isSelected || undefined}
       className={cn(

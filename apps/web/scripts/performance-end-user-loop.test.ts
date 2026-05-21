@@ -142,7 +142,7 @@ function createSummary(): GuardSummary {
       },
       {
         auth: true,
-        configuredPath: '/app/dashboard/releases',
+        configuredPath: '/app/releases',
         group: 'creator-shell',
         id: 'creator-releases',
         primaryMetric: 'warm-shell-response',
@@ -164,7 +164,7 @@ function createSummary(): GuardSummary {
           'time-to-first-byte': 120,
           'warm-shell-response': 130,
         },
-        resolvedPath: '/app/dashboard/releases',
+        resolvedPath: '/app/releases',
         resourceSizes: [],
         routeSurface: 'creator-app',
         samples: [],
@@ -178,7 +178,7 @@ function createSummary(): GuardSummary {
             unit: 'ms',
           },
         ],
-        url: 'http://127.0.0.1:4100/app/dashboard/releases',
+        url: 'http://127.0.0.1:4100/app/releases',
         violations: [
           {
             budget: 100,
@@ -326,7 +326,7 @@ describe('performance end-user loop', () => {
           firstContentfulPaintMs: 700,
           largestContentfulPaintMs: 1000,
           cumulativeLayoutShift: 0.01,
-          finalUrl: '/app/dashboard/releases',
+          finalUrl: '/app/releases',
         },
         {
           warmShellResponseMs: 150,
@@ -335,7 +335,7 @@ describe('performance end-user loop', () => {
           firstContentfulPaintMs: 680,
           largestContentfulPaintMs: 980,
           cumulativeLayoutShift: 0.01,
-          finalUrl: '/app/dashboard/releases',
+          finalUrl: '/app/releases',
         },
         {
           warmShellResponseMs: 100,
@@ -344,7 +344,7 @@ describe('performance end-user loop', () => {
           firstContentfulPaintMs: 660,
           largestContentfulPaintMs: 960,
           cumulativeLayoutShift: 0.01,
-          finalUrl: '/app/dashboard/releases',
+          finalUrl: '/app/releases',
         },
       ],
       100,

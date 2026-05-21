@@ -36,7 +36,7 @@ function ActionCard({
   const content = (
     <ContentSurfaceCard
       surface='nested'
-      className='group flex items-center justify-between gap-3 p-3.5 transition-[background-color,border-color] duration-150 hover:bg-surface-0'
+      className='group flex items-center justify-between gap-3 p-3.5 transition-[background-color,border-color] duration-subtle hover:bg-surface-0'
     >
       <div className='flex items-center gap-3 min-w-0'>
         <div className='flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-(--linear-app-frame-seam) bg-surface-0 text-secondary-token'>
@@ -48,7 +48,7 @@ function ActionCard({
         </div>
       </div>
       <ArrowRight
-        className='h-3.5 w-3.5 shrink-0 text-tertiary-token transition-transform group-hover:translate-x-0.5 group-hover:text-secondary-token'
+        className='h-3.5 w-3.5 shrink-0 text-tertiary-token transition-colors group-hover:text-secondary-token'
         aria-hidden='true'
       />
     </ContentSurfaceCard>

@@ -155,6 +155,14 @@ export interface ProfileCompletion {
   profileIsLive: boolean;
 }
 
+interface SocialLinkExistenceQueryOptions {
+  context: string;
+  operation: string;
+  profileId: string;
+  queryLabel: string;
+  userId: string;
+}
+
 function hasText(value: string | null | undefined): boolean {
   return typeof value === 'string' && value.trim().length > 0;
 }
@@ -184,7 +192,7 @@ type BioLinkActivationEventType =
 
 async function buildBioLinkActivation(
   tx: DbOrTransaction,
-  profile: CreatorProfile
+  profile: Pick<CreatorProfile, 'id' | 'onboardingCompletedAt'>
 ): Promise<BioLinkActivation | null> {
   const windowEndsAt = getBioLinkActivationWindowEnd(
     profile.onboardingCompletedAt
@@ -258,6 +266,74 @@ async function buildBioLinkActivation(
     }),
     windowEndsAt: serializeNullableDate(windowEndsAt),
   };
+}
+
+async function fetchSocialLinkExistence(
+  tx: DbOrTransaction,
+  {
+    context,
+    operation,
+    profileId,
+    queryLabel,
+    userId,
+  }: SocialLinkExistenceQueryOptions
+): Promise<{ hasLinks: boolean; hasMusicLinks: boolean }> {
+  return dashboardQuery(
+    () =>
+      tx
+        .select({
+          hasLinks: drizzleSql<boolean>`
+            exists (
+              select 1
+              from ${socialLinks}
+              where ${and(
+                eq(socialLinks.creatorProfileId, profileId),
+                eq(socialLinks.state, 'active'),
+                eq(socialLinks.isActive, true)
+              )}
+            )
+          `,
+          hasMusicLinks: drizzleSql<boolean>`
+            exists (
+              select 1
+              from ${socialLinks}
+              where ${and(
+                eq(socialLinks.creatorProfileId, profileId),
+                eq(socialLinks.state, 'active'),
+                eq(socialLinks.isActive, true),
+                or(
+                  eq(socialLinks.platformType, 'dsp'),
+                  eq(socialLinks.platform, sqlAny(DSP_PLATFORMS))
+                )
+              )}
+            )
+          `,
+        })
+        .from(users)
+        .where(eq(users.id, userId))
+        .limit(1),
+    queryLabel
+  )
+    .then(result => mapSocialLinkExistence(result?.[0]))
+    .catch((error: unknown) => {
+      const migrationResult = handleMigrationErrors(error, {
+        userId,
+        operation,
+      });
+
+      if (!migrationResult.shouldRetry) {
+        return { hasLinks: false, hasMusicLinks: false };
+      }
+
+      Sentry.captureException(error, {
+        level: 'warning',
+        tags: {
+          query: operation,
+          context,
+        },
+      });
+      return { hasLinks: false, hasMusicLinks: false };
+    });
 }
 
 function buildProfileCompletion(
@@ -561,62 +637,13 @@ async function fetchDashboardCoreWithSession(
         // These share a single transaction connection (pg serializes queries
         // on one connection), so parallel dispatch would just queue them
         // while starting all timeout timers simultaneously.
-        const linkCounts = await dashboardQuery(
-          () =>
-            tx
-              .select({
-                hasLinks: drizzleSql<boolean>`
-                exists (
-                  select 1
-                  from ${socialLinks}
-                  where ${and(
-                    eq(socialLinks.creatorProfileId, selected.id),
-                    eq(socialLinks.state, 'active'),
-                    eq(socialLinks.isActive, true)
-                  )}
-                )
-              `,
-                hasMusicLinks: drizzleSql<boolean>`
-                exists (
-                  select 1
-                  from ${socialLinks}
-                  where ${and(
-                    eq(socialLinks.creatorProfileId, selected.id),
-                    eq(socialLinks.state, 'active'),
-                    eq(socialLinks.isActive, true),
-                    or(
-                      eq(socialLinks.platformType, 'dsp'),
-                      eq(socialLinks.platform, sqlAny(DSP_PLATFORMS))
-                    )
-                  )}
-                )
-              `,
-              })
-              .from(users)
-              .where(eq(users.id, userId))
-              .limit(1),
-          'Social links existence query'
-        )
-          .then(result => mapSocialLinkExistence(result?.[0]))
-          .catch((error: unknown) => {
-            const migrationResult = handleMigrationErrors(error, {
-              userId,
-              operation: 'social_links_existence',
-            });
-
-            if (!migrationResult.shouldRetry) {
-              return { hasLinks: false, hasMusicLinks: false };
-            }
-
-            Sentry.captureException(error, {
-              level: 'warning',
-              tags: {
-                query: 'social_links_existence',
-                context: 'dashboard_data_settled',
-              },
-            });
-            return { hasLinks: false, hasMusicLinks: false };
-          });
+        const linkCounts = await fetchSocialLinkExistence(tx, {
+          context: 'dashboard_data_settled',
+          operation: 'social_links_existence',
+          profileId: selected.id,
+          queryLabel: 'Social links existence query',
+          userId,
+        });
 
         const avatarQuality = await getAvatarQualityForProfile(
           selected.id,

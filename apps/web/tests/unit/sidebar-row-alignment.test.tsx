@@ -3,6 +3,11 @@ import type { ComponentProps, PropsWithChildren } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import { SidebarCollapsibleGroup } from '@/components/organisms/SidebarCollapsibleGroup';
 import { SidebarGroupLabel } from '@/components/organisms/sidebar/group';
+import {
+  SidebarContent,
+  SidebarHeader,
+  SidebarSeparator,
+} from '@/components/organisms/sidebar/layout';
 
 type SidebarGroupProps = PropsWithChildren<{ className?: string }>;
 type SidebarGroupContentProps = PropsWithChildren<{ className?: string }>;
@@ -54,5 +59,23 @@ describe('Sidebar row alignment', () => {
     expect(
       screen.getByRole('button', { name: /general/i }).className
     ).toContain('px-2.5');
+  });
+
+  it('keeps shell sidebar wrapper spacing on the same token grid', () => {
+    const { container } = render(
+      <>
+        <SidebarHeader>Header</SidebarHeader>
+        <SidebarContent>Content</SidebarContent>
+        <SidebarSeparator />
+      </>
+    );
+
+    const header = container.querySelector('[data-sidebar="header"]');
+    const content = container.querySelector('[data-sidebar="content"]');
+    const separator = container.querySelector('[role="separator"]');
+
+    expect(header?.getAttribute('class')).toContain('px-2.5');
+    expect(content?.getAttribute('class')).toContain('px-0');
+    expect(separator?.getAttribute('class')).toContain('mx-2.5');
   });
 });

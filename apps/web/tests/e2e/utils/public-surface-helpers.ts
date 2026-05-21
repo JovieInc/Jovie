@@ -33,6 +33,12 @@ export async function installPublicRouteMocks(page: Page) {
   await page.route('**/api/profile/view', route =>
     route.fulfill({ status: 200, body: '{}' })
   );
+  await page.route('**/api/audience/visit-token*', route =>
+    route.fulfill({
+      status: 200,
+      body: JSON.stringify({ token: null, expiresAt: null }),
+    })
+  );
   await page.route('**/api/audience/visit', route =>
     route.fulfill({ status: 200, body: '{}' })
   );
@@ -197,17 +203,21 @@ export async function assertPublicSurfaceHealthy(
 }
 
 /**
- * JOV-2145: assert that the marketing-glass-header flyouts ("Features",
- * "Resources" megamenus) start fully hidden on any surface that mounts
- * MarketingHeader. The flyout's visibility is CSS-only — without the
- * stylesheet, the DOM renders the menu content fully expanded as
- * unstyled text. Existing health checks (status, text length, overflow,
- * console errors, keyboard reach) all pass against that broken state,
- * which is why CI missed the regression.
+ * JOV-2145 / JOV-2147: assert that the marketing-glass-header flyouts
+ * ("Features", "Resources" megamenus) are not rendered when closed on any
+ * surface that mounts MarketingHeader.
  *
- * No-op on surfaces that don't mount the marketing header. Asserts all
- * three CSS props (visibility, opacity, pointer-events) so the assertion
- * can't false-pass mid-transition (the flyout uses a 130ms ease).
+ * After JOV-2147, flyouts use conditional render — they are only mounted in
+ * the DOM when open (always with the `--open` class). A closed flyout has no
+ * DOM node. This makes it impossible for flyout content to appear as unstyled
+ * text regardless of CSS availability, eliminating the JOV-2145 bug class.
+ *
+ * The assertion: any `.marketing-glass-header__flyout` node in the DOM on
+ * initial page load (before any user interaction) must not exist, because
+ * none should be open at that point. If a node is found without the `--open`
+ * class it means the conditional-render guard was removed, which is a bug.
+ *
+ * No-op on surfaces that don't mount the marketing header.
  */
 export async function assertMarketingHeaderFlyoutsHidden(
   page: Page,
@@ -220,33 +230,11 @@ export async function assertMarketingHeaderFlyoutsHidden(
 
   const flyouts = page.locator('.marketing-glass-header__flyout');
   const flyoutCount = await flyouts.count();
-  if (flyoutCount === 0) {
-    return;
-  }
 
-  for (let i = 0; i < flyoutCount; i += 1) {
-    const computed = await flyouts.nth(i).evaluate(el => {
-      const style = getComputedStyle(el);
-      return {
-        visibility: style.visibility,
-        opacity: style.opacity,
-        pointerEvents: style.pointerEvents,
-      };
-    });
-
-    expect(
-      computed.visibility,
-      `${surface.id} flyout ${i} visibility (CSS missing? see JOV-2145)`
-    ).toBe('hidden');
-    expect(
-      Number.parseFloat(computed.opacity),
-      `${surface.id} flyout ${i} opacity`
-    ).toBe(0);
-    expect(
-      computed.pointerEvents,
-      `${surface.id} flyout ${i} pointer-events`
-    ).toBe('none');
-  }
+  expect(
+    flyoutCount,
+    `${surface.id}: found ${flyoutCount} initial flyout(s) in DOM — marketing flyouts must only mount after user intent (JOV-2147)`
+  ).toBe(0);
 }
 
 async function visibleLocators(page: Page, selectors: readonly string[]) {

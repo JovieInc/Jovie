@@ -26,6 +26,12 @@ apps/web/artifacts/
 /.next/
 /out/
 
+# braintrust local CLI cache
+.bt/
+
+# swc cache
+apps/web/.swc/
+
 # production
 /build
 /.build/

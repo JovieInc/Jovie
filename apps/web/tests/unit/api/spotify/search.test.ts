@@ -309,4 +309,18 @@ describe('GET /api/spotify/search', () => {
       'ip:127.0.0.1'
     );
   });
+
+  it('falls back to IP rate limiting when auth lookup is temporarily unavailable', async () => {
+    mockAuth.mockRejectedValueOnce(new Error('auth middleware initializing'));
+    mockSearchArtists.mockResolvedValue([]);
+
+    const response = await GET(
+      new NextRequest('http://localhost/api/spotify/search?q=artist')
+    );
+
+    expect(response.status).toBe(200);
+    expect(mockSpotifySearchApiLimiterLimit).toHaveBeenCalledWith(
+      'ip:127.0.0.1'
+    );
+  });
 });

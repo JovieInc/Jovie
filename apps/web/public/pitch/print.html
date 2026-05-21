@@ -1,0 +1,885 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Jovie — seed deck</title>
+<script src="deck-stage.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --bg: #000000;
+    --ink: #F5F4F0;        /* cream-white, per Jovie marketing */
+    --ink-2: #A2A7AF;
+    --ink-3: #8A8F98;
+    --ink-4: #4A4E57;
+    --hair: rgba(255,255,255,0.08);
+    --hair-2: rgba(255,255,255,0.14);
+    --blue: #4D7DFF;
+    --red: #FF4D5F;
+    --green: #43B85C;
+    --display: "Manrope", -apple-system, BlinkMacSystemFont, "Helvetica Neue", Arial, sans-serif;
+    --body: "DM Sans", -apple-system, BlinkMacSystemFont, "Helvetica Neue", Arial, sans-serif;
+    --mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
+  }
+  html, body { margin: 0; background: #000; }
+
+  /* All slides — Jovie marketing surface */
+  deck-stage > section {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: var(--body);
+    padding: 120px;
+    display: flex;
+    flex-direction: column;
+    position: relative;
+    overflow: hidden;
+    -webkit-font-smoothing: antialiased;
+  }
+  deck-stage > section.center {
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+  }
+
+  /* Slide chrome — logo top-left, slide number bottom-left */
+  .chrome-logo {
+    position: absolute;
+    top: 56px;
+    left: 56px;
+    height: 28px;
+    width: 28px;
+    opacity: 0.55;
+    z-index: 5;
+  }
+  .num {
+    position: absolute;
+    left: 56px;
+    bottom: 48px;
+    font-family: var(--mono);
+    font-size: 13px;
+    font-weight: 400;
+    color: var(--ink-4);
+    letter-spacing: 0.04em;
+    z-index: 5;
+  }
+
+  /* Eyebrow — small label */
+  .eyebrow {
+    font-family: var(--body);
+    font-size: 22px;
+    font-weight: 500;
+    color: var(--ink-3);
+    letter-spacing: -0.005em;
+    margin: 0 0 40px 0;
+  }
+  .eyebrow.upper {
+    text-transform: uppercase;
+    letter-spacing: 0.16em;
+    font-size: 16px;
+    font-weight: 500;
+  }
+
+  /* Display type — go big. Satoshi/Manrope heavy. */
+  .display-xl {
+    font-family: var(--display);
+    font-size: 168px;
+    font-weight: 700;
+    line-height: 0.92;
+    letter-spacing: -0.045em;
+    margin: 0;
+    color: var(--ink);
+  }
+  .display {
+    font-family: var(--display);
+    font-size: 128px;
+    font-weight: 700;
+    line-height: 0.95;
+    letter-spacing: -0.04em;
+    margin: 0;
+    color: var(--ink);
+  }
+  .title {
+    font-family: var(--display);
+    font-size: 96px;
+    font-weight: 700;
+    line-height: 0.98;
+    letter-spacing: -0.035em;
+    margin: 0;
+    color: var(--ink);
+  }
+  .headline {
+    font-family: var(--display);
+    font-size: 72px;
+    font-weight: 700;
+    line-height: 1.04;
+    letter-spacing: -0.03em;
+    margin: 0;
+    color: var(--ink);
+  }
+  .body-lg {
+    font-family: var(--body);
+    font-size: 40px;
+    font-weight: 400;
+    line-height: 1.35;
+    letter-spacing: -0.015em;
+    color: var(--ink-2);
+    margin: 0;
+    max-width: 1500px;
+  }
+  .body {
+    font-family: var(--body);
+    font-size: 30px;
+    font-weight: 400;
+    line-height: 1.45;
+    letter-spacing: -0.01em;
+    color: var(--ink-2);
+    margin: 0;
+    max-width: 1400px;
+  }
+  .muted { color: var(--ink-3); }
+  .strong { color: var(--ink); }
+
+  /* ─── 01 — HERO ─────────────────────────────────────────────────── */
+  section.hero { padding: 0; }
+  .hero-logo-bg {
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    pointer-events: none;
+    /* fade out at edges, linear */
+    -webkit-mask-image: linear-gradient(180deg, rgba(0,0,0,0) 0%, rgba(0,0,0,0.85) 38%, rgba(0,0,0,1) 50%, rgba(0,0,0,0.85) 62%, rgba(0,0,0,0) 100%);
+            mask-image: linear-gradient(180deg, rgba(0,0,0,0) 0%, rgba(0,0,0,0.85) 38%, rgba(0,0,0,1) 50%, rgba(0,0,0,0.85) 62%, rgba(0,0,0,0) 100%);
+  }
+  .hero-logo-bg .glow {
+    position: absolute;
+    width: 1600px;
+    height: 1600px;
+    border-radius: 50%;
+    background: radial-gradient(circle at center,
+      rgba(120, 120, 200, 0.18) 0%,
+      rgba(60, 60, 120, 0.10) 30%,
+      rgba(0,0,0,0) 60%);
+    filter: blur(40px);
+  }
+  .hero-logo-bg img {
+    position: relative;
+    width: 1480px;
+    height: 1480px;
+    opacity: 0.085;
+  }
+
+  .hero-inner {
+    position: relative;
+    z-index: 2;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+  }
+  .hero-top {
+    padding: 88px 120px 0 120px;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    flex-shrink: 0;
+  }
+  .hero-logo-mark {
+    height: 32px;
+    width: 32px;
+    margin-bottom: 28px;
+    opacity: 0.9;
+  }
+  .hero-eyebrow {
+    font-family: var(--body);
+    font-size: 22px;
+    font-weight: 500;
+    color: var(--ink-3);
+    letter-spacing: 0.02em;
+    margin: 0 0 24px 0;
+  }
+  .hero-title {
+    font-family: var(--display);
+    font-size: 116px;
+    font-weight: 700;
+    line-height: 0.94;
+    letter-spacing: -0.045em;
+    margin: 0;
+    color: var(--ink);
+    max-width: 1640px;
+  }
+  .hero-title .dim { color: var(--ink-3); }
+  .hero-sub {
+    margin-top: 28px;
+    font-family: var(--body);
+    font-size: 26px;
+    line-height: 1.35;
+    letter-spacing: -0.01em;
+    color: var(--ink-2);
+    max-width: 1100px;
+  }
+  .hero-shot-wrap {
+    margin-top: 40px;
+    flex: 1;
+    width: 100%;
+    display: flex;
+    justify-content: center;
+    align-items: flex-end;
+    position: relative;
+    min-height: 0;
+  }
+  .hero-shot-wrap::before {
+    content: "";
+    position: absolute;
+    bottom: 0;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 80%;
+    height: 90%;
+    background: radial-gradient(ellipse at bottom,
+      rgba(77,125,255,0.18) 0%,
+      rgba(120,80,255,0.10) 35%,
+      rgba(0,0,0,0) 75%);
+    filter: blur(20px);
+    pointer-events: none;
+  }
+  .hero-shot {
+    position: relative;
+    width: 82%;
+    max-width: 1560px;
+    height: 100%;
+    max-height: 100%;
+    border-radius: 18px 18px 0 0;
+    overflow: hidden;
+    background: #0a0a0b;
+    border: 1px solid rgba(255,255,255,0.12);
+    border-bottom: none;
+    box-shadow:
+      0 -1px 0 rgba(255,255,255,0.06) inset,
+      0 40px 80px -20px rgba(0,0,0,0.6),
+      0 80px 160px -40px rgba(77,125,255,0.18),
+      0 -2px 80px rgba(94,106,210,0.10);
+  }
+  .hero-shot img {
+    display: block;
+    width: 100%;
+    height: auto;
+  }
+
+  /* ─── 02/03 — Charts ─────────────────────────────────────────────── */
+  .chart-wrap {
+    width: 100%;
+    margin-top: 64px;
+    display: flex;
+    justify-content: center;
+  }
+  .chart { width: 100%; max-width: 1680px; display: block; }
+
+  /* ─── 04 — Product ───────────────────────────────────────────────── */
+  .product-stack {
+    margin-top: 64px;
+    display: flex;
+    flex-direction: column;
+    gap: 28px;
+    max-width: 1620px;
+  }
+  .product-pills {
+    display: flex;
+    gap: 16px;
+    flex-wrap: wrap;
+    margin-top: 56px;
+  }
+  .pill {
+    font-family: var(--body);
+    font-size: 24px;
+    font-weight: 500;
+    padding: 16px 28px;
+    border-radius: 9999px;
+    border: 1px solid var(--hair-2);
+    color: var(--ink);
+    background: rgba(255,255,255,0.025);
+  }
+
+  /* ─── 05 — Traction (placeholders) ───────────────────────────────── */
+  .metrics {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 0;
+    margin-top: 80px;
+    border-top: 1px solid var(--hair);
+  }
+  .metric {
+    padding: 64px 56px 0 0;
+    border-right: 1px solid var(--hair);
+  }
+  .metric:last-child { border-right: none; }
+  .metric .n {
+    font-family: var(--display);
+    font-size: 128px;
+    font-weight: 700;
+    letter-spacing: -0.04em;
+    line-height: 1;
+    color: var(--ink);
+  }
+  .metric .l {
+    margin-top: 28px;
+    font-size: 24px;
+    font-weight: 400;
+    color: var(--ink-2);
+    letter-spacing: -0.005em;
+    line-height: 1.4;
+    max-width: 380px;
+  }
+  .placeholder { color: var(--ink-4); }
+
+  /* ─── 06 — ARR Table ─────────────────────────────────────────────── */
+  .arr-table {
+    width: 100%;
+    margin-top: 72px;
+    border-top: 1px solid var(--hair);
+  }
+  .arr-row {
+    display: grid;
+    grid-template-columns: 1.6fr 1fr 1fr 1fr;
+    align-items: baseline;
+    padding: 44px 0;
+    border-bottom: 1px solid var(--hair);
+    font-variant-numeric: tabular-nums;
+  }
+  .arr-row.total {
+    border-bottom: none;
+    border-top: 1px solid var(--hair-2);
+    margin-top: 8px;
+    padding-top: 56px;
+  }
+  .arr-row .cell {
+    font-family: var(--display);
+    font-size: 44px;
+    font-weight: 600;
+    color: var(--ink);
+    letter-spacing: -0.02em;
+  }
+  .arr-row .cell.dim { color: var(--ink-3); font-weight: 500; }
+  .arr-row .cell.right { text-align: right; }
+  .arr-row.total .cell { font-size: 56px; font-weight: 700; }
+  .arr-row.total .cell.label {
+    color: var(--ink-3); font-weight: 500;
+    font-size: 22px; letter-spacing: 0.12em; text-transform: uppercase;
+    font-family: var(--body);
+  }
+
+  /* ─── 07 — Team ──────────────────────────────────────────────────── */
+  .team-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 96px;
+    margin-top: 64px;
+    align-items: stretch;
+  }
+  .team-copy {
+    display: flex; flex-direction: column; justify-content: center;
+  }
+  .team-name {
+    font-family: var(--display);
+    font-size: 104px;
+    font-weight: 700;
+    letter-spacing: -0.035em;
+    line-height: 0.98;
+    color: var(--ink);
+    margin: 0;
+  }
+  .team-role {
+    margin-top: 20px;
+    font-size: 22px;
+    color: var(--ink-3);
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    font-weight: 500;
+  }
+  .team-bio {
+    margin-top: 48px;
+    font-family: var(--body);
+    font-size: 30px;
+    line-height: 1.42;
+    color: var(--ink-2);
+    letter-spacing: -0.01em;
+    max-width: 620px;
+  }
+  .team-photo {
+    width: 100%;
+    aspect-ratio: 4/5;
+    background: #0a0a0b;
+    border: 1px solid var(--hair);
+    border-radius: 16px;
+    overflow: hidden;
+    position: relative;
+  }
+  .team-photo img {
+    width: 100%; height: 100%;
+    object-fit: cover;
+    display: block;
+  }
+
+  /* ─── 08 — Ask ───────────────────────────────────────────────────── */
+  .ask-wrap {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+  }
+  .ask-amount {
+    font-family: var(--display);
+    font-size: 320px;
+    font-weight: 700;
+    line-height: 0.9;
+    letter-spacing: -0.05em;
+    color: var(--ink);
+    margin: 0;
+  }
+  .ask-vehicle {
+    font-family: var(--display);
+    font-size: 56px;
+    font-weight: 600;
+    letter-spacing: -0.025em;
+    color: var(--ink);
+    margin: 48px 0 0 0;
+  }
+  .ask-sub {
+    margin-top: 56px;
+    font-size: 26px;
+    color: var(--ink-3);
+    max-width: 800px;
+    line-height: 1.45;
+  }
+
+  /* ─── Appendix ───────────────────────────────────────────────────── */
+  .compare {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 120px;
+    margin-top: 80px;
+    border-top: 1px solid var(--hair);
+    padding-top: 64px;
+  }
+  .compare h3 {
+    font-family: var(--body);
+    font-size: 16px;
+    font-weight: 500;
+    color: var(--ink-3);
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    margin: 0 0 32px 0;
+  }
+  .compare .what {
+    font-family: var(--display);
+    font-size: 52px;
+    font-weight: 700;
+    line-height: 1.05;
+    letter-spacing: -0.025em;
+    color: var(--ink);
+    margin: 0 0 32px 0;
+  }
+  .compare .examples {
+    font-size: 24px;
+    color: var(--ink-2);
+    line-height: 1.5;
+    letter-spacing: -0.005em;
+  }
+  .compare .examples .lbl {
+    font-family: var(--body);
+    font-size: 14px;
+    color: var(--ink-3);
+    display: block;
+    margin-bottom: 12px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    font-weight: 500;
+  }
+
+  .gtm {
+    margin-top: 64px;
+    max-width: 1600px;
+  }
+  .gtm .line {
+    display: grid;
+    grid-template-columns: 80px 1fr;
+    gap: 32px;
+    padding: 40px 0;
+    border-top: 1px solid var(--hair);
+    align-items: baseline;
+  }
+  .gtm .line:last-child { border-bottom: 1px solid var(--hair); }
+  .gtm .line .k {
+    font-family: var(--mono);
+    font-size: 18px;
+    color: var(--ink-3);
+    letter-spacing: 0.04em;
+  }
+  .gtm .line .v {
+    font-family: var(--display);
+    font-size: 40px;
+    font-weight: 600;
+    color: var(--ink);
+    letter-spacing: -0.02em;
+    line-height: 1.2;
+  }
+
+  .advisor-card {
+    margin-top: 72px;
+    max-width: 1000px;
+    border-top: 1px solid var(--hair);
+    padding-top: 56px;
+  }
+  .advisor-name {
+    font-family: var(--display);
+    font-size: 72px;
+    font-weight: 700;
+    letter-spacing: -0.03em;
+    line-height: 1;
+    margin: 0;
+    color: var(--ink);
+  }
+  .advisor-role {
+    margin-top: 20px;
+    font-size: 16px;
+    color: var(--ink-3);
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    font-weight: 500;
+  }
+  .advisor-bio {
+    margin-top: 36px;
+    font-size: 30px;
+    color: var(--ink-2);
+    line-height: 1.4;
+    letter-spacing: -0.01em;
+  }
+
+  .sub-label {
+    font-size: 20px;
+    color: var(--ink-3);
+    margin-top: 24px;
+    letter-spacing: -0.005em;
+    font-weight: 500;
+  }
+
+  section.divider .display { color: var(--ink-3); font-weight: 500; }
+</style>
+</head>
+<body>
+
+<deck-stage width="1920" height="1080">
+
+  <!-- ═══════ 01 — HERO ═══════ -->
+  <section class="hero" data-label="Meet Jovie">
+    <!-- Oversized logo background -->
+    <div class="hero-logo-bg" aria-hidden="true">
+      <div class="glow"></div>
+      <img src="assets/logo-icon-white.svg" alt="" />
+    </div>
+
+    <div class="hero-inner">
+      <div class="hero-top">
+        <img class="hero-logo-mark" src="assets/logo-icon-white.svg" alt="Jovie" />
+        <p class="hero-eyebrow">Meet Jovie.</p>
+        <h1 class="hero-title">
+          Vertical AI to<br/>monetize your<br/>music catalog.
+        </h1>
+        <p class="hero-sub">A beautiful agent that finds the revenue hiding in your existing songs — and ships the work to capture it.</p>
+      </div>
+      <div class="hero-shot-wrap">
+        <div class="hero-shot">
+          <img src="assets/product-releases.png" alt="Jovie app — Releases view" />
+        </div>
+      </div>
+    </div>
+
+    <div class="num">01 / 08</div>
+  </section>
+
+  <!-- ═══════ 02 — PROBLEM ═══════ -->
+  <section data-label="Problem">
+    <img class="chrome-logo" src="assets/logo-icon-white.svg" alt="Jovie" />
+    <p class="eyebrow upper">Problem</p>
+    <h2 class="title">Most catalogs look like this.</h2>
+    <p class="sub-label muted">Three releases. Three spikes. Then silence.</p>
+    <div class="chart-wrap">
+      <svg class="chart" viewBox="0 0 1680 460" preserveAspectRatio="none" aria-hidden="true">
+        <defs>
+          <filter id="glowR" x="-20%" y="-50%" width="140%" height="200%">
+            <feGaussianBlur stdDeviation="4" result="b"/>
+            <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+          </filter>
+        </defs>
+        <line x1="0" y1="360" x2="1680" y2="360" stroke="rgba(255,255,255,0.08)" stroke-width="1" stroke-dasharray="2 6"/>
+        <path d="
+          M 0 360
+          L 240 360
+          L 270 350 L 290 380 L 310 130 L 330 410 L 350 350
+          L 380 360
+          L 760 360
+          L 790 350 L 810 380 L 830 150 L 850 405 L 870 350
+          L 900 360
+          L 1280 360
+          L 1310 350 L 1330 380 L 1350 145 L 1370 410 L 1390 350
+          L 1420 360
+          L 1680 360
+        " fill="none" stroke="#FF4D5F" stroke-width="3" stroke-linejoin="round" stroke-linecap="round" filter="url(#glowR)"/>
+      </svg>
+    </div>
+    <div class="num">02 / 08</div>
+  </section>
+
+  <!-- ═══════ 03 — SOLUTION ═══════ -->
+  <section data-label="Solution">
+    <img class="chrome-logo" src="assets/logo-icon-white.svg" alt="Jovie" />
+    <p class="eyebrow upper">Solution</p>
+    <h2 class="title">With Jovie, they look like this.</h2>
+    <p class="sub-label muted">Every release compounds the last one.</p>
+    <div class="chart-wrap">
+      <svg class="chart" viewBox="0 0 1680 460" preserveAspectRatio="none" aria-hidden="true">
+        <defs>
+          <filter id="glowB" x="-20%" y="-50%" width="140%" height="200%">
+            <feGaussianBlur stdDeviation="4" result="b"/>
+            <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+          </filter>
+          <linearGradient id="blueFill" x1="0" x2="0" y1="0" y2="1">
+            <stop offset="0%" stop-color="#4D7DFF" stop-opacity="0.22"/>
+            <stop offset="100%" stop-color="#4D7DFF" stop-opacity="0"/>
+          </linearGradient>
+        </defs>
+        <line x1="0" y1="420" x2="1680" y2="420" stroke="rgba(255,255,255,0.08)" stroke-width="1" stroke-dasharray="2 6"/>
+        <path d="
+          M 60 420
+          L 180 420 L 200 410 L 215 435 L 230 360 L 245 430 L 260 390
+          L 380 390 L 400 380 L 415 405 L 430 320 L 445 400 L 460 355
+          L 580 355 L 600 345 L 615 370 L 630 280 L 645 365 L 660 315
+          L 780 315 L 800 305 L 815 330 L 830 230 L 845 320 L 860 270
+          L 980 270 L 1000 260 L 1015 285 L 1030 180 L 1045 275 L 1060 220
+          L 1180 220 L 1200 210 L 1215 235 L 1230 130 L 1245 220 L 1260 170
+          L 1380 170 L 1400 160 L 1415 185 L 1430 80 L 1445 170 L 1460 120
+          L 1580 120 L 1600 110 L 1615 135 L 1630 35 L 1645 120 L 1660 75
+          L 1660 440 L 60 440 Z
+        " fill="url(#blueFill)"/>
+        <path d="
+          M 60 420
+          L 180 420 L 200 410 L 215 435 L 230 360 L 245 430 L 260 390
+          L 380 390 L 400 380 L 415 405 L 430 320 L 445 400 L 460 355
+          L 580 355 L 600 345 L 615 370 L 630 280 L 645 365 L 660 315
+          L 780 315 L 800 305 L 815 330 L 830 230 L 845 320 L 860 270
+          L 980 270 L 1000 260 L 1015 285 L 1030 180 L 1045 275 L 1060 220
+          L 1180 220 L 1200 210 L 1215 235 L 1230 130 L 1245 220 L 1260 170
+          L 1380 170 L 1400 160 L 1415 185 L 1430 80 L 1445 170 L 1460 120
+          L 1580 120 L 1600 110 L 1615 135 L 1630 35 L 1645 120 L 1660 75
+        " fill="none" stroke="#4D7DFF" stroke-width="3.2" stroke-linejoin="round" stroke-linecap="round" filter="url(#glowB)"/>
+      </svg>
+    </div>
+    <div class="num">03 / 08</div>
+  </section>
+
+  <!-- ═══════ 04 — PRODUCT ═══════ -->
+  <section data-label="Product">
+    <img class="chrome-logo" src="assets/logo-icon-white.svg" alt="Jovie" />
+    <p class="eyebrow upper">Product</p>
+    <h2 class="title">Jovie finds the revenue hiding<br/>in your catalog —</h2>
+    <h2 class="title" style="color:var(--ink-3);margin-top:8px;">then ships the work to capture it.</h2>
+    <div class="product-stack">
+      <div class="product-pills">
+        <span class="pill">Scans the catalog</span>
+        <span class="pill">Surfaces opportunities</span>
+        <span class="pill">Generates workflows</span>
+        <span class="pill">Completes them end-to-end</span>
+      </div>
+    </div>
+    <div class="num">04 / 08</div>
+  </section>
+
+  <!-- ═══════ 05 — TRACTION ═══════ -->
+  <section data-label="Traction">
+    <img class="chrome-logo" src="assets/logo-icon-white.svg" alt="Jovie" />
+    <p class="eyebrow upper">Traction</p>
+    <h2 class="title">Live product. Real songs.</h2>
+    <p class="sub-label muted">Numbers below are placeholders — drop in real ones before sending.</p>
+    <div class="metrics">
+      <div class="metric">
+        <div class="n placeholder">X</div>
+        <div class="l">artists on the platform</div>
+      </div>
+      <div class="metric">
+        <div class="n placeholder">Y</div>
+        <div class="l">songs under management</div>
+      </div>
+      <div class="metric">
+        <div class="n placeholder">Z</div>
+        <div class="l">workflows shipped by Jovie</div>
+      </div>
+    </div>
+    <div class="num">05 / 08</div>
+  </section>
+
+  <!-- ═══════ 06 — PATH TO $100M ═══════ -->
+  <section data-label="Path to $100M ARR">
+    <img class="chrome-logo" src="assets/logo-icon-white.svg" alt="Jovie" />
+    <p class="eyebrow upper">Path to $100M ARR</p>
+    <h2 class="title">Three tiers. One catalog system.</h2>
+    <div class="arr-table">
+      <div class="arr-row">
+        <div class="cell">Artists</div>
+        <div class="cell dim">75,000</div>
+        <div class="cell dim">× $49 / mo</div>
+        <div class="cell right">$44M</div>
+      </div>
+      <div class="arr-row">
+        <div class="cell">Labels</div>
+        <div class="cell dim">10,000</div>
+        <div class="cell dim">× $299 / mo</div>
+        <div class="cell right">$36M</div>
+      </div>
+      <div class="arr-row">
+        <div class="cell">Pro label teams</div>
+        <div class="cell dim">2,000</div>
+        <div class="cell dim">× $999 / mo</div>
+        <div class="cell right">$24M</div>
+      </div>
+      <div class="arr-row total">
+        <div class="cell label">Total</div>
+        <div class="cell"></div>
+        <div class="cell"></div>
+        <div class="cell right">$104M ARR</div>
+      </div>
+    </div>
+    <div class="num">06 / 08</div>
+  </section>
+
+  <!-- ═══════ 07 — TEAM ═══════ -->
+  <section data-label="Team">
+    <img class="chrome-logo" src="assets/logo-icon-white.svg" alt="Jovie" />
+    <p class="eyebrow upper">Team</p>
+    <div class="team-grid">
+      <div class="team-copy">
+        <p class="team-name">Tim White</p>
+        <p class="team-role">Founder</p>
+        <p class="team-bio">15 years in music.<br/>Built the manual release workflows Jovie automates — drove 90M streams doing it by hand.</p>
+      </div>
+      <div class="team-photo">
+        <img src="assets/tim-universal.png" alt="Tim White at Universal Music" />
+      </div>
+    </div>
+    <div class="num">07 / 08</div>
+  </section>
+
+  <!-- ═══════ 08 — ASK ═══════ -->
+  <section class="center" data-label="Ask">
+    <img class="chrome-logo" src="assets/logo-icon-white.svg" alt="Jovie" />
+    <div class="ask-wrap">
+      <p class="eyebrow upper" style="margin-bottom:32px;">Raising</p>
+      <p class="ask-amount">$2M</p>
+      <p class="ask-vehicle">on a post-money SAFE.</p>
+      <p class="ask-sub">To build the vertical AI that monetizes the world's music catalogs.</p>
+    </div>
+    <div class="num">08 / 08</div>
+  </section>
+
+  <!-- ═══════ Appendix ═══════ -->
+  <section class="center divider" data-label="Appendix">
+    <img class="chrome-logo" src="assets/logo-icon-white.svg" alt="Jovie" />
+    <p class="display" style="font-size:200px;">Appendix</p>
+    <div class="num">—</div>
+  </section>
+
+  <section data-label="Not distribution">
+    <img class="chrome-logo" src="assets/logo-icon-white.svg" alt="Jovie" />
+    <p class="eyebrow upper">Appendix A</p>
+    <h2 class="title">Jovie is not distribution.</h2>
+    <div class="compare">
+      <div>
+        <h3>Distribution</h3>
+        <p class="what">Gets music onto platforms.</p>
+        <div class="examples">
+          <span class="lbl">Examples</span>
+          DistroKid, TuneCore, CD Baby.
+        </div>
+      </div>
+      <div>
+        <h3>Jovie</h3>
+        <p class="what">Monetizes the catalog already there.</p>
+        <div class="examples">
+          <span class="lbl">Examples</span>
+          Profile matching, ISRC detection, release pages, smart links, fan notifications, launch workflows, opportunity surfacing.
+        </div>
+      </div>
+    </div>
+    <div class="num">A</div>
+  </section>
+
+  <section data-label="Go-to-market">
+    <img class="chrome-logo" src="assets/logo-icon-white.svg" alt="Jovie" />
+    <p class="eyebrow upper">Appendix B · Go-to-market</p>
+    <h2 class="title">We send artists a pre-built profile.</h2>
+    <div class="gtm">
+      <div class="line">
+        <div class="k">01</div>
+        <div class="v">They're already paying for 2+ tools Jovie replaces.</div>
+      </div>
+      <div class="line">
+        <div class="k">02</div>
+        <div class="v"><span class="placeholder">X%</span> of cold outreach claim their profile.</div>
+      </div>
+      <div class="line">
+        <div class="k">03</div>
+        <div class="v">We've identified <span class="placeholder">Z</span> qualified leads.</div>
+      </div>
+    </div>
+    <div class="num">B</div>
+  </section>
+
+  <section data-label="Advisors">
+    <img class="chrome-logo" src="assets/logo-icon-white.svg" alt="Jovie" />
+    <p class="eyebrow upper">Appendix C · Advisors</p>
+    <div class="advisor-card">
+      <p class="advisor-name">Daniel Kang</p>
+      <p class="advisor-role">Advisor</p>
+      <p class="advisor-bio">YC founder. Ex-SoftBank. Ex-Expedia.</p>
+    </div>
+    <div class="num">C</div>
+  </section>
+
+</deck-stage>
+
+<script>
+(async () => {
+  try { await customElements.whenDefined('deck-stage'); } catch (e) {}
+  const ds = document.querySelector('deck-stage');
+  if (ds) {
+    // Weigh only slide children — same filter as deck-stage.length. Skipping
+    // slotted script/style/template keeps inline Babel/CSS from registering
+    // as stable "content" before the framework has mounted anything.
+    const weigh = () => {
+      let text = 0, media = 0;
+      for (const c of ds.children) {
+        const t = c.tagName;
+        if (t === 'SCRIPT' || t === 'STYLE' || t === 'TEMPLATE') continue;
+        text += (c.textContent || '').trim().length;
+        media += c.querySelectorAll('img,svg,canvas,video').length;
+      }
+      return text + media * 100;
+    };
+    const deadline = Date.now() + 15000;
+    let last = -1, stable = 0;
+    while (Date.now() < deadline) {
+      const n = weigh();
+      if (n > 0 && n === last) { if (++stable >= 2) break; } else { stable = 0; }
+      last = n;
+      await new Promise((r) => setTimeout(r, 250));
+    }
+  }
+  try { await document.fonts.ready; } catch (e) {}
+  setTimeout(() => { try { window.print(); } catch (e) {} }, 200);
+})();
+</script>
+</body>
+</html>

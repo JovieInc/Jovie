@@ -56,7 +56,10 @@ test.describe('Profile Notifications Hosts', () => {
         return;
       }
 
-      const trigger = page.getByTestId('profile-hero-alerts-row');
+      const trigger = page
+        .getByTestId('profile-home-alerts-row')
+        .or(page.getByTestId('profile-home-alerts-fallback-card'))
+        .first();
       await expect(trigger).toBeVisible();
 
       if (breakpoint.name === 'tablet') {
@@ -89,10 +92,10 @@ test.describe('Profile Notifications Hosts', () => {
       await waitForHydration(page);
 
       await expect(
-        page.getByTestId('profile-mobile-notifications-flow')
+        page.getByTestId('profile-mobile-notifications-flow').first()
       ).toBeVisible();
       await expect(
-        page.getByTestId('profile-mobile-notifications-step-email')
+        page.getByTestId('profile-mobile-notifications-step-email').first()
       ).toBeVisible();
     });
 
@@ -164,13 +167,15 @@ test.describe('Profile Notifications Hosts', () => {
       await waitForHydration(page);
 
       await expect(
-        page.getByTestId('profile-mobile-notifications-flow')
+        page.getByTestId('profile-mobile-notifications-flow').first()
       ).toBeVisible();
       await expect(
-        page.getByTestId('profile-mobile-notifications-step-preferences')
+        page
+          .getByTestId('profile-mobile-notifications-step-preferences')
+          .first()
       ).toBeVisible();
       await expect(
-        page.getByTestId('profile-mobile-notifications-sent-from')
+        page.getByTestId('profile-mobile-notifications-sent-from').first()
       ).toBeVisible();
     });
   }

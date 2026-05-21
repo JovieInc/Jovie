@@ -13,8 +13,10 @@
 // Touch / coarse pointer is suppressed at the ShellDropdown level — this
 // component just renders what it's given.
 
+import { Gauge, Music, Users } from 'lucide-react';
 import Image from 'next/image';
 import {
+  type KeyboardEvent,
   type ReactNode,
   useCallback,
   useEffect,
@@ -23,7 +25,9 @@ import {
   useState,
 } from 'react';
 import { createPortal } from 'react-dom';
+import { LINEAR_SURFACE } from '@/components/tokens/linear-surface';
 import { cn } from '@/lib/utils';
+import { getInitials } from '@/lib/utils/initials';
 
 // ---------------------------------------------------------------------------
 // Data shapes
@@ -101,6 +105,7 @@ export type EntityPopoverData =
 // ---------------------------------------------------------------------------
 
 export function formatEntitySubtitle(entity: EntityPopoverData): string | null {
+  if (!entity || typeof entity.label !== 'string') return null;
   switch (entity.kind) {
     case 'release': {
       const parts: string[] = [];
@@ -109,7 +114,12 @@ export function formatEntitySubtitle(entity: EntityPopoverData): string | null {
       return parts.join(' · ') || null;
     }
     case 'artist': {
-      if (entity.handle)
+      // Token cleanup + no raw Spotify URLs (entity matching in chat/onboarding)
+      // Never surface open.spotify.com in UI; use icon + clean label instead.
+      if (
+        entity.handle &&
+        !/open\.spotify\.com|spotify\.com\/artist/i.test(entity.handle)
+      )
         return `@${entity.handle}${entity.isYou ? ' · You' : ''}`;
       if (entity.followers)
         return `${compactNumber(entity.followers)} followers`;
@@ -151,6 +161,25 @@ function compactNumber(value: number): string {
   return value.toString();
 }
 
+/** Sanitize artist label/handle for display: never render raw Spotify URLs; prefer premium icon label. (Per Wave 5: Spotify logo/icon instead of open.spotify.com) */
+function getSpotifyArtistDisplay(entity: EntityPopoverData): {
+  displayLabel: string;
+  useSpotifyIcon: boolean;
+} {
+  if (entity.kind !== 'artist') {
+    return { displayLabel: entity.label || '', useSpotifyIcon: false };
+  }
+  const label = entity.label || '';
+  const handle = entity.handle || '';
+  const isSpotifyUrl =
+    /open\.spotify\.com|spotify\.com\/artist/i.test(label) ||
+    /open\.spotify\.com|spotify\.com\/artist/i.test(handle);
+  if (isSpotifyUrl) {
+    return { displayLabel: 'Spotify artist', useSpotifyIcon: true };
+  }
+  return { displayLabel: label, useSpotifyIcon: false };
+}
+
 function formatLongDate(iso: string | undefined): string | null {
   if (!iso) return null;
   const d = new Date(iso);
@@ -169,15 +198,6 @@ function formatClock(durationSec: number | undefined): string | null {
   return `${m}:${s.toString().padStart(2, '0')}`;
 }
 
-function initialsOf(label: string): string {
-  return label
-    .split(/\s+/)
-    .slice(0, 2)
-    .map(p => p.charAt(0))
-    .join('')
-    .toUpperCase();
-}
-
 // ---------------------------------------------------------------------------
 // Row art — small 28×28 leading element rendered inside ShellDropdown.EntityItem.
 // ---------------------------------------------------------------------------
@@ -187,15 +207,16 @@ export function EntityRowArt({
 }: {
   readonly entity: EntityPopoverData;
 }) {
+  if (!entity || typeof entity.label !== 'string') return null;
   if (entity.kind === 'event' && !entity.thumbnail) {
     const stamp = stampParts(entity.eventDate);
     if (stamp) {
       return (
-        <span className='flex h-7 w-7 shrink-0 flex-col items-center justify-center rounded-md bg-gradient-to-b from-[#1a1a1f] to-[#0a0a0c] shadow-[inset_0_0.5px_0_rgba(255,255,255,0.08),inset_0_0_0_0.5px_rgba(255,255,255,0.04)]'>
-          <span className='text-[7px] font-semibold uppercase tracking-[0.1em] text-tertiary-token leading-none'>
+        <span className='flex h-7 w-7 shrink-0 flex-col items-center justify-center rounded-md border border-subtle bg-surface-1 shadow-app-control'>
+          <span className='text-3xs font-caption leading-none text-tertiary-token'>
             {stamp.month}
           </span>
-          <span className='text-[12px] font-bold leading-none tracking-[-0.02em] text-primary-token mt-0.5'>
+          <span className='mt-0.5 text-2xs font-bold leading-none text-primary-token'>
             {stamp.day}
           </span>
         </span>
@@ -212,7 +233,7 @@ export function EntityRowArt({
     return (
       <span
         className={cn(
-          'relative h-7 w-7 shrink-0 overflow-hidden shadow-[inset_0_0_0_0.5px_rgba(255,255,255,0.06)]',
+          'relative h-7 w-7 shrink-0 overflow-hidden shadow-app-control',
           rounded
         )}
       >
@@ -234,13 +255,11 @@ export function EntityRowArt({
   return (
     <span
       className={cn(
-        'flex h-7 w-7 shrink-0 items-center justify-center text-[10px] font-semibold tracking-[-0.01em] text-primary-token',
-        'bg-gradient-to-br from-[#2a2a2f] to-[#16161a]',
-        'shadow-[inset_0_0_0_0.5px_rgba(255,255,255,0.06)]',
+        'flex h-7 w-7 shrink-0 items-center justify-center border border-subtle bg-surface-1 text-3xs font-caption text-primary-token shadow-app-control',
         isCircular ? 'rounded-full' : 'rounded-md'
       )}
     >
-      {initialsOf(entity.label) || '·'}
+      {getInitials(entity.label) || '·'}
     </span>
   );
 }
@@ -256,6 +275,7 @@ interface StatChip {
 }
 
 function buildStats(entity: EntityPopoverData): StatChip[] {
+  if (!entity) return [];
   const out: StatChip[] = [];
   switch (entity.kind) {
     case 'release': {
@@ -281,17 +301,25 @@ function buildStats(entity: EntityPopoverData): StatChip[] {
       break;
     }
     case 'artist': {
-      if (entity.handle) out.push({ key: 'handle', node: `@${entity.handle}` });
+      if (
+        entity.handle &&
+        !/open\.spotify\.com|spotify\.com\/artist/i.test(entity.handle)
+      )
+        out.push({ key: 'handle', node: `@${entity.handle}` });
       if (entity.followers) {
         out.push({
           key: 'followers',
           node: (
-            <>
+            <span
+              title={`${entity.followers.toLocaleString()} Spotify followers`}
+              className='inline-flex items-center gap-1'
+            >
+              <Users className='h-3 w-3 text-tertiary-token' aria-hidden />
               <strong className='font-semibold tabular-nums text-primary-token'>
                 {compactNumber(entity.followers)}
-              </strong>{' '}
-              followers
-            </>
+              </strong>
+              <span className='sr-only'>followers</span>
+            </span>
           ),
         });
       }
@@ -299,12 +327,15 @@ function buildStats(entity: EntityPopoverData): StatChip[] {
         out.push({
           key: 'pop',
           node: (
-            <>
-              Spotify{' '}
+            <span
+              title={`Spotify popularity: ${entity.popularity} / 100`}
+              className='inline-flex items-center gap-1'
+            >
+              <Gauge className='h-3 w-3 text-tertiary-token' aria-hidden />
               <strong className='font-semibold tabular-nums text-primary-token'>
                 {entity.popularity}
               </strong>
-            </>
+            </span>
           ),
         });
       }
@@ -378,6 +409,7 @@ function buildStats(entity: EntityPopoverData): StatChip[] {
 }
 
 function eyebrowOf(entity: EntityPopoverData): string {
+  if (!entity) return '';
   switch (entity.kind) {
     case 'release':
       return entity.releaseType ? `Release · ${entity.releaseType}` : 'Release';
@@ -418,20 +450,18 @@ function stampParts(iso: string | undefined): DateStampParts | null {
   };
 }
 
-// 56×56 hero artwork inside the card.
+// 48px hero artwork inside the card.
 function CardArtwork({ entity }: { readonly entity: EntityPopoverData }) {
+  if (!entity) return null;
   if (entity.kind === 'event' && !entity.thumbnail) {
     const stamp = stampParts(entity.eventDate);
     if (stamp) {
       return (
-        <div
-          className='flex h-14 w-14 shrink-0 flex-col items-center justify-center rounded-[8px] shadow-[0_0_0_0.5px_rgba(255,255,255,0.06),inset_0_0.5px_0_rgba(255,255,255,0.08),0_8px_18px_-8px_rgba(0,0,0,0.55)]'
-          style={{ background: 'linear-gradient(180deg,#1a1a1f,#0a0a0c)' }}
-        >
-          <span className='text-[8px] font-semibold uppercase tracking-[0.12em] text-tertiary-token'>
+        <div className='flex h-12 w-12 shrink-0 flex-col items-center justify-center rounded-md bg-surface-1'>
+          <span className='text-3xs font-caption text-tertiary-token'>
             {stamp.month}
           </span>
-          <span className='text-[20px] font-bold leading-none tracking-[-0.02em] text-primary-token'>
+          <span className='text-mid font-bold leading-none text-primary-token'>
             {stamp.day}
           </span>
         </div>
@@ -446,15 +476,15 @@ function CardArtwork({ entity }: { readonly entity: EntityPopoverData }) {
     return (
       <div
         className={cn(
-          'relative h-14 w-14 shrink-0 overflow-hidden shadow-[0_0_0_0.5px_rgba(255,255,255,0.06),inset_0_0.5px_0_rgba(255,255,255,0.08),0_8px_18px_-8px_rgba(0,0,0,0.55)]',
-          isCircular ? 'rounded-full' : 'rounded-[8px]'
+          'relative h-12 w-12 shrink-0 overflow-hidden',
+          isCircular ? 'rounded-full' : 'rounded-md'
         )}
       >
         <Image
           src={entity.thumbnail}
           alt=''
           fill
-          sizes='56px'
+          sizes='48px'
           className='object-cover'
           unoptimized
         />
@@ -464,13 +494,11 @@ function CardArtwork({ entity }: { readonly entity: EntityPopoverData }) {
   return (
     <div
       className={cn(
-        'flex h-14 w-14 shrink-0 items-center justify-center text-[16px] font-semibold tracking-[-0.02em] text-primary-token',
-        'bg-gradient-to-br from-[#2a2a2f] to-[#16161a]',
-        'shadow-[0_0_0_0.5px_rgba(255,255,255,0.06),inset_0_0.5px_0_rgba(255,255,255,0.08),0_8px_18px_-8px_rgba(0,0,0,0.55)]',
-        isCircular ? 'rounded-full' : 'rounded-[8px]'
+        'flex h-12 w-12 shrink-0 items-center justify-center bg-surface-1 text-app font-caption text-primary-token',
+        isCircular ? 'rounded-full' : 'rounded-md'
       )}
     >
-      {initialsOf(entity.label) || '·'}
+      {getInitials(entity.label) || '·'}
     </div>
   );
 }
@@ -481,6 +509,7 @@ interface EntityCardProps {
 }
 
 function EntityCard({ entity, onActivate }: EntityCardProps) {
+  if (!entity || typeof entity.label !== 'string') return null;
   const stats = buildStats(entity);
   const eyebrow = eyebrowOf(entity);
 
@@ -490,15 +519,28 @@ function EntityCard({ entity, onActivate }: EntityCardProps) {
       ? entity.artist
       : null;
 
+  const artistDisp = getSpotifyArtistDisplay(entity);
+
   return (
-    <div className='flex items-start gap-3'>
+    <div className='flex items-start gap-2.5'>
       <CardArtwork entity={entity} />
-      <div className='min-w-0 flex-1 pt-0.5'>
-        <div className='mb-1 text-[9.5px] font-semibold uppercase tracking-[0.12em] text-quaternary-token'>
+      <div className='min-w-0 flex-1'>
+        <div className='mb-0.5 text-2xs font-caption text-tertiary-token'>
           {eyebrow}
         </div>
-        <h3 className='m-0 mb-2 text-[15px] font-semibold leading-[1.2] tracking-[-0.02em] text-primary-token truncate'>
-          {entity.label}
+        <h3 className='m-0 mb-1 truncate text-app font-caption leading-tight text-primary-token'>
+          {artistDisp.useSpotifyIcon ? (
+            <span className='inline-flex items-center gap-1.5'>
+              <Music
+                className='h-3.5 w-3.5 shrink-0'
+                style={{ color: '#1DB954' }}
+                aria-hidden='true'
+              />
+              {artistDisp.displayLabel}
+            </span>
+          ) : (
+            entity.label
+          )}
         </h3>
         {artistLink ? (
           <button
@@ -511,25 +553,24 @@ function EntityCard({ entity, onActivate }: EntityCardProps) {
                 label: artistLink,
               });
             }}
-            className='mb-2 inline-flex items-center text-[11.5px] text-tertiary-token hover:text-primary-token underline underline-offset-2 decoration-(--linear-app-shell-border) hover:decoration-current transition-colors duration-150 ease-out'
+            className='mb-2 inline-flex items-center text-2xs font-caption text-secondary-token underline decoration-subtle underline-offset-2 transition-colors duration-subtle ease-subtle hover:text-primary-token hover:decoration-default'
           >
             {artistLink}
           </button>
         ) : null}
         {stats.length > 0 ? (
-          <div className='flex flex-wrap items-center text-[11.5px] leading-[1.5] tracking-[-0.002em] text-tertiary-token'>
+          <div className='flex flex-wrap items-center gap-x-1 gap-y-0.5 text-2xs leading-normal text-tertiary-token'>
             {stats.map((stat, i) => (
               <span
                 key={stat.key}
                 className={cn(
-                  'relative inline-flex items-center whitespace-nowrap',
+                  'relative inline-flex h-5 items-center whitespace-nowrap rounded-full',
                   stat.emphasis === 'solid'
-                    ? 'ml-2 rounded-[3px] bg-white/10 px-[6px] py-px text-[9.5px] font-semibold uppercase tracking-[0.1em] text-primary-token'
-                    : 'px-[8px]',
-                  i === 0 && stat.emphasis !== 'solid' && 'pl-0',
+                    ? 'border border-subtle bg-surface-1 px-1 text-3xs font-caption text-primary-token'
+                    : 'px-0',
                   i > 0 &&
                     stat.emphasis !== 'solid' &&
-                    "before:absolute before:left-0 before:top-1/2 before:h-[2px] before:w-[2px] before:-translate-y-1/2 before:rounded-full before:bg-quaternary-token before:content-['']"
+                    'before:mr-1.5 before:h-0.5 before:w-0.5 before:rounded-full before:bg-quaternary-token before:content-[""]'
                 )}
               >
                 {stat.node}
@@ -544,6 +585,8 @@ function EntityCard({ entity, onActivate }: EntityCardProps) {
 
 // ---------------------------------------------------------------------------
 // Popover surface — fixed-positioned, anchored to a row, collision-flips.
+// Token/padding cleanup: inner content uses rail-aligned px-3 py-2.5 for premium compact feel (matches ReleaseSidebar / table rows).
+// Failure handling guards placed AFTER all hooks to satisfy react-hooks/rules-of-hooks.
 // ---------------------------------------------------------------------------
 
 interface EntityPopoverProps {
@@ -554,7 +597,7 @@ interface EntityPopoverProps {
   readonly onActivate?: (entity: EntityPopoverData) => void;
 }
 
-const POPOVER_WIDTH = 288;
+const POPOVER_WIDTH = 272;
 const POPOVER_MARGIN = 8;
 const SIDE_OFFSET = 6;
 
@@ -591,11 +634,15 @@ export function EntityPopover({
       const left = wantsRight
         ? a.right + SIDE_OFFSET
         : Math.max(POPOVER_MARGIN, a.left - SIDE_OFFSET - POPOVER_WIDTH);
-      let top = a.top;
-      if (top + contentHeight > window.innerHeight - POPOVER_MARGIN) {
-        top = window.innerHeight - POPOVER_MARGIN - contentHeight;
+      // Smart vertical positioning: center on anchor (near trigger/cursor) for
+      // tight coupling instead of always pinning to a.top. Minimal clamp keeps
+      // it near the row even near viewport edges (prevents "far jump" bug).
+      let top = a.top + a.height / 2 - contentHeight / 2;
+      const margin = POPOVER_MARGIN;
+      if (top < margin) top = margin;
+      if (top + contentHeight > window.innerHeight - margin) {
+        top = window.innerHeight - margin - contentHeight;
       }
-      if (top < POPOVER_MARGIN) top = POPOVER_MARGIN;
       setPos({ left, top, side: wantsRight ? 'right' : 'left' });
     };
     update();
@@ -610,6 +657,9 @@ export function EntityPopover({
     };
   }, [anchor]);
 
+  if (!entity || !entity.kind || typeof entity.label !== 'string') {
+    return null;
+  }
   if (!mounted) return null;
 
   return createPortal(
@@ -627,15 +677,17 @@ export function EntityPopover({
         visibility: pos ? 'visible' : 'hidden',
       }}
       className={cn(
-        'z-[80]',
-        'rounded-xl border border-(--linear-app-shell-border)',
-        'bg-(--linear-app-content-surface)/95 backdrop-blur-xl',
-        'shadow-[0_12px_40px_rgba(0,0,0,0.32)] p-3',
-        'animate-in fade-in-0 duration-150 ease-out',
-        pos?.side === 'left' ? 'slide-in-from-right-1' : 'slide-in-from-left-1'
+        'z-[120]',
+        LINEAR_SURFACE.popover,
+        'text-primary-token',
+        'animate-in fade-in-0 zoom-in-95 duration-subtle ease-subtle',
+        pos?.side === 'left' ? 'slide-in-from-right-1' : 'slide-in-from-left-1',
+        'motion-reduce:transition-opacity motion-reduce:transform-none'
       )}
     >
-      <EntityCard entity={entity} onActivate={onActivate} />
+      <div className='px-3 py-2.5'>
+        <EntityCard entity={entity} onActivate={onActivate} />
+      </div>
     </div>,
     document.body
   );
@@ -647,6 +699,7 @@ export function EntityPopover({
 // @-mentions and any other inline entity reference. Manages its own 200ms /
 // 120ms hover-bridge state so the popover stays open while the cursor moves
 // diagonally onto the popover surface.
+// Failure handling guard placed AFTER all hooks.
 // ---------------------------------------------------------------------------
 
 const HOVER_OPEN_MS = 200;
@@ -677,6 +730,19 @@ export function EntityHoverLink({
     }
   }, []);
 
+  const cancelOpen = useCallback(() => {
+    if (openTimer.current !== undefined) {
+      window.clearTimeout(openTimer.current);
+      openTimer.current = undefined;
+    }
+  }, []);
+
+  const closeNow = useCallback(() => {
+    cancelOpen();
+    cancelClose();
+    setOpen(false);
+  }, [cancelClose, cancelOpen]);
+
   const requestOpen = useCallback(() => {
     cancelClose();
     if (openTimer.current !== undefined) return;
@@ -687,26 +753,35 @@ export function EntityHoverLink({
   }, [cancelClose]);
 
   const requestClose = useCallback(() => {
-    if (openTimer.current !== undefined) {
-      window.clearTimeout(openTimer.current);
-      openTimer.current = undefined;
-    }
+    cancelOpen();
     if (closeTimer.current !== undefined) return;
     closeTimer.current = window.setTimeout(() => {
       setOpen(false);
       closeTimer.current = undefined;
     }, HOVER_CLOSE_MS);
-  }, []);
+  }, [cancelOpen]);
 
   useEffect(
     () => () => {
-      if (openTimer.current !== undefined)
-        window.clearTimeout(openTimer.current);
-      if (closeTimer.current !== undefined)
-        window.clearTimeout(closeTimer.current);
+      cancelOpen();
+      cancelClose();
     },
-    []
+    [cancelClose, cancelOpen]
   );
+
+  const handleKeyDown = useCallback(
+    (event: KeyboardEvent<HTMLButtonElement>) => {
+      if (event.key !== 'Escape') return;
+      event.preventDefault();
+      closeNow();
+    },
+    [closeNow]
+  );
+
+  if (!entity || !entity.kind || typeof entity.label !== 'string') {
+    // Failure handling: render children without popover affordance on bad data
+    return <>{children}</>;
+  }
 
   return (
     <>
@@ -717,13 +792,15 @@ export function EntityHoverLink({
         onMouseLeave={requestClose}
         onFocus={requestOpen}
         onBlur={requestClose}
+        onKeyDown={handleKeyDown}
         onClick={() => onActivate?.(entity)}
         // Subtle treatment: underline only on hover/focus, no static
         // decoration — keeps entity-rich copy from reading as a wall of
         // dotted lines while still surfacing the affordance on intent.
         className={cn(
-          'inline-flex items-center hover:text-primary-token transition-colors duration-150 ease-out',
+          'inline-flex items-center rounded-md transition-colors duration-subtle ease-subtle hover:text-primary-token',
           'no-underline hover:underline focus-visible:underline underline-offset-2',
+          'focus-ring-themed',
           className
         )}
       >

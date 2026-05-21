@@ -5,13 +5,13 @@ import { useCallback, useEffect, useState } from 'react';
 import { AboutSection } from '@/features/profile/AboutSection';
 import { ArtistNotificationsCTA } from '@/features/profile/artist-notifications-cta/ArtistNotificationsCTA';
 import { TwoStepNotificationsCTA } from '@/features/profile/artist-notifications-cta/TwoStepNotificationsCTA';
+import type { NotificationSourceContext } from '@/features/profile/artist-notifications-cta/types';
 import type {
   ProfilePreviewNotificationsState,
   ProfilePrimaryTab,
   ProfileRenderMode,
 } from '@/features/profile/contracts';
 import type { PublicRelease } from '@/features/profile/releases/types';
-import { StaticListenInterface } from '@/features/profile/StaticListenInterface';
 import { TourDrawerContent } from '@/features/profile/TourModePanel';
 import { ReleasesView } from '@/features/profile/views/ReleasesView';
 import type { AvailableDSP } from '@/lib/dsp';
@@ -46,6 +46,7 @@ interface ProfilePrimaryTabPanelProps {
   readonly allowPhotoDownloads?: boolean;
   readonly tourDates?: readonly TourDateViewModel[];
   readonly releases?: readonly PublicRelease[];
+  readonly alertSourceContext?: NotificationSourceContext;
   readonly previewNotificationsState?: ProfilePreviewNotificationsState;
   readonly onFlowClosed?: () => void;
   readonly onSubscriptionActivated?: () => void;
@@ -169,6 +170,7 @@ function SubscribePanel({
   onFlowClosed,
   onSubscriptionActivated,
   keepSubscribeFlowMounted = false,
+  sourceContext,
 }: Readonly<{
   artist: Artist;
   isSubscribed: boolean;
@@ -184,6 +186,7 @@ function SubscribePanel({
   onFlowClosed?: () => void;
   onSubscriptionActivated?: () => void;
   keepSubscribeFlowMounted?: boolean;
+  sourceContext?: NotificationSourceContext;
 }>) {
   if (renderMode === 'preview') {
     return (
@@ -215,6 +218,8 @@ function SubscribePanel({
             onFlowClosed={onFlowClosed}
             onSubscriptionActivated={onSubscriptionActivated}
             experimentVariant={alertOptInVariant}
+            source={sourceContext?.ctaLocation ?? 'subscribe_tab'}
+            sourceContext={sourceContext}
           />
         ) : (
           <ArtistNotificationsCTA
@@ -224,6 +229,8 @@ function SubscribePanel({
             autoOpen
             forceExpanded
             hideListenFallback
+            source={sourceContext?.ctaLocation ?? 'subscribe_tab'}
+            sourceContext={sourceContext}
             portalContainer={notificationsPortalContainer}
             onFlowClosed={onFlowClosed}
             onSubscriptionActivated={onSubscriptionActivated}
@@ -242,6 +249,42 @@ function SubscribePanel({
       onUnsubscribe={onUnsubscribe}
       isUnsubscribing={isUnsubscribing}
     />
+  );
+}
+
+function ProfileEmptyState({
+  artist,
+  title,
+  body,
+  triggerLabel,
+  sourceContext,
+}: Readonly<{
+  artist: Artist;
+  title: string;
+  body: string;
+  triggerLabel: string;
+  sourceContext: NotificationSourceContext;
+}>) {
+  return (
+    <div className='flex min-h-[42vh] flex-col items-center justify-center px-6 py-14 text-center'>
+      <p className='text-[18px] font-[650] tracking-[-0.035em] text-white'>
+        {title}
+      </p>
+      <p className='mt-2 max-w-[25ch] text-[13px] leading-5 text-white/52'>
+        {body}
+      </p>
+      <div className='mt-5'>
+        <ArtistNotificationsCTA
+          artist={artist}
+          variant='button'
+          presentation='overlay'
+          hideListenFallback
+          source={sourceContext.ctaLocation}
+          sourceContext={sourceContext}
+          triggerLabel={triggerLabel}
+        />
+      </div>
+    </div>
   );
 }
 
@@ -291,6 +334,8 @@ function AlertsSettingsRow({
       type='button'
       onClick={onClick}
       disabled={disabled}
+      role='switch'
+      aria-checked={checked}
       className='flex min-h-[62px] w-full items-center gap-3 border-t border-white/[0.075] px-4 py-3 text-left transition-colors duration-subtle first:border-t-0 hover:bg-white/[0.03] disabled:cursor-default disabled:hover:bg-transparent'
     >
       <div className='min-w-0 flex-1'>
@@ -403,9 +448,7 @@ export function ProfilePrimaryTabPanel({
   mode,
   renderMode = 'interactive',
   artist,
-  dsps,
   notificationsPortalContainer,
-  enableDynamicEngagement = false,
   subscribeTwoStep = false,
   alertOptInVariant,
   isSubscribed,
@@ -418,6 +461,7 @@ export function ProfilePrimaryTabPanel({
   allowPhotoDownloads = false,
   tourDates = [],
   releases = [],
+  alertSourceContext,
   previewNotificationsState,
   onFlowClosed,
   onSubscriptionActivated,
@@ -440,6 +484,31 @@ export function ProfilePrimaryTabPanel({
     setKeepSubscribeFlowMounted(true);
     onSubscriptionActivated?.();
   }, [onSubscriptionActivated]);
+  const musicEmptySourceContext: NotificationSourceContext = {
+    artistId: artist.id,
+    profileId: artist.id,
+    profileSlug: artist.handle,
+    currentTab: 'music',
+    ctaLocation: 'music_empty_state',
+    intent: 'music_alerts',
+  };
+  const eventsEmptySourceContext: NotificationSourceContext = {
+    artistId: artist.id,
+    profileId: artist.id,
+    profileSlug: artist.handle,
+    currentTab: 'events',
+    ctaLocation: 'events_empty_state',
+    intent: 'event_alerts',
+  };
+  const subscribeSourceContext: NotificationSourceContext =
+    alertSourceContext ?? {
+      artistId: artist.id,
+      profileId: artist.id,
+      profileSlug: artist.handle,
+      currentTab: 'alerts',
+      ctaLocation: 'subscribe_tab',
+      intent: 'general_alerts',
+    };
 
   if (mode === 'listen') {
     const visibleReleases = releases.filter(release => Boolean(release.slug));
@@ -458,21 +527,11 @@ export function ProfilePrimaryTabPanel({
             </div>
             <ReleasesView
               releases={visibleReleases}
+              artistId={artist.id}
               artistHandle={artist.handle}
               artistName={artist.name}
             />
           </div>
-          <StaticListenInterface
-            artist={artist}
-            handle={artist.handle}
-            dspsOverride={dsps}
-            enableDynamicEngagement={enableDynamicEngagement}
-            renderMode={renderMode}
-            containerClassName='max-w-none px-4'
-            providerButtonClassName='rounded-[22px] border-white/8 bg-white/[0.045] px-4 py-3.5 text-white hover:bg-white/[0.08]'
-            emptyStateClassName='border-white/8 bg-white/[0.04] shadow-none'
-            hideHelpText
-          />
         </div>
       );
     }
@@ -487,16 +546,12 @@ export function ProfilePrimaryTabPanel({
             Music
           </h2>
         </div>
-        <StaticListenInterface
+        <ProfileEmptyState
           artist={artist}
-          handle={artist.handle}
-          dspsOverride={dsps}
-          enableDynamicEngagement={enableDynamicEngagement}
-          renderMode={renderMode}
-          containerClassName='max-w-none'
-          providerButtonClassName='rounded-[22px] border-white/8 bg-white/[0.045] px-4 py-3.5 text-white hover:bg-white/[0.08]'
-          emptyStateClassName='border-white/8 bg-white/[0.04] shadow-none'
-          hideHelpText
+          title='No music yet.'
+          body='Get a note when the first release lands.'
+          triggerLabel='Turn on alerts'
+          sourceContext={musicEmptySourceContext}
         />
       </div>
     );
@@ -513,7 +568,12 @@ export function ProfilePrimaryTabPanel({
             Events
           </h2>
         </div>
-        <TourDrawerContent artist={artist} tourDates={[...tourDates]} />
+        <TourDrawerContent
+          artist={artist}
+          tourDates={[...tourDates]}
+          emptyStateSourceContext={eventsEmptySourceContext}
+          renderMode={renderMode}
+        />
       </div>
     );
   }
@@ -535,6 +595,7 @@ export function ProfilePrimaryTabPanel({
         onFlowClosed={handleSubscribeFlowClosed}
         onSubscriptionActivated={handleSubscriptionActivated}
         keepSubscribeFlowMounted={keepSubscribeFlowMounted}
+        sourceContext={subscribeSourceContext}
       />
     );
   }

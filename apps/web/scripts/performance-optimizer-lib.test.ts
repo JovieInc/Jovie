@@ -97,7 +97,7 @@ describe('performance optimizer lib', () => {
   it('prefers route ids over paths when building budget guard args', () => {
     const args = buildDashboardBudgetGuardArgs(
       '/tmp/session.json',
-      '/app/dashboard/releases',
+      '/app/releases',
       'creator-releases'
     );
 
@@ -166,7 +166,7 @@ describe('performance optimizer lib', () => {
     const sample = extractDashboardSample({
       pages: [
         {
-          url: 'http://localhost:3000/app/dashboard/releases',
+          url: 'http://localhost:3000/app/releases',
           rawTimings: {
             'warm-shell-response': 88,
             'time-to-first-byte': 220,
@@ -233,7 +233,7 @@ describe('performance optimizer lib', () => {
           firstContentfulPaintMs: 900,
           largestContentfulPaintMs: 1400,
           cumulativeLayoutShift: 0.01,
-          finalUrl: '/app/dashboard/releases',
+          finalUrl: '/app/releases',
         },
       ],
       100,
@@ -248,7 +248,7 @@ describe('performance optimizer lib', () => {
           firstContentfulPaintMs: 920,
           largestContentfulPaintMs: 1420,
           cumulativeLayoutShift: 0.01,
-          finalUrl: '/app/dashboard/releases',
+          finalUrl: '/app/releases',
         },
       ],
       100,
@@ -324,7 +324,7 @@ describe('performance optimizer lib', () => {
           firstContentfulPaintMs: 900,
           largestContentfulPaintMs: 1400,
           cumulativeLayoutShift: 0.01,
-          finalUrl: '/app/dashboard/releases',
+          finalUrl: '/app/releases',
         },
       ],
       100,
@@ -341,10 +341,8 @@ describe('performance optimizer lib', () => {
 
     expect(prompt).toContain('Mode: dashboard');
     expect(prompt).toContain('DashboardNav.tsx');
-    expect(prompt).toContain(
-      `Route performance for ${APP_ROUTES.DASHBOARD_RELEASES}`
-    );
-    expect(prompt).toContain(APP_ROUTES.DASHBOARD_RELEASES);
+    expect(prompt).toContain(`Route performance for ${APP_ROUTES.RELEASES}`);
+    expect(prompt).toContain(APP_ROUTES.RELEASES);
     expect(prompt).toContain('Measure a 5-run baseline and use the median.');
     expect(prompt).toContain('Rebuild and remeasure 5 times.');
   });

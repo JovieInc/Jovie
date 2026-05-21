@@ -11,13 +11,6 @@ import {
   waitForNetworkIdle,
 } from './utils/smoke-test-utils';
 
-test.use({
-  deviceScaleFactor: 3,
-  hasTouch: true,
-  isMobile: true,
-  storageState: { cookies: [], origins: [] },
-});
-
 const DEFAULT_MOBILE_WIDTHS = [
   320, 360, 375, 390, 393, 402, 414, 428, 430,
 ] as const;
@@ -100,7 +93,7 @@ const AUTHENTICATED_ROUTES = [
   },
   {
     id: 'app-releases',
-    path: APP_ROUTES.DASHBOARD_RELEASES,
+    path: APP_ROUTES.RELEASES,
     readySelectors: [
       '[data-testid="releases-matrix"]',
       '[data-testid="releases-empty-state-enriching"]',
@@ -109,7 +102,7 @@ const AUTHENTICATED_ROUTES = [
   },
   {
     id: 'app-audience',
-    path: APP_ROUTES.DASHBOARD_AUDIENCE,
+    path: APP_ROUTES.AUDIENCE,
     readySelectors: ['[data-testid="dashboard-audience-client"]', 'main'],
   },
   {
@@ -256,135 +249,146 @@ async function clickFirstVisible(
   return false;
 }
 
-test.describe('Mobile Overflow Release Guard', () => {
-  test.setTimeout(120_000);
+test.describe('Mobile Overflow', () => {
+  test.use({
+    deviceScaleFactor: 3,
+    hasTouch: true,
+    isMobile: true,
+    storageState: { cookies: [], origins: [] },
+  });
 
-  for (const width of MOBILE_WIDTHS) {
-    test.describe(`${width}px`, () => {
-      test.use({ viewport: { width, height: MOBILE_HEIGHT } });
+  test.describe('Mobile Overflow Release Guard', () => {
+    test.setTimeout(120_000);
 
-      for (const surface of PUBLIC_SURFACES) {
-        test(`public ${surface.id} has no horizontal overflow @ ${width}px`, async ({
-          page,
-        }, testInfo) => {
-          await navigateToPublicSurface(page, surface);
-          await assertSurfaceDoesNotOverflow(
+    for (const width of MOBILE_WIDTHS) {
+      test.describe(`${width}px`, () => {
+        test.use({ viewport: { width, height: MOBILE_HEIGHT } });
+
+        for (const surface of PUBLIC_SURFACES) {
+          test(`public ${surface.id} has no horizontal overflow @ ${width}px`, async ({
             page,
-            testInfo,
-            `${surface.id} ${width}px`
-          );
-        });
-      }
+          }, testInfo) => {
+            await navigateToPublicSurface(page, surface);
+            await assertSurfaceDoesNotOverflow(
+              page,
+              testInfo,
+              `${surface.id} ${width}px`
+            );
+          });
+        }
 
-      for (const route of AUTHENTICATED_ROUTES) {
-        test(`authenticated ${route.id} has no horizontal overflow @ ${width}px`, async ({
-          page,
-        }, testInfo) => {
-          await enterAuthenticatedRoute(page, route);
-          await assertSurfaceDoesNotOverflow(
+        for (const route of AUTHENTICATED_ROUTES) {
+          test(`authenticated ${route.id} has no horizontal overflow @ ${width}px`, async ({
             page,
-            testInfo,
-            `${route.id} ${width}px`
-          );
-        });
+          }, testInfo) => {
+            await enterAuthenticatedRoute(page, route);
+            await assertSurfaceDoesNotOverflow(
+              page,
+              testInfo,
+              `${route.id} ${width}px`
+            );
+          });
+        }
+      });
+    }
+  });
+
+  test.describe('Mobile Overflow Open States', () => {
+    test.use({ viewport: { width: 390, height: MOBILE_HEIGHT } });
+
+    test('homepage mobile navigation does not overflow', async ({
+      page,
+    }, testInfo) => {
+      const home = PUBLIC_SURFACES_BY_ID.get('home');
+      expect(home, 'Expected home surface in public manifest').toBeTruthy();
+
+      await navigateToPublicSurface(page, home as ResolvedPublicSurfaceSpec);
+      await expectNoDocumentOverflow(page, testInfo, 'home before nav open');
+
+      await clickFirstVisible(page, [
+        'button[aria-label*="menu" i]',
+        'button[aria-label*="navigation" i]',
+        'button[aria-expanded="false"]',
+      ]);
+
+      await expectNoDocumentOverflow(page, testInfo, 'home nav open state');
+    });
+
+    test('profile mobile drawers do not overflow', async ({
+      page,
+    }, testInfo) => {
+      const profile = PUBLIC_SURFACES_BY_ID.get('profile-main');
+      expect(
+        profile,
+        'Expected profile-main surface in public manifest'
+      ).toBeTruthy();
+
+      await navigateToPublicSurface(page, profile as ResolvedPublicSurfaceSpec);
+      await expectNoDocumentOverflow(
+        page,
+        testInfo,
+        'profile before open states'
+      );
+
+      const triggers = page.locator(
+        [
+          '[data-testid^="profile-primary-tab-"]',
+          'a[href*="mode="]',
+          'button[aria-haspopup="dialog"]',
+          'button[aria-label*="contact" i]',
+          'button[aria-label*="tip" i]',
+          'button[aria-label*="pay" i]',
+        ].join(', ')
+      );
+      const count = Math.min(await triggers.count(), OPEN_STATE_CLICK_LIMIT);
+
+      for (let index = 0; index < count; index += 1) {
+        const trigger = triggers.nth(index);
+        if (!(await trigger.isVisible().catch(() => false))) continue;
+
+        await trigger.click({ timeout: 10_000 }).catch(() => {});
+        await waitForHydration(page, { timeout: 15_000 });
+        await expectNoDocumentOverflow(
+          page,
+          testInfo,
+          `profile open state ${index + 1}`
+        );
+        await page.keyboard.press('Escape').catch(() => {});
       }
     });
-  }
-});
 
-test.describe('Mobile Overflow Open States', () => {
-  test.use({ viewport: { width: 390, height: MOBILE_HEIGHT } });
-
-  test('homepage mobile navigation does not overflow', async ({
-    page,
-  }, testInfo) => {
-    const home = PUBLIC_SURFACES_BY_ID.get('home');
-    expect(home, 'Expected home surface in public manifest').toBeTruthy();
-
-    await navigateToPublicSurface(page, home as ResolvedPublicSurfaceSpec);
-    await expectNoDocumentOverflow(page, testInfo, 'home before nav open');
-
-    await clickFirstVisible(page, [
-      'button[aria-label*="menu" i]',
-      'button[aria-label*="navigation" i]',
-      'button[aria-expanded="false"]',
-    ]);
-
-    await expectNoDocumentOverflow(page, testInfo, 'home nav open state');
-  });
-
-  test('profile mobile drawers do not overflow', async ({ page }, testInfo) => {
-    const profile = PUBLIC_SURFACES_BY_ID.get('profile-main');
-    expect(
-      profile,
-      'Expected profile-main surface in public manifest'
-    ).toBeTruthy();
-
-    await navigateToPublicSurface(page, profile as ResolvedPublicSurfaceSpec);
-    await expectNoDocumentOverflow(
+    test('dashboard menus and dialogs do not overflow', async ({
       page,
-      testInfo,
-      'profile before open states'
-    );
-
-    const triggers = page.locator(
-      [
-        '[data-testid^="profile-primary-tab-"]',
-        'a[href*="mode="]',
-        'button[aria-haspopup="dialog"]',
-        'button[aria-label*="contact" i]',
-        'button[aria-label*="tip" i]',
-        'button[aria-label*="pay" i]',
-      ].join(', ')
-    );
-    const count = Math.min(await triggers.count(), OPEN_STATE_CLICK_LIMIT);
-
-    for (let index = 0; index < count; index += 1) {
-      const trigger = triggers.nth(index);
-      if (!(await trigger.isVisible().catch(() => false))) continue;
-
-      await trigger.click({ timeout: 10_000 }).catch(() => {});
-      await waitForHydration(page, { timeout: 15_000 });
+    }, testInfo) => {
+      await enterAuthenticatedRoute(page, AUTHENTICATED_ROUTES[0]);
       await expectNoDocumentOverflow(
         page,
         testInfo,
-        `profile open state ${index + 1}`
+        'dashboard before open states'
       );
-      await page.keyboard.press('Escape').catch(() => {});
-    }
-  });
 
-  test('dashboard menus and dialogs do not overflow', async ({
-    page,
-  }, testInfo) => {
-    await enterAuthenticatedRoute(page, AUTHENTICATED_ROUTES[0]);
-    await expectNoDocumentOverflow(
-      page,
-      testInfo,
-      'dashboard before open states'
-    );
-
-    const triggers = page.locator(
-      [
-        'button[aria-haspopup="menu"]:not([disabled])',
-        'button[aria-haspopup="dialog"]:not([disabled])',
-        'button[aria-expanded="false"]:not([disabled])',
-      ].join(', ')
-    );
-    const count = Math.min(await triggers.count(), OPEN_STATE_CLICK_LIMIT);
-
-    for (let index = 0; index < count; index += 1) {
-      const trigger = triggers.nth(index);
-      if (!(await trigger.isVisible().catch(() => false))) continue;
-
-      await trigger.click({ timeout: 10_000 }).catch(() => {});
-      await waitForHydration(page, { timeout: 15_000 });
-      await expectNoDocumentOverflow(
-        page,
-        testInfo,
-        `dashboard open state ${index + 1}`
+      const triggers = page.locator(
+        [
+          'button[aria-haspopup="menu"]:not([disabled])',
+          'button[aria-haspopup="dialog"]:not([disabled])',
+          'button[aria-expanded="false"]:not([disabled])',
+        ].join(', ')
       );
-      await page.keyboard.press('Escape').catch(() => {});
-    }
+      const count = Math.min(await triggers.count(), OPEN_STATE_CLICK_LIMIT);
+
+      for (let index = 0; index < count; index += 1) {
+        const trigger = triggers.nth(index);
+        if (!(await trigger.isVisible().catch(() => false))) continue;
+
+        await trigger.click({ timeout: 10_000 }).catch(() => {});
+        await waitForHydration(page, { timeout: 15_000 });
+        await expectNoDocumentOverflow(
+          page,
+          testInfo,
+          `dashboard open state ${index + 1}`
+        );
+        await page.keyboard.press('Escape').catch(() => {});
+      }
+    });
   });
 });

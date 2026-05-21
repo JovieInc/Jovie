@@ -4,6 +4,7 @@ import { Check, ExternalLink } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
+import { ShellListRowFrame } from '@/components/organisms/table';
 import type {
   TimActionIssue,
   TimActionsResponse,
@@ -67,7 +68,7 @@ function ActionRow({ issue, onClose, isClosing }: Readonly<ActionRowProps>) {
   const priorityConfig = getPriorityConfig(issue.priority);
 
   return (
-    <div className='flex items-center gap-3 rounded-xl border border-subtle bg-surface-0 px-3 py-2.5'>
+    <ShellListRowFrame className='flex items-center gap-3 border border-subtle bg-surface-0 px-3 py-2.5'>
       {/* Title + Linear link */}
       <div className='min-w-0 flex-1'>
         <a
@@ -76,7 +77,7 @@ function ActionRow({ issue, onClose, isClosing }: Readonly<ActionRowProps>) {
           rel='noopener noreferrer'
           className='group flex items-center gap-1.5'
         >
-          <p className='truncate text-[13px] font-semibold text-primary-token transition-colors group-hover:text-[#FACC15]'>
+          <p className='truncate text-[13px] font-semibold text-primary-token transition-colors group-hover:text-warning'>
             {issue.title}
           </p>
           <ExternalLink
@@ -84,14 +85,14 @@ function ActionRow({ issue, onClose, isClosing }: Readonly<ActionRowProps>) {
             aria-hidden='true'
           />
         </a>
-        <p className='mt-0.5 text-[11px] uppercase tracking-[0.08em] text-tertiary-token'>
+        <p className='mt-0.5 text-[11px] text-tertiary-token'>
           {issue.identifier}
         </p>
       </div>
 
       {/* Priority badge */}
       <span
-        className={`shrink-0 rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.08em] ${priorityConfig.className}`}
+        className={`shrink-0 rounded px-1.5 py-0.5 text-[10px] font-semibold ${priorityConfig.className}`}
       >
         {priorityConfig.label}
       </span>
@@ -105,11 +106,11 @@ function ActionRow({ issue, onClose, isClosing }: Readonly<ActionRowProps>) {
         onClick={() => void onClose(issue.id)}
         disabled={isClosing}
         aria-label={`Mark "${issue.title}" as done`}
-        className='shrink-0 rounded-lg border border-subtle bg-surface-1 p-1.5 text-tertiary-token transition-colors hover:border-[#FACC15]/30 hover:bg-[#FACC15]/10 hover:text-[#FACC15] disabled:cursor-not-allowed disabled:opacity-40'
+        className='shrink-0 rounded-lg border border-subtle bg-surface-1 p-1.5 text-tertiary-token transition-colors hover:border-warning/30 hover:bg-warning/10 hover:text-warning disabled:cursor-not-allowed disabled:opacity-40'
       >
         <Check className='h-3.5 w-3.5' aria-hidden='true' />
       </button>
-    </div>
+    </ShellListRowFrame>
   );
 }
 
@@ -219,13 +220,12 @@ export function TimActionRequiredSection() {
       <div className='space-y-2.5'>
         {/* Section header */}
         <div className='flex items-center gap-2'>
-          {/* Amber accent dot matching the #FACC15 tim-action-required label color */}
+          {/* Warning accent dot for Tim action-required state. */}
           <span
-            className='h-2 w-2 shrink-0 rounded-full'
-            style={{ backgroundColor: '#FACC15' }}
+            className='h-2 w-2 shrink-0 rounded-full bg-warning'
             aria-hidden='true'
           />
-          <p className='text-[11px] font-semibold uppercase tracking-[0.16em] text-tertiary-token'>
+          <p className='text-[12px] font-caption text-tertiary-token'>
             Tim Action Required
           </p>
           {!isLoading && visibleIssues.length > 0 ? (

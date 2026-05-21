@@ -4,6 +4,7 @@ import { useCallback } from 'react';
 import { useTrackAudioPlayer } from '@/components/organisms/release-sidebar/useTrackAudioPlayer';
 import { SidebarBottomNowPlaying } from '@/components/shell/SidebarBottomNowPlaying';
 import { useAppFlag } from '@/lib/flags/client';
+import { useAudioChromeSnapshot } from './audio-chrome-state';
 
 /**
  * SidebarBottomNowPlayingBridge — flag-gated mount of the shell
@@ -17,6 +18,7 @@ import { useAppFlag } from '@/lib/flags/client';
  */
 export function SidebarBottomNowPlayingBridge() {
   const shellChatV1Enabled = useAppFlag('DESIGN_V1');
+  const audioChrome = useAudioChromeSnapshot();
   const { playbackState, toggleTrack } = useTrackAudioPlayer();
 
   const handlePlay = useCallback(() => {
@@ -29,9 +31,18 @@ export function SidebarBottomNowPlayingBridge() {
 
   if (!shellChatV1Enabled) return null;
   if (!playbackState.activeTrackId || !playbackState.trackTitle) return null;
+  if (
+    audioChrome.compactPlayerVisible &&
+    audioChrome.activeTrackId === playbackState.activeTrackId
+  ) {
+    return null;
+  }
 
   return (
-    <div className='px-2 pb-2'>
+    <div
+      data-shell-audio-surface='sidebar-compact'
+      className='px-2 pb-2 pt-1 transition-[opacity,transform] duration-cinematic ease-cinematic'
+    >
       <SidebarBottomNowPlaying
         track={{
           trackTitle: playbackState.trackTitle,
@@ -40,6 +51,7 @@ export function SidebarBottomNowPlayingBridge() {
         }}
         isPlaying={playbackState.isPlaying}
         onPlay={handlePlay}
+        className='border border-(--linear-app-shell-border)/75 bg-(--linear-app-content-surface) shadow-[0_10px_24px_rgba(0,0,0,0.12)] transition-[opacity,transform,border-color,background-color] duration-cinematic ease-cinematic'
       />
     </div>
   );

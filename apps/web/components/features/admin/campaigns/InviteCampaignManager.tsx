@@ -11,6 +11,7 @@ import {
   AlertDialogTitle,
   Button,
 } from '@jovie/ui';
+import { type ColumnDef, createColumnHelper } from '@tanstack/react-table';
 import type { ComponentPropsWithoutRef, ReactNode } from 'react';
 import { useCallback, useState } from 'react';
 
@@ -18,8 +19,12 @@ import { Icon } from '@/components/atoms/Icon';
 import { ContentMetricCard } from '@/components/molecules/ContentMetricCard';
 import { ContentSectionHeader } from '@/components/molecules/ContentSectionHeader';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
+import { TableEmptyState } from '@/components/organisms/table';
 import { APP_ROUTES } from '@/constants/routes';
+import { AdminDataTable } from '@/features/admin/table/AdminDataTable';
 import {
+  type CampaignInviteListItem,
+  type CampaignPreviewResponse,
   DEFAULT_THROTTLING,
   type SendCampaignInvitesResponse,
   type ThrottlingConfig,
@@ -34,6 +39,12 @@ import { cn } from '@/lib/utils';
 
 /** Threshold for showing confirmation modal */
 const LARGE_BATCH_THRESHOLD = 25;
+
+type CampaignPreviewProfile =
+  CampaignPreviewResponse['sample']['profiles'][number];
+
+const inviteActivityColumnHelper = createColumnHelper<CampaignInviteListItem>();
+const previewProfileColumnHelper = createColumnHelper<CampaignPreviewProfile>();
 
 function formatEngagementStatus(engagement: {
   clicked: boolean;
@@ -140,43 +151,70 @@ function CampaignMetric({
   );
 }
 
-function CampaignDataTable({
-  children,
-}: Readonly<{
-  children: ReactNode;
-}>) {
-  return (
-    <div className='overflow-hidden rounded-xl border border-subtle bg-surface-0'>
-      <table className='w-full text-sm'>{children}</table>
-    </div>
-  );
-}
+const INVITE_ACTIVITY_COLUMNS: ColumnDef<CampaignInviteListItem, unknown>[] = [
+  inviteActivityColumnHelper.accessor(row => row.profile.username, {
+    id: 'creator',
+    header: 'Creator',
+    cell: ({ row }) => (
+      <span className='font-medium text-primary-token'>
+        @{row.original.profile.username}
+      </span>
+    ),
+  }) as ColumnDef<CampaignInviteListItem, unknown>,
+  inviteActivityColumnHelper.accessor('status', {
+    header: 'Status',
+    cell: ({ row }) => (
+      <span className='capitalize'>{row.original.status}</span>
+    ),
+  }) as ColumnDef<CampaignInviteListItem, unknown>,
+  inviteActivityColumnHelper.display({
+    id: 'engagement',
+    header: 'Engagement',
+    cell: ({ row }) => formatEngagementStatus(row.original.engagement),
+  }),
+  inviteActivityColumnHelper.accessor(row => row.profile.isClaimed, {
+    id: 'claimed',
+    header: 'Claimed',
+    cell: ({ row }) => (
+      <span
+        className={
+          row.original.profile.isClaimed
+            ? 'text-success'
+            : 'text-secondary-token'
+        }
+      >
+        {row.original.profile.isClaimed ? 'Yes' : 'No'}
+      </span>
+    ),
+  }) as ColumnDef<CampaignInviteListItem, unknown>,
+];
 
-function CampaignTableHeaderCell({
-  children,
-}: Readonly<{
-  children: ReactNode;
-}>) {
-  return (
-    <th className='px-4 py-2.5 text-left text-xs font-semibold tracking-normal text-secondary-token'>
-      {children}
-    </th>
-  );
-}
-
-function CampaignTableCell({
-  children,
-  className,
-}: Readonly<{
-  children: ReactNode;
-  className?: string;
-}>) {
-  return (
-    <td className={cn('px-4 py-2.5 text-secondary-token', className)}>
-      {children}
-    </td>
-  );
-}
+const PREVIEW_PROFILE_COLUMNS: ColumnDef<CampaignPreviewProfile, unknown>[] = [
+  previewProfileColumnHelper.accessor('username', {
+    header: 'Username',
+    cell: ({ row }) => (
+      <span className='font-medium text-primary-token'>
+        @{row.original.username}
+      </span>
+    ),
+  }) as ColumnDef<CampaignPreviewProfile, unknown>,
+  previewProfileColumnHelper.accessor('fitScore', {
+    header: 'Fit Score',
+    cell: ({ row }) => (
+      <span className='inline-flex items-center rounded-full border border-info/20 bg-info/10 px-2 py-0.5 text-xs font-medium text-info'>
+        {row.original.fitScore ?? 'N/A'}
+      </span>
+    ),
+  }) as ColumnDef<CampaignPreviewProfile, unknown>,
+  previewProfileColumnHelper.accessor('email', {
+    header: 'Email',
+    cell: ({ row }) => (
+      <span className='font-mono text-xs text-secondary-token'>
+        {row.original.email}
+      </span>
+    ),
+  }) as ColumnDef<CampaignPreviewProfile, unknown>,
+];
 
 export function InviteCampaignManager() {
   const [sendResult, setSendResult] =
@@ -434,46 +472,18 @@ export function InviteCampaignManager() {
         }
       >
         {inviteList && inviteList.invites.length > 0 ? (
-          <CampaignDataTable>
-            <thead className='bg-surface-1'>
-              <tr>
-                <CampaignTableHeaderCell>Creator</CampaignTableHeaderCell>
-                <CampaignTableHeaderCell>Status</CampaignTableHeaderCell>
-                <CampaignTableHeaderCell>Engagement</CampaignTableHeaderCell>
-                <CampaignTableHeaderCell>Claimed</CampaignTableHeaderCell>
-              </tr>
-            </thead>
-            <tbody className='divide-y divide-(--linear-border-subtle)'>
-              {inviteList.invites.map(invite => (
-                <tr key={invite.id}>
-                  <CampaignTableCell className='text-primary-token'>
-                    @{invite.profile.username}
-                  </CampaignTableCell>
-                  <CampaignTableCell className='capitalize'>
-                    {invite.status}
-                  </CampaignTableCell>
-                  <CampaignTableCell>
-                    {formatEngagementStatus(invite.engagement)}
-                  </CampaignTableCell>
-                  <CampaignTableCell>
-                    <span
-                      className={
-                        invite.profile.isClaimed
-                          ? 'text-success'
-                          : 'text-secondary-token'
-                      }
-                    >
-                      {invite.profile.isClaimed ? 'Yes' : 'No'}
-                    </span>
-                  </CampaignTableCell>
-                </tr>
-              ))}
-            </tbody>
-          </CampaignDataTable>
+          <AdminDataTable
+            data={inviteList.invites}
+            columns={INVITE_ACTIVITY_COLUMNS}
+            getRowId={invite => invite.id}
+            enableVirtualization={false}
+            minWidth='640px'
+          />
         ) : (
-          <p className='text-sm text-secondary-token'>
-            No invite activity yet.
-          </p>
+          <TableEmptyState
+            title='No invite activity'
+            description='No invite activity has been recorded yet.'
+          />
         )}
       </CampaignSection>
 
@@ -531,36 +541,13 @@ export function InviteCampaignManager() {
                 <p className='mb-2 text-sm font-medium text-primary-token'>
                   Sample profiles to invite:
                 </p>
-                <CampaignDataTable>
-                  <thead className='bg-surface-1'>
-                    <tr>
-                      <CampaignTableHeaderCell>
-                        Username
-                      </CampaignTableHeaderCell>
-                      <CampaignTableHeaderCell>
-                        Fit Score
-                      </CampaignTableHeaderCell>
-                      <CampaignTableHeaderCell>Email</CampaignTableHeaderCell>
-                    </tr>
-                  </thead>
-                  <tbody className='divide-y divide-(--linear-border-subtle)'>
-                    {preview.sample.profiles.map(profile => (
-                      <tr key={profile.id}>
-                        <CampaignTableCell className='text-primary-token'>
-                          @{profile.username}
-                        </CampaignTableCell>
-                        <CampaignTableCell>
-                          <span className='inline-flex items-center rounded-full border border-info/20 bg-info/10 px-2 py-0.5 text-xs font-medium text-info'>
-                            {profile.fitScore ?? 'N/A'}
-                          </span>
-                        </CampaignTableCell>
-                        <CampaignTableCell className='font-mono text-xs'>
-                          {profile.email}
-                        </CampaignTableCell>
-                      </tr>
-                    ))}
-                  </tbody>
-                </CampaignDataTable>
+                <AdminDataTable
+                  data={preview.sample.profiles}
+                  columns={PREVIEW_PROFILE_COLUMNS}
+                  getRowId={profile => profile.id}
+                  enableVirtualization={false}
+                  minWidth='560px'
+                />
               </div>
             )}
           </div>

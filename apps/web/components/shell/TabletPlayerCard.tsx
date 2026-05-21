@@ -2,6 +2,7 @@
 
 import { Pause, Play, SkipBack, SkipForward } from 'lucide-react';
 import Image from 'next/image';
+import React from 'react';
 import { formatTime } from '@/lib/format-time';
 import { cn } from '@/lib/utils';
 import type { NowPlayingTrack } from './SidebarNowPlaying';
@@ -15,6 +16,9 @@ import type { NowPlayingTrack } from './SidebarNowPlaying';
  * Pure presentational. Caller owns `currentTime` / `duration` so the
  * timestamps stay in lockstep with the audio element.
  *
+ * Memoized high-churn tablet now-playing card renderer over real prod
+ * NowPlayingTrack + player state (zero layout shift on transitions).
+ *
  * @example
  * ```tsx
  * const { playbackState, toggleTrack } = useTrackAudioPlayer();
@@ -27,7 +31,7 @@ import type { NowPlayingTrack } from './SidebarNowPlaying';
  * />
  * ```
  */
-export function TabletPlayerCard({
+export const TabletPlayerCard = React.memo(function TabletPlayerCard({
   track,
   isPlaying,
   currentTime,
@@ -63,7 +67,7 @@ export function TabletPlayerCard({
         className
       )}
     >
-      <div className='rounded-2xl backdrop-blur-2xl bg-(--linear-app-content-surface)/70 border border-white/10 shadow-[0_10px_40px_rgba(0,0,0,0.18)] relative overflow-hidden'>
+      <div className='rounded-2xl backdrop-blur-2xl bg-(--linear-app-content-surface)/70 border border-(--linear-app-frame-seam) shadow-[0_10px_40px_rgba(0,0,0,0.18)] relative overflow-hidden'>
         <span
           aria-hidden='true'
           className='absolute top-0 left-0 right-0 h-px bg-tertiary-token/30'
@@ -102,7 +106,7 @@ export function TabletPlayerCard({
             <button
               type='button'
               onClick={onPrevious}
-              className='h-8 w-8 rounded grid place-items-center text-quaternary-token hover:text-primary-token transition-colors duration-150 ease-out'
+              className='h-8 w-8 rounded grid place-items-center text-quaternary-token hover:text-primary-token transition-colors duration-subtle ease-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/55 focus-visible:ring-offset-2 focus-visible:ring-offset-(--linear-bg-page) outline-none'
               aria-label='Previous'
             >
               <SkipBack
@@ -114,7 +118,7 @@ export function TabletPlayerCard({
             <button
               type='button'
               onClick={onPlay}
-              className='h-9 w-9 rounded-full grid place-items-center bg-primary text-on-primary transition-transform duration-150 ease-out active:scale-95'
+              className='h-9 w-9 rounded-full grid place-items-center bg-primary text-on-primary transition-transform duration-subtle ease-subtle active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/55 focus-visible:ring-offset-2 focus-visible:ring-offset-(--linear-bg-page) outline-none'
               aria-label={isPlaying ? 'Pause' : 'Play'}
             >
               {isPlaying ? (
@@ -134,7 +138,7 @@ export function TabletPlayerCard({
             <button
               type='button'
               onClick={onNext}
-              className='h-8 w-8 rounded grid place-items-center text-quaternary-token hover:text-primary-token transition-colors duration-150 ease-out'
+              className='h-8 w-8 rounded grid place-items-center text-quaternary-token hover:text-primary-token transition-colors duration-subtle ease-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/55 focus-visible:ring-offset-2 focus-visible:ring-offset-(--linear-bg-page) outline-none'
               aria-label='Next'
             >
               <SkipForward
@@ -163,4 +167,4 @@ export function TabletPlayerCard({
       </div>
     </div>
   );
-}
+});

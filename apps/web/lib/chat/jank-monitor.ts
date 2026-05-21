@@ -330,17 +330,15 @@ export function createJankMonitor(opts: CreateJankMonitorOptions): JankMonitor {
     emit(event, payload);
   }
 
-  function observeMessages(
-    conversationId: string | null,
-    snapshot: readonly MessageSnapshot[],
-    status?: string
-  ): void {
-    const s = state(conversationId);
-    s.snapshotIndex += 1;
-    const nowTs = now();
-    const effective = snapshot.filter(m => !IGNORED_IDS.has(m.id));
+  // --- Sonar S3776 cognitive complexity reductions: extracted phase handlers ---
+  // These keep identical behavior and side-effects. Main observeMessages is now a thin
+  // orchestrator, dropping its cognitive complexity below the 15 threshold.
 
-    // ── Duplicates ─────────────────────────────────────────────
+  function handleDuplicates(
+    conversationId: string | null,
+    effective: readonly MessageSnapshot[],
+    s: ConvState
+  ): void {
     const seenInSnapshot = new Set<string>();
     for (const m of effective) {
       if (seenInSnapshot.has(m.id)) {
@@ -353,8 +351,13 @@ export function createJankMonitor(opts: CreateJankMonitorOptions): JankMonitor {
       }
       seenInSnapshot.add(m.id);
     }
+  }
 
-    // ── Reorder ────────────────────────────────────────────────
+  function handleReorder(
+    conversationId: string | null,
+    effective: readonly MessageSnapshot[],
+    s: ConvState
+  ): string[] {
     const nextIdOrder = effective.map(m => m.id);
     if (s.lastIdOrder.length > 0 && detectReorder(s.lastIdOrder, nextIdOrder)) {
       s.counts.reorderCount += 1;
@@ -363,13 +366,20 @@ export function createJankMonitor(opts: CreateJankMonitorOptions): JankMonitor {
         nextState: nextIdOrder.join(','),
       });
     }
+    return nextIdOrder;
+  }
 
-    // ── Disappear / reappear ───────────────────────────────────
+  function handleDisappearReappear(
+    conversationId: string | null,
+    effective: readonly MessageSnapshot[],
+    s: ConvState,
+    nowTs: number,
+    nextIdOrder: string[]
+  ): void {
     const currentIds = new Set(nextIdOrder);
     // Confirm any previously-pending disappears that are STILL missing.
     for (const [id, meta] of s.pendingDisappear) {
       if (!currentIds.has(id)) {
-        // Confirm — emit disappear.
         s.counts.messageDisappearCount += 1;
         fire(conversationId, JANK_EVENT_NAMES.MESSAGE_DISAPPEARED, {
           messageId: id,
@@ -415,9 +425,15 @@ export function createJankMonitor(opts: CreateJankMonitorOptions): JankMonitor {
     for (const [id, meta] of s.recentlyRemoved) {
       if (nowTs - meta.at > reappearWindowMs) s.recentlyRemoved.delete(id);
     }
+  }
 
-    // ── Token rollback (per (id, partIndex)) ───────────────────
-    // Progress bookkeeping (any part delta = progress).
+  function handleTokenRollbacks(
+    conversationId: string | null,
+    effective: readonly MessageSnapshot[],
+    s: ConvState,
+    nowTs: number,
+    status: string | undefined
+  ): boolean {
     let anyProgress = false;
     for (const m of effective) {
       const prev = s.lastSeen.get(m.id);
@@ -445,8 +461,14 @@ export function createJankMonitor(opts: CreateJankMonitorOptions): JankMonitor {
         }
       }
     }
+    return anyProgress;
+  }
 
-    // ── Update lastSeen ────────────────────────────────────────
+  function updateLastSeenState(
+    s: ConvState,
+    effective: readonly MessageSnapshot[],
+    nextIdOrder: string[]
+  ): void {
     s.lastSeen.clear();
     effective.forEach((m, idx) => {
       s.lastSeen.set(m.id, {
@@ -458,11 +480,16 @@ export function createJankMonitor(opts: CreateJankMonitorOptions): JankMonitor {
     });
     s.lastIdOrder = nextIdOrder;
     s.sequenceIndex = effective.length;
+  }
 
-    // ── Stream revision / progress ─────────────────────────────
+  function handleStreamRevisionAndProgress(
+    s: ConvState,
+    status: string | undefined,
+    anyProgress: boolean,
+    nowTs: number
+  ): void {
     if (status !== s.lastStatus) {
       if (status === 'streaming' || status === 'submitted') {
-        // New stream: reset per-stream counters.
         s.streamRevision = 0;
         s.stallEmitted = false;
         s.lastProgressAt = nowTs;
@@ -474,14 +501,20 @@ export function createJankMonitor(opts: CreateJankMonitorOptions): JankMonitor {
       s.streamRevision += 1;
       s.stallEmitted = false;
     }
+  }
 
-    // ── Feedback after send ────────────────────────────────────
+  function handleFeedbackAfterSend(
+    conversationId: string | null,
+    s: ConvState,
+    effective: readonly MessageSnapshot[],
+    snapshot: readonly MessageSnapshot[],
+    nowTs: number
+  ): void {
     if (
       s.onSendPendingAt !== null &&
       !s.feedbackEmittedForSend &&
       nowTs - s.onSendPendingAt >= feedbackTimeoutMs
     ) {
-      // Look for a NEW user bubble or assistant placeholder vs baseline.
       const newUserIds = effective
         .filter(m => m.role === 'user' && !s.onSendUserIds.has(m.id))
         .map(m => m.id);
@@ -499,7 +532,6 @@ export function createJankMonitor(opts: CreateJankMonitorOptions): JankMonitor {
       s.feedbackEmittedForSend = true;
       s.onSendPendingAt = null;
     } else if (s.onSendPendingAt !== null) {
-      // Check for satisfied feedback.
       const newUserBubble = effective.some(
         m => m.role === 'user' && !s.onSendUserIds.has(m.id)
       );
@@ -511,6 +543,44 @@ export function createJankMonitor(opts: CreateJankMonitorOptions): JankMonitor {
         s.feedbackEmittedForSend = true;
       }
     }
+  }
+
+  function observeMessages(
+    conversationId: string | null,
+    snapshot: readonly MessageSnapshot[],
+    status?: string
+  ): void {
+    const s = state(conversationId);
+    s.snapshotIndex += 1;
+    const nowTs = now();
+    const effective = snapshot.filter(m => !IGNORED_IDS.has(m.id));
+
+    // ── Duplicates ─────────────────────────────────────────────
+    handleDuplicates(conversationId, effective, s);
+
+    // ── Reorder ────────────────────────────────────────────────
+    const nextIdOrder = handleReorder(conversationId, effective, s);
+
+    // ── Disappear / reappear ───────────────────────────────────
+    handleDisappearReappear(conversationId, effective, s, nowTs, nextIdOrder);
+
+    // ── Token rollback (per (id, partIndex)) ───────────────────
+    const anyProgress = handleTokenRollbacks(
+      conversationId,
+      effective,
+      s,
+      nowTs,
+      status
+    );
+
+    // ── Update lastSeen ────────────────────────────────────────
+    updateLastSeenState(s, effective, nextIdOrder);
+
+    // ── Stream revision / progress ─────────────────────────────
+    handleStreamRevisionAndProgress(s, status, anyProgress, nowTs);
+
+    // ── Feedback after send ────────────────────────────────────
+    handleFeedbackAfterSend(conversationId, s, effective, snapshot, nowTs);
   }
 
   function onSend(

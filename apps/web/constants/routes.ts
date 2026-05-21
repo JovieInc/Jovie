@@ -15,14 +15,18 @@ export const APP_ROUTES = {
   DASHBOARD: '/app',
   /** Legacy dashboard landing path. Kept as a constant so the legacy redirect in `next.config.js` has a referenceable source. Do NOT use for navigation. */
   LEGACY_DASHBOARD: '/app/dashboard',
+  /** Legacy earnings path. Keep for old bookmarks; use EARNINGS for canonical entry. */
   DASHBOARD_EARNINGS: '/app/dashboard/earnings',
   DASHBOARD_LINKS: '/app/dashboard/links',
   DASHBOARD_PROFILE: '/app/dashboard/profile',
+  /** Legacy audience path. Keep as a redirect source only. */
   DASHBOARD_AUDIENCE: '/app/dashboard/audience',
   /** Legacy library path. Keep as a redirect source only. */
   LEGACY_DASHBOARD_LIBRARY: '/app/dashboard/library',
   DASHBOARD_LIBRARY: '/app/library',
+  /** Legacy release workspace route. Keep for old bookmarks and nested task aliases; use RELEASES for navigation. */
   DASHBOARD_RELEASES: '/app/dashboard/releases',
+  /** Legacy tasks path. Keep for old bookmarks; use TASKS for navigation. */
   DASHBOARD_TASKS: '/app/dashboard/tasks',
   DASHBOARD_RELEASE_TASKS: '/app/dashboard/releases/[releaseId]/tasks',
   DASHBOARD_TIPPING: '/app/dashboard/tipping',
@@ -34,10 +38,11 @@ export const APP_ROUTES = {
   CONTACTS: '/app/contacts',
   RELEASES: '/app/releases',
   TOUR_DATES: '/app/tour-dates',
+  CALENDAR: '/app/calendar',
   AUDIENCE: '/app/audience',
   EARNINGS: '/app/earnings',
   LIBRARY: '/app/library',
-  TASKS: '/app/dashboard/tasks',
+  TASKS: '/app/tasks',
   CHAT: '/app/chat',
   CHAT_PROFILE_PANEL: '/app/chat?panel=profile',
   INSIGHTS: '/app/insights',
@@ -54,9 +59,11 @@ export const APP_ROUTES = {
   SETTINGS_DATA_PRIVACY: '/app/settings/data-privacy',
   SETTINGS_CONTACTS: '/app/settings/contacts',
   SETTINGS_TOURING: '/app/settings/touring',
+  SETTINGS_CONNECTORS: '/app/settings/connectors',
   SETTINGS_AUDIENCE: '/app/settings/audience',
   SETTINGS_ANALYTICS: '/app/settings/analytics',
   SETTINGS_ADMIN: '/app/settings/admin',
+  SETTINGS_RETARGETING_ADS: '/app/settings/retargeting-ads',
   /** @deprecated Use SETTINGS_DATA_PRIVACY instead */
   SETTINGS_DELETE_ACCOUNT: '/app/settings/delete-account',
 
@@ -96,6 +103,10 @@ export const APP_ROUTES = {
   ADMIN_ALGORITHM_HEALTH: '/app/admin/algorithm-health',
   ADMIN_PLAYLISTS: '/app/admin/playlists',
   ADMIN_PLATFORM_CONNECTIONS: '/app/admin/platform-connections',
+  ADMIN_AGENT_RUN: '/app/admin/agent-runs',
+  ADMIN_AGENT_RUN_DETAIL: '/app/admin/agent-runs/[id]',
+  ADMIN_COSTS: '/app/admin/costs',
+  FEATURE_FLAGS: '/app/feature-flags',
 
   // System
   UNAVAILABLE: '/unavailable',
@@ -121,6 +132,7 @@ export const APP_ROUTES = {
   DEMO_VIDEO: '/demovideo',
   ENGAGEMENT_ENGINE: '/engagement-engine',
   INVESTORS: '/investors',
+  PITCH: '/pitch',
   LANDING_NEW: '/new',
   PRICING: '/pricing',
   LAUNCH: '/launch',
@@ -153,8 +165,57 @@ export const APP_ROUTES = {
 
 export type AppRoute = (typeof APP_ROUTES)[keyof typeof APP_ROUTES];
 
-export function buildLyricsRoute(trackId: string): string {
-  return `${APP_ROUTES.LYRICS}/${encodeURIComponent(trackId)}`;
+function normalizeLyricsReturnRoute(
+  candidate: string | null | undefined
+): string | null {
+  if (!candidate) return null;
+
+  try {
+    const url = new URL(candidate, 'https://jovie.local');
+    const route = `${url.pathname}${url.search}`;
+
+    if (!url.pathname.startsWith('/app')) {
+      return null;
+    }
+
+    if (
+      url.pathname === APP_ROUTES.LYRICS ||
+      url.pathname.startsWith(`${APP_ROUTES.LYRICS}/`)
+    ) {
+      return null;
+    }
+
+    return route;
+  } catch {
+    return null;
+  }
+}
+
+export function resolveLyricsReturnRoute(
+  candidate: string | null | undefined,
+  fallback: string = APP_ROUTES.LIBRARY
+): string {
+  return normalizeLyricsReturnRoute(candidate) ?? fallback;
+}
+
+export function buildLyricsRoute(
+  trackId: string,
+  options?: {
+    readonly from?: string | null;
+  }
+): string {
+  const route = `${APP_ROUTES.LYRICS}/${encodeURIComponent(trackId)}`;
+  const returnTo = normalizeLyricsReturnRoute(options?.from);
+
+  if (!returnTo) {
+    return route;
+  }
+
+  return `${route}?from=${encodeURIComponent(returnTo)}`;
+}
+
+export function buildReleaseTasksRoute(releaseId: string): string {
+  return `${APP_ROUTES.RELEASES}/${encodeURIComponent(releaseId)}/tasks`;
 }
 
 export function isDemoRoutePath(pathname: string | null | undefined): boolean {
