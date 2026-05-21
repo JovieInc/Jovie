@@ -26,6 +26,18 @@
 - **[internal] Stitched-surface CSS hacks**: deleted four rule blocks from `globals.css` plus the `[data-sidebar-dock-button]` hide-in-Electron rule (now dead because the button is no longer rendered in Electron).
 - **[internal] `SidebarDockButton` in Electron**: conditionally skipped via `useIsElectronRuntime()` instead of rendered-then-hidden via CSS.
 
+## [26.5.34.1] - 2026-05-21
+
+> The investor pitch deck at `/pitch` now opens straight into the slides with a quiet presentation chrome instead of the consumer marketing nav, and a handful of slides got line-break and alignment cleanup so headlines stop orphaning words.
+
+### Changed
+
+- **`/pitch` page world-class redesign**: moved the route out of the `(marketing)` group so the marketing header no longer renders above the investor deck. New `apps/web/app/pitch/layout.tsx` is a minimal dark pass-through. `apps/web/app/pitch/page.tsx` is rewritten as a 44px presentation top bar (Jovie wordmark on the left, `Present` and `PDF` chrome links on the right) above a full-bleed iframe that lets the deck's own 16:9 letterboxing create the framing. A mobile fallback below `sm` shows the wordmark, a "Designed for desktop" message, and Download PDF + email CTAs.
+
+### Fixed
+
+- **Pitch deck inline-style cleanup (no copy changes)** in `apps/web/public/pitch/index.html`: removed a broken `width: 100px` on `.suno-title` that was crushing the heading and dropped the font from 150px to 132px so slide 2 stops orphaning "people" onto its own line; removed redundant inline `font-size` + `margin` on the `<span class="dim">` inside `.problem-title`; deleted the empty `<p class="problem-sub">` that was leaving a hairline gap on slide 3; removed a broken `width: 140px` on `.bs-title` that was crushing the bad-solutions headline.
+
 ## [26.5.34] - 2026-05-21
 
 > Fixed a layout shift on public artist profile pages that caused Lighthouse CLS scores of 0.317, unblocking the Lighthouse CI gate.
