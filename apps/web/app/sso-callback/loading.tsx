@@ -1,4 +1,4 @@
-import { BrandLogo } from '@/components/atoms/BrandLogo';
+import { JovieMarkElectric } from '@/components/atoms/JovieMarkElectric';
 
 /**
  * SSO callback loading screen
@@ -7,12 +7,7 @@ import { BrandLogo } from '@/components/atoms/BrandLogo';
 export default function SsoCallbackLoading() {
   return (
     <div className='min-h-dvh grid place-items-center bg-base'>
-      <BrandLogo
-        size={32}
-        tone='muted'
-        alt='Processing authentication...'
-        className='animate-pulse animate-in fade-in duration-700 ease-out'
-      />
+      <JovieMarkElectric size={32} />
     </div>
   );
 }
