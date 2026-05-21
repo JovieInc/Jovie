@@ -634,11 +634,15 @@ export function EntityPopover({
       const left = wantsRight
         ? a.right + SIDE_OFFSET
         : Math.max(POPOVER_MARGIN, a.left - SIDE_OFFSET - POPOVER_WIDTH);
-      let top = a.top;
-      if (top + contentHeight > window.innerHeight - POPOVER_MARGIN) {
-        top = window.innerHeight - POPOVER_MARGIN - contentHeight;
+      // Smart vertical positioning: center on anchor (near trigger/cursor) for
+      // tight coupling instead of always pinning to a.top. Minimal clamp keeps
+      // it near the row even near viewport edges (prevents "far jump" bug).
+      let top = a.top + a.height / 2 - contentHeight / 2;
+      const margin = POPOVER_MARGIN;
+      if (top < margin) top = margin;
+      if (top + contentHeight > window.innerHeight - margin) {
+        top = window.innerHeight - margin - contentHeight;
       }
-      if (top < POPOVER_MARGIN) top = POPOVER_MARGIN;
       setPos({ left, top, side: wantsRight ? 'right' : 'left' });
     };
     update();
@@ -673,7 +677,7 @@ export function EntityPopover({
         visibility: pos ? 'visible' : 'hidden',
       }}
       className={cn(
-        'z-[80]',
+        'z-[120]',
         LINEAR_SURFACE.popover,
         'text-primary-token',
         'animate-in fade-in-0 zoom-in-95 duration-subtle ease-subtle',
