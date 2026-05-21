@@ -21,12 +21,10 @@ import { toast } from 'sonner';
 import { TableErrorFallback } from '@/components/atoms/TableErrorFallback';
 import { TableActionMenu } from '@/components/atoms/table-action-menu/TableActionMenu';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
-import { HeaderSearchAction } from '@/components/molecules/HeaderSearchAction';
 import {
   type ContextMenuItemType,
   convertContextMenuItems,
   convertToCommonDropdownItems,
-  createMultiFieldFilterFn,
   ExportCSVButton,
   PAGE_TOOLBAR_END_GROUP_CLASS,
   PAGE_TOOLBAR_META_TEXT_CLASS,
@@ -43,11 +41,9 @@ import {
   AdminTableSubheader,
 } from '@/features/admin/table/AdminTableHeader';
 import { AdminTableShell } from '@/features/admin/table/AdminTableShell';
-import { DashboardHeaderActionGroup } from '@/features/dashboard/atoms/DashboardHeaderActionGroup';
 import { DrawerToggleButton } from '@/features/dashboard/atoms/DrawerToggleButton';
 import { useBreakpointDown } from '@/hooks/useBreakpoint';
 import { copyToClipboard } from '@/hooks/useClipboard';
-import { useSearchUrlSync } from '@/hooks/useSearchUrlSync';
 import {
   USERS_CSV_FILENAME_PREFIX,
   usersCSVColumns,
@@ -149,24 +145,8 @@ function AdminUserMobileCard({
 }
 
 export function AdminUsersTableUnified(props: Readonly<AdminUsersTableProps>) {
-  const {
-    users: initialUsers,
-    pageSize,
-    total,
-    search,
-    sort,
-    basePath = APP_ROUTES.ADMIN_USERS,
-  } = props;
+  const { users: initialUsers, pageSize, total, sort } = props;
   const router = useRouter();
-  const [filterTerm, setFilterTerm] = useState(search);
-
-  // Sync URL search param on initial load
-  useEffect(() => {
-    setFilterTerm(search);
-  }, [search]);
-
-  // Debounced URL sync (no navigation, just replaceState)
-  useSearchUrlSync(filterTerm, basePath);
 
   // Load all data without server-side search — filter client-side instead
   const { data, fetchNextPage, hasNextPage, isFetchingNextPage } =
@@ -176,19 +156,6 @@ export function AdminUsersTableUnified(props: Readonly<AdminUsersTableProps>) {
       pageSize,
       initialData: { rows: initialUsers, total },
     });
-
-  // Client-side filter searches across name, email, handle, and clerk ID
-  const userFilterFn = useMemo(
-    () =>
-      createMultiFieldFilterFn<AdminUserRow>([
-        r => r.name,
-        r => r.email,
-        r => r.profileUsername,
-        r => r.clerkId,
-        r => r.plan,
-      ]),
-    []
-  );
 
   const users = useMemo(
     () => data?.pages.flatMap(page => page.rows) ?? initialUsers,
@@ -231,38 +198,19 @@ export function AdminUsersTableUnified(props: Readonly<AdminUsersTableProps>) {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- setTableMeta is a stable context setter
   }, [selectedUser, users.length]);
 
-  const headerActions = useMemo(
-    () => (
-      <DashboardHeaderActionGroup
-        trailing={
-          <DrawerToggleButton
-            ariaLabel='Toggle user details'
-            label='Details'
-            tooltipLabel='Details'
-          />
-        }
-      >
-        <HeaderSearchAction
-          alwaysOpen
-          searchValue={filterTerm}
-          onSearchValueChange={setFilterTerm}
-          placeholder='Search by email, name, or handle'
-          ariaLabel='Search users by email, name, or handle'
-          submitAriaLabel='Search users'
-          tooltipLabel='Search'
-        />
-      </DashboardHeaderActionGroup>
-    ),
-    [filterTerm]
-  );
-
   useEffect(() => {
-    setHeaderActions(headerActions);
+    setHeaderActions(
+      <DrawerToggleButton
+        ariaLabel='Toggle user details'
+        label='Details'
+        tooltipLabel='Details'
+      />
+    );
 
     return () => {
       setHeaderActions(null);
     };
-  }, [headerActions, setHeaderActions]);
+  }, [setHeaderActions]);
 
   // Row selection
   const rowIds = useMemo(() => users.map(user => user.id), [users]);
@@ -646,9 +594,7 @@ export function AdminUsersTableUnified(props: Readonly<AdminUsersTableProps>) {
                           No users found
                         </div>
                         <div className='text-xs text-secondary-token'>
-                          {filterTerm
-                            ? 'Try adjusting your search terms or clearing the filter.'
-                            : 'Users will appear here once they sign up.'}
+                          Users will appear here once they sign up.
                         </div>
                       </div>
                     </ContentSurfaceCard>
@@ -685,10 +631,6 @@ export function AdminUsersTableUnified(props: Readonly<AdminUsersTableProps>) {
                   columns={columns}
                   rowSelection={rowSelection}
                   isLoading={false}
-                  globalFilter={filterTerm}
-                  onGlobalFilterChange={setFilterTerm}
-                  enableFiltering
-                  globalFilterFn={userFilterFn}
                   emptyState={
                     <ContentSurfaceCard className='mx-4 my-6 flex flex-col items-center gap-3 bg-surface-0 px-4 py-10 text-center'>
                       <Users className='h-6 w-6' />
@@ -697,9 +639,7 @@ export function AdminUsersTableUnified(props: Readonly<AdminUsersTableProps>) {
                           No users found
                         </div>
                         <div className='text-xs text-secondary-token'>
-                          {filterTerm
-                            ? 'Try adjusting your search terms or clearing the filter.'
-                            : 'Users will appear here once they sign up.'}
+                          Users will appear here once they sign up.
                         </div>
                       </div>
                     </ContentSurfaceCard>

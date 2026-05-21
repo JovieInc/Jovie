@@ -5,13 +5,21 @@
      5|The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
      6|and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
-## [26.5.32.0] - 2026-05-21
+## [26.5.33] - 2026-05-21
 
-> [internal] Admin profile, dashboard profile, and contact detail sidebars now use the unified DrawerHero header component, completing the EntitySidebarShell migration started in JOV-2018.
+> [internal] Removed a duplicate search button from the admin panel header; the sidebar search is now the single entry point for admin search.
+
+### Fixed
+
+- **Admin header duplicate search (JOV-2121)**: removed the `HeaderSearchAction` injection from the three admin table wrappers (`AdminUsersTableUnified`, `AdminReleasesPageWrapper`, `AdminCreatorsPageWrapper`) that duplicated the sidebar's search entry point. `DrawerToggleButton`, `BatchIngestButton`, and `IngestProfileDropdown` are preserved.
+
+## [26.5.32] - 2026-05-21
+
+> [internal] Electron desktop titlebar now has a single unified sidebar toggle and pill-style nav controls, with the sidebar rail correctly aligned to the titlebar column.
 
 ### Changed
 
-- **[internal] DrawerHero migration (JOV-2136)**: wired `<DrawerHero>` into the 3 remaining EntitySidebarShell callers — AdminProfileSidebar, ProfileContactSidebar, and ContactDetailSidebar — replacing the legacy `EntityHeaderCard` pattern. Each sidebar now uses `entityHeaderSurface='flat'` with its own `DrawerSurfaceCard` wrapper, a `DrawerCardActionBar` with `border-0 bg-transparent px-0 py-0` to prevent a border strip above the hero, and `className='[&_h2]:pr-9'` to keep the title clear of floating action buttons. The intermediate `ProfileEntityHeader` helper component was collapsed into `ProfileSidebarHeaderCard`. All 9 existing sidebar tests pass.
+- **[internal] Electron titlebar unification (JOV-2504)**: sidebar toggle is now the single canonical toggle in Electron mode — the in-sidebar dock button is hidden via CSS when inside the desktop runtime. Back/forward navigation buttons are grouped in a pill-shaped container in the main titlebar cell. Titlebar sidebar-cell `padding-left` is aligned to the shell gap so the column precisely tracks the sidebar rail in shellChatV1 mode. Geometry Playwright tests added to verify DOM structure, no-duplicate-toggle invariant, and sidebar-cell width vs CSS token.
 
 ## [26.5.29] - 2026-05-18
 
