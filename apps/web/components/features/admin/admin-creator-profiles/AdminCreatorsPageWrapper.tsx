@@ -4,13 +4,10 @@ import { ListPlus } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
 import { APP_CONTROL_BUTTON_CLASS } from '@/components/atoms/AppIconButton';
-import { HeaderSearchAction } from '@/components/molecules/HeaderSearchAction';
-import { APP_ROUTES } from '@/constants/routes';
 import { useSetHeaderActions } from '@/contexts/HeaderActionsContext';
 import { BatchIngestModal } from '@/features/admin/BatchIngestModal';
 import { IngestProfileDropdown } from '@/features/admin/ingest-profile-dropdown';
 import { DrawerToggleButton } from '@/features/dashboard/atoms/DrawerToggleButton';
-import { useSearchUrlSync } from '@/hooks/useSearchUrlSync';
 import { cn } from '@/lib/utils';
 import { AdminCreatorProfilesUnified } from './AdminCreatorProfilesUnified';
 import type { AdminCreatorProfilesWithSidebarProps } from './types';
@@ -37,11 +34,6 @@ export function AdminCreatorsPageWrapper(
   const router = useRouter();
   const { setHeaderActions } = useSetHeaderActions();
   const [batchModalOpen, setBatchModalOpen] = useState(false);
-  const basePath = props.basePath ?? APP_ROUTES.ADMIN_CREATORS;
-  const [searchQuery, setSearchQuery] = useState(props.search);
-
-  // Sync URL without navigation
-  useSearchUrlSync(searchQuery, basePath);
 
   const handleIngestPending = useCallback(() => {
     router.refresh();
@@ -55,14 +47,6 @@ export function AdminCreatorsPageWrapper(
   useEffect(() => {
     setHeaderActions(
       <div className='flex items-center gap-1.5'>
-        <HeaderSearchAction
-          searchValue={searchQuery}
-          onSearchValueChange={setSearchQuery}
-          placeholder='Search by handle or name'
-          ariaLabel='Search creators by handle or name'
-          submitAriaLabel='Search creators'
-          tooltipLabel='Search'
-        />
         <BatchIngestButton onClick={handleOpenBatchModal} />
         <IngestProfileDropdown onIngestPending={handleIngestPending} />
 
@@ -78,16 +62,11 @@ export function AdminCreatorsPageWrapper(
     return () => {
       setHeaderActions(null);
     };
-  }, [
-    setHeaderActions,
-    handleIngestPending,
-    handleOpenBatchModal,
-    searchQuery,
-  ]);
+  }, [setHeaderActions, handleIngestPending, handleOpenBatchModal]);
 
   return (
     <>
-      <AdminCreatorProfilesUnified {...props} clientFilter={searchQuery} />
+      <AdminCreatorProfilesUnified {...props} />
       <BatchIngestModal
         open={batchModalOpen}
         onOpenChange={setBatchModalOpen}
