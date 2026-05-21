@@ -176,12 +176,12 @@ describe('LibrarySurface', () => {
     });
 
     expect(assetCardButton.className).toContain(
-      'focus-visible:bg-(--linear-row-hover)'
+      'focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/55'
     );
     expect(assetCardButton.className).toContain(
-      'focus-visible:shadow-[inset_0_0_0_1px'
+      'focus-visible:ring-offset-(--linear-app-content-surface)'
     );
-    expect(assetCardButton.className).not.toContain('focus-visible:ring');
+    expect(assetCardButton.className).not.toContain('focus-visible:shadow');
 
     fireEvent.click(assetCardButton);
 
@@ -200,10 +200,13 @@ describe('LibrarySurface', () => {
       previewLink,
       providerLink,
     ]) {
-      expect(element.className).not.toContain('focus-visible:ring');
       expect(element.className).toContain(
-        'focus-visible:shadow-[inset_0_0_0_1px'
+        'focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/55'
       );
+      expect(element.className).toContain(
+        'focus-visible:ring-offset-(--linear-app-content-surface)'
+      );
+      expect(element.className).not.toContain('focus-visible:shadow');
     }
   });
 
