@@ -152,10 +152,10 @@ describe('tasks page routes', () => {
     ).not.toBeInTheDocument();
   });
 
-  it('keeps the legacy dashboard entry point on the same task contract', async () => {
-    render(await LegacyTasksPage());
+  it('redirects the legacy dashboard entry point to the canonical /app/tasks route', () => {
+    expect(() => LegacyTasksPage()).toThrow(`REDIRECT:${APP_ROUTES.TASKS}`);
 
-    expect(screen.getByTestId('tasks-page-client')).toBeInTheDocument();
+    expect(mockRedirect).toHaveBeenCalledWith(APP_ROUTES.TASKS);
   });
 
   it('redirects onboarding-required users back to start', async () => {
