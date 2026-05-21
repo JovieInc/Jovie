@@ -524,8 +524,12 @@ export const SCREENSHOT_SCENARIOS: readonly ScreenshotScenario[] = [
       id: 'public-profile-desktop',
       title: 'Public Profile',
       route: '/demo/showcase/public-profile',
-      // StaticArtistPage now renders the compact public shell at every width.
-      // Wait on that stable shell instead of the removed desktop-only surface.
+      // Wait for the stable profile-compact-shell (always present on the inner
+      // content div rendered by ProfileCompactTemplate via StaticArtistPage for
+      // the demo surfaces). This is the reliable post-hydration marker used for
+      // desktop marketing captures (tim-white live/mainstream + public profile)
+      // across shell waves; avoids pre-hydration phone fallback and stale
+      // data-layout attr after UnifiedSidebar / compact template changes.
       waitFor: '[data-testid="profile-compact-shell"]',
       publicExportPath: 'profile-desktop.png',
     },
