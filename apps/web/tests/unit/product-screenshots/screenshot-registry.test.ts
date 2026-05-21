@@ -138,7 +138,7 @@ describe('screenshot registry', () => {
     }
   });
 
-  it('waits for compact public profile shell on desktop profile captures', () => {
+  it('waits for compact profile shell on desktop captures (stable post-shell-migration selector)', () => {
     const desktopProfileIds = [
       'tim-white-profile-live-desktop',
       'tim-white-profile-mainstream-desktop',
