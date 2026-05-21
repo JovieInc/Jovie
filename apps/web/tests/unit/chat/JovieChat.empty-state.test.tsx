@@ -1,3 +1,4 @@
+import { fireEvent, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { JovieChat } from '@/components/jovie/JovieChat';
@@ -104,13 +105,14 @@ vi.mock('@/components/jovie/components/ChatUsageAlert', () => ({
 
 describe('JovieChat empty state', () => {
   beforeEach(() => {
+    vi.clearAllMocks();
     mockChatState.messages = [];
     mockChatState.hasMessages = false;
     mockChatState.isLoading = false;
     mockChatState.isSubmitting = false;
   });
 
-  it('renders the minimal welcome state with hero-style heading, pills, and composer', () => {
+  it('renders the minimal welcome state without prompt pills', () => {
     const { getByTestId, getByText, queryByText } = renderWithQueryClient(
       <JovieChat profileId='profile-1' />
     );
@@ -120,14 +122,39 @@ describe('JovieChat empty state', () => {
     expect(queryByText('Jovie Assistant')).toBeNull();
     expect(queryByText('Ask anything or tell Jovie what you need')).toBeNull();
     expect(getByTestId('chat-input')).toBeTruthy();
-    // New hero-style pills sourced from DEFAULT_SUGGESTIONS (mirrors homepage).
-    expect(getByText('Plan a release')).toBeTruthy();
-    expect(getByText('Generate album art')).toBeTruthy();
-    expect(getByText('Pitch playlists')).toBeTruthy();
+    expect(queryByText('Plan a release')).toBeNull();
+    expect(queryByText('Generate album art')).toBeNull();
+    expect(queryByText('Pitch playlists')).toBeNull();
     // Old task-list-style actions should NOT appear — they belong in the profile switcher.
     expect(queryByText('Preview profile')).toBeNull();
     expect(queryByText('Change photo')).toBeNull();
     expect(queryByText('Release link')).toBeNull();
+  });
+
+  it('renders a contextual action card and submits its prompt', () => {
+    renderWithQueryClient(
+      <JovieChat
+        profileId='profile-1'
+        actionCards={[
+          {
+            id: 'connect-music-catalog',
+            title: 'Connect Your Music Catalog',
+            body: 'Add Spotify, Apple Music, or YouTube Music so Jovie can plan from real releases.',
+            actionLabel: 'Plan Setup',
+            prompt: 'Help me connect my music catalog.',
+          },
+        ]}
+      />
+    );
+
+    expect(screen.getByText('Connect Your Music Catalog')).toBeTruthy();
+    expect(screen.getByText(/Add Spotify/)).toBeTruthy();
+
+    fireEvent.click(screen.getByRole('button', { name: /Plan Setup/ }));
+
+    expect(mockChatState.handleSuggestedPrompt).toHaveBeenCalledWith(
+      'Help me connect my music catalog.'
+    );
   });
 
   it('renders first-session greeting for new users', () => {

@@ -3,17 +3,16 @@
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { ImagePlus } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { SuggestionCard } from '@/components/shell/SuggestionCard';
 import { useAppFlag } from '@/lib/flags/client';
 import { SUPPORTED_IMAGE_MIME_TYPES } from '@/lib/images/config';
-
 import {
   ChatInput,
   ChatMessage,
   ChatMessageSkeleton,
   ErrorDisplay,
   ScrollToBottom,
-  SuggestedPrompts,
 } from './components';
 import { ChatProvidersRegistrar } from './components/ChatProvidersRegistrar';
 import { ChatUsageAlert } from './components/ChatUsageAlert';
@@ -55,7 +54,7 @@ export function JovieChat({
   username,
   displayName,
   isFirstSession = false,
-  latestReleaseTitle,
+  actionCards = [],
 }: JovieChatProps) {
   const initialQuerySubmitted = useRef(false);
   const initialSkillApplied = useRef(false);
@@ -93,24 +92,6 @@ export function JovieChat({
     onConversationCreate,
     username,
   });
-
-  const followUpQuickActions = useMemo(
-    () => [
-      {
-        label: 'Summarize this thread',
-        prompt: 'Summarize this thread in three concise bullets.',
-      },
-      {
-        label: 'What should I do next?',
-        prompt: 'Based on this conversation, what should I do next?',
-      },
-      {
-        label: 'Turn it into a checklist',
-        prompt: 'Turn this conversation into a short checklist I can follow.',
-      },
-    ],
-    []
-  );
 
   // Image attachments for chat messages
   const {
@@ -353,6 +334,7 @@ export function JovieChat({
   } else {
     emptyStateHeading = 'Welcome Back';
   }
+  const primaryActionCard = actionCards[0] ?? null;
 
   return (
     <div
@@ -535,8 +517,6 @@ export function JovieChat({
                 placeholder='Ask a follow-up...'
                 variant='compact'
                 shellChatV1={shellChatV1Enabled}
-                quickActions={followUpQuickActions}
-                onQuickActionSelect={handleSuggestedPromptWithJank}
               />
             </div>
           </div>
@@ -587,13 +567,17 @@ export function JovieChat({
                 {emptyStateHeading}
               </h1>
               <div className='mx-auto flex w-full max-w-[38rem] flex-col items-center gap-3'>
-                <SuggestedPrompts
-                  onSelect={handleSuggestedPromptWithJank}
-                  isFirstSession={isFirstSession}
-                  latestReleaseTitle={latestReleaseTitle}
-                  layout='rail'
-                  dimmed={composerPickerOpen}
-                />
+                {primaryActionCard ? (
+                  <SuggestionCard
+                    title={primaryActionCard.title}
+                    body={primaryActionCard.body}
+                    actionLabel={primaryActionCard.actionLabel}
+                    onAct={() =>
+                      handleSuggestedPromptWithJank(primaryActionCard.prompt)
+                    }
+                    className={composerPickerOpen ? 'opacity-55' : undefined}
+                  />
+                ) : null}
                 {chatError && (
                   <div className='mt-2.5 w-full'>
                     <ErrorDisplay
