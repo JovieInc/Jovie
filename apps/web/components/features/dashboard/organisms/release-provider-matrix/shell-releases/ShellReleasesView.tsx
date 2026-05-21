@@ -268,7 +268,7 @@ function ReleasesListContent({
             <button
               type='button'
               onClick={onClearFilters}
-              className='mt-2 text-[11px] text-cyan-400 hover:text-cyan-300 transition-colors duration-subtle ease-out'
+              className='mt-2 text-[11px] text-cyan-400 hover:text-cyan-300 transition-colors duration-subtle ease-subtle'
             >
               Clear filters
             </button>
