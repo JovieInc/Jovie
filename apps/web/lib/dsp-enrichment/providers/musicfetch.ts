@@ -118,6 +118,8 @@ export function isMusicFetchAvailable(): boolean {
  * Returns cross-platform DSP links and social profiles, or null for
  * non-retryable lookup failures.
  *
+ * @param options.signal - Optional AbortSignal for caller-driven cancellation (navigation, unmount, etc.).
+ *
  * @throws {MusicfetchRequestError} When MusicFetch rejects the configured
  * service list with an invalid-services 400 detected by
  * isMusicfetchInvalidServicesError().
@@ -152,7 +154,8 @@ function handleMusicfetchLookupError(error: unknown, spotifyUrl: string): null {
 }
 
 export async function fetchArtistBySpotifyUrl(
-  spotifyUrl: string
+  spotifyUrl: string,
+  options?: { signal?: AbortSignal }
 ): Promise<MusicFetchArtistResult | null> {
   if (!isMusicFetchAvailable()) {
     logger.warn('MusicFetch API token not configured, skipping enrichment');
@@ -184,6 +187,7 @@ export async function fetchArtistBySpotifyUrl(
           params,
           {
             timeoutMs: REQUEST_TIMEOUT_MS,
+            signal: options?.signal,
           }
         );
 
