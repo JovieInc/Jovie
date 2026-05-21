@@ -13,6 +13,7 @@ import { captureError, captureWarning } from '@/lib/error-tracking';
 import { mergeProfileTheme } from '@/lib/profile/profile-theme';
 import { buildThemeWithProfileAccent } from '@/lib/profile/profile-theme.server';
 import { getRedis } from '@/lib/redis';
+import { logger } from '@/lib/utils/logger';
 import type { ProfileData, ProfileUpdateData } from './types';
 
 // Redis key prefix for view count batching
@@ -213,7 +214,9 @@ async function flushViewsToDatabase(
     }
   }
 
-  captureWarning('Profile view flush failed after retries', {
+  // JOV-2388: view counts are non-critical telemetry — log only, do not send to Sentry.
+  // Neon connection failures under traffic spikes are transient; the next flush will succeed.
+  logger.warn('[profile/mutations] profile view flush failed after retries', {
     username: normalizedUsername,
     count: sanitizedCount,
     maxRetries,
@@ -255,11 +258,17 @@ async function incrementViewsDirectly(
     }
   }
 
-  captureWarning('Profile view increment failed after retries', {
-    username: normalizedUsername,
-    maxRetries,
-    error: lastError?.message,
-  });
+  // JOV-2388: view counts are non-critical telemetry — log only, do not send to Sentry.
+  // Neon connection failures under traffic spikes are transient; Redis batching reduces
+  // direct-DB path frequency. A failed increment is acceptable data loss.
+  logger.warn(
+    '[profile/mutations] profile view increment failed after retries',
+    {
+      username: normalizedUsername,
+      maxRetries,
+      error: lastError?.message,
+    }
+  );
 }
 
 /**

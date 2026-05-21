@@ -37,7 +37,7 @@ import {
 import { db } from '@/lib/db';
 import { workflowRuns } from '@/lib/db/schema/connectors';
 import { env } from '@/lib/env-server';
-import { captureError } from '@/lib/error-tracking';
+import { captureError, captureWarning } from '@/lib/error-tracking';
 import { logger } from '@/lib/utils/logger';
 
 export const maxDuration = 300;
@@ -142,8 +142,16 @@ export async function GET(request: Request): Promise<Response> {
       failed,
     });
   } catch (err) {
-    logger.error('[process-workflow-runs] cron tick failed', err);
-    await captureError('process-workflow-runs cron tick failed', err, {});
+    // JOV-2326: a failed cron tick is self-healing — the next tick (6 min) will retry
+    // any pending rows. Log at warn level to avoid Sentry noise from transient Neon
+    // connection failures; escalate only if the error recurs persistently.
+    logger.warn(
+      '[process-workflow-runs] cron tick failed (transient, will retry)',
+      {
+        err,
+      }
+    );
+    await captureWarning('process-workflow-runs cron tick failed', err, {});
     return NextResponse.json({ error: 'internal-error' }, { status: 500 });
   }
 }

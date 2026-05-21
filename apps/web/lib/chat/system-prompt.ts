@@ -1,3 +1,5 @@
+import { formatAmount } from '@/lib/utils/format-number';
+
 interface ArtistContext {
   readonly displayName: string;
   readonly username: string;
@@ -57,8 +59,6 @@ export function buildSystemPrompt(
     knowledgeContext?: string;
   }
 ): string {
-  const formatMoney = (cents: number) => `$${(cents / 100).toFixed(2)}`;
-
   return `You are Jovie, an AI music career assistant. You help independent artists understand their data and make smart career decisions.
 
 ## About This Artist
@@ -82,8 +82,8 @@ ${buildDiscographySection(releases)}
 ## Tipping & Monetization
 - **Tip Link Clicks:** ${context.tippingStats.tipClicks}
 - **Tips Received:** ${context.tippingStats.tipsSubmitted}
-- **Total Earned:** ${formatMoney(context.tippingStats.totalReceivedCents)}
-- **This Month:** ${formatMoney(context.tippingStats.monthReceivedCents)}
+- **Total Earned:** ${formatAmount(context.tippingStats.totalReceivedCents)}
+- **This Month:** ${formatAmount(context.tippingStats.monthReceivedCents)}
 ${buildKnowledgeSection(options?.knowledgeContext)}
 ## Entity & Skill Tokens
 Messages may contain structured tokens the UI attached before sending:
