@@ -1,7 +1,14 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { Suspense, useCallback, useMemo, useState } from 'react';
+import {
+  type RefObject,
+  Suspense,
+  useCallback,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import { Icon } from '@/components/atoms/Icon';
 import {
   DrawerButton,
@@ -152,6 +159,8 @@ interface ReleasesListContentProps {
   readonly onSync: () => void;
   readonly onSelect: (release: ReleaseViewModel) => void;
   readonly onClearFilters: () => void;
+  /** Ref forwarded to the listbox element for keyboard-nav focus scoping. */
+  readonly listboxRef?: RefObject<HTMLDivElement | null>;
 }
 
 function ReleasesListContent({
@@ -170,6 +179,7 @@ function ReleasesListContent({
   onSync,
   onSelect,
   onClearFilters,
+  listboxRef,
 }: ReleasesListContentProps) {
   if (showEmptyState) {
     return (
@@ -280,6 +290,7 @@ function ReleasesListContent({
 
   return (
     <div
+      ref={listboxRef}
       role='listbox'
       aria-label='Releases'
       className='py-1.5 space-y-px px-2'
@@ -470,11 +481,34 @@ export function ShellReleasesView({
     [openEditor, visibleReleases]
   );
 
+  /**
+   * Enter key drill-in: opens the release sidebar for the currently selected
+   * (highlighted) release. Unlike J/K which call `openEditor` (a toggle), this
+   * is non-destructive — it opens the sidebar only when the release is not
+   * already being edited, preventing Enter from accidentally closing the panel.
+   */
+  const handleAmbientActivate = useCallback(
+    (index: number) => {
+      const target = visibleReleases[index];
+      if (!target) return;
+      // Only open if not already editing this release — avoids toggle-close.
+      if (editingRelease?.id !== target.id) {
+        openEditor(target);
+      }
+    },
+    [editingRelease, openEditor, visibleReleases]
+  );
+
+  /** Ref for the listbox container — used to scope J/K nav to the releases list. */
+  const listboxRef = useRef<HTMLDivElement>(null);
+
   useAmbientListSelection({
     enabled: visibleReleases.length > 0,
     count: visibleReleases.length,
     selectedIndex: selectedReleaseIndex,
     onSelect: handleAmbientSelect,
+    onActivate: handleAmbientActivate,
+    containerRef: listboxRef,
   });
 
   const openTrackDrawer = useCallback(
@@ -891,6 +925,7 @@ export function ShellReleasesView({
             onSync={handleSync}
             onSelect={handleSelect}
             onClearFilters={handleClearFilters}
+            listboxRef={listboxRef}
           />
         </div>
       </PageShell>
