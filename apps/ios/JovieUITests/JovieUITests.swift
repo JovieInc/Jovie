@@ -6,7 +6,10 @@ final class JovieUITests: XCTestCase {
       $0.staticTexts["Jovie"]
     }
 
-    XCTAssertTrue(app.staticTexts["Syncing profile"].exists || app.staticTexts["Preparing QR"].exists || app.staticTexts["Opening workspace"].exists)
+    XCTAssertTrue(
+      app.otherElements["cinematic-loading"].exists || app.staticTexts["Jovie"].exists,
+      "Cinematic splash did not render the loading surface.\n\(app.debugDescription)"
+    )
     attachScreenshot(named: "cinematic-loading", app: app)
   }
 

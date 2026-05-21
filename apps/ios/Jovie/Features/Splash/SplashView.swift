@@ -53,6 +53,7 @@ struct SplashView: View {
     }
     .accessibilityElement(children: .combine)
     .accessibilityLabel("Jovie is loading")
+    .accessibilityIdentifier("cinematic-loading")
     .task {
       if reduceMotion {
         stageIndex = 1
