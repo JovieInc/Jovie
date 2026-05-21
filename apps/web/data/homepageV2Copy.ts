@@ -159,7 +159,7 @@ export const HOMEPAGE_V2_COPY: HomepageV2Copy = {
     body: 'Real release behavior, not generic creator proof.',
   },
   pricing: {
-    headline: 'Simple pricing',
+    headline: 'Free to start.',
     body: 'Artist profiles are free forever. Pro adds the release tools when you need them.',
     supportLine: 'Profiles stay free. Paid plans open from the waitlist.',
     ctaLabel: 'See Pricing',
