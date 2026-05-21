@@ -46,6 +46,7 @@ export const ServerEnvSchema = z.object({
     })
     .optional(),
   VERCEL_AUTOMATION_BYPASS_SECRET: z.string().optional(),
+  PUBLIC_NOAUTH_SMOKE: z.string().optional(),
 
   // Clerk server-side configuration
   CLERK_SECRET_KEY: z.string().optional(),
@@ -291,6 +292,7 @@ export const ENV_KEYS = [
   'VERCEL_ENV',
   'VERCEL_URL',
   'VERCEL_AUTOMATION_BYPASS_SECRET',
+  'PUBLIC_NOAUTH_SMOKE',
   'CLERK_SECRET_KEY',
   'CLERK_WEBHOOK_SECRET',
   'CLERK_PUBLISHABLE_KEY_STAGING',
