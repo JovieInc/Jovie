@@ -48,6 +48,8 @@ const mocks = vi.hoisted(() => ({
   shouldBypassClerkForRequest: vi.fn().mockReturnValue(true),
   isTestAuthBypassEnabled: vi.fn().mockReturnValue(true),
   resolveTestBypassUserId: vi.fn().mockReturnValue(null),
+  checkProfileVisitorBlocked: vi.fn().mockResolvedValue(false),
+  getAudienceBlockIpFromHeaders: vi.fn().mockReturnValue('masked-ip'),
   createBotResponse: vi.fn(),
   clerkMiddleware: vi.fn(),
   buildProtectedAuthRedirectUrl: vi.fn(
@@ -97,6 +99,10 @@ vi.mock('@/lib/auth/test-mode', () => ({
   TEST_AUTH_BYPASS_MODE: 'test-auth-bypass',
   TEST_MODE_HEADER: 'x-test-mode',
   resolveTestBypassUserId: mocks.resolveTestBypassUserId,
+}));
+vi.mock('@/lib/audience/public-profile-block', () => ({
+  checkProfileVisitorBlocked: mocks.checkProfileVisitorBlocked,
+  getAudienceBlockIpFromHeaders: mocks.getAudienceBlockIpFromHeaders,
 }));
 vi.mock('@/lib/utils/bot-detection', () => ({
   createBotResponse: mocks.createBotResponse,
@@ -181,6 +187,8 @@ function resetMocks() {
   mocks.getUserState.mockResolvedValue(null);
   mocks.isKnownActiveUser.mockReturnValue(false);
   mocks.isStagingHost.mockReturnValue(false);
+  mocks.checkProfileVisitorBlocked.mockResolvedValue(false);
+  mocks.getAudienceBlockIpFromHeaders.mockReturnValue('masked-ip');
   mocks.createBotResponse.mockReturnValue(undefined);
   mocks.fetch.mockResolvedValue(
     new Response('ok', {
@@ -514,6 +522,61 @@ describe('proxy.ts middleware', () => {
       const res = await callMiddleware(req);
 
       expect(res.status).toBeLessThan(300);
+    });
+
+    it('does not run the audience block lookup for reserved public routes', async () => {
+      const reservedRoutes = ['/start', '/pricing', '/about', '/investors'];
+
+      for (const pathname of reservedRoutes) {
+        const req = createUnauthenticatedRequest({ pathname });
+        const res = await callMiddleware(req);
+
+        expect(res.status).toBeLessThan(300);
+      }
+
+      expect(mocks.checkProfileVisitorBlocked).not.toHaveBeenCalled();
+      expect(mocks.getAudienceBlockIpFromHeaders).not.toHaveBeenCalled();
+    });
+
+    it('runs the audience block lookup for public profile root paths only', async () => {
+      const req = createUnauthenticatedRequest({
+        pathname: '/timwhite',
+        headers: {
+          'x-forwarded-for': '203.0.113.7, 198.51.100.8',
+          'user-agent': 'Mozilla/5.0',
+        },
+      });
+      const res = await callMiddleware(req);
+
+      expect(res.status).toBeLessThan(300);
+      expect(mocks.getAudienceBlockIpFromHeaders).toHaveBeenCalledWith(
+        req.headers
+      );
+      expect(mocks.checkProfileVisitorBlocked).toHaveBeenCalledWith(
+        'timwhite',
+        'masked-ip',
+        'Mozilla/5.0'
+      );
+    });
+
+    it('redirects blocked public profile visitors before route handling continues', async () => {
+      mocks.checkProfileVisitorBlocked.mockResolvedValue(true);
+
+      const req = createUnauthenticatedRequest({
+        pathname: '/timwhite',
+        headers: {
+          'user-agent': 'Mozilla/5.0',
+        },
+      });
+      const res = await callMiddleware(req);
+
+      expect(res.status).toBe(307);
+      expect(res.headers.get('location')).toBe('https://jov.ie/');
+      expect(mocks.checkProfileVisitorBlocked).toHaveBeenCalledWith(
+        'timwhite',
+        'masked-ip',
+        'Mozilla/5.0'
+      );
     });
 
     it('normalizes /sign-in to /signin', async () => {
@@ -1421,6 +1484,25 @@ describe('proxy.ts middleware', () => {
       expect(res.headers.get('location')).toBe(
         'https://jov.ie/support?t=token-123&action=interested'
       );
+    });
+  });
+
+  describe('path-based investor portal (proxy investor early returns)', () => {
+    it('lets investor response links bypass Clerk without stripping token params', async () => {
+      const req = createUnauthenticatedRequest({
+        pathname: '/investor-portal/respond',
+        searchParams: {
+          t: 'token-123',
+          action: 'interested',
+        },
+      });
+      const res = await callMiddleware(req);
+
+      expect(res.status).toBe(200);
+      expect(res.headers.get('location')).toBeNull();
+      expect(res.headers.get('X-Robots-Tag')).toContain('noindex');
+      expect(res.headers.get('Cache-Control')).toBe('private, no-store');
+      expect(mocks.clerkMiddleware).not.toHaveBeenCalled();
     });
   });
 
