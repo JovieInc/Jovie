@@ -105,6 +105,7 @@ export function AdminProfileSidebar({
               menuItems={contextMenuItems}
               onClose={onClose}
               overflowTriggerPlacement='card-top-right'
+              className='border-0 bg-transparent px-0 py-0'
             />
             <DrawerHero
               title={profile.displayName ?? profile.username}

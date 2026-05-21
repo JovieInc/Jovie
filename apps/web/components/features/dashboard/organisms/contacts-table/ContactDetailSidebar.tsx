@@ -254,6 +254,7 @@ export const ContactDetailSidebar = memo(function ContactDetailSidebar({
                 menuItems={contextMenuItems}
                 onClose={handleClose}
                 overflowTriggerPlacement='card-top-right'
+                className='border-0 bg-transparent px-0 py-0'
               />
               <DrawerHero
                 title={contactDisplayName}
