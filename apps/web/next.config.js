@@ -441,6 +441,15 @@ const nextConfig = {
       }
     })(),
   },
+  // Keep @statsig/statsig-node-core external so Next.js does not webpack-bundle
+  // the NAPI package. When bundled, the hash-prefixed import path that Next.js
+  // generates (`@statsig/statsig-node-core-<hash>`) cannot be resolved at
+  // runtime on Vercel — Vercel file-tracing cannot follow hashed require()
+  // paths to locate the platform-native .node binary. Marking it external
+  // restores the original require path so Vercel's tracer includes the correct
+  // linux-x64 or linux-arm64 binary in the serverless function bundle.
+  // See JOV-2322.
+  serverExternalPackages: ['@statsig/statsig-node-core'],
   experimental: {
     // Note: PPR (ppr: 'incremental') was deprecated in Next.js 15.3
     // cacheComponents: true requires additional configuration, disabled for now

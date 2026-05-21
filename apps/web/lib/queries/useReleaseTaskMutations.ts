@@ -1,14 +1,38 @@
 'use client';
 
 import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { toast } from 'sonner';
 import {
   addReleaseTask,
   deleteReleaseTask,
   instantiateReleaseTasks,
   updateReleaseTask,
 } from '@/app/app/(shell)/dashboard/releases/task-actions';
+import { captureError } from '@/lib/error-tracking';
 import type { ReleaseTaskView } from '@/lib/release-tasks/types';
 import { queryKeys } from './keys';
+
+/**
+ * Returns true when the error is a TasksUpgradeRequiredError that crossed the
+ * Server Action boundary. Matches on the serialised `name` field or the `code`
+ * property to avoid a brittle instanceof check across the boundary.
+ */
+function isUpgradeRequiredError(error: unknown): boolean {
+  if (error instanceof Error && error.name === 'TasksUpgradeRequiredError') {
+    return true;
+  }
+  if (
+    error !== null &&
+    typeof error === 'object' &&
+    'code' in error &&
+    typeof (error as { code: unknown }).code === 'string' &&
+    ((error as { code: string }).code === 'RELEASE_PLAN_LOCKED' ||
+      (error as { code: string }).code === 'TASKS_WORKSPACE_LOCKED')
+  ) {
+    return true;
+  }
+  return false;
+}
 
 function getReleaseTasksQueryKey(releaseId: string) {
   return queryKeys.releaseTasks.byRelease(releaseId);
@@ -99,6 +123,21 @@ export function useInstantiateTasksMutation(releaseId: string) {
 
   return useMutation({
     mutationFn: () => instantiateReleaseTasks(releaseId),
+
+    onError: (error: unknown) => {
+      // Expected entitlement gate — not a bug, do not report to Sentry.
+      if (isUpgradeRequiredError(error)) {
+        toast.error(
+          'Release plans require a Pro plan. Upgrade to unlock this feature.'
+        );
+        return;
+      }
+      captureError('Failed to instantiate release tasks', error, {
+        releaseId,
+        action: 'instantiate-release-tasks',
+      });
+      toast.error('Failed to set up release tasks. Try again.');
+    },
 
     onSettled: async () => {
       await invalidateReleaseTaskQueries(queryClient, releaseId);
