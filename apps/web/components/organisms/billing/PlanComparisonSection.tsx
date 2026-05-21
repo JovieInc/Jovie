@@ -9,6 +9,7 @@ import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { UpgradeButton } from '@/components/molecules/UpgradeButton';
 import type { PricingOption } from '@/lib/queries';
 import { cn } from '@/lib/utils';
+import { formatAmountNoCents } from '@/lib/utils/format-number';
 import {
   LINEAR_EASE,
   PLAN_FEATURES,
@@ -125,7 +126,7 @@ export function PlanComparisonSection({
           let priceDisplay: string | null = '$0';
           if (planKey !== 'free') {
             priceDisplay = priceOption
-              ? `$${(priceOption.amount / 100).toFixed(0)}`
+              ? formatAmountNoCents(priceOption.amount)
               : null;
           }
 
@@ -140,7 +141,7 @@ export function PlanComparisonSection({
             <ContentSurfaceCard
               key={planKey}
               className={cn(
-                'relative flex flex-col overflow-hidden p-0 transition-[border-color,box-shadow] duration-200',
+                'relative flex flex-col overflow-hidden p-0 transition-[border-color,box-shadow] duration-subtle',
                 isCurrentPlan && 'border-(--linear-border-focus)'
               )}
             >
