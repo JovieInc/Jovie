@@ -5,13 +5,21 @@
      5|The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
      6|and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.5.33] - 2026-05-21
+
+> [internal] Removed a duplicate search button from the admin panel header; the sidebar search is now the single entry point for admin search.
+
+### Fixed
+
+- **Admin header duplicate search (JOV-2121)**: removed the `HeaderSearchAction` injection from the three admin table wrappers (`AdminUsersTableUnified`, `AdminReleasesPageWrapper`, `AdminCreatorsPageWrapper`) that duplicated the sidebar's search entry point. `DrawerToggleButton`, `BatchIngestButton`, and `IngestProfileDropdown` are preserved.
+
 ## [26.5.32] - 2026-05-21
 
-> [internal] OTP verification on public artist profile pages now fires source-attributed analytics events so confirmed subscriptions can be measured back to the originating signup surface.
+> [internal] Electron desktop titlebar now has a single unified sidebar toggle and pill-style nav controls, with the sidebar rail correctly aligned to the titlebar column.
 
-### Added
+### Changed
 
-- **[internal] OTP verification source canary (JOV-2360)**: `useSubscriptionForm` now fires `otp_verified` and `otp_verify_error` analytics events at OTP confirmation time, carrying the originating `source` (e.g., `subscribe_tab`, `hero_alerts_button`) and the artist handle. Closes the measurement gap between subscribe intent and confirmed email verification.
+- **[internal] Electron titlebar unification (JOV-2504)**: sidebar toggle is now the single canonical toggle in Electron mode — the in-sidebar dock button is hidden via CSS when inside the desktop runtime. Back/forward navigation buttons are grouped in a pill-shaped container in the main titlebar cell. Titlebar sidebar-cell `padding-left` is aligned to the shell gap so the column precisely tracks the sidebar rail in shellChatV1 mode. Geometry Playwright tests added to verify DOM structure, no-duplicate-toggle invariant, and sidebar-cell width vs CSS token.
 
 ## [26.5.29] - 2026-05-18
 

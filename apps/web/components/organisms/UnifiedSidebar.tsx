@@ -229,6 +229,7 @@ function SidebarDockButton() {
       <button
         type='button'
         aria-label='Collapse sidebar'
+        data-sidebar-dock-button='true'
         onClick={toggleSidebar}
         className='flex size-7 shrink-0 items-center justify-center rounded-[10px] bg-transparent text-sidebar-item-icon transition-[background,color] duration-normal ease-interactive hover:bg-sidebar-accent/60 hover:text-sidebar-item-foreground focus-visible:outline-none focus-visible:bg-sidebar-accent/60 focus-visible:text-sidebar-item-foreground'
       >
