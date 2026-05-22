@@ -3,8 +3,8 @@
 import { Button } from '@jovie/ui';
 import { Download, RefreshCw } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
-import { ContentSectionHeader } from '@/components/molecules/ContentSectionHeader';
-import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
+import { SettingsSection } from '@/components/features/dashboard/organisms/SettingsSection';
+import { SettingsPanel } from '@/components/molecules/settings/SettingsPanel';
 import { useNotifications } from '@/lib/hooks/useNotifications';
 
 interface AttributionStats {
@@ -28,16 +28,19 @@ function SummaryCard({
   description,
 }: Readonly<SummaryCardProps>) {
   return (
-    <ContentSurfaceCard surface='nested' className='space-y-1 p-4'>
-      <p className='text-2xl font-semibold text-primary-token'>{value}</p>
+    <div className='min-h-[116px] rounded-md border border-subtle bg-surface-0 px-3 py-3'>
+      <p className='text-xl font-semibold text-primary-token'>{value}</p>
       <p className='text-xs font-medium text-tertiary-token'>{label}</p>
-      <p className='text-app leading-5 text-secondary-token'>{description}</p>
-    </ContentSurfaceCard>
+      <p className='mt-1 text-app leading-5 text-secondary-token'>
+        {description}
+      </p>
+    </div>
   );
 }
 
 function AttributionStatsCard() {
   const [stats, setStats] = useState<AttributionStats | null>(null);
+  const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -49,16 +52,17 @@ function AttributionStatsCard() {
           setStats(data);
         }
       })
-      .catch(() => {});
+      .catch(() => {})
+      .finally(() => {
+        if (!cancelled) {
+          setLoaded(true);
+        }
+      });
 
     return () => {
       cancelled = true;
     };
   }, []);
-
-  if (!stats || stats.total === 0) {
-    return null;
-  }
 
   const platforms = [
     { key: 'retargeting_meta' as const, label: 'Meta' },
@@ -67,42 +71,62 @@ function AttributionStatsCard() {
   ];
 
   return (
-    <ContentSurfaceCard surface='details'>
-      <ContentSectionHeader
-        density='compact'
-        title='Retargeting attribution'
-        subtitle='Subscribers attributed to these ads this month.'
-      />
-      <div className='space-y-3 p-3 pt-0 sm:p-4 sm:pt-0'>
-        <div>
-          <p className='text-2xl font-semibold text-primary-token'>
-            {stats.total}
+    <SettingsPanel
+      className='min-h-[156px]'
+      cardClassName='p-4'
+      title='Retargeting attribution'
+      description='Subscribers attributed to these ads this month.'
+    >
+      {!loaded ? (
+        <div className='space-y-3'>
+          <div className='h-7 w-10 rounded-md skeleton motion-reduce:animate-none' />
+          <div className='h-4 w-72 max-w-full rounded-md skeleton motion-reduce:animate-none' />
+          <div className='flex gap-2'>
+            <div className='h-12 w-20 rounded-md skeleton motion-reduce:animate-none' />
+            <div className='h-12 w-20 rounded-md skeleton motion-reduce:animate-none' />
+          </div>
+        </div>
+      ) : stats && stats.total > 0 ? (
+        <div className='space-y-3'>
+          <div>
+            <p className='text-2xl font-semibold text-primary-token'>
+              {stats.total}
+            </p>
+            <p className='text-app text-secondary-token'>
+              {stats.total === 1 ? 'Subscriber' : 'Subscribers'} attributed to
+              retargeting campaigns this month.
+            </p>
+          </div>
+          <div className='flex flex-wrap gap-2'>
+            {platforms
+              .filter(platform => stats.byPlatform[platform.key] > 0)
+              .map(platform => (
+                <div
+                  key={platform.key}
+                  className='min-w-20 rounded-md border border-subtle bg-surface-0 px-3 py-2'
+                >
+                  <p className='text-xs font-semibold text-primary-token'>
+                    {platform.label}
+                  </p>
+                  <p className='text-xs text-secondary-token'>
+                    {stats.byPlatform[platform.key]}
+                  </p>
+                </div>
+              ))}
+          </div>
+        </div>
+      ) : (
+        <div className='flex min-h-[92px] flex-col justify-center'>
+          <p className='text-app font-medium text-primary-token'>
+            No attributed subscribers yet
           </p>
-          <p className='text-app text-secondary-token'>
-            {stats.total === 1 ? 'Subscriber' : 'Subscribers'} attributed to
-            retargeting campaigns this month.
+          <p className='mt-1 max-w-prose text-app text-secondary-token'>
+            Attribution appears here once a retargeting campaign starts sending
+            subscribers back to Jovie.
           </p>
         </div>
-        <div className='flex flex-wrap gap-2'>
-          {platforms
-            .filter(platform => stats.byPlatform[platform.key] > 0)
-            .map(platform => (
-              <ContentSurfaceCard
-                key={platform.key}
-                surface='nested'
-                className='px-3 py-2'
-              >
-                <p className='text-xs font-semibold text-primary-token'>
-                  {platform.label}
-                </p>
-                <p className='text-xs text-secondary-token'>
-                  {stats.byPlatform[platform.key]}
-                </p>
-              </ContentSurfaceCard>
-            ))}
-        </div>
-      </div>
-    </ContentSurfaceCard>
+      )}
+    </SettingsPanel>
   );
 }
 
@@ -202,7 +226,7 @@ function AdPreviewCard({ variant }: { readonly variant: AdVariant }) {
     : getAdCreativeUrl(variant.type, variant.size);
 
   return (
-    <ContentSurfaceCard surface='nested' className='space-y-3 p-4'>
+    <div className='space-y-3 rounded-md border border-subtle bg-surface-0 p-4'>
       <div
         className={
           variant.size === 'story'
@@ -251,7 +275,7 @@ function AdPreviewCard({ variant }: { readonly variant: AdVariant }) {
           </Button>
         </div>
       </div>
-    </ContentSurfaceCard>
+    </div>
   );
 }
 
@@ -267,13 +291,8 @@ function AdGroupSection({
   variants,
 }: Readonly<AdGroupSectionProps>) {
   return (
-    <ContentSurfaceCard surface='details'>
-      <ContentSectionHeader
-        density='compact'
-        title={title}
-        subtitle={subtitle}
-      />
-      <div className='grid grid-cols-1 gap-4 p-3 pt-0 sm:grid-cols-2 sm:p-4 sm:pt-0'>
+    <SettingsPanel title={title} description={subtitle} cardClassName='p-4'>
+      <div className='grid grid-cols-1 gap-4 sm:grid-cols-2'>
         {variants.map(variant => (
           <AdPreviewCard
             key={variant.type + '-' + variant.size}
@@ -281,20 +300,23 @@ function AdGroupSection({
           />
         ))}
       </div>
-    </ContentSurfaceCard>
+    </SettingsPanel>
   );
 }
 
 export default function RetargetingAdsPage() {
   return (
-    <div className='space-y-6'>
-      <ContentSurfaceCard surface='details'>
-        <ContentSectionHeader
-          density='compact'
-          title='Retargeting ads'
-          subtitle='Download ready-to-run creatives for Meta retargeting campaigns.'
-        />
-        <div className='grid grid-cols-1 gap-3 p-3 pt-0 sm:grid-cols-3 sm:p-4 sm:pt-0'>
+    <SettingsSection
+      id='retargeting-ads'
+      title='Retargeting ads'
+      description='Download ready-to-run creatives for Meta retargeting campaigns.'
+    >
+      <SettingsPanel
+        title='Campaign kit'
+        description='Ready-to-run assets for Meta Ads Manager.'
+        cardClassName='p-4'
+      >
+        <div className='grid grid-cols-1 gap-3 sm:grid-cols-3'>
           <SummaryCard
             value='4'
             label='Creatives'
@@ -311,7 +333,7 @@ export default function RetargetingAdsPage() {
             description='Upload these PNG assets directly to Ads Manager for Instagram and Facebook placements.'
           />
         </div>
-      </ContentSurfaceCard>
+      </SettingsPanel>
 
       <AttributionStatsCard />
 
@@ -327,13 +349,12 @@ export default function RetargetingAdsPage() {
         variants={AD_VARIANTS.filter(variant => variant.type === 'claim')}
       />
 
-      <ContentSurfaceCard surface='details'>
-        <ContentSectionHeader
-          density='compact'
-          title='How to use these ads'
-          subtitle='Upload the feed and story assets directly to Meta Ads Manager.'
-        />
-        <ol className='list-decimal space-y-2 px-8 py-5 pt-4 text-app text-secondary-token'>
+      <SettingsPanel
+        title='How to use these ads'
+        description='Upload the feed and story assets directly to Meta Ads Manager.'
+        cardClassName='p-5'
+      >
+        <ol className='list-decimal space-y-2 pl-5 text-app text-secondary-token'>
           <li>Download the ad images above.</li>
           <li>
             Create a new campaign in Meta Ads Manager with the Traffic
@@ -355,7 +376,7 @@ export default function RetargetingAdsPage() {
             results.
           </li>
         </ol>
-      </ContentSurfaceCard>
-    </div>
+      </SettingsPanel>
+    </SettingsSection>
   );
 }

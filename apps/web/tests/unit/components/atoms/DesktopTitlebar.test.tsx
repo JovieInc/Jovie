@@ -7,6 +7,13 @@ vi.mock('@/lib/desktop/electron-bridge', () => ({
   useIsElectronRuntime: () => true,
 }));
 
+vi.mock('next/navigation', () => ({
+  useRouter: () => ({
+    back: vi.fn(),
+    forward: vi.fn(),
+  }),
+}));
+
 vi.mock('@/components/atoms/UpdateAvailablePill', () => ({
   UpdateAvailablePill: () => (
     <button type='button' data-testid='update-available-pill'>
@@ -16,7 +23,7 @@ vi.mock('@/components/atoms/UpdateAvailablePill', () => ({
 }));
 
 describe('DesktopTitlebar', () => {
-  it('renders Electron titlebar with sidebar toggle and update pill in the sidebar cell', () => {
+  it('renders Electron titlebar with nav controls, sidebar toggle, and update pill in the sidebar cell', () => {
     render(
       <SidebarContext.Provider
         value={{
@@ -39,6 +46,12 @@ describe('DesktopTitlebar', () => {
     expect(
       screen.getByTestId('electron-titlebar-sidebar-cell')
     ).toContainElement(screen.getByTestId('electron-sidebar-toggle'));
+    expect(
+      screen.getByTestId('electron-titlebar-sidebar-cell')
+    ).toContainElement(screen.getByTestId('electron-nav-back'));
+    expect(
+      screen.getByTestId('electron-titlebar-sidebar-cell')
+    ).toContainElement(screen.getByTestId('electron-nav-forward'));
 
     // Update pill is in the sidebar cell
     expect(
@@ -50,7 +63,7 @@ describe('DesktopTitlebar', () => {
     ).toBeInTheDocument();
   });
 
-  it('does not render back/forward nav pill (keyboard shortcuts handle navigation)', () => {
+  it('keeps back/forward nav in the sidebar titlebar cell', () => {
     render(
       <SidebarContext.Provider
         value={{
@@ -67,11 +80,13 @@ describe('DesktopTitlebar', () => {
       </SidebarContext.Provider>
     );
 
-    expect(screen.queryByTestId('electron-nav-pill')).not.toBeInTheDocument();
-    expect(screen.queryByTestId('electron-nav-back')).not.toBeInTheDocument();
+    expect(screen.getByTestId('electron-nav-pill')).toBeInTheDocument();
     expect(
-      screen.queryByTestId('electron-nav-forward')
-    ).not.toBeInTheDocument();
+      screen.getByTestId('electron-titlebar-sidebar-cell')
+    ).toContainElement(screen.getByTestId('electron-nav-pill'));
+    expect(
+      screen.getByTestId('electron-titlebar-main-cell')
+    ).not.toContainElement(screen.getByTestId('electron-nav-pill'));
   });
 
   it('main cell is a plain drag region with no rounded card chrome', () => {

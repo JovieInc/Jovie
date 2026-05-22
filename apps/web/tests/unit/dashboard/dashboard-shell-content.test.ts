@@ -20,6 +20,13 @@ import {
 import { APP_ROUTES } from '@/constants/routes';
 
 describe('@critical DashboardShellContent behavior contracts', () => {
+  function resolveSidebarDefaultOpen(
+    sidebarCookie: { value: string } | undefined,
+    sidebarCollapsed: boolean
+  ) {
+    return sidebarCookie ? sidebarCookie.value !== 'false' : !sidebarCollapsed;
+  }
+
   describe('ban check decision', () => {
     it('banned user should see UnavailablePage (contract: banStatus.isBanned === true)', () => {
       // The component checks banStatus.isBanned early and returns UnavailablePage
@@ -123,20 +130,31 @@ describe('@critical DashboardShellContent behavior contracts', () => {
   describe('sidebar cookie contract', () => {
     it('sidebar defaults to open when cookie is absent', () => {
       const sidebarCookie = undefined;
-      const sidebarDefaultOpen = sidebarCookie?.value !== 'false';
+      const sidebarDefaultOpen = resolveSidebarDefaultOpen(
+        sidebarCookie,
+        false
+      );
       expect(sidebarDefaultOpen).toBe(true);
     });
 
     it('sidebar is closed when cookie is "false"', () => {
       const sidebarCookie = { value: 'false' };
-      const sidebarDefaultOpen = sidebarCookie?.value !== 'false';
+      const sidebarDefaultOpen = resolveSidebarDefaultOpen(
+        sidebarCookie,
+        false
+      );
       expect(sidebarDefaultOpen).toBe(false);
     });
 
     it('sidebar is open when cookie has any other value', () => {
       const sidebarCookie = { value: 'true' };
-      const sidebarDefaultOpen = sidebarCookie?.value !== 'false';
+      const sidebarDefaultOpen = resolveSidebarDefaultOpen(sidebarCookie, true);
       expect(sidebarDefaultOpen).toBe(true);
+    });
+
+    it('falls back to persisted dashboard preference when cookie is absent', () => {
+      expect(resolveSidebarDefaultOpen(undefined, true)).toBe(false);
+      expect(resolveSidebarDefaultOpen(undefined, false)).toBe(true);
     });
   });
 

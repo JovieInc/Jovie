@@ -1,20 +1,20 @@
-import { ContentSectionHeaderSkeleton } from '@/components/molecules/ContentSectionHeaderSkeleton';
-import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
+import { SettingsSection } from '@/components/features/dashboard/organisms/SettingsSection';
 import { LoadingSkeleton } from '@/components/molecules/LoadingSkeleton';
+import { SettingsPanel } from '@/components/molecules/settings/SettingsPanel';
 
 function SummaryCardSkeleton() {
   return (
-    <ContentSurfaceCard surface='nested' className='space-y-1 p-4'>
+    <div className='min-h-[116px] rounded-md border border-subtle bg-surface-0 px-3 py-3'>
       <LoadingSkeleton height='h-7' width='w-8' rounded='md' />
       <LoadingSkeleton height='h-3' width='w-20' rounded='md' />
       <LoadingSkeleton height='h-4' width='w-full' rounded='md' />
-    </ContentSurfaceCard>
+    </div>
   );
 }
 
 function AdPreviewCardSkeleton() {
   return (
-    <ContentSurfaceCard surface='nested' className='space-y-3 p-4'>
+    <div className='space-y-3 rounded-md border border-subtle bg-surface-0 p-4'>
       <div className='aspect-square rounded-lg skeleton motion-reduce:animate-none' />
       <div className='flex items-start justify-between gap-3'>
         <div className='min-w-0 space-y-1'>
@@ -23,23 +23,22 @@ function AdPreviewCardSkeleton() {
         </div>
         <LoadingSkeleton height='h-8' width='w-24' rounded='md' />
       </div>
-    </ContentSurfaceCard>
+    </div>
   );
 }
 
 function AdGroupSkeleton() {
   return (
-    <ContentSurfaceCard surface='details'>
-      <ContentSectionHeaderSkeleton
-        titleWidth='w-36'
-        descriptionWidth='w-80'
-        className='min-h-0 px-4 py-3'
-      />
-      <div className='grid grid-cols-1 gap-4 p-3 pt-0 sm:grid-cols-2 sm:p-4 sm:pt-0'>
+    <SettingsPanel
+      title={<LoadingSkeleton height='h-4' width='w-36' rounded='md' />}
+      description={<LoadingSkeleton height='h-3' width='w-80' rounded='md' />}
+      cardClassName='p-4'
+    >
+      <div className='grid grid-cols-1 gap-4 sm:grid-cols-2'>
         <AdPreviewCardSkeleton />
         <AdPreviewCardSkeleton />
       </div>
-    </ContentSurfaceCard>
+    </SettingsPanel>
   );
 }
 
@@ -49,20 +48,39 @@ function AdGroupSkeleton() {
  */
 export default function RetargetingAdsLoading() {
   return (
-    <div className='space-y-6'>
+    <SettingsSection
+      id='retargeting-ads'
+      title='Retargeting ads'
+      description='Download ready-to-run creatives for Meta retargeting campaigns.'
+    >
       {/* Summary section */}
-      <ContentSurfaceCard surface='details'>
-        <ContentSectionHeaderSkeleton
-          titleWidth='w-36'
-          descriptionWidth='w-96'
-          className='min-h-0 px-4 py-3'
-        />
-        <div className='grid grid-cols-1 gap-3 p-3 pt-0 sm:grid-cols-3 sm:p-4 sm:pt-0'>
+      <SettingsPanel
+        title={<LoadingSkeleton height='h-4' width='w-28' rounded='md' />}
+        description={<LoadingSkeleton height='h-3' width='w-72' rounded='md' />}
+        cardClassName='p-4'
+      >
+        <div className='grid grid-cols-1 gap-3 sm:grid-cols-3'>
           <SummaryCardSkeleton />
           <SummaryCardSkeleton />
           <SummaryCardSkeleton />
         </div>
-      </ContentSurfaceCard>
+      </SettingsPanel>
+
+      <SettingsPanel
+        className='min-h-[156px]'
+        title={<LoadingSkeleton height='h-4' width='w-40' rounded='md' />}
+        description={<LoadingSkeleton height='h-3' width='w-72' rounded='md' />}
+        cardClassName='p-4'
+      >
+        <div className='space-y-3'>
+          <LoadingSkeleton height='h-7' width='w-10' rounded='md' />
+          <LoadingSkeleton height='h-4' width='w-72' rounded='md' />
+          <div className='flex gap-2'>
+            <LoadingSkeleton height='h-12' width='w-20' rounded='md' />
+            <LoadingSkeleton height='h-12' width='w-20' rounded='md' />
+          </div>
+        </div>
+      </SettingsPanel>
 
       {/* Fan retargeting ad group */}
       <AdGroupSkeleton />
@@ -71,13 +89,12 @@ export default function RetargetingAdsLoading() {
       <AdGroupSkeleton />
 
       {/* Instructions section */}
-      <ContentSurfaceCard surface='details'>
-        <ContentSectionHeaderSkeleton
-          titleWidth='w-48'
-          descriptionWidth='w-96'
-          className='min-h-0 px-4 py-3'
-        />
-        <div className='space-y-2 px-8 py-5 pt-4'>
+      <SettingsPanel
+        title={<LoadingSkeleton height='h-4' width='w-48' rounded='md' />}
+        description={<LoadingSkeleton height='h-3' width='w-80' rounded='md' />}
+        cardClassName='p-5'
+      >
+        <div className='space-y-2'>
           <LoadingSkeleton height='h-4' width='w-full' rounded='md' />
           <LoadingSkeleton height='h-4' width='w-11/12' rounded='md' />
           <LoadingSkeleton height='h-4' width='w-full' rounded='md' />
@@ -85,7 +102,7 @@ export default function RetargetingAdsLoading() {
           <LoadingSkeleton height='h-4' width='w-full' rounded='md' />
           <LoadingSkeleton height='h-4' width='w-9/12' rounded='md' />
         </div>
-      </ContentSurfaceCard>
-    </div>
+      </SettingsPanel>
+    </SettingsSection>
   );
 }

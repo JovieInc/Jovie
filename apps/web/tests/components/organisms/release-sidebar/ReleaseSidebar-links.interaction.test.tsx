@@ -381,14 +381,6 @@ vi.mock('@/components/organisms/release-sidebar/ReleaseDspLinks', () => ({
   ),
 }));
 
-vi.mock('@/components/organisms/release-sidebar/ReleaseCreditsSection', () => ({
-  ReleaseCreditsSection: ({ variant }: { variant?: 'card' | 'flat' }) => (
-    <div data-testid='release-credits' data-variant={variant ?? 'card'}>
-      Credits
-    </div>
-  ),
-}));
-
 vi.mock(
   '@/components/organisms/release-sidebar/release-credits-action',
   () => ({
@@ -554,7 +546,7 @@ describe('ReleaseSidebar inspector cards', () => {
       'data-variant',
       'flat'
     );
-    expect(screen.getByTestId('release-credits')).toHaveAttribute(
+    expect(screen.getByTestId('credits')).toHaveAttribute(
       'data-variant',
       'flat'
     );
@@ -782,7 +774,7 @@ describe('ReleaseSidebar inspector cards', () => {
   it('renders the properties panel with flat metadata and credits content', () => {
     render(<ReleaseSidebar release={mockRelease} {...defaultProps} />);
 
-    expect(screen.getByTestId('release-credits')).toHaveAttribute(
+    expect(screen.getByTestId('credits')).toHaveAttribute(
       'data-variant',
       'flat'
     );

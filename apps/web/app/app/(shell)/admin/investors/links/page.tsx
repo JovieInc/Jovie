@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import { AdminToolPage } from '@/components/features/admin/layout/AdminToolPage';
+import { AdminPage } from '@/components/features/admin/layout/AdminPage';
 import { InvestorLinksManager } from './InvestorLinksManager';
 
 export const metadata: Metadata = {
@@ -12,12 +12,12 @@ export const metadata: Metadata = {
  */
 export default function InvestorLinksPage() {
   return (
-    <AdminToolPage
+    <AdminPage
       title='Investor Links'
       description='Create, copy, and disable investor links without leaving the admin shell.'
       testId='admin-investors-links-page'
     >
       <InvestorLinksManager />
-    </AdminToolPage>
+    </AdminPage>
   );
 }

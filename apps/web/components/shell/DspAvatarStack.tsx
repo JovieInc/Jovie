@@ -125,7 +125,7 @@ export function DspAvatarStack({
       <div
         role='tooltip'
         className={cn(
-          'pointer-events-none absolute right-0 top-full mt-1.5 z-[100] w-[220px]',
+          'pointer-events-none absolute right-0 top-full mt-1.5 z-[150] w-[220px]',
           'opacity-0 group-hover/dsps:opacity-100 group-hover/dsps:pointer-events-auto',
           'transition-[opacity] duration-subtle ease-subtle delay-[400ms] group-hover/dsps:delay-[400ms]'
         )}

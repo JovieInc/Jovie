@@ -2,8 +2,9 @@
  * Geometry tests for the Electron titlebar.
  *
  * These tests run in the browser (not in an actual Electron shell) and verify:
- * 1. The titlebar DOM structure — sidebar-cell contains sidebar toggle + update pill;
- *    main-cell is a plain drag region (no nav pill, no header — those moved into
+ * 1. The titlebar DOM structure — sidebar-cell contains back/forward,
+ *    sidebar toggle + update pill; main-cell is a plain drag region (no header —
+ *    page headers moved into
  *    the elevated content card below).
  * 2. No duplicate sidebar toggles — only one [data-sidebar-dock-button] per page and
  *    it must not also have [data-testid="electron-sidebar-toggle"] as a sibling.
@@ -36,6 +37,11 @@ async function forceDesignV1(page: Page): Promise<void> {
 
   await page.addInitScript(
     ({ cookieName, key, value }) => {
+      Object.defineProperty(window, 'electronAPI', {
+        configurable: true,
+        value: {},
+      });
+      document.documentElement.dataset.desktopRuntime = 'electron';
       localStorage.setItem(key, value);
       document.cookie = `${cookieName}=${encodeURIComponent(value)}; path=/; SameSite=Lax`;
     },
@@ -94,17 +100,26 @@ test('titlebar DOM has a single sidebar toggle and an empty main-cell drag regio
   const titlebarRow = page.locator('[data-testid="electron-titlebar-row"]');
   await expect(titlebarRow).toBeAttached({ timeout: 10_000 });
 
-  // Sidebar cell: must contain the canonical sidebar toggle.
+  // Sidebar cell: must contain browser nav and the canonical sidebar toggle.
   const sidebarCell = titlebarRow.locator(
     '[data-testid="electron-titlebar-sidebar-cell"]'
   );
   await expect(sidebarCell).toBeAttached();
   await expect(
+    sidebarCell.locator('[data-testid="electron-nav-pill"]')
+  ).toBeAttached();
+  await expect(
+    sidebarCell.locator('[data-testid="electron-nav-back"]')
+  ).toBeAttached();
+  await expect(
+    sidebarCell.locator('[data-testid="electron-nav-forward"]')
+  ).toBeAttached();
+  await expect(
     sidebarCell.locator('[data-testid="electron-sidebar-toggle"]')
   ).toBeAttached();
 
   // Main cell exists as a drag region but contains no chrome — the page header
-  // and any nav controls now live inside the elevated content card below.
+  // lives inside the elevated content card below.
   const mainCell = titlebarRow.locator(
     '[data-testid="electron-titlebar-main-cell"]'
   );

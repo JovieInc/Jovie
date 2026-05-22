@@ -740,9 +740,6 @@ export function OnboardingChat({
       </div>
     ) : null;
 
-  // Persistent bottom dock composer: showInitialComposer now only controls
-  // the *upper* morphing content (intro vs messages). The composer itself is
-  // always rendered in the bottom dock for zero structural jump on first turn.
   const showInitialComposer = messages.length === 0 && !hasSentFirst;
 
   const onboardingChatInputProps = {
@@ -765,6 +762,11 @@ export function OnboardingChat({
     shellChatV1: true,
     statusBanner: composerStatusBanner,
   } as const;
+  const onboardingComposerSurface = (
+    <div className='mx-auto w-full max-w-[45rem]'>
+      <ChatInput {...onboardingChatInputProps} />
+    </div>
+  );
 
   return (
     <section
@@ -795,12 +797,24 @@ export function OnboardingChat({
       >
         <div
           ref={totalSizeRef}
-          className='mx-auto flex min-h-full w-full max-w-[44rem] flex-col'
+          className={cn(
+            'mx-auto flex min-h-full w-full max-w-[44rem] flex-col',
+            showInitialComposer && 'justify-center'
+          )}
         >
           <AnimatePresence mode='popLayout' initial={false}>
             {showInitialComposer ? (
-              <div key='onboarding-empty-upper'>
+              <div
+                key='onboarding-empty-upper'
+                className='flex w-full flex-col items-center justify-center gap-5 py-8'
+              >
                 <OnboardingInitialIntro hidden={composerPickerOpen} />
+                <div
+                  className='w-full'
+                  data-testid='onboarding-centered-composer'
+                >
+                  {onboardingComposerSurface}
+                </div>
               </div>
             ) : (
               <div key='onboarding-messages'>
@@ -818,15 +832,14 @@ export function OnboardingChat({
         </div>
       </div>
 
-      {/* Persistent always-bottom composer dock (Hyp 1 stabilization).
-          No more conditional render or justify-center teleport for the input.
-          The motion surface inside ChatInput (with layoutId) + stable dock
-          position guarantees zero layout shift on first user message. */}
-      <div className='shrink-0 bg-(--linear-app-content-surface) px-4 pb-4 pt-2 sm:px-6 sm:pb-5 sm:pt-2.5 lg:px-8'>
-        <div className='mx-auto w-full max-w-[45rem]'>
-          <ChatInput {...onboardingChatInputProps} />
+      {showInitialComposer ? null : (
+        <div
+          className='shrink-0 bg-(--linear-app-content-surface) px-4 pb-4 pt-2 sm:px-6 sm:pb-5 sm:pt-2.5 lg:px-8'
+          data-testid='onboarding-composer-dock'
+        >
+          {onboardingComposerSurface}
         </div>
-      </div>
+      )}
     </section>
   );
 }

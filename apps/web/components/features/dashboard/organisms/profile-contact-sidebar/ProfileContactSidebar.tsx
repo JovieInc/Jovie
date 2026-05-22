@@ -759,7 +759,7 @@ export function ProfileContactSidebar() {
             }
             actionsClassName='h-[26px] w-[26px]'
             overflowMode='scroll'
-            distribution='intrinsic'
+            distribution='fill'
           />
         }
         contentClassName='pt-2'
