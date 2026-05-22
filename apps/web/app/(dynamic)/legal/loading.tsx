@@ -13,9 +13,8 @@ export default function LegalLoading() {
         <div className='w-full max-w-3xl border-b border-neutral-200 pb-8 dark:border-white/10'>
           <div className='h-10 w-56 skeleton rounded-md' />
           <div className='mt-3 h-4 w-44 skeleton rounded-md' />
-          <div className='mt-7 border-l border-neutral-300 pl-4 dark:border-white/15'>
-            <div className='h-4 w-36 skeleton rounded-md' />
-            <div className='mt-3 h-4 w-full max-w-xl skeleton rounded-md' />
+          <div className='mt-6 space-y-2'>
+            <div className='h-4 w-full max-w-xl skeleton rounded-md' />
             <div className='mt-2 h-4 w-4/5 max-w-lg skeleton rounded-md' />
           </div>
         </div>

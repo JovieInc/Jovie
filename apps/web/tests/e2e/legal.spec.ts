@@ -39,7 +39,14 @@ test.describe('Legal Pages', () => {
       await expect(page.locator('h1')).toContainText('Privacy Policy');
       await expect(page.getByText('Last updated: February 2026')).toBeVisible();
       await expect(
-        page.getByRole('heading', { name: 'Practical Summary' })
+        page.getByText('We collect only what is essential')
+      ).toBeVisible();
+      await expect(page.getByRole('button', { name: 'Print' })).toBeVisible();
+      await expect(
+        page.getByRole('button', { name: 'Download PDF' })
+      ).toBeVisible();
+      await expect(
+        page.getByRole('navigation', { name: 'Document navigation' }).first()
       ).toBeVisible();
 
       // Check main section headings (must match actual markdown content)
@@ -107,7 +114,7 @@ test.describe('Legal Pages', () => {
       await expect(page.locator('h1')).toContainText('Terms of Service');
       await expect(page.getByText('Last updated: February 2026')).toBeVisible();
       await expect(
-        page.getByRole('heading', { name: 'Practical Summary' })
+        page.getByText('Jovie is governed by clear policies')
       ).toBeVisible();
 
       // Check main section headings (must match actual markdown content)
@@ -154,6 +161,55 @@ test.describe('Legal Pages', () => {
       await expect(
         page.getByRole('heading', { name: 'Acceptance of Terms' })
       ).toBeVisible();
+    });
+  });
+
+  test.describe('Cookie Policy', () => {
+    test('keeps GFM tables readable without page-level mobile overflow', async ({
+      page,
+    }) => {
+      await page.route('**/api/profile/view', r =>
+        r.fulfill({ status: 200, body: '{}' })
+      );
+      await page.route('**/api/audience/visit', r =>
+        r.fulfill({ status: 200, body: '{}' })
+      );
+      await page.route('**/api/track', r =>
+        r.fulfill({ status: 200, body: '{}' })
+      );
+      await page.setViewportSize({ width: 375, height: 667 });
+      await page.goto('/legal/cookies', { timeout: 180_000 });
+
+      const table = page.locator('table').first();
+      await expect(table).toBeVisible();
+      await expect(
+        page.locator('code').filter({ hasText: 'jv_cc' }).first()
+      ).toBeVisible();
+
+      const overflow = await page.evaluate(() => {
+        const firstTable = document.querySelector('table');
+        const previousScrollLeft = firstTable?.scrollLeft ?? 0;
+        if (firstTable) {
+          firstTable.scrollLeft = 50;
+        }
+        const nextScrollLeft = firstTable?.scrollLeft ?? 0;
+        if (firstTable) {
+          firstTable.scrollLeft = previousScrollLeft;
+        }
+
+        return {
+          documentWidth: document.documentElement.scrollWidth,
+          tableCanScroll: nextScrollLeft > previousScrollLeft,
+          tableFits:
+            (firstTable?.scrollWidth ?? 0) <= (firstTable?.clientWidth ?? 0),
+          viewportWidth: window.innerWidth,
+        };
+      });
+
+      expect(overflow.documentWidth).toBeLessThanOrEqual(
+        overflow.viewportWidth + 2
+      );
+      expect(overflow.tableCanScroll || overflow.tableFits).toBe(true);
     });
   });
 
