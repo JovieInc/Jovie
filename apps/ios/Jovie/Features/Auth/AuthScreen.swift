@@ -1,6 +1,12 @@
 import ClerkKit
+import OSLog
 import SwiftUI
 import UIKit
+
+private let authLogger = Logger(
+  subsystem: Bundle.main.bundleIdentifier ?? "ie.jov.Jovie",
+  category: "Auth"
+)
 
 struct AuthScreen: View {
   let isMock: Bool
@@ -42,6 +48,9 @@ struct AuthScreen: View {
     .accessibilityIdentifier("auth-screen")
     .task {
       isBackdropActive = true
+    }
+    .onDisappear {
+      isBackdropActive = false
     }
   }
 }
@@ -120,6 +129,7 @@ private struct LiveEmailCodeAuthForm: View {
   @State private var signIn: SignIn?
   @State private var isSubmitting = false
   @State private var errorMessage: String?
+  @State private var submitTask: Task<Void, Never>?
   @FocusState private var focusedField: AuthField?
 
   private var canSubmit: Bool {
@@ -154,7 +164,7 @@ private struct LiveEmailCodeAuthForm: View {
               field: .email
             )
             .onSubmit {
-              Task { await submitEmail() }
+              startSubmit()
             }
           } else {
             AuthTextField(
@@ -172,6 +182,9 @@ private struct LiveEmailCodeAuthForm: View {
             )
 
             Button {
+              submitTask?.cancel()
+              submitTask = nil
+              isSubmitting = false
               step = .email
               code = ""
               errorMessage = nil
@@ -189,7 +202,7 @@ private struct LiveEmailCodeAuthForm: View {
         AuthErrorText(message: errorMessage)
 
         Button {
-          Task { await submit() }
+          startSubmit()
         } label: {
           AuthPrimaryButtonLabel(
             title: step == .email ? "Continue" : "Verify code",
@@ -213,43 +226,59 @@ private struct LiveEmailCodeAuthForm: View {
     .onAppear {
       focusedField = .email
     }
+    .onDisappear {
+      submitTask?.cancel()
+      submitTask = nil
+      isSubmitting = false
+    }
   }
 
   @MainActor
-  private func submit() async {
-    switch step {
-    case .email:
-      await submitEmail()
-    case .code:
-      await submitCode()
+  private func startSubmit() {
+    guard canSubmit, !isSubmitting else { return }
+
+    submitTask?.cancel()
+    isSubmitting = true
+    errorMessage = nil
+
+    submitTask = Task { @MainActor in
+      defer {
+        isSubmitting = false
+        submitTask = nil
+      }
+
+      switch step {
+      case .email:
+        await submitEmail()
+      case .code:
+        await submitCode()
+      }
     }
   }
 
   @MainActor
   private func submitEmail() async {
-    guard AuthFormInput.isLikelyEmail(email), !isSubmitting else { return }
-
-    isSubmitting = true
-    errorMessage = nil
+    guard AuthFormInput.isLikelyEmail(email) else { return }
 
     do {
       signIn = try await clerk.auth.signInWithEmailCode(
         emailAddress: AuthFormInput.normalizedEmail(email)
       )
+
+      guard !Task.isCancelled else { return }
+
       code = ""
       step = .code
       focusedField = .code
     } catch {
       errorMessage = AuthErrorMapper.message(for: error)
     }
-
-    isSubmitting = false
   }
 
   @MainActor
   private func submitCode() async {
     let verificationCode = AuthFormInput.normalizedCode(code)
-    guard verificationCode.count == 6, !isSubmitting else { return }
+    guard verificationCode.count == 6 else { return }
 
     guard let signIn else {
       step = .email
@@ -257,11 +286,9 @@ private struct LiveEmailCodeAuthForm: View {
       return
     }
 
-    isSubmitting = true
-    errorMessage = nil
-
     do {
       let completedSignIn = try await signIn.verifyCode(verificationCode)
+      guard !Task.isCancelled else { return }
 
       if let sessionID = completedSignIn.createdSessionId,
          clerk.session?.id != sessionID
@@ -272,9 +299,11 @@ private struct LiveEmailCodeAuthForm: View {
       _ = try await clerk.refreshClient()
       _ = try await ClerkTokenProvider().bearerToken(forceRefresh: false)
 
-      guard let userID = clerk.user?.id ?? Clerk.shared.user?.id else {
+      guard !Task.isCancelled else { return }
+
+      guard let userID = clerk.user?.id else {
+        authLogger.error("Clerk user missing after successful email code verification.")
         errorMessage = "You're signed in, but we couldn't load your profile. Try again."
-        isSubmitting = false
         return
       }
 
@@ -282,8 +311,6 @@ private struct LiveEmailCodeAuthForm: View {
     } catch {
       errorMessage = AuthErrorMapper.message(for: error)
     }
-
-    isSubmitting = false
   }
 }
 
@@ -456,7 +483,7 @@ private struct AuthErrorText: View {
   var body: some View {
     Text(message ?? " ")
       .font(JovieFont.body(size: 13, weight: .medium))
-      .foregroundStyle(Color(red: 1, green: 0.48, blue: 0.45))
+      .foregroundStyle(JovieColor.errorText)
       .multilineTextAlignment(.center)
       .fixedSize(horizontal: false, vertical: true)
       .frame(minHeight: 34)

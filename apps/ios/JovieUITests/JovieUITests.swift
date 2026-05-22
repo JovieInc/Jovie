@@ -212,13 +212,19 @@ final class JovieUITests: XCTestCase {
   }
 
   private func endUITestSession(_ app: XCUIApplication) {
-    guard app.state == .runningForeground else { return }
+    guard app.state != .notRunning else { return }
 
-    let exitButton = app.buttons["ui-test-exit"]
-    if exitButton.waitForExistence(timeout: 1) {
-      exitButton.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
+    if app.state == .runningForeground {
+      let exitButton = app.buttons["ui-test-exit"]
+      if exitButton.waitForExistence(timeout: 1) {
+        exitButton.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
+      }
     }
-    _ = app.wait(for: .notRunning, timeout: 5)
+
+    if !app.wait(for: .notRunning, timeout: 5) {
+      app.terminate()
+      _ = app.wait(for: .notRunning, timeout: 2)
+    }
   }
 
   private func attachScreenshot(named name: String, app: XCUIApplication) {

@@ -41,11 +41,19 @@ pick_destination_from_simctl() {
   local prefer_ios_prefix="${1:-}"
   local prefer_name_pattern="${2:-}"
   local devices_json
+  local simctl_stderr
+  simctl_stderr="$(mktemp)"
 
-  devices_json="$(xcrun simctl list devices available -j 2>/dev/null || true)"
+  devices_json="$(xcrun simctl list devices available -j 2>"$simctl_stderr" || true)"
   if [[ -z "$devices_json" ]]; then
+    if [[ -s "$simctl_stderr" ]]; then
+      cat "$simctl_stderr" >&2
+    fi
+    rm -f "$simctl_stderr"
     return 0
   fi
+
+  rm -f "$simctl_stderr"
 
   printf '%s\n' "$devices_json" | PREFER_IOS_PREFIX="$prefer_ios_prefix" PREFER_NAME_PATTERN="$prefer_name_pattern" RUBYOPT= ruby -rjson -e '
     prefer_ios_prefix = ENV.fetch("PREFER_IOS_PREFIX", "")
@@ -93,20 +101,25 @@ DESTINATIONS=""
 
 load_xcodebuild_destinations() {
   local destinations_file
+  local destinations_stderr
   destinations_file="$(mktemp)"
+  destinations_stderr="$(mktemp)"
 
   if run_with_timeout "${JOVIE_IOS_DESTINATIONS_TIMEOUT:-30}" \
     xcodebuild -showdestinations \
       -project "$PROJECT_PATH" \
       -scheme "$SCHEME" \
-      >"$destinations_file" 2>/dev/null; then
+      >"$destinations_file" 2>"$destinations_stderr"; then
     DESTINATIONS="$(cat "$destinations_file")"
   else
-    echo "Timed out resolving xcodebuild destinations." >&2
+    echo "Failed or timed out resolving xcodebuild destinations." >&2
+    if [[ -s "$destinations_stderr" ]]; then
+      cat "$destinations_stderr" >&2
+    fi
     DESTINATIONS=""
   fi
 
-  rm -f "$destinations_file"
+  rm -f "$destinations_file" "$destinations_stderr"
 }
 
 pick_destination() {
