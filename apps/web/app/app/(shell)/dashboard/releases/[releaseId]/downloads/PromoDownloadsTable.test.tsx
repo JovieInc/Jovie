@@ -3,6 +3,21 @@ import { describe, expect, it, vi } from 'vitest';
 import { PromoDownloadsTable } from './PromoDownloadsTable';
 
 describe('PromoDownloadsTable', () => {
+  it('reserves table space while files are loading', () => {
+    const { container } = render(
+      <PromoDownloadsTable
+        loaded={false}
+        files={[]}
+        onToggleActive={vi.fn()}
+        onDelete={vi.fn()}
+      />
+    );
+
+    expect(container.firstElementChild).toHaveClass('min-h-[220px]');
+    expect(container.firstElementChild).toHaveAttribute('aria-hidden', 'true');
+    expect(screen.queryByRole('table')).not.toBeInTheDocument();
+  });
+
   it('renders shared table rows for promo downloads', () => {
     const onToggleActive = vi.fn();
     const onDelete = vi.fn();
