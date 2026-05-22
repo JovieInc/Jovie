@@ -82,7 +82,7 @@ export function percentile(values: readonly number[], p: number) {
   return sorted[index] ?? null;
 }
 
-function compactNumbers(values: readonly Array<number | undefined>) {
+function compactNumbers(values: readonly (number | undefined)[]) {
   return values.filter((value): value is number => typeof value === 'number');
 }
 
@@ -223,9 +223,7 @@ function summarizeScenario(
   };
 }
 
-function compactStrings<T extends string>(
-  values: readonly Array<T | undefined>
-) {
+function compactStrings<T extends string>(values: readonly (T | undefined)[]) {
   return values.filter((value): value is T => typeof value === 'string');
 }
 
