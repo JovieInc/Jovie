@@ -73,7 +73,7 @@ pick_device() {
     pattern = Regexp.new(ARGV.fetch(0))
     input = STDIN.read
     devices_by_runtime = JSON.parse(input).fetch("devices", {})
-    picked = nil
+    candidates = []
 
     devices_by_runtime.each do |runtime, devices|
       next unless runtime.include?("com.apple.CoreSimulator.SimRuntime.iOS")
@@ -82,14 +82,24 @@ pick_device() {
         next unless device["isAvailable"]
         next unless device["name"].to_s.match?(pattern)
 
-        picked = device["udid"].to_s
-        break
+        candidates << {
+          "udid" => device["udid"].to_s,
+          "name" => device["name"].to_s,
+          "state" => device["state"].to_s
+        }
       end
-
-      break if picked
     end
 
-    print(picked || "")
+    picked = candidates.max_by do |device|
+      [
+        device.fetch("state") == "Booted" ? 1 : 0,
+        device.fetch("name") == "iPhone 17" ? 1 : 0,
+        device.fetch("name") == "iPad Pro 11-inch (M5)" ? 1 : 0,
+        device.fetch("name")
+      ]
+    end
+
+    print(picked&.fetch("udid") || "")
   ' "$name_pattern" <"$devices_file"
 
   rm -f "$devices_file"
@@ -99,7 +109,7 @@ prepare_device() {
   local udid="$1"
 
   echo "Preparing simulator $udid"
-  run_with_timeout "${IOS_SCREENSHOT_BOOT_COMMAND_TIMEOUT:-30}" xcrun simctl boot "$udid" >/dev/null 2>&1 || true
+  run_with_timeout "${IOS_SCREENSHOT_BOOT_COMMAND_TIMEOUT:-120}" xcrun simctl boot "$udid" >/dev/null 2>&1 || true
   wait_for_boot "$udid"
   run_with_timeout "${IOS_SCREENSHOT_UI_TIMEOUT:-10}" xcrun simctl ui "$udid" appearance dark >/dev/null 2>&1 || true
   run_with_timeout "${IOS_SCREENSHOT_UNINSTALL_TIMEOUT:-30}" xcrun simctl uninstall "$udid" "$BUNDLE_ID" >/dev/null 2>&1 || true
@@ -108,7 +118,7 @@ prepare_device() {
 
 wait_for_boot() {
   local udid="$1"
-  local timeout_seconds="${IOS_SCREENSHOT_BOOT_TIMEOUT:-60}"
+  local timeout_seconds="${IOS_SCREENSHOT_BOOT_TIMEOUT:-180}"
   local boot_log="$OUTPUT_DIR/bootstatus-$udid.log"
   local elapsed=0
 

@@ -53,7 +53,7 @@ jobs:
         run: bash apps/ios/scripts/run-xcodebuild.sh test -derivedDataPath .build/ios-ci
 
       - name: Capture simulator screenshots
-        timeout-minutes: 8
+        timeout-minutes: 15
         env:
           IOS_SCREENSHOT_DERIVED_DATA: .build/ios-ci
         run: bash apps/ios/scripts/capture-screenshots.sh
