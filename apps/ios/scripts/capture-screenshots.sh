@@ -15,15 +15,19 @@ mkdir -p "$OUTPUT_DIR"
 
 "$SCRIPT_DIR/ensure-configuration.sh"
 
-xcodebuild build \
-  -project "$PROJECT_PATH" \
-  -scheme "$SCHEME" \
-  -configuration Debug \
-  -destination "generic/platform=iOS Simulator" \
-  -derivedDataPath "$DERIVED_DATA_PATH" \
-  CODE_SIGNING_ALLOWED=NO
-
 APP_PATH="$DERIVED_DATA_PATH/Build/Products/Debug-iphonesimulator/Jovie.app"
+if [[ -d "$APP_PATH" ]]; then
+  echo "Using existing built app at $APP_PATH"
+else
+  xcodebuild build \
+    -project "$PROJECT_PATH" \
+    -scheme "$SCHEME" \
+    -configuration Debug \
+    -destination "generic/platform=iOS Simulator" \
+    -derivedDataPath "$DERIVED_DATA_PATH" \
+    CODE_SIGNING_ALLOWED=NO
+fi
+
 if [[ ! -d "$APP_PATH" ]]; then
   echo "Built app not found at $APP_PATH"
   exit 1
