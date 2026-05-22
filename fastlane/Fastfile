@@ -90,6 +90,26 @@ def write_ios_configuration(api_base_url:, web_base_url:, clerk_publishable_key:
   )
 end
 
+def ios_simulator_destination
+  destination = sh("bash #{repo_path("apps/ios/scripts/run-xcodebuild.sh").shellescape} destination")
+    .lines
+    .map(&:strip)
+    .find { |line| line.start_with?("platform=iOS Simulator") }
+  UI.user_error!("Unable to resolve an iOS simulator destination") if destination.to_s.empty?
+
+  destination
+end
+
+def reset_ios_simulator(destination:)
+  simulator_id = destination[/id=([^,]+)/, 1]
+  UI.user_error!("Unable to parse simulator id from destination #{destination}") if simulator_id.to_s.empty?
+
+  sh("xcrun simctl shutdown #{simulator_id.shellescape} >/dev/null 2>&1 || true")
+  sh("xcrun simctl boot #{simulator_id.shellescape} >/dev/null 2>&1 || true")
+  sh("xcrun simctl bootstatus #{simulator_id.shellescape} -b")
+  sh("xcrun simctl terminate #{simulator_id.shellescape} #{APP_IDENTIFIER.shellescape} >/dev/null 2>&1 || true")
+end
+
 def ensure_app_store_assets!(api_key:, apple_team_id:)
   bundle_id = Spaceship::ConnectAPI::BundleId.find(APP_IDENTIFIER)
   if bundle_id
@@ -134,12 +154,14 @@ platform :ios do
   lane :ios_tests do
     sh("bash #{repo_path("apps/ios/scripts/ensure-configuration.sh").shellescape}")
     sh("bash #{repo_path("apps/ios/scripts/validate-app-icon.sh").shellescape}")
+    destination = ios_simulator_destination
+    reset_ios_simulator(destination: destination)
 
     scan(
       project: IOS_PROJECT,
       scheme: IOS_SCHEME,
       clean: true,
-      devices: ["iPhone 17"],
+      destination: destination,
       output_directory: repo_path("artifacts/ios-test-results"),
       result_bundle: true,
       xcargs: "CODE_SIGNING_ALLOWED=NO"
