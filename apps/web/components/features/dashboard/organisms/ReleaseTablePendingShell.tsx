@@ -78,6 +78,7 @@ export function ReleaseTablePendingShell({
       frame='content-container'
       contentPadding='none'
       data-testid={testId}
+      surfaceMode='table'
       toolbar={
         showHeader ? (
           <PageToolbar
@@ -99,7 +100,7 @@ export function ReleaseTablePendingShell({
         skeletonColumnConfig={RELEASE_LOADING_SKELETON_CONFIG}
         rowHeight={56}
         minWidth='0'
-        containerClassName='h-full px-2.5 pb-2.5 pt-1'
+        containerClassName='h-full'
       />
     </PageShell>
   );

@@ -48,6 +48,10 @@ body {
   overscroll-behavior: none;
 }
 
+:root {
+  --jovie-shell-overlay-z-index: 180;
+}
+
 html[data-desktop-runtime="electron"] {
   --electron-titlebar-height: 40px;
 }

@@ -891,6 +891,7 @@ export function ShellReleasesView({
         className='h-full focus:outline-none'
         data-design-v1-releases='true'
         data-testid='shell-releases-view'
+        surfaceMode='table'
       >
         <ReleaseStateBanners
           rows={rows}

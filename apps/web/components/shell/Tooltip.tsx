@@ -79,6 +79,7 @@ export function Tooltip({
         <TooltipContent
           side={side}
           sideOffset={6}
+          style={{ zIndex: 'var(--jovie-shell-overlay-z-index)' }}
           className='flex items-center gap-2 whitespace-nowrap'
         >
           <span>{label}</span>

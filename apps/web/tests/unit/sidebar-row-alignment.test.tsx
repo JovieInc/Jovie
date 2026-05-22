@@ -148,15 +148,15 @@ describe('Sidebar row alignment', () => {
     expect(rowClassName).toContain('h-6.5');
     expect(rowClassName).toContain('px-2.5');
     expect(rowClassName).toContain('gap-x-2.5');
-    expect(rowClassName).toContain('grid-cols-[20px_minmax(0,1fr)_auto]');
+    expect(rowClassName).toContain('grid-cols-[20px_minmax(0,1fr)_40px]');
     expect(rowClassName).toContain('before:left-[20px]');
     expect(rowClassName).toContain('after:left-[34px]');
     expect(rowClassName).toContain('text-[12.5px]');
     expect(rowClassName).toContain(
-      'hover:bg-[color-mix(in_oklab,var(--color-sidebar-accent)_82%,transparent)]'
+      'hover:bg-[color-mix(in_oklab,var(--color-sidebar-accent)_88%,transparent)]'
     );
-    expect(activeRowClassName).toContain('bg-surface-1');
+    expect(activeRowClassName).toContain('color-sidebar-accent-active');
     expect(iconClassName).toContain('h-3.5');
-    expect(iconClassName).toContain('text-tertiary-token');
+    expect(iconClassName).toContain('text-sidebar-muted/80');
   });
 });

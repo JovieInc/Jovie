@@ -292,7 +292,7 @@ describe('DashboardNav', () => {
     const tasksLink = getByRole('link', { name: 'Tasks 7' });
     expect(tasksLink.className).toContain('h-6.5');
     expect(tasksLink.className).toContain(
-      'grid-cols-[20px_minmax(0,1fr)_auto]'
+      'grid-cols-[20px_minmax(0,1fr)_40px]'
     );
     expect(tasksLink.className).toContain('text-[12.5px]');
     expect(getByText('7')).toBeDefined();
