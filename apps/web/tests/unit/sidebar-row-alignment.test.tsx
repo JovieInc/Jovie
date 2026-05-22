@@ -146,8 +146,11 @@ describe('Sidebar row alignment', () => {
     const iconClassName = getSidebarNavIconClassName({});
 
     expect(rowClassName).toContain('h-6.5');
-    expect(rowClassName).toContain('pl-2.5');
-    expect(rowClassName).toContain('gap-2.5');
+    expect(rowClassName).toContain('px-2.5');
+    expect(rowClassName).toContain('gap-x-2.5');
+    expect(rowClassName).toContain('grid-cols-[20px_minmax(0,1fr)_auto]');
+    expect(rowClassName).toContain('before:left-[20px]');
+    expect(rowClassName).toContain('after:left-[34px]');
     expect(rowClassName).toContain('text-[12.5px]');
     expect(rowClassName).toContain(
       'hover:bg-[color-mix(in_oklab,var(--color-sidebar-accent)_82%,transparent)]'

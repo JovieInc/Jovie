@@ -186,6 +186,25 @@ describe('OnboardingChat Turnstile gating', () => {
     errorMocks.metadata = {};
   });
 
+  it('centers the welcome composer before the first message and docks it after messages exist', () => {
+    const { rerender } = render(<TurnstileHarness />);
+
+    expect(screen.getByTestId('onboarding-centered-composer')).toBeVisible();
+    expect(screen.queryByTestId('onboarding-composer-dock')).toBeNull();
+
+    chatMocks.messages = [
+      {
+        id: 'message-1',
+        role: 'user',
+        parts: [{ type: 'text', text: 'help me launch' }],
+      },
+    ];
+    rerender(<TurnstileHarness />);
+
+    expect(screen.queryByTestId('onboarding-centered-composer')).toBeNull();
+    expect(screen.getByTestId('onboarding-composer-dock')).toBeVisible();
+  });
+
   it('keeps the first message local and shows verification guidance until a token exists', () => {
     const onTurnstileRequired = vi.fn();
     render(<TurnstileHarness onTurnstileRequired={onTurnstileRequired} />);
@@ -220,7 +239,7 @@ describe('OnboardingChat Turnstile gating', () => {
     expect(chatMocks.sendMessage).toHaveBeenCalledWith({
       text: 'I am Test Artist',
     });
-    expect(input).toHaveValue('');
+    expect(screen.getByLabelText('Chat message input')).toHaveValue('');
 
     errorMocks.metadata = {
       errorCode: 'TURNSTILE_REQUIRED',
@@ -232,14 +251,18 @@ describe('OnboardingChat Turnstile gating', () => {
     });
 
     expect(onTurnstileRejected).toHaveBeenCalledTimes(1);
-    expect(input).toHaveValue('I am Test Artist');
+    expect(screen.getByLabelText('Chat message input')).toHaveValue(
+      'I am Test Artist'
+    );
     expect(screen.getByText('Verify you are human to send')).toBeVisible();
 
     chatMocks.sendMessage.mockClear();
     fireEvent.click(screen.getByRole('button', { name: 'Retry message' }));
 
     expect(chatMocks.sendMessage).not.toHaveBeenCalled();
-    expect(input).toHaveValue('I am Test Artist');
+    expect(screen.getByLabelText('Chat message input')).toHaveValue(
+      'I am Test Artist'
+    );
     expect(onTurnstileRequired).toHaveBeenCalledWith(
       'Verify you are human to send'
     );

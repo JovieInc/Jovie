@@ -39,15 +39,24 @@ export function getSidebarNavRowClassName({
   tight,
   className,
 }: SidebarNavChromeOptions) {
-  const nonCollapsedSize = tight ? 'h-6 pl-2.5 pr-2' : 'h-6.5 pl-2.5 pr-2';
+  const nonCollapsedSize = tight ? 'h-6 px-2.5' : 'h-6.5 px-2.5';
   const inactiveColor = nested
     ? 'text-tertiary-token hover:bg-[color-mix(in_oklab,var(--color-sidebar-accent)_82%,transparent)] hover:text-primary-token'
     : 'text-secondary-token hover:bg-[color-mix(in_oklab,var(--color-sidebar-accent)_82%,transparent)] hover:text-primary-token';
 
   return cn(
-    'relative flex items-center rounded-md w-full transition-[background-color] duration-subtle ease-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/55 focus-visible:ring-offset-2 focus-visible:ring-offset-(--linear-bg-page)',
-    tight ? 'gap-2 text-[12px]' : 'gap-2.5 text-[12.5px]',
-    collapsed ? 'h-7 w-10 mx-auto justify-center' : nonCollapsedSize,
+    'relative grid items-center rounded-md w-full transition-[background-color] duration-subtle ease-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/55 focus-visible:ring-offset-2 focus-visible:ring-offset-(--linear-bg-page)',
+    'before:pointer-events-none before:absolute before:inset-y-1 before:left-[20px] before:w-px before:bg-[color-mix(in_oklab,var(--linear-app-frame-seam)_42%,transparent)]',
+    'after:pointer-events-none after:absolute after:inset-y-1 after:left-[34px] after:w-px after:bg-[color-mix(in_oklab,var(--linear-app-frame-seam)_42%,transparent)]',
+    'group-data-[collapsible=icon]:before:hidden group-data-[collapsible=icon]:after:hidden',
+    tight ? 'gap-x-2 text-[12px]' : 'gap-x-2.5 text-[12.5px]',
+    collapsed
+      ? 'h-7 w-10 mx-auto grid-cols-1 place-items-center before:hidden after:hidden'
+      : cn(
+          'grid-cols-[20px_minmax(0,1fr)_auto]',
+          nonCollapsedSize,
+          'group-data-[collapsible=icon]:grid-cols-1 group-data-[collapsible=icon]:place-items-center'
+        ),
     active ? 'text-primary-token bg-surface-1' : inactiveColor,
     className
   );

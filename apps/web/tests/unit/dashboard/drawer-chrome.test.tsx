@@ -55,11 +55,10 @@ describe('dashboard drawer chrome', () => {
     expect(
       screen.getByRole('button', { name: 'More actions' })
     ).toBeInTheDocument();
-    // The ariaLabel is rendered as an sr-only span in the minimal header bar — not as a
-    // visible heading. Confirm it exists only as an accessible label, not a sighted heading.
-    const titleSpan = screen.queryByText('Audience member details');
-    expect(titleSpan).toBeInTheDocument();
-    expect(titleSpan).toHaveClass('sr-only');
+    expect(
+      screen.queryByText('Audience member details')
+    ).not.toBeInTheDocument();
+    expect(screen.getByText('Alex Fan')).toBeInTheDocument();
   });
 
   it('audience member drawer uses the tabbed card as the scroll region', () => {

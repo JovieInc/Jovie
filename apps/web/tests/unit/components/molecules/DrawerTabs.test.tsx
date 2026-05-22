@@ -22,6 +22,10 @@ describe('DrawerTabs', () => {
     expect(drawerTabs).toHaveAttribute('data-overflow-mode', 'collapse');
     expect(tablist).toBeInTheDocument();
     expect(tablist).toHaveAttribute('aria-label', 'Drawer tabs');
+    expect(tablist.className).toContain('w-full');
+    expect(screen.getByRole('tab', { name: 'Details' }).className).toContain(
+      'flex-1'
+    );
   });
 
   it('renders active tabs as pills and notifies on selection changes', () => {
