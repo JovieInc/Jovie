@@ -387,8 +387,23 @@ struct LiveRootContainer: View {
 
         await appState.handleSignedInUserChange(userID)
       } catch {
-        try? await clerk.auth.signOut()
-        await appState.signOut()
+        guard !(error is CancellationError), !Task.isCancelled else {
+          return
+        }
+
+        if error is MobileAuthReturnError {
+          try? await clerk.auth.signOut()
+          await appState.signOut()
+          authErrorMessage = "Couldn't finish sign-in. Try again."
+          return
+        }
+
+        if let existingUserID = clerk.user?.id {
+          await appState.handleSignedInUserChange(existingUserID)
+        } else {
+          await appState.signOut()
+        }
+
         authErrorMessage = "Couldn't finish sign-in. Try again."
       }
     }

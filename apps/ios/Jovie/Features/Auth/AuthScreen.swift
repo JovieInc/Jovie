@@ -67,6 +67,7 @@ struct AuthScreen: View {
 
 enum MobileBrowserAuthURLBuilder {
   static func signInURL(baseURL: URL, returnRoute: String = "/app") -> URL? {
+    let safeReturnRoute = sanitizeReturnRoute(returnRoute) ?? "/app"
     guard var components = URLComponents(
       url: baseURL.appending(path: "signin"),
       resolvingAgainstBaseURL: false
@@ -75,10 +76,30 @@ enum MobileBrowserAuthURLBuilder {
     }
 
     components.queryItems = [
-      URLQueryItem(name: "mobile_return", value: returnRoute),
+      URLQueryItem(name: "mobile_return", value: safeReturnRoute),
     ]
 
     return components.url
+  }
+
+  private static func sanitizeReturnRoute(_ route: String) -> String? {
+    let trimmed = route.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard trimmed.starts(with: "/"),
+          !trimmed.starts(with: "//"),
+          !trimmed.contains("://"),
+          !trimmed.contains("\\")
+    else {
+      return nil
+    }
+
+    guard let components = URLComponents(string: trimmed),
+          components.scheme == nil,
+          components.host == nil
+    else {
+      return nil
+    }
+
+    return trimmed
   }
 }
 

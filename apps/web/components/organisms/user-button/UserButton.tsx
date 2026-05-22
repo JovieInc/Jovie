@@ -70,6 +70,17 @@ interface BuildDropdownItemsParams {
   isElectronRuntime: boolean;
 }
 
+function sanitizeInstallUrl(value: unknown): string | null {
+  if (typeof value !== 'string') return null;
+
+  try {
+    const url = new URL(value);
+    return url.protocol === 'https:' ? url.toString() : null;
+  } catch {
+    return null;
+  }
+}
+
 function buildDropdownItems({
   billingStatus,
   loading,
@@ -151,7 +162,8 @@ function buildDropdownItems({
       label: 'Install iOS Alpha',
       icon: Smartphone,
       onClick: () => {
-        const href = iosAlphaAccess.installUrl ?? APP_ROUTES.DOWNLOAD;
+        const href =
+          sanitizeInstallUrl(iosAlphaAccess.installUrl) ?? APP_ROUTES.DOWNLOAD;
         window.open(href, '_blank', 'noopener,noreferrer');
       },
     });
@@ -395,7 +407,12 @@ export function UserButton({
         const response = await fetch('/api/mobile/v1/ios-access', {
           cache: 'no-store',
         });
-        if (!response.ok) return;
+        if (!response.ok) {
+          if (isActive) {
+            setIOSAlphaAccess({ hasAccess: false, installUrl: null });
+          }
+          return;
+        }
 
         const payload = (await response.json()) as {
           hasAccess?: unknown;
@@ -405,8 +422,7 @@ export function UserButton({
 
         setIOSAlphaAccess({
           hasAccess: payload.hasAccess === true,
-          installUrl:
-            typeof payload.installUrl === 'string' ? payload.installUrl : null,
+          installUrl: sanitizeInstallUrl(payload.installUrl),
         });
       } catch {
         if (isActive) {

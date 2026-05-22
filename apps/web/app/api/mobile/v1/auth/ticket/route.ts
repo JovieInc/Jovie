@@ -6,6 +6,7 @@ import {
   buildMobileAuthDeepLink,
   sanitizeMobileReturnRoute,
 } from '@/lib/mobile/auth-return';
+import { createRateLimitHeaders, generalLimiter } from '@/lib/rate-limit';
 
 export const runtime = 'nodejs';
 
@@ -31,6 +32,22 @@ export async function POST(request: Request) {
       return NextResponse.json(
         { error: 'Unauthorized' },
         { status: 401, headers: NO_STORE_HEADERS }
+      );
+    }
+
+    const rateLimit = await generalLimiter.limit(
+      `mobile-auth-ticket:${userId}`
+    );
+    if (!rateLimit.success) {
+      return NextResponse.json(
+        { error: rateLimit.reason ?? 'Rate limit exceeded' },
+        {
+          status: 429,
+          headers: {
+            ...NO_STORE_HEADERS,
+            ...createRateLimitHeaders(rateLimit),
+          },
+        }
       );
     }
 

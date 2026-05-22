@@ -167,6 +167,15 @@ struct AppStateTests {
     #expect(url?.absoluteString == "https://jov.ie/signin?mobile_return=/app")
   }
 
+  @Test func mobileBrowserAuthURLFallsBackForUnsafeMobileReturn() {
+    let url = MobileBrowserAuthURLBuilder.signInURL(
+      baseURL: URL(string: "https://jov.ie")!,
+      returnRoute: "https://evil.example/app"
+    )
+
+    #expect(url?.absoluteString == "https://jov.ie/signin?mobile_return=/app")
+  }
+
   @Test func mobileAuthReturnParserAcceptsTicketCallback() {
     let result = MobileAuthReturnParser.parse(
       URL(string: "ie.jov.Jovie://auth-return?ticket=ticket_123&route=%2Fapp%2Fsettings")!
