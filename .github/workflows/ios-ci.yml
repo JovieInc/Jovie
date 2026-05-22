@@ -103,9 +103,12 @@ jobs:
             -project apps/ios/Jovie.xcodeproj \
             -scheme Jovie \
             -destination '${{ steps.simulator.outputs.destination }}' \
+            -derivedDataPath .build/ios-ci \
             CODE_SIGNING_ALLOWED=NO
 
       - name: Capture simulator screenshots
+        env:
+          IOS_SCREENSHOT_DERIVED_DATA: .build/ios-ci
         run: bash apps/ios/scripts/capture-screenshots.sh
 
       - name: Upload simulator screenshots
