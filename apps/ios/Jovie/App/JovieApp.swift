@@ -50,8 +50,8 @@ struct JovieApp: App {
           RootView(
             appState: appState,
             liveUserID: nil,
-            onLogout: { await appState.signOut() },
-            onAuthenticated: { _ in }
+            authErrorMessage: nil,
+            onLogout: { await appState.signOut() }
           )
         }
       }

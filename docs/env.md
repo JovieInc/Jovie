@@ -59,6 +59,12 @@ The public URL of your application.
 
 **Default:** `https://jov.ie`
 
+### `IOS_TESTFLIGHT_PUBLIC_LINK`
+
+Optional internal TestFlight install URL used by authenticated, alpha-gated iOS
+download surfaces. Leave unset to keep the iOS alpha visible but not directly
+installable from web UI.
+
 ## Feature Flags (Statsig)
 
 ### `STATSIG_SERVER_SECRET`

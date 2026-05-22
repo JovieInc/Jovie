@@ -14,6 +14,7 @@ const AUTH_ROUTE_PREFIXES = [
   '/sso-callback',
   DESKTOP_AUTH_RETURN_PATH,
   DESKTOP_AUTH_HANDOFF_PATH,
+  '/mobile-auth-return',
   '/__clerk',
   '/clerk',
   '/api',

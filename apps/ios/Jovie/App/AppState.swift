@@ -61,7 +61,7 @@ final class AppState {
     case .uiTestingSignedOut:
       route = .signedOut
       dashboardState = .idle
-    case .uiTestingReady, .uiTestingSettings, .uiTestingVenueMode:
+    case .uiTestingReady, .uiTestingChat, .uiTestingSettings, .uiTestingVenueMode:
       route = .ready
       dashboardState = .loaded(.previewReady)
       isOffline = false
@@ -162,5 +162,9 @@ final class AppState {
     case .idle, .loading, .error:
       return configuration.webBaseURL.appending(path: "app")
     }
+  }
+
+  var billingURL: URL {
+    continueOnWebURL.appending(path: "settings/billing")
   }
 }

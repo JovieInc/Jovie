@@ -12,6 +12,11 @@ import {
   buildDesktopAuthReturnPath,
   sanitizeDesktopReturnRoute,
 } from '@/lib/desktop/auth-return';
+import {
+  buildAuthRouteUrlWithMobileReturn,
+  buildMobileAuthReturnPath,
+  sanitizeMobileReturnRoute,
+} from '@/lib/mobile/auth-return';
 
 /**
  * Shows a banner when the OAuth provider returned an error code.
@@ -103,12 +108,19 @@ export function SignInPageClient() {
   const desktopReturnRoute = sanitizeDesktopReturnRoute(
     searchParams.get('desktop_return')
   );
-  const signUpUrl = desktopReturnRoute
-    ? buildAuthRouteUrlWithDesktopReturn(APP_ROUTES.SIGNUP, searchParams)
-    : buildAuthRouteUrl(APP_ROUTES.SIGNUP, searchParams);
-  const fallbackRedirectUrl = desktopReturnRoute
-    ? buildDesktopAuthReturnPath(desktopReturnRoute)
-    : undefined;
+  const mobileReturnRoute = sanitizeMobileReturnRoute(
+    searchParams.get('mobile_return')
+  );
+  const signUpUrl = mobileReturnRoute
+    ? buildAuthRouteUrlWithMobileReturn(APP_ROUTES.SIGNUP, searchParams)
+    : desktopReturnRoute
+      ? buildAuthRouteUrlWithDesktopReturn(APP_ROUTES.SIGNUP, searchParams)
+      : buildAuthRouteUrl(APP_ROUTES.SIGNUP, searchParams);
+  const fallbackRedirectUrl = mobileReturnRoute
+    ? buildMobileAuthReturnPath(mobileReturnRoute)
+    : desktopReturnRoute
+      ? buildDesktopAuthReturnPath(desktopReturnRoute)
+      : undefined;
   const initialValues = useMemo(
     () => (isValidEmail(email) ? { emailAddress: email } : undefined),
     [email]
@@ -134,7 +146,9 @@ export function SignInPageClient() {
       <AuthShell
         mode='sign-in'
         forceOppositeModeHardNavigation
-        oppositeModeUrl={desktopReturnRoute ? signUpUrl : undefined}
+        oppositeModeUrl={
+          desktopReturnRoute || mobileReturnRoute ? signUpUrl : undefined
+        }
         fallbackRedirectUrl={fallbackRedirectUrl}
         initialValues={initialValues}
       />

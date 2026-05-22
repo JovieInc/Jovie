@@ -159,23 +159,63 @@ struct AppStateTests {
     #expect(await repository.clearedUsers() == ["user_123"])
   }
 
-  @Test func authErrorMapperKeepsSpecificFallbackMessage() {
-    let error = NSError(
-      domain: "Clerk",
-      code: 429,
-      userInfo: [NSLocalizedDescriptionKey: "Too many attempts. Try again later."]
+  @Test func mobileBrowserAuthURLUsesWebSignInWithMobileReturn() {
+    let url = MobileBrowserAuthURLBuilder.signInURL(
+      baseURL: URL(string: "https://jov.ie")!
     )
 
-    #expect(AuthErrorMapper.message(for: error) == "Too many attempts. Try again later.")
+    #expect(url?.absoluteString == "https://jov.ie/signin?mobile_return=/app")
   }
 
-  @Test func authErrorMapperHidesUserCancelledBrowserSession() {
-    let error = NSError(
-      domain: "AuthenticationServices.WebAuthenticationSession",
-      code: 1,
-      userInfo: [NSLocalizedDescriptionKey: "The operation was canceled."]
+  @Test func mobileAuthReturnParserAcceptsTicketCallback() {
+    let result = MobileAuthReturnParser.parse(
+      URL(string: "ie.jov.Jovie://auth-return?ticket=ticket_123&route=%2Fapp%2Fsettings")!
     )
 
-    #expect(AuthErrorMapper.message(for: error) == nil)
+    #expect(result == MobileAuthReturn(ticket: "ticket_123", route: "/app/settings"))
+  }
+
+  @Test func mobileAuthReturnParserRejectsUnsafeReturnRoutes() {
+    let result = MobileAuthReturnParser.parse(
+      URL(string: "ie.jov.Jovie://auth-return?ticket=ticket_123&route=%2F%2Fevil.com")!
+    )
+
+    #expect(result == MobileAuthReturn(ticket: "ticket_123", route: "/app"))
+  }
+
+  @Test func chatLaunchModeOpensChatWithoutChangingReadyState() async throws {
+    let repository = MockRepository(
+      nextResult: .success(
+        MeRepositoryResult(response: .previewReady, isStale: false)
+      )
+    )
+    let appState = AppState(
+      configuration: configuration,
+      launchMode: .uiTestingChat,
+      repository: repository,
+      brightnessManager: MockBrightnessController()
+    )
+
+    await appState.completeLaunch()
+
+    #expect(appState.route == .ready)
+    #expect(appState.dashboardState == .loaded(.previewReady))
+    #expect(appState.launchMode.opensChatOnLaunch == true)
+  }
+
+  @Test func billingURLRedirectsToWebBillingSettings() {
+    let repository = MockRepository(
+      nextResult: .success(
+        MeRepositoryResult(response: .previewReady, isStale: false)
+      )
+    )
+    let appState = AppState(
+      configuration: configuration,
+      launchMode: .live,
+      repository: repository,
+      brightnessManager: MockBrightnessController()
+    )
+
+    #expect(appState.billingURL.absoluteString == "https://jov.ie/app/settings/billing")
   }
 }

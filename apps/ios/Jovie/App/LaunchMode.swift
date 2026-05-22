@@ -7,6 +7,7 @@ enum LaunchMode: Equatable {
   case uiTestingLiveAuth
   case uiTestingSignedOut
   case uiTestingReady
+  case uiTestingChat
   case uiTestingSettings
   case uiTestingVenueMode
   case uiTestingNeedsOnboarding
@@ -19,6 +20,7 @@ enum LaunchMode: Equatable {
     case .unitTesting,
          .uiTestingSignedOut,
          .uiTestingReady,
+         .uiTestingChat,
          .uiTestingSettings,
          .uiTestingVenueMode,
          .uiTestingNeedsOnboarding,
@@ -33,6 +35,10 @@ enum LaunchMode: Equatable {
 
   var opensSettingsOnLaunch: Bool {
     self == .uiTestingSettings
+  }
+
+  var opensChatOnLaunch: Bool {
+    self == .uiTestingChat
   }
 
   var opensVenueModeOnLaunch: Bool {
@@ -56,6 +62,10 @@ enum LaunchMode: Equatable {
 
     if arguments.contains("-ui-testing-ready") {
       return .uiTestingReady
+    }
+
+    if arguments.contains("-ui-testing-chat") {
+      return .uiTestingChat
     }
 
     if arguments.contains("-ui-testing-settings") {

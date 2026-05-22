@@ -23,6 +23,9 @@ describe('desktop auth return helpers', () => {
     expect(sanitizeDesktopReturnRoute('/signin')).toBeNull();
     expect(sanitizeDesktopReturnRoute('/signup/sso-callback')).toBeNull();
     expect(sanitizeDesktopReturnRoute('/auth-return?route=/app')).toBeNull();
+    expect(
+      sanitizeDesktopReturnRoute('/mobile-auth-return?route=/app')
+    ).toBeNull();
     expect(sanitizeDesktopReturnRoute('/api/auth/reset')).toBeNull();
   });
 

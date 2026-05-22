@@ -41,9 +41,10 @@ run_with_timeout() {
 "$SCRIPT_DIR/ensure-configuration.sh"
 
 APP_PATH="$DERIVED_DATA_PATH/Build/Products/Debug-iphonesimulator/Jovie.app"
-if [[ -d "$APP_PATH" ]]; then
+if [[ -d "$APP_PATH" && "${IOS_SCREENSHOT_REUSE_BUILD:-0}" == "1" ]]; then
   echo "Using existing built app at $APP_PATH"
 else
+  rm -rf "$DERIVED_DATA_PATH"
   run_with_timeout "${IOS_SCREENSHOT_BUILD_TIMEOUT:-300}" xcodebuild build \
     -project "$PROJECT_PATH" \
     -scheme "$SCHEME" \
@@ -183,10 +184,11 @@ fi
 prepare_device "$IPHONE_UDID"
 capture "$IPHONE_UDID" "00-loading" "-ui-testing-splash"
 capture "$IPHONE_UDID" "01-signed-out" "-ui-testing-signed-out"
-capture "$IPHONE_UDID" "02-dashboard" "-ui-testing-ready"
+capture "$IPHONE_UDID" "02-profile" "-ui-testing-ready"
 capture "$IPHONE_UDID" "03-fullscreen-qr" "-ui-testing-venue-mode"
 capture "$IPHONE_UDID" "04-settings" "-ui-testing-settings"
 capture "$IPHONE_UDID" "05-needs-onboarding" "-ui-testing-needs-onboarding"
+capture "$IPHONE_UDID" "06-chat" "-ui-testing-chat"
 
 IPAD_UDID="$(pick_device "^iPad")"
 if [[ -n "$IPAD_UDID" ]]; then
@@ -195,7 +197,7 @@ if [[ -n "$IPAD_UDID" ]]; then
     [[ -z "$candidate_udid" ]] && continue
 
     if IOS_SCREENSHOT_BOOT_TIMEOUT="${IOS_SCREENSHOT_IPAD_BOOT_TIMEOUT:-90}" prepare_device "$candidate_udid" &&
-      capture "$candidate_udid" "06-ipad-shell" "-ui-testing-ready"; then
+      capture "$candidate_udid" "07-ipad-shell" "-ui-testing-ready"; then
       captured_ipad=true
       break
     fi

@@ -272,7 +272,8 @@ platform :ios do
       api_key: api_key,
       app_identifier: APP_IDENTIFIER,
       ipa: File.join(DEFAULT_ARTIFACT_DIR, "Jovie.ipa"),
-      skip_waiting_for_build_processing: true,
+      skip_waiting_for_build_processing: false,
+      wait_processing_timeout_duration: ENV.fetch("TESTFLIGHT_PROCESSING_TIMEOUT", "3600").to_i,
       distribute_external: false,
       changelog: ENV.fetch("TESTFLIGHT_CHANGELOG", "Internal iOS foundation build #{current_build_number}")
     )

@@ -1,5 +1,3 @@
-import AuthenticationServices
-import ClerkKit
 import OSLog
 import SwiftUI
 
@@ -11,7 +9,10 @@ private let authLogger = Logger(
 struct AuthScreen: View {
   let isMock: Bool
   let webBaseURL: URL
-  let onAuthenticated: @MainActor (String) async -> Void
+  let errorMessage: String?
+
+  @Environment(\.openURL) private var openURL
+  @State private var didRequestBrowserAuth = false
 
   var body: some View {
     ZStack {
@@ -35,165 +36,60 @@ struct AuthScreen: View {
 
         Spacer(minLength: 72)
 
-        if isMock {
-          MockSSOAuthActions()
-        } else {
-          LiveSSOAuthActions(onAuthenticated: onAuthenticated)
-        }
+        BrowserAuthActions(
+          isOpening: didRequestBrowserAuth,
+          errorMessage: errorMessage,
+          action: startBrowserAuth
+        )
       }
       .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
     .accessibilityIdentifier("auth-screen")
   }
-}
 
-private enum SSOProvider: Hashable, Identifiable {
-  case google
-  case apple
-
-  var id: Self { self }
-
-  var title: String {
-    switch self {
-    case .google:
-      "Continue with Google"
-    case .apple:
-      "Continue with Apple"
+  private func startBrowserAuth() {
+    guard !isMock,
+          let authURL = MobileBrowserAuthURLBuilder.signInURL(baseURL: webBaseURL)
+    else {
+      return
     }
-  }
 
-  var clerkProvider: OAuthProvider {
-    switch self {
-    case .google:
-      .google
-    case .apple:
-      .apple
-    }
-  }
+    didRequestBrowserAuth = true
 
-  var accessibilityIdentifier: String {
-    switch self {
-    case .google:
-      "auth-google-button"
-    case .apple:
-      "auth-apple-button"
+    openURL(authURL) { accepted in
+      if !accepted {
+        authLogger.error("System refused to open mobile browser auth URL.")
+        didRequestBrowserAuth = false
+      }
     }
   }
 }
 
-private struct MockSSOAuthActions: View {
-  var body: some View {
-    SSOProviderButtons(
-      activeProvider: nil,
-      errorMessage: nil,
-      onSelect: { _ in }
-    )
+enum MobileBrowserAuthURLBuilder {
+  static func signInURL(baseURL: URL, returnRoute: String = "/app") -> URL? {
+    guard var components = URLComponents(
+      url: baseURL.appending(path: "signin"),
+      resolvingAgainstBaseURL: false
+    ) else {
+      return nil
+    }
+
+    components.queryItems = [
+      URLQueryItem(name: "mobile_return", value: returnRoute),
+    ]
+
+    return components.url
   }
 }
 
-private struct LiveSSOAuthActions: View {
-  @Environment(Clerk.self) private var clerk
-
-  let onAuthenticated: @MainActor (String) async -> Void
-
-  @State private var activeProvider: SSOProvider?
-  @State private var errorMessage: String?
-  @State private var authTask: Task<Void, Never>?
-
-  var body: some View {
-    SSOProviderButtons(
-      activeProvider: activeProvider,
-      errorMessage: errorMessage,
-      onSelect: startAuth
-    )
-    .onDisappear {
-      authTask?.cancel()
-      authTask = nil
-      activeProvider = nil
-    }
-  }
-
-  @MainActor
-  private func startAuth(with provider: SSOProvider) {
-    guard activeProvider == nil else { return }
-
-    authTask?.cancel()
-    activeProvider = provider
-    errorMessage = nil
-
-    authTask = Task { @MainActor in
-      defer {
-        activeProvider = nil
-        authTask = nil
-      }
-
-      do {
-        let result = try await clerk.auth.signInWithOAuth(
-          provider: provider.clerkProvider,
-          prefersEphemeralWebBrowserSession: false,
-          transferable: true
-        )
-
-        guard !Task.isCancelled else { return }
-        try await finishAuthentication(result)
-      } catch {
-        guard !Task.isCancelled else { return }
-
-        if let message = AuthErrorMapper.message(for: error) {
-          errorMessage = message
-        }
-      }
-    }
-  }
-
-  @MainActor
-  private func finishAuthentication(_ result: TransferFlowResult) async throws {
-    switch result {
-    case let .signIn(signIn):
-      if let sessionID = signIn.createdSessionId,
-         clerk.session?.id != sessionID
-      {
-        try await clerk.auth.setActive(sessionId: sessionID)
-      }
-    case let .signUp(signUp):
-      if let sessionID = signUp.createdSessionId,
-         clerk.session?.id != sessionID
-      {
-        try await clerk.auth.setActive(sessionId: sessionID)
-      }
-    }
-
-    _ = try await clerk.refreshClient()
-    _ = try await ClerkTokenProvider().bearerToken(forceRefresh: false)
-
-    guard let userID = clerk.user?.id else {
-      authLogger.error("Clerk user missing after successful OAuth verification.")
-      throw AuthPresentationError.missingSignedInUser
-    }
-
-    await onAuthenticated(userID)
-  }
-}
-
-private struct SSOProviderButtons: View {
-  let activeProvider: SSOProvider?
+private struct BrowserAuthActions: View {
+  let isOpening: Bool
   let errorMessage: String?
-  let onSelect: (SSOProvider) -> Void
-
-  private let providers: [SSOProvider] = [.google, .apple]
+  let action: () -> Void
 
   var body: some View {
     VStack(spacing: JovieSpacing.large) {
-      VStack(spacing: JovieSpacing.medium) {
-        ForEach(providers) { provider in
-          SSOProviderButton(
-            provider: provider,
-            isLoading: activeProvider == provider,
-            isDisabled: activeProvider != nil,
-            action: { onSelect(provider) }
-          )
-        }
-      }
+      GetStartedButton(isOpening: isOpening, action: action)
 
       AuthErrorText(message: errorMessage)
     }
@@ -203,47 +99,35 @@ private struct SSOProviderButtons: View {
   }
 }
 
-private struct SSOProviderButton: View {
-  let provider: SSOProvider
-  let isLoading: Bool
-  let isDisabled: Bool
+private struct GetStartedButton: View {
+  let isOpening: Bool
   let action: () -> Void
-
-  private var isPrimary: Bool {
-    provider == .google
-  }
 
   var body: some View {
     Button(action: action) {
       HStack(spacing: JovieSpacing.small) {
-        if isLoading {
+        if isOpening {
           ProgressView()
             .controlSize(.small)
-            .tint(isPrimary ? JovieColor.backgroundBase : JovieColor.textPrimary)
+            .tint(JovieColor.backgroundBase)
         }
 
-        Text(provider.title)
+        Text(isOpening ? "Opening..." : "Get started")
           .lineLimit(1)
           .minimumScaleFactor(0.82)
       }
       .font(JovieFont.body(size: 16, weight: .semibold))
-      .foregroundStyle(isPrimary ? JovieColor.backgroundBase : JovieColor.textPrimary)
+      .foregroundStyle(JovieColor.backgroundBase)
       .frame(maxWidth: .infinity)
       .frame(height: 56)
       .contentShape(Rectangle())
     }
     .buttonStyle(.plain)
-    .disabled(isDisabled)
     .background(
       Capsule(style: .continuous)
-        .fill(isPrimary ? Color.white : JovieColor.surface1)
+        .fill(Color.white)
     )
-    .overlay {
-      Capsule(style: .continuous)
-        .stroke(isPrimary ? Color.clear : JovieColor.borderDefault, lineWidth: 1)
-    }
-    .opacity(isDisabled && !isLoading ? 0.62 : 1)
-    .accessibilityIdentifier(provider.accessibilityIdentifier)
+    .accessibilityIdentifier("auth-get-started-button")
   }
 }
 
@@ -259,52 +143,5 @@ private struct AuthErrorText: View {
       .frame(minHeight: 36)
       .frame(maxWidth: .infinity)
       .accessibilityHidden(message == nil)
-  }
-}
-
-private enum AuthPresentationError: LocalizedError {
-  case missingSignedInUser
-
-  var errorDescription: String? {
-    switch self {
-    case .missingSignedInUser:
-      "You're signed in, but we couldn't load your profile. Try again."
-    }
-  }
-}
-
-enum AuthErrorMapper {
-  static func message(for error: Error) -> String? {
-    if let authError = error as? ASWebAuthenticationSessionError,
-       authError.code == .canceledLogin
-    {
-      return nil
-    }
-
-    let rawMessage = error.localizedDescription.trimmingCharacters(in: .whitespacesAndNewlines)
-    let lowercased = rawMessage.lowercased()
-
-    if lowercased.contains("cancel") {
-      return nil
-    }
-
-    if lowercased.contains("network") ||
-      lowercased.contains("offline") ||
-      lowercased.contains("internet") ||
-      lowercased.contains("timed out")
-    {
-      return "We couldn't reach Jovie. Check your connection and try again."
-    }
-
-    if lowercased.contains("not allowed") ||
-      lowercased.contains("strategy") ||
-      lowercased.contains("oauth")
-    {
-      return "This sign-in method is not available yet. Try another option."
-    }
-
-    return rawMessage.isEmpty
-      ? "Sign in failed. Try again."
-      : rawMessage
   }
 }

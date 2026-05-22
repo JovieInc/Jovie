@@ -214,4 +214,24 @@ describe('signin page', () => {
       '/signup?desktop_return=%2Fapp%2Fsettings%3Ftab%3Dbilling'
     );
   });
+
+  it('uses mobile_return for mobile browser auth fallback and cross-link', async () => {
+    searchParamsState.value = 'mobile_return=%2Fapp%2Fsettings';
+
+    render(<SignInPage />);
+
+    await waitFor(() => {
+      expect(clerkSignInMock).toHaveBeenCalledTimes(1);
+    });
+
+    expect(clerkSignInMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        signUpUrl: fullAuthUrl('/signup?mobile_return=%2Fapp%2Fsettings'),
+        fallbackRedirectUrl: '/mobile-auth-return?route=%2Fapp%2Fsettings',
+      })
+    );
+    expect(routerPrefetchMock).toHaveBeenCalledWith(
+      '/signup?mobile_return=%2Fapp%2Fsettings'
+    );
+  });
 });

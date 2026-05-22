@@ -67,6 +67,7 @@ export const APP_FLAG_REGISTRY = {
   PLAYLIST_ENGINE: buildBooleanFlag('PLAYLIST_ENGINE'),
   ALBUM_ART_GENERATION: buildBooleanFlag('ALBUM_ART_GENERATION'),
   CHAT_JANK_MONITOR: buildBooleanFlag('CHAT_JANK_MONITOR'),
+  IOS_APP_ALPHA_ACCESS: buildBooleanFlag('IOS_APP_ALPHA_ACCESS'),
   // RELEASE_PLAN_DEMO is on by default in dev/preview so QA and the demo
   // recorder can visit /app/dashboard/release-plan without a manual override.
   // Production keeps it off (default=false) — enable via localStorage override
