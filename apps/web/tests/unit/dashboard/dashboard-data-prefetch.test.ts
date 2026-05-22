@@ -285,7 +285,8 @@ describe('dashboard data prefetch', () => {
   it('retries shell user lookup after auth reconciliation when the clerk row is missing', async () => {
     // The shell path must keep profile reads inside the same transaction-scoped
     // session because creator profile visibility depends on RLS.
-    // Mock tx to return empty on first user lookup, then found on retry.
+    // The cached shell fetch now returns the empty snapshot first, then the
+    // fresh retry performs auth reconciliation and recovers the user row.
     const profile = {
       id: 'profile_1',
       userId: 'user_db_1',
@@ -300,6 +301,13 @@ describe('dashboard data prefetch', () => {
 
     const selectMock = vi
       .fn()
+      .mockReturnValueOnce({
+        from: vi.fn().mockReturnValue({
+          where: vi.fn().mockReturnValue({
+            limit: vi.fn().mockResolvedValue([]),
+          }),
+        }),
+      } as never)
       .mockReturnValueOnce({
         from: vi.fn().mockReturnValue({
           where: vi.fn().mockReturnValue({
@@ -327,9 +335,13 @@ describe('dashboard data prefetch', () => {
           }),
         }),
       } as never);
-    withDbSessionTxMock.mockImplementationOnce(async handler =>
-      handler({ select: selectMock }, 'user_123')
-    );
+    withDbSessionTxMock
+      .mockImplementationOnce(async handler =>
+        handler({ select: selectMock }, 'user_123')
+      )
+      .mockImplementationOnce(async handler =>
+        handler({ select: selectMock }, 'user_123')
+      );
 
     const { getDashboardShellData } = await import(
       '@/app/app/(shell)/dashboard/actions/dashboard-data'
@@ -339,10 +351,10 @@ describe('dashboard data prefetch', () => {
 
     expect(resolveUserStateMock).toHaveBeenCalledWith({
       createDbUserIfMissing: true,
+      knownClerkUserId: 'user_123',
     });
-    expect(withDbSessionTxMock).toHaveBeenCalledWith(expect.any(Function), {
-      clerkUserId: 'user_123',
-    });
+    expect(resolveUserStateMock).toHaveBeenCalledTimes(1);
+    expect(withDbSessionTxMock).toHaveBeenCalledTimes(2);
     expect(withDbSessionMock).not.toHaveBeenCalled();
     expect(result.user?.id).toBe('user_db_1');
     expect(result.selectedProfile?.id).toBe('profile_1');

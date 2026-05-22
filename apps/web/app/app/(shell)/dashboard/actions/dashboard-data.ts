@@ -482,6 +482,7 @@ async function fetchDashboardBaseWithSession(
   sessionUserId: string,
   options?: {
     readonly includeSettings?: boolean;
+    readonly allowMissingUserProvisioning?: boolean;
   }
 ): Promise<CoreData> {
   const selectUser = () =>
@@ -497,10 +498,15 @@ async function fetchDashboardBaseWithSession(
 
   let [userData] = await dashboardQuery(selectUser, 'User lookup query');
 
-  if (!userData?.id) {
+  if (!userData?.id && options?.allowMissingUserProvisioning !== false) {
     try {
+      // Pass knownClerkUserId so resolveUserState does not call auth() or
+      // currentUser() — both access headers() and will throw ClerkUseCacheError
+      // when this function is invoked inside an unstable_cache boundary.
+      // (JOV-2441)
       const resolvedUserState = await resolveUserState({
         createDbUserIfMissing: true,
+        knownClerkUserId: sessionUserId,
       });
 
       if (
@@ -617,12 +623,17 @@ async function fetchDashboardBaseWithSession(
  * then augments with slow supplementary queries (links, avatar, tipping).
  */
 async function fetchDashboardCoreWithSession(
-  clerkUserId: string
+  clerkUserId: string,
+  options?: {
+    readonly allowMissingUserProvisioning?: boolean;
+  }
 ): Promise<CoreData> {
   try {
     return await withDbSessionTx(
       async (tx, sessionUserId) => {
-        const base = await fetchDashboardBaseWithSession(tx, sessionUserId);
+        const base = await fetchDashboardBaseWithSession(tx, sessionUserId, {
+          allowMissingUserProvisioning: options?.allowMissingUserProvisioning,
+        });
 
         // If no profile resolved, return the base result (onboarding/error state)
         if (!base.selectedProfile) {
@@ -854,12 +865,17 @@ async function resolveDashboardData(): Promise<DashboardData> {
  * ~3 fast single-row queries vs ~6 sequential queries in the full fetch.
  */
 async function fetchDashboardEssentialWithSession(
-  clerkUserId: string
+  clerkUserId: string,
+  options?: {
+    readonly allowMissingUserProvisioning?: boolean;
+  }
 ): Promise<CoreData> {
   try {
     return await withDbSessionTx(
       async (tx, sessionUserId) =>
-        fetchDashboardBaseWithSession(tx, sessionUserId),
+        fetchDashboardBaseWithSession(tx, sessionUserId, {
+          allowMissingUserProvisioning: options?.allowMissingUserProvisioning,
+        }),
       { clerkUserId }
     );
   } catch (error) {
@@ -901,7 +917,10 @@ async function fetchDashboardEssentialWithSession(
  * provides selectedProfile + creatorProfiles for the sidebar shell.
  */
 async function fetchDashboardShellWithSession(
-  clerkUserId: string
+  clerkUserId: string,
+  options?: {
+    readonly allowMissingUserProvisioning?: boolean;
+  }
 ): Promise<CoreData> {
   try {
     // Keep shell reads inside the transaction-scoped session. RLS depends on
@@ -912,6 +931,7 @@ async function fetchDashboardShellWithSession(
       async (tx, sessionUserId) =>
         fetchDashboardBaseWithSession(tx, sessionUserId, {
           includeSettings: false,
+          allowMissingUserProvisioning: options?.allowMissingUserProvisioning,
         }),
       { clerkUserId }
     );
@@ -951,7 +971,9 @@ async function fetchDashboardShellWithSession(
  */
 const getCachedDashboardEssential = unstableCache(
   async (clerkUserId: string) =>
-    fetchDashboardEssentialWithSession(clerkUserId),
+    fetchDashboardEssentialWithSession(clerkUserId, {
+      allowMissingUserProvisioning: false,
+    }),
   ['dashboard-essential'],
   {
     revalidate: CACHE_TTL.MEDIUM,
@@ -960,7 +982,10 @@ const getCachedDashboardEssential = unstableCache(
 );
 
 const getCachedDashboardShell = unstableCache(
-  async (clerkUserId: string) => fetchDashboardShellWithSession(clerkUserId),
+  async (clerkUserId: string) =>
+    fetchDashboardShellWithSession(clerkUserId, {
+      allowMissingUserProvisioning: false,
+    }),
   ['dashboard-shell'],
   {
     revalidate: CACHE_TTL.MEDIUM,
@@ -974,7 +999,10 @@ const getCachedDashboardShell = unstableCache(
  * within fetchDashboardCoreWithSession to avoid pool exhaustion.
  */
 const getCachedDashboardCore = unstableCache(
-  async (clerkUserId: string) => fetchDashboardCoreWithSession(clerkUserId),
+  async (clerkUserId: string) =>
+    fetchDashboardCoreWithSession(clerkUserId, {
+      allowMissingUserProvisioning: false,
+    }),
   ['dashboard-core'],
   {
     revalidate: CACHE_TTL.MEDIUM,

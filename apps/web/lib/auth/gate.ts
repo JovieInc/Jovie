@@ -441,9 +441,22 @@ async function handleMissingDbUser(
  * @param options.createDbUserIfMissing - If true, creates a DB user row when missing (default: true)
  */
 export async function resolveUserState(
-  options: { createDbUserIfMissing?: boolean } = {}
+  options: {
+    createDbUserIfMissing?: boolean;
+    /**
+     * Pre-resolved Clerk user ID. When provided, skips calling auth() and
+     * currentUser() — both of which read request headers and must NOT be
+     * called inside unstable_cache or "use cache" boundaries.
+     *
+     * Pass this when the Clerk user ID is already known (e.g. from a cached
+     * function that received it as a parameter). In this case email will be
+     * null, so user creation via handleMissingDbUser will fail gracefully
+     * rather than throwing a ClerkUseCacheError.
+     */
+    knownClerkUserId?: string;
+  } = {}
 ): Promise<AuthGateResult> {
-  const { createDbUserIfMissing = true } = options;
+  const { createDbUserIfMissing = true, knownClerkUserId } = options;
 
   // Default empty result
   const emptyResult: AuthGateResult = {
@@ -459,22 +472,41 @@ export async function resolveUserState(
     },
   };
 
-  // 1. Check Clerk authentication (parallelize both calls for performance)
-  const [authResult, clerkUser] = await Promise.all([
-    getCachedAuth(),
-    getCachedCurrentUser(),
-  ]);
+  // 1. Resolve the Clerk user ID.
+  //
+  // When knownClerkUserId is provided (e.g. from a cached function), skip
+  // getCachedAuth() and getCachedCurrentUser() — both access headers()
+  // internally and will throw ClerkUseCacheError inside unstable_cache scopes.
+  let clerkUserId: string | null;
+  let email: string | null;
 
-  const { userId: clerkUserId } = authResult;
+  if (knownClerkUserId) {
+    clerkUserId = knownClerkUserId;
+    // Email is unavailable without getCachedCurrentUser(). User creation will
+    // fail gracefully in handleMissingDbUser if email is required.
+    email = null;
+  } else {
+    const [authResult, clerkUser] = await Promise.all([
+      getCachedAuth(),
+      getCachedCurrentUser(),
+    ]);
+
+    clerkUserId = authResult.userId;
+    if (!clerkUserId) {
+      return emptyResult;
+    }
+
+    // Get the primary verified email — verified emails are the source of truth
+    // for identity. Prefer a verified address over index [0] (may be unverified).
+    email =
+      clerkUser?.emailAddresses?.find(
+        e => e.verification?.status === 'verified'
+      )?.emailAddress ?? null;
+  }
+
   if (!clerkUserId) {
     return emptyResult;
   }
-
-  // Get the primary verified email — verified emails are the source of truth for identity.
-  // Prefer a verified address over index [0] which may be unverified.
-  const email =
-    clerkUser?.emailAddresses?.find(e => e.verification?.status === 'verified')
-      ?.emailAddress ?? null;
 
   // 2. Query DB user AND profile in a single JOIN query (performance optimization)
   // This reduces database round trips from 2 to 1
