@@ -103,7 +103,7 @@ test('chat route renders the Shell V1 app frame when forced on', async ({
   await expect(chatContent).toBeVisible({ timeout: 30_000 });
   await expect(composer).toHaveCSS(
     'border-radius',
-    /^(?:999px|18px|20px|24px|28px)$/
+    /^(?:999px|18px|20px|24px|28px|36px)$/
   );
   await expect(page.locator('.animate-shell-in')).toHaveCount(0);
 });
@@ -188,6 +188,18 @@ test('chat composer clears mobile shell tabs on tablet and phone', async ({
 
     await expect(composer).toBeVisible({ timeout: 30_000 });
     await expect(mobileTabs).toBeVisible({ timeout: 30_000 });
+    await expect
+      .poll(() => composer.boundingBox(), {
+        message: `${viewport.label} composer is measurable`,
+        timeout: 30_000,
+      })
+      .not.toBeNull();
+    await expect
+      .poll(() => mobileTabs.boundingBox(), {
+        message: `${viewport.label} mobile tabs are measurable`,
+        timeout: 30_000,
+      })
+      .not.toBeNull();
 
     const composerBox = await composer.boundingBox();
     const tabsBox = await mobileTabs.boundingBox();

@@ -12,6 +12,13 @@ import {
 } from 'electron';
 import { autoUpdater } from 'electron-updater';
 import { APP_ENV, APP_URL } from './env';
+import {
+  getUrlDisposition as getDesktopUrlDisposition,
+  isAllowedExternalUrl as isAllowedDesktopExternalUrl,
+  matchesPathPrefix,
+  parseUrl,
+  type UrlDisposition,
+} from './navigation';
 
 // Separate userData for staging so staging and production apps coexist
 if (APP_ENV === 'staging') {
@@ -19,6 +26,7 @@ if (APP_ENV === 'staging') {
 }
 
 const APP_ORIGIN = new URL(APP_URL).origin;
+const URL_DISPOSITION_OPTIONS = { appUrl: APP_URL, appEnv: APP_ENV } as const;
 const APP_ENTRY_URL = buildAppUrl('/app/chat');
 const SETTINGS_URL = buildAppUrl('/app/settings');
 const APP_BACKGROUND_COLOR = '#08090a';
@@ -76,44 +84,18 @@ if (!gotSingleInstanceLock) {
   app.quit();
 }
 
-function parseUrl(urlString: string): URL | null {
-  try {
-    return new URL(urlString);
-  } catch {
-    return null;
-  }
-}
-
 function buildAppUrl(pathname: string): string {
   const url = new URL(pathname, APP_URL);
   url.searchParams.set('runtime', 'electron');
   return url.toString();
 }
 
-function isAllowedInAppUrl(parsed: URL): boolean {
-  if (
-    parsed.protocol !== 'https:' &&
-    !(APP_ENV === 'local' && parsed.protocol === 'http:')
-  ) {
-    return false;
-  }
-  return (
-    parsed.origin === APP_ORIGIN && !isBrowserOnlyInAppPath(parsed.pathname)
-  );
-}
-
 function isAllowedExternalUrl(parsed: URL): boolean {
-  return parsed.protocol === 'https:' || parsed.protocol === 'mailto:';
+  return isAllowedDesktopExternalUrl(parsed, URL_DISPOSITION_OPTIONS);
 }
-
-type UrlDisposition = 'in-app' | 'external' | 'blocked';
 
 function getUrlDisposition(urlString: string): UrlDisposition {
-  const parsed = parseUrl(urlString);
-  if (!parsed) return 'blocked';
-  if (isAllowedInAppUrl(parsed)) return 'in-app';
-  if (isAllowedExternalUrl(parsed)) return 'external';
-  return 'blocked';
+  return getDesktopUrlDisposition(urlString, URL_DISPOSITION_OPTIONS);
 }
 
 function openExternalUrl(urlString: string): void {
@@ -139,19 +121,26 @@ function isTrustedDesktopAuthSender(event: IpcMainInvokeEvent): boolean {
   );
 }
 
-function matchesPathPrefix(pathname: string, prefix: string): boolean {
-  return pathname === prefix || pathname.startsWith(`${prefix}/`);
-}
-
 const AUTH_ROUTE_PREFIXES = [
   '/signin',
   '/signup',
   '/sign-in',
   '/sign-up',
   '/sso-callback',
+  '/signin/sso-callback',
+  '/signup/sso-callback',
+  '/sign-in/sso-callback',
+  '/sign-up/sso-callback',
+  '/auth/callback',
+  '/app/auth/callback',
 ] as const;
 
-const BROWSER_ONLY_IN_APP_PREFIXES = ['/auth-return'] as const;
+const DESKTOP_BROWSER_AUTH_PATHS = [
+  '/signin',
+  '/signup',
+  '/sign-in',
+  '/sign-up',
+] as const;
 
 const BLOCKED_RETURN_PREFIXES = [
   ...AUTH_ROUTE_PREFIXES,
@@ -163,15 +152,7 @@ const BLOCKED_RETURN_PREFIXES = [
 ] as const;
 
 function isDesktopAuthPath(pathname: string): boolean {
-  return AUTH_ROUTE_PREFIXES.some(prefix =>
-    matchesPathPrefix(pathname, prefix)
-  );
-}
-
-function isBrowserOnlyInAppPath(pathname: string): boolean {
-  return BROWSER_ONLY_IN_APP_PREFIXES.some(prefix =>
-    matchesPathPrefix(pathname, prefix)
-  );
+  return DESKTOP_BROWSER_AUTH_PATHS.some(prefix => pathname === prefix);
 }
 
 function sanitizeDesktopReturnRoute(
@@ -275,7 +256,9 @@ function isTrustedPermissionRequest(
   if (requestingOrigin !== undefined) {
     return isTrustedPermissionOrigin(requestingOrigin);
   }
-  return webContents !== null && isTrustedPermissionOrigin(webContents.getURL());
+  return (
+    webContents !== null && isTrustedPermissionOrigin(webContents.getURL())
+  );
 }
 
 function isAudioOnlyMediaPermissionRequest(details: unknown): boolean {
@@ -588,7 +571,10 @@ function createWindow(initialUrl = APP_ENTRY_URL): BrowserWindow {
       console.error('[Jovie Desktop] Shell load failure (graceful recovery)', {
         errorCode,
         errorDescription,
-        validatedURL: typeof validatedURL === 'string' ? validatedURL.split('?')[0] : validatedURL,
+        validatedURL:
+          typeof validatedURL === 'string'
+            ? validatedURL.split('?')[0]
+            : validatedURL,
         appEntry: APP_ENTRY_URL,
       });
       showDesktopLoadFailure(win);

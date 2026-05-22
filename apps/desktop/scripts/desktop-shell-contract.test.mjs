@@ -1,9 +1,9 @@
+import assert from 'node:assert/strict';
+import { execFile } from 'node:child_process';
 import { readFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
-import { execFile } from 'node:child_process';
-import { fileURLToPath } from 'node:url';
-import assert from 'node:assert/strict';
 import test from 'node:test';
+import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
 
 const desktopRoot = dirname(dirname(fileURLToPath(import.meta.url)));
@@ -63,6 +63,58 @@ test('desktop window fails into a branded Jovie recovery surface', async () => {
   assert.doesNotMatch(mainSource, /M11 31L30 31M14 36L31 36M18 41L32 41/);
 });
 
+test('desktop navigation uses explicit URL disposition allowlists', async () => {
+  const mainSource = await readFile(join(desktopRoot, 'src/main.ts'), 'utf8');
+  const navigationSource = await readFile(
+    join(desktopRoot, 'src/navigation.ts'),
+    'utf8'
+  );
+
+  assert.match(mainSource, /getUrlDisposition as getDesktopUrlDisposition/);
+  assert.match(
+    mainSource,
+    /isAllowedExternalUrl as isAllowedDesktopExternalUrl/
+  );
+  assert.match(
+    mainSource,
+    /const URL_DISPOSITION_OPTIONS = \{ appUrl: APP_URL, appEnv: APP_ENV \} as const;/
+  );
+  assert.match(
+    mainSource,
+    /const DESKTOP_BROWSER_AUTH_PATHS = \[\s*'\/signin',\s*'\/signup',\s*'\/sign-in',\s*'\/sign-up',\s*\] as const;/
+  );
+  assert.match(mainSource, /'\/app\/auth\/callback'/);
+  assert.match(
+    mainSource,
+    /return DESKTOP_BROWSER_AUTH_PATHS\.some\(prefix => pathname === prefix\);/
+  );
+  assert.doesNotMatch(
+    mainSource,
+    /return parsed\.protocol === 'https:' \|\| parsed\.protocol === 'mailto:';/
+  );
+
+  assert.match(navigationSource, /const IN_APP_ROUTE_PREFIXES = \[/);
+  assert.match(navigationSource, /'\/app'/);
+  assert.match(navigationSource, /const AUTH_CALLBACK_ROUTE_PREFIXES = \[/);
+  assert.match(navigationSource, /'\/signin\/sso-callback'/);
+  assert.match(navigationSource, /'\/app\/auth\/callback'/);
+  assert.match(
+    navigationSource,
+    /const SAME_ORIGIN_EXTERNAL_ROUTE_PREFIXES = \[/
+  );
+  assert.match(navigationSource, /'\/legal'/);
+  assert.match(navigationSource, /'\/pricing'/);
+  assert.match(navigationSource, /'\/blog'/);
+  assert.match(
+    navigationSource,
+    /const DEFAULT_DOCS_URL = 'https:\/\/docs\.jov\.ie';/
+  );
+  assert.match(navigationSource, /PUBLIC_PROFILE_RESERVED_ROOT_SEGMENTS/);
+  assert.match(navigationSource, /parsed\.protocol === 'mailto:'/);
+  assert.match(navigationSource, /urlString\.startsWith\('\/\/'\)/);
+  assert.match(navigationSource, /decoded\.includes\('\\\\'\)/);
+});
+
 test('preload marks the hosted app as Electron after the document root is ready', async () => {
   const preloadSource = await readFile(
     join(desktopRoot, 'src/preload.ts'),
@@ -86,7 +138,10 @@ test('desktop bridge exposes bounded dictation support', async () => {
     'utf8'
   );
 
-  assert.match(mainSource, /const DICTATION_STATUS_CHANNEL = 'dictation-status'/);
+  assert.match(
+    mainSource,
+    /const DICTATION_STATUS_CHANNEL = 'dictation-status'/
+  );
   assert.match(mainSource, /ipcMain\.handle\(\s*DICTATION_STATUS_CHANNEL,/);
   assert.match(mainSource, /function getDesktopDictationStatus\(\)/);
   assert.match(mainSource, /nativeAvailable: false/);
@@ -99,14 +154,14 @@ test('desktop bridge exposes bounded dictation support', async () => {
   assert.match(mainSource, /mediaType === 'audio'/);
   assert.match(mainSource, /isTrustedPermissionRequest/);
   assert.match(preloadSource, /getDictationStatus/);
-  assert.match(preloadSource, /ipcRenderer\.invoke\(DICTATION_STATUS_CHANNEL\)/);
+  assert.match(
+    preloadSource,
+    /ipcRenderer\.invoke\(DICTATION_STATUS_CHANNEL\)/
+  );
 });
 
 test('desktop dev defaults to the local app shell and packaged builds keep production', async () => {
-  const packageJson = await readFile(
-    join(desktopRoot, 'package.json'),
-    'utf8'
-  );
+  const packageJson = await readFile(join(desktopRoot, 'package.json'), 'utf8');
   assert.match(
     packageJson,
     /"predev": "cross-env ELECTRON_ENV=local node scripts\/write-env\.mjs"/
