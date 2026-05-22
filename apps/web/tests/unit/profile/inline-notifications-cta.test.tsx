@@ -253,7 +253,7 @@ describe('ProfileInlineNotificationsCTA flow', () => {
     fireEvent.click(await screen.findByRole('button', { name: /^verify$/i }));
 
     expect(await screen.findByTestId('mobile-name-input')).toBeInTheDocument();
-    expect(screen.getByText('Alerts activated')).toBeInTheDocument();
+    expect(screen.getByText('First Name')).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: /^continue$/i }));
     expect(

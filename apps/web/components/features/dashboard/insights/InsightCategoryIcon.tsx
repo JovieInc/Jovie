@@ -45,8 +45,8 @@ const CATEGORY_CONFIG: Record<
   },
   platform: {
     icon: Share2,
-    iconClassName: 'text-indigo-600 dark:text-indigo-400',
-    chipClassName: 'bg-indigo-500/10 dark:bg-indigo-500/15',
+    iconClassName: 'text-accent',
+    chipClassName: 'bg-accent/10 dark:bg-accent/15',
   },
   engagement: {
     icon: Users,

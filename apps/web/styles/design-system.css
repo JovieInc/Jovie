@@ -37,22 +37,22 @@
   --app-shell-content-max-form: 50rem;
   --profile-shell-max-width: 430px;
   --profile-shell-header-max-width: 38rem;
-  --profile-shell-card-radius: 30px;
-  --profile-card-radius: 28px;
-  --profile-inner-radius: 26px;
-  --profile-drawer-radius-mobile: 24px;
+  --profile-shell-card-radius: 24px;
+  --profile-card-radius: 22px;
+  --profile-inner-radius: 18px;
+  --profile-drawer-radius-mobile: 22px;
   --profile-drawer-radius-desktop: 20px;
   --profile-action-radius: 14px;
   --page-pad: clamp(16px, 4vw, 32px);
   --section-gap: clamp(16px, 3vw, 28px);
   --card-pad: clamp(14px, 3vw, 24px);
   --avatar-size: clamp(88px, 22vw, 144px);
-  --cover-height: clamp(320px, min(112vw, 56svh), 500px);
+  --cover-height: clamp(300px, min(94vw, 46svh), 430px);
   --content-max: 720px;
   --profile-bottom-nav-height: calc(
-    3.5rem +
-    max(12px, env(safe-area-inset-bottom)) +
-    24px
+    3.125rem +
+    max(10px, env(safe-area-inset-bottom)) +
+    14px
   );
 
   /* DS_FOUNDATION_V1: canonical semantic aliases (do not redefine downstream) */
@@ -100,15 +100,15 @@
   --section-gap: clamp(16px, 3vw, 28px);
   --card-pad: clamp(14px, 3vw, 24px);
   --avatar-size: clamp(88px, 22vw, 144px);
-  --cover-height: clamp(320px, min(112vw, 56svh), 500px);
+  --cover-height: clamp(300px, min(94vw, 46svh), 430px);
   --content-max: 720px;
 }
 
 .public-profile-layout-frame {
   height: 100%;
   max-width: min(100%, var(--content-max));
-  padding-left: max(var(--page-pad), env(safe-area-inset-left));
-  padding-right: max(var(--page-pad), env(safe-area-inset-right));
+  padding-left: env(safe-area-inset-left);
+  padding-right: env(safe-area-inset-right);
 }
 
 .public-profile-layout-frame--desktop {
@@ -116,6 +116,8 @@
     100%,
     calc(var(--profile-shell-max-width) + (var(--page-pad) * 2))
   );
+  padding-left: max(var(--page-pad), env(safe-area-inset-left));
+  padding-right: max(var(--page-pad), env(safe-area-inset-right));
   padding-block: clamp(16px, 2vw, 24px);
 }
 
@@ -164,6 +166,8 @@
       100%,
       calc(var(--profile-shell-max-width) + (var(--page-pad) * 2))
     );
+    padding-left: max(var(--page-pad), env(safe-area-inset-left));
+    padding-right: max(var(--page-pad), env(safe-area-inset-right));
     padding-block: clamp(16px, 2vw, 24px);
   }
 }

@@ -159,18 +159,18 @@ function ScreenShell({
 }>) {
   return (
     <div className='flex flex-1 flex-col'>
-      <div className='space-y-3 pb-8 pt-4'>
-        <h2 className='text-[2rem] font-semibold leading-[1.02] tracking-[-0.06em] text-white'>
+      <div className='space-y-2 pb-6 pt-2'>
+        <h2 className='text-[24px] font-semibold leading-[1.06] tracking-normal text-white'>
           {title}
         </h2>
         {body ? (
-          <p className='max-w-[24rem] text-[15px] leading-6 text-white/58'>
+          <p className='max-w-[24rem] text-[14px] leading-5 text-white/58'>
             {body}
           </p>
         ) : null}
       </div>
       <div className='flex-1'>{children}</div>
-      <div className='pt-8'>{footer}</div>
+      <div className='pt-6'>{footer}</div>
     </div>
   );
 }
@@ -209,7 +209,7 @@ function PrimaryButton({
         activate();
       }}
       disabled={disabled}
-      className='inline-flex h-14 w-full items-center justify-center rounded-[18px] bg-white/14 px-5 text-[15px] font-semibold tracking-[-0.02em] text-white transition-colors duration-subtle hover:bg-white/18 disabled:cursor-not-allowed disabled:opacity-60'
+      className='inline-flex h-12 w-full items-center justify-center rounded-[var(--profile-action-radius)] bg-white/14 px-5 text-[14px] font-semibold tracking-[-0.01em] text-white transition-colors duration-subtle hover:bg-white/18 disabled:cursor-not-allowed disabled:opacity-60'
     >
       {children}
     </button>
@@ -230,7 +230,7 @@ function SecondaryTextButton({
       type='button'
       onClick={onClick}
       disabled={disabled}
-      className='inline-flex h-12 w-full items-center justify-center rounded-[18px] px-5 text-[15px] font-medium tracking-[-0.02em] text-white/58 transition-colors duration-subtle hover:text-white/76 disabled:cursor-not-allowed disabled:opacity-60'
+      className='inline-flex h-10 w-full items-center justify-center rounded-[var(--profile-action-radius)] px-5 text-[13px] font-medium tracking-[-0.005em] text-white/58 transition-colors duration-subtle hover:text-white/76 disabled:cursor-not-allowed disabled:opacity-60'
     >
       {children}
     </button>
@@ -275,7 +275,7 @@ function LabeledInput({
         onChange={event => onChange(event.target.value)}
         onKeyDown={onKeyDown}
         disabled={disabled}
-        className='h-14 w-full touch-manipulation rounded-[18px] border border-white/10 bg-white/[0.03] px-4 text-[16px] font-medium tracking-[-0.015em] text-white placeholder:text-white/28 focus:border-white/18 focus:outline-none disabled:cursor-not-allowed disabled:opacity-60'
+        className='h-12 w-full touch-manipulation rounded-[var(--profile-action-radius)] border border-white/10 bg-white/[0.03] px-3.5 text-[16px] font-medium tracking-[-0.005em] text-white placeholder:text-white/28 focus:border-white/18 focus:outline-none disabled:cursor-not-allowed disabled:opacity-60'
       />
     </label>
   );
@@ -315,7 +315,7 @@ function BirthdaySelectors({
           data-testid='mobile-birthday-month'
           value={parts.month}
           onChange={event => updatePart('month', event.target.value)}
-          className='h-14 w-full touch-manipulation appearance-none rounded-[18px] border border-white/10 bg-white/[0.03] px-4 text-[16px] font-medium tracking-[-0.015em] text-white focus:border-white/18 focus:outline-none'
+          className='h-12 w-full touch-manipulation appearance-none rounded-[var(--profile-action-radius)] border border-white/10 bg-white/[0.03] px-3 text-[16px] font-medium tracking-[-0.005em] text-white focus:border-white/18 focus:outline-none'
         >
           <option value=''>Month</option>
           {MONTH_OPTIONS.map((month, index) => (
@@ -334,7 +334,7 @@ function BirthdaySelectors({
           data-testid='mobile-birthday-day'
           value={parts.day}
           onChange={event => updatePart('day', event.target.value)}
-          className='h-14 w-full touch-manipulation appearance-none rounded-[18px] border border-white/10 bg-white/[0.03] px-4 text-[16px] font-medium tracking-[-0.015em] text-white focus:border-white/18 focus:outline-none'
+          className='h-12 w-full touch-manipulation appearance-none rounded-[var(--profile-action-radius)] border border-white/10 bg-white/[0.03] px-3 text-[16px] font-medium tracking-[-0.005em] text-white focus:border-white/18 focus:outline-none'
         >
           <option value=''>Day</option>
           {Array.from({ length: 31 }, (_, index) => index + 1).map(day => (
@@ -353,7 +353,7 @@ function BirthdaySelectors({
           data-testid='mobile-birthday-year'
           value={parts.year}
           onChange={event => updatePart('year', event.target.value)}
-          className='h-14 w-full touch-manipulation appearance-none rounded-[18px] border border-white/10 bg-white/[0.03] px-4 text-[16px] font-medium tracking-[-0.015em] text-white focus:border-white/18 focus:outline-none'
+          className='h-12 w-full touch-manipulation appearance-none rounded-[var(--profile-action-radius)] border border-white/10 bg-white/[0.03] px-3 text-[16px] font-medium tracking-[-0.005em] text-white focus:border-white/18 focus:outline-none'
         >
           <option value=''>Year</option>
           {yearOptions.map(year => (
@@ -500,8 +500,8 @@ export function ProfileMobileNotificationsFlow({
     if (step === 'email') {
       return (
         <ScreenShell
-          title={channel === 'sms' ? 'Enter your phone' : 'Enter your email'}
-          body="We'll use it to send your alerts."
+          title={channel === 'sms' ? 'Text Alerts' : 'Email Alerts'}
+          body={`We'll send ${artistName} alerts here.`}
           footer={
             <div className='space-y-3'>
               {error ? (
@@ -540,7 +540,7 @@ export function ProfileMobileNotificationsFlow({
       return (
         <ScreenShell
           title='Enter the code'
-          body={`Verify your email to activate alerts from ${artistName}.`}
+          body={`Verify your ${channel === 'sms' ? 'phone' : 'email'} to activate ${artistName} alerts.`}
           footer={
             <div className='space-y-3'>
               {error ? (
@@ -585,8 +585,8 @@ export function ProfileMobileNotificationsFlow({
     if (step === 'name') {
       return (
         <ScreenShell
-          title='Alerts activated'
-          body='You are subscribed. Add your first name to personalize updates.'
+          title='First Name'
+          body='Optional. Personalizes updates.'
           footer={
             <PrimaryButton onClick={onNameSubmit} disabled={isNameSaving}>
               Continue
@@ -615,8 +615,8 @@ export function ProfileMobileNotificationsFlow({
     if (step === 'birthday') {
       return (
         <ScreenShell
-          title='Add your birthday'
-          body="Optional. You're already subscribed, and your birthday won't be shown publicly."
+          title='Birthday'
+          body='Optional. It stays private.'
           footer={
             <div className='space-y-3'>
               {birthdayHintShown ? (
@@ -645,7 +645,7 @@ export function ProfileMobileNotificationsFlow({
       return (
         <ScreenShell
           title='Alerts'
-          body='New music, shows, and merch.'
+          body='Choose what to receive.'
           footer={
             canEditPreferences ? (
               <PrimaryButton
@@ -666,10 +666,9 @@ export function ProfileMobileNotificationsFlow({
                 >
                   Sent from Jovie
                 </p>
-                <p className='text-[14px] leading-6 text-white/58'>
-                  Jovie Alerts are concise, one-time, verified notifications to
-                  your {channel === 'sms' ? 'phone' : 'email'} about verified
-                  new releases of music and shows.
+                <p className='text-[14px] leading-5 text-white/58'>
+                  Jovie sends verified release and show alerts to your{' '}
+                  {channel === 'sms' ? 'phone' : 'email'}.
                 </p>
               </div>
 
@@ -713,9 +712,9 @@ export function ProfileMobileNotificationsFlow({
                     <p className='text-[13px] font-semibold tracking-[-0.01em] text-white/42'>
                       Sent by {artistName}
                     </p>
-                    <p className='text-[14px] leading-6 text-white/58'>
-                      Share your email with {artistName} to receive occasional
-                      emails about related things.
+                    <p className='text-[14px] leading-5 text-white/58'>
+                      Share your email with {artistName} for occasional artist
+                      emails.
                     </p>
                   </div>
 
@@ -726,7 +725,7 @@ export function ProfileMobileNotificationsFlow({
                       </span>
                       <div>
                         <p className='text-[15px] font-medium tracking-[-0.015em] text-white/88'>
-                          Subscribe to Other Alerts
+                          Artist Emails
                         </p>
                       </div>
                     </div>
@@ -735,7 +734,7 @@ export function ProfileMobileNotificationsFlow({
                       onCheckedChange={checked =>
                         onArtistEmailToggle?.(checked)
                       }
-                      aria-label='Subscribe to other alerts'
+                      aria-label='Artist emails'
                       className='data-[state=checked]:bg-[var(--mobile-flow-accent)] data-[state=unchecked]:bg-white/14'
                     />
                   </div>
@@ -749,22 +748,22 @@ export function ProfileMobileNotificationsFlow({
 
     return (
       <ScreenShell
-        title='Alerts activated'
-        body={`New music, shows, and merch alerts from ${artistName} are on.`}
+        title='Alerts On'
+        body={`${artistName} alerts are on.`}
         footer={
           <PrimaryButton onClick={onClose}>Back to Profile</PrimaryButton>
         }
       >
         <div className='flex h-full items-center justify-center'>
           <div
-            className='flex h-28 w-28 items-center justify-center rounded-full border border-white/10 bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.12),rgba(255,255,255,0.04))] shadow-[0_28px_60px_rgba(0,0,0,0.32)]'
+            className='flex h-24 w-24 items-center justify-center rounded-full border border-white/10 bg-white/[0.045] shadow-[0_20px_44px_rgba(0,0,0,0.28)]'
             style={
               {
-                boxShadow: `0 28px 60px rgba(0,0,0,0.32), inset 0 0 0 1px ${accentHex}55`,
+                boxShadow: `0 20px 44px rgba(0,0,0,0.28), inset 0 0 0 1px ${accentHex}55`,
               } as CSSProperties
             }
           >
-            <Check className='h-12 w-12 text-white' />
+            <Check className='h-10 w-10 text-white' />
           </div>
         </div>
       </ScreenShell>
@@ -784,13 +783,13 @@ export function ProfileMobileNotificationsFlow({
 
       <div
         className={cn(
-          'relative mx-auto flex w-full max-w-[430px] flex-col px-6',
+          'relative mx-auto flex w-full max-w-[430px] flex-col px-5',
           presentation === 'overlay'
             ? 'h-full pb-[max(env(safe-area-inset-bottom),28px)] pt-[max(env(safe-area-inset-top),18px)]'
             : 'h-full pb-8 pt-6'
         )}
       >
-        <header className='flex items-center justify-between pb-6'>
+        <header className='flex items-center justify-between pb-5'>
           {showBackButton ? (
             <button
               type='button'
@@ -868,13 +867,13 @@ export function ProfileMobileNotificationsFlow({
         aria-modal='true'
         style={contentStyle}
       >
-        <div className='relative flex h-[min(760px,calc(100dvh-48px))] w-full max-w-[440px] flex-col overflow-hidden rounded-[34px] border border-white/10 bg-[color:var(--profile-stage-bg)] shadow-[0_34px_96px_rgba(0,0,0,0.48)]'>
+        <div className='relative flex h-[min(760px,calc(100dvh-48px))] w-full max-w-[440px] flex-col overflow-hidden rounded-[var(--profile-card-radius)] border border-white/10 bg-[color:var(--profile-stage-bg)] shadow-[0_34px_96px_rgba(0,0,0,0.48)]'>
           {contentBody}
         </div>
       </div>
     ) : (
       <div
-        className='relative min-h-[640px] rounded-[32px] bg-[color:var(--profile-stage-bg)] text-white'
+        className='relative min-h-[600px] rounded-[var(--profile-card-radius)] bg-[color:var(--profile-stage-bg)] text-white'
         data-testid='profile-mobile-notifications-flow'
         data-shell-variant='inline-full-height'
         style={contentStyle}

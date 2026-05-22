@@ -51,7 +51,7 @@ describe('profile view models', () => {
     });
 
     expect(viewModel.mode).toBe('tour');
-    expect(viewModel.subtitle).toBe('Tour dates');
+    expect(viewModel.subtitle).toBe('Events');
     expect(viewModel.showBackButton).toBe(true);
     expect(viewModel.showNotificationButton).toBe(true);
     expect(viewModel.isTourModeActive).toBe(true);

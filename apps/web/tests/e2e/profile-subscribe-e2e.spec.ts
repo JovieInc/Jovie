@@ -22,6 +22,34 @@ test.describe.configure({ mode: 'serial' });
 // Helpers
 // ---------------------------------------------------------------------------
 
+const NOTIFICATIONS_TRIGGER_SELECTOR = [
+  '[data-testid="profile-inline-notifications-trigger"]',
+  '[data-testid="profile-home-alerts-row"]',
+  '[data-testid="profile-home-alerts-fallback-card"]',
+].join(', ');
+const VISIBLE_EMAIL_STEP_SELECTOR =
+  '[data-testid="profile-mobile-notifications-step-email"]:visible';
+const VISIBLE_EMAIL_INPUT_SELECTOR =
+  '[data-testid="mobile-email-input"]:visible';
+
+async function getActiveNotificationsFlow(page: Page) {
+  const dialogFlow = page
+    .locator('[role="dialog"][data-testid="profile-mobile-notifications-flow"]')
+    .first();
+  const dialogVisible = await dialogFlow
+    .waitFor({ state: 'visible', timeout: SMOKE_TIMEOUTS.QUICK })
+    .then(() => true)
+    .catch(() => false);
+
+  if (dialogVisible) {
+    return dialogFlow;
+  }
+
+  return page
+    .locator('[data-testid="profile-mobile-notifications-flow"]:visible')
+    .first();
+}
+
 async function interceptAnalytics(page: Page) {
   await page.route('**/api/profile/view', (r: Route) =>
     r.fulfill({ status: 200, body: '{}' })
@@ -58,7 +86,7 @@ async function setupProfilePage(page: Page) {
 
   await page
     .locator(
-      '[data-testid="profile-mobile-notifications-step-email"], [data-testid="profile-inline-notifications-trigger"]'
+      [VISIBLE_EMAIL_STEP_SELECTOR, NOTIFICATIONS_TRIGGER_SELECTOR].join(', ')
     )
     .first()
     .waitFor({ state: 'visible', timeout: SMOKE_TIMEOUTS.VISIBILITY });
@@ -68,13 +96,14 @@ async function setupProfilePage(page: Page) {
  * Open the full-screen notifications flow and wait for the email step.
  */
 async function clickTurnOnNotifications(page: Page) {
-  const emailStep = page.getByTestId('profile-mobile-notifications-step-email');
+  const emailStep = page.locator(VISIBLE_EMAIL_STEP_SELECTOR).first();
   const emailVisible = await emailStep
-    .isVisible({ timeout: SMOKE_TIMEOUTS.VISIBILITY })
+    .waitFor({ state: 'visible', timeout: SMOKE_TIMEOUTS.QUICK })
+    .then(() => true)
     .catch(() => false);
 
   if (!emailVisible) {
-    const btn = page.getByTestId('profile-inline-notifications-trigger');
+    const btn = page.locator(NOTIFICATIONS_TRIGGER_SELECTOR).first();
     await btn.waitFor({ state: 'visible', timeout: SMOKE_TIMEOUTS.VISIBILITY });
     await btn.click();
     await emailStep.waitFor({
@@ -83,7 +112,8 @@ async function clickTurnOnNotifications(page: Page) {
     });
   }
 
-  await page.getByTestId('mobile-email-input').waitFor({
+  const flow = await getActiveNotificationsFlow(page);
+  await flow.locator(VISIBLE_EMAIL_INPUT_SELECTOR).first().waitFor({
     state: 'visible',
     timeout: SMOKE_TIMEOUTS.VISIBILITY,
   });
@@ -97,12 +127,15 @@ async function submitEmail(
   email: string,
   options: { readonly waitForSubscribe?: boolean } = {}
 ) {
-  const emailStep = page.getByTestId('profile-mobile-notifications-step-email');
+  const flow = await getActiveNotificationsFlow(page);
+  const emailStep = flow
+    .locator('[data-testid="profile-mobile-notifications-step-email"]')
+    .first();
   await emailStep.waitFor({
     state: 'visible',
     timeout: SMOKE_TIMEOUTS.VISIBILITY,
   });
-  const input = page.getByTestId('mobile-email-input');
+  const input = flow.locator('[data-testid="mobile-email-input"]').first();
   await input.fill(email);
 
   const submitBtn = emailStep.getByRole('button', { name: /^continue$/i });
@@ -131,12 +164,15 @@ async function expectSubscribeError(page: Page, message: string) {
 }
 
 async function completeNameStep(page: Page, name: string) {
-  const nameStep = page.getByTestId('profile-mobile-notifications-step-name');
+  const flow = await getActiveNotificationsFlow(page);
+  const nameStep = flow
+    .locator('[data-testid="profile-mobile-notifications-step-name"]')
+    .first();
   await nameStep.waitFor({
     state: 'visible',
     timeout: SMOKE_TIMEOUTS.VISIBILITY,
   });
-  const input = page.getByTestId('mobile-name-input');
+  const input = flow.locator('[data-testid="mobile-name-input"]').first();
   await input.fill(name);
   await expect(input).toHaveValue(name);
 
@@ -146,16 +182,21 @@ async function completeNameStep(page: Page, name: string) {
 }
 
 async function completeBirthdayStep(page: Page) {
-  const birthdayStep = page.getByTestId(
-    'profile-mobile-notifications-step-birthday'
-  );
+  const flow = await getActiveNotificationsFlow(page);
+  const birthdayStep = flow
+    .locator('[data-testid="profile-mobile-notifications-step-birthday"]')
+    .first();
   await birthdayStep.waitFor({
     state: 'visible',
     timeout: SMOKE_TIMEOUTS.VISIBILITY,
   });
-  await page.getByTestId('mobile-birthday-month').selectOption('04');
-  await page.getByTestId('mobile-birthday-day').selectOption('24');
-  await page.getByTestId('mobile-birthday-year').selectOption('1994');
+  await flow
+    .locator('[data-testid="mobile-birthday-month"]')
+    .selectOption('04');
+  await flow.locator('[data-testid="mobile-birthday-day"]').selectOption('24');
+  await flow
+    .locator('[data-testid="mobile-birthday-year"]')
+    .selectOption('1994');
   const continueButton = birthdayStep.getByRole('button', {
     name: /^continue$/i,
   });
@@ -164,8 +205,11 @@ async function completeBirthdayStep(page: Page) {
 }
 
 async function enterOtpCode(page: Page, code: string) {
-  const otpStep = page.getByTestId('profile-mobile-notifications-step-otp');
-  const firstDigitInput = page.getByLabel('Digit 1 of 6');
+  const flow = await getActiveNotificationsFlow(page);
+  const otpStep = flow
+    .locator('[data-testid="profile-mobile-notifications-step-otp"]')
+    .first();
+  const firstDigitInput = flow.getByLabel('Digit 1 of 6');
 
   await otpStep.waitFor({
     state: 'visible',
@@ -251,7 +295,9 @@ test.describe('Profile Subscribe Flow @smoke', () => {
     await completeBirthdayStep(page);
 
     await expect(
-      page.getByTestId('profile-mobile-notifications-step-done')
+      (await getActiveNotificationsFlow(page))
+        .locator('[data-testid="profile-mobile-notifications-step-done"]')
+        .first()
     ).toBeVisible({
       timeout: SMOKE_TIMEOUTS.VISIBILITY,
     });

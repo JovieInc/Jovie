@@ -78,7 +78,7 @@ export const PROFILE_MODE_REGISTRY: Record<ProfileMode, ProfileModeDefinition> =
     },
     tour: {
       mode: 'tour',
-      subtitle: 'Tour dates',
+      subtitle: 'Events',
       pathSegment: 'tour',
       shell: {
         showBackButton: true,

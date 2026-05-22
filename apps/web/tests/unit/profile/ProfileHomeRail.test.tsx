@@ -55,6 +55,12 @@ describe('ProfileHomeRail', () => {
       screen.getByTestId('profile-home-alerts-fallback-card')
     ).toBeInTheDocument();
     expect(
+      screen.getByTestId('profile-home-alerts-switch')
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: /Turn On/i })
+    ).not.toBeInTheDocument();
+    expect(
       screen.queryByTestId('profile-home-feature-card')
     ).not.toBeInTheDocument();
     expect(screen.queryByText('Listen across your preferred platforms')).toBe(
@@ -77,7 +83,33 @@ describe('ProfileHomeRail', () => {
     );
 
     expect(screen.getByTestId('profile-home-alerts-row')).toBeInTheDocument();
+    expect(
+      screen.getByTestId('profile-home-alerts-switch')
+    ).toBeInTheDocument();
     expect(screen.getByTestId('profile-home-feature-card')).toBeInTheDocument();
     expect(screen.getByText('The Deep End')).toBeInTheDocument();
+  });
+
+  it('hides the alerts card entirely once subscribed', () => {
+    render(
+      <ProfileHomeRail
+        artist={makeArtist()}
+        latestRelease={makeRelease()}
+        profileSettings={{ showOldReleases: true }}
+        featuredPlaylistFallback={null}
+        tourDates={[]}
+        hasPlayableDestinations
+        renderMode='preview'
+        isSubscribed
+      />
+    );
+
+    expect(
+      screen.queryByTestId('profile-home-alerts-row')
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByTestId('profile-home-alerts-fallback-card')
+    ).not.toBeInTheDocument();
+    expect(screen.getByTestId('profile-home-feature-card')).toBeInTheDocument();
   });
 });

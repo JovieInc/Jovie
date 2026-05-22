@@ -2,7 +2,6 @@
 
 import { Calendar, Download, Home, MapPin } from 'lucide-react';
 import { ImageWithFallback } from '@/components/atoms/ImageWithFallback';
-import { hexToRgba, lightenHex } from '@/lib/utils/color';
 import type { Artist } from '@/types/db';
 import type { PressPhoto } from '@/types/press-photos';
 
@@ -12,19 +11,6 @@ interface AboutSectionProps {
   readonly pressPhotos?: readonly PressPhoto[];
   readonly allowPhotoDownloads?: boolean;
 }
-
-// Geist accent palette for genre badge rotation — tuned for dark surfaces
-// via low-alpha fill + lightened text. Matches the design system's rotation.
-const GENRE_ACCENTS = [
-  '#8b5cf6', // purple
-  '#22c1fc', // cyan
-  '#0cce6b', // green
-  '#f5a623', // amber
-  '#0070f3', // blue
-  '#ff0080', // pink
-  '#00bcd4', // teal
-  '#f7d600', // yellow
-] as const;
 
 function sanitizeFilename(value: string): string {
   const sanitized = value
@@ -78,7 +64,10 @@ export function AboutSection({
   const hasLocation = Boolean(artist.location);
   const hasHometown = Boolean(artist.hometown);
   const hasActiveSince = Boolean(artist.active_since_year);
-  const hasGenres = genres && genres.length > 0;
+  const uniqueGenres = genres
+    ? Array.from(new Set(genres.map(genre => genre.trim()).filter(Boolean)))
+    : [];
+  const hasGenres = uniqueGenres.length > 0;
   const hasPressPhotos = allowPhotoDownloads && pressPhotos.length > 0;
   const hasMetadata = hasLocation || hasHometown || hasActiveSince;
 
@@ -129,22 +118,11 @@ export function AboutSection({
 
       {hasGenres && (
         <div className='flex flex-wrap gap-2'>
-          {genres.map((genre, i) => {
-            const accent = GENRE_ACCENTS[i % GENRE_ACCENTS.length];
-            // Dedupe duplicate genre labels deterministically: track how
-            // many times each label has appeared so the key is stable
-            // across renders but still unique. Avoids array index in key.
-            const dupIndex = genres.slice(0, i).filter(g => g === genre).length;
-            const key = dupIndex === 0 ? genre : `${genre}-${dupIndex}`;
+          {uniqueGenres.map(genre => {
             return (
               <span
-                key={key}
-                className='rounded-full border px-3 py-1 text-2xs font-caption capitalize'
-                style={{
-                  backgroundColor: hexToRgba(accent, 0.14),
-                  color: lightenHex(accent, 0.35),
-                  borderColor: hexToRgba(accent, 0.28),
-                }}
+                key={genre}
+                className='rounded-full border border-[color:var(--profile-status-pill-border)] bg-[color:var(--profile-status-pill-bg)] px-3 py-1 text-2xs font-caption capitalize text-[color:var(--profile-status-pill-fg)]'
               >
                 {genre}
               </span>

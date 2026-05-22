@@ -198,7 +198,7 @@ export function ProfileDrawerShell({
           onClick={() => onOpenChange(false)}
         />
         <div
-          className='relative z-10 flex max-h-[min(760px,calc(100%-24px))] w-full max-w-[430px] flex-col overflow-hidden rounded-[34px] border border-white/[0.08] bg-[color:var(--profile-drawer-bg)] text-primary-token shadow-[0_34px_96px_rgba(0,0,0,0.48)] backdrop-blur-2xl'
+          className='relative z-10 flex max-h-[min(760px,calc(100%-24px))] w-full max-w-[430px] flex-col overflow-hidden rounded-[var(--profile-card-radius)] border border-white/[0.08] bg-[color:var(--profile-drawer-bg)] text-primary-token shadow-[0_34px_96px_rgba(0,0,0,0.48)] backdrop-blur-2xl'
           data-testid={dataTestId}
           role='dialog'
           aria-describedby={accessibleDescriptionId}

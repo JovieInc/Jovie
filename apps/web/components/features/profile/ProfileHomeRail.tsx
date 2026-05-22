@@ -62,40 +62,35 @@ function getUpcomingTourDates(
 
 function HomeAlertsCard({
   artist,
-  isSubscribed,
   onAlertsClick,
   renderMode,
   variant,
   sourceContext,
 }: Readonly<{
   artist: Artist;
-  isSubscribed: boolean;
   onAlertsClick?: (context: NotificationSourceContext) => void;
   renderMode: ProfileRenderMode;
   variant: 'row' | 'bento';
   sourceContext: NotificationSourceContext;
 }>) {
-  const title = isSubscribed ? 'Alerts On' : `Get ${artist.name} alerts`;
-  const description = isSubscribed
-    ? 'New music, shows, and merch updates are ready.'
-    : 'New music, shows, and merch in one tap.';
-  const isInteractive = renderMode === 'interactive' && onAlertsClick;
+  const title = 'Alerts';
+  const description = `${artist.name}: music, shows, merch.`;
+  const isInteractive = renderMode === 'interactive';
+  const subscribeHref = `/${artist.handle}?mode=subscribe`;
   const sharedProps = {
     className:
       variant === 'bento'
-        ? 'group flex min-h-[78px] w-full min-w-0 items-center gap-3 rounded-[16px] border border-white/10 bg-[linear-gradient(135deg,rgba(255,255,255,0.06),rgba(255,255,255,0.025))] px-3.5 py-3 text-left text-white shadow-[0_16px_34px_-24px_rgba(0,0,0,0.7),inset_0_1px_0_rgba(255,255,255,0.05)] backdrop-blur-2xl transition-[background-color,border-color,opacity] duration-subtle hover:bg-white/[0.06] active:opacity-[0.9]'
+        ? 'group flex min-h-[70px] w-full min-w-0 items-center gap-3 rounded-[var(--profile-inner-radius)] border border-white/10 bg-white/[0.045] px-3.5 py-3 text-left text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.04),0_14px_28px_-22px_rgba(0,0,0,0.62)] backdrop-blur-2xl transition-[background-color,border-color,opacity] duration-subtle hover:bg-white/[0.06] active:opacity-[0.9]'
         : 'group flex min-h-12 w-full min-w-0 items-center gap-2.5 rounded-[14px] border border-white/10 bg-white/[0.035] px-3 text-left text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.04),0_14px_28px_-18px_rgba(0,0,0,0.55)] backdrop-blur-2xl transition-[background-color,border-color,opacity] duration-subtle hover:bg-white/[0.055] active:opacity-[0.9]',
     'data-testid':
       variant === 'bento'
         ? 'profile-home-alerts-fallback-card'
         : 'profile-home-alerts-row',
   } as const;
-  const ariaLabel = isSubscribed
-    ? `Manage alerts for ${artist.name}`
-    : `Get alerts for ${artist.name}`;
+  const ariaLabel = `Turn on alerts for ${artist.name}`;
   const iconClassName =
     variant === 'bento'
-      ? 'flex h-9 w-9 shrink-0 items-center justify-center rounded-[12px] border border-white/8 bg-white/[0.055] text-white/88'
+      ? 'flex h-8 w-8 shrink-0 items-center justify-center rounded-[12px] border border-white/8 bg-white/[0.055] text-white/88'
       : 'flex h-8 w-8 shrink-0 items-center justify-center rounded-[10px] border border-white/8 bg-white/[0.045] text-white/86';
   const content = (
     <>
@@ -106,8 +101,8 @@ function HomeAlertsCard({
         <span
           className={
             variant === 'bento'
-              ? 'block text-[14px] font-[650] leading-[1.15] tracking-[-0.015em] [overflow-wrap:anywhere]'
-              : 'block text-[12.5px] font-semibold leading-4 tracking-[-0.005em] [overflow-wrap:anywhere]'
+              ? 'block text-[13px] font-semibold leading-[1.15] [overflow-wrap:anywhere]'
+              : 'block text-[12.5px] font-semibold leading-4 [overflow-wrap:anywhere]'
           }
         >
           {title}
@@ -115,7 +110,7 @@ function HomeAlertsCard({
         <span
           className={
             variant === 'bento'
-              ? 'mt-1 block max-w-[25ch] text-[11.5px] leading-4 text-white/54 [overflow-wrap:anywhere]'
+              ? 'mt-0.5 block max-w-[25ch] text-[11.5px] leading-4 text-white/54 [overflow-wrap:anywhere]'
               : 'mt-0.5 block text-[11px] leading-3.5 text-white/50 [overflow-wrap:anywhere]'
           }
         >
@@ -123,24 +118,31 @@ function HomeAlertsCard({
         </span>
       </span>
       <span
-        className='inline-flex h-8 shrink-0 items-center rounded-full bg-white px-3 text-[12px] font-[680] tracking-[-0.01em] text-black'
+        className='relative inline-flex h-[28px] w-[48px] shrink-0 items-center rounded-full border border-white/12 bg-white/[0.16] p-[3px] shadow-[inset_0_1px_1px_rgba(255,255,255,0.12)] transition-[background-color,border-color,opacity] duration-subtle group-hover:bg-white/[0.2]'
         aria-hidden='true'
+        data-testid='profile-home-alerts-switch'
       >
-        {isSubscribed ? 'Manage' : 'Get alerts'}
+        <span className='block h-[22px] w-[22px] rounded-full bg-white shadow-[0_3px_10px_rgba(0,0,0,0.32)]' />
       </span>
     </>
   );
 
   if (isInteractive) {
     return (
-      <button
-        type='button'
-        onClick={() => onAlertsClick(sourceContext)}
+      <a
+        href={subscribeHref}
+        onClick={event => {
+          if (!onAlertsClick) {
+            return;
+          }
+          event.preventDefault();
+          onAlertsClick(sourceContext);
+        }}
         aria-label={ariaLabel}
         {...sharedProps}
       >
         {content}
-      </button>
+      </a>
     );
   }
 
@@ -218,10 +220,9 @@ export function ProfileHomeRail({
     featuredState.kind === 'tour_next' ||
     featuredState.kind === 'playlist_fallback';
 
-  const alertsCard = (
+  const alertsCard = isSubscribed ? null : (
     <HomeAlertsCard
       artist={artist}
-      isSubscribed={isSubscribed}
       onAlertsClick={onAlertsClick}
       renderMode={renderMode}
       variant={hasPrimaryFeature ? 'row' : 'bento'}
@@ -249,7 +250,12 @@ export function ProfileHomeRail({
       onPlayClick={onPlayClick}
       viewerLocation={viewerLocation}
       resolveNearbyTour={resolveNearbyTour}
-      size='showcase'
+      size={
+        featuredState.kind === 'release_countdown' ||
+        featuredState.kind === 'release_live'
+          ? 'showcase'
+          : 'compact'
+      }
       dataTestId='profile-home-primary-action-card'
       className='w-full'
       now={now}

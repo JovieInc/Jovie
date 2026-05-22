@@ -184,7 +184,7 @@ export function ScreenshotGallery({ screenshots }: ScreenshotGalleryProps) {
               alt={screenshot.title}
               loading='lazy'
               decoding='async'
-              className='h-full w-full object-cover object-top transition-transform duration-200 group-hover:scale-105'
+              className='h-full w-full object-cover object-top'
             />
           </div>
         </button>

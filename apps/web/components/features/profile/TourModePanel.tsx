@@ -78,7 +78,7 @@ function DateBox({
 
   return (
     <div className='flex w-11 shrink-0 flex-col items-center justify-center'>
-      <span className='text-[10px] font-[680] uppercase tracking-[0.14em] text-white/52'>
+      <span className='text-[10px] font-semibold tracking-[0.02em] text-white/52'>
         {displayDate.month}
       </span>
       <span className='mt-1 text-[20px] font-[680] leading-none tracking-[-0.02em] text-white tabular-nums'>
@@ -188,10 +188,10 @@ function TourDatesContent({
       renderMode === 'preview' ? (
         <button
           type='button'
-          className='inline-flex h-12 items-center rounded-full bg-white px-5 text-[15px] font-[680] tracking-[-0.02em] text-black'
+          className='inline-flex h-11 items-center rounded-full bg-white px-5 text-[13px] font-semibold tracking-[-0.01em] text-black'
           disabled
         >
-          Get event alerts
+          Event Alerts
         </button>
       ) : (
         <ArtistNotificationsCTA
@@ -200,18 +200,18 @@ function TourDatesContent({
           hideListenFallback
           source={emptyStateSourceContext.ctaLocation}
           sourceContext={emptyStateSourceContext}
-          triggerLabel='Get event alerts'
+          triggerLabel='Event Alerts'
           presentation='overlay'
         />
       );
 
     return (
-      <div className='flex min-h-[42vh] flex-col items-center justify-center px-6 py-14 text-center'>
-        <p className='text-[18px] font-[650] tracking-[-0.035em] text-white'>
-          No upcoming events.
+      <div className='flex min-h-[36vh] flex-col items-center justify-center px-6 py-12 text-center'>
+        <p className='text-[17px] font-semibold tracking-[-0.018em] text-white'>
+          No Events
         </p>
-        <p className='mt-2 max-w-[25ch] text-[13px] leading-5 text-white/52'>
-          Get a note when new shows are announced.
+        <p className='mt-2 max-w-[25ch] text-[12.5px] leading-5 text-white/52'>
+          Get alerted when shows are announced.
         </p>
         <div className='mt-5'>{action}</div>
       </div>
@@ -316,7 +316,7 @@ export function TourModePanel({
     <ProfileDrawerShell
       open
       onOpenChange={open => !open && router.replace(`/${artist.handle}`)}
-      title='All Shows'
+      title='Events'
       dataTestId='tour-drawer'
     >
       <TourDrawerContent artist={artist} tourDates={tourDates} />

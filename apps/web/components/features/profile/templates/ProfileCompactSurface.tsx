@@ -392,7 +392,7 @@ export function ProfileCompactSurface({
   const socialIconClassName =
     'inline-flex h-8 w-8 items-center justify-center text-white/68 transition-colors duration-subtle hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/80 focus-visible:ring-offset-2 focus-visible:ring-offset-transparent';
   const heroHeightClassName = isHomeMode
-    ? 'h-[var(--cover-height)] min-h-[320px] max-h-[500px]'
+    ? 'h-[var(--cover-height)] min-h-[300px] max-h-[430px]'
     : 'h-[calc(3.5rem+max(env(safe-area-inset-top),0px))] border-b border-white/[0.075]';
   const locationLabel = artist.location?.trim() || artist.hometown?.trim();
   const registerNotificationsReveal = useCallback(
@@ -585,7 +585,7 @@ export function ProfileCompactSurface({
           </div>
 
           {isHomeMode ? (
-            <div className='absolute inset-x-0 bottom-0 z-10 px-[var(--page-pad)] pb-5'>
+            <div className='absolute inset-x-0 bottom-0 z-10 px-[var(--page-pad)] pb-4'>
               <div
                 className='min-w-0 px-0 py-0 [overflow-wrap:anywhere]'
                 data-testid='profile-hero-identity-block'
@@ -600,14 +600,14 @@ export function ProfileCompactSurface({
                     data-testid='profile-identity-link'
                     href={profileHref}
                     aria-label={`Go to ${artist.name}'s profile`}
-                    className='inline-flex max-w-full min-w-0 flex-wrap items-center gap-1.5 rounded-md text-[clamp(28px,8vw,34px)] font-semibold leading-[0.98] tracking-[-0.026em] text-white drop-shadow-[0_2px_14px_rgba(0,0,0,0.42)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--focus-ring))] focus-visible:ring-offset-2 focus-visible:ring-offset-transparent [@media(max-height:820px)]:text-[30px] [@media(max-height:760px)]:text-[28px]'
+                    className='inline-flex max-w-full min-w-0 flex-wrap items-center gap-1.5 rounded-md text-[30px] font-semibold leading-none tracking-normal text-white drop-shadow-[0_2px_14px_rgba(0,0,0,0.42)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--focus-ring))] focus-visible:ring-offset-2 focus-visible:ring-offset-transparent [@media(max-height:820px)]:text-[28px] [@media(max-height:760px)]:text-[26px]'
                   >
                     <span className='min-w-0 max-w-full [overflow-wrap:anywhere]'>
                       {artist.name}
                     </span>
                     {artist.is_verified ? (
                       <BadgeCheck
-                        className='h-5 w-5 shrink-0 [@media(max-height:820px)]:h-4 [@media(max-height:820px)]:w-4'
+                        className='h-4.5 w-4.5 shrink-0 [@media(max-height:820px)]:h-4 [@media(max-height:820px)]:w-4'
                         fill='white'
                         stroke='black'
                         strokeWidth={2}
@@ -617,13 +617,13 @@ export function ProfileCompactSurface({
                   </Link>
                 </IdentityHeading>
 
-                <p className='mt-1 line-clamp-2 min-w-0 text-[13px] font-medium leading-5 tracking-[-0.012em] text-white/76 [overflow-wrap:anywhere] [@media(max-height:820px)]:text-[12px]'>
+                <p className='mt-1 line-clamp-2 min-w-0 text-[12.5px] font-medium leading-4 tracking-[-0.005em] text-white/76 [overflow-wrap:anywhere] [@media(max-height:820px)]:text-[12px]'>
                   {heroSubtitle}
                 </p>
 
                 <div className='flex min-w-0 items-center justify-between gap-3 pt-1 [@media(max-height:820px)]:pt-0'>
                   {locationLabel ? (
-                    <p className='inline-flex min-w-0 items-center gap-1.5 text-[13px] font-medium text-white/78 [overflow-wrap:anywhere] [@media(max-height:820px)]:text-[12px]'>
+                    <p className='inline-flex min-w-0 items-center gap-1.5 text-[12.5px] font-medium text-white/78 [overflow-wrap:anywhere] [@media(max-height:820px)]:text-[12px]'>
                       <MapPin className='h-3.5 w-3.5 shrink-0' />
                       <span className='min-w-0 [overflow-wrap:anywhere]'>
                         {locationLabel}
@@ -635,7 +635,7 @@ export function ProfileCompactSurface({
 
                   {visibleSocialLinks.length > 0 ? (
                     <div
-                      className='flex shrink-0 items-center gap-2'
+                      className='flex shrink-0 items-center gap-1.5'
                       data-testid='profile-hero-social-row'
                     >
                       {visibleSocialLinks.map(link =>

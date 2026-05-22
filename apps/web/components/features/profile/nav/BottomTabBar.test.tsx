@@ -13,7 +13,7 @@
  *  - More click handler calls onOpenMenu
  *  - Grid column count matches visible tab count
  *  - No horizontal overflow at narrow viewports (320px) — structural check
- *  - 44×44pt touch target minimum via min-h-[52px] class
+ *  - 44×44pt touch target minimum via min-h-[50px] class
  *  - Empty Events tabs remain reachable so the surface can show alert signup
  */
 
@@ -257,11 +257,11 @@ describe('BottomTabBar — grid layout', () => {
     expect(grid?.getAttribute('style')).toContain('repeat(4,');
   });
 
-  it('all primary tab buttons have min-h-[52px] for 44pt touch target compliance', () => {
+  it('all primary tab buttons have min-h-[50px] for 44pt touch target compliance', () => {
     const { container } = render(<BottomTabBar {...makeProps()} />);
     const buttons = container.querySelectorAll('button');
     for (const btn of buttons) {
-      expect(btn.className).toContain('min-h-[52px]');
+      expect(btn.className).toContain('min-h-[50px]');
     }
   });
 
@@ -276,11 +276,11 @@ describe('BottomTabBar — grid layout', () => {
 // ---------------------------------------------------------------------------
 
 describe('BottomTabBar — safe area classes', () => {
-  it('applies pb-[max(env(safe-area-inset-bottom),12px)] inside the bar wrapper', () => {
+  it('applies pb-[max(env(safe-area-inset-bottom),10px)] inside the bar wrapper', () => {
     const { container } = render(<BottomTabBar {...makeProps()} />);
     const wrapper = container.querySelector('[data-testid="profile-tab-bar"]');
     expect(wrapper?.className).toContain(
-      'pb-[max(env(safe-area-inset-bottom),12px)]'
+      'pb-[max(env(safe-area-inset-bottom),10px)]'
     );
   });
 });

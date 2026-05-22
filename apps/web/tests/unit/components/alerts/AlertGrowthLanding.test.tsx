@@ -35,7 +35,7 @@ describe('<AlertGrowthLanding>', () => {
   it('renders the artist name in the hero copy', () => {
     render(<AlertGrowthLanding artist={ARTIST} />);
     expect(screen.getByText(/Tim White/)).toBeDefined();
-    expect(screen.getByText(/Get the next drop first/i)).toBeDefined();
+    expect(screen.getByText(/Get alerts first/i)).toBeDefined();
   });
 
   it('defaults to SMS, submits with E.164 phone + US country code', async () => {
