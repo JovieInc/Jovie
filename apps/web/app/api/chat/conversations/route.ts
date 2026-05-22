@@ -1,6 +1,10 @@
 import { count, desc, eq } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 import { getSessionContext } from '@/lib/auth/session';
+import {
+  sanitizeConversationTitle,
+  withSanitizedConversationTitles,
+} from '@/lib/chat/title';
 import { db } from '@/lib/db';
 import { chatConversations, chatMessages } from '@/lib/db/schema/chat';
 import { captureError } from '@/lib/error-tracking';
@@ -55,7 +59,9 @@ export async function GET(req: Request) {
       .limit(limit);
 
     return NextResponse.json(
-      { conversations },
+      {
+        conversations: withSanitizedConversationTitles(conversations),
+      },
       { status: 200, headers: NO_STORE_HEADERS }
     );
   } catch (error) {
@@ -119,6 +125,7 @@ export async function POST(req: Request) {
     }
 
     const { title, initialMessage } = body;
+    const sanitizedTitle = sanitizeConversationTitle(title);
 
     // Validate initial message length
     if (
@@ -139,7 +146,7 @@ export async function POST(req: Request) {
       .values({
         userId: user.id,
         creatorProfileId: profile.id,
-        title: title ?? null,
+        title: sanitizedTitle,
       })
       .returning();
 

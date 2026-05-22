@@ -139,15 +139,7 @@ function buildChatActionCards({
     ];
   }
 
-  return [
-    {
-      id: 'plan-next-move',
-      title: 'Plan Your Next Move',
-      body: `Use ${artistName}'s profile and catalog context to choose one concrete action for this week.`,
-      actionLabel: 'Plan Move',
-      prompt: `Use my artist profile, music catalog, and dashboard context for ${artistName} to recommend the single most useful action I should take this week. Include the first step.`,
-    },
-  ];
+  return [];
 }
 
 export function shouldRetryWelcomeChatBootstrap(

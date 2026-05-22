@@ -7,6 +7,7 @@ import {
   chatMessages,
   chatTurns,
 } from '@/lib/db/schema/chat';
+import { sanitizeConversationTitle } from './title';
 import type { PersistedToolEvent } from './tool-events';
 
 export type ChatTurnSource = 'typed' | 'quick_action' | 'slash_command';
@@ -28,10 +29,7 @@ const IN_FLIGHT_STATUSES = new Set<ChatTurn['status']>([
 ]);
 
 function toConversationTitle(text: string): string | null {
-  const trimmed = text.trim();
-  if (!trimmed) return null;
-  const collapsed = trimmed.replace(/\s+/g, ' ');
-  return collapsed.length > 50 ? `${collapsed.slice(0, 50)}...` : collapsed;
+  return sanitizeConversationTitle(text, 50);
 }
 
 async function fetchTurnMessages(turnId: string): Promise<ChatMessage[]> {

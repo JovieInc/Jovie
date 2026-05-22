@@ -2,6 +2,7 @@
 
 import { Fragment, useMemo } from 'react';
 import { type ChatToken, parseTokens } from '@/lib/chat/tokens';
+import { skillById } from '@/lib/commands/registry';
 import { cn } from '@/lib/utils';
 import { EntityChip, type EntityChipTone } from './EntityChip';
 import { EntityChipPopover } from './EntityChipPopover';
@@ -75,16 +76,38 @@ export function TokenizedText({
             />
           );
         }
-        return (
-          <span
-            key={key}
-            className='inline-flex items-center rounded bg-surface-2 px-1.5 py-0.5 align-baseline text-xs font-medium text-secondary-token'
-            title={`Skill: ${token.id}`}
-          >
-            /{token.id}
-          </span>
-        );
+        return <TranscriptSkillChip key={key} id={token.id} tone={tone} />;
       })}
+    </span>
+  );
+}
+
+interface TranscriptSkillChipProps {
+  readonly id: string;
+  readonly tone: EntityChipTone;
+}
+
+function TranscriptSkillChip({ id, tone }: TranscriptSkillChipProps) {
+  const label = skillById(id)?.label ?? id;
+  return (
+    <span
+      className={cn(
+        'mx-0.5 inline-flex h-6 max-w-[220px] items-center gap-1.5 rounded-[8px] border px-2 align-[-0.2em] text-[12px] font-medium leading-none shadow-none',
+        tone === 'onLight'
+          ? 'border-black/10 bg-black/[0.055] text-[#111216]'
+          : 'border-white/[0.085] bg-white/[0.035] text-primary-token'
+      )}
+      title={label}
+      data-testid='transcript-skill-chip'
+    >
+      <span
+        aria-hidden
+        className={cn(
+          'h-1.5 w-1.5 shrink-0 rounded-full',
+          tone === 'onLight' ? 'bg-black/45' : 'bg-tertiary-token'
+        )}
+      />
+      <span className='min-w-0 truncate'>{label}</span>
     </span>
   );
 }

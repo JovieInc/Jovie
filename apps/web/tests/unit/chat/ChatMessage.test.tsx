@@ -52,5 +52,26 @@ describe('ChatMessage', () => {
     expect(bubble.className).toContain('py-1.5');
     expect(bubble.className).not.toContain('py-3.5');
     expect(bubble.className).not.toContain('min-h-8');
+    expect(bubble).toHaveAttribute('data-bubble-shape', 'pill');
+  });
+
+  it('renders long or multiline user messages as rounded rectangles', () => {
+    const messageProps = {
+      id: 'user-2',
+      role: 'user' as const,
+      parts: [
+        {
+          type: 'text' as const,
+          text: 'Generate album art for this release with a long direction note that will wrap in the transcript.',
+        },
+      ],
+    };
+
+    fastRender(<ChatMessage {...messageProps} />);
+
+    const bubble = screen.getByTestId('chat-user-bubble');
+    expect(bubble).toHaveAttribute('data-bubble-shape', 'rectangle');
+    expect(bubble.className).toContain('rounded-[18px]');
+    expect(bubble.className).toContain('py-2');
   });
 });

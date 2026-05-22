@@ -24,7 +24,7 @@ function insertReleaseChips(
   release: { id: string; title: string },
   { createRelease = false }: { readonly createRelease?: boolean } = {}
 ): void {
-  // Skill chip first so the transcript reads "/skill:... @release:..."
+  // Skill chip first so the transcript keeps action context before the release.
   globalThis.dispatchEvent(
     new CustomEvent('jovie-chat-insert-mention', {
       detail: { skillId: 'generateAlbumArt' },

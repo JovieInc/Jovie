@@ -1,6 +1,9 @@
 import type { Metadata } from 'next';
 import { DeferredChatPageClient } from '../DeferredChatPageClient';
-import { loadChatThreadMetadataTitle } from './chat-thread-metadata-data';
+import {
+  loadChatThreadMetadataTitle,
+  loadChatThreadTitle,
+} from './chat-thread-metadata-data';
 
 interface Props {
   readonly params: Promise<{
@@ -31,7 +34,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
  */
 export default async function ChatConversationPage({ params }: Props) {
   const { id } = await params;
-  const initialConversationTitle = await loadChatThreadMetadataTitle(id);
+  const initialConversationTitle = await loadChatThreadTitle(id);
 
   return (
     <DeferredChatPageClient

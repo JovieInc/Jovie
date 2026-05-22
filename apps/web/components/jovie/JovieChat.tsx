@@ -5,7 +5,6 @@ import { ImagePlus } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { JovieMarkElectric } from '@/components/atoms/JovieMarkElectric';
-import { SuggestionCard } from '@/components/shell/SuggestionCard';
 import { useAppFlag } from '@/lib/flags/client';
 import { SUPPORTED_IMAGE_MIME_TYPES } from '@/lib/images/config';
 import { cn } from '@/lib/utils';
@@ -18,9 +17,11 @@ import {
   ErrorDisplay,
   ScrollToBottom,
 } from './components';
+import { ChatActionCard } from './components/ChatActionCard';
 import { ChatProvidersRegistrar } from './components/ChatProvidersRegistrar';
 import { ChatUsageAlert } from './components/ChatUsageAlert';
 import { EntityResolutionProvider } from './components/EntityResolutionProvider';
+import { SuggestedPrompts } from './components/SuggestedPrompts';
 import {
   useChatImageAttachments,
   useChatJankMonitor,
@@ -78,6 +79,9 @@ export function JovieChat({
   const imageFileInputRef = useRef<HTMLInputElement>(null);
   // Track message IDs that were loaded from persistence to skip entrance animation
   const knownMessageIdsRef = useRef<Set<string>>(new Set());
+  const [dismissedActionCardIds, setDismissedActionCardIds] = useState<
+    ReadonlySet<string>
+  >(() => new Set());
   // Hide neighbouring affordances while the slash picker owns the composer.
   const [composerPickerOpen, setComposerPickerOpen] = useState(false);
   const {
@@ -318,6 +322,14 @@ export function JovieChat({
   const isStreaming = status === 'streaming';
   const showThreadView = hasMessages || showPendingBootstrap;
 
+  const handleDismissActionCard = useCallback((cardId: string) => {
+    setDismissedActionCardIds(prev => {
+      const next = new Set(prev);
+      next.add(cardId);
+      return next;
+    });
+  }, []);
+
   // Show skeleton while fetching existing conversation
   if (isLoadingConversation) {
     return (
@@ -372,14 +384,23 @@ export function JovieChat({
 
   const greetingName =
     getFirstNameForGreeting(displayName) ?? getFirstNameForGreeting(username);
-  const primaryActionCard = actionCards[0] ?? null;
+  const primaryActionCard =
+    actionCards.find(card => !dismissedActionCardIds.has(card.id)) ?? null;
   const hasActionCardEmptyLayout = primaryActionCard !== null;
+  const hasComposerActivity =
+    input.trim().length > 0 ||
+    (pendingImages?.length ?? 0) > 0 ||
+    chipTray.chips.length > 0;
   const showActionCardContent =
     primaryActionCard !== null &&
-    input.trim().length === 0 &&
+    !hasComposerActivity &&
     !composerPickerOpen &&
-    (pendingImages?.length ?? 0) === 0 &&
-    chipTray.chips.length === 0;
+    !showThreadView;
+  const showSoftSuggestions =
+    !showThreadView &&
+    primaryActionCard === null &&
+    !hasComposerActivity &&
+    !composerPickerOpen;
   let emptyStateHeading: string;
   if (isFirstSession) {
     emptyStateHeading = "Hey, I'm Jovie.";
@@ -532,7 +553,7 @@ export function JovieChat({
                         data-testid='chat-empty-state-action-card-slot'
                       >
                         {showActionCardContent ? (
-                          <SuggestionCard
+                          <ChatActionCard
                             className='h-full'
                             title={primaryActionCard.title}
                             body={primaryActionCard.body}
@@ -541,6 +562,9 @@ export function JovieChat({
                               handleSuggestedPromptWithJank(
                                 primaryActionCard.prompt
                               )
+                            }
+                            onDismiss={() =>
+                              handleDismissActionCard(primaryActionCard.id)
                             }
                           />
                         ) : null}
@@ -562,6 +586,18 @@ export function JovieChat({
                           data-testid='chat-empty-state-centered-composer'
                         >
                           {composerSurface}
+                        </div>
+                        <div
+                          className='min-h-[38px] w-full'
+                          data-testid='chat-empty-state-soft-suggestions-slot'
+                        >
+                          {showSoftSuggestions ? (
+                            <SuggestedPrompts
+                              onSelect={handleSuggestedPromptWithJank}
+                              isFirstSession={isFirstSession}
+                              layout='rail'
+                            />
+                          ) : null}
                         </div>
                       </>
                     )}
