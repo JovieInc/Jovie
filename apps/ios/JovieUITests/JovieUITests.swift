@@ -61,14 +61,14 @@ final class JovieUITests: XCTestCase {
     }
     let window = app.windows.element(boundBy: 0)
 
-    revealSidebar(app: app, window: window)
+    guard revealSidebar(app: app, window: window) else { return }
     XCTAssertTrue(
       app.buttons["Dashboard"].waitForExistence(timeout: 3),
       "Shell navigation did not reveal sidebar.\n\(app.debugDescription)"
     )
 
     app.buttons["Close Sidebar"].tap()
-    revealSettings(app: app, window: window)
+    guard revealSettings(app: app, window: window) else { return }
     XCTAssertTrue(
       app.staticTexts["Settings"].waitForExistence(timeout: 3),
       "Shell navigation did not reveal settings.\n\(app.debugDescription)"
@@ -207,23 +207,55 @@ final class JovieUITests: XCTestCase {
     startCoordinate.press(forDuration: 0.08, thenDragTo: endCoordinate)
   }
 
-  private func revealSidebar(app: XCUIApplication, window: XCUIElement) {
+  private func revealSidebar(
+    app: XCUIApplication,
+    window: XCUIElement,
+    file: StaticString = #filePath,
+    line: UInt = #line
+  ) -> Bool {
     edgeDrag(in: window, from: CGVector(dx: 0.01, dy: 0.5), to: CGVector(dx: 0.72, dy: 0.5))
-    if app.buttons["Dashboard"].waitForExistence(timeout: 1) { return }
+    if app.buttons["Dashboard"].waitForExistence(timeout: 1) { return true }
 
     edgeDrag(in: window, from: CGVector(dx: 0.05, dy: 0.5), to: CGVector(dx: 0.82, dy: 0.5))
-    if app.buttons["Dashboard"].waitForExistence(timeout: 1) { return }
+    if app.buttons["Dashboard"].waitForExistence(timeout: 1) { return true }
 
-    app.buttons["Open Sidebar"].tap()
+    let openSidebarButton = app.buttons["Open Sidebar"]
+    guard openSidebarButton.waitForExistence(timeout: 2) else {
+      XCTFail(
+        "Open Sidebar did not appear after the sidebar edge-swipe attempts.\n\(app.debugDescription)",
+        file: file,
+        line: line
+      )
+      return false
+    }
+
+    openSidebarButton.tap()
+    return true
   }
 
-  private func revealSettings(app: XCUIApplication, window: XCUIElement) {
+  private func revealSettings(
+    app: XCUIApplication,
+    window: XCUIElement,
+    file: StaticString = #filePath,
+    line: UInt = #line
+  ) -> Bool {
     edgeDrag(in: window, from: CGVector(dx: 0.99, dy: 0.5), to: CGVector(dx: 0.28, dy: 0.5))
-    if app.staticTexts["Settings"].waitForExistence(timeout: 1) { return }
+    if app.staticTexts["Settings"].waitForExistence(timeout: 1) { return true }
 
     edgeDrag(in: window, from: CGVector(dx: 0.95, dy: 0.5), to: CGVector(dx: 0.18, dy: 0.5))
-    if app.staticTexts["Settings"].waitForExistence(timeout: 1) { return }
+    if app.staticTexts["Settings"].waitForExistence(timeout: 1) { return true }
 
-    app.buttons["Open Settings"].tap()
+    let openSettingsButton = app.buttons["Open Settings"]
+    guard openSettingsButton.waitForExistence(timeout: 2) else {
+      XCTFail(
+        "Open Settings did not appear after the settings edge-swipe attempts.\n\(app.debugDescription)",
+        file: file,
+        line: line
+      )
+      return false
+    }
+
+    openSettingsButton.tap()
+    return true
   }
 }
