@@ -205,6 +205,19 @@ export function CmdKPalette({
     if (!open) return;
     function onKey(e: KeyboardEvent) {
       if (e.isComposing) return;
+      if (
+        (e.metaKey || e.ctrlKey) &&
+        !e.altKey &&
+        !e.shiftKey &&
+        (e.key === '1' || e.key === '2' || e.key === '3')
+      ) {
+        const nextIndex = Number(e.key) - 1;
+        if (nextIndex < flatItems.length) {
+          e.preventDefault();
+          setSelectedIndex(nextIndex);
+        }
+        return;
+      }
       if (e.key === 'ArrowDown') {
         e.preventDefault();
         setSelectedIndex(prev =>
@@ -228,7 +241,7 @@ export function CmdKPalette({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
-        className='overflow-hidden rounded-[18px] border border-(--linear-app-frame-seam) bg-(--linear-app-content-surface) p-0 shadow-popover sm:max-w-[560px]'
+        className='overflow-hidden rounded-xl border border-(--linear-app-frame-seam) bg-(--linear-app-content-surface) p-0 shadow-popover sm:max-w-[560px]'
         hideClose
       >
         <DialogPrimitive.Title className='sr-only'>
@@ -242,7 +255,7 @@ export function CmdKPalette({
           data-testid='shared-command-palette'
           data-surface='cmdk'
         >
-          <div className='flex items-center gap-2.5 border-b border-(--linear-app-frame-seam) px-4 py-3'>
+          <div className='flex items-center gap-2 border-b border-(--linear-app-frame-seam) px-3.5 py-2.5'>
             <Search
               className='size-4 shrink-0 text-tertiary-token'
               aria-hidden='true'
@@ -259,12 +272,12 @@ export function CmdKPalette({
               className='flex-1 appearance-none bg-transparent text-sm text-primary-token outline-none placeholder:text-tertiary-token focus:outline-none focus-visible:outline-none focus-visible:shadow-[inset_0_0_0_1px_color-mix(in_oklab,var(--linear-border-focus)_45%,transparent)]'
               aria-label='Command palette search'
             />
-            <span className='hidden shrink-0 rounded-md border border-(--linear-app-frame-seam) bg-surface-1 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-tertiary-token sm:inline'>
+            <span className='hidden shrink-0 px-1 text-[11px] font-medium text-quaternary-token sm:inline'>
               Esc
             </span>
           </div>
           <div
-            className='max-h-[420px] overflow-y-auto p-[5px]'
+            className='max-h-[420px] overflow-y-auto px-1.5 pb-1.5 pt-1'
             role='listbox'
             aria-label='Command palette results'
           >
@@ -274,6 +287,8 @@ export function CmdKPalette({
               setSelectedIndex={setSelectedIndex}
               commitIndex={commitIndex}
               emptyHint='No matches.'
+              variant='cmdk'
+              showIndexedShortcuts
             />
           </div>
         </div>
