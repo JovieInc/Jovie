@@ -2,6 +2,7 @@ default_platform(:ios)
 opt_out_usage
 
 require "shellwords"
+require "open3"
 require "time"
 
 REPO_ROOT = File.expand_path("..", __dir__)
@@ -51,6 +52,27 @@ def match_git_auth_options
   options[:git_private_key] = ENV["MATCH_GIT_PRIVATE_KEY"] if env_present?("MATCH_GIT_PRIVATE_KEY")
   options[:git_basic_authorization] = ENV["MATCH_GIT_BASIC_AUTHORIZATION"] if env_present?("MATCH_GIT_BASIC_AUTHORIZATION")
   options
+end
+
+def distribution_certificate_name(apple_team_id:)
+  return ENV["APPLE_DISTRIBUTION_CERTIFICATE"] if env_present?("APPLE_DISTRIBUTION_CERTIFICATE")
+
+  output, status = Open3.capture2e("security", "find-identity", "-v", "-p", "codesigning")
+  UI.user_error!("Unable to inspect installed code signing identities") unless status.success?
+
+  team_pattern = Regexp.escape(apple_team_id)
+  matches = output.lines.filter_map do |line|
+    line[/\"((?:Apple|iPhone) Distribution: [^\"]+ \(#{team_pattern}\))\"/, 1]
+  end.uniq
+
+  UI.user_error!("No Apple Distribution signing identity found for team #{apple_team_id}") if matches.empty?
+  if matches.length > 1
+    UI.user_error!(
+      "Multiple Apple Distribution signing identities found for team #{apple_team_id}: #{matches.join(", ")}"
+    )
+  end
+
+  matches.fetch(0)
 end
 
 def build_number
@@ -185,12 +207,13 @@ platform :ios do
       }.merge(match_git_auth_options)
     )
 
+    distribution_certificate = distribution_certificate_name(apple_team_id: apple_team_id)
     profile_name = "match AppStore #{APP_IDENTIFIER}"
     signing_xcargs = [
       "CODE_SIGNING_ALLOWED=YES",
       "CODE_SIGNING_REQUIRED=YES",
       "CODE_SIGN_STYLE=Manual",
-      "CODE_SIGN_IDENTITY=#{"Apple Distribution".shellescape}",
+      "CODE_SIGN_IDENTITY=#{distribution_certificate.shellescape}",
       "DEVELOPMENT_TEAM=#{apple_team_id.shellescape}",
       "CURRENT_PROJECT_VERSION=#{current_build_number.shellescape}",
       "CLERK_ASSOCIATED_DOMAIN=#{clerk_domain.shellescape}",
@@ -209,7 +232,7 @@ platform :ios do
       export_options: {
         method: "app-store",
         signingStyle: "manual",
-        signingCertificate: "Apple Distribution",
+        signingCertificate: distribution_certificate,
         teamID: apple_team_id,
         provisioningProfiles: {
           APP_IDENTIFIER => profile_name

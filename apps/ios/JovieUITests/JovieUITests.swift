@@ -209,20 +209,20 @@ final class JovieUITests: XCTestCase {
 
   private func revealSidebar(app: XCUIApplication, window: XCUIElement) {
     edgeDrag(in: window, from: CGVector(dx: 0.01, dy: 0.5), to: CGVector(dx: 0.72, dy: 0.5))
-    guard !app.buttons["Dashboard"].waitForExistence(timeout: 1) else { return }
+    if app.buttons["Dashboard"].waitForExistence(timeout: 1) { return }
 
     edgeDrag(in: window, from: CGVector(dx: 0.05, dy: 0.5), to: CGVector(dx: 0.82, dy: 0.5))
-    guard !app.buttons["Dashboard"].waitForExistence(timeout: 1) else { return }
+    if app.buttons["Dashboard"].waitForExistence(timeout: 1) { return }
 
     app.buttons["Open Sidebar"].tap()
   }
 
   private func revealSettings(app: XCUIApplication, window: XCUIElement) {
     edgeDrag(in: window, from: CGVector(dx: 0.99, dy: 0.5), to: CGVector(dx: 0.28, dy: 0.5))
-    guard !app.staticTexts["Settings"].waitForExistence(timeout: 1) else { return }
+    if app.staticTexts["Settings"].waitForExistence(timeout: 1) { return }
 
     edgeDrag(in: window, from: CGVector(dx: 0.95, dy: 0.5), to: CGVector(dx: 0.18, dy: 0.5))
-    guard !app.staticTexts["Settings"].waitForExistence(timeout: 1) else { return }
+    if app.staticTexts["Settings"].waitForExistence(timeout: 1) { return }
 
     app.buttons["Open Settings"].tap()
   }
