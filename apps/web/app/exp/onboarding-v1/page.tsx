@@ -115,18 +115,21 @@ export default function OnboardingC() {
     });
   }, [messages, typing]);
 
-  const sendJovie = useCallback(async (lines: string[]) => {
-    for (const line of lines) {
-      setTyping(true);
-      await sleep(400 + line.length * 8);
-      setTyping(false);
-      setMessages(m => [
-        ...m,
-        { id: nextMessageId('j'), role: 'jovie', text: line },
-      ]);
-      await sleep(180);
-    }
-  }, [nextMessageId]);
+  const sendJovie = useCallback(
+    async (lines: string[]) => {
+      for (const line of lines) {
+        setTyping(true);
+        await sleep(400 + line.length * 8);
+        setTyping(false);
+        setMessages(m => [
+          ...m,
+          { id: nextMessageId('j'), role: 'jovie', text: line },
+        ]);
+        await sleep(180);
+      }
+    },
+    [nextMessageId]
+  );
   function sendUser(text: string) {
     setMessages(m => [...m, { id: nextMessageId('u'), role: 'user', text }]);
   }

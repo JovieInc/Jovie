@@ -1,6 +1,6 @@
-import { SignUpPageClient } from './SignUpPageClient';
 import { Suspense } from 'react';
 import { AuthFormSkeleton } from '@/components/molecules/LoadingSkeleton';
+import { SignUpPageClient } from './SignUpPageClient';
 
 /**
  * Sign-up page using the canonical AuthShell (JOV-2064).

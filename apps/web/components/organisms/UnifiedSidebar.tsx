@@ -258,7 +258,7 @@ function SidebarHeaderNav({
   isDemoRoute: boolean;
   routeBackHref?: string;
   routeBackLabel?: string;
-  }>) {
+}>) {
   const shellChatV1Enabled = useAppFlag('DESIGN_V1');
   const newChatLink = (
     <Link
