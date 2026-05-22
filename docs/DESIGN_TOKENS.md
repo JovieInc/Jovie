@@ -30,6 +30,7 @@ This is the repo-owned source of truth for:
 - button tokens
 - focus tokens
 - duration tokens
+- shell V1 semantic aliases for app chrome geometry and audio/sidebar chrome
 
 Add new core tokens here.
 
@@ -99,6 +100,21 @@ tests, but they are not the live production path.
 Dashboard and authenticated app surfaces use the same token layer, but their
 component structure remains under the app and dashboard feature families. They
 are not described by the marketing or public-surface shell libraries.
+
+Shell V1 app chrome should prefer the semantic `--app-shell-*` aliases for
+shared geometry and surfaces. These aliases live in `design-system.css` and
+resolve to the current Linear-derived values:
+
+- `--app-shell-sidebar-width`
+- `--app-shell-header-height`
+- `--app-shell-header-height-compact`
+- `--app-shell-gap`
+- `--app-shell-radius`
+- `--app-shell-border`
+- `--app-shell-frame-seam`
+- `--app-shell-content-surface`
+- `--app-shell-audio-bar-max-height`
+- `--app-shell-audio-compact-height`
 
 ## Canonical Surface Contract
 
