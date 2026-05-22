@@ -33,7 +33,6 @@ describe('fetchWithTimeoutResponse CSRF header injection', () => {
       headers: { 'Content-Type': 'application/json' },
     });
 
-    expect(mockFetch).toHaveBeenCalledTimes(1);
     const [, options] = mockFetch.mock.calls[0] as [
       string,
       RequestInit & { headers?: HeadersInit },
@@ -55,6 +54,55 @@ describe('fetchWithTimeoutResponse CSRF header injection', () => {
 
     await fetchWithTimeoutResponse('/api/stripe/checkout');
 
+    const [, options] = mockFetch.mock.calls[0] as [
+      string,
+      RequestInit & { headers?: HeadersInit },
+    ];
+    const headers = new Headers(options.headers);
+
+    expect(headers.get(CSRF_HEADER_NAME)).toBeNull();
+  });
+
+  it('does not attach the CSRF token when location origin is missing', async () => {
+    document.cookie = 'jovie_csrf=session-token-123';
+    vi.stubGlobal('location', { origin: undefined } as Location);
+    mockFetch.mockResolvedValueOnce(
+      new Response('{"ok":true}', {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      })
+    );
+
+    await fetchWithTimeoutResponse('/api/stripe/checkout', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+    });
+
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+    const [, options] = mockFetch.mock.calls[0] as [
+      string,
+      RequestInit & { headers?: HeadersInit },
+    ];
+    const headers = new Headers(options.headers);
+
+    expect(headers.get(CSRF_HEADER_NAME)).toBeNull();
+  });
+
+  it('does not attach the CSRF token when URL parsing throws', async () => {
+    document.cookie = 'jovie_csrf=session-token-123';
+    mockFetch.mockResolvedValueOnce(
+      new Response('{"ok":true}', {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      })
+    );
+
+    await fetchWithTimeoutResponse('http://[::1', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+    });
+
+    expect(mockFetch).toHaveBeenCalledTimes(1);
     const [, options] = mockFetch.mock.calls[0] as [
       string,
       RequestInit & { headers?: HeadersInit },

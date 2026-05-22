@@ -31,15 +31,19 @@ export function getBrowserCsrfToken(): string | null {
 }
 
 export function isSameOriginApiRequest(url: string): boolean {
-  if (typeof globalThis.location === 'undefined') {
+  const origin = globalThis.location?.origin;
+  if (typeof origin !== 'string' || origin.length === 0) {
     return false;
   }
 
-  const requestUrl = new URL(url, globalThis.location.origin);
-  return (
-    requestUrl.origin === globalThis.location.origin &&
-    requestUrl.pathname.startsWith('/api/')
-  );
+  try {
+    const requestUrl = new URL(url, origin);
+    return (
+      requestUrl.origin === origin && requestUrl.pathname.startsWith('/api/')
+    );
+  } catch {
+    return false;
+  }
 }
 
 export function shouldAttachCsrfHeader(
