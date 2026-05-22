@@ -468,10 +468,18 @@ export function DashboardNav(_: DashboardNavProps) {
     <nav className='flex flex-1 flex-col' aria-label='Dashboard navigation'>
       {isInSettings ? (
         <>
-          <SidebarCollapsibleGroup label='General' defaultOpen>
+          <SidebarCollapsibleGroup
+            label='General'
+            defaultOpen
+            storageKey='settings.general'
+          >
             {renderSection(userSettingsNavigation)}
           </SidebarCollapsibleGroup>
-          <SidebarCollapsibleGroup label={artistSettingsLabel} defaultOpen>
+          <SidebarCollapsibleGroup
+            label={artistSettingsLabel}
+            defaultOpen={false}
+            storageKey='settings.artist'
+          >
             {renderSection(artistSettingsNavigation)}
           </SidebarCollapsibleGroup>
         </>
@@ -483,7 +491,11 @@ export function DashboardNav(_: DashboardNavProps) {
                 {/* Section divider for visual separation (except for first section) */}
                 {index > 0 && <div className='my-1.5' />}
                 {section.label ? (
-                  <SidebarCollapsibleGroup label={section.label} defaultOpen>
+                  <SidebarCollapsibleGroup
+                    label={section.label}
+                    defaultOpen
+                    storageKey={`dashboard.${section.key}`}
+                  >
                     {renderSection(section.items)}
                   </SidebarCollapsibleGroup>
                 ) : (
@@ -519,7 +531,8 @@ export function DashboardNav(_: DashboardNavProps) {
         <div data-nav-section={artistWorkspaceSection.key} className='mt-3'>
           <SidebarCollapsibleGroup
             label={artistWorkspaceSection.label}
-            defaultOpen
+            defaultOpen={false}
+            storageKey={artistWorkspaceSection.key}
           >
             {renderSection(artistWorkspaceSection.items)}
           </SidebarCollapsibleGroup>
@@ -528,7 +541,11 @@ export function DashboardNav(_: DashboardNavProps) {
 
       {isAdmin && !isInSettings && (
         <div data-testid='admin-nav-section' className='mt-3'>
-          <SidebarCollapsibleGroup label='Admin' defaultOpen>
+          <SidebarCollapsibleGroup
+            label='Admin'
+            defaultOpen={false}
+            storageKey='dashboard.admin'
+          >
             {adminNavigationSections.map(section => (
               <div
                 key={section.label}
