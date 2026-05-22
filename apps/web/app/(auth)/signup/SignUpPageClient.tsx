@@ -21,6 +21,11 @@ import {
   buildDesktopAuthReturnPath,
   sanitizeDesktopReturnRoute,
 } from '@/lib/desktop/auth-return';
+import {
+  buildAuthRouteUrlWithMobileReturn,
+  buildMobileAuthReturnPath,
+  sanitizeMobileReturnRoute,
+} from '@/lib/mobile/auth-return';
 
 /**
  * Persist pre-signup claim data from the homepage hero into sessionStorage,
@@ -206,12 +211,19 @@ export function SignUpPageClient() {
   const desktopReturnRoute = sanitizeDesktopReturnRoute(
     searchParams.get('desktop_return')
   );
-  const signInUrl = desktopReturnRoute
-    ? buildAuthRouteUrlWithDesktopReturn(APP_ROUTES.SIGNIN, searchParams)
-    : buildAuthRouteUrl(APP_ROUTES.SIGNIN, searchParams);
-  const fallbackRedirectUrl = desktopReturnRoute
-    ? buildDesktopAuthReturnPath(desktopReturnRoute)
-    : undefined;
+  const mobileReturnRoute = sanitizeMobileReturnRoute(
+    searchParams.get('mobile_return')
+  );
+  const signInUrl = mobileReturnRoute
+    ? buildAuthRouteUrlWithMobileReturn(APP_ROUTES.SIGNIN, searchParams)
+    : desktopReturnRoute
+      ? buildAuthRouteUrlWithDesktopReturn(APP_ROUTES.SIGNIN, searchParams)
+      : buildAuthRouteUrl(APP_ROUTES.SIGNIN, searchParams);
+  const fallbackRedirectUrl = mobileReturnRoute
+    ? buildMobileAuthReturnPath(mobileReturnRoute)
+    : desktopReturnRoute
+      ? buildDesktopAuthReturnPath(desktopReturnRoute)
+      : undefined;
 
   return (
     <AuthLayout

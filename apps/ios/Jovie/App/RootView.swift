@@ -20,6 +20,17 @@ private enum LiveAuthBootstrapError: LocalizedError {
   }
 }
 
+private enum MobileAuthReturnError: LocalizedError {
+  case missingSignedInUser
+
+  var errorDescription: String? {
+    switch self {
+    case .missingSignedInUser:
+      "You're signed in, but we couldn't load your profile. Try again."
+    }
+  }
+}
+
 private enum LiveAuthBootstrapper {
   @MainActor
   static func signInFromEnvironment(
@@ -106,8 +117,8 @@ private enum LiveAuthBootstrapper {
 
 private struct AppContentView: View {
   @Bindable var appState: AppState
+  let authErrorMessage: String?
   let onLogout: @MainActor () async -> Void
-  let onAuthenticated: @MainActor (String) async -> Void
 
   var body: some View {
     Group {
@@ -118,22 +129,28 @@ private struct AppContentView: View {
         AuthScreen(
           isMock: !appState.launchMode.usesLiveClerk,
           webBaseURL: appState.configuration.webBaseURL,
-          onAuthenticated: onAuthenticated
+          errorMessage: authErrorMessage
         )
       case .needsOnboarding:
         AppShellView(
           profile: AppShellProfile(response: nil),
           isOffline: false,
-          initialPanel: appState.launchMode.opensSettingsOnLaunch ? .settings : .main,
+          initialTab: .profile,
+          opensSettingsOnLaunch: appState.launchMode.opensSettingsOnLaunch,
+          billingURL: appState.billingURL,
           onLogout: onLogout
         ) {
           NeedsOnboardingView(continueURL: appState.continueOnWebURL)
+        } chatContent: {
+          MobileChatHomeView(isOffline: false)
         }
       case .ready:
         AppShellView(
           profile: AppShellProfile(response: appState.loadedDashboardResponse),
           isOffline: appState.isOffline,
-          initialPanel: appState.launchMode.opensSettingsOnLaunch ? .settings : .main,
+          initialTab: appState.launchMode.opensChatOnLaunch ? .chat : .profile,
+          opensSettingsOnLaunch: appState.launchMode.opensSettingsOnLaunch,
+          billingURL: appState.billingURL,
           onLogout: onLogout
         ) {
           DashboardView(
@@ -143,24 +160,109 @@ private struct AppContentView: View {
             showVenueModeOnLaunch: appState.launchMode.opensVenueModeOnLaunch,
             onRetry: { await appState.retry() }
           )
+        } chatContent: {
+          MobileChatHomeView(isOffline: appState.isOffline)
         }
       }
     }
   }
 }
 
+private struct MobileChatHomeView: View {
+  let isOffline: Bool
+
+  @State private var draft = ""
+
+  var body: some View {
+    ZStack {
+      JovieColor.backgroundBase.ignoresSafeArea()
+
+      VStack(spacing: 0) {
+        Spacer(minLength: 120)
+
+        VStack(spacing: JovieSpacing.large) {
+          JovieLogoMark(size: 34)
+
+          VStack(spacing: JovieSpacing.small) {
+            Text("Ask Jovie")
+              .font(JovieFont.display(size: 28))
+              .foregroundStyle(JovieColor.textPrimary)
+              .multilineTextAlignment(.center)
+
+            Text(isOffline ? "Offline. Drafts stay on this device." : "Native chat is in alpha for internal testers.")
+              .font(JovieFont.body(size: 15))
+              .foregroundStyle(JovieColor.textTertiary)
+              .multilineTextAlignment(.center)
+              .fixedSize(horizontal: false, vertical: true)
+          }
+        }
+        .frame(maxWidth: 330)
+        .padding(.horizontal, JovieSpacing.xLarge)
+
+        Spacer(minLength: 48)
+
+        ChatComposerPreview(draft: $draft)
+          .padding(.horizontal, JovieSpacing.large)
+          .padding(.bottom, JovieSpacing.medium)
+      }
+    }
+    .accessibilityIdentifier("mobile-chat")
+  }
+}
+
+private struct ChatComposerPreview: View {
+  @Binding var draft: String
+
+  var body: some View {
+    let trimmedDraft = draft.trimmingCharacters(in: .whitespacesAndNewlines)
+
+    HStack(spacing: JovieSpacing.medium) {
+      TextField("Ask Jovie", text: $draft)
+        .textInputAutocapitalization(.sentences)
+        .disableAutocorrection(false)
+        .font(JovieFont.body(size: 16))
+        .foregroundStyle(JovieColor.textPrimary)
+        .frame(height: 52)
+
+      Button {
+        draft = ""
+      } label: {
+        Image(systemName: "arrow.up")
+          .font(.system(size: 16, weight: .bold))
+          .foregroundStyle(trimmedDraft.isEmpty ? JovieColor.textTertiary : JovieColor.backgroundBase)
+          .frame(width: 36, height: 36)
+          .background(
+            trimmedDraft.isEmpty ? JovieColor.surface2 : Color.white,
+            in: Circle()
+          )
+      }
+      .buttonStyle(.plain)
+      .disabled(trimmedDraft.isEmpty)
+      .accessibilityLabel("Send")
+    }
+    .padding(.horizontal, JovieSpacing.large)
+    .frame(height: 64)
+    .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 28, style: .continuous))
+    .overlay {
+      RoundedRectangle(cornerRadius: 28, style: .continuous)
+        .stroke(JovieColor.borderDefault, lineWidth: 1)
+    }
+    .accessibilityIdentifier("chat-composer")
+  }
+}
+
 struct RootView: View {
   @Bindable var appState: AppState
   let liveUserID: String?
+  let authErrorMessage: String?
   let onLogout: @MainActor () async -> Void
-  let onAuthenticated: @MainActor (String) async -> Void
 
   var body: some View {
     ZStack {
       AppContentView(
         appState: appState,
-        onLogout: onLogout,
-        onAuthenticated: onAuthenticated
+        authErrorMessage: authErrorMessage,
+        onLogout: onLogout
       )
 
 #if DEBUG
@@ -213,19 +315,22 @@ struct LiveRootContainer: View {
   @Environment(Clerk.self) private var clerk
   @Bindable var appState: AppState
   @State private var didBootstrapLiveAuth = false
+  @State private var authReturnTask: Task<Void, Never>?
+  @State private var authErrorMessage: String?
 
   var body: some View {
     RootView(
       appState: appState,
       liveUserID: clerk.user?.id,
+      authErrorMessage: authErrorMessage,
       onLogout: {
         try? await clerk.auth.signOut()
         await appState.signOut()
-      },
-      onAuthenticated: { userID in
-        await appState.handleSignedInUserChange(userID)
       }
     )
+      .onOpenURL { url in
+        handleAuthReturn(url)
+      }
       .task(id: appState.launchMode.requiresAutoAuth) {
         guard appState.launchMode.requiresAutoAuth, didBootstrapLiveAuth == false else {
           return
@@ -245,6 +350,63 @@ struct LiveRootContainer: View {
           )
         }
       }
+      .onDisappear {
+        authReturnTask?.cancel()
+        authReturnTask = nil
+      }
+  }
+
+  @MainActor
+  private func handleAuthReturn(_ url: URL) {
+    guard let authReturn = MobileAuthReturnParser.parse(url) else { return }
+
+    authReturnTask?.cancel()
+    authErrorMessage = nil
+    appState.route = .launching
+
+    authReturnTask = Task { @MainActor in
+      defer {
+        authReturnTask = nil
+      }
+
+      do {
+        let signIn = try await clerk.auth.signInWithTicket(authReturn.ticket)
+
+        if let sessionID = signIn.createdSessionId,
+           clerk.session?.id != sessionID
+        {
+          try await clerk.auth.setActive(sessionId: sessionID)
+        }
+
+        _ = try await clerk.refreshClient()
+        _ = try await ClerkTokenProvider().bearerToken(forceRefresh: false)
+
+        guard let userID = clerk.user?.id else {
+          throw MobileAuthReturnError.missingSignedInUser
+        }
+
+        await appState.handleSignedInUserChange(userID)
+      } catch {
+        guard !(error is CancellationError), !Task.isCancelled else {
+          return
+        }
+
+        if error is MobileAuthReturnError {
+          try? await clerk.auth.signOut()
+          await appState.signOut()
+          authErrorMessage = "Couldn't finish sign-in. Try again."
+          return
+        }
+
+        if let existingUserID = clerk.user?.id {
+          await appState.handleSignedInUserChange(existingUserID)
+        } else {
+          await appState.signOut()
+        }
+
+        authErrorMessage = "Couldn't finish sign-in. Try again."
+      }
+    }
   }
 }
 

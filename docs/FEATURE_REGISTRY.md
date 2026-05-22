@@ -59,6 +59,7 @@ This document is the canonical feature list for Jovie. It is designed for onboar
 | Monetization | Earnings dashboard | Shipped | Pro+ | None | /dashboard/earnings |
 | AI Assistant | AI assistant (daily message limits by plan) | Shipped | Free+/Pro+/Growth | None | Plan limits: 25/100/500 msgs |
 | AI Connectors | Gmail booking email to Google Calendar auto-add | Shipped (flagged) | Flag-gated | `ai_connectors_beta` | Closed beta; default off; allowlist design-partner DJs post-merge |
+| Mobile App | iOS internal TestFlight alpha | Shipped (flagged) | Admin / flag-gated | `ios_app_alpha_access` | Internal install access only; public marketing remains off |
 | Brand | Remove Jovie branding | Shipped | Pro+ | None | Entitlement-backed (`canRemoveBranding`) |
 | Growth (Coming Soon) | A/B testing | Planned | Growth | None | Smart link variant testing |
 | Growth (Coming Soon) | Automated follow-ups | Planned | Growth | None | Auto-follow-up emails to fans |

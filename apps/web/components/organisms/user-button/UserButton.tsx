@@ -13,10 +13,11 @@ import {
   Monitor,
   Settings,
   Shield,
+  Smartphone,
   Sparkles,
 } from 'lucide-react';
 import dynamic from 'next/dynamic';
-import { useCallback } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Badge } from '@/components/atoms/Badge';
 import { APP_ROUTES } from '@/constants/routes';
 import { useKeyboardShortcutsSafe } from '@/contexts/KeyboardShortcutsContext';
@@ -55,6 +56,10 @@ interface BuildDropdownItemsParams {
   formattedUsername: string | null;
   handleProfile: () => void;
   handleSettings: () => void;
+  iosAlphaAccess: {
+    hasAccess: boolean;
+    installUrl: string | null;
+  };
   handleUsageStats: () => void;
   handleManageBilling: () => void;
   handleUpgrade: () => void;
@@ -63,6 +68,17 @@ interface BuildDropdownItemsParams {
   setIsFeedbackOpen: (open: boolean) => void;
   handleOpenShortcuts?: () => void;
   isElectronRuntime: boolean;
+}
+
+function sanitizeInstallUrl(value: unknown): string | null {
+  if (typeof value !== 'string') return null;
+
+  try {
+    const url = new URL(value);
+    return url.protocol === 'https:' ? url.toString() : null;
+  } catch {
+    return null;
+  }
 }
 
 function buildDropdownItems({
@@ -74,6 +90,7 @@ function buildDropdownItems({
   formattedUsername,
   handleProfile,
   handleSettings,
+  iosAlphaAccess,
   handleUsageStats,
   handleManageBilling,
   handleUpgrade,
@@ -136,14 +153,29 @@ function buildDropdownItems({
       onClick: handleSettings,
       shortcut: 'G S',
     },
-    {
-      type: 'action',
-      id: 'usage-stats',
-      label: 'Usage Stats',
-      icon: Gauge,
-      onClick: handleUsageStats,
-    },
   ];
+
+  if (iosAlphaAccess.hasAccess) {
+    items.push({
+      type: 'action',
+      id: 'download-ios',
+      label: 'Install iOS Alpha',
+      icon: Smartphone,
+      onClick: () => {
+        const href =
+          sanitizeInstallUrl(iosAlphaAccess.installUrl) ?? APP_ROUTES.DOWNLOAD;
+        window.open(href, '_blank', 'noopener,noreferrer');
+      },
+    });
+  }
+
+  items.push({
+    type: 'action',
+    id: 'usage-stats',
+    label: 'Usage Stats',
+    icon: Gauge,
+    onClick: handleUsageStats,
+  });
 
   if (!isElectronRuntime) {
     items.push({
@@ -309,6 +341,13 @@ export function UserButton({
 }: UserButtonProps) {
   const keyboardShortcuts = useKeyboardShortcutsSafe();
   const isElectronRuntime = useIsElectronRuntime();
+  const [iosAlphaAccess, setIOSAlphaAccess] = useState<{
+    hasAccess: boolean;
+    installUrl: string | null;
+  }>({
+    hasAccess: false,
+    installUrl: null,
+  });
   const handleFeedbackSubmit = useCallback(async (feedback: string) => {
     const trimmedFeedback = feedback.trim();
 
@@ -354,6 +393,50 @@ export function UserButton({
 
   const { userImageUrl, displayName, userInitials, formattedUsername } =
     userInfo;
+
+  useEffect(() => {
+    if (!isElectronRuntime || !isLoaded || !user) {
+      setIOSAlphaAccess({ hasAccess: false, installUrl: null });
+      return;
+    }
+
+    let isActive = true;
+
+    async function loadIOSAlphaAccess() {
+      try {
+        const response = await fetch('/api/mobile/v1/ios-access', {
+          cache: 'no-store',
+        });
+        if (!response.ok) {
+          if (isActive) {
+            setIOSAlphaAccess({ hasAccess: false, installUrl: null });
+          }
+          return;
+        }
+
+        const payload = (await response.json()) as {
+          hasAccess?: unknown;
+          installUrl?: unknown;
+        };
+        if (!isActive) return;
+
+        setIOSAlphaAccess({
+          hasAccess: payload.hasAccess === true,
+          installUrl: sanitizeInstallUrl(payload.installUrl),
+        });
+      } catch {
+        if (isActive) {
+          setIOSAlphaAccess({ hasAccess: false, installUrl: null });
+        }
+      }
+    }
+
+    void loadIOSAlphaAccess();
+
+    return () => {
+      isActive = false;
+    };
+  }, [isElectronRuntime, isLoaded, user]);
 
   // Handle loading state or no user
   if (!isLoaded || !user) {
@@ -401,6 +484,7 @@ export function UserButton({
     formattedUsername,
     handleProfile,
     handleSettings,
+    iosAlphaAccess,
     handleUsageStats,
     handleManageBilling,
     handleUpgrade,

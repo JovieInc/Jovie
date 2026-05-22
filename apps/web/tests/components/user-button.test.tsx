@@ -87,6 +87,7 @@ describe('UserButton billing actions', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     window.sessionStorage.clear();
+    delete document.documentElement.dataset.desktopRuntime;
 
     fetchMock = vi.fn();
     vi.spyOn(globalThis, 'fetch').mockImplementation(fetchMock);
@@ -363,6 +364,36 @@ describe('UserButton billing actions', () => {
     expect(track).toHaveBeenCalledWith(
       'billing_manage_billing_redirected',
       expect.any(Object)
+    );
+  });
+
+  it('falls back to the download page when the iOS alpha install URL is unsafe', async () => {
+    document.documentElement.dataset.desktopRuntime = 'electron';
+    mockUseBillingStatusQuery.mockReturnValue({
+      data: { isPro: true, plan: 'pro', hasStripeCustomer: true },
+      isLoading: false,
+      error: null,
+    } as any);
+    fetchMock.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({
+        hasAccess: true,
+        installUrl: 'javascript:alert(1)',
+      }),
+    });
+    const openMock = vi.spyOn(window, 'open').mockReturnValue(null);
+
+    const user = userEvent.setup();
+    render(<UserButton showUserInfo />);
+    await flushMicrotasks();
+
+    await user.click(screen.getByText('Adele Adkins'));
+    await user.click(await screen.findByText('Install iOS Alpha'));
+
+    expect(openMock).toHaveBeenCalledWith(
+      APP_ROUTES.DOWNLOAD,
+      '_blank',
+      'noopener,noreferrer'
     );
   });
 

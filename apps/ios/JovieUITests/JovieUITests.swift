@@ -20,34 +20,38 @@ final class JovieUITests: XCTestCase {
       $0.staticTexts["Sign in to Jovie"]
     }
 
-    XCTAssertTrue(app.buttons["Continue with Google"].exists)
-    XCTAssertTrue(app.buttons["Continue with Apple"].exists)
+    XCTAssertTrue(app.buttons["Get started"].exists)
+    XCTAssertFalse(app.buttons["Continue with Google"].exists)
+    XCTAssertFalse(app.buttons["Continue with Apple"].exists)
     XCTAssertFalse(app.staticTexts["Email"].exists)
     XCTAssertFalse(app.buttons["Open Jovie on web"].exists)
     attachScreenshot(named: "signed-out", app: app)
   }
 
-  func testReadyLaunchShowsDashboard() {
+  func testReadyLaunchShowsProfileTab() {
     let app = launchMockApp(launchArgument: "-ui-testing-ready", expectedElementDescription: "\"Copy URL\"") {
       $0.buttons["Copy URL"]
     }
 
     XCTAssertTrue(app.staticTexts["Tim White"].exists)
-    attachScreenshot(named: "dashboard", app: app)
+    XCTAssertTrue(app.buttons["Chat"].exists)
+    XCTAssertTrue(app.buttons["Profile"].exists)
+    XCTAssertTrue(app.buttons["Open Settings"].exists)
+    attachScreenshot(named: "profile", app: app)
   }
 
   func testNeedsOnboardingLaunchShowsContinueOnWeb() {
     let app = launchMockApp(
       launchArgument: "-ui-testing-needs-onboarding",
-      expectedElementDescription: "\"Continue On Web\""
+      expectedElementDescription: "\"Continue on Web\""
     ) {
-      $0.buttons["Continue On Web"]
+      $0.buttons["Continue on Web"]
     }
 
     attachScreenshot(named: "needs-onboarding", app: app)
   }
 
-  func testSettingsPanelLogsOutToSignedOut() {
+  func testFullScreenSettingsLogsOutToSignedOut() {
     let app = launchMockApp(launchArgument: "-ui-testing-settings", expectedElementDescription: "\"Settings\"") {
       $0.staticTexts["Settings"]
     }
@@ -61,23 +65,40 @@ final class JovieUITests: XCTestCase {
     )
   }
 
-  func testShellNavigationRevealsSidebarAndSettings() {
+  func testBottomNavigationSwitchesBetweenChatAndProfile() {
+    let app = launchMockApp(launchArgument: "-ui-testing-chat", expectedElementDescription: "\"Ask Jovie\"") {
+      $0.staticTexts["Ask Jovie"]
+    }
+
+    XCTAssertTrue(app.textFields["Ask Jovie"].exists)
+    XCTAssertTrue(app.buttons["Profile"].exists)
+    attachScreenshot(named: "chat", app: app)
+
+    app.buttons["Profile"].tap()
+
+    XCTAssertTrue(
+      app.buttons["Copy URL"].waitForExistence(timeout: 3),
+      "Bottom nav did not switch to Profile.\n\(app.debugDescription)"
+    )
+
+  }
+
+  func testShellMenuAndSettingsNavigationAreFullScreen() {
     let app = launchMockApp(launchArgument: "-ui-testing-ready", expectedElementDescription: "\"Copy URL\"") {
       $0.buttons["Copy URL"]
     }
-    let window = app.windows.element(boundBy: 0)
 
-    guard revealSidebar(app: app, window: window) else { return }
+    app.buttons["Open Menu"].tap()
     XCTAssertTrue(
-      app.buttons["Dashboard"].waitForExistence(timeout: 3),
-      "Shell navigation did not reveal sidebar.\n\(app.debugDescription)"
+      app.staticTexts["Jovie"].waitForExistence(timeout: 3),
+      "Shell navigation did not reveal the menu.\n\(app.debugDescription)"
     )
 
-    app.buttons["Close Sidebar"].tap()
-    guard revealSettings(app: app, window: window) else { return }
+    app.buttons["Close Menu"].tap()
+    app.buttons["Open Settings"].tap()
     XCTAssertTrue(
       app.staticTexts["Settings"].waitForExistence(timeout: 3),
-      "Shell navigation did not reveal settings.\n\(app.debugDescription)"
+      "Shell navigation did not open settings.\n\(app.debugDescription)"
     )
   }
 
@@ -111,12 +132,8 @@ final class JovieUITests: XCTestCase {
       "Native auth heading did not appear.\n\(app.debugDescription)"
     )
     XCTAssertTrue(
-      app.buttons["Continue with Google"].waitForExistence(timeout: 10),
-      "Native auth Google SSO button did not appear.\n\(app.debugDescription)"
-    )
-    XCTAssertTrue(
-      app.buttons["Continue with Apple"].waitForExistence(timeout: 10),
-      "Native auth Apple SSO button did not appear.\n\(app.debugDescription)"
+      app.buttons["Get started"].waitForExistence(timeout: 10),
+      "Browser auth entry button did not appear.\n\(app.debugDescription)"
     )
   }
 
@@ -129,7 +146,7 @@ final class JovieUITests: XCTestCase {
     app.launch()
 
     let copyURLButton = app.buttons["Copy URL"]
-    let continueOnWebButton = app.buttons["Continue On Web"]
+    let continueOnWebButton = app.buttons["Continue on Web"]
     let deadline = Date().addingTimeInterval(25)
 
     while Date() < deadline {
@@ -236,61 +253,4 @@ final class JovieUITests: XCTestCase {
     add(attachment)
   }
 
-  private func edgeDrag(in element: XCUIElement, from start: CGVector, to end: CGVector) {
-    let startCoordinate = element.coordinate(withNormalizedOffset: start)
-    let endCoordinate = element.coordinate(withNormalizedOffset: end)
-    startCoordinate.press(forDuration: 0.08, thenDragTo: endCoordinate)
-  }
-
-  private func revealSidebar(
-    app: XCUIApplication,
-    window: XCUIElement,
-    file: StaticString = #filePath,
-    line: UInt = #line
-  ) -> Bool {
-    edgeDrag(in: window, from: CGVector(dx: 0.01, dy: 0.5), to: CGVector(dx: 0.72, dy: 0.5))
-    if app.buttons["Dashboard"].waitForExistence(timeout: 1) { return true }
-
-    edgeDrag(in: window, from: CGVector(dx: 0.05, dy: 0.5), to: CGVector(dx: 0.82, dy: 0.5))
-    if app.buttons["Dashboard"].waitForExistence(timeout: 1) { return true }
-
-    let openSidebarButton = app.buttons["Open Sidebar"]
-    guard openSidebarButton.waitForExistence(timeout: 2) else {
-      XCTFail(
-        "Open Sidebar did not appear after the sidebar edge-swipe attempts.\n\(app.debugDescription)",
-        file: file,
-        line: line
-      )
-      return false
-    }
-
-    openSidebarButton.tap()
-    return true
-  }
-
-  private func revealSettings(
-    app: XCUIApplication,
-    window: XCUIElement,
-    file: StaticString = #filePath,
-    line: UInt = #line
-  ) -> Bool {
-    edgeDrag(in: window, from: CGVector(dx: 0.99, dy: 0.5), to: CGVector(dx: 0.28, dy: 0.5))
-    if app.staticTexts["Settings"].waitForExistence(timeout: 1) { return true }
-
-    edgeDrag(in: window, from: CGVector(dx: 0.95, dy: 0.5), to: CGVector(dx: 0.18, dy: 0.5))
-    if app.staticTexts["Settings"].waitForExistence(timeout: 1) { return true }
-
-    let openSettingsButton = app.buttons["Open Settings"]
-    guard openSettingsButton.waitForExistence(timeout: 2) else {
-      XCTFail(
-        "Open Settings did not appear after the settings edge-swipe attempts.\n\(app.debugDescription)",
-        file: file,
-        line: line
-      )
-      return false
-    }
-
-    openSettingsButton.tap()
-    return true
-  }
 }

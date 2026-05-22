@@ -23,12 +23,18 @@ struct AppConfiguration: Sendable {
       envKey: String,
       fallback: String? = nil
     ) -> String {
-      if let value = values?[key] as? String, !value.isEmpty {
-        return value
+      if let value = values?[key] as? String {
+        let trimmedValue = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !trimmedValue.isEmpty {
+          return trimmedValue
+        }
       }
 
-      if let value = ProcessInfo.processInfo.environment[envKey], !value.isEmpty {
-        return value
+      if let value = ProcessInfo.processInfo.environment[envKey] {
+        let trimmedValue = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !trimmedValue.isEmpty {
+          return trimmedValue
+        }
       }
 
       if let fallback {

@@ -58,6 +58,9 @@ describe('proxy routing helpers', () => {
       expect(categorizePath('/').isProtectedPath).toBe(false);
       expect(categorizePath('/pricing').isProtectedPath).toBe(false);
       expect(categorizePath('/tim').isProtectedPath).toBe(false);
+      expect(
+        categorizePath('/mobile-auth-return').publicProfileCandidate
+      ).toBeNull();
     });
 
     it('recognizes auth entrypoints and callback aliases', () => {

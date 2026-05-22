@@ -18,6 +18,7 @@
 		4C46B1496145C062FB2FE978 /* ClerkKit in Frameworks */ = {isa = PBXBuildFile; productRef = 0199C257CC5EA4F6FD36397D /* ClerkKit */; };
 		4CA1C477ECC6B7B40EA17787 /* LaunchMode.swift in Sources */ = {isa = PBXBuildFile; fileRef = DD30F57584F71E958D8C0514 /* LaunchMode.swift */; };
 		52C5CBF9C24E4C502FA64955 /* MobileMeResponse.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3EC2367922F1F00AB0AF1164 /* MobileMeResponse.swift */; };
+		61A81E78D0B448B6A68F45AD /* MobileAuthReturn.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2EBA07D5CBE04B0BBF053706 /* MobileAuthReturn.swift */; };
 		6853DA69F7459FE14462F48F /* Jovie-logo.png in Resources */ = {isa = PBXBuildFile; fileRef = 969C5D08D3E71A2D9824375A /* Jovie-logo.png */; };
 		6E62396A29D88F275920CA48 /* JovieTheme.swift in Sources */ = {isa = PBXBuildFile; fileRef = D03E6B0F83EC74031D75DCFB /* JovieTheme.swift */; };
 		70003B11B0FA1692B2017553 /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 6FDEFEB6D7C1D0251FDA1E61 /* Foundation.framework */; };
@@ -71,6 +72,7 @@
 		191669F70597A1039C74C0B1 /* MeRepositoryTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MeRepositoryTests.swift; sourceTree = "<group>"; };
 		28FBA9F0D12E0BD1CB8B0B09 /* MeRepository.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MeRepository.swift; sourceTree = "<group>"; };
 		2E13A897DB2C3D06E845EC58 /* Info.plist */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		2EBA07D5CBE04B0BBF053706 /* MobileAuthReturn.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MobileAuthReturn.swift; sourceTree = "<group>"; };
 		3EC2367922F1F00AB0AF1164 /* MobileMeResponse.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MobileMeResponse.swift; sourceTree = "<group>"; };
 		3FA81B967152B211E5988375 /* ScreenBrightnessManager.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ScreenBrightnessManager.swift; sourceTree = "<group>"; };
 		448ADF9C21BB11784C6AD119 /* QRCodeRendererTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = QRCodeRendererTests.swift; sourceTree = "<group>"; };
@@ -308,6 +310,7 @@
 				E4EAFC467F76300BCFC2659F /* Configuration.swift */,
 				00BCF42EFB99B5DAB4E0F400 /* JovieApp.swift */,
 				DD30F57584F71E958D8C0514 /* LaunchMode.swift */,
+				2EBA07D5CBE04B0BBF053706 /* MobileAuthReturn.swift */,
 				969DB5F8041C9A004CDB5234 /* RootView.swift */,
 			);
 			name = App;
@@ -488,6 +491,7 @@
 				EBDA8137B767F16402C41C24 /* Configuration.swift in Sources */,
 				89B2D98342D65781B5E80A72 /* JovieApp.swift in Sources */,
 				4CA1C477ECC6B7B40EA17787 /* LaunchMode.swift in Sources */,
+				61A81E78D0B448B6A68F45AD /* MobileAuthReturn.swift in Sources */,
 				964DEFE0F4D4206832B6888E /* RootView.swift in Sources */,
 				E26FB0F0CBAA2DE24B6BC572 /* APIClient.swift in Sources */,
 				D9CF5232BCCF1F895975D7B7 /* ClerkTokenProvider.swift in Sources */,

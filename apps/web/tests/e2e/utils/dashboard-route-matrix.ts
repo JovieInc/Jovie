@@ -591,6 +591,7 @@ export const EXCLUDED_ROUTES: Record<string, string> = {
   '/signup/sso-callback': 'Clerk internal',
   '/auth-return': 'Desktop auth return page',
   '/desktop-auth': 'Desktop auth handoff page',
+  '/mobile-auth-return': 'Mobile auth return page',
   '/account': 'Clerk account page',
   '/investor-portal': 'Investor portal (admin-managed)',
   '/investor-portal/:slug': 'Investor portal detail',

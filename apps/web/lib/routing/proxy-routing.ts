@@ -80,6 +80,9 @@ const AUTH_RESERVED_SEGMENTS = new Set([
   'sign-in',
   'sign-up',
   'sso-callback',
+  'auth-return',
+  'desktop-auth',
+  'mobile-auth-return',
 ]);
 
 const ALL_RESERVED_ROOT_SEGMENTS = new Set<string>([
@@ -131,6 +134,7 @@ export function isProxyRewriteExempt(pathname: string): boolean {
   if (pathname === APP_ROUTES.START) return true;
   if (pathname === APP_ROUTES.ONBOARDING) return true;
   if (pathname === APP_ROUTES.ONBOARDING_CHECKOUT) return true;
+  if (pathname === '/mobile-auth-return') return true;
   return false;
 }
 

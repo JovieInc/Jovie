@@ -247,6 +247,23 @@ describe('signup page', () => {
     );
   });
 
+  it('uses mobile_return for mobile browser auth fallback and sign-in link', async () => {
+    searchParamsState.value = 'mobile_return=%2Fapp';
+
+    render(<SignUpPage />);
+
+    await waitFor(() => {
+      expect(clerkSignUpMock).toHaveBeenCalledTimes(1);
+    });
+
+    expect(clerkSignUpMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        signInUrl: fullAuthUrl('/signin?mobile_return=%2Fapp'),
+        fallbackRedirectUrl: '/mobile-auth-return?route=%2Fapp',
+      })
+    );
+  });
+
   it('ignores invalid plan values and does not track plan intent', async () => {
     searchParamsState.value = 'plan=not-a-plan&handle=TestHandle';
     validatePlanMock.mockReturnValue(null);

@@ -15,6 +15,7 @@ struct AppBuildInfo: Equatable {
 struct SettingsView: View {
   let profile: AppShellProfile
   let buildInfo: AppBuildInfo
+  let billingURL: URL
   var onClose: (() -> Void)?
   let onLogout: @MainActor () async -> Void
 
@@ -34,7 +35,7 @@ struct SettingsView: View {
     }
     .scrollIndicators(.hidden)
     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-    .background(JovieColor.surface0)
+    .background(JovieColor.backgroundBase)
     .accessibilityIdentifier("settings-view")
   }
 
@@ -82,7 +83,7 @@ struct SettingsView: View {
         Spacer(minLength: 0)
       }
       .padding(JovieSpacing.medium)
-      .jovieSurface(radius: JovieRadius.medium)
+      .background(JovieColor.surface0, in: RoundedRectangle(cornerRadius: JovieRadius.medium, style: .continuous))
     }
   }
 
@@ -93,6 +94,12 @@ struct SettingsView: View {
       VStack(spacing: 0) {
         SettingsLinkRow(title: "Support", systemImage: "questionmark.circle") {
           openURL(URL(string: "https://jov.ie/support")!)
+        }
+
+        SettingsDivider()
+
+        SettingsLinkRow(title: "Billing", systemImage: "creditcard") {
+          openURL(billingURL)
         }
 
         SettingsDivider()
@@ -108,7 +115,7 @@ struct SettingsView: View {
         }
       }
       .padding(.vertical, JovieSpacing.xSmall)
-      .jovieSurface(radius: JovieRadius.medium)
+      .background(JovieColor.surface0, in: RoundedRectangle(cornerRadius: JovieRadius.medium, style: .continuous))
     }
   }
 
@@ -122,7 +129,7 @@ struct SettingsView: View {
         SettingsValueRow(title: "Build", value: buildInfo.build)
       }
       .padding(.vertical, JovieSpacing.xSmall)
-      .jovieSurface(radius: JovieRadius.medium)
+      .background(JovieColor.surface0, in: RoundedRectangle(cornerRadius: JovieRadius.medium, style: .continuous))
     }
   }
 

@@ -1,5 +1,5 @@
 import { Button } from '@jovie/ui';
-import { ArrowDownToLine } from 'lucide-react';
+import { ArrowDownToLine, Smartphone } from 'lucide-react';
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import {
@@ -53,7 +53,7 @@ const FAQ_ITEMS = [
 ];
 
 export const metadata: Metadata = {
-  title: 'Download Jovie for Mac',
+  title: 'Download Jovie',
   description: `Download the ${APP_NAME} desktop app for macOS. Code-signed, notarized by Apple, and updates itself in the background.`,
   alternates: {
     canonical: `${BASE_URL}/download`,
@@ -127,6 +127,30 @@ export default async function DownloadPage() {
           </p>
         </div>
       </MarketingHero>
+
+      <MarketingContainer width='prose' className='pb-20'>
+        <section id='ios' className='border-y border-subtle py-10 sm:py-12'>
+          <div className='flex flex-col gap-6 sm:flex-row sm:items-center sm:justify-between'>
+            <div>
+              <div className='inline-flex items-center gap-2 text-sm font-medium text-tertiary-token'>
+                <Smartphone className='size-4' aria-hidden='true' />
+                iOS alpha
+              </div>
+              <h2 className='mt-3 text-2xl font-semibold tracking-normal text-primary-token'>
+                Jovie for iPhone is in internal TestFlight.
+              </h2>
+              <p className='mt-3 max-w-[56ch] text-sm leading-6 text-secondary-token'>
+                We are keeping the mobile app private while the internal alpha
+                proves install, auth, Profile QR, Settings, and TestFlight
+                reliability.
+              </p>
+            </div>
+            <div className='inline-flex h-11 shrink-0 items-center justify-center rounded-full border border-subtle px-5 text-sm font-medium text-tertiary-token'>
+              Internal alpha only
+            </div>
+          </div>
+        </section>
+      </MarketingContainer>
 
       <MarketingContainer width='prose' className='pb-20'>
         <section>
