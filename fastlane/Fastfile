@@ -190,6 +190,7 @@ platform :ios do
       "CODE_SIGNING_ALLOWED=YES",
       "CODE_SIGNING_REQUIRED=YES",
       "CODE_SIGN_STYLE=Manual",
+      "CODE_SIGN_IDENTITY=#{"Apple Distribution".shellescape}",
       "DEVELOPMENT_TEAM=#{apple_team_id.shellescape}",
       "CURRENT_PROJECT_VERSION=#{current_build_number.shellescape}",
       "CLERK_ASSOCIATED_DOMAIN=#{clerk_domain.shellescape}",
@@ -208,6 +209,8 @@ platform :ios do
       export_options: {
         method: "app-store",
         signingStyle: "manual",
+        signingCertificate: "Apple Distribution",
+        teamID: apple_team_id,
         provisioningProfiles: {
           APP_IDENTIFIER => profile_name
         }
