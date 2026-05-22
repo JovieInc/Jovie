@@ -58,7 +58,7 @@ if [[ ! -d "$APP_PATH" ]]; then
   exit 1
 fi
 
-pick_device() {
+list_devices() {
   local name_pattern="$1"
   local devices_file
   devices_file="$(mktemp)"
@@ -90,19 +90,24 @@ pick_device() {
       end
     end
 
-    picked = candidates.max_by do |device|
+    ranked = candidates.sort_by do |device|
+      name = device.fetch("name")
       [
-        device.fetch("state") == "Booted" ? 1 : 0,
-        device.fetch("name") == "iPhone 17" ? 1 : 0,
-        device.fetch("name") == "iPad Pro 11-inch (M5)" ? 1 : 0,
-        device.fetch("name")
+        device.fetch("state") == "Booted" ? 0 : 1,
+        name == "iPhone 17" ? 0 : 1,
+        name == "iPad (A16)" ? 0 : 1,
+        name
       ]
     end
 
-    print(picked&.fetch("udid") || "")
+    puts(ranked.map { |device| device.fetch("udid") })
   ' "$name_pattern" <"$devices_file"
 
   rm -f "$devices_file"
+}
+
+pick_device() {
+  list_devices "$1" | head -n 1
 }
 
 prepare_device() {
@@ -160,7 +165,11 @@ capture() {
   run_with_timeout "${IOS_SCREENSHOT_TERMINATE_TIMEOUT:-15}" xcrun simctl terminate "$udid" "$BUNDLE_ID" >/dev/null 2>&1 || true
   run_with_timeout "${IOS_SCREENSHOT_LAUNCH_TIMEOUT:-20}" xcrun simctl launch "$udid" "$BUNDLE_ID" "$@"
   sleep 2
-  run_with_timeout "${IOS_SCREENSHOT_CAPTURE_TIMEOUT:-20}" xcrun simctl io "$udid" screenshot "$OUTPUT_DIR/$name.png"
+  if ! run_with_timeout "${IOS_SCREENSHOT_CAPTURE_TIMEOUT:-45}" xcrun simctl io "$udid" screenshot "$OUTPUT_DIR/$name.png"; then
+    echo "Retrying screenshot capture for $name after simulator settle."
+    sleep 5
+    run_with_timeout "${IOS_SCREENSHOT_CAPTURE_TIMEOUT:-45}" xcrun simctl io "$udid" screenshot "$OUTPUT_DIR/$name.png"
+  fi
   echo "Captured $OUTPUT_DIR/$name.png"
 }
 
@@ -181,8 +190,27 @@ capture "$IPHONE_UDID" "05-needs-onboarding" "-ui-testing-needs-onboarding"
 
 IPAD_UDID="$(pick_device "^iPad")"
 if [[ -n "$IPAD_UDID" ]]; then
-  prepare_device "$IPAD_UDID"
-  capture "$IPAD_UDID" "06-ipad-shell" "-ui-testing-ready"
+  captured_ipad=false
+  while IFS= read -r candidate_udid; do
+    [[ -z "$candidate_udid" ]] && continue
+
+    if IOS_SCREENSHOT_BOOT_TIMEOUT="${IOS_SCREENSHOT_IPAD_BOOT_TIMEOUT:-90}" prepare_device "$candidate_udid" &&
+      capture "$candidate_udid" "06-ipad-shell" "-ui-testing-ready"; then
+      captured_ipad=true
+      break
+    fi
+
+    echo "iPad simulator $candidate_udid did not complete screenshot capture; trying the next available iPad."
+  done < <(list_devices "^iPad")
+
+  if [[ "$captured_ipad" != true ]]; then
+    if [[ "${IOS_SCREENSHOT_REQUIRE_IPAD:-1}" == "1" ]]; then
+      echo "Unable to capture the iPad shell screenshot."
+      exit 1
+    fi
+
+    echo "No iPad simulator completed screenshot capture; continuing after core iPhone screenshots."
+  fi
 else
   echo "No iPad simulator available; skipped iPad shell screenshot."
 fi

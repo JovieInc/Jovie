@@ -8,13 +8,10 @@ final class JovieUITests: XCTestCase {
 
   func testCinematicSplashLaunchShowsLoadingState() {
     let app = launchMockApp(launchArgument: "-ui-testing-splash", expectedElementDescription: "\"Jovie is loading\"") {
-      $0.staticTexts["Jovie"]
+      $0.images["cinematic-loading"]
     }
 
-    XCTAssertTrue(
-      app.otherElements["cinematic-loading"].exists || app.staticTexts["Jovie"].exists,
-      "Cinematic splash did not render the loading surface.\n\(app.debugDescription)"
-    )
+    XCTAssertTrue(app.images["cinematic-loading"].exists)
     attachScreenshot(named: "cinematic-loading", app: app)
   }
 
