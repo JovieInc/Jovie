@@ -24,6 +24,8 @@ run_with_timeout() {
   while kill -0 "$command_pid" >/dev/null 2>&1; do
     if (( elapsed >= timeout_seconds )); then
       kill "$command_pid" >/dev/null 2>&1 || true
+      sleep 1
+      kill -9 "$command_pid" >/dev/null 2>&1 || true
       wait "$command_pid" >/dev/null 2>&1 || true
       echo "Command timed out after ${timeout_seconds}s: $*"
       return 124
@@ -58,8 +60,16 @@ fi
 
 pick_device() {
   local name_pattern="$1"
+  local devices_file
+  devices_file="$(mktemp)"
 
-  xcrun simctl list devices available -j | RUBYOPT= ruby -rjson -e '
+  if ! run_with_timeout "${IOS_SCREENSHOT_SIMCTL_LIST_TIMEOUT:-30}" xcrun simctl list devices available -j >"$devices_file"; then
+    echo "Timed out listing available simulators."
+    rm -f "$devices_file"
+    return 1
+  fi
+
+  RUBYOPT= ruby -rjson -e '
     pattern = Regexp.new(ARGV.fetch(0))
     input = STDIN.read
     devices_by_runtime = JSON.parse(input).fetch("devices", {})
@@ -80,7 +90,9 @@ pick_device() {
     end
 
     print(picked || "")
-  ' "$name_pattern"
+  ' "$name_pattern" <"$devices_file"
+
+  rm -f "$devices_file"
 }
 
 prepare_device() {
@@ -108,10 +120,15 @@ wait_for_boot() {
       kill "$boot_pid" >/dev/null 2>&1 || true
       wait "$boot_pid" >/dev/null 2>&1 || true
 
-      if xcrun simctl list devices | grep -F "$udid)" | grep -q "(Booted)"; then
+      local devices_file
+      devices_file="$(mktemp)"
+      if run_with_timeout "${IOS_SCREENSHOT_SIMCTL_LIST_TIMEOUT:-30}" xcrun simctl list devices >"$devices_file" &&
+        grep -F "$udid)" "$devices_file" | grep -q "(Booted)"; then
+        rm -f "$devices_file"
         echo "Simulator $udid is booted; continuing after bootstatus timeout."
         return 0
       fi
+      rm -f "$devices_file"
 
       cat "$boot_log"
       echo "Simulator $udid did not finish booting within ${timeout_seconds}s."
@@ -130,7 +147,7 @@ capture() {
   local name="$2"
   shift 2
 
-  xcrun simctl terminate "$udid" "$BUNDLE_ID" >/dev/null 2>&1 || true
+  run_with_timeout "${IOS_SCREENSHOT_TERMINATE_TIMEOUT:-15}" xcrun simctl terminate "$udid" "$BUNDLE_ID" >/dev/null 2>&1 || true
   run_with_timeout "${IOS_SCREENSHOT_LAUNCH_TIMEOUT:-20}" xcrun simctl launch "$udid" "$BUNDLE_ID" "$@"
   sleep 2
   run_with_timeout "${IOS_SCREENSHOT_CAPTURE_TIMEOUT:-20}" xcrun simctl io "$udid" screenshot "$OUTPUT_DIR/$name.png"
