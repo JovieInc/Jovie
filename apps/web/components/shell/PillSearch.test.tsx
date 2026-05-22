@@ -38,6 +38,25 @@ describe('PillSearch', () => {
     expect(input.className).not.toContain('ring-cyan');
   });
 
+  it('keeps the route search row at a stable single-line height', () => {
+    setup({
+      pills: [{ id: '1', field: 'artist', op: 'is', values: ['Frank Ocean'] }],
+    });
+
+    const input = screen.getByLabelText('Filter tracks');
+    const row = input.parentElement;
+    const root = row?.parentElement;
+    const closeButton = screen.getByRole('button', { name: 'Close search' });
+
+    expect(root?.className).toContain('h-full');
+    expect(row?.className).toContain('h-full');
+    expect(row?.className).toContain('min-h-0');
+    expect(row?.className).toContain('overflow-hidden');
+    expect(input.className).toContain('h-6');
+    expect(closeButton.className).toContain('h-5');
+    expect(closeButton.className).not.toContain('uppercase');
+  });
+
   it('switches to the "and…" placeholder once a pill is present', () => {
     setup({
       pills: [{ id: '1', field: 'artist', op: 'is', values: ['Frank Ocean'] }],

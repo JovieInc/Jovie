@@ -74,6 +74,13 @@ export const primaryNavigation: NavItem[] = [
     description: 'Link out every provider with one smart link',
   },
   {
+    name: 'Calendar',
+    href: APP_ROUTES.CALENDAR,
+    id: 'calendar',
+    icon: CalendarDays,
+    description: 'See release dates, events, and calendar moments',
+  },
+  {
     name: 'Tasks',
     href: APP_ROUTES.TASKS,
     id: 'tasks',
@@ -96,6 +103,10 @@ export const libraryNavItem: NavItem = {
   icon: LibraryIcon,
   description: 'Browse read-only release assets and provider links',
 };
+
+export const calendarNavItem = primaryNavigation.find(
+  item => item.id === 'calendar'
+)!;
 
 export const settingsNavItem: NavItem = {
   name: 'Settings',
@@ -273,6 +284,7 @@ export const mobilePrimaryNavigation: NavItem[] = [
 
 /** Items shown in the expanded "more" menu on mobile. */
 export const mobileExpandedNavigation: NavItem[] = [
+  calendarNavItem,
   primaryNavigation.find(i => i.id === 'tasks')!,
   settingsNavItem,
 ];

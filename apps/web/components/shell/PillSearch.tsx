@@ -368,8 +368,8 @@ export function PillSearch({
     : undefined;
 
   return (
-    <div ref={wrapperRef} className='relative w-full'>
-      <div className='flex items-center gap-1.5 flex-wrap min-h-7 pr-1'>
+    <div ref={wrapperRef} className='relative h-full w-full min-w-0'>
+      <div className='flex h-full min-h-0 items-center gap-1.5 overflow-hidden pr-0.5'>
         <Search
           className='h-3.5 w-3.5 text-quaternary-token shrink-0'
           strokeWidth={2.25}
@@ -402,12 +402,12 @@ export function PillSearch({
           aria-autocomplete='list'
           aria-activedescendant={activeOptionId}
           placeholder={pills.length === 0 ? placeholder : 'and…'}
-          className='flex-1 min-w-[120px] rounded-sm bg-transparent text-[13px] text-primary-token outline-none placeholder:text-tertiary-token focus:outline-none focus:ring-0 focus:shadow-none focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)/25 focus-visible:ring-offset-0 focus-visible:shadow-none'
+          className='h-6 min-w-[96px] flex-1 rounded-sm bg-transparent text-[13px] text-primary-token outline-none placeholder:text-tertiary-token focus:outline-none focus:ring-0 focus:shadow-none focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)/25 focus-visible:ring-offset-0 focus-visible:shadow-none'
         />
         <button
           type='button'
           onClick={onClose}
-          className='shrink-0 inline-flex items-center h-5 px-1.5 rounded text-[10px] font-caption uppercase tracking-[0.06em] text-quaternary-token hover:text-primary-token hover:bg-surface-1/60 transition-colors duration-subtle ease-subtle'
+          className='inline-flex h-5 shrink-0 items-center rounded px-1.5 text-[11px] font-medium text-quaternary-token transition-colors duration-subtle ease-subtle hover:bg-surface-1/60 hover:text-primary-token'
           aria-label='Close search'
         >
           Esc
@@ -419,7 +419,7 @@ export function PillSearch({
           id={listboxId}
           role='listbox'
           tabIndex={-1}
-          className='absolute left-0 right-0 top-9 z-40 rounded-lg border border-(--linear-app-shell-border) bg-(--linear-app-content-surface) shadow-[0_18px_60px_rgba(0,0,0,0.32)] py-1 max-h-[320px] overflow-y-auto'
+          className='absolute left-0 right-0 top-[calc(100%+6px)] z-40 max-h-[320px] overflow-y-auto rounded-lg border border-(--linear-app-shell-border) bg-(--linear-app-content-surface) py-1 shadow-[0_18px_60px_rgba(0,0,0,0.32)]'
         >
           {suggestions.map((sug, i) => {
             const optionId = `${optionIdPrefix}-${i}`;
@@ -489,7 +489,7 @@ function PillChip({
   onRemoveValue,
 }: PillChipProps) {
   return (
-    <span className='group/pill inline-flex items-center h-[22px] rounded-md border border-cyan-500/30 bg-cyan-500/10 text-[11.5px] font-caption text-secondary-token overflow-hidden'>
+    <span className='group/pill inline-flex h-[22px] max-w-[220px] shrink-0 items-center overflow-hidden rounded-md border border-cyan-500/30 bg-cyan-500/10 text-[11.5px] font-caption text-secondary-token'>
       <span className='px-1.5 text-cyan-300/90 uppercase text-[10px] tracking-[0.06em] border-r border-cyan-500/20'>
         {FIELD_LABEL[pill.field]}
       </span>
@@ -501,7 +501,7 @@ function PillChip({
       >
         {pill.op}
       </button>
-      <span className='inline-flex items-center gap-0.5 pr-0.5'>
+      <span className='inline-flex min-w-0 items-center gap-0.5 pr-0.5'>
         {pill.values.map((v, i) => (
           <span key={v} className='inline-flex items-center'>
             {i > 0 && (
@@ -509,8 +509,8 @@ function PillChip({
                 or
               </span>
             )}
-            <span className='inline-flex items-center bg-cyan-500/15 px-1.5 h-[18px] rounded text-cyan-100/95'>
-              {v}
+            <span className='inline-flex h-[18px] min-w-0 items-center rounded bg-cyan-500/15 px-1.5 text-cyan-100/95'>
+              <span className='truncate'>{v}</span>
               <button
                 type='button'
                 onClick={() => onRemoveValue(v)}

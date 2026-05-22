@@ -26,6 +26,9 @@ describe('DashboardNav', () => {
 
     expect(getByRole('button', { name: 'Profile' })).toBeDefined();
     expect(getByRole('link', { name: 'Releases' })).toBeDefined();
+    expect(getByRole('link', { name: 'Calendar' }).getAttribute('href')).toBe(
+      APP_ROUTES.CALENDAR
+    );
     expect(getByRole('link', { name: 'Tasks' }).getAttribute('href')).toBe(
       APP_ROUTES.TASKS
     );
@@ -42,6 +45,19 @@ describe('DashboardNav', () => {
 
     expect(getByRole('link', { name: 'Library' }).getAttribute('href')).toBe(
       APP_ROUTES.LIBRARY
+    );
+  });
+
+  it('renders Calendar in the Design V1 user work section', () => {
+    const { getByRole } = renderDashboardNav({
+      renderFn: fastRender,
+      appFlags: { DESIGN_V1: true },
+    });
+
+    const calendarLink = getByRole('link', { name: 'Calendar' });
+    expect(calendarLink.getAttribute('href')).toBe(APP_ROUTES.CALENDAR);
+    expect(calendarLink.className).toContain(
+      'grid-cols-[20px_minmax(0,1fr)_40px]'
     );
   });
 
