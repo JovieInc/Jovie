@@ -109,6 +109,18 @@ struct AppStateTests {
     #expect(!AuthFormInput.isLikelyEmail("tim"))
     #expect(!AuthFormInput.isLikelyEmail("tim@"))
     #expect(!AuthFormInput.isLikelyEmail("tim@jovie"))
+    #expect(!AuthFormInput.isLikelyEmail("tim@jov.ie."))
+    #expect(!AuthFormInput.isLikelyEmail("tim@jov..ie"))
     #expect(!AuthFormInput.isLikelyEmail("@jov.ie"))
+  }
+
+  @Test func authErrorMapperKeepsSpecificFallbackMessage() {
+    let error = NSError(
+      domain: "Clerk",
+      code: 429,
+      userInfo: [NSLocalizedDescriptionKey: "Too many attempts. Try again later."]
+    )
+
+    #expect(AuthErrorMapper.message(for: error) == "Too many attempts. Try again later.")
   }
 }

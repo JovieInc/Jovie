@@ -64,7 +64,7 @@ enum AuthFormInput {
       return false
     }
 
-    return domain.split(separator: ".").allSatisfy { !$0.isEmpty }
+    return domain.split(separator: ".", omittingEmptySubsequences: false).allSatisfy { !$0.isEmpty }
   }
 
   static func normalizedCode(_ value: String) -> String {
@@ -486,7 +486,7 @@ private struct AuthPrimaryButtonLabel: View {
   }
 }
 
-private enum AuthErrorMapper {
+enum AuthErrorMapper {
   static func message(for error: Error) -> String {
     let rawMessage = error.localizedDescription.trimmingCharacters(in: .whitespacesAndNewlines)
     let lowercased = rawMessage.lowercased()
@@ -512,6 +512,6 @@ private enum AuthErrorMapper {
 
     return rawMessage.isEmpty
       ? "Sign in failed. Try again."
-      : "Sign in failed. Try again."
+      : rawMessage
   }
 }
