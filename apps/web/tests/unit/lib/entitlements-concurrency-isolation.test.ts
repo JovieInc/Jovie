@@ -34,9 +34,18 @@ vi.mock('@/lib/utils/logger', () => ({
 describe('entitlements concurrent access isolation', () => {
   it('keeps per-request data isolated across concurrent calls', async () => {
     const authSequence = [
-      { userId: 'user_free' },
-      { userId: 'user_pro' },
-      { userId: 'user_max' },
+      {
+        userId: 'user_free',
+        has: vi.fn().mockReturnValue(false),
+      },
+      {
+        userId: 'user_pro',
+        has: vi.fn().mockReturnValue(false),
+      },
+      {
+        userId: 'user_max',
+        has: vi.fn().mockReturnValue(true),
+      },
     ];
 
     mockCachedAuth.mockImplementation(async () => authSequence.shift());

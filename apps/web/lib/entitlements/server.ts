@@ -1,5 +1,6 @@
 import 'server-only';
 
+import { hasRecentAdminMfaReverification } from '@/lib/admin/mfa';
 import { isAdmin as checkAdminRole } from '@/lib/admin/roles';
 import { getCachedAuth, getCachedCurrentUser } from '@/lib/auth/cached';
 import { resolveClerkIdentity } from '@/lib/auth/clerk-identity';
@@ -53,7 +54,8 @@ function isMissingBillingRecord(error?: string): boolean {
 }
 
 export async function getCurrentUserEntitlements(): Promise<UserEntitlements> {
-  const { userId } = await getCachedAuth();
+  const authResult = await getCachedAuth();
+  const { userId } = authResult;
   if (!userId) {
     return UNAUTHENTICATED_ENTITLEMENTS;
   }
@@ -69,10 +71,12 @@ export async function getCurrentUserEntitlements(): Promise<UserEntitlements> {
   // Check admin status independently of billing using the dedicated admin
   // role check (Redis-cached, 60s TTL). This avoids losing admin status when
   // the billing query fails due to transient DB/connection issues.
-  const [adminStatus, billing] = await Promise.all([
+  const [hasAdminRole, billing] = await Promise.all([
     checkAdminRole(userId),
     getUserBillingInfo(),
   ]);
+  const adminStatus =
+    hasAdminRole && hasRecentAdminMfaReverification(authResult);
 
   if (!billing.success) {
     if (isMissingBillingRecord(billing.error)) {

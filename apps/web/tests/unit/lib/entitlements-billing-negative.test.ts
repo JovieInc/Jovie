@@ -232,7 +232,10 @@ describe('Entitlements – Billing Failure Safety', () => {
   });
 
   it('billing failure for admin preserves admin flag in degraded result', async () => {
-    mockCachedAuth.mockResolvedValue({ userId: 'user_admin_fail' });
+    mockCachedAuth.mockResolvedValue({
+      userId: 'user_admin_fail',
+      has: vi.fn().mockReturnValue(true),
+    });
     mockCachedCurrentUser.mockResolvedValue({
       primaryEmailAddress: { emailAddress: 'admin@example.com' },
     });
