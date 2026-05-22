@@ -3,13 +3,14 @@
 import { useCallback } from 'react';
 import { useTrackAudioPlayer } from '@/components/organisms/release-sidebar/useTrackAudioPlayer';
 import { SidebarBottomNowPlaying } from '@/components/shell/SidebarBottomNowPlaying';
-import { useAppFlag } from '@/lib/flags/client';
+import { cn } from '@/lib/utils';
 import { useAudioChromeSnapshot } from './audio-chrome-state';
 
 /**
- * SidebarBottomNowPlayingBridge — flag-gated mount of the shell
+ * SidebarBottomNowPlayingBridge — production audio adapter for the shell
  * `SidebarBottomNowPlaying` atom inside `UnifiedSidebar`. Renders only when
- * DESIGN_V1 is on AND there's an active track.
+ * there's an active track and the persistent compact player does not already
+ * own the same now-playing surface.
  *
  * Adapter: production `useTrackAudioPlayer().playbackState` →
  * `NowPlayingTrack` (trackTitle / artistName / artworkUrl). Tap-to-play
@@ -17,7 +18,6 @@ import { useAudioChromeSnapshot } from './audio-chrome-state';
  * sidebar mini-player and the persistent bar stay in sync.
  */
 export function SidebarBottomNowPlayingBridge() {
-  const shellChatV1Enabled = useAppFlag('DESIGN_V1');
   const audioChrome = useAudioChromeSnapshot();
   const { playbackState, toggleTrack } = useTrackAudioPlayer();
 
@@ -29,19 +29,26 @@ export function SidebarBottomNowPlayingBridge() {
     }).catch(() => {});
   }, [playbackState.activeTrackId, playbackState.trackTitle, toggleTrack]);
 
-  if (!shellChatV1Enabled) return null;
-  if (!playbackState.activeTrackId || !playbackState.trackTitle) return null;
-  if (
+  const hasActiveTrack = Boolean(
+    playbackState.activeTrackId && playbackState.trackTitle
+  );
+  if (!hasActiveTrack) return null;
+
+  const compactPlayerOwnsTrack =
     audioChrome.compactPlayerVisible &&
-    audioChrome.activeTrackId === playbackState.activeTrackId
-  ) {
-    return null;
-  }
+    audioChrome.activeTrackId === playbackState.activeTrackId;
 
   return (
     <div
       data-shell-audio-surface='sidebar-compact'
-      className='px-2 pb-2 pt-1 transition-[opacity,transform] duration-cinematic ease-cinematic'
+      data-state={compactPlayerOwnsTrack ? 'reserved' : 'visible'}
+      aria-hidden={compactPlayerOwnsTrack}
+      className={cn(
+        'h-(--linear-app-audio-compact-height) overflow-hidden px-2 pb-2 pt-1 transition-[opacity,transform] duration-cinematic ease-cinematic',
+        compactPlayerOwnsTrack
+          ? 'pointer-events-none invisible opacity-0'
+          : 'opacity-100'
+      )}
     >
       <SidebarBottomNowPlaying
         track={{
