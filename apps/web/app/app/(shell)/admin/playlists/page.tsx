@@ -1,7 +1,7 @@
 import { Button } from '@jovie/ui';
 import { ExternalLink } from 'lucide-react';
 import type { Metadata } from 'next';
-import { AdminWorkspacePage } from '@/components/features/admin/layout/AdminWorkspacePage';
+import { AdminPage } from '@/components/features/admin/layout/AdminPage';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { approvePlaylist, rejectPlaylist } from './playlist-actions';
 import { type AdminPlaylistTab, loadAdminPlaylists } from './playlists-data';
@@ -27,12 +27,14 @@ export default async function AdminPlaylistsPage({
   const playlists = await loadAdminPlaylists(currentTab);
 
   return (
-    <AdminWorkspacePage
+    <AdminPage
       title='Playlists'
       description='Review and approve auto-generated playlists.'
-      primaryParam='tab'
-      primaryValue={currentTab}
-      primaryOptions={TAB_OPTIONS}
+      tabs={{
+        param: 'tab',
+        value: currentTab,
+        options: TAB_OPTIONS,
+      }}
       testId='admin-playlists'
     >
       {/* Playlist list */}
@@ -119,6 +121,6 @@ export default async function AdminPlaylistsPage({
           ))}
         </div>
       )}
-    </AdminWorkspacePage>
+    </AdminPage>
   );
 }

@@ -4,7 +4,7 @@ import { AdminCreatorsPageWrapper } from '@/components/features/admin/admin-crea
 import { AdminReleasesPageWrapper } from '@/components/features/admin/admin-releases-table';
 import { AdminUsersTableUnified } from '@/components/features/admin/admin-users-table/AdminUsersTableUnified';
 import { AdminFeedbackTable } from '@/components/features/admin/feedback-table/AdminFeedbackTable';
-import { AdminWorkspacePage } from '@/components/features/admin/layout/AdminWorkspacePage';
+import { AdminPage } from '@/components/features/admin/layout/AdminPage';
 import { WaitlistMetrics } from '@/components/features/admin/WaitlistMetrics';
 import { AdminWaitlistTableWithViews } from '@/components/features/admin/waitlist-table/AdminWaitlistTableWithViews';
 import {
@@ -198,16 +198,18 @@ export default async function AdminPeoplePage({
   const content = await renderPeopleView(view, params);
 
   return (
-    <AdminWorkspacePage
+    <AdminPage
       title='People'
       description='Waitlist, creators, users, releases, and feedback.'
-      primaryParam='view'
-      primaryValue={view}
-      primaryOptions={peopleTabs}
+      tabs={{
+        param: 'view',
+        value: view,
+        options: peopleTabs,
+      }}
       testId='admin-people-page'
       viewTestId={`admin-people-view-${view}`}
     >
       {content}
-    </AdminWorkspacePage>
+    </AdminPage>
   );
 }

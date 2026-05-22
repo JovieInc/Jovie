@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import { AdminWorkspacePage } from '@/components/features/admin/layout/AdminWorkspacePage';
+import { AdminPage } from '@/components/features/admin/layout/AdminPage';
 import { PlatformConnectionsClient } from './PlatformConnectionsClient';
 import { loadAdminPlatformConnectionsData } from './platform-connections-data';
 
@@ -27,12 +27,14 @@ export default async function AdminPlatformConnectionsPage({
   const data = await loadAdminPlatformConnectionsData();
 
   return (
-    <AdminWorkspacePage
+    <AdminPage
       title='Platform Connections'
       description='Manage internal publisher connections and playlist generation controls.'
-      primaryParam='tab'
-      primaryValue={currentTab}
-      primaryOptions={TAB_OPTIONS}
+      tabs={{
+        param: 'tab',
+        value: currentTab,
+        options: TAB_OPTIONS,
+      }}
       testId='admin-platform-connections'
       viewTestId={`admin-platform-connections-${currentTab}`}
     >
@@ -42,6 +44,6 @@ export default async function AdminPlatformConnectionsPage({
         engineSettings={data.engineSettings}
         currentUser={data.currentUser}
       />
-    </AdminWorkspacePage>
+    </AdminPage>
   );
 }
