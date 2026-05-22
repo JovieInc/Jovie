@@ -54,7 +54,7 @@ export function HeaderSearchSurface({
         onClick={onOpen}
         className={cn(
           headerSearchSurfaceChrome,
-          'inline-flex h-7 min-w-0 items-center gap-1.5 px-2.5 text-[12px] text-secondary-token transition-[background-color,border-color,color,box-shadow] duration-cinematic ease-cinematic hover:border-default hover:bg-surface-1 hover:text-primary-token focus-ring-themed',
+          'inline-flex h-7 min-h-7 min-w-0 items-center gap-1.5 px-2.5 text-[12px] text-secondary-token transition-[background-color,border-color,color,box-shadow] duration-cinematic ease-cinematic hover:border-default hover:bg-surface-1 hover:text-primary-token focus-ring-themed',
           className
         )}
         aria-label={adapter.ariaLabel ?? adapter.triggerLabel}
@@ -73,7 +73,7 @@ export function HeaderSearchSurface({
     <div
       className={cn(
         headerSearchSurfaceChrome,
-        'w-full max-w-[min(560px,calc(100vw-2rem))] px-2 py-1 shadow-popover sm:w-[440px] lg:w-[520px]',
+        'flex h-7 min-h-7 w-full max-w-[min(560px,calc(100vw-2rem))] items-center px-2 py-0 shadow-popover sm:w-[440px] lg:w-[520px]',
         className
       )}
     >

@@ -29,6 +29,7 @@ import { useTaskStatsQuery } from '@/lib/queries/useTasksQuery';
 import {
   adminNavigationSections,
   artistSettingsNavigation,
+  calendarNavItem,
   libraryNavItem,
   newThreadNavItem,
   primaryNavigation,
@@ -211,6 +212,7 @@ export function DashboardNav(_: DashboardNavProps) {
             items: [
               newThreadNavItem,
               searchNavItem,
+              calendarNavItem,
               ...(tasksItem ? [decorateItem(tasksItem)] : []),
               ...(shellChatLibraryEnabled ? [libraryNavItem] : []),
             ],

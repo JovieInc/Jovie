@@ -1,10 +1,14 @@
 import { render, screen } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { DesktopTitlebar } from '@/components/atoms/DesktopTitlebar';
 import { SidebarContext } from '@/components/organisms/sidebar/context';
 
+const electronRuntimeMock = vi.hoisted(() => ({
+  isElectronRuntime: true,
+}));
+
 vi.mock('@/lib/desktop/electron-bridge', () => ({
-  useIsElectronRuntime: () => true,
+  useIsElectronRuntime: () => electronRuntimeMock.isElectronRuntime,
 }));
 
 vi.mock('next/navigation', () => ({
@@ -22,23 +26,31 @@ vi.mock('@/components/atoms/UpdateAvailablePill', () => ({
   ),
 }));
 
+function renderTitlebar() {
+  return render(
+    <SidebarContext.Provider
+      value={{
+        state: 'open',
+        open: true,
+        setOpen: vi.fn(),
+        openMobile: false,
+        setOpenMobile: vi.fn(),
+        isMobile: false,
+        toggleSidebar: vi.fn(),
+      }}
+    >
+      <DesktopTitlebar />
+    </SidebarContext.Provider>
+  );
+}
+
 describe('DesktopTitlebar', () => {
+  beforeEach(() => {
+    electronRuntimeMock.isElectronRuntime = true;
+  });
+
   it('renders Electron titlebar with nav controls, sidebar toggle, and update pill in the sidebar cell', () => {
-    render(
-      <SidebarContext.Provider
-        value={{
-          state: 'open',
-          open: true,
-          setOpen: vi.fn(),
-          openMobile: false,
-          setOpenMobile: vi.fn(),
-          isMobile: false,
-          toggleSidebar: vi.fn(),
-        }}
-      >
-        <DesktopTitlebar />
-      </SidebarContext.Provider>
-    );
+    renderTitlebar();
 
     expect(screen.getByTestId('electron-titlebar-row')).toBeInTheDocument();
 
@@ -63,22 +75,26 @@ describe('DesktopTitlebar', () => {
     ).toBeInTheDocument();
   });
 
+  it('renders no Electron controls in the browser runtime', () => {
+    electronRuntimeMock.isElectronRuntime = false;
+
+    renderTitlebar();
+
+    expect(screen.getByTestId('electron-titlebar-row')).toBeEmptyDOMElement();
+    expect(
+      screen.queryByTestId('electron-titlebar-sidebar-cell')
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByTestId('electron-sidebar-toggle')
+    ).not.toBeInTheDocument();
+    expect(screen.queryByTestId('electron-nav-pill')).not.toBeInTheDocument();
+    expect(
+      screen.queryByTestId('update-available-pill')
+    ).not.toBeInTheDocument();
+  });
+
   it('keeps back/forward nav in the sidebar titlebar cell', () => {
-    render(
-      <SidebarContext.Provider
-        value={{
-          state: 'open',
-          open: true,
-          setOpen: vi.fn(),
-          openMobile: false,
-          setOpenMobile: vi.fn(),
-          isMobile: false,
-          toggleSidebar: vi.fn(),
-        }}
-      >
-        <DesktopTitlebar />
-      </SidebarContext.Provider>
-    );
+    renderTitlebar();
 
     expect(screen.getByTestId('electron-nav-pill')).toBeInTheDocument();
     expect(
@@ -90,21 +106,7 @@ describe('DesktopTitlebar', () => {
   });
 
   it('main cell is a plain drag region with no rounded card chrome', () => {
-    render(
-      <SidebarContext.Provider
-        value={{
-          state: 'open',
-          open: true,
-          setOpen: vi.fn(),
-          openMobile: false,
-          setOpenMobile: vi.fn(),
-          isMobile: false,
-          toggleSidebar: vi.fn(),
-        }}
-      >
-        <DesktopTitlebar />
-      </SidebarContext.Provider>
-    );
+    renderTitlebar();
 
     const mainCell = screen.getByTestId('electron-titlebar-main-cell');
     const className = mainCell.className;

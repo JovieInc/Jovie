@@ -273,6 +273,12 @@ export function NavMenuItem({
   ]);
 
   const shellNavItem = useShellNavItem;
+  const shellTooltipShortcut = shortcut
+    ? {
+        keys: shortcut.keys,
+        description: shortcut.description ?? shortcut.label,
+      }
+    : undefined;
   const shellNavClassName = getSidebarNavRowClassName({
     active: isActive,
     className:
@@ -301,7 +307,12 @@ export function NavMenuItem({
       <ContextMenuTrigger asChild>
         <SidebarMenuItem>
           {shellNavItem ? (
-            <Tooltip label={item.name} side='right' block>
+            <Tooltip
+              label={item.name}
+              shortcut={shellTooltipShortcut}
+              side='right'
+              block
+            >
               {renderAsButton ? (
                 <button
                   type='button'

@@ -152,11 +152,16 @@ describe('Sidebar row alignment', () => {
     expect(rowClassName).toContain('before:left-[20px]');
     expect(rowClassName).toContain('after:left-[34px]');
     expect(rowClassName).toContain('text-[12.5px]');
-    expect(rowClassName).toContain(
-      'hover:bg-[color-mix(in_oklab,var(--color-sidebar-accent)_88%,transparent)]'
-    );
-    expect(activeRowClassName).toContain('color-sidebar-accent-active');
+    expect(rowClassName).toContain('font-normal');
+    expect(rowClassName).toContain('hover:bg-sidebar-accent');
+    expect(rowClassName).toContain('text-sidebar-muted/80');
+    expect(activeRowClassName).toContain('bg-sidebar-accent-active');
+    expect(activeRowClassName).toContain('text-primary-token');
+    expect(activeRowClassName).toContain('font-medium');
     expect(iconClassName).toContain('h-3.5');
-    expect(iconClassName).toContain('text-sidebar-muted/80');
+    expect(iconClassName).toContain('text-sidebar-muted/70');
+    expect(getSidebarNavIconClassName({ active: true })).toContain(
+      'text-primary-token'
+    );
   });
 });
