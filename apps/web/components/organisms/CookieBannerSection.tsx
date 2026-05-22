@@ -6,22 +6,13 @@ import { usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { CookieActions } from '@/components/molecules/CookieActions';
 import { CookieModal } from '@/components/organisms/CookieModal';
+import { APP_ROUTES } from '@/constants/routes';
 import { saveConsent } from '@/lib/cookies/consent';
 import { COOKIE_BANNER_REQUIRED_COOKIE } from '@/lib/cookies/consent-regions';
 import { setConsentState } from '@/lib/tracking/consent';
 
 const CONSENT_SAVE_ERROR =
   'We could not save preferences. Check your connection and try again.';
-
-declare global {
-  var JVConsent:
-    | {
-        onChange: (cb: (v: unknown) => void) => () => void;
-        _emit: (v: unknown) => void;
-        openModal: () => void;
-      }
-    | undefined;
-}
 
 /**
  * Read the cookie-banner-required flag from document.cookie.
@@ -67,27 +58,6 @@ export function CookieBannerSection() {
       setVisible(true);
     }
   }, [isDashboard, isDemo]);
-
-  useEffect(() => {
-    if (globalThis.window && !globalThis.JVConsent) {
-      const listeners = new Set<(v: unknown) => void>();
-      globalThis.JVConsent = {
-        onChange(cb: (v: unknown) => void) {
-          listeners.add(cb);
-          return () => listeners.delete(cb);
-        },
-        _emit(value: unknown) {
-          listeners.forEach(l => l(value));
-        },
-        openModal() {
-          setCustomize(true);
-        },
-      };
-      if (globalThis.window !== undefined) {
-        globalThis.dispatchEvent(new Event('jvconsent:ready'));
-      }
-    }
-  }, []);
 
   useEffect(() => {
     if (!visible) {
@@ -136,9 +106,20 @@ export function CookieBannerSection() {
   useEffect(() => {
     if (typeof window === 'undefined') return;
 
-    const handleOpen = () => setCustomize(true);
-    globalThis.addEventListener('jv:cookie:open', handleOpen);
-    return () => globalThis.removeEventListener('jv:cookie:open', handleOpen);
+    let unsubscribe: (() => void) | undefined;
+
+    const subscribe = () => {
+      unsubscribe?.();
+      unsubscribe = globalThis.JVConsent?.onChange(() => setVisible(false));
+    };
+
+    subscribe();
+    globalThis.addEventListener('jvconsent:ready', subscribe);
+
+    return () => {
+      unsubscribe?.();
+      globalThis.removeEventListener('jvconsent:ready', subscribe);
+    };
   }, []);
 
   const applyConsentLocally = (consent: {
@@ -213,7 +194,7 @@ export function CookieBannerSection() {
                   We use cookies for essential functionality and to improve your
                   experience.{' '}
                   <Link
-                    href='/privacy'
+                    href={APP_ROUTES.LEGAL_PRIVACY}
                     className='underline hover:opacity-80 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent'
                   >
                     Privacy

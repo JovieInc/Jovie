@@ -7,6 +7,12 @@ import {
   resolveLyricsReturnRoute,
 } from '@/constants/routes';
 
+describe('APP_ROUTES settings', () => {
+  it('exposes the canonical settings usage route', () => {
+    expect(APP_ROUTES.SETTINGS_USAGE).toBe('/app/settings/usage');
+  });
+});
+
 describe('buildLyricsRoute', () => {
   it('builds the canonical lyrics path', () => {
     expect(buildLyricsRoute('track_1')).toBe('/app/lyrics/track_1');
