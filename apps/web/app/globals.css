@@ -23,6 +23,19 @@
 
 @source "../../../packages/ui";
 @source "../../../node_modules/streamdown/dist/*.js";
+
+/* JOV-2269: Exclude app-shell and dashboard-only source paths from the
+   global Tailwind scan. These directories contain components that are never
+   rendered on public routes (homepage, /[username] profile, marketing pages).
+   Excluding them prevents shell-specific Tailwind utilities (sidebar tokens,
+   dashboard colour-mix variants, shell chrome classes) from being compiled
+   into the shared CSS chunk that is served on every public page.
+   Note: components/shell is intentionally NOT excluded — it is imported by
+   shared organisms (PersistentAudioBar, release-sidebar, etc.) that may
+   render on any route. */
+@source not "../app/app";
+@source not "../components/features/dashboard";
+@source not "../components/features/admin";
 @custom-variant dark (&:is(.dark *));
 
 /* Base document sizing and immediate dark-aware fallback colors */
@@ -36,7 +49,7 @@ body {
 }
 
 html[data-desktop-runtime="electron"] {
-  --electron-titlebar-height: 36px;
+  --electron-titlebar-height: 52px;
 }
 
 html[data-desktop-runtime="electron"] body {
@@ -58,12 +71,32 @@ html[data-desktop-runtime="electron"] [data-electron-titlebar="true"] {
   z-index: 60;
   display: grid;
   grid-template-columns: var(--linear-app-sidebar-width) minmax(0, 1fr);
+  column-gap: var(--linear-app-shell-gap);
   align-items: center;
+  padding-right: var(--linear-app-shell-gap);
   flex-shrink: 0;
   height: var(--electron-titlebar-height);
   user-select: none;
   background: rgb(var(--sidebar-background));
-  border-bottom: 1px solid rgb(var(--sidebar-border));
+}
+
+html[data-desktop-runtime="electron"]
+  [data-shell-design="shellChatV1"]
+  [data-app-shell-body="true"] {
+  padding-top: 0;
+}
+
+html[data-desktop-runtime="electron"]
+  [data-shell-design="shellChatV1"]
+  #main-content {
+  border-top-width: 0;
+  border-top-left-radius: 0;
+  border-top-right-radius: 0;
+  padding-top: 0;
+}
+
+html[data-desktop-runtime="electron"] [data-electron-main-header="body"] {
+  display: none;
 }
 
 html[data-desktop-runtime="electron"] [data-electron-drag-region="true"] {
@@ -91,6 +124,22 @@ html[data-desktop-runtime="electron"] [data-electron-update-pill="true"] {
   padding-inline: 12px;
   border-radius: 999px;
   box-shadow: none;
+}
+
+/* Titlebar rail alignment for shellChatV1 — the app-shell-body has
+   p-[--linear-app-shell-gap] on all sides, so the sidebar column starts at
+   gap offset from the left edge. Mirror that offset in the titlebar so the
+   sidebar-cell left edge aligns with the sidebar rail. */
+html[data-desktop-runtime="electron"] [data-shell-design="shellChatV1"]
+  [data-electron-titlebar="true"] {
+  padding-left: var(--linear-app-shell-gap);
+  grid-template-columns: var(--linear-app-sidebar-width) minmax(0, 1fr);
+}
+
+/* Hide the in-sidebar dock/collapse button in Electron — the titlebar carries
+   the single canonical sidebar toggle so there is never a duplicate affordance. */
+html[data-desktop-runtime="electron"] [data-sidebar-dock-button="true"] {
+  display: none;
 }
 
 /* Marketing pages use document scrolling rather than app-shell scroll panes.
@@ -680,17 +729,20 @@ body {
    ============================================ */
 
 @layer components {
-  /* Focus ring utilities */
+  /* Focus ring utilities — canonical recipe (see design-system.css global + STYLES.md)
+     Subtle visible gray ring for shell/chrome consistency (post smallwin-4 / a11y polish).
+     Use /55 + page offset for most interactive chrome. Stronger variants (higher %,
+     accent purple, or double box-shadow) reserved for primary CTAs / marketing. */
   .focus-ring {
-    @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-focus/50 focus-visible:ring-offset-(--linear-bg-page);
+    @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-(--linear-border-focus)/55 focus-visible:ring-offset-(--linear-bg-page);
   }
   .focus-ring-transparent-offset {
-    @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus/50 focus-visible:ring-offset-transparent;
+    @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/55 focus-visible:ring-offset-transparent;
   }
   /* Button component styles */
   .btn {
     @apply inline-flex items-center justify-center rounded-full text-[13px] font-medium transition-colors duration-normal disabled:opacity-50 disabled:pointer-events-none;
-    @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-focus/50 focus-visible:ring-offset-(--linear-bg-page);
+    @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-(--linear-border-focus)/55 focus-visible:ring-offset-(--linear-bg-page);
   }
   .btn-primary {
     background-color: var(--color-btn-primary-bg);
@@ -945,6 +997,15 @@ body {
     background: #ffffff;
     opacity: 0.94;
   }
+  /* WCAG SC 2.4.7 — visible focus ring for keyboard users.
+     Uses a double-ring (offset + color ring) that is visible on both dark
+     and light backgrounds. */
+  .public-action-primary:focus-visible {
+    outline: none;
+    box-shadow:
+      0 0 0 2px rgba(0, 0, 0, 0.85),
+      0 0 0 4px color-mix(in oklab, var(--linear-border-focus) 72%, transparent);
+  }
   .public-action-secondary {
     display: inline-flex;
     align-items: center;
@@ -976,6 +1037,13 @@ body {
       white 32%
     );
     opacity: 0.92;
+  }
+  /* WCAG SC 2.4.7 — visible focus ring for keyboard users */
+  .public-action-secondary:focus-visible {
+    outline: none;
+    box-shadow:
+      0 0 0 2px rgba(0, 0, 0, 0.85),
+      0 0 0 4px color-mix(in oklab, var(--linear-border-focus) 72%, transparent);
   }
   .marketing-pricing-plans {
     display: grid;
@@ -1427,8 +1495,10 @@ body {
     background-color: transparent;
     border-color: transparent;
     box-shadow: none;
+    /* Only suppress hover/active background — do NOT include :focus-visible here
+       so that the focus-ring-themed utility class (applied at usage sites) can
+       render the WCAG SC 2.4.7-required focus ring. */
     &:hover,
-    &:focus-visible,
     &:active {
       background-color: transparent;
       border-color: transparent;
@@ -1469,6 +1539,16 @@ body {
       background-color: var(--linear-btn-primary-hover);
       border-color: var(--linear-btn-primary-hover);
     }
+    /* WCAG SC 2.4.7 — visible focus ring for keyboard users */
+    &:focus-visible {
+      outline: none;
+      box-shadow:
+        var(--shadow-button-inset),
+        0 1px 1px rgba(0, 0, 0, 0.14),
+        0 0 0 2px var(--linear-bg-page),
+        0 0 0 4px
+        color-mix(in oklab, var(--linear-border-focus) 55%, transparent);
+    }
   }
   /* Linear Button - Primary CTA styling using tokens */
   .btn-linear-primary {
@@ -1494,6 +1574,16 @@ body {
     transition: all 150ms cubic-bezier(0.4, 0, 0.2, 1);
     &:hover {
       background-color: var(--color-btn-primary-hover);
+    }
+    /* WCAG SC 2.4.7 — visible focus ring for keyboard users */
+    &:focus-visible {
+      outline: none;
+      box-shadow:
+        var(--shadow-button-inset),
+        0 1px 1px rgba(0, 0, 0, 0.14),
+        0 0 0 2px var(--linear-bg-page),
+        0 0 0 4px
+        color-mix(in oklab, var(--linear-border-focus) 55%, transparent);
     }
   }
   /* Linear Spacing System — symmetric section padding from tokens */

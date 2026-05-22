@@ -192,7 +192,7 @@ export const SocialBioNudge = memo(function SocialBioNudge({
             </div>
             <div className='flex flex-wrap gap-2'>
               <Button asChild size='sm' variant='secondary'>
-                <Link href={APP_ROUTES.DASHBOARD_AUDIENCE}>
+                <Link href={APP_ROUTES.AUDIENCE}>
                   View Analytics
                   <ArrowRight className='ml-1 h-3.5 w-3.5' />
                 </Link>

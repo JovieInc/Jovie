@@ -22,7 +22,7 @@ describe('MobilePlayerCard', () => {
   });
 
   it('renders title + artist from the NowPlayingTrack shape', () => {
-    render(
+    const { container } = render(
       <MobilePlayerCard
         track={TRACK}
         isPlaying={false}
@@ -32,6 +32,11 @@ describe('MobilePlayerCard', () => {
     );
     expect(screen.getByText('Lost in the Light')).toBeInTheDocument();
     expect(screen.getByText('Bahamas')).toBeInTheDocument();
+    expect(container.innerHTML).toContain('border-(--linear-app-frame-seam)');
+    expect(container.innerHTML).toContain(
+      'bg-(--linear-app-content-surface)/70'
+    );
+    expect(container.innerHTML).not.toContain('border-white/10');
   });
 
   it('shows the play label when not playing and pause when playing', () => {

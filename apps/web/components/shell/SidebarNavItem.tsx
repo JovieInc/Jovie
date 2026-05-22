@@ -30,10 +30,10 @@ export function SidebarNavItem({
   nested,
   tight,
 }: SidebarNavItemProps) {
-  const nonCollapsedSize = tight ? 'h-6 pl-2.5 pr-2' : 'h-7 pl-3 pr-2';
+  const nonCollapsedSize = tight ? 'h-6 pl-2.5 pr-2' : 'h-6.5 pl-2.5 pr-2';
   const inactiveColor = nested
-    ? 'text-tertiary-token hover:bg-surface-1/40 hover:text-primary-token'
-    : 'text-secondary-token hover:bg-surface-1/60 hover:text-primary-token';
+    ? 'text-tertiary-token hover:bg-[color-mix(in_oklab,var(--color-sidebar-accent)_82%,transparent)] hover:text-primary-token'
+    : 'text-secondary-token hover:bg-[color-mix(in_oklab,var(--color-sidebar-accent)_82%,transparent)] hover:text-primary-token';
   const inactiveIconColor = nested
     ? 'text-quaternary-token'
     : 'text-tertiary-token';
@@ -43,9 +43,9 @@ export function SidebarNavItem({
       type='button'
       onClick={item.onActivate}
       className={cn(
-        'relative flex items-center rounded-md w-full transition-colors duration-subtle ease-out tracking-[-0.005em]',
-        tight ? 'gap-2 text-[12.5px]' : 'gap-2.5 text-[13px]',
-        collapsed ? 'h-8 w-10 mx-auto justify-center' : nonCollapsedSize,
+        'relative flex items-center rounded-md w-full transition-[background-color] duration-subtle ease-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/55 focus-visible:ring-offset-2 focus-visible:ring-offset-(--linear-bg-page)',
+        tight ? 'gap-2 text-[12px]' : 'gap-2.5 text-[12.5px]',
+        collapsed ? 'h-7 w-10 mx-auto justify-center' : nonCollapsedSize,
         item.active ? 'text-primary-token bg-surface-1' : inactiveColor
       )}
     >

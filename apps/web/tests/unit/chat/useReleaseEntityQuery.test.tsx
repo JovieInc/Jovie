@@ -10,7 +10,7 @@ const { mockLoadReleaseEntity } = vi.hoisted(() => ({
   mockLoadReleaseEntity: vi.fn(),
 }));
 
-vi.mock('@/app/app/(shell)/dashboard/releases/actions', () => ({
+vi.mock('@/lib/releases/release-matrix-loader', () => ({
   loadReleaseEntity: mockLoadReleaseEntity,
 }));
 

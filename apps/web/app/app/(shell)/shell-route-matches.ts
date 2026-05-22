@@ -26,6 +26,32 @@ function parseAppShellPath(headerValue: string | null): string | null {
   }
 }
 
+function matchesExactRoute(
+  pathname: string | null,
+  ...routes: readonly string[]
+): boolean {
+  if (!pathname) return false;
+  return routes.some(route => pathname === route);
+}
+
+function matchesRoutePrefix(
+  pathname: string | null,
+  ...routes: readonly string[]
+): boolean {
+  if (!pathname) return false;
+  return routes.some(
+    route => pathname === route || pathname.startsWith(`${route}/`)
+  );
+}
+
+function matchesNestedRoute(
+  pathname: string | null,
+  ...routes: readonly string[]
+): boolean {
+  if (!pathname) return false;
+  return routes.some(route => pathname.startsWith(`${route}/`));
+}
+
 export function resolveAppShellRequestPath(
   ...headerValues: readonly (string | null)[]
 ): string | null {
@@ -44,49 +70,67 @@ export function resolveAppShellRequestPath(
 }
 
 export function isChatShellRoute(pathname: string | null): boolean {
-  if (!pathname) {
-    return false;
-  }
-
   return (
-    pathname === APP_ROUTES.DASHBOARD ||
-    pathname === APP_ROUTES.CHAT ||
-    pathname.startsWith(`${APP_ROUTES.CHAT}/`)
+    matchesExactRoute(pathname, APP_ROUTES.DASHBOARD) ||
+    matchesRoutePrefix(pathname, APP_ROUTES.CHAT)
   );
 }
 
 export function isReleasesShellRoute(pathname: string | null): boolean {
-  if (!pathname) return false;
-  return (
-    pathname === APP_ROUTES.RELEASES ||
-    pathname === APP_ROUTES.DASHBOARD_RELEASES ||
-    pathname.startsWith(`${APP_ROUTES.DASHBOARD_RELEASES}/`)
+  return matchesRoutePrefix(
+    pathname,
+    APP_ROUTES.RELEASES,
+    APP_ROUTES.DASHBOARD_RELEASES
   );
 }
 
 export function isLyricsShellRoute(pathname: string | null): boolean {
-  if (!pathname) return false;
-  return (
-    pathname === APP_ROUTES.LYRICS ||
-    pathname.startsWith(`${APP_ROUTES.LYRICS}/`)
-  );
+  return matchesRoutePrefix(pathname, APP_ROUTES.LYRICS);
 }
 
 export function isLibraryShellRoute(pathname: string | null): boolean {
-  if (!pathname) return false;
-  return (
-    pathname === APP_ROUTES.LIBRARY ||
-    pathname.startsWith(`${APP_ROUTES.LIBRARY}/`) ||
-    pathname === APP_ROUTES.DASHBOARD_LIBRARY ||
-    pathname.startsWith(`${APP_ROUTES.DASHBOARD_LIBRARY}/`) ||
-    pathname === APP_ROUTES.LEGACY_DASHBOARD_LIBRARY ||
-    pathname.startsWith(`${APP_ROUTES.LEGACY_DASHBOARD_LIBRARY}/`)
+  return matchesRoutePrefix(
+    pathname,
+    APP_ROUTES.LIBRARY,
+    APP_ROUTES.DASHBOARD_LIBRARY,
+    APP_ROUTES.LEGACY_DASHBOARD_LIBRARY
   );
 }
 
+export function isTasksShellRoute(pathname: string | null): boolean {
+  return matchesRoutePrefix(
+    pathname,
+    APP_ROUTES.TASKS,
+    APP_ROUTES.DASHBOARD_TASKS
+  );
+}
+
+export function isInsightsShellRoute(pathname: string | null): boolean {
+  return matchesRoutePrefix(pathname, APP_ROUTES.INSIGHTS);
+}
+
+export function isPresenceShellRoute(pathname: string | null): boolean {
+  return matchesRoutePrefix(pathname, APP_ROUTES.PRESENCE);
+}
+
+export function isAudienceShellRoute(pathname: string | null): boolean {
+  return matchesRoutePrefix(
+    pathname,
+    APP_ROUTES.AUDIENCE,
+    APP_ROUTES.DASHBOARD_AUDIENCE
+  );
+}
+
+export function isCalendarShellRoute(pathname: string | null): boolean {
+  return matchesRoutePrefix(pathname, APP_ROUTES.CALENDAR);
+}
+
 function isDashboardSubRoute(pathname: string | null): boolean {
-  if (!pathname) return false;
-  return pathname.startsWith(`${APP_ROUTES.LEGACY_DASHBOARD}/`);
+  return matchesNestedRoute(pathname, APP_ROUTES.LEGACY_DASHBOARD);
+}
+
+function isShellOptimizedSettingsRoute(pathname: string | null): boolean {
+  return matchesRoutePrefix(pathname, APP_ROUTES.SETTINGS);
 }
 
 function isLightweightShellRoute(pathname: string | null): boolean {
@@ -95,7 +139,13 @@ function isLightweightShellRoute(pathname: string | null): boolean {
     isReleasesShellRoute(pathname) ||
     isLyricsShellRoute(pathname) ||
     isLibraryShellRoute(pathname) ||
-    isDashboardSubRoute(pathname)
+    isTasksShellRoute(pathname) ||
+    isInsightsShellRoute(pathname) ||
+    isPresenceShellRoute(pathname) ||
+    isAudienceShellRoute(pathname) ||
+    isCalendarShellRoute(pathname) ||
+    isDashboardSubRoute(pathname) ||
+    isShellOptimizedSettingsRoute(pathname)
   );
 }
 
@@ -104,5 +154,16 @@ export function shouldUseEssentialShellData(pathname: string | null): boolean {
 }
 
 export function shouldRedirectToOnboarding(pathname: string | null): boolean {
-  return isLightweightShellRoute(pathname);
+  return (
+    isChatShellRoute(pathname) ||
+    isReleasesShellRoute(pathname) ||
+    isLyricsShellRoute(pathname) ||
+    isLibraryShellRoute(pathname) ||
+    isTasksShellRoute(pathname) ||
+    isInsightsShellRoute(pathname) ||
+    isPresenceShellRoute(pathname) ||
+    isAudienceShellRoute(pathname) ||
+    isCalendarShellRoute(pathname) ||
+    isDashboardSubRoute(pathname)
+  );
 }

@@ -26,7 +26,7 @@ vi.mock('@/components/atoms/UpdateAvailablePill', () => ({
 }));
 
 describe('DesktopTitlebar', () => {
-  it('renders Electron titlebar controls in sidebar and main grid cells', () => {
+  it('renders Electron titlebar with sidebar toggle in sidebar-cell and nav pill in main-cell', () => {
     render(
       <SidebarContext.Provider
         value={{
@@ -44,22 +44,46 @@ describe('DesktopTitlebar', () => {
     );
 
     expect(screen.getByTestId('electron-titlebar-row')).toBeInTheDocument();
+
+    // Sidebar toggle is in the sidebar cell (single canonical toggle)
+    expect(
+      screen.getByTestId('electron-titlebar-sidebar-cell')
+    ).toContainElement(screen.getByTestId('electron-sidebar-toggle'));
+
+    // Update pill is in the sidebar cell
     expect(
       screen.getByTestId('electron-titlebar-sidebar-cell')
     ).toContainElement(screen.getByTestId('update-available-pill'));
+
+    // Nav back/forward are in the main cell inside the pill group
+    expect(screen.getByTestId('electron-titlebar-main-cell')).toContainElement(
+      screen.getByTestId('electron-nav-pill')
+    );
+    expect(screen.getByTestId('electron-nav-pill')).toContainElement(
+      screen.getByTestId('electron-nav-back')
+    );
+    expect(screen.getByTestId('electron-nav-pill')).toContainElement(
+      screen.getByTestId('electron-nav-forward')
+    );
+
     expect(screen.getByTestId('update-available-pill')).toHaveAttribute(
       'data-compact',
       'true'
     );
-    expect(screen.getByTestId('electron-titlebar-main-cell')).toContainElement(
-      screen.getByTestId('electron-nav-back')
-    );
-    expect(screen.getByTestId('electron-titlebar-main-cell')).toContainElement(
-      screen.getByTestId('electron-nav-forward')
-    );
+    expect(
+      screen.getByRole('button', { name: 'Collapse sidebar' })
+    ).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Go back' })).toBeInTheDocument();
     expect(
       screen.getByRole('button', { name: 'Go forward' })
     ).toBeInTheDocument();
+  });
+
+  it('renders an optional main titlebar slot', () => {
+    render(<DesktopTitlebar mainSlot={<div>Route header</div>} />);
+
+    expect(screen.getByTestId('electron-titlebar-main-slot')).toHaveTextContent(
+      'Route header'
+    );
   });
 });

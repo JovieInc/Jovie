@@ -72,6 +72,22 @@ describe('buildContentSecurityPolicy', () => {
     expect(connectSrc).toContain('https://*.ingest.us.sentry.io');
   });
 
+  it('includes staging Clerk host in script, connect, and frame directives', () => {
+    const csp = buildContentSecurityPolicy({
+      nonce: 'test-nonce',
+      isDev: false,
+      enableToolbar: false,
+    });
+    const scriptSrc = findDirective(csp, 'script-src');
+    const connectSrc = findDirective(csp, 'connect-src');
+    const frameSrc = findDirective(csp, 'frame-src');
+
+    expect(scriptSrc).toContain('https://clerk.staging.jov.ie');
+    expect(connectSrc).toContain('https://clerk.staging.jov.ie');
+    expect(connectSrc).toContain('wss://clerk.staging.jov.ie');
+    expect(frameSrc).toContain('https://clerk.staging.jov.ie');
+  });
+
   it('includes vercel analytics inline script hash in script-src', () => {
     const csp = buildContentSecurityPolicy({
       nonce: 'test-nonce',

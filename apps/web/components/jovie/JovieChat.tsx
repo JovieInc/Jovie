@@ -3,20 +3,28 @@
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { ImagePlus } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { JovieMarkElectric } from '@/components/atoms/JovieMarkElectric';
+import { SuggestionCard } from '@/components/shell/SuggestionCard';
 import { useAppFlag } from '@/lib/flags/client';
 import { SUPPORTED_IMAGE_MIME_TYPES } from '@/lib/images/config';
+import { cn } from '@/lib/utils';
 
+import { CHAT_COMPOSER_DOCK_CLASSNAME } from './chat-layout';
 import {
   ChatInput,
   ChatMessage,
   ChatMessageSkeleton,
   ErrorDisplay,
   ScrollToBottom,
-  SuggestedPrompts,
 } from './components';
 import { ChatProvidersRegistrar } from './components/ChatProvidersRegistrar';
 import { ChatUsageAlert } from './components/ChatUsageAlert';
+import {
+  CHAT_PROMPT_RAIL_MASK_STYLE,
+  CHAT_PROMPT_RAIL_SCROLL_CLASS,
+} from './components/chat-prompt-styles';
+import { EntityResolutionProvider } from './components/EntityResolutionProvider';
 import {
   useChatImageAttachments,
   useChatJankMonitor,
@@ -28,6 +36,73 @@ import type { JovieChatProps, MessagePart } from './types';
 /** Sentinel ID for the synthetic thinking placeholder */
 const THINKING_PLACEHOLDER_ID = 'thinking-placeholder';
 const VIRTUALIZATION_THRESHOLD = 12;
+const EMPTY_STATE_SIGNAL_CARDS = [
+  {
+    headline: 'Release plan',
+    body: 'Turn a song into a launch sequence.',
+  },
+  {
+    headline: 'Asset brief',
+    body: 'Creative direction and copy, ready to use.',
+  },
+  {
+    headline: 'Context',
+    body: 'Releases, contacts, and references stay attached.',
+  },
+] as const;
+
+function EmptyStateSignalCards({
+  dimmed = false,
+}: {
+  readonly dimmed?: boolean;
+}) {
+  return (
+    <div
+      className={cn('w-full max-w-[52rem]', dimmed && 'pointer-events-none')}
+      aria-hidden={dimmed ? 'true' : undefined}
+      data-testid='chat-empty-state-top-signals'
+    >
+      <div
+        className={cn(
+          CHAT_PROMPT_RAIL_SCROLL_CLASS,
+          'overscroll-x-contain px-1 sm:px-0 lg:overflow-visible'
+        )}
+        style={CHAT_PROMPT_RAIL_MASK_STYLE}
+      >
+        <div
+          className='flex snap-x snap-mandatory flex-nowrap gap-3 lg:grid lg:grid-cols-3'
+          data-testid='chat-empty-state-top-signals-row'
+        >
+          {EMPTY_STATE_SIGNAL_CARDS.map(card => (
+            <article
+              key={card.headline}
+              className='min-h-[124px] min-w-[min(19rem,84vw)] flex-1 snap-start rounded-[22px] border border-subtle bg-surface-1 px-4 py-4 shadow-[0_16px_44px_-30px_rgba(0,0,0,0.92)] lg:min-w-0'
+            >
+              <p className='text-pretty text-[17px] font-semibold leading-[1.2] text-primary-token'>
+                {card.headline}
+              </p>
+              <p className='mt-3 max-w-[24ch] text-[12.5px] leading-5 text-tertiary-token'>
+                {card.body}
+              </p>
+            </article>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Extracts the first name token for use in the empty-state greeting (e.g. "What are we working on, Alex?").
+ * Handles null/undefined/blank by returning null. Splits on whitespace.
+ */
+export function getFirstNameForGreeting(
+  name: string | null | undefined
+): string | null {
+  const trimmed = name?.trim();
+  if (!trimmed) return null;
+  return trimmed.split(/\s+/)[0] ?? null;
+}
 
 function findLastAssistantIndex(
   messages: readonly { id: string; role: string }[]
@@ -55,7 +130,7 @@ export function JovieChat({
   username,
   displayName,
   isFirstSession = false,
-  latestReleaseTitle,
+  actionCards = [],
 }: JovieChatProps) {
   const initialQuerySubmitted = useRef(false);
   const initialSkillApplied = useRef(false);
@@ -94,24 +169,6 @@ export function JovieChat({
     username,
   });
 
-  const followUpQuickActions = useMemo(
-    () => [
-      {
-        label: 'Summarize this thread',
-        prompt: 'Summarize this thread in three concise bullets.',
-      },
-      {
-        label: 'What should I do next?',
-        prompt: 'Based on this conversation, what should I do next?',
-      },
-      {
-        label: 'Turn it into a checklist',
-        prompt: 'Turn this conversation into a short checklist I can follow.',
-      },
-    ],
-    []
-  );
-
   // Image attachments for chat messages
   const {
     pendingImages,
@@ -131,6 +188,7 @@ export function JovieChat({
   // Append a placeholder when waiting for the AI to start responding.
   // This is a displayMessages array, NOT a modification to the real messages.
   const lastMessage = messages[messages.length - 1];
+  const showPendingBootstrap = messages.length === 0 && isSubmitting;
   const displayMessages =
     isLoading && lastMessage?.role === 'user'
       ? [
@@ -142,7 +200,16 @@ export function JovieChat({
             createdAt: new Date(),
           },
         ]
-      : messages;
+      : showPendingBootstrap
+        ? [
+            {
+              id: THINKING_PLACEHOLDER_ID,
+              role: 'assistant' as const,
+              parts: [] as MessagePart[],
+              createdAt: new Date(),
+            },
+          ]
+        : messages;
 
   // ─── Sticky scroll via ResizeObserver ────────────────────────────
   const {
@@ -310,12 +377,32 @@ export function JovieChat({
   const lastAssistantIndex = findLastAssistantIndex(displayMessages);
 
   const isStreaming = status === 'streaming';
+  const showThreadView = hasMessages || showPendingBootstrap;
 
   // Show skeleton while fetching existing conversation
   if (isLoadingConversation) {
     return (
-      <div className='flex h-full flex-col'>
-        <ChatMessageSkeleton />
+      <div
+        className='flex h-full flex-col bg-(--linear-app-content-surface)'
+        data-testid='chat-loading-conversation-skeleton'
+      >
+        <div className='flex-1 overflow-hidden px-4 py-5 sm:px-5'>
+          <ChatMessageSkeleton />
+        </div>
+        <div className='shrink-0 px-4 pb-4 pt-2 sm:px-5 sm:pb-5 sm:pt-2.5'>
+          <div className='mx-auto h-[88px] w-full max-w-[45rem] rounded-[28px] border border-white/[0.08] bg-[linear-gradient(180deg,rgba(255,255,255,0.035)_0%,rgba(255,255,255,0.014)_45%,transparent_100%),#16171b] shadow-[0_18px_56px_-30px_rgba(0,0,0,0.86),inset_0_1px_0_rgba(255,255,255,0.055)]'>
+            <div className='grid h-full grid-rows-[minmax(24px,auto)_40px] gap-2 px-3 py-2.5'>
+              <div className='mx-1 mt-1 h-5 w-44 rounded-full bg-white/[0.055]' />
+              <div className='flex items-center justify-between'>
+                <div className='h-9 w-9 rounded-full bg-white/[0.045]' />
+                <div className='flex items-center gap-2'>
+                  <div className='h-9 w-9 rounded-full bg-white/[0.045]' />
+                  <div className='h-9 w-9 rounded-full bg-white/[0.08]' />
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
     );
   }
@@ -344,169 +431,274 @@ export function JovieChat({
     profileId,
   } as const;
 
-  const greetingName = displayName?.trim() || username?.trim() || null;
+  const greetingName =
+    getFirstNameForGreeting(displayName) ?? getFirstNameForGreeting(username);
+  const primaryActionCard = actionCards[0] ?? null;
+  const showActionCard =
+    primaryActionCard !== null &&
+    input.trim().length === 0 &&
+    !composerPickerOpen &&
+    (pendingImages?.length ?? 0) === 0 &&
+    chipTray.chips.length === 0;
   let emptyStateHeading: string;
   if (isFirstSession) {
-    emptyStateHeading = 'Welcome to Jovie';
-  } else if (greetingName) {
-    emptyStateHeading = `Welcome Back ${greetingName}`;
+    emptyStateHeading = "Hey, I'm Jovie.";
   } else {
-    emptyStateHeading = 'Welcome Back';
+    emptyStateHeading = greetingName
+      ? `What are we working on, ${greetingName}?`
+      : 'What are we working on?';
   }
 
   return (
-    <div
-      ref={dropZoneRef}
-      className='relative flex h-full flex-col bg-(--linear-app-content-surface)'
-      data-testid='chat-content'
-      data-design-v1-chat-entities={
-        designV1ChatEntitiesEnabled ? 'true' : undefined
-      }
-    >
-      {/* Registers entity providers (release, artist) for the slash menu */}
-      {profileId ? <ChatProvidersRegistrar profileId={profileId} /> : null}
+    <EntityResolutionProvider profileId={profileId}>
+      <div
+        ref={dropZoneRef}
+        className='relative flex h-full flex-col bg-(--linear-app-content-surface)'
+        data-testid='chat-content'
+        data-design-v1-chat-entities={
+          designV1ChatEntitiesEnabled ? 'true' : undefined
+        }
+      >
+        {/* Registers entity providers (release, artist) for the slash menu */}
+        {profileId ? <ChatProvidersRegistrar profileId={profileId} /> : null}
 
-      {/* Hidden file input for image attachments */}
-      <input
-        ref={imageFileInputRef}
-        type='file'
-        accept={SUPPORTED_IMAGE_MIME_TYPES.join(',')}
-        onChange={handleImageFileChange}
-        multiple
-        className='hidden'
-        tabIndex={-1}
-      />
+        {/* Hidden file input for image attachments */}
+        <input
+          ref={imageFileInputRef}
+          type='file'
+          accept={SUPPORTED_IMAGE_MIME_TYPES.join(',')}
+          onChange={handleImageFileChange}
+          multiple
+          className='hidden'
+          tabIndex={-1}
+        />
 
-      {/* Drag-and-drop overlay */}
-      <AnimatePresence>
-        {isDragOver && (
-          <motion.div
-            className='absolute inset-0 z-50 flex items-center justify-center rounded-xl border-2 border-dashed border-accent/50 bg-accent/5 backdrop-blur-sm'
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.15 }}
-          >
-            <div className='flex flex-col items-center gap-2 text-accent'>
-              <ImagePlus className='h-6 w-6' />
-              <span className='text-sm font-medium'>Drop images here</span>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+        {/* Drag-and-drop overlay */}
+        <AnimatePresence>
+          {isDragOver && (
+            <motion.div
+              data-testid='chat-attachment-dropzone'
+              className='absolute inset-0 z-50 flex items-center justify-center rounded-[var(--linear-app-shell-radius)] border border-dashed border-(--linear-app-frame-seam) bg-[linear-gradient(180deg,color-mix(in_oklab,var(--linear-app-content-surface)_82%,black),color-mix(in_oklab,var(--linear-app-content-surface)_70%,black))] p-6 backdrop-blur-md'
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] }}
+            >
+              <div className='flex min-h-40 w-full max-w-sm flex-col items-center justify-center gap-3 rounded-xl border border-(--linear-app-frame-seam) bg-surface-1 px-6 py-8 text-center shadow-[0_24px_80px_-32px_rgba(0,0,0,0.95)]'>
+                <ImagePlus
+                  className='h-7 w-7 text-secondary-token'
+                  aria-hidden='true'
+                  strokeWidth={2.25}
+                />
+                <div>
+                  <p className='text-sm font-semibold text-primary-token'>
+                    Drop images to attach
+                  </p>
+                  <p className='mt-1 text-xs leading-5 text-secondary-token'>
+                    Up to 4 images, 10 MB each.
+                  </p>
+                </div>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
 
-      {hasMessages ? (
+        {/* Persistent scroll viewport (flex-1) + morphing upper content.
+            The former hard switch (showThreadView ? thread-with-dock : centered-empty-with-dupe-composer)
+            is replaced by always-present bottom dock + AnimatePresence on the upper
+            (signals+heading+ornament+suggested vs. messages list). This is the exact
+            mechanical mirror of the OnboardingChat first-turn stabilization.
+            layoutId on ChatInput surface + dock position lock the geometry so hero↔compact
+            and empty↔thread transitions have zero jump or flicker. */}
         <div className='flex flex-1 flex-col overflow-hidden'>
-          {/* Messages area */}
           <div
             ref={scrollContainerRef}
             className='relative flex flex-1 flex-col overflow-y-auto px-4 py-5 sm:px-5'
             onScroll={onScroll}
           >
-            {shouldVirtualizeMessages ? (
-              <div
-                ref={totalSizeRef}
-                className='mx-auto flex min-h-full w-full max-w-[44rem] flex-col'
-                style={{
-                  position: 'relative',
-                  height: Math.max(
-                    virtualizer.getTotalSize(),
-                    scrollContainerRef.current?.clientHeight ?? 0
-                  ),
-                }}
-              >
-                {virtualizer.getVirtualItems().map(virtualItem => {
-                  const message = displayMessages[virtualItem.index];
-                  const index = virtualItem.index;
-                  const isThinking = message.id === THINKING_PLACEHOLDER_ID;
-                  return (
+            <AnimatePresence mode='popLayout' initial={false}>
+              {!showThreadView ? (
+                <div key='joviechat-empty-upper'>
+                  {/* Giant Jovie circle mark behind empty thread.
+                      Positioned absolute so it doesn't shift the welcome heading. */}
+                  <div
+                    aria-hidden
+                    className='pointer-events-none absolute inset-0 flex items-center justify-center select-none anim-calm-breath opacity-45'
+                    data-testid='chat-empty-thread-ornament'
+                  >
+                    {shellChatV1Enabled ? (
+                      <JovieMarkElectric
+                        spark={false}
+                        className='opacity-100'
+                        style={{
+                          width: 'clamp(180px, 34vw, 360px)',
+                          height: 'clamp(180px, 34vw, 360px)',
+                          transform: 'translateY(-16px)',
+                          WebkitMaskImage:
+                            'radial-gradient(circle, rgba(0,0,0,1) 55%, rgba(0,0,0,0.75) 75%, rgba(0,0,0,0) 95%)',
+                          maskImage:
+                            'radial-gradient(circle, rgba(0,0,0,1) 55%, rgba(0,0,0,0.75) 75%, rgba(0,0,0,0) 95%)',
+                        }}
+                      />
+                    ) : (
+                      <span
+                        style={{
+                          fontFamily:
+                            'var(--font-display, "Satoshi", -apple-system, system-ui, sans-serif)',
+                          fontWeight: 600,
+                          fontSize: 'clamp(180px, 38vw, 360px)',
+                          color: 'rgba(255,255,255,0.018)',
+                          letterSpacing: '-0.08em',
+                          lineHeight: 0.8,
+                          transform: 'translateY(-12px)',
+                        }}
+                      >
+                        j
+                      </span>
+                    )}
+                  </div>
+
+                  <div
+                    className='relative mx-auto flex min-h-full w-full max-w-[52rem] flex-col gap-6 py-8'
+                    data-testid='chat-empty-state-composer-region'
+                  >
+                    <EmptyStateSignalCards dimmed={composerPickerOpen} />
+
+                    <h1
+                      className={cn(
+                        'text-balance text-center text-[2rem] font-semibold leading-[1.1] text-primary-token sm:text-[2.5rem] md:text-[3rem]',
+                        composerPickerOpen && 'pointer-events-none opacity-0'
+                      )}
+                      aria-hidden={composerPickerOpen ? 'true' : undefined}
+                    >
+                      {emptyStateHeading}
+                    </h1>
+
+                    <div className='mx-auto flex w-full max-w-[38rem] flex-col items-center gap-3'>
+                      {showActionCard ? (
+                        <SuggestionCard
+                          title={primaryActionCard.title}
+                          body={primaryActionCard.body}
+                          actionLabel={primaryActionCard.actionLabel}
+                          onAct={() =>
+                            handleSuggestedPromptWithJank(
+                              primaryActionCard.prompt
+                            )
+                          }
+                        />
+                      ) : null}
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div key='joviechat-messages'>
+                  {shouldVirtualizeMessages ? (
                     <div
-                      key={message.id}
-                      data-index={virtualItem.index}
-                      ref={virtualizer.measureElement}
+                      ref={totalSizeRef}
+                      className='mx-auto flex min-h-full w-full max-w-[44rem] flex-col'
                       style={{
-                        position: 'absolute',
-                        top: 0,
-                        left: 0,
-                        width: '100%',
-                        transform: `translateY(${virtualItem.start}px)`,
+                        position: 'relative',
+                        height: Math.max(
+                          virtualizer.getTotalSize(),
+                          scrollContainerRef.current?.clientHeight ?? 0
+                        ),
                       }}
                     >
-                      <div className='pb-4'>
-                        <ChatMessage
-                          id={message.id}
-                          role={message.role}
-                          parts={message.parts}
-                          isStreaming={
-                            isStreaming && index === lastAssistantIndex
-                          }
-                          isThinking={isThinking}
-                          avatarUrl={
-                            message.role === 'user' ? avatarUrl : undefined
-                          }
-                          profileId={profileId}
-                          skipEntrance={knownMessageIdsRef.current.has(
-                            message.id
-                          )}
-                        />
-                      </div>
+                      {virtualizer.getVirtualItems().map(virtualItem => {
+                        const message = displayMessages[virtualItem.index];
+                        const index = virtualItem.index;
+                        const isThinking =
+                          message.id === THINKING_PLACEHOLDER_ID;
+                        return (
+                          <div
+                            key={message.id}
+                            data-index={virtualItem.index}
+                            ref={virtualizer.measureElement}
+                            style={{
+                              position: 'absolute',
+                              top: 0,
+                              left: 0,
+                              width: '100%',
+                              transform: `translateY(${virtualItem.start}px)`,
+                            }}
+                          >
+                            <div className='pb-4'>
+                              <ChatMessage
+                                id={message.id}
+                                role={message.role}
+                                parts={message.parts}
+                                isStreaming={
+                                  isStreaming && index === lastAssistantIndex
+                                }
+                                isThinking={isThinking}
+                                avatarUrl={
+                                  message.role === 'user'
+                                    ? avatarUrl
+                                    : undefined
+                                }
+                                profileId={profileId}
+                                skipEntrance={knownMessageIdsRef.current.has(
+                                  message.id
+                                )}
+                              />
+                            </div>
+                          </div>
+                        );
+                      })}
                     </div>
-                  );
-                })}
-              </div>
-            ) : (
-              <div
-                ref={totalSizeRef}
-                className='mx-auto flex min-h-full w-full max-w-[44rem] flex-col'
-              >
-                {displayMessages.map((message, index) => {
-                  const isThinking = message.id === THINKING_PLACEHOLDER_ID;
-                  return (
-                    <div key={message.id} className='pb-4'>
-                      <ChatMessage
-                        id={message.id}
-                        role={message.role}
-                        parts={message.parts}
-                        isStreaming={
-                          isStreaming && index === lastAssistantIndex
-                        }
-                        isThinking={isThinking}
-                        avatarUrl={
-                          message.role === 'user' ? avatarUrl : undefined
-                        }
-                        profileId={profileId}
-                        skipEntrance={knownMessageIdsRef.current.has(
-                          message.id
-                        )}
-                      />
+                  ) : (
+                    <div
+                      ref={totalSizeRef}
+                      className='mx-auto flex min-h-full w-full max-w-[44rem] flex-col'
+                    >
+                      {displayMessages.map((message, index) => {
+                        const isThinking =
+                          message.id === THINKING_PLACEHOLDER_ID;
+                        return (
+                          <div key={message.id} className='pb-4'>
+                            <ChatMessage
+                              id={message.id}
+                              role={message.role}
+                              parts={message.parts}
+                              isStreaming={
+                                isStreaming && index === lastAssistantIndex
+                              }
+                              isThinking={isThinking}
+                              avatarUrl={
+                                message.role === 'user' ? avatarUrl : undefined
+                              }
+                              profileId={profileId}
+                              skipEntrance={knownMessageIdsRef.current.has(
+                                message.id
+                              )}
+                            />
+                          </div>
+                        );
+                      })}
                     </div>
-                  );
-                })}
-              </div>
-            )}
+                  )}
 
-            {/* Scroll to bottom button */}
-            <ScrollToBottom
-              visible={!isStuckToBottom}
-              onClick={scrollToBottom}
-            />
+                  {/* Scroll to bottom button */}
+                  <ScrollToBottom
+                    visible={!isStuckToBottom}
+                    onClick={scrollToBottom}
+                  />
+                </div>
+              )}
+            </AnimatePresence>
           </div>
 
           {/*
-            Composer region anchors at the bottom (shrink-0 keeps it from
-            collapsing under flex-1 siblings). Wrapper padding is fixed, so
-            the input never jumps when transient alerts appear/disappear:
-            previously, ChatUsageAlert was wrapped in an always-rendered
-            `pt-3` div even when the alert returned null, leaving permanent
-            empty chrome that flipped to actual content the moment the alert
-            mounted. Now each alert opts in to its own bottom margin and is
-            unmounted entirely when empty.
+            Persistent always-bottom composer dock.
+            No more conditional + justify-center teleport for the input on first message.
+            Variant (hero/compact) changes are smoothed by the layoutId on the inner
+            motion surface. All transient chrome (alerts, rate, error) lives here for both
+            empty and thread states.
           */}
-          <div className='shrink-0 bg-(--linear-app-content-surface) px-4 pb-4 pt-2 sm:px-5 sm:pb-5 sm:pt-2.5'>
-            <div className='mx-auto w-full max-w-[44rem]'>
+          <div className={CHAT_COMPOSER_DOCK_CLASSNAME}>
+            <div className='mx-auto w-full max-w-[45rem]'>
               {/* Transient alerts stack above the input. Each contributes its
-                  own bottom margin only when rendered, so toggling them does
-                  not leave residual padding behind. */}
+                own bottom margin only when rendered. */}
               <ChatUsageAlert />
 
               {chatError && (
@@ -532,105 +724,16 @@ export function JovieChat({
 
               <ChatInput
                 {...chatInputProps}
-                placeholder='Ask a follow-up...'
-                variant='compact'
-                shellChatV1={shellChatV1Enabled}
-                quickActions={followUpQuickActions}
-                onQuickActionSelect={handleSuggestedPromptWithJank}
-              />
-            </div>
-          </div>
-        </div>
-      ) : (
-        <div className='flex flex-1 flex-col overflow-hidden'>
-          <div className='relative flex-1 overflow-y-auto px-4 sm:px-6'>
-            {/* Giant Jovie circle mark behind empty thread.
-                Positioned absolute so it doesn't shift the welcome heading. */}
-            <div
-              aria-hidden
-              className='pointer-events-none absolute inset-0 flex items-center justify-center select-none'
-              data-testid='chat-empty-thread-ornament'
-            >
-              {shellChatV1Enabled ? (
-                <svg
-                  viewBox='0 0 353.68 347.97'
-                  aria-hidden='true'
-                  fill='currentColor'
-                  style={{
-                    width: 'clamp(180px, 38vw, 360px)',
-                    height: 'clamp(180px, 38vw, 360px)',
-                    color: 'rgba(255,255,255,0.018)',
-                    transform: 'translateY(-12px)',
-                  }}
-                >
-                  <path d='m176.84,0l3.08.05c8.92,1.73,16.9,6.45,23.05,13.18,7.95,8.7,12.87,20.77,12.87,34.14s-4.92,25.44-12.87,34.14c-6.7,7.34-15.59,12.28-25.49,13.57h-.64s0,.01,0,.01h0c-22.2,0-42.3,8.84-56.83,23.13-14.5,14.27-23.49,33.99-23.49,55.77h0v.02c0,21.78,8.98,41.5,23.49,55.77,14.54,14.3,34.64,23.15,56.83,23.15v-.02h.01c22.2,0,42.3-8.84,56.83-23.13,14.51-14.27,23.49-33.99,23.49-55.77h0c0-17.55-5.81-33.75-15.63-46.82-10.08-13.43-24.42-23.61-41.05-28.62l-2.11-.64c4.36-2.65,8.34-5.96,11.84-9.78,9.57-10.47,15.5-24.89,15.5-40.77s-5.93-30.3-15.5-40.77c-1.44-1.57-2.95-3.06-4.55-4.44l7.67,1.58c40.44,8.35,75.81,30.3,100.91,60.75,24.66,29.91,39.44,68.02,39.44,109.5h0c0,48.05-19.81,91.55-51.83,123.05-31.99,31.46-76.19,50.92-125,50.92v.02h-.01c-48.79,0-93-19.47-125-50.94C19.81,265.54,0,222.04,0,173.99h0c0-48.05,19.81-91.56,51.83-123.05C83.84,19.47,128.04,0,176.84,0Z' />
-                </svg>
-              ) : (
-                <span
-                  style={{
-                    fontFamily:
-                      'var(--font-display, "Satoshi", -apple-system, system-ui, sans-serif)',
-                    fontWeight: 600,
-                    fontSize: 'clamp(180px, 38vw, 360px)',
-                    color: 'rgba(255,255,255,0.018)',
-                    letterSpacing: '-0.08em',
-                    lineHeight: 0.8,
-                    transform: 'translateY(-12px)',
-                  }}
-                >
-                  j
-                </span>
-              )}
-            </div>
-            <div className='relative mx-auto flex min-h-full w-full max-w-[44rem] flex-col items-center justify-center gap-6 py-8'>
-              <h1 className='text-balance text-center text-[2rem] font-semibold leading-[1.1] tracking-[-0.035em] text-primary-token sm:text-[2.5rem] md:text-[3rem]'>
-                {emptyStateHeading}
-              </h1>
-              <div className='mx-auto flex w-full max-w-[38rem] flex-col items-center gap-3'>
-                <SuggestedPrompts
-                  onSelect={handleSuggestedPromptWithJank}
-                  isFirstSession={isFirstSession}
-                  latestReleaseTitle={latestReleaseTitle}
-                  layout='rail'
-                  dimmed={composerPickerOpen}
-                />
-                {chatError && (
-                  <div className='mt-2.5 w-full'>
-                    <ErrorDisplay
-                      chatError={chatError}
-                      onRetry={handleRetry}
-                      isLoading={isLoading}
-                      isSubmitting={isSubmitting}
-                    />
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-
-          <div className='shrink-0 bg-(--linear-app-content-surface) px-4 pb-4 pt-2 sm:px-5 sm:pb-5 sm:pt-2.5'>
-            <div className='mx-auto w-full max-w-[34rem]'>
-              <ChatUsageAlert />
-
-              {isRateLimited && (
-                <p
-                  className='mb-1.5 text-center text-xs text-tertiary-token'
-                  aria-live='polite'
-                >
-                  Sending too fast. Please wait a second before your next
-                  message.
-                </p>
-              )}
-
-              <ChatInput
-                {...chatInputProps}
-                placeholder='Ask Jovie...'
+                placeholder={
+                  showThreadView ? 'Ask a follow-up...' : 'Ask Jovie...'
+                }
+                variant={showThreadView ? 'compact' : 'hero'}
                 shellChatV1={shellChatV1Enabled}
               />
             </div>
           </div>
         </div>
-      )}
-    </div>
+      </div>
+    </EntityResolutionProvider>
   );
 }

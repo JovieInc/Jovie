@@ -1,4 +1,4 @@
-import { APP_ROUTES } from '../constants/routes';
+import { APP_ROUTES, buildLyricsRoute } from '../constants/routes';
 import {
   resolveActiveProfileOnboardingPath,
   resolveChatConversationPerfPath,
@@ -132,12 +132,66 @@ function normalizeRouteDefinition(
   };
 }
 
+const RELEASE_TASKS_ROUTE_TEMPLATE = `${APP_ROUTES.RELEASES}/[releaseId]/tasks`;
+
+function extractReleaseIdFromReleaseTasksPath(path: string) {
+  const pathname = path.split('?')[0];
+  const releaseTasksPrefix = [
+    APP_ROUTES.RELEASES,
+    APP_ROUTES.DASHBOARD_RELEASES,
+  ]
+    .map(prefix => `${prefix}/`)
+    .find(prefix => pathname.startsWith(prefix));
+
+  if (!releaseTasksPrefix || !pathname.endsWith('/tasks')) {
+    throw new Error(
+      `Could not derive a lyrics route from release tasks path: ${path}`
+    );
+  }
+
+  const releaseId = pathname
+    .slice(releaseTasksPrefix.length, -'/tasks'.length)
+    .replace(/^\/+|\/+$/g, '');
+
+  if (!releaseId) {
+    throw new Error(
+      `Could not derive a release id from release tasks path: ${path}`
+    );
+  }
+
+  return releaseId;
+}
+
+async function resolveCreatorLyricsPerfPath(
+  route: PerfRouteDefinition,
+  context: PerfResolveContext
+) {
+  const releaseTasksPath = await resolveReleaseTasksPerfPath(
+    {
+      ...route,
+      path: RELEASE_TASKS_ROUTE_TEMPLATE,
+    },
+    context
+  );
+  return buildLyricsRoute(
+    extractReleaseIdFromReleaseTasksPath(releaseTasksPath)
+  );
+}
+
 const DEFAULT_PUBLIC_RESOURCE_BUDGETS = [
   { resourceType: 'script', budget: 1050 },
   { resourceType: 'image', budget: 500 },
   { resourceType: 'font', budget: 100 },
   { resourceType: 'stylesheet', budget: 100 },
   { resourceType: 'total', budget: 1200 },
+] as const satisfies readonly PerfResourceBudget[];
+
+const BRAND_RESOURCE_BUDGETS = [
+  { resourceType: 'script', budget: 700 },
+  { resourceType: 'image', budget: 10 },
+  { resourceType: 'font', budget: 75 },
+  { resourceType: 'stylesheet', budget: 130 },
+  { resourceType: 'total', budget: 900 },
 ] as const satisfies readonly PerfResourceBudget[];
 
 const AUTH_RESOURCE_BUDGETS = [
@@ -759,16 +813,19 @@ const MARKETING_PUBLIC_ROUTES = [
     path: APP_ROUTES.BRAND,
     requiresAuth: false,
     warmupStrategy: 'public-route',
-    measureMode: 'page-load',
-    readySelectors: { content: ['main', 'h1'] },
+    measureMode: 'interactive-shell',
+    readySelectors: {
+      shell: ['main h1'],
+      content: ['main h1'],
+    },
     timings: [
-      { metric: 'first-contentful-paint', budget: 1800 },
-      { metric: 'largest-contentful-paint', budget: 2600 },
-      { metric: 'cumulative-layout-shift', budget: 0.1 },
+      { metric: 'first-contentful-paint', budget: 100 },
+      { metric: 'largest-contentful-paint', budget: 300 },
+      { metric: 'cumulative-layout-shift', budget: 0.05 },
       { metric: 'first-input-delay', budget: 100 },
-      { metric: 'time-to-first-byte', budget: 1500 },
+      { metric: 'time-to-first-byte', budget: 50 },
     ],
-    resourceSizes: DEFAULT_PUBLIC_RESOURCE_BUDGETS,
+    resourceSizes: BRAND_RESOURCE_BUDGETS,
     priority: 2,
   },
 ] as const satisfies readonly PerfRouteDefinition[];
@@ -895,7 +952,7 @@ const CREATOR_SHELL_ROUTES = [
     id: 'creator-audience',
     group: 'creator-shell',
     surface: 'creator-app',
-    path: APP_ROUTES.DASHBOARD_AUDIENCE,
+    path: APP_ROUTES.AUDIENCE,
     requiresAuth: true,
     warmupStrategy: 'authenticated-route',
     measureMode: 'page-load',
@@ -988,21 +1045,18 @@ const CREATOR_SHELL_ROUTES = [
     id: 'creator-releases',
     group: 'creator-shell',
     surface: 'creator-app',
-    path: APP_ROUTES.DASHBOARD_RELEASES,
+    path: APP_ROUTES.RELEASES,
     requiresAuth: true,
     warmupStrategy: 'authenticated-shell',
     measureMode: 'warm-navigation',
     readySelectors: {
-      shell: ['[data-testid="releases-shell-ready"]'],
+      shell: ['[data-app-shell-frame="true"]'],
       content: [
         '[data-testid="releases-loading"]',
         '[data-testid="releases-matrix"]',
       ],
       loading: ['[data-testid="releases-loading"]'],
-      navTrigger: [
-        `a[href="${APP_ROUTES.DASHBOARD_RELEASES}"]`,
-        `a[href="${APP_ROUTES.RELEASES}"]`,
-      ],
+      navTrigger: [`a[href="${APP_ROUTES.RELEASES}"]`],
       redirectDestinations: [APP_ROUTES.RELEASES],
     },
     timings: [
@@ -1016,10 +1070,84 @@ const CREATOR_SHELL_ROUTES = [
     seedProfile: 'active-user',
   },
   {
+    id: 'creator-library',
+    group: 'creator-shell',
+    surface: 'creator-app',
+    path: APP_ROUTES.LIBRARY,
+    requiresAuth: true,
+    warmupStrategy: 'authenticated-shell',
+    measureMode: 'warm-navigation',
+    readySelectors: {
+      shell: ['[data-testid="library-surface"]'],
+      content: ['[data-testid="library-surface"]'],
+      loading: ['main[aria-label="Loading Library"]'],
+      navTrigger: [
+        `a[href="${APP_ROUTES.LIBRARY}"]`,
+        `a[href="${APP_ROUTES.DASHBOARD_LIBRARY}"]`,
+        `a[href="${APP_ROUTES.LEGACY_DASHBOARD_LIBRARY}"]`,
+      ],
+    },
+    timings: [
+      { metric: 'warm-shell-response', budget: 100 },
+      { metric: 'skeleton-to-content', budget: 1000 },
+    ],
+    resourceSizes: RELEASES_RESOURCE_BUDGETS,
+    priority: 9,
+    seedProfile: 'active-user',
+  },
+  {
+    id: 'creator-tasks',
+    group: 'creator-shell',
+    surface: 'creator-app',
+    path: APP_ROUTES.TASKS,
+    requiresAuth: true,
+    warmupStrategy: 'authenticated-shell',
+    measureMode: 'warm-navigation',
+    readySelectors: {
+      shell: [
+        '[data-testid="tasks-workspace"]',
+        '[data-testid="tasks-upgrade-interstitial"]',
+      ],
+      content: [
+        '[data-testid="tasks-workspace"]',
+        '[data-testid="tasks-upgrade-interstitial"]',
+        '[data-testid="release-plan-upgrade-interstitial"]',
+      ],
+      navTrigger: [`a[href="${APP_ROUTES.TASKS}"]`],
+    },
+    timings: [{ metric: 'warm-shell-response', budget: 100 }],
+    resourceSizes: RELEASES_RESOURCE_BUDGETS,
+    priority: 10,
+    seedProfile: 'active-user',
+  },
+  {
+    id: 'creator-lyrics',
+    group: 'creator-shell',
+    surface: 'creator-app',
+    path: `${APP_ROUTES.LYRICS}/[trackId]`,
+    resolvePath: resolveCreatorLyricsPerfPath,
+    requiresAuth: true,
+    warmupStrategy: 'authenticated-route',
+    measureMode: 'page-load',
+    readySelectors: {
+      content: ['section[aria-label="Lyrics"]', 'h2:has-text("No lyrics yet")'],
+    },
+    timings: [
+      { metric: 'first-contentful-paint', budget: 1800 },
+      { metric: 'largest-contentful-paint', budget: 3000 },
+      { metric: 'cumulative-layout-shift', budget: 0.1 },
+      { metric: 'first-input-delay', budget: 100 },
+      { metric: 'time-to-first-byte', budget: 1600 },
+    ],
+    resourceSizes: RELEASES_RESOURCE_BUDGETS,
+    priority: 11,
+    seedProfile: 'active-user',
+  },
+  {
     id: 'creator-release-tasks',
     group: 'creator-shell',
     surface: 'creator-app',
-    path: APP_ROUTES.DASHBOARD_RELEASE_TASKS,
+    path: RELEASE_TASKS_ROUTE_TEMPLATE,
     resolvePath: resolveReleaseTasksPerfPath,
     requiresAuth: true,
     warmupStrategy: 'authenticated-route',
@@ -1039,7 +1167,7 @@ const CREATOR_SHELL_ROUTES = [
       { metric: 'skeleton-to-content', budget: 600 },
     ],
     resourceSizes: RELEASES_RESOURCE_BUDGETS,
-    priority: 9,
+    priority: 12,
     seedProfile: 'active-user',
   },
 ] as const satisfies readonly PerfRouteDefinition[];

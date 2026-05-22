@@ -112,13 +112,49 @@ describe('tryHandleAnonymousOnboardingChat', () => {
     expect(hoisted.checkGateForUserMock).not.toHaveBeenCalled();
   });
 
-  it('returns 503 when the Statsig kill-switch is disabled', async () => {
+  it('does not let the removed onboarding rollout gate disable the live route', async () => {
     vi.resetModules();
     vi.doMock('@/lib/env-server', () => ({
       env: { NODE_ENV: 'production' },
       isSecureEnv: () => true,
     }));
     hoisted.checkGateForUserMock.mockResolvedValue(false);
+    hoisted.isTurnstileConfiguredMock.mockReturnValue(true);
+    hoisted.verifyTurnstileTokenMock.mockResolvedValue({
+      success: false,
+      reason: 'missing_token',
+    });
+    const { tryHandleAnonymousOnboardingChat } = await import(
+      '@/app/api/chat/onboarding-handler'
+    );
+    const req = makeRequest({
+      mode: 'onboarding',
+      messages: [userMessage('hi')],
+    });
+    const result = await tryHandleAnonymousOnboardingChat(req, 'req-2a');
+    expect(result).not.toBeNull();
+    expect(result?.status).toBe(403);
+    const body = await result?.json();
+    expect(body.errorCode).toBe('TURNSTILE_REQUIRED');
+    expect(hoisted.checkGateForUserMock).toHaveBeenCalledWith(
+      null,
+      'ai_chat_disabled',
+      false
+    );
+    expect(hoisted.checkGateForUserMock).not.toHaveBeenCalledWith(
+      null,
+      'onboarding_chat_v2',
+      false
+    );
+  });
+
+  it('returns 503 when the global chat kill-switch is enabled', async () => {
+    vi.resetModules();
+    vi.doMock('@/lib/env-server', () => ({
+      env: { NODE_ENV: 'production' },
+      isSecureEnv: () => true,
+    }));
+    hoisted.checkGateForUserMock.mockResolvedValue(true);
     const { tryHandleAnonymousOnboardingChat } = await import(
       '@/app/api/chat/onboarding-handler'
     );
@@ -178,6 +214,7 @@ describe('tryHandleAnonymousOnboardingChat', () => {
       env: { NODE_ENV: 'production' },
       isSecureEnv: () => true,
     }));
+    hoisted.checkGateForUserMock.mockResolvedValue(false);
     hoisted.isTurnstileConfiguredMock.mockReturnValue(false);
     const { tryHandleAnonymousOnboardingChat } = await import(
       '@/app/api/chat/onboarding-handler'

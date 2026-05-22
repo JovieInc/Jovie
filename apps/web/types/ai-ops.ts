@@ -3,6 +3,7 @@ export type HermesAiOpsSource =
   | 'linear'
   | 'sentry'
   | 'hermes'
+  | 'hermes-air'
   | 'ci';
 
 export type HermesAiOpsKind =

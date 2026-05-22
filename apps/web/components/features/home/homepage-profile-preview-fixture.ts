@@ -545,7 +545,7 @@ export const HOMEPAGE_PROFILE_PREVIEW_RELEASES = {
     title: HOME_RELEASE_DESTINATION_PRESAVE_MOCK.title,
     slug: 'the-deep-end',
     artworkUrl: '/img/releases/the-deep-end.jpg',
-    releaseDate: '2026-05-01T07:00:00.000Z',
+    releaseDate: '2027-07-01T07:00:00.000Z',
     revealDate: '2026-04-18T07:00:00.000Z',
     releaseType: 'single',
     metadata: {
@@ -714,6 +714,13 @@ export const HOMEPAGE_PROFILE_SHOWCASE_STATES: Readonly<
     label: 'Listen Fallback',
     helper: 'Keep a clean listen action live when nothing else should lead.',
   }),
+  'alerts-fallback': createQuietButtonShowcaseState({
+    id: 'alerts-fallback',
+    latestReleaseKey: 'none',
+    label: 'Alerts Fallback',
+    helper:
+      'When there is no release, tour, playlist, or merch item, alerts become the action.',
+  }),
   'fans-opt-in': createComposeShowcaseState({
     id: 'fans-opt-in',
     latestReleaseKey: 'live',
@@ -808,6 +815,27 @@ export const HOMEPAGE_PROFILE_SHOWCASE_STATES: Readonly<
     label: 'Next Date Live',
     helper: 'Lead with the next date and open the full run from there.',
     drawerView: 'tour',
+    showSubscriptionConfirmedBanner: false,
+  }),
+  'events-empty': createShowcaseState({
+    id: 'events-empty',
+    latestReleaseKey: 'none',
+    kind: 'button',
+    tone: 'quiet',
+    label: 'Events Empty',
+    helper: 'The empty Events tab should still offer alerts.',
+    drawerView: 'tour',
+    showSubscriptionConfirmedBanner: false,
+  }),
+  'more-menu': createShowcaseState({
+    id: 'more-menu',
+    latestReleaseKey: 'live',
+    kind: 'button',
+    tone: 'quiet',
+    label: 'More Menu',
+    helper: 'The compact profile menu should fit above the bottom nav.',
+    drawerView: 'menu',
+    releaseActionLabel: 'Listen',
     showSubscriptionConfirmedBanner: false,
   }),
   'tips-open': createQuietButtonShowcaseState({

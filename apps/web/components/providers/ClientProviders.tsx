@@ -94,6 +94,7 @@ export function ClientProviders({
       proxyUrl={getClerkProxyUrl(globalThis.location)}
       appearance={clerkAppearanceBase}
       ui={ui}
+      prefetchUI={false}
       signInUrl={APP_ROUTES.SIGNIN}
       signUpUrl={APP_ROUTES.SIGNUP}
       signInFallbackRedirectUrl={APP_ROUTES.DASHBOARD}

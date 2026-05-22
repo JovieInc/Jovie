@@ -14,13 +14,19 @@ import { getBreadcrumbLabel } from '@/lib/constants/breadcrumb-labels';
 import type { DashboardBreadcrumbItem } from '@/types/dashboard';
 
 export interface AuthRouteConfig {
-  section: 'admin' | 'dashboard' | 'settings';
+  section: 'admin' | 'dashboard' | 'library' | 'settings';
   breadcrumbs: DashboardBreadcrumbItem[];
   showMobileTabs: boolean;
   isTableRoute: boolean;
   isArtistProfileSettings: boolean;
+  isChatRoute: boolean;
   isDemoRoute: boolean;
   showChatUsageIndicator: boolean;
+  isLyricsRoute: boolean;
+}
+
+function isChatThreadPath(parts: readonly string[]): boolean {
+  return parts[0] === 'app' && parts[1] === 'chat' && parts.length > 2;
 }
 
 export function getDemoBreadcrumbSegment(pathname: string): string {
@@ -51,9 +57,17 @@ export function useAuthRouteConfig(): AuthRouteConfig {
   const isDemoRoute = isDemoRoutePath(pathname);
 
   // Detect section based on pathname
-  const section = useMemo<'admin' | 'dashboard' | 'settings'>(() => {
+  const section = useMemo<
+    'admin' | 'dashboard' | 'library' | 'settings'
+  >(() => {
     if (pathname.startsWith(APP_ROUTES.ADMIN)) return 'admin';
     if (pathname.startsWith(APP_ROUTES.SETTINGS)) return 'settings';
+    if (
+      pathname === APP_ROUTES.LIBRARY ||
+      pathname.startsWith(`${APP_ROUTES.LIBRARY}/`)
+    ) {
+      return 'library';
+    }
     return 'dashboard';
   }, [pathname]);
 
@@ -78,7 +92,9 @@ export function useAuthRouteConfig(): AuthRouteConfig {
     const UUID_REGEX =
       /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
     let lastPart = parts[parts.length - 1];
-    if (UUID_REGEX.test(lastPart) && parts.length >= 2) {
+    if (isChatThreadPath(parts)) {
+      lastPart = 'chat';
+    } else if (UUID_REGEX.test(lastPart) && parts.length >= 2) {
       lastPart = parts[parts.length - 2];
     }
 
@@ -151,8 +167,17 @@ export function useAuthRouteConfig(): AuthRouteConfig {
     [pathname]
   );
 
-  const showChatUsageIndicator = useMemo(
-    () => pathname.startsWith(`${APP_ROUTES.CHAT}/`),
+  const isChatRoute = useMemo(
+    () =>
+      pathname === APP_ROUTES.CHAT ||
+      pathname.startsWith(`${APP_ROUTES.CHAT}/`),
+    [pathname]
+  );
+
+  const isLyricsRoute = useMemo(
+    () =>
+      pathname === APP_ROUTES.LYRICS ||
+      Boolean(pathname?.startsWith(`${APP_ROUTES.LYRICS}/`)),
     [pathname]
   );
 
@@ -162,7 +187,9 @@ export function useAuthRouteConfig(): AuthRouteConfig {
     showMobileTabs,
     isTableRoute,
     isArtistProfileSettings,
+    isChatRoute,
     isDemoRoute,
-    showChatUsageIndicator,
+    showChatUsageIndicator: isChatRoute,
+    isLyricsRoute,
   };
 }

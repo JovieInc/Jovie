@@ -22,9 +22,6 @@ import {
 } from './ScrubGradient';
 import { Tooltip } from './Tooltip';
 
-const DURATION_CINEMATIC = 420;
-const EASE_CINEMATIC = 'cubic-bezier(0.32, 0.72, 0, 1)';
-
 export interface AudioBarTrack {
   /** Used for accessible labels and ISRC-style follow-ups elsewhere. */
   readonly id: string;
@@ -139,7 +136,7 @@ export function AudioBar({
         <button
           type='button'
           onClick={onPlay}
-          className='h-8 w-8 rounded-full grid place-items-center bg-primary text-on-primary transition-colors duration-150 ease-out hover:bg-primary/90'
+          className='h-8 w-8 rounded-full grid place-items-center bg-primary text-on-primary transition-colors duration-subtle ease-subtle hover:bg-primary/90'
           aria-label={isPlaying ? 'Pause (space)' : 'Play (space)'}
         >
           {isPlaying ? (
@@ -176,7 +173,7 @@ export function AudioBar({
     <div className='flex items-center gap-1.5 justify-self-end'>
       {track.hasLyrics && onOpenLyrics && (
         <IconBtn
-          label='Lyrics'
+          label={lyricsActive ? 'Close lyrics' : 'Lyrics'}
           shortcut={SHORTCUTS.toggleLyrics}
           onClick={onOpenLyrics}
           active={lyricsActive}
@@ -234,7 +231,7 @@ export function AudioBar({
             maxHeight: waveformOn ? 40 : 0,
             opacity: waveformOn ? 1 : 0,
             transform: waveformOn ? 'translateY(0)' : 'translateY(6px)',
-            transition: `max-height ${DURATION_CINEMATIC}ms ${EASE_CINEMATIC}, opacity ${DURATION_CINEMATIC}ms ${EASE_CINEMATIC}, transform ${DURATION_CINEMATIC}ms ${EASE_CINEMATIC}`,
+            transition: `max-height var(--ds-motion-cinematic-duration) var(--ds-motion-cinematic-easing), opacity var(--ds-motion-cinematic-duration) var(--ds-motion-cinematic-easing), transform var(--ds-motion-cinematic-duration) var(--ds-motion-cinematic-easing)`,
           }}
         >
           <div className='pt-1.5 pb-1.5'>

@@ -140,6 +140,28 @@ describe('SlashCommandMenu keyboard + IME + ARIA', () => {
     expect(typeof skill.id).toBe('string');
   });
 
+  it('filters and commits the Feedback skill from the root slash query', () => {
+    const handlers = makeHandlers();
+    renderMenu(
+      {
+        status: 'root',
+        query: 'feed',
+        startIdx: 0,
+        selectedIndex: 0,
+      },
+      handlers
+    );
+
+    expect(
+      screen.getByRole('option', { name: /send feedback/i })
+    ).toBeVisible();
+    fireEvent.keyDown(window, { key: 'Enter' });
+
+    expect(handlers.onSelectSkill).toHaveBeenCalledTimes(1);
+    const skill = handlers.onSelectSkill.mock.calls[0][0] as SkillCommand;
+    expect(skill.id).toBe('submitFeedback');
+  });
+
   it('Escape calls onClose', () => {
     const handlers = makeHandlers();
     renderMenu(rootState(0), handlers);

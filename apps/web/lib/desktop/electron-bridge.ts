@@ -46,6 +46,12 @@ export interface ElectronAPI {
     readonly ok: boolean;
     readonly reason?: string;
   }>;
+  /**
+   * Desktop dictation capability probe. Native OS dictation APIs are not
+   * exposed directly to the sandboxed renderer; this tells the web composer
+   * whether Electron has explicitly allowed the trusted Web Speech fallback.
+   */
+  readonly getDictationStatus?: () => Promise<DesktopDictationStatus>;
 }
 
 type InstallUpdateResult = Awaited<
@@ -278,7 +284,9 @@ export function useDesktopUpdate(): DesktopUpdateState {
 export async function startDesktopAuthHandoff(authUrl: string): Promise<void> {
   const api = getRawElectronAPI();
   if (api && typeof api.startDesktopAuthHandoff === 'function') {
-    await api.startDesktopAuthHandoff(authUrl);
+    const result = await api.startDesktopAuthHandoff(authUrl);
+    if (result?.ok) return;
+    openBrowserFallback(authUrl);
     return;
   }
   if (api) {
@@ -312,6 +320,44 @@ export interface DesktopNavState {
   readonly goForward: () => void;
 }
 
+export interface DesktopDictationStatus {
+  readonly ok: boolean;
+  readonly nativeAvailable: boolean;
+  readonly webSpeechFallbackAllowed: boolean;
+  readonly mode: 'native' | 'web-speech' | 'unavailable';
+  readonly reason?: string;
+}
+
+const DESKTOP_DICTATION_UNAVAILABLE: DesktopDictationStatus = {
+  ok: false,
+  nativeAvailable: false,
+  webSpeechFallbackAllowed: false,
+  mode: 'unavailable',
+  reason: 'desktop-dictation-bridge-unavailable',
+};
+
+function isDesktopDictationMode(
+  value: unknown
+): value is DesktopDictationStatus['mode'] {
+  return (
+    value === 'native' || value === 'web-speech' || value === 'unavailable'
+  );
+}
+
+function isDesktopDictationStatus(
+  value: unknown
+): value is DesktopDictationStatus {
+  if (value === null || typeof value !== 'object') return false;
+  const status = value as Partial<DesktopDictationStatus>;
+  return (
+    typeof status.ok === 'boolean' &&
+    typeof status.nativeAvailable === 'boolean' &&
+    typeof status.webSpeechFallbackAllowed === 'boolean' &&
+    isDesktopDictationMode(status.mode) &&
+    (status.reason === undefined || typeof status.reason === 'string')
+  );
+}
+
 /**
  * useDesktopNavigation — subscribes to Electron webContents nav-state IPC.
  *
@@ -343,10 +389,77 @@ export function useDesktopNavigation(): DesktopNavState {
   };
 }
 
+async function safeGetDictationStatus(): Promise<DesktopDictationStatus> {
+  const api = getRawElectronAPI();
+  if (!api) {
+    return {
+      ok: true,
+      nativeAvailable: false,
+      webSpeechFallbackAllowed: true,
+      mode: 'web-speech',
+      reason: 'browser-context',
+    };
+  }
+
+  if (typeof api.getDictationStatus !== 'function') {
+    reportMissingBridgeMethod('getDictationStatus');
+    return DESKTOP_DICTATION_UNAVAILABLE;
+  }
+
+  try {
+    const status = await api.getDictationStatus();
+    if (isDesktopDictationStatus(status)) return status;
+
+    void captureWarning(
+      'getDictationStatus returned invalid payload',
+      'Renderer expected a DesktopDictationStatus payload from the Electron bridge.',
+      {
+        route: 'desktop/electron-bridge',
+        bridgeMethod: 'getDictationStatus',
+      }
+    );
+    return DESKTOP_DICTATION_UNAVAILABLE;
+  } catch (error) {
+    void captureWarning('getDictationStatus threw', error, {
+      route: 'desktop/electron-bridge',
+      bridgeMethod: 'getDictationStatus',
+    });
+    return DESKTOP_DICTATION_UNAVAILABLE;
+  }
+}
+
+export function useDesktopDictationStatus(): DesktopDictationStatus {
+  const [status, setStatus] = useState<DesktopDictationStatus>(() => {
+    if (!isElectronRuntime()) {
+      return {
+        ok: true,
+        nativeAvailable: false,
+        webSpeechFallbackAllowed: true,
+        mode: 'web-speech',
+        reason: 'browser-context',
+      };
+    }
+    return DESKTOP_DICTATION_UNAVAILABLE;
+  });
+
+  useEffect(() => {
+    let isActive = true;
+    void safeGetDictationStatus().then(nextStatus => {
+      if (isActive) setStatus(nextStatus);
+    });
+    return () => {
+      isActive = false;
+    };
+  }, []);
+
+  return status;
+}
+
 // Exported for tests only — do not call directly from product code.
 export const __testing = {
   reset: () => reportedMissing.clear(),
   safeInstallUpdateAndRestart,
+  safeGetDictationStatus,
   safeOnUpdateAvailable,
   safeOnUpdateDownloaded,
   startDesktopAuthHandoff,

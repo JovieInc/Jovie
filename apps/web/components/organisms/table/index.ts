@@ -83,6 +83,16 @@ export { AudienceVisitsCell } from './atoms/AudienceVisitsCell';
 export { AvatarCell } from './atoms/AvatarCell';
 export { DateCell } from './atoms/DateCell';
 export { GroupHeader } from './atoms/GroupHeader';
+export type {
+  ShellListRowButtonProps,
+  ShellListRowFrameProps,
+  ShellListRowInteraction,
+} from './atoms/ShellListRowFrame';
+export {
+  getShellListRowFrameClassName,
+  ShellListRowButton,
+  ShellListRowFrame,
+} from './atoms/ShellListRowFrame';
 export { SkeletonCell } from './atoms/SkeletonCell';
 export { SkeletonRow } from './atoms/SkeletonRow';
 export { TableBadge } from './atoms/TableBadge';
@@ -101,8 +111,6 @@ export { TableEmptyState } from './atoms/TableEmptyState';
 export type { TableHeaderCellProps } from './atoms/TableHeaderCell';
 export { TableHeaderCell } from './atoms/TableHeaderCell';
 export { TableIconButton } from './atoms/TableIconButton';
-export type { TableRowProps } from './atoms/TableRow';
-export { TableRow } from './atoms/TableRow';
 
 // =============================================================================
 // Molecules
@@ -151,6 +159,12 @@ export {
 export type { PageToolbarSearchFormProps } from './molecules/PageToolbarSearchForm';
 export { PageToolbarSearchForm } from './molecules/PageToolbarSearchForm';
 export { ResponsiveActionsCell } from './molecules/ResponsiveActionsCell';
+export {
+  TableBody,
+  TableHead,
+  TableRoot,
+  TableRow,
+} from './molecules/SemanticTable';
 export { SocialLinksCell } from './molecules/SocialLinksCell';
 export type { BulkAction } from './molecules/TableBulkActionsToolbar';
 export { TableBulkActionsToolbar } from './molecules/TableBulkActionsToolbar';
@@ -236,4 +250,4 @@ export { useTableGrouping } from './utils/useTableGrouping';
 // Styles
 // =============================================================================
 
-export { cn, presets } from './table.styles';
+export { cn, presets, rowState } from './table.styles';

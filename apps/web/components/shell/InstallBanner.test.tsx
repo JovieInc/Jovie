@@ -47,4 +47,19 @@ describe('InstallBanner', () => {
     fireEvent.click(screen.getByText('Install'));
     expect(onCta).toHaveBeenCalledOnce();
   });
+
+  it('supports disabling the primary action', () => {
+    const onCta = vi.fn();
+    render(
+      <InstallBanner
+        open
+        onDismiss={() => undefined}
+        onCta={onCta}
+        ctaDisabled
+      />
+    );
+    fireEvent.click(screen.getByText('Install'));
+    expect(screen.getByText('Install')).toBeDisabled();
+    expect(onCta).not.toHaveBeenCalled();
+  });
 });

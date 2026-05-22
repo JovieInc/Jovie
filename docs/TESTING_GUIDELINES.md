@@ -16,6 +16,8 @@ Coverage is not the goal — coverage on the right files is. The risk-based dash
 
 **When you add or modify code in a critical surface,** check the heatmap's priority queue and aim for the surface's `target_coverage`. The register fields drive everything: change `blast_radius` / `reversibility` / `visibility` to recalibrate, change `target_coverage` to move the goal post.
 
+**Layout shift & visual stability testing is mandatory risk-based coverage.** Any component or route that renders conditional UI (loading states, status banners, securing/awaiting indicators, empty vs populated, auth variants, mobile/desktop, composer states, progressive rails, etc.) must have explicit tests or assertions proving that state transitions cause **zero layout shift**. Use Playwright `boundingBox()` or `getBoundingClientRect` helpers, visual regression specs, or dedicated stability specs (see `tests/e2e/profile-cls-audit.spec.ts`, `tests/helpers/dom-stability.ts`). The `/start` onboarding composer (duplicate "Securing chat..." removal) is the reference case: parents now use constant structure + ChatInput placeholder as single source of truth.
+
 ## Principles
 
 - **Ship fast, stay correct:** Tests are a safety net, not a brake. Write the minimum set that lets you ship with conviction.

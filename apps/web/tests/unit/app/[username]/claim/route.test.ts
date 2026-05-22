@@ -85,4 +85,30 @@ describe('Claim route', () => {
     );
     expect(mockGetProfileByUsername).toHaveBeenCalledWith('testartist');
   });
+
+  it('redirects to / for invalid username (length or pattern)', async () => {
+    const { GET } = await import('../../../../../app/[username]/claim/route'); // re-import safe
+    const response = await GET(
+      new NextRequest(
+        'http://localhost/thisusernameiswaytoolongandinvalid/claim'
+      ),
+      {
+        params: Promise.resolve({
+          username: 'thisusernameiswaytoolongandinvalid',
+        }),
+      }
+    );
+    expect(response.status).toBe(307);
+    expect(response.headers.get('location')).toBe('http://localhost/');
+  });
+
+  it('redirects to / when profile not found', async () => {
+    mockGetProfileByUsername.mockResolvedValueOnce(null);
+    const response = await GET(
+      new NextRequest('http://localhost/ghost/claim'),
+      { params: Promise.resolve({ username: 'ghost' }) }
+    );
+    expect(response.status).toBe(307);
+    expect(response.headers.get('location')).toBe('http://localhost/');
+  });
 });

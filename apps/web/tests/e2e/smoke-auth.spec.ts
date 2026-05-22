@@ -78,7 +78,7 @@ async function assertDashboardRouteLoaded(
     return;
   }
 
-  if (path === APP_ROUTES.DASHBOARD_AUDIENCE) {
+  if (path === APP_ROUTES.AUDIENCE) {
     await expect(
       page.getByTestId('dashboard-audience-client'),
       'Audience: audience client did not render'
@@ -86,7 +86,7 @@ async function assertDashboardRouteLoaded(
     return;
   }
 
-  if (path === APP_ROUTES.DASHBOARD_RELEASES) {
+  if (path === APP_ROUTES.RELEASES) {
     const releasesSurface = page
       .getByTestId('releases-matrix')
       .or(page.getByTestId('shell-releases-view'))
@@ -230,8 +230,8 @@ test.describe('Dashboard Navigation @smoke', () => {
       ? [{ path: APP_ROUTES.CHAT, name: 'Chat' }]
       : [
           { path: APP_ROUTES.CHAT, name: 'Chat' },
-          { path: APP_ROUTES.DASHBOARD_AUDIENCE, name: 'Audience' },
-          { path: APP_ROUTES.DASHBOARD_RELEASES, name: 'Releases' },
+          { path: APP_ROUTES.AUDIENCE, name: 'Audience' },
+          { path: APP_ROUTES.RELEASES, name: 'Releases' },
           {
             path: APP_ROUTES.DASHBOARD_EARNINGS,
             name: 'Legacy Earnings Redirect',

@@ -18,7 +18,8 @@
       "!.claude/skills/gstack/**",
       "!!storybook-static",
       "!**/*.html",
-      "!**/.next"
+      "!**/.next",
+      "!apps/web/public/pitch/**"
     ]
   },
   "formatter": {

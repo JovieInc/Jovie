@@ -11,6 +11,8 @@ import { ErrorBoundary } from '@/components/providers/ErrorBoundary';
 import { DashboardHeaderActionButton } from '@/features/dashboard/atoms/DashboardHeaderActionButton';
 
 function ProfilePageChatFallback() {
+  const router = useRouter();
+
   return (
     <ChatWorkspaceSurface>
       <div className='flex h-full items-center justify-center p-6'>
@@ -23,7 +25,7 @@ function ProfilePageChatFallback() {
           </p>
           <DashboardHeaderActionButton
             ariaLabel='Reload chat'
-            onClick={() => globalThis.location.reload()}
+            onClick={() => router.refresh()}
             icon={<RefreshCw className='h-4 w-4' />}
             label='Reload'
           />

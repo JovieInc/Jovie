@@ -16,7 +16,7 @@ import type { ReleaseFilters } from '../ReleaseTableSubheader';
 export function filterReleases(
   releases: readonly ReleaseViewModel[],
   filters: ReleaseFilters,
-  searchQuery: string
+  searchQuery: string = ''
 ): ReleaseViewModel[] {
   return releases.filter(release => {
     // Text search filter — matches title or any artist name (case-insensitive)

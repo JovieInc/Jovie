@@ -173,12 +173,14 @@ function DesktopSurfaceCard({
   onAction,
   children,
   className,
+  testId,
 }: Readonly<{
   title: string;
   actionLabel?: string;
   onAction?: () => void;
   children: React.ReactNode;
   className?: string;
+  testId?: string;
 }>) {
   return (
     <section
@@ -186,6 +188,7 @@ function DesktopSurfaceCard({
         'rounded-[18px] border border-white/6 bg-white/[0.025] p-5',
         className
       )}
+      data-testid={testId}
     >
       <div className='mb-4 flex items-center justify-between gap-4'>
         <h2 className='text-[16px] font-semibold tracking-[-0.02em] text-white'>
@@ -376,9 +379,12 @@ export function ProfileDesktopSurface({
   }
 
   const homeOverview = (
-    <div className='grid min-h-0 flex-1 gap-4 xl:grid-cols-[minmax(0,1.55fr)_minmax(360px,0.9fr)]'>
-      <div className='grid min-h-0 gap-3.5'>
-        <section className='relative min-h-[548px] overflow-hidden rounded-[26px] bg-[color:var(--profile-stage-bg)]'>
+    <div className='grid min-h-0 min-w-0 flex-1 gap-4 xl:grid-cols-[minmax(0,1fr)_360px] 2xl:grid-cols-[minmax(0,1.55fr)_minmax(360px,0.9fr)]'>
+      <div className='grid min-h-0 min-w-0 gap-3.5'>
+        <section
+          className='relative aspect-[4/5] h-[min(620px,calc(100dvh-180px))] min-h-[420px] min-w-0 max-w-[520px] overflow-hidden rounded-[26px] bg-[color:var(--profile-stage-bg)]'
+          data-testid='profile-desktop-cover'
+        >
           <div className='absolute inset-0'>
             {heroImageUrl ? (
               <ImageWithFallback
@@ -458,7 +464,10 @@ export function ProfileDesktopSurface({
           </div>
         </section>
 
-        <div className='grid gap-3.5 xl:grid-cols-[minmax(0,1.12fr)_minmax(320px,0.88fr)]'>
+        <div
+          className='grid gap-3.5 xl:grid-cols-[minmax(0,1.12fr)_minmax(320px,0.88fr)]'
+          data-testid='profile-desktop-secondary-grid'
+        >
           <DesktopSurfaceCard
             title='All Shows'
             actionLabel='View all shows'
@@ -561,8 +570,8 @@ export function ProfileDesktopSurface({
         </div>
       </div>
 
-      <div className='grid min-h-0 gap-3.5'>
-        <DesktopSurfaceCard title='Alerts'>
+      <div className='grid min-h-0 min-w-0 gap-3.5'>
+        <DesktopSurfaceCard title='Alerts' testId='profile-desktop-alerts-card'>
           <div className='space-y-4'>
             {!isSubscribed ? (
               <button
@@ -662,10 +671,15 @@ export function ProfileDesktopSurface({
   const nonHomeContent =
     activePrimaryTab === 'listen' ? (
       <div className='grid min-h-0 flex-1 gap-3.5 xl:grid-cols-[minmax(0,1.3fr)_360px]'>
-        <DesktopSurfaceCard title='Releases' className='min-h-0'>
+        <DesktopSurfaceCard
+          title='Releases'
+          className='min-h-0'
+          testId='profile-primary-tab-releases'
+        >
           {visibleReleases.length > 0 ? (
             <ReleasesView
               releases={visibleReleases}
+              artistId={artist.id}
               artistHandle={artist.handle}
               artistName={artist.name}
             />
@@ -728,7 +742,11 @@ export function ProfileDesktopSurface({
         </div>
       </div>
     ) : activePrimaryTab === 'tour' ? (
-      <DesktopSurfaceCard title='All Shows' className='flex-1'>
+      <DesktopSurfaceCard
+        title='All Shows'
+        className='flex-1'
+        testId='profile-primary-tab-tour'
+      >
         <div className='space-y-2'>
           {upcomingTourDates.length > 0 ? (
             upcomingTourDates.map(tourDate => (
@@ -773,7 +791,11 @@ export function ProfileDesktopSurface({
         </div>
       </DesktopSurfaceCard>
     ) : activePrimaryTab === 'about' ? (
-      <DesktopSurfaceCard title='Profile' className='flex-1'>
+      <DesktopSurfaceCard
+        title='Profile'
+        className='flex-1'
+        testId='profile-primary-tab-about'
+      >
         <AboutSection
           artist={artist}
           genres={genres}
@@ -805,6 +827,7 @@ export function ProfileDesktopSurface({
                   key={tab.mode}
                   type='button'
                   onClick={() => onModeSelect(tab.mode)}
+                  data-testid={`profile-primary-tab-${tab.mode}`}
                   className={cn(
                     'inline-flex h-10 min-w-0 items-center gap-2 rounded-full px-3 text-[13px] font-medium tracking-[-0.01em] transition-colors duration-subtle active:bg-white/[0.08]',
                     isActive
@@ -837,7 +860,7 @@ export function ProfileDesktopSurface({
 
         <div className='relative flex min-h-0 flex-1 flex-col overflow-hidden'>
           <div className='pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,rgba(255,255,255,0.025),transparent_34%)]' />
-          <div className='relative z-10 flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto overscroll-contain p-5 pt-4 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden'>
+          <div className='relative z-10 flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto overscroll-contain [touch-action:pan-y] [will-change:scroll-position] p-5 pt-4 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden'>
             {nonHomeContent}
           </div>
         </div>

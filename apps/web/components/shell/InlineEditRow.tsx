@@ -134,7 +134,7 @@ export function InlineEditRow({
           aria-label={`Edit ${label}`}
           className={cn(
             valueClass,
-            'bg-transparent outline-none focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary-token rounded-sm'
+            'bg-transparent outline-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/24 rounded-sm'
           )}
         />
       </div>
@@ -146,7 +146,7 @@ export function InlineEditRow({
     // biome-ignore lint/a11y/noNoninteractiveElementInteractions: same — handlers route to enterEdit only when non-readOnly
     <div
       className={cn(
-        'group/row flex items-center gap-3 h-8 px-2 rounded-md transition-colors duration-150 ease-out',
+        'group/row flex items-center gap-3 h-8 px-2 rounded-md transition-colors duration-subtle ease-subtle',
         readOnly
           ? 'hover:bg-transparent'
           : 'cursor-pointer hover:bg-surface-1/40',
@@ -180,7 +180,7 @@ export function InlineEditRow({
             enterEdit();
           }}
           aria-label={`Edit ${label}`}
-          className='shrink-0 inline-flex items-center justify-center h-5 w-5 rounded text-quaternary-token hover:text-primary-token hover:bg-surface-1/60 opacity-0 group-hover/row:opacity-100 focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-token transition-opacity duration-150 ease-out'
+          className='shrink-0 inline-flex items-center justify-center h-5 w-5 rounded text-quaternary-token hover:text-primary-token hover:bg-surface-1/60 opacity-0 group-hover/row:opacity-100 focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/55 focus-visible:ring-offset-2 focus-visible:ring-offset-(--linear-bg-page) transition-opacity duration-subtle ease-subtle'
         >
           <Pencil className='h-3 w-3' strokeWidth={2.25} />
         </button>

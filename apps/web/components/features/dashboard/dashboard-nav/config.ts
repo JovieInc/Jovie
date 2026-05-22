@@ -14,6 +14,7 @@ import {
   LayoutDashboard,
   Library as LibraryIcon,
   Lock,
+  type LucideIcon,
   MailCheck,
   Music,
   PieChart,
@@ -47,6 +48,14 @@ export const dashboardHome: NavItem = {
   description: 'Start a new chat',
 };
 
+export const newThreadNavItem: NavItem = {
+  name: 'New chat',
+  href: APP_ROUTES.CHAT,
+  id: 'chat',
+  icon: SquarePen,
+  description: 'Start a new chat',
+};
+
 export const profileNavItem: NavItem = {
   name: 'Profile',
   href: APP_ROUTES.CHAT,
@@ -59,7 +68,7 @@ export const primaryNavigation: NavItem[] = [
   profileNavItem,
   {
     name: 'Releases',
-    href: APP_ROUTES.DASHBOARD_RELEASES,
+    href: APP_ROUTES.RELEASES,
     id: 'releases',
     icon: Music,
     description: 'Link out every provider with one smart link',
@@ -73,7 +82,7 @@ export const primaryNavigation: NavItem[] = [
   },
   {
     name: 'Audience',
-    href: APP_ROUTES.DASHBOARD_AUDIENCE,
+    href: APP_ROUTES.AUDIENCE,
     id: 'audience',
     icon: Users,
     description: 'Understand your audience demographics',
@@ -179,7 +188,13 @@ export const settingsNavigation: NavItem[] = [
   ...artistSettingsNavigation,
 ];
 
-const adminIconById = {
+/** Admin settings item — shown only to admin users */
+
+// Exhaustive map of AdminWorkspaceId → icon. Typed as Record so adding a new
+// workspace id to `AdminWorkspaceId` without a matching icon entry fails
+// typecheck — silent `undefined` returns would otherwise show up as missing
+// icons in the admin sidebar at runtime.
+const adminIconById: Record<AdminWorkspaceId, LucideIcon> = {
   overview: LayoutDashboard,
   ops: Gauge,
   people: Users,
@@ -188,8 +203,9 @@ const adminIconById = {
   activity: Activity,
   investors: Briefcase,
   screenshots: ImageIcon,
+  costs: Banknote,
   share_studio: Share2,
-} as const;
+};
 
 function buildAdminNavigationItems(
   ids: readonly AdminWorkspaceId[]

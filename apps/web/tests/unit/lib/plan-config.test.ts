@@ -19,6 +19,7 @@ describe('Plan Configuration (Entitlement Registry)', () => {
         smartLinksLimit: null,
         aiDailyMessageLimit: 10,
         aiPitchGenPerRelease: 1,
+        aiRetouchDailyLimit: null,
       });
       expect(free.booleans).toEqual({
         canExportContacts: false,
@@ -47,6 +48,7 @@ describe('Plan Configuration (Entitlement Registry)', () => {
         canAccessWebhooks: false,
         canAccessWhiteLabel: false,
         canAccessAbTesting: false,
+        canAccessAiRetouching: false,
       });
     });
 
@@ -58,6 +60,7 @@ describe('Plan Configuration (Entitlement Registry)', () => {
         smartLinksLimit: null,
         aiDailyMessageLimit: 100,
         aiPitchGenPerRelease: 5,
+        aiRetouchDailyLimit: 10,
       });
       expect(pro.booleans).toEqual({
         canExportContacts: true,
@@ -86,6 +89,7 @@ describe('Plan Configuration (Entitlement Registry)', () => {
         canAccessWebhooks: false,
         canAccessWhiteLabel: false,
         canAccessAbTesting: false,
+        canAccessAiRetouching: true,
       });
     });
 
@@ -97,6 +101,7 @@ describe('Plan Configuration (Entitlement Registry)', () => {
         smartLinksLimit: null,
         aiDailyMessageLimit: 500,
         aiPitchGenPerRelease: null,
+        aiRetouchDailyLimit: 50,
       });
       expect(max.booleans).toEqual({
         canExportContacts: true,
@@ -125,6 +130,7 @@ describe('Plan Configuration (Entitlement Registry)', () => {
         canAccessWebhooks: true,
         canAccessWhiteLabel: true,
         canAccessAbTesting: true,
+        canAccessAiRetouching: true,
       });
     });
 

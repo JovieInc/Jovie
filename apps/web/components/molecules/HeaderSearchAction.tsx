@@ -19,6 +19,7 @@ export interface HeaderSearchActionProps {
   readonly className?: string;
   readonly inputClassName?: string;
   readonly alwaysOpen?: boolean;
+  readonly openSignal?: number;
 }
 
 export function HeaderSearchAction({
@@ -33,6 +34,7 @@ export function HeaderSearchAction({
   className,
   inputClassName,
   alwaysOpen = false,
+  openSignal,
 }: Readonly<HeaderSearchActionProps>) {
   const [isOpen, setIsOpen] = useState(alwaysOpen || searchValue.length > 0);
 
@@ -41,6 +43,11 @@ export function HeaderSearchAction({
       setIsOpen(true);
     }
   }, [searchValue]);
+
+  useEffect(() => {
+    if (openSignal === undefined) return;
+    setIsOpen(true);
+  }, [openSignal]);
 
   const close = () => {
     if (alwaysOpen) {

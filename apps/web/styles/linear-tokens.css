@@ -69,7 +69,7 @@
   --linear-border-subtle: rgba(0, 0, 0, 0.06);
   --linear-border-default: rgba(0, 0, 0, 0.1);
   --linear-border-strong: rgba(0, 0, 0, 0.15);
-  --linear-border-focus: oklch(55% 0.15 270);
+  --linear-border-focus: rgba(0, 0, 0, 0.28);
   /* ============================================
      BUTTON COLORS — LIGHT MODE
      ============================================ */
@@ -246,7 +246,9 @@
     0 0 0 1px rgba(0, 0, 0, 0.03), 0 14px 32px rgba(0, 0, 0, 0.05);
   --linear-row-hover: oklch(96.2% 0.003 282);
   --linear-row-selected: oklch(94.8% 0.006 282);
-  --linear-app-sidebar-width: 244px;
+  --linear-app-sidebar-width: 224px;
+  --linear-app-audio-bar-max-height: 120px;
+  --linear-app-audio-compact-height: 64px;
   --linear-app-sidebar-background-rgb: 247 248 248;
   --linear-app-sidebar-foreground-rgb: 18 18 20;
   --linear-app-sidebar-border-rgb: 0 0 0 / 0.06;
@@ -404,7 +406,7 @@
   --linear-border-subtle: rgba(255, 255, 255, 0.07);
   --linear-border-default: rgba(255, 255, 255, 0.11);
   --linear-border-strong: rgba(255, 255, 255, 0.18);
-  --linear-border-focus: oklch(60% 0.12 282);
+  --linear-border-focus: rgba(255, 255, 255, 0.32);
   /* Buttons — white primary on dark bg, matching Linear.app */
   --linear-btn-primary-bg: #ffffff;
   --linear-btn-primary-fg: #06070a;

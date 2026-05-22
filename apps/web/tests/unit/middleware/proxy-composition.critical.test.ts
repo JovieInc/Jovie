@@ -110,9 +110,11 @@ vi.mock('@clerk/nextjs/server', () => ({
 vi.mock('@/constants/app', () => ({
   AUDIENCE_ANON_COOKIE: 'audience_anon',
   AUDIENCE_IDENTIFIED_COOKIE: 'audience_identified',
+  AUDIENCE_SPOTIFY_PREFERRED_COOKIE: 'audience_spotify_preferred',
   COUNTRY_CODE_COOKIE: 'country_code',
   HOMEPAGE_CITY_COOKIE: 'homepage_city',
   HOMEPAGE_REGION_COOKIE: 'homepage_region',
+  LISTEN_COOKIE: 'listen_cookie',
 }));
 vi.mock('@/constants/domains', () => ({
   BASE_URL: 'https://jov.ie',

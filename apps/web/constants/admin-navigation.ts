@@ -37,6 +37,7 @@ export type AdminWorkspaceId =
   | 'activity'
   | 'investors'
   | 'screenshots'
+  | 'costs'
   | 'share_studio';
 
 export type AdminNavigationSection = 'workspaces' | 'utilities';
@@ -62,6 +63,7 @@ export const ADMIN_SETTINGS_TOOL_IDS = [
   'investors',
   'screenshots',
   'share_studio',
+  'costs',
 ] as const satisfies readonly AdminWorkspaceId[];
 
 export const ADMIN_NAV_REGISTRY: readonly AdminNavRegistryItem[] = [
@@ -119,6 +121,14 @@ export const ADMIN_NAV_REGISTRY: readonly AdminNavRegistryItem[] = [
     label: 'Screenshots',
     href: APP_ROUTES.ADMIN_SCREENSHOTS,
     description: 'Generated docs and QA screenshots',
+    section: 'utilities',
+  },
+  {
+    id: 'costs',
+    label: 'Costs',
+    href: APP_ROUTES.ADMIN_COSTS,
+    description:
+      'Company infra, AI gateway, Neon, and vendor spend (30-day view)',
     section: 'utilities',
   },
   {

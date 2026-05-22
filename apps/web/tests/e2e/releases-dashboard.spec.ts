@@ -18,6 +18,8 @@ const TIMEOUTS = {
   SIDEBAR_OPEN: 30_000,
 } as const;
 
+const RELEASES_ROUTE = '/app/releases';
+
 type ReleasesSurface = 'desktop' | 'mobile';
 
 async function resolveReleasesSurface(
@@ -172,7 +174,7 @@ async function ensureReleasesVisible(
 
   expect(
     visibleStates,
-    `Expected populated seeded releases on /app/dashboard/releases, found ${visibleStates.join(', ') || 'no rows'}`
+    `Expected populated seeded releases on ${RELEASES_ROUTE}, found ${visibleStates.join(', ') || 'no rows'}`
   ).toHaveLength(0);
 
   return { matrix, surface: 'desktop' };
@@ -254,7 +256,7 @@ test.describe('Releases dashboard', () => {
     await page.route('**/api/track', route =>
       route.fulfill({ status: 200, body: '{}' })
     );
-    await page.goto('/app/dashboard/releases', {
+    await page.goto(RELEASES_ROUTE, {
       waitUntil: 'domcontentloaded',
       timeout: TIMEOUTS.NAVIGATION,
     });
@@ -315,7 +317,7 @@ test.describe('Releases dashboard', () => {
     await page.route('**/api/track', route =>
       route.fulfill({ status: 200, body: '{}' })
     );
-    await page.goto('/app/dashboard/releases', {
+    await page.goto(RELEASES_ROUTE, {
       waitUntil: 'domcontentloaded',
       timeout: TIMEOUTS.NAVIGATION,
     });
@@ -363,7 +365,7 @@ test.describe('Releases dashboard', () => {
     await page.route('**/api/track', route =>
       route.fulfill({ status: 200, body: '{}' })
     );
-    await page.goto('/app/dashboard/releases', {
+    await page.goto(RELEASES_ROUTE, {
       waitUntil: 'domcontentloaded',
       timeout: TIMEOUTS.NAVIGATION,
     });
@@ -397,7 +399,7 @@ test.describe('Releases dashboard', () => {
     await page.route('**/api/track', route =>
       route.fulfill({ status: 200, body: '{}' })
     );
-    await page.goto('/app/dashboard/releases', {
+    await page.goto(RELEASES_ROUTE, {
       waitUntil: 'domcontentloaded',
       timeout: TIMEOUTS.NAVIGATION,
     });
@@ -434,7 +436,7 @@ test.describe('Releases dashboard', () => {
     await page.route('**/api/track', route =>
       route.fulfill({ status: 200, body: '{}' })
     );
-    await page.goto('/app/dashboard/releases', {
+    await page.goto(RELEASES_ROUTE, {
       waitUntil: 'domcontentloaded',
       timeout: TIMEOUTS.NAVIGATION,
     });
@@ -474,7 +476,7 @@ test.describe('Releases dashboard', () => {
     await page.route('**/api/track', route =>
       route.fulfill({ status: 200, body: '{}' })
     );
-    await page.goto('/app/dashboard/releases', {
+    await page.goto(RELEASES_ROUTE, {
       waitUntil: 'domcontentloaded',
       timeout: TIMEOUTS.NAVIGATION,
     });

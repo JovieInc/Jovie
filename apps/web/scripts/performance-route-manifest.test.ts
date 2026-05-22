@@ -59,6 +59,20 @@ describe('performance route manifest', () => {
     ]);
   });
 
+  it('measures the canonical releases shell routes', () => {
+    const routes = getEndUserPerfRouteManifest();
+    const releases = routes.find(route => route.id === 'creator-releases');
+    const releaseTasks = routes.find(
+      route => route.id === 'creator-release-tasks'
+    );
+
+    expect(releases?.path).toBe('/app/releases');
+    expect(releases?.readySelectors.navTrigger).toEqual([
+      'a[href="/app/releases"]',
+    ]);
+    expect(releaseTasks?.path).toBe('/app/releases/[releaseId]/tasks');
+  });
+
   it('measures canonical chat onboarding at /start, not the legacy form shim', () => {
     const onboarding = getEndUserPerfRouteManifest().find(
       route => route.id === 'onboarding'
@@ -69,5 +83,28 @@ describe('performance route manifest', () => {
     expect(onboarding?.readySelectors.content).toContain(
       '[data-testid="onboarding-chat"]'
     );
+  });
+
+  it('holds the brand page to the perceived-latency budget', () => {
+    const brand = getEndUserPerfRouteManifest().find(
+      route => route.id === 'marketing-brand'
+    );
+
+    expect(brand?.path).toBe('/brand');
+    expect(brand?.requiresAuth).toBe(false);
+    expect(brand?.measureMode).toBe('interactive-shell');
+    expect(brand?.readySelectors.shell).toContain('main h1');
+    expect(brand?.readySelectors.content).toContain('main h1');
+    expect(getPrimaryTimingMetricName(brand!)).toBe('first-contentful-paint');
+    expect(
+      getRouteTimingBudgets(brand!).find(
+        timing => timing.metric === 'first-contentful-paint'
+      )?.budget
+    ).toBe(100);
+    expect(
+      getRouteResourceBudgets(brand!).find(
+        resource => resource.resourceType === 'font'
+      )?.budget
+    ).toBe(75);
   });
 });

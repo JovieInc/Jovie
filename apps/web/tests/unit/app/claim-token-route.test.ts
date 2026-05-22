@@ -111,4 +111,49 @@ describe('Claim token route', () => {
       expectedSpotifyArtistId: 'spotify_123',
     });
   });
+
+  it('redirects to root with no token provided (early exit, no side effects)', async () => {
+    const response = await GET(new NextRequest('http://localhost/claim/'), {
+      params: Promise.resolve({ token: '' }),
+    });
+
+    expect(response.status).toBe(307);
+    expect(response.headers.get('location')).toBe('http://localhost/');
+    expect(mockLookupUsernameByClaimToken).not.toHaveBeenCalled();
+    expect(mockWritePendingClaimContext).not.toHaveBeenCalled();
+  });
+
+  it('clears attribution and redirects to root when username lookup fails for token', async () => {
+    mockLookupUsernameByClaimToken.mockResolvedValue(null);
+
+    const response = await GET(
+      new NextRequest('http://localhost/claim/missing-user-token'),
+      {
+        params: Promise.resolve({ token: 'missing-user-token' }),
+      }
+    );
+
+    expect(response.status).toBe(307);
+    expect(response.headers.get('location')).toBe('http://localhost/');
+    expect(mockClearLeadAttributionCookie).toHaveBeenCalledTimes(1);
+    expect(mockWritePendingClaimContext).not.toHaveBeenCalled();
+  });
+
+  it('clears attribution and redirects to root when profile lookup fails after valid token', async () => {
+    mockLookupUsernameByClaimToken.mockResolvedValue('ghostartist');
+    mockIsClaimTokenValid.mockResolvedValue(true);
+    mockGetProfileByUsername.mockResolvedValue(null);
+
+    const response = await GET(
+      new NextRequest('http://localhost/claim/valid-but-no-profile'),
+      {
+        params: Promise.resolve({ token: 'valid-but-no-profile' }),
+      }
+    );
+
+    expect(response.status).toBe(307);
+    expect(response.headers.get('location')).toBe('http://localhost/');
+    expect(mockClearLeadAttributionCookie).toHaveBeenCalledTimes(1);
+    expect(mockWritePendingClaimContext).not.toHaveBeenCalled();
+  });
 });

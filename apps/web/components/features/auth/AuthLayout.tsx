@@ -12,6 +12,7 @@ import Link from 'next/link';
 import { type ReactNode, useRef } from 'react';
 import { AppIconButton } from '@/components/atoms/AppIconButton';
 import { BrandLogo } from '@/components/atoms/BrandLogo';
+import { APP_ROUTES } from '@/constants/routes';
 import { AUTH_FORM_MAX_WIDTH_CLASS } from '@/features/auth/constants';
 import { useMobileKeyboard } from '@/hooks/useMobileKeyboard';
 import { useAppFlag } from '@/lib/flags/client';
@@ -183,10 +184,10 @@ export function AuthLayout({
   children,
   formTitle,
   formTitleClassName = 'text-[18px] leading-[22px] font-medium text-primary-token text-center',
-  footerPrompt = "Don't have access?",
-  footerLinkText = 'Join the waitlist',
-  footerLinkHref = '/waitlist',
-  showFooterPrompt = true,
+  footerPrompt = 'No account?',
+  footerLinkText = 'Request access',
+  footerLinkHref = APP_ROUTES.SIGNUP,
+  showFooterPrompt = false,
   showFormTitle = true,
   logoSpinDelayMs: _logoSpinDelayMs,
   showSkipLink = true,

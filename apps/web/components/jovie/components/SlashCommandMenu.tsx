@@ -24,8 +24,11 @@ import {
   Music2,
   UserCircle,
 } from 'lucide-react';
-import { useEffect, useMemo } from 'react';
-import { InlinePalette } from '@/components/organisms/SharedCommandPalette';
+import { useCallback, useEffect, useMemo } from 'react';
+import {
+  flattenSections,
+  InlinePalette,
+} from '@/components/organisms/SharedCommandPalette';
 import type { EntityKind } from '@/lib/chat/tokens';
 import type { EntityRef } from '@/lib/commands/entities';
 import { commandsForSurface, type SkillCommand } from '@/lib/commands/registry';
@@ -65,6 +68,11 @@ export interface SlashMenuItem {
   readonly entity?: EntityRef;
 }
 
+export interface SlashPromptAction {
+  readonly label: string;
+  readonly prompt: string;
+}
+
 interface ListSection {
   readonly id: string;
   readonly label: string;
@@ -91,6 +99,8 @@ interface SlashCommandMenuProps {
    * textarea can mirror it onto `aria-activedescendant`.
    */
   readonly onActiveRowChange?: (id: string | null) => void;
+  readonly promptActions?: readonly SlashPromptAction[];
+  readonly onSelectPrompt?: (prompt: string) => void;
 }
 
 function fuzzyMatch(haystack: string, needle: string): boolean {
@@ -264,6 +274,19 @@ function toPickerItem(item: SlashMenuItem): PickerItem | null {
   return null;
 }
 
+function promptActionId(action: SlashPromptAction): string {
+  return action.label
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-|-$/g, '');
+}
+
+function promptActionDescription(action: SlashPromptAction): string {
+  const trimmed = action.prompt.trim();
+  if (!trimmed) return 'Send this prompt to Jovie.';
+  return trimmed.length > 88 ? `${trimmed.slice(0, 85)}...` : trimmed;
+}
+
 interface SlashHeaderProps {
   readonly state: PickerState;
 }
@@ -273,7 +296,7 @@ function SlashHeader({ state }: SlashHeaderProps) {
   if (state.status === 'entity') {
     const Icon = KIND_ICON_MAP[state.kind];
     return (
-      <div className='flex items-center gap-[10px] border-b border-white/[0.055] px-[18px] pb-3 pt-4 text-[13px] tracking-[-0.005em]'>
+      <div className='flex items-center gap-[10px] border-b border-white/[0.055] px-[18px] pb-3 pt-4 text-[13px]'>
         <span className='inline-flex items-center gap-1.5 rounded-[5px] border border-white/10 bg-white/[0.05] px-2 py-[2px] text-[11px] font-semibold uppercase tracking-[0.04em] text-primary-token shadow-[inset_0_0.5px_0_rgba(255,255,255,0.04)]'>
           <Icon className='h-3 w-3' strokeWidth={1.6} />
           {entityKindLabel(state.kind)}
@@ -287,7 +310,7 @@ function SlashHeader({ state }: SlashHeaderProps) {
     );
   }
   return (
-    <div className='flex items-center gap-[10px] border-b border-white/[0.055] px-[18px] pb-3 pt-4 text-[13px] tracking-[-0.005em]'>
+    <div className='flex items-center gap-[10px] border-b border-white/[0.055] px-[18px] pb-3 pt-4 text-[13px]'>
       <span className='inline-flex h-[21px] items-center rounded-[4px] bg-white/[0.06] px-1.5 text-[12.5px] font-semibold leading-none text-primary-token shadow-[inset_0_0.5px_0_rgba(255,255,255,0.06),inset_0_0_0_0.5px_rgba(255,255,255,0.04)]'>
         /
       </span>
@@ -318,33 +341,65 @@ export function SlashCommandMenu({
   variant = 'inline',
   listIdProp,
   onActiveRowChange,
+  promptActions,
+  onSelectPrompt,
 }: SlashCommandMenuProps) {
-  const { items, sections, isLoading } = useSlashItems(state, profileId);
+  const { sections, isLoading } = useSlashItems(state, profileId);
+  const query = state.status === 'closed' ? '' : state.query;
+  const promptItems = useMemo<PickerItem[]>(() => {
+    if (state.status !== 'root' || !promptActions?.length) return [];
+    return promptActions
+      .filter(action => fuzzyMatch(`${action.label} ${action.prompt}`, query))
+      .map(action => ({
+        kind: 'prompt' as const,
+        prompt: {
+          id: promptActionId(action),
+          label: action.label,
+          description: promptActionDescription(action),
+          prompt: action.prompt,
+        },
+      }));
+  }, [promptActions, query, state.status]);
 
   // Map legacy SlashMenuItem sections → PickerItem sections for the shared
   // shell. The shape is structurally equivalent; the indirection just gates
   // the optionality.
-  const paletteSections = useMemo(
-    () =>
-      sections
-        .map(section => ({
-          id: section.id,
-          label: section.label,
-          items: section.items
-            .map(toPickerItem)
-            .filter((x): x is PickerItem => x !== null),
-        }))
-        .filter(section => section.items.length > 0),
-    [sections]
+  const paletteSections = useMemo(() => {
+    const mappedSections = sections
+      .map(section => ({
+        id: section.id,
+        label: section.label,
+        items: section.items
+          .map(toPickerItem)
+          .filter((x): x is PickerItem => x !== null),
+      }))
+      .filter(section => section.items.length > 0);
+    if (promptItems.length > 0) {
+      mappedSections.unshift({
+        id: 'suggestions',
+        label: 'Suggestions',
+        items: promptItems,
+      });
+    }
+    return mappedSections;
+  }, [promptItems, sections]);
+  const flatItems = useMemo(
+    () => flattenSections(paletteSections),
+    [paletteSections]
   );
 
-  const handleCommit = (pickerItem: PickerItem) => {
-    if (pickerItem.kind === 'skill') {
-      onSelectSkill(pickerItem.skill);
-    } else if (pickerItem.kind === 'entity') {
-      onSelectEntity(pickerItem.entity);
-    }
-  };
+  const handleCommit = useCallback(
+    (pickerItem: PickerItem) => {
+      if (pickerItem.kind === 'skill') {
+        onSelectSkill(pickerItem.skill);
+      } else if (pickerItem.kind === 'entity') {
+        onSelectEntity(pickerItem.entity);
+      } else if (pickerItem.kind === 'prompt') {
+        onSelectPrompt?.(pickerItem.prompt.prompt);
+      }
+    },
+    [onSelectEntity, onSelectPrompt, onSelectSkill]
+  );
 
   // Keyboard nav lives at this layer so commit dispatches happen via the
   // same callbacks (skill vs entity) the composer wires up.
@@ -357,27 +412,25 @@ export function SlashCommandMenu({
       if (e.isComposing || e.keyCode === 229) return;
       if (e.key === 'ArrowDown') {
         e.preventDefault();
-        onMoveSelected(1, items.length);
+        onMoveSelected(1, flatItems.length);
       } else if (e.key === 'ArrowUp') {
         e.preventDefault();
-        onMoveSelected(-1, items.length);
+        onMoveSelected(-1, flatItems.length);
       } else if (e.key === 'Enter') {
         const selectedIdx =
-          items.length === 0
+          flatItems.length === 0
             ? -1
             : Math.max(
                 0,
                 Math.min(
-                  items.length - 1,
+                  flatItems.length - 1,
                   state.status === 'closed' ? 0 : state.selectedIndex
                 )
               );
-        const item = items[selectedIdx];
+        const item = flatItems[selectedIdx];
         if (!item) return;
         e.preventDefault();
-        if (item.kind === 'skill' && item.skill) onSelectSkill(item.skill);
-        else if (item.kind === 'entity' && item.entity)
-          onSelectEntity(item.entity);
+        handleCommit(item);
       } else if (e.key === 'Escape') {
         e.preventDefault();
         onClose();
@@ -385,7 +438,7 @@ export function SlashCommandMenu({
     }
     globalThis.addEventListener('keydown', onKey, true);
     return () => globalThis.removeEventListener('keydown', onKey, true);
-  }, [state, items, onMoveSelected, onSelectSkill, onSelectEntity, onClose]);
+  }, [state, flatItems, handleCommit, onMoveSelected, onClose]);
 
   if (state.status === 'closed') return null;
 

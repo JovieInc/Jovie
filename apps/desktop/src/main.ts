@@ -8,6 +8,7 @@ import {
   Menu,
   type MenuItemConstructorOptions,
   shell,
+  type WebContents,
 } from 'electron';
 import { autoUpdater } from 'electron-updater';
 import { APP_ENV, APP_URL } from './env';
@@ -18,9 +19,18 @@ if (APP_ENV === 'staging') {
 }
 
 const APP_ORIGIN = new URL(APP_URL).origin;
-const SETTINGS_URL = new URL('/app/settings', APP_URL).toString();
-const APP_BACKGROUND_COLOR = '#09090b';
+const APP_ENTRY_URL = buildAppUrl('/app/chat');
+const SETTINGS_URL = buildAppUrl('/app/settings');
+const APP_BACKGROUND_COLOR = '#08090a';
+const NAVIGATION_ABORTED_ERROR_CODE = -3;
+const APP_ICON_FILENAME =
+  APP_ENV === 'staging' ? 'icon-staging.png' : 'icon.png';
+const APP_ICON_PATH = path.join(__dirname, '..', 'assets', APP_ICON_FILENAME);
+const DESKTOP_USER_AGENT_PRODUCT = `JovieDesktop/${app.getVersion()}`;
+const JOVIE_MARK_SVG_PATH =
+  'm176.84,0l3.08.05c8.92,1.73,16.9,6.45,23.05,13.18,7.95,8.7,12.87,20.77,12.87,34.14s-4.92,25.44-12.87,34.14c-6.7,7.34-15.59,12.28-25.49,13.57h-.64s0,.01,0,.01h0c-22.2,0-42.3,8.84-56.83,23.13-14.5,14.27-23.49,33.99-23.49,55.77h0v.02c0,21.78,8.98,41.5,23.49,55.77,14.54,14.3,34.64,23.15,56.83,23.15v-.02h.01c22.2,0,42.3-8.84,56.83-23.13,14.51-14.27,23.49-33.99,23.49-55.77h0c0-17.55-5.81-33.75-15.63-46.82-10.08-13.43-24.42-23.61-41.05-28.62l-2.11-.64c4.36-2.65,8.34-5.96,11.84-9.78,9.57-10.47,15.5-24.89,15.5-40.77s-5.93-30.3-15.5-40.77c-1.44-1.57-2.95-3.06-4.55-4.44l7.67,1.58c40.44,8.35,75.81,30.3,100.91,60.75,24.66,29.91,39.44,68.02,39.44,109.5h0c0,48.05-19.81,91.55-51.83,123.05-31.99,31.46-76.19,50.92-125,50.92v.02h-.01c-48.79,0-93-19.47-125-50.94C19.81,265.54,0,222.04,0,173.99h0c0-48.05,19.81-91.56,51.83-123.05C83.84,19.47,128.04,0,176.84,0Z';
 const ENABLE_DEVTOOLS = APP_ENV !== 'production' || !app.isPackaged;
+const MACOS_TRAFFIC_LIGHT_POSITION = { x: 20, y: 17 } as const;
 const UPDATE_AVAILABLE_CHANNEL = 'update-available';
 const UPDATE_DOWNLOADED_CHANNEL = 'update-downloaded';
 const QUIT_AND_INSTALL_CHANNEL = 'quit-and-install';
@@ -34,6 +44,7 @@ const DESKTOP_AUTH_HANDOFF_PATH = '/desktop-auth';
 const DESKTOP_RETURN_PARAM = 'desktop_return';
 const AUTH_RETURN_PROTOCOL = 'jovie:';
 const AUTH_RETURN_HOST = 'auth-return';
+const DICTATION_STATUS_CHANNEL = 'dictation-status';
 
 type UpdateChannel =
   | typeof UPDATE_AVAILABLE_CHANNEL
@@ -44,10 +55,20 @@ interface NavState {
   canGoForward: boolean;
 }
 
+interface DesktopDictationStatus {
+  ok: boolean;
+  nativeAvailable: boolean;
+  webSpeechFallbackAllowed: boolean;
+  mode: 'native' | 'web-speech' | 'unavailable';
+  reason?: string;
+}
+
 let updateReadyToInstall = false;
 let mainWindow: BrowserWindow | null = null;
 let authHandoffWindow: BrowserWindow | null = null;
 let pendingAuthReturnRoute: string | null = null;
+
+app.setName(APP_ENV === 'staging' ? 'Jovie Staging' : 'Jovie');
 
 const gotSingleInstanceLock = app.requestSingleInstanceLock();
 
@@ -63,8 +84,19 @@ function parseUrl(urlString: string): URL | null {
   }
 }
 
+function buildAppUrl(pathname: string): string {
+  const url = new URL(pathname, APP_URL);
+  url.searchParams.set('runtime', 'electron');
+  return url.toString();
+}
+
 function isAllowedInAppUrl(parsed: URL): boolean {
-  if (parsed.protocol !== 'https:') return false;
+  if (
+    parsed.protocol !== 'https:' &&
+    !(APP_ENV === 'local' && parsed.protocol === 'http:')
+  ) {
+    return false;
+  }
   return (
     parsed.origin === APP_ORIGIN && !isBrowserOnlyInAppPath(parsed.pathname)
   );
@@ -231,6 +263,49 @@ function findAuthReturnRouteInArgv(argv: readonly string[]): string | null {
   return null;
 }
 
+function isTrustedPermissionOrigin(urlString?: string): boolean {
+  const parsed = parseUrl(urlString ?? '');
+  return parsed?.origin === APP_ORIGIN;
+}
+
+function isTrustedPermissionRequest(
+  webContents: WebContents | null,
+  requestingOrigin?: string
+): boolean {
+  if (requestingOrigin !== undefined) {
+    return isTrustedPermissionOrigin(requestingOrigin);
+  }
+  return webContents !== null && isTrustedPermissionOrigin(webContents.getURL());
+}
+
+function isAudioOnlyMediaPermissionRequest(details: unknown): boolean {
+  if (details === null || typeof details !== 'object') return false;
+  const mediaTypes = (details as { mediaTypes?: unknown }).mediaTypes;
+  return (
+    Array.isArray(mediaTypes) &&
+    mediaTypes.includes('audio') &&
+    !mediaTypes.includes('video')
+  );
+}
+
+function isAudioMediaPermissionCheck(details: unknown): boolean {
+  if (details === null || typeof details !== 'object') return false;
+  return (details as { mediaType?: unknown }).mediaType === 'audio';
+}
+
+function getDesktopDictationStatus(): DesktopDictationStatus {
+  return {
+    ok: true,
+    nativeAvailable: false,
+    webSpeechFallbackAllowed: true,
+    mode: 'web-speech',
+    reason:
+      process.platform === 'darwin'
+        ? 'native-macos-dictation-is-system-owned-web-speech-fallback-enabled'
+        : 'native-dictation-unavailable-web-speech-fallback-enabled',
+  };
+}
+
 interface WindowState {
   x?: number;
   y?: number;
@@ -242,6 +317,10 @@ const WINDOW_STATE_FILE = path.join(
   app.getPath('userData'),
   'window-state.json'
 );
+
+function getAppIconPath(): string | undefined {
+  return fs.existsSync(APP_ICON_PATH) ? APP_ICON_PATH : undefined;
+}
 
 function loadWindowState(): WindowState {
   try {
@@ -392,9 +471,67 @@ function maybeShowDesktopAuthHandoff(urlString: string): boolean {
   return true;
 }
 
-function createWindow(initialUrl = APP_URL): BrowserWindow {
+function buildDesktopLoadFailureUrl(): string {
+  const retryUrl = JSON.stringify(APP_ENTRY_URL);
+  const appOrigin = JSON.stringify(APP_ORIGIN);
+  const html = `<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Jovie Desktop</title>
+    <style>
+      :root { color-scheme: dark; }
+      html, body { margin: 0; min-height: 100%; background: #08090a; color: #f4f6fa; font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", Inter, sans-serif; }
+      body { display: grid; place-items: center; overflow: hidden; }
+      .shell { position: relative; display: grid; width: min(520px, calc(100vw - 48px)); gap: 22px; padding: 40px; border: 1px solid rgba(255,255,255,0.08); border-radius: 28px; background: linear-gradient(145deg, rgba(15,16,17,0.94), rgba(8,9,10,0.98)); box-shadow: 0 30px 120px rgba(0,0,0,0.42); }
+      .mark { position: absolute; right: -52px; top: -46px; width: 220px; height: 220px; opacity: 0.055; }
+      .brand { display: flex; align-items: center; gap: 14px; }
+      .icon { display: grid; width: 42px; height: 42px; place-items: center; border-radius: 14px; background: #f4f6fa; color: #080a0d; }
+      h1 { margin: 0; font-size: 17px; font-weight: 650; letter-spacing: 0; }
+      p { margin: 0; max-width: 38ch; color: #a8b0bd; font-size: 13px; line-height: 1.55; }
+      .actions { display: flex; flex-wrap: wrap; gap: 10px; }
+      button, a { display: inline-flex; height: 34px; align-items: center; justify-content: center; border-radius: 10px; padding: 0 13px; border: 1px solid rgba(255,255,255,0.1); background: #f4f6fa; color: #080a0d; font-size: 12px; font-weight: 590; text-decoration: none; }
+      a { background: transparent; color: #d9dee7; }
+      .meta { color: #737d8c; font-size: 11px; }
+    </style>
+  </head>
+  <body>
+    <main class="shell" role="main">
+      <svg class="mark" viewBox="0 0 353.68 347.97" aria-hidden="true">
+        <path fill="currentColor" d="${JOVIE_MARK_SVG_PATH}"/>
+      </svg>
+      <div class="brand">
+        <div class="icon" aria-hidden="true">
+          <svg width="28" height="28" viewBox="0 0 353.68 347.97">
+            <path fill="currentColor" d="${JOVIE_MARK_SVG_PATH}"/>
+          </svg>
+        </div>
+        <div>
+          <h1>Jovie Desktop</h1>
+          <p>Built for artists.</p>
+        </div>
+      </div>
+      <p>Jovie could not load the app shell. Check your connection, then retry. If this keeps happening, open Jovie in your browser and install the latest desktop build.</p>
+      <div class="actions">
+        <button type="button" onclick="window.location.href = ${retryUrl}">Retry</button>
+        <a href=${appOrigin}>Open Jovie</a>
+      </div>
+      <div class="meta">Desktop shell runtime: Electron</div>
+    </main>
+  </body>
+</html>`;
+
+  return `data:text/html;charset=utf-8,${encodeURIComponent(html)}`;
+}
+
+function showDesktopLoadFailure(win: BrowserWindow): void {
+  if (win.isDestroyed()) return;
+  void win.loadURL(buildDesktopLoadFailureUrl());
+}
+
+function createWindow(initialUrl = APP_ENTRY_URL): BrowserWindow {
   const windowState = loadWindowState();
-  let lastNonAuthAppUrl = APP_URL;
 
   const win = new BrowserWindow({
     show: false,
@@ -406,9 +543,10 @@ function createWindow(initialUrl = APP_URL): BrowserWindow {
     y: windowState.y,
     minWidth: 800,
     minHeight: 600,
+    icon: getAppIconPath(),
     titleBarStyle: process.platform === 'darwin' ? 'hiddenInset' : 'default',
     trafficLightPosition:
-      process.platform === 'darwin' ? { x: 13, y: 11 } : undefined,
+      process.platform === 'darwin' ? MACOS_TRAFFIC_LIGHT_POSITION : undefined,
     webPreferences: {
       contextIsolation: true,
       devTools: ENABLE_DEVTOOLS,
@@ -428,22 +566,56 @@ function createWindow(initialUrl = APP_URL): BrowserWindow {
 
   mainWindow = win;
 
+  win.webContents.setUserAgent(
+    `${win.webContents.getUserAgent()} ${DESKTOP_USER_AGENT_PRODUCT}`
+  );
+
   const initialAuthUrl = buildDesktopBrowserAuthUrl(initialUrl);
   if (initialAuthUrl) {
     showDesktopAuthHandoff(initialAuthUrl);
-    void win.loadURL(APP_URL);
+    void win.loadURL(APP_ENTRY_URL);
   } else {
-    lastNonAuthAppUrl = initialUrl;
     void win.loadURL(initialUrl);
   }
 
-  win.webContents.session.setPermissionRequestHandler(
-    (_webContents, _permission, callback) => {
-      callback(false);
+  win.webContents.on(
+    'did-fail-load',
+    (_event, errorCode, errorDescription, validatedURL, isMainFrame) => {
+      if (!isMainFrame || errorCode === NAVIGATION_ABORTED_ERROR_CODE) {
+        return;
+      }
+
+      console.error('[Jovie Desktop] Shell load failure (graceful recovery)', {
+        errorCode,
+        errorDescription,
+        validatedURL: typeof validatedURL === 'string' ? validatedURL.split('?')[0] : validatedURL,
+        appEntry: APP_ENTRY_URL,
+      });
+      showDesktopLoadFailure(win);
     }
   );
 
-  win.webContents.session.setPermissionCheckHandler(() => false);
+  win.webContents.session.setPermissionRequestHandler(
+    (webContents, permission, callback, details) => {
+      const requestingOrigin =
+        typeof details.requestingUrl === 'string'
+          ? details.requestingUrl
+          : undefined;
+      callback(
+        permission === 'media' &&
+          isAudioOnlyMediaPermissionRequest(details) &&
+          isTrustedPermissionRequest(webContents, requestingOrigin)
+      );
+    }
+  );
+
+  win.webContents.session.setPermissionCheckHandler(
+    (webContents, permission, requestingOrigin, details) => {
+      if (permission !== 'media') return false;
+      if (!isAudioMediaPermissionCheck(details)) return false;
+      return isTrustedPermissionRequest(webContents, requestingOrigin);
+    }
+  );
 
   // Navigation guard: app-host routes stay in-window; auth routes get the
   // dedicated handoff; all other safe URLs open in the system browser.
@@ -520,30 +692,7 @@ function createWindow(initialUrl = APP_URL): BrowserWindow {
   }
 
   win.webContents.on('did-navigate-in-page', sendNavState);
-  win.webContents.on('did-navigate-in-page', (_event, url, isMainFrame) => {
-    if (!isMainFrame) return;
-    if (maybeShowDesktopAuthHandoff(url)) {
-      void win.loadURL(lastNonAuthAppUrl);
-      return;
-    }
-    const disposition = getUrlDisposition(url);
-    if (disposition === 'external') {
-      openExternalUrl(url);
-      void win.loadURL(lastNonAuthAppUrl);
-      return;
-    }
-    const parsed = parseUrl(url);
-    if (parsed?.origin === APP_ORIGIN && !isBrowserOnlyInAppPath(parsed.pathname)) {
-      lastNonAuthAppUrl = url;
-    }
-  });
-  win.webContents.on('did-navigate', (_event, url) => {
-    const parsed = parseUrl(url);
-    if (parsed?.origin === APP_ORIGIN && !isDesktopAuthPath(parsed.pathname)) {
-      lastNonAuthAppUrl = url;
-    }
-    sendNavState();
-  });
+  win.webContents.on('did-navigate', sendNavState);
 
   return win;
 }
@@ -818,12 +967,17 @@ if (gotSingleInstanceLock) {
 app.whenReady().then(() => {
   if (!gotSingleInstanceLock) return;
 
+  const appIconPath = getAppIconPath();
+  if (process.platform === 'darwin' && appIconPath && app.dock) {
+    app.dock.setIcon(appIconPath);
+  }
+
   registerAuthReturnProtocol();
   refreshApplicationMenu();
   createWindow(
     pendingAuthReturnRoute
       ? new URL(pendingAuthReturnRoute, APP_URL).toString()
-      : APP_URL
+      : APP_ENTRY_URL
   );
   pendingAuthReturnRoute = null;
 
@@ -853,3 +1007,20 @@ app.on('window-all-closed', () => {
     app.quit();
   }
 });
+
+ipcMain.handle(
+  DICTATION_STATUS_CHANNEL,
+  (event: IpcMainInvokeEvent, ...args: unknown[]) => {
+    if (!isTrustedIpcSender(event) || args.length !== 0) {
+      return {
+        ok: false,
+        nativeAvailable: false,
+        webSpeechFallbackAllowed: false,
+        mode: 'unavailable',
+        reason: 'invalid-request',
+      } satisfies DesktopDictationStatus;
+    }
+
+    return getDesktopDictationStatus();
+  }
+);

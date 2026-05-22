@@ -1,7 +1,7 @@
 /**
  * E2E: Chat Pitch Generation (paid-tier feature)
  *
- * Tests the "Generate pitches" suggested prompt and the generateReleasePitch
+ * Tests pitch-generation access through the composer and the generateReleasePitch
  * chat tool, which are gated behind paid plans (aiCanUseTools).
  *
  * Run:
@@ -39,7 +39,7 @@ test.describe
     test('pitch suggestion hidden on free plan', async ({ page }) => {
       await ensureSignedInUser(page);
 
-      // Navigate to new chat thread (empty state shows suggested prompts)
+      // Navigate to new chat thread.
       await smokeNavigateWithRetry(page, APP_ROUTES.CHAT, { timeout: 60_000 });
       await waitForHydration(page);
 
@@ -48,7 +48,9 @@ test.describe
       await expect(pitchSuggestion).not.toBeVisible({ timeout: 5_000 });
     });
 
-    test('upgrade to pro enables pitch suggestion', async ({ page }) => {
+    test('upgrade to pro keeps pitch requests available through the composer', async ({
+      page,
+    }) => {
       await ensureSignedInUser(page);
 
       // Upgrade test user to pro
@@ -65,29 +67,13 @@ test.describe
         await waitForHydration(page);
       }
 
-      // The pitch suggestion should now be visible (if profile is complete enough)
-      // Note: The test user may not have 100% profile completion, which hides
-      // suggested prompts entirely. Check for either the suggestion OR the
-      // profile completion card.
+      // Prompt suggestion pills are not part of this shell convergence wave.
+      // The paid tool remains reachable through the composer.
       const pitchSuggestion = page.getByText(/generate pitches/i);
-      const profileCompletionGate = page.getByRole('button', {
-        name: /profile \d+% complete/i,
-      });
       const chatInput = page.getByPlaceholder(/ask jovie|chat message/i);
 
-      // At minimum, the chat input should be present
       await expect(chatInput).toBeVisible({ timeout: 15_000 });
-
-      // If the profile completion card is showing, pitch suggestion is hidden
-      // because SuggestedPrompts only renders when profile is 100% complete.
-      // This is correct behavior — not a test failure.
-      const isProfileIncomplete = await profileCompletionGate
-        .isVisible()
-        .catch(() => false);
-      if (!isProfileIncomplete) {
-        // Profile is complete — pitch suggestion should be visible for pro users
-        await expect(pitchSuggestion).toBeVisible({ timeout: 10_000 });
-      }
+      await expect(pitchSuggestion).not.toBeVisible({ timeout: 5_000 });
     });
 
     test('can type and send a pitch request via chat', async ({ page }) => {

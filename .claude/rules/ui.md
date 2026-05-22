@@ -202,6 +202,24 @@ This is the subtraction principle applied specifically to container boundaries. 
 - Screenshot test: before and after a perf PR, the fully-loaded page must look identical.
 - If a route needs a genuinely different UI, that is a product decision requiring explicit approval, not a perf side effect.
 
+### Layout Shift Prevention — Mandatory for All Agents
+
+Before touching **any** component or surface, an agent **must** explicitly enumerate every possible visual state it can render (loading, empty, error, partial data, success, authenticated vs anonymous, with/without banners/status lines/status text, mobile vs desktop, collapsed vs expanded, first-message vs ongoing, securing/awaiting vs ready, etc.).
+
+For every state transition the component or page can undergo, the agent must verify that **no layout shift** occurs:
+- Content does not push or displace other content vertically or horizontally.
+- Containers do not unexpectedly resize or reflow.
+- Scroll position is preserved where users expect it.
+- Focus, selection, and caret positions are not disrupted.
+
+Where a transition would insert or remove content that affects layout height or position:
+- Reserve space in advance (min-height, skeleton loaders, empty placeholder elements with matching dimensions, or a dedicated fixed-status slot).
+- Or use height-preserving wrappers combined with opacity / visibility / scale / transform transitions only (never height or margin changes that cause reflow).
+
+Add or update tests (Playwright layout guards, visual regression snapshots, bounding-box assertions on key containers, CLS metrics, or stability specs) for any non-trivial state changes or surfaces that render conditional UI.
+
+This rule is non-negotiable and applies to **all product work** (including onboarding, chat, dashboards, marketing, and shell surfaces). Violations block design review and PR landing. See also `DESIGN.md` (visual stability section), `docs/TESTING_GUIDELINES.md` (risk-based visual QA), and `AGENTS.md` (verification).
+
 ### Global UI Components Render Once
 
 Global UI elements must only render in root `app/layout.tsx`:

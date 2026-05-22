@@ -1,3 +1,3 @@
 export { ReleaseTaskChecklist } from './ReleaseTaskChecklist';
-export { ReleaseTaskPage } from './ReleaseTaskPage';
+export { ReleaseTaskPage, ReleaseTaskPageSkeleton } from './ReleaseTaskPage';
 export { ReleaseTaskProgressBar } from './ReleaseTaskProgressBar';

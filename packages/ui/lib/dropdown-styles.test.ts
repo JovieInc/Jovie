@@ -50,7 +50,7 @@ describe('dropdown-styles', () => {
 
   describe('content base styles', () => {
     it('DROPDOWN_CONTENT_BASE includes z-index, border, and background', () => {
-      expect(DROPDOWN_CONTENT_BASE).toContain('z-[70]');
+      expect(DROPDOWN_CONTENT_BASE).toContain('z-[90]');
       expect(DROPDOWN_CONTENT_BASE).toContain('border');
       expect(DROPDOWN_CONTENT_BASE).toContain('bg-');
       expect(DROPDOWN_CONTENT_BASE).toContain('rounded-');

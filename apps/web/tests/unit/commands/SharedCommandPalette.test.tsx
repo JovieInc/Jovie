@@ -92,6 +92,20 @@ describe('SharedCommandPalette (cmd+k surface)', () => {
     expect(slashNavs).toHaveLength(0);
   });
 
+  it('keeps Feedback available on both command surfaces', () => {
+    for (const surface of ['chat-slash', 'cmdk'] as const) {
+      expect(commandsForSurface(surface)).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            kind: 'skill',
+            id: 'submitFeedback',
+            label: 'Send feedback',
+          }),
+        ])
+      );
+    }
+  });
+
   it('renders nav, skill, and release sections when open', () => {
     render(<CmdKPalette profileId='profile-1' open onOpenChange={vi.fn()} />);
     expect(screen.getByTestId('shared-command-palette')).toBeInTheDocument();
@@ -115,7 +129,18 @@ describe('SharedCommandPalette (cmd+k surface)', () => {
       .find(el => el.textContent?.includes('Manage your release catalog'));
     expect(releasesNav).toBeDefined();
     fireEvent.mouseDown(releasesNav!);
-    expect(pushMock).toHaveBeenCalledWith('/app/dashboard/releases');
+    expect(pushMock).toHaveBeenCalledWith('/app/releases');
+  });
+
+  it('uses the canonical audience route for the Audience nav item', () => {
+    pushMock.mockClear();
+    render(<CmdKPalette profileId='profile-1' open onOpenChange={vi.fn()} />);
+    const audienceNav = screen
+      .getAllByRole('option')
+      .find(el => el.textContent?.includes('Understand your audience'));
+    expect(audienceNav).toBeDefined();
+    fireEvent.mouseDown(audienceNav!);
+    expect(pushMock).toHaveBeenCalledWith('/app/audience');
   });
 
   it('routes a skill commit to chat with the ?skill= handoff', () => {
@@ -130,6 +155,17 @@ describe('SharedCommandPalette (cmd+k surface)', () => {
     expect(pushMock).toHaveBeenCalledWith('/app/chat?skill=generateAlbumArt');
   });
 
+  it('routes Feedback from cmd+k through the same skill handoff', () => {
+    pushMock.mockClear();
+    render(<CmdKPalette profileId='profile-1' open onOpenChange={vi.fn()} />);
+    const feedbackRow = screen
+      .getAllByRole('option')
+      .find(el => el.textContent?.includes('Share feedback'));
+    expect(feedbackRow).toBeDefined();
+    fireEvent.mouseDown(feedbackRow!);
+    expect(pushMock).toHaveBeenCalledWith('/app/chat?skill=submitFeedback');
+  });
+
   it('routes a release entity commit to its tasks page', () => {
     pushMock.mockClear();
     render(<CmdKPalette profileId='profile-1' open onOpenChange={vi.fn()} />);
@@ -138,9 +174,7 @@ describe('SharedCommandPalette (cmd+k surface)', () => {
       .find(el => el.textContent?.includes('Midnight Run'));
     expect(releaseRow).toBeDefined();
     fireEvent.mouseDown(releaseRow!);
-    expect(pushMock).toHaveBeenCalledWith(
-      '/app/dashboard/releases/rel-1/tasks'
-    );
+    expect(pushMock).toHaveBeenCalledWith('/app/releases/rel-1/tasks');
   });
 
   it('renders additional sections (e.g. recent threads) and routes via callback', () => {

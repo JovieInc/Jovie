@@ -28,6 +28,7 @@ import { DashboardDataProvider } from '@/app/app/(shell)/dashboard/DashboardData
 import { AuthShellWrapper } from '@/components/organisms/AuthShellWrapper';
 import { NuqsProvider } from '@/components/providers/NuqsProvider';
 import { ClerkSafeDefaultsProvider } from '@/hooks/useClerkSafe';
+import type { ReleaseViewModel } from '@/lib/discography/types';
 import { queryKeys } from '@/lib/queries';
 import type { BillingStatusData } from '@/lib/queries/useBillingStatusQuery';
 import type { ChatUsageData } from '@/lib/queries/useChatUsageQuery';
@@ -47,6 +48,7 @@ type DemoQuerySeeder = (
 function createDemoQueryClient(
   profileId: string,
   dashboardData: DashboardData,
+  releasesForQuery: readonly ReleaseViewModel[],
   seedQueryClient?: DemoQuerySeeder
 ): QueryClient {
   const client = new QueryClient({
@@ -62,10 +64,7 @@ function createDemoQueryClient(
   });
 
   // Pre-seed the releases query so the sidebar badge shows the count
-  client.setQueryData(
-    queryKeys.releases.matrix(profileId),
-    DEMO_RELEASE_VIEW_MODELS
-  );
+  client.setQueryData(queryKeys.releases.matrix(profileId), releasesForQuery);
   client.setQueryData<BillingStatusData>(queryKeys.billing.status(), {
     isPro: true,
     plan: 'max',
@@ -98,12 +97,14 @@ interface DemoAuthShellProps {
   readonly children: React.ReactNode;
   /** Pre-built DashboardData from a DB-fetched FeaturedCreator. Falls back to the internal demo persona. */
   readonly dashboardData?: DashboardData;
+  readonly releasesForQuery?: readonly ReleaseViewModel[];
   readonly seedQueryClient?: DemoQuerySeeder;
 }
 
 export function DemoAuthShell({
   children,
   dashboardData,
+  releasesForQuery = DEMO_RELEASE_VIEW_MODELS,
   seedQueryClient,
 }: DemoAuthShellProps) {
   const data = dashboardData ?? DEMO_DASHBOARD_DATA;
@@ -111,8 +112,9 @@ export function DemoAuthShell({
 
   // Stable QueryClient instance per component mount
   const demoQueryClient = useMemo(
-    () => createDemoQueryClient(profileId, data, seedQueryClient),
-    [data, profileId, seedQueryClient]
+    () =>
+      createDemoQueryClient(profileId, data, releasesForQuery, seedQueryClient),
+    [data, profileId, releasesForQuery, seedQueryClient]
   );
 
   return (

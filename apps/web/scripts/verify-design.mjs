@@ -92,9 +92,9 @@ await page.screenshot({
 });
 
 // 4) Releases route
-console.log('--- /app/dashboard/releases ---');
+console.log('--- /app/releases ---');
 await page
-  .goto('http://localhost:3100/app/dashboard/releases', {
+  .goto('http://localhost:3100/app/releases', {
     waitUntil: 'domcontentloaded',
     timeout: 60000,
   })

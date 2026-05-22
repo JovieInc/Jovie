@@ -1,24 +1,17 @@
 'use client';
 
 import { Badge } from '@jovie/ui';
+import { type ColumnDef, createColumnHelper } from '@tanstack/react-table';
 import { ExternalLink } from 'lucide-react';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import { LoadingSpinner } from '@/components/atoms/LoadingSpinner';
 import { ContentSectionHeader } from '@/components/molecules/ContentSectionHeader';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
-import {
-  CONTENT_TABLE_CELL_CLASS,
-  CONTENT_TABLE_FOOTER_CLASS,
-  CONTENT_TABLE_HEAD_CELL_CLASS,
-  CONTENT_TABLE_HEAD_ROW_CLASS,
-  CONTENT_TABLE_ROW_CLASS,
-  ContentTable,
-  ContentTableStateRow,
-} from '@/components/molecules/ContentTable';
 import { DrawerButton } from '@/components/molecules/drawer';
+import { TableEmptyState } from '@/components/organisms/table';
+import { AdminDataTable } from '@/features/admin/table/AdminDataTable';
 import { AdminTablePagination } from '@/features/admin/table/AdminTablePagination';
-import { cn } from '@/lib/utils';
 
 interface ReviewLead {
   id: string;
@@ -51,13 +44,15 @@ const SIGNAL_CONFIG: Record<
   hasRepresentation: { label: 'Has Representation', variant: 'primary' },
 };
 
+const reviewQueueColumnHelper = createColumnHelper<ReviewLead>();
+
 export function ReviewQueuePanel() {
   const [leads, setLeads] = useState<ReviewLead[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
-  const [skippingId, setSkippingId] = useState<string | null>(null);
+  const [skippingIds, setSkippingIds] = useState<Set<string>>(() => new Set());
   const limit = 50;
 
   const fetchQueue = useCallback(async () => {
@@ -93,23 +88,128 @@ export function ReviewQueuePanel() {
     fetchQueue();
   }, [fetchQueue]);
 
-  async function handleSkip(id: string) {
-    setSkippingId(id);
-    try {
-      const res = await fetch(`/api/admin/leads/${id}/skip`, {
-        method: 'PATCH',
-      });
-      if (!res.ok) {
-        throw new Error('Failed to skip lead');
+  const handleSkip = useCallback(
+    async (id: string) => {
+      setSkippingIds(current => new Set(current).add(id));
+      try {
+        const res = await fetch(`/api/admin/leads/${id}/skip`, {
+          method: 'PATCH',
+        });
+        if (!res.ok) {
+          throw new Error('Failed to skip lead');
+        }
+        toast.success('Lead skipped');
+        await fetchQueue();
+      } catch {
+        toast.error('Failed to skip lead');
+      } finally {
+        setSkippingIds(current => {
+          const next = new Set(current);
+          next.delete(id);
+          return next;
+        });
       }
-      toast.success('Lead skipped');
-      await fetchQueue();
-    } catch {
-      toast.error('Failed to skip lead');
-    } finally {
-      setSkippingId(null);
-    }
-  }
+    },
+    [fetchQueue]
+  );
+
+  const columns = useMemo<ColumnDef<ReviewLead, unknown>[]>(
+    () => [
+      reviewQueueColumnHelper.accessor('displayName', {
+        header: 'Name',
+        cell: ({ getValue }) => (
+          <span className='font-semibold text-primary-token'>
+            {getValue() || '-'}
+          </span>
+        ),
+        size: 180,
+      }) as ColumnDef<ReviewLead, unknown>,
+      reviewQueueColumnHelper.accessor('priorityScore', {
+        header: 'Priority',
+        cell: ({ getValue }) => (
+          <span className='tabular-nums'>{getValue() ?? '-'}</span>
+        ),
+        size: 92,
+      }) as ColumnDef<ReviewLead, unknown>,
+      reviewQueueColumnHelper.accessor('fitScore', {
+        header: 'Fit score',
+        cell: ({ getValue }) => (
+          <span className='tabular-nums'>{getValue() ?? '-'}</span>
+        ),
+        size: 92,
+      }) as ColumnDef<ReviewLead, unknown>,
+      reviewQueueColumnHelper.accessor('contactEmail', {
+        header: 'Email',
+        cell: ({ getValue }) => (
+          <span className='text-secondary-token'>{getValue() || '-'}</span>
+        ),
+        size: 220,
+      }) as ColumnDef<ReviewLead, unknown>,
+      reviewQueueColumnHelper.accessor('instagramHandle', {
+        header: 'Instagram',
+        cell: ({ getValue }) => {
+          const handle = getValue();
+          return handle ? (
+            <a
+              href={`https://instagram.com/${handle}`}
+              target='_blank'
+              rel='noopener noreferrer'
+              className='flex items-center gap-1 text-secondary-token hover:text-primary-token'
+            >
+              @{handle}
+              <ExternalLink className='size-3' aria-hidden='true' />
+            </a>
+          ) : (
+            <span className='text-tertiary-token'>-</span>
+          );
+        },
+        size: 150,
+      }) as ColumnDef<ReviewLead, unknown>,
+      reviewQueueColumnHelper.accessor('signals', {
+        header: 'Signals',
+        cell: ({ getValue }) => (
+          <div className='flex flex-wrap gap-1'>
+            {Object.entries(getValue() ?? {}).map(
+              ([key, value]) =>
+                value &&
+                SIGNAL_CONFIG[key] && (
+                  <Badge
+                    key={key}
+                    variant={SIGNAL_CONFIG[key].variant}
+                    className='text-2xs'
+                  >
+                    {SIGNAL_CONFIG[key].label}
+                  </Badge>
+                )
+            )}
+          </div>
+        ),
+        size: 220,
+      }) as ColumnDef<ReviewLead, unknown>,
+      reviewQueueColumnHelper.display({
+        id: 'actions',
+        header: 'Actions',
+        cell: ({ row }) => (
+          <DrawerButton
+            tone='secondary'
+            size='sm'
+            onClick={() => {
+              void handleSkip(row.original.id);
+            }}
+            disabled={skippingIds.has(row.original.id)}
+            className='h-8 px-3 text-xs'
+          >
+            {skippingIds.has(row.original.id) ? (
+              <LoadingSpinner size='sm' tone='muted' className='mr-1.5' />
+            ) : null}
+            Skip
+          </DrawerButton>
+        ),
+        size: 110,
+      }) as ColumnDef<ReviewLead, unknown>,
+    ],
+    [handleSkip, skippingIds]
+  );
 
   const totalPages = Math.ceil(total / limit);
   const hasPreviousPage = page > 1;
@@ -130,106 +230,25 @@ export function ReviewQueuePanel() {
           actionsClassName='shrink-0'
         />
 
-        <ContentTable>
-          <thead>
-            <tr className={CONTENT_TABLE_HEAD_ROW_CLASS}>
-              <th className={CONTENT_TABLE_HEAD_CELL_CLASS}>Name</th>
-              <th className={CONTENT_TABLE_HEAD_CELL_CLASS}>Priority</th>
-              <th className={CONTENT_TABLE_HEAD_CELL_CLASS}>Fit score</th>
-              <th className={CONTENT_TABLE_HEAD_CELL_CLASS}>Email</th>
-              <th className={CONTENT_TABLE_HEAD_CELL_CLASS}>Instagram</th>
-              <th className={CONTENT_TABLE_HEAD_CELL_CLASS}>Signals</th>
-              <th className={CONTENT_TABLE_HEAD_CELL_CLASS}>Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {loading || leads.length === 0 ? (
-              <ContentTableStateRow
-                colSpan={7}
-                isLoading={loading}
-                emptyMessage={loadError ?? 'No leads pending review'}
-                loadingLabel='Loading manual review queue'
-              />
-            ) : (
-              leads.map(lead => (
-                <tr key={lead.id} className={CONTENT_TABLE_ROW_CLASS}>
-                  <td className={CONTENT_TABLE_CELL_CLASS}>
-                    <span className='font-semibold text-primary-token'>
-                      {lead.displayName || '-'}
-                    </span>
-                  </td>
-                  <td className={cn(CONTENT_TABLE_CELL_CLASS, 'tabular-nums')}>
-                    {lead.priorityScore ?? '-'}
-                  </td>
-                  <td className={cn(CONTENT_TABLE_CELL_CLASS, 'tabular-nums')}>
-                    {lead.fitScore ?? '-'}
-                  </td>
-                  <td className={CONTENT_TABLE_CELL_CLASS}>
-                    <span className='text-secondary-token'>
-                      {lead.contactEmail || '-'}
-                    </span>
-                  </td>
-                  <td className={CONTENT_TABLE_CELL_CLASS}>
-                    {lead.instagramHandle ? (
-                      <a
-                        href={`https://instagram.com/${lead.instagramHandle}`}
-                        target='_blank'
-                        rel='noopener noreferrer'
-                        className='flex items-center gap-1 text-secondary-token hover:text-primary-token'
-                      >
-                        @{lead.instagramHandle}
-                        <ExternalLink className='size-3' aria-hidden='true' />
-                      </a>
-                    ) : (
-                      <span className='text-tertiary-token'>-</span>
-                    )}
-                  </td>
-                  <td className={CONTENT_TABLE_CELL_CLASS}>
-                    <div className='flex flex-wrap gap-1'>
-                      {lead.signals &&
-                        Object.entries(lead.signals).map(
-                          ([key, value]) =>
-                            value &&
-                            SIGNAL_CONFIG[key] && (
-                              <Badge
-                                key={key}
-                                variant={SIGNAL_CONFIG[key].variant}
-                                className='text-2xs'
-                              >
-                                {SIGNAL_CONFIG[key].label}
-                              </Badge>
-                            )
-                        )}
-                    </div>
-                  </td>
-                  <td className={CONTENT_TABLE_CELL_CLASS}>
-                    <DrawerButton
-                      tone='secondary'
-                      size='sm'
-                      onClick={() => {
-                        void handleSkip(lead.id);
-                      }}
-                      disabled={skippingId === lead.id}
-                      className='h-8 px-3 text-xs'
-                    >
-                      {skippingId === lead.id ? (
-                        <LoadingSpinner
-                          size='sm'
-                          tone='muted'
-                          className='mr-1.5'
-                        />
-                      ) : null}
-                      Skip
-                    </DrawerButton>
-                  </td>
-                </tr>
-              ))
-            )}
-          </tbody>
-        </ContentTable>
+        <AdminDataTable
+          data={leads}
+          columns={columns}
+          isLoading={loading}
+          getRowId={lead => lead.id}
+          enableVirtualization={false}
+          minWidth='980px'
+          emptyState={
+            <TableEmptyState
+              title={
+                loadError ? 'Unable to load manual review' : 'No leads pending'
+              }
+              description={loadError ?? 'No leads pending review'}
+            />
+          }
+        />
 
         {totalPages > 1 && (
-          <div className={CONTENT_TABLE_FOOTER_CLASS}>
+          <div className='border-t border-subtle px-(--linear-app-content-padding-x) py-2'>
             <AdminTablePagination
               page={page}
               totalPages={totalPages}

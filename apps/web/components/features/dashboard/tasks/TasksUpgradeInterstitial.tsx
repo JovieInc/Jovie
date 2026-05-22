@@ -33,11 +33,11 @@ function TasksUpgradeContent({
         'mx-auto flex w-full flex-col items-center justify-center text-center',
         compact
           ? 'rounded-[18px] border border-(--linear-app-frame-seam) bg-surface-1 px-5 py-8'
-          : 'max-w-xl rounded-[24px] border border-[color-mix(in_oklab,var(--linear-app-shell-border)_72%,transparent)] bg-[color-mix(in_oklab,var(--linear-app-content-surface)_97%,transparent)] px-8 py-14'
+          : 'max-w-xl rounded-[24px] border border-subtle bg-surface-1 px-8 py-14'
       )}
       data-testid={testId}
     >
-      <div className='mb-4 flex h-11 w-11 items-center justify-center rounded-full bg-[color-mix(in_oklab,var(--linear-app-content-surface)_84%,transparent)] text-amber-700'>
+      <div className='mb-4 flex h-11 w-11 items-center justify-center rounded-full bg-surface-0 text-amber-700'>
         {compact ? (
           <Lock className='h-5 w-5' aria-hidden='true' />
         ) : (
@@ -73,7 +73,7 @@ export function TasksWorkspaceUpgradeInterstitial() {
         <TasksUpgradeContent
           heading='Upgrade to access Tasks'
           description='Upgrade to turn releases into step-by-step plans and manage all of your work in one task workspace.'
-          secondaryHref={APP_ROUTES.DASHBOARD_RELEASES}
+          secondaryHref={APP_ROUTES.RELEASES}
           secondaryLabel='Back to Releases'
         />
       </section>
@@ -92,9 +92,9 @@ export function ReleasePlanUpgradeInterstitial({
       data-testid='release-plan-upgrade-interstitial'
     >
       <TasksUpgradeContent
-        heading='Upgrade To Generate A Release Plan'
+        heading='Upgrade to Generate a Release Plan'
         description={`Upgrade to turn ${releaseName} into a step-by-step plan with tasks you can assign to Jovie AI.`}
-        secondaryHref={APP_ROUTES.DASHBOARD_RELEASES}
+        secondaryHref={APP_ROUTES.RELEASES}
         secondaryLabel='Back to Releases'
       />
     </div>
@@ -107,7 +107,7 @@ export function CompactReleasePlanUpgradeCard({
   return (
     <TasksUpgradeContent
       compact
-      heading='Upgrade To Generate A Release Plan'
+      heading='Upgrade to Generate a Release Plan'
       description='Upgrade to turn this release into an assignable step-by-step plan.'
       onSecondaryClick={onDismiss}
       secondaryLabel='Maybe Later'

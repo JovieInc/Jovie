@@ -264,7 +264,7 @@ test.describe('Production Auth Smoke @production-smoke', () => {
 
     await waitForHydration(page);
 
-    const tabs = [APP_ROUTES.DASHBOARD_AUDIENCE, APP_ROUTES.DASHBOARD_RELEASES];
+    const tabs = [APP_ROUTES.AUDIENCE, APP_ROUTES.RELEASES];
 
     for (const tabPath of tabs) {
       await page.goto(tabPath, {

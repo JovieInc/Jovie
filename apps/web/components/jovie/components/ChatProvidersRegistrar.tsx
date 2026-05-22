@@ -30,9 +30,15 @@ export function ChatProvidersRegistrar({
   );
 
   useEffect(() => {
-    registerEntityProvider(releaseProvider);
-    registerEntityProvider(artistProvider);
-    registerEntityProvider(eventProvider);
+    const unregisterReleaseProvider = registerEntityProvider(releaseProvider);
+    const unregisterArtistProvider = registerEntityProvider(artistProvider);
+    const unregisterEventProvider = registerEntityProvider(eventProvider);
+
+    return () => {
+      unregisterEventProvider();
+      unregisterArtistProvider();
+      unregisterReleaseProvider();
+    };
   }, [releaseProvider, eventProvider]);
 
   return null;

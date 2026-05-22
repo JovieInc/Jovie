@@ -217,6 +217,8 @@ describe('ProfileViewTracker', () => {
     expect(mockTrack).toHaveBeenCalledWith('profile_view', {
       handle: 'testartist',
       artist_id: 'artist-123',
+      profile_id: 'artist-123',
+      profile_slug: 'testartist',
       source: 'https://google.com',
     });
   });
@@ -289,6 +291,8 @@ describe('ProfileViewTracker', () => {
     expect(mockTrack).toHaveBeenCalledWith('profile_view', {
       handle: 'testartist',
       artist_id: 'artist-123',
+      profile_id: 'artist-123',
+      profile_slug: 'testartist',
       source: 'qr-code',
     });
   });

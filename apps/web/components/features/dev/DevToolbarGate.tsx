@@ -1,7 +1,12 @@
 'use client';
 
 import dynamic from 'next/dynamic';
+import { usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
+import {
+  isDemoRecordingClient,
+  isDevChromeDisabledClient,
+} from '@/lib/demo-recording';
 
 const DevToolbar = dynamic(
   () =>
@@ -16,7 +21,12 @@ interface DevToolbarGateProps {
   readonly disabled?: boolean;
 }
 
-const DEV_TOOLBAR_SUPPRESSED_PATHS = new Set(['/demovideo', '/demo/video']);
+const DEV_TOOLBAR_SUPPRESSED_PATHS = new Set([
+  '/demovideo',
+  '/demo',
+  '/demo/video',
+]);
+const DEV_TOOLBAR_SUPPRESSED_PREFIXES = ['/demo/'];
 
 function hasDevToolbarCookie(): boolean {
   if (typeof document === 'undefined') return false;
@@ -26,10 +36,19 @@ function hasDevToolbarCookie(): boolean {
     .some(cookie => cookie.trim().startsWith('__dev_toolbar=1'));
 }
 
-function isSuppressedPath(): boolean {
+export function isDevToolbarSuppressedPath(pathname: string): boolean {
   return (
-    typeof window !== 'undefined' &&
-    DEV_TOOLBAR_SUPPRESSED_PATHS.has(window.location.pathname)
+    DEV_TOOLBAR_SUPPRESSED_PATHS.has(pathname) ||
+    DEV_TOOLBAR_SUPPRESSED_PREFIXES.some(prefix => pathname.startsWith(prefix))
+  );
+}
+
+function isSuppressedClientContext(pathname: string): boolean {
+  return (
+    isDemoRecordingClient() ||
+    isDevChromeDisabledClient() ||
+    document.documentElement.dataset.desktopRuntime === 'electron' ||
+    isDevToolbarSuppressedPath(pathname)
   );
 }
 
@@ -40,19 +59,60 @@ export function DevToolbarGate({
   disabled = false,
 }: DevToolbarGateProps) {
   const [shouldRender, setShouldRender] = useState(false);
+  const pathname = usePathname();
 
   useEffect(() => {
-    if (disabled || isSuppressedPath()) {
+    let cancelled = false;
+
+    const hideToolbar = () => {
       document.documentElement.style.setProperty('--dev-toolbar-height', '0px');
       setShouldRender(false);
-      return;
-    }
+    };
 
-    const isProduction =
-      process.env.NODE_ENV === 'production' && env === 'production';
+    const syncToolbarVisibility = () => {
+      if (cancelled) return;
 
-    setShouldRender(!isProduction || hasDevToolbarCookie());
-  }, [disabled, env]);
+      if (disabled || isSuppressedClientContext(pathname)) {
+        hideToolbar();
+        return;
+      }
+
+      const isProduction =
+        process.env.NODE_ENV === 'production' && env === 'production';
+
+      setShouldRender(!isProduction || hasDevToolbarCookie());
+    };
+
+    syncToolbarVisibility();
+
+    const animationFrame = globalThis.requestAnimationFrame?.(
+      syncToolbarVisibility
+    );
+    const handleDomReady = () => syncToolbarVisibility();
+    document.addEventListener('DOMContentLoaded', handleDomReady);
+
+    const observer =
+      typeof MutationObserver === 'undefined'
+        ? null
+        : new MutationObserver(syncToolbarVisibility);
+    observer?.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: [
+        'data-demo-recording',
+        'data-desktop-runtime',
+        'data-dev-chrome-disabled',
+      ],
+    });
+
+    return () => {
+      cancelled = true;
+      if (animationFrame !== undefined) {
+        globalThis.cancelAnimationFrame?.(animationFrame);
+      }
+      document.removeEventListener('DOMContentLoaded', handleDomReady);
+      observer?.disconnect();
+    };
+  }, [disabled, env, pathname]);
 
   if (disabled || !shouldRender) {
     return null;

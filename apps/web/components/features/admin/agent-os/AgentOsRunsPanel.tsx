@@ -24,7 +24,8 @@ import {
 } from 'react';
 import { ContentSectionHeader } from '@/components/molecules/ContentSectionHeader';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
-import { TableEmptyState, UnifiedTable } from '@/components/organisms/table';
+import { rowState, TableEmptyState } from '@/components/organisms/table';
+import { AdminDataTable } from '@/features/admin/table/AdminDataTable';
 import type { AgentRunArtifact, AgentRunStatus } from '@/lib/agent-os/artifact';
 import { cn } from '@/lib/utils';
 import { ApprovalQueuePanel } from './ApprovalQueuePanel';
@@ -236,7 +237,6 @@ function AgentOsBoardCard({
           </div>
         </button>
         <div className='flex shrink-0 items-center gap-1'>
-          <WorkflowStatusPill status={artifact.status} />
           <AgentRunDetailPopover artifact={artifact} />
         </div>
       </div>
@@ -268,7 +268,7 @@ function AgentOsBoard({
   }
 
   return (
-    <div className='grid gap-2 md:grid-cols-2 xl:grid-cols-3'>
+    <div className='grid gap-2 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4'>
       {BOARD_STATUSES.map(status => {
         const laneRows = rows.filter(artifact => artifact.status === status);
 
@@ -414,9 +414,10 @@ const AGENT_OS_COLUMNS: ColumnDef<AgentRunArtifact, unknown>[] = [
 ];
 
 function getRowClassName(artifact: AgentRunArtifact) {
+  const hover = rowState.hover;
   return artifact.status === 'blocked' || artifact.status === 'failed'
-    ? 'group bg-surface-0 hover:bg-(--linear-row-hover)'
-    : 'group hover:bg-(--linear-row-hover)';
+    ? `group bg-surface-0 ${hover}`
+    : `group ${hover}`;
 }
 
 function ViewModeButton({
@@ -555,7 +556,7 @@ export function AgentOsRunsPanel({
             />
           ) : (
             <div className='min-w-0 rounded-lg border border-subtle bg-(--linear-app-content-surface)'>
-              <UnifiedTable
+              <AdminDataTable
                 data={rows}
                 columns={columns}
                 isLoading={false}
@@ -578,7 +579,6 @@ export function AgentOsRunsPanel({
                 getRowTestId={artifact => `agent-os-run-${artifact.id}`}
                 enableVirtualization={false}
                 minWidth='700px'
-                className='text-[12.5px] [&_thead_th]:py-1 [&_thead_th]:text-3xs [&_thead_th]:tracking-[0.07em]'
                 containerClassName='max-h-[460px]'
               />
             </div>

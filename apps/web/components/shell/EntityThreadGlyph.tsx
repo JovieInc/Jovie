@@ -45,7 +45,7 @@ export function EntityThreadGlyph({
           onOpen();
         }}
         aria-label='Open running thread'
-        className='shrink-0 inline-flex items-center justify-center h-5 w-5 rounded text-cyan-300/85 hover:text-cyan-200 hover:bg-surface-1/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-token transition-colors duration-150 ease-out'
+        className='shrink-0 inline-flex items-center justify-center h-5 w-5 rounded text-cyan-300/85 hover:text-cyan-200 hover:bg-surface-1/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-token transition-colors duration-subtle ease-subtle'
       >
         <span className='relative inline-grid place-items-center h-3 w-3'>
           <span

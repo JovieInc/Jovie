@@ -11,7 +11,7 @@ export function PreviewToggleButton() {
   const Icon = isOpen ? PanelRightOpen : PanelRight;
 
   return (
-    <TooltipShortcut label={label} shortcut='Space' side='bottom'>
+    <TooltipShortcut label={label} side='bottom'>
       <DashboardHeaderActionButton
         ariaLabel={label}
         pressed={isOpen}

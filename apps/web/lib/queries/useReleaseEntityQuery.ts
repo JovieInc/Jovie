@@ -1,9 +1,9 @@
 'use client';
 
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { loadReleaseEntity } from '@/app/app/(shell)/dashboard/releases/actions';
 import type { ReleaseViewModel } from '@/lib/discography/types';
 import { queryKeys, STANDARD_NO_REMOUNT_CACHE } from '@/lib/queries';
+import { loadReleaseEntity } from '@/lib/releases/release-matrix-loader';
 
 interface CachedMatrixRelease {
   release: ReleaseViewModel;

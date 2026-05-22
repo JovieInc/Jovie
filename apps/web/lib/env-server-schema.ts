@@ -45,10 +45,14 @@ export const ServerEnvSchema = z.object({
         'VERCEL_URL must be a hostname or hostname:port without a scheme or path',
     })
     .optional(),
+  VERCEL_AUTOMATION_BYPASS_SECRET: z.string().optional(),
+  PUBLIC_NOAUTH_SMOKE: z.string().optional(),
 
   // Clerk server-side configuration
   CLERK_SECRET_KEY: z.string().optional(),
   CLERK_WEBHOOK_SECRET: z.string().optional(),
+  CLERK_PUBLISHABLE_KEY_STAGING: z.string().optional(),
+  NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: z.string().optional(),
 
   // Email / notifications
   RESEND_API_KEY: z.string().optional(),
@@ -193,6 +197,9 @@ export const ServerEnvSchema = z.object({
   // AI Gateway auth (required for chat completions)
   AI_GATEWAY_API_KEY: z.string().optional(),
 
+  // Braintrust observability (LLM tracing + evals)
+  BRAINTRUST_API_KEY: z.string().optional(),
+
   // AgentOS workflows are compile-ready but runtime-disabled by default.
   AGENT_OS_WORKFLOWS_ENABLED: z.enum(['true', 'false']).optional(),
 
@@ -201,6 +208,18 @@ export const ServerEnvSchema = z.object({
   ALBUM_ART_IMAGE_MODEL: z.string().optional(),
   ALBUM_ART_GENERATION_DAILY_LIMIT: z.string().optional(),
   ALBUM_ART_GENERATION_BURST_LIMIT: z.string().optional(),
+
+  // Google OAuth + Connectors (AI Connector v1 — JOV-2230)
+  GOOGLE_OAUTH_CLIENT_ID: z.string().optional(),
+  GOOGLE_OAUTH_CLIENT_SECRET: z.string().optional(),
+  /** Base URL for the Google OAuth redirect URI, e.g. https://jov.ie/api/connectors/google */
+  GOOGLE_OAUTH_REDIRECT_URI_BASE: z.string().url().optional(),
+  /** Days before/after today to fetch Calendar events (default: 90 past, 365 future) */
+  GOOGLE_CALENDAR_DEFAULT_WINDOW_DAYS: z.string().optional(),
+  /** Days of Gmail history to scan for booking signals (default: 30) */
+  GMAIL_HISTORY_WINDOW_DAYS: z.string().optional(),
+  /** Per-user per-day Gateway token budget for AI Connector extraction (default: 100000) */
+  AI_CONNECTORS_DAILY_TOKEN_BUDGET: z.string().optional(),
 
   // Development tools
   JOVIE_DEV_MEMORY_MONITOR: z.string().optional(),
@@ -226,6 +245,17 @@ export const ServerEnvSchema = z.object({
   E2E_USE_TEST_AUTH_BYPASS: z.string().optional(),
   E2E_CLERK_USER_ID: z.string().optional(),
   E2E_CLERK_USER_USERNAME: z.string().optional(),
+  E2E_PROD_SIGNUP_EMAIL_BASE: z.string().email().optional(),
+  E2E_PROD_SIGNUP_PASSWORD: z.string().optional(),
+  E2E_PROD_MAILBOX_PROVIDER: z
+    .enum(['gmail', 'cloudflare-email-routing'])
+    .optional(),
+  E2E_PROD_MAILBOX_CLIENT_ID: z.string().optional(),
+  E2E_PROD_MAILBOX_CLIENT_SECRET: z.string().optional(),
+  E2E_PROD_MAILBOX_REFRESH_TOKEN: z.string().optional(),
+  E2E_PROD_MAILBOX_QUERY_FROM: z.string().optional(),
+  E2E_PROD_OTP_CHECK_URL: z.string().url().optional(),
+  E2E_PROD_OTP_CHECK_TOKEN: z.string().optional(),
   DEMO_RECORDING: z.string().optional(),
   DEMO_CLERK_USER_ID: z.string().optional(),
 
@@ -261,8 +291,12 @@ export const ENV_KEYS = [
   'VITEST',
   'VERCEL_ENV',
   'VERCEL_URL',
+  'VERCEL_AUTOMATION_BYPASS_SECRET',
+  'PUBLIC_NOAUTH_SMOKE',
   'CLERK_SECRET_KEY',
   'CLERK_WEBHOOK_SECRET',
+  'CLERK_PUBLISHABLE_KEY_STAGING',
+  'NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY',
   'RESEND_API_KEY',
   'RESEND_FROM_EMAIL',
   'RESEND_REPLY_TO_EMAIL',
@@ -319,6 +353,15 @@ export const ENV_KEYS = [
   'UPSTASH_REDIS_REST_TOKEN',
   'SESSION_SECRET',
   'TURNSTILE_SECRET_KEY',
+  'E2E_PROD_SIGNUP_EMAIL_BASE',
+  'E2E_PROD_SIGNUP_PASSWORD',
+  'E2E_PROD_MAILBOX_PROVIDER',
+  'E2E_PROD_MAILBOX_CLIENT_ID',
+  'E2E_PROD_MAILBOX_CLIENT_SECRET',
+  'E2E_PROD_MAILBOX_REFRESH_TOKEN',
+  'E2E_PROD_MAILBOX_QUERY_FROM',
+  'E2E_PROD_OTP_CHECK_URL',
+  'E2E_PROD_OTP_CHECK_TOKEN',
   'ANALYTICS_RETENTION_DAYS',
   'TRACKING_TOKEN_SECRET',
   'TRACKING_RATE_LIMIT_CLICKS_PER_HOUR',
@@ -336,6 +379,7 @@ export const ENV_KEYS = [
   'VERCEL_GIT_REPO_SLUG',
   'STATSIG_SERVER_SECRET',
   'AI_GATEWAY_API_KEY',
+  'BRAINTRUST_API_KEY',
   'AGENT_OS_WORKFLOWS_ENABLED',
   'XAI_API_KEY',
   'ALBUM_ART_IMAGE_MODEL',
@@ -367,4 +411,10 @@ export const ENV_KEYS = [
   'TWILIO_FROM_NUMBER',
   'NATIVE_SMS_ENABLED',
   'SMS_DEMO_BYPASS_PRO_GATE',
+  'GOOGLE_OAUTH_CLIENT_ID',
+  'GOOGLE_OAUTH_CLIENT_SECRET',
+  'GOOGLE_OAUTH_REDIRECT_URI_BASE',
+  'GOOGLE_CALENDAR_DEFAULT_WINDOW_DAYS',
+  'GMAIL_HISTORY_WINDOW_DAYS',
+  'AI_CONNECTORS_DAILY_TOKEN_BUDGET',
 ] as const satisfies readonly (keyof z.infer<typeof ServerEnvSchema>)[];

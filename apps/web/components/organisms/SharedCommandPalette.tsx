@@ -116,6 +116,11 @@ export function filterAdditionalSections(
       items: section.items.filter(item => {
         if (item.kind === 'skill') return fuzzyMatch(item.skill.label, lower);
         if (item.kind === 'nav') return fuzzyMatch(item.nav.label, lower);
+        if (item.kind === 'prompt')
+          return fuzzyMatch(
+            `${item.prompt.label} ${item.prompt.description}`,
+            lower
+          );
         return fuzzyMatch(item.entity.label, lower);
       }),
     }))

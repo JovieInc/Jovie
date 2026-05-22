@@ -17,13 +17,12 @@ import {
   PAGE_TOOLBAR_END_GROUP_CLASS,
   PAGE_TOOLBAR_META_TEXT_CLASS,
   TableEmptyState,
-  UnifiedTable,
 } from '@/components/organisms/table';
 import { APP_ROUTES } from '@/constants/routes';
+import { AdminDataTable } from '@/features/admin/table/AdminDataTable';
 import { AdminTableSubheader } from '@/features/admin/table/AdminTableHeader';
 import { AdminTableShell } from '@/features/admin/table/AdminTableShell';
 import type { AdminReleaseRow } from '@/lib/admin/types';
-import { TABLE_MIN_WIDTHS } from '@/lib/constants/layout';
 import {
   type AdminReleasesSort,
   useAdminReleasesInfiniteQuery,
@@ -350,11 +349,10 @@ export function AdminReleasesTableUnified({
       }
     >
       {() => (
-        <UnifiedTable
+        <AdminDataTable
           data={allReleases}
           columns={columns}
           getRowId={(row: AdminReleaseRow) => row.id}
-          minWidth={`${TABLE_MIN_WIDTHS.MEDIUM}px`}
           emptyState={emptyState}
           globalFilter={clientFilter ?? ''}
           enableFiltering={clientFilter !== undefined}

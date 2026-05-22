@@ -26,6 +26,12 @@ import {
   getChatPromptPillClass,
 } from './chat-prompt-styles';
 
+interface PromptCapability {
+  readonly availability: 'available' | 'unavailable' | 'unknown';
+  readonly reason: string | null;
+  readonly reasonCode: string | null;
+}
+
 /** Map icon name strings to lucide components */
 const ICON_MAP: Record<string, ComponentType<SVGProps<SVGSVGElement>>> = {
   Camera,
@@ -42,6 +48,7 @@ interface SuggestedPromptsProps {
   readonly isFirstSession?: boolean;
   readonly latestReleaseTitle?: string | null;
   readonly canUseAdvancedTools?: boolean;
+  readonly albumArtCapability?: PromptCapability;
   readonly layout?: 'rail' | 'grid' | 'flat';
   /**
    * Variant F: while the slash picker is open, fade chips out (don't unmount)
@@ -55,26 +62,36 @@ function SuggestionPill({
   onSelect,
   className,
   density = 'default',
+  disabled = false,
+  disabledReason,
 }: {
   readonly suggestion: ChatSuggestion;
   readonly onSelect: (prompt: string) => void;
   readonly className?: string;
   readonly density?: 'default' | 'compact';
+  readonly disabled?: boolean;
+  readonly disabledReason?: string | null;
 }) {
   const IconComponent = ICON_MAP[suggestion.icon];
 
   return (
     <button
       type='button'
-      onClick={() => onSelect(suggestion.prompt)}
+      onClick={() => {
+        if (!disabled) onSelect(suggestion.prompt);
+      }}
+      disabled={disabled}
       className={cn(
-        'chat-pill cursor-pointer',
+        'chat-pill',
+        disabled ? 'cursor-not-allowed opacity-55' : 'cursor-pointer',
         getChatPromptPillClass(density),
         className
       )}
       aria-label={suggestion.label}
+      aria-disabled={disabled}
+      title={disabledReason ?? undefined}
     >
-      <span className='flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-black/[0.035] text-secondary-token transition-colors duration-150 group-hover:bg-black/[0.05] group-hover:text-primary-token dark:bg-white/[0.045] dark:group-hover:bg-white/[0.065]'>
+      <span className='flex h-4 w-4 shrink-0 items-center justify-center text-tertiary-token transition-colors duration-subtle group-hover:text-primary-token'>
         {IconComponent && <IconComponent className='h-3.5 w-3.5 shrink-0' />}
       </span>
       <span className='min-w-0 flex-1 truncate leading-none'>
@@ -89,6 +106,7 @@ export function SuggestedPrompts({
   isFirstSession = false,
   latestReleaseTitle,
   canUseAdvancedTools = false,
+  albumArtCapability,
   layout = 'rail',
   dimmed = false,
 }: SuggestedPromptsProps) {
@@ -111,6 +129,53 @@ export function SuggestedPrompts({
       })
     : DEFAULT_SUGGESTIONS;
 
+  const resolvedAlbumArtCapability = albumArtCapability ?? {
+    availability: 'unknown' as const,
+    reason: 'Checking album art availability...',
+    reasonCode: 'CHECKING',
+  };
+  const albumArtDisabled =
+    resolvedAlbumArtCapability.availability === 'unknown' ||
+    resolvedAlbumArtCapability.availability === 'unavailable';
+  // Provider-down ('PROVIDER_UNAVAILABLE') and Statsig-killed
+  // ('FEATURE_DISABLED') reason codes are genuinely broken — surface no entry
+  // point. Plan-gated ('PLAN_UNAVAILABLE') and profile-pending
+  // ('PROFILE_REQUIRED') reasons remain visible-but-disabled because the user
+  // has an action to take (upgrade, finish onboarding).
+  const isAlbumArtProviderBroken =
+    resolvedAlbumArtCapability.availability === 'unavailable' &&
+    (resolvedAlbumArtCapability.reasonCode === 'PROVIDER_UNAVAILABLE' ||
+      resolvedAlbumArtCapability.reasonCode === 'FEATURE_DISABLED');
+  const draftAlbumArtBriefSuggestion: ChatSuggestion | null =
+    resolvedAlbumArtCapability.availability === 'unavailable'
+      ? {
+          icon: 'Camera',
+          label: 'Draft album-art brief',
+          prompt:
+            'Draft an album-art brief for my latest release with visual direction, mood, palette, typography, and production notes.',
+          accent: 'purple',
+        }
+      : null;
+
+  const promptSuggestionsWithCapabilities = promptSuggestions.flatMap(
+    suggestion => {
+      if (suggestion.label !== 'Generate album art') return [suggestion];
+      // Provider broken → drop the album-art pill entirely; surface the brief
+      // fallback in its place so the row keeps a creative-direction action.
+      if (isAlbumArtProviderBroken) {
+        return draftAlbumArtBriefSuggestion
+          ? [draftAlbumArtBriefSuggestion]
+          : [];
+      }
+      // Other unavailable reasons keep the disabled pill (upsell / onboarding
+      // affordance) and append the brief as an additional path.
+      if (draftAlbumArtBriefSuggestion) {
+        return [suggestion, draftAlbumArtBriefSuggestion];
+      }
+      return [suggestion];
+    }
+  );
+
   // Build the pitch suggestion (personalized if release title available)
   const pitchSuggestion =
     canUseAdvancedTools && !isFirstSession
@@ -131,7 +196,7 @@ export function SuggestedPrompts({
       : null;
 
   const allSuggestions = [
-    ...promptSuggestions,
+    ...promptSuggestionsWithCapabilities,
     ...(pitchSuggestion ? [pitchSuggestion] : []),
     FEEDBACK_SUGGESTION,
   ];
@@ -140,11 +205,11 @@ export function SuggestedPrompts({
   // so dimmed chips can't be reached by Tab/Shift+Tab while the slash picker
   // is open. `aria-hidden` on the wrapper hides them from SR.
   const dimClass = dimmed
-    ? 'opacity-0 transition-opacity duration-200 ease-out'
-    : 'opacity-100 transition-opacity duration-200 ease-out';
+    ? 'opacity-0 transition-opacity duration-subtle ease-out'
+    : 'opacity-100 transition-opacity duration-subtle ease-out';
 
   if (layout === 'grid') {
-    const primarySuggestions = promptSuggestions.slice(0, 3);
+    const primarySuggestions = promptSuggestionsWithCapabilities.slice(0, 3);
     const secondarySuggestions = allSuggestions.filter(
       suggestion =>
         !primarySuggestions.some(primary => primary.label === suggestion.label)
@@ -164,6 +229,10 @@ export function SuggestedPrompts({
               suggestion={suggestion}
               onSelect={onSelect}
               className='min-w-0 max-w-none justify-start px-3.5 py-2'
+              disabled={
+                suggestion.label === 'Generate album art' && albumArtDisabled
+              }
+              disabledReason={resolvedAlbumArtCapability.reason}
             />
           ))}
         </div>
@@ -177,6 +246,10 @@ export function SuggestedPrompts({
                 onSelect={onSelect}
                 density='compact'
                 className='min-w-0 max-w-none px-3'
+                disabled={
+                  suggestion.label === 'Generate album art' && albumArtDisabled
+                }
+                disabledReason={resolvedAlbumArtCapability.reason}
               />
             ))}
           </div>
@@ -203,11 +276,28 @@ export function SuggestedPrompts({
             <button
               key={suggestion.label}
               type='button'
-              onClick={() => onSelect(suggestion.prompt)}
-              className='group flex w-full items-center gap-2 rounded-full bg-transparent px-3 py-2 text-left text-[12.5px] text-secondary-token transition-[background-color,color] duration-150 hover:bg-surface-0 hover:text-primary-token focus-visible:outline-none focus-visible:border-(--linear-border-focus) focus-visible:bg-surface-0 focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/12'
+              onClick={() => {
+                if (
+                  !(
+                    suggestion.label === 'Generate album art' &&
+                    albumArtDisabled
+                  )
+                ) {
+                  onSelect(suggestion.prompt);
+                }
+              }}
+              disabled={
+                suggestion.label === 'Generate album art' && albumArtDisabled
+              }
+              className='group flex w-full items-center gap-2 rounded-full bg-transparent px-3 py-2 text-left text-[12.5px] text-secondary-token transition-[background-color,color] duration-subtle enabled:hover:bg-surface-0 enabled:hover:text-primary-token disabled:cursor-not-allowed disabled:opacity-55 focus-visible:outline-none focus-visible:border-(--linear-border-focus) focus-visible:bg-surface-0 focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/12'
               aria-label={suggestion.label}
+              title={
+                suggestion.label === 'Generate album art'
+                  ? (resolvedAlbumArtCapability.reason ?? undefined)
+                  : undefined
+              }
             >
-              <span className='flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-tertiary-token transition-colors duration-150 group-hover:text-primary-token'>
+              <span className='flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-tertiary-token transition-colors duration-subtle group-hover:text-primary-token'>
                 {IconComponent ? (
                   <IconComponent className='h-3.5 w-3.5 shrink-0' />
                 ) : null}
@@ -229,7 +319,7 @@ export function SuggestedPrompts({
       <div
         className={cn(
           CHAT_PROMPT_RAIL_SCROLL_CLASS,
-          'md:overflow-visible md:[mask-image:none] md:[-webkit-mask-image:none]'
+          'overscroll-x-contain px-1 sm:px-0'
         )}
         style={CHAT_PROMPT_RAIL_MASK_STYLE}
         data-testid='suggested-prompts-rail'
@@ -237,22 +327,32 @@ export function SuggestedPrompts({
         <div
           className={cn(
             CHAT_PROMPT_RAIL_CLASS,
-            'md:flex-wrap md:justify-center md:gap-2'
+            'snap-x snap-mandatory whitespace-nowrap'
           )}
         >
-          {promptSuggestions.map(suggestion => (
+          {promptSuggestionsWithCapabilities.map(suggestion => (
             <SuggestionPill
               key={suggestion.label}
               suggestion={suggestion}
               onSelect={onSelect}
+              className='snap-start'
+              disabled={
+                suggestion.label === 'Generate album art' && albumArtDisabled
+              }
+              disabledReason={resolvedAlbumArtCapability.reason}
             />
           ))}
           {pitchSuggestion && (
-            <SuggestionPill suggestion={pitchSuggestion} onSelect={onSelect} />
+            <SuggestionPill
+              suggestion={pitchSuggestion}
+              onSelect={onSelect}
+              className='snap-start'
+            />
           )}
           <SuggestionPill
             suggestion={FEEDBACK_SUGGESTION}
             onSelect={onSelect}
+            className='snap-start'
           />
         </div>
       </div>

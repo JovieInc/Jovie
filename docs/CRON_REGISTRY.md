@@ -26,22 +26,24 @@ Scheduled workflows in `.github/workflows/`. Not Vercel crons — these run on G
 
 ## Production Schedule
 
-Source of truth: `vercel.json` (repo root — Vercel reads this file; `apps/web/vercel.json` has been deleted per JOV-1901 / AUTOMATION_AUDIT.md)
+Source of truth: `apps/web/vercel.json`. The Vercel project's Root Directory is set to `apps/web/` (verified via `vercel project inspect jovie`), so Vercel reads that file, not the repo-root `vercel.json`. The root-level `vercel.json` exists for historical reasons and is **not** what Vercel consumes — keep both in sync until it can be deleted (see JOV-1901 / AUTOMATION_AUDIT.md for the original deletion intent).
 
 | Cron Path | Schedule | Frequency |
 |-----------|----------|-----------|
 | `/api/cron/frequent` | `*/15 * * * *` | Every 15 minutes |
 | `/api/cron/daily-maintenance` | `0 0 * * *` | Daily at midnight UTC |
 | `/api/cron/generate-insights` | `0 5 * * *` | Daily at 05:00 UTC |
-| `/api/cron/process-ingestion-jobs` | `* * * * *` | Every minute |
+| `/api/cron/process-ingestion-jobs` | `*/6 * * * *` | Every 6 minutes (JOV-2500: lets Neon 5min autosuspend reclaim compute) |
 | `/api/cron/purge-pixel-ips` | `0 3 * * *` | Daily at 03:00 UTC |
 | `/api/cron/summarize-interviews` | `*/5 * * * *` | Every 5 minutes |
 | `/api/cron/generate-playlist` | `0 6 * * *` | Daily at 06:00 UTC |
 | `/api/cron/process-pre-saves` | `0 2 * * *` | Daily at 02:00 UTC |
 | `/api/cron/monitor-metadata-submissions` | `0 * * * *` | Hourly |
 | `/api/cron/process-metadata-submissions` | `0 4 * * *` | Daily at 04:00 UTC |
+| `/api/cron/public-profile-canary` | `13 6 * * *` | Daily at 06:13 UTC |
+| `/api/cron/clerk-config-audit` | `*/30 * * * *` | Every 30 minutes (JOV-2446) |
 
-9 paths are currently scheduled in production. `cleanup-sms-intents` was folded into `daily-maintenance` as a sub-job per JOV-1901 (see AUTOMATION_AUDIT.md). Other cron route files exist as standalone endpoints whose logic is called as sub-jobs of `frequent` or `daily-maintenance`.
+12 paths are currently scheduled in production. `cleanup-sms-intents` was folded into `daily-maintenance` as a sub-job per JOV-1901 (see AUTOMATION_AUDIT.md). Other cron route files exist as standalone endpoints whose logic is called as sub-jobs of `frequent` or `daily-maintenance`.
 
 **Auth:** All crons use `Authorization: Bearer ${CRON_SECRET}`. The `data-retention` route additionally uses timing-safe comparison + origin verification.
 
@@ -104,6 +106,7 @@ These have their own Vercel schedule OR exist as callable endpoints (also invoke
 | `/api/cron/process-campaigns` | 60s | Processes drip campaign sends | `frequent` |
 | `/api/cron/schedule-release-notifications` | 60s | Schedules release-day notifications | `daily-maintenance` |
 | `/api/cron/send-release-notifications` | 120s | Sends notifications; recovers stuck rows >10min; max 100/run | `frequent` |
+| `/api/cron/public-profile-canary` | 30s | Lightweight HTTP health check: GET /tim, /tim/alerts, /tim/pay, POST /api/audience/visit; emits Sentry breadcrumb + writes Redis key for admin ops panel (JOV-1872) | — |
 
 ## LLM Model Usage in Web App Crons
 

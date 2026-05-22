@@ -2,6 +2,7 @@
 
 import { Pause, Play } from 'lucide-react';
 import Image from 'next/image';
+import React from 'react';
 import { cn } from '@/lib/utils';
 import type { NowPlayingTrack } from './SidebarNowPlaying';
 
@@ -17,6 +18,8 @@ import type { NowPlayingTrack } from './SidebarNowPlaying';
  * supplies a `NowPlayingTrack` so the card can pull from
  * `useTrackAudioPlayer().playbackState` directly.
  *
+ * Memoized high-churn mobile now-playing renderer over real prod audio state.
+ *
  * @example
  * ```tsx
  * const { playbackState, toggleTrack } = useTrackAudioPlayer();
@@ -28,7 +31,7 @@ import type { NowPlayingTrack } from './SidebarNowPlaying';
  * />
  * ```
  */
-export function MobilePlayerCard({
+export const MobilePlayerCard = React.memo(function MobilePlayerCard({
   track,
   isPlaying,
   pct,
@@ -52,7 +55,7 @@ export function MobilePlayerCard({
 
   return (
     <div className={cn('md:hidden fixed inset-x-3 z-40 bottom-3', className)}>
-      <div className='rounded-2xl px-2.5 py-2 flex items-center gap-2.5 backdrop-blur-2xl bg-(--linear-app-content-surface)/70 border border-white/10 shadow-[0_10px_40px_rgba(0,0,0,0.18)] relative overflow-hidden'>
+      <div className='rounded-2xl px-2.5 py-2 flex items-center gap-2.5 backdrop-blur-2xl bg-(--linear-app-content-surface)/70 border border-(--linear-app-frame-seam) shadow-[0_10px_40px_rgba(0,0,0,0.18)] relative overflow-hidden'>
         <span
           aria-hidden='true'
           className='absolute top-0 left-0 right-0 h-px bg-tertiary-token/30'
@@ -88,7 +91,7 @@ export function MobilePlayerCard({
         <button
           type='button'
           onClick={onPlay}
-          className='h-9 w-9 rounded-full grid place-items-center bg-primary text-on-primary shrink-0 transition-transform duration-150 ease-out active:scale-95'
+          className='h-9 w-9 rounded-full grid place-items-center bg-primary text-on-primary shrink-0 transition-transform duration-subtle ease-subtle active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/55 focus-visible:ring-offset-2 focus-visible:ring-offset-(--linear-bg-page) outline-none'
           aria-label={isPlaying ? 'Pause' : 'Play'}
         >
           {isPlaying ? (
@@ -104,4 +107,4 @@ export function MobilePlayerCard({
       </div>
     </div>
   );
-}
+});

@@ -53,6 +53,20 @@ class SearchEnrichmentFallbackError extends Error {
   }
 }
 
+async function getSearchRateLimitIdentifier(
+  request: NextRequest
+): Promise<string> {
+  try {
+    const { userId } = await getCachedAuth();
+    return userId ? `user:${userId}` : `ip:${getClientIP(request)}`;
+  } catch (error) {
+    logger.warn('[Spotify Search] Auth lookup failed; using IP fallback', {
+      error: error instanceof Error ? error.message : String(error),
+    });
+    return `ip:${getClientIP(request)}`;
+  }
+}
+
 function handleSearchError(
   error: unknown,
   q: string,
@@ -141,7 +155,6 @@ function validateSearchQuery(q: string | undefined): NextResponse | null {
  * - Data sanitization
  */
 export async function GET(request: NextRequest) {
-  const { userId } = await getCachedAuth();
   const { searchParams } = request.nextUrl;
   const q = searchParams.get('q')?.trim();
   const limitParam = searchParams.get('limit');
@@ -162,7 +175,7 @@ export async function GET(request: NextRequest) {
   const normalizedQuery = q.toLowerCase();
 
   // Rate limiting with headers for client visibility
-  const identifier = userId ? `user:${userId}` : `ip:${getClientIP(request)}`;
+  const identifier = await getSearchRateLimitIdentifier(request);
   const rateLimitResult = await spotifySearchApiLimiter.limit(identifier);
   const rateLimitHeaders = {
     ...NO_STORE_HEADERS,

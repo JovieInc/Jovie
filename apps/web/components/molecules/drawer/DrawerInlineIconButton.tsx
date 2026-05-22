@@ -1,5 +1,6 @@
 'use client';
 
+import React from 'react';
 import {
   InlineIconButton,
   type InlineIconButtonProps,
@@ -13,6 +14,10 @@ export {
   INLINE_ICON_BUTTON_VISIBLE_CLASSNAME as DRAWER_INLINE_ICON_BUTTON_VISIBLE_CLASSNAME,
 } from '@/components/atoms/InlineIconButton';
 
-export function DrawerInlineIconButton(props: DrawerInlineIconButtonProps) {
-  return <InlineIconButton {...props} />;
-}
+// Shell rot 22: memoized thin re-export for drawer edit affordance icon
+// buttons (delegated from DrawerEditableTextField).
+export const DrawerInlineIconButton = React.memo(
+  function DrawerInlineIconButton(props: DrawerInlineIconButtonProps) {
+    return <InlineIconButton {...props} />;
+  }
+);

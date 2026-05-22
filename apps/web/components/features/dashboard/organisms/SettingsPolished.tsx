@@ -99,7 +99,7 @@ const SettingsSidebar = memo(
       <div className='max-h-[calc(100vh-4.5rem)] overflow-y-auto rounded-[14px] border border-(--linear-app-frame-seam) bg-[color-mix(in_oklab,var(--linear-app-content-surface)_97%,var(--linear-bg-surface-0))] p-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] backdrop-blur-sm'>
         {groups.map(group => (
           <div key={group.id} className='mb-2 last:mb-0'>
-            <p className='mb-1 px-2.5 text-2xs font-semibold uppercase tracking-[0.08em] text-tertiary-token'>
+            <p className='mb-1 px-2.5 text-2xs font-semibold text-tertiary-token'>
               {group.label}
             </p>
             <nav aria-label={`${group.label} settings`}>

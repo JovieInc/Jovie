@@ -2,11 +2,29 @@ import { TooltipProvider } from '@jovie/ui';
 import { act, fireEvent, render, screen } from '@testing-library/react';
 import React from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { TaskView } from '@/lib/tasks/types';
+import { APP_ROUTES } from '@/constants/routes';
+import type { TaskBoardResult, TaskStatus, TaskView } from '@/lib/tasks/types';
 
-const { mockRegisterRightPanel, mockUseAppFlag } = vi.hoisted(() => ({
+const {
+  mockRouterPush,
+  mockRegisterRightPanel,
+  mockUseAppFlag,
+  mockUseReleaseEntityQuery,
+  mockUseTaskBoardQuery,
+  mockUseTasksQuery,
+} = vi.hoisted(() => ({
+  mockRouterPush: vi.fn(),
   mockRegisterRightPanel: vi.fn(),
   mockUseAppFlag: vi.fn(),
+  mockUseReleaseEntityQuery: vi.fn(),
+  mockUseTaskBoardQuery: vi.fn(),
+  mockUseTasksQuery: vi.fn(),
+}));
+
+vi.mock('next/navigation', () => ({
+  useRouter: () => ({
+    push: mockRouterPush,
+  }),
 }));
 
 vi.mock('@jovie/ui', async () => {
@@ -107,12 +125,12 @@ const mockTask = {
   category: null,
   scheduledFor: null,
   startedAt: null,
-  completedAt: '2026-04-01T00:00:00.000Z',
+  completedAt: new Date('2026-04-01T00:00:00.000Z'),
   position: 0,
   sourceTemplateId: null,
   metadata: null,
-  createdAt: '2026-04-01T00:00:00.000Z',
-  updatedAt: '2026-04-01T00:00:00.000Z',
+  createdAt: new Date('2026-04-01T00:00:00.000Z'),
+  updatedAt: new Date('2026-04-01T00:00:00.000Z'),
 } as const;
 
 const mockTaskTwo = {
@@ -177,13 +195,50 @@ const mockHelperTask = {
 const mockCreateTask = vi.fn();
 const mockDeleteTask = vi.fn();
 const mockUpdateTask = vi.fn();
+const mockMoveTask = vi.fn();
 const mockSetHeaderActions = vi.fn();
 let setHeaderActionsHost: ((actions: React.ReactNode) => void) | null = null;
 let mockIsXlUp = true;
 let mockIs2xlUp = true;
-let mockTasksData = [mockTask, mockTaskTwo];
+let mockTasksData: TaskView[] = [mockTask, mockTaskTwo];
+let mockListQueryData: TaskView[] | undefined | null = null;
+let mockListQueryIsLoading = false;
+let mockListQueryIsError = false;
+let mockBoardQueryIsLoading = false;
+let mockBoardQueryIsError = false;
+let mockViewMode: 'board' | 'list' = 'list';
 let mockCanShowTaskDocumentAlongsideReleaseSidebar = true;
 const mockUnifiedTable = vi.fn();
+const mockSetViewMode = vi.fn((viewMode: 'board' | 'list') => {
+  mockViewMode = viewMode;
+});
+const mockRefetchTasks = vi.fn();
+const mockRefetchTaskBoard = vi.fn();
+
+function createMockTaskBoardResult(
+  tasks: ReadonlyArray<TaskView>
+): TaskBoardResult {
+  const statuses: TaskStatus[] = [
+    'backlog',
+    'todo',
+    'in_progress',
+    'done',
+    'cancelled',
+  ];
+
+  return {
+    columns: statuses.map(status => {
+      const columnTasks = tasks.filter(task => task.status === status);
+      return {
+        status,
+        tasks: columnTasks,
+        totalCount: columnTasks.length,
+        nextCursor: null,
+      };
+    }),
+    totalCount: tasks.length,
+  };
+}
 
 function setHeaderActionsForTest(actions: React.ReactNode) {
   mockSetHeaderActions(actions);
@@ -206,11 +261,21 @@ vi.mock('@/app/app/(shell)/dashboard/DashboardDataContext', () => ({
   }),
 }));
 
-vi.mock('@/contexts/HeaderActionsContext', () => ({
-  useSetHeaderActions: () => ({
-    setHeaderActions: setHeaderActionsForTest,
-  }),
-}));
+vi.mock('@/contexts/HeaderActionsContext', async () => {
+  const ReactModule = await vi.importActual<typeof import('react')>('react');
+
+  return {
+    useRegisterHeaderActions: (actions: React.ReactNode) => {
+      ReactModule.useEffect(() => {
+        setHeaderActionsForTest(actions);
+        return () => setHeaderActionsForTest(null);
+      }, [actions]);
+    },
+    useSetHeaderActions: () => ({
+      setHeaderActions: setHeaderActionsForTest,
+    }),
+  };
+});
 
 vi.mock('@/hooks/useRegisterRightPanel', () => ({
   useRegisterRightPanel: mockRegisterRightPanel,
@@ -226,7 +291,7 @@ vi.mock('@/hooks/useBreakpoint', () => ({
       return mockIs2xlUp;
     }
 
-    if (breakpoint === 'xl') {
+    if (breakpoint === 'lg' || breakpoint === 'xl') {
       return mockIsXlUp;
     }
 
@@ -238,19 +303,62 @@ vi.mock('@/hooks/useMediaQuery', () => ({
   useMediaQuery: () => mockCanShowTaskDocumentAlongsideReleaseSidebar,
 }));
 
-vi.mock('@/lib/queries/useReleasesQuery', () => ({
-  useReleasesQuery: () => ({
-    data: [{ id: 'release-1', title: 'QA Release' }],
+vi.mock('@/components/organisms/table/utils/useViewMode', () => ({
+  useViewMode: () => ({
+    viewMode: mockViewMode,
+    setViewMode: mockSetViewMode,
+    availableModes: ['board', 'list'],
+    isHydrated: true,
   }),
 }));
 
+vi.mock('@/lib/queries/useReleaseEntityQuery', () => ({
+  useReleaseEntityQuery: (profileId: string, releaseId: string) => {
+    mockUseReleaseEntityQuery(profileId, releaseId);
+
+    return {
+      data: releaseId ? { id: releaseId, title: 'QA Release' } : null,
+      isError: false,
+      isLoading: false,
+      refetch: vi.fn(),
+    };
+  },
+}));
+
 vi.mock('@/lib/queries/useTasksQuery', () => ({
-  useTasksQuery: () => ({
-    data: { tasks: mockTasksData },
-    isLoading: false,
-    isError: false,
-    refetch: vi.fn(),
-  }),
+  useTasksQuery: (
+    profileId: string | undefined,
+    filters: unknown,
+    options: unknown
+  ) => {
+    mockUseTasksQuery(profileId, filters, options);
+
+    return {
+      data:
+        mockListQueryData === null
+          ? { tasks: mockTasksData }
+          : mockListQueryData
+            ? { tasks: mockListQueryData }
+            : undefined,
+      isLoading: mockListQueryIsLoading,
+      isError: mockListQueryIsError,
+      refetch: mockRefetchTasks,
+    };
+  },
+  useTaskBoardQuery: (
+    profileId: string | undefined,
+    filters: unknown,
+    options: unknown
+  ) => {
+    mockUseTaskBoardQuery(profileId, filters, options);
+
+    return {
+      data: createMockTaskBoardResult(mockTasksData as TaskView[]),
+      isLoading: mockBoardQueryIsLoading,
+      isError: mockBoardQueryIsError,
+      refetch: mockRefetchTaskBoard,
+    };
+  },
   useTaskQuery: (taskId: string | null) => ({
     data: mockTasksData.find(task => task.id === taskId),
   }),
@@ -270,6 +378,46 @@ vi.mock('@/lib/queries/useTaskMutations', () => ({
     mutate: mockUpdateTask,
     isPending: false,
   }),
+  useMoveTaskMutation: () => ({
+    mutate: mockMoveTask,
+    isPending: false,
+  }),
+}));
+
+vi.mock('@/components/features/dashboard/tasks/TaskBoard', () => ({
+  TaskBoard: ({
+    board,
+    onOpenTask,
+    onMoveTask,
+  }: {
+    readonly board?: TaskBoardResult;
+    readonly onOpenTask: (task: TaskView) => void;
+    readonly onMoveTask: (input: {
+      readonly taskId: string;
+      readonly toStatus: TaskStatus;
+    }) => void;
+  }) => (
+    <div data-testid='tasks-board'>
+      {board?.columns.flatMap(column =>
+        column.tasks.map(task => (
+          <button
+            key={task.id}
+            type='button'
+            data-testid={`mock-board-card-${task.id}`}
+            onClick={() => onOpenTask(task)}
+          >
+            {task.title}
+          </button>
+        ))
+      )}
+      <button
+        type='button'
+        onClick={() => onMoveTask({ taskId: 'task-2', toStatus: 'done' })}
+      >
+        Move board task
+      </button>
+    </div>
+  ),
 }));
 
 vi.mock(
@@ -356,13 +504,72 @@ vi.mock('@/components/organisms/table', () => ({
       {end}
     </div>
   ),
-  UnifiedTable: (props: { minWidth?: string; containerClassName?: string }) => {
+  ShellListRowButton: ({
+    children,
+    className,
+    isSelected,
+    type = 'button',
+    ...props
+  }: React.ButtonHTMLAttributes<HTMLButtonElement> & {
+    isSelected?: boolean;
+  }) => (
+    <button
+      type={type}
+      data-shell-list-row='true'
+      data-selected={isSelected ? 'true' : undefined}
+      className={className}
+      {...props}
+    >
+      {children}
+    </button>
+  ),
+  ShellListRowFrame: ({
+    children,
+    className,
+    isSelected,
+    ...props
+  }: React.HTMLAttributes<HTMLDivElement> & {
+    isSelected?: boolean;
+  }) => (
+    <div
+      data-shell-list-row='true'
+      data-selected={isSelected ? 'true' : undefined}
+      className={className}
+      {...props}
+    >
+      {children}
+    </div>
+  ),
+  TableEmptyState: ({
+    title,
+    description,
+    action,
+    secondaryAction,
+  }: {
+    title: string;
+    description?: string;
+    action?: React.ReactNode;
+    secondaryAction?: React.ReactNode;
+  }) => (
+    <div>
+      <p>{title}</p>
+      {description ? <p>{description}</p> : null}
+      {action}
+      {secondaryAction}
+    </div>
+  ),
+  UnifiedTable: (props: {
+    minWidth?: string;
+    containerClassName?: string;
+    isLoading?: boolean;
+  }) => {
     mockUnifiedTable(props);
     return (
       <div
         data-testid='tasks-table'
         data-min-width={props.minWidth ?? ''}
         data-container-class-name={props.containerClassName ?? ''}
+        data-loading={props.isLoading ? 'true' : 'false'}
       />
     );
   },
@@ -410,6 +617,7 @@ function getLatestTableProps() {
     | {
         readonly data?: ReadonlyArray<TaskView>;
         readonly onRowClick?: (task: TaskView) => void;
+        readonly getRowClassName?: (task: TaskView, index: number) => string;
         readonly getContextMenuItems?: (task: TaskView) => ReadonlyArray<{
           readonly id?: string;
           readonly label?: string;
@@ -418,6 +626,11 @@ function getLatestTableProps() {
         }>;
       }
     | undefined;
+}
+
+function openDesktopTaskSearch() {
+  fireEvent.click(screen.getByRole('button', { name: 'Search tasks' }));
+  return screen.getByRole('searchbox', { name: 'Search tasks' });
 }
 
 function enableDesignV1Tasks() {
@@ -430,13 +643,27 @@ describe('TasksPageClient', () => {
     mockCreateTask.mockReset();
     mockDeleteTask.mockReset();
     mockUpdateTask.mockReset();
+    mockMoveTask.mockReset();
+    mockSetViewMode.mockClear();
     mockSetHeaderActions.mockReset();
     mockRegisterRightPanel.mockReset();
+    mockRouterPush.mockReset();
+    mockUseReleaseEntityQuery.mockClear();
+    mockUseTaskBoardQuery.mockClear();
+    mockUseTasksQuery.mockClear();
+    mockRefetchTasks.mockReset();
+    mockRefetchTaskBoard.mockReset();
     mockUseAppFlag.mockReturnValue(false);
     mockUnifiedTable.mockReset();
     mockIsXlUp = true;
     mockIs2xlUp = true;
     mockTasksData = [mockTask, mockTaskTwo];
+    mockListQueryData = null;
+    mockListQueryIsLoading = false;
+    mockListQueryIsError = false;
+    mockBoardQueryIsLoading = false;
+    mockBoardQueryIsError = false;
+    mockViewMode = 'list';
     mockCanShowTaskDocumentAlongsideReleaseSidebar = true;
   });
 
@@ -452,6 +679,86 @@ describe('TasksPageClient', () => {
     expect(screen.queryByText('All Statuses')).not.toBeInTheDocument();
     expect(screen.queryByText('All Priorities')).not.toBeInTheDocument();
     expect(screen.queryByText('All Assignees')).not.toBeInTheDocument();
+  });
+
+  it('routes the empty-state release setup CTA through the app router', () => {
+    mockTasksData = [];
+    mockListQueryData = [];
+
+    renderPage();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Set Up Release' }));
+
+    expect(mockRouterPush).toHaveBeenCalledWith(APP_ROUTES.RELEASES);
+  });
+
+  it('keeps release detail loading disabled until a release context is opened', () => {
+    renderPage();
+
+    expect(mockUseReleaseEntityQuery).toHaveBeenCalledWith('profile-1', '');
+    expect(
+      mockUseReleaseEntityQuery.mock.calls.some(
+        ([, releaseId]) => releaseId === 'release-1'
+      )
+    ).toBe(false);
+  });
+
+  it('renders the board workspace when board mode is active', () => {
+    mockViewMode = 'board';
+
+    renderPage();
+
+    expect(screen.getByTestId('tasks-board')).toBeInTheDocument();
+    expect(screen.queryByTestId('tasks-table')).not.toBeInTheDocument();
+    expect(screen.getByTestId('task-document-pane')).toHaveClass('hidden');
+
+    fireEvent.click(screen.getByTestId('mock-board-card-task-2'));
+
+    expect(screen.getByLabelText('Task title')).toHaveValue(mockTaskTwo.title);
+  });
+
+  it('uses board data for subview counts when the list query is not loaded', () => {
+    mockViewMode = 'board';
+    mockListQueryData = undefined;
+    mockTasksData = [mockTask, mockTaskTwo, mockJovieTask];
+
+    renderPage();
+
+    expect(screen.getByRole('tab', { name: 'All 3' })).toHaveAttribute(
+      'aria-selected',
+      'true'
+    );
+    expect(
+      screen.getByRole('tab', { name: 'Assigned To Me 2' })
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('tab', { name: 'Assigned To Jovie 1' })
+    ).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('tab', { name: 'Assigned To Jovie 1' }));
+
+    expect(
+      screen.getByTestId('mock-board-card-task-jovie')
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByTestId('mock-board-card-task-1')
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByTestId('mock-board-card-task-2')
+    ).not.toBeInTheDocument();
+  });
+
+  it('submits board moves through the move mutation', () => {
+    mockViewMode = 'board';
+
+    renderPage();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Move board task' }));
+
+    expect(mockMoveTask).toHaveBeenCalledWith(
+      { taskId: 'task-2', toStatus: 'done' },
+      expect.objectContaining({ onError: expect.any(Function) })
+    );
   });
 
   it('filters desktop tasks through the assignee subview tabs', () => {
@@ -496,6 +803,27 @@ describe('TasksPageClient', () => {
     expect(screen.getByLabelText('Task title')).toHaveValue(mockTaskTwo.title);
   });
 
+  it('marks the opened DESIGN_V1 task with the shared selected row state', () => {
+    enableDesignV1Tasks();
+
+    renderPage();
+
+    expect(
+      getLatestTableProps()?.getRowClassName?.(mockTaskTwo, 0)
+    ).not.toContain('bg-(--linear-row-selected)');
+
+    act(() => {
+      getLatestTableProps()?.onRowClick?.(mockTaskTwo);
+    });
+
+    expect(getLatestTableProps()?.getRowClassName?.(mockTaskTwo, 0)).toContain(
+      'bg-(--linear-row-selected)'
+    );
+    expect(getLatestTableProps()?.getRowClassName?.(mockTask, 1)).not.toContain(
+      'bg-(--linear-row-selected)'
+    );
+  });
+
   it('resets the DESIGN_V1 detail selection when subview filters exclude the selected task', () => {
     enableDesignV1Tasks();
     mockTasksData = [mockTaskTwo, mockJovieTask];
@@ -525,8 +853,8 @@ describe('TasksPageClient', () => {
     renderPage();
 
     expect(getLatestTableProps()?.data?.map(task => task.id)).toEqual([
-      'task-2',
       'task-jovie',
+      'task-2',
       'task-1',
     ]);
 
@@ -543,8 +871,8 @@ describe('TasksPageClient', () => {
 
     fireEvent.click(screen.getByRole('tab', { name: 'All 3' }));
     expect(getLatestTableProps()?.data?.map(task => task.id)).toEqual([
-      'task-2',
       'task-jovie',
+      'task-2',
       'task-1',
     ]);
   });
@@ -555,6 +883,12 @@ describe('TasksPageClient', () => {
     const titleEditor = screen.getByLabelText('Task title');
     expect(titleEditor.tagName).toBe('TEXTAREA');
     expect(titleEditor).toHaveValue(mockTaskTwo.title);
+    expect(titleEditor.className).toContain('focus-visible:bg-');
+    expect(titleEditor).toHaveStyle({ boxShadow: 'none' });
+
+    const descriptionEditor = screen.getByLabelText('Task description');
+    expect(descriptionEditor.className).toContain('focus-visible:bg-');
+    expect(descriptionEditor).toHaveStyle({ boxShadow: 'none' });
   });
 
   it('keeps the tasks subheader at the same compact header height as the page header', () => {
@@ -598,12 +932,56 @@ describe('TasksPageClient', () => {
     );
   });
 
+  it('keeps the list pane in loading mode through the responsive-layout handoff', () => {
+    mockListQueryData = undefined;
+
+    renderPage();
+
+    const firstTableProps = mockUnifiedTable.mock.calls[0]?.[0] as
+      | {
+          readonly isLoading?: boolean;
+        }
+      | undefined;
+
+    expect(firstTableProps?.isLoading).toBe(true);
+  });
+
+  it('shows shell loading rows on mobile instead of flashing the empty state', () => {
+    mockIsXlUp = false;
+    mockListQueryData = undefined;
+    mockListQueryIsLoading = true;
+
+    renderPage();
+
+    expect(screen.getByRole('status')).toBeInTheDocument();
+    expect(screen.getByText('Loading tasks')).toBeInTheDocument();
+    expect(
+      screen.queryByText('Your Task List Is Empty')
+    ).not.toBeInTheDocument();
+  });
+
+  it('renders the shared retry state when the task query fails', () => {
+    mockListQueryIsError = true;
+
+    renderPage();
+
+    expect(screen.getByText("Couldn't Load Tasks")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
+
+    expect(mockRefetchTasks).toHaveBeenCalledTimes(1);
+  });
+
   it('hides the task document when the right panel opens on constrained desktop widths', () => {
     mockCanShowTaskDocumentAlongsideReleaseSidebar = false;
     renderPage();
 
     fireEvent.click(screen.getByRole('button', { name: 'QA Release' }));
 
+    expect(mockUseReleaseEntityQuery).toHaveBeenLastCalledWith(
+      'profile-1',
+      'release-1'
+    );
     expect(screen.getByTestId('task-document-pane')).toHaveClass('hidden');
     expect(screen.getByTestId('tasks-table')).toBeInTheDocument();
   });
@@ -613,6 +991,10 @@ describe('TasksPageClient', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'QA Release' }));
 
+    expect(mockUseReleaseEntityQuery).toHaveBeenLastCalledWith(
+      'profile-1',
+      'release-1'
+    );
     expect(mockRegisterRightPanel).toHaveBeenLastCalledWith(
       expect.objectContaining({
         type: expect.any(Function),
@@ -641,6 +1023,52 @@ describe('TasksPageClient', () => {
         taskId: 'task-2',
         data: {
           title: 'Updated release handoff title',
+          description: mockTaskTwo.description,
+        },
+      },
+      expect.objectContaining({
+        onError: expect.any(Function),
+      })
+    );
+  });
+
+  it('does not reset unsaved title text when task metadata refreshes', () => {
+    const view = renderPage();
+
+    const titleEditor = screen.getByLabelText('Task title');
+    fireEvent.change(titleEditor, {
+      target: { value: 'Unsaved metadata-safe title' },
+    });
+
+    mockTasksData = [
+      {
+        ...mockTaskTwo,
+        priority: 'urgent',
+        assigneeKind: 'jovie',
+      },
+      mockTask,
+    ];
+
+    view.rerender(
+      <TooltipProvider>
+        <HeaderActionsHost />
+        <TasksPageClient />
+      </TooltipProvider>
+    );
+
+    expect(screen.getByLabelText('Task title')).toHaveValue(
+      'Unsaved metadata-safe title'
+    );
+
+    act(() => {
+      vi.advanceTimersByTime(500);
+    });
+
+    expect(mockUpdateTask).toHaveBeenCalledWith(
+      {
+        taskId: 'task-2',
+        data: {
+          title: 'Unsaved metadata-safe title',
           description: mockTaskTwo.description,
         },
       },
@@ -803,34 +1231,83 @@ describe('TasksPageClient', () => {
     expect(screen.getByRole('button', { name: 'Next task' })).toBeEnabled();
   });
 
-  it('promotes the header into search mode when search is triggered', () => {
+  it('keeps task search collapsed in the workspace toolbar by default', () => {
     renderPage();
 
+    const headerActions = screen.getByTestId('header-actions-host');
+
+    expect(
+      headerActions.querySelector('[aria-label="Search tasks"]')
+    ).not.toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'Create task' })
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'Search tasks' })
+    ).toBeInTheDocument();
     expect(
       screen.queryByRole('searchbox', { name: 'Search tasks' })
-    ).not.toBeInTheDocument();
+    ).toBeNull();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Search tasks' }));
+    openDesktopTaskSearch();
 
     expect(
       screen.getByRole('searchbox', { name: 'Search tasks' })
     ).toBeInTheDocument();
   });
 
-  it('opens task search with / unless focus is in a text editor', () => {
+  it('does not open or focus task search with the slash key', () => {
     renderPage();
+
+    const searchButton = screen.getByRole('button', { name: 'Search tasks' });
 
     fireEvent.keyDown(screen.getByLabelText('Task title'), { key: '/' });
 
     expect(
       screen.queryByRole('searchbox', { name: 'Search tasks' })
-    ).not.toBeInTheDocument();
+    ).toBeNull();
+    expect(document.activeElement).not.toBe(searchButton);
 
     fireEvent.keyDown(window, { key: '/' });
 
     expect(
-      screen.getByRole('searchbox', { name: 'Search tasks' })
-    ).toBeInTheDocument();
+      screen.queryByRole('searchbox', { name: 'Search tasks' })
+    ).toBeNull();
+    expect(document.activeElement).not.toBe(searchButton);
+  });
+
+  it('focuses task search when the shared search action opens it', () => {
+    renderPage();
+
+    const searchBox = openDesktopTaskSearch();
+
+    expect(document.activeElement).toBe(searchBox);
+  });
+
+  it('keeps task title search wired into list filters', () => {
+    renderPage();
+
+    fireEvent.change(openDesktopTaskSearch(), {
+      target: { value: 'metadata' },
+    });
+
+    expect(mockUseTasksQuery.mock.calls.at(-1)?.[1]).toEqual(
+      expect.objectContaining({ search: 'metadata' })
+    );
+  });
+
+  it('keeps task title search wired into board filters', () => {
+    mockViewMode = 'board';
+
+    renderPage();
+
+    fireEvent.change(openDesktopTaskSearch(), {
+      target: { value: 'press' },
+    });
+
+    expect(mockUseTaskBoardQuery.mock.calls.at(-1)?.[1]).toEqual(
+      expect.objectContaining({ search: 'press' })
+    );
   });
 
   it('promotes the header into create mode when new task is triggered', () => {
@@ -1004,17 +1481,20 @@ describe('TasksPageClient', () => {
     expect(screen.getByTestId('mobile-task-list')).toBeInTheDocument();
   });
 
-  it('renders the mobile list shell and opens task detail on tap', () => {
+  it('renders the mobile list shell without duplicate search and opens task detail on tap', () => {
     mockIsXlUp = false;
 
     renderPage();
 
     expect(screen.getByText('2 total tasks')).toBeInTheDocument();
     expect(
-      screen.getByRole('button', { name: 'Search tasks' })
-    ).toBeInTheDocument();
+      screen.queryByRole('searchbox', { name: 'Search tasks' })
+    ).not.toBeInTheDocument();
 
-    fireEvent.click(screen.getAllByTestId('mobile-task-row')[0]!);
+    const firstMobileRow = screen.getAllByTestId('mobile-task-row')[0]!;
+    expect(firstMobileRow).toHaveAttribute('data-shell-list-row', 'true');
+
+    fireEvent.click(firstMobileRow);
 
     expect(screen.getByLabelText('Task title')).toBeInTheDocument();
   });

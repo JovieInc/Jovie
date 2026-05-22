@@ -62,7 +62,7 @@ export function DrawerTabStrip<T extends string>({
               aria-selected={on}
               onClick={() => onChange(t.value)}
               className={cn(
-                'flex-1 h-7 px-3 rounded-full text-[11.5px] font-medium tracking-[-0.005em] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-token transition-colors duration-150 ease-out',
+                'flex-1 h-7 px-3 rounded-full text-[11.5px] font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-token transition-colors duration-subtle ease-subtle',
                 on
                   ? 'bg-(--surface-2) text-primary-token ring-1 ring-inset ring-white/10 shadow-[0_1px_0_0_rgba(255,255,255,0.05)]'
                   : 'text-tertiary-token hover:text-primary-token'

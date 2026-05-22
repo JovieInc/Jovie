@@ -176,19 +176,55 @@ describe('scrubPii', () => {
     expect(scrubPii(event as any)).toBeNull();
   });
 
-  it('should filter stale server action lookup errors', () => {
+  it('should filter client-side UnrecognizedActionError (type field match)', () => {
+    // Next.js client throws UnrecognizedActionError when it receives
+    // NEXT_ACTION_NOT_FOUND_HEADER from the server. The error type is
+    // UnrecognizedActionError; the message is the plain server action not found text.
+    const event = {
+      exception: {
+        values: [
+          {
+            type: 'UnrecognizedActionError',
+            value:
+              'Server Action "005a331209a8ea5b575bfbb0957bc1531f71788fae" was not found on the server.',
+          },
+        ],
+      },
+    };
+    expect(scrubPii(event as any)).toBeNull();
+  });
+
+  it('should filter server-side "Failed to find Server Action" errors (E974/E975)', () => {
+    // Next.js server-side action-handler.js throws this plain Error when
+    // the action manifest lookup fails (deployment skew). The error type is
+    // plain Error; the message contains the "Failed to find Server Action" text.
     const event = {
       exception: {
         values: [
           {
             type: 'Error',
             value:
-              'UnrecognizedActionError: Server Action "005a331209a8ea5b575bfbb0957bc1531f71788fae" was not found on the server.',
+              'Failed to find Server Action. This request might be from an older or newer deployment.',
           },
         ],
       },
     };
+    expect(scrubPii(event as any)).toBeNull();
+  });
 
+  it('should filter UnrecognizedActionError with action hash in message', () => {
+    // Additional variant: message contains "was not found on the server"
+    const event = {
+      exception: {
+        values: [
+          {
+            type: 'UnrecognizedActionError',
+            value:
+              'Server Action "abc123def456" was not found on the server. Read more: https://nextjs.org/docs/messages/failed-to-find-server-action',
+          },
+        ],
+      },
+    };
     expect(scrubPii(event as any)).toBeNull();
   });
 

@@ -1,6 +1,8 @@
 import { contextBridge, ipcRenderer } from 'electron';
+import { APP_URL } from './env';
 
 const TRUSTED_APP_ORIGINS = new Set([
+  new URL(APP_URL).origin,
   'https://jov.ie',
   'https://staging.app.jov.ie',
 ]);
@@ -13,11 +15,17 @@ const NAV_STATE_CHANNEL = 'nav-state-changed';
 const START_DESKTOP_AUTH_HANDOFF_CHANNEL = 'start-desktop-auth-handoff';
 const OPEN_DESKTOP_AUTH_URL_CHANNEL = 'open-desktop-auth-url';
 const CLOSE_DESKTOP_AUTH_WINDOW_CHANNEL = 'close-desktop-auth-window';
+const DICTATION_STATUS_CHANNEL = 'dictation-status';
 
 interface MinimalDocument {
   readonly documentElement?: {
     readonly dataset: Record<string, string | undefined>;
   };
+  addEventListener?: (
+    type: 'DOMContentLoaded',
+    listener: () => void,
+    options?: { once: boolean }
+  ) => void;
 }
 
 interface MinimalLocation {
@@ -34,13 +42,23 @@ function isTrustedAppOrigin(): boolean {
   return TRUSTED_APP_ORIGINS.has(getCurrentOrigin() ?? '');
 }
 
-function markElectronRuntime(): void {
+function markElectronRuntime(): boolean {
   const maybeDocument = (globalThis as { document?: MinimalDocument }).document;
   const root = maybeDocument?.documentElement;
-  if (!root) return;
+  if (!root) return false;
 
   root.dataset.desktopRuntime = 'electron';
   root.dataset.electronPlatform = process.platform;
+  return true;
+}
+
+function installElectronRuntimeMarker(): void {
+  if (markElectronRuntime()) return;
+
+  const maybeDocument = (globalThis as { document?: MinimalDocument }).document;
+  maybeDocument?.addEventListener?.('DOMContentLoaded', markElectronRuntime, {
+    once: true,
+  });
 }
 
 type UpdateChannel =
@@ -56,7 +74,7 @@ function onUpdateChannel(channel: UpdateChannel, cb: () => void): () => void {
 }
 
 if (isTrustedAppOrigin()) {
-  markElectronRuntime();
+  installElectronRuntimeMarker();
 
   contextBridge.exposeInMainWorld('electronAPI', {
     platform: process.platform,
@@ -129,6 +147,11 @@ if (isTrustedAppOrigin()) {
         ok: boolean;
         reason?: string;
       }>;
+    },
+
+    /** Probe desktop dictation support without exposing node/native APIs. */
+    getDictationStatus: () => {
+      return ipcRenderer.invoke(DICTATION_STATUS_CHANNEL);
     },
   });
 }

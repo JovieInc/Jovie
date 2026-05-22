@@ -36,19 +36,19 @@ body:has(.home-viewport)::-webkit-scrollbar {
  * with restrained light, calmer chrome, and an embedded header.
  */
 .home-viewport {
-  --linear-header-height: 72px;
+  --linear-header-height: 56px;
   --homepage-page-gutter: clamp(1.25rem, 2.2vw, 2rem);
   --homepage-header-gutter: clamp(1.25rem, 2.2vw, 2rem);
   --homepage-radius: 1rem;
   --homepage-hero-top: calc(
     var(--linear-header-height) +
-    clamp(8rem, 15.3vh, 10.5rem)
+    clamp(6.4rem, 11.6vh, 8.35rem)
   );
   --homepage-hero-copy-max: min(
     67.5rem,
     calc(100vw - var(--homepage-page-gutter) - var(--homepage-page-gutter))
   );
-  --homepage-hero-subhead-max: 44rem;
+  --homepage-hero-subhead-max: 38rem;
   --homepage-hero-cta-gap: 0.75rem;
   --homepage-carousel-width: 100vw;
   --homepage-carousel-stage-height: clamp(22rem, 31vw, 30rem);
@@ -332,11 +332,11 @@ body:has(.home-viewport)::-webkit-scrollbar {
   /* Match --linear-h1-weight 800 from Claude Design home-page-hero spec. */
   font-weight: 800;
   line-height: 1.04;
-  letter-spacing: -0.025em;
-  text-wrap: normal;
+  letter-spacing: -0.03em;
+  text-wrap: balance;
   margin-left: auto;
   margin-right: auto;
-  max-width: min(22ch, var(--homepage-hero-copy-max));
+  max-width: min(20ch, var(--homepage-hero-copy-max));
   color: rgb(252, 252, 252);
 }
 
@@ -354,16 +354,16 @@ body:has(.home-viewport)::-webkit-scrollbar {
 }
 
 .homepage-hero-subhead {
-  margin-top: 0.75rem;
+  margin-top: 0.85rem;
   margin-left: auto;
   margin-right: auto;
   max-width: var(--homepage-hero-subhead-max);
   font-size: 18px;
   font-weight: 400;
-  line-height: 1.45;
-  letter-spacing: 0;
+  line-height: 1.55;
+  letter-spacing: -0.008em;
   text-wrap: balance;
-  color: rgba(234, 234, 255, 0.5);
+  color: rgba(234, 234, 255, 0.62);
 }
 
 .homepage-hero-actions {
@@ -1257,7 +1257,7 @@ body:has(.home-viewport)::-webkit-scrollbar {
 
 @media (max-width: 767px) {
   .home-viewport {
-    --linear-header-height: 72px;
+    --linear-header-height: 52px;
     --homepage-page-gutter: 1.5rem;
     --homepage-header-gutter: 1.5rem;
     --homepage-hero-top: calc(var(--linear-header-height) + 8.15rem);
@@ -2091,7 +2091,7 @@ body:has(.home-viewport)::-webkit-scrollbar {
 
 /* Frame.io-rhythm homepage cleanup: sparse hero, wide media, slower sections. */
 .home-viewport {
-  --linear-header-height: 80px;
+  --linear-header-height: 56px;
   --homepage-hero-top: calc(
     var(--linear-header-height) +
     clamp(4.9rem, 11.5vh, 7.8rem)
@@ -2427,7 +2427,7 @@ body:has(.home-viewport)::-webkit-scrollbar {
   position: relative;
   width: 100vw;
   max-width: none;
-  margin-top: clamp(2.5rem, 4.4vw, 4rem);
+  margin-top: clamp(2.1rem, 3.2vw, 3.1rem);
   padding-inline: 0;
   overflow: hidden;
 }
@@ -2627,11 +2627,11 @@ body:has(.home-viewport)::-webkit-scrollbar {
 
 .homepage-trust-logo-grid {
   display: grid;
+  /* 5 logos: awal, orchard, umg (widest), armada, black-hole.
+     Prior 8-track layout was leftover from JOV-2075 logo removal. */
   grid-template-columns:
-    minmax(7rem, 0.95fr) minmax(7.5rem, 1fr)
-    minmax(11rem, 1.38fr) minmax(7.75rem, 1fr)
-    minmax(8rem, 1fr) minmax(6.75rem, 0.8fr)
-    minmax(7.5rem, 0.9fr) minmax(6.25rem, 0.72fr);
+    minmax(7rem, 0.95fr) minmax(7.5rem, 1fr) minmax(11rem, 1.38fr)
+    minmax(7.75rem, 1fr) minmax(7.5rem, 0.9fr);
   align-items: center;
   gap: clamp(1rem, 2.4vw, 3.1rem);
   transform-origin: center top;
@@ -2700,8 +2700,8 @@ body:has(.home-viewport)::-webkit-scrollbar {
   }
 
   .homepage-trust-logo-grid {
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-    gap: 1.45rem 2rem;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: 1.45rem 1.5rem;
   }
 
   .homepage-trust-logo-slot {
@@ -2709,7 +2709,7 @@ body:has(.home-viewport)::-webkit-scrollbar {
   }
 
   .homepage-trust-logo-slot--umg {
-    grid-column: span 2;
+    grid-column: auto;
   }
 
   .homepage-spec-wall-grid {
@@ -2974,12 +2974,16 @@ body:has(.home-viewport)::-webkit-scrollbar {
 }
 
 .homepage-go-live-card h3 {
-  margin: 1.2rem 0 0;
+  margin: 0;
   color: rgba(255, 255, 255, 0.95);
   font-size: clamp(1.05rem, 1.45vw, 1.24rem);
   font-weight: 650;
   line-height: 1.12;
   letter-spacing: 0;
+}
+
+.homepage-go-live-card span + h3 {
+  margin-top: 1.2rem;
 }
 
 .homepage-go-live-card p {
@@ -4319,7 +4323,7 @@ body:has(.home-viewport)::-webkit-scrollbar {
 
 @media (max-width: 767px) {
   .home-viewport {
-    --linear-header-height: 60px;
+    --linear-header-height: 52px;
     --homepage-hero-top: calc(var(--linear-header-height) + 3.9rem);
     --homepage-carousel-stage-height: clamp(22rem, 92vw, 28rem);
     --homepage-section-space: clamp(4.8rem, 15vw, 6.2rem);
@@ -4690,124 +4694,6 @@ body:has(.home-viewport)::-webkit-scrollbar {
   width: 100%;
 }
 
-/* =============================================================================
-   MARKETING FOOTER — frame.io-style premium density
-   -----------------------------------------------------------------------------
-   Dense disciplined columns, 11px tracked eyebrow caps, 13.5px caption-weight
-   links, hairline-separated bottom band. Subtle top edge-glow at the footer
-   seam. Active across all marketing routes (not gated to .frame-skin) so the
-   brand reads consistently end-to-end.
-   ========================================================================= */
-
-.marketing-footer-premium {
-  --mf-text: rgba(255, 255, 255, 0.92);
-  --mf-text-secondary: rgba(255, 255, 255, 0.6);
-  --mf-text-tertiary: rgba(255, 255, 255, 0.48);
-  --mf-text-muted: rgba(255, 255, 255, 0.22);
-  --mf-hairline: rgba(255, 255, 255, 0.07);
-  --mf-hairline-strong: rgba(255, 255, 255, 0.12);
-  position: relative;
-  isolation: isolate;
-  background: #06070a;
-  color: var(--mf-text);
-  border-top: 1px solid var(--mf-hairline);
-}
-
-.marketing-footer-premium::before {
-  content: "";
-  position: absolute;
-  inset: 0 0 auto 0;
-  height: 220px;
-  pointer-events: none;
-  background: linear-gradient(
-    180deg,
-    rgba(255, 255, 255, 0.025) 0%,
-    rgba(255, 255, 255, 0) 100%
-  );
-  z-index: 0;
-}
-
-.marketing-footer-premium > * {
-  position: relative;
-  z-index: 1;
-}
-
-/* Footer column eyebrow — neutral base. Per project design guidance,
-   marketing pages must NOT use all-caps labels as default styling, so the
-   base only sets neutral typography. The tracked-caps treatment is opt-in
-   via the `.mf-eyebrow--caps` modifier (used by footer column headers). */
-.marketing-footer-premium .mf-eyebrow {
-  display: block;
-  font-size: 0.6875rem; /* 11px */
-  color: var(--mf-text-tertiary);
-  line-height: 1;
-  margin-bottom: 1.25rem;
-}
-
-.marketing-footer-premium .mf-eyebrow--caps {
-  text-transform: uppercase;
-  font-weight: 500;
-  letter-spacing: 0.2em;
-}
-.marketing-footer-premium .mf-link {
-  display: inline-flex;
-  width: fit-content;
-  font-size: 0.875rem; /* 14px */
-  line-height: 1.45;
-  letter-spacing: -0.005em;
-  color: var(--mf-text-secondary);
-  transition: color 150ms ease;
-  border-radius: 4px;
-}
-
-.marketing-footer-premium .mf-link:hover,
-.marketing-footer-premium .mf-link:focus-visible {
-  color: var(--mf-text);
-}
-
-.marketing-footer-premium .mf-link:focus-visible {
-  outline: 2px solid rgba(255, 255, 255, 0.25);
-  outline-offset: 2px;
-}
-
-.marketing-footer-premium .mf-baseband {
-  border-top: 1px solid var(--mf-hairline);
-  margin-top: clamp(3rem, 5.5vw, 4.5rem);
-  padding-top: clamp(1.5rem, 2.5vw, 2rem);
-}
-
-.marketing-footer-premium .mf-legal-link {
-  display: inline-flex;
-  font-size: 0.75rem; /* 12px */
-  line-height: 1.45;
-  letter-spacing: -0.005em;
-  color: var(--mf-text-tertiary);
-  transition: color 150ms ease;
-  border-radius: 4px;
-}
-
-.marketing-footer-premium .mf-legal-link:hover,
-.marketing-footer-premium .mf-legal-link:focus-visible {
-  color: var(--mf-text);
-}
-
-.marketing-footer-premium .mf-legal-link:focus-visible {
-  outline: 2px solid rgba(255, 255, 255, 0.25);
-  outline-offset: 2px;
-}
-
-/* Wordmark sits in its own column on lg+, stacks above on smaller screens.
-   Caption beside the mark — frame.io-style "the platform for X" tagline at
-   tertiary opacity. */
-.marketing-footer-premium .mf-mark-tagline {
-  font-size: 0.75rem; /* 12px */
-  line-height: 1.5;
-  letter-spacing: -0.005em;
-  color: var(--mf-text-tertiary);
-  max-width: 16rem;
-  margin-top: 1.25rem;
-}
-
 .home-viewport .marketing-footer-premium > div {
   padding-top: clamp(2.6rem, 4.5vw, 3.6rem) !important;
   padding-bottom: clamp(1.7rem, 3vw, 2.25rem) !important;
@@ -4846,7 +4732,7 @@ body:has(.home-viewport)::-webkit-scrollbar {
 
 @media (max-width: 767px) {
   .homepage-hero-inner {
-    padding-top: calc(var(--linear-header-height) + 2.85rem);
+    padding-top: calc(var(--linear-header-height) + 2.45rem);
     padding-bottom: clamp(3.25rem, 9vw, 4.25rem);
   }
 
@@ -4857,10 +4743,10 @@ body:has(.home-viewport)::-webkit-scrollbar {
 
   .homepage-hero-headline {
     font-family: -apple-system, system-ui, sans-serif;
-    max-width: 9.1ch;
-    font-size: clamp(3rem, 13vw, 3.85rem);
+    max-width: 11.8ch;
+    font-size: clamp(2.8rem, 11.6vw, 3.65rem);
     letter-spacing: 0;
-    line-height: 0.98;
+    line-height: 1;
   }
 
   .homepage-hero-command-center {
@@ -4869,7 +4755,7 @@ body:has(.home-viewport)::-webkit-scrollbar {
       calc(100vw - var(--homepage-page-gutter) * 2),
       calc(var(--homepage-product-rail-height) * 1.6)
     );
-    margin-top: 2.2rem;
+    margin-top: 1.85rem;
   }
 
   .homepage-product-pane--release {

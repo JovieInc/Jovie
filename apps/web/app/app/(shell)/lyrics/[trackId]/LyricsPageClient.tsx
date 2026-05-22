@@ -1,11 +1,15 @@
 'use client';
 
+import { useRouter, useSearchParams } from 'next/navigation';
+import { useEffect, useMemo } from 'react';
 import { useTrackAudioPlayer } from '@/components/organisms/release-sidebar/useTrackAudioPlayer';
 import {
   type LyricLine,
   LyricsView,
   type LyricsViewTrack,
 } from '@/components/shell/LyricsView';
+import { APP_ROUTES, resolveLyricsReturnRoute } from '@/constants/routes';
+import { isFormElement } from '@/lib/utils/keyboard';
 
 /**
  * Client wrapper for the lyrics route.
@@ -25,8 +29,35 @@ export function LyricsPageClient({
   readonly initialDurationSec: number;
   readonly trackId: string;
 }) {
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const { playbackState, seek } = useTrackAudioPlayer();
   const isActive = playbackState.activeTrackId === trackId;
+  const returnRoute = useMemo(
+    () =>
+      resolveLyricsReturnRoute(searchParams.get('from'), APP_ROUTES.LIBRARY),
+    [searchParams]
+  );
+
+  useEffect(() => {
+    if (isActive) return;
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (
+        event.defaultPrevented ||
+        event.key !== 'Escape' ||
+        isFormElement(event.target)
+      ) {
+        return;
+      }
+
+      event.preventDefault();
+      router.push(returnRoute);
+    }
+
+    globalThis.addEventListener('keydown', handleKeyDown);
+    return () => globalThis.removeEventListener('keydown', handleKeyDown);
+  }, [isActive, returnRoute, router]);
 
   const track = {
     title:
@@ -58,6 +89,7 @@ export function LyricsPageClient({
       lines={initialLines}
       onSeek={seek}
       timed={false}
+      autoFocusView
     />
   );
 }

@@ -484,6 +484,7 @@ export function ProfileUnifiedDrawer({
           {renderedView === 'releases' && canOpenReleasesDrawer && (
             <ReleasesView
               releases={visibleReleases}
+              artistId={artist.id}
               artistHandle={artist.handle}
               artistName={artist.name}
             />

@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { Children, type ReactNode } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -43,6 +45,10 @@ vi.mock('@/app/app/(shell)/dashboard/releases/actions', () => ({
   }),
 }));
 
+vi.mock('@/lib/releases/release-matrix-loader', () => ({
+  loadReleaseMatrix: vi.fn().mockResolvedValue([]),
+}));
+
 vi.mock('@/lib/queries/server', () => ({
   getQueryClient: vi.fn(() => ({
     prefetchQuery: vi.fn().mockResolvedValue(undefined),
@@ -57,6 +63,15 @@ vi.mock('@/lib/queries/HydrateClient', () => ({
 vi.mock('next/navigation', () => ({
   redirect: vi.fn(),
 }));
+
+const CHAT_THREAD_PAGE = resolve(
+  process.cwd(),
+  'app/app/(shell)/chat/[id]/page.tsx'
+);
+const CHAT_THREAD_METADATA_DATA = resolve(
+  process.cwd(),
+  'app/app/(shell)/chat/[id]/chat-thread-metadata-data.ts'
+);
 
 describe('dashboard metadata generation', () => {
   beforeEach(() => {
@@ -104,6 +119,20 @@ describe('dashboard metadata generation', () => {
     });
 
     expect(metadata.title).toBe('Thread | Jovie');
+  });
+
+  it('keeps chat thread metadata queries outside the page module', () => {
+    const pageSource = readFileSync(CHAT_THREAD_PAGE, 'utf8');
+    const dataSource = readFileSync(CHAT_THREAD_METADATA_DATA, 'utf8');
+
+    expect(pageSource).toContain('loadChatThreadMetadataTitle');
+    expect(pageSource).not.toContain('drizzle-orm');
+    expect(pageSource).not.toContain('@/lib/db');
+    expect(pageSource).not.toContain('@/lib/db/schema/chat');
+    expect(pageSource).not.toContain('chatConversations');
+
+    expect(dataSource).toMatch(/^import 'server-only';/);
+    expect(dataSource).toContain('chatConversations');
   });
 
   it('home page renders the same chat client as /app/chat (AGENTS.md #16)', async () => {

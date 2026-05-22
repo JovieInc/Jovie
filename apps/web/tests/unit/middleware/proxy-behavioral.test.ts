@@ -15,6 +15,7 @@
  */
 import { NextResponse } from 'next/server';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { APP_ROUTES } from '@/constants/routes';
 import type { ProxyUserState } from '@/lib/auth/proxy-state';
 
 // ============================================================================
@@ -47,6 +48,8 @@ const mocks = vi.hoisted(() => ({
   shouldBypassClerkForRequest: vi.fn().mockReturnValue(true),
   isTestAuthBypassEnabled: vi.fn().mockReturnValue(true),
   resolveTestBypassUserId: vi.fn().mockReturnValue(null),
+  checkProfileVisitorBlocked: vi.fn().mockResolvedValue(false),
+  getAudienceBlockIpFromHeaders: vi.fn().mockReturnValue('masked-ip'),
   createBotResponse: vi.fn(),
   clerkMiddleware: vi.fn(),
   buildProtectedAuthRedirectUrl: vi.fn(
@@ -97,6 +100,10 @@ vi.mock('@/lib/auth/test-mode', () => ({
   TEST_MODE_HEADER: 'x-test-mode',
   resolveTestBypassUserId: mocks.resolveTestBypassUserId,
 }));
+vi.mock('@/lib/audience/public-profile-block', () => ({
+  checkProfileVisitorBlocked: mocks.checkProfileVisitorBlocked,
+  getAudienceBlockIpFromHeaders: mocks.getAudienceBlockIpFromHeaders,
+}));
 vi.mock('@/lib/utils/bot-detection', () => ({
   createBotResponse: mocks.createBotResponse,
 }));
@@ -112,9 +119,11 @@ vi.mock('@clerk/nextjs/server', () => ({
 vi.mock('@/constants/app', () => ({
   AUDIENCE_ANON_COOKIE: 'audience_anon',
   AUDIENCE_IDENTIFIED_COOKIE: 'audience_identified',
+  AUDIENCE_SPOTIFY_PREFERRED_COOKIE: 'audience_spotify_preferred',
   COUNTRY_CODE_COOKIE: 'country_code',
   HOMEPAGE_CITY_COOKIE: 'homepage_city',
   HOMEPAGE_REGION_COOKIE: 'homepage_region',
+  LISTEN_COOKIE: 'listen_cookie',
 }));
 vi.mock('@/constants/domains', () => ({
   BASE_URL: 'https://jov.ie',
@@ -178,6 +187,8 @@ function resetMocks() {
   mocks.getUserState.mockResolvedValue(null);
   mocks.isKnownActiveUser.mockReturnValue(false);
   mocks.isStagingHost.mockReturnValue(false);
+  mocks.checkProfileVisitorBlocked.mockResolvedValue(false);
+  mocks.getAudienceBlockIpFromHeaders.mockReturnValue('masked-ip');
   mocks.createBotResponse.mockReturnValue(undefined);
   mocks.fetch.mockResolvedValue(
     new Response('ok', {
@@ -199,6 +210,40 @@ describe('proxy.ts middleware', () => {
   });
 
   // ==========================================================================
+  // Scanner probe drop (JOV-2189) — must be the earliest exit so probes
+  // never reach Clerk, DB lookups, or the page handler.
+  // ==========================================================================
+  describe('scanner probe drop', () => {
+    it.each([
+      '/some-creator/wp-content/plugins/hellopress/wp_filemanager.php',
+      '/timwhite/wp-admin/install.php',
+      '/xmlrpc.php',
+      '/.env',
+      '/some/random.php',
+    ])('returns 404 for probe path %s without invoking Clerk', async path => {
+      const req = createUnauthenticatedRequest({ pathname: path });
+      const res = await callMiddleware(req);
+
+      expect(res.status).toBe(404);
+      // Critical: probe must not touch auth or DB; if any of these were
+      // called the early-return failed and the request leaked deeper.
+      expect(mocks.resolveTestBypassUserId).not.toHaveBeenCalled();
+      expect(mocks.getUserState).not.toHaveBeenCalled();
+      expect(mocks.shouldBypassClerkForRequest).not.toHaveBeenCalled();
+    });
+
+    it('still serves a legitimate profile path that contains no probe markers', async () => {
+      const req = createUnauthenticatedRequest({
+        pathname: '/timwhite/listen',
+      });
+      const res = await callMiddleware(req);
+      // Anything other than the 404 drop response means the probe gate
+      // correctly let real traffic through.
+      expect(res.status).not.toBe(404);
+    });
+  });
+
+  // ==========================================================================
   // Cookie Banner Geo-Detection
   // ==========================================================================
   describe('cookie banner geo-detection', () => {
@@ -214,6 +259,136 @@ describe('proxy.ts middleware', () => {
       expect(mocks.isCookieBannerRequired).toHaveBeenCalledWith('DE', null);
       const cookies = getResponseCookies(res);
       expect(cookies.jv_cc_required).toBe('1');
+    });
+
+    it('keeps only pre-consent cookies for consent-required visitors without consent', async () => {
+      mocks.isCookieBannerRequired.mockReturnValue(true);
+
+      const req = createUnauthenticatedRequest({
+        pathname: '/',
+        headers: {
+          'x-vercel-ip-country': 'DE',
+          'x-vercel-ip-city': 'Berlin',
+          'x-vercel-ip-country-region': 'BE',
+        },
+      });
+      const res = await callMiddleware(req);
+
+      const cookies = getResponseCookies(res);
+      expect(cookies.jv_cc_required).toBe('1');
+      expect(cookies.country_code).toBe('DE');
+      expect(cookies.homepage_city).toBeUndefined();
+      expect(cookies.homepage_region).toBeUndefined();
+      expect(cookies.audience_anon).toBeUndefined();
+    });
+
+    it('deletes existing nonessential proxy cookies when consent is missing', async () => {
+      mocks.isCookieBannerRequired.mockReturnValue(true);
+
+      const req = createUnauthenticatedRequest({
+        pathname: '/',
+        headers: {
+          'x-vercel-ip-country': 'DE',
+          'x-vercel-ip-city': 'Berlin',
+          'x-vercel-ip-country-region': 'BE',
+        },
+        cookies: {
+          audience_anon: 'anon-1',
+          audience_identified: '1',
+          homepage_city: 'Munich',
+          homepage_region: 'BY',
+        },
+      });
+      const res = await callMiddleware(req);
+
+      const cookies = getResponseCookies(res);
+      expect(cookies.audience_anon).toBe('');
+      expect(cookies.audience_identified).toBe('');
+      expect(cookies.homepage_city).toBe('');
+      expect(cookies.homepage_region).toBe('');
+    });
+
+    it('sets nonessential proxy cookies after analytics consent is granted', async () => {
+      mocks.isCookieBannerRequired.mockReturnValue(true);
+
+      const req = createUnauthenticatedRequest({
+        pathname: '/',
+        headers: {
+          'x-vercel-ip-country': 'DE',
+          'x-vercel-ip-city': 'Berlin',
+          'x-vercel-ip-country-region': 'BE',
+        },
+        cookies: {
+          jv_cc: JSON.stringify({
+            essential: true,
+            analytics: true,
+            marketing: false,
+          }),
+        },
+      });
+      const res = await callMiddleware(req);
+
+      const cookies = getResponseCookies(res);
+      expect(cookies.homepage_city).toBe('Berlin');
+      expect(cookies.homepage_region).toBe('BE');
+      expect(cookies.audience_anon).toBeDefined();
+    });
+
+    it('does not set analytics-classified cookies for marketing-only consent', async () => {
+      mocks.isCookieBannerRequired.mockReturnValue(true);
+
+      const req = createUnauthenticatedRequest({
+        pathname: '/',
+        headers: {
+          'x-vercel-ip-country': 'DE',
+          'x-vercel-ip-city': 'Berlin',
+          'x-vercel-ip-country-region': 'BE',
+        },
+        cookies: {
+          jv_cc: JSON.stringify({
+            essential: true,
+            analytics: false,
+            marketing: true,
+          }),
+        },
+      });
+      const res = await callMiddleware(req);
+
+      const cookies = getResponseCookies(res);
+      expect(cookies.homepage_city).toBeUndefined();
+      expect(cookies.homepage_region).toBeUndefined();
+      expect(cookies.audience_anon).toBeUndefined();
+    });
+
+    it('deletes analytics-classified cookies for marketing-only consent', async () => {
+      mocks.isCookieBannerRequired.mockReturnValue(true);
+
+      const req = createUnauthenticatedRequest({
+        pathname: '/',
+        headers: {
+          'x-vercel-ip-country': 'DE',
+          'x-vercel-ip-city': 'Berlin',
+          'x-vercel-ip-country-region': 'BE',
+        },
+        cookies: {
+          jv_cc: JSON.stringify({
+            essential: true,
+            analytics: false,
+            marketing: true,
+          }),
+          audience_anon: 'anon-1',
+          audience_identified: '1',
+          homepage_city: 'Munich',
+          homepage_region: 'BY',
+        },
+      });
+      const res = await callMiddleware(req);
+
+      const cookies = getResponseCookies(res);
+      expect(cookies.audience_anon).toBe('');
+      expect(cookies.audience_identified).toBe('');
+      expect(cookies.homepage_city).toBe('');
+      expect(cookies.homepage_region).toBe('');
     });
 
     it('sets jv_cc_required=1 for US California (CCPA)', async () => {
@@ -294,7 +469,7 @@ describe('proxy.ts middleware', () => {
 
     it('keeps unauthenticated legacy earnings deep links behind signin', async () => {
       const req = createUnauthenticatedRequest({
-        pathname: '/app/dashboard/earnings',
+        pathname: APP_ROUTES.DASHBOARD_EARNINGS,
       });
       const res = await callMiddleware(req);
 
@@ -303,6 +478,20 @@ describe('proxy.ts middleware', () => {
       expect(isRedirectTo(res, '/signin')).toBe(true);
       expect(res.headers.get('location')).toContain(
         'redirect_url=%2Fapp%2Fdashboard%2Fearnings'
+      );
+    });
+
+    it('keeps unauthenticated app earnings aliases behind signin', async () => {
+      const req = createUnauthenticatedRequest({
+        pathname: APP_ROUTES.EARNINGS,
+      });
+      const res = await callMiddleware(req);
+
+      expect(res.status).toBeGreaterThanOrEqual(300);
+      expect(res.status).toBeLessThan(400);
+      expect(isRedirectTo(res, APP_ROUTES.SIGNIN)).toBe(true);
+      expect(res.headers.get('location')).toContain(
+        'redirect_url=%2Fapp%2Fearnings'
       );
     });
 
@@ -333,6 +522,61 @@ describe('proxy.ts middleware', () => {
       const res = await callMiddleware(req);
 
       expect(res.status).toBeLessThan(300);
+    });
+
+    it('does not run the audience block lookup for reserved public routes', async () => {
+      const reservedRoutes = ['/start', '/pricing', '/about', '/investors'];
+
+      for (const pathname of reservedRoutes) {
+        const req = createUnauthenticatedRequest({ pathname });
+        const res = await callMiddleware(req);
+
+        expect(res.status).toBeLessThan(300);
+      }
+
+      expect(mocks.checkProfileVisitorBlocked).not.toHaveBeenCalled();
+      expect(mocks.getAudienceBlockIpFromHeaders).not.toHaveBeenCalled();
+    });
+
+    it('runs the audience block lookup for public profile root paths only', async () => {
+      const req = createUnauthenticatedRequest({
+        pathname: '/timwhite',
+        headers: {
+          'x-forwarded-for': '203.0.113.7, 198.51.100.8',
+          'user-agent': 'Mozilla/5.0',
+        },
+      });
+      const res = await callMiddleware(req);
+
+      expect(res.status).toBeLessThan(300);
+      expect(mocks.getAudienceBlockIpFromHeaders).toHaveBeenCalledWith(
+        req.headers
+      );
+      expect(mocks.checkProfileVisitorBlocked).toHaveBeenCalledWith(
+        'timwhite',
+        'masked-ip',
+        'Mozilla/5.0'
+      );
+    });
+
+    it('redirects blocked public profile visitors before route handling continues', async () => {
+      mocks.checkProfileVisitorBlocked.mockResolvedValue(true);
+
+      const req = createUnauthenticatedRequest({
+        pathname: '/timwhite',
+        headers: {
+          'user-agent': 'Mozilla/5.0',
+        },
+      });
+      const res = await callMiddleware(req);
+
+      expect(res.status).toBe(307);
+      expect(res.headers.get('location')).toBe('https://jov.ie/');
+      expect(mocks.checkProfileVisitorBlocked).toHaveBeenCalledWith(
+        'timwhite',
+        'masked-ip',
+        'Mozilla/5.0'
+      );
     });
 
     it('normalizes /sign-in to /signin', async () => {
@@ -675,7 +919,7 @@ describe('proxy.ts middleware', () => {
       mocks.getUserState.mockResolvedValue(USER_STATES.active);
 
       const req = createAuthenticatedRequest('clerk_user_1', {
-        pathname: '/app/dashboard/earnings',
+        pathname: APP_ROUTES.DASHBOARD_EARNINGS,
       });
       const res = await callMiddleware(req);
 
@@ -685,6 +929,25 @@ describe('proxy.ts middleware', () => {
       expect(location).toBeTruthy();
       const locationUrl = new URL(location ?? '', 'https://localhost');
       expect(locationUrl.pathname).toBe('/app/settings/artist-profile');
+      expect(locationUrl.searchParams.get('tab')).toBe('earn');
+      expect(locationUrl.hash).toBe('#pay');
+      expect(mocks.getUserState).not.toHaveBeenCalled();
+    });
+
+    it('redirects authenticated app earnings aliases to artist profile pay', async () => {
+      mocks.getUserState.mockResolvedValue(USER_STATES.active);
+
+      const req = createAuthenticatedRequest('clerk_user_1', {
+        pathname: APP_ROUTES.EARNINGS,
+      });
+      const res = await callMiddleware(req);
+
+      expect(res.status).toBeGreaterThanOrEqual(300);
+      expect(res.status).toBeLessThan(400);
+      const location = res.headers.get('location');
+      expect(location).toBeTruthy();
+      const locationUrl = new URL(location ?? '', 'https://localhost');
+      expect(locationUrl.pathname).toBe(APP_ROUTES.SETTINGS_ARTIST_PROFILE);
       expect(locationUrl.searchParams.get('tab')).toBe('earn');
       expect(locationUrl.hash).toBe('#pay');
       expect(mocks.getUserState).not.toHaveBeenCalled();
@@ -1220,6 +1483,67 @@ describe('proxy.ts middleware', () => {
       expect(res.status).toBe(308);
       expect(res.headers.get('location')).toBe(
         'https://jov.ie/support?t=token-123&action=interested'
+      );
+    });
+  });
+
+  describe('path-based investor portal (proxy investor early returns)', () => {
+    it('lets investor response links bypass Clerk without stripping token params', async () => {
+      const req = createUnauthenticatedRequest({
+        pathname: '/investor-portal/respond',
+        searchParams: {
+          t: 'token-123',
+          action: 'interested',
+        },
+      });
+      const res = await callMiddleware(req);
+
+      expect(res.status).toBe(200);
+      expect(res.headers.get('location')).toBeNull();
+      expect(res.headers.get('X-Robots-Tag')).toContain('noindex');
+      expect(res.headers.get('Cache-Control')).toBe('private, no-store');
+      expect(mocks.clerkMiddleware).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('investors.jov.ie legacy subdomain (proxy investor 301 early returns)', () => {
+    it('301 redirects investors.jov.ie non-static paths to jov.ie/investor-portal preserving token', async () => {
+      const req = createUnauthenticatedRequest({
+        pathname: '/foo/bar',
+        hostname: 'investors.jov.ie',
+        searchParams: { t: 'tok-abc', utm: 'x' },
+      });
+      const res = await callMiddleware(req);
+
+      expect(res.status).toBe(301);
+      const location = res.headers.get('location') || '';
+      expect(location).toContain('https://jov.ie/investor-portal/foo/bar');
+      expect(location).toContain('t=tok-abc');
+      expect(location).toContain('utm=x');
+    });
+
+    it('passes through _next static assets on investors.jov.ie without redirect (early return)', async () => {
+      const req = createUnauthenticatedRequest({
+        pathname: '/_next/static/chunks/main.js',
+        hostname: 'investors.jov.ie',
+      });
+      const res = await callMiddleware(req);
+
+      // NextResponse.next() has status 200 in test harness? or no redirect
+      expect(res.status).not.toBe(301);
+      expect(res.headers.get('location')).toBeNull();
+    });
+
+    it('301 redirects investors.jov.ie root to jov.ie/investor-portal', async () => {
+      const req = createUnauthenticatedRequest({
+        pathname: '/',
+        hostname: 'investors.jov.ie',
+      });
+      const res = await callMiddleware(req);
+
+      expect(res.status).toBe(301);
+      expect(res.headers.get('location')).toContain(
+        'https://jov.ie/investor-portal'
       );
     });
   });

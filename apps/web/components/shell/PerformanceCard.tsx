@@ -148,7 +148,7 @@ export function PerformanceCard({
                     setHoverIdx(null);
                   }}
                   className={cn(
-                    'h-5 px-2 rounded-full text-[10px] font-medium tracking-[-0.005em] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-token transition-colors duration-150 ease-out',
+                    'h-5 px-2 rounded-full text-[10px] font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-token transition-colors duration-subtle ease-subtle',
                     on
                       ? 'bg-(--surface-2) text-primary-token ring-1 ring-inset ring-white/10'
                       : 'text-tertiary-token hover:text-primary-token'

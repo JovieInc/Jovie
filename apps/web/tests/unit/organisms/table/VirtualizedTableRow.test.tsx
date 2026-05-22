@@ -5,11 +5,16 @@ import { VirtualizedTableRow } from '@/components/organisms/table/organisms/Virt
 
 type TestRow = { id: string; name: string };
 
-const createRow = (id: string, name: string): Row<TestRow> =>
+const createRow = (
+  id: string,
+  name: string,
+  isSelected = false
+): Row<TestRow> =>
   ({
     id,
     original: { id, name },
     getVisibleCells: () => [],
+    getIsSelected: () => isSelected,
   }) as unknown as Row<TestRow>;
 
 const baseProps = {
@@ -91,5 +96,23 @@ describe('VirtualizedTableRow', () => {
     // Should not throw
     fireEvent.contextMenu(row);
     expect(onRowClick).toHaveBeenCalled();
+  });
+
+  it('maps TanStack row selection to shared selected row styling', () => {
+    render(
+      <table>
+        <tbody>
+          <VirtualizedTableRow
+            {...baseProps}
+            row={createRow('1', 'One', true)}
+          />
+        </tbody>
+      </table>
+    );
+
+    const row = screen.getByRole('row');
+    expect(row).toHaveAttribute('aria-selected', 'true');
+    expect(row.className).toContain('bg-(--linear-row-selected)');
+    expect(row.className).toContain('--linear-border-focus');
   });
 });

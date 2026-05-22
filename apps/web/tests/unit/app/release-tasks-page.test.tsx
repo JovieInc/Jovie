@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { render, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -5,23 +7,30 @@ const {
   mockCanAccessTasksWorkspace,
   mockDbSelect,
   mockDbRows,
-  mockGetCurrentUserProfile,
   mockGetCurrentUserEntitlements,
+  mockLoadAppShellRouteContext,
   mockNotFound,
+  mockRedirect,
 } = vi.hoisted(() => ({
   mockCanAccessTasksWorkspace: vi.fn(),
   mockDbSelect: vi.fn(),
   mockDbRows: { rows: [] as Array<Record<string, unknown>> },
-  mockGetCurrentUserProfile: vi.fn(),
   mockGetCurrentUserEntitlements: vi.fn(),
+  mockLoadAppShellRouteContext: vi.fn(),
   mockNotFound: vi.fn(() => {
     throw new Error('NOT_FOUND');
+  }),
+  mockRedirect: vi.fn((url: string) => {
+    throw new Error(`REDIRECT:${url}`);
   }),
 }));
 
 vi.mock('next/navigation', () => ({
   notFound: mockNotFound,
+  redirect: mockRedirect,
 }));
+
+vi.mock('server-only', () => ({}));
 
 vi.mock('drizzle-orm', () => ({
   and: vi.fn((...args: unknown[]) => args),
@@ -51,8 +60,8 @@ vi.mock('@/lib/entitlements/tasks-gate', () => ({
   canAccessTasksWorkspace: mockCanAccessTasksWorkspace,
 }));
 
-vi.mock('@/lib/auth/session', () => ({
-  getCurrentUserProfile: mockGetCurrentUserProfile,
+vi.mock('@/app/app/(shell)/app-shell-route-context', () => ({
+  loadAppShellRouteContext: mockLoadAppShellRouteContext,
 }));
 
 vi.mock('@/components/features/dashboard/release-tasks', () => ({
@@ -66,6 +75,9 @@ vi.mock('@/components/features/dashboard/release-tasks', () => ({
     <div data-testid='release-task-page'>
       {releaseId}:{releaseTitle}
     </div>
+  ),
+  ReleaseTaskPageSkeleton: () => (
+    <div data-testid='release-task-page-skeleton'>Loading tasks</div>
   ),
 }));
 
@@ -82,7 +94,8 @@ vi.mock(
   })
 );
 
-import ReleaseTasksPage from '@/app/app/(shell)/dashboard/releases/[releaseId]/tasks/page';
+import LegacyReleaseTasksPage from '@/app/app/(shell)/dashboard/releases/[releaseId]/tasks/page';
+import CanonicalReleaseTasksPage from '@/app/app/(shell)/releases/[releaseId]/tasks/page';
 
 function setupReleaseQueryRows(rows: Array<Record<string, unknown>>) {
   mockDbRows.rows = rows;
@@ -96,7 +109,7 @@ function setupReleaseQueryRows(rows: Array<Record<string, unknown>>) {
 }
 
 async function renderResolvedTasksContent() {
-  const tree = await ReleaseTasksPage({
+  const tree = await CanonicalReleaseTasksPage({
     params: Promise.resolve({ releaseId: 'release_1' }),
   });
   const tasksContentElement = (tree as React.ReactElement).props.children;
@@ -109,9 +122,11 @@ async function renderResolvedTasksContent() {
 describe('release tasks page', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockGetCurrentUserProfile.mockResolvedValue({
-      id: 'profile_1',
-      onboardingCompletedAt: '2026-01-01T00:00:00.000Z',
+    mockLoadAppShellRouteContext.mockResolvedValue({
+      ok: true,
+      profileId: 'profile_1',
+      userId: 'user_1',
+      dashboardData: {},
     });
     mockGetCurrentUserEntitlements.mockResolvedValue({
       isAdmin: false,
@@ -131,6 +146,13 @@ describe('release tasks page', () => {
 
     await renderResolvedTasksContent();
 
+    expect(mockLoadAppShellRouteContext).toHaveBeenCalledWith({
+      route: '/app/releases/release_1/tasks',
+      dashboardErrorLogMessage:
+        'Dashboard data load failed on release tasks page',
+      dashboardErrorMessage:
+        'Failed to load release task data. Please refresh the page.',
+    });
     expect(
       screen.getByTestId('release-plan-upgrade-interstitial')
     ).toHaveTextContent('My Release');
@@ -149,5 +171,30 @@ describe('release tasks page', () => {
     expect(screen.getByTestId('release-task-page')).toHaveTextContent(
       'release_1:My Release'
     );
+  });
+
+  it('keeps the legacy dashboard route aliased to the canonical release route', () => {
+    expect(LegacyReleaseTasksPage).toBe(CanonicalReleaseTasksPage);
+  });
+
+  it('keeps release task shell/profile loading on the shared route context', () => {
+    const source = readFileSync(
+      resolve(
+        process.cwd(),
+        'app/app/(shell)/releases/[releaseId]/tasks/ReleaseTasksRoute.tsx'
+      ),
+      'utf8'
+    );
+
+    expect(source).toContain('loadAppShellRouteContext');
+    expect(source).toContain('buildReleaseTasksRoute');
+    expect(source).toContain('loadReleaseTaskRouteRelease');
+    expect(source).not.toContain('getCurrentUserProfile');
+    expect(source).not.toContain('getDashboardShellData');
+    expect(source).not.toContain('getDashboardDataEssential');
+    expect(source).not.toContain('drizzle-orm');
+    expect(source).not.toContain('@/lib/db');
+    expect(source).not.toContain('@/lib/db/schema/content');
+    expect(source).not.toContain('discogReleases');
   });
 });

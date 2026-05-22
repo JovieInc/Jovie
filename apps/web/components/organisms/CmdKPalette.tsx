@@ -169,6 +169,7 @@ export function CmdKPalette({
         let id: string;
         if (item.kind === 'nav') id = item.nav.id;
         else if (item.kind === 'skill') id = item.skill.id;
+        else if (item.kind === 'prompt') id = item.prompt.id;
         else id = item.entity.id;
         onAdditionalSelect?.(id);
         handleClose();
@@ -183,6 +184,10 @@ export function CmdKPalette({
       if (item.kind === 'skill') {
         const url = `${APP_ROUTES.CHAT}?skill=${encodeURIComponent(item.skill.id)}`;
         router.push(url);
+        handleClose();
+        return;
+      }
+      if (item.kind === 'prompt') {
         handleClose();
         return;
       }
@@ -251,7 +256,7 @@ export function CmdKPalette({
                 setSelectedIndex(0);
               }}
               placeholder='Jump to a page, skill, release, or thread…'
-              className='flex-1 bg-transparent text-sm text-primary-token outline-none placeholder:text-tertiary-token'
+              className='flex-1 appearance-none bg-transparent text-sm text-primary-token outline-none placeholder:text-tertiary-token focus:outline-none focus-visible:outline-none focus-visible:shadow-[inset_0_0_0_1px_color-mix(in_oklab,var(--linear-border-focus)_45%,transparent)]'
               aria-label='Command palette search'
             />
             <span className='hidden shrink-0 rounded-md border border-(--linear-app-frame-seam) bg-surface-1 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-tertiary-token sm:inline'>

@@ -15,6 +15,19 @@ import {
   getSubscribeCTAVariantValue,
 } from './statsig';
 
+/**
+ * RELEASE_PLAN_DEMO is the YC wedge demo page.
+ * It is off by default in production but on in dev and preview so that
+ * the demo recorder and QA passes can visit /app/dashboard/release-plan
+ * without needing a localStorage override or Statsig gate.
+ *
+ * In production, the page stays hidden behind the default=false.
+ * To enable it for a production demo session, set the localStorage override:
+ *   localStorage.setItem('__ff_overrides', JSON.stringify({ 'code:RELEASE_PLAN_DEMO': true }))
+ * or use the DevToolbar flag panel.
+ */
+const IS_VERCEL_PRODUCTION = process.env.VERCEL_ENV === 'production';
+
 type FlagEntities = {
   userId: string | null;
 };
@@ -54,7 +67,22 @@ export const APP_FLAG_REGISTRY = {
   PLAYLIST_ENGINE: buildBooleanFlag('PLAYLIST_ENGINE'),
   ALBUM_ART_GENERATION: buildBooleanFlag('ALBUM_ART_GENERATION'),
   CHAT_JANK_MONITOR: buildBooleanFlag('CHAT_JANK_MONITOR'),
-  RELEASE_PLAN_DEMO: buildBooleanFlag('RELEASE_PLAN_DEMO'),
+  // RELEASE_PLAN_DEMO is on by default in dev/preview so QA and the demo
+  // recorder can visit /app/dashboard/release-plan without a manual override.
+  // Production keeps it off (default=false) — enable via localStorage override
+  // or DevToolbar for live demo sessions.
+  RELEASE_PLAN_DEMO: flag<boolean, FlagEntities>({
+    key: APP_FLAG_KEYS.RELEASE_PLAN_DEMO,
+    defaultValue: APP_FLAG_DEFAULTS.RELEASE_PLAN_DEMO,
+    description: APP_FLAG_DESCRIPTIONS.RELEASE_PLAN_DEMO,
+    options: [
+      { label: 'Off', value: false },
+      { label: 'On', value: true },
+    ],
+    async decide() {
+      return !IS_VERCEL_PRODUCTION;
+    },
+  }),
   DESIGN_V1: buildBooleanFlag('DESIGN_V1'),
   SHELL_CHAT_V1: buildBooleanFlag('SHELL_CHAT_V1'),
   DESIGN_V1_RELEASES: buildBooleanFlag('DESIGN_V1_RELEASES'),
@@ -64,6 +92,7 @@ export const APP_FLAG_REGISTRY = {
   DESIGN_V1_LIBRARY: buildBooleanFlag('DESIGN_V1_LIBRARY'),
   DESIGN_V1_AUTH: buildBooleanFlag('DESIGN_V1_AUTH'),
   DESIGN_V1_ONBOARDING: buildBooleanFlag('DESIGN_V1_ONBOARDING'),
+  AI_CONNECTORS_BETA: buildBooleanFlag('AI_CONNECTORS_BETA'),
 } as const satisfies Record<AppFlagName, Flag<boolean, FlagEntities>>;
 
 export const SUBSCRIBE_CTA_VARIANT_FLAG = flag<

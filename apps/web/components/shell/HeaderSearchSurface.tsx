@@ -17,6 +17,9 @@ interface HeaderSearchSurfaceProps {
   readonly className?: string;
 }
 
+const headerSearchSurfaceChrome =
+  'rounded-[12px] border border-(--linear-app-frame-seam) bg-(--linear-app-content-surface) shadow-[0_0_0_1px_color-mix(in_oklab,var(--linear-app-frame-seam)_18%,transparent)]';
+
 /**
  * Shell-owned search surface that morphs between a compact trigger button
  * (closed) and a full PillSearch panel (open).
@@ -50,7 +53,8 @@ export function HeaderSearchSurface({
         data-app-search-trigger='true'
         onClick={onOpen}
         className={cn(
-          'inline-flex h-7 items-center gap-1.5 rounded-md border border-(--linear-app-shell-border) bg-[color-mix(in_oklab,var(--linear-app-content-surface)_94%,transparent)] px-2 text-[12px] text-secondary-token transition-[background-color,border-color,color] duration-subtle hover:bg-surface-1 hover:text-primary-token focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)',
+          headerSearchSurfaceChrome,
+          'inline-flex h-7 min-w-0 items-center gap-1.5 px-2.5 text-[12px] text-secondary-token transition-[background-color,border-color,color,box-shadow] duration-cinematic ease-cinematic hover:border-default hover:bg-surface-1 hover:text-primary-token focus-ring-themed',
           className
         )}
         aria-label={adapter.ariaLabel ?? adapter.triggerLabel}
@@ -61,7 +65,6 @@ export function HeaderSearchSurface({
           {visibleCount}
           {showFilteredOf ? ` of ${adapter.totalCount}` : ''}
         </span>
-        <span className='hidden text-tertiary-token lg:inline'>/</span>
       </button>
     );
   }
@@ -69,7 +72,8 @@ export function HeaderSearchSurface({
   return (
     <div
       className={cn(
-        'w-full max-w-[min(560px,calc(100vw-2rem))] rounded-lg border border-(--linear-app-shell-border) bg-[color-mix(in_oklab,var(--linear-app-content-surface)_96%,var(--linear-bg-surface-0))] px-2 py-1 shadow-[0_10px_32px_rgba(0,0,0,0.16)] sm:w-[440px] lg:w-[520px]',
+        headerSearchSurfaceChrome,
+        'w-full max-w-[min(560px,calc(100vw-2rem))] px-2 py-1 shadow-popover sm:w-[440px] lg:w-[520px]',
         className
       )}
     >
@@ -80,8 +84,11 @@ export function HeaderSearchSurface({
         artistOptions={adapter.artistOptions}
         titleOptions={adapter.titleOptions}
         albumOptions={adapter.albumOptions}
+        statusOptions={adapter.statusOptions}
+        hasOptions={adapter.hasOptions}
         ariaLabel={adapter.ariaLabel ?? `Filter ${adapter.triggerLabel}`}
-        placeholder={adapter.placeholder ?? 'Type to filter — / for fields'}
+        placeholder={adapter.placeholder ?? 'Type to filter'}
+        allowedFields={adapter.allowedFields}
         onClose={handleCloseAndClear}
       />
     </div>

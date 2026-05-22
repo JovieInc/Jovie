@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { useDesktopDictationStatus } from '@/lib/desktop/electron-bridge';
 
 // Minimal Web Speech API types for cross-browser support.
 // The standard SpeechRecognition interface is not yet in all TS dom libs.
@@ -77,6 +78,7 @@ export function useSpeechRecognition({
   onTranscript,
   lang = 'en-US',
 }: UseSpeechRecognitionOptions): UseSpeechRecognitionReturn {
+  const desktopDictationStatus = useDesktopDictationStatus();
   const [isListening, setIsListening] = useState(false);
   // Start as false so SSR and the first client render agree, then flip to
   // the real value after mount. Otherwise the chat composer renders
@@ -92,11 +94,14 @@ export function useSpeechRecognition({
   }, [onTranscript]);
 
   useEffect(() => {
-    if (typeof window === 'undefined') return;
+    if (!browserWindow) return;
+    const browserSpeechSupported =
+      'SpeechRecognition' in browserWindow ||
+      'webkitSpeechRecognition' in browserWindow;
     setIsSupported(
-      'SpeechRecognition' in window || 'webkitSpeechRecognition' in window
+      browserSpeechSupported && desktopDictationStatus.webSpeechFallbackAllowed
     );
-  }, []);
+  }, [browserWindow, desktopDictationStatus.webSpeechFallbackAllowed]);
 
   const getRecognition = useCallback(() => {
     if (recognitionRef.current) return recognitionRef.current;

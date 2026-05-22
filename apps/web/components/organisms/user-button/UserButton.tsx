@@ -262,7 +262,8 @@ function buildDropdownItems({
     });
   }
 
-  // Add feedback, delete account, and sign out
+  // Add feedback, version info, and sign out.
+  // Version is now shown to all users (moved from admin-only sidebar footer).
   items.push(
     {
       type: 'action',
@@ -272,6 +273,18 @@ function buildDropdownItems({
       onClick: () => setIsFeedbackOpen(true),
     },
     { type: 'separator', id: 'sep-2' },
+    {
+      type: 'custom',
+      id: 'version',
+      render: () => (
+        <div className='px-2.5 py-1 text-2xs text-tertiary-token select-none'>
+          v{process.env.NEXT_PUBLIC_APP_VERSION ?? '0.0.0'}
+          {process.env.NEXT_PUBLIC_BUILD_SHA
+            ? ` (${process.env.NEXT_PUBLIC_BUILD_SHA})`
+            : ''}
+        </div>
+      ),
+    },
     {
       type: 'action',
       id: 'sign-out',

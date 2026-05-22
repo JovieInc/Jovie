@@ -97,6 +97,7 @@ vi.mock('@/components/organisms/table', () => ({
     getRowId,
     getRowClassName,
     getRowTestId,
+    rowSelection,
     expandedRowIds,
     renderExpandedContent,
   }: {
@@ -105,6 +106,7 @@ vi.mock('@/components/organisms/table', () => ({
     getRowId: (row: { id: string }) => string;
     getRowClassName: (row: { id: string }) => string;
     getRowTestId?: (row: { id: string }, index: number) => string | undefined;
+    rowSelection?: Record<string, boolean>;
     expandedRowIds?: Set<string>;
     renderExpandedContent?: (
       row: { id: string },
@@ -118,7 +120,14 @@ vi.mock('@/components/organisms/table', () => ({
           <div key={rowId} data-testid={`release-row-wrapper-${rowId}`}>
             <div
               data-testid={getRowTestId?.(row, index)}
-              className={getRowClassName(row)}
+              className={[
+                rowSelection?.[rowId]
+                  ? 'bg-(--linear-row-selected) shadow-[inset_0_0_0_1px_color-mix(in_oklab,var(--linear-border-focus)_24%,transparent)]'
+                  : '',
+                getRowClassName(row),
+              ]
+                .filter(Boolean)
+                .join(' ')}
             />
             {expandedRowIds?.has(rowId) ? (
               <div data-testid={`expanded-row-${rowId}`}>
@@ -172,6 +181,33 @@ describe('ReleaseTable', () => {
     expect(expandedRow).toBeInTheDocument();
     expect(selectedRow).toBeInTheDocument();
     expect(expandedRow).not.toBe(selectedRow);
+    expect(expandedRow?.className).not.toContain('bg-(--linear-row-selected)');
+    expect(selectedRow?.className).toContain('bg-(--linear-row-selected)');
+    expect(selectedRow?.className).not.toContain(
+      'shadow-[inset_3px_0_0_0_var(--linear-accent)'
+    );
+  });
+
+  it('uses the shared selected state in design v1 table rows', () => {
+    render(
+      <ReleaseTable
+        {...commonProps}
+        designV1={true}
+        showTracks={false}
+        selectedReleaseId='release_1'
+      />
+    );
+
+    const selectedRow = screen
+      .getByTestId('release-row-wrapper-release_1')
+      .querySelector('div');
+
+    expect(selectedRow).toBeInTheDocument();
+    expect(selectedRow?.className).toContain('bg-(--linear-row-selected)');
+    expect(selectedRow?.className).toContain('border-transparent');
+    expect(selectedRow?.className).not.toContain(
+      'shadow-[inset_3px_0_0_0_var(--linear-accent)'
+    );
   });
 
   it('gives idle release rows the same visible rounded hover silhouette', () => {

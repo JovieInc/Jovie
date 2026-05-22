@@ -2,8 +2,8 @@
 
 import { Pause, Play, X } from 'lucide-react';
 import Image from 'next/image';
-import { usePathname, useRouter } from 'next/navigation';
-import { useCallback, useEffect, useState } from 'react';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { SeekBar } from '@/components/atoms/SeekBar';
 import { TruncatedText } from '@/components/atoms/TruncatedText';
@@ -11,11 +11,19 @@ import { useTrackAudioPlayer } from '@/components/organisms/release-sidebar/useT
 import { AudioBar, type AudioBarTrack } from '@/components/shell/AudioBar';
 import { SidebarBottomNowPlaying } from '@/components/shell/SidebarBottomNowPlaying';
 import { SidebarNowPlaying } from '@/components/shell/SidebarNowPlaying';
-import { buildLyricsRoute } from '@/constants/routes';
+import {
+  APP_ROUTES,
+  buildLyricsRoute,
+  resolveLyricsReturnRoute,
+} from '@/constants/routes';
 import { useAppFlag } from '@/lib/flags/client';
 import { cn } from '@/lib/utils';
 import { formatDuration } from '@/lib/utils/formatDuration';
 import { isFormElement } from '@/lib/utils/keyboard';
+import {
+  resetAudioChromeSnapshot,
+  setAudioChromeSnapshot,
+} from './audio-chrome-state';
 
 export type PersistentAudioBarVariant = 'legacy' | 'shellChatV1';
 
@@ -23,17 +31,41 @@ interface PersistentAudioBarProps {
   readonly variant?: PersistentAudioBarVariant;
 }
 
+const SHELL_AUDIO_BAR_TRANSITION =
+  'max-height var(--ds-motion-cinematic-duration) var(--ds-motion-cinematic-easing), opacity var(--ds-motion-cinematic-duration) var(--ds-motion-cinematic-easing), transform var(--ds-motion-cinematic-duration) var(--ds-motion-cinematic-easing)';
+const SHELL_AUDIO_CHROME_TRANSITION_CLASSNAME =
+  'transition-[max-height,opacity,transform,border-color,background-color] duration-cinematic ease-cinematic';
+const SHELL_NOW_PLAYING_CARD_CLASSNAME =
+  'max-w-56 rounded-lg border border-(--linear-app-shell-border)/75 bg-(--linear-app-content-surface) px-2 py-2 shadow-[0_10px_24px_rgba(0,0,0,0.12)] transition-[opacity,transform] duration-cinematic ease-cinematic';
+const SHELL_NOW_PLAYING_ROW_CLASSNAME =
+  'max-w-64 border border-(--linear-app-shell-border)/75 bg-(--linear-app-content-surface) shadow-[0_10px_24px_rgba(0,0,0,0.12)] transition-[opacity,transform,border-color,background-color] duration-cinematic ease-cinematic';
+
+function isLyricsRoutePath(pathname: string | null): boolean {
+  return (
+    pathname === APP_ROUTES.LYRICS ||
+    Boolean(pathname?.startsWith(`${APP_ROUTES.LYRICS}/`))
+  );
+}
+
 export function PersistentAudioBar({
   variant = 'legacy',
 }: Readonly<PersistentAudioBarProps>) {
   const router = useRouter();
   const pathname = usePathname();
+  const searchParams = useSearchParams();
   const designV1LyricsEnabled = useAppFlag('DESIGN_V1');
   const { playbackState, toggleTrack, seek, stop, onError } =
     useTrackAudioPlayer();
   const [imgError, setImgError] = useState(false);
   const [barCollapsed, setBarCollapsed] = useState(false);
   const [waveformOn, setWaveformOn] = useState(true);
+  const lastNonLyricsPathRef = useRef<string>(APP_ROUTES.LIBRARY);
+  const currentPathWithSearch = useMemo(() => {
+    if (!pathname) return APP_ROUTES.LIBRARY;
+
+    const query = searchParams.toString();
+    return query ? `${pathname}?${query}` : pathname;
+  }, [pathname, searchParams]);
 
   useEffect(() => {
     return onError(() => {
@@ -49,6 +81,12 @@ export function PersistentAudioBar({
     setBarCollapsed(false);
   }, [playbackState.activeTrackId]);
 
+  useEffect(() => {
+    if (!isLyricsRoutePath(pathname) && pathname) {
+      lastNonLyricsPathRef.current = currentPathWithSearch;
+    }
+  }, [currentPathWithSearch, pathname]);
+
   const handleToggle = useCallback(() => {
     if (playbackState.playbackStatus === 'loading') return;
     if (!playbackState.activeTrackId || !playbackState.trackTitle) return;
@@ -63,12 +101,39 @@ export function PersistentAudioBar({
     toggleTrack,
   ]);
 
+  const handleCloseLyrics = useCallback(() => {
+    router.push(
+      resolveLyricsReturnRoute(
+        searchParams.get('from'),
+        lastNonLyricsPathRef.current
+      )
+    );
+  }, [router, searchParams]);
+
   const handleOpenLyrics = useCallback(() => {
     if (!playbackState.activeTrackId) return;
-    router.push(buildLyricsRoute(playbackState.activeTrackId));
-  }, [playbackState.activeTrackId, router]);
+    const lyricsBasePath = buildLyricsRoute(playbackState.activeTrackId);
+    if (pathname === lyricsBasePath) {
+      handleCloseLyrics();
+      return;
+    }
+    router.push(
+      buildLyricsRoute(playbackState.activeTrackId, {
+        from: currentPathWithSearch,
+      })
+    );
+  }, [
+    currentPathWithSearch,
+    handleCloseLyrics,
+    pathname,
+    playbackState.activeTrackId,
+    router,
+  ]);
 
   const activeTrackId = playbackState.activeTrackId;
+  const isShellAudioBar = variant === 'shellChatV1';
+  const compactPlayerVisible =
+    isShellAudioBar && Boolean(activeTrackId) && barCollapsed;
 
   useEffect(() => {
     if (variant !== 'shellChatV1' || !activeTrackId) return;
@@ -79,6 +144,12 @@ export function PersistentAudioBar({
       const hasModifier = event.metaKey || event.ctrlKey || event.altKey;
       const plainKey = !hasModifier && !event.shiftKey;
       const key = event.key.toLowerCase();
+
+      if (event.key === 'Escape' && isLyricsRoutePath(pathname)) {
+        event.preventDefault();
+        handleCloseLyrics();
+        return;
+      }
 
       if (event.key === ' ' && plainKey) {
         event.preventDefault();
@@ -125,11 +196,30 @@ export function PersistentAudioBar({
   }, [
     activeTrackId,
     designV1LyricsEnabled,
+    handleCloseLyrics,
     handleOpenLyrics,
     handleToggle,
+    pathname,
     playbackState.hasLyrics,
     variant,
   ]);
+
+  useEffect(() => {
+    if (!isShellAudioBar || !activeTrackId) {
+      resetAudioChromeSnapshot();
+      return;
+    }
+
+    setAudioChromeSnapshot({
+      activeTrackId,
+      compactPlayerVisible,
+      fullPlayerVisible: !compactPlayerVisible,
+    });
+  }, [activeTrackId, compactPlayerVisible, isShellAudioBar]);
+
+  useEffect(() => {
+    return resetAudioChromeSnapshot;
+  }, []);
 
   if (!activeTrackId) return null;
 
@@ -160,7 +250,7 @@ export function PersistentAudioBar({
     <section
       aria-label='Audio player'
       className={cn(
-        'animate-in fade-in slide-in-from-bottom-2 duration-200 shrink-0 border-t border-subtle bg-(--linear-app-content-surface) backdrop-blur-xl px-3 py-2 max-lg:mb-[calc(3.5rem+env(safe-area-inset-bottom))]',
+        'animate-in fade-in slide-in-from-bottom-2 duration-cinematic shrink-0 border-t border-subtle bg-(--linear-app-content-surface) backdrop-blur-xl px-3 py-2 max-lg:mb-[calc(3.5rem+env(safe-area-inset-bottom))]',
         className
       )}
     >
@@ -229,7 +319,7 @@ export function PersistentAudioBar({
           type='button'
           onClick={handleToggle}
           disabled={isLoading}
-          className='relative flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-subtle bg-surface-0 text-secondary-token transition-[background-color,color,border-color] duration-150 hover:border-default hover:bg-surface-1 hover:text-primary-token focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-(--linear-border-focus) disabled:opacity-50 before:absolute before:-inset-2 before:content-[""]'
+          className='relative flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-subtle bg-surface-0 text-secondary-token transition-[background-color,color,border-color] duration-subtle hover:border-default hover:bg-surface-1 hover:text-primary-token focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-(--linear-border-focus) disabled:opacity-50 before:absolute before:-inset-2 before:content-[""]'
           aria-label={playButtonLabel}
         >
           {playButtonIcon}
@@ -239,7 +329,7 @@ export function PersistentAudioBar({
         <button
           type='button'
           onClick={stop}
-          className='relative flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-quaternary-token transition-colors duration-150 hover:text-secondary-token focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-(--linear-border-focus) before:absolute before:-inset-2.5 before:content-[""]'
+          className='relative flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-quaternary-token transition-colors duration-subtle hover:text-secondary-token focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-(--linear-border-focus) before:absolute before:-inset-2.5 before:content-[""]'
           aria-label='Dismiss player'
         >
           <X className='h-3.5 w-3.5' />
@@ -268,13 +358,21 @@ export function PersistentAudioBar({
   return (
     <>
       <div
+        data-testid='audio-surface-expanded-shell'
+        data-shell-audio-surface='persistent-expanded'
         aria-hidden={barCollapsed}
-        className='hidden shrink-0 overflow-hidden border-t border-(--linear-app-shell-border) bg-(--linear-bg-page) lg:block'
+        className={cn(
+          'hidden shrink-0 overflow-hidden border-t border-(--linear-app-shell-border) bg-(--linear-bg-page) lg:block',
+          SHELL_AUDIO_CHROME_TRANSITION_CLASSNAME
+        )}
         style={{
-          maxHeight: barCollapsed ? 0 : 120,
+          maxHeight: barCollapsed
+            ? 0
+            : 'var(--linear-app-audio-bar-max-height)',
           opacity: barCollapsed ? 0 : 1,
+          transform: barCollapsed ? 'translateY(10px)' : 'translateY(0)',
           pointerEvents: barCollapsed ? 'none' : 'auto',
-          transition: 'max-height 150ms ease-out, opacity 150ms ease-out',
+          transition: SHELL_AUDIO_BAR_TRANSITION,
         }}
       >
         <div className='px-8 pt-2'>
@@ -283,7 +381,7 @@ export function PersistentAudioBar({
             isPlaying={playbackState.isPlaying}
             onPlay={handleToggle}
             playOverlayVisible={false}
-            className='max-w-56'
+            className={SHELL_NOW_PLAYING_CARD_CLASSNAME}
           />
         </div>
         <AudioBar
@@ -304,20 +402,28 @@ export function PersistentAudioBar({
         />
       </div>
       <div
+        data-testid='audio-surface-compact-shell'
+        data-shell-audio-surface='persistent-compact'
         aria-hidden={!barCollapsed}
-        className='hidden shrink-0 overflow-hidden border-t border-(--linear-app-shell-border) bg-(--linear-app-content-surface) px-3 lg:block'
+        className={cn(
+          'hidden shrink-0 overflow-hidden border-t border-(--linear-app-shell-border) bg-(--linear-app-content-surface) px-3 lg:block',
+          SHELL_AUDIO_CHROME_TRANSITION_CLASSNAME
+        )}
         style={{
-          maxHeight: barCollapsed ? 64 : 0,
+          maxHeight: barCollapsed
+            ? 'var(--linear-app-audio-compact-height)'
+            : 0,
           opacity: barCollapsed ? 1 : 0,
+          transform: barCollapsed ? 'translateY(0)' : 'translateY(8px)',
           pointerEvents: barCollapsed ? 'auto' : 'none',
-          transition: 'max-height 150ms ease-out, opacity 150ms ease-out',
+          transition: SHELL_AUDIO_BAR_TRANSITION,
         }}
       >
         <SidebarBottomNowPlaying
           track={nowPlayingTrack}
           isPlaying={playbackState.isPlaying}
           onPlay={handleToggle}
-          className='my-2 max-w-64'
+          className={cn('my-2', SHELL_NOW_PLAYING_ROW_CLASSNAME)}
         />
       </div>
       {legacyBar('lg:hidden')}

@@ -198,7 +198,7 @@ describe('performance route resolvers', () => {
 
   it('resolves the latest seeded release task route for the active creator profile', async () => {
     const route = {
-      path: '/app/dashboard/releases/[releaseId]/tasks',
+      path: '/app/releases/[releaseId]/tasks',
     } as PerfRouteDefinition;
 
     await expect(
@@ -206,13 +206,13 @@ describe('performance route resolvers', () => {
         authCookies: [],
         baseUrl: 'http://127.0.0.1:4100',
       })
-    ).resolves.toBe('/app/dashboard/releases/release_456/tasks');
+    ).resolves.toBe('/app/releases/release_456/tasks');
   });
 
   it('uses the auth bypass cookie when E2E_CLERK_USER_ID is missing for release task routes', async () => {
     vi.stubEnv('E2E_CLERK_USER_ID', '');
     const route = {
-      path: '/app/dashboard/releases/[releaseId]/tasks',
+      path: '/app/releases/[releaseId]/tasks',
     } as PerfRouteDefinition;
     await expect(
       resolveReleaseTasksPerfPath(route, {
@@ -226,7 +226,7 @@ describe('performance route resolvers', () => {
         ],
         baseUrl: 'http://127.0.0.1:4100',
       })
-    ).resolves.toBe('/app/dashboard/releases/release_456/tasks');
+    ).resolves.toBe('/app/releases/release_456/tasks');
   });
 
   it('creates a lightweight perf release when the active profile has no releases yet', async () => {
@@ -256,7 +256,7 @@ describe('performance route resolvers', () => {
     );
 
     const route = {
-      path: '/app/dashboard/releases/[releaseId]/tasks',
+      path: '/app/releases/[releaseId]/tasks',
     } as PerfRouteDefinition;
 
     await expect(
@@ -264,7 +264,7 @@ describe('performance route resolvers', () => {
         authCookies: [],
         baseUrl: 'http://127.0.0.1:4100',
       })
-    ).resolves.toBe('/app/dashboard/releases/release_perf_123/tasks');
+    ).resolves.toBe('/app/releases/release_perf_123/tasks');
   });
 
   it('falls back to the authenticated releases UI when DB release lookup is unavailable', async () => {
@@ -302,8 +302,7 @@ describe('performance route resolvers', () => {
           locator,
           setViewportSize,
           url: vi.fn(
-            () =>
-              'http://127.0.0.1:4100/app/dashboard/releases/release_987/tasks'
+            () => 'http://127.0.0.1:4100/app/releases/release_987/tasks'
           ),
           viewportSize,
           waitForLoadState,
@@ -314,7 +313,7 @@ describe('performance route resolvers', () => {
     });
 
     const route = {
-      path: '/app/dashboard/releases/[releaseId]/tasks',
+      path: '/app/releases/[releaseId]/tasks',
     } as PerfRouteDefinition;
 
     await expect(
@@ -329,15 +328,12 @@ describe('performance route resolvers', () => {
         ],
         baseUrl: 'http://127.0.0.1:4100',
       })
-    ).resolves.toBe('/app/dashboard/releases/release_987/tasks');
+    ).resolves.toBe('/app/releases/release_987/tasks');
 
     expect(addCookies).toHaveBeenCalledOnce();
-    expect(goto).toHaveBeenCalledWith(
-      'http://127.0.0.1:4100/app/dashboard/releases',
-      {
-        waitUntil: 'domcontentloaded',
-      }
-    );
+    expect(goto).toHaveBeenCalledWith('http://127.0.0.1:4100/app/releases', {
+      waitUntil: 'domcontentloaded',
+    });
     expect(waitForLoadState).toHaveBeenCalledWith('domcontentloaded', {
       timeout: 10_000,
     });
@@ -357,6 +353,51 @@ describe('performance route resolvers', () => {
     expect(waitForURL).not.toHaveBeenCalled();
     expect(contextClose).toHaveBeenCalledOnce();
     expect(browserClose).toHaveBeenCalledOnce();
+  });
+
+  it('normalizes legacy release task URLs returned by the app fallback', async () => {
+    vi.unstubAllEnvs();
+    vi.stubEnv('DATABASE_URL', '');
+
+    resolverMocks.chromiumLaunch.mockResolvedValue({
+      close: vi.fn().mockResolvedValue(undefined),
+      newContext: vi.fn().mockResolvedValue({
+        addCookies: vi.fn().mockResolvedValue(undefined),
+        close: vi.fn().mockResolvedValue(undefined),
+        newPage: vi.fn().mockResolvedValue({
+          goto: vi.fn().mockResolvedValue(undefined),
+          locator: vi.fn(() => ({
+            first: () => ({
+              getAttribute: vi.fn().mockResolvedValue(null),
+            }),
+          })),
+          setViewportSize: vi.fn().mockResolvedValue(undefined),
+          url: vi.fn(
+            () =>
+              'http://127.0.0.1:4100/app/dashboard/releases/release_legacy/tasks?tab=checklist'
+          ),
+          viewportSize: vi.fn(() => ({ width: 1280, height: 720 })),
+          waitForLoadState: vi.fn().mockResolvedValue(undefined),
+        }),
+      }),
+    });
+
+    await expect(
+      resolveReleaseTasksPerfPath(
+        { path: '/app/releases/[releaseId]/tasks' } as PerfRouteDefinition,
+        {
+          authCookies: [
+            {
+              domain: '127.0.0.1',
+              name: 'session',
+              path: '/',
+              value: 'cookie',
+            },
+          ],
+          baseUrl: 'http://127.0.0.1:4100',
+        }
+      )
+    ).resolves.toBe('/app/releases/release_legacy/tasks?tab=checklist');
   });
 
   it('fails closed when the app fallback cannot resolve a release tasks route', async () => {
@@ -380,7 +421,7 @@ describe('performance route resolvers', () => {
             }),
           })),
           setViewportSize: vi.fn().mockResolvedValue(undefined),
-          url: vi.fn(() => 'http://127.0.0.1:4100/app/dashboard/releases'),
+          url: vi.fn(() => 'http://127.0.0.1:4100/app/releases'),
           viewportSize: vi.fn(() => ({ width: 1280, height: 720 })),
           waitForLoadState: vi.fn().mockResolvedValue(undefined),
         }),
@@ -388,7 +429,7 @@ describe('performance route resolvers', () => {
     });
 
     const route = {
-      path: '/app/dashboard/releases/[releaseId]/tasks',
+      path: '/app/releases/[releaseId]/tasks',
     } as PerfRouteDefinition;
 
     await expect(

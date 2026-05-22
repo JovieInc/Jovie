@@ -12,7 +12,7 @@
  * @see apps/web/components/jovie/components/SlashCommandMenu.tsx
  */
 
-import { expect, test } from '@playwright/test';
+import { expect, type Page, test } from '@playwright/test';
 import { APP_ROUTES } from '@/constants/routes';
 import { ensureSignedInUser, hasClerkCredentials } from '../helpers/clerk-auth';
 import {
@@ -23,23 +23,256 @@ import {
 const COMPOSER_SURFACE = '[data-testid="chat-composer-surface"]';
 const COMPOSER_TEXTAREA = '[aria-label="Chat message input"]';
 const SLASH_MENU = '[data-testid="slash-command-menu"]';
+const CLIPPING_VIEWPORTS = [
+  { width: 390, height: 844 },
+  { width: 1280, height: 900 },
+] as const;
+
+function composerSurface(page: Page) {
+  return page.locator(COMPOSER_SURFACE).last();
+}
 
 async function expectSurfaceMode(
-  page: import('@playwright/test').Page,
+  page: Page,
   mode: 'empty' | 'typing' | 'root' | 'entity'
 ): Promise<void> {
-  await expect(page.locator(COMPOSER_SURFACE)).toHaveAttribute(
+  await expect(composerSurface(page)).toHaveAttribute(
     'data-surface-mode',
     mode,
-    { timeout: 10_000 }
+    {
+      timeout: 10_000,
+    }
   );
 }
 
-async function openComposer(page: import('@playwright/test').Page) {
+async function openComposer(page: Page) {
   await ensureSignedInUser(page);
   await smokeNavigateWithRetry(page, APP_ROUTES.CHAT, { timeout: 60_000 });
   await waitForHydration(page);
-  await expect(page.locator(COMPOSER_SURFACE)).toBeVisible({ timeout: 30_000 });
+  await expect(composerSurface(page)).toBeVisible({ timeout: 30_000 });
+}
+
+function expectBoxInsideViewport(
+  box: { x: number; y: number; width: number; height: number } | null,
+  viewport: { width: number; height: number } | null
+) {
+  expect(box).not.toBeNull();
+  expect(viewport).not.toBeNull();
+  if (!(box && viewport)) return;
+
+  expect(box.x).toBeGreaterThanOrEqual(0);
+  expect(box.y).toBeGreaterThanOrEqual(0);
+  expect(box.x + box.width).toBeLessThanOrEqual(viewport.width);
+  expect(box.y + box.height).toBeLessThanOrEqual(viewport.height);
+}
+
+async function readComposerVisualMetrics(page: Page) {
+  return page.evaluate(
+    ({ surfaceSelector, textareaSelector }) => {
+      function rectFor(element: Element | null) {
+        if (!element) return null;
+        const rect = element.getBoundingClientRect();
+        return {
+          bottom: rect.bottom,
+          height: rect.height,
+          left: rect.left,
+          right: rect.right,
+          top: rect.top,
+          width: rect.width,
+        };
+      }
+
+      function parseColor(value: string, depth = 0) {
+        const hex = value.match(/^#([0-9a-f]{6})$/i);
+        if (hex) {
+          const raw = hex[1];
+          return {
+            alpha: 1,
+            b: Number.parseInt(raw.slice(4, 6), 16),
+            g: Number.parseInt(raw.slice(2, 4), 16),
+            r: Number.parseInt(raw.slice(0, 2), 16),
+          };
+        }
+
+        const rgb = value.match(
+          /rgba?\(([\d.]+)[,\s]+([\d.]+)[,\s]+([\d.]+)(?:[,\s/]+([\d.]+))?\)/
+        );
+        if (rgb) {
+          return {
+            alpha: Number(rgb[4] ?? 1),
+            b: Number(rgb[3]),
+            g: Number(rgb[2]),
+            r: Number(rgb[1]),
+          };
+        }
+
+        const functionalColor = value.match(
+          /color\((?:srgb|display-p3)\s+([\d.]+)\s+([\d.]+)\s+([\d.]+)(?:\s*\/\s*([\d.]+))?\)/
+        );
+        if (functionalColor) {
+          return {
+            alpha: Number(functionalColor[4] ?? 1),
+            b: Number(functionalColor[3]) * 255,
+            g: Number(functionalColor[2]) * 255,
+            r: Number(functionalColor[1]) * 255,
+          };
+        }
+
+        const oklabColor = value.match(
+          /oklab\(([\d.-]+)\s+([\d.-]+)\s+([\d.-]+)(?:\s*\/\s*([\d.]+))?\)/
+        );
+        if (oklabColor) {
+          const l = Number(oklabColor[1]);
+          const a = Number(oklabColor[2]);
+          const b = Number(oklabColor[3]);
+          const lPrime = l + 0.3963377774 * a + 0.2158037573 * b;
+          const mPrime = l - 0.1055613458 * a - 0.0638541728 * b;
+          const sPrime = l - 0.0894841775 * a - 1.291485548 * b;
+          const lCubed = lPrime ** 3;
+          const mCubed = mPrime ** 3;
+          const sCubed = sPrime ** 3;
+          const toSrgb = (linear: number) => {
+            const channel =
+              linear <= 0.0031308
+                ? 12.92 * linear
+                : 1.055 * linear ** (1 / 2.4) - 0.055;
+            return Math.min(255, Math.max(0, channel * 255));
+          };
+          return {
+            alpha: Number(oklabColor[4] ?? 1),
+            b: toSrgb(
+              -0.0041960863 * lCubed -
+                0.7034186147 * mCubed +
+                1.707614701 * sCubed
+            ),
+            g: toSrgb(
+              -1.2684380046 * lCubed +
+                2.6097574011 * mCubed -
+                0.3413193965 * sCubed
+            ),
+            r: toSrgb(
+              4.0767416621 * lCubed -
+                3.3077115913 * mCubed +
+                0.2309699292 * sCubed
+            ),
+          };
+        }
+
+        if (depth === 0) {
+          const canvas = document.createElement('canvas');
+          const context = canvas.getContext('2d');
+          if (context) {
+            context.fillStyle = '#000000';
+            context.fillStyle = value;
+            const normalized = context.fillStyle;
+            if (normalized !== '#000000' && normalized !== value) {
+              return parseColor(normalized, 1);
+            }
+          }
+        }
+
+        return null;
+      }
+
+      function luminance(channel: number) {
+        const normalized = channel / 255;
+        return normalized <= 0.03928
+          ? normalized / 12.92
+          : ((normalized + 0.055) / 1.055) ** 2.4;
+      }
+
+      function contrastRatio(
+        foreground: { r: number; g: number; b: number; alpha: number },
+        background: { r: number; g: number; b: number; alpha: number }
+      ) {
+        const blended = {
+          b:
+            foreground.b * foreground.alpha +
+            background.b * (1 - foreground.alpha),
+          g:
+            foreground.g * foreground.alpha +
+            background.g * (1 - foreground.alpha),
+          r:
+            foreground.r * foreground.alpha +
+            background.r * (1 - foreground.alpha),
+        };
+        const fgLum =
+          0.2126 * luminance(blended.r) +
+          0.7152 * luminance(blended.g) +
+          0.0722 * luminance(blended.b);
+        const bgLum =
+          0.2126 * luminance(background.r) +
+          0.7152 * luminance(background.g) +
+          0.0722 * luminance(background.b);
+        const lighter = Math.max(fgLum, bgLum);
+        const darker = Math.min(fgLum, bgLum);
+        return (lighter + 0.05) / (darker + 0.05);
+      }
+
+      function relativeLuminance(color: { r: number; g: number; b: number }) {
+        return (
+          0.2126 * luminance(color.r) +
+          0.7152 * luminance(color.g) +
+          0.0722 * luminance(color.b)
+        );
+      }
+
+      function visibleSurface() {
+        const surfaces = Array.from(document.querySelectorAll(surfaceSelector));
+        return (
+          surfaces
+            .filter(element => {
+              const rect = element.getBoundingClientRect();
+              const style = getComputedStyle(element);
+              return (
+                rect.width > 0 &&
+                rect.height > 0 &&
+                style.display !== 'none' &&
+                style.visibility !== 'hidden'
+              );
+            })
+            .at(-1) ?? null
+        );
+      }
+
+      const surface = visibleSurface();
+      const textarea = document.querySelector(textareaSelector);
+      const surfaceStyles = surface ? getComputedStyle(surface) : null;
+      const textareaStyles = textarea ? getComputedStyle(textarea) : null;
+      const foreground = textareaStyles
+        ? parseColor(textareaStyles.color)
+        : null;
+      const background = surfaceStyles
+        ? parseColor(surfaceStyles.backgroundColor)
+        : null;
+      const effectiveBackground =
+        background && background.alpha > 0.05
+          ? background
+          : { alpha: 1, b: 27, g: 23, r: 22 };
+      const isSurfaceDark = relativeLuminance(effectiveBackground) < 0.12;
+
+      return {
+        buttonRects: Array.from(surface?.querySelectorAll('button') ?? []).map(
+          rectFor
+        ),
+        contrast:
+          foreground && isSurfaceDark
+            ? contrastRatio(foreground, effectiveBackground)
+            : 0,
+        isSurfaceDark,
+        surface: rectFor(surface),
+        textarea: rectFor(textarea),
+        viewport: {
+          height: window.innerHeight,
+          width: window.innerWidth,
+        },
+      };
+    },
+    {
+      surfaceSelector: COMPOSER_SURFACE,
+      textareaSelector: COMPOSER_TEXTAREA,
+    }
+  );
 }
 
 test.describe('Chat composer — Variant F surface morph', () => {
@@ -102,9 +335,8 @@ test.describe('Chat composer — Variant F surface morph', () => {
     // empty depending on whether a chip lingered.
     await page.keyboard.press('Escape');
 
-    const surfaceMode = await page
-      .locator(COMPOSER_SURFACE)
-      .getAttribute('data-surface-mode');
+    const surfaceMode =
+      await composerSurface(page).getAttribute('data-surface-mode');
     expect(surfaceMode === 'empty' || surfaceMode === 'typing').toBe(true);
   });
 
@@ -121,9 +353,7 @@ test.describe('Chat composer — Variant F surface morph', () => {
     await page.keyboard.press('/');
     await page.keyboard.type('release ');
 
-    const mode = await page
-      .locator(COMPOSER_SURFACE)
-      .getAttribute('data-surface-mode');
+    const mode = await composerSurface(page).getAttribute('data-surface-mode');
     if (mode !== 'entity') {
       test.skip(true, '/release direct-entry not on this build');
     }
@@ -217,6 +447,65 @@ test.describe('Chat composer — Variant F surface morph', () => {
       // Stacked mode: rail's bottom edge should sit at or above the
       // textarea's top edge.
       expect(railBox.y + railBox.height).toBeLessThanOrEqual(inputBox.y + 1);
+    }
+  });
+
+  test('G: hardened composer remains readable and keeps usable targets', async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 1280, height: 900 });
+    await openComposer(page);
+
+    const textarea = page.locator(COMPOSER_TEXTAREA);
+    await textarea.fill(
+      'Draft a release rollout with pitch timing, short-form assets, approvals, and fallback steps if the import fails before launch.'
+    );
+    await expectSurfaceMode(page, 'typing');
+
+    const metrics = await readComposerVisualMetrics(page);
+    expect(metrics.isSurfaceDark).toBe(true);
+    expect(metrics.contrast).toBeGreaterThanOrEqual(4.5);
+    expect(metrics.surface?.width ?? 0).toBeGreaterThanOrEqual(680);
+    expect(metrics.surface?.height ?? 0).toBeGreaterThanOrEqual(88);
+    expect(metrics.textarea?.height ?? 0).toBeGreaterThanOrEqual(24);
+    expect(metrics.textarea?.height ?? 0).toBeLessThanOrEqual(168);
+    for (const rect of metrics.buttonRects) {
+      expect(rect?.height ?? 0).toBeGreaterThanOrEqual(36);
+      expect(rect?.width ?? 0).toBeGreaterThanOrEqual(36);
+    }
+  });
+
+  test('H: attachment flyout and slash picker avoid viewport clipping', async ({
+    page,
+  }) => {
+    for (const viewportSize of CLIPPING_VIEWPORTS) {
+      await page.setViewportSize(viewportSize);
+      await openComposer(page);
+
+      const attachButton = page.getByRole('button', {
+        name: 'Attachment options',
+      });
+      await expect(attachButton).toBeVisible();
+      await attachButton.click();
+      const attachmentMenu = page.getByRole('menu');
+      await expect(attachmentMenu).toBeVisible();
+      expectBoxInsideViewport(
+        await attachmentMenu.boundingBox(),
+        page.viewportSize()
+      );
+
+      await page.keyboard.press('Escape');
+      const textarea = page.locator(COMPOSER_TEXTAREA);
+      await textarea.click();
+      await textarea.fill('');
+      await page.keyboard.press('/');
+      await expectSurfaceMode(page, 'root');
+      await expect(page.locator(SLASH_MENU)).toBeVisible({ timeout: 5_000 });
+      expectBoxInsideViewport(
+        await page.locator(SLASH_MENU).boundingBox(),
+        page.viewportSize()
+      );
+      await page.keyboard.press('Escape');
     }
   });
 });

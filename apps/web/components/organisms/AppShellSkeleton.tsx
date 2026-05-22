@@ -18,93 +18,117 @@ const NAV_ITEMS_2 = [
   { key: 'nav-docs', width: '50%' },
 ];
 
+function DefaultSidebarSkeleton({
+  isShellChatV1,
+}: {
+  readonly isShellChatV1: boolean;
+}) {
+  return (
+    <div
+      // Shell V1 mirrors the production sidebar token width (244px) and the
+      // compact header height so the post-resolve UnifiedSidebar slots in
+      // without a width/header reflow.
+      className={cn(
+        'max-lg:hidden bg-sidebar lg:flex lg:shrink-0 lg:flex-col',
+        isShellChatV1 ? 'lg:w-(--linear-app-sidebar-width)' : 'lg:w-[232px]'
+      )}
+    >
+      <div
+        className={cn(
+          'flex items-center gap-2 px-2.5',
+          isShellChatV1
+            ? 'h-(--linear-app-header-height-compact) py-0.5'
+            : 'h-9 pt-2'
+        )}
+      >
+        <div className='skeleton h-6 w-6 rounded-md' />
+        <div className='skeleton h-4 w-24 rounded' />
+      </div>
+
+      <div
+        className={cn(
+          'flex-1 space-y-1',
+          isShellChatV1 ? 'px-2.5 pt-1.5' : 'px-2 pt-4'
+        )}
+      >
+        {NAV_ITEMS.map(item => (
+          <div
+            key={item.key}
+            className='flex h-7 items-center gap-2 rounded-md px-1.5'
+          >
+            <div className='skeleton h-3.5 w-3.5 shrink-0 rounded' />
+            <div
+              className='skeleton h-3 rounded'
+              style={{ width: item.width }}
+            />
+          </div>
+        ))}
+
+        <div className='pb-1 pt-3'>
+          <div className='skeleton ml-1.5 h-3 w-16 rounded' />
+        </div>
+
+        {NAV_ITEMS_2.map(item => (
+          <div
+            key={item.key}
+            className='flex h-7 items-center gap-2 rounded-md px-1.5'
+          >
+            <div className='skeleton h-3.5 w-3.5 shrink-0 rounded' />
+            <div
+              className='skeleton h-3 rounded'
+              style={{ width: item.width }}
+            />
+          </div>
+        ))}
+      </div>
+
+      <div
+        className={cn(
+          'flex items-center gap-2 pb-2 pt-1',
+          isShellChatV1 ? 'px-2.5' : 'px-2'
+        )}
+      >
+        <div className='skeleton h-7 w-7 shrink-0 rounded-full' />
+        <div className='skeleton h-3 w-20 rounded' />
+      </div>
+    </div>
+  );
+}
+
 export function AppShellSkeleton({
   main: mainOverride,
+  audioPlayer,
   variant,
+  sidebar: sidebarOverride,
 }: {
   readonly main?: ReactNode;
+  readonly audioPlayer?: ReactNode;
   /**
    * Match the AppShellFrame variant the post-skeleton render will use so the
    * Suspense fallback doesn't flash a different layout while data loads.
    * Defaults to 'legacy' to match the production default state.
    */
   readonly variant?: AppShellFrameVariant;
+  /**
+   * Override the sidebar skeleton. Pass `null` for unauthenticated onboarding
+   * surfaces (e.g. /start) that intentionally render without sidebar.
+   * Undefined falls back to the standard nav skeleton.
+   */
+  readonly sidebar?: ReactNode | null;
 } = {}) {
   const isShellChatV1 = variant === 'shellChatV1';
+
+  const resolvedSidebar =
+    sidebarOverride !== undefined ? (
+      sidebarOverride
+    ) : (
+      <DefaultSidebarSkeleton isShellChatV1={isShellChatV1} />
+    );
 
   return (
     <AppShellFrame
       variant={variant}
-      sidebar={
-        <div
-          // Shell V1 mirrors the production sidebar token width (244px) and the
-          // compact header height so the post-resolve UnifiedSidebar slots in
-          // without a width/header reflow.
-          className={cn(
-            'max-lg:hidden bg-sidebar lg:flex lg:shrink-0 lg:flex-col',
-            isShellChatV1 ? 'lg:w-(--linear-app-sidebar-width)' : 'lg:w-[232px]'
-          )}
-        >
-          <div
-            className={cn(
-              'flex items-center gap-2 px-2.5',
-              isShellChatV1
-                ? 'h-(--linear-app-header-height-compact) py-0.5'
-                : 'h-9 pt-2'
-            )}
-          >
-            <div className='skeleton h-6 w-6 rounded-md' />
-            <div className='skeleton h-4 w-24 rounded' />
-          </div>
-
-          <div
-            className={cn(
-              'flex-1 space-y-1',
-              isShellChatV1 ? 'px-2.5 pt-1.5' : 'px-2 pt-4'
-            )}
-          >
-            {NAV_ITEMS.map(item => (
-              <div
-                key={item.key}
-                className='flex h-7 items-center gap-2 rounded-md px-1.5'
-              >
-                <div className='skeleton h-3.5 w-3.5 shrink-0 rounded' />
-                <div
-                  className='skeleton h-3 rounded'
-                  style={{ width: item.width }}
-                />
-              </div>
-            ))}
-
-            <div className='pb-1 pt-3'>
-              <div className='skeleton ml-1.5 h-3 w-16 rounded' />
-            </div>
-
-            {NAV_ITEMS_2.map(item => (
-              <div
-                key={item.key}
-                className='flex h-7 items-center gap-2 rounded-md px-1.5'
-              >
-                <div className='skeleton h-3.5 w-3.5 shrink-0 rounded' />
-                <div
-                  className='skeleton h-3 rounded'
-                  style={{ width: item.width }}
-                />
-              </div>
-            ))}
-          </div>
-
-          <div
-            className={cn(
-              'flex items-center gap-2 pb-2 pt-1',
-              isShellChatV1 ? 'px-2.5' : 'px-2'
-            )}
-          >
-            <div className='skeleton h-7 w-7 shrink-0 rounded-full' />
-            <div className='skeleton h-3 w-20 rounded' />
-          </div>
-        </div>
-      }
+      sidebar={resolvedSidebar}
       header={
         <header
           // Shell V1 header sits on the rounded content surface — no border-b,
@@ -122,6 +146,7 @@ export function AppShellSkeleton({
           <div className='skeleton h-4 w-28 rounded' />
         </header>
       }
+      audioPlayer={audioPlayer}
       main={
         mainOverride ?? (
           <div className='mx-auto flex h-full w-full max-w-5xl p-4 sm:p-6'>

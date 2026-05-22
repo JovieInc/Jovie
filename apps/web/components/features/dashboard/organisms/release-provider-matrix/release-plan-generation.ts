@@ -4,10 +4,36 @@ import { useCallback, useState } from 'react';
 import { toast } from 'sonner';
 import { instantiateReleaseTasksFromCatalog } from '@/app/app/(shell)/dashboard/releases/catalog-task-actions';
 import { instantiateReleaseTasks } from '@/app/app/(shell)/dashboard/releases/task-actions';
-import { APP_ROUTES } from '@/constants/routes';
+import { buildReleaseTasksRoute } from '@/constants/routes';
 import type { ReleaseViewModel } from '@/lib/discography/types';
 import { captureError } from '@/lib/error-tracking';
 import type { ReleaseContext } from '@/lib/release-tasks/applicability';
+
+/**
+ * Returns true when the error is a TasksUpgradeRequiredError that crossed the
+ * Server Action boundary. instanceof checks are unreliable across that boundary,
+ * so we match on the serialised `name` field that Next.js preserves in the
+ * re-thrown client-side Error, with a fallback on the `code` property for
+ * cases where the error object was constructed directly (e.g. in unit tests).
+ *
+ * These are expected business-logic gates, not bugs — do not report to Sentry.
+ */
+function isUpgradeRequiredError(error: unknown): boolean {
+  if (error instanceof Error && error.name === 'TasksUpgradeRequiredError') {
+    return true;
+  }
+  if (
+    error !== null &&
+    typeof error === 'object' &&
+    'code' in error &&
+    typeof (error as { code: unknown }).code === 'string' &&
+    ((error as { code: string }).code === 'RELEASE_PLAN_LOCKED' ||
+      (error as { code: string }).code === 'TASKS_WORKSPACE_LOCKED')
+  ) {
+    return true;
+  }
+  return false;
+}
 
 export async function generateReleasePlanTasks(
   releaseId: string,
@@ -19,7 +45,7 @@ export async function generateReleasePlanTasks(
     await instantiateReleaseTasks(releaseId);
   }
 
-  return APP_ROUTES.DASHBOARD_RELEASE_TASKS.replace('[releaseId]', releaseId);
+  return buildReleaseTasksRoute(releaseId);
 }
 
 interface UsePostCreateReleasePlanOptions {
@@ -69,12 +95,19 @@ export function usePostCreateReleasePlan({
         setPostCreateRelease(null);
         router.push(releaseTasksPath);
       } catch (error) {
-        captureError('Failed to generate release plan', error, {
-          context: captureContext,
-          releaseId: postCreateRelease.id,
-          action: 'generate-release-plan',
-        });
-        toast.error('Failed to generate the release plan. Try again.');
+        if (isUpgradeRequiredError(error)) {
+          // Expected entitlement gate — not a bug, do not report to Sentry.
+          toast.error(
+            'Release plans require a Pro plan. Upgrade to unlock this feature.'
+          );
+        } else {
+          captureError('Failed to generate release plan', error, {
+            context: captureContext,
+            releaseId: postCreateRelease.id,
+            action: 'generate-release-plan',
+          });
+          toast.error('Failed to generate the release plan. Try again.');
+        }
       } finally {
         setIsGeneratingReleasePlan(false);
       }

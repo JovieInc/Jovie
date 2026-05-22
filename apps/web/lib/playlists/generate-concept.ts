@@ -7,9 +7,9 @@
  */
 
 import 'server-only';
-import Anthropic from '@anthropic-ai/sdk';
 import { count, desc } from 'drizzle-orm';
 import { z } from 'zod';
+import { getAnthropicClient } from '@/lib/ai/anthropic';
 import { db } from '@/lib/db';
 import { joviePlaylists } from '@/lib/db/schema/playlists';
 import { captureError } from '@/lib/error-tracking';
@@ -108,7 +108,7 @@ export async function generatePlaylistConcept(options?: {
     seed: Date.now() % 10000,
   });
 
-  const anthropic = new Anthropic();
+  const anthropic = getAnthropicClient();
 
   // Try up to 3 times to get a valid concept
   for (let attempt = 0; attempt < 3; attempt++) {

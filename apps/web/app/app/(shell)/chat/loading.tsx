@@ -4,7 +4,7 @@ import { LoadingSkeleton } from '@/components/molecules/LoadingSkeleton';
 
 /**
  * Chat page loading skeleton.
- * Matches the JovieChat empty state layout: centered heading, input, and suggested prompts.
+ * Matches the JovieChat empty state layout: centered heading, action card, and input.
  */
 export default function ChatLoading() {
   return (
@@ -19,6 +19,16 @@ export default function ChatLoading() {
           <div className='mx-auto flex w-full max-w-[34rem] flex-1 flex-col items-center justify-center gap-5'>
             {/* Heading skeleton */}
             <Skeleton className='h-6 w-48' rounded='lg' />
+
+            {/* Action card skeleton */}
+            <div className='w-full max-w-[32rem] rounded-[18px] border border-white/[0.05] bg-(--linear-app-content-surface) px-7 py-6 shadow-[0_16px_40px_-24px_rgba(0,0,0,0.45)]'>
+              <Skeleton className='h-4 w-56' rounded='lg' />
+              <Skeleton className='mt-3 h-3 w-full' rounded='lg' />
+              <Skeleton className='mt-2 h-3 w-4/5' rounded='lg' />
+              <div className='mt-6 flex justify-end'>
+                <Skeleton className='h-7 w-24 rounded-full' rounded='full' />
+              </div>
+            </div>
 
             {/* Input area skeleton */}
             <div className='w-full max-w-[35rem] space-y-2'>
@@ -48,13 +58,6 @@ export default function ChatLoading() {
                     <LoadingSkeleton height='h-4' width='w-4' rounded='full' />
                   </button>
                 </div>
-              </div>
-
-              {/* Suggested prompts skeleton */}
-              <div className='flex flex-wrap justify-center gap-2 pt-1'>
-                <Skeleton className='h-8 w-28 rounded-full' rounded='full' />
-                <Skeleton className='h-8 w-24 rounded-full' rounded='full' />
-                <Skeleton className='h-8 w-32 rounded-full' rounded='full' />
               </div>
             </div>
           </div>

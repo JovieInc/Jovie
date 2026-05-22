@@ -25,9 +25,11 @@ vi.mock('@/lib/admin/funnel-metrics', () => ({
   getAllTimeFunnelTotals: hoisted.getAllTimeFunnelTotals,
 }));
 
-const { AdminScoreboardSection, AdminScoreboardSectionSkeleton } = await import(
-  '@/app/app/(shell)/admin/_components/AdminScoreboardSection'
-);
+const {
+  AdminHeroMetrics,
+  AdminScoreboardSection,
+  AdminScoreboardSectionSkeleton,
+} = await import('@/app/app/(shell)/admin/_components/AdminScoreboardSection');
 
 function buildDefaultMetrics(
   overrides: Partial<AdminFunnelMetrics> = {}
@@ -103,10 +105,8 @@ const defaultTrend = [
 describe('AdminScoreboardSection', () => {
   it('renders hero metrics with correct formatting', async () => {
     hoisted.getAdminFunnelMetrics.mockResolvedValue(buildDefaultMetrics());
-    hoisted.getWeeklyFunnelTrend.mockResolvedValue(defaultTrend);
-    hoisted.getAllTimeFunnelTotals.mockResolvedValue(buildDefaultTotals());
 
-    const Component = await AdminScoreboardSection();
+    const Component = await AdminHeroMetrics();
     render(Component);
 
     // MRR
@@ -155,10 +155,8 @@ describe('AdminScoreboardSection', () => {
     hoisted.getAdminFunnelMetrics.mockResolvedValue(
       buildDefaultMetrics({ wowGrowthRate: -0.05 })
     );
-    hoisted.getWeeklyFunnelTrend.mockResolvedValue(defaultTrend);
-    hoisted.getAllTimeFunnelTotals.mockResolvedValue(buildDefaultTotals());
 
-    const Component = await AdminScoreboardSection();
+    const Component = await AdminHeroMetrics();
     render(Component);
 
     expect(screen.getByText('-5.0%')).toBeInTheDocument();
@@ -168,10 +166,8 @@ describe('AdminScoreboardSection', () => {
     hoisted.getAdminFunnelMetrics.mockResolvedValue(
       buildDefaultMetrics({ wowGrowthRate: null })
     );
-    hoisted.getWeeklyFunnelTrend.mockResolvedValue(defaultTrend);
-    hoisted.getAllTimeFunnelTotals.mockResolvedValue(buildDefaultTotals());
 
-    const Component = await AdminScoreboardSection();
+    const Component = await AdminHeroMetrics();
     render(Component);
 
     // The WoW Growth hero metric should show em dash

@@ -63,7 +63,7 @@ export async function getCurrentUserEntitlements(): Promise<UserEntitlements> {
     const clerkIdentity = resolveClerkIdentity(await getCachedCurrentUser());
     clerkEmail = clerkIdentity.email;
   } catch (error) {
-    console.error('Failed to load Clerk user for entitlements', error);
+    logger.error('Failed to load Clerk user for entitlements', { error });
   }
 
   // Check admin status independently of billing using the dedicated admin

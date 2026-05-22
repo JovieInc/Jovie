@@ -5,10 +5,6 @@
 import { render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const appFlagState = vi.hoisted(() => ({
-  DESIGN_V1: false,
-}));
-
 // Mock dashboard context
 const mockProfile = {
   id: 'profile-1',
@@ -18,34 +14,17 @@ const mockProfile = {
 };
 
 vi.mock('next/dynamic', () => {
-  let dynamicComponentIndex = 0;
-
   return {
     default: () => {
-      dynamicComponentIndex += 1;
-
-      if (dynamicComponentIndex === 1) {
-        return function DynamicReleasesExperience(
-          props: Record<string, unknown>
-        ) {
-          return (
-            <div
-              data-testid='releases-experience'
-              data-count={String((props.releases as unknown[])?.length ?? 0)}
-            >
-              Releases
-            </div>
-          );
-        };
-      }
-
-      return function DynamicShellReleasesView(props: Record<string, unknown>) {
+      return function DynamicReleasesExperience(
+        props: Record<string, unknown>
+      ) {
         return (
           <div
-            data-testid='shell-releases-view'
+            data-testid='releases-experience'
             data-count={String((props.releases as unknown[])?.length ?? 0)}
           >
-            Shell Releases
+            Releases
           </div>
         );
       };
@@ -73,10 +52,6 @@ vi.mock('@/lib/queries/useReleasesQuery', () => ({
   useReleasesQuery: () => mockQueryResult,
 }));
 
-vi.mock('@/lib/flags/client', () => ({
-  useAppFlag: (flagName: keyof typeof appFlagState) => appFlagState[flagName],
-}));
-
 vi.mock('@/features/feedback/PageErrorState', () => ({
   PageErrorState: ({ message }: { message: string }) => (
     <div data-testid='page-error'>{message}</div>
@@ -88,35 +63,23 @@ vi.mock('@/app/app/(shell)/dashboard/releases/config', () => ({
   providerConfig: {},
 }));
 
+vi.mock('@/lib/flags/client', () => ({
+  useAppFlag: () => false,
+}));
+
 vi.mock('@/app/app/(shell)/dashboard/releases/loading', () => ({
   ReleaseTableSkeleton: () => (
     <div data-testid='release-skeleton'>Loading...</div>
   ),
 }));
 
-import {
-  ReleasesPageClient,
-  resolveReleasesViewMode,
-} from '@/app/app/(shell)/dashboard/releases/ReleasesPageClient';
+import { ReleasesPageClient } from '@/app/app/(shell)/dashboard/releases/ReleasesPageClient';
 
 describe('@critical ReleasesPageClient', () => {
   beforeEach(() => {
-    appFlagState.DESIGN_V1 = false;
     mockQueryResult.data = [];
     mockQueryResult.isLoading = false;
     mockQueryResult.isError = false;
-  });
-
-  it.each([
-    [false, 'legacyProviderMatrix'],
-    [true, 'designV1ShellReleases'],
-  ] as const)('resolves releases view mode for DESIGN_V1=%s', (designV1ReleasesEnabled, expectedMode) => {
-    expect(
-      resolveReleasesViewMode({
-        shellChatV1Enabled: designV1ReleasesEnabled,
-        designV1ReleasesEnabled,
-      })
-    ).toBe(expectedMode);
   });
 
   it('shows skeleton when loading with no cached data', () => {
@@ -176,29 +139,14 @@ describe('@critical ReleasesPageClient', () => {
     );
   });
 
-  it('keeps ReleasesExperience when DESIGN_V1 is off', () => {
-    appFlagState.DESIGN_V1 = false;
-    mockQueryResult.data = [{ id: 'r1' }] as unknown[];
+  it('always renders the canonical releases experience when data is present', () => {
+    mockQueryResult.data = [{ id: 'r1' }, { id: 'r2' }] as unknown[];
 
     render(<ReleasesPageClient />);
 
     expect(screen.getByTestId('releases-experience')).toHaveAttribute(
       'data-count',
-      '1'
-    );
-    expect(screen.queryByTestId('shell-releases-view')).not.toBeInTheDocument();
-  });
-
-  it('renders ShellReleasesView when DESIGN_V1 is on', () => {
-    appFlagState.DESIGN_V1 = true;
-    mockQueryResult.data = [{ id: 'r1' }, { id: 'r2' }] as unknown[];
-
-    render(<ReleasesPageClient />);
-
-    expect(screen.getByTestId('shell-releases-view')).toHaveAttribute(
-      'data-count',
       '2'
     );
-    expect(screen.queryByTestId('releases-experience')).not.toBeInTheDocument();
   });
 });

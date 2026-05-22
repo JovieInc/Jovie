@@ -39,7 +39,7 @@ vi.mock('next/navigation', () => ({
     prefetch: vi.fn(),
   }),
   useSearchParams: () => new URLSearchParams(),
-  usePathname: () => '/app/dashboard/audience',
+  usePathname: () => '/app/audience',
 }));
 
 vi.mock('@/contexts/TableMetaContext', () => ({
@@ -347,7 +347,7 @@ describe('DashboardAudienceTable', () => {
     await waitFor(
       () => {
         expect(capturedColumnVisibility).toEqual({
-          signal: false,
+          alerts: false,
           engagement: false,
           state: false,
           last: false,
@@ -374,7 +374,7 @@ describe('DashboardAudienceTable', () => {
     await waitFor(
       () => {
         expect(capturedColumnVisibility).toEqual({
-          signal: false,
+          alerts: false,
           engagement: false,
         });
         expect(capturedMinWidth).toBe('640px');
@@ -431,7 +431,7 @@ describe('DashboardAudienceTable', () => {
     await waitFor(
       () => {
         expect(capturedColumnVisibility).toEqual({
-          signal: false,
+          alerts: false,
           engagement: false,
           state: false,
           last: false,

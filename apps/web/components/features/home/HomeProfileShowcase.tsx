@@ -185,6 +185,8 @@ function getTourDates(stateId: ProfileShowcaseStateId) {
       return [...HOMEPAGE_PROFILE_PREVIEW_MOCK_HOME_TOUR_DATES];
     case 'playlist-fallback':
     case 'listen-fallback':
+    case 'alerts-fallback':
+    case 'events-empty':
       return [];
     default:
       return [...HOMEPAGE_PROFILE_PREVIEW_TOUR_DATES];
@@ -233,6 +235,8 @@ function getPreviewActiveMode(
     case 'subscribe':
     case 'tour':
       return drawerView;
+    case 'menu':
+      return 'profile';
     default:
       return 'profile';
   }

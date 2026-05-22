@@ -331,6 +331,8 @@ export const queryKeys = {
     conversation: (id: string) =>
       [...queryKeys.chat.all, 'conversation', id] as const,
     usage: () => [...queryKeys.chat.all, 'usage'] as const,
+    capabilities: (profileId: string | null | undefined) =>
+      [...queryKeys.chat.all, 'capabilities', profileId ?? 'active'] as const,
   },
 
   // Audience infinite scroll
@@ -368,6 +370,13 @@ export const queryKeys = {
       [
         ...queryKeys.tasks.all,
         'list',
+        ...(profileId === undefined ? [] : [profileId]),
+        ...(filters === undefined ? [] : [filters]),
+      ] as const,
+    board: (profileId?: string, filters?: Record<string, unknown>) =>
+      [
+        ...queryKeys.tasks.all,
+        'board',
         ...(profileId === undefined ? [] : [profileId]),
         ...(filters === undefined ? [] : [filters]),
       ] as const,

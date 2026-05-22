@@ -138,7 +138,7 @@ const blockingEvals: readonly EvalDefinition[] = [
     id: 'lighthouse.releases',
     category: 'perf',
     command: ['pnpm', '--filter', '@jovie/web', 'test:lighthouse:dashboard:pr'],
-    extraEnv: { LIGHTHOUSE_DASHBOARD_URLS: APP_ROUTES.DASHBOARD_RELEASES },
+    extraEnv: { LIGHTHOUSE_DASHBOARD_URLS: APP_ROUTES.RELEASES },
   },
 ];
 

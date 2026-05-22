@@ -36,10 +36,35 @@ import type { CreatorProfile } from '@/types/db';
  */
 export function sanitizeMetadataText(value: string | null | undefined): string {
   if (!value) return '';
-  // Remove HTML tags
-  const stripped = value.replace(/<[^>]*>/g, ' ');
+  const stripped = stripHtmlTags(value);
   // Collapse multiple whitespace chars into a single space and trim
   return stripped.replace(/\s+/g, ' ').trim();
+}
+
+function stripHtmlTags(value: string): string {
+  const htmlTagStartChars =
+    'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz!/';
+  let output = '';
+  let insideTag = false;
+
+  for (let index = 0; index < value.length; index += 1) {
+    const char = value[index];
+    if (char === '<' && htmlTagStartChars.includes(value[index + 1] ?? '')) {
+      insideTag = true;
+      output += ' ';
+      continue;
+    }
+
+    if (char === '>') {
+      insideTag = false;
+      output += ' ';
+      continue;
+    }
+
+    if (!insideTag) output += char;
+  }
+
+  return output;
 }
 
 /**
@@ -157,7 +182,7 @@ export function buildPublicProfileMetadata(
   const artistName =
     sanitizeMetadataText(profile.display_name) ||
     sanitizeMetadataText(profile.username) ||
-    profile.username;
+    APP_NAME;
 
   const canonicalUrl = buildProfileCanonicalUrl(profile);
   const socialTitle = `${artistName} | ${APP_NAME}`;

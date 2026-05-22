@@ -52,7 +52,7 @@ vi.mock('@/lib/auth/cached', () => ({
 }));
 
 vi.mock('@/app/app/(shell)/dashboard/actions', () => ({
-  getDashboardData: mockGetDashboardData,
+  getDashboardDataEssential: mockGetDashboardData,
 }));
 
 vi.mock('next/cache', () => ({
@@ -152,7 +152,11 @@ vi.mock('@/lib/utils/redirect-error', () => ({
 }));
 
 vi.mock('@/constants/routes', () => ({
-  APP_ROUTES: { RELEASES: '/dashboard/releases', SIGNIN: '/signin' },
+  APP_ROUTES: {
+    RELEASES: '/dashboard/releases',
+    SIGNIN: '/signin',
+    START: '/start',
+  },
 }));
 
 vi.mock('@/lib/env-public', () => ({

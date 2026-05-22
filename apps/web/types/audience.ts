@@ -67,7 +67,15 @@ export type AudienceMember = {
   tags: string[];
   deviceType: string | null;
   lastSeenAt: string | null;
+  /** Denormalized from notification_subscriptions (JOV-1842). */
+  hasActiveAlerts?: boolean;
+  /** Channels with confirmed active alerts. */
+  activeAlertChannels?: AudienceAlertChannel[];
+  /** Most recent confirmed_at across active subscriptions. */
+  lastAlertConfirmedAt?: string | null;
 };
+
+export type AudienceAlertChannel = 'sms' | 'email' | 'push';
 
 export type AudienceSourceGroup = {
   id: string;

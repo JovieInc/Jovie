@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 
@@ -72,5 +74,23 @@ describe('ThreadView', () => {
       screen.getByRole('button', { name: 'my-composer' })
     ).toBeInTheDocument();
     expect(screen.queryByTestId('mock-chat-input')).toBeNull();
+  });
+});
+
+describe('ThreadView shell contract', () => {
+  it('uses shared shell spacing tokens for the scroll column and composer dock', () => {
+    const source = readFileSync(
+      resolve(process.cwd(), 'components/shell/ThreadView.tsx'),
+      'utf8'
+    );
+
+    expect(source).toContain('px-(--linear-app-header-padding-x)');
+    expect(source).toContain('max-w-[44rem]');
+    expect(source).toContain('env(safe-area-inset-bottom)');
+    expect(source).toContain('shadow-popover');
+    expect(source).not.toContain('max-w-3xl');
+    expect(source).not.toContain('px-8');
+    expect(source).not.toContain('focus-visible:ring-primary-token');
+    expect(source).not.toContain('transition-all');
   });
 });

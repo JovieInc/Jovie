@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const {
   clearSignupClaimValueMock,
+  authLayoutMock,
   clerkSignUpMock,
   fetchMock,
   persistSignupClaimValueMock,
@@ -14,6 +15,7 @@ const {
   validatePlanMock,
 } = vi.hoisted(() => ({
   clearSignupClaimValueMock: vi.fn(),
+  authLayoutMock: vi.fn(),
   clerkSignUpMock: vi.fn(),
   fetchMock: vi.fn(),
   persistSignupClaimValueMock: vi.fn(),
@@ -38,12 +40,14 @@ vi.mock('next/navigation', () => ({
 vi.mock('@/features/auth', async () => {
   const reactModule = await import('react');
   return {
-    AuthLayout: ({ children }: { children: ReactNode }) =>
-      reactModule.createElement(
+    AuthLayout: (props: { children: ReactNode }) => {
+      authLayoutMock(props);
+      return reactModule.createElement(
         'div',
         { 'data-testid': 'auth-layout' },
-        children
-      ),
+        props.children
+      );
+    },
     AuthRoutePrefetch: ({ href }: { href: string }) => {
       routerPrefetchMock(href);
       return null;
@@ -77,8 +81,13 @@ import { APP_ROUTES } from '@/constants/routes';
 import SignUpPage from '../../../app/(auth)/signup/page';
 
 describe('signup page', () => {
+  function fullAuthUrl(path: string) {
+    return new URL(path, globalThis.location.origin).toString();
+  }
+
   beforeEach(() => {
     clearSignupClaimValueMock.mockReset();
+    authLayoutMock.mockReset();
     clerkSignUpMock.mockReset();
     fetchMock.mockReset();
     fetchMock.mockResolvedValue({
@@ -103,13 +112,25 @@ describe('signup page', () => {
     });
 
     expect(screen.getByTestId('clerk-sign-up')).toBeInTheDocument();
-    expect(routerPrefetchMock).toHaveBeenCalledWith(APP_ROUTES.WAITLIST);
+    expect(authLayoutMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        formTitle: 'Request access',
+        showFormTitle: false,
+        showFooterPrompt: false,
+        layoutVariant: 'split',
+      })
+    );
+    expect(
+      screen.queryByText('Start your private launch request.')
+    ).not.toBeInTheDocument();
+    expect(screen.queryByText("Don't have access?")).not.toBeInTheDocument();
+    expect(routerPrefetchMock).toHaveBeenCalledWith(APP_ROUTES.SIGNIN);
     expect(clerkSignUpMock).toHaveBeenCalledWith(
       expect.objectContaining({
         routing: 'path',
         path: '/signup',
         oauthFlow: 'redirect',
-        signInUrl: APP_ROUTES.SIGNIN,
+        signInUrl: fullAuthUrl(APP_ROUTES.SIGNIN),
         fallbackRedirectUrl: APP_ROUTES.WAITLIST,
       })
     );
@@ -202,7 +223,7 @@ describe('signup page', () => {
 
     expect(clerkSignUpMock).toHaveBeenCalledWith(
       expect.objectContaining({
-        signInUrl: '/signin?redirect_url=%2Fonboarding',
+        signInUrl: fullAuthUrl('/signin?redirect_url=%2Fonboarding'),
       })
     );
   });
@@ -218,7 +239,9 @@ describe('signup page', () => {
 
     expect(clerkSignUpMock).toHaveBeenCalledWith(
       expect.objectContaining({
-        signInUrl: '/signin?desktop_return=%2Fstart%3Fintent_id%3Dabc',
+        signInUrl: fullAuthUrl(
+          '/signin?desktop_return=%2Fstart%3Fintent_id%3Dabc'
+        ),
         fallbackRedirectUrl: '/auth-return?route=%2Fstart%3Fintent_id%3Dabc',
       })
     );
@@ -306,7 +329,7 @@ describe('signup page', () => {
     render(<SignUpPage />);
 
     expect(screen.getByRole('alert')).toHaveTextContent(
-      'Required permissions were not granted. Please try again and accept all permissions.'
+      'Sign-in was cancelled. Try again, or pick a different method.'
     );
 
     await waitFor(() => {
@@ -317,7 +340,39 @@ describe('signup page', () => {
 
     expect(clerkSignUpMock).toHaveBeenCalledWith(
       expect.objectContaining({
-        signInUrl: '/signin?redirect_url=%2Fonboarding%3Fhandle%3Dartist',
+        signInUrl: fullAuthUrl(
+          '/signin?redirect_url=%2Fonboarding%3Fhandle%3Dartist'
+        ),
+      })
+    );
+  });
+
+  it('interpolates the conflicting email into the account_exists banner when ?email= is present', async () => {
+    searchParamsState.value =
+      'oauth_error=account_exists&email=artist%40example.com';
+    globalThis.history.replaceState(
+      null,
+      '',
+      '/signup?oauth_error=account_exists&email=artist%40example.com'
+    );
+
+    render(<SignUpPage />);
+
+    const alert = screen.getByRole('alert');
+    expect(alert).toHaveTextContent('artist@example.com');
+    expect(alert).toHaveTextContent('already exists');
+  });
+
+  it('passes oidcPrompt=select_account to Clerk SignUp so account chooser always appears', async () => {
+    render(<SignUpPage />);
+
+    await waitFor(() => {
+      expect(clerkSignUpMock).toHaveBeenCalledTimes(1);
+    });
+
+    expect(clerkSignUpMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        oidcPrompt: 'select_account',
       })
     );
   });

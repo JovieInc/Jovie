@@ -49,7 +49,8 @@ vi.mock('@/lib/analytics', () => ({
   track: vi.fn(),
 }));
 
-import { useRouter } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
+import { toast } from 'sonner';
 import { UserButton } from '@/components/organisms/user-button';
 import { APP_ROUTES } from '@/constants/routes';
 import { useAuthSafe, useUserSafe } from '@/hooks/useClerkSafe';
@@ -75,6 +76,7 @@ const mockUsePortalMutation = vi.mocked(usePortalMutation);
 const mockUseUserSafe = vi.mocked(useUserSafe);
 const mockUseAuthSafe = vi.mocked(useAuthSafe);
 const mockUseRouter = vi.mocked(useRouter);
+const mockUsePathname = vi.mocked(usePathname);
 
 const originalLocation = window.location;
 
@@ -84,6 +86,7 @@ describe('UserButton billing actions', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    window.sessionStorage.clear();
 
     fetchMock = vi.fn();
     vi.spyOn(globalThis, 'fetch').mockImplementation(fetchMock);
@@ -132,6 +135,7 @@ describe('UserButton billing actions', () => {
       isLoaded: true,
       isSignedIn: true,
       user: {
+        id: 'user_123',
         imageUrl: null,
         fullName: 'Adele Adkins',
         firstName: 'Adele',
@@ -159,6 +163,7 @@ describe('UserButton billing actions', () => {
     mockUseRouter.mockReturnValue({
       push: pushMock,
     } as any);
+    mockUsePathname.mockReturnValue('/app');
 
     mockUseBillingStatusQuery.mockReset();
 
@@ -359,6 +364,150 @@ describe('UserButton billing actions', () => {
       'billing_manage_billing_redirected',
       expect.any(Object)
     );
+  });
+
+  it('does not show the passive billing-status toast on admin surfaces', () => {
+    mockUsePathname.mockReturnValue('/app/admin');
+    mockUseBillingStatusQuery.mockReturnValue({
+      data: null,
+      isLoading: false,
+      error: new Error('Billing unavailable'),
+    } as any);
+
+    render(<UserButton showUserInfo />);
+
+    expect(toast.error).not.toHaveBeenCalled();
+  });
+
+  it('does not show the passive billing-status toast while the pathname is unavailable', () => {
+    mockUsePathname.mockReturnValue(null);
+    mockUseBillingStatusQuery.mockReturnValue({
+      data: null,
+      isLoading: false,
+      error: new Error('Billing unavailable'),
+    } as any);
+
+    render(<UserButton showUserInfo />);
+
+    expect(toast.error).not.toHaveBeenCalled();
+  });
+
+  it('shows the passive billing-status toast on billing surfaces', () => {
+    mockUsePathname.mockReturnValue('/billing');
+    mockUseBillingStatusQuery.mockReturnValue({
+      data: null,
+      isLoading: false,
+      error: new Error('Billing unavailable'),
+    } as any);
+
+    render(<UserButton showUserInfo />);
+
+    expect(toast.error).toHaveBeenCalledWith(
+      "Couldn't confirm your plan. Billing actions may be unavailable.",
+      { duration: 6000, id: 'billing-status-error' }
+    );
+  });
+
+  it('does not repeat the passive billing-status toast after remounting in the same browser session', () => {
+    mockUsePathname.mockReturnValue('/app/settings/billing');
+    mockUseBillingStatusQuery.mockReturnValue({
+      data: null,
+      isLoading: false,
+      error: new Error('Billing unavailable'),
+    } as any);
+
+    const firstRender = render(<UserButton showUserInfo />);
+
+    expect(toast.error).toHaveBeenCalledTimes(1);
+
+    firstRender.unmount();
+    render(<UserButton showUserInfo />);
+
+    expect(toast.error).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not suppress the passive billing-status toast for a different user in the same browser session', () => {
+    mockUsePathname.mockReturnValue('/app/settings/billing');
+    mockUseBillingStatusQuery.mockReturnValue({
+      data: null,
+      isLoading: false,
+      error: new Error('Billing unavailable'),
+    } as any);
+
+    const firstRender = render(<UserButton showUserInfo />);
+
+    expect(toast.error).toHaveBeenCalledTimes(1);
+
+    firstRender.unmount();
+    mockUseUserSafe.mockReturnValue({
+      isLoaded: true,
+      isSignedIn: true,
+      user: {
+        id: 'user_456',
+        imageUrl: null,
+        fullName: 'Beyonce Knowles',
+        firstName: 'Beyonce',
+        emailAddresses: [{ emailAddress: 'beyonce@example.com' }],
+        primaryEmailAddress: { emailAddress: 'beyonce@example.com' },
+      } as any,
+    });
+
+    render(<UserButton showUserInfo />);
+
+    expect(toast.error).toHaveBeenCalledTimes(2);
+  });
+
+  it('waits for the loaded user before showing the passive billing-status toast', () => {
+    mockUsePathname.mockReturnValue('/billing');
+    mockUseBillingStatusQuery.mockReturnValue({
+      data: null,
+      isLoading: false,
+      error: new Error('Billing unavailable'),
+    } as any);
+    mockUseUserSafe.mockReturnValue({
+      isLoaded: false,
+      isSignedIn: false,
+      user: null,
+    } as any);
+
+    const { rerender } = render(<UserButton showUserInfo />);
+
+    expect(toast.error).not.toHaveBeenCalled();
+    expect(mockUseBillingStatusQuery).toHaveBeenLastCalledWith({
+      enabled: false,
+    });
+
+    mockUseUserSafe.mockReturnValue({
+      isLoaded: true,
+      isSignedIn: true,
+      user: {
+        id: 'user_123',
+        imageUrl: null,
+        fullName: 'Adele Adkins',
+        firstName: 'Adele',
+        emailAddresses: [{ emailAddress: 'adele@example.com' }],
+        primaryEmailAddress: { emailAddress: 'adele@example.com' },
+      } as any,
+    });
+
+    rerender(<UserButton showUserInfo />);
+
+    expect(toast.error).toHaveBeenCalledTimes(1);
+    expect(mockUseBillingStatusQuery).toHaveBeenLastCalledWith({
+      enabled: true,
+    });
+    expect(
+      window.sessionStorage.getItem('jovie:billing-status-error-toast-shown')
+    ).toBeNull();
+    expect(
+      window.sessionStorage.getItem(
+        'jovie:billing-status-error-toast-shown:user_123'
+      )
+    ).toBe('true');
+
+    rerender(<UserButton showUserInfo />);
+
+    expect(toast.error).toHaveBeenCalledTimes(1);
   });
 
   it('renders a custom trigger while user data is still loading', () => {
