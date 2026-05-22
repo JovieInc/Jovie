@@ -8,6 +8,10 @@ import {
   SidebarHeader,
   SidebarSeparator,
 } from '@/components/organisms/sidebar/layout';
+import {
+  getSidebarNavIconClassName,
+  getSidebarNavRowClassName,
+} from '@/components/shell/SidebarNavItem';
 
 type SidebarGroupProps = PropsWithChildren<{ className?: string }>;
 type SidebarGroupContentProps = PropsWithChildren<{ className?: string }>;
@@ -77,5 +81,22 @@ describe('Sidebar row alignment', () => {
     expect(header?.getAttribute('class')).toContain('px-2.5');
     expect(content?.getAttribute('class')).toContain('px-0');
     expect(separator?.getAttribute('class')).toContain('mx-2.5');
+  });
+
+  it('shares the shell nav row and icon chrome helpers', () => {
+    const rowClassName = getSidebarNavRowClassName({});
+    const activeRowClassName = getSidebarNavRowClassName({ active: true });
+    const iconClassName = getSidebarNavIconClassName({});
+
+    expect(rowClassName).toContain('h-6.5');
+    expect(rowClassName).toContain('pl-2.5');
+    expect(rowClassName).toContain('gap-2.5');
+    expect(rowClassName).toContain('text-[12.5px]');
+    expect(rowClassName).toContain(
+      'hover:bg-[color-mix(in_oklab,var(--color-sidebar-accent)_82%,transparent)]'
+    );
+    expect(activeRowClassName).toContain('bg-surface-1');
+    expect(iconClassName).toContain('h-3.5');
+    expect(iconClassName).toContain('text-tertiary-token');
   });
 });
