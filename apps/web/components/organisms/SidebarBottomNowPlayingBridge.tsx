@@ -43,11 +43,10 @@ export function SidebarBottomNowPlayingBridge() {
       data-shell-audio-surface='sidebar-compact'
       data-state={compactPlayerOwnsTrack ? 'reserved' : 'visible'}
       aria-hidden={compactPlayerOwnsTrack}
+      inert={compactPlayerOwnsTrack ? true : undefined}
       className={cn(
         'h-(--linear-app-audio-compact-height) overflow-hidden px-2 pb-2 pt-1 transition-[opacity,transform] duration-cinematic ease-cinematic',
-        compactPlayerOwnsTrack
-          ? 'pointer-events-none invisible opacity-0'
-          : 'opacity-100'
+        compactPlayerOwnsTrack ? 'pointer-events-none opacity-0' : 'opacity-100'
       )}
     >
       <SidebarBottomNowPlaying
