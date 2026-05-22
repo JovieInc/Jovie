@@ -7,6 +7,11 @@ import { getUserByClerkId } from '@/lib/db/queries/shared';
 import { users } from '@/lib/db/schema/auth';
 import { captureError } from '@/lib/error-tracking';
 import { parseJsonBody } from '@/lib/http/parse-json';
+import {
+  checkAccountEmailRateLimit,
+  createRateLimitHeaders,
+  getClientIP,
+} from '@/lib/rate-limit';
 import { logger } from '@/lib/utils/logger';
 import { accountEmailSyncSchema } from '@/lib/validation/schemas';
 
@@ -16,6 +21,21 @@ const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
 
 export async function POST(request: Request) {
   try {
+    const clientIp = getClientIP(request);
+    const rateLimitResult = await checkAccountEmailRateLimit(clientIp);
+    if (!rateLimitResult.success) {
+      return NextResponse.json(
+        { error: rateLimitResult.reason ?? 'Rate limit exceeded' },
+        {
+          status: 429,
+          headers: {
+            ...NO_STORE_HEADERS,
+            ...createRateLimitHeaders(rateLimitResult),
+          },
+        }
+      );
+    }
+
     const parsedBody = await parseJsonBody<unknown>(request, {
       route: 'POST /api/account/email',
       headers: NO_STORE_HEADERS,

@@ -601,6 +601,15 @@ export const RATE_LIMITERS = {
     analytics: true,
   } satisfies RateLimitConfig,
 
+  /** Account email sync: 5 requests per minute per IP - prevents abuse */
+  accountEmail: {
+    name: 'Account Email',
+    limit: 5,
+    window: '1 m',
+    prefix: 'account:email',
+    analytics: true,
+  } satisfies RateLimitConfig,
+
   // ---------------------------------------------------------------------------
   // Verification Operations
   // ---------------------------------------------------------------------------

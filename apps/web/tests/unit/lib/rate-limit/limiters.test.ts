@@ -237,6 +237,12 @@ vi.mock('@/lib/rate-limit/config', () => ({
       window: '1 h',
       prefix: 'account:export',
     },
+    accountEmail: {
+      name: 'Account Email',
+      limit: 5,
+      window: '1 m',
+      prefix: 'account:email',
+    },
     appleMusicRescanFree: {
       name: 'Apple Music Rescan (Free)',
       limit: 1,
@@ -349,6 +355,7 @@ describe('limiters.ts', () => {
         'releaseRefreshPaid',
         'accountDelete',
         'accountExport',
+        'accountEmail',
       ];
 
       for (const key of expectedKeys) {
