@@ -9,6 +9,12 @@
  * TanStack Query is used with server data.
  */
 
+import {
+  CSRF_HEADER_NAME,
+  getBrowserCsrfToken,
+  shouldAttachCsrfHeader,
+} from '@/lib/security/csrf';
+
 interface FetchOptions extends RequestInit {
   /**
    * Timeout in milliseconds. Defaults to 10 seconds.
@@ -91,8 +97,20 @@ export async function fetchWithTimeoutResponse(
   linkSignal(controller, externalSignal ?? undefined);
 
   try {
+    const headers = new Headers(fetchOptions.headers);
+    if (
+      shouldAttachCsrfHeader(url, fetchOptions.method) &&
+      !headers.has(CSRF_HEADER_NAME)
+    ) {
+      const csrfToken = getBrowserCsrfToken();
+      if (csrfToken) {
+        headers.set(CSRF_HEADER_NAME, csrfToken);
+      }
+    }
+
     const response = await fetch(url, {
       ...fetchOptions,
+      headers,
       signal: controller.signal,
     });
 
