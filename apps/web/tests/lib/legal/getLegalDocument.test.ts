@@ -21,4 +21,21 @@ describe('getLegalDocument', () => {
     expect(doc.html).toContain('<th>Cookie Name</th>');
     expect(doc.html).toContain('<code>jv_cc</code>');
   });
+
+  it('keeps legal routes fully static', async () => {
+    const layout = await import('@/app/(dynamic)/legal/layout');
+    const routeModules = await Promise.all([
+      import('@/app/(dynamic)/legal/privacy/page'),
+      import('@/app/(dynamic)/legal/terms/page'),
+      import('@/app/(dynamic)/legal/cookies/page'),
+      import('@/app/(dynamic)/legal/dmca/page'),
+    ]);
+
+    expect(layout.revalidate).toBe(false);
+
+    for (const routeModule of routeModules) {
+      expect(routeModule.dynamic).toBe('force-static');
+      expect(routeModule.revalidate).toBe(false);
+    }
+  });
 });

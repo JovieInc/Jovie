@@ -19,20 +19,9 @@ export function LegalHero({
           Last updated: {lastUpdated}
         </p>
       ) : null}
-      <section
-        aria-labelledby='legal-practical-summary'
-        className='mt-7 border-l border-neutral-300 pl-4 dark:border-white/15'
-      >
-        <h2
-          id='legal-practical-summary'
-          className='text-sm font-medium text-neutral-950 dark:text-white'
-        >
-          Practical Summary
-        </h2>
-        <p className='mt-2 max-w-2xl text-[15px] leading-7 text-neutral-600 dark:text-neutral-400'>
-          {practicalSummary}
-        </p>
-      </section>
+      <p className='mt-6 max-w-2xl text-[15px] leading-7 text-neutral-600 dark:text-neutral-400'>
+        {practicalSummary}
+      </p>
     </header>
   );
 }
