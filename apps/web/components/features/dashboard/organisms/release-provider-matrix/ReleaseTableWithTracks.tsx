@@ -339,7 +339,7 @@ export function ReleaseTableWithTracks({
       className='text-[12.5px] text-primary-token'
       containerClassName={
         designV1
-          ? 'h-full px-2 pb-2 pt-1 md:px-2.5 md:pb-2.5 md:pt-1.5'
+          ? 'h-full'
           : 'h-full px-2.5 pb-2.5 pt-0.5 md:px-3 md:pb-3 md:pt-1'
       }
       columnVisibility={tanstackColumnVisibility}
@@ -358,7 +358,7 @@ export function ReleaseTableWithTracks({
           icon={<Icon name='Disc3' className='h-6 w-6' />}
           title='No releases'
           description='Your releases will appear here once synced.'
-          className='m-3 min-h-[160px]'
+          className={designV1 ? 'm-0 min-h-[160px]' : 'm-3 min-h-[160px]'}
         />
       }
     />

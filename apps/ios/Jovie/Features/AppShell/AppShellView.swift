@@ -220,11 +220,7 @@ private struct AppSidebarView: View {
   var body: some View {
     VStack(alignment: .leading, spacing: JovieSpacing.large) {
       HStack(spacing: JovieSpacing.medium) {
-        Image("Jovie-logo")
-          .resizable()
-          .scaledToFit()
-          .frame(width: 28, height: 28)
-          .clipShape(RoundedRectangle(cornerRadius: JovieRadius.small, style: .continuous))
+        JovieLogoMark(size: 28)
 
         Text("Jovie")
           .font(JovieFont.display(size: 18))

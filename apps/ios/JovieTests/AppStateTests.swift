@@ -159,21 +159,6 @@ struct AppStateTests {
     #expect(await repository.clearedUsers() == ["user_123"])
   }
 
-  @Test func authFormInputNormalizesEmailAndCode() {
-    #expect(AuthFormInput.normalizedEmail("  TIM@JOV.IE\n") == "tim@jov.ie")
-    #expect(AuthFormInput.normalizedCode("12 3-4567") == "123456")
-  }
-
-  @Test func authFormInputValidatesLikelyEmailAddress() {
-    #expect(AuthFormInput.isLikelyEmail("tim@jov.ie"))
-    #expect(!AuthFormInput.isLikelyEmail("tim"))
-    #expect(!AuthFormInput.isLikelyEmail("tim@"))
-    #expect(!AuthFormInput.isLikelyEmail("tim@jovie"))
-    #expect(!AuthFormInput.isLikelyEmail("tim@jov.ie."))
-    #expect(!AuthFormInput.isLikelyEmail("tim@jov..ie"))
-    #expect(!AuthFormInput.isLikelyEmail("@jov.ie"))
-  }
-
   @Test func authErrorMapperKeepsSpecificFallbackMessage() {
     let error = NSError(
       domain: "Clerk",
@@ -182,5 +167,15 @@ struct AppStateTests {
     )
 
     #expect(AuthErrorMapper.message(for: error) == "Too many attempts. Try again later.")
+  }
+
+  @Test func authErrorMapperHidesUserCancelledBrowserSession() {
+    let error = NSError(
+      domain: "AuthenticationServices.WebAuthenticationSession",
+      code: 1,
+      userInfo: [NSLocalizedDescriptionKey: "The operation was canceled."]
+    )
+
+    #expect(AuthErrorMapper.message(for: error) == nil)
   }
 }

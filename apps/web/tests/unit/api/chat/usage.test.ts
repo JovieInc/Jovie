@@ -72,7 +72,10 @@ describe('GET /api/chat/usage', () => {
     hoisted.getEntitlementsMock.mockReturnValue({
       limits: { aiDailyMessageLimit: 10 },
     });
-    hoisted.getStatusMock.mockReturnValue({ remaining: 7 });
+    hoisted.getStatusMock.mockReturnValue({
+      remaining: 7,
+      resetTime: Date.UTC(2026, 4, 23, 7, 0, 0),
+    });
 
     const { GET } = await import('@/app/api/chat/usage/route');
     const response = await GET();
@@ -83,6 +86,11 @@ describe('GET /api/chat/usage', () => {
     expect(body.dailyLimit).toBe(10);
     expect(body.remaining).toBe(7);
     expect(body.used).toBe(3);
+    expect(body.resetAt).toBe('2026-05-23T07:00:00.000Z');
+    expect(body.monthlyLimit).toBeGreaterThanOrEqual(280);
+    expect(body.monthlyUsed).toBe(3);
+    expect(body.monthlyRemaining).toBe(body.monthlyLimit - 3);
+    expect(body.monthlyResetAt).toMatch(/T00:00:00\.000Z$/);
     expect(body.isExhausted).toBe(false);
   });
 

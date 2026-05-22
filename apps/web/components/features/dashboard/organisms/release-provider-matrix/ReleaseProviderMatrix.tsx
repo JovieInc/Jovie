@@ -622,7 +622,11 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
           onAppleMusicMatchStatusChange={handleMatchStatusChange}
         />
         {showEmptyState && (
-          <PageShell className='mt-2.5' data-testid='release-table-shell'>
+          <PageShell
+            className='mt-2.5'
+            data-testid='release-table-shell'
+            surfaceMode='table'
+          >
             <ReleasesEmptyState
               onConnectSpotify={() => setSpotifySearchOpen(true)}
             />
@@ -635,6 +639,7 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
             <PageShell
               className='mt-2.5'
               data-testid='release-table-shell'
+              surfaceMode='table'
               toolbar={
                 <ReleaseTableSubheader
                   releases={filteredRows}
@@ -677,7 +682,11 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
 
         {/* Show "No releases" state when connected but no releases and not importing */}
         {isConnected && rows.length === 0 && !isImporting && (
-          <PageShell className='mt-2.5' data-testid='release-table-shell'>
+          <PageShell
+            className='mt-2.5'
+            data-testid='release-table-shell'
+            surfaceMode='table'
+          >
             <DrawerSurfaceCard
               variant='card'
               className='flex min-h-[212px] flex-col items-center justify-center px-5 py-9 text-center'

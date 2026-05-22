@@ -36,10 +36,11 @@ test.describe('Legal Pages', () => {
     });
 
     test('displays privacy policy page correctly', async ({ page }) => {
-      // Check hero title (the h1 from LegalHero)
-      await expect(page.locator('h1')).toContainText(
-        'Privacy built for artists on the move'
-      );
+      await expect(page.locator('h1')).toContainText('Privacy Policy');
+      await expect(page.getByText('Last updated: February 2026')).toBeVisible();
+      await expect(
+        page.getByRole('heading', { name: 'Practical Summary' })
+      ).toBeVisible();
 
       // Check main section headings (must match actual markdown content)
       await expect(
@@ -103,10 +104,11 @@ test.describe('Legal Pages', () => {
     });
 
     test('displays terms of service page correctly', async ({ page }) => {
-      // Check hero title (the h1 from LegalHero)
-      await expect(page.locator('h1')).toContainText(
-        'Terms that respect your creativity and control'
-      );
+      await expect(page.locator('h1')).toContainText('Terms of Service');
+      await expect(page.getByText('Last updated: February 2026')).toBeVisible();
+      await expect(
+        page.getByRole('heading', { name: 'Practical Summary' })
+      ).toBeVisible();
 
       // Check main section headings (must match actual markdown content)
       await expect(
@@ -204,11 +206,11 @@ test.describe('Legal Pages', () => {
       );
       await page.goto('/legal/privacy', { timeout: 180_000 });
 
-      // The hero h1 should be the first heading
+      // The document title should be the first heading
       const headings = page.locator('h1, h2, h3');
       await expect(headings.first()).toBeVisible();
 
-      // There should be exactly one h1 (from LegalHero)
+      // There should be exactly one h1
       const h1Count = await page.locator('h1').count();
       expect(h1Count).toBe(1);
     });
@@ -225,11 +227,11 @@ test.describe('Legal Pages', () => {
       );
       await page.goto('/legal/terms', { timeout: 180_000 });
 
-      // The hero h1 should be the first heading
+      // The document title should be the first heading
       const headings = page.locator('h1, h2, h3');
       await expect(headings.first()).toBeVisible();
 
-      // There should be exactly one h1 (from LegalHero)
+      // There should be exactly one h1
       const h1Count = await page.locator('h1').count();
       expect(h1Count).toBe(1);
     });

@@ -27,6 +27,7 @@ let onFinishHandler:
       isError: boolean;
     }) => void)
   | undefined;
+let onErrorHandler: ((error: Error) => void) | undefined;
 let mockStatus: 'ready' | 'streaming' = 'ready';
 let currentChatId = 'new-chat';
 let currentTransportConversationId: string | null = null;
@@ -53,12 +54,15 @@ vi.mock('@ai-sdk/react', () => ({
     id,
     transport,
     onFinish,
+    onError,
   }: {
     id?: string;
     transport: { body?: { conversationId?: string } };
     onFinish?: typeof onFinishHandler;
+    onError?: typeof onErrorHandler;
   }) => {
     onFinishHandler = onFinish;
+    onErrorHandler = onError;
     if (id && id !== currentChatId) {
       currentChatId = id;
       currentTransportConversationId = transport.body?.conversationId ?? null;
@@ -76,6 +80,7 @@ vi.mock('@ai-sdk/react', () => ({
         }),
       status: mockStatus,
       setMessages: setMessagesMock,
+      stop: vi.fn(),
     };
   },
 }));
@@ -87,10 +92,26 @@ vi.mock('@tanstack/react-query', () => ({
 }));
 
 vi.mock('@tanstack/react-pacer', () => ({
-  useAsyncRateLimiter: (_fn: unknown, options: { onReject?: () => void }) => {
+  useAsyncRateLimiter: (
+    fn: (args: {
+      text: string;
+      files?: unknown;
+      source?: string;
+      toolIntent?: string | null;
+    }) => Promise<void>,
+    options: { onReject?: () => void }
+  ) => {
     onRejectHandler = options.onReject;
     return {
-      maybeExecute: maybeExecuteMock,
+      maybeExecute: (args: {
+        text: string;
+        files?: unknown;
+        source?: string;
+        toolIntent?: string | null;
+      }) => {
+        maybeExecuteMock(args);
+        return fn(args);
+      },
       getRemainingInWindow: () => 1,
       state: { isExecuting: false },
     };
@@ -121,11 +142,13 @@ describe('useJovieChat', () => {
     mutateAsyncMock.mockReset();
     addMessagesMutateMock.mockReset();
     setMessagesMock.mockReset();
+    sendMessageMock.mockImplementation(() => undefined);
     mutateAsyncMock.mockResolvedValue({
       conversation: { id: 'conv_123' },
     });
     onRejectHandler = undefined;
     onFinishHandler = undefined;
+    onErrorHandler = undefined;
     mockStatus = 'ready';
     currentChatId = 'new-chat';
     currentTransportConversationId = null;
@@ -153,6 +176,8 @@ describe('useJovieChat', () => {
     expect(maybeExecuteMock).toHaveBeenCalledWith({
       text: 'Hello Jovie',
       files: undefined,
+      source: 'typed',
+      toolIntent: null,
     });
 
     act(() => {
@@ -226,6 +251,156 @@ describe('useJovieChat', () => {
         },
       })
     );
+  });
+
+  it('sends plain composer messages and re-enables after finish', async () => {
+    const { result } = renderHook(() =>
+      useJovieChat({ profileId: 'profile_1' })
+    );
+
+    act(() => {
+      result.current.setInput('Hello Jovie');
+    });
+
+    await act(async () => {
+      await result.current.handleSubmit();
+    });
+
+    expect(sendMessageMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        payload: { text: 'Hello Jovie' },
+        options: {
+          body: expect.objectContaining({
+            source: 'typed',
+          }),
+        },
+      })
+    );
+    expect(result.current.isSubmitting).toBe(true);
+
+    act(() => {
+      onFinishHandler?.({
+        message: {
+          metadata: {
+            conversationId: 'conv_server',
+            turnId: 'turn_server',
+            requestId: 'req_1',
+          },
+        },
+        messages: [],
+        isAbort: false,
+        isDisconnect: false,
+        isError: false,
+      });
+    });
+
+    expect(result.current.isSubmitting).toBe(false);
+  });
+
+  it('sends a skill-only composer turn as a slash command', async () => {
+    const { result } = renderHook(() =>
+      useJovieChat({ profileId: 'profile_1' })
+    );
+
+    await act(async () => {
+      result.current.chipTray.addSkill('generateAlbumArt');
+    });
+
+    await act(async () => {
+      await result.current.handleSubmit();
+    });
+
+    expect(sendMessageMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        payload: { text: '/skill:generateAlbumArt' },
+        options: {
+          body: expect.objectContaining({
+            source: 'slash_command',
+            toolIntent: 'album_art_generation',
+          }),
+        },
+      })
+    );
+    expect(result.current.chipTray.chips).toHaveLength(0);
+  });
+
+  it('sends skill and entity chips together before free text', async () => {
+    const { result } = renderHook(() =>
+      useJovieChat({ profileId: 'profile_1' })
+    );
+
+    await act(async () => {
+      result.current.chipTray.addSkill('generateAlbumArt');
+      result.current.chipTray.addEntity({
+        kind: 'release',
+        id: 'rel_1',
+        label: 'Midnight Drive',
+      });
+      result.current.setInput('please');
+    });
+
+    await act(async () => {
+      await result.current.handleSubmit();
+    });
+
+    expect(sendMessageMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        payload: {
+          text: '/skill:generateAlbumArt @release:rel_1[Midnight Drive] please',
+        },
+        options: {
+          body: expect.objectContaining({
+            source: 'slash_command',
+            toolIntent: 'album_art_generation',
+          }),
+        },
+      })
+    );
+  });
+
+  it('clears the loader and restores input when send throws', async () => {
+    sendMessageMock.mockImplementationOnce(() => {
+      throw new Error('Network failed');
+    });
+    const { result } = renderHook(() =>
+      useJovieChat({ profileId: 'profile_1' })
+    );
+
+    act(() => {
+      result.current.setInput('Retry this');
+    });
+
+    await act(async () => {
+      await result.current.handleSubmit();
+    });
+
+    expect(result.current.isSubmitting).toBe(false);
+    expect(result.current.input).toBe('Retry this');
+    expect(result.current.chatError?.message).toBe('Network failed');
+  });
+
+  it('clears the loader when the stream reports an error', async () => {
+    const { result } = renderHook(() =>
+      useJovieChat({ profileId: 'profile_1' })
+    );
+
+    act(() => {
+      result.current.setInput('Try this');
+    });
+
+    await act(async () => {
+      await result.current.handleSubmit();
+    });
+
+    expect(result.current.isSubmitting).toBe(true);
+
+    act(() => {
+      onErrorHandler?.(new Error('Server failed'));
+    });
+
+    expect(result.current.isSubmitting).toBe(false);
+    expect(result.current.input).toBe('Try this');
+    expect(result.current.chatError?.message).toBe('Server failed');
   });
 
   it('marks album art generation prompts with a tool intent', async () => {

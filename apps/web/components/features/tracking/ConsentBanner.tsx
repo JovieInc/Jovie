@@ -3,6 +3,7 @@
 import { X } from 'lucide-react';
 import type { CSSProperties } from 'react';
 import { useEffect, useState } from 'react';
+import { APP_ROUTES } from '@/constants/routes';
 import {
   type ConsentState,
   getConsentState,
@@ -86,7 +87,7 @@ export function ConsentBanner({ className }: ConsentBannerProps) {
         'fixed bottom-0 left-0 right-0 z-50',
         'backdrop-blur-sm',
         'px-4 py-2.5',
-        'animate-in slide-in-from-bottom-4 duration-300',
+        'animate-in slide-in-from-bottom-4 duration-cinematic',
         className
       )}
       style={{
@@ -112,7 +113,7 @@ export function ConsentBanner({ className }: ConsentBannerProps) {
           We use cookies to understand how you use this page and improve your
           experience.{' '}
           <a
-            href='/privacy'
+            href={APP_ROUTES.LEGAL_PRIVACY}
             className='underline hover:opacity-80'
             style={{ color: 'var(--linear-text-primary)' }}
             target='_blank'

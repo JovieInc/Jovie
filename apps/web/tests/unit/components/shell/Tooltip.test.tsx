@@ -23,6 +23,8 @@ describe('shell Tooltip', () => {
     const content = screen.getByTestId('tooltip-content');
     expect(content).toHaveTextContent('Full truncated row name');
     expect(content).toHaveTextContent('G A');
-    expect(content.className).toContain('z-[150]');
+    expect(content).toHaveStyle({
+      zIndex: 'var(--jovie-shell-overlay-z-index)',
+    });
   });
 });

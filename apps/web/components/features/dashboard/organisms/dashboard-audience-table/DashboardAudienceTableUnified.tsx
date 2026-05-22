@@ -843,6 +843,7 @@ export const DashboardAudienceTableUnified = memo(
             <PageShell
               className='overflow-hidden'
               data-testid={testId}
+              surfaceMode='table'
               toolbar={
                 <AudienceTableSubheader
                   view={view}
