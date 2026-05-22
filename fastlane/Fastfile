@@ -209,15 +209,21 @@ platform :ios do
 
     distribution_certificate = distribution_certificate_name(apple_team_id: apple_team_id)
     profile_name = "match AppStore #{APP_IDENTIFIER}"
+    update_code_signing_settings(
+      path: IOS_PROJECT,
+      use_automatic_signing: false,
+      targets: [IOS_SCHEME],
+      build_configurations: ["Release"],
+      team_id: apple_team_id,
+      code_sign_identity: distribution_certificate,
+      profile_name: profile_name
+    )
+
     signing_xcargs = [
       "CODE_SIGNING_ALLOWED=YES",
       "CODE_SIGNING_REQUIRED=YES",
-      "CODE_SIGN_STYLE=Manual",
-      "CODE_SIGN_IDENTITY=#{distribution_certificate.shellescape}",
-      "DEVELOPMENT_TEAM=#{apple_team_id.shellescape}",
       "CURRENT_PROJECT_VERSION=#{current_build_number.shellescape}",
-      "CLERK_ASSOCIATED_DOMAIN=#{clerk_domain.shellescape}",
-      "PROVISIONING_PROFILE_SPECIFIER=#{profile_name.shellescape}"
+      "CLERK_ASSOCIATED_DOMAIN=#{clerk_domain.shellescape}"
     ].join(" ")
 
     gym(
