@@ -160,7 +160,11 @@ capture() {
   run_with_timeout "${IOS_SCREENSHOT_TERMINATE_TIMEOUT:-15}" xcrun simctl terminate "$udid" "$BUNDLE_ID" >/dev/null 2>&1 || true
   run_with_timeout "${IOS_SCREENSHOT_LAUNCH_TIMEOUT:-20}" xcrun simctl launch "$udid" "$BUNDLE_ID" "$@"
   sleep 2
-  run_with_timeout "${IOS_SCREENSHOT_CAPTURE_TIMEOUT:-20}" xcrun simctl io "$udid" screenshot "$OUTPUT_DIR/$name.png"
+  if ! run_with_timeout "${IOS_SCREENSHOT_CAPTURE_TIMEOUT:-45}" xcrun simctl io "$udid" screenshot "$OUTPUT_DIR/$name.png"; then
+    echo "Retrying screenshot capture for $name after simulator settle."
+    sleep 5
+    run_with_timeout "${IOS_SCREENSHOT_CAPTURE_TIMEOUT:-45}" xcrun simctl io "$udid" screenshot "$OUTPUT_DIR/$name.png"
+  fi
   echo "Captured $OUTPUT_DIR/$name.png"
 }
 
