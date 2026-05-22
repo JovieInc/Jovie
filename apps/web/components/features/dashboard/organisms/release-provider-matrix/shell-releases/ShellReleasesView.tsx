@@ -31,6 +31,7 @@ import {
   useRegisterHeaderActions,
   useRegisterHeaderSearch,
 } from '@/contexts/HeaderActionsContext';
+import { DashboardHeaderActionGroup } from '@/features/dashboard/atoms/DashboardHeaderActionGroup';
 import { buildReleaseActions } from '@/features/dashboard/organisms/releases/release-actions';
 import { useRegisterRightPanel } from '@/hooks/useRegisterRightPanel';
 import { openChatWithPrompt } from '@/lib/chat/open-chat-with-prompt';
@@ -851,14 +852,14 @@ export function ShellReleasesView({
 
   const headerActions = useMemo(() => {
     return (
-      <div className='flex items-center gap-2'>
+      <DashboardHeaderActionGroup>
         <NewReleaseHeaderAction
           canCreateManualReleases={canCreateManualReleases}
           isSyncing={isSyncing}
           onSyncSpotify={handleSync}
           onCreateManual={handleNewRelease}
         />
-      </div>
+      </DashboardHeaderActionGroup>
     );
   }, [canCreateManualReleases, handleNewRelease, handleSync, isSyncing]);
 
