@@ -30,6 +30,7 @@ final class AppState {
 
   private let repository: AppStateRepository
   private let launchDate = Date()
+  private var loadingUserID: String?
 
   init(
     configuration: AppConfiguration,
@@ -78,13 +79,25 @@ final class AppState {
   func handleSignedInUserChange(_ userID: String?) async {
     guard launchMode.usesLiveClerk, didLoadClerk else { return }
 
+    if let userID, loadingUserID == userID {
+      return
+    }
+
     activeUserID = userID
 
     guard let userID else {
+      loadingUserID = nil
       route = .signedOut
       dashboardState = .idle
       isOffline = false
       return
+    }
+
+    loadingUserID = userID
+    defer {
+      if loadingUserID == userID {
+        loadingUserID = nil
+      }
     }
 
     route = .launching
@@ -93,6 +106,7 @@ final class AppState {
 
     do {
       let result = try await repository.loadMe(for: userID)
+      guard activeUserID == userID, loadingUserID == userID else { return }
       isOffline = result.isStale
 
       switch result.response.state {
@@ -104,6 +118,8 @@ final class AppState {
         dashboardState = .idle
       }
     } catch {
+      guard activeUserID == userID, loadingUserID == userID else { return }
+
       if let error = error as? APIClientError {
         switch error {
         case .missingToken, .requestFailed(statusCode: 401):
@@ -129,6 +145,7 @@ final class AppState {
   func signOut() async {
     let userID = activeUserID
     activeUserID = nil
+    loadingUserID = nil
     route = .signedOut
     dashboardState = .idle
     isOffline = false

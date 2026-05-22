@@ -14,6 +14,7 @@ enum JovieColor {
   static let borderDefault = Color.white.opacity(0.08)
   static let borderStrong = Color.white.opacity(0.10)
   static let accent = Color(hex: 0x7170FF)
+  static let errorText = Color(hex: 0xFF7A73)
 }
 
 enum JovieFont {

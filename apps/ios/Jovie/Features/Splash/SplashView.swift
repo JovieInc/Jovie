@@ -72,7 +72,7 @@ struct SplashView: View {
   }
 }
 
-private struct CinematicLoadingBackdrop: View {
+struct CinematicLoadingBackdrop: View {
   let isActive: Bool
 
   var body: some View {

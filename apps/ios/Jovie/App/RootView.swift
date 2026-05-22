@@ -1,4 +1,5 @@
 import ClerkKit
+import Darwin
 import Observation
 import SwiftUI
 
@@ -106,6 +107,7 @@ private enum LiveAuthBootstrapper {
 private struct AppContentView: View {
   @Bindable var appState: AppState
   let onLogout: @MainActor () async -> Void
+  let onAuthenticated: @MainActor (String) async -> Void
 
   var body: some View {
     Group {
@@ -113,7 +115,11 @@ private struct AppContentView: View {
       case .launching:
         SplashView()
       case .signedOut:
-        AuthScreen(isMock: !appState.launchMode.usesLiveClerk)
+        AuthScreen(
+          isMock: !appState.launchMode.usesLiveClerk,
+          webBaseURL: appState.configuration.webBaseURL,
+          onAuthenticated: onAuthenticated
+        )
       case .needsOnboarding:
         AppShellView(
           profile: AppShellProfile(response: nil),
@@ -147,9 +153,22 @@ struct RootView: View {
   @Bindable var appState: AppState
   let liveUserID: String?
   let onLogout: @MainActor () async -> Void
+  let onAuthenticated: @MainActor (String) async -> Void
 
   var body: some View {
-    AppContentView(appState: appState, onLogout: onLogout)
+    ZStack {
+      AppContentView(
+        appState: appState,
+        onLogout: onLogout,
+        onAuthenticated: onAuthenticated
+      )
+
+#if DEBUG
+      if ProcessInfo.processInfo.arguments.contains("-ui-testing-allow-exit") {
+        UITestExitButton()
+      }
+#endif
+    }
       .task(id: "\(appState.didLoadClerk)-\(liveUserID ?? "signed-out")") {
         if appState.launchMode.requiresAutoAuth, liveUserID == nil {
           return
@@ -164,6 +183,32 @@ struct RootView: View {
   }
 }
 
+#if DEBUG
+private struct UITestExitButton: View {
+  var body: some View {
+    VStack {
+      Spacer()
+
+      HStack {
+        Spacer()
+
+        Button("End UI Test Session") {
+          Darwin.exit(0)
+        }
+        .buttonStyle(.plain)
+        .accessibilityIdentifier("ui-test-exit")
+        .foregroundStyle(.white)
+        .frame(width: 80, height: 80)
+        .background(Color.black)
+        .clipShape(RoundedRectangle(cornerRadius: 8))
+      }
+    }
+    .allowsHitTesting(true)
+    .ignoresSafeArea()
+  }
+}
+#endif
+
 struct LiveRootContainer: View {
   @Environment(Clerk.self) private var clerk
   @Bindable var appState: AppState
@@ -176,6 +221,9 @@ struct LiveRootContainer: View {
       onLogout: {
         try? await clerk.auth.signOut()
         await appState.signOut()
+      },
+      onAuthenticated: { userID in
+        await appState.handleSignedInUserChange(userID)
       }
     )
       .task(id: appState.launchMode.requiresAutoAuth) {

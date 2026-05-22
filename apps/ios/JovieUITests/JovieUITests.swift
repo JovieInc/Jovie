@@ -1,6 +1,11 @@
 import XCTest
 
 final class JovieUITests: XCTestCase {
+  override func setUp() {
+    super.setUp()
+    continueAfterFailure = false
+  }
+
   func testCinematicSplashLaunchShowsLoadingState() {
     let app = launchMockApp(launchArgument: "-ui-testing-splash", expectedElementDescription: "\"Jovie is loading\"") {
       $0.staticTexts["Jovie"]
@@ -14,10 +19,13 @@ final class JovieUITests: XCTestCase {
   }
 
   func testSignedOutLaunchShowsAuthScreen() {
-    let app = launchMockApp(launchArgument: "-ui-testing-signed-out", expectedElementDescription: "\"Sign In\"") {
-      $0.staticTexts["Sign In"]
+    let app = launchMockApp(launchArgument: "-ui-testing-signed-out", expectedElementDescription: "\"Sign in to Jovie\"") {
+      $0.staticTexts["Sign in to Jovie"]
     }
 
+    XCTAssertTrue(app.staticTexts["Jovie"].exists)
+    XCTAssertTrue(app.staticTexts["Email"].exists)
+    XCTAssertTrue(app.buttons["Continue"].exists)
     attachScreenshot(named: "signed-out", app: app)
   }
 
@@ -50,7 +58,7 @@ final class JovieUITests: XCTestCase {
     app.buttons["Log Out"].tap()
 
     XCTAssertTrue(
-      app.staticTexts["Sign In"].waitForExistence(timeout: 5),
+      app.staticTexts["Sign in to Jovie"].waitForExistence(timeout: 5),
       "Logout did not return to signed-out state.\n\(app.debugDescription)"
     )
   }
@@ -101,12 +109,12 @@ final class JovieUITests: XCTestCase {
     app.launch()
 
     XCTAssertTrue(
-      app.staticTexts["Continue to Jovie"].waitForExistence(timeout: 10),
-      "Clerk auth heading did not appear.\n\(app.debugDescription)"
+      app.staticTexts["Sign in to Jovie"].waitForExistence(timeout: 10),
+      "Native auth heading did not appear.\n\(app.debugDescription)"
     )
     XCTAssertTrue(
-      app.staticTexts["Enter your email"].waitForExistence(timeout: 10),
-      "Clerk email prompt did not appear.\n\(app.debugDescription)"
+      app.staticTexts["Email"].waitForExistence(timeout: 10),
+      "Native auth email prompt did not appear.\n\(app.debugDescription)"
     )
   }
 
@@ -144,6 +152,7 @@ final class JovieUITests: XCTestCase {
 
     let app = XCUIApplication()
     app.launchArguments.append(launchArgument)
+    app.launchArguments.append("-ui-testing-allow-exit")
     app.launchEnvironment["API_BASE_URL"] = apiBaseURL
     app.launchEnvironment["E2E_CLERK_USER_USERNAME"] = emailAddress
     app.launchEnvironment["JOVIE_IOS_LIVE_AUTH_CODE"] = verificationCode
@@ -151,6 +160,10 @@ final class JovieUITests: XCTestCase {
     if !publishableKey.isEmpty {
       app.launchEnvironment["CLERK_PUBLISHABLE_KEY"] = publishableKey
       app.launchEnvironment["NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY"] = publishableKey
+    }
+
+    addTeardownBlock { [app] in
+      self.endUITestSession(app)
     }
 
     return app
@@ -175,6 +188,10 @@ final class JovieUITests: XCTestCase {
   ) -> XCUIApplication {
     let app = XCUIApplication()
     app.launchArguments.append(launchArgument)
+    app.launchArguments.append("-ui-testing-allow-exit")
+    addTeardownBlock { [app] in
+      self.endUITestSession(app)
+    }
 
     for attempt in 1...2 {
       app.launch()
@@ -192,6 +209,22 @@ final class JovieUITests: XCTestCase {
       line: line
     )
     return app
+  }
+
+  private func endUITestSession(_ app: XCUIApplication) {
+    guard app.state != .notRunning else { return }
+
+    if app.state == .runningForeground {
+      let exitButton = app.buttons["ui-test-exit"]
+      if exitButton.waitForExistence(timeout: 1) {
+        exitButton.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
+      }
+    }
+
+    if !app.wait(for: .notRunning, timeout: 5) {
+      app.terminate()
+      _ = app.wait(for: .notRunning, timeout: 2)
+    }
   }
 
   private func attachScreenshot(named name: String, app: XCUIApplication) {
