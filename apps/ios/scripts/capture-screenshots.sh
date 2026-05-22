@@ -13,13 +13,36 @@ DERIVED_DATA_PATH="${IOS_SCREENSHOT_DERIVED_DATA:-$REPO_ROOT/.build/ios-screensh
 rm -rf "$OUTPUT_DIR"
 mkdir -p "$OUTPUT_DIR"
 
+run_with_timeout() {
+  local timeout_seconds="$1"
+  shift
+
+  "$@" &
+  local command_pid=$!
+  local elapsed=0
+
+  while kill -0 "$command_pid" >/dev/null 2>&1; do
+    if (( elapsed >= timeout_seconds )); then
+      kill "$command_pid" >/dev/null 2>&1 || true
+      wait "$command_pid" >/dev/null 2>&1 || true
+      echo "Command timed out after ${timeout_seconds}s: $*"
+      return 124
+    fi
+
+    sleep 1
+    elapsed=$((elapsed + 1))
+  done
+
+  wait "$command_pid"
+}
+
 "$SCRIPT_DIR/ensure-configuration.sh"
 
 APP_PATH="$DERIVED_DATA_PATH/Build/Products/Debug-iphonesimulator/Jovie.app"
 if [[ -d "$APP_PATH" ]]; then
   echo "Using existing built app at $APP_PATH"
 else
-  xcodebuild build \
+  run_with_timeout "${IOS_SCREENSHOT_BUILD_TIMEOUT:-300}" xcodebuild build \
     -project "$PROJECT_PATH" \
     -scheme "$SCHEME" \
     -configuration Debug \
@@ -63,11 +86,12 @@ pick_device() {
 prepare_device() {
   local udid="$1"
 
-  xcrun simctl boot "$udid" >/dev/null 2>&1 || true
+  echo "Preparing simulator $udid"
+  run_with_timeout "${IOS_SCREENSHOT_BOOT_COMMAND_TIMEOUT:-30}" xcrun simctl boot "$udid" >/dev/null 2>&1 || true
   wait_for_boot "$udid"
-  xcrun simctl ui "$udid" appearance dark >/dev/null 2>&1 || true
-  xcrun simctl uninstall "$udid" "$BUNDLE_ID" >/dev/null 2>&1 || true
-  xcrun simctl install "$udid" "$APP_PATH"
+  run_with_timeout "${IOS_SCREENSHOT_UI_TIMEOUT:-10}" xcrun simctl ui "$udid" appearance dark >/dev/null 2>&1 || true
+  run_with_timeout "${IOS_SCREENSHOT_UNINSTALL_TIMEOUT:-30}" xcrun simctl uninstall "$udid" "$BUNDLE_ID" >/dev/null 2>&1 || true
+  run_with_timeout "${IOS_SCREENSHOT_INSTALL_TIMEOUT:-60}" xcrun simctl install "$udid" "$APP_PATH"
 }
 
 wait_for_boot() {
@@ -99,29 +123,6 @@ wait_for_boot() {
   done
 
   wait "$boot_pid"
-}
-
-run_with_timeout() {
-  local timeout_seconds="$1"
-  shift
-
-  "$@" &
-  local command_pid=$!
-  local elapsed=0
-
-  while kill -0 "$command_pid" >/dev/null 2>&1; do
-    if (( elapsed >= timeout_seconds )); then
-      kill "$command_pid" >/dev/null 2>&1 || true
-      wait "$command_pid" >/dev/null 2>&1 || true
-      echo "Command timed out after ${timeout_seconds}s: $*"
-      return 124
-    fi
-
-    sleep 1
-    elapsed=$((elapsed + 1))
-  done
-
-  wait "$command_pid"
 }
 
 capture() {
