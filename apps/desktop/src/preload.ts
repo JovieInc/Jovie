@@ -12,6 +12,9 @@ const QUIT_AND_INSTALL_CHANNEL = 'quit-and-install';
 const GO_BACK_CHANNEL = 'go-back';
 const GO_FORWARD_CHANNEL = 'go-forward';
 const NAV_STATE_CHANNEL = 'nav-state-changed';
+const START_DESKTOP_AUTH_HANDOFF_CHANNEL = 'start-desktop-auth-handoff';
+const OPEN_DESKTOP_AUTH_URL_CHANNEL = 'open-desktop-auth-url';
+const CLOSE_DESKTOP_AUTH_WINDOW_CHANNEL = 'close-desktop-auth-window';
 const DICTATION_STATUS_CHANNEL = 'dictation-status';
 
 interface MinimalDocument {
@@ -115,6 +118,35 @@ if (isTrustedAppOrigin()) {
       ) => cb(state);
       ipcRenderer.on(NAV_STATE_CHANNEL, listener);
       return () => ipcRenderer.removeListener(NAV_STATE_CHANNEL, listener);
+    },
+
+    /** Ask the main process to show the dedicated desktop auth handoff window. */
+    startDesktopAuthHandoff: (authUrl: string) => {
+      return ipcRenderer.invoke(
+        START_DESKTOP_AUTH_HANDOFF_CHANNEL,
+        authUrl
+      ) as Promise<{ ok: boolean; reason?: string }>;
+    },
+
+    /** Open auth in the system browser from the dedicated handoff page. */
+    openDesktopAuthUrl: (authUrl: string) => {
+      return ipcRenderer.invoke(
+        OPEN_DESKTOP_AUTH_URL_CHANNEL,
+        authUrl
+      ) as Promise<{
+        ok: boolean;
+        reason?: string;
+      }>;
+    },
+
+    /** Close the dedicated handoff window without exposing window controls. */
+    closeDesktopAuthWindow: () => {
+      return ipcRenderer.invoke(
+        CLOSE_DESKTOP_AUTH_WINDOW_CHANNEL
+      ) as Promise<{
+        ok: boolean;
+        reason?: string;
+      }>;
     },
 
     /** Probe desktop dictation support without exposing node/native APIs. */

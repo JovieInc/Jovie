@@ -5,6 +5,7 @@ import { Button, CommonDropdown } from '@jovie/ui';
 import {
   CreditCard,
   FileText,
+  Gauge,
   HelpCircle,
   Keyboard,
   LogOut,
@@ -54,6 +55,7 @@ interface BuildDropdownItemsParams {
   formattedUsername: string | null;
   handleProfile: () => void;
   handleSettings: () => void;
+  handleUsageStats: () => void;
   handleManageBilling: () => void;
   handleUpgrade: () => void;
   upgradeLabel: string;
@@ -72,6 +74,7 @@ function buildDropdownItems({
   formattedUsername,
   handleProfile,
   handleSettings,
+  handleUsageStats,
   handleManageBilling,
   handleUpgrade,
   upgradeLabel,
@@ -132,6 +135,13 @@ function buildDropdownItems({
       icon: Settings,
       onClick: handleSettings,
       shortcut: 'G S',
+    },
+    {
+      type: 'action',
+      id: 'usage-stats',
+      label: 'Usage Stats',
+      icon: Gauge,
+      onClick: handleUsageStats,
     },
   ];
 
@@ -336,6 +346,7 @@ export function UserButton({
     handleManageBilling,
     handleProfile,
     handleSettings,
+    handleUsageStats,
     handleSignOut,
     handleUpgrade,
     loading,
@@ -390,6 +401,7 @@ export function UserButton({
     formattedUsername,
     handleProfile,
     handleSettings,
+    handleUsageStats,
     handleManageBilling,
     handleUpgrade,
     upgradeLabel: menuActions.upgradeLabel,

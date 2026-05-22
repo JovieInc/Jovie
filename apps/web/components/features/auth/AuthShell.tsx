@@ -227,10 +227,6 @@ export function AuthShell({
 
   const isSignUp = mode === 'sign-up';
 
-  // Sign-in cross-link → Need help (/support). Sign-up cross-link → /signin.
-  // Pre-JOV-2446 the sign-in side pointed at /waitlist, which was a dead end
-  // for returnees who lost their SSO session. With email/password gone, a
-  // generic Need help link is the right escape hatch.
   const crossLinkUrl =
     oppositeModeUrl ??
     buildAuthRouteUrl(

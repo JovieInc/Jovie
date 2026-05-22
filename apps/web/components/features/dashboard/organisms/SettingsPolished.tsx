@@ -26,6 +26,7 @@ import { SettingsPaymentsSection } from '@/features/dashboard/organisms/Settings
 import { SettingsSection } from '@/features/dashboard/organisms/SettingsSection';
 import { SettingsSmsAccessSection } from '@/features/dashboard/organisms/SettingsSmsAccessSection';
 import { SettingsTouringSection } from '@/features/dashboard/organisms/SettingsTouringSection';
+import { SettingsUsageStatsSection } from '@/features/dashboard/organisms/SettingsUsageStatsSection';
 import { SettingsArtistProfileSection } from '@/features/dashboard/organisms/settings-artist-profile-section';
 import { publicEnv } from '@/lib/env-public';
 import { useAppFlag } from '@/lib/flags/client';
@@ -65,6 +66,8 @@ function getFocusedSettingsHref(sectionId: string): string {
       return APP_ROUTES.SETTINGS_APPEARANCE;
     case 'billing':
       return APP_ROUTES.SETTINGS_BILLING;
+    case 'usage':
+      return APP_ROUTES.SETTINGS_USAGE;
     case 'data-privacy':
       return APP_ROUTES.SETTINGS_DATA_PRIVACY;
     case 'artist-profile':
@@ -222,6 +225,13 @@ export function SettingsPolished({
         description:
           'Manage your security, theme, and notification preferences.',
         render: renderAccountSection,
+      },
+      {
+        id: 'usage',
+        title: 'Usage Stats',
+        description:
+          'Track your daily chat quota, remaining messages, and plan.',
+        render: () => <SettingsUsageStatsSection />,
       },
     ],
     [renderAccountSection]

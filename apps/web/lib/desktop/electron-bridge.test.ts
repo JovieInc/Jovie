@@ -182,6 +182,81 @@ describe('electron-bridge — defensive guards', () => {
     expect(windowOpenSpy).not.toHaveBeenCalled();
   });
 
+  it('openDesktopAuthUrl uses the explicit bridge method when available', async () => {
+    const openDesktopAuthUrl = vi.fn(async () => ({ ok: true }));
+    setElectronAPI({
+      openDesktopAuthUrl,
+    });
+
+    await __testing.openDesktopAuthUrl(
+      'https://jov.ie/signin?desktop_return=%2Fapp'
+    );
+
+    expect(openDesktopAuthUrl).toHaveBeenCalledWith(
+      'https://jov.ie/signin?desktop_return=%2Fapp'
+    );
+    expect(windowOpenSpy).not.toHaveBeenCalled();
+  });
+
+  it('openDesktopAuthUrl falls back to browser open when the bridge rejects', async () => {
+    const openDesktopAuthUrl = vi.fn(async () => ({
+      ok: false,
+      reason: 'invalid-auth-url',
+    }));
+    setElectronAPI({
+      openDesktopAuthUrl,
+    });
+
+    await __testing.openDesktopAuthUrl(
+      'https://jov.ie/signin?desktop_return=%2Fapp'
+    );
+
+    expect(windowOpenSpy).toHaveBeenCalledWith(
+      'https://jov.ie/signin?desktop_return=%2Fapp',
+      '_blank',
+      'noopener,noreferrer'
+    );
+  });
+
+  it('startDesktopAuthHandoff uses explicit IPC when available', async () => {
+    const startDesktopAuthHandoff = vi.fn(async () => ({ ok: true }));
+    setElectronAPI({
+      startDesktopAuthHandoff,
+    });
+
+    await __testing.startDesktopAuthHandoff(
+      'https://jov.ie/signup?desktop_return=%2Fstart'
+    );
+
+    expect(startDesktopAuthHandoff).toHaveBeenCalledWith(
+      'https://jov.ie/signup?desktop_return=%2Fstart'
+    );
+    expect(windowOpenSpy).not.toHaveBeenCalled();
+  });
+
+  it('startDesktopAuthHandoff falls back to the browser when IPC rejects', async () => {
+    const startDesktopAuthHandoff = vi.fn(async () => ({
+      ok: false,
+      reason: 'invalid-auth-url',
+    }));
+    setElectronAPI({
+      startDesktopAuthHandoff,
+    });
+
+    await __testing.startDesktopAuthHandoff(
+      'https://jov.ie/signup?desktop_return=%2Fstart'
+    );
+
+    expect(startDesktopAuthHandoff).toHaveBeenCalledWith(
+      'https://jov.ie/signup?desktop_return=%2Fstart'
+    );
+    expect(windowOpenSpy).toHaveBeenCalledWith(
+      'https://jov.ie/signup?desktop_return=%2Fstart',
+      '_blank',
+      'noopener,noreferrer'
+    );
+  });
+
   it('safeGetDictationStatus allows browser Web Speech outside Electron', async () => {
     await expect(__testing.safeGetDictationStatus()).resolves.toMatchObject({
       ok: true,

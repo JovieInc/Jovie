@@ -62,7 +62,7 @@ describe('DashboardNav', () => {
     expect(releasesLink.getAttribute('aria-current')).toBe('page');
   });
 
-  it('only marks New thread active on the chat root', () => {
+  it('only marks New chat active on the chat root', () => {
     mockUsePathname.mockReturnValueOnce(`${APP_ROUTES.CHAT}/thread-123`);
 
     const { getByRole } = renderDashboardNav({
@@ -71,7 +71,7 @@ describe('DashboardNav', () => {
     });
 
     expect(
-      getByRole('link', { name: 'New thread' }).getAttribute('aria-current')
+      getByRole('link', { name: 'New chat' }).getAttribute('aria-current')
     ).toBeNull();
   });
 

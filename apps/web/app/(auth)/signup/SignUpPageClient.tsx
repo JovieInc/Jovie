@@ -16,6 +16,11 @@ import {
   SIGNUP_SPOTIFY_EXPECTED_KEY,
   SIGNUP_SPOTIFY_URL_KEY,
 } from '@/lib/auth/signup-claim-storage';
+import {
+  buildAuthRouteUrlWithDesktopReturn,
+  buildDesktopAuthReturnPath,
+  sanitizeDesktopReturnRoute,
+} from '@/lib/desktop/auth-return';
 
 /**
  * Persist pre-signup claim data from the homepage hero into sessionStorage,
@@ -125,7 +130,11 @@ function SignUpClaimDataPersistence() {
   );
 }
 
-function SignUpOauthErrorBanner() {
+function SignUpOauthErrorBanner({
+  signInUrl,
+}: Readonly<{
+  signInUrl: string;
+}>) {
   const searchParams = useSearchParams();
   const oauthError = searchParams.get('oauth_error');
   // Used to personalise the account_exists message when the conflicting
@@ -173,7 +182,7 @@ function SignUpOauthErrorBanner() {
       {isAccountExists ? (
         <p className='mt-2 text-sm text-secondary-token'>
           <Link
-            href={buildAuthRouteUrl(APP_ROUTES.SIGNIN, searchParams)}
+            href={signInUrl}
             className='text-primary-token underline focus-ring-themed rounded-md'
           >
             Sign in instead
@@ -193,6 +202,17 @@ function SignUpOauthErrorBanner() {
  * until its env flag is set (JOV-2062).
  */
 export function SignUpPageClient() {
+  const searchParams = useSearchParams();
+  const desktopReturnRoute = sanitizeDesktopReturnRoute(
+    searchParams.get('desktop_return')
+  );
+  const signInUrl = desktopReturnRoute
+    ? buildAuthRouteUrlWithDesktopReturn(APP_ROUTES.SIGNIN, searchParams)
+    : buildAuthRouteUrl(APP_ROUTES.SIGNIN, searchParams);
+  const fallbackRedirectUrl = desktopReturnRoute
+    ? buildDesktopAuthReturnPath(desktopReturnRoute)
+    : undefined;
+
   return (
     <AuthLayout
       formTitle='Request access'
@@ -200,10 +220,15 @@ export function SignUpPageClient() {
       showFooterPrompt={false}
       layoutVariant='split'
     >
-      <AuthRoutePrefetch href={APP_ROUTES.WAITLIST} />
-      <SignUpOauthErrorBanner />
+      <AuthRoutePrefetch href={signInUrl} />
+      <SignUpOauthErrorBanner signInUrl={signInUrl} />
       <SignUpClaimDataPersistence />
-      <AuthShell mode='sign-up' forceOppositeModeHardNavigation />
+      <AuthShell
+        mode='sign-up'
+        forceOppositeModeHardNavigation
+        oppositeModeUrl={signInUrl}
+        fallbackRedirectUrl={fallbackRedirectUrl}
+      />
     </AuthLayout>
   );
 }

@@ -56,6 +56,9 @@ test('desktop window fails into a branded Jovie recovery surface', async () => {
   assert.match(mainSource, /NAVIGATION_ABORTED_ERROR_CODE/);
   assert.match(mainSource, /showDesktopLoadFailure\(win\)/);
   assert.match(mainSource, /viewBox="0 0 353\.68 347\.97"/);
+  assert.match(mainSource, /START_DESKTOP_AUTH_HANDOFF_CHANNEL/);
+  assert.match(mainSource, /OPEN_DESKTOP_AUTH_URL_CHANNEL/);
+  assert.match(mainSource, /CLOSE_DESKTOP_AUTH_WINDOW_CHANNEL/);
   assert.doesNotMatch(mainSource, /M31 10A20 20 0 0 0 11 30H31V10Z/);
   assert.doesNotMatch(mainSource, /M11 31L30 31M14 36L31 36M18 41L32 41/);
 });
@@ -71,6 +74,9 @@ test('preload marks the hosted app as Electron after the document root is ready'
   assert.match(preloadSource, /markElectronRuntime\(\)/);
   assert.match(preloadSource, /DOMContentLoaded/);
   assert.match(preloadSource, /dataset\.desktopRuntime = 'electron'/);
+  assert.match(preloadSource, /startDesktopAuthHandoff/);
+  assert.match(preloadSource, /openDesktopAuthUrl/);
+  assert.match(preloadSource, /closeDesktopAuthWindow/);
 });
 
 test('desktop bridge exposes bounded dictation support', async () => {

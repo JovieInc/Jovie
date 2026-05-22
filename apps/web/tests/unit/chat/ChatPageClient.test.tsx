@@ -361,7 +361,7 @@ describe('ChatPageClient', () => {
     );
   });
 
-  it('does not register chat header actions on the new-thread route', () => {
+  it('does not register chat header actions on the new-chat route', () => {
     renderChatPage();
 
     expect(mockSetHeaderActions).toHaveBeenCalledWith(null);
