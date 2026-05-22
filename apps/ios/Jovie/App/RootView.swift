@@ -1,4 +1,5 @@
 import ClerkKit
+import Darwin
 import Observation
 import SwiftUI
 
@@ -155,11 +156,19 @@ struct RootView: View {
   let onAuthenticated: @MainActor (String) async -> Void
 
   var body: some View {
-    AppContentView(
-      appState: appState,
-      onLogout: onLogout,
-      onAuthenticated: onAuthenticated
-    )
+    ZStack {
+      AppContentView(
+        appState: appState,
+        onLogout: onLogout,
+        onAuthenticated: onAuthenticated
+      )
+
+#if DEBUG
+      if ProcessInfo.processInfo.arguments.contains("-ui-testing-allow-exit") {
+        UITestExitButton()
+      }
+#endif
+    }
       .task(id: "\(appState.didLoadClerk)-\(liveUserID ?? "signed-out")") {
         if appState.launchMode.requiresAutoAuth, liveUserID == nil {
           return
@@ -173,6 +182,32 @@ struct RootView: View {
       }
   }
 }
+
+#if DEBUG
+private struct UITestExitButton: View {
+  var body: some View {
+    VStack {
+      Spacer()
+
+      HStack {
+        Spacer()
+
+        Button("End UI Test Session") {
+          Darwin.exit(0)
+        }
+        .buttonStyle(.plain)
+        .accessibilityIdentifier("ui-test-exit")
+        .foregroundStyle(.white)
+        .frame(width: 80, height: 80)
+        .background(Color.black)
+        .clipShape(RoundedRectangle(cornerRadius: 8))
+      }
+    }
+    .allowsHitTesting(true)
+    .ignoresSafeArea()
+  }
+}
+#endif
 
 struct LiveRootContainer: View {
   @Environment(Clerk.self) private var clerk

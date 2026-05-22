@@ -106,7 +106,6 @@ final class JovieUITests: XCTestCase {
     }
 
     let app = try makeLiveClerkApp(launchArgument: "-ui-testing-live-auth")
-    terminate(app)
     app.launch()
 
     XCTAssertTrue(
@@ -125,7 +124,6 @@ final class JovieUITests: XCTestCase {
     }
 
     let app = try makeLiveClerkApp(launchArgument: "-ui-testing-auto-auth")
-    terminate(app)
     app.launch()
 
     let copyURLButton = app.buttons["Copy URL"]
@@ -154,6 +152,7 @@ final class JovieUITests: XCTestCase {
 
     let app = XCUIApplication()
     app.launchArguments.append(launchArgument)
+    app.launchArguments.append("-ui-testing-allow-exit")
     app.launchEnvironment["API_BASE_URL"] = apiBaseURL
     app.launchEnvironment["E2E_CLERK_USER_USERNAME"] = emailAddress
     app.launchEnvironment["JOVIE_IOS_LIVE_AUTH_CODE"] = verificationCode
@@ -164,7 +163,7 @@ final class JovieUITests: XCTestCase {
     }
 
     addTeardownBlock { [app] in
-      self.terminate(app)
+      self.endUITestSession(app)
     }
 
     return app
@@ -189,12 +188,12 @@ final class JovieUITests: XCTestCase {
   ) -> XCUIApplication {
     let app = XCUIApplication()
     app.launchArguments.append(launchArgument)
+    app.launchArguments.append("-ui-testing-allow-exit")
     addTeardownBlock { [app] in
-      self.terminate(app)
+      self.endUITestSession(app)
     }
 
     for attempt in 1...2 {
-      terminate(app)
       app.launch()
       if element(app).waitForExistence(timeout: timeout) {
         return app
@@ -212,10 +211,13 @@ final class JovieUITests: XCTestCase {
     return app
   }
 
-  private func terminate(_ app: XCUIApplication) {
-    guard app.state != .notRunning else { return }
+  private func endUITestSession(_ app: XCUIApplication) {
+    guard app.state == .runningForeground else { return }
 
-    app.terminate()
+    let exitButton = app.buttons["ui-test-exit"]
+    if exitButton.waitForExistence(timeout: 1) {
+      exitButton.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
+    }
     _ = app.wait(for: .notRunning, timeout: 5)
   }
 

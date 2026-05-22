@@ -36,7 +36,7 @@ fi
 pick_device() {
   local name_pattern="$1"
 
-  xcrun simctl list devices available -j | ruby -rjson -e '
+  xcrun simctl list devices available -j | RUBYOPT= ruby -rjson -e '
     pattern = Regexp.new(ARGV.fetch(0))
     input = STDIN.read
     devices_by_runtime = JSON.parse(input).fetch("devices", {})
