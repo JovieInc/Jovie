@@ -21,11 +21,13 @@ export default function ChatLoading() {
             <Skeleton className='h-6 w-48' rounded='lg' />
 
             {/* Action card skeleton */}
-            <div className='w-full max-w-[32rem] rounded-[18px] border border-white/[0.05] bg-(--linear-app-content-surface) px-7 py-6 shadow-[0_16px_40px_-24px_rgba(0,0,0,0.45)]'>
-              <Skeleton className='h-4 w-56' rounded='lg' />
-              <Skeleton className='mt-3 h-3 w-full' rounded='lg' />
-              <Skeleton className='mt-2 h-3 w-4/5' rounded='lg' />
-              <div className='mt-6 flex justify-end'>
+            <div className='grid min-h-[148px] w-full max-w-[32rem] grid-cols-1 items-center gap-4 rounded-[18px] border border-white/[0.05] bg-(--linear-app-content-surface) px-5 py-5 shadow-[0_16px_40px_-24px_rgba(0,0,0,0.45)] sm:grid-cols-[minmax(0,1fr)_auto] sm:px-7'>
+              <div className='min-w-0'>
+                <Skeleton className='h-4 w-56' rounded='lg' />
+                <Skeleton className='mt-3 h-3 w-full' rounded='lg' />
+                <Skeleton className='mt-2 h-3 w-4/5' rounded='lg' />
+              </div>
+              <div className='flex justify-start sm:justify-end'>
                 <Skeleton className='h-7 w-24 rounded-full' rounded='full' />
               </div>
             </div>

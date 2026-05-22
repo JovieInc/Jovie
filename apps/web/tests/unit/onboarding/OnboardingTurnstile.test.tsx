@@ -112,7 +112,7 @@ describe('OnboardingTurnstile', () => {
       'interactive'
     );
     expect(
-      screen.getByText('Complete the Cloudflare check to send your message.')
+      screen.getByText('Required before your first message.')
     ).toBeVisible();
 
     act(() => options?.['error-callback']?.('bad-token'));
@@ -120,7 +120,7 @@ describe('OnboardingTurnstile', () => {
       'data-turnstile-status',
       'error'
     );
-    expect(screen.getByText('Retry verification')).toBeVisible();
+    expect(screen.getByText('Retry Verification')).toBeVisible();
 
     act(() => options?.['timeout-callback']?.());
     expect(screen.getByTestId('onboarding-turnstile-panel')).toHaveAttribute(
