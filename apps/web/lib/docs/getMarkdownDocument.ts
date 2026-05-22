@@ -2,6 +2,7 @@ import { promises as fs } from 'node:fs';
 import { toString } from 'mdast-util-to-string';
 import { cache } from 'react';
 import { remark } from 'remark';
+import remarkGfm from 'remark-gfm';
 import remarkHtml from 'remark-html';
 import { visit } from 'unist-util-visit';
 import { LEGAL_ENTITY_NAME } from '@/constants/app';
@@ -30,7 +31,7 @@ type HeadingNode = {
   };
 };
 
-const applyMarkdownTemplate = (raw: string): string => {
+export const applyMarkdownTemplate = (raw: string): string => {
   return raw.replaceAll(/\{\{\s*LEGAL_ENTITY_NAME\s*\}\}/g, LEGAL_ENTITY_NAME);
 };
 
@@ -46,7 +47,9 @@ export async function getMarkdownDocument(
 export async function createMarkdownDocument(
   raw: string
 ): Promise<MarkdownDocument> {
-  const processor = remark().use(remarkHtml, { sanitize: false });
+  const processor = remark()
+    .use(remarkGfm)
+    .use(remarkHtml, { sanitize: false });
   const ast = processor.parse(raw);
 
   const toc: TocEntry[] = [];
