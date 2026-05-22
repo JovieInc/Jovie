@@ -45,15 +45,15 @@ jobs:
         run: bash apps/ios/scripts/validate-app-icon.sh
 
       - name: Resolve Swift package dependencies
-        run: |
-          xcodebuild -resolvePackageDependencies \
-            -project apps/ios/Jovie.xcodeproj \
-            -scheme Jovie
+        timeout-minutes: 5
+        run: bash apps/ios/scripts/run-xcodebuild.sh -resolvePackageDependencies -derivedDataPath .build/ios-ci
 
       - name: Build and test
+        timeout-minutes: 20
         run: bash apps/ios/scripts/run-xcodebuild.sh test -derivedDataPath .build/ios-ci
 
       - name: Capture simulator screenshots
+        timeout-minutes: 8
         env:
           IOS_SCREENSHOT_DERIVED_DATA: .build/ios-ci
         run: bash apps/ios/scripts/capture-screenshots.sh
