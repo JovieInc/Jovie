@@ -1,4 +1,4 @@
-import { and, asc, eq } from 'drizzle-orm';
+import { and, asc, eq, sql } from 'drizzle-orm';
 import { db } from '@/lib/db';
 import {
   type ChatMessage,
@@ -239,6 +239,14 @@ export async function reserveChatTurn(input: {
     })
     .onConflictDoNothing({
       target: [chatMessages.conversationId, chatMessages.clientMessageId],
+      // The matching unique index is partial
+      // (`idx_chat_messages_conversation_client_message_unique` is defined
+      // `WHERE client_message_id IS NOT NULL`). Postgres only infers a
+      // partial unique index when the ON CONFLICT clause specifies the same
+      // WHERE predicate, so we mirror it here. The insert above always sets
+      // `clientMessageId` (falling back to `clientTurnId`), so every row this
+      // path produces satisfies the predicate.
+      targetWhere: sql`${chatMessages.clientMessageId} IS NOT NULL`,
     });
 
   await db
