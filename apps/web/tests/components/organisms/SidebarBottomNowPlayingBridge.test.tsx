@@ -95,6 +95,9 @@ describe('SidebarBottomNowPlayingBridge', () => {
     );
     expect(slot).toHaveAttribute('data-state', 'reserved');
     expect(slot).toHaveAttribute('aria-hidden', 'true');
+    expect(slot).toHaveAttribute('inert');
+    expect(slot).toHaveClass('opacity-0');
+    expect(slot).not.toHaveClass('invisible');
     expect(
       screen.queryByRole('button', { name: 'Play' })
     ).not.toBeInTheDocument();
