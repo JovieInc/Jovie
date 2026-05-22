@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import { AdminToolPage } from '@/components/features/admin/layout/AdminToolPage';
+import { AdminPage } from '@/components/features/admin/layout/AdminPage';
 import { getAdminCosts, getCostsLastRefreshedAt } from '@/lib/admin/costs';
 import { CostsTable } from './CostsTable';
 
@@ -25,12 +25,12 @@ export default async function AdminCostsPage() {
     : 'never (seed on load)';
 
   return (
-    <AdminToolPage
+    <AdminPage
       title='Costs'
       description='Manual 30-day line-item view of company infra + AI spend. Lagging data only (v1).'
       testId='admin-costs-page'
     >
       <CostsTable items={items} lastRefreshedLabel={refreshedLabel} />
-    </AdminToolPage>
+    </AdminPage>
   );
 }

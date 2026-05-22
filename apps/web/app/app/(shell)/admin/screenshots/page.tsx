@@ -1,7 +1,7 @@
 import { Skeleton } from '@jovie/ui';
 import type { Metadata } from 'next';
 import dynamic from 'next/dynamic';
-import { AdminToolPage } from '@/components/features/admin/layout/AdminToolPage';
+import { AdminPage } from '@/components/features/admin/layout/AdminPage';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { APP_ROUTES } from '@/constants/routes';
 import { getScreenshots } from '@/lib/admin/screenshots';
@@ -59,12 +59,12 @@ export default async function AdminScreenshotsPage() {
     : `Review ${CANONICAL_SURFACES.length} canonical surfaces across ${canonicalCaptureCount} canonical captures, plus ${supportingCaptureCount} supporting captures from the latest screenshot catalog.`;
 
   return (
-    <AdminToolPage
+    <AdminPage
       title='Screenshots'
       description={description}
       testId='admin-screenshots-page'
     >
       <ScreenshotGallery screenshots={screenshots} />
-    </AdminToolPage>
+    </AdminPage>
   );
 }
