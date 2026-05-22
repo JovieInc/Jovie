@@ -1,6 +1,6 @@
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import type { ComponentProps, PropsWithChildren } from 'react';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { SidebarCollapsibleGroup } from '@/components/organisms/SidebarCollapsibleGroup';
 import { SidebarGroupLabel } from '@/components/organisms/sidebar/group';
 import {
@@ -47,6 +47,10 @@ vi.mock('@/components/organisms/Sidebar', () => ({
 }));
 
 describe('Sidebar row alignment', () => {
+  afterEach(() => {
+    localStorage.clear();
+  });
+
   it('uses px-2.5 for section labels', () => {
     render(<SidebarGroupLabel>General</SidebarGroupLabel>);
 
@@ -63,6 +67,59 @@ describe('Sidebar row alignment', () => {
     expect(
       screen.getByRole('button', { name: /general/i }).className
     ).toContain('px-2.5');
+  });
+
+  it('can default a persisted collapsible section closed without removing its slot', () => {
+    const { container } = render(
+      <SidebarCollapsibleGroup
+        label='Admin'
+        defaultOpen={false}
+        storageKey='dashboard.admin'
+      >
+        <div>People</div>
+      </SidebarCollapsibleGroup>
+    );
+
+    const button = screen.getByRole('button', { name: /admin/i });
+    const body = container.querySelector('[inert]');
+
+    expect(button).toHaveAttribute('aria-expanded', 'false');
+    expect(body?.className).toContain('grid-rows-[0fr]');
+    expect(body?.className).toContain('opacity-0');
+  });
+
+  it('persists collapsible section state by storage key', () => {
+    const { unmount } = render(
+      <SidebarCollapsibleGroup
+        label='Artist'
+        defaultOpen={false}
+        storageKey='dashboard.artist-workspace'
+      >
+        <div>Profile</div>
+      </SidebarCollapsibleGroup>
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: /artist/i }));
+    expect(
+      localStorage.getItem('jovie:sidebar-section:dashboard.artist-workspace')
+    ).toBe('open');
+
+    unmount();
+
+    render(
+      <SidebarCollapsibleGroup
+        label='Artist'
+        defaultOpen={false}
+        storageKey='dashboard.artist-workspace'
+      >
+        <div>Profile</div>
+      </SidebarCollapsibleGroup>
+    );
+
+    expect(screen.getByRole('button', { name: /artist/i })).toHaveAttribute(
+      'aria-expanded',
+      'true'
+    );
   });
 
   it('keeps shell sidebar wrapper spacing on the same token grid', () => {

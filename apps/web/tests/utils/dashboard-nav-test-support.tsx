@@ -150,6 +150,7 @@ const baseDashboardData: DashboardData = {
 type RenderDashboardNavFn = (ui: ReactElement) => ReturnType<typeof render>;
 
 export function resetDashboardNavTestMocks() {
+  localStorage.clear();
   mockUsePathname.mockReset();
   mockUsePathname.mockReturnValue(APP_ROUTES.CHAT);
   mockUseTaskStatsQuery.mockReset();
