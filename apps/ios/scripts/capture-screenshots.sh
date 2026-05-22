@@ -101,15 +101,38 @@ wait_for_boot() {
   wait "$boot_pid"
 }
 
+run_with_timeout() {
+  local timeout_seconds="$1"
+  shift
+
+  "$@" &
+  local command_pid=$!
+  local elapsed=0
+
+  while kill -0 "$command_pid" >/dev/null 2>&1; do
+    if (( elapsed >= timeout_seconds )); then
+      kill "$command_pid" >/dev/null 2>&1 || true
+      wait "$command_pid" >/dev/null 2>&1 || true
+      echo "Command timed out after ${timeout_seconds}s: $*"
+      return 124
+    fi
+
+    sleep 1
+    elapsed=$((elapsed + 1))
+  done
+
+  wait "$command_pid"
+}
+
 capture() {
   local udid="$1"
   local name="$2"
   shift 2
 
   xcrun simctl terminate "$udid" "$BUNDLE_ID" >/dev/null 2>&1 || true
-  xcrun simctl launch "$udid" "$BUNDLE_ID" "$@" >/dev/null
+  run_with_timeout "${IOS_SCREENSHOT_LAUNCH_TIMEOUT:-20}" xcrun simctl launch "$udid" "$BUNDLE_ID" "$@"
   sleep 2
-  xcrun simctl io "$udid" screenshot "$OUTPUT_DIR/$name.png"
+  run_with_timeout "${IOS_SCREENSHOT_CAPTURE_TIMEOUT:-20}" xcrun simctl io "$udid" screenshot "$OUTPUT_DIR/$name.png"
   echo "Captured $OUTPUT_DIR/$name.png"
 }
 
