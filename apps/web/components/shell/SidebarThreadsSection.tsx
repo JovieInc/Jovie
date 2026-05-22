@@ -285,7 +285,7 @@ export function SidebarThreadsSection({
               aria-hidden='true'
               strokeWidth={2.25}
             />
-            <span className='min-w-0 flex-1 truncate'>New thread</span>
+            <span className='min-w-0 flex-1 truncate'>New chat</span>
           </button>
         ) : null}
         {visible.map(t => {

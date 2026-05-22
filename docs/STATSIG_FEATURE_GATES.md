@@ -22,7 +22,6 @@ experiments used by the web app.
 | `feature_spotify_oauth` | `LEGACY_STATSIG_GATE_KEYS.SPOTIFY_OAUTH` | `false` | Auth and onboarding login method selector | Active |
 | `stripe-connect-enabled` | `LEGACY_STATSIG_GATE_KEYS.STRIPE_CONNECT_ENABLED` | `false` | Stripe Connect payouts (settings + payment routes) | Active |
 | `chat_jank_monitor` | `LEGACY_STATSIG_GATE_KEYS.CHAT_JANK_MONITOR` | `false` | Chat jank instrumentation (message continuity + streaming) | Active |
-| `design_v1` | `LEGACY_STATSIG_GATE_KEYS.DESIGN_V1` | `false` | Unified Design V1 rollout for shell, releases, tasks, chat entities, lyrics, library, auth, and onboarding app flags | Active |
 | `ai_connectors_beta` | `LEGACY_STATSIG_GATE_KEYS.AI_CONNECTORS_BETA` | `false` | AI Connector v1 closed beta — Gmail booking email → Google Calendar event flow | Active |
 | `ai_chat_disabled` | `CHAT_KILL_SWITCH_GATES.DISABLED` | `false` | Emergency kill switch for `/api/chat` | Active |
 | `ai_chat_force_light` | `CHAT_KILL_SWITCH_GATES.FORCE_LIGHT` | `false` | Runtime switch to route `/api/chat` to the lighter model | Active |
@@ -41,12 +40,12 @@ experiments used by the web app.
   browser SDK.
 - If `STATSIG_SERVER_SECRET` is not configured, the app degrades gracefully to
   safe defaults.
-- `SHELL_CHAT_V1`, `DESIGN_V1_RELEASES`, `DESIGN_V1_TASKS`,
-  `DESIGN_V1_CHAT_ENTITIES`, `DESIGN_V1_LYRICS`, `DESIGN_V1_LIBRARY`,
-  `DESIGN_V1_AUTH`, and `DESIGN_V1_ONBOARDING` are app-level aliases backed by
-  the single remote `design_v1` gate. The legacy per-surface key constants are
-  compatibility names only; changing those keys in Statsig does not affect the
-  current runtime.
+- `DESIGN_V1` and its aliases (`SHELL_CHAT_V1`, `DESIGN_V1_RELEASES`,
+  `DESIGN_V1_TASKS`, `DESIGN_V1_CHAT_ENTITIES`, `DESIGN_V1_LYRICS`,
+  `DESIGN_V1_LIBRARY`, `DESIGN_V1_AUTH`, and `DESIGN_V1_ONBOARDING`) are
+  permanent local-default app flags, not Statsig-backed rollout gates. The
+  legacy `design_v1` and per-surface key constants remain compatibility names
+  only; changing those keys in Statsig does not affect the current runtime.
 - Security-sensitive authorization must still rely on server-side entitlement checks; gates are rollout controls, not permission boundaries.
 - The Design V1 rollout contract, valid flag combinations, and rollback paths live in `docs/DESIGN_V1_ROLLOUT_MATRIX.md`.
 

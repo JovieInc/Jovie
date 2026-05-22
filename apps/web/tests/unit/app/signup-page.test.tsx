@@ -124,7 +124,7 @@ describe('signup page', () => {
       screen.queryByText('Start your private launch request.')
     ).not.toBeInTheDocument();
     expect(screen.queryByText("Don't have access?")).not.toBeInTheDocument();
-    expect(routerPrefetchMock).toHaveBeenCalledWith(APP_ROUTES.WAITLIST);
+    expect(routerPrefetchMock).toHaveBeenCalledWith(APP_ROUTES.SIGNIN);
     expect(clerkSignUpMock).toHaveBeenCalledWith(
       expect.objectContaining({
         routing: 'path',
@@ -196,6 +196,22 @@ describe('signup page', () => {
     replaceStateSpy.mockRestore();
   });
 
+  it('preserves desktop_return on the oauth compatibility banner sign-in link', async () => {
+    searchParamsState.value =
+      'oauth_error=account_exists&desktop_return=%2Fapp%2Fsettings';
+    globalThis.history.replaceState(
+      null,
+      '',
+      '/signup?oauth_error=account_exists&desktop_return=%2Fapp%2Fsettings'
+    );
+
+    render(<SignUpPage />);
+
+    expect(
+      screen.getByRole('link', { name: 'Sign in instead' })
+    ).toHaveAttribute('href', '/signin?desktop_return=%2Fapp%2Fsettings');
+  });
+
   it('preserves redirect_url on the Clerk sign-in footer link', async () => {
     searchParamsState.value = 'redirect_url=%2Fonboarding';
 
@@ -208,6 +224,25 @@ describe('signup page', () => {
     expect(clerkSignUpMock).toHaveBeenCalledWith(
       expect.objectContaining({
         signInUrl: fullAuthUrl('/signin?redirect_url=%2Fonboarding'),
+      })
+    );
+  });
+
+  it('uses desktop_return for desktop browser auth fallback and sign-in link', async () => {
+    searchParamsState.value = 'desktop_return=%2Fstart%3Fintent_id%3Dabc';
+
+    render(<SignUpPage />);
+
+    await waitFor(() => {
+      expect(clerkSignUpMock).toHaveBeenCalledTimes(1);
+    });
+
+    expect(clerkSignUpMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        signInUrl: fullAuthUrl(
+          '/signin?desktop_return=%2Fstart%3Fintent_id%3Dabc'
+        ),
+        fallbackRedirectUrl: '/auth-return?route=%2Fstart%3Fintent_id%3Dabc',
       })
     );
   });

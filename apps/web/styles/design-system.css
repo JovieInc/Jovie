@@ -59,6 +59,20 @@
   --ds-public-content-max: 1298px; /* canonical public/marketing width */
   --ds-prose-max: 680px; /* prose exception */
 
+  /* Shell V1 semantic aliases — app chrome should prefer these names when
+     touching shared shell geometry. They intentionally resolve to the current
+     Linear-derived values so this pass changes the token contract, not visuals. */
+  --app-shell-sidebar-width: var(--linear-app-sidebar-width);
+  --app-shell-header-height: var(--linear-app-header-height);
+  --app-shell-header-height-compact: var(--linear-app-header-height-compact);
+  --app-shell-gap: var(--linear-app-shell-gap);
+  --app-shell-radius: var(--linear-app-shell-radius);
+  --app-shell-border: var(--linear-app-shell-border);
+  --app-shell-frame-seam: var(--linear-app-frame-seam);
+  --app-shell-content-surface: var(--linear-app-content-surface);
+  --app-shell-audio-bar-max-height: var(--linear-app-audio-bar-max-height);
+  --app-shell-audio-compact-height: var(--linear-app-audio-compact-height);
+
   --ds-motion-subtle-duration: 150ms;
   --ds-motion-subtle-easing: cubic-bezier(0.4, 0, 0.2, 1);
   --ds-motion-cinematic-duration: 420ms;

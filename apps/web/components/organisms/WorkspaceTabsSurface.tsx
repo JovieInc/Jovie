@@ -28,6 +28,13 @@ interface WorkspaceTabsSurfaceProps<
   readonly secondaryOptions?: readonly WorkspaceTabOption<TSecondary>[];
   readonly clearOnPrimaryChange?: readonly string[];
   readonly actions?: ReactNode;
+  /**
+   * Suppress the title/description row inside the surface card. The parent
+   * shell is rendering its own page header (e.g. `AdminPage` with a `hero`
+   * slot). Tab controls still render. Used to avoid stacking competing
+   * headers above tabbed admin workspaces.
+   */
+  readonly headerless?: boolean;
   readonly children: ReactNode;
 }
 
@@ -45,6 +52,7 @@ export function WorkspaceTabsSurface<
   secondaryOptions,
   clearOnPrimaryChange = [],
   actions,
+  headerless = false,
   children,
 }: Readonly<WorkspaceTabsSurfaceProps<TPrimary, TSecondary>>) {
   const pathname = usePathname();
@@ -98,18 +106,34 @@ export function WorkspaceTabsSurface<
   const shouldShowPrimaryControl = primaryOptions.length > 1;
   const shouldShowTabControls = shouldShowPrimaryControl || secondaryControl;
 
+  // When the parent renders its own header (e.g. AdminPage hero) we suppress
+  // the surface's title/description but keep the tab card. If there are also
+  // no tabs to show, omit the card entirely — the surface has nothing to
+  // contribute beyond the children.
+  if (headerless && !shouldShowTabControls) {
+    return <div className='space-y-4'>{children}</div>;
+  }
+
   return (
     <div className='space-y-4'>
       <ContentSurfaceCard className='overflow-hidden'>
-        <ContentSectionHeader
-          title={title}
-          subtitle={description}
-          actions={actions}
-          className='min-h-0 px-(--linear-app-header-padding-x) py-3'
-          actionsClassName='shrink-0'
-        />
+        {headerless ? null : (
+          <ContentSectionHeader
+            title={title}
+            subtitle={description}
+            actions={actions}
+            className='min-h-0 px-(--linear-app-header-padding-x) py-3'
+            actionsClassName='shrink-0'
+          />
+        )}
         {shouldShowTabControls ? (
-          <div className='border-t border-subtle px-(--linear-app-content-padding-x) py-3'>
+          <div
+            className={
+              headerless
+                ? 'px-(--linear-app-content-padding-x) py-3'
+                : 'border-t border-subtle px-(--linear-app-content-padding-x) py-3'
+            }
+          >
             <div className='flex flex-col gap-3'>
               {shouldShowPrimaryControl ? (
                 <AppSegmentControl

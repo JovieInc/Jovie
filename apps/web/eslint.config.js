@@ -1,6 +1,7 @@
 const nextConfig = require('eslint-config-next');
 const nextCoreWebVitals = require('eslint-config-next/core-web-vitals');
 const boundariesPlugin = require('eslint-plugin-boundaries');
+const tsParser = require('@typescript-eslint/parser');
 const iconUsageRule = require('./eslint-rules/icon-usage');
 const edgeRuntimeNodeImportsRule = require('./eslint-rules/edge-runtime-node-imports');
 const noHandlerInitializationRule = require('./eslint-rules/no-handler-initialization');
@@ -409,6 +410,17 @@ module.exports = [
     ],
     rules: {
       '@jovie/no-ad-hoc-currency': 'off',
+    },
+  },
+  {
+    files: ['**/*.{js,jsx,mjs,mts,cts}'],
+    languageOptions: {
+      // Next's default parser crashes on module-style config and support files
+      // under ESLint 10.2.1. Reuse the TypeScript parser here so plain JS/ESM
+      // scripts keep lint coverage.
+      parser: tsParser,
+      ecmaVersion: 'latest',
+      sourceType: 'module',
     },
   },
 ];

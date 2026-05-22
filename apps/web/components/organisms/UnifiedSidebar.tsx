@@ -262,11 +262,14 @@ function SidebarHeaderNav({
 }>) {
   const shellChatV1Enabled = useAppFlag('DESIGN_V1');
   const isDesktop = useIsElectronRuntime();
-  const legacyNewThreadLink = (
+  const newChatLink = (
     <Link
       href={APP_ROUTES.CHAT}
-      aria-label='New thread'
-      className='ml-auto flex size-7 shrink-0 items-center justify-center rounded-[10px] bg-transparent text-sidebar-item-icon transition-[background,color] duration-normal ease-interactive hover:bg-sidebar-accent/60 hover:text-sidebar-item-foreground focus-visible:outline-none focus-visible:bg-sidebar-accent/60 focus-visible:text-sidebar-item-foreground group-data-[collapsible=icon]:hidden'
+      aria-label='New chat'
+      className={cn(
+        'flex size-7 shrink-0 items-center justify-center rounded-[10px] bg-transparent text-sidebar-item-icon transition-[background,color] duration-normal ease-interactive hover:bg-sidebar-accent/60 hover:text-sidebar-item-foreground focus-visible:outline-none focus-visible:bg-sidebar-accent/60 focus-visible:text-sidebar-item-foreground',
+        !shellChatV1Enabled && 'ml-auto group-data-[collapsible=icon]:hidden'
+      )}
     >
       <Plus aria-hidden='true' className='size-3.5' />
     </Link>
@@ -344,13 +347,17 @@ function SidebarHeaderNav({
 
       {!isRouteSidebar &&
         isDashboardOrAdmin &&
-        !isDesktop &&
         (shellChatV1Enabled ? (
-          <div className='ml-auto flex items-center group-data-[collapsible=icon]:hidden'>
-            <SidebarDockButton />
-          </div>
+          !isDesktop ? (
+            <div className='ml-auto flex items-center gap-0.5 group-data-[collapsible=icon]:hidden'>
+              <Tooltip label='New chat' side='bottom'>
+                {newChatLink}
+              </Tooltip>
+              <SidebarDockButton />
+            </div>
+          ) : null
         ) : (
-          legacyNewThreadLink
+          newChatLink
         ))}
     </div>
   );

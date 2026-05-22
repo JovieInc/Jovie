@@ -1,5 +1,6 @@
 import { ChevronRight } from 'lucide-react';
 import { WeeklyTrendChart } from '@/components/features/admin/WeeklyTrendChart';
+import { AnalyticsCard } from '@/components/features/dashboard/atoms/AnalyticsCard';
 import { ContentSectionHeader } from '@/components/molecules/ContentSectionHeader';
 import { ContentSectionHeaderSkeleton } from '@/components/molecules/ContentSectionHeaderSkeleton';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
@@ -22,32 +23,11 @@ function formatWowGrowth(rate: number | null): {
   label: string;
   className: string;
 } {
-  if (rate === null)
-    return { label: '\u2014', className: 'text-tertiary-token' };
-  if (!Number.isFinite(rate))
-    return { label: '+\u221E', className: 'text-success' };
+  if (rate === null) return { label: '—', className: 'text-tertiary-token' };
+  if (!Number.isFinite(rate)) return { label: '+∞', className: 'text-success' };
   const pct = (rate * 100).toFixed(1);
   if (rate >= 0) return { label: `+${pct}%`, className: 'text-success' };
   return { label: `${pct}%`, className: 'text-error' };
-}
-
-interface HeroMetricProps {
-  readonly label: string;
-  readonly value: string;
-  readonly ariaLabel: string;
-  readonly subtitle?: React.ReactNode;
-}
-
-function HeroMetric({ label, value, ariaLabel, subtitle }: HeroMetricProps) {
-  return (
-    <section aria-label={ariaLabel}>
-      <p className='text-[36px] font-bold leading-none tracking-[-0.03em] text-primary-token tabular-nums'>
-        {value}
-      </p>
-      <p className='mt-1.5 text-app font-book text-tertiary-token'>{label}</p>
-      {subtitle}
-    </section>
-  );
 }
 
 interface FunnelStepProps {
@@ -77,10 +57,70 @@ function FunnelStep({
           {count.toLocaleString('en-US')}
         </p>
         <p className='mt-0.5 text-xs text-tertiary-token'>
-          {conversionRate === null ? '\u2014' : formatPercent(conversionRate)}
+          {conversionRate === null ? '—' : formatPercent(conversionRate)}
         </p>
       </li>
     </>
+  );
+}
+
+/**
+ * Renders the hero metric row (MRR / paying customers / WoW growth) used at
+ * the top of the admin Overview. Exported so `/app/admin/page.tsx` can mount
+ * it inside `AdminPage`'s `hero` slot.
+ */
+export async function AdminHeroMetrics() {
+  const metrics = await getAdminFunnelMetrics();
+
+  const mrrDisplay = metrics.stripeAvailable ? formatUsd(metrics.mrrUsd) : '—';
+  const payingDisplay = metrics.stripeAvailable
+    ? metrics.payingCustomers.toLocaleString('en-US')
+    : '—';
+  const wowGrowth = formatWowGrowth(metrics.wowGrowthRate);
+
+  return (
+    <div className='grid grid-cols-3 gap-4' data-testid='admin-hero-metrics'>
+      <AnalyticsCard
+        variant='hero'
+        title='Monthly Recurring Revenue'
+        value={mrrDisplay}
+        ariaLabel={`Monthly recurring revenue: ${mrrDisplay}`}
+      />
+      <AnalyticsCard
+        variant='hero'
+        title='Paying Customers'
+        value={payingDisplay}
+        ariaLabel={`Paying customers: ${payingDisplay}`}
+      />
+      <AnalyticsCard
+        variant='hero'
+        title='WoW Growth'
+        value={wowGrowth.label}
+        ariaLabel={`Week over week growth: ${wowGrowth.label}`}
+      >
+        {wowGrowth.label === '—' ? null : (
+          <span className={wowGrowth.className}>vs. prior week</span>
+        )}
+      </AnalyticsCard>
+    </div>
+  );
+}
+
+export function AdminHeroMetricsSkeleton() {
+  // Each hero column reserves ~75px so the row matches its resolved height
+  // and no layout shift occurs when Suspense resolves (per .claude/rules/ui.md).
+  return (
+    <div
+      className='grid grid-cols-3 gap-4'
+      data-testid='admin-hero-metrics-skeleton'
+    >
+      {['mrr', 'customers', 'growth'].map(key => (
+        <div key={key} className='min-h-[75px]'>
+          <div className='h-9 w-24 animate-pulse rounded-md bg-surface-1' />
+          <div className='mt-1.5 h-4 w-32 animate-pulse rounded-md bg-surface-1' />
+        </div>
+      ))}
+    </div>
   );
 }
 
@@ -98,14 +138,6 @@ export async function AdminScoreboardSection() {
     metrics.claimClicks7d === 0 &&
     metrics.signups7d === 0 &&
     metrics.paidConversions7d === 0;
-
-  const mrrDisplay = metrics.stripeAvailable
-    ? formatUsd(metrics.mrrUsd)
-    : '\u2014';
-  const payingDisplay = metrics.stripeAvailable
-    ? metrics.payingCustomers.toLocaleString('en-US')
-    : '\u2014';
-  const wowGrowth = formatWowGrowth(metrics.wowGrowthRate);
 
   // Funnel steps — left to right
   const funnelSteps: Array<{
@@ -139,34 +171,10 @@ export async function AdminScoreboardSection() {
 
   return (
     <div className='space-y-4' data-testid='admin-scoreboard'>
-      {/* Hero Metrics — no card wrapper */}
-      <div className='grid grid-cols-3 gap-4'>
-        <HeroMetric
-          label='Monthly Recurring Revenue'
-          value={mrrDisplay}
-          ariaLabel={`Monthly recurring revenue: ${mrrDisplay}`}
-        />
-        <HeroMetric
-          label='Paying Customers'
-          value={payingDisplay}
-          ariaLabel={`Paying customers: ${payingDisplay}`}
-        />
-        <HeroMetric
-          label='WoW Growth'
-          value={wowGrowth.label}
-          ariaLabel={`Week over week growth: ${wowGrowth.label}`}
-          subtitle={
-            <p className={`mt-0.5 text-app font-book ${wowGrowth.className}`}>
-              {wowGrowth.label === '\u2014' ? '' : 'vs. prior week'}
-            </p>
-          }
-        />
-      </div>
-
       {/* Error state */}
       {metrics.errors.length > 0 && (
         <p className='text-xs text-secondary-token'>
-          {metrics.errors.join(' \u2014 ')}
+          {metrics.errors.join(' — ')}
         </p>
       )}
 
@@ -243,16 +251,6 @@ export async function AdminScoreboardSection() {
 export function AdminScoreboardSectionSkeleton() {
   return (
     <div className='space-y-4' data-testid='admin-scoreboard-skeleton'>
-      {/* Hero skeletons */}
-      <div className='grid grid-cols-3 gap-4'>
-        {['mrr', 'customers', 'growth'].map(key => (
-          <div key={key}>
-            <div className='h-9 w-24 animate-pulse rounded-md bg-surface-1' />
-            <div className='mt-1.5 h-4 w-32 animate-pulse rounded-md bg-surface-1' />
-          </div>
-        ))}
-      </div>
-
       {/* Funnel skeleton */}
       <ContentSurfaceCard className='overflow-hidden p-0'>
         <ContentSectionHeaderSkeleton

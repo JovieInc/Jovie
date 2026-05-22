@@ -931,7 +931,7 @@ const CREATOR_SHELL_ROUTES = [
     measureMode: 'page-load',
     readySelectors: {
       content: [
-        'button[aria-label="New thread"]',
+        'button[aria-label="New chat"]',
         '[placeholder*="ask jovie" i]',
       ],
       loading: ['[data-testid="chat-loading"]'],
@@ -1183,7 +1183,7 @@ const CREATOR_ALIAS_ROUTES = [
     measureMode: 'redirect',
     readySelectors: {
       content: [
-        'button[aria-label="New thread"]',
+        'button[aria-label="New chat"]',
         '[placeholder*="ask jovie" i]',
       ],
       redirectDestinations: [APP_ROUTES.DASHBOARD],
@@ -1206,7 +1206,7 @@ const CREATOR_ALIAS_ROUTES = [
     measureMode: 'redirect',
     readySelectors: {
       content: [
-        'button[aria-label="New thread"]',
+        'button[aria-label="New chat"]',
         '[placeholder*="ask jovie" i]',
       ],
       redirectDestinations: [APP_ROUTES.CHAT, APP_ROUTES.CHAT_PROFILE_PANEL],
@@ -1229,7 +1229,7 @@ const CREATOR_ALIAS_ROUTES = [
     measureMode: 'redirect',
     readySelectors: {
       content: [
-        'button[aria-label="New thread"]',
+        'button[aria-label="New chat"]',
         '[placeholder*="ask jovie" i]',
       ],
       redirectDestinations: [APP_ROUTES.CHAT, APP_ROUTES.CHAT_PROFILE_PANEL],

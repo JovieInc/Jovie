@@ -673,7 +673,7 @@ async function waitForShellReadyAfterAuth(page: Page): Promise<void> {
     const userButton = page.locator('[data-clerk-element="userButton"]');
     const chatComposer = page
       .locator(
-        'textarea, [contenteditable="true"], button:has-text("New thread")'
+        'textarea, [contenteditable="true"], button[aria-label="New chat"]'
       )
       .first();
     const main = page.locator('main').first();
@@ -1234,7 +1234,7 @@ export async function ensureSignedInUser(
     const userButton = page.locator('[data-clerk-element="userButton"]');
     const chatComposer = page
       .locator(
-        'textarea, [contenteditable="true"], button:has-text("New thread")'
+        'textarea, [contenteditable="true"], button[aria-label="New chat"]'
       )
       .first();
     const main = page.locator('main').first();

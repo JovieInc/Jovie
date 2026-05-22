@@ -2,12 +2,19 @@ import CoreImage.CIFilterBuiltins
 import UIKit
 
 enum QRCodeRenderer {
+  private static let cache = NSCache<NSString, UIImage>()
+  private static let context = CIContext(options: [.cacheIntermediates: false])
+
   static func image(for payload: String, scale: CGFloat = 12) -> UIImage? {
     guard !payload.isEmpty else {
       return nil
     }
 
-    let context = CIContext()
+    let cacheKey = "\(scale):\(payload)" as NSString
+    if let cachedImage = cache.object(forKey: cacheKey) {
+      return cachedImage
+    }
+
     let filter = CIFilter.qrCodeGenerator()
     filter.setValue(Data(payload.utf8), forKey: "inputMessage")
     filter.correctionLevel = "M"
@@ -24,6 +31,12 @@ enum QRCodeRenderer {
       return nil
     }
 
-    return UIImage(cgImage: cgImage)
+    let image = UIImage(cgImage: cgImage)
+    cache.setObject(image, forKey: cacheKey)
+    return image
+  }
+
+  static func clearCache() {
+    cache.removeAllObjects()
   }
 }

@@ -287,7 +287,7 @@ describe('DashboardNav interactions', () => {
       appFlags: { DESIGN_V1: true },
     });
 
-    await user.click(screen.getByRole('button', { name: 'New thread' }));
+    await user.click(screen.getByRole('button', { name: 'New chat' }));
 
     expect(mockRouterPush).toHaveBeenCalledWith(APP_ROUTES.CHAT);
   });

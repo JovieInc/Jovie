@@ -12,7 +12,10 @@ import {
 } from '@/components/providers/clerkAvailability';
 import { BASE_URL } from '@/constants/domains';
 import { APP_ROUTES } from '@/constants/routes';
-import { createFingerprintEdge } from '@/lib/audience/fingerprint';
+import {
+  checkProfileVisitorBlocked,
+  getAudienceBlockIpFromHeaders,
+} from '@/lib/audience/public-profile-block';
 import {
   buildAuthDegradedHtmlResponse,
   isBrowserNavigation,
@@ -121,74 +124,6 @@ function applyStateRewrite(
   return res;
 }
 
-// ============================================================================
-// Public Profile Audience Block Check
-// ============================================================================
-// Runs in middleware so ISR-cached profile pages don't need headers() in the
-// page component. On Vercel, middleware executes before the CDN cache is served,
-// so this gate applies even to cache hits.
-// ============================================================================
-
-/**
- * Mask an IP address for fingerprinting.
- * Mirrors maskIpAddress() in app/api/audience/lib/audience-utils.ts.
- * Edge-compatible (no Node.js modules).
- */
-
-/**
- * Check if a public profile visitor should be blocked.
- *
- * Uses a single JOIN query (creator_profiles ⋈ audience_blocks) so no round-trip
- * is wasted when the profile exists but the visitor isn't blocked (the common case).
- *
- * Fails open on any error — a blocked user slipping through once is preferable
- * to locking out all visitors during a DB hiccup.
- */
-async function checkProfileVisitorBlocked(
-  username: string,
-  ip: string | null,
-  ua: string | null
-): Promise<boolean> {
-  // Skip in unit-test environments and public smoke-test mode
-  if (process.env.NODE_ENV === 'test') return false;
-  if (process.env.PUBLIC_NOAUTH_SMOKE === '1') return false;
-
-  try {
-    const fingerprint = await createFingerprintEdge(ip, ua);
-
-    // Lazy imports mirror the investor-portal pattern in this file.
-    const { db } = await import('@/lib/db');
-    const { and, eq, isNull } = await import('drizzle-orm');
-    const { audienceBlocks } = await import('@/lib/db/schema/analytics');
-    const { creatorProfiles } = await import('@/lib/db/schema/profiles');
-
-    // Single round-trip: join profile + block table. Returns a row only when
-    // the username exists AND the fingerprint is in the block list.
-    // Profile owners cannot block themselves, so no owner-skip is needed here.
-    const [result] = await db
-      .select({ blockId: audienceBlocks.id })
-      .from(creatorProfiles)
-      .innerJoin(
-        audienceBlocks,
-        eq(audienceBlocks.creatorProfileId, creatorProfiles.id)
-      )
-      .where(
-        and(
-          eq(creatorProfiles.username, username.toLowerCase()),
-          eq(audienceBlocks.fingerprint, fingerprint),
-          isNull(audienceBlocks.unblockedAt)
-        )
-      )
-      .limit(1);
-
-    return !!result;
-  } catch {
-    // Fail open: don't lock out visitors on DB errors.
-    return false;
-  }
-}
-
-// ============================================================================
 const CLERK_SENSITIVE_PATTERNS = [
   'dummy',
   'mock',
@@ -346,13 +281,7 @@ async function handleRequest(req: NextRequest, userId: string | null) {
     if (isNavigationMethod) {
       const profileUsername = pathInfo.publicProfileCandidate;
       if (profileUsername) {
-        // Mirror extractClientIP() priority: cf-connecting-ip > x-real-ip > x-forwarded-for > true-client-ip
-        const rawIp =
-          req.headers.get('cf-connecting-ip') ||
-          req.headers.get('x-real-ip') ||
-          (req.headers.get('x-forwarded-for') || '').split(',')[0].trim() ||
-          req.headers.get('true-client-ip') ||
-          null;
+        const rawIp = getAudienceBlockIpFromHeaders(req.headers);
         const ua = req.headers.get('user-agent');
         const isBlocked = await checkProfileVisitorBlocked(
           profileUsername,

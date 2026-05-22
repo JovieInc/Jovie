@@ -11,7 +11,7 @@
 
 ### Changed
 
-- **Electron desktop shell: header inside content card.** Moved `DashboardHeader` out of the top reserved titlebar and into the elevated content card so the entire card (header + body) collapses/expands with the sidebar. Removed the duplicate-render hack that previously rendered the header twice (one copy hidden via `display: none`) and zeroed `#main-content`'s top radius to fake a stitched surface. Net `−94` lines across 9 files.
+- **Electron desktop shell: header inside content card.** Moved `DashboardHeader` out of the top reserved titlebar and into the elevated content card so the entire card (header + body) collapses/expands with the sidebar. Removed the duplicate-render hack that previously rendered the header twice (one copy hidden via `display: none`) and zeroed `#main-content`'s top radius to fake a stitched surface.
 - **[internal] Sidebar header identity**: added a "Jovie" wordmark next to the BrandLogo in the default single-profile sidebar header so the header has a clear identity anchor instead of just a 14px logo.
 - **[internal] Titlebar height**: reduced `--electron-titlebar-height` from 52px to 40px now that the header no longer occupies the titlebar.
 
@@ -25,6 +25,13 @@
 - **[internal] Back/forward nav pill in the Electron titlebar**: removed the visible pill. Cmd+[ / Cmd+] still navigate via `useDesktopNavigation`.
 - **[internal] Stitched-surface CSS hacks**: deleted four rule blocks from `globals.css` plus the `[data-sidebar-dock-button]` hide-in-Electron rule (now dead because the button is no longer rendered in Electron).
 - **[internal] `SidebarDockButton` in Electron**: conditionally skipped via `useIsElectronRuntime()` instead of rendered-then-hidden via CSS.
+## [26.5.36] - 2026-05-21
+
+> Chat home no longer advertises album-art generation when the provider is down or feature-flagged off — the suggestion pill is hidden instead of showing as a disabled button, and the "Draft album-art brief" fallback takes its place. Pro upsells stay visible.
+
+### Changed
+
+- **Chat suggestions: hide unavailable album-art capability (JOV-2524)**: `SuggestedPrompts` now omits the "Generate album art" pill entirely when `albumArtCapability.reasonCode` is `PROVIDER_UNAVAILABLE` or `FEATURE_DISABLED`, surfacing the "Draft album-art brief" suggestion in its place. Plan-gated (`PLAN_UNAVAILABLE`) and onboarding-pending (`PROFILE_REQUIRED`) reasons retain the existing disabled-with-tooltip behavior so the upsell affordance is preserved. Sourced from prod chat audit (JOV-2524).
 
 ## [26.5.34.1] - 2026-05-21
 

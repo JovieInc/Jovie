@@ -8,6 +8,7 @@ import {
 } from '@/app/app/(shell)/chat/ChatPageClient';
 import type { DashboardData } from '@/app/app/(shell)/dashboard/actions/dashboard-data';
 import { DashboardDataProvider } from '@/app/app/(shell)/dashboard/DashboardDataContext';
+import type { ChatActionCard } from '@/components/jovie/types';
 import { fastRender } from '@/tests/utils/fast-render';
 
 // Controllable mocks
@@ -81,6 +82,7 @@ vi.mock('@/contexts/HeaderActionsContext', () => ({
 
 // Track the onTitleChange callback from JovieChat
 let capturedOnTitleChange: ((title: string | null) => void) | undefined;
+let capturedActionCards: readonly ChatActionCard[] | undefined;
 
 vi.mock('@/components/jovie/JovieChat', () => ({
   JovieChat: (props: {
@@ -90,13 +92,16 @@ vi.mock('@/components/jovie/JovieChat', () => ({
     onTitleChange?: (title: string | null) => void;
     initialQuery?: string;
     isFirstSession?: boolean;
+    actionCards?: readonly ChatActionCard[];
   }) => {
     capturedOnTitleChange = props.onTitleChange;
+    capturedActionCards = props.actionCards;
     return React.createElement('div', {
       'data-testid': 'jovie-chat',
       'data-profile-id': props.profileId,
       'data-conversation-id': props.conversationId ?? '',
       'data-is-first-session': props.isFirstSession ? 'true' : 'false',
+      'data-action-card-count': String(props.actionCards?.length ?? 0),
     });
   },
 }));
@@ -200,6 +205,7 @@ describe('ChatPageClient', () => {
     vi.useRealTimers();
     mockSearchParams = new URLSearchParams();
     capturedOnTitleChange = undefined;
+    capturedActionCards = undefined;
     mockSuccessNotification.mockReset();
     mockErrorNotification.mockReset();
     mockSetPreviewData.mockReset();
@@ -211,6 +217,56 @@ describe('ChatPageClient', () => {
     const { getByTestId } = renderChatPage();
     const chat = getByTestId('jovie-chat');
     expect(chat.getAttribute('data-profile-id')).toBe('profile-1');
+  });
+
+  it('passes a production-backed action card to new chat threads', () => {
+    const { getByTestId } = renderChatPage();
+    const chat = getByTestId('jovie-chat');
+
+    expect(chat.getAttribute('data-action-card-count')).toBe('1');
+    expect(capturedActionCards?.[0]).toEqual(
+      expect.objectContaining({
+        id: 'connect-music-catalog',
+        title: 'Connect Your Music Catalog',
+        actionLabel: 'Plan Setup',
+        prompt:
+          'Help me connect my music catalog for Test Artist. Use the current profile context and give me the next setup step.',
+      })
+    );
+  });
+
+  it('derives music catalog context from selectedProfile fields', () => {
+    const dataWithConnectedMusic: DashboardData = {
+      ...baseDashboardData,
+      hasMusicLinks: false,
+      selectedProfile: {
+        ...baseDashboardData.selectedProfile!,
+        spotifyId: 'spotify-artist-123',
+      } as DashboardData['selectedProfile'],
+      profileCompletion: {
+        percentage: 100,
+        completedCount: 4,
+        totalCount: 4,
+        steps: [],
+        profileIsLive: true,
+      },
+    };
+
+    fastRender(
+      <DashboardDataProvider value={dataWithConnectedMusic}>
+        <ChatPageClient />
+      </DashboardDataProvider>
+    );
+
+    expect(capturedActionCards?.[0]).toEqual(
+      expect.objectContaining({
+        id: 'plan-next-move',
+        title: 'Plan Your Next Move',
+        actionLabel: 'Plan Move',
+        prompt:
+          'Use my artist profile, music catalog, and dashboard context for Test Artist to recommend the single most useful action I should take this week. Include the first step.',
+      })
+    );
   });
 
   it('passes conversationId to JovieChat', () => {
@@ -305,7 +361,7 @@ describe('ChatPageClient', () => {
     );
   });
 
-  it('does not register chat header actions on the new-thread route', () => {
+  it('does not register chat header actions on the new-chat route', () => {
     renderChatPage();
 
     expect(mockSetHeaderActions).toHaveBeenCalledWith(null);

@@ -1,7 +1,7 @@
 import SwiftUI
 import UIKit
 
-private struct DashboardAvatarView: View {
+struct DashboardAvatarView: View {
   let name: String
   let avatarURL: URL?
 
@@ -41,10 +41,26 @@ struct DashboardView: View {
   let state: DashboardLoadState
   let isOffline: Bool
   let brightnessManager: BrightnessControlling
+  let showVenueModeOnLaunch: Bool
   let onRetry: () async -> Void
 
   @State private var isShowingVenueMode = false
   @State private var didCopyURL = false
+  @State private var didPresentLaunchVenueMode = false
+
+  init(
+    state: DashboardLoadState,
+    isOffline: Bool,
+    brightnessManager: BrightnessControlling,
+    showVenueModeOnLaunch: Bool = false,
+    onRetry: @escaping () async -> Void
+  ) {
+    self.state = state
+    self.isOffline = isOffline
+    self.brightnessManager = brightnessManager
+    self.showVenueModeOnLaunch = showVenueModeOnLaunch
+    self.onRetry = onRetry
+  }
 
   var body: some View {
     ZStack {
@@ -64,6 +80,15 @@ struct DashboardView: View {
           onDismiss: { isShowingVenueMode = false }
         )
       }
+    }
+    .task(id: showVenueModeOnLaunch) {
+      guard showVenueModeOnLaunch, !didPresentLaunchVenueMode else {
+        return
+      }
+
+      didPresentLaunchVenueMode = true
+      await Task.yield()
+      isShowingVenueMode = true
     }
   }
 
@@ -162,11 +187,19 @@ struct DashboardView: View {
             .scaledToFit()
             .padding(24)
             .background(Color.white, in: RoundedRectangle(cornerRadius: 28, style: .continuous))
+            .accessibilityLabel("Profile QR Code")
+        } else {
+          Text("QR unavailable")
+            .font(JovieFont.body(size: 15, weight: .medium))
+            .foregroundStyle(JovieColor.textTertiary)
+            .frame(width: 280, height: 280)
+            .background(JovieColor.surface1, in: RoundedRectangle(cornerRadius: 28, style: .continuous))
         }
       }
       .buttonStyle(.plain)
       .frame(maxWidth: .infinity)
-      .accessibilityLabel(response.publicProfileURL ?? "Profile QR code")
+      .accessibilityLabel("Profile QR Code")
+      .accessibilityIdentifier("profile-qr-button")
 
       Text(response.publicProfileURL ?? "jov.ie")
         .font(JovieFont.body(size: 14))

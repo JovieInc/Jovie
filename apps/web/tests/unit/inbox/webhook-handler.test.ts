@@ -246,7 +246,7 @@ describe('POST /api/webhooks/resend-inbound', () => {
     // Default: no existing thread
     mockFindThread.mockResolvedValue(null);
 
-    // Default: insert returns new thread ID
+    // Default: insert returns new chat ID
     mockDbInsertReturning.mockResolvedValue([{ id: 'thread-new' }]);
 
     // Default: classification succeeds
@@ -333,7 +333,7 @@ describe('POST /api/webhooks/resend-inbound', () => {
       })
     );
 
-    // Should have inserted a new thread (via db.insert)
+    // Should have inserted a new chat (via db.insert)
     expect(mockDbInsert).toHaveBeenCalled();
 
     // Should have stored the inbound email (second insert call)
@@ -375,10 +375,10 @@ describe('POST /api/webhooks/resend-inbound', () => {
 
     expect(res.status).toBe(200);
 
-    // Should update the existing thread (messageCount + 1), not insert a new one
+    // Should update the existing chat (messageCount + 1), not insert a new one
     expect(mockDbUpdate).toHaveBeenCalled();
 
-    // Should NOT classify on existing threads (classification only for new threads)
+    // Should NOT classify on existing chats (classification only for new chats)
     expect(mockClassifyEmail).not.toHaveBeenCalled();
 
     // Should log success
@@ -407,10 +407,10 @@ describe('POST /api/webhooks/resend-inbound', () => {
     // Classification was called but returned null
     expect(mockClassifyEmail).toHaveBeenCalled();
 
-    // Thread should still be created — the update with classification data
+    // Chat should still be created — the update with classification data
     // should NOT happen when classification is null. We verify by checking
     // that db.update was NOT called after thread creation (update is only
-    // called for classification results on new threads).
+    // called for classification results on new chats).
     // The insert for the thread + the insert for the email should still happen.
     expect(mockDbInsert).toHaveBeenCalledTimes(2);
 

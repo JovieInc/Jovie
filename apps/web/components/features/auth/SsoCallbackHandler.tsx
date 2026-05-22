@@ -2,7 +2,7 @@
 
 import { useClerk } from '@clerk/nextjs';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 import { LoadingSpinner } from '@/components/atoms/LoadingSpinner';
 import { APP_ROUTES } from '@/constants/routes';
@@ -10,6 +10,7 @@ import {
   isAccessDeniedError,
   isAccountExistsError,
 } from '@/lib/auth/clerk-errors';
+import { buildDesktopCallbackFallbackRedirectUrl } from '@/lib/desktop/auth-return';
 import { logger } from '@/lib/utils/logger';
 
 /** Seconds before showing stall message */
@@ -86,9 +87,21 @@ export function SsoCallbackHandler({
 }: Readonly<SsoCallbackHandlerProps>) {
   const clerk = useClerk();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [isHandlingHash, setIsHandlingHash] = useState(false);
   const [isStalled, setIsStalled] = useState(false);
   const callbackInitiated = useRef(false);
+  const searchParamsString = searchParams.toString();
+  const resolvedSignInFallbackRedirectUrl =
+    buildDesktopCallbackFallbackRedirectUrl(
+      searchParams,
+      signInFallbackRedirectUrl
+    );
+  const resolvedSignUpFallbackRedirectUrl =
+    buildDesktopCallbackFallbackRedirectUrl(
+      searchParams,
+      signUpFallbackRedirectUrl
+    );
 
   useEffect(() => {
     // Check for unexpected hash fragments that Clerk might add
@@ -112,11 +125,11 @@ export function SsoCallbackHandler({
       // The user is already authenticated via OAuth at this point
       globalThis.history.replaceState(null, '', globalThis.location.pathname);
 
-      // Use signInFallbackRedirectUrl as the default destination
+      // Use sign-in fallback as the default destination
       // since password prompts typically happen for existing users
-      router.replace(signInFallbackRedirectUrl);
+      router.replace(resolvedSignInFallbackRedirectUrl);
     }
-  }, [router, signInFallbackRedirectUrl]);
+  }, [router, resolvedSignInFallbackRedirectUrl]);
 
   // Process the OAuth callback imperatively
   useEffect(() => {
@@ -129,12 +142,14 @@ export function SsoCallbackHandler({
 
     clerk
       .handleRedirectCallback({
-        signInFallbackRedirectUrl,
-        signUpFallbackRedirectUrl,
+        signInFallbackRedirectUrl: resolvedSignInFallbackRedirectUrl,
+        signUpFallbackRedirectUrl: resolvedSignUpFallbackRedirectUrl,
         transferable: true,
       })
       .catch((err: unknown) => {
         const errorType = classifyOAuthError(err);
+        const nextSearchParams = new URLSearchParams(searchParamsString);
+        nextSearchParams.set('oauth_error', errorType);
 
         logger.warn(
           'OAuth callback failed',
@@ -147,14 +162,15 @@ export function SsoCallbackHandler({
 
         // Redirect to signup page with error classification so it can
         // show the appropriate error message using existing OAuth error UI
-        router.replace(`${APP_ROUTES.SIGNUP}?oauth_error=${errorType}`);
+        router.replace(`${APP_ROUTES.SIGNUP}?${nextSearchParams.toString()}`);
       });
   }, [
     clerk,
     router,
     isHandlingHash,
-    signInFallbackRedirectUrl,
-    signUpFallbackRedirectUrl,
+    searchParamsString,
+    resolvedSignInFallbackRedirectUrl,
+    resolvedSignUpFallbackRedirectUrl,
   ]);
 
   // Stall detection: if the callback hasn't resolved after a timeout, show help

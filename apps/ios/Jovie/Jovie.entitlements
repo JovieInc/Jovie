@@ -4,7 +4,7 @@
 <dict>
   <key>com.apple.developer.associated-domains</key>
   <array>
-    <string>webcredentials:distinct-giraffe-5.clerk.accounts.dev</string>
+    <string>webcredentials:$(CLERK_ASSOCIATED_DOMAIN)</string>
   </array>
 </dict>
 </plist>

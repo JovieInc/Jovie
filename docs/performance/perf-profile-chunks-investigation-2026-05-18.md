@@ -1,7 +1,7 @@
 # Profile Route JS Chunk Reduction Investigation
-**Date**: 2026-05-18  
-**Issue**: JOV-2271  
-**Branch**: `tim/jov-2271-profile-chunk-reduction`  
+**Date**: 2026-05-18
+**Issue**: JOV-2271
+**Branch**: `tim/jov-2271-profile-chunk-reduction`
 **Investigator**: Agent (coder profile)
 
 ## Goal
@@ -107,25 +107,25 @@ These would require significant refactoring outside the JOV-2271 scope:
 ### Option A: Merge client boundaries in `page.tsx`
 Create a single `ProfileClientGroup` component that wraps `PublicClaimBanner`, `DesktopQrOverlayClient`, `ProfileViewTracker`, and `JoviePixel` into one client boundary. This reduces 4 independent client module entries to 1.
 
-**Estimated reduction**: ~6-8 chunks (the shared chunks created specifically for these components)  
+**Estimated reduction**: ~6-8 chunks (the shared chunks created specifically for these components)
 **Risk**: Moderate. Would need careful review of SSR impact for each component.
 
 ### Option B: Reduce `ProfileCompactTemplate` imports
 `ProfileCompactTemplate` currently imports the full `motion` (Framer Motion) library. Replacing motion animations with CSS transitions would eliminate one of the largest vendor trees from the initial profile bundle.
 
-**Estimated reduction**: ~5-8 chunks (motion-related vendor chunks)  
+**Estimated reduction**: ~5-8 chunks (motion-related vendor chunks)
 **Risk**: High. Requires visual regression testing across all profile animation states.
 
 ### Option C: Convert `ErrorBanner` to server-renderable fallback on the profile route
 Replace the `ErrorBanner` client component (which imports `sonner` toast library) in `page.tsx` with a simple server-rendered error state. `ErrorBanner` is only shown on DB errors and doesn't need client interactivity on the profile page.
 
-**Estimated reduction**: ~2-3 chunks (sonner vendor tree)  
+**Estimated reduction**: ~2-3 chunks (sonner vendor tree)
 **Risk**: Low. The error path is rare; a server-rendered fallback is sufficient.
 
 ### Option D: Next.js upgrade with improved ISR streaming
 A Next.js upgrade introducing server component streaming could allow lazy-loading entire route segments. This is the only way to get the profile route below ~25 chunks without major refactoring.
 
-**Estimated reduction**: ~10+ chunks (if ISR streaming + server suspense is available)  
+**Estimated reduction**: ~10+ chunks (if ISR streaming + server suspense is available)
 **Risk**: High. Requires framework upgrade and testing.
 
 ## Current State

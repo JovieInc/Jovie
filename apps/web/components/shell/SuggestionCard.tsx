@@ -53,24 +53,26 @@ export function SuggestionCard({
   return (
     <article
       className={cn(
-        'group/sug relative w-full rounded-[18px] overflow-hidden border border-white/[0.05] bg-(--linear-app-content-surface)',
+        'group/sug relative min-h-[148px] w-full overflow-hidden rounded-[18px] border border-white/[0.05] bg-(--linear-app-content-surface)',
         className
       )}
       style={{
         boxShadow:
           'inset 0 1px 0 rgba(255,255,255,0.04), 0 1px 2px rgba(0,0,0,0.18), 0 16px 40px -16px rgba(0,0,0,0.4)',
-        transition: `transform var(--ds-motion-cinematic-duration) ${EASE_CINEMATIC}, box-shadow var(--ds-motion-cinematic-duration) ${EASE_CINEMATIC}`,
+        transition: `box-shadow var(--ds-motion-cinematic-duration) ${EASE_CINEMATIC}`,
       }}
     >
-      <div className='px-7 py-6'>
-        <h2 className='text-[17px] font-semibold leading-[1.3] text-primary-token'>
-          {title}
-        </h2>
-        <p className='mt-2 text-[12.5px] leading-[1.6] text-tertiary-token'>
-          {body}
-        </p>
+      <div className='grid min-h-[inherit] grid-cols-1 items-center gap-4 px-5 py-5 sm:grid-cols-[minmax(0,1fr)_auto] sm:px-7'>
+        <div className='min-w-0'>
+          <h2 className='text-pretty text-[16px] font-semibold leading-[1.3] text-primary-token sm:text-[17px]'>
+            {title}
+          </h2>
+          <p className='mt-2 max-w-[48ch] text-pretty text-[12.5px] leading-[1.55] text-tertiary-token'>
+            {body}
+          </p>
+        </div>
 
-        <div className='mt-6 flex items-center justify-end gap-1'>
+        <div className='flex shrink-0 items-center justify-start gap-1 sm:justify-end'>
           {onDismiss && (
             <button
               type='button'
@@ -84,7 +86,7 @@ export function SuggestionCard({
             type='button'
             onClick={onAct}
             disabled={!onAct}
-            className='inline-flex items-center gap-1.5 h-7 px-3.5 rounded-full text-[12px] font-medium bg-white text-black hover:brightness-110 active:scale-[0.99] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/55 focus-visible:ring-offset-2 focus-visible:ring-offset-(--linear-bg-page) disabled:cursor-not-allowed disabled:opacity-60 shadow-[0_4px_14px_rgba(0,0,0,0.35),inset_0_1px_0_rgba(255,255,255,0.45)] transition-[filter,transform,box-shadow,opacity] duration-subtle ease-out'
+            className='inline-flex items-center gap-1.5 h-7 px-3.5 rounded-full text-[12px] font-medium bg-white text-black hover:brightness-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/55 focus-visible:ring-offset-2 focus-visible:ring-offset-(--linear-bg-page) disabled:cursor-not-allowed disabled:opacity-60 shadow-[0_4px_14px_rgba(0,0,0,0.35),inset_0_1px_0_rgba(255,255,255,0.45)] transition-[filter,box-shadow,opacity] duration-subtle ease-out'
           >
             {actionLabel}
             <ArrowRight className='h-3 w-3' strokeWidth={2.5} />

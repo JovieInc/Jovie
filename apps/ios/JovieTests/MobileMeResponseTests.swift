@@ -7,10 +7,10 @@ struct MobileMeResponseTests {
     let data = """
       {
         "state": "ready",
-        "displayName": "DJ Shadow",
-        "username": "djshadow",
-        "publicProfileUrl": "https://jov.ie/djshadow",
-        "qrPayload": "https://jov.ie/djshadow",
+        "displayName": "Tim White",
+        "username": "tim",
+        "publicProfileUrl": "https://jov.ie/tim",
+        "qrPayload": "https://jov.ie/tim",
         "avatarUrl": null,
         "continueOnWebUrl": "https://jov.ie/app"
       }
@@ -19,7 +19,7 @@ struct MobileMeResponseTests {
     let response = try JSONDecoder().decode(MobileMeResponse.self, from: data)
 
     #expect(response.state == .ready)
-    #expect(response.publicProfileURL == "https://jov.ie/djshadow")
+    #expect(response.publicProfileURL == "https://jov.ie/tim")
   }
 
   @Test func decodesNeedsOnboardingResponse() throws {

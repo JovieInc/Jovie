@@ -1,6 +1,6 @@
 {
   "name": "jovie-monorepo",
-  "version": "26.5.35.0",
+  "version": "26.5.37.0",
   "private": true,
   "config": {
     "commitizen": {
@@ -76,6 +76,7 @@
     "ios:setup-env": "bash apps/ios/scripts/setup-env.sh",
     "ios:build": "bash apps/ios/scripts/run-xcodebuild.sh build",
     "ios:test": "bash apps/ios/scripts/run-xcodebuild.sh test",
+    "ios:screenshots": "bash apps/ios/scripts/capture-screenshots.sh",
     "build": "node scripts/turbo-local.mjs build",
     "build:web": "node scripts/turbo-local.mjs build --filter=@jovie/web",
     "lint": "node scripts/run-scoped-turbo-task.mjs lint",

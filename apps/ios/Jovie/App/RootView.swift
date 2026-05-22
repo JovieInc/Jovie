@@ -105,6 +105,7 @@ private enum LiveAuthBootstrapper {
 
 private struct AppContentView: View {
   @Bindable var appState: AppState
+  let onLogout: @MainActor () async -> Void
 
   var body: some View {
     Group {
@@ -114,14 +115,29 @@ private struct AppContentView: View {
       case .signedOut:
         AuthScreen(isMock: !appState.launchMode.usesLiveClerk)
       case .needsOnboarding:
-        NeedsOnboardingView(continueURL: appState.continueOnWebURL)
+        AppShellView(
+          profile: AppShellProfile(response: nil),
+          isOffline: false,
+          initialPanel: appState.launchMode.opensSettingsOnLaunch ? .settings : .main,
+          onLogout: onLogout
+        ) {
+          NeedsOnboardingView(continueURL: appState.continueOnWebURL)
+        }
       case .ready:
-        DashboardView(
-          state: appState.dashboardState,
+        AppShellView(
+          profile: AppShellProfile(response: appState.loadedDashboardResponse),
           isOffline: appState.isOffline,
-          brightnessManager: appState.brightnessManager,
-          onRetry: { await appState.retry() }
-        )
+          initialPanel: appState.launchMode.opensSettingsOnLaunch ? .settings : .main,
+          onLogout: onLogout
+        ) {
+          DashboardView(
+            state: appState.dashboardState,
+            isOffline: appState.isOffline,
+            brightnessManager: appState.brightnessManager,
+            showVenueModeOnLaunch: appState.launchMode.opensVenueModeOnLaunch,
+            onRetry: { await appState.retry() }
+          )
+        }
       }
     }
   }
@@ -130,9 +146,10 @@ private struct AppContentView: View {
 struct RootView: View {
   @Bindable var appState: AppState
   let liveUserID: String?
+  let onLogout: @MainActor () async -> Void
 
   var body: some View {
-    AppContentView(appState: appState)
+    AppContentView(appState: appState, onLogout: onLogout)
       .task(id: "\(appState.didLoadClerk)-\(liveUserID ?? "signed-out")") {
         if appState.launchMode.requiresAutoAuth, liveUserID == nil {
           return
@@ -153,7 +170,14 @@ struct LiveRootContainer: View {
   @State private var didBootstrapLiveAuth = false
 
   var body: some View {
-    RootView(appState: appState, liveUserID: clerk.user?.id)
+    RootView(
+      appState: appState,
+      liveUserID: clerk.user?.id,
+      onLogout: {
+        try? await clerk.auth.signOut()
+        await appState.signOut()
+      }
+    )
       .task(id: appState.launchMode.requiresAutoAuth) {
         guard appState.launchMode.requiresAutoAuth, didBootstrapLiveAuth == false else {
           return
@@ -173,5 +197,15 @@ struct LiveRootContainer: View {
           )
         }
       }
+  }
+}
+
+private extension AppState {
+  var loadedDashboardResponse: MobileMeResponse? {
+    guard case let .loaded(response) = dashboardState else {
+      return nil
+    }
+
+    return response
   }
 }

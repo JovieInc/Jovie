@@ -1,5 +1,5 @@
 /** @type {import('@stryker-mutator/api/core').PartialStrykerOptions} */
-export default {
+const strykerConfig = {
   packageManager: 'pnpm',
   plugins: ['@stryker-mutator/vitest-runner'],
   testRunner: 'vitest',
@@ -281,3 +281,5 @@ export default {
   timeoutMS: 15000,
   dryRunTimeoutMinutes: 10,
 };
+
+export default strykerConfig;

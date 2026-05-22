@@ -10,7 +10,6 @@ import {
 import { Copy, ExternalLink } from 'lucide-react';
 import Link from 'next/link';
 import {
-  type ComponentType,
   type MouseEvent,
   type ReactNode,
   useCallback,
@@ -24,12 +23,15 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
 } from '@/components/organisms/Sidebar';
+import {
+  getSidebarNavIconClassName,
+  getSidebarNavRowClassName,
+} from '@/components/shell/SidebarNavItem';
 import { Tooltip } from '@/components/shell/Tooltip';
 import { BASE_URL } from '@/constants/domains';
 import { copyToClipboard } from '@/hooks/useClipboard';
 import { useIsElectronRuntime } from '@/lib/desktop/electron-bridge';
 import type { KeyboardShortcut } from '@/lib/keyboard-shortcuts';
-import { cn } from '@/lib/utils';
 import type { NavItem } from './types';
 
 interface NavMenuItemProps {
@@ -270,25 +272,16 @@ export function NavMenuItem({
     showPendingShell,
   ]);
 
-  const ShellIcon = item.icon as ComponentType<{
-    readonly className?: string;
-    readonly strokeWidth?: number;
-  }>;
   const shellNavItem = useShellNavItem;
-  const shellNavClassName = cn(
-    'relative flex h-6 w-full items-center gap-2 rounded-md pl-2.5 pr-2 text-[12.5px] tracking-[-0.005em] transition-colors duration-subtle ease-out',
-    isActive
-      ? 'bg-surface-1 text-primary-token'
-      : 'text-secondary-token hover:bg-surface-1 hover:text-primary-token',
-    'group-data-[collapsible=icon]:mx-auto group-data-[collapsible=icon]:h-8 group-data-[collapsible=icon]:w-10 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0'
-  );
+  const shellNavClassName = getSidebarNavRowClassName({
+    active: isActive,
+    className:
+      'group-data-[collapsible=icon]:mx-auto group-data-[collapsible=icon]:h-8 group-data-[collapsible=icon]:w-10 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0',
+  });
   const shellInnerContent = (
     <>
-      <ShellIcon
-        className={cn(
-          'h-3 w-3 shrink-0',
-          isActive ? 'text-primary-token' : 'text-tertiary-token'
-        )}
+      <item.icon
+        className={getSidebarNavIconClassName({ active: isActive })}
         strokeWidth={2.25}
         aria-hidden='true'
       />

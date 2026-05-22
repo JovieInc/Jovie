@@ -25,18 +25,22 @@ final class ScreenBrightnessManager: BrightnessControlling, @unchecked Sendable 
   }
 
   func setMaxBrightness() async {
-    guard originalBrightness == nil else {
-      provider.currentBrightness = 1
-      return
-    }
+    await MainActor.run {
+      guard originalBrightness == nil else {
+        provider.currentBrightness = 1
+        return
+      }
 
-    originalBrightness = provider.currentBrightness
-    provider.currentBrightness = 1
+      originalBrightness = provider.currentBrightness
+      provider.currentBrightness = 1
+    }
   }
 
   func restoreBrightness() async {
-    guard let originalBrightness else { return }
-    provider.currentBrightness = originalBrightness
-    self.originalBrightness = nil
+    await MainActor.run {
+      guard let originalBrightness else { return }
+      provider.currentBrightness = originalBrightness
+      self.originalBrightness = nil
+    }
   }
 }

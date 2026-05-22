@@ -3,11 +3,11 @@
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { ImagePlus } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { JovieMarkElectric } from '@/components/atoms/JovieMarkElectric';
+import { SuggestionCard } from '@/components/shell/SuggestionCard';
 import { useAppFlag } from '@/lib/flags/client';
 import { SUPPORTED_IMAGE_MIME_TYPES } from '@/lib/images/config';
-import { useChatCapabilitiesQuery } from '@/lib/queries';
 import { cn } from '@/lib/utils';
 
 import { CHAT_COMPOSER_DOCK_CLASSNAME } from './chat-layout';
@@ -17,14 +17,9 @@ import {
   ChatMessageSkeleton,
   ErrorDisplay,
   ScrollToBottom,
-  SuggestedPrompts,
 } from './components';
 import { ChatProvidersRegistrar } from './components/ChatProvidersRegistrar';
 import { ChatUsageAlert } from './components/ChatUsageAlert';
-import {
-  CHAT_PROMPT_RAIL_MASK_STYLE,
-  CHAT_PROMPT_RAIL_SCROLL_CLASS,
-} from './components/chat-prompt-styles';
 import { EntityResolutionProvider } from './components/EntityResolutionProvider';
 import {
   useChatImageAttachments,
@@ -37,61 +32,6 @@ import type { JovieChatProps, MessagePart } from './types';
 /** Sentinel ID for the synthetic thinking placeholder */
 const THINKING_PLACEHOLDER_ID = 'thinking-placeholder';
 const VIRTUALIZATION_THRESHOLD = 12;
-const EMPTY_STATE_SIGNAL_CARDS = [
-  {
-    headline: 'Release plan',
-    body: 'Turn a song into a launch sequence.',
-  },
-  {
-    headline: 'Asset brief',
-    body: 'Creative direction and copy, ready to use.',
-  },
-  {
-    headline: 'Context',
-    body: 'Releases, contacts, and references stay attached.',
-  },
-] as const;
-
-function EmptyStateSignalCards({
-  dimmed = false,
-}: {
-  readonly dimmed?: boolean;
-}) {
-  return (
-    <div
-      className={cn('w-full max-w-[52rem]', dimmed && 'pointer-events-none')}
-      aria-hidden={dimmed ? 'true' : undefined}
-      data-testid='chat-empty-state-top-signals'
-    >
-      <div
-        className={cn(
-          CHAT_PROMPT_RAIL_SCROLL_CLASS,
-          'overscroll-x-contain px-1 sm:px-0 lg:overflow-visible'
-        )}
-        style={CHAT_PROMPT_RAIL_MASK_STYLE}
-      >
-        <div
-          className='flex snap-x snap-mandatory flex-nowrap gap-3 lg:grid lg:grid-cols-3'
-          data-testid='chat-empty-state-top-signals-row'
-        >
-          {EMPTY_STATE_SIGNAL_CARDS.map(card => (
-            <article
-              key={card.headline}
-              className='min-h-[124px] min-w-[min(19rem,84vw)] flex-1 snap-start rounded-[22px] border border-subtle bg-surface-1 px-4 py-4 shadow-[0_16px_44px_-30px_rgba(0,0,0,0.92)] lg:min-w-0'
-            >
-              <p className='text-pretty text-[17px] font-semibold leading-[1.2] text-primary-token'>
-                {card.headline}
-              </p>
-              <p className='mt-3 max-w-[24ch] text-[12.5px] leading-5 text-tertiary-token'>
-                {card.body}
-              </p>
-            </article>
-          ))}
-        </div>
-      </div>
-    </div>
-  );
-}
 
 /**
  * Extracts the first name token for use in the empty-state greeting (e.g. "What are we working on, Alex?").
@@ -131,15 +71,14 @@ export function JovieChat({
   username,
   displayName,
   isFirstSession = false,
-  latestReleaseTitle,
+  actionCards = [],
 }: JovieChatProps) {
   const initialQuerySubmitted = useRef(false);
   const initialSkillApplied = useRef(false);
   const imageFileInputRef = useRef<HTMLInputElement>(null);
   // Track message IDs that were loaded from persistence to skip entrance animation
   const knownMessageIdsRef = useRef<Set<string>>(new Set());
-  // Variant F: dim suggestion chips while the slash picker is open so they
-  // don't compete with the morphing surface.
+  // Hide neighbouring affordances while the slash picker owns the composer.
   const [composerPickerOpen, setComposerPickerOpen] = useState(false);
   const {
     input,
@@ -169,71 +108,6 @@ export function JovieChat({
     onConversationCreate,
     username,
   });
-  const {
-    data: chatCapabilities,
-    isLoading: isLoadingCapabilities,
-    isError: isCapabilitiesError,
-  } = useChatCapabilitiesQuery({
-    profileId,
-    enabled: Boolean(profileId),
-  });
-  const albumArtCapability =
-    chatCapabilities?.tools.albumArt ??
-    (isCapabilitiesError
-      ? {
-          availability: 'unavailable' as const,
-          reason: 'Album art availability could not be verified.',
-          reasonCode: 'CAPABILITY_CHECK_FAILED',
-        }
-      : {
-          availability:
-            profileId && isLoadingCapabilities
-              ? ('unknown' as const)
-              : ('unavailable' as const),
-          reason: profileId
-            ? 'Checking album art availability...'
-            : 'Album art generation needs an artist profile.',
-          reasonCode: profileId ? 'CHECKING' : 'PROFILE_REQUIRED',
-        });
-
-  const followUpQuickActions = useMemo(
-    () => [
-      {
-        label: 'Summarize this thread',
-        prompt: 'Summarize this thread in three concise bullets.',
-      },
-      {
-        label: 'What should I do next?',
-        prompt: 'Based on this conversation, what should I do next?',
-      },
-      {
-        label: 'Turn it into a checklist',
-        prompt: 'Turn this conversation into a short checklist I can follow.',
-      },
-    ],
-    []
-  );
-  const starterQuickActions = useMemo(
-    () => [
-      {
-        label: 'Plan a release',
-        prompt: 'Help me plan my next release.',
-      },
-      {
-        label: 'Generate album art',
-        prompt: 'Generate album art ideas for my next release.',
-      },
-      {
-        label: 'Pitch playlists',
-        prompt: 'Help me pitch this release to playlists.',
-      },
-      {
-        label: 'Send feedback',
-        prompt: '/feedback ',
-      },
-    ],
-    []
-  );
 
   // Image attachments for chat messages
   const {
@@ -288,7 +162,6 @@ export function JovieChat({
 
   // ─── Chat jank instrumentation (flag-gated) ─────────────────
   const jankMonitorEnabled = useAppFlag('CHAT_JANK_MONITOR');
-  const shellChatV1Enabled = useAppFlag('DESIGN_V1');
   const designV1ChatEntitiesEnabled = useAppFlag('DESIGN_V1');
   const { onSend: notifyJankSend } = useChatJankMonitor({
     conversationId: activeConversationId,
@@ -499,7 +372,9 @@ export function JovieChat({
 
   const greetingName =
     getFirstNameForGreeting(displayName) ?? getFirstNameForGreeting(username);
-  const showStarterPrompts =
+  const primaryActionCard = actionCards[0] ?? null;
+  const showActionCardContent =
+    primaryActionCard !== null &&
     input.trim().length === 0 &&
     !composerPickerOpen &&
     (pendingImages?.length ?? 0) === 0 &&
@@ -590,47 +465,28 @@ export function JovieChat({
                     className='pointer-events-none absolute inset-0 flex items-center justify-center select-none anim-calm-breath opacity-45'
                     data-testid='chat-empty-thread-ornament'
                   >
-                    {shellChatV1Enabled ? (
-                      <JovieMarkElectric
-                        spark={false}
-                        className='opacity-100'
-                        style={{
-                          width: 'clamp(180px, 34vw, 360px)',
-                          height: 'clamp(180px, 34vw, 360px)',
-                          transform: 'translateY(-16px)',
-                          WebkitMaskImage:
-                            'radial-gradient(circle, rgba(0,0,0,1) 55%, rgba(0,0,0,0.75) 75%, rgba(0,0,0,0) 95%)',
-                          maskImage:
-                            'radial-gradient(circle, rgba(0,0,0,1) 55%, rgba(0,0,0,0.75) 75%, rgba(0,0,0,0) 95%)',
-                        }}
-                      />
-                    ) : (
-                      <span
-                        style={{
-                          fontFamily:
-                            'var(--font-display, "Satoshi", -apple-system, system-ui, sans-serif)',
-                          fontWeight: 600,
-                          fontSize: 'clamp(180px, 38vw, 360px)',
-                          color: 'rgba(255,255,255,0.018)',
-                          letterSpacing: '-0.08em',
-                          lineHeight: 0.8,
-                          transform: 'translateY(-12px)',
-                        }}
-                      >
-                        j
-                      </span>
-                    )}
+                    <JovieMarkElectric
+                      spark={false}
+                      className='opacity-100'
+                      style={{
+                        width: 'clamp(180px, 34vw, 360px)',
+                        height: 'clamp(180px, 34vw, 360px)',
+                        transform: 'translateY(-16px)',
+                        WebkitMaskImage:
+                          'radial-gradient(circle, rgba(0,0,0,1) 55%, rgba(0,0,0,0.75) 75%, rgba(0,0,0,0) 95%)',
+                        maskImage:
+                          'radial-gradient(circle, rgba(0,0,0,1) 55%, rgba(0,0,0,0.75) 75%, rgba(0,0,0,0) 95%)',
+                      }}
+                    />
                   </div>
 
                   <div
-                    className='relative mx-auto flex min-h-full w-full max-w-[52rem] flex-col gap-6 py-8'
+                    className='relative mx-auto flex min-h-full w-full max-w-[52rem] flex-col items-center justify-center gap-5 py-8'
                     data-testid='chat-empty-state-composer-region'
                   >
-                    <EmptyStateSignalCards dimmed={composerPickerOpen} />
-
                     <h1
                       className={cn(
-                        'text-balance text-center text-[2rem] font-semibold leading-[1.1] text-primary-token sm:text-[2.5rem] md:text-[3rem]',
+                        'text-balance text-center text-[2rem] font-semibold leading-[1.1] text-primary-token sm:text-[2.35rem] md:text-[2.65rem]',
                         composerPickerOpen && 'pointer-events-none opacity-0'
                       )}
                       aria-hidden={composerPickerOpen ? 'true' : undefined}
@@ -638,23 +494,22 @@ export function JovieChat({
                       {emptyStateHeading}
                     </h1>
 
-                    <div className='mx-auto flex w-full max-w-[45rem] flex-col items-center gap-3'>
-                      {/* Suggested prompts rail lives in upper morph area (above persistent dock).
-                          Alerts, rate-limit, and errors are unified into the always-rendered dock
-                          below for parity with thread view and to remove duplicate composer chrome. */}
-                      {showStarterPrompts ? (
-                        <div
-                          className='w-full'
-                          data-testid='chat-empty-state-prompt-rail'
-                        >
-                          <SuggestedPrompts
-                            onSelect={handleSuggestedPromptWithJank}
-                            isFirstSession={isFirstSession}
-                            latestReleaseTitle={latestReleaseTitle}
-                            albumArtCapability={albumArtCapability}
-                            layout='rail'
-                          />
-                        </div>
+                    <div
+                      className='mx-auto flex h-[172px] w-full max-w-[38rem] items-center justify-center sm:h-[148px]'
+                      data-testid='chat-empty-state-action-card-slot'
+                    >
+                      {showActionCardContent ? (
+                        <SuggestionCard
+                          className='h-full'
+                          title={primaryActionCard.title}
+                          body={primaryActionCard.body}
+                          actionLabel={primaryActionCard.actionLabel}
+                          onAct={() =>
+                            handleSuggestedPromptWithJank(
+                              primaryActionCard.prompt
+                            )
+                          }
+                        />
                       ) : null}
                     </div>
                   </div>
@@ -797,11 +652,7 @@ export function JovieChat({
                   showThreadView ? 'Ask a follow-up...' : 'Ask Jovie...'
                 }
                 variant={showThreadView ? 'compact' : 'hero'}
-                shellChatV1={shellChatV1Enabled}
-                quickActions={
-                  showThreadView ? followUpQuickActions : starterQuickActions
-                }
-                onQuickActionSelect={handleSuggestedPromptWithJank}
+                shellChatV1
               />
             </div>
           </div>

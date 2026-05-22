@@ -7,6 +7,7 @@
  * /investors etc NEVER trigger the public-profile audience block DB path.
  */
 import { describe, expect, it } from 'vitest';
+import { APP_ROUTES } from '@/constants/routes';
 import {
   categorizePath,
   getPublicProfileCandidate,
@@ -39,6 +40,19 @@ describe('route-policy (proxy-routing)', () => {
       expect(getPublicProfileCandidate('/_next/static')).toBeNull(); // multi but first seg
       expect(getPublicProfileCandidate('/__clerk')).toBeNull();
       expect(getPublicProfileCandidate('/api/foo')).toBeNull();
+    });
+
+    it('reserves every single-segment APP_ROUTES value from public-profile lookup', () => {
+      const topLevelRoutes = Object.values(APP_ROUTES).filter(route => {
+        if (typeof route !== 'string' || !route.startsWith('/')) return false;
+        const rest = route.slice(1);
+        return rest.length > 0 && !rest.includes('/');
+      });
+
+      for (const route of topLevelRoutes) {
+        expect(getPublicProfileCandidate(route), route).toBeNull();
+        expect(isPublicProfileAudienceBlockCandidate(route), route).toBe(false);
+      }
     });
 
     it('returns the username for valid single-segment profile-shaped paths', () => {

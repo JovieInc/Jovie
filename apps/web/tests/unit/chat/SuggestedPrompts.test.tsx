@@ -158,4 +158,71 @@ describe('SuggestedPrompts', () => {
     expect(onSelect).not.toHaveBeenCalled();
     expect(queryByRole('button', { name: 'Draft album-art brief' })).toBeNull();
   });
+
+  it('omits "Generate album art" entirely when provider is unavailable and surfaces the brief in its place', () => {
+    const onSelect = vi.fn();
+    const { queryByRole, getByRole } = fastRender(
+      <SuggestedPrompts
+        onSelect={onSelect}
+        albumArtCapability={{
+          availability: 'unavailable',
+          reason: 'Album art generation is temporarily unavailable.',
+          reasonCode: 'PROVIDER_UNAVAILABLE',
+        }}
+      />
+    );
+
+    // Provider broken → don't advertise a capability we can't deliver.
+    expect(queryByRole('button', { name: 'Generate album art' })).toBeNull();
+
+    // Brief fallback still surfaces a useful creative action.
+    const draftBrief = getByRole('button', { name: 'Draft album-art brief' });
+    expect(draftBrief).toBeEnabled();
+    draftBrief.click();
+    expect(onSelect).toHaveBeenCalledWith(
+      'Draft an album-art brief for my latest release with visual direction, mood, palette, typography, and production notes.'
+    );
+  });
+
+  it('omits "Generate album art" entirely when the feature flag is disabled', () => {
+    const onSelect = vi.fn();
+    const { queryByRole, getByRole } = fastRender(
+      <SuggestedPrompts
+        onSelect={onSelect}
+        albumArtCapability={{
+          availability: 'unavailable',
+          reason: 'Album art generation is not enabled for this workspace.',
+          reasonCode: 'FEATURE_DISABLED',
+        }}
+      />
+    );
+
+    expect(queryByRole('button', { name: 'Generate album art' })).toBeNull();
+    expect(
+      getByRole('button', { name: 'Draft album-art brief' })
+    ).toBeEnabled();
+  });
+
+  it('keeps "Generate album art" visible-but-disabled for plan-gated users (upsell)', () => {
+    const onSelect = vi.fn();
+    const { getByRole } = fastRender(
+      <SuggestedPrompts
+        onSelect={onSelect}
+        albumArtCapability={{
+          availability: 'unavailable',
+          reason: 'Album art generation requires a Pro plan.',
+          reasonCode: 'PLAN_UNAVAILABLE',
+        }}
+      />
+    );
+
+    // Plan-gated → keep the pill as a Pro upsell affordance.
+    const albumArt = getByRole('button', { name: 'Generate album art' });
+    expect(albumArt).toBeDisabled();
+
+    // Brief fallback still surfaces for the free-tier user.
+    expect(
+      getByRole('button', { name: 'Draft album-art brief' })
+    ).toBeEnabled();
+  });
 });

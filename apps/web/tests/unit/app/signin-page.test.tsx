@@ -190,4 +190,28 @@ describe('signin page', () => {
       })
     );
   });
+
+  it('uses desktop_return for desktop browser auth fallback and cross-link', async () => {
+    searchParamsState.value =
+      'desktop_return=%2Fapp%2Fsettings%3Ftab%3Dbilling';
+
+    render(<SignInPage />);
+
+    await waitFor(() => {
+      expect(clerkSignInMock).toHaveBeenCalledTimes(1);
+    });
+
+    expect(clerkSignInMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        signUpUrl: fullAuthUrl(
+          '/signup?desktop_return=%2Fapp%2Fsettings%3Ftab%3Dbilling'
+        ),
+        fallbackRedirectUrl:
+          '/auth-return?route=%2Fapp%2Fsettings%3Ftab%3Dbilling',
+      })
+    );
+    expect(routerPrefetchMock).toHaveBeenCalledWith(
+      '/signup?desktop_return=%2Fapp%2Fsettings%3Ftab%3Dbilling'
+    );
+  });
 });
