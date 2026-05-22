@@ -10,12 +10,104 @@ IOS_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 PROJECT_PATH="$IOS_DIR/Jovie.xcodeproj"
 SCHEME="Jovie"
 
-DESTINATIONS="$(
-  xcodebuild -showdestinations \
-    -project "$PROJECT_PATH" \
-    -scheme "$SCHEME" \
-    2>/dev/null || true
-)"
+run_with_timeout() {
+  local timeout_seconds="$1"
+  shift
+
+  local start_time
+  start_time="$(date +%s)"
+
+  "$@" &
+  local command_pid=$!
+
+  while kill -0 "$command_pid" 2>/dev/null; do
+    local now
+    now="$(date +%s)"
+    if ((now - start_time >= timeout_seconds)); then
+      kill "$command_pid" 2>/dev/null || true
+      sleep 1
+      kill -9 "$command_pid" 2>/dev/null || true
+      wait "$command_pid" 2>/dev/null || true
+      return 124
+    fi
+
+    sleep 1
+  done
+
+  wait "$command_pid"
+}
+
+pick_destination_from_simctl() {
+  local prefer_ios_prefix="${1:-}"
+  local prefer_name_pattern="${2:-}"
+  local devices_json
+
+  devices_json="$(xcrun simctl list devices available -j 2>/dev/null || true)"
+  if [[ -z "$devices_json" ]]; then
+    return 0
+  fi
+
+  printf '%s\n' "$devices_json" | PREFER_IOS_PREFIX="$prefer_ios_prefix" PREFER_NAME_PATTERN="$prefer_name_pattern" RUBYOPT= ruby -rjson -e '
+    prefer_ios_prefix = ENV.fetch("PREFER_IOS_PREFIX", "")
+    prefer_name_pattern = ENV.fetch("PREFER_NAME_PATTERN", "")
+    candidates = []
+
+    JSON.parse($stdin.read).fetch("devices", {}).each do |runtime, devices|
+      runtime_version = runtime.to_s[/iOS-([0-9-]+)/, 1]
+      next if runtime_version.nil?
+
+      os = runtime_version.tr("-", ".")
+
+      devices.each do |device|
+        next if device["isAvailable"] == false
+
+        name = device["name"].to_s
+        id = device["udid"].to_s
+        next if id.empty?
+        next unless prefer_ios_prefix.empty? || os.start_with?(prefer_ios_prefix)
+        next unless prefer_name_pattern.empty? || name.match?(Regexp.new(prefer_name_pattern))
+
+        candidates << {
+          "destination" => "platform=iOS Simulator,id=#{id}",
+          "name" => name,
+          "os_parts" => os.split(".").map(&:to_i)
+        }
+      end
+    end
+
+    if candidates.any?
+      selected = candidates.max_by do |candidate|
+        [
+          candidate.fetch("os_parts"),
+          candidate.fetch("name") == "iPhone 17" ? 1 : 0,
+          candidate.fetch("name")
+        ]
+      end
+
+      puts selected.fetch("destination")
+    end
+  ' || true
+}
+
+DESTINATIONS=""
+
+load_xcodebuild_destinations() {
+  local destinations_file
+  destinations_file="$(mktemp)"
+
+  if run_with_timeout "${JOVIE_IOS_DESTINATIONS_TIMEOUT:-30}" \
+    xcodebuild -showdestinations \
+      -project "$PROJECT_PATH" \
+      -scheme "$SCHEME" \
+      >"$destinations_file" 2>/dev/null; then
+    DESTINATIONS="$(cat "$destinations_file")"
+  else
+    echo "Timed out resolving xcodebuild destinations." >&2
+    DESTINATIONS=""
+  fi
+
+  rm -f "$destinations_file"
+}
 
 pick_destination() {
   local prefer_ios_prefix="${1:-}"
@@ -59,9 +151,43 @@ pick_destination() {
 
 PREFERRED_IOS_PREFIX="${JOVIE_IOS_PREFER_OS_PREFIX:-26.}"
 
+echo "Resolving iOS Simulator destination..." >&2
+
 DESTINATION="$(
-  PREFER_IOS_PREFIX="$PREFERRED_IOS_PREFIX" PREFER_NAME_PATTERN="^iPhone" pick_destination
+  pick_destination_from_simctl "$PREFERRED_IOS_PREFIX" "^iPhone"
 )"
+
+if [[ -z "$DESTINATION" && "$PREFERRED_IOS_PREFIX" != "18." ]]; then
+  DESTINATION="$(
+    pick_destination_from_simctl "18." "^iPhone"
+  )"
+fi
+
+if [[ -z "$DESTINATION" ]]; then
+  DESTINATION="$(
+    pick_destination_from_simctl "" "^iPhone"
+  )"
+fi
+
+if [[ -z "$DESTINATION" ]]; then
+  DESTINATION="$(
+    pick_destination_from_simctl "18." ""
+  )"
+fi
+
+if [[ -z "$DESTINATION" ]]; then
+  DESTINATION="$(
+    pick_destination_from_simctl
+  )"
+fi
+
+if [[ -z "$DESTINATION" ]]; then
+  load_xcodebuild_destinations
+
+  DESTINATION="$(
+    PREFER_IOS_PREFIX="$PREFERRED_IOS_PREFIX" PREFER_NAME_PATTERN="^iPhone" pick_destination
+  )"
+fi
 
 if [[ -z "$DESTINATION" && "$PREFERRED_IOS_PREFIX" != "18." ]]; then
   DESTINATION="$(
