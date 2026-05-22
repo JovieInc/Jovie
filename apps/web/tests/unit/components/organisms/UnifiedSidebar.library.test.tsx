@@ -1,7 +1,7 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { render, screen, waitFor } from '@testing-library/react';
 import type { ReactNode } from 'react';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { DashboardData } from '@/app/app/(shell)/dashboard/actions/dashboard-data';
 import { DashboardDataProvider } from '@/app/app/(shell)/dashboard/DashboardDataContext';
 import { SidebarProvider } from '@/components/organisms/Sidebar';
@@ -17,6 +17,30 @@ import {
   mockUsePathname,
   resetDashboardNavTestMocks,
 } from '@/tests/utils/dashboard-nav-test-support';
+
+vi.mock('@/lib/desktop/electron-bridge', () => ({
+  useIsElectronRuntime: () => true,
+}));
+
+vi.mock('@/features/dashboard/dashboard-nav', () => ({
+  DashboardNav: () => <div data-testid='dashboard-nav' />,
+}));
+
+vi.mock('@/components/organisms/user-button', () => ({
+  UserButton: () => <div data-testid='user-button' />,
+}));
+
+vi.mock('@/features/feedback/SidebarUpgradeBanner', () => ({
+  SidebarUpgradeBanner: () => null,
+}));
+
+vi.mock('@/features/feedback/SidebarInstallBanner', () => ({
+  SidebarInstallBanner: () => null,
+}));
+
+vi.mock('@/components/organisms/SidebarBottomNowPlayingBridge', () => ({
+  SidebarBottomNowPlayingBridge: () => null,
+}));
 
 const dashboardData: DashboardData = {
   user: { id: 'user_123' },
@@ -66,17 +90,25 @@ function LibrarySidebarOverride({
 
 function renderUnifiedSidebar({
   overrideContent,
+  designV1 = true,
+  pathname = APP_ROUTES.LIBRARY,
+  section = 'library',
 }: {
   readonly overrideContent?: ReactNode;
+  readonly designV1?: boolean;
+  readonly pathname?: string;
+  readonly section?: 'admin' | 'dashboard' | 'library' | 'settings';
 } = {}) {
-  mockUsePathname.mockReturnValue(APP_ROUTES.LIBRARY);
+  mockUsePathname.mockReturnValue(pathname);
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false } },
   });
 
   return render(
     <QueryClientProvider client={queryClient}>
-      <AppFlagProvider initialFlags={{ ...APP_FLAG_DEFAULTS, DESIGN_V1: true }}>
+      <AppFlagProvider
+        initialFlags={{ ...APP_FLAG_DEFAULTS, DESIGN_V1: designV1 }}
+      >
         <DashboardDataProvider value={dashboardData}>
           <SidebarProvider>
             <ShellSidebarOverrideProvider>
@@ -85,7 +117,7 @@ function renderUnifiedSidebar({
                   {overrideContent}
                 </LibrarySidebarOverride>
               ) : null}
-              <UnifiedSidebar section='library' />
+              <UnifiedSidebar section={section} />
             </ShellSidebarOverrideProvider>
           </SidebarProvider>
         </DashboardDataProvider>
@@ -134,5 +166,16 @@ describe('UnifiedSidebar library route', () => {
       'href',
       APP_ROUTES.CHAT
     );
+  });
+
+  it('keeps the Jovie wordmark and legacy new chat link visible in Electron dashboard mode', () => {
+    renderUnifiedSidebar({
+      designV1: false,
+      pathname: APP_ROUTES.DASHBOARD,
+      section: 'dashboard',
+    });
+
+    expect(screen.getByText('Jovie', { selector: 'span' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'New chat' })).toBeInTheDocument();
   });
 });

@@ -4,29 +4,19 @@ import { DesktopTitlebar } from '@/components/atoms/DesktopTitlebar';
 import { SidebarContext } from '@/components/organisms/sidebar/context';
 
 vi.mock('@/lib/desktop/electron-bridge', () => ({
-  useDesktopNavigation: () => ({
-    canGoBack: true,
-    canGoForward: false,
-    goBack: vi.fn(),
-    goForward: vi.fn(),
-  }),
   useIsElectronRuntime: () => true,
 }));
 
 vi.mock('@/components/atoms/UpdateAvailablePill', () => ({
-  UpdateAvailablePill: ({ compact }: { readonly compact?: boolean }) => (
-    <button
-      type='button'
-      data-testid='update-available-pill'
-      data-compact={compact ? 'true' : 'false'}
-    >
+  UpdateAvailablePill: () => (
+    <button type='button' data-testid='update-available-pill'>
       Update
     </button>
   ),
 }));
 
 describe('DesktopTitlebar', () => {
-  it('renders Electron titlebar with sidebar toggle in sidebar-cell and nav pill in main-cell', () => {
+  it('renders Electron titlebar with sidebar toggle and update pill in the sidebar cell', () => {
     render(
       <SidebarContext.Provider
         value={{
@@ -55,35 +45,58 @@ describe('DesktopTitlebar', () => {
       screen.getByTestId('electron-titlebar-sidebar-cell')
     ).toContainElement(screen.getByTestId('update-available-pill'));
 
-    // Nav back/forward are in the main cell inside the pill group
-    expect(screen.getByTestId('electron-titlebar-main-cell')).toContainElement(
-      screen.getByTestId('electron-nav-pill')
-    );
-    expect(screen.getByTestId('electron-nav-pill')).toContainElement(
-      screen.getByTestId('electron-nav-back')
-    );
-    expect(screen.getByTestId('electron-nav-pill')).toContainElement(
-      screen.getByTestId('electron-nav-forward')
-    );
-
-    expect(screen.getByTestId('update-available-pill')).toHaveAttribute(
-      'data-compact',
-      'true'
-    );
     expect(
       screen.getByRole('button', { name: 'Collapse sidebar' })
     ).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Go back' })).toBeInTheDocument();
-    expect(
-      screen.getByRole('button', { name: 'Go forward' })
-    ).toBeInTheDocument();
   });
 
-  it('renders an optional main titlebar slot', () => {
-    render(<DesktopTitlebar mainSlot={<div>Route header</div>} />);
-
-    expect(screen.getByTestId('electron-titlebar-main-slot')).toHaveTextContent(
-      'Route header'
+  it('does not render back/forward nav pill (keyboard shortcuts handle navigation)', () => {
+    render(
+      <SidebarContext.Provider
+        value={{
+          state: 'open',
+          open: true,
+          setOpen: vi.fn(),
+          openMobile: false,
+          setOpenMobile: vi.fn(),
+          isMobile: false,
+          toggleSidebar: vi.fn(),
+        }}
+      >
+        <DesktopTitlebar />
+      </SidebarContext.Provider>
     );
+
+    expect(screen.queryByTestId('electron-nav-pill')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('electron-nav-back')).not.toBeInTheDocument();
+    expect(
+      screen.queryByTestId('electron-nav-forward')
+    ).not.toBeInTheDocument();
+  });
+
+  it('main cell is a plain drag region with no rounded card chrome', () => {
+    render(
+      <SidebarContext.Provider
+        value={{
+          state: 'open',
+          open: true,
+          setOpen: vi.fn(),
+          openMobile: false,
+          setOpenMobile: vi.fn(),
+          isMobile: false,
+          toggleSidebar: vi.fn(),
+        }}
+      >
+        <DesktopTitlebar />
+      </SidebarContext.Provider>
+    );
+
+    const mainCell = screen.getByTestId('electron-titlebar-main-cell');
+    const className = mainCell.className;
+    // No rounded-top, no border, no content-surface background — the main cell
+    // is a plain drag region. The elevated card lives in #main-content below.
+    expect(className).not.toMatch(/rounded-t/);
+    expect(className).not.toMatch(/\bborder\b/);
+    expect(className).not.toMatch(/linear-app-content-surface/);
   });
 });

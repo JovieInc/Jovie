@@ -50,6 +50,7 @@ import { SidebarUpgradeBanner } from '@/features/feedback/SidebarUpgradeBanner';
 import { copyToClipboard } from '@/hooks/useClipboard';
 import { useProfileData } from '@/hooks/useProfileData';
 import { SIDEBAR_KEYBOARD_SHORTCUT_BARE } from '@/hooks/useSidebarKeyboardShortcut';
+import { useIsElectronRuntime } from '@/lib/desktop/electron-bridge';
 import { env } from '@/lib/env-client';
 import { useAppFlag } from '@/lib/flags/client';
 import {
@@ -260,6 +261,7 @@ function SidebarHeaderNav({
   routeBackLabel?: string;
 }>) {
   const shellChatV1Enabled = useAppFlag('DESIGN_V1');
+  const isDesktop = useIsElectronRuntime();
   const newChatLink = (
     <Link
       href={APP_ROUTES.CHAT}
@@ -321,8 +323,8 @@ function SidebarHeaderNav({
         if (hasMultipleProfiles && !isAdmin) {
           return <ProfileSwitcher />;
         }
-        // Clean header: just the Jovie logo (no workspace button / chevron).
-        // The user menu is now accessed via the bottom Settings button.
+        // Clean header: Jovie logo + wordmark for identity (matches Linear's
+        // workspace pill pattern). User menu lives in the bottom Settings button.
         return (
           <div
             className={cn(
@@ -336,6 +338,9 @@ function SidebarHeaderNav({
               rounded={false}
               className='rounded-sm shrink-0'
             />
+            <span className='truncate text-app tracking-tight text-sidebar-item-foreground [font-weight:var(--font-weight-nav)] group-data-[collapsible=icon]:hidden'>
+              Jovie
+            </span>
           </div>
         );
       })()}
@@ -343,12 +348,14 @@ function SidebarHeaderNav({
       {!isRouteSidebar &&
         isDashboardOrAdmin &&
         (shellChatV1Enabled ? (
-          <div className='ml-auto flex items-center gap-0.5 group-data-[collapsible=icon]:hidden'>
-            <Tooltip label='New chat' side='bottom'>
-              {newChatLink}
-            </Tooltip>
-            <SidebarDockButton />
-          </div>
+          !isDesktop ? (
+            <div className='ml-auto flex items-center gap-0.5 group-data-[collapsible=icon]:hidden'>
+              <Tooltip label='New chat' side='bottom'>
+                {newChatLink}
+              </Tooltip>
+              <SidebarDockButton />
+            </div>
+          ) : null
         ) : (
           newChatLink
         ))}
