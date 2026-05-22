@@ -97,22 +97,27 @@ export async function fetchWithTimeoutResponse(
   linkSignal(controller, externalSignal ?? undefined);
 
   try {
-    const headers = new Headers(fetchOptions.headers);
-    if (
-      shouldAttachCsrfHeader(url, fetchOptions.method) &&
-      !headers.has(CSRF_HEADER_NAME)
-    ) {
+    let headers = fetchOptions.headers;
+    if (shouldAttachCsrfHeader(url, fetchOptions.method)) {
       const csrfToken = getBrowserCsrfToken();
       if (csrfToken) {
-        headers.set(CSRF_HEADER_NAME, csrfToken);
+        const csrfHeaders = new Headers(fetchOptions.headers);
+        if (!csrfHeaders.has(CSRF_HEADER_NAME)) {
+          csrfHeaders.set(CSRF_HEADER_NAME, csrfToken);
+          headers = csrfHeaders;
+        }
       }
     }
 
-    const response = await fetch(url, {
+    const requestInit: RequestInit = {
       ...fetchOptions,
-      headers,
       signal: controller.signal,
-    });
+    };
+    if (headers !== undefined) {
+      requestInit.headers = headers;
+    }
+
+    const response = await fetch(url, requestInit);
 
     if (!response.ok) {
       let message = getFetchErrorMessage(response);
