@@ -1,32 +1,34 @@
 # Design V1 Rollout Matrix
 
-This is the operating contract for moving the experimental Design V1 surfaces
-into production behind default-off app flags. It covers the full flag set,
-supported combinations, rollout order, and rollback paths. Product code must
-keep using production data adapters and must not import from `app/exp/*`.
+This is the operating contract for the now-permanent Design V1 production
+surfaces. It records the runtime aliases that remain for callsite clarity, the
+static marketing/public preview flags that still exist, and the cleanup rules
+for retiring old branches. Product code must keep using production data
+adapters and must not import from `app/exp/*`.
 
 ## Flag Inventory
 
 | Flag | Type | Owner | Surface | Default | Rollback |
 | --- | --- | --- | --- | --- | --- |
-| `SHELL_CHAT_V1` | Runtime app flag backed by Statsig gate `design_v1` | Shell | Authenticated shell frame, chat composer geometry, shell sidebar/audio primitives | `false` | Disable `design_v1` in Statsig or remove dev override |
-| `DESIGN_V1_RELEASES` | Runtime app flag backed by Statsig gate `design_v1` | Releases | Releases table/list styling, row treatment, drawer metadata polish | `false` | Disable `design_v1` in Statsig or remove dev override |
-| `DESIGN_V1_TASKS` | Runtime app flag backed by Statsig gate `design_v1` | Tasks | Tasks workspace subviews, V1 task list/detail behavior | `false` | Disable `design_v1` in Statsig or remove dev override |
-| `DESIGN_V1_CHAT_ENTITIES` | Runtime app flag backed by Statsig gate `design_v1` | Chat | Chat entity chips and right-panel adapters | `false` | Disable `design_v1` in Statsig or remove dev override |
-| `DESIGN_V1_LYRICS` | Runtime app flag backed by Statsig gate `design_v1` | Lyrics | `/app/lyrics/[trackId]`, lyrics button/link affordances | `false` | Disable `design_v1` in Statsig or remove dev override |
-| `DESIGN_V1_LIBRARY` | Runtime app flag backed by Statsig gate `design_v1` | Library | Read-only library route from existing release/artwork data | `false` | Disable `design_v1` in Statsig or remove dev override |
-| `DESIGN_V1_AUTH` | Runtime app flag backed by Statsig gate `design_v1` | Auth | Visual wrapper around existing Clerk sign-in/sign-up flows | `false` | Disable `design_v1` in Statsig or remove dev override |
-| `DESIGN_V1_ONBOARDING` | Runtime app flag backed by Statsig gate `design_v1` | Onboarding | Visual wrapper around existing production onboarding actions | `false` | Disable `design_v1` in Statsig or remove dev override |
+| `SHELL_CHAT_V1` | Runtime app alias of permanent `DESIGN_V1` default | Shell | Authenticated shell frame, chat composer geometry, shell sidebar/audio primitives | `true` | Revert the code branch or ship a targeted disabling flag |
+| `DESIGN_V1_RELEASES` | Runtime app alias of permanent `DESIGN_V1` default | Releases | Releases table/list styling, row treatment, drawer metadata polish | `true` | Revert the code branch or ship a targeted disabling flag |
+| `DESIGN_V1_TASKS` | Runtime app alias of permanent `DESIGN_V1` default | Tasks | Tasks workspace subviews, V1 task list/detail behavior | `true` | Revert the code branch or ship a targeted disabling flag |
+| `DESIGN_V1_CHAT_ENTITIES` | Runtime app alias of permanent `DESIGN_V1` default | Chat | Chat entity chips and right-panel adapters | `true` | Revert the code branch or ship a targeted disabling flag |
+| `DESIGN_V1_LYRICS` | Runtime app alias of permanent `DESIGN_V1` default | Lyrics | `/app/lyrics/[trackId]`, lyrics button/link affordances | `true` | Revert the code branch or ship a targeted disabling flag |
+| `DESIGN_V1_LIBRARY` | Runtime app alias of permanent `DESIGN_V1` default | Library | Read-only library route from existing release/artwork data | `true` | Revert the code branch or ship a targeted disabling flag |
+| `DESIGN_V1_AUTH` | Runtime app alias of permanent `DESIGN_V1` default | Auth | Visual wrapper around existing Clerk sign-in/sign-up flows | `true` | Revert the code branch or ship a targeted disabling flag |
+| `DESIGN_V1_ONBOARDING` | Runtime app alias of permanent `DESIGN_V1` default | Onboarding | Visual wrapper around existing production onboarding actions | `true` | Revert the code branch or ship a targeted disabling flag |
 | `SHOW_HOME_V1_DESIGN` | Static build-time flag | Marketing | Homepage V1 design | `false` | Revert flag and redeploy |
 | `SHOW_PUBLIC_PROFILE_V1_DESIGN` | Static build-time flag | Public Profile | Public profile V1 design | `false` | Revert flag and redeploy |
 
-Runtime app flags are defined in `apps/web/lib/flags/contracts.ts` and
+Runtime app aliases are defined in `apps/web/lib/flags/contracts.ts` and
 resolved through `apps/web/lib/flags/server.ts` / `AppFlagProvider`. All
-runtime Design V1 app flags currently resolve through the single remote
-Statsig gate `design_v1`; the per-surface names are app-level aliases for
-callsite clarity, not independent Statsig rollout controls. Static marketing
-flags are defined in `apps/web/lib/flags/marketing-static.ts` and must stay
-build-time constants so marketing pages remain fully static.
+runtime Design V1 app flags now live in `LOCAL_DEFAULT_ONLY_FLAGS` with
+default `true`; they are not backed by `APP_FLAG_TO_STATSIG_GATE`. The
+per-surface names remain app-level aliases for callsite clarity, not
+independent remote rollout controls. Static marketing flags are defined in
+`apps/web/lib/flags/marketing-static.ts` and must stay build-time constants so
+marketing pages remain fully static.
 
 Static marketing flags are not remote rollout controls. The value imported from
 `marketing-static.ts` is bundled into the deployed build, so changing either
@@ -38,8 +40,8 @@ toolbar override harness, cookies, request headers, or query parameters.
 
 | Combination | Expected Behavior | Status |
 | --- | --- | --- |
-| All flags `false` | Current production UI and behavior. This is the default safety baseline. | Required |
-| `design_v1=true` | All runtime Design V1 alias flags resolve `true`. This is the supported remote rollout shape. | Supported |
+| Runtime aliases at default | Design V1 production UI and behavior. This is the current baseline. | Required |
+| Dev/test override `code:DESIGN_V1=false` | Compatibility smoke only for remaining cleanup branches. Do not treat this as a production rollback path. | Temporary |
 | Per-surface alias override in dev/test | Local dev tooling may present alias labels, but the stored override key is `code:DESIGN_V1`; aliases move together. | Supported for local QA labels only |
 | Static public flags `true` with runtime flags `false` | Homepage/public profile V1 can ship independently because they are build-time static surfaces. | Supported after static QA |
 | Runtime flags `true` with static public flags `false` | Authenticated app rollout without marketing/public profile changes. | Supported |
@@ -66,15 +68,16 @@ Console gates in the same PR.
 
 ## Rollout Order
 
-1. Keep `design_v1` default `false` and land infrastructure/tests first.
-2. Validate `design_v1` with chat, sidebar, audio, releases, tasks, lyrics,
-   library, auth, and onboarding smoke coverage.
+1. Keep the permanent runtime aliases default `true` in
+   `apps/web/lib/flags/contracts.ts`.
+2. Remove stale fallback branches in small PRs only when focused tests prove no
+   behavior loss.
 3. Validate auth and onboarding carefully because they touch entry and resume
    flows.
 4. Validate static homepage/public profile flags in preview builds. Static flags
    require a redeploy for rollback, so do not batch them with runtime flips.
-5. Ramp `design_v1` by cohort only after flag-off parity and flag-on smoke are
-   both green for the affected routes.
+5. Keep remaining dev/test override coverage until the old branches are fully
+   retired, then delete the compatibility tests with the branch removal.
 
 ## Static Marketing Preview Procedure
 
@@ -140,12 +143,13 @@ then repeat this procedure from a fresh preview deployment.
 
 ## Rollback
 
-Runtime app flags:
+Runtime app aliases:
 
-1. Disable the `design_v1` Statsig gate or remove the local dev override.
-2. Confirm the route returns to the flag-off screenshot/smoke baseline.
-3. Leave follow-up code in place if flag-off parity is intact; revert only if
-   the disabled code still affects production.
+1. Revert the product-code branch that caused the regression, or ship a
+   targeted disabling flag with an owner and expiry.
+2. Confirm the affected route returns to the previous production screenshot or
+   smoke baseline.
+3. Remove any temporary disabling flag as soon as the product-code fix lands.
 
 Static build-time flags:
 
@@ -166,10 +170,12 @@ Static build-time flags:
 
 ## Required Verification
 
-Every Design V1 PR must name the flags it touches and verify:
+Every Design V1 PR must name the runtime aliases or static flags it touches and
+verify:
 
-- Flag-off parity for every touched route.
-- Flag-on smoke for the touched surface.
+- Production-baseline smoke for every touched route.
+- Dev/test override compatibility only when the PR edits a remaining fallback
+  branch.
 - No `app/exp/*` imports in production paths.
 - No schema migration unless the Linear issue explicitly assigns schema work.
 - `./scripts/setup.sh` in the worktree.
@@ -192,19 +198,19 @@ The nightly workflow runs a targeted Chromium canary via:
 pnpm --filter @jovie/web run test:e2e:design-v1-flags
 ```
 
-The canary covers flagged dashboard, auth, and onboarding surfaces in
-`apps/web/tests/e2e/design-v1-flagged-surfaces.spec.ts`. It verifies every
-runtime Design V1 flag remains default-off, then forces each surface on through
-the browser override harness. It is also available manually from **Nightly
-Tests** with suite `design-v1` before a staged rollout.
+The canary covers dashboard, auth, and onboarding surfaces in
+`apps/web/tests/e2e/design-v1-flagged-surfaces.spec.ts`. During the cleanup
+period it may still exercise the browser override harness so stale fallback
+branches fail loudly before they are removed. It is also available manually
+from **Nightly Tests** with suite `design-v1`.
 
 Interpret failures this way:
 
-- Default-off failures mean a flag default, route fallback, or production
-  baseline changed. Treat this as a rollout blocker.
-- Flag-on failures mean the gated surface, auth bypass, seed data, or route
-  contract regressed. Fix or explicitly defer that surface before widening the
-  cohort.
+- Production-baseline failures mean a route fallback, seeded data contract, or
+  shell surface changed. Treat this as a release blocker.
+- Override-harness failures mean a stale fallback branch or cleanup assumption
+  regressed. Fix the branch or remove the obsolete test in the same PR that
+  removes the branch.
 - A11y and Lighthouse coverage stays in the existing public/PR lanes unless the
   changed flagged surface has a known accessibility or performance risk that
   justifies the extra runtime.

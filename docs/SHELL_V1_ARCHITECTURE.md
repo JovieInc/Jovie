@@ -1,6 +1,9 @@
 # Shell V1 Architecture
 
-The "shell v1" port (commit `9d4ec67c2`) introduced a new authenticated app layout under `apps/web/app/app/(shell)/`. It coexists with the legacy flat `apps/web/app/app/*` structure during a flag-gated rollout. New code should target the shell layout.
+The "shell v1" port (commit `9d4ec67c2`) introduced the authenticated app
+layout under `apps/web/app/app/(shell)/`. It coexists with a shrinking set of
+legacy fallback branches while those branches are retired. New code should
+target the shell layout.
 
 ## Why
 
@@ -30,42 +33,46 @@ apps/web/app/app/layout.tsx                   # ResolvedClientProviders
 - `(shell)/settings/` — account, contacts, retargeting-ads
 - `(shell)/lyrics/`, `(shell)/contact/` — domain surfaces
 
-## Feature flag: `SHELL_CHAT_V1`
+## Design V1 Runtime Aliases
 
-Defined in `apps/web/lib/flags/contracts.ts` as the `SHELL_CHAT_V1` app flag
-(default `false`). It is currently backed by the unified Statsig gate
-`design_v1`, resolved server-side once in `apps/web/app/app/(shell)/layout.tsx`,
-then provided to every consumer via `AppFlagProvider`. Read in client
-components with `useAppFlag('SHELL_CHAT_V1')`.
+`DESIGN_V1` and its app-surface aliases, including `SHELL_CHAT_V1`, are
+permanent local-default flags in `apps/web/lib/flags/contracts.ts`. They
+resolve server-side once in `apps/web/app/app/(shell)/layout.tsx`, then flow to
+client consumers through `AppFlagProvider`. They are not backed by Statsig
+rollout gates.
 
-When `true`:
+At the current default:
 
-- `AppShellSkeleton` switches to the v1 chrome (so the skeleton frame matches what the rendered shell will look like).
+- `AppShellSkeleton` uses the v1 chrome so the skeleton frame matches the
+  rendered shell.
 - `DashboardNav` and `AuthShell` use v1 navigation/audio primitives.
+- Shell geometry and audio/sidebar chrome resolve through the shared shell
+  token contract in `apps/web/styles/design-system.css` and
+  `apps/web/styles/linear-tokens.css`.
 
-When `false`:
-
-- The shell layout still renders, but consumers fall through to legacy primitives — so the flag is purely a visual rollout control. No traffic ever bypasses `(shell)/layout.tsx`.
-
-Flag plumbing: `apps/web/lib/flags/server.ts:getAppFlagValue` /
+Flag plumbing: `apps/web/lib/flags/server.ts:getAppFlagValue` and
 `getAppFlagsSnapshot` resolve through `APP_FLAG_REGISTRY`, with dev/test
-overrides honored. Remote rollout uses `design_v1`; the legacy
-`feature_shell_chat_v1` key is not an active runtime control.
+overrides still honored for compatibility tests while old branches are removed.
+The legacy `feature_shell_chat_v1` and `design_v1` Statsig keys are not active
+runtime controls.
 
 ## Releases flag boundary
 
-`SHELL_CHAT_V1` does not own the releases route implementation. It only controls the authenticated shell frame and shared navigation/audio chrome around `/app/dashboard/releases`.
+`SHELL_CHAT_V1` is now an alias for the permanent shell baseline. It does not
+own the releases route implementation; it only names the authenticated shell
+frame and shared navigation/audio chrome around `/app/dashboard/releases`.
 
-`DESIGN_V1_RELEASES` owns releases-specific Design V1 behavior. `ShellReleasesView` is the gated Design V1 releases view; the legacy `ReleasesExperience`/`ReleaseProviderMatrix` remains the default when `DESIGN_V1_RELEASES` is off.
+`DESIGN_V1_RELEASES` names releases-specific Design V1 behavior.
+`ShellReleasesView` is the production releases view; any remaining
+`ReleasesExperience`/`ReleaseProviderMatrix` fallback should be treated as
+cleanup debt and removed in a focused PR when tests prove parity.
 
 Mixed-state contract:
 
-| `SHELL_CHAT_V1` | `DESIGN_V1_RELEASES` | Releases behavior |
-|---|---|---|
-| `false` | `false` | Legacy shell frame with `ReleasesExperience` |
-| `true` | `false` | Shell/chat V1 frame with `ReleasesExperience` |
-| `false` | `true` | Legacy shell frame with `ShellReleasesView` |
-| `true` | `true` | Shell/chat V1 frame with `ShellReleasesView` |
+| Runtime alias state | Releases behavior |
+|---|---|
+| Defaults | Shell/chat V1 frame with `ShellReleasesView` |
+| Dev/test override forced off | Compatibility path only, used to catch stale branch assumptions before removal |
 
 ## /exp/shell-v1
 
@@ -73,7 +80,7 @@ Mixed-state contract:
 
 ## Migration path
 
-For new code, always target `(shell)/` — the legacy `/app/*` paths will be removed once `SHELL_CHAT_V1` ramps to 100% and bakes (DESIGN.md notes the timeline is TBD). Concretely:
+For new code, always target `(shell)/`. Concretely:
 
 - New dashboard surface → `(shell)/dashboard/<name>/page.tsx`
 - New settings surface → `(shell)/settings/<name>/page.tsx`
@@ -81,4 +88,5 @@ For new code, always target `(shell)/` — the legacy `/app/*` paths will be rem
 
 `DashboardShellContent` decides whether to fetch the full dashboard payload or a lightweight shell payload via `shouldUseEssentialShellData(pathname)` — chat and standalone surfaces should be added there if they don't need the full dashboard.
 
-When you add a v1-only primitive, gate it on `useAppFlag('SHELL_CHAT_V1')` until the flag retires.
+When you add shell primitives, wire them to production data and shared shell
+tokens. Do not add new `SHELL_CHAT_V1` branches for purely visual chrome.
