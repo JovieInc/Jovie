@@ -145,6 +145,51 @@ describe('DashboardNav', () => {
     );
   });
 
+  it('defaults artist workspace and admin groups collapsed', () => {
+    const { getByRole } = renderDashboardNav({
+      renderFn: fastRender,
+      overrides: {
+        isAdmin: true,
+        selectedProfile: {
+          id: 'profile_123',
+          displayName: 'Tim White',
+          username: 'tim',
+          usernameNormalized: 'tim',
+        } as DashboardData['selectedProfile'],
+      },
+    });
+
+    expect(getByRole('button', { name: 'Tim White' })).toHaveAttribute(
+      'aria-expanded',
+      'false'
+    );
+    expect(getByRole('button', { name: 'Admin' })).toHaveAttribute(
+      'aria-expanded',
+      'false'
+    );
+  });
+
+  it('remembers an expanded artist workspace group', () => {
+    localStorage.setItem('jovie:sidebar-section:artist-workspace', 'open');
+
+    const { getByRole } = renderDashboardNav({
+      renderFn: fastRender,
+      overrides: {
+        selectedProfile: {
+          id: 'profile_123',
+          displayName: 'Tim White',
+          username: 'tim',
+          usernameNormalized: 'tim',
+        } as DashboardData['selectedProfile'],
+      },
+    });
+
+    expect(getByRole('button', { name: 'Tim White' })).toHaveAttribute(
+      'aria-expanded',
+      'true'
+    );
+  });
+
   it('renders with different pathname', () => {
     mockUsePathname.mockReturnValueOnce('/app/audience');
 
