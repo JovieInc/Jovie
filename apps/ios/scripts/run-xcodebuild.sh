@@ -10,6 +10,16 @@ IOS_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 PROJECT_PATH="$IOS_DIR/Jovie.xcodeproj"
 SCHEME="Jovie"
 
+if [[ "$ACTION" == "-resolvePackageDependencies" ]]; then
+  echo "Resolving Swift package dependencies without a simulator destination..." >&2
+  xcodebuild "$ACTION" \
+    -project "$PROJECT_PATH" \
+    -scheme "$SCHEME" \
+    "$@" \
+    CODE_SIGNING_ALLOWED=NO
+  exit 0
+fi
+
 run_with_timeout() {
   local timeout_seconds="$1"
   shift

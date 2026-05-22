@@ -5,13 +5,20 @@ import Testing
 private actor MockRepository: AppStateRepository {
   var nextResult: Result<MeRepositoryResult, Error>
   private var clearedUserIDs: [String] = []
+  private var loadCallCount = 0
+  private let loadDelay: Duration?
 
-  init(nextResult: Result<MeRepositoryResult, Error>) {
+  init(nextResult: Result<MeRepositoryResult, Error>, loadDelay: Duration? = nil) {
     self.nextResult = nextResult
+    self.loadDelay = loadDelay
   }
 
   func loadMe(for clerkUserID: String) async throws -> MeRepositoryResult {
-    try nextResult.get()
+    loadCallCount += 1
+    if let loadDelay {
+      try await Task.sleep(for: loadDelay)
+    }
+    return try nextResult.get()
   }
 
   func clearCachedUser(_ clerkUserID: String) {
@@ -20,6 +27,10 @@ private actor MockRepository: AppStateRepository {
 
   func clearedUsers() -> [String] {
     clearedUserIDs
+  }
+
+  func loadCount() -> Int {
+    loadCallCount
   }
 }
 
@@ -96,6 +107,55 @@ struct AppStateTests {
     #expect(appState.dashboardState == .idle)
     #expect(appState.activeUserID == nil)
     #expect(appState.isOffline == false)
+    #expect(await repository.clearedUsers() == ["user_123"])
+  }
+
+  @Test func duplicateSignedInUserLoadIsIgnoredWhileInFlight() async throws {
+    let repository = MockRepository(
+      nextResult: .success(
+        MeRepositoryResult(response: .previewReady, isStale: false)
+      ),
+      loadDelay: .milliseconds(50)
+    )
+    let appState = AppState(
+      configuration: configuration,
+      launchMode: .live,
+      repository: repository,
+      brightnessManager: MockBrightnessController()
+    )
+    appState.didLoadClerk = true
+
+    async let first: Void = appState.handleSignedInUserChange("user_123")
+    async let second: Void = appState.handleSignedInUserChange("user_123")
+    _ = await (first, second)
+
+    #expect(await repository.loadCount() == 1)
+    #expect(appState.route == .ready)
+  }
+
+  @Test func signOutIgnoresInFlightProfileLoad() async throws {
+    let repository = MockRepository(
+      nextResult: .success(
+        MeRepositoryResult(response: .previewReady, isStale: false)
+      ),
+      loadDelay: .milliseconds(50)
+    )
+    let appState = AppState(
+      configuration: configuration,
+      launchMode: .live,
+      repository: repository,
+      brightnessManager: MockBrightnessController()
+    )
+    appState.didLoadClerk = true
+
+    async let load: Void = appState.handleSignedInUserChange("user_123")
+    try await Task.sleep(for: .milliseconds(10))
+    await appState.signOut()
+    _ = await load
+
+    #expect(appState.route == .signedOut)
+    #expect(appState.dashboardState == .idle)
+    #expect(appState.activeUserID == nil)
     #expect(await repository.clearedUsers() == ["user_123"])
   }
 
