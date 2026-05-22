@@ -140,7 +140,12 @@ export function PromoDownloadsTable({
   );
 
   if (!loaded && files.length === 0) {
-    return null;
+    return (
+      <div
+        aria-hidden='true'
+        className='min-h-[220px] rounded-lg border border-subtle bg-surface-1 skeleton'
+      />
+    );
   }
 
   if (loaded && files.length === 0) {
