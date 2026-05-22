@@ -10,6 +10,7 @@ enum DashboardLoadState: Equatable {
 
 protocol AppStateRepository: Sendable {
   func loadMe(for clerkUserID: String) async throws -> MeRepositoryResult
+  func clearCachedUser(_ clerkUserID: String) async
 }
 
 extension MeRepository: AppStateRepository {}
@@ -59,12 +60,16 @@ final class AppState {
     case .uiTestingSignedOut:
       route = .signedOut
       dashboardState = .idle
-    case .uiTestingReady:
+    case .uiTestingReady, .uiTestingSettings, .uiTestingVenueMode:
       route = .ready
       dashboardState = .loaded(.previewReady)
       isOffline = false
     case .uiTestingNeedsOnboarding:
       route = .needsOnboarding
+      dashboardState = .idle
+      isOffline = false
+    case .uiTestingSplash:
+      route = .launching
       dashboardState = .idle
       isOffline = false
     }
@@ -106,7 +111,7 @@ final class AppState {
           dashboardState = .idle
           isOffline = false
           return
-        case .invalidResponse, .requestFailed:
+        case .decodingFailed, .invalidResponse, .transportFailed, .requestFailed:
           break
         }
       }
@@ -119,6 +124,18 @@ final class AppState {
 
   func retry() async {
     await handleSignedInUserChange(activeUserID)
+  }
+
+  func signOut() async {
+    let userID = activeUserID
+    activeUserID = nil
+    route = .signedOut
+    dashboardState = .idle
+    isOffline = false
+
+    if let userID {
+      await repository.clearCachedUser(userID)
+    }
   }
 
   var continueOnWebURL: URL {

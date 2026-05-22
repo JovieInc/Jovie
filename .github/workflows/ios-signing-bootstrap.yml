@@ -1,0 +1,68 @@
+name: iOS Signing Bootstrap
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ios-signing-bootstrap
+  cancel-in-progress: false
+
+jobs:
+  bootstrap:
+    name: Bootstrap Match Signing
+    runs-on: macos-26
+    timeout-minutes: 45
+    env:
+      CI: "true"
+      APPLE_API_KEY: ${{ secrets.APPLE_API_KEY }}
+      APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
+      APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
+      APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+      MATCH_GIT_URL: ${{ secrets.MATCH_GIT_URL }}
+      MATCH_PASSWORD: ${{ secrets.MATCH_PASSWORD }}
+      MATCH_GIT_PRIVATE_KEY: ${{ secrets.MATCH_GIT_PRIVATE_KEY }}
+      MATCH_GIT_BASIC_AUTHORIZATION: ${{ secrets.MATCH_GIT_BASIC_AUTHORIZATION }}
+      APP_STORE_COMPANY_NAME: ${{ secrets.APP_STORE_COMPANY_NAME }}
+
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Show Xcode version
+        run: xcodebuild -version
+
+      - name: Set up Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          bundler-cache: true
+
+      - name: Validate signing bootstrap secrets
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          required=(
+            APPLE_API_KEY
+            APPLE_API_KEY_ID
+            APPLE_API_ISSUER
+            APPLE_TEAM_ID
+            MATCH_GIT_URL
+            MATCH_PASSWORD
+          )
+
+          for key in "${required[@]}"; do
+            if [[ -z "${!key:-}" ]]; then
+              echo "Missing required secret or env var: $key"
+              exit 1
+            fi
+          done
+
+          if [[ -z "${MATCH_GIT_PRIVATE_KEY:-}" && -z "${MATCH_GIT_BASIC_AUTHORIZATION:-}" ]]; then
+            echo "Missing match git authentication: set MATCH_GIT_PRIVATE_KEY or MATCH_GIT_BASIC_AUTHORIZATION"
+            exit 1
+          fi
+
+      - name: Bootstrap App Store signing
+        run: bundle exec fastlane ios bootstrap_signing

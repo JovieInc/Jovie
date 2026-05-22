@@ -4,6 +4,7 @@ import Testing
 
 private actor MockRepository: AppStateRepository {
   var nextResult: Result<MeRepositoryResult, Error>
+  private var clearedUserIDs: [String] = []
 
   init(nextResult: Result<MeRepositoryResult, Error>) {
     self.nextResult = nextResult
@@ -11,6 +12,14 @@ private actor MockRepository: AppStateRepository {
 
   func loadMe(for clerkUserID: String) async throws -> MeRepositoryResult {
     try nextResult.get()
+  }
+
+  func clearCachedUser(_ clerkUserID: String) {
+    clearedUserIDs.append(clerkUserID)
+  }
+
+  func clearedUsers() -> [String] {
+    clearedUserIDs
   }
 }
 
@@ -64,5 +73,29 @@ struct AppStateTests {
     await appState.handleSignedInUserChange("user_123")
 
     #expect(appState.route == .needsOnboarding)
+  }
+
+  @Test func signOutResetsRouteAndClearsActiveUserCache() async throws {
+    let repository = MockRepository(
+      nextResult: .success(
+        MeRepositoryResult(response: .previewReady, isStale: false)
+      )
+    )
+    let appState = AppState(
+      configuration: configuration,
+      launchMode: .live,
+      repository: repository,
+      brightnessManager: MockBrightnessController()
+    )
+    appState.didLoadClerk = true
+
+    await appState.handleSignedInUserChange("user_123")
+    await appState.signOut()
+
+    #expect(appState.route == .signedOut)
+    #expect(appState.dashboardState == .idle)
+    #expect(appState.activeUserID == nil)
+    #expect(appState.isOffline == false)
+    #expect(await repository.clearedUsers() == ["user_123"])
   }
 }

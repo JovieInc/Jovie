@@ -30,4 +30,8 @@ struct MeRepository: MeRepositoryProtocol, Sendable {
       throw error
     }
   }
+
+  func clearCachedUser(_ clerkUserID: String) async {
+    await cache.remove(for: clerkUserID)
+  }
 }

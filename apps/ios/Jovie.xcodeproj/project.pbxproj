@@ -13,6 +13,8 @@
 		2C6C36E98540C94E3F1EF74A /* Configuration.local.plist in Resources */ = {isa = PBXBuildFile; fileRef = D24EEA621BFC0D5C4F57065C /* Configuration.local.plist */; };
 		3397C6D45B48BBDAF736A405 /* AppRouter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 71290AE6A5F14D6941193B70 /* AppRouter.swift */; };
 		33F1DF8D4B8D292316335711 /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 6FDEFEB6D7C1D0251FDA1E61 /* Foundation.framework */; };
+		D7BCD277F96E47648D68C062 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = B53DAA4BCC9D40A3A2C1552B /* PrivacyInfo.xcprivacy */; };
+		5F4F3551CC9F4C09A2520AEB /* AppShellView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4C2C97BF3A0B42C58A62529F /* AppShellView.swift */; };
 		4C46B1496145C062FB2FE978 /* ClerkKit in Frameworks */ = {isa = PBXBuildFile; productRef = 0199C257CC5EA4F6FD36397D /* ClerkKit */; };
 		4CA1C477ECC6B7B40EA17787 /* LaunchMode.swift in Sources */ = {isa = PBXBuildFile; fileRef = DD30F57584F71E958D8C0514 /* LaunchMode.swift */; };
 		52C5CBF9C24E4C502FA64955 /* MobileMeResponse.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3EC2367922F1F00AB0AF1164 /* MobileMeResponse.swift */; };
@@ -37,6 +39,7 @@
 		E6EA9EC85A52208BEFC20DF0 /* ClerkKitUI in Frameworks */ = {isa = PBXBuildFile; productRef = 37321F1DC431FDA58D969E72 /* ClerkKitUI */; };
 		EBDA8137B767F16402C41C24 /* Configuration.swift in Sources */ = {isa = PBXBuildFile; fileRef = E4EAFC467F76300BCFC2659F /* Configuration.swift */; };
 		EE4CBA88057592FAFCD7F926 /* AppStateTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A93DB506915B418D06E897A4 /* AppStateTests.swift */; };
+		F178AB3E908746C78645E4EE /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 35E151E782B5462F89618579 /* SettingsView.swift */; };
 		F3E8220C7612A63FF54DB345 /* NeedsOnboardingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 88FB8A38A81A1249F313D416 /* NeedsOnboardingView.swift */; };
 		F8BC948A5A68297B746E217F /* MeCache.swift in Sources */ = {isa = PBXBuildFile; fileRef = 918FBCBCF600AA8C10191F60 /* MeCache.swift */; };
 		F95545618F95E792DCBCA7DF /* AuthScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = EDFB0D6D1DA6A287207AC1A6 /* AuthScreen.swift */; };
@@ -73,6 +76,7 @@
 		448ADF9C21BB11784C6AD119 /* QRCodeRendererTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = QRCodeRendererTests.swift; sourceTree = "<group>"; };
 		47976CA8BC5B309FDB2B6215 /* Assets.xcassets */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		4C8753F36E077F69D925EE26 /* APIClientTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = APIClientTests.swift; sourceTree = "<group>"; };
+		4C2C97BF3A0B42C58A62529F /* AppShellView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AppShellView.swift; sourceTree = "<group>"; };
 		535ED5D3D849F7B0F9DBB0E9 /* Jovie.entitlements */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.entitlements; path = Jovie.entitlements; sourceTree = "<group>"; };
 		549B9163EF50F377CA1A4C5B /* JovieTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = JovieTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		611EE527D20DC6F6872CBF33 /* JovieUITests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = JovieUITests.swift; sourceTree = "<group>"; };
@@ -92,6 +96,8 @@
 		A93DB506915B418D06E897A4 /* AppStateTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AppStateTests.swift; sourceTree = "<group>"; };
 		B4D156B3220339CAB0DBE1DD /* SplashView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SplashView.swift; sourceTree = "<group>"; };
 		B83A77F0A36DF3E6D5C77C2F /* MobileMeResponseTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MobileMeResponseTests.swift; sourceTree = "<group>"; };
+		35E151E782B5462F89618579 /* SettingsView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
+		B53DAA4BCC9D40A3A2C1552B /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.xml; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 		D03E6B0F83EC74031D75DCFB /* JovieTheme.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = JovieTheme.swift; sourceTree = "<group>"; };
 		DD30F57584F71E958D8C0514 /* LaunchMode.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = LaunchMode.swift; sourceTree = "<group>"; };
 		D24EEA621BFC0D5C4F57065C /* Configuration.local.plist */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.xml; path = Configuration.local.plist; sourceTree = "<group>"; };
@@ -164,9 +170,11 @@
 		38A521B77CFB8C49A552F2BF /* Features */ = {
 			isa = PBXGroup;
 			children = (
+				44CFD0078FC64A56A527EB88 /* AppShell */,
 				D38B16D4420C99A6D206BF5B /* Auth */,
 				A5A8CD9F74C3AE8AD7332D93 /* Dashboard */,
 				3BE73A70044C889546FD4A64 /* NeedsOnboarding */,
+				876FD84B7A3B40CAA0DDDBC8 /* Settings */,
 				D8C70D614390928784D627FC /* Splash */,
 			);
 			name = Features;
@@ -194,6 +202,15 @@
 			);
 			name = NeedsOnboarding;
 			path = NeedsOnboarding;
+			sourceTree = "<group>";
+		};
+		44CFD0078FC64A56A527EB88 /* AppShell */ = {
+			isa = PBXGroup;
+			children = (
+				4C2C97BF3A0B42C58A62529F /* AppShellView.swift */,
+			);
+			name = AppShell;
+			path = AppShell;
 			sourceTree = "<group>";
 		};
 		447FB872611F29AB452FBAFB /* iOS */ = {
@@ -247,6 +264,15 @@
 			path = Core;
 			sourceTree = "<group>";
 		};
+		876FD84B7A3B40CAA0DDDBC8 /* Settings */ = {
+			isa = PBXGroup;
+			children = (
+				35E151E782B5462F89618579 /* SettingsView.swift */,
+			);
+			name = Settings;
+			path = Settings;
+			sourceTree = "<group>";
+		};
 		97F028CFFF6B312B90AC0518 /* Jovie */ = {
 			isa = PBXGroup;
 			children = (
@@ -258,6 +284,7 @@
 				D24EEA621BFC0D5C4F57065C /* Configuration.local.plist */,
 				2E13A897DB2C3D06E845EC58 /* Info.plist */,
 				535ED5D3D849F7B0F9DBB0E9 /* Jovie.entitlements */,
+				B53DAA4BCC9D40A3A2C1552B /* PrivacyInfo.xcprivacy */,
 			);
 			name = Jovie;
 			path = Jovie;
@@ -425,6 +452,7 @@
 				6853DA69F7459FE14462F48F /* Jovie-logo.png in Resources */,
 				19328D236A7AE57920138038 /* Assets.xcassets in Resources */,
 				296968C7C074659FBA3D85E9 /* Inter-Variable.ttf in Resources */,
+				D7BCD277F96E47648D68C062 /* PrivacyInfo.xcprivacy in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -469,10 +497,12 @@
 				ADC14533827EFD888D1ED50F /* QRCodeRenderer.swift in Sources */,
 				A13F86A7D4F0C7F83D2BB000 /* ScreenBrightnessManager.swift in Sources */,
 				6E62396A29D88F275920CA48 /* JovieTheme.swift in Sources */,
+				5F4F3551CC9F4C09A2520AEB /* AppShellView.swift in Sources */,
 				F95545618F95E792DCBCA7DF /* AuthScreen.swift in Sources */,
 				74E75D0A3C816805F65FA48A /* DashboardView.swift in Sources */,
 				BE57F23AE56E75A83692D03D /* VenueModeView.swift in Sources */,
 				F3E8220C7612A63FF54DB345 /* NeedsOnboardingView.swift in Sources */,
+				F178AB3E908746C78645E4EE /* SettingsView.swift in Sources */,
 				FA8D45F4123178BDD33F82C5 /* SplashView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -508,6 +538,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CLERK_ASSOCIATED_DOMAIN = "distinct-giraffe-5.clerk.accounts.dev";
 				CLANG_ENABLE_MODULES = YES;
 				CLANG_ENABLE_OBJC_WEAK = NO;
 				CODE_SIGNING_ALLOWED = NO;
@@ -539,6 +570,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CLERK_ASSOCIATED_DOMAIN = "distinct-giraffe-5.clerk.accounts.dev";
 				CLANG_ENABLE_MODULES = YES;
 				CLANG_ENABLE_OBJC_WEAK = NO;
 				CODE_SIGNING_ALLOWED = NO;
