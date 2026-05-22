@@ -9,6 +9,7 @@ import {
   resolveTestBypassUserId,
 } from '@/lib/auth/test-mode';
 import { captureWarning } from '@/lib/error-tracking';
+import { hasRecentAdminMfaReverification } from './mfa';
 import { isAdmin } from './roles';
 
 /**
@@ -33,6 +34,7 @@ import { isAdmin } from './roles';
  */
 export async function requireAdmin(): Promise<NextResponse | null> {
   let userId: string | null = null;
+  let authResult: Awaited<ReturnType<typeof auth>> | null = null;
 
   if (isTestAuthBypassEnabled()) {
     try {
@@ -46,7 +48,7 @@ export async function requireAdmin(): Promise<NextResponse | null> {
 
   if (!userId) {
     try {
-      const authResult = await auth();
+      authResult = await auth();
       userId = authResult.userId;
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
@@ -75,11 +77,14 @@ export async function requireAdmin(): Promise<NextResponse | null> {
 
   // Check admin status
   const userIsAdmin = await isAdmin(userId);
+  const hasRecentMfa = authResult
+    ? hasRecentAdminMfaReverification(authResult)
+    : true;
 
   // Mask user ID for logging to prevent PII exposure
   const maskedUserId = maskUserIdForLog(userId);
 
-  if (!userIsAdmin) {
+  if (!userIsAdmin || !hasRecentMfa) {
     // Log unauthorized access attempt with masked ID
     captureWarning(
       `[admin/middleware] Forbidden admin access attempt by user: ${maskedUserId}`
@@ -111,6 +116,7 @@ export async function requireAdmin(): Promise<NextResponse | null> {
  */
 export async function checkIsAdmin(): Promise<boolean> {
   let userId: string | null = null;
+  let authResult: Awaited<ReturnType<typeof auth>> | null = null;
 
   if (isTestAuthBypassEnabled()) {
     try {
@@ -124,7 +130,7 @@ export async function checkIsAdmin(): Promise<boolean> {
 
   if (!userId) {
     try {
-      const authResult = await auth();
+      authResult = await auth();
       userId = authResult.userId;
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
@@ -135,5 +141,8 @@ export async function checkIsAdmin(): Promise<boolean> {
   }
 
   if (!userId) return false;
+  if (authResult && !hasRecentAdminMfaReverification(authResult)) {
+    return false;
+  }
   return isAdmin(userId);
 }

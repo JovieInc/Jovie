@@ -104,7 +104,10 @@ describe('getCurrentUserEntitlements', () => {
   });
 
   it('billing failure preserves admin status in degraded result', async () => {
-    mockCachedAuth.mockResolvedValue({ userId: 'user_admin' });
+    mockCachedAuth.mockResolvedValue({
+      userId: 'user_admin',
+      has: vi.fn().mockReturnValue(true),
+    });
     mockCachedCurrentUser.mockResolvedValue({
       primaryEmailAddress: { emailAddress: 'admin@example.com' },
     });
@@ -408,7 +411,10 @@ describe('getCurrentUserEntitlements', () => {
   });
 
   it('admin status is fetched independently of billing', async () => {
-    mockCachedAuth.mockResolvedValue({ userId: 'user_admin' });
+    mockCachedAuth.mockResolvedValue({
+      userId: 'user_admin',
+      has: vi.fn().mockReturnValue(true),
+    });
     mockCachedCurrentUser.mockResolvedValue({
       primaryEmailAddress: { emailAddress: 'admin@example.com' },
     });
@@ -430,6 +436,33 @@ describe('getCurrentUserEntitlements', () => {
 
     // isAdmin comes from the role check (Redis), not from billing DB
     expect(entitlements.isAdmin).toBe(true);
+  });
+
+  it('does not treat an admin role as admin without fresh MFA reverification', async () => {
+    mockCachedAuth.mockResolvedValue({
+      userId: 'user_admin',
+      has: vi.fn().mockReturnValue(false),
+    });
+    mockCachedCurrentUser.mockResolvedValue({
+      primaryEmailAddress: { emailAddress: 'admin@example.com' },
+    });
+    mockIsAdmin.mockResolvedValue(true);
+    mockGetUserBillingInfo.mockResolvedValue({
+      success: true,
+      data: {
+        userId: 'db_user_id',
+        email: 'admin@example.com',
+        isAdmin: false,
+        isPro: false,
+        plan: 'free',
+        stripeCustomerId: null,
+        stripeSubscriptionId: null,
+      },
+    });
+
+    const entitlements = await getCurrentUserEntitlements();
+
+    expect(entitlements.isAdmin).toBe(false);
   });
 
   it('defaults to pro plan when isPro=true but dbPlan is null', async () => {
@@ -544,7 +577,10 @@ describe('getCurrentUserEntitlements', () => {
   });
 
   it('admin who is also a pro subscriber gets both flags', async () => {
-    mockCachedAuth.mockResolvedValue({ userId: 'user_admin_pro' });
+    mockCachedAuth.mockResolvedValue({
+      userId: 'user_admin_pro',
+      has: vi.fn().mockReturnValue(true),
+    });
     mockCachedCurrentUser.mockResolvedValue({
       primaryEmailAddress: { emailAddress: 'adminpro@example.com' },
     });
