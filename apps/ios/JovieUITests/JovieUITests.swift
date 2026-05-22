@@ -1,6 +1,11 @@
 import XCTest
 
 final class JovieUITests: XCTestCase {
+  override func setUp() {
+    super.setUp()
+    continueAfterFailure = false
+  }
+
   func testCinematicSplashLaunchShowsLoadingState() {
     let app = launchMockApp(launchArgument: "-ui-testing-splash", expectedElementDescription: "\"Jovie is loading\"") {
       $0.staticTexts["Jovie"]
@@ -101,6 +106,7 @@ final class JovieUITests: XCTestCase {
     }
 
     let app = try makeLiveClerkApp(launchArgument: "-ui-testing-live-auth")
+    terminate(app)
     app.launch()
 
     XCTAssertTrue(
@@ -119,6 +125,7 @@ final class JovieUITests: XCTestCase {
     }
 
     let app = try makeLiveClerkApp(launchArgument: "-ui-testing-auto-auth")
+    terminate(app)
     app.launch()
 
     let copyURLButton = app.buttons["Copy URL"]
@@ -156,6 +163,10 @@ final class JovieUITests: XCTestCase {
       app.launchEnvironment["NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY"] = publishableKey
     }
 
+    addTeardownBlock { [app] in
+      self.terminate(app)
+    }
+
     return app
   }
 
@@ -178,8 +189,12 @@ final class JovieUITests: XCTestCase {
   ) -> XCUIApplication {
     let app = XCUIApplication()
     app.launchArguments.append(launchArgument)
+    addTeardownBlock { [app] in
+      self.terminate(app)
+    }
 
     for attempt in 1...2 {
+      terminate(app)
       app.launch()
       if element(app).waitForExistence(timeout: timeout) {
         return app
@@ -195,6 +210,13 @@ final class JovieUITests: XCTestCase {
       line: line
     )
     return app
+  }
+
+  private func terminate(_ app: XCUIApplication) {
+    guard app.state != .notRunning else { return }
+
+    app.terminate()
+    _ = app.wait(for: .notRunning, timeout: 5)
   }
 
   private func attachScreenshot(named name: String, app: XCUIApplication) {
