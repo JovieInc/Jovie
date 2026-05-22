@@ -98,4 +98,17 @@ struct AppStateTests {
     #expect(appState.isOffline == false)
     #expect(await repository.clearedUsers() == ["user_123"])
   }
+
+  @Test func authFormInputNormalizesEmailAndCode() {
+    #expect(AuthFormInput.normalizedEmail("  TIM@JOV.IE\n") == "tim@jov.ie")
+    #expect(AuthFormInput.normalizedCode("12 3-4567") == "123456")
+  }
+
+  @Test func authFormInputValidatesLikelyEmailAddress() {
+    #expect(AuthFormInput.isLikelyEmail("tim@jov.ie"))
+    #expect(!AuthFormInput.isLikelyEmail("tim"))
+    #expect(!AuthFormInput.isLikelyEmail("tim@"))
+    #expect(!AuthFormInput.isLikelyEmail("tim@jovie"))
+    #expect(!AuthFormInput.isLikelyEmail("@jov.ie"))
+  }
 }

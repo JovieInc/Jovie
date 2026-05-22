@@ -106,6 +106,7 @@ private enum LiveAuthBootstrapper {
 private struct AppContentView: View {
   @Bindable var appState: AppState
   let onLogout: @MainActor () async -> Void
+  let onAuthenticated: @MainActor (String) async -> Void
 
   var body: some View {
     Group {
@@ -113,7 +114,11 @@ private struct AppContentView: View {
       case .launching:
         SplashView()
       case .signedOut:
-        AuthScreen(isMock: !appState.launchMode.usesLiveClerk)
+        AuthScreen(
+          isMock: !appState.launchMode.usesLiveClerk,
+          webBaseURL: appState.configuration.webBaseURL,
+          onAuthenticated: onAuthenticated
+        )
       case .needsOnboarding:
         AppShellView(
           profile: AppShellProfile(response: nil),
@@ -147,9 +152,14 @@ struct RootView: View {
   @Bindable var appState: AppState
   let liveUserID: String?
   let onLogout: @MainActor () async -> Void
+  let onAuthenticated: @MainActor (String) async -> Void
 
   var body: some View {
-    AppContentView(appState: appState, onLogout: onLogout)
+    AppContentView(
+      appState: appState,
+      onLogout: onLogout,
+      onAuthenticated: onAuthenticated
+    )
       .task(id: "\(appState.didLoadClerk)-\(liveUserID ?? "signed-out")") {
         if appState.launchMode.requiresAutoAuth, liveUserID == nil {
           return
@@ -176,6 +186,9 @@ struct LiveRootContainer: View {
       onLogout: {
         try? await clerk.auth.signOut()
         await appState.signOut()
+      },
+      onAuthenticated: { userID in
+        await appState.handleSignedInUserChange(userID)
       }
     )
       .task(id: appState.launchMode.requiresAutoAuth) {
