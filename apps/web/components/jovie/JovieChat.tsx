@@ -162,7 +162,6 @@ export function JovieChat({
 
   // ─── Chat jank instrumentation (flag-gated) ─────────────────
   const jankMonitorEnabled = useAppFlag('CHAT_JANK_MONITOR');
-  const shellChatV1Enabled = useAppFlag('DESIGN_V1');
   const designV1ChatEntitiesEnabled = useAppFlag('DESIGN_V1');
   const { onSend: notifyJankSend } = useChatJankMonitor({
     conversationId: activeConversationId,
@@ -466,36 +465,19 @@ export function JovieChat({
                     className='pointer-events-none absolute inset-0 flex items-center justify-center select-none anim-calm-breath opacity-45'
                     data-testid='chat-empty-thread-ornament'
                   >
-                    {shellChatV1Enabled ? (
-                      <JovieMarkElectric
-                        spark={false}
-                        className='opacity-100'
-                        style={{
-                          width: 'clamp(180px, 34vw, 360px)',
-                          height: 'clamp(180px, 34vw, 360px)',
-                          transform: 'translateY(-16px)',
-                          WebkitMaskImage:
-                            'radial-gradient(circle, rgba(0,0,0,1) 55%, rgba(0,0,0,0.75) 75%, rgba(0,0,0,0) 95%)',
-                          maskImage:
-                            'radial-gradient(circle, rgba(0,0,0,1) 55%, rgba(0,0,0,0.75) 75%, rgba(0,0,0,0) 95%)',
-                        }}
-                      />
-                    ) : (
-                      <span
-                        style={{
-                          fontFamily:
-                            'var(--font-display, "Satoshi", -apple-system, system-ui, sans-serif)',
-                          fontWeight: 600,
-                          fontSize: 'clamp(180px, 38vw, 360px)',
-                          color: 'rgba(255,255,255,0.018)',
-                          letterSpacing: '-0.08em',
-                          lineHeight: 0.8,
-                          transform: 'translateY(-12px)',
-                        }}
-                      >
-                        j
-                      </span>
-                    )}
+                    <JovieMarkElectric
+                      spark={false}
+                      className='opacity-100'
+                      style={{
+                        width: 'clamp(180px, 34vw, 360px)',
+                        height: 'clamp(180px, 34vw, 360px)',
+                        transform: 'translateY(-16px)',
+                        WebkitMaskImage:
+                          'radial-gradient(circle, rgba(0,0,0,1) 55%, rgba(0,0,0,0.75) 75%, rgba(0,0,0,0) 95%)',
+                        maskImage:
+                          'radial-gradient(circle, rgba(0,0,0,1) 55%, rgba(0,0,0,0.75) 75%, rgba(0,0,0,0) 95%)',
+                      }}
+                    />
                   </div>
 
                   <div
@@ -670,7 +652,7 @@ export function JovieChat({
                   showThreadView ? 'Ask a follow-up...' : 'Ask Jovie...'
                 }
                 variant={showThreadView ? 'compact' : 'hero'}
-                shellChatV1={shellChatV1Enabled}
+                shellChatV1
               />
             </div>
           </div>

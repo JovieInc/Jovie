@@ -1,0 +1,94 @@
+name: iOS TestFlight
+
+on:
+  workflow_dispatch:
+    inputs:
+      build_number:
+        description: Optional App Store build number override
+        required: false
+      changelog:
+        description: Optional TestFlight changelog
+        required: false
+  push:
+    branches: [main]
+    paths:
+      - "apps/ios/**"
+      - "fastlane/**"
+      - "Gemfile"
+      - "Gemfile.lock"
+      - ".github/workflows/ios-testflight.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ios-testflight-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  beta:
+    name: Upload Internal TestFlight
+    runs-on: macos-26
+    timeout-minutes: 75
+    env:
+      CI: "true"
+      APPLE_API_KEY: ${{ secrets.APPLE_API_KEY }}
+      APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
+      APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
+      APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+      MATCH_GIT_URL: ${{ secrets.MATCH_GIT_URL }}
+      MATCH_PASSWORD: ${{ secrets.MATCH_PASSWORD }}
+      MATCH_GIT_PRIVATE_KEY: ${{ secrets.MATCH_GIT_PRIVATE_KEY }}
+      MATCH_GIT_BASIC_AUTHORIZATION: ${{ secrets.MATCH_GIT_BASIC_AUTHORIZATION }}
+      CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
+      CLERK_ASSOCIATED_DOMAIN: ${{ secrets.CLERK_ASSOCIATED_DOMAIN }}
+      APP_STORE_COMPANY_NAME: ${{ secrets.APP_STORE_COMPANY_NAME }}
+      API_BASE_URL: https://jov.ie
+      WEB_BASE_URL: https://jov.ie
+      IOS_BUILD_NUMBER: ${{ github.event_name == 'workflow_dispatch' && inputs.build_number || github.run_number }}
+      TESTFLIGHT_CHANGELOG: ${{ github.event_name == 'workflow_dispatch' && inputs.changelog || format('Internal build {0}', github.sha) }}
+
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Show Xcode version
+        run: xcodebuild -version
+
+      - name: Set up Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          bundler-cache: true
+
+      - name: Validate TestFlight secrets
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          required=(
+            APPLE_API_KEY
+            APPLE_API_KEY_ID
+            APPLE_API_ISSUER
+            APPLE_TEAM_ID
+            MATCH_GIT_URL
+            MATCH_PASSWORD
+            CLERK_PUBLISHABLE_KEY
+            CLERK_ASSOCIATED_DOMAIN
+          )
+
+          for key in "${required[@]}"; do
+            if [[ -z "${!key:-}" ]]; then
+              echo "Missing required secret or env var: $key"
+              exit 1
+            fi
+          done
+
+          if [[ -z "${MATCH_GIT_PRIVATE_KEY:-}" && -z "${MATCH_GIT_BASIC_AUTHORIZATION:-}" ]]; then
+            echo "Missing match git authentication: set MATCH_GIT_PRIVATE_KEY or MATCH_GIT_BASIC_AUTHORIZATION"
+            exit 1
+          fi
+
+      - name: Run iOS tests
+        run: bundle exec fastlane ios ios_tests
+
+      - name: Upload internal TestFlight build
+        run: bundle exec fastlane ios beta
