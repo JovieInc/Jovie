@@ -61,7 +61,7 @@ test.describe('Command palette — Cmd+K contract', () => {
 
     // Enter commits the highlighted item — should navigate to releases.
     await page.keyboard.press('Enter');
-    await page.waitForURL(/\/app\/dashboard\/releases/, { timeout: 15_000 });
+    await page.waitForURL(/\/app\/releases/, { timeout: 15_000 });
 
     // Move focus back to the body so the next Meta+K isn't swallowed by an
     // auto-focused form element on the destination route.

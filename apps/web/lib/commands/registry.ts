@@ -178,6 +178,13 @@ export const COMMANDS: readonly Command[] = [
     APP_ROUTES.RELEASES
   ),
   nav(
+    'go-calendar',
+    'Calendar',
+    'Plan release dates and campaign moments.',
+    'Calendar',
+    APP_ROUTES.CALENDAR
+  ),
+  nav(
     'go-audience',
     'Audience',
     'Understand your audience demographics.',

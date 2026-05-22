@@ -3,11 +3,9 @@
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { ImagePlus } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { JovieMarkElectric } from '@/components/atoms/JovieMarkElectric';
+import { useCallback, useEffect, useRef } from 'react';
 import { useAppFlag } from '@/lib/flags/client';
 import { SUPPORTED_IMAGE_MIME_TYPES } from '@/lib/images/config';
-import { cn } from '@/lib/utils';
 
 import { CHAT_COMPOSER_DOCK_CLASSNAME } from './chat-layout';
 import {
@@ -17,11 +15,9 @@ import {
   ErrorDisplay,
   ScrollToBottom,
 } from './components';
-import { ChatActionCard } from './components/ChatActionCard';
 import { ChatProvidersRegistrar } from './components/ChatProvidersRegistrar';
 import { ChatUsageAlert } from './components/ChatUsageAlert';
 import { EntityResolutionProvider } from './components/EntityResolutionProvider';
-import { SuggestedPrompts } from './components/SuggestedPrompts';
 import {
   useChatImageAttachments,
   useChatJankMonitor,
@@ -33,18 +29,6 @@ import type { JovieChatProps, MessagePart } from './types';
 /** Sentinel ID for the synthetic thinking placeholder */
 const THINKING_PLACEHOLDER_ID = 'thinking-placeholder';
 const VIRTUALIZATION_THRESHOLD = 12;
-
-/**
- * Extracts the first name token for use in the empty-state greeting (e.g. "What are we working on, Alex?").
- * Handles null/undefined/blank by returning null. Splits on whitespace.
- */
-export function getFirstNameForGreeting(
-  name: string | null | undefined
-): string | null {
-  const trimmed = name?.trim();
-  if (!trimmed) return null;
-  return trimmed.split(/\s+/)[0] ?? null;
-}
 
 function findLastAssistantIndex(
   messages: readonly { id: string; role: string }[]
@@ -70,20 +54,12 @@ export function JovieChat({
   onTitleChange,
   avatarUrl,
   username,
-  displayName,
-  isFirstSession = false,
-  actionCards = [],
 }: JovieChatProps) {
   const initialQuerySubmitted = useRef(false);
   const initialSkillApplied = useRef(false);
   const imageFileInputRef = useRef<HTMLInputElement>(null);
   // Track message IDs that were loaded from persistence to skip entrance animation
   const knownMessageIdsRef = useRef<Set<string>>(new Set());
-  const [dismissedActionCardIds, setDismissedActionCardIds] = useState<
-    ReadonlySet<string>
-  >(() => new Set());
-  // Hide neighbouring affordances while the slash picker owns the composer.
-  const [composerPickerOpen, setComposerPickerOpen] = useState(false);
   const {
     input,
     setInput,
@@ -99,7 +75,6 @@ export function JovieChat({
     inputRef,
     handleSubmit,
     handleRetry,
-    handleSuggestedPrompt,
     submitMessage,
     setChatError,
     isRateLimited,
@@ -220,14 +195,6 @@ export function JovieChat({
     ]
   );
 
-  const handleSuggestedPromptWithJank = useCallback(
-    (prompt: string) => {
-      notifyJankSend();
-      handleSuggestedPrompt(prompt);
-    },
-    [handleSuggestedPrompt, notifyJankSend]
-  );
-
   // Notify parent when the conversation title changes
   const prevTitleRef = useRef<string | null>(null);
   useEffect(() => {
@@ -322,14 +289,6 @@ export function JovieChat({
   const isStreaming = status === 'streaming';
   const showThreadView = hasMessages || showPendingBootstrap;
 
-  const handleDismissActionCard = useCallback((cardId: string) => {
-    setDismissedActionCardIds(prev => {
-      const next = new Set(prev);
-      next.add(cardId);
-      return next;
-    });
-  }, []);
-
   // Show skeleton while fetching existing conversation
   if (isLoadingConversation) {
     return (
@@ -378,38 +337,10 @@ export function JovieChat({
     onRemoveLastChip: chipTray.removeLast,
     onAddSkill: chipTray.addSkill,
     onAddEntity: chipTray.addEntity,
-    onPickerOpenChange: setComposerPickerOpen,
     profileId,
   } as const;
 
-  const greetingName =
-    getFirstNameForGreeting(displayName) ?? getFirstNameForGreeting(username);
-  const primaryActionCard =
-    actionCards.find(card => !dismissedActionCardIds.has(card.id)) ?? null;
-  const hasActionCardEmptyLayout = primaryActionCard !== null;
-  const hasComposerActivity =
-    input.trim().length > 0 ||
-    (pendingImages?.length ?? 0) > 0 ||
-    chipTray.chips.length > 0;
-  const showActionCardContent =
-    primaryActionCard !== null &&
-    !hasComposerActivity &&
-    !composerPickerOpen &&
-    !showThreadView;
-  const showSoftSuggestions =
-    !showThreadView &&
-    primaryActionCard === null &&
-    !hasComposerActivity &&
-    !composerPickerOpen;
-  let emptyStateHeading: string;
-  if (isFirstSession) {
-    emptyStateHeading = "Hey, I'm Jovie.";
-  } else {
-    emptyStateHeading = greetingName
-      ? `What are we working on, ${greetingName}?`
-      : 'What are we working on?';
-  }
-  const showBottomComposer = showThreadView || hasActionCardEmptyLayout;
+  const showBottomComposer = showThreadView;
 
   const composerSurface = (
     <div className='mx-auto w-full max-w-[45rem]'>
@@ -498,12 +429,8 @@ export function JovieChat({
         </AnimatePresence>
 
         {/* Persistent scroll viewport (flex-1) + morphing upper content.
-            The former hard switch (showThreadView ? thread-with-dock : centered-empty-with-dupe-composer)
-            is replaced by always-present bottom dock + AnimatePresence on the upper
-            (signals+heading+ornament+suggested vs. messages list). This is the exact
-            mechanical mirror of the OnboardingChat first-turn stabilization.
-            layoutId on ChatInput surface + dock position lock the geometry so hero↔compact
-            and empty↔thread transitions have zero jump or flicker. */}
+            Empty chat intentionally renders only the composer. Thread state
+            owns the message viewport and the persistent bottom dock. */}
         <div className='flex flex-1 flex-col overflow-hidden'>
           <div
             ref={scrollContainerRef}
@@ -516,91 +443,16 @@ export function JovieChat({
                   key='joviechat-empty-upper'
                   className='relative min-h-full'
                 >
-                  {/* Giant Jovie circle mark behind empty thread.
-                      Positioned absolute so it doesn't shift the welcome heading. */}
-                  {!hasActionCardEmptyLayout ? (
-                    <div
-                      aria-hidden
-                      className='pointer-events-none absolute inset-0 flex items-center justify-center select-none anim-calm-breath opacity-35'
-                      data-testid='chat-empty-thread-ornament'
-                    >
-                      <JovieMarkElectric
-                        spark={false}
-                        className='opacity-100'
-                        style={{
-                          width: 'clamp(180px, 34vw, 360px)',
-                          height: 'clamp(180px, 34vw, 360px)',
-                          transform: 'translateY(-16px)',
-                          WebkitMaskImage:
-                            'radial-gradient(circle, rgba(0,0,0,1) 55%, rgba(0,0,0,0.72) 75%, rgba(0,0,0,0) 95%)',
-                          maskImage:
-                            'radial-gradient(circle, rgba(0,0,0,1) 55%, rgba(0,0,0,0.72) 75%, rgba(0,0,0,0) 95%)',
-                        }}
-                      />
-                    </div>
-                  ) : null}
-
                   <div
-                    className={cn(
-                      'relative mx-auto flex min-h-full w-full max-w-[52rem] flex-col items-center justify-center py-8',
-                      hasActionCardEmptyLayout ? 'gap-0' : 'gap-5'
-                    )}
+                    className='relative mx-auto flex min-h-full w-full max-w-[52rem] flex-col items-center justify-center py-8'
                     data-testid='chat-empty-state-composer-region'
                   >
-                    {hasActionCardEmptyLayout ? (
-                      <div
-                        className='mx-auto flex min-h-[172px] w-full max-w-[38rem] items-center justify-center sm:min-h-[148px]'
-                        data-testid='chat-empty-state-action-card-slot'
-                      >
-                        {showActionCardContent ? (
-                          <ChatActionCard
-                            className='h-full'
-                            title={primaryActionCard.title}
-                            body={primaryActionCard.body}
-                            actionLabel={primaryActionCard.actionLabel}
-                            onAct={() =>
-                              handleSuggestedPromptWithJank(
-                                primaryActionCard.prompt
-                              )
-                            }
-                            onDismiss={() =>
-                              handleDismissActionCard(primaryActionCard.id)
-                            }
-                          />
-                        ) : null}
-                      </div>
-                    ) : (
-                      <>
-                        <h1
-                          className={cn(
-                            'text-balance text-center text-[2rem] font-semibold leading-[1.1] text-primary-token sm:text-[2.35rem] md:text-[2.65rem]',
-                            composerPickerOpen &&
-                              'pointer-events-none opacity-0'
-                          )}
-                          aria-hidden={composerPickerOpen ? 'true' : undefined}
-                        >
-                          {emptyStateHeading}
-                        </h1>
-                        <div
-                          className='w-full'
-                          data-testid='chat-empty-state-centered-composer'
-                        >
-                          {composerSurface}
-                        </div>
-                        <div
-                          className='min-h-[38px] w-full'
-                          data-testid='chat-empty-state-soft-suggestions-slot'
-                        >
-                          {showSoftSuggestions ? (
-                            <SuggestedPrompts
-                              onSelect={handleSuggestedPromptWithJank}
-                              isFirstSession={isFirstSession}
-                              layout='rail'
-                            />
-                          ) : null}
-                        </div>
-                      </>
-                    )}
+                    <div
+                      className='w-full'
+                      data-testid='chat-empty-state-centered-composer'
+                    >
+                      {composerSurface}
+                    </div>
                   </div>
                 </div>
               ) : (
@@ -702,11 +554,8 @@ export function JovieChat({
           </div>
 
           {/*
-            Persistent always-bottom composer dock.
-            No more conditional + justify-center teleport for the input on first message.
-            Variant (hero/compact) changes are smoothed by the layoutId on the inner
-            motion surface. All transient chrome (alerts, rate, error) lives here for both
-            empty and thread states.
+            Thread composer dock. Empty chat keeps the same composer surface centered
+            above, while active threads pin it below the message viewport.
           */}
           {showBottomComposer ? (
             <div

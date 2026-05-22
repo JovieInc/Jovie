@@ -10,9 +10,11 @@ import { fireEvent, render, screen } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import { CmdKPalette } from '@/components/organisms/CmdKPalette';
+import { APP_ROUTES } from '@/constants/routes';
 import { commandsForSurface } from '@/lib/commands/registry';
 
 const pushMock = vi.fn();
+const CMD_LABEL = String.fromCodePoint(0x2318);
 
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: pushMock, replace: vi.fn() }),
@@ -106,6 +108,27 @@ describe('SharedCommandPalette (cmd+k surface)', () => {
     }
   });
 
+  it('adds Calendar as a cmd+k-only nav route', () => {
+    expect(commandsForSurface('cmdk')).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          kind: 'nav',
+          id: 'go-calendar',
+          label: 'Calendar',
+          href: APP_ROUTES.CALENDAR,
+        }),
+      ])
+    );
+    expect(commandsForSurface('chat-slash')).not.toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          kind: 'nav',
+          id: 'go-calendar',
+        }),
+      ])
+    );
+  });
+
   it('renders nav, skill, and release sections when open', () => {
     render(<CmdKPalette profileId='profile-1' open onOpenChange={vi.fn()} />);
     expect(screen.getByTestId('shared-command-palette')).toBeInTheDocument();
@@ -118,6 +141,31 @@ describe('SharedCommandPalette (cmd+k surface)', () => {
     expect(sectionLabels).toContain('Skills');
     expect(sectionLabels).toContain('Releases');
     expect(screen.getByText('Midnight Run')).toBeInTheDocument();
+  });
+
+  it('shows aligned numbered shortcuts for the first three visible rows', () => {
+    render(<CmdKPalette profileId='profile-1' open onOpenChange={vi.fn()} />);
+    const rows = screen.getAllByRole('option');
+
+    expect(rows[0]).toHaveTextContent(`${CMD_LABEL}1`);
+    expect(rows[1]).toHaveTextContent(`${CMD_LABEL}2`);
+    expect(rows[2]).toHaveTextContent(`${CMD_LABEL}3`);
+    expect(rows[3]).not.toHaveTextContent(`${CMD_LABEL}4`);
+  });
+
+  it.each([
+    ['1', 0],
+    ['2', 1],
+    ['3', 2],
+  ])('selects visible row %s with its numbered shortcut', (key, rowIndex) => {
+    pushMock.mockClear();
+    render(<CmdKPalette profileId='profile-1' open onOpenChange={vi.fn()} />);
+
+    fireEvent.keyDown(globalThis, { key, metaKey: true });
+
+    const rows = screen.getAllByRole('option');
+    expect(rows[rowIndex]).toHaveAttribute('aria-selected', 'true');
+    expect(pushMock).not.toHaveBeenCalled();
   });
 
   it('navigates to the nav href when a nav item is committed', () => {
