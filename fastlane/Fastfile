@@ -65,8 +65,6 @@ def write_ios_configuration(api_base_url:, web_base_url:, clerk_publishable_key:
 end
 
 def ensure_app_store_assets!(api_key:, apple_team_id:)
-  Spaceship::ConnectAPI.token = api_key
-
   bundle_id = Spaceship::ConnectAPI::BundleId.find(APP_IDENTIFIER)
   if bundle_id
     UI.message("Found Apple bundle identifier #{APP_IDENTIFIER}")
