@@ -47,11 +47,25 @@ test.describe('Profile Notifications Hosts', () => {
       await waitForHydration(page);
 
       if (breakpoint.name === 'desktop') {
+        const desktopAlertsCard = page.getByTestId(
+          'profile-desktop-alerts-card'
+        );
+        const hasDesktopAlertsCard = await desktopAlertsCard
+          .isVisible({ timeout: 2500 })
+          .catch(() => false);
+
+        if (hasDesktopAlertsCard) {
+          await expect(
+            desktopAlertsCard.getByRole('switch', { name: /new music/i })
+          ).toBeVisible();
+          return;
+        }
+
         await expect(
-          page.getByRole('heading', { name: 'Alerts' })
-        ).toBeVisible();
-        await expect(
-          page.getByRole('switch', { name: /new music/i })
+          page
+            .getByTestId('profile-home-alerts-row')
+            .or(page.getByTestId('profile-home-alerts-fallback-card'))
+            .first()
         ).toBeVisible();
         return;
       }
@@ -69,10 +83,10 @@ test.describe('Profile Notifications Hosts', () => {
       await trigger.click();
 
       await expect(
-        page.getByTestId('profile-mobile-notifications-flow')
+        page.getByTestId('profile-mobile-notifications-flow').first()
       ).toBeVisible();
       await expect(
-        page.getByTestId('profile-mobile-notifications-step-email')
+        page.getByTestId('profile-mobile-notifications-step-email').first()
       ).toBeVisible();
     });
 

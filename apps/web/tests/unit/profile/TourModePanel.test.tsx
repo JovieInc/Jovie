@@ -138,7 +138,7 @@ describe('TourModePanel', () => {
   it('renders empty state when no tour dates', () => {
     render(<TourModePanel artist={artist} tourDates={[]} />);
     expect(screen.getByTestId('tour-drawer-content')).toBeInTheDocument();
-    expect(screen.getByText('No upcoming events.')).toBeInTheDocument();
+    expect(screen.getByText('No Events')).toBeInTheDocument();
     expect(screen.getByTestId('mock-notifications-cta')).toHaveAttribute(
       'data-source',
       'events_empty_state'

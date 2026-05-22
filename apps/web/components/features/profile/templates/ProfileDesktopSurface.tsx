@@ -469,8 +469,8 @@ export function ProfileDesktopSurface({
           data-testid='profile-desktop-secondary-grid'
         >
           <DesktopSurfaceCard
-            title='All Shows'
-            actionLabel='View all shows'
+            title='Events'
+            actionLabel='View Events'
             onAction={() => onModeSelect('tour')}
           >
             <div className='space-y-2'>
@@ -640,22 +640,22 @@ export function ProfileDesktopSurface({
                     <p className='text-[13px] font-semibold tracking-[-0.01em] text-white/44'>
                       Sent by {artist.name}
                     </p>
-                    <p className='text-[14px] leading-6 text-white/58'>
-                      Share your email with {artist.name} to receive occasional
-                      emails about related things.
+                    <p className='text-[14px] leading-5 text-white/58'>
+                      Share your email with {artist.name} for occasional artist
+                      emails.
                     </p>
                   </div>
                   <div className='flex items-center justify-between gap-4'>
                     <div className='flex items-center gap-3'>
                       <Mail className='size-4 text-white/62' />
                       <span className='text-[14px] font-medium tracking-[-0.015em] text-white/84'>
-                        Subscribe to Other Alerts
+                        Artist Emails
                       </span>
                     </div>
                     <Switch
                       checked={isSubscribed}
                       onCheckedChange={() => onModeSelect('subscribe')}
-                      aria-label='Subscribe to other alerts'
+                      aria-label='Artist emails'
                       className='data-[state=checked]:bg-white/36 data-[state=unchecked]:bg-white/14'
                     />
                   </div>
@@ -743,7 +743,7 @@ export function ProfileDesktopSurface({
       </div>
     ) : activePrimaryTab === 'tour' ? (
       <DesktopSurfaceCard
-        title='All Shows'
+        title='Events'
         className='flex-1'
         testId='profile-primary-tab-tour'
       >

@@ -170,7 +170,7 @@ describe('ProfileInlineNotificationsCTA', () => {
     expect(formState.handleChannelChange).toHaveBeenCalledWith('email');
     expect(formState.openSubscription).toHaveBeenCalled();
     expect(await screen.findByRole('dialog')).toBeInTheDocument();
-    expect(screen.getByText('Enter your email')).toBeInTheDocument();
+    expect(screen.getByText('Email Alerts')).toBeInTheDocument();
     expect(screen.getByTestId('mobile-email-input')).toBeInTheDocument();
     expect(screen.queryByText('Sent by Test Artist')).not.toBeInTheDocument();
   }, 10_000);
@@ -182,7 +182,7 @@ describe('ProfileInlineNotificationsCTA', () => {
 
     fireEvent.click(screen.getByRole('button', { name: /get alerts/i }));
 
-    expect(await screen.findByText('Enter your email')).toBeInTheDocument();
+    expect(await screen.findByText('Email Alerts')).toBeInTheDocument();
   });
 
   it('routes subscribed users into manage mode when a handler is provided', () => {
@@ -239,7 +239,7 @@ describe('ProfileInlineNotificationsCTA', () => {
     expect(screen.getByText('Sent from Jovie')).toBeInTheDocument();
     expect(screen.getByText('Sent by Test Artist')).toBeInTheDocument();
     expect(
-      screen.getByRole('switch', { name: /subscribe to other alerts/i })
+      screen.getByRole('switch', { name: /artist emails/i })
     ).toBeChecked();
   });
 
@@ -254,7 +254,7 @@ describe('ProfileInlineNotificationsCTA', () => {
       />
     );
 
-    expect(await screen.findByText('Enter your email')).toBeInTheDocument();
+    expect(await screen.findByText('Email Alerts')).toBeInTheDocument();
 
     mockUseProfileNotifications.mockReturnValue(
       buildProfileNotifications({
@@ -291,7 +291,7 @@ describe('ProfileInlineNotificationsCTA', () => {
       <ProfileInlineNotificationsCTA artist={makeArtist()} autoOpen />
     );
 
-    expect(await screen.findByText('Enter your email')).toBeInTheDocument();
+    expect(await screen.findByText('Email Alerts')).toBeInTheDocument();
 
     mockUseProfileNotifications.mockReturnValue(
       buildProfileNotifications({
@@ -465,9 +465,7 @@ describe('ProfileInlineNotificationsCTA', () => {
 
     await screen.findByText('Alerts');
 
-    fireEvent.click(
-      screen.getByRole('switch', { name: /subscribe to other alerts/i })
-    );
+    fireEvent.click(screen.getByRole('switch', { name: /artist emails/i }));
     fireEvent.click(screen.getByRole('button', { name: /save & finish/i }));
 
     await waitFor(() => {

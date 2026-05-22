@@ -1,6 +1,6 @@
 'use client';
 
-import { Bell, CheckCircle2, ChevronRight, Mail } from 'lucide-react';
+import { Bell, CheckCircle2, Mail } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
 import { AboutSection } from '@/features/profile/AboutSection';
 import { ArtistNotificationsCTA } from '@/features/profile/artist-notifications-cta/ArtistNotificationsCTA';
@@ -23,7 +23,7 @@ import type { NotificationContentType } from '@/types/notifications';
 import type { PressPhoto } from '@/types/press-photos';
 
 const PANEL_CLASS_NAME =
-  'rounded-[34px] border border-white/8 bg-[linear-gradient(180deg,rgba(255,255,255,0.05),rgba(255,255,255,0.025))] p-5 shadow-[0_28px_72px_rgba(0,0,0,0.26)] backdrop-blur-2xl';
+  'rounded-[var(--profile-card-radius)] border border-[color:var(--profile-panel-border)] bg-[color:var(--profile-content-bg)] p-5 shadow-[var(--profile-panel-shadow)] backdrop-blur-2xl';
 const OTP_SLOT_KEYS = ['a', 'b', 'c', 'd', 'e', 'f'] as const;
 const NATIVE_PANEL_CLASS_NAME = '-mx-4 space-y-0 pb-2';
 
@@ -266,11 +266,11 @@ function ProfileEmptyState({
   sourceContext: NotificationSourceContext;
 }>) {
   return (
-    <div className='flex min-h-[42vh] flex-col items-center justify-center px-6 py-14 text-center'>
-      <p className='text-[18px] font-[650] tracking-[-0.035em] text-white'>
+    <div className='flex min-h-[36vh] flex-col items-center justify-center px-6 py-12 text-center'>
+      <p className='text-[17px] font-semibold tracking-[-0.018em] text-white'>
         {title}
       </p>
-      <p className='mt-2 max-w-[25ch] text-[13px] leading-5 text-white/52'>
+      <p className='mt-2 max-w-[25ch] text-[12.5px] leading-5 text-white/52'>
         {body}
       </p>
       <div className='mt-5'>
@@ -336,13 +336,13 @@ function AlertsSettingsRow({
       disabled={disabled}
       role='switch'
       aria-checked={checked}
-      className='flex min-h-[62px] w-full items-center gap-3 border-t border-white/[0.075] px-4 py-3 text-left transition-colors duration-subtle first:border-t-0 hover:bg-white/[0.03] disabled:cursor-default disabled:hover:bg-transparent'
+      className='flex min-h-[58px] w-full items-center gap-3 border-t border-white/[0.075] px-4 py-3 text-left transition-colors duration-subtle first:border-t-0 hover:bg-white/[0.03] disabled:cursor-default disabled:hover:bg-transparent'
     >
       <div className='min-w-0 flex-1'>
-        <p className='truncate text-[15px] font-medium tracking-[-0.01em] text-white'>
+        <p className='truncate text-[14px] font-medium tracking-[-0.005em] text-white'>
           {label}
         </p>
-        <p className='truncate text-[12px] leading-4 text-white/50'>
+        <p className='truncate text-[11.5px] leading-4 text-white/50'>
           {description}
         </p>
       </div>
@@ -372,7 +372,7 @@ function AlertsSettingsView({
       data-testid='profile-alerts-settings'
     >
       <div className='flex items-baseline justify-between px-4 pb-2 pt-3'>
-        <h2 className='text-[22px] font-[680] leading-none tracking-[-0.025em] text-white'>
+        <h2 className='text-[20px] font-semibold leading-none tracking-[-0.014em] text-white'>
           Alerts
         </h2>
         <span className='text-[13px] font-medium text-white/52'>
@@ -416,14 +416,13 @@ function AlertsSettingsView({
           <Mail className='h-4 w-4' />
         </span>
         <div className='min-w-0 flex-1'>
-          <p className='truncate text-[15px] font-medium tracking-[-0.01em] text-white'>
+          <p className='truncate text-[14px] font-medium tracking-[-0.005em] text-white'>
             Delivery
           </p>
-          <p className='truncate text-[12px] leading-4 text-white/50'>
-            Email and SMS settings are managed securely.
+          <p className='truncate text-[11.5px] leading-4 text-white/50'>
+            Email and text delivery.
           </p>
         </div>
-        <ChevronRight className='h-4 w-4 text-white/32' />
       </div>
 
       {isSubscribed ? (
@@ -521,7 +520,7 @@ export function ProfilePrimaryTabPanel({
         >
           <div>
             <div className='px-4 pb-2 pt-3'>
-              <h2 className='text-[22px] font-[680] leading-none tracking-[-0.025em] text-white'>
+              <h2 className='text-[20px] font-semibold leading-none tracking-[-0.014em] text-white'>
                 Music
               </h2>
             </div>
@@ -542,13 +541,13 @@ export function ProfilePrimaryTabPanel({
         data-testid='profile-primary-tab-listen'
       >
         <div className='px-4 pb-2 pt-3'>
-          <h2 className='text-[22px] font-[680] leading-none tracking-[-0.025em] text-white'>
+          <h2 className='text-[20px] font-semibold leading-none tracking-[-0.014em] text-white'>
             Music
           </h2>
         </div>
         <ProfileEmptyState
           artist={artist}
-          title='No music yet.'
+          title='No Music'
           body='Get a note when the first release lands.'
           triggerLabel='Turn on alerts'
           sourceContext={musicEmptySourceContext}
@@ -564,7 +563,7 @@ export function ProfilePrimaryTabPanel({
         data-testid='profile-primary-tab-tour'
       >
         <div className='px-4 pb-2 pt-3'>
-          <h2 className='text-[22px] font-[680] leading-none tracking-[-0.025em] text-white'>
+          <h2 className='text-[20px] font-semibold leading-none tracking-[-0.014em] text-white'>
             Events
           </h2>
         </div>

@@ -7,7 +7,7 @@ import { cn } from '../lib/utils';
 
 /**
  * Switch component matching Linear.app toggle design.
- * 28×16px track, 12×12px thumb, smooth 150ms slide transition.
+ * 28×16px track, 12×12px thumb, System B motion and accent tokens.
  * Supports keyboard navigation, disabled state, and focus ring.
  */
 const Switch = React.forwardRef<
@@ -17,11 +17,11 @@ const Switch = React.forwardRef<
   <SwitchPrimitives.Root
     className={cn(
       'peer inline-flex h-4 w-7 shrink-0 cursor-pointer items-center rounded-full px-0.5',
-      'transition-colors duration-[150ms] ease-in-out',
+      'transition-colors duration-subtle ease-[var(--ds-motion-subtle-easing)]',
       'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--color-accent) focus-visible:ring-offset-2',
       'disabled:cursor-not-allowed disabled:opacity-50',
       'data-[state=unchecked]:bg-white/[0.08] data-[state=unchecked]:hover:bg-white/[0.12] disabled:data-[state=unchecked]:hover:bg-white/[0.08]',
-      'data-[state=checked]:bg-indigo-500 data-[state=checked]:hover:bg-indigo-600 disabled:data-[state=checked]:hover:bg-indigo-500',
+      'data-[state=checked]:bg-[var(--color-accent)] data-[state=checked]:hover:bg-[var(--color-accent-hover)] disabled:data-[state=checked]:hover:bg-[var(--color-accent)]',
       className
     )}
     {...props}
@@ -30,7 +30,7 @@ const Switch = React.forwardRef<
     <SwitchPrimitives.Thumb
       className={cn(
         'pointer-events-none block h-3 w-3 rounded-full bg-white shadow-sm ring-0',
-        'transition-transform duration-[150ms] ease-in-out',
+        'transition-transform duration-subtle ease-[var(--ds-motion-subtle-easing)]',
         'data-[state=unchecked]:translate-x-0',
         'data-[state=checked]:translate-x-3'
       )}

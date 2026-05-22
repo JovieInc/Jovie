@@ -141,7 +141,7 @@ describe('StaticArtistPage', () => {
         artist={mockArtist}
         socialLinks={mockSocialLinks}
         contacts={[]}
-        subtitle='Tour dates'
+        subtitle='Events'
         showBackButton={true}
         showSubscriptionConfirmedBanner
       />

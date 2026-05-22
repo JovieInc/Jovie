@@ -187,7 +187,7 @@ describe('ArtistNotificationsCTA full-screen alert flow states', () => {
   it('opens directly to email entry for unsubscribed fans', async () => {
     await renderCTA();
 
-    expect(await screen.findByText('Enter your email')).toBeInTheDocument();
+    expect(await screen.findByText('Email Alerts')).toBeInTheDocument();
     expect(screen.getByTestId('mobile-email-input')).toHaveAttribute(
       'type',
       'email'
@@ -207,7 +207,7 @@ describe('ArtistNotificationsCTA full-screen alert flow states', () => {
     await renderCTA();
 
     const user = userEvent.setup();
-    await screen.findByText('Enter your email');
+    await screen.findByText('Email Alerts');
 
     await user.click(screen.getByRole('button', { name: 'Continue' }));
 
@@ -244,7 +244,7 @@ describe('ArtistNotificationsCTA full-screen alert flow states', () => {
     await renderCTA();
 
     const user = userEvent.setup();
-    await screen.findByText('Enter your email');
+    await screen.findByText('Email Alerts');
     await user.click(screen.getByRole('button', { name: 'Continue' }));
     await screen.findByText('Enter the code');
     await user.click(screen.getByRole('button', { name: 'Verify' }));

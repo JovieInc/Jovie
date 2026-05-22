@@ -623,7 +623,7 @@ describe('ProfileCompactTemplate', () => {
     );
 
     expect(screen.getByTestId('profile-home-alerts-row')).toHaveTextContent(
-      'Get Test Artist alerts'
+      'Alerts'
     );
     expect(
       screen.getByTestId('profile-home-primary-action-card')
@@ -651,7 +651,7 @@ describe('ProfileCompactTemplate', () => {
     );
 
     expect(screen.getByTestId('profile-home-alerts-row')).toHaveTextContent(
-      'Get Test Artist alerts'
+      'Alerts'
     );
     expect(
       screen.getByTestId('profile-home-primary-action-card')
@@ -689,7 +689,7 @@ describe('ProfileCompactTemplate', () => {
     );
 
     const alertsRow = screen.getByTestId('profile-home-alerts-fallback-card');
-    expect(alertsRow).toHaveTextContent('Get Test Artist alerts');
+    expect(alertsRow).toHaveTextContent('Alerts');
     expect(alertsRow).not.toHaveTextContent('New music and shows');
 
     fireEvent.click(alertsRow);
@@ -741,7 +741,7 @@ describe('ProfileCompactTemplate', () => {
     ).not.toBeInTheDocument();
   });
 
-  it('shows the alerts fallback as on for returning subscribers', async () => {
+  it('hides the compact hero alerts card for returning subscribers', async () => {
     mockUseProfileShell.mockImplementation(() => ({
       notificationsContextValue: {
         subscribedChannels: { email: true },
@@ -765,11 +765,14 @@ describe('ProfileCompactTemplate', () => {
     );
 
     expect(
-      screen.getByTestId('profile-home-alerts-fallback-card')
-    ).toHaveTextContent('Alerts On');
+      screen.queryByTestId('profile-home-alerts-fallback-card')
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByTestId('profile-home-alerts-row')
+    ).not.toBeInTheDocument();
   });
 
-  it('keeps the compact hero alerts row on after activation in the current session', async () => {
+  it('hides the compact hero alerts card after activation in the current session', async () => {
     mockProfileInlineNotificationsCTA.mockImplementation(
       (props: { readonly onSubscriptionActivated?: () => void }) => (
         <button
@@ -811,8 +814,11 @@ describe('ProfileCompactTemplate', () => {
     view.rerender(renderProfile());
 
     expect(
-      screen.getByTestId('profile-home-alerts-fallback-card')
-    ).toHaveTextContent('Alerts On');
+      screen.queryByTestId('profile-home-alerts-fallback-card')
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByTestId('profile-home-alerts-row')
+    ).not.toBeInTheDocument();
   });
 
   it('falls back to the mode prop when the URL has no mode param', async () => {

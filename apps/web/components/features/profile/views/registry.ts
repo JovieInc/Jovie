@@ -135,7 +135,8 @@ export const PROFILE_VIEW_REGISTRY: Record<
   },
   tour: {
     key: 'tour',
-    title: 'All Shows',
+    title: 'Events',
+    subtitle: 'Tour dates and ticket updates.',
     icon: Ticket,
     menuOrder: 5,
     analyticsEvent: 'tour_drawer_open',
@@ -160,7 +161,7 @@ export const PROFILE_VIEW_REGISTRY: Record<
   },
   share: {
     key: 'share',
-    title: 'Share',
+    title: 'Share Profile',
     subtitle: 'Share this profile',
     icon: Share2,
     menuOrder: 8,

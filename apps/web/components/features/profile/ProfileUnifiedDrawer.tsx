@@ -106,7 +106,7 @@ function resolveViewMeta({
   }
 
   if (view === 'tour' && canOpenTourDrawer) {
-    return { title: 'All Shows', subtitle: undefined };
+    return { title: 'Events', subtitle: undefined };
   }
 
   return PROFILE_VIEW_REGISTRY[registryKey];

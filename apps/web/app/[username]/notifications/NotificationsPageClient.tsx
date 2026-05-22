@@ -70,7 +70,7 @@ export function NotificationsPageClient({ artist }: Props) {
         />
         <div
           ref={setNotificationsPortalContainer}
-          className='relative z-10 flex h-[calc(100dvh-2rem)] w-full max-w-sm flex-col overflow-hidden rounded-[32px] border border-[color:var(--profile-panel-border)] bg-[var(--profile-content-bg)] p-5 shadow-[var(--profile-panel-shadow)] backdrop-blur-2xl sm:h-[min(844px,calc(100dvh-48px))] sm:p-6 min-[1180px]:h-[min(940px,calc(100dvh-48px))] min-[1180px]:max-w-[1540px] min-[1180px]:rounded-[36px] min-[1180px]:p-8'
+          className='relative z-10 flex h-[calc(100dvh-2rem)] w-full max-w-sm flex-col overflow-hidden rounded-[var(--profile-card-radius)] border border-[color:var(--profile-panel-border)] bg-[var(--profile-content-bg)] p-5 shadow-[var(--profile-panel-shadow)] backdrop-blur-2xl sm:h-[min(844px,calc(100dvh-48px))] sm:p-6 min-[1180px]:h-[min(940px,calc(100dvh-48px))] min-[1180px]:max-w-[1540px] min-[1180px]:p-8'
         >
           <div className='mb-5 flex items-center justify-between'>
             <Link

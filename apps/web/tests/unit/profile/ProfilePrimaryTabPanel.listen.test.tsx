@@ -138,7 +138,7 @@ describe('ProfilePrimaryTabPanel listen mode', () => {
       />
     );
 
-    expect(screen.getByText('No music yet.')).toBeVisible();
+    expect(screen.getByText('No Music')).toBeVisible();
     expect(
       screen.getByRole('button', { name: 'Turn on alerts' })
     ).toHaveAttribute('data-source', 'music_empty_state');

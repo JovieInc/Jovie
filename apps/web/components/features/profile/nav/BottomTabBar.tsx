@@ -101,12 +101,11 @@ export interface BottomTabBarProps {
 /**
  * Bottom tab bar for the public profile compact surface.
  *
- * Safe-area padding is applied inside the bar (`pb-[max(env(safe-area-inset-bottom),12px)]`).
+ * Safe-area padding is applied inside the bar (`pb-[max(env(safe-area-inset-bottom),10px)]`).
  * Content rendered above this bar must reserve `--profile-bottom-nav-height`
  * — see `CONTENT_SAFE_AREA_BOTTOM_PADDING` in `lib/profile/nav-constants.ts`.
  *
- * Touch targets meet the 44×44pt minimum via `min-h-[52px]` on each button
- * (52px provides comfortable margin above the spec minimum).
+ * Touch targets meet the 44×44pt minimum via `min-h-[50px]` on each button.
  */
 export function BottomTabBar({
   activeTab,
@@ -125,7 +124,7 @@ export function BottomTabBar({
   return (
     <div
       className={cn(
-        '-mx-[var(--page-pad)] shrink-0 border-t border-white/[0.075] bg-black/72 px-1 pb-[max(env(safe-area-inset-bottom),12px)] pt-1 backdrop-blur-2xl',
+        '-mx-[var(--page-pad)] shrink-0 border-t border-[color:var(--profile-dock-border)] bg-[color:var(--profile-dock-bg)] px-1.5 pb-[max(env(safe-area-inset-bottom),10px)] pt-1 backdrop-blur-2xl',
         className
       )}
       data-testid='profile-tab-bar'
@@ -148,9 +147,8 @@ export function BottomTabBar({
                 type='button'
                 onClick={() => onTabSelect(tab.mode)}
                 // 44×44pt minimum touch target (spec §2 a11y requirement).
-                // min-h-[52px] provides comfortable margin above the minimum.
                 className={cn(
-                  'relative flex min-h-[52px] min-w-0 flex-col items-center justify-center gap-1 rounded-[22px] px-1.5 py-1.5 text-center transition-[background-color,color] duration-subtle',
+                  'relative flex min-h-[50px] min-w-0 flex-col items-center justify-center gap-0.5 rounded-[var(--profile-action-radius)] px-1.5 py-1.5 text-center transition-[background-color,color] duration-subtle',
                   'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--focus-ring))] focus-visible:ring-offset-2 focus-visible:ring-offset-transparent',
                   isActive ? 'text-white' : 'text-white/40 hover:text-white/62'
                 )}
@@ -167,7 +165,7 @@ export function BottomTabBar({
                 />
                 <span
                   className={cn(
-                    'truncate text-[11px] leading-none tracking-[-0.012em]',
+                    'truncate text-[10.5px] leading-none tracking-[-0.005em]',
                     isActive ? 'font-semibold' : 'font-medium'
                   )}
                 >
@@ -182,7 +180,7 @@ export function BottomTabBar({
               type='button'
               onClick={onOpenMenu}
               className={cn(
-                'relative flex min-h-[52px] min-w-0 flex-col items-center justify-center gap-1 rounded-[22px] px-1.5 py-1.5 text-center transition-[background-color,color] duration-subtle',
+                'relative flex min-h-[50px] min-w-0 flex-col items-center justify-center gap-0.5 rounded-[var(--profile-action-radius)] px-1.5 py-1.5 text-center transition-[background-color,color] duration-subtle',
                 'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--focus-ring))] focus-visible:ring-offset-2 focus-visible:ring-offset-transparent',
                 isMenuOpen ? 'text-white' : 'text-white/40 hover:text-white/62'
               )}
@@ -199,7 +197,7 @@ export function BottomTabBar({
               />
               <span
                 className={cn(
-                  'truncate text-[11px] leading-none tracking-[-0.012em]',
+                  'truncate text-[10.5px] leading-none tracking-[-0.005em]',
                   isMenuOpen ? 'font-semibold' : 'font-medium'
                 )}
               >

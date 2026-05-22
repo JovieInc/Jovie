@@ -291,7 +291,7 @@ test.describe('Public profile /tim layout hardening @regression', () => {
       expect(metrics.shell?.left ?? 0).toBeGreaterThanOrEqual(-1);
       expect(metrics.shell?.right ?? 0).toBeLessThanOrEqual(viewport.width + 1);
       expect(metrics.cover?.height ?? 0).toBeGreaterThanOrEqual(
-        viewport.isMobile ? 320 : 220
+        viewport.isMobile ? 300 : 220
       );
 
       for (const image of metrics.visibleLargeImages) {

@@ -1,3 +1,4 @@
+import { Check } from 'lucide-react';
 import { type ReactNode } from 'react';
 
 export interface SetupTaskItemProps {
@@ -28,7 +29,7 @@ export function SetupTaskItem({
           }`}
           aria-hidden='true'
         >
-          {complete ? '✓' : index}
+          {complete ? <Check className='h-3.5 w-3.5' /> : index}
         </div>
         <p className='truncate text-app font-semibold text-primary-token'>
           {title}
