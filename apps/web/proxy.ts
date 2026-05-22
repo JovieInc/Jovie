@@ -38,7 +38,7 @@ import {
   isTestAuthBypassEnabled,
   resolveTestBypassUserId,
 } from '@/lib/auth/test-mode';
-import { captureError } from '@/lib/error-tracking';
+import { captureError, captureWarning } from '@/lib/error-tracking';
 import {
   analyzeHost,
   categorizePath,
@@ -461,7 +461,7 @@ async function handleRequest(req: NextRequest, userId: string | null) {
           '/waitlist'
         );
         if (waitlistRewrite === null) {
-          await captureError(
+          await captureWarning(
             '[proxy] Redirect loop circuit breaker triggered',
             new Error('Redirect loop detected'),
             {
@@ -495,7 +495,7 @@ async function handleRequest(req: NextRequest, userId: string | null) {
             APP_ROUTES.START
           );
           if (rewriteRes === null) {
-            await captureError(
+            await captureWarning(
               '[proxy] Redirect loop circuit breaker triggered',
               new Error('Redirect loop detected'),
               {

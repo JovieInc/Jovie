@@ -715,12 +715,12 @@ export async function POST(request: NextRequest) {
         { headers: NO_STORE_HEADERS }
       );
     } catch (error) {
-      logger.error('[Audience Visit] Optional persistence degraded', {
+      logger.warn('[Audience Visit] Optional persistence degraded', {
         error,
         fingerprint,
         profileId,
       });
-      await captureError('Audience visit persistence degraded', error, {
+      await captureWarning('Audience visit persistence degraded', error, {
         route: '/api/audience/visit',
         method: 'POST',
         fingerprint,

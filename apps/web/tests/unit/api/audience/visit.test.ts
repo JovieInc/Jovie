@@ -86,6 +86,7 @@ describe('POST /api/audience/visit', () => {
     mockCheckVisitRateLimit.mockResolvedValue({ success: true });
     mockDoesColumnExist.mockResolvedValue(true);
     mockDoesTableExist.mockResolvedValue(true);
+    mockCaptureWarning.mockReset();
     mockCaptureError.mockReset();
   });
 
@@ -653,7 +654,7 @@ describe('POST /api/audience/visit', () => {
     expect(data.success).toBe(true);
     expect(data.degraded).toBe(true);
     expect(data.fingerprint).toBeDefined();
-    expect(mockCaptureError).toHaveBeenCalledWith(
+    expect(mockCaptureWarning).toHaveBeenCalledWith(
       'Audience visit persistence degraded',
       expect.any(Error),
       expect.objectContaining({
@@ -972,6 +973,11 @@ describe('POST /api/audience/visit', () => {
             onConflictDoNothing: vi.fn().mockReturnValue({
               returning: vi.fn().mockResolvedValue([{ id: 'inserted_member' }]),
             }),
+          }),
+        }),
+        update: vi.fn().mockReturnValue({
+          set: vi.fn().mockReturnValue({
+            where: vi.fn().mockResolvedValue(undefined),
           }),
         }),
       });

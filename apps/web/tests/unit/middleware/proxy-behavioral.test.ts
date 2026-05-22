@@ -32,6 +32,7 @@ const mocks = vi.hoisted(() => ({
       (countryCode: string | null, regionCode?: string | null) => boolean
     >(),
   captureError: vi.fn(),
+  captureWarning: vi.fn(),
   ensureSentry: vi.fn().mockResolvedValue(undefined),
   buildContentSecurityPolicy: vi.fn().mockReturnValue("default-src 'self'"),
   buildContentSecurityPolicyReportOnly: vi.fn().mockReturnValue(null),
@@ -71,6 +72,7 @@ vi.mock('@/lib/cookies/consent-regions', () => ({
 }));
 vi.mock('@/lib/error-tracking', () => ({
   captureError: mocks.captureError,
+  captureWarning: mocks.captureWarning,
 }));
 vi.mock('@/lib/sentry/ensure', () => ({
   ensureSentry: mocks.ensureSentry,
@@ -998,7 +1000,7 @@ describe('proxy.ts middleware', () => {
       const res = await callMiddleware(req);
 
       expect(res.status).toBeLessThan(300);
-      expect(mocks.captureError).toHaveBeenCalledWith(
+      expect(mocks.captureWarning).toHaveBeenCalledWith(
         expect.stringContaining('circuit breaker'),
         expect.any(Error),
         expect.objectContaining({ redirectCount: 3 })
@@ -1060,7 +1062,7 @@ describe('proxy.ts middleware', () => {
       const res = await callMiddleware(req);
 
       expect(res.status).toBeLessThan(300);
-      expect(mocks.captureError).toHaveBeenCalledWith(
+      expect(mocks.captureWarning).toHaveBeenCalledWith(
         expect.stringContaining('circuit breaker'),
         expect.any(Error),
         expect.objectContaining({ target: '/waitlist', redirectCount: 3 })
