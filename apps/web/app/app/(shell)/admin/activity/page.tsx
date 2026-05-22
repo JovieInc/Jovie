@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
 import { Suspense } from 'react';
-import { AdminWorkspacePage } from '@/components/features/admin/layout/AdminWorkspacePage';
+import { AdminPage } from '@/components/features/admin/layout/AdminPage';
 import { ActivityTableUnified } from '@/features/admin/ActivityTableUnified';
 import { getAdminActivityFeed } from '@/lib/admin/overview';
 import { AdminActivitySkeleton } from './loading';
@@ -20,18 +20,20 @@ const activityTabs = [{ value: 'activity', label: 'Activity' }] as const;
 
 export default function AdminActivityPage() {
   return (
-    <AdminWorkspacePage
+    <AdminPage
       title='Activity'
       description='Recent admin interventions, creator events, and system outcomes.'
-      primaryParam='view'
-      primaryValue='activity'
-      primaryOptions={activityTabs}
+      tabs={{
+        param: 'view',
+        value: 'activity',
+        options: activityTabs,
+      }}
       testId='admin-activity-page'
       viewTestId='admin-activity-view'
     >
       <Suspense fallback={<AdminActivitySkeleton />}>
         <ActivityContent />
       </Suspense>
-    </AdminWorkspacePage>
+    </AdminPage>
   );
 }

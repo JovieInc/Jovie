@@ -111,10 +111,10 @@ function countImporters(): { files: string[]; count: number } {
  * RATCHET — only ever decrement this value.
  *
  * Update the date and Linear issue ID when you decrement. Current ceiling
- * established by JOV-2525 on 2026-05-21: 16 importers remain after PR-1
- * migrates `/app/admin/page.tsx` to `AdminPage` directly.
+ * lowered by JOV-2542 on 2026-05-21: 10 importers remain after migrating
+ * `AdminWorkspacePage` callers to `AdminPage` directly.
  */
-const MAX_DEPRECATED_IMPORTERS = 16;
+const MAX_DEPRECATED_IMPORTERS = 10;
 
 describe('admin shell deprecation ratchet', () => {
   it(`has at most ${MAX_DEPRECATED_IMPORTERS} importers of AdminToolPage/AdminWorkspacePage`, () => {
