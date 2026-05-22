@@ -19,8 +19,7 @@ import { SelectCell } from './utils/column-renderers';
 
 const memberColumnHelper = createColumnHelper<AudienceMember>();
 
-export const AUDIENCE_TABLE_CONTAINER_CLASS =
-  'h-full px-2.5 pb-2.5 pt-0 md:px-3 md:pb-3 md:pt-0';
+export const AUDIENCE_TABLE_CONTAINER_CLASS = 'h-full';
 
 export const AUDIENCE_TABLE_SKELETON_COLUMN_CONFIG: Array<{
   readonly width?: string;

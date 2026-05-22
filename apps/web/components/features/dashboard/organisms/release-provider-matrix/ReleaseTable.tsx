@@ -303,7 +303,7 @@ export function ReleaseTable({
       }
       containerClassName={
         designV1
-          ? 'h-full px-2 py-1.5 md:px-2.5 md:py-2' /* aligned to shell releases grid padding */
+          ? 'h-full'
           : 'h-full px-2.5 pb-2.5 pt-0.5 md:px-3 md:pb-3 md:pt-1'
       }
       columnVisibility={tanstackColumnVisibility}
@@ -319,7 +319,7 @@ export function ReleaseTable({
           icon={<Icon name='Disc3' className='h-6 w-6' />}
           title='No releases'
           description='Your releases will appear here once synced.'
-          className='m-3 min-h-[160px]'
+          className={designV1 ? 'm-0 min-h-[160px]' : 'm-3 min-h-[160px]'}
         />
       }
     />

@@ -10,6 +10,7 @@ export interface PageShellProps
   readonly maxWidth?: 'full' | 'wide' | 'reading' | 'form';
   readonly frame?: 'none' | 'content-container';
   readonly contentPadding?: 'none' | 'compact' | 'default';
+  readonly surfaceMode?: 'default' | 'table';
   readonly scroll?: 'panel' | 'page';
   readonly className?: string;
   readonly surfaceClassName?: string;
@@ -59,6 +60,7 @@ export function PageShell({
   maxWidth = 'full',
   frame = 'none',
   contentPadding = 'none',
+  surfaceMode = 'default',
   scroll = 'panel',
   className,
   surfaceClassName,
@@ -72,6 +74,7 @@ export function PageShell({
       maxWidth={maxWidth}
       frame={frame}
       contentPadding={contentPadding}
+      surfaceMode={surfaceMode}
       scroll={scroll}
       className={className}
       surfaceClassName={surfaceClassName}

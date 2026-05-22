@@ -289,7 +289,7 @@ export function NavMenuItem({
         {item.name}
       </span>
       {item.badge != null ? (
-        <span className='ml-auto shrink-0 group-data-[collapsible=icon]:hidden'>
+        <span className='justify-self-end shrink-0 group-data-[collapsible=icon]:hidden'>
           {item.badge}
         </span>
       ) : null}

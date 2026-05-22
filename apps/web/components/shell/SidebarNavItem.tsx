@@ -41,11 +41,11 @@ export function getSidebarNavRowClassName({
 }: SidebarNavChromeOptions) {
   const nonCollapsedSize = tight ? 'h-6 px-2.5' : 'h-6.5 px-2.5';
   const inactiveColor = nested
-    ? 'text-tertiary-token hover:bg-[color-mix(in_oklab,var(--color-sidebar-accent)_82%,transparent)] hover:text-primary-token'
-    : 'text-secondary-token hover:bg-[color-mix(in_oklab,var(--color-sidebar-accent)_82%,transparent)] hover:text-primary-token';
+    ? 'text-sidebar-muted/70 hover:bg-[color-mix(in_oklab,var(--color-sidebar-accent)_88%,transparent)] hover:text-sidebar-item-foreground'
+    : 'text-sidebar-muted hover:bg-[color-mix(in_oklab,var(--color-sidebar-accent)_88%,transparent)] hover:text-sidebar-item-foreground';
 
   return cn(
-    'relative grid items-center rounded-md w-full transition-[background-color] duration-subtle ease-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/55 focus-visible:ring-offset-2 focus-visible:ring-offset-(--linear-bg-page)',
+    'relative grid items-center rounded-md w-full border border-transparent transition-[background-color,border-color,box-shadow,color] duration-subtle ease-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/55 focus-visible:ring-offset-2 focus-visible:ring-offset-(--linear-bg-page)',
     'before:pointer-events-none before:absolute before:inset-y-1 before:left-[20px] before:w-px before:bg-[color-mix(in_oklab,var(--linear-app-frame-seam)_42%,transparent)]',
     'after:pointer-events-none after:absolute after:inset-y-1 after:left-[34px] after:w-px after:bg-[color-mix(in_oklab,var(--linear-app-frame-seam)_42%,transparent)]',
     'group-data-[collapsible=icon]:before:hidden group-data-[collapsible=icon]:after:hidden',
@@ -53,11 +53,13 @@ export function getSidebarNavRowClassName({
     collapsed
       ? 'h-7 w-10 mx-auto grid-cols-1 place-items-center before:hidden after:hidden'
       : cn(
-          'grid-cols-[20px_minmax(0,1fr)_auto]',
+          'grid-cols-[20px_minmax(0,1fr)_40px]',
           nonCollapsedSize,
           'group-data-[collapsible=icon]:grid-cols-1 group-data-[collapsible=icon]:place-items-center'
         ),
-    active ? 'text-primary-token bg-surface-1' : inactiveColor,
+    active
+      ? 'border-[color-mix(in_oklab,var(--linear-app-frame-seam)_80%,transparent)] bg-[color-mix(in_oklab,var(--color-sidebar-accent-active)_90%,var(--linear-app-content-surface))] text-sidebar-item-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.03),inset_0_0_0_1px_color-mix(in_oklab,var(--linear-app-frame-seam)_58%,transparent)]'
+      : inactiveColor,
     className
   );
 }
@@ -69,13 +71,13 @@ export function getSidebarNavIconClassName({
   className,
 }: SidebarNavChromeOptions) {
   const inactiveIconColor = nested
-    ? 'text-quaternary-token'
-    : 'text-tertiary-token';
+    ? 'text-sidebar-muted/60'
+    : 'text-sidebar-muted/80';
 
   return cn(
-    'shrink-0',
+    'shrink-0 justify-self-center',
     tight ? 'h-3 w-3' : 'h-3.5 w-3.5',
-    active ? 'text-primary-token' : inactiveIconColor,
+    active ? 'text-sidebar-item-foreground' : inactiveIconColor,
     className
   );
 }

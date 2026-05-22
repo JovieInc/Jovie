@@ -57,6 +57,25 @@ export function DesktopTitlebar() {
           >
             {/* Traffic-light clearance — macOS hiddenInset reserves ~72px on the left */}
             <div className='w-[72px] shrink-0' aria-hidden='true' />
+            {/* Single canonical sidebar toggle for Electron — the in-sidebar
+                SidebarDockButton is not rendered in desktop runtime */}
+            <button
+              type='button'
+              onClick={toggleSidebar}
+              disabled={!toggleSidebar}
+              aria-label={sidebarToggleLabel}
+              data-testid='electron-sidebar-toggle'
+              className={cn(
+                'flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-secondary-token',
+                'transition-colors duration-subtle',
+                'hover:bg-white/[0.06] hover:text-primary-token',
+                'focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-white/30',
+                'disabled:pointer-events-none disabled:opacity-30'
+              )}
+              style={{ WebkitAppRegion: 'no-drag' } as CSSProperties}
+            >
+              <PanelLeft className='h-3.5 w-3.5' strokeWidth={2} />
+            </button>
             <div
               data-testid='electron-nav-pill'
               className='flex shrink-0 items-center gap-0.5'
@@ -91,25 +110,6 @@ export function DesktopTitlebar() {
                 <ChevronRight className='h-3.5 w-3.5' strokeWidth={2} />
               </button>
             </div>
-            {/* Single canonical sidebar toggle for Electron — the in-sidebar
-                SidebarDockButton is not rendered in desktop runtime */}
-            <button
-              type='button'
-              onClick={toggleSidebar}
-              disabled={!toggleSidebar}
-              aria-label={sidebarToggleLabel}
-              data-testid='electron-sidebar-toggle'
-              className={cn(
-                'flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-secondary-token',
-                'transition-colors duration-subtle',
-                'hover:bg-white/[0.06] hover:text-primary-token',
-                'focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-white/30',
-                'disabled:pointer-events-none disabled:opacity-30'
-              )}
-              style={{ WebkitAppRegion: 'no-drag' } as CSSProperties}
-            >
-              <PanelLeft className='h-3.5 w-3.5' strokeWidth={2} />
-            </button>
             <div
               className='ml-auto min-w-0 shrink-0'
               style={{ WebkitAppRegion: 'no-drag' } as CSSProperties}

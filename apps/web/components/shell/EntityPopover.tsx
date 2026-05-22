@@ -675,9 +675,9 @@ export function EntityPopover({
         top: pos?.top ?? -9999,
         width: POPOVER_WIDTH,
         visibility: pos ? 'visible' : 'hidden',
+        zIndex: 'var(--jovie-shell-overlay-z-index)',
       }}
       className={cn(
-        'z-[120]',
         LINEAR_SURFACE.popover,
         'text-primary-token',
         'animate-in fade-in-0 zoom-in-95 duration-subtle ease-subtle',

@@ -37,19 +37,16 @@ export function UpdateAvailablePill() {
       aria-label='Update available — click to install'
       style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
       className={cn(
-        'inline-flex h-7 items-center justify-center gap-1.5 rounded-full bg-white px-3 text-black',
+        'inline-flex h-6 items-center justify-center gap-1 rounded-full bg-white px-2.5 text-black',
         'hover:bg-white/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50 focus-visible:ring-offset-1 disabled:opacity-70'
       )}
     >
       {updating ? (
-        <Loader2
-          className='h-3.5 w-3.5 shrink-0 animate-spin'
-          aria-hidden='true'
-        />
+        <Loader2 className='h-3 w-3 shrink-0 animate-spin' aria-hidden='true' />
       ) : (
-        <Download className='h-3.5 w-3.5 shrink-0' aria-hidden='true' />
+        <Download className='h-3 w-3 shrink-0' aria-hidden='true' />
       )}
-      <span className='whitespace-nowrap text-[12px] font-medium'>
+      <span className='whitespace-nowrap text-[11.5px] font-medium leading-none'>
         {updating ? 'Updating…' : 'Update'}
       </span>
     </button>
