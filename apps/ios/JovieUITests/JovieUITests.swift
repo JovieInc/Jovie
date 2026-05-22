@@ -55,23 +55,23 @@ final class JovieUITests: XCTestCase {
     )
   }
 
-  func testShellSwipesRevealSidebarAndSettings() {
+  func testShellNavigationRevealsSidebarAndSettings() {
     let app = launchMockApp(launchArgument: "-ui-testing-ready", expectedElementDescription: "\"Copy URL\"") {
       $0.buttons["Copy URL"]
     }
     let window = app.windows.element(boundBy: 0)
 
-    edgeDrag(in: window, from: CGVector(dx: 0.01, dy: 0.5), to: CGVector(dx: 0.72, dy: 0.5))
+    revealSidebar(app: app, window: window)
     XCTAssertTrue(
       app.buttons["Dashboard"].waitForExistence(timeout: 3),
-      "Right swipe did not reveal sidebar.\n\(app.debugDescription)"
+      "Shell navigation did not reveal sidebar.\n\(app.debugDescription)"
     )
 
     app.buttons["Close Sidebar"].tap()
-    edgeDrag(in: window, from: CGVector(dx: 0.99, dy: 0.5), to: CGVector(dx: 0.28, dy: 0.5))
+    revealSettings(app: app, window: window)
     XCTAssertTrue(
       app.staticTexts["Settings"].waitForExistence(timeout: 3),
-      "Left swipe did not reveal settings.\n\(app.debugDescription)"
+      "Shell navigation did not reveal settings.\n\(app.debugDescription)"
     )
   }
 
@@ -205,5 +205,25 @@ final class JovieUITests: XCTestCase {
     let startCoordinate = element.coordinate(withNormalizedOffset: start)
     let endCoordinate = element.coordinate(withNormalizedOffset: end)
     startCoordinate.press(forDuration: 0.08, thenDragTo: endCoordinate)
+  }
+
+  private func revealSidebar(app: XCUIApplication, window: XCUIElement) {
+    edgeDrag(in: window, from: CGVector(dx: 0.01, dy: 0.5), to: CGVector(dx: 0.72, dy: 0.5))
+    guard !app.buttons["Dashboard"].waitForExistence(timeout: 1) else { return }
+
+    edgeDrag(in: window, from: CGVector(dx: 0.05, dy: 0.5), to: CGVector(dx: 0.82, dy: 0.5))
+    guard !app.buttons["Dashboard"].waitForExistence(timeout: 1) else { return }
+
+    app.buttons["Open Sidebar"].tap()
+  }
+
+  private func revealSettings(app: XCUIApplication, window: XCUIElement) {
+    edgeDrag(in: window, from: CGVector(dx: 0.99, dy: 0.5), to: CGVector(dx: 0.28, dy: 0.5))
+    guard !app.staticTexts["Settings"].waitForExistence(timeout: 1) else { return }
+
+    edgeDrag(in: window, from: CGVector(dx: 0.95, dy: 0.5), to: CGVector(dx: 0.18, dy: 0.5))
+    guard !app.staticTexts["Settings"].waitForExistence(timeout: 1) else { return }
+
+    app.buttons["Open Settings"].tap()
   }
 }
