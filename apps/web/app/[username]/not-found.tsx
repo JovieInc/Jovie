@@ -9,7 +9,7 @@ export default function NotFound() {
         className='profile-viewport flex min-h-[calc(100dvh-var(--public-shell-header-offset))] items-center justify-center px-4 py-12'
       >
         <div className='w-full max-w-sm rounded-[var(--profile-card-radius)] border border-[color:var(--profile-panel-border)] bg-[color:var(--profile-content-bg)] px-5 py-6 text-center shadow-[var(--profile-panel-shadow)] backdrop-blur-2xl'>
-          <p className='text-[11px] font-medium tracking-[0.02em] text-white/42'>
+          <p className='text-[11px] font-medium tracking-[0.02em] text-white/56'>
             404
           </p>
           <h1 className='mt-2 text-[18px] font-semibold tracking-[-0.018em] text-white'>

@@ -104,6 +104,18 @@ export function canFallbackToBypassUserId(
   return Boolean(persona);
 }
 
+export function resolveBypassFallbackUserId(
+  persona: DevTestAuthPersona | null,
+  overrideUserId?: string | null
+): string | null {
+  const configuredUserId = getTestAuthBypassUserId();
+  if (persona && configuredUserId) {
+    return configuredUserId;
+  }
+
+  return overrideUserId?.trim() || configuredUserId;
+}
+
 export function resolveBypassSessionUrls(baseUrl: string): readonly string[] {
   const urls = [new URL('/api/dev/test-auth/session', baseUrl).toString()];
 
@@ -292,7 +304,7 @@ export async function setTestAuthBypassSession(
   persona: DevTestAuthPersona | null,
   overrideUserId?: string | null
 ): Promise<void> {
-  const userId = overrideUserId?.trim() || getTestAuthBypassUserId();
+  const userId = resolveBypassFallbackUserId(persona, overrideUserId);
   if (!(userId || persona)) {
     throw new ClerkTestError(
       'E2E_CLERK_USER_ID is required when test auth bypass has no persona.',

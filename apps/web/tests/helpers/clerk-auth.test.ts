@@ -4,6 +4,7 @@ import {
   hasClerkOriginMismatchSignal,
   isClerkHandshakeUrl,
   isClerkOriginMismatchMessage,
+  resolveBypassFallbackUserId,
   resolveBypassSessionUrls,
 } from './clerk-auth';
 
@@ -56,6 +57,26 @@ describe('clerk-auth helpers', () => {
     expect(canFallbackToBypassUserId('creator-ready')).toBe(true);
     expect(canFallbackToBypassUserId('admin')).toBe(true);
     expect(canFallbackToBypassUserId(null)).toBe(false);
+  });
+
+  it('prefers the seeded bypass user over per-test overrides for persona fallback', () => {
+    const originalUserId = process.env.E2E_CLERK_USER_ID;
+    process.env.E2E_CLERK_USER_ID = 'seeded-ci-user';
+
+    try {
+      expect(
+        resolveBypassFallbackUserId('creator-ready', 'ad-hoc-test-user')
+      ).toBe('seeded-ci-user');
+      expect(resolveBypassFallbackUserId(null, 'ad-hoc-test-user')).toBe(
+        'ad-hoc-test-user'
+      );
+    } finally {
+      if (originalUserId === undefined) {
+        delete process.env.E2E_CLERK_USER_ID;
+      } else {
+        process.env.E2E_CLERK_USER_ID = originalUserId;
+      }
+    }
   });
 
   it('resolves localhost bypass session urls with an IPv4 fallback', () => {
