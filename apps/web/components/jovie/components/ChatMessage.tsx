@@ -71,6 +71,11 @@ export function ChatMessage({
     });
   })();
   const hasAssistantContent = Boolean(messageText) || toolEvents.length > 0;
+  const useUserPillBubble =
+    isUser &&
+    imageChips.length === 0 &&
+    !messageText.includes('\n') &&
+    messageText.length <= 72;
 
   return (
     <motion.div
@@ -86,7 +91,13 @@ export function ChatMessage({
       {isUser ? (
         <div
           data-testid='chat-user-bubble'
-          className='flex min-h-7 max-w-[78%] flex-col justify-center rounded-full border border-white/80 bg-white px-3 py-1.5 text-[#111216] shadow-[0_12px_38px_-28px_rgba(0,0,0,0.85),inset_0_1px_0_rgba(255,255,255,0.9)]'
+          data-bubble-shape={useUserPillBubble ? 'pill' : 'rectangle'}
+          className={cn(
+            'flex min-h-7 max-w-[78%] flex-col justify-center border border-white/80 bg-white text-[#111216] shadow-[0_12px_38px_-28px_rgba(0,0,0,0.85),inset_0_1px_0_rgba(255,255,255,0.9)]',
+            useUserPillBubble
+              ? 'rounded-full px-3 py-1.5'
+              : 'rounded-[18px] px-3.5 py-2'
+          )}
         >
           {imageChips.length > 0 && (
             <div

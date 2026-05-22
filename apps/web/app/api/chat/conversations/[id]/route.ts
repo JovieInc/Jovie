@@ -1,6 +1,10 @@
 import { and, desc, eq, lt } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 import { getSessionContext } from '@/lib/auth/session';
+import {
+  sanitizeConversationTitle,
+  withSanitizedConversationTitle,
+} from '@/lib/chat/title';
 import { decodeToolEvents } from '@/lib/chat/tool-events';
 import { db } from '@/lib/db';
 import { chatConversations, chatMessages } from '@/lib/db/schema/chat';
@@ -113,7 +117,11 @@ export async function GET(req: Request, { params }: RouteParams) {
     });
 
     return NextResponse.json(
-      { conversation, messages, hasMore },
+      {
+        conversation: withSanitizedConversationTitle(conversation),
+        messages,
+        hasMore,
+      },
       { status: 200, headers: NO_STORE_HEADERS }
     );
   } catch (error) {
@@ -166,12 +174,13 @@ export async function PATCH(req: Request, { params }: RouteParams) {
     }
 
     const { title } = body;
+    const sanitizedTitle = sanitizeConversationTitle(title);
 
     // Update the conversation, ensuring it belongs to the user's profile
     const [updated] = await db
       .update(chatConversations)
       .set({
-        title: title ?? null,
+        title: sanitizedTitle,
         updatedAt: new Date(),
       })
       .where(
@@ -190,7 +199,9 @@ export async function PATCH(req: Request, { params }: RouteParams) {
     }
 
     return NextResponse.json(
-      { conversation: updated },
+      {
+        conversation: withSanitizedConversationTitle(updated),
+      },
       { status: 200, headers: NO_STORE_HEADERS }
     );
   } catch (error) {

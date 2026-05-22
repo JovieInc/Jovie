@@ -24,7 +24,7 @@ const mockChatState = {
   isRateLimited: false,
   stop: vi.fn(),
   chipTray: {
-    chips: [],
+    chips: [] as Array<{ type: 'skill'; id: string; uid: string }>,
     addSkill: vi.fn(),
     addEntity: vi.fn(),
     removeAt: vi.fn(),
@@ -137,6 +137,7 @@ describe('JovieChat empty state', () => {
     mockChatState.hasMessages = false;
     mockChatState.isLoading = false;
     mockChatState.isSubmitting = false;
+    mockChatState.chipTray.chips = [];
   });
 
   it('centers the welcome composer when there are no action cards', () => {
@@ -157,7 +158,8 @@ describe('JovieChat empty state', () => {
     expect(getByTestId('chat-empty-state-centered-composer')).toBeTruthy();
     expect(queryByTestId('chat-empty-state-action-card-slot')).toBeNull();
     expect(queryByTestId('chat-composer-dock')).toBeNull();
-    expect(queryByTestId('chat-empty-state-prompt-rail')).toBeNull();
+    expect(getByTestId('chat-empty-state-soft-suggestions-slot')).toBeTruthy();
+    expect(getByTestId('suggested-prompts-rail')).toBeTruthy();
     expect(getByTestId('chat-input')).toBeTruthy();
     expect(getByTestId('chat-input').getAttribute('data-placeholder')).toBe(
       'Ask Jovie...'
@@ -166,9 +168,9 @@ describe('JovieChat empty state', () => {
     expect(
       getByTestId('chat-input').getAttribute('data-quick-actions')
     ).toBeNull();
-    expect(queryByText('Plan a release')).toBeNull();
-    expect(queryByText('Generate album art')).toBeNull();
-    expect(queryByText('Pitch playlists')).toBeNull();
+    expect(queryByText('Plan a release')).toBeTruthy();
+    expect(queryByText('Generate album art')).toBeTruthy();
+    expect(queryByText('Pitch playlists')).toBeTruthy();
     // Old task-list-style actions should NOT appear — they belong in the profile switcher.
     expect(queryByText('Preview profile')).toBeNull();
     expect(queryByText('Change photo')).toBeNull();
@@ -201,12 +203,22 @@ describe('JovieChat empty state', () => {
       screen.queryByTestId('chat-empty-state-centered-composer')
     ).toBeNull();
     expect(screen.getByTestId('chat-composer-dock')).toBeTruthy();
+    expect(screen.queryByTestId('suggested-prompts-rail')).toBeNull();
 
     fireEvent.click(screen.getByRole('button', { name: /Plan Setup/ }));
 
     expect(mockChatState.handleSuggestedPrompt).toHaveBeenCalledWith(
       'Help me connect my music catalog.'
     );
+
+    fireEvent.click(
+      screen.getByRole('button', {
+        name: /Dismiss Connect Your Music Catalog/i,
+      })
+    );
+
+    expect(screen.queryByText('Connect Your Music Catalog')).toBeNull();
+    expect(screen.getByTestId('suggested-prompts-rail')).toBeTruthy();
   });
 
   it('hides the contextual action card while the empty composer has typed text', () => {
@@ -233,6 +245,24 @@ describe('JovieChat empty state', () => {
     expect(queryByTestId('chat-empty-state-top-signals')).toBeNull();
     expect(getByTestId('chat-input')).toBeTruthy();
     expect(queryByText('Connect Your Music Catalog')).toBeNull();
+    expect(queryByTestId('suggested-prompts-rail')).toBeNull();
+  });
+
+  it('hides soft suggestions while a chip is active', () => {
+    mockChatState.chipTray.chips = [
+      {
+        type: 'skill',
+        id: 'generateAlbumArt',
+        uid: 'chip-skill-1',
+      },
+    ];
+
+    const { getByTestId, queryByTestId } = renderWithQueryClient(
+      <JovieChat profileId='profile-1' />
+    );
+
+    expect(getByTestId('chat-empty-state-soft-suggestions-slot')).toBeTruthy();
+    expect(queryByTestId('suggested-prompts-rail')).toBeNull();
   });
 
   it('renders first-session greeting for new users', () => {

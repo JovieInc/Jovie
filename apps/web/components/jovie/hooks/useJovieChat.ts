@@ -99,6 +99,10 @@ function inferToolIntentFromPrompt(text: string): string | null {
     : null;
 }
 
+function inferToolIntentFromSkill(id: string): string | null {
+  return id === 'generateAlbumArt' ? 'album_art_generation' : id;
+}
+
 function getTitlePollIntervalMs(
   titlePollingSince: number | null,
   currentTime: number
@@ -116,6 +120,10 @@ function getTitlePollIntervalMs(
   return elapsed < TITLE_POLL_FAST_WINDOW_MS
     ? TITLE_POLL_FAST_INTERVAL_MS
     : TITLE_POLL_BACKOFF_INTERVAL_MS;
+}
+
+function toError(value: unknown): Error {
+  return value instanceof Error ? value : new Error('Chat send failed');
 }
 
 export function useJovieChat({
@@ -228,6 +236,41 @@ export function useJovieChat({
     );
   }, [existingConversation]);
 
+  const handleChatFailure = useCallback(
+    (error: Error, errorType: 'send' | 'stream') => {
+      captureException(error, {
+        tags: {
+          feature: 'ai-chat',
+          source: 'useJovieChat',
+          errorType,
+        },
+        extra: {
+          profileId: profileId ?? null,
+          conversationId: activeConversationId,
+        },
+      });
+
+      const chatErrorType = getErrorType(error);
+      const metadata = extractErrorMetadata(error);
+
+      setChatError({
+        type: chatErrorType,
+        message: getPreferredErrorMessage(error, chatErrorType, metadata),
+        retryAfter: metadata.retryAfter,
+        errorCode: metadata.errorCode,
+        requestId: metadata.requestId,
+        failedMessage: lastAttemptedMessageRef.current,
+      });
+
+      if (lastAttemptedMessageRef.current) {
+        setInput(lastAttemptedMessageRef.current);
+      }
+
+      setIsSubmitting(false);
+    },
+    [activeConversationId, profileId]
+  );
+
   const {
     messages,
     sendMessage,
@@ -261,40 +304,11 @@ export function useJovieChat({
       setIsSubmitting(false);
     },
     onError: error => {
-      captureException(error, {
-        tags: {
-          feature: 'ai-chat',
-          source: 'useJovieChat',
-          errorType: 'stream',
-        },
-        extra: {
-          profileId: profileId ?? null,
-          conversationId: activeConversationId,
-        },
-      });
-
-      const errorType = getErrorType(error);
-      const metadata = extractErrorMetadata(error);
-
-      setChatError({
-        type: errorType,
-        message: getPreferredErrorMessage(error, errorType, metadata),
-        retryAfter: metadata.retryAfter,
-        errorCode: metadata.errorCode,
-        requestId: metadata.requestId,
-        failedMessage: lastAttemptedMessageRef.current,
-      });
-
-      // Restore the user's message so they don't lose it
-      if (lastAttemptedMessageRef.current) {
-        setInput(lastAttemptedMessageRef.current);
-      }
+      handleChatFailure(error, 'stream');
 
       queryClient.invalidateQueries({
         queryKey: queryKeys.chat.usage(),
       });
-
-      setIsSubmitting(false);
     },
   });
 
@@ -372,7 +386,11 @@ export function useJovieChat({
 
   // Clear error when user starts typing
   useEffect(() => {
-    if (input && chatError) {
+    if (
+      input &&
+      chatError &&
+      (!chatError.failedMessage || input !== chatError.failedMessage)
+    ) {
       setChatError(null);
     }
   }, [input, chatError]);
@@ -415,10 +433,10 @@ export function useJovieChat({
       text: string,
       files?: FileUIPart[],
       options?: SubmitChatMessageOptions
-    ) => {
+    ): Promise<boolean> => {
       const hasFiles = files && files.length > 0;
-      if (!text.trim() && !hasFiles) return;
-      if (isLoading || isSubmitting) return;
+      if (!text.trim() && !hasFiles) return false;
+      if (isLoading || isSubmitting) return false;
 
       // Validate message length
       if (text.length > MAX_MESSAGE_LENGTH) {
@@ -426,13 +444,13 @@ export function useJovieChat({
           type: 'unknown',
           message: `Message is too long. Maximum is ${MAX_MESSAGE_LENGTH} characters.`,
         });
-        return;
+        return false;
       }
 
       const trimmedText = text.trim();
 
       // Check for deterministic commands before hitting AI
-      if (!hasFiles && tryHandleCommand(trimmedText)) return;
+      if (!hasFiles && tryHandleCommand(trimmedText)) return true;
 
       const payload = {
         text: trimmedText,
@@ -448,17 +466,28 @@ export function useJovieChat({
       const toolIntent =
         options?.toolIntent ?? inferToolIntentFromPrompt(trimmedText);
 
-      sendMessage(payload, {
+      const sendOptions = {
         body: {
           clientTurnId,
           clientMessageId: `${clientTurnId}:user`,
           source: options?.source ?? 'typed',
           ...(toolIntent ? { toolIntent } : {}),
         },
-      });
-      setInput('');
+      };
+
+      try {
+        const result = sendMessage(payload, sendOptions);
+        setInput('');
+        void Promise.resolve(result).catch(value => {
+          handleChatFailure(toError(value), 'send');
+        });
+        return true;
+      } catch (error) {
+        handleChatFailure(toError(error), 'send');
+        return false;
+      }
     },
-    [isLoading, isSubmitting, sendMessage, tryHandleCommand]
+    [handleChatFailure, isLoading, isSubmitting, sendMessage, tryHandleCommand]
   );
 
   // Retry the last failed message
@@ -476,7 +505,10 @@ export function useJovieChat({
       source,
       toolIntent,
     }: { text: string; files?: FileUIPart[] } & SubmitChatMessageOptions) => {
-      await doSubmit(text, files, { source, toolIntent });
+      const submitted = await doSubmit(text, files, { source, toolIntent });
+      if (submitted) {
+        chipTray.clear();
+      }
     },
     {
       limit: 1,
@@ -509,8 +541,13 @@ export function useJovieChat({
     (e?: React.FormEvent, files?: FileUIPart[]) => {
       e?.preventDefault();
       const composed = composeMessage(chipTray.chips, input);
-      rateLimitedSubmitter.maybeExecute({ text: composed, files });
-      chipTray.clear();
+      const skillChip = chipTray.chips.find(chip => chip.type === 'skill');
+      rateLimitedSubmitter.maybeExecute({
+        text: composed,
+        files,
+        source: skillChip ? 'slash_command' : 'typed',
+        toolIntent: skillChip ? inferToolIntentFromSkill(skillChip.id) : null,
+      });
     },
     [chipTray, input, rateLimitedSubmitter]
   );

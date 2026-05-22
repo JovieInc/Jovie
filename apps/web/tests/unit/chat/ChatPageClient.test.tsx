@@ -258,15 +258,7 @@ describe('ChatPageClient', () => {
       </DashboardDataProvider>
     );
 
-    expect(capturedActionCards?.[0]).toEqual(
-      expect.objectContaining({
-        id: 'plan-next-move',
-        title: 'Plan Your Next Move',
-        actionLabel: 'Plan Move',
-        prompt:
-          'Use my artist profile, music catalog, and dashboard context for Test Artist to recommend the single most useful action I should take this week. Include the first step.',
-      })
-    );
+    expect(capturedActionCards).toEqual([]);
   });
 
   it('passes conversationId to JovieChat', () => {
