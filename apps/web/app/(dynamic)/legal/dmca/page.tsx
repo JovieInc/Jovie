@@ -26,13 +26,6 @@ export default async function DMCAPage() {
   return (
     <LegalPage
       doc={doc}
-      hero={{
-        eyebrow: 'DMCA policy',
-        title: 'Copyright protection for creators',
-        description:
-          'How to report copyright infringement on Jovie. Our takedown and counter-notice process.',
-        highlight: 'We respect your rights',
-      }}
       contactEmail='legal@jov.ie'
       supportDescription='Need to report copyright infringement?'
     />

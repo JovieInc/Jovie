@@ -109,6 +109,7 @@ export function PublicTableOfContents({
               aria-current={isActive ? 'location' : undefined}
               className={cn(
                 'public-doc-nav-item',
+                entry.level > 2 && 'public-doc-nav-item-nested',
                 isActive && 'public-doc-nav-item-active'
               )}
             >

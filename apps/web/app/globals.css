@@ -1199,9 +1199,14 @@ body {
     text-align: left;
     font-size: 0.875rem;
     color: var(--color-text-tertiary-token);
+    overflow-wrap: anywhere;
     transition:
       background-color 150ms var(--ease-interactive),
       color 150ms var(--ease-interactive);
+  }
+  .public-doc-nav-item-nested {
+    padding-left: 1.5rem;
+    font-size: 0.8125rem;
   }
   .public-doc-nav-item:hover {
     background: var(--color-bg-surface-1);
