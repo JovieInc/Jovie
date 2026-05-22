@@ -19,6 +19,7 @@ import {
   LayoutList,
   type LucideIcon,
   Music2,
+  Pause,
   PlayCircle,
   Video,
   X,
@@ -27,15 +28,21 @@ import Image from 'next/image';
 import Link from 'next/link';
 import {
   type CSSProperties,
+  createContext,
+  type MouseEvent,
   memo,
   type ReactNode,
+  useCallback,
+  useContext,
   useEffect,
   useId,
   useMemo,
   useState,
 } from 'react';
+import { toast } from 'sonner';
 import { ArtworkFallbackTile } from '@/components/atoms/ArtworkFallbackTile';
 import { PageShell } from '@/components/organisms/PageShell';
+import { useTrackAudioPlayer } from '@/components/organisms/release-sidebar/useTrackAudioPlayer';
 import {
   PAGE_TOOLBAR_END_GROUP_CLASS,
   PAGE_TOOLBAR_ICON_CLASS,
@@ -93,6 +100,18 @@ type LibraryViewMode = 'grid' | 'list';
 type LibrarySortKey = 'releaseDate' | 'title' | 'status' | 'providers';
 type LibraryPresetId = 'all' | 'ready' | 'needsAssets' | 'scheduled';
 type ArtworkSize = 'card' | 'row' | 'drawer';
+type LibraryPreviewToggle = (
+  asset: LibraryReleaseAsset,
+  event?: MouseEvent<HTMLElement>
+) => void;
+const noopPreviewToggle: LibraryPreviewToggle = () => undefined;
+const LibraryPreviewContext = createContext<{
+  readonly playingPreviewId: string | null;
+  readonly onTogglePreview: LibraryPreviewToggle;
+}>({
+  playingPreviewId: null,
+  onTogglePreview: noopPreviewToggle,
+});
 
 type LibraryFilters = {
   readonly statuses: Set<LibraryReleaseAsset['status']>;
@@ -364,10 +383,42 @@ const ReleaseCell = memo(function ReleaseCell({
 }: {
   readonly asset: LibraryReleaseAsset;
 }) {
+  const { playingPreviewId, onTogglePreview } = useContext(
+    LibraryPreviewContext
+  );
+  const hasPreview = Boolean(asset.previewUrl);
+  const isPreviewPlaying = playingPreviewId === asset.id;
+
   return (
     <div className='flex min-w-0 items-center gap-2.5'>
-      <span className='h-10 w-10 shrink-0 overflow-hidden rounded-md bg-black'>
+      <span className='group/artwork relative h-10 w-10 shrink-0 overflow-hidden rounded-md bg-black'>
         <Artwork asset={asset} size='row' />
+        {hasPreview ? (
+          <button
+            type='button'
+            onClick={event => onTogglePreview(asset, event)}
+            onKeyDown={event => event.stopPropagation()}
+            aria-label={
+              isPreviewPlaying
+                ? `Pause Preview for ${asset.title}`
+                : `Play Preview for ${asset.title}`
+            }
+            aria-pressed={isPreviewPlaying}
+            data-testid={`library-preview-row-${asset.id}`}
+            className={cn(
+              'absolute inset-0 grid place-items-center bg-black/55 text-white transition-opacity duration-subtle ease-subtle focus-visible:outline-none focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/55',
+              isPreviewPlaying
+                ? 'opacity-100'
+                : 'opacity-0 group-hover/artwork:opacity-100'
+            )}
+          >
+            {isPreviewPlaying ? (
+              <Pause className='h-3.5 w-3.5' strokeWidth={2.5} />
+            ) : (
+              <PlayCircle className='h-3.5 w-3.5' strokeWidth={2.25} />
+            )}
+          </button>
+        ) : null}
       </span>
       <span className='min-w-0'>
         <span className='block truncate text-sm font-medium text-primary-token'>
@@ -891,12 +942,20 @@ const AssetKindPill = memo(function AssetKindPill({
 const AssetCard = memo(function AssetCard({
   asset,
   selected,
+  isPreviewActive,
+  isPreviewPlaying,
   onSelect,
+  onTogglePreview,
 }: {
   readonly asset: LibraryReleaseAsset;
   readonly selected: boolean;
+  readonly isPreviewActive: boolean;
+  readonly isPreviewPlaying: boolean;
   readonly onSelect: () => void;
+  readonly onTogglePreview: LibraryPreviewToggle;
 }) {
+  const hasPreview = Boolean(asset.previewUrl);
+
   return (
     <article
       className={cn(
@@ -909,6 +968,7 @@ const AssetCard = memo(function AssetCard({
       <button
         type='button'
         onClick={onSelect}
+        aria-label={`Inspect ${asset.title}`}
         className={cn(
           'flex h-full w-full flex-col text-left transition-[background-color,box-shadow] duration-subtle ease-subtle',
           LIBRARY_CARD_FOCUS_CLASS
@@ -957,6 +1017,35 @@ const AssetCard = memo(function AssetCard({
           </div>
         </div>
       </button>
+      {hasPreview ? (
+        <button
+          type='button'
+          onClick={event => onTogglePreview(asset, event)}
+          aria-label={
+            isPreviewPlaying
+              ? `Pause Preview for ${asset.title}`
+              : `Play Preview for ${asset.title}`
+          }
+          aria-pressed={isPreviewPlaying}
+          data-testid={`library-preview-card-${asset.id}`}
+          className={cn(
+            'absolute right-2 top-2 z-10 grid h-8 w-8 place-items-center rounded-full border border-white/20 bg-black/60 text-white shadow-[0_8px_20px_rgba(0,0,0,0.22)] backdrop-blur transition-[background-color,border-color,opacity] duration-subtle ease-subtle hover:border-white/35 hover:bg-black/70',
+            isPreviewActive
+              ? 'opacity-100'
+              : 'opacity-90 group-hover:opacity-100',
+            LIBRARY_CARD_FOCUS_CLASS
+          )}
+        >
+          {isPreviewPlaying ? (
+            <Pause className='h-3.5 w-3.5' strokeWidth={2.5} />
+          ) : (
+            <PlayCircle className='h-3.5 w-3.5' strokeWidth={2.25} />
+          )}
+          <span className='sr-only'>
+            {isPreviewPlaying ? 'Pause Preview' : 'Play Preview'}
+          </span>
+        </button>
+      ) : null}
     </article>
   );
 });
@@ -964,11 +1053,17 @@ const AssetCard = memo(function AssetCard({
 function AssetGrid({
   assets,
   selectedId,
+  activePreviewId,
+  playingPreviewId,
   onSelect,
+  onTogglePreview,
 }: {
   readonly assets: readonly LibraryReleaseAsset[];
   readonly selectedId: string | null;
+  readonly activePreviewId: string | null;
+  readonly playingPreviewId: string | null;
   readonly onSelect: (id: string) => void;
+  readonly onTogglePreview: LibraryPreviewToggle;
 }) {
   return (
     <div className='grid gap-2.5 px-2.5 pb-2.5 pt-1 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4'>
@@ -977,7 +1072,10 @@ function AssetGrid({
           key={asset.id}
           asset={asset}
           selected={selectedId === asset.id}
+          isPreviewActive={activePreviewId === asset.id}
+          isPreviewPlaying={playingPreviewId === asset.id}
           onSelect={() => onSelect(asset.id)}
+          onTogglePreview={onTogglePreview}
         />
       ))}
     </div>
@@ -987,13 +1085,21 @@ function AssetGrid({
 function LibraryDataTable({
   assets,
   selectedId,
+  playingPreviewId,
   onSelect,
+  onTogglePreview,
 }: {
   readonly assets: readonly LibraryReleaseAsset[];
   readonly selectedId: string | null;
+  readonly playingPreviewId: string | null;
   readonly onSelect: (id: string) => void;
+  readonly onTogglePreview: LibraryPreviewToggle;
 }) {
   const tableData = useMemo(() => [...assets], [assets]);
+  const previewContext = useMemo(
+    () => ({ playingPreviewId, onTogglePreview }),
+    [onTogglePreview, playingPreviewId]
+  );
   const getRowId = useMemo(() => (asset: LibraryReleaseAsset) => asset.id, []);
   const getRowTestId = useMemo(
     () => (asset: LibraryReleaseAsset) => `library-release-row-${asset.id}`,
@@ -1005,22 +1111,24 @@ function LibraryDataTable({
   );
 
   return (
-    <UnifiedTable<LibraryReleaseAsset>
-      data={tableData}
-      columns={LIBRARY_TABLE_COLUMNS}
-      onRowClick={asset => onSelect(asset.id)}
-      getRowId={getRowId}
-      getRowTestId={getRowTestId}
-      rowSelection={rowSelection}
-      enableVirtualization={assets.length >= 20}
-      rowHeight={LIBRARY_TABLE_ROW_HEIGHT}
-      minWidth={LIBRARY_TABLE_MIN_WIDTH}
-      hideHeader
-      className='text-app text-primary-token'
-      containerClassName='h-full px-2.5 pb-2.5 pt-1'
-      skeletonRows={SKELETON_ROW_COUNT.TABLE}
-      skeletonColumnConfig={LIBRARY_TABLE_SKELETON_CONFIG}
-    />
+    <LibraryPreviewContext.Provider value={previewContext}>
+      <UnifiedTable<LibraryReleaseAsset>
+        data={tableData}
+        columns={LIBRARY_TABLE_COLUMNS}
+        onRowClick={asset => onSelect(asset.id)}
+        getRowId={getRowId}
+        getRowTestId={getRowTestId}
+        rowSelection={rowSelection}
+        enableVirtualization={assets.length >= 20}
+        rowHeight={LIBRARY_TABLE_ROW_HEIGHT}
+        minWidth={LIBRARY_TABLE_MIN_WIDTH}
+        hideHeader
+        className='text-app text-primary-token'
+        containerClassName='h-full px-2.5 pb-2.5 pt-1'
+        skeletonRows={SKELETON_ROW_COUNT.TABLE}
+        skeletonColumnConfig={LIBRARY_TABLE_SKELETON_CONFIG}
+      />
+    </LibraryPreviewContext.Provider>
   );
 }
 
@@ -1090,14 +1198,60 @@ function MetadataRow({
   );
 }
 
+function PreviewActionButton({
+  asset,
+  isPreviewPlaying,
+  onTogglePreview,
+  compact = false,
+  disabledTabIndex,
+}: {
+  readonly asset: LibraryReleaseAsset;
+  readonly isPreviewPlaying: boolean;
+  readonly onTogglePreview: LibraryPreviewToggle;
+  readonly compact?: boolean;
+  readonly disabledTabIndex?: number;
+}) {
+  if (!asset.previewUrl) return null;
+
+  const label = isPreviewPlaying ? 'Pause Preview' : 'Play Preview';
+
+  return (
+    <button
+      type='button'
+      onClick={event => onTogglePreview(asset, event)}
+      aria-label={`${label} for ${asset.title}`}
+      aria-pressed={isPreviewPlaying}
+      tabIndex={disabledTabIndex}
+      className={cn(
+        'inline-flex items-center justify-center gap-1.5 rounded-md border border-subtle bg-surface-1 text-xs font-medium text-primary-token transition-[background-color,border-color,box-shadow] duration-subtle hover:border-default hover:bg-surface-2',
+        compact ? 'h-7 w-7 px-0' : 'h-8 px-3',
+        LIBRARY_BUTTON_FOCUS_CLASS
+      )}
+    >
+      {isPreviewPlaying ? (
+        <Pause className='h-3 w-3' strokeWidth={2.5} />
+      ) : (
+        <PlayCircle className='h-3 w-3' strokeWidth={2.25} />
+      )}
+      {compact ? <span className='sr-only'>{label}</span> : label}
+    </button>
+  );
+}
+
 function AssetDrawer({
   asset,
   open,
   onClose,
+  activePreviewId,
+  playingPreviewId,
+  onTogglePreview,
 }: {
   readonly asset: LibraryReleaseAsset | null;
   readonly open: boolean;
   readonly onClose: () => void;
+  readonly activePreviewId: string | null;
+  readonly playingPreviewId: string | null;
+  readonly onTogglePreview: LibraryPreviewToggle;
 }) {
   const [stickyAsset, setStickyAsset] = useState<LibraryReleaseAsset | null>(
     asset
@@ -1109,6 +1263,10 @@ function AssetDrawer({
 
   const current = asset ?? stickyAsset;
   const closedInteractiveProps = open ? {} : { tabIndex: -1 };
+  const closedTabIndex = open ? undefined : -1;
+  const isPreviewPlaying = Boolean(
+    current && playingPreviewId === current.id && activePreviewId === current.id
+  );
 
   return (
     <aside
@@ -1125,26 +1283,46 @@ function AssetDrawer({
     >
       {current ? (
         <div className='flex h-full min-h-0 flex-col'>
-          <div className='flex h-10 shrink-0 items-center justify-between border-b border-subtle px-3'>
-            <span className='text-xs font-semibold text-primary-token'>
-              Asset Details
+          <div className='flex h-10 shrink-0 items-center justify-between gap-2 border-b border-subtle px-3'>
+            <span className='min-w-0 truncate text-xs font-semibold text-primary-token'>
+              Release
             </span>
-            <button
-              type='button'
-              onClick={onClose}
-              aria-label='Close asset details'
-              {...closedInteractiveProps}
-              className={cn(
-                'grid h-7 w-7 place-items-center rounded-md text-tertiary-token transition-[background-color,color,box-shadow] duration-subtle hover:bg-surface-1 hover:text-primary-token',
-                LIBRARY_ICON_FOCUS_CLASS
-              )}
-            >
-              <X className='h-3.5 w-3.5' />
-            </button>
+            <div className='flex shrink-0 items-center gap-1'>
+              <PreviewActionButton
+                asset={current}
+                isPreviewPlaying={isPreviewPlaying}
+                onTogglePreview={onTogglePreview}
+                compact
+                disabledTabIndex={closedTabIndex}
+              />
+              <Link
+                href={current.smartLinkPath}
+                {...closedInteractiveProps}
+                aria-label={`Open ${current.title}`}
+                className={cn(
+                  'grid h-7 w-7 place-items-center rounded-md border border-subtle bg-surface-1 text-tertiary-token transition-[background-color,border-color,color,box-shadow] duration-subtle hover:border-default hover:bg-surface-2 hover:text-primary-token',
+                  LIBRARY_ICON_FOCUS_CLASS
+                )}
+              >
+                <ExternalLink className='h-3.5 w-3.5' />
+              </Link>
+              <button
+                type='button'
+                onClick={onClose}
+                aria-label='Close asset details'
+                {...closedInteractiveProps}
+                className={cn(
+                  'grid h-7 w-7 place-items-center rounded-md text-tertiary-token transition-[background-color,color,box-shadow] duration-subtle hover:bg-surface-1 hover:text-primary-token',
+                  LIBRARY_ICON_FOCUS_CLASS
+                )}
+              >
+                <X className='h-3.5 w-3.5' />
+              </button>
+            </div>
           </div>
 
           <div className='min-h-0 flex-1 overflow-y-auto p-3'>
-            <div className='overflow-hidden rounded-lg border border-subtle bg-black'>
+            <div className='overflow-hidden rounded-lg bg-black'>
               <div className='aspect-square'>
                 <Artwork asset={current} size='drawer' />
               </div>
@@ -1185,21 +1363,12 @@ function AssetDrawer({
                 Open Release
                 <ExternalLink className='h-3 w-3' />
               </Link>
-              {current.previewUrl ? (
-                <a
-                  href={current.previewUrl}
-                  target='_blank'
-                  rel='noopener noreferrer'
-                  {...closedInteractiveProps}
-                  className={cn(
-                    'inline-flex h-8 items-center gap-1.5 rounded-md border border-subtle bg-surface-1 px-3 text-xs font-medium text-primary-token transition-[background-color,border-color,box-shadow] duration-subtle hover:border-default hover:bg-surface-2',
-                    LIBRARY_BUTTON_FOCUS_CLASS
-                  )}
-                >
-                  <PlayCircle className='h-3 w-3' />
-                  Preview
-                </a>
-              ) : null}
+              <PreviewActionButton
+                asset={current}
+                isPreviewPlaying={isPreviewPlaying}
+                onTogglePreview={onTogglePreview}
+                disabledTabIndex={closedTabIndex}
+              />
             </div>
 
             <dl className='mt-4'>
@@ -1282,11 +1451,39 @@ function AssetDrawer({
   );
 }
 
+function LibraryStatusBar({
+  visibleCount,
+  totalCount,
+  sort,
+  view,
+  activePreviewTitle,
+}: {
+  readonly visibleCount: number;
+  readonly totalCount: number;
+  readonly sort: LibrarySortKey;
+  readonly view: LibraryViewMode;
+  readonly activePreviewTitle: string | null;
+}) {
+  return (
+    <div className='hidden h-8 shrink-0 items-center justify-between gap-3 border-t border-subtle bg-(--linear-app-content-surface) px-3 text-[11px] text-tertiary-token sm:flex'>
+      <span className='min-w-0 truncate'>
+        {visibleCount} of {totalCount} Releases
+      </span>
+      <span className='min-w-0 truncate text-right'>
+        {activePreviewTitle
+          ? `Playing ${activePreviewTitle}`
+          : `${SORT_LABELS[sort]} - ${view === 'grid' ? 'Grid' : 'List'}`}
+      </span>
+    </div>
+  );
+}
+
 export function LibrarySurface({
   assets,
 }: {
   readonly assets: readonly LibraryReleaseAsset[];
 }) {
+  const { playbackState, toggleTrack } = useTrackAudioPlayer();
   const [preset, setPreset] = useState<LibraryPresetId>('all');
   const [filters, setFilters] = useState<LibraryFilters>(() => emptyFilters());
   const [sort, setSort] = useState<LibrarySortKey>('releaseDate');
@@ -1327,6 +1524,41 @@ export function LibrarySurface({
 
   const selectedAsset =
     visibleAssets.find(asset => asset.id === selectedId) ?? null;
+  const activePreviewAsset =
+    assets.find(asset => asset.id === playbackState.activeTrackId) ?? null;
+  const activePreviewId = activePreviewAsset?.id ?? null;
+  const playingPreviewId = playbackState.isPlaying ? activePreviewId : null;
+  const activePreviewTitle =
+    activePreviewAsset && playingPreviewId === activePreviewAsset.id
+      ? activePreviewAsset.title
+      : null;
+
+  const handleTogglePreview = useCallback<LibraryPreviewToggle>(
+    (asset, event) => {
+      event?.stopPropagation();
+      if (playbackState.activeTrackId === asset.id) {
+        toggleTrack({ id: asset.id, title: asset.title }).catch(() => {
+          toast.error('Unable to control playback right now');
+        });
+        return;
+      }
+
+      if (!asset.previewUrl) return;
+
+      toggleTrack({
+        id: asset.id,
+        title: asset.title,
+        audioUrl: asset.previewUrl,
+        releaseTitle: asset.title,
+        artistName: asset.artist,
+        artworkUrl: asset.artworkUrl,
+        hasLyrics: asset.hasLyrics,
+      }).catch(() => {
+        toast.error('Unable to play preview');
+      });
+    },
+    [playbackState.activeTrackId, toggleTrack]
+  );
 
   useEffect(() => {
     if (selectedId && !visibleAssets.some(asset => asset.id === selectedId)) {
@@ -1468,27 +1700,44 @@ export function LibrarySurface({
           } as CSSProperties
         }
       >
-        <div className='min-w-0 overflow-y-auto pb-20 lg:pb-0'>
-          {visibleAssets.length === 0 ? (
-            <NoResults onReset={resetView} />
-          ) : view === 'grid' ? (
-            <AssetGrid
-              assets={visibleAssets}
-              selectedId={selectedId}
-              onSelect={openAsset}
-            />
-          ) : (
-            <LibraryDataTable
-              assets={visibleAssets}
-              selectedId={selectedId}
-              onSelect={openAsset}
-            />
-          )}
+        <div className='flex min-h-0 min-w-0 flex-col overflow-hidden'>
+          <div className='min-h-0 flex-1 overflow-y-auto pb-20 lg:pb-0'>
+            {visibleAssets.length === 0 ? (
+              <NoResults onReset={resetView} />
+            ) : view === 'grid' ? (
+              <AssetGrid
+                assets={visibleAssets}
+                selectedId={selectedId}
+                activePreviewId={activePreviewId}
+                playingPreviewId={playingPreviewId}
+                onSelect={openAsset}
+                onTogglePreview={handleTogglePreview}
+              />
+            ) : (
+              <LibraryDataTable
+                assets={visibleAssets}
+                selectedId={selectedId}
+                playingPreviewId={playingPreviewId}
+                onSelect={openAsset}
+                onTogglePreview={handleTogglePreview}
+              />
+            )}
+          </div>
+          <LibraryStatusBar
+            visibleCount={visibleAssets.length}
+            totalCount={assets.length}
+            sort={sort}
+            view={view}
+            activePreviewTitle={activePreviewTitle}
+          />
         </div>
         <AssetDrawer
           asset={selectedAsset}
           open={drawerOpen}
           onClose={() => setDrawerOpen(false)}
+          activePreviewId={activePreviewId}
+          playingPreviewId={playingPreviewId}
+          onTogglePreview={handleTogglePreview}
         />
       </div>
     </PageShell>

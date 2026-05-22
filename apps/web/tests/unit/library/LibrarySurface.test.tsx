@@ -1,7 +1,7 @@
 import { TooltipProvider } from '@jovie/ui';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import type { ComponentProps } from 'react';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { LibrarySurface } from '@/app/app/(shell)/library/LibrarySurface';
 import type { LibraryReleaseAsset } from '@/app/app/(shell)/library/library-data';
 import { HeaderSearchSurfaceFromContext } from '@/components/shell/HeaderSearchSurface';
@@ -13,6 +13,41 @@ import {
 } from '@/contexts/ShellSidebarOverrideContext';
 
 Element.prototype.scrollIntoView = vi.fn();
+
+const audioMock = vi.hoisted(() => {
+  const basePlaybackState = {
+    activeTrackId: null,
+    isPlaying: false,
+    playbackStatus: 'idle',
+    lastErrorReason: null,
+    currentTime: 0,
+    duration: 0,
+    trackTitle: null,
+    releaseTitle: null,
+    artistName: null,
+    artworkUrl: null,
+    hasLyrics: false,
+  };
+
+  return {
+    basePlaybackState,
+    playbackState: { ...basePlaybackState },
+    toggleTrack: vi.fn().mockResolvedValue(undefined),
+    seek: vi.fn(),
+    stop: vi.fn(),
+    onError: vi.fn(() => () => undefined),
+  };
+});
+
+vi.mock('@/components/organisms/release-sidebar/useTrackAudioPlayer', () => ({
+  useTrackAudioPlayer: () => audioMock,
+}));
+
+vi.mock('sonner', () => ({
+  toast: {
+    error: vi.fn(),
+  },
+}));
 
 vi.mock('next/image', () => ({
   default: (
@@ -113,6 +148,14 @@ function renderLibraryWithSidebarOverride(
 }
 
 describe('LibrarySurface', () => {
+  beforeEach(() => {
+    audioMock.playbackState = { ...audioMock.basePlaybackState };
+    audioMock.toggleTrack.mockClear();
+    audioMock.seek.mockClear();
+    audioMock.stop.mockClear();
+    audioMock.onError.mockClear();
+  });
+
   it('renders an empty read-only library state with a releases escape hatch', () => {
     renderLibrary([]);
 
@@ -138,7 +181,9 @@ describe('LibrarySurface', () => {
     expect(screen.getAllByText('Preview').length).toBeGreaterThan(0);
     expect(screen.getAllByText('Lyrics').length).toBeGreaterThan(0);
 
-    fireEvent.click(screen.getByRole('button', { name: /Take Me Over/u }));
+    fireEvent.click(
+      screen.getByRole('button', { name: /Inspect Take Me Over/u })
+    );
 
     expect(screen.getByText('Apr 28, 2026')).toBeDefined();
     expect(screen.getByTestId('library-asset-drawer')).toHaveAttribute(
@@ -153,10 +198,12 @@ describe('LibrarySurface', () => {
       'href',
       'https://open.spotify.com/album/take-me-over'
     );
-    expect(screen.getByRole('link', { name: /^Preview$/u })).toHaveAttribute(
-      'href',
-      'https://cdn.example.com/preview.mp3'
-    );
+    const drawer = within(screen.getByTestId('library-asset-drawer'));
+    expect(
+      drawer.getAllByRole('button', {
+        name: /Play Preview for Take Me Over/u,
+      }).length
+    ).toBeGreaterThan(0);
     expect(screen.getByText('68/100')).toBeDefined();
     expect(screen.getByText('Progressive House')).toBeDefined();
 
@@ -172,7 +219,7 @@ describe('LibrarySurface', () => {
     renderLibrary([buildAsset()]);
 
     const assetCardButton = screen.getByRole('button', {
-      name: /Take Me Over/u,
+      name: /Inspect Take Me Over/u,
     });
 
     expect(assetCardButton.className).toContain(
@@ -191,13 +238,18 @@ describe('LibrarySurface', () => {
     const openReleaseLink = screen.getByRole('link', {
       name: /Open Release/u,
     });
-    const previewLink = screen.getByRole('link', { name: /^Preview$/u });
+    const [previewButton] = within(
+      screen.getByTestId('library-asset-drawer')
+    ).getAllByRole('button', { name: /Play Preview for Take Me Over/u });
+    if (!previewButton) {
+      throw new Error('Expected a drawer preview button');
+    }
     const providerLink = screen.getByRole('link', { name: /Spotify/u });
 
     for (const element of [
       closeButton,
       openReleaseLink,
-      previewLink,
+      previewButton,
       providerLink,
     ]) {
       expect(element.className).toContain(
@@ -235,6 +287,22 @@ describe('LibrarySurface', () => {
     ).toBeInTheDocument();
     expect(screen.getByText('Never Say A Word')).toBeInTheDocument();
     expect(screen.getByText('Take Me Over')).toBeInTheDocument();
+  });
+
+  it('starts the persistent player from real production preview data', () => {
+    renderLibrary([buildAsset()]);
+
+    fireEvent.click(screen.getByTestId('library-preview-card-release-1'));
+
+    expect(audioMock.toggleTrack).toHaveBeenCalledWith({
+      id: 'release-1',
+      title: 'Take Me Over',
+      audioUrl: 'https://cdn.example.com/preview.mp3',
+      releaseTitle: 'Take Me Over',
+      artistName: 'Tim White',
+      artworkUrl: 'https://cdn.example.com/artwork.jpg',
+      hasLyrics: true,
+    });
   });
 
   it('opens the read-only asset drawer from list rows', () => {
