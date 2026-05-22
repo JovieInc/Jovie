@@ -79,4 +79,18 @@ describe('requireAdmin', () => {
 
     expect(response).toBeNull();
   });
+
+  it('fails closed when admin authResult is missing', async () => {
+    mockIsTestAuthBypassEnabled.mockReturnValue(true);
+    mockResolveTestBypassUserId.mockReturnValue('user_admin');
+    mockIsAdmin.mockResolvedValue(true);
+
+    const response = await requireAdmin();
+
+    expect(mockAuth).not.toHaveBeenCalled();
+    expect(response?.status).toBe(403);
+    await expect(response?.json()).resolves.toEqual({
+      error: 'Forbidden. Admin privileges required.',
+    });
+  });
 });

@@ -79,7 +79,7 @@ export async function requireAdmin(): Promise<NextResponse | null> {
   const userIsAdmin = await isAdmin(userId);
   const hasRecentMfa = authResult
     ? hasRecentAdminMfaReverification(authResult)
-    : true;
+    : false;
 
   // Mask user ID for logging to prevent PII exposure
   const maskedUserId = maskUserIdForLog(userId);
@@ -141,7 +141,7 @@ export async function checkIsAdmin(): Promise<boolean> {
   }
 
   if (!userId) return false;
-  if (authResult && !hasRecentAdminMfaReverification(authResult)) {
+  if (!authResult || !hasRecentAdminMfaReverification(authResult)) {
     return false;
   }
   return isAdmin(userId);
