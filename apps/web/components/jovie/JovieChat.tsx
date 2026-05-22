@@ -373,6 +373,7 @@ export function JovieChat({
   const greetingName =
     getFirstNameForGreeting(displayName) ?? getFirstNameForGreeting(username);
   const primaryActionCard = actionCards[0] ?? null;
+  const hasActionCardEmptyLayout = primaryActionCard !== null;
   const showActionCardContent =
     primaryActionCard !== null &&
     input.trim().length === 0 &&
@@ -387,6 +388,39 @@ export function JovieChat({
       ? `What are we working on, ${greetingName}?`
       : 'What are we working on?';
   }
+  const showBottomComposer = showThreadView || hasActionCardEmptyLayout;
+
+  const composerSurface = (
+    <div className='mx-auto w-full max-w-[45rem]'>
+      {/* Transient alerts stack above the input. Each contributes its
+        own bottom margin only when rendered. */}
+      <ChatUsageAlert />
+
+      {chatError && (
+        <div className='mb-2'>
+          <ErrorDisplay
+            chatError={chatError}
+            onRetry={handleRetry}
+            isLoading={isLoading}
+            isSubmitting={isSubmitting}
+          />
+        </div>
+      )}
+
+      {isRateLimited && (
+        <p className='mb-1.5 text-xs text-tertiary-token' aria-live='polite'>
+          Sending too fast. Please wait a second before your next message.
+        </p>
+      )}
+
+      <ChatInput
+        {...chatInputProps}
+        placeholder={showThreadView ? 'Ask a follow-up...' : 'Ask Jovie...'}
+        variant={showThreadView ? 'compact' : 'hero'}
+        shellChatV1
+      />
+    </div>
+  );
 
   return (
     <EntityResolutionProvider profileId={profileId}>
@@ -457,61 +491,80 @@ export function JovieChat({
           >
             <AnimatePresence mode='popLayout' initial={false}>
               {!showThreadView ? (
-                <div key='joviechat-empty-upper'>
+                <div
+                  key='joviechat-empty-upper'
+                  className='relative min-h-full'
+                >
                   {/* Giant Jovie circle mark behind empty thread.
                       Positioned absolute so it doesn't shift the welcome heading. */}
-                  <div
-                    aria-hidden
-                    className='pointer-events-none absolute inset-0 flex items-center justify-center select-none anim-calm-breath opacity-45'
-                    data-testid='chat-empty-thread-ornament'
-                  >
-                    <JovieMarkElectric
-                      spark={false}
-                      className='opacity-100'
-                      style={{
-                        width: 'clamp(180px, 34vw, 360px)',
-                        height: 'clamp(180px, 34vw, 360px)',
-                        transform: 'translateY(-16px)',
-                        WebkitMaskImage:
-                          'radial-gradient(circle, rgba(0,0,0,1) 55%, rgba(0,0,0,0.75) 75%, rgba(0,0,0,0) 95%)',
-                        maskImage:
-                          'radial-gradient(circle, rgba(0,0,0,1) 55%, rgba(0,0,0,0.75) 75%, rgba(0,0,0,0) 95%)',
-                      }}
-                    />
-                  </div>
+                  {!hasActionCardEmptyLayout ? (
+                    <div
+                      aria-hidden
+                      className='pointer-events-none absolute inset-0 flex items-center justify-center select-none anim-calm-breath opacity-35'
+                      data-testid='chat-empty-thread-ornament'
+                    >
+                      <JovieMarkElectric
+                        spark={false}
+                        className='opacity-100'
+                        style={{
+                          width: 'clamp(180px, 34vw, 360px)',
+                          height: 'clamp(180px, 34vw, 360px)',
+                          transform: 'translateY(-16px)',
+                          WebkitMaskImage:
+                            'radial-gradient(circle, rgba(0,0,0,1) 55%, rgba(0,0,0,0.72) 75%, rgba(0,0,0,0) 95%)',
+                          maskImage:
+                            'radial-gradient(circle, rgba(0,0,0,1) 55%, rgba(0,0,0,0.72) 75%, rgba(0,0,0,0) 95%)',
+                        }}
+                      />
+                    </div>
+                  ) : null}
 
                   <div
-                    className='relative mx-auto flex min-h-full w-full max-w-[52rem] flex-col items-center justify-center gap-5 py-8'
+                    className={cn(
+                      'relative mx-auto flex min-h-full w-full max-w-[52rem] flex-col items-center justify-center py-8',
+                      hasActionCardEmptyLayout ? 'gap-0' : 'gap-5'
+                    )}
                     data-testid='chat-empty-state-composer-region'
                   >
-                    <h1
-                      className={cn(
-                        'text-balance text-center text-[2rem] font-semibold leading-[1.1] text-primary-token sm:text-[2.35rem] md:text-[2.65rem]',
-                        composerPickerOpen && 'pointer-events-none opacity-0'
-                      )}
-                      aria-hidden={composerPickerOpen ? 'true' : undefined}
-                    >
-                      {emptyStateHeading}
-                    </h1>
-
-                    <div
-                      className='mx-auto flex h-[172px] w-full max-w-[38rem] items-center justify-center sm:h-[148px]'
-                      data-testid='chat-empty-state-action-card-slot'
-                    >
-                      {showActionCardContent ? (
-                        <SuggestionCard
-                          className='h-full'
-                          title={primaryActionCard.title}
-                          body={primaryActionCard.body}
-                          actionLabel={primaryActionCard.actionLabel}
-                          onAct={() =>
-                            handleSuggestedPromptWithJank(
-                              primaryActionCard.prompt
-                            )
-                          }
-                        />
-                      ) : null}
-                    </div>
+                    {hasActionCardEmptyLayout ? (
+                      <div
+                        className='mx-auto flex min-h-[172px] w-full max-w-[38rem] items-center justify-center sm:min-h-[148px]'
+                        data-testid='chat-empty-state-action-card-slot'
+                      >
+                        {showActionCardContent ? (
+                          <SuggestionCard
+                            className='h-full'
+                            title={primaryActionCard.title}
+                            body={primaryActionCard.body}
+                            actionLabel={primaryActionCard.actionLabel}
+                            onAct={() =>
+                              handleSuggestedPromptWithJank(
+                                primaryActionCard.prompt
+                              )
+                            }
+                          />
+                        ) : null}
+                      </div>
+                    ) : (
+                      <>
+                        <h1
+                          className={cn(
+                            'text-balance text-center text-[2rem] font-semibold leading-[1.1] text-primary-token sm:text-[2.35rem] md:text-[2.65rem]',
+                            composerPickerOpen &&
+                              'pointer-events-none opacity-0'
+                          )}
+                          aria-hidden={composerPickerOpen ? 'true' : undefined}
+                        >
+                          {emptyStateHeading}
+                        </h1>
+                        <div
+                          className='w-full'
+                          data-testid='chat-empty-state-centered-composer'
+                        >
+                          {composerSurface}
+                        </div>
+                      </>
+                    )}
                   </div>
                 </div>
               ) : (
@@ -619,43 +672,14 @@ export function JovieChat({
             motion surface. All transient chrome (alerts, rate, error) lives here for both
             empty and thread states.
           */}
-          <div className={CHAT_COMPOSER_DOCK_CLASSNAME}>
-            <div className='mx-auto w-full max-w-[45rem]'>
-              {/* Transient alerts stack above the input. Each contributes its
-                own bottom margin only when rendered. */}
-              <ChatUsageAlert />
-
-              {chatError && (
-                <div className='mb-2'>
-                  <ErrorDisplay
-                    chatError={chatError}
-                    onRetry={handleRetry}
-                    isLoading={isLoading}
-                    isSubmitting={isSubmitting}
-                  />
-                </div>
-              )}
-
-              {isRateLimited && (
-                <p
-                  className='mb-1.5 text-xs text-tertiary-token'
-                  aria-live='polite'
-                >
-                  Sending too fast. Please wait a second before your next
-                  message.
-                </p>
-              )}
-
-              <ChatInput
-                {...chatInputProps}
-                placeholder={
-                  showThreadView ? 'Ask a follow-up...' : 'Ask Jovie...'
-                }
-                variant={showThreadView ? 'compact' : 'hero'}
-                shellChatV1
-              />
+          {showBottomComposer ? (
+            <div
+              className={CHAT_COMPOSER_DOCK_CLASSNAME}
+              data-testid='chat-composer-dock'
+            >
+              {composerSurface}
             </div>
-          </div>
+          ) : null}
         </div>
       </div>
     </EntityResolutionProvider>

@@ -1087,7 +1087,7 @@ export function ReleaseSidebar({
                 options={releaseTabOptions}
                 ariaLabel='Release sidebar tabs'
                 overflowMode='scroll'
-                distribution='intrinsic'
+                distribution='fill'
               />
             }
             controls={activeTab === 'dsps' ? platformCardActions : undefined}

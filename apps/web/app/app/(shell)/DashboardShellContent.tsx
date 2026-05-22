@@ -96,7 +96,9 @@ export async function DashboardShellContent({
 
   // Read sidebar cookie server-side so SSR matches client state (no flash)
   const sidebarCookie = cookieStore.get('sidebar:state');
-  const sidebarDefaultOpen = sidebarCookie?.value !== 'false';
+  const sidebarDefaultOpen = sidebarCookie
+    ? sidebarCookie.value !== 'false'
+    : !dashboardData.sidebarCollapsed;
 
   const shellContents = (
     <div className='h-full'>

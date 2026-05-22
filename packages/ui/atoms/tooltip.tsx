@@ -60,7 +60,7 @@ interface TooltipContentProps
 
 /**
  * Tooltip content with tokenized surface styling.
- * z-[100] to sit above new shell chrome (sidebar, audio bar, now playing, drawers).
+ * z-[150] to sit above shell chrome, right rails, popovers, and drawers.
  * Pure opacity reveal only (fade-in/out) — no decorative zoom or slide/translate
  * per DESIGN.md + .claude/rules/ui.md "No Decorative Hover Motion" + subtraction.
  * Complements shell Tooltip (support-8) + DspAvatarStack pure opacity updates.
@@ -88,7 +88,7 @@ const TooltipContent = React.forwardRef<
         data-testid={testId}
         className={cn(
           // Base layout + spacing
-          'z-[100] overflow-hidden rounded-md border border-(--linear-border-subtle)',
+          'z-[150] overflow-hidden rounded-md border border-(--linear-border-subtle)',
           'bg-(--linear-bg-surface-0) px-2 py-1 text-[12px] font-[400] tracking-[-0.011em]',
           'text-(--linear-text-primary) shadow-(--linear-shadow-card-elevated)',
           'max-w-[220px]',

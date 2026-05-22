@@ -406,7 +406,7 @@ export function TrackSidebar({
               options={TRACK_SIDEBAR_TAB_OPTIONS}
               ariaLabel='Track sidebar tabs'
               overflowMode='scroll'
-              distribution='intrinsic'
+              distribution='fill'
             />
           }
           contentClassName='pt-2'

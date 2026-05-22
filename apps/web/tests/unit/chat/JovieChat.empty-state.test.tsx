@@ -139,7 +139,7 @@ describe('JovieChat empty state', () => {
     mockChatState.isSubmitting = false;
   });
 
-  it('renders the minimal welcome state without prompt pills or competing suggestion cards', () => {
+  it('centers the welcome composer when there are no action cards', () => {
     const { getByTestId, getByText, queryByTestId, queryByText } =
       renderWithQueryClient(<JovieChat profileId='profile-1' />);
 
@@ -154,10 +154,9 @@ describe('JovieChat empty state', () => {
     expect(queryByText('Jovie Assistant')).toBeNull();
     expect(queryByText('Ask anything or tell Jovie what you need')).toBeNull();
     expect(getByTestId('chat-empty-state-composer-region')).toBeTruthy();
-    expect(getByTestId('chat-empty-state-action-card-slot')).toBeTruthy();
-    expect(
-      getByTestId('chat-empty-state-action-card-slot').className
-    ).toContain('h-[172px]');
+    expect(getByTestId('chat-empty-state-centered-composer')).toBeTruthy();
+    expect(queryByTestId('chat-empty-state-action-card-slot')).toBeNull();
+    expect(queryByTestId('chat-composer-dock')).toBeNull();
     expect(queryByTestId('chat-empty-state-prompt-rail')).toBeNull();
     expect(getByTestId('chat-input')).toBeTruthy();
     expect(getByTestId('chat-input').getAttribute('data-placeholder')).toBe(
@@ -176,7 +175,7 @@ describe('JovieChat empty state', () => {
     expect(queryByText('Release link')).toBeNull();
   });
 
-  it('renders a contextual action card and submits its prompt', () => {
+  it('centers a contextual action card, hides welcome text, and docks the composer', () => {
     renderWithQueryClient(
       <JovieChat
         profileId='profile-1'
@@ -194,6 +193,14 @@ describe('JovieChat empty state', () => {
 
     expect(screen.getByText('Connect Your Music Catalog')).toBeTruthy();
     expect(screen.getByText(/Add Spotify/)).toBeTruthy();
+    expect(screen.queryByText('What are we working on?')).toBeNull();
+    expect(
+      screen.getByTestId('chat-empty-state-action-card-slot')
+    ).toBeTruthy();
+    expect(
+      screen.queryByTestId('chat-empty-state-centered-composer')
+    ).toBeNull();
+    expect(screen.getByTestId('chat-composer-dock')).toBeTruthy();
 
     fireEvent.click(screen.getByRole('button', { name: /Plan Setup/ }));
 
@@ -222,6 +229,7 @@ describe('JovieChat empty state', () => {
 
     expect(getByTestId('chat-empty-state-composer-region')).toBeTruthy();
     expect(getByTestId('chat-empty-state-action-card-slot')).toBeTruthy();
+    expect(getByTestId('chat-composer-dock')).toBeTruthy();
     expect(queryByTestId('chat-empty-state-top-signals')).toBeNull();
     expect(getByTestId('chat-input')).toBeTruthy();
     expect(queryByText('Connect Your Music Catalog')).toBeNull();
