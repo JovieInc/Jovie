@@ -20,9 +20,10 @@ final class JovieUITests: XCTestCase {
       $0.staticTexts["Sign in to Jovie"]
     }
 
-    XCTAssertTrue(app.staticTexts["Jovie"].exists)
-    XCTAssertTrue(app.staticTexts["Email"].exists)
-    XCTAssertTrue(app.buttons["Continue"].exists)
+    XCTAssertTrue(app.buttons["Continue with Google"].exists)
+    XCTAssertTrue(app.buttons["Continue with Apple"].exists)
+    XCTAssertFalse(app.staticTexts["Email"].exists)
+    XCTAssertFalse(app.buttons["Open Jovie on web"].exists)
     attachScreenshot(named: "signed-out", app: app)
   }
 
@@ -110,8 +111,12 @@ final class JovieUITests: XCTestCase {
       "Native auth heading did not appear.\n\(app.debugDescription)"
     )
     XCTAssertTrue(
-      app.staticTexts["Email"].waitForExistence(timeout: 10),
-      "Native auth email prompt did not appear.\n\(app.debugDescription)"
+      app.buttons["Continue with Google"].waitForExistence(timeout: 10),
+      "Native auth Google SSO button did not appear.\n\(app.debugDescription)"
+    )
+    XCTAssertTrue(
+      app.buttons["Continue with Apple"].waitForExistence(timeout: 10),
+      "Native auth Apple SSO button did not appear.\n\(app.debugDescription)"
     )
   }
 

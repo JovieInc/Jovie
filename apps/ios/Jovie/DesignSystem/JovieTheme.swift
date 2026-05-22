@@ -132,6 +132,20 @@ struct JovieIconButtonStyle: ButtonStyle {
   }
 }
 
+struct JovieLogoMark: View {
+  let size: CGFloat
+
+  var body: some View {
+    Image("Jovie-logo")
+      .resizable()
+      .renderingMode(.template)
+      .scaledToFit()
+      .foregroundStyle(Color.white)
+      .frame(width: size, height: size)
+      .accessibilityHidden(true)
+  }
+}
+
 extension Color {
   init(hex: UInt32) {
     self.init(

@@ -1,7 +1,7 @@
+import AuthenticationServices
 import ClerkKit
 import OSLog
 import SwiftUI
-import UIKit
 
 private let authLogger = Logger(
   subsystem: Bundle.main.bundleIdentifier ?? "ie.jov.Jovie",
@@ -13,467 +13,237 @@ struct AuthScreen: View {
   let webBaseURL: URL
   let onAuthenticated: @MainActor (String) async -> Void
 
-  @Environment(\.accessibilityReduceMotion) private var reduceMotion
-  @State private var isBackdropActive = false
-
   var body: some View {
     ZStack {
       JovieColor.backgroundBase.ignoresSafeArea()
-      CinematicLoadingBackdrop(isActive: isBackdropActive && !reduceMotion)
 
-      ScrollView {
-        VStack(spacing: JovieSpacing.xxLarge) {
-          Spacer(minLength: 18)
-          AuthHero()
+      VStack(spacing: 0) {
+        Spacer(minLength: 96)
 
-          if isMock {
-            MockAuthForm(webBaseURL: webBaseURL)
-          } else {
-            LiveEmailCodeAuthForm(
-              webBaseURL: webBaseURL,
-              onAuthenticated: onAuthenticated
-            )
-          }
+        VStack(spacing: JovieSpacing.xLarge) {
+          JovieLogoMark(size: 92)
+            .accessibilityIdentifier("auth-jovie-logo")
 
-          Spacer(minLength: 18)
+          Text("Sign in to Jovie")
+            .font(JovieFont.display(size: 29, weight: .semibold))
+            .foregroundStyle(JovieColor.textPrimary)
+            .multilineTextAlignment(.center)
+            .minimumScaleFactor(0.86)
         }
-        .frame(maxWidth: 430)
+        .frame(maxWidth: 360)
         .padding(.horizontal, JovieSpacing.xLarge)
-        .padding(.vertical, JovieSpacing.xxLarge)
-        .frame(maxWidth: .infinity)
-        .frame(minHeight: 720)
+
+        Spacer(minLength: 72)
+
+        if isMock {
+          MockSSOAuthActions()
+        } else {
+          LiveSSOAuthActions(onAuthenticated: onAuthenticated)
+        }
       }
-      .scrollIndicators(.hidden)
+      .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
     .accessibilityIdentifier("auth-screen")
-    .task {
-      isBackdropActive = true
+  }
+}
+
+private enum SSOProvider: Hashable, Identifiable {
+  case google
+  case apple
+
+  var id: Self { self }
+
+  var title: String {
+    switch self {
+    case .google:
+      "Continue with Google"
+    case .apple:
+      "Continue with Apple"
     }
-    .onDisappear {
-      isBackdropActive = false
+  }
+
+  var clerkProvider: OAuthProvider {
+    switch self {
+    case .google:
+      .google
+    case .apple:
+      .apple
+    }
+  }
+
+  var accessibilityIdentifier: String {
+    switch self {
+    case .google:
+      "auth-google-button"
+    case .apple:
+      "auth-apple-button"
     }
   }
 }
 
-enum AuthFormInput {
-  static func normalizedEmail(_ value: String) -> String {
-    value.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
-  }
-
-  static func isLikelyEmail(_ value: String) -> Bool {
-    let email = normalizedEmail(value)
-    let parts = email.split(separator: "@", omittingEmptySubsequences: false)
-
-    guard parts.count == 2,
-          let local = parts.first,
-          let domain = parts.last,
-          !local.isEmpty,
-          domain.contains(".")
-    else {
-      return false
-    }
-
-    return domain.split(separator: ".", omittingEmptySubsequences: false).allSatisfy { !$0.isEmpty }
-  }
-
-  static func normalizedCode(_ value: String) -> String {
-    String(value.filter(\.isNumber).prefix(6))
-  }
-}
-
-private enum AuthStep {
-  case email
-  case code
-}
-
-private enum AuthField: Hashable {
-  case email
-  case code
-}
-
-private struct AuthHero: View {
+private struct MockSSOAuthActions: View {
   var body: some View {
-    VStack(spacing: JovieSpacing.large) {
-      ZStack {
-        Circle()
-          .fill(JovieColor.surface1.opacity(0.92))
-          .frame(width: 82, height: 82)
-          .overlay {
-            Circle().stroke(JovieColor.borderStrong, lineWidth: 1)
-          }
-
-        Image("Jovie-logo")
-          .resizable()
-          .scaledToFit()
-          .frame(width: 50, height: 50)
-          .accessibilityHidden(true)
-      }
-
-      Text("Jovie")
-        .font(JovieFont.display(size: 24, weight: .semibold))
-        .foregroundStyle(JovieColor.textPrimary)
-    }
+    SSOProviderButtons(
+      activeProvider: nil,
+      errorMessage: nil,
+      onSelect: { _ in }
+    )
   }
 }
 
-private struct LiveEmailCodeAuthForm: View {
+private struct LiveSSOAuthActions: View {
   @Environment(Clerk.self) private var clerk
-  @Environment(\.openURL) private var openURL
 
-  let webBaseURL: URL
   let onAuthenticated: @MainActor (String) async -> Void
 
-  @State private var email = ""
-  @State private var code = ""
-  @State private var step: AuthStep = .email
-  @State private var signIn: SignIn?
-  @State private var isSubmitting = false
+  @State private var activeProvider: SSOProvider?
   @State private var errorMessage: String?
-  @State private var submitTask: Task<Void, Never>?
-  @FocusState private var focusedField: AuthField?
-
-  private var canSubmit: Bool {
-    switch step {
-    case .email:
-      return AuthFormInput.isLikelyEmail(email)
-    case .code:
-      return AuthFormInput.normalizedCode(code).count == 6
-    }
-  }
+  @State private var authTask: Task<Void, Never>?
 
   var body: some View {
-    AuthPanel {
-      VStack(spacing: JovieSpacing.xLarge) {
-        AuthStepHeader(
-          title: step == .email ? "Sign in to Jovie" : "Enter your code",
-          subtitle: step == .email
-            ? "Use the email connected to your Jovie account."
-            : "We sent a 6-digit code to \(AuthFormInput.normalizedEmail(email))."
-        )
-
-        VStack(spacing: JovieSpacing.large) {
-          if step == .email {
-            AuthTextField(
-              title: "Email",
-              placeholder: "you@example.com",
-              text: $email,
-              systemImage: "envelope",
-              keyboardType: .emailAddress,
-              textContentType: .emailAddress,
-              focus: $focusedField,
-              field: .email
-            )
-            .onSubmit {
-              startSubmit()
-            }
-          } else {
-            AuthTextField(
-              title: "Code",
-              placeholder: "000000",
-              text: Binding(
-                get: { code },
-                set: { code = AuthFormInput.normalizedCode($0) }
-              ),
-              systemImage: "number",
-              keyboardType: .numberPad,
-              textContentType: .oneTimeCode,
-              focus: $focusedField,
-              field: .code
-            )
-
-            Button {
-              submitTask?.cancel()
-              submitTask = nil
-              isSubmitting = false
-              step = .email
-              code = ""
-              errorMessage = nil
-              focusedField = .email
-            } label: {
-              Label("Use a different email", systemImage: "arrow.left")
-                .font(JovieFont.body(size: 13, weight: .semibold))
-            }
-            .buttonStyle(.plain)
-            .foregroundStyle(JovieColor.textSecondary)
-            .frame(maxWidth: .infinity, alignment: .leading)
-          }
-        }
-
-        AuthErrorText(message: errorMessage)
-
-        Button {
-          startSubmit()
-        } label: {
-          AuthPrimaryButtonLabel(
-            title: step == .email ? "Continue" : "Verify code",
-            systemImage: step == .email ? "arrow.right" : "checkmark",
-            isLoading: isSubmitting
-          )
-        }
-        .buttonStyle(JoviePillButtonStyle(filled: true))
-        .disabled(!canSubmit || isSubmitting)
-        .opacity(canSubmit ? 1 : 0.48)
-
-        Button {
-          openURL(webBaseURL.appending(path: "signin"))
-        } label: {
-          Label("Open Jovie on web", systemImage: "safari")
-            .frame(maxWidth: .infinity)
-        }
-        .buttonStyle(JoviePillButtonStyle(filled: false))
-      }
-    }
-    .onAppear {
-      focusedField = .email
-    }
+    SSOProviderButtons(
+      activeProvider: activeProvider,
+      errorMessage: errorMessage,
+      onSelect: startAuth
+    )
     .onDisappear {
-      submitTask?.cancel()
-      submitTask = nil
-      isSubmitting = false
+      authTask?.cancel()
+      authTask = nil
+      activeProvider = nil
     }
   }
 
   @MainActor
-  private func startSubmit() {
-    guard canSubmit, !isSubmitting else { return }
+  private func startAuth(with provider: SSOProvider) {
+    guard activeProvider == nil else { return }
 
-    submitTask?.cancel()
-    isSubmitting = true
+    authTask?.cancel()
+    activeProvider = provider
     errorMessage = nil
 
-    submitTask = Task { @MainActor in
+    authTask = Task { @MainActor in
       defer {
-        isSubmitting = false
-        submitTask = nil
+        activeProvider = nil
+        authTask = nil
       }
 
-      switch step {
-      case .email:
-        await submitEmail()
-      case .code:
-        await submitCode()
+      do {
+        let result = try await clerk.auth.signInWithOAuth(
+          provider: provider.clerkProvider,
+          prefersEphemeralWebBrowserSession: false,
+          transferable: true
+        )
+
+        guard !Task.isCancelled else { return }
+        try await finishAuthentication(result)
+      } catch {
+        guard !Task.isCancelled else { return }
+
+        if let message = AuthErrorMapper.message(for: error) {
+          errorMessage = message
+        }
       }
     }
   }
 
   @MainActor
-  private func submitEmail() async {
-    guard AuthFormInput.isLikelyEmail(email) else { return }
-
-    do {
-      signIn = try await clerk.auth.signInWithEmailCode(
-        emailAddress: AuthFormInput.normalizedEmail(email)
-      )
-
-      guard !Task.isCancelled else { return }
-
-      code = ""
-      step = .code
-      focusedField = .code
-    } catch {
-      errorMessage = AuthErrorMapper.message(for: error)
-    }
-  }
-
-  @MainActor
-  private func submitCode() async {
-    let verificationCode = AuthFormInput.normalizedCode(code)
-    guard verificationCode.count == 6 else { return }
-
-    guard let signIn else {
-      step = .email
-      errorMessage = "Enter your email again to request a fresh code."
-      return
-    }
-
-    do {
-      let completedSignIn = try await signIn.verifyCode(verificationCode)
-      guard !Task.isCancelled else { return }
-
-      if let sessionID = completedSignIn.createdSessionId,
+  private func finishAuthentication(_ result: TransferFlowResult) async throws {
+    switch result {
+    case let .signIn(signIn):
+      if let sessionID = signIn.createdSessionId,
          clerk.session?.id != sessionID
       {
         try await clerk.auth.setActive(sessionId: sessionID)
       }
-
-      _ = try await clerk.refreshClient()
-      _ = try await ClerkTokenProvider().bearerToken(forceRefresh: false)
-
-      guard !Task.isCancelled else { return }
-
-      guard let userID = clerk.user?.id else {
-        authLogger.error("Clerk user missing after successful email code verification.")
-        errorMessage = "You're signed in, but we couldn't load your profile. Try again."
-        return
+    case let .signUp(signUp):
+      if let sessionID = signUp.createdSessionId,
+         clerk.session?.id != sessionID
+      {
+        try await clerk.auth.setActive(sessionId: sessionID)
       }
-
-      await onAuthenticated(userID)
-    } catch {
-      errorMessage = AuthErrorMapper.message(for: error)
     }
+
+    _ = try await clerk.refreshClient()
+    _ = try await ClerkTokenProvider().bearerToken(forceRefresh: false)
+
+    guard let userID = clerk.user?.id else {
+      authLogger.error("Clerk user missing after successful OAuth verification.")
+      throw AuthPresentationError.missingSignedInUser
+    }
+
+    await onAuthenticated(userID)
   }
 }
 
-private struct MockAuthForm: View {
-  @Environment(\.openURL) private var openURL
-  let webBaseURL: URL
+private struct SSOProviderButtons: View {
+  let activeProvider: SSOProvider?
+  let errorMessage: String?
+  let onSelect: (SSOProvider) -> Void
+
+  private let providers: [SSOProvider] = [.google, .apple]
 
   var body: some View {
-    AuthPanel {
-      VStack(spacing: JovieSpacing.xLarge) {
-        AuthStepHeader(
-          title: "Sign in to Jovie",
-          subtitle: "Use the email connected to your Jovie account."
-        )
-
-        VStack(spacing: JovieSpacing.large) {
-          AuthStaticField(
-            title: "Email",
-            value: "you@example.com",
-            systemImage: "envelope"
+    VStack(spacing: JovieSpacing.large) {
+      VStack(spacing: JovieSpacing.medium) {
+        ForEach(providers) { provider in
+          SSOProviderButton(
+            provider: provider,
+            isLoading: activeProvider == provider,
+            isDisabled: activeProvider != nil,
+            action: { onSelect(provider) }
           )
-
-          AuthErrorText(message: nil)
-
-          Button {} label: {
-            AuthPrimaryButtonLabel(
-              title: "Continue",
-              systemImage: "arrow.right",
-              isLoading: false
-            )
-          }
-          .buttonStyle(JoviePillButtonStyle(filled: true))
-          .disabled(true)
-          .opacity(0.48)
-
-          Button {
-            openURL(webBaseURL.appending(path: "signin"))
-          } label: {
-            Label("Open Jovie on web", systemImage: "safari")
-              .frame(maxWidth: .infinity)
-          }
-          .buttonStyle(JoviePillButtonStyle(filled: false))
         }
       }
+
+      AuthErrorText(message: errorMessage)
     }
+    .frame(maxWidth: 430)
+    .padding(.horizontal, JovieSpacing.xLarge)
+    .padding(.bottom, JovieSpacing.xxLarge)
   }
 }
 
-private struct AuthPanel<Content: View>: View {
-  let content: Content
+private struct SSOProviderButton: View {
+  let provider: SSOProvider
+  let isLoading: Bool
+  let isDisabled: Bool
+  let action: () -> Void
 
-  init(@ViewBuilder content: () -> Content) {
-    self.content = content()
+  private var isPrimary: Bool {
+    provider == .google
   }
 
   var body: some View {
-    content
-      .padding(JovieSpacing.xLarge)
-      .background(JovieColor.surface0.opacity(0.74), in: RoundedRectangle(cornerRadius: JovieRadius.xLarge, style: .continuous))
-      .jovieSurface(radius: JovieRadius.xLarge)
-      .overlay {
-        RoundedRectangle(cornerRadius: JovieRadius.xLarge, style: .continuous)
-          .stroke(JovieColor.borderStrong, lineWidth: 1)
+    Button(action: action) {
+      HStack(spacing: JovieSpacing.small) {
+        if isLoading {
+          ProgressView()
+            .controlSize(.small)
+            .tint(isPrimary ? JovieColor.backgroundBase : JovieColor.textPrimary)
+        }
+
+        Text(provider.title)
+          .lineLimit(1)
+          .minimumScaleFactor(0.82)
       }
-  }
-}
-
-private struct AuthStepHeader: View {
-  let title: String
-  let subtitle: String
-
-  var body: some View {
-    VStack(spacing: JovieSpacing.small) {
-      Text(title)
-        .font(JovieFont.display(size: 28, weight: .semibold))
-        .foregroundStyle(JovieColor.textPrimary)
-        .multilineTextAlignment(.center)
-        .frame(maxWidth: .infinity)
-        .minimumScaleFactor(0.86)
-
-      Text(subtitle)
-        .font(JovieFont.body(size: 15, weight: .medium))
-        .foregroundStyle(JovieColor.textTertiary)
-        .multilineTextAlignment(.center)
-        .fixedSize(horizontal: false, vertical: true)
-    }
-  }
-}
-
-private struct AuthTextField: View {
-  let title: String
-  let placeholder: String
-  @Binding var text: String
-  let systemImage: String
-  let keyboardType: UIKeyboardType
-  let textContentType: UITextContentType
-  let focus: FocusState<AuthField?>.Binding
-  let field: AuthField
-
-  var body: some View {
-    VStack(alignment: .leading, spacing: JovieSpacing.small) {
-      Text(title)
-        .font(JovieFont.body(size: 13, weight: .semibold))
-        .foregroundStyle(JovieColor.textSecondary)
-
-      HStack(spacing: JovieSpacing.medium) {
-        Image(systemName: systemImage)
-          .font(.system(size: 16, weight: .semibold))
-          .foregroundStyle(JovieColor.textTertiary)
-          .frame(width: 20)
-
-        TextField(placeholder, text: $text)
-          .font(JovieFont.body(size: 17, weight: .medium))
-          .foregroundStyle(JovieColor.textPrimary)
-          .keyboardType(keyboardType)
-          .textContentType(textContentType)
-          .textInputAutocapitalization(.never)
-          .autocorrectionDisabled()
-          .focused(focus, equals: field)
-          .submitLabel(field == .email ? .continue : .done)
-      }
+      .font(JovieFont.body(size: 16, weight: .semibold))
+      .foregroundStyle(isPrimary ? JovieColor.backgroundBase : JovieColor.textPrimary)
+      .frame(maxWidth: .infinity)
       .frame(height: 56)
-      .padding(.horizontal, JovieSpacing.large)
-      .background(JovieColor.surface1.opacity(0.92), in: RoundedRectangle(cornerRadius: JovieRadius.medium, style: .continuous))
-      .overlay {
-        RoundedRectangle(cornerRadius: JovieRadius.medium, style: .continuous)
-          .stroke(JovieColor.borderDefault, lineWidth: 1)
-      }
+      .contentShape(Rectangle())
     }
-  }
-}
-
-private struct AuthStaticField: View {
-  let title: String
-  let value: String
-  let systemImage: String
-
-  var body: some View {
-    VStack(alignment: .leading, spacing: JovieSpacing.small) {
-      Text(title)
-        .font(JovieFont.body(size: 13, weight: .semibold))
-        .foregroundStyle(JovieColor.textSecondary)
-
-      HStack(spacing: JovieSpacing.medium) {
-        Image(systemName: systemImage)
-          .font(.system(size: 16, weight: .semibold))
-          .foregroundStyle(JovieColor.textTertiary)
-          .frame(width: 20)
-
-        Text(value)
-          .font(JovieFont.body(size: 17, weight: .medium))
-          .foregroundStyle(JovieColor.textTertiary)
-
-        Spacer()
-      }
-      .frame(height: 56)
-      .padding(.horizontal, JovieSpacing.large)
-      .background(JovieColor.surface1.opacity(0.72), in: RoundedRectangle(cornerRadius: JovieRadius.medium, style: .continuous))
-      .overlay {
-        RoundedRectangle(cornerRadius: JovieRadius.medium, style: .continuous)
-          .stroke(JovieColor.borderDefault, lineWidth: 1)
-      }
+    .buttonStyle(.plain)
+    .disabled(isDisabled)
+    .background(
+      Capsule(style: .continuous)
+        .fill(isPrimary ? Color.white : JovieColor.surface1)
+    )
+    .overlay {
+      Capsule(style: .continuous)
+        .stroke(isPrimary ? Color.clear : JovieColor.borderDefault, lineWidth: 1)
     }
+    .opacity(isDisabled && !isLoading ? 0.62 : 1)
+    .accessibilityIdentifier(provider.accessibilityIdentifier)
   }
 }
 
@@ -486,40 +256,36 @@ private struct AuthErrorText: View {
       .foregroundStyle(JovieColor.errorText)
       .multilineTextAlignment(.center)
       .fixedSize(horizontal: false, vertical: true)
-      .frame(minHeight: 34)
+      .frame(minHeight: 36)
       .frame(maxWidth: .infinity)
       .accessibilityHidden(message == nil)
   }
 }
 
-private struct AuthPrimaryButtonLabel: View {
-  let title: String
-  let systemImage: String
-  let isLoading: Bool
+private enum AuthPresentationError: LocalizedError {
+  case missingSignedInUser
 
-  var body: some View {
-    HStack(spacing: JovieSpacing.small) {
-      if isLoading {
-        ProgressView()
-          .tint(JovieColor.backgroundBase)
-          .controlSize(.small)
-      } else {
-        Image(systemName: systemImage)
-      }
-
-      Text(title)
+  var errorDescription: String? {
+    switch self {
+    case .missingSignedInUser:
+      "You're signed in, but we couldn't load your profile. Try again."
     }
-    .frame(maxWidth: .infinity)
   }
 }
 
 enum AuthErrorMapper {
-  static func message(for error: Error) -> String {
+  static func message(for error: Error) -> String? {
+    if let authError = error as? ASWebAuthenticationSessionError,
+       authError.code == .canceledLogin
+    {
+      return nil
+    }
+
     let rawMessage = error.localizedDescription.trimmingCharacters(in: .whitespacesAndNewlines)
     let lowercased = rawMessage.lowercased()
 
-    if lowercased.contains("code") || lowercased.contains("verification") {
-      return "That code did not work. Check the email and try again."
+    if lowercased.contains("cancel") {
+      return nil
     }
 
     if lowercased.contains("network") ||
@@ -530,11 +296,11 @@ enum AuthErrorMapper {
       return "We couldn't reach Jovie. Check your connection and try again."
     }
 
-    if lowercased.contains("identifier") ||
-      lowercased.contains("email") ||
-      lowercased.contains("not found")
+    if lowercased.contains("not allowed") ||
+      lowercased.contains("strategy") ||
+      lowercased.contains("oauth")
     {
-      return "Use the email connected to your Jovie account."
+      return "This sign-in method is not available yet. Try another option."
     }
 
     return rawMessage.isEmpty
