@@ -20,6 +20,10 @@ def require_env!(name)
   value
 end
 
+def env_present?(name)
+  !ENV[name].to_s.strip.empty?
+end
+
 def repo_path(path)
   File.join(REPO_ROOT, path)
 end
@@ -37,15 +41,15 @@ def app_store_api_key_from_env
 end
 
 def require_match_git_auth!
-  return unless ENV["MATCH_GIT_PRIVATE_KEY"].to_s.empty? && ENV["MATCH_GIT_BASIC_AUTHORIZATION"].to_s.empty?
+  return if env_present?("MATCH_GIT_PRIVATE_KEY") || env_present?("MATCH_GIT_BASIC_AUTHORIZATION")
 
   UI.user_error!("Missing match git authentication: set MATCH_GIT_PRIVATE_KEY or MATCH_GIT_BASIC_AUTHORIZATION")
 end
 
 def match_git_auth_options
   options = {}
-  options[:git_private_key] = ENV["MATCH_GIT_PRIVATE_KEY"] unless ENV["MATCH_GIT_PRIVATE_KEY"].to_s.empty?
-  options[:git_basic_authorization] = ENV["MATCH_GIT_BASIC_AUTHORIZATION"] unless ENV["MATCH_GIT_BASIC_AUTHORIZATION"].to_s.empty?
+  options[:git_private_key] = ENV["MATCH_GIT_PRIVATE_KEY"] if env_present?("MATCH_GIT_PRIVATE_KEY")
+  options[:git_basic_authorization] = ENV["MATCH_GIT_BASIC_AUTHORIZATION"] if env_present?("MATCH_GIT_BASIC_AUTHORIZATION")
   options
 end
 

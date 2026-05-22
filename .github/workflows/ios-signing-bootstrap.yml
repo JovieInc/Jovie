@@ -60,10 +60,19 @@ jobs:
             fi
           done
 
-          if [[ -z "${MATCH_GIT_PRIVATE_KEY:-}" && -z "${MATCH_GIT_BASIC_AUTHORIZATION:-}" ]]; then
+          match_git_private_key="${MATCH_GIT_PRIVATE_KEY:-}"
+          match_git_basic_authorization="${MATCH_GIT_BASIC_AUTHORIZATION:-}"
+          if [[ -z "${match_git_private_key//[[:space:]]/}" && -z "${match_git_basic_authorization//[[:space:]]/}" ]]; then
             echo "Missing match git authentication: set MATCH_GIT_PRIVATE_KEY or MATCH_GIT_BASIC_AUTHORIZATION"
             exit 1
           fi
 
       - name: Bootstrap App Store signing
-        run: bundle exec fastlane ios bootstrap_signing
+        shell: bash
+        run: |
+          set -euo pipefail
+          match_git_private_key="${MATCH_GIT_PRIVATE_KEY:-}"
+          if [[ -z "${match_git_private_key//[[:space:]]/}" ]]; then
+            unset MATCH_GIT_PRIVATE_KEY
+          fi
+          bundle exec fastlane ios bootstrap_signing
