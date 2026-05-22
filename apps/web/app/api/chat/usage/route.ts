@@ -17,6 +17,11 @@ type ChatUsageSnapshot = {
   dailyLimit: number;
   used: number;
   remaining: number;
+  resetAt: string | null;
+  monthlyLimit: number;
+  monthlyUsed: number;
+  monthlyRemaining: number;
+  monthlyResetAt: string;
   isExhausted: boolean;
   warningThreshold: number;
   isNearLimit: boolean;
@@ -63,6 +68,26 @@ function writeChatUsageCache(
 const CACHE_HEADERS = {
   'Cache-Control': 'private, max-age=30, stale-while-revalidate=120',
 } as const;
+
+function resolveMonthlyUsageWindow(now = new Date()): {
+  readonly daysInMonth: number;
+  readonly resetAt: string;
+} {
+  const year = now.getUTCFullYear();
+  const month = now.getUTCMonth();
+  const daysInMonth = new Date(Date.UTC(year, month + 1, 0)).getUTCDate();
+  const resetAt = new Date(Date.UTC(year, month + 1, 1, 0, 0, 0, 0));
+
+  return {
+    daysInMonth,
+    resetAt: resetAt.toISOString(),
+  };
+}
+
+function formatResetAt(resetTime: number): string | null {
+  if (!Number.isFinite(resetTime)) return null;
+  return new Date(resetTime).toISOString();
+}
 
 export async function GET() {
   let userId: string | null;
@@ -112,12 +137,20 @@ export async function GET() {
   const remaining = Math.max(0, Math.min(dailyLimit, status.remaining));
   const used = Math.max(0, dailyLimit - remaining);
   const warningThreshold = plan === 'free' ? 2 : 5;
+  const monthlyWindow = resolveMonthlyUsageWindow();
+  const monthlyLimit = dailyLimit * monthlyWindow.daysInMonth;
+  const monthlyUsed = Math.min(used, monthlyLimit);
 
   const response: ChatUsageSnapshot = {
     plan,
     dailyLimit,
     used,
     remaining,
+    resetAt: formatResetAt(status.resetTime),
+    monthlyLimit,
+    monthlyUsed,
+    monthlyRemaining: Math.max(0, monthlyLimit - monthlyUsed),
+    monthlyResetAt: monthlyWindow.resetAt,
     isExhausted: remaining <= 0,
     warningThreshold,
     isNearLimit: remaining > 0 && remaining <= warningThreshold,

@@ -37,6 +37,7 @@ describe('CookieBannerSection consent sync', () => {
 
   afterEach(() => {
     setCookie('');
+    globalThis.JVConsent = undefined;
   });
 
   it('calls setConsentState accepted on acceptAll', async () => {
@@ -144,6 +145,7 @@ describe('CookieModal loads saved preferences', () => {
 
   afterEach(() => {
     localStorage.clear();
+    globalThis.JVConsent = undefined;
   });
 
   it('initializes with saved preferences from localStorage', async () => {
@@ -217,9 +219,76 @@ describe('CookieModal loads saved preferences', () => {
   });
 });
 
+describe('CookieBannerMount global preferences controller', () => {
+  beforeEach(() => {
+    mockSaveConsent.mockClear();
+    mockSaveConsent.mockResolvedValue(undefined);
+    localStorage.clear();
+  });
+
+  afterEach(() => {
+    setCookie('');
+    localStorage.clear();
+    globalThis.JVConsent = undefined;
+  });
+
+  it('opens cookie preferences from the global menu event without a mounted banner', async () => {
+    setCookie('jv_cc_required=0');
+    const { CookieBannerMount } = await import(
+      '@/components/organisms/CookieBannerMount'
+    );
+
+    render(<CookieBannerMount />);
+
+    await vi.waitFor(() => {
+      expect(globalThis.JVConsent).toBeDefined();
+    });
+    expect(screen.queryByTestId('cookie-banner')).not.toBeInTheDocument();
+
+    globalThis.dispatchEvent(new CustomEvent('jv:cookie:open'));
+
+    await vi.waitFor(() => {
+      expect(
+        screen.getByRole('dialog', { name: /cookie preferences/i })
+      ).toBeInTheDocument();
+    });
+  });
+
+  it('persists preferences opened from the global controller', async () => {
+    setCookie('jv_cc_required=0');
+    const { setConsentState } = await import('@/lib/tracking/consent');
+    const { CookieBannerMount } = await import(
+      '@/components/organisms/CookieBannerMount'
+    );
+
+    render(<CookieBannerMount />);
+
+    await vi.waitFor(() => {
+      expect(globalThis.JVConsent).toBeDefined();
+    });
+
+    globalThis.JVConsent?.openModal();
+
+    await vi.waitFor(() => {
+      expect(
+        screen.getByRole('dialog', { name: /cookie preferences/i })
+      ).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: /save preferences/i }));
+
+    await vi.waitFor(() => {
+      expect(mockSaveConsent).toHaveBeenCalledTimes(1);
+      expect(setConsentState).toHaveBeenCalledWith('rejected');
+      expect(localStorage.getItem('jv_cc')).toContain('"essential":true');
+    });
+  });
+});
+
 describe('CookieSettingsFooterButton visibility', () => {
   afterEach(() => {
     setCookie('');
+    globalThis.JVConsent = undefined;
   });
 
   it('renders nothing when jv_cc_required is 0', async () => {

@@ -71,7 +71,7 @@ describe('CookieBannerSection', () => {
     expect(banner.textContent).toContain('essential functionality');
     expect(screen.getByRole('link', { name: /privacy/i })).toHaveAttribute(
       'href',
-      '/privacy'
+      '/legal/privacy'
     );
   });
 

@@ -10,6 +10,11 @@ export interface ChatUsageData {
   dailyLimit: number;
   used: number;
   remaining: number;
+  resetAt?: string | null;
+  monthlyLimit?: number | null;
+  monthlyUsed?: number | null;
+  monthlyRemaining?: number | null;
+  monthlyResetAt?: string | null;
   isExhausted: boolean;
   warningThreshold: number;
   isNearLimit: boolean;
