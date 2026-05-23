@@ -79,6 +79,7 @@
     "ios:screenshots": "bash apps/ios/scripts/capture-screenshots.sh",
     "build": "node scripts/turbo-local.mjs build",
     "build:web": "node scripts/turbo-local.mjs build --filter=@jovie/web",
+    "brand:generate": "tsx scripts/generate-brand-assets.ts",
     "lint": "node scripts/run-scoped-turbo-task.mjs lint",
     "lint:fix": "node scripts/turbo-local.mjs lint:fix",
     "typecheck": "node scripts/run-scoped-turbo-task.mjs typecheck",

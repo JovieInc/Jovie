@@ -61,6 +61,31 @@ export async function getOverflowingElements(
   return page.evaluate(() => {
     const viewportWidth = document.documentElement.clientWidth;
     const tolerance = 1;
+    const clippingOverflowValues = new Set([
+      'auto',
+      'clip',
+      'hidden',
+      'scroll',
+    ]);
+
+    function hasClippedOrScrolledAncestor(element: Element): boolean {
+      let current: Element | null = element;
+
+      while (current && current !== document.documentElement) {
+        if (current.getAttribute('aria-hidden') === 'true') {
+          return true;
+        }
+
+        const style = window.getComputedStyle(current);
+        if (clippingOverflowValues.has(style.overflowX)) {
+          return true;
+        }
+
+        current = current.parentElement;
+      }
+
+      return false;
+    }
 
     return Array.from(document.querySelectorAll('*'))
       .map(element => {
@@ -89,11 +114,13 @@ export async function getOverflowingElements(
             style.display !== 'none' &&
             style.visibility !== 'hidden' &&
             Number.parseFloat(style.opacity || '1') > 0.01,
+          isIntentionalClip: hasClippedOrScrolledAncestor(element),
         };
       })
       .filter(
         item =>
           item.isVisible &&
+          !item.isIntentionalClip &&
           item.width > 0 &&
           (item.right > viewportWidth + tolerance || item.left < -tolerance)
       )

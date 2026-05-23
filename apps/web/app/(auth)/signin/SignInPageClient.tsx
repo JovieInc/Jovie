@@ -7,6 +7,7 @@ import { SignInTimeoutEscape } from '@/components/molecules/SignInTimeoutEscape'
 import { APP_ROUTES } from '@/constants/routes';
 import { AuthLayout, AuthRoutePrefetch, AuthShell } from '@/features/auth';
 import { buildAuthRouteUrl } from '@/lib/auth/build-auth-route-url';
+import { getCentralAuthCallbackPath } from '@/lib/auth/central-auth-routing';
 import {
   buildAuthRouteUrlWithDesktopReturn,
   buildDesktopAuthReturnPath,
@@ -120,7 +121,7 @@ export function SignInPageClient() {
     ? buildMobileAuthReturnPath(mobileReturnRoute)
     : desktopReturnRoute
       ? buildDesktopAuthReturnPath(desktopReturnRoute)
-      : undefined;
+      : (getCentralAuthCallbackPath(searchParams) ?? undefined);
   const initialValues = useMemo(
     () => (isValidEmail(email) ? { emailAddress: email } : undefined),
     [email]

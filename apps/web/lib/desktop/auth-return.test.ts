@@ -22,6 +22,7 @@ describe('desktop auth return helpers', () => {
     expect(sanitizeDesktopReturnRoute('/%2F%2Fevil.com')).toBeNull();
     expect(sanitizeDesktopReturnRoute('/signin')).toBeNull();
     expect(sanitizeDesktopReturnRoute('/signup/sso-callback')).toBeNull();
+    expect(sanitizeDesktopReturnRoute('/auth/start')).toBeNull();
     expect(sanitizeDesktopReturnRoute('/auth-return?route=/app')).toBeNull();
     expect(
       sanitizeDesktopReturnRoute('/mobile-auth-return?route=/app')
@@ -81,23 +82,33 @@ describe('desktop auth return helpers', () => {
     ).toBe('/signin');
   });
 
-  it('accepts desktop auth URLs only for app auth routes with desktop_return', () => {
+  it('accepts central desktop auth start URLs with PKCE and sanitized return targets', () => {
     expect(
       sanitizeDesktopAuthUrl(
-        '/signin?desktop_return=%2Fapp%2Fsettings',
+        '/auth/start?client=electron&intent=sign_in&return_to=%2Fapp%2Fsettings&code_challenge=abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQ&code_challenge_method=S256',
         'https://jov.ie'
       )
-    ).toBe('https://jov.ie/signin?desktop_return=%2Fapp%2Fsettings');
+    ).toBe(
+      'https://jov.ie/auth/start?client=electron&intent=sign_in&return_to=%2Fapp%2Fsettings&code_challenge=abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQ&code_challenge_method=S256'
+    );
 
     expect(
       sanitizeDesktopAuthUrl(
-        'https://evil.com/signin?desktop_return=%2Fapp',
+        'https://evil.com/auth/start?client=electron&intent=sign_in&return_to=%2Fapp&code_challenge=abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQ&code_challenge_method=S256',
         'https://jov.ie'
       )
     ).toBeNull();
     expect(
-      sanitizeDesktopAuthUrl('/pricing?desktop_return=%2Fapp', 'https://jov.ie')
+      sanitizeDesktopAuthUrl(
+        '/auth/start?client=web&intent=sign_in&return_to=%2Fapp&code_challenge=abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQ&code_challenge_method=S256',
+        'https://jov.ie'
+      )
     ).toBeNull();
-    expect(sanitizeDesktopAuthUrl('/signin', 'https://jov.ie')).toBeNull();
+    expect(
+      sanitizeDesktopAuthUrl(
+        '/auth/start?client=electron&intent=sign_in&return_to=%2Fauth%2Fcallback&code_challenge=abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQ&code_challenge_method=S256',
+        'https://jov.ie'
+      )
+    ).toBeNull();
   });
 });

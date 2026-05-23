@@ -129,6 +129,30 @@ export const CAPTURE_ANIMATION_STYLES = `
     }
   }
 
+  @media (max-width: 767px) {
+    .artist-profile-audience-mask {
+      mask-image: none;
+      overflow: visible;
+    }
+
+    .artist-profile-audience-rail {
+      display: grid;
+      width: 100%;
+      grid-template-columns: minmax(0, 1fr);
+      animation: none;
+      transform: none;
+    }
+
+    .artist-profile-audience-rail > :nth-child(n + 5) {
+      display: none;
+    }
+
+    .artist-profile-audience-pill {
+      width: 100%;
+      max-width: 100%;
+    }
+  }
+
   @media (prefers-reduced-motion: reduce) {
     .artist-profile-audience-rail,
     .artist-profile-capture-typed,

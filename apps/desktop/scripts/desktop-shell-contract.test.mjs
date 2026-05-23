@@ -219,5 +219,5 @@ test('hosted web app has an early Electron runtime marker before first paint', a
   assert.match(runtimeInit, /JovieDesktop\\\//);
   assert.match(runtimeInit, /root\.dataset\.desktopRuntime = 'electron'/);
   assert.match(runtimeInit, /root\.dataset\.devChromeDisabled = '1'/);
-  assert.match(globalsCss, /--electron-titlebar-height: 52px;/);
+  assert.match(globalsCss, /--electron-titlebar-height: 40px;/);
 });

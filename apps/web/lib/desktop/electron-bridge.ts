@@ -46,6 +46,8 @@ export interface ElectronAPI {
     readonly ok: boolean;
     readonly reason?: string;
   }>;
+  /** Consume the one-time auth completion payload delivered by the desktop deep link. */
+  readonly consumeDesktopAuthCompletion?: () => Promise<DesktopAuthCompletionResult>;
   /**
    * Desktop dictation capability probe. Native OS dictation APIs are not
    * exposed directly to the sandboxed renderer; this tells the web composer
@@ -53,6 +55,22 @@ export interface ElectronAPI {
    */
   readonly getDictationStatus?: () => Promise<DesktopDictationStatus>;
 }
+
+export interface DesktopAuthCompletion {
+  readonly code: string;
+  readonly state: string;
+  readonly codeVerifier: string;
+}
+
+export type DesktopAuthCompletionResult =
+  | {
+      readonly ok: true;
+      readonly completion: DesktopAuthCompletion;
+    }
+  | {
+      readonly ok: false;
+      readonly reason?: string;
+    };
 
 type InstallUpdateResult = Awaited<
   ReturnType<ElectronAPI['installUpdateAndRestart']>
@@ -313,6 +331,44 @@ export async function closeDesktopAuthWindow(): Promise<void> {
   }
 }
 
+function isDesktopAuthCompletion(
+  value: unknown
+): value is DesktopAuthCompletion {
+  if (value === null || typeof value !== 'object') return false;
+  const completion = value as Partial<DesktopAuthCompletion>;
+  return (
+    typeof completion.code === 'string' &&
+    completion.code.length > 0 &&
+    typeof completion.state === 'string' &&
+    completion.state.length > 0 &&
+    typeof completion.codeVerifier === 'string' &&
+    completion.codeVerifier.length > 0
+  );
+}
+
+export async function consumeDesktopAuthCompletion(): Promise<DesktopAuthCompletionResult> {
+  const api = getRawElectronAPI();
+  if (api && typeof api.consumeDesktopAuthCompletion === 'function') {
+    const result = await api.consumeDesktopAuthCompletion();
+    if (!result.ok) {
+      return { ok: false, reason: result.reason ?? 'missing-completion' };
+    }
+    if (isDesktopAuthCompletion(result.completion)) {
+      return {
+        ok: true,
+        completion: result.completion,
+      };
+    }
+    return { ok: false, reason: 'invalid-completion' };
+  }
+
+  if (api) {
+    reportMissingBridgeMethod('consumeDesktopAuthCompletion');
+  }
+
+  return { ok: false, reason: 'desktop-auth-completion-bridge-unavailable' };
+}
+
 export interface DesktopNavState {
   readonly canGoBack: boolean;
   readonly canGoForward: boolean;
@@ -465,5 +521,6 @@ export const __testing = {
   startDesktopAuthHandoff,
   openDesktopAuthUrl,
   closeDesktopAuthWindow,
+  consumeDesktopAuthCompletion,
   RELEASE_DOWNLOAD_URL,
 };

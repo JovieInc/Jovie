@@ -727,7 +727,10 @@ test.describe('Public Profile Mobile Viewport Stability @smoke @critical', () =>
         ]);
 
         const rootSelector = '[data-testid="notifications-page"]';
-        const emailInput = flowPage.getByTestId('mobile-email-input');
+        const activeFlow = flowPage.locator(
+          '[role="dialog"][data-testid="profile-mobile-notifications-flow"]'
+        );
+        const emailInput = activeFlow.getByTestId('mobile-email-input');
         await focusAndAssertNoShift(
           flowPage,
           emailInput,
@@ -735,12 +738,12 @@ test.describe('Public Profile Mobile Viewport Stability @smoke @critical', () =>
           `${viewport.label} email`
         );
         await emailInput.fill(`mobile-${viewport.id}@example.com`);
-        await flowPage
+        await activeFlow
           .getByTestId('profile-mobile-notifications-step-email')
           .getByRole('button', { name: /^continue$/i })
           .click();
 
-        const firstOtpDigit = flowPage.getByLabel('Digit 1 of 6');
+        const firstOtpDigit = activeFlow.getByLabel('Digit 1 of 6');
         await focusAndAssertNoShift(
           flowPage,
           firstOtpDigit,
@@ -749,7 +752,7 @@ test.describe('Public Profile Mobile Viewport Stability @smoke @critical', () =>
         );
         await firstOtpDigit.pressSequentially('123456');
 
-        const nameInput = flowPage.getByTestId('mobile-name-input');
+        const nameInput = activeFlow.getByTestId('mobile-name-input');
         await focusAndAssertNoShift(
           flowPage,
           nameInput,
@@ -757,7 +760,7 @@ test.describe('Public Profile Mobile Viewport Stability @smoke @critical', () =>
           `${viewport.label} name`
         );
         await nameInput.fill('Alex');
-        await flowPage
+        await activeFlow
           .getByTestId('profile-mobile-notifications-step-name')
           .getByRole('button', { name: /^continue$/i })
           .click();
@@ -769,7 +772,7 @@ test.describe('Public Profile Mobile Viewport Stability @smoke @critical', () =>
         ] as const) {
           await focusAndAssertNoShift(
             flowPage,
-            flowPage.getByTestId(id),
+            activeFlow.getByTestId(id),
             rootSelector,
             `${viewport.label} ${label}`
           );

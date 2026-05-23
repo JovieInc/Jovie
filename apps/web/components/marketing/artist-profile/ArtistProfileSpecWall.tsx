@@ -277,7 +277,7 @@ function ArtistProfilePowerFeatureTile({
         />
         <div
           aria-hidden='true'
-          className='pointer-events-none absolute -right-16 -top-16 h-44 w-44 rounded-full bg-[var(--tile-accent)]/12 blur-3xl'
+          className='pointer-events-none absolute -right-16 -top-16 hidden h-44 w-44 rounded-full bg-[var(--tile-accent)]/12 blur-3xl sm:block'
         />
         <div className='relative flex-1'>
           {tile.visual === 'audience-quality-filter' ? (

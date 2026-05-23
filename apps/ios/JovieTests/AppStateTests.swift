@@ -159,37 +159,50 @@ struct AppStateTests {
     #expect(await repository.clearedUsers() == ["user_123"])
   }
 
-  @Test func mobileBrowserAuthURLUsesWebSignInWithMobileReturn() {
+  @Test func mobileBrowserAuthURLUsesCentralAuthStartWithPKCE() {
     let url = MobileBrowserAuthURLBuilder.signInURL(
-      baseURL: URL(string: "https://jov.ie")!
+      baseURL: URL(string: "https://jov.ie")!,
+      codeChallenge: "challenge_123"
     )
 
-    #expect(url?.absoluteString == "https://jov.ie/signin?mobile_return=/app")
+    #expect(
+      url?.absoluteString == "https://jov.ie/auth/start?client=ios&intent=sign_in&return_to=/app&code_challenge=challenge_123&code_challenge_method=S256"
+    )
   }
 
   @Test func mobileBrowserAuthURLFallsBackForUnsafeMobileReturn() {
     let url = MobileBrowserAuthURLBuilder.signInURL(
       baseURL: URL(string: "https://jov.ie")!,
-      returnRoute: "https://evil.example/app"
+      returnRoute: "https://evil.example/app",
+      codeChallenge: "challenge_123"
     )
 
-    #expect(url?.absoluteString == "https://jov.ie/signin?mobile_return=/app")
+    #expect(
+      url?.absoluteString == "https://jov.ie/auth/start?client=ios&intent=sign_in&return_to=/app&code_challenge=challenge_123&code_challenge_method=S256"
+    )
   }
 
-  @Test func mobileAuthReturnParserAcceptsTicketCallback() {
+  @Test func mobileAuthReturnParserAcceptsCodeCallback() {
     let result = MobileAuthReturnParser.parse(
-      URL(string: "ie.jov.Jovie://auth-return?ticket=ticket_123&route=%2Fapp%2Fsettings")!
+      URL(string: "ie.jov.Jovie://auth/complete?code=code_123&state=state_123")!,
+      codeVerifier: "verifier_123"
     )
 
-    #expect(result == MobileAuthReturn(ticket: "ticket_123", route: "/app/settings"))
+    #expect(
+      result == MobileAuthReturn(
+        code: "code_123",
+        state: "state_123",
+        codeVerifier: "verifier_123"
+      )
+    )
   }
 
-  @Test func mobileAuthReturnParserRejectsUnsafeReturnRoutes() {
+  @Test func mobileAuthReturnParserRejectsMissingVerifier() {
     let result = MobileAuthReturnParser.parse(
-      URL(string: "ie.jov.Jovie://auth-return?ticket=ticket_123&route=%2F%2Fevil.com")!
+      URL(string: "ie.jov.Jovie://auth/complete?code=code_123&state=state_123")!
     )
 
-    #expect(result == MobileAuthReturn(ticket: "ticket_123", route: "/app"))
+    #expect(result == nil)
   }
 
   @Test func chatLaunchModeOpensChatWithoutChangingReadyState() async throws {

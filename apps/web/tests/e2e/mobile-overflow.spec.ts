@@ -1,5 +1,12 @@
-import { expect, type Page, type TestInfo, test } from '@playwright/test';
+import {
+  expect,
+  type Page,
+  type Response,
+  type TestInfo,
+  test,
+} from '@playwright/test';
 import { APP_ROUTES } from '@/constants/routes';
+import { setTestAuthBypassSession } from '../helpers/clerk-auth';
 import { expectNoDocumentOverflow } from './utils/mobile-overflow';
 import {
   type ResolvedPublicSurfaceSpec,
@@ -96,9 +103,11 @@ const AUTHENTICATED_ROUTES = [
     id: 'app-releases',
     path: APP_ROUTES.RELEASES,
     readySelectors: [
+      '[data-testid="shell-releases-view"]',
       '[data-testid="releases-matrix"]',
       '[data-testid="releases-empty-state-enriching"]',
-      'main',
+      '[data-testid="releases-empty-state-disconnected"]',
+      '[data-testid="shell-releases-empty-state-connected"]',
     ],
   },
   {
@@ -128,36 +137,72 @@ async function waitForAnySelector(
   selectors: readonly string[],
   timeout = SMOKE_TIMEOUTS.VISIBILITY
 ): Promise<void> {
-  const errors: string[] = [];
+  try {
+    await Promise.any(
+      selectors.map(selector =>
+        page
+          .locator(selector)
+          .first()
+          .waitFor({
+            state: 'visible',
+            timeout: Math.min(timeout, 12_000),
+          })
+      )
+    );
+    return;
+  } catch (error) {
+    const errors =
+      error instanceof AggregateError
+        ? error.errors.map(entry =>
+            entry instanceof Error ? entry.message : String(entry)
+          )
+        : [error instanceof Error ? error.message : String(error)];
 
-  for (const selector of selectors) {
+    expect(
+      errors,
+      `Expected one ready selector to become visible: ${selectors.join(', ')}`
+    ).toHaveLength(0);
+  }
+}
+
+async function gotoRouteWithRetry(
+  page: Page,
+  route: MobileOverflowRoute
+): Promise<Response | null> {
+  const maxAttempts = 2;
+  let lastError: unknown = null;
+
+  for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
     try {
-      await page
-        .locator(selector)
-        .first()
-        .waitFor({
-          state: 'visible',
-          timeout: Math.min(timeout, 12_000),
-        });
-      return;
+      const response = await page.goto(route.path, {
+        waitUntil: 'domcontentloaded',
+        timeout: 120_000,
+      });
+      if (attempt < maxAttempts && response && response.status() >= 500) {
+        await page.waitForTimeout(1_000);
+        continue;
+      }
+      return response;
     } catch (error) {
-      errors.push(error instanceof Error ? error.message : String(error));
+      lastError = error;
+      const message = error instanceof Error ? error.message : String(error);
+      const shouldRetry =
+        attempt < maxAttempts && /ERR_EMPTY_RESPONSE|ECONNRESET/i.test(message);
+      if (!shouldRetry) break;
     }
   }
 
-  expect(
-    errors,
-    `Expected one ready selector to become visible: ${selectors.join(', ')}`
-  ).toHaveLength(0);
+  throw lastError instanceof Error ? lastError : new Error(String(lastError));
 }
 
 async function navigateToPublicSurface(
   page: Page,
   surface: ResolvedPublicSurfaceSpec
 ): Promise<void> {
-  const response = await page.goto(surface.resolvedPath, {
-    waitUntil: 'domcontentloaded',
-    timeout: 90_000,
+  const response = await gotoRouteWithRetry(page, {
+    id: surface.id,
+    path: surface.resolvedPath,
+    readySelectors: surface.readySelectors,
   });
 
   expect(
@@ -184,14 +229,8 @@ async function enterAuthenticatedRoute(
     'Authenticated mobile overflow routes require E2E_USE_TEST_AUTH_BYPASS=1'
   );
 
-  const authEntryPath = `/api/dev/test-auth/enter?persona=creator-ready&redirect=${encodeURIComponent(
-    route.path
-  )}`;
-
-  const response = await page.goto(authEntryPath, {
-    waitUntil: 'domcontentloaded',
-    timeout: 120_000,
-  });
+  await setTestAuthBypassSession(page, 'creator-ready');
+  const response = await gotoRouteWithRetry(page, route);
 
   expect(
     response?.status() ?? 200,

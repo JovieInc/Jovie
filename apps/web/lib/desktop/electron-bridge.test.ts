@@ -189,11 +189,11 @@ describe('electron-bridge — defensive guards', () => {
     });
 
     await __testing.openDesktopAuthUrl(
-      'https://jov.ie/signin?desktop_return=%2Fapp'
+      'https://jov.ie/auth/start?client=electron&intent=sign_in&return_to=%2Fapp&code_challenge=abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQ&code_challenge_method=S256'
     );
 
     expect(openDesktopAuthUrl).toHaveBeenCalledWith(
-      'https://jov.ie/signin?desktop_return=%2Fapp'
+      'https://jov.ie/auth/start?client=electron&intent=sign_in&return_to=%2Fapp&code_challenge=abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQ&code_challenge_method=S256'
     );
     expect(windowOpenSpy).not.toHaveBeenCalled();
   });
@@ -208,11 +208,11 @@ describe('electron-bridge — defensive guards', () => {
     });
 
     await __testing.openDesktopAuthUrl(
-      'https://jov.ie/signin?desktop_return=%2Fapp'
+      'https://jov.ie/auth/start?client=electron&intent=sign_in&return_to=%2Fapp&code_challenge=abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQ&code_challenge_method=S256'
     );
 
     expect(windowOpenSpy).toHaveBeenCalledWith(
-      'https://jov.ie/signin?desktop_return=%2Fapp',
+      'https://jov.ie/auth/start?client=electron&intent=sign_in&return_to=%2Fapp&code_challenge=abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQ&code_challenge_method=S256',
       '_blank',
       'noopener,noreferrer'
     );
@@ -225,11 +225,11 @@ describe('electron-bridge — defensive guards', () => {
     });
 
     await __testing.startDesktopAuthHandoff(
-      'https://jov.ie/signup?desktop_return=%2Fstart'
+      'https://jov.ie/auth/start?client=electron&intent=sign_up&return_to=%2Fstart&code_challenge=abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQ&code_challenge_method=S256'
     );
 
     expect(startDesktopAuthHandoff).toHaveBeenCalledWith(
-      'https://jov.ie/signup?desktop_return=%2Fstart'
+      'https://jov.ie/auth/start?client=electron&intent=sign_up&return_to=%2Fstart&code_challenge=abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQ&code_challenge_method=S256'
     );
     expect(windowOpenSpy).not.toHaveBeenCalled();
   });
@@ -244,17 +244,52 @@ describe('electron-bridge — defensive guards', () => {
     });
 
     await __testing.startDesktopAuthHandoff(
-      'https://jov.ie/signup?desktop_return=%2Fstart'
+      'https://jov.ie/auth/start?client=electron&intent=sign_up&return_to=%2Fstart&code_challenge=abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQ&code_challenge_method=S256'
     );
 
     expect(startDesktopAuthHandoff).toHaveBeenCalledWith(
-      'https://jov.ie/signup?desktop_return=%2Fstart'
+      'https://jov.ie/auth/start?client=electron&intent=sign_up&return_to=%2Fstart&code_challenge=abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQ&code_challenge_method=S256'
     );
     expect(windowOpenSpy).toHaveBeenCalledWith(
-      'https://jov.ie/signup?desktop_return=%2Fstart',
+      'https://jov.ie/auth/start?client=electron&intent=sign_up&return_to=%2Fstart&code_challenge=abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQ&code_challenge_method=S256',
       '_blank',
       'noopener,noreferrer'
     );
+  });
+
+  it('consumeDesktopAuthCompletion returns a validated one-time completion payload', async () => {
+    const completion = {
+      code: 'code_123',
+      state: 'state_123',
+      codeVerifier: 'verifier_123',
+    };
+    const consumeDesktopAuthCompletion = vi.fn(async () => ({
+      ok: true,
+      completion,
+    }));
+    setElectronAPI({
+      consumeDesktopAuthCompletion,
+    });
+
+    await expect(__testing.consumeDesktopAuthCompletion()).resolves.toEqual({
+      ok: true,
+      completion,
+    });
+  });
+
+  it('consumeDesktopAuthCompletion rejects malformed bridge payloads', async () => {
+    const consumeDesktopAuthCompletion = vi.fn(async () => ({
+      ok: true,
+      completion: { code: 'code_123' },
+    }));
+    setElectronAPI({
+      consumeDesktopAuthCompletion,
+    });
+
+    await expect(__testing.consumeDesktopAuthCompletion()).resolves.toEqual({
+      ok: false,
+      reason: 'invalid-completion',
+    });
   });
 
   it('safeGetDictationStatus allows browser Web Speech outside Electron', async () => {

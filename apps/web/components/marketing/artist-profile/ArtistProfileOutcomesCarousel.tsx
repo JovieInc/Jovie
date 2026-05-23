@@ -34,10 +34,10 @@ const OUTCOME_CARD_ACCENTS: Record<OutcomeId, string> = {
 // proofs, so they get wider slots; Share anywhere is a single QR card
 // and can stay narrow.
 const OUTCOME_CARD_WIDTHS: Record<OutcomeId, string> = {
-  'drive-streams': 'w-[85vw] sm:w-[34rem] lg:w-[38rem]',
-  'sell-out': 'w-[85vw] sm:w-[36rem] lg:w-[40rem]',
-  'get-paid': 'w-[85vw] sm:w-[30rem] lg:w-[32rem]',
-  'share-anywhere': 'w-[85vw] sm:w-[24rem] lg:w-[26rem]',
+  'drive-streams': 'w-full sm:w-[34rem] lg:w-[38rem]',
+  'sell-out': 'w-full sm:w-[36rem] lg:w-[40rem]',
+  'get-paid': 'w-full sm:w-[30rem] lg:w-[32rem]',
+  'share-anywhere': 'w-full sm:w-[24rem] lg:w-[26rem]',
 };
 
 type OutcomeAccentStyle = CSSProperties & {
@@ -151,7 +151,7 @@ export function ArtistProfileOutcomesCarousel({
             data-testid='artist-profile-outcomes-grid'
             aria-label='Outcome showcase'
             aria-describedby='artist-profile-outcomes-instructions'
-            className='relative flex gap-3 overflow-x-auto overflow-y-hidden overscroll-x-contain scroll-smooth snap-x snap-mandatory pb-3 pl-5 pr-[10vw] scroll-pl-5 sm:gap-3.5 sm:pl-6 sm:pr-[12vw] sm:scroll-pl-6 lg:pl-[max(1.5rem,calc((100vw-var(--linear-content-max))/2))] lg:pr-[14vw] lg:scroll-pl-[max(1.5rem,calc((100vw-var(--linear-content-max))/2))] [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden'
+            className='relative grid grid-cols-1 gap-3 overflow-visible pb-3 pl-5 pr-5 sm:flex sm:gap-3.5 sm:overflow-x-auto sm:overflow-y-hidden sm:overscroll-x-contain sm:scroll-smooth sm:snap-x sm:snap-mandatory sm:pl-6 sm:pr-[12vw] sm:scroll-pl-6 lg:pl-[max(1.5rem,calc((100vw-var(--linear-content-max))/2))] lg:pr-[14vw] lg:scroll-pl-[max(1.5rem,calc((100vw-var(--linear-content-max))/2))] [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden'
           >
             {outcomes.cards.map(card => (
               <OutcomeCard key={card.id} card={card} outcomes={outcomes} />

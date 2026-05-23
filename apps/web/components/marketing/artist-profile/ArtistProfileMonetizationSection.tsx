@@ -231,7 +231,7 @@ export function ArtistProfileMonetizationSection({
             ref={scrollerRef}
             data-testid='artist-profile-monetization-scroller'
             aria-label='Monetization card carousel'
-            className='relative flex gap-3.5 overflow-x-auto overflow-y-hidden overscroll-contain scroll-smooth snap-x snap-mandatory pb-2 pl-[max(1.25rem,calc((100vw-var(--linear-content-max))/2+1.25rem))] pr-[9vw] scroll-pl-[max(1.25rem,calc((100vw-var(--linear-content-max))/2+1.25rem))] [-ms-overflow-style:none] [scrollbar-width:none] scrollbar-hide sm:gap-4 sm:pl-[max(1.5rem,calc((100vw-var(--linear-content-max))/2+1.5rem))] sm:pr-[10vw] sm:scroll-pl-[max(1.5rem,calc((100vw-var(--linear-content-max))/2+1.5rem))] lg:pl-[max(1.5rem,calc((100vw-var(--linear-content-max))/2))] lg:pr-[12vw] lg:scroll-pl-[max(1.5rem,calc((100vw-var(--linear-content-max))/2))] [&::-webkit-scrollbar]:hidden'
+            className='relative grid grid-cols-1 gap-3 overflow-visible px-5 pb-2 sm:flex sm:gap-4 sm:overflow-x-auto sm:overflow-y-hidden sm:overscroll-contain sm:scroll-smooth sm:snap-x sm:snap-mandatory sm:pl-[max(1.5rem,calc((100vw-var(--linear-content-max))/2+1.5rem))] sm:pr-[10vw] sm:scroll-pl-[max(1.5rem,calc((100vw-var(--linear-content-max))/2+1.5rem))] lg:pl-[max(1.5rem,calc((100vw-var(--linear-content-max))/2))] lg:pr-[12vw] lg:scroll-pl-[max(1.5rem,calc((100vw-var(--linear-content-max))/2))] [-ms-overflow-style:none] [scrollbar-width:none] scrollbar-hide [&::-webkit-scrollbar]:hidden'
           >
             <button
               type='button'
@@ -356,8 +356,7 @@ const MonetizationCard = forwardRef<HTMLElement, MonetizationCardProps>(
         className={cn(
           'relative z-10',
           visualSide === 'right' ? 'self-end' : 'self-start',
-          isIrlPaymentsCard &&
-            '-mb-5 -mr-5 sm:-mb-6 sm:-mr-6 lg:-mb-6.5 lg:-mr-6.5'
+          isIrlPaymentsCard && 'sm:-mb-6 sm:-mr-6 lg:-mb-6.5 lg:-mr-6.5'
         )}
       >
         {children}
@@ -369,7 +368,7 @@ const MonetizationCard = forwardRef<HTMLElement, MonetizationCardProps>(
         ref={ref}
         data-testid='artist-profile-monetization-card'
         className={cn(
-          'relative flex w-[min(22rem,82vw)] shrink-0 snap-start flex-col overflow-hidden rounded-[1.45rem] bg-[#f3efe6] p-5 text-black shadow-[0_22px_64px_rgba(0,0,0,0.26)] sm:w-[25rem] sm:p-6 lg:w-[27rem] lg:p-6.5',
+          'relative flex w-full shrink-0 snap-start flex-col overflow-hidden rounded-[1.45rem] bg-[#f3efe6] p-5 text-black shadow-[0_22px_64px_rgba(0,0,0,0.26)] sm:w-[25rem] sm:p-6 lg:w-[27rem] lg:p-6.5',
           isCaptureCard
             ? 'min-h-[22.75rem] sm:min-h-[23.75rem] lg:min-h-[24.5rem]'
             : 'min-h-[27rem] sm:min-h-[29rem] lg:min-h-[30rem]'
@@ -391,7 +390,7 @@ function IrlPaymentsVisual({}: Readonly<{
   card: ArtistProfileLandingCopy['monetization']['irlPaymentsCard'];
 }>) {
   return (
-    <div className='relative h-[13.8rem] w-[18rem] overflow-hidden rounded-t-[1.45rem] rounded-b-none bg-[#0d1015] shadow-[0_-20px_48px_rgba(0,0,0,0.24)] sm:h-[14.5rem] sm:w-[19rem]'>
+    <div className='relative h-[12.5rem] w-full max-w-[16rem] overflow-hidden rounded-t-[1.45rem] rounded-b-none bg-[#0d1015] shadow-[0_-20px_48px_rgba(0,0,0,0.24)] sm:h-[14.5rem] sm:w-[19rem] sm:max-w-none'>
       <Image
         alt='Pay drawer open inside an artist profile payment flow'
         className='object-cover object-bottom'
@@ -473,10 +472,10 @@ function SayThanksVisual({
   );
 }
 
-function getOutputTransform(index: number): string {
-  if (index === 0) return 'translateX(0px)';
-  if (index === 1) return 'translateX(10px)';
-  return 'translateX(20px)';
+function getOutputTransformClass(index: number): string {
+  if (index === 1) return 'sm:translate-x-2.5';
+  if (index >= 2) return 'sm:translate-x-5';
+  return '';
 }
 
 function ReengageVisual({
@@ -491,7 +490,7 @@ function ReengageVisual({
   } as const;
 
   return (
-    <div className='relative w-[15.75rem]'>
+    <div className='relative w-full max-w-[15rem] sm:w-[15.75rem] sm:max-w-none'>
       {card.outputs.map((output, index) => {
         const Icon = iconMap[output.id];
         return (
@@ -499,11 +498,9 @@ function ReengageVisual({
             key={output.id}
             className={cn(
               'relative rounded-[1rem] bg-[#0d1015] px-3.5 py-3.5 text-white shadow-[0_14px_30px_rgba(0,0,0,0.18)]',
+              getOutputTransformClass(index),
               index > 0 && 'mt-2.5'
             )}
-            style={{
-              transform: getOutputTransform(index),
-            }}
           >
             <div className='flex items-start gap-3'>
               <span className='mt-0.5 inline-flex h-8.5 w-8.5 shrink-0 items-center justify-center rounded-full bg-white/[0.08] text-white/88'>

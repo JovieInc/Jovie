@@ -167,6 +167,7 @@
     "@dnd-kit/utilities": "^3.2.2",
     "@floating-ui/react": "^0.27.19",
     "@headlessui/react": "^2.2.9",
+    "@jovie/auth-routing": "workspace:*",
     "@jovie/ui": "workspace:*",
     "@neondatabase/serverless": "^1.1.0",
     "@radix-ui/react-alert-dialog": "^1.1.15",
