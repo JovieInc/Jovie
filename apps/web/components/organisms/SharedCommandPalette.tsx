@@ -346,7 +346,12 @@ export function InlinePalette({
 
   return (
     <div
-      className={cn('flex flex-col', variant === 'rail' && 'h-full min-h-0')}
+      className={cn(
+        'flex flex-col',
+        variant === 'rail'
+          ? 'h-full min-h-0'
+          : 'max-h-[min(320px,calc(100vh-14rem))]'
+      )}
       data-testid='shared-command-palette'
       data-surface='chat-slash'
     >
@@ -356,7 +361,7 @@ export function InlinePalette({
         role='listbox'
         aria-label='Slash command suggestions'
         className={cn(
-          'flex-1 overflow-y-auto p-[5px]',
+          'min-h-0 flex-1 overflow-y-auto p-[5px]',
           variant === 'inline' && 'max-h-[260px]'
         )}
       >

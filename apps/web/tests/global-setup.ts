@@ -177,6 +177,32 @@ async function globalSetup() {
     }
   }
 
+  const apiWarmupRequests = [
+    {
+      body: JSON.stringify({}),
+      headers: { 'Content-Type': 'application/json' },
+      method: 'POST',
+      route: '/api/onboarding/welcome-chat',
+    },
+  ];
+
+  for (const request of apiWarmupRequests) {
+    try {
+      const res = await fetch(`${baseURL}${request.route}`, {
+        body: request.body,
+        headers: request.headers,
+        method: request.method,
+        signal: AbortSignal.timeout(120_000),
+        redirect: 'follow',
+      });
+      console.log(`  ✓ ${request.route} (${res.status}) warmed up`);
+    } catch {
+      console.log(
+        `  ⚠ ${request.route} warmup failed (will compile on first test visit)`
+      );
+    }
+  }
+
   const elapsed = Date.now() - startTime;
   console.log(`✅ E2E global setup complete in ${elapsed}ms`);
 }

@@ -6,7 +6,7 @@ import { ContentSectionHeader } from '@/components/molecules/ContentSectionHeade
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { APP_ROUTES } from '@/constants/routes';
 import { formatUsd } from '@/lib/admin/format';
-import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
+import { getCurrentAdminPageAccess } from '@/lib/admin/page-access';
 import { loadAdminAgentRun } from './agent-run-data';
 
 export const runtime = 'nodejs';
@@ -36,12 +36,12 @@ interface AgentRunDebugPageProps {
 export default async function AgentRunDebugPage({
   params,
 }: AgentRunDebugPageProps) {
-  const entitlements = await getCurrentUserEntitlements();
+  const adminAccess = await getCurrentAdminPageAccess();
 
   if (
-    !entitlements.isAuthenticated ||
-    !entitlements.userId ||
-    !entitlements.isAdmin
+    !adminAccess.isAuthenticated ||
+    !adminAccess.userId ||
+    !adminAccess.hasAdminRole
   ) {
     redirect(APP_ROUTES.DASHBOARD);
   }

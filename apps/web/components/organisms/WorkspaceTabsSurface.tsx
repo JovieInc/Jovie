@@ -1,11 +1,17 @@
 'use client';
 
-import { usePathname, useRouter, useSearchParams } from 'next/navigation';
+import Link from 'next/link';
+import { usePathname, useSearchParams } from 'next/navigation';
 import type { ReactNode } from 'react';
 import { useCallback, useMemo } from 'react';
-import { AppSegmentControl } from '@/components/atoms/AppSegmentControl';
 import { ContentSectionHeader } from '@/components/molecules/ContentSectionHeader';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
+import {
+  TAB_BAR_RAIL_CLASSNAME,
+  TAB_BAR_SEGMENT_TRIGGER_ACTIVE_CLASSNAME,
+  TAB_BAR_SEGMENT_TRIGGER_CLASSNAME,
+} from '@/components/molecules/tab-bar/TabBar';
+import { cn } from '@/lib/utils';
 
 export interface WorkspaceTabOption<T extends string> {
   readonly value: T;
@@ -56,12 +62,11 @@ export function WorkspaceTabsSurface<
   children,
 }: Readonly<WorkspaceTabsSurfaceProps<TPrimary, TSecondary>>) {
   const pathname = usePathname();
-  const router = useRouter();
   const searchParams = useSearchParams();
 
   const selectedSecondaryValue = secondaryValue ?? undefined;
 
-  const navigateWithParam = useCallback(
+  const buildHrefWithParam = useCallback(
     (param: string, value: string, resetKeys: readonly string[]) => {
       const nextParams = new URLSearchParams(searchParams.toString());
       nextParams.set(param, value);
@@ -71,9 +76,9 @@ export function WorkspaceTabsSurface<
       }
 
       const query = nextParams.toString();
-      router.push(query ? `${pathname}?${query}` : pathname);
+      return query ? `${pathname}?${query}` : pathname;
     },
-    [pathname, router, searchParams]
+    [pathname, searchParams]
   );
 
   const secondaryControl = useMemo(() => {
@@ -86,13 +91,11 @@ export function WorkspaceTabsSurface<
     }
 
     return (
-      <AppSegmentControl
+      <LinkedTabBar
         value={selectedSecondaryValue}
-        onValueChange={value => navigateWithParam(secondaryParam, value, [])}
         options={secondaryOptions}
-        size='sm'
-        surface='ghost'
-        aria-label={`${title} secondary views`}
+        ariaLabel={`${title} secondary views`}
+        getHref={value => buildHrefWithParam(secondaryParam, value, [])}
       />
     );
   }, [
@@ -100,7 +103,7 @@ export function WorkspaceTabsSurface<
     secondaryParam,
     selectedSecondaryValue,
     title,
-    navigateWithParam,
+    buildHrefWithParam,
   ]);
 
   const shouldShowPrimaryControl = primaryOptions.length > 1;
@@ -136,17 +139,16 @@ export function WorkspaceTabsSurface<
           >
             <div className='flex flex-col gap-3'>
               {shouldShowPrimaryControl ? (
-                <AppSegmentControl
+                <LinkedTabBar
                   value={primaryValue}
-                  onValueChange={value =>
-                    navigateWithParam(primaryParam, value, [
+                  options={primaryOptions}
+                  ariaLabel={`${title} primary views`}
+                  getHref={value =>
+                    buildHrefWithParam(primaryParam, value, [
                       ...PRIMARY_TAB_RESET_KEYS,
                       ...clearOnPrimaryChange,
                     ])
                   }
-                  options={primaryOptions}
-                  size='sm'
-                  aria-label={`${title} primary views`}
                 />
               ) : null}
               {secondaryControl}
@@ -155,6 +157,78 @@ export function WorkspaceTabsSurface<
         ) : null}
       </ContentSurfaceCard>
       {children}
+    </div>
+  );
+}
+
+function LinkedTabBar<T extends string>({
+  value,
+  options,
+  ariaLabel,
+  getHref,
+}: Readonly<{
+  value: T;
+  options: readonly WorkspaceTabOption<T>[];
+  ariaLabel: string;
+  getHref: (value: T) => string;
+}>) {
+  return (
+    <div
+      className='flex w-full items-start gap-2'
+      data-overflow-mode='scroll'
+      data-testid='drawer-tabs'
+    >
+      <div
+        className='min-w-0 flex-1 overflow-x-auto overflow-y-hidden pb-px [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden'
+        data-testid='drawer-tabs-scroll'
+      >
+        <div
+          role='tablist'
+          aria-label={ariaLabel}
+          className={cn(
+            TAB_BAR_RAIL_CLASSNAME,
+            'min-w-max flex-nowrap scroll-smooth [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden'
+          )}
+        >
+          {options.map(option => {
+            const selected = value === option.value;
+            const href = getHref(option.value);
+
+            return (
+              <Link
+                key={option.value}
+                href={href}
+                prefetch={false}
+                role='tab'
+                data-testid={`drawer-tab-${option.value}`}
+                aria-selected={selected}
+                tabIndex={selected ? 0 : -1}
+                onClick={event => {
+                  if (
+                    event.defaultPrevented ||
+                    event.button !== 0 ||
+                    event.metaKey ||
+                    event.altKey ||
+                    event.ctrlKey ||
+                    event.shiftKey
+                  ) {
+                    return;
+                  }
+
+                  event.preventDefault();
+                  window.location.assign(href);
+                }}
+                className={cn(
+                  TAB_BAR_SEGMENT_TRIGGER_CLASSNAME,
+                  selected && TAB_BAR_SEGMENT_TRIGGER_ACTIVE_CLASSNAME
+                )}
+              >
+                {option.label}
+              </Link>
+            );
+          })}
+        </div>
+      </div>
     </div>
   );
 }

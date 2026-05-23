@@ -193,7 +193,38 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
     const minHeight = 24;
 
     const internalTextareaRef = useRef<HTMLTextAreaElement>(null);
+    const latestOnChangeRef = useRef(onChange);
+    const latestValueRef = useRef(value);
     useImperativeHandle(ref, () => internalTextareaRef.current!, []);
+
+    useEffect(() => {
+      latestOnChangeRef.current = onChange;
+    }, [onChange]);
+
+    useEffect(() => {
+      latestValueRef.current = value;
+    }, [value]);
+
+    useEffect(() => {
+      const textarea = internalTextareaRef.current;
+      if (!textarea) return;
+
+      const syncDomValue = () => {
+        const nextValue = textarea.value;
+        if (nextValue !== latestValueRef.current) {
+          latestOnChangeRef.current(nextValue);
+        }
+      };
+
+      syncDomValue();
+      textarea.addEventListener('input', syncDomValue);
+      textarea.addEventListener('change', syncDomValue);
+
+      return () => {
+        textarea.removeEventListener('input', syncDomValue);
+        textarea.removeEventListener('change', syncDomValue);
+      };
+    }, []);
 
     const { measuredHeight, isAtMaxHeight, containerRef, hiddenDivRef } =
       useTextareaAutosize({
@@ -422,7 +453,7 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
           {/* ROOT inline picker is absolutely positioned so it does not alter
               the composer surface height and cause layout shift when it opens. */}
           {showInlinePicker ? (
-            <div className='absolute bottom-full left-0 right-0 z-50 mb-1 flex justify-center'>
+            <div className='absolute bottom-full left-0 right-0 z-50 mb-4 flex justify-center'>
               <div
                 style={{
                   width: geometry.width,

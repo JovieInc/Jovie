@@ -400,6 +400,7 @@ describe('dashboard data prefetch', () => {
   });
 
   it('bypasses creator onboarding checks for admins on full dashboard data', async () => {
+    checkAdminRoleMock.mockResolvedValue(true);
     getCurrentUserEntitlementsMock.mockResolvedValue({
       userId: 'user_123',
       email: 'admin@example.com',
@@ -429,6 +430,40 @@ describe('dashboard data prefetch', () => {
 
     expect(result.isAdmin).toBe(true);
     expect(result.needsOnboarding).toBe(false);
+  });
+
+  it('keeps full dashboard admin navigation role-based when MFA is stale', async () => {
+    checkAdminRoleMock.mockResolvedValue(true);
+    getCurrentUserEntitlementsMock.mockResolvedValue({
+      userId: 'user_123',
+      email: 'admin@example.com',
+      isAuthenticated: true,
+      isAdmin: false,
+      isPro: false,
+      hasAdvancedFeatures: false,
+      canRemoveBranding: false,
+    });
+    withDbSessionTxMock.mockResolvedValue({
+      ...baseDashboardResponse,
+      selectedProfile: {
+        id: 'admin_profile',
+        username: null,
+        displayName: 'Admin',
+        isPublic: false,
+        onboardingCompletedAt: new Date('2026-03-31T00:00:00.000Z'),
+      },
+      needsOnboarding: true,
+    });
+
+    const { getDashboardData } = await import(
+      '@/app/app/(shell)/dashboard/actions/dashboard-data'
+    );
+
+    const result = await getDashboardData();
+
+    expect(result.isAdmin).toBe(true);
+    expect(result.needsOnboarding).toBe(false);
+    expect(checkAdminRoleMock).toHaveBeenCalledWith('user_123');
   });
 
   it('bypasses creator onboarding checks for admins on shell data', async () => {

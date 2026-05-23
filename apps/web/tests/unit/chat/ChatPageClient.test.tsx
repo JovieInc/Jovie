@@ -1,4 +1,4 @@
-import { waitFor } from '@testing-library/react';
+import { screen, waitFor } from '@testing-library/react';
 import React from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
@@ -490,5 +490,19 @@ describe('ChatPageClient', () => {
 
     expect(stateRef.current).toBe('idle');
     expect(retryCountRef.current).toBe(0);
+  });
+
+  it('announces welcome chat bootstrap progress without changing layout', async () => {
+    mockSearchParams = new URLSearchParams('from=onboarding');
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(() => new Promise<Response>(() => {}))
+    );
+
+    renderChatPage();
+
+    expect(await screen.findByRole('status')).toHaveTextContent(
+      'Starting your onboarding chat.'
+    );
   });
 });

@@ -1026,12 +1026,19 @@ async function resolveDashboardDataWith(
 ): Promise<DashboardData> {
   const bypassCache = shouldBypassDashboardCache();
   const entitlements = await getCurrentUserEntitlements();
-  const isAdmin = entitlements.isAdmin;
+  let isAdmin = entitlements.isAdmin;
   const userId = entitlements.userId;
 
   if (!userId) {
     return { ...createEmptyCoreData(), isAdmin };
   }
+
+  const adminRolePromise = checkAdminRole(userId).catch(error => {
+    Sentry.captureException(error, {
+      tags: { context: `${context}_admin_role` },
+    });
+    return entitlements.isAdmin;
+  });
 
   try {
     let coreData = bypassCache
@@ -1043,6 +1050,11 @@ async function resolveDashboardDataWith(
     if (!bypassCache && shouldRefreshUnstableDashboardState(coreData)) {
       coreData = await fetchFreshFn(userId);
     }
+
+    // Dashboard navigation is role-based; MFA is enforced by admin actions and
+    // entitlement-backed API routes so stale reverification does not hide or
+    // eject admins from the workspace shell.
+    isAdmin = await adminRolePromise;
 
     return {
       ...applyAdminOnboardingBypass(coreData, isAdmin),

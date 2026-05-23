@@ -2,7 +2,7 @@ import { TooltipProvider } from '@jovie/ui';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import type { ComponentProps, ReactNode } from 'react';
+import { type ComponentProps, type ReactNode, useState } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { ChatInput } from '@/components/jovie/components/ChatInput';
@@ -119,6 +119,20 @@ function setElectronAPI(api: object) {
 function removeElectronAPI() {
   Reflect.deleteProperty(window, 'electronAPI');
   delete document.documentElement.dataset.desktopRuntime;
+}
+
+function ControlledChatInputHarness() {
+  const [value, setValue] = useState('');
+
+  return (
+    <ChatInput
+      value={value}
+      onChange={setValue}
+      onSubmit={vi.fn()}
+      isLoading={false}
+      isSubmitting={false}
+    />
+  );
 }
 
 afterEach(() => {
@@ -479,6 +493,22 @@ describe('ChatInput', () => {
     expect(sendButton).toBeDisabled();
     await user.click(sendButton);
     expect(onSubmit).not.toHaveBeenCalled();
+  });
+
+  it('enables send when textarea DOM input is replayed into controlled state', async () => {
+    fastRender(withProviders(<ControlledChatInputHarness />));
+
+    const textarea = screen.getByRole('textbox', {
+      name: /chat message input/i,
+    });
+    const sendButton = screen.getByRole('button', { name: /send message/i });
+    expect(sendButton).toBeDisabled();
+
+    fireEvent.input(textarea, {
+      target: { value: 'typed while the page was still hydrating' },
+    });
+
+    await waitFor(() => expect(sendButton).toBeEnabled());
   });
 
   it('shows the stop action while streaming even when the draft is empty', async () => {

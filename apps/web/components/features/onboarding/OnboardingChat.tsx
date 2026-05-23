@@ -2,14 +2,9 @@
 
 import { useChat } from '@ai-sdk/react';
 import { DefaultChatTransport, type UIMessage } from 'ai';
-import { AnimatePresence } from 'motion/react';
 import type { ReactNode } from 'react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import {
-  ChatInput,
-  ChatMessage,
-  ErrorDisplay,
-} from '@/components/jovie/components';
+import { ChatInput, ChatMessage } from '@/components/jovie/components';
 import { useChatJankMonitor, useStickToBottom } from '@/components/jovie/hooks';
 import {
   composeMessage,
@@ -522,7 +517,13 @@ function OnboardingMessageList({
   );
 }
 
-function OnboardingInitialIntro({ hidden }: { readonly hidden: boolean }) {
+function OnboardingInitialIntro({
+  hidden,
+  testId = 'onboarding-intro-message',
+}: {
+  readonly hidden: boolean;
+  readonly testId?: string;
+}) {
   return (
     <div
       className={cn(
@@ -530,7 +531,7 @@ function OnboardingInitialIntro({ hidden }: { readonly hidden: boolean }) {
         hidden && 'pointer-events-none opacity-0'
       )}
       aria-hidden={hidden ? 'true' : undefined}
-      data-testid='onboarding-intro-message'
+      data-testid={testId}
     >
       <p className='text-[2rem] font-semibold leading-[1.08] tracking-[-0.035em] text-primary-token sm:text-[2.4rem]'>
         Hey, I&apos;m Jovie.
@@ -718,18 +719,27 @@ export function OnboardingChat({
 
   const shouldShowTurnstileBanner =
     Boolean(turnstilePanel) && isAwaitingFirstToken;
-  const chatErrorStatusBanner =
-    chatError && composerPickerOpen ? (
-      <div
-        role='alert'
-        aria-live='assertive'
-        aria-atomic='true'
-        className='px-3 py-2.5 text-[12.5px] leading-5'
-      >
-        <p className='font-medium text-primary-token'>Message paused</p>
-        <p className='mt-0.5 text-secondary-token'>{chatError.message}</p>
-      </div>
-    ) : null;
+  const chatErrorStatusBanner = chatError ? (
+    <div
+      role='alert'
+      aria-live='assertive'
+      aria-atomic='true'
+      className='px-3 py-2.5 text-[12.5px] leading-5'
+    >
+      <p className='font-medium text-primary-token'>Message paused</p>
+      <p className='mt-0.5 text-secondary-token'>{chatError.message}</p>
+      {chatError.failedMessage && !chatError.retryAfter ? (
+        <button
+          type='button'
+          onClick={handleRetry}
+          disabled={isBusy || isSubmitted}
+          className='mt-2 inline-flex h-7 items-center rounded-[8px] border border-subtle px-2.5 text-[11.5px] font-medium text-secondary-token transition-colors duration-fast hover:border-white/15 hover:text-primary-token focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-white/20 disabled:opacity-50'
+        >
+          Retry message
+        </button>
+      ) : null}
+    </div>
+  ) : null;
   const composerStatusBanner =
     shouldShowTurnstileBanner || chatErrorStatusBanner ? (
       <div className='divide-y divide-white/[0.065]'>
@@ -740,7 +750,12 @@ export function OnboardingChat({
       </div>
     ) : null;
 
-  const showInitialComposer = messages.length === 0 && !hasSentFirst;
+  const userTurnCount = messages.filter(
+    message => message.role === 'user'
+  ).length;
+  const hasConversationStarted = messages.length > 0 || hasSentFirst;
+  const shouldDockComposer =
+    chatError !== null || userTurnCount > 1 || selectedArtist !== null;
 
   const onboardingChatInputProps = {
     value: input,
@@ -775,19 +790,6 @@ export function OnboardingChat({
       data-testid='onboarding-chat'
       data-picker-open={composerPickerOpen ? 'true' : undefined}
     >
-      {chatError && !composerPickerOpen ? (
-        <div className='pointer-events-none absolute right-3 top-3 z-30 w-[min(27rem,calc(100%-1.5rem))] sm:right-4 sm:top-4'>
-          <div className='pointer-events-auto'>
-            <ErrorDisplay
-              chatError={chatError}
-              onRetry={handleRetry}
-              isLoading={isBusy}
-              isSubmitting={isSubmitted}
-            />
-          </div>
-        </div>
-      ) : null}
-
       {/* Scroll area (flex-1) — upper content morphs on first message */}
       <div
         ref={scrollContainerRef}
@@ -799,47 +801,61 @@ export function OnboardingChat({
           ref={totalSizeRef}
           className={cn(
             'mx-auto flex min-h-full w-full max-w-[44rem] flex-col',
-            showInitialComposer && 'justify-center'
+            !shouldDockComposer && 'justify-center'
           )}
         >
-          <AnimatePresence mode='popLayout' initial={false}>
-            {showInitialComposer ? (
-              <div
-                key='onboarding-empty-upper'
-                className='flex w-full flex-col items-center justify-center gap-5 py-8'
-              >
-                <OnboardingInitialIntro hidden={composerPickerOpen} />
-                <div
-                  className='w-full'
-                  data-testid='onboarding-centered-composer'
-                >
-                  {onboardingComposerSurface}
-                </div>
-              </div>
-            ) : (
-              <div key='onboarding-messages'>
-                <OnboardingMessageList
-                  displayMessages={displayMessages}
-                  hideIntroMessage={composerPickerOpen}
-                  isStreaming={isStreaming}
-                  lastAssistantMessageId={lastAssistantMessageId}
-                  isBusy={isBusy}
-                  onSelectArtist={handleArtistSelect}
+          {shouldDockComposer ? (
+            <OnboardingMessageList
+              displayMessages={displayMessages}
+              hideIntroMessage={composerPickerOpen}
+              isStreaming={isStreaming}
+              lastAssistantMessageId={lastAssistantMessageId}
+              isBusy={isBusy}
+              onSelectArtist={handleArtistSelect}
+            />
+          ) : (
+            <div className='flex w-full flex-col items-center justify-center gap-5 py-8'>
+              <div className='relative w-full'>
+                <OnboardingInitialIntro
+                  hidden={hasConversationStarted || composerPickerOpen}
+                  testId={
+                    hasConversationStarted
+                      ? undefined
+                      : 'onboarding-intro-message'
+                  }
                 />
+                {hasConversationStarted ? (
+                  <div className='absolute inset-x-0 bottom-0 z-10 max-h-[min(42vh,24rem)] overflow-y-auto overscroll-contain pb-1'>
+                    <OnboardingMessageList
+                      displayMessages={displayMessages}
+                      hideIntroMessage={composerPickerOpen}
+                      isStreaming={isStreaming}
+                      lastAssistantMessageId={lastAssistantMessageId}
+                      isBusy={isBusy}
+                      onSelectArtist={handleArtistSelect}
+                    />
+                  </div>
+                ) : null}
               </div>
-            )}
-          </AnimatePresence>
+              <div
+                className='w-full'
+                data-testid='onboarding-centered-composer'
+              >
+                {onboardingComposerSurface}
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
-      {showInitialComposer ? null : (
+      {shouldDockComposer ? (
         <div
           className='shrink-0 bg-(--linear-app-content-surface) px-4 pb-4 pt-2 sm:px-6 sm:pb-5 sm:pt-2.5 lg:px-8'
           data-testid='onboarding-composer-dock'
         >
           {onboardingComposerSurface}
         </div>
-      )}
+      ) : null}
     </section>
   );
 }

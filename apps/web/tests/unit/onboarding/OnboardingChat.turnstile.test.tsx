@@ -24,12 +24,6 @@ const errorMocks = vi.hoisted(() => ({
   },
 }));
 
-vi.mock('motion/react', () => ({
-  AnimatePresence: ({ children }: { readonly children: ReactNode }) => (
-    <>{children}</>
-  ),
-}));
-
 vi.mock('ai', () => ({
   DefaultChatTransport: class DefaultChatTransport {
     constructor(readonly options: unknown) {}
@@ -76,20 +70,6 @@ vi.mock('@/components/jovie/components', () => ({
   ),
   ChatMessage: ({ id }: { readonly id: string }) => (
     <div data-testid='chat-message'>{id}</div>
-  ),
-  ErrorDisplay: ({
-    chatError,
-    onRetry,
-  }: {
-    readonly chatError: { readonly message: string };
-    readonly onRetry: () => void;
-  }) => (
-    <div role='alert'>
-      <p>{chatError.message}</p>
-      <button type='button' onClick={onRetry}>
-        Retry message
-      </button>
-    </div>
   ),
 }));
 
@@ -186,7 +166,7 @@ describe('OnboardingChat Turnstile gating', () => {
     errorMocks.metadata = {};
   });
 
-  it('centers the welcome composer before the first message and docks it after messages exist', () => {
+  it('keeps the first turn stable before docking follow-up turns', () => {
     const { rerender } = render(<TurnstileHarness />);
 
     expect(screen.getByTestId('onboarding-centered-composer')).toBeVisible();
@@ -197,6 +177,24 @@ describe('OnboardingChat Turnstile gating', () => {
         id: 'message-1',
         role: 'user',
         parts: [{ type: 'text', text: 'help me launch' }],
+      },
+    ];
+    rerender(<TurnstileHarness />);
+
+    expect(screen.getByTestId('onboarding-centered-composer')).toBeVisible();
+    expect(screen.queryByTestId('onboarding-composer-dock')).toBeNull();
+
+    chatMocks.messages = [
+      ...chatMocks.messages,
+      {
+        id: 'message-2',
+        role: 'assistant',
+        parts: [{ type: 'text', text: 'got it' }],
+      },
+      {
+        id: 'message-3',
+        role: 'user',
+        parts: [{ type: 'text', text: 'artist selected' }],
       },
     ];
     rerender(<TurnstileHarness />);
