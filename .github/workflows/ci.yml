@@ -266,20 +266,27 @@ jobs:
     if: ${{ github.event_name != 'pull_request' || needs.ci-path-changes.outputs.has_code_changes == 'true' }}
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-        with: { fetch-depth: 1 }
+        with: { fetch-depth: 2 }
       - uses: ./.github/actions/setup-node-pnpm
       - name: Run Biome CI (lint + format)
         run: |
           # For PRs: only lint changed files (faster, pre-commit already ran on local)
           # For pushes to main: full lint to catch any issues
           if [[ "${{ github.event_name }}" == "pull_request" ]]; then
-            git fetch origin "${{ github.base_ref }}" --depth=1
+            DIFF_BASE="HEAD^1"
+            if ! git rev-parse --verify "$DIFF_BASE" >/dev/null 2>&1; then
+              git fetch origin "${{ github.base_ref }}" --depth=1
+              DIFF_BASE="origin/${{ github.base_ref }}"
+            fi
             # Use diff-filter=d to exclude deleted files (biome can't lint deleted files)
             # Include .mts/.mjs extensions for ESM config files
-            CHANGED_FILES=$(git diff --diff-filter=d --name-only "origin/${{ github.base_ref }}" HEAD -- '*.ts' '*.tsx' '*.js' '*.jsx' '*.json' '*.mts' '*.mjs' ':(exclude)**/package-lock.json' ':(exclude).claude/settings.json' ':(exclude).claude/skills/**' | tr '\n' ' ')
-            if [ -n "$CHANGED_FILES" ]; then
-              echo "Linting changed files only: $CHANGED_FILES"
-              pnpm biome ci --reporter=github --no-errors-on-unmatched $CHANGED_FILES
+            mapfile -t CHANGED_FILES < <(
+              git diff --diff-filter=d --name-only "$DIFF_BASE" HEAD -- '*.ts' '*.tsx' '*.js' '*.jsx' '*.json' '*.mts' '*.mjs' ':(exclude)**/package-lock.json' ':(exclude).claude/settings.json' ':(exclude).claude/skills/**'
+            )
+            if (( ${#CHANGED_FILES[@]} > 0 )); then
+              echo "Linting changed files only:"
+              printf '  %s\n' "${CHANGED_FILES[@]}"
+              pnpm biome ci --reporter=github --no-errors-on-unmatched "${CHANGED_FILES[@]}"
             else
               echo "No lintable files changed"
             fi
@@ -296,15 +303,19 @@ jobs:
     if: ${{ github.event_name != 'pull_request' || needs.ci-path-changes.outputs.has_code_changes == 'true' }}
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-        with: { fetch-depth: 1 }
+        with: { fetch-depth: 2 }
       - uses: ./.github/actions/setup-node-pnpm
       - name: Run ESLint server boundary checks
         shell: bash
         run: |
           if [[ "${{ github.event_name }}" == "pull_request" ]]; then
-            git fetch origin "${{ github.base_ref }}" --depth=1
+            DIFF_BASE="HEAD^1"
+            if ! git rev-parse --verify "$DIFF_BASE" >/dev/null 2>&1; then
+              git fetch origin "${{ github.base_ref }}" --depth=1
+              DIFF_BASE="origin/${{ github.base_ref }}"
+            fi
             mapfile -t CHANGED_FILES < <(
-              git diff --diff-filter=d --name-only "origin/${{ github.base_ref }}" HEAD -- \
+              git diff --diff-filter=d --name-only "$DIFF_BASE" HEAD -- \
                 'apps/web/*.ts' \
                 'apps/web/*.tsx' \
                 'apps/web/**/*.ts' \
