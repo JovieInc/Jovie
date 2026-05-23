@@ -20,6 +20,7 @@ interface PaySelectorProps {
   readonly primaryLabel?: string;
   readonly otherPaymentOptionsLabel?: string;
   readonly showOtherPaymentOptions?: boolean;
+  readonly screenReaderDescription?: string;
 }
 
 function formatAmountForScreenReader(amount: number): string {
@@ -56,6 +57,7 @@ export function PaySelector({
   primaryLabel = 'Continue',
   otherPaymentOptionsLabel = 'Other payment methods',
   showOtherPaymentOptions = false,
+  screenReaderDescription,
 }: PaySelectorProps) {
   const defaultIdx = Math.floor(Math.max(0, amounts.length - 1) / 2);
   const [selectedIdx, setSelectedIdx] = useState<number>(defaultIdx);
@@ -133,6 +135,9 @@ export function PaySelector({
         <h3 id='pay-selector-heading' className='sr-only'>
           Select amount
         </h3>
+        {screenReaderDescription ? (
+          <p className='sr-only'>{screenReaderDescription}</p>
+        ) : null}
 
         <div className='sr-only' aria-live='polite' ref={statusRef}></div>
 
@@ -295,6 +300,9 @@ export function PaySelector({
       <h3 id='pay-selector-heading' className='sr-only'>
         Select amount
       </h3>
+      {screenReaderDescription ? (
+        <p className='sr-only'>{screenReaderDescription}</p>
+      ) : null}
 
       <div className='sr-only' aria-live='polite' ref={statusRef}></div>
 
