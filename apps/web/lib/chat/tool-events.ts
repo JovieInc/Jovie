@@ -63,6 +63,7 @@ export const persistedToolEventsSchema = z.array(persistedToolEventSchema);
 
 export const chatPersistenceMessageSchema = z
   .object({
+    clientMessageId: z.string().min(1).max(200).optional(),
     role: z.enum(['user', 'assistant']),
     content: z.string().max(50_000),
     toolCalls: persistedToolEventsSchema.optional(),

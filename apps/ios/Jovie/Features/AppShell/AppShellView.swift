@@ -4,6 +4,15 @@ enum AppShellTab: Equatable {
   case chat
   case profile
 
+  var accessibilityID: String {
+    switch self {
+    case .chat:
+      return "shell-tab-chat"
+    case .profile:
+      return "shell-tab-profile"
+    }
+  }
+
   var title: String {
     switch self {
     case .chat:
@@ -210,7 +219,6 @@ struct AppShellView<ProfileContent: View, ChatContent: View>: View {
       }
     }
     .padding(.bottom, JovieSpacing.medium)
-    .accessibilityIdentifier("shell-bottom-navigation")
   }
 
   private func tabButton(_ tab: AppShellTab) -> some View {
@@ -238,6 +246,7 @@ struct AppShellView<ProfileContent: View, ChatContent: View>: View {
     }
     .buttonStyle(.plain)
     .accessibilityLabel(tab.title)
+    .accessibilityIdentifier(tab.accessibilityID)
   }
 
   private var edgeSwipe: some Gesture {

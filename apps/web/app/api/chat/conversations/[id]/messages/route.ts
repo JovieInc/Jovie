@@ -1,5 +1,5 @@
 import { gateway } from '@ai-sdk/gateway';
-import { and, eq, isNull } from 'drizzle-orm';
+import { and, sql as drizzleSql, eq, isNull } from 'drizzle-orm';
 import { after, NextResponse } from 'next/server';
 import { generateText } from '@/lib/ai/sdk';
 import { getSessionContext } from '@/lib/auth/session';
@@ -54,8 +54,8 @@ async function maybeGenerateTitle(
       abortSignal: AbortSignal.timeout(5000),
       experimental_telemetry: {
         isEnabled: true,
-        recordInputs: true,
-        recordOutputs: true,
+        recordInputs: false,
+        recordOutputs: false,
         functionId: 'jovie-chat-title',
       },
     });
@@ -173,11 +173,16 @@ export async function POST(req: Request, { params }: RouteParams) {
       .values(
         messagesToInsert.map(msg => ({
           conversationId,
+          clientMessageId: msg.clientMessageId ?? null,
           role: msg.role,
           content: msg.content,
           toolCalls: msg.toolCalls ?? null,
         }))
       )
+      .onConflictDoNothing({
+        target: [chatMessages.conversationId, chatMessages.clientMessageId],
+        where: drizzleSql`${chatMessages.clientMessageId} IS NOT NULL`,
+      })
       .returning();
 
     // Update conversation's updatedAt timestamp

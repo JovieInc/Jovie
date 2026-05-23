@@ -70,6 +70,7 @@ export interface AudioBarTrack {
 export function AudioBar({
   isPlaying,
   onPlay,
+  onSeek,
   onShuffle,
   onPrevious,
   onNext,
@@ -89,6 +90,7 @@ export function AudioBar({
 }: {
   readonly isPlaying: boolean;
   readonly onPlay: () => void;
+  readonly onSeek?: (time: number) => void;
   readonly onShuffle?: () => void;
   readonly onPrevious?: () => void;
   readonly onNext?: () => void;
@@ -238,6 +240,7 @@ export function AudioBar({
             <ScrubGradient
               currentTime={currentTime}
               duration={duration}
+              onSeek={onSeek}
               cues={cues}
               loopMode={loopMode}
               loopSection={loopSection}

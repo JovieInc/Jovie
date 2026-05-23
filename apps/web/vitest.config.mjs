@@ -5,6 +5,8 @@ import { defineConfig } from 'vitest/config';
 // Load environment variables from .env.test if it exists
 dotenv.config({ path: '.env.test' });
 
+const workspaceRoot = path.resolve(__dirname, '../..');
+
 export default defineConfig({
   test: {
     environment: 'jsdom',
@@ -14,6 +16,7 @@ export default defineConfig({
       'tests/performance/**',
       'node_modules/**',
       '.next/**',
+      '.stryker-tmp/**',
     ],
     // Use forks pool to prevent JS heap OOM in worker threads
     pool: 'forks',
@@ -45,7 +48,7 @@ export default defineConfig({
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './'),
-      '@jovie/ui': path.resolve(__dirname, './packages/ui'),
+      '@jovie/ui': path.resolve(workspaceRoot, 'packages/ui'),
     },
   },
   // Build optimizations

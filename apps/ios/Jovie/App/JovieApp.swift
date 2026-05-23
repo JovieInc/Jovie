@@ -15,8 +15,8 @@ struct JovieApp: App {
         options: Clerk.Options(
           keychainConfig: .init(service: "ie.jov.Jovie"),
           redirectConfig: .init(
-            redirectUrl: "ie.jov.Jovie://callback",
-            callbackUrlScheme: "ie.jov.Jovie"
+            redirectUrl: "ie.jov.jovie://callback",
+            callbackUrlScheme: "ie.jov.jovie"
           )
         )
       )

@@ -71,10 +71,16 @@ final class JovieUITests: XCTestCase {
     }
 
     XCTAssertTrue(app.textFields["Ask Jovie"].exists)
-    XCTAssertTrue(app.buttons["Profile"].exists)
+    let profileTab = app.buttons["shell-tab-profile"]
+    let chatTab = app.buttons["shell-tab-chat"]
+    XCTAssertTrue(
+      profileTab.waitForExistence(timeout: 3),
+      "Bottom navigation did not appear.\n\(app.debugDescription)"
+    )
+    XCTAssertTrue(chatTab.exists)
     attachScreenshot(named: "chat", app: app)
 
-    app.buttons["Profile"].tap()
+    profileTab.tap()
 
     XCTAssertTrue(
       app.buttons["Copy URL"].waitForExistence(timeout: 3),

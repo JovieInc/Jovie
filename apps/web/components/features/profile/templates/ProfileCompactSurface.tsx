@@ -494,6 +494,7 @@ export function ProfileCompactSurface({
         ref={setNotificationsPortalContainer}
         className='relative flex h-full w-full flex-col overflow-hidden bg-[color:var(--profile-content-bg)]'
         data-testid='profile-compact-surface'
+        data-mode={activeVisiblePrimaryTab}
         data-presentation={presentation}
       >
         {!isHomeMode && renderMode !== 'preview' ? (

@@ -503,13 +503,15 @@ describe('ProfileCompactTemplate', () => {
       />
     );
 
-    expect(window.location.search).toBe('?mode=listen');
-    expect(pushStateSpy).not.toHaveBeenCalled();
-    expect(mockUseProfileShell).toHaveBeenLastCalledWith(
-      expect.objectContaining({
-        modeOverride: 'listen',
-      })
-    );
+    await waitFor(() => {
+      expect(window.location.search).toBe('?mode=listen');
+      expect(pushStateSpy).not.toHaveBeenCalled();
+      expect(mockUseProfileShell).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          modeOverride: 'listen',
+        })
+      );
+    });
 
     pushStateSpy.mockRestore();
   });
@@ -1258,19 +1260,12 @@ describe('ProfileCompactTemplate', () => {
     restoreViewport();
   });
 
-  describe('CLS prevention — lazy state initializers', () => {
-    // Regression: JOV-2514 — requestedMode and isDesktopLayout must be read
-    // from the environment synchronously during React's first render pass, not
-    // in a useEffect that fires after first paint. A useEffect-driven update
-    // causes layout shift (CLS 0.317 on Lighthouse desktop preset, 1350×940px).
-    // Found by /qa on 2026-05-21
-    // Report: .gstack/qa-reports/
+  describe('hydration-safe profile mode sync', () => {
+    // The public profile route is ISR/static, so the server cannot know query
+    // params or viewport matchMedia. Keep the first client render aligned with
+    // the server, then sync query mode and responsive presentation after mount.
 
-    it('reads ?mode=listen from the URL on the first render without needing a useEffect flush', () => {
-      // Regression: if getInitialModeFromLocation is called with readWindowLocation=false
-      // (the old default), requestedMode starts as 'profile' and only updates to 'listen'
-      // in a useEffect — causing CLS. With the lazy initializer fix, modeOverride must
-      // already be 'listen' on the very first render call to useProfileShell.
+    it('starts ?mode=listen from the server mode, then syncs after hydration', async () => {
       mockCanonicalProfileDSPs.mockReturnValue([{ platform: 'spotify' }]);
       window.history.replaceState(null, '', '/test-artist?mode=listen');
 
@@ -1283,13 +1278,17 @@ describe('ProfileCompactTemplate', () => {
         />
       );
 
-      // Assert on the FIRST render call (index 0), not the last — no act/waitFor.
-      // If the lazy initializer doesn't read the URL, this will be 'profile'.
       const firstCallArgs = mockUseProfileShell.mock.calls[0]?.[0];
-      expect(firstCallArgs).toMatchObject({ modeOverride: 'listen' });
+      expect(firstCallArgs).toMatchObject({ modeOverride: 'profile' });
+
+      await waitFor(() => {
+        expect(mockUseProfileShell).toHaveBeenLastCalledWith(
+          expect.objectContaining({ modeOverride: 'listen' })
+        );
+      });
     });
 
-    it('reads ?mode=subscribe from the URL on the first render without needing a useEffect flush', () => {
+    it('starts ?mode=subscribe from the server mode, then syncs after hydration', async () => {
       mockCanonicalProfileDSPs.mockReturnValue([{ platform: 'spotify' }]);
       window.history.replaceState(null, '', '/test-artist?mode=subscribe');
 
@@ -1303,14 +1302,16 @@ describe('ProfileCompactTemplate', () => {
       );
 
       const firstCallArgs = mockUseProfileShell.mock.calls[0]?.[0];
-      expect(firstCallArgs).toMatchObject({ modeOverride: 'subscribe' });
+      expect(firstCallArgs).toMatchObject({ modeOverride: 'profile' });
+
+      await waitFor(() => {
+        expect(mockUseProfileShell).toHaveBeenLastCalledWith(
+          expect.objectContaining({ modeOverride: 'subscribe' })
+        );
+      });
     });
 
-    it('reads drawerPresentation from matchMedia on the first render at desktop viewport', () => {
-      // Regression: if drawerPresentation starts as 'standalone' and updates via
-      // useEffect, the drawer presentation changes post-paint at 1350px (Lighthouse
-      // desktop preset), contributing to CLS. The lazy initializer must return
-      // 'modal' immediately at >=1180px without needing a useEffect flush.
+    it('starts drawerPresentation from the server layout, then syncs desktop viewport after hydration', async () => {
       const restoreViewport = mockViewport('desktop');
 
       render(
@@ -1322,13 +1323,16 @@ describe('ProfileCompactTemplate', () => {
         />
       );
 
-      // drawerPresentation is passed to the mock drawer as data-presentation.
-      // On the first render with the lazy initializer fix, the mock should have
-      // been called with presentation='modal' immediately (not 'standalone').
       const firstDrawerCall = mockProfileUnifiedDrawer.mock.calls[0]?.[0] as
         | { presentation?: string }
         | undefined;
-      expect(firstDrawerCall?.presentation).toBe('modal');
+      expect(firstDrawerCall?.presentation).toBe('standalone');
+
+      await waitFor(() => {
+        expect(mockProfileUnifiedDrawer).toHaveBeenLastCalledWith(
+          expect.objectContaining({ presentation: 'modal' })
+        );
+      });
 
       restoreViewport();
     });

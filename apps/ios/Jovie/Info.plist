@@ -24,13 +24,13 @@
       <key>CFBundleTypeRole</key>
       <string>Editor</string>
       <key>CFBundleURLName</key>
-      <string>ie.jov.Jovie.callback</string>
-      <key>CFBundleURLSchemes</key>
-      <array>
-        <string>ie.jov.Jovie</string>
-      </array>
-    </dict>
-  </array>
+			<string>ie.jov.jovie.callback</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>ie.jov.jovie</string>
+			</array>
+		</dict>
+	</array>
   <key>CFBundleVersion</key>
   <string>$(CURRENT_PROJECT_VERSION)</string>
   <key>ITSAppUsesNonExemptEncryption</key>
