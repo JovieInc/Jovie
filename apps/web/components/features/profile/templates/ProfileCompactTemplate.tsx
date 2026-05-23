@@ -144,6 +144,30 @@ function getInitialModeFromLocation(
   return modeParam === null ? fallbackMode : getProfileMode(modeParam);
 }
 
+function getInitialDrawerPresentation(): ProfileSurfacePresentation {
+  if (globalThis.window === undefined) {
+    return 'standalone';
+  }
+
+  if (globalThis.matchMedia('(min-width: 1180px)').matches) {
+    return 'modal';
+  }
+
+  if (globalThis.matchMedia('(min-width: 768px)').matches) {
+    return 'embedded';
+  }
+
+  return 'standalone';
+}
+
+function getInitialIsDesktopLayout(): boolean {
+  if (globalThis.window === undefined) {
+    return false;
+  }
+
+  return globalThis.matchMedia('(min-width: 1180px)').matches;
+}
+
 function getModeFromUrl(): ProfileMode {
   if (globalThis.window === undefined) {
     return 'profile';
@@ -215,10 +239,12 @@ export function ProfileCompactTemplate({
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [drawerView, setDrawerView] = useState<DrawerView>('menu');
   const [drawerPresentation, setDrawerPresentation] =
-    useState<ProfileSurfacePresentation>('standalone');
-  const [isDesktopLayout, setIsDesktopLayout] = useState(false);
+    useState<ProfileSurfacePresentation>(getInitialDrawerPresentation);
+  const [isDesktopLayout, setIsDesktopLayout] = useState(
+    getInitialIsDesktopLayout
+  );
   const [requestedMode, setRequestedMode] = useState<ProfileMode>(() =>
-    getInitialModeFromLocation(mode)
+    getInitialModeFromLocation(mode, true)
   );
   const revealNotificationsRef = useRef<(() => void) | null>(null);
   const closeResetTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);

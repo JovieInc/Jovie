@@ -401,7 +401,7 @@ describe('ProfileUnifiedDrawer — Releases', () => {
     expect(headers.length).toBe(0);
   });
 
-  it('shows Releases menu item when hasReleases is true', async () => {
+  it('keeps Releases out of the menu even when the Music tab has content', async () => {
     const { ProfileUnifiedDrawer } = await import(
       '@/features/profile/ProfileUnifiedDrawer'
     );
@@ -410,7 +410,8 @@ describe('ProfileUnifiedDrawer — Releases', () => {
       <ProfileUnifiedDrawer {...defaultProps} view='menu' hasReleases={true} />
     );
 
-    expect(screen.getByText('Releases')).toBeDefined();
+    expect(screen.queryByText('Releases')).toBeNull();
+    expect(screen.getByText('Share Profile')).toBeDefined();
   });
 
   it('hides Releases menu item when hasReleases is false', async () => {

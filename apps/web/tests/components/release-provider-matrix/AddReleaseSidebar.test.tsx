@@ -405,6 +405,10 @@ describe('AddReleaseSidebar', () => {
 
     const revealDatePicker = screen.getByLabelText('Reveal Date');
     expect(revealDatePicker).toBeInTheDocument();
+    expect(revealDatePicker).toHaveTextContent('Pick a date');
+
+    await user.click(screen.getAllByTestId('calendar-select-date')[1]!);
+
     expect(revealDatePicker).toHaveTextContent(/\w{3} \d{1,2}, \d{4}/);
   });
 

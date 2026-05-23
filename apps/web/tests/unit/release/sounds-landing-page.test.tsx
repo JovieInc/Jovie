@@ -188,7 +188,7 @@ describe('SoundsLandingPage', () => {
     expect(screen.queryByText('Listen')).not.toBeInTheDocument();
 
     // Open menu
-    fireEvent.click(screen.getByRole('button', { name: /more options/i }));
+    fireEvent.click(screen.getByRole('button', { name: 'Menu' }));
 
     // Listen link in menu
     expect(screen.getByText('Listen')).toBeInTheDocument();
@@ -202,7 +202,7 @@ describe('SoundsLandingPage', () => {
       />
     );
 
-    fireEvent.click(screen.getByRole('button', { name: /more options/i }));
+    fireEvent.click(screen.getByRole('button', { name: 'Menu' }));
     const listenLink = screen.getByText('Listen').closest('a');
     const href = listenLink?.getAttribute('href') ?? '';
     expect(href).toContain('utm_source=tiktok');

@@ -59,8 +59,8 @@ describe('PROFILE_VIEW_REGISTRY', () => {
   it('locks the menu order to the design-reviewed conversion-first sequence', () => {
     // Lock-file: changing this list without product + design sign-off is a
     // conversion regression. Order: conversion intents first (Listen,
-    // Subscribe, Pay), relationship (Contact, Tour, Releases), context last
-    // (About, Share).
+    // Subscribe, Pay), relationship (Contact, Tour), context last
+    // (About, Share). Releases is intentionally handled by the Music tab.
     const ordered = getMenuEntries(ALL_AVAILABLE).map(entry => entry.key);
     expect(ordered).toEqual([
       'listen',
@@ -68,7 +68,6 @@ describe('PROFILE_VIEW_REGISTRY', () => {
       'pay',
       'contact',
       'tour',
-      'releases',
       'about',
       'share',
     ]);
@@ -77,7 +76,7 @@ describe('PROFILE_VIEW_REGISTRY', () => {
   it('excludes data-less views from the menu', () => {
     const ordered = getMenuEntries(NONE_AVAILABLE).map(entry => entry.key);
     // listen / subscribe / share always show. pay / contact / tour /
-    // releases / about require data and are hidden when absent.
+    // about require data and are hidden when absent.
     expect(ordered).toEqual(['listen', 'subscribe', 'share']);
   });
 });

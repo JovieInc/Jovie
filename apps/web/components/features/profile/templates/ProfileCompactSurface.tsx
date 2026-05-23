@@ -574,19 +574,23 @@ export function ProfileCompactSurface({
                 </p>
               ) : null}
 
-              <CircleIconButton
-                onClick={onOpenMenu}
-                size='lg'
-                variant='pearl'
-                className={topChromeButtonClassName}
-                ariaLabel='Menu'
-              >
-                {hideJovieBranding ? (
-                  <MoreHorizontal className='h-[18px] w-[18px]' />
-                ) : (
-                  <Mark size={18} className='h-[18px] w-[18px]' />
-                )}
-              </CircleIconButton>
+              {hideMoreMenu ? (
+                <div className='h-11 w-11 shrink-0' aria-hidden='true' />
+              ) : (
+                <CircleIconButton
+                  onClick={onOpenMenu}
+                  size='lg'
+                  variant='pearl'
+                  className={topChromeButtonClassName}
+                  ariaLabel='Menu'
+                >
+                  {hideJovieBranding ? (
+                    <MoreHorizontal className='h-[18px] w-[18px]' />
+                  ) : (
+                    <Mark size={18} className='h-[18px] w-[18px]' />
+                  )}
+                </CircleIconButton>
+              )}
             </div>
           </div>
 

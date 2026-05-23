@@ -50,7 +50,7 @@ describe('PaySelector', () => {
     ).toBeInTheDocument();
 
     fireEvent.click(
-      screen.getByRole('button', { name: /Other payment options/i })
+      screen.getByRole('button', { name: /Other payment methods/i })
     );
 
     expect(
@@ -102,7 +102,7 @@ describe('PaySelector', () => {
       target: { value: '42.50' },
     });
     fireEvent.click(
-      screen.getByRole('button', { name: /Send payment for \$42.50/i })
+      screen.getByRole('button', { name: /Continue for \$42.50/i })
     );
 
     expect(onContinue).toHaveBeenCalledWith(42.5);
