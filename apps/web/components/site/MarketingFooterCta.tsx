@@ -20,10 +20,22 @@ const FOOTER_CTA_ARCS = [
 
 interface MarketingFooterCtaProps {
   readonly className?: string;
+  readonly title?: string;
+  readonly body?: string;
+  readonly ctaLabel?: string;
+  readonly ctaHref?: string;
+  readonly ctaAnalyticsEvent?: string;
+  readonly ctaAnalyticsSource?: string;
 }
 
 export function MarketingFooterCta({
   className,
+  title = 'Request Access to Jovie.',
+  body,
+  ctaLabel = HOMEPAGE_V2_COPY.finalCta.primaryCtaLabel,
+  ctaHref = APP_ROUTES.SIGNUP,
+  ctaAnalyticsEvent,
+  ctaAnalyticsSource,
 }: Readonly<MarketingFooterCtaProps>) {
   const instanceId = useId().replace(/:/g, '-');
   const primaryGradientId = `marketing-footer-cta-primary-${instanceId}`;
@@ -90,13 +102,20 @@ export function MarketingFooterCta({
       <MarketingContainer width='page' className='relative z-10'>
         <div className='homepage-final-cta-copy mx-auto'>
           <h2 className='text-balance text-[clamp(2rem,3.4vw,3rem)] font-[680] leading-[1.05] tracking-[-0.025em] text-white'>
-            Request Access to <span className='block'>Jovie.</span>
+            {title}
           </h2>
+          {body ? (
+            <p className='mx-auto mt-3 max-w-[36rem] text-balance text-[18px] leading-[1.45] text-white/[0.58]'>
+              {body}
+            </p>
+          ) : null}
           <Link
-            href={APP_ROUTES.SIGNUP}
+            href={ctaHref}
             className='homepage-final-cta-action public-action-primary focus-ring-themed'
+            data-analytics-event={ctaAnalyticsEvent}
+            data-analytics-source={ctaAnalyticsSource}
           >
-            {HOMEPAGE_V2_COPY.finalCta.primaryCtaLabel}
+            {ctaLabel}
           </Link>
         </div>
       </MarketingContainer>

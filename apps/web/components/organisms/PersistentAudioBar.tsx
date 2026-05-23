@@ -390,6 +390,7 @@ export function PersistentAudioBar({
           onCollapse={() => setBarCollapsed(true)}
           currentTime={playbackState.currentTime}
           duration={playbackState.duration}
+          onSeek={seek}
           waveformOn={waveformOn}
           onToggleWaveform={() => setWaveformOn(current => !current)}
           lyricsActive={pathname === lyricsPath}

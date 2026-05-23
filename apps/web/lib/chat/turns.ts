@@ -1,4 +1,4 @@
-import { and, asc, eq } from 'drizzle-orm';
+import { and, asc, sql as drizzleSql, eq } from 'drizzle-orm';
 import { db } from '@/lib/db';
 import {
   type ChatMessage,
@@ -237,6 +237,7 @@ export async function reserveChatTurn(input: {
     })
     .onConflictDoNothing({
       target: [chatMessages.conversationId, chatMessages.clientMessageId],
+      where: drizzleSql`${chatMessages.clientMessageId} IS NOT NULL`,
     });
 
   await db

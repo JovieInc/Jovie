@@ -76,46 +76,30 @@ async function fetchJsonFromPage<T>(
   readonly data: T;
 }> {
   const baseUrl = process.env.BASE_URL ?? 'http://localhost:3100';
+  const resolvedTarget = /^[a-z]+:\/\//i.test(input)
+    ? input
+    : new URL(input, baseUrl).toString();
+  const response = await page.context().request.fetch(resolvedTarget, {
+    method: init?.method,
+    headers: init?.headers,
+    data: init?.body,
+    timeout: 15_000,
+  });
+  const rawBody = await response.text().catch(() => '');
+  let data = {} as T;
+  if (rawBody.trim().length > 0) {
+    try {
+      data = JSON.parse(rawBody) as T;
+    } catch {
+      data = {} as T;
+    }
+  }
 
-  return page.evaluate(
-    async ({ target, requestInit, fallbackBaseUrl }) => {
-      const controller = new AbortController();
-      const timeoutId = window.setTimeout(() => controller.abort(), 15_000);
-
-      try {
-        // Route resolvers may run before first navigation (about:blank). Resolve
-        // API paths against a stable base URL so fetch never receives an invalid URL.
-        const resolvedTarget = /^[a-z]+:\/\//i.test(target)
-          ? target
-          : new URL(target, fallbackBaseUrl).toString();
-
-        const response = await fetch(resolvedTarget, {
-          method: requestInit?.method,
-          headers: requestInit?.headers,
-          body: requestInit?.body,
-          signal: controller.signal,
-        });
-        const rawBody = await response.text().catch(() => '');
-        let data = {} as T;
-        if (rawBody.trim().length > 0) {
-          try {
-            data = JSON.parse(rawBody) as T;
-          } catch {
-            data = {} as T;
-          }
-        }
-
-        return {
-          ok: response.ok,
-          status: response.status,
-          data,
-        };
-      } finally {
-        window.clearTimeout(timeoutId);
-      }
-    },
-    { target: input, requestInit: init, fallbackBaseUrl: baseUrl }
-  );
+  return {
+    ok: response.ok(),
+    status: response.status(),
+    data,
+  };
 }
 
 export async function resolveChatConversationPath(page: Page): Promise<string> {

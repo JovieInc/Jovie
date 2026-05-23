@@ -106,6 +106,10 @@ vi.mock('drizzle-orm', () => ({
   and: vi.fn(),
   asc: vi.fn(),
   eq: vi.fn(),
+  sql: vi.fn((strings: TemplateStringsArray, ...values: unknown[]) => ({
+    strings,
+    values,
+  })),
 }));
 
 describe('chat turn service', () => {
@@ -204,6 +208,13 @@ describe('chat turn service', () => {
     // JOV-2275: user-message insert must use onConflictDoNothing so a
     // retried request cannot double-write the user row.
     expect(hoisted.insertOnConflictDoNothingMock).toHaveBeenCalled();
+    expect(
+      hoisted.insertOnConflictDoNothingMock.mock.calls.at(-1)?.[0]
+    ).toEqual(
+      expect.objectContaining({
+        where: expect.anything(),
+      })
+    );
   });
 
   it('falls back to clientTurnId when no clientMessageId is provided', async () => {
@@ -235,6 +246,13 @@ describe('chat turn service', () => {
       expect.objectContaining({
         clientMessageId: 'client-turn-2',
         role: 'user',
+      })
+    );
+    expect(
+      hoisted.insertOnConflictDoNothingMock.mock.calls.at(-1)?.[0]
+    ).toEqual(
+      expect.objectContaining({
+        where: expect.anything(),
       })
     );
   });

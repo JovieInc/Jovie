@@ -184,7 +184,7 @@ struct AppStateTests {
 
   @Test func mobileAuthReturnParserAcceptsCodeCallback() {
     let result = MobileAuthReturnParser.parse(
-      URL(string: "ie.jov.Jovie://auth/complete?code=code_123&state=state_123")!,
+      URL(string: "ie.jov.jovie://auth/complete?code=code_123&state=state_123")!,
       codeVerifier: "verifier_123"
     )
 
@@ -199,7 +199,7 @@ struct AppStateTests {
 
   @Test func mobileAuthReturnParserRejectsMissingVerifier() {
     let result = MobileAuthReturnParser.parse(
-      URL(string: "ie.jov.Jovie://auth/complete?code=code_123&state=state_123")!
+      URL(string: "ie.jov.jovie://auth/complete?code=code_123&state=state_123")!
     )
 
     #expect(result == nil)

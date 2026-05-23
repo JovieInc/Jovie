@@ -145,27 +145,15 @@ function getInitialModeFromLocation(
 }
 
 function getInitialDrawerPresentation(): ProfileSurfacePresentation {
-  if (globalThis.window === undefined) {
-    return 'standalone';
-  }
-
-  if (globalThis.matchMedia('(min-width: 1180px)').matches) {
-    return 'modal';
-  }
-
-  if (globalThis.matchMedia('(min-width: 768px)').matches) {
-    return 'embedded';
-  }
-
+  // Keep the first client render identical to the server render. The responsive
+  // presentation is synced in an effect immediately after hydration.
   return 'standalone';
 }
 
 function getInitialIsDesktopLayout(): boolean {
-  if (globalThis.window === undefined) {
-    return false;
-  }
-
-  return globalThis.matchMedia('(min-width: 1180px)').matches;
+  // Keep the first client render identical to the server render. The responsive
+  // layout is synced in an effect immediately after hydration.
+  return false;
 }
 
 function getModeFromUrl(): ProfileMode {
@@ -244,7 +232,7 @@ export function ProfileCompactTemplate({
     getInitialIsDesktopLayout
   );
   const [requestedMode, setRequestedMode] = useState<ProfileMode>(() =>
-    getInitialModeFromLocation(mode, true)
+    getInitialModeFromLocation(mode, false)
   );
   const revealNotificationsRef = useRef<(() => void) | null>(null);
   const closeResetTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);

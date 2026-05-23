@@ -154,17 +154,14 @@ platform :ios do
   lane :ios_tests do
     sh("bash #{repo_path("apps/ios/scripts/ensure-configuration.sh").shellescape}")
     sh("bash #{repo_path("apps/ios/scripts/validate-app-icon.sh").shellescape}")
-    destination = ios_simulator_destination
-    reset_ios_simulator(destination: destination)
-
-    scan(
-      project: IOS_PROJECT,
-      scheme: IOS_SCHEME,
-      clean: true,
-      destination: destination,
-      output_directory: repo_path("artifacts/ios-test-results"),
-      result_bundle: true,
-      xcargs: "CODE_SIGNING_ALLOWED=NO"
+    result_bundle_path = repo_path("artifacts/ios-test-results/Jovie.xcresult")
+    sh("rm -rf #{result_bundle_path.shellescape}")
+    sh(
+      [
+        "bash #{repo_path("apps/ios/scripts/run-xcodebuild.sh").shellescape}",
+        "test",
+        "-resultBundlePath #{result_bundle_path.shellescape}"
+      ].join(" ")
     )
   end
 

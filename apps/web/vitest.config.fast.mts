@@ -13,6 +13,9 @@ const realRoot = (() => {
     return path.resolve(__dirname);
   }
 })();
+const workspaceRoot = realRoot.includes(`${path.sep}.stryker-tmp${path.sep}`)
+  ? path.resolve(realRoot, '../../../..')
+  : path.resolve(realRoot, '../..');
 
 // Load environment variables from .env.test if it exists to keep parity with the
 // standard configuration while using the optimized defaults locally.
@@ -51,7 +54,7 @@ export default defineConfig({
   // Windows short-name paths like TIMWHI~1 that contain spaces when expanded).
   server: {
     fs: {
-      allow: [realRoot, path.resolve(realRoot, '../..'), '..', 'C:/'],
+      allow: [realRoot, workspaceRoot, '..', 'C:/'],
       strict: false,
     },
   },
@@ -81,6 +84,7 @@ export default defineConfig({
       'tests/product-screenshots/**',
       'node_modules/**',
       '.next/**',
+      '.stryker-tmp/**',
     ],
 
     // Performance optimizations
@@ -202,19 +206,19 @@ export default defineConfig({
       },
       {
         find: /^@jovie\/auth-routing$/,
-        replacement: path.resolve(__dirname, '../../packages/auth-routing'),
+        replacement: path.resolve(workspaceRoot, 'packages/auth-routing'),
       },
       {
         find: /^@jovie\/auth-routing\//,
-        replacement: `${path.resolve(__dirname, '../../packages/auth-routing')}/`,
+        replacement: `${path.resolve(workspaceRoot, 'packages/auth-routing')}/`,
       },
       {
         find: /^@jovie\/ui\//,
-        replacement: `${path.resolve(__dirname, '../../packages/ui')}/`,
+        replacement: `${path.resolve(workspaceRoot, 'packages/ui')}/`,
       },
       {
         find: /^@jovie\/ui$/,
-        replacement: path.resolve(__dirname, '../../packages/ui'),
+        replacement: path.resolve(workspaceRoot, 'packages/ui'),
       },
     ],
   },

@@ -2,7 +2,7 @@ import 'server-only';
 import { randomUUID } from 'node:crypto';
 import * as Sentry from '@sentry/nextjs';
 import type { UIMessage } from 'ai';
-import { and, desc, eq, isNull } from 'drizzle-orm';
+import { and, desc, sql as drizzleSql, eq, isNull } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { executeChatTurn, isClientDisconnect } from '@/lib/chat/run';
@@ -516,6 +516,7 @@ async function reserveAnonymousOnboardingConversation({
     })
     .onConflictDoNothing({
       target: [chatMessages.conversationId, chatMessages.clientMessageId],
+      where: drizzleSql`${chatMessages.clientMessageId} IS NOT NULL`,
     });
 
   await db
@@ -554,6 +555,7 @@ async function persistAnonymousAssistantMessage({
     })
     .onConflictDoNothing({
       target: [chatMessages.conversationId, chatMessages.clientMessageId],
+      where: drizzleSql`${chatMessages.clientMessageId} IS NOT NULL`,
     });
 
   await db

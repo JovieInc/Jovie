@@ -1,4 +1,10 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import {
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { ReactNode } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -285,6 +291,25 @@ describe('PersistentAudioBar', () => {
       'aria-hidden',
       'true'
     );
+  });
+
+  it('wires shell V1 waveform seeking to the shared audio player', () => {
+    setPlaying({
+      artistName: 'DJ Cool',
+      currentTime: 10,
+      duration: 30,
+    });
+
+    render(<PersistentAudioBar variant='shellChatV1' />);
+
+    const expandedSurface = screen.getByTestId('audio-surface-expanded-shell');
+    const waveformSeek = within(expandedSurface).getByRole('slider', {
+      name: 'Seek track waveform',
+    });
+
+    fireEvent.change(waveformSeek, { target: { value: '18' } });
+
+    expect(seek).toHaveBeenCalledWith(18);
   });
 
   it('links the shell V1 lyrics button to the active track when DESIGN_V1 is enabled', async () => {
