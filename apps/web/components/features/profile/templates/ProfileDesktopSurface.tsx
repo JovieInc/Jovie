@@ -51,11 +51,11 @@ const PRIMARY_TABS: ReadonlyArray<{
   label: string;
   icon: typeof House;
 }> = [
-  { mode: 'profile', label: 'Home', icon: House },
+  { mode: 'profile', label: 'Profile', icon: House },
   { mode: 'listen', label: 'Music', icon: Music2 },
   { mode: 'tour', label: 'Events', icon: CalendarDays },
   { mode: 'subscribe', label: 'Alerts', icon: Bell },
-  { mode: 'about', label: 'Profile', icon: UserRound },
+  { mode: 'about', label: 'About', icon: UserRound },
 ];
 
 interface ProfileDesktopSurfaceProps {
@@ -726,8 +726,8 @@ export function ProfileDesktopSurface({
           </DesktopSurfaceCard>
           {hasTip ? (
             <DesktopSurfaceCard
-              title='Support'
-              actionLabel='Open Support'
+              title='Pay'
+              actionLabel='Open Pay'
               onAction={() => onDrawerViewChange('pay')}
             >
               <button
@@ -735,7 +735,7 @@ export function ProfileDesktopSurface({
                 onClick={() => onDrawerViewChange('pay')}
                 className='inline-flex h-12 items-center rounded-full border border-white/12 px-4 text-[14px] font-medium text-white/84 transition-colors duration-subtle hover:bg-white/[0.04]'
               >
-                Support {artist.name}
+                Pay {artist.name}
               </button>
             </DesktopSurfaceCard>
           ) : null}
@@ -852,7 +852,7 @@ export function ProfileDesktopSurface({
             type='button'
             onClick={onOpenMenu}
             className='inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-black/28 text-white backdrop-blur-xl transition-colors duration-subtle hover:bg-black/44'
-            aria-label='More options'
+            aria-label='Menu'
           >
             <MoreHorizontal className='h-5 w-5' />
           </button>

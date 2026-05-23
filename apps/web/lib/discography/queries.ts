@@ -20,6 +20,7 @@ import {
   releaseArtists,
 } from '@/lib/db/schema/content';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
+import { publicReleaseEligibilitySqlPredicate } from '@/lib/profile/public-release-eligibility';
 import { resolveTrackProviderLinks } from './track-provider-links';
 
 /**
@@ -47,6 +48,7 @@ export interface PublicDiscogReleaseLite {
   slug: string | null;
   releaseType: DiscogRelease['releaseType'];
   releaseDate: string | null;
+  revealDate: string | null;
   artworkUrl: string | null;
 }
 
@@ -224,9 +226,7 @@ export async function getLatestReleaseForProfile(
     .where(
       and(
         eq(discogReleases.creatorProfileId, creatorProfileId),
-        isNull(discogReleases.deletedAt),
-        ne(discogReleases.status, 'draft'),
-        drizzleSql`(${discogReleases.revealDate} IS NULL OR ${discogReleases.revealDate} <= NOW())`
+        publicReleaseEligibilitySqlPredicate()
       )
     )
     .orderBy(drizzleSql`${discogReleases.releaseDate} DESC NULLS LAST`)
@@ -278,10 +278,8 @@ export async function getLatestReleaseByUsername(
     .where(
       and(
         eq(creatorProfiles.usernameNormalized, usernameNormalized),
-        isNull(discogReleases.deletedAt),
-        ne(discogReleases.status, 'draft'),
         ne(discogReleases.releaseType, 'music_video'),
-        drizzleSql`(${discogReleases.revealDate} IS NULL OR ${discogReleases.revealDate} <= NOW())`
+        publicReleaseEligibilitySqlPredicate()
       )
     )
     .orderBy(drizzleSql`${discogReleases.releaseDate} DESC NULLS LAST`)
@@ -299,8 +297,7 @@ export async function getReleaseStatsByUsername(
 ): Promise<{ releaseCount: number; topReleaseTitles: string[] }> {
   const publicFilter = and(
     eq(creatorProfiles.usernameNormalized, usernameNormalized),
-    isNull(discogReleases.deletedAt),
-    ne(discogReleases.status, 'draft')
+    publicReleaseEligibilitySqlPredicate()
   );
   const [countResult, topReleases] = await Promise.all([
     db
@@ -347,16 +344,15 @@ export async function getReleasesForProfileLite(
       slug: discogReleases.slug,
       releaseType: discogReleases.releaseType,
       releaseDate: discogReleases.releaseDate,
+      revealDate: discogReleases.revealDate,
       artworkUrl: discogReleases.artworkUrl,
     })
     .from(discogReleases)
     .where(
       and(
         eq(discogReleases.creatorProfileId, creatorProfileId),
-        isNull(discogReleases.deletedAt),
-        ne(discogReleases.status, 'draft'),
         // Intentionally includes music videos for the public releases drawer.
-        drizzleSql`(${discogReleases.revealDate} IS NULL OR ${discogReleases.revealDate} <= NOW())`
+        publicReleaseEligibilitySqlPredicate()
       )
     )
     .orderBy(drizzleSql`${discogReleases.releaseDate} DESC NULLS LAST`)
@@ -371,6 +367,7 @@ export async function getReleasesForProfileLite(
   return releases.map(release => ({
     ...release,
     releaseDate: release.releaseDate?.toISOString() ?? null,
+    revealDate: release.revealDate?.toISOString() ?? null,
     artistNames: artistNamesByRelease.get(release.id) ?? [],
   }));
 }

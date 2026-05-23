@@ -71,10 +71,9 @@ export function PayView({
       amounts={[...amounts]}
       onContinue={handleAmountSelected}
       presentation='drawer'
-      primaryLabel='Send payment'
+      primaryLabel='Continue with Venmo'
       paymentLabel='Venmo'
-      showOtherPaymentOptions
-      otherPaymentOptionsLabel='Other payment options'
+      showOtherPaymentOptions={false}
     />
   );
 }

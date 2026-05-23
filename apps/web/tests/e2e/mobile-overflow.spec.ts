@@ -40,6 +40,7 @@ const PUBLIC_SURFACE_IDS = [
   'profile-mode-pay',
   'profile-mode-tour',
   'profile-notifications',
+  'profile-pay',
   'profile-tip',
   'public-release',
   'public-track',

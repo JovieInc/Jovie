@@ -21,6 +21,7 @@
 
 import { type Page, test } from '@playwright/test';
 import { expect } from '../setup';
+import { getOverflowingElements } from '../utils/mobile-overflow';
 import {
   PROFILE_MATRIX_ROUTES,
   PROFILE_RESPONSIVE_VIEWPORTS,
@@ -57,6 +58,16 @@ async function assertNoHorizontalOverflow(
   expect(metrics.innerWidth, `${label} viewport width drifted`).toBe(
     viewport.width
   );
+
+  const offenders = await getOverflowingElements(page);
+  expect(
+    offenders,
+    `${label} has visible elements clipped outside the viewport: ${JSON.stringify(
+      { metrics, offenders },
+      null,
+      2
+    )}`
+  ).toHaveLength(0);
 }
 
 async function waitForAnyVisible(
@@ -105,7 +116,7 @@ async function assertBottomTabBarState(
       ).toHaveCount(1, { timeout: SMOKE_TIMEOUTS.QUICK });
 
       const expectedLabelByMode: Record<string, string> = {
-        profile: 'Home',
+        profile: 'Profile',
         listen: 'Music',
         tour: 'Events',
         subscribe: 'Alerts',

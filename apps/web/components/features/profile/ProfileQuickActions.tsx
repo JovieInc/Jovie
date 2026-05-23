@@ -20,7 +20,7 @@ interface ProfileQuickActionsProps {
 }
 
 const QUICK_ACTIONS: QuickActionItem[] = [
-  { id: 'profile', label: 'Home', icon: House },
+  { id: 'profile', label: 'Profile', icon: House },
   { id: 'tour', label: 'Tour', icon: CalendarDays },
   { id: 'contact', label: 'Book', icon: Mail },
   { id: 'pay', label: 'Pay', icon: DollarSign },

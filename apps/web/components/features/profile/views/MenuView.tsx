@@ -10,10 +10,6 @@ const MENU_ENTRIES = [
     isVisible: () => true,
   },
   {
-    key: 'releases',
-    isVisible: ({ hasReleases }: MenuViewVisibility) => hasReleases,
-  },
-  {
     key: 'pay',
     isVisible: ({ hasTip }: MenuViewVisibility) => hasTip,
   },

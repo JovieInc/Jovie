@@ -421,10 +421,12 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const trackingResult = await withSystemIngestionSession(async tx => {
-      // Only create/update audience member records when marketing consent is given
-      const audienceMemberId = hasMarketingConsent
-        ? await upsertAudienceMember(tx, {
+    // Audience member enrichment is valuable, but it cannot be allowed to make
+    // a public click-tracking request fail. Keep it outside the click insert
+    // transaction so a DB-shape or conflict error does not poison the click write.
+    const audienceMemberId = hasMarketingConsent
+      ? await withSystemIngestionSession(async tx =>
+          upsertAudienceMember(tx, {
             profileId: profile.id,
             fingerprint,
             audienceDeviceType,
@@ -436,8 +438,18 @@ export async function POST(request: NextRequest) {
             target,
             isBot: botDetection.isBot,
           })
-        : null;
+        ).catch(async error => {
+          await captureError('Track audience member upsert failed', error, {
+            route: '/api/track',
+            creatorProfileId: profile.id,
+            handle,
+            linkType,
+          });
+          return null;
+        })
+      : null;
 
+    const trackingResult = await withSystemIngestionSession(async tx => {
       const metadata = buildClickMetadata(
         target,
         resolvedSource,

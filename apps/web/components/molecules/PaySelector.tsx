@@ -53,8 +53,8 @@ export function PaySelector({
   className = '',
   paymentLabel,
   presentation = 'default',
-  primaryLabel = 'Send payment',
-  otherPaymentOptionsLabel = 'Other payment options',
+  primaryLabel = 'Continue',
+  otherPaymentOptionsLabel = 'Other payment methods',
   showOtherPaymentOptions = false,
 }: PaySelectorProps) {
   const defaultIdx = Math.floor(Math.max(0, amounts.length - 1) / 2);
@@ -213,9 +213,17 @@ export function PaySelector({
             type='button'
             onClick={handleContinue}
             disabled={isLoading || !canContinue}
-            className='flex h-[50px] w-full items-center justify-center rounded-full bg-white px-5 text-[16px] font-semibold tracking-[-0.025em] text-[#101013] transition-[opacity,transform] duration-subtle hover:opacity-96 disabled:cursor-not-allowed disabled:opacity-50'
+            className='flex h-[50px] w-full items-center justify-center gap-2.5 rounded-full bg-white px-5 text-[16px] font-semibold tracking-[-0.025em] text-[#101013] transition-[opacity] duration-subtle hover:opacity-96 disabled:cursor-not-allowed disabled:opacity-50'
             aria-label={`${primaryLabel} for ${formatAmountForScreenReader(selectedAmount)}`}
           >
+            {paymentLabel === 'Venmo' ? (
+              <SocialIcon
+                platform='venmo'
+                size={20}
+                className='shrink-0'
+                aria-hidden
+              />
+            ) : null}
             {isLoading ? 'Processing...' : primaryLabel}
           </button>
 

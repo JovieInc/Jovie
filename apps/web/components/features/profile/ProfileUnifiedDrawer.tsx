@@ -355,6 +355,7 @@ export function ProfileUnifiedDrawer({
       title={meta.title}
       subtitle={'subtitle' in meta ? meta.subtitle : undefined}
       onBack={isSubView ? () => navigateTo('menu') : undefined}
+      navigationLevel={isSubView ? 'secondary' : 'root'}
       dataTestId='profile-menu-drawer'
       presentation={presentation}
     >
@@ -497,10 +498,9 @@ export function ProfileUnifiedDrawer({
                   amounts={PAY_AMOUNTS}
                   onContinue={handleTipAmountSelected}
                   presentation='drawer'
-                  primaryLabel='Send payment'
+                  primaryLabel='Continue with Venmo'
                   paymentLabel='Venmo'
-                  showOtherPaymentOptions
-                  otherPaymentOptionsLabel='Other payment options'
+                  showOtherPaymentOptions={false}
                 />
               ) : (
                 <div className='rounded-[var(--profile-drawer-radius-mobile)] border border-subtle bg-[color:var(--color-interactive-hover)] px-4 py-5 text-center'>

@@ -4,13 +4,9 @@
  * Covers:
  *  - All four tabs render whether or not events exist
  *  - Active tab is marked with aria-current="page"
- *  - Active tab uses correct text/icon colour class (font-semibold)
+ *  - Active tab uses correct icon colour class
  *  - Inactive tabs do not have aria-current
- *  - More button renders when hideMoreMenu = false
- *  - More button omitted when hideMoreMenu = true
- *  - More button aria-expanded reflects isMenuOpen
  *  - Tab click handler calls onTabSelect with correct mode
- *  - More click handler calls onOpenMenu
  *  - Grid column count matches visible tab count
  *  - No horizontal overflow at narrow viewports (320px) — structural check
  *  - 44×44pt touch target minimum via min-h-[50px] class
@@ -30,7 +26,6 @@ function makeProps(overrides?: Partial<BottomTabBarProps>): BottomTabBarProps {
   return {
     activeTab: 'profile',
     hasTourDates: true,
-    hideMoreMenu: false,
     isMenuOpen: false,
     onTabSelect: vi.fn(),
     onOpenMenu: vi.fn(),
@@ -45,7 +40,7 @@ function makeProps(overrides?: Partial<BottomTabBarProps>): BottomTabBarProps {
 describe('BottomTabBar — tab rendering', () => {
   it('renders all four primary tabs when hasTourDates is true', () => {
     render(<BottomTabBar {...makeProps({ hasTourDates: true })} />);
-    expect(screen.getByRole('button', { name: 'Home' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Profile' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Music' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Events' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Alerts' })).toBeInTheDocument();
@@ -53,21 +48,14 @@ describe('BottomTabBar — tab rendering', () => {
 
   it('keeps the Events tab when hasTourDates is false', () => {
     render(<BottomTabBar {...makeProps({ hasTourDates: false })} />);
-    expect(screen.getByRole('button', { name: 'Home' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Profile' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Music' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Events' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Alerts' })).toBeInTheDocument();
   });
 
-  it('renders a More button when hideMoreMenu is false', () => {
-    render(<BottomTabBar {...makeProps({ hideMoreMenu: false })} />);
-    expect(
-      screen.getByRole('button', { name: 'More options' })
-    ).toBeInTheDocument();
-  });
-
-  it('omits the More button when hideMoreMenu is true', () => {
-    render(<BottomTabBar {...makeProps({ hideMoreMenu: true })} />);
+  it('does not render a More button', () => {
+    render(<BottomTabBar {...makeProps()} />);
     expect(
       screen.queryByRole('button', { name: 'More options' })
     ).not.toBeInTheDocument();
@@ -96,7 +84,7 @@ describe('BottomTabBar — active state', () => {
 
   it('does not mark inactive tabs with aria-current', () => {
     render(<BottomTabBar {...makeProps({ activeTab: 'listen' })} />);
-    const homeBtn = screen.getByRole('button', { name: 'Home' });
+    const homeBtn = screen.getByRole('button', { name: 'Profile' });
     expect(homeBtn).not.toHaveAttribute('aria-current', 'page');
     expect(homeBtn.getAttribute('aria-current')).toBeNull();
   });
@@ -117,9 +105,9 @@ describe('BottomTabBar — active state', () => {
     expect(span?.className).not.toContain('font-semibold');
   });
 
-  it('marks the profile (Home) tab active by default', () => {
+  it('marks the profile tab active by default', () => {
     render(<BottomTabBar {...makeProps({ activeTab: 'profile' })} />);
-    expect(screen.getByRole('button', { name: 'Home' })).toHaveAttribute(
+    expect(screen.getByRole('button', { name: 'Profile' })).toHaveAttribute(
       'aria-current',
       'page'
     );
@@ -132,39 +120,10 @@ describe('BottomTabBar — active state', () => {
       />
     );
     // No primary tab should have aria-current when the menu is open
-    const buttons = screen
-      .getAllByRole('button')
-      .filter(btn => btn.getAttribute('aria-label') !== 'More options');
+    const buttons = screen.getAllByRole('button');
     for (const btn of buttons) {
       expect(btn).not.toHaveAttribute('aria-current', 'page');
     }
-  });
-});
-
-// ---------------------------------------------------------------------------
-// More button state
-// ---------------------------------------------------------------------------
-
-describe('BottomTabBar — More button', () => {
-  it('More button has aria-haspopup="dialog"', () => {
-    render(<BottomTabBar {...makeProps()} />);
-    expect(
-      screen.getByRole('button', { name: 'More options' })
-    ).toHaveAttribute('aria-haspopup', 'dialog');
-  });
-
-  it('More button aria-expanded is false when menu is closed', () => {
-    render(<BottomTabBar {...makeProps({ isMenuOpen: false })} />);
-    expect(
-      screen.getByRole('button', { name: 'More options' })
-    ).toHaveAttribute('aria-expanded', 'false');
-  });
-
-  it('More button aria-expanded is true when menu is open', () => {
-    render(<BottomTabBar {...makeProps({ isMenuOpen: true })} />);
-    expect(
-      screen.getByRole('button', { name: 'More options' })
-    ).toHaveAttribute('aria-expanded', 'true');
   });
 });
 
@@ -173,10 +132,10 @@ describe('BottomTabBar — More button', () => {
 // ---------------------------------------------------------------------------
 
 describe('BottomTabBar — interaction handlers', () => {
-  it('calls onTabSelect with "profile" when Home is clicked', () => {
+  it('calls onTabSelect with "profile" when Profile is clicked', () => {
     const onTabSelect = vi.fn();
     render(<BottomTabBar {...makeProps({ onTabSelect })} />);
-    fireEvent.click(screen.getByRole('button', { name: 'Home' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Profile' }));
     expect(onTabSelect).toHaveBeenCalledTimes(1);
     expect(onTabSelect).toHaveBeenCalledWith('profile');
   });
@@ -203,13 +162,6 @@ describe('BottomTabBar — interaction handlers', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Alerts' }));
     expect(onTabSelect).toHaveBeenCalledWith('subscribe');
   });
-
-  it('calls onOpenMenu when More is clicked', () => {
-    const onOpenMenu = vi.fn();
-    render(<BottomTabBar {...makeProps({ onOpenMenu })} />);
-    fireEvent.click(screen.getByRole('button', { name: 'More options' }));
-    expect(onOpenMenu).toHaveBeenCalledTimes(1);
-  });
 });
 
 // ---------------------------------------------------------------------------
@@ -217,41 +169,17 @@ describe('BottomTabBar — interaction handlers', () => {
 // ---------------------------------------------------------------------------
 
 describe('BottomTabBar — grid layout', () => {
-  it('has 5 columns when hasTourDates=true and hideMoreMenu=false', () => {
+  it('has 4 columns when hasTourDates=true', () => {
     const { container } = render(
-      <BottomTabBar
-        {...makeProps({ hasTourDates: true, hideMoreMenu: false })}
-      />
-    );
-    const grid = container.querySelector('[style*="grid-template-columns"]');
-    expect(grid?.getAttribute('style')).toContain('repeat(5,');
-  });
-
-  it('has 5 columns when hasTourDates=false and hideMoreMenu=false', () => {
-    const { container } = render(
-      <BottomTabBar
-        {...makeProps({ hasTourDates: false, hideMoreMenu: false })}
-      />
-    );
-    const grid = container.querySelector('[style*="grid-template-columns"]');
-    expect(grid?.getAttribute('style')).toContain('repeat(5,');
-  });
-
-  it('has 4 columns when hasTourDates=true and hideMoreMenu=true', () => {
-    const { container } = render(
-      <BottomTabBar
-        {...makeProps({ hasTourDates: true, hideMoreMenu: true })}
-      />
+      <BottomTabBar {...makeProps({ hasTourDates: true })} />
     );
     const grid = container.querySelector('[style*="grid-template-columns"]');
     expect(grid?.getAttribute('style')).toContain('repeat(4,');
   });
 
-  it('has 4 columns when hasTourDates=false and hideMoreMenu=true', () => {
+  it('has 4 columns when hasTourDates=false', () => {
     const { container } = render(
-      <BottomTabBar
-        {...makeProps({ hasTourDates: false, hideMoreMenu: true })}
-      />
+      <BottomTabBar {...makeProps({ hasTourDates: false })} />
     );
     const grid = container.querySelector('[style*="grid-template-columns"]');
     expect(grid?.getAttribute('style')).toContain('repeat(4,');

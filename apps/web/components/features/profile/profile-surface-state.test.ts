@@ -70,7 +70,7 @@ describe('resolveProfileSurfaceState', () => {
       latestRelease: {
         title: 'New Song',
         slug: 'new-song',
-        artworkUrl: null,
+        artworkUrl: 'https://example.com/new-song.jpg',
         releaseDate: '2026-04-01',
         releaseType: 'single',
       },
@@ -99,7 +99,7 @@ describe('resolveProfileSurfaceState', () => {
       latestRelease: {
         title: 'New Song',
         slug: 'new-song',
-        artworkUrl: null,
+        artworkUrl: 'https://example.com/new-song.jpg',
         releaseDate: '2026-04-01',
         releaseType: 'single',
       },

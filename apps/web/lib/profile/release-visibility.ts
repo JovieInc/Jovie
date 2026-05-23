@@ -1,4 +1,5 @@
 import { determineReleasePhase } from '@/lib/discography/release-phase';
+import { isPublicReleaseEligible } from '@/lib/profile/public-release-eligibility';
 
 const RETIREMENT_DAYS = 90;
 
@@ -21,6 +22,10 @@ export function getProfileReleaseVisibility(
     | {
         releaseDate: Date | string | null;
         revealDate?: Date | string | null;
+        artworkUrl: string | null;
+        status?: string | null;
+        deletedAt?: Date | string | null;
+        hasProviderLinks?: boolean;
       }
     | null
     | undefined,
@@ -30,6 +35,10 @@ export function getProfileReleaseVisibility(
   if (!release) return null;
 
   const currentTime = now ?? new Date();
+  if (!isPublicReleaseEligible(release, currentTime)) {
+    return null;
+  }
+
   const phase = determineReleasePhase(
     release.releaseDate,
     release.revealDate,

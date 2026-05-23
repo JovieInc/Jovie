@@ -1,6 +1,6 @@
 'use client';
 
-import { Bell, CheckCircle2, Mail } from 'lucide-react';
+import { Bell, CheckCircle2 } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
 import { AboutSection } from '@/features/profile/AboutSection';
 import { ArtistNotificationsCTA } from '@/features/profile/artist-notifications-cta/ArtistNotificationsCTA';
@@ -411,20 +411,6 @@ function AlertsSettingsView({
         />
       </div>
 
-      <div className='flex items-center gap-3 border-b border-white/[0.075] px-4 py-3.5'>
-        <span className='flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white/[0.06] text-white/72'>
-          <Mail className='h-4 w-4' />
-        </span>
-        <div className='min-w-0 flex-1'>
-          <p className='truncate text-[14px] font-medium tracking-[-0.005em] text-white'>
-            Delivery
-          </p>
-          <p className='truncate text-[11.5px] leading-4 text-white/50'>
-            Email and text delivery.
-          </p>
-        </div>
-      </div>
-
       {isSubscribed ? (
         <button
           type='button'
@@ -432,7 +418,7 @@ function AlertsSettingsView({
           disabled={isUnsubscribing}
           className='mt-5 w-full px-4 py-3 text-center text-[14px] font-semibold text-white/72 transition-colors duration-subtle hover:text-white disabled:cursor-not-allowed disabled:text-white/36'
         >
-          {isUnsubscribing ? 'Turning Off...' : 'Turn Off Alerts'}
+          {isUnsubscribing ? 'Turning off...' : 'Turn off alerts'}
         </button>
       ) : (
         <p className='px-4 pt-4 text-[12px] leading-5 text-white/42'>

@@ -565,7 +565,7 @@ describe('Public Profile Page Logic', () => {
   describe('Profile page mode logic', () => {
     it.each([
       ['profile', 'Artist'],
-      ['pay', 'Support'],
+      ['pay', 'Pay'],
       ['listen', 'Listen now'],
       ['subscribe', 'Manage alerts'],
     ])('mode "%s" maps to subtitle "%s"', (mode, expectedSubtitle) => {

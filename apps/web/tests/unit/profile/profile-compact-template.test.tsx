@@ -377,7 +377,7 @@ describe('ProfileCompactTemplate', () => {
     ).not.toBeNull();
   });
 
-  it('renders the alerts trigger instead of the overflow trigger in the compact profile header', async () => {
+  it('renders the Jovie menu trigger instead of a duplicate alerts trigger in the compact profile header', async () => {
     render(
       <ProfileCompactTemplate
         mode='profile'
@@ -389,12 +389,12 @@ describe('ProfileCompactTemplate', () => {
 
     expect(
       within(screen.getByTestId('profile-top-chrome')).getByRole('button', {
-        name: 'Alerts',
+        name: 'Menu',
       })
     ).toBeInTheDocument();
     expect(
       within(screen.getByTestId('profile-top-chrome')).queryByRole('button', {
-        name: /more options/i,
+        name: 'Alerts',
       })
     ).not.toBeInTheDocument();
   });
@@ -411,7 +411,7 @@ describe('ProfileCompactTemplate', () => {
     );
 
     expect(
-      screen.queryByRole('button', { name: /more options/i })
+      screen.queryByRole('button', { name: 'Menu' })
     ).not.toBeInTheDocument();
     expect(
       screen.queryByRole('button', { name: 'More' })
@@ -419,7 +419,7 @@ describe('ProfileCompactTemplate', () => {
     expect(screen.getByRole('button', { name: 'Back' })).toBeInTheDocument();
   });
 
-  it('renders the compact bottom navigation with a real More action', async () => {
+  it('renders the compact bottom navigation with four primary icon tabs', async () => {
     render(
       <ProfileCompactTemplate
         mode='profile'
@@ -430,29 +430,14 @@ describe('ProfileCompactTemplate', () => {
     );
 
     const bottomNav = screen.getByTestId('profile-bottom-nav');
-    for (const label of ['Home', 'Music', 'Events', 'Alerts', 'More options']) {
+    for (const label of ['Profile', 'Music', 'Events', 'Alerts']) {
       expect(
         within(bottomNav).getByRole('button', { name: label })
       ).toBeInTheDocument();
     }
     expect(
-      within(bottomNav).queryByRole('button', { name: 'Profile' })
+      within(bottomNav).queryByRole('button', { name: 'More options' })
     ).not.toBeInTheDocument();
-
-    fireEvent.click(
-      within(bottomNav).getByRole('button', { name: 'More options' })
-    );
-
-    await waitFor(() => {
-      expect(screen.getByTestId('mock-profile-unified-drawer')).toHaveAttribute(
-        'data-open',
-        'true'
-      );
-      expect(screen.getByTestId('mock-profile-unified-drawer')).toHaveAttribute(
-        'data-view',
-        'menu'
-      );
-    });
   });
 
   it('keeps the home tab active for about mode deep links', async () => {
@@ -467,7 +452,7 @@ describe('ProfileCompactTemplate', () => {
 
     const bottomNav = screen.getByTestId('profile-bottom-nav');
     expect(
-      within(bottomNav).getByRole('button', { name: 'Home' })
+      within(bottomNav).getByRole('button', { name: 'Profile' })
     ).toHaveAttribute('aria-current', 'page');
   });
 
@@ -965,7 +950,7 @@ describe('ProfileCompactTemplate', () => {
 
     pushStateSpy.mockClear();
 
-    fireEvent.click(screen.getByRole('button', { name: 'More options' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Menu' }));
 
     expect(pushStateSpy).not.toHaveBeenCalled();
     expect(window.location.search).toBe('?mode=listen');

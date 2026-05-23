@@ -4,6 +4,7 @@ export interface PublicRelease {
   readonly slug: string;
   readonly releaseType: string;
   readonly releaseDate: string | null;
+  readonly revealDate?: string | null;
   readonly artworkUrl: string | null;
   readonly artistNames: readonly string[];
 }

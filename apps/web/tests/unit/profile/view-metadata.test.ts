@@ -45,7 +45,7 @@ describe('buildViewMetadata', () => {
       'Listen · The Weeknd · Jovie'
     );
     expect(buildViewMetadata('pay', BASELINE).title).toBe(
-      'Support · The Weeknd · Jovie'
+      'Pay · The Weeknd · Jovie'
     );
     // Base profile is artist-first.
     expect(buildViewMetadata('profile', BASELINE).title).toBe(

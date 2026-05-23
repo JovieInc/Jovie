@@ -60,11 +60,13 @@ export async function getOverflowingElements(
 ): Promise<readonly OverflowingElement[]> {
   return page.evaluate(() => {
     const viewportWidth = document.documentElement.clientWidth;
+    const tolerance = 1;
 
     return Array.from(document.querySelectorAll('*'))
       .map(element => {
         const rect = element.getBoundingClientRect();
         const htmlElement = element as HTMLElement;
+        const style = window.getComputedStyle(htmlElement);
         const className =
           typeof htmlElement.className === 'string'
             ? htmlElement.className
@@ -83,11 +85,29 @@ export async function getOverflowingElements(
             .trim()
             .replace(/\s+/g, ' ')
             .slice(0, 80),
+          isVisible:
+            style.display !== 'none' &&
+            style.visibility !== 'hidden' &&
+            Number.parseFloat(style.opacity || '1') > 0.01,
         };
       })
       .filter(
-        item => item.width > 0 && (item.right > viewportWidth || item.left < 0)
+        item =>
+          item.isVisible &&
+          item.width > 0 &&
+          (item.right > viewportWidth + tolerance || item.left < -tolerance)
       )
+      .map(item => ({
+        tag: item.tag,
+        id: item.id,
+        className: item.className,
+        role: item.role,
+        ariaLabel: item.ariaLabel,
+        left: item.left,
+        right: item.right,
+        width: item.width,
+        text: item.text,
+      }))
       .slice(0, 20);
   });
 }
@@ -98,9 +118,9 @@ export async function expectNoDocumentOverflow(
   label: string
 ): Promise<void> {
   const metrics = await getMobileOverflowMetrics(page);
+  const offenders = await getOverflowingElements(page);
 
-  if (metrics.documentOverflow > 0) {
-    const offenders = await getOverflowingElements(page);
+  if (metrics.documentOverflow > 0 || offenders.length > 0) {
     await testInfo.attach(
       `mobile-overflow-${normalizeAttachmentName(label)}.json`,
       {
@@ -118,4 +138,13 @@ export async function expectNoDocumentOverflow(
       2
     )}`
   ).toBeLessThanOrEqual(0);
+
+  expect(
+    offenders,
+    `${label} has visible elements clipped outside the viewport: ${JSON.stringify(
+      { metrics, offenders },
+      null,
+      2
+    )}`
+  ).toHaveLength(0);
 }

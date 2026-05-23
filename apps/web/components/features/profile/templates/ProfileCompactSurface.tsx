@@ -1,6 +1,6 @@
 'use client';
 
-import { BadgeCheck, Bell, ChevronLeft, MapPin } from 'lucide-react';
+import { BadgeCheck, ChevronLeft, MapPin, MoreHorizontal } from 'lucide-react';
 import dynamic from 'next/dynamic';
 import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -26,6 +26,7 @@ import type { PublicRelease } from '@/features/profile/releases/types';
 import { SubscriptionConfirmedBanner } from '@/features/profile/SubscriptionConfirmedBanner';
 import type { UserLocation } from '@/hooks/useUserLocation';
 import { track } from '@/lib/analytics';
+import { Mark } from '@/lib/brand/primitives';
 import { sortDSPsByGeoPopularity } from '@/lib/dsp';
 import type { ProfileAlertOptInVariant } from '@/lib/flags/contracts';
 import type { ConfirmedFeaturedPlaylistFallback } from '@/lib/profile/featured-playlist-fallback';
@@ -271,6 +272,7 @@ export function ProfileCompactSurface({
   },
   dataTestId,
   hideMoreMenu = false,
+  hideJovieBranding = false,
   headerSocialLinksOverride,
   renderInteractiveOverlays = true,
   renderSemanticHeading = true,
@@ -390,7 +392,7 @@ export function ProfileCompactSurface({
   const topChromeButtonClassName =
     'h-9! w-9! border-white/14 bg-black/24 text-white shadow-[0_10px_24px_rgba(0,0,0,0.22)] backdrop-blur-md hover:bg-black/36 active:scale-100';
   const socialIconClassName =
-    'inline-flex h-8 w-8 items-center justify-center text-white/68 transition-colors duration-subtle hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/80 focus-visible:ring-offset-2 focus-visible:ring-offset-transparent';
+    'inline-flex h-7 w-7 items-center justify-center text-white/68 transition-colors duration-subtle hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/80 focus-visible:ring-offset-2 focus-visible:ring-offset-transparent';
   const heroHeightClassName = isHomeMode
     ? 'h-[var(--cover-height)] min-h-[300px] max-h-[430px]'
     : 'h-[calc(3.5rem+max(env(safe-area-inset-top),0px))] border-b border-white/[0.075]';
@@ -572,15 +574,23 @@ export function ProfileCompactSurface({
                 </p>
               ) : null}
 
-              <CircleIconButton
-                onClick={() => openNotifications()}
-                size='lg'
-                variant='pearl'
-                className={topChromeButtonClassName}
-                ariaLabel='Alerts'
-              >
-                <Bell className='h-4 w-4' />
-              </CircleIconButton>
+              {hideMoreMenu ? (
+                <div className='h-11 w-11 shrink-0' aria-hidden='true' />
+              ) : (
+                <CircleIconButton
+                  onClick={onOpenMenu}
+                  size='lg'
+                  variant='pearl'
+                  className={topChromeButtonClassName}
+                  ariaLabel='Menu'
+                >
+                  {hideJovieBranding ? (
+                    <MoreHorizontal className='h-[18px] w-[18px]' />
+                  ) : (
+                    <Mark size={18} className='h-[18px] w-[18px]' />
+                  )}
+                </CircleIconButton>
+              )}
             </div>
           </div>
 
@@ -600,7 +610,7 @@ export function ProfileCompactSurface({
                     data-testid='profile-identity-link'
                     href={profileHref}
                     aria-label={`Go to ${artist.name}'s profile`}
-                    className='inline-flex max-w-full min-w-0 flex-wrap items-center gap-1.5 rounded-md text-[30px] font-semibold leading-none tracking-normal text-white drop-shadow-[0_2px_14px_rgba(0,0,0,0.42)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--focus-ring))] focus-visible:ring-offset-2 focus-visible:ring-offset-transparent [@media(max-height:820px)]:text-[28px] [@media(max-height:760px)]:text-[26px]'
+                    className='inline-flex max-w-full min-w-0 flex-wrap items-start gap-1 rounded-md text-[28px] font-semibold leading-none tracking-normal text-white drop-shadow-[0_2px_14px_rgba(0,0,0,0.42)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--focus-ring))] focus-visible:ring-offset-2 focus-visible:ring-offset-transparent [@media(max-height:820px)]:text-[26px] [@media(max-height:760px)]:text-[24px]'
                   >
                     <span className='min-w-0 max-w-full [overflow-wrap:anywhere]'>
                       {artist.name}
@@ -617,25 +627,23 @@ export function ProfileCompactSurface({
                   </Link>
                 </IdentityHeading>
 
-                <p className='mt-1 line-clamp-2 min-w-0 text-[12.5px] font-medium leading-4 tracking-[-0.005em] text-white/76 [overflow-wrap:anywhere] [@media(max-height:820px)]:text-[12px]'>
-                  {heroSubtitle}
-                </p>
-
-                <div className='flex min-w-0 items-center justify-between gap-3 pt-1 [@media(max-height:820px)]:pt-0'>
-                  {locationLabel ? (
-                    <p className='inline-flex min-w-0 items-center gap-1.5 text-[12.5px] font-medium text-white/78 [overflow-wrap:anywhere] [@media(max-height:820px)]:text-[12px]'>
-                      <MapPin className='h-3.5 w-3.5 shrink-0' />
-                      <span className='min-w-0 [overflow-wrap:anywhere]'>
-                        {locationLabel}
-                      </span>
-                    </p>
-                  ) : (
-                    <span />
-                  )}
+                <div className='mt-1 flex min-w-0 items-center justify-between gap-2 [@media(max-height:820px)]:mt-0.5'>
+                  <p className='flex min-w-0 items-center gap-1.5 text-[12px] font-medium leading-4 tracking-normal text-white/74 [@media(max-height:820px)]:text-[11.5px]'>
+                    <span className='min-w-0 truncate'>{heroSubtitle}</span>
+                    {locationLabel ? (
+                      <>
+                        <span className='h-1 w-1 shrink-0 rounded-full bg-white/34' />
+                        <MapPin className='h-3.5 w-3.5 shrink-0 text-white/58' />
+                        <span className='min-w-0 truncate'>
+                          {locationLabel}
+                        </span>
+                      </>
+                    ) : null}
+                  </p>
 
                   {visibleSocialLinks.length > 0 ? (
                     <div
-                      className='flex shrink-0 items-center gap-1.5'
+                      className='flex shrink-0 items-center gap-1'
                       data-testid='profile-hero-social-row'
                     >
                       {visibleSocialLinks.map(link =>

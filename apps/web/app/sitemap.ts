@@ -1,5 +1,5 @@
 import * as Sentry from '@sentry/nextjs';
-import { eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import { MetadataRoute } from 'next';
 import { unstable_cache } from 'next/cache';
 import { BASE_URL } from '@/constants/app';
@@ -8,10 +8,15 @@ import { getAlternativeSlugs } from '@/content/alternatives';
 import { getComparisonSlugs } from '@/content/comparisons';
 import { getBlogPosts, slugifyCategory } from '@/lib/blog/getBlogPosts';
 import { db } from '@/lib/db';
-import { discogRecordings, discogReleases } from '@/lib/db/schema/content';
+import {
+  discogRecordings,
+  discogReleases,
+  discogReleaseTracks,
+} from '@/lib/db/schema/content';
 import { joviePlaylists } from '@/lib/db/schema/playlists';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { env } from '@/lib/env-server';
+import { publicReleaseEligibilitySqlPredicate } from '@/lib/profile/public-release-eligibility';
 
 export const revalidate = 3600;
 
@@ -68,7 +73,12 @@ const getSitemapCatalog = unstable_cache(
             creatorProfiles,
             eq(discogReleases.creatorProfileId, creatorProfiles.id)
           )
-          .where(eq(creatorProfiles.isPublic, true)),
+          .where(
+            and(
+              eq(creatorProfiles.isPublic, true),
+              publicReleaseEligibilitySqlPredicate()
+            )
+          ),
 
         db
           .select({
@@ -78,10 +88,23 @@ const getSitemapCatalog = unstable_cache(
           })
           .from(discogRecordings)
           .innerJoin(
+            discogReleaseTracks,
+            eq(discogReleaseTracks.recordingId, discogRecordings.id)
+          )
+          .innerJoin(
+            discogReleases,
+            eq(discogReleaseTracks.releaseId, discogReleases.id)
+          )
+          .innerJoin(
             creatorProfiles,
             eq(discogRecordings.creatorProfileId, creatorProfiles.id)
           )
-          .where(eq(creatorProfiles.isPublic, true)),
+          .where(
+            and(
+              eq(creatorProfiles.isPublic, true),
+              publicReleaseEligibilitySqlPredicate()
+            )
+          ),
 
         db
           .select({
