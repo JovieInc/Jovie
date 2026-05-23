@@ -1,5 +1,9 @@
+import AuthenticationServices
+import CryptoKit
 import OSLog
+import Security
 import SwiftUI
+import UIKit
 
 private let authLogger = Logger(
   subsystem: Bundle.main.bundleIdentifier ?? "ie.jov.Jovie",
@@ -10,8 +14,9 @@ struct AuthScreen: View {
   let isMock: Bool
   let webBaseURL: URL
   let errorMessage: String?
+  let onAuthReturn: @MainActor (MobileAuthReturn) -> Void
 
-  @Environment(\.openURL) private var openURL
+  @State private var authCoordinator = MobileAuthCoordinator()
   @State private var didRequestBrowserAuth = false
 
   var body: some View {
@@ -48,35 +53,51 @@ struct AuthScreen: View {
   }
 
   private func startBrowserAuth() {
-    guard !isMock,
-          let authURL = MobileBrowserAuthURLBuilder.signInURL(baseURL: webBaseURL)
-    else {
+    guard !isMock else {
       return
     }
 
     didRequestBrowserAuth = true
 
-    openURL(authURL) { accepted in
-      if !accepted {
-        authLogger.error("System refused to open mobile browser auth URL.")
+    authCoordinator.startSignIn(baseURL: webBaseURL) { result in
+      Task { @MainActor in
         didRequestBrowserAuth = false
+
+        switch result {
+        case let .success(authReturn):
+          onAuthReturn(authReturn)
+        case let .failure(error):
+          if error is CancellationError {
+            return
+          }
+
+          authLogger.error("Mobile browser auth failed: \(error.localizedDescription, privacy: .public)")
+        }
       }
     }
   }
 }
 
 enum MobileBrowserAuthURLBuilder {
-  static func signInURL(baseURL: URL, returnRoute: String = "/app") -> URL? {
+  static func signInURL(
+    baseURL: URL,
+    returnRoute: String = "/app",
+    codeChallenge: String
+  ) -> URL? {
     let safeReturnRoute = sanitizeReturnRoute(returnRoute) ?? "/app"
     guard var components = URLComponents(
-      url: baseURL.appending(path: "signin"),
+      url: baseURL.appending(path: "auth/start"),
       resolvingAgainstBaseURL: false
     ) else {
       return nil
     }
 
     components.queryItems = [
-      URLQueryItem(name: "mobile_return", value: safeReturnRoute),
+      URLQueryItem(name: "client", value: "ios"),
+      URLQueryItem(name: "intent", value: "sign_in"),
+      URLQueryItem(name: "return_to", value: safeReturnRoute),
+      URLQueryItem(name: "code_challenge", value: codeChallenge),
+      URLQueryItem(name: "code_challenge_method", value: "S256"),
     ]
 
     return components.url
@@ -100,6 +121,96 @@ enum MobileBrowserAuthURLBuilder {
     }
 
     return trimmed
+  }
+}
+
+enum MobileAuthCoordinatorError: Error {
+  case invalidAuthURL
+  case missingCallbackURL
+}
+
+@MainActor
+final class MobileAuthCoordinator: NSObject, ASWebAuthenticationPresentationContextProviding {
+  private var session: ASWebAuthenticationSession?
+
+  func startSignIn(
+    baseURL: URL,
+    completion: @escaping (Result<MobileAuthReturn, Error>) -> Void
+  ) {
+    let codeVerifier = Self.makeCodeVerifier()
+    let codeChallenge = Self.makeCodeChallenge(verifier: codeVerifier)
+
+    guard let authURL = MobileBrowserAuthURLBuilder.signInURL(
+      baseURL: baseURL,
+      codeChallenge: codeChallenge
+    ) else {
+      completion(.failure(MobileAuthCoordinatorError.invalidAuthURL))
+      return
+    }
+
+    let session = ASWebAuthenticationSession(
+      url: authURL,
+      callbackURLScheme: "ie.jov.jovie"
+    ) { callbackURL, error in
+      Task { @MainActor in
+        self.session = nil
+
+        if let error {
+          completion(.failure(error))
+          return
+        }
+
+        guard let callbackURL,
+              let authReturn = MobileAuthReturnParser.parse(
+                callbackURL,
+                codeVerifier: codeVerifier
+              )
+        else {
+          completion(.failure(MobileAuthCoordinatorError.missingCallbackURL))
+          return
+        }
+
+        completion(.success(authReturn))
+      }
+    }
+
+    session.presentationContextProvider = self
+    session.prefersEphemeralWebBrowserSession = false
+    self.session = session
+
+    if !session.start() {
+      self.session = nil
+      completion(.failure(MobileAuthCoordinatorError.invalidAuthURL))
+    }
+  }
+
+  func presentationAnchor(
+    for session: ASWebAuthenticationSession
+  ) -> ASPresentationAnchor {
+    UIApplication.shared.connectedScenes
+      .compactMap { $0 as? UIWindowScene }
+      .flatMap(\.windows)
+      .first { $0.isKeyWindow } ?? ASPresentationAnchor()
+  }
+
+  private static func makeCodeVerifier() -> String {
+    var bytes = [UInt8](repeating: 0, count: 64)
+    _ = SecRandomCopyBytes(kSecRandomDefault, bytes.count, &bytes)
+    return Data(bytes).base64URLEncodedString()
+  }
+
+  private static func makeCodeChallenge(verifier: String) -> String {
+    let digest = SHA256.hash(data: Data(verifier.utf8))
+    return Data(digest).base64URLEncodedString()
+  }
+}
+
+private extension Data {
+  func base64URLEncodedString() -> String {
+    base64EncodedString()
+      .replacingOccurrences(of: "+", with: "-")
+      .replacingOccurrences(of: "/", with: "_")
+      .replacingOccurrences(of: "=", with: "")
   }
 }
 

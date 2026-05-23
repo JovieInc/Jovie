@@ -20,7 +20,7 @@ describe('DesktopAuthPage', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     searchParamsState.value =
-      'auth_url=%2Fsignin%3Fdesktop_return%3D%252Fapp%252Fsettings';
+      'auth_url=%2Fauth%2Fstart%3Fclient%3Delectron%26intent%3Dsign_in%26return_to%3D%252Fapp%252Fsettings%26code_challenge%3DabcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQ%26code_challenge_method%3DS256';
   });
 
   it('auto-opens the browser auth URL and keeps retry/cancel actions available', async () => {
@@ -31,7 +31,7 @@ describe('DesktopAuthPage', () => {
     render(<DesktopAuthPage />);
 
     const expectedAuthUrl = new URL(
-      '/signin?desktop_return=%2Fapp%2Fsettings',
+      '/auth/start?client=electron&intent=sign_in&return_to=%2Fapp%2Fsettings&code_challenge=abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQ&code_challenge_method=S256',
       window.location.origin
     ).toString();
 
@@ -40,7 +40,9 @@ describe('DesktopAuthPage', () => {
       expect(openDesktopAuthUrlMock).toHaveBeenCalledWith(expectedAuthUrl);
     });
 
-    fireEvent.click(screen.getByRole('button', { name: 'Open browser again' }));
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Continue in browser' })
+    );
 
     await waitFor(() => {
       expect(openDesktopAuthUrlMock).toHaveBeenCalledTimes(2);

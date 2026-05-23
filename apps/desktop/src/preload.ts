@@ -15,6 +15,8 @@ const NAV_STATE_CHANNEL = 'nav-state-changed';
 const START_DESKTOP_AUTH_HANDOFF_CHANNEL = 'start-desktop-auth-handoff';
 const OPEN_DESKTOP_AUTH_URL_CHANNEL = 'open-desktop-auth-url';
 const CLOSE_DESKTOP_AUTH_WINDOW_CHANNEL = 'close-desktop-auth-window';
+const CONSUME_DESKTOP_AUTH_COMPLETION_CHANNEL =
+  'consume-desktop-auth-completion';
 const DICTATION_STATUS_CHANNEL = 'dictation-status';
 
 interface MinimalDocument {
@@ -146,6 +148,21 @@ if (isTrustedAppOrigin()) {
       ) as Promise<{
         ok: boolean;
         reason?: string;
+      }>;
+    },
+
+    /** Consume the one-time desktop auth completion payload after deep-link return. */
+    consumeDesktopAuthCompletion: () => {
+      return ipcRenderer.invoke(
+        CONSUME_DESKTOP_AUTH_COMPLETION_CHANNEL
+      ) as Promise<{
+        ok: boolean;
+        reason?: string;
+        completion?: {
+          code: string;
+          state: string;
+          codeVerifier: string;
+        };
       }>;
     },
 

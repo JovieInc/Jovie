@@ -8,6 +8,7 @@ import { APP_ROUTES } from '@/constants/routes';
 import { AuthLayout, AuthRoutePrefetch, AuthShell } from '@/features/auth';
 import { track } from '@/lib/analytics';
 import { buildAuthRouteUrl } from '@/lib/auth/build-auth-route-url';
+import { getCentralAuthCallbackPath } from '@/lib/auth/central-auth-routing';
 import { setPlanIntent, validatePlan } from '@/lib/auth/plan-intent';
 import {
   clearSignupClaimValue,
@@ -223,7 +224,7 @@ export function SignUpPageClient() {
     ? buildMobileAuthReturnPath(mobileReturnRoute)
     : desktopReturnRoute
       ? buildDesktopAuthReturnPath(desktopReturnRoute)
-      : undefined;
+      : (getCentralAuthCallbackPath(searchParams) ?? undefined);
 
   return (
     <AuthLayout

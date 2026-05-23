@@ -3,7 +3,6 @@ import { sanitizeDesktopReturnRoute } from '@/lib/desktop/auth-return';
 
 export const MOBILE_RETURN_PARAM = 'mobile_return';
 export const MOBILE_AUTH_RETURN_PATH = '/mobile-auth-return';
-export const JOVIE_IOS_AUTH_RETURN_URL = 'ie.jov.jovie://auth-return';
 
 interface SearchParamReader {
   get(key: string): string | null;
@@ -33,15 +32,6 @@ export function buildMobileAuthReturnPath(route: string): string {
   const url = new URL(MOBILE_AUTH_RETURN_PATH, 'https://jov.ie');
   url.searchParams.set('route', sanitizedRoute);
   return `${url.pathname}${url.search}`;
-}
-
-export function buildMobileAuthDeepLink(ticket: string, route: string): string {
-  const sanitizedRoute =
-    sanitizeMobileReturnRoute(route) ?? APP_ROUTES.DASHBOARD;
-  const url = new URL(JOVIE_IOS_AUTH_RETURN_URL);
-  url.searchParams.set('ticket', ticket);
-  url.searchParams.set('route', sanitizedRoute);
-  return url.toString();
 }
 
 export function buildAuthRouteUrlWithMobileReturn(

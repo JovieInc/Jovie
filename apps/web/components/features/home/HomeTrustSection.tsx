@@ -103,7 +103,7 @@ export function HomeTrustSection({
           className={cn(
             isInlineStrip
               ? 'homepage-trust-logo-grid'
-              : 'grid grid-cols-2 items-center justify-items-center gap-x-6 gap-y-6 sm:flex sm:flex-wrap sm:items-center sm:justify-center sm:gap-x-10 sm:gap-y-5 lg:flex-nowrap lg:justify-between',
+              : 'grid grid-cols-1 items-center justify-items-center gap-x-6 gap-y-6 sm:flex sm:flex-wrap sm:items-center sm:justify-center sm:gap-x-10 sm:gap-y-5 lg:flex-nowrap lg:justify-between',
             variant === 'compact' &&
               !isInlineStrip &&
               'gap-x-5 gap-y-5 sm:gap-x-8'

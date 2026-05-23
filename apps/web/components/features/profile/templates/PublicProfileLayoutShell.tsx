@@ -40,7 +40,7 @@ export function PublicProfileLayoutShell({
       data-testid='public-profile-layout-shell'
     >
       <div className='absolute inset-0' aria-hidden='true'>
-        <div className='absolute inset-[-10%]'>
+        <div className='absolute inset-0 sm:inset-[-10%]'>
           {/* CSS-only ambient glow — replaces the blurred full-res image.
               At blur-[84px] + opacity-28 the image is visually indistinguishable
               from a solid radial gradient, saving ~96KB per page load (JOV-2263). */}

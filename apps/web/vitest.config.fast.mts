@@ -201,6 +201,14 @@ export default defineConfig({
         replacement: `${path.resolve(__dirname, './')}/`,
       },
       {
+        find: /^@jovie\/auth-routing$/,
+        replacement: path.resolve(__dirname, '../../packages/auth-routing'),
+      },
+      {
+        find: /^@jovie\/auth-routing\//,
+        replacement: `${path.resolve(__dirname, '../../packages/auth-routing')}/`,
+      },
+      {
         find: /^@jovie\/ui\//,
         replacement: `${path.resolve(__dirname, '../../packages/ui')}/`,
       },

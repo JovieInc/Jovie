@@ -3,6 +3,7 @@ import { APP_ROUTES } from '@/constants/routes';
 export const DESKTOP_RETURN_PARAM = 'desktop_return';
 export const DESKTOP_AUTH_RETURN_PATH = '/auth-return';
 export const DESKTOP_AUTH_HANDOFF_PATH = '/desktop-auth';
+export const DESKTOP_AUTH_START_PATH = '/auth/start';
 export const DESKTOP_AUTH_URL_PARAM = 'auth_url';
 export const JOVIE_AUTH_RETURN_PROTOCOL_URL = 'jovie://auth-return';
 
@@ -12,6 +13,7 @@ const AUTH_ROUTE_PREFIXES = [
   '/sign-in',
   '/sign-up',
   '/sso-callback',
+  '/auth',
   DESKTOP_AUTH_RETURN_PATH,
   DESKTOP_AUTH_HANDOFF_PATH,
   '/mobile-auth-return',
@@ -27,6 +29,14 @@ const DESKTOP_AUTH_ROUTE_PREFIXES = [
   '/sign-up',
   '/sso-callback',
 ] as const;
+
+const AUTH_START_INTENTS = new Set([
+  'sign_in',
+  'sign_up',
+  'session_recovery',
+  'account_link',
+]);
+const PKCE_CHALLENGE_PATTERN = /^[A-Za-z0-9_-]{43,128}$/;
 
 interface SearchParamReader {
   get(key: string): string | null;
@@ -146,6 +156,29 @@ export function sanitizeDesktopAuthUrl(
   }
 
   if (parsed.origin !== origin.origin) return null;
+  if (parsed.pathname === DESKTOP_AUTH_START_PATH) {
+    if (parsed.searchParams.get('client') !== 'electron') return null;
+    if (!AUTH_START_INTENTS.has(parsed.searchParams.get('intent') ?? '')) {
+      return null;
+    }
+
+    const returnTo = sanitizeDesktopReturnRoute(
+      parsed.searchParams.get('return_to')
+    );
+    const codeChallenge = parsed.searchParams.get('code_challenge');
+    if (
+      !returnTo ||
+      parsed.searchParams.get('code_challenge_method') !== 'S256' ||
+      !codeChallenge ||
+      !PKCE_CHALLENGE_PATTERN.test(codeChallenge)
+    ) {
+      return null;
+    }
+
+    parsed.searchParams.set('return_to', returnTo);
+    return parsed.toString();
+  }
+
   if (
     !DESKTOP_AUTH_ROUTE_PREFIXES.some(prefix =>
       matchesPathPrefix(parsed.pathname, prefix)

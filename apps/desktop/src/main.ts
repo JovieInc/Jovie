@@ -1,3 +1,4 @@
+import { createHash, randomBytes } from 'node:crypto';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import {
@@ -48,10 +49,16 @@ const NAV_STATE_CHANNEL = 'nav-state-changed';
 const START_DESKTOP_AUTH_HANDOFF_CHANNEL = 'start-desktop-auth-handoff';
 const OPEN_DESKTOP_AUTH_URL_CHANNEL = 'open-desktop-auth-url';
 const CLOSE_DESKTOP_AUTH_WINDOW_CHANNEL = 'close-desktop-auth-window';
+const CONSUME_DESKTOP_AUTH_COMPLETION_CHANNEL =
+  'consume-desktop-auth-completion';
 const DESKTOP_AUTH_HANDOFF_PATH = '/desktop-auth';
+const DESKTOP_AUTH_START_PATH = '/auth/start';
+const DESKTOP_AUTH_NATIVE_COMPLETE_PATH = '/auth/native-complete';
 const DESKTOP_RETURN_PARAM = 'desktop_return';
 const AUTH_RETURN_PROTOCOL = 'jovie:';
-const AUTH_RETURN_HOST = 'auth-return';
+const AUTH_RETURN_HOST = 'auth';
+const AUTH_RETURN_COMPLETE_PATH = '/complete';
+const LEGACY_AUTH_RETURN_HOST = 'auth-return';
 const DICTATION_STATUS_CHANNEL = 'dictation-status';
 
 type UpdateChannel =
@@ -71,10 +78,24 @@ interface DesktopDictationStatus {
   reason?: string;
 }
 
+interface DesktopAuthCompletion {
+  readonly code: string;
+  readonly state: string;
+  readonly codeVerifier: string;
+}
+
+interface PendingDesktopAuthPkce {
+  readonly codeVerifier: string;
+  readonly codeChallenge: string;
+  readonly createdAt: number;
+}
+
 let updateReadyToInstall = false;
 let mainWindow: BrowserWindow | null = null;
 let authHandoffWindow: BrowserWindow | null = null;
-let pendingAuthReturnRoute: string | null = null;
+let pendingAuthCompletion: DesktopAuthCompletion | null = null;
+let pendingLegacyAuthReturnRoute: string | null = null;
+let pendingDesktopAuthPkce: PendingDesktopAuthPkce | null = null;
 
 app.setName(APP_ENV === 'staging' ? 'Jovie Staging' : 'Jovie');
 
@@ -121,6 +142,16 @@ function isTrustedDesktopAuthSender(event: IpcMainInvokeEvent): boolean {
   );
 }
 
+function isTrustedDesktopAuthCompleteSender(
+  event: IpcMainInvokeEvent
+): boolean {
+  const parsed = parseUrl(getIpcSenderUrl(event));
+  return (
+    parsed?.origin === APP_ORIGIN &&
+    parsed.pathname === DESKTOP_AUTH_NATIVE_COMPLETE_PATH
+  );
+}
+
 const AUTH_ROUTE_PREFIXES = [
   '/signin',
   '/signup',
@@ -132,6 +163,7 @@ const AUTH_ROUTE_PREFIXES = [
   '/sign-in/sso-callback',
   '/sign-up/sso-callback',
   '/auth/callback',
+  DESKTOP_AUTH_NATIVE_COMPLETE_PATH,
   '/app/auth/callback',
 ] as const;
 
@@ -143,6 +175,7 @@ const DESKTOP_BROWSER_AUTH_PATHS = [
 ] as const;
 
 const BLOCKED_RETURN_PREFIXES = [
+  '/auth',
   ...AUTH_ROUTE_PREFIXES,
   '/auth-return',
   DESKTOP_AUTH_HANDOFF_PATH,
@@ -197,8 +230,69 @@ function getDefaultDesktopReturnRoute(pathname: string): string {
     : '/app';
 }
 
+function base64Url(buffer: Buffer): string {
+  return buffer
+    .toString('base64')
+    .replaceAll('+', '-')
+    .replaceAll('/', '_')
+    .replaceAll('=', '');
+}
+
+function createDesktopAuthPkce(): PendingDesktopAuthPkce {
+  const codeVerifier = base64Url(randomBytes(64));
+  const codeChallenge = base64Url(
+    createHash('sha256').update(codeVerifier).digest()
+  );
+  return {
+    codeVerifier,
+    codeChallenge,
+    createdAt: Date.now(),
+  };
+}
+
+function rememberDesktopAuthPkce(pkce: PendingDesktopAuthPkce): void {
+  pendingDesktopAuthPkce = pkce;
+}
+
+function consumePendingDesktopAuthPkce(): PendingDesktopAuthPkce | null {
+  const pending = pendingDesktopAuthPkce;
+  pendingDesktopAuthPkce = null;
+  return pending;
+}
+
+function buildCentralDesktopAuthUrl(
+  intent: 'sign_in' | 'sign_up',
+  returnTo: string
+): string {
+  const pkce = createDesktopAuthPkce();
+  rememberDesktopAuthPkce(pkce);
+
+  const authUrl = new URL(DESKTOP_AUTH_START_PATH, APP_URL);
+  authUrl.searchParams.set('client', 'electron');
+  authUrl.searchParams.set('intent', intent);
+  authUrl.searchParams.set('return_to', returnTo);
+  authUrl.searchParams.set('code_challenge', pkce.codeChallenge);
+  authUrl.searchParams.set('code_challenge_method', 'S256');
+  return authUrl.toString();
+}
+
+function isCentralDesktopAuthStartUrl(parsed: URL): boolean {
+  return (
+    parsed.origin === APP_ORIGIN &&
+    parsed.pathname === DESKTOP_AUTH_START_PATH &&
+    parsed.searchParams.get('client') === 'electron' &&
+    parsed.searchParams.get('code_challenge_method') === 'S256' &&
+    Boolean(parsed.searchParams.get('code_challenge')) &&
+    Boolean(sanitizeDesktopReturnRoute(parsed.searchParams.get('return_to')))
+  );
+}
+
 function buildDesktopBrowserAuthUrl(urlString: string): string | null {
   const parsed = parseUrl(urlString);
+  if (parsed && isCentralDesktopAuthStartUrl(parsed)) {
+    return parsed.toString();
+  }
+
   if (
     !parsed ||
     parsed.origin !== APP_ORIGIN ||
@@ -213,8 +307,12 @@ function buildDesktopBrowserAuthUrl(urlString: string): string | null {
     getDefaultDesktopReturnRoute(parsed.pathname);
 
   parsed.searchParams.delete('oauth_error');
-  parsed.searchParams.set(DESKTOP_RETURN_PARAM, desktopReturn);
-  return parsed.toString();
+  const intent =
+    matchesPathPrefix(parsed.pathname, '/signup') ||
+    matchesPathPrefix(parsed.pathname, '/sign-up')
+      ? 'sign_up'
+      : 'sign_in';
+  return buildCentralDesktopAuthUrl(intent, desktopReturn);
 }
 
 function buildDesktopAuthHandoffUrl(authUrl: string): string {
@@ -223,12 +321,42 @@ function buildDesktopAuthHandoffUrl(authUrl: string): string {
   return url.toString();
 }
 
-function parseAuthReturnDeepLink(urlString: string): string | null {
+function parseAuthReturnDeepLink(
+  urlString: string
+): Omit<DesktopAuthCompletion, 'codeVerifier'> | null {
   const parsed = parseUrl(urlString);
   if (
     !parsed ||
     parsed.protocol !== AUTH_RETURN_PROTOCOL ||
-    parsed.hostname !== AUTH_RETURN_HOST
+    parsed.hostname !== AUTH_RETURN_HOST ||
+    parsed.pathname !== AUTH_RETURN_COMPLETE_PATH
+  ) {
+    return null;
+  }
+
+  const code = parsed.searchParams.get('code');
+  const state = parsed.searchParams.get('state');
+  if (!code || !state) return null;
+
+  return { code, state };
+}
+
+function findAuthReturnInArgv(
+  argv: readonly string[]
+): Omit<DesktopAuthCompletion, 'codeVerifier'> | null {
+  for (const arg of argv) {
+    const completion = parseAuthReturnDeepLink(arg);
+    if (completion) return completion;
+  }
+  return null;
+}
+
+function parseLegacyAuthReturnRouteDeepLink(urlString: string): string | null {
+  const parsed = parseUrl(urlString);
+  if (
+    !parsed ||
+    parsed.protocol !== AUTH_RETURN_PROTOCOL ||
+    parsed.hostname !== LEGACY_AUTH_RETURN_HOST
   ) {
     return null;
   }
@@ -236,9 +364,9 @@ function parseAuthReturnDeepLink(urlString: string): string | null {
   return sanitizeDesktopReturnRoute(parsed.searchParams.get('route'));
 }
 
-function findAuthReturnRouteInArgv(argv: readonly string[]): string | null {
+function findLegacyAuthReturnRouteInArgv(argv: readonly string[]): string | null {
   for (const arg of argv) {
-    const route = parseAuthReturnDeepLink(arg);
+    const route = parseLegacyAuthReturnRouteDeepLink(arg);
     if (route) return route;
   }
   return null;
@@ -349,6 +477,47 @@ function showWindow(win: BrowserWindow): void {
   win.focus();
 }
 
+function loadAuthCompletion(completion: DesktopAuthCompletion): void {
+  pendingAuthCompletion = completion;
+
+  const targetUrl = new URL(DESKTOP_AUTH_NATIVE_COMPLETE_PATH, APP_URL);
+  targetUrl.searchParams.set('client', 'electron');
+  targetUrl.searchParams.set('state', completion.state);
+  const win =
+    mainWindow && !mainWindow.isDestroyed()
+      ? mainWindow
+      : createWindow(targetUrl.toString());
+
+  if (win.webContents.getURL() !== targetUrl.toString()) {
+    void win.loadURL(targetUrl.toString());
+  }
+
+  showWindow(win);
+
+  if (authHandoffWindow && !authHandoffWindow.isDestroyed()) {
+    authHandoffWindow.close();
+  }
+}
+
+function handleAuthCompletion(
+  completion: Omit<DesktopAuthCompletion, 'codeVerifier'>
+): void {
+  const pkce = consumePendingDesktopAuthPkce();
+  if (!pkce) return;
+
+  const nativeCompletion: DesktopAuthCompletion = {
+    ...completion,
+    codeVerifier: pkce.codeVerifier,
+  };
+
+  if (app.isReady()) {
+    loadAuthCompletion(nativeCompletion);
+    return;
+  }
+
+  pendingAuthCompletion = nativeCompletion;
+}
+
 function loadReturnedRoute(route: string): void {
   const targetUrl = new URL(route, APP_URL).toString();
   const win =
@@ -367,13 +536,13 @@ function loadReturnedRoute(route: string): void {
   }
 }
 
-function handleAuthReturnRoute(route: string): void {
+function handleLegacyAuthReturnRoute(route: string): void {
   if (app.isReady()) {
     loadReturnedRoute(route);
     return;
   }
 
-  pendingAuthReturnRoute = route;
+  pendingLegacyAuthReturnRoute = route;
 }
 
 function showDesktopAuthHandoff(authUrl: string): void {
@@ -911,6 +1080,23 @@ ipcMain.handle(
   }
 );
 
+ipcMain.handle(
+  CONSUME_DESKTOP_AUTH_COMPLETION_CHANNEL,
+  (event: IpcMainInvokeEvent, ...args: unknown[]) => {
+    if (!isTrustedDesktopAuthCompleteSender(event) || args.length !== 0) {
+      return { ok: false, reason: 'invalid-request' };
+    }
+
+    if (!pendingAuthCompletion) {
+      return { ok: false, reason: 'missing-auth-completion' };
+    }
+
+    const completion = pendingAuthCompletion;
+    pendingAuthCompletion = null;
+    return { ok: true, completion };
+  }
+);
+
 function registerAuthReturnProtocol(): void {
   const defaultAppProcess = process as NodeJS.Process & {
     readonly defaultApp?: boolean;
@@ -928,9 +1114,15 @@ function registerAuthReturnProtocol(): void {
 
 if (gotSingleInstanceLock) {
   app.on('second-instance', (_event, argv) => {
-    const route = findAuthReturnRouteInArgv(argv);
-    if (route) {
-      handleAuthReturnRoute(route);
+    const completion = findAuthReturnInArgv(argv);
+    if (completion) {
+      handleAuthCompletion(completion);
+      return;
+    }
+
+    const legacyRoute = findLegacyAuthReturnRouteInArgv(argv);
+    if (legacyRoute) {
+      handleLegacyAuthReturnRoute(legacyRoute);
       return;
     }
 
@@ -941,13 +1133,19 @@ if (gotSingleInstanceLock) {
 
   app.on('open-url', (event, url) => {
     event.preventDefault();
-    const route = parseAuthReturnDeepLink(url);
-    if (route) {
-      handleAuthReturnRoute(route);
+    const completion = parseAuthReturnDeepLink(url);
+    if (completion) {
+      handleAuthCompletion(completion);
+      return;
+    }
+
+    const legacyRoute = parseLegacyAuthReturnRouteDeepLink(url);
+    if (legacyRoute) {
+      handleLegacyAuthReturnRoute(legacyRoute);
     }
   });
 
-  pendingAuthReturnRoute = findAuthReturnRouteInArgv(process.argv);
+  pendingLegacyAuthReturnRoute = findLegacyAuthReturnRouteInArgv(process.argv);
 }
 
 app.whenReady().then(() => {
@@ -961,11 +1159,13 @@ app.whenReady().then(() => {
   registerAuthReturnProtocol();
   refreshApplicationMenu();
   createWindow(
-    pendingAuthReturnRoute
-      ? new URL(pendingAuthReturnRoute, APP_URL).toString()
+    pendingAuthCompletion
+      ? new URL(DESKTOP_AUTH_NATIVE_COMPLETE_PATH, APP_URL).toString()
+      : pendingLegacyAuthReturnRoute
+        ? new URL(pendingLegacyAuthReturnRoute, APP_URL).toString()
       : APP_ENTRY_URL
   );
-  pendingAuthReturnRoute = null;
+  pendingLegacyAuthReturnRoute = null;
 
   // Auto-update: check on launch then every 30 minutes
   autoUpdater.checkForUpdatesAndNotify().catch(() => {

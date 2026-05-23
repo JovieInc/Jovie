@@ -51,7 +51,8 @@ struct JovieApp: App {
             appState: appState,
             liveUserID: nil,
             authErrorMessage: nil,
-            onLogout: { await appState.signOut() }
+            onLogout: { await appState.signOut() },
+            onAuthReturn: { _ in }
           )
         }
       }

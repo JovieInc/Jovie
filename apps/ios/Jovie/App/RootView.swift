@@ -119,6 +119,7 @@ private struct AppContentView: View {
   @Bindable var appState: AppState
   let authErrorMessage: String?
   let onLogout: @MainActor () async -> Void
+  let onAuthReturn: @MainActor (MobileAuthReturn) -> Void
 
   var body: some View {
     Group {
@@ -129,7 +130,8 @@ private struct AppContentView: View {
         AuthScreen(
           isMock: !appState.launchMode.usesLiveClerk,
           webBaseURL: appState.configuration.webBaseURL,
-          errorMessage: authErrorMessage
+          errorMessage: authErrorMessage,
+          onAuthReturn: onAuthReturn
         )
       case .needsOnboarding:
         AppShellView(
@@ -256,13 +258,15 @@ struct RootView: View {
   let liveUserID: String?
   let authErrorMessage: String?
   let onLogout: @MainActor () async -> Void
+  let onAuthReturn: @MainActor (MobileAuthReturn) -> Void
 
   var body: some View {
     ZStack {
       AppContentView(
         appState: appState,
         authErrorMessage: authErrorMessage,
-        onLogout: onLogout
+        onLogout: onLogout,
+        onAuthReturn: onAuthReturn
       )
 
 #if DEBUG
@@ -326,7 +330,8 @@ struct LiveRootContainer: View {
       onLogout: {
         try? await clerk.auth.signOut()
         await appState.signOut()
-      }
+      },
+      onAuthReturn: handleAuthReturn
     )
       .onOpenURL { url in
         handleAuthReturn(url)
@@ -359,7 +364,11 @@ struct LiveRootContainer: View {
   @MainActor
   private func handleAuthReturn(_ url: URL) {
     guard let authReturn = MobileAuthReturnParser.parse(url) else { return }
+    handleAuthReturn(authReturn)
+  }
 
+  @MainActor
+  private func handleAuthReturn(_ authReturn: MobileAuthReturn) {
     authReturnTask?.cancel()
     authErrorMessage = nil
     appState.route = .launching
@@ -370,7 +379,10 @@ struct LiveRootContainer: View {
       }
 
       do {
-        let signIn = try await clerk.auth.signInWithTicket(authReturn.ticket)
+        let exchangeResponse = try await NativeAuthExchangeClient(
+          baseURL: appState.configuration.webBaseURL
+        ).exchange(authReturn)
+        let signIn = try await clerk.auth.signInWithTicket(exchangeResponse.ticket)
 
         if let sessionID = signIn.createdSessionId,
            clerk.session?.id != sessionID

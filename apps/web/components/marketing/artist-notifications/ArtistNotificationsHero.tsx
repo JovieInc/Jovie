@@ -33,13 +33,13 @@ export function ArtistNotificationsHero({
         className='absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(255,255,255,0.14),transparent_42%),radial-gradient(circle_at_80%_18%,rgba(86,182,255,0.16),transparent_24%),linear-gradient(180deg,rgba(255,255,255,0.02),transparent_48%)]'
       />
       <MarketingContainer width='landing' className='relative'>
-        <div className='grid gap-12 lg:grid-cols-[minmax(0,0.92fr)_minmax(0,1.08fr)] lg:items-center'>
-          <div className='max-w-[38rem]'>
-            <h1 className='max-w-[10ch] text-[clamp(3.6rem,8.4vw,7.2rem)] font-semibold leading-[0.88] tracking-[-0.085em] text-primary-token'>
+        <div className='grid min-w-0 gap-12 lg:grid-cols-[minmax(0,0.92fr)_minmax(0,1.08fr)] lg:items-center'>
+          <div className='w-full min-w-0 max-w-[38rem]'>
+            <h1 className='max-w-full text-[clamp(3rem,15vw,3.6rem)] font-semibold leading-[0.92] tracking-[-0.045em] text-primary-token sm:max-w-[10ch] sm:text-[clamp(3.6rem,8.4vw,7.2rem)] sm:leading-[0.88] sm:tracking-[-0.085em]'>
               {hero.headlineLines?.length
                 ? hero.headlineLines.map(line =>
                     line ? (
-                      <span key={line} className='block'>
+                      <span key={line} className='block max-w-full break-words'>
                         {line}
                       </span>
                     ) : null
@@ -63,11 +63,11 @@ export function ArtistNotificationsHero({
             </div>
           </div>
 
-          <div className='relative flex flex-col gap-3 lg:block lg:h-[32rem]'>
+          <div className='relative flex min-w-0 flex-col gap-3 lg:block lg:h-[32rem]'>
             {hero.floatingCards.map(card => (
               <div
                 key={card.id}
-                className={`${CARD_POSITIONS[card.kind]} w-full`}
+                className={`${CARD_POSITIONS[card.kind]} w-full min-w-0`}
               >
                 <ArtistNotificationFloatingCardView card={card} />
               </div>

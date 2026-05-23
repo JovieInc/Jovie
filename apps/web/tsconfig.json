@@ -32,6 +32,8 @@
       "@/app/*": ["./app/*", "./app/app/*"],
       "@/lib/*": ["./lib/*"],
       "@/types/*": ["./types/*"],
+      "@jovie/auth-routing": ["../../packages/auth-routing"],
+      "@jovie/auth-routing/*": ["../../packages/auth-routing/*"],
       "@jovie/ui": ["../../packages/ui"],
       "@jovie/ui/*": ["../../packages/ui/*"],
       "@jovie/extension-contracts": ["../../packages/extension-contracts"],

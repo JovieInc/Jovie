@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
   buildAuthRouteUrlWithMobileReturn,
-  buildMobileAuthDeepLink,
   buildMobileAuthReturnPath,
   sanitizeMobileReturnRoute,
 } from '@/lib/mobile/auth-return';
@@ -24,12 +23,9 @@ describe('mobile auth return helpers', () => {
     expect(sanitizeMobileReturnRoute('/api/mobile/v1/me')).toBeNull();
   });
 
-  it('builds the mobile auth-return page and app deep link', () => {
+  it('builds the mobile auth-return compatibility page without native tickets', () => {
     expect(buildMobileAuthReturnPath('/app/settings')).toBe(
       '/mobile-auth-return?route=%2Fapp%2Fsettings'
-    );
-    expect(buildMobileAuthDeepLink('ticket_123', '/app/settings')).toBe(
-      'ie.jov.jovie://auth-return?ticket=ticket_123&route=%2Fapp%2Fsettings'
     );
   });
 

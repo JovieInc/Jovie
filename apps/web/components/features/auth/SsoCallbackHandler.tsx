@@ -6,6 +6,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 import { LoadingSpinner } from '@/components/atoms/LoadingSpinner';
 import { APP_ROUTES } from '@/constants/routes';
+import { isCentralAuthCallbackPath } from '@/lib/auth/central-auth-routing';
 import {
   isAccessDeniedError,
   isAccountExistsError,
@@ -92,16 +93,22 @@ export function SsoCallbackHandler({
   const [isStalled, setIsStalled] = useState(false);
   const callbackInitiated = useRef(false);
   const searchParamsString = searchParams.toString();
-  const resolvedSignInFallbackRedirectUrl =
-    buildDesktopCallbackFallbackRedirectUrl(
-      searchParams,
-      signInFallbackRedirectUrl
-    );
-  const resolvedSignUpFallbackRedirectUrl =
-    buildDesktopCallbackFallbackRedirectUrl(
-      searchParams,
-      signUpFallbackRedirectUrl
-    );
+  const resolvedSignInFallbackRedirectUrl = isCentralAuthCallbackPath(
+    signInFallbackRedirectUrl
+  )
+    ? signInFallbackRedirectUrl
+    : buildDesktopCallbackFallbackRedirectUrl(
+        searchParams,
+        signInFallbackRedirectUrl
+      );
+  const resolvedSignUpFallbackRedirectUrl = isCentralAuthCallbackPath(
+    signUpFallbackRedirectUrl
+  )
+    ? signUpFallbackRedirectUrl
+    : buildDesktopCallbackFallbackRedirectUrl(
+        searchParams,
+        signUpFallbackRedirectUrl
+      );
 
   useEffect(() => {
     // Check for unexpected hash fragments that Clerk might add
