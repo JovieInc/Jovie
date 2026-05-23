@@ -222,7 +222,7 @@ describe('DashboardNav interactions', () => {
   });
 
   it('renders recent threads in the Design V1 sidebar as App Router links', () => {
-    mockUseChatConversationsQuery.mockReturnValueOnce({
+    mockUseChatConversationsQuery.mockReturnValue({
       data: [
         {
           id: 'thread-older',
@@ -262,7 +262,7 @@ describe('DashboardNav interactions', () => {
   it('renders compact thread loading and empty states from the real conversations query', async () => {
     const user = userEvent.setup();
 
-    mockUseChatConversationsQuery.mockReturnValueOnce({
+    mockUseChatConversationsQuery.mockReturnValue({
       data: undefined,
       isLoading: true,
     });
@@ -276,7 +276,7 @@ describe('DashboardNav interactions', () => {
     expect(screen.queryByText('Loading threads')).not.toBeInTheDocument();
     unmount();
 
-    mockUseChatConversationsQuery.mockReturnValueOnce({
+    mockUseChatConversationsQuery.mockReturnValue({
       data: [],
       isLoading: false,
       isError: false,
