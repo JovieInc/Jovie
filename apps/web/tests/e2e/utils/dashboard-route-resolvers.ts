@@ -60,21 +60,25 @@ interface ConversationsListResponse {
   }>;
 }
 
-interface BrowserFetchInit {
+interface PlaywrightRequestInit {
   readonly method?: string;
   readonly headers?: Record<string, string>;
-  readonly body?: string;
+  readonly data?: string;
+}
+
+interface FetchJsonResult<T> {
+  readonly ok: boolean;
+  readonly status: number;
+  readonly data: T;
+  readonly parseError?: string;
+  readonly rawBody?: string;
 }
 
 async function fetchJsonFromPage<T>(
   page: Page,
   input: string,
-  init?: BrowserFetchInit
-): Promise<{
-  readonly ok: boolean;
-  readonly status: number;
-  readonly data: T;
-}> {
+  init?: PlaywrightRequestInit
+): Promise<FetchJsonResult<T>> {
   const baseUrl = process.env.BASE_URL ?? 'http://localhost:3100';
   const resolvedTarget = /^[a-z]+:\/\//i.test(input)
     ? input
@@ -82,15 +86,18 @@ async function fetchJsonFromPage<T>(
   const response = await page.context().request.fetch(resolvedTarget, {
     method: init?.method,
     headers: init?.headers,
-    data: init?.body,
+    data: init?.data,
     timeout: 15_000,
   });
   const rawBody = await response.text().catch(() => '');
   let data = {} as T;
+  let parseError: string | undefined;
   if (rawBody.trim().length > 0) {
     try {
       data = JSON.parse(rawBody) as T;
-    } catch {
+    } catch (error) {
+      parseError =
+        error instanceof Error ? error.message : 'Unknown JSON parse error';
       data = {} as T;
     }
   }
@@ -99,6 +106,8 @@ async function fetchJsonFromPage<T>(
     ok: response.ok(),
     status: response.status(),
     data,
+    parseError,
+    rawBody: parseError ? rawBody : undefined,
   };
 }
 
@@ -121,7 +130,7 @@ export async function resolveChatConversationPath(page: Page): Promise<string> {
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({
+      data: JSON.stringify({
         title: 'Dashboard QA thread',
       }),
     }
@@ -129,8 +138,11 @@ export async function resolveChatConversationPath(page: Page): Promise<string> {
 
   const createdConversationId = created.data.conversation?.id;
   if (!created.ok || !createdConversationId) {
+    const parseDetails = created.parseError
+      ? `; response was not valid JSON (${created.parseError})`
+      : '';
     throw new Error(
-      `Unable to resolve chat conversation route (status ${created.status})`
+      `Unable to resolve chat conversation route (status ${created.status}${parseDetails})`
     );
   }
 
