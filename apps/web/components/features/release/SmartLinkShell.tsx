@@ -11,7 +11,7 @@
 import { ChevronLeft } from 'lucide-react';
 import Image from 'next/image';
 import Link from 'next/link';
-import { useCallback } from 'react';
+import { type ReactNode, useCallback } from 'react';
 import { Icon } from '@/components/atoms/Icon';
 import {
   PublicSurfaceHeader,
@@ -81,6 +81,43 @@ function ArtworkFallback() {
   );
 }
 
+function SmartLinkHeaderRightSlot({
+  onMenuOpen,
+  showBrandMark,
+  showMenuButton,
+}: {
+  readonly onMenuOpen?: () => void;
+  readonly showBrandMark: boolean;
+  readonly showMenuButton: boolean;
+}): ReactNode {
+  if (showMenuButton && onMenuOpen) {
+    return (
+      <button
+        type='button'
+        onClick={onMenuOpen}
+        className='flex h-8 w-8 items-center justify-center rounded-full border border-white/[0.08] bg-black/25 text-white/70 backdrop-blur-2xl transition-colors duration-subtle hover:bg-black/40'
+        aria-label='Menu'
+        aria-haspopup='dialog'
+      >
+        <Mark size={17} className='h-[17px] w-[17px]' />
+      </button>
+    );
+  }
+
+  if (!showBrandMark) {
+    return null;
+  }
+
+  return (
+    <span
+      className='flex h-8 w-8 items-center justify-center text-white/48 drop-shadow-[0_1px_4px_rgba(0,0,0,0.4)]'
+      data-testid='smart-link-brand-mark'
+    >
+      <Mark size={17} className='h-[17px] w-[17px]' />
+    </span>
+  );
+}
+
 export function SmartLinkShell({
   artworkUrl,
   artworkAlt = 'Artwork',
@@ -133,26 +170,11 @@ export function SmartLinkShell({
                 </Link>
               ) : null
             }
-            rightSlot={
-              showMenuButton && onMenuOpen ? (
-                <button
-                  type='button'
-                  onClick={onMenuOpen}
-                  className='flex h-8 w-8 items-center justify-center rounded-full border border-white/[0.08] bg-black/25 text-white/70 backdrop-blur-2xl transition-colors duration-subtle hover:bg-black/40'
-                  aria-label='Menu'
-                  aria-haspopup='dialog'
-                >
-                  <Mark size={17} className='h-[17px] w-[17px]' />
-                </button>
-              ) : showBrandMark ? (
-                <span
-                  className='flex h-8 w-8 items-center justify-center text-white/48 drop-shadow-[0_1px_4px_rgba(0,0,0,0.4)]'
-                  data-testid='smart-link-brand-mark'
-                >
-                  <Mark size={17} className='h-[17px] w-[17px]' />
-                </span>
-              ) : null
-            }
+            rightSlot={SmartLinkHeaderRightSlot({
+              onMenuOpen,
+              showBrandMark,
+              showMenuButton,
+            })}
           />
 
           {/* Hero overlay */}

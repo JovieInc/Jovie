@@ -762,10 +762,8 @@ export function ProfileCompactSurface({
             <BottomTabBar
               activeTab={activeVisiblePrimaryTab}
               hasTourDates={hasTourDates}
-              hideMoreMenu={hideMoreMenu}
               isMenuOpen={isMenuActive}
               onTabSelect={handleTabSelect}
-              onOpenMenu={onOpenMenu}
             />
           ) : null}
         </div>

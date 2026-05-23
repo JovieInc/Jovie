@@ -95,8 +95,6 @@ export function AddReleaseSidebar({
     return parsedReleaseDate ? parsedReleaseDate > startOfToday() : false;
   }, [releaseDate]);
 
-  const [, setRevealDateManuallySet] = useState(false);
-
   const replaceStagedArtworkPreview = useCallback((nextUrl: string | null) => {
     setStagedArtworkPreviewUrl(nextUrl);
   }, []);
@@ -106,7 +104,6 @@ export function AddReleaseSidebar({
     setReleaseType('single');
     setReleaseDate('');
     setRevealDate('');
-    setRevealDateManuallySet(false);
     setGenres([]);
     setIsExplicit(false);
     setStagedArtworkFile(null);
@@ -373,7 +370,6 @@ export function AddReleaseSidebar({
                   onSelect={date => {
                     if (!date) return;
                     setReleaseDate(format(date, 'yyyy-MM-dd'));
-                    setRevealDateManuallySet(false);
                   }}
                   autoFocus
                 />
@@ -405,7 +401,6 @@ export function AddReleaseSidebar({
                     onSelect={date => {
                       if (!date) return;
                       setRevealDate(format(date, 'yyyy-MM-dd'));
-                      setRevealDateManuallySet(true);
                     }}
                     autoFocus
                   />
