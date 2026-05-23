@@ -97,6 +97,10 @@ export function UnreleasedReleaseHero({
       >
         {/* Content — countdown + notification signup */}
         <div className='relative z-10 flex min-h-0 flex-1 flex-col px-5 pt-3'>
+          <p className='sr-only'>
+            {release.title} by {artist.name} is coming soon. Get notified when
+            it drops.
+          </p>
           <div className='min-h-0 flex-1 overflow-y-auto overscroll-contain scrollbar-hide'>
             <PreSaveActions
               releaseId={release.id}

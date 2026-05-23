@@ -74,6 +74,7 @@ export function PayView({
       primaryLabel='Continue with Venmo'
       paymentLabel='Venmo'
       showOtherPaymentOptions={false}
+      screenReaderDescription={`Send support to ${artistHandle} with Venmo.`}
     />
   );
 }
