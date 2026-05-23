@@ -3,7 +3,7 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { Search } from 'lucide-react';
 import { usePathname, useRouter } from 'next/navigation';
-import { useCallback, useEffect, useMemo, useRef } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { useDashboardData } from '@/app/app/(shell)/dashboard/DashboardDataContext';
 import { usePreviewPanelState } from '@/app/app/(shell)/dashboard/PreviewPanelContext';
@@ -46,6 +46,60 @@ const searchNavItem: NavItem = {
   icon: Search,
   description: 'Search routes, releases, artists, and threads',
 };
+
+const THREAD_READ_STORAGE_KEY = 'jovie:sidebar-thread-read-at';
+const IN_PROGRESS_CHAT_TURN_STATUSES = new Set([
+  'reserved',
+  'running',
+  'streaming',
+]);
+const FAILED_CHAT_TURN_STATUSES = new Set([
+  'failed_tool_unavailable',
+  'failed_model_error',
+  'failed_timeout',
+  'failed_network',
+]);
+
+function readThreadReadState(): Record<string, string> {
+  try {
+    const stored = globalThis.localStorage?.getItem(THREAD_READ_STORAGE_KEY);
+    if (!stored) return {};
+    const parsed = JSON.parse(stored) as unknown;
+    if (!parsed || typeof parsed !== 'object') return {};
+
+    return Object.fromEntries(
+      Object.entries(parsed as Record<string, unknown>).filter(
+        (entry): entry is [string, string] => typeof entry[1] === 'string'
+      )
+    );
+  } catch {
+    return {};
+  }
+}
+
+function writeThreadReadState(value: Record<string, string>): void {
+  try {
+    globalThis.localStorage?.setItem(
+      THREAD_READ_STORAGE_KEY,
+      JSON.stringify(value)
+    );
+  } catch {
+    // Storage can be unavailable in restricted browsers; row state still works.
+  }
+}
+
+function isTimestampAfter(
+  candidate: string | null | undefined,
+  baseline: string | null | undefined
+): boolean {
+  if (!candidate) return false;
+  if (!baseline) return true;
+  const candidateMs = Date.parse(candidate);
+  const baselineMs = Date.parse(baseline);
+  return Number.isFinite(candidateMs) && Number.isFinite(baselineMs)
+    ? candidateMs > baselineMs
+    : candidate > baseline;
+}
 
 type DashboardNavSection = {
   readonly key: string;
@@ -113,6 +167,8 @@ export function DashboardNav(_: DashboardNavProps) {
   const queryClient = useQueryClient();
   const shellChatV1Enabled = useAppFlag('DESIGN_V1');
   const shellChatLibraryEnabled = useAppFlag('SHELL_CHAT_V1');
+  const [threadReadAtById, setThreadReadAtById] =
+    useState<Record<string, string>>(readThreadReadState);
   const {
     isOpen: isPreviewOpen,
     open: openPreviewPanel,
@@ -155,6 +211,23 @@ export function DashboardNav(_: DashboardNavProps) {
     limit: 10,
     enabled: threadsVisible,
   });
+
+  useEffect(() => {
+    if (!conversations || conversations.length === 0) return;
+
+    setThreadReadAtById(previous => {
+      if (Object.keys(previous).length > 0) return previous;
+
+      const baseline = Object.fromEntries(
+        conversations.map(conversation => [
+          conversation.id,
+          conversation.updatedAt,
+        ])
+      );
+      writeThreadReadState(baseline);
+      return baseline;
+    });
+  }, [conversations]);
 
   // Settings nav: "General" (user) and artist name (or "Artist") groups
   const artistSettingsLabel = artistName || 'Artist';
@@ -365,24 +438,64 @@ export function DashboardNav(_: DashboardNavProps) {
     openCommandPalette();
   }, []);
 
-  const sidebarThreads = useMemo<SidebarThread[]>(
-    () =>
-      (conversations ?? []).map(conversation => ({
-        id: conversation.id,
-        href: `${APP_ROUTES.CHAT}/${encodeURIComponent(conversation.id)}`,
-        title: conversation.title?.trim() || 'Untitled thread',
-        status: 'complete',
-        updatedAt: conversation.updatedAt,
-      })),
-    [conversations]
-  );
-
   const activeThreadId = useMemo(() => {
     const chatPrefix = `${APP_ROUTES.CHAT}/`;
     if (!pathname.startsWith(chatPrefix)) return null;
     const [id] = pathname.slice(chatPrefix.length).split('/');
     return id ? decodeURIComponent(id) : null;
   }, [pathname]);
+
+  useEffect(() => {
+    if (!activeThreadId || !conversations) return;
+
+    const activeConversation = conversations.find(
+      conversation => conversation.id === activeThreadId
+    );
+    if (!activeConversation) return;
+
+    setThreadReadAtById(previous => {
+      if (previous[activeThreadId] === activeConversation.updatedAt) {
+        return previous;
+      }
+
+      const next = {
+        ...previous,
+        [activeThreadId]: activeConversation.updatedAt,
+      };
+      writeThreadReadState(next);
+      return next;
+    });
+  }, [activeThreadId, conversations]);
+
+  const sidebarThreads = useMemo<SidebarThread[]>(
+    () =>
+      (conversations ?? []).map(conversation => {
+        const latestTurnStatus = conversation.latestTurnStatus ?? null;
+        const isRunning = latestTurnStatus
+          ? IN_PROGRESS_CHAT_TURN_STATUSES.has(latestTurnStatus)
+          : false;
+        const isFailed = latestTurnStatus
+          ? FAILED_CHAT_TURN_STATUSES.has(latestTurnStatus)
+          : false;
+        const isUnread =
+          activeThreadId !== conversation.id &&
+          conversation.latestMessageRole === 'assistant' &&
+          isTimestampAfter(
+            conversation.updatedAt,
+            threadReadAtById[conversation.id]
+          );
+
+        return {
+          id: conversation.id,
+          href: `${APP_ROUTES.CHAT}/${encodeURIComponent(conversation.id)}`,
+          title: conversation.title?.trim() || 'Untitled thread',
+          status: isRunning ? 'running' : isFailed ? 'errored' : 'complete',
+          updatedAt: conversation.updatedAt,
+          unread: isUnread,
+        };
+      }),
+    [activeThreadId, conversations, threadReadAtById]
+  );
 
   const handleNewThread = useCallback(() => {
     router.push(APP_ROUTES.CHAT);

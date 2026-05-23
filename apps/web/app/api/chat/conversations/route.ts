@@ -1,4 +1,4 @@
-import { count, desc, eq } from 'drizzle-orm';
+import { count, desc, sql as drizzleSql, eq } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 import { getSessionContext } from '@/lib/auth/session';
 import {
@@ -6,7 +6,11 @@ import {
   withSanitizedConversationTitles,
 } from '@/lib/chat/title';
 import { db } from '@/lib/db';
-import { chatConversations, chatMessages } from '@/lib/db/schema/chat';
+import {
+  chatConversations,
+  chatMessages,
+  chatTurns,
+} from '@/lib/db/schema/chat';
 import { captureError } from '@/lib/error-tracking';
 import { logger } from '@/lib/utils/logger';
 import { getSessionErrorResponse } from '../session-error-response';
@@ -52,6 +56,14 @@ export async function GET(req: Request) {
         title: chatConversations.title,
         createdAt: chatConversations.createdAt,
         updatedAt: chatConversations.updatedAt,
+        latestMessageRole:
+          drizzleSql<string>`(SELECT ${chatMessages.role} FROM ${chatMessages} WHERE ${chatMessages.conversationId} = ${chatConversations.id} ORDER BY ${chatMessages.createdAt} DESC LIMIT 1)`.as(
+            'latest_message_role'
+          ),
+        latestTurnStatus:
+          drizzleSql<string>`(SELECT ${chatTurns.status} FROM ${chatTurns} WHERE ${chatTurns.conversationId} = ${chatConversations.id} ORDER BY ${chatTurns.updatedAt} DESC LIMIT 1)`.as(
+            'latest_turn_status'
+          ),
       })
       .from(chatConversations)
       .where(eq(chatConversations.creatorProfileId, profile.id))

@@ -113,6 +113,53 @@ describe('DashboardNav', () => {
     }
   });
 
+  it('maps real conversation metadata into unread and running thread rows', () => {
+    localStorage.setItem(
+      'jovie:sidebar-thread-read-at',
+      JSON.stringify({
+        'conv-unread': '2026-05-22T08:00:00.000Z',
+        'conv-running': '2026-05-22T09:00:00.000Z',
+      })
+    );
+    mockUseChatConversationsQuery.mockReturnValue({
+      data: [
+        {
+          id: 'conv-unread',
+          title: 'Unread answer',
+          createdAt: '2026-05-22T07:00:00.000Z',
+          updatedAt: '2026-05-22T10:00:00.000Z',
+          latestMessageRole: 'assistant',
+          latestTurnStatus: 'completed',
+        },
+        {
+          id: 'conv-running',
+          title: 'Running task',
+          createdAt: '2026-05-22T07:00:00.000Z',
+          updatedAt: '2026-05-22T10:30:00.000Z',
+          latestMessageRole: 'user',
+          latestTurnStatus: 'streaming',
+        },
+      ],
+      isError: false,
+      isLoading: false,
+      refetch: vi.fn(),
+    });
+
+    const { container, getByRole } = renderDashboardNav({
+      renderFn: fastRender,
+      appFlags: { DESIGN_V1: true },
+    });
+
+    expect(getByRole('link', { name: 'Unread answer' })).toHaveClass(
+      'text-primary-token'
+    );
+    expect(getByRole('link', { name: 'Running task' })).toHaveAttribute(
+      'href',
+      `${APP_ROUTES.CHAT}/conv-running`
+    );
+    expect(container.querySelector('.anim-calm-breath')).toBeTruthy();
+  });
+
   it('handles collapsed state', () => {
     const { container } = renderDashboardNav({
       renderFn: fastRender,

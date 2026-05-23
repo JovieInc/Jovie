@@ -1,7 +1,13 @@
 import { TooltipProvider } from '@jovie/ui';
-import { fireEvent, render, screen, within } from '@testing-library/react';
+import {
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from '@testing-library/react';
 import type { ComponentProps } from 'react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { LibrarySurface } from '@/app/app/(shell)/library/LibrarySurface';
 import type { LibraryReleaseAsset } from '@/app/app/(shell)/library/library-data';
 import { HeaderSearchSurfaceFromContext } from '@/components/shell/HeaderSearchSurface';
@@ -13,6 +19,12 @@ import {
 } from '@/contexts/ShellSidebarOverrideContext';
 
 Element.prototype.scrollIntoView = vi.fn();
+
+const navigationMock = vi.hoisted(() => ({
+  refresh: vi.fn(),
+}));
+
+const blobUploadMock = vi.hoisted(() => vi.fn());
 
 const audioMock = vi.hoisted(() => {
   const basePlaybackState = {
@@ -41,6 +53,16 @@ const audioMock = vi.hoisted(() => {
 
 vi.mock('@/components/organisms/release-sidebar/useTrackAudioPlayer', () => ({
   useTrackAudioPlayer: () => audioMock,
+}));
+
+vi.mock('@vercel/blob/client', () => ({
+  upload: blobUploadMock,
+}));
+
+vi.mock('next/navigation', () => ({
+  useRouter: () => ({
+    refresh: navigationMock.refresh,
+  }),
 }));
 
 vi.mock('sonner', () => ({
@@ -154,6 +176,12 @@ describe('LibrarySurface', () => {
     audioMock.seek.mockClear();
     audioMock.stop.mockClear();
     audioMock.onError.mockClear();
+    navigationMock.refresh.mockClear();
+    blobUploadMock.mockReset();
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
   });
 
   it('renders an empty read-only library state with a releases escape hatch', () => {
@@ -303,6 +331,83 @@ describe('LibrarySurface', () => {
       artworkUrl: 'https://cdn.example.com/artwork.jpg',
       hasLyrics: true,
     });
+  });
+
+  it('renders a right-rail audio dropzone when a release is missing audio', () => {
+    renderLibrary([
+      buildAsset({
+        previewUrl: null,
+        assetKinds: ['artwork', 'lyrics', 'providers'],
+      }),
+    ]);
+
+    fireEvent.click(
+      screen.getByRole('button', { name: /Inspect Take Me Over/u })
+    );
+
+    expect(screen.getByTestId('library-audio-dropzone')).toBeInTheDocument();
+    expect(
+      screen.getByLabelText('Upload audio for Take Me Over')
+    ).toHaveAttribute('accept', expect.stringContaining('audio/mpeg'));
+    expect(screen.queryByTestId('library-audio-ready')).not.toBeInTheDocument();
+  });
+
+  it('uploads missing drawer audio and reveals persistent-player controls', async () => {
+    const previewUrl = 'https://cdn.example.com/uploaded-preview.mp3';
+    blobUploadMock.mockResolvedValue({
+      url: previewUrl,
+      pathname: 'library/audio/uploaded-preview.mp3',
+    });
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({ success: true, previewUrl }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      })
+    );
+    vi.stubGlobal('fetch', fetchMock);
+
+    renderLibrary([
+      buildAsset({
+        previewUrl: null,
+        assetKinds: ['artwork', 'lyrics', 'providers'],
+      }),
+    ]);
+
+    fireEvent.click(
+      screen.getByRole('button', { name: /Inspect Take Me Over/u })
+    );
+    fireEvent.change(screen.getByLabelText('Upload audio for Take Me Over'), {
+      target: {
+        files: [
+          new File(['audio'], 'take-me-over.mp3', { type: 'audio/mpeg' }),
+        ],
+      },
+    });
+
+    await waitFor(() => {
+      expect(screen.getByTestId('library-audio-ready')).toBeInTheDocument();
+    });
+    expect(blobUploadMock).toHaveBeenCalledWith(
+      'take-me-over.mp3',
+      expect.any(File),
+      {
+        access: 'public',
+        handleUploadUrl: '/api/library/audio/upload-token',
+      }
+    );
+    expect(fetchMock).toHaveBeenCalledWith(
+      '/api/library/audio/confirm',
+      expect.objectContaining({
+        method: 'POST',
+      })
+    );
+    expect(navigationMock.refresh).toHaveBeenCalledTimes(1);
+    expect(
+      within(screen.getByTestId('library-asset-drawer')).getAllByRole(
+        'button',
+        { name: /Play Preview for Take Me Over/u }
+      ).length
+    ).toBeGreaterThan(0);
   });
 
   it('opens the read-only asset drawer from list rows', () => {
