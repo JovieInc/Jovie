@@ -11,6 +11,15 @@ export interface ProfileReleaseVisibility {
   isRetired: boolean;
 }
 
+type ProfileReleaseVisibilityInput = {
+  releaseDate: Date | string | null;
+  revealDate?: Date | string | null;
+  artworkUrl: string | null;
+  status?: string | null;
+  deletedAt?: Date | string | null;
+  hasProviderLinks?: boolean;
+};
+
 /**
  * Determines whether and how the latest release card should display
  * on an artist's public profile page.
@@ -18,17 +27,7 @@ export interface ProfileReleaseVisibility {
  * Returns null when there is no release to show at all.
  */
 export function getProfileReleaseVisibility(
-  release:
-    | {
-        releaseDate: Date | string | null;
-        revealDate?: Date | string | null;
-        artworkUrl: string | null;
-        status?: string | null;
-        deletedAt?: Date | string | null;
-        hasProviderLinks?: boolean;
-      }
-    | null
-    | undefined,
+  release: ProfileReleaseVisibilityInput | null | undefined,
   settings: { showOldReleases?: boolean } | null | undefined,
   now?: Date
 ): ProfileReleaseVisibility | null {

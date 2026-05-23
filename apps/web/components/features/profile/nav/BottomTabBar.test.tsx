@@ -28,7 +28,6 @@ function makeProps(overrides?: Partial<BottomTabBarProps>): BottomTabBarProps {
     hasTourDates: true,
     isMenuOpen: false,
     onTabSelect: vi.fn(),
-    onOpenMenu: vi.fn(),
     ...overrides,
   };
 }
