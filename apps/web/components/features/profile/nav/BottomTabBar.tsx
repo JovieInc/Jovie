@@ -12,14 +12,10 @@
  * Constants: apps/web/lib/profile/nav-constants.ts
  *
  * Tab definitions (spec §2.1, fixed order):
- *   1. Home     (mode: profile)   — UserRound icon
+ *   1. Profile  (mode: profile)   — UserRound icon
  *   2. Music    (mode: listen)    — Music2 icon
  *   3. Events   (mode: tour)      — CalendarDays icon
  *   4. Alerts   (mode: subscribe) — Bell icon
- *
- * A fifth "More" item follows the tabs when `hideMoreMenu` is false.
- * "More" is not a tab — it opens the menu drawer (aria-haspopup="dialog").
- *
  * Desktop / tablet behaviour: the public profile shell may center this
  * compact experience on larger screens, so the tab bar remains canonical.
  */
@@ -28,7 +24,6 @@ import {
   Bell,
   CalendarDays,
   type LucideIcon,
-  MoreHorizontal,
   Music2,
   UserRound,
 } from 'lucide-react';
@@ -49,7 +44,7 @@ interface TabDefinition {
  * All four primary tab definitions, in canonical order.
  */
 const ALL_PRIMARY_TABS: ReadonlyArray<TabDefinition> = [
-  { mode: 'profile', label: 'Home', icon: UserRound },
+  { mode: 'profile', label: 'Profile', icon: UserRound },
   { mode: 'listen', label: 'Music', icon: Music2 },
   { mode: 'tour', label: 'Events', icon: CalendarDays },
   { mode: 'subscribe', label: 'Alerts', icon: Bell },
@@ -73,21 +68,19 @@ export interface BottomTabBarProps {
   readonly hasTourDates: boolean;
 
   /**
-   * When true, the "More" menu trigger is omitted from the tab bar.
-   * Default: false (More is shown).
+   * Retained for API compatibility. More now lives in the profile header.
    */
   readonly hideMoreMenu?: boolean;
 
   /**
-   * Whether the "More" menu is currently open.
-   * Controls `aria-expanded` on the More button.
+   * Whether the header menu is currently open.
    */
   readonly isMenuOpen?: boolean;
 
   /** Called when the user taps a primary tab. */
   readonly onTabSelect: (mode: ProfilePrimaryTab) => void;
 
-  /** Called when the user taps the "More" trigger. */
+  /** Retained for API compatibility. */
   readonly onOpenMenu: () => void;
 
   /** Optional extra className applied to the outermost wrapper. */
@@ -110,16 +103,12 @@ export interface BottomTabBarProps {
 export function BottomTabBar({
   activeTab,
   hasTourDates: _hasTourDates,
-  hideMoreMenu = false,
   isMenuOpen = false,
   onTabSelect,
-  onOpenMenu,
   className,
 }: BottomTabBarProps) {
   const visibleTabs = ALL_PRIMARY_TABS;
-
-  // Total column count = tabs + (More button ? 1 : 0)
-  const columnCount = visibleTabs.length + (hideMoreMenu ? 0 : 1);
+  const columnCount = visibleTabs.length;
 
   return (
     <div
@@ -158,14 +147,14 @@ export function BottomTabBar({
               >
                 <Icon
                   className={cn(
-                    'h-5 w-5 shrink-0',
+                    'h-[21px] w-[21px] shrink-0',
                     isActive ? 'text-white' : 'text-white/52'
                   )}
                   aria-hidden='true'
                 />
                 <span
                   className={cn(
-                    'truncate text-[10.5px] leading-none tracking-[-0.005em]',
+                    'sr-only',
                     isActive ? 'font-semibold' : 'font-medium'
                   )}
                 >
@@ -174,37 +163,6 @@ export function BottomTabBar({
               </button>
             );
           })}
-
-          {!hideMoreMenu ? (
-            <button
-              type='button'
-              onClick={onOpenMenu}
-              className={cn(
-                'relative flex min-h-[50px] min-w-0 flex-col items-center justify-center gap-0.5 rounded-[var(--profile-action-radius)] px-1.5 py-1.5 text-center transition-[background-color,color] duration-subtle',
-                'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--focus-ring))] focus-visible:ring-offset-2 focus-visible:ring-offset-transparent',
-                isMenuOpen ? 'text-white' : 'text-white/40 hover:text-white/62'
-              )}
-              aria-label='More options'
-              aria-haspopup='dialog'
-              aria-expanded={isMenuOpen}
-            >
-              <MoreHorizontal
-                className={cn(
-                  'h-5 w-5 shrink-0',
-                  isMenuOpen ? 'text-white' : 'text-white/52'
-                )}
-                aria-hidden='true'
-              />
-              <span
-                className={cn(
-                  'truncate text-[10.5px] leading-none tracking-[-0.005em]',
-                  isMenuOpen ? 'font-semibold' : 'font-medium'
-                )}
-              >
-                More
-              </span>
-            </button>
-          ) : null}
         </div>
       </nav>
     </div>

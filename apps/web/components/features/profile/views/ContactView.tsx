@@ -6,7 +6,7 @@ import { ProfileContactDrawerContent } from '../ProfileContactDrawerContent';
 export interface ContactViewProps {
   readonly artistHandle: string;
   readonly contacts: PublicContact[];
-  readonly primaryChannel: (contact: PublicContact) => PublicContactChannel;
+  readonly primaryChannel?: (contact: PublicContact) => PublicContactChannel;
 }
 
 /**
@@ -17,7 +17,7 @@ export interface ContactViewProps {
 export function ContactView({
   artistHandle,
   contacts,
-  primaryChannel,
+  primaryChannel = contact => contact.channels[0],
 }: ContactViewProps) {
   return (
     <ProfileContactDrawerContent

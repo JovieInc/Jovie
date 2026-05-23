@@ -20,6 +20,7 @@ import { useUserLocation } from '@/hooks/useUserLocation';
 import type { ConfirmedFeaturedPlaylistFallback } from '@/lib/profile/featured-playlist-fallback';
 import { getProfileReleaseVisibility } from '@/lib/profile/release-visibility';
 import type { TourDateViewModel } from '@/lib/tour-dates/types';
+import { cn } from '@/lib/utils';
 import type { Artist } from '@/types/db';
 
 interface ProfileHomeRailProps {
@@ -88,15 +89,15 @@ function HomeAlertsCard({
         : 'profile-home-alerts-row',
   } as const;
   const ariaLabel = `Turn on alerts for ${artist.name}`;
-  const iconClassName =
-    variant === 'bento'
-      ? 'flex h-8 w-8 shrink-0 items-center justify-center rounded-[12px] border border-white/8 bg-white/[0.055] text-white/88'
-      : 'flex h-8 w-8 shrink-0 items-center justify-center rounded-[10px] border border-white/8 bg-white/[0.045] text-white/86';
   const content = (
     <>
-      <span className={iconClassName} aria-hidden='true'>
-        <Bell className={variant === 'bento' ? 'h-4 w-4' : 'h-3.5 w-3.5'} />
-      </span>
+      <Bell
+        className={cn(
+          'shrink-0 text-white/84',
+          variant === 'bento' ? 'h-[18px] w-[18px]' : 'h-4 w-4'
+        )}
+        aria-hidden='true'
+      />
       <span className='min-w-0 flex-1'>
         <span
           className={
@@ -268,12 +269,12 @@ export function ProfileHomeRail({
       data-testid='profile-home-rail'
       data-feature-state={featuredState.kind}
     >
-      {alertsCard}
       {featureCard ? (
         <div className='min-w-0' data-testid='profile-home-feature-card'>
           {featureCard}
         </div>
       ) : null}
+      {alertsCard}
     </div>
   );
 }

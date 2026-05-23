@@ -99,12 +99,11 @@ export const PROFILE_MATRIX_ROUTES: readonly ProfileMatrixRoute[] = [
     showsBottomTabBar: true,
   },
   {
-    id: 'notifications',
-    // Secondary task flow — bottom tab bar is intentionally hidden.
+    id: 'notifications-legacy',
     path: `/${TIP_HANDLE}/notifications`,
-    expectedActiveTab: null,
-    readySelectors: ['[data-testid="notifications-page"]'],
-    showsBottomTabBar: false,
+    expectedActiveTab: 'subscribe',
+    readySelectors: ['[data-testid="profile-primary-tab-subscribe"]'],
+    showsBottomTabBar: true,
   },
 ] as const;
 

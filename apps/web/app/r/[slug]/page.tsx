@@ -27,6 +27,7 @@ import {
   PROVIDER_CONFIG,
 } from '@/lib/discography/config';
 import type { ProviderKey } from '@/lib/discography/types';
+import { publicReleaseEligibilitySqlPredicate } from '@/lib/profile/public-release-eligibility';
 import { trackServerEvent } from '@/lib/server-analytics';
 import { appendUTMParamsToUrl, extractUTMParams } from '@/lib/utm';
 import { ReleaseLandingPage } from './ReleaseLandingPage';
@@ -79,7 +80,8 @@ const getReleaseData = cache(async (releaseSlug: string, profileId: string) => {
       .where(
         and(
           eq(discogReleases.creatorProfileId, profileId),
-          eq(discogReleases.slug, releaseSlug)
+          eq(discogReleases.slug, releaseSlug),
+          publicReleaseEligibilitySqlPredicate()
         )
       )
       .limit(1),

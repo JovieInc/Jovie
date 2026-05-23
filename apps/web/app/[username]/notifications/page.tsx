@@ -1,10 +1,9 @@
 import type { Metadata } from 'next';
-import { notFound } from 'next/navigation';
+import { redirect } from 'next/navigation';
 import { APP_NAME, BASE_URL } from '@/constants/app';
+import { getProfileModeHref } from '@/features/profile/registry';
 import { sanitizeMetadataText } from '@/lib/profile/metadata';
-import { convertCreatorProfileToArtist } from '@/types/db';
 import { getProfileAndLinks } from '../_lib/public-profile-loader';
-import { NotificationsPageClient } from './NotificationsPageClient';
 
 interface Props {
   readonly params: Promise<{ username: string }>;
@@ -23,19 +22,20 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
   const canonicalUsername =
     result.profile?.username_normalized ?? username.toLowerCase();
+  const canonical = `${BASE_URL}${getProfileModeHref(canonicalUsername, 'subscribe')}`;
 
   return {
     title: `Get notifications from ${artistName}`,
     description: `Manage alerts for ${artistName}'s music, shows, and merch updates.`,
     metadataBase: new URL(BASE_URL),
     alternates: {
-      canonical: `${BASE_URL}/${canonicalUsername}/notifications`,
+      canonical,
     },
     openGraph: {
       type: 'website',
       title: `Get notifications from ${artistName}`,
       description: `Manage alerts for ${artistName}'s music, shows, and merch updates.`,
-      url: `${BASE_URL}/${canonicalUsername}/notifications`,
+      url: canonical,
       siteName: APP_NAME,
     },
     twitter: {
@@ -49,12 +49,5 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
 export default async function NotificationsPage({ params }: Props) {
   const { username } = await params;
-
-  const result = await getProfileAndLinks(username);
-  if (result.status !== 'ok' || !result.profile) notFound();
-
-  const profile = result.profile;
-  const artist = convertCreatorProfileToArtist(profile);
-
-  return <NotificationsPageClient artist={artist} />;
+  redirect(getProfileModeHref(username, 'subscribe'));
 }

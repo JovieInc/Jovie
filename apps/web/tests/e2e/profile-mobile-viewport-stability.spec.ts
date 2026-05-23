@@ -7,6 +7,7 @@ import {
   type TestInfo,
   test,
 } from '@playwright/test';
+import { expectNoDocumentOverflow } from './utils/mobile-overflow';
 import {
   MOBILE_PROFILE_VIEWPORTS,
   type MobileProfileViewport,
@@ -544,7 +545,13 @@ type ReleaseCardLayout = {
     readonly bottom: number;
     readonly left: number;
     readonly right: number;
+    readonly width: number;
+    readonly height: number;
   };
+  readonly artwork: {
+    readonly width: number;
+    readonly height: number;
+  } | null;
   readonly hero: {
     readonly top: number;
     readonly bottom: number;
@@ -558,6 +565,7 @@ async function collectMockHomeReleaseCardLayout(
     const card = document.querySelector<HTMLElement>(
       '[data-testid="profile-home-primary-action-card"]'
     );
+    const artwork = card?.querySelector<HTMLImageElement>('img') ?? null;
     const hero = document.querySelector<HTMLElement>(
       '[data-testid="profile-hero-identity-block"]'
     );
@@ -573,11 +581,14 @@ async function collectMockHomeReleaseCardLayout(
         bottom: box.bottom,
         left: box.left,
         right: box.right,
+        width: box.width,
+        height: box.height,
       };
     };
 
     return {
       card: rect(card),
+      artwork: artwork ? rect(artwork) : null,
       hero: hero ? rect(hero) : null,
     };
   });
@@ -585,9 +596,9 @@ async function collectMockHomeReleaseCardLayout(
 
 test.describe('Public Profile Mock Home Release Card Layout @smoke @critical', () => {
   for (const viewport of MOCK_HOME_RELEASE_CARD_VIEWPORTS) {
-    test(`${viewport.label} keeps release title inside the card`, async ({
+    test(`${viewport.label} renders a stable bento release card`, async ({
       page,
-    }) => {
+    }, testInfo) => {
       await page.setViewportSize({
         width: viewport.width,
         height: viewport.height,
@@ -604,6 +615,11 @@ test.describe('Public Profile Mock Home Release Card Layout @smoke @critical', (
         '[data-testid="profile-home-primary-action-card"]',
       ]);
       await settleLayout(page);
+      await expectNoDocumentOverflow(
+        page,
+        testInfo,
+        `${viewport.label} mock-home profile`
+      );
 
       const snapshot = await collectViewportSnapshot(
         page,
@@ -621,6 +637,11 @@ test.describe('Public Profile Mock Home Release Card Layout @smoke @critical', (
           `${viewport.label} release card should sit below hero identity`
         ).toBeGreaterThanOrEqual(layout.hero.bottom + 4);
       }
+
+      expect(
+        layout.artwork?.width ?? 0,
+        `${viewport.label} bento artwork should fill the card width`
+      ).toBeGreaterThanOrEqual(layout.card.width - 2);
     });
   }
 });

@@ -328,6 +328,8 @@ export function ReleaseLandingPage({
       artworkUrl={release.artworkUrl}
       artworkAlt={`${release.title} artwork`}
       onMenuOpen={() => setMenuOpen(true)}
+      returnHref={artist.handle ? `/${artist.handle}` : null}
+      returnLabel={`Back to ${artist.name}`}
       artworkWrapper={
         allowDownloads
           ? img => (

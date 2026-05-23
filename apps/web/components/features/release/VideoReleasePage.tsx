@@ -81,6 +81,8 @@ export function VideoReleasePage({
       artworkUrl={release.artworkUrl}
       artworkAlt={`${release.title} artwork`}
       onMenuOpen={() => setShareOpen(true)}
+      returnHref={`/${artist.handle}`}
+      returnLabel={`Back to ${artist.name}`}
       heroOverlay={
         <div className='absolute inset-x-0 bottom-5 z-10 px-5'>
           <h1 className='text-[15px] font-[510] leading-[1.2] tracking-[-0.01em] text-white [text-shadow:0_1px_12px_rgba(0,0,0,0.4)]'>

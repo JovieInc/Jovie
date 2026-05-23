@@ -8,16 +8,17 @@
  * vignettes, and top bar into a single reusable component.
  */
 
-import { MoreHorizontal } from 'lucide-react';
+import { ChevronLeft } from 'lucide-react';
 import Image from 'next/image';
+import Link from 'next/link';
 import { useCallback } from 'react';
-import { BrandLogo } from '@/components/atoms/BrandLogo';
 import { Icon } from '@/components/atoms/Icon';
 import {
   PublicSurfaceHeader,
   PublicSurfaceShell,
   PublicSurfaceStage,
 } from '@/components/organisms/public-surface';
+import { Mark } from '@/lib/brand/primitives';
 
 /** Shared menu item styling for smart link and profile drawers */
 export const SMART_LINK_MENU_ITEM_CLASS =
@@ -52,6 +53,8 @@ type SmartLinkShellBaseProps = {
   /** Content overlaid at the bottom of the hero artwork (title, artist, play button) */
   readonly heroOverlay?: React.ReactNode;
   readonly showBrandMark?: boolean;
+  readonly returnHref?: string | null;
+  readonly returnLabel?: string;
   /** Wraps the artwork image (e.g., for context menu). Must render a relative h-full w-full container. */
   readonly artworkWrapper?: (img: React.ReactNode) => React.ReactNode;
 };
@@ -86,6 +89,8 @@ export function SmartLinkShell({
   onMenuOpen,
   showBrandMark = true,
   showMenuButton = true,
+  returnHref,
+  returnLabel = 'Back',
   artworkWrapper,
 }: SmartLinkShellProps) {
   const artworkImage = artworkUrl ? (
@@ -117,15 +122,15 @@ export function SmartLinkShell({
           <PublicSurfaceHeader
             className='px-5 pt-[max(env(safe-area-inset-top),20px)]'
             leftSlot={
-              showBrandMark ? (
-                <span data-testid='smart-link-brand-mark'>
-                  <BrandLogo
-                    size={22}
-                    tone='white'
-                    rounded={false}
-                    className='opacity-45 drop-shadow-[0_1px_4px_rgba(0,0,0,0.4)]'
-                  />
-                </span>
+              returnHref ? (
+                <Link
+                  href={returnHref}
+                  className='flex h-8 w-8 items-center justify-center rounded-full border border-white/[0.08] bg-black/25 text-white/70 backdrop-blur-2xl transition-colors duration-subtle hover:bg-black/40'
+                  aria-label={returnLabel}
+                  data-testid='smart-link-back'
+                >
+                  <ChevronLeft className='h-[16px] w-[16px]' />
+                </Link>
               ) : null
             }
             rightSlot={
@@ -134,11 +139,18 @@ export function SmartLinkShell({
                   type='button'
                   onClick={onMenuOpen}
                   className='flex h-8 w-8 items-center justify-center rounded-full border border-white/[0.08] bg-black/25 text-white/70 backdrop-blur-2xl transition-colors duration-subtle hover:bg-black/40'
-                  aria-label='More options'
+                  aria-label='Menu'
                   aria-haspopup='dialog'
                 >
-                  <MoreHorizontal className='h-[15px] w-[15px]' />
+                  <Mark size={17} className='h-[17px] w-[17px]' />
                 </button>
+              ) : showBrandMark ? (
+                <span
+                  className='flex h-8 w-8 items-center justify-center text-white/48 drop-shadow-[0_1px_4px_rgba(0,0,0,0.4)]'
+                  data-testid='smart-link-brand-mark'
+                >
+                  <Mark size={17} className='h-[17px] w-[17px]' />
+                </span>
               ) : null
             }
           />

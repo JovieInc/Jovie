@@ -2,9 +2,9 @@
  * Determines the current phase of a release based on its dates.
  *
  * Phases:
- * - 'mystery': revealDate is in the future (details hidden)
- * - 'revealed': revealDate has passed but releaseDate is in the future (details visible, countdown to release)
- * - 'released': releaseDate has passed or no dates set (full page)
+ * - 'mystery': no public release date, or announce date has not passed
+ * - 'revealed': announce date has passed but release date is in the future
+ * - 'released': release date has passed
  */
 export function determineReleasePhase(
   releaseDate: string | Date | null | undefined,
@@ -13,16 +13,30 @@ export function determineReleasePhase(
 ): 'mystery' | 'revealed' | 'released' {
   const currentTime = now ?? new Date();
 
-  // If revealDate is in the future, we're in mystery phase
-  if (revealDate && new Date(revealDate) > currentTime) {
+  if (!releaseDate) {
     return 'mystery';
   }
 
-  // If releaseDate is in the future (and revealDate has passed or is null), we're revealed
-  if (releaseDate && new Date(releaseDate) > currentTime) {
-    return 'revealed';
+  const resolvedReleaseDate = new Date(releaseDate);
+  if (Number.isNaN(resolvedReleaseDate.getTime())) {
+    return 'mystery';
   }
 
-  // Otherwise, the release is fully out
-  return 'released';
+  if (resolvedReleaseDate <= currentTime) {
+    return 'released';
+  }
+
+  if (!revealDate) {
+    return 'mystery';
+  }
+
+  const resolvedRevealDate = new Date(revealDate);
+  if (
+    Number.isNaN(resolvedRevealDate.getTime()) ||
+    resolvedRevealDate > currentTime
+  ) {
+    return 'mystery';
+  }
+
+  return 'revealed';
 }

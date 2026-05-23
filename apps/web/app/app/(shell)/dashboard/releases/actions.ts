@@ -2105,15 +2105,11 @@ function determineReleaseStatus(releaseDate: Date | null): ReleaseStatusValue {
 
 function computeRevealDate(
   formRevealDate: string | null,
-  releaseDate: Date | null,
-  status: ReleaseStatusValue
+  _releaseDate: Date | null,
+  _status: ReleaseStatusValue
 ): Date | null {
   if (formRevealDate) return new Date(formRevealDate);
-  if (!releaseDate || status !== 'scheduled') return null;
-  const thirtyDaysBefore = new Date(releaseDate);
-  thirtyDaysBefore.setDate(thirtyDaysBefore.getDate() - 30);
-  const now = new Date();
-  return thirtyDaysBefore > now ? thirtyDaysBefore : now;
+  return null;
 }
 
 export async function createRelease(formData: {

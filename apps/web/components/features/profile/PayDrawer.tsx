@@ -52,8 +52,8 @@ export function PayDrawer({
     <ProfileDrawerShell
       open={open}
       onOpenChange={handleOpenChange}
-      title={`Support ${artistName}`}
-      subtitle='Send support instantly with Venmo.'
+      title={`Pay ${artistName}`}
+      subtitle='Continue with Venmo.'
     >
       <PayView
         artistHandle={artistHandle}

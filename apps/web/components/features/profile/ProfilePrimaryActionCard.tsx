@@ -113,7 +113,7 @@ function buildCardStyles(
     shellClassName: cn(
       'group w-full rounded-[var(--profile-action-radius)] border border-white/[0.08] bg-white/[0.05] text-left backdrop-blur-2xl transition-[background-color,box-shadow,opacity] duration-150 hover:bg-white/[0.08] active:opacity-[0.9]',
       isShowcase
-        ? 'relative min-h-[198px] overflow-hidden shadow-[0_18px_46px_rgba(0,0,0,0.34)]'
+        ? 'relative block min-h-[198px] overflow-hidden shadow-[0_18px_46px_rgba(0,0,0,0.34)]'
         : 'flex min-h-[64px] items-center gap-3 px-3 py-2.5',
       className
     ),
@@ -135,7 +135,6 @@ function ReleaseCard({
   styles,
   renderMode,
   previewActionLabel,
-  onPlayClick,
   dataTestId,
 }: Readonly<{
   state: ProfileCardReleaseState;
@@ -143,13 +142,10 @@ function ReleaseCard({
   styles: CardStyles;
   renderMode: ProfileRenderMode;
   previewActionLabel: string;
-  onPlayClick?: () => void;
   dataTestId?: string;
 }>) {
   const href = `/${artist.handle}/${state.release.slug}`;
-  const wrapperHref =
-    state.kind === 'release_countdown' || !onPlayClick ? href : undefined;
-  const actionClick = state.kind === 'release_live' ? onPlayClick : undefined;
+  const wrapperHref = href;
   const actionLabel = renderMode === 'preview' ? previewActionLabel : 'Listen';
   const releaseDate = toDateValue(state.release.releaseDate);
 
@@ -158,7 +154,6 @@ function ReleaseCard({
       <ActionCardShell
         kind={state.kind}
         href={wrapperHref}
-        onClick={actionClick}
         className={styles.shellClassName}
         dataTestId={dataTestId}
       >
@@ -218,7 +213,6 @@ function ReleaseCard({
     <ActionCardShell
       kind={state.kind}
       href={wrapperHref}
-      onClick={actionClick}
       className={styles.shellClassName}
       dataTestId={dataTestId}
     >
@@ -738,7 +732,6 @@ export function ProfilePrimaryActionCard({
         styles={styles}
         renderMode={renderMode}
         previewActionLabel={previewActionLabel}
-        onPlayClick={onPlayClick}
         dataTestId={dataTestId}
       />
     );

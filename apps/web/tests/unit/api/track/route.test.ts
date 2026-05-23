@@ -317,4 +317,69 @@ describe('POST /api/track', () => {
       })
     );
   });
+
+  it('still records the click when audience member enrichment fails', async () => {
+    const upsertError = new Error('audience upsert failed');
+    const upsertInsertMock = vi.fn().mockReturnValue({
+      values: vi.fn().mockReturnValue({
+        onConflictDoNothing: vi.fn().mockReturnValue({
+          returning: vi.fn().mockRejectedValue(upsertError),
+        }),
+      }),
+    });
+    const clickValuesMock = vi.fn().mockReturnValue({
+      returning: vi.fn().mockResolvedValue([{ id: 'click_event_123' }]),
+    });
+    const clickInsertMock = vi.fn().mockReturnValue({
+      values: clickValuesMock,
+    });
+
+    hoisted.withSystemIngestionSession
+      .mockImplementationOnce(async callback =>
+        callback({
+          insert: upsertInsertMock,
+        })
+      )
+      .mockImplementationOnce(async callback =>
+        callback({
+          insert: clickInsertMock,
+        })
+      );
+
+    const request = new NextRequest('http://localhost/api/track', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Cookie: 'jv_cc={"essential":true,"analytics":true,"marketing":true}',
+      },
+      body: JSON.stringify({
+        handle: 'artist123',
+        linkType: 'other',
+        target: 'https://example.com',
+        source: 'profile',
+      }),
+    });
+
+    const response = await POST(request as unknown as NextRequest);
+    const data = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(data.id).toBe('click_event_123');
+    expect(clickValuesMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        audienceMemberId: null,
+      })
+    );
+    expect(captureError).toHaveBeenCalledWith(
+      'Track audience member upsert failed',
+      upsertError,
+      expect.objectContaining({
+        route: '/api/track',
+        creatorProfileId: 'profile_123',
+        handle: 'artist123',
+        linkType: 'other',
+      })
+    );
+    expect(recordAudienceEvent).not.toHaveBeenCalled();
+  });
 });

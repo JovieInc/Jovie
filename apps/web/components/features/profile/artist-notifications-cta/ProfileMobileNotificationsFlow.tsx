@@ -160,7 +160,7 @@ function ScreenShell({
   return (
     <div className='flex flex-1 flex-col'>
       <div className='space-y-2 pb-6 pt-2'>
-        <h2 className='text-[24px] font-semibold leading-[1.06] tracking-normal text-white'>
+        <h2 className='text-[22px] font-semibold leading-[1.08] tracking-normal text-white'>
           {title}
         </h2>
         {body ? (
@@ -209,7 +209,7 @@ function PrimaryButton({
         activate();
       }}
       disabled={disabled}
-      className='inline-flex h-12 w-full items-center justify-center rounded-[var(--profile-action-radius)] bg-white/14 px-5 text-[14px] font-semibold tracking-[-0.01em] text-white transition-colors duration-subtle hover:bg-white/18 disabled:cursor-not-allowed disabled:opacity-60'
+      className='inline-flex h-12 w-full items-center justify-center rounded-full bg-white/14 px-5 text-[14px] font-semibold tracking-[-0.01em] text-white transition-colors duration-subtle hover:bg-white/18 disabled:cursor-not-allowed disabled:opacity-60'
     >
       {children}
     </button>
@@ -230,7 +230,7 @@ function SecondaryTextButton({
       type='button'
       onClick={onClick}
       disabled={disabled}
-      className='inline-flex h-10 w-full items-center justify-center rounded-[var(--profile-action-radius)] px-5 text-[13px] font-medium tracking-[-0.005em] text-white/58 transition-colors duration-subtle hover:text-white/76 disabled:cursor-not-allowed disabled:opacity-60'
+      className='inline-flex h-10 w-full items-center justify-center rounded-full px-5 text-[13px] font-medium tracking-[-0.005em] text-white/58 transition-colors duration-subtle hover:text-white/76 disabled:cursor-not-allowed disabled:opacity-60'
     >
       {children}
     </button>
@@ -275,7 +275,7 @@ function LabeledInput({
         onChange={event => onChange(event.target.value)}
         onKeyDown={onKeyDown}
         disabled={disabled}
-        className='h-12 w-full touch-manipulation rounded-[var(--profile-action-radius)] border border-white/10 bg-white/[0.03] px-3.5 text-[16px] font-medium tracking-[-0.005em] text-white placeholder:text-white/28 focus:border-white/18 focus:outline-none disabled:cursor-not-allowed disabled:opacity-60'
+        className='h-12 w-full touch-manipulation rounded-full border border-white/10 bg-white/[0.03] px-4 text-[16px] font-medium tracking-[-0.005em] text-white placeholder:text-white/28 focus:border-white/18 focus:outline-none disabled:cursor-not-allowed disabled:opacity-60'
       />
     </label>
   );
@@ -315,7 +315,7 @@ function BirthdaySelectors({
           data-testid='mobile-birthday-month'
           value={parts.month}
           onChange={event => updatePart('month', event.target.value)}
-          className='h-12 w-full touch-manipulation appearance-none rounded-[var(--profile-action-radius)] border border-white/10 bg-white/[0.03] px-3 text-[16px] font-medium tracking-[-0.005em] text-white focus:border-white/18 focus:outline-none'
+          className='h-12 w-full touch-manipulation appearance-none rounded-full border border-white/10 bg-white/[0.03] px-3 text-[16px] font-medium tracking-[-0.005em] text-white focus:border-white/18 focus:outline-none'
         >
           <option value=''>Month</option>
           {MONTH_OPTIONS.map((month, index) => (
@@ -334,7 +334,7 @@ function BirthdaySelectors({
           data-testid='mobile-birthday-day'
           value={parts.day}
           onChange={event => updatePart('day', event.target.value)}
-          className='h-12 w-full touch-manipulation appearance-none rounded-[var(--profile-action-radius)] border border-white/10 bg-white/[0.03] px-3 text-[16px] font-medium tracking-[-0.005em] text-white focus:border-white/18 focus:outline-none'
+          className='h-12 w-full touch-manipulation appearance-none rounded-full border border-white/10 bg-white/[0.03] px-3 text-[16px] font-medium tracking-[-0.005em] text-white focus:border-white/18 focus:outline-none'
         >
           <option value=''>Day</option>
           {Array.from({ length: 31 }, (_, index) => index + 1).map(day => (
@@ -353,7 +353,7 @@ function BirthdaySelectors({
           data-testid='mobile-birthday-year'
           value={parts.year}
           onChange={event => updatePart('year', event.target.value)}
-          className='h-12 w-full touch-manipulation appearance-none rounded-[var(--profile-action-radius)] border border-white/10 bg-white/[0.03] px-3 text-[16px] font-medium tracking-[-0.005em] text-white focus:border-white/18 focus:outline-none'
+          className='h-12 w-full touch-manipulation appearance-none rounded-full border border-white/10 bg-white/[0.03] px-3 text-[16px] font-medium tracking-[-0.005em] text-white focus:border-white/18 focus:outline-none'
         >
           <option value=''>Year</option>
           {yearOptions.map(year => (
@@ -374,7 +374,7 @@ export function ProfileMobileNotificationsFlow({
   artistName,
   channel = 'email',
   step,
-  accentHex = '#ed9962',
+  accentHex = '#8b5cf6',
   emailInput,
   otpCode,
   nameInput,
@@ -772,14 +772,16 @@ export function ProfileMobileNotificationsFlow({
 
   const isRootPreferencesStep =
     step === 'preferences' && !canGoBackFromPreferences;
+  const isFirstStep = step === 'email';
   const showBackButton =
-    step !== 'done' && (!isRootPreferencesStep || presentation !== 'inline');
+    step !== 'done' &&
+    !isFirstStep &&
+    (!isRootPreferencesStep || presentation !== 'inline');
   const showCloseButton = presentation === 'modal';
 
   const contentBody = (
     <>
-      <div className='absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.06),transparent_42%)]' />
-      <div className='absolute inset-x-0 top-0 h-40 bg-[radial-gradient(circle_at_top,rgba(237,153,98,0.18),transparent_68%)]' />
+      <div className='absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.055),transparent_42%)]' />
 
       <div
         className={cn(
