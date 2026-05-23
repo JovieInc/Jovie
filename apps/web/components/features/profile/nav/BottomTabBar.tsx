@@ -68,20 +68,12 @@ export interface BottomTabBarProps {
   readonly hasTourDates: boolean;
 
   /**
-   * Retained for API compatibility. More now lives in the profile header.
-   */
-  readonly hideMoreMenu?: boolean;
-
-  /**
    * Whether the header menu is currently open.
    */
   readonly isMenuOpen?: boolean;
 
   /** Called when the user taps a primary tab. */
   readonly onTabSelect: (mode: ProfilePrimaryTab) => void;
-
-  /** Retained for API compatibility. */
-  readonly onOpenMenu: () => void;
 
   /** Optional extra className applied to the outermost wrapper. */
   readonly className?: string;
