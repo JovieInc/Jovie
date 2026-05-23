@@ -6,12 +6,14 @@ const {
   mockCaptureError,
   mockGetSessionContext,
   mockGetSessionErrorResponse,
+  mockGetCurrentOnboardingSessionId,
   mockWithDbSessionTx,
 } = vi.hoisted(() => ({
   mockBuildWelcomeMessage: vi.fn(),
   mockCaptureError: vi.fn(),
   mockGetSessionContext: vi.fn(),
   mockGetSessionErrorResponse: vi.fn(),
+  mockGetCurrentOnboardingSessionId: vi.fn(),
   mockWithDbSessionTx: vi.fn(),
 }));
 
@@ -22,6 +24,10 @@ vi.mock('@/lib/auth/session', () => ({
 
 vi.mock('@/lib/services/onboarding/welcome-message', () => ({
   buildWelcomeMessage: mockBuildWelcomeMessage,
+}));
+
+vi.mock('@/lib/onboarding/session', () => ({
+  getCurrentOnboardingSessionId: mockGetCurrentOnboardingSessionId,
 }));
 
 vi.mock('@/app/api/chat/session-error-response', () => ({
@@ -46,6 +52,7 @@ function createTransaction(selectResults: unknown[] = []) {
 
   const insertMock = vi.fn(() => ({
     values: vi.fn(() => ({
+      onConflictDoNothing: vi.fn().mockResolvedValue(undefined),
       returning: vi
         .fn()
         .mockResolvedValue(insertReturningResults.shift() ?? []),
@@ -93,6 +100,7 @@ describe('POST /api/onboarding/welcome-chat', () => {
     });
     mockBuildWelcomeMessage.mockReturnValue('Welcome to Jovie');
     mockGetSessionErrorResponse.mockReturnValue(null);
+    mockGetCurrentOnboardingSessionId.mockResolvedValue(null);
   });
 
   it('returns 404 when the authenticated user has no profile', async () => {
@@ -160,6 +168,7 @@ describe('POST /api/onboarding/welcome-chat', () => {
   it('creates a new welcome conversation and returns the onboarding chat route', async () => {
     const tx = createTransaction([
       [],
+      [],
       [{ value: 8 }],
       [{ value: 2 }],
       [{ value: 1 }],
@@ -204,6 +213,36 @@ describe('POST /api/onboarding/welcome-chat', () => {
     );
     expect(tx.insert).toHaveBeenCalledTimes(3);
     expect(tx.update).toHaveBeenCalledTimes(1);
+  });
+
+  it('adopts the claimed anonymous conversation onto the active profile', async () => {
+    mockGetCurrentOnboardingSessionId.mockResolvedValueOnce('sess_abc123');
+    const tx = createTransaction([[], [{ id: 'conv_claimed' }]]);
+    mockWithDbSessionTx.mockImplementationOnce(async callback => callback(tx));
+
+    const { POST } = await import('@/app/api/onboarding/welcome-chat/route');
+    const response = await POST(
+      new Request('http://localhost/api/onboarding/welcome-chat', {
+        method: 'POST',
+        body: JSON.stringify({}),
+      })
+    );
+    const payload = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(payload).toEqual({
+      success: true,
+      conversationId: 'conv_claimed',
+      route: '/app/chat/conv_claimed?panel=profile&from=onboarding',
+      reused: true,
+    });
+    expect(tx.updateSetMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        creatorProfileId: 'profile_123',
+      })
+    );
+    expect(tx.insert).not.toHaveBeenCalled();
+    expect(mockBuildWelcomeMessage).not.toHaveBeenCalled();
   });
 
   it('returns the mapped session error response when auth context resolution fails', async () => {

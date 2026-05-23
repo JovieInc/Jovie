@@ -1,4 +1,13 @@
-import { and, count, desc, sql as drizzleSql, eq, or } from 'drizzle-orm';
+import {
+  and,
+  count,
+  desc,
+  sql as drizzleSql,
+  eq,
+  isNotNull,
+  isNull,
+  or,
+} from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 import { getSessionErrorResponse } from '@/app/api/chat/session-error-response';
 import { APP_ROUTES } from '@/constants/routes';
@@ -9,6 +18,7 @@ import { dspArtistMatches } from '@/lib/db/schema/dsp-enrichment';
 import { socialLinks } from '@/lib/db/schema/links';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { captureError } from '@/lib/error-tracking';
+import { getCurrentOnboardingSessionId } from '@/lib/onboarding/session';
 import { buildWelcomeMessage } from '@/lib/services/onboarding/welcome-message';
 
 const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
@@ -48,6 +58,10 @@ export async function POST(request: Request) {
         { status: 400, headers: NO_STORE_HEADERS }
       );
     }
+
+    const onboardingSessionId = await getCurrentOnboardingSessionId().catch(
+      () => null
+    );
 
     const result = await withDbSessionTx(
       async tx => {
@@ -97,6 +111,48 @@ export async function POST(request: Request) {
 
           return {
             conversationId: existingConversation.id,
+            reused: true,
+          };
+        }
+
+        const orphanWhere = onboardingSessionId
+          ? and(
+              eq(chatConversations.userId, user.id),
+              eq(chatConversations.sessionId, onboardingSessionId),
+              isNull(chatConversations.creatorProfileId)
+            )
+          : and(
+              eq(chatConversations.userId, user.id),
+              isNotNull(chatConversations.sessionId),
+              isNull(chatConversations.creatorProfileId)
+            );
+
+        const [claimedConversation] = await tx
+          .select({
+            id: chatConversations.id,
+          })
+          .from(chatConversations)
+          .where(orphanWhere)
+          .orderBy(desc(chatConversations.updatedAt))
+          .limit(1);
+
+        if (claimedConversation) {
+          await tx
+            .update(chatConversations)
+            .set({
+              creatorProfileId: profile.id,
+              updatedAt: new Date(),
+            })
+            .where(
+              and(
+                eq(chatConversations.id, claimedConversation.id),
+                eq(chatConversations.userId, user.id),
+                isNull(chatConversations.creatorProfileId)
+              )
+            );
+
+          return {
+            conversationId: claimedConversation.id,
             reused: true,
           };
         }

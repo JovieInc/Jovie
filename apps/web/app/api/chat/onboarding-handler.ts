@@ -2,14 +2,19 @@ import 'server-only';
 import { randomUUID } from 'node:crypto';
 import * as Sentry from '@sentry/nextjs';
 import type { UIMessage } from 'ai';
+import { and, desc, eq, isNull } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { executeChatTurn, isClientDisconnect } from '@/lib/chat/run';
+import { sanitizeConversationTitle } from '@/lib/chat/title';
+import { encodeToolEvents } from '@/lib/chat/tool-events';
 import {
   buildOnboardingTools,
   createOnboardingTurnState,
 } from '@/lib/chat/tools/onboarding-tool-impls';
 import type { ChatTelemetry } from '@/lib/chat/types';
+import { db } from '@/lib/db';
+import { chatConversations, chatMessages } from '@/lib/db/schema/chat';
 import { getEntitlements } from '@/lib/entitlements/registry';
 import { env, isSecureEnv } from '@/lib/env-server';
 import { checkGateForUser } from '@/lib/flags/server';
@@ -284,7 +289,42 @@ export async function tryHandleAnonymousOnboardingChat(
     );
   }
   const uiMessages = rawMessages as UIMessage[];
+  const latestUserMessage = getLatestUserMessage(uiMessages);
+  if (!latestUserMessage) {
+    return NextResponse.json(
+      {
+        error: 'messages array must include a user message',
+        errorCode: 'INVALID_MESSAGES',
+        requestId,
+      },
+      { status: 400, headers: { ...corsHeaders, 'x-request-id': requestId } }
+    );
+  }
   const turnCount = uiMessages.filter(m => m.role === 'user').length;
+
+  let conversationId: string;
+  try {
+    conversationId = await reserveAnonymousOnboardingConversation({
+      sessionId,
+      latestUserMessage,
+    });
+  } catch (error) {
+    Sentry.captureException(error, {
+      tags: { context: 'onboarding_handler_persistence' },
+      extra: { sessionId: sessionId.slice(0, 8), requestId, turnCount },
+    });
+    return NextResponse.json(
+      {
+        error: 'Onboarding chat is temporarily unavailable',
+        errorCode: 'ONBOARDING_CHAT_PERSISTENCE_FAILED',
+        requestId,
+      },
+      {
+        status: 503,
+        headers: { ...corsHeaders, 'x-request-id': requestId },
+      }
+    );
+  }
 
   // --- Build the per-turn state accumulator and the onboarding tool palette ---
   const onboardingState = createOnboardingTurnState({ sessionId, turnCount });
@@ -322,7 +362,7 @@ export async function tryHandleAnonymousOnboardingChat(
       artistContext: null,
       releases: [],
       resolvedProfileId: null,
-      resolvedConversationId: null,
+      resolvedConversationId: conversationId,
       userId: null,
       userPlan: 'free',
       planLimits: freeTierLimits,
@@ -362,6 +402,15 @@ export async function tryHandleAnonymousOnboardingChat(
 
     return turn.streamResult.toUIMessageStreamResponse({
       headers: responseHeaders,
+      onFinish: async ({ responseMessage }) => {
+        await persistAnonymousAssistantMessage({
+          conversationId,
+          latestUserClientMessageId: latestUserMessage.clientMessageId,
+          responseMessage,
+        });
+      },
+      onError: () =>
+        'Jovie hit a temporary issue while processing your message. Please retry or send a simpler next step.',
     });
   } catch (error) {
     if (isClientDisconnect(error, req.signal)) {
@@ -386,6 +435,138 @@ export async function tryHandleAnonymousOnboardingChat(
       }
     );
   }
+}
+
+interface LatestUserMessage {
+  readonly clientMessageId: string;
+  readonly text: string;
+}
+
+function getLatestUserMessage(
+  messages: readonly UIMessage[]
+): LatestUserMessage | null {
+  for (let index = messages.length - 1; index >= 0; index -= 1) {
+    const message = messages[index];
+    if (message?.role !== 'user') continue;
+    return {
+      clientMessageId: message.id || `user:${index}`,
+      text: extractUIMessageText(message.parts),
+    };
+  }
+  return null;
+}
+
+function extractUIMessageText(parts: UIMessage['parts']): string {
+  return (parts ?? [])
+    .filter(
+      (part): part is { type: 'text'; text: string } =>
+        part.type === 'text' && typeof part.text === 'string'
+    )
+    .map(part => part.text)
+    .join('');
+}
+
+async function reserveAnonymousOnboardingConversation({
+  sessionId,
+  latestUserMessage,
+}: {
+  readonly sessionId: string;
+  readonly latestUserMessage: LatestUserMessage;
+}): Promise<string> {
+  const now = new Date();
+  const [existingConversation] = await db
+    .select({ id: chatConversations.id })
+    .from(chatConversations)
+    .where(
+      and(
+        eq(chatConversations.sessionId, sessionId),
+        isNull(chatConversations.userId),
+        isNull(chatConversations.creatorProfileId)
+      )
+    )
+    .orderBy(desc(chatConversations.updatedAt))
+    .limit(1);
+
+  const conversationId =
+    existingConversation?.id ??
+    (
+      await db
+        .insert(chatConversations)
+        .values({
+          sessionId,
+          title: sanitizeConversationTitle(latestUserMessage.text, 50),
+          createdAt: now,
+          updatedAt: now,
+        })
+        .returning({ id: chatConversations.id })
+    )[0]?.id;
+
+  if (!conversationId) {
+    throw new Error('Failed to reserve anonymous onboarding conversation');
+  }
+
+  await db
+    .insert(chatMessages)
+    .values({
+      conversationId,
+      clientMessageId: latestUserMessage.clientMessageId,
+      role: 'user',
+      content: latestUserMessage.text,
+      createdAt: now,
+    })
+    .onConflictDoNothing({
+      target: [chatMessages.conversationId, chatMessages.clientMessageId],
+    });
+
+  await db
+    .update(chatConversations)
+    .set({ updatedAt: now })
+    .where(eq(chatConversations.id, conversationId));
+
+  return conversationId;
+}
+
+async function persistAnonymousAssistantMessage({
+  conversationId,
+  latestUserClientMessageId,
+  responseMessage,
+}: {
+  readonly conversationId: string;
+  readonly latestUserClientMessageId: string;
+  readonly responseMessage: UIMessage;
+}): Promise<void> {
+  const now = new Date();
+  const assistantText = extractUIMessageText(responseMessage.parts);
+  const toolCalls = encodeToolEvents(responseMessage.parts);
+  await db
+    .insert(chatMessages)
+    .values({
+      conversationId,
+      clientMessageId: `assistant:${latestUserClientMessageId}`,
+      role: 'assistant',
+      content:
+        assistantText ||
+        (toolCalls && toolCalls.length > 0
+          ? ''
+          : 'Done. What would you like to do next?'),
+      toolCalls,
+      createdAt: now,
+    })
+    .onConflictDoNothing({
+      target: [chatMessages.conversationId, chatMessages.clientMessageId],
+    });
+
+  await db
+    .update(chatConversations)
+    .set({ updatedAt: now })
+    .where(eq(chatConversations.id, conversationId));
+
+  Sentry.addBreadcrumb({
+    category: 'onboarding-chat',
+    message: 'anonymous_assistant_persisted',
+    level: 'info',
+    data: { conversationId: conversationId.slice(0, 8) },
+  });
 }
 
 /**

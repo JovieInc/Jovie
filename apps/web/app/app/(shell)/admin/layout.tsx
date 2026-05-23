@@ -2,7 +2,7 @@ import { redirect } from 'next/navigation';
 import type { ReactNode } from 'react';
 import { QueryProvider } from '@/components/providers/QueryProvider';
 import { APP_ROUTES } from '@/constants/routes';
-import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
+import { getCurrentAdminPageAccess } from '@/lib/admin/page-access';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -12,18 +12,16 @@ export default async function AdminLayout({
 }: {
   children: ReactNode;
 }) {
-  // getCurrentUserEntitlements degrades gracefully on billing failure --
-  // admin status is fetched independently and preserved even when billing is down.
-  const entitlements = await getCurrentUserEntitlements();
+  const adminAccess = await getCurrentAdminPageAccess();
 
-  // Redirect unauthorized users to dashboard. Middleware already gates /app/admin
-  // as a protected path, so unauthenticated users never reach this layout.
-  // If auth state is transiently unavailable, redirecting to /sign-in would loop
-  // (middleware redirects authed users back). Dashboard is the safe fallback.
+  // Redirect unauthorized users to dashboard. Middleware already gates
+  // /app/admin as a protected path, so unauthenticated users should rarely
+  // reach this layout. If auth state is transiently unavailable, redirecting
+  // to /sign-in would loop; dashboard is the safe fallback.
   if (
-    !entitlements.isAuthenticated ||
-    !entitlements.userId ||
-    !entitlements.isAdmin
+    !adminAccess.isAuthenticated ||
+    !adminAccess.userId ||
+    !adminAccess.hasAdminRole
   ) {
     redirect(APP_ROUTES.DASHBOARD);
   }

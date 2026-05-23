@@ -163,6 +163,41 @@ export function resetWelcomeChatBootstrapState(
   retryCountRef.current = 0;
 }
 
+function getWelcomeChatBootstrapAnnouncement(
+  state: WelcomeChatBootstrapState
+): string {
+  switch (state) {
+    case 'pending':
+      return 'Starting your onboarding chat.';
+    case 'scheduled':
+      return 'Still setting up your onboarding chat. Retrying now.';
+    case 'failed':
+      return 'We could not start your onboarding chat. Refresh to try again.';
+    default:
+      return '';
+  }
+}
+
+function WelcomeChatBootstrapAnnouncer({
+  state,
+}: {
+  readonly state: WelcomeChatBootstrapState;
+}) {
+  const message = getWelcomeChatBootstrapAnnouncement(state);
+  if (!message) return null;
+  const isFailure = state === 'failed';
+  return (
+    <div
+      className='sr-only'
+      role={isFailure ? 'alert' : 'status'}
+      aria-live={isFailure ? 'assertive' : 'polite'}
+      aria-atomic='true'
+    >
+      {message}
+    </div>
+  );
+}
+
 /**
  * Header badge that displays the conversation title as the breadcrumb suffix.
  * Rendered inside the DashboardHeader via HeaderActionsContext.
@@ -289,7 +324,7 @@ export function ChatPageClient({
   useEffect(() => {
     setCurrentThreadTitle(initialConversationTitle);
   }, [conversationId, initialConversationTitle]);
-  const [_welcomeChatBootstrapState, setWelcomeChatBootstrapState] =
+  const [welcomeChatBootstrapState, setWelcomeChatBootstrapState] =
     useState<WelcomeChatBootstrapState>('idle');
   const welcomeChatBootstrapStateRef =
     useRef<WelcomeChatBootstrapState>('idle');
@@ -822,6 +857,7 @@ export function ChatPageClient({
         }
       >
         <ChatWorkspaceSurface>
+          <WelcomeChatBootstrapAnnouncer state={welcomeChatBootstrapState} />
           <JovieChat
             profileId={activeProfile.id}
             conversationId={conversationId}

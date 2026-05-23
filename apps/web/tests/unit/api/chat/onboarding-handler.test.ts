@@ -13,6 +13,10 @@ const hoisted = vi.hoisted(() => ({
   setTagsMock: vi.fn(),
   setExtraMock: vi.fn(),
   addBreadcrumbMock: vi.fn(),
+  dbSelectMock: vi.fn(),
+  dbInsertMock: vi.fn(),
+  dbUpdateMock: vi.fn(),
+  dbSelectRowsMock: vi.fn(),
 }));
 
 vi.mock('server-only', () => ({}));
@@ -24,6 +28,14 @@ vi.mock('@/lib/flags/server', () => ({
 vi.mock('@/lib/chat/run', () => ({
   executeChatTurn: hoisted.executeChatTurnMock,
   isClientDisconnect: () => false,
+}));
+
+vi.mock('@/lib/db', () => ({
+  db: {
+    select: hoisted.dbSelectMock,
+    insert: hoisted.dbInsertMock,
+    update: hoisted.dbUpdateMock,
+  },
 }));
 
 vi.mock('@/lib/rate-limit', () => ({
@@ -84,6 +96,30 @@ function userMessage(text: string) {
   };
 }
 
+function installDefaultDbMocks() {
+  hoisted.dbSelectRowsMock.mockResolvedValue([]);
+  hoisted.dbSelectMock.mockImplementation(() => ({
+    from: () => ({
+      where: () => ({
+        orderBy: () => ({
+          limit: hoisted.dbSelectRowsMock,
+        }),
+      }),
+    }),
+  }));
+  hoisted.dbInsertMock.mockImplementation(() => ({
+    values: () => ({
+      returning: vi.fn().mockResolvedValue([{ id: 'conv_anonymous' }]),
+      onConflictDoNothing: vi.fn().mockResolvedValue(undefined),
+    }),
+  }));
+  hoisted.dbUpdateMock.mockImplementation(() => ({
+    set: () => ({
+      where: vi.fn().mockResolvedValue(undefined),
+    }),
+  }));
+}
+
 describe('tryHandleAnonymousOnboardingChat', () => {
   beforeEach(() => {
     vi.resetModules();
@@ -100,6 +136,7 @@ describe('tryHandleAnonymousOnboardingChat', () => {
     hoisted.encodeSessionCookieMock.mockImplementation(
       (id: string) => `signed.${id}.sig`
     );
+    installDefaultDbMocks();
   });
 
   it('returns null when mode is not onboarding (fall through to authenticated path)', async () => {
@@ -275,6 +312,7 @@ describe('tryHandleAnonymousOnboardingChat', () => {
     expect(call.mode).toBe('onboarding');
     expect(call.userId).toBeNull();
     expect(call.artistContext).toBeNull();
+    expect(call.resolvedConversationId).toBe('conv_anonymous');
     expect(call.resolvedProfileId).toBeNull();
     expect(call.forceLightModel).toBe(true);
     expect(call.userPlan).toBe('free');
@@ -294,6 +332,30 @@ describe('tryHandleAnonymousOnboardingChat', () => {
       'jovie_onboarding_session='
     );
     expect(result?.headers.get('x-chat-mode')).toBe('onboarding');
+  });
+
+  it('fails closed before streaming when anonymous persistence is unavailable', async () => {
+    vi.resetModules();
+    vi.doMock('@/lib/env-server', () => ({
+      env: { NODE_ENV: 'development' },
+      isSecureEnv: () => false,
+    }));
+    installDefaultDbMocks();
+    hoisted.dbSelectRowsMock.mockRejectedValueOnce(new Error('db unavailable'));
+
+    const { tryHandleAnonymousOnboardingChat } = await import(
+      '@/app/api/chat/onboarding-handler'
+    );
+    const req = makeRequest({
+      mode: 'onboarding',
+      messages: [userMessage('persist me')],
+    });
+    const result = await tryHandleAnonymousOnboardingChat(req, 'req-persist');
+
+    expect(result?.status).toBe(503);
+    const body = await result?.json();
+    expect(body.errorCode).toBe('ONBOARDING_CHAT_PERSISTENCE_FAILED');
+    expect(hoisted.executeChatTurnMock).not.toHaveBeenCalled();
   });
 
   it('reuses an existing valid session cookie (no fresh cookie minted)', async () => {
