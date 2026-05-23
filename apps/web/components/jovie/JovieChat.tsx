@@ -4,6 +4,7 @@ import { useVirtualizer } from '@tanstack/react-virtual';
 import { ImagePlus } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
 import { useCallback, useEffect, useRef } from 'react';
+import { JovieMarkElectric } from '@/components/atoms/JovieMarkElectric';
 import { useAppFlag } from '@/lib/flags/client';
 import { SUPPORTED_IMAGE_MIME_TYPES } from '@/lib/images/config';
 
@@ -444,11 +445,17 @@ export function JovieChat({
                   className='relative min-h-full'
                 >
                   <div
-                    className='relative mx-auto flex min-h-full w-full max-w-[52rem] flex-col items-center justify-center py-8'
+                    className='relative mx-auto flex min-h-full w-full max-w-[52rem] flex-col items-center justify-center px-1 py-8'
                     data-testid='chat-empty-state-composer-region'
                   >
                     <div
-                      className='w-full'
+                      className='pointer-events-none absolute left-1/2 top-1/2 h-[min(46vw,28rem)] w-[min(46vw,28rem)] -translate-x-1/2 -translate-y-[60%] opacity-80 max-sm:h-[min(72vw,18rem)] max-sm:w-[min(72vw,18rem)]'
+                      data-testid='chat-empty-state-logo'
+                    >
+                      <JovieMarkElectric className='h-full w-full' />
+                    </div>
+                    <div
+                      className='relative z-10 w-full'
                       data-testid='chat-empty-state-centered-composer'
                     >
                       {composerSurface}

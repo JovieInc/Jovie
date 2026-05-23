@@ -34,6 +34,8 @@ describe('HeaderSearchSurface', () => {
     const trigger = screen.getByRole('button', { name: 'Search Releases' });
     expect(trigger.className).toContain('h-7');
     expect(trigger.className).toContain('min-h-7');
+    expect(trigger.className).toContain('justify-start');
+    expect(trigger.className).toContain('text-left');
   });
 
   it('keeps the open search surface on the same compact header height', () => {
@@ -50,6 +52,8 @@ describe('HeaderSearchSurface', () => {
     expect(surface?.className).toContain('h-7');
     expect(surface?.className).toContain('min-h-7');
     expect(surface?.className).toContain('items-center');
+    expect(surface?.className).toContain('justify-start');
+    expect(surface?.className).toContain('text-left');
     expect(screen.getByLabelText('Filter Search Releases')).toBeInTheDocument();
   });
 });

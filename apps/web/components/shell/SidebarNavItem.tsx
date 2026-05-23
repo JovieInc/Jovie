@@ -108,7 +108,11 @@ export function SidebarNavItem({
         })}
         strokeWidth={2.25}
       />
-      {!collapsed && <span className='truncate'>{item.label}</span>}
+      {!collapsed && (
+        <span className='min-w-0 truncate text-left justify-self-start'>
+          {item.label}
+        </span>
+      )}
     </button>
   );
 

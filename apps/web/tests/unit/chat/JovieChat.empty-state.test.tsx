@@ -140,7 +140,7 @@ describe('JovieChat empty state', () => {
     mockChatState.chipTray.chips = [];
   });
 
-  it('renders only the simple composer when empty', () => {
+  it('renders only the logo and simple composer when empty', () => {
     const { getByTestId, queryByTestId, queryByText } = renderWithQueryClient(
       <JovieChat profileId='profile-1' />
     );
@@ -157,6 +157,7 @@ describe('JovieChat empty state', () => {
     expect(queryByText('Jovie Assistant')).toBeNull();
     expect(queryByText('Ask anything or tell Jovie what you need')).toBeNull();
     expect(getByTestId('chat-empty-state-composer-region')).toBeTruthy();
+    expect(getByTestId('chat-empty-state-logo')).toBeTruthy();
     expect(getByTestId('chat-empty-state-centered-composer')).toBeTruthy();
     expect(queryByTestId('chat-empty-state-action-card-slot')).toBeNull();
     expect(queryByTestId('chat-composer-dock')).toBeNull();

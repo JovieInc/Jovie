@@ -115,7 +115,9 @@ function BreadcrumbTrail({
         </>
       )}
       {showInlineSearch ? (
-        <div className='ml-1.5 flex min-w-0 items-center'>{searchSurface}</div>
+        <div className='ml-1.5 flex min-w-0 items-center justify-start'>
+          {searchSurface}
+        </div>
       ) : null}
     </>
   );
@@ -170,7 +172,7 @@ export function DashboardHeader({
           data-search-active={searchTakesOver ? 'true' : 'false'}
         >
           {searchTakesOver ? (
-            <div className='min-w-0 flex-1 flex items-center'>
+            <div className='flex min-w-0 flex-1 items-center justify-start'>
               {searchSurface}
             </div>
           ) : (

@@ -291,7 +291,7 @@ export function NavMenuItem({
         strokeWidth={2.25}
         aria-hidden='true'
       />
-      <span className='truncate group-data-[collapsible=icon]:hidden'>
+      <span className='min-w-0 truncate text-left justify-self-start group-data-[collapsible=icon]:hidden'>
         {item.name}
       </span>
       {item.badge != null ? (

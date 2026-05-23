@@ -59,6 +59,12 @@ vi.mock('@/lib/db/schema/chat', () => ({
     conversationId: 'conversationId',
     role: 'role',
     content: 'content',
+    createdAt: 'createdAt',
+  },
+  chatTurns: {
+    conversationId: 'conversationId',
+    status: 'status',
+    updatedAt: 'updatedAt',
   },
 }));
 
@@ -66,6 +72,7 @@ vi.mock('drizzle-orm', () => ({
   count: vi.fn(),
   desc: vi.fn(),
   eq: vi.fn(),
+  sql: vi.fn(() => ({ as: vi.fn(() => 'subquery') })),
 }));
 
 vi.mock('@/lib/error-tracking', () => ({
@@ -123,6 +130,8 @@ describe('GET /api/chat/conversations', () => {
         title: 'Test Conv',
         createdAt: new Date(),
         updatedAt: new Date(),
+        latestMessageRole: 'assistant',
+        latestTurnStatus: 'streaming',
       },
     ];
     hoisted.getSessionContextMock.mockResolvedValue({
@@ -139,6 +148,8 @@ describe('GET /api/chat/conversations', () => {
     expect(body.conversations).toHaveLength(1);
     expect(body.conversations[0].id).toBe('conv_1');
     expect(body.conversations[0].title).toBe('Test Conv');
+    expect(body.conversations[0].latestMessageRole).toBe('assistant');
+    expect(body.conversations[0].latestTurnStatus).toBe('streaming');
   });
 
   it('respects limit query parameter', async () => {

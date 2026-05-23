@@ -5,6 +5,7 @@ import {
   createColumnHelper,
   type RowSelectionState,
 } from '@tanstack/react-table';
+import { upload } from '@vercel/blob/client';
 import {
   ArrowUpDown,
   Check,
@@ -17,18 +18,23 @@ import {
   Grid3x3,
   ImageIcon,
   LayoutList,
+  Loader2,
   type LucideIcon,
   Music2,
   Pause,
   PlayCircle,
+  Upload,
   Video,
   X,
 } from 'lucide-react';
 import Image from 'next/image';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import {
+  type ChangeEvent,
   type CSSProperties,
   createContext,
+  type DragEvent,
   type MouseEvent,
   memo,
   type ReactNode,
@@ -37,6 +43,7 @@ import {
   useEffect,
   useId,
   useMemo,
+  useRef,
   useState,
 } from 'react';
 import { toast } from 'sonner';
@@ -78,6 +85,21 @@ const LIBRARY_BUTTON_FOCUS_CLASS =
   'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/55 focus-visible:ring-offset-2 focus-visible:ring-offset-(--linear-app-content-surface) outline-none';
 const LIBRARY_ICON_FOCUS_CLASS =
   'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/55 focus-visible:ring-offset-2 focus-visible:ring-offset-(--linear-app-content-surface) outline-none';
+const LIBRARY_AUDIO_MAX_FILE_SIZE = 150 * 1024 * 1024;
+const LIBRARY_AUDIO_ACCEPT =
+  'audio/aac,audio/aiff,audio/flac,audio/mp4,audio/mpeg,audio/wav,audio/x-aiff,audio/x-flac,audio/x-m4a,audio/x-wav';
+const LIBRARY_AUDIO_MIME_TYPES = new Set([
+  'audio/aac',
+  'audio/aiff',
+  'audio/flac',
+  'audio/mp4',
+  'audio/mpeg',
+  'audio/wav',
+  'audio/x-aiff',
+  'audio/x-flac',
+  'audio/x-m4a',
+  'audio/x-wav',
+]);
 
 const LIBRARY_TABLE_SKELETON_CONFIG: Array<{
   readonly width?: string;
@@ -1204,14 +1226,26 @@ function PreviewActionButton({
   onTogglePreview,
   compact = false,
   disabledTabIndex,
+  reserveSpace = false,
 }: {
   readonly asset: LibraryReleaseAsset;
   readonly isPreviewPlaying: boolean;
   readonly onTogglePreview: LibraryPreviewToggle;
   readonly compact?: boolean;
   readonly disabledTabIndex?: number;
+  readonly reserveSpace?: boolean;
 }) {
-  if (!asset.previewUrl) return null;
+  if (!asset.previewUrl) {
+    return reserveSpace ? (
+      <span
+        aria-hidden='true'
+        className={cn(
+          'pointer-events-none inline-flex shrink-0 opacity-0',
+          compact ? 'h-7 w-7' : 'h-8 w-[92px]'
+        )}
+      />
+    ) : null;
+  }
 
   const label = isPreviewPlaying ? 'Pause Preview' : 'Play Preview';
 
@@ -1238,20 +1272,245 @@ function PreviewActionButton({
   );
 }
 
+function isSupportedAudioFile(file: File): boolean {
+  if (LIBRARY_AUDIO_MIME_TYPES.has(file.type)) return true;
+  return /\.(aac|aiff?|flac|m4a|mp3|wav)$/i.test(file.name);
+}
+
+function LibraryAudioDropzone({
+  asset,
+  onUploaded,
+  disabledTabIndex,
+}: {
+  readonly asset: LibraryReleaseAsset;
+  readonly onUploaded: (assetId: string, previewUrl: string) => void;
+  readonly disabledTabIndex?: number;
+}) {
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [isDragging, setIsDragging] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+
+  const uploadFile = useCallback(
+    async (file: File) => {
+      if (!isSupportedAudioFile(file)) {
+        setUploadError('Use MP3, WAV, FLAC, AIFF, AAC, or M4A audio.');
+        return;
+      }
+
+      if (file.size > LIBRARY_AUDIO_MAX_FILE_SIZE) {
+        setUploadError('Audio must be 150 MB or smaller.');
+        return;
+      }
+
+      setUploading(true);
+      setUploadError(null);
+
+      try {
+        const blob = await upload(file.name, file, {
+          access: 'public',
+          handleUploadUrl: '/api/library/audio/upload-token',
+        });
+        const response = await fetch('/api/library/audio/confirm', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            releaseId: asset.id,
+            blobUrl: blob.url,
+            blobPathname: blob.pathname,
+            fileName: file.name,
+            fileMimeType: file.type,
+            fileSizeBytes: file.size,
+          }),
+        });
+        const body = (await response.json().catch(() => ({}))) as {
+          readonly previewUrl?: string;
+          readonly error?: string;
+        };
+
+        if (!response.ok || !body.previewUrl) {
+          throw new Error(body.error ?? 'Audio upload failed');
+        }
+
+        onUploaded(asset.id, body.previewUrl);
+      } catch (error) {
+        const message =
+          error instanceof Error ? error.message : 'Audio upload failed';
+        setUploadError(message);
+        toast.error(message);
+      } finally {
+        setUploading(false);
+        if (inputRef.current) {
+          inputRef.current.value = '';
+        }
+      }
+    },
+    [asset.id, onUploaded]
+  );
+
+  const handleInputChange = useCallback(
+    (event: ChangeEvent<HTMLInputElement>) => {
+      const file = event.target.files?.[0];
+      if (file) void uploadFile(file);
+    },
+    [uploadFile]
+  );
+
+  const handleDrop = useCallback(
+    (event: DragEvent<HTMLButtonElement>) => {
+      event.preventDefault();
+      setIsDragging(false);
+      const file = event.dataTransfer.files?.[0];
+      if (file) void uploadFile(file);
+    },
+    [uploadFile]
+  );
+
+  return (
+    <div>
+      <button
+        type='button'
+        onClick={() => inputRef.current?.click()}
+        onDragEnter={event => {
+          event.preventDefault();
+          setIsDragging(true);
+        }}
+        onDragOver={event => {
+          event.preventDefault();
+          setIsDragging(true);
+        }}
+        onDragLeave={event => {
+          event.preventDefault();
+          setIsDragging(false);
+        }}
+        onDrop={handleDrop}
+        disabled={uploading}
+        tabIndex={disabledTabIndex}
+        data-testid='library-audio-dropzone'
+        className={cn(
+          'flex min-h-[118px] w-full flex-col items-center justify-center rounded-lg border border-dashed border-subtle bg-surface-0 px-3 py-4 text-center transition-[background-color,border-color,color] duration-subtle ease-subtle',
+          isDragging &&
+            'border-(--linear-border-focus) bg-[color-mix(in_oklab,var(--linear-border-focus)_8%,var(--linear-bg-surface-0))]',
+          !uploading &&
+            'hover:border-default hover:bg-surface-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/55 focus-visible:ring-offset-2 focus-visible:ring-offset-(--linear-app-content-surface)'
+        )}
+        aria-busy={uploading || undefined}
+      >
+        {uploading ? (
+          <Loader2
+            className='h-5 w-5 animate-spin text-secondary-token motion-reduce:animate-none'
+            aria-hidden='true'
+            strokeWidth={2.25}
+          />
+        ) : (
+          <Upload
+            className='h-5 w-5 text-tertiary-token'
+            aria-hidden='true'
+            strokeWidth={2.25}
+          />
+        )}
+        <span className='mt-2 text-xs font-medium text-primary-token'>
+          {uploading ? 'Uploading audio' : 'Drop audio'}
+        </span>
+        <span className='mt-1 text-2xs leading-4 text-tertiary-token'>
+          MP3, WAV, FLAC, AIFF, AAC, or M4A. Max 150 MB.
+        </span>
+      </button>
+      <input
+        ref={inputRef}
+        type='file'
+        accept={LIBRARY_AUDIO_ACCEPT}
+        onChange={handleInputChange}
+        disabled={uploading}
+        tabIndex={disabledTabIndex}
+        className='sr-only'
+        aria-label={`Upload audio for ${asset.title}`}
+      />
+      <div className='min-h-5 pt-1.5 text-2xs' role='status'>
+        {uploadError ? <p className='text-error'>{uploadError}</p> : null}
+      </div>
+    </div>
+  );
+}
+
+function LibraryAudioPanel({
+  asset,
+  isPreviewPlaying,
+  onTogglePreview,
+  onUploaded,
+  disabledTabIndex,
+}: {
+  readonly asset: LibraryReleaseAsset;
+  readonly isPreviewPlaying: boolean;
+  readonly onTogglePreview: LibraryPreviewToggle;
+  readonly onUploaded: (assetId: string, previewUrl: string) => void;
+  readonly disabledTabIndex?: number;
+}) {
+  return (
+    <div className='mt-4 border-t border-subtle pt-3'>
+      <div className='mb-2 flex h-7 items-center justify-between gap-2'>
+        <div className='flex min-w-0 items-center gap-2'>
+          <FileAudio2 className='h-3.5 w-3.5 shrink-0 text-tertiary-token' />
+          <h3 className='truncate text-xs font-semibold text-primary-token'>
+            Audio
+          </h3>
+        </div>
+        {asset.previewUrl ? (
+          <PreviewActionButton
+            asset={asset}
+            isPreviewPlaying={isPreviewPlaying}
+            onTogglePreview={onTogglePreview}
+            compact
+            disabledTabIndex={disabledTabIndex}
+          />
+        ) : null}
+      </div>
+      {asset.previewUrl ? (
+        <div
+          className='flex min-h-[118px] items-center gap-3 rounded-lg border border-subtle bg-surface-0 px-3 py-3'
+          data-testid='library-audio-ready'
+        >
+          <span className='grid h-8 w-8 shrink-0 place-items-center rounded-md bg-surface-1 text-secondary-token'>
+            <FileAudio2 className='h-4 w-4' strokeWidth={2.25} />
+          </span>
+          <div className='min-w-0'>
+            <p className='truncate text-xs font-medium text-primary-token'>
+              Audio attached
+            </p>
+            <p className='mt-0.5 text-2xs leading-4 text-tertiary-token'>
+              Preview playback is available in the persistent player.
+            </p>
+          </div>
+        </div>
+      ) : (
+        <LibraryAudioDropzone
+          asset={asset}
+          onUploaded={onUploaded}
+          disabledTabIndex={disabledTabIndex}
+        />
+      )}
+    </div>
+  );
+}
+
 function AssetDrawer({
   asset,
   open,
   onClose,
   activePreviewId,
   playingPreviewId,
+  isDesktopLayout,
   onTogglePreview,
+  onAudioUploaded,
 }: {
   readonly asset: LibraryReleaseAsset | null;
   readonly open: boolean;
   readonly onClose: () => void;
   readonly activePreviewId: string | null;
   readonly playingPreviewId: string | null;
+  readonly isDesktopLayout: boolean;
   readonly onTogglePreview: LibraryPreviewToggle;
+  readonly onAudioUploaded: (assetId: string, previewUrl: string) => void;
 }) {
   const [stickyAsset, setStickyAsset] = useState<LibraryReleaseAsset | null>(
     asset
@@ -1273,11 +1532,16 @@ function AssetDrawer({
       aria-hidden={!open}
       inert={open ? undefined : true}
       className={cn(
-        'overflow-hidden border-l border-subtle bg-surface-0 transition-[opacity,transform] duration-cinematic ease-cinematic',
-        'fixed inset-x-3 bottom-20 top-16 z-40 rounded-lg border shadow-[0_18px_48px_rgba(0,0,0,0.28)] lg:bottom-3 lg:static lg:z-auto lg:rounded-none lg:border-y-0 lg:border-r-0 lg:shadow-none',
+        'h-full min-h-0 overflow-hidden border-l border-subtle bg-surface-0 transition-[opacity,transform] duration-cinematic ease-cinematic',
+        isDesktopLayout
+          ? 'static z-auto rounded-none border-y-0 border-r-0 shadow-none'
+          : 'fixed inset-x-3 bottom-20 top-16 z-40 rounded-lg border shadow-[0_18px_48px_rgba(0,0,0,0.28)]',
         open
           ? 'translate-y-0 opacity-100'
-          : 'pointer-events-none translate-y-2 opacity-0 max-lg:hidden'
+          : cn(
+              'pointer-events-none opacity-0',
+              isDesktopLayout ? null : 'translate-y-2 hidden'
+            )
       )}
       data-testid='library-asset-drawer'
     >
@@ -1294,6 +1558,7 @@ function AssetDrawer({
                 onTogglePreview={onTogglePreview}
                 compact
                 disabledTabIndex={closedTabIndex}
+                reserveSpace
               />
               <Link
                 href={current.smartLinkPath}
@@ -1323,7 +1588,7 @@ function AssetDrawer({
 
           <div className='min-h-0 flex-1 overflow-y-auto p-3'>
             <div className='overflow-hidden rounded-lg bg-black'>
-              <div className='aspect-square'>
+              <div className='mx-auto aspect-square w-full max-w-80'>
                 <Artwork asset={current} size='drawer' />
               </div>
             </div>
@@ -1363,13 +1628,15 @@ function AssetDrawer({
                 Open Release
                 <ExternalLink className='h-3 w-3' />
               </Link>
-              <PreviewActionButton
-                asset={current}
-                isPreviewPlaying={isPreviewPlaying}
-                onTogglePreview={onTogglePreview}
-                disabledTabIndex={closedTabIndex}
-              />
             </div>
+
+            <LibraryAudioPanel
+              asset={current}
+              isPreviewPlaying={isPreviewPlaying}
+              onTogglePreview={onTogglePreview}
+              onUploaded={onAudioUploaded}
+              disabledTabIndex={closedTabIndex}
+            />
 
             <dl className='mt-4'>
               <MetadataRow
@@ -1483,7 +1750,11 @@ export function LibrarySurface({
 }: {
   readonly assets: readonly LibraryReleaseAsset[];
 }) {
+  const router = useRouter();
   const { playbackState, toggleTrack } = useTrackAudioPlayer();
+  const [audioOverrides, setAudioOverrides] = useState<Record<string, string>>(
+    {}
+  );
   const [preset, setPreset] = useState<LibraryPresetId>('all');
   const [filters, setFilters] = useState<LibraryFilters>(() => emptyFilters());
   const [sort, setSort] = useState<LibrarySortKey>('releaseDate');
@@ -1494,38 +1765,58 @@ export function LibrarySurface({
   const [pills, setPills] = useState<FilterPill[]>([]);
   const isDesktopLayout = useBreakpoint('lg');
 
+  const effectiveAssets = useMemo<readonly LibraryReleaseAsset[]>(
+    () =>
+      assets.map((asset): LibraryReleaseAsset => {
+        const previewUrl = audioOverrides[asset.id];
+        if (!previewUrl) return asset;
+        const assetKinds: readonly LibraryAssetKind[] =
+          asset.assetKinds.includes('preview')
+            ? asset.assetKinds
+            : [...asset.assetKinds, 'preview'];
+
+        return {
+          ...asset,
+          previewUrl,
+          assetKinds,
+        };
+      }),
+    [assets, audioOverrides]
+  );
+
   const visibleAssets = useMemo(() => {
     const presetPredicate =
       PRESETS.find(item => item.id === preset)?.predicate ?? (() => true);
 
-    return assets
+    return effectiveAssets
       .filter(presetPredicate)
       .filter(asset => assetMatchesFilters(asset, filters))
       .filter(asset => assetMatchesPills(asset, pills))
       .toSorted(compareAssets(sort));
-  }, [assets, filters, pills, preset, sort]);
+  }, [effectiveAssets, filters, pills, preset, sort]);
 
   const artistOptions = useMemo(
-    () => uniqueSorted(assets.map(asset => asset.artist)),
-    [assets]
+    () => uniqueSorted(effectiveAssets.map(asset => asset.artist)),
+    [effectiveAssets]
   );
   const titleOptions = useMemo(
-    () => uniqueSorted(assets.map(asset => asset.title)),
-    [assets]
+    () => uniqueSorted(effectiveAssets.map(asset => asset.title)),
+    [effectiveAssets]
   );
   const statusOptions = useMemo(
-    () => uniqueSorted(assets.map(asset => asset.status)),
-    [assets]
+    () => uniqueSorted(effectiveAssets.map(asset => asset.status)),
+    [effectiveAssets]
   );
   const hasOptions = useMemo(
-    () => uniqueSorted(assets.flatMap(asset => asset.assetKinds)),
-    [assets]
+    () => uniqueSorted(effectiveAssets.flatMap(asset => asset.assetKinds)),
+    [effectiveAssets]
   );
 
   const selectedAsset =
     visibleAssets.find(asset => asset.id === selectedId) ?? null;
   const activePreviewAsset =
-    assets.find(asset => asset.id === playbackState.activeTrackId) ?? null;
+    effectiveAssets.find(asset => asset.id === playbackState.activeTrackId) ??
+    null;
   const activePreviewId = activePreviewAsset?.id ?? null;
   const playingPreviewId = playbackState.isPlaying ? activePreviewId : null;
   const activePreviewTitle =
@@ -1597,7 +1888,7 @@ export function LibrarySurface({
   const sidebarNavigation = useMemo(
     () => (
       <LibraryRail
-        assets={assets}
+        assets={effectiveAssets}
         preset={preset}
         filters={filters}
         onPreset={setPreset}
@@ -1605,7 +1896,7 @@ export function LibrarySurface({
         onClearFilters={() => setFilters(emptyFilters())}
       />
     ),
-    [assets, filters, preset]
+    [effectiveAssets, filters, preset]
   );
 
   const sidebarOverride = useMemo(
@@ -1622,7 +1913,7 @@ export function LibrarySurface({
 
   const headerSearchAdapter = useMemo(
     () =>
-      assets.length === 0
+      effectiveAssets.length === 0
         ? null
         : {
             key: 'library',
@@ -1633,7 +1924,7 @@ export function LibrarySurface({
             albumOptions: [],
             statusOptions,
             hasOptions,
-            totalCount: assets.length,
+            totalCount: effectiveAssets.length,
             visibleCount: visibleAssets.length,
             triggerLabel: 'Filter',
             ariaLabel: 'Filter library assets',
@@ -1642,7 +1933,7 @@ export function LibrarySurface({
           },
     [
       artistOptions,
-      assets.length,
+      effectiveAssets.length,
       hasOptions,
       pills,
       statusOptions,
@@ -1653,7 +1944,18 @@ export function LibrarySurface({
 
   useRegisterHeaderSearch(headerSearchAdapter);
 
-  if (assets.length === 0) {
+  const handleAudioUploaded = useCallback(
+    (assetId: string, previewUrl: string) => {
+      setAudioOverrides(previous => ({
+        ...previous,
+        [assetId]: previewUrl,
+      }));
+      router.refresh();
+    },
+    [router]
+  );
+
+  if (effectiveAssets.length === 0) {
     return <EmptyCatalog />;
   }
 
@@ -1670,7 +1972,7 @@ export function LibrarySurface({
           view={view}
           onView={setView}
           visibleCount={visibleAssets.length}
-          totalCount={assets.length}
+          totalCount={effectiveAssets.length}
           mobileFiltersOpen={mobileFiltersOpen}
           onToggleMobileFilters={() => setMobileFiltersOpen(value => !value)}
         />
@@ -1678,7 +1980,7 @@ export function LibrarySurface({
     >
       {mobileFiltersOpen ? (
         <LibraryRail
-          assets={assets}
+          assets={effectiveAssets}
           preset={preset}
           filters={filters}
           onPreset={setPreset}
@@ -1689,7 +1991,7 @@ export function LibrarySurface({
       ) : null}
 
       <div
-        className='grid min-h-0 flex-1 overflow-hidden'
+        className='grid h-full min-h-0 flex-1 overflow-hidden'
         style={
           {
             gridTemplateColumns: isDesktopLayout
@@ -1725,7 +2027,7 @@ export function LibrarySurface({
           </div>
           <LibraryStatusBar
             visibleCount={visibleAssets.length}
-            totalCount={assets.length}
+            totalCount={effectiveAssets.length}
             sort={sort}
             view={view}
             activePreviewTitle={activePreviewTitle}
@@ -1737,7 +2039,9 @@ export function LibrarySurface({
           onClose={() => setDrawerOpen(false)}
           activePreviewId={activePreviewId}
           playingPreviewId={playingPreviewId}
+          isDesktopLayout={isDesktopLayout}
           onTogglePreview={handleTogglePreview}
+          onAudioUploaded={handleAudioUploaded}
         />
       </div>
     </PageShell>
