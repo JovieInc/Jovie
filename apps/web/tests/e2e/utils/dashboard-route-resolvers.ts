@@ -2,6 +2,7 @@ import { neon } from '@neondatabase/serverless';
 import type { Page } from '@playwright/test';
 import { APP_ROUTES, buildReleaseTasksRoute } from '@/constants/routes';
 import { TEST_USER_ID_COOKIE } from '@/lib/auth/test-mode';
+import { env } from '@/lib/env-server';
 
 interface ResolverProfile {
   id: string;
@@ -79,7 +80,7 @@ async function fetchJsonFromPage<T>(
   input: string,
   init?: PlaywrightRequestInit
 ): Promise<FetchJsonResult<T>> {
-  const baseUrl = process.env.BASE_URL ?? 'http://localhost:3100';
+  const baseUrl = env.BASE_URL ?? 'http://localhost:3100';
   const resolvedTarget = /^[a-z]+:\/\//i.test(input)
     ? input
     : new URL(input, baseUrl).toString();
@@ -116,6 +117,12 @@ export async function resolveChatConversationPath(page: Page): Promise<string> {
     page,
     '/api/chat/conversations?limit=1'
   );
+
+  if (existing.parseError) {
+    throw new Error(
+      `Unable to resolve chat conversation route from existing conversations (status ${existing.status}; response was not valid JSON (${existing.parseError}))`
+    );
+  }
 
   const existingConversationId = existing.data.conversations?.[0]?.id;
   if (existing.ok && existingConversationId) {
@@ -184,9 +191,8 @@ export async function resolveReleaseTasksPathFromPage(
   const cookieUserId = authCookies.find(
     cookie => cookie.name === TEST_USER_ID_COOKIE
   )?.value;
-  const clerkUserId =
-    cookieUserId?.trim() || process.env.E2E_CLERK_USER_ID?.trim();
-  const databaseUrl = process.env.DATABASE_URL?.trim();
+  const clerkUserId = cookieUserId?.trim() || env.E2E_CLERK_USER_ID?.trim();
+  const databaseUrl = env.DATABASE_URL?.trim();
   if (!clerkUserId) {
     throw new Error('E2E_CLERK_USER_ID is required to resolve release tasks');
   }
