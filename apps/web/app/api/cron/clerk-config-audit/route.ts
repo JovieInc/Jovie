@@ -129,32 +129,47 @@ function pickAuthConfig(
   return {};
 }
 
+function getAuthAttributes(
+  authConfig: Record<string, unknown>
+): Record<string, unknown> {
+  const attributes = authConfig['attributes'];
+  return attributes && typeof attributes === 'object'
+    ? (attributes as Record<string, unknown>)
+    : {};
+}
+
+function appendFirstFactor(
+  factors: Set<string>,
+  attribute: string,
+  settings: Record<string, unknown>
+): void {
+  if (settings['used_for_first_factor'] !== true) return;
+
+  const verifications = asStringArray(settings['verifications']);
+  if (verifications.length === 0) {
+    factors.add(attribute);
+    return;
+  }
+
+  for (const verification of verifications) {
+    factors.add(verification);
+  }
+}
+
 function extractFirstFactors(
   authConfig: Record<string, unknown>
 ): readonly string[] {
   const direct = asStringArray(authConfig['first_factors']);
   if (direct.length > 0) return direct;
 
-  const attributes = authConfig['attributes'];
-  if (attributes && typeof attributes === 'object') {
-    const factors = new Set<string>();
-    for (const [attribute, settings] of Object.entries(attributes)) {
-      if (!settings || typeof settings !== 'object') continue;
-      const s = settings as Record<string, unknown>;
-      if (s['used_for_first_factor'] !== true) continue;
-      const verifications = asStringArray(s['verifications']);
-      if (verifications.length === 0) {
-        factors.add(attribute);
-      } else {
-        for (const verification of verifications) {
-          factors.add(verification);
-        }
-      }
-    }
-    return Array.from(factors);
+  const factors = new Set<string>();
+  for (const [attribute, settings] of Object.entries(
+    getAuthAttributes(authConfig)
+  )) {
+    if (!settings || typeof settings !== 'object') continue;
+    appendFirstFactor(factors, attribute, settings as Record<string, unknown>);
   }
-
-  return [];
+  return Array.from(factors);
 }
 
 function extractIdentifications(
@@ -163,20 +178,17 @@ function extractIdentifications(
   const direct = asStringArray(authConfig['identification_requirements']);
   if (direct.length > 0) return direct;
 
-  const attributes = authConfig['attributes'];
-  if (attributes && typeof attributes === 'object') {
-    const required: string[] = [];
-    for (const [attribute, settings] of Object.entries(attributes)) {
-      if (!settings || typeof settings !== 'object') continue;
-      const s = settings as Record<string, unknown>;
-      if (s['used_for_first_factor'] === true && s['enabled'] === true) {
-        required.push(attribute);
-      }
+  const required: string[] = [];
+  for (const [attribute, settings] of Object.entries(
+    getAuthAttributes(authConfig)
+  )) {
+    if (!settings || typeof settings !== 'object') continue;
+    const s = settings as Record<string, unknown>;
+    if (s['used_for_first_factor'] === true && s['enabled'] === true) {
+      required.push(attribute);
     }
-    return required;
   }
-
-  return [];
+  return required;
 }
 
 async function auditInstance(

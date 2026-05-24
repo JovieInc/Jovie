@@ -21,13 +21,13 @@ function isUpgradeRequiredError(error: unknown): boolean {
   if (error instanceof Error && error.name === 'TasksUpgradeRequiredError') {
     return true;
   }
+  const code =
+    error !== null && typeof error === 'object' && 'code' in error
+      ? error.code
+      : undefined;
   if (
-    error !== null &&
-    typeof error === 'object' &&
-    'code' in error &&
-    typeof (error as { code: unknown }).code === 'string' &&
-    ((error as { code: string }).code === 'RELEASE_PLAN_LOCKED' ||
-      (error as { code: string }).code === 'TASKS_WORKSPACE_LOCKED')
+    typeof code === 'string' &&
+    (code === 'RELEASE_PLAN_LOCKED' || code === 'TASKS_WORKSPACE_LOCKED')
   ) {
     return true;
   }
