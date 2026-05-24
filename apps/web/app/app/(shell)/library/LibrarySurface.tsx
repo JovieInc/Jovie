@@ -1745,9 +1745,11 @@ function LibraryStatusBar({
   readonly view: LibraryViewMode;
   readonly activePreviewTitle: string | null;
 }) {
+  const viewLabel = view === 'grid' ? 'Grid' : 'List';
+  const idleSummary = `${SORT_LABELS[sort]} - ${viewLabel}`;
   const playbackSummary = activePreviewTitle
     ? `Playing ${activePreviewTitle}`
-    : `${SORT_LABELS[sort]} - ${view === 'grid' ? 'Grid' : 'List'}`;
+    : idleSummary;
 
   return (
     <div className='hidden h-8 shrink-0 items-center justify-between gap-3 border-t border-subtle bg-(--linear-app-content-surface) px-3 text-[11px] text-tertiary-token sm:flex'>
