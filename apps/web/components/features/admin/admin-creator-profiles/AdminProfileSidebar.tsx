@@ -110,6 +110,12 @@ export function AdminProfileSidebar({
             <DrawerHero
               title={profile.displayName ?? profile.username}
               subtitle={`@${profile.username}`}
+              stableLayout
+              titleLineClamp={1}
+              subtitleLineClamp={1}
+              reserveSubtitleSlot
+              reserveMetaSlot
+              metaOverflow='scroll'
               artwork={
                 <AvatarUploadable
                   src={profile.avatarUrl}
@@ -120,7 +126,7 @@ export function AdminProfileSidebar({
                 />
               }
               meta={
-                <div className='flex flex-wrap items-center gap-2 text-2xs text-tertiary-token'>
+                <div className='flex items-center gap-2 text-2xs text-tertiary-token'>
                   <span>
                     {links.length} linked destination
                     {links.length === 1 ? '' : 's'}

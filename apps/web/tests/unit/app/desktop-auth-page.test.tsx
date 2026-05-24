@@ -1,4 +1,10 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const openDesktopAuthUrlMock = vi.fn().mockResolvedValue({ ok: true });
@@ -39,6 +45,9 @@ describe('DesktopAuthPage', () => {
       expect(openDesktopAuthUrlMock).toHaveBeenCalledTimes(1);
       expect(openDesktopAuthUrlMock).toHaveBeenCalledWith(expectedAuthUrl);
     });
+    expect(
+      await screen.findByText('Continue sign-in in your browser.')
+    ).toBeInTheDocument();
 
     fireEvent.click(
       screen.getByRole('button', { name: 'Continue in browser' })
@@ -51,5 +60,74 @@ describe('DesktopAuthPage', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Cancel sign-in' }));
 
     expect(closeDesktopAuthWindowMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps continue retryable and shows a stable failure message when browser launch fails', async () => {
+    openDesktopAuthUrlMock.mockResolvedValueOnce({
+      ok: false,
+      reason: 'open-external-failed',
+    });
+    const { default: DesktopAuthPage } = await import(
+      '../../../app/desktop-auth/page'
+    );
+
+    render(<DesktopAuthPage />);
+
+    const continueButton = screen.getByRole('button', {
+      name: 'Continue in browser',
+    });
+
+    await waitFor(() => {
+      expect(openDesktopAuthUrlMock).toHaveBeenCalledTimes(1);
+    });
+    expect(continueButton).toBeEnabled();
+    expect(
+      await screen.findByText(/The browser did not open/i)
+    ).toBeInTheDocument();
+
+    openDesktopAuthUrlMock.mockResolvedValueOnce({ ok: true });
+    fireEvent.click(continueButton);
+
+    await waitFor(() => {
+      expect(openDesktopAuthUrlMock).toHaveBeenCalledTimes(2);
+    });
+    expect(
+      await screen.findByText('Continue sign-in in your browser.')
+    ).toBeInTheDocument();
+  });
+
+  it('disables continue only while a browser launch is pending', async () => {
+    let resolveOpen: (value: { ok: false; reason: string }) => void = () => {};
+    openDesktopAuthUrlMock.mockReturnValueOnce(
+      new Promise<{ ok: false; reason: string }>(resolve => {
+        resolveOpen = resolve;
+      })
+    );
+    const { default: DesktopAuthPage } = await import(
+      '../../../app/desktop-auth/page'
+    );
+
+    render(<DesktopAuthPage />);
+
+    const continueButton = screen.getByRole('button', {
+      name: 'Continue in browser',
+    });
+
+    await waitFor(() => {
+      expect(continueButton).toBeDisabled();
+    });
+    fireEvent.click(continueButton);
+    expect(openDesktopAuthUrlMock).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      resolveOpen({ ok: false, reason: 'open-external-failed' });
+    });
+
+    await waitFor(() => {
+      expect(continueButton).toBeEnabled();
+    });
+    expect(screen.getByRole('status')).toHaveTextContent(
+      /The browser did not open/i
+    );
   });
 });

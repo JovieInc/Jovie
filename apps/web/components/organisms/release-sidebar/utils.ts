@@ -37,3 +37,25 @@ export function isValidUrl(value: string): boolean {
     return false;
   }
 }
+
+export function createVoidRetryHandler(
+  action: () => Promise<unknown> | void
+): () => void {
+  return () => {
+    void action();
+  };
+}
+
+export interface ReleaseSaveFeedback {
+  readonly message: string;
+  readonly actionLabel: string;
+  readonly onRetry: () => void;
+}
+
+export function createSaveFeedback(
+  message: string,
+  actionLabel: string,
+  onRetry: () => void
+): ReleaseSaveFeedback {
+  return { message, actionLabel, onRetry };
+}

@@ -1,10 +1,14 @@
 'use client';
 
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { track } from '@/lib/analytics';
 import type { ProviderKey } from '@/lib/discography/types';
-import type { Release, ReleaseSidebarProps } from './types';
-import { isFormElement, isValidUrl } from './utils';
+import type {
+  Release,
+  ReleaseSidebarActionError,
+  ReleaseSidebarProps,
+} from './types';
+import { createVoidRetryHandler, isFormElement, isValidUrl } from './utils';
 
 export interface UseReleaseSidebarReturn {
   isAddingLink: boolean;
@@ -19,6 +23,8 @@ export interface UseReleaseSidebarReturn {
   canRevertArtwork: boolean;
   isAddingDspLink: boolean;
   isRemovingDspLink: string | null;
+  dspLinkActionError: ReleaseSidebarActionError | null;
+  clearDspLinkActionError: () => void;
   handleFieldChange: (updater: (current: Release) => Release) => void;
   handleArtworkUpload: (file: File) => Promise<string>;
   handleArtworkRevert: () => Promise<void>;
@@ -59,9 +65,18 @@ export function useReleaseSidebar({
   const [isRemovingDspLink, setIsRemovingDspLink] = useState<string | null>(
     null
   );
+  const [dspLinkActionError, setDspLinkActionError] =
+    useState<ReleaseSidebarActionError | null>(null);
+  const clearDspLinkActionError = useCallback(() => {
+    setDspLinkActionError(null);
+  }, []);
 
   const isEditable = mode === 'admin';
   const hasRelease = Boolean(release);
+
+  useEffect(() => {
+    setDspLinkActionError(null);
+  }, [release?.id]);
 
   const handleFieldChange = useCallback(
     (updater: (current: Release) => Release) => {
@@ -123,6 +138,7 @@ export function useReleaseSidebar({
     if (!isValidUrl(trimmedUrl)) return;
 
     setIsAddingDspLink(true);
+    setDspLinkActionError(null);
     try {
       await onAddDspLink(release.id, selectedProvider, trimmedUrl);
       track('release_dsp_link_added', {
@@ -133,6 +149,13 @@ export function useReleaseSidebar({
       setNewLinkUrl('');
       setSelectedProvider(null);
     } catch (error) {
+      setDspLinkActionError({
+        title: 'Unable to add DSP link',
+        message:
+          'The link was not saved. Your draft is still here, so you can retry or adjust the URL.',
+        actionLabel: 'Try again',
+        onRetry: createVoidRetryHandler(handleAddLink),
+      });
       console.error('Failed to add DSP link', error);
     } finally {
       setIsAddingDspLink(false);
@@ -143,6 +166,7 @@ export function useReleaseSidebar({
     async (provider: ProviderKey) => {
       if (!release || !onRemoveDspLink) return;
       setIsRemovingDspLink(provider);
+      setDspLinkActionError(null);
       try {
         await onRemoveDspLink(release.id, provider);
         track('release_dsp_link_removed', {
@@ -150,6 +174,13 @@ export function useReleaseSidebar({
           provider,
         });
       } catch (error) {
+        setDspLinkActionError({
+          title: 'Unable to remove DSP link',
+          message:
+            'The link is still available. Try the action again if you want to remove it.',
+          actionLabel: 'Try again',
+          onRetry: createVoidRetryHandler(() => handleRemoveLink(provider)),
+        });
         console.error('Failed to remove DSP link', error);
       } finally {
         setIsRemovingDspLink(null);
@@ -203,6 +234,8 @@ export function useReleaseSidebar({
     canRevertArtwork,
     isAddingDspLink,
     isRemovingDspLink,
+    dspLinkActionError,
+    clearDspLinkActionError,
     handleFieldChange,
     handleArtworkUpload,
     handleArtworkRevert,

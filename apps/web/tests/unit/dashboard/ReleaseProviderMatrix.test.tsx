@@ -911,7 +911,7 @@ describe('ReleaseProviderMatrix', () => {
         );
       });
       expect(mockRouterPush).toHaveBeenCalledWith(
-        '/app/releases/created-release/tasks'
+        '/app/dashboard/releases/created-release/tasks'
       );
     });
 

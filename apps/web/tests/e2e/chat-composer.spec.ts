@@ -83,6 +83,49 @@ async function readComposerVisualMetrics(page: Page) {
       }
 
       function parseColor(value: string, depth = 0) {
+        const toSrgb = (linear: number) => {
+          const channel =
+            linear <= 0.0031308
+              ? 12.92 * linear
+              : 1.055 * linear ** (1 / 2.4) - 0.055;
+          return Math.min(255, Math.max(0, channel * 255));
+        };
+
+        const parseMaybePercent = (raw: string, percentageBase = 1) =>
+          raw.endsWith('%')
+            ? (Number(raw.slice(0, -1)) / 100) * percentageBase
+            : Number(raw);
+
+        const labToSrgb = (
+          lRaw: string,
+          aRaw: string,
+          bRaw: string,
+          alphaRaw?: string
+        ) => {
+          const l = parseMaybePercent(lRaw, 100);
+          const a = Number(aRaw);
+          const b = Number(bRaw);
+          const fy = (l + 16) / 116;
+          const fx = fy + a / 500;
+          const fz = fy - b / 200;
+          const epsilon = 216 / 24389;
+          const kappa = 24389 / 27;
+          const toXyzRatio = (channel: number) => {
+            const cubed = channel ** 3;
+            return cubed > epsilon ? cubed : (116 * channel - 16) / kappa;
+          };
+          const x = toXyzRatio(fx) * 0.96422;
+          const y = l > kappa * epsilon ? ((l + 16) / 116) ** 3 : l / kappa;
+          const z = toXyzRatio(fz) * 0.82521;
+
+          return {
+            alpha: Number(alphaRaw ?? 1),
+            b: toSrgb(0.0719453 * x - 0.2289914 * y + 1.4052427 * z),
+            g: toSrgb(-0.9787684 * x + 1.9161415 * y + 0.033454 * z),
+            r: toSrgb(3.1338561 * x - 1.6168667 * y - 0.4906146 * z),
+          };
+        };
+
         const hex = value.match(/^#([0-9a-f]{6})$/i);
         if (hex) {
           const raw = hex[1];
@@ -118,28 +161,44 @@ async function readComposerVisualMetrics(page: Page) {
           };
         }
 
-        const oklabColor = value.match(
-          /oklab\(([\d.-]+)\s+([\d.-]+)\s+([\d.-]+)(?:\s*\/\s*([\d.]+))?\)/
+        const labColor = value.match(
+          /lab\(([\d.-]+%?)\s+([\d.-]+)\s+([\d.-]+)(?:\s*\/\s*([\d.]+))?\)/
         );
-        if (oklabColor) {
-          const l = Number(oklabColor[1]);
-          const a = Number(oklabColor[2]);
-          const b = Number(oklabColor[3]);
+        if (labColor) {
+          return labToSrgb(labColor[1], labColor[2], labColor[3], labColor[4]);
+        }
+
+        const lchColor = value.match(
+          /lch\(([\d.-]+%?)\s+([\d.-]+)\s+([\d.-]+)(?:deg)?(?:\s*\/\s*([\d.]+))?\)/
+        );
+        if (lchColor) {
+          const chroma = Number(lchColor[2]);
+          const hue = (Number(lchColor[3]) * Math.PI) / 180;
+          return labToSrgb(
+            lchColor[1],
+            String(chroma * Math.cos(hue)),
+            String(chroma * Math.sin(hue)),
+            lchColor[4]
+          );
+        }
+
+        const parseOklab = (
+          lRaw: string,
+          aRaw: string,
+          bRaw: string,
+          alphaRaw?: string
+        ) => {
+          const l = parseMaybePercent(lRaw);
+          const a = Number(aRaw);
+          const b = Number(bRaw);
           const lPrime = l + 0.3963377774 * a + 0.2158037573 * b;
           const mPrime = l - 0.1055613458 * a - 0.0638541728 * b;
           const sPrime = l - 0.0894841775 * a - 1.291485548 * b;
           const lCubed = lPrime ** 3;
           const mCubed = mPrime ** 3;
           const sCubed = sPrime ** 3;
-          const toSrgb = (linear: number) => {
-            const channel =
-              linear <= 0.0031308
-                ? 12.92 * linear
-                : 1.055 * linear ** (1 / 2.4) - 0.055;
-            return Math.min(255, Math.max(0, channel * 255));
-          };
           return {
-            alpha: Number(oklabColor[4] ?? 1),
+            alpha: Number(alphaRaw ?? 1),
             b: toSrgb(
               -0.0041960863 * lCubed -
                 0.7034186147 * mCubed +
@@ -156,6 +215,32 @@ async function readComposerVisualMetrics(page: Page) {
                 0.2309699292 * sCubed
             ),
           };
+        };
+
+        const oklabColor = value.match(
+          /oklab\(([\d.-]+%?)\s+([\d.-]+)\s+([\d.-]+)(?:\s*\/\s*([\d.]+))?\)/
+        );
+        if (oklabColor) {
+          return parseOklab(
+            oklabColor[1],
+            oklabColor[2],
+            oklabColor[3],
+            oklabColor[4]
+          );
+        }
+
+        const oklchColor = value.match(
+          /oklch\(([\d.-]+%?)\s+([\d.-]+)\s+([\d.-]+)(?:deg)?(?:\s*\/\s*([\d.]+))?\)/
+        );
+        if (oklchColor) {
+          const chroma = Number(oklchColor[2]);
+          const hue = (Number(oklchColor[3]) * Math.PI) / 180;
+          return parseOklab(
+            oklchColor[1],
+            String(chroma * Math.cos(hue)),
+            String(chroma * Math.sin(hue)),
+            oklchColor[4]
+          );
         }
 
         if (depth === 0) {
@@ -461,6 +546,26 @@ test.describe('Chat composer — Variant F surface morph', () => {
       'Draft a release rollout with pitch timing, short-form assets, approvals, and fallback steps if the import fails before launch.'
     );
     await expectSurfaceMode(page, 'typing');
+    await expect
+      .poll(
+        async () =>
+          (await readComposerVisualMetrics(page)).surface?.height ?? 0,
+        { timeout: 5_000 }
+      )
+      .toBeGreaterThanOrEqual(88);
+    await expect
+      .poll(
+        async () => {
+          const metrics = await readComposerVisualMetrics(page);
+          return Math.min(
+            ...metrics.buttonRects.map(rect =>
+              Math.min(rect?.height ?? 0, rect?.width ?? 0)
+            )
+          );
+        },
+        { timeout: 5_000 }
+      )
+      .toBeGreaterThanOrEqual(36);
 
     const metrics = await readComposerVisualMetrics(page);
     expect(metrics.isSurfaceDark).toBe(true);

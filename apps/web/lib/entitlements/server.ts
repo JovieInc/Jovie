@@ -12,7 +12,12 @@ import {
 } from '@/lib/entitlements/registry';
 import { getUserBillingInfo } from '@/lib/stripe/customer-sync';
 import { logger } from '@/lib/utils/logger';
-import type { UserEntitlements, UserPlan } from '@/types';
+import type {
+  BillingPlanMismatch,
+  BillingVerificationState,
+  UserEntitlements,
+  UserPlan,
+} from '@/types';
 
 const UNAUTHENTICATED_ENTITLEMENTS: UserEntitlements = {
   userId: null,
@@ -28,6 +33,25 @@ const UNAUTHENTICATED_ENTITLEMENTS: UserEntitlements = {
   ...ENTITLEMENT_REGISTRY.free.booleans,
   ...ENTITLEMENT_REGISTRY.free.limits,
 };
+
+function buildFreeEntitlements(params: {
+  userId: string | null;
+  email: string | null;
+  isAuthenticated: boolean;
+  isAdmin: boolean;
+  billingVerification?: BillingVerificationState;
+}): UserEntitlements {
+  return {
+    ...UNAUTHENTICATED_ENTITLEMENTS,
+    userId: params.userId,
+    email: params.email,
+    isAuthenticated: params.isAuthenticated,
+    isAdmin: params.isAdmin,
+    ...(params.billingVerification
+      ? { billingVerification: params.billingVerification }
+      : {}),
+  };
+}
 
 /**
  * Error class retained for backwards compatibility.
@@ -51,6 +75,85 @@ export class BillingUnavailableError extends Error {
 
 function isMissingBillingRecord(error?: string): boolean {
   return error === 'User not found';
+}
+
+function normalizeBillingPlan(params: {
+  rawPlan: string | null | undefined;
+  isPro: boolean;
+  trialEndsAt: Date | null;
+}): {
+  plan: UserPlan;
+  isTrialing: boolean;
+  trialEndsAt: string | null;
+  trialDaysRemaining: number | null;
+  mismatch: BillingPlanMismatch | null;
+} {
+  const rawPlan =
+    typeof params.rawPlan === 'string' && params.rawPlan.length > 0
+      ? params.rawPlan
+      : null;
+  let isTrialing = false;
+  let trialEndsAt: string | null = null;
+  let trialDaysRemaining: number | null = null;
+
+  if (rawPlan === 'trial' && params.trialEndsAt) {
+    const now = new Date();
+    const trialActive = params.trialEndsAt > now;
+    if (trialActive) {
+      isTrialing = true;
+      trialEndsAt = params.trialEndsAt.toISOString();
+      trialDaysRemaining = Math.max(
+        0,
+        Math.floor(
+          (params.trialEndsAt.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)
+        )
+      );
+      return {
+        plan: 'trial',
+        isTrialing,
+        trialEndsAt,
+        trialDaysRemaining,
+        mismatch: null,
+      };
+    }
+  }
+
+  if (!params.isPro) {
+    return {
+      plan: 'free',
+      isTrialing: false,
+      trialEndsAt: null,
+      trialDaysRemaining: null,
+      mismatch: null,
+    };
+  }
+
+  if (
+    rawPlan === 'founding' ||
+    rawPlan === 'pro' ||
+    rawPlan === 'max' ||
+    rawPlan === 'growth'
+  ) {
+    return {
+      plan: rawPlan,
+      isTrialing: false,
+      trialEndsAt: null,
+      trialDaysRemaining: null,
+      mismatch: null,
+    };
+  }
+
+  return {
+    plan: 'pro',
+    isTrialing: false,
+    trialEndsAt: null,
+    trialDaysRemaining: null,
+    mismatch: {
+      rawPlan,
+      normalizedPlan: 'pro',
+      reason: 'is_pro_true_with_non_paid_plan',
+    },
+  };
 }
 
 export async function getCurrentUserEntitlements(): Promise<UserEntitlements> {
@@ -80,13 +183,13 @@ export async function getCurrentUserEntitlements(): Promise<UserEntitlements> {
 
   if (!billing.success) {
     if (isMissingBillingRecord(billing.error)) {
-      return {
-        ...UNAUTHENTICATED_ENTITLEMENTS,
+      return buildFreeEntitlements({
         userId,
         email: clerkEmail,
         isAuthenticated: true,
         isAdmin: adminStatus,
-      };
+        billingVerification: 'missing_user',
+      });
     }
 
     // Billing lookup failed (transient DB/connection error).
@@ -99,71 +202,67 @@ export async function getCurrentUserEntitlements(): Promise<UserEntitlements> {
       userId,
       error: billing.error,
     });
-    return {
-      ...UNAUTHENTICATED_ENTITLEMENTS,
+    return buildFreeEntitlements({
       userId,
       email: clerkEmail,
       isAuthenticated: true,
       isAdmin: adminStatus,
-    };
+      billingVerification: 'unavailable',
+    });
   }
 
   if (!billing.data) {
     // User exists in auth but not in billing DB — genuinely a new/free user.
-    return {
-      ...UNAUTHENTICATED_ENTITLEMENTS,
+    return buildFreeEntitlements({
       userId,
       email: clerkEmail,
       isAuthenticated: true,
       isAdmin: adminStatus,
-    };
+      billingVerification: 'missing_user',
+    });
   }
 
   const { email: emailFromDb, isPro, plan: dbPlan } = billing.data;
   const effectiveEmail = emailFromDb || clerkEmail;
 
-  // Determine plan from billing data.
-  // Trial check comes BEFORE isPro gate because trial users have isPro=false
-  // (no Stripe subscription yet) but need pro-level entitlements.
-  let plan: UserPlan = 'free';
-  let isTrialing = false;
-  let trialEndsAt: string | null = null;
-  let trialDaysRemaining: number | null = null;
-
   const rawTrialEndsAt = (billing.data as Record<string, unknown>)
     .trialEndsAt as Date | null;
+  const normalized = normalizeBillingPlan({
+    rawPlan: dbPlan,
+    isPro,
+    trialEndsAt: rawTrialEndsAt,
+  });
 
-  if (dbPlan === 'trial' && rawTrialEndsAt) {
-    const now = new Date();
-    const trialActive = rawTrialEndsAt > now;
-    plan = trialActive ? 'trial' : 'free';
-    isTrialing = trialActive;
-    trialEndsAt = rawTrialEndsAt.toISOString();
-    if (trialActive) {
-      trialDaysRemaining = Math.max(
-        0,
-        Math.floor(
-          (rawTrialEndsAt.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)
-        )
-      );
-    }
-  } else if (isPro) {
-    plan = (dbPlan as UserPlan) || 'pro';
+  if (normalized.mismatch) {
+    logger.warn('Billing plan mismatch normalized for entitlements', {
+      userId,
+      rawPlan: normalized.mismatch.rawPlan,
+      normalizedPlan: normalized.mismatch.normalizedPlan,
+      reason: normalized.mismatch.reason,
+      hasStripeCustomer: Boolean(billing.data.stripeCustomerId),
+      hasStripeSubscription: Boolean(billing.data.stripeSubscriptionId),
+    });
   }
 
-  const ent = getEntitlements(plan);
+  const ent = getEntitlements(normalized.plan);
 
   return {
     userId,
     email: effectiveEmail,
     isAuthenticated: true,
     isAdmin: adminStatus,
-    plan,
-    isPro: isProPlan(plan),
-    hasAdvancedFeatures: hasAdvancedFeatures(plan),
-    isTrialing,
-    trialEndsAt,
-    trialDaysRemaining,
+    plan: normalized.plan,
+    isPro: isProPlan(normalized.plan),
+    hasAdvancedFeatures: hasAdvancedFeatures(normalized.plan),
+    isTrialing: normalized.isTrialing,
+    trialEndsAt: normalized.trialEndsAt,
+    trialDaysRemaining: normalized.trialDaysRemaining,
+    billingVerification: 'verified',
+    ...(normalized.mismatch
+      ? { billingPlanMismatch: normalized.mismatch }
+      : {}),
+    hasStripeCustomer: Boolean(billing.data.stripeCustomerId),
+    hasStripeSubscription: Boolean(billing.data.stripeSubscriptionId),
     ...ent.booleans,
     ...ent.limits,
   };

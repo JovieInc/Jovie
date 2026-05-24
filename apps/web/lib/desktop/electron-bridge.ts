@@ -72,6 +72,11 @@ export type DesktopAuthCompletionResult =
       readonly reason?: string;
     };
 
+export interface DesktopAuthActionResult {
+  readonly ok: boolean;
+  readonly reason?: string;
+}
+
 type InstallUpdateResult = Awaited<
   ReturnType<ElectronAPI['installUpdateAndRestart']>
 >;
@@ -189,10 +194,14 @@ function openManualDownload(): void {
   }
 }
 
-function openBrowserFallback(url: string): void {
+function openBrowserFallback(url: string): DesktopAuthActionResult {
   if (typeof window !== 'undefined') {
-    window.open(url, '_blank', 'noopener,noreferrer');
+    const opened = window.open(url, '_blank', 'noopener,noreferrer');
+    return opened
+      ? { ok: true }
+      : { ok: false, reason: 'browser-window-open-blocked' };
   }
+  return { ok: false, reason: 'browser-window-unavailable' };
 }
 
 function reportInstallFailure(error: unknown): void {
@@ -299,29 +308,42 @@ export function useDesktopUpdate(): DesktopUpdateState {
   };
 }
 
-export async function startDesktopAuthHandoff(authUrl: string): Promise<void> {
+export async function startDesktopAuthHandoff(
+  authUrl: string
+): Promise<DesktopAuthActionResult> {
   const api = getRawElectronAPI();
   if (api && typeof api.startDesktopAuthHandoff === 'function') {
     const result = await api.startDesktopAuthHandoff(authUrl);
-    if (result?.ok) return;
-    openBrowserFallback(authUrl);
-    return;
+    if (result?.ok) return { ok: true };
+    if (result) {
+      return {
+        ok: false,
+        reason: result.reason ?? 'desktop-auth-handoff-failed',
+      };
+    }
+    return openBrowserFallback(authUrl);
   }
   if (api) {
     reportMissingBridgeMethod('startDesktopAuthHandoff');
   }
-  openBrowserFallback(authUrl);
+  return openBrowserFallback(authUrl);
 }
 
-export async function openDesktopAuthUrl(authUrl: string): Promise<void> {
+export async function openDesktopAuthUrl(
+  authUrl: string
+): Promise<DesktopAuthActionResult> {
   const api = getRawElectronAPI();
   if (api && typeof api.openDesktopAuthUrl === 'function') {
     const result = await api.openDesktopAuthUrl(authUrl);
-    if (result.ok) return;
+    if (result.ok) return { ok: true };
+    return {
+      ok: false,
+      reason: result.reason ?? 'desktop-auth-open-failed',
+    };
   } else if (api) {
     reportMissingBridgeMethod('openDesktopAuthUrl');
   }
-  openBrowserFallback(authUrl);
+  return openBrowserFallback(authUrl);
 }
 
 export async function closeDesktopAuthWindow(): Promise<void> {

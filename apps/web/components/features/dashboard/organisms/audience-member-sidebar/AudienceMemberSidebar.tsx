@@ -60,7 +60,7 @@ export function AudienceMemberSidebar({
       hideMinimalHeaderBar
       entityHeader={
         member ? (
-          <div className='relative'>
+          <div className='relative' data-testid='audience-member-header-card'>
             <div className='absolute right-2.5 top-2.5 z-10'>
               <DrawerHeaderActions
                 primaryActions={[]}
@@ -71,6 +71,12 @@ export function AudienceMemberSidebar({
             <DrawerHero
               title={primaryLabel}
               subtitle={secondaryLabel}
+              stableLayout
+              titleLineClamp={1}
+              subtitleLineClamp={1}
+              reserveSubtitleSlot
+              reserveMetaSlot
+              metaOverflow='scroll'
               artwork={
                 <div className='flex h-10 w-10 shrink-0 items-center justify-center rounded-[11px] border border-subtle bg-surface-0 text-sm font-semibold text-secondary-token'>
                   {primaryLabel.charAt(0).toUpperCase()}
@@ -78,7 +84,7 @@ export function AudienceMemberSidebar({
               }
               meta={
                 member.locationLabel || member.visits > 0 ? (
-                  <div className='flex flex-wrap items-center gap-2 pr-8 text-2xs text-tertiary-token'>
+                  <div className='flex items-center gap-2 pr-8 text-2xs text-tertiary-token'>
                     {member.locationLabel ? (
                       <span className='inline-flex items-center gap-1'>
                         <MapPin className='h-3 w-3' />
@@ -91,6 +97,7 @@ export function AudienceMemberSidebar({
                   </div>
                 ) : undefined
               }
+              className='[&_h2]:pr-9'
             />
           </div>
         ) : undefined

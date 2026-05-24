@@ -15,4 +15,33 @@ describe('TokenizedText', () => {
     expect(screen.queryByText('/skill:generateAlbumArt')).toBeNull();
     expect(screen.queryByText('generateAlbumArt')).toBeNull();
   });
+
+  it('renders entity tokens as rich chips instead of raw wire tokens', () => {
+    fastRender(
+      <TokenizedText
+        content='Update @release:rel_1[Take Me Over] before Friday'
+        tone='onDark'
+      />
+    );
+
+    const chip = screen.getByTestId('entity-chip');
+    expect(chip).toHaveTextContent('Take Me Over');
+    expect(chip).toHaveAttribute('data-entity-kind', 'release');
+    expect(chip).toHaveAttribute('data-entity-tone', 'onDark');
+    expect(screen.queryByText('@release:rel_1[Take Me Over]')).toBeNull();
+  });
+
+  it('uses light-surface chip tone inside user bubbles', () => {
+    fastRender(
+      <TokenizedText
+        content='Use @artist:artist_1[Tim White] for this update'
+        tone='onLight'
+      />
+    );
+
+    const chip = screen.getByTestId('entity-chip');
+    expect(chip).toHaveAttribute('data-entity-kind', 'artist');
+    expect(chip).toHaveAttribute('data-entity-tone', 'onLight');
+    expect(chip.className).toContain('#111216');
+  });
 });

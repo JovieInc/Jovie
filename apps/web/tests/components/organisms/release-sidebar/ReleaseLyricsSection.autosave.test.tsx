@@ -120,6 +120,41 @@ describe('ReleaseLyricsSection auto-save', () => {
     });
   });
 
+  it('keeps the draft visible and offers retry when auto-save fails', async () => {
+    const onSaveLyrics = vi
+      .fn()
+      .mockRejectedValueOnce(new Error('save failed'))
+      .mockResolvedValueOnce(undefined);
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+
+    render(
+      <ReleaseLyricsSection
+        releaseId='r1'
+        lyrics=''
+        isEditable={true}
+        onSaveLyrics={onSaveLyrics}
+      />
+    );
+
+    const textarea = screen.getByPlaceholderText('Paste your lyrics here');
+    await user.type(textarea, 'Retry me');
+
+    vi.advanceTimersByTime(1600);
+
+    await waitFor(() => {
+      expect(screen.getByRole('status')).toHaveTextContent(
+        'Failed to save lyrics. Your draft is still here.'
+      );
+    });
+
+    await user.click(screen.getByRole('button', { name: 'Retry save' }));
+
+    await waitFor(() => {
+      expect(onSaveLyrics).toHaveBeenCalledTimes(2);
+    });
+    expect(textarea).toHaveValue('Retry me');
+  });
+
   it('does not auto-save when not editable', async () => {
     const onSaveLyrics = vi.fn().mockResolvedValue(undefined);
 

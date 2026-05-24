@@ -48,12 +48,18 @@ import { createImportBioFromUrlTool } from '@/lib/ai/tools/import-bio-from-url';
 import { createProfileEditTool } from '@/lib/ai/tools/profile-edit';
 import { getOptionalAuth } from '@/lib/auth/cached';
 import { getSessionContext } from '@/lib/auth/session';
+import { resolveChatAccountContext } from '@/lib/chat/account-context';
+import { createAccountChatTools } from '@/lib/chat/account-tools';
 import {
   buildAlbumArtUnavailableAssistantMessage,
   detectAlbumArtGenerationIntent,
   resolveAlbumArtCapability,
 } from '@/lib/chat/album-art-capability';
 import { executeChatTurn, isClientDisconnect } from '@/lib/chat/run';
+import {
+  canUsePaidChatTools,
+  resolveChatTurnPlanLimits,
+} from '@/lib/chat/tool-access';
 import {
   decodeToolEvents,
   encodeToolEvents,
@@ -81,10 +87,8 @@ import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { sqlAny } from '@/lib/db/sql-helpers';
 import { upsertRelease } from '@/lib/discography/queries';
 import { generateUniqueSlug } from '@/lib/discography/slug';
-import { getEntitlements } from '@/lib/entitlements/registry';
-import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
 import { FEATURE_FLAGS } from '@/lib/feature-flags/shared';
-import { checkGateForUser, getAppFlagValue } from '@/lib/flags/server';
+import { checkGateForUser } from '@/lib/flags/server';
 import { createAuthenticatedCorsHeaders } from '@/lib/http/headers';
 import {
   classifyIntent,
@@ -137,7 +141,6 @@ import {
 import { getInsightsSummary } from '@/lib/services/insights/lifecycle';
 import { buildPitchInput, generatePitches } from '@/lib/services/pitch';
 import { DSP_PLATFORMS } from '@/lib/services/social-links/types';
-import { getUserBillingInfo } from '@/lib/stripe/customer-sync/billing-info';
 import { toISOStringOrNull } from '@/lib/utils/date';
 import { detectPlatform } from '@/lib/utils/platform-detection/detector';
 
@@ -1887,9 +1890,11 @@ function createGenerateReleasePitchTool(resolvedProfileId: string) {
  */
 function buildFreeChatTools(
   resolvedProfileId: string | null,
-  clerkUserId: string
+  clerkUserId: string,
+  accountContext: Awaited<ReturnType<typeof resolveChatAccountContext>>
 ) {
   return {
+    ...createAccountChatTools(accountContext),
     proposeAvatarUpload: createAvatarUploadTool(),
     proposeSocialLink: createSocialLinkTool(),
     proposeSocialLinkRemoval: createSocialLinkRemovalTool(resolvedProfileId),
@@ -2228,13 +2233,17 @@ export async function POST(req: Request) {
     );
   }
 
-  // Fetch billing/plan before the kill switch so 503 responses are still
-  // tagged by tier — lets us answer "how many paid users did this incident
-  // block" from Sentry without a second data source.
-  const billingInfo = await getUserBillingInfo();
-  const userPlan = billingInfo.data?.plan ?? 'free';
+  // Resolve account context once and use it for plan tags, rate limits,
+  // prompt context, and tool gates. This avoids stale request/body plan paths
+  // disagreeing with the canonical entitlement resolver.
+  const accountContext = await resolveChatAccountContext({ userId });
+  const userPlan = accountContext.plan;
+  const planLimits = resolveChatTurnPlanLimits(accountContext);
+  const currentUserEntitlements = accountContext.userEntitlements;
+  const insightsEnabled = currentUserEntitlements.isPro;
   safeSetSentryContext(() => {
     Sentry.setTag('plan_tier', userPlan);
+    Sentry.setTag('billing_verification', accountContext.billingVerification);
   });
 
   // Kill switch: Statsig-backed, no deploy required. When a provider incident
@@ -2265,12 +2274,6 @@ export async function POST(req: Request) {
     CHAT_KILL_SWITCH_GATES.FORCE_LIGHT,
     false
   );
-  const planLimits = getEntitlements(userPlan);
-  const currentUserEntitlements = await getCurrentUserEntitlements().catch(
-    () => null
-  );
-  const insightsEnabled = currentUserEntitlements?.isPro ?? false;
-
   // Parse and validate request body
   let body: {
     messages?: unknown;
@@ -2464,21 +2467,24 @@ export async function POST(req: Request) {
   // that send clientTurnId, reservation/replay happens before quota charging.
   const rateLimitResult = await checkAiChatRateLimitForPlan(userId, userPlan);
   if (!rateLimitResult.success) {
+    const rateLimitMessage =
+      accountContext.billingVerification === 'unavailable'
+        ? 'Jovie could not verify your billing status right now, so chat usage is temporarily limited. Please retry in a few minutes or open billing settings.'
+        : (rateLimitResult.reason ??
+          'You have reached your chat limit. Please try again later.');
+
     if (reservedTurn) {
-      const replyText =
-        rateLimitResult.reason ??
-        'You have reached your chat limit. Please try again later.';
       await persistTerminalAssistantMessage({
         conversationId: reservedTurn.conversationId,
         turnId: reservedTurn.turnId,
         status: 'failed_model_error',
-        content: replyText,
+        content: rateLimitMessage,
         errorCode: 'RATE_LIMITED',
         errorMessage: rateLimitResult.reason,
       });
 
       return createAssistantTextStreamResponse({
-        text: replyText,
+        text: rateLimitMessage,
         requestId,
         corsHeaders,
         headers: {
@@ -2498,7 +2504,7 @@ export async function POST(req: Request) {
     return NextResponse.json(
       {
         error: 'Rate limit exceeded',
-        message: rateLimitResult.reason,
+        message: rateLimitMessage,
         errorCode: 'RATE_LIMITED',
         retryAfter: sanitizeRetryAfterSeconds(
           (rateLimitResult.reset.getTime() - Date.now()) / 1000
@@ -2574,12 +2580,16 @@ export async function POST(req: Request) {
 
   try {
     const albumArtEnabled = FEATURE_FLAGS.ALBUM_ART_GENERATION;
-    const merchEnabled = await getAppFlagValue('MERCH_MVP', { userId });
+    const merchEnabled = accountContext.flags.merchMvp;
 
     // Free tools (avatar upload, social links, link removal, feedback) available on ALL plans
-    const freeTools = buildFreeChatTools(resolvedProfileId, userId);
+    const freeTools = buildFreeChatTools(
+      resolvedProfileId,
+      userId,
+      accountContext
+    );
     // Advanced tools gated behind paid plans
-    const tools = planLimits.booleans.aiCanUseTools
+    const tools = canUsePaidChatTools(accountContext)
       ? {
           ...freeTools,
           ...buildChatTools(
@@ -2637,6 +2647,7 @@ export async function POST(req: Request) {
       userId,
       userPlan,
       planLimits,
+      accountContext,
       insightsEnabled,
       forceLightModel,
       tools,

@@ -1,10 +1,6 @@
 'use client';
 
-import {
-  type ColumnDef,
-  createColumnHelper,
-  type RowSelectionState,
-} from '@tanstack/react-table';
+import { type ColumnDef, createColumnHelper } from '@tanstack/react-table';
 import { lazy, Suspense, useCallback, useMemo } from 'react';
 import { Icon } from '@/components/atoms/Icon';
 import { TableEmptyState, UnifiedTable } from '@/components/organisms/table';
@@ -104,10 +100,6 @@ export function ReleaseTableWithTracks({
       index === 0 ? 'release-row' : undefined,
     []
   );
-  const rowSelection = useMemo<RowSelectionState>(
-    () => (selectedReleaseId ? { [selectedReleaseId]: true } : {}),
-    [selectedReleaseId]
-  );
 
   const getRowClassName = useCallback(
     (row: ReleaseViewModel) => {
@@ -117,14 +109,18 @@ export function ReleaseTableWithTracks({
       const isFlashed = flashedReleaseId === row.id;
 
       let baseClassName: string;
-      if (isSelected) {
-        baseClassName = designV1 ? 'border-transparent' : '';
+      if (designV1 && isSelected) {
+        baseClassName =
+          'border-transparent bg-(--linear-bg-surface-1)/80 shadow-[inset_3px_0_0_0_var(--linear-accent),inset_0_0_0_1px_color-mix(in_oklab,var(--linear-border-focus)_24%,transparent)] hover:bg-(--linear-bg-surface-1)/90 focus-within:bg-(--linear-bg-surface-1)';
       } else if (designV1 && isRowExpanded) {
         baseClassName =
           'border-transparent bg-(--linear-bg-surface-1)/58 hover:bg-(--linear-bg-surface-1)/64 focus-within:bg-(--linear-bg-surface-1)/70';
       } else if (designV1) {
         baseClassName =
           'border-transparent bg-transparent hover:bg-(--linear-bg-surface-1)/55 focus-within:bg-(--linear-bg-surface-1)/65 transition-[background-color,box-shadow,color] duration-150 ease-out [&:hover_span]:text-primary-token [&:hover_p]:text-primary-token';
+      } else if (isSelected) {
+        baseClassName =
+          'bg-[color-mix(in_oklab,var(--linear-row-selected)_55%,transparent)] shadow-[inset_3px_0_0_0_var(--linear-accent)] hover:bg-[color-mix(in_oklab,var(--linear-row-selected)_65%,transparent)] focus-within:bg-[color-mix(in_oklab,var(--linear-row-selected)_72%,transparent)] focus-within:shadow-[inset_3px_0_0_0_var(--linear-accent),inset_0_0_0_1px_var(--linear-border-focus)]';
       } else if (isRowExpanded) {
         baseClassName =
           'bg-[color-mix(in_oklab,var(--linear-bg-surface-1)_52%,transparent)] hover:bg-[color-mix(in_oklab,var(--linear-bg-surface-1)_58%,transparent)] focus-within:bg-[color-mix(in_oklab,var(--linear-bg-surface-1)_62%,transparent)]';
@@ -297,8 +293,8 @@ export function ReleaseTableWithTracks({
       return (
         <TableEmptyState
           icon={<Icon name='Disc3' className='h-6 w-6' />}
-          title='No releases'
-          description='Your releases will appear here once synced.'
+          title='No releases found'
+          description='Use the toolbar to create a release, sync from Spotify, or clear filters.'
           className='mx-4 my-3 min-h-[160px]'
         />
       );
@@ -323,7 +319,6 @@ export function ReleaseTableWithTracks({
     <UnifiedTable
       data={releases}
       columns={columns as ColumnDef<ReleaseViewModel, unknown>[]}
-      rowSelection={rowSelection}
       sorting={sorting}
       onSortingChange={onSortingChange}
       isLoading={isSorting && isLargeDataset}
@@ -339,7 +334,7 @@ export function ReleaseTableWithTracks({
       className='text-[12.5px] text-primary-token'
       containerClassName={
         designV1
-          ? 'h-full'
+          ? 'h-full px-2 pb-2 pt-1 md:px-2.5 md:pb-2.5 md:pt-1.5'
           : 'h-full px-2.5 pb-2.5 pt-0.5 md:px-3 md:pb-3 md:pt-1'
       }
       columnVisibility={tanstackColumnVisibility}
@@ -356,9 +351,9 @@ export function ReleaseTableWithTracks({
       emptyState={
         <TableEmptyState
           icon={<Icon name='Disc3' className='h-6 w-6' />}
-          title='No releases'
-          description='Your releases will appear here once synced.'
-          className={designV1 ? 'm-0 min-h-[160px]' : 'm-3 min-h-[160px]'}
+          title='No releases found'
+          description='Use the toolbar to create a release, sync from Spotify, or clear filters.'
+          className='m-3 min-h-[160px]'
         />
       }
     />

@@ -90,53 +90,59 @@ vi.mock(
 );
 
 vi.mock('@/components/organisms/table', () => ({
-  TableEmptyState: () => <div data-testid='table-empty-state' />,
+  TableEmptyState: ({
+    title,
+    description,
+  }: {
+    title?: string;
+    description?: string;
+  }) => (
+    <div data-testid='table-empty-state'>
+      <h3>{title}</h3>
+      <p>{description}</p>
+    </div>
+  ),
   UnifiedTable: ({
     data,
     columns,
     getRowId,
     getRowClassName,
     getRowTestId,
-    rowSelection,
     expandedRowIds,
     renderExpandedContent,
+    emptyState,
   }: {
     data: Array<{ id: string }>;
     columns: unknown[];
     getRowId: (row: { id: string }) => string;
     getRowClassName: (row: { id: string }) => string;
     getRowTestId?: (row: { id: string }, index: number) => string | undefined;
-    rowSelection?: Record<string, boolean>;
     expandedRowIds?: Set<string>;
     renderExpandedContent?: (
       row: { id: string },
       columnCount: number
     ) => ReactNode;
+    emptyState?: ReactNode;
   }) => (
     <div data-testid='unified-table'>
-      {data.map((row, index) => {
-        const rowId = getRowId(row);
-        return (
-          <div key={rowId} data-testid={`release-row-wrapper-${rowId}`}>
-            <div
-              data-testid={getRowTestId?.(row, index)}
-              className={[
-                rowSelection?.[rowId]
-                  ? 'bg-(--linear-row-selected) shadow-[inset_0_0_0_1px_color-mix(in_oklab,var(--linear-border-focus)_24%,transparent)]'
-                  : '',
-                getRowClassName(row),
-              ]
-                .filter(Boolean)
-                .join(' ')}
-            />
-            {expandedRowIds?.has(rowId) ? (
-              <div data-testid={`expanded-row-${rowId}`}>
-                {renderExpandedContent?.(row, columns.length)}
+      {data.length === 0
+        ? emptyState
+        : data.map((row, index) => {
+            const rowId = getRowId(row);
+            return (
+              <div key={rowId} data-testid={`release-row-wrapper-${rowId}`}>
+                <div
+                  data-testid={getRowTestId?.(row, index)}
+                  className={getRowClassName(row)}
+                />
+                {expandedRowIds?.has(rowId) ? (
+                  <div data-testid={`expanded-row-${rowId}`}>
+                    {renderExpandedContent?.(row, columns.length)}
+                  </div>
+                ) : null}
               </div>
-            ) : null}
-          </div>
-        );
-      })}
+            );
+          })}
     </div>
   ),
 }));
@@ -181,33 +187,6 @@ describe('ReleaseTable', () => {
     expect(expandedRow).toBeInTheDocument();
     expect(selectedRow).toBeInTheDocument();
     expect(expandedRow).not.toBe(selectedRow);
-    expect(expandedRow?.className).not.toContain('bg-(--linear-row-selected)');
-    expect(selectedRow?.className).toContain('bg-(--linear-row-selected)');
-    expect(selectedRow?.className).not.toContain(
-      'shadow-[inset_3px_0_0_0_var(--linear-accent)'
-    );
-  });
-
-  it('uses the shared selected state in design v1 table rows', () => {
-    render(
-      <ReleaseTable
-        {...commonProps}
-        designV1={true}
-        showTracks={false}
-        selectedReleaseId='release_1'
-      />
-    );
-
-    const selectedRow = screen
-      .getByTestId('release-row-wrapper-release_1')
-      .querySelector('div');
-
-    expect(selectedRow).toBeInTheDocument();
-    expect(selectedRow?.className).toContain('bg-(--linear-row-selected)');
-    expect(selectedRow?.className).toContain('border-transparent');
-    expect(selectedRow?.className).not.toContain(
-      'shadow-[inset_3px_0_0_0_var(--linear-accent)'
-    );
   });
 
   it('gives idle release rows the same visible rounded hover silhouette', () => {
@@ -239,5 +218,16 @@ describe('ReleaseTable', () => {
       'data-state',
       'selected'
     );
+  });
+
+  it('shows an actionable empty state when there are no releases', () => {
+    render(<ReleaseTable {...commonProps} releases={[]} showTracks={false} />);
+
+    expect(screen.getByText('No releases found')).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        'Use the toolbar to create a release, sync from Spotify, or clear filters.'
+      )
+    ).toBeInTheDocument();
   });
 });

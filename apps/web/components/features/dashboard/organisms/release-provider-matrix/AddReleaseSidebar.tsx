@@ -269,6 +269,12 @@ export function AddReleaseSidebar({
           <div className='p-3'>
             <EntityHeaderCard
               eyebrow='Release preview'
+              stableLayout
+              titleLineClamp={1}
+              subtitleLineClamp={1}
+              reserveSubtitleSlot
+              reserveMetaSlot
+              metaOverflow='scroll'
               image={
                 <AvatarUploadable
                   src={stagedArtworkPreviewUrl}

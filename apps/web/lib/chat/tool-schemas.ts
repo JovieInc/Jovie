@@ -127,6 +127,24 @@ export const TOOL_SCHEMAS = {
     inputSchema: z.object({}),
   },
 
+  showAccountStatus: {
+    description:
+      'Show authenticated account plan, billing verification, feature access, merch access, and safe next action.',
+    inputSchema: z.object({}),
+  },
+
+  showUsage: {
+    description:
+      'Show AI chat usage, daily/monthly limits, remaining messages, and reset time for the authenticated account.',
+    inputSchema: z.object({}),
+  },
+
+  openBillingPortal: {
+    description:
+      'Open the Stripe billing portal when available, or return billing settings when no billing account exists. Does not change the subscription.',
+    inputSchema: z.object({}),
+  },
+
   proposeSocialLink: {
     description:
       'Propose adding a social link to the artist profile. Pass the full URL. The client will show a confirmation card with the detected platform. Use this when the artist asks to add a link or social profile URL.',

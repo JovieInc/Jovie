@@ -82,6 +82,22 @@ describe('AudienceMemberSidebar', () => {
     expect(screen.getByText('jordan@example.com')).toBeInTheDocument();
   });
 
+  it('reserves the header contact line when an audience member has no email or phone', () => {
+    render(
+      <AudienceMemberSidebar
+        member={{ ...member, email: null, phone: null }}
+        isOpen
+        onClose={() => undefined}
+      />
+    );
+
+    expect(screen.getByText('Jordan Reyes')).toBeInTheDocument();
+    expect(screen.getByTestId('drawer-hero-subtitle-slot')).toHaveClass(
+      'invisible',
+      'min-h-[16px]'
+    );
+  });
+
   it('renders location and visit count in meta slot', () => {
     render(
       <AudienceMemberSidebar member={member} isOpen onClose={() => undefined} />

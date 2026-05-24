@@ -31,8 +31,15 @@ const ReleasesExperience = dynamic(
 export function ReleasesPageClient() {
   const { selectedProfile } = useDashboardData();
   const profileId = selectedProfile?.id ?? '';
-  const { data: releases, isError } = useReleasesQuery(profileId);
-  const designV1ReleasesEnabled = useAppFlag('DESIGN_V1_RELEASES');
+  const designV1ReleasesEnabled = useAppFlag('DESIGN_V1');
+
+  const {
+    data: releases,
+    isLoading,
+    isError,
+    refetch,
+    error,
+  } = useReleasesQuery(profileId);
 
   const settings =
     (selectedProfile?.settings as Record<string, unknown> | null) ?? {};
@@ -52,12 +59,29 @@ export function ReleasesPageClient() {
       ? settings.spotifyImportTotal
       : 0;
 
-  // Cold-load skeleton only. TanStack's `isLoading` can spike on refetch
-  // transitions before data is repopulated, which flashes the skeleton.
-  // `data === undefined` is the only true no-cache signal here.
-  if (isError) {
+  // Only swap to skeleton on a true cold load. Once we have any data (even
+  // from placeholderData), keep the tree mounted so background refetches
+  // never tear down the drawer or remount the table.
+  if (!releases && isLoading) {
+    return <ReleaseTableSkeleton showHeader={false} />;
+  }
+
+  if (isError && !releases) {
     return (
-      <PageErrorState message='Failed to load releases data. Please refresh the page.' />
+      <PageErrorState
+        title='Unable to load releases'
+        message='We could not load your releases. Retry the request or refresh the page.'
+        error={error instanceof Error ? error : undefined}
+        actionLabel='Retry load'
+        onRetry={() => {
+          refetch();
+        }}
+        secondaryAction={{
+          label: 'Refresh page',
+          onClick: () => globalThis.location.reload(),
+        }}
+        extraContext={{ Profile: profileId }}
+      />
     );
   }
 

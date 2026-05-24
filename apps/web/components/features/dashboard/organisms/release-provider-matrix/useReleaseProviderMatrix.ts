@@ -95,6 +95,8 @@ export function useReleaseProviderMatrix({
   rawRowsRef.current = rawRows;
   const providerConfigRef = useRef(providerConfig);
   providerConfigRef.current = providerConfig;
+  const saveProviderMutateRef = useRef(saveProviderMutation.mutate);
+  saveProviderMutateRef.current = saveProviderMutation.mutate;
 
   // No custom sorting needed - UnifiedTable handles this
   const rows = rawRows;
@@ -244,34 +246,39 @@ export function useReleaseProviderMatrix({
       const release = rawRowsRef.current.find(r => r.id === releaseId);
       if (!release) return;
 
-      saveProviderMutation.mutate(
-        {
-          profileId: release.profileId,
+      try {
+        const updated = await new Promise<ReleaseViewModel>(
+          (resolve, reject) => {
+            saveProviderMutateRef.current(
+              {
+                profileId: release.profileId,
+                releaseId,
+                provider,
+                url,
+              },
+              {
+                onSuccess: resolve,
+                onError: reject,
+              }
+            );
+          }
+        );
+        updateRow(updated);
+        toast.success(
+          `${providerConfigRef.current[provider].label} link added`
+        );
+      } catch (error) {
+        captureError('Failed to add provider link', error, {
+          context: 'release-mutation',
           releaseId,
           provider,
-          url,
-        },
-        {
-          onSuccess: updated => {
-            updateRow(updated);
-            toast.success(
-              `${providerConfigRef.current[provider].label} link added`
-            );
-          },
-          onError: error => {
-            captureError('Failed to add provider link', error, {
-              context: 'release-mutation',
-              releaseId,
-              provider,
-              action: 'add-provider-link',
-            });
-            toast.error('Failed to add link');
-          },
-        }
-      );
+          action: 'add-provider-link',
+        });
+        toast.error('Failed to add link');
+        throw error;
+      }
     },
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- mutate is stable from TanStack Query
-    [saveProviderMutation.mutate]
+    [updateRow]
   );
 
   const handleReset = (provider: ProviderKey) => {

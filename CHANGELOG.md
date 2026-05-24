@@ -5,6 +5,67 @@
      5|The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
      6|and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.5.46] - 2026-05-24
+
+> Virtualized chat threads now reserve slash-command picker clearance in the scroll geometry itself.
+
+### Fixed
+
+- **Virtualized slash-command clearance (JOV-2566)**: adds flyout clearance to the virtualized message spacer height instead of fixed-height padding, so long threads keep the latest message clear of the slash picker.
+
+### Added
+
+- **Virtualized flyout regression coverage**: extends the populated chat flyout Playwright fixture past the virtualization threshold so the smoke invariant covers long-thread geometry.
+
+## [26.5.45] - 2026-05-24
+
+> Chat slash-command flyouts and rich chip previews now stay above the transcript, clear active messages, and preserve composer geometry across desktop and mobile shells.
+
+### Fixed
+
+- **Chat slash-command flyout layering (JOV-2566)**: the active thread now reserves scroll clearance when the root slash picker opens, keeps the composer pinned, and prevents the picker from colliding with recent assistant replies, tool status rows, and user bubbles.
+- **Rich chip preview surfaces**: transcript entity chips and image attachment chips now use the chat overlay tier, opaque popover surfaces, viewport-bounded sizing, and safer placement around nearby messages.
+
+### Added
+
+- **Flyout and chip regression coverage**: added Playwright coverage for populated chat threads plus focused unit coverage for slash picker geometry, transcript token chips, image attachment chips, multiline bubbles, and chip popover interaction semantics.
+
+## [26.5.44] - 2026-05-24
+
+> [internal] Jovie chat now has a Promptfoo baseline eval suite that exercises the production chat runner with synthetic artist fixtures, making support quality, retrieval grounding, tool use, privacy, and onboarding regressions measurable.
+
+### Added
+
+- **[internal] Promptfoo chat baseline evals (JOV-2561)**: added a small Promptfoo suite for the web chat path, a custom provider around `executeChatTurn()`, synthetic Luna Waves fixtures, eval-only tool stubs, and JavaScript assertions covering support quality, retrieval grounding, tool-call correctness, privacy, business rules, onboarding task completion, and Jovie voice.
+- **[internal] Eval command and docs**: added `pnpm run evals` from the repo root and documented required env, baseline scope, and known route-level gaps for auth, billing, rate limits, DB persistence, mobile chat, Clerk, Spotify, and Stripe.
+
+## [26.5.43] - 2026-05-24
+
+> The Mac Electron auth handoff now fails closed on callback replay and keeps the browser-open retry controls bounded.
+
+### Changed
+
+- **Electron auth handoff window**: extracted the handoff window bounds and removed the indirect `showWindow` path when foregrounding the auth handoff window.
+
+### Fixed
+
+- **Native auth callback replay hardening**: `/auth/callback` now consumes the validated auth state before creating the native exchange code, so replay attempts fail closed and cannot leave auth state alive after exchange creation.
+- **Desktop auth browser retry state**: `Continue in browser` is disabled only while an open attempt is pending, then becomes retryable after success, failure, or timeout.
+- **Desktop auth bridge errors**: explicit IPC failure reasons now reach the renderer instead of being masked by a browser fallback.
+
+## [26.5.42] - 2026-05-24
+
+> The Mac Electron app now keeps browser sign-in in a dedicated handoff window, returns through the `jovie://` protocol, and avoids auth-route cookie banner noise.
+
+### Changed
+
+- **Electron auth handoff**: the Mac app now hides the main app shell while the browser handoff is active, reports failed browser launches back to the renderer, and declares the production `jovie://` auth-return protocol in the app bundle.
+
+### Fixed
+
+- **Native auth callback**: `/auth/callback` now consumes the already-validated auth state without re-reading it after native exchange creation, preventing valid Electron callbacks from falling into the `Auth state expired` response.
+- **Auth-surface cookie banner**: the visible cookie banner is suppressed on desktop/native auth utility routes while the normal cookie preferences controller remains mounted elsewhere.
+
 ## [26.5.41] - 2026-05-24
 
 > Jovie can now create Jovie-owned merch cards from chat, publish them to public artist profiles, collect payment through platform Stripe Checkout, route paid orders to Printful, and accrue manual artist payout liability.

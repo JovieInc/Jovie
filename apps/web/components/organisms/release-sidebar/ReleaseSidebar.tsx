@@ -346,6 +346,12 @@ function ReleaseEntityHeader({
         ) : null}
         <DrawerHero
           title={release.title}
+          stableLayout
+          titleLineClamp={2}
+          subtitleLineClamp={2}
+          reserveSubtitleSlot
+          reserveMetaSlot
+          metaOverflow='scroll'
           subtitle={
             artistLine ? (
               <span className='line-clamp-2 block'>{artistLine}</span>
@@ -575,6 +581,8 @@ export function ReleaseSidebar({
     canRevertArtwork: _canRevertArtwork,
     isAddingDspLink,
     isRemovingDspLink,
+    dspLinkActionError,
+    clearDspLinkActionError,
     handleArtworkUpload,
     handleArtworkRevert,
     handleAddLink,
@@ -955,11 +963,13 @@ export function ReleaseSidebar({
           selectedProvider={selectedProvider}
           isAddingDspLink={isAddingDspLink}
           isRemovingDspLink={isRemovingDspLink}
+          actionError={dspLinkActionError}
           onSetIsAddingLink={setIsAddingLink}
           onSetNewLinkUrl={setNewLinkUrl}
           onSetSelectedProvider={setSelectedProvider}
           onAddLink={handleAddLink}
           onRemoveLink={handleRemoveLink}
+          onDismissActionError={clearDspLinkActionError}
           onNewLinkKeyDown={handleNewLinkKeyDown}
           showHeading={false}
         />
