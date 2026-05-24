@@ -62,13 +62,18 @@ async function openWithTimeout(authUrl: string) {
   }
 }
 
+function getAppOrigin(): string {
+  return typeof globalThis.window === 'undefined'
+    ? 'https://jov.ie'
+    : globalThis.window.location.origin;
+}
+
 function DesktopAuthContent() {
   const searchParams = useSearchParams();
   const [openState, setOpenState] = useState<BrowserOpenState>('idle');
   const [openError, setOpenError] = useState<string | null>(null);
   const autoOpenedRef = useRef(false);
-  const appOrigin =
-    typeof window === 'undefined' ? 'https://jov.ie' : window.location.origin;
+  const appOrigin = getAppOrigin();
   const authUrl = useMemo(
     () => sanitizeDesktopAuthUrl(searchParams.get('auth_url'), appOrigin),
     [searchParams, appOrigin]
