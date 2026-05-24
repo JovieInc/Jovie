@@ -111,6 +111,22 @@ function toolEvent(): PersistedToolEvent {
 }
 
 async function mockFlyoutConversation(page: Page) {
+  const historicalMessages = Array.from({ length: 8 }, (_, index) => {
+    const role = index % 2 === 0 ? 'assistant' : 'user';
+    return {
+      id: `history-${index}`,
+      role,
+      content:
+        role === 'assistant'
+          ? `Earlier assistant context ${index + 1}`
+          : `Earlier user context ${index + 1}`,
+      toolCalls: null,
+      clientMessageId: role === 'user' ? `client-history-${index}` : null,
+      turnId: `turn-history-${index}`,
+      createdAt: `2026-05-24T07:${String(40 + index).padStart(2, '0')}:00.000Z`,
+    };
+  });
+
   await page.route('**/api/chat/capabilities**', route =>
     route.fulfill({
       status: 200,
@@ -150,6 +166,7 @@ async function mockFlyoutConversation(page: Page) {
             updatedAt: '2026-05-24T07:55:00.000Z',
           },
           messages: [
+            ...historicalMessages,
             {
               id: 'assistant-intro',
               role: 'assistant',
