@@ -37,8 +37,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 12
     permissions:
-      contents: write
-      pull-requests: write
+      contents: read
     steps:
       - name: Stagger start to avoid CI stampede
         env:
