@@ -193,17 +193,19 @@ if [[ "$MODE" == "install" ]]; then
   ok "Ollama ready with qwen3:4b-q4_K_M"
 
   # 8. tsx for running the cron job scripts
-  if ! command -v tsx >/dev/null 2>&1; then
-    log "Installing tsx globally"
-    npm install -g tsx@4.21.0
+  if command -v tsx >/dev/null 2>&1; then
+    TSX_BIN="$(command -v tsx)"
+  elif [[ -x "${REPO_ROOT}/node_modules/.bin/tsx" ]]; then
+    TSX_BIN="${REPO_ROOT}/node_modules/.bin/tsx"
+  else
+    die "tsx not found. Run pnpm install --frozen-lockfile from the repo root before bootstrap."
   fi
-  TSX_BIN="$(command -v tsx)"
   ok "tsx at $TSX_BIN"
 else
   # reconfigure: discover existing binaries
   HERMES_BIN="$(command -v hermes || echo /usr/local/bin/hermes)"
   GBRAIN_BIN="$(command -v gbrain || echo /usr/local/bin/gbrain)"
-  TSX_BIN="$(command -v tsx || echo /usr/local/bin/tsx)"
+  TSX_BIN="$(command -v tsx || echo "${REPO_ROOT}/node_modules/.bin/tsx")"
   TAILSCALE_IP="$(tailscale ip -4 2>/dev/null | head -1 || echo 127.0.0.1)"
 fi
 
