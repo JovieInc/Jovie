@@ -29,6 +29,7 @@ import {
 } from '@/components/shell/SidebarNavItem';
 import { Tooltip } from '@/components/shell/Tooltip';
 import { BASE_URL } from '@/constants/domains';
+import { APP_ROUTES } from '@/constants/routes';
 import { copyToClipboard } from '@/hooks/useClipboard';
 import { useIsElectronRuntime } from '@/lib/desktop/electron-bridge';
 import type { KeyboardShortcut } from '@/lib/keyboard-shortcuts';
@@ -279,8 +280,11 @@ export function NavMenuItem({
         description: shortcut.description ?? shortcut.label,
       }
     : undefined;
+  const isPrimaryNavAction =
+    item.id === 'chat' && item.href === APP_ROUTES.CHAT;
   const shellNavClassName = getSidebarNavRowClassName({
     active: isActive,
+    tone: isPrimaryNavAction && !isActive ? 'primary' : 'default',
     className:
       'group-data-[collapsible=icon]:mx-auto group-data-[collapsible=icon]:h-8 group-data-[collapsible=icon]:w-10 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0',
   });
@@ -305,7 +309,7 @@ export function NavMenuItem({
   return (
     <ContextMenu>
       <ContextMenuTrigger asChild>
-        <SidebarMenuItem>
+        <SidebarMenuItem className={isPrimaryNavAction ? 'mb-1.5' : undefined}>
           {shellNavItem ? (
             <Tooltip
               label={item.name}

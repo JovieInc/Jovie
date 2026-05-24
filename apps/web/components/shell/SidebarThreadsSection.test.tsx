@@ -41,7 +41,7 @@ describe('SidebarThreadsSection', () => {
     expect(activeThread).toHaveAttribute('href', '/app/chat/thread-newer');
     expect(activeThread).toHaveAttribute('aria-current', 'page');
     expect(activeThread).toHaveClass('h-6');
-    expect(activeThread).toHaveClass('bg-surface-1');
+    expect(activeThread).toHaveClass('bg-sidebar-accent-active');
     expect(activeThread).toHaveClass('text-primary-token');
     expect(inactiveThread).toHaveClass('text-secondary-token');
     expect(inactiveThread).toHaveClass('hover:bg-surface-1');

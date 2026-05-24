@@ -6,7 +6,6 @@ import { usePathname, useRouter } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { useDashboardData } from '@/app/app/(shell)/dashboard/DashboardDataContext';
-import { usePreviewPanelState } from '@/app/app/(shell)/dashboard/PreviewPanelContext';
 import { openCommandPalette } from '@/components/organisms/command-palette-events';
 import { usePendingShell } from '@/components/organisms/PendingShellContext';
 import {
@@ -169,12 +168,6 @@ export function DashboardNav(_: DashboardNavProps) {
   const shellChatLibraryEnabled = useAppFlag('SHELL_CHAT_V1');
   const [threadReadAtById, setThreadReadAtById] =
     useState<Record<string, string>>(readThreadReadState);
-  const {
-    isOpen: isPreviewOpen,
-    open: openPreviewPanel,
-    toggle: togglePreviewPanel,
-  } = usePreviewPanelState();
-
   const username =
     selectedProfile?.usernameNormalized ?? selectedProfile?.username;
   const publicProfileHref = username ? `/${username}` : undefined;
@@ -311,18 +304,6 @@ export function DashboardNav(_: DashboardNavProps) {
     shellChatLibraryEnabled,
     taskStats,
   ]);
-
-  // Profile nav item opens the preview drawer instead of navigating to a separate page.
-  // If already on a chat route, just opens the drawer; otherwise navigates first.
-  const handleProfileClick = useCallback(() => {
-    const isOnChat = pathname.startsWith(APP_ROUTES.CHAT);
-    if (isOnChat) {
-      togglePreviewPanel();
-    } else {
-      router.push(APP_ROUTES.CHAT);
-      queueMicrotask(() => openPreviewPanel());
-    }
-  }, [pathname, togglePreviewPanel, openPreviewPanel, router]);
 
   // Debounced prefetch: avoid firing on fast mouse sweeps across nav items
   const prefetchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -511,7 +492,7 @@ export function DashboardNav(_: DashboardNavProps) {
         item.id === 'chat' && item.href === APP_ROUTES.CHAT;
       let isActive = false;
       if (isProfileItem) {
-        isActive = isPreviewOpen && pathname.startsWith(APP_ROUTES.CHAT);
+        isActive = isItemActive(pathname, item);
       } else if (isNewThreadItem) {
         isActive = normalizeTrailingSlash(pathname) === APP_ROUTES.CHAT;
       } else if (!isSearchItem) {
@@ -521,12 +502,10 @@ export function DashboardNav(_: DashboardNavProps) {
 
       // In demo mode, only Releases has real content — intercept all other nav clicks
       const demoUnavailable = isDemo && !isReleasesItem && !isSearchItem;
-      const renderAsButton =
-        (isProfileItem && !demoUnavailable) || isSearchItem;
+      const renderAsButton = isSearchItem;
       let onClick: (() => void) | undefined;
       if (demoUnavailable) onClick = () => handleDemoNavClick(item);
       else if (isSearchItem) onClick = handleSearchClick;
-      else if (isProfileItem) onClick = handleProfileClick;
 
       return (
         <NavMenuItem
@@ -553,13 +532,11 @@ export function DashboardNav(_: DashboardNavProps) {
     [
       pathname,
       profileActions,
-      handleProfileClick,
       handleDemoNavClick,
       handlePrefetch,
       handleSearchClick,
       clearPendingReleasesShell,
       showPendingReleasesShell,
-      isPreviewOpen,
       isDemo,
       shellChatV1Enabled,
     ]
