@@ -511,7 +511,7 @@ export const workflowRuns = pgTable(
       .notNull()
       .references(() => users.id, { onDelete: 'cascade' }),
 
-    status: workflowRunStatusEnum('status').notNull().default('pending'),
+    status: workflowRunStatusEnum('status').notNull().default('queued'),
 
     /** Name of the step currently executing or next to run on resume. */
     currentStep: text('current_step'),

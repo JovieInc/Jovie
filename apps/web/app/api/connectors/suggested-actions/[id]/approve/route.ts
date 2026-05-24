@@ -79,7 +79,7 @@ export async function POST(_request: Request, { params }: RouteParams) {
     await db.insert(workflowRuns).values({
       kind: 'execute_approved_action',
       userId,
-      status: 'pending',
+      status: 'queued',
       currentStep: 'create_calendar_event',
       stepOutputs: { approvalId: id, eventPayload },
       runAt: new Date(),
