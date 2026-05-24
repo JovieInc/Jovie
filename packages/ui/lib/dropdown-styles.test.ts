@@ -60,7 +60,7 @@ describe('dropdown-styles', () => {
       expect(DROPDOWN_CONTENT_BASE).toContain(
         'border-(--linear-border-default)'
       );
-      expect(DROPDOWN_CONTENT_BASE).toContain('p-1');
+      expect(DROPDOWN_CONTENT_BASE.split(/\s+/)).toContain('p-1');
     });
 
     it('compact base uses p-0.5 padding', () => {
