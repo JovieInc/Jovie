@@ -967,8 +967,6 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
                   onFiltersChange={setFilters}
                   releaseView={releaseView}
                   onReleaseViewChange={setReleaseView}
-                  searchQuery={searchQuery}
-                  onSearchQueryChange={setSearchQuery}
                   onCreateRelease={handleNewRelease}
                   canCreateManualReleases={canCreateManualReleases}
                 />

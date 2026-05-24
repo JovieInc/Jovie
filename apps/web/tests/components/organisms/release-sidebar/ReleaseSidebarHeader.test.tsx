@@ -2,9 +2,11 @@ import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+const mockToastError = vi.fn();
+
 vi.mock('sonner', () => ({
   toast: {
-    error: vi.fn(),
+    error: mockToastError,
   },
 }));
 
@@ -18,6 +20,7 @@ vi.mock('next/navigation', () => ({
 
 beforeEach(() => {
   mockRouterRefresh.mockReset();
+  mockToastError.mockReset();
 });
 
 const { useReleaseHeaderParts } = await import(
