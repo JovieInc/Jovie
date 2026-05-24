@@ -17,6 +17,34 @@ interface TourDateCardProps {
   readonly distanceKm?: number | null;
 }
 
+function getActionLabel({
+  canBuyTickets,
+  isCancelled,
+}: {
+  readonly canBuyTickets: boolean;
+  readonly isCancelled: boolean;
+}) {
+  if (isCancelled) {
+    return 'Cancelled';
+  }
+
+  if (canBuyTickets) {
+    return 'Get tickets';
+  }
+
+  return 'Add to calendar';
+}
+
+function getEyebrow(isNearYou: boolean, distanceKm: number | null | undefined) {
+  if (!isNearYou) {
+    return 'Next Show';
+  }
+
+  return distanceKm === null || distanceKm === undefined
+    ? 'Near You'
+    : `${Math.round(distanceKm)} km away`;
+}
+
 export function TourDateCard({
   tourDate,
   handle,
@@ -64,13 +92,11 @@ export function TourDateCard({
   const canBuyTickets =
     Boolean(tourDate.ticketUrl) && !isCancelled && !isSoldOut;
   const canAddToCalendar = !isCancelled;
-  const actionLabel = isCancelled
-    ? 'Cancelled'
-    : isSoldOut
-      ? 'Add to calendar'
-      : canBuyTickets
-        ? 'Get tickets'
-        : 'Add to calendar';
+  const actionLabel = getActionLabel({
+    canBuyTickets,
+    isCancelled,
+  });
+  const eyebrow = getEyebrow(isNearYou, distanceKm);
   const calendarAction = canAddToCalendar
     ? {
         label: 'Add to calendar',
@@ -81,13 +107,7 @@ export function TourDateCard({
 
   return (
     <ProfileMediaCard
-      eyebrow={
-        isNearYou
-          ? distanceKm === null || distanceKm === undefined
-            ? 'Near You'
-            : `${Math.round(distanceKm)} km away`
-          : 'Next Show'
-      }
+      eyebrow={eyebrow}
       title={tourDate.title ?? 'Live'}
       subtitle={tourDate.venueName}
       locationLabel={location}

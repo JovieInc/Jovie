@@ -154,7 +154,15 @@ if [[ "$MODE" == "install" ]]; then
   # 5. Hermes (hermes-agent-rs)
   if ! command -v hermes >/dev/null 2>&1; then
     log "Installing Hermes (hermes-agent-rs)"
-    curl -fsSL https://raw.githubusercontent.com/Lumio-Research/hermes-agent-rs/main/scripts/install.sh | bash
+    HERMES_INSTALL_REF="60ee269fe37f5eb29df49378479293a102c2ad07"
+    HERMES_INSTALL_SHA256="3f2404dc8b47414a6c46899a5549dea73a456f9e99d0e3f5ed2da65eee891881"
+    HERMES_VERSION="v0.1.1"
+    HERMES_INSTALLER="$(mktemp)"
+    curl -fsSL "https://raw.githubusercontent.com/Lumio-Research/hermes-agent-rs/${HERMES_INSTALL_REF}/scripts/install.sh" \
+      -o "$HERMES_INSTALLER"
+    printf '%s  %s\n' "$HERMES_INSTALL_SHA256" "$HERMES_INSTALLER" | shasum -a 256 -c -
+    bash "$HERMES_INSTALLER" "$HERMES_VERSION"
+    rm -f "$HERMES_INSTALLER"
   fi
   HERMES_BIN="$(command -v hermes)"
   ok "Hermes at $HERMES_BIN"
@@ -187,7 +195,7 @@ if [[ "$MODE" == "install" ]]; then
   # 8. tsx for running the cron job scripts
   if ! command -v tsx >/dev/null 2>&1; then
     log "Installing tsx globally"
-    npm install -g tsx
+    npm install -g tsx@4.21.0
   fi
   TSX_BIN="$(command -v tsx)"
   ok "tsx at $TSX_BIN"

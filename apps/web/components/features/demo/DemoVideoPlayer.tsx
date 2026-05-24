@@ -34,7 +34,7 @@ export function DemoVideoPlayer({
       return;
     }
 
-    void video
+    video
       .play()
       .then(() => {
         setHasStarted(true);

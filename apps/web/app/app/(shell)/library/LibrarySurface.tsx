@@ -1360,7 +1360,9 @@ function LibraryAudioDropzone({
   const handleInputChange = useCallback(
     (event: ChangeEvent<HTMLInputElement>) => {
       const file = event.target.files?.[0];
-      if (file) void uploadFile(file);
+      if (file) {
+        uploadFile(file).catch(() => {});
+      }
     },
     [uploadFile]
   );
@@ -1370,7 +1372,9 @@ function LibraryAudioDropzone({
       event.preventDefault();
       setIsDragging(false);
       const file = event.dataTransfer.files?.[0];
-      if (file) void uploadFile(file);
+      if (file) {
+        uploadFile(file).catch(() => {});
+      }
     },
     [uploadFile]
   );

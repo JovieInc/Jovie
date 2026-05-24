@@ -47,10 +47,7 @@ jobs:
     name: Run Hermes CLI Worker
     runs-on: [self-hosted, hermes]
     timeout-minutes: 120
-    permissions:
-      contents: write
-      pull-requests: write
-      actions: read
+    permissions: {}
     env:
       JOVIE_AGENT_PROFILE: coder
     steps:

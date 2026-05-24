@@ -46,6 +46,31 @@ const SIGNAL_CONFIG: Record<
 
 const reviewQueueColumnHelper = createColumnHelper<ReviewLead>();
 
+interface ReviewLeadActionsProps {
+  readonly id: string;
+  readonly isSkipping: boolean;
+  readonly onSkip: (id: string) => Promise<void>;
+}
+
+function ReviewLeadActions({ id, isSkipping, onSkip }: ReviewLeadActionsProps) {
+  return (
+    <DrawerButton
+      tone='secondary'
+      size='sm'
+      onClick={() => {
+        onSkip(id).catch(() => {});
+      }}
+      disabled={isSkipping}
+      className='h-8 px-3 text-xs'
+    >
+      {isSkipping ? (
+        <LoadingSpinner size='sm' tone='muted' className='mr-1.5' />
+      ) : null}
+      Skip
+    </DrawerButton>
+  );
+}
+
 export function ReviewQueuePanel() {
   const [leads, setLeads] = useState<ReviewLead[]>([]);
   const [total, setTotal] = useState(0);
@@ -189,22 +214,16 @@ export function ReviewQueuePanel() {
       reviewQueueColumnHelper.display({
         id: 'actions',
         header: 'Actions',
-        cell: ({ row }) => (
-          <DrawerButton
-            tone='secondary'
-            size='sm'
-            onClick={() => {
-              void handleSkip(row.original.id);
-            }}
-            disabled={skippingIds.has(row.original.id)}
-            className='h-8 px-3 text-xs'
-          >
-            {skippingIds.has(row.original.id) ? (
-              <LoadingSpinner size='sm' tone='muted' className='mr-1.5' />
-            ) : null}
-            Skip
-          </DrawerButton>
-        ),
+        cell: ({ row }) => {
+          const leadId = row.original.id;
+          return (
+            <ReviewLeadActions
+              id={leadId}
+              isSkipping={skippingIds.has(leadId)}
+              onSkip={handleSkip}
+            />
+          );
+        },
         size: 110,
       }) as ColumnDef<ReviewLead, unknown>,
     ],

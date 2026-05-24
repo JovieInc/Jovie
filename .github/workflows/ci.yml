@@ -3534,12 +3534,10 @@ jobs:
       - name: Check if SHA is still main HEAD
         id: check
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          tip=$(curl -sS -H "Authorization: Bearer $GITHUB_TOKEN" -H "Accept: application/vnd.github+json" \
-            "${{ github.api_url }}/repos/${{ github.repository }}/commits/main" \
-            | python3 -c 'import json,sys; print(json.load(sys.stdin).get("sha",""))')
+          tip=$(gh api "repos/${{ github.repository }}/commits/main" --jq '.sha // ""' 2>/dev/null || true)
           if [ -z "$tip" ]; then
             echo "::warning::Could not resolve origin/main tip; defaulting to proceed"
             echo "is_head=true" >> "$GITHUB_OUTPUT"

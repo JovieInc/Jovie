@@ -1897,7 +1897,9 @@ export function TasksPageClient() {
               : 'empty'
         }
         onClose={closeReleaseSidebar}
-        onRetry={() => void selectedReleaseQuery.refetch()}
+        onRetry={() => {
+          Promise.resolve(selectedReleaseQuery.refetch()).catch(() => {});
+        }}
       />
     )
   ) : null;
@@ -2138,7 +2140,11 @@ export function TasksPageClient() {
           data-testid='tasks-content-panel'
         >
           {activeIsError ? (
-            <TaskErrorState onRetry={() => void refetchActiveTasks()} />
+            <TaskErrorState
+              onRetry={() => {
+                Promise.resolve(refetchActiveTasks()).catch(() => {});
+              }}
+            />
           ) : (
             <div className='flex min-h-0 flex-1 overflow-hidden'>
               <div
