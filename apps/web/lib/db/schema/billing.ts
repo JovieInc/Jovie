@@ -20,6 +20,7 @@ export const stripeWebhookEvents = pgTable(
     userClerkId: text('user_clerk_id'),
     payload: jsonb('payload').$type<Record<string, unknown>>().default({}),
     processedAt: timestamp('processed_at'),
+    processingStartedAt: timestamp('processing_started_at'),
     stripeCreatedAt: timestamp('stripe_created_at'),
     createdAt: timestamp('created_at').defaultNow().notNull(),
   },

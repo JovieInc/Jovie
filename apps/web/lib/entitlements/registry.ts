@@ -48,6 +48,7 @@ export type BooleanEntitlement =
   | 'canAccessWebhooks'
   | 'canAccessWhiteLabel'
   | 'canAccessAbTesting'
+  | 'canAccessMerchCreation'
   | 'canAccessAiRetouching';
 
 export type NumericEntitlement =
@@ -112,6 +113,7 @@ const PRO_BOOLEANS: Record<BooleanEntitlement, boolean> = {
   canAccessWebhooks: false,
   canAccessWhiteLabel: false,
   canAccessAbTesting: false,
+  canAccessMerchCreation: true,
   canAccessAiRetouching: true,
 };
 
@@ -138,6 +140,7 @@ const PRO_FEATURES: readonly string[] = [
   'Fan CRM',
   'Tips & payments',
   'Earnings dashboard',
+  'AI merch creation',
   'URL encryption',
   'Ad pixel tracking',
   'Verified badge',
@@ -179,6 +182,7 @@ export const ENTITLEMENT_REGISTRY: Record<PlanId, PlanEntitlements> = {
       canAccessWebhooks: false,
       canAccessWhiteLabel: false,
       canAccessAbTesting: false,
+      canAccessMerchCreation: false,
       canAccessAiRetouching: false,
     },
     limits: {
@@ -259,6 +263,7 @@ export const ENTITLEMENT_REGISTRY: Record<PlanId, PlanEntitlements> = {
       canAccessWebhooks: true,
       canAccessWhiteLabel: true,
       canAccessAbTesting: true,
+      canAccessMerchCreation: true,
       canAccessAiRetouching: true,
     },
     limits: {
@@ -287,6 +292,7 @@ export const ENTITLEMENT_REGISTRY: Record<PlanId, PlanEntitlements> = {
         'Webhooks',
         'White-label / custom domain',
         'A/B testing',
+        'AI merch creation',
       ],
       price: {
         monthly: PLAN_PRICES.max.monthly,
@@ -513,6 +519,7 @@ export const PRICING_COMPARISON: readonly PricingCategory[] = [
     features: [
       { name: 'Tips & payments', free: false, pro: true, max: true },
       { name: 'Earnings dashboard', free: false, pro: true, max: true },
+      { name: 'AI merch creation', free: false, pro: true, max: true },
       { name: 'Stripe Connect payouts', free: false, pro: false, max: true },
       { name: 'Fan subscriptions', free: false, pro: false, max: true },
     ],

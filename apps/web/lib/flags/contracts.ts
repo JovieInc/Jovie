@@ -20,6 +20,7 @@ export const LEGACY_STATSIG_GATE_KEYS = {
   CHAT_JANK_MONITOR: 'chat_jank_monitor',
   AI_CONNECTORS_BETA: 'ai_connectors_beta',
   IOS_APP_ALPHA_ACCESS: 'ios_app_alpha_access',
+  MERCH_MVP: 'merch_mvp',
 } as const;
 
 export type StatsigGateKey =
@@ -43,6 +44,7 @@ export const APP_FLAG_DEFAULTS = {
   RELEASE_PLAN_DEMO: false,
   AI_CONNECTORS_BETA: false,
   IOS_APP_ALPHA_ACCESS: false,
+  MERCH_MVP: false,
   // DESIGN_V1 and all its surface aliases are permanently enabled.
   // Statsig gate "design_v1" is also set to 100% rollout.
   // The true default here ensures the new design is on even if Statsig is
@@ -73,6 +75,7 @@ export const APP_FLAG_KEYS = {
   RELEASE_PLAN_DEMO: 'release_plan_demo',
   AI_CONNECTORS_BETA: 'ai_connectors_beta',
   IOS_APP_ALPHA_ACCESS: 'ios_app_alpha_access',
+  MERCH_MVP: LEGACY_STATSIG_GATE_KEYS.MERCH_MVP,
   DESIGN_V1: 'design_v1',
   SHELL_CHAT_V1: LEGACY_STATSIG_GATE_KEYS.DESIGN_V1,
   DESIGN_V1_RELEASES: LEGACY_STATSIG_GATE_KEYS.DESIGN_V1,
@@ -96,6 +99,7 @@ export const APP_FLAG_OVERRIDE_KEYS = {
   RELEASE_PLAN_DEMO: 'code:RELEASE_PLAN_DEMO',
   AI_CONNECTORS_BETA: 'code:AI_CONNECTORS_BETA',
   IOS_APP_ALPHA_ACCESS: 'code:IOS_APP_ALPHA_ACCESS',
+  MERCH_MVP: 'code:MERCH_MVP',
   DESIGN_V1: 'code:DESIGN_V1',
   SHELL_CHAT_V1: 'code:DESIGN_V1',
   DESIGN_V1_RELEASES: 'code:DESIGN_V1',
@@ -116,6 +120,7 @@ export const APP_FLAG_TO_STATSIG_GATE = {
   CHAT_JANK_MONITOR: LEGACY_STATSIG_GATE_KEYS.CHAT_JANK_MONITOR,
   AI_CONNECTORS_BETA: LEGACY_STATSIG_GATE_KEYS.AI_CONNECTORS_BETA,
   IOS_APP_ALPHA_ACCESS: LEGACY_STATSIG_GATE_KEYS.IOS_APP_ALPHA_ACCESS,
+  MERCH_MVP: LEGACY_STATSIG_GATE_KEYS.MERCH_MVP,
 } as const satisfies Partial<Record<AppFlagName, StatsigGateKey>>;
 
 export type StatsigBackedAppFlagName = keyof typeof APP_FLAG_TO_STATSIG_GATE;
@@ -134,6 +139,7 @@ export const APP_FLAG_DESCRIPTIONS = {
   AI_CONNECTORS_BETA:
     'AI Connectors v1 beta (Gmail booking extraction → calendar)',
   IOS_APP_ALPHA_ACCESS: 'Internal iOS TestFlight alpha install access',
+  MERCH_MVP: 'Jovie-owned merch creation, checkout, and Printful fulfillment',
   DESIGN_V1: 'New production design',
   SHELL_CHAT_V1: 'New production design alias for shell and chat',
   DESIGN_V1_RELEASES: 'New production design alias for releases',

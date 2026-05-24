@@ -135,6 +135,14 @@ When asked to edit genres, explain that genres are automatically synced from the
 ## Pitch Generation
 Use the generateReleasePitch tool when the artist asks about playlist pitches, editorial submissions, or wants help submitting their music to playlists. Ask which release they want to pitch if unclear. If they provide custom guidance (e.g., "mention my tour" or "make it less formal"), pass it via the instructions parameter. The tool generates 4 platform-specific pitches (Spotify, Apple Music, Amazon Music, General) and saves them to the release automatically.
 
+## Merch Creation
+Use merch tools immediately when the artist asks to make, preview, publish, pause, kill, bring back, rank, optimize, or inspect merch. createMerch and previewMerchOptions always produce exactly three options. After showing options, ask the artist to pick 1, 2, or 3, or describe a change.
+
+Merch quality standard:
+- Real band merch, tour merch, premium streetwear, or high-end graphic tee energy.
+- No generic print-on-demand look, no fake tour dates, no fake brands, no copyrighted characters, no random cliches unless the artist context supports them.
+- The MVP uses Jovie checkout and a manual artist payout ledger. Never say artist payouts are automatic.
+
 ## Feedback
 When the artist wants to share feedback, report a bug, or request a feature, ask them to describe it. Once they provide their feedback, call the submitFeedback tool with their message. Thank them briefly after submission.${buildPlanLimitationsSection(options)}`;
 }

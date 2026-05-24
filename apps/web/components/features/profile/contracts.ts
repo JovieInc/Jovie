@@ -1,5 +1,6 @@
 import type { DiscogRelease } from '@/lib/db/schema/content';
 import type { ProfileAlertOptInVariant } from '@/lib/flags/contracts';
+import type { PublicMerchCard } from '@/lib/merch/types';
 import type { ConfirmedFeaturedPlaylistFallback } from '@/lib/profile/featured-playlist-fallback';
 import type { TourDateViewModel } from '@/lib/tour-dates/types';
 import type { AvatarSize } from '@/lib/utils/avatar-sizes';
@@ -172,6 +173,7 @@ export interface ProfilePublicViewModel {
   } | null;
   readonly featuredPlaylistFallback?: ConfirmedFeaturedPlaylistFallback | null;
   readonly releases?: readonly PublicRelease[];
+  readonly merchCards?: readonly PublicMerchCard[];
 }
 
 export interface ProfileIdentityFields {

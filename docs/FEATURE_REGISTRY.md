@@ -57,7 +57,9 @@ This document is the canonical feature list for Jovie. It is designed for onboar
 | Growth | Release notifications | Shipped | Free+ | None | Entitlement-backed (`canSendNotifications`) |
 | Monetization | Tips & payments (Venmo) | Shipped | Pro+ | None | Venmo today, Stripe Connect coming |
 | Monetization | Earnings dashboard | Shipped | Pro+ | None | /dashboard/earnings |
+| Monetization | Chat-generated merch cards, checkout, fulfillment, and payout ledger | Shipped (flagged) | Trial/Pro/Max + flag-gated | `merch_mvp` | Jovie-owned merch cards; Stripe Checkout under Jovie; Printful fulfillment; manual artist payout ledger |
 | AI Assistant | AI assistant (daily message limits by plan) | Shipped | Free+/Pro+/Growth | None | Plan limits: 25/100/500 msgs |
+| AI Assistant | Merch creation tools | Shipped (flagged) | Trial/Pro/Max + flag-gated | `merch_mvp` | Entitlement-backed (`canAccessMerchCreation`); generates exactly 3 deterministic production-art options |
 | AI Connectors | Gmail booking email to Google Calendar auto-add | Shipped (flagged) | Flag-gated | `ai_connectors_beta` | Closed beta; default off; allowlist design-partner DJs post-merge |
 | Mobile App | iOS internal TestFlight alpha | Shipped (flagged) | Admin / flag-gated | `ios_app_alpha_access` | Internal install access only; public marketing remains off |
 | Brand | Remove Jovie branding | Shipped | Pro+ | None | Entitlement-backed (`canRemoveBranding`) |

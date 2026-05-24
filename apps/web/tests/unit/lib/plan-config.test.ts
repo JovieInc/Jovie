@@ -48,6 +48,7 @@ describe('Plan Configuration (Entitlement Registry)', () => {
         canAccessWebhooks: false,
         canAccessWhiteLabel: false,
         canAccessAbTesting: false,
+        canAccessMerchCreation: false,
         canAccessAiRetouching: false,
       });
     });
@@ -89,6 +90,7 @@ describe('Plan Configuration (Entitlement Registry)', () => {
         canAccessWebhooks: false,
         canAccessWhiteLabel: false,
         canAccessAbTesting: false,
+        canAccessMerchCreation: true,
         canAccessAiRetouching: true,
       });
     });
@@ -130,6 +132,7 @@ describe('Plan Configuration (Entitlement Registry)', () => {
         canAccessWebhooks: true,
         canAccessWhiteLabel: true,
         canAccessAbTesting: true,
+        canAccessMerchCreation: true,
         canAccessAiRetouching: true,
       });
     });

@@ -47,7 +47,7 @@ vi.mock('@/lib/utils/logger', () => ({
   logger: { warn: vi.fn(), error: vi.fn() },
 }));
 
-// Contract matrix — 4 plans × 27 booleans + 6 limits (exact values for mutation killing)
+// Contract matrix — 4 plans × 28 booleans + 6 limits (exact values for mutation killing)
 const BOOLS_FREE: Record<BooleanEntitlement, boolean> = {
   canExportContacts: false,
   canAccessAdvancedAnalytics: false,
@@ -75,6 +75,7 @@ const BOOLS_FREE: Record<BooleanEntitlement, boolean> = {
   canAccessWebhooks: false,
   canAccessWhiteLabel: false,
   canAccessAbTesting: false,
+  canAccessMerchCreation: false,
   canAccessAiRetouching: false,
 };
 
@@ -105,6 +106,7 @@ const BOOLS_PRO: Record<BooleanEntitlement, boolean> = {
   canAccessWebhooks: false,
   canAccessWhiteLabel: false,
   canAccessAbTesting: false,
+  canAccessMerchCreation: true,
   canAccessAiRetouching: true,
 };
 
@@ -135,6 +137,7 @@ const BOOLS_MAX: Record<BooleanEntitlement, boolean> = {
   canAccessWebhooks: true,
   canAccessWhiteLabel: true,
   canAccessAbTesting: true,
+  canAccessMerchCreation: true,
   canAccessAiRetouching: true,
 };
 
@@ -183,7 +186,7 @@ const MATRIX = {
   trial: { booleans: BOOLS_TRIAL, limits: LIMITS_TRIAL },
 } as const;
 
-describe('Entitlements registry plan matrix contract (4 plans × 27 booleans + 6 limits + legacy)', () => {
+describe('Entitlements registry plan matrix contract (4 plans × 28 booleans + 6 limits + legacy)', () => {
   it('getAllPlanIds returns exactly the 4 canonical PlanIds', () => {
     expect(getAllPlanIds()).toEqual(['free', 'trial', 'pro', 'max'] as const);
   });
@@ -196,7 +199,7 @@ describe('Entitlements registry plan matrix contract (4 plans × 27 booleans + 6
     });
   });
 
-  it('checkBoolean/getLimit cover every key in the 27×4 + 6×4 matrix', () => {
+  it('checkBoolean/getLimit cover every key in the 28×4 + 6×4 matrix', () => {
     (['free', 'pro', 'max', 'trial'] as const).forEach(plan => {
       const m = MATRIX[plan];
       (Object.keys(m.booleans) as BooleanEntitlement[]).forEach(key => {

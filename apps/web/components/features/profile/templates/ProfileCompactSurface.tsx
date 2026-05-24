@@ -29,6 +29,7 @@ import { track } from '@/lib/analytics';
 import { Mark } from '@/lib/brand/primitives';
 import { sortDSPsByGeoPopularity } from '@/lib/dsp';
 import type { ProfileAlertOptInVariant } from '@/lib/flags/contracts';
+import type { PublicMerchCard } from '@/lib/merch/types';
 import type { ConfirmedFeaturedPlaylistFallback } from '@/lib/profile/featured-playlist-fallback';
 import { CONTENT_SAFE_AREA_BOTTOM_PADDING } from '@/lib/profile/nav-constants';
 import { getCanonicalProfileDSPs } from '@/lib/profile-dsps';
@@ -157,6 +158,7 @@ interface ProfileCompactSurfaceProps {
   readonly viewerLocation?: UserLocation | null;
   readonly resolveNearbyTour?: boolean;
   readonly releases?: readonly PublicRelease[];
+  readonly merchCards?: readonly PublicMerchCard[];
   readonly drawerOpen: boolean;
   readonly drawerView: DrawerView;
   readonly activeMode?: ProfileMode;
@@ -247,6 +249,7 @@ export function ProfileCompactSurface({
   viewerLocation,
   resolveNearbyTour = true,
   releases = [],
+  merchCards = [],
   drawerOpen,
   drawerView,
   activeMode = 'profile',
@@ -728,6 +731,7 @@ export function ProfileCompactSurface({
                 isSubscribed={homeAlertsSubscribed}
                 viewerLocation={viewerLocation}
                 resolveNearbyTour={resolveNearbyTour}
+                merchCards={merchCards}
               />
             ) : (
               <ProfilePrimaryTabPanel

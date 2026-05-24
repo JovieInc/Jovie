@@ -192,6 +192,16 @@ export const RATE_LIMITERS = {
     analytics: true,
   } satisfies RateLimitConfig,
 
+  /** Merch checkout: 20 sessions per hour per IP - public physical-goods endpoint */
+  merchCheckout: {
+    name: 'Merch Checkout',
+    limit: 20,
+    window: '1 h',
+    prefix: 'merch_checkout',
+    analytics: true,
+    requireRedis: true,
+  } satisfies RateLimitConfig,
+
   // ---------------------------------------------------------------------------
   // Admin Operations
   // ---------------------------------------------------------------------------
