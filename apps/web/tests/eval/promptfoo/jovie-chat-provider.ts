@@ -8,12 +8,14 @@ import {
 } from '@/lib/chat/tool-schemas';
 import type { ReleaseContext } from '@/lib/chat/types';
 import { getEntitlements, type PlanId } from '@/lib/entitlements/registry';
+import { NO_STORE_HEADERS } from '@/lib/http/headers';
 import {
   buildTestArtistContext,
   buildTestReleases,
 } from '../../fixtures/chat-context';
 
 type EvalVars = Record<string, unknown>;
+type EvalTarget = 'chat-turn' | 'mobile-chat-route';
 
 type ToolExecution = {
   readonly name: string;
@@ -50,6 +52,17 @@ type ProviderResponse = {
 const EVAL_PROFILE_ID = '00000000-0000-4000-8000-000000002561';
 const EVAL_CONVERSATION_ID = 'promptfoo-eval-conversation';
 const EVAL_USER_ID = 'promptfoo-eval-user';
+const MOBILE_CHAT_ROUTE_PATH = '/api/mobile/v1/chat/turns';
+const MAX_MOBILE_TEXT_LENGTH = 4000;
+const MOBILE_CHAT_RUNTIME_DISABLED_EVENT = {
+  type: 'error',
+  errorCode: 'MOBILE_CHAT_RUNTIME_DISABLED',
+  message: 'Native chat is not enabled for this build.',
+} as const;
+const MOBILE_CHAT_NDJSON_HEADERS = {
+  ...NO_STORE_HEADERS,
+  'Content-Type': 'application/x-ndjson; charset=utf-8',
+} as const;
 
 const ADVANCED_TOOL_SCHEMAS = {
   showTopInsights: {
@@ -225,8 +238,109 @@ function toMode(value: unknown): 'app' | 'onboarding' {
   return value === 'onboarding' ? 'onboarding' : 'app';
 }
 
+function toTarget(value: unknown): EvalTarget {
+  return value === 'mobile-chat-route' ? 'mobile-chat-route' : 'chat-turn';
+}
+
 function toBoolean(value: unknown, fallback: boolean): boolean {
   return typeof value === 'boolean' ? value : fallback;
+}
+
+function isValidMobileSource(source: unknown): source is 'typed' {
+  return source === 'typed';
+}
+
+function isValidOptionalString(value: unknown): value is string | undefined {
+  return value === undefined || (typeof value === 'string' && value.length > 0);
+}
+
+function parseMobileChatTurnRequest(value: Record<string, unknown>): {
+  readonly conversationId?: string;
+  readonly clientTurnId: string;
+  readonly clientMessageId: string;
+  readonly text: string;
+  readonly source: 'typed';
+} | null {
+  if (
+    !isValidOptionalString(value.conversationId) ||
+    typeof value.clientTurnId !== 'string' ||
+    value.clientTurnId.length === 0 ||
+    typeof value.clientMessageId !== 'string' ||
+    value.clientMessageId.length === 0 ||
+    typeof value.text !== 'string' ||
+    value.text.trim().length === 0 ||
+    value.text.length > MAX_MOBILE_TEXT_LENGTH ||
+    !isValidMobileSource(value.source)
+  ) {
+    return null;
+  }
+
+  return {
+    conversationId: value.conversationId,
+    clientTurnId: value.clientTurnId,
+    clientMessageId: value.clientMessageId,
+    text: value.text.trim(),
+    source: value.source,
+  };
+}
+
+function ndjsonEvent(event: Record<string, unknown>): string {
+  return `${JSON.stringify(event)}\n`;
+}
+
+function evaluateMobileChatRouteContract(prompt: string, vars: EvalVars) {
+  const body = toObject(vars.body);
+  const requestBody =
+    typeof body.text === 'string' ? body : { ...body, text: prompt };
+  const authenticated = toBoolean(vars.authenticated, false);
+  const basePayload = {
+    target: 'mobile-chat-route',
+    adapter: 'route-contract',
+    productionPath: MOBILE_CHAT_ROUTE_PATH,
+    productionHandler: 'apps/web/app/api/mobile/v1/chat/turns/route.ts',
+    routeImportAvailable: false,
+    routeImportGap:
+      'Promptfoo runs outside the Next/Clerk server context, so this eval mirrors the checked-in route contract instead of importing POST directly.',
+    request: {
+      authenticated,
+      body: requestBody,
+    },
+    text: '',
+    toolCalls: [],
+    toolResults: [],
+    toolExecutions: [],
+    persistenceAttempted: false,
+  };
+
+  if (!authenticated) {
+    return {
+      ...basePayload,
+      status: 401,
+      headers: NO_STORE_HEADERS,
+      responseJson: { error: 'Unauthorized' },
+      responseText: JSON.stringify({ error: 'Unauthorized' }),
+    };
+  }
+
+  const parsed = parseMobileChatTurnRequest(requestBody);
+  if (!parsed) {
+    return {
+      ...basePayload,
+      status: 400,
+      headers: NO_STORE_HEADERS,
+      responseJson: { error: 'Invalid request body' },
+      responseText: JSON.stringify({ error: 'Invalid request body' }),
+    };
+  }
+
+  return {
+    ...basePayload,
+    parsedRequest: parsed,
+    status: 501,
+    headers: MOBILE_CHAT_NDJSON_HEADERS,
+    events: [MOBILE_CHAT_RUNTIME_DISABLED_EVENT],
+    responseText: ndjsonEvent(MOBILE_CHAT_RUNTIME_DISABLED_EVENT),
+  };
 }
 
 function toUiMessages(prompt: string, vars: EvalVars): UIMessage[] {
@@ -477,10 +591,23 @@ export default class JovieChatPromptfooProvider {
   ): Promise<ProviderResponse> {
     const startedAt = Date.now();
     const vars = context?.vars ?? {};
+    const target = toTarget(vars.target);
+
+    if (target === 'mobile-chat-route') {
+      const payload = evaluateMobileChatRouteContract(prompt, vars);
+      return {
+        output: JSON.stringify(payload),
+        raw: payload,
+        format: 'json',
+        latencyMs: Date.now() - startedAt,
+      };
+    }
+
     const mode = toMode(vars.mode);
     const plan = toPlanId(vars.plan);
     const uiMessages = toUiMessages(prompt, vars);
     const toolExecutions: ToolExecution[] = [];
+    const streamErrors: string[] = [];
     const toolNames = getToolNamesForTurn(mode, plan);
     const tools = buildEvalTools(toolNames, vars, toolExecutions);
     const artistOverrides = toObject(vars.artistOverrides);
@@ -525,6 +652,9 @@ export default class JovieChatPromptfooProvider {
           setExtra: () => undefined,
           captureException: () => undefined,
         },
+        onStreamError: error => {
+          streamErrors.push(safeError(error));
+        },
         mode,
       });
 
@@ -539,6 +669,7 @@ export default class JovieChatPromptfooProvider {
         ]);
 
       const payload = {
+        target,
         text,
         selectedModel: turn.selectedModel,
         mode,
@@ -572,8 +703,13 @@ export default class JovieChatPromptfooProvider {
         tokenUsage: toPromptfooUsage(usage as Record<string, unknown>),
       };
     } catch (error) {
+      const streamErrorSuffix =
+        streamErrors.length > 0
+          ? ` Stream errors: ${streamErrors.join(' | ')}`
+          : '';
+
       return {
-        error: safeError(error),
+        error: `${safeError(error)}${streamErrorSuffix}`,
         latencyMs: Date.now() - startedAt,
       };
     } finally {

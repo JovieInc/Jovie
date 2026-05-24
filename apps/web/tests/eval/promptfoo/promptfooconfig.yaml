@@ -135,3 +135,50 @@ tests:
     assert:
       - type: javascript
         value: file://assertions.cjs:assertConciseJovieVoice
+
+  - description: Mobile chat route rejects missing session before persistence
+    vars:
+      input: "Help me launch my next release."
+      target: mobile-chat-route
+      authenticated: false
+      body:
+        clientTurnId: mobile-turn-unauthorized
+        clientMessageId: mobile-message-unauthorized
+        text: "Help me launch my next release."
+        source: typed
+    assert:
+      - type: javascript
+        value: file://assertions.cjs:assertMobileRouteUnauthorized
+      - type: javascript
+        value: file://assertions.cjs:assertNoRoutePersistence
+
+  - description: Mobile chat route validates required mobile turn ids
+    vars:
+      input: "Help me launch my next release."
+      target: mobile-chat-route
+      authenticated: true
+      body:
+        text: "Help me launch my next release."
+        source: typed
+    assert:
+      - type: javascript
+        value: file://assertions.cjs:assertMobileRouteInvalidBody
+      - type: javascript
+        value: file://assertions.cjs:assertNoRoutePersistence
+
+  - description: Mobile chat route fails closed while native runtime is disabled
+    vars:
+      input: "Help me launch my next release."
+      target: mobile-chat-route
+      authenticated: true
+      body:
+        conversationId: mobile-conversation-1
+        clientTurnId: mobile-turn-disabled
+        clientMessageId: mobile-message-disabled
+        text: "Help me launch my next release."
+        source: typed
+    assert:
+      - type: javascript
+        value: file://assertions.cjs:assertMobileRouteRuntimeDisabled
+      - type: javascript
+        value: file://assertions.cjs:assertNoRoutePersistence

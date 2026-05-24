@@ -321,6 +321,87 @@ function assertConciseJovieVoice(output) {
   return pass();
 }
 
+function assertMobileRouteUnauthorized(output) {
+  const payload = parseOutput(output);
+
+  if (payload.target !== 'mobile-chat-route') {
+    return fail('case did not run through the mobile chat route contract');
+  }
+  if (payload.status !== 401) {
+    return fail(`expected 401, got ${String(payload.status)}`);
+  }
+  if (payload.responseJson?.error !== 'Unauthorized') {
+    return fail('missing Unauthorized response body');
+  }
+  if (payload.headers?.['Cache-Control'] !== 'no-store') {
+    return fail('missing no-store cache header');
+  }
+
+  return pass();
+}
+
+function assertMobileRouteInvalidBody(output) {
+  const payload = parseOutput(output);
+
+  if (payload.target !== 'mobile-chat-route') {
+    return fail('case did not run through the mobile chat route contract');
+  }
+  if (payload.status !== 400) {
+    return fail(`expected 400, got ${String(payload.status)}`);
+  }
+  if (payload.responseJson?.error !== 'Invalid request body') {
+    return fail('missing Invalid request body response');
+  }
+  if (payload.headers?.['Cache-Control'] !== 'no-store') {
+    return fail('missing no-store cache header');
+  }
+
+  return pass();
+}
+
+function assertMobileRouteRuntimeDisabled(output) {
+  const payload = parseOutput(output);
+  const event = Array.isArray(payload.events) ? payload.events[0] : null;
+
+  if (payload.target !== 'mobile-chat-route') {
+    return fail('case did not run through the mobile chat route contract');
+  }
+  if (payload.status !== 501) {
+    return fail(`expected 501, got ${String(payload.status)}`);
+  }
+  if (
+    payload.headers?.['Content-Type'] !== 'application/x-ndjson; charset=utf-8'
+  ) {
+    return fail('missing NDJSON content type');
+  }
+  if (event?.errorCode !== 'MOBILE_CHAT_RUNTIME_DISABLED') {
+    return fail('missing MOBILE_CHAT_RUNTIME_DISABLED event');
+  }
+  if (textOf(payload).trim().length > 0) {
+    return fail('disabled route produced assistant text');
+  }
+  if (
+    !String(payload.responseText ?? '').includes('MOBILE_CHAT_RUNTIME_DISABLED')
+  ) {
+    return fail('response text does not include disabled-runtime event');
+  }
+
+  return pass();
+}
+
+function assertNoRoutePersistence(output) {
+  const payload = parseOutput(output);
+
+  if (payload.persistenceAttempted !== false) {
+    return fail('route contract should not attempt persistence');
+  }
+  if (toolNames(payload).length > 0 || allExecutions(payload).length > 0) {
+    return fail('route contract should not call or execute tools');
+  }
+
+  return pass();
+}
+
 module.exports = {
   assertNoPromptLeak,
   assertGroundedReleaseLeadTime,
@@ -333,4 +414,8 @@ module.exports = {
   assertPitchingConflictReconciled,
   assertOnboardingSpotifyObservation,
   assertConciseJovieVoice,
+  assertMobileRouteUnauthorized,
+  assertMobileRouteInvalidBody,
+  assertMobileRouteRuntimeDisabled,
+  assertNoRoutePersistence,
 };
