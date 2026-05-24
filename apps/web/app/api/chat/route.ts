@@ -1277,6 +1277,20 @@ function createSelectMerchDesignTool(params: {
   });
 }
 
+function getMerchCardUpdateStatus(
+  action: 'pause' | 'unpause' | 'archive'
+): 'paused' | 'archived' | 'live' {
+  if (action === 'pause') {
+    return 'paused';
+  }
+
+  if (action === 'archive') {
+    return 'archived';
+  }
+
+  return 'live';
+}
+
 function createMerchStatusTool(params: {
   readonly action: 'publish' | 'pause' | 'unpause' | 'archive';
   readonly profileId: string | null;
@@ -1307,12 +1321,7 @@ function createMerchStatusTool(params: {
         };
       }
 
-      const status =
-        params.action === 'pause'
-          ? 'paused'
-          : params.action === 'archive'
-            ? 'archived'
-            : 'live';
+      const status = getMerchCardUpdateStatus(params.action);
       const card = await updateMerchCardStatus({
         cardId: merchCardId,
         profileId: params.profileId,
