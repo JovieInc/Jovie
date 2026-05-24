@@ -89,6 +89,11 @@ interface DesktopAuthCompletion {
   readonly codeVerifier: string;
 }
 
+interface DesktopAuthOpenResult {
+  readonly ok: boolean;
+  readonly reason?: string;
+}
+
 interface PendingDesktopAuthPkce {
   readonly codeVerifier: string;
   readonly codeChallenge: string;
@@ -101,6 +106,7 @@ let authHandoffWindow: BrowserWindow | null = null;
 let pendingAuthCompletion: DesktopAuthCompletion | null = null;
 let pendingLegacyAuthReturnRoute: string | null = null;
 let pendingDesktopAuthPkce: PendingDesktopAuthPkce | null = null;
+let mainWindowHiddenForAuthHandoff = false;
 
 app.setName(APP_ENV === 'staging' ? 'Jovie Staging' : 'Jovie');
 
@@ -124,10 +130,22 @@ function getUrlDisposition(urlString: string): UrlDisposition {
   return getDesktopUrlDisposition(urlString, URL_DISPOSITION_OPTIONS);
 }
 
-function openExternalUrl(urlString: string): void {
+async function openExternalUrl(urlString: string): Promise<DesktopAuthOpenResult> {
   const parsed = parseUrl(urlString);
-  if (!parsed || !isAllowedExternalUrl(parsed)) return;
-  void shell.openExternal(parsed.toString());
+  if (!parsed || !isAllowedExternalUrl(parsed)) {
+    return { ok: false, reason: 'blocked-url' };
+  }
+
+  try {
+    await shell.openExternal(parsed.toString());
+    return { ok: true };
+  } catch (error) {
+    console.error('[Jovie Desktop] Could not open external URL', {
+      reason: error instanceof Error ? error.message : String(error),
+      url: parsed.toString().split('?')[0],
+    });
+    return { ok: false, reason: 'open-external-failed' };
+  }
 }
 
 function getIpcSenderUrl(event: IpcMainInvokeEvent): string {
@@ -475,11 +493,42 @@ function saveWindowState(win: BrowserWindow): void {
 
 function showWindow(win: BrowserWindow): void {
   if (win.isDestroyed()) return;
+  if (win === mainWindow && isAuthHandoffOpen()) {
+    mainWindowHiddenForAuthHandoff = true;
+    if (win.isVisible()) {
+      win.hide();
+    }
+    if (authHandoffWindow && !authHandoffWindow.isDestroyed()) {
+      showWindow(authHandoffWindow);
+    }
+    return;
+  }
+
   if (win.isMinimized()) {
     win.restore();
   }
   win.show();
   win.focus();
+}
+
+function isAuthHandoffOpen(): boolean {
+  return Boolean(authHandoffWindow && !authHandoffWindow.isDestroyed());
+}
+
+function hideMainWindowForAuthHandoff(): void {
+  if (!mainWindow || mainWindow.isDestroyed()) return;
+  mainWindowHiddenForAuthHandoff = true;
+  if (mainWindow.isVisible()) {
+    mainWindow.hide();
+  }
+}
+
+function restoreMainWindowAfterAuthHandoff(): void {
+  if (!mainWindowHiddenForAuthHandoff) return;
+  mainWindowHiddenForAuthHandoff = false;
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    showWindow(mainWindow);
+  }
 }
 
 function loadAuthCompletion(completion: DesktopAuthCompletion): void {
@@ -497,11 +546,12 @@ function loadAuthCompletion(completion: DesktopAuthCompletion): void {
     void win.loadURL(targetUrl.toString());
   }
 
-  showWindow(win);
-
   if (authHandoffWindow && !authHandoffWindow.isDestroyed()) {
     authHandoffWindow.close();
   }
+
+  mainWindowHiddenForAuthHandoff = false;
+  showWindow(win);
 }
 
 function handleAuthCompletion(
@@ -534,11 +584,12 @@ function loadReturnedRoute(route: string): void {
     void win.loadURL(targetUrl);
   }
 
-  showWindow(win);
-
   if (authHandoffWindow && !authHandoffWindow.isDestroyed()) {
     authHandoffWindow.close();
   }
+
+  mainWindowHiddenForAuthHandoff = false;
+  showWindow(win);
 }
 
 function handleLegacyAuthReturnRoute(route: string): void {
@@ -552,6 +603,7 @@ function handleLegacyAuthReturnRoute(route: string): void {
 
 function showDesktopAuthHandoff(authUrl: string): void {
   const handoffUrl = buildDesktopAuthHandoffUrl(authUrl);
+  hideMainWindowForAuthHandoff();
 
   if (authHandoffWindow && !authHandoffWindow.isDestroyed()) {
     void authHandoffWindow.loadURL(handoffUrl);
@@ -570,7 +622,6 @@ function showDesktopAuthHandoff(authUrl: string): void {
     fullscreenable: false,
     title: 'Jovie Sign In',
     backgroundColor: APP_BACKGROUND_COLOR,
-    parent: mainWindow && !mainWindow.isDestroyed() ? mainWindow : undefined,
     modal: false,
     webPreferences: {
       contextIsolation: true,
@@ -586,11 +637,13 @@ function showDesktopAuthHandoff(authUrl: string): void {
   });
 
   authHandoffWindow.once('ready-to-show', () => {
+    hideMainWindowForAuthHandoff();
     if (authHandoffWindow) showWindow(authHandoffWindow);
   });
 
   authHandoffWindow.on('closed', () => {
     authHandoffWindow = null;
+    restoreMainWindowAfterAuthHandoff();
   });
 
   authHandoffWindow.webContents.session.setPermissionRequestHandler(
@@ -609,11 +662,11 @@ function showDesktopAuthHandoff(authUrl: string): void {
       return;
     }
     event.preventDefault();
-    openExternalUrl(event.url);
+    void openExternalUrl(event.url);
   });
 
   authHandoffWindow.webContents.setWindowOpenHandler(({ url }) => {
-    openExternalUrl(url);
+    void openExternalUrl(url);
     return { action: 'deny' };
   });
 
@@ -722,6 +775,10 @@ function createWindow(initialUrl = APP_ENTRY_URL): BrowserWindow {
   });
 
   win.once('ready-to-show', () => {
+    if (isAuthHandoffOpen()) {
+      mainWindowHiddenForAuthHandoff = true;
+      return;
+    }
     showWindow(win);
   });
 
@@ -794,7 +851,7 @@ function createWindow(initialUrl = APP_ENTRY_URL): BrowserWindow {
 
     event.preventDefault();
     if (disposition === 'external') {
-      openExternalUrl(event.url);
+      void openExternalUrl(event.url);
     }
   });
 
@@ -814,7 +871,7 @@ function createWindow(initialUrl = APP_ENTRY_URL): BrowserWindow {
 
     event.preventDefault();
     if (event.isMainFrame && disposition === 'external') {
-      openExternalUrl(event.url);
+      void openExternalUrl(event.url);
     }
   });
 
@@ -830,7 +887,7 @@ function createWindow(initialUrl = APP_ENTRY_URL): BrowserWindow {
     if (disposition === 'in-app') {
       void win.loadURL(url);
     } else if (disposition === 'external') {
-      openExternalUrl(url);
+      void openExternalUrl(url);
     }
 
     return { action: 'deny' };
@@ -1054,7 +1111,11 @@ ipcMain.handle(
 
 ipcMain.handle(
   OPEN_DESKTOP_AUTH_URL_CHANNEL,
-  (event: IpcMainInvokeEvent, authUrl: unknown, ...args: unknown[]) => {
+  async (
+    event: IpcMainInvokeEvent,
+    authUrl: unknown,
+    ...args: unknown[]
+  ): Promise<DesktopAuthOpenResult> => {
     if (
       !isTrustedDesktopAuthSender(event) ||
       args.length !== 0 ||
@@ -1068,8 +1129,7 @@ ipcMain.handle(
       return { ok: false, reason: 'invalid-auth-url' };
     }
 
-    openExternalUrl(browserAuthUrl);
-    return { ok: true };
+    return openExternalUrl(browserAuthUrl);
   }
 );
 
@@ -1189,6 +1249,11 @@ app.whenReady().then(() => {
   }, UPDATE_INTERVAL_MS);
 
   app.on('activate', () => {
+    if (isAuthHandoffOpen() && authHandoffWindow) {
+      showWindow(authHandoffWindow);
+      return;
+    }
+
     if (!mainWindow || mainWindow.isDestroyed()) {
       createWindow();
     } else {

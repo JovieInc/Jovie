@@ -5,6 +5,19 @@
      5|The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
      6|and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.5.42] - 2026-05-24
+
+> The Mac Electron app now keeps browser sign-in in a dedicated handoff window, returns through the `jovie://` protocol, and avoids auth-route cookie banner noise.
+
+### Changed
+
+- **Electron auth handoff**: the Mac app now hides the main app shell while the browser handoff is active, reports failed browser launches back to the renderer, and declares the production `jovie://` auth-return protocol in the app bundle.
+
+### Fixed
+
+- **Native auth callback**: `/auth/callback` now consumes the already-validated auth state without re-reading it after native exchange creation, preventing valid Electron callbacks from falling into the `Auth state expired` response.
+- **Auth-surface cookie banner**: the visible cookie banner is suppressed on desktop/native auth utility routes while the normal cookie preferences controller remains mounted elsewhere.
+
 ## [26.5.41] - 2026-05-24
 
 > Jovie can now create Jovie-owned merch cards from chat, publish them to public artist profiles, collect payment through platform Stripe Checkout, route paid orders to Printful, and accrue manual artist payout liability.

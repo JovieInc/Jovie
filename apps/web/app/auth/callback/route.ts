@@ -8,8 +8,8 @@ import {
 import { NextResponse } from 'next/server';
 import { APP_ROUTES } from '@/constants/routes';
 import {
-  consumeStoredAuthState,
   createStoredNativeExchangeCode,
+  deleteStoredAuthState,
   readStoredAuthState,
 } from '@/lib/auth/routing-state.server';
 import { captureError } from '@/lib/error-tracking';
@@ -77,13 +77,7 @@ export async function GET(request: Request) {
       });
     }
 
-    const consumedStateRecord = await consumeStoredAuthState({ state });
-    if (!consumedStateRecord) {
-      return NextResponse.json(
-        { error: 'Auth state expired' },
-        { status: 410, headers: NO_STORE_HEADERS }
-      );
-    }
+    await deleteStoredAuthState({ state });
 
     const resolved = resolveAuthCallback({ stateRecord, exchangeCode });
     void trackAuthEvent('auth_returned_to_client', {
