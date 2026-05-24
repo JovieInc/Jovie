@@ -123,6 +123,68 @@ const ReleasePlanWizard = lazy(() =>
 
 const RELEASE_DETAIL_PANEL_WIDTH = 388;
 
+type ReleaseLockReason = 'scheduled' | 'cap';
+
+interface ReleaseLockState {
+  readonly unlockedIds: Set<string> | null;
+  readonly lockReasons: Map<string, ReleaseLockReason>;
+  readonly releasedCount: number;
+  readonly unreleasedCount: number;
+}
+
+function buildReleaseLockState(
+  rows: ReleaseViewModel[],
+  smartLinksLimit: number | null,
+  canAccessFutureReleases: boolean
+): ReleaseLockState {
+  const now = Date.now();
+  const released: typeof rows = [];
+  const unreleased: typeof rows = [];
+  const reasons = new Map<string, ReleaseLockReason>();
+
+  for (const r of rows) {
+    const releaseTime = r.releaseDate ? new Date(r.releaseDate).getTime() : 0;
+    if (releaseTime > now) {
+      unreleased.push(r);
+      if (!canAccessFutureReleases) {
+        reasons.set(r.id, 'scheduled');
+      }
+    } else {
+      released.push(r);
+    }
+  }
+
+  if (!smartLinksLimit) {
+    return {
+      unlockedIds: canAccessFutureReleases
+        ? null
+        : new Set(released.map(r => r.id)),
+      lockReasons: reasons,
+      releasedCount: released.length,
+      unreleasedCount: unreleased.length,
+    };
+  }
+
+  const sorted = [...released].sort((a, b) => {
+    const dateA = a.releaseDate ? new Date(a.releaseDate).getTime() : 0;
+    const dateB = b.releaseDate ? new Date(b.releaseDate).getTime() : 0;
+    return dateA - dateB;
+  });
+  const allowed = sorted.slice(0, smartLinksLimit);
+  const ids = new Set(allowed.map(r => r.id));
+
+  for (const r of sorted.slice(smartLinksLimit)) {
+    reasons.set(r.id, 'cap');
+  }
+
+  return {
+    unlockedIds: ids,
+    lockReasons: reasons,
+    releasedCount: released.length,
+    unreleasedCount: unreleased.length,
+  };
+}
+
 export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
   releases,
   providerConfig,
@@ -348,60 +410,10 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
   const SMART_LINK_SOFT_CAP = 100;
 
   // Partition releases into released vs unreleased, and compute lock state
-  const { unlockedIds, lockReasons, releasedCount, unreleasedCount } =
-    useMemo(() => {
-      const now = Date.now();
-      const released: typeof rows = [];
-      const unreleased: typeof rows = [];
-      const reasons = new Map<string, 'scheduled' | 'cap'>();
-
-      for (const r of rows) {
-        const releaseTime = r.releaseDate
-          ? new Date(r.releaseDate).getTime()
-          : 0;
-        if (releaseTime > now) {
-          unreleased.push(r);
-          // Mark as scheduled if the creator can't access future release pages
-          if (!canAccessFutureReleases) {
-            reasons.set(r.id, 'scheduled');
-          }
-        } else {
-          released.push(r);
-        }
-      }
-
-      if (!smartLinksLimit) {
-        // null = unlimited — no cap-based locks
-        return {
-          unlockedIds: canAccessFutureReleases
-            ? null
-            : new Set(released.map(r => r.id)),
-          lockReasons: reasons,
-          releasedCount: released.length,
-          unreleasedCount: unreleased.length,
-        };
-      }
-
-      // Apply cap-based locks (oldest first when over cap)
-      const sorted = [...released].sort((a, b) => {
-        const dateA = a.releaseDate ? new Date(a.releaseDate).getTime() : 0;
-        const dateB = b.releaseDate ? new Date(b.releaseDate).getTime() : 0;
-        return dateA - dateB;
-      });
-      const allowed = sorted.slice(0, smartLinksLimit);
-      const ids = new Set(allowed.map(r => r.id));
-
-      for (const r of sorted.slice(smartLinksLimit)) {
-        reasons.set(r.id, 'cap');
-      }
-
-      return {
-        unlockedIds: ids,
-        lockReasons: reasons,
-        releasedCount: released.length,
-        unreleasedCount: unreleased.length,
-      };
-    }, [rows, smartLinksLimit, canAccessFutureReleases]);
+  const { unlockedIds, lockReasons, releasedCount, unreleasedCount } = useMemo(
+    () => buildReleaseLockState(rows, smartLinksLimit, canAccessFutureReleases),
+    [rows, smartLinksLimit, canAccessFutureReleases]
+  );
 
   const isSmartLinkLocked = useCallback(
     (releaseId: string) => {

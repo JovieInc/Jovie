@@ -97,6 +97,71 @@ interface ReleaseLandingPageProps
     readonly initialMenuOpen?: boolean;
   }> {}
 
+function resolveReleaseUtmParams(
+  defaultParams: PartialUTMParams
+): PartialUTMParams {
+  if (globalThis.window === undefined) {
+    return defaultParams;
+  }
+
+  const currentUtmParams = extractUTMParams(
+    new URLSearchParams(globalThis.location.search)
+  );
+
+  return Object.keys(currentUtmParams).length > 0
+    ? currentUtmParams
+    : defaultParams;
+}
+
+function getReleaseSharePathname(
+  artistHandle: string | null,
+  shareSlug: string
+): string | undefined {
+  if (artistHandle) {
+    return `/${artistHandle}/${shareSlug}`;
+  }
+
+  if (shareSlug === 'release') {
+    return undefined;
+  }
+
+  return `/r/${shareSlug}`;
+}
+
+function createReleaseShareContext({
+  artistHandle,
+  artistName,
+  releaseTitle,
+  artworkUrl,
+  shareSlug,
+  sharePathname,
+}: Readonly<{
+  artistHandle: string | null;
+  artistName: string;
+  releaseTitle: string;
+  artworkUrl: string | null;
+  shareSlug: string;
+  sharePathname: string | undefined;
+}>) {
+  return buildReleaseShareContext({
+    username: artistHandle ?? 'release',
+    slug: shareSlug,
+    title: releaseTitle,
+    artistName,
+    artworkUrl,
+    pathname: sharePathname,
+    storyQueryParams: artistHandle
+      ? undefined
+      : {
+          slug: shareSlug,
+          title: releaseTitle,
+          artistName,
+          pathname: sharePathname ?? `/r/${shareSlug}`,
+          artworkUrl,
+        },
+  });
+}
+
 function SmartLinkClaimBanner({
   profileId,
   username,
@@ -243,45 +308,24 @@ export function ReleaseLandingPage({
   const clickableProviders = providers.filter(
     (provider): provider is Provider & { url: string } => Boolean(provider.url)
   );
-  const resolvedUtmParams = useMemo(() => {
-    if (globalThis.window === undefined) {
-      return utmParams;
-    }
-
-    const currentUtmParams = extractUTMParams(
-      new URLSearchParams(globalThis.location.search)
-    );
-
-    return Object.keys(currentUtmParams).length > 0
-      ? currentUtmParams
-      : utmParams;
-  }, [utmParams]);
+  const resolvedUtmParams = useMemo(
+    () => resolveReleaseUtmParams(utmParams),
+    [utmParams]
+  );
   // All providers rendered as a flat list — no canonical/fallback distinction for fans
   const sizes = buildArtworkSizes(artworkSizes, release.artworkUrl);
   const hasCredits = credits?.some(group => group.entries.length > 0);
   const shareSlug = tracking?.smartLinkSlug ?? 'release';
-  let sharePathname: string | undefined;
-  if (artist.handle) sharePathname = `/${artist.handle}/${shareSlug}`;
-  else if (tracking?.smartLinkSlug)
-    sharePathname = `/r/${tracking.smartLinkSlug}`;
+  const sharePathname = getReleaseSharePathname(artist.handle, shareSlug);
   const shareContext = useMemo(
     () =>
-      buildReleaseShareContext({
-        username: artist.handle ?? 'release',
-        slug: shareSlug,
-        title: release.title,
+      createReleaseShareContext({
+        artistHandle: artist.handle,
         artistName: artist.name,
+        releaseTitle: release.title,
         artworkUrl: release.artworkUrl,
-        pathname: sharePathname,
-        storyQueryParams: artist.handle
-          ? undefined
-          : {
-              slug: shareSlug,
-              title: release.title,
-              artistName: artist.name,
-              pathname: sharePathname ?? `/r/${shareSlug}`,
-              artworkUrl: release.artworkUrl,
-            },
+        shareSlug,
+        sharePathname,
       }),
     [
       artist.handle,
