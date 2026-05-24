@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 import Image from 'next/image';
 import Link from 'next/link';
-import { AdminToolPage } from '@/components/features/admin/layout/AdminToolPage';
+import { AdminPage } from '@/components/features/admin/layout/AdminPage';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { APP_ROUTES } from '@/constants/routes';
 import {
@@ -232,7 +232,7 @@ export default async function AdminShareStudioPage({
 
   if (!data) {
     return (
-      <AdminToolPage
+      <AdminPage
         title='Share Studio'
         description='Preview share payloads once blog, profile, release, and playlist content exists.'
         testId='admin-share-studio-page'
@@ -241,12 +241,12 @@ export default async function AdminShareStudioPage({
           Share Studio needs at least one real blog post, public profile,
           release, and published playlist to render previews.
         </ContentSurfaceCard>
-      </AdminToolPage>
+      </AdminPage>
     );
   }
 
   return (
-    <AdminToolPage
+    <AdminPage
       title='Share Studio'
       description='Preview public share payloads, download story assets, and inspect tracked-link outputs across all public surfaces.'
       testId='admin-share-studio-page'
@@ -297,6 +297,6 @@ export default async function AdminShareStudioPage({
           context={data.playlistContext}
         />
       </div>
-    </AdminToolPage>
+    </AdminPage>
   );
 }

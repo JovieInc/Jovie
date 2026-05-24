@@ -30,11 +30,11 @@ function readSource(filePath: string): string {
 }
 
 describe('admin ops shell normalization', () => {
-  it('keeps the ops route inside AdminToolPage while preserving kiosk mode', () => {
+  it('keeps the ops route inside AdminPage while preserving kiosk mode', () => {
     const source = readSource(OPS_PAGE);
 
-    expect(source).toContain('import { AdminToolPage }');
-    expect(source).toContain('<AdminToolPage');
+    expect(source).toContain('import { AdminPage }');
+    expect(source).toContain('<AdminPage');
     expect(source).toContain("value === 'kiosk' ? 'admin-kiosk' : 'shell'");
     expect(source).toContain("presentationMode='admin-kiosk'");
     expect(source).toContain("density='kiosk'");
