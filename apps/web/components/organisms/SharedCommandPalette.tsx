@@ -163,14 +163,14 @@ function CmdKPaletteRow({
   shortcutLabel,
 }: CmdKPaletteRowProps) {
   return (
-    <button
-      type='button'
+    <div
       role='option'
       id={rowId}
+      tabIndex={-1}
       aria-selected={isActive ? 'true' : 'false'}
       aria-current={isActive ? 'true' : undefined}
       data-selected={isActive ? 'true' : undefined}
-      cmdk-item=''
+      data-cmdk-item=''
       onMouseEnter={() => onMouseEnter(index)}
       onMouseDown={e => {
         e.preventDefault();
@@ -190,7 +190,7 @@ function CmdKPaletteRow({
           {shortcutLabel}
         </span>
       ) : null}
-    </button>
+    </div>
   );
 }
 
