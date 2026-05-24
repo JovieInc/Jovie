@@ -194,7 +194,7 @@ export function ReviewQueuePanel() {
             tone='secondary'
             size='sm'
             onClick={() => {
-              void handleSkip(row.original.id);
+              handleSkip(row.original.id).catch(() => {});
             }}
             disabled={skippingIds.has(row.original.id)}
             className='h-8 px-3 text-xs'

@@ -32,6 +32,30 @@ const CARBON_VARS: React.CSSProperties = {
 type Mode = 'signin' | 'signup';
 type Step = 'email' | 'otp' | 'success';
 
+function getAuthHeading(step: Step, mode: Mode) {
+  if (step === 'email') {
+    return mode === 'signup' ? 'Create your account' : 'Welcome back';
+  }
+
+  return step === 'otp' ? 'Check your email' : 'You’re in';
+}
+
+function getAuthDescription(step: Step, mode: Mode, email: string) {
+  if (step === 'email') {
+    return mode === 'signup'
+      ? 'A passwordless link to set up your artist workspace.'
+      : 'Sign in with the email you used to set up Jovie.';
+  }
+
+  if (step === 'otp') {
+    return `We sent a six-digit code to ${email}.`;
+  }
+
+  return mode === 'signup'
+    ? 'Taking you to onboarding…'
+    : 'Taking you to your dashboard…';
+}
+
 export default function AuthV1Page() {
   const [mode, setMode] = useState<Mode>('signin');
   const [step, setStep] = useState<Step>('email');
@@ -41,6 +65,8 @@ export default function AuthV1Page() {
   const [mounted, setMounted] = useState(false);
   const emailRef = useRef<HTMLInputElement | null>(null);
   const otpRef = useRef<HTMLInputElement | null>(null);
+  const heading = getAuthHeading(step, mode);
+  const description = getAuthDescription(step, mode, email);
 
   useEffect(() => {
     const t = setTimeout(() => setMounted(true), 60);
@@ -112,24 +138,10 @@ export default function AuthV1Page() {
             className='text-[24px] font-semibold leading-tight'
             style={{ letterSpacing: '-0.02em' }}
           >
-            {step === 'email'
-              ? mode === 'signup'
-                ? 'Create your account'
-                : 'Welcome back'
-              : step === 'otp'
-                ? 'Check your email'
-                : 'You’re in'}
+            {heading}
           </h1>
           <p className='mt-2 text-[13px] text-tertiary-token max-w-[320px]'>
-            {step === 'email'
-              ? mode === 'signup'
-                ? 'A passwordless link to set up your artist workspace.'
-                : 'Sign in with the email you used to set up Jovie.'
-              : step === 'otp'
-                ? `We sent a six-digit code to ${email}.`
-                : mode === 'signup'
-                  ? 'Taking you to onboarding…'
-                  : 'Taking you to your dashboard…'}
+            {description}
           </p>
 
           <div className='mt-8 w-full'>
