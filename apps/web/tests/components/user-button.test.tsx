@@ -410,11 +410,42 @@ describe('UserButton billing actions', () => {
     expect(toast.error).not.toHaveBeenCalled();
   });
 
+  it('does not show the passive billing-status toast after a clean admin login with a healthy subscription', () => {
+    mockUsePathname.mockReturnValue('/app/admin/ops');
+    mockUseBillingStatusQuery.mockReturnValue({
+      data: { isPro: true, plan: 'pro', hasStripeCustomer: true },
+      isLoading: false,
+      error: null,
+    } as any);
+
+    render(<UserButton showUserInfo />);
+
+    expect(toast.error).not.toHaveBeenCalled();
+    expect(
+      window.sessionStorage.getItem(
+        'jovie:billing-status-error-toast-shown:user_123'
+      )
+    ).toBeNull();
+  });
+
   it('does not show the passive billing-status toast while the pathname is unavailable', () => {
     mockUsePathname.mockReturnValue(null);
     mockUseBillingStatusQuery.mockReturnValue({
       data: null,
       isLoading: false,
+      error: new Error('Billing unavailable'),
+    } as any);
+
+    render(<UserButton showUserInfo />);
+
+    expect(toast.error).not.toHaveBeenCalled();
+  });
+
+  it('waits for billing status to settle before showing the passive billing-status toast', () => {
+    mockUsePathname.mockReturnValue('/billing');
+    mockUseBillingStatusQuery.mockReturnValue({
+      data: null,
+      isLoading: true,
       error: new Error('Billing unavailable'),
     } as any);
 
