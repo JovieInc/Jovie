@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -639,6 +639,18 @@ describe('ReleaseSidebar inspector cards', () => {
     expect(
       screen.queryByTestId('release-inspector-stack')
     ).not.toBeInTheDocument();
+  });
+
+  it('uses stable release header geometry for text, badges, and analytics', () => {
+    render(<ReleaseSidebar release={mockRelease} {...defaultProps} />);
+
+    const header = screen.getByTestId('release-header-card');
+    expect(
+      within(header).getByRole('heading', { name: mockRelease.title })
+    ).toHaveClass('line-clamp-2', 'min-h-[44px]');
+    expect(
+      screen.getByTestId('drawer-hero-meta-slot').firstElementChild
+    ).toHaveClass('overflow-x-auto', 'whitespace-nowrap');
   });
 
   it('resets the active tab to Details when the release changes', async () => {

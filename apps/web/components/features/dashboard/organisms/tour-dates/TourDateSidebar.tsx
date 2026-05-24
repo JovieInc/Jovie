@@ -263,6 +263,13 @@ export function TourDateSidebar({
               <EntityHeaderCard
                 eyebrow='Tour Date'
                 title={tourDate.title?.trim() || tourDate.venueName}
+                stableLayout
+                titleLineClamp={1}
+                subtitleLineClamp={1}
+                reserveSubtitleSlot
+                reserveMetaSlot
+                reserveFooterSlot
+                metaOverflow='scroll'
                 subtitle={
                   <>
                     {formatISODate(tourDate.startDate)} · {tourDate.city}
@@ -484,7 +491,7 @@ export function TourDateSidebar({
                         }
                         disabled={isPending}
                         className={cn(
-                          'flex-1 rounded-full border px-3 py-2 text-xs font-caption transition-[background-color,border-color,color] duration-150',
+                          'flex-1 rounded-full border px-3 py-2 text-xs font-caption transition-[background-color,border-color,color] duration-subtle',
                           formData.ticketStatus === status
                             ? 'border-accent/35 bg-accent/10 text-accent'
                             : 'border-(--linear-app-frame-seam) bg-surface-0 text-secondary-token hover:bg-surface-1 hover:text-primary-token'
