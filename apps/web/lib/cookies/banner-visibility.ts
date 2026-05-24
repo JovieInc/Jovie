@@ -2,6 +2,7 @@ const COOKIE_BANNER_SUPPRESSED_PATH_PREFIXES = [
   '/app',
   '/demo',
   '/desktop-auth',
+  // Native/browser auth handoff routes should stay free of visible banner chrome.
   '/auth',
   '/signin',
   '/signup',

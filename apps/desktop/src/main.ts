@@ -100,6 +100,13 @@ interface PendingDesktopAuthPkce {
   readonly createdAt: number;
 }
 
+const AUTH_HANDOFF_WINDOW_BOUNDS = {
+  width: 420,
+  height: 360,
+  minWidth: 360,
+  minHeight: 320,
+} as const;
+
 let updateReadyToInstall = false;
 let mainWindow: BrowserWindow | null = null;
 let authHandoffWindow: BrowserWindow | null = null;
@@ -491,6 +498,15 @@ function saveWindowState(win: BrowserWindow): void {
   }
 }
 
+function showWindowNow(win: BrowserWindow): void {
+  if (win.isDestroyed()) return;
+  if (win.isMinimized()) {
+    win.restore();
+  }
+  win.show();
+  win.focus();
+}
+
 function showWindow(win: BrowserWindow): void {
   if (win.isDestroyed()) return;
   if (win === mainWindow && isAuthHandoffOpen()) {
@@ -499,16 +515,12 @@ function showWindow(win: BrowserWindow): void {
       win.hide();
     }
     if (authHandoffWindow && !authHandoffWindow.isDestroyed()) {
-      showWindow(authHandoffWindow);
+      showWindowNow(authHandoffWindow);
     }
     return;
   }
 
-  if (win.isMinimized()) {
-    win.restore();
-  }
-  win.show();
-  win.focus();
+  showWindowNow(win);
 }
 
 function isAuthHandoffOpen(): boolean {
@@ -613,10 +625,7 @@ function showDesktopAuthHandoff(authUrl: string): void {
 
   authHandoffWindow = new BrowserWindow({
     show: false,
-    width: 420,
-    height: 360,
-    minWidth: 360,
-    minHeight: 320,
+    ...AUTH_HANDOFF_WINDOW_BOUNDS,
     resizable: false,
     maximizable: false,
     fullscreenable: false,

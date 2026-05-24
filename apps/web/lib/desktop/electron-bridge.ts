@@ -315,6 +315,12 @@ export async function startDesktopAuthHandoff(
   if (api && typeof api.startDesktopAuthHandoff === 'function') {
     const result = await api.startDesktopAuthHandoff(authUrl);
     if (result?.ok) return { ok: true };
+    if (result) {
+      return {
+        ok: false,
+        reason: result.reason ?? 'desktop-auth-handoff-failed',
+      };
+    }
     return openBrowserFallback(authUrl);
   }
   if (api) {
