@@ -94,7 +94,7 @@ export function SidebarCollapsibleGroup({
             )}
             aria-expanded={open}
           >
-            <span className='truncate group-data-[collapsible=icon]:hidden text-xs font-caption tracking-normal'>
+            <span className='truncate group-data-[collapsible=icon]:hidden text-[10.5px] font-semibold uppercase tracking-[0.08em]'>
               {label}
             </span>
             {GroupIcon ? (
