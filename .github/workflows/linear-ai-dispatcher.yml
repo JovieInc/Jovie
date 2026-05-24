@@ -38,10 +38,7 @@ jobs:
     name: Dispatch Ready Linear Issues
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    permissions:
-      contents: write
-      pull-requests: read
-      actions: write
+    permissions: {}
     env:
       PROJECT_NAME: ${{ inputs.project_name || 'Design V1 Rollout / Flag Hardening' }}
       READY_LABEL: ${{ inputs.ready_label || 'automated' }}

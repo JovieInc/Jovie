@@ -36,8 +36,7 @@ on:
           - production
         default: production
 
-permissions:
-  contents: write
+permissions: {}
 
 concurrency:
   # On push, github.event.inputs.environment is empty → group becomes
@@ -54,6 +53,8 @@ jobs:
     # those binaries today and building them on every release wastes runner
     # time. To re-enable, restore the matrix strategy with the desired OSes.
     runs-on: macos-latest
+    permissions:
+      contents: write
     env:
       ENVIRONMENT: ${{ github.event.inputs.environment || 'production' }}
       HAS_MAC_SIGNING_CREDENTIALS: ${{ secrets.MAC_CERTIFICATE_BASE64 != '' && secrets.MAC_CERTIFICATE_PASSWORD != '' }}
