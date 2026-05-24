@@ -102,7 +102,7 @@ describe('Entitlements – Privilege Escalation Prevention', () => {
     expect(e.contactsLimit).toBe(100);
   });
 
-  it('isPro=true + unrecognized plan string → defaults to pro, not escalated', async () => {
+  it('isPro=true + unrecognized plan string → normalizes to pro, not custom escalation', async () => {
     setupAuthenticatedUser({
       isPro: true,
       plan: 'superadmin',
@@ -111,15 +111,16 @@ describe('Entitlements – Privilege Escalation Prevention', () => {
     });
     const e = await getCurrentUserEntitlements();
 
-    // (dbPlan as UserPlan) || 'pro' → 'superadmin' is truthy but
-    // getPlanLimits('superadmin') falls through to free limits
-    // This is actually a quirk: the plan string passes through but
-    // isProPlan/hasAdvancedFeatures use strict equality checks
-    expect(e.isPro).toBe(false); // isProPlan('superadmin') = false
+    expect(e.plan).toBe('pro');
+    expect(e.isPro).toBe(true);
     expect(e.hasAdvancedFeatures).toBe(false);
-    // getPlanLimits('superadmin') falls back to free
-    expect(e.contactsLimit).toBe(100);
-    expect(e.analyticsRetentionDays).toBe(30);
+    expect(e.contactsLimit).toBeNull();
+    expect(e.analyticsRetentionDays).toBe(180);
+    expect(e.billingPlanMismatch).toEqual({
+      rawPlan: 'superadmin',
+      normalizedPlan: 'pro',
+      reason: 'is_pro_true_with_non_paid_plan',
+    });
   });
 });
 
