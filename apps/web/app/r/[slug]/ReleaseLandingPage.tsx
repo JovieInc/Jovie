@@ -404,6 +404,31 @@ export function ReleaseLandingPage({
               <p className='text-muted-foreground mt-2 text-sm'>
                 No streaming links available yet.
               </p>
+              <div className='mt-3 flex flex-wrap items-center justify-center gap-2'>
+                {downloadUrl ? (
+                  <Link
+                    href={appendUTMParamsToUrl(downloadUrl, resolvedUtmParams)}
+                    className='inline-flex h-8 items-center justify-center rounded-full border border-white/10 bg-white/10 px-3 text-xs font-medium text-white transition-colors hover:bg-white/15'
+                  >
+                    Download files
+                  </Link>
+                ) : null}
+                {artist.handle ? (
+                  <Link
+                    href={`/${artist.handle}`}
+                    className='inline-flex h-8 items-center justify-center rounded-full border border-white/10 bg-transparent px-3 text-xs font-medium text-white/80 transition-colors hover:text-white'
+                  >
+                    Visit artist profile
+                  </Link>
+                ) : null}
+                <button
+                  type='button'
+                  onClick={() => setShareOpen(true)}
+                  className='inline-flex h-8 items-center justify-center rounded-full border border-white/10 bg-transparent px-3 text-xs font-medium text-white/80 transition-colors hover:text-white'
+                >
+                  Share release
+                </button>
+              </div>
             </div>
           )}
         </div>

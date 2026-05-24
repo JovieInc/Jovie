@@ -90,7 +90,18 @@ vi.mock(
 );
 
 vi.mock('@/components/organisms/table', () => ({
-  TableEmptyState: () => <div data-testid='table-empty-state' />,
+  TableEmptyState: ({
+    title,
+    description,
+  }: {
+    title?: string;
+    description?: string;
+  }) => (
+    <div data-testid='table-empty-state'>
+      <h3>{title}</h3>
+      <p>{description}</p>
+    </div>
+  ),
   UnifiedTable: ({
     data,
     columns,
@@ -99,6 +110,7 @@ vi.mock('@/components/organisms/table', () => ({
     getRowTestId,
     expandedRowIds,
     renderExpandedContent,
+    emptyState,
   }: {
     data: Array<{ id: string }>;
     columns: unknown[];
@@ -110,24 +122,27 @@ vi.mock('@/components/organisms/table', () => ({
       row: { id: string },
       columnCount: number
     ) => ReactNode;
+    emptyState?: ReactNode;
   }) => (
     <div data-testid='unified-table'>
-      {data.map((row, index) => {
-        const rowId = getRowId(row);
-        return (
-          <div key={rowId} data-testid={`release-row-wrapper-${rowId}`}>
-            <div
-              data-testid={getRowTestId?.(row, index)}
-              className={getRowClassName(row)}
-            />
-            {expandedRowIds?.has(rowId) ? (
-              <div data-testid={`expanded-row-${rowId}`}>
-                {renderExpandedContent?.(row, columns.length)}
+      {data.length === 0
+        ? emptyState
+        : data.map((row, index) => {
+            const rowId = getRowId(row);
+            return (
+              <div key={rowId} data-testid={`release-row-wrapper-${rowId}`}>
+                <div
+                  data-testid={getRowTestId?.(row, index)}
+                  className={getRowClassName(row)}
+                />
+                {expandedRowIds?.has(rowId) ? (
+                  <div data-testid={`expanded-row-${rowId}`}>
+                    {renderExpandedContent?.(row, columns.length)}
+                  </div>
+                ) : null}
               </div>
-            ) : null}
-          </div>
-        );
-      })}
+            );
+          })}
     </div>
   ),
 }));
@@ -203,5 +218,16 @@ describe('ReleaseTable', () => {
       'data-state',
       'selected'
     );
+  });
+
+  it('shows an actionable empty state when there are no releases', () => {
+    render(<ReleaseTable {...commonProps} releases={[]} showTracks={false} />);
+
+    expect(screen.getByText('No releases found')).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        'Use the toolbar to create a release, sync from Spotify, or clear filters.'
+      )
+    ).toBeInTheDocument();
   });
 });

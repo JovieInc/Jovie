@@ -244,34 +244,29 @@ export function useReleaseProviderMatrix({
       const release = rawRowsRef.current.find(r => r.id === releaseId);
       if (!release) return;
 
-      saveProviderMutation.mutate(
-        {
+      try {
+        const updated = await saveProviderMutation.mutateAsync({
           profileId: release.profileId,
           releaseId,
           provider,
           url,
-        },
-        {
-          onSuccess: updated => {
-            updateRow(updated);
-            toast.success(
-              `${providerConfigRef.current[provider].label} link added`
-            );
-          },
-          onError: error => {
-            captureError('Failed to add provider link', error, {
-              context: 'release-mutation',
-              releaseId,
-              provider,
-              action: 'add-provider-link',
-            });
-            toast.error('Failed to add link');
-          },
-        }
-      );
+        });
+        updateRow(updated);
+        toast.success(
+          `${providerConfigRef.current[provider].label} link added`
+        );
+      } catch (error) {
+        captureError('Failed to add provider link', error, {
+          context: 'release-mutation',
+          releaseId,
+          provider,
+          action: 'add-provider-link',
+        });
+        toast.error('Failed to add link');
+        throw error;
+      }
     },
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- mutate is stable from TanStack Query
-    [saveProviderMutation.mutate]
+    [saveProviderMutation, updateRow]
   );
 
   const handleReset = (provider: ProviderKey) => {

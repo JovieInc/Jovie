@@ -1,6 +1,14 @@
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
+
+const toastError = vi.hoisted(() => vi.fn());
+
+vi.mock('sonner', () => ({
+  toast: {
+    error: toastError,
+  },
+}));
 
 const { useReleaseHeaderParts } = await import(
   '@/components/organisms/release-sidebar/ReleaseSidebarHeader'
@@ -53,10 +61,6 @@ function TestHarness(props: Parameters<typeof useReleaseHeaderParts>[0]) {
 }
 
 describe('useReleaseHeaderParts', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
   it('omits duplicate visible header copy and smart-link primary actions', () => {
     render(<TestHarness release={release} hasRelease />);
 
@@ -79,5 +83,17 @@ describe('useReleaseHeaderParts', () => {
     expect(
       screen.getByRole('button', { name: /copy release id/i })
     ).toBeInTheDocument();
+  });
+
+  it('copies the release id and shows the copied state', async () => {
+    const user = userEvent.setup();
+    render(<TestHarness release={release} hasRelease />);
+
+    await user.click(screen.getByRole('button', { name: /copy release id/i }));
+
+    expect(
+      await screen.findByRole('button', { name: /copied!/i })
+    ).toBeInTheDocument();
+    expect(toastError).not.toHaveBeenCalled();
   });
 });

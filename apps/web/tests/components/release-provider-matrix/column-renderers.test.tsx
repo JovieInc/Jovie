@@ -1,6 +1,6 @@
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
-import { createRightMetaCellRenderer } from '@/features/dashboard/organisms/release-provider-matrix/utils/column-renderers';
+import { createRightMetaCellRenderer } from '@/features/dashboard/organisms/release-provider-matrix/utils/release-table-renderers';
 import type { ReleaseViewModel } from '@/lib/discography/types';
 
 vi.mock('@/features/dashboard/organisms/releases/cells', () => ({
@@ -20,6 +20,7 @@ const baseRelease: ReleaseViewModel = {
   id: 'release-1',
   title: 'Skyline Dreams',
   slug: 'skyline-dreams',
+  status: 'scheduled',
   releaseType: 'single',
   isExplicit: false,
   releaseDate: '2026-06-15',
@@ -69,5 +70,42 @@ describe('createRightMetaCellRenderer', () => {
 
     const placeholder = screen.getByText('—');
     expect(placeholder).toBeInTheDocument();
+  });
+
+  it('renders design v1 status, type, date, DSP, and smart link treatment from release data', () => {
+    const Renderer = createRightMetaCellRenderer(undefined, undefined, true);
+    render(
+      <Renderer
+        row={
+          {
+            original: {
+              ...baseRelease,
+              providers: [
+                {
+                  key: 'spotify',
+                  label: 'Spotify',
+                  path: '/spotify',
+                  isPrimary: true,
+                  url: 'https://open.spotify.com/album/1',
+                  source: 'ingested',
+                  updatedAt: '2026-04-01T00:00:00.000Z',
+                  confidence: 'canonical',
+                },
+              ],
+            },
+          } as never
+        }
+        getValue={vi.fn() as never}
+        table={{} as never}
+        column={{} as never}
+        cell={{} as never}
+        renderValue={vi.fn() as never}
+      />
+    );
+
+    expect(screen.getByText('Scheduled')).toBeInTheDocument();
+    expect(screen.getByText('Single')).toBeInTheDocument();
+    expect(screen.getByText('Spotify')).toBeInTheDocument();
+    expect(screen.getByText('/smart/release-1')).toBeInTheDocument();
   });
 });

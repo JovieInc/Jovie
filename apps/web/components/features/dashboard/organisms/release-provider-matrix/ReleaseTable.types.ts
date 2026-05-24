@@ -33,6 +33,7 @@ export interface ReleaseTableProps {
   readonly flashedReleaseId?: string | null;
   readonly selectedReleaseId?: string | null;
   readonly selectedTrackId?: string | null;
+  readonly designV1?: boolean;
   readonly isSmartLinkLocked?: (releaseId: string) => boolean;
   readonly getSmartLinkLockReason?: (
     releaseId: string

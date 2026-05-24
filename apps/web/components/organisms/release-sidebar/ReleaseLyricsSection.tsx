@@ -8,7 +8,14 @@ import {
   DropdownMenuTrigger,
   Textarea,
 } from '@jovie/ui';
-import { Check, ChevronDown, Copy, Loader2, Sparkles } from 'lucide-react';
+import {
+  AlertTriangle,
+  Check,
+  ChevronDown,
+  Copy,
+  Loader2,
+  Sparkles,
+} from 'lucide-react';
 import {
   startTransition,
   useCallback,
@@ -28,7 +35,22 @@ const AUTO_SAVE_DELAY_MS = 1500;
 /** All available format options in display order */
 const FORMAT_OPTIONS: LyricsFormat[] = ['apple-music', 'deezer', 'genius'];
 
-type SaveStatus = 'idle' | 'saving' | 'saved';
+type SaveStatus = 'idle' | 'saving' | 'saved' | 'error';
+
+type ActionFeedback =
+  | {
+      readonly kind: 'save';
+      readonly message: string;
+      readonly actionLabel: string;
+      readonly onRetry: () => void;
+    }
+  | {
+      readonly kind: 'format';
+      readonly message: string;
+      readonly actionLabel: string;
+      readonly onRetry: () => void;
+    }
+  | null;
 
 interface ReleaseLyricsSectionProps {
   readonly releaseId: string;
@@ -57,6 +79,7 @@ export function ReleaseLyricsSection({
   const [isCopying, setIsCopying] = useState(false);
   const [isFormatting, setIsFormatting] = useState(false);
   const [saveStatus, setSaveStatus] = useState<SaveStatus>('idle');
+  const [actionFeedback, setActionFeedback] = useState<ActionFeedback>(null);
   const [selectedFormat, setSelectedFormat] =
     useState<LyricsFormat>('apple-music');
 
@@ -78,6 +101,7 @@ export function ReleaseLyricsSection({
   useEffect(() => {
     setDraftLyrics(lyrics ?? '');
     setSaveStatus('idle');
+    setActionFeedback(null);
   }, [lyrics, releaseId]);
 
   // Auto-save implementation
@@ -90,10 +114,16 @@ export function ReleaseLyricsSection({
     // Only save if there are actual changes
     if (currentDraft === currentLyrics) return;
 
+    if (savedIndicatorTimerRef.current) {
+      clearTimeout(savedIndicatorTimerRef.current);
+      savedIndicatorTimerRef.current = null;
+    }
     setSaveStatus('saving');
+    setActionFeedback(null);
     try {
       await onSaveLyrics(currentReleaseId, currentDraft);
       setSaveStatus('saved');
+      setActionFeedback(null);
 
       // Clear "Saved" indicator after 2s
       if (savedIndicatorTimerRef.current) {
@@ -104,8 +134,17 @@ export function ReleaseLyricsSection({
         2000
       );
     } catch {
-      setSaveStatus('idle');
-      toast.error('Failed to auto-save lyrics');
+      setSaveStatus('error');
+      const message = 'Failed to save lyrics. Your draft is still here.';
+      setActionFeedback({
+        kind: 'save',
+        message,
+        actionLabel: 'Retry save',
+        onRetry: () => {
+          void performAutoSave();
+        },
+      });
+      toast.error(message);
     }
   }, [onSaveLyrics]);
 
@@ -145,13 +184,25 @@ export function ReleaseLyricsSection({
       if (!onFormatLyrics || !draftLyrics.trim()) return;
       setSelectedFormat(format);
       setIsFormatting(true);
+      setActionFeedback(null);
       try {
         const changes = await onFormatLyrics(releaseId, draftLyrics, format);
         if (changes.length > 0) {
           toast.info(changes.join(' · '));
         }
+        setActionFeedback(null);
       } catch {
-        toast.error('Unable to format lyrics right now');
+        const message =
+          'Unable to format lyrics right now. Your draft is still here.';
+        setActionFeedback({
+          kind: 'format',
+          message,
+          actionLabel: 'Retry format',
+          onRetry: () => {
+            void handleFormat(format);
+          },
+        });
+        toast.error(message);
       } finally {
         setIsFormatting(false);
       }
@@ -190,28 +241,61 @@ export function ReleaseLyricsSection({
         <Textarea
           placeholder='Paste your lyrics here'
           value={draftLyrics}
-          onChange={event => setDraftLyrics(event.target.value)}
+          onChange={event => {
+            setDraftLyrics(event.target.value);
+            setActionFeedback(null);
+            if (saveStatus !== 'saving') {
+              setSaveStatus('idle');
+            }
+          }}
           rows={draftLyrics ? 10 : 4}
           disabled={!isEditable || isSaving}
           className='min-h-[140px] resize-y border-(--linear-app-frame-seam) bg-surface-0 text-xs'
         />
         {/* Auto-save status indicator */}
-        {saveStatus !== 'idle' && (
-          <div className='flex items-center gap-1 text-2xs text-tertiary-token'>
-            {saveStatus === 'saving' && (
-              <>
-                <Loader2 className='h-3 w-3 animate-spin' aria-hidden='true' />
-                <span>Saving…</span>
-              </>
-            )}
-            {saveStatus === 'saved' && (
-              <>
-                <Check className='h-3 w-3 text-success' aria-hidden='true' />
-                <span>Saved</span>
-              </>
-            )}
-          </div>
-        )}
+        <div className='min-h-[22px]'>
+          {saveStatus !== 'idle' || actionFeedback ? (
+            <div
+              className='flex items-center gap-1 text-2xs'
+              role='status'
+              aria-live='polite'
+            >
+              {saveStatus === 'saving' ? (
+                <>
+                  <Loader2
+                    className='h-3 w-3 animate-spin text-tertiary-token'
+                    aria-hidden='true'
+                  />
+                  <span className='text-tertiary-token'>Saving…</span>
+                </>
+              ) : saveStatus === 'saved' && !actionFeedback ? (
+                <>
+                  <Check className='h-3 w-3 text-success' aria-hidden='true' />
+                  <span className='text-tertiary-token'>Saved</span>
+                </>
+              ) : actionFeedback ? (
+                <div className='flex w-full items-start gap-2 rounded-lg border border-destructive/20 bg-destructive/5 px-2.5 py-2'>
+                  <AlertTriangle
+                    className='mt-0.25 h-3.5 w-3.5 shrink-0 text-destructive'
+                    aria-hidden='true'
+                  />
+                  <div className='min-w-0 flex-1'>
+                    <p className='text-secondary-token'>
+                      {actionFeedback.message}
+                    </p>
+                    <DrawerButton
+                      type='button'
+                      onClick={actionFeedback.onRetry}
+                      className='mt-1 h-6 px-2 text-2xs'
+                    >
+                      {actionFeedback.actionLabel}
+                    </DrawerButton>
+                  </div>
+                </div>
+              ) : null}
+            </div>
+          ) : null}
+        </div>
       </div>
 
       <div className='flex flex-wrap items-center gap-2 border-t border-(--linear-app-frame-seam) px-3 py-2.5'>

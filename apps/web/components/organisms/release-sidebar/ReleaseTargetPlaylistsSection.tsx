@@ -1,10 +1,10 @@
 'use client';
 
 import { Input } from '@jovie/ui';
-import { Loader2 } from 'lucide-react';
+import { AlertTriangle, Loader2 } from 'lucide-react';
 import { useCallback, useRef, useState } from 'react';
 import { toast } from 'sonner';
-import { DrawerSurfaceCard } from '@/components/molecules/drawer';
+import { DrawerButton, DrawerSurfaceCard } from '@/components/molecules/drawer';
 import { LINEAR_SURFACE } from '@/features/dashboard/tokens';
 import { cn } from '@/lib/utils';
 
@@ -37,6 +37,7 @@ export function ReleaseTargetPlaylistsSection({
   const initialValue = joinPlaylists(targetPlaylists);
   const [value, setValue] = useState(initialValue);
   const [isSaving, setIsSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
   const lastSavedRef = useRef(initialValue);
 
   const handleBlur = useCallback(async () => {
@@ -49,16 +50,26 @@ export function ReleaseTargetPlaylistsSection({
     if (currentJoined === lastSavedRef.current) return;
 
     setIsSaving(true);
+    setSaveError(null);
     try {
       await onSave(releaseId, parsed);
       setValue(currentJoined);
       lastSavedRef.current = currentJoined;
+      setSaveError(null);
+      toast.success('Target playlists saved');
     } catch {
-      toast.error('Failed to save target playlists');
+      const message =
+        'Failed to save target playlists. Your draft is still here.';
+      setSaveError(message);
+      toast.error(message);
     } finally {
       setIsSaving(false);
     }
   }, [onSave, readOnly, value, releaseId]);
+
+  const handleRetry = useCallback(() => {
+    void handleBlur();
+  }, [handleBlur]);
 
   return (
     <DrawerSurfaceCard
@@ -88,11 +99,35 @@ export function ReleaseTargetPlaylistsSection({
         Playlists you&apos;re targeting for this release. Leave blank to use
         your defaults.
       </p>
+      <div className='min-h-[18px]'>
+        {saveError ? (
+          <div
+            className='flex items-start gap-2 rounded-lg border border-destructive/20 bg-destructive/5 px-2.5 py-2 text-2xs text-secondary-token'
+            role='status'
+            aria-live='polite'
+          >
+            <AlertTriangle className='mt-0.25 h-3.5 w-3.5 shrink-0 text-destructive' />
+            <div className='min-w-0 flex-1'>
+              <p>{saveError}</p>
+              <DrawerButton
+                type='button'
+                onClick={handleRetry}
+                className='mt-1 h-6 px-2 text-2xs'
+              >
+                Try again
+              </DrawerButton>
+            </div>
+          </div>
+        ) : null}
+      </div>
       <Input
         type='text'
         id={`target-playlists-${releaseId}`}
         value={value}
-        onChange={e => setValue(e.target.value)}
+        onChange={e => {
+          setValue(e.target.value);
+          setSaveError(null);
+        }}
         onBlur={handleBlur}
         placeholder='e.g. Pollen, Butter, Lorem'
         maxLength={310}

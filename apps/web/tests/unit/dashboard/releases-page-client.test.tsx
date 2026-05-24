@@ -41,16 +41,21 @@ const mockQueryResult = {
   data: [] as unknown[],
   isLoading: false,
   isError: false,
+  refetch: vi.fn().mockResolvedValue(undefined),
+  error: undefined as Error | undefined,
 };
+
+let capturedPageErrorStateProps: Record<string, unknown> | null = null;
 
 vi.mock('@/lib/queries/useReleasesQuery', () => ({
   useReleasesQuery: () => mockQueryResult,
 }));
 
 vi.mock('@/features/feedback/PageErrorState', () => ({
-  PageErrorState: ({ message }: { message: string }) => (
-    <div data-testid='page-error'>{message}</div>
-  ),
+  PageErrorState: (props: Record<string, unknown>) => {
+    capturedPageErrorStateProps = props;
+    return <div data-testid='page-error'>{String(props.message ?? '')}</div>;
+  },
 }));
 
 vi.mock('@/app/app/(shell)/dashboard/releases/config', () => ({
@@ -86,18 +91,27 @@ describe('@critical ReleasesPageClient', () => {
     mockQueryResult.data = undefined as unknown as unknown[];
     mockQueryResult.isLoading = false;
     mockQueryResult.isError = true;
+    mockQueryResult.error = new Error('load failed');
+    capturedPageErrorStateProps = null;
 
     render(<ReleasesPageClient />);
     expect(screen.getByTestId('page-error')).toHaveTextContent(
-      'Failed to load releases data. Please refresh the page.'
+      'We could not load your releases. Retry the request or refresh the page.'
     );
-    expect(
-      screen.getByText('Failed to load releases data. Please refresh the page.')
-    ).toBeInTheDocument();
+    expect(capturedPageErrorStateProps).toMatchObject({
+      title: 'Unable to load releases',
+      actionLabel: 'Retry load',
+    });
+    expect(typeof capturedPageErrorStateProps?.onRetry).toBe('function');
+
+    mockQueryResult.refetch.mockClear();
+    (capturedPageErrorStateProps?.onRetry as (() => void) | undefined)?.();
+    expect(mockQueryResult.refetch).toHaveBeenCalledTimes(1);
 
     // Reset
     mockQueryResult.isError = false;
     mockQueryResult.data = [];
+    mockQueryResult.error = undefined;
   });
 
   it('renders ReleasesExperience when data loaded', async () => {
@@ -133,5 +147,22 @@ describe('@critical ReleasesPageClient', () => {
       'data-count',
       '0'
     );
+  });
+
+  it('keeps cached releases visible when a background refetch errors', () => {
+    mockQueryResult.data = [{ id: 'r1' }] as unknown[];
+    mockQueryResult.isLoading = false;
+    mockQueryResult.isError = true;
+    mockQueryResult.error = new Error('background refetch failed');
+
+    render(<ReleasesPageClient />);
+    expect(screen.getByTestId('releases-experience')).toHaveAttribute(
+      'data-count',
+      '1'
+    );
+
+    mockQueryResult.data = [];
+    mockQueryResult.isError = false;
+    mockQueryResult.error = undefined;
   });
 });

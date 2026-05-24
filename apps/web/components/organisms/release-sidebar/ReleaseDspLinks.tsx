@@ -38,7 +38,7 @@ import type {
 import { cn } from '@/lib/utils';
 import { formatTimeAgo } from '@/lib/utils/date-formatting';
 
-import type { Release } from './types';
+import type { Release, ReleaseSidebarActionError } from './types';
 import { isValidUrl } from './utils';
 
 type DspStatus = 'connected' | 'pending' | 'error' | 'missing';
@@ -127,11 +127,13 @@ interface ReleaseDspLinksProps {
   readonly selectedProvider: ProviderKey | null;
   readonly isAddingDspLink: boolean;
   readonly isRemovingDspLink: string | null;
+  readonly actionError?: ReleaseSidebarActionError | null;
   readonly onSetIsAddingLink: (value: boolean) => void;
   readonly onSetNewLinkUrl: (value: string) => void;
   readonly onSetSelectedProvider: (value: ProviderKey | null) => void;
   readonly onAddLink: () => Promise<void>;
   readonly onRemoveLink: (provider: ProviderKey) => Promise<void>;
+  readonly onDismissActionError?: () => void;
   readonly onNewLinkKeyDown: (event: KeyboardEvent<HTMLInputElement>) => void;
   readonly showHeading?: boolean;
 }
@@ -145,11 +147,13 @@ export function ReleaseDspLinks({
   selectedProvider,
   isAddingDspLink,
   isRemovingDspLink,
+  actionError,
   onSetIsAddingLink,
   onSetNewLinkUrl,
   onSetSelectedProvider,
   onAddLink,
   onRemoveLink,
+  onDismissActionError,
   onNewLinkKeyDown,
   showHeading = false,
 }: ReleaseDspLinksProps) {
@@ -288,6 +292,48 @@ export function ReleaseDspLinks({
         </div>
       )}
 
+      {actionError ? (
+        <div role='status' aria-live='polite' className='mt-3'>
+          <DrawerSurfaceCard
+            className='space-y-2 rounded-[14px] border border-destructive/20 bg-destructive/5 p-3'
+            testId='dsp-link-action-error'
+          >
+            <div className='flex items-start gap-2'>
+              <span className='mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center text-destructive'>
+                <AlertTriangle className='h-4 w-4' aria-hidden='true' />
+              </span>
+              <div className='min-w-0 flex-1 space-y-0.5'>
+                <p className='text-xs font-medium text-primary-token'>
+                  {actionError.title}
+                </p>
+                <p className='text-2xs leading-[15px] text-secondary-token'>
+                  {actionError.message}
+                </p>
+              </div>
+            </div>
+            <div className='flex flex-wrap items-center gap-2'>
+              <DrawerButton
+                type='button'
+                onClick={actionError.onRetry}
+                className='h-7 px-2 text-2xs'
+              >
+                {actionError.actionLabel}
+              </DrawerButton>
+              {onDismissActionError ? (
+                <DrawerButton
+                  type='button'
+                  onClick={onDismissActionError}
+                  tone='ghost'
+                  className='h-7 px-2 text-2xs'
+                >
+                  Dismiss
+                </DrawerButton>
+              ) : null}
+            </div>
+          </DrawerSurfaceCard>
+        </div>
+      ) : null}
+
       {/* Add link form */}
       {isEditable && isAddingLink && (
         <DrawerSurfaceCard
@@ -299,6 +345,7 @@ export function ReleaseDspLinks({
               onValueChange={(value: string) => {
                 if (value in providerConfig) {
                   onSetSelectedProvider(value as ProviderKey);
+                  onDismissActionError?.();
                 }
               }}
             >
@@ -323,9 +370,10 @@ export function ReleaseDspLinks({
             <Input
               type='url'
               value={newLinkUrl}
-              onChange={(event: ChangeEvent<HTMLInputElement>) =>
-                onSetNewLinkUrl(event.target.value)
-              }
+              onChange={(event: ChangeEvent<HTMLInputElement>) => {
+                onSetNewLinkUrl(event.target.value);
+                onDismissActionError?.();
+              }}
               onKeyDown={onNewLinkKeyDown}
               placeholder='https://open.spotify.com/...'
               inputMode='url'
@@ -342,6 +390,7 @@ export function ReleaseDspLinks({
                 onSetIsAddingLink(false);
                 onSetNewLinkUrl('');
                 onSetSelectedProvider(null);
+                onDismissActionError?.();
               }}
               tone='ghost'
             >
@@ -358,6 +407,11 @@ export function ReleaseDspLinks({
               {isAddingDspLink ? 'Adding...' : 'Add'}
             </DrawerButton>
           </div>
+          <p className='min-h-[16px] text-2xs leading-[15px] text-tertiary-token'>
+            {!selectedProvider || !isValidUrl(newLinkUrl)
+              ? 'Choose a provider and paste a valid URL to add this link.'
+              : 'Your draft will stay in place if the save fails.'}
+          </p>
         </DrawerSurfaceCard>
       )}
     </DrawerLinkSection>

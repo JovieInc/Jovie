@@ -41,8 +41,15 @@ export function ReleasesPageClient() {
   const { selectedProfile } = useDashboardData();
   const profileId = selectedProfile?.id ?? '';
   const shellChatV1Enabled = useAppFlag('SHELL_CHAT_V1');
+  const designV1ReleasesEnabled = useAppFlag('DESIGN_V1_RELEASES');
 
-  const { data: releases, isLoading, isError } = useReleasesQuery(profileId);
+  const {
+    data: releases,
+    isLoading,
+    isError,
+    refetch,
+    error,
+  } = useReleasesQuery(profileId);
 
   const settings =
     (selectedProfile?.settings as Record<string, unknown> | null) ?? {};
@@ -69,13 +76,26 @@ export function ReleasesPageClient() {
     return <ReleaseTableSkeleton showHeader={false} />;
   }
 
-  if (isError) {
+  if (isError && !releases) {
     return (
-      <PageErrorState message='Failed to load releases data. Please refresh the page.' />
+      <PageErrorState
+        title='Unable to load releases'
+        message='We could not load your releases. Retry the request or refresh the page.'
+        error={error as Error | undefined}
+        actionLabel='Retry load'
+        onRetry={() => {
+          void refetch();
+        }}
+        secondaryAction={{
+          label: 'Refresh page',
+          onClick: () => globalThis.location.reload(),
+        }}
+        extraContext={{ Profile: profileId }}
+      />
     );
   }
 
-  if (shellChatV1Enabled) {
+  if (shellChatV1Enabled && !designV1ReleasesEnabled) {
     return <ShellReleasesView releases={releases ?? []} />;
   }
 
