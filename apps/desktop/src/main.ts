@@ -39,7 +39,12 @@ const DESKTOP_USER_AGENT_PRODUCT = `JovieDesktop/${app.getVersion()}`;
 const JOVIE_MARK_SVG_PATH =
   'm176.84,0l3.08.05c8.92,1.73,16.9,6.45,23.05,13.18,7.95,8.7,12.87,20.77,12.87,34.14s-4.92,25.44-12.87,34.14c-6.7,7.34-15.59,12.28-25.49,13.57h-.64s0,.01,0,.01h0c-22.2,0-42.3,8.84-56.83,23.13-14.5,14.27-23.49,33.99-23.49,55.77h0v.02c0,21.78,8.98,41.5,23.49,55.77,14.54,14.3,34.64,23.15,56.83,23.15v-.02h.01c22.2,0,42.3-8.84,56.83-23.13,14.51-14.27,23.49-33.99,23.49-55.77h0c0-17.55-5.81-33.75-15.63-46.82-10.08-13.43-24.42-23.61-41.05-28.62l-2.11-.64c4.36-2.65,8.34-5.96,11.84-9.78,9.57-10.47,15.5-24.89,15.5-40.77s-5.93-30.3-15.5-40.77c-1.44-1.57-2.95-3.06-4.55-4.44l7.67,1.58c40.44,8.35,75.81,30.3,100.91,60.75,24.66,29.91,39.44,68.02,39.44,109.5h0c0,48.05-19.81,91.55-51.83,123.05-31.99,31.46-76.19,50.92-125,50.92v.02h-.01c-48.79,0-93-19.47-125-50.94C19.81,265.54,0,222.04,0,173.99h0c0-48.05,19.81-91.56,51.83-123.05C83.84,19.47,128.04,0,176.84,0Z';
 const ENABLE_DEVTOOLS = APP_ENV !== 'production' || !app.isPackaged;
-const MACOS_TRAFFIC_LIGHT_POSITION = { x: 20, y: 17 } as const;
+const MACOS_TRAFFIC_LIGHT_X = 20;
+const MACOS_TRAFFIC_LIGHT_Y = 17;
+const MACOS_TRAFFIC_LIGHT_POSITION = {
+  x: MACOS_TRAFFIC_LIGHT_X,
+  y: MACOS_TRAFFIC_LIGHT_Y,
+} as const;
 const UPDATE_AVAILABLE_CHANNEL = 'update-available';
 const UPDATE_DOWNLOADED_CHANNEL = 'update-downloaded';
 const QUIT_AND_INSTALL_CHANNEL = 'quit-and-install';
@@ -623,9 +628,13 @@ function maybeShowDesktopAuthHandoff(urlString: string): boolean {
   return true;
 }
 
+function escapeHtmlAttribute(value: string): string {
+  return value.replaceAll('&', '&amp;').replaceAll('"', '&quot;');
+}
+
 function buildDesktopLoadFailureUrl(): string {
-  const retryUrl = JSON.stringify(APP_ENTRY_URL);
-  const appOrigin = JSON.stringify(APP_ORIGIN);
+  const retryUrl = escapeHtmlAttribute(APP_ENTRY_URL);
+  const appOrigin = escapeHtmlAttribute(APP_ORIGIN);
   const html = `<!doctype html>
 <html lang="en">
   <head>
@@ -643,8 +652,8 @@ function buildDesktopLoadFailureUrl(): string {
       h1 { margin: 0; font-size: 17px; font-weight: 650; letter-spacing: 0; }
       p { margin: 0; max-width: 38ch; color: #a8b0bd; font-size: 13px; line-height: 1.55; }
       .actions { display: flex; flex-wrap: wrap; gap: 10px; }
-      button, a { display: inline-flex; height: 34px; align-items: center; justify-content: center; border-radius: 10px; padding: 0 13px; border: 1px solid rgba(255,255,255,0.1); background: #f4f6fa; color: #080a0d; font-size: 12px; font-weight: 590; text-decoration: none; }
-      a { background: transparent; color: #d9dee7; }
+      a { display: inline-flex; height: 34px; align-items: center; justify-content: center; border-radius: 10px; padding: 0 13px; border: 1px solid rgba(255,255,255,0.1); background: transparent; color: #d9dee7; font-size: 12px; font-weight: 590; text-decoration: none; }
+      .primary { background: #f4f6fa; color: #080a0d; }
       .meta { color: #737d8c; font-size: 11px; }
     </style>
   </head>
@@ -666,8 +675,8 @@ function buildDesktopLoadFailureUrl(): string {
       </div>
       <p>Jovie could not load the app shell. Check your connection, then retry. If this keeps happening, open Jovie in your browser and install the latest desktop build.</p>
       <div class="actions">
-        <button type="button" onclick="window.location.href = ${retryUrl}">Retry</button>
-        <a href=${appOrigin}>Open Jovie</a>
+        <a class="primary" href="${retryUrl}">Retry</a>
+        <a href="${appOrigin}">Open Jovie</a>
       </div>
       <div class="meta">Desktop shell runtime: Electron</div>
     </main>

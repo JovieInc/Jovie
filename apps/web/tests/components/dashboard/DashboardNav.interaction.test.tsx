@@ -1,8 +1,8 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { useEffect, useState } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { DashboardData } from '@/app/app/(shell)/dashboard/actions/dashboard-data';
-import { CommandPalette } from '@/components/organisms/CommandPalette';
 import { OPEN_COMMAND_PALETTE_EVENT } from '@/components/organisms/command-palette-events';
 import { APP_ROUTES } from '@/constants/routes';
 import {
@@ -30,6 +30,20 @@ vi.mock('@/lib/queries/useArtistSearchQuery', () => ({
     state: 'idle',
   }),
 }));
+
+function CommandPaletteHarness() {
+  const [open, setOpen] = useState(false);
+
+  useEffect(() => {
+    const openPalette = () => setOpen(true);
+    globalThis.addEventListener(OPEN_COMMAND_PALETTE_EVENT, openPalette);
+    return () => {
+      globalThis.removeEventListener(OPEN_COMMAND_PALETTE_EVENT, openPalette);
+    };
+  }, []);
+
+  return open ? <input aria-label='Command palette search' /> : null;
+}
 
 describe('DashboardNav interactions', () => {
   afterEach(() => {
@@ -174,7 +188,7 @@ describe('DashboardNav interactions', () => {
     renderDashboardNav({
       renderFn: render,
       appFlags: { DESIGN_V1: true },
-      children: <CommandPalette />,
+      children: <CommandPaletteHarness />,
     });
 
     await user.click(screen.getByRole('button', { name: 'Search' }));
@@ -182,7 +196,7 @@ describe('DashboardNav interactions', () => {
     expect(screen.getByLabelText('Command palette search')).toBeInTheDocument();
   });
 
-  it('groups artist-owned routes under the artist name after Threads in Design V1', () => {
+  it('groups artist-owned routes under the artist name after the primary Design V1 rows', () => {
     const { container } = renderDashboardNav({
       renderFn: render,
       appFlags: { DESIGN_V1: true },
@@ -196,14 +210,16 @@ describe('DashboardNav interactions', () => {
       },
     });
 
-    const threadsHeading = screen.getByText('Threads');
+    const primarySection = container.querySelector('[data-nav-section="true"]');
     const artistGroupButton = screen.getByRole('button', {
       name: 'Tim White',
     });
+    expect(primarySection).toBeInTheDocument();
     expect(artistGroupButton).toBeInTheDocument();
     expect(screen.queryByText('Artist Workspace')).not.toBeInTheDocument();
+    expect(screen.queryByText('Threads')).not.toBeInTheDocument();
     expect(
-      threadsHeading.compareDocumentPosition(artistGroupButton) &
+      primarySection!.compareDocumentPosition(artistGroupButton) &
         Node.DOCUMENT_POSITION_FOLLOWING
     ).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Search' })).toBeInTheDocument();
@@ -259,9 +275,7 @@ describe('DashboardNav interactions', () => {
     ).not.toBeInTheDocument();
   });
 
-  it('renders compact thread loading and empty states from the real conversations query', async () => {
-    const user = userEvent.setup();
-
+  it('renders compact thread loading without adding duplicate empty-state chat controls', () => {
     mockUseChatConversationsQuery.mockReturnValue({
       data: undefined,
       isLoading: true,
@@ -287,9 +301,10 @@ describe('DashboardNav interactions', () => {
       appFlags: { DESIGN_V1: true },
     });
 
-    await user.click(screen.getByRole('button', { name: 'New chat' }));
-
-    expect(mockRouterPush).toHaveBeenCalledWith(APP_ROUTES.CHAT);
+    expect(screen.getAllByRole('link', { name: 'New chat' })).toHaveLength(1);
+    expect(
+      screen.queryByRole('button', { name: 'New chat' })
+    ).not.toBeInTheDocument();
   });
 
   it('profile button navigates to chat before opening the drawer off chat routes', async () => {

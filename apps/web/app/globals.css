@@ -54,6 +54,11 @@ body {
 
 html[data-desktop-runtime="electron"] {
   --electron-titlebar-height: 40px;
+  --electron-traffic-light-safe-width: 72px;
+  --electron-traffic-light-x: 20px;
+  --electron-traffic-light-y: 17px;
+  --electron-sidebar-width: var(--linear-app-sidebar-width);
+  --electron-sidebar-collapsed-width: 52px;
 }
 
 html[data-desktop-runtime="electron"] body {
@@ -74,7 +79,7 @@ html[data-desktop-runtime="electron"] [data-electron-titlebar="true"] {
   -webkit-app-region: drag;
   z-index: 60;
   display: grid;
-  grid-template-columns: var(--linear-app-sidebar-width) minmax(0, 1fr);
+  grid-template-columns: var(--electron-sidebar-width) minmax(0, 1fr);
   column-gap: var(--linear-app-shell-gap);
   align-items: center;
   padding-right: var(--linear-app-shell-gap);
@@ -111,7 +116,7 @@ html[data-desktop-runtime="electron"]
 html[data-desktop-runtime="electron"] [data-shell-design="shellChatV1"]
   [data-electron-titlebar="true"] {
   padding-left: var(--linear-app-shell-gap);
-  grid-template-columns: var(--linear-app-sidebar-width) minmax(0, 1fr);
+  grid-template-columns: var(--electron-sidebar-width) minmax(0, 1fr);
 }
 
 /* Marketing pages use document scrolling rather than app-shell scroll panes.

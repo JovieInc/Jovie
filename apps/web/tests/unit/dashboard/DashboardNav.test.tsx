@@ -83,12 +83,21 @@ describe('DashboardNav', () => {
 
     const { getByRole } = renderDashboardNav({
       renderFn: fastRender,
-      appFlags: { SHELL_CHAT_V1: true },
+      appFlags: { DESIGN_V1: true },
     });
 
     expect(
       getByRole('link', { name: 'New chat' }).getAttribute('aria-current')
     ).toBeNull();
+  });
+
+  it('renders one canonical New chat nav row in Design V1', () => {
+    const { getAllByRole } = renderDashboardNav({
+      renderFn: fastRender,
+      appFlags: { DESIGN_V1: true },
+    });
+
+    expect(getAllByRole('link', { name: 'New chat' })).toHaveLength(1);
   });
 
   it('opens the global command palette from Search instead of navigating', () => {

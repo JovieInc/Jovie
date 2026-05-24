@@ -18,8 +18,12 @@ import {
   resetDashboardNavTestMocks,
 } from '@/tests/utils/dashboard-nav-test-support';
 
+const electronRuntimeMock = vi.hoisted(() => ({
+  isElectronRuntime: true,
+}));
+
 vi.mock('@/lib/desktop/electron-bridge', () => ({
-  useIsElectronRuntime: () => true,
+  useIsElectronRuntime: () => electronRuntimeMock.isElectronRuntime,
 }));
 
 vi.mock('@/features/dashboard/dashboard-nav', () => ({
@@ -128,6 +132,7 @@ function renderUnifiedSidebar({
 
 describe('UnifiedSidebar library route', () => {
   afterEach(() => {
+    electronRuntimeMock.isElectronRuntime = true;
     resetDashboardNavTestMocks();
   });
 
@@ -168,7 +173,7 @@ describe('UnifiedSidebar library route', () => {
     );
   });
 
-  it('keeps the Jovie wordmark and legacy new chat link visible in Electron dashboard mode', () => {
+  it('omits header New chat and web dock controls in Electron dashboard mode', () => {
     renderUnifiedSidebar({
       designV1: false,
       pathname: APP_ROUTES.DASHBOARD,
@@ -176,6 +181,27 @@ describe('UnifiedSidebar library route', () => {
     });
 
     expect(screen.getByText('Jovie', { selector: 'span' })).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'New chat' })).toBeInTheDocument();
+    expect(
+      screen.queryByRole('link', { name: 'New chat' })
+    ).not.toBeInTheDocument();
+    expect(
+      document.querySelector('[data-sidebar-dock-button="true"]')
+    ).not.toBeInTheDocument();
+  });
+
+  it('uses the in-sidebar dock control as the web dashboard toggle', () => {
+    electronRuntimeMock.isElectronRuntime = false;
+
+    renderUnifiedSidebar({
+      pathname: APP_ROUTES.DASHBOARD,
+      section: 'dashboard',
+    });
+
+    expect(
+      document.querySelector('[data-sidebar-dock-button="true"]')
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole('link', { name: 'New chat' })
+    ).not.toBeInTheDocument();
   });
 });

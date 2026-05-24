@@ -282,7 +282,7 @@ async function assertUserButtonLoaded(
 
   const hasShellChrome = await hasVisibleMatch(
     page.locator(
-      'nav[aria-label="Dashboard navigation"], main, textarea, [contenteditable="true"], button[aria-label="New chat"]'
+      'nav[aria-label="Dashboard navigation"], main, textarea, [contenteditable="true"], a[href="/app/chat"]'
     ),
     5_000
   );

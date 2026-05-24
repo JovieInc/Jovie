@@ -497,10 +497,6 @@ export function DashboardNav(_: DashboardNavProps) {
     [activeThreadId, conversations, threadReadAtById]
   );
 
-  const handleNewThread = useCallback(() => {
-    router.push(APP_ROUTES.CHAT);
-  }, [router]);
-
   const handleRetryThreads = useCallback(() => {
     void refetchConversations();
   }, [refetchConversations]);
@@ -635,7 +631,6 @@ export function DashboardNav(_: DashboardNavProps) {
                   : 'idle'
             }
             onRetry={handleRetryThreads}
-            onNewThread={handleNewThread}
             tight
             collapsed={false}
           />

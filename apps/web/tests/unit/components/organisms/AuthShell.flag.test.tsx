@@ -12,13 +12,16 @@ vi.mock('@/app/app/(shell)/dashboard/PreviewPanelContext', () => ({
 
 vi.mock('@/components/organisms/AppShellFrame', () => ({
   AppShellFrame: ({
+    header,
     main,
     variant,
   }: {
+    header?: ReactNode;
     main: ReactNode;
     variant: 'legacy' | 'shellChatV1';
   }) => (
     <div data-testid='app-shell-frame' data-shell-design={variant}>
+      {header}
       {main}
     </div>
   ),
@@ -45,7 +48,9 @@ vi.mock('@/contexts/RightPanelContext', () => ({
 }));
 
 vi.mock('@/features/dashboard/organisms/DashboardHeader', () => ({
-  DashboardHeader: () => <header>Dashboard Header</header>,
+  DashboardHeader: ({ sidebarTrigger }: { sidebarTrigger?: ReactNode }) => (
+    <header>{sidebarTrigger}Dashboard Header</header>
+  ),
 }));
 
 vi.mock('@/features/dashboard/organisms/DashboardMobileTabs', () => ({
@@ -80,6 +85,9 @@ describe('AuthShell DESIGN_V1 wiring', () => {
       'data-shell-design',
       'legacy'
     );
+    expect(
+      screen.getByRole('button', { name: 'Toggle Sidebar' })
+    ).toBeInTheDocument();
   });
 
   it('uses the shell chat V1 frame when DESIGN_V1 is enabled', () => {
@@ -89,5 +97,8 @@ describe('AuthShell DESIGN_V1 wiring', () => {
       'data-shell-design',
       'shellChatV1'
     );
+    expect(
+      screen.queryByRole('button', { name: 'Toggle Sidebar' })
+    ).not.toBeInTheDocument();
   });
 });

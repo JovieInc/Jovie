@@ -113,9 +113,7 @@ async function assertDashboardPageContent(
 ) {
   if (pageConfig.name === 'Chat') {
     const chatReady = page
-      .locator(
-        'textarea, [contenteditable="true"], button[aria-label="New chat"]'
-      )
+      .locator('textarea, [contenteditable="true"], a[href="/app/chat"]')
       .first();
     await expect(
       chatReady,
