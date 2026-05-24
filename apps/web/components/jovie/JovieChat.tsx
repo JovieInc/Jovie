@@ -335,7 +335,7 @@ export function JovieChat({
 
       <ChatInput
         {...chatInputProps}
-        placeholder={showThreadView ? 'Ask a follow-up...' : 'Ask Jovie...'}
+        placeholder='Ask Jovie...'
         variant={showThreadView ? 'compact' : 'hero'}
         shellChatV1
       />
@@ -416,7 +416,13 @@ export function JovieChat({
                     data-testid='chat-empty-state-composer-region'
                   >
                     <div
-                      className='pointer-events-none absolute left-1/2 top-1/2 h-[min(46vw,28rem)] w-[min(46vw,28rem)] -translate-x-1/2 -translate-y-[60%] opacity-80 max-sm:h-[min(72vw,18rem)] max-sm:w-[min(72vw,18rem)]'
+                      className='pointer-events-none absolute left-1/2 top-1/2 h-[min(46vw,28rem)] w-[min(46vw,28rem)] -translate-x-1/2 -translate-y-[60%] opacity-85 drop-shadow-[0_0_34px_rgba(68,188,255,0.18)] max-sm:h-[min(72vw,18rem)] max-sm:w-[min(72vw,18rem)]'
+                      style={{
+                        maskImage:
+                          'radial-gradient(ellipse at center, black 54%, rgba(0,0,0,0.72) 68%, transparent 88%)',
+                        WebkitMaskImage:
+                          'radial-gradient(ellipse at center, black 54%, rgba(0,0,0,0.72) 68%, transparent 88%)',
+                      }}
                       data-testid='chat-empty-state-logo'
                     >
                       <JovieMarkElectric className='h-full w-full' />

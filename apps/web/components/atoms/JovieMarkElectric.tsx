@@ -54,9 +54,9 @@ export function JovieMarkElectric({
         <style id={styleId}>{`
           @keyframes ${sparkAnimationName} {
             0%   { stroke-dashoffset: 45;    opacity: 0; }
-            14%  { stroke-dashoffset: -120;  opacity: 0.56; }
-            48%  { stroke-dashoffset: -520;  opacity: 0.68; }
-            78%  { stroke-dashoffset: -820;  opacity: 0.22; }
+            12%  { stroke-dashoffset: -110;  opacity: 0.42; }
+            42%  { stroke-dashoffset: -500;  opacity: 0.72; }
+            76%  { stroke-dashoffset: -820;  opacity: 0.34; }
             100% { stroke-dashoffset: -1000; opacity: 0; }
           }
         `}</style>
@@ -71,14 +71,14 @@ export function JovieMarkElectric({
       >
         <defs>
           <filter id={filterId} x='-30%' y='-30%' width='160%' height='160%'>
-            <feGaussianBlur stdDeviation='2.5' />
+            <feGaussianBlur stdDeviation='4.5' />
           </filter>
         </defs>
         <path
           d={JOVIE_ICON_PATH}
           fill='none'
-          stroke='rgba(255,255,255,0.04)'
-          strokeWidth='1'
+          stroke='rgba(255,255,255,0.065)'
+          strokeWidth='1.15'
         />
         {showSpark && (
           <>
@@ -86,9 +86,9 @@ export function JovieMarkElectric({
               pathLength='1000'
               d={JOVIE_ICON_PATH}
               fill='none'
-              stroke='rgba(78,190,255,0.76)'
-              strokeWidth='1.4'
-              strokeDasharray='50 950'
+              stroke='rgba(78,190,255,0.82)'
+              strokeWidth='3.2'
+              strokeDasharray='86 914'
               strokeLinecap='round'
               filter={`url(#${filterId})`}
               style={{
@@ -105,8 +105,8 @@ export function JovieMarkElectric({
               d={JOVIE_ICON_PATH}
               fill='none'
               stroke='rgba(236,250,255,0.88)'
-              strokeWidth='0.55'
-              strokeDasharray='20 980'
+              strokeWidth='1.05'
+              strokeDasharray='34 966'
               strokeLinecap='round'
               style={{
                 animationName: sparkAnimationName,
