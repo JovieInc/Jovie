@@ -125,7 +125,7 @@ function reportMissingBridgeMethod(method: keyof ElectronAPI): void {
 }
 
 function getRawElectronAPI(): Partial<ElectronAPI> | undefined {
-  if (typeof globalThis.window === 'undefined') return undefined;
+  if (globalThis.window === undefined) return undefined;
   const raw = (
     globalThis.window as Window & { electronAPI?: Partial<ElectronAPI> }
   ).electronAPI;
@@ -190,7 +190,7 @@ function openManualDownload(): void {
   // Fallback: open the releases page in the system browser (or in-app).
   // window.open is safe in both browser and Electron contexts; Electron's
   // shell handler will route it via shell.openExternal.
-  if (typeof globalThis.window !== 'undefined') {
+  if (globalThis.window !== undefined) {
     globalThis.window.open(
       RELEASE_DOWNLOAD_URL,
       '_blank',
@@ -200,7 +200,7 @@ function openManualDownload(): void {
 }
 
 function openBrowserFallback(url: string): DesktopAuthActionResult {
-  if (typeof globalThis.window !== 'undefined') {
+  if (globalThis.window !== undefined) {
     const opened = globalThis.window.open(url, '_blank', 'noopener,noreferrer');
     return opened
       ? { ok: true }
@@ -254,7 +254,7 @@ function safeInstallUpdateAndRestart(): void {
 }
 
 export function isElectronRuntime(): boolean {
-  if (typeof globalThis.window === 'undefined') return false;
+  if (globalThis.window === undefined) return false;
   if (isDesktopEnvironment()) return true;
   return (
     globalThis.document.documentElement.dataset.desktopRuntime === 'electron'

@@ -87,6 +87,10 @@ const ONBOARDING_INTRO_MESSAGE = {
   ],
 } satisfies UIMessage;
 
+const BLOCKED_TURNSTILE_TOKEN_STATUSES: ReadonlySet<
+  OnboardingTurnstileStatus | undefined
+> = new Set(['expired', 'timeout', 'error', 'unsupported', 'unconfigured']);
+
 function getMessageText(message: UIMessage): string {
   return (message.parts ?? [])
     .filter(
@@ -548,9 +552,7 @@ function isTurnstileTokenUsable(
   status: OnboardingTurnstileStatus | undefined
 ): boolean {
   if (!token) return false;
-  return !['expired', 'timeout', 'error', 'unsupported', 'unconfigured'].some(
-    blockedStatus => blockedStatus === status
-  );
+  return !BLOCKED_TURNSTILE_TOKEN_STATUSES.has(status);
 }
 
 function getDisplayMessages(
