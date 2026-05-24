@@ -1,7 +1,14 @@
 'use client';
 
 import { useSearchParams } from 'next/navigation';
-import { Suspense, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  Suspense,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import { sanitizeDesktopAuthUrl } from '@/lib/desktop/auth-return';
 import {
   closeDesktopAuthWindow,
@@ -22,15 +29,22 @@ function formatOpenError(reason?: string): string {
 }
 
 async function openWithTimeout(authUrl: string) {
-  return Promise.race([
-    openDesktopAuthUrl(authUrl),
-    new Promise<{ ok: false; reason: string }>(resolve => {
-      setTimeout(
-        () => resolve({ ok: false, reason: 'desktop-auth-open-timeout' }),
-        BROWSER_OPEN_TIMEOUT_MS
-      );
-    }),
-  ]);
+  let timeoutId: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      openDesktopAuthUrl(authUrl),
+      new Promise<{ ok: false; reason: string }>(resolve => {
+        timeoutId = setTimeout(
+          () => resolve({ ok: false, reason: 'desktop-auth-open-timeout' }),
+          BROWSER_OPEN_TIMEOUT_MS
+        );
+      }),
+    ]);
+  } finally {
+    if (timeoutId !== undefined) {
+      clearTimeout(timeoutId);
+    }
+  }
 }
 
 function DesktopAuthContent() {
@@ -46,21 +60,18 @@ function DesktopAuthContent() {
   );
   const canAutoOpen = isElectronRuntime();
 
-  const openAuthUrl = useMemo(
-    () => async () => {
-      if (!authUrl) return;
-      setOpenState('opening');
-      setOpenError(null);
-      const result = await openWithTimeout(authUrl);
-      if (result.ok) {
-        setOpenState('opened');
-        return;
-      }
-      setOpenState('error');
-      setOpenError(formatOpenError(result.reason));
-    },
-    [authUrl]
-  );
+  const openAuthUrl = useCallback(async () => {
+    if (!authUrl || openState === 'opening') return;
+    setOpenState('opening');
+    setOpenError(null);
+    const result = await openWithTimeout(authUrl);
+    if (result.ok) {
+      setOpenState('opened');
+      return;
+    }
+    setOpenState('error');
+    setOpenError(formatOpenError(result.reason));
+  }, [authUrl, openState]);
 
   useEffect(() => {
     if (!canAutoOpen || !authUrl || autoOpenedRef.current) return;
@@ -105,7 +116,7 @@ function DesktopAuthContent() {
           <button
             type='button'
             className='inline-flex h-10 w-full items-center justify-center rounded-full bg-white px-4 text-[13px] font-medium text-black transition-colors hover:bg-white/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/35 disabled:cursor-not-allowed disabled:opacity-55'
-            disabled={!authUrl}
+            disabled={!authUrl || openState === 'opening'}
             onClick={() => {
               void openAuthUrl();
             }}
@@ -124,6 +135,7 @@ function DesktopAuthContent() {
         </div>
         <p
           aria-live='polite'
+          role='status'
           className='mt-3 min-h-5 text-[12px] leading-5 text-white/56'
         >
           {statusText}

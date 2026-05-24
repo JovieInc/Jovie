@@ -188,13 +188,6 @@ export async function consumeStoredAuthState(input: {
   return record;
 }
 
-export async function deleteStoredAuthState(input: {
-  readonly state: string;
-}): Promise<void> {
-  const redis = getRequiredRedis();
-  await redis.del(buildAuthStateKey(input.state));
-}
-
 export async function createStoredNativeExchangeCode(input: {
   readonly code: string;
   readonly client: NativeAuthClient;

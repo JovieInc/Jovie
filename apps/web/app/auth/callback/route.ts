@@ -8,9 +8,8 @@ import {
 import { NextResponse } from 'next/server';
 import { APP_ROUTES } from '@/constants/routes';
 import {
+  consumeStoredAuthState,
   createStoredNativeExchangeCode,
-  deleteStoredAuthState,
-  readStoredAuthState,
 } from '@/lib/auth/routing-state.server';
 import { captureError } from '@/lib/error-tracking';
 import { NO_STORE_HEADERS } from '@/lib/http/headers';
@@ -49,7 +48,7 @@ export async function GET(request: Request) {
       return NextResponse.redirect(signInUrl, { headers: NO_STORE_HEADERS });
     }
 
-    const stateRecord = await readStoredAuthState({ state });
+    const stateRecord = await consumeStoredAuthState({ state });
     if (!stateRecord) {
       return NextResponse.json(
         { error: 'Auth state expired' },
@@ -76,8 +75,6 @@ export async function GET(request: Request) {
         codeChallenge: stateRecord.codeChallenge,
       });
     }
-
-    await deleteStoredAuthState({ state });
 
     const resolved = resolveAuthCallback({ stateRecord, exchangeCode });
     void trackAuthEvent('auth_returned_to_client', {
