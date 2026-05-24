@@ -6,7 +6,8 @@ import { getLeadFunnelReport } from '@/lib/leads/reporting';
 
 function formatRate(value: number | null): string {
   if (value === null) return '--';
-  return `${(value * 100).toFixed(1)}%`;
+  const percent = Math.min(100, Math.max(0, value * 100));
+  return `${percent.toFixed(1)}%`;
 }
 
 function BreakdownList({
