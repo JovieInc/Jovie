@@ -4,6 +4,7 @@ import { ProfileCompactTemplate } from '@/features/profile/templates/ProfileComp
 import { buildProfilePublicViewModel } from '@/features/profile/view-models';
 import type { DiscogRelease } from '@/lib/db/schema/content';
 import type { ProfileAlertOptInVariant } from '@/lib/flags/contracts';
+import type { PublicMerchCard } from '@/lib/merch/types';
 import type { ConfirmedFeaturedPlaylistFallback } from '@/lib/profile/featured-playlist-fallback';
 import type { TourDateViewModel } from '@/lib/tour-dates/types';
 import type { AvatarSize } from '@/lib/utils/avatar-sizes';
@@ -42,6 +43,7 @@ export interface StaticArtistPageProps {
   readonly viewerCountryCode?: string | null;
   readonly presentation?: StaticArtistPagePresentation;
   readonly releases?: readonly PublicRelease[];
+  readonly merchCards?: readonly PublicMerchCard[];
   readonly hideJovieBranding?: boolean;
   readonly hideMoreMenu?: boolean;
 }
@@ -73,6 +75,7 @@ export function StaticArtistPage({
   viewerCountryCode,
   presentation = 'full-public',
   releases,
+  merchCards,
   hideJovieBranding = false,
   hideMoreMenu = false,
 }: StaticArtistPageProps) {
@@ -100,6 +103,7 @@ export function StaticArtistPage({
     showShopButton,
     profileSettings,
     featuredPlaylistFallback,
+    merchCards,
   });
 
   // Live public profiles and compact preview callers intentionally share the
@@ -130,6 +134,7 @@ export function StaticArtistPage({
       featuredPlaylistFallback={viewModel.featuredPlaylistFallback}
       viewerCountryCode={viewerCountryCode}
       releases={releases}
+      merchCards={viewModel.merchCards}
       hideJovieBranding={hideJovieBranding}
       hideMoreMenu={hideMoreMenu}
     />

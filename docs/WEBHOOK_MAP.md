@@ -16,18 +16,21 @@
 | `/api/webhooks/resend-inbound` | Resend (inbound email) | Svix-style HMAC (`RESEND_INBOUND_WEBHOOK_SECRET`, 5-min timestamp window) | `email.received` | Parses recipient, looks up creator, creates/updates `emailThreads`, inserts `inboundEmails`, runs AI classification (category, priority, summary). |
 | `/api/webhooks/linear` | Linear | HMAC-SHA256 (`linear-signature` + `LINEAR_WEBHOOK_SECRET`, timing-safe) | Issue → "Todo" state, CodeRabbit plan-ready comment | Deduplication via Redis (60s TTL). Fires GitHub `repository_dispatch` (`linear_todo_ready` or `linear_plan_ready`) to trigger CI automation. |
 | `/api/webhooks/sentry` | Sentry | HMAC-SHA256 (`sentry-hook-signature` + `SENTRY_WEBHOOK_SECRET`, timing-safe) | Issue alerts | Deduplication via Redis (60s TTL). Fires GitHub `repository_dispatch` (`sentry-issue`) to trigger autofix workflow with stack frames. |
+| `/api/webhooks/stripe-merch` | Stripe (merch) | Stripe signature (`stripe-signature` + `STRIPE_WEBHOOK_SECRET_MERCH`) | `checkout.session.completed`, `charge.refunded` | **checkout:** marks merch orders paid, stores shipping details, enqueues Printful fulfillment, accrues manual payout ledger. **full refund:** reverses ledger liability. **partial refund:** holds fulfillment/payout for manual review. |
+| `/api/webhooks/printful` | Printful | HMAC-SHA256 (`x-pf-webhook-signature` + `PRINTFUL_WEBHOOK_SECRET`, timing-safe) | Order shipment, delivery, cancellation, failure, hold events | Idempotent via `webhookEvents`. Updates merch order fulfillment status and keeps failed/hold states from becoming payout-ready. |
 
 ## Shared Patterns
 
 **Idempotency:**
 - Stripe webhooks use the `stripeWebhookEvents` table (unique constraint on event ID) to prevent double-processing
-- Resend delivery webhooks use the `webhookEvents` table for the same purpose
+- Resend delivery and Printful webhooks use the `webhookEvents` table for the same purpose
 - Linear/Sentry webhooks use Redis-backed `acquireRecentDispatch` with 60s TTL
 
 **Verification methods:**
 - **Svix:** Used by Clerk. Verifies `svix-id`, `svix-timestamp`, `svix-signature` headers via `new Webhook(secret).verify()`
 - **Stripe signature:** Used by all Stripe handlers. Verifies `stripe-signature` header via `stripe.webhooks.constructEvent()`
 - **Manual HMAC-SHA256:** Used by Resend, Linear, Sentry. Computes HMAC over payload with timing-safe comparison
+- **Printful HMAC-SHA256:** Used by Printful. Computes the SHA-256 HMAC over the raw body with the configured Printful webhook secret and compares it to `x-pf-webhook-signature`.
 
 **Error handling:** All webhook handlers use try/catch with `captureError()` and return appropriate HTTP status codes. Failed webhooks are logged but don't crash the endpoint.
 

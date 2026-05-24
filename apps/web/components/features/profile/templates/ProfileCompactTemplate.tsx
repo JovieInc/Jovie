@@ -28,6 +28,7 @@ import type { PublicRelease } from '@/features/profile/releases/types';
 import { sortDSPsByGeoPopularity } from '@/lib/dsp';
 import type { ProfileAlertOptInVariant } from '@/lib/flags/contracts';
 import { useNotifications } from '@/lib/hooks/useNotifications';
+import type { PublicMerchCard } from '@/lib/merch/types';
 import type { ConfirmedFeaturedPlaylistFallback } from '@/lib/profile/featured-playlist-fallback';
 import {
   buildProfileAccentCssVars,
@@ -78,6 +79,7 @@ interface ProfileCompactTemplateProps {
   readonly showSubscriptionConfirmedBanner?: boolean;
   readonly viewerCountryCode?: string | null;
   readonly releases?: readonly PublicRelease[];
+  readonly merchCards?: readonly PublicMerchCard[];
   readonly hideJovieBranding?: boolean;
   readonly hideMoreMenu?: boolean;
   readonly visualVariant?: 'default';
@@ -215,6 +217,7 @@ export function ProfileCompactTemplate({
   showSubscriptionConfirmedBanner = false,
   viewerCountryCode,
   releases,
+  merchCards = [],
   hideJovieBranding = false,
   hideMoreMenu = false,
   visualVariant = 'default',
@@ -728,6 +731,7 @@ export function ProfileCompactTemplate({
               tourDates={tourDates}
               showSubscriptionConfirmedBanner={showSubscriptionConfirmedBanner}
               viewerCountryCode={viewerCountryCode}
+              merchCards={merchCards}
               hideJovieBranding={hideJovieBranding}
               hideMoreMenu={hideMoreMenu}
               renderInteractiveOverlays

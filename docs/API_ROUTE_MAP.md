@@ -165,6 +165,7 @@
 | `/api/cron/generate-insights` | GET | `cron` | Generate AI insights for creators |
 | `/api/cron/pixel-forwarding` | GET | `cron` | Forward queued pixel events |
 | `/api/cron/process-campaigns` | GET | `cron` | Process pending campaigns |
+| `/api/cron/process-merch-fulfillment` | GET | `cron` | Submit paid merch orders to Printful idempotently |
 | `/api/cron/process-ingestion-jobs` | GET | `cron` | Process creator ingestion queue |
 | `/api/cron/process-pre-saves` | GET | `cron` | Process pre-save conversions |
 | `/api/cron/purge-pixel-ips` | GET | `cron` | Purge stored pixel IP addresses |
@@ -299,6 +300,13 @@
 |-------|---------|------|-------------|
 | `/api/link/[id]` | POST | `public` | Generate time-limited signed URL for sensitive links |
 
+### Merch
+
+| Route | Methods | Auth | Description |
+|-------|---------|------|-------------|
+| `/api/merch/checkout` | POST | `public` | Create a Stripe Checkout session for a live Jovie merch card |
+| `/{username}/merch/{cardId}` | GET | `public` | Public merch product page with mockups, size/quantity selection, and checkout |
+
 ### Notifications
 
 | Route | Methods | Auth | Description |
@@ -426,7 +434,9 @@
 | `/api/webhooks/resend` | POST | `webhook` | Resend delivery events |
 | `/api/webhooks/resend-inbound` | POST | `webhook` | Resend inbound email |
 | `/api/webhooks/sentry` | POST | `webhook` | Sentry issue alerts |
+| `/api/webhooks/printful` | POST | `webhook` | Printful merch fulfillment status updates |
 | `/api/webhooks/stripe-connect` | POST | `webhook` | Stripe Connect events |
+| `/api/webhooks/stripe-merch` | POST | `webhook` | Stripe merch Checkout and refund events |
 | `/api/webhooks/stripe-tips` | POST | `webhook` | Stripe tip payment events |
 
 ### Wrap Link
@@ -443,7 +453,7 @@
 |-----------|-------------|
 | `admin` | ~38 |
 | `auth` | ~62 |
-| `public` | ~33 |
-| `cron` | ~15 |
-| `webhook` | ~7 |
-| **Total** | **~155** |
+| `public` | ~35 |
+| `cron` | ~16 |
+| `webhook` | ~9 |
+| **Total** | **~159** |

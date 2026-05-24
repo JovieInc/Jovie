@@ -88,6 +88,12 @@ The secret key for Stripe.
 
 The webhook secret for Stripe.
 
+### `STRIPE_WEBHOOK_SECRET_MERCH`
+
+Webhook secret for the dedicated Stripe merch webhook at
+`/api/webhooks/stripe-merch`. Used for one-time merch Checkout completion and
+refund events; separate from subscription and tip webhook secrets.
+
 ### `STRIPE_PRICE_STANDARD_MONTHLY`
 
 The price ID for the Standard monthly subscription (branding removed).
@@ -117,6 +123,28 @@ The folder to upload files to in Cloudinary.
 ### `CLOUDINARY_UPLOAD_PRESET`
 
 The upload preset for Cloudinary.
+
+## Printful Merch Fulfillment
+
+### `PRINTFUL_API_KEY`
+
+Server-side Printful API key used for catalog, mockup, and order fulfillment
+requests. Required only when the `merch_mvp` gate is enabled and paid merch
+orders should be submitted to Printful.
+
+### `PRINTFUL_API_BASE_URL`
+
+Optional override for the Printful API base URL. Defaults to
+`https://api.printful.com`.
+
+### `PRINTFUL_STORE_ID`
+
+Optional Printful store id passed as `X-PF-Store-Id` for accounts that require
+store-scoped requests.
+
+### `PRINTFUL_WEBHOOK_SECRET`
+
+Secret used to verify `x-pf-webhook-signature` on `/api/webhooks/printful`.
 
 ## Spotify Integration
 

@@ -91,6 +91,7 @@ export {
   handleCheckLimiter,
   healthLimiter,
   isrcRescanLimiter,
+  merchCheckoutLimiter,
   musicBrainzLookupLimiter,
   onboardingLimiter,
   paymentIntentLimiter,

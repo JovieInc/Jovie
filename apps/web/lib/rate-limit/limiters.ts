@@ -144,6 +144,14 @@ export const paymentIntentLimiter = createRateLimiter(
  */
 export const tipCheckoutLimiter = createRateLimiter(RATE_LIMITERS.tipCheckout);
 
+/**
+ * Merch checkout session rate limiter
+ * Limit: 20 sessions per hour per IP
+ */
+export const merchCheckoutLimiter = createRateLimiter(
+  RATE_LIMITERS.merchCheckout
+);
+
 // ============================================================================
 // Admin Operations
 // ============================================================================
@@ -1017,6 +1025,7 @@ export function getAllLimiters(): Record<string, RateLimiter> {
     dashboardLinks: dashboardLinksLimiter,
     paymentIntent: paymentIntentLimiter,
     tipCheckout: tipCheckoutLimiter,
+    merchCheckout: merchCheckoutLimiter,
     adminImpersonate: adminImpersonateLimiter,
     adminFitScores: adminFitScoresLimiter,
     adminCreatorIngest: adminCreatorIngestLimiter,

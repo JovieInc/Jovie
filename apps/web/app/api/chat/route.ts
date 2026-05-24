@@ -84,7 +84,7 @@ import { generateUniqueSlug } from '@/lib/discography/slug';
 import { getEntitlements } from '@/lib/entitlements/registry';
 import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
 import { FEATURE_FLAGS } from '@/lib/feature-flags/shared';
-import { checkGateForUser } from '@/lib/flags/server';
+import { checkGateForUser, getAppFlagValue } from '@/lib/flags/server';
 import { createAuthenticatedCorsHeaders } from '@/lib/http/headers';
 import {
   classifyIntent,
@@ -92,6 +92,17 @@ import {
   routeIntent,
 } from '@/lib/intent-detection';
 import { formatLyricsForAppleMusic } from '@/lib/lyrics/format-lyrics-for-apple-music';
+import { formatMerchMoney } from '@/lib/merch/pricing';
+import {
+  createMerchGeneration,
+  optimizeMerchCards,
+  publishMerchCard,
+  reorderMerchCards,
+  selectMerchDesign,
+  showArtistPayouts,
+  showMerchSales,
+  updateMerchCardStatus,
+} from '@/lib/merch/service';
 import {
   albumArtGenerationBurstLimiter,
   albumArtGenerationLimiter,
@@ -1191,6 +1202,170 @@ function createGenerateAlbumArtTool(params: {
   });
 }
 
+function createMerchGenerationTool(params: {
+  readonly profileId: string | null;
+  readonly clerkUserId: string;
+  readonly command: 'create_merch' | 'preview_merch_options';
+}) {
+  return tool({
+    description:
+      'Generate exactly three premium merch design options for the current artist. Use for make merch, create a tee, create a hoodie, or make something that would sell.',
+    inputSchema: z.object({
+      prompt: z.string().max(500).optional(),
+      itemType: z.string().max(80).optional(),
+      makeLive: z.boolean().optional(),
+    }),
+    execute: async ({ prompt, itemType }) => {
+      if (!params.profileId) {
+        return { success: false as const, error: 'Profile ID required' };
+      }
+
+      const merchPrompt = [prompt, itemType ? `Item type: ${itemType}` : null]
+        .filter(Boolean)
+        .join('\n')
+        .trim();
+
+      const result = await createMerchGeneration({
+        profileId: params.profileId,
+        clerkUserId: params.clerkUserId,
+        prompt: merchPrompt || 'Make premium merch for this artist.',
+        command: params.command,
+      });
+
+      return {
+        ...result,
+        nextStep: 'Pick 1, 2, or 3. You can also tell me what to change.',
+      };
+    },
+  });
+}
+
+function createSelectMerchDesignTool(params: {
+  readonly profileId: string | null;
+  readonly clerkUserId: string;
+}) {
+  return tool({
+    description:
+      'Select a merch option from a previous generation and create a Jovie merch card. Publish only when the artist asks to make it live.',
+    inputSchema: z
+      .object({
+        generationId: z.string().uuid(),
+        optionNumber: z.number().int().min(1).max(3).optional(),
+        optionId: z.string().uuid().optional(),
+        makeLive: z.boolean().optional(),
+      })
+      .refine(data => data.optionNumber !== undefined || data.optionId, {
+        message: 'Provide either optionNumber or optionId.',
+        path: ['optionNumber'],
+      }),
+    execute: async ({ generationId, optionNumber, optionId, makeLive }) => {
+      if (!params.profileId) {
+        return { success: false as const, error: 'Profile ID required' };
+      }
+
+      return selectMerchDesign({
+        generationId,
+        clerkUserId: params.clerkUserId,
+        optionId,
+        optionNumber,
+        publish: makeLive === true,
+      });
+    },
+  });
+}
+
+function createMerchStatusTool(params: {
+  readonly action: 'publish' | 'pause' | 'unpause' | 'archive';
+  readonly profileId: string | null;
+  readonly clerkUserId: string;
+}) {
+  return tool({
+    description:
+      'Change a merch card status. Use publish for live, pause for kill temporarily, unpause to bring back, and archive for delete/remove.',
+    inputSchema: z.object({
+      merchCardId: z.string().uuid(),
+    }),
+    execute: async ({ merchCardId }) => {
+      if (!params.profileId) {
+        return { success: false as const, error: 'Profile ID required' };
+      }
+
+      if (params.action === 'publish') {
+        const card = await publishMerchCard({
+          cardId: merchCardId,
+          profileId: params.profileId,
+          clerkUserId: params.clerkUserId,
+        });
+        return {
+          success: true as const,
+          merchCardId: card.id,
+          status: card.status,
+          title: card.title,
+        };
+      }
+
+      const status =
+        params.action === 'pause'
+          ? 'paused'
+          : params.action === 'archive'
+            ? 'archived'
+            : 'live';
+      const card = await updateMerchCardStatus({
+        cardId: merchCardId,
+        profileId: params.profileId,
+        clerkUserId: params.clerkUserId,
+        status,
+      });
+      return {
+        success: true as const,
+        merchCardId: card.id,
+        status: card.status,
+        title: card.title,
+      };
+    },
+  });
+}
+
+function createMerchSalesTool(profileId: string | null) {
+  return tool({
+    description: 'Show merch revenue and purchase counts for this artist.',
+    inputSchema: z.object({}),
+    execute: async () => {
+      if (!profileId) {
+        return { success: false as const, error: 'Profile ID required' };
+      }
+      const summary = await showMerchSales(profileId);
+      return {
+        success: true as const,
+        grossRevenue: formatMerchMoney(summary.grossRevenueCents),
+        purchases: summary.purchases,
+        liveCards: summary.liveCards,
+      };
+    },
+  });
+}
+
+function createMerchPayoutsTool(profileId: string | null) {
+  return tool({
+    description:
+      'Show manual merch payout liability for this artist. MVP payouts are not automatic.',
+    inputSchema: z.object({}),
+    execute: async () => {
+      if (!profileId) {
+        return { success: false as const, error: 'Profile ID required' };
+      }
+      const summary = await showArtistPayouts(profileId);
+      return {
+        success: true as const,
+        accrued: formatMerchMoney(summary.accruedCents),
+        readyToPay: formatMerchMoney(summary.readyCents),
+        paidManually: formatMerchMoney(summary.paidCents),
+        payoutMode: 'manual ledger, no automatic Stripe Connect payout in MVP',
+      };
+    },
+  });
+}
+
 function buildCanvasPlan(
   release: ReleaseContext,
   motionPreference = 'ambient'
@@ -1731,7 +1906,9 @@ function buildChatTools(
   insightsEnabled: boolean,
   clerkUserId: string,
   canGenerateAlbumArt: boolean,
-  albumArtEnabled: boolean
+  albumArtEnabled: boolean,
+  canAccessMerchCreation: boolean,
+  merchEnabled: boolean
 ) {
   return {
     ...(insightsEnabled
@@ -1767,6 +1944,90 @@ function buildChatTools(
           createRelease: createReleaseTool(resolvedProfileId),
           generateReleasePitch:
             createGenerateReleasePitchTool(resolvedProfileId),
+        }
+      : {}),
+    ...(merchEnabled && canAccessMerchCreation
+      ? {
+          createMerch: createMerchGenerationTool({
+            profileId: resolvedProfileId,
+            clerkUserId,
+            command: 'create_merch',
+          }),
+          previewMerchOptions: createMerchGenerationTool({
+            profileId: resolvedProfileId,
+            clerkUserId,
+            command: 'preview_merch_options',
+          }),
+          selectMerchDesign: createSelectMerchDesignTool({
+            profileId: resolvedProfileId,
+            clerkUserId,
+          }),
+          publishMerchCard: createMerchStatusTool({
+            action: 'publish',
+            profileId: resolvedProfileId,
+            clerkUserId,
+          }),
+          pauseMerchCard: createMerchStatusTool({
+            action: 'pause',
+            profileId: resolvedProfileId,
+            clerkUserId,
+          }),
+          unpauseMerchCard: createMerchStatusTool({
+            action: 'unpause',
+            profileId: resolvedProfileId,
+            clerkUserId,
+          }),
+          deleteOrArchiveMerchCard: createMerchStatusTool({
+            action: 'archive',
+            profileId: resolvedProfileId,
+            clerkUserId,
+          }),
+          reorderMerchCards: tool({
+            description:
+              'Record the desired order for merch cards. Use only when the artist gives explicit card IDs.',
+            inputSchema: z.object({
+              merchCardIds: z.array(z.string().uuid()).min(1).max(12),
+            }),
+            execute: async ({ merchCardIds }) => {
+              if (!resolvedProfileId) {
+                return {
+                  success: false as const,
+                  error: 'Profile ID required',
+                };
+              }
+
+              const result = await reorderMerchCards({
+                profileId: resolvedProfileId,
+                merchCardIds,
+              });
+              return {
+                success: true as const,
+                merchCardIds: result.merchCardIds,
+                updated: result.updated,
+              };
+            },
+          }),
+          optimizeMerchCards: tool({
+            description:
+              'Optimize merch card ranking using current conversion, revenue, margin, and recency signals.',
+            inputSchema: z.object({}),
+            execute: async () => {
+              if (!resolvedProfileId) {
+                return {
+                  success: false as const,
+                  error: 'Profile ID required',
+                };
+              }
+
+              const result = await optimizeMerchCards(resolvedProfileId);
+              return {
+                success: true as const,
+                optimized: result.optimized,
+              };
+            },
+          }),
+          showMerchSales: createMerchSalesTool(resolvedProfileId),
+          showArtistPayouts: createMerchPayoutsTool(resolvedProfileId),
         }
       : {}),
   };
@@ -2313,6 +2574,7 @@ export async function POST(req: Request) {
 
   try {
     const albumArtEnabled = FEATURE_FLAGS.ALBUM_ART_GENERATION;
+    const merchEnabled = await getAppFlagValue('MERCH_MVP', { userId });
 
     // Free tools (avatar upload, social links, link removal, feedback) available on ALL plans
     const freeTools = buildFreeChatTools(resolvedProfileId, userId);
@@ -2326,7 +2588,9 @@ export async function POST(req: Request) {
             insightsEnabled,
             userId,
             albumArtCapability.availability === 'available',
-            albumArtEnabled
+            albumArtEnabled,
+            planLimits.booleans.canAccessMerchCreation,
+            merchEnabled
           ),
         }
       : freeTools;
