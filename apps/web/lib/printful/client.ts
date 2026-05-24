@@ -174,14 +174,13 @@ function extractErrorMessage(payload: unknown): string {
 
 async function requestPrintful<T>(
   path: string,
-  options: RequestInit & { readonly retry?: boolean } = {}
+  options: RequestInit & { readonly retry?: boolean }
 ): Promise<T> {
   const response = await serverFetch(`${getPrintfulBaseUrl()}${path}`, {
     ...options,
-    headers: {
-      ...getAuthHeaders(),
-      ...(options.headers ?? {}),
-    },
+    headers: options.headers
+      ? { ...getAuthHeaders(), ...options.headers }
+      : getAuthHeaders(),
     timeoutMs: PRINTFUL_TIMEOUT_MS,
     context: `Printful ${options.method ?? 'GET'} ${path}`,
     retry: options.retry
@@ -239,9 +238,11 @@ export async function listCatalogProducts(params?: {
     search.set('limit', String(params.limit));
   }
 
+  const catalogProductsPath =
+    search.size > 0 ? `/v2/catalog-products?${search}` : '/v2/catalog-products';
   const payload = await requestPrintful<
     PrintfulListResponse<PrintfulCatalogProduct>
-  >(`/v2/catalog-products${search.size ? `?${search}` : ''}`, {
+  >(catalogProductsPath, {
     method: 'GET',
     retry: true,
   });
