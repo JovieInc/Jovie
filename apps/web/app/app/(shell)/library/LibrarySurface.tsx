@@ -33,6 +33,7 @@ import { useRouter } from 'next/navigation';
 import {
   type ChangeEvent,
   type CSSProperties,
+  cloneElement,
   createContext,
   type DragEvent,
   type MouseEvent,
@@ -1935,6 +1936,20 @@ export function LibrarySurface({
 
   useRegisterHeaderSearch(headerSearchAdapter);
 
+  const libraryRail = useMemo(
+    () => (
+      <LibraryRail
+        assets={effectiveAssets}
+        preset={preset}
+        filters={filters}
+        onPreset={setPreset}
+        onFilters={setFilters}
+        onClearFilters={() => setFilters(emptyFilters())}
+      />
+    ),
+    [effectiveAssets, filters, preset]
+  );
+
   const handleAudioUploaded = useCallback(
     (assetId: string, previewUrl: string) => {
       setAudioOverrides(previous => ({
@@ -1971,15 +1986,11 @@ export function LibrarySurface({
       }
     >
       {mobileFiltersOpen ? (
-        <LibraryRail
-          assets={effectiveAssets}
-          preset={preset}
-          filters={filters}
-          onPreset={setPreset}
-          onFilters={setFilters}
-          onClearFilters={() => setFilters(emptyFilters())}
-          className='max-h-[45svh] shrink-0 border-b border-subtle lg:hidden'
-        />
+        <div className='lg:hidden'>
+          {cloneElement(libraryRail, {
+            className: 'max-h-[45svh] shrink-0 border-b border-subtle',
+          })}
+        </div>
       ) : null}
 
       <div
@@ -1987,13 +1998,19 @@ export function LibrarySurface({
         style={
           {
             gridTemplateColumns: isDesktopLayout
-              ? `minmax(0, 1fr) ${drawerOpen ? '360px' : '0px'}`
+              ? `minmax(16rem,17.5rem) minmax(0,1fr) ${drawerOpen ? '360px' : '0px'}`
               : 'minmax(0, 1fr)',
             transition:
               'grid-template-columns var(--duration-cinematic) var(--ease-cinematic)',
           } as CSSProperties
         }
       >
+        {isDesktopLayout
+          ? cloneElement(libraryRail, {
+              className:
+                'hidden min-h-0 border-r border-subtle lg:flex lg:h-full',
+            })
+          : null}
         <div className='flex min-h-0 min-w-0 flex-col overflow-hidden'>
           <div className='min-h-0 flex-1 overflow-y-auto pb-20 lg:pb-0'>
             {visibleAssets.length === 0 ? (

@@ -1485,6 +1485,18 @@ describe('TasksPageClient', () => {
     expect(screen.getByTestId('mobile-task-list')).toBeInTheDocument();
   });
 
+  it('keeps a create-task affordance visible below the desktop breakpoint', () => {
+    mockIsXlUp = false;
+
+    renderPage();
+
+    expect(
+      within(screen.getByTestId('header-actions-host')).getByRole('button', {
+        name: 'Create task',
+      })
+    ).toBeInTheDocument();
+  });
+
   it('renders the mobile list shell without duplicate search and opens task detail on tap', () => {
     mockIsXlUp = false;
 

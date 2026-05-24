@@ -307,8 +307,11 @@ export const ShellReleaseRow = memo(function ShellReleaseRow({
         smartLinkPath={smartLinkPath}
       />
 
-      <div className='h-7 w-7 shrink-0'>
-        {actionMenuItems && actionMenuItems.length > 0 ? (
+      {actionMenuItems && actionMenuItems.length > 0 ? (
+        <div
+          className='h-7 w-7 shrink-0'
+          data-testid='shell-release-row-actions'
+        >
           <TableActionMenu items={actionMenuItems} trigger='custom' align='end'>
             <button
               type='button'
@@ -324,8 +327,8 @@ export const ShellReleaseRow = memo(function ShellReleaseRow({
               <MoreHorizontal className='h-3 w-3' strokeWidth={2.25} />
             </button>
           </TableActionMenu>
-        ) : null}
-      </div>
+        </div>
+      ) : null}
     </ShellListRowFrame>
   );
 });
