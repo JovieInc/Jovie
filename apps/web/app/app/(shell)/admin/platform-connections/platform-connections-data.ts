@@ -39,7 +39,7 @@ export async function loadAdminPlatformConnectionsData(): Promise<AdminPlatformC
   ]);
 
   const currentSpotifyAccount =
-    user?.externalAccounts.find(isSpotifyAccount) ?? null;
+    user?.externalAccounts?.find(isSpotifyAccount) ?? null;
   const approvedScopes = readExternalAccountScopes(currentSpotifyAccount);
   const missingScopes = REQUIRED_PLAYLIST_SPOTIFY_SCOPES.filter(
     scope => !approvedScopes.includes(scope)

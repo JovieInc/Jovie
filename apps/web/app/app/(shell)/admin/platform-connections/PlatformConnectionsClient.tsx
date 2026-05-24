@@ -1,7 +1,13 @@
 'use client';
 
 import { Badge, Button, Input, Switch } from '@jovie/ui';
-import { CheckCircle2, Loader2, RefreshCw, ShieldCheck } from 'lucide-react';
+import {
+  AlertTriangle,
+  CheckCircle2,
+  Loader2,
+  RefreshCw,
+  ShieldCheck,
+} from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState, useTransition } from 'react';
 import { ConfirmDialog } from '@/components/molecules/ConfirmDialog';
@@ -66,6 +72,59 @@ function StatusBadge({ ok, label }: Readonly<{ ok: boolean; label: string }>) {
       {ok ? <CheckCircle2 className='size-3.5' aria-hidden /> : null}
       {label}
     </Badge>
+  );
+}
+
+function getSpotifySourceLabel(source: SpotifyStatus['source']) {
+  switch (source) {
+    case 'database':
+      return 'Settings Row';
+    case 'env fallback':
+      return 'Environment Fallback';
+    case 'missing':
+      return 'Configuration Not Set';
+  }
+}
+
+function StatusSummaryItem({
+  label,
+  value,
+  ok,
+}: Readonly<{ label: string; value: string; ok: boolean }>) {
+  return (
+    <div className='min-w-[11rem] flex-1 rounded-md bg-surface-0 px-3 py-2'>
+      <div className='flex items-center gap-2 text-xs font-medium text-primary-token'>
+        {ok ? (
+          <CheckCircle2 className='size-3.5 text-success' aria-hidden />
+        ) : (
+          <AlertTriangle className='size-3.5 text-warning' aria-hidden />
+        )}
+        {label}
+      </div>
+      <p className='mt-1 text-xs text-secondary-token'>{value}</p>
+    </div>
+  );
+}
+
+function MissingScopesList({
+  scopes,
+}: Readonly<{ scopes: readonly string[] }>) {
+  if (scopes.length === 0) return null;
+
+  return (
+    <div className='mt-2 space-y-1.5'>
+      <p className='text-xs font-medium text-warning'>Missing scopes</p>
+      <div className='flex flex-wrap gap-1.5'>
+        {scopes.map(scope => (
+          <code
+            key={scope}
+            className='rounded-full border border-warning/20 bg-warning/10 px-2 py-0.5 text-[11px] leading-4 text-warning'
+          >
+            {scope}
+          </code>
+        ))}
+      </div>
+    </div>
   );
 }
 
@@ -165,19 +224,27 @@ function SpotifyTabContent({
 
   return (
     <div className='divide-y divide-(--linear-app-frame-seam) rounded-lg border border-(--linear-app-frame-seam) bg-surface-1'>
-      <div className='flex flex-wrap items-center justify-between gap-3 px-4 py-3'>
-        <div className='flex min-w-0 flex-wrap items-center gap-2'>
-          <StatusBadge
+      <div className='flex flex-wrap items-start justify-between gap-3 px-4 py-3'>
+        <div className='flex min-w-0 flex-1 flex-wrap gap-2'>
+          <StatusSummaryItem
+            label='Publisher'
+            value={
+              spotifyStatus.connected ? 'Account linked' : 'No account linked'
+            }
             ok={spotifyStatus.connected}
-            label={spotifyStatus.connected ? 'Connected' : 'Disconnected'}
           />
-          <StatusBadge
+          <StatusSummaryItem
+            label='Health'
+            value={
+              spotifyStatus.healthy ? 'Ready for publishing' : 'Action required'
+            }
             ok={spotifyStatus.healthy}
-            label={spotifyStatus.healthy ? 'Healthy' : 'Needs attention'}
           />
-          <Badge variant='secondary' size='sm'>
-            Source: {spotifyStatus.source}
-          </Badge>
+          <StatusSummaryItem
+            label='Configuration'
+            value={getSpotifySourceLabel(spotifyStatus.source)}
+            ok={spotifyStatus.source !== 'missing'}
+          />
         </div>
         <Button
           type='button'
@@ -214,17 +281,15 @@ function SpotifyTabContent({
               ? (currentUser.label ?? 'Spotify connected')
               : 'Spotify is not connected'}
           </p>
-          {currentUser.missingScopes.length > 0 ? (
-            <p className='mt-1 text-xs text-red-300'>
-              Missing scopes: {currentUser.missingScopes.join(', ')}
-            </p>
-          ) : null}
+          <MissingScopesList scopes={currentUser.missingScopes} />
         </div>
       </div>
 
       {spotifyStatus.error ? (
-        <div className='px-4 py-3 text-xs text-red-300'>
-          {spotifyStatus.error}
+        <div className='px-4 py-3'>
+          <p className='rounded-lg border border-warning/20 bg-warning/10 px-3 py-2 text-xs text-warning'>
+            {spotifyStatus.error}
+          </p>
         </div>
       ) : null}
 
@@ -346,10 +411,7 @@ function EngineTabContent({
       <div className='divide-y divide-(--linear-app-frame-seam) rounded-lg border border-(--linear-app-frame-seam) bg-surface-1'>
         <div className='flex flex-wrap items-center justify-between gap-3 px-4 py-3'>
           <div className='flex min-w-0 flex-wrap items-center gap-2'>
-            <StatusBadge
-              ok={enabled}
-              label={enabled ? 'Enabled' : 'Disabled'}
-            />
+            <StatusBadge ok={enabled} label={enabled ? 'Enabled' : 'Paused'} />
             <Badge variant='secondary' size='sm'>
               Minimum interval
             </Badge>

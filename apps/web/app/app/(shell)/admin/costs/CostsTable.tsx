@@ -1,10 +1,8 @@
 'use client';
 
-import { Button } from '@jovie/ui';
 import { type ColumnDef, createColumnHelper } from '@tanstack/react-table';
-import { ExternalLink, RefreshCw } from 'lucide-react';
-import { useMemo, useState } from 'react';
-import { toast } from 'sonner';
+import { ExternalLink } from 'lucide-react';
+import { useMemo } from 'react';
 import { PageToolbar, TableEmptyState } from '@/components/organisms/table';
 import { AdminDataTable } from '@/features/admin/table/AdminDataTable';
 import { AdminTableShell } from '@/features/admin/table/AdminTableShell';
@@ -28,20 +26,24 @@ interface CostsTableProps {
 const columnHelper = createColumnHelper<AdminCostRow>();
 
 export function CostsTable({ items, lastRefreshedLabel }: CostsTableProps) {
-  const [localRefreshed, setLocalRefreshed] = useState(lastRefreshedLabel);
-  const [isRefreshing, setIsRefreshing] = useState(false);
-
   const columns = useMemo(
     () =>
       [
         columnHelper.accessor('label', {
-          header: 'Line Item / Provider',
+          header: 'Provider',
           cell: info => (
-            <span className='font-medium text-primary-token'>
-              {info.getValue()}
-            </span>
+            <div className='min-w-0 space-y-1'>
+              <span className='block truncate font-medium text-primary-token'>
+                {info.getValue()}
+              </span>
+              {info.row.original.notes ? (
+                <span className='line-clamp-2 block max-w-[34rem] text-xs leading-[17px] text-secondary-token'>
+                  {info.row.original.notes}
+                </span>
+              ) : null}
+            </div>
           ),
-          meta: { className: 'min-w-[220px]' },
+          meta: { className: 'min-w-[280px]' },
         }),
         columnHelper.accessor('observed30dUsd', {
           header: '30d Spend (USD)',
@@ -75,15 +77,6 @@ export function CostsTable({ items, lastRefreshedLabel }: CostsTableProps) {
           header: 'Last Updated',
           cell: info => info.getValue(),
         }),
-        columnHelper.accessor('notes', {
-          header: 'Notes',
-          cell: info => (
-            <span className='line-clamp-2 text-tertiary-token text-xs'>
-              {info.getValue() || '—'}
-            </span>
-          ),
-          meta: { className: 'max-w-[320px]' },
-        }),
         columnHelper.accessor('externalUrl', {
           header: '',
           cell: info => {
@@ -113,22 +106,6 @@ export function CostsTable({ items, lastRefreshedLabel }: CostsTableProps) {
     0
   );
 
-  async function handleMarkRefreshed() {
-    setIsRefreshing(true);
-    // v1: client-side only bump (no real persistence required per charter)
-    const now = new Date().toLocaleString('en-US', {
-      month: 'short',
-      day: 'numeric',
-      hour: 'numeric',
-      minute: '2-digit',
-    });
-    setLocalRefreshed(now);
-    setIsRefreshing(false);
-    toast.success(
-      'Marked refreshed (v1 manual — copy real numbers from dashboards)'
-    );
-  }
-
   const toolbar = (
     <PageToolbar
       start={
@@ -137,22 +114,8 @@ export function CostsTable({ items, lastRefreshedLabel }: CostsTableProps) {
             {items.length} items • ${total30d.toFixed(2)} in last 30d
           </span>
           <span className='opacity-60'>•</span>
-          <span>Last refreshed: {localRefreshed}</span>
+          <span>Last refreshed: {lastRefreshedLabel}</span>
         </div>
-      }
-      end={
-        <Button
-          variant='outline'
-          size='sm'
-          onClick={handleMarkRefreshed}
-          disabled={isRefreshing}
-          className='gap-1.5'
-        >
-          <RefreshCw
-            className={`h-3.5 w-3.5 ${isRefreshing ? 'animate-spin' : ''}`}
-          />
-          Mark refreshed
-        </Button>
       }
     />
   );
@@ -166,7 +129,7 @@ export function CostsTable({ items, lastRefreshedLabel }: CostsTableProps) {
           emptyState={
             <TableEmptyState
               title='No cost items'
-              description='Seed data will appear on first load.'
+              description='Cost data is unavailable in this environment.'
             />
           }
         />
