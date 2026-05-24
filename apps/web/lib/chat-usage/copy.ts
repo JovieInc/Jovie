@@ -19,13 +19,15 @@ const PLAN_LABELS: Record<ChatUsageData['plan'], string> = {
   max: 'Max',
 };
 
+function getChatUsageState(data: ChatUsageData): ChatUsageState {
+  if (data.isExhausted) return 'exhausted';
+  if (data.isNearLimit) return 'near_limit';
+  return 'healthy';
+}
+
 export function getChatUsageCopy(data: ChatUsageData): ChatUsageCopy {
   const pluralSuffix = data.remaining === 1 ? '' : 's';
-  const state: ChatUsageState = data.isExhausted
-    ? 'exhausted'
-    : data.isNearLimit
-      ? 'near_limit'
-      : 'healthy';
+  const state = getChatUsageState(data);
 
   if (state === 'exhausted') {
     const summaryDescription =
