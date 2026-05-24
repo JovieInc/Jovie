@@ -22,6 +22,11 @@ interface SummaryCardProps {
   readonly description: string;
 }
 
+type RetargetingPlatform = {
+  readonly key: keyof AttributionStats['byPlatform'];
+  readonly label: string;
+};
+
 function SummaryCard({
   value,
   label,
@@ -34,6 +39,70 @@ function SummaryCard({
       <p className='mt-1 text-app leading-5 text-secondary-token'>
         {description}
       </p>
+    </div>
+  );
+}
+
+function renderAttributionContent(
+  loaded: boolean,
+  stats: AttributionStats | null,
+  platforms: readonly RetargetingPlatform[]
+) {
+  if (loaded) {
+    if (stats && stats.total > 0) {
+      return (
+        <div className='space-y-3'>
+          <div>
+            <p className='text-2xl font-semibold text-primary-token'>
+              {stats.total}
+            </p>
+            <p className='text-app text-secondary-token'>
+              {stats.total === 1 ? 'Subscriber' : 'Subscribers'} attributed to
+              retargeting campaigns this month.
+            </p>
+          </div>
+          <div className='flex flex-wrap gap-2'>
+            {platforms
+              .filter(platform => stats.byPlatform[platform.key] > 0)
+              .map(platform => (
+                <div
+                  key={platform.key}
+                  className='min-w-20 rounded-md border border-subtle bg-surface-0 px-3 py-2'
+                >
+                  <p className='text-xs font-semibold text-primary-token'>
+                    {platform.label}
+                  </p>
+                  <p className='text-xs text-secondary-token'>
+                    {stats.byPlatform[platform.key]}
+                  </p>
+                </div>
+              ))}
+          </div>
+        </div>
+      );
+    }
+
+    return (
+      <div className='flex min-h-[92px] flex-col justify-center'>
+        <p className='text-app font-medium text-primary-token'>
+          No attributed subscribers yet
+        </p>
+        <p className='mt-1 max-w-prose text-app text-secondary-token'>
+          Attribution appears here once a retargeting campaign starts sending
+          subscribers back to Jovie.
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div className='space-y-3'>
+      <div className='h-7 w-10 rounded-md skeleton motion-reduce:animate-none' />
+      <div className='h-4 w-72 max-w-full rounded-md skeleton motion-reduce:animate-none' />
+      <div className='flex gap-2'>
+        <div className='h-12 w-20 rounded-md skeleton motion-reduce:animate-none' />
+        <div className='h-12 w-20 rounded-md skeleton motion-reduce:animate-none' />
+      </div>
     </div>
   );
 }
@@ -64,10 +133,10 @@ function AttributionStatsCard() {
     };
   }, []);
 
-  const platforms = [
-    { key: 'retargeting_meta' as const, label: 'Meta' },
-    { key: 'retargeting_google' as const, label: 'Google' },
-    { key: 'retargeting_tiktok' as const, label: 'TikTok' },
+  const platforms: RetargetingPlatform[] = [
+    { key: 'retargeting_meta', label: 'Meta' },
+    { key: 'retargeting_google', label: 'Google' },
+    { key: 'retargeting_tiktok', label: 'TikTok' },
   ];
 
   return (
@@ -77,55 +146,7 @@ function AttributionStatsCard() {
       title='Retargeting attribution'
       description='Subscribers attributed to these ads this month.'
     >
-      {!loaded ? (
-        <div className='space-y-3'>
-          <div className='h-7 w-10 rounded-md skeleton motion-reduce:animate-none' />
-          <div className='h-4 w-72 max-w-full rounded-md skeleton motion-reduce:animate-none' />
-          <div className='flex gap-2'>
-            <div className='h-12 w-20 rounded-md skeleton motion-reduce:animate-none' />
-            <div className='h-12 w-20 rounded-md skeleton motion-reduce:animate-none' />
-          </div>
-        </div>
-      ) : stats && stats.total > 0 ? (
-        <div className='space-y-3'>
-          <div>
-            <p className='text-2xl font-semibold text-primary-token'>
-              {stats.total}
-            </p>
-            <p className='text-app text-secondary-token'>
-              {stats.total === 1 ? 'Subscriber' : 'Subscribers'} attributed to
-              retargeting campaigns this month.
-            </p>
-          </div>
-          <div className='flex flex-wrap gap-2'>
-            {platforms
-              .filter(platform => stats.byPlatform[platform.key] > 0)
-              .map(platform => (
-                <div
-                  key={platform.key}
-                  className='min-w-20 rounded-md border border-subtle bg-surface-0 px-3 py-2'
-                >
-                  <p className='text-xs font-semibold text-primary-token'>
-                    {platform.label}
-                  </p>
-                  <p className='text-xs text-secondary-token'>
-                    {stats.byPlatform[platform.key]}
-                  </p>
-                </div>
-              ))}
-          </div>
-        </div>
-      ) : (
-        <div className='flex min-h-[92px] flex-col justify-center'>
-          <p className='text-app font-medium text-primary-token'>
-            No attributed subscribers yet
-          </p>
-          <p className='mt-1 max-w-prose text-app text-secondary-token'>
-            Attribution appears here once a retargeting campaign starts sending
-            subscribers back to Jovie.
-          </p>
-        </div>
-      )}
+      {renderAttributionContent(loaded, stats, platforms)}
     </SettingsPanel>
   );
 }

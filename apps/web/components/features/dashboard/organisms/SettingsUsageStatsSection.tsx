@@ -50,11 +50,6 @@ function formatResetAt(value: string | null | undefined): string {
   }).format(resetAt);
 }
 
-function getProgressValue(used: number, limit: number): number {
-  if (limit <= 0) return 0;
-  return Math.min(100, Math.max(0, Math.round((used / limit) * 100)));
-}
-
 function getMonthlyUsage(data: ChatUsageData): {
   readonly limit: number;
   readonly used: number;
@@ -89,8 +84,8 @@ function UsageMeterRow({
   remaining,
   resetAt,
 }: UsageMeterRowProps) {
-  const progress = getProgressValue(used, limit);
   const clampedUsed = Math.min(Math.max(0, used), Math.max(0, limit));
+  const progressMax = Math.max(1, limit);
 
   return (
     <div className='px-4 py-4 sm:px-5'>
@@ -109,14 +104,11 @@ function UsageMeterRow({
         </div>
       </div>
       <div className='mt-3 h-2 rounded-full bg-surface-0'>
-        <div
-          role='progressbar'
+        <progress
           aria-label={`${title} usage`}
-          aria-valuemin={0}
-          aria-valuemax={limit}
-          aria-valuenow={clampedUsed}
-          className='h-2 rounded-full bg-primary-token'
-          style={{ width: `${progress}%` }}
+          value={clampedUsed}
+          max={progressMax}
+          className='block h-2 w-full appearance-none overflow-hidden rounded-full bg-surface-0 [&::-moz-progress-bar]:rounded-full [&::-moz-progress-bar]:bg-primary-token [&::-webkit-progress-bar]:rounded-full [&::-webkit-progress-bar]:bg-surface-0 [&::-webkit-progress-value]:rounded-full [&::-webkit-progress-value]:bg-primary-token'
         />
       </div>
       <p className='mt-2 text-2xs text-tertiary-token'>
