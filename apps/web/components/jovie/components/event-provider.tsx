@@ -9,7 +9,14 @@ import type {
 import { type EventRecord, useEventsQuery } from '@/lib/queries/useEventsQuery';
 import { EntityChip } from './EntityChip';
 
-function eventMatches(event: EventRecord, lowerQuery: string): boolean {
+/**
+ * Exported for the slash menu's direct adapter — the picker calls
+ * `useEventsQuery` itself for hook-order stability and uses this matcher.
+ */
+export function eventRowMatches(
+  event: EventRecord,
+  lowerQuery: string
+): boolean {
   if (!lowerQuery) return true;
   if (event.title.toLowerCase().includes(lowerQuery)) return true;
   if (event.city?.toLowerCase().includes(lowerQuery)) return true;
@@ -48,13 +55,14 @@ function eventToEntityRef(event: EventRecord): EntityRef {
 export function createEventProvider(profileId: string): EntityProvider {
   return {
     kind: 'event',
+    registryKey: `event:${profileId}`,
     label: 'Events',
     useSearch(query: string): EntitySearchResult {
       const { data, isLoading } = useEventsQuery(profileId);
       return useMemo(() => {
         const lowerQuery = query.toLowerCase();
         const items = (data ?? [])
-          .filter(e => eventMatches(e, lowerQuery))
+          .filter(e => eventRowMatches(e, lowerQuery))
           .slice(0, 8)
           .map(eventToEntityRef);
         return { items, isLoading };

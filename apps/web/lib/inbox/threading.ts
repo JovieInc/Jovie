@@ -6,7 +6,7 @@
  * 2. Fallback: match by sender email + normalized subject (fuzzy)
  */
 
-import { and, sql as drizzleSql, eq } from 'drizzle-orm';
+import { and, sql as drizzleSql, eq, inArray } from 'drizzle-orm';
 import { db } from '@/lib/db';
 import { emailThreads, inboundEmails } from '@/lib/db/schema/inbox';
 import { normalizeSubject } from './constants';
@@ -56,7 +56,7 @@ async function matchByHeaders(input: ThreadMatchInput): Promise<string | null> {
     .where(
       and(
         eq(inboundEmails.creatorProfileId, input.creatorProfileId),
-        drizzleSql`${inboundEmails.messageId} = ANY(${messageIdsToCheck})`
+        inArray(inboundEmails.messageId, messageIdsToCheck)
       )
     )
     .limit(1);

@@ -5,21 +5,25 @@ import { Button, CommonDropdown } from '@jovie/ui';
 import {
   CreditCard,
   FileText,
+  Gauge,
   HelpCircle,
   Keyboard,
   LogOut,
   MessageSquare,
+  Monitor,
   Settings,
   Shield,
+  Smartphone,
   Sparkles,
 } from 'lucide-react';
 import dynamic from 'next/dynamic';
-import { useCallback } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Badge } from '@/components/atoms/Badge';
 import { APP_ROUTES } from '@/constants/routes';
 import { useKeyboardShortcutsSafe } from '@/contexts/KeyboardShortcutsContext';
 import { track } from '@/lib/analytics';
 import { COOKIE_BANNER_REQUIRED_COOKIE } from '@/lib/cookies/consent-regions';
+import { useIsElectronRuntime } from '@/lib/desktop/electron-bridge';
 import { GLYPH_CMD, GLYPH_OPT, GLYPH_SHIFT } from '@/lib/keyboard-shortcuts';
 import { Icon } from '../../atoms/Icon';
 import { Avatar } from '../../molecules/Avatar/Avatar';
@@ -52,12 +56,29 @@ interface BuildDropdownItemsParams {
   formattedUsername: string | null;
   handleProfile: () => void;
   handleSettings: () => void;
+  iosAlphaAccess: {
+    hasAccess: boolean;
+    installUrl: string | null;
+  };
+  handleUsageStats: () => void;
   handleManageBilling: () => void;
   handleUpgrade: () => void;
   upgradeLabel: string;
   handleSignOut: () => void;
   setIsFeedbackOpen: (open: boolean) => void;
   handleOpenShortcuts?: () => void;
+  isElectronRuntime: boolean;
+}
+
+function sanitizeInstallUrl(value: unknown): string | null {
+  if (typeof value !== 'string') return null;
+
+  try {
+    const url = new URL(value);
+    return url.protocol === 'https:' ? url.toString() : null;
+  } catch {
+    return null;
+  }
 }
 
 function buildDropdownItems({
@@ -69,12 +90,15 @@ function buildDropdownItems({
   formattedUsername,
   handleProfile,
   handleSettings,
+  iosAlphaAccess,
+  handleUsageStats,
   handleManageBilling,
   handleUpgrade,
   upgradeLabel,
   handleSignOut,
   setIsFeedbackOpen,
   handleOpenShortcuts,
+  isElectronRuntime,
 }: BuildDropdownItemsParams): CommonDropdownItem[] {
   const items: CommonDropdownItem[] = [
     // Profile card
@@ -130,6 +154,40 @@ function buildDropdownItems({
       shortcut: 'G S',
     },
   ];
+
+  if (iosAlphaAccess.hasAccess) {
+    items.push({
+      type: 'action',
+      id: 'download-ios',
+      label: 'Install iOS Alpha',
+      icon: Smartphone,
+      onClick: () => {
+        const href =
+          sanitizeInstallUrl(iosAlphaAccess.installUrl) ?? APP_ROUTES.DOWNLOAD;
+        window.open(href, '_blank', 'noopener,noreferrer');
+      },
+    });
+  }
+
+  items.push({
+    type: 'action',
+    id: 'usage-stats',
+    label: 'Usage Stats',
+    icon: Gauge,
+    onClick: handleUsageStats,
+  });
+
+  if (!isElectronRuntime) {
+    items.push({
+      type: 'action' as const,
+      id: 'download-desktop',
+      label: 'Download Desktop App',
+      icon: Monitor,
+      onClick: () => {
+        window.open(APP_ROUTES.DOWNLOAD, '_blank', 'noopener,noreferrer');
+      },
+    });
+  }
 
   // Add "Learn More" submenu with keyboard shortcuts and legal links
   const learnMoreItems: CommonDropdownItem[] = [];
@@ -236,7 +294,8 @@ function buildDropdownItems({
     });
   }
 
-  // Add feedback, delete account, and sign out
+  // Add feedback, version info, and sign out.
+  // Version is now shown to all users (moved from admin-only sidebar footer).
   items.push(
     {
       type: 'action',
@@ -246,6 +305,18 @@ function buildDropdownItems({
       onClick: () => setIsFeedbackOpen(true),
     },
     { type: 'separator', id: 'sep-2' },
+    {
+      type: 'custom',
+      id: 'version',
+      render: () => (
+        <div className='px-2.5 py-1 text-2xs text-tertiary-token select-none'>
+          v{process.env.NEXT_PUBLIC_APP_VERSION ?? '0.0.0'}
+          {process.env.NEXT_PUBLIC_BUILD_SHA
+            ? ` (${process.env.NEXT_PUBLIC_BUILD_SHA})`
+            : ''}
+        </div>
+      ),
+    },
     {
       type: 'action',
       id: 'sign-out',
@@ -269,6 +340,14 @@ export function UserButton({
   trigger,
 }: UserButtonProps) {
   const keyboardShortcuts = useKeyboardShortcutsSafe();
+  const isElectronRuntime = useIsElectronRuntime();
+  const [iosAlphaAccess, setIOSAlphaAccess] = useState<{
+    hasAccess: boolean;
+    installUrl: string | null;
+  }>({
+    hasAccess: false,
+    installUrl: null,
+  });
   const handleFeedbackSubmit = useCallback(async (feedback: string) => {
     const trimmedFeedback = feedback.trim();
 
@@ -306,6 +385,7 @@ export function UserButton({
     handleManageBilling,
     handleProfile,
     handleSettings,
+    handleUsageStats,
     handleSignOut,
     handleUpgrade,
     loading,
@@ -313,6 +393,50 @@ export function UserButton({
 
   const { userImageUrl, displayName, userInitials, formattedUsername } =
     userInfo;
+
+  useEffect(() => {
+    if (!isElectronRuntime || !isLoaded || !user) {
+      setIOSAlphaAccess({ hasAccess: false, installUrl: null });
+      return;
+    }
+
+    let isActive = true;
+
+    async function loadIOSAlphaAccess() {
+      try {
+        const response = await fetch('/api/mobile/v1/ios-access', {
+          cache: 'no-store',
+        });
+        if (!response.ok) {
+          if (isActive) {
+            setIOSAlphaAccess({ hasAccess: false, installUrl: null });
+          }
+          return;
+        }
+
+        const payload = (await response.json()) as {
+          hasAccess?: unknown;
+          installUrl?: unknown;
+        };
+        if (!isActive) return;
+
+        setIOSAlphaAccess({
+          hasAccess: payload.hasAccess === true,
+          installUrl: sanitizeInstallUrl(payload.installUrl),
+        });
+      } catch {
+        if (isActive) {
+          setIOSAlphaAccess({ hasAccess: false, installUrl: null });
+        }
+      }
+    }
+
+    void loadIOSAlphaAccess();
+
+    return () => {
+      isActive = false;
+    };
+  }, [isElectronRuntime, isLoaded, user]);
 
   // Handle loading state or no user
   if (!isLoaded || !user) {
@@ -360,12 +484,15 @@ export function UserButton({
     formattedUsername,
     handleProfile,
     handleSettings,
+    iosAlphaAccess,
+    handleUsageStats,
     handleManageBilling,
     handleUpgrade,
     upgradeLabel: menuActions.upgradeLabel,
     handleSignOut,
     setIsFeedbackOpen,
     handleOpenShortcuts: keyboardShortcuts?.open,
+    isElectronRuntime,
   });
 
   // Custom trigger — use provided trigger prop or build default

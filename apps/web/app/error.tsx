@@ -7,7 +7,7 @@ const ICON_PATH =
 
 export default function RootError({ error, reset }: ErrorProps) {
   return (
-    <div className='flex min-h-dvh items-center justify-center bg-[#08090a] px-6 text-white'>
+    <div className='flex min-h-dvh items-center justify-center bg-[#06070a] px-6 text-white'>
       <div className='flex w-full max-w-[320px] flex-col items-center text-center'>
         <svg
           viewBox='0 0 353.68 347.97'
@@ -30,14 +30,14 @@ export default function RootError({ error, reset }: ErrorProps) {
           <button
             type='button'
             onClick={reset}
-            className='h-9 cursor-pointer rounded-full bg-[#e6e6e6] px-4 text-sm font-medium text-[#08090a] transition-[background] duration-150 hover:bg-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7170ff] active:scale-[0.97]'
+            className='h-9 cursor-pointer rounded-full bg-[#e6e6e6] px-4 text-sm font-medium text-[#06070a] transition-[background] duration-subtle hover:bg-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7170ff]'
           >
             Try Again
           </button>
           {/* eslint-disable-next-line @next/next/no-html-link-for-pages -- Using <a> for resilience when Next.js routing may be broken */}
           <a
             href='/'
-            className='flex h-9 items-center rounded-full border border-white/[0.08] bg-transparent px-4 text-sm font-medium text-[#969799] transition-[background,border-color] duration-150 hover:border-white/[0.12] hover:bg-white/[0.04] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7170ff] active:scale-[0.97]'
+            className='flex h-9 items-center rounded-full border border-white/[0.08] bg-transparent px-4 text-sm font-medium text-[#969799] transition-[background,border-color] duration-subtle hover:border-white/[0.12] hover:bg-white/[0.04] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7170ff]'
           >
             Go Home
           </a>

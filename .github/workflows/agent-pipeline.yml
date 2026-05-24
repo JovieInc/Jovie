@@ -16,7 +16,7 @@
 # when @claude is mentioned in a CodeRabbit review thread.
 #
 # SAFETY:
-# - Only runs on agent branches (linear/*, claude/*, codegen-bot/*, codex/*)
+# - Only runs on agent branches (linear/*, claude/*, codegen-bot/*, codex/*, */jov-*)
 # - Max 5 fix attempts per SHA to prevent infinite loops
 # - Escalates to 'needs-human' label after exhaustion
 # - Sensitive path detection prevents auto-merge on high-risk changes
@@ -75,6 +75,7 @@ jobs:
         id: trigger
         env:
           GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
           HEAD_BRANCH: ${{ github.event.workflow_run.head_branch }}
           HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
           CONCLUSION: ${{ github.event.workflow_run.conclusion }}
@@ -87,29 +88,33 @@ jobs:
           PR_IS_DRAFT_EVENT: ${{ github.event.pull_request.draft }}
           EVENT_NAME: ${{ github.event_name }}
         run: |
+          write_output() {
+            printf '%s\n' "$1" >> "$GITHUB_OUTPUT"
+          }
+
           EVENT="$EVENT_NAME"
 
           if [[ "$EVENT" == "workflow_run" ]]; then
             if [[ "$CONCLUSION" == "failure" ]]; then
               echo "CI failed — routing to fix path"
-              echo "trigger_type=ci_failure" >> "$GITHUB_OUTPUT"
+              write_output "trigger_type=ci_failure"
             elif [[ "$CONCLUSION" == "success" ]]; then
               echo "$WORKFLOW_NAME succeeded — routing to approve path"
-              echo "trigger_type=approval_candidate" >> "$GITHUB_OUTPUT"
+              write_output "trigger_type=approval_candidate"
             else
               echo "Workflow conclusion: $CONCLUSION. Skipping."
-              echo "should_continue=false" >> "$GITHUB_OUTPUT"
+              write_output "should_continue=false"
               exit 0
             fi
 
             # Find the PR for this branch
-            # gh api returns a JSON array — do NOT use jq -s (slurp) which double-wraps it
-            PR_DATA=$(gh api repos/${{ github.repository }}/pulls \
-              | jq --arg branch "$HEAD_BRANCH" '([.[] | select(.head.ref == $branch and .state == "open")] | first) as $pr | if $pr == null then null else {number: $pr.number, head_ref: $pr.head.ref, head_sha: $pr.head.sha, draft: $pr.draft, labels: [($pr.labels // [])[]?.name]} end')
+            # gh api --paginate returns one JSON array per page; jq -s joins the pages.
+            PR_DATA=$(gh api --paginate "repos/$REPOSITORY/pulls?state=open&per_page=100" \
+              | jq -s --arg branch "$HEAD_BRANCH" '([.[][] | select(.head.ref == $branch and .state == "open")] | first) as $pr | if $pr == null then null else {number: $pr.number, head_ref: $pr.head.ref, head_sha: $pr.head.sha, draft: $pr.draft, labels: [($pr.labels // [])[]?.name]} end')
 
             if [[ -z "$PR_DATA" || "$PR_DATA" == "null" ]]; then
               echo "No open PR found for branch '$HEAD_BRANCH'. Skipping."
-              echo "should_continue=false" >> "$GITHUB_OUTPUT"
+              write_output "should_continue=false"
               exit 0
             fi
 
@@ -119,12 +124,12 @@ jobs:
             IS_DRAFT=$(echo "$PR_DATA" | jq -r '.draft')
             HAS_NEEDS_HUMAN=$(echo "$PR_DATA" | jq -r '(.labels // []) | any(. == "needs-human")')
 
-            echo "pr_number=$PR_NUMBER" >> "$GITHUB_OUTPUT"
-            echo "pr_head_ref=$PR_HEAD_REF" >> "$GITHUB_OUTPUT"
-            echo "pr_head_sha=$PR_HEAD_SHA" >> "$GITHUB_OUTPUT"
-            echo "is_draft=$IS_DRAFT" >> "$GITHUB_OUTPUT"
-            echo "has_needs_human=$HAS_NEEDS_HUMAN" >> "$GITHUB_OUTPUT"
-            echo "should_continue=true" >> "$GITHUB_OUTPUT"
+            write_output "pr_number=$PR_NUMBER"
+            write_output "pr_head_ref=$PR_HEAD_REF"
+            write_output "pr_head_sha=$PR_HEAD_SHA"
+            write_output "is_draft=$IS_DRAFT"
+            write_output "has_needs_human=$HAS_NEEDS_HUMAN"
+            write_output "should_continue=true"
 
           elif [[ "$EVENT" == "pull_request_review" ]]; then
             REVIEWER="$PR_REVIEW_USER"
@@ -132,23 +137,23 @@ jobs:
 
             if [[ "$REVIEWER" != "coderabbitai[bot]" ]]; then
               echo "Reviewer is not CodeRabbit (got: $REVIEWER). Skipping."
-              echo "should_continue=false" >> "$GITHUB_OUTPUT"
+              write_output "should_continue=false"
               exit 0
             fi
 
             if [[ "$STATE" != "changes_requested" ]]; then
               echo "Review state is not blocking (got: $STATE). Skipping."
-              echo "should_continue=false" >> "$GITHUB_OUTPUT"
+              write_output "should_continue=false"
               exit 0
             fi
 
-            echo "trigger_type=coderabbit_review" >> "$GITHUB_OUTPUT"
-            echo "pr_number=$PR_NUMBER_EVENT" >> "$GITHUB_OUTPUT"
-            echo "pr_head_ref=$PR_HEAD_REF_EVENT" >> "$GITHUB_OUTPUT"
-            echo "pr_head_sha=$PR_HEAD_SHA_EVENT" >> "$GITHUB_OUTPUT"
-            echo "is_draft=$PR_IS_DRAFT_EVENT" >> "$GITHUB_OUTPUT"
-            echo "has_needs_human=false" >> "$GITHUB_OUTPUT"
-            echo "should_continue=true" >> "$GITHUB_OUTPUT"
+            write_output "trigger_type=coderabbit_review"
+            write_output "pr_number=$PR_NUMBER_EVENT"
+            write_output "pr_head_ref=$PR_HEAD_REF_EVENT"
+            write_output "pr_head_sha=$PR_HEAD_SHA_EVENT"
+            write_output "is_draft=$PR_IS_DRAFT_EVENT"
+            write_output "has_needs_human=false"
+            write_output "should_continue=true"
           fi
 
       - name: Check agent branch pattern
@@ -159,7 +164,7 @@ jobs:
         run: |
           echo "Branch: $BRANCH"
 
-          if [[ "$BRANCH" =~ ^(linear/|claude/|codegen-bot/|codex/) ]]; then
+          if [[ "$BRANCH" =~ ^(linear/|claude/|codegen-bot/|codex/) || "$BRANCH" =~ (^|/)jov-[0-9]+ ]]; then
             echo "Agent branch detected"
             echo "is_agent_branch=true" >> "$GITHUB_OUTPUT"
           else
@@ -209,7 +214,7 @@ jobs:
 
           # Sample up to 10 other open agent PRs
           OTHER_PRS=$(gh pr list --state open --json number,headRefName --limit 20 \
-            | jq -r --arg this "$PR_NUMBER" '.[] | select(.number != ($this | tonumber)) | select(.headRefName | test("^(linear/|claude/|codegen-bot/|codex/)")) | .number' \
+            | jq -r --arg this "$PR_NUMBER" '.[] | select(.number != ($this | tonumber)) | select(.headRefName | test("^(linear/|claude/|codegen-bot/|codex/)") or test("(^|/)jov-[0-9]+"; "i")) | .number' \
             | head -10)
 
           SYSTEMIC_CHECKS=""
@@ -366,6 +371,10 @@ jobs:
           PR_HEAD_SHA: ${{ steps.trigger.outputs.pr_head_sha }}
           HAS_NEEDS_HUMAN: ${{ steps.trigger.outputs.has_needs_human }}
         run: |
+          write_output() {
+            printf '%s\n' "$1" >> "$GITHUB_OUTPUT"
+          }
+
           echo "=== Guard Summary ==="
           echo "Should continue: $SHOULD_CONTINUE"
           echo "Is agent branch: $IS_AGENT"
@@ -395,12 +404,12 @@ jobs:
             echo "Routing to approve path"
           fi
 
-          echo "should_fix=$SHOULD_FIX" >> "$GITHUB_OUTPUT"
-          echo "should_approve=$SHOULD_APPROVE" >> "$GITHUB_OUTPUT"
-          echo "trigger_type=$TRIGGER_TYPE" >> "$GITHUB_OUTPUT"
-          echo "pr_number=$PR_NUMBER" >> "$GITHUB_OUTPUT"
-          echo "pr_head_ref=$PR_HEAD_REF" >> "$GITHUB_OUTPUT"
-          echo "pr_head_sha=$PR_HEAD_SHA" >> "$GITHUB_OUTPUT"
+          write_output "should_fix=$SHOULD_FIX"
+          write_output "should_approve=$SHOULD_APPROVE"
+          write_output "trigger_type=$TRIGGER_TYPE"
+          write_output "pr_number=$PR_NUMBER"
+          write_output "pr_head_ref=$PR_HEAD_REF"
+          write_output "pr_head_sha=$PR_HEAD_SHA"
 
   # ==========================================================================
   # SYSTEMIC REPORT: Label and comment on PRs blocked by systemic failures
@@ -419,7 +428,7 @@ jobs:
     steps:
       - name: Generate Jovie Bot token
         id: app-token
-        uses: actions/create-github-app-token@f8d387b68d61c58ab83c6c016672934102569859 # v3.0.0
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
         with:
           app-id: ${{ vars.JOVIE_BOT_APP_ID }}
           private-key: ${{ secrets.JOVIE_BOT_PRIVATE_KEY }}
@@ -427,10 +436,11 @@ jobs:
       - name: Label and comment systemic blocker
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          REPOSITORY: ${{ github.repository }}
           PR_NUMBER: ${{ needs.guard.outputs.pr_number }}
           SYSTEMIC: ${{ needs.guard.outputs.systemic_checks }}
         run: |
-          gh api repos/${{ github.repository }}/issues/$PR_NUMBER/labels \
+          gh api "repos/$REPOSITORY/issues/$PR_NUMBER/labels" \
             --method POST \
             --field "labels[]=systemic-blocker" || true
 
@@ -466,7 +476,7 @@ jobs:
     steps:
       - name: Generate Jovie Bot token
         id: app-token
-        uses: actions/create-github-app-token@f8d387b68d61c58ab83c6c016672934102569859 # v3.0.0
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
         with:
           app-id: ${{ vars.JOVIE_BOT_APP_ID }}
           private-key: ${{ secrets.JOVIE_BOT_PRIVATE_KEY }}
@@ -488,11 +498,12 @@ jobs:
       - name: Request unprivileged remediation
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          REPOSITORY: ${{ github.repository }}
           PR_NUMBER: ${{ needs.guard.outputs.pr_number }}
           TRIGGER_TYPE: ${{ needs.guard.outputs.trigger_type }}
           ATTEMPT: ${{ needs.guard.outputs.attempt_number }}
         run: |
-          gh api repos/${{ github.repository }}/issues/$PR_NUMBER/labels \
+          gh api "repos/$REPOSITORY/issues/$PR_NUMBER/labels" \
             --method POST \
             --field "labels[]=agent-remediation-requested" || true
 
@@ -509,17 +520,18 @@ jobs:
         if: always()
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          REPOSITORY: ${{ github.repository }}
         run: |
           PR_NUMBER="${{ needs.guard.outputs.pr_number }}"
           HEAD_SHA="${{ needs.guard.outputs.pr_head_sha }}"
           SHORT_SHA="${HEAD_SHA:0:7}"
 
-          LABELS=$(gh api repos/${{ github.repository }}/issues/$PR_NUMBER/labels --jq '.[].name' 2>/dev/null || echo "")
+          LABELS=$(gh api "repos/$REPOSITORY/issues/$PR_NUMBER/labels" --jq '.[].name' 2>/dev/null || echo "")
 
           echo "$LABELS" | grep "^agent-fix-" | while read -r label; do
             if [[ ! "$label" =~ $SHORT_SHA ]]; then
               echo "Removing stale label: $label"
-              gh api repos/${{ github.repository }}/issues/$PR_NUMBER/labels/$label --method DELETE || true
+              gh api "repos/$REPOSITORY/issues/$PR_NUMBER/labels/$label" --method DELETE || true
             fi
           done
 
@@ -540,10 +552,19 @@ jobs:
     steps:
       - name: Generate Jovie Bot token
         id: app-token
-        uses: actions/create-github-app-token@f8d387b68d61c58ab83c6c016672934102569859 # v3.0.0
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
         with:
           app-id: ${{ vars.JOVIE_BOT_APP_ID }}
           private-key: ${{ secrets.JOVIE_BOT_PRIVATE_KEY }}
+
+      - name: Checkout main policy code
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          ref: main
+          persist-credentials: false
+
+      - name: Setup Node.js and pnpm
+        uses: ./.github/actions/setup-node-pnpm
 
       - name: Check all required statuses
         id: check-statuses
@@ -593,9 +614,33 @@ jobs:
           echo "All status checks passed"
           echo "all_passed=true" >> "$GITHUB_OUTPUT"
 
+      - name: Check GStack gate evidence
+        id: gstack-gates
+        if: steps.check-statuses.outputs.all_passed == 'true'
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          REPOSITORY: ${{ github.repository }}
+          AGENT_RUN_SOURCE_RUN_ID: ${{ needs.guard.outputs.pr_head_sha }}
+        run: |
+          PR_NUMBER="${{ needs.guard.outputs.pr_number }}"
+          EVIDENCE_FILE="$RUNNER_TEMP/agent-gate-evidence.md"
+
+          gh pr view "$PR_NUMBER" --json body --jq '.body // ""' > "$EVIDENCE_FILE"
+          gh api --paginate "repos/$REPOSITORY/issues/$PR_NUMBER/comments" \
+            --jq '.[].body // ""' >> "$EVIDENCE_FILE"
+
+          if pnpm --filter @jovie/web exec tsx scripts/check-agent-gate-evidence.ts "$EVIDENCE_FILE"; then
+            echo "all_passed=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "all_passed=false" >> "$GITHUB_OUTPUT"
+            echo "blocking_reason=missing GStack gate evidence" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Check for sensitive file changes
         id: sensitive-check
-        if: steps.check-statuses.outputs.all_passed == 'true'
+        if: >-
+          steps.check-statuses.outputs.all_passed == 'true' &&
+          steps.gstack-gates.outputs.all_passed == 'true'
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
         run: |
@@ -804,12 +849,17 @@ jobs:
           SENSITIVE_SAFE="${{ steps.sensitive-check.outputs.is_safe }}"
           BLOCKING="${{ steps.check-statuses.outputs.blocking_reason }}"
           SENSITIVE_FILES="${{ steps.sensitive-check.outputs.sensitive_files }}"
+          GSTACK_PASSED="${{ steps.gstack-gates.outputs.all_passed }}"
+          GSTACK_BLOCKING="${{ steps.gstack-gates.outputs.blocking_reason }}"
 
           echo "Auto-approve skipped:"
           if [[ "$STATUSES_PASSED" != "true" ]]; then
             echo "  - Status checks not all passing: $BLOCKING"
           fi
-          if [[ "$SENSITIVE_SAFE" != "true" ]]; then
+          if [[ "$STATUSES_PASSED" == "true" && "$GSTACK_PASSED" != "true" ]]; then
+            echo "  - GStack evidence missing: $GSTACK_BLOCKING"
+          fi
+          if [[ "$GSTACK_PASSED" == "true" && "$SENSITIVE_SAFE" == "false" ]]; then
             echo "  - Sensitive files changed: $SENSITIVE_FILES"
           fi
 
@@ -833,7 +883,7 @@ jobs:
     steps:
       - name: Generate Jovie Bot token
         id: app-token
-        uses: actions/create-github-app-token@f8d387b68d61c58ab83c6c016672934102569859 # v3.0.0
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
         with:
           app-id: ${{ vars.JOVIE_BOT_APP_ID }}
           private-key: ${{ secrets.JOVIE_BOT_PRIVATE_KEY }}
@@ -845,7 +895,7 @@ jobs:
           # Find open agent PRs with needs-human label
           STALE_PRS=$(gh pr list --state open --label needs-human --json number,headRefName,updatedAt,title --limit 50 \
             | jq -c --arg cutoff "$(date -u -d '48 hours ago' +%Y-%m-%dT%H:%M:%SZ 2>/dev/null || date -u -v-48H +%Y-%m-%dT%H:%M:%SZ)" \
-            '[.[] | select(.headRefName | test("^(linear/|claude/|codegen-bot/|codex/)")) | select(.updatedAt < $cutoff)] | .[]')
+            '[.[] | select(.headRefName | test("^(linear/|claude/|codegen-bot/|codex/)") or test("(^|/)jov-[0-9]+"; "i")) | select(.updatedAt < $cutoff)] | .[]')
 
           if [[ -z "$STALE_PRS" ]]; then
             echo "No stale agent PRs found"

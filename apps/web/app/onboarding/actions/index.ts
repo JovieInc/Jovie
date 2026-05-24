@@ -40,6 +40,7 @@ import { withTimeout } from '@/lib/resilience/primitives';
 import { extractClientIP } from '@/lib/utils/ip-extraction';
 import { isContentClean } from '@/lib/validation/content-filter';
 import { normalizeUsername, validateUsername } from '@/lib/validation/username';
+import { markWaitlistSignedUpInTx } from '@/lib/waitlist/signup';
 import { handleBackgroundAvatarUpload } from './avatar';
 import { logOnboardingError } from './errors';
 import { profileIsPublishable } from './helpers';
@@ -336,9 +337,10 @@ export async function completeOnboarding({
         withDbSessionTx(
           async (tx, clerkUserId: string) => {
             const existingUser = await fetchExistingUser(tx, clerkUserId);
+            let result: CompletionResult;
 
             if (pendingClaim) {
-              return applyPendingClaimTx(
+              result = await applyPendingClaimTx(
                 tx,
                 clerkUserId,
                 pendingClaim,
@@ -347,6 +349,10 @@ export async function completeOnboarding({
                 normalizedUsername,
                 trimmedDisplayName
               );
+              if (pendingClaim.mode !== 'direct_profile') {
+                await markWaitlistSignedUpInTx(tx, clerkUserId);
+              }
+              return result;
             }
 
             // If the user record does not exist, the stored function will create both user + profile
@@ -355,16 +361,18 @@ export async function completeOnboarding({
                 await ensureEmailAvailable(tx, clerkUserId, userEmail);
               }
               await ensureHandleAvailable(tx, normalizedUsername, null);
-              return createUserAndProfile(
+              result = await createUserAndProfile(
                 tx,
                 clerkUserId,
                 userEmail,
                 normalizedUsername,
                 trimmedDisplayName
               );
+              await markWaitlistSignedUpInTx(tx, clerkUserId);
+              return result;
             }
 
-            return applyExistingUserProfileTx(
+            result = await applyExistingUserProfileTx(
               tx,
               clerkUserId,
               existingUser.id,
@@ -373,6 +381,8 @@ export async function completeOnboarding({
               trimmedDisplayName,
               username
             );
+            await markWaitlistSignedUpInTx(tx, clerkUserId);
+            return result;
           },
           { isolationLevel: 'serializable' }
         ),
@@ -443,19 +453,14 @@ export async function completeOnboarding({
       );
     }
 
-    // Step 8: Sync operations (parallel, fire-and-forget)
+    // Steps 8-9: Sync, trial activation, and completion cookie (fire-and-forget)
     if (shouldFinalizeOnboarding) {
       runBackgroundSyncOperations(userId, completion.username);
-    }
 
-    // Step 9: Activate 14-day Pro trial (fire-and-forget)
-    if (shouldFinalizeOnboarding) {
       void import('./activate-trial').then(({ activateTrial }) =>
         activateTrial(userId)
       );
-    }
 
-    if (shouldFinalizeOnboarding) {
       // ENG-002: Set completion cookie to prevent redirect loop race condition
       const cookieStore = await cookies();
       cookieStore.set('jovie_onboarding_complete', '1', {

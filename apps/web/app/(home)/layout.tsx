@@ -3,12 +3,9 @@ import { SkipToContent } from '@/components/atoms/SkipToContent';
 import { HomeLegalFooter } from '@/components/homepage/HomeLegalFooter';
 import { HomeScrollWatcher } from '@/components/homepage/HomeScrollWatcher';
 import { MarketingHeader } from '@/components/site/MarketingHeader';
-import { APP_ROUTES } from '@/constants/routes';
+import { FEATURE_FLAGS } from '@/lib/flags/marketing-static';
 
-const HOME_NAV_LINKS = [
-  { href: APP_ROUTES.ARTIST_PROFILES, label: 'Product' },
-  { href: APP_ROUTES.PRICING, label: 'Pricing' },
-] as const;
+export const revalidate = false;
 
 export default function HomeLayout({
   children,
@@ -25,9 +22,9 @@ export default function HomeLayout({
       <HomeScrollWatcher />
       <MarketingHeader
         logoSize='sm'
-        logoVariant='word'
+        logoVariant='icon'
+        showHomepageCenterNav={FEATURE_FLAGS.SHOW_HOMEPAGE_CENTER_NAV}
         variant='homepage'
-        navLinks={HOME_NAV_LINKS}
       />
       <main id='main-content' className='flex min-h-[100svh] flex-1 flex-col'>
         {children}

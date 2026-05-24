@@ -18,12 +18,25 @@ interface TimeLeft {
   total: number;
 }
 
+type CompactCountdownSegment = {
+  readonly value: number;
+  readonly label: 'YR' | 'YRS' | 'D' | 'H' | 'M';
+};
+
 /**
- * Calculate time remaining until target date
+ * Calculate time remaining until target date.
+ * Returns zero-state for invalid or already-past dates.
  */
 function getTimeLeft(targetDate: Date): TimeLeft {
+  const targetMs = targetDate.getTime();
+  // Treat non-finite timestamps (NaN, ±Infinity) as expired to prevent NaN
+  // values propagating into the countdown digits.
+  if (!Number.isFinite(targetMs)) {
+    return { days: 0, hours: 0, minutes: 0, total: 0 };
+  }
+
   const now = new Date();
-  const total = targetDate.getTime() - now.getTime();
+  const total = targetMs - now.getTime();
 
   if (total <= 0) {
     return { days: 0, hours: 0, minutes: 0, total: 0 };
@@ -45,6 +58,29 @@ interface ReleaseCountdownProps {
 }
 
 const UPDATE_INTERVAL_MS = 60_000;
+const DAYS_PER_YEAR = 365;
+
+export function getCompactCountdownSegments(
+  timeLeft: Pick<TimeLeft, 'days' | 'hours' | 'minutes'>
+): readonly CompactCountdownSegment[] {
+  if (timeLeft.days >= DAYS_PER_YEAR) {
+    const years = Math.max(1, Math.floor(timeLeft.days / DAYS_PER_YEAR));
+    return [
+      {
+        value: years,
+        label: years === 1 ? 'YR' : 'YRS',
+      },
+    ];
+  }
+
+  return [
+    ...(timeLeft.days > 0
+      ? [{ value: timeLeft.days, label: 'D' as const }]
+      : []),
+    { value: timeLeft.hours, label: 'H' },
+    { value: timeLeft.minutes, label: 'M' },
+  ];
+}
 
 export function ReleaseCountdown({
   releaseDate,
@@ -89,40 +125,32 @@ export function ReleaseCountdown({
     return () => clearInterval(timer);
   }, [releaseDate, router]);
 
-  // Don't render until mounted or if release has passed
-  if (!timeLeft || timeLeft.total <= 0) {
+  // Defensive synchronous expiry check: if an ISR-cached parent rendered us
+  // with a release date already in the past, render nothing immediately
+  // instead of waiting for the next interval tick. The `typeof window` guard
+  // preserves SSR-safe hydration (server matches the initial null state).
+  const isPastNow =
+    typeof window !== 'undefined' && releaseDate.getTime() <= Date.now();
+
+  if (!timeLeft || timeLeft.total <= 0 || isPastNow) {
     return null;
   }
 
   if (compact) {
+    const segments = getCompactCountdownSegments(timeLeft);
+
     return (
-      <div className='flex items-baseline gap-3 tabular-nums'>
-        {timeLeft.days > 0 && (
-          <span>
+      <div className='flex items-baseline gap-2.5 tabular-nums'>
+        {segments.map(segment => (
+          <span key={segment.label}>
             <span className='text-[22px] font-[680] tracking-[-0.03em] text-white'>
-              {timeLeft.days}
+              {segment.value}
             </span>
             <span className='ml-0.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-white/35'>
-              D
+              {segment.label}
             </span>
           </span>
-        )}
-        <span>
-          <span className='text-[22px] font-[680] tracking-[-0.03em] text-white'>
-            {timeLeft.hours}
-          </span>
-          <span className='ml-0.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-white/35'>
-            H
-          </span>
-        </span>
-        <span>
-          <span className='text-[22px] font-[680] tracking-[-0.03em] text-white'>
-            {timeLeft.minutes}
-          </span>
-          <span className='ml-0.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-white/35'>
-            M
-          </span>
-        </span>
+        ))}
       </div>
     );
   }

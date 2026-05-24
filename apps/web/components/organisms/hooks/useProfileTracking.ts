@@ -81,16 +81,46 @@ export function useProfileVisitTracking(
     if (typeof window === 'undefined') return;
     if (!artistId) return;
     if (process.env.NEXT_PUBLIC_CI === 'true') return;
+    if (process.env.NEXT_PUBLIC_DEMO_RECORDING === '1') return;
+    let cancelled = false;
+    const profileId = artistId;
 
     const utmParams = extractUtmParams();
     const referrer = document.referrer || undefined;
 
-    trackVisitRef.current.mutate({
-      profileId: artistId,
-      referrer,
-      ...(utmParams && { utmParams }),
-      ...(trackingToken && { trackingToken }),
-    });
+    function fireVisit(token?: string) {
+      if (cancelled) return;
+      trackVisitRef.current.mutate({
+        profileId: artistId,
+        referrer,
+        ...(utmParams && { utmParams }),
+        ...(token && { trackingToken: token }),
+      });
+    }
+
+    if (trackingToken) {
+      // Token already provided by the server render — fire immediately.
+      fireVisit(trackingToken);
+    } else {
+      // No token yet. Send the beacon NOW so fast bounces / slow mobile
+      // connections don't lose the view, and asynchronously try to attach a
+      // signed token afterwards (best-effort enrichment).
+      fireVisit();
+      void (async () => {
+        try {
+          const response = await fetch(
+            `/api/audience/visit-token?profileId=${encodeURIComponent(profileId)}`,
+            { cache: 'no-store' }
+          );
+          await response.json().catch(() => null);
+        } catch {
+          // best-effort
+        }
+      })();
+    }
+    return () => {
+      cancelled = true;
+    };
   }, [artistId, trackingToken]);
 }
 

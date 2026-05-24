@@ -52,7 +52,7 @@ Legend: Y = present, **M** = missing (should add), - = N/A for this component
 |-----------|------------|-------|
 | Input | hover | `hover:border-(--linear-border-default)` |
 | Switch | hover (unchecked) | `data-[state=unchecked]:hover:bg-white/[0.12]` |
-| Switch | hover (checked) | `data-[state=checked]:hover:bg-indigo-600` |
+| Switch | hover (checked) | `data-[state=checked]:hover:bg-[var(--color-accent-hover)]` |
 | Badge | focus-visible | `focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--color-accent)/30 focus-visible:ring-offset-1` |
 | Select trigger | hover | `hover:border-(--linear-border-default)` |
 | Textarea | hover | `hover:border-(--linear-border-default)` |

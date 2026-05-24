@@ -2,7 +2,7 @@
 
 import Image from 'next/image';
 import { useEffect, useState } from 'react';
-import { Icon } from '@/components/atoms/Icon';
+import { ArtworkFallbackTile } from '@/components/atoms/ArtworkFallbackTile';
 import { cn } from '@/lib/utils';
 
 interface ReleaseArtworkThumbProps {
@@ -53,14 +53,11 @@ export function ReleaseArtworkThumb({
           onError={() => setImgError(true)}
         />
       ) : (
-        <div className='flex h-full w-full items-center justify-center'>
-          <Icon
-            name='Disc3'
-            className={cn('text-tertiary-token', fallbackIconClass)}
-            aria-hidden='true'
-          />
-          <span className='sr-only'>{alt}</span>
-        </div>
+        <ArtworkFallbackTile
+          seed={alt}
+          label={alt}
+          iconClassName={fallbackIconClass}
+        />
       )}
     </div>
   );

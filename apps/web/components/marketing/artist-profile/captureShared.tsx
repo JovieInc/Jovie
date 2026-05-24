@@ -129,6 +129,30 @@ export const CAPTURE_ANIMATION_STYLES = `
     }
   }
 
+  @media (max-width: 767px) {
+    .artist-profile-audience-mask {
+      mask-image: none;
+      overflow: visible;
+    }
+
+    .artist-profile-audience-rail {
+      display: grid;
+      width: 100%;
+      grid-template-columns: minmax(0, 1fr);
+      animation: none;
+      transform: none;
+    }
+
+    .artist-profile-audience-rail > :nth-child(n + 5) {
+      display: none;
+    }
+
+    .artist-profile-audience-pill {
+      width: 100%;
+      max-width: 100%;
+    }
+  }
+
   @media (prefers-reduced-motion: reduce) {
     .artist-profile-audience-rail,
     .artist-profile-capture-typed,
@@ -160,7 +184,7 @@ export function CaptureActionPill({
     >
       <div
         className={cn(
-          'flex min-h-[4rem] items-center rounded-full px-2 py-1.5 transition-[background-color,transform,opacity] duration-300',
+          'flex min-h-[4rem] items-center rounded-full px-2 py-1.5 transition-[background-color,transform,opacity] duration-subtle',
           isDone
             ? 'justify-center bg-white text-black'
             : 'gap-2 bg-[linear-gradient(180deg,rgba(255,255,255,0.04),rgba(255,255,255,0.015))]'
@@ -171,7 +195,7 @@ export function CaptureActionPill({
             <span className='inline-flex h-7 w-7 items-center justify-center rounded-full bg-black text-white'>
               <Check className='h-3.5 w-3.5' strokeWidth={2.4} />
             </span>
-            <span className='text-[12.5px] font-semibold tracking-[-0.02em] text-black'>
+            <span className='rounded-full bg-white px-1 text-[12.5px] font-semibold tracking-[-0.02em] text-black'>
               {capture.action.confirmedLabel}
             </span>
           </div>
@@ -200,7 +224,7 @@ export function CaptureActionPill({
 
             <span
               className={cn(
-                'rounded-full px-4 py-2.5 text-[12px] font-semibold tracking-[-0.02em] transition-all duration-300',
+                'rounded-full px-4 py-2.5 text-[12px] font-semibold tracking-[-0.02em] transition-[background-color,color,transform] duration-subtle',
                 isSubmitting
                   ? 'scale-[0.96] bg-white/88 text-black'
                   : 'bg-white text-black'

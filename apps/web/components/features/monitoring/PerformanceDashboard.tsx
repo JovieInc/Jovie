@@ -1,5 +1,6 @@
 'use client';
 
+import { ChevronDown, ChevronUp } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import type { Metric } from 'web-vitals';
 
@@ -110,16 +111,20 @@ export function PerformanceDashboard({
 
   return (
     <div className='fixed bottom-4 right-4 z-50'>
-      <div className='bg-white rounded-lg shadow-lg overflow-hidden'>
+      <div className='overflow-hidden rounded-[var(--app-shell-radius)] border border-subtle bg-surface-0 shadow-lg'>
         <button
           type='button'
-          className='w-full px-4 py-2 bg-indigo-600 text-white cursor-pointer flex justify-between items-center'
+          className='flex w-full cursor-pointer items-center justify-between bg-accent px-4 py-2 text-on-accent'
           onClick={() => setExpanded(!expanded)}
           aria-expanded={expanded}
           aria-label='Toggle performance metrics'
         >
           <h3 className='text-sm font-medium'>Performance Metrics</h3>
-          <span aria-hidden='true'>{expanded ? '▼' : '▲'}</span>
+          {expanded ? (
+            <ChevronDown className='h-4 w-4' aria-hidden='true' />
+          ) : (
+            <ChevronUp className='h-4 w-4' aria-hidden='true' />
+          )}
         </button>
 
         {expanded && (

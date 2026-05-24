@@ -52,7 +52,7 @@ export const DROPDOWN_SLIDE_ANIMATIONS =
  * Border uses --linear-border-default (slightly more opaque than --linear-border-subtle used by separators)
  */
 export const DROPDOWN_CONTENT_BASE =
-  'z-[70] min-w-[184px] overflow-hidden rounded-(--linear-app-radius-menu) border border-(--linear-border-default) bg-(--linear-bg-surface-0) p-0.5 text-(--linear-text-primary) shadow-(--linear-shadow-card-elevated)';
+  'z-[90] min-w-[184px] overflow-hidden rounded-(--linear-app-radius-menu) border border-(--linear-border-default) bg-(--linear-bg-surface-0) p-0.5 text-(--linear-text-primary) shadow-(--linear-shadow-card-elevated)';
 
 /**
  * Shadow effect for elevated appearance
@@ -168,7 +168,7 @@ export const MENU_ITEM_BASE =
   'text-(--linear-text-secondary) hover:bg-(--linear-bg-surface-1) hover:text-(--linear-text-primary) ' +
   'data-[highlighted]:bg-(--linear-bg-surface-1) data-[highlighted]:text-(--linear-text-primary) ' +
   'data-[disabled]:pointer-events-none data-[disabled]:opacity-[0.46] ' +
-  'focus-visible:outline-none focus-visible:bg-(--linear-bg-surface-1) ' +
+  'focus-visible:outline-none focus-visible:bg-(--linear-bg-surface-1) focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)/35 ' +
   '[&_svg]:pointer-events-none [&_svg]:h-3 [&_svg]:w-3 [&_svg]:shrink-0 [&_svg]:[stroke-width:1.5] [&_svg]:text-(--linear-text-tertiary) ' +
   'hover:[&_svg]:text-(--linear-text-primary) data-[highlighted]:[&_svg]:text-(--linear-text-primary)';
 
@@ -196,7 +196,7 @@ export const CHECKBOX_RADIO_ITEM_BASE =
   'text-(--linear-text-secondary) hover:bg-(--linear-bg-surface-1) hover:text-(--linear-text-primary) ' +
   'data-[highlighted]:bg-(--linear-bg-surface-1) data-[highlighted]:text-(--linear-text-primary) ' +
   'data-[disabled]:pointer-events-none data-[disabled]:opacity-[0.46] ' +
-  'focus-visible:outline-none focus-visible:bg-(--linear-bg-surface-1)';
+  'focus-visible:outline-none focus-visible:bg-(--linear-bg-surface-1) focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)/35';
 
 /**
  * Select item base — unified with MENU_ITEM_BASE hover/focus behavior
@@ -205,7 +205,7 @@ export const SELECT_ITEM_BASE =
   'relative flex w-full cursor-default select-none items-center rounded-(--linear-app-radius-item) py-1.5 pl-8 pr-2 text-[13px] font-[400] leading-5 outline-none ' +
   'transition-colors duration-normal ease-interactive ' +
   'text-(--linear-text-secondary) ' +
-  'focus-visible:bg-(--linear-bg-surface-1) focus-visible:text-(--linear-text-primary) ' +
+  'focus-visible:outline-none focus-visible:bg-(--linear-bg-surface-1) focus-visible:text-(--linear-text-primary) focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)/35 ' +
   'data-[highlighted]:bg-(--linear-bg-surface-1) data-[highlighted]:text-(--linear-text-primary) ' +
   'data-[disabled]:pointer-events-none data-[disabled]:opacity-[0.46]';
 
@@ -222,7 +222,7 @@ export const MENU_ITEM_COMPACT =
   'text-(--linear-text-secondary) hover:bg-(--linear-bg-surface-1) hover:text-(--linear-text-primary) ' +
   'data-[highlighted]:bg-(--linear-bg-surface-1) data-[highlighted]:text-(--linear-text-primary) ' +
   'data-[disabled]:pointer-events-none data-[disabled]:opacity-[0.46] ' +
-  'focus-visible:outline-none focus-visible:bg-(--linear-bg-surface-1) ' +
+  'focus-visible:outline-none focus-visible:bg-(--linear-bg-surface-1) focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)/35 ' +
   '[&_svg]:pointer-events-none [&_svg]:h-4 [&_svg]:w-4 [&_svg]:shrink-0 [&_svg]:[stroke-width:1.5] [&_svg]:text-(--linear-text-tertiary) ' +
   'hover:[&_svg]:text-(--linear-text-primary) data-[highlighted]:[&_svg]:text-(--linear-text-primary)';
 
@@ -282,7 +282,7 @@ export const MENU_SEARCH_HEADER_BASE =
   'border-b border-(--linear-border-subtle) px-2 py-2';
 
 export const MENU_SEARCH_INPUT_BASE =
-  'h-7 w-full rounded-(--linear-app-radius-item) border border-(--linear-border-subtle) bg-(--linear-bg-surface-1) py-1 pl-7 pr-7 text-[12px] text-(--linear-text-primary) placeholder:text-(--linear-text-tertiary) focus-visible:outline-none focus-visible:border-(--linear-border-focus)';
+  'h-7 w-full rounded-(--linear-app-radius-item) border border-(--linear-border-subtle) bg-(--linear-bg-surface-1) py-1 pl-7 pr-7 text-[12px] text-(--linear-text-primary) placeholder:text-(--linear-text-tertiary) focus-visible:outline-none focus-visible:border-(--linear-border-focus) focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/24';
 
 /**
  * Empty and loading states inside menu surfaces
@@ -306,7 +306,7 @@ export const SELECT_TRIGGER_BASE =
   'placeholder:text-(--linear-text-tertiary) ' +
   'transition-colors duration-normal ' +
   'hover:border-(--linear-border-default) ' +
-  'focus-visible:outline-none focus-visible:border-(--color-accent) ' +
+  'focus-visible:outline-none focus-visible:border-(--linear-border-focus) focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/24 ' +
   'disabled:cursor-not-allowed disabled:opacity-50 ' +
   '[&>span]:line-clamp-1';
 

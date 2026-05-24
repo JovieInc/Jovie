@@ -5,6 +5,14 @@ import {
   ARTIST_PROFILE_SPEC_TILES,
   type ArtistProfileFeatureTile,
 } from '@/data/artistProfileFeatures';
+import { FEATURE_FLAGS } from '@/lib/flags/marketing-static';
+
+// Footer CTA label tracks the prelaunch waitlist gate. Mirrors the hero
+// front-door pattern: "Request access" while we're waitlisting, then
+// "Start free trial" once the doors open.
+const FOOTER_CTA_LABEL = FEATURE_FLAGS.WAITLIST_ENABLED
+  ? 'Request access'
+  : 'Start free trial';
 
 function requireTile<T extends { readonly id: string }>(
   tiles: readonly T[],
@@ -151,16 +159,16 @@ export const HOMEPAGE_V2_COPY: HomepageV2Copy = {
     body: 'Real release behavior, not generic creator proof.',
   },
   pricing: {
-    headline: 'Simple Pricing.',
-    body: 'One plan. 14-day free trial.',
-    supportLine: '14-day Pro trial. No credit card required.',
+    headline: 'Free to start.',
+    body: 'Artist profiles are free forever. Pro adds the release tools when you need them.',
+    supportLine: 'Profiles stay free. Paid plans open from the waitlist.',
     ctaLabel: 'See Pricing',
     href: APP_ROUTES.PRICING,
   },
   finalCta: {
-    headline: 'Start With the Next Drop.',
+    headline: 'Keep your music moving.',
     body: 'Jovie handles the plan, assets, and follow-up from there.',
-    primaryCtaLabel: 'Claim My Workspace',
+    primaryCtaLabel: FOOTER_CTA_LABEL,
     secondaryCtaLabel: 'See Pricing',
   },
   footerColumns: [

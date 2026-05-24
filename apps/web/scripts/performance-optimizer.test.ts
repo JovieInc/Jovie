@@ -48,7 +48,7 @@ describe('performance optimizer helpers', () => {
           firstContentfulPaintMs: 900,
           largestContentfulPaintMs: 1400,
           cumulativeLayoutShift: 0.01,
-          finalUrl: '/app/dashboard/releases',
+          finalUrl: '/app/releases',
         },
       ],
       100,
@@ -105,6 +105,6 @@ describe('performance optimizer helpers', () => {
   it('does not require auth for manifest-backed public routes', () => {
     expect(requiresDashboardAuth(undefined, 'public-profile-main')).toBe(false);
     expect(requiresDashboardAuth('/[username]')).toBe(false);
-    expect(requiresDashboardAuth('/app/dashboard/releases')).toBe(true);
+    expect(requiresDashboardAuth('/app/releases')).toBe(true);
   });
 });

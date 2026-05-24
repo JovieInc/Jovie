@@ -79,12 +79,14 @@ afterEach(() => {
 });
 
 describe('ProfileLayout', () => {
-  it('keeps Clerk enabled for production public profile routes', async () => {
+  // JOV-2268: public profile routes always bypass Clerk on the client so
+  // anonymous visitors don't download clerk.browser.js (~400KB gzip).
+  it('bypasses Clerk for production public profile routes', async () => {
     await renderProfileLayout();
 
     expect(screen.getByTestId('child')).toBeInTheDocument();
     expect(clientProvidersMock).toHaveBeenCalledWith({
-      forceBypassClerk: false,
+      forceBypassClerk: true,
       publishableKey: 'pk_live_example',
       skipCoreProviders: true,
     });
@@ -92,6 +94,17 @@ describe('ProfileLayout', () => {
 
   it('bypasses Clerk for preview public profile routes', async () => {
     await renderProfileLayout({ vercelEnv: 'preview' });
+
+    expect(screen.getByTestId('child')).toBeInTheDocument();
+    expect(clientProvidersMock).toHaveBeenCalledWith({
+      forceBypassClerk: true,
+      publishableKey: 'pk_live_example',
+      skipCoreProviders: true,
+    });
+  });
+
+  it('bypasses Clerk in E2E mode', async () => {
+    await renderProfileLayout({ e2eMode: '1' });
 
     expect(screen.getByTestId('child')).toBeInTheDocument();
     expect(clientProvidersMock).toHaveBeenCalledWith({

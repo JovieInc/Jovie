@@ -10,7 +10,12 @@ import {
 } from '@/lib/analytics/tracking-token';
 import { isVisitorBlocked } from '@/lib/audience/block-check';
 import { recordAudienceEvent } from '@/lib/audience/record-audience-event';
-import { type DbOrTransaction, db, doesTableExist } from '@/lib/db';
+import {
+  type DbOrTransaction,
+  db,
+  doesColumnExist,
+  doesTableExist,
+} from '@/lib/db';
 import { unwrapPgError } from '@/lib/db/errors';
 import {
   audienceMembers,
@@ -47,6 +52,42 @@ export const runtime = 'nodejs';
 const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
 
 const INTERNAL_HOST_SUFFIXES = ['jov.ie', 'jovie.fm'];
+
+interface AudienceVisitSchemaCompatibility {
+  canWriteAudienceActions: boolean;
+  hasAudienceMemberLatestActionLabelColumn: boolean;
+  hasAudienceMemberLatestReferrerUrlColumn: boolean;
+  hasAudienceReferrersTable: boolean;
+  hasCreatorDistributionEventsTable: boolean;
+  hasDailyProfileViewsTable: boolean;
+}
+
+async function resolveAudienceVisitSchemaCompatibility(): Promise<AudienceVisitSchemaCompatibility> {
+  const [
+    canWriteAudienceActions,
+    hasAudienceMemberLatestActionLabelColumn,
+    hasAudienceMemberLatestReferrerUrlColumn,
+    hasAudienceReferrersTable,
+    hasCreatorDistributionEventsTable,
+    hasDailyProfileViewsTable,
+  ] = await Promise.all([
+    doesColumnExist('audience_actions', 'event_type'),
+    doesColumnExist('audience_members', 'latest_action_label'),
+    doesColumnExist('audience_members', 'latest_referrer_url'),
+    doesTableExist('audience_referrers'),
+    doesTableExist('creator_distribution_events'),
+    doesTableExist('daily_profile_views'),
+  ]);
+
+  return {
+    canWriteAudienceActions,
+    hasAudienceMemberLatestActionLabelColumn,
+    hasAudienceMemberLatestReferrerUrlColumn,
+    hasAudienceReferrersTable,
+    hasCreatorDistributionEventsTable,
+    hasDailyProfileViewsTable,
+  };
+}
 
 function isInternalTrafficReferrer(referrerUrl: string): boolean {
   try {
@@ -475,9 +516,8 @@ export async function POST(request: NextRequest) {
       : [];
 
     try {
-      const hasDailyProfileViewsTable = await doesTableExist(
-        'daily_profile_views'
-      );
+      const schemaCompatibility =
+        await resolveAudienceVisitSchemaCompatibility();
 
       await withSystemIngestionSession(async tx => {
         const viewDate = now.toISOString().slice(0, 10);
@@ -541,11 +581,18 @@ export async function POST(request: NextRequest) {
         const instagramReferrerHost =
           getInstagramReferrerHost(resolvedReferrer);
 
-        if (hasDailyProfileViewsTable && !isBotAudienceMember) {
+        if (
+          schemaCompatibility.hasDailyProfileViewsTable &&
+          !isBotAudienceMember
+        ) {
           await writeDailyProfileViews(tx, profileId, viewDate, now);
         }
 
-        if (shouldTrackInstagramActivation && !isBotAudienceMember) {
+        if (
+          schemaCompatibility.hasCreatorDistributionEventsTable &&
+          shouldTrackInstagramActivation &&
+          !isBotAudienceMember
+        ) {
           await writeInstagramActivation(
             tx,
             profileId,
@@ -557,6 +604,37 @@ export async function POST(request: NextRequest) {
 
         // Summary column value for fast list views
         const latestReferrerUrl = resolvedReferrer?.trim() ?? null;
+        const recordProfileVisitEvent = async (audienceMemberId: string) => {
+          if (!schemaCompatibility.canWriteAudienceActions) return;
+
+          await recordAudienceEvent(
+            tx,
+            {
+              creatorProfileId: profileId,
+              audienceMemberId,
+              eventType: 'profile_visited',
+              verb: 'visited',
+              confidence: 'observed',
+              sourceKind: resolveVisitSourceKind(utmParams, latestReferrerUrl),
+              sourceLabel: resolveVisitSourceLabel(
+                utmParams,
+                latestReferrerUrl
+              ),
+              objectType: 'profile',
+              objectId: profileId,
+              objectLabel: 'Profile',
+              properties: {
+                referrer: latestReferrerUrl,
+                utmParams: resolvedUtmParams,
+              },
+              timestamp: now,
+            },
+            {
+              includeLatestActionLabel:
+                schemaCompatibility.hasAudienceMemberLatestActionLabelColumn,
+            }
+          );
+        };
 
         if (existing) {
           await tx
@@ -572,31 +650,19 @@ export async function POST(request: NextRequest) {
               deviceType: normalizedDevice,
               referrerHistory,
               tags: mergedTags,
-              ...(latestReferrerUrl && { latestReferrerUrl }),
+              ...(schemaCompatibility.hasAudienceMemberLatestReferrerUrlColumn &&
+                latestReferrerUrl && { latestReferrerUrl }),
               ...(utmParams && { utmParams: resolvedUtmParams }),
             })
             .where(eq(audienceMembers.id, existing.id));
 
-          if (latestReferrerUrl) {
+          if (
+            schemaCompatibility.hasAudienceReferrersTable &&
+            latestReferrerUrl
+          ) {
             await writeReferrer(tx, existing.id, latestReferrerUrl, now);
           }
-          await recordAudienceEvent(tx, {
-            creatorProfileId: profileId,
-            audienceMemberId: existing.id,
-            eventType: 'profile_visited',
-            verb: 'visited',
-            confidence: 'observed',
-            sourceKind: resolveVisitSourceKind(utmParams, latestReferrerUrl),
-            sourceLabel: resolveVisitSourceLabel(utmParams, latestReferrerUrl),
-            objectType: 'profile',
-            objectId: profileId,
-            objectLabel: 'Profile',
-            properties: {
-              referrer: latestReferrerUrl,
-              utmParams: resolvedUtmParams,
-            },
-            timestamp: now,
-          });
+          await recordProfileVisitEvent(existing.id);
           return;
         }
 
@@ -619,7 +685,8 @@ export async function POST(request: NextRequest) {
             utmParams: resolvedUtmParams,
             tags: mergedTags,
             latestActions: [],
-            latestReferrerUrl,
+            ...(schemaCompatibility.hasAudienceMemberLatestReferrerUrlColumn &&
+              latestReferrerUrl && { latestReferrerUrl }),
             updatedAt: now,
             createdAt: now,
           })
@@ -631,27 +698,15 @@ export async function POST(request: NextRequest) {
           })
           .returning({ id: audienceMembers.id });
 
-        if (inserted && latestReferrerUrl) {
+        if (
+          inserted &&
+          schemaCompatibility.hasAudienceReferrersTable &&
+          latestReferrerUrl
+        ) {
           await writeReferrer(tx, inserted.id, latestReferrerUrl, now);
         }
         if (inserted) {
-          await recordAudienceEvent(tx, {
-            creatorProfileId: profileId,
-            audienceMemberId: inserted.id,
-            eventType: 'profile_visited',
-            verb: 'visited',
-            confidence: 'observed',
-            sourceKind: resolveVisitSourceKind(utmParams, latestReferrerUrl),
-            sourceLabel: resolveVisitSourceLabel(utmParams, latestReferrerUrl),
-            objectType: 'profile',
-            objectId: profileId,
-            objectLabel: 'Profile',
-            properties: {
-              referrer: latestReferrerUrl,
-              utmParams: resolvedUtmParams,
-            },
-            timestamp: now,
-          });
+          await recordProfileVisitEvent(inserted.id);
         }
       });
 
@@ -660,12 +715,12 @@ export async function POST(request: NextRequest) {
         { headers: NO_STORE_HEADERS }
       );
     } catch (error) {
-      logger.error('[Audience Visit] Optional persistence degraded', {
+      logger.warn('[Audience Visit] Optional persistence degraded', {
         error,
         fingerprint,
         profileId,
       });
-      await captureError('Audience visit persistence degraded', error, {
+      await captureWarning('Audience visit persistence degraded', error, {
         route: '/api/audience/visit',
         method: 'POST',
         fingerprint,

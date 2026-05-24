@@ -12,6 +12,9 @@
 
 /* Import Linear-specific tokens for marketing pages */
 @import "./linear-tokens.css";
+/* DESIGN AGENT: Carbon palette synced to shell-v1 */
+/* Tokens updated: bg-page #06070a, surface0 #0a0b0e, surface1 #101216, 
+   surface2 #161a20, contentSurface #0a0c0f, border #171a20 */
 
 /* ============================================
    THEME INPUTS - The only 3 variables needed
@@ -24,20 +27,56 @@
   --public-shell-text: var(--color-text-primary-token);
   --public-shell-border: var(--color-border-default);
   --public-shell-content-max: var(--linear-content-max);
+  /* TODO(DS_FOUNDATION_V1 Wave 1): migrate consumers to --ds-public-content-max (1298px) and remove these legacy variants */
   --public-content-max-landing: 1280px;
   --public-content-max-page: 1200px;
-  --public-content-max-prose: 680px;
+  /* TODO(DS_FOUNDATION_V1 Wave 4): consider deprecating once consumers migrate to --ds-prose-max */
+  --public-content-max-prose: var(--ds-prose-max);
   --app-shell-content-max-wide: 84rem;
   --app-shell-content-max-reading: 56rem;
   --app-shell-content-max-form: 50rem;
   --profile-shell-max-width: 430px;
   --profile-shell-header-max-width: 38rem;
-  --profile-shell-card-radius: 30px;
-  --profile-card-radius: 28px;
-  --profile-inner-radius: 26px;
-  --profile-drawer-radius-mobile: 24px;
+  --profile-shell-card-radius: 24px;
+  --profile-card-radius: 22px;
+  --profile-inner-radius: 18px;
+  --profile-drawer-radius-mobile: 22px;
   --profile-drawer-radius-desktop: 20px;
   --profile-action-radius: 14px;
+  --page-pad: clamp(16px, 4vw, 32px);
+  --section-gap: clamp(16px, 3vw, 28px);
+  --card-pad: clamp(14px, 3vw, 24px);
+  --avatar-size: clamp(88px, 22vw, 144px);
+  --cover-height: clamp(300px, min(94vw, 46svh), 430px);
+  --content-max: 720px;
+  --profile-bottom-nav-height: calc(
+    3.125rem +
+    max(10px, env(safe-area-inset-bottom)) +
+    14px
+  );
+
+  /* DS_FOUNDATION_V1: canonical semantic aliases (do not redefine downstream) */
+  --ds-public-content-max: 1298px; /* canonical public/marketing width */
+  --ds-prose-max: 680px; /* prose exception */
+
+  /* Shell V1 semantic aliases — app chrome should prefer these names when
+     touching shared shell geometry. They intentionally resolve to the current
+     Linear-derived values so this pass changes the token contract, not visuals. */
+  --app-shell-sidebar-width: var(--linear-app-sidebar-width);
+  --app-shell-header-height: var(--linear-app-header-height);
+  --app-shell-header-height-compact: var(--linear-app-header-height-compact);
+  --app-shell-gap: var(--linear-app-shell-gap);
+  --app-shell-radius: var(--linear-app-shell-radius);
+  --app-shell-border: var(--linear-app-shell-border);
+  --app-shell-frame-seam: var(--linear-app-frame-seam);
+  --app-shell-content-surface: var(--linear-app-content-surface);
+  --app-shell-audio-bar-max-height: var(--linear-app-audio-bar-max-height);
+  --app-shell-audio-compact-height: var(--linear-app-audio-compact-height);
+
+  --ds-motion-subtle-duration: 150ms;
+  --ds-motion-subtle-easing: cubic-bezier(0.4, 0, 0.2, 1);
+  --ds-motion-cinematic-duration: 420ms;
+  --ds-motion-cinematic-easing: cubic-bezier(0.22, 1, 0.36, 1);
 
   /* Core Theme Inputs */
   --theme-base-hue: 282;
@@ -54,6 +93,83 @@
   /* Derived base lightness for light mode */
   --theme-base-l: 99%;
   /* Near white for light mode */
+}
+
+.profile-viewport {
+  --page-pad: clamp(16px, 4vw, 32px);
+  --section-gap: clamp(16px, 3vw, 28px);
+  --card-pad: clamp(14px, 3vw, 24px);
+  --avatar-size: clamp(88px, 22vw, 144px);
+  --cover-height: clamp(300px, min(94vw, 46svh), 430px);
+  --content-max: 720px;
+}
+
+.public-profile-layout-frame {
+  height: 100%;
+  max-width: min(100%, var(--content-max));
+  padding-left: env(safe-area-inset-left);
+  padding-right: env(safe-area-inset-right);
+}
+
+.public-profile-layout-frame--desktop {
+  max-width: min(
+    100%,
+    calc(var(--profile-shell-max-width) + (var(--page-pad) * 2))
+  );
+  padding-left: max(var(--page-pad), env(safe-area-inset-left));
+  padding-right: max(var(--page-pad), env(safe-area-inset-right));
+  padding-block: clamp(16px, 2vw, 24px);
+}
+
+.public-profile-layout-frame--compact {
+  max-width: min(100%, calc(var(--content-max) + (var(--page-pad) * 2)));
+}
+
+.public-profile-layout-compact-slot {
+  display: flex;
+  height: 100%;
+  min-width: 0;
+  width: 100%;
+  flex-direction: column;
+}
+
+.public-profile-layout-desktop-shell {
+  display: none;
+  min-width: 0;
+  width: 100%;
+}
+
+.public-profile-layout-desktop-placeholder {
+  height: min(940px, calc(100dvh - 48px));
+  width: 100%;
+  overflow: hidden;
+  border-radius: 28px;
+  background: rgba(8, 10, 14, 0.76);
+}
+
+.public-profile-compact-shell {
+  max-width: min(var(--profile-shell-max-width), 100%);
+}
+
+@media (min-width: 768px) {
+  .public-profile-compact-shell {
+    --cover-height: 340px;
+    height: min(740px, calc(100dvh - (var(--page-pad) * 2)));
+  }
+}
+
+@media (min-width: 1180px) {
+  /* Match desktop max-width so SSR compact class produces the same frame width
+     as the JS-switched desktop class, eliminating layout shift on hydration. */
+  .public-profile-layout-frame--compact {
+    max-width: min(
+      100%,
+      calc(var(--profile-shell-max-width) + (var(--page-pad) * 2))
+    );
+    padding-left: max(var(--page-pad), env(safe-area-inset-left));
+    padding-right: max(var(--page-pad), env(safe-area-inset-right));
+    padding-block: clamp(16px, 2vw, 24px);
+  }
 }
 
 :root.dark {
@@ -290,10 +406,10 @@
   );
   --color-skeleton-shimmer: oklch(100% 0 0);
 
-  /* Focus ring — Linear: #7170ff (extracted 2026-03-16) */
-  --color-focus-ring: var(--color-accent);
-  --focus-ring-width: 2px;
-  --focus-ring-offset: 2px;
+  /* Focus ring — Jovie/Linear keyboard focus token */
+  --color-focus-ring: var(--linear-border-focus);
+  --focus-ring-width: 1px;
+  --focus-ring-offset: 0px;
 
   /* Font size scale — extracted from Linear CSS vars (2026-02-17)
      --font-size-micro: 11px, --font-size-mini: 12px, --font-size-small: 13px,
@@ -302,28 +418,28 @@
 
 /* Dark mode - same generation logic, inverted lightness */
 :root.dark {
-  /* Dark mode surfaces — matched to Linear's exact Hex values */
-  --color-bg-base: #08090a;
+  /* Dark mode surfaces — matched to shell-v1 Carbon palette */
+  --color-bg-base: #06070a;
   /* sidebar/page bg */
-  --color-bg-surface-0: #0f1011;
+  --color-bg-surface-0: #0a0b0e;
   /* primary app surface — matches --linear-bg-surface-0 */
   --color-bg-surface-1: var(--linear-bg-surface-1);
   /* Shared card surface inside the dark app shell */
-  --color-bg-surface-2: #23252a;
+  --color-bg-surface-2: #161a20;
   /* inputs, elevated */
   --color-bg-surface-3: #2a2c32;
   /* modals, tooltips */
 
   /* Additional dark surface levels */
-  --color-bg-page: #08090a;
+  --color-bg-page: #06070a;
   /* Same as base */
   --color-bg-hover: rgba(255, 255, 255, 0.04);
   /* Row/item hover */
-  --color-bg-elevated: #0f1011;
+  --color-bg-elevated: #0a0b0e;
   /* Same as surface-0 */
-  --color-bg-input: #191b1f;
+  --color-bg-input: #101216;
   /* Same as surface-1 */
-  --color-bg-active: #23252a;
+  --color-bg-active: #161a20;
   /* Same as surface-2 */
   --color-bg-primary: lch(9.894% 0.5 282);
   --color-bg-secondary: lch(14.44% 0.5 282);
@@ -402,7 +518,7 @@
 
   /* Primary button - inverted for dark mode (Linear: rgb(230,230,230)) */
   --color-btn-primary-bg: #e6e6e6;
-  --color-btn-primary-fg: #08090a;
+  --color-btn-primary-fg: #06070a;
   --color-btn-primary-hover: #f0f0f0;
 
   /* Secondary button */
@@ -1026,8 +1142,8 @@
                   open/close, chat composer surface morph. 320ms feels
                   intentional and gives the eye time to track the move.
      Always prefer these over hardcoded numbers; they pick up reduced-motion. */
-  --duration-subtle: 150ms;
-  --duration-cinematic: 320ms;
+  --duration-subtle: var(--ds-motion-subtle-duration);
+  --duration-cinematic: var(--ds-motion-cinematic-duration);
 
   /* Easings - Linear uses cubic-bezier for smooth feel */
   --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
@@ -1036,8 +1152,8 @@
   --ease-interactive: cubic-bezier(0.25, 0.46, 0.45, 0.94);
   --ease-linear: var(--ease-interactive);
   /* Legacy alias */
-  --ease-subtle: var(--ease-interactive);
-  --ease-cinematic: cubic-bezier(0.32, 0.72, 0, 1);
+  --ease-subtle: var(--ds-motion-subtle-easing);
+  --ease-cinematic: var(--ds-motion-cinematic-easing);
 
   /* Pre-composed transition patterns (extracted from Linear)
      Use duration custom properties so prefers-reduced-motion overrides work */
@@ -1060,6 +1176,8 @@
 /* Reduced motion — zero out all duration tokens so transition patterns inherit 0ms */
 @media (prefers-reduced-motion: reduce) {
   :root {
+    --ds-motion-subtle-duration: 0ms;
+    --ds-motion-cinematic-duration: 0ms;
     --duration-instant: 0ms;
     --duration-fast: 0ms;
     --duration-normal: 0ms;
@@ -1245,9 +1363,12 @@
 [data-theme="linear"],
 .linear-marketing {
   /* Marketing typography: Satoshi (display/buttons) + DM Sans (body) */
-  font-family: var(--font-body);
-  --marketing-font-display: var(--font-display);
-  --marketing-font-body: var(--font-body);
+  font-family:
+    var(--font-dm-sans), "DM Sans", -apple-system, "system-ui", sans-serif;
+  --marketing-font-display:
+    var(--font-satoshi), "Satoshi", -apple-system, "system-ui", sans-serif;
+  --marketing-font-body:
+    var(--font-dm-sans), "DM Sans", -apple-system, "system-ui", sans-serif;
 
   /* Map Linear text colors to design system */
   --color-text-primary-token: var(--linear-text-primary);
@@ -1292,4 +1413,100 @@
 .linear-marketing a[class*="btn"] {
   font-family: var(--marketing-font-display);
   letter-spacing: -0.01em;
+}
+
+/* Keyboard focus fallback — canonical visible focus ring (WCAG SC 2.4.7).
+   Design-system consistent recipe used across shell/chrome (smallwin + a11y polish):
+     focus-visible:outline-none
+     focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/55
+     focus-visible:ring-offset-2 focus-visible:ring-offset-(--linear-bg-page)
+   Box-shadow equivalent ensures global application to any :focus-visible without
+   explicit treatment. :where() keeps specificity at 0 so component-level overrides
+   (stronger CTA rings, public-action-*, Clerk, surface-specific offsets, input borders)
+   win cleanly. Eliminates all browser default outline artifacts.
+   Subtle gray ring provides visible keyboard focus on every surface without
+   clashing with Linear/Jovie app accents. Primary marketing CTAs and key actions
+   layer explicit stronger variants on top where emphasis is required. */
+:where(:focus-visible) {
+  outline: none;
+  box-shadow:
+    0 0 0 2px var(--linear-bg-page),
+    0 0 0 4px color-mix(in oklab, var(--linear-border-focus) 55%, transparent);
+  transition:
+    box-shadow 150ms cubic-bezier(0.32, 0.72, 0, 1),
+    border-color 150ms cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+:where(
+    input,
+    textarea,
+    select,
+    [contenteditable="true"],
+    [role="textbox"]
+  ):focus {
+  outline: none;
+}
+
+:where(
+    input,
+    textarea,
+    select,
+    [contenteditable="true"],
+    [role="textbox"]
+  ):focus-visible {
+  box-shadow: none;
+}
+
+/* ============================================
+   GEIST ACCENT PALETTE — feature-surface accents
+   ============================================
+
+   Nine hues sourced from the Vercel Geist palette. Each hue exposes three
+   stops: -bg (subtle fill / atmosphere), -solid (text/icon/halo), -fg (legible
+   text on -solid). Used to rotate accents across feature surfaces (Bento,
+   Profile hero, Loop diagram). Never use as primary CTA color — primary CTA
+   stays white-on-black per .linear-marketing contract above.
+
+   Source: home-page-hero handoff bundle (Claude Design 2026-04).
+*/
+:root {
+  --geist-blue-bg: #e1f0ff;
+  --geist-blue-solid: #0070f3;
+  --geist-blue-fg: #ffffff;
+  --geist-purple-bg: #f4e8ff;
+  --geist-purple-solid: #8b5cf6;
+  --geist-purple-fg: #ffffff;
+  --geist-pink-bg: #ffe4f1;
+  --geist-pink-solid: #ff0080;
+  --geist-pink-fg: #ffffff;
+  --geist-red-bg: #ffe5e5;
+  --geist-red-solid: #e00000;
+  --geist-red-fg: #ffffff;
+  --geist-amber-bg: #fff3d6;
+  --geist-amber-solid: #f5a623;
+  --geist-amber-fg: #18181b;
+  --geist-yellow-bg: #fff9c2;
+  --geist-yellow-solid: #f7d600;
+  --geist-yellow-fg: #18181b;
+  --geist-green-bg: #d3f9d8;
+  --geist-green-solid: #0cce6b;
+  --geist-green-fg: #ffffff;
+  --geist-teal-bg: #ccf5ef;
+  --geist-teal-solid: #00bcd4;
+  --geist-teal-fg: #ffffff;
+  --geist-cyan-bg: #d6f3ff;
+  --geist-cyan-solid: #22c1fc;
+  --geist-cyan-fg: #18181b;
+
+  /* Rotation order — blue, purple, pink, amber, green, teal, red, cyan, yellow.
+   * Apple-style hue rotation across feature surfaces. */
+  --geist-rotation-1: var(--geist-blue-solid);
+  --geist-rotation-2: var(--geist-purple-solid);
+  --geist-rotation-3: var(--geist-pink-solid);
+  --geist-rotation-4: var(--geist-amber-solid);
+  --geist-rotation-5: var(--geist-green-solid);
+  --geist-rotation-6: var(--geist-teal-solid);
+  --geist-rotation-7: var(--geist-red-solid);
+  --geist-rotation-8: var(--geist-cyan-solid);
+  --geist-rotation-9: var(--geist-yellow-solid);
 }

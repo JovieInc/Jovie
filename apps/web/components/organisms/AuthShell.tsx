@@ -9,6 +9,8 @@ import {
   useSidebar,
 } from '@/components/organisms/Sidebar';
 import { UnifiedSidebar } from '@/components/organisms/UnifiedSidebar';
+import { HeaderSearchSurfaceFromContext } from '@/components/shell/HeaderSearchSurface';
+import { useOptionalHeaderActions } from '@/contexts/HeaderActionsContext';
 import { useRightPanel } from '@/contexts/RightPanelContext';
 import { DashboardHeader } from '@/features/dashboard/organisms/DashboardHeader';
 import { DashboardMobileTabs } from '@/features/dashboard/organisms/DashboardMobileTabs';
@@ -18,12 +20,13 @@ import type { DashboardBreadcrumbItem } from '@/types/dashboard';
 import { AppShellFrame } from './AppShellFrame';
 import { PersistentAudioBar } from './PersistentAudioBar';
 export interface AuthShellProps {
-  readonly section: 'admin' | 'dashboard' | 'settings';
+  readonly section: 'admin' | 'dashboard' | 'library' | 'settings';
   readonly breadcrumbs: DashboardBreadcrumbItem[];
   readonly headerBadge?: ReactNode;
   readonly headerAction?: ReactNode;
   readonly showMobileTabs?: boolean;
   readonly isTableRoute?: boolean;
+  readonly isLyricsRoute?: boolean;
   readonly onSidebarOpenChange?: (open: boolean) => void;
   readonly sidebarDefaultOpen?: boolean;
   readonly children: ReactNode;
@@ -41,16 +44,20 @@ function AuthShellInner({
   headerAction,
   showMobileTabs = false,
   isTableRoute = false,
+  isLyricsRoute = false,
   children,
 }: Readonly<Omit<AuthShellProps, 'children'> & { children: ReactNode }>) {
   const { isMobile } = useSidebar();
   const rightPanel = useRightPanel();
   const previewPanelState = usePreviewPanelState();
-  const shellChatV1Enabled = useAppFlag('SHELL_CHAT_V1');
+  const headerActionsState = useOptionalHeaderActions();
+  const shellChatV1Enabled = useAppFlag('DESIGN_V1');
 
-  const sidebarTrigger = isMobile ? null : <SidebarTrigger />;
+  const sidebarTrigger =
+    isMobile || shellChatV1Enabled ? null : <SidebarTrigger />;
 
   const isInSettings = section === 'settings';
+  const hideTopHeader = isInSettings || isLyricsRoute;
 
   // Memoize the sidebar so it doesn't re-render on breadcrumb/header changes.
   // The sidebar only depends on `section` — it shouldn't remount when
@@ -65,6 +72,13 @@ function AuthShellInner({
     () => (showMobileTabs ? <DashboardMobileTabs /> : null),
     [showMobileTabs]
   );
+  const searchSurface = useMemo(() => {
+    if (!headerActionsState?.headerSearchAdapter) {
+      return null;
+    }
+
+    return <HeaderSearchSurfaceFromContext className='w-full sm:w-auto' />;
+  }, [headerActionsState?.headerSearchAdapter]);
   const shellVariant = shellChatV1Enabled ? 'shellChatV1' : 'legacy';
   const audioPlayer = useMemo(
     () => <PersistentAudioBar variant={shellVariant} />,
@@ -75,12 +89,14 @@ function AuthShellInner({
     <AppShellFrame
       sidebar={sidebar}
       header={
-        isInSettings ? null : (
+        hideTopHeader ? null : (
           <DashboardHeader
             breadcrumbs={breadcrumbs}
             sidebarTrigger={sidebarTrigger}
             breadcrumbSuffix={headerBadge}
             action={headerAction}
+            searchSurface={searchSurface}
+            isSearchActive={headerActionsState?.isSearchOpen ?? false}
             mobileProfileSlot={
               <MobileProfileDrawer onOpen={previewPanelState.toggle} />
             }

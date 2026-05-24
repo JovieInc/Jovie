@@ -1,3 +1,27 @@
+/**
+ * Stripe Tips Webhook Handler
+ *
+ * Handles Stripe events for fan tips (the standalone tips checkout, separate
+ * from Stripe Connect onboarding which lives in `./stripe-connect`).
+ *
+ * Auth: signature verified via STRIPE_WEBHOOK_SECRET_TIPS using
+ * `stripe.webhooks.constructEvent`. Missing/invalid signature → 400.
+ *
+ * Events handled:
+ * - `checkout.session.completed` → create a tips row, fire post-processing
+ *   (audience upsert + thank-you email via processTipCompleted)
+ * - `charge.refunded` → mark the matching tip row `status: 'refunded'`
+ * - All other event types → logged and acknowledged with 200
+ *
+ * Idempotency: tips are inserted with `onConflictDoNothing` keyed on
+ * `paymentIntentId`, so duplicate Stripe deliveries are no-ops. Post-processing
+ * only runs when a row is actually inserted.
+ *
+ * Failure mode: handler returns 200 even when metadata is missing or no
+ * matching profile is found — these are logged via captureCriticalError so the
+ * team can manually reconcile, but Stripe is not asked to retry.
+ */
+
 import { eq } from 'drizzle-orm';
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';

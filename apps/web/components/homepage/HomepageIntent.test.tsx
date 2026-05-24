@@ -49,12 +49,12 @@ describe('HomepageIntent', () => {
     render(<HomepageIntent />);
     expect(
       screen.getByRole('heading', {
-        name: 'Drop more music, with less work.',
+        name: 'Your AI artist manager.',
       })
     ).toBeTruthy();
     expect(
       screen.getByText(
-        'Release music faster and grow your audience effortlessly.'
+        'Jovie watches your catalog, surfaces what to do next, and helps you ship the presave, fan path, or playlist pitch.'
       )
     ).toBeTruthy();
     expect(getInput()).toBeTruthy();
@@ -148,14 +148,14 @@ describe('HomepageIntent', () => {
     expect(props.promptLength).toBe('Plan a release for my EP'.length);
   });
 
-  it('6. submit calls router.push with /signup?redirect_url=/onboarding', () => {
+  it('6. submit calls router.push with /signup?redirect_url=/start', () => {
     render(<HomepageIntent />);
     fireEvent.change(getInput(), { target: { value: 'anything' } });
     fireEvent.click(getSubmit());
     expect(mockPush).toHaveBeenCalledTimes(1);
     const target = mockPush.mock.calls[0][0] as string;
     expect(target).toContain('/signup');
-    expect(target).toContain('redirect_url=%2Fonboarding%3Fintent_id%3D');
+    expect(target).toContain('redirect_url=%2Fstart%3Fintent_id%3D');
   });
 
   it('7. homepage_viewed fires exactly once on mount', () => {

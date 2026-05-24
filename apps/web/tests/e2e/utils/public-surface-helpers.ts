@@ -33,6 +33,12 @@ export async function installPublicRouteMocks(page: Page) {
   await page.route('**/api/profile/view', route =>
     route.fulfill({ status: 200, body: '{}' })
   );
+  await page.route('**/api/audience/visit-token*', route =>
+    route.fulfill({
+      status: 200,
+      body: JSON.stringify({ token: null, expiresAt: null }),
+    })
+  );
   await page.route('**/api/audience/visit', route =>
     route.fulfill({ status: 200, body: '{}' })
   );
@@ -194,6 +200,41 @@ export async function assertPublicSurfaceHealthy(
   ) {
     expect(h1Count, `${surface.id} should render exactly one h1`).toBe(1);
   }
+}
+
+/**
+ * JOV-2145 / JOV-2147: assert that the marketing-glass-header flyouts
+ * ("Features", "Resources" megamenus) are not rendered when closed on any
+ * surface that mounts MarketingHeader.
+ *
+ * After JOV-2147, flyouts use conditional render — they are only mounted in
+ * the DOM when open (always with the `--open` class). A closed flyout has no
+ * DOM node. This makes it impossible for flyout content to appear as unstyled
+ * text regardless of CSS availability, eliminating the JOV-2145 bug class.
+ *
+ * The assertion: any `.marketing-glass-header__flyout` node in the DOM on
+ * initial page load (before any user interaction) must not exist, because
+ * none should be open at that point. If a node is found without the `--open`
+ * class it means the conditional-render guard was removed, which is a bug.
+ *
+ * No-op on surfaces that don't mount the marketing header.
+ */
+export async function assertMarketingHeaderFlyoutsHidden(
+  page: Page,
+  surface: ResolvedPublicSurfaceSpec
+) {
+  const headerCount = await page.locator('.marketing-glass-header').count();
+  if (headerCount === 0) {
+    return;
+  }
+
+  const flyouts = page.locator('.marketing-glass-header__flyout');
+  const flyoutCount = await flyouts.count();
+
+  expect(
+    flyoutCount,
+    `${surface.id}: found ${flyoutCount} initial flyout(s) in DOM — marketing flyouts must only mount after user intent (JOV-2147)`
+  ).toBe(0);
 }
 
 async function visibleLocators(page: Page, selectors: readonly string[]) {

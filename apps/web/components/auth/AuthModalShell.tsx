@@ -38,6 +38,29 @@ export function AuthModalShell({
     if (!dialog.open) dialog.showModal();
   }, []);
 
+  useEffect(() => {
+    const body = globalThis.document?.body;
+    const root = globalThis.document?.documentElement;
+    if (!body || !root) return;
+
+    const previousBodyOverflow = body.style.overflow;
+    const previousBodyOverscroll = body.style.overscrollBehavior;
+    const previousRootOverflow = root.style.overflow;
+    const previousRootOverscroll = root.style.overscrollBehavior;
+
+    body.style.overflow = 'hidden';
+    body.style.overscrollBehavior = 'contain';
+    root.style.overflow = 'hidden';
+    root.style.overscrollBehavior = 'contain';
+
+    return () => {
+      body.style.overflow = previousBodyOverflow;
+      body.style.overscrollBehavior = previousBodyOverscroll;
+      root.style.overflow = previousRootOverflow;
+      root.style.overscrollBehavior = previousRootOverscroll;
+    };
+  }, []);
+
   const dismiss = useCallback(() => {
     router.back();
   }, [router]);
@@ -67,11 +90,11 @@ export function AuthModalShell({
       aria-label={ariaLabel}
       data-auth-modal-shell
       onMouseDown={onBackdropMouseDown}
-      className='jovie-auth-modal fixed inset-0 m-auto h-auto max-h-[calc(100svh-40px)] w-[min(calc(100vw-24px),600px)] overflow-auto rounded-[2rem] border border-white/[0.08] bg-[#08090a]/96 p-3 text-primary-token shadow-[0_36px_100px_rgba(0,0,0,0.5)] backdrop:bg-black/70 backdrop:backdrop-blur-sm sm:w-[min(calc(100vw-32px),600px)] sm:p-4'
+      className='jovie-auth-modal fixed inset-0 m-0 h-[100dvh] max-h-[100dvh] w-[100dvw] max-w-none overflow-y-auto overscroll-contain rounded-none border-0 bg-[#06070a] p-0 text-primary-token shadow-none backdrop:bg-black/70 backdrop:backdrop-blur-sm sm:m-auto sm:h-auto sm:max-h-[min(600px,calc(100svh-32px))] sm:w-[min(calc(100vw-32px),420px)] sm:rounded-[2rem] sm:border sm:border-white/[0.08] sm:bg-[#06070a]/96 sm:p-4 sm:shadow-[0_36px_100px_rgba(0,0,0,0.5)]'
     >
       <div
         data-auth-modal-body
-        className='flex min-h-0 flex-col rounded-[1.6rem] bg-transparent px-3 py-3 sm:px-4 sm:py-4'
+        className='flex min-h-[100dvh] flex-col bg-transparent pb-[max(1rem,env(safe-area-inset-bottom))] pl-[max(1rem,env(safe-area-inset-left))] pr-[max(1rem,env(safe-area-inset-right))] pt-[max(1rem,env(safe-area-inset-top))] sm:min-h-0 sm:rounded-[1.6rem] sm:px-4 sm:py-4'
       >
         <div className='mb-5 flex min-w-0 items-center gap-3 sm:mb-6'>
           <button
@@ -89,7 +112,7 @@ export function AuthModalShell({
           ) : null}
         </div>
 
-        <div className='mx-auto flex w-full max-w-[520px] min-h-0 flex-1 flex-col'>
+        <div className='mx-auto flex w-full min-h-0 flex-1 flex-col'>
           {children}
         </div>
       </div>

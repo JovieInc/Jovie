@@ -1,4 +1,5 @@
 import { cn } from '@/lib/utils';
+import { ShellMetadataChip } from './ShellMetadataChip';
 
 export interface DueChipProps {
   /** ISO timestamp of the due date. */
@@ -22,11 +23,21 @@ function formatDueLabel(days: number): string {
   if (days === 1) return 'Due tomorrow';
   if (days === -1) return 'Due yesterday';
   if (days > 0) {
-    const text = days < 7 ? `${days}d` : `${Math.round(days / 7)}w`;
+    const text =
+      days >= 365
+        ? `${Math.round(days / 365)}y`
+        : days < 7
+          ? `${days}d`
+          : `${Math.round(days / 7)}w`;
     return `Due in ${text}`;
   }
   const abs = Math.abs(days);
-  const text = abs < 7 ? `${abs}d` : `${Math.round(abs / 7)}w`;
+  const text =
+    abs >= 365
+      ? `${Math.round(abs / 365)}y`
+      : abs < 7
+        ? `${abs}d`
+        : `${Math.round(abs / 7)}w`;
   return `Due ${text} ago`;
 }
 
@@ -52,19 +63,15 @@ export function DueChip({ dueIso, now, muted, className }: DueChipProps) {
   const days = Math.round((due - reference) / MS_PER_DAY);
   const label = formatDueLabel(days);
   const soon = !muted && days >= 0 && days <= 2;
+  const overdue = !muted && days < 0;
   return (
-    <span
-      className={cn(
-        'inline-flex items-center h-[18px] px-1.5 rounded text-[10px] font-caption uppercase tracking-[0.04em] whitespace-nowrap shrink-0 tabular-nums',
-        muted
-          ? 'text-quaternary-token/70'
-          : soon
-            ? 'text-amber-300/90'
-            : 'text-tertiary-token',
-        className
-      )}
+    <ShellMetadataChip
+      tone={muted ? 'muted' : overdue ? 'danger' : soon ? 'warning' : 'neutral'}
+      className={cn('tabular-nums', className)}
+      contentClassName='uppercase tracking-[0.04em]'
+      title={new Date(due).toLocaleDateString()}
     >
       {label}
-    </span>
+    </ShellMetadataChip>
   );
 }

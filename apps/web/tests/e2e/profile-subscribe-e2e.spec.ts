@@ -22,6 +22,34 @@ test.describe.configure({ mode: 'serial' });
 // Helpers
 // ---------------------------------------------------------------------------
 
+const NOTIFICATIONS_TRIGGER_SELECTOR = [
+  '[data-testid="profile-inline-notifications-trigger"]',
+  '[data-testid="profile-home-alerts-row"]',
+  '[data-testid="profile-home-alerts-fallback-card"]',
+].join(', ');
+const VISIBLE_EMAIL_STEP_SELECTOR =
+  '[data-testid="profile-mobile-notifications-step-email"]:visible';
+const VISIBLE_EMAIL_INPUT_SELECTOR =
+  '[data-testid="mobile-email-input"]:visible';
+
+async function getActiveNotificationsFlow(page: Page) {
+  const dialogFlow = page
+    .locator('[role="dialog"][data-testid="profile-mobile-notifications-flow"]')
+    .first();
+  const dialogVisible = await dialogFlow
+    .waitFor({ state: 'visible', timeout: SMOKE_TIMEOUTS.QUICK })
+    .then(() => true)
+    .catch(() => false);
+
+  if (dialogVisible) {
+    return dialogFlow;
+  }
+
+  return page
+    .locator('[data-testid="profile-mobile-notifications-flow"]:visible')
+    .first();
+}
+
 async function interceptAnalytics(page: Page) {
   await page.route('**/api/profile/view', (r: Route) =>
     r.fulfill({ status: 200, body: '{}' })
@@ -31,6 +59,9 @@ async function interceptAnalytics(page: Page) {
   );
   await page.route('**/api/track', (r: Route) =>
     r.fulfill({ status: 200, body: '{}' })
+  );
+  await page.route('**/api/px', (r: Route) =>
+    r.fulfill({ status: 204, body: '' })
   );
 }
 
@@ -55,40 +86,34 @@ async function setupProfilePage(page: Page) {
 
   await page
     .locator(
-      '[data-testid="profile-mobile-notifications-step-preferences"], [data-testid="profile-inline-notifications-trigger"]'
+      [VISIBLE_EMAIL_STEP_SELECTOR, NOTIFICATIONS_TRIGGER_SELECTOR].join(', ')
     )
     .first()
     .waitFor({ state: 'visible', timeout: SMOKE_TIMEOUTS.VISIBILITY });
 }
 
 /**
- * Open the full-screen notifications flow and advance to the email step.
- * Returns `false` if the trigger is not found.
+ * Open the full-screen notifications flow and wait for the email step.
  */
 async function clickTurnOnNotifications(page: Page) {
-  const preferencesStep = page.getByTestId(
-    'profile-mobile-notifications-step-preferences'
-  );
-  const preferencesVisible = await preferencesStep
-    .isVisible({ timeout: SMOKE_TIMEOUTS.VISIBILITY })
+  const emailStep = page.locator(VISIBLE_EMAIL_STEP_SELECTOR).first();
+  const emailVisible = await emailStep
+    .waitFor({ state: 'visible', timeout: SMOKE_TIMEOUTS.QUICK })
+    .then(() => true)
     .catch(() => false);
 
-  if (!preferencesVisible) {
-    const btn = page.getByTestId('profile-inline-notifications-trigger');
+  if (!emailVisible) {
+    const btn = page.locator(NOTIFICATIONS_TRIGGER_SELECTOR).first();
     await btn.waitFor({ state: 'visible', timeout: SMOKE_TIMEOUTS.VISIBILITY });
     await btn.click();
-    await preferencesStep.waitFor({
+    await emailStep.waitFor({
       state: 'visible',
       timeout: SMOKE_TIMEOUTS.VISIBILITY,
     });
   }
 
-  await preferencesStep.getByRole('switch', { name: /new music/i }).click();
-
-  await page
-    .getByTestId('profile-mobile-notifications-step-email')
-    .waitFor({ state: 'visible', timeout: SMOKE_TIMEOUTS.VISIBILITY });
-  await page.getByTestId('mobile-email-input').waitFor({
+  const flow = await getActiveNotificationsFlow(page);
+  await flow.locator(VISIBLE_EMAIL_INPUT_SELECTOR).first().waitFor({
     state: 'visible',
     timeout: SMOKE_TIMEOUTS.VISIBILITY,
   });
@@ -97,57 +122,94 @@ async function clickTurnOnNotifications(page: Page) {
 /**
  * Type an email and submit the email step.
  */
-async function submitEmail(page: Page, email: string) {
-  const emailStep = page.getByTestId('profile-mobile-notifications-step-email');
+async function submitEmail(
+  page: Page,
+  email: string,
+  options: { readonly waitForSubscribe?: boolean } = {}
+) {
+  const flow = await getActiveNotificationsFlow(page);
+  const emailStep = flow
+    .locator('[data-testid="profile-mobile-notifications-step-email"]')
+    .first();
   await emailStep.waitFor({
     state: 'visible',
     timeout: SMOKE_TIMEOUTS.VISIBILITY,
   });
-  const input = page.getByTestId('mobile-email-input');
+  const input = flow.locator('[data-testid="mobile-email-input"]').first();
   await input.fill(email);
 
   const submitBtn = emailStep.getByRole('button', { name: /^continue$/i });
+  await expect(submitBtn).toBeEnabled();
+
+  if (options.waitForSubscribe) {
+    await Promise.all([
+      page.waitForResponse(
+        response =>
+          response.url().includes('/api/notifications/subscribe') &&
+          response.request().method() === 'POST',
+        { timeout: SMOKE_TIMEOUTS.VISIBILITY }
+      ),
+      submitBtn.click(),
+    ]);
+    return;
+  }
+
   await submitBtn.click();
 }
 
 async function expectSubscribeError(page: Page, message: string) {
-  await expect(
-    page
-      .getByRole('alert')
-      .or(page.getByRole('tooltip'))
-      .or(page.getByTestId('profile-mobile-notifications-flow'))
-  ).toContainText(message, {
+  await expect(page.getByText(message, { exact: false }).first()).toBeVisible({
     timeout: SMOKE_TIMEOUTS.VISIBILITY,
   });
 }
 
 async function completeNameStep(page: Page, name: string) {
-  const nameStep = page.getByTestId('profile-mobile-notifications-step-name');
+  const flow = await getActiveNotificationsFlow(page);
+  const nameStep = flow
+    .locator('[data-testid="profile-mobile-notifications-step-name"]')
+    .first();
   await nameStep.waitFor({
     state: 'visible',
     timeout: SMOKE_TIMEOUTS.VISIBILITY,
   });
-  await page.getByTestId('mobile-name-input').fill(name);
-  await nameStep.getByRole('button', { name: /^continue$/i }).click();
+  const input = flow.locator('[data-testid="mobile-name-input"]').first();
+  await input.fill(name);
+  await expect(input).toHaveValue(name);
+
+  const continueButton = nameStep.getByRole('button', { name: /^continue$/i });
+  await expect(continueButton).toBeEnabled();
+  await continueButton.click();
 }
 
 async function completeBirthdayStep(page: Page) {
-  const birthdayStep = page.getByTestId(
-    'profile-mobile-notifications-step-birthday'
-  );
+  const flow = await getActiveNotificationsFlow(page);
+  const birthdayStep = flow
+    .locator('[data-testid="profile-mobile-notifications-step-birthday"]')
+    .first();
   await birthdayStep.waitFor({
     state: 'visible',
     timeout: SMOKE_TIMEOUTS.VISIBILITY,
   });
-  await page.getByTestId('mobile-birthday-month').selectOption('04');
-  await page.getByTestId('mobile-birthday-day').selectOption('24');
-  await page.getByTestId('mobile-birthday-year').selectOption('1994');
-  await birthdayStep.getByRole('button', { name: /^continue$/i }).click();
+  await flow
+    .locator('[data-testid="mobile-birthday-month"]')
+    .selectOption('04');
+  await flow.locator('[data-testid="mobile-birthday-day"]').selectOption('24');
+  await flow
+    .locator('[data-testid="mobile-birthday-year"]')
+    .selectOption('1994');
+  const continueButton = birthdayStep.getByRole('button', {
+    name: /^continue$/i,
+  });
+  await expect(continueButton).toBeEnabled();
+  await continueButton.click();
 }
 
 async function enterOtpCode(page: Page, code: string) {
-  const otpStep = page.getByTestId('profile-mobile-notifications-step-otp');
-  const firstDigitInput = page.getByLabel('Digit 1 of 6');
+  const flow = await getActiveNotificationsFlow(page);
+  const otpStep = flow
+    .locator('[data-testid="profile-mobile-notifications-step-otp"]')
+    .first();
+  const firstDigitInput = flow.getByLabel('Digit 1 of 6');
 
   await otpStep.waitFor({
     state: 'visible',
@@ -160,15 +222,6 @@ async function enterOtpCode(page: Page, code: string) {
 
   await firstDigitInput.click();
   await firstDigitInput.pressSequentially(code);
-
-  const otpSubmitBtn = otpStep.getByRole('button', { name: /^verify$/i });
-  const canClickVerify = await otpSubmitBtn
-    .isEnabled({ timeout: 1000 })
-    .catch(() => false);
-
-  if (canClickVerify) {
-    await otpSubmitBtn.click();
-  }
 }
 
 // ---------------------------------------------------------------------------
@@ -178,7 +231,7 @@ async function enterOtpCode(page: Page, code: string) {
 test.describe('Profile Subscribe Flow @smoke', () => {
   test.setTimeout(180_000);
 
-  test('email happy path: submit -> OTP -> verify -> success', async ({
+  test('email happy path: submit -> OTP -> verify -> activated', async ({
     page,
   }) => {
     // Mock subscribe endpoint
@@ -186,7 +239,14 @@ test.describe('Profile Subscribe Flow @smoke', () => {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
-        body: JSON.stringify({ pendingConfirmation: true }),
+        body: JSON.stringify({
+          success: true,
+          message: 'Please check your email to confirm your subscription',
+          emailDispatched: true,
+          durationMs: 1,
+          pendingConfirmation: true,
+          requiresOtp: true,
+        }),
       });
     });
 
@@ -226,7 +286,7 @@ test.describe('Profile Subscribe Flow @smoke', () => {
     await clickTurnOnNotifications(page);
 
     // Type email and submit
-    await submitEmail(page, 'test@example.com');
+    await submitEmail(page, 'test@example.com', { waitForSubscribe: true });
 
     // Wait for OTP step
     await enterOtpCode(page, '123456');
@@ -234,16 +294,10 @@ test.describe('Profile Subscribe Flow @smoke', () => {
     await completeNameStep(page, 'Alex');
     await completeBirthdayStep(page);
 
-    await page
-      .getByTestId('profile-mobile-notifications-step-preferences')
-      .waitFor({ state: 'visible', timeout: SMOKE_TIMEOUTS.VISIBILITY });
-    await page
-      .getByTestId('profile-mobile-notifications-step-preferences')
-      .getByRole('button', { name: /save & finish/i })
-      .click();
-
     await expect(
-      page.getByTestId('profile-mobile-notifications-step-done')
+      (await getActiveNotificationsFlow(page))
+        .locator('[data-testid="profile-mobile-notifications-step-done"]')
+        .first()
     ).toBeVisible({
       timeout: SMOKE_TIMEOUTS.VISIBILITY,
     });
@@ -265,7 +319,14 @@ test.describe('Profile Subscribe Flow @smoke', () => {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
-        body: JSON.stringify({ pendingConfirmation: true }),
+        body: JSON.stringify({
+          success: true,
+          message: 'Please check your email to confirm your subscription',
+          emailDispatched: true,
+          durationMs: 1,
+          pendingConfirmation: true,
+          requiresOtp: true,
+        }),
       });
     });
 
@@ -274,14 +335,17 @@ test.describe('Profile Subscribe Flow @smoke', () => {
       await route.fulfill({
         status: 400,
         contentType: 'application/json',
-        body: JSON.stringify({ error: 'Invalid verification code' }),
+        body: JSON.stringify({
+          success: false,
+          error: 'Invalid verification code',
+        }),
       });
     });
 
     await setupProfilePage(page);
     await clickTurnOnNotifications(page);
 
-    await submitEmail(page, 'test@example.com');
+    await submitEmail(page, 'test@example.com', { waitForSubscribe: true });
 
     // Wait for OTP step
     await enterOtpCode(page, '000000');
@@ -295,7 +359,14 @@ test.describe('Profile Subscribe Flow @smoke', () => {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
-        body: JSON.stringify({ pendingConfirmation: true }),
+        body: JSON.stringify({
+          success: true,
+          message: 'Please check your email to confirm your subscription',
+          emailDispatched: true,
+          durationMs: 1,
+          pendingConfirmation: true,
+          requiresOtp: true,
+        }),
       });
     });
 
@@ -305,6 +376,7 @@ test.describe('Profile Subscribe Flow @smoke', () => {
         status: 429,
         contentType: 'application/json',
         body: JSON.stringify({
+          success: false,
           error: 'Too many attempts. Please try again later.',
         }),
       });
@@ -313,7 +385,7 @@ test.describe('Profile Subscribe Flow @smoke', () => {
     await setupProfilePage(page);
     await clickTurnOnNotifications(page);
 
-    await submitEmail(page, 'test@example.com');
+    await submitEmail(page, 'test@example.com', { waitForSubscribe: true });
 
     // Wait for OTP step
     await enterOtpCode(page, '000000');

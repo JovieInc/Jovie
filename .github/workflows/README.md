@@ -50,13 +50,19 @@ The main CI workflow `ci.yml` is the gatekeeper for PRs to `main`. It includes:
 - **Smoke tests** - validates critical paths after deploy
 - **Lighthouse CI** - performance metrics on each deploy
 
-## Auto-Merge
+## Agent Landing Sweep
 
-The `auto-merge.yml` workflow handles automatic merging for:
+The `agent-landing-sweep.yml` workflow runs every 15 minutes as a scheduled fallback for the event-driven approve job in `agent-pipeline.yml`. It sweeps open, non-draft agent PRs and enables auto-merge on any that pass all guardrails:
 
-- Dependabot PRs (patch/minor updates)
-- Codegen PRs
-- PRs with `auto-merge` label (after CI passes)
+- CI PR Ready check passed
+- Scope judge passed
+- CodeRabbit not blocking
+- No sensitive files changed (auth, billing, migrations, CI, etc.)
+- No `needs-human` label
+- Has `automerge`, `auto-approved`, or `ai:ready-to-merge` label
+- Queue pressure below threshold (12 PRs already queued)
+
+This catches PRs that the event-driven pipeline missed due to delivery delays or race conditions.
 
 ## Linear AI Automation
 
@@ -66,6 +72,9 @@ The Linear automation path uses two workflows:
   - Trigger: `repository_dispatch` (`linear_todo_ready`) from `/api/webhooks/linear`
   - Behavior: waits for a CodeRabbit plan marker, assigns the issue to Codex in Linear, runs implementation, pushes a codex/* branch for auto-PR creation, then updates Linear to review
   - Includes bounded polling with configurable loop counts (`MAX_PLAN_WAIT_ATTEMPTS`, `PLAN_POLL_INTERVAL_SECONDS`)
+  - Burn controls: routine dispatch defaults to `model_tier: economy`; only an explicit
+    `premium` payload preserves the premium path
+  - Capacity controls: new agent work is deferred when 5 agent PRs are already open
 
 - **`linear-sync-on-merge.yml`**
   - Trigger: `pull_request.closed` (merged)
@@ -93,4 +102,8 @@ The `synthetic-monitoring.yml` workflow runs golden path tests against jov.ie on
 
 ## Agent Push-to-PR Bridge
 
-The `auto-pr-on-push.yml` workflow closes the handoff gap for agent branches (`codex/*`, `claude/*`, `codegen-bot/*`, `linear/*`) by creating a PR immediately after a push and enabling auto-merge.
+The `auto-pr-on-push.yml` workflow closes the handoff gap for agent branches
+(`codex/*`, `claude/*`, `codegen-bot/*`, `linear/*`) by creating a draft PR
+after a push. It enforces the same 5 open-agent-PR capacity cap before creating
+new draft PRs; downstream verification and agent pipeline jobs decide when a
+draft is ready and whether auto-merge is eligible.

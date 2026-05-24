@@ -7,6 +7,14 @@ import {
   resolveAudienceClickVerb,
 } from '@/lib/audience/click-event-helpers';
 import { recordAudienceEvent } from '@/lib/audience/record-audience-event';
+import {
+  COOKIE_BANNER_REQUIRED_COOKIE,
+  isCookieBannerRequired,
+} from '@/lib/cookies/consent-regions';
+import {
+  CONSENT_COOKIE_NAME,
+  parseConsentCookieValue,
+} from '@/lib/cookies/consent-state';
 import { db } from '@/lib/db';
 import { audienceMembers, clickEvents } from '@/lib/db/schema/analytics';
 import { socialLinks } from '@/lib/db/schema/links';
@@ -28,30 +36,6 @@ import {
   mergeAudienceTags,
 } from '../audience/lib/audience-utils';
 import { validateTrackRequest } from './validation';
-
-// ---------------------------------------------------------------------------
-// Consent helpers
-// ---------------------------------------------------------------------------
-
-const CONSENT_COOKIE_NAME = 'jv_cc';
-
-interface ConsentPreferences {
-  essential: boolean;
-  analytics: boolean;
-  marketing: boolean;
-}
-
-function parseConsentCookie(request: NextRequest): ConsentPreferences | null {
-  try {
-    const raw = request.cookies?.get(CONSENT_COOKIE_NAME)?.value;
-    if (!raw) return null;
-    const parsed = JSON.parse(raw) as ConsentPreferences;
-    if (typeof parsed?.marketing !== 'boolean') return null;
-    return parsed;
-  } catch {
-    return null;
-  }
-}
 
 /**
  * Anonymize an IP address for privacy:
@@ -397,14 +381,22 @@ export async function POST(request: NextRequest) {
       request.headers.get('x-vercel-ip-country') ??
       request.headers.get('cf-ipcountry') ??
       undefined;
+    const geoRegion =
+      request.headers.get('x-vercel-ip-country-region') ?? undefined;
     const audienceDeviceType = inferAudienceDeviceType(userAgent);
 
     // Determine marketing consent from jv_cc cookie.
-    // When the cookie banner is not shown (non-regulated jurisdictions),
-    // jv_cc is absent — treat absent cookie as consent given (default-allow).
-    // Only explicit marketing=false (user rejected) blocks audience tracking.
-    const consent = parseConsentCookie(request);
-    const hasMarketingConsent = consent === null || consent.marketing === true;
+    // Non-regulated jurisdictions remain default-allow when no banner was
+    // required, but consent-required visitors need a valid marketing opt-in.
+    const requiresCookieConsent =
+      request.cookies?.get(COOKIE_BANNER_REQUIRED_COOKIE)?.value === '1' ||
+      isCookieBannerRequired(geoCountry ?? null, geoRegion ?? null);
+    const consent = parseConsentCookieValue(
+      request.cookies?.get(CONSENT_COOKIE_NAME)?.value
+    );
+    const hasMarketingConsent =
+      consent?.marketing === true ||
+      (consent === null && !requiresCookieConsent);
 
     // Without marketing consent: anonymize IP and use generic fingerprint.
     // With consent: full behavior (store real IP, create audience members).
@@ -429,10 +421,12 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const trackingResult = await withSystemIngestionSession(async tx => {
-      // Only create/update audience member records when marketing consent is given
-      const audienceMemberId = hasMarketingConsent
-        ? await upsertAudienceMember(tx, {
+    // Audience member enrichment is valuable, but it cannot be allowed to make
+    // a public click-tracking request fail. Keep it outside the click insert
+    // transaction so a DB-shape or conflict error does not poison the click write.
+    const audienceMemberId = hasMarketingConsent
+      ? await withSystemIngestionSession(async tx =>
+          upsertAudienceMember(tx, {
             profileId: profile.id,
             fingerprint,
             audienceDeviceType,
@@ -444,8 +438,18 @@ export async function POST(request: NextRequest) {
             target,
             isBot: botDetection.isBot,
           })
-        : null;
+        ).catch(async error => {
+          await captureError('Track audience member upsert failed', error, {
+            route: '/api/track',
+            creatorProfileId: profile.id,
+            handle,
+            linkType,
+          });
+          return null;
+        })
+      : null;
 
+    const trackingResult = await withSystemIngestionSession(async tx => {
       const metadata = buildClickMetadata(
         target,
         resolvedSource,

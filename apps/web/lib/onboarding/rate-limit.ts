@@ -17,6 +17,18 @@ import {
   handleCheckLimiter,
 } from '@/lib/rate-limit';
 
+const RATE_LIMIT_ERROR_PREFIX = `[${OnboardingErrorCode.RATE_LIMITED}] `;
+
+export function getOnboardingRateLimitMessage(error: unknown): string | null {
+  if (!(error instanceof Error)) return null;
+  if (!error.message.startsWith(RATE_LIMIT_ERROR_PREFIX)) return null;
+
+  return (
+    error.message.slice(RATE_LIMIT_ERROR_PREFIX.length).trim() ||
+    'Too many attempts. Please wait a moment and try again.'
+  );
+}
+
 /**
  * Enforce onboarding rate limits using the unified rate limiter.
  *

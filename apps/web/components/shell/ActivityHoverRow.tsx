@@ -56,7 +56,7 @@ export function ActivityHoverRow({
       type='button'
       onClick={onClick}
       className={cn(
-        'group/act flex items-center gap-2.5 h-8 px-2 rounded-md text-[12.5px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-token transition-colors duration-150 ease-out',
+        'group/act flex items-center gap-2.5 h-8 px-2 rounded-md text-[12.5px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/55 focus-visible:ring-offset-2 focus-visible:ring-offset-(--linear-bg-page) transition-colors duration-subtle ease-subtle',
         danger
           ? 'text-rose-300/85 hover:bg-rose-500/10 hover:text-rose-200'
           : 'text-secondary-token hover:bg-surface-1/50 hover:text-primary-token',
@@ -77,7 +77,7 @@ export function ActivityHoverRow({
           className='h-1.5 w-1.5 rounded-full bg-cyan-300/80 anim-calm-breath'
         />
       )}
-      <span className='text-[10.5px] uppercase tracking-[0.06em] text-quaternary-token group-hover/act:text-tertiary-token transition-colors duration-150 ease-out'>
+      <span className='text-[10.5px] uppercase tracking-[0.06em] text-quaternary-token group-hover/act:text-tertiary-token transition-colors duration-subtle ease-subtle'>
         {meta}
       </span>
     </button>

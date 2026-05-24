@@ -12,13 +12,16 @@ vi.mock('@/app/app/(shell)/dashboard/PreviewPanelContext', () => ({
 
 vi.mock('@/components/organisms/AppShellFrame', () => ({
   AppShellFrame: ({
+    header,
     main,
     variant,
   }: {
+    header?: ReactNode;
     main: ReactNode;
     variant: 'legacy' | 'shellChatV1';
   }) => (
     <div data-testid='app-shell-frame' data-shell-design={variant}>
+      {header}
       {main}
     </div>
   ),
@@ -45,7 +48,9 @@ vi.mock('@/contexts/RightPanelContext', () => ({
 }));
 
 vi.mock('@/features/dashboard/organisms/DashboardHeader', () => ({
-  DashboardHeader: () => <header>Dashboard Header</header>,
+  DashboardHeader: ({ sidebarTrigger }: { sidebarTrigger?: ReactNode }) => (
+    <header>{sidebarTrigger}Dashboard Header</header>
+  ),
 }));
 
 vi.mock('@/features/dashboard/organisms/DashboardMobileTabs', () => ({
@@ -56,10 +61,10 @@ vi.mock('@/features/dashboard/organisms/MobileProfileDrawer', () => ({
   MobileProfileDrawer: () => null,
 }));
 
-function renderAuthShell(shellChatV1: boolean) {
+function renderAuthShell(designV1: boolean) {
   render(
     <AppFlagProvider
-      initialFlags={{ ...APP_FLAG_DEFAULTS, SHELL_CHAT_V1: shellChatV1 }}
+      initialFlags={{ ...APP_FLAG_DEFAULTS, DESIGN_V1: designV1 }}
     >
       <AuthShell section='dashboard' breadcrumbs={[]}>
         <div>Shell Content</div>
@@ -68,26 +73,32 @@ function renderAuthShell(shellChatV1: boolean) {
   );
 }
 
-describe('AuthShell SHELL_CHAT_V1 wiring', () => {
+describe('AuthShell DESIGN_V1 wiring', () => {
   beforeEach(() => {
     localStorage.removeItem(FF_OVERRIDES_KEY);
   });
 
-  it('uses the legacy shell frame when SHELL_CHAT_V1 is disabled', () => {
+  it('uses the legacy shell frame when DESIGN_V1 is disabled', () => {
     renderAuthShell(false);
 
     expect(screen.getByTestId('app-shell-frame')).toHaveAttribute(
       'data-shell-design',
       'legacy'
     );
+    expect(
+      screen.getByRole('button', { name: 'Toggle Sidebar' })
+    ).toBeInTheDocument();
   });
 
-  it('uses the shell chat V1 frame when SHELL_CHAT_V1 is enabled', () => {
+  it('uses the shell chat V1 frame when DESIGN_V1 is enabled', () => {
     renderAuthShell(true);
 
     expect(screen.getByTestId('app-shell-frame')).toHaveAttribute(
       'data-shell-design',
       'shellChatV1'
     );
+    expect(
+      screen.queryByRole('button', { name: 'Toggle Sidebar' })
+    ).not.toBeInTheDocument();
   });
 });

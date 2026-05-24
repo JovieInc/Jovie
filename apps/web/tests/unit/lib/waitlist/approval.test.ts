@@ -1,5 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { approveWaitlistEntryInTx } from '@/lib/waitlist/approval';
+import {
+  approveWaitlistEntryInTx,
+  disapproveWaitlistEntryInTx,
+} from '@/lib/waitlist/approval';
 
 type QueryResult = Array<Record<string, unknown>>;
 
@@ -29,9 +32,13 @@ function createTxMock(selectResults: QueryResult[]) {
   }));
 
   return {
-    tx: { select, update } as unknown as Parameters<
-      typeof approveWaitlistEntryInTx
-    >[0],
+    tx: {
+      select,
+      update,
+      insert: vi.fn(() => ({
+        values: vi.fn().mockResolvedValue(undefined),
+      })),
+    } as unknown as Parameters<typeof approveWaitlistEntryInTx>[0],
     updateSet,
   };
 }
@@ -51,8 +58,8 @@ describe('approveWaitlistEntryInTx', () => {
           status: 'new',
         },
       ],
-      [{ id: 'target-profile' }],
       [{ id: 'user-1', clerkId: 'clerk_123' }],
+      [{ id: 'target-profile' }],
       [{ id: 'old-profile' }],
     ]);
 
@@ -60,6 +67,7 @@ describe('approveWaitlistEntryInTx', () => {
 
     expect(result).toEqual({
       outcome: 'approved',
+      entryId: 'entry-1',
       profileId: 'target-profile',
       email: 'creator@example.com',
       fullName: 'Creator',
@@ -83,7 +91,7 @@ describe('approveWaitlistEntryInTx', () => {
       expect.objectContaining({
         userId: 'user-1',
         isClaimed: true,
-        isPublic: true,
+        isPublic: false,
       })
     );
     expect(updateSet).toHaveBeenNthCalledWith(
@@ -93,11 +101,12 @@ describe('approveWaitlistEntryInTx', () => {
       })
     );
 
-    // User status stays active — onboarding is gated by isProfileComplete() not userStatus
+    // Approval grants access but still requires onboarding completion.
     expect(updateSet).toHaveBeenNthCalledWith(
       4,
       expect.objectContaining({
-        userStatus: 'active',
+        userStatus: 'waitlist_approved',
+        activeProfileId: 'target-profile',
       })
     );
   });
@@ -112,8 +121,8 @@ describe('approveWaitlistEntryInTx', () => {
           status: 'new',
         },
       ],
-      [{ id: 'target-profile' }],
       [{ id: 'user-1', clerkId: 'clerk_123' }],
+      [{ id: 'target-profile' }],
       [],
     ]);
 
@@ -134,12 +143,135 @@ describe('approveWaitlistEntryInTx', () => {
         onboardingCompletedAt: expect.anything(),
       })
     );
-    // User status stays active
+    // User gets access without being marked active.
     expect(updateSet).toHaveBeenNthCalledWith(
       3,
       expect.objectContaining({
-        userStatus: 'active',
+        userStatus: 'waitlist_approved',
       })
     );
+  });
+
+  it('approves entries that do not have a precreated profile', async () => {
+    const { tx, updateSet } = createTxMock([
+      [
+        {
+          id: 'entry-1',
+          email: 'creator@example.com',
+          fullName: 'Creator',
+          status: 'new',
+        },
+      ],
+      [{ id: 'user-1', clerkId: 'clerk_123' }],
+      [],
+    ]);
+
+    const result = await approveWaitlistEntryInTx(tx, 'entry-1');
+
+    expect(result).toEqual({
+      outcome: 'approved',
+      entryId: 'entry-1',
+      profileId: null,
+      email: 'creator@example.com',
+      fullName: 'Creator',
+      clerkId: 'clerk_123',
+    });
+    expect(updateSet).toHaveBeenCalledTimes(2);
+    expect(updateSet).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({
+        userStatus: 'waitlist_approved',
+        activeProfileId: null,
+      })
+    );
+  });
+
+  it('re-approves expired invites so admins can send a fresh invite', async () => {
+    const { tx, updateSet } = createTxMock([
+      [
+        {
+          id: 'entry-1',
+          email: 'creator@example.com',
+          fullName: 'Creator',
+          status: 'expired',
+        },
+      ],
+      [{ id: 'user-1', clerkId: 'clerk_123' }],
+      [],
+    ]);
+
+    const result = await approveWaitlistEntryInTx(tx, 'entry-1');
+
+    expect(result).toEqual({
+      outcome: 'approved',
+      entryId: 'entry-1',
+      profileId: null,
+      email: 'creator@example.com',
+      fullName: 'Creator',
+      clerkId: 'clerk_123',
+    });
+    expect(updateSet).toHaveBeenCalledTimes(2);
+    expect(updateSet).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({
+        status: 'invited',
+        expiredAt: null,
+        inviteTokenRedeemedAt: null,
+      })
+    );
+  });
+});
+
+describe('disapproveWaitlistEntryInTx', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('clears invite token and email metadata so later re-approval can issue a fresh invite', async () => {
+    const { tx, updateSet } = createTxMock([
+      [
+        {
+          id: 'entry-1',
+          email: 'creator@example.com',
+          status: 'approved',
+        },
+      ],
+      [{ id: 'user-1', clerkId: 'clerk_123' }],
+      [],
+    ]);
+
+    const result = await disapproveWaitlistEntryInTx(tx, 'entry-1');
+
+    expect(result).toEqual({
+      outcome: 'disapproved',
+      clerkId: 'clerk_123',
+    });
+    expect(updateSet).toHaveBeenCalledWith(
+      expect.objectContaining({
+        status: 'waitlisted',
+        inviteTokenHash: null,
+        inviteTokenExpiresAt: null,
+        inviteTokenRedeemedAt: null,
+        inviteEmailStatus: null,
+        inviteEmailSentAt: null,
+      })
+    );
+  });
+
+  it('treats legacy claimed entries as terminal', async () => {
+    const { tx, updateSet } = createTxMock([
+      [
+        {
+          id: 'entry-1',
+          email: 'creator@example.com',
+          status: 'claimed',
+        },
+      ],
+    ]);
+
+    const result = await disapproveWaitlistEntryInTx(tx, 'entry-1');
+
+    expect(result).toEqual({ outcome: 'terminal', status: 'claimed' });
+    expect(updateSet).not.toHaveBeenCalled();
   });
 });

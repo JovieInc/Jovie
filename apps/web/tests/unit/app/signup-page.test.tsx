@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const {
   clearSignupClaimValueMock,
+  authLayoutMock,
   clerkSignUpMock,
   fetchMock,
   persistSignupClaimValueMock,
@@ -14,6 +15,7 @@ const {
   validatePlanMock,
 } = vi.hoisted(() => ({
   clearSignupClaimValueMock: vi.fn(),
+  authLayoutMock: vi.fn(),
   clerkSignUpMock: vi.fn(),
   fetchMock: vi.fn(),
   persistSignupClaimValueMock: vi.fn(),
@@ -35,15 +37,26 @@ vi.mock('next/navigation', () => ({
   useSearchParams: () => new URLSearchParams(searchParamsState.value),
 }));
 
-vi.mock('@/features/auth', () => ({
-  AuthLayout: ({ children }: { children: ReactNode }) => (
-    <div data-testid='auth-layout'>{children}</div>
-  ),
-  AuthRoutePrefetch: ({ href }: { href: string }) => {
-    routerPrefetchMock(href);
-    return null;
-  },
-}));
+vi.mock('@/features/auth', async () => {
+  const reactModule = await import('react');
+  return {
+    AuthLayout: (props: { children: ReactNode }) => {
+      authLayoutMock(props);
+      return reactModule.createElement(
+        'div',
+        { 'data-testid': 'auth-layout' },
+        props.children
+      );
+    },
+    AuthRoutePrefetch: ({ href }: { href: string }) => {
+      routerPrefetchMock(href);
+      return null;
+    },
+    // Import the real AuthShell so its Clerk wiring is exercised in this
+    // test. Provider gating is verified separately in oauth-providers.test.ts.
+    AuthShell: (await import('@/components/features/auth/AuthShell')).AuthShell,
+  };
+});
 
 vi.mock('@/lib/analytics', () => ({
   track: trackMock,
@@ -68,8 +81,13 @@ import { APP_ROUTES } from '@/constants/routes';
 import SignUpPage from '../../../app/(auth)/signup/page';
 
 describe('signup page', () => {
+  function fullAuthUrl(path: string) {
+    return new URL(path, globalThis.location.origin).toString();
+  }
+
   beforeEach(() => {
     clearSignupClaimValueMock.mockReset();
+    authLayoutMock.mockReset();
     clerkSignUpMock.mockReset();
     fetchMock.mockReset();
     fetchMock.mockResolvedValue({
@@ -94,13 +112,26 @@ describe('signup page', () => {
     });
 
     expect(screen.getByTestId('clerk-sign-up')).toBeInTheDocument();
+    expect(authLayoutMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        formTitle: 'Request access',
+        showFormTitle: false,
+        showFooterPrompt: false,
+        layoutVariant: 'split',
+      })
+    );
+    expect(
+      screen.queryByText('Start your private launch request.')
+    ).not.toBeInTheDocument();
+    expect(screen.queryByText("Don't have access?")).not.toBeInTheDocument();
     expect(routerPrefetchMock).toHaveBeenCalledWith(APP_ROUTES.SIGNIN);
     expect(clerkSignUpMock).toHaveBeenCalledWith(
       expect.objectContaining({
-        routing: 'hash',
+        routing: 'path',
+        path: '/signup',
         oauthFlow: 'redirect',
-        signInUrl: APP_ROUTES.SIGNIN,
-        fallbackRedirectUrl: APP_ROUTES.ONBOARDING,
+        signInUrl: fullAuthUrl(APP_ROUTES.SIGNIN),
+        fallbackRedirectUrl: APP_ROUTES.WAITLIST,
       })
     );
     expect(
@@ -165,6 +196,22 @@ describe('signup page', () => {
     replaceStateSpy.mockRestore();
   });
 
+  it('preserves desktop_return on the oauth compatibility banner sign-in link', async () => {
+    searchParamsState.value =
+      'oauth_error=account_exists&desktop_return=%2Fapp%2Fsettings';
+    globalThis.history.replaceState(
+      null,
+      '',
+      '/signup?oauth_error=account_exists&desktop_return=%2Fapp%2Fsettings'
+    );
+
+    render(<SignUpPage />);
+
+    expect(
+      screen.getByRole('link', { name: 'Sign in instead' })
+    ).toHaveAttribute('href', '/signin?desktop_return=%2Fapp%2Fsettings');
+  });
+
   it('preserves redirect_url on the Clerk sign-in footer link', async () => {
     searchParamsState.value = 'redirect_url=%2Fonboarding';
 
@@ -176,7 +223,43 @@ describe('signup page', () => {
 
     expect(clerkSignUpMock).toHaveBeenCalledWith(
       expect.objectContaining({
-        signInUrl: '/signin?redirect_url=%2Fonboarding',
+        signInUrl: fullAuthUrl('/signin?redirect_url=%2Fonboarding'),
+      })
+    );
+  });
+
+  it('uses desktop_return for desktop browser auth fallback and sign-in link', async () => {
+    searchParamsState.value = 'desktop_return=%2Fstart%3Fintent_id%3Dabc';
+
+    render(<SignUpPage />);
+
+    await waitFor(() => {
+      expect(clerkSignUpMock).toHaveBeenCalledTimes(1);
+    });
+
+    expect(clerkSignUpMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        signInUrl: fullAuthUrl(
+          '/signin?desktop_return=%2Fstart%3Fintent_id%3Dabc'
+        ),
+        fallbackRedirectUrl: '/auth-return?route=%2Fstart%3Fintent_id%3Dabc',
+      })
+    );
+  });
+
+  it('uses mobile_return for mobile browser auth fallback and sign-in link', async () => {
+    searchParamsState.value = 'mobile_return=%2Fapp';
+
+    render(<SignUpPage />);
+
+    await waitFor(() => {
+      expect(clerkSignUpMock).toHaveBeenCalledTimes(1);
+    });
+
+    expect(clerkSignUpMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        signInUrl: fullAuthUrl('/signin?mobile_return=%2Fapp'),
+        fallbackRedirectUrl: '/mobile-auth-return?route=%2Fapp',
       })
     );
   });
@@ -263,7 +346,7 @@ describe('signup page', () => {
     render(<SignUpPage />);
 
     expect(screen.getByRole('alert')).toHaveTextContent(
-      'Required permissions were not granted. Please try again and accept all permissions.'
+      'Sign-in was cancelled. Try again, or pick a different method.'
     );
 
     await waitFor(() => {
@@ -274,7 +357,39 @@ describe('signup page', () => {
 
     expect(clerkSignUpMock).toHaveBeenCalledWith(
       expect.objectContaining({
-        signInUrl: '/signin?redirect_url=%2Fonboarding%3Fhandle%3Dartist',
+        signInUrl: fullAuthUrl(
+          '/signin?redirect_url=%2Fonboarding%3Fhandle%3Dartist'
+        ),
+      })
+    );
+  });
+
+  it('interpolates the conflicting email into the account_exists banner when ?email= is present', async () => {
+    searchParamsState.value =
+      'oauth_error=account_exists&email=artist%40example.com';
+    globalThis.history.replaceState(
+      null,
+      '',
+      '/signup?oauth_error=account_exists&email=artist%40example.com'
+    );
+
+    render(<SignUpPage />);
+
+    const alert = screen.getByRole('alert');
+    expect(alert).toHaveTextContent('artist@example.com');
+    expect(alert).toHaveTextContent('already exists');
+  });
+
+  it('passes oidcPrompt=select_account to Clerk SignUp so account chooser always appears', async () => {
+    render(<SignUpPage />);
+
+    await waitFor(() => {
+      expect(clerkSignUpMock).toHaveBeenCalledTimes(1);
+    });
+
+    expect(clerkSignUpMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        oidcPrompt: 'select_account',
       })
     );
   });

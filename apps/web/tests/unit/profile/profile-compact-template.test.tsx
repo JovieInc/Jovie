@@ -49,6 +49,10 @@ vi.mock('next/dynamic', () => ({
       return (props: unknown) => mockProfileInlineNotificationsCTA(props);
     }
 
+    if (source.includes('ProfileDesktopSurface')) {
+      return (props: unknown) => mockProfileDesktopSurface(props);
+    }
+
     return () => null;
   },
 }));
@@ -215,6 +219,26 @@ const mockReleases = [
   },
 ] satisfies readonly PublicRelease[];
 
+function mockViewport(width: 'mobile' | 'desktop') {
+  const previousMatchMedia = window.matchMedia;
+  window.matchMedia = vi.fn().mockImplementation((query: string) => ({
+    matches:
+      width === 'desktop' &&
+      (query === '(min-width: 768px)' || query === '(min-width: 1180px)'),
+    media: query,
+    onchange: null,
+    addEventListener: vi.fn(),
+    removeEventListener: vi.fn(),
+    addListener: vi.fn(),
+    removeListener: vi.fn(),
+    dispatchEvent: vi.fn(),
+  })) as typeof window.matchMedia;
+
+  return () => {
+    window.matchMedia = previousMatchMedia;
+  };
+}
+
 let ProfileCompactTemplate: typeof import('@/features/profile/templates/ProfileCompactTemplate').ProfileCompactTemplate;
 
 describe('ProfileCompactTemplate', () => {
@@ -326,7 +350,34 @@ describe('ProfileCompactTemplate', () => {
     ).toHaveAttribute('href', `/${mockArtist.handle}`);
   });
 
-  it('renders the mock-style overflow trigger in the compact profile header', async () => {
+  it('keeps the artist photo in color with profile text over the image', async () => {
+    render(
+      <ProfileCompactTemplate
+        mode='profile'
+        artist={{
+          ...mockArtist,
+          image_url: 'https://example.com/artist.jpg',
+          location: 'Los Angeles',
+        }}
+        socialLinks={[]}
+        contacts={[]}
+      />
+    );
+
+    const artistPhoto = screen.getByRole('img', { name: mockArtist.name });
+    expect(artistPhoto).toHaveAttribute(
+      'src',
+      'https://example.com/artist.jpg'
+    );
+    expect(artistPhoto.className).not.toContain('grayscale');
+    expect(
+      artistPhoto
+        .closest('header')
+        ?.querySelector('[data-testid="profile-hero-identity-block"]')
+    ).not.toBeNull();
+  });
+
+  it('renders the Jovie menu trigger instead of a duplicate alerts trigger in the compact profile header', async () => {
     render(
       <ProfileCompactTemplate
         mode='profile'
@@ -336,9 +387,16 @@ describe('ProfileCompactTemplate', () => {
       />
     );
 
-    const trigger = screen.getByRole('button', { name: /more options/i });
-    expect(trigger.className).toContain('bg-black/34');
-    expect(trigger.className).toContain('h-11!');
+    expect(
+      within(screen.getByTestId('profile-top-chrome')).getByRole('button', {
+        name: 'Menu',
+      })
+    ).toBeInTheDocument();
+    expect(
+      within(screen.getByTestId('profile-top-chrome')).queryByRole('button', {
+        name: 'Alerts',
+      })
+    ).not.toBeInTheDocument();
   });
 
   it('can hide the menu trigger for clean marketing screenshots', async () => {
@@ -353,7 +411,7 @@ describe('ProfileCompactTemplate', () => {
     );
 
     expect(
-      screen.queryByRole('button', { name: /more options/i })
+      screen.queryByRole('button', { name: 'Menu' })
     ).not.toBeInTheDocument();
     expect(
       screen.queryByRole('button', { name: 'More' })
@@ -361,7 +419,7 @@ describe('ProfileCompactTemplate', () => {
     expect(screen.getByRole('button', { name: 'Back' })).toBeInTheDocument();
   });
 
-  it('renders the compact bottom navigation with a real More action', async () => {
+  it('renders the compact bottom navigation with four primary icon tabs', async () => {
     render(
       <ProfileCompactTemplate
         mode='profile'
@@ -372,27 +430,14 @@ describe('ProfileCompactTemplate', () => {
     );
 
     const bottomNav = screen.getByTestId('profile-bottom-nav');
-    for (const label of ['Home', 'Music', 'Events', 'Alerts', 'More']) {
+    for (const label of ['Profile', 'Music', 'Events', 'Alerts']) {
       expect(
         within(bottomNav).getByRole('button', { name: label })
       ).toBeInTheDocument();
     }
     expect(
-      within(bottomNav).queryByRole('button', { name: 'Profile' })
+      within(bottomNav).queryByRole('button', { name: 'More options' })
     ).not.toBeInTheDocument();
-
-    fireEvent.click(within(bottomNav).getByRole('button', { name: 'More' }));
-
-    await waitFor(() => {
-      expect(screen.getByTestId('mock-profile-unified-drawer')).toHaveAttribute(
-        'data-open',
-        'true'
-      );
-      expect(screen.getByTestId('mock-profile-unified-drawer')).toHaveAttribute(
-        'data-view',
-        'menu'
-      );
-    });
   });
 
   it('keeps the home tab active for about mode deep links', async () => {
@@ -407,7 +452,7 @@ describe('ProfileCompactTemplate', () => {
 
     const bottomNav = screen.getByTestId('profile-bottom-nav');
     expect(
-      within(bottomNav).getByRole('button', { name: 'Home' })
+      within(bottomNav).getByRole('button', { name: 'Profile' })
     ).toHaveAttribute('aria-current', 'page');
   });
 
@@ -458,13 +503,15 @@ describe('ProfileCompactTemplate', () => {
       />
     );
 
-    expect(window.location.search).toBe('?mode=listen');
-    expect(pushStateSpy).not.toHaveBeenCalled();
-    expect(mockUseProfileShell).toHaveBeenLastCalledWith(
-      expect.objectContaining({
-        modeOverride: 'listen',
-      })
-    );
+    await waitFor(() => {
+      expect(window.location.search).toBe('?mode=listen');
+      expect(pushStateSpy).not.toHaveBeenCalled();
+      expect(mockUseProfileShell).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          modeOverride: 'listen',
+        })
+      );
+    });
 
     pushStateSpy.mockRestore();
   });
@@ -498,7 +545,7 @@ describe('ProfileCompactTemplate', () => {
       );
     });
 
-    expect(screen.queryByTestId('profile-bottom-nav')).not.toBeInTheDocument();
+    expect(screen.getByTestId('profile-bottom-nav')).toBeInTheDocument();
   });
 
   it('renders the Music tab when ?mode=listen is in the URL even when releases exist', async () => {
@@ -537,13 +584,6 @@ describe('ProfileCompactTemplate', () => {
         artist={mockArtist}
         socialLinks={[]}
         contacts={[]}
-        latestRelease={{
-          title: "Don't Look Down",
-          slug: 'dont-look-down',
-          artworkUrl: 'https://example.com/release.jpg',
-          releaseDate: '2026-04-01T00:00:00.000Z',
-          releaseType: 'single',
-        }}
         tourDates={[
           {
             id: 'tour-1',
@@ -569,18 +609,18 @@ describe('ProfileCompactTemplate', () => {
       />
     );
 
-    expect(screen.getByTestId('profile-hero-alerts-row')).toHaveTextContent(
-      'Alerts Off'
+    expect(screen.getByTestId('profile-home-alerts-row')).toHaveTextContent(
+      'Alerts'
     );
-    expect(screen.getByTestId('profile-home-rail-tour')).toHaveTextContent(
-      'Tickets'
-    );
+    expect(
+      screen.getByTestId('profile-home-primary-action-card')
+    ).toHaveTextContent('Tickets');
     expect(
       screen.queryByTestId('profile-hero-status-pill')
     ).not.toBeInTheDocument();
   });
 
-  it('falls back to the listen CTA without rendering release metadata in the hero', async () => {
+  it('renders the compact latest release card without release metadata in the hero', async () => {
     render(
       <ProfileCompactTemplate
         mode='profile'
@@ -597,15 +637,32 @@ describe('ProfileCompactTemplate', () => {
       />
     );
 
-    expect(screen.getByTestId('profile-hero-alerts-row')).toHaveTextContent(
-      'Alerts Off'
+    expect(screen.getByTestId('profile-home-alerts-row')).toHaveTextContent(
+      'Alerts'
     );
-    expect(screen.getByTestId('profile-home-rail-release')).toHaveTextContent(
-      'Listen Now'
-    );
+    expect(
+      screen.getByTestId('profile-home-primary-action-card')
+    ).toHaveTextContent('Listen');
     expect(
       screen.queryByTestId('profile-hero-status-pill')
     ).not.toBeInTheDocument();
+  });
+
+  it('shows the newest catalog release on Home when latestRelease is not provided', async () => {
+    render(
+      <ProfileCompactTemplate
+        mode='profile'
+        artist={mockArtist}
+        socialLinks={[]}
+        contacts={[]}
+        releases={mockReleases}
+      />
+    );
+
+    const homeCard = screen.getByTestId('profile-home-primary-action-card');
+    expect(homeCard).toHaveAttribute('data-state', 'release_live');
+    expect(homeCard).toHaveTextContent("Don't Look Down");
+    expect(homeCard).not.toHaveTextContent('Holding On');
   });
 
   it('opens the alerts tab from the compact hero alerts row', async () => {
@@ -618,8 +675,8 @@ describe('ProfileCompactTemplate', () => {
       />
     );
 
-    const alertsRow = screen.getByTestId('profile-hero-alerts-row');
-    expect(alertsRow).toHaveTextContent('Alerts Off');
+    const alertsRow = screen.getByTestId('profile-home-alerts-fallback-card');
+    expect(alertsRow).toHaveTextContent('Alerts');
     expect(alertsRow).not.toHaveTextContent('New music and shows');
 
     fireEvent.click(alertsRow);
@@ -661,18 +718,17 @@ describe('ProfileCompactTemplate', () => {
       />
     );
 
-    fireEvent.click(screen.getByTestId('profile-hero-alerts-row'));
+    fireEvent.click(screen.getByTestId('profile-home-alerts-fallback-card'));
 
-    expect(revealNotifications).toHaveBeenCalledTimes(1);
     await waitFor(() => {
-      expect(screen.getByTestId('mock-primary-tab-panel')).toHaveAttribute(
-        'data-mode',
-        'subscribe'
-      );
+      expect(revealNotifications).toHaveBeenCalledTimes(1);
     });
+    expect(
+      screen.queryByTestId('mock-primary-tab-panel')
+    ).not.toBeInTheDocument();
   });
 
-  it('hides the compact hero alerts row for returning subscribers', async () => {
+  it('hides the compact hero alerts card for returning subscribers', async () => {
     mockUseProfileShell.mockImplementation(() => ({
       notificationsContextValue: {
         subscribedChannels: { email: true },
@@ -696,11 +752,26 @@ describe('ProfileCompactTemplate', () => {
     );
 
     expect(
-      screen.queryByTestId('profile-hero-alerts-row')
+      screen.queryByTestId('profile-home-alerts-fallback-card')
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByTestId('profile-home-alerts-row')
     ).not.toBeInTheDocument();
   });
 
-  it('keeps the compact hero alerts row on after activation in the current session', async () => {
+  it('hides the compact hero alerts card after activation in the current session', async () => {
+    mockProfileInlineNotificationsCTA.mockImplementation(
+      (props: { readonly onSubscriptionActivated?: () => void }) => (
+        <button
+          type='button'
+          data-testid='mock-inline-notifications-cta'
+          onClick={() => props.onSubscriptionActivated?.()}
+        >
+          Inline notifications
+        </button>
+      )
+    );
+
     const renderProfile = () => (
       <ProfileCompactTemplate
         mode='profile'
@@ -729,9 +800,12 @@ describe('ProfileCompactTemplate', () => {
 
     view.rerender(renderProfile());
 
-    expect(screen.getByTestId('profile-hero-alerts-row')).toHaveTextContent(
-      'Alerts On'
-    );
+    expect(
+      screen.queryByTestId('profile-home-alerts-fallback-card')
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByTestId('profile-home-alerts-row')
+    ).not.toBeInTheDocument();
   });
 
   it('falls back to the mode prop when the URL has no mode param', async () => {
@@ -878,7 +952,7 @@ describe('ProfileCompactTemplate', () => {
 
     pushStateSpy.mockClear();
 
-    fireEvent.click(screen.getByRole('button', { name: 'More' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Menu' }));
 
     expect(pushStateSpy).not.toHaveBeenCalled();
     expect(window.location.search).toBe('?mode=listen');
@@ -915,7 +989,7 @@ describe('ProfileCompactTemplate', () => {
       'href',
       'https://open.spotify.com/playlist/37i9dQZF1DZ06evO2SKVTu'
     );
-    expect(screen.getByText('Featured Playlist')).toBeInTheDocument();
+    expect(screen.getByText('Open playlist')).toBeInTheDocument();
   });
 
   it('keeps optional hero role metadata out of the mobile hero chrome', async () => {
@@ -979,7 +1053,9 @@ describe('ProfileCompactTemplate', () => {
       />
     );
 
-    expect(screen.getByTestId('profile-home-rail-tour')).toBeInTheDocument();
+    expect(
+      screen.getByTestId('profile-home-primary-action-card')
+    ).toHaveAttribute('data-state', 'tour_next');
     expect(
       screen.queryByRole('link', {
         name: `Open This Is playlist for ${mockArtist.name}`,
@@ -1090,18 +1166,8 @@ describe('ProfileCompactTemplate', () => {
     });
   });
 
-  it('renders the drawer at desktop widths', async () => {
-    const previousMatchMedia = window.matchMedia;
-    window.matchMedia = vi.fn().mockImplementation((query: string) => ({
-      matches: query === '(min-width: 768px)',
-      media: query,
-      onchange: null,
-      addEventListener: vi.fn(),
-      removeEventListener: vi.fn(),
-      addListener: vi.fn(),
-      removeListener: vi.fn(),
-      dispatchEvent: vi.fn(),
-    })) as typeof window.matchMedia;
+  it('renders the compact profile shell at desktop widths', async () => {
+    const restoreViewport = mockViewport('desktop');
 
     render(
       <ProfileCompactTemplate
@@ -1113,11 +1179,162 @@ describe('ProfileCompactTemplate', () => {
     );
 
     await waitFor(() => {
-      expect(
-        screen.getByTestId('mock-profile-unified-drawer')
-      ).toBeInTheDocument();
+      expect(screen.getByTestId('profile-compact-shell')).toBeInTheDocument();
+      expect(mockProfileDesktopSurface).not.toHaveBeenCalled();
     });
 
-    window.matchMedia = previousMatchMedia;
+    restoreViewport();
+  });
+
+  it('keeps desktop widths on the compact surface across profile variants', async () => {
+    const restoreViewport = mockViewport('desktop');
+
+    const variantProps = {
+      artist: mockArtist,
+      socialLinks: [
+        {
+          id: 'venmo-1',
+          artist_id: mockArtist.id,
+          platform: 'venmo' as const,
+          url: 'https://venmo.com/testartist',
+          clicks: 0,
+          created_at: '2024-01-01T00:00:00.000Z',
+        },
+      ],
+      contacts: mockContacts,
+      showPayButton: true,
+      latestRelease: {
+        title: "Don't Look Down",
+        slug: 'dont-look-down',
+        artworkUrl: 'https://example.com/release.jpg',
+        releaseDate: '2026-04-01T00:00:00.000Z',
+        releaseType: 'single' as const,
+      },
+      tourDates: [
+        {
+          id: 'tour-1',
+          profileId: mockArtist.id,
+          title: null,
+          venueName: 'The Echo',
+          city: 'Los Angeles',
+          region: 'CA',
+          country: 'US',
+          startDate: '2099-05-01T00:00:00.000Z',
+          endDate: null,
+          ticketUrl: 'https://tickets.example.com/show',
+          ticketStatus: 'onsale' as const,
+          timezone: 'America/Los_Angeles',
+          latitude: null,
+          longitude: null,
+          source: 'manual' as const,
+          sourceEventId: null,
+          createdAt: '2026-01-01T00:00:00.000Z',
+          updatedAt: '2026-01-01T00:00:00.000Z',
+        },
+      ],
+      releases: mockReleases,
+    };
+
+    const view = render(
+      <ProfileCompactTemplate mode='pay' {...variantProps} />
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId('profile-compact-shell')).toBeInTheDocument();
+      expect(mockProfileDesktopSurface).not.toHaveBeenCalled();
+    });
+
+    view.rerender(
+      <ProfileCompactTemplate mode='subscribe' {...variantProps} />
+    );
+
+    await waitFor(() => {
+      expect(mockProfilePrimaryTabPanel).toHaveBeenCalledWith(
+        expect.objectContaining({
+          mode: 'subscribe',
+        })
+      );
+      expect(mockProfileDesktopSurface).not.toHaveBeenCalled();
+    });
+
+    restoreViewport();
+  });
+
+  describe('hydration-safe profile mode sync', () => {
+    // The public profile route is ISR/static, so the server cannot know query
+    // params or viewport matchMedia. Keep the first client render aligned with
+    // the server, then sync query mode and responsive presentation after mount.
+
+    it('starts ?mode=listen from the server mode, then syncs after hydration', async () => {
+      mockCanonicalProfileDSPs.mockReturnValue([{ platform: 'spotify' }]);
+      window.history.replaceState(null, '', '/test-artist?mode=listen');
+
+      render(
+        <ProfileCompactTemplate
+          mode='profile'
+          artist={mockArtist}
+          socialLinks={[]}
+          contacts={[]}
+        />
+      );
+
+      const firstCallArgs = mockUseProfileShell.mock.calls[0]?.[0];
+      expect(firstCallArgs).toMatchObject({ modeOverride: 'profile' });
+
+      await waitFor(() => {
+        expect(mockUseProfileShell).toHaveBeenLastCalledWith(
+          expect.objectContaining({ modeOverride: 'listen' })
+        );
+      });
+    });
+
+    it('starts ?mode=subscribe from the server mode, then syncs after hydration', async () => {
+      mockCanonicalProfileDSPs.mockReturnValue([{ platform: 'spotify' }]);
+      window.history.replaceState(null, '', '/test-artist?mode=subscribe');
+
+      render(
+        <ProfileCompactTemplate
+          mode='profile'
+          artist={mockArtist}
+          socialLinks={[]}
+          contacts={[]}
+        />
+      );
+
+      const firstCallArgs = mockUseProfileShell.mock.calls[0]?.[0];
+      expect(firstCallArgs).toMatchObject({ modeOverride: 'profile' });
+
+      await waitFor(() => {
+        expect(mockUseProfileShell).toHaveBeenLastCalledWith(
+          expect.objectContaining({ modeOverride: 'subscribe' })
+        );
+      });
+    });
+
+    it('starts drawerPresentation from the server layout, then syncs desktop viewport after hydration', async () => {
+      const restoreViewport = mockViewport('desktop');
+
+      render(
+        <ProfileCompactTemplate
+          mode='profile'
+          artist={mockArtist}
+          socialLinks={[]}
+          contacts={[]}
+        />
+      );
+
+      const firstDrawerCall = mockProfileUnifiedDrawer.mock.calls[0]?.[0] as
+        | { presentation?: string }
+        | undefined;
+      expect(firstDrawerCall?.presentation).toBe('standalone');
+
+      await waitFor(() => {
+        expect(mockProfileUnifiedDrawer).toHaveBeenLastCalledWith(
+          expect.objectContaining({ presentation: 'modal' })
+        );
+      });
+
+      restoreViewport();
+    });
   });
 });

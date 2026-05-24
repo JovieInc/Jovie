@@ -2,6 +2,7 @@
 
 import { useRouter } from 'next/navigation';
 import { type FormEvent, useState } from 'react';
+import { shellCtaClassName } from '@/components/marketing/artist-profile/ShellCtaButton';
 import { APP_ROUTES } from '@/constants/routes';
 import { track } from '@/lib/analytics';
 
@@ -49,7 +50,11 @@ export function HomeHeroCTA() {
       <button
         type='submit'
         data-testid='homepage-primary-cta'
-        className='inline-flex h-11 shrink-0 items-center justify-center rounded-full bg-white px-5 text-[13px] font-semibold tracking-[-0.02em] text-black transition-colors hover:bg-white/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40 focus-visible:ring-offset-2 focus-visible:ring-offset-black'
+        className={shellCtaClassName({
+          tone: 'primary',
+          size: 'md',
+          context: 'on-dark',
+        })}
       >
         Claim your profile
       </button>

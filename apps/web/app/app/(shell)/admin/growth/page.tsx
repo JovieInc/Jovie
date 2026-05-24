@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 import type { SearchParams } from 'nuqs/server';
 import { Suspense } from 'react';
-import { AdminWorkspacePage } from '@/components/features/admin/layout/AdminWorkspacePage';
+import { AdminPage } from '@/components/features/admin/layout/AdminPage';
 import { GtmCollapsibles } from '@/components/features/admin/leads/GtmCollapsibles';
 import {
   GtmFunnel,
@@ -29,12 +29,14 @@ export default async function AdminGrowthPage({
   const counts = await getLeadFunnelCounts();
 
   return (
-    <AdminWorkspacePage
+    <AdminPage
       title='Growth'
       description='Self-driving artist discovery and outreach pipeline.'
-      primaryParam='view'
-      primaryValue='growth'
-      primaryOptions={[]}
+      tabs={{
+        param: 'view',
+        value: 'growth',
+        options: [],
+      }}
       testId='admin-growth-page'
       viewTestId='admin-growth-view-leads'
     >
@@ -47,6 +49,6 @@ export default async function AdminGrowthPage({
         basePath={buildAdminGrowthHref('leads')}
       />
       <GtmCollapsibles initialOpen={params.view} />
-    </AdminWorkspacePage>
+    </AdminPage>
   );
 }

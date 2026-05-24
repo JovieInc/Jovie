@@ -1,8 +1,9 @@
 import { gateway } from '@ai-sdk/gateway';
-import { generateText } from 'ai';
-import { and, eq, isNull } from 'drizzle-orm';
+import { and, sql as drizzleSql, eq, isNull } from 'drizzle-orm';
 import { after, NextResponse } from 'next/server';
+import { generateText } from '@/lib/ai/sdk';
 import { getSessionContext } from '@/lib/auth/session';
+import { sanitizeConversationTitle } from '@/lib/chat/title';
 import {
   type ChatPersistenceMessage,
   chatPersistenceBatchSchema,
@@ -32,11 +33,16 @@ async function maybeGenerateTitle(
   messages: ChatPersistenceMessage[]
 ): Promise<void> {
   const userMessage = messages.find(m => m.role === 'user');
-  if (!userMessage?.content) return;
+  const titleSource = sanitizeConversationTitle(userMessage?.content, 200);
+  if (!titleSource) return;
 
   try {
     const context = messages
-      .map(m => `${m.role}: ${m.content.slice(0, 200)}`)
+      .map(m => {
+        const content = sanitizeConversationTitle(m.content, 200);
+        return content ? `${m.role}: ${content}` : null;
+      })
+      .filter((line): line is string => line !== null)
       .join('\n');
 
     const { text } = await generateText({
@@ -48,16 +54,13 @@ async function maybeGenerateTitle(
       abortSignal: AbortSignal.timeout(5000),
       experimental_telemetry: {
         isEnabled: true,
-        recordInputs: true,
-        recordOutputs: true,
+        recordInputs: false,
+        recordOutputs: false,
         functionId: 'jovie-chat-title',
       },
     });
 
-    const title = text
-      .trim()
-      .replaceAll(/(?:^["'])|(?:["']$)/g, '')
-      .slice(0, 80);
+    const title = sanitizeConversationTitle(text);
 
     if (!title) throw new Error('Empty title generated');
 
@@ -72,13 +75,11 @@ async function maybeGenerateTitle(
       );
   } catch (error) {
     logger.error('AI title generation failed, using fallback:', error);
-    const raw = userMessage.content.trim();
-    if (!raw) return;
-    const fallback = raw.slice(0, 50);
-    const suffix = raw.length > 50 ? '...' : '';
+    const fallback = sanitizeConversationTitle(titleSource, 50);
+    if (!fallback) return;
     await db
       .update(chatConversations)
-      .set({ title: fallback + suffix })
+      .set({ title: fallback })
       .where(
         and(
           eq(chatConversations.id, conversationId),
@@ -172,11 +173,16 @@ export async function POST(req: Request, { params }: RouteParams) {
       .values(
         messagesToInsert.map(msg => ({
           conversationId,
+          clientMessageId: msg.clientMessageId ?? null,
           role: msg.role,
           content: msg.content,
           toolCalls: msg.toolCalls ?? null,
         }))
       )
+      .onConflictDoNothing({
+        target: [chatMessages.conversationId, chatMessages.clientMessageId],
+        where: drizzleSql`${chatMessages.clientMessageId} IS NOT NULL`,
+      })
       .returning();
 
     // Update conversation's updatedAt timestamp

@@ -42,6 +42,9 @@ const upcomingShow = {
   profileId: artist.id,
   externalId: null,
   provider: 'manual',
+  eventType: 'tour',
+  confirmationStatus: 'confirmed',
+  reviewedAt: '2026-01-01T00:00:00.000Z',
   title: null,
   venueName: 'The Echo',
   city: 'Los Angeles',
@@ -67,7 +70,7 @@ describe('resolveProfileSurfaceState', () => {
       latestRelease: {
         title: 'New Song',
         slug: 'new-song',
-        artworkUrl: null,
+        artworkUrl: 'https://example.com/new-song.jpg',
         releaseDate: '2026-04-01',
         releaseType: 'single',
       },
@@ -96,7 +99,7 @@ describe('resolveProfileSurfaceState', () => {
       latestRelease: {
         title: 'New Song',
         slug: 'new-song',
-        artworkUrl: null,
+        artworkUrl: 'https://example.com/new-song.jpg',
         releaseDate: '2026-04-01',
         releaseType: 'single',
       },

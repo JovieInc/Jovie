@@ -5,8 +5,7 @@ const hoisted = vi.hoisted(() => ({
   getUserByClerkId: vi.fn(),
   getAppFlagValue: vi.fn(),
   captureError: vi.fn().mockResolvedValue(undefined),
-  captureWarning: vi.fn().mockResolvedValue(undefined),
-  stripeAccountsRetrieve: vi.fn(),
+  getStripeConnectReadiness: vi.fn(),
   dbSelect: vi.fn(),
 }));
 
@@ -24,15 +23,10 @@ vi.mock('@/lib/flags/server', () => ({
 
 vi.mock('@/lib/error-tracking', () => ({
   captureError: hoisted.captureError,
-  captureWarning: hoisted.captureWarning,
 }));
 
-vi.mock('@/lib/stripe/client', () => ({
-  stripe: {
-    accounts: {
-      retrieve: hoisted.stripeAccountsRetrieve,
-    },
-  },
+vi.mock('@/lib/stripe/connect-readiness', () => ({
+  getStripeConnectReadiness: hoisted.getStripeConnectReadiness,
 }));
 
 vi.mock('@/lib/db/schema/profiles', () => ({
@@ -82,9 +76,16 @@ describe('GET /api/stripe-connect/status', () => {
     ]);
   });
 
-  it('returns account email when Stripe retrieve succeeds', async () => {
-    hoisted.stripeAccountsRetrieve.mockResolvedValue({
-      email: 'payouts@example.com',
+  it('returns cached readiness from getStripeConnectReadiness', async () => {
+    hoisted.getStripeConnectReadiness.mockResolvedValue({
+      stripeAccountId: 'acct_abc',
+      chargesEnabled: true,
+      payoutsEnabled: true,
+      detailsSubmitted: true,
+      onboardingComplete: true,
+      payoutEmail: 'payouts@example.com',
+      lastSyncedAt: new Date(),
+      source: 'cache',
     });
 
     const res = await GET();
@@ -96,18 +97,15 @@ describe('GET /api/stripe-connect/status', () => {
       payoutsEnabled: true,
       email: 'payouts@example.com',
     });
-    expect(hoisted.captureWarning).not.toHaveBeenCalled();
+    expect(hoisted.getStripeConnectReadiness).toHaveBeenCalledWith('acct_abc');
   });
 
-  it('surfaces Stripe retrieve failure via captureWarning instead of silently swallowing it', async () => {
-    const stripeErr = new Error('No such account: acct_abc');
-    hoisted.stripeAccountsRetrieve.mockRejectedValue(stripeErr);
+  it('falls back to DB-cached flags when readiness lookup returns null (no creator linked)', async () => {
+    hoisted.getStripeConnectReadiness.mockResolvedValue(null);
 
     const res = await GET();
     const body = await res.json();
 
-    // Still returns 200 with cached DB flags and null email — user-facing
-    // behaviour is unchanged.
     expect(res.status).toBe(200);
     expect(body).toEqual({
       connected: true,
@@ -115,16 +113,28 @@ describe('GET /api/stripe-connect/status', () => {
       payoutsEnabled: true,
       email: null,
     });
+  });
 
-    // The critical assertion: the Stripe error must be reported, not swallowed.
-    expect(hoisted.captureWarning).toHaveBeenCalledTimes(1);
-    const [message, err, context] = hoisted.captureWarning.mock.calls[0];
-    expect(message).toBe('Stripe Connect account retrieve failed');
-    expect(err).toBe(stripeErr);
-    expect(context).toMatchObject({
-      clerkUserId: 'clerk_user_123',
-      stripeAccountId: 'acct_abc',
-      route: '/api/stripe-connect/status',
+  it('returns disconnected status when no Stripe account is linked', async () => {
+    hoisted.dbSelect.mockResolvedValue([
+      {
+        id: 'profile_123',
+        stripeAccountId: null,
+        stripeOnboardingComplete: false,
+        stripePayoutsEnabled: false,
+      },
+    ]);
+
+    const res = await GET();
+    const body = await res.json();
+
+    expect(res.status).toBe(200);
+    expect(body).toEqual({
+      connected: false,
+      onboardingComplete: false,
+      payoutsEnabled: false,
+      email: null,
     });
+    expect(hoisted.getStripeConnectReadiness).not.toHaveBeenCalled();
   });
 });

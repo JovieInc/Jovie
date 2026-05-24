@@ -1,3 +1,4 @@
+/* TODO(DS_FOUNDATION_V1 Wave 4): consume --ds-public-content-max instead of hardcoded 1298px */
 /**
  * Linear Design Tokens
  *
@@ -68,7 +69,7 @@
   --linear-border-subtle: rgba(0, 0, 0, 0.06);
   --linear-border-default: rgba(0, 0, 0, 0.1);
   --linear-border-strong: rgba(0, 0, 0, 0.15);
-  --linear-border-focus: oklch(55% 0.15 270);
+  --linear-border-focus: rgba(0, 0, 0, 0.28);
   /* ============================================
      BUTTON COLORS — LIGHT MODE
      ============================================ */
@@ -157,18 +158,23 @@
      TYPE SCALE (Desktop) — mode-independent
      ============================================ */
   --linear-h1-size: 64px;
-  --linear-h1-weight: 510;
+  /* Marketing display weight bumped to 800 per Claude Design home-page-hero
+   * spec (2026-04). Replaces Linear's 510 default for marketing surfaces;
+   * app/product surfaces remain on Inter at default weights elsewhere. */
+  --linear-h1-weight: 800;
   --linear-h1-leading: 67.84px;
   /* Linear renders 1.06 ratio: 64px × 1.06 = 67.84px (verified 2026-03-23) */
-  --linear-h1-tracking: -1.408px;
+  --linear-h1-tracking: -1.6px;
+  /* Tracking tightened to -0.025em at 64px to match Satoshi 800 cadence. */
   --linear-h2-size: 48px;
-  --linear-h2-weight: 510;
-  --linear-h2-leading: 48px;
-  --linear-h2-tracking: -1.056px;
+  --linear-h2-weight: 700;
+  --linear-h2-leading: 50.4px;
+  /* H2 leading 1.05 to balance the heavier weight (was 1.0 at 510). */
+  --linear-h2-tracking: -0.96px;
   --linear-h3-size: 20px;
-  --linear-h3-weight: 590;
+  --linear-h3-weight: 600;
   --linear-h3-leading: 26.6px;
-  --linear-h3-tracking: -0.24px;
+  --linear-h3-tracking: -0.3px;
   --linear-h4-size: 18px;
   --linear-h4-weight: 538;
   --linear-h4-leading: 24px;
@@ -194,7 +200,8 @@
   /* ============================================
      LAYOUT — mode-independent
      ============================================ */
-  --linear-container-max: 1298px;
+  /* Aliased to canonical DS token (DS_FOUNDATION_V1) — both resolve to 1298px */
+  --linear-container-max: var(--ds-public-content-max);
   --linear-container-padding: 24px;
   --linear-content-max: 1200px;
   --linear-hero-section-max: 1024px;
@@ -239,7 +246,9 @@
     0 0 0 1px rgba(0, 0, 0, 0.03), 0 14px 32px rgba(0, 0, 0, 0.05);
   --linear-row-hover: oklch(96.2% 0.003 282);
   --linear-row-selected: oklch(94.8% 0.006 282);
-  --linear-app-sidebar-width: 244px;
+  --linear-app-sidebar-width: 224px;
+  --linear-app-audio-bar-max-height: 120px;
+  --linear-app-audio-compact-height: 64px;
   --linear-app-sidebar-background-rgb: 247 248 248;
   --linear-app-sidebar-foreground-rgb: 18 18 20;
   --linear-app-sidebar-border-rgb: 0 0 0 / 0.06;
@@ -377,18 +386,18 @@
      --color-bg-primary: #08090a  body bg
      --color-bg-secondary: #1c1c1f  cards/panels
      --color-bg-tertiary: #232326  elevated surfaces */
-  --linear-bg-page: #08090a;
+  --linear-bg-page: #06070a;
   --linear-bg-header: transparent;
-  --linear-bg-surface-0: #0f1011;
+  --linear-bg-surface-0: #0a0b0e;
   /* recessed wells / deepest app surface */
-  --linear-bg-surface-1: #17171a;
+  --linear-bg-surface-1: #101216;
   /* shared card surface inside the app shell */
-  --linear-bg-surface-2: #1c1c1f;
+  --linear-bg-surface-2: #161a20;
   /* elevated controls and stronger separation */
-  --linear-panel-bg: #0f1011;
+  --linear-panel-bg: #0a0b0e;
   --linear-panel-ring: #23252a;
   --linear-bg-button: #2a2a2e;
-  --linear-bg-footer: #08090a;
+  --linear-bg-footer: #06070a;
   --linear-border-footer: #2a2a2e;
   --linear-bg-hover: rgba(255, 255, 255, 0.06);
   /* Borders — JOV-1780: dark-mode contrast bump (prev 0.04/0.07/0.12 blended
@@ -397,10 +406,10 @@
   --linear-border-subtle: rgba(255, 255, 255, 0.07);
   --linear-border-default: rgba(255, 255, 255, 0.11);
   --linear-border-strong: rgba(255, 255, 255, 0.18);
-  --linear-border-focus: oklch(60% 0.12 282);
+  --linear-border-focus: rgba(255, 255, 255, 0.32);
   /* Buttons — white primary on dark bg, matching Linear.app */
   --linear-btn-primary-bg: #ffffff;
-  --linear-btn-primary-fg: #08090a;
+  --linear-btn-primary-fg: #06070a;
   --linear-btn-primary-hover: #e8e9ec;
   --linear-btn-primary-border: #ffffff;
   --linear-btn-secondary-bg: #232326;
@@ -433,12 +442,12 @@
   --linear-shadow-card: 0px 4px 24px rgba(0, 0, 0, 0.4);
   --linear-shadow-card-elevated:
     0 0 0 1px rgba(255, 255, 255, 0.12), 0px 8px 40px rgba(0, 0, 0, 0.55);
-  --linear-app-content-surface: var(--linear-bg-surface-0);
+  --linear-app-content-surface: #0a0c0f;
   /* primary framed main-pane surface */
   --linear-app-card-shadow: none;
   /* JOV-1780: panel/frame seams bumped so card & panel boundaries are
      visible in dark mode (prev 0.03 / 0.035 read as no edge at all). */
-  --linear-app-shell-border: rgba(255, 255, 255, 0.06);
+  --linear-app-shell-border: #171a20;
   --linear-app-shell-sidebar-seam: rgba(255, 255, 255, 0.08);
   --linear-app-frame-seam: rgba(255, 255, 255, 0.07);
   --linear-app-shell-shadow:
@@ -449,7 +458,7 @@
     0 0 0 1px rgba(255, 255, 255, 0.042), 0 18px 42px rgba(0, 0, 0, 0.3);
   --linear-row-hover: rgba(255, 255, 255, 0.022);
   --linear-row-selected: rgba(255, 255, 255, 0.048);
-  --linear-app-sidebar-background-rgb: 8 9 10;
+  --linear-app-sidebar-background-rgb: 6 7 10;
   --linear-app-sidebar-foreground-rgb: 227 228 229;
   --linear-app-sidebar-border-rgb: 255 255 255 / 0.06;
   --linear-app-sidebar-accent-rgb: 255 255 255 / 0.03;

@@ -160,6 +160,8 @@ export function SoundsLandingPage({
       artworkUrl={release.artworkUrl}
       artworkAlt={`${release.title} artwork`}
       onMenuOpen={() => setMenuOpen(true)}
+      returnHref={artist.handle ? `/${artist.handle}` : null}
+      returnLabel={`Back to ${artist.name}`}
       heroOverlay={
         <div className='absolute inset-x-0 bottom-5 z-10 px-5'>
           <h1 className='text-[28px] font-semibold leading-[1.06] tracking-[-0.02em] text-white [text-shadow:0_1px_12px_rgba(0,0,0,0.4)]'>

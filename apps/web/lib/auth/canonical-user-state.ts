@@ -117,15 +117,18 @@ export function resolveCanonicalState(
     return CanonicalUserState.BANNED;
   }
 
+  // Pending users remain gated until an intake submission is accepted or an
+  // admin approves them. Turning the launch gate off only opens daily intake
+  // capacity; it must not unlock already-waitlisted accounts by navigation.
+  if (input.userStatus === 'waitlist_pending') {
+    return CanonicalUserState.WAITLIST_PENDING;
+  }
+
   // Waitlist gate is enabled and user is not approved
   if (
     input.waitlistGateEnabled &&
     !APPROVED_STATUSES.has(input.userStatus ?? '')
   ) {
-    // User has submitted waitlist → pending
-    if (input.userStatus === 'waitlist_pending') {
-      return CanonicalUserState.WAITLIST_PENDING;
-    }
     // User hasn't submitted yet
     return CanonicalUserState.NEEDS_WAITLIST_SUBMISSION;
   }
@@ -145,10 +148,10 @@ export function resolveCanonicalState(
 
 const STATE_REDIRECT_MAP: Record<CanonicalUserState, string | null> = {
   [CanonicalUserState.UNAUTHENTICATED]: '/signin',
-  [CanonicalUserState.NEEDS_DB_USER]: '/onboarding?fresh_signup=true',
+  [CanonicalUserState.NEEDS_DB_USER]: '/start?fresh_signup=true',
   [CanonicalUserState.NEEDS_WAITLIST_SUBMISSION]: '/waitlist',
   [CanonicalUserState.WAITLIST_PENDING]: '/waitlist',
-  [CanonicalUserState.NEEDS_ONBOARDING]: '/onboarding?fresh_signup=true',
+  [CanonicalUserState.NEEDS_ONBOARDING]: '/start?fresh_signup=true',
   [CanonicalUserState.BANNED]: '/unavailable',
   [CanonicalUserState.USER_CREATION_FAILED]: '/error/user-creation-failed',
   [CanonicalUserState.ACTIVE]: null,

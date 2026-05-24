@@ -17,7 +17,14 @@ const PRIVILEGED_TEST_ACCOUNT_EMAIL_REGEX =
 
 type SeededUserValues = Pick<
   typeof users.$inferInsert,
-  'clerkId' | 'email' | 'name' | 'userStatus' | 'isAdmin'
+  | 'clerkId'
+  | 'email'
+  | 'name'
+  | 'userStatus'
+  | 'isAdmin'
+  | 'plan'
+  | 'isPro'
+  | 'billingUpdatedAt'
 >;
 
 type SeededCreatorProfileValues = Pick<
@@ -176,6 +183,13 @@ export function getDeterministicTestClerkId(email: string): string {
   return `user_dev_${stableId || 'browse'}`;
 }
 
+function shouldUseDeterministicClerkTestUser(): boolean {
+  return (
+    process.env.NEXT_PUBLIC_CLERK_MOCK === '1' ||
+    process.env.E2E_USE_TEST_AUTH_BYPASS === '1'
+  );
+}
+
 function resolveMatchedSeedUser(
   matchedUsers: readonly MatchedSeedUser[],
   values: SeededUserValues
@@ -228,17 +242,19 @@ export async function resolveClerkTestUserId(
 ): Promise<string> {
   const normalizedEmail = normalizeEmail(email);
   const secretKey = process.env.CLERK_SECRET_KEY;
+  const deterministicClerkId =
+    fallbackClerkId ?? getDeterministicTestClerkId(normalizedEmail || email);
 
-  if (!normalizedEmail) {
-    return fallbackClerkId ?? getDeterministicTestClerkId(email);
+  if (!normalizedEmail || shouldUseDeterministicClerkTestUser()) {
+    return deterministicClerkId;
   }
 
   if (!secretKey?.startsWith('sk_test_')) {
-    return fallbackClerkId ?? getDeterministicTestClerkId(normalizedEmail);
+    return deterministicClerkId;
   }
 
   if (!isAllowlistedTestAccountEmail(normalizedEmail)) {
-    return fallbackClerkId ?? getDeterministicTestClerkId(normalizedEmail);
+    return deterministicClerkId;
   }
 
   const clerk = createClerkClient({ secretKey });
@@ -271,13 +287,19 @@ export async function ensureClerkTestUser({
 }: EnsureClerkTestUserOptions): Promise<string> {
   const normalizedEmail = normalizeEmail(email);
   const secretKey = process.env.CLERK_SECRET_KEY;
+  const deterministicClerkId =
+    fallbackClerkId ?? getDeterministicTestClerkId(normalizedEmail || email);
+
+  if (shouldUseDeterministicClerkTestUser()) {
+    return deterministicClerkId;
+  }
 
   if (!secretKey?.startsWith('sk_test_')) {
-    return fallbackClerkId ?? getDeterministicTestClerkId(normalizedEmail);
+    return deterministicClerkId;
   }
 
   if (!isAllowlistedTestAccountEmail(normalizedEmail)) {
-    return fallbackClerkId ?? getDeterministicTestClerkId(normalizedEmail);
+    return deterministicClerkId;
   }
 
   const clerk = createClerkClient({ secretKey });

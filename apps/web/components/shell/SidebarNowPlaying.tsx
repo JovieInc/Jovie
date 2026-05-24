@@ -1,6 +1,7 @@
 'use client';
 
 import Image from 'next/image';
+import React from 'react';
 import { cn } from '@/lib/utils';
 import { ArtworkPlayOverlay } from './ArtworkPlayOverlay';
 
@@ -24,6 +25,8 @@ export interface NowPlayingTrack {
  * `playOverlayVisible={true}` when the audio bar is hidden so the artwork
  * surfaces transport.
  *
+ * Memoized high-churn renderer over real production NowPlayingTrack + player state.
+ *
  * @example
  * ```tsx
  * const { playbackState, toggleTrack } = useTrackAudioPlayer();
@@ -35,7 +38,7 @@ export interface NowPlayingTrack {
  * />
  * ```
  */
-export function SidebarNowPlaying({
+export const SidebarNowPlaying = React.memo(function SidebarNowPlaying({
   track,
   isPlaying,
   onPlay,
@@ -122,4 +125,4 @@ export function SidebarNowPlaying({
       </div>
     </div>
   );
-}
+});

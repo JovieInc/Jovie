@@ -35,11 +35,10 @@ Jovie uses a modern, secure stack designed for scalability, type safety, and exc
 - **Stripe** - Payment processing with subscriptions and webhooks
 - **RevenueCat** - Cross-platform subscription management (mobile)
 
-### Analytics & Feature Flags
-- **Statsig** - Feature flags, A/B testing, and analytics
-  - `@statsig/react-bindings` - React integration
-  - `@statsig/session-replay` - User session recording
-  - `@statsig/web-analytics` - Web analytics tracking
+### Feature Flags & Experiments
+- **Statsig** - Server-side feature flags and A/B tests
+  - `@statsig/statsig-node-core` - Server SDK used by `apps/web/lib/flags/statsig.ts`
+  - `flags` - App flag registry and bootstrap payloads for client consumers
 
 ### Error Tracking & Monitoring
 - **Sentry 10** - Error tracking, performance monitoring, and session replay
@@ -71,13 +70,12 @@ Jovie uses a modern, secure stack designed for scalability, type safety, and exc
 - 🎵 **Artist Profiles** - Customizable profile pages with themes and branding
 - 🔗 **Link-in-Bio** - Centralized link hub with click tracking
 - 💸 **Tipping & Payments** - Integrated Stripe payments with subscription support
-- 📊 **Analytics Dashboard** - Real-time creator analytics with Statsig
+- 📊 **Analytics Dashboard** - Real-time creator analytics
 - 🔐 **Row Level Security** - Database-level security with Clerk JWT integration
 - 📱 **Mobile Optimized** - Responsive design with touch-friendly UI
 - ⚡ **Edge Performance** - Server-side rendering with edge optimization
 - 🌙 **Dark Mode** - System-aware theme switching
 - 🎭 **Feature Flags** - Gradual rollouts with Statsig
-- 📈 **Session Replay** - Debug user issues with Statsig session replay
 
 ## Getting Started
 
@@ -92,7 +90,7 @@ Jovie uses a modern, secure stack designed for scalability, type safety, and exc
   - [Clerk](https://clerk.com/) - Authentication
   - [Stripe](https://stripe.com/) - Payments
   - [Doppler](https://doppler.com/) - Secrets management
-  - [Statsig](https://statsig.com/) - Feature flags & analytics (optional)
+  - [Statsig](https://statsig.com/) - Feature flags and experiments (optional)
   - [Sentry](https://sentry.io/) - Error tracking (optional)
 
 ### Installation
@@ -110,7 +108,7 @@ Jovie uses a modern, secure stack designed for scalability, type safety, and exc
    ./scripts/setup.sh
    ```
 
-   This verifies the required Node/pnpm/ripgrep tooling, installs dependencies, and checks Doppler access.
+   This verifies the required Node/pnpm/ripgrep tooling, installs dependencies when package manifests changed, and checks Doppler access.
    On supported macOS and Debian/Ubuntu systems it will attempt to install `ripgrep` automatically. If auto-install is unavailable, use:
 
    ```bash
@@ -124,15 +122,27 @@ From the repo root, use the root wrappers for the canonical internal workflow:
 
 ```bash
 pnpm run db:web:migrate
-pnpm run dev:web:local
+pnpm run dev:web:fast
+pnpm run benchmark:dev
 pnpm run test:web
 pnpm run dev:web:browse
 ```
 
-For authenticated local browser QA, open:
+`pnpm run dev:web:fast` is the daily coding loop. It pins Doppler to `jovie-web/dev`, enables the local test-auth bypass, disables local Sentry initialization unless `JOVIE_ENABLE_LOCAL_SENTRY=1`, uses `PORT=3100` by default, and prewarms `/`, `/app`, and `/api/health/build-info` after the server is ready.
+
+Useful local speed toggles:
+
+```bash
+JOVIE_DEV_RESET_NEXT_CACHE=1 ./scripts/setup.sh
+JOVIE_DEV_SYNC_CLERK_IDS=1 ./scripts/setup.sh
+JOVIE_ENABLE_LOCAL_SENTRY=1 pnpm run dev:web:fast
+JOVIE_DEV_RESET_NEXT_CACHE=1 pnpm run benchmark:dev
+```
+
+For authenticated local browser QA, open the dashboard-ready persona:
 
 ```text
-/api/dev/test-auth/enter?persona=creator&redirect=/app/dashboard/earnings
+/api/dev/test-auth/enter?persona=creator-ready&redirect=/app/dashboard/earnings
 ```
 
 3. **Set up Doppler (Recommended)**
@@ -168,10 +178,10 @@ For authenticated local browser QA, open:
 6. **Start the development server**
 
    ```bash
-   pnpm run dev:web:local
+   pnpm run dev:web:fast
    ```
 
-   Open [http://localhost:3000](http://localhost:3000) in your browser.
+   Open [http://localhost:3100](http://localhost:3100) in your browser.
 
 ## Development
 
@@ -214,6 +224,9 @@ pnpm run db:web:studio
 # Web app test suite with pinned Doppler scope
 pnpm run test:web
 
+# Changed web tests for quick local iteration
+pnpm run test:web:changed
+
 # Web smoke suite
 pnpm run test:web:smoke
 
@@ -227,6 +240,9 @@ pnpm test:fast
 ### Code Quality
 
 ```bash
+# Fast web typecheck for local iteration
+pnpm run typecheck:web:fast
+
 # Type checking
 pnpm typecheck
 
@@ -240,6 +256,9 @@ pnpm format:check
 
 # Tailwind CSS check
 pnpm tailwind:check
+
+# Dev server ready, first-route compile, and warm-route timing
+pnpm run benchmark:dev
 ```
 
 ### Turborepo
@@ -248,15 +267,18 @@ pnpm tailwind:check
 # Search Turborepo docs from terminal (2.8+)
 turbo docs "task configuration"
 
-# Run only affected packages (CI optimization)
-pnpm turbo build --affected
-pnpm turbo test --affected
+# Run only affected packages with local-read/remote-read Turbo cache policy
+pnpm run build -- --affected
+pnpm run test -- --affected
+
+# Verify local remote-cache reads
+pnpm run turbo:verify-cache
 
 # Preview task execution plan without running
-pnpm turbo build --dry
+pnpm run build -- --dry
 
 # Reduce memory pressure for tests (OOM fix)
-pnpm turbo test --concurrency=1
+pnpm run test -- --concurrency=1
 ```
 
 ### Parallel Development with Worktrees
@@ -268,8 +290,8 @@ Git worktrees enable parallel agent work with shared Turbo cache (2.8+):
 git worktree add ../Jovie-agent-1 -b agent/task-name
 cd ../Jovie-agent-1 && ./scripts/setup.sh
 
-# Work normally -- turbo cache is shared automatically
-pnpm turbo build
+# Work normally with the local remote-cache read policy
+pnpm run build
 
 # Clean up
 git worktree remove ../Jovie-agent-1
@@ -320,9 +342,8 @@ STRIPE_SECRET_KEY=sk_test_...
 STRIPE_WEBHOOK_SECRET=whsec_...
 NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=pk_test_...
 
-# Statsig (Feature Flags & Analytics)
-NEXT_PUBLIC_STATSIG_CLIENT_KEY=client-...
-STATSIG_SERVER_API_KEY=secret-...
+# Statsig (server-side feature flags and experiments)
+STATSIG_SERVER_SECRET=secret-...
 
 # Sentry (Error Tracking)
 SENTRY_AUTH_TOKEN=...
@@ -366,7 +387,6 @@ doppler run --project jovie-web --config prd -- pnpm --filter @jovie/web run dri
 
 ### Performance
 - **Vercel Analytics** - Core Web Vitals, page performance
-- **Statsig Web Analytics** - User behavior, feature adoption
 - **Sentry Performance** - Backend performance, slow queries
 
 ### Errors
@@ -375,8 +395,7 @@ doppler run --project jovie-web --config prd -- pnpm --filter @jovie/web run dri
 - **Neon Dashboard** - Database errors, connection issues
 
 ### Feature Flags
-- **Statsig Console** - Feature rollouts, A/B tests, metrics
-- **Session Replay** - User session recordings for debugging
+- **Statsig Console** - Server-side feature rollouts and A/B tests
 
 ## Database Schema
 

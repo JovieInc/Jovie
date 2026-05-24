@@ -1,8 +1,16 @@
-import { count, desc, eq } from 'drizzle-orm';
+import { count, desc, sql as drizzleSql, eq } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 import { getSessionContext } from '@/lib/auth/session';
+import {
+  sanitizeConversationTitle,
+  withSanitizedConversationTitles,
+} from '@/lib/chat/title';
 import { db } from '@/lib/db';
-import { chatConversations, chatMessages } from '@/lib/db/schema/chat';
+import {
+  chatConversations,
+  chatMessages,
+  chatTurns,
+} from '@/lib/db/schema/chat';
 import { captureError } from '@/lib/error-tracking';
 import { logger } from '@/lib/utils/logger';
 import { getSessionErrorResponse } from '../session-error-response';
@@ -48,6 +56,14 @@ export async function GET(req: Request) {
         title: chatConversations.title,
         createdAt: chatConversations.createdAt,
         updatedAt: chatConversations.updatedAt,
+        latestMessageRole:
+          drizzleSql<string>`(SELECT ${chatMessages.role} FROM ${chatMessages} WHERE ${chatMessages.conversationId} = ${chatConversations.id} ORDER BY ${chatMessages.createdAt} DESC LIMIT 1)`.as(
+            'latest_message_role'
+          ),
+        latestTurnStatus:
+          drizzleSql<string>`(SELECT ${chatTurns.status} FROM ${chatTurns} WHERE ${chatTurns.conversationId} = ${chatConversations.id} ORDER BY ${chatTurns.updatedAt} DESC LIMIT 1)`.as(
+            'latest_turn_status'
+          ),
       })
       .from(chatConversations)
       .where(eq(chatConversations.creatorProfileId, profile.id))
@@ -55,7 +71,9 @@ export async function GET(req: Request) {
       .limit(limit);
 
     return NextResponse.json(
-      { conversations },
+      {
+        conversations: withSanitizedConversationTitles(conversations),
+      },
       { status: 200, headers: NO_STORE_HEADERS }
     );
   } catch (error) {
@@ -119,6 +137,7 @@ export async function POST(req: Request) {
     }
 
     const { title, initialMessage } = body;
+    const sanitizedTitle = sanitizeConversationTitle(title);
 
     // Validate initial message length
     if (
@@ -139,7 +158,7 @@ export async function POST(req: Request) {
       .values({
         userId: user.id,
         creatorProfileId: profile.id,
-        title: title ?? null,
+        title: sanitizedTitle,
       })
       .returning();
 

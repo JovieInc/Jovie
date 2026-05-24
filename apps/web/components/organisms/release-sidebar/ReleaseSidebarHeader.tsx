@@ -8,6 +8,7 @@
  */
 
 import { Check, Hash, RefreshCw } from 'lucide-react';
+import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import type { DrawerHeaderAction } from '@/components/molecules/drawer-header/DrawerHeaderActions';
@@ -37,6 +38,7 @@ export function useReleaseHeaderParts({
   onRefresh,
   isRefreshing = false,
 }: UseReleaseHeaderPartsProps): UseReleaseHeaderResult {
+  const router = useRouter();
   const showActions = hasRelease && release?.smartLinkPath;
   const [isIdCopied, setIsIdCopied] = useState(false);
   const idCopyTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -53,8 +55,8 @@ export function useReleaseHeaderParts({
       onRefresh();
       return;
     }
-    globalThis.location.reload();
-  }, [isRefreshing, onRefresh]);
+    router.refresh();
+  }, [isRefreshing, onRefresh, router]);
 
   const handleCopyReleaseId = useCallback(async () => {
     const releaseId = release?.id ?? '';

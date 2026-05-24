@@ -77,6 +77,7 @@ const BASE_URL =
   process.env.ROUTE_QA_BASE_URL?.trim() || 'http://localhost:3000';
 const ROUTE_FILTER = process.env.ROUTE_QA_FILTER?.trim().toLowerCase() || null;
 const ROUTE_LIMIT = Number.parseInt(process.env.ROUTE_QA_LIMIT || '', 10);
+const CANONICAL_RELEASE_TASKS_ROUTE = `${APP_ROUTES.RELEASES}/[releaseId]/tasks`;
 const ROUTE_CASE_TIMEOUT_MS = Number.parseInt(
   process.env.ROUTE_QA_CASE_TIMEOUT_MS || '',
   10
@@ -368,7 +369,12 @@ export async function expandDynamicRoute(
         buildDynamicCase(
           `/investor-portal/${page.slug}`,
           `${source} -> investor-portal/${page.slug}`,
-          route
+          route,
+          {
+            expectedState: 'not-found',
+            notes:
+              'Investor portal routes are token-gated and intentionally return not-found without an investor token.',
+          }
         )
       );
     } catch (error) {
@@ -411,7 +417,10 @@ export async function expandDynamicRoute(
     ];
   }
 
-  if (route === APP_ROUTES.DASHBOARD_RELEASE_TASKS) {
+  if (
+    route === CANONICAL_RELEASE_TASKS_ROUTE ||
+    route === APP_ROUTES.DASHBOARD_RELEASE_TASKS
+  ) {
     const resolvedPath = await resolveReleaseTasksPerfPath(
       {
         id: 'route-qa-release-tasks',
@@ -421,12 +430,12 @@ export async function expandDynamicRoute(
     ).catch(() => null);
     if (
       !resolvedPath ||
-      resolvedPath === APP_ROUTES.DASHBOARD_RELEASES ||
-      resolvedPath === APP_ROUTES.DASHBOARD_TASKS
+      resolvedPath === APP_ROUTES.RELEASES ||
+      resolvedPath === APP_ROUTES.TASKS
     ) {
       return [
         buildDynamicCase(
-          APP_ROUTES.DASHBOARD_RELEASE_TASKS,
+          route,
           `${source} -> missing release task fixture`,
           route,
           {
@@ -506,10 +515,13 @@ export async function expandDynamicRoute(
 
   if (
     route === '/[username]/about' ||
+    route === '/[username]/alerts' ||
     route === '/[username]/claim' ||
     route === '/[username]/contact' ||
     route === '/[username]/listen' ||
     route === '/[username]/notifications' ||
+    route === '/[username]/pay' ||
+    route === '/[username]/releases' ||
     route === '/[username]/shop' ||
     route === '/[username]/subscribe' ||
     route === '/[username]/tip' ||

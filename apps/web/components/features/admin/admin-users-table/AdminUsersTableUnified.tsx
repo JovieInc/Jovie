@@ -21,38 +21,35 @@ import { toast } from 'sonner';
 import { TableErrorFallback } from '@/components/atoms/TableErrorFallback';
 import { TableActionMenu } from '@/components/atoms/table-action-menu/TableActionMenu';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
-import { HeaderSearchAction } from '@/components/molecules/HeaderSearchAction';
-import { useTableMeta } from '@/components/organisms/AuthShellWrapper';
 import {
   type ContextMenuItemType,
   convertContextMenuItems,
   convertToCommonDropdownItems,
-  createMultiFieldFilterFn,
   ExportCSVButton,
   PAGE_TOOLBAR_END_GROUP_CLASS,
   PAGE_TOOLBAR_META_TEXT_CLASS,
+  rowState,
   TableBulkActionsToolbar,
-  UnifiedTable,
   useRowSelection,
 } from '@/components/organisms/table';
 import { APP_ROUTES } from '@/constants/routes';
 import { useSetHeaderActions } from '@/contexts/HeaderActionsContext';
+import { useTableMeta } from '@/contexts/TableMetaContext';
+import { AdminDataTable } from '@/features/admin/table/AdminDataTable';
 import {
   AdminTableHeader,
   AdminTableSubheader,
 } from '@/features/admin/table/AdminTableHeader';
 import { AdminTableShell } from '@/features/admin/table/AdminTableShell';
-import { DashboardHeaderActionGroup } from '@/features/dashboard/atoms/DashboardHeaderActionGroup';
 import { DrawerToggleButton } from '@/features/dashboard/atoms/DrawerToggleButton';
 import { useBreakpointDown } from '@/hooks/useBreakpoint';
 import { copyToClipboard } from '@/hooks/useClipboard';
-import { useSearchUrlSync } from '@/hooks/useSearchUrlSync';
 import {
   USERS_CSV_FILENAME_PREFIX,
   usersCSVColumns,
 } from '@/lib/admin/csv-configs/users';
 import type { AdminUserRow } from '@/lib/admin/types';
-import { SIDEBAR_WIDTH, TABLE_MIN_WIDTHS } from '@/lib/constants/layout';
+import { SIDEBAR_WIDTH } from '@/lib/constants/layout';
 import { QueryErrorBoundary, useAdminUsersInfiniteQuery } from '@/lib/queries';
 import { AdminUserDetailDrawer } from './AdminUserDetailDrawer';
 import {
@@ -108,7 +105,7 @@ function AdminUserMobileCard({
             type='checkbox'
             checked={isSelected}
             onChange={() => onToggleSelect(user.id)}
-            className='mt-0.5 h-4 w-4 rounded border-(--linear-border-strong) bg-surface-0 text-(--linear-accent) focus:ring-(--linear-border-focus) focus:ring-1'
+            className='mt-0.5 h-4 w-4 rounded border-(--linear-border-strong) bg-surface-0 text-(--linear-accent) focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)'
             aria-label={`Select ${user.name ?? user.email ?? 'user'}`}
           />
           <div className='min-w-0'>
@@ -148,24 +145,8 @@ function AdminUserMobileCard({
 }
 
 export function AdminUsersTableUnified(props: Readonly<AdminUsersTableProps>) {
-  const {
-    users: initialUsers,
-    pageSize,
-    total,
-    search,
-    sort,
-    basePath = APP_ROUTES.ADMIN_USERS,
-  } = props;
+  const { users: initialUsers, pageSize, total, sort } = props;
   const router = useRouter();
-  const [filterTerm, setFilterTerm] = useState(search);
-
-  // Sync URL search param on initial load
-  useEffect(() => {
-    setFilterTerm(search);
-  }, [search]);
-
-  // Debounced URL sync (no navigation, just replaceState)
-  useSearchUrlSync(filterTerm, basePath);
 
   // Load all data without server-side search — filter client-side instead
   const { data, fetchNextPage, hasNextPage, isFetchingNextPage } =
@@ -175,19 +156,6 @@ export function AdminUsersTableUnified(props: Readonly<AdminUsersTableProps>) {
       pageSize,
       initialData: { rows: initialUsers, total },
     });
-
-  // Client-side filter searches across name, email, handle, and clerk ID
-  const userFilterFn = useMemo(
-    () =>
-      createMultiFieldFilterFn<AdminUserRow>([
-        r => r.name,
-        r => r.email,
-        r => r.profileUsername,
-        r => r.clerkId,
-        r => r.plan,
-      ]),
-    []
-  );
 
   const users = useMemo(
     () => data?.pages.flatMap(page => page.rows) ?? initialUsers,
@@ -230,38 +198,19 @@ export function AdminUsersTableUnified(props: Readonly<AdminUsersTableProps>) {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- setTableMeta is a stable context setter
   }, [selectedUser, users.length]);
 
-  const headerActions = useMemo(
-    () => (
-      <DashboardHeaderActionGroup
-        trailing={
-          <DrawerToggleButton
-            ariaLabel='Toggle user details'
-            label='Details'
-            tooltipLabel='Details'
-          />
-        }
-      >
-        <HeaderSearchAction
-          alwaysOpen
-          searchValue={filterTerm}
-          onSearchValueChange={setFilterTerm}
-          placeholder='Search by email, name, or handle'
-          ariaLabel='Search users by email, name, or handle'
-          submitAriaLabel='Search users'
-          tooltipLabel='Search'
-        />
-      </DashboardHeaderActionGroup>
-    ),
-    [filterTerm]
-  );
-
   useEffect(() => {
-    setHeaderActions(headerActions);
+    setHeaderActions(
+      <DrawerToggleButton
+        ariaLabel='Toggle user details'
+        label='Details'
+        tooltipLabel='Details'
+      />
+    );
 
     return () => {
       setHeaderActions(null);
     };
-  }, [headerActions, setHeaderActions]);
+  }, [setHeaderActions]);
 
   // Row selection
   const rowIds = useMemo(() => users.map(user => user.id), [users]);
@@ -586,8 +535,8 @@ export function AdminUsersTableUnified(props: Readonly<AdminUsersTableProps>) {
   const getRowClassName = useCallback(
     (row: AdminUserRow) =>
       row.id === selectedUser?.id
-        ? 'group cursor-pointer bg-(--linear-row-selected) hover:bg-(--linear-row-selected)'
-        : 'group cursor-pointer bg-transparent hover:bg-(--linear-row-hover)',
+        ? `group cursor-pointer ${rowState.selected}`
+        : `group cursor-pointer ${rowState.hover}`,
     [selectedUser?.id]
   );
 
@@ -595,41 +544,43 @@ export function AdminUsersTableUnified(props: Readonly<AdminUsersTableProps>) {
     <QueryErrorBoundary fallback={TableErrorFallback}>
       <div className='flex h-full'>
         <div className='flex-1 min-w-0'>
-          <AdminTableHeader
-            title='Users'
-            subtitle='Review lifecycle state, profile completion, and suppression health.'
-          />
-          <AdminTableSubheader
-            start={
-              <div className={PAGE_TOOLBAR_META_TEXT_CLASS}>
-                Showing {from.toLocaleString()}–{to.toLocaleString()} of{' '}
-                {total.toLocaleString()} users
-              </div>
-            }
-            end={
-              <div className={PAGE_TOOLBAR_END_GROUP_CLASS}>
-                <ExportCSVButton<AdminUserRow>
-                  getData={() => users}
-                  columns={usersCSVColumns}
-                  filename={USERS_CSV_FILENAME_PREFIX}
-                  disabled={users.length === 0}
-                  ariaLabel='Export users to CSV file'
-                  chrome='page-toolbar'
-                  iconOnly
-                  tooltipLabel='Export'
-                />
-              </div>
-            }
-          />
           <AdminTableShell
             testId='admin-users-content'
             className='rounded-none border-0'
             toolbar={
-              <TableBulkActionsToolbar
-                selectedCount={selectedCount}
-                onClearSelection={clearSelection}
-                actions={bulkActions}
-              />
+              <>
+                <TableBulkActionsToolbar
+                  selectedCount={selectedCount}
+                  onClearSelection={clearSelection}
+                  actions={bulkActions}
+                />
+                <AdminTableHeader
+                  title='Users'
+                  subtitle='Review lifecycle state, profile completion, and suppression health.'
+                />
+                <AdminTableSubheader
+                  start={
+                    <div className={PAGE_TOOLBAR_META_TEXT_CLASS}>
+                      Showing {from.toLocaleString()}–{to.toLocaleString()} of{' '}
+                      {total.toLocaleString()} users
+                    </div>
+                  }
+                  end={
+                    <div className={PAGE_TOOLBAR_END_GROUP_CLASS}>
+                      <ExportCSVButton<AdminUserRow>
+                        getData={() => users}
+                        columns={usersCSVColumns}
+                        filename={USERS_CSV_FILENAME_PREFIX}
+                        disabled={users.length === 0}
+                        ariaLabel='Export users to CSV file'
+                        chrome='page-toolbar'
+                        iconOnly
+                        tooltipLabel='Export'
+                      />
+                    </div>
+                  }
+                />
+              </>
             }
           >
             {() =>
@@ -643,9 +594,7 @@ export function AdminUsersTableUnified(props: Readonly<AdminUsersTableProps>) {
                           No users found
                         </div>
                         <div className='text-xs text-secondary-token'>
-                          {filterTerm
-                            ? 'Try adjusting your search terms or clearing the filter.'
-                            : 'Users will appear here once they sign up.'}
+                          Users will appear here once they sign up.
                         </div>
                       </div>
                     </ContentSurfaceCard>
@@ -677,15 +626,11 @@ export function AdminUsersTableUnified(props: Readonly<AdminUsersTableProps>) {
                   ) : null}
                 </div>
               ) : (
-                <UnifiedTable
+                <AdminDataTable
                   data={users}
                   columns={columns}
                   rowSelection={rowSelection}
                   isLoading={false}
-                  globalFilter={filterTerm}
-                  onGlobalFilterChange={setFilterTerm}
-                  enableFiltering
-                  globalFilterFn={userFilterFn}
                   emptyState={
                     <ContentSurfaceCard className='mx-4 my-6 flex flex-col items-center gap-3 bg-surface-0 px-4 py-10 text-center'>
                       <Users className='h-6 w-6' />
@@ -694,9 +639,7 @@ export function AdminUsersTableUnified(props: Readonly<AdminUsersTableProps>) {
                           No users found
                         </div>
                         <div className='text-xs text-secondary-token'>
-                          {filterTerm
-                            ? 'Try adjusting your search terms or clearing the filter.'
-                            : 'Users will appear here once they sign up.'}
+                          Users will appear here once they sign up.
                         </div>
                       </div>
                     </ContentSurfaceCard>
@@ -706,9 +649,6 @@ export function AdminUsersTableUnified(props: Readonly<AdminUsersTableProps>) {
                   onRowClick={handleRowClick}
                   onFocusedRowChange={handleFocusedRowChange}
                   getContextMenuItems={getContextMenuItems}
-                  enableVirtualization={true}
-                  minWidth={`${TABLE_MIN_WIDTHS.MEDIUM}px`}
-                  className='text-[12.5px] [&_thead_th]:py-1 [&_thead_th]:text-3xs [&_thead_th]:tracking-[0.07em]'
                   hasNextPage={hasNextPage}
                   isFetchingNextPage={isFetchingNextPage}
                   onLoadMore={() => {

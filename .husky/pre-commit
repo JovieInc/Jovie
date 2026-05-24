@@ -1,4 +1,6 @@
 #!/usr/bin/env sh
+set -e  # Required: ensures check-conflict-markers.sh failure actually blocks commits
 
+bash scripts/check-conflict-markers.sh
 pnpm run next:proxy-guard
 pnpm exec lint-staged

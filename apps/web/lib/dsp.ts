@@ -1,5 +1,9 @@
 import { geoAwarePopularityIndex } from '@/constants/app';
-import { DSP_CONFIGS, type DSPConfig } from '@/lib/dsp-registry';
+import {
+  DSP_CONFIGS,
+  type DSPConfig,
+  PROVIDER_DOMAINS,
+} from '@/lib/dsp-registry';
 import { Artist, Release } from '@/types/db';
 
 export type { DSPConfig } from '@/lib/dsp-registry';
@@ -19,8 +23,64 @@ export interface AvailableDSP {
 }
 
 /**
- * Helper to add a DSP to the list if URL is available and not already present.
+ * Validate a DSP URL for a given provider key.
+ *
+ * Checks:
+ * 1. URL is non-empty after trimming.
+ * 2. URL parses as a valid absolute URL (http or https).
+ * 3. The URL hostname matches one of the canonical domains registered for
+ *    that DSP in PROVIDER_DOMAINS (with `www.` prefix handling).
+ *
+ * Domain validation is intentionally permissive — we strip a leading `www.`
+ * from both sides before comparing so that `www.deezer.com` vs `deezer.com`
+ * both match. Short-links (e.g. `spotify.link`, `apple.co`) are explicitly
+ * listed in the registry domains.
+ *
+ * Returns true when no domain restriction is registered for a key (i.e. the
+ * key exists in DSP_CONFIGS but not in PROVIDER_DOMAINS), allowing
+ * pass-through for DSPs that accept arbitrary URLs (bandcamp artist subdomains,
+ * etc.).
+ */
+export function isValidDspUrl(
+  key: string,
+  url: string | null | undefined
+): boolean {
+  if (!url?.trim()) return false;
+
+  let parsed: URL;
+  try {
+    parsed = new URL(url.trim());
+  } catch {
+    return false;
+  }
+
+  // Require http or https scheme
+  if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+    return false;
+  }
+
+  const registeredDomains = PROVIDER_DOMAINS[key];
+  // No domain restriction registered — allow the URL through
+  if (!registeredDomains || registeredDomains.length === 0) return true;
+
+  const hostname = parsed.hostname.toLowerCase();
+  const hostnameNoWww = hostname.startsWith('www.')
+    ? hostname.slice(4)
+    : hostname;
+
+  return registeredDomains.some(domain => {
+    const domainNoWww = domain.startsWith('www.') ? domain.slice(4) : domain;
+    return hostname === domain || hostnameNoWww === domainNoWww;
+  });
+}
+
+/**
+ * Helper to add a DSP to the list if URL is available, valid, and not already present.
  * Eliminates duplication in DSP object construction.
+ *
+ * Silently skips DSPs whose URL fails basic validity checks (non-empty,
+ * parses as a URL, matches the canonical domain registry) so that broken
+ * or outdated links never reach the listen interface.
  */
 function addDSP(
   dsps: AvailableDSP[],
@@ -28,6 +88,10 @@ function addDSP(
   url: string | null | undefined
 ): void {
   if (!url || dsps.some(d => d.key === key)) {
+    return;
+  }
+
+  if (!isValidDspUrl(key, url)) {
     return;
   }
 

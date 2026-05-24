@@ -6,12 +6,15 @@ import {
   CalendarDays,
   CheckSquare,
   FolderKanban,
+  Gauge,
   HandCoins,
   Home,
   IdCard,
   Image as ImageIcon,
   LayoutDashboard,
+  Library as LibraryIcon,
   Lock,
+  type LucideIcon,
   MailCheck,
   Music,
   PieChart,
@@ -42,7 +45,15 @@ export const dashboardHome: NavItem = {
   href: APP_ROUTES.CHAT,
   id: 'overview',
   icon: Home,
-  description: 'Start a new thread',
+  description: 'Start a new chat',
+};
+
+export const newThreadNavItem: NavItem = {
+  name: 'New chat',
+  href: APP_ROUTES.CHAT,
+  id: 'chat',
+  icon: SquarePen,
+  description: 'Start a new chat',
 };
 
 export const profileNavItem: NavItem = {
@@ -57,10 +68,17 @@ export const primaryNavigation: NavItem[] = [
   profileNavItem,
   {
     name: 'Releases',
-    href: APP_ROUTES.DASHBOARD_RELEASES,
+    href: APP_ROUTES.RELEASES,
     id: 'releases',
     icon: Music,
     description: 'Link out every provider with one smart link',
+  },
+  {
+    name: 'Calendar',
+    href: APP_ROUTES.CALENDAR,
+    id: 'calendar',
+    icon: CalendarDays,
+    description: 'See release dates, events, and calendar moments',
   },
   {
     name: 'Tasks',
@@ -71,12 +89,24 @@ export const primaryNavigation: NavItem[] = [
   },
   {
     name: 'Audience',
-    href: APP_ROUTES.DASHBOARD_AUDIENCE,
+    href: APP_ROUTES.AUDIENCE,
     id: 'audience',
     icon: Users,
     description: 'Understand your audience demographics',
   },
 ];
+
+export const libraryNavItem: NavItem = {
+  name: 'Library',
+  href: APP_ROUTES.LIBRARY,
+  id: 'library',
+  icon: LibraryIcon,
+  description: 'Browse read-only release assets and provider links',
+};
+
+export const calendarNavItem = primaryNavigation.find(
+  item => item.id === 'calendar'
+)!;
 
 export const settingsNavItem: NavItem = {
   name: 'Settings',
@@ -92,6 +122,12 @@ export const userSettingsNavigation: NavItem[] = [
     href: APP_ROUTES.SETTINGS_ACCOUNT,
     id: 'account',
     icon: ShieldCheck,
+  },
+  {
+    name: 'Usage Stats',
+    href: APP_ROUTES.SETTINGS_USAGE,
+    id: 'usage',
+    icon: Gauge,
   },
   {
     name: 'Billing & Subscription',
@@ -163,16 +199,24 @@ export const settingsNavigation: NavItem[] = [
   ...artistSettingsNavigation,
 ];
 
-const adminIconById = {
+/** Admin settings item — shown only to admin users */
+
+// Exhaustive map of AdminWorkspaceId → icon. Typed as Record so adding a new
+// workspace id to `AdminWorkspaceId` without a matching icon entry fails
+// typecheck — silent `undefined` returns would otherwise show up as missing
+// icons in the admin sidebar at runtime.
+const adminIconById: Record<AdminWorkspaceId, LucideIcon> = {
   overview: LayoutDashboard,
+  ops: Gauge,
   people: Users,
   growth: FolderKanban,
   platform_connections: Cable,
   activity: Activity,
   investors: Briefcase,
   screenshots: ImageIcon,
+  costs: Banknote,
   share_studio: Share2,
-} as const;
+};
 
 function buildAdminNavigationItems(
   ids: readonly AdminWorkspaceId[]
@@ -212,14 +256,6 @@ export const adminNavigationSections: AdminNavSection[] = [
     label: 'Workspaces',
     items: adminNavigation,
   },
-];
-
-export const adminSettingsNavigationSections: AdminNavSection[] = [
-  {
-    // Settings keeps quick links to the primary workspaces alongside utilities.
-    label: 'Workspaces',
-    items: adminNavigation,
-  },
   {
     label: 'Utilities',
     items: adminSettingsNavigation,
@@ -248,6 +284,7 @@ export const mobilePrimaryNavigation: NavItem[] = [
 
 /** Items shown in the expanded "more" menu on mobile. */
 export const mobileExpandedNavigation: NavItem[] = [
+  calendarNavItem,
   primaryNavigation.find(i => i.id === 'tasks')!,
   settingsNavItem,
 ];

@@ -5,6 +5,7 @@ import {
   persistedToolEventsSchema,
   toolEventToMessagePart,
 } from '@/lib/chat/tool-events';
+import { ONBOARDING_TOOLS } from '@/lib/chat/tool-schemas';
 import { TOOL_UI_REGISTRY } from '@/lib/chat/tool-ui-registry';
 import {
   getBackfillDecision,
@@ -79,7 +80,7 @@ describe('tool event contract', () => {
   });
 
   it('covers every chat tool in the shared UI registry', () => {
-    for (const toolName of CHAT_ROUTE_TOOL_NAMES) {
+    for (const toolName of [...CHAT_ROUTE_TOOL_NAMES, ...ONBOARDING_TOOLS]) {
       expect(TOOL_UI_REGISTRY[toolName]).toBeDefined();
     }
   });

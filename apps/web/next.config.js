@@ -3,6 +3,7 @@ const path = require('path');
 const withBundleAnalyzer = require('@next/bundle-analyzer')({
   enabled: process.env.ANALYZE === 'true',
 });
+const { withWorkflow } = require('workflow/next');
 // Read version from canonical source (version.json at monorepo root)
 const { version: APP_VERSION } = require('../../version.json');
 const isVercelPreview = process.env.VERCEL_ENV === 'preview';
@@ -56,6 +57,11 @@ const nextConfig = {
   // Note: cacheComponents disabled due to incompatibility with runtime='nodejs' in API routes
   // Using traditional caching (unstable_cache) instead
   images: {
+    localPatterns: [
+      {
+        pathname: '/**',
+      },
+    ],
     // Remote image patterns for Next.js image optimization.
     // Keep in sync with constants/platforms/cdn-domains.ts — verified by sync test.
     remotePatterns: [
@@ -120,7 +126,7 @@ const nextConfig = {
     ],
     formats: ['image/avif', 'image/webp'],
     qualities: [25, 50, 75, 85, 100],
-    deviceSizes: [640, 750, 828, 1080, 1200],
+    deviceSizes: [640, 750, 828, 1080, 1200, 1920, 2880],
     imageSizes: [64, 96, 128, 256, 384, 400, 1024],
     minimumCacheTTL: 60 * 60 * 24 * 365, // 1 year for better caching
     dangerouslyAllowSVG: true,
@@ -228,6 +234,18 @@ const nextConfig = {
         source: '/(.*)',
         headers: [...securityHeaders, cacheHeaders.revalidate],
       },
+      // Canonical pitch-deck static HTML (apps/web/public/pitch/**) is
+      // embedded as a same-origin iframe from the /pitch wrapper page.
+      // Override X-Frame-Options DENY → SAMEORIGIN for these assets only,
+      // AFTER the catch-all (Next.js merges headers; later rules win).
+      // The wrapper page itself (/pitch) stays DENY via the catch-all.
+      {
+        source: '/pitch/:path+',
+        headers: [
+          { key: 'X-Frame-Options', value: 'SAMEORIGIN' },
+          { key: 'Cache-Control', value: cacheHeaders.immutable.value },
+        ],
+      },
     ];
   },
   async redirects() {
@@ -242,45 +260,14 @@ const nextConfig = {
     ];
 
     const legacyAppRedirects = [
-      { source: '/app/contact', destination: '/app/settings/contacts' },
-      { source: '/app/profile', destination: '/app/chat?panel=profile' },
-      { source: '/app/contacts', destination: '/app/settings/contacts' },
-      {
-        source: '/app/earnings',
-        destination: '/app/settings/artist-profile?tab=earn#pay',
-      },
-      {
-        source: '/app/tipping',
-        destination: '/app/settings/artist-profile?tab=earn#pay',
-      },
-      { source: '/app/tour-dates', destination: '/app/settings/touring' },
       { source: '/app/dashboard', destination: '/app' },
       { source: '/app/dashboard/overview', destination: '/app' },
-      {
-        source: '/app/dashboard/earnings',
-        destination: '/app/settings/artist-profile?tab=earn#pay',
-      },
-      {
-        source: '/app/dashboard/links',
-        destination: '/app/chat?panel=profile',
-      },
-      {
-        source: '/app/dashboard/tipping',
-        destination: '/app/settings/artist-profile?tab=earn#pay',
-      },
-      {
-        source: '/app/dashboard/profile',
-        destination: '/app/chat?panel=profile',
-      },
+      // NOTE: shell-owned aliases such as /app/profile, /app/tipping,
+      // /app/earnings, /app/contacts, /app/tour-dates, and dashboard profile
+      // aliases are intentionally omitted here. App Router pages handle their
+      // final destination so middleware can preserve the requested deep link
+      // for unauthenticated users.
       { source: '/app/dashboard/chat', destination: '/app/chat' },
-      {
-        source: '/app/dashboard/contacts',
-        destination: '/app/settings/contacts',
-      },
-      {
-        source: '/app/dashboard/tour-dates',
-        destination: '/app/settings/touring',
-      },
       { source: '/app/settings', destination: '/app/settings/account' },
       {
         source: '/app/settings/profile',
@@ -377,13 +364,23 @@ const nextConfig = {
         permanent: true,
       },
       {
+        source: '/sign-up',
+        destination: '/signup',
+        permanent: true,
+      },
+      {
+        source: '/sign-in',
+        destination: '/signin',
+        permanent: true,
+      },
+      {
         source: '/app/analytics',
-        destination: '/app/dashboard/audience',
+        destination: '/app/audience',
         permanent: false,
       },
       {
         source: '/app/dashboard/analytics',
-        destination: '/app/dashboard/audience',
+        destination: '/app/audience',
         permanent: false,
       },
       ...legacyAppRedirects,
@@ -398,30 +395,24 @@ const nextConfig = {
         destination: '/artist-notifications',
         permanent: true,
       },
+      // Press / brand aliases — journalists searching "Jovie press kit"
+      // land on the brand kit's Downloads section.
+      {
+        source: '/press',
+        destination: '/brand#downloads',
+        permanent: false,
+      },
+      {
+        source: '/press-kit',
+        destination: '/brand#downloads',
+        permanent: false,
+      },
       // VIP username redirects
       ...vipUsernameRedirects,
     ];
   },
   async rewrites() {
-    return [
-      // Rewrite /app/* to /app/dashboard/* for cleaner URLs
-      {
-        source: '/app/releases',
-        destination: '/app/dashboard/releases',
-      },
-      {
-        source: '/app/audience',
-        destination: '/app/dashboard/audience',
-      },
-      {
-        source: '/app/insights',
-        destination: '/app/dashboard/insights',
-      },
-      {
-        source: '/app/presence',
-        destination: '/app/dashboard/presence',
-      },
-    ];
+    return [];
   },
   env: {
     // Build-time env vars — these get inlined into client bundles by Next.js
@@ -450,6 +441,15 @@ const nextConfig = {
       }
     })(),
   },
+  // Keep @statsig/statsig-node-core external so Next.js does not webpack-bundle
+  // the NAPI package. When bundled, the hash-prefixed import path that Next.js
+  // generates (`@statsig/statsig-node-core-<hash>`) cannot be resolved at
+  // runtime on Vercel — Vercel file-tracing cannot follow hashed require()
+  // paths to locate the platform-native .node binary. Marking it external
+  // restores the original require path so Vercel's tracer includes the correct
+  // linux-x64 or linux-arm64 binary in the serverless function bundle.
+  // See JOV-2322.
+  serverExternalPackages: ['@statsig/statsig-node-core'],
   experimental: {
     // Note: PPR (ppr: 'incremental') was deprecated in Next.js 15.3
     // cacheComponents: true requires additional configuration, disabled for now
@@ -525,8 +525,29 @@ const withVercelToolbar = enableVercelToolbar
   ? require('@vercel/toolbar/plugins/next')()
   : config => config;
 
-// Apply plugins in order: bundle analyzer -> vercel toolbar -> sentry
-module.exports = withBundleAnalyzer(withVercelToolbar(nextConfig));
+/**
+ * Attaches base pre-plugin static config properties so config-inspection tests
+ * can call fields such as `config.redirects()` after plugins wrap the export.
+ * Plugin-level additions such as the Sentry tunnel rewrite are not reflected.
+ */
+function exposeBaseStaticConfigForTooling(config) {
+  if (typeof config !== 'function') {
+    return config;
+  }
+
+  return Object.assign(config, {
+    images: nextConfig.images,
+    redirects: nextConfig.redirects,
+    rewrites: nextConfig.rewrites,
+  });
+}
+
+// Apply plugins in order: workflow -> bundle analyzer -> vercel toolbar -> sentry.
+// `withWorkflow()` must stay active even while AgentOS workflows are runtime-gated
+// so WDK directives compile before PR5 adds the first dry-run workflow.
+module.exports = exposeBaseStaticConfigForTooling(
+  withVercelToolbar(withBundleAnalyzer(withWorkflow(nextConfig)))
+);
 
 // Sentry build plugin: source map upload + tunnel route only when upload auth
 // exists. Generic CI public-audit builds run production standalone without
@@ -540,12 +561,14 @@ const shouldUseSentryPlugin =
   hasSentryAuthToken &&
   (process.env.NODE_ENV === 'production' || !!process.env.VERCEL_ENV);
 
-module.exports = shouldUseSentryPlugin
-  ? withSentryConfig(module.exports, {
-      org: 'jovie',
-      project: 'jovie-web',
-      silent: !process.env.CI,
-      widenClientFileUpload: true,
-      tunnelRoute: '/monitoring',
-    })
-  : module.exports;
+module.exports = exposeBaseStaticConfigForTooling(
+  shouldUseSentryPlugin
+    ? withSentryConfig(module.exports, {
+        org: 'jovie',
+        project: 'jovie-web',
+        silent: !process.env.CI,
+        widenClientFileUpload: true,
+        tunnelRoute: '/monitoring',
+      })
+    : module.exports
+);

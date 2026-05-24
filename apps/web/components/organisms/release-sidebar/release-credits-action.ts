@@ -3,7 +3,7 @@
 import { and, eq } from 'drizzle-orm';
 import type { SmartLinkCreditGroup } from '@/app/[username]/[slug]/_lib/data';
 import { groupReleaseCredits } from '@/app/[username]/[slug]/_lib/data';
-import { getDashboardData } from '@/app/app/(shell)/dashboard/actions';
+import { getDashboardDataEssential } from '@/app/app/(shell)/dashboard/actions';
 import { getOptionalAuth } from '@/lib/auth/cached';
 import { db } from '@/lib/db';
 import {
@@ -21,7 +21,7 @@ export async function fetchReleaseCreditsAction(
     return [];
   }
 
-  const dashboardData = await getDashboardData();
+  const dashboardData = await getDashboardDataEssential();
   const selectedProfile = dashboardData.selectedProfile;
 
   if (!selectedProfile) {

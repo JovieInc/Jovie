@@ -1,5 +1,7 @@
 'use client';
 
+import React from 'react';
+import { ShellListRowFrame } from '@/components/organisms/table/atoms/ShellListRowFrame';
 import type { ReleaseTaskView } from '@/lib/release-tasks/types';
 import {
   getAccentCssVars,
@@ -8,6 +10,13 @@ import {
 import { ReleaseTaskAssigneeBadge } from './ReleaseTaskAssigneeBadge';
 import { ReleaseTaskDueBadge } from './ReleaseTaskDueBadge';
 import { ReleaseTaskExplainerPopover } from './ReleaseTaskExplainerPopover';
+import {
+  isReleaseTaskAutomated,
+  isReleaseTaskDone,
+  ReleaseTaskAutoBadge,
+  ReleaseTaskCheckbox,
+  ReleaseTaskTitleText,
+} from './ReleaseTaskRowPrimitives';
 
 interface ReleaseTaskRowProps {
   readonly task: ReleaseTaskView;
@@ -22,9 +31,19 @@ const PRIORITY_DISPLAY: Record<string, { dots: string }> = {
   none: { dots: '' },
 };
 
-export function ReleaseTaskRow({ task, onToggle }: ReleaseTaskRowProps) {
-  const isDone = task.status === 'done';
-  const isAi = task.assigneeType === 'ai_workflow';
+/**
+ * ReleaseTaskRow — full list row renderer for release tasks in checklists / tables.
+ * High-churn over real production ReleaseTaskView data (status, priority, due, assignee).
+ *
+ * Memoized + canonical focus rings + DS subtle motion only (shell handoff rot 20).
+ * Container-aware via ShellListRowFrame (subtraction).
+ */
+export const ReleaseTaskRow = React.memo(function ReleaseTaskRow({
+  task,
+  onToggle,
+}: ReleaseTaskRowProps) {
+  const isDone = isReleaseTaskDone(task);
+  const isAi = isReleaseTaskAutomated(task);
   const priority = PRIORITY_DISPLAY[task.priority] ?? PRIORITY_DISPLAY.medium;
   const priorityAccent =
     task.priority === 'none'
@@ -33,35 +52,25 @@ export function ReleaseTaskRow({ task, onToggle }: ReleaseTaskRowProps) {
   const aiAccent = getAccentCssVars('purple');
 
   return (
-    <div className='flex items-center gap-2 px-4 py-1 min-h-[32px] group hover:bg-surface-1 rounded transition-colors'>
-      {/* Checkbox */}
-      <input
-        type='checkbox'
-        checked={isDone}
-        disabled={isAi}
-        onChange={() => onToggle(task.id, !isDone)}
-        className='h-3.5 w-3.5 flex-shrink-0 rounded accent-[var(--linear-accent,#5e6ad2)] cursor-pointer disabled:cursor-default disabled:opacity-60'
-        aria-label={`Mark "${task.title}" as ${isDone ? 'incomplete' : 'complete'}`}
+    <ShellListRowFrame className='flex min-h-[32px] items-center gap-2 px-4 py-1'>
+      <ReleaseTaskCheckbox
+        task={task}
+        isDone={isDone}
+        onToggle={onToggle}
+        className='h-3.5 w-3.5'
       />
 
-      {/* Title */}
-      <span
-        className={`flex-1 text-[11.5px] truncate transition-colors ${
-          isDone
-            ? 'text-tertiary-token line-through opacity-60'
-            : 'text-primary-token'
-        }`}
-      >
+      <ReleaseTaskTitleText className='flex-1 text-[11.5px]' isDone={isDone}>
         {task.title}
         {isAi && (
-          <span
+          <ReleaseTaskAutoBadge
             className='ml-1.5 text-3xs font-medium'
             style={{ color: aiAccent.solid }}
           >
             Auto
-          </span>
+          </ReleaseTaskAutoBadge>
         )}
-      </span>
+      </ReleaseTaskTitleText>
 
       {/* Assignee badge */}
       <div className='flex-shrink-0 max-md:hidden'>
@@ -95,6 +104,6 @@ export function ReleaseTaskRow({ task, onToggle }: ReleaseTaskRowProps) {
           learnMoreUrl={task.learnMoreUrl}
         />
       )}
-    </div>
+    </ShellListRowFrame>
   );
-}
+});

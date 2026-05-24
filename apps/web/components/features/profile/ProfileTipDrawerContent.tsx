@@ -21,10 +21,9 @@ export function ProfileTipDrawerContent({
           interactive ? amount => onAmountSelected?.(amount) : () => {}
         }
         presentation='drawer'
-        primaryLabel='Send payment'
+        primaryLabel='Continue with Venmo'
         paymentLabel='Venmo'
-        showOtherPaymentOptions
-        otherPaymentOptionsLabel='Other payment options'
+        showOtherPaymentOptions={false}
       />
     </div>
   );

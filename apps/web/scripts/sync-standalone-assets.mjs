@@ -6,6 +6,7 @@ import {
   mkdirSync,
   readdirSync,
   readFileSync,
+  readlinkSync,
   realpathSync,
   rmSync,
   writeFileSync,
@@ -18,8 +19,24 @@ const scriptDir = path.dirname(fileURLToPath(import.meta.url));
 const require = createRequire(import.meta.url);
 const appRoot = path.resolve(scriptDir, '..');
 const standaloneOutputRoot = path.join(appRoot, '.next', 'standalone');
+const standaloneNodeModulesRoot = path.join(
+  standaloneOutputRoot,
+  'node_modules'
+);
+const workspaceNodeModulesRoot = path.resolve(
+  appRoot,
+  '..',
+  '..',
+  'node_modules'
+);
+const appNodeModulesRoot = path.join(appRoot, 'node_modules');
 const standaloneRoot = path.join(standaloneOutputRoot, 'apps', 'web');
 const standaloneNextRoot = path.join(standaloneRoot, '.next');
+const standaloneNextNodeModulesRoot = path.join(
+  standaloneNextRoot,
+  'node_modules'
+);
+const appNextNodeModulesRoot = path.join(appRoot, '.next', 'node_modules');
 
 const copyTargets = [
   {
@@ -45,6 +62,7 @@ const optionalCopyTargets = [
 const standaloneRuntimePackages = [
   '@next/env',
   '@swc/helpers',
+  '@statsig/statsig-node-core',
   'require-in-the-middle',
 ];
 const copiedRuntimePackages = new Set();
@@ -74,6 +92,80 @@ function countSymlinks(rootDir) {
   return total;
 }
 
+function isPathInside(candidatePath, parentPath) {
+  const relativePath = path.relative(parentPath, candidatePath);
+  return (
+    relativePath === '' ||
+    (!relativePath.startsWith('..') && !path.isAbsolute(relativePath))
+  );
+}
+
+function findStandaloneNodeModulesRoot(entryPath) {
+  for (const nodeModulesRoot of [
+    standaloneNextNodeModulesRoot,
+    standaloneNodeModulesRoot,
+  ]) {
+    if (isPathInside(entryPath, nodeModulesRoot)) {
+      return nodeModulesRoot;
+    }
+  }
+
+  return null;
+}
+
+function getFallbackNodeModulesRoots(nodeModulesRoot) {
+  if (nodeModulesRoot === standaloneNextNodeModulesRoot) {
+    return [
+      appNextNodeModulesRoot,
+      appNodeModulesRoot,
+      workspaceNodeModulesRoot,
+    ];
+  }
+
+  return [appNodeModulesRoot, workspaceNodeModulesRoot];
+}
+
+function resolveStandaloneSymlinkTarget(entryPath) {
+  try {
+    return realpathSync(entryPath);
+  } catch (error) {
+    if (error?.code !== 'ENOENT') {
+      throw error;
+    }
+
+    const linkTarget = readlinkSync(entryPath);
+    const standaloneTarget = path.resolve(path.dirname(entryPath), linkTarget);
+    const nodeModulesRoot = findStandaloneNodeModulesRoot(entryPath);
+
+    if (nodeModulesRoot === null) {
+      throw new Error(
+        `Unable to resolve standalone symlink outside known node_modules roots: ${entryPath} -> ${standaloneTarget}`,
+        { cause: error }
+      );
+    }
+
+    const relativeTarget = path.relative(nodeModulesRoot, standaloneTarget);
+
+    if (relativeTarget.startsWith('..') || path.isAbsolute(relativeTarget)) {
+      throw new Error(
+        `Unable to remap standalone symlink target outside ${nodeModulesRoot}: ${entryPath} -> ${standaloneTarget}`,
+        { cause: error }
+      );
+    }
+
+    const fallbackRoots = getFallbackNodeModulesRoots(nodeModulesRoot);
+
+    for (const root of fallbackRoots) {
+      const fallbackTarget = path.join(root, relativeTarget);
+      if (existsSync(fallbackTarget)) {
+        return realpathSync(fallbackTarget);
+      }
+    }
+
+    throw error;
+  }
+}
+
 function materializeSymlinks(rootDir) {
   let materialized = 0;
 
@@ -81,7 +173,7 @@ function materializeSymlinks(rootDir) {
     const entryPath = path.join(rootDir, entry.name);
 
     if (entry.isSymbolicLink()) {
-      const resolvedPath = realpathSync(entryPath);
+      const resolvedPath = resolveStandaloneSymlinkTarget(entryPath);
       const resolvedStats = lstatSync(resolvedPath);
 
       rmSync(entryPath, { force: true, recursive: true });
@@ -105,6 +197,50 @@ function materializeSymlinks(rootDir) {
   return materialized;
 }
 
+function findPackageJsonFromEntry(entryPath, packageName) {
+  let currentDir = path.dirname(entryPath);
+  const rootDir = path.parse(currentDir).root;
+
+  while (currentDir !== rootDir) {
+    const packageJsonPath = path.join(currentDir, 'package.json');
+    if (existsSync(packageJsonPath)) {
+      const packageJson = JSON.parse(readFileSync(packageJsonPath, 'utf8'));
+      if (packageJson.name === packageName) {
+        return packageJsonPath;
+      }
+    }
+
+    currentDir = path.dirname(currentDir);
+  }
+
+  throw new Error(
+    `Unable to find package.json for ${packageName} from ${entryPath}`
+  );
+}
+
+function resolvePackageJson(packageName, paths) {
+  try {
+    return require.resolve(`${packageName}/package.json`, { paths });
+  } catch (error) {
+    if (error?.code !== 'ERR_PACKAGE_PATH_NOT_EXPORTED') {
+      throw error;
+    }
+
+    return findPackageJsonFromEntry(
+      require.resolve(packageName, { paths }),
+      packageName
+    );
+  }
+}
+
+function isOptionalRuntimePackageUnavailable(error) {
+  return (
+    error?.code === 'MODULE_NOT_FOUND' ||
+    (error instanceof Error &&
+      error.message.startsWith('Unable to find package.json for '))
+  );
+}
+
 function copyRuntimePackageToStandalone(
   packageName,
   resolveFrom = path.dirname(require.resolve('next/package.json'))
@@ -113,9 +249,10 @@ function copyRuntimePackageToStandalone(
     return;
   }
 
-  const packageJsonPath = require.resolve(`${packageName}/package.json`, {
-    paths: [resolveFrom, path.dirname(require.resolve('next/package.json'))],
-  });
+  const packageJsonPath = resolvePackageJson(packageName, [
+    resolveFrom,
+    path.dirname(require.resolve('next/package.json')),
+  ]);
   const packageRoot = path.dirname(packageJsonPath);
   const packageJson = JSON.parse(readFileSync(packageJsonPath, 'utf8'));
   const destination = path.join(
@@ -131,6 +268,18 @@ function copyRuntimePackageToStandalone(
 
   for (const dependencyName of Object.keys(packageJson.dependencies ?? {})) {
     copyRuntimePackageToStandalone(dependencyName, packageRoot);
+  }
+
+  for (const dependencyName of Object.keys(
+    packageJson.optionalDependencies ?? {}
+  )) {
+    try {
+      copyRuntimePackageToStandalone(dependencyName, packageRoot);
+    } catch (error) {
+      if (!isOptionalRuntimePackageUnavailable(error)) {
+        throw error;
+      }
+    }
   }
 }
 
@@ -180,6 +329,7 @@ function createHashedExternalStubs(rootDir) {
     path.join(rootDir, 'node_modules'),
     path.join(rootDir, '.next', 'node_modules'),
     path.join(rootDir, '.next', 'server', 'node_modules'),
+    path.join(standaloneOutputRoot, 'node_modules'),
   ];
 
   // Find a real package directory by searching all candidates. Returns the

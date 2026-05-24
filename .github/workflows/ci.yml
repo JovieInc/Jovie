@@ -35,6 +35,7 @@ concurrency:
 env:
   TURBO_TOKEN: ${{ secrets.TURBO_TOKEN }}
   TURBO_TEAM: ${{ secrets.TURBO_TEAM }}
+  TURBO_CACHE: local:rw,remote:rw
   # Larger runner for CPU-heavy jobs (typecheck, build, tests).
   # Set to a GitHub-hosted larger runner label (e.g. "ubuntu-4core") for burst throughput,
   # or leave as "ubuntu-latest" for default 2-core runners.
@@ -59,6 +60,7 @@ jobs:
       run_chat_lighthouse: ${{ steps.detect.outputs.run_chat_lighthouse }}
       run_e2e: ${{ steps.detect.outputs.run_e2e }}
       run_drizzle: ${{ steps.detect.outputs.run_drizzle }}
+      run_neon: ${{ steps.detect.outputs.run_neon }}
       has_code_changes: ${{ steps.detect.outputs.has_code_changes }}
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
@@ -74,7 +76,7 @@ jobs:
           # Force run all if the 'testing' label is present
           if [[ "$FULL_CI_LABEL" == "true" ]]; then
             echo "Forcing full CI run due to 'testing' label"
-            for t in run_build run_test run_public_lighthouse run_dashboard_lighthouse run_onboarding_lighthouse run_admin_lighthouse run_chat_lighthouse run_e2e run_drizzle has_code_changes; do
+            for t in run_build run_test run_public_lighthouse run_dashboard_lighthouse run_onboarding_lighthouse run_admin_lighthouse run_chat_lighthouse run_e2e run_drizzle run_neon has_code_changes; do
               echo "$t=true" >> "$GITHUB_OUTPUT"
             done
             exit 0
@@ -87,7 +89,7 @@ jobs:
           elif [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
             # Manual dispatch: run everything
             echo "Manual dispatch: running all checks"
-            for t in run_build run_test run_public_lighthouse run_dashboard_lighthouse run_onboarding_lighthouse run_admin_lighthouse run_chat_lighthouse run_e2e run_drizzle has_code_changes; do
+            for t in run_build run_test run_public_lighthouse run_dashboard_lighthouse run_onboarding_lighthouse run_admin_lighthouse run_chat_lighthouse run_e2e run_drizzle run_neon has_code_changes; do
               echo "$t=true" >> "$GITHUB_OUTPUT"
             done
             exit 0
@@ -98,7 +100,7 @@ jobs:
           # Check if only docs changed (exclude .github/ — workflow changes must run CI)
           if echo "$CHANGED_FILES" | grep -v -E '^\.(github/)' | grep -v -E '\.(md|txt)$' | wc -l | grep -q '^0$'; then
             echo "Only documentation files changed"
-            for t in run_build run_test run_public_lighthouse run_dashboard_lighthouse run_onboarding_lighthouse run_admin_lighthouse run_chat_lighthouse run_e2e run_drizzle has_code_changes; do
+            for t in run_build run_test run_public_lighthouse run_dashboard_lighthouse run_onboarding_lighthouse run_admin_lighthouse run_chat_lighthouse run_e2e run_drizzle run_neon has_code_changes; do
               echo "$t=false" >> "$GITHUB_OUTPUT"
             done
             exit 0
@@ -126,7 +128,7 @@ jobs:
             echo "run_test=false" >> "$GITHUB_OUTPUT"
           fi
 
-          PUBLIC_LIGHTHOUSE_PATTERN='^(\.github/workflows/ci\.yml|apps/web/\.lighthouserc\.pr\.json|apps/web/\.lighthouserc\.public-launch\.json|apps/web/app/\(home\)/|apps/web/app/\(marketing\)/|apps/web/app/\(dynamic\)/legal/|apps/web/content/legal/|apps/web/app/\[username\]/|apps/web/app/layout\.tsx|apps/web/app/globals\.css|apps/web/public/|apps/web/styles/|apps/web/components/features/home/|apps/web/components/features/marketing/|apps/web/components/features/profile/|apps/web/scripts/run-public-lighthouse\.ts|apps/web/scripts/public-route-qa\.ts|apps/web/scripts/public-surface-qa\.ts|apps/web/scripts/performance-route-manifest\.ts|apps/web/tests/e2e/public-exhaustive\.spec\.ts|apps/web/tests/e2e/axe-audit\.spec\.ts|apps/web/tests/e2e/utils/(public-surface-(manifest|helpers)|smoke-test-utils)\.ts|packages/|apps/web/package.*\.json|package.*\.json|apps/web/tailwind\.config\.|apps/web/postcss\.config\.)'
+          PUBLIC_LIGHTHOUSE_PATTERN='^(\.github/workflows/ci\.yml|apps/web/\.lighthouserc\.pr\.json|apps/web/\.lighthouserc\.public-launch\.json|apps/web/app/\(home\)/|apps/web/app/\(marketing\)/|apps/web/app/\(dynamic\)/legal/|apps/web/content/legal/|apps/web/app/\[username\]/|apps/web/app/layout\.tsx|apps/web/app/globals\.css|apps/web/public/|apps/web/styles/|apps/web/components/features/home/|apps/web/components/features/marketing/|apps/web/components/features/profile/|apps/web/components/homepage/|apps/web/components/marketing/|apps/web/scripts/run-public-lighthouse\.ts|apps/web/scripts/public-route-qa\.ts|apps/web/scripts/public-surface-qa\.ts|apps/web/scripts/performance-route-manifest\.ts|apps/web/tests/e2e/public-exhaustive\.spec\.ts|apps/web/tests/e2e/profile-mobile-viewport-stability\.spec\.ts|apps/web/tests/e2e/axe-audit\.spec\.ts|apps/web/tests/e2e/utils/(public-surface-(manifest|helpers)|smoke-test-utils|mobile-profile-viewports)\.ts|packages/|apps/web/package.*\.json|package.*\.json|apps/web/tailwind\.config\.|apps/web/postcss\.config\.)'
           if echo "$CHANGED_FILES" | grep -q -E "$PUBLIC_LIGHTHOUSE_PATTERN"; then
             echo "run_public_lighthouse=true" >> "$GITHUB_OUTPUT"
           else
@@ -175,6 +177,17 @@ jobs:
             echo "run_drizzle=true" >> "$GITHUB_OUTPUT"
           else
             echo "run_drizzle=false" >> "$GITHUB_OUTPUT"
+          fi
+
+          # Neon ephemeral-branch gate: only spin up Neon when DB-relevant code changed.
+          # Covers drizzle, lib/db, lib/queries, schema, cron routes, SQL files, and
+          # package.json changes that could affect drizzle/DB deps.
+          # Jobs that create ephemeral Neon branches must check this flag before doing so.
+          NEON_PATTERN='^(apps/web/drizzle/|apps/web/lib/db/|apps/web/lib/queries/|apps/web/drizzle\.config\.ts|drizzle\.kit\.(m?js|ts)|.*\.sql$|apps/web/app/api/cron/|apps/web/package.*\.json|package.*\.json)'
+          if echo "$CHANGED_FILES" | grep -q -E "$NEON_PATTERN"; then
+            echo "run_neon=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "run_neon=false" >> "$GITHUB_OUTPUT"
           fi
 
           # Fork guard: disable E2E for forks (no secrets)
@@ -229,10 +242,20 @@ jobs:
     if: ${{ github.event_name != 'pull_request' || needs.ci-path-changes.outputs.has_code_changes == 'true' }}
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-        with: { fetch-depth: 1 }
-      - uses: ./.github/actions/setup-node-pnpm
+        with: { fetch-depth: 0 }
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
+        with:
+          node-version: '22'
+      - name: Desktop release guard
+        env:
+          BASE_REF: ${{ github.base_ref || 'main' }}
+        run: node scripts/desktop-release-guard.mjs --base "origin/${BASE_REF}"
       - name: Next.js proxy guard
-        run: pnpm --filter=@jovie/web run next:proxy-guard
+        # next-proxy-guard.mjs only uses Node built-ins (fs, path) — no pnpm install needed.
+        # Running node directly avoids ERR_PNPM_OUTDATED_LOCKFILE on dependabot PRs that
+        # bump package.json without regenerating pnpm-lock.yaml.
+        working-directory: apps/web
+        run: node scripts/next-proxy-guard.mjs
 
   ci-biome:
     name: Lint
@@ -243,20 +266,27 @@ jobs:
     if: ${{ github.event_name != 'pull_request' || needs.ci-path-changes.outputs.has_code_changes == 'true' }}
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-        with: { fetch-depth: 1 }
+        with: { fetch-depth: 2 }
       - uses: ./.github/actions/setup-node-pnpm
       - name: Run Biome CI (lint + format)
         run: |
           # For PRs: only lint changed files (faster, pre-commit already ran on local)
           # For pushes to main: full lint to catch any issues
           if [[ "${{ github.event_name }}" == "pull_request" ]]; then
-            git fetch origin "${{ github.base_ref }}" --depth=1
+            DIFF_BASE="HEAD^1"
+            if ! git rev-parse --verify "$DIFF_BASE" >/dev/null 2>&1; then
+              git fetch origin "${{ github.base_ref }}" --depth=1
+              DIFF_BASE="origin/${{ github.base_ref }}"
+            fi
             # Use diff-filter=d to exclude deleted files (biome can't lint deleted files)
             # Include .mts/.mjs extensions for ESM config files
-            CHANGED_FILES=$(git diff --diff-filter=d --name-only "origin/${{ github.base_ref }}" HEAD -- '*.ts' '*.tsx' '*.js' '*.jsx' '*.json' '*.mts' '*.mjs' ':(exclude)**/package-lock.json' ':(exclude).claude/settings.json' ':(exclude).claude/skills/**' | tr '\n' ' ')
-            if [ -n "$CHANGED_FILES" ]; then
-              echo "Linting changed files only: $CHANGED_FILES"
-              pnpm biome ci --reporter=github $CHANGED_FILES
+            mapfile -t CHANGED_FILES < <(
+              git diff --diff-filter=d --name-only "$DIFF_BASE" HEAD -- '*.ts' '*.tsx' '*.js' '*.jsx' '*.json' '*.mts' '*.mjs' ':(exclude)**/package-lock.json' ':(exclude).claude/settings.json' ':(exclude).claude/skills/**'
+            )
+            if (( ${#CHANGED_FILES[@]} > 0 )); then
+              echo "Linting changed files only:"
+              printf '  %s\n' "${CHANGED_FILES[@]}"
+              pnpm biome ci --reporter=github --no-errors-on-unmatched "${CHANGED_FILES[@]}"
             else
               echo "No lintable files changed"
             fi
@@ -273,15 +303,19 @@ jobs:
     if: ${{ github.event_name != 'pull_request' || needs.ci-path-changes.outputs.has_code_changes == 'true' }}
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-        with: { fetch-depth: 1 }
+        with: { fetch-depth: 2 }
       - uses: ./.github/actions/setup-node-pnpm
       - name: Run ESLint server boundary checks
         shell: bash
         run: |
           if [[ "${{ github.event_name }}" == "pull_request" ]]; then
-            git fetch origin "${{ github.base_ref }}" --depth=1
+            DIFF_BASE="HEAD^1"
+            if ! git rev-parse --verify "$DIFF_BASE" >/dev/null 2>&1; then
+              git fetch origin "${{ github.base_ref }}" --depth=1
+              DIFF_BASE="origin/${{ github.base_ref }}"
+            fi
             mapfile -t CHANGED_FILES < <(
-              git diff --diff-filter=d --name-only "origin/${{ github.base_ref }}" HEAD -- \
+              git diff --diff-filter=d --name-only "$DIFF_BASE" HEAD -- \
                 'apps/web/*.ts' \
                 'apps/web/*.tsx' \
                 'apps/web/**/*.ts' \
@@ -343,13 +377,17 @@ jobs:
             ${{ runner.os }}-tsc-${{ github.ref }}-
             ${{ runner.os }}-tsc-
       - name: Run typecheck
+        env:
+          TURBO_SCM_BASE: ${{ github.event_name == 'merge_group' && 'origin/main' || (github.base_ref && format('origin/{0}', github.base_ref)) || '' }}
         run: pnpm turbo typecheck --affected
 
   neon-db:
     name: Neon DB
     needs: [ci-path-changes]
-    # Run for push to main, risky PRs with the testing label, or schema PRs that need a shared Neon branch.
-    if: ${{ github.event_name == 'push' || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork == false && (contains(github.event.pull_request.labels.*.name, 'testing') || needs.ci-path-changes.outputs.run_drizzle == 'true')) }}
+    # Run for push to main, risky PRs with the testing label, or PRs touching DB-relevant paths.
+    # run_neon covers drizzle, lib/db, lib/queries, schema, cron routes, SQL files, and
+    # package.json changes. PRs touching only UI/perf/docs skip this job entirely.
+    if: ${{ github.event_name == 'push' || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork == false && (contains(github.event.pull_request.labels.*.name, 'testing') || needs.ci-path-changes.outputs.run_neon == 'true')) }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
     outputs:
@@ -547,8 +585,8 @@ jobs:
         uses: ./.github/actions/resolve-neon-database-url
         with:
           connection_file: /tmp/neon-db-connection/connection.json
-          candidate_json_key: db_url_pooled
-          fallback_json_key: db_url
+          candidate_json_key: db_url
+          fallback_json_key: db_url_pooled
           credential_source_url: ${{ secrets.DATABASE_URL_MAIN }}
           credential_fallback_url: ${{ secrets.DATABASE_URL }}
 
@@ -796,6 +834,125 @@ jobs:
           path: apps/web/playwright-report/
           retention-days: 3
 
+  ci-mobile-overflow:
+    name: Mobile Overflow Guard (${{ matrix.width }}px)
+    needs: [ci-fast, ci-path-changes, neon-db]
+    if: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork == false && needs.ci-path-changes.outputs.run_e2e == 'true' && github.actor != 'dependabot[bot]' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        width: [320, 390, 430]
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 1
+
+      - uses: ./.github/actions/setup-node-pnpm
+
+      - name: Run static mobile overflow guard
+        run: pnpm --filter=@jovie/web run mobile-overflow:guard
+
+      - name: Create ephemeral Neon database branch (with retry)
+        # Only create an ephemeral branch when DB-relevant code changed (saves 3 Neon branches
+        # per PR run — one per matrix shard — on UI-only PRs that just need a read-only DB).
+        if: needs.ci-path-changes.outputs.run_neon == 'true'
+        id: neon-branch
+        uses: ./.github/actions/neon-create-branch-with-retry
+        with:
+          project_id: ${{ vars.NEON_PROJECT_ID }}
+          branch_name: mobile-overflow-${{ matrix.width }}-${{ github.run_id }}-${{ github.run_attempt }}
+          role: neondb_owner
+          api_key: ${{ secrets.NEON_API_KEY }}
+          protected_branches: main,development,preview,br-main,br-production,${{ needs.neon-db.outputs.branch_name }}
+
+      - name: Resolve DATABASE_URL (Neon ephemeral)
+        # Only resolve from the ephemeral branch when one was created.
+        if: needs.ci-path-changes.outputs.run_neon == 'true'
+        id: resolve-mobile-overflow-neon-db-url
+        uses: ./.github/actions/resolve-neon-database-url
+        with:
+          candidate_url: ${{ steps.neon-branch.outputs.db_url_pooled }}
+          fallback_candidate_url: ${{ steps.neon-branch.outputs.db_url }}
+          credential_source_url: ${{ secrets.DATABASE_URL_MAIN }}
+          credential_fallback_url: ${{ secrets.DATABASE_URL }}
+
+      - name: Export DATABASE_URL (ephemeral branch)
+        if: needs.ci-path-changes.outputs.run_neon == 'true'
+        run: echo "DATABASE_URL=${{ steps.resolve-mobile-overflow-neon-db-url.outputs.database_url }}" >> "$GITHUB_ENV"
+
+      - name: Export DATABASE_URL (main — non-DB PR)
+        # No ephemeral branch was created; use the stable main DB for SSR reads.
+        if: needs.ci-path-changes.outputs.run_neon != 'true'
+        run: echo "DATABASE_URL=${{ secrets.DATABASE_URL_MAIN }}" >> "$GITHUB_ENV"
+
+      - name: Run migrations (ephemeral Neon)
+        if: needs.ci-path-changes.outputs.run_neon == 'true'
+        run: pnpm --filter=@jovie/web run drizzle:migrate:ci
+        env:
+          DATABASE_URL: ${{ env.DATABASE_URL }}
+          NODE_ENV: test
+          GIT_BRANCH: pr-${{ github.event.pull_request.number }}
+          ALLOW_PROD_MIGRATIONS: 'true'
+
+      - name: Seed mobile overflow fixtures
+        if: needs.ci-path-changes.outputs.run_neon == 'true'
+        run: pnpm --filter=@jovie/web exec tsx tests/seed-test-data.ts
+        env:
+          DATABASE_URL: ${{ env.DATABASE_URL }}
+          NODE_ENV: test
+
+      - name: Cache Playwright Browsers
+        uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-chromium-${{ hashFiles('pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-playwright-chromium-
+
+      - name: Install Playwright (Chromium)
+        run: pnpm --filter=@jovie/web exec playwright install chromium
+
+      - name: Run mobile overflow Playwright guard
+        run: pnpm --filter=@jovie/web exec playwright test tests/e2e/mobile-overflow.spec.ts --project=chromium --reporter=line
+        env:
+          DATABASE_URL: ${{ env.DATABASE_URL }}
+          NODE_ENV: test
+          CI: true
+          E2E_USE_TEST_AUTH_BYPASS: '1'
+          NEXT_PUBLIC_CLERK_MOCK: '1'
+          NEXT_PUBLIC_CLERK_PROXY_DISABLED: '1'
+          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
+          CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY }}
+          FLAGS_SECRET: ${{ secrets.FLAGS_SECRET }}
+          URL_ENCRYPTION_KEY: mobile-overflow-ci-url-encryption-key
+          AI_GATEWAY_API_KEY: mobile-overflow-ci
+          MOBILE_OVERFLOW_WIDTHS: ${{ matrix.width }}
+          MOBILE_OVERFLOW_FOCUS_LIMIT: '8'
+          # Each matrix shard owns one mobile width. Keep navigation serialized
+          # so Turbopack cold compiles do not reset peer browser requests.
+          PLAYWRIGHT_WORKERS: '1'
+
+      - name: Upload Playwright Artifacts on Failure
+        if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: mobile-overflow-report-${{ matrix.width }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            apps/web/playwright-report/
+            apps/web/test-results/
+          retention-days: 3
+
+      - name: Cleanup ephemeral Neon branch
+        if: always() && steps.neon-branch.outputs.branch_id != ''
+        continue-on-error: true
+        run: |
+          curl -sS -X DELETE \
+            -H "Authorization: Bearer ${{ secrets.NEON_API_KEY }}" \
+            -H "Content-Type: application/json" \
+            "https://console.neon.tech/api/v2/projects/${{ vars.NEON_PROJECT_ID }}/branches/${{ steps.neon-branch.outputs.branch_id }}"
+
   ci-lighthouse-pr:
     name: Lighthouse (public routes PR)
     needs: [ci-build-public, ci-path-changes, neon-db]
@@ -808,7 +965,21 @@ jobs:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
       - uses: ./.github/actions/setup-node-pnpm
 
+      - name: Cache Playwright Browsers
+        uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-chromium-${{ hashFiles('pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-playwright-chromium-
+
+      - name: Install Playwright (Chromium)
+        run: pnpm --filter=@jovie/web exec playwright install chromium
+
       - name: Create ephemeral Neon database branch (with retry)
+        # Only create an ephemeral branch when DB-relevant code changed (saves Neon compute).
+        # Non-DB PRs skip branch creation and fall back to DATABASE_URL_MAIN for SSR reads.
+        if: needs.ci-path-changes.outputs.run_neon == 'true'
         id: neon-branch
         uses: ./.github/actions/neon-create-branch-with-retry
         with:
@@ -819,6 +990,8 @@ jobs:
           protected_branches: main,development,preview,br-main,br-production,${{ needs.neon-db.outputs.branch_name }}
 
       - name: Resolve DATABASE_URL (Neon ephemeral)
+        # Only resolve from the ephemeral branch when one was created.
+        if: needs.ci-path-changes.outputs.run_neon == 'true'
         id: resolve-neon-db-url
         uses: ./.github/actions/resolve-neon-database-url
         with:
@@ -827,10 +1000,18 @@ jobs:
           credential_source_url: ${{ secrets.DATABASE_URL_MAIN }}
           credential_fallback_url: ${{ secrets.DATABASE_URL }}
 
-      - name: Export DATABASE_URL
+      - name: Export DATABASE_URL (ephemeral branch)
+        if: needs.ci-path-changes.outputs.run_neon == 'true'
         run: echo "DATABASE_URL=${{ steps.resolve-neon-db-url.outputs.database_url }}" >> "$GITHUB_ENV"
 
+      - name: Export DATABASE_URL (main — non-DB PR)
+        # No ephemeral branch was created; use the stable main DB for SSR reads.
+        if: needs.ci-path-changes.outputs.run_neon != 'true'
+        run: echo "DATABASE_URL=${{ secrets.DATABASE_URL_MAIN }}" >> "$GITHUB_ENV"
+
       - name: Run migrations (ephemeral Neon)
+        # Only migrate when we have a fresh ephemeral branch (DB-relevant changes).
+        if: needs.ci-path-changes.outputs.run_neon == 'true'
         run: pnpm --filter=@jovie/web run drizzle:migrate:ci
         env:
           DATABASE_URL: ${{ env.DATABASE_URL }}
@@ -839,6 +1020,7 @@ jobs:
           ALLOW_PROD_MIGRATIONS: 'true'
 
       - name: Seed public QA fixtures
+        if: needs.ci-path-changes.outputs.run_neon == 'true'
         run: pnpm --filter=@jovie/web exec tsx tests/seed-test-data.ts
         env:
           DATABASE_URL: ${{ env.DATABASE_URL }}
@@ -888,9 +1070,14 @@ jobs:
           fi
 
           pnpm run test:lighthouse:public:launch
+
+          mkdir -p tests/.auth
+          echo '{"cookies":[],"origins":[]}' > tests/.auth/user.json
+          pnpm exec playwright test tests/e2e/profile-mobile-viewport-stability.spec.ts --config=playwright.config.noauth.ts --project=chromium --reporter=line
         env:
           CI: true
           BASE_URL: http://127.0.0.1:3000
+          PROFILE_MOBILE_PERF_BUDGETS: '1'
           NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
           CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY }}
           DATABASE_URL: ${{ env.DATABASE_URL }}
@@ -1080,6 +1267,9 @@ jobs:
         run: pnpm --filter=@jovie/web exec playwright install chromium
 
       - name: Create ephemeral Neon database branch (with retry)
+        # Only create an ephemeral branch when DB-relevant code changed.
+        # Non-DB PRs skip branch creation; resolve-neon-database-url falls back to DATABASE_URL_MAIN.
+        if: needs.ci-path-changes.outputs.run_neon == 'true'
         id: neon-branch
         uses: ./.github/actions/neon-create-branch-with-retry
         with:
@@ -1090,6 +1280,8 @@ jobs:
           protected_branches: main,development,preview,br-main,br-production,${{ needs.neon-db.outputs.branch_name }}
 
       - name: Resolve DATABASE_URL (Neon ephemeral)
+        # Only resolve from the ephemeral branch when one was created.
+        if: needs.ci-path-changes.outputs.run_neon == 'true'
         id: resolve-onboarding-neon-db-url
         uses: ./.github/actions/resolve-neon-database-url
         with:
@@ -1098,10 +1290,17 @@ jobs:
           credential_source_url: ${{ secrets.DATABASE_URL_MAIN }}
           credential_fallback_url: ${{ secrets.DATABASE_URL }}
 
-      - name: Export DATABASE_URL
+      - name: Export DATABASE_URL (ephemeral branch)
+        if: needs.ci-path-changes.outputs.run_neon == 'true'
         run: echo "DATABASE_URL=${{ steps.resolve-onboarding-neon-db-url.outputs.database_url }}" >> "$GITHUB_ENV"
 
+      - name: Export DATABASE_URL (main — non-DB PR)
+        # No ephemeral branch was created; use the stable main DB for SSR reads.
+        if: needs.ci-path-changes.outputs.run_neon != 'true'
+        run: echo "DATABASE_URL=${{ secrets.DATABASE_URL_MAIN }}" >> "$GITHUB_ENV"
+
       - name: Run migrations (ephemeral Neon)
+        if: needs.ci-path-changes.outputs.run_neon == 'true'
         run: pnpm --filter=@jovie/web run drizzle:migrate:ci
         env:
           DATABASE_URL: ${{ env.DATABASE_URL }}
@@ -1685,15 +1884,20 @@ jobs:
             FAILURES=$((FAILURES + 1))
           fi
 
-          # -- 4. Critical pages: /signup, /pricing -- no 5xx --
+          # -- 4. Critical pages: /signup, /start, /pricing -- no 5xx --
           check_critical_pages() {
-            for route in "/signup" "/pricing"; do
+            for route in "/signup" "/start" "/pricing"; do
               local response
               response=$(fetch "https://jov.ie${route}")
               local status="${response##*$'\n'}"
+              local body="${response%$'\n'*}"
 
               if [ "$status" -ge 500 ] 2>/dev/null; then
                 echo "  Route ${route} returned HTTP $status (server error)"
+                return 1
+              fi
+              if echo "$body" | grep -qi "turnstile is not configured\|auth unavailable\|clerk is not configured"; then
+                echo "  Route ${route} contains front-door config error"
                 return 1
               fi
               echo "  ${route}: HTTP $status"
@@ -1903,11 +2107,11 @@ jobs:
     # Path-gated: skips test execution when no test-relevant files changed.
     if: ${{ github.event_name == 'pull_request' || (github.event_name == 'push' && github.ref == 'refs/heads/main') || github.event_name == 'merge_group' || github.event_name == 'workflow_dispatch' }}
     runs-on: ${{ vars.CI_FAST_RUNNER || 'ubuntu-latest' }}
-    timeout-minutes: 20
+    timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
-        shard: ['1/4', '2/4', '3/4', '4/4']
+        shard: ['1/6', '2/6', '3/6', '4/6', '5/6', '6/6']
     outputs:
       run_full_ci: ${{ steps.check_changes.outputs.run_full_ci }}
     steps:
@@ -1972,7 +2176,7 @@ jobs:
           VITEST_CI_FLAGS="--pool=forks --maxWorkers=2"
           # Mitigate low-frequency flakes by retrying failed tests once in CI
           RETRY_FLAG="--retry=1"
-          # Use shard-specific output file so Codecov Test Analytics receives all 4 shards
+          # Use shard-specific output file so Codecov Test Analytics receives all 6 shards
           # (a shared filename causes only the last upload to be recorded)
           # Note: vitest runs from apps/web/, so path is relative to that directory
           SHARD_SLUG="${{ matrix.shard }}"
@@ -2010,7 +2214,7 @@ jobs:
 
       - name: Upload coverage to Codecov
         if: steps.check_changes.outputs.run_full_ci == 'true' && github.ref == 'refs/heads/main'
-        uses: codecov/codecov-action@57e3a136b779b570ffcdbf80b3bdc90e7fab3de2 # v5
+        uses: codecov/codecov-action@e79a6962e0d4c0c17b229090214935d2e33f8354 # v5
         with:
           directory: apps/web/coverage
           flags: unittests
@@ -2031,7 +2235,7 @@ jobs:
     name: A11y (axe)
     # Runs axe-core WCAG 2.1 AA audit on public routes — uses shared build artifact.
     needs: [ci-build-public, ci-path-changes, neon-db]
-    if: ${{ ((github.event_name == 'push' && github.ref == 'refs/heads/main') || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork == false) || github.event_name == 'workflow_dispatch') && needs.ci-build-public.outputs.has_artifact == 'true' }}
+    if: ${{ ((github.event_name == 'push' && github.ref == 'refs/heads/main') || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork == false) || github.event_name == 'workflow_dispatch') && needs.ci-build-public.outputs.has_artifact == 'true' && github.actor != 'dependabot[bot]' }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -2063,6 +2267,9 @@ jobs:
         if: steps.check_changes.outputs.run_full_ci == 'true'
 
       - name: Create ephemeral Neon database branch (with retry)
+        # Public a11y routes depend on seeded QA profiles and smart links.
+        # Always use an isolated branch when this job runs so the gate is
+        # deterministic and never relies on or mutates the stable main DB.
         if: steps.check_changes.outputs.run_full_ci == 'true'
         id: neon-branch
         uses: ./.github/actions/neon-create-branch-with-retry
@@ -2083,7 +2290,7 @@ jobs:
           credential_source_url: ${{ secrets.DATABASE_URL_MAIN }}
           credential_fallback_url: ${{ secrets.DATABASE_URL }}
 
-      - name: Export DATABASE_URL
+      - name: Export DATABASE_URL (ephemeral branch)
         if: steps.check_changes.outputs.run_full_ci == 'true'
         run: echo "DATABASE_URL=${{ steps.resolve-a11y-neon-db-url.outputs.database_url }}" >> "$GITHUB_ENV"
 
@@ -2137,15 +2344,35 @@ jobs:
           # The axe audit only tests public routes (SMOKE_ONLY=1) so no real auth is needed.
           mkdir -p tests/.auth
           echo '{"cookies":[],"origins":[]}' > tests/.auth/user.json
-          PORT=3100 pnpm --filter=@jovie/web exec next start &
+
+          cleanup() {
+            kill "$SERVER_PID" 2>/dev/null || true
+          }
+          trap cleanup EXIT
+
+          if [ ! -f .next/standalone/apps/web/server.js ]; then
+            echo "Standalone server not found - public axe audit cannot start."
+            exit 1
+          fi
+
+          PORT=3100 node .next/standalone/apps/web/server.js &
           SERVER_PID=$!
-          # Wait for server to accept connections
+
+          SERVER_READY=false
           for i in $(seq 1 30); do
-            if curl -sf http://localhost:3100 > /dev/null 2>&1; then break; fi
+            if curl -sf http://localhost:3100 > /dev/null 2>&1; then
+              SERVER_READY=true
+              break
+            fi
             sleep 1
           done
+
+          if [ "$SERVER_READY" = "false" ]; then
+            echo "Standalone server failed to start within 30s."
+            exit 1
+          fi
+
           pnpm exec playwright test tests/e2e/axe-audit.spec.ts --config=playwright.config.ts --project=chromium --reporter=line
-          kill $SERVER_PID 2>/dev/null || true
         env:
           BASE_URL: http://localhost:3100
           SMOKE_ONLY: '1'
@@ -2180,7 +2407,7 @@ jobs:
     needs: [ci-fast, ci-path-changes, neon-db]
     if: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork == false && contains(github.event.pull_request.labels.*.name, 'testing') }}
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 20
     outputs:
       run_full_ci: ${{ steps.check_changes.outputs.run_full_ci }}
     steps:
@@ -2218,8 +2445,8 @@ jobs:
         id: resolve-e2e-smoke-neon-db-url
         uses: ./.github/actions/resolve-neon-database-url
         with:
-          candidate_url: ${{ steps.neon-branch.outputs.db_url_pooled }}
-          fallback_candidate_url: ${{ steps.neon-branch.outputs.db_url }}
+          candidate_url: ${{ steps.neon-branch.outputs.db_url }}
+          fallback_candidate_url: ${{ steps.neon-branch.outputs.db_url_pooled }}
           credential_source_url: ${{ secrets.DATABASE_URL_MAIN }}
           credential_fallback_url: ${{ secrets.DATABASE_URL }}
 
@@ -2260,10 +2487,17 @@ jobs:
           SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
           SENTRY_ENVIRONMENT: ci-pr-e2e
           SENTRY_RELEASE: ${{ github.sha }}
+          E2E_USE_TEST_AUTH_BYPASS: '1'
+          E2E_TEST_AUTH_PERSONA: creator-ready
+          NEXT_PUBLIC_CLERK_MOCK: '1'
+          NEXT_PUBLIC_CLERK_PROXY_DISABLED: '1'
           NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
           CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY }}
+          E2E_CLERK_USER_ID: ${{ secrets.E2E_CLERK_USER_ID }}
+          E2E_CLERK_USER_USERNAME: ${{ secrets.E2E_CLERK_USER_USERNAME }}
+          E2E_CLERK_USER_PASSWORD: ${{ secrets.E2E_CLERK_USER_PASSWORD }}
           FLAGS_SECRET: ${{ secrets.FLAGS_SECRET }}
-        run: pnpm --filter=@jovie/web run e2e:smoke --project=chromium
+        run: pnpm --filter=@jovie/web exec playwright test --config=playwright.config.smoke.ts --project=chromium --reporter=line
 
       - name: Upload Playwright Artifacts on Failure
         if: failure() && steps.check_changes.outputs.run_full_ci == 'true'
@@ -2464,8 +2698,8 @@ jobs:
         uses: ./.github/actions/resolve-neon-database-url
         with:
           connection_file: /tmp/neon-db-connection/connection.json
-          candidate_json_key: db_url_pooled
-          fallback_json_key: db_url
+          candidate_json_key: db_url
+          fallback_json_key: db_url_pooled
           credential_source_url: ${{ secrets.DATABASE_URL_MAIN }}
           credential_fallback_url: ${{ secrets.DATABASE_URL }}
 
@@ -2489,6 +2723,16 @@ jobs:
           NODE_ENV: test
           GIT_BRANCH: ${{ github.ref_name }}
           ALLOW_PROD_MIGRATIONS: 'true'
+
+      - name: Seed E2E DB
+        if: steps.check_changes.outputs.run_full_ci == 'true'
+        run: pnpm --filter=@jovie/web exec tsx tests/seed-test-data.ts
+        env:
+          DATABASE_URL: ${{ env.DATABASE_URL }}
+          NODE_ENV: test
+          CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY }}
+          E2E_CLERK_USER_ID: ${{ secrets.E2E_CLERK_USER_ID }}
+          E2E_CLERK_USER_USERNAME: ${{ secrets.E2E_CLERK_USER_USERNAME }}
 
   ci-e2e-tests:
     name: Full E2E (Preview)
@@ -2527,8 +2771,8 @@ jobs:
         uses: ./.github/actions/resolve-neon-database-url
         with:
           connection_file: /tmp/neon-db-connection/connection.json
-          candidate_json_key: db_url_pooled
-          fallback_json_key: db_url
+          candidate_json_key: db_url
+          fallback_json_key: db_url_pooled
           credential_source_url: ${{ secrets.DATABASE_URL_MAIN }}
           credential_fallback_url: ${{ secrets.DATABASE_URL }}
 
@@ -2601,6 +2845,7 @@ jobs:
         env:
           DATABASE_URL: ${{ env.DATABASE_URL }}
           NODE_ENV: test
+          E2E_SKIP_SEED: '1'
           SMOKE_ONLY: '1'
           E2E_USE_TEST_AUTH_BYPASS: '1'
           SENTRY_E2E_REPORTING: '1'
@@ -2612,21 +2857,24 @@ jobs:
           E2E_CLERK_USER_ID: ${{ secrets.E2E_CLERK_USER_ID }}
           E2E_CLERK_USER_USERNAME: ${{ secrets.E2E_CLERK_USER_USERNAME }}
           E2E_CLERK_USER_PASSWORD: ${{ secrets.E2E_CLERK_USER_PASSWORD }}
-          NEXT_PUBLIC_STATSIG_CLIENT_KEY: ${{ secrets.NEXT_PUBLIC_STATSIG_CLIENT_KEY }}
           FLAGS_SECRET: ${{ secrets.FLAGS_SECRET }}
         run: |
           if [ -z "${{ steps.quarantine.outputs.allowed_specs }}" ]; then
             echo "No non-quarantined E2E specs to run."
             exit 0
           fi
-          # Chrome-only for PRs - faster feedback, Firefox runs on main only
-          cd apps/web && pnpm e2e:smoke --trace=retain-on-failure --project=chromium --shard=${SHARD_INDEX}/${SHARD_TOTAL} ${{ steps.quarantine.outputs.allowed_specs }}
+          # Chrome-only for PRs - faster feedback, Firefox runs on main only.
+          # `e2e:smoke:tagged` runs every `-g @smoke` test across the suite,
+          # sharded and quarantine-filtered. The focused PR-fast lane lives in
+          # the separate `ci-e2e-smoke` job (playwright.config.smoke.ts).
+          cd apps/web && pnpm e2e:smoke:tagged --trace=retain-on-failure --project=chromium --shard=${SHARD_INDEX}/${SHARD_TOTAL} ${{ steps.quarantine.outputs.allowed_specs }}
 
       - name: E2E Auth Smoke (PR Gate)
         if: ${{ matrix.shard == 1 && github.event_name == 'pull_request' && github.ref != 'refs/heads/production' && hashFiles('apps/web/tests/e2e/smoke-auth.spec.ts') != '' }}
         env:
           DATABASE_URL: ${{ env.DATABASE_URL }}
           NODE_ENV: test
+          E2E_SKIP_SEED: '1'
           SMOKE_ONLY: '1'
           E2E_USE_TEST_AUTH_BYPASS: '1'
           SENTRY_E2E_REPORTING: '1'
@@ -2641,7 +2889,6 @@ jobs:
           E2E_CLERK_USER_USERNAME: ${{ secrets.E2E_CLERK_USER_USERNAME }}
           E2E_CLERK_USER_PASSWORD: ${{ secrets.E2E_CLERK_USER_PASSWORD }}
           # Optional: enable deterministic spotify-only UI check
-          NEXT_PUBLIC_STATSIG_CLIENT_KEY: ${{ secrets.NEXT_PUBLIC_STATSIG_CLIENT_KEY }}
           FLAGS_SECRET: ${{ secrets.FLAGS_SECRET }}
         run: |
           cd apps/web && pnpm --filter=@jovie/web run e2e:auth-smoke --project=chromium
@@ -2651,6 +2898,7 @@ jobs:
         env:
           DATABASE_URL: ${{ env.DATABASE_URL }}
           NODE_ENV: test
+          E2E_SKIP_SEED: '1'
           SENTRY_E2E_REPORTING: '1'
           SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
           SENTRY_ENVIRONMENT: ci-main-e2e
@@ -2658,9 +2906,10 @@ jobs:
           NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
           CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
           CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY }}
+          E2E_USE_TEST_AUTH_BYPASS: '1'
+          E2E_CLERK_USER_ID: ${{ secrets.E2E_CLERK_USER_ID }}
           E2E_CLERK_USER_USERNAME: ${{ secrets.E2E_CLERK_USER_USERNAME }}
           E2E_CLERK_USER_PASSWORD: ${{ secrets.E2E_CLERK_USER_PASSWORD }}
-          NEXT_PUBLIC_STATSIG_CLIENT_KEY: ${{ secrets.NEXT_PUBLIC_STATSIG_CLIENT_KEY }}
           FLAGS_SECRET: ${{ secrets.FLAGS_SECRET }}
         run: |
           if [ -z "${{ steps.quarantine.outputs.allowed_specs }}" ]; then
@@ -2675,12 +2924,12 @@ jobs:
         env:
           DATABASE_URL: ${{ env.DATABASE_URL }}
           NODE_ENV: test
+          E2E_SKIP_SEED: '1'
           NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
           CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
           CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY }}
           E2E_CLERK_USER_USERNAME: ${{ secrets.E2E_CLERK_USER_USERNAME }}
           E2E_CLERK_USER_PASSWORD: ${{ secrets.E2E_CLERK_USER_PASSWORD }}
-          NEXT_PUBLIC_STATSIG_CLIENT_KEY: ${{ secrets.NEXT_PUBLIC_STATSIG_CLIENT_KEY }}
           FLAGS_SECRET: ${{ secrets.FLAGS_SECRET }}
           SENTRY_E2E_REPORTING: '1'
           SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
@@ -2762,12 +3011,37 @@ jobs:
         with:
           secrets: ${{ toJSON(secrets) }}
       - name: Pull env (preview)
-        run: ./node_modules/.bin/vercel pull --yes --environment=preview --token ${{ secrets.VERCEL_TOKEN }}
+        run: |
+          scope_args=()
+          if [ -n "${VERCEL_ORG_ID:-}" ]; then
+            scope_args=(--scope "$VERCEL_ORG_ID")
+          fi
+          ./node_modules/.bin/vercel pull --yes --environment=preview --token "$VERCEL_TOKEN" "${scope_args[@]}"
+        env:
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+      - name: Strip deprecated Turbo env overrides (preview)
+        run: |
+          for env_file in .vercel/.env.preview.local .vercel/.env.local; do
+            if [ -f "$env_file" ]; then
+              grep -v '^TURBO_REMOTE_ONLY=' "$env_file" > "${env_file}.tmp" || true
+              mv "${env_file}.tmp" "$env_file"
+            fi
+          done
       - name: Build (PR preview)
-        run: ./node_modules/.bin/vercel build --token ${{ secrets.VERCEL_TOKEN }}
+        run: |
+          scope_args=()
+          if [ -n "${VERCEL_ORG_ID:-}" ]; then
+            scope_args=(--scope "$VERCEL_ORG_ID")
+          fi
+          env -u TURBO_REMOTE_ONLY ./node_modules/.bin/vercel build --token "$VERCEL_TOKEN" "${scope_args[@]}"
         env:
           COREPACK_ENABLE_DOWNLOAD_PROMPT: 0
           COREPACK_ENABLE_STRICT: 0
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
       - name: Deploy (PR preview, fast deployment for UI-only changes)
         id: pr_deploy
         run: |
@@ -3116,7 +3390,12 @@ jobs:
           export DATABASE_URL="${{ env.DATABASE_URL }}"
           export NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY="${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}"
           export CLERK_SECRET_KEY="${{ secrets.CLERK_SECRET_KEY }}"
+          export NEXT_PUBLIC_E2E_MODE=1
+          export NEXT_DISABLE_TOOLBAR=1
+          export NEXT_PUBLIC_CLERK_MOCK=1
+          export NEXT_PUBLIC_CLERK_PROXY_DISABLED=1
           export E2E_USE_TEST_AUTH_BYPASS=1
+          export E2E_TEST_AUTH_PERSONA=creator-ready
           export E2E_CLERK_USER_ID="${{ secrets.E2E_CLERK_USER_ID }}"
           export FLAGS_SECRET="${{ secrets.FLAGS_SECRET }}"
           export URL_ENCRYPTION_KEY="smoke-preview-url-encryption-key"
@@ -3151,7 +3430,12 @@ jobs:
           DATABASE_URL: ${{ env.DATABASE_URL }}
           NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
           CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY }}
+          NEXT_PUBLIC_E2E_MODE: '1'
+          NEXT_DISABLE_TOOLBAR: '1'
+          NEXT_PUBLIC_CLERK_MOCK: '1'
+          NEXT_PUBLIC_CLERK_PROXY_DISABLED: '1'
           E2E_USE_TEST_AUTH_BYPASS: '1'
+          E2E_TEST_AUTH_PERSONA: creator-ready
           E2E_CLERK_USER_ID: ${{ secrets.E2E_CLERK_USER_ID }}
           E2E_CLERK_USER_USERNAME: ${{ secrets.E2E_CLERK_USER_USERNAME }}
           E2E_CLERK_USER_PASSWORD: ${{ secrets.E2E_CLERK_USER_PASSWORD }}
@@ -3332,24 +3616,142 @@ jobs:
         uses: oNaiPs/secrets-to-env-action@75f319b3c8c926ac2eabcca34daa6cf531daf32f # v1.8
         with:
           secrets: ${{ toJSON(secrets) }}
+      - name: Sync required production env to Vercel project
+        run: |
+          set -euo pipefail
+          set +x
+
+          required_vercel_env=(
+            NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY
+            CLERK_SECRET_KEY
+            DATABASE_URL
+            SESSION_SECRET
+            AI_GATEWAY_API_KEY
+            NEXT_PUBLIC_TURNSTILE_SITE_KEY
+            TURNSTILE_SECRET_KEY
+          )
+
+          missing_env=()
+          for key in "${required_vercel_env[@]}"; do
+            if [ -z "${!key:-}" ]; then
+              missing_env+=("$key")
+            fi
+          done
+
+          if [ "${#missing_env[@]}" -gt 0 ]; then
+            echo "Missing GitHub secrets required for Vercel production env: ${missing_env[*]}"
+            exit 1
+          fi
+
+          for key in "${required_vercel_env[@]}"; do
+            ./node_modules/.bin/vercel env rm "$key" production \
+              --yes \
+              --token "$VERCEL_TOKEN" \
+              --scope "$VERCEL_ORG_ID" >/dev/null 2>&1 || true
+            ./node_modules/.bin/vercel env add "$key" production \
+              --yes \
+              --value "${!key}" \
+              --token "$VERCEL_TOKEN" \
+              --scope "$VERCEL_ORG_ID" >/dev/null
+            echo "Synced ${key} to Vercel production env."
+          done
+        env:
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
+          CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY }}
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          SESSION_SECRET: ${{ secrets.SESSION_SECRET }}
+          AI_GATEWAY_API_KEY: ${{ secrets.AI_GATEWAY_API_KEY }}
+          NEXT_PUBLIC_TURNSTILE_SITE_KEY: ${{ secrets.NEXT_PUBLIC_TURNSTILE_SITE_KEY }}
+          TURNSTILE_SECRET_KEY: ${{ secrets.TURNSTILE_SECRET_KEY }}
       - name: Pull env (production)
-        run: ./node_modules/.bin/vercel pull --yes --environment=production --token ${{ secrets.VERCEL_TOKEN }}
+        run: |
+          scope_args=()
+          if [ -n "${VERCEL_ORG_ID:-}" ]; then
+            scope_args=(--scope "$VERCEL_ORG_ID")
+          fi
+          ./node_modules/.bin/vercel pull --yes --environment=production --token "$VERCEL_TOKEN" "${scope_args[@]}"
+        env:
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+      - name: Strip deprecated Turbo env overrides (production)
+        run: |
+          for env_file in .vercel/.env.production.local .vercel/.env.local; do
+            if [ -f "$env_file" ]; then
+              grep -v '^TURBO_REMOTE_ONLY=' "$env_file" > "${env_file}.tmp" || true
+              mv "${env_file}.tmp" "$env_file"
+            fi
+          done
+      - name: Check signup readiness (production deploy env)
+        run: pnpm --filter=@jovie/web exec tsx scripts/check-signup-readiness.ts --target=prd --source=env
       - name: Build (preview target for staging verification)
-        run: ./node_modules/.bin/vercel build --token ${{ secrets.VERCEL_TOKEN }}
+        run: |
+          scope_args=()
+          if [ -n "${VERCEL_ORG_ID:-}" ]; then
+            scope_args=(--scope "$VERCEL_ORG_ID")
+          fi
+          env -u TURBO_REMOTE_ONLY ./node_modules/.bin/vercel build --token "$VERCEL_TOKEN" "${scope_args[@]}"
         env:
           COREPACK_ENABLE_DOWNLOAD_PROMPT: 0
           COREPACK_ENABLE_STRICT: 0
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
       - name: Deploy (staging preview, prebuilt)
         id: deploy
         run: |
+          required_runtime_env=(
+            VERCEL_AUTOMATION_BYPASS_SECRET
+            NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY
+            CLERK_SECRET_KEY
+            DATABASE_URL
+            SESSION_SECRET
+            AI_GATEWAY_API_KEY
+            NEXT_PUBLIC_TURNSTILE_SITE_KEY
+            TURNSTILE_SECRET_KEY
+            CLERK_PUBLISHABLE_KEY_STAGING
+            CLERK_SECRET_KEY_STAGING
+          )
+
+          missing_runtime_env=()
+          for key in "${required_runtime_env[@]}"; do
+            if [ -z "${!key:-}" ]; then
+              missing_runtime_env+=("$key")
+            fi
+          done
+
+          if [ "${#missing_runtime_env[@]}" -gt 0 ]; then
+            echo "Missing staging preview runtime env: ${missing_runtime_env[*]}"
+            exit 1
+          fi
+
           bash .github/scripts/vercel-prebuilt-deploy.sh deploy_url \
+            --env VERCEL_AUTOMATION_BYPASS_SECRET="${VERCEL_AUTOMATION_BYPASS_SECRET}" \
+            --env NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY="${NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY}" \
+            --env CLERK_SECRET_KEY="${CLERK_SECRET_KEY}" \
+            --env DATABASE_URL="${DATABASE_URL}" \
+            --env SESSION_SECRET="${SESSION_SECRET}" \
+            --env AI_GATEWAY_API_KEY="${AI_GATEWAY_API_KEY}" \
+            --env NEXT_PUBLIC_TURNSTILE_SITE_KEY="${NEXT_PUBLIC_TURNSTILE_SITE_KEY}" \
+            --env TURNSTILE_SECRET_KEY="${TURNSTILE_SECRET_KEY}" \
             --env CLERK_PUBLISHABLE_KEY_STAGING="${CLERK_PUBLISHABLE_KEY_STAGING}" \
             --env CLERK_SECRET_KEY_STAGING="${CLERK_SECRET_KEY_STAGING}"
         env:
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
           VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
+          CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY }}
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          SESSION_SECRET: ${{ secrets.SESSION_SECRET }}
+          AI_GATEWAY_API_KEY: ${{ secrets.AI_GATEWAY_API_KEY }}
+          NEXT_PUBLIC_TURNSTILE_SITE_KEY: ${{ secrets.NEXT_PUBLIC_TURNSTILE_SITE_KEY }}
+          TURNSTILE_SECRET_KEY: ${{ secrets.TURNSTILE_SECRET_KEY }}
           CLERK_PUBLISHABLE_KEY_STAGING: ${{ secrets.CLERK_PUBLISHABLE_KEY_STAGING }}
           CLERK_SECRET_KEY_STAGING: ${{ secrets.CLERK_SECRET_KEY_STAGING }}
+          VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
           VERCEL_ENABLE_PLAIN_PREBUILT_FALLBACK: 'true'
 
@@ -3393,12 +3795,25 @@ jobs:
     outputs:
       # Emitted when promote-production exits non-zero so deploy-notify can
       # distinguish silent-no-op regressions from generic promote failures.
-      # Values: "no_match" (no Vercel deployment for github.sha) | "verify_mismatch"
-      # (production keeps serving the old commit after promote).
-      failure_subtype: ${{ steps.promote.outputs.failure_subtype }}
+      # Values: "domain_project_mismatch" (public domains are not on the
+      # canonical Vercel project) | "no_match" (no Vercel deployment for
+      # github.sha) | "verify_mismatch" (production keeps serving the old
+      # commit after promote).
+      failure_subtype: ${{ steps.domain-guard.outputs.failure_subtype || steps.promote.outputs.failure_subtype }}
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
       - uses: ./.github/actions/setup-node-pnpm
+      - name: Verify production domains are on canonical Vercel project
+        id: domain-guard
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+        run: |
+          if ! node .github/scripts/verify-vercel-production-domains.mjs; then
+            echo "failure_subtype=domain_project_mismatch" >> "$GITHUB_OUTPUT"
+            exit 1
+          fi
       - name: Promote specific deployment for this SHA
         id: promote
         env:
@@ -3526,20 +3941,19 @@ jobs:
             BYPASS_ARGS+=(-H "x-vercel-protection-bypass: ${VERCEL_AUTOMATION_BYPASS_SECRET}")
           fi
 
-          # Probe the DEPLOYMENT URL directly rather than jov.ie. Rationale:
-          # jov.ie is fronted by Vercel's edge router + CDN. After `vercel
-          # promote` succeeds, the alias IS atomically pointed at the new
-          # deployment at the router level, but edge caches can take longer
-          # than our 60s window to start serving fresh responses (observed
-          # 2026-04-24 on commit 57a7dc3 — promote succeeded, prod flipped
-          # within ~2 min, but the verify loop expired first and emitted a
-          # false-positive verify_mismatch). The deployment URL is stable —
-          # it always serves exactly this deployment's code, no aliases, no
-          # edge timing. If the deployment's /api/health/build-info returns
-          # expected commitSha, the promote was successful and prod is
-          # serving it (edge cache will catch up asynchronously).
-          probe_url="${deploy_url}/api/health/build-info"
-          echo "Verifying ${probe_url} serves ${expected}..."
+          # Prefer the deployment URL when Vercel allows direct access, but
+          # also verify the canonical production alias. Protected deployment
+          # URLs can return 401 even after a successful promote; jov.ie is the
+          # user-facing surface and catches domain/project wiring regressions.
+          probe_urls=(
+            "${deploy_url}/api/health/build-info"
+            "https://jov.ie/api/health/build-info"
+          )
+          probe_labels=(
+            "deployment"
+            "production-alias"
+          )
+          echo "Verifying promoted deployment serves ${expected}..."
           # Track confirmed_mismatch separately from saw_valid_probe so a
           # late 500 can't overwrite an earlier confirmed mismatch. Once we
           # see a 200 with a wrong SHA, it IS a mismatch — routing a
@@ -3549,59 +3963,61 @@ jobs:
           last_status=""
           saw_valid_probe=false
           confirmed_mismatch=false
-          # Vercel edge rollout can lag behind a successful `vercel promote`
-          # by more than a minute. Keep verification strict, but use a longer
-          # bounded window to avoid false negatives on healthy deploys.
-          max_attempts=18
+          # Vercel edge rollout can lag behind a successful `vercel promote`.
+          # Keep verification strict, but use a bounded 5-minute window to
+          # avoid false negatives on healthy deploys.
+          max_attempts=30
           for attempt in $(seq 1 "$max_attempts"); do
             # Skip sleep on the first attempt; wait between retries so we
             # don't burn 10s after the final failing attempt.
             if [ "$attempt" -gt 1 ]; then
               sleep 10
             fi
-            response=$(curl -sS -L \
-              --connect-timeout 5 \
-              --max-time 10 \
-              -A "$USER_AGENT" \
-              -H "Cache-Control: no-cache" \
-              "${BYPASS_ARGS[@]}" \
-              -w "\n%{http_code}" \
-              "${probe_url}?_cb=$(date +%s%N)" 2>/dev/null || printf '\n000')
-            last_status="${response##*$'\n'}"
-            body="${response%$'\n'*}"
+            for index in "${!probe_urls[@]}"; do
+              probe_url="${probe_urls[$index]}"
+              probe_label="${probe_labels[$index]}"
+              response=$(curl -sS -L \
+                --connect-timeout 5 \
+                --max-time 10 \
+                -A "$USER_AGENT" \
+                -H "Cache-Control: no-cache" \
+                "${BYPASS_ARGS[@]}" \
+                -w "\n%{http_code}" \
+                "${probe_url}?_cb=$(date +%s%N)" 2>/dev/null || printf '\n000')
+              last_status="${response##*$'\n'}"
+              body="${response%$'\n'*}"
 
-            if [ "$last_status" != "200" ]; then
-              echo "  attempt ${attempt}: build-info returned HTTP ${last_status}"
-              continue
-            fi
+              if [ "$last_status" != "200" ]; then
+                echo "  attempt ${attempt} ${probe_label}: build-info returned HTTP ${last_status}"
+                continue
+              fi
 
-            actual=$(printf '%s' "$body" | jq -r '.commitSha // ""' 2>/dev/null || echo "")
-            if [ -z "$actual" ]; then
-              echo "  attempt ${attempt}: build-info returned 200 without commitSha"
-              continue
-            fi
+              actual=$(printf '%s' "$body" | jq -r '.commitSha // ""' 2>/dev/null || echo "")
+              if [ -z "$actual" ]; then
+                echo "  attempt ${attempt} ${probe_label}: build-info returned 200 without commitSha"
+                continue
+              fi
 
-            echo "  attempt ${attempt}: build-info commitSha=${actual}"
-            saw_valid_probe=true
-            if [ "$actual" = "$expected" ]; then
-              echo "✅ Deployment ${deploy_url} serves ${expected} — promote succeeded."
-              echo "   Edge cache on jov.ie will catch up asynchronously (typically 1-3 min)."
-              exit 0
-            fi
-            confirmed_mismatch=true
+              echo "  attempt ${attempt} ${probe_label}: build-info commitSha=${actual}"
+              saw_valid_probe=true
+              if [ "$actual" = "$expected" ]; then
+                echo "✅ ${probe_label} serves ${expected} — promote succeeded."
+                exit 0
+              fi
+              confirmed_mismatch=true
+            done
           done
 
           if [ "$confirmed_mismatch" = "true" ]; then
-            echo "❌ Deployment ${deploy_url} returned commitSha='${actual:-<empty>}' but expected '${expected}'."
-            echo "   This is a data integrity problem: the Vercel API matched this deployment"
-            echo "   URL to GITHUB_SHA, but the deployment's runtime reports a different SHA."
+            echo "❌ Production verification returned commitSha='${actual:-<empty>}' but expected '${expected}'."
+            echo "   The promoted deployment or jov.ie alias is serving a different SHA."
             echo "failure_subtype=verify_mismatch" >> "$GITHUB_OUTPUT"
             exit 1
           fi
 
           if [ "$saw_valid_probe" != "true" ]; then
-            echo "❌ Deployment build-info probe failed across all attempts (last HTTP ${last_status})."
-            echo "   Cannot confirm whether the deployment itself is serving ${expected}."
+            echo "❌ Production build-info probes failed across all attempts (last HTTP ${last_status})."
+            echo "   Cannot confirm whether production is serving ${expected}."
             echo "failure_subtype=verify_probe_failed" >> "$GITHUB_OUTPUT"
             exit 1
           fi
@@ -3642,27 +4058,10 @@ jobs:
       - name: Resolve failure provenance
         id: failure-provenance
         if: ${{ always() }}
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
 
-          api_url="${{ github.api_url }}/repos/${{ github.repository }}/actions/runs/${{ github.run_id }}/jobs?per_page=100"
-          response=$(curl -sS -H "Authorization: Bearer $GITHUB_TOKEN" -H "Accept: application/vnd.github+json" "$api_url")
-          job_url=$(RESPONSE="$response" JOB_NAME="${{ github.job }}" python - <<'PY'
-          import json
-          import os
-
-          data = json.loads(os.environ["RESPONSE"])
-          job_name = os.environ["JOB_NAME"]
-          job = next((item for item in data.get("jobs", []) if item.get("name") == job_name), None)
-          print(job.get("html_url", "") if job else "")
-          PY
-          )
-
-          if [ -z "$job_url" ]; then
-            job_url="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}?check_suite_focus=true"
-          fi
+          job_url="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}?check_suite_focus=true"
 
           echo "job_name=${{ github.job }}" >> "$GITHUB_OUTPUT"
           echo "job_url=$job_url" >> "$GITHUB_OUTPUT"
@@ -3740,6 +4139,14 @@ jobs:
           # Distinguish the silent-no-op regression (production kept old SHA
           # even though vercel promote exited 0) from a generic promote failure.
           PROMOTE_SUBTYPE="${{ needs.promote-production.outputs.failure_subtype }}"
+          if [ "$PROMOTE_RESULT" = "failure" ] && [ "$PROMOTE_SUBTYPE" = "domain_project_mismatch" ]; then
+            echo "failure_type=promote_domain_project_mismatch" >> "$GITHUB_OUTPUT"
+            echo "failure_emoji=🧭" >> "$GITHUB_OUTPUT"
+            echo "failure_title=Production domains are on the wrong Vercel project" >> "$GITHUB_OUTPUT"
+            echo "failure_detail=One or more public production domains are missing from the canonical Vercel project or have incorrect redirect wiring. Production promotion was blocked before deploy." >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
           if [ "$PROMOTE_RESULT" = "failure" ] && [ "$PROMOTE_SUBTYPE" = "no_match" ]; then
             echo "failure_type=promote_no_match" >> "$GITHUB_OUTPUT"
             echo "failure_emoji=🕳️" >> "$GITHUB_OUTPUT"
@@ -3913,7 +4320,7 @@ jobs:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
 
       - name: Slack notify (general deploy failure)
-        if: ${{ always() && (steps.classify-failure.outputs.failure_type == 'deploy' || steps.classify-failure.outputs.failure_type == 'promote' || steps.classify-failure.outputs.failure_type == 'promote_no_match' || steps.classify-failure.outputs.failure_type == 'promote_verify_mismatch' || steps.classify-failure.outputs.failure_type == 'promote_verify_probe_failed' || steps.classify-failure.outputs.failure_type == 'promote_missing_creds' || steps.classify-failure.outputs.failure_type == 'cancelled' || steps.classify-failure.outputs.failure_type == 'unknown') && env.SLACK_WEBHOOK_URL != '' }}
+        if: ${{ always() && (steps.classify-failure.outputs.failure_type == 'deploy' || steps.classify-failure.outputs.failure_type == 'promote' || steps.classify-failure.outputs.failure_type == 'promote_domain_project_mismatch' || steps.classify-failure.outputs.failure_type == 'promote_no_match' || steps.classify-failure.outputs.failure_type == 'promote_verify_mismatch' || steps.classify-failure.outputs.failure_type == 'promote_verify_probe_failed' || steps.classify-failure.outputs.failure_type == 'promote_missing_creds' || steps.classify-failure.outputs.failure_type == 'cancelled' || steps.classify-failure.outputs.failure_type == 'unknown') && env.SLACK_WEBHOOK_URL != '' }}
         uses: 8398a7/action-slack@77eaa4f1c608a7d68b38af4e3f739dcd8cba273e # v3.19.0
         with:
           status: custom

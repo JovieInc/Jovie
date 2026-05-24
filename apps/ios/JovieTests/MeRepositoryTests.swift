@@ -30,7 +30,9 @@ private actor MutableAPIClient: APIClientProtocol {
 
 struct MeRepositoryTests {
   @Test func returnsFreshDataAndCachesIt() async throws {
-    let cache = MeCache(defaults: UserDefaults(suiteName: "MeRepositoryTests-A")!)
+    let defaults = UserDefaults(suiteName: "MeRepositoryTests-A")!
+    defaults.removePersistentDomain(forName: "MeRepositoryTests-A")
+    let cache = MeCache(defaults: defaults)
     let apiClient = MutableAPIClient(mode: .success(.previewReady))
     let repository = MeRepository(apiClient: apiClient, cache: cache)
 
@@ -56,5 +58,18 @@ struct MeRepositoryTests {
 
     #expect(staleResult.isStale == true)
     #expect(staleResult.response == .previewReady)
+  }
+
+  @Test func clearCachedUserRemovesSnapshot() async throws {
+    let defaults = UserDefaults(suiteName: "MeRepositoryTests-C")!
+    defaults.removePersistentDomain(forName: "MeRepositoryTests-C")
+    let cache = MeCache(defaults: defaults)
+    let apiClient = MutableAPIClient(mode: .success(.previewReady))
+    let repository = MeRepository(apiClient: apiClient, cache: cache)
+
+    _ = try await repository.loadMe(for: "user_789")
+    await repository.clearCachedUser("user_789")
+
+    #expect(await cache.load(for: "user_789") == nil)
   }
 }

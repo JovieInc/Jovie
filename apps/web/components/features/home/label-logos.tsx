@@ -124,8 +124,10 @@ export function TheOrchardLogo(props: React.SVGProps<SVGSVGElement>) {
  */
 export function BlackHoleRecordingsLogo({
   className,
+  style,
 }: Readonly<{
   readonly className?: string;
+  readonly style?: React.CSSProperties;
 }>) {
   return (
     <Image
@@ -135,6 +137,7 @@ export function BlackHoleRecordingsLogo({
       height={146}
       sizes='(min-width: 1024px) 140px, (min-width: 640px) 126px, 112px'
       className={cn('select-none brightness-0 invert', className)}
+      style={style}
     />
   );
 }
@@ -160,6 +163,48 @@ export function DiscoWaxLogo({
     >
       <span className='text-[1em] font-semibold lowercase tracking-[-0.06em]'>
         disco:wax
+      </span>
+    </span>
+  );
+}
+
+export function BlancoYNegroLogo({
+  className,
+}: Readonly<{
+  readonly className?: string;
+}>) {
+  return (
+    <span
+      role='img'
+      aria-label='Blanco y Negro'
+      className={cn(
+        'inline-flex items-center justify-center select-none text-white/92',
+        className
+      )}
+    >
+      <span className='text-[1em] font-semibold tracking-[-0.04em]'>
+        Blanco y Negro
+      </span>
+    </span>
+  );
+}
+
+export function RecPlayLogo({
+  className,
+}: Readonly<{
+  readonly className?: string;
+}>) {
+  return (
+    <span
+      role='img'
+      aria-label='rec play'
+      className={cn(
+        'inline-flex items-center justify-center select-none text-white/92',
+        className
+      )}
+    >
+      <span className='text-[1em] font-semibold lowercase tracking-[-0.035em]'>
+        rec play
       </span>
     </span>
   );

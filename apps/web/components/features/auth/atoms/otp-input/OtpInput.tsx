@@ -121,7 +121,7 @@ export function OtpInput({
         onFocus={handleAutofillFocus}
         disabled={disabled}
         className={cn(
-          'absolute inset-0 w-full h-full opacity-0 cursor-text',
+          'absolute inset-0 w-full h-full opacity-0 cursor-text text-[16px]',
           'z-0',
           'bg-transparent border-none outline-none'
         )}

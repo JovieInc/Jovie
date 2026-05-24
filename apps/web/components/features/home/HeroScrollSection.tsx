@@ -1,6 +1,6 @@
+import { MarketingScreenshot } from '@/components/marketing/MarketingScreenshot';
 import { Container } from '@/components/site/Container';
 import { ClaimHandleForm } from './claim-handle';
-import { ProductScreenshot } from './ProductScreenshot';
 
 export function HeroScrollSection() {
   return (
@@ -34,20 +34,20 @@ export function HeroScrollSection() {
               </div>
 
               <p className='mt-3.5 text-[11px] tracking-[0.01em] text-quaternary-token md:mt-4 lg:text-left'>
-                Start free with your artist page and next release ready to go.
+                Private launch access with your artist page and next release
+                ready to go.
               </p>
             </div>
 
             <div className='relative mt-10 w-full md:mt-13 lg:mt-15'>
               <div className='homepage-surface-card relative overflow-hidden rounded-[1rem] md:rounded-[1.1rem]'>
-                <ProductScreenshot
-                  src='/product-screenshots/releases-dashboard-full.png'
-                  alt='Jovie release dashboard showing releases table with smart link details'
+                <MarketingScreenshot
+                  scenarioId='dashboard-releases-desktop'
+                  altOverride='Jovie release dashboard showing releases table with smart link details'
                   width={2880}
                   height={1800}
                   title='Jovie'
                   priority
-                  skipCheck
                   testId='hero-dashboard-screenshot'
                 />
                 {/* Gentle bottom fade — subtle, not aggressive */}

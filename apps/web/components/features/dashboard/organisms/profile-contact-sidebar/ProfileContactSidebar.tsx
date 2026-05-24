@@ -17,16 +17,18 @@ import {
   DrawerSurfaceCard,
   DrawerTabbedCard,
   DrawerTabs,
-  EntityHeaderCard,
   EntitySidebarShell,
 } from '@/components/molecules/drawer';
 import { DrawerHeaderActions } from '@/components/molecules/drawer-header/DrawerHeaderActions';
 import { useProfileHeaderParts } from '@/components/organisms/profile-sidebar/ProfileSidebarHeader';
+import { DrawerHero } from '@/components/shell/DrawerHero';
 import { BASE_URL } from '@/constants/domains';
 import { APP_ROUTES } from '@/constants/routes';
 import { ProfilePaySurface } from '@/features/dashboard/molecules/ProfilePaySurface';
+import { useEmailSignatureMenuAction } from '@/features/dashboard/molecules/useEmailSignatureMenuAction';
 import { getPlatformCategory } from '@/features/dashboard/organisms/links/utils/platform-category';
 import { LINEAR_SURFACE } from '@/features/dashboard/tokens';
+import { buildSignatureInputFromProfile } from '@/lib/email-signature/profile-input';
 import {
   useDeletePressPhotoMutation,
   useDspMatchesQuery,
@@ -134,10 +136,16 @@ async function confirmLinkOnServer(
   return linkId;
 }
 
-function ProfileEntityHeader({
+function ProfileSidebarHeaderCard({
   previewData,
+  profileUrl,
+  onClose,
+  overflowActions,
 }: Readonly<{
   previewData: PreviewPanelData;
+  profileUrl: string;
+  onClose: () => void;
+  overflowActions: ReturnType<typeof useProfileHeaderParts>['overflowActions'];
 }>) {
   const primaryLabel =
     previewData.displayName?.trim() || `@${previewData.username}`;
@@ -153,48 +161,6 @@ function ProfileEntityHeader({
   const fallbackLabel = primaryLabel.replace(/^@/, '').charAt(0).toUpperCase();
 
   return (
-    <div className='p-3.5'>
-      <EntityHeaderCard
-        title={primaryLabel}
-        subtitle={secondaryLabel}
-        meta={
-          <div className='mt-1 flex flex-wrap items-center gap-2 text-2xs text-tertiary-token'>
-            {detailChips.map(detail => (
-              <span key={detail}>{detail}</span>
-            ))}
-          </div>
-        }
-        image={
-          <DrawerMediaThumb
-            src={previewData.avatarUrl}
-            alt={primaryLabel}
-            sizeClassName='h-[60px] w-[60px] rounded-[14px]'
-            sizes='60px'
-            fallback={
-              <span className='text-lg font-semibold text-secondary-token'>
-                {fallbackLabel}
-              </span>
-            }
-          />
-        }
-        className='pr-8'
-      />
-    </div>
-  );
-}
-
-function ProfileSidebarHeaderCard({
-  previewData,
-  profileUrl,
-  onClose,
-  overflowActions,
-}: Readonly<{
-  previewData: PreviewPanelData;
-  profileUrl: string;
-  onClose: () => void;
-  overflowActions: ReturnType<typeof useProfileHeaderParts>['overflowActions'];
-}>) {
-  return (
     <DrawerSurfaceCard
       className='overflow-hidden'
       testId='profile-contact-header-card'
@@ -207,10 +173,32 @@ function ProfileSidebarHeaderCard({
             onClose={onClose}
           />
         </div>
-        <ProfileEntityHeader previewData={previewData} />
-        <div>
-          <ProfileSmartLinkAnalytics profileUrl={profileUrl} variant='flat' />
-        </div>
+        <DrawerHero
+          title={primaryLabel}
+          subtitle={secondaryLabel}
+          artwork={
+            <DrawerMediaThumb
+              src={previewData.avatarUrl}
+              alt={primaryLabel}
+              sizeClassName='h-[60px] w-[60px] rounded-[14px]'
+              sizes='60px'
+              fallback={
+                <span className='text-lg font-semibold text-secondary-token'>
+                  {fallbackLabel}
+                </span>
+              }
+            />
+          }
+          meta={
+            <div className='flex flex-wrap items-center gap-2 text-2xs text-tertiary-token'>
+              {detailChips.map(detail => (
+                <span key={detail}>{detail}</span>
+              ))}
+            </div>
+          }
+          className='[&_h2]:pr-9'
+        />
+        <ProfileSmartLinkAnalytics profileUrl={profileUrl} variant='flat' />
       </div>
     </DrawerSurfaceCard>
   );
@@ -511,7 +499,7 @@ export function ProfileContactSidebar() {
   }, [monetizationSummary, router]);
 
   const handleViewAnalytics = useCallback(() => {
-    router.push(APP_ROUTES.DASHBOARD_AUDIENCE);
+    router.push(APP_ROUTES.AUDIENCE);
   }, [router]);
 
   // Handle smart add — receives a detected link from SidebarLinkInput
@@ -632,12 +620,38 @@ export function ProfileContactSidebar() {
   );
 
   // Header parts hook needs to be called unconditionally
-  const { overflowActions } = useProfileHeaderParts({
+  const { overflowActions: baseOverflowActions } = useProfileHeaderParts({
     username: previewData?.username ?? '',
     displayName: previewData?.displayName ?? '',
     profilePath: previewData?.profilePath ?? '',
     onClose: close,
   });
+
+  const emailSignatureInput = useMemo(
+    () =>
+      previewData?.username
+        ? buildSignatureInputFromProfile({
+            profile: {
+              username: previewData.username,
+              displayName: previewData.displayName,
+              avatarUrl: previewData.avatarUrl,
+              genres: previewData.genres,
+              location: previewData.location,
+            },
+            socials: previewData.links.map(link => ({
+              label: link.title,
+              url: link.url,
+            })),
+          })
+        : null,
+    [previewData]
+  );
+  const { action: emailSignatureAction, modal: emailSignatureModal } =
+    useEmailSignatureMenuAction(emailSignatureInput);
+  const overflowActions = useMemo(
+    () => [...baseOverflowActions, emailSignatureAction],
+    [baseOverflowActions, emailSignatureAction]
+  );
 
   // Show skeleton sidebar until preview data loads (prevents CLS)
   if (!previewData) {
@@ -648,6 +662,7 @@ export function ProfileContactSidebar() {
         headerMode='minimal'
         hideMinimalHeaderBar
       >
+        {emailSignatureModal}
         <div className='space-y-2.5 pt-0.5'>
           <div className='space-y-2.5 p-3'>
             <div className='grid grid-cols-2 gap-3'>
@@ -718,6 +733,7 @@ export function ProfileContactSidebar() {
         />
       }
     >
+      {emailSignatureModal}
       <DrawerTabbedCard
         testId='profile-contact-tabbed-card'
         className='mt-2.5'
@@ -743,7 +759,7 @@ export function ProfileContactSidebar() {
             }
             actionsClassName='h-[26px] w-[26px]'
             overflowMode='scroll'
-            distribution='intrinsic'
+            distribution='fill'
           />
         }
         contentClassName='pt-2'

@@ -14,7 +14,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from '@jovie/ui/atoms/popover';
-import { format, isValid, max, parse, startOfToday, subDays } from 'date-fns';
+import { format, isValid, parse, startOfToday } from 'date-fns';
 import { CalendarIcon } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
@@ -95,26 +95,6 @@ export function AddReleaseSidebar({
     return parsedReleaseDate ? parsedReleaseDate > startOfToday() : false;
   }, [releaseDate]);
 
-  // Auto-calculate reveal date default (30 days before release)
-  const autoRevealDate = useMemo(() => {
-    const parsedReleaseDate = parseDateValue(releaseDate);
-    if (!parsedReleaseDate || !isFutureRelease) return '';
-
-    const today = startOfToday();
-    const suggestedRevealDate = subDays(parsedReleaseDate, 30);
-    const effective = max([suggestedRevealDate, today]);
-
-    return format(effective, 'yyyy-MM-dd');
-  }, [releaseDate, isFutureRelease]);
-
-  // Auto-set reveal date when release date changes (only if user hasn't manually set one)
-  const [revealDateManuallySet, setRevealDateManuallySet] = useState(false);
-  useEffect(() => {
-    if (!revealDateManuallySet && autoRevealDate) {
-      setRevealDate(autoRevealDate);
-    }
-  }, [autoRevealDate, revealDateManuallySet]);
-
   const replaceStagedArtworkPreview = useCallback((nextUrl: string | null) => {
     setStagedArtworkPreviewUrl(nextUrl);
   }, []);
@@ -124,7 +104,6 @@ export function AddReleaseSidebar({
     setReleaseType('single');
     setReleaseDate('');
     setRevealDate('');
-    setRevealDateManuallySet(false);
     setGenres([]);
     setIsExplicit(false);
     setStagedArtworkFile(null);
@@ -391,7 +370,6 @@ export function AddReleaseSidebar({
                   onSelect={date => {
                     if (!date) return;
                     setReleaseDate(format(date, 'yyyy-MM-dd'));
-                    setRevealDateManuallySet(false);
                   }}
                   autoFocus
                 />
@@ -423,14 +401,14 @@ export function AddReleaseSidebar({
                     onSelect={date => {
                       if (!date) return;
                       setRevealDate(format(date, 'yyyy-MM-dd'));
-                      setRevealDateManuallySet(true);
                     }}
                     autoFocus
                   />
                 </PopoverContent>
               </Popover>
               <p className='mt-1 text-2xs text-tertiary-token'>
-                Details hidden until this date (mystery page)
+                Leave blank to keep this off the public profile until release
+                day.
               </p>
             </DrawerFormField>
           )}
@@ -442,7 +420,7 @@ export function AddReleaseSidebar({
               trigger={
                 <button
                   type='button'
-                  className='flex min-h-[32px] w-full items-center justify-between gap-2 rounded-lg border border-subtle bg-surface-0 px-3 py-1.5 text-left text-xs text-primary-token transition-[border-color,background-color,color] duration-150 hover:border-default hover:bg-surface-1'
+                  className='flex min-h-[32px] w-full items-center justify-between gap-2 rounded-lg border border-subtle bg-surface-0 px-3 py-1.5 text-left text-xs text-primary-token transition-[border-color,background-color,color] duration-subtle hover:border-default hover:bg-surface-1'
                 >
                   <span className='flex min-w-0 flex-1 flex-wrap gap-1.5'>
                     {genres.length > 0 ? (

@@ -7,24 +7,23 @@
  * Pro-only feature. Lists existing downloads with active toggle and delete.
  */
 
+import { buttonVariants } from '@jovie/ui';
 import { upload } from '@vercel/blob/client';
 import { useParams } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Icon } from '@/components/atoms/Icon';
-
-interface PromoDownloadFile {
-  id: string;
-  title: string;
-  fileName: string;
-  fileMimeType: string;
-  fileSizeBytes: number | null;
-  isActive: boolean;
-  position: number;
-}
+import { ContentSectionHeader } from '@/components/molecules/ContentSectionHeader';
+import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
+import { PageContent, PageShell } from '@/components/organisms/PageShell';
+import { cn } from '@/lib/utils';
+import {
+  type PromoDownloadFile,
+  PromoDownloadsTable,
+} from './PromoDownloadsTable';
 
 const MAX_FILE_SIZE = 150 * 1024 * 1024; // 150MB
 
-const ALLOWED_TYPES = new Set([
+const ALLOWED_TYPES = new Set<PromoDownloadFile['fileMimeType']>([
   'audio/mpeg',
   'audio/wav',
   'audio/flac',
@@ -33,29 +32,14 @@ const ALLOWED_TYPES = new Set([
   'audio/x-m4a',
 ]);
 
-function formatFileSize(bytes: number | null): string {
-  if (!bytes) return '';
-  if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-}
-
-function formatExtension(mimeType: string): string {
-  const map: Record<string, string> = {
-    'audio/mpeg': 'MP3',
-    'audio/wav': 'WAV',
-    'audio/flac': 'FLAC',
-    'audio/aiff': 'AIFF',
-    'audio/mp4': 'M4A',
-    'audio/x-m4a': 'M4A',
-  };
-  return map[mimeType] ?? 'Audio';
-}
-
 export default function PromoDownloadsPage() {
   const { releaseId } = useParams<{ releaseId: string }>();
   const [files, setFiles] = useState<PromoDownloadFile[]>([]);
   const [uploading, setUploading] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
+  const [listError, setListError] = useState<string | null>(null);
+  const [operationError, setOperationError] = useState<string | null>(null);
   const [loaded, setLoaded] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -65,14 +49,18 @@ export default function PromoDownloadsPage() {
       const res = await fetch(
         `/api/promo-downloads/confirm?releaseId=${releaseId}&list=true`
       );
-      if (res.ok) {
-        const data = await res.json();
-        if (Array.isArray(data.files)) {
-          setFiles(data.files);
-        }
+      if (!res.ok) {
+        setListError('Unable to load promo downloads right now.');
+        return;
       }
+
+      const data = await res.json();
+      if (Array.isArray(data.files)) {
+        setFiles(data.files);
+      }
+      setListError(null);
     } catch {
-      // Silently fail — files just won't load
+      setListError('Unable to load promo downloads right now.');
     } finally {
       setLoaded(true);
     }
@@ -85,11 +73,8 @@ export default function PromoDownloadsPage() {
     }
   }, [loaded, loadFiles]);
 
-  const handleFileSelect = useCallback(
-    async (e: React.ChangeEvent<HTMLInputElement>) => {
-      const file = e.target.files?.[0];
-      if (!file) return;
-
+  const uploadFile = useCallback(
+    async (file: File) => {
       if (!ALLOWED_TYPES.has(file.type)) {
         setUploadError(
           'Invalid file type. Supported: MP3, WAV, FLAC, AIFF, M4A.'
@@ -104,6 +89,7 @@ export default function PromoDownloadsPage() {
 
       setUploading(true);
       setUploadError(null);
+      setOperationError(null);
 
       try {
         // Client-side upload to Vercel Blob
@@ -130,14 +116,18 @@ export default function PromoDownloadsPage() {
 
         if (!res.ok) {
           const data = await res.json();
-          setUploadError(data.error ?? 'Upload failed');
+          setUploadError(data.error ?? 'Upload failed. Please try again.');
           return;
         }
 
         const data = await res.json();
         setFiles(prev => [...prev, data.promoDownload]);
       } catch (err) {
-        setUploadError(err instanceof Error ? err.message : 'Upload failed');
+        setUploadError(
+          err instanceof Error
+            ? err.message
+            : 'Upload failed. Please try again.'
+        );
       } finally {
         setUploading(false);
         // Reset file input
@@ -147,19 +137,45 @@ export default function PromoDownloadsPage() {
     [releaseId]
   );
 
+  const handleFileSelect = useCallback(
+    async (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      if (!file) return;
+      await uploadFile(file);
+    },
+    [uploadFile]
+  );
+
+  const handleDrop = useCallback(
+    async (e: React.DragEvent<HTMLButtonElement>) => {
+      e.preventDefault();
+      setIsDragging(false);
+      const file = e.dataTransfer.files?.[0];
+      if (!file || uploading) return;
+      await uploadFile(file);
+    },
+    [uploadFile, uploading]
+  );
+
   const handleToggleActive = useCallback(
     async (fileId: string, isActive: boolean) => {
       try {
-        await fetch(`/api/promo-downloads/${fileId}`, {
+        setOperationError(null);
+        const res = await fetch(`/api/promo-downloads/${fileId}`, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ isActive }),
         });
+        if (!res.ok) {
+          throw new Error('Unable to update file visibility.');
+        }
         setFiles(prev =>
           prev.map(f => (f.id === fileId ? { ...f, isActive } : f))
         );
       } catch {
-        // Revert on error
+        setOperationError(
+          'Unable to update file visibility. Please try again.'
+        );
       }
     },
     []
@@ -167,117 +183,117 @@ export default function PromoDownloadsPage() {
 
   const handleDelete = useCallback(async (fileId: string) => {
     try {
-      await fetch(`/api/promo-downloads/${fileId}`, {
+      setOperationError(null);
+      const res = await fetch(`/api/promo-downloads/${fileId}`, {
         method: 'DELETE',
       });
+      if (!res.ok) {
+        throw new Error('Unable to delete file.');
+      }
       setFiles(prev => prev.filter(f => f.id !== fileId));
     } catch {
-      // Silently fail
+      setOperationError('Unable to delete this file. Please try again.');
     }
   }, []);
 
   return (
-    <div className='space-y-6'>
-      <div>
-        <h2 className='text-foreground text-sm font-semibold'>
-          Promo Downloads
-        </h2>
-        <p className='text-muted-foreground mt-1 text-xs'>
-          Upload audio files for email-gated downloads. Fans enter their email
-          to get the files.
-        </p>
-      </div>
-
-      {/* Upload area */}
-      <div className='rounded-xl border border-dashed border-white/10 p-6 text-center'>
-        <Icon
-          name='Upload'
-          className='text-muted-foreground mx-auto h-8 w-8'
-          aria-hidden='true'
-        />
-        <p className='text-muted-foreground mt-2 text-sm'>
-          {uploading ? 'Uploading...' : 'Drop an audio file or click to upload'}
-        </p>
-        <p className='text-muted-foreground/60 mt-1 text-2xs'>
-          MP3, WAV, FLAC, AIFF, M4A — max 150 MB
-        </p>
-        <input
-          ref={fileInputRef}
-          type='file'
-          accept='audio/mpeg,audio/wav,audio/flac,audio/aiff,audio/mp4,audio/x-m4a'
-          onChange={handleFileSelect}
-          disabled={uploading}
-          className='absolute inset-0 cursor-pointer opacity-0'
-          style={{ position: 'relative' }}
-        />
-        {uploadError && (
-          <p className='mt-2 text-xs text-red-400'>{uploadError}</p>
-        )}
-      </div>
-
-      {/* File list */}
-      {files.length > 0 ? (
-        <div className='space-y-2'>
-          {files.map(file => (
-            <div
-              key={file.id}
-              className='flex items-center gap-3 rounded-lg bg-surface-1 px-3 py-2.5 ring-1 ring-inset ring-white/[0.06]'
-            >
-              <div className='min-w-0 flex-1'>
-                <p className='text-foreground truncate text-sm font-medium'>
-                  {file.title}
-                </p>
-                <p className='text-muted-foreground text-2xs'>
-                  {formatExtension(file.fileMimeType)}
-                  {file.fileSizeBytes
-                    ? ` · ${formatFileSize(file.fileSizeBytes)}`
-                    : ''}
-                </p>
-              </div>
-
-              {/* Active toggle */}
+    <PageShell
+      aria-label='Promo downloads'
+      data-testid='release-downloads-shell'
+    >
+      <PageContent>
+        <div className='flex h-full min-h-0 flex-col gap-4'>
+          <ContentSurfaceCard as='section' className='overflow-hidden p-0'>
+            <ContentSectionHeader
+              title='Promo downloads'
+              subtitle='Upload audio files for email-gated fan downloads.'
+              subtitleClassName='whitespace-normal'
+            />
+            <div className='p-3 sm:p-4'>
               <button
                 type='button'
-                onClick={() => handleToggleActive(file.id, !file.isActive)}
-                className={`shrink-0 rounded-full px-2 py-0.5 text-2xs font-medium transition-colors ${
-                  file.isActive
-                    ? 'bg-green-500/15 text-green-400'
-                    : 'bg-white/5 text-white/40'
-                }`}
+                aria-disabled={uploading || undefined}
+                aria-label='Drop or choose a promo download audio file'
+                onClick={() => {
+                  if (!uploading) {
+                    fileInputRef.current?.click();
+                  }
+                }}
+                onDragEnter={e => {
+                  e.preventDefault();
+                  setIsDragging(true);
+                }}
+                onDragOver={e => {
+                  e.preventDefault();
+                  setIsDragging(true);
+                }}
+                onDragLeave={e => {
+                  e.preventDefault();
+                  setIsDragging(false);
+                }}
+                onDrop={handleDrop}
+                className={cn(
+                  'flex min-h-[154px] flex-col items-center justify-center rounded-lg border border-dashed border-(--linear-app-frame-seam) bg-surface-0 px-4 py-6 text-center transition-[background-color,border-color]',
+                  isDragging &&
+                    'border-(--linear-border-focus) bg-[color-mix(in_oklab,var(--linear-border-focus)_8%,var(--linear-bg-surface-0))]'
+                )}
+                data-testid='promo-download-dropzone'
               >
-                {file.isActive ? 'Active' : 'Hidden'}
-              </button>
-
-              {/* Delete */}
-              <button
-                type='button'
-                onClick={() => handleDelete(file.id)}
-                className='text-muted-foreground hover:text-red-400 shrink-0 transition-colors'
-                aria-label={`Delete ${file.title}`}
-              >
-                <Icon name='Trash2' className='h-4 w-4' aria-hidden='true' />
+                <Icon
+                  name='Upload'
+                  className='h-8 w-8 text-tertiary-token'
+                  aria-hidden='true'
+                />
+                <p className='mt-3 text-sm font-medium text-primary-token'>
+                  {uploading ? 'Uploading audio...' : 'Drop an audio file here'}
+                </p>
+                <p className='mt-1 text-2xs text-tertiary-token'>
+                  MP3, WAV, FLAC, AIFF, M4A. Max 150 MB.
+                </p>
+                <span
+                  className={buttonVariants({
+                    variant: 'secondary',
+                    size: 'sm',
+                    className: 'mt-3',
+                  })}
+                >
+                  Choose file
+                </span>
               </button>
             </div>
-          ))}
-        </div>
-      ) : (
-        loaded && (
-          <div className='rounded-xl bg-surface-1 p-8 text-center'>
-            <Icon
-              name='Music'
-              className='text-muted-foreground mx-auto h-10 w-10'
-              aria-hidden='true'
+            <input
+              ref={fileInputRef}
+              type='file'
+              accept='audio/mpeg,audio/wav,audio/flac,audio/aiff,audio/mp4,audio/x-m4a'
+              onChange={handleFileSelect}
+              disabled={uploading}
+              className='sr-only'
+              aria-label='Upload promo download audio file'
             />
-            <p className='text-muted-foreground mt-3 text-sm'>
-              No download files yet
-            </p>
-            <p className='text-muted-foreground/60 mt-1 text-xs'>
-              Upload audio files to create an email-gated download page for this
-              release.
-            </p>
+            <div
+              className='min-h-9 border-t border-transparent px-3 py-2.5 text-xs sm:px-4'
+              role='status'
+            >
+              {uploadError ? <p className='text-error'>{uploadError}</p> : null}
+            </div>
+          </ContentSurfaceCard>
+
+          <div className='min-h-10' role='status'>
+            {listError || operationError ? (
+              <ContentSurfaceCard className='border-error/20 bg-error-subtle px-3 py-2.5 text-xs text-error'>
+                {operationError ?? listError}
+              </ContentSurfaceCard>
+            ) : null}
           </div>
-        )
-      )}
-    </div>
+
+          <PromoDownloadsTable
+            files={files}
+            loaded={loaded}
+            onToggleActive={handleToggleActive}
+            onDelete={handleDelete}
+          />
+        </div>
+      </PageContent>
+    </PageShell>
   );
 }

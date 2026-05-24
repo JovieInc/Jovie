@@ -37,7 +37,7 @@ We may suspend or terminate accounts for:
 - Requests from the account owner to close the profile
 - Legal obligations or court orders
 
-If your account is terminated, your public profile may be disabled, and we will delete your data in accordance with our [Privacy Policy](#privacy-and-data).
+If your account is terminated, your public profile may be disabled, and we will delete your data in accordance with our [Privacy Policy](/legal/privacy).
 
 ## Content and Conduct
 
@@ -98,7 +98,7 @@ If you believe your content was removed in error, you may submit a counter-notic
 
 ## Privacy and Data
 
-We value your privacy. Please review the [Privacy Policy](#privacy-and-data) to understand how we collect, use, and protect your information.
+We value your privacy. Please review the [Privacy Policy](/legal/privacy) to understand how we collect, use, and protect your information.
 
 ## Payment and Subscriptions
 

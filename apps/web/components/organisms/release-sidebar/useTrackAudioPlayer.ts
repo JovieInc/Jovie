@@ -12,6 +12,7 @@ interface AudioTrackSource {
   readonly releaseTitle?: string;
   readonly artistName?: string;
   readonly artworkUrl?: string | null;
+  readonly hasLyrics?: boolean;
 }
 
 interface PlaybackState {
@@ -29,6 +30,7 @@ interface PlaybackState {
   readonly releaseTitle: string | null;
   readonly artistName: string | null;
   readonly artworkUrl: string | null;
+  readonly hasLyrics: boolean;
 }
 
 let _audio: HTMLAudioElement | null = null;
@@ -61,6 +63,7 @@ let state: PlaybackState = {
   releaseTitle: null,
   artistName: null,
   artworkUrl: null,
+  hasLyrics: false,
 };
 
 const listeners = new Set<() => void>();
@@ -104,6 +107,7 @@ function handlePlaybackFailure(
     releaseTitle: null,
     artistName: null,
     artworkUrl: null,
+    hasLyrics: false,
   });
   notifyPlaybackError(reason);
 }
@@ -253,6 +257,7 @@ export function useTrackAudioPlayer() {
       releaseTitle: track.releaseTitle ?? null,
       artistName: track.artistName ?? null,
       artworkUrl: track.artworkUrl ?? null,
+      hasLyrics: Boolean(track.hasLyrics),
     });
     try {
       await audio.play();
@@ -295,6 +300,7 @@ export function useTrackAudioPlayer() {
       releaseTitle: null,
       artistName: null,
       artworkUrl: null,
+      hasLyrics: false,
     });
   }, []);
 

@@ -115,6 +115,7 @@ export const TrackRow = memo(function TrackRow({
         releaseTitle: release?.title,
         artistName: release?.artistNames?.[0],
         artworkUrl: release?.artworkUrl,
+        hasLyrics: Boolean(track.lyrics?.trim()),
       }).catch(() => {});
     },
     [
@@ -122,6 +123,7 @@ export const TrackRow = memo(function TrackRow({
       toggleTrack,
       track.id,
       track.title,
+      track.lyrics,
       release?.title,
       release?.artistNames,
       release?.artworkUrl,
@@ -428,6 +430,7 @@ export const TrackRowsContainer = memo(function TrackRowsContainer({
         previewUrl: track.previewUrl,
         audioUrl: track.audioUrl,
         audioFormat: track.audioFormat,
+        lyrics: track.lyrics,
         previewSource: track.previewSource,
         previewVerification: track.previewVerification,
         providerConfidenceSummary: track.providerConfidenceSummary,

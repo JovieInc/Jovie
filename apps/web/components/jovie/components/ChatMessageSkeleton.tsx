@@ -2,8 +2,8 @@ import { Skeleton } from '@jovie/ui';
 
 /**
  * Skeleton loader that mimics the ChatMessage layout.
- * Shows one user message and one assistant reply bubble
- * matching the actual message structure (avatar + label above bubble).
+ * Shows one user message and one assistant reply, matching the final
+ * user pill plus plain assistant text structure.
  */
 export function ChatMessageSkeleton() {
   return (
@@ -13,19 +13,15 @@ export function ChatMessageSkeleton() {
     >
       {/* User message skeleton */}
       <div className='flex justify-end'>
-        <div className='max-w-[78%] rounded-[18px] border border-(--linear-app-frame-seam) bg-surface-2 px-4 py-3.5'>
-          <Skeleton className='h-4 w-40' rounded='lg' />
+        <div className='flex min-h-7 max-w-[78%] items-center rounded-full border border-(--linear-app-frame-seam) bg-surface-2 px-3 py-1.5'>
+          <Skeleton className='h-3.5 w-36' rounded='full' />
         </div>
       </div>
 
       {/* Assistant message skeleton */}
       <div className='flex justify-start'>
-        <div className='max-w-[78%] space-y-1.5'>
-          <div className='flex items-center gap-2 pl-0.5'>
-            <Skeleton className='h-5.5 w-5.5 rounded-full' rounded='full' />
-            <Skeleton className='h-3 w-8' rounded='sm' />
-          </div>
-          <div className='space-y-2 rounded-[18px] border border-subtle bg-surface-1 px-4 py-3.5'>
+        <div className='w-full max-w-[78%] space-y-2 text-[15px] leading-7'>
+          <div className='space-y-2 pl-0.5'>
             <Skeleton className='h-4 w-[85%]' rounded='lg' />
             <Skeleton className='h-4 w-[70%]' rounded='lg' />
             <Skeleton className='h-4 w-[45%]' rounded='lg' />

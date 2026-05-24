@@ -224,7 +224,7 @@ describe('POST /api/webhooks/linear', () => {
 
     expect(response.status).toBe(200);
     expect(mockServerFetch).toHaveBeenCalledWith(
-      'https://api.github.com/repos/TheBlackFuture/Jovie/dispatches',
+      'https://api.github.com/repos/JovieInc/Jovie/dispatches',
       expect.objectContaining({
         method: 'POST',
         timeoutMs: 10000,

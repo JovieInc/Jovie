@@ -6,9 +6,9 @@ import { useCallback, useMemo, useRef } from 'react';
 import { toast } from 'sonner';
 import {
   type ContextMenuItemType,
-  UnifiedTable,
   useRowSelection,
 } from '@/components/organisms/table';
+import { AdminDataTable } from '@/features/admin/table/AdminDataTable';
 import { copyToClipboard } from '@/hooks/useClipboard';
 import type { WaitlistEntryRow } from '@/lib/admin/types';
 import { TABLE_MIN_WIDTHS, TABLE_ROW_HEIGHTS } from '@/lib/constants/layout';
@@ -33,9 +33,17 @@ const columnHelper = createColumnHelper<WaitlistEntryRow>();
 
 // Status display labels for grouping
 const STATUS_LABELS: Record<string, string> = {
-  new: 'New',
+  new: 'Waitlisted',
+  chat_started: 'Chat started',
+  qualified: 'Qualified',
+  waitlisted: 'Waitlisted',
   invited: 'Invited',
-  claimed: 'Claimed',
+  approved: 'Approved',
+  claimed: 'Signed up',
+  signed_up: 'Signed up',
+  rejected: 'Rejected',
+  expired: 'Expired',
+  blocked: 'Blocked',
 };
 
 export function AdminWaitlistTableUnified({
@@ -48,7 +56,7 @@ export function AdminWaitlistTableUnified({
   groupingEnabled = false,
   externalSelection,
 }: WaitlistTableProps) {
-  const { approveEntry } = useApproveEntry({
+  const { approveEntry, resendInvite } = useApproveEntry({
     onRowUpdate: () => {
       // No-op for now since we're using server-side refresh
     },
@@ -96,9 +104,14 @@ export function AdminWaitlistTableUnified({
   // Create context menu items for a waitlist entry
   const createContextMenuItems = useCallback(
     (entry: WaitlistEntryRow): ContextMenuItemType[] => {
-      return buildContextMenuItems(entry, safeCopyToClipboard, approveEntry);
+      return buildContextMenuItems(
+        entry,
+        safeCopyToClipboard,
+        approveEntry,
+        resendInvite
+      );
     },
-    [approveEntry, safeCopyToClipboard]
+    [approveEntry, resendInvite, safeCopyToClipboard]
   );
 
   // Define columns using TanStack Table
@@ -199,36 +212,30 @@ export function AdminWaitlistTableUnified({
     ]
   );
 
-  // Get row className - uses unified hover token
-  const getRowClassName = useCallback(() => {
-    return 'group bg-transparent hover:bg-(--linear-row-hover)';
-  }, []);
-
   // Render unified table with optional grouping
   return (
-    <UnifiedTable
+    <AdminDataTable
       data={entries}
       columns={columns}
       isLoading={false}
       getContextMenuItems={createContextMenuItems}
       emptyState={
-        <div className='px-4 py-10 text-center text-sm text-secondary-token flex flex-col items-center gap-3'>
-          <ClipboardList className='h-6 w-6' />
+        <div className='flex flex-col items-center gap-3 px-4 py-10 text-center text-sm text-secondary-token'>
+          <ClipboardList className='h-6 w-6 text-tertiary-token' />
           <div>
-            <div className='font-medium'>No waitlist entries</div>
-            <div className='text-xs'>
+            <div className='font-medium text-primary-token'>
+              No waitlist entries
+            </div>
+            <div className='text-xs text-secondary-token'>
               New waitlist signups will appear here.
             </div>
           </div>
         </div>
       }
       getRowId={row => row.id}
-      getRowClassName={getRowClassName}
-      enableVirtualization={true}
       rowHeight={TABLE_ROW_HEIGHTS.STANDARD}
       overscan={5}
       minWidth={`${TABLE_MIN_WIDTHS.LARGE}px`}
-      className='text-[12.5px] [&_thead_th]:py-1 [&_thead_th]:text-3xs [&_thead_th]:tracking-[0.07em]'
       rowSelection={rowSelection}
       hasNextPage={hasNextPage}
       isFetchingNextPage={isFetchingNextPage}

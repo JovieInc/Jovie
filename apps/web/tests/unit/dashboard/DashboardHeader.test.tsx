@@ -26,4 +26,82 @@ describe('DashboardHeader', () => {
     );
     expect(actionWrapper).toHaveClass('flex', 'items-center', 'gap-1');
   });
+
+  it('renders the breadcrumb alongside the closed search surface', () => {
+    const { container } = render(
+      <DashboardHeader
+        breadcrumbs={[{ label: 'Releases', href: '/app/dashboard/releases' }]}
+        searchSurface={<button type='button'>Search Releases</button>}
+        isSearchActive={false}
+      />
+    );
+
+    const desktopRow = container.querySelector(
+      '[data-search-active="false"]'
+    ) as HTMLElement | null;
+    expect(desktopRow).not.toBeNull();
+    // Breadcrumb label remains visible alongside the inline trigger.
+    expect(within(desktopRow!).getAllByText('Releases').length).toBeGreaterThan(
+      0
+    );
+    expect(
+      within(desktopRow!).getByRole('button', { name: 'Search Releases' })
+    ).toBeInTheDocument();
+  });
+
+  it('keeps the closed search surface reachable in the mobile header', () => {
+    const { container } = render(
+      <DashboardHeader
+        breadcrumbs={[{ label: 'Library', href: '/app/library' }]}
+        searchSurface={<button type='button'>Filter Library</button>}
+        isSearchActive={false}
+      />
+    );
+
+    const mobileHeader = container.querySelector('.hidden.max-sm\\:flex');
+
+    expect(mobileHeader).not.toBeNull();
+    expect(within(mobileHeader!).getByText('Library')).toBeInTheDocument();
+    expect(
+      within(mobileHeader!).getByRole('button', { name: 'Filter Library' })
+    ).toBeInTheDocument();
+  });
+
+  it('prefers the breadcrumb suffix for the mobile title when present', () => {
+    const { container } = render(
+      <DashboardHeader
+        breadcrumbs={[{ label: 'New chat', href: '/app/chat/conv-123' }]}
+        breadcrumbSuffix={<span>Release planning thread</span>}
+      />
+    );
+
+    const mobileHeader = container.querySelector('.hidden.max-sm\\:flex');
+
+    expect(mobileHeader).not.toBeNull();
+    expect(
+      within(mobileHeader!).getByText('Release planning thread')
+    ).toBeInTheDocument();
+    expect(within(mobileHeader!).queryByText('New chat')).toBeNull();
+  });
+
+  it('collapses the breadcrumb when the search surface takes over', () => {
+    const { container } = render(
+      <DashboardHeader
+        breadcrumbs={[{ label: 'Releases', href: '/app/dashboard/releases' }]}
+        searchSurface={
+          <input type='search' aria-label='Filter releases' defaultValue='' />
+        }
+        isSearchActive
+      />
+    );
+
+    const desktopRow = container.querySelector(
+      '[data-search-active="true"]'
+    ) as HTMLElement | null;
+    expect(desktopRow).not.toBeNull();
+    expect(within(desktopRow!).queryByText('Releases')).not.toBeInTheDocument();
+    expect(
+      within(desktopRow!).getByRole('searchbox', { name: 'Filter releases' })
+    ).toBeInTheDocument();
+  });
 });

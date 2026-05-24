@@ -15,8 +15,8 @@ struct JovieApp: App {
         options: Clerk.Options(
           keychainConfig: .init(service: "ie.jov.Jovie"),
           redirectConfig: .init(
-            redirectUrl: "ie.jov.Jovie://callback",
-            callbackUrlScheme: "ie.jov.Jovie"
+            redirectUrl: "ie.jov.jovie://callback",
+            callbackUrlScheme: "ie.jov.jovie"
           )
         )
       )
@@ -47,7 +47,13 @@ struct JovieApp: App {
           LiveRootContainer(appState: appState)
             .environment(Clerk.shared)
         } else {
-          RootView(appState: appState, liveUserID: nil)
+          RootView(
+            appState: appState,
+            liveUserID: nil,
+            authErrorMessage: nil,
+            onLogout: { await appState.signOut() },
+            onAuthReturn: { _ in }
+          )
         }
       }
       .preferredColorScheme(.dark)

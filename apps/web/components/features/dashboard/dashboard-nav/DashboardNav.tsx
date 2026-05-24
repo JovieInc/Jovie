@@ -1,29 +1,37 @@
 'use client';
 
 import { useQueryClient } from '@tanstack/react-query';
-import dynamic from 'next/dynamic';
+import { Search } from 'lucide-react';
 import { usePathname, useRouter } from 'next/navigation';
-import { useCallback, useEffect, useMemo, useRef } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { useDashboardData } from '@/app/app/(shell)/dashboard/DashboardDataContext';
 import { usePreviewPanelState } from '@/app/app/(shell)/dashboard/PreviewPanelContext';
-import { Flagged } from '@/components/features/dev/Flagged';
+import { openCommandPalette } from '@/components/organisms/command-palette-events';
 import { usePendingShell } from '@/components/organisms/PendingShellContext';
 import {
   SidebarGroup,
   SidebarGroupContent,
   SidebarMenu,
+  useSidebar,
 } from '@/components/organisms/Sidebar';
 import { SidebarCollapsibleGroup } from '@/components/organisms/SidebarCollapsibleGroup';
+import {
+  type SidebarThread,
+  SidebarThreadsSection,
+} from '@/components/shell/SidebarThreadsSection';
 import { APP_ROUTES, isDemoRoutePath } from '@/constants/routes';
-import { env } from '@/lib/env-client';
 import { useAppFlag } from '@/lib/flags/client';
 import { NAV_SHORTCUTS } from '@/lib/keyboard-shortcuts';
 import { usePlanGate } from '@/lib/queries';
+import { useChatConversationsQuery } from '@/lib/queries/useChatConversationsQuery';
 import { useTaskStatsQuery } from '@/lib/queries/useTasksQuery';
 import {
   adminNavigationSections,
   artistSettingsNavigation,
+  calendarNavItem,
+  libraryNavItem,
+  newThreadNavItem,
   primaryNavigation,
   userSettingsNavigation,
 } from './config';
@@ -31,17 +39,79 @@ import { NavMenuItem } from './NavMenuItem';
 import { ProfileMenuActions } from './ProfileMenuActions';
 import type { DashboardNavProps, NavItem } from './types';
 
-const RecentChats = dynamic(
-  () => import('./RecentChats').then(mod => ({ default: mod.RecentChats })),
-  {
-    ssr: false,
-    loading: () => (
-      <div className='px-2 py-1 text-sm text-secondary-token animate-pulse'>
-        Loading threads…
-      </div>
-    ),
+const searchNavItem: NavItem = {
+  name: 'Search',
+  href: APP_ROUTES.CHAT,
+  id: 'search',
+  icon: Search,
+  description: 'Search routes, releases, artists, and threads',
+};
+
+const THREAD_READ_STORAGE_KEY = 'jovie:sidebar-thread-read-at';
+const IN_PROGRESS_CHAT_TURN_STATUSES = new Set([
+  'reserved',
+  'running',
+  'streaming',
+]);
+const FAILED_CHAT_TURN_STATUSES = new Set([
+  'failed_tool_unavailable',
+  'failed_model_error',
+  'failed_timeout',
+  'failed_network',
+]);
+
+function readThreadReadState(): Record<string, string> {
+  try {
+    const stored = globalThis.localStorage?.getItem(THREAD_READ_STORAGE_KEY);
+    if (!stored) return {};
+    const parsed = JSON.parse(stored) as unknown;
+    if (!parsed || typeof parsed !== 'object') return {};
+
+    return Object.fromEntries(
+      Object.entries(parsed as Record<string, unknown>).filter(
+        (entry): entry is [string, string] => typeof entry[1] === 'string'
+      )
+    );
+  } catch {
+    return {};
   }
-);
+}
+
+function writeThreadReadState(value: Record<string, string>): void {
+  try {
+    globalThis.localStorage?.setItem(
+      THREAD_READ_STORAGE_KEY,
+      JSON.stringify(value)
+    );
+  } catch {
+    // Storage can be unavailable in restricted browsers; row state still works.
+  }
+}
+
+function isTimestampAfter(
+  candidate: string | null | undefined,
+  baseline: string | null | undefined
+): boolean {
+  if (!candidate) return false;
+  if (!baseline) return true;
+  const candidateMs = Date.parse(candidate);
+  const baselineMs = Date.parse(baseline);
+  return Number.isFinite(candidateMs) && Number.isFinite(baselineMs)
+    ? candidateMs > baselineMs
+    : candidate > baseline;
+}
+
+type DashboardNavSection = {
+  readonly key: string;
+  readonly label?: string;
+  readonly items: NavItem[];
+};
+
+type ArtistWorkspaceNavSection = {
+  readonly key: 'artist-workspace';
+  readonly label: string;
+  readonly items: NavItem[];
+};
 
 function isItemActive(pathname: string, item: NavItem): boolean {
   const normalizedPathname = (() => {
@@ -51,8 +121,11 @@ function isItemActive(pathname: string, item: NavItem): boolean {
     ) {
       return APP_ROUTES.RELEASES;
     }
-    if (pathname === APP_ROUTES.AUDIENCE) {
-      return APP_ROUTES.DASHBOARD_AUDIENCE;
+    if (
+      pathname === APP_ROUTES.DASHBOARD_AUDIENCE ||
+      pathname === APP_ROUTES.AUDIENCE
+    ) {
+      return APP_ROUTES.AUDIENCE;
     }
     return pathname;
   })();
@@ -60,7 +133,8 @@ function isItemActive(pathname: string, item: NavItem): boolean {
   if (
     normalizedPathname === item.href ||
     (normalizedPathname === APP_ROUTES.RELEASES &&
-      item.href === APP_ROUTES.DASHBOARD_RELEASES)
+      (item.href === APP_ROUTES.RELEASES ||
+        item.href === APP_ROUTES.DASHBOARD_RELEASES))
   ) {
     return true;
   }
@@ -73,6 +147,10 @@ function isItemActive(pathname: string, item: NavItem): boolean {
   return normalizedPathname.startsWith(`${item.href}/`);
 }
 
+function normalizeTrailingSlash(pathname: string): string {
+  return pathname === '/' ? pathname : pathname.replace(/\/$/, '');
+}
+
 function formatTaskBadge(
   taskStats: { activeTodoCount: number } | undefined
 ): string | number | undefined {
@@ -83,11 +161,14 @@ function formatTaskBadge(
 export function DashboardNav(_: DashboardNavProps) {
   const { isAdmin, selectedProfile } = useDashboardData();
   const { clearPendingShell, showPendingShell } = usePendingShell();
+  const { isMobile, openMobile, state: sidebarState } = useSidebar();
   const pathname = usePathname();
   const router = useRouter();
   const queryClient = useQueryClient();
-  const threadsEnabled = useAppFlag('THREADS_ENABLED');
-  const shellChatV1Enabled = useAppFlag('SHELL_CHAT_V1');
+  const shellChatV1Enabled = useAppFlag('DESIGN_V1');
+  const shellChatLibraryEnabled = useAppFlag('SHELL_CHAT_V1');
+  const [threadReadAtById, setThreadReadAtById] =
+    useState<Record<string, string>>(readThreadReadState);
   const {
     isOpen: isPreviewOpen,
     open: openPreviewPanel,
@@ -107,8 +188,7 @@ export function DashboardNav(_: DashboardNavProps) {
     [publicProfileHref]
   );
 
-  // Replace "Profile" label with artist display name when available
-  const artistName = selectedProfile?.displayName;
+  const artistName = selectedProfile?.displayName?.trim();
   const profileId = selectedProfile?.id ?? '';
   const isDemo = isDemoRoutePath(pathname);
   const { canAccessTasksWorkspace, isLoading: isPlanGateLoading } =
@@ -117,36 +197,120 @@ export function DashboardNav(_: DashboardNavProps) {
     enabled: !isDemo && canAccessTasksWorkspace,
   });
   const isInSettings = pathname.startsWith(APP_ROUTES.SETTINGS);
+  const threadsVisible =
+    shellChatV1Enabled &&
+    !isDemo &&
+    !isInSettings &&
+    (isMobile ? openMobile : sidebarState === 'open');
+  const {
+    data: conversations,
+    isError: conversationsError,
+    isLoading: conversationsLoading,
+    refetch: refetchConversations,
+  } = useChatConversationsQuery({
+    limit: 10,
+    enabled: threadsVisible,
+  });
+
+  useEffect(() => {
+    if (!conversations || conversations.length === 0) return;
+
+    setThreadReadAtById(previous => {
+      if (Object.keys(previous).length > 0) return previous;
+
+      const baseline = Object.fromEntries(
+        conversations.map(conversation => [
+          conversation.id,
+          conversation.updatedAt,
+        ])
+      );
+      writeThreadReadState(baseline);
+      return baseline;
+    });
+  }, [conversations]);
 
   // Settings nav: "General" (user) and artist name (or "Artist") groups
   const artistSettingsLabel = artistName || 'Artist';
+  const artistWorkspaceLabel = artistName || 'Artist';
 
   // Memoize nav sections for dashboard (non-settings) mode
-  const navSections = useMemo(
-    () => [
-      {
-        key: 'primary',
-        items: primaryNavigation.map(item =>
-          item.id === 'tasks'
-            ? {
-                ...item,
-                badge: (() => {
-                  if (isPlanGateLoading) return undefined;
-                  if (canAccessTasksWorkspace)
-                    return formatTaskBadge(taskStats);
-                  return (
-                    <span className='rounded-full border border-[color-mix(in_oklab,var(--linear-app-frame-seam)_76%,transparent)] bg-[color-mix(in_oklab,var(--linear-app-content-surface)_90%,transparent)] px-1.5 py-0.5 text-[9px] font-semibold tracking-[0.02em] text-secondary-token'>
-                      Pro
-                    </span>
-                  );
-                })(),
-              }
-            : item
-        ),
-      },
-    ],
-    [canAccessTasksWorkspace, isPlanGateLoading, taskStats]
-  );
+  const { artistWorkspaceSection, navSections } = useMemo<{
+    readonly artistWorkspaceSection: ArtistWorkspaceNavSection | null;
+    readonly navSections: DashboardNavSection[];
+  }>(() => {
+    const decorateItem = (item: NavItem): NavItem =>
+      item.id === 'tasks'
+        ? {
+            ...item,
+            badge: (() => {
+              if (isPlanGateLoading) return undefined;
+              if (canAccessTasksWorkspace) return formatTaskBadge(taskStats);
+              return (
+                <span className='rounded-full border border-[color-mix(in_oklab,var(--linear-app-frame-seam)_76%,transparent)] bg-[color-mix(in_oklab,var(--linear-app-content-surface)_90%,transparent)] px-1.5 py-0.5 text-[9px] font-semibold tracking-[0.02em] text-secondary-token'>
+                  Pro
+                </span>
+              );
+            })(),
+          }
+        : item;
+    const primaryItems = shellChatLibraryEnabled
+      ? [
+          ...primaryNavigation.slice(0, 2),
+          libraryNavItem,
+          ...primaryNavigation.slice(2),
+        ]
+      : primaryNavigation;
+
+    if (shellChatV1Enabled) {
+      const profileItem = primaryNavigation.find(item => item.id === 'profile');
+      const releaseItem = primaryNavigation.find(
+        item => item.id === 'releases'
+      );
+      const audienceItem = primaryNavigation.find(
+        item => item.id === 'audience'
+      );
+      const tasksItem = primaryNavigation.find(item => item.id === 'tasks');
+
+      return {
+        artistWorkspaceSection: {
+          key: 'artist-workspace',
+          label: artistWorkspaceLabel,
+          items: [profileItem, releaseItem, audienceItem]
+            .filter((item): item is NavItem => Boolean(item))
+            .map(decorateItem),
+        },
+        navSections: [
+          {
+            key: 'user-work',
+            items: [
+              newThreadNavItem,
+              searchNavItem,
+              calendarNavItem,
+              ...(tasksItem ? [decorateItem(tasksItem)] : []),
+              ...(shellChatLibraryEnabled ? [libraryNavItem] : []),
+            ],
+          },
+        ],
+      };
+    }
+
+    return {
+      artistWorkspaceSection: null,
+      navSections: [
+        {
+          key: 'primary',
+          items: primaryItems.map(decorateItem),
+        },
+      ],
+    };
+  }, [
+    artistWorkspaceLabel,
+    canAccessTasksWorkspace,
+    isPlanGateLoading,
+    shellChatV1Enabled,
+    shellChatLibraryEnabled,
+    taskStats,
+  ]);
 
   // Profile nav item opens the preview drawer instead of navigating to a separate page.
   // If already on a chat route, just opens the drawer; otherwise navigates first.
@@ -163,6 +327,7 @@ export function DashboardNav(_: DashboardNavProps) {
   // Debounced prefetch: avoid firing on fast mouse sweeps across nav items
   const prefetchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const releasesPrefetchedProfileIdRef = useRef<string | null>(null);
+  const releasesWarmReadyProfileIdRef = useRef<string | null>(null);
   useEffect(
     () => () => {
       if (prefetchTimerRef.current) clearTimeout(prefetchTimerRef.current);
@@ -171,11 +336,47 @@ export function DashboardNav(_: DashboardNavProps) {
   );
 
   useEffect(() => {
+    releasesPrefetchedProfileIdRef.current = null;
+    releasesWarmReadyProfileIdRef.current = null;
+  }, [profileId]);
+
+  const warmReleasesRoute = useCallback(async () => {
+    if (isDemo || !profileId) {
+      return;
+    }
+
+    if (releasesPrefetchedProfileIdRef.current === profileId) {
+      router.prefetch(APP_ROUTES.RELEASES);
+      return;
+    }
+
+    releasesPrefetchedProfileIdRef.current = profileId;
+    router.prefetch(APP_ROUTES.RELEASES);
+
+    try {
+      await Promise.all([
+        import('@/features/dashboard/organisms/release-provider-matrix'),
+        import('@/lib/queries/prefetch-dashboard').then(
+          ({ prefetchForRoute }) =>
+            prefetchForRoute('releases', queryClient, profileId)
+        ),
+      ]);
+
+      releasesPrefetchedProfileIdRef.current = profileId;
+      releasesWarmReadyProfileIdRef.current = profileId;
+    } catch {
+      releasesPrefetchedProfileIdRef.current = null;
+      releasesWarmReadyProfileIdRef.current = null;
+    }
+  }, [isDemo, profileId, queryClient, router]);
+
+  useEffect(() => {
     if (
       isDemo ||
       !profileId ||
-      releasesPrefetchedProfileIdRef.current === profileId ||
-      pathname !== APP_ROUTES.DASHBOARD
+      releasesWarmReadyProfileIdRef.current === profileId ||
+      pathname === APP_ROUTES.RELEASES ||
+      pathname === APP_ROUTES.DASHBOARD_RELEASES
     ) {
       return;
     }
@@ -187,24 +388,11 @@ export function DashboardNav(_: DashboardNavProps) {
     // the timer so a cleanup that fires before the timer runs (fast route
     // change) leaves the ref null and a later visit will retry.
     const handle = setTimeout(() => {
-      releasesPrefetchedProfileIdRef.current = profileId;
-      router.prefetch(APP_ROUTES.DASHBOARD_RELEASES);
-      void import(
-        '@/features/dashboard/organisms/release-provider-matrix'
-      ).catch(() => {
-        releasesPrefetchedProfileIdRef.current = null;
-      });
-      void import('@/lib/queries/prefetch-dashboard')
-        .then(({ prefetchForRoute }) =>
-          prefetchForRoute('releases', queryClient, profileId)
-        )
-        .catch(() => {
-          releasesPrefetchedProfileIdRef.current = null;
-        });
+      void warmReleasesRoute();
     }, 300);
 
     return () => clearTimeout(handle);
-  }, [isDemo, pathname, profileId, queryClient, router]);
+  }, [isDemo, pathname, profileId, warmReleasesRoute]);
 
   const handlePrefetch = useCallback(
     (itemId: string) => {
@@ -212,9 +400,8 @@ export function DashboardNav(_: DashboardNavProps) {
       const prefetchDelayMs = itemId === 'releases' ? 0 : 150;
       prefetchTimerRef.current = setTimeout(() => {
         if (itemId === 'releases') {
-          void import(
-            '@/features/dashboard/organisms/release-provider-matrix'
-          ).catch(() => {});
+          void warmReleasesRoute();
+          return;
         }
         void import('@/lib/queries/prefetch-dashboard')
           .then(({ prefetchForRoute }) =>
@@ -223,29 +410,122 @@ export function DashboardNav(_: DashboardNavProps) {
           .catch(() => {});
       }, prefetchDelayMs);
     },
-    [queryClient, profileId]
+    [profileId, queryClient, warmReleasesRoute]
   );
+
+  const showPendingReleasesShell = useCallback(() => {
+    if (releasesWarmReadyProfileIdRef.current === profileId) {
+      return;
+    }
+
+    showPendingShell('releases');
+  }, [profileId, showPendingShell]);
+
+  const clearPendingReleasesShell = useCallback(() => {
+    if (releasesWarmReadyProfileIdRef.current === profileId) {
+      return;
+    }
+
+    clearPendingShell('releases');
+  }, [clearPendingShell, profileId]);
 
   // In demo mode, intercept nav clicks for tabs without demo data
   const handleDemoNavClick = useCallback((item: NavItem) => {
     toast.info(`${item.name} is not available in demo mode`);
   }, []);
 
+  const handleSearchClick = useCallback(() => {
+    openCommandPalette();
+  }, []);
+
+  const activeThreadId = useMemo(() => {
+    const chatPrefix = `${APP_ROUTES.CHAT}/`;
+    if (!pathname.startsWith(chatPrefix)) return null;
+    const [id] = pathname.slice(chatPrefix.length).split('/');
+    return id ? decodeURIComponent(id) : null;
+  }, [pathname]);
+
+  useEffect(() => {
+    if (!activeThreadId || !conversations) return;
+
+    const activeConversation = conversations.find(
+      conversation => conversation.id === activeThreadId
+    );
+    if (!activeConversation) return;
+
+    setThreadReadAtById(previous => {
+      if (previous[activeThreadId] === activeConversation.updatedAt) {
+        return previous;
+      }
+
+      const next = {
+        ...previous,
+        [activeThreadId]: activeConversation.updatedAt,
+      };
+      writeThreadReadState(next);
+      return next;
+    });
+  }, [activeThreadId, conversations]);
+
+  const sidebarThreads = useMemo<SidebarThread[]>(
+    () =>
+      (conversations ?? []).map(conversation => {
+        const latestTurnStatus = conversation.latestTurnStatus ?? null;
+        const isRunning = latestTurnStatus
+          ? IN_PROGRESS_CHAT_TURN_STATUSES.has(latestTurnStatus)
+          : false;
+        const isFailed = latestTurnStatus
+          ? FAILED_CHAT_TURN_STATUSES.has(latestTurnStatus)
+          : false;
+        const isUnread =
+          activeThreadId !== conversation.id &&
+          conversation.latestMessageRole === 'assistant' &&
+          isTimestampAfter(
+            conversation.updatedAt,
+            threadReadAtById[conversation.id]
+          );
+
+        return {
+          id: conversation.id,
+          href: `${APP_ROUTES.CHAT}/${encodeURIComponent(conversation.id)}`,
+          title: conversation.title?.trim() || 'Untitled thread',
+          status: isRunning ? 'running' : isFailed ? 'errored' : 'complete',
+          updatedAt: conversation.updatedAt,
+          unread: isUnread,
+        };
+      }),
+    [activeThreadId, conversations, threadReadAtById]
+  );
+
+  const handleRetryThreads = useCallback(() => {
+    void refetchConversations();
+  }, [refetchConversations]);
+
   // Memoize renderNavItem to prevent creating new functions on every render
   const renderNavItem = useCallback(
     (item: NavItem, _index: number) => {
       const isProfileItem = item.id === 'profile';
       const isReleasesItem = item.id === 'releases';
-      const isActive = isProfileItem
-        ? isPreviewOpen && pathname.startsWith(APP_ROUTES.CHAT)
-        : isItemActive(pathname, item);
+      const isSearchItem = item.id === 'search';
+      const isNewThreadItem =
+        item.id === 'chat' && item.href === APP_ROUTES.CHAT;
+      let isActive = false;
+      if (isProfileItem) {
+        isActive = isPreviewOpen && pathname.startsWith(APP_ROUTES.CHAT);
+      } else if (isNewThreadItem) {
+        isActive = normalizeTrailingSlash(pathname) === APP_ROUTES.CHAT;
+      } else if (!isSearchItem) {
+        isActive = isItemActive(pathname, item);
+      }
       const shortcut = NAV_SHORTCUTS[item.id];
 
       // In demo mode, only Releases has real content — intercept all other nav clicks
-      const demoUnavailable = isDemo && !isReleasesItem;
-      const renderAsButton = isProfileItem && !demoUnavailable;
+      const demoUnavailable = isDemo && !isReleasesItem && !isSearchItem;
+      const renderAsButton =
+        (isProfileItem && !demoUnavailable) || isSearchItem;
       let onClick: (() => void) | undefined;
       if (demoUnavailable) onClick = () => handleDemoNavClick(item);
+      else if (isSearchItem) onClick = handleSearchClick;
       else if (isProfileItem) onClick = handleProfileClick;
 
       return (
@@ -259,16 +539,12 @@ export function DashboardNav(_: DashboardNavProps) {
           onClick={onClick}
           preventNavigation={demoUnavailable}
           renderAsButton={renderAsButton}
-          useShellNavItem={shellChatV1Enabled && renderAsButton}
+          useShellNavItem={shellChatV1Enabled}
           onNavigate={
-            isReleasesItem && !isActive
-              ? () => showPendingShell('releases')
-              : undefined
+            isReleasesItem && !isActive ? showPendingReleasesShell : undefined
           }
           onCancelNavigate={
-            isReleasesItem && !isActive
-              ? () => clearPendingShell('releases')
-              : undefined
+            isReleasesItem && !isActive ? clearPendingReleasesShell : undefined
           }
           onPrefetch={() => handlePrefetch(item.id)}
         />
@@ -280,8 +556,9 @@ export function DashboardNav(_: DashboardNavProps) {
       handleProfileClick,
       handleDemoNavClick,
       handlePrefetch,
-      clearPendingShell,
-      showPendingShell,
+      handleSearchClick,
+      clearPendingReleasesShell,
+      showPendingReleasesShell,
       isPreviewOpen,
       isDemo,
       shellChatV1Enabled,
@@ -302,10 +579,18 @@ export function DashboardNav(_: DashboardNavProps) {
     <nav className='flex flex-1 flex-col' aria-label='Dashboard navigation'>
       {isInSettings ? (
         <>
-          <SidebarCollapsibleGroup label='General' defaultOpen>
+          <SidebarCollapsibleGroup
+            label='General'
+            defaultOpen
+            storageKey='settings.general'
+          >
             {renderSection(userSettingsNavigation)}
           </SidebarCollapsibleGroup>
-          <SidebarCollapsibleGroup label={artistSettingsLabel} defaultOpen>
+          <SidebarCollapsibleGroup
+            label={artistSettingsLabel}
+            defaultOpen={false}
+            storageKey='settings.artist'
+          >
             {renderSection(artistSettingsNavigation)}
           </SidebarCollapsibleGroup>
         </>
@@ -316,24 +601,61 @@ export function DashboardNav(_: DashboardNavProps) {
               <div key={section.key} data-nav-section>
                 {/* Section divider for visual separation (except for first section) */}
                 {index > 0 && <div className='my-1.5' />}
-                {renderSection(section.items)}
+                {section.label ? (
+                  <SidebarCollapsibleGroup
+                    label={section.label}
+                    defaultOpen
+                    storageKey={`dashboard.${section.key}`}
+                  >
+                    {renderSection(section.items)}
+                  </SidebarCollapsibleGroup>
+                ) : (
+                  renderSection(section.items)
+                )}
               </div>
             ))}
           </SidebarGroupContent>
         </SidebarGroup>
       )}
 
-      {!isInSettings && threadsEnabled && !env.IS_E2E && (
-        <Flagged name='THREADS_ENABLED'>
-          <div className='mt-3.5'>
-            <RecentChats />
-          </div>
-        </Flagged>
-      )}
+      {threadsVisible ? (
+        <div className='mt-1.5'>
+          <SidebarThreadsSection
+            threads={sidebarThreads}
+            activeThreadId={activeThreadId}
+            state={
+              conversationsError
+                ? 'error'
+                : conversationsLoading
+                  ? 'loading'
+                  : 'idle'
+            }
+            onRetry={handleRetryThreads}
+            tight
+            collapsed={false}
+          />
+        </div>
+      ) : null}
+
+      {artistWorkspaceSection ? (
+        <div data-nav-section={artistWorkspaceSection.key} className='mt-3'>
+          <SidebarCollapsibleGroup
+            label={artistWorkspaceSection.label}
+            defaultOpen={false}
+            storageKey={artistWorkspaceSection.key}
+          >
+            {renderSection(artistWorkspaceSection.items)}
+          </SidebarCollapsibleGroup>
+        </div>
+      ) : null}
 
       {isAdmin && !isInSettings && (
         <div data-testid='admin-nav-section' className='mt-3'>
-          <SidebarCollapsibleGroup label='Admin' defaultOpen>
+          <SidebarCollapsibleGroup
+            label='Admin'
+            defaultOpen={false}
+            storageKey='dashboard.admin'
+          >
             {adminNavigationSections.map(section => (
               <div
                 key={section.label}

@@ -26,9 +26,19 @@ import {
 async function getEssentialShellFlagsSnapshot(
   userId: string
 ): Promise<AppFlagSnapshot> {
+  const designV1 = await getAppFlagValue('DESIGN_V1', { userId });
+
   return {
     ...APP_FLAG_DEFAULTS,
-    SHELL_CHAT_V1: await getAppFlagValue('SHELL_CHAT_V1', { userId }),
+    DESIGN_V1: designV1,
+    SHELL_CHAT_V1: designV1,
+    DESIGN_V1_RELEASES: designV1,
+    DESIGN_V1_TASKS: designV1,
+    DESIGN_V1_CHAT_ENTITIES: designV1,
+    DESIGN_V1_LYRICS: designV1,
+    DESIGN_V1_LIBRARY: designV1,
+    DESIGN_V1_AUTH: designV1,
+    DESIGN_V1_ONBOARDING: designV1,
   };
 }
 
@@ -55,9 +65,8 @@ export async function DashboardShellContent({
   readonly pathname: string | null;
   readonly children: React.ReactNode;
 }) {
-  // Keep the shell fast on the chat-first landing path and releases.
-  // Other dashboard/settings routes still receive the full dashboard context
-  // because they rely on supplementary fields from the slower fetch.
+  // Keep the shell fast on route-owned workspaces. Routes that fetch their own
+  // page data should not force the shared shell through the full dashboard path.
   const useEssentialShell = shouldUseEssentialShellData(pathname);
   const cookieStorePromise = cookies();
   const initialFlagsPromise = useEssentialShell
@@ -82,15 +91,17 @@ export async function DashboardShellContent({
     dashboardData.needsOnboarding &&
     !dashboardData.dashboardLoadError
   ) {
-    redirect(APP_ROUTES.ONBOARDING);
+    redirect(APP_ROUTES.START);
   }
 
   // Read sidebar cookie server-side so SSR matches client state (no flash)
   const sidebarCookie = cookieStore.get('sidebar:state');
-  const sidebarDefaultOpen = sidebarCookie?.value !== 'false';
+  const sidebarDefaultOpen = sidebarCookie
+    ? sidebarCookie.value !== 'false'
+    : !dashboardData.sidebarCollapsed;
 
   const shellContents = (
-    <div className='animate-shell-in h-full'>
+    <div className='h-full'>
       {/* ENG-004: Show environment issues to admins in non-production */}
       <OperatorBanner isAdmin={dashboardData.isAdmin} />
       <ImpersonationBannerWrapper />
@@ -113,12 +124,19 @@ export async function DashboardShellContent({
     </AppFlagProvider>
   );
 
-  if (useEssentialShell) {
-    return flaggedShellContents;
-  }
+  // Always wrap with HydrateClient (even for essential-shell routes with undefined state).
+  // This guarantees a stable client component tree root for *all* /app/* routes.
+  // Previously the conditional caused <HydrateClient> vs direct <AppFlagProvider>
+  // root on warm nav between lightweight and full-data routes, which remounted
+  // AuthShellWrapper + AppShellFrame + providers (losing transient sidebar UI state
+  // until cookie restore, and risking blank/dark chrome flashes).
+  // With a fixed top-level client boundary, AppShellFrame/AuthShell/sidebar/audio
+  // chrome now survive all normal client-side navigations inside the shell.
+  // Empty state on essential routes is a no-op; pages needing hydration still work.
+  const dehydratedState = useEssentialShell ? undefined : getDehydratedState();
 
   return (
-    <HydrateClient state={getDehydratedState()}>
+    <HydrateClient state={dehydratedState}>
       {flaggedShellContents}
     </HydrateClient>
   );

@@ -127,6 +127,7 @@ describe('ReleaseCell', () => {
       releaseTitle: 'Skyline Dreams',
       artistName: undefined,
       artworkUrl: undefined,
+      hasLyrics: false,
     });
   });
 

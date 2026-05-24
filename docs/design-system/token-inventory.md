@@ -198,11 +198,15 @@ Defined primarily in `apps/web/styles/linear-tokens.css` and consumed through cl
 
 #### Existing app-shell layout tokens
 
-- `--linear-app-sidebar-width: 244px`
+- `--linear-app-sidebar-width: 224px`
 - `--linear-app-header-height: 40px`
 - `--linear-app-header-height-compact: 36px`
 - `--linear-app-shell-gap: 8px`
 - `--linear-app-shell-radius: 12px`
+- `--linear-app-content-surface: var(--linear-bg-surface-0)` in light mode,
+  `#0a0c0f` in dark mode
+- `--linear-app-audio-bar-max-height: 120px`
+- `--linear-app-audio-compact-height: 64px`
 
 ### Semantic aliases added during consolidation
 
@@ -225,6 +229,16 @@ These aliases keep current values but give public surfaces a single shared contr
 - `--profile-drawer-radius-mobile`
 - `--profile-drawer-radius-desktop`
 - `--profile-action-radius`
+- `--app-shell-sidebar-width`
+- `--app-shell-header-height`
+- `--app-shell-header-height-compact`
+- `--app-shell-gap`
+- `--app-shell-radius`
+- `--app-shell-border`
+- `--app-shell-frame-seam`
+- `--app-shell-content-surface`
+- `--app-shell-audio-bar-max-height`
+- `--app-shell-audio-compact-height`
 
 ## Canonical template mapping
 

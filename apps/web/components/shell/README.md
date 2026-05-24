@@ -1,8 +1,13 @@
 # `components/shell/`
 
 Production-ready primitives extracted from `apps/web/app/exp/shell-v1/page.tsx`.
-The shell-v1 experiment is the source of truth for the production app shell
-look-and-feel; pieces graduate here once they've settled.
+The extracted components in this directory are the implementation source of
+truth. The `shell-v1` experiment remains the visual/reference fixture for
+unextracted shell ideas, but production code should import from
+`@/components/shell/*` rather than reaching back into `/app/exp`.
+
+See `apps/web/app/exp/README.md` for the current experimental-shell debt
+ledger and delete-later inventory.
 
 ## Foundational primitives
 
@@ -25,7 +30,7 @@ look-and-feel; pieces graduate here once they've settled.
 | `LyricRow` | Single lyric line — display mode (centered, fades dim siblings) or edit mode (grip + time-stamp + inline-editable text). |
 | `LyricsTimeline` | Sticky-bottom scrub bar with one cue dot per lyric line. Click anywhere to seek. NaN-safe duration handling. |
 
-## Now-playing
+## Now-Playing
 
 | Component | Purpose |
 |-----------|---------|
@@ -33,7 +38,11 @@ look-and-feel; pieces graduate here once they've settled.
 | `SidebarBottomNowPlaying` | Compact now-playing row mounted at the sidebar bottom. Artwork + title/artist + small play button. Hides entirely when nothing's playing. |
 | `ArtworkPlayOverlay` | Small play/pause button overlaid on album art. Shared between the two now-playing cards. |
 
-All three accept a `track: NowPlayingTrack` whose fields (`trackTitle`, `artistName`, `artworkUrl`) match `useTrackAudioPlayer().playbackState` directly.
+`SidebarNowPlaying` and `SidebarBottomNowPlaying` accept a
+`track: NowPlayingTrack` whose fields (`trackTitle`, `artistName`,
+`artworkUrl`) match `useTrackAudioPlayer().playbackState` directly.
+If another caller needs a differently shaped source, add a small adapter at
+that caller boundary instead of widening the component contract.
 
 ## Drawer
 

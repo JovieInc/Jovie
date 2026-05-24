@@ -217,9 +217,9 @@ vi.mock('@/components/atoms/Calendar', () => ({
     <button
       type='button'
       data-testid='calendar-select-date'
-      onClick={() => onSelect?.(new Date('2026-05-20T12:00:00.000Z'))}
+      onClick={() => onSelect?.(new Date('2030-05-20T12:00:00.000Z'))}
     >
-      Select May 20 2026
+      Select May 20 2030
     </button>
   ),
 }));
@@ -376,7 +376,7 @@ describe('AddReleaseSidebar', () => {
       'Midnight Sun'
     );
     expect(screen.getByTestId('release-fields')).toHaveTextContent(
-      'type:single|date:2026-05-20|tracks:1'
+      'type:single|date:2030-05-20|tracks:1'
     );
   });
 
@@ -405,6 +405,10 @@ describe('AddReleaseSidebar', () => {
 
     const revealDatePicker = screen.getByLabelText('Reveal Date');
     expect(revealDatePicker).toBeInTheDocument();
+    expect(revealDatePicker).toHaveTextContent('Pick a date');
+
+    await user.click(screen.getAllByTestId('calendar-select-date')[1]!);
+
     expect(revealDatePicker).toHaveTextContent(/\w{3} \d{1,2}, \d{4}/);
   });
 

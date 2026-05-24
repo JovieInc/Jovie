@@ -1,4 +1,3 @@
-export { ArtistPageShell } from './ArtistPageShell';
 export type {
   ProfileIdentityFields,
   ProfileMode,
@@ -8,7 +7,6 @@ export type {
   ProfileSaveState,
 } from './contracts';
 export { PROFILE_MODE_KEYS } from './contracts';
-export { ProgressiveArtistPage } from './ProgressiveArtistPage';
 export {
   getProfileMode,
   getProfileModeDefinition,

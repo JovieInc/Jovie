@@ -113,3 +113,7 @@ export function useChatEntityPanel(): ChatEntityPanelContextValue {
   }
   return context;
 }
+
+export function useOptionalChatEntityPanel(): ChatEntityPanelContextValue | null {
+  return useContext(ChatEntityPanelContext);
+}

@@ -1,6 +1,8 @@
 import { execFileSync, spawnSync } from 'node:child_process';
 
-const [, , task, ...extraArgs] = process.argv;
+const [, , task, ...rawExtraArgs] = process.argv;
+const extraArgs =
+  rawExtraArgs[0] === '--' ? rawExtraArgs.slice(1) : rawExtraArgs;
 
 if (!task) {
   console.error(
@@ -43,7 +45,7 @@ function resolveMergeBase() {
 }
 
 function buildFallbackTurboArgs() {
-  return ['turbo', task, ...extraArgs];
+  return [task, ...extraArgs];
 }
 
 const mergeBase = resolveMergeBase();
@@ -51,7 +53,7 @@ const headSha = tryExec('git', ['rev-parse', 'HEAD']);
 const turboArgs = mergeBase
   ? mergeBase.mergeBase === headSha
     ? buildFallbackTurboArgs()
-    : ['turbo', task, '--affected', ...extraArgs]
+    : [task, '--affected', ...extraArgs]
   : buildFallbackTurboArgs();
 
 if (mergeBase) {
@@ -66,7 +68,7 @@ if (mergeBase) {
   }
 }
 
-const result = spawnSync('pnpm', turboArgs, {
+const result = spawnSync('node', ['scripts/turbo-local.mjs', ...turboArgs], {
   cwd: process.cwd(),
   stdio: 'inherit',
   shell: process.platform === 'win32',

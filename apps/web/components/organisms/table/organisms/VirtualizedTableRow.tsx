@@ -3,7 +3,7 @@
 import type { Row } from '@tanstack/react-table';
 import { flexRender } from '@tanstack/react-table';
 import React, { memo, useCallback, useEffect, useRef } from 'react';
-import { cn, presets } from '../table.styles';
+import { cn, presets, rowState } from '../table.styles';
 
 /**
  * Props that VirtualizedTableRow manages internally.
@@ -81,6 +81,7 @@ function VirtualizedTableRowComponent<TData>({
 }: VirtualizedTableRowProps<TData> &
   Omit<React.ComponentPropsWithoutRef<'tr'>, ManagedTrProps>) {
   const rowData = row.original as TData;
+  const isRowSelected = row.getIsSelected?.() ?? false;
 
   // Keep a ref to the forwarded onContextMenu so we can compose it without
   // breaking memoisation of handleContextMenu.
@@ -148,13 +149,13 @@ function VirtualizedTableRowComponent<TData>({
       data-index={rowIndex}
       data-testid={getRowTestId?.(rowData, rowIndex)}
       tabIndex={shouldEnableKeyboardNav ? 0 : undefined}
+      aria-selected={isRowSelected || htmlProps['aria-selected']}
       className={cn(
         presets.tableRow,
         onRowClick && 'cursor-pointer',
-        shouldEnableKeyboardNav &&
-          'focus-visible:outline-none focus-visible:bg-(--linear-row-hover) focus-visible:shadow-[inset_0_0_0_1px_color-mix(in_oklab,var(--linear-border-focus)_45%,transparent)]',
-        focusedIndex === rowIndex &&
-          'bg-(--linear-row-hover) shadow-[inset_0_0_0_1px_color-mix(in_oklab,var(--linear-border-focus)_35%,transparent)]',
+        shouldEnableKeyboardNav && rowState.focusVisible,
+        isRowSelected && rowState.selected,
+        focusedIndex === rowIndex && !isRowSelected && rowState.focused,
         getRowClassName?.(rowData, rowIndex)
       )}
       onClick={handleClick}

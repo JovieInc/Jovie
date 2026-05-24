@@ -122,7 +122,7 @@ describe('Switch', () => {
       render(<Switch aria-label='Toggle' data-testid='switch' />);
       const switchElement = screen.getByTestId('switch');
       expect(switchElement.className).toContain(
-        'data-[state=checked]:hover:bg-indigo-600'
+        'data-[state=checked]:hover:bg-[var(--color-accent-hover)]'
       );
     });
 
@@ -132,7 +132,7 @@ describe('Switch', () => {
       );
       const switchElement = screen.getByTestId('switch');
       expect(switchElement.className).toContain(
-        'data-[state=checked]:bg-indigo-500'
+        'data-[state=checked]:bg-[var(--color-accent)]'
       );
     });
 
@@ -277,8 +277,10 @@ describe('Switch', () => {
       // Unchecked track must use a visible background
       expect(classes).toContain('data-[state=unchecked]:bg-white/[0.08]');
 
-      // Checked track must use indigo background
-      expect(classes).toContain('data-[state=checked]:bg-indigo-500');
+      // Checked track must use the System B accent token
+      expect(classes).toContain(
+        'data-[state=checked]:bg-[var(--color-accent)]'
+      );
     });
 
     it('checked and unchecked use different background colors', () => {

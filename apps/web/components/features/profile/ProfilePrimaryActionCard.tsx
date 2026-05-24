@@ -11,6 +11,7 @@ import {
   startOfProfileSurfaceLocalDay as startOfLocalDay,
   toProfileSurfaceDateValue as toDateValue,
 } from '@/features/profile/profile-surface-state';
+import { useReleaseAwareNow } from '@/hooks/useReleaseAwareNow';
 import { useTourDateProximity } from '@/hooks/useTourDateProximity';
 import type { UserLocation } from '@/hooks/useUserLocation';
 import { useUserLocation } from '@/hooks/useUserLocation';
@@ -110,17 +111,17 @@ function buildCardStyles(
   return {
     isShowcase,
     shellClassName: cn(
-      'group flex w-full items-center gap-3 rounded-[var(--profile-action-radius)] border border-white/[0.08] bg-white/[0.05] text-left backdrop-blur-2xl transition-[background-color,box-shadow,opacity] duration-150 hover:bg-white/[0.08] active:opacity-[0.9]',
+      'group w-full rounded-[var(--profile-action-radius)] border border-white/[0.08] bg-white/[0.05] text-left backdrop-blur-2xl transition-[background-color,box-shadow,opacity] duration-150 hover:bg-white/[0.08] active:opacity-[0.9]',
       isShowcase
-        ? 'min-h-[92px] px-4 py-3.5 shadow-[0_22px_58px_rgba(0,0,0,0.34)]'
-        : 'min-h-[64px] px-3 py-2.5',
+        ? 'relative block min-h-[198px] overflow-hidden shadow-[0_18px_46px_rgba(0,0,0,0.34)]'
+        : 'flex min-h-[64px] items-center gap-3 px-3 py-2.5',
       className
     ),
     artClassName: isShowcase
-      ? 'h-14 w-14 rounded-[14px]'
+      ? 'h-12 w-12 rounded-[12px]'
       : 'h-11 w-11 rounded-xl',
     titleClassName: isShowcase
-      ? 'text-base font-[630] tracking-[-0.03em] text-white'
+      ? 'text-[14px] font-semibold leading-[1.12] text-white'
       : 'text-app font-semibold leading-[1.1] text-white/92',
     metaClassName: isShowcase
       ? 'text-[11.5px] text-white/56'
@@ -134,7 +135,6 @@ function ReleaseCard({
   styles,
   renderMode,
   previewActionLabel,
-  onPlayClick,
   dataTestId,
 }: Readonly<{
   state: ProfileCardReleaseState;
@@ -142,21 +142,77 @@ function ReleaseCard({
   styles: CardStyles;
   renderMode: ProfileRenderMode;
   previewActionLabel: string;
-  onPlayClick?: () => void;
   dataTestId?: string;
 }>) {
   const href = `/${artist.handle}/${state.release.slug}`;
-  const wrapperHref =
-    state.kind === 'release_countdown' || !onPlayClick ? href : undefined;
-  const actionClick = state.kind === 'release_live' ? onPlayClick : undefined;
+  const wrapperHref = href;
   const actionLabel = renderMode === 'preview' ? previewActionLabel : 'Listen';
   const releaseDate = toDateValue(state.release.releaseDate);
+
+  if (styles.isShowcase) {
+    return (
+      <ActionCardShell
+        kind={state.kind}
+        href={wrapperHref}
+        className={styles.shellClassName}
+        dataTestId={dataTestId}
+      >
+        {state.release.artworkUrl ? (
+          <ImageWithFallback
+            src={state.release.artworkUrl}
+            alt={`${state.release.title} artwork`}
+            fill
+            sizes='(max-width: 430px) 100vw, 340px'
+            className='object-cover opacity-[0.9] transition-opacity duration-subtle group-hover:opacity-100'
+            fallbackVariant='release'
+          />
+        ) : (
+          <div className='absolute inset-0 flex items-center justify-center bg-white/[0.055] text-white/42'>
+            <Play className='h-12 w-12 fill-current' />
+          </div>
+        )}
+        <span
+          aria-hidden='true'
+          className='absolute inset-0 bg-[linear-gradient(180deg,rgba(0,0,0,0.04)_0%,rgba(0,0,0,0.24)_46%,rgba(0,0,0,0.74)_100%)]'
+        />
+        <span
+          aria-hidden='true'
+          className='absolute inset-x-0 bottom-0 h-24 bg-[radial-gradient(circle_at_24%_100%,rgba(255,255,255,0.18),transparent_46%)]'
+        />
+        <div className='relative z-10 flex min-h-[198px] flex-col justify-end p-4'>
+          <div className='flex min-w-0 items-end justify-between gap-3'>
+            <div className='min-w-0 flex-1'>
+              <p className='line-clamp-2 text-[17px] font-semibold leading-[1.08] text-white [overflow-wrap:anywhere]'>
+                {state.release.title}
+              </p>
+              <div className='mt-1 space-y-0.5'>
+                <p className='truncate text-[12px] font-semibold leading-4 text-white/72'>
+                  {artist.name}
+                </p>
+                {state.collaboratorLine ? (
+                  <p className='truncate font-caption text-[11.5px] leading-4 text-white/58'>
+                    {state.collaboratorLine}
+                  </p>
+                ) : null}
+              </div>
+            </div>
+            {state.kind === 'release_countdown' && releaseDate ? (
+              <div className='shrink-0 rounded-[18px] border border-white/12 bg-black/24 px-3 py-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.05)] backdrop-blur-xl'>
+                <ReleaseCountdown releaseDate={releaseDate} compact />
+              </div>
+            ) : (
+              <ActionPill label={actionLabel} />
+            )}
+          </div>
+        </div>
+      </ActionCardShell>
+    );
+  }
 
   return (
     <ActionCardShell
       kind={state.kind}
       href={wrapperHref}
-      onClick={actionClick}
       className={styles.shellClassName}
       dataTestId={dataTestId}
     >
@@ -609,14 +665,20 @@ export function ProfilePrimaryActionCard({
   size = 'compact',
   now,
 }: Readonly<ProfilePrimaryActionCardProps>) {
+  // Re-evaluate visibility at the release boundary so the countdown card
+  // chrome transitions to "live" the moment the release drops (even if the
+  // surrounding page is served from a stale ISR cache).
+  const releaseAwareNow = useReleaseAwareNow(latestRelease?.releaseDate);
+  const effectiveNow = now ?? releaseAwareNow;
   const upcomingTourDates = useMemo(
-    () => getUpcomingTourDates(tourDates, now),
-    [now, tourDates]
+    () => getUpcomingTourDates(tourDates, effectiveNow),
+    [effectiveNow, tourDates]
   );
   const nextTourDate = upcomingTourDates[0] ?? null;
   const releaseVisibility = useMemo(
-    () => getProfileReleaseVisibility(latestRelease, profileSettings, now),
-    [latestRelease, now, profileSettings]
+    () =>
+      getProfileReleaseVisibility(latestRelease, profileSettings, effectiveNow),
+    [latestRelease, effectiveNow, profileSettings]
   );
   const shouldResolveGeo =
     resolveNearbyTour &&
@@ -642,16 +704,16 @@ export function ProfilePrimaryActionCard({
         nearbyTourDate,
         featuredPlaylistFallback,
         hasPlayableDestinations,
-        now,
+        now: effectiveNow,
       }),
     [
       artist.name,
+      effectiveNow,
       featuredPlaylistFallback,
       hasPlayableDestinations,
       latestRelease,
       nearbyTourDate,
       nextTourDate,
-      now,
       profileSettings,
     ]
   );
@@ -670,7 +732,6 @@ export function ProfilePrimaryActionCard({
         styles={styles}
         renderMode={renderMode}
         previewActionLabel={previewActionLabel}
-        onPlayClick={onPlayClick}
         dataTestId={dataTestId}
       />
     );

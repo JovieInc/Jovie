@@ -9,7 +9,7 @@ vi.mock('@/components/marketing/homepage-v2/HomepageV2Route', () => ({
     <main data-testid='homepage-v2-route'>
       <h1>Make every release feel bigger.</h1>
       <Link data-testid='homepage-v2-hero-primary-cta' href='/signup'>
-        Start free trial
+        Request Access
       </Link>
       <Link href='/artist-profiles'>Explore artist profiles</Link>
       <h2>One system for the whole release cycle.</h2>
@@ -43,20 +43,16 @@ vi.mock('next/navigation', () => ({
 }));
 
 describe('NewLandingPage', () => {
-  it('renders the staged homepage v2 content and staged product nav', () => {
+  it('renders the staged homepage v2 content with YC-tightened nav', () => {
     render(<MarketingHeader />);
 
+    expect(screen.queryByRole('button', { name: /Features/ })).toBeNull();
+    expect(screen.queryByRole('button', { name: /Resources/ })).toBeNull();
+    expect(screen.queryByRole('link', { name: 'Pricing' })).toBeNull();
+    expect(screen.queryByRole('link', { name: 'Contact' })).toBeNull();
     expect(
-      screen.getByRole('link', { name: 'Artist Profiles' })
-    ).toHaveAttribute('href', '/artist-profiles');
-    expect(screen.getByRole('link', { name: 'Pricing' })).toHaveAttribute(
-      'href',
-      '/pricing'
-    );
-    expect(screen.getByRole('link', { name: 'Support' })).toHaveAttribute(
-      'href',
-      '/support'
-    );
+      screen.getByRole('link', { name: 'Start Free Trial' })
+    ).toHaveAttribute('href', '/signup');
 
     render(<NewLandingPage />);
 

@@ -1,15 +1,13 @@
 'use client';
 
-import dynamic from 'next/dynamic';
 import Link from 'next/link';
 import { useMemo, useState } from 'react';
 import { CTAButton } from '@/components/molecules/CTAButton';
 import { useProfileNotifications } from '@/components/organisms/profile-shell/ProfileNotificationsContext';
 import { AUDIENCE_SPOTIFY_PREFERRED_COOKIE } from '@/constants/app';
-import {
-  profilePrimaryPillClassName,
-  SubscriptionFormSkeleton,
-} from '@/features/profile/artist-notifications-cta/shared';
+import { ArtistNotificationsCTA } from '@/features/profile/artist-notifications-cta/ArtistNotificationsCTA';
+import { profilePrimaryPillClassName } from '@/features/profile/artist-notifications-cta/shared';
+import { TwoStepNotificationsCTA } from '@/features/profile/artist-notifications-cta/TwoStepNotificationsCTA';
 import { useBreakpointDown } from '@/hooks/useBreakpoint';
 import type { AvailableDSP } from '@/lib/dsp';
 import {
@@ -20,32 +18,19 @@ import { cn } from '@/lib/utils';
 import type { Artist, LegacySocialLink } from '@/types/db';
 import { ListenDrawer } from './ListenDrawer';
 
-const ctaLoadingFallback = (
-  <div className='space-y-3 py-2 sm:py-3'>
-    <div className='h-3 w-40 rounded skeleton' aria-hidden='true' />
-    <SubscriptionFormSkeleton />
-  </div>
-);
-
-const ArtistNotificationsCTA = dynamic(
-  () =>
-    import(
-      '@/features/profile/artist-notifications-cta/ArtistNotificationsCTA'
-    ).then(mod => ({
-      default: mod.ArtistNotificationsCTA,
-    })),
-  { ssr: false, loading: () => ctaLoadingFallback }
-);
-
-const TwoStepNotificationsCTA = dynamic(
-  () =>
-    import(
-      '@/features/profile/artist-notifications-cta/TwoStepNotificationsCTA'
-    ).then(mod => ({
-      default: mod.TwoStepNotificationsCTA,
-    })),
-  { ssr: false, loading: () => ctaLoadingFallback }
-);
+// Previously these imports used `dynamic({ ssr: false })` to defer the
+// notification flow modules to the client. That bailed the parent SSR tree
+// to client-side rendering and emitted
+// `<template data-dgst="BAILOUT_TO_CLIENT_SIDE_RENDERING">` in the streaming
+// payload — shipping the animated skeleton from `loading.tsx` as the initial
+// visible HTML for every cold visit (JOV-2273).
+//
+// Notification CTAs render trivially on the server (just markup + a Bell
+// icon) and only need client JS for the subscribe interaction itself, so
+// direct import is safe.
+//
+// `ProfilePrimaryCTA` is currently only consumed by unit tests; the change
+// is preventative against future usage on the public profile RSC tree.
 
 /**
  * Read Spotify preference from client-side cookie.

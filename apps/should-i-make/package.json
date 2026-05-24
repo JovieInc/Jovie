@@ -1,6 +1,6 @@
 {
   "name": "@jovie/should-i-make",
-  "version": "26.4.179",
+  "version": "26.5.14",
   "private": true,
   "engines": {
     "node": ">=22.13.0"
@@ -14,9 +14,9 @@
   },
   "dependencies": {
     "@vercel/analytics": "^2.0.1",
-    "next": "^16.2.4",
-    "react": "19.2.4",
-    "react-dom": "19.2.4"
+    "next": "^16.2.6",
+    "react": "19.2.6",
+    "react-dom": "19.2.6"
   },
   "devDependencies": {
     "@fontsource-variable/inter": "^5.2.8",
@@ -24,8 +24,8 @@
     "@types/node": "^22.13.0",
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
-    "postcss": "^8.5.10",
-    "tailwindcss": "^4.2.2",
+    "postcss": "^8.5.15",
+    "tailwindcss": "^4.3.0",
     "typescript": "^6.0.3"
   }
 }

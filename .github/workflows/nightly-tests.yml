@@ -5,13 +5,16 @@
 #
 # REPLACES: nightly-unit-tests.yml, nightly-e2e-tests.yml
 #
-# SCHEDULE: Daily at 2:00 AM UTC (both suites run in parallel)
+# SCHEDULE: Daily at 2:00 AM America/Los_Angeles during daylight saving time
+# (both suites run in parallel). Keep UTC here until actionlint accepts
+# GitHub's timezone-aware schedule key.
 
 name: Nightly Tests
 
 on:
   schedule:
     - cron: '0 2 * * *'
+      timezone: 'America/Los_Angeles'
   workflow_dispatch:
     inputs:
       suite:
@@ -21,6 +24,7 @@ on:
           - all
           - unit
           - e2e
+          - design-v1
         default: all
       coverage:
         description: 'Enable unit test coverage report'
@@ -42,6 +46,10 @@ concurrency:
 jobs:
   knip:
     name: Knip Dead Code Audit
+    if: >-
+      github.event_name == 'schedule' ||
+      github.event.inputs.suite == 'all' ||
+      github.event.inputs.suite == 'unit'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -99,7 +107,8 @@ jobs:
     if: >-
       github.event_name == 'schedule' ||
       github.event.inputs.suite == 'all' ||
-      github.event.inputs.suite == 'e2e'
+      github.event.inputs.suite == 'e2e' ||
+      github.event.inputs.suite == 'design-v1'
     environment: Preview – jovie
     runs-on: ubuntu-latest
     timeout-minutes: 45
@@ -140,7 +149,7 @@ jobs:
         run: pnpm --filter=@jovie/web exec playwright install chromium --with-deps
 
       - name: Seed nightly QA data
-        if: ${{ github.event_name == 'schedule' || github.event.inputs.test_filter == '' }}
+        if: ${{ github.event_name == 'schedule' || github.event.inputs.test_filter == '' || github.event.inputs.suite == 'design-v1' }}
         run: |
           cd apps/web
           pnpm exec tsx tests/seed-test-data.ts
@@ -154,14 +163,30 @@ jobs:
           E2E_CLERK_USER_PASSWORD: ${{ secrets.E2E_CLERK_USER_PASSWORD }}
 
       - name: Start route QA bypass server
-        if: ${{ github.event_name == 'schedule' || github.event.inputs.test_filter == '' }}
+        if: ${{ github.event_name == 'schedule' || github.event.inputs.test_filter == '' || github.event.inputs.suite == 'design-v1' }}
         run: |
           cd apps/web
           pnpm run dev:local:playwright > "$RUNNER_TEMP/nightly-qa-web.log" 2>&1 &
           echo $! > "$RUNNER_TEMP/nightly-qa-web.pid"
-          for attempt in $(seq 1 90); do
+          for _ in $(seq 1 90); do
             if curl -fsS http://127.0.0.1:3100/api/dev/test-auth/session >/dev/null; then
               echo "Nightly QA bypass server is ready."
+              for persona in creator creator-ready; do
+                for attempt in 1 2 3; do
+                  if curl -fsS -X POST http://127.0.0.1:3100/api/dev/test-auth/session \
+                    -H 'content-type: application/json' \
+                    --data "{\"persona\":\"$persona\"}" >/dev/null; then
+                    break
+                  fi
+                  if [ "$attempt" = "3" ]; then
+                    echo "Failed to prepare $persona bypass persona." >&2
+                    cat "$RUNNER_TEMP/nightly-qa-web.log"
+                    exit 1
+                  fi
+                  sleep 5
+                done
+              done
+              echo "Nightly QA bypass personas are ready."
               exit 0
             fi
             sleep 2
@@ -180,14 +205,16 @@ jobs:
           E2E_USE_TEST_AUTH_BYPASS: '1'
           E2E_FAST_ONBOARDING: '1'
           E2E_TEST_AUTH_PERSONA: creator
+          NEXT_PUBLIC_E2E_MODE: '1'
           NEXT_PUBLIC_CLERK_MOCK: '1'
           NEXT_PUBLIC_CLERK_PROXY_DISABLED: '1'
           NEXT_DISABLE_TOOLBAR: '1'
+          E2E_ALLOW_DEV_CSP: '1'
           FLAGS_SECRET: ${{ secrets.FLAGS_SECRET }}
 
       - name: Run nightly route QA breadth pass
         # Temporarily keep this flaky breadth pass out of scheduled runs.
-        if: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.test_filter == '' }}
+        if: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.test_filter == '' && github.event.inputs.suite != 'design-v1' }}
         run: |
           cd apps/web
           pnpm run qa:routes
@@ -199,7 +226,7 @@ jobs:
           E2E_CLERK_USER_ID: ${{ secrets.E2E_CLERK_USER_ID }}
 
       - name: Run full surface chaos sweep
-        if: ${{ github.event_name == 'schedule' || github.event.inputs.test_filter == '' }}
+        if: ${{ github.event_name == 'schedule' || (github.event.inputs.test_filter == '' && github.event.inputs.suite != 'design-v1') }}
         run: |
           cd apps/web
           pnpm playwright test tests/e2e/nightly/full-surface-chaos.spec.ts --config=playwright.config.nightly.ts --project=chromium
@@ -221,7 +248,7 @@ jobs:
           FLAGS_SECRET: ${{ secrets.FLAGS_SECRET }}
 
       - name: Stop route QA bypass server
-        if: ${{ always() && (github.event_name == 'schedule' || github.event.inputs.test_filter == '') }}
+        if: ${{ always() && (github.event_name == 'schedule' || github.event.inputs.test_filter == '' || github.event.inputs.suite == 'design-v1') }}
         run: |
           if [ -f "$RUNNER_TEMP/nightly-qa-web.pid" ]; then
             pid="$(cat "$RUNNER_TEMP/nightly-qa-web.pid")"
@@ -230,6 +257,7 @@ jobs:
           fi
 
       - name: Run nightly E2E tests
+        if: ${{ github.event_name != 'workflow_dispatch' || github.event.inputs.suite != 'design-v1' }}
         run: |
           cd apps/web
           if [ -n "${{ github.event.inputs.test_filter }}" ]; then
@@ -285,6 +313,10 @@ jobs:
         continue-on-error: true
         run: |
           cd apps/web
+          if [[ "${CLERK_SECRET_KEY:-}" != sk_test_* ]]; then
+            echo "Skipping Clerk E2E cleanup because CLERK_SECRET_KEY is not a Clerk test secret."
+            exit 0
+          fi
           pnpm tsx scripts/cleanup-e2e-users.ts --force
         env:
           CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY }}
@@ -318,7 +350,7 @@ jobs:
     steps:
       - name: Slack notification on Knip failure
         if: ${{ needs.knip.result == 'failure' }}
-        uses: slackapi/slack-github-action@03ea5433c137af7c0495bc0cad1af10403fc800c # v3.0.2
+        uses: slackapi/slack-github-action@45a88b9581bfab2566dc881e2cd66d334e621e2c # v3.0.3
         with:
           channel-id: ${{ vars.SLACK_CI_CHANNEL_ID }}
           payload: |
@@ -339,7 +371,7 @@ jobs:
 
       - name: Slack notification on unit test failure
         if: ${{ needs.unit-tests.result == 'failure' }}
-        uses: slackapi/slack-github-action@03ea5433c137af7c0495bc0cad1af10403fc800c # v3.0.2
+        uses: slackapi/slack-github-action@45a88b9581bfab2566dc881e2cd66d334e621e2c # v3.0.3
         with:
           channel-id: ${{ vars.SLACK_CI_CHANNEL_ID }}
           payload: |

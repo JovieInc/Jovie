@@ -76,7 +76,7 @@ export function MismatchCard({
   if (removing) {
     return (
       <div
-        className='overflow-hidden transition-all duration-300 ease-out'
+        className='overflow-hidden transition-[max-height,opacity,margin] duration-cinematic ease-out'
         style={{ maxHeight: 0, opacity: 0, marginBottom: 0 }}
         aria-hidden='true'
       />
@@ -87,7 +87,7 @@ export function MismatchCard({
   if (pendingAction && !error) {
     return (
       <div
-        className='flex items-center justify-between gap-3 rounded-md border border-border bg-muted/30 px-3 py-2.5 transition-all'
+        className='flex items-center justify-between gap-3 rounded-md border border-subtle bg-surface-1 px-3 py-2.5 transition-colors duration-subtle'
         role='status'
         aria-live='polite'
       >
@@ -133,7 +133,7 @@ export function MismatchCard({
 
   // Normal card state
   return (
-    <li className='list-none group flex items-center gap-3 rounded-md border border-border bg-card px-3 py-2.5 transition-all hover:bg-accent/50'>
+    <li className='list-none group flex items-center gap-3 rounded-md border border-subtle bg-surface-0 px-3 py-2.5 transition-colors duration-subtle hover:bg-surface-1'>
       {/* Artwork — clickable to Spotify */}
       {spotifyUrl && (
         <a

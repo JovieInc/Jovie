@@ -44,7 +44,7 @@ const PROFILE_SHELL = join(
 
 const REPRESENTATIVE_PROFILE_ENTRYPOINTS = [
   join(ROOT, 'app', '[username]', 'page.tsx'),
-  join(ROOT, 'components', 'features', 'profile', 'ProgressiveArtistPage.tsx'),
+  // ProgressiveArtistPage.tsx deleted in JOV-2022 legacy cleanup (no live route callers)
   join(ROOT, 'components', 'features', 'demo', 'DemoPublicProfileSurface.tsx'),
   join(
     ROOT,
@@ -115,5 +115,13 @@ describe('public profile contract guard', () => {
     expect(readFileSync(PROFILE_SHELL, 'utf8')).toContain(
       '--profile-shell-header-max-width'
     );
+  });
+
+  it('does not reserve hidden notifications CTA space above the compact profile rail', () => {
+    const contents = readFileSync(PROFILE_COMPACT_SURFACE, 'utf8');
+
+    expect(contents).toContain('hideTrigger');
+    expect(contents).not.toContain('profile-inline-cta-placeholder');
+    expect(contents).not.toContain('min-h-[116px]');
   });
 });

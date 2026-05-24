@@ -1,6 +1,7 @@
 'use client';
 
 import { Pause, Play } from 'lucide-react';
+import React from 'react';
 import { cn } from '@/lib/utils';
 
 /**
@@ -10,8 +11,10 @@ import { cn } from '@/lib/utils';
  * by default; the parent toggles `visible` based on context (e.g. when
  * the audio bar is collapsed and the artwork becomes the primary
  * playback affordance).
+ *
+ * Memoized to stabilize high-churn play state renders over live audio player data.
  */
-export function ArtworkPlayOverlay({
+export const ArtworkPlayOverlay = React.memo(function ArtworkPlayOverlay({
   isPlaying,
   onPlay,
   visible,
@@ -27,7 +30,7 @@ export function ArtworkPlayOverlay({
       type='button'
       onClick={onPlay}
       className={cn(
-        'absolute inset-0 grid place-items-center bg-black/50 text-white transition-opacity duration-150 ease-out hover:opacity-100',
+        'absolute inset-0 grid place-items-center bg-black/50 text-white transition-opacity duration-subtle ease-subtle hover:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/55 focus-visible:ring-offset-2 focus-visible:ring-offset-(--linear-bg-page) outline-none',
         visible ? 'opacity-100' : 'opacity-0',
         className
       )}
@@ -41,4 +44,4 @@ export function ArtworkPlayOverlay({
       )}
     </button>
   );
-}
+});

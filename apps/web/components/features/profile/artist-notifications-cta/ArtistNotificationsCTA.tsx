@@ -13,7 +13,10 @@ export function ArtistNotificationsCTA({
   hideTrigger = false,
   onFlowClosed,
   onSubscriptionActivated,
+  experimentVariant,
   source,
+  sourceContext,
+  triggerLabel,
 }: ArtistNotificationsCTAProps) {
   const resolvedPresentation =
     presentation ?? (autoOpen || forceExpanded ? 'inline' : 'overlay');
@@ -28,7 +31,10 @@ export function ArtistNotificationsCTA({
       hideTrigger={hideTrigger}
       onFlowClosed={onFlowClosed}
       onSubscriptionActivated={onSubscriptionActivated}
+      experimentVariant={experimentVariant}
       source={source}
+      sourceContext={sourceContext}
+      triggerLabel={triggerLabel}
     />
   );
 }

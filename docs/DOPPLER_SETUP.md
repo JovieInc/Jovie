@@ -71,7 +71,7 @@ Doppler is the canonical internal local workflow. The root wrapper commands alre
 **Development server:**
 
 ```bash
-pnpm run dev:web:local
+pnpm run dev:web:fast
 ```
 
 **Type checking:**
@@ -183,6 +183,53 @@ doppler secrets set SECRET_NAME=value --project jovie-web --config dev
 - Document required secrets in `.env.example`
 - Never commit actual secret values to Git
 
+### Production Signup Readiness
+
+Production signup and anonymous onboarding chat are blocked unless these keys are present in `prd`:
+
+```bash
+NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY
+CLERK_SECRET_KEY
+DATABASE_URL
+SESSION_SECRET
+AI_GATEWAY_API_KEY
+NEXT_PUBLIC_TURNSTILE_SITE_KEY
+TURNSTILE_SECRET_KEY
+```
+
+Run the redacted readiness check before promoting production:
+
+```bash
+doppler run --project jovie-web --config prd -- \
+  pnpm --filter=@jovie/web run check:signup-readiness -- --target=prd
+```
+
+The production synthetic signup canary also requires these `prd` secrets:
+
+```bash
+E2E_PROD_SIGNUP_EMAIL_BASE
+E2E_PROD_SIGNUP_PASSWORD
+E2E_PROD_MAILBOX_PROVIDER=gmail # or cloudflare-email-routing
+E2E_PROD_MAILBOX_CLIENT_ID
+E2E_PROD_MAILBOX_CLIENT_SECRET
+E2E_PROD_MAILBOX_REFRESH_TOKEN
+E2E_PROD_MAILBOX_QUERY_FROM # optional Gmail query narrowing
+```
+
+For the preferred no-inbox Cloudflare Email Routing setup, set:
+
+```bash
+E2E_PROD_SIGNUP_EMAIL_BASE=synthetic-signup@<dedicated-e2e-domain>
+E2E_PROD_MAILBOX_PROVIDER=cloudflare-email-routing
+E2E_PROD_OTP_CHECK_URL=https://<otp-worker-host>/latest
+E2E_PROD_OTP_CHECK_TOKEN=<shared bearer token>
+```
+
+The Cloudflare worker should receive the catch-all route for the dedicated e2e
+domain, store only recent Clerk OTP messages for `synthetic-signup+*@...`, and
+serve the latest code from `E2E_PROD_OTP_CHECK_URL` only when called with the
+bearer token.
+
 ### Migrating from .env Files
 
 If you have existing `.env` files, you can import them:
@@ -233,7 +280,7 @@ doppler configure get
 doppler setup --project jovie-web --config dev
 
 # Or use the repo wrapper command
-pnpm run dev:web:local
+pnpm run dev:web:fast
 ```
 
 ### Vercel Sync Not Working

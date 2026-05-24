@@ -4,9 +4,12 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 
 import {
+  APP_FLAG_DEFAULTS,
   APP_FLAG_KEYS,
   APP_FLAG_TO_STATSIG_GATE,
+  DESIGN_V1_ALIAS_FLAGS,
   LEGACY_STATSIG_GATE_KEYS,
+  LOCAL_DEFAULT_ONLY_FLAGS,
 } from '@/lib/flags/contracts';
 
 const SOURCE_DIRECTORIES = ['app', 'components', 'hooks', 'lib'];
@@ -23,11 +26,13 @@ const SKIP_DIRECTORIES = new Set([
 
 const APP_FLAG_CALL_REGEX =
   /\b(?:useAppFlag|useFeatureFlag|getAppFlagValue)\(\s*['"`]([A-Z0-9_]+)['"`]/g;
-const EXP_ROUTE_IMPORT_REGEX = /from ['"]@\/app\/exp\//;
+const EXP_ROUTE_IMPORT_REGEX =
+  /\b(?:import|export)\b[\s\S]*?\bfrom\s*['"]@\/app\/exp(?:\/|['"])|\bimport\s*\(\s*['"]@\/app\/exp(?:\/|['"])/;
 
 /** Stable package root resolved from this test file's location. */
 const TEST_FILE_DIR = path.dirname(fileURLToPath(import.meta.url));
 const WEB_ROOT = path.resolve(TEST_FILE_DIR, '../../..');
+const REPO_ROOT = path.resolve(WEB_ROOT, '../..');
 
 /**
  * Recursively collect source files from the given root directory, skipping
@@ -63,6 +68,10 @@ function collectSourceFiles(rootDir: string): string[] {
   return files;
 }
 
+function readRepoFile(relativePath: string): string {
+  return readFileSync(path.join(REPO_ROOT, relativePath), 'utf8');
+}
+
 describe('feature flag registry integrity', () => {
   it('keeps all runtime app-flag references registered', () => {
     const sourceFiles = collectSourceFiles(WEB_ROOT);
@@ -86,9 +95,17 @@ describe('feature flag registry integrity', () => {
   });
 
   it('does not include API chat-specific feature flags in the registry', () => {
-    const allowedShellRolloutEntries = new Set([
+    const allowedShellRolloutEntries = new Set<string>([
+      'DESIGN_V1',
+      LEGACY_STATSIG_GATE_KEYS.DESIGN_V1,
       'SHELL_CHAT_V1',
       LEGACY_STATSIG_GATE_KEYS.SHELL_CHAT_V1,
+      'DESIGN_V1_CHAT_ENTITIES',
+      LEGACY_STATSIG_GATE_KEYS.DESIGN_V1_CHAT_ENTITIES,
+      // CHAT_JANK_MONITOR is a legitimate app-level instrumentation flag backed
+      // by a Statsig gate; it is not an API-chat-only flag.
+      'CHAT_JANK_MONITOR',
+      LEGACY_STATSIG_GATE_KEYS.CHAT_JANK_MONITOR,
     ]);
     const chatFlagsInKeys = Object.keys(LEGACY_STATSIG_GATE_KEYS).filter(
       key => /chat/i.test(key) && !allowedShellRolloutEntries.has(key)
@@ -100,13 +117,62 @@ describe('feature flag registry integrity', () => {
     expect([...chatFlagsInKeys, ...chatFlagsInValues]).toEqual([]);
   });
 
-  it('keeps SHELL_CHAT_V1 Statsig-backed', () => {
-    expect(APP_FLAG_KEYS.SHELL_CHAT_V1).toBe(
-      LEGACY_STATSIG_GATE_KEYS.SHELL_CHAT_V1
-    );
-    expect(APP_FLAG_TO_STATSIG_GATE.SHELL_CHAT_V1).toBe(
-      LEGACY_STATSIG_GATE_KEYS.SHELL_CHAT_V1
-    );
+  it('keeps DESIGN_V1 and aliases permanently enabled (no Statsig gate, default true)', () => {
+    // DESIGN_V1 is the only design. It must NOT be backed by a Statsig gate
+    // (so a misconfigured gate cannot turn off the new design in production).
+    // All entries live in LOCAL_DEFAULT_ONLY_FLAGS with default=true.
+    const statsigBackedFlags = new Set(Object.keys(APP_FLAG_TO_STATSIG_GATE));
+
+    expect(statsigBackedFlags.has('DESIGN_V1')).toBe(false);
+    expect(LOCAL_DEFAULT_ONLY_FLAGS.has('DESIGN_V1')).toBe(true);
+    expect(APP_FLAG_DEFAULTS.DESIGN_V1).toBe(true);
+
+    for (const aliasFlag of DESIGN_V1_ALIAS_FLAGS) {
+      expect(statsigBackedFlags.has(aliasFlag)).toBe(false);
+      expect(LOCAL_DEFAULT_ONLY_FLAGS.has(aliasFlag)).toBe(true);
+      expect(APP_FLAG_DEFAULTS[aliasFlag]).toBe(true);
+    }
+  });
+
+  it('keeps Statsig docs aligned with runtime gate keys', () => {
+    const docs = readRepoFile('docs/STATSIG_FEATURE_GATES.md');
+    const runtimeGateKeys = new Set(Object.values(APP_FLAG_TO_STATSIG_GATE));
+
+    for (const gateKey of runtimeGateKeys) {
+      expect(docs).toContain(`\`${gateKey}\``);
+    }
+
+    expect(docs).toContain('`ai_chat_disabled`');
+    expect(docs).toContain('`ai_chat_force_light`');
+    expect(docs).toContain('`profile_alert_optin_cta_variant`');
+
+    for (const aliasFlag of DESIGN_V1_ALIAS_FLAGS) {
+      const legacyGateKey = LEGACY_STATSIG_GATE_KEYS[aliasFlag];
+      expect(docs).not.toContain(`| \`${legacyGateKey}\` |`);
+    }
+  });
+
+  it('documents the server-only Statsig environment contract', () => {
+    const checkedFiles = [
+      'README.md',
+      'docs/env.md',
+      '.github/workflows/ci.yml',
+    ];
+    const staleEnvNames = [
+      'NEXT_PUBLIC_STATSIG_CLIENT_KEY',
+      'STATSIG_SERVER_API_KEY',
+      'STATSIG_SERVER_SECRET_KEY',
+    ];
+
+    for (const relativePath of checkedFiles) {
+      const contents = readRepoFile(relativePath);
+      for (const envName of staleEnvNames) {
+        expect(contents).not.toContain(envName);
+      }
+    }
+
+    expect(readRepoFile('README.md')).toContain('STATSIG_SERVER_SECRET');
+    expect(readRepoFile('docs/env.md')).toContain('STATSIG_SERVER_SECRET');
   });
 
   it('limits legacy feature-flags imports to static marketing and compatibility files', () => {

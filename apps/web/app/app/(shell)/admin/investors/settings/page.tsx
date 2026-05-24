@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import { AdminToolPage } from '@/components/features/admin/layout/AdminToolPage';
+import { AdminPage } from '@/components/features/admin/layout/AdminPage';
 import { InvestorSettingsForm } from './InvestorSettingsForm';
 
 export const metadata: Metadata = {
@@ -12,12 +12,12 @@ export const metadata: Metadata = {
  */
 export default function InvestorSettingsPage() {
   return (
-    <AdminToolPage
+    <AdminPage
       title='Investor Settings'
       description='Configure the investor portal, progress display, and follow-up defaults.'
       testId='admin-investors-settings-page'
     >
       <InvestorSettingsForm />
-    </AdminToolPage>
+    </AdminPage>
   );
 }

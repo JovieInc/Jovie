@@ -1,7 +1,7 @@
 'use client';
 
 import { usePathname } from 'next/navigation';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import { APP_ROUTES, isDemoRoutePath } from '@/constants/routes';
 import { useAuthSafe, useUserSafe } from '@/hooks/useClerkSafe';
@@ -11,6 +11,9 @@ import { upgradeOAuthAvatarUrl } from '@/lib/utils/avatar-url';
 import type { Artist } from '@/types/db';
 import { useUserMenuActions } from '../useUserMenuActions';
 import type { UserDisplayInfo } from './types';
+
+const BILLING_STATUS_ERROR_TOAST_SESSION_KEY =
+  'jovie:billing-status-error-toast-shown';
 
 export interface UseUserButtonProps {
   readonly artist?: Artist | null;
@@ -39,6 +42,48 @@ export interface UseUserButtonReturn {
   menuActions: ReturnType<typeof useUserMenuActions>;
 }
 
+function isRoutePath(pathname: string | null | undefined, route: string) {
+  return (
+    typeof pathname === 'string' &&
+    (pathname === route || pathname.startsWith(`${route}/`))
+  );
+}
+
+function isBillingOwnedSurface(pathname: string | null | undefined) {
+  return (
+    isRoutePath(pathname, APP_ROUTES.BILLING) ||
+    isRoutePath(pathname, APP_ROUTES.SETTINGS_BILLING)
+  );
+}
+
+function getBillingStatusErrorToastSessionKey(
+  userId: string | null | undefined
+) {
+  return userId
+    ? `${BILLING_STATUS_ERROR_TOAST_SESSION_KEY}:${userId}`
+    : BILLING_STATUS_ERROR_TOAST_SESSION_KEY;
+}
+
+function hasNotifiedBillingErrorThisSession(storageKey: string) {
+  if (typeof window === 'undefined') return true;
+
+  try {
+    return window.sessionStorage.getItem(storageKey) === 'true';
+  } catch {
+    return false;
+  }
+}
+
+function markBillingErrorNotifiedThisSession(storageKey: string) {
+  if (typeof window === 'undefined') return;
+
+  try {
+    window.sessionStorage.setItem(storageKey, 'true');
+  } catch {
+    // Storage can be unavailable in private browsing or constrained test envs.
+  }
+}
+
 export function useUserButton({
   artist,
   profileHref,
@@ -51,10 +96,13 @@ export function useUserButton({
   const [isFeedbackOpen, setIsFeedbackOpen] = useState(false);
   const isPassiveRuntime = env.IS_E2E;
   const isDemoRoute = isDemoRoutePath(pathname);
+  const billingStatusErrorToastSessionKey =
+    getBillingStatusErrorToastSessionKey(user?.id);
+  const hasLoadedUser = isLoaded && Boolean(user?.id);
   const { data, isLoading, error } = useBillingStatusQuery({
-    enabled: !isPassiveRuntime && !isDemoRoute,
+    enabled: hasLoadedUser && !isPassiveRuntime && !isDemoRoute,
   });
-  const billingErrorNotifiedRef = useRef(false);
+  const shouldSurfaceBillingStatusError = isBillingOwnedSurface(pathname);
 
   // Normalize error to string without nested ternary
   const errorMessage = (() => {
@@ -87,18 +135,24 @@ export function useUserButton({
   };
 
   useEffect(() => {
-    if (billingStatus.error && !billingErrorNotifiedRef.current) {
+    if (
+      hasLoadedUser &&
+      billingStatus.error &&
+      shouldSurfaceBillingStatusError &&
+      !hasNotifiedBillingErrorThisSession(billingStatusErrorToastSessionKey)
+    ) {
       toast.error(
         "Couldn't confirm your plan. Billing actions may be unavailable.",
         { duration: 6000, id: 'billing-status-error' }
       );
-      billingErrorNotifiedRef.current = true;
+      markBillingErrorNotifiedThisSession(billingStatusErrorToastSessionKey);
     }
-
-    if (!billingStatus.error) {
-      billingErrorNotifiedRef.current = false;
-    }
-  }, [billingStatus.error]);
+  }, [
+    billingStatus.error,
+    billingStatusErrorToastSessionKey,
+    hasLoadedUser,
+    shouldSurfaceBillingStatusError,
+  ]);
 
   // User display info - upgrade OAuth avatar to high resolution
   const userImageUrl = useMemo(
@@ -145,6 +199,7 @@ export function useUserButton({
     profileUrl = APP_ROUTES.SETTINGS;
   }
   const settingsUrl = settingsHref ?? APP_ROUTES.SETTINGS;
+  const usageStatsUrl = APP_ROUTES.SETTINGS_USAGE;
 
   const jovieUsername =
     user?.username || artist?.handle || contactEmail?.split('@')[0] || null;
@@ -155,6 +210,7 @@ export function useUserButton({
     profileUrl,
     redirectToUrl,
     settingsUrl,
+    usageStatsUrl,
     signOut,
   });
 

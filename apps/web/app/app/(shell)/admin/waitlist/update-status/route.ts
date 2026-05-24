@@ -7,6 +7,11 @@ import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
 import { captureCriticalError } from '@/lib/error-tracking';
 import { parseJsonBody } from '@/lib/http/parse-json';
 import { withSystemIngestionSession } from '@/lib/ingestion/session';
+import { insertWaitlistAuditLog } from '@/lib/waitlist/audit';
+import {
+  canTransitionWaitlistStatus,
+  type WaitlistStatus,
+} from '@/lib/waitlist/state-machine';
 
 export const runtime = 'nodejs';
 
@@ -14,11 +19,19 @@ const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
 
 const updateStatusSchema = z.object({
   entryId: z.string().uuid(),
-  status: z.enum(['new', 'invited', 'claimed']),
+  status: z.enum([
+    'new',
+    'chat_started',
+    'qualified',
+    'waitlisted',
+    'rejected',
+  ]),
 });
 
 export async function POST(request: Request) {
-  let entitlements;
+  let entitlements:
+    | Awaited<ReturnType<typeof getCurrentUserEntitlements>>
+    | undefined;
   try {
     entitlements = await getCurrentUserEntitlements();
     if (!entitlements.isAuthenticated) {
@@ -34,6 +47,7 @@ export async function POST(request: Request) {
         { status: 403, headers: NO_STORE_HEADERS }
       );
     }
+    const adminUserId = entitlements.userId;
 
     const parsedBody = await parseJsonBody<unknown>(request, {
       route: `POST ${APP_ROUTES.ADMIN_WAITLIST}/update-status`,
@@ -70,14 +84,45 @@ export async function POST(request: Request) {
           return { outcome: 'not_found' as const };
         }
 
+        if (
+          !canTransitionWaitlistStatus(
+            entry.status as WaitlistStatus,
+            parsed.data.status
+          )
+        ) {
+          return {
+            outcome: 'invalid_transition' as const,
+            fromStatus: entry.status,
+            toStatus: parsed.data.status,
+          };
+        }
+
+        const statusTimestamps = {
+          ...(parsed.data.status === 'qualified' ? { qualifiedAt: now } : {}),
+          ...(parsed.data.status === 'waitlisted' ? { waitlistedAt: now } : {}),
+          ...(parsed.data.status === 'rejected' ? { rejectedAt: now } : {}),
+        };
+
         // Update waitlist entry status
         await tx
           .update(waitlistEntries)
           .set({
             status: parsed.data.status,
+            statusReason: 'admin_status_update',
+            adminActorId: adminUserId,
+            ...statusTimestamps,
             updatedAt: now,
           })
           .where(eq(waitlistEntries.id, entry.id));
+
+        await insertWaitlistAuditLog(tx, {
+          waitlistEntryId: entry.id,
+          fromStatus: entry.status,
+          toStatus: parsed.data.status,
+          actorUserId: adminUserId,
+          actorType: 'admin',
+          reason: 'admin_status_update',
+        });
 
         return {
           outcome: 'updated' as const,
@@ -91,6 +136,16 @@ export async function POST(request: Request) {
       return NextResponse.json(
         { success: false, error: 'Waitlist entry not found' },
         { status: 404, headers: NO_STORE_HEADERS }
+      );
+    }
+
+    if (result.outcome === 'invalid_transition') {
+      return NextResponse.json(
+        {
+          success: false,
+          error: `Invalid waitlist transition: ${result.fromStatus} -> ${result.toStatus}`,
+        },
+        { status: 409, headers: NO_STORE_HEADERS }
       );
     }
 

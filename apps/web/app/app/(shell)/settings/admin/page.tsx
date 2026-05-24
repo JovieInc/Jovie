@@ -1,23 +1,26 @@
-'use client';
-
-import { useRouter } from 'next/navigation';
-import { useEffect } from 'react';
-import { useDashboardData } from '@/app/app/(shell)/dashboard/DashboardDataContext';
+import { redirect } from 'next/navigation';
 import { APP_ROUTES } from '@/constants/routes';
 import { SettingsAdminSection } from '@/features/dashboard/organisms/SettingsAdminSection';
 import { SettingsSection } from '@/features/dashboard/organisms/SettingsSection';
+import { loadAppShellRouteContext } from '../../app-shell-route-context';
 
-export default function SettingsAdminPage() {
-  const { isAdmin } = useDashboardData();
-  const router = useRouter();
+export const runtime = 'nodejs';
 
-  useEffect(() => {
-    if (!isAdmin) {
-      router.replace(APP_ROUTES.SETTINGS_ARTIST_PROFILE);
-    }
-  }, [isAdmin, router]);
+export default async function SettingsAdminPage() {
+  const routeContext = await loadAppShellRouteContext({
+    route: APP_ROUTES.SETTINGS_ADMIN,
+    dashboardErrorLogMessage:
+      'Dashboard data load failed on settings admin page',
+    dashboardErrorMessage:
+      'Failed to load admin settings. Please refresh the page.',
+  });
+  if (!routeContext.ok) {
+    return routeContext.error;
+  }
 
-  if (!isAdmin) return null;
+  if (!routeContext.dashboardData.isAdmin) {
+    redirect(APP_ROUTES.SETTINGS_ARTIST_PROFILE);
+  }
 
   return (
     <SettingsSection

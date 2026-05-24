@@ -1,6 +1,7 @@
 import { ChevronLeft } from 'lucide-react';
 import Link from 'next/link';
 import type { ReactNode } from 'react';
+import { Mark } from '@/lib/brand/primitives';
 import { PROFILE_VIEW_REGISTRY, type ProfileViewKey } from './registry';
 
 export interface ProfileIntentPageProps {
@@ -39,11 +40,11 @@ export function ProfileIntentPage({
   const entry = PROFILE_VIEW_REGISTRY[mode];
 
   return (
-    <main className='mx-auto flex min-h-dvh w-full max-w-(--profile-shell-max-width) flex-col bg-[color:var(--profile-drawer-bg)] text-primary-token'>
-      <header className='relative flex items-center gap-2.5 px-5 pb-3 pt-5'>
+    <main className='mx-auto flex min-h-dvh w-full max-w-(--profile-shell-max-width) flex-col overflow-x-hidden bg-[color:var(--profile-drawer-bg)] text-primary-token'>
+      <header className='relative grid grid-cols-[44px_minmax(0,1fr)_44px] items-center gap-2.5 px-5 pb-3 pt-5'>
         <Link
           href={`/${artistHandle}`}
-          className='flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-white/[0.04] text-white/44 transition-colors duration-150 hover:bg-white/[0.08] hover:text-white/74 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--focus-ring))]'
+          className='flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-white/[0.04] text-white/44 transition-colors duration-subtle hover:bg-white/[0.08] hover:text-white/74 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--focus-ring))]'
           aria-label={`Back to ${artistName}`}
           data-testid='profile-intent-page-back'
         >
@@ -59,6 +60,13 @@ export function ProfileIntentPage({
             </p>
           ) : null}
         </div>
+        <Link
+          href={`/${artistHandle}`}
+          className='flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-white/[0.04] text-white/44 transition-colors duration-subtle hover:bg-white/[0.08] hover:text-white/74 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--focus-ring))]'
+          aria-label={`${artistName} profile`}
+        >
+          <Mark size={18} className='h-[18px] w-[18px]' />
+        </Link>
       </header>
       <div className='mx-5 h-px bg-white/[0.06]' />
       <section

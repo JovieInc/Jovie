@@ -43,8 +43,13 @@ import { cn } from '@/lib/utils';
 
 const EASE_CINEMATIC = 'cubic-bezier(0.32, 0.72, 0, 1)';
 const DURATION_CINEMATIC = 420;
+export const LIBRARY_DEMO_NOW_MS = new Date(
+  '2026-04-25T12:00:00.000Z'
+).getTime();
 
 // Carbon palette (locked theme — same tokens as shell-v1).
+// Text tokens are omitted here: they are already defined in the global
+// design-system.css and picked up automatically via the dark theme.
 const CARBON_VARS: React.CSSProperties = {
   ['--linear-bg-page' as string]: '#06070a',
   ['--linear-app-content-surface' as string]: '#0a0c0f',
@@ -53,10 +58,6 @@ const CARBON_VARS: React.CSSProperties = {
   ['--surface-0' as string]: '#0a0b0e',
   ['--surface-1' as string]: '#101216',
   ['--surface-2' as string]: '#161a20',
-  ['--text-primary' as string]: 'rgba(255,255,255,0.92)',
-  ['--text-secondary' as string]: 'rgba(255,255,255,0.66)',
-  ['--text-tertiary' as string]: 'rgba(255,255,255,0.46)',
-  ['--text-quaternary' as string]: 'rgba(255,255,255,0.32)',
 };
 
 export type AssetType =
@@ -105,11 +106,11 @@ export interface Asset {
 }
 
 const RELEASES = [
-  { id: 'this-noise', title: 'This Noise', color: '#22d3ee' },
-  { id: 'lost-frequency', title: 'Lost Frequency', color: '#a78bfa' },
-  { id: 'glass-empires', title: 'Glass Empires', color: '#fb923c' },
-  { id: 'echo-tape', title: 'Echo Tape', color: '#34d399' },
-  { id: 'lucid-hours', title: 'Lucid Hours', color: '#f472b6' },
+  { id: 'the-deep-end', title: 'The Deep End', color: '#22d3ee' },
+  { id: 'take-me-over', title: 'Take Me Over', color: '#a78bfa' },
+  { id: 'never-say-a-word', title: 'Never Say A Word', color: '#f472b6' },
+  { id: 'dont-look-down', title: "Don't Look Down", color: '#818cf8' },
+  { id: 'press-kit', title: 'Tim White Press Kit', color: '#34d399' },
 ];
 
 const TYPE_LABELS: Record<AssetType, string> = {
@@ -167,142 +168,203 @@ const TYPES: AssetType[] = [
   'master',
 ];
 
+const EDITORIAL_POSTERS = {
+  cover: [
+    '/img/releases/the-deep-end.jpg',
+    '/img/releases/take-me-over.jpg',
+    '/images/mock-profile/tim-white-dont-look-down-card.jpg',
+  ],
+  reel: [
+    '/images/mock-profile/tim-white-dont-look-down-hero.jpg',
+    '/images/mock-profile/tim-white-dont-look-down-card.jpg',
+    '/images/hero/tim-profile.avif',
+  ],
+  visualizer: [
+    '/img/releases/never-say-a-word.jpg',
+    '/images/mock-profile/tim-white-dont-look-down-card.jpg',
+    '/img/releases/the-deep-end.jpg',
+  ],
+  lyric_clip: [
+    '/images/mock-profile/tim-white-dont-look-down-hero.jpg',
+    '/images/mock-profile/tim-white-dont-look-down-card.jpg',
+    '/images/hero/tim-profile.avif',
+  ],
+  alt_crop: [
+    '/images/mock-profile/tim-white-dont-look-down-card.jpg',
+    '/img/releases/never-say-a-word.jpg',
+    '/img/releases/the-deep-end.jpg',
+  ],
+  remix_art: [
+    '/img/releases/take-me-over.jpg',
+    '/img/releases/never-say-a-word.jpg',
+    '/images/mock-profile/tim-white-dont-look-down-card.jpg',
+  ],
+  master: [
+    '/img/releases/the-deep-end.jpg',
+    '/img/releases/take-me-over.jpg',
+    '/images/mock-profile/tim-white-dont-look-down-hero.jpg',
+  ],
+} satisfies Record<AssetType, readonly string[]>;
+
+type AssetSeed = Partial<Asset> & Pick<Asset, 'title' | 'type' | 'release'>;
+
+function assetSeed({
+  alt,
+  poster,
+  release,
+  title,
+  type,
+}: Readonly<{
+  alt?: string;
+  poster: string;
+  release: string;
+  title: string;
+  type: AssetType;
+}>): AssetSeed {
+  return { alt, poster, release, title, type };
+}
+
+function releaseAssetSeeds({
+  displayTitle,
+  entries,
+  poster,
+  release,
+}: Readonly<{
+  displayTitle: string;
+  entries: readonly (readonly [AssetType, string, string?])[];
+  poster: string;
+  release: string;
+}>): AssetSeed[] {
+  return entries.map(([type, suffix, alt]) =>
+    assetSeed({
+      alt: alt ?? `${displayTitle} ${suffix}`,
+      poster,
+      release,
+      title: `${displayTitle} — ${suffix}`,
+      type,
+    })
+  );
+}
+
+const LIBRARY_ASSET_SEEDS: readonly AssetSeed[] = [
+  ...releaseAssetSeeds({
+    displayTitle: 'The Deep End',
+    entries: [
+      [
+        'cover',
+        'album art',
+        'Cosmic Gate and Tim White The Deep End album art',
+      ],
+      ['reel', 'vertical teaser 01'],
+      ['visualizer', 'visualizer frame'],
+      ['visualizer', 'smart link hero crop'],
+      ['remix_art', 'remix art prep'],
+    ],
+    poster: '/img/releases/the-deep-end.jpg',
+    release: 'the-deep-end',
+  }),
+  ...releaseAssetSeeds({
+    displayTitle: 'Take Me Over feat. Erica Gibson',
+    entries: [
+      [
+        'cover',
+        'album art',
+        'Tim White Take Me Over featuring Erica Gibson album art',
+      ],
+      ['alt_crop', 'square crop'],
+      ['lyric_clip', 'lyric clip'],
+      ['master', 'master'],
+      ['remix_art', 'remix art prep'],
+    ],
+    poster: '/img/releases/take-me-over.jpg',
+    release: 'take-me-over',
+  }),
+  ...releaseAssetSeeds({
+    displayTitle: 'Never Say A Word',
+    entries: [
+      ['cover', 'album art', 'Tim White Never Say A Word album art'],
+      ['reel', 'vertical teaser'],
+      ['lyric_clip', 'lyric clip 01'],
+      ['visualizer', 'visualizer'],
+      ['master', 'master'],
+    ],
+    poster: '/img/releases/never-say-a-word.jpg',
+    release: 'never-say-a-word',
+  }),
+  ...releaseAssetSeeds({
+    displayTitle: "Don't Look Down",
+    entries: [
+      ['cover', 'card artwork', "Tim White Don't Look Down card artwork"],
+      ['visualizer', 'visualizer'],
+      ['master', 'master'],
+    ],
+    poster: '/images/mock-profile/tim-white-dont-look-down-card.jpg',
+    release: 'dont-look-down',
+  }),
+  ...[
+    [
+      'dont-look-down',
+      "Don't Look Down — hero crop",
+      'alt_crop',
+      '/images/mock-profile/tim-white-dont-look-down-hero.jpg',
+      "Tim White Don't Look Down hero crop",
+    ],
+    [
+      'dont-look-down',
+      "Don't Look Down — reel teaser",
+      'reel',
+      '/images/mock-profile/tim-white-dont-look-down-hero.jpg',
+      "Tim White Don't Look Down reel teaser",
+    ],
+    [
+      'press-kit',
+      'Tim White press photo 01',
+      'alt_crop',
+      '/images/avatars/tim-white-founder.jpg',
+      'Tim White press photo 01',
+    ],
+    [
+      'press-kit',
+      'Tim White press photo 02',
+      'alt_crop',
+      '/images/hero/tim-profile.avif',
+      'Tim White press photo 02',
+    ],
+    [
+      'press-kit',
+      'Tim White press photo 03',
+      'alt_crop',
+      '/images/avatars/tim-white.jpg',
+      'Tim White press photo 03',
+    ],
+    [
+      'press-kit',
+      'Tim White press photo 03 — square crop',
+      'cover',
+      '/images/avatars/tim-white.jpg',
+      'Tim White press photo 03 square crop',
+    ],
+    [
+      'press-kit',
+      'Tim White press photo 02 — reel crop',
+      'reel',
+      '/images/hero/tim-profile.avif',
+      'Tim White press photo 02 vertical crop',
+    ],
+  ].map(([release, title, type, poster, alt]) =>
+    assetSeed({
+      alt,
+      poster,
+      release,
+      title,
+      type: type as AssetType,
+    })
+  ),
+] as const;
+
 // Deterministic mock data — repeatable visuals across reloads.
 export function generateAssets(): Asset[] {
-  const seeds: Array<
-    Partial<Asset> & Pick<Asset, 'title' | 'type' | 'release'>
-  > = [
-    {
-      title: 'This Noise — cover (final)',
-      type: 'cover',
-      release: 'this-noise',
-    },
-    {
-      title: 'This Noise — vertical teaser 01',
-      type: 'reel',
-      release: 'this-noise',
-    },
-    {
-      title: 'This Noise — vertical teaser 02',
-      type: 'reel',
-      release: 'this-noise',
-    },
-    {
-      title: 'This Noise — visualizer A',
-      type: 'visualizer',
-      release: 'this-noise',
-    },
-    {
-      title: 'This Noise — visualizer B',
-      type: 'visualizer',
-      release: 'this-noise',
-    },
-    {
-      title: 'This Noise — chorus lyric clip',
-      type: 'lyric_clip',
-      release: 'this-noise',
-    },
-    {
-      title: 'This Noise — square crop alt',
-      type: 'alt_crop',
-      release: 'this-noise',
-    },
-    {
-      title: 'This Noise — remix art (Carbon)',
-      type: 'remix_art',
-      release: 'this-noise',
-    },
-    {
-      title: 'Lost Frequency — cover',
-      type: 'cover',
-      release: 'lost-frequency',
-    },
-    {
-      title: 'Lost Frequency — reel cut 01',
-      type: 'reel',
-      release: 'lost-frequency',
-    },
-    {
-      title: 'Lost Frequency — reel cut 02',
-      type: 'reel',
-      release: 'lost-frequency',
-    },
-    {
-      title: 'Lost Frequency — visualizer A',
-      type: 'visualizer',
-      release: 'lost-frequency',
-    },
-    {
-      title: 'Lost Frequency — alt crop wide',
-      type: 'alt_crop',
-      release: 'lost-frequency',
-    },
-    {
-      title: 'Lost Frequency — master',
-      type: 'master',
-      release: 'lost-frequency',
-    },
-    { title: 'Glass Empires — cover', type: 'cover', release: 'glass-empires' },
-    {
-      title: 'Glass Empires — vertical promo',
-      type: 'reel',
-      release: 'glass-empires',
-    },
-    {
-      title: 'Glass Empires — visualizer',
-      type: 'visualizer',
-      release: 'glass-empires',
-    },
-    {
-      title: 'Glass Empires — lyric clip 01',
-      type: 'lyric_clip',
-      release: 'glass-empires',
-    },
-    {
-      title: 'Glass Empires — lyric clip 02',
-      type: 'lyric_clip',
-      release: 'glass-empires',
-    },
-    {
-      title: 'Glass Empires — remix art',
-      type: 'remix_art',
-      release: 'glass-empires',
-    },
-    { title: 'Echo Tape — cover', type: 'cover', release: 'echo-tape' },
-    { title: 'Echo Tape — reel teaser', type: 'reel', release: 'echo-tape' },
-    {
-      title: 'Echo Tape — visualizer A',
-      type: 'visualizer',
-      release: 'echo-tape',
-    },
-    {
-      title: 'Echo Tape — visualizer B',
-      type: 'visualizer',
-      release: 'echo-tape',
-    },
-    {
-      title: 'Echo Tape — alt crop portrait',
-      type: 'alt_crop',
-      release: 'echo-tape',
-    },
-    { title: 'Lucid Hours — cover', type: 'cover', release: 'lucid-hours' },
-    {
-      title: 'Lucid Hours — reel cut 01',
-      type: 'reel',
-      release: 'lucid-hours',
-    },
-    {
-      title: 'Lucid Hours — reel cut 02',
-      type: 'reel',
-      release: 'lucid-hours',
-    },
-    {
-      title: 'Lucid Hours — visualizer',
-      type: 'visualizer',
-      release: 'lucid-hours',
-    },
-    { title: 'Lucid Hours — master', type: 'master', release: 'lucid-hours' },
-  ];
+  const seeds = LIBRARY_ASSET_SEEDS;
 
   const aspectByType: Record<AssetType, Aspect> = {
     cover: '1:1',
@@ -352,13 +414,15 @@ export function generateAssets(): Asset[] {
     const status = statusCycle[i % statusCycle.length];
     const generatedBy = generatedCycle[i % generatedCycle.length];
     const dayOffset = (i * 1.7) % 14;
-    const captured = new Date(Date.now() - dayOffset * 86400000).toISOString();
-    const added = new Date(
-      Date.now() - Math.max(0, dayOffset - 1) * 86400000
+    const captured = new Date(
+      LIBRARY_DEMO_NOW_MS - dayOffset * 86400000
     ).toISOString();
-    const releaseColor =
-      RELEASES.find(r => r.id === seed.release)?.color ?? '#22d3ee';
-    const poster = posterFor(seed.type, releaseColor, i);
+    const added = new Date(
+      LIBRARY_DEMO_NOW_MS - Math.max(0, dayOffset - 1) * 86400000
+    ).toISOString();
+    const releaseTitle =
+      RELEASES.find(r => r.id === seed.release)?.title ?? seed.release;
+    const poster = seed.poster ?? posterFor(seed.type, i);
     return {
       id: `asset-${String(i + 1).padStart(2, '0')}`,
       title: seed.title,
@@ -388,32 +452,19 @@ export function generateAssets(): Asset[] {
       favorite: i % 5 === 0,
       versionCount: 1 + (i % 4),
       popularity: 100 - i * 3,
-      alt: `${TYPE_LABELS[seed.type]} for ${RELEASES.find(r => r.id === seed.release)?.title}`,
+      alt: seed.alt ?? `${TYPE_LABELS[seed.type]} for ${releaseTitle}`,
       tags: tagsFor(seed.type, seed.release),
       promptSeed:
         generatedBy === 'jovie'
-          ? `${TYPE_LABELS[seed.type].toLowerCase()} for ${RELEASES.find(r => r.id === seed.release)?.title}, carbon palette, electric cyan accent, restrained motion`
+          ? `${TYPE_LABELS[seed.type].toLowerCase()} for ${releaseTitle}, carbon palette, electric cyan accent, restrained motion`
           : undefined,
     };
   });
 }
 
-function posterFor(type: AssetType, releaseColor: string, i: number): string {
-  // Inline SVG data URI — deterministic, no network. Tinted with release color.
-  const seed = (i * 53 + 17) % 360;
-  const hue1 = seed;
-  const hue2 = (seed + 80) % 360;
-  const grain =
-    type === 'cover' || type === 'master' || type === 'remix_art'
-      ? 'circle'
-      : 'lines';
-  // eslint-disable-next-line @jovie/icon-usage -- inline SVG poster string, not a UI icon
-  const svg = `<?xml version='1.0'?><svg xmlns='http://www.w3.org/2000/svg' width='800' height='800' viewBox='0 0 800 800'><defs><linearGradient id='g' x1='0' y1='0' x2='1' y2='1'><stop offset='0' stop-color='hsl(${hue1}, 50%, 18%)'/><stop offset='1' stop-color='hsl(${hue2}, 60%, 8%)'/></linearGradient><radialGradient id='r' cx='0.7' cy='0.3' r='0.8'><stop offset='0' stop-color='${releaseColor}' stop-opacity='0.55'/><stop offset='1' stop-color='${releaseColor}' stop-opacity='0'/></radialGradient></defs><rect width='800' height='800' fill='url(%23g)'/><rect width='800' height='800' fill='url(%23r)'/>${
-    grain === 'circle'
-      ? `<circle cx='${200 + ((i * 17) % 400)}' cy='${200 + ((i * 23) % 400)}' r='${120 + ((i * 7) % 80)}' fill='${releaseColor}' fill-opacity='0.18'/>`
-      : `<g stroke='${releaseColor}' stroke-opacity='0.22' stroke-width='1.5'><line x1='0' y1='${200 + i * 6}' x2='800' y2='${260 + i * 4}'/><line x1='0' y1='${360 + i * 5}' x2='800' y2='${420 + i * 3}'/><line x1='0' y1='${520 + i * 4}' x2='800' y2='${560 + i * 2}'/></g>`
-  }</svg>`;
-  return `data:image/svg+xml;utf8,${svg.replace(/#/g, '%23').replace(/"/g, "'")}`;
+function posterFor(type: AssetType, i: number): string {
+  const posters = EDITORIAL_POSTERS[type];
+  return posters[i % posters.length] ?? posters[0];
 }
 
 function tagsFor(type: AssetType, release: string): string[] {
@@ -434,7 +485,7 @@ export type SavedViewId =
   | 'approved'
   | 'reels'
   | 'review'
-  | 'this-noise'
+  | 'deep-end'
   | 'this-week';
 
 interface SavedView {
@@ -461,15 +512,16 @@ const SAVED_VIEWS: SavedView[] = [
     predicate: a => a.status === 'review',
   },
   {
-    id: 'this-noise',
-    label: 'This Noise',
-    predicate: a => a.release === 'this-noise',
+    id: 'deep-end',
+    label: 'The Deep End',
+    predicate: a => a.release === 'the-deep-end',
   },
   {
     id: 'this-week',
     label: 'Generated this week',
     predicate: a => {
-      const days = (Date.now() - new Date(a.addedAt).getTime()) / 86400000;
+      const days =
+        (LIBRARY_DEMO_NOW_MS - new Date(a.addedAt).getTime()) / 86400000;
       return days <= 7 && a.generatedBy === 'jovie';
     },
   },
@@ -482,6 +534,40 @@ export interface Filters {
   statuses: Set<Status>;
   channels: Set<Channel>;
   generatedBy: Set<GeneratedBy>;
+}
+
+function filterSetAllows<T>(selected: ReadonlySet<T>, value: T): boolean {
+  return selected.size === 0 || selected.has(value);
+}
+
+function assetMatchesFilters(asset: Asset, filters: Filters): boolean {
+  const matchesChannel =
+    filters.channels.size === 0 ||
+    asset.channels.some(channel => filters.channels.has(channel));
+
+  return (
+    filterSetAllows(filters.types, asset.type) &&
+    filterSetAllows(filters.aspects, asset.aspect) &&
+    filterSetAllows(filters.releases, asset.release) &&
+    filterSetAllows(filters.statuses, asset.status) &&
+    filterSetAllows(filters.generatedBy, asset.generatedBy) &&
+    matchesChannel
+  );
+}
+
+function assetMatchesSearch(asset: Asset, query: string): boolean {
+  if (!query) return true;
+  const haystack = `${asset.title} ${asset.tags.join(' ')} ${asset.alt}`;
+  return haystack.toLowerCase().includes(query);
+}
+
+function compareAssetsBy(sort: SortKey) {
+  return (a: Asset, b: Asset) => {
+    if (sort === 'addedAt') return b.addedAt.localeCompare(a.addedAt);
+    if (sort === 'capturedAt') return b.capturedAt.localeCompare(a.capturedAt);
+    if (sort === 'status') return a.status.localeCompare(b.status);
+    return b.popularity - a.popularity;
+  };
 }
 
 export function emptyFilters(): Filters {
@@ -508,7 +594,7 @@ function hasFilters(f: Filters): boolean {
 }
 
 function relativeTime(iso: string): string {
-  const ms = Date.now() - new Date(iso).getTime();
+  const ms = LIBRARY_DEMO_NOW_MS - new Date(iso).getTime();
   const days = Math.floor(ms / 86400000);
   if (days === 0) return 'today';
   if (days === 1) return 'yesterday';
@@ -549,33 +635,9 @@ export default function LibraryV1Page() {
     const q = search.trim().toLowerCase();
     return allAssets
       .filter(savedPredicate)
-      .filter(a => {
-        if (filters.types.size && !filters.types.has(a.type)) return false;
-        if (filters.aspects.size && !filters.aspects.has(a.aspect))
-          return false;
-        if (filters.releases.size && !filters.releases.has(a.release))
-          return false;
-        if (filters.statuses.size && !filters.statuses.has(a.status))
-          return false;
-        if (filters.channels.size) {
-          const hit = a.channels.some(c => filters.channels.has(c));
-          if (!hit) return false;
-        }
-        if (filters.generatedBy.size && !filters.generatedBy.has(a.generatedBy))
-          return false;
-        if (q) {
-          const hay = `${a.title} ${a.tags.join(' ')} ${a.alt}`.toLowerCase();
-          if (!hay.includes(q)) return false;
-        }
-        return true;
-      })
-      .sort((a, b) => {
-        if (sort === 'addedAt') return b.addedAt.localeCompare(a.addedAt);
-        if (sort === 'capturedAt')
-          return b.capturedAt.localeCompare(a.capturedAt);
-        if (sort === 'status') return a.status.localeCompare(b.status);
-        return b.popularity - a.popularity;
-      });
+      .filter(asset => assetMatchesFilters(asset, filters))
+      .filter(asset => assetMatchesSearch(asset, q))
+      .sort(compareAssetsBy(sort));
   }, [allAssets, savedView, filters, search, sort]);
 
   const selected = filteredAssets.find(a => a.id === selectedId) ?? null;
@@ -774,7 +836,7 @@ export function LeftRail({
                 type='button'
                 onClick={() => onSavedView(v.id)}
                 className={cn(
-                  'flex items-center gap-2 h-7 px-2 rounded-md text-[12.5px] transition-colors duration-150 ease-out',
+                  'flex items-center gap-2 h-7 px-2 rounded-md text-[12.5px] transition-colors duration-subtle ease-out',
                   active
                     ? 'bg-surface-1/80 text-primary-token'
                     : 'text-secondary-token hover:bg-surface-1/50 hover:text-primary-token'
@@ -797,7 +859,7 @@ export function LeftRail({
             <button
               type='button'
               onClick={onClearAll}
-              className='text-[10.5px] uppercase tracking-[0.06em] text-tertiary-token hover:text-primary-token transition-colors duration-150 ease-out'
+              className='text-[10.5px] uppercase tracking-[0.06em] text-tertiary-token hover:text-primary-token transition-colors duration-subtle ease-out'
             >
               Clear
             </button>
@@ -973,11 +1035,11 @@ function FacetGroup({
       <button
         type='button'
         onClick={() => setOpen(v => !v)}
-        className='w-full flex items-center gap-1 px-2 py-1 text-[10.5px] uppercase tracking-[0.06em] text-tertiary-token hover:text-primary-token transition-colors duration-150 ease-out'
+        className='w-full flex items-center gap-1 px-2 py-1 text-[10.5px] uppercase tracking-[0.06em] text-tertiary-token hover:text-primary-token transition-colors duration-subtle ease-out'
       >
         <ChevronRight
           className={cn(
-            'h-3 w-3 transition-transform duration-150 ease-out',
+            'h-3 w-3 transition-transform duration-subtle ease-out',
             open && 'rotate-90'
           )}
         />
@@ -1010,7 +1072,7 @@ function FacetRow({
       type='button'
       onClick={onClick}
       className={cn(
-        'flex items-center gap-2 h-6 pl-3 pr-2 rounded-md text-[12px] transition-colors duration-150 ease-out',
+        'flex items-center gap-2 h-6 pl-3 pr-2 rounded-md text-[12px] transition-colors duration-subtle ease-out',
         active
           ? 'bg-surface-1/80 text-primary-token'
           : 'text-secondary-token hover:bg-surface-1/50 hover:text-primary-token'
@@ -1108,7 +1170,7 @@ function SearchInput({
   return (
     <div
       className={cn(
-        'flex items-center gap-2 h-8 px-2.5 rounded-md border transition-colors duration-150 ease-out',
+        'flex items-center gap-2 h-8 px-2.5 rounded-md border transition-colors duration-subtle ease-out',
         focused
           ? 'border-cyan-400/40 bg-(--surface-1)/70'
           : 'border-(--linear-app-shell-border) bg-(--surface-0) hover:border-white/10'
@@ -1136,7 +1198,7 @@ function SearchInput({
         <button
           type='button'
           onClick={() => onChange('')}
-          className='shrink-0 inline-flex items-center h-5 px-1.5 rounded text-[10px] font-caption uppercase tracking-[0.06em] text-tertiary-token hover:text-primary-token bg-(--surface-2)/60 border border-(--linear-app-shell-border) transition-colors duration-150 ease-out'
+          className='shrink-0 inline-flex items-center h-5 px-1.5 rounded text-[10px] font-caption uppercase tracking-[0.06em] text-tertiary-token hover:text-primary-token bg-(--surface-2)/60 border border-(--linear-app-shell-border) transition-colors duration-subtle ease-out'
           aria-label='Clear search'
         >
           Clear
@@ -1172,7 +1234,7 @@ export function SortDropdown({
       trigger={
         <button
           type='button'
-          className='inline-flex items-center gap-1.5 h-7 px-2.5 rounded-md text-[12px] text-secondary-token hover:text-primary-token border border-(--linear-app-shell-border) bg-(--surface-0) hover:bg-surface-1/60 transition-colors duration-150 ease-out data-[state=open]:text-primary-token'
+          className='inline-flex items-center gap-1.5 h-7 px-2.5 rounded-md text-[12px] text-secondary-token hover:text-primary-token border border-(--linear-app-shell-border) bg-(--surface-0) hover:bg-surface-1/60 transition-colors duration-subtle ease-out data-[state=open]:text-primary-token'
         >
           <ArrowUpDown className='h-3 w-3' strokeWidth={2.25} />
           <span>{labels[sort]}</span>
@@ -1206,7 +1268,7 @@ export function ViewToggle({
         type='button'
         onClick={() => onView('grid')}
         className={cn(
-          'h-6 w-7 rounded-[5px] grid place-items-center transition-colors duration-150 ease-out',
+          'h-6 w-7 rounded-[5px] grid place-items-center transition-colors duration-subtle ease-out',
           view === 'grid'
             ? 'bg-surface-2/80 text-primary-token'
             : 'text-quaternary-token hover:text-primary-token'
@@ -1219,7 +1281,7 @@ export function ViewToggle({
         type='button'
         onClick={() => onView('table')}
         className={cn(
-          'h-6 w-7 rounded-[5px] grid place-items-center transition-colors duration-150 ease-out',
+          'h-6 w-7 rounded-[5px] grid place-items-center transition-colors duration-subtle ease-out',
           view === 'table'
             ? 'bg-surface-2/80 text-primary-token'
             : 'text-quaternary-token hover:text-primary-token'
@@ -1236,7 +1298,7 @@ function GenerateButton() {
   return (
     <button
       type='button'
-      className='inline-flex items-center gap-1.5 h-7 px-3 rounded-md text-[12px] font-medium bg-cyan-300 text-black hover:bg-cyan-200 transition-colors duration-150 ease-out'
+      className='inline-flex items-center gap-1.5 h-7 px-3 rounded-md text-[12px] font-medium bg-cyan-300 text-black hover:bg-cyan-200 transition-colors duration-subtle ease-out'
     >
       <Sparkles className='h-3.5 w-3.5' strokeWidth={2.25} />
       <span>Generate</span>
@@ -1295,11 +1357,9 @@ function AssetCard({
   const release = RELEASES.find(r => r.id === asset.release);
   const TypeIcon = TYPE_ICONS[asset.type];
   return (
-    <button
-      type='button'
-      onClick={onSelect}
+    <div
       className={cn(
-        'group relative flex flex-col text-left rounded-[10px] border bg-(--linear-app-content-surface) overflow-hidden transition-colors duration-150 ease-out',
+        'group relative flex flex-col overflow-hidden rounded-[10px] border bg-(--linear-app-content-surface) text-left transition-colors duration-subtle ease-out focus-within:ring-1 focus-within:ring-cyan-400/40',
         selected
           ? 'border-cyan-400/50'
           : 'border-(--linear-app-shell-border) hover:border-white/15'
@@ -1311,44 +1371,50 @@ function AssetCard({
           className='pointer-events-none absolute inset-0 rounded-[10px]'
           style={{
             boxShadow:
-              'inset 2px 0 0 0 #67e8f9, inset 0 0 0 1px rgba(103,232,249,0.08)',
+              'inset 2px 0 0 0 rgb(103 232 249), inset 0 0 0 1px rgb(103 232 249 / 0.08)',
           }}
         />
       )}
-      <Poster asset={asset} />
-      <div className='flex flex-col gap-1 px-2.5 pt-2 pb-2.5 min-w-0'>
-        <div className='flex items-center gap-1.5 min-w-0'>
-          <span
-            className={cn(
-              'h-1.5 w-1.5 rounded-full shrink-0',
-              STATUS_DOT[asset.status]
-            )}
-          />
-          <p
-            className='text-[12.5px] font-medium text-primary-token truncate'
-            style={{ letterSpacing: '-0.005em' }}
-          >
-            {asset.title}
-          </p>
-        </div>
-        <div className='flex items-center gap-1.5 text-[10.5px] text-quaternary-token'>
-          <TypeIcon className='h-3 w-3' strokeWidth={2.25} />
-          <span>{TYPE_LABELS[asset.type]}</span>
-          <span className='opacity-50'>·</span>
-          <span className='font-mono tracking-wide'>{asset.aspect}</span>
-          <span className='opacity-50'>·</span>
-          <span
-            className='inline-flex items-center gap-1 truncate'
-            style={{ color: 'rgba(255,255,255,0.46)' }}
-          >
+      <button
+        type='button'
+        onClick={onSelect}
+        className='flex w-full cursor-pointer flex-col text-left outline-none'
+      >
+        <Poster asset={asset} />
+        <div className='flex flex-col gap-1 px-2.5 pt-2 pb-2.5 min-w-0'>
+          <div className='flex items-center gap-1.5 min-w-0'>
             <span
-              className='h-1.5 w-1.5 rounded-full shrink-0'
-              style={{ background: release?.color }}
+              className={cn(
+                'h-1.5 w-1.5 rounded-full shrink-0',
+                STATUS_DOT[asset.status]
+              )}
             />
-            <span className='truncate'>{release?.title}</span>
-          </span>
+            <p
+              className='text-[12.5px] font-medium text-primary-token truncate'
+              style={{ letterSpacing: '-0.005em' }}
+            >
+              {asset.title}
+            </p>
+          </div>
+          <div className='flex items-center gap-1.5 text-[10.5px] text-quaternary-token'>
+            <TypeIcon className='h-3 w-3' strokeWidth={2.25} />
+            <span>{TYPE_LABELS[asset.type]}</span>
+            <span className='opacity-50'>·</span>
+            <span className='font-mono tracking-wide'>{asset.aspect}</span>
+            <span className='opacity-50'>·</span>
+            <span className='inline-flex items-center gap-1 truncate text-tertiary-token'>
+              <span
+                className='h-1.5 w-1.5 rounded-full shrink-0'
+                style={{ background: release?.color }}
+              />
+              <span className='truncate'>{release?.title}</span>
+            </span>
+          </div>
         </div>
-      </div>
+        <span className='absolute top-2 left-2 inline-flex items-center h-5 px-1.5 rounded text-[10px] font-caption uppercase tracking-[0.06em] text-primary-token bg-black/55 backdrop-blur opacity-0 group-hover:opacity-100 transition-opacity duration-subtle ease-out'>
+          Inspect
+        </span>
+      </button>
       <button
         type='button'
         onClick={e => {
@@ -1356,7 +1422,7 @@ function AssetCard({
           onToggleFavorite();
         }}
         className={cn(
-          'absolute top-2 right-2 h-6 w-6 rounded-md grid place-items-center transition-colors duration-150 ease-out',
+          'absolute top-2 right-2 h-6 w-6 rounded-md grid place-items-center transition-colors duration-subtle ease-out',
           favorite
             ? 'text-amber-300 bg-black/50 backdrop-blur'
             : 'text-quaternary-token bg-black/40 backdrop-blur opacity-0 group-hover:opacity-100 hover:text-amber-300'
@@ -1369,10 +1435,7 @@ function AssetCard({
           fill={favorite ? 'currentColor' : 'none'}
         />
       </button>
-      <span className='absolute top-2 left-2 inline-flex items-center h-5 px-1.5 rounded text-[10px] font-caption uppercase tracking-[0.06em] text-primary-token bg-black/55 backdrop-blur opacity-0 group-hover:opacity-100 transition-opacity duration-150 ease-out'>
-        Inspect
-      </span>
-    </button>
+    </div>
   );
 }
 
@@ -1455,7 +1518,7 @@ export function Table({
                 }
               }}
               className={cn(
-                'group relative grid items-center px-2 py-1 text-[12.5px] text-secondary-token text-left transition-colors duration-150 ease-out cursor-pointer outline-none focus-visible:ring-1 focus-visible:ring-cyan-400/40',
+                'group relative grid items-center px-2 py-1 text-[12.5px] text-secondary-token text-left transition-colors duration-subtle ease-out cursor-pointer outline-none focus-visible:ring-1 focus-visible:ring-cyan-400/40',
                 selected
                   ? 'bg-cyan-400/[0.08] text-primary-token'
                   : 'hover:bg-surface-1/40 hover:text-primary-token'
@@ -1469,7 +1532,7 @@ export function Table({
                 <span
                   aria-hidden
                   className='pointer-events-none absolute inset-0'
-                  style={{ boxShadow: 'inset 2px 0 0 0 #67e8f9' }}
+                  style={{ boxShadow: 'inset 2px 0 0 0 rgb(103 232 249)' }}
                 />
               )}
               <button
@@ -1479,7 +1542,7 @@ export function Table({
                   onToggleFavorite(a.id);
                 }}
                 className={cn(
-                  'inline-grid place-items-center h-6 w-6 rounded-md transition-colors duration-150 ease-out',
+                  'inline-grid place-items-center h-6 w-6 rounded-md transition-colors duration-subtle ease-out',
                   fav
                     ? 'text-amber-300'
                     : 'text-quaternary-token hover:text-amber-300'
@@ -1529,7 +1592,7 @@ export function Table({
               <span className='text-right text-tertiary-token tabular-nums'>
                 {relativeTime(a.addedAt)}
               </span>
-              <span className='inline-grid place-items-center text-quaternary-token opacity-0 group-hover:opacity-100 transition-opacity duration-150 ease-out'>
+              <span className='inline-grid place-items-center text-quaternary-token opacity-0 group-hover:opacity-100 transition-opacity duration-subtle ease-out'>
                 <MoreHorizontal className='h-3.5 w-3.5' strokeWidth={2.25} />
               </span>
             </div>
@@ -1589,7 +1652,7 @@ export function Drawer({
                 type='button'
                 onClick={() => onToggleFavorite(asset.id)}
                 className={cn(
-                  'h-6 w-6 rounded-md grid place-items-center transition-colors duration-150 ease-out',
+                  'h-6 w-6 rounded-md grid place-items-center transition-colors duration-subtle ease-out',
                   favorites.has(asset.id)
                     ? 'text-amber-300'
                     : 'text-quaternary-token hover:text-amber-300'
@@ -1605,7 +1668,7 @@ export function Drawer({
               <button
                 type='button'
                 onClick={onClose}
-                className='h-6 w-6 rounded-md grid place-items-center text-quaternary-token hover:text-primary-token hover:bg-surface-1/60 transition-colors duration-150 ease-out'
+                className='h-6 w-6 rounded-md grid place-items-center text-quaternary-token hover:text-primary-token hover:bg-surface-1/60 transition-colors duration-subtle ease-out'
                 aria-label='Close'
               >
                 <X className='h-3.5 w-3.5' strokeWidth={2.25} />
@@ -1644,7 +1707,7 @@ export function Drawer({
                   <button
                     type='button'
                     onClick={() => setEditing(false)}
-                    className='h-7 px-3 rounded-md text-[12px] bg-cyan-300 text-black hover:bg-cyan-200 transition-colors duration-150 ease-out'
+                    className='h-7 px-3 rounded-md text-[12px] bg-cyan-300 text-black hover:bg-cyan-200 transition-colors duration-subtle ease-out'
                   >
                     Save
                   </button>
@@ -1656,7 +1719,7 @@ export function Drawer({
                       setDraftTags(asset.tags.join(', '));
                       setEditing(false);
                     }}
-                    className='h-7 px-3 rounded-md text-[12px] text-secondary-token hover:text-primary-token border border-(--linear-app-shell-border) bg-(--surface-0) hover:bg-surface-1/60 transition-colors duration-150 ease-out'
+                    className='h-7 px-3 rounded-md text-[12px] text-secondary-token hover:text-primary-token border border-(--linear-app-shell-border) bg-(--surface-0) hover:bg-surface-1/60 transition-colors duration-subtle ease-out'
                   >
                     Cancel
                   </button>
@@ -1680,7 +1743,7 @@ export function Drawer({
                     {asset.alt}
                   </p>
                 </div>
-                <span className='text-[10.5px] uppercase tracking-[0.06em] text-quaternary-token opacity-0 group-hover/title:opacity-100 transition-opacity duration-150 ease-out'>
+                <span className='text-[10.5px] uppercase tracking-[0.06em] text-quaternary-token opacity-0 group-hover/title:opacity-100 transition-opacity duration-subtle ease-out'>
                   Edit
                 </span>
               </button>
@@ -1833,7 +1896,7 @@ function ReleaseMoment({ asset }: { asset: Asset }) {
       </div>
       <button
         type='button'
-        className='text-[10.5px] uppercase tracking-[0.06em] text-tertiary-token hover:text-primary-token transition-colors duration-150 ease-out'
+        className='text-[10.5px] uppercase tracking-[0.06em] text-tertiary-token hover:text-primary-token transition-colors duration-subtle ease-out'
       >
         Open
       </button>
@@ -1853,7 +1916,7 @@ function VersionStack({ asset }: { asset: Asset }) {
         <div
           key={v.n}
           className={cn(
-            'flex items-center gap-2 px-2 py-1.5 rounded-md border transition-colors duration-150 ease-out',
+            'flex items-center gap-2 px-2 py-1.5 rounded-md border transition-colors duration-subtle ease-out',
             v.current
               ? 'border-cyan-400/30 bg-cyan-400/[0.06]'
               : 'border-(--linear-app-shell-border) bg-(--surface-0) hover:bg-surface-1/40'
@@ -1879,7 +1942,7 @@ function VersionStack({ asset }: { asset: Asset }) {
             ) : (
               <button
                 type='button'
-                className='text-[10.5px] uppercase tracking-[0.06em] text-tertiary-token hover:text-primary-token transition-colors duration-150 ease-out'
+                className='text-[10.5px] uppercase tracking-[0.06em] text-tertiary-token hover:text-primary-token transition-colors duration-subtle ease-out'
               >
                 Make current
               </button>
@@ -1924,7 +1987,7 @@ function DownloadButton({
     <button
       type='button'
       className={cn(
-        'flex flex-col items-start gap-0.5 h-12 px-2.5 rounded-md transition-colors duration-150 ease-out text-left',
+        'flex flex-col items-start gap-0.5 h-12 px-2.5 rounded-md transition-colors duration-subtle ease-out text-left',
         primary
           ? 'bg-cyan-300 text-black hover:bg-cyan-200'
           : 'border border-(--linear-app-shell-border) bg-(--surface-0) text-secondary-token hover:bg-surface-1/60 hover:text-primary-token'
@@ -1953,7 +2016,7 @@ function SecondaryAction({
   return (
     <button
       type='button'
-      className='flex-1 inline-flex items-center justify-center gap-1.5 h-7 rounded-md text-[11.5px] text-secondary-token border border-(--linear-app-shell-border) bg-(--surface-0) hover:bg-surface-1/60 hover:text-primary-token transition-colors duration-150 ease-out'
+      className='flex-1 inline-flex items-center justify-center gap-1.5 h-7 rounded-md text-[11.5px] text-secondary-token border border-(--linear-app-shell-border) bg-(--surface-0) hover:bg-surface-1/60 hover:text-primary-token transition-colors duration-subtle ease-out'
     >
       <Icon className='h-3 w-3' strokeWidth={2.25} />
       {label}
@@ -2016,7 +2079,7 @@ export function EmptyState({ onClear }: { onClear: () => void }) {
           <button
             type='button'
             onClick={onClear}
-            className='inline-flex items-center h-7 px-3 rounded-md text-[12px] text-primary-token bg-(--surface-1) border border-(--linear-app-shell-border) hover:bg-surface-2/80 transition-colors duration-150 ease-out'
+            className='inline-flex items-center h-7 px-3 rounded-md text-[12px] text-primary-token bg-(--surface-1) border border-(--linear-app-shell-border) hover:bg-surface-2/80 transition-colors duration-subtle ease-out'
           >
             Clear all filters
           </button>

@@ -767,9 +767,9 @@ describe('TEST_FAILURE_TRIAGE resolver', () => {
     expect(shipSkill).toContain('collaborative');
   });
 
-  test('solo mode offers fix-now, TODO, and skip options', () => {
+  test('solo mode offers fix-now, Linear follow-up, and skip options', () => {
     expect(shipSkill).toContain('Investigate and fix now');
-    expect(shipSkill).toContain('Add as P0 TODO');
+    expect(shipSkill).toContain('Create required Linear follow-up');
     expect(shipSkill).toContain('Skip');
   });
 
@@ -838,7 +838,7 @@ describe('PLAN_COMPLETION_AUDIT placeholders', () => {
   test('ship mode has gate logic for NOT DONE items', () => {
     expect(shipSkill).toContain('NOT DONE');
     expect(shipSkill).toContain('Stop — implement the missing items');
-    expect(shipSkill).toContain('Ship anyway — defer');
+    expect(shipSkill).toContain('Ship anyway — create required Linear follow-up issues');
     expect(shipSkill).toContain('intentionally dropped');
   });
 
@@ -2032,6 +2032,7 @@ describe('setup script validation', () => {
     expect(fnBody).toContain('design-checklist.md');
     expect(fnBody).toContain('greptile-triage.md');
     expect(fnBody).toContain('TODOS-format.md');
+    expect(fnBody).toContain('LINEAR-followups.md');
     expect(fnBody).not.toContain('ln -snf "$gstack_dir" "$codex_gstack"');
   });
 

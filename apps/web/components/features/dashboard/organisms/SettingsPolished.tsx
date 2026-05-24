@@ -26,6 +26,7 @@ import { SettingsPaymentsSection } from '@/features/dashboard/organisms/Settings
 import { SettingsSection } from '@/features/dashboard/organisms/SettingsSection';
 import { SettingsSmsAccessSection } from '@/features/dashboard/organisms/SettingsSmsAccessSection';
 import { SettingsTouringSection } from '@/features/dashboard/organisms/SettingsTouringSection';
+import { SettingsUsageStatsSection } from '@/features/dashboard/organisms/SettingsUsageStatsSection';
 import { SettingsArtistProfileSection } from '@/features/dashboard/organisms/settings-artist-profile-section';
 import { publicEnv } from '@/lib/env-public';
 import { useAppFlag } from '@/lib/flags/client';
@@ -65,6 +66,8 @@ function getFocusedSettingsHref(sectionId: string): string {
       return APP_ROUTES.SETTINGS_APPEARANCE;
     case 'billing':
       return APP_ROUTES.SETTINGS_BILLING;
+    case 'usage':
+      return APP_ROUTES.SETTINGS_USAGE;
     case 'data-privacy':
       return APP_ROUTES.SETTINGS_DATA_PRIVACY;
     case 'artist-profile':
@@ -96,7 +99,7 @@ const SettingsSidebar = memo(
       <div className='max-h-[calc(100vh-4.5rem)] overflow-y-auto rounded-[14px] border border-(--linear-app-frame-seam) bg-[color-mix(in_oklab,var(--linear-app-content-surface)_97%,var(--linear-bg-surface-0))] p-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] backdrop-blur-sm'>
         {groups.map(group => (
           <div key={group.id} className='mb-2 last:mb-0'>
-            <p className='mb-1 px-2.5 text-2xs font-semibold uppercase tracking-[0.08em] text-tertiary-token'>
+            <p className='mb-1 px-2.5 text-2xs font-semibold text-tertiary-token'>
               {group.label}
             </p>
             <nav aria-label={`${group.label} settings`}>
@@ -222,6 +225,13 @@ export function SettingsPolished({
         description:
           'Manage your security, theme, and notification preferences.',
         render: renderAccountSection,
+      },
+      {
+        id: 'usage',
+        title: 'Usage Stats',
+        description:
+          'Track your daily chat quota, remaining messages, and plan.',
+        render: () => <SettingsUsageStatsSection />,
       },
     ],
     [renderAccountSection]

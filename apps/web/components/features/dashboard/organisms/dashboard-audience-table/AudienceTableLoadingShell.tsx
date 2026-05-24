@@ -1,58 +1,55 @@
-import { ContentSectionHeaderSkeleton } from '@/components/molecules/ContentSectionHeaderSkeleton';
+'use client';
+
 import { LoadingSkeleton } from '@/components/molecules/LoadingSkeleton';
-import { PageToolbar } from '@/components/organisms/table';
+import { PageShell } from '@/components/organisms/PageShell';
+import {
+  PageToolbar,
+  UnifiedTableSkeleton,
+} from '@/components/organisms/table';
 import { SKELETON_ROW_COUNT, TABLE_ROW_HEIGHTS } from '@/lib/constants/layout';
+import {
+  AUDIENCE_TABLE_CONTAINER_CLASS,
+  AUDIENCE_TABLE_SKELETON_COLUMN_CONFIG,
+  buildAudienceMemberColumns,
+} from './table-config';
 
 const AUDIENCE_LOADING_TAB_KEYS = ['all', 'identified', 'anonymous'] as const;
-const AUDIENCE_TABLE_HEADER_KEYS = Array.from(
-  { length: 7 },
-  (_, i) => `audience-header-${i + 1}`
-);
-const AUDIENCE_TABLE_ROW_KEYS = Array.from(
-  { length: SKELETON_ROW_COUNT.TABLE },
-  (_, i) => `audience-row-${i + 1}`
-);
-const AUDIENCE_TABLE_COL_KEYS = Array.from(
-  { length: 7 },
-  (_, i) => `audience-col-${i + 1}`
-);
 const AUDIENCE_MOBILE_ROW_KEYS = Array.from(
   { length: SKELETON_ROW_COUNT.MOBILE },
   (_, i) => `audience-mobile-${i + 1}`
 );
+const AUDIENCE_LOADING_COLUMNS = buildAudienceMemberColumns('members');
 
 export function AudienceTableLoadingShell() {
   return (
-    <div className='flex h-full min-h-0 flex-col' aria-busy='true'>
-      <ContentSectionHeaderSkeleton
-        titleWidth='w-32'
-        actionWidths={['w-8', 'w-8']}
-        className='bg-(--linear-app-content-surface)'
-      />
-
-      <PageToolbar
-        start={
-          <div className='flex flex-wrap items-center gap-1'>
-            {AUDIENCE_LOADING_TAB_KEYS.map(key => (
-              <LoadingSkeleton
-                key={key}
-                height='h-8'
-                width='w-24'
-                rounded='md'
-              />
-            ))}
-          </div>
-        }
-        end={
-          <>
-            <LoadingSkeleton height='h-8' width='w-8' rounded='md' />
-            <LoadingSkeleton height='h-8' width='w-8' rounded='md' />
-            <LoadingSkeleton height='h-8' width='w-8' rounded='md' />
-            <LoadingSkeleton height='h-8' width='w-8' rounded='md' />
-          </>
-        }
-      />
-
+    <PageShell
+      aria-busy='true'
+      aria-label='Loading Audience'
+      data-testid='dashboard-audience-loading'
+      surfaceMode='table'
+      toolbar={
+        <PageToolbar
+          start={
+            <div className='flex flex-wrap items-center gap-1'>
+              {AUDIENCE_LOADING_TAB_KEYS.map(key => (
+                <LoadingSkeleton
+                  key={key}
+                  height='h-8'
+                  width='w-24'
+                  rounded='md'
+                />
+              ))}
+            </div>
+          }
+          end={
+            <>
+              <LoadingSkeleton height='h-8' width='w-8' rounded='md' />
+              <LoadingSkeleton height='h-8' width='w-8' rounded='md' />
+            </>
+          }
+        />
+      }
+    >
       <div className='flex-1 min-h-0 overflow-hidden bg-(--linear-app-content-surface)'>
         <div className='flex h-full min-h-0 flex-col'>
           <div className='flex-1 min-h-0 overflow-hidden sm:hidden'>
@@ -81,69 +78,18 @@ export function AudienceTableLoadingShell() {
           </div>
 
           <div className='max-sm:hidden flex-1 min-h-0 overflow-hidden'>
-            <div className='px-4 py-4 sm:px-6'>
-              <div className='overflow-hidden rounded-xl border border-subtle bg-(--linear-app-content-surface) shadow-subtle-bottom dark:shadow-inset-highlight'>
-                <div className='grid grid-cols-7 gap-4 border-b border-subtle px-4 py-3'>
-                  {AUDIENCE_TABLE_HEADER_KEYS.map(key => (
-                    <LoadingSkeleton
-                      key={key}
-                      height='h-4'
-                      width='w-24'
-                      rounded='md'
-                    />
-                  ))}
-                </div>
-                <ul>
-                  {AUDIENCE_TABLE_ROW_KEYS.map(rowKey => (
-                    <li
-                      key={rowKey}
-                      className='grid grid-cols-7 items-center gap-4 border-b border-subtle px-4 last:border-b-0'
-                      style={{ height: `${TABLE_ROW_HEIGHTS.STANDARD + 4}px` }}
-                      aria-hidden='true'
-                    >
-                      {AUDIENCE_TABLE_COL_KEYS.map(colKey => (
-                        <LoadingSkeleton
-                          key={`${rowKey}-${colKey}`}
-                          height='h-4'
-                          width='w-full'
-                          rounded='md'
-                        />
-                      ))}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            </div>
-          </div>
-
-          <div className='sticky bottom-0 z-20 flex flex-wrap items-center justify-between gap-3 border-t border-subtle bg-(--linear-app-content-surface)/95 px-4 py-2 text-xs text-secondary-token backdrop-blur-md sm:px-6 supports-[backdrop-filter]:bg-(--linear-app-content-surface)/85'>
-            <LoadingSkeleton
-              height='h-4'
-              width='w-48'
-              rounded='md'
-              className='max-sm:hidden'
+            <UnifiedTableSkeleton
+              columns={AUDIENCE_LOADING_COLUMNS}
+              skeletonRows={SKELETON_ROW_COUNT.TABLE}
+              skeletonColumnConfig={AUDIENCE_TABLE_SKELETON_COLUMN_CONFIG}
+              rowHeight={TABLE_ROW_HEIGHTS.STANDARD}
+              minWidth='800px'
+              className='text-app'
+              containerClassName={AUDIENCE_TABLE_CONTAINER_CLASS}
             />
-            <LoadingSkeleton
-              height='h-4'
-              width='w-24'
-              rounded='md'
-              className='sm:hidden'
-            />
-            <div className='flex items-center gap-3'>
-              <LoadingSkeleton
-                height='h-8'
-                width='w-28'
-                rounded='md'
-                className='max-sm:hidden'
-              />
-              <div className='flex gap-2'>
-                <LoadingSkeleton height='h-8' width='w-20' rounded='md' />
-                <LoadingSkeleton height='h-8' width='w-16' rounded='md' />
-              </div>
-            </div>
           </div>
         </div>
       </div>
-    </div>
+    </PageShell>
   );
 }

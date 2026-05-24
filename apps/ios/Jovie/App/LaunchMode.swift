@@ -7,19 +7,42 @@ enum LaunchMode: Equatable {
   case uiTestingLiveAuth
   case uiTestingSignedOut
   case uiTestingReady
+  case uiTestingChat
+  case uiTestingSettings
+  case uiTestingVenueMode
   case uiTestingNeedsOnboarding
+  case uiTestingSplash
 
   var usesLiveClerk: Bool {
     switch self {
     case .live, .uiTestingAutoAuth, .uiTestingLiveAuth:
       return true
-    case .unitTesting, .uiTestingSignedOut, .uiTestingReady, .uiTestingNeedsOnboarding:
+    case .unitTesting,
+         .uiTestingSignedOut,
+         .uiTestingReady,
+         .uiTestingChat,
+         .uiTestingSettings,
+         .uiTestingVenueMode,
+         .uiTestingNeedsOnboarding,
+         .uiTestingSplash:
       return false
     }
   }
 
   var requiresAutoAuth: Bool {
     self == .uiTestingAutoAuth
+  }
+
+  var opensSettingsOnLaunch: Bool {
+    self == .uiTestingSettings
+  }
+
+  var opensChatOnLaunch: Bool {
+    self == .uiTestingChat
+  }
+
+  var opensVenueModeOnLaunch: Bool {
+    self == .uiTestingVenueMode
   }
 
   static func current(processInfo: ProcessInfo = .processInfo) -> LaunchMode {
@@ -41,8 +64,24 @@ enum LaunchMode: Equatable {
       return .uiTestingReady
     }
 
+    if arguments.contains("-ui-testing-chat") {
+      return .uiTestingChat
+    }
+
+    if arguments.contains("-ui-testing-settings") {
+      return .uiTestingSettings
+    }
+
+    if arguments.contains("-ui-testing-venue-mode") {
+      return .uiTestingVenueMode
+    }
+
     if arguments.contains("-ui-testing-needs-onboarding") {
       return .uiTestingNeedsOnboarding
+    }
+
+    if arguments.contains("-ui-testing-splash") {
+      return .uiTestingSplash
     }
 
     if processInfo.environment["XCTestConfigurationFilePath"] != nil {

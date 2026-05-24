@@ -28,6 +28,7 @@ interface ArtistProfileLandingPageProps {
   readonly socialProof: ArtistProfileSocialProofData;
   readonly flags: ArtistProfileSectionFlags;
   readonly payFlowVideoUrl?: string;
+  readonly showForgeUiMarketingUpdates?: boolean;
 }
 
 export function ArtistProfileLandingPage({
@@ -37,6 +38,7 @@ export function ArtistProfileLandingPage({
   socialProof,
   flags,
   payFlowVideoUrl,
+  showForgeUiMarketingUpdates = false,
 }: Readonly<ArtistProfileLandingPageProps>) {
   if (!flags.FULL_PAGE) {
     return (
@@ -52,13 +54,22 @@ export function ArtistProfileLandingPage({
   }
 
   return (
+    // The cinematic frame-skin design layer is scoped per-section instead of
+    // wrapping the whole page, so each section can iterate independently and
+    // sections that haven't adopted the frame.io treatment render in their
+    // pre-existing style. Today only the hero adaptive intro opts in (it
+    // anchors the page with the editorial top edge-glow + film grain).
+    // Add `frame-skin` to other section wrappers as they migrate.
     <>
-      <ArtistProfileHeroAdaptiveIntro
-        hero={copy.hero}
-        adaptive={copy.adaptive}
-        phoneCaption={copy.hero.phoneCaption}
-        phoneSubcaption={copy.hero.phoneSubcaption}
-      />
+      <div className='frame-skin'>
+        <ArtistProfileHeroAdaptiveIntro
+          hero={copy.hero}
+          adaptive={copy.adaptive}
+          phoneCaption={copy.hero.phoneCaption}
+          phoneSubcaption={copy.hero.phoneSubcaption}
+          showForgeUiMarketingUpdates={showForgeUiMarketingUpdates}
+        />
+      </div>
       <div data-testid={ARTIST_PROFILE_SECTION_TEST_IDS.outcomes}>
         <ArtistProfileOutcomesCarousel outcomes={copy.outcomes} />
       </div>

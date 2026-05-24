@@ -1,3 +1,35 @@
+/**
+ * AI Chat Route — POST /api/chat
+ *
+ * Entry point for the in-app artist chat. The request flow is:
+ *
+ *   1. Auth (Clerk via getOptionalAuth) + Sentry tagging (feature, plan_tier)
+ *   2. Billing fetch (so 503/429 responses are still tagged by tier)
+ *   3. Kill switches via Statsig — `ai_chat_disabled` (503) and
+ *      `ai_chat_force_light` (route to cheaper model). Gate keys are const so
+ *      a typo fails at compile time rather than silently defaulting to false.
+ *   4. Plan-aware rate limiting (checkAiChatRateLimitForPlan) + 429 with
+ *      Retry-After when over quota
+ *   5. Body parse + UIMessage validation (length, role, parts shape)
+ *   6. Deterministic intent routing (tryRouteViaIntent) — short-circuits the
+ *      LLM for simple CRUD intents and emits a UIMessage SSE stream directly
+ *   7. Resolve artist context (server-side fetch by profileId, with optional
+ *      client-provided fallback for backwards compatibility)
+ *   8. Build tools for the active plan (buildFreeChatTools always; paid plans
+ *      add buildChatTools — bio/canvas/album-art/pitch/etc.)
+ *   9. executeChatTurn(): the pure pipeline that runs the LLM with tools,
+ *      streams UIMessage parts, and persists telemetry. Telemetry hooks bind
+ *      Sentry from this layer so executeChatTurn stays provider-neutral
+ *      (eval scripts pass a no-op).
+ *
+ * Auth: Clerk; unauthenticated requests get 401. CORS via
+ * createAuthenticatedCorsHeaders so the chat client can be embedded on
+ * trusted origins.
+ *
+ * Cancellation: req.signal forwarded to executeChatTurn; client disconnects
+ * surface as 499 (and bypass Sentry capture).
+ */
+
 import { randomUUID } from 'node:crypto';
 import * as Sentry from '@sentry/nextjs';
 import {
@@ -5,15 +37,35 @@ import {
   createUIMessageStreamResponse,
   tool,
   type UIMessage,
+  type UIMessageChunk,
 } from 'ai';
 import { and, count, desc, sql as drizzleSql, eq } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
+import { tryHandleAnonymousOnboardingChat } from '@/app/api/chat/onboarding-handler';
 import { buildArtistBioDraft } from '@/lib/ai/artist-bio-writer';
 import { createImportBioFromUrlTool } from '@/lib/ai/tools/import-bio-from-url';
 import { createProfileEditTool } from '@/lib/ai/tools/profile-edit';
 import { getOptionalAuth } from '@/lib/auth/cached';
+import { getSessionContext } from '@/lib/auth/session';
+import {
+  buildAlbumArtUnavailableAssistantMessage,
+  detectAlbumArtGenerationIntent,
+  resolveAlbumArtCapability,
+} from '@/lib/chat/album-art-capability';
 import { executeChatTurn, isClientDisconnect } from '@/lib/chat/run';
+import {
+  decodeToolEvents,
+  encodeToolEvents,
+  type PersistedToolEvent,
+} from '@/lib/chat/tool-events';
+import {
+  type ChatTurnSource,
+  markChatTurnStreaming,
+  persistTerminalAssistantMessage,
+  reserveChatTurn,
+  TURN_IN_PROGRESS_ERROR_CODE,
+} from '@/lib/chat/turns';
 import {
   type ArtistContext,
   artistContextSchema,
@@ -49,6 +101,8 @@ import {
 import {
   buildAlbumArtBackgroundPrompt,
   generateAlbumArtBackgrounds,
+  isXaiConfigured,
+  XaiApiKeyMissingError,
 } from '@/lib/services/album-art/provider-xai';
 import { renderAlbumArtCandidate } from '@/lib/services/album-art/render';
 import {
@@ -452,6 +506,179 @@ function safeSetSentryContext(callback: () => void): void {
   }
 }
 
+function extractLastUserText(uiMessages: UIMessage[]): string {
+  const lastUserMsg = [...uiMessages].reverse().find(m => m.role === 'user');
+  if (!lastUserMsg) return '';
+  return extractUIMessageText(
+    lastUserMsg.parts as Array<{ type: string; text?: string }>
+  ).trim();
+}
+
+function normalizeChatTurnSource(value: unknown): ChatTurnSource {
+  return value === 'quick_action' || value === 'slash_command'
+    ? value
+    : 'typed';
+}
+
+function normalizeToolIntent(value: unknown): string | null {
+  if (typeof value !== 'string') return null;
+  const trimmed = value.trim();
+  return /^[a-z][a-z0-9_:-]{0,63}$/i.test(trimmed) ? trimmed : null;
+}
+
+function normalizeClientId(value: unknown): string | null {
+  if (typeof value !== 'string') return null;
+  const trimmed = value.trim();
+  return /^[a-zA-Z0-9:_-]{8,160}$/.test(trimmed) ? trimmed : null;
+}
+
+function createAssistantTextStreamResponse(input: {
+  readonly text: string;
+  readonly requestId: string;
+  readonly corsHeaders: Record<string, string>;
+  readonly headers?: Record<string, string>;
+  readonly metadata?: Record<string, unknown>;
+}) {
+  const messageId = randomUUID();
+  const textId = randomUUID();
+  const stream = createUIMessageStream({
+    execute: ({ writer }) => {
+      writer.write({
+        type: 'start',
+        messageId,
+        ...(input.metadata ? { messageMetadata: input.metadata } : {}),
+      });
+      writer.write({ type: 'start-step' });
+      writer.write({ type: 'text-start', id: textId });
+      writer.write({ type: 'text-delta', id: textId, delta: input.text });
+      writer.write({ type: 'text-end', id: textId });
+      writer.write({ type: 'finish-step' });
+      writer.write({
+        type: 'finish',
+        finishReason: 'stop',
+        ...(input.metadata ? { messageMetadata: input.metadata } : {}),
+      });
+    },
+  });
+
+  return createUIMessageStreamResponse({
+    stream,
+    headers: {
+      ...input.corsHeaders,
+      ...input.headers,
+      'x-request-id': input.requestId,
+    },
+  });
+}
+
+function writePersistedToolEventReplay(
+  writer: { write: (chunk: UIMessageChunk) => void },
+  event: PersistedToolEvent
+) {
+  writer.write({
+    type: 'tool-input-available',
+    toolCallId: event.toolCallId,
+    toolName: event.toolName,
+    input: event.input ?? {},
+    dynamic: true,
+  });
+
+  if (event.state === 'succeeded') {
+    writer.write({
+      type: 'tool-output-available',
+      toolCallId: event.toolCallId,
+      output: event.output ?? {},
+      dynamic: true,
+    });
+    return;
+  }
+
+  if (event.state === 'failed') {
+    writer.write({
+      type: 'tool-output-error',
+      toolCallId: event.toolCallId,
+      errorText:
+        event.errorMessage ?? event.summary ?? 'Tool execution failed.',
+      dynamic: true,
+    });
+    return;
+  }
+
+  if (event.state === 'denied') {
+    writer.write({
+      type: 'tool-output-denied',
+      toolCallId: event.toolCallId,
+    });
+    return;
+  }
+
+  if (event.state === 'needs-approval') {
+    writer.write({
+      type: 'tool-approval-request',
+      approvalId: event.approval?.id ?? `${event.toolCallId}-approval`,
+      toolCallId: event.toolCallId,
+    });
+  }
+}
+
+function createAssistantReplayStreamResponse(input: {
+  readonly text: string;
+  readonly toolCalls: unknown;
+  readonly requestId: string;
+  readonly corsHeaders: Record<string, string>;
+  readonly headers?: Record<string, string>;
+  readonly metadata?: Record<string, unknown>;
+}) {
+  const messageId = randomUUID();
+  const textId = randomUUID();
+  const decodedToolEvents = decodeToolEvents(input.toolCalls).events;
+  const stream = createUIMessageStream({
+    execute: ({ writer }) => {
+      writer.write({
+        type: 'start',
+        messageId,
+        ...(input.metadata ? { messageMetadata: input.metadata } : {}),
+      });
+      writer.write({ type: 'start-step' });
+      if (input.text.length > 0) {
+        writer.write({ type: 'text-start', id: textId });
+        writer.write({ type: 'text-delta', id: textId, delta: input.text });
+        writer.write({ type: 'text-end', id: textId });
+      }
+      for (const event of decodedToolEvents) {
+        writePersistedToolEventReplay(writer, event);
+      }
+      writer.write({ type: 'finish-step' });
+      writer.write({
+        type: 'finish',
+        finishReason: 'stop',
+        ...(input.metadata ? { messageMetadata: input.metadata } : {}),
+      });
+    },
+  });
+
+  return createUIMessageStreamResponse({
+    stream,
+    headers: {
+      ...input.corsHeaders,
+      ...input.headers,
+      'x-request-id': input.requestId,
+    },
+  });
+}
+
+function buildChatTurnMetadata(input: {
+  readonly conversationId: string;
+  readonly turnId: string;
+  readonly requestId: string;
+}) {
+  return {
+    conversationId: input.conversationId,
+    turnId: input.turnId,
+    requestId: input.requestId,
+  };
+}
+
 /**
  * Creates the proposeAvatarUpload tool that signals the client to render
  * an inline photo upload widget in the chat conversation.
@@ -793,6 +1020,14 @@ function createGenerateAlbumArtTool(params: {
         };
       }
 
+      if (!isXaiConfigured()) {
+        return {
+          success: false as const,
+          retryable: false,
+          error: 'Album art generation is temporarily unavailable.',
+        };
+      }
+
       const releases = await fetchReleasesForChat(params.profileId);
       const target = resolveAlbumArtReleaseTarget(releases, {
         releaseId,
@@ -933,6 +1168,15 @@ function createGenerateAlbumArtTool(params: {
           })),
         };
       } catch (error) {
+        if (error instanceof XaiApiKeyMissingError) {
+          // Provider key may go missing between the early check and the call
+          // (e.g. env reload). Treat as feature_disabled, do not capture.
+          return {
+            success: false as const,
+            retryable: false,
+            error: 'Album art generation is temporarily unavailable.',
+          };
+        }
         Sentry.captureException(error, {
           tags: { feature: 'album-art-generation' },
           extra: { profileId: params.profileId, releaseId, releaseTitle },
@@ -1587,7 +1831,8 @@ async function tryRouteViaIntent(
   profileId: unknown,
   userId: string,
   corsHeaders: Record<string, string>,
-  requestId: string
+  requestId: string,
+  reservedTurn?: { conversationId: string; turnId: string } | null
 ): Promise<Response | null> {
   const lastUserMsg = [...uiMessages].reverse().find(m => m.role === 'user');
   if (!lastUserMsg) return null;
@@ -1621,16 +1866,50 @@ async function tryRouteViaIntent(
         ? 'Done.'
         : 'Something went wrong. Please try again.';
 
+  if (reservedTurn) {
+    await persistTerminalAssistantMessage({
+      conversationId: reservedTurn.conversationId,
+      turnId: reservedTurn.turnId,
+      status: result.success ? 'completed' : 'failed_model_error',
+      content: replyText,
+      errorCode: result.success ? null : 'DETERMINISTIC_INTENT_FAILED',
+      errorMessage: result.success ? null : replyText,
+    });
+  }
+
   const textId = randomUUID();
   const stream = createUIMessageStream({
     execute: ({ writer }) => {
-      writer.write({ type: 'start' });
+      writer.write({
+        type: 'start',
+        ...(reservedTurn
+          ? {
+              messageMetadata: buildChatTurnMetadata({
+                conversationId: reservedTurn.conversationId,
+                turnId: reservedTurn.turnId,
+                requestId,
+              }),
+            }
+          : {}),
+      });
       writer.write({ type: 'start-step' });
       writer.write({ type: 'text-start', id: textId });
       writer.write({ type: 'text-delta', id: textId, delta: replyText });
       writer.write({ type: 'text-end', id: textId });
       writer.write({ type: 'finish-step' });
-      writer.write({ type: 'finish' });
+      writer.write({
+        type: 'finish',
+        finishReason: 'stop',
+        ...(reservedTurn
+          ? {
+              messageMetadata: buildChatTurnMetadata({
+                conversationId: reservedTurn.conversationId,
+                turnId: reservedTurn.turnId,
+                requestId,
+              }),
+            }
+          : {}),
+      });
     },
   });
 
@@ -1641,6 +1920,12 @@ async function tryRouteViaIntent(
       'x-request-id': requestId,
       'x-intent-routed': 'true',
       'x-intent-category': intent.category,
+      ...(reservedTurn
+        ? {
+            'x-conversation-id': reservedTurn.conversationId,
+            'x-chat-turn-id': reservedTurn.turnId,
+          }
+        : {}),
     },
   });
 }
@@ -1662,6 +1947,16 @@ export async function POST(req: Request) {
     Sentry.setTag('feature', 'ai-chat');
     Sentry.setExtra('request_id', requestId);
   });
+
+  // Anonymous onboarding mode (JOV-2132): clones the request to peek for
+  // `mode: 'onboarding'`. If present, runs cookie/turnstile/rate-limit gates
+  // and returns a response (501 stub in PR 1; LLM dispatch in PR 2). Returns
+  // null for normal authenticated traffic, falling through to the flow below.
+  const onboardingResponse = await tryHandleAnonymousOnboardingChat(
+    req,
+    requestId
+  );
+  if (onboardingResponse) return onboardingResponse;
 
   // Auth check - ensure user is authenticated
   const { userId } = await getOptionalAuth();
@@ -1715,36 +2010,16 @@ export async function POST(req: Request) {
   );
   const insightsEnabled = currentUserEntitlements?.isPro ?? false;
 
-  // Rate limiting - plan-aware daily quota + burst protection
-  const rateLimitResult = await checkAiChatRateLimitForPlan(userId, userPlan);
-  if (!rateLimitResult.success) {
-    return NextResponse.json(
-      {
-        error: 'Rate limit exceeded',
-        message: rateLimitResult.reason,
-        errorCode: 'RATE_LIMITED',
-        retryAfter: sanitizeRetryAfterSeconds(
-          (rateLimitResult.reset.getTime() - Date.now()) / 1000
-        ),
-        requestId,
-      },
-      {
-        status: 429,
-        headers: {
-          ...corsHeaders,
-          ...createRateLimitHeaders(rateLimitResult),
-          'x-request-id': requestId,
-        },
-      }
-    );
-  }
-
   // Parse and validate request body
   let body: {
     messages?: unknown;
     profileId?: unknown;
     conversationId?: unknown;
     artistContext?: unknown;
+    clientTurnId?: unknown;
+    clientMessageId?: unknown;
+    source?: unknown;
+    toolIntent?: unknown;
   };
   try {
     body = await req.json();
@@ -1779,6 +2054,206 @@ export async function POST(req: Request) {
 
   // After validation, we know messages is a valid UIMessage array
   const uiMessages = messages as UIMessage[];
+  const userText = extractLastUserText(uiMessages);
+  const clientTurnId = normalizeClientId(body.clientTurnId);
+  const clientMessageId = normalizeClientId(body.clientMessageId);
+  const source = normalizeChatTurnSource(body.source);
+  const toolIntent = normalizeToolIntent(body.toolIntent);
+  const resolvedProfileId = toNullableString(profileId);
+  const resolvedConversationId = toNullableString(conversationId);
+  const albumArtCapability = resolveAlbumArtCapability({
+    featureEnabled: FEATURE_FLAGS.ALBUM_ART_GENERATION,
+    providerConfigured: isXaiConfigured(),
+    entitlements: currentUserEntitlements,
+  });
+
+  let reservedTurn: {
+    conversationId: string;
+    turnId: string;
+  } | null = null;
+
+  if (clientTurnId) {
+    if (!resolvedProfileId) {
+      return NextResponse.json(
+        {
+          error: 'profileId is required when clientTurnId is provided',
+          requestId,
+        },
+        { status: 400, headers: { ...corsHeaders, 'x-request-id': requestId } }
+      );
+    }
+
+    const sessionContext = await getSessionContext({
+      clerkUserId: userId,
+      requireProfile: true,
+    });
+
+    if (
+      !sessionContext.profile ||
+      sessionContext.profile.id !== resolvedProfileId
+    ) {
+      return NextResponse.json(
+        { error: 'Profile not found or unauthorized', requestId },
+        { status: 404, headers: { ...corsHeaders, 'x-request-id': requestId } }
+      );
+    }
+
+    const reservation = await reserveChatTurn({
+      conversationId: resolvedConversationId,
+      clientTurnId,
+      clientMessageId,
+      source,
+      toolIntent,
+      userMessage: userText || '(image attachment)',
+      userId: sessionContext.user.id,
+      creatorProfileId: resolvedProfileId,
+    });
+
+    if (reservation.outcome === 'duplicate_in_progress') {
+      return NextResponse.json(
+        {
+          error: TURN_IN_PROGRESS_ERROR_CODE,
+          message: 'This chat action is still in progress.',
+          errorCode: TURN_IN_PROGRESS_ERROR_CODE,
+          requestId,
+          conversationId: reservation.conversationId,
+          turnId: reservation.turn.id,
+        },
+        {
+          status: 409,
+          headers: {
+            ...corsHeaders,
+            'x-request-id': requestId,
+            'x-conversation-id': reservation.conversationId,
+            'x-chat-turn-id': reservation.turn.id,
+          },
+        }
+      );
+    }
+
+    if (reservation.outcome === 'duplicate_completed') {
+      const assistantMessage = [...reservation.messages]
+        .reverse()
+        .find(message => message.role === 'assistant');
+      const assistantToolCalls = assistantMessage?.toolCalls;
+      const hasPersistedToolState =
+        decodeToolEvents(assistantToolCalls).events.length > 0;
+      const replayText =
+        assistantMessage?.content ||
+        (hasPersistedToolState
+          ? ''
+          : 'This chat action already finished. Please send a new message if you need anything else.');
+      return createAssistantReplayStreamResponse({
+        text: replayText,
+        toolCalls: assistantToolCalls,
+        requestId,
+        corsHeaders,
+        headers: {
+          'x-chat-replay': 'true',
+          'x-conversation-id': reservation.conversationId,
+          'x-chat-turn-id': reservation.turn.id,
+        },
+        metadata: buildChatTurnMetadata({
+          conversationId: reservation.conversationId,
+          turnId: reservation.turn.id,
+          requestId,
+        }),
+      });
+    }
+
+    reservedTurn = {
+      conversationId: reservation.conversationId,
+      turnId: reservation.turn.id,
+    };
+
+    if (
+      albumArtCapability.availability !== 'available' &&
+      detectAlbumArtGenerationIntent({ text: userText, toolIntent })
+    ) {
+      const replyText =
+        buildAlbumArtUnavailableAssistantMessage(albumArtCapability);
+      await persistTerminalAssistantMessage({
+        conversationId: reservation.conversationId,
+        turnId: reservation.turn.id,
+        status: 'failed_tool_unavailable',
+        content: replyText,
+        errorCode: albumArtCapability.reasonCode ?? 'TOOL_UNAVAILABLE',
+        errorMessage: albumArtCapability.reason,
+      });
+
+      return createAssistantTextStreamResponse({
+        text: replyText,
+        requestId,
+        corsHeaders,
+        headers: {
+          'x-chat-preflight': 'album-art-unavailable',
+          'x-conversation-id': reservation.conversationId,
+          'x-chat-turn-id': reservation.turn.id,
+        },
+        metadata: buildChatTurnMetadata({
+          conversationId: reservation.conversationId,
+          turnId: reservation.turn.id,
+          requestId,
+        }),
+      });
+    }
+  }
+
+  // Rate limiting - plan-aware daily quota + burst protection. For clients
+  // that send clientTurnId, reservation/replay happens before quota charging.
+  const rateLimitResult = await checkAiChatRateLimitForPlan(userId, userPlan);
+  if (!rateLimitResult.success) {
+    if (reservedTurn) {
+      const replyText =
+        rateLimitResult.reason ??
+        'You have reached your chat limit. Please try again later.';
+      await persistTerminalAssistantMessage({
+        conversationId: reservedTurn.conversationId,
+        turnId: reservedTurn.turnId,
+        status: 'failed_model_error',
+        content: replyText,
+        errorCode: 'RATE_LIMITED',
+        errorMessage: rateLimitResult.reason,
+      });
+
+      return createAssistantTextStreamResponse({
+        text: replyText,
+        requestId,
+        corsHeaders,
+        headers: {
+          ...createRateLimitHeaders(rateLimitResult),
+          'x-chat-terminal-failure': 'rate-limited',
+          'x-conversation-id': reservedTurn.conversationId,
+          'x-chat-turn-id': reservedTurn.turnId,
+        },
+        metadata: buildChatTurnMetadata({
+          conversationId: reservedTurn.conversationId,
+          turnId: reservedTurn.turnId,
+          requestId,
+        }),
+      });
+    }
+
+    return NextResponse.json(
+      {
+        error: 'Rate limit exceeded',
+        message: rateLimitResult.reason,
+        errorCode: 'RATE_LIMITED',
+        retryAfter: sanitizeRetryAfterSeconds(
+          (rateLimitResult.reset.getTime() - Date.now()) / 1000
+        ),
+        requestId,
+      },
+      {
+        status: 429,
+        headers: {
+          ...corsHeaders,
+          ...createRateLimitHeaders(rateLimitResult),
+          'x-request-id': requestId,
+        },
+      }
+    );
+  }
 
   // --- Deterministic intent routing (skip AI for simple CRUD) ---
   const intentResponse = await tryRouteViaIntent(
@@ -1786,7 +2261,8 @@ export async function POST(req: Request) {
     profileId,
     userId,
     corsHeaders,
-    requestId
+    requestId,
+    reservedTurn
   );
   if (intentResponse) return intentResponse;
 
@@ -1798,13 +2274,42 @@ export async function POST(req: Request) {
     corsHeaders
   );
   if (contextResult.error) {
+    if (reservedTurn) {
+      const replyText =
+        'Jovie could not load your artist context for this request. Please refresh and try again.';
+      await persistTerminalAssistantMessage({
+        conversationId: reservedTurn.conversationId,
+        turnId: reservedTurn.turnId,
+        status: 'failed_model_error',
+        content: replyText,
+        errorCode: 'ARTIST_CONTEXT_UNAVAILABLE',
+        errorMessage: `Artist context lookup failed with ${contextResult.error.status}`,
+      });
+
+      return createAssistantTextStreamResponse({
+        text: replyText,
+        requestId,
+        corsHeaders,
+        headers: {
+          'x-chat-terminal-failure': 'artist-context-unavailable',
+          'x-conversation-id': reservedTurn.conversationId,
+          'x-chat-turn-id': reservedTurn.turnId,
+        },
+        metadata: buildChatTurnMetadata({
+          conversationId: reservedTurn.conversationId,
+          turnId: reservedTurn.turnId,
+          requestId,
+        }),
+      });
+    }
+
     return contextResult.error;
   }
   const artistContext = contextResult.context;
 
-  const resolvedProfileId = toNullableString(profileId);
-  const resolvedConversationId = toNullableString(conversationId);
   const releases = await fetchOptionalReleases(resolvedProfileId);
+  const dispatchConversationId =
+    reservedTurn?.conversationId ?? resolvedConversationId;
 
   try {
     const albumArtEnabled = FEATURE_FLAGS.ALBUM_ART_GENERATION;
@@ -1820,7 +2325,7 @@ export async function POST(req: Request) {
             resolvedProfileId,
             insightsEnabled,
             userId,
-            currentUserEntitlements?.canGenerateAlbumArt ?? false,
+            albumArtCapability.availability === 'available',
             albumArtEnabled
           ),
         }
@@ -1835,13 +2340,36 @@ export async function POST(req: Request) {
       captureException: (error, context) =>
         Sentry.captureException(error, context),
     };
+    let streamFailurePersisted = false;
+    const persistStreamFailure = async (error: unknown) => {
+      if (!reservedTurn || streamFailurePersisted) {
+        return;
+      }
+
+      streamFailurePersisted = true;
+      const message =
+        error instanceof Error ? error.message : 'The assistant stream failed.';
+      await persistTerminalAssistantMessage({
+        conversationId: reservedTurn.conversationId,
+        turnId: reservedTurn.turnId,
+        status: 'failed_model_error',
+        content:
+          'Jovie hit a temporary issue while processing your message. Please retry or send a simpler next step.',
+        errorCode: 'CHAT_STREAM_FAILED',
+        errorMessage: message,
+      });
+    };
+
+    if (reservedTurn) {
+      await markChatTurnStreaming(reservedTurn.turnId);
+    }
 
     const turn = await executeChatTurn({
       uiMessages,
       artistContext,
       releases,
       resolvedProfileId,
-      resolvedConversationId,
+      resolvedConversationId: dispatchConversationId,
       userId,
       userPlan,
       planLimits,
@@ -1851,16 +2379,64 @@ export async function POST(req: Request) {
       signal: req.signal,
       requestId,
       telemetry,
+      onStreamError: persistStreamFailure,
     });
 
     return turn.streamResult.toUIMessageStreamResponse({
       headers: {
         ...corsHeaders,
         'x-request-id': requestId,
+        ...(reservedTurn
+          ? {
+              'x-conversation-id': reservedTurn.conversationId,
+              'x-chat-turn-id': reservedTurn.turnId,
+            }
+          : {}),
+      },
+      messageMetadata: () =>
+        reservedTurn
+          ? buildChatTurnMetadata({
+              conversationId: reservedTurn.conversationId,
+              turnId: reservedTurn.turnId,
+              requestId,
+            })
+          : undefined,
+      onFinish: async ({ responseMessage }) => {
+        if (!reservedTurn) return;
+
+        const assistantText = extractUIMessageText(
+          responseMessage.parts as Array<{ type: string; text?: string }>
+        );
+        const toolCalls = encodeToolEvents(responseMessage.parts);
+        await persistTerminalAssistantMessage({
+          conversationId: reservedTurn.conversationId,
+          turnId: reservedTurn.turnId,
+          status: 'completed',
+          content:
+            assistantText ||
+            (toolCalls && toolCalls.length > 0
+              ? ''
+              : 'Done. What would you like to do next?'),
+          toolCalls,
+        });
+      },
+      onError: () => {
+        return 'Jovie hit a temporary issue while processing your message. Please retry or send a simpler next step.';
       },
     });
   } catch (error) {
     if (isClientDisconnect(error, req.signal)) {
+      if (reservedTurn) {
+        await persistTerminalAssistantMessage({
+          conversationId: reservedTurn.conversationId,
+          turnId: reservedTurn.turnId,
+          status: 'canceled',
+          content:
+            'This response was canceled before Jovie could finish. Retry when you are ready.',
+          errorCode: 'CLIENT_DISCONNECTED',
+          errorMessage: 'Client disconnected',
+        }).catch(() => null);
+      }
       return new NextResponse(
         JSON.stringify({ error: 'Client disconnected', requestId }),
         {
@@ -1870,13 +2446,27 @@ export async function POST(req: Request) {
       );
     }
 
+    if (reservedTurn) {
+      const message =
+        error instanceof Error ? error.message : 'Failed to process chat turn';
+      await persistTerminalAssistantMessage({
+        conversationId: reservedTurn.conversationId,
+        turnId: reservedTurn.turnId,
+        status: 'failed_model_error',
+        content:
+          'Jovie hit a temporary issue while processing your message. Please retry or send a simpler next step.',
+        errorCode: 'CHAT_STREAM_FAILED',
+        errorMessage: message,
+      }).catch(() => null);
+    }
+
     return buildChatErrorResponse(
       error,
       userId,
       uiMessages.length,
       requestId,
       resolvedProfileId,
-      resolvedConversationId,
+      dispatchConversationId,
       corsHeaders
     );
   }

@@ -9,6 +9,11 @@ function formatCount(value: number, singular: string, plural = `${singular}s`) {
   return `${value} ${value === 1 ? singular : plural}`;
 }
 
+function getFirstName(displayName: string): string {
+  const trimmed = displayName.trim();
+  return trimmed.split(/\s+/)[0] ?? '';
+}
+
 export interface WelcomeMessageParams {
   displayName: string;
   releaseCount: number;
@@ -26,7 +31,7 @@ export function buildWelcomeMessage({
   socialCount,
   careerHighlights,
 }: WelcomeMessageParams) {
-  const resolvedName = displayName.trim() || 'there';
+  const resolvedName = getFirstName(displayName) || 'there';
   const musicSummary =
     trackCount > 0
       ? formatCount(trackCount, 'track')

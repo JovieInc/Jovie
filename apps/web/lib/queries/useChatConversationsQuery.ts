@@ -9,6 +9,18 @@ export interface ChatConversation {
   title: string | null;
   createdAt: string;
   updatedAt: string;
+  latestMessageRole?: 'user' | 'assistant' | 'system' | null;
+  latestTurnStatus?:
+    | 'reserved'
+    | 'running'
+    | 'streaming'
+    | 'completed'
+    | 'failed_tool_unavailable'
+    | 'failed_model_error'
+    | 'failed_timeout'
+    | 'failed_network'
+    | 'canceled'
+    | null;
 }
 
 interface ConversationsResponse {

@@ -19,6 +19,7 @@ import {
   useState,
 } from 'react';
 import { toast } from 'sonner';
+import { rowState } from '@/components/organisms/table';
 import { CreatorAvatarCell } from '@/features/admin/CreatorAvatarCell';
 import { CreatorProfileSocialLinks } from '@/features/admin/CreatorProfileSocialLinks';
 import { CreatorActionsMenu } from '@/features/admin/creator-actions-menu';
@@ -40,12 +41,9 @@ const getRowClassName = (isChecked: boolean, isSelected: boolean) => {
   const baseClasses =
     'group cursor-pointer border-b border-subtle transition-[background-color,box-shadow] duration-150 last:border-b-0';
   if (isChecked || isSelected) {
-    return cn(
-      baseClasses,
-      'bg-[color-mix(in_srgb,var(--linear-row-selected)_68%,transparent)] shadow-[inset_1px_0_0_0_var(--linear-border-focus)] hover:bg-[color-mix(in_srgb,var(--linear-row-selected)_78%,transparent)]'
-    );
+    return cn(baseClasses, rowState.selected);
   }
-  return cn(baseClasses, 'bg-transparent hover:bg-(--linear-row-hover)');
+  return cn(baseClasses, rowState.hover);
 };
 
 const renderContextMenuItem = ({

@@ -11,6 +11,7 @@ export interface OnboardingExperienceShellProps {
   readonly mode?: 'standalone' | 'embedded';
   readonly stableStageHeight?: 'default' | 'tall';
   readonly stageVariant?: 'framed' | 'flat';
+  readonly visualVariant?: 'default' | 'v1';
   readonly className?: string;
   readonly stageClassName?: string;
   readonly 'data-testid'?: string;
@@ -50,12 +51,22 @@ export function OnboardingExperienceShell({
   mode = 'standalone',
   stableStageHeight = 'default',
   stageVariant = 'framed',
+  visualVariant = 'default',
   className,
   stageClassName,
   'data-testid': testId,
 }: Readonly<OnboardingExperienceShellProps>) {
   return (
-    <div className={cn(ROOT_CLASSNAME[mode], className)} data-testid={testId}>
+    <div
+      className={cn(
+        ROOT_CLASSNAME[mode],
+        visualVariant === 'v1' &&
+          'bg-[#06070a] bg-[radial-gradient(circle_at_52%_12%,rgba(103,232,249,0.10),transparent_32%)]',
+        className
+      )}
+      data-testid={testId}
+      data-onboarding-visual-variant={visualVariant}
+    >
       {topBar ? (
         <div className='shrink-0'>
           <div className='mx-auto w-full max-w-[1440px] px-4 pt-4 sm:px-6 lg:px-8'>
@@ -86,6 +97,8 @@ export function OnboardingExperienceShell({
               'flex min-w-0 flex-1 flex-col pt-[12vh]',
               STAGE_HEIGHT_CLASSNAME[stableStageHeight],
               STAGE_VARIANT_CLASSNAME[stageVariant],
+              visualVariant === 'v1' &&
+                'rounded-[28px] border border-white/[0.07] bg-[#0a0c0f]/72 px-5 py-6 shadow-[0_28px_100px_rgba(0,0,0,0.34)] sm:px-8',
               stageClassName
             )}
             data-testid={`onboarding-stage-${stageVariant}`}

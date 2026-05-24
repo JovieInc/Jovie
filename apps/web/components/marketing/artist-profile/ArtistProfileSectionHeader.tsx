@@ -3,41 +3,54 @@ import { cn } from '@/lib/utils';
 interface ArtistProfileSectionHeaderProps {
   readonly headline: string;
   readonly body?: string;
+  readonly eyebrow?: string;
   readonly align?: 'center' | 'left';
   readonly className?: string;
   readonly headlineClassName?: string;
   readonly bodyClassName?: string;
+  readonly eyebrowClassName?: string;
 }
+
+export const SHELL_H2_CLASS =
+  'text-[clamp(2.25rem,4.8vw,3.5rem)] font-[680] leading-[1.02] tracking-[-0.04em] text-primary-token text-balance';
+
+export const SHELL_EYEBROW_CLASS =
+  'text-[12px] font-medium uppercase tracking-[0.06em] text-secondary-token';
+
+export const SHELL_LEAD_CLASS =
+  'text-[clamp(1.0625rem,1.4vw,1.25rem)] leading-[1.45] text-secondary-token';
 
 export function ArtistProfileSectionHeader({
   headline,
   body,
+  eyebrow,
   align = 'center',
   className,
   headlineClassName,
   bodyClassName,
+  eyebrowClassName,
 }: Readonly<ArtistProfileSectionHeaderProps>) {
   const isCentered = align === 'center';
 
   return (
     <div
       className={cn(
-        isCentered ? 'mx-auto max-w-[44rem] text-center' : 'max-w-[40rem]',
+        isCentered ? 'mx-auto max-w-[46rem] text-center' : 'max-w-[42rem]',
         className
       )}
     >
-      <h2
-        className={cn(
-          'text-[clamp(2.7rem,5.25vw,4.6rem)] font-[650] leading-[0.94] tracking-[-0.072em] text-primary-token',
-          headlineClassName
-        )}
-      >
-        {headline}
-      </h2>
+      {eyebrow ? (
+        <p className={cn(SHELL_EYEBROW_CLASS, 'mb-5', eyebrowClassName)}>
+          {eyebrow}
+        </p>
+      ) : null}
+      <h2 className={cn(SHELL_H2_CLASS, headlineClassName)}>{headline}</h2>
       {body ? (
         <p
           className={cn(
-            'mt-5 text-[clamp(1rem,1.55vw,1.16rem)] leading-[1.65] tracking-[-0.02em] text-secondary-token',
+            SHELL_LEAD_CLASS,
+            'mt-5 sm:mt-6',
+            isCentered ? 'mx-auto max-w-[38rem]' : 'max-w-[42rem]',
             bodyClassName
           )}
         >

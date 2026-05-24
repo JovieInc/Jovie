@@ -248,7 +248,7 @@ The Chrome sidebar now defends against prompt injection attacks. Three layers: X
 - **XML prompt framing with trust boundaries.** User messages are wrapped in `<user-message>` tags with explicit instructions to treat content as data, not instructions. XML special characters (`< > &`) are escaped to prevent tag injection attacks.
 - **Bash command allowlist.** The sidebar's system prompt now restricts Claude to browse binary commands only (`$B goto`, `$B click`, `$B snapshot`, etc.). All other bash commands (`curl`, `rm`, `cat`, etc.) are forbidden. This prevents prompt injection from escalating to arbitrary code execution.
 - **Opus default for sidebar.** The sidebar now uses Opus (the most injection-resistant model) by default, instead of whatever model Claude Code happens to be running.
-- **ML prompt injection defense design doc.** Full design doc at `docs/designs/ML_PROMPT_INJECTION_KILLER.md` covering the follow-up ML classifier (DeBERTa, BrowseSafe-bench, Bun-native 5ms vision). P0 TODO for the next PR.
+- **ML prompt injection defense design doc.** Full design doc at `docs/designs/ML_PROMPT_INJECTION_KILLER.md` covering a historical ML classifier design (DeBERTa, BrowseSafe-bench, Bun-native 5ms vision). Kept as design context only.
 
 ## [0.13.3.0] - 2026-03-28 — Lock It Down
 
@@ -806,7 +806,7 @@ Thanks to @osc, @Explorer1092, @Qike-Li, @francoisaubert1, @itstimwhite, @yinanl
 
 - `test/gen-skill-docs.test.ts` validates all `.agents/` descriptions stay within 1024 chars
 - `gstack-update-check` includes a one-time migration that deletes oversized Codex SKILL.md files
-- P1 TODO added: Codex→Claude reverse buddy check skill
+- P1 tracked follow-up added: Codex→Claude reverse buddy check skill
 
 ## [0.11.8.0] - 2026-03-23 — zsh Compatibility Fix
 

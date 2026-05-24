@@ -80,19 +80,3 @@ export async function fetchSpotifyArtistData(
 
   return null;
 }
-
-/**
- * Fetch the artist name from Spotify API for a Spotify artist handle.
- *
- * @deprecated Use fetchSpotifyArtistData for full metadata.
- * @param handle - Handle that may be a Spotify artist ID (prefixed with 'artist_')
- * @param platformId - Platform identifier to verify this is a Spotify URL
- * @returns Artist name from Spotify, or null if not a Spotify artist or fetch failed
- */
-export async function fetchSpotifyArtistName(
-  handle: string,
-  platformId: string
-): Promise<string | null> {
-  const data = await fetchSpotifyArtistData(handle, platformId);
-  return data?.name ?? null;
-}

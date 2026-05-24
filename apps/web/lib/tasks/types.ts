@@ -67,6 +67,25 @@ export interface TaskListResult {
   readonly nextCursor: TaskCursor | null;
 }
 
+export interface TaskBoardColumnResult {
+  readonly status: TaskStatus;
+  readonly tasks: TaskView[];
+  readonly totalCount: number;
+  readonly nextCursor: TaskCursor | null;
+}
+
+export interface TaskBoardResult {
+  readonly columns: TaskBoardColumnResult[];
+  readonly totalCount: number;
+}
+
+export interface MoveTaskInput {
+  readonly taskId: string;
+  readonly toStatus: TaskStatus;
+  readonly beforeTaskId?: string | null;
+  readonly afterTaskId?: string | null;
+}
+
 export interface TaskStats {
   readonly backlog: number;
   readonly todo: number;

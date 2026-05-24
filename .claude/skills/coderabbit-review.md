@@ -34,5 +34,6 @@ After receiving the review:
 - Use `--prompt-only` for token efficiency
 - Focus on uncommitted changes with `-t uncommitted`
 - Maximum 3 CodeRabbit runs to avoid excessive API usage
+- If you hit CodeRabbit rate limits, wait the cooldown time and batch fixes before re-running
 - Apply fixes methodically, one issue at a time
 - Verify fixes don't break existing functionality

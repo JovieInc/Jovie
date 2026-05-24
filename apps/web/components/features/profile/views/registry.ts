@@ -64,10 +64,9 @@ export interface ProfileViewRegistryEntry {
   /** Lucide icon used in `MenuView` and any future navigation rails. */
   readonly icon: IconComponent;
   /**
-   * Sort order inside `MenuView`. Locked by the design review: conversion
-   * intents first (Listen, Subscribe, Pay), relationship intents middle
-   * (Contact, Tour, Releases), context last (About, Share). `profile` and
-   * `menu` are containers and never appear as entries.
+   * Sort order for secondary menus. Bottom-tab destinations and legacy
+   * compatibility routes stay out of the overflow menu to avoid duplicate
+   * navigation.
    */
   readonly menuOrder: number | null;
   /**
@@ -118,7 +117,7 @@ export const PROFILE_VIEW_REGISTRY: Record<
   },
   pay: {
     key: 'pay',
-    title: 'Support',
+    title: 'Pay',
     icon: Wallet,
     menuOrder: 3,
     analyticsEvent: 'tip_drawer_open',
@@ -135,7 +134,8 @@ export const PROFILE_VIEW_REGISTRY: Record<
   },
   tour: {
     key: 'tour',
-    title: 'All Shows',
+    title: 'Events',
+    subtitle: 'Tour dates and ticket updates.',
     icon: Ticket,
     menuOrder: 5,
     analyticsEvent: 'tour_drawer_open',
@@ -145,7 +145,7 @@ export const PROFILE_VIEW_REGISTRY: Record<
     key: 'releases',
     title: 'Releases',
     icon: Disc3,
-    menuOrder: 6,
+    menuOrder: null,
     analyticsEvent: 'releases_drawer_open',
     shouldShow: ({ hasReleases }) => hasReleases,
   },
@@ -160,7 +160,7 @@ export const PROFILE_VIEW_REGISTRY: Record<
   },
   share: {
     key: 'share',
-    title: 'Share',
+    title: 'Share Profile',
     subtitle: 'Share this profile',
     icon: Share2,
     menuOrder: 8,

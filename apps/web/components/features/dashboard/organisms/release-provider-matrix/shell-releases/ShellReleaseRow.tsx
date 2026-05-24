@@ -1,24 +1,212 @@
 'use client';
 
-import { ExternalLink, MoreHorizontal } from 'lucide-react';
+import {
+  Clock,
+  ExternalLink,
+  Lock,
+  MoreHorizontal,
+  Pause,
+  Play,
+} from 'lucide-react';
 import Link from 'next/link';
-import { type KeyboardEvent, memo, useMemo } from 'react';
+import {
+  type KeyboardEvent,
+  type MouseEvent,
+  memo,
+  useCallback,
+  useMemo,
+} from 'react';
+import { toast } from 'sonner';
+import { TableActionMenu } from '@/components/atoms/table-action-menu/TableActionMenu';
+import type { TableActionMenuItem } from '@/components/atoms/table-action-menu/types';
+import { useTrackAudioPlayer } from '@/components/organisms/release-sidebar/useTrackAudioPlayer';
+import { ShellListRowFrame } from '@/components/organisms/table';
 import { ArtworkThumb } from '@/components/shell/ArtworkThumb';
 import { DropDateChip } from '@/components/shell/DropDateChip';
 import { DspAvatarStack } from '@/components/shell/DspAvatarStack';
+import {
+  EntityHoverLink,
+  type EntityPopoverData,
+} from '@/components/shell/EntityPopover';
 import { StatusBadge } from '@/components/shell/StatusBadge';
 import type { ReleaseViewModel } from '@/lib/discography/types';
 import { dropDateMeta } from '@/lib/format-drop-date';
 import { cn } from '@/lib/utils';
 import { releaseStatusToShell, releaseToDspItems } from './release-adapters';
 
+export type ShellRowLockReason = 'scheduled' | 'cap' | null;
+export const shellReleaseRowTypography = {
+  title: 'truncate text-[13px] font-caption text-primary-token leading-[1.2]',
+  subtitle: 'truncate text-[11px] text-tertiary-token leading-[1.3] mt-0.5',
+} as const;
+
+// ── Subcomponents ─────────────────────────────────────────────────────────────
+
+function useArtworkPlayback(release: ReleaseViewModel) {
+  const { playbackState, toggleTrack } = useTrackAudioPlayer();
+  const previewUrl = release.previewUrl ?? null;
+  const isActiveTrack = playbackState.activeTrackId === release.id;
+  const isTrackPlaying = isActiveTrack && playbackState.isPlaying;
+  const primaryArtist = release.artistNames?.[0];
+
+  const handleTogglePlayback = useCallback(
+    (e: MouseEvent<HTMLButtonElement> | KeyboardEvent<HTMLButtonElement>) => {
+      e.stopPropagation();
+
+      if (isActiveTrack) {
+        toggleTrack({ id: release.id, title: release.title }).catch(() => {
+          toast.error('Unable to control playback right now');
+        });
+        return;
+      }
+
+      if (!previewUrl) return;
+
+      toggleTrack({
+        id: release.id,
+        title: release.title,
+        audioUrl: previewUrl,
+        isrc: release.primaryIsrc ?? null,
+        releaseTitle: release.title,
+        artistName: primaryArtist,
+        artworkUrl: release.artworkUrl,
+        hasLyrics: Boolean(release.lyrics?.trim()),
+      }).catch(() => {
+        toast.error('Unable to play preview');
+      });
+    },
+    [
+      isActiveTrack,
+      previewUrl,
+      primaryArtist,
+      release.artworkUrl,
+      release.id,
+      release.lyrics,
+      release.primaryIsrc,
+      release.title,
+      toggleTrack,
+    ]
+  );
+
+  return { previewUrl, isActiveTrack, isTrackPlaying, handleTogglePlayback };
+}
+
+const ArtworkCell = memo(function ArtworkCell({
+  release,
+}: {
+  readonly release: ReleaseViewModel;
+}) {
+  const { previewUrl, isTrackPlaying, handleTogglePlayback } =
+    useArtworkPlayback(release);
+  const hasPreview = Boolean(previewUrl);
+
+  return (
+    <div className='relative shrink-0'>
+      <ArtworkThumb
+        src={release.artworkUrl ?? ''}
+        title={release.title}
+        size={40}
+      />
+      {hasPreview ? (
+        <button
+          type='button'
+          onClick={handleTogglePlayback}
+          onKeyDown={e => e.stopPropagation()}
+          aria-label={
+            isTrackPlaying ? `Pause ${release.title}` : `Play ${release.title}`
+          }
+          aria-pressed={isTrackPlaying}
+          data-testid={`shell-release-play-${release.id}`}
+          className={cn(
+            'absolute inset-0 grid place-items-center rounded-sm bg-black/50 text-white transition-opacity duration-subtle ease-subtle focus-visible:outline-none focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/55',
+            isTrackPlaying
+              ? 'opacity-100'
+              : 'opacity-0 group-hover/row:opacity-100'
+          )}
+        >
+          {isTrackPlaying ? (
+            <Pause
+              className='h-3.5 w-3.5'
+              strokeWidth={2.5}
+              fill='currentColor'
+              aria-hidden='true'
+            />
+          ) : (
+            <Play
+              className='h-3.5 w-3.5 translate-x-px'
+              strokeWidth={2.5}
+              fill='currentColor'
+              aria-hidden='true'
+            />
+          )}
+        </button>
+      ) : null}
+    </div>
+  );
+});
+
+const SmartLinkCell = memo(function SmartLinkCell({
+  release,
+  smartLinkLockReason,
+  smartLinkPath,
+}: {
+  readonly release: ReleaseViewModel;
+  readonly smartLinkLockReason: ShellRowLockReason;
+  readonly smartLinkPath: string;
+}) {
+  const isLocked = smartLinkLockReason !== null;
+  const isScheduled = smartLinkLockReason === 'scheduled';
+
+  if (isLocked) {
+    return (
+      <span
+        role='img'
+        aria-label={
+          isScheduled
+            ? `Scheduled smart link (Pro) for ${release.title}`
+            : `Smart link locked (Pro) for ${release.title}`
+        }
+        title={
+          isScheduled
+            ? 'Pre-release smart link requires Pro'
+            : 'Smart link locked — upgrade for more'
+        }
+        data-shell-release-smart-link-locked='true'
+        data-shell-release-smart-link-lock-reason={smartLinkLockReason}
+        className='shrink-0 h-7 w-7 rounded-md grid place-items-center text-quaternary-token cursor-not-allowed'
+      >
+        {isScheduled ? (
+          <Clock className='h-3 w-3' strokeWidth={2.25} aria-hidden='true' />
+        ) : (
+          <Lock className='h-3 w-3' strokeWidth={2.25} aria-hidden='true' />
+        )}
+      </span>
+    );
+  }
+
+  return (
+    <Link
+      href={smartLinkPath}
+      target='_blank'
+      rel='noreferrer'
+      onClick={e => e.stopPropagation()}
+      title={`Open smart link · ${smartLinkPath}`}
+      aria-label={`Open smart link for ${release.title}`}
+      className='shrink-0 h-7 w-7 rounded-md grid place-items-center text-quaternary-token hover:text-primary-token hover:bg-surface-2/70 transition-colors duration-subtle ease-subtle'
+    >
+      <ExternalLink className='h-3 w-3' strokeWidth={2.25} />
+    </Link>
+  );
+});
+
+// ── Main row component ─────────────────────────────────────────────────────────
+
 /**
- * Linear-style release row for the SHELL_CHAT_V1 path. Replaces the legacy
+ * Linear-style release row for the DESIGN_V1 path. Replaces the legacy
  * provider-matrix cells with: artwork + title + artists + status + drop date
  * + DSP avatar stack + smart link + more menu.
  *
- * The outer `<li>` is the click + keyboard target (parent `<ul role="listbox">`
- * means `<li role="option">` with `tabIndex={0}` is the right semantic).
+ * The outer `<div>` is the click + keyboard target (parent `<div role="listbox">`)
  * Inner interactive elements (smart link, more-menu) stop propagation so
  * they don't double-fire selection — the standard pattern across shell-v1.
  */
@@ -26,12 +214,14 @@ export const ShellReleaseRow = memo(function ShellReleaseRow({
   release,
   isSelected,
   onSelect,
-  onOpenMore,
+  actionMenuItems,
+  smartLinkLockReason = null,
 }: {
   readonly release: ReleaseViewModel;
   readonly isSelected: boolean;
   readonly onSelect: () => void;
-  readonly onOpenMore?: (e: React.MouseEvent<HTMLButtonElement>) => void;
+  readonly actionMenuItems?: TableActionMenuItem[];
+  readonly smartLinkLockReason?: ShellRowLockReason;
 }) {
   const dspItems = useMemo(() => releaseToDspItems(release), [release]);
   const dropMeta = useMemo(
@@ -41,6 +231,23 @@ export const ShellReleaseRow = memo(function ShellReleaseRow({
   const status = releaseStatusToShell(release.status);
   const artistLabel = release.artistNames?.join(', ') ?? '';
   const smartLinkPath = release.smartLinkPath || `/${release.slug}`;
+  const { playbackState } = useTrackAudioPlayer();
+  const isActiveTrack = playbackState.activeTrackId === release.id;
+
+  const releaseEntity: EntityPopoverData = {
+    kind: 'release',
+    id: release.id,
+    label: release.title,
+    thumbnail: release.artworkUrl,
+    artist: artistLabel || undefined,
+    releaseType: release.releaseType,
+    releaseDate: release.releaseDate,
+    totalTracks: release.totalTracks > 0 ? release.totalTracks : undefined,
+    durationSec: release.totalDurationMs
+      ? Math.floor(release.totalDurationMs / 1000)
+      : undefined,
+    status: release.status,
+  };
 
   function handleKeyDown(e: KeyboardEvent<HTMLDivElement>) {
     if (e.key === 'Enter' || e.key === ' ') {
@@ -50,7 +257,7 @@ export const ShellReleaseRow = memo(function ShellReleaseRow({
   }
 
   return (
-    <div
+    <ShellListRowFrame
       role='option'
       aria-selected={isSelected}
       tabIndex={0}
@@ -58,33 +265,24 @@ export const ShellReleaseRow = memo(function ShellReleaseRow({
       onKeyDown={handleKeyDown}
       data-shell-release-row
       data-release-id={release.id}
-      className={cn(
-        'group/row relative flex items-center gap-3 px-3 h-14 rounded-md cursor-pointer transition-colors duration-150 ease-out outline-none focus-visible:ring-1 focus-visible:ring-cyan-400/50',
-        isSelected
-          ? 'bg-(--linear-bg-surface-1)/80'
-          : 'hover:bg-(--linear-bg-surface-1)/50'
-      )}
+      data-release-active={isActiveTrack ? 'true' : undefined}
+      isSelected={isSelected}
+      interactive
+      className='group/row flex h-14 items-center gap-3 px-3'
     >
-      {isSelected ? (
-        <span
-          aria-hidden='true'
-          className='absolute left-0 top-1/2 -translate-y-1/2 h-3.5 w-[3px] rounded-full bg-cyan-400'
-        />
-      ) : null}
-
-      <ArtworkThumb
-        src={release.artworkUrl ?? ''}
-        title={release.title}
-        size={40}
-      />
+      <ArtworkCell release={release} />
 
       <div className='min-w-0 flex-1'>
-        <div className='truncate text-[13px] font-caption text-primary-token leading-[1.2]'>
+        <EntityHoverLink
+          entity={releaseEntity}
+          className={cn(
+            shellReleaseRowTypography.title,
+            'inline-flex w-full max-w-full hover:no-underline'
+          )}
+        >
           {release.title}
-        </div>
-        <div className='truncate text-[11px] text-tertiary-token leading-[1.3] mt-0.5'>
-          {artistLabel}
-        </div>
+        </EntityHoverLink>
+        <div className={shellReleaseRowTypography.subtitle}>{artistLabel}</div>
       </div>
 
       <div className='hidden md:inline-flex shrink-0'>
@@ -101,35 +299,29 @@ export const ShellReleaseRow = memo(function ShellReleaseRow({
         <DspAvatarStack dsps={dspItems} />
       </div>
 
-      <Link
-        href={smartLinkPath}
-        target='_blank'
-        rel='noreferrer'
-        onClick={e => e.stopPropagation()}
-        title={`Open smart link · ${smartLinkPath}`}
-        aria-label={`Open smart link for ${release.title}`}
-        className='shrink-0 h-7 w-7 rounded-md grid place-items-center text-quaternary-token hover:text-primary-token hover:bg-surface-2/70 transition-colors duration-150 ease-out'
-      >
-        <ExternalLink className='h-3 w-3' strokeWidth={2.25} />
-      </Link>
+      <SmartLinkCell
+        release={release}
+        smartLinkLockReason={smartLinkLockReason}
+        smartLinkPath={smartLinkPath}
+      />
 
-      {onOpenMore ? (
-        <button
-          type='button'
-          onClick={e => {
-            e.stopPropagation();
-            onOpenMore(e);
-          }}
-          aria-label={`Release actions for ${release.title}`}
-          className={cn(
-            'shrink-0 h-7 w-7 rounded-md grid place-items-center text-quaternary-token hover:text-primary-token hover:bg-surface-2/70 transition-[opacity,color,background-color] duration-150 ease-out',
-            'opacity-0 group-hover/row:opacity-100 focus-visible:opacity-100 data-[state=open]:opacity-100',
-            isSelected && 'opacity-100'
-          )}
-        >
-          <MoreHorizontal className='h-3 w-3' strokeWidth={2.25} />
-        </button>
+      {actionMenuItems && actionMenuItems.length > 0 ? (
+        <TableActionMenu items={actionMenuItems} trigger='custom' align='end'>
+          <button
+            type='button'
+            onClick={e => e.stopPropagation()}
+            onKeyDown={e => e.stopPropagation()}
+            aria-label={`Release actions for ${release.title}`}
+            className={cn(
+              'shrink-0 h-7 w-7 rounded-md grid place-items-center text-quaternary-token hover:text-primary-token hover:bg-surface-2/70 transition-[opacity,color,background-color] duration-subtle ease-subtle',
+              'opacity-0 group-hover/row:opacity-100 focus-visible:opacity-100 data-[state=open]:opacity-100',
+              isSelected && 'opacity-100'
+            )}
+          >
+            <MoreHorizontal className='h-3 w-3' strokeWidth={2.25} />
+          </button>
+        </TableActionMenu>
       ) : null}
-    </div>
+    </ShellListRowFrame>
   );
 });

@@ -1,10 +1,16 @@
 import { defineConfig, devices } from '@playwright/test';
+import { DESKTOP_SMOKE_SPECS } from './tests/e2e/smoke-manifest';
 
 /**
- * Smoke Test Playwright Configuration
+ * Smoke Test Playwright Configuration (Desktop)
  *
- * Focused config for the highest-signal smoke test files that gate production deploys.
- * Optimized for speed: higher parallelism, shorter timeouts, no video recording.
+ * Focused config for the highest-signal smoke test files that gate production
+ * deploys. Optimized for speed: higher parallelism, shorter timeouts, no
+ * video recording.
+ *
+ * The spec list lives in `tests/e2e/smoke-manifest.ts` so the package script,
+ * the CI workflow, and this config stay in lockstep. See
+ * `apps/web/tests/TESTING.md` → "Smoke Lanes" for the canonical policy.
  *
  * Usage:
  *   pnpm --filter=@jovie/web exec playwright test --config=playwright.config.smoke.ts
@@ -24,16 +30,12 @@ if (!managedWebServerUrl.port) {
   managedWebServerUrl.port = '3100';
 }
 const managedWebServerPort = managedWebServerUrl.port;
+const useTestAuthBypass = process.env.E2E_USE_TEST_AUTH_BYPASS === '1';
 
 export default defineConfig({
   testDir: './tests/e2e',
-  // Keep this lane limited to the highest-signal unauthenticated/public/auth flows.
-  testMatch: [
-    'smoke-public.spec.ts',
-    'golden-path.spec.ts',
-    'signup-funnel.smoke.spec.ts',
-    'smoke-auth.spec.ts',
-  ],
+  // Source of truth: tests/e2e/smoke-manifest.ts → DESKTOP_SMOKE_SPECS.
+  testMatch: [...DESKTOP_SMOKE_SPECS],
   fullyParallel: true,
   forbidOnly: true,
   retries: 2,
@@ -56,18 +58,12 @@ export default defineConfig({
     navigationTimeout: 60_000,
     actionTimeout: 20_000,
     ...(Object.keys(extraHTTPHeaders).length > 0 && { extraHTTPHeaders }),
-    storageState: 'tests/.auth/user.json',
+    storageState: { cookies: [], origins: [] },
   },
 
   projects: [
     {
-      name: 'auth-setup',
-      testMatch: /auth\.setup\.ts/,
-      use: { storageState: { cookies: [], origins: [] } },
-    },
-    {
       name: 'chromium',
-      dependencies: ['auth-setup'],
       use: { ...devices['Desktop Chrome'] },
     },
   ],
@@ -77,14 +73,24 @@ export default defineConfig({
     ? {}
     : {
         webServer: {
+          // Pin Doppler scope explicitly so worktrees never inherit whichever
+          // scope happens to be active in the parent shell.
+          // See .claude/rules/environment.md.
           command: process.env.DATABASE_URL
             ? 'pnpm run dev:local'
-            : 'doppler run -- pnpm run dev:local',
+            : 'doppler run --project jovie-web --config dev -- pnpm run dev:local',
           env: {
             ...process.env,
             NODE_ENV: 'test',
             PORT: managedWebServerPort,
             NEXT_DISABLE_TOOLBAR: '1',
+            E2E_USE_TEST_AUTH_BYPASS: useTestAuthBypass ? '1' : '0',
+            ...(useTestAuthBypass
+              ? {
+                  NEXT_PUBLIC_CLERK_MOCK: '1',
+                  NEXT_PUBLIC_CLERK_PROXY_DISABLED: '1',
+                }
+              : {}),
           },
           url: managedWebServerUrl.origin,
           reuseExistingServer: true,

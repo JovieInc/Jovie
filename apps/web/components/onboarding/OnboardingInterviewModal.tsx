@@ -1,6 +1,7 @@
 'use client';
 
-import { usePathname, useRouter, useSearchParams } from 'next/navigation';
+import { Button } from '@jovie/ui';
+import { usePathname, useRouter } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   type InterviewQuestion,
@@ -42,16 +43,14 @@ function toTranscript(draft: DraftEntry[]) {
 }
 
 interface OnboardingInterviewModalProps {
-  readonly paramKey?: string;
+  readonly initialRequested?: boolean;
 }
 
 export function OnboardingInterviewModal({
-  paramKey = 'interview',
+  initialRequested = false,
 }: OnboardingInterviewModalProps) {
   const router = useRouter();
   const pathname = usePathname();
-  const searchParams = useSearchParams();
-  const isRequested = searchParams.get(paramKey) === '1';
 
   const dialogRef = useRef<HTMLDialogElement>(null);
   const [open, setOpen] = useState(false);
@@ -63,7 +62,7 @@ export function OnboardingInterviewModal({
   // submitted in this tab. Immediately strip the param so refresh/back
   // doesn't resurrect the modal.
   useEffect(() => {
-    if (!isRequested) return;
+    if (!initialRequested) return;
 
     const alreadySubmitted =
       globalThis.window !== undefined &&
@@ -76,7 +75,7 @@ export function OnboardingInterviewModal({
 
     setOpen(true);
     router.replace(pathname);
-  }, [isRequested, pathname, router]);
+  }, [initialRequested, pathname, router]);
 
   useEffect(() => {
     const dialog = dialogRef.current;
@@ -214,14 +213,14 @@ export function OnboardingInterviewModal({
         >
           Skip
         </button>
-        <button
-          type='button'
+        <Button
+          variant='whitePill'
           onClick={() => advance(false)}
           disabled={!canSubmit || entry.answer.trim().length === 0}
-          className='rounded-full bg-white px-4 py-2 text-sm font-medium text-black transition-opacity hover:opacity-90 disabled:opacity-40'
+          className='px-4 py-2 text-sm'
         >
           {submitLabel}
-        </button>
+        </Button>
       </div>
     </dialog>
   );

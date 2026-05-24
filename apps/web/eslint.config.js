@@ -1,6 +1,7 @@
 const nextConfig = require('eslint-config-next');
 const nextCoreWebVitals = require('eslint-config-next/core-web-vitals');
 const boundariesPlugin = require('eslint-plugin-boundaries');
+const tsParser = require('@typescript-eslint/parser');
 const iconUsageRule = require('./eslint-rules/icon-usage');
 const edgeRuntimeNodeImportsRule = require('./eslint-rules/edge-runtime-node-imports');
 const noHandlerInitializationRule = require('./eslint-rules/no-handler-initialization');
@@ -12,6 +13,12 @@ const noManualDbPoolingRule = require('./eslint-rules/no-manual-db-pooling');
 const noHardcodedRoutesRule = require('./eslint-rules/no-hardcoded-routes');
 const requireQueryCacheConfigRule = require('./eslint-rules/require-query-cache-config');
 const requireAbortSignalRule = require('./eslint-rules/require-abort-signal');
+const noRawMotionValuesRule = require('./eslint-rules/no-raw-motion-values');
+const noDirectElectronBridgeRule = require('./eslint-rules/no-direct-electron-bridge');
+const noBannedMarketingCopyRule = require('./eslint-rules/no-banned-marketing-copy');
+const noRawFocusRingRule = require('./eslint-rules/no-raw-focus-ring');
+const noAdHocCurrencyRule = require('./eslint-rules/no-ad-hoc-currency');
+const clerkOauthOptionsMustIncludePromptRule = require('./eslint-rules/clerk-oauth-options-must-include-prompt');
 
 const [nextBase, nextTypescript, nextIgnores] = nextConfig;
 
@@ -32,6 +39,13 @@ const baseConfig = {
         'no-hardcoded-routes': noHardcodedRoutesRule,
         'require-query-cache-config': requireQueryCacheConfigRule,
         'require-abort-signal': requireAbortSignalRule,
+        'no-raw-motion-values': noRawMotionValuesRule,
+        'no-direct-electron-bridge': noDirectElectronBridgeRule,
+        'no-banned-marketing-copy': noBannedMarketingCopyRule,
+        'no-raw-focus-ring': noRawFocusRingRule,
+        'no-ad-hoc-currency': noAdHocCurrencyRule,
+        'clerk-oauth-options-must-include-prompt':
+          clerkOauthOptionsMustIncludePromptRule,
       },
     },
   },
@@ -174,6 +188,21 @@ const baseConfig = {
     '@jovie/no-hardcoded-routes': 'error',
     '@jovie/require-query-cache-config': 'error',
     '@jovie/require-abort-signal': 'error',
+    '@jovie/no-raw-motion-values': 'warn',
+    // Prevent renderer code from reaching past the guarded electron-bridge
+    // wrapper — installed binaries may expose a partial bridge.
+    '@jovie/no-direct-electron-bridge': 'error',
+    // Marketing copy guardrails — prevent placeholder/internal text on public pages
+    // (Scoped to app/(marketing)/** via the rule's internal file filter)
+    '@jovie/no-banned-marketing-copy': 'error',
+    // Design-system focus ring enforcement — interactive elements must use
+    // canonical focus-ring-themed or focus-visible:* utilities
+    '@jovie/no-raw-focus-ring': 'warn',
+    '@jovie/no-ad-hoc-currency': 'error',
+    // clerk-oauth-options-must-include-prompt is scoped to app/(auth)/** via
+    // its internal file-path check, so setting 'error' globally is safe — it
+    // will only fire on files under app/(auth)/.
+    '@jovie/clerk-oauth-options-must-include-prompt': 'error',
   },
 };
 
@@ -367,6 +396,31 @@ module.exports = [
           ],
         },
       ],
+    },
+  },
+  // JOV-2168: Deferred no-ad-hoc-currency violations — each suppressed here pending
+  // migration to the canonical formatter (see linked issue for per-file rationale).
+  {
+    files: [
+      'lib/chat/system-prompt.ts',
+      'components/organisms/billing/PlanComparisonSection.tsx',
+      'components/molecules/PaySelector.tsx',
+      'app/investor-portal/_components/FundraiseProgress.tsx',
+      'app/onboarding/checkout/OnboardingCheckoutClient.tsx',
+    ],
+    rules: {
+      '@jovie/no-ad-hoc-currency': 'off',
+    },
+  },
+  {
+    files: ['**/*.{js,jsx,mjs,mts,cts}'],
+    languageOptions: {
+      // Next's default parser crashes on module-style config and support files
+      // under ESLint 10.2.1. Reuse the TypeScript parser here so plain JS/ESM
+      // scripts keep lint coverage.
+      parser: tsParser,
+      ecmaVersion: 'latest',
+      sourceType: 'module',
     },
   },
 ];

@@ -36,6 +36,13 @@ const PUBLIC_PROFILE_LOADER_SOURCE = readFileSync(
   'utf8'
 );
 const PUBLIC_PROFILE_PAGE_AND_LOADER_SOURCE = `${PUBLIC_PROFILE_PAGE_SOURCE}\n${PUBLIC_PROFILE_LOADER_SOURCE}`;
+const PUBLIC_PROFILE_TEMPLATE_SOURCE = readFileSync(
+  path.join(
+    WEB_ROOT,
+    'components/features/profile/templates/ProfileCompactTemplate.tsx'
+  ),
+  'utf8'
+);
 
 const mockProfile = {
   id: 'profile-123',
@@ -113,7 +120,10 @@ describe('Public Profile Page Logic', () => {
         'Error fetching public profile tour dates'
       );
       expect(PUBLIC_PROFILE_PAGE_SOURCE).toContain(
-        'getPublicTourDates(profile.id)'
+        'const tourDatesPromise = getPublicTourDates(profile.id)'
+      );
+      expect(PUBLIC_PROFILE_PAGE_SOURCE).toContain(
+        'tourDatesPromise.catch(() => [] as TourDateViewModel[])'
       );
     });
 
@@ -129,10 +139,42 @@ describe('Public Profile Page Logic', () => {
   });
 
   describe('public claim banner handling', () => {
-    it('reads search params for mode handling', () => {
-      expect(PUBLIC_PROFILE_PAGE_SOURCE).toContain(
-        'const resolvedSearchParams = await searchParams;'
+    it('keeps mode query handling out of the ISR server render', () => {
+      expect(PUBLIC_PROFILE_PAGE_SOURCE).not.toContain('await searchParams');
+      expect(PUBLIC_PROFILE_PAGE_SOURCE).not.toContain('readonly searchParams');
+      expect(PUBLIC_PROFILE_TEMPLATE_SOURCE).toContain(
+        'new URLSearchParams(globalThis.location.search).get'
       );
+    });
+
+    it('derives the runtime mode from ?mode= search params', async () => {
+      const { getProfileMode } = await import('@/features/profile/registry');
+
+      // Default and unknown values fall back to 'profile'.
+      expect(getProfileMode(null)).toBe('profile');
+      expect(getProfileMode(undefined)).toBe('profile');
+      expect(getProfileMode('not-a-real-mode')).toBe('profile');
+
+      // Known modes round-trip.
+      expect(getProfileMode('listen')).toBe('listen');
+      expect(getProfileMode('pay')).toBe('pay');
+
+      // Legacy 'tip' alias remaps to 'pay' so old links keep working.
+      expect(getProfileMode('tip')).toBe('pay');
+    });
+
+    it('derives a subtitle for every supported runtime mode', () => {
+      // If a route ever stops feeding the URL `?mode=` value into the
+      // subtitle helper, the visible header copy will silently drift. Assert
+      // that each mode maps to the same registry-driven subtitle the
+      // template renders so a regression there is caught here.
+      for (const mode of profileModes) {
+        const subtitle = getProfileModeSubtitle(mode);
+        expect(typeof subtitle).toBe('string');
+        expect(subtitle.length).toBeGreaterThan(0);
+      }
+      // 'tip' is the legacy alias for 'pay' — must produce the same subtitle.
+      expect(getProfileModeSubtitle('tip')).toBe(getProfileModeSubtitle('pay'));
     });
 
     it('delegates claim banner query handling to the client wrapper', () => {
@@ -140,12 +182,13 @@ describe('Public Profile Page Logic', () => {
     });
   });
 
-  describe('profile accent backfill', () => {
-    it('derives a non-persisted accent fallback during public profile render', () => {
-      expect(PUBLIC_PROFILE_LOADER_SOURCE).toContain(
+  describe('profile accent handling', () => {
+    it('does not derive remote avatar accents during public profile ISR render', () => {
+      expect(PUBLIC_PROFILE_LOADER_SOURCE).toContain('mergeProfileTheme');
+      expect(PUBLIC_PROFILE_LOADER_SOURCE).not.toContain(
         'ensureThemeHasProfileAccent'
       );
-      expect(PUBLIC_PROFILE_LOADER_SOURCE).toContain('accentSourceUrl');
+      expect(PUBLIC_PROFILE_LOADER_SOURCE).not.toContain('accentSourceUrl');
       expect(PUBLIC_PROFILE_LOADER_SOURCE).not.toContain(
         'persistDerivedProfileAccent'
       );
@@ -263,7 +306,7 @@ describe('Public Profile Page Logic', () => {
         ],
       };
 
-      const MAX_EVENT_SCHEMAS = 10;
+      const MAX_EVENT_SCHEMAS = 5;
       const eventSchemas = tourDates.slice(0, MAX_EVENT_SCHEMAS).map(td => ({
         '@type': 'MusicEvent',
         '@id': `${profileUrl}#event-${td.id}`,
@@ -473,7 +516,7 @@ describe('Public Profile Page Logic', () => {
       ).toBe(false);
     });
 
-    it('adds MusicEvent schemas for tour dates, capped at 10', () => {
+    it('adds MusicEvent schemas for tour dates, capped at 5', () => {
       const tourDates: TourDateForTest[] = Array.from(
         { length: 15 },
         (_, i) => ({
@@ -501,7 +544,7 @@ describe('Public Profile Page Logic', () => {
         item => item['@type'] === 'MusicEvent'
       );
 
-      expect(events.length).toBe(10);
+      expect(events.length).toBe(5);
     });
 
     it('emits zero MusicEvent schemas when no tour dates', () => {
@@ -522,7 +565,7 @@ describe('Public Profile Page Logic', () => {
   describe('Profile page mode logic', () => {
     it.each([
       ['profile', 'Artist'],
-      ['pay', 'Support'],
+      ['pay', 'Pay'],
       ['listen', 'Listen now'],
       ['subscribe', 'Manage alerts'],
     ])('mode "%s" maps to subtitle "%s"', (mode, expectedSubtitle) => {

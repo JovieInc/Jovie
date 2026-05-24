@@ -3,9 +3,7 @@
 import { TooltipProvider } from '@jovie/ui';
 import type { ReactNode } from 'react';
 import {
-  createContext,
   useCallback,
-  useContext,
   useEffect,
   useMemo,
   useRef,
@@ -13,20 +11,29 @@ import {
   useTransition,
 } from 'react';
 import { PreviewPanelProvider } from '@/app/app/(shell)/dashboard/PreviewPanelContext';
+import { UpdateAvailablePill } from '@/components/atoms/UpdateAvailablePill';
 import { ErrorBoundary } from '@/components/providers/ErrorBoundary';
 import {
   HeaderActionsProvider,
-  useOptionalHeaderActions,
+  useHeaderActions,
 } from '@/contexts/HeaderActionsContext';
 import {
   KeyboardShortcutsProvider,
   useKeyboardShortcuts,
 } from '@/contexts/KeyboardShortcutsContext';
 import { RightPanelProvider } from '@/contexts/RightPanelContext';
+import { ShellSidebarOverrideProvider } from '@/contexts/ShellSidebarOverrideContext';
+import {
+  type TableMeta,
+  TableMetaContext,
+  TableMetaProvider,
+  useTableMeta,
+} from '@/contexts/TableMetaContext';
 import { HeaderChatUsageIndicator } from '@/features/dashboard/atoms/HeaderChatUsageIndicator';
-import { HeaderProfileProgress } from '@/features/dashboard/atoms/HeaderProfileProgress';
 import { useAuthRouteConfig } from '@/hooks/useAuthRouteConfig';
 import { useDashboardShortcuts } from '@/hooks/useDashboardShortcuts';
+import { useGlobalShortcutActions } from '@/hooks/useGlobalShortcutActions';
+import { useIsElectronRuntime } from '@/lib/desktop/electron-bridge';
 import { AuthShell } from './AuthShell';
 import { CommandPalette } from './CommandPalette';
 import { KeyboardShortcutsSheet } from './keyboard-shortcuts-sheet';
@@ -36,52 +43,7 @@ import {
   usePendingShell,
 } from './PendingShellContext';
 
-export { usePendingShell };
-
-// TableMetaContext for audience/creators tables
-type TableMeta = {
-  rowCount: number | null;
-  toggle?: (() => void) | null;
-  rightPanelWidth?: number | null;
-};
-
-type TableMetaContextValue = {
-  tableMeta: TableMeta;
-  setTableMeta: (meta: TableMeta) => void;
-};
-
-const TableMetaContext = createContext<TableMetaContextValue | null>(null);
-
-export function useTableMeta(): TableMetaContextValue {
-  const ctx = useContext(TableMetaContext);
-  if (!ctx) {
-    throw new TypeError('useTableMeta must be used within AuthShellWrapper');
-  }
-  return ctx;
-}
-
-/**
- * TableMetaProvider - Provides TableMetaContext for use in Storybook and tests.
- * Use this when you need to render components that call useTableMeta()
- * without the full AuthShellWrapper (e.g., in Storybook stories).
- */
-export function TableMetaProvider({
-  children,
-}: Readonly<{ children: ReactNode }>) {
-  const [tableMeta, setTableMeta] = useState<TableMeta>({
-    rowCount: null,
-    toggle: null,
-  });
-  const value = useMemo(
-    () => ({ tableMeta, setTableMeta }),
-    [tableMeta, setTableMeta]
-  );
-  return (
-    <TableMetaContext.Provider value={value}>
-      {children}
-    </TableMetaContext.Provider>
-  );
-}
+export { TableMetaProvider, usePendingShell, useTableMeta };
 
 export interface AuthShellWrapperProps {
   readonly persistSidebarCollapsed?: (collapsed: boolean) => Promise<void>;
@@ -96,6 +58,7 @@ export interface AuthShellWrapperProps {
 function KeyboardShortcutsHandler() {
   const { open } = useKeyboardShortcuts();
   useDashboardShortcuts({ onOpenShortcutsModal: open });
+  useGlobalShortcutActions();
   return <KeyboardShortcutsSheet />;
 }
 
@@ -114,7 +77,8 @@ function AuthShellWrapperInner({
   children: ReactNode;
 }>) {
   const config = useAuthRouteConfig();
-  const headerActionsContext = useOptionalHeaderActions();
+  const headerActions = useHeaderActions();
+  const isElectron = useIsElectronRuntime();
   const [, startTransition] = useTransition();
   const [pendingShellRoute, setPendingShellRoute] =
     useState<PendingShellRoute>(null);
@@ -133,7 +97,12 @@ function AuthShellWrapperInner({
   const previewEnabled =
     config.section === 'dashboard' || config.isArtistProfileSettings;
   const shouldDefaultOpenPreviewPanel =
-    config.section === 'dashboard' && previewPanelDefaultOpen;
+    config.section === 'dashboard' &&
+    !config.isChatRoute &&
+    previewPanelDefaultOpen;
+  const previewPanelScope = config.isArtistProfileSettings
+    ? 'artist-profile-settings'
+    : 'app-shell';
 
   // Determine header action: use custom actions from context if available,
   // otherwise fall back to default based on route type
@@ -143,21 +112,20 @@ function AuthShellWrapperInner({
         {config.showChatUsageIndicator && !config.isDemoRoute ? (
           <HeaderChatUsageIndicator />
         ) : null}
-        <HeaderProfileProgress />
+        {isElectron ? null : <UpdateAvailablePill />}
       </>
     ),
-    [config.isDemoRoute, config.showChatUsageIndicator]
+    [config.isDemoRoute, config.showChatUsageIndicator, isElectron]
   );
   // Wrap page-injected header elements in ErrorBoundary so a throwing badge/action
   // degrades gracefully (renders nothing + toast) instead of crashing the shell.
-  const rawHeaderAction =
-    headerActionsContext?.headerActions ?? defaultHeaderAction;
+  const rawHeaderAction = headerActions.headerActions ?? defaultHeaderAction;
   const headerAction = rawHeaderAction ? (
     <ErrorBoundary fallback={null}>{rawHeaderAction}</ErrorBoundary>
   ) : null;
 
   // Header badge from context (shown after breadcrumb on left side)
-  const rawHeaderBadge = headerActionsContext?.headerBadge ?? null;
+  const rawHeaderBadge = headerActions.headerBadge ?? null;
   const headerBadge = rawHeaderBadge ? (
     <ErrorBoundary fallback={null}>{rawHeaderBadge}</ErrorBoundary>
   ) : null;
@@ -281,7 +249,7 @@ function AuthShellWrapperInner({
       <PendingShellContext.Provider value={pendingShellContextValue}>
         <RightPanelProvider>
           <PreviewPanelProvider
-            key={config.section}
+            key={previewPanelScope}
             defaultOpen={shouldDefaultOpenPreviewPanel}
             enabled={previewEnabled}
           >
@@ -292,6 +260,7 @@ function AuthShellWrapperInner({
               headerAction={headerAction}
               showMobileTabs={config.showMobileTabs}
               isTableRoute={config.isTableRoute}
+              isLyricsRoute={config.isLyricsRoute}
               onSidebarOpenChange={
                 persistSidebarCollapsed ? handleSidebarOpenChange : undefined
               }
@@ -325,18 +294,20 @@ export function AuthShellWrapper({
   children,
 }: Readonly<AuthShellWrapperProps>) {
   return (
-    <TooltipProvider delayDuration={1200}>
+    <TooltipProvider delayDuration={120} skipDelayDuration={40}>
       <KeyboardShortcutsProvider>
         <HeaderActionsProvider>
-          <AuthShellWrapperInner
-            persistSidebarCollapsed={persistSidebarCollapsed}
-            sidebarDefaultOpen={sidebarDefaultOpen}
-            previewPanelDefaultOpen={previewPanelDefaultOpen}
-          >
-            {children}
-          </AuthShellWrapperInner>
-          <KeyboardShortcutsHandler />
-          <CommandPalette />
+          <ShellSidebarOverrideProvider>
+            <AuthShellWrapperInner
+              persistSidebarCollapsed={persistSidebarCollapsed}
+              sidebarDefaultOpen={sidebarDefaultOpen}
+              previewPanelDefaultOpen={previewPanelDefaultOpen}
+            >
+              {children}
+            </AuthShellWrapperInner>
+            <KeyboardShortcutsHandler />
+            <CommandPalette />
+          </ShellSidebarOverrideProvider>
         </HeaderActionsProvider>
       </KeyboardShortcutsProvider>
     </TooltipProvider>

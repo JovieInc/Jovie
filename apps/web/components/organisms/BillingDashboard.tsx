@@ -67,11 +67,27 @@ const BillingDashboardContent = memo(function BillingDashboardContent() {
       source: 'billing_dashboard',
     });
     cancelMutation.mutate(undefined, {
-      onSuccess: () => {
-        notifySuccess('Your subscription has been cancelled.');
+      onSuccess: response => {
+        // Cancellation is scheduled at end of current billing period (JOV-2180).
+        // Surface the cancel-on date when Stripe returns it; otherwise fall
+        // back to a generic period-end message.
+        const cancelAtMs = response?.cancelAt
+          ? Date.parse(response.cancelAt)
+          : Number.NaN;
+        const message = Number.isFinite(cancelAtMs)
+          ? `Pro access continues until ${new Date(
+              cancelAtMs
+            ).toLocaleDateString(undefined, {
+              year: 'numeric',
+              month: 'long',
+              day: 'numeric',
+            })} — cancellation scheduled.`
+          : 'Pro access continues until the end of your billing period — cancellation scheduled.';
+        notifySuccess(message);
         setCancelDialogOpen(false);
         track('subscription_cancelled', {
           source: 'billing_dashboard',
+          cancelAtPeriodEnd: response?.cancelAtPeriodEnd === true,
         });
       },
     });

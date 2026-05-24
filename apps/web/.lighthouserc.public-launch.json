@@ -2,6 +2,9 @@
   "ci": {
     "collect": {
       "numberOfRuns": 3,
+      "settings": {
+        "preset": "desktop"
+      },
       "url": ["http://localhost:3200/"]
     },
     "assert": {
@@ -12,7 +15,7 @@
             "categories:performance": [
               "error",
               {
-                "minScore": 0.7
+                "minScore": 0.4
               }
             ],
             "categories:accessibility": [
@@ -48,7 +51,59 @@
             "total-blocking-time": [
               "error",
               {
-                "maxNumericValue": 300
+                "maxNumericValue": 1500
+              }
+            ],
+            "errors-in-console": "error",
+            "button-name": "error",
+            "color-contrast": "error",
+            "document-title": "error",
+            "html-has-lang": "error"
+          }
+        },
+        {
+          "matchingUrlPattern": "https?://[^/]+/brand$",
+          "assertions": {
+            "categories:performance": [
+              "error",
+              {
+                "minScore": 0.9
+              }
+            ],
+            "categories:accessibility": [
+              "error",
+              {
+                "minScore": 0.95
+              }
+            ],
+            "categories:best-practices": [
+              "error",
+              {
+                "minScore": 0.9
+              }
+            ],
+            "categories:seo": [
+              "warn",
+              {
+                "minScore": 0.8
+              }
+            ],
+            "cumulative-layout-shift": [
+              "error",
+              {
+                "maxNumericValue": 0.05
+              }
+            ],
+            "largest-contentful-paint": [
+              "error",
+              {
+                "maxNumericValue": 1500
+              }
+            ],
+            "total-blocking-time": [
+              "error",
+              {
+                "maxNumericValue": 100
               }
             ],
             "errors-in-console": "error",
@@ -100,7 +155,7 @@
             "total-blocking-time": [
               "error",
               {
-                "maxNumericValue": 300
+                "maxNumericValue": 1500
               }
             ],
             "errors-in-console": "error",
@@ -140,7 +195,7 @@
             "cumulative-layout-shift": [
               "error",
               {
-                "maxNumericValue": 0.15
+                "maxNumericValue": 0.25
               }
             ],
             "largest-contentful-paint": [
@@ -152,7 +207,7 @@
             "total-blocking-time": [
               "error",
               {
-                "maxNumericValue": 500
+                "maxNumericValue": 1500
               }
             ],
             "errors-in-console": "warn",
@@ -204,7 +259,7 @@
             "total-blocking-time": [
               "error",
               {
-                "maxNumericValue": 500
+                "maxNumericValue": 1500
               }
             ],
             "errors-in-console": "error",

@@ -9,6 +9,7 @@
 
 import type { CommonDropdownItem } from '@jovie/ui';
 import { Activity, Pause, Play, Plus, RefreshCw } from 'lucide-react';
+import { useRouter } from 'next/navigation';
 import {
   type ReactNode,
   useCallback,
@@ -48,7 +49,7 @@ import {
   StatusBadge,
 } from '@/components/shell/StatusBadge';
 import { TypeBadge } from '@/components/shell/TypeBadge';
-import { APP_ROUTES } from '@/constants/routes';
+import { buildReleaseTasksRoute } from '@/constants/routes';
 import { buildReleaseActions } from '@/features/dashboard/organisms/releases/release-actions';
 import { CompactReleasePlanUpgradeCard } from '@/features/dashboard/tasks/TasksUpgradeInterstitial';
 import {
@@ -196,7 +197,7 @@ function renderArtistLine(
       <button
         type='button'
         onClick={() => onArtistClick(fallback)}
-        className='rounded-sm hover:underline focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-(--linear-focus-ring)'
+        className='rounded-sm hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/55 focus-visible:ring-offset-2 focus-visible:ring-offset-(--linear-bg-page)'
       >
         {fallback}
       </button>
@@ -220,7 +221,7 @@ function renderArtistLine(
         key={key}
         type='button'
         onClick={() => onArtistClick(part.value)}
-        className='rounded-sm hover:underline focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-(--linear-focus-ring)'
+        className='rounded-sm hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/55 focus-visible:ring-offset-2 focus-visible:ring-offset-(--linear-bg-page)'
       >
         {part.value}
       </button>
@@ -276,7 +277,7 @@ function getDspAvatarItems(
       }),
       label,
       glyph: getProviderGlyph(label, provider.key),
-      colorClass: PROVIDER_COLOR_CLASS[provider.key] ?? 'bg-slate-500/90',
+      colorClass: PROVIDER_COLOR_CLASS[provider.key] ?? 'bg-surface-2',
     };
   });
 
@@ -289,11 +290,16 @@ function getDspAvatarItems(
         status: 'missing' as const,
         label,
         glyph: getProviderGlyph(label, key),
-        colorClass: PROVIDER_COLOR_CLASS[key] ?? 'bg-slate-500/90',
+        colorClass: PROVIDER_COLOR_CLASS[key] ?? 'bg-surface-2',
       };
     });
 
   return [...linkedItems, ...missingItems];
+}
+
+function formatTrackCount(totalTracks: number): string | null {
+  if (totalTracks <= 0) return null;
+  return `${totalTracks} ${totalTracks === 1 ? 'Track' : 'Tracks'}`;
 }
 
 function ReleaseEntityHeader({
@@ -326,10 +332,7 @@ function ReleaseEntityHeader({
     ? dropDateMeta(release.releaseDate)
     : null;
   const dspItems = getDspAvatarItems(release, providerConfig);
-  const trackLabel =
-    release.totalTracks > 0
-      ? `${release.totalTracks} ${release.totalTracks === 1 ? 'Track' : 'Tracks'}`
-      : null;
+  const trackLabel = formatTrackCount(release.totalTracks);
 
   return (
     <DrawerSurfaceCard
@@ -392,7 +395,7 @@ function ReleaseEntityHeader({
                 disabled={!previewUrl}
                 aria-pressed={isPlaying}
                 className={cn(
-                  'absolute inset-0 flex items-center justify-center rounded-lg transition-all duration-160',
+                  'absolute inset-0 flex items-center justify-center rounded-lg transition-[background-color,opacity] duration-subtle',
                   'bg-black/0 opacity-0',
                   'group-hover/artwork:bg-black/40 group-hover/artwork:opacity-100',
                   'aria-[pressed=true]:bg-black/40 aria-[pressed=true]:opacity-100',
@@ -505,8 +508,8 @@ function ReleaseActivitySection({
             key={`${row.providerKey}-${row.updatedAt}`}
             className='flex items-center gap-2.5 px-3 py-2.5'
           >
-            <span className='flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-subtle bg-surface-1 text-tertiary-token'>
-              <Activity className='h-3 w-3' aria-hidden='true' />
+            <span className='flex size-6 shrink-0 items-center justify-center rounded-full border border-subtle bg-surface-1 text-tertiary-token'>
+              <Activity className='size-3' aria-hidden='true' />
             </span>
             <div className='min-w-0 flex-1'>
               <p className='truncate text-[12px] font-caption text-primary-token'>
@@ -557,7 +560,9 @@ export function ReleaseSidebar({
   showCredits = true,
   onCanvasStatusUpdate,
   designV1 = false,
+  onTrackClick,
 }: ReleaseSidebarProps) {
+  const router = useRouter();
   const {
     isAddingLink,
     setIsAddingLink,
@@ -681,6 +686,7 @@ export function ReleaseSidebar({
       releaseTitle: release.title,
       artistName: release.artistNames?.[0],
       artworkUrl: release.artworkUrl,
+      hasLyrics: Boolean(release.lyrics?.trim()),
     }).catch(() => {});
   }, [toggleTrack, release]);
 
@@ -733,7 +739,7 @@ export function ReleaseSidebar({
             onRefresh();
             return;
           }
-          globalThis.location.reload();
+          router.refresh();
         },
         disabled: isRefreshing,
       },
@@ -746,6 +752,7 @@ export function ReleaseSidebar({
     onGenerateAlbumArt,
     isRefreshing,
     onRefresh,
+    router,
     setIsAddingLink,
   ]);
 
@@ -803,11 +810,8 @@ export function ReleaseSidebar({
       return;
     }
 
-    globalThis.location.href = APP_ROUTES.DASHBOARD_RELEASE_TASKS.replace(
-      '[releaseId]',
-      release.id
-    );
-  }, [release]);
+    router.push(buildReleaseTasksRoute(release.id));
+  }, [release, router]);
 
   const handleDismissTasksUpgrade = useCallback(() => {
     setShowTasksUpgrade(false);
@@ -934,6 +938,7 @@ export function ReleaseSidebar({
               <ReleaseTrackList
                 release={release}
                 tracksOverride={tracksOverride}
+                onTrackClick={onTrackClick}
               />
             </DrawerSection>
           ) : null}
@@ -970,10 +975,13 @@ export function ReleaseSidebar({
         <div data-testid='release-tasks-card'>
           {isTasksWorkspaceGateLoading ? (
             <div
-              className='animate-pulse px-1 py-1.5 text-xs text-secondary-token'
+              className='px-1 py-1.5'
               data-testid='release-tasks-loading-state'
             >
-              Loading tasks...
+              <div
+                className='h-3 w-24 rounded skeleton motion-reduce:animate-none'
+                aria-hidden='true'
+              />
             </div>
           ) : null}
           {!isTasksWorkspaceGateLoading && canAccessTasksWorkspace ? (
@@ -1031,6 +1039,7 @@ export function ReleaseSidebar({
       data-testid='release-sidebar'
       headerMode='minimal'
       hideMinimalHeaderBar
+      entityHeaderSurface='flat'
       entityHeader={
         release ? (
           <ReleaseEntityHeader
@@ -1082,7 +1091,7 @@ export function ReleaseSidebar({
                 options={releaseTabOptions}
                 ariaLabel='Release sidebar tabs'
                 overflowMode='scroll'
-                distribution='intrinsic'
+                distribution='fill'
               />
             }
             controls={activeTab === 'dsps' ? platformCardActions : undefined}

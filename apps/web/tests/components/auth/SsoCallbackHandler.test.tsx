@@ -4,6 +4,7 @@ import { SsoCallbackHandler } from '@/features/auth/SsoCallbackHandler';
 
 const replaceMock = vi.fn();
 const handleRedirectCallbackMock = vi.fn();
+const searchParamsState = { value: '' };
 
 vi.mock('@clerk/nextjs', () => ({
   useClerk: () => ({
@@ -13,6 +14,7 @@ vi.mock('@clerk/nextjs', () => ({
 
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ replace: replaceMock }),
+  useSearchParams: () => new URLSearchParams(searchParamsState.value),
 }));
 
 vi.mock('@/components/atoms/LoadingSpinner', () => ({
@@ -22,6 +24,7 @@ vi.mock('@/components/atoms/LoadingSpinner', () => ({
 describe('SsoCallbackHandler', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    searchParamsState.value = '';
     // Default: callback resolves successfully
     handleRedirectCallbackMock.mockResolvedValue(undefined);
   });
@@ -46,6 +49,23 @@ describe('SsoCallbackHandler', () => {
     expect(handleRedirectCallbackMock).toHaveBeenCalledWith({
       signInFallbackRedirectUrl: '/onboarding',
       signUpFallbackRedirectUrl: '/onboarding',
+      transferable: true,
+    });
+  });
+
+  it('uses desktop_return as the fallback after OAuth callback processing', () => {
+    searchParamsState.value = 'desktop_return=%2Fapp%2Fsettings';
+
+    render(
+      <SsoCallbackHandler
+        signInFallbackRedirectUrl='/onboarding'
+        signUpFallbackRedirectUrl='/start'
+      />
+    );
+
+    expect(handleRedirectCallbackMock).toHaveBeenCalledWith({
+      signInFallbackRedirectUrl: '/auth-return?route=%2Fapp%2Fsettings',
+      signUpFallbackRedirectUrl: '/auth-return?route=%2Fapp%2Fsettings',
       transferable: true,
     });
   });
@@ -102,6 +122,24 @@ describe('SsoCallbackHandler', () => {
 
     await vi.waitFor(() => {
       expect(replaceMock).toHaveBeenCalledWith('/signup?oauth_error=unknown');
+    });
+  });
+
+  it('preserves desktop_return on signup error redirects', async () => {
+    searchParamsState.value = 'desktop_return=%2Fapp%2Fsettings';
+    handleRedirectCallbackMock.mockRejectedValue(new Error('Network error'));
+
+    render(
+      <SsoCallbackHandler
+        signInFallbackRedirectUrl='/onboarding'
+        signUpFallbackRedirectUrl='/onboarding'
+      />
+    );
+
+    await vi.waitFor(() => {
+      expect(replaceMock).toHaveBeenCalledWith(
+        '/signup?desktop_return=%2Fapp%2Fsettings&oauth_error=unknown'
+      );
     });
   });
 

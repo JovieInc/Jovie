@@ -3,11 +3,11 @@ import { APP_ROUTES } from '@/constants/routes';
 import { cn } from '@/lib/utils';
 
 export interface MarketingFinalCTAProps {
-  /** Override headline copy. Defaults to the standard "Start using Jovie today" line. */
+  /** Override headline copy. Defaults to the standard private launch request line. */
   readonly title?: string;
   /** Optional supporting paragraph below the headline. */
   readonly body?: string;
-  /** Primary CTA label. Defaults to "Start Free Trial". */
+  /** Primary CTA label. Defaults to "Request Access". */
   readonly ctaLabel?: string;
   /** Primary CTA destination. Defaults to the signup route. */
   readonly ctaHref?: string;
@@ -18,8 +18,8 @@ export interface MarketingFinalCTAProps {
   readonly testId?: string;
 }
 
-const DEFAULT_TITLE = 'Start using Jovie today for free.';
-const DEFAULT_CTA_LABEL = 'Start Free Trial';
+const DEFAULT_TITLE = 'Request private launch access.';
+const DEFAULT_CTA_LABEL = 'Request Access';
 const DEFAULT_CTA_HREF = APP_ROUTES.SIGNUP;
 
 export function MarketingFinalCTA({

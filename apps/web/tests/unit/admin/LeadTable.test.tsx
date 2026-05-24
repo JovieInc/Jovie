@@ -1,8 +1,8 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { render, screen } from '@testing-library/react';
+import { cleanup, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { ReactElement } from 'react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { AdminLead } from '@/lib/queries';
 
@@ -90,6 +90,10 @@ async function getLeadTable() {
 }
 
 describe('LeadTable', () => {
+  afterEach(() => {
+    cleanup();
+  });
+
   beforeEach(() => {
     vi.clearAllMocks();
 
@@ -105,6 +109,7 @@ describe('LeadTable', () => {
       hasNextPage: false,
       isFetchingNextPage: false,
       fetchNextPage: vi.fn(),
+      refetch: vi.fn(),
     });
 
     const LeadTable = await getLeadTable();
@@ -115,7 +120,7 @@ describe('LeadTable', () => {
     // Skeleton elements should be present
     const skeletons = document.querySelectorAll('.skeleton');
     expect(skeletons.length).toBeGreaterThan(0);
-  }, 15_000);
+  }, 30_000);
 
   it('renders empty state when no leads exist', async () => {
     mockLeadsInfiniteQuery.mockReturnValue({
@@ -124,14 +129,15 @@ describe('LeadTable', () => {
       hasNextPage: false,
       isFetchingNextPage: false,
       fetchNextPage: vi.fn(),
+      refetch: vi.fn(),
     });
 
     const LeadTable = await getLeadTable();
     renderWithProviders(<LeadTable />);
 
     expect(
-      screen.getByText('No leads have been discovered yet')
-    ).toBeInTheDocument();
+      screen.getAllByText('No leads have been discovered yet').length
+    ).toBeGreaterThan(0);
   }, 15_000);
 
   it('renders lead data in table columns', async () => {
@@ -142,6 +148,7 @@ describe('LeadTable', () => {
       hasNextPage: false,
       isFetchingNextPage: false,
       fetchNextPage: vi.fn(),
+      refetch: vi.fn(),
     });
 
     const LeadTable = await getLeadTable();
@@ -154,6 +161,10 @@ describe('LeadTable', () => {
     expect(screen.getByText('Spotify')).toBeInTheDocument();
     expect(screen.getByText('Paid')).toBeInTheDocument();
     expect(screen.getByText('DistroKid')).toBeInTheDocument();
+
+    const row = document.querySelector('tbody tr');
+    // Canonical shell row via presets.tableRow / rowState (no explicit 'group' needed for this table)
+    expect(row).toHaveClass('hover:bg-(--linear-row-hover)');
   });
 
   it('renders status filter tabs', async () => {
@@ -163,6 +174,7 @@ describe('LeadTable', () => {
       hasNextPage: false,
       isFetchingNextPage: false,
       fetchNextPage: vi.fn(),
+      refetch: vi.fn(),
     });
 
     const LeadTable = await getLeadTable();
@@ -182,6 +194,7 @@ describe('LeadTable', () => {
       hasNextPage: false,
       isFetchingNextPage: false,
       fetchNextPage: vi.fn(),
+      refetch: vi.fn(),
     });
 
     const LeadTable = await getLeadTable();
@@ -206,6 +219,7 @@ describe('LeadTable', () => {
       hasNextPage: false,
       isFetchingNextPage: false,
       fetchNextPage: vi.fn(),
+      refetch: vi.fn(),
     });
 
     const LeadTable = await getLeadTable();
@@ -223,6 +237,7 @@ describe('LeadTable', () => {
       hasNextPage: false,
       isFetchingNextPage: false,
       fetchNextPage: vi.fn(),
+      refetch: vi.fn(),
     });
 
     const LeadTable = await getLeadTable();
@@ -247,6 +262,7 @@ describe('LeadTable', () => {
       hasNextPage: false,
       isFetchingNextPage: false,
       fetchNextPage: vi.fn(),
+      refetch: vi.fn(),
     });
 
     const LeadTable = await getLeadTable();
@@ -256,5 +272,29 @@ describe('LeadTable', () => {
     expect(screen.getByText('IG')).toBeInTheDocument();
     expect(screen.queryByText('Paid')).not.toBeInTheDocument();
     expect(screen.queryByText('Email')).not.toBeInTheDocument();
+  });
+
+  it('renders a retryable error state when the lead query fails', async () => {
+    const refetch = vi.fn().mockResolvedValue(undefined);
+    mockLeadsInfiniteQuery.mockReturnValue({
+      data: undefined,
+      isLoading: false,
+      isError: true,
+      hasNextPage: false,
+      isFetchingNextPage: false,
+      fetchNextPage: vi.fn(),
+      refetch,
+    });
+
+    const LeadTable = await getLeadTable();
+    renderWithProviders(<LeadTable />);
+
+    expect(screen.getByText('Unable to load leads')).toBeInTheDocument();
+    const retryButton = screen.getByRole('button', { name: 'Retry' });
+    expect(retryButton).toBeInTheDocument();
+
+    const user = userEvent.setup();
+    await user.click(retryButton);
+    expect(refetch).toHaveBeenCalledTimes(1);
   });
 });

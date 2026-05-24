@@ -1,22 +1,18 @@
 'use client';
 
+import { Shield } from 'lucide-react';
+import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { CookieActions } from '@/components/molecules/CookieActions';
 import { CookieModal } from '@/components/organisms/CookieModal';
+import { APP_ROUTES } from '@/constants/routes';
 import { saveConsent } from '@/lib/cookies/consent';
 import { COOKIE_BANNER_REQUIRED_COOKIE } from '@/lib/cookies/consent-regions';
 import { setConsentState } from '@/lib/tracking/consent';
 
-declare global {
-  var JVConsent:
-    | {
-        onChange: (cb: (v: unknown) => void) => () => void;
-        _emit: (v: unknown) => void;
-        openModal: () => void;
-      }
-    | undefined;
-}
+const CONSENT_SAVE_ERROR =
+  'We could not save preferences. Check your connection and try again.';
 
 /**
  * Read the cookie-banner-required flag from document.cookie.
@@ -39,7 +35,9 @@ export function CookieBannerSection() {
 
   const [visible, setVisible] = useState(false);
   const [customize, setCustomize] = useState(false);
-  const [isMobileExpanded, setIsMobileExpanded] = useState(false);
+  const [_isMobileExpanded, setIsMobileExpanded] = useState(false);
+  const [isSavingConsent, setIsSavingConsent] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   useEffect(() => {
     if (isDashboard || isDemo) {
@@ -62,64 +60,120 @@ export function CookieBannerSection() {
   }, [isDashboard, isDemo]);
 
   useEffect(() => {
-    if (globalThis.window && !globalThis.JVConsent) {
-      const listeners = new Set<(v: unknown) => void>();
-      globalThis.JVConsent = {
-        onChange(cb: (v: unknown) => void) {
-          listeners.add(cb);
-          return () => listeners.delete(cb);
-        },
-        _emit(value: unknown) {
-          listeners.forEach(l => l(value));
-        },
-        openModal() {
-          setCustomize(true);
-        },
-      };
-      if (globalThis.window !== undefined) {
-        globalThis.dispatchEvent(new Event('jvconsent:ready'));
-      }
-    }
-  }, []);
-
-  useEffect(() => {
     if (!visible) {
       setIsMobileExpanded(false);
     }
   }, [visible]);
 
+  // Publish banner height + 16px bottom offset as CSS custom property on :root
+  // so layout regions (profile shells, QR coordination) reserve the exact space
+  // occupied by the fixed bottom-right card (bottom-4 + measured h).
+  // Cleared on hide/consent for zero layout impact. Matches useCookieBannerHeight
+  // total offset for toasts.
+  useEffect(() => {
+    if (typeof document === 'undefined') return;
+
+    const root = document.documentElement;
+
+    if (!visible || isDashboard) {
+      root.style.removeProperty('--cookie-banner-h');
+      return;
+    }
+
+    const banner = document.querySelector<HTMLElement>(
+      '[data-testid="cookie-banner"]'
+    );
+    if (!banner) return;
+
+    const update = () => {
+      root.style.setProperty(
+        '--cookie-banner-h',
+        `${banner.getBoundingClientRect().height + 16}px`
+      );
+    };
+
+    update();
+
+    const ro = new ResizeObserver(update);
+    ro.observe(banner);
+
+    return () => {
+      ro.disconnect();
+      root.style.removeProperty('--cookie-banner-h');
+    };
+  }, [visible, isDashboard]);
+
   useEffect(() => {
     if (typeof window === 'undefined') return;
 
-    const handleOpen = () => setCustomize(true);
-    globalThis.addEventListener('jv:cookie:open', handleOpen);
-    return () => globalThis.removeEventListener('jv:cookie:open', handleOpen);
+    let unsubscribe: (() => void) | undefined;
+
+    const subscribe = () => {
+      unsubscribe?.();
+      unsubscribe = globalThis.JVConsent?.onChange(() => setVisible(false));
+    };
+
+    subscribe();
+    globalThis.addEventListener('jvconsent:ready', subscribe);
+
+    return () => {
+      unsubscribe?.();
+      globalThis.removeEventListener('jvconsent:ready', subscribe);
+    };
   }, []);
 
-  const acceptAll = async () => {
-    const consent = { essential: true, analytics: true, marketing: true };
-    await saveConsent(consent);
-    setConsentState('accepted');
+  const applyConsentLocally = (consent: {
+    essential: boolean;
+    analytics: boolean;
+    marketing: boolean;
+  }) => {
+    setConsentState(
+      consent.analytics || consent.marketing ? 'accepted' : 'rejected'
+    );
     try {
       localStorage.setItem('jv_cc', JSON.stringify(consent));
     } catch {
-      // ignore
+      // ignore — restricted browsing context
     }
     globalThis.JVConsent?._emit(consent);
-    setVisible(false);
   };
 
-  const reject = async () => {
-    const consent = { essential: true, analytics: false, marketing: false };
-    await saveConsent(consent);
-    setConsentState('rejected');
+  const persistConsent = async (consent: {
+    essential: boolean;
+    analytics: boolean;
+    marketing: boolean;
+  }) => {
+    setIsSavingConsent(true);
+    setSaveError(null);
     try {
-      localStorage.setItem('jv_cc', JSON.stringify(consent));
+      await saveConsent(consent);
+      applyConsentLocally(consent);
+      setVisible(false);
     } catch {
-      // ignore
+      setSaveError(CONSENT_SAVE_ERROR);
+    } finally {
+      setIsSavingConsent(false);
     }
-    globalThis.JVConsent?._emit(consent);
+  };
+
+  const acceptAll = () => {
+    const consent = { essential: true, analytics: true, marketing: true };
+    void persistConsent(consent);
+  };
+
+  const reject = () => {
+    const consent = { essential: true, analytics: false, marketing: false };
+    void persistConsent(consent);
+  };
+
+  const saveCustomPreferences = (consent: {
+    essential: boolean;
+    analytics: boolean;
+    marketing: boolean;
+  }) => {
+    applyConsentLocally(consent);
     setVisible(false);
+    setSaveError(null);
   };
 
   return (
@@ -128,53 +182,43 @@ export function CookieBannerSection() {
         <aside
           aria-label='Cookie consent'
           data-testid='cookie-banner'
-          className='fixed inset-x-0 bottom-0 z-40 px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-3 backdrop-blur-md sm:px-6 md:flex md:items-center md:justify-between md:gap-4'
-          style={{
-            backgroundColor: 'var(--linear-bg-surface-1)',
-            borderTop: '1px solid var(--linear-border-default)',
-            boxShadow: 'var(--linear-shadow-card)',
-          }}
+          className='fixed bottom-4 right-4 z-[60] w-[calc(100vw-2rem)] max-w-[340px] sm:max-w-[380px]'
         >
-          <div className='mb-2 flex items-center justify-between gap-3 md:mb-0 md:flex-1'>
-            <p
-              style={{
-                fontSize: '12px',
-                lineHeight: '1.5',
-                color: 'var(--linear-text-secondary)',
-              }}
-            >
-              We use cookies to improve your experience.
-            </p>
-            <button
-              type='button'
-              className='md:hidden shrink-0 transition-opacity hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-accent'
-              style={{
-                backgroundColor: 'var(--linear-bg-button)',
-                color: 'var(--linear-text-primary)',
-                border: '1px solid var(--linear-border-default)',
-                borderRadius: 'var(--linear-radius-sm)',
-                fontSize: '12px',
-                fontWeight: 'var(--linear-font-weight-medium)',
-                padding: '6px 10px',
-                height: '28px',
-              }}
-              aria-expanded={isMobileExpanded}
-              aria-controls='cookie-actions'
-              onClick={() => setIsMobileExpanded(prev => !prev)}
-            >
-              {isMobileExpanded ? 'Hide' : 'Manage'}
-            </button>
-          </div>
-
-          <div
-            id='cookie-actions'
-            className={isMobileExpanded ? 'block' : 'max-md:hidden'}
-          >
-            <CookieActions
-              onAcceptAll={acceptAll}
-              onReject={reject}
-              onCustomize={() => setCustomize(true)}
-            />
+          <div className='rounded-[18px] border border-(--linear-app-frame-seam) bg-surface-1 shadow-card px-4 py-4'>
+            <div className='flex items-start gap-3'>
+              <div className='mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-surface-0 text-secondary-token'>
+                <Shield className='h-3.5 w-3.5' aria-hidden='true' />
+              </div>
+              <div className='min-w-0 flex-1'>
+                <p className='text-[12px] leading-[1.5] text-secondary-token'>
+                  We use cookies for essential functionality and to improve your
+                  experience.{' '}
+                  <Link
+                    href={APP_ROUTES.LEGAL_PRIVACY}
+                    className='underline hover:opacity-80 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent'
+                  >
+                    Privacy
+                  </Link>
+                </p>
+                <div className='mt-3'>
+                  <CookieActions
+                    compact
+                    onAcceptAll={acceptAll}
+                    onReject={reject}
+                    onCustomize={() => setCustomize(true)}
+                    disabled={isSavingConsent}
+                  />
+                </div>
+                {saveError ? (
+                  <p
+                    role='alert'
+                    className='mt-2 text-[11px] leading-snug text-secondary-token'
+                  >
+                    {saveError}
+                  </p>
+                ) : null}
+              </div>
+            </div>
           </div>
         </aside>
       ) : null}
@@ -183,18 +227,7 @@ export function CookieBannerSection() {
         <CookieModal
           open={customize}
           onClose={() => setCustomize(false)}
-          onSave={c => {
-            setConsentState(
-              c.analytics || c.marketing ? 'accepted' : 'rejected'
-            );
-            try {
-              localStorage.setItem('jv_cc', JSON.stringify(c));
-            } catch {
-              // ignore
-            }
-            globalThis.JVConsent?._emit(c);
-            setVisible(false);
-          }}
+          onSave={saveCustomPreferences}
         />
       ) : null}
     </>

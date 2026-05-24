@@ -1,7 +1,8 @@
 import { neon } from '@neondatabase/serverless';
 import type { Page } from '@playwright/test';
-import { APP_ROUTES } from '@/constants/routes';
+import { APP_ROUTES, buildReleaseTasksRoute } from '@/constants/routes';
 import { TEST_USER_ID_COOKIE } from '@/lib/auth/test-mode';
+import { env } from '@/lib/env-server';
 
 interface ResolverProfile {
   id: string;
@@ -60,62 +61,55 @@ interface ConversationsListResponse {
   }>;
 }
 
-interface BrowserFetchInit {
+interface PlaywrightRequestInit {
   readonly method?: string;
   readonly headers?: Record<string, string>;
-  readonly body?: string;
+  readonly data?: string;
+}
+
+interface FetchJsonResult<T> {
+  readonly ok: boolean;
+  readonly status: number;
+  readonly data: T;
+  readonly parseError?: string;
+  readonly rawBody?: string;
 }
 
 async function fetchJsonFromPage<T>(
   page: Page,
   input: string,
-  init?: BrowserFetchInit
-): Promise<{
-  readonly ok: boolean;
-  readonly status: number;
-  readonly data: T;
-}> {
-  const baseUrl = process.env.BASE_URL ?? 'http://localhost:3100';
+  init?: PlaywrightRequestInit
+): Promise<FetchJsonResult<T>> {
+  const baseUrl = env.BASE_URL ?? 'http://localhost:3100';
+  const resolvedTarget = /^[a-z]+:\/\//i.test(input)
+    ? input
+    : new URL(input, baseUrl).toString();
+  const response = await page.context().request.fetch(resolvedTarget, {
+    method: init?.method,
+    headers: init?.headers,
+    data: init?.data,
+    timeout: 15_000,
+  });
+  const rawBody = await response.text().catch(() => '');
+  let data = {} as T;
+  let parseError: string | undefined;
+  if (rawBody.trim().length > 0) {
+    try {
+      data = JSON.parse(rawBody) as T;
+    } catch (error) {
+      parseError =
+        error instanceof Error ? error.message : 'Unknown JSON parse error';
+      data = {} as T;
+    }
+  }
 
-  return page.evaluate(
-    async ({ target, requestInit, fallbackBaseUrl }) => {
-      const controller = new AbortController();
-      const timeoutId = window.setTimeout(() => controller.abort(), 15_000);
-
-      try {
-        // Route resolvers may run before first navigation (about:blank). Resolve
-        // API paths against a stable base URL so fetch never receives an invalid URL.
-        const resolvedTarget = /^[a-z]+:\/\//i.test(target)
-          ? target
-          : new URL(target, fallbackBaseUrl).toString();
-
-        const response = await fetch(resolvedTarget, {
-          method: requestInit?.method,
-          headers: requestInit?.headers,
-          body: requestInit?.body,
-          signal: controller.signal,
-        });
-        const rawBody = await response.text().catch(() => '');
-        let data = {} as T;
-        if (rawBody.trim().length > 0) {
-          try {
-            data = JSON.parse(rawBody) as T;
-          } catch {
-            data = {} as T;
-          }
-        }
-
-        return {
-          ok: response.ok,
-          status: response.status,
-          data,
-        };
-      } finally {
-        window.clearTimeout(timeoutId);
-      }
-    },
-    { target: input, requestInit: init, fallbackBaseUrl: baseUrl }
-  );
+  return {
+    ok: response.ok(),
+    status: response.status(),
+    data,
+    parseError,
+    rawBody: parseError ? rawBody : undefined,
+  };
 }
 
 export async function resolveChatConversationPath(page: Page): Promise<string> {
@@ -123,6 +117,12 @@ export async function resolveChatConversationPath(page: Page): Promise<string> {
     page,
     '/api/chat/conversations?limit=1'
   );
+
+  if (existing.parseError) {
+    throw new Error(
+      `Unable to resolve chat conversation route from existing conversations (status ${existing.status}; response was not valid JSON (${existing.parseError}))`
+    );
+  }
 
   const existingConversationId = existing.data.conversations?.[0]?.id;
   if (existing.ok && existingConversationId) {
@@ -137,7 +137,7 @@ export async function resolveChatConversationPath(page: Page): Promise<string> {
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({
+      data: JSON.stringify({
         title: 'Dashboard QA thread',
       }),
     }
@@ -145,8 +145,11 @@ export async function resolveChatConversationPath(page: Page): Promise<string> {
 
   const createdConversationId = created.data.conversation?.id;
   if (!created.ok || !createdConversationId) {
+    const parseDetails = created.parseError
+      ? `; response was not valid JSON (${created.parseError})`
+      : '';
     throw new Error(
-      `Unable to resolve chat conversation route (status ${created.status})`
+      `Unable to resolve chat conversation route (status ${created.status}${parseDetails})`
     );
   }
 
@@ -161,7 +164,7 @@ export async function resolveReleaseTasksPathFromPage(
     await page.setViewportSize({ width: 390, height: originalViewport.height });
   }
 
-  await page.goto(APP_ROUTES.DASHBOARD_RELEASES, {
+  await page.goto(APP_ROUTES.RELEASES, {
     waitUntil: 'domcontentloaded',
     timeout: 60_000,
   });
@@ -181,16 +184,15 @@ export async function resolveReleaseTasksPathFromPage(
 
   const mobileReleaseId = mobileRowTestId?.replace('mobile-release-row-', '');
   if (mobileReleaseId) {
-    return `${APP_ROUTES.DASHBOARD_RELEASES}/${mobileReleaseId}/tasks`;
+    return buildReleaseTasksRoute(mobileReleaseId);
   }
 
   const authCookies = await page.context().cookies();
   const cookieUserId = authCookies.find(
     cookie => cookie.name === TEST_USER_ID_COOKIE
   )?.value;
-  const clerkUserId =
-    cookieUserId?.trim() || process.env.E2E_CLERK_USER_ID?.trim();
-  const databaseUrl = process.env.DATABASE_URL?.trim();
+  const clerkUserId = cookieUserId?.trim() || env.E2E_CLERK_USER_ID?.trim();
+  const databaseUrl = env.DATABASE_URL?.trim();
   if (!clerkUserId) {
     throw new Error('E2E_CLERK_USER_ID is required to resolve release tasks');
   }
@@ -281,5 +283,5 @@ export async function resolveReleaseTasksPathFromPage(
     throw new Error('No seeded release found for the E2E test user');
   }
 
-  return `${APP_ROUTES.DASHBOARD_RELEASES}/${release.id}/tasks`;
+  return buildReleaseTasksRoute(release.id);
 }

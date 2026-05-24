@@ -19,7 +19,9 @@ export type ScreenshotConsumer =
 export type ScreenshotInteraction =
   | 'none'
   | 'open-first-release'
-  | 'open-first-release-dsps';
+  | 'open-first-release-dsps'
+  | 'open-shell-library'
+  | 'open-shell-releases';
 
 export type ScreenshotCaptureTarget = 'page' | 'locator';
 
@@ -46,6 +48,17 @@ export interface ScreenshotScenario {
   readonly publicExportPath?: string;
   readonly fixedNow?: string;
   readonly reducedMotion?: boolean;
+  /**
+   * Visible audio player timestamp for this scenario (e.g. "2:14").
+   *
+   * Set this when the screenshot captures a visible music player so that the
+   * invariant test can verify that no two scenarios with a visible player show
+   * the same timestamp. This keeps marketing screenshots looking authentic
+   * rather than copy-pasted.
+   *
+   * Format: "M:SS" or "MM:SS" — matching the Jovie player display format.
+   */
+  readonly playerTimestamp?: string;
 }
 
 export interface ScreenshotScenario

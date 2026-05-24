@@ -1,4 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
+import { CHAT_COMPOSER_DOCK_CLASSNAME } from '@/components/jovie/chat-layout';
 import { JovieChat } from '@/components/jovie/JovieChat';
 import { renderWithQueryClient } from '@/tests/utils/test-utils';
 
@@ -146,5 +147,19 @@ describe('JovieChat styling regressions', () => {
     // Verify the chat input area renders
     const chatInput = container.querySelector('[data-testid="chat-input"]');
     expect(chatInput).toBeTruthy();
+  });
+
+  it('keeps the composer dock padded above mobile shell navigation', () => {
+    const { container } = renderWithQueryClient(
+      <JovieChat profileId='profile-1' />
+    );
+
+    const composerDock = container.querySelector('[data-testid="chat-input"]')
+      ?.parentElement?.parentElement;
+
+    expect(composerDock?.className).toContain(CHAT_COMPOSER_DOCK_CLASSNAME);
+    expect(composerDock?.className).toContain(
+      'max-lg:pb-[calc(1.5rem+env(safe-area-inset-bottom))]'
+    );
   });
 });

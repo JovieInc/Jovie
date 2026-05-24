@@ -10,6 +10,7 @@ enum DashboardLoadState: Equatable {
 
 protocol AppStateRepository: Sendable {
   func loadMe(for clerkUserID: String) async throws -> MeRepositoryResult
+  func clearCachedUser(_ clerkUserID: String) async
 }
 
 extension MeRepository: AppStateRepository {}
@@ -29,6 +30,7 @@ final class AppState {
 
   private let repository: AppStateRepository
   private let launchDate = Date()
+  private var loadingUserID: String?
 
   init(
     configuration: AppConfiguration,
@@ -59,12 +61,16 @@ final class AppState {
     case .uiTestingSignedOut:
       route = .signedOut
       dashboardState = .idle
-    case .uiTestingReady:
+    case .uiTestingReady, .uiTestingChat, .uiTestingSettings, .uiTestingVenueMode:
       route = .ready
       dashboardState = .loaded(.previewReady)
       isOffline = false
     case .uiTestingNeedsOnboarding:
       route = .needsOnboarding
+      dashboardState = .idle
+      isOffline = false
+    case .uiTestingSplash:
+      route = .launching
       dashboardState = .idle
       isOffline = false
     }
@@ -73,13 +79,25 @@ final class AppState {
   func handleSignedInUserChange(_ userID: String?) async {
     guard launchMode.usesLiveClerk, didLoadClerk else { return }
 
+    if let userID, loadingUserID == userID {
+      return
+    }
+
     activeUserID = userID
 
     guard let userID else {
+      loadingUserID = nil
       route = .signedOut
       dashboardState = .idle
       isOffline = false
       return
+    }
+
+    loadingUserID = userID
+    defer {
+      if loadingUserID == userID {
+        loadingUserID = nil
+      }
     }
 
     route = .launching
@@ -88,6 +106,7 @@ final class AppState {
 
     do {
       let result = try await repository.loadMe(for: userID)
+      guard activeUserID == userID, loadingUserID == userID else { return }
       isOffline = result.isStale
 
       switch result.response.state {
@@ -99,6 +118,8 @@ final class AppState {
         dashboardState = .idle
       }
     } catch {
+      guard activeUserID == userID, loadingUserID == userID else { return }
+
       if let error = error as? APIClientError {
         switch error {
         case .missingToken, .requestFailed(statusCode: 401):
@@ -106,7 +127,7 @@ final class AppState {
           dashboardState = .idle
           isOffline = false
           return
-        case .invalidResponse, .requestFailed:
+        case .decodingFailed, .invalidResponse, .transportFailed, .requestFailed:
           break
         }
       }
@@ -121,6 +142,19 @@ final class AppState {
     await handleSignedInUserChange(activeUserID)
   }
 
+  func signOut() async {
+    let userID = activeUserID
+    activeUserID = nil
+    loadingUserID = nil
+    route = .signedOut
+    dashboardState = .idle
+    isOffline = false
+
+    if let userID {
+      await repository.clearCachedUser(userID)
+    }
+  }
+
   var continueOnWebURL: URL {
     switch dashboardState {
     case let .loaded(response):
@@ -128,5 +162,9 @@ final class AppState {
     case .idle, .loading, .error:
       return configuration.webBaseURL.appending(path: "app")
     }
+  }
+
+  var billingURL: URL {
+    continueOnWebURL.appending(path: "settings/billing")
   }
 }

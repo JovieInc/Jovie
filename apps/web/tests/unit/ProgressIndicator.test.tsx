@@ -121,11 +121,9 @@ describe('ProgressIndicator', () => {
       <ProgressIndicator currentStep={1} totalSteps={3} steps={mockSteps} />
     );
 
-    // Step 2 of 3 should be 66.67% progress
-    const progressBar = screen
-      .getByRole('progressbar')
-      .querySelector('[style*="width"]');
-    expect(progressBar).toHaveStyle('width: 66.66666666666666%');
+    // Step 2 of 3 should be 66.67% progress — verified via native progress element
+    const progressEl = screen.getByRole('progressbar') as HTMLProgressElement;
+    expect((progressEl.value / progressEl.max) * 100).toBeCloseTo(66.667, 2);
   });
 
   it('applies custom className', () => {

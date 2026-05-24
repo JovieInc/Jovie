@@ -92,19 +92,32 @@ runs:
         fi
 
         RESOLVED_URL="$(
-          CANDIDATE="$CANDIDATE" CREDENTIAL_SOURCE="$CREDENTIAL_SOURCE" node <<'NODE'
+          CANDIDATE="$CANDIDATE" FALLBACK_CANDIDATE="$FALLBACK_CANDIDATE" CREDENTIAL_SOURCE="$CREDENTIAL_SOURCE" node <<'NODE'
         const candidate = new URL(process.env.CANDIDATE);
+        const fallbackCandidate = process.env.FALLBACK_CANDIDATE
+          ? new URL(process.env.FALLBACK_CANDIDATE)
+          : null;
         const source = new URL(process.env.CREDENTIAL_SOURCE);
 
-        // Preserve credentials baked into the Neon branch URL. Branch-specific
-        // passwords can differ from the long-lived main DB secret, and replacing
-        // them causes auth and endpoint failures across downstream CI jobs.
-        if (!candidate.username && source.username) {
-          candidate.username = source.username;
+        // Keep the ephemeral branch host/database and prefer the credentials
+        // returned for that branch. Stable secrets are only a fallback when the
+        // action output is missing a credential component.
+        const credentialSources = [candidate, fallbackCandidate, source].filter(
+          Boolean
+        );
+
+        const usernameSource = !candidate.username
+          ? credentialSources.find((url) => url.username)
+          : null;
+        if (usernameSource) {
+          candidate.username = usernameSource.username;
         }
 
-        if (!candidate.password && source.password) {
-          candidate.password = source.password;
+        const passwordSource = !candidate.password
+          ? credentialSources.find((url) => url.password)
+          : null;
+        if (passwordSource) {
+          candidate.password = passwordSource.password;
         }
 
         console.log(candidate.toString());

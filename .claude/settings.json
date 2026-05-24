@@ -1,6 +1,8 @@
 {
   "env": {
-    "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "1"
+    "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "1",
+    "DISABLE_TELEMETRY": "1",
+    "DO_NOT_TRACK": "1"
   },
   "hooks": {
     "SessionStart": [
@@ -36,6 +38,11 @@
           {
             "type": "command",
             "command": "bash \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/infra-guardrails-check.sh",
+            "timeout": 5
+          },
+          {
+            "type": "command",
+            "command": "bash \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/orchestrator-boundary-check.sh",
             "timeout": 5
           }
         ]
@@ -132,6 +139,8 @@
       "Skill(ideate-quality:*)",
       "Skill(ideate-perf)",
       "Skill(ideate-perf:*)",
+      "Skill(jovie-performance-hardening)",
+      "Skill(jovie-performance-hardening:*)",
       "Skill(consolidate-ui)",
       "Skill(consolidate-ui:*)",
       "Skill(turborepo)",
@@ -162,6 +171,7 @@
       "SlashCommand(/review)",
       "SlashCommand(/browse)",
       "SlashCommand(/qa)",
+      "SlashCommand(/perf-loop)",
       "SlashCommand(/retro)",
       "SlashCommand(/gstack-upgrade)"
     ],

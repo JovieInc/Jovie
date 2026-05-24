@@ -30,16 +30,28 @@ describe('DueChip', () => {
     expect(screen.getByText('Due in 2w')).toBeInTheDocument();
   });
 
+  it('renders year counts instead of raw multi-year day counts', () => {
+    render(<DueChip dueIso='2020-04-25T12:00:00Z' now={NOW} />);
+    expect(screen.getByText('Due 6y ago')).toBeInTheDocument();
+    expect(screen.queryByText(/2192d/i)).not.toBeInTheDocument();
+  });
+
   it('tints amber for soon-due (<= 2 days)', () => {
-    render(<DueChip dueIso='2026-04-26T12:00:00Z' now={NOW} />);
-    expect(screen.getByText('Due tomorrow').className).toContain('amber-300');
+    const { container } = render(
+      <DueChip dueIso='2026-04-26T12:00:00Z' now={NOW} />
+    );
+    expect((container.firstElementChild as HTMLElement).className).toContain(
+      'amber-300'
+    );
   });
 
   it('respects muted prop', () => {
-    render(<DueChip dueIso='2026-04-26T12:00:00Z' now={NOW} muted />);
-    expect(screen.getByText('Due tomorrow').className).not.toContain(
-      'amber-300'
+    const { container } = render(
+      <DueChip dueIso='2026-04-26T12:00:00Z' now={NOW} muted />
     );
+    expect(
+      (container.firstElementChild as HTMLElement).className
+    ).not.toContain('amber-300');
   });
 
   it('returns null on a non-finite due date', () => {

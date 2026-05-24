@@ -75,8 +75,8 @@ test.describe('Onboarding Handle Race Conditions', () => {
     // Navigate to homepage claim form (works unauthenticated)
     await page.goto('/', { waitUntil: 'domcontentloaded' });
 
-    // The handle claim form is behind a feature flag (CLAIM_HANDLE).
-    // If the form isn't rendered, skip all tests in this suite.
+    // The handle claim form is wired into the onboarding shell, not the
+    // marketing homepage. If the form isn't rendered, skip the suite.
     const handleInput = page.getByLabel(
       /choose your handle|claim your handle/i
     );

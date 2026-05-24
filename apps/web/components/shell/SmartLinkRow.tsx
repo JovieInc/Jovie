@@ -57,7 +57,7 @@ export function SmartLinkRow({
   return (
     <div
       className={cn(
-        'flex items-center gap-1.5 h-7 pl-3 pr-1 rounded-full border border-(--linear-app-shell-border) bg-(--surface-0)/60 text-[11.5px] text-tertiary-token transition-colors duration-150 ease-out',
+        'flex items-center gap-1.5 h-7 pl-3 pr-1 rounded-full border border-(--linear-app-shell-border) bg-(--surface-0)/60 text-[11.5px] text-tertiary-token transition-colors duration-subtle ease-subtle',
         className
       )}
     >
@@ -70,7 +70,7 @@ export function SmartLinkRow({
         <button
           type='button'
           onClick={handleCopy}
-          className='inline-flex items-center justify-center h-5 w-5 rounded text-quaternary-token hover:text-primary-token hover:bg-surface-1/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-token transition-colors duration-150 ease-out'
+          className='inline-flex items-center justify-center h-5 w-5 rounded text-quaternary-token hover:text-primary-token hover:bg-surface-1/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-token transition-colors duration-subtle ease-subtle'
           aria-label={copied ? 'Copied' : 'Copy smart link'}
           aria-live='polite'
         >
@@ -82,7 +82,7 @@ export function SmartLinkRow({
           <button
             type='button'
             onClick={onOpen}
-            className='inline-flex items-center justify-center h-5 w-5 rounded text-quaternary-token hover:text-primary-token hover:bg-surface-1/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-token transition-colors duration-150 ease-out'
+            className='inline-flex items-center justify-center h-5 w-5 rounded text-quaternary-token hover:text-primary-token hover:bg-surface-1/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-token transition-colors duration-subtle ease-subtle'
             aria-label='Open smart link'
           >
             <ExternalLink className='h-3 w-3' strokeWidth={2.25} />

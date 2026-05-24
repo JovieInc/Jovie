@@ -1,4 +1,4 @@
-import { desc, sql as drizzleSql } from 'drizzle-orm';
+import { and, desc, sql as drizzleSql, eq } from 'drizzle-orm';
 import { db, doesTableExist } from '@/lib/db';
 import { type WaitlistEntry, waitlistEntries } from '@/lib/db/schema/waitlist';
 
@@ -34,9 +34,10 @@ export interface GetAdminWaitlistResult {
 
 export interface WaitlistMetrics {
   total: number;
-  new: number;
+  waitlisted: number;
   invited: number;
-  claimed: number;
+  signedUp: number;
+  emailFailures: number;
 }
 
 /**
@@ -45,7 +46,13 @@ export interface WaitlistMetrics {
 export async function getWaitlistMetrics(): Promise<WaitlistMetrics> {
   const hasWaitlistTable = await doesTableExist('waitlist_entries');
   if (!hasWaitlistTable) {
-    return { total: 0, new: 0, invited: 0, claimed: 0 };
+    return {
+      total: 0,
+      waitlisted: 0,
+      invited: 0,
+      signedUp: 0,
+      emailFailures: 0,
+    };
   }
 
   try {
@@ -55,22 +62,47 @@ export async function getWaitlistMetrics(): Promise<WaitlistMetrics> {
         count: drizzleSql<number>`count(*)::int`,
       })
       .from(waitlistEntries)
+      .where(eq(waitlistEntries.canonical, true))
       .groupBy(waitlistEntries.status);
 
     const metrics: WaitlistMetrics = {
       total: 0,
-      new: 0,
+      waitlisted: 0,
       invited: 0,
-      claimed: 0,
+      signedUp: 0,
+      emailFailures: 0,
     };
 
     for (const row of result) {
       const count = row.count ?? 0;
       metrics.total += count;
-      if (row.status === 'new') metrics.new = count;
-      else if (row.status === 'invited') metrics.invited = count;
-      else if (row.status === 'claimed') metrics.claimed = count;
+      if (
+        row.status === 'new' ||
+        row.status === 'chat_started' ||
+        row.status === 'qualified' ||
+        row.status === 'waitlisted'
+      ) {
+        metrics.waitlisted += count;
+      } else if (row.status === 'invited' || row.status === 'approved') {
+        metrics.invited += count;
+      } else if (row.status === 'claimed' || row.status === 'signed_up') {
+        metrics.signedUp += count;
+      }
     }
+
+    const [emailFailures] = await db
+      .select({
+        count: drizzleSql<number>`count(*)::int`,
+      })
+      .from(waitlistEntries)
+      .where(
+        and(
+          eq(waitlistEntries.canonical, true),
+          drizzleSql`${waitlistEntries.waitlistEmailStatus} = 'error' OR ${waitlistEntries.inviteEmailStatus} = 'error'`
+        )
+      );
+
+    metrics.emailFailures = emailFailures?.count ?? 0;
 
     return metrics;
   } catch (error) {
@@ -103,7 +135,8 @@ export async function getAdminWaitlistEntries(
     // Get total count
     const [countResult] = await db
       .select({ count: drizzleSql<number>`count(*)::int` })
-      .from(waitlistEntries);
+      .from(waitlistEntries)
+      .where(eq(waitlistEntries.canonical, true));
 
     const total = countResult?.count ?? 0;
 
@@ -111,6 +144,7 @@ export async function getAdminWaitlistEntries(
     const entries = await db
       .select()
       .from(waitlistEntries)
+      .where(eq(waitlistEntries.canonical, true))
       .orderBy(desc(waitlistEntries.createdAt))
       .limit(pageSize)
       .offset(offset);

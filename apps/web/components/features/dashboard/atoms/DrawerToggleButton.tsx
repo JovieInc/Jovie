@@ -2,8 +2,8 @@
 
 import { PanelRight } from 'lucide-react';
 import { useEffect, useState } from 'react';
-import { useTableMeta } from '@/components/organisms/AuthShellWrapper';
 import { PageToolbarActionButton } from '@/components/organisms/table';
+import { useTableMeta } from '@/contexts/TableMetaContext';
 import { DashboardHeaderActionButton } from './DashboardHeaderActionButton';
 
 export function DrawerToggleButton({

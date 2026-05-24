@@ -9,10 +9,13 @@ describe('HomepageV2FinalCta', () => {
     expect(screen.getByTestId('homepage-v2-final-cta')).toBeInTheDocument();
     expect(
       screen.getByTestId('homepage-v2-final-cta-heading')
-    ).toHaveTextContent(/Start using Jovie\s*today for free\./);
+    ).toHaveTextContent('Keep your music moving.');
     expect(
       screen.getByTestId('homepage-v2-final-cta-primary')
-    ).toBeInTheDocument();
+    ).toHaveTextContent('Request access');
+    expect(
+      screen.queryByTestId('homepage-v2-final-cta-secondary')
+    ).not.toBeInTheDocument();
     expect(
       screen.queryByTestId('homepage-v2-final-cta-background')
     ).not.toBeInTheDocument();

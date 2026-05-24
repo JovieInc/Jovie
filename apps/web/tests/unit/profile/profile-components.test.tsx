@@ -217,6 +217,8 @@ describe('ProfileViewTracker', () => {
     expect(mockTrack).toHaveBeenCalledWith('profile_view', {
       handle: 'testartist',
       artist_id: 'artist-123',
+      profile_id: 'artist-123',
+      profile_slug: 'testartist',
       source: 'https://google.com',
     });
   });
@@ -289,6 +291,8 @@ describe('ProfileViewTracker', () => {
     expect(mockTrack).toHaveBeenCalledWith('profile_view', {
       handle: 'testartist',
       artist_id: 'artist-123',
+      profile_id: 'artist-123',
+      profile_slug: 'testartist',
       source: 'qr-code',
     });
   });
@@ -331,7 +335,7 @@ describe('LatestReleaseCard', () => {
     );
 
     expect(screen.getByText('Midnight Dreams')).toBeDefined();
-    expect(screen.getByText('Listen')).toBeDefined();
+    expect(screen.getByText('Listen Now')).toBeDefined();
   });
 
   it('displays release type with proper capitalization', async () => {
@@ -433,7 +437,7 @@ describe('LatestReleaseCard', () => {
       />
     );
 
-    const listenLink = screen.getByText('Listen').closest('a');
+    const listenLink = screen.getByText('Listen Now').closest('a');
     expect(listenLink?.getAttribute('href')).toBe(
       '/testartist/midnight-dreams'
     );

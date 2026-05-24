@@ -17,22 +17,24 @@
   <key>CFBundlePackageType</key>
   <string>APPL</string>
   <key>CFBundleShortVersionString</key>
-  <string>1.0</string>
+  <string>$(MARKETING_VERSION)</string>
   <key>CFBundleURLTypes</key>
   <array>
     <dict>
       <key>CFBundleTypeRole</key>
       <string>Editor</string>
       <key>CFBundleURLName</key>
-      <string>ie.jov.Jovie.callback</string>
-      <key>CFBundleURLSchemes</key>
-      <array>
-        <string>ie.jov.Jovie</string>
-      </array>
-    </dict>
-  </array>
+			<string>ie.jov.jovie.callback</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>ie.jov.jovie</string>
+			</array>
+		</dict>
+	</array>
   <key>CFBundleVersion</key>
-  <string>1</string>
+  <string>$(CURRENT_PROJECT_VERSION)</string>
+  <key>ITSAppUsesNonExemptEncryption</key>
+  <false/>
   <key>LSRequiresIPhoneOS</key>
   <true/>
   <key>NSAppTransportSecurity</key>
@@ -48,5 +50,21 @@
   <true/>
   <key>UILaunchScreen</key>
   <dict/>
+  <key>UISupportedInterfaceOrientations</key>
+  <array>
+    <string>UIInterfaceOrientationPortrait</string>
+    <string>UIInterfaceOrientationPortraitUpsideDown</string>
+    <string>UIInterfaceOrientationLandscapeLeft</string>
+    <string>UIInterfaceOrientationLandscapeRight</string>
+  </array>
+  <key>UISupportedInterfaceOrientations~ipad</key>
+  <array>
+    <string>UIInterfaceOrientationPortrait</string>
+    <string>UIInterfaceOrientationPortraitUpsideDown</string>
+    <string>UIInterfaceOrientationLandscapeLeft</string>
+    <string>UIInterfaceOrientationLandscapeRight</string>
+  </array>
+  <key>UIUserInterfaceStyle</key>
+  <string>Dark</string>
 </dict>
 </plist>

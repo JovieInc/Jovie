@@ -1,3 +1,4 @@
+import { screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { JovieChat } from '@/components/jovie/JovieChat';
@@ -23,7 +24,7 @@ const mockChatState = {
   isRateLimited: false,
   stop: vi.fn(),
   chipTray: {
-    chips: [],
+    chips: [] as Array<{ type: 'skill'; id: string; uid: string }>,
     addSkill: vi.fn(),
     addEntity: vi.fn(),
     removeAt: vi.fn(),
@@ -83,6 +84,17 @@ vi.mock('@/components/jovie/hooks', () => ({
   }),
 }));
 
+vi.mock('@/lib/queries', () => ({
+  queryKeys: {
+    releases: {
+      matrix: (profileId: string) => ['releases', 'matrix', profileId],
+    },
+    events: {
+      list: (profileId: string) => ['events', 'list', profileId],
+    },
+  },
+}));
+
 vi.mock('@/components/jovie/components', async () => {
   const actual = await vi.importActual<
     typeof import('@/components/jovie/components')
@@ -90,7 +102,22 @@ vi.mock('@/components/jovie/components', async () => {
 
   return {
     ...actual,
-    ChatInput: () => <div data-testid='chat-input' />,
+    ChatInput: ({
+      placeholder,
+      quickActions,
+      variant,
+    }: {
+      readonly placeholder?: string;
+      readonly quickActions?: readonly { readonly label: string }[];
+      readonly variant?: string;
+    }) => (
+      <div
+        data-placeholder={placeholder}
+        data-quick-actions={quickActions?.map(action => action.label).join('|')}
+        data-variant={variant}
+        data-testid='chat-input'
+      />
+    ),
     ChatMessage: () => <div data-testid='chat-message' />,
     ChatMessageSkeleton: () => <div data-testid='chat-message-skeleton' />,
     ErrorDisplay: () => <div data-testid='chat-error' />,
@@ -104,38 +131,148 @@ vi.mock('@/components/jovie/components/ChatUsageAlert', () => ({
 
 describe('JovieChat empty state', () => {
   beforeEach(() => {
+    vi.clearAllMocks();
+    mockChatState.input = '';
     mockChatState.messages = [];
     mockChatState.hasMessages = false;
     mockChatState.isLoading = false;
     mockChatState.isSubmitting = false;
+    mockChatState.chipTray.chips = [];
   });
 
-  it('renders the minimal welcome state with hero-style heading, pills, and composer', () => {
-    const { getByTestId, getByText, queryByText } = renderWithQueryClient(
+  it('renders only the logo and simple composer when empty', () => {
+    const { getByTestId, queryByTestId, queryByText } = renderWithQueryClient(
       <JovieChat profileId='profile-1' />
     );
 
-    expect(getByText('Welcome Back')).toBeTruthy();
-    expect(queryByText('Welcome to Jovie')).toBeNull();
+    expect(queryByTestId('chat-empty-state-top-signals')).toBeNull();
+    expect(queryByTestId('chat-empty-thread-ornament')).toBeNull();
+    expect(queryByText('Release plan')).toBeNull();
+    expect(queryByText('Asset brief')).toBeNull();
+    expect(queryByText('Context')).toBeNull();
+    expect(queryByText('What are we working on?')).toBeNull();
+    expect(queryByText('Welcome back')).toBeNull();
+    expect(queryByText('Welcome back, Tim')).toBeNull();
+    expect(queryByText("Hey, I'm Jovie.")).toBeNull();
     expect(queryByText('Jovie Assistant')).toBeNull();
     expect(queryByText('Ask anything or tell Jovie what you need')).toBeNull();
+    expect(getByTestId('chat-empty-state-composer-region')).toBeTruthy();
+    expect(getByTestId('chat-empty-state-logo')).toBeTruthy();
+    expect(getByTestId('chat-empty-state-centered-composer')).toBeTruthy();
+    expect(queryByTestId('chat-empty-state-action-card-slot')).toBeNull();
+    expect(queryByTestId('chat-composer-dock')).toBeNull();
+    expect(queryByTestId('chat-empty-state-soft-suggestions-slot')).toBeNull();
+    expect(queryByTestId('suggested-prompts-rail')).toBeNull();
     expect(getByTestId('chat-input')).toBeTruthy();
-    // New hero-style pills sourced from DEFAULT_SUGGESTIONS (mirrors homepage).
-    expect(getByText('Plan a release')).toBeTruthy();
-    expect(getByText('Generate album art')).toBeTruthy();
-    expect(getByText('Pitch playlists')).toBeTruthy();
+    expect(getByTestId('chat-input').getAttribute('data-placeholder')).toBe(
+      'Ask Jovie...'
+    );
+    expect(getByTestId('chat-input').getAttribute('data-variant')).toBe('hero');
+    expect(
+      getByTestId('chat-input').getAttribute('data-quick-actions')
+    ).toBeNull();
+    expect(queryByText('Plan a release')).toBeNull();
+    expect(queryByText('Generate album art')).toBeNull();
+    expect(queryByText('Pitch playlists')).toBeNull();
     // Old task-list-style actions should NOT appear — they belong in the profile switcher.
     expect(queryByText('Preview profile')).toBeNull();
     expect(queryByText('Change photo')).toBeNull();
     expect(queryByText('Release link')).toBeNull();
   });
 
-  it('renders first-session greeting for new users', () => {
-    const { getByText } = renderWithQueryClient(
+  it('does not render empty-state action cards by default', () => {
+    renderWithQueryClient(
+      <JovieChat
+        profileId='profile-1'
+        actionCards={[
+          {
+            id: 'connect-music-catalog',
+            title: 'Connect Your Music Catalog',
+            body: 'Add Spotify, Apple Music, or YouTube Music so Jovie can plan from real releases.',
+            actionLabel: 'Plan Setup',
+            prompt: 'Help me connect my music catalog.',
+          },
+        ]}
+      />
+    );
+
+    expect(screen.queryByText('Connect Your Music Catalog')).toBeNull();
+    expect(screen.queryByText(/Add Spotify/)).toBeNull();
+    expect(screen.queryByText('What are we working on?')).toBeNull();
+    expect(
+      screen.queryByTestId('chat-empty-state-action-card-slot')
+    ).toBeNull();
+    expect(
+      screen.getByTestId('chat-empty-state-centered-composer')
+    ).toBeTruthy();
+    expect(screen.queryByTestId('chat-composer-dock')).toBeNull();
+    expect(screen.queryByTestId('suggested-prompts-rail')).toBeNull();
+  });
+
+  it('keeps typed empty chat on the simple composer', () => {
+    mockChatState.input = 'Help me with';
+
+    const { getByTestId, queryByTestId, queryByText } = renderWithQueryClient(
+      <JovieChat
+        profileId='profile-1'
+        actionCards={[
+          {
+            id: 'connect-music-catalog',
+            title: 'Connect Your Music Catalog',
+            body: 'Add Spotify, Apple Music, or YouTube Music so Jovie can plan from real releases.',
+            actionLabel: 'Plan Setup',
+            prompt: 'Help me connect my music catalog.',
+          },
+        ]}
+      />
+    );
+
+    expect(getByTestId('chat-empty-state-composer-region')).toBeTruthy();
+    expect(queryByTestId('chat-empty-state-action-card-slot')).toBeNull();
+    expect(queryByTestId('chat-composer-dock')).toBeNull();
+    expect(queryByTestId('chat-empty-state-top-signals')).toBeNull();
+    expect(getByTestId('chat-input')).toBeTruthy();
+    expect(queryByText('Connect Your Music Catalog')).toBeNull();
+    expect(queryByTestId('suggested-prompts-rail')).toBeNull();
+  });
+
+  it('preserves the chip-enabled composer without empty-state suggestions', () => {
+    mockChatState.chipTray.chips = [
+      {
+        type: 'skill',
+        id: 'generateAlbumArt',
+        uid: 'chip-skill-1',
+      },
+    ];
+
+    const { getByTestId, queryByTestId } = renderWithQueryClient(
+      <JovieChat profileId='profile-1' />
+    );
+
+    expect(getByTestId('chat-empty-state-centered-composer')).toBeTruthy();
+    expect(getByTestId('chat-input')).toBeTruthy();
+    expect(queryByTestId('chat-empty-state-soft-suggestions-slot')).toBeNull();
+    expect(queryByTestId('suggested-prompts-rail')).toBeNull();
+  });
+
+  it('does not render first-session welcome copy in the empty state', () => {
+    const { queryByText } = renderWithQueryClient(
       <JovieChat profileId='profile-1' isFirstSession />
     );
 
-    expect(getByText('Welcome to Jovie')).toBeTruthy();
+    expect(queryByText("Hey, I'm Jovie.")).toBeNull();
+  });
+
+  it('does not render returning-user welcome copy in the empty state', () => {
+    const { queryByText } = renderWithQueryClient(
+      <JovieChat profileId='profile-1' displayName='Tim White' />
+    );
+
+    expect(queryByText('What are we working on, Tim?')).toBeNull();
+    expect(queryByText('What are we working on?')).toBeNull();
+    expect(queryByText('Welcome back')).toBeNull();
+    expect(queryByText('Welcome back, Tim')).toBeNull();
+    expect(queryByText('Welcome back, Tim White')).toBeNull();
   });
 
   it('renders chat messages after in-place message array updates', () => {
@@ -144,7 +281,8 @@ describe('JovieChat empty state', () => {
       <JovieChat profileId='profile-1' />
     );
 
-    expect(queryByText('Welcome Back')).toBeTruthy();
+    expect(queryByText('What are we working on?')).toBeNull();
+    expect(queryByText('Welcome back')).toBeNull();
 
     messages.push(
       {
@@ -164,7 +302,17 @@ describe('JovieChat empty state', () => {
 
     rerender(<JovieChat profileId='profile-1' />);
 
-    expect(queryByText('Welcome Back')).toBeNull();
+    expect(queryByText('What are we working on?')).toBeNull();
+    expect(queryByText('Welcome back')).toBeNull();
     expect(getAllByTestId('chat-message')).toHaveLength(2);
+    expect(
+      screen.getByTestId('chat-input').getAttribute('data-placeholder')
+    ).toBe('Ask a follow-up...');
+    expect(screen.getByTestId('chat-input').getAttribute('data-variant')).toBe(
+      'compact'
+    );
+    expect(
+      screen.getByTestId('chat-input').getAttribute('data-quick-actions')
+    ).toBeNull();
   });
 });

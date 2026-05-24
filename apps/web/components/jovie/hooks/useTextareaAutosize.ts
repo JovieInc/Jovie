@@ -118,13 +118,13 @@ export const HIDDEN_DIV_STYLES: React.CSSProperties = {
   height: 'auto',
   overflow: 'hidden',
   // Text styles must match the textarea:
-  fontSize: '14px',
+  fontSize: '16px',
   lineHeight: '24px',
   fontFamily: 'inherit',
-  padding: '6px 0', // py-1.5
+  padding: '1px 4px',
   boxSizing: 'border-box',
   wordWrap: 'break-word',
   whiteSpace: 'pre-wrap',
-  letterSpacing: 'inherit',
+  letterSpacing: '0',
   borderWidth: 0,
 };

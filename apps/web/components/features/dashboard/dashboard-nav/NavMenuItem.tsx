@@ -9,9 +9,7 @@ import {
 } from '@jovie/ui';
 import { Copy, ExternalLink } from 'lucide-react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
 import {
-  type ComponentType,
   type MouseEvent,
   type ReactNode,
   useCallback,
@@ -25,9 +23,14 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
 } from '@/components/organisms/Sidebar';
-import { SidebarNavItem } from '@/components/shell/SidebarNavItem';
+import {
+  getSidebarNavIconClassName,
+  getSidebarNavRowClassName,
+} from '@/components/shell/SidebarNavItem';
+import { Tooltip } from '@/components/shell/Tooltip';
 import { BASE_URL } from '@/constants/domains';
 import { copyToClipboard } from '@/hooks/useClipboard';
+import { useIsElectronRuntime } from '@/lib/desktop/electron-bridge';
 import type { KeyboardShortcut } from '@/lib/keyboard-shortcuts';
 import type { NavItem } from './types';
 
@@ -112,7 +115,7 @@ export function NavMenuItem({
   onPrefetch,
   useShellNavItem = false,
 }: NavMenuItemProps) {
-  const router = useRouter();
+  const isElectronRuntime = useIsElectronRuntime();
   const pendingNavigationRef = useRef(false);
   const clearPendingNavigationListenersRef = useRef<(() => void) | null>(null);
   // Memoize tooltip to prevent creating new objects on every render,
@@ -201,7 +204,7 @@ export function NavMenuItem({
       if (preventNavigation) {
         event.preventDefault();
       }
-      const shouldInterceptNavigation =
+      const isPlainNavigation =
         !preventNavigation &&
         Boolean(onNavigate) &&
         event.button === 0 &&
@@ -210,30 +213,21 @@ export function NavMenuItem({
         !event.shiftKey &&
         !event.altKey;
 
-      if (!hadPendingPointerNavigation && shouldInterceptNavigation) {
+      if (!hadPendingPointerNavigation && isPlainNavigation) {
         showPendingShell();
       }
       onClick?.();
 
-      if (!shouldInterceptNavigation && onNavigate) {
+      if (!isPlainNavigation && onNavigate) {
         onCancelNavigate?.();
-      }
-
-      if (shouldInterceptNavigation) {
-        event.preventDefault();
-        requestAnimationFrame(() => {
-          router.push(item.href);
-        });
       }
     },
     [
-      item.href,
       clearPendingNavigationListeners,
       onCancelNavigate,
       onClick,
       onNavigate,
       preventNavigation,
-      router,
       showPendingShell,
     ]
   );
@@ -278,29 +272,76 @@ export function NavMenuItem({
     showPendingShell,
   ]);
 
-  const ShellIcon = item.icon as ComponentType<{
-    readonly className?: string;
-    readonly strokeWidth?: number;
-  }>;
-  const shellNavItem =
-    useShellNavItem && renderAsButton && item.badge == null ? (
-      <SidebarNavItem
-        item={{
-          icon: ShellIcon,
-          label: item.name,
-          active: isActive,
-          onActivate: handleButtonClick,
-        }}
-        collapsed={false}
-        tight
+  const shellNavItem = useShellNavItem;
+  const shellTooltipShortcut = shortcut
+    ? {
+        keys: shortcut.keys,
+        description: shortcut.description ?? shortcut.label,
+      }
+    : undefined;
+  const shellNavClassName = getSidebarNavRowClassName({
+    active: isActive,
+    className:
+      'group-data-[collapsible=icon]:mx-auto group-data-[collapsible=icon]:h-8 group-data-[collapsible=icon]:w-10 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0',
+  });
+  const shellInnerContent = (
+    <>
+      <item.icon
+        className={getSidebarNavIconClassName({ active: isActive })}
+        strokeWidth={2.25}
+        aria-hidden='true'
       />
-    ) : null;
+      <span className='min-w-0 truncate text-left justify-self-start group-data-[collapsible=icon]:hidden'>
+        {item.name}
+      </span>
+      {item.badge != null ? (
+        <span className='justify-self-end shrink-0 group-data-[collapsible=icon]:hidden'>
+          {item.badge}
+        </span>
+      ) : null}
+    </>
+  );
 
   return (
     <ContextMenu>
       <ContextMenuTrigger asChild>
         <SidebarMenuItem>
-          {shellNavItem ?? (
+          {shellNavItem ? (
+            <Tooltip
+              label={item.name}
+              shortcut={shellTooltipShortcut}
+              side='right'
+              block
+            >
+              {renderAsButton ? (
+                <button
+                  type='button'
+                  onClick={handleButtonClick}
+                  onPointerDown={handlePressStart}
+                  onMouseEnter={onPrefetch}
+                  onFocus={onPrefetch}
+                  aria-pressed={isActive}
+                  className={shellNavClassName}
+                >
+                  {shellInnerContent}
+                </button>
+              ) : (
+                <Link
+                  href={item.href}
+                  prefetch={prefetch}
+                  onClick={handleLinkClick}
+                  onPointerDown={handlePressStart}
+                  onMouseEnter={onPrefetch}
+                  onFocus={onPrefetch}
+                  aria-current={isActive ? 'page' : undefined}
+                  aria-disabled={preventNavigation || undefined}
+                  className={shellNavClassName}
+                >
+                  {shellInnerContent}
+                </Link>
+              )}
+            </Tooltip>
+          ) : (
             <SidebarMenuButton asChild isActive={isActive} tooltip={tooltip}>
               {renderAsButton ? (
                 <button
@@ -331,7 +372,7 @@ export function NavMenuItem({
               )}
             </SidebarMenuButton>
           )}
-          {item.badge != null && (
+          {!shellNavItem && item.badge != null && (
             <SidebarMenuBadge>{item.badge}</SidebarMenuBadge>
           )}
           {actions}
@@ -343,10 +384,12 @@ export function NavMenuItem({
           <Copy className='mr-2 h-3.5 w-3.5' />
           Copy link
         </ContextMenuItem>
-        <ContextMenuItem onSelect={handleOpenInNewTab}>
-          <ExternalLink className='mr-2 h-3.5 w-3.5' />
-          Open in new tab
-        </ContextMenuItem>
+        {isElectronRuntime ? null : (
+          <ContextMenuItem onSelect={handleOpenInNewTab}>
+            <ExternalLink className='mr-2 h-3.5 w-3.5' />
+            Open in new tab
+          </ContextMenuItem>
+        )}
       </ContextMenuContent>
     </ContextMenu>
   );

@@ -1,11 +1,12 @@
 import { TooltipProvider } from '@jovie/ui';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { fireEvent, render, screen } from '@testing-library/react';
-import type { ComponentProps, ReactNode } from 'react';
+import type { ComponentProps, FormEvent, ReactNode } from 'react';
 import { useState } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 
 import { ChatInput } from '@/components/jovie/components/ChatInput';
+import { useChipTray } from '@/components/jovie/hooks/useChipTray';
 
 /**
  * ARIA combobox contract for the chat composer textarea.
@@ -16,8 +17,8 @@ import { ChatInput } from '@/components/jovie/components/ChatInput';
  *   - aria-controls={pickerListId}
  *   - aria-activedescendant={activeRowId}
  *   - aria-autocomplete='list'
- * When closed, only aria-expanded='false' (and the existing aria-label)
- * remain.
+ * When closed, only the existing aria-label remains. `aria-expanded` is
+ * omitted because it is invalid on a plain textarea without combobox role.
  */
 
 vi.mock('@/lib/queries/useReleasesQuery', () => ({
@@ -30,6 +31,10 @@ vi.mock('@/lib/queries/useArtistSearchQuery', () => ({
     state: 'idle' as const,
     search: vi.fn(),
   }),
+}));
+
+vi.mock('@/lib/queries/useEventsQuery', () => ({
+  useEventsQuery: () => ({ data: [], isLoading: false }),
 }));
 
 // Match ChatInput.test.tsx's motion mock so motion's ref forwarding doesn't
@@ -105,18 +110,25 @@ function withProviders(ui: ReactNode) {
 
 interface HarnessProps {
   readonly initialValue?: string;
+  readonly onSubmit?: (e?: FormEvent) => void;
 }
 
-function Harness({ initialValue = '' }: HarnessProps) {
+function Harness({ initialValue = '', onSubmit = () => {} }: HarnessProps) {
   const [value, setValue] = useState(initialValue);
+  const chipTray = useChipTray();
   return (
     <ChatInput
       value={value}
       onChange={setValue}
-      onSubmit={() => {}}
+      onSubmit={onSubmit}
       isLoading={false}
       isSubmitting={false}
       profileId='profile-test'
+      chips={chipTray.chips}
+      onRemoveChipAt={chipTray.removeAt}
+      onRemoveLastChip={chipTray.removeLast}
+      onAddSkill={chipTray.addSkill}
+      onAddEntity={chipTray.addEntity}
     />
   );
 }
@@ -128,10 +140,10 @@ function getTextarea(): HTMLTextAreaElement {
 }
 
 describe('ChatInput combobox ARIA wiring', () => {
-  it('starts with aria-expanded=false and no combobox role when picker closed', () => {
+  it('starts with no combobox-only attrs when picker closed', () => {
     render(withProviders(<Harness />));
     const textarea = getTextarea();
-    expect(textarea).toHaveAttribute('aria-expanded', 'false');
+    expect(textarea).not.toHaveAttribute('aria-expanded');
     expect(textarea).not.toHaveAttribute('role', 'combobox');
     expect(textarea).not.toHaveAttribute('aria-controls');
     expect(textarea).not.toHaveAttribute('aria-activedescendant');
@@ -174,7 +186,7 @@ describe('ChatInput combobox ARIA wiring', () => {
     // Wait one microtask for the picker close + 0ms timeout focus restore.
     await new Promise(resolve => setTimeout(resolve, 10));
 
-    expect(textarea).toHaveAttribute('aria-expanded', 'false');
+    expect(textarea).not.toHaveAttribute('aria-expanded');
     expect(textarea).not.toHaveAttribute('role', 'combobox');
     expect(textarea).not.toHaveAttribute('aria-controls');
     expect(textarea).not.toHaveAttribute('aria-activedescendant');
@@ -197,5 +209,30 @@ describe('ChatInput combobox ARIA wiring', () => {
 
     const sendButton = screen.getByRole('button', { name: /send message/i });
     expect(sendButton).toBeDisabled();
+  });
+
+  it('commits the Feedback slash command into a sendable skill chip', () => {
+    const onSubmit = vi.fn();
+    render(withProviders(<Harness onSubmit={onSubmit} />));
+    const textarea = getTextarea();
+    textarea.focus();
+    fireEvent.change(textarea, { target: { value: '/feed' } });
+
+    expect(
+      screen.getByRole('option', { name: /send feedback/i })
+    ).toBeInTheDocument();
+
+    fireEvent.keyDown(window, { key: 'Enter' });
+
+    expect(screen.getByTestId('chat-input-chip-tray')).toHaveTextContent(
+      'Send feedback'
+    );
+    expect(textarea).toHaveValue('');
+
+    const sendButton = screen.getByRole('button', { name: /send message/i });
+    expect(sendButton).toBeEnabled();
+
+    fireEvent.click(sendButton);
+    expect(onSubmit).toHaveBeenCalledTimes(1);
   });
 });

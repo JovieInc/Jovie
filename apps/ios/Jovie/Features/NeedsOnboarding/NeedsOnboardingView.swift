@@ -9,7 +9,7 @@ struct NeedsOnboardingView: View {
       JovieColor.backgroundBase.ignoresSafeArea()
 
       VStack(alignment: .leading, spacing: JovieSpacing.large) {
-        Text("Complete Your Profile On Web")
+        Text("Complete Your Profile on Web")
           .font(JovieFont.display(size: 28))
           .foregroundStyle(JovieColor.textPrimary)
 
@@ -17,7 +17,7 @@ struct NeedsOnboardingView: View {
           .font(JovieFont.body(size: 16))
           .foregroundStyle(JovieColor.textSecondary)
 
-        Button("Continue On Web") {
+        Button("Continue on Web") {
           openURL(continueURL)
         }
         .buttonStyle(JoviePillButtonStyle(filled: true))

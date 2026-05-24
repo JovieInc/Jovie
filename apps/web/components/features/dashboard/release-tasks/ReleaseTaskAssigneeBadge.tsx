@@ -9,7 +9,7 @@ interface ReleaseTaskAssigneeBadgeProps {
 const ASSIGNEE_VARIANTS = {
   human: {
     className: 'border-transparent bg-transparent',
-    dotClassName: 'bg-[var(--linear-accent,#5e6ad2)]',
+    dotClassName: 'bg-accent',
   },
   ai_workflow: {
     className: 'border-purple-500/20 bg-purple-500/5',

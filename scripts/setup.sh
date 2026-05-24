@@ -151,6 +151,8 @@ install_ripgrep_standalone() {
 
 MISSING=()
 IS_WORKTREE=false
+SETUP_START_SECONDS=$(date +%s)
+REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 DOPPLER_PROJECT="jovie-web"
 DOPPLER_CONFIG="dev"
 DOPPLER_LOCAL_RUN=(doppler run --project "$DOPPLER_PROJECT" --config "$DOPPLER_CONFIG" --)
@@ -158,6 +160,28 @@ DOPPLER_LOCAL_RUN=(doppler run --project "$DOPPLER_PROJECT" --config "$DOPPLER_C
 if git rev-parse --is-inside-work-tree &>/dev/null && [ -f ".git" ]; then
   IS_WORKTREE=true
 fi
+
+hash_dependency_inputs() {
+  local hash_cmd
+  if command -v shasum &>/dev/null; then
+    hash_cmd=(shasum -a 256)
+  elif command -v sha256sum &>/dev/null; then
+    hash_cmd=(sha256sum)
+  else
+    return 1
+  fi
+
+  git ls-files \
+    'package.json' \
+    '**/package.json' \
+    'pnpm-lock.yaml' \
+    'pnpm-workspace.yaml' \
+    '.npmrc' 2>/dev/null |
+    sort |
+    xargs "${hash_cmd[@]}" |
+    "${hash_cmd[@]}" |
+    awk '{print $1}'
+}
 
 # ─── 1. Node.js version check ───────────────────────────────────────────────
 echo ""
@@ -300,26 +324,44 @@ echo ""
 echo "── Dependencies ────────────────────────────────────────────────────────"
 if command -v pnpm &>/dev/null; then
   if [[ "$IS_WORKTREE" == "true" ]]; then
-    info "Fresh worktree detected (.git is a file) — installing dependencies for this worktree."
+    info "Git worktree detected (.git is a file). Dependencies are still per-worktree."
   fi
-  info "Running pnpm install..."
-  pnpm install
-  success "Dependencies installed"
+
+  SETUP_CACHE_DIR="$REPO_ROOT/node_modules/.cache/jovie-setup"
+  DEP_FINGERPRINT_FILE="$SETUP_CACHE_DIR/deps.sha256"
+  DEP_FINGERPRINT="$(hash_dependency_inputs || true)"
+  PREVIOUS_DEP_FINGERPRINT=""
+  if [[ -f "$DEP_FINGERPRINT_FILE" ]]; then
+    PREVIOUS_DEP_FINGERPRINT="$(cat "$DEP_FINGERPRINT_FILE" 2>/dev/null || true)"
+  fi
+
+  if [[ -n "$DEP_FINGERPRINT" && -f "$REPO_ROOT/node_modules/.modules.yaml" && "$DEP_FINGERPRINT" == "$PREVIOUS_DEP_FINGERPRINT" ]]; then
+    success "Dependencies unchanged — skipped pnpm install"
+  else
+    info "Running pnpm install..."
+    pnpm install
+    mkdir -p "$SETUP_CACHE_DIR"
+    if [[ -n "$DEP_FINGERPRINT" ]]; then
+      printf '%s\n' "$DEP_FINGERPRINT" >"$DEP_FINGERPRINT_FILE"
+    fi
+    success "Dependencies installed"
+  fi
 else
   warn "Skipping pnpm install — pnpm not available"
   MISSING+=("pnpm install")
 fi
 
-# ─── 5.5. Clear stale Turbopack cache ──────────────────────────────────────
+# ─── 5.5. Turbopack cache ──────────────────────────────────────────────────
 echo ""
 echo "── Turbopack cache ─────────────────────────────────────────────────"
-REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 NEXT_CACHE="$REPO_ROOT/apps/web/.next/cache"
-if [ -d "$NEXT_CACHE" ]; then
+if [[ "${JOVIE_DEV_RESET_NEXT_CACHE:-0}" == "1" && -d "$NEXT_CACHE" ]]; then
   rm -rf "$NEXT_CACHE/pack" "$NEXT_CACHE/turbopack"
-  success "Cleared stale Turbopack cache"
-else
+  success "Cleared Turbopack cache"
+elif [[ "${JOVIE_DEV_RESET_NEXT_CACHE:-0}" == "1" ]]; then
   info "No Turbopack cache to clear"
+else
+  info "Preserved Turbopack cache (set JOVIE_DEV_RESET_NEXT_CACHE=1 to reset)"
 fi
 
 # ─── 6. Doppler auth / config check ─────────────────────────────────────────
@@ -411,10 +453,24 @@ fi
 # USER_CREATION_FAILED. This step syncs them automatically.
 echo ""
 echo "── Dev Clerk ID sync ─────────────────────────────────────────────────"
-if command -v doppler &>/dev/null && "${DOPPLER_LOCAL_RUN[@]}" echo "ok" &>/dev/null 2>&1; then
+CLERK_SYNC_STAMP="$REPO_ROOT/node_modules/.cache/jovie-setup/dev-clerk-sync.stamp"
+SHOULD_SYNC_CLERK=false
+if [[ "${JOVIE_DEV_SYNC_CLERK_IDS:-0}" == "1" ]]; then
+  SHOULD_SYNC_CLERK=true
+elif [[ ! -f "$CLERK_SYNC_STAMP" ]]; then
+  SHOULD_SYNC_CLERK=true
+elif find "$CLERK_SYNC_STAMP" -mtime +7 -print -quit 2>/dev/null | grep -q .; then
+  SHOULD_SYNC_CLERK=true
+fi
+
+if [[ "$SHOULD_SYNC_CLERK" != "true" ]]; then
+  success "Dev Clerk IDs recently synced — skipped"
+elif command -v doppler &>/dev/null && "${DOPPLER_LOCAL_RUN[@]}" echo "ok" &>/dev/null 2>&1; then
   SYNC_SCRIPT="$REPO_ROOT/scripts/sync-dev-clerk-ids.ts"
   if [[ -f "$SYNC_SCRIPT" ]]; then
     if "${DOPPLER_LOCAL_RUN[@]}" pnpm tsx "$SYNC_SCRIPT" 2>/dev/null; then
+      mkdir -p "$(dirname "$CLERK_SYNC_STAMP")"
+      touch "$CLERK_SYNC_STAMP"
       success "Dev Clerk IDs synced"
     else
       warn "Clerk ID sync failed (non-blocking — app may prompt user creation)"
@@ -430,10 +486,12 @@ fi
 echo ""
 echo "────────────────────────────────────────────────────────────────────────"
 if [[ ${#MISSING[@]} -eq 0 ]]; then
+  SETUP_DURATION_SECONDS=$(( $(date +%s) - SETUP_START_SECONDS ))
   success "Ready to develop"
+  info "Setup completed in ${SETUP_DURATION_SECONDS}s"
   echo ""
-  echo "  Start the dev server:"
-  echo "    pnpm run dev:web:local"
+  echo "  Start the fast local dev server:"
+  echo "    pnpm run dev:web:fast"
   echo ""
   echo "  Run tests:"
   echo "    pnpm run test:web"

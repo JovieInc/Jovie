@@ -37,8 +37,8 @@ import {
   useAdminWaitlistInfiniteQuery,
   useApproveWaitlistMutation,
   useDisapproveWaitlistMutation,
-  useUpdateWaitlistStatusMutation,
 } from '@/lib/queries';
+import { logger } from '@/lib/utils/logger';
 import { AdminWaitlistTableUnified } from './AdminWaitlistTableUnified';
 import {
   persistGroupingPreference,
@@ -102,7 +102,6 @@ export function AdminWaitlistTableWithViews(props: WaitlistTableProps) {
   });
 
   // TanStack Query mutations for waitlist status changes
-  const updateStatusMutation = useUpdateWaitlistStatusMutation();
   const approveMutation = useApproveWaitlistMutation();
   const disapproveMutation = useDisapproveWaitlistMutation();
 
@@ -157,12 +156,13 @@ export function AdminWaitlistTableWithViews(props: WaitlistTableProps) {
         icon: <CheckCircle className='h-3.5 w-3.5' />,
         onClick: async () => {
           const eligible = selectedEntries.filter(
-            e => e.status === 'new' || e.status === 'invited'
+            e =>
+              e.status === 'new' ||
+              e.status === 'waitlisted' ||
+              e.status === 'qualified'
           );
           if (eligible.length === 0) {
-            toast.info(
-              'No entries eligible for approval (must have status "new" or "invited")'
-            );
+            toast.info('No entries eligible for approval');
             return;
           }
           await Promise.all(
@@ -179,16 +179,14 @@ export function AdminWaitlistTableWithViews(props: WaitlistTableProps) {
         icon: <XCircle className='h-3.5 w-3.5' />,
         onClick: async () => {
           const eligible = selectedEntries.filter(
-            e => e.status === 'invited' || e.status === 'claimed'
+            e => e.status === 'invited' || e.status === 'approved'
           );
           if (eligible.length === 0) {
-            toast.info(
-              'No entries eligible for disapproval (must be invited or claimed)'
-            );
+            toast.info('No entries eligible for disapproval');
             return;
           }
           await Promise.all(
-            eligible.map(e => approveEntry({ id: e.id, status: e.status }))
+            eligible.map(e => disapproveMutation.mutateAsync({ entryId: e.id }))
           );
           toast.success(
             `Disapproved ${eligible.length} entr${eligible.length === 1 ? 'y' : 'ies'}`
@@ -197,18 +195,28 @@ export function AdminWaitlistTableWithViews(props: WaitlistTableProps) {
         },
       },
     ];
-  }, [entries, selectedIds, clearSelection, approveEntry]);
+  }, [entries, selectedIds, clearSelection, approveEntry, disapproveMutation]);
 
   // Group entries by status for Kanban board
   const kanbanColumns = useMemo<KanbanColumn<WaitlistEntryRow>[]>(() => {
-    const newEntries = entries.filter(e => e.status === 'new');
-    const invitedEntries = entries.filter(e => e.status === 'invited');
-    const claimedEntries = entries.filter(e => e.status === 'claimed');
+    const newEntries = entries.filter(
+      e =>
+        e.status === 'new' ||
+        e.status === 'chat_started' ||
+        e.status === 'qualified' ||
+        e.status === 'waitlisted'
+    );
+    const invitedEntries = entries.filter(
+      e => e.status === 'invited' || e.status === 'approved'
+    );
+    const claimedEntries = entries.filter(
+      e => e.status === 'claimed' || e.status === 'signed_up'
+    );
 
     return [
       {
-        id: 'new',
-        title: 'New',
+        id: 'pipeline',
+        title: 'Pipeline',
         items: newEntries,
         count: newEntries.length,
         accent: '#3b82f6', // blue
@@ -221,8 +229,8 @@ export function AdminWaitlistTableWithViews(props: WaitlistTableProps) {
         accent: '#8b5cf6', // purple
       },
       {
-        id: 'claimed',
-        title: 'Claimed',
+        id: 'signed_up',
+        title: 'Signed up',
         items: claimedEntries,
         count: claimedEntries.length,
         accent: '#10b981', // green
@@ -244,36 +252,33 @@ export function AdminWaitlistTableWithViews(props: WaitlistTableProps) {
   const handleItemMove = useCallback(
     async (itemId: string, fromColumnId: string, toColumnId: string) => {
       try {
-        if (toColumnId === 'claimed') {
-          // Use proper approval flow — updates users.userStatus, activeProfileId,
-          // profile fields, and invalidates proxy cache
-          await approveMutation.mutateAsync({ entryId: itemId });
-        } else if (toColumnId === 'new') {
-          // Use proper disapproval flow — reverts user status and profile
-          await disapproveMutation.mutateAsync({ entryId: itemId });
-        } else if (fromColumnId === 'claimed' && toColumnId === 'invited') {
-          // Block claimed→invited: no backend path to partially revert approval.
-          // Admin should move to New first, then to Invited if needed.
+        if (toColumnId === 'signed_up' || fromColumnId === 'signed_up') {
           toast.error(
-            'Move claimed entries to New first, then to Invited if needed.'
+            'Signed-up entries are terminal. Update the user account instead.'
           );
           return;
+        }
+
+        if (toColumnId === 'invited') {
+          await approveMutation.mutateAsync({ entryId: itemId });
+        } else if (toColumnId === 'pipeline') {
+          // Use proper disapproval flow — reverts user status and profile
+          await disapproveMutation.mutateAsync({ entryId: itemId });
         } else {
-          // Transitional status updates (e.g. new→invited) use simple status update
-          await updateStatusMutation.mutateAsync({
-            entryId: itemId,
-            status: toColumnId as 'new' | 'invited' | 'claimed',
-          });
+          toast.error('Unsupported waitlist status update.');
         }
       } catch (error) {
-        console.error('Failed to update waitlist status:', error);
+        logger.error(
+          '[admin/waitlist] Failed to update waitlist status:',
+          error
+        );
         toast.error('Failed to update status', {
           description:
             error instanceof Error ? error.message : 'Please try again',
         });
       }
     },
-    [approveMutation, disapproveMutation, updateStatusMutation]
+    [approveMutation, disapproveMutation]
   );
 
   return (

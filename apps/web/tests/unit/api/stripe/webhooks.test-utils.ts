@@ -11,6 +11,19 @@ export function setSkipProcessing(value: boolean) {
   skipProcessing = value;
 }
 
+// Additional simulation modes for rare idempotency branches in route
+// (data race disappear after conflict, unprocessed-retry path for prior failure)
+export let simulateRaceDisappear = false;
+export let simulateUnprocessedRetry = false;
+
+export function setSimulateRaceDisappear(value: boolean) {
+  simulateRaceDisappear = value;
+}
+
+export function setSimulateUnprocessedRetry(value: boolean) {
+  simulateUnprocessedRetry = value;
+}
+
 export async function getPost() {
   const mod = await import('@/app/api/stripe/webhooks/route');
   return mod.POST;
@@ -26,12 +39,14 @@ const hoisted = vi.hoisted(() => {
     values: vi.fn(() => ({
       onConflictDoNothing: vi.fn(() => ({
         returning: vi.fn(async () => {
-          // Import skipProcessing dynamically to get current value
-          const { skipProcessing: skip } = await import(
-            './webhooks.test-utils'
-          );
-          // If skip mode, simulate conflict (return empty = row already exists)
-          return skip ? [] : [{ id: 'webhook-1' }];
+          // Import dynamically to get current control values (supports multiple modes)
+          const {
+            skipProcessing: skip,
+            simulateRaceDisappear: disappear,
+            simulateUnprocessedRetry: unproc,
+          } = await import('./webhooks.test-utils');
+          // Conflict modes return empty (row "exists" per unique)
+          return skip || disappear || unproc ? [] : [{ id: 'webhook-1' }];
         }),
       })),
     })),
@@ -42,9 +57,13 @@ const hoisted = vi.hoisted(() => {
     from: vi.fn(() => ({
       where: vi.fn(() => ({
         limit: vi.fn(async () => {
-          const { skipProcessing: skip } = await import(
-            './webhooks.test-utils'
-          );
+          const {
+            skipProcessing: skip,
+            simulateRaceDisappear: disappear,
+            simulateUnprocessedRetry: unproc,
+          } = await import('./webhooks.test-utils');
+          if (disappear) return [];
+          if (unproc) return [{ id: 'existing-id', processedAt: null }];
           return skip ? [{ id: 'existing-id', processedAt: new Date() }] : [];
         }),
       })),

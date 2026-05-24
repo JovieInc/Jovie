@@ -34,4 +34,54 @@ describe('createMarkdownDocument', () => {
     expect(doc.html).toContain('id="target-heading"');
     expect(doc.html).toContain('href="#target-heading"');
   });
+
+  it('removes dangerous HTML from markdown output', async () => {
+    const md =
+      '## Safe\n\n<script>alert("x")</script><a href="javascript:alert(1)" onclick="alert(2)">Bad link</a>';
+    const doc = await createMarkdownDocument(md);
+
+    expect(doc.html).toContain('Bad link');
+    expect(doc.html).not.toContain('<script');
+    expect(doc.html).not.toContain('javascript:');
+    expect(doc.html).not.toContain('onclick');
+  });
+
+  it('renders GitHub-flavored tables and task lists', async () => {
+    const md = [
+      '| Cookie Name | Purpose |',
+      '| --- | --- |',
+      '| `jv_cc` | Stores consent preferences |',
+      '',
+      '- [x] Essential cookies',
+      '- [ ] Marketing cookies',
+    ].join('\n');
+    const doc = await createMarkdownDocument(md);
+
+    expect(doc.html).toContain('<table>');
+    expect(doc.html).toContain('<th>Cookie Name</th>');
+    expect(doc.html).toContain('<code>jv_cc</code>');
+    expect(doc.html).toContain('class="contains-task-list"');
+    expect(doc.html).toContain('class="task-list-item"');
+    expect(doc.html).toContain('type="checkbox"');
+  });
+
+  it('sanitizes dangerous HTML inside GFM table and task list output', async () => {
+    const md = [
+      '| Name | Link |',
+      '| --- | --- |',
+      '| Bad | <a href="javascript:alert(1)" onclick="alert(2)">Unsafe</a> |',
+      '',
+      '- [x] <span onclick="alert(3)">Checked</span>',
+      '- [ ] <script>alert("x")</script>Unchecked',
+    ].join('\n');
+    const doc = await createMarkdownDocument(md);
+
+    expect(doc.html).toContain('<table>');
+    expect(doc.html).toContain('Unsafe');
+    expect(doc.html).toContain('Checked');
+    expect(doc.html).toContain('Unchecked');
+    expect(doc.html).not.toContain('<script');
+    expect(doc.html).not.toContain('javascript:');
+    expect(doc.html).not.toContain('onclick');
+  });
 });

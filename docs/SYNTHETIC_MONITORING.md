@@ -1,22 +1,23 @@
 # Synthetic Monitoring
 
-This document describes the synthetic monitoring setup for Jovie's golden path user journey.
+This document describes the synthetic monitoring setup for Jovie's production front-door user journey.
 
 ## Overview
 
-Synthetic monitoring runs automated tests against production and preview environments to ensure critical user flows are working correctly. The tests run every 5-10 minutes and alert the team via Slack when issues are detected.
+Synthetic monitoring runs automated tests against production to make sure a real new visitor can enter the product. The scheduled workflow uses Doppler `prd` secrets, runs Playwright against `https://jov.ie`, and alerts Slack when any blocking check fails.
 
 ## Test Coverage
 
 ### Golden Path Test
 
-The primary test covers the complete revenue-generating user journey:
+The primary test covers the complete front-door journey:
 
-1. **Homepage Load** - Verify site accessibility and signup button
-2. **Sign Up Flow** - Clerk registration process
-3. **Username Claim** - Onboarding with handle validation
-4. **Dashboard Access** - Successful profile creation
-5. **Public Profile** - Profile accessibility and rendering
+1. **`/start` onboarding chat** - verifies the first anonymous chat turn can POST without Turnstile configuration errors.
+2. **Homepage CTA** - verifies the primary front-door CTA is visible and routes to `/signup`.
+3. **Clerk sign-up** - creates a plus-addressed synthetic production user through the rendered UI.
+4. **Mailbox OTP** - reads the Clerk code from a dedicated mailbox provider and completes verification.
+5. **Post-signup app state** - confirms the signed-in user can reach a non-empty usable app/onboarding surface.
+6. **Scoped cleanup** - deletes only the exact plus-addressed synthetic Clerk user created by that run.
 
 ### Health Checks
 
@@ -24,7 +25,8 @@ Additional monitoring includes:
 
 - Critical page load times
 - Error boundary detection
-- API endpoint health
+- `/start` visible Turnstile/auth configuration errors
+- Public profile rendering
 - Performance baseline validation
 
 ## Data Test Attributes
@@ -33,9 +35,8 @@ The following `data-test` attributes are used for reliable element selection:
 
 | Attribute                         | Element                   | Purpose                |
 | --------------------------------- | ------------------------- | ---------------------- |
-| `data-test="signup-btn"`          | Homepage signup button    | Entry point tracking   |
-| `data-test="username-input"`      | Onboarding username field | Handle validation flow |
-| `data-test="claim-btn"`           | Onboarding submit button  | Profile creation       |
+| `data-testid="homepage-primary-cta"` | Homepage primary CTA      | Entry point tracking   |
+| `aria-label="Chat message input"` | `/start` chat composer    | First-turn chat check  |
 | `data-test="dashboard-welcome"`   | Dashboard header          | Successful onboarding  |
 | `data-test="public-profile-root"` | Profile page container    | Public accessibility   |
 | `data-test="listen-btn"`          | Listen mode DSP buttons   | Listen functionality   |
@@ -57,10 +58,22 @@ pnpm exec playwright test tests/e2e/golden-path.spec.ts --ui
 
 ```bash
 # Run synthetic monitoring test against staging
-E2E_SYNTHETIC_MODE=true BASE_URL=https://preview.jovie.app pnpm test:e2e:synthetic
+E2E_SYNTHETIC_MODE=true BASE_URL=https://staging.jov.ie pnpm test:e2e:synthetic
 
-# Run against production (requires production secrets)
-E2E_SYNTHETIC_MODE=true BASE_URL=https://jovie.app pnpm test:e2e:synthetic
+# Run against production (requires Doppler prd production secrets)
+doppler run --project jovie-web --config prd -- \
+  E2E_SYNTHETIC_MODE=true \
+  E2E_ENVIRONMENT=production \
+  BASE_URL=https://jov.ie \
+  PLAYWRIGHT_TEST_BASE_URL=https://jov.ie \
+  pnpm --filter=@jovie/web run test:e2e:synthetic
+```
+
+### Readiness Preflight
+
+```bash
+doppler run --project jovie-web --config prd -- \
+  pnpm --filter=@jovie/web run check:signup-readiness -- --target=prd
 ```
 
 ## Environment Variables
@@ -70,24 +83,53 @@ E2E_SYNTHETIC_MODE=true BASE_URL=https://jovie.app pnpm test:e2e:synthetic
 ```bash
 E2E_SYNTHETIC_MODE=true
 E2E_ENVIRONMENT=production|preview
-BASE_URL=https://jovie.app
+BASE_URL=https://jov.ie
 NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_live_...
 CLERK_SECRET_KEY=sk_live_...
-NEXT_PUBLIC_SUPABASE_URL=https://...
-NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJ...
+DATABASE_URL=postgres://...
+SESSION_SECRET=...
+AI_GATEWAY_API_KEY=...
+NEXT_PUBLIC_TURNSTILE_SITE_KEY=...
+TURNSTILE_SECRET_KEY=...
+E2E_PROD_SIGNUP_EMAIL_BASE=synthetic-signup@...
+E2E_PROD_SIGNUP_PASSWORD=...
+E2E_PROD_MAILBOX_PROVIDER=gmail
+E2E_PROD_MAILBOX_CLIENT_ID=...
+E2E_PROD_MAILBOX_CLIENT_SECRET=...
+E2E_PROD_MAILBOX_REFRESH_TOKEN=...
+```
+
+Preferred no-inbox provider:
+
+```bash
+E2E_PROD_SIGNUP_EMAIL_BASE=synthetic-signup@<dedicated-e2e-domain>
+E2E_PROD_MAILBOX_PROVIDER=cloudflare-email-routing
+E2E_PROD_OTP_CHECK_URL=https://<otp-worker-host>/latest
+E2E_PROD_OTP_CHECK_TOKEN=...
+```
+
+Cloudflare Email Routing should be configured on a dedicated e2e domain with a
+catch-all route to an Email Worker. The Worker parses Clerk verification emails,
+stores only short-lived OTP state for the addressed run, and exposes a
+bearer-protected `POST` endpoint. The synthetic canary calls
+`E2E_PROD_OTP_CHECK_URL` with:
+
+```json
+{ "email": "synthetic-signup+run-id@<dedicated-e2e-domain>", "sinceMs": 1770000000000 }
+```
+
+The endpoint should return `404` or `204` while no fresh code is available, or
+`200` with one of:
+
+```json
+{ "otp": "123456" }
+{ "code": "123456" }
+{ "text": "Your verification code is 123456." }
 ```
 
 ### GitHub Secrets
 
-The following secrets must be configured in GitHub Actions:
-
-| Secret                       | Description                       |
-| ---------------------------- | --------------------------------- |
-| `CLERK_PUBLISHABLE_KEY_PROD` | Production Clerk publishable key  |
-| `CLERK_SECRET_KEY_PROD`      | Production Clerk secret key       |
-| `SUPABASE_URL_PROD`          | Production Supabase URL           |
-| `SUPABASE_ANON_KEY_PROD`     | Production Supabase anonymous key |
-| `SLACK_WEBHOOK_URL`          | Slack webhook for alerts          |
+The workflow reads runtime secrets through `DOPPLER_TOKEN_PRD`. Do not duplicate Turnstile or mailbox values as standalone GitHub repo secrets.
 
 ## GitHub Actions Workflow
 
@@ -95,13 +137,12 @@ The synthetic monitoring runs automatically via GitHub Actions:
 
 ### Schedule
 
-- **Business Hours (9 AM - 9 PM PST)**: Every 5 minutes
-- **Off Hours (9 PM - 9 AM PST)**: Every 10 minutes
+- **Business Hours (8 AM - 8 PM Pacific)**: Every 15 minutes
+- **Off Hours**: Every 30 minutes
 
 ### Environments Tested
 
-- **Production**: https://jovie.app
-- **Preview**: https://preview.jovie.app
+- **Production**: https://jov.ie
 
 ### Failure Handling
 
@@ -114,15 +155,15 @@ The synthetic monitoring runs automatically via GitHub Actions:
 ### Account Strategy
 
 - Each test run creates a fresh user account
-- Email format: `synthetic-{timestamp}@jovie-monitoring.test`
-- Handle format: `synth{timestamp}`
-- Accounts are not automatically cleaned up (manual cleanup required)
+- Email format: `<E2E_PROD_SIGNUP_EMAIL_BASE local>+<run-id>@<domain>`
+- Accounts are tagged with Clerk public metadata `role=synthetic_production_canary`
+- The test deletes only the exact plus-addressed email created in that run
 
 ### Production Considerations
 
-- Synthetic accounts should be periodically cleaned from production database
+- Synthetic account cleanup must stay scoped to the configured plus-addressed mailbox
 - Monitor synthetic account creation rate to avoid hitting limits
-- Consider implementing auto-cleanup after 24-48 hours
+- Do not run broad `cleanup-e2e-users.ts` against production Clerk
 
 ## Alerting
 

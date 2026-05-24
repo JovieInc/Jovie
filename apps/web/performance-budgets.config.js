@@ -58,7 +58,7 @@ module.exports = {
       ],
     },
     {
-      path: '/app/dashboard/releases',
+      path: '/app/releases',
       auth: true,
       timings: [
         // Authenticated dashboard page — must feel instant (Gmail rule)

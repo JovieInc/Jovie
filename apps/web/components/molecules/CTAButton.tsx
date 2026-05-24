@@ -5,7 +5,6 @@ import { Check } from 'lucide-react';
 import Link from 'next/link';
 import React from 'react';
 import { LoadingSpinner } from '@/components/atoms/LoadingSpinner';
-import { useReducedMotion } from '@/lib/hooks/useReducedMotion';
 import { cn } from '@/lib/utils';
 
 export interface CTAButtonProps extends Omit<ButtonProps, 'loading' | 'size'> {
@@ -60,8 +59,6 @@ export const CTAButton = React.forwardRef<
     },
     ref
   ) => {
-    const prefersReducedMotion = useReducedMotion();
-
     const mappedSize: ButtonProps['size'] | undefined =
       size === 'md' ? 'default' : size;
 
@@ -75,14 +72,11 @@ export const CTAButton = React.forwardRef<
       </span>
     );
 
+    // Calm color/opacity/shadow feedback only — no decorative scale/translate.
+    // See .claude/rules/ui.md "No Decorative Hover Motion".
     const sharedClassName = cn(
-      'gap-2 rounded-lg transition-all duration-150 ease-out',
-      'active:translate-y-[1px] focus-visible:translate-y-[0.5px]',
-      'motion-reduce:transition-none motion-reduce:transform-none',
-      'will-change-transform focus-visible:ring-offset-2 focus-visible:ring-ring focus-visible:ring-offset-background',
-      prefersReducedMotion
-        ? 'shadow-none active:translate-y-0 hover:shadow-none'
-        : 'shadow-lg hover:shadow-xl hover:scale-[1.02] active:scale-[0.98]',
+      'gap-2 rounded-lg shadow-lg transition-[background-color,border-color,box-shadow,color,opacity] duration-subtle ease-subtle',
+      'hover:shadow-xl focus-visible:ring-offset-2 focus-visible:ring-ring focus-visible:ring-offset-background',
       className
     );
 
@@ -93,7 +87,6 @@ export const CTAButton = React.forwardRef<
           disabled={isDisabled}
           size={mappedSize}
           data-state={dataState}
-          data-reduced-motion={prefersReducedMotion ? 'true' : undefined}
           className={sharedClassName}
           aria-busy={isLoading || undefined}
           {...props}
@@ -118,7 +111,6 @@ export const CTAButton = React.forwardRef<
         disabled={isDisabled}
         size={mappedSize}
         data-state={dataState}
-        data-reduced-motion={prefersReducedMotion ? 'true' : undefined}
         className={sharedClassName}
         aria-live={isSuccess ? 'polite' : undefined}
         aria-busy={isLoading || undefined}

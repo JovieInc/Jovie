@@ -5,6 +5,8 @@ enum JovieColor {
   static let backgroundBase = Color(hex: 0x08090A)
   static let surface0 = Color(hex: 0x0F1011)
   static let surface1 = Color(hex: 0x17171A)
+  static let surface2 = Color(hex: 0x23252A)
+  static let surface3 = Color(hex: 0x2A2C32)
   static let textPrimary = Color(hex: 0xFFFFFF)
   static let textSecondary = Color(hex: 0xE3E4E6)
   static let textTertiary = Color(hex: 0x969799)
@@ -12,6 +14,7 @@ enum JovieColor {
   static let borderDefault = Color.white.opacity(0.08)
   static let borderStrong = Color.white.opacity(0.10)
   static let accent = Color(hex: 0x7170FF)
+  static let errorText = Color(hex: 0xFF7A73)
 }
 
 enum JovieFont {
@@ -45,6 +48,50 @@ enum JovieSpacing {
   static let xxLarge: CGFloat = 32
 }
 
+enum JovieRadius {
+  static let small: CGFloat = 6
+  static let medium: CGFloat = 8
+  static let large: CGFloat = 12
+  static let xLarge: CGFloat = 16
+}
+
+private struct JovieSurfaceModifier: ViewModifier {
+  let radius: CGFloat
+  let interactive: Bool
+
+  @ViewBuilder
+  func body(content: Content) -> some View {
+    if #available(iOS 26.0, *) {
+      if interactive {
+        content
+          .glassEffect(
+            .regular.tint(JovieColor.surface1.opacity(0.62)).interactive(),
+            in: .rect(cornerRadius: radius)
+          )
+      } else {
+        content
+          .glassEffect(
+            .regular.tint(JovieColor.surface1.opacity(0.62)),
+            in: .rect(cornerRadius: radius)
+          )
+      }
+    } else {
+      content
+        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: radius, style: .continuous))
+        .overlay {
+          RoundedRectangle(cornerRadius: radius, style: .continuous)
+            .stroke(JovieColor.borderDefault, lineWidth: 1)
+        }
+    }
+  }
+}
+
+extension View {
+  func jovieSurface(radius: CGFloat = JovieRadius.large, interactive: Bool = false) -> some View {
+    modifier(JovieSurfaceModifier(radius: radius, interactive: interactive))
+  }
+}
+
 struct JoviePillButtonStyle: ButtonStyle {
   let filled: Bool
 
@@ -67,6 +114,35 @@ struct JoviePillButtonStyle: ButtonStyle {
       }
       .opacity(configuration.isPressed ? 0.8 : 1)
       .animation(.easeOut(duration: 0.15), value: configuration.isPressed)
+  }
+}
+
+struct JovieIconButtonStyle: ButtonStyle {
+  func makeBody(configuration: Configuration) -> some View {
+    configuration.label
+      .font(.system(size: 17, weight: .semibold))
+      .foregroundStyle(JovieColor.textPrimary)
+      .frame(width: 44, height: 44)
+      .background(JovieColor.surface1, in: Circle())
+      .overlay {
+        Circle().stroke(JovieColor.borderDefault, lineWidth: 1)
+      }
+      .opacity(configuration.isPressed ? 0.72 : 1)
+      .animation(.easeOut(duration: 0.12), value: configuration.isPressed)
+  }
+}
+
+struct JovieLogoMark: View {
+  let size: CGFloat
+
+  var body: some View {
+    Image("Jovie-logo")
+      .resizable()
+      .renderingMode(.template)
+      .scaledToFit()
+      .foregroundStyle(Color.white)
+      .frame(width: size, height: size)
+      .accessibilityHidden(true)
   }
 }
 

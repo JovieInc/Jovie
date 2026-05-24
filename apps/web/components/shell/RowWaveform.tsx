@@ -1,6 +1,11 @@
 'use client';
 
-import { type MouseEvent as ReactMouseEvent, useId, useMemo } from 'react';
+import {
+  type KeyboardEvent as ReactKeyboardEvent,
+  type MouseEvent as ReactMouseEvent,
+  useId,
+  useMemo,
+} from 'react';
 import { cn } from '@/lib/utils';
 import type { CueKind, RowWaveformDatum } from './row-waveform.types';
 
@@ -102,11 +107,11 @@ export function RowWaveform({
   const stride = ROW_WF_W / peaks.length;
   const clipId = useId();
 
+  const SEEK_STEP = Math.max(1, track.durationSec * 0.05);
+
   function handleClick(e: ReactMouseEvent<HTMLDivElement>) {
     e.stopPropagation();
     const rect = e.currentTarget.getBoundingClientRect();
-    // Guard against a 0-width rect during layout transitions; would
-    // otherwise divide by zero and seek to NaN.
     if (rect.width <= 0) return;
     const ratio = Math.max(
       0,
@@ -115,16 +120,32 @@ export function RowWaveform({
     onSeek(ratio * track.durationSec);
   }
 
+  function handleKeyDown(e: ReactKeyboardEvent<HTMLDivElement>) {
+    if (e.key === 'ArrowRight' || e.key === 'ArrowUp') {
+      e.preventDefault();
+      onSeek(Math.min(track.durationSec, currentTimeSec + SEEK_STEP));
+    } else if (e.key === 'ArrowLeft' || e.key === 'ArrowDown') {
+      e.preventDefault();
+      onSeek(Math.max(0, currentTimeSec - SEEK_STEP));
+    } else if (e.key === 'Home') {
+      e.preventDefault();
+      onSeek(0);
+    } else if (e.key === 'End') {
+      e.preventDefault();
+      onSeek(track.durationSec);
+    }
+  }
+
   return (
-    // biome-ignore lint/a11y/useKeyWithClickEvents: scrub via mouse; keyboard seek lands on a follow-up
     <div
       role='slider'
       aria-label={`Scrub ${track.title}`}
       aria-valuemin={0}
       aria-valuemax={track.durationSec}
       aria-valuenow={Math.round(currentTimeSec)}
-      tabIndex={-1}
+      tabIndex={0}
       onClick={handleClick}
+      onKeyDown={handleKeyDown}
       className={cn('group/wf relative h-7 cursor-pointer', className)}
     >
       <svg
@@ -146,7 +167,7 @@ export function RowWaveform({
 
         <g
           className={cn(
-            'transition-opacity duration-150 ease-out',
+            'transition-opacity duration-subtle ease-subtle',
             isCurrentTrack
               ? 'opacity-50'
               : 'opacity-35 group-hover/wf:opacity-55'
@@ -223,13 +244,13 @@ export function RowWaveform({
             >
               <span
                 className={cn(
-                  'absolute inset-y-0 w-px transition-opacity duration-150 ease-out opacity-50 group-hover/wf:opacity-90',
+                  'absolute inset-y-0 w-px transition-opacity duration-subtle ease-subtle opacity-50 group-hover/wf:opacity-90',
                   CUE_TONE_LINE[c.kind]
                 )}
               />
               <span
                 className={cn(
-                  'absolute -top-px h-[3px] w-[3px] rounded-full -translate-x-[1px] transition-opacity duration-150 ease-out opacity-80 group-hover/wf:opacity-100',
+                  'absolute -top-px h-[3px] w-[3px] rounded-full -translate-x-[1px] transition-opacity duration-subtle ease-subtle opacity-80 group-hover/wf:opacity-100',
                   CUE_TONE_DOT[c.kind]
                 )}
               />

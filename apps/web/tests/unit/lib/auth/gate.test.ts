@@ -7,6 +7,7 @@ const {
   mockDbSelect,
   mockDbInsert,
   mockEq,
+  mockSql,
   mockIsWaitlistGateEnabled,
 } = vi.hoisted(() => ({
   mockCachedAuth: vi.fn(),
@@ -14,15 +15,22 @@ const {
   mockDbSelect: vi.fn(),
   mockDbInsert: vi.fn(),
   mockEq: vi.fn(),
+  mockSql: vi.fn(),
   mockIsWaitlistGateEnabled: vi.fn().mockResolvedValue(true),
 }));
 
 vi.mock('drizzle-orm', async importOriginal => {
   const actual = await importOriginal<typeof import('drizzle-orm')>();
   mockEq.mockImplementation((...args: any[]) => (actual as any).eq(...args));
+  mockSql.mockImplementation((strings: TemplateStringsArray, ...values) => ({
+    strings,
+    values,
+  }));
   return {
     ...actual,
     eq: ((...args: any[]) => mockEq(...args)) as unknown as typeof actual.eq,
+    sql: ((strings: TemplateStringsArray, ...values: unknown[]) =>
+      mockSql(strings, ...values)) as unknown as typeof actual.sql,
   };
 });
 
@@ -80,10 +88,14 @@ const createJoinQueryMock = (result: unknown[]) => ({
 });
 
 // Helper to create mock for simple queries (waitlist)
+// JOV-1963: waitlist lookup now chains .orderBy(desc(createdAt)).limit(1)
+// to ensure the latest entry wins when multiple rows exist for one email.
 const createSimpleQueryMock = (result: unknown[]) => ({
   from: vi.fn().mockReturnValue({
     where: vi.fn().mockReturnValue({
-      limit: vi.fn().mockResolvedValue(result),
+      orderBy: vi.fn().mockReturnValue({
+        limit: vi.fn().mockResolvedValue(result),
+      }),
     }),
   }),
 });
@@ -126,7 +138,12 @@ describe('gate.ts', () => {
     it('returns BANNED for soft-deleted users', async () => {
       mockCachedAuth.mockResolvedValue({ userId: 'clerk_123' });
       mockCachedCurrentUser.mockResolvedValue({
-        emailAddresses: [{ emailAddress: 'test@example.com' }],
+        emailAddresses: [
+          {
+            emailAddress: 'test@example.com',
+            verification: { status: 'verified' },
+          },
+        ],
       });
 
       // Mock JOIN query returning user with deletedAt set (no profile)
@@ -153,7 +170,12 @@ describe('gate.ts', () => {
     it('returns BANNED for banned status', async () => {
       mockCachedAuth.mockResolvedValue({ userId: 'clerk_123' });
       mockCachedCurrentUser.mockResolvedValue({
-        emailAddresses: [{ emailAddress: 'test@example.com' }],
+        emailAddresses: [
+          {
+            emailAddress: 'test@example.com',
+            verification: { status: 'verified' },
+          },
+        ],
       });
 
       mockDbSelect.mockReturnValue(
@@ -179,7 +201,12 @@ describe('gate.ts', () => {
     it('returns BANNED for suspended status', async () => {
       mockCachedAuth.mockResolvedValue({ userId: 'clerk_123' });
       mockCachedCurrentUser.mockResolvedValue({
-        emailAddresses: [{ emailAddress: 'test@example.com' }],
+        emailAddresses: [
+          {
+            emailAddress: 'test@example.com',
+            verification: { status: 'verified' },
+          },
+        ],
       });
 
       mockDbSelect.mockReturnValue(
@@ -205,7 +232,12 @@ describe('gate.ts', () => {
     it('returns NEEDS_ONBOARDING when user has no profile', async () => {
       mockCachedAuth.mockResolvedValue({ userId: 'clerk_123' });
       mockCachedCurrentUser.mockResolvedValue({
-        emailAddresses: [{ emailAddress: 'test@example.com' }],
+        emailAddresses: [
+          {
+            emailAddress: 'test@example.com',
+            verification: { status: 'verified' },
+          },
+        ],
       });
 
       // Single JOIN query: user exists but no profile (profileId is null)
@@ -233,14 +265,19 @@ describe('gate.ts', () => {
       const result = await resolveUserState();
 
       expect(result.state).toBe(CanonicalUserState.NEEDS_ONBOARDING);
-      expect(result.redirectTo).toBe('/onboarding?fresh_signup=true');
+      expect(result.redirectTo).toBe('/start?fresh_signup=true');
       expect(result.dbUserId).toBe('a1b2c3d4-e5f6-7890-abcd-ef1234567890');
     });
 
     it('returns NEEDS_ONBOARDING when profile is incomplete', async () => {
       mockCachedAuth.mockResolvedValue({ userId: 'clerk_123' });
       mockCachedCurrentUser.mockResolvedValue({
-        emailAddresses: [{ emailAddress: 'test@example.com' }],
+        emailAddresses: [
+          {
+            emailAddress: 'test@example.com',
+            verification: { status: 'verified' },
+          },
+        ],
       });
 
       // Single JOIN query: user with incomplete profile (missing username)
@@ -274,7 +311,12 @@ describe('gate.ts', () => {
     it('returns ACTIVE for fully onboarded user', async () => {
       mockCachedAuth.mockResolvedValue({ userId: 'clerk_123' });
       mockCachedCurrentUser.mockResolvedValue({
-        emailAddresses: [{ emailAddress: 'test@example.com' }],
+        emailAddresses: [
+          {
+            emailAddress: 'test@example.com',
+            verification: { status: 'verified' },
+          },
+        ],
       });
 
       // Single JOIN query: user with complete profile
@@ -350,7 +392,12 @@ describe('gate.ts', () => {
     it('returns NEEDS_DB_USER when createDbUserIfMissing is false', async () => {
       mockCachedAuth.mockResolvedValue({ userId: 'clerk_123' });
       mockCachedCurrentUser.mockResolvedValue({
-        emailAddresses: [{ emailAddress: 'test@example.com' }],
+        emailAddresses: [
+          {
+            emailAddress: 'test@example.com',
+            verification: { status: 'verified' },
+          },
+        ],
       });
 
       // No DB user found (JOIN query returns empty)
@@ -359,7 +406,7 @@ describe('gate.ts', () => {
       const result = await resolveUserState({ createDbUserIfMissing: false });
 
       expect(result.state).toBe(CanonicalUserState.NEEDS_DB_USER);
-      expect(result.redirectTo).toBe('/onboarding?fresh_signup=true');
+      expect(result.redirectTo).toBe('/start?fresh_signup=true');
     });
   });
 
@@ -369,7 +416,7 @@ describe('gate.ts', () => {
         '/signin'
       );
       expect(getRedirectForState(CanonicalUserState.NEEDS_DB_USER)).toBe(
-        '/onboarding?fresh_signup=true'
+        '/start?fresh_signup=true'
       );
       expect(
         getRedirectForState(CanonicalUserState.NEEDS_WAITLIST_SUBMISSION)
@@ -378,7 +425,7 @@ describe('gate.ts', () => {
         '/waitlist'
       );
       expect(getRedirectForState(CanonicalUserState.NEEDS_ONBOARDING)).toBe(
-        '/onboarding?fresh_signup=true'
+        '/start?fresh_signup=true'
       );
       expect(getRedirectForState(CanonicalUserState.BANNED)).toBe(
         '/unavailable'
@@ -463,8 +510,11 @@ describe('gate.ts', () => {
     });
 
     it('normalizes email to lowercase', async () => {
+      // JOV-1963: query now chains .orderBy(...).limit(1)
       const whereMock = vi.fn().mockReturnValue({
-        limit: vi.fn().mockResolvedValue([]),
+        orderBy: vi.fn().mockReturnValue({
+          limit: vi.fn().mockResolvedValue([]),
+        }),
       });
 
       mockDbSelect.mockReturnValue({
@@ -475,11 +525,10 @@ describe('gate.ts', () => {
 
       await getWaitlistAccess('  TEST@EXAMPLE.COM  ');
 
-      // Verify the normalized value is passed into Drizzle eq()
-      expect(mockEq).toHaveBeenCalled();
-      expect(mockEq.mock.calls[0]?.[1]).toBe('test@example.com');
-      // And that where() receives the exact SQL expression returned by eq()
-      expect(whereMock).toHaveBeenCalledWith(mockEq.mock.results[0]?.value);
+      // Verify the normalized value is included in the lower(email) SQL guard.
+      expect(mockSql).toHaveBeenCalled();
+      expect(mockSql.mock.calls[0]?.[2]).toBe('test@example.com');
+      expect(whereMock).toHaveBeenCalledWith(mockSql.mock.results[0]?.value);
     });
   });
 });

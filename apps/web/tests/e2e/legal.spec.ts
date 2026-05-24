@@ -36,10 +36,18 @@ test.describe('Legal Pages', () => {
     });
 
     test('displays privacy policy page correctly', async ({ page }) => {
-      // Check hero title (the h1 from LegalHero)
-      await expect(page.locator('h1')).toContainText(
-        'Privacy built for artists on the move'
-      );
+      await expect(page.locator('h1')).toContainText('Privacy Policy');
+      await expect(page.getByText('Last updated: February 2026')).toBeVisible();
+      await expect(
+        page.getByText('We collect only what is essential')
+      ).toBeVisible();
+      await expect(page.getByRole('button', { name: 'Print' })).toBeVisible();
+      await expect(
+        page.getByRole('button', { name: 'Download PDF' })
+      ).toBeVisible();
+      await expect(
+        page.getByRole('navigation', { name: 'Document navigation' }).first()
+      ).toBeVisible();
 
       // Check main section headings (must match actual markdown content)
       await expect(
@@ -103,10 +111,11 @@ test.describe('Legal Pages', () => {
     });
 
     test('displays terms of service page correctly', async ({ page }) => {
-      // Check hero title (the h1 from LegalHero)
-      await expect(page.locator('h1')).toContainText(
-        'Terms that respect your creativity and control'
-      );
+      await expect(page.locator('h1')).toContainText('Terms of Service');
+      await expect(page.getByText('Last updated: February 2026')).toBeVisible();
+      await expect(
+        page.getByText('Jovie is governed by clear policies')
+      ).toBeVisible();
 
       // Check main section headings (must match actual markdown content)
       await expect(
@@ -152,6 +161,55 @@ test.describe('Legal Pages', () => {
       await expect(
         page.getByRole('heading', { name: 'Acceptance of Terms' })
       ).toBeVisible();
+    });
+  });
+
+  test.describe('Cookie Policy', () => {
+    test('keeps GFM tables readable without page-level mobile overflow', async ({
+      page,
+    }) => {
+      await page.route('**/api/profile/view', r =>
+        r.fulfill({ status: 200, body: '{}' })
+      );
+      await page.route('**/api/audience/visit', r =>
+        r.fulfill({ status: 200, body: '{}' })
+      );
+      await page.route('**/api/track', r =>
+        r.fulfill({ status: 200, body: '{}' })
+      );
+      await page.setViewportSize({ width: 375, height: 667 });
+      await page.goto('/legal/cookies', { timeout: 180_000 });
+
+      const table = page.locator('table').first();
+      await expect(table).toBeVisible();
+      await expect(
+        page.locator('code').filter({ hasText: 'jv_cc' }).first()
+      ).toBeVisible();
+
+      const overflow = await page.evaluate(() => {
+        const firstTable = document.querySelector('table');
+        const previousScrollLeft = firstTable?.scrollLeft ?? 0;
+        if (firstTable) {
+          firstTable.scrollLeft = 50;
+        }
+        const nextScrollLeft = firstTable?.scrollLeft ?? 0;
+        if (firstTable) {
+          firstTable.scrollLeft = previousScrollLeft;
+        }
+
+        return {
+          documentWidth: document.documentElement.scrollWidth,
+          tableCanScroll: nextScrollLeft > previousScrollLeft,
+          tableFits:
+            (firstTable?.scrollWidth ?? 0) <= (firstTable?.clientWidth ?? 0),
+          viewportWidth: window.innerWidth,
+        };
+      });
+
+      expect(overflow.documentWidth).toBeLessThanOrEqual(
+        overflow.viewportWidth + 2
+      );
+      expect(overflow.tableCanScroll || overflow.tableFits).toBe(true);
     });
   });
 
@@ -204,11 +262,11 @@ test.describe('Legal Pages', () => {
       );
       await page.goto('/legal/privacy', { timeout: 180_000 });
 
-      // The hero h1 should be the first heading
+      // The document title should be the first heading
       const headings = page.locator('h1, h2, h3');
       await expect(headings.first()).toBeVisible();
 
-      // There should be exactly one h1 (from LegalHero)
+      // There should be exactly one h1
       const h1Count = await page.locator('h1').count();
       expect(h1Count).toBe(1);
     });
@@ -225,11 +283,11 @@ test.describe('Legal Pages', () => {
       );
       await page.goto('/legal/terms', { timeout: 180_000 });
 
-      // The hero h1 should be the first heading
+      // The document title should be the first heading
       const headings = page.locator('h1, h2, h3');
       await expect(headings.first()).toBeVisible();
 
-      // There should be exactly one h1 (from LegalHero)
+      // There should be exactly one h1
       const h1Count = await page.locator('h1').count();
       expect(h1Count).toBe(1);
     });

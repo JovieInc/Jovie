@@ -34,13 +34,15 @@ export function ReleaseFields({
   const releaseTypeLabel = releaseType
     ? (RELEASE_TYPE_LABELS[releaseType] ?? releaseType)
     : null;
+  const trackNoun = totalTracks === 1 ? 'Track' : 'Tracks';
   const trackLabel =
     totalTracks != null && totalTracks > 0
-      ? `${totalTracks} ${totalTracks === 1 ? 'Track' : 'Tracks'}`
+      ? `${totalTracks} ${trackNoun}`
       : null;
+  const platformNoun = platformCount === 1 ? 'DSP' : 'DSPs';
   const platformLabel =
     platformCount != null && platformCount > 0
-      ? `${platformCount} ${platformCount === 1 ? 'DSP' : 'DSPs'}`
+      ? `${platformCount} ${platformNoun}`
       : null;
   const dropDate = releaseDate ? dropDateMeta(releaseDate) : null;
 

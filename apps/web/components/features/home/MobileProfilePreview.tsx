@@ -15,10 +15,7 @@ export function MobileProfilePreview({ creator }: MobileProfilePreviewProps) {
   const primaryGenre = creator.tagline?.trim() || creator.genres[0] || 'Artist';
 
   return (
-    <div
-      className='flex h-full flex-col items-center'
-      style={{ backgroundColor: 'var(--linear-bg-page)' }}
-    >
+    <div className='flex h-full flex-col items-center bg-page'>
       {/* Profile photo */}
       <div className='pt-12 pb-3'>
         <div
@@ -39,10 +36,7 @@ export function MobileProfilePreview({ creator }: MobileProfilePreviewProps) {
 
       {/* Name + verified badge */}
       <div className='flex items-center gap-1'>
-        <p
-          className='text-[15px] font-semibold'
-          style={{ color: 'var(--linear-text-primary)' }}
-        >
+        <p className='text-[15px] font-semibold text-primary-token'>
           {displayName}
         </p>
         <span className='inline-flex rounded-full bg-white/10 p-0.5 text-sky-400'>

@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useProfileNotifications } from '@/components/organisms/profile-shell/ProfileNotificationsContext';
 import {
   COUNTRY_OPTIONS,
@@ -8,6 +8,7 @@ import {
 } from '@/features/profile/notifications';
 import { track } from '@/lib/analytics';
 import { captureError } from '@/lib/error-tracking';
+import type { ProfileAlertOptInVariant } from '@/lib/flags/contracts';
 import { useNotifications } from '@/lib/hooks/useNotifications';
 import {
   getNotificationSubscribeSuccessMessage,
@@ -23,12 +24,19 @@ import {
 } from '@/lib/queries/useNotificationStatusQuery';
 import type { Artist } from '@/types/db';
 import type { NotificationChannel } from '@/types/notifications';
-import type { NotificationSource } from './types';
+import {
+  buildNotificationSourceContext,
+  type NotificationSource,
+  type NotificationSourceContext,
+  resolveNotificationSource,
+} from './types';
 import { buildPhoneE164, getMaxNationalDigits } from './utils';
 
 interface UseSubscriptionFormOptions {
   artist: Artist;
   source?: NotificationSource;
+  sourceContext?: NotificationSourceContext;
+  experimentVariant?: ProfileAlertOptInVariant;
 }
 
 export type SubscriptionErrorOrigin =
@@ -94,8 +102,34 @@ const resolveInlineErrorMessage = (
 export function useSubscriptionForm({
   artist,
   source: sourceProp,
+  sourceContext,
+  experimentVariant,
 }: UseSubscriptionFormOptions): UseSubscriptionFormReturn {
-  const source = sourceProp ?? 'profile_inline';
+  const source = resolveNotificationSource(sourceProp, sourceContext);
+  const analyticsBase = useMemo(
+    () =>
+      buildNotificationSourceContext(artist, {
+        artistId: sourceContext?.artistId,
+        profileId: sourceContext?.profileId,
+        profileSlug: sourceContext?.profileSlug,
+        currentTab: sourceContext?.currentTab ?? 'home',
+        ctaLocation: source,
+        intent: sourceContext?.intent ?? 'general_alerts',
+        releaseId: sourceContext?.releaseId,
+        eventId: sourceContext?.eventId,
+      }),
+    [
+      artist,
+      source,
+      sourceContext?.artistId,
+      sourceContext?.currentTab,
+      sourceContext?.eventId,
+      sourceContext?.intent,
+      sourceContext?.profileId,
+      sourceContext?.profileSlug,
+      sourceContext?.releaseId,
+    ]
+  );
   const {
     state: notificationsState,
     setState: setNotificationsState,
@@ -274,12 +308,14 @@ export function useSubscriptionForm({
         phone: channel === 'sms' ? phoneE164 : undefined,
         countryCode: channel === 'sms' ? country.code : undefined,
         source,
+        sourceContext: analyticsBase,
       });
 
       track('notifications_subscribe_success', {
+        ...analyticsBase,
         channel,
         source,
-        handle: artist.handle,
+        alert_opt_in_variant: experimentVariant,
         pending_confirmation: response.pendingConfirmation ?? false,
       });
 
@@ -319,10 +355,11 @@ export function useSubscriptionForm({
       });
 
       track('notifications_subscribe_error', {
+        ...analyticsBase,
         error_type: 'submission_error',
         channel,
         source,
-        handle: artist.handle,
+        alert_opt_in_variant: experimentVariant,
       });
       return 'error';
     } finally {
@@ -331,11 +368,13 @@ export function useSubscriptionForm({
   }, [
     artist.handle,
     artist.id,
+    analyticsBase,
     channel,
     clearError,
     country.code,
     country.dialCode,
     emailInput,
+    experimentVariant,
     isSubmitting,
     phoneInput,
     source,
@@ -390,27 +429,50 @@ export function useSubscriptionForm({
         setSubscriptionDetails(prev => ({ ...prev, email: normalizedEmail }));
         setNotificationsState('success');
         showSuccess("You're all set. We'll keep you in the loop.");
+
+        // Canary: record source intent at OTP verification time so we can
+        // attribute confirmed subscriptions back to the originating profile page
+        // (JOV-2360). The source was already stored server-side at subscribe
+        // time, but this client event lets us measure completion rate per source.
+        track('otp_verified', {
+          ...analyticsBase,
+          source,
+          channel: 'email',
+          alert_opt_in_variant: experimentVariant,
+        });
+
         return 'subscribed' as const;
       } catch (err) {
         updateError(
           resolveInlineErrorMessage(err, NOTIFICATION_COPY.errors.generic),
           'verify'
         );
+
+        track('otp_verify_error', {
+          ...analyticsBase,
+          source,
+          channel: 'email',
+          alert_opt_in_variant: experimentVariant,
+        });
+
         return 'error' as const;
       } finally {
         setIsSubmitting(false);
       }
     },
     [
+      analyticsBase,
       artist.id,
       clearError,
       emailInput,
+      experimentVariant,
       isSubmitting,
       otpCode,
       setNotificationsState,
       setSubscribedChannels,
       setSubscriptionDetails,
       showSuccess,
+      source,
       updateError,
       verifyEmailOtpMutation,
     ]
@@ -425,16 +487,18 @@ export function useSubscriptionForm({
     clearError();
 
     track('otp_resend_attempt', {
+      ...analyticsBase,
       source,
-      handle: artist.handle,
+      alert_opt_in_variant: experimentVariant,
     });
 
     const result = await handleConfirmSubscription();
 
     if (result !== 'error') {
       track('otp_resend_success', {
+        ...analyticsBase,
         source,
-        handle: artist.handle,
+        alert_opt_in_variant: experimentVariant,
       });
 
       setOtpCode('');
@@ -446,8 +510,9 @@ export function useSubscriptionForm({
     setIsResending(false);
     return result !== 'error';
   }, [
-    artist.handle,
+    analyticsBase,
     clearError,
+    experimentVariant,
     handleConfirmSubscription,
     isResending,
     resendCooldownEnd,
@@ -467,31 +532,41 @@ export function useSubscriptionForm({
 
     // Track button click intent (before validation)
     track('subscribe_click', {
+      ...analyticsBase,
       channel,
       source,
-      handle: artist.handle,
+      alert_opt_in_variant: experimentVariant,
+    });
+    track('alert_signup_submit', {
+      ...analyticsBase,
+      channel,
+      source,
+      alert_opt_in_variant: experimentVariant,
     });
 
     if (!validateCurrent('submit')) {
       track('notifications_subscribe_error', {
+        ...analyticsBase,
         error_type: 'validation_error',
         channel,
         source,
-        handle: artist.handle,
+        alert_opt_in_variant: experimentVariant,
       });
       return 'error' as const;
     }
 
     track('notifications_subscribe_attempt', {
+      ...analyticsBase,
       channel,
       source,
-      handle: artist.handle,
+      alert_opt_in_variant: experimentVariant,
     });
 
     return await handleConfirmSubscription();
   }, [
-    artist.handle,
+    analyticsBase,
     channel,
+    experimentVariant,
     handleConfirmSubscription,
     isSubmitting,
     source,

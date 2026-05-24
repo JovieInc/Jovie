@@ -183,6 +183,12 @@ Before replying to any comment, run the **Escalation Detection** algorithm from 
 
 4. **SUPPRESSED comments:** Skip silently — these are known false positives from previous triage.
 
+5. **Durable hardening check:** For every VALID & ACTIONABLE or VALID BUT ALREADY FIXED comment, ask: "does this need a durable test, rule, or skill update?" Add the narrowest durable guard when the answer is yes:
+   - Deterministic parser/script failures -> focused test.
+   - Repeated repo-policy mistake -> `.claude/rules/*` or `LESSONS.md`.
+   - Repeated workflow mistake -> edit the gstack `.tmpl` source and regenerate generated skills.
+   - High-risk product/auth/billing/migration work -> create a Linear follow-up issue instead of broadening this review. Do not merely mention it.
+
 ---
 
 ## Step 5.5: TODOS cross-reference

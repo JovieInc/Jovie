@@ -2,7 +2,7 @@
 
 import { Mic2, Sparkles } from 'lucide-react';
 import type { KeyboardEvent } from 'react';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { cn } from '@/lib/utils';
 import { LyricRow } from './LyricRow';
 import { LyricsHeader } from './LyricsHeader';
@@ -26,7 +26,7 @@ export type { LyricLine, LyricsViewTrack } from './LyricsView.types';
  * @example
  * ```tsx
  * const { playbackState, seek } = useTrackAudioPlayer();
- * const [lines, setLines] = useState<LyricLine[]>(MOCK_LYRICS);
+ * const [lines, setLines] = useState<LyricLine[]>(initialLines);
  * <LyricsView
  *   track={{ artist: 'Bahamas', title: 'Lost in the Light' }}
  *   durationSec={playbackState.duration}
@@ -48,6 +48,8 @@ export function LyricsView({
   onTranscribe,
   onPaste,
   editing = false,
+  timed = true,
+  autoFocusView = false,
   className,
 }: {
   readonly track: LyricsViewTrack;
@@ -60,25 +62,36 @@ export function LyricsView({
   readonly onTranscribe?: () => void;
   readonly onPaste?: () => void;
   readonly editing?: boolean;
+  readonly timed?: boolean;
+  readonly autoFocusView?: boolean;
   readonly className?: string;
 }) {
   const [focusedIndex, setFocusedIndex] = useState(0);
+  const lyricsRootRef = useRef<HTMLElement | null>(null);
 
   const activeIndex = useMemo(() => {
     // Scan every line — caller may have edited a stamp out of order
     // (LyricsView allows mid-list reordering via stampLine), so we cannot
     // rely on ascending order to early-exit. Linear scan is O(n) but n is
     // typically <40 lyric lines per track.
+    if (!timed) return -1;
+
     let idx = -1;
     for (let i = 0; i < lines.length; i++) {
       if (lines[i].startSec <= currentTimeSec) idx = i;
     }
     return idx;
-  }, [lines, currentTimeSec]);
+  }, [lines, currentTimeSec, timed]);
 
   useEffect(() => {
     if (activeIndex >= 0) setFocusedIndex(activeIndex);
   }, [activeIndex]);
+
+  useEffect(() => {
+    if (autoFocusView && lines.length > 0) {
+      lyricsRootRef.current?.focus({ preventScroll: true });
+    }
+  }, [autoFocusView, lines.length]);
 
   function stampLine(index: number) {
     if (!onLinesChange) return;
@@ -122,7 +135,7 @@ export function LyricsView({
                 strokeWidth={2.25}
               />
             </div>
-            <h2 className='text-[18px] font-display tracking-[-0.012em] text-primary-token'>
+            <h2 className='text-[18px] font-display text-primary-token'>
               No lyrics yet
             </h2>
             <p className='mt-2 text-[13px] leading-[1.55] text-tertiary-token'>
@@ -134,7 +147,7 @@ export function LyricsView({
                 <button
                   type='button'
                   onClick={onTranscribe}
-                  className='inline-flex items-center gap-1.5 h-8 px-4 rounded-full bg-white text-black text-[12.5px] font-caption tracking-[-0.005em] hover:brightness-110 active:scale-[0.99] transition-all duration-150 ease-out'
+                  className='inline-flex items-center gap-1.5 h-8 px-4 rounded-full bg-white text-black text-[12.5px] font-caption transition-[filter] duration-subtle ease-subtle hover:brightness-110'
                 >
                   <Sparkles className='h-3.5 w-3.5' strokeWidth={2.25} />
                   Transcribe with Jovie
@@ -144,7 +157,7 @@ export function LyricsView({
                 <button
                   type='button'
                   onClick={onPaste}
-                  className='inline-flex items-center h-8 px-4 rounded-full border border-(--linear-app-shell-border) bg-surface-1/60 text-[12.5px] font-caption text-secondary-token tracking-[-0.005em] transition-colors duration-150 ease-out hover:text-primary-token hover:bg-surface-1'
+                  className='inline-flex items-center h-8 px-4 rounded-full border border-(--linear-app-shell-border) bg-surface-1/60 text-[12.5px] font-caption text-secondary-token transition-colors duration-subtle ease-subtle hover:text-primary-token hover:bg-surface-1'
                 >
                   Paste lyrics
                 </button>
@@ -159,6 +172,7 @@ export function LyricsView({
   return (
     // biome-ignore lint/a11y/noNoninteractiveElementInteractions: keyboard list root for J/K + Enter, mirrors TracksView
     <section
+      ref={lyricsRootRef}
       className={cn('flex h-full flex-col focus:outline-none', className)}
       // biome-ignore lint/a11y/noNoninteractiveTabindex: keyboard entry point for J/K + Enter navigation
       tabIndex={0}
@@ -180,6 +194,7 @@ export function LyricsView({
                 isActive={isActive}
                 isFocused={isFocused}
                 editing={editing && Boolean(onLinesChange)}
+                interactive={timed}
                 onFocus={() => setFocusedIndex(i)}
                 onSeek={() => onSeek(line.startSec)}
                 onStamp={() => stampLine(i)}
@@ -189,13 +204,15 @@ export function LyricsView({
           })}
         </ul>
       </div>
-      <LyricsTimeline
-        durationSec={durationSec}
-        currentTimeSec={currentTimeSec}
-        lines={lines}
-        activeIndex={activeIndex}
-        onSeek={onSeek}
-      />
+      {timed && (
+        <LyricsTimeline
+          durationSec={durationSec}
+          currentTimeSec={currentTimeSec}
+          lines={lines}
+          activeIndex={activeIndex}
+          onSeek={onSeek}
+        />
+      )}
     </section>
   );
 }

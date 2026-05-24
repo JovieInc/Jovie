@@ -66,22 +66,10 @@ export function DashboardAudienceDemo() {
         ].map(card => (
           <div
             key={card.label}
-            className='rounded-lg px-3 py-2.5'
-            style={{
-              backgroundColor: 'var(--linear-bg-surface-1)',
-              border: '1px solid var(--linear-border-subtle)',
-            }}
+            className='rounded-lg px-3 py-2.5 bg-surface-1 border border-subtle'
           >
-            <p
-              className='text-[11px]'
-              style={{ color: 'var(--linear-text-tertiary)' }}
-            >
-              {card.label}
-            </p>
-            <p
-              className='mt-0.5 text-lg font-semibold tabular-nums'
-              style={{ color: 'var(--linear-text-primary)' }}
-            >
+            <p className='text-[11px] text-tertiary-token'>{card.label}</p>
+            <p className='mt-0.5 text-lg font-semibold tabular-nums text-primary-token'>
               {card.value}
             </p>
           </div>
@@ -89,25 +77,15 @@ export function DashboardAudienceDemo() {
       </div>
 
       {/* Audience table */}
-      <div
-        className='overflow-hidden rounded-lg'
-        style={{
-          border: '1px solid var(--linear-border-subtle)',
-          backgroundColor: 'var(--linear-bg-surface-0)',
-        }}
-      >
+      <div className='overflow-hidden rounded-lg border border-subtle bg-surface-0'>
         <table className='w-full text-left text-xs'>
           <thead>
-            <tr style={{ backgroundColor: 'var(--linear-bg-surface-1)' }}>
+            <tr className='bg-surface-1'>
               {['Visitor', 'Intent', 'Returning', 'Source', 'Last Action'].map(
                 h => (
                   <th
                     key={h}
-                    className='px-3 py-2 font-medium'
-                    style={{
-                      color: 'var(--linear-text-tertiary)',
-                      borderBottom: '1px solid var(--linear-border-subtle)',
-                    }}
+                    className='px-3 py-2 font-medium text-tertiary-token border-b border-subtle'
                   >
                     {h}
                   </th>
@@ -129,12 +107,7 @@ export function DashboardAudienceDemo() {
                       : undefined,
                 }}
               >
-                <td
-                  className='px-3 py-2'
-                  style={{ color: 'var(--linear-text-primary)' }}
-                >
-                  {m.name}
-                </td>
+                <td className='px-3 py-2 text-primary-token'>{m.name}</td>
                 {/* Intent — dot + colored label (matches AudienceIntentScoreCell) */}
                 <td className='px-3 py-2'>
                   <span className='inline-flex items-center gap-1.5'>
@@ -154,28 +127,16 @@ export function DashboardAudienceDemo() {
                   </span>
                 </td>
                 {/* Returning — matches AudienceReturningCell */}
-                <td
-                  className='px-3 py-2'
-                  style={{ color: 'var(--linear-text-secondary)' }}
-                >
+                <td className='px-3 py-2 text-secondary-token'>
                   {m.status === 'Returning' ? 'Yes' : 'No'}
                 </td>
                 {/* Source — pill badge */}
                 <td className='px-3 py-2'>
-                  <span
-                    className='inline-flex rounded-full px-2 py-0.5 text-[10px] font-medium'
-                    style={{
-                      color: 'var(--linear-text-secondary)',
-                      backgroundColor: 'var(--linear-bg-surface-2)',
-                    }}
-                  >
+                  <span className='inline-flex rounded-full px-2 py-0.5 text-[10px] font-medium text-secondary-token bg-surface-2'>
                     {m.source}
                   </span>
                 </td>
-                <td
-                  className='px-3 py-2'
-                  style={{ color: 'var(--linear-text-tertiary)' }}
-                >
+                <td className='px-3 py-2 text-tertiary-token'>
                   {m.lastAction}
                 </td>
               </tr>

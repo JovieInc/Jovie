@@ -82,7 +82,7 @@ export const MusicImportHero = memo(function MusicImportHero({
           <p className='text-sm'>
             We had trouble importing your music. Try refreshing from the{' '}
             <Link
-              href={APP_ROUTES.DASHBOARD_RELEASES}
+              href={APP_ROUTES.RELEASES}
               className='font-medium text-accent underline-offset-2 hover:underline'
             >
               releases page
@@ -135,7 +135,7 @@ export const MusicImportHero = memo(function MusicImportHero({
           asChild
           className='rounded-[10px] text-2xs font-caption tracking-[-0.01em]'
         >
-          <Link href={APP_ROUTES.DASHBOARD_RELEASES}>
+          <Link href={APP_ROUTES.RELEASES}>
             {isImporting ? 'View All Releases' : 'Explore Your Releases'}
           </Link>
         </Button>

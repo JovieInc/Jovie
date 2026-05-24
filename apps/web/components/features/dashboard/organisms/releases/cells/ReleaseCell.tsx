@@ -41,6 +41,7 @@ export const ReleaseCell = memo(function ReleaseCell({
         releaseTitle: release.title,
         artistName: primaryArtist,
         artworkUrl: release.artworkUrl,
+        hasLyrics: Boolean(release.lyrics?.trim()),
       }).catch(() => {
         toast.error('Unable to play preview');
       });
@@ -50,6 +51,7 @@ export const ReleaseCell = memo(function ReleaseCell({
       release.id,
       release.title,
       release.previewUrl,
+      release.lyrics,
       primaryArtist,
       release.artworkUrl,
     ]

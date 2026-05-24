@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import { formatAmount } from '@/lib/utils/format-number';
 import { EARNINGS_SUMMARY, MONTHLY_EARNINGS, RECENT_TIPS } from './mock-data';
 
 /**
@@ -25,8 +26,6 @@ export function DashboardEarningsDemo() {
 
   const maxEarning = Math.max(...MONTHLY_EARNINGS.map(m => m.amount));
 
-  const formatCents = (cents: number) => `$${(cents / 100).toFixed(2)}`;
-
   return (
     <div ref={containerRef} className='space-y-4'>
       {/* Summary cards */}
@@ -34,11 +33,11 @@ export function DashboardEarningsDemo() {
         {[
           {
             label: 'Total Earned',
-            value: formatCents(EARNINGS_SUMMARY.totalReceivedCents),
+            value: formatAmount(EARNINGS_SUMMARY.totalReceivedCents),
           },
           {
             label: 'This Month',
-            value: formatCents(EARNINGS_SUMMARY.monthReceivedCents),
+            value: formatAmount(EARNINGS_SUMMARY.monthReceivedCents),
           },
           {
             label: 'Tips Received',
@@ -51,22 +50,10 @@ export function DashboardEarningsDemo() {
         ].map(card => (
           <div
             key={card.label}
-            className='rounded-lg px-3 py-2.5'
-            style={{
-              backgroundColor: 'var(--linear-bg-surface-1)',
-              border: '1px solid var(--linear-border-subtle)',
-            }}
+            className='rounded-lg px-3 py-2.5 bg-surface-1 border border-subtle'
           >
-            <p
-              className='text-[11px]'
-              style={{ color: 'var(--linear-text-tertiary)' }}
-            >
-              {card.label}
-            </p>
-            <p
-              className='mt-0.5 text-lg font-semibold tabular-nums'
-              style={{ color: 'var(--linear-text-primary)' }}
-            >
+            <p className='text-[11px] text-tertiary-token'>{card.label}</p>
+            <p className='mt-0.5 text-lg font-semibold tabular-nums text-primary-token'>
               {card.value}
             </p>
           </div>
@@ -75,17 +62,8 @@ export function DashboardEarningsDemo() {
 
       <div className='grid gap-4 sm:grid-cols-2'>
         {/* Monthly chart */}
-        <div
-          className='rounded-lg px-4 py-3'
-          style={{
-            backgroundColor: 'var(--linear-bg-surface-1)',
-            border: '1px solid var(--linear-border-subtle)',
-          }}
-        >
-          <p
-            className='mb-3 text-xs font-medium'
-            style={{ color: 'var(--linear-text-secondary)' }}
-          >
+        <div className='rounded-lg px-4 py-3 bg-surface-1 border border-subtle'>
+          <p className='mb-3 text-xs font-medium text-secondary-token'>
             Monthly earnings
           </p>
           <div className='flex items-end gap-2' style={{ height: 80 }}>
@@ -102,13 +80,10 @@ export function DashboardEarningsDemo() {
                       height: visible ? `${heightPct}%` : '0%',
                       backgroundColor: 'var(--linear-success)',
                       opacity: 0.8,
-                      transition: `height 0.6s cubic-bezier(0.34,1.56,0.64,1) ${i * 60}ms`,
+                      transition: `height 0.6s var(--ds-motion-cinematic-easing) ${i * 60}ms`,
                     }}
                   />
-                  <span
-                    className='text-[10px]'
-                    style={{ color: 'var(--linear-text-tertiary)' }}
-                  >
+                  <span className='text-[10px] text-tertiary-token'>
                     {m.month}
                   </span>
                 </div>
@@ -118,17 +93,8 @@ export function DashboardEarningsDemo() {
         </div>
 
         {/* Recent tips */}
-        <div
-          className='rounded-lg px-4 py-3'
-          style={{
-            backgroundColor: 'var(--linear-bg-surface-1)',
-            border: '1px solid var(--linear-border-subtle)',
-          }}
-        >
-          <p
-            className='mb-3 text-xs font-medium'
-            style={{ color: 'var(--linear-text-secondary)' }}
-          >
+        <div className='rounded-lg px-4 py-3 bg-surface-1 border border-subtle'>
+          <p className='mb-3 text-xs font-medium text-secondary-token'>
             Recent tips
           </p>
           <ul className='space-y-2'>
@@ -143,29 +109,18 @@ export function DashboardEarningsDemo() {
                 }}
               >
                 <div>
-                  <p
-                    className='text-xs'
-                    style={{ color: 'var(--linear-text-primary)' }}
-                  >
+                  <p className='text-xs text-primary-token'>
                     {tip.donor}
                     {tip.message && (
-                      <span style={{ color: 'var(--linear-text-tertiary)' }}>
+                      <span className='text-tertiary-token'>
                         {' '}
                         — {tip.message}
                       </span>
                     )}
                   </p>
-                  <p
-                    className='text-[10px]'
-                    style={{ color: 'var(--linear-text-tertiary)' }}
-                  >
-                    {tip.time}
-                  </p>
+                  <p className='text-[10px] text-tertiary-token'>{tip.time}</p>
                 </div>
-                <span
-                  className='text-xs font-semibold tabular-nums'
-                  style={{ color: 'var(--linear-success)' }}
-                >
+                <span className='text-xs font-semibold tabular-nums text-success'>
                   {tip.amount}
                 </span>
               </li>

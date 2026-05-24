@@ -7,6 +7,7 @@ import {
   resolveAvatarQuality,
   UNKNOWN_AVATAR_QUALITY,
 } from '@/lib/profile/avatar-quality';
+import { logger } from '@/lib/utils/logger';
 
 function isAvatarQualitySchemaUnavailableError(error: unknown): boolean {
   const directCode =
@@ -27,6 +28,29 @@ function isAvatarQualitySchemaUnavailableError(error: unknown): boolean {
     directCode === '42703' ||
     causeCode === '42P01' ||
     causeCode === '42703'
+  );
+}
+
+/**
+ * JOV-2285: detect transient Neon/pg connection failures that resolve on retry.
+ * These occur during cold-start, autosuspend wake, or connection-limit exhaustion
+ * and should degrade gracefully rather than propagating to Sentry as errors.
+ * Avatar quality is supplementary metadata — returning UNKNOWN is always safe.
+ */
+function isTransientDbConnectionError(error: unknown): boolean {
+  const message =
+    error instanceof Error
+      ? error.message.toLowerCase()
+      : String(error).toLowerCase();
+  return (
+    message.includes('connection') ||
+    message.includes('socket') ||
+    message.includes('econnreset') ||
+    message.includes('endpoint is disabled') ||
+    message.includes('too many connections') ||
+    message.includes('connection timeout') ||
+    message.includes('connection refused') ||
+    message.includes('fetch failed')
   );
 }
 
@@ -65,6 +89,19 @@ export async function getAvatarQualityForProfile(
         '[avatar-quality] profile_photos metadata unavailable, returning unknown',
         error,
         { creatorProfileId }
+      );
+      return UNKNOWN_AVATAR_QUALITY;
+    }
+
+    // JOV-2285: transient Neon connection failures degrade gracefully.
+    // Avatar quality is supplementary — UNKNOWN is the safe fallback.
+    if (isTransientDbConnectionError(error)) {
+      logger.warn(
+        '[avatar-quality] transient DB connection error, returning unknown quality',
+        {
+          creatorProfileId,
+          error: error instanceof Error ? error.message : String(error),
+        }
       );
       return UNKNOWN_AVATAR_QUALITY;
     }

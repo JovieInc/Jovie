@@ -1,6 +1,7 @@
 'use client';
 
 import { Play } from 'lucide-react';
+import { memo } from 'react';
 import { cn } from '@/lib/utils';
 import type { Cue } from './cues.types';
 
@@ -22,6 +23,53 @@ function formatCueTime(seconds: number): string {
   const s = Math.floor(seconds % 60);
   return `${m}:${String(s).padStart(2, '0')}`;
 }
+
+// Memoized row renderer for drawer cue list (high-churn over real prod Cue data
+// in entity drawers / waveform siblings). DS subtle + canonical focus rings
+// per established shell handoff pattern (rot 10+).
+const CueRow = memo(function CueRow({
+  c,
+  onSeek,
+  disabled,
+}: {
+  readonly c: Cue;
+  readonly onSeek?: (sec: number) => void;
+  readonly disabled: boolean;
+}) {
+  return (
+    <button
+      type='button'
+      onClick={() => onSeek?.(c.at)}
+      disabled={disabled}
+      className='group/cue w-full flex items-center gap-2 h-8 px-2 rounded-md text-[12.5px] text-secondary-token hover:bg-surface-1/40 hover:text-primary-token disabled:cursor-default disabled:hover:bg-transparent disabled:hover:text-secondary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/55 focus-visible:ring-offset-2 focus-visible:ring-offset-(--linear-bg-page) transition-colors duration-subtle ease-subtle'
+    >
+      <span className='relative w-9 shrink-0'>
+        <span
+          className={cn(
+            'absolute inset-0 grid place-items-start tabular-nums text-[10.5px] text-quaternary-token',
+            onSeek &&
+              'opacity-100 group-hover/cue:opacity-0 transition-opacity duration-subtle ease-subtle'
+          )}
+        >
+          {formatCueTime(c.at)}
+        </span>
+        {onSeek && (
+          <span className='absolute inset-0 grid place-items-center text-primary-token opacity-0 group-hover/cue:opacity-100 transition-opacity duration-subtle ease-subtle'>
+            <Play
+              className='h-3 w-3 translate-x-px'
+              strokeWidth={2.5}
+              fill='currentColor'
+            />
+          </span>
+        )}
+      </span>
+      <span className='flex-1 text-left truncate'>{c.label}</span>
+      <span className='text-[10px] uppercase tracking-[0.06em] text-quaternary-token capitalize'>
+        {c.kind}
+      </span>
+    </button>
+  );
+});
 
 /**
  * CuesPanel — entity drawer panel listing audio cues (intro / verse /
@@ -79,37 +127,7 @@ export function CuesPanel({
       <ul className='mt-3 flex flex-col -mx-2'>
         {cues.map(c => (
           <li key={`row-${c.at}-${c.label}`}>
-            <button
-              type='button'
-              onClick={() => onSeek?.(c.at)}
-              disabled={!onSeek}
-              className='group/cue w-full flex items-center gap-2 h-8 px-2 rounded-md text-[12.5px] text-secondary-token hover:bg-surface-1/40 hover:text-primary-token disabled:cursor-default disabled:hover:bg-transparent disabled:hover:text-secondary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-token transition-colors duration-150 ease-out'
-            >
-              <span className='relative w-9 shrink-0'>
-                <span
-                  className={cn(
-                    'absolute inset-0 grid place-items-start tabular-nums text-[10.5px] text-quaternary-token',
-                    onSeek &&
-                      'opacity-100 group-hover/cue:opacity-0 transition-opacity duration-150 ease-out'
-                  )}
-                >
-                  {formatCueTime(c.at)}
-                </span>
-                {onSeek && (
-                  <span className='absolute inset-0 grid place-items-center text-primary-token opacity-0 group-hover/cue:opacity-100 transition-opacity duration-150 ease-out'>
-                    <Play
-                      className='h-3 w-3 translate-x-px'
-                      strokeWidth={2.5}
-                      fill='currentColor'
-                    />
-                  </span>
-                )}
-              </span>
-              <span className='flex-1 text-left truncate'>{c.label}</span>
-              <span className='text-[10px] uppercase tracking-[0.06em] text-quaternary-token capitalize'>
-                {c.kind}
-              </span>
-            </button>
+            <CueRow c={c} onSeek={onSeek} disabled={!onSeek} />
           </li>
         ))}
       </ul>

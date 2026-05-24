@@ -177,12 +177,12 @@ test.describe('Golden Path: Core App Flows', { tag: '@golden-path' }, () => {
   test('releases page loads', async ({ page }) => {
     test.setTimeout(240_000);
 
-    await smokeNavigateWithRetry(page, APP_ROUTES.DASHBOARD_RELEASES, {
+    await smokeNavigateWithRetry(page, APP_ROUTES.RELEASES, {
       timeout: 60_000,
       retries: 2,
     });
     await waitForHydration(page);
-    await expect(page).toHaveURL(/\/app\/dashboard\/releases/, {
+    await expect(page).toHaveURL(/\/app\/releases/, {
       timeout: 15_000,
     });
     // Verify no error page
@@ -194,7 +194,7 @@ test.describe('Golden Path: Core App Flows', { tag: '@golden-path' }, () => {
   test('audience page loads', async ({ page }) => {
     test.setTimeout(240_000);
 
-    await smokeNavigateWithRetry(page, APP_ROUTES.DASHBOARD_AUDIENCE, {
+    await smokeNavigateWithRetry(page, APP_ROUTES.AUDIENCE, {
       timeout: 60_000,
       retries: 2,
     });

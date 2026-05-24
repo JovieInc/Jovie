@@ -256,7 +256,7 @@ export function CampaignSettingsPanel() {
             label='Effective Rate'
             value={`~${effectiveRatePerHour}/hour`}
             subtitle={`Avg delay: ${avgDelaySeconds}s`}
-            className='h-full bg-surface-0 shadow-none'
+            className='h-full'
             labelClassName='tracking-[0.06em]'
             valueClassName='text-[24px]'
           />

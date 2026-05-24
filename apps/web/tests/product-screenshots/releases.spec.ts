@@ -12,7 +12,7 @@
  *   public/product-screenshots/
  */
 
-import { expect, test } from '@playwright/test';
+import { expect, type Page, test } from '@playwright/test';
 import {
   assertNoDevOverlays,
   hideTransientUI,
@@ -21,6 +21,24 @@ import {
   waitForImages,
   waitForSettle,
 } from './helpers';
+
+async function waitForReleaseArtwork(page: Page) {
+  await page.waitForFunction(
+    () => {
+      const matrix = document.querySelector('[data-testid="releases-matrix"]');
+      if (!matrix) return false;
+
+      const artworkTiles = matrix.querySelectorAll('[data-artwork-state]');
+      if (artworkTiles.length === 0) return false;
+
+      return Array.from(artworkTiles).every(
+        tile => tile.getAttribute('data-artwork-state') === 'image'
+      );
+    },
+    undefined,
+    { timeout: TIMEOUTS.CONTENT_VISIBLE }
+  );
+}
 
 test.describe('Product Screenshots – Releases Dashboard', () => {
   test('releases table – full view', async ({ page }) => {
@@ -33,10 +51,7 @@ test.describe('Product Screenshots – Releases Dashboard', () => {
 
     const matrix = page.getByTestId('releases-matrix');
     await expect(matrix).toBeVisible({ timeout: TIMEOUTS.CONTENT_VISIBLE });
-    // Some demo releases have no artwork — don't block on missing images
-    await waitForImages(page, 'table').catch(() => {
-      console.log('⚠ Some table images may not have loaded, continuing...');
-    });
+    await waitForReleaseArtwork(page);
     await waitForSettle(page);
     await hideTransientUI(page);
     await assertNoDevOverlays(page);
@@ -58,9 +73,7 @@ test.describe('Product Screenshots – Releases Dashboard', () => {
 
     const matrix = page.getByTestId('releases-matrix');
     await expect(matrix).toBeVisible({ timeout: TIMEOUTS.CONTENT_VISIBLE });
-    await waitForImages(page, 'table').catch(() => {
-      console.log('⚠ Some table images may not have loaded, continuing...');
-    });
+    await waitForReleaseArtwork(page);
     await waitForSettle(page, 2000);
 
     // Click on the first release row to open the sidebar

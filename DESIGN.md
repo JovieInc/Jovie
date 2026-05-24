@@ -100,6 +100,18 @@ poster composition; Inter at 80px reads narrow and tech-y in this context.
 | H2 | 24px | 36px | 48px |
 | Body LG | 16px | — | 17px |
 
+### Line Break Quality
+
+- Marketing headlines, hero subheads, CTA copy, card titles, and nav labels
+  must not leave a single orphan word on the final line at desktop, tablet, or
+  mobile widths.
+- Prefer `text-wrap: balance`, tighter `max-width` values, nonbreaking phrase
+  groups, or copy edits over manual `<br>` tags. Use manual breaks only at a
+  natural phrase boundary and verify every responsive breakpoint.
+- When a line has to wrap, it should break at the sentence's logic: clause,
+  object, or paired phrase. Never accept a wrap that strands one word or makes
+  the final line visually weaker than the line above it.
+
 ### OpenType Features
 
 ```css
@@ -352,11 +364,37 @@ Pure neutral HSL — no hue tint. Used across both systems.
 
 | Token | Value | Usage |
 |-------|-------|-------|
-| Marketing canonical | 1200px | **All boxed marketing content** — header, hero, every section. One width. |
-| Prose | 624px | Long-form text |
+| Marketing canonical | 1298px | **All boxed marketing content** — header, hero, every section. One width. |
+| Prose | 680px | Long-form text |
 | Pricing grid | 1024px | Pricing layout (intentional narrow) |
 
-**Rule:** All marketing sections use `max-w-[1200px]` (or `var(--linear-content-max)`). Full-bleed sections explicitly break out. No more mixed widths.
+**Rule:** All marketing sections use the canonical width (or `var(--linear-content-max)`). Full-bleed sections explicitly break out. No more mixed widths.
+
+These are surface-side aliases of `--ds-public-content-max` and `--ds-prose-max` (DS_FOUNDATION_V1).
+
+---
+
+## DS_FOUNDATION_V1 canonical decisions
+
+Wave 0 of the DS_FOUNDATION_V1 consolidation locks in the following canonical
+semantic aliases. Downstream files and components should consume these instead
+of redefining them.
+
+- **Canonical public/marketing width = 1298px** (Linear.app parity).
+  Exposed as `--ds-public-content-max` and Tailwind class `max-w-public-content`.
+- **Prose exception = 680px** for long-form reading surfaces.
+  Exposed as `--ds-prose-max` and Tailwind class `max-w-prose-canonical`.
+- **Motion taxonomy:** two intents only.
+  - `subtle` — 150ms with `--ds-motion-subtle-easing`. Use for hover, focus,
+    color, icon swap, toast. Tailwind: `duration-subtle ease-subtle`.
+  - `cinematic` — 420ms with `--ds-motion-cinematic-easing`. Use for drawers,
+    modals, audio player open/close. Tailwind: `duration-cinematic ease-cinematic`.
+  - Raw durations and easings in route code are forbidden (enforced in Wave 4).
+- **Canonical button variants:** TBD by the Wave 1 audit; this section will
+  link forward to the Wave 1 PR once it lands.
+
+See [`docs/DESIGN_TOKENS.md`](docs/DESIGN_TOKENS.md#ds_foundation_v1-canonical-decisions)
+for the canonical CSS + Tailwind references.
 
 ---
 
@@ -421,8 +459,10 @@ the app feeling consistent even as new components land.
 
 | Token | Duration | Easing | Use for |
 |-------|----------|--------|---------|
-| **subtle** (`duration-subtle ease-subtle`) | 150ms | `cubic-bezier(0.25, 0.46, 0.45, 0.94)` | Hover, focus, color, icon swap, toast, button press, anything micro |
-| **cinematic** (`duration-cinematic ease-cinematic`) | 320ms | `cubic-bezier(0.32, 0.72, 0, 1)` | Side drawers, audio player open/close, modal entry, chat composer surface morph, anything reveal-class |
+| **subtle** (`duration-subtle ease-subtle`) | 150ms | `cubic-bezier(0.4, 0, 0.2, 1)` | Hover, focus, color, icon swap, toast, button press, anything micro |
+| **cinematic** (`duration-cinematic ease-cinematic`) | 420ms | `cubic-bezier(0.22, 1, 0.36, 1)` | Side drawers, audio player open/close, modal entry, chat composer surface morph, anything reveal-class |
+
+These are surface-side aliases of `--ds-motion-*` tokens (DS_FOUNDATION_V1).
 
 **Rule of thumb:** if the user's eye has to track the move (panel sliding in,
 surface growing), it's cinematic. If the user notices it only as feedback
@@ -528,6 +568,35 @@ Height: sm=32px, md=40px. Radius: pill (9999px) for app, 6px for marketing. Padd
 | Hover | `oklch(96.2% 0.003 260)` | `rgba(255,255,255,0.022)` |
 | Selected | `oklch(94.8% 0.006 260)` | `rgba(255,255,255,0.048)` |
 
+### Confirmations & Destructive Actions
+
+| Action shape | Replacement | When |
+|---|---|---|
+| Irreversible single-item delete (account, investor link, payment method) | `<ConfirmDialog>` modal, `variant='destructive'` | Default for hard delete and any action with no recovery path |
+| Bulk destructive action ≥ 10 items | `<ConfirmDialog>` modal with count-prefixed title | Below the count threshold, prefer one-click + undo-toast |
+| Async error / failure feedback | `toast.error("...")` from `sonner` | Non-blocking; auto-dismisses |
+| Async success feedback | `toast.success("...")` from `sonner` | Show on every successful confirm — silence reads as "did it work?" |
+| Reversible single-item action (soft-delete, hide/show, status change) | Optimistic update + undo-toast | Pattern not yet codified — for now use `<ConfirmDialog>` and file a follow-up |
+| Native `alert()` / `confirm()` / `prompt()` | **NEVER** | Banned by `biome.json` `noRestrictedGlobals` and CI grep gate |
+
+**Copy rules (earn every word):**
+- **Title (Title Case):** name the action and its target. "Delete investor link?" not "Are you sure?"
+- **Description (Sentence case):** name the *external* consequence, not the internal record state. "Anyone with this URL will see a 404." not "This will be permanently removed."
+- **Confirm button (Title Case):** action verb. "Delete", "Dismiss all", "Cancel subscription" — never "OK" or "Yes"
+- **Cancel button:** keep the default "Cancel"
+- **Success toast:** terse confirmation, name the action and (where useful) the count. "Investor link deleted", "42 mismatches dismissed"
+
+**Component placement:**
+- Render exactly one `<ConfirmDialog>` per surface — at the manager / page-level component, not inside row components. Multiple per-row dialogs cause focus-trap conflicts and a multi-dialog race.
+- Drive open-state with a `pendingX: T | null` pattern — single source of truth for "which item is pending."
+- For mutations: prefer `mutateAsync` + `await` so the dialog's "Please wait..." state matches the actual network duration.
+- Wrap `onConfirm` in try/catch to route success/failure to toasts; the dialog's own `try/finally` already handles state cleanup on throw.
+
+**Mobile (375px iPhone SE):**
+- Title and description must not clip; long object names should wrap, not overflow
+- Destructive button height ≥ 44pt
+- Modal padding may not introduce horizontal scroll
+
 ---
 
 ## Full-Screen Status Screens
@@ -569,6 +638,47 @@ All full-screen takeover screens (offline, global error, root error, public erro
 - `apps/web/components/providers/PublicPageErrorFallback.tsx` (React, inline styles)
 - `apps/web/app/error.tsx` (React, Tailwind)
 - `apps/web/public/sw.js` (service worker, bump `CACHE_NAME` when updating offline.html)
+
+---
+
+## Layout Shift Prevention (Visual Stability)
+
+**Mandatory standing rule for every agent and every change.**
+
+Before editing or authoring any component, organism, feature surface, empty state, loading state, error state, composer, banner, or conditional UI, the agent **must**:
+
+1. Explicitly enumerate **all possible visual states** the element or page can render:
+   - Loading / awaiting / securing / initializing
+   - Empty / zero-data / first-use / intro
+   - Error / partial / degraded / retry
+   - Success / populated / streaming / ongoing conversation
+   - Authenticated vs anonymous
+   - With vs without status lines, banners, chips, tool cards, rails
+   - Mobile vs desktop vs tablet breakpoints
+   - Collapsed / expanded / picker-open / picker-closed
+   - First-message flow vs subsequent turns
+   - Any progressive disclosure or progressive builder states
+
+2. For **every state transition**, verify **zero layout shift**:
+   - No vertical or horizontal push of sibling/parent content.
+   - Containers maintain stable dimensions (use `min-height`, grid-template, flex basis, or reserved slots).
+   - Scroll containers preserve user scroll position.
+   - No reflow that moves interactive elements (buttons, inputs, CTAs) under the cursor or changes hit targets.
+
+3. When a transition would add/remove height-affecting content:
+   - **Reserve space in advance** (min-height on the status container, always-mounted placeholder div with matching metrics, skeleton that matches final height, or a fixed-status slot).
+   - Prefer **opacity/visibility/scale/transform-only** transitions inside a height-stable wrapper.
+   - Never rely on conditional `{cond ? <p>text</p> : null}` directly above/below variable-height siblings without a reserved slot.
+
+4. Add or update tests for non-trivial surfaces:
+   - Playwright bounding-box assertions on key containers across states.
+   - Visual regression (Chromatic / snapshot) covering the transitions.
+   - CLS / layout-shift metrics in performance tests where relevant.
+   - E2E that exercises the full state machine (e.g. `/start` onboarding first-token flow).
+
+This rule is non-negotiable. It directly implements the subtraction principle and DESIGN_V1 stability goals. Violations are blocked at design review and landing. Cross-references: `.claude/rules/ui.md` (Taste Rules), `docs/TESTING_GUIDELINES.md` (Risk-Based Testing), `AGENTS.md` (Verification).
+
+The `/start` onboarding composer fix (JOV-2496 follow-up) is the canonical example: the explicit "Securing chat..." paragraphs were removed in favor of the ChatInput placeholder; parent containers now have constant child structure so the input never jumps on token arrival.
 
 ---
 

@@ -9,6 +9,10 @@ const TEST_MODE_COOKIE = '__e2e_test_mode';
 const TEST_USER_ID_COOKIE = '__e2e_test_user_id';
 const TEST_PERSONA_COOKIE = '__e2e_test_persona';
 const TEST_AUTH_BYPASS_MODE = 'bypass-auth';
+const DEV_TOOLBAR_OPEN_KEY = '__dev_toolbar_open';
+const DEV_TOOLBAR_HIDDEN_KEY = '__dev_toolbar_hidden';
+const RELEASES_ROUTE = '/app/releases';
+const LEGACY_RELEASES_ROUTE = '/app/dashboard/releases';
 
 // Mirrors DevTestAuthPersona in apps/web/lib/auth/dev-test-auth-types.ts.
 const ALLOWED_PERSONAS = new Set(['creator', 'creator-ready', 'admin']);
@@ -47,9 +51,18 @@ function resolveCollectUrls(baseUrl) {
         .split(',')
         .map(value => value.trim())
         .filter(Boolean)
-    : ['/app', '/app/dashboard/releases'];
+    : ['/app', RELEASES_ROUTE];
 
   return paths.map(path => new URL(path, `${baseUrl}/`).toString());
+}
+
+function urlRequiresAuth(url) {
+  const pathname = new URL(url).pathname;
+  return pathname.startsWith('/app') || pathname === '/onboarding/checkout';
+}
+
+function isReleasesRoute(pathname) {
+  return pathname === RELEASES_ROUTE || pathname === LEGACY_RELEASES_ROUTE;
 }
 
 function resolveAuthStatePath() {
@@ -217,9 +230,25 @@ async function seedDashboardAuth(browser, { url }) {
         ? page.browserContext()
         : null;
   const testUserId = process.env.E2E_CLERK_USER_ID?.trim();
+
+  const seedAuditStorage = async () => {
+    await page.goto(origin, { waitUntil: 'domcontentloaded', timeout: 60_000 });
+    await page.evaluate(
+      ({ hiddenKey, openKey }) => {
+        localStorage.setItem(hiddenKey, '1');
+        localStorage.setItem(openKey, '0');
+        document.documentElement.style.setProperty(
+          '--dev-toolbar-height',
+          '0px'
+        );
+      },
+      { hiddenKey: DEV_TOOLBAR_HIDDEN_KEY, openKey: DEV_TOOLBAR_OPEN_KEY }
+    );
+  };
+
   const warmRoute = async () => {
     await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 60_000 });
-    if (pathname === '/app/dashboard/releases') {
+    if (isReleasesRoute(pathname)) {
       await Promise.any([
         page.waitForSelector('[data-testid="releases-matrix"]', {
           timeout: 60_000,
@@ -231,10 +260,17 @@ async function seedDashboardAuth(browser, { url }) {
           timeout: 60_000,
         }),
       ]).catch(() => undefined);
+    } else if (pathname.startsWith('/start')) {
+      await page
+        .waitForSelector(
+          '[data-testid="onboarding-chat"], [data-app-shell-frame="true"][data-shell-design="shellChatV1"]',
+          { timeout: 30_000 }
+        )
+        .catch(() => undefined);
     } else if (pathname.startsWith('/onboarding')) {
       await page
         .waitForSelector(
-          '[data-testid="onboarding-form-wrapper"], [data-testid="onboarding-experience-shell"]',
+          '[data-testid="onboarding-chat"], [data-testid="onboarding-form-wrapper"], [data-testid="onboarding-experience-shell"]',
           { timeout: 30_000 }
         )
         .catch(() => undefined);
@@ -265,16 +301,23 @@ async function seedDashboardAuth(browser, { url }) {
       .catch(() => undefined);
   };
 
-  const warmRouteCount = pathname === '/app/dashboard/releases' ? 3 : 1;
+  const warmRouteCount = isReleasesRoute(pathname) ? 3 : 1;
   const warmRouteRepeatedly = async () => {
+    await seedAuditStorage();
     await warmDashboardShell();
     for (let i = 0; i < warmRouteCount; i += 1) {
       await warmRoute();
     }
     await new Promise(resolve => {
-      setTimeout(resolve, pathname === '/app/dashboard/releases' ? 750 : 250);
+      setTimeout(resolve, isReleasesRoute(pathname) ? 750 : 250);
     });
   };
+
+  if (!urlRequiresAuth(url)) {
+    await warmRouteRepeatedly();
+    await page.close();
+    return;
+  }
 
   if (process.env.E2E_USE_TEST_AUTH_BYPASS === '1' && testUserId) {
     const authCookies = [
@@ -363,15 +406,23 @@ async function seedDashboardAuth(browser, { url }) {
 function main() {
   const baseUrl = resolveBaseUrl();
   const collectUrls = resolveCollectUrls(baseUrl);
-  assertCiUsesSyntheticBypass();
-  const authStatePath = ensureAuthState(baseUrl);
+  const requiresAuth = collectUrls.some(urlRequiresAuth);
+  if (requiresAuth) {
+    assertCiUsesSyntheticBypass();
+  }
+  const authStatePath = requiresAuth ? ensureAuthState(baseUrl) : null;
   const chromePath = ensureChromiumPath();
   const env = {
     ...process.env,
     BASE_URL: baseUrl,
-    LIGHTHOUSE_AUTH_STATE_PATH: authStatePath ?? resolveAuthStatePath(),
     NODE_PATH: buildNodePath(),
   };
+
+  if (authStatePath) {
+    env.LIGHTHOUSE_AUTH_STATE_PATH = authStatePath;
+  } else {
+    delete env.LIGHTHOUSE_AUTH_STATE_PATH;
+  }
 
   if (process.env.E2E_CLERK_USER_ID?.trim()) {
     env.E2E_USE_TEST_AUTH_BYPASS = '1';

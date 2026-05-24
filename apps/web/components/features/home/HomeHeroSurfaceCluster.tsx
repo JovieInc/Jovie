@@ -1,6 +1,12 @@
 import { CheckCircle2, Circle } from 'lucide-react';
+import { getMarketingExportImage } from '@/lib/screenshots/registry';
 import { HOME_HERO_TASKS } from './home-surface-seed';
 import { MarketingSurfaceCard } from './MarketingSurfaceCard';
+
+const HERO_PROFILE_IMAGE = getMarketingExportImage(
+  'tim-white-profile-listen-mobile'
+);
+const HERO_RELEASE_IMAGE = getMarketingExportImage('release-presave-mobile');
 
 const TASK_STATUS_STYLES = {
   ready: {
@@ -108,7 +114,7 @@ function HeroProfilePanel() {
   return (
     <div data-testid='homepage-hero-profile-card'>
       <MarketingSurfaceCard
-        src='/product-screenshots/tim-white-profile-listen-phone.png'
+        src={HERO_PROFILE_IMAGE.publicUrl}
         alt='Mobile artist profile showing Tim White identity and fan CTA'
         aspectRatio='9 / 16'
         objectPosition='center top'
@@ -128,7 +134,7 @@ function HeroSmartLinkPanel() {
   return (
     <div data-testid='homepage-hero-release-card'>
       <MarketingSurfaceCard
-        src='/product-screenshots/release-deep-end-phone.png'
+        src={HERO_RELEASE_IMAGE.publicUrl}
         alt='The Deep End by Cosmic Gate and Tim White — release page with album art and streaming links'
         aspectRatio='9 / 16'
         objectPosition='center top'

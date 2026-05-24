@@ -6,6 +6,7 @@ import { getAdminStripeOverviewMetrics } from '@/lib/admin/stripe-metrics';
 import { checkDbHealth } from '@/lib/db';
 import { getHudDeployments } from '@/lib/deployments/github';
 import { env } from '@/lib/env-server';
+import { getHudAiOpsSummary } from '@/lib/hud/ai-ops';
 import type { HudAccessMode, HudMetrics } from '@/types/hud';
 
 function normalizeIso(value: unknown): string {
@@ -139,18 +140,22 @@ export async function getHudMetrics(mode: HudAccessMode): Promise<HudMetrics> {
     reliabilitySummary,
     dbHealth,
     deployments,
+    aiOps,
   ] = await Promise.all([
     getAdminStripeOverviewMetrics(),
     getAdminMercuryMetrics(),
     getAdminReliabilitySummary(),
     checkDbHealth(),
     getHudDeployments(),
+    getHudAiOpsSummary(generatedAt),
   ]);
 
   const financialStatus = calculateFinancialStatus(
     stripeMetrics,
     mercuryMetrics
   );
+  const financialDataAvailable =
+    stripeMetrics.isAvailable && mercuryMetrics.isAvailable;
 
   const operationsStatus: HudMetrics['operations'] = {
     status: dbHealth.healthy ? 'ok' : 'degraded',
@@ -174,20 +179,30 @@ export async function getHudMetrics(mode: HudAccessMode): Promise<HudMetrics> {
     overview: {
       mrrUsd: stripeMetrics.mrrUsd,
       activeSubscribers: stripeMetrics.activeSubscribers,
-      balanceUsd: mercuryMetrics.balanceUsd,
-      burnRateUsd: mercuryMetrics.burnRateUsd,
-      runwayMonths: financialStatus.runwayMonths,
-      defaultStatus: financialStatus.isDefaultAlive ? 'alive' : 'dead',
+      balanceUsd: mercuryMetrics.isAvailable ? mercuryMetrics.balanceUsd : 0,
+      burnRateUsd: mercuryMetrics.isAvailable ? mercuryMetrics.burnRateUsd : 0,
+      runwayMonths: financialDataAvailable
+        ? financialStatus.runwayMonths
+        : null,
+      defaultStatus: financialDataAvailable
+        ? financialStatus.isDefaultAlive
+          ? 'alive'
+          : 'dead'
+        : 'unknown',
       defaultStatusDetail: financialStatus.defaultStatusDetail,
+      financialDataAvailable,
     },
     operations: operationsStatus,
     reliability: {
       errorRatePercent: reliabilitySummary.errorRatePercent,
+      reliabilityScorePercent: reliabilitySummary.reliabilityScorePercent,
       p95LatencyMs: reliabilitySummary.p95LatencyMs,
       incidents24h: reliabilitySummary.incidents24h,
       lastIncidentAtIso,
+      unresolvedSentryIssues24h: reliabilitySummary.unresolvedSentryIssues24h,
     },
     deployments,
+    aiOps,
     generatedAtIso: generatedAt.toISOString(),
   };
 }

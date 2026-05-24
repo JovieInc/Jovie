@@ -3,6 +3,7 @@
 import { ArrowRight } from 'lucide-react';
 import Image from 'next/image';
 import Link from 'next/link';
+import { APP_ROUTES } from '@/constants/routes';
 import { JoviePixel } from '@/features/tracking/JoviePixel';
 
 interface ClaimPageContentProps {
@@ -19,7 +20,7 @@ export function ClaimPageContent({
   avatarUrl,
 }: ClaimPageContentProps) {
   const encodedRedirect = encodeURIComponent(`/${username}`);
-  const signupUrl = `/signup?handle=${encodeURIComponent(username)}&redirect_url=${encodedRedirect}`;
+  const signupUrl = `${APP_ROUTES.SIGNUP}?handle=${encodeURIComponent(username)}&redirect_url=${encodedRedirect}`;
 
   return (
     <>
@@ -58,7 +59,7 @@ export function ClaimPageContent({
           </Link>
 
           <p className='mt-4 text-xs text-tertiary-token'>
-            Free forever. No credit card required.
+            Private launch access. No credit card required.
           </p>
         </div>
       </div>

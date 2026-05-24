@@ -9,6 +9,15 @@ import {
 // Mock global fetch with proper isolation
 const mockFetch = vi.fn();
 
+function getCalledHeaders(callIndex = 0): Headers {
+  const [, options] = mockFetch.mock.calls[callIndex] as [
+    string,
+    RequestInit & { headers?: HeadersInit },
+  ];
+
+  return new Headers(options.headers);
+}
+
 describe('fetch utilities', () => {
   beforeEach(() => {
     vi.stubGlobal('fetch', mockFetch);
@@ -174,11 +183,12 @@ describe('fetch utilities', () => {
         body: JSON.stringify({ data: 'test' }),
       });
 
+      const headers = getCalledHeaders();
+      expect(headers.get('X-Custom')).toBe('value');
       expect(mockFetch).toHaveBeenCalledWith(
         '/api/test',
         expect.objectContaining({
           method: 'POST',
-          headers: { 'X-Custom': 'value' },
           body: JSON.stringify({ data: 'test' }),
         })
       );
@@ -233,12 +243,9 @@ describe('fetch utilities', () => {
       });
       await queryFn({});
 
-      expect(mockFetch).toHaveBeenCalledWith(
-        '/api/test',
-        expect.objectContaining({
-          headers: { Authorization: 'Bearer token' },
-        })
-      );
+      const headers = getCalledHeaders();
+      expect(headers.get('Authorization')).toBe('Bearer token');
+      expect(mockFetch).toHaveBeenCalledWith('/api/test', expect.any(Object));
     });
   });
 
@@ -257,11 +264,12 @@ describe('fetch utilities', () => {
       const result = await mutationFn({ name: 'Test' });
 
       expect(result).toEqual(mockResponse);
+      const headers = getCalledHeaders();
+      expect(headers.get('Content-Type')).toBe('application/json');
       expect(mockFetch).toHaveBeenCalledWith(
         '/api/create',
         expect.objectContaining({
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ name: 'Test' }),
         })
       );
@@ -329,15 +337,10 @@ describe('fetch utilities', () => {
       });
       await mutationFn({ data: 'test' });
 
-      expect(mockFetch).toHaveBeenCalledWith(
-        '/api/test',
-        expect.objectContaining({
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: 'Bearer token',
-          },
-        })
-      );
+      const headers = getCalledHeaders();
+      expect(headers.get('Content-Type')).toBe('application/json');
+      expect(headers.get('Authorization')).toBe('Bearer token');
+      expect(mockFetch).toHaveBeenCalledWith('/api/test', expect.any(Object));
     });
 
     it('propagates FetchError on failure', async () => {

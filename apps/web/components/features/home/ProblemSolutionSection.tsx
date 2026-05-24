@@ -60,7 +60,7 @@ export function ProblemSolutionSection() {
             size='hero'
             className='group shadow-sm hover:shadow-md'
           >
-            <Link href='/onboarding' onClick={handleClick}>
+            <Link href='/start' onClick={handleClick}>
               <span>Request Early Access</span>
               <svg
                 className='ml-2 h-4 w-4 transition-transform duration-slow group-hover:translate-x-1'

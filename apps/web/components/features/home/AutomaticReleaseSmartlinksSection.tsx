@@ -3,6 +3,7 @@
 import Image from 'next/image';
 
 import { DSP_LOGO_CONFIG } from '@/components/atoms/DspLogo';
+import { MarketingPhoneImage } from '@/components/marketing/MarketingPhoneImage';
 import { Container } from '@/components/site/Container';
 import { SmartLinkProviderButton } from '@/features/release/SmartLinkProviderButton';
 import { DSP_CONFIGS } from '@/lib/dsp';
@@ -107,9 +108,9 @@ export function AutomaticReleaseSmartlinksSection() {
 
                 {/* Demo capture from the shared /demo route */}
                 <div className='relative h-[420px] overflow-hidden'>
-                  <Image
-                    src='/product-screenshots/releases-dashboard-full.png'
-                    alt='Jovie releases dashboard showing the live shared releases workspace'
+                  <MarketingPhoneImage
+                    scenarioId='dashboard-releases-desktop'
+                    altOverride='Jovie releases dashboard showing the live shared releases workspace'
                     fill
                     priority={false}
                     className='object-cover object-top'

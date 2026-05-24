@@ -2,13 +2,16 @@
 
 import { useClerk } from '@clerk/nextjs';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 import { LoadingSpinner } from '@/components/atoms/LoadingSpinner';
+import { APP_ROUTES } from '@/constants/routes';
+import { isCentralAuthCallbackPath } from '@/lib/auth/central-auth-routing';
 import {
   isAccessDeniedError,
   isAccountExistsError,
 } from '@/lib/auth/clerk-errors';
+import { buildDesktopCallbackFallbackRedirectUrl } from '@/lib/desktop/auth-return';
 import { logger } from '@/lib/utils/logger';
 
 /** Seconds before showing stall message */
@@ -32,7 +35,7 @@ interface SsoCallbackHandlerProps {
 function SsoLoadingState({ isStalled }: { readonly isStalled: boolean }) {
   return (
     <output
-      className='flex flex-col items-center justify-center gap-4 animate-in fade-in duration-500 ease-out'
+      className='flex flex-col items-center justify-center gap-4 animate-in fade-in duration-cinematic ease-out'
       aria-busy='true'
       aria-live='polite'
     >
@@ -44,7 +47,7 @@ function SsoLoadingState({ isStalled }: { readonly isStalled: boolean }) {
         <p className='text-xs text-tertiary-token/70 text-center max-w-xs'>
           This is taking longer than expected. You can{' '}
           <Link
-            href='/signin'
+            href={APP_ROUTES.SIGNIN}
             className='text-primary-token underline focus-ring-themed rounded-md'
           >
             try signing in again
@@ -85,9 +88,27 @@ export function SsoCallbackHandler({
 }: Readonly<SsoCallbackHandlerProps>) {
   const clerk = useClerk();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [isHandlingHash, setIsHandlingHash] = useState(false);
   const [isStalled, setIsStalled] = useState(false);
   const callbackInitiated = useRef(false);
+  const searchParamsString = searchParams.toString();
+  const resolvedSignInFallbackRedirectUrl = isCentralAuthCallbackPath(
+    signInFallbackRedirectUrl
+  )
+    ? signInFallbackRedirectUrl
+    : buildDesktopCallbackFallbackRedirectUrl(
+        searchParams,
+        signInFallbackRedirectUrl
+      );
+  const resolvedSignUpFallbackRedirectUrl = isCentralAuthCallbackPath(
+    signUpFallbackRedirectUrl
+  )
+    ? signUpFallbackRedirectUrl
+    : buildDesktopCallbackFallbackRedirectUrl(
+        searchParams,
+        signUpFallbackRedirectUrl
+      );
 
   useEffect(() => {
     // Check for unexpected hash fragments that Clerk might add
@@ -111,11 +132,11 @@ export function SsoCallbackHandler({
       // The user is already authenticated via OAuth at this point
       globalThis.history.replaceState(null, '', globalThis.location.pathname);
 
-      // Use signInFallbackRedirectUrl as the default destination
+      // Use sign-in fallback as the default destination
       // since password prompts typically happen for existing users
-      router.replace(signInFallbackRedirectUrl);
+      router.replace(resolvedSignInFallbackRedirectUrl);
     }
-  }, [router, signInFallbackRedirectUrl]);
+  }, [router, resolvedSignInFallbackRedirectUrl]);
 
   // Process the OAuth callback imperatively
   useEffect(() => {
@@ -128,12 +149,14 @@ export function SsoCallbackHandler({
 
     clerk
       .handleRedirectCallback({
-        signInFallbackRedirectUrl,
-        signUpFallbackRedirectUrl,
+        signInFallbackRedirectUrl: resolvedSignInFallbackRedirectUrl,
+        signUpFallbackRedirectUrl: resolvedSignUpFallbackRedirectUrl,
         transferable: true,
       })
       .catch((err: unknown) => {
         const errorType = classifyOAuthError(err);
+        const nextSearchParams = new URLSearchParams(searchParamsString);
+        nextSearchParams.set('oauth_error', errorType);
 
         logger.warn(
           'OAuth callback failed',
@@ -146,14 +169,15 @@ export function SsoCallbackHandler({
 
         // Redirect to signup page with error classification so it can
         // show the appropriate error message using existing OAuth error UI
-        router.replace(`/signup?oauth_error=${errorType}`);
+        router.replace(`${APP_ROUTES.SIGNUP}?${nextSearchParams.toString()}`);
       });
   }, [
     clerk,
     router,
     isHandlingHash,
-    signInFallbackRedirectUrl,
-    signUpFallbackRedirectUrl,
+    searchParamsString,
+    resolvedSignInFallbackRedirectUrl,
+    resolvedSignUpFallbackRedirectUrl,
   ]);
 
   // Stall detection: if the callback hasn't resolved after a timeout, show help

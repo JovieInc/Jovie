@@ -1,4 +1,4 @@
-import { APP_ROUTES } from '../constants/routes';
+import { APP_ROUTES, buildLyricsRoute } from '../constants/routes';
 import {
   resolveActiveProfileOnboardingPath,
   resolveChatConversationPerfPath,
@@ -132,12 +132,66 @@ function normalizeRouteDefinition(
   };
 }
 
+const RELEASE_TASKS_ROUTE_TEMPLATE = `${APP_ROUTES.RELEASES}/[releaseId]/tasks`;
+
+function extractReleaseIdFromReleaseTasksPath(path: string) {
+  const pathname = path.split('?')[0];
+  const releaseTasksPrefix = [
+    APP_ROUTES.RELEASES,
+    APP_ROUTES.DASHBOARD_RELEASES,
+  ]
+    .map(prefix => `${prefix}/`)
+    .find(prefix => pathname.startsWith(prefix));
+
+  if (!releaseTasksPrefix || !pathname.endsWith('/tasks')) {
+    throw new Error(
+      `Could not derive a lyrics route from release tasks path: ${path}`
+    );
+  }
+
+  const releaseId = pathname
+    .slice(releaseTasksPrefix.length, -'/tasks'.length)
+    .replace(/^\/+|\/+$/g, '');
+
+  if (!releaseId) {
+    throw new Error(
+      `Could not derive a release id from release tasks path: ${path}`
+    );
+  }
+
+  return releaseId;
+}
+
+async function resolveCreatorLyricsPerfPath(
+  route: PerfRouteDefinition,
+  context: PerfResolveContext
+) {
+  const releaseTasksPath = await resolveReleaseTasksPerfPath(
+    {
+      ...route,
+      path: RELEASE_TASKS_ROUTE_TEMPLATE,
+    },
+    context
+  );
+  return buildLyricsRoute(
+    extractReleaseIdFromReleaseTasksPath(releaseTasksPath)
+  );
+}
+
 const DEFAULT_PUBLIC_RESOURCE_BUDGETS = [
   { resourceType: 'script', budget: 1050 },
   { resourceType: 'image', budget: 500 },
   { resourceType: 'font', budget: 100 },
   { resourceType: 'stylesheet', budget: 100 },
   { resourceType: 'total', budget: 1200 },
+] as const satisfies readonly PerfResourceBudget[];
+
+const BRAND_RESOURCE_BUDGETS = [
+  { resourceType: 'script', budget: 700 },
+  { resourceType: 'image', budget: 10 },
+  { resourceType: 'font', budget: 75 },
+  { resourceType: 'stylesheet', budget: 130 },
+  { resourceType: 'total', budget: 900 },
 ] as const satisfies readonly PerfResourceBudget[];
 
 const AUTH_RESOURCE_BUDGETS = [
@@ -181,11 +235,11 @@ const ARTIST_PROFILE_SETTINGS_RESOURCE_BUDGETS = [
 ] as const satisfies readonly PerfResourceBudget[];
 
 const ONBOARDING_RESOURCE_BUDGETS = [
-  { resourceType: 'script', budget: 2600 },
+  { resourceType: 'script', budget: 2400 },
   { resourceType: 'image', budget: 700 },
   { resourceType: 'font', budget: 100 },
-  { resourceType: 'stylesheet', budget: 550 },
-  { resourceType: 'total', budget: 3200 },
+  { resourceType: 'stylesheet', budget: 500 },
+  { resourceType: 'total', budget: 3000 },
 ] as const satisfies readonly PerfResourceBudget[];
 
 const GROUP_PRIORITY: Record<PerfRouteGroup, number> = {
@@ -752,6 +806,28 @@ const MARKETING_PUBLIC_ROUTES = [
     resourceSizes: DEFAULT_PUBLIC_RESOURCE_BUDGETS,
     priority: 2,
   },
+  {
+    id: 'marketing-brand',
+    group: 'marketing-public',
+    surface: 'marketing',
+    path: APP_ROUTES.BRAND,
+    requiresAuth: false,
+    warmupStrategy: 'public-route',
+    measureMode: 'interactive-shell',
+    readySelectors: {
+      shell: ['main h1'],
+      content: ['main h1'],
+    },
+    timings: [
+      { metric: 'first-contentful-paint', budget: 100 },
+      { metric: 'largest-contentful-paint', budget: 300 },
+      { metric: 'cumulative-layout-shift', budget: 0.05 },
+      { metric: 'first-input-delay', budget: 100 },
+      { metric: 'time-to-first-byte', budget: 50 },
+    ],
+    resourceSizes: BRAND_RESOURCE_BUDGETS,
+    priority: 2,
+  },
 ] as const satisfies readonly PerfRouteDefinition[];
 
 const LEGAL_PUBLIC_ROUTES = [
@@ -811,7 +887,7 @@ const CREATOR_SHELL_ROUTES = [
     timings: [
       { metric: 'first-contentful-paint', budget: 1500 },
       { metric: 'largest-contentful-paint', budget: 3000 },
-      { metric: 'cumulative-layout-shift', budget: 0.1 },
+      { metric: 'cumulative-layout-shift', budget: 0.05 },
       { metric: 'first-input-delay', budget: 100 },
       { metric: 'time-to-first-byte', budget: 1500 },
       { metric: 'skeleton-to-content', budget: 750 },
@@ -835,7 +911,7 @@ const CREATOR_SHELL_ROUTES = [
     timings: [
       { metric: 'first-contentful-paint', budget: 1500 },
       { metric: 'largest-contentful-paint', budget: 3000 },
-      { metric: 'cumulative-layout-shift', budget: 0.1 },
+      { metric: 'cumulative-layout-shift', budget: 0.02 },
       { metric: 'first-input-delay', budget: 100 },
       { metric: 'time-to-first-byte', budget: 1500 },
       { metric: 'skeleton-to-content', budget: 1200 },
@@ -854,16 +930,13 @@ const CREATOR_SHELL_ROUTES = [
     warmupStrategy: 'authenticated-route',
     measureMode: 'page-load',
     readySelectors: {
-      content: [
-        'button[aria-label="New thread"]',
-        '[placeholder*="ask jovie" i]',
-      ],
+      content: ['a[href="/app/chat"]', '[placeholder*="ask jovie" i]'],
       loading: ['[data-testid="chat-loading"]'],
     },
     timings: [
       { metric: 'first-contentful-paint', budget: 1500 },
       { metric: 'largest-contentful-paint', budget: 3000 },
-      { metric: 'cumulative-layout-shift', budget: 0.1 },
+      { metric: 'cumulative-layout-shift', budget: 0.02 },
       { metric: 'first-input-delay', budget: 100 },
       { metric: 'time-to-first-byte', budget: 1500 },
       { metric: 'skeleton-to-content', budget: 1200 },
@@ -876,7 +949,7 @@ const CREATOR_SHELL_ROUTES = [
     id: 'creator-audience',
     group: 'creator-shell',
     surface: 'creator-app',
-    path: APP_ROUTES.DASHBOARD_AUDIENCE,
+    path: APP_ROUTES.AUDIENCE,
     requiresAuth: true,
     warmupStrategy: 'authenticated-route',
     measureMode: 'page-load',
@@ -969,21 +1042,18 @@ const CREATOR_SHELL_ROUTES = [
     id: 'creator-releases',
     group: 'creator-shell',
     surface: 'creator-app',
-    path: APP_ROUTES.DASHBOARD_RELEASES,
+    path: APP_ROUTES.RELEASES,
     requiresAuth: true,
     warmupStrategy: 'authenticated-shell',
     measureMode: 'warm-navigation',
     readySelectors: {
-      shell: ['[data-testid="releases-shell-ready"]'],
+      shell: ['[data-app-shell-frame="true"]'],
       content: [
         '[data-testid="releases-loading"]',
         '[data-testid="releases-matrix"]',
       ],
       loading: ['[data-testid="releases-loading"]'],
-      navTrigger: [
-        `a[href="${APP_ROUTES.DASHBOARD_RELEASES}"]`,
-        `a[href="${APP_ROUTES.RELEASES}"]`,
-      ],
+      navTrigger: [`a[href="${APP_ROUTES.RELEASES}"]`],
       redirectDestinations: [APP_ROUTES.RELEASES],
     },
     timings: [
@@ -997,10 +1067,84 @@ const CREATOR_SHELL_ROUTES = [
     seedProfile: 'active-user',
   },
   {
+    id: 'creator-library',
+    group: 'creator-shell',
+    surface: 'creator-app',
+    path: APP_ROUTES.LIBRARY,
+    requiresAuth: true,
+    warmupStrategy: 'authenticated-shell',
+    measureMode: 'warm-navigation',
+    readySelectors: {
+      shell: ['[data-testid="library-surface"]'],
+      content: ['[data-testid="library-surface"]'],
+      loading: ['main[aria-label="Loading Library"]'],
+      navTrigger: [
+        `a[href="${APP_ROUTES.LIBRARY}"]`,
+        `a[href="${APP_ROUTES.DASHBOARD_LIBRARY}"]`,
+        `a[href="${APP_ROUTES.LEGACY_DASHBOARD_LIBRARY}"]`,
+      ],
+    },
+    timings: [
+      { metric: 'warm-shell-response', budget: 100 },
+      { metric: 'skeleton-to-content', budget: 1000 },
+    ],
+    resourceSizes: RELEASES_RESOURCE_BUDGETS,
+    priority: 9,
+    seedProfile: 'active-user',
+  },
+  {
+    id: 'creator-tasks',
+    group: 'creator-shell',
+    surface: 'creator-app',
+    path: APP_ROUTES.TASKS,
+    requiresAuth: true,
+    warmupStrategy: 'authenticated-shell',
+    measureMode: 'warm-navigation',
+    readySelectors: {
+      shell: [
+        '[data-testid="tasks-workspace"]',
+        '[data-testid="tasks-upgrade-interstitial"]',
+      ],
+      content: [
+        '[data-testid="tasks-workspace"]',
+        '[data-testid="tasks-upgrade-interstitial"]',
+        '[data-testid="release-plan-upgrade-interstitial"]',
+      ],
+      navTrigger: [`a[href="${APP_ROUTES.TASKS}"]`],
+    },
+    timings: [{ metric: 'warm-shell-response', budget: 100 }],
+    resourceSizes: RELEASES_RESOURCE_BUDGETS,
+    priority: 10,
+    seedProfile: 'active-user',
+  },
+  {
+    id: 'creator-lyrics',
+    group: 'creator-shell',
+    surface: 'creator-app',
+    path: `${APP_ROUTES.LYRICS}/[trackId]`,
+    resolvePath: resolveCreatorLyricsPerfPath,
+    requiresAuth: true,
+    warmupStrategy: 'authenticated-route',
+    measureMode: 'page-load',
+    readySelectors: {
+      content: ['section[aria-label="Lyrics"]', 'h2:has-text("No lyrics yet")'],
+    },
+    timings: [
+      { metric: 'first-contentful-paint', budget: 1800 },
+      { metric: 'largest-contentful-paint', budget: 3000 },
+      { metric: 'cumulative-layout-shift', budget: 0.1 },
+      { metric: 'first-input-delay', budget: 100 },
+      { metric: 'time-to-first-byte', budget: 1600 },
+    ],
+    resourceSizes: RELEASES_RESOURCE_BUDGETS,
+    priority: 11,
+    seedProfile: 'active-user',
+  },
+  {
     id: 'creator-release-tasks',
     group: 'creator-shell',
     surface: 'creator-app',
-    path: APP_ROUTES.DASHBOARD_RELEASE_TASKS,
+    path: RELEASE_TASKS_ROUTE_TEMPLATE,
     resolvePath: resolveReleaseTasksPerfPath,
     requiresAuth: true,
     warmupStrategy: 'authenticated-route',
@@ -1020,7 +1164,7 @@ const CREATOR_SHELL_ROUTES = [
       { metric: 'skeleton-to-content', budget: 600 },
     ],
     resourceSizes: RELEASES_RESOURCE_BUDGETS,
-    priority: 9,
+    priority: 12,
     seedProfile: 'active-user',
   },
 ] as const satisfies readonly PerfRouteDefinition[];
@@ -1035,10 +1179,7 @@ const CREATOR_ALIAS_ROUTES = [
     warmupStrategy: 'authenticated-route',
     measureMode: 'redirect',
     readySelectors: {
-      content: [
-        'button[aria-label="New thread"]',
-        '[placeholder*="ask jovie" i]',
-      ],
+      content: ['a[href="/app/chat"]', '[placeholder*="ask jovie" i]'],
       redirectDestinations: [APP_ROUTES.DASHBOARD],
     },
     timings: [
@@ -1058,10 +1199,7 @@ const CREATOR_ALIAS_ROUTES = [
     warmupStrategy: 'authenticated-route',
     measureMode: 'redirect',
     readySelectors: {
-      content: [
-        'button[aria-label="New thread"]',
-        '[placeholder*="ask jovie" i]',
-      ],
+      content: ['a[href="/app/chat"]', '[placeholder*="ask jovie" i]'],
       redirectDestinations: [APP_ROUTES.CHAT, APP_ROUTES.CHAT_PROFILE_PANEL],
     },
     timings: [
@@ -1081,10 +1219,7 @@ const CREATOR_ALIAS_ROUTES = [
     warmupStrategy: 'authenticated-route',
     measureMode: 'redirect',
     readySelectors: {
-      content: [
-        'button[aria-label="New thread"]',
-        '[placeholder*="ask jovie" i]',
-      ],
+      content: ['a[href="/app/chat"]', '[placeholder*="ask jovie" i]'],
       redirectDestinations: [APP_ROUTES.CHAT, APP_ROUTES.CHAT_PROFILE_PANEL],
     },
     timings: [
@@ -1324,18 +1459,23 @@ const ONBOARDING_ROUTES = [
     id: 'onboarding',
     group: 'onboarding',
     surface: 'onboarding',
-    path: APP_ROUTES.ONBOARDING,
-    requiresAuth: true,
-    warmupStrategy: 'authenticated-route',
+    path: APP_ROUTES.START,
+    requiresAuth: false,
+    warmupStrategy: 'public-route',
     measureMode: 'page-load',
-    readySelectors: { content: ['[data-testid="onboarding-form-wrapper"]'] },
+    readySelectors: {
+      shell: ['[data-app-shell-frame="true"][data-shell-design="shellChatV1"]'],
+      content: [
+        '[data-testid="onboarding-chat"]',
+        '[data-testid="chat-composer-surface"]',
+      ],
+    },
     timings: [
-      // Gmail rule targets for onboarding
-      { metric: 'first-contentful-paint', budget: 1000 },
-      { metric: 'largest-contentful-paint', budget: 1500 },
-      { metric: 'cumulative-layout-shift', budget: 0.05 },
+      { metric: 'first-contentful-paint', budget: 900 },
+      { metric: 'largest-contentful-paint', budget: 1300 },
+      { metric: 'cumulative-layout-shift', budget: 0.02 },
       { metric: 'first-input-delay', budget: 100 },
-      { metric: 'time-to-first-byte', budget: 1200 },
+      { metric: 'time-to-first-byte', budget: 1000 },
     ],
     resourceSizes: ONBOARDING_RESOURCE_BUDGETS,
     priority: 1,
@@ -1366,19 +1506,24 @@ const ONBOARDING_ROUTES = [
     id: 'onboarding-resume-handle',
     group: 'onboarding',
     surface: 'onboarding',
-    path: '/onboarding?resume=handle&handle=[username]',
+    path: '/start?resume=handle&handle=[username]',
     resolvePath: resolveActiveProfileOnboardingPath,
-    requiresAuth: true,
-    warmupStrategy: 'authenticated-route',
+    requiresAuth: false,
+    warmupStrategy: 'public-route',
     measureMode: 'page-load',
-    readySelectors: { content: ['[data-testid="onboarding-form-wrapper"]'] },
+    readySelectors: {
+      shell: ['[data-app-shell-frame="true"][data-shell-design="shellChatV1"]'],
+      content: [
+        '[data-testid="onboarding-chat"]',
+        '[data-testid="chat-composer-surface"]',
+      ],
+    },
     timings: [
-      // Gmail rule targets for onboarding
-      { metric: 'first-contentful-paint', budget: 1000 },
-      { metric: 'largest-contentful-paint', budget: 1500 },
-      { metric: 'cumulative-layout-shift', budget: 0.05 },
+      { metric: 'first-contentful-paint', budget: 900 },
+      { metric: 'largest-contentful-paint', budget: 1300 },
+      { metric: 'cumulative-layout-shift', budget: 0.02 },
       { metric: 'first-input-delay', budget: 100 },
-      { metric: 'time-to-first-byte', budget: 1200 },
+      { metric: 'time-to-first-byte', budget: 1000 },
     ],
     resourceSizes: ONBOARDING_RESOURCE_BUDGETS,
     priority: 3,
@@ -1388,19 +1533,24 @@ const ONBOARDING_ROUTES = [
     id: 'onboarding-resume-spotify',
     group: 'onboarding',
     surface: 'onboarding',
-    path: '/onboarding?resume=spotify&handle=[username]',
+    path: '/start?resume=spotify&handle=[username]',
     resolvePath: resolveActiveProfileOnboardingPath,
-    requiresAuth: true,
-    warmupStrategy: 'authenticated-route',
+    requiresAuth: false,
+    warmupStrategy: 'public-route',
     measureMode: 'page-load',
-    readySelectors: { content: ['[data-testid="onboarding-form-wrapper"]'] },
+    readySelectors: {
+      shell: ['[data-app-shell-frame="true"][data-shell-design="shellChatV1"]'],
+      content: [
+        '[data-testid="onboarding-chat"]',
+        '[data-testid="chat-composer-surface"]',
+      ],
+    },
     timings: [
-      // Gmail rule targets for onboarding
-      { metric: 'first-contentful-paint', budget: 1000 },
-      { metric: 'largest-contentful-paint', budget: 1500 },
-      { metric: 'cumulative-layout-shift', budget: 0.05 },
+      { metric: 'first-contentful-paint', budget: 900 },
+      { metric: 'largest-contentful-paint', budget: 1300 },
+      { metric: 'cumulative-layout-shift', budget: 0.02 },
       { metric: 'first-input-delay', budget: 100 },
-      { metric: 'time-to-first-byte', budget: 1200 },
+      { metric: 'time-to-first-byte', budget: 1000 },
     ],
     resourceSizes: ONBOARDING_RESOURCE_BUDGETS,
     priority: 4,
@@ -1410,19 +1560,24 @@ const ONBOARDING_ROUTES = [
     id: 'onboarding-resume-artist-confirm',
     group: 'onboarding',
     surface: 'onboarding',
-    path: '/onboarding?resume=artist-confirm&handle=[username]',
+    path: '/start?resume=artist-confirm&handle=[username]',
     resolvePath: resolveActiveProfileOnboardingPath,
-    requiresAuth: true,
-    warmupStrategy: 'authenticated-route',
+    requiresAuth: false,
+    warmupStrategy: 'public-route',
     measureMode: 'page-load',
-    readySelectors: { content: ['[data-testid="onboarding-form-wrapper"]'] },
+    readySelectors: {
+      shell: ['[data-app-shell-frame="true"][data-shell-design="shellChatV1"]'],
+      content: [
+        '[data-testid="onboarding-chat"]',
+        '[data-testid="chat-composer-surface"]',
+      ],
+    },
     timings: [
-      // Gmail rule targets for onboarding
-      { metric: 'first-contentful-paint', budget: 1000 },
-      { metric: 'largest-contentful-paint', budget: 1500 },
-      { metric: 'cumulative-layout-shift', budget: 0.05 },
+      { metric: 'first-contentful-paint', budget: 900 },
+      { metric: 'largest-contentful-paint', budget: 1300 },
+      { metric: 'cumulative-layout-shift', budget: 0.02 },
       { metric: 'first-input-delay', budget: 100 },
-      { metric: 'time-to-first-byte', budget: 1200 },
+      { metric: 'time-to-first-byte', budget: 1000 },
     ],
     resourceSizes: ONBOARDING_RESOURCE_BUDGETS,
     priority: 5,
@@ -1432,19 +1587,24 @@ const ONBOARDING_ROUTES = [
     id: 'onboarding-resume-upgrade',
     group: 'onboarding',
     surface: 'onboarding',
-    path: '/onboarding?resume=upgrade&handle=[username]',
+    path: '/start?resume=upgrade&handle=[username]',
     resolvePath: resolveActiveProfileOnboardingPath,
-    requiresAuth: true,
-    warmupStrategy: 'authenticated-route',
+    requiresAuth: false,
+    warmupStrategy: 'public-route',
     measureMode: 'page-load',
-    readySelectors: { content: ['[data-testid="onboarding-form-wrapper"]'] },
+    readySelectors: {
+      shell: ['[data-app-shell-frame="true"][data-shell-design="shellChatV1"]'],
+      content: [
+        '[data-testid="onboarding-chat"]',
+        '[data-testid="chat-composer-surface"]',
+      ],
+    },
     timings: [
-      // Gmail rule targets for onboarding
-      { metric: 'first-contentful-paint', budget: 1000 },
-      { metric: 'largest-contentful-paint', budget: 1500 },
-      { metric: 'cumulative-layout-shift', budget: 0.05 },
+      { metric: 'first-contentful-paint', budget: 900 },
+      { metric: 'largest-contentful-paint', budget: 1300 },
+      { metric: 'cumulative-layout-shift', budget: 0.02 },
       { metric: 'first-input-delay', budget: 100 },
-      { metric: 'time-to-first-byte', budget: 1200 },
+      { metric: 'time-to-first-byte', budget: 1000 },
     ],
     resourceSizes: ONBOARDING_RESOURCE_BUDGETS,
     priority: 6,
@@ -1454,19 +1614,24 @@ const ONBOARDING_ROUTES = [
     id: 'onboarding-resume-dsp',
     group: 'onboarding',
     surface: 'onboarding',
-    path: '/onboarding?resume=dsp&handle=[username]',
+    path: '/start?resume=dsp&handle=[username]',
     resolvePath: resolveActiveProfileOnboardingPath,
-    requiresAuth: true,
-    warmupStrategy: 'authenticated-route',
+    requiresAuth: false,
+    warmupStrategy: 'public-route',
     measureMode: 'page-load',
-    readySelectors: { content: ['[data-testid="onboarding-form-wrapper"]'] },
+    readySelectors: {
+      shell: ['[data-app-shell-frame="true"][data-shell-design="shellChatV1"]'],
+      content: [
+        '[data-testid="onboarding-chat"]',
+        '[data-testid="chat-composer-surface"]',
+      ],
+    },
     timings: [
-      // Gmail rule targets for onboarding
-      { metric: 'first-contentful-paint', budget: 1000 },
-      { metric: 'largest-contentful-paint', budget: 1500 },
-      { metric: 'cumulative-layout-shift', budget: 0.05 },
+      { metric: 'first-contentful-paint', budget: 900 },
+      { metric: 'largest-contentful-paint', budget: 1300 },
+      { metric: 'cumulative-layout-shift', budget: 0.02 },
       { metric: 'first-input-delay', budget: 100 },
-      { metric: 'time-to-first-byte', budget: 1200 },
+      { metric: 'time-to-first-byte', budget: 1000 },
     ],
     resourceSizes: ONBOARDING_RESOURCE_BUDGETS,
     priority: 7,
@@ -1476,19 +1641,24 @@ const ONBOARDING_ROUTES = [
     id: 'onboarding-resume-social',
     group: 'onboarding',
     surface: 'onboarding',
-    path: '/onboarding?resume=social&handle=[username]',
+    path: '/start?resume=social&handle=[username]',
     resolvePath: resolveActiveProfileOnboardingPath,
-    requiresAuth: true,
-    warmupStrategy: 'authenticated-route',
+    requiresAuth: false,
+    warmupStrategy: 'public-route',
     measureMode: 'page-load',
-    readySelectors: { content: ['[data-testid="onboarding-form-wrapper"]'] },
+    readySelectors: {
+      shell: ['[data-app-shell-frame="true"][data-shell-design="shellChatV1"]'],
+      content: [
+        '[data-testid="onboarding-chat"]',
+        '[data-testid="chat-composer-surface"]',
+      ],
+    },
     timings: [
-      // Gmail rule targets for onboarding
-      { metric: 'first-contentful-paint', budget: 1000 },
-      { metric: 'largest-contentful-paint', budget: 1500 },
-      { metric: 'cumulative-layout-shift', budget: 0.05 },
+      { metric: 'first-contentful-paint', budget: 900 },
+      { metric: 'largest-contentful-paint', budget: 1300 },
+      { metric: 'cumulative-layout-shift', budget: 0.02 },
       { metric: 'first-input-delay', budget: 100 },
-      { metric: 'time-to-first-byte', budget: 1200 },
+      { metric: 'time-to-first-byte', budget: 1000 },
     ],
     resourceSizes: ONBOARDING_RESOURCE_BUDGETS,
     priority: 8,
@@ -1498,19 +1668,24 @@ const ONBOARDING_ROUTES = [
     id: 'onboarding-resume-releases',
     group: 'onboarding',
     surface: 'onboarding',
-    path: '/onboarding?resume=releases&handle=[username]',
+    path: '/start?resume=releases&handle=[username]',
     resolvePath: resolveActiveProfileOnboardingPath,
-    requiresAuth: true,
-    warmupStrategy: 'authenticated-route',
+    requiresAuth: false,
+    warmupStrategy: 'public-route',
     measureMode: 'page-load',
-    readySelectors: { content: ['[data-testid="onboarding-form-wrapper"]'] },
+    readySelectors: {
+      shell: ['[data-app-shell-frame="true"][data-shell-design="shellChatV1"]'],
+      content: [
+        '[data-testid="onboarding-chat"]',
+        '[data-testid="chat-composer-surface"]',
+      ],
+    },
     timings: [
-      // Gmail rule targets for onboarding
-      { metric: 'first-contentful-paint', budget: 1000 },
-      { metric: 'largest-contentful-paint', budget: 1500 },
-      { metric: 'cumulative-layout-shift', budget: 0.05 },
+      { metric: 'first-contentful-paint', budget: 900 },
+      { metric: 'largest-contentful-paint', budget: 1300 },
+      { metric: 'cumulative-layout-shift', budget: 0.02 },
       { metric: 'first-input-delay', budget: 100 },
-      { metric: 'time-to-first-byte', budget: 1200 },
+      { metric: 'time-to-first-byte', budget: 1000 },
     ],
     resourceSizes: ONBOARDING_RESOURCE_BUDGETS,
     priority: 9,
@@ -1520,19 +1695,24 @@ const ONBOARDING_ROUTES = [
     id: 'onboarding-resume-late-arrivals',
     group: 'onboarding',
     surface: 'onboarding',
-    path: '/onboarding?resume=late-arrivals&handle=[username]',
+    path: '/start?resume=late-arrivals&handle=[username]',
     resolvePath: resolveActiveProfileOnboardingPath,
-    requiresAuth: true,
-    warmupStrategy: 'authenticated-route',
+    requiresAuth: false,
+    warmupStrategy: 'public-route',
     measureMode: 'page-load',
-    readySelectors: { content: ['[data-testid="onboarding-form-wrapper"]'] },
+    readySelectors: {
+      shell: ['[data-app-shell-frame="true"][data-shell-design="shellChatV1"]'],
+      content: [
+        '[data-testid="onboarding-chat"]',
+        '[data-testid="chat-composer-surface"]',
+      ],
+    },
     timings: [
-      // Gmail rule targets for onboarding
-      { metric: 'first-contentful-paint', budget: 1000 },
-      { metric: 'largest-contentful-paint', budget: 1500 },
-      { metric: 'cumulative-layout-shift', budget: 0.05 },
+      { metric: 'first-contentful-paint', budget: 900 },
+      { metric: 'largest-contentful-paint', budget: 1300 },
+      { metric: 'cumulative-layout-shift', budget: 0.02 },
       { metric: 'first-input-delay', budget: 100 },
-      { metric: 'time-to-first-byte', budget: 1200 },
+      { metric: 'time-to-first-byte', budget: 1000 },
     ],
     resourceSizes: ONBOARDING_RESOURCE_BUDGETS,
     priority: 10,
@@ -1542,19 +1722,24 @@ const ONBOARDING_ROUTES = [
     id: 'onboarding-resume-profile-ready',
     group: 'onboarding',
     surface: 'onboarding',
-    path: '/onboarding?resume=profile-ready&handle=[username]',
+    path: '/start?resume=profile-ready&handle=[username]',
     resolvePath: resolveActiveProfileOnboardingPath,
-    requiresAuth: true,
-    warmupStrategy: 'authenticated-route',
+    requiresAuth: false,
+    warmupStrategy: 'public-route',
     measureMode: 'page-load',
-    readySelectors: { content: ['[data-testid="onboarding-form-wrapper"]'] },
+    readySelectors: {
+      shell: ['[data-app-shell-frame="true"][data-shell-design="shellChatV1"]'],
+      content: [
+        '[data-testid="onboarding-chat"]',
+        '[data-testid="chat-composer-surface"]',
+      ],
+    },
     timings: [
-      // Gmail rule targets for onboarding
-      { metric: 'first-contentful-paint', budget: 1000 },
-      { metric: 'largest-contentful-paint', budget: 1500 },
-      { metric: 'cumulative-layout-shift', budget: 0.05 },
+      { metric: 'first-contentful-paint', budget: 900 },
+      { metric: 'largest-contentful-paint', budget: 1300 },
+      { metric: 'cumulative-layout-shift', budget: 0.02 },
       { metric: 'first-input-delay', budget: 100 },
-      { metric: 'time-to-first-byte', budget: 1200 },
+      { metric: 'time-to-first-byte', budget: 1000 },
     ],
     resourceSizes: ONBOARDING_RESOURCE_BUDGETS,
     priority: 11,

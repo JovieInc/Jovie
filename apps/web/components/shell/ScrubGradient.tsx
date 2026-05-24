@@ -69,7 +69,7 @@ function filledStrandsPath(): string {
     );
     bot.push(`L ${x.toFixed(2)} ${(WAVE_CY + half).toFixed(2)}`);
   });
-  return `${top.join(' ')} ${bot.toReversed().join(' ')} Z`;
+  return `${top.join(' ')} ${[...bot].reverse().join(' ')} Z`;
 }
 
 const FILLED_PATH = filledStrandsPath();
@@ -94,6 +94,7 @@ const FILLED_PATH = filledStrandsPath();
 export function ScrubGradient({
   currentTime,
   duration,
+  onSeek,
   cues = [],
   loopMode = 'off',
   loopSection,
@@ -101,6 +102,7 @@ export function ScrubGradient({
 }: {
   readonly currentTime: number;
   readonly duration: number;
+  readonly onSeek?: (time: number) => void;
   readonly cues?: readonly ScrubCue[];
   readonly loopMode?: 'off' | 'track' | 'section';
   /** Required when `loopMode === 'section'`. */
@@ -130,7 +132,7 @@ export function ScrubGradient({
       <span className={cn(TIME_LABEL, 'text-right')}>
         {formatTime(safeCurrent)}
       </span>
-      <div className='relative flex-1 min-w-[60px] h-8'>
+      <div className='relative flex-1 min-w-[60px] h-8 rounded-sm focus-within:ring-1 focus-within:ring-(--linear-border-focus)'>
         <svg
           viewBox={`0 0 ${SCRUB_W} ${SCRUB_H}`}
           className='w-full h-full overflow-visible'
@@ -214,6 +216,20 @@ export function ScrubGradient({
             className='text-primary-token'
           />
         </svg>
+        {onSeek ? (
+          <input
+            type='range'
+            min={0}
+            max={safeDuration > 0 ? safeDuration : 1}
+            step='any'
+            value={safeDuration > 0 ? Math.min(safeCurrent, safeDuration) : 0}
+            onChange={event => onSeek(Number(event.target.value))}
+            aria-label='Seek track waveform'
+            aria-valuetext={`${formatTime(safeCurrent)} of ${formatTime(safeDuration)}`}
+            disabled={safeDuration <= 0}
+            className='absolute inset-0 h-full w-full cursor-pointer appearance-none opacity-0 disabled:cursor-default'
+          />
+        ) : null}
       </div>
       <span className={TIME_LABEL}>{formatTime(safeDuration)}</span>
     </div>

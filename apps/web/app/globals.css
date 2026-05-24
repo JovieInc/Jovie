@@ -1,3 +1,4 @@
+/* TODO(DS_FOUNDATION_V1 Wave 4): audit for token redefinitions */
 /**
  * 🔒 CRITICAL IMPORTS - DO NOT MODIFY ORDER OR PATHS
  *
@@ -22,6 +23,19 @@
 
 @source "../../../packages/ui";
 @source "../../../node_modules/streamdown/dist/*.js";
+
+/* JOV-2269: Exclude app-shell and dashboard-only source paths from the
+   global Tailwind scan. These directories contain components that are never
+   rendered on public routes (homepage, /[username] profile, marketing pages).
+   Excluding them prevents shell-specific Tailwind utilities (sidebar tokens,
+   dashboard colour-mix variants, shell chrome classes) from being compiled
+   into the shared CSS chunk that is served on every public page.
+   Note: components/shell is intentionally NOT excluded — it is imported by
+   shared organisms (PersistentAudioBar, release-sidebar, etc.) that may
+   render on any route. */
+@source not "../app/app";
+@source not "../components/features/dashboard";
+@source not "../components/features/admin";
 @custom-variant dark (&:is(.dark *));
 
 /* Base document sizing and immediate dark-aware fallback colors */
@@ -32,6 +46,77 @@ body {
   overflow-x: clip;
   overflow-y: hidden;
   overscroll-behavior: none;
+}
+
+:root {
+  --jovie-shell-overlay-z-index: 180;
+}
+
+html[data-desktop-runtime="electron"] {
+  --electron-titlebar-height: 40px;
+  --electron-traffic-light-safe-width: 72px;
+  --electron-traffic-light-x: 20px;
+  --electron-traffic-light-y: 17px;
+  --electron-sidebar-width: var(--linear-app-sidebar-width);
+  --electron-sidebar-collapsed-width: 52px;
+}
+
+html[data-desktop-runtime="electron"] body {
+  background: rgb(var(--sidebar-background));
+  font-family:
+    -apple-system, BlinkMacSystemFont, var(--font-inter), "Inter", sans-serif;
+}
+
+[data-electron-titlebar="true"] {
+  display: none;
+}
+
+html[data-desktop-runtime="electron"] [data-app-shell-frame="true"] {
+  box-sizing: border-box;
+}
+
+html[data-desktop-runtime="electron"] [data-electron-titlebar="true"] {
+  -webkit-app-region: drag;
+  z-index: 60;
+  display: grid;
+  grid-template-columns: var(--electron-sidebar-width) minmax(0, 1fr);
+  column-gap: var(--linear-app-shell-gap);
+  align-items: center;
+  padding-right: var(--linear-app-shell-gap);
+  flex-shrink: 0;
+  height: var(--electron-titlebar-height);
+  user-select: none;
+  background: rgb(var(--sidebar-background));
+}
+
+html[data-desktop-runtime="electron"] [data-electron-drag-region="true"] {
+  -webkit-app-region: drag;
+}
+
+html[data-desktop-runtime="electron"]
+  :where(
+    a,
+    button,
+    input,
+    textarea,
+    select,
+    summary,
+    [role="button"],
+    [role="menuitem"],
+    [data-electron-no-drag="true"],
+    [data-radix-popper-content-wrapper]
+  ) {
+  -webkit-app-region: no-drag;
+}
+
+/* Titlebar rail alignment for shellChatV1 — the app-shell-body has
+   p-[--linear-app-shell-gap] on all sides, so the sidebar column starts at
+   gap offset from the left edge. Mirror that offset in the titlebar so the
+   sidebar-cell left edge aligns with the sidebar rail. */
+html[data-desktop-runtime="electron"] [data-shell-design="shellChatV1"]
+  [data-electron-titlebar="true"] {
+  padding-left: var(--linear-app-shell-gap);
+  grid-template-columns: var(--electron-sidebar-width) minmax(0, 1fr);
 }
 
 /* Marketing pages use document scrolling rather than app-shell scroll panes.
@@ -77,6 +162,24 @@ body:has(.profile-viewport) {
     overflow-y: auto;
     overscroll-behavior: auto;
   }
+}
+
+/* HUD kiosk page — token-only TV/wallboard rendering. Scrolls on the document
+   so the bottom cards (AI ops, Default status hero) are reachable. Only applied
+   when the kiosk-mode <main> is the dominant surface; admin/shell renderings
+   of the same body component must NOT include this class so they keep using
+   the AppShellFrame internal scroll container. */
+html:has(.hud-kiosk-viewport) {
+  height: auto;
+  min-height: 100%;
+  overflow-y: auto;
+  overscroll-behavior: auto;
+}
+body:has(.hud-kiosk-viewport) {
+  height: auto;
+  min-height: 100%;
+  overflow: visible;
+  overscroll-behavior: auto;
 }
 
 /* Compact profile — override CTA styles so button ↔ composer is zero-shift */
@@ -603,17 +706,20 @@ body {
    ============================================ */
 
 @layer components {
-  /* Focus ring utilities */
+  /* Focus ring utilities — canonical recipe (see design-system.css global + STYLES.md)
+     Subtle visible gray ring for shell/chrome consistency (post smallwin-4 / a11y polish).
+     Use /55 + page offset for most interactive chrome. Stronger variants (higher %,
+     accent purple, or double box-shadow) reserved for primary CTAs / marketing. */
   .focus-ring {
-    @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-gray-500/50 dark:focus-visible:ring-white/40 dark:focus-visible:ring-offset-gray-900;
+    @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-(--linear-border-focus)/55 focus-visible:ring-offset-(--linear-bg-page);
   }
   .focus-ring-transparent-offset {
-    @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-transparent focus-visible:ring-gray-500/50 dark:focus-visible:ring-white/40;
+    @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/55 focus-visible:ring-offset-transparent;
   }
   /* Button component styles */
   .btn {
     @apply inline-flex items-center justify-center rounded-full text-[13px] font-medium transition-colors duration-normal disabled:opacity-50 disabled:pointer-events-none;
-    @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-gray-500/50 dark:focus-visible:ring-white/40 dark:focus-visible:ring-offset-gray-900;
+    @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-(--linear-border-focus)/55 focus-visible:ring-offset-(--linear-bg-page);
   }
   .btn-primary {
     background-color: var(--color-btn-primary-bg);
@@ -849,37 +955,214 @@ body {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    min-height: var(--linear-button-height-sm);
-    border-radius: var(--linear-radius-sm);
-    background: var(--linear-btn-primary-bg);
-    color: var(--linear-btn-primary-fg);
-    padding: 0 20px;
-    font-size: var(--linear-body-sm-size);
-    font-weight: var(--linear-font-weight-medium);
+    min-height: 42px;
+    border: 1px solid rgba(255, 255, 255, 0.9);
+    border-radius: 999px;
+    background: rgb(244, 246, 255);
+    color: rgb(6, 7, 10);
+    padding: 0 1.45rem;
+    font-size: 14px;
+    font-weight: 650;
+    letter-spacing: 0;
+    text-decoration: none;
     transition:
-      opacity 150ms var(--ease-interactive),
-      transform 150ms var(--ease-interactive);
+      background-color 150ms var(--ease-interactive),
+      border-color 150ms var(--ease-interactive),
+      opacity 150ms var(--ease-interactive);
   }
   .public-action-primary:hover {
-    opacity: 0.92;
+    background: #ffffff;
+    opacity: 0.94;
+  }
+  /* WCAG SC 2.4.7 — visible focus ring for keyboard users.
+     Uses a double-ring (offset + color ring) that is visible on both dark
+     and light backgrounds. */
+  .public-action-primary:focus-visible {
+    outline: none;
+    box-shadow:
+      0 0 0 2px rgba(0, 0, 0, 0.85),
+      0 0 0 4px color-mix(in oklab, var(--linear-border-focus) 72%, transparent);
   }
   .public-action-secondary {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    min-height: var(--linear-button-height-sm);
-    border-radius: var(--linear-radius-sm);
-    background: var(--linear-bg-button);
+    min-height: 42px;
+    border: 1px solid
+      color-mix(in oklab, var(--linear-border-default) 72%, white 12%);
+    border-radius: 999px;
+    background: color-mix(
+      in oklab,
+      var(--linear-bg-surface-1) 82%,
+      transparent
+    );
     color: var(--linear-text-primary);
-    padding: 0 20px;
-    font-size: var(--linear-body-sm-size);
-    font-weight: var(--linear-font-weight-medium);
+    padding: 0 1.35rem;
+    font-size: 14px;
+    font-weight: 620;
+    letter-spacing: 0;
+    text-decoration: none;
     transition:
-      opacity 150ms var(--ease-interactive),
-      transform 150ms var(--ease-interactive);
+      background-color 150ms var(--ease-interactive),
+      border-color 150ms var(--ease-interactive),
+      opacity 150ms var(--ease-interactive);
   }
   .public-action-secondary:hover {
+    border-color: color-mix(
+      in oklab,
+      var(--linear-border-default) 52%,
+      white 32%
+    );
     opacity: 0.92;
+  }
+  /* WCAG SC 2.4.7 — visible focus ring for keyboard users */
+  .public-action-secondary:focus-visible {
+    outline: none;
+    box-shadow:
+      0 0 0 2px rgba(0, 0, 0, 0.85),
+      0 0 0 4px color-mix(in oklab, var(--linear-border-focus) 72%, transparent);
+  }
+  .marketing-pricing-plans {
+    display: grid;
+    gap: clamp(0.85rem, 1.4vw, 1.1rem);
+  }
+  .marketing-pricing-plans--compact {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+  .marketing-pricing-plans--expanded {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+  .marketing-pricing-plan-card {
+    --marketing-plan-accent: #00c8ff;
+    position: relative;
+    display: flex;
+    min-height: 24rem;
+    flex-direction: column;
+    overflow: hidden;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 18px;
+    padding: clamp(1.2rem, 2vw, 1.55rem);
+    background:
+      radial-gradient(
+        92% 62% at 50% 0%,
+        color-mix(in oklab, var(--marketing-plan-accent) 15%, transparent),
+        transparent 62%
+      ),
+      linear-gradient(180deg, rgba(255, 255, 255, 0.04), transparent 42%),
+      rgba(255, 255, 255, 0.02);
+    box-shadow:
+      0 28px 80px rgba(0, 0, 0, 0.24),
+      inset 0 1px 0 rgba(255, 255, 255, 0.055);
+  }
+  .marketing-pricing-plan-card--blue {
+    --marketing-plan-accent: #1463ff;
+  }
+  .marketing-pricing-plan-card--pink {
+    --marketing-plan-accent: #ff3b8a;
+  }
+  .marketing-pricing-plan-card--violet {
+    --marketing-plan-accent: #7b2cff;
+  }
+  .marketing-pricing-plan-card__topline {
+    position: absolute;
+    inset: 0 0 auto;
+    height: 1px;
+    background: linear-gradient(
+      90deg,
+      color-mix(in oklab, var(--marketing-plan-accent) 68%, transparent),
+      rgba(255, 255, 255, 0.16),
+      transparent
+    );
+  }
+  .marketing-pricing-plan-card__header {
+    display: grid;
+    min-height: 6.6rem;
+    grid-template-columns: minmax(0, 1fr);
+    align-content: start;
+    gap: 0.8rem;
+  }
+  .marketing-pricing-plan-card__name {
+    margin: 0;
+    color: rgba(255, 255, 255, 0.94);
+    font-size: 1.05rem;
+    font-weight: 650;
+    line-height: 1.16;
+  }
+  .marketing-pricing-plan-card__body {
+    max-width: 20rem;
+    margin: 0.5rem 0 0;
+    color: rgba(255, 255, 255, 0.58);
+    font-size: 13.5px;
+    line-height: 1.48;
+  }
+  .marketing-pricing-plan-card__badge {
+    display: inline-flex;
+    width: fit-content;
+    min-height: 1.7rem;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 999px;
+    padding-inline: 0.68rem;
+    background: rgba(255, 255, 255, 0.035);
+    color: rgba(255, 255, 255, 0.64);
+    font-size: 11px;
+    font-weight: 620;
+    line-height: 1;
+  }
+  .marketing-pricing-plan-card__price {
+    margin: 1.35rem 0 0;
+    color: rgba(255, 255, 255, 0.95);
+    font-size: clamp(2.25rem, 3.2vw, 2.85rem);
+    font-weight: 650;
+    line-height: 0.96;
+    letter-spacing: -0.045em;
+  }
+  .marketing-pricing-plan-card__price span {
+    margin-left: 0.08em;
+    color: rgba(255, 255, 255, 0.55);
+    font-size: 0.48em;
+    font-weight: 560;
+    letter-spacing: 0;
+  }
+  .marketing-pricing-plan-card__cta {
+    width: 100%;
+    margin-top: 1.15rem;
+  }
+  .marketing-pricing-plan-card__features {
+    display: grid;
+    gap: 0.7rem;
+    margin: 1.35rem 0 0;
+    padding: 0;
+    list-style: none;
+  }
+  .marketing-pricing-plan-card__features li {
+    display: grid;
+    grid-template-columns: 15px minmax(0, 1fr);
+    gap: 0.55rem;
+    align-items: start;
+    color: rgba(255, 255, 255, 0.64);
+    font-size: 13px;
+    line-height: 1.42;
+  }
+  .marketing-pricing-plan-card__features svg {
+    margin-top: 0.12rem;
+    color: color-mix(in oklab, var(--marketing-plan-accent) 70%, white 30%);
+  }
+  @media (max-width: 1180px) {
+    .marketing-pricing-plans--compact,
+    .marketing-pricing-plans--expanded {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+  }
+  @media (max-width: 700px) {
+    .marketing-pricing-plans--compact,
+    .marketing-pricing-plans--expanded {
+      grid-template-columns: minmax(0, 1fr);
+    }
+    .marketing-pricing-plan-card {
+      min-height: auto;
+    }
   }
   .public-action-inline {
     display: inline-flex;
@@ -921,9 +1204,14 @@ body {
     text-align: left;
     font-size: 0.875rem;
     color: var(--color-text-tertiary-token);
+    overflow-wrap: anywhere;
     transition:
       background-color 150ms var(--ease-interactive),
       color 150ms var(--ease-interactive);
+  }
+  .public-doc-nav-item-nested {
+    padding-left: 1.5rem;
+    font-size: 0.8125rem;
   }
   .public-doc-nav-item:hover {
     background: var(--color-bg-surface-1);
@@ -1189,8 +1477,10 @@ body {
     background-color: transparent;
     border-color: transparent;
     box-shadow: none;
+    /* Only suppress hover/active background — do NOT include :focus-visible here
+       so that the focus-ring-themed utility class (applied at usage sites) can
+       render the WCAG SC 2.4.7-required focus ring. */
     &:hover,
-    &:focus-visible,
     &:active {
       background-color: transparent;
       border-color: transparent;
@@ -1231,6 +1521,16 @@ body {
       background-color: var(--linear-btn-primary-hover);
       border-color: var(--linear-btn-primary-hover);
     }
+    /* WCAG SC 2.4.7 — visible focus ring for keyboard users */
+    &:focus-visible {
+      outline: none;
+      box-shadow:
+        var(--shadow-button-inset),
+        0 1px 1px rgba(0, 0, 0, 0.14),
+        0 0 0 2px var(--linear-bg-page),
+        0 0 0 4px
+        color-mix(in oklab, var(--linear-border-focus) 55%, transparent);
+    }
   }
   /* Linear Button - Primary CTA styling using tokens */
   .btn-linear-primary {
@@ -1256,6 +1556,16 @@ body {
     transition: all 150ms cubic-bezier(0.4, 0, 0.2, 1);
     &:hover {
       background-color: var(--color-btn-primary-hover);
+    }
+    /* WCAG SC 2.4.7 — visible focus ring for keyboard users */
+    &:focus-visible {
+      outline: none;
+      box-shadow:
+        var(--shadow-button-inset),
+        0 1px 1px rgba(0, 0, 0, 0.14),
+        0 0 0 2px var(--linear-bg-page),
+        0 0 0 4px
+        color-mix(in oklab, var(--linear-border-focus) 55%, transparent);
     }
   }
   /* Linear Spacing System — symmetric section padding from tokens */
@@ -1618,7 +1928,12 @@ body {
   }
   .focus-ring-themed {
     @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2;
-    --tw-ring-color: var(--color-focus-ring);
+    --tw-ring-color: color-mix(
+      in oklab,
+      var(--color-focus-ring) 52%,
+      transparent
+    );
+    --tw-ring-offset-color: var(--color-bg-page);
   }
 }
 
@@ -1791,7 +2106,11 @@ body {
   }
   .input-focus-glow {
     @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-1 focus-visible:shadow-lg transition-all duration-slow;
-    --tw-ring-color: var(--color-accent);
+    --tw-ring-color: color-mix(
+      in oklab,
+      var(--color-focus-ring) 40%,
+      transparent
+    );
   }
   .btn-press {
     @apply transform transition-transform duration-100 ease-out active:scale-95;
@@ -2154,21 +2473,6 @@ body {
   100% {
     opacity: 1;
   }
-}
-
-@keyframes shell-content-in {
-  from {
-    opacity: 0;
-    transform: scale(0.99) translateY(2px);
-  }
-  to {
-    opacity: 1;
-    transform: scale(1) translateY(0);
-  }
-}
-
-.animate-shell-in {
-  animation: shell-content-in 0.2s ease-out both;
 }
 
 .jv-shake {

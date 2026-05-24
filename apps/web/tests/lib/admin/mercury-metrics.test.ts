@@ -31,6 +31,7 @@ describe('getAdminMercuryMetrics', () => {
       burnWindowDays: 30,
       isConfigured: false,
       isAvailable: false,
+      defaultStatus: 'unknown',
       errorMessage:
         'Mercury credentials not configured (set MERCURY_API_TOKEN or MERCURY_API_KEY and MERCURY_CHECKING_ACCOUNT_ID or MERCURY_ACCOUNT_ID)',
     });
@@ -40,20 +41,22 @@ describe('getAdminMercuryMetrics', () => {
     process.env.MERCURY_API_TOKEN = 'token';
     process.env.MERCURY_CHECKING_ACCOUNT_ID = 'acct_123';
 
+    // Mercury API returns amounts in USD dollars (not cents).
+    // $2,500.00 balance, $50.00 + $25.00 debits = $75.00 burn rate.
     fetchMock
       .mockResolvedValueOnce({
         ok: true,
         json: async () => ({
-          availableBalance: 250000,
+          availableBalance: 2500,
         }),
       })
       .mockResolvedValueOnce({
         ok: true,
         json: async () => ({
           transactions: [
-            { amount: 5000, direction: 'debit' },
-            { amount: 2500, direction: 'debit' },
-            { amount: 4000, direction: 'credit' },
+            { amount: 50, direction: 'debit' },
+            { amount: 25, direction: 'debit' },
+            { amount: 40, direction: 'credit' },
           ],
         }),
       });
@@ -65,6 +68,7 @@ describe('getAdminMercuryMetrics', () => {
     expect(metrics.burnWindowDays).toBe(30);
     expect(metrics.isConfigured).toBe(true);
     expect(metrics.isAvailable).toBe(true);
+    expect(metrics.defaultStatus).toBe('alive');
     expect(metrics.errorMessage).toBeUndefined();
   });
 
@@ -80,6 +84,7 @@ describe('getAdminMercuryMetrics', () => {
     expect(metrics.burnRateUsd).toBe(0);
     expect(metrics.isConfigured).toBe(true);
     expect(metrics.isAvailable).toBe(false);
+    expect(metrics.defaultStatus).toBe('unknown');
     expect(metrics.errorMessage).toContain('Mercury API error');
   });
 });

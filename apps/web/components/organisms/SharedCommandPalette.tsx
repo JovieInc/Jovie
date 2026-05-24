@@ -25,6 +25,8 @@ import {
   type PickerItem,
   PickerRow,
   pickerItemKey,
+  RowBody,
+  RowVisual,
 } from '../jovie/components/picker-rows';
 
 export interface PaletteSection {
@@ -116,6 +118,11 @@ export function filterAdditionalSections(
       items: section.items.filter(item => {
         if (item.kind === 'skill') return fuzzyMatch(item.skill.label, lower);
         if (item.kind === 'nav') return fuzzyMatch(item.nav.label, lower);
+        if (item.kind === 'prompt')
+          return fuzzyMatch(
+            `${item.prompt.label} ${item.prompt.description}`,
+            lower
+          );
         return fuzzyMatch(item.entity.label, lower);
       }),
     }))
@@ -130,6 +137,61 @@ interface PaletteListProps {
   readonly emptyHint: ReactNode;
   /** When supplied, rows render with `id={listId}-row-{idx}` for aria-activedescendant. */
   readonly listId?: string;
+  readonly variant?: 'inline' | 'cmdk';
+  readonly showIndexedShortcuts?: boolean;
+}
+
+const CMD_KEY_LABEL = String.fromCodePoint(0x2318);
+
+interface CmdKPaletteRowProps {
+  readonly item: PickerItem;
+  readonly index: number;
+  readonly isActive: boolean;
+  readonly onMouseEnter: (index: number) => void;
+  readonly onCommit: (index: number) => void;
+  readonly rowId?: string;
+  readonly shortcutLabel?: string;
+}
+
+function CmdKPaletteRow({
+  item,
+  index,
+  isActive,
+  onMouseEnter,
+  onCommit,
+  rowId,
+  shortcutLabel,
+}: CmdKPaletteRowProps) {
+  return (
+    <button
+      type='button'
+      role='option'
+      id={rowId}
+      aria-selected={isActive ? 'true' : 'false'}
+      aria-current={isActive ? 'true' : undefined}
+      data-selected={isActive ? 'true' : undefined}
+      cmdk-item=''
+      onMouseEnter={() => onMouseEnter(index)}
+      onMouseDown={e => {
+        e.preventDefault();
+        onCommit(index);
+      }}
+      className={cn(
+        'flex min-h-12 w-full items-center gap-2 rounded-md px-2 py-1.5 text-left outline-none transition-colors duration-subtle ease-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/55 focus-visible:ring-offset-2 focus-visible:ring-offset-(--linear-bg-page)',
+        isActive
+          ? 'bg-white/[0.075] shadow-[inset_0_0_0_1px_rgba(255,255,255,0.075)]'
+          : 'hover:bg-white/[0.035]'
+      )}
+    >
+      <RowVisual item={item} />
+      <RowBody item={item} />
+      {shortcutLabel ? (
+        <span className='ml-auto flex min-w-9 shrink-0 justify-end tabular-nums text-[11px] font-medium text-quaternary-token'>
+          {shortcutLabel}
+        </span>
+      ) : null}
+    </button>
+  );
 }
 
 export function PaletteList({
@@ -139,6 +201,8 @@ export function PaletteList({
   commitIndex,
   emptyHint,
   listId,
+  variant = 'inline',
+  showIndexedShortcuts = false,
 }: PaletteListProps) {
   if (sections.length === 0) {
     return (
@@ -162,11 +226,35 @@ export function PaletteList({
         const start = sectionStarts[sectionIdx] ?? 0;
         return (
           <div key={section.id}>
-            <div className='px-[10px] pb-[5px] pt-[11px] text-[9.5px] font-semibold uppercase tracking-[0.1em] text-quaternary-token'>
+            <div
+              className={cn(
+                variant === 'cmdk'
+                  ? 'px-2 pb-1 pt-2 text-[11px] font-medium text-quaternary-token'
+                  : 'px-[10px] pb-[5px] pt-[11px] text-[9.5px] font-semibold uppercase tracking-[0.1em] text-quaternary-token'
+              )}
+            >
               {section.label}
             </div>
             {section.items.map((item, localIdx) => {
               const flatIdx = start + localIdx;
+              const shortcutLabel =
+                showIndexedShortcuts && flatIdx < 3
+                  ? `${CMD_KEY_LABEL}${flatIdx + 1}`
+                  : undefined;
+              if (variant === 'cmdk') {
+                return (
+                  <CmdKPaletteRow
+                    key={pickerItemKey(item)}
+                    item={item}
+                    index={flatIdx}
+                    isActive={flatIdx === selectedIndex}
+                    onMouseEnter={setSelectedIndex}
+                    onCommit={commitIndex}
+                    rowId={listId ? `${listId}-row-${flatIdx}` : undefined}
+                    shortcutLabel={shortcutLabel}
+                  />
+                );
+              }
               return (
                 <PickerRow
                   key={pickerItemKey(item)}
@@ -258,7 +346,12 @@ export function InlinePalette({
 
   return (
     <div
-      className={cn('flex flex-col', variant === 'rail' && 'h-full min-h-0')}
+      className={cn(
+        'flex flex-col',
+        variant === 'rail'
+          ? 'h-full min-h-0'
+          : 'max-h-[min(320px,calc(100vh-14rem))]'
+      )}
       data-testid='shared-command-palette'
       data-surface='chat-slash'
     >
@@ -268,7 +361,7 @@ export function InlinePalette({
         role='listbox'
         aria-label='Slash command suggestions'
         className={cn(
-          'flex-1 overflow-y-auto p-[5px]',
+          'min-h-0 flex-1 overflow-y-auto p-[5px]',
           variant === 'inline' && 'max-h-[260px]'
         )}
       >

@@ -6,20 +6,20 @@ import { cva, type VariantProps } from 'class-variance-authority';
 import * as React from 'react';
 
 const buttonVariants = cva(
-  'relative inline-flex items-center justify-center rounded-full text-[13px] font-[510] tracking-[-0.011em] transition-colors duration-normal ease-interactive focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:opacity-50 disabled:pointer-events-none',
+  'relative inline-flex items-center justify-center rounded-full text-[13px] font-[510] tracking-[-0.011em] transition-colors duration-normal ease-interactive focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/55 focus-visible:ring-offset-2 focus-visible:ring-offset-(--linear-bg-page) disabled:opacity-50 disabled:pointer-events-none',
   {
     variants: {
       variant: {
         // Core variants — Linear-aligned shadows and radii
         primary:
-          'bg-btn-primary text-btn-primary-foreground shadow-button-inset hover:bg-btn-primary/90',
+          'border border-(--linear-btn-primary-border) bg-btn-primary text-btn-primary-foreground shadow-button-inset hover:border-(--linear-btn-primary-hover) hover:bg-(--linear-btn-primary-hover)',
         accent: 'bg-accent text-accent-foreground hover:bg-accent/90',
         secondary:
-          'border border-subtle bg-btn-secondary text-btn-secondary-foreground hover:bg-(--color-btn-secondary-hover)',
+          'border border-(--linear-border-subtle) bg-btn-secondary text-btn-secondary-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.04),0_1px_1px_rgba(0,0,0,0.08)] hover:border-(--linear-border-default) hover:bg-(--linear-btn-secondary-hover)',
         ghost:
           'hover:bg-interactive-hover active:bg-interactive-active text-secondary-token hover:text-primary-token',
         outline:
-          'border border-default bg-transparent hover:bg-surface-hover active:bg-interactive-active',
+          'border border-default bg-transparent hover:bg-surface-hover active:bg-interactive-active shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]',
         // Destructive variant
         destructive:
           'bg-[var(--color-error)] text-[var(--color-error-foreground)] hover:opacity-90',
@@ -32,6 +32,11 @@ const buttonVariants = cva(
           'backdrop-blur-sm bg-surface-0/30 dark:bg-surface-1/10 hover:bg-surface-1/50 dark:hover:bg-surface-2/20 border border-subtle',
         'frosted-outline':
           'backdrop-blur-sm bg-transparent border border-subtle hover:bg-surface-1/20 dark:hover:bg-surface-2/10',
+        // Canonical white pill CTA — high-contrast hero/auth pill used across
+        // marketing headers and homepage sign-in. Calm color/opacity feedback
+        // only — no decorative scale/translate. See .claude/rules/ui.md.
+        whitePill:
+          'border border-white/88 bg-white text-black shadow-[0_8px_20px_rgba(0,0,0,0.14),inset_0_1px_0_rgba(255,255,255,0.72)] hover:bg-white/95 font-medium tracking-[-0.012em] sm:shadow-[0_10px_24px_rgba(0,0,0,0.18),inset_0_1px_0_rgba(255,255,255,0.72)]',
       },
       size: {
         default: 'h-8 px-3 py-1.5',

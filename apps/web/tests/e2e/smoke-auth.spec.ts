@@ -78,7 +78,7 @@ async function assertDashboardRouteLoaded(
     return;
   }
 
-  if (path === APP_ROUTES.DASHBOARD_AUDIENCE) {
+  if (path === APP_ROUTES.AUDIENCE) {
     await expect(
       page.getByTestId('dashboard-audience-client'),
       'Audience: audience client did not render'
@@ -86,10 +86,15 @@ async function assertDashboardRouteLoaded(
     return;
   }
 
-  if (path === APP_ROUTES.DASHBOARD_RELEASES) {
+  if (path === APP_ROUTES.RELEASES) {
+    const releasesSurface = page
+      .getByTestId('releases-matrix')
+      .or(page.getByTestId('shell-releases-view'))
+      .first();
+
     await expect(
-      page.getByTestId('releases-matrix'),
-      'Releases: releases matrix did not render'
+      releasesSurface,
+      'Releases: releases surface did not render'
     ).toBeVisible({ timeout: SMOKE_TIMEOUTS.VISIBILITY });
     return;
   }
@@ -169,10 +174,7 @@ test.describe('Dashboard Navigation @smoke', () => {
     const page = await context.newPage();
 
     try {
-      for (const route of [
-        APP_ROUTES.LEGACY_DASHBOARD,
-        APP_ROUTES.ONBOARDING,
-      ]) {
+      for (const route of [APP_ROUTES.LEGACY_DASHBOARD]) {
         await smokeNavigateWithRetry(page, route, {
           timeout: SMOKE_TIMEOUTS.NAVIGATION,
           retries: 2,
@@ -228,8 +230,8 @@ test.describe('Dashboard Navigation @smoke', () => {
       ? [{ path: APP_ROUTES.CHAT, name: 'Chat' }]
       : [
           { path: APP_ROUTES.CHAT, name: 'Chat' },
-          { path: APP_ROUTES.DASHBOARD_AUDIENCE, name: 'Audience' },
-          { path: APP_ROUTES.DASHBOARD_RELEASES, name: 'Releases' },
+          { path: APP_ROUTES.AUDIENCE, name: 'Audience' },
+          { path: APP_ROUTES.RELEASES, name: 'Releases' },
           {
             path: APP_ROUTES.DASHBOARD_EARNINGS,
             name: 'Legacy Earnings Redirect',

@@ -9,11 +9,12 @@ export const BREADCRUMB_LABELS: Record<string, string> = {
   dashboard: 'Dashboard',
   profile: 'Profile',
   contacts: 'Contacts',
+  library: 'Library',
   releases: 'Releases',
   audience: 'Audience',
   earnings: 'Earnings',
   analytics: 'Analytics',
-  chat: 'New thread',
+  chat: 'New chat',
   'tour-dates': 'Tour dates',
 
   // Settings routes
@@ -21,6 +22,7 @@ export const BREADCRUMB_LABELS: Record<string, string> = {
   appearance: 'Appearance',
   notifications: 'Notifications',
   billing: 'Billing',
+  usage: 'Usage stats',
 
   // Admin routes
   admin: 'Admin',
@@ -37,7 +39,7 @@ export const BREADCRUMB_LABELS: Record<string, string> = {
   feedback: 'Feedback',
 
   // Root routes
-  app: 'New thread',
+  app: 'New chat',
 } as const;
 
 /**

@@ -76,12 +76,61 @@ interface ProfileUnifiedDrawerProps {
   readonly pressPhotos?: readonly PressPhoto[];
   readonly allowPhotoDownloads?: boolean;
   readonly tourDates?: TourDateViewModel[];
+  readonly hasTourDates: boolean;
   readonly hasReleases: boolean;
   readonly releases?: readonly PublicRelease[];
   readonly presentation?: ProfileSurfacePresentation;
 }
 
 const PAY_AMOUNTS = [5, 10, 20];
+
+function resolveRegistryKey(
+  view: DrawerView
+): keyof typeof PROFILE_VIEW_REGISTRY {
+  return view === 'releases' || view === 'tour' ? 'menu' : view;
+}
+
+function resolveViewMeta({
+  view,
+  canOpenReleasesDrawer,
+  canOpenTourDrawer,
+  registryKey,
+}: {
+  readonly view: DrawerView;
+  readonly canOpenReleasesDrawer: boolean;
+  readonly canOpenTourDrawer: boolean;
+  readonly registryKey: keyof typeof PROFILE_VIEW_REGISTRY;
+}) {
+  if (view === 'releases' && canOpenReleasesDrawer) {
+    return { title: 'Releases', subtitle: undefined };
+  }
+
+  if (view === 'tour' && canOpenTourDrawer) {
+    return { title: 'Events', subtitle: undefined };
+  }
+
+  return PROFILE_VIEW_REGISTRY[registryKey];
+}
+
+function resolveRenderedView({
+  view,
+  canOpenReleasesDrawer,
+  canOpenTourDrawer,
+}: {
+  readonly view: DrawerView;
+  readonly canOpenReleasesDrawer: boolean;
+  readonly canOpenTourDrawer: boolean;
+}): DrawerView {
+  if (view === 'releases' && !canOpenReleasesDrawer) {
+    return 'menu';
+  }
+
+  if (view === 'tour' && !canOpenTourDrawer) {
+    return 'menu';
+  }
+
+  return view;
+}
 
 function ContactList({
   artistHandle,
@@ -136,7 +185,7 @@ function ContactList({
                   <a
                     key={`${contact.id}-${channel.type}`}
                     href={channelHref}
-                    className='flex h-8 w-8 items-center justify-center rounded-full text-white/50 transition-colors duration-normal hover:bg-white/[0.08] hover:text-white/80'
+                    className='flex h-8 w-8 items-center justify-center rounded-full text-tertiary-token transition-colors duration-subtle ease-subtle hover:bg-interactive-active hover:text-primary-token'
                     aria-label={`${labels[channel.type] ?? 'Call'} ${contact.roleLabel}`}
                     onClick={() => trackAction(channel, contact)}
                   >
@@ -176,6 +225,7 @@ export function ProfileUnifiedDrawer({
   pressPhotos = [],
   allowPhotoDownloads = false,
   tourDates = [],
+  hasTourDates,
   hasReleases,
   releases = [],
   presentation = 'standalone',
@@ -185,14 +235,20 @@ export function ProfileUnifiedDrawer({
     [releases]
   );
   const canOpenReleasesDrawer = hasReleases && visibleReleases.length > 0;
+  const canOpenTourDrawer = hasTourDates && tourDates.length > 0;
 
-  const registryKey = view === 'releases' ? 'menu' : view;
-  const meta =
-    view === 'releases' && canOpenReleasesDrawer
-      ? { title: 'Releases', subtitle: undefined }
-      : PROFILE_VIEW_REGISTRY[registryKey];
-  const renderedView =
-    view === 'releases' && !canOpenReleasesDrawer ? 'menu' : view;
+  const registryKey = resolveRegistryKey(view);
+  const meta = resolveViewMeta({
+    view,
+    canOpenReleasesDrawer,
+    canOpenTourDrawer,
+    registryKey,
+  });
+  const renderedView = resolveRenderedView({
+    view,
+    canOpenReleasesDrawer,
+    canOpenTourDrawer,
+  });
 
   const handleOpenChange = useCallback(
     (next: boolean) => {
@@ -232,16 +288,36 @@ export function ProfileUnifiedDrawer({
           releases_count: visibleReleases.length,
         });
         break;
+      case 'tour':
+        if (canOpenTourDrawer) {
+          track('tour_drawer_open', {
+            handle: artist.handle,
+            tour_dates_count: tourDates.length,
+          });
+        }
+        break;
       default:
         break;
     }
-  }, [open, view, artist.handle, contacts.length, visibleReleases.length]);
+  }, [
+    open,
+    view,
+    artist.handle,
+    canOpenTourDrawer,
+    contacts.length,
+    tourDates.length,
+    visibleReleases.length,
+  ]);
 
-  useEffect(() => {
-    if (view === 'releases' && !canOpenReleasesDrawer) {
-      onViewChange('menu');
-    }
-  }, [canOpenReleasesDrawer, onViewChange, view]);
+  // Intentionally do NOT mutate `view` when capability flips false.
+  // `resolveRenderedView` already returns 'menu' for that case (line 124),
+  // and `resolveViewMeta` falls back to the menu title (line 104). Mutating
+  // here causes the drawer to flicker whenever the releases query refetches
+  // and transiently returns empty data — the effect would snap view back to
+  // 'menu', the data would resolve, and the user would see a blink as the
+  // drawer re-rendered releases content. The view stays as 'releases' in
+  // parent state; rendering is the source of truth for what the user sees.
+  // See JOV-2150.
 
   const venmoLink =
     socialLinks.find(link => link.platform === 'venmo')?.url ?? null;
@@ -270,7 +346,7 @@ export function ProfileUnifiedDrawer({
     };
   }, [hasValidVenmoLink, venmoLink, venmoUsername]);
 
-  const isSubView = view !== 'menu';
+  const isSubView = renderedView !== 'menu';
 
   return (
     <ProfileDrawerShell
@@ -279,6 +355,7 @@ export function ProfileUnifiedDrawer({
       title={meta.title}
       subtitle={'subtitle' in meta ? meta.subtitle : undefined}
       onBack={isSubView ? () => navigateTo('menu') : undefined}
+      navigationLevel={isSubView ? 'secondary' : 'root'}
       dataTestId='profile-menu-drawer'
       presentation={presentation}
     >
@@ -294,6 +371,7 @@ export function ProfileUnifiedDrawer({
             <MenuView
               onNavigate={next => navigateTo(next as DrawerView)}
               hasReleases={canOpenReleasesDrawer}
+              hasTourDates={canOpenTourDrawer}
               hasTip={hasTip}
               hasContacts={hasContacts}
             />
@@ -322,12 +400,12 @@ export function ProfileUnifiedDrawer({
                     checked={contentPrefs[pref.key]}
                     onCheckedChange={() => onTogglePref(pref.key)}
                     aria-label={pref.label}
-                    className='data-[state=checked]:bg-green-500 data-[state=checked]:hover:bg-green-600 data-[state=unchecked]:bg-white/[0.16] data-[state=unchecked]:hover:bg-white/[0.22]'
+                    className='data-[state=checked]:bg-success data-[state=checked]:hover:bg-success/90'
                   />
                 </div>
               ))}
 
-              <div className='mx-1 my-1 h-px bg-white/[0.06]' />
+              <div className='mx-1 my-1 h-px bg-[color:var(--color-border-subtle)]' />
 
               <button
                 type='button'
@@ -336,7 +414,7 @@ export function ProfileUnifiedDrawer({
                 onClick={onUnsubscribe}
                 disabled={isUnsubscribing}
               >
-                <BellOff className='size-4 text-red-400/50' />
+                <BellOff className='size-4 text-error/60' />
                 {isUnsubscribing
                   ? 'Turning off\u2026'
                   : 'Turn off notifications'}
@@ -407,6 +485,7 @@ export function ProfileUnifiedDrawer({
           {renderedView === 'releases' && canOpenReleasesDrawer && (
             <ReleasesView
               releases={visibleReleases}
+              artistId={artist.id}
               artistHandle={artist.handle}
               artistName={artist.name}
             />
@@ -419,17 +498,16 @@ export function ProfileUnifiedDrawer({
                   amounts={PAY_AMOUNTS}
                   onContinue={handleTipAmountSelected}
                   presentation='drawer'
-                  primaryLabel='Send payment'
+                  primaryLabel='Continue with Venmo'
                   paymentLabel='Venmo'
-                  showOtherPaymentOptions
-                  otherPaymentOptionsLabel='Other payment options'
+                  showOtherPaymentOptions={false}
                 />
               ) : (
-                <div className='rounded-[var(--profile-drawer-radius-mobile)] border border-white/8 bg-white/[0.035] px-4 py-5 text-center'>
-                  <p className='text-sm font-semibold text-white/88'>
+                <div className='rounded-[var(--profile-drawer-radius-mobile)] border border-subtle bg-[color:var(--color-interactive-hover)] px-4 py-5 text-center'>
+                  <p className='text-sm font-semibold text-primary-token'>
                     Payments not available yet
                   </p>
-                  <p className='mt-2 text-sm leading-6 text-white/54'>
+                  <p className='mt-2 text-sm leading-6 text-tertiary-token'>
                     This profile has not added a public Venmo link.
                   </p>
                 </div>

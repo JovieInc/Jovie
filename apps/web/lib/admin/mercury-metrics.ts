@@ -2,7 +2,11 @@ import 'server-only';
 
 import { env } from '@/lib/env-server';
 import { captureError } from '@/lib/error-tracking';
-import { serverFetch } from '@/lib/http/server-fetch';
+import { ServerFetchTimeoutError, serverFetch } from '@/lib/http/server-fetch';
+import {
+  computeMercuryDefaultStatus,
+  type MercuryDefaultStatus,
+} from './hud-metric-derivations';
 
 const MERCURY_BASE_URL =
   env.MERCURY_API_BASE_URL?.trim() || 'https://api.mercury.com/api/v1';
@@ -45,6 +49,13 @@ export interface AdminMercuryMetrics {
   isConfigured: boolean;
   /** Indicates whether the Mercury API call succeeded */
   isAvailable: boolean;
+  /**
+   * Explicit default-status signal.
+   * - 'alive'  — balance > burn (runway > profitability horizon)
+   * - 'dead'   — balance <= burn (runway ends before profitability)
+   * - 'unknown' — Mercury is unavailable or data is missing; must NOT be shown as dead
+   */
+  defaultStatus: MercuryDefaultStatus;
   /** Error message if Mercury API call failed */
   errorMessage?: string;
 }
@@ -90,6 +101,9 @@ async function fetchMercury<T>(
       'Content-Type': 'application/json',
     },
     cache: 'no-store',
+    // Mercury transactions endpoint can be slow when paginating 30 days of data.
+    // 8s gives enough headroom without blocking the HUD indefinitely.
+    timeoutMs: 8000,
   });
 
   if (!response.ok) {
@@ -119,11 +133,10 @@ function isDebit(transaction: MercuryTransaction, amount: number): boolean {
   return amount < 0;
 }
 
-function centsToUsd(amountCents: number): number {
-  return amountCents / 100;
-}
+// NOTE: Mercury API returns amounts in USD dollars (e.g. 328.92 = $328.92),
+// NOT cents. Do not divide by 100.
 
-async function getCheckingBalanceCents(): Promise<number> {
+async function getCheckingBalanceUsd(): Promise<number> {
   const mercuryEnv = getMercuryEnv();
   if (!mercuryEnv) return 0;
 
@@ -131,14 +144,14 @@ async function getCheckingBalanceCents(): Promise<number> {
     `/accounts/${mercuryEnv.checkingAccountId}`
   );
 
-  const balanceCents = Number(
+  const balanceUsd = Number(
     account.availableBalance ?? account.currentBalance ?? account.balance ?? 0
   );
 
-  return balanceCents;
+  return balanceUsd;
 }
 
-async function getCheckingTransactionsCents(
+async function getCheckingTransactions(
   startDate: Date,
   endDate: Date
 ): Promise<MercuryTransaction[]> {
@@ -147,8 +160,15 @@ async function getCheckingTransactionsCents(
 
   const transactions: MercuryTransaction[] = [];
   let cursor: string | undefined;
+  // Safety guard: cap pagination to avoid unbounded iteration if Mercury
+  // returns unexpectedly many pages (each request has its own 8s timeout).
+  const MAX_PAGES = 20;
+  let pageCount = 0;
 
   for (;;) {
+    if (pageCount >= MAX_PAGES) break;
+    pageCount++;
+
     const response = await fetchMercury<MercuryTransactionsResponse>(
       `/accounts/${mercuryEnv.checkingAccountId}/transactions`,
       {
@@ -185,6 +205,7 @@ export async function getAdminMercuryMetrics(): Promise<AdminMercuryMetrics> {
       burnWindowDays: 30,
       isConfigured: false,
       isAvailable: false,
+      defaultStatus: 'unknown',
       errorMessage:
         'Mercury credentials not configured (set MERCURY_API_TOKEN or MERCURY_API_KEY and MERCURY_CHECKING_ACCOUNT_ID or MERCURY_ACCOUNT_ID)',
     };
@@ -194,24 +215,41 @@ export async function getAdminMercuryMetrics(): Promise<AdminMercuryMetrics> {
     const endDate = new Date();
     const startDate = new Date(endDate.getTime() - 30 * MS_PER_DAY);
 
-    const [balanceCents, transactions] = await Promise.all([
-      getCheckingBalanceCents(),
-      getCheckingTransactionsCents(startDate, endDate),
-    ]);
+    // Fetch balance first — it's fast and most important for the HUD.
+    const balanceUsd = await getCheckingBalanceUsd();
 
-    const debitCents = transactions.reduce((total, transaction) => {
-      const amount = normalizeAmount(transaction.amount);
-      if (Number.isNaN(amount)) return total;
-      if (!isDebit(transaction, amount)) return total;
-      return total + Math.abs(amount);
-    }, 0);
+    // Transactions can be slow (30-day pagination). If they time out, degrade
+    // gracefully: show the balance as available with burnRateUsd=0 rather than
+    // marking Mercury as unavailable entirely.
+    let burnRateUsd = 0;
+    try {
+      const transactions = await getCheckingTransactions(startDate, endDate);
+      burnRateUsd = transactions.reduce((total, transaction) => {
+        const amount = normalizeAmount(transaction.amount);
+        if (Number.isNaN(amount)) return total;
+        if (!isDebit(transaction, amount)) return total;
+        return total + Math.abs(amount);
+      }, 0);
+    } catch (txError) {
+      if (txError instanceof ServerFetchTimeoutError) {
+        // Degraded mode: balance is still accurate, burn rate unavailable.
+        captureError(
+          'Mercury transactions timed out — burn rate unavailable',
+          txError
+        );
+      } else {
+        // Re-throw non-timeout errors so the outer catch handles them.
+        throw txError;
+      }
+    }
 
     return {
-      balanceUsd: centsToUsd(balanceCents),
-      burnRateUsd: centsToUsd(debitCents),
+      balanceUsd,
+      burnRateUsd,
       burnWindowDays: 30,
       isConfigured: true,
       isAvailable: true,
+      defaultStatus: computeMercuryDefaultStatus(true, balanceUsd, burnRateUsd),
     };
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unknown error';
@@ -222,6 +260,7 @@ export async function getAdminMercuryMetrics(): Promise<AdminMercuryMetrics> {
       burnWindowDays: 30,
       isConfigured: true,
       isAvailable: false,
+      defaultStatus: 'unknown',
       errorMessage: `Mercury API error: ${message}`,
     };
   }

@@ -1,4 +1,3 @@
-import '../(auth)/auth-utilities.css';
 import { ResolvedClientProviders } from '@/components/providers/ResolvedClientProviders';
 
 export const runtime = 'nodejs';

@@ -11,9 +11,13 @@ const hoisted = vi.hoisted(() => {
   const selectMock = vi.fn().mockReturnValue({ from: selectFromMock });
 
   const insertReturningMock = vi.fn();
-  const insertValuesMock = vi
+  const insertOnConflictDoNothingMock = vi
     .fn()
     .mockReturnValue({ returning: insertReturningMock });
+  const insertValuesMock = vi.fn().mockReturnValue({
+    onConflictDoNothing: insertOnConflictDoNothingMock,
+    returning: insertReturningMock,
+  });
   const insertMock = vi.fn().mockReturnValue({ values: insertValuesMock });
 
   const updateWhereMock = vi.fn().mockResolvedValue(undefined);
@@ -26,6 +30,7 @@ const hoisted = vi.hoisted(() => {
     selectLimitMock,
     insertMock,
     insertValuesMock,
+    insertOnConflictDoNothingMock,
     insertReturningMock,
     updateMock,
     captureErrorMock: vi.fn(),
@@ -56,6 +61,7 @@ vi.mock('@/lib/db/schema/chat', () => ({
   chatMessages: {
     id: 'messageId',
     conversationId: 'conversationId',
+    clientMessageId: 'clientMessageId',
     role: 'role',
     content: 'content',
     toolCalls: 'toolCalls',
@@ -69,6 +75,10 @@ vi.mock('drizzle-orm', () => ({
   eq: vi.fn(),
   isNull: vi.fn(),
   lt: vi.fn(),
+  sql: vi.fn((strings: TemplateStringsArray, ...values: unknown[]) => ({
+    strings,
+    values,
+  })),
 }));
 
 vi.mock('@ai-sdk/gateway', () => ({
@@ -146,6 +156,7 @@ describe('chat conversation message routes', () => {
         body: JSON.stringify({
           messages: [
             {
+              clientMessageId: 'assistant:tool-1',
               role: 'assistant',
               content: '',
               toolCalls: [
@@ -170,6 +181,7 @@ describe('chat conversation message routes', () => {
     expect(hoisted.insertValuesMock).toHaveBeenCalledWith([
       {
         conversationId: 'conv-1',
+        clientMessageId: 'assistant:tool-1',
         role: 'assistant',
         content: '',
         toolCalls: [
@@ -185,6 +197,11 @@ describe('chat conversation message routes', () => {
         ],
       },
     ]);
+    expect(hoisted.insertOnConflictDoNothingMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.anything(),
+      })
+    );
   });
 
   it('rejects assistant messages with empty content and no tool calls', async () => {

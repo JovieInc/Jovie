@@ -17,6 +17,7 @@ interface OnboardingHandleOnlyFormProps {
   readonly shouldAutoSubmitHandle?: boolean;
   readonly userEmail?: string | null;
   readonly userId: string;
+  readonly designV1?: boolean;
 }
 
 const SIDEBAR_STEPS = [
@@ -69,6 +70,7 @@ export function OnboardingHandleOnlyForm({
   shouldAutoSubmitHandle = false,
   userEmail = null,
   userId,
+  designV1 = false,
 }: Readonly<OnboardingHandleOnlyFormProps>) {
   const router = useRouter();
   const onboardingStartedAtRef = useRef(Date.now());
@@ -159,6 +161,7 @@ export function OnboardingHandleOnlyForm({
       sidebar={<HandleSidebar />}
       sidebarTitle='Jovie Setup'
       stageVariant='flat'
+      visualVariant={designV1 ? 'v1' : 'default'}
       data-testid='onboarding-experience-shell'
     >
       <OnboardingHandleStep

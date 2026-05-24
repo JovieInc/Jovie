@@ -65,6 +65,8 @@ describe('StaticArtistPage', () => {
   afterEach(() => {
     compactPreviewMountIds.length = 0;
     cleanup();
+    vi.doUnmock('@/lib/flags/marketing-static');
+    vi.resetModules();
   });
 
   it('defaults to the full public profile presentation', async () => {
@@ -139,7 +141,7 @@ describe('StaticArtistPage', () => {
         artist={mockArtist}
         socialLinks={mockSocialLinks}
         contacts={[]}
-        subtitle='Tour dates'
+        subtitle='Events'
         showBackButton={true}
         showSubscriptionConfirmedBanner
       />

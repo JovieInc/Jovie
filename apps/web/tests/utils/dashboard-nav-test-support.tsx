@@ -1,6 +1,6 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { render } from '@testing-library/react';
-import type { ComponentProps, ReactElement } from 'react';
+import type { ComponentProps, ReactElement, ReactNode } from 'react';
 import React from 'react';
 import { vi } from 'vitest';
 import type { DashboardData } from '@/app/app/(shell)/dashboard/actions/dashboard-data';
@@ -13,6 +13,9 @@ import { APP_FLAG_DEFAULTS, type AppFlagSnapshot } from '@/lib/flags/contracts';
 
 export const mockUsePathname = vi.fn<() => string>(() => APP_ROUTES.CHAT);
 export const mockUseTaskStatsQuery = vi.fn(() => ({ data: undefined }));
+export const mockUseChatConversationsQuery = vi.fn(() => ({
+  data: undefined,
+}));
 export const mockUsePlanGate = vi.fn(() => ({
   canAccessTasksWorkspace: true,
   isLoading: false,
@@ -40,13 +43,9 @@ vi.mock('sonner', () => ({
   },
 }));
 
-vi.mock('@statsig/react-bindings', () => ({
-  useFeatureGate: () => ({ value: true }),
-  StatsigContext: React.createContext({ client: {} }),
-}));
-
 vi.mock('@/lib/queries/useChatConversationsQuery', () => ({
-  useChatConversationsQuery: () => ({ data: undefined }),
+  useChatConversationsQuery: (...args: unknown[]) =>
+    mockUseChatConversationsQuery(...args),
 }));
 
 vi.mock('@/lib/queries/useChatMutations', () => ({
@@ -151,10 +150,13 @@ const baseDashboardData: DashboardData = {
 type RenderDashboardNavFn = (ui: ReactElement) => ReturnType<typeof render>;
 
 export function resetDashboardNavTestMocks() {
+  localStorage.clear();
   mockUsePathname.mockReset();
   mockUsePathname.mockReturnValue(APP_ROUTES.CHAT);
   mockUseTaskStatsQuery.mockReset();
   mockUseTaskStatsQuery.mockReturnValue({ data: undefined });
+  mockUseChatConversationsQuery.mockReset();
+  mockUseChatConversationsQuery.mockReturnValue({ data: undefined });
   mockUsePlanGate.mockReset();
   mockUsePlanGate.mockReturnValue({
     canAccessTasksWorkspace: true,
@@ -173,11 +175,13 @@ export function renderDashboardNav({
   overrides = {},
   sidebarProps = {},
   appFlags = {},
+  children = null,
 }: Readonly<{
   renderFn?: RenderDashboardNavFn;
   overrides?: Partial<DashboardData>;
   sidebarProps?: ComponentProps<typeof SidebarProvider>;
   appFlags?: Partial<AppFlagSnapshot>;
+  children?: ReactNode;
 }>) {
   const value: DashboardData = { ...baseDashboardData, ...overrides };
 
@@ -191,6 +195,7 @@ export function renderDashboardNav({
         <DashboardDataProvider value={value}>
           <SidebarProvider {...sidebarProps}>
             <DashboardNav />
+            {children}
           </SidebarProvider>
         </DashboardDataProvider>
       </AppFlagProvider>

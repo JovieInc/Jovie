@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  expandDynamicRoute,
   isNotFoundLike,
   resolveRouteCaseTimeoutMs,
   settleWithTimeout,
@@ -51,5 +52,18 @@ describe('route-qa not-found detection', () => {
 
   it('uses a two minute per-route timeout by default', () => {
     expect(resolveRouteCaseTimeoutMs()).toBe(120_000);
+  });
+
+  it('expands investor portal slugs as token-gated not-found cases', async () => {
+    await expect(
+      expandDynamicRoute('/investor-portal/[slug]', 'route-qa-test')
+    ).resolves.toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          path: '/investor-portal/memo',
+          expectedState: 'not-found',
+        }),
+      ])
+    );
   });
 });

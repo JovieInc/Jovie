@@ -1,6 +1,11 @@
 import Image from 'next/image';
 import Link from 'next/link';
 import { APP_ROUTES } from '@/constants/routes';
+import { getMarketingExportImage } from '@/lib/screenshots/registry';
+
+const HERO_LINEAR_IMAGE = getMarketingExportImage(
+  'dashboard-releases-sidebar-desktop'
+);
 
 interface HeroLinearProps {
   readonly fullScreen?: boolean;
@@ -49,11 +54,11 @@ export function HeroLinear({ fullScreen = false }: Readonly<HeroLinearProps>) {
                 href={APP_ROUTES.SIGNUP}
                 className='public-action-primary focus-ring-themed'
               >
-                Get Started Free
+                Request Access
               </Link>
             </div>
             <p className='mt-3 text-[11px] tracking-[0.01em] text-quaternary-token'>
-              Free forever. No credit card required.
+              Private launch access. No credit card required.
             </p>
           </div>
         </div>
@@ -66,7 +71,7 @@ export function HeroLinear({ fullScreen = false }: Readonly<HeroLinearProps>) {
           style={{ borderRadius: '6px', aspectRatio: '16 / 6' }}
         >
           <Image
-            src='/product-screenshots/releases-dashboard-sidebar.png'
+            src={HERO_LINEAR_IMAGE.publicUrl}
             alt='Jovie releases dashboard showing smart links, release management, and audience insights'
             fill
             sizes='(max-width: 768px) 100vw, (max-width: 1200px) 96vw, 1200px'

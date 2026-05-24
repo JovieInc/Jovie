@@ -26,8 +26,8 @@ fi
 errors=()
 
 # 1. TypeScript type check
-if ! pnpm --filter @jovie/web exec tsc --noEmit >/dev/null 2>&1; then
-  errors+=("TypeScript type check failed — run: pnpm --filter @jovie/web exec tsc --noEmit")
+if ! pnpm --filter @jovie/web run typecheck -- --pretty false >/dev/null 2>&1; then
+  errors+=("TypeScript type check failed — run: pnpm --filter @jovie/web run typecheck -- --pretty false")
 fi
 
 # 2. Biome lint

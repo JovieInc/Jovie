@@ -83,7 +83,7 @@ function CarouselDots({
             key={index}
             aria-hidden
             className={cn(
-              'h-1.5 rounded-full transition-all duration-200',
+              'h-1.5 rounded-full transition-[width,background-color] duration-subtle',
               index === current
                 ? 'w-4 bg-primary-token'
                 : 'w-1.5 bg-tertiary-token/30'
@@ -193,7 +193,7 @@ function ProfileReadyCard({
       className={cn(
         'chat-card overflow-hidden rounded-[14px] border border-(--linear-app-frame-seam)',
         'bg-(--linear-app-content-surface)',
-        'transition-all duration-300 ease-out',
+        'transition-[opacity,transform] duration-cinematic ease-out',
         direction === 'left' && 'animate-slide-out-left',
         direction === 'right' && 'animate-slide-out-right'
       )}
@@ -311,7 +311,7 @@ function SuggestionCard({
       className={cn(
         'chat-card overflow-hidden rounded-[14px] border border-(--linear-app-frame-seam)',
         'bg-(--linear-app-content-surface)',
-        'transition-all duration-300 ease-out',
+        'transition-[opacity,transform] duration-cinematic ease-out',
         direction === 'left' && 'animate-slide-out-left',
         direction === 'right' && 'animate-slide-out-right'
       )}
@@ -405,7 +405,7 @@ function SuggestionCard({
               'border border-subtle px-3 py-3 text-app font-medium sm:py-2',
               'text-secondary-token transition-colors',
               'hover:bg-surface-2 hover:text-primary-token',
-              'focus:outline-none focus:ring-2 focus:ring-btn-primary/20',
+              'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-btn-primary/20',
               'disabled:opacity-50 disabled:cursor-not-allowed'
             )}
           >
@@ -424,7 +424,7 @@ function SuggestionCard({
               'flex flex-1 items-center justify-center gap-1.5 rounded-[12px]',
               'bg-btn-primary px-3 py-3 text-app font-medium text-btn-primary-foreground sm:py-2',
               'transition-colors hover:bg-btn-primary/90',
-              'focus:outline-none focus:ring-2 focus:ring-btn-primary/20',
+              'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-btn-primary/20',
               'disabled:opacity-50 disabled:cursor-not-allowed'
             )}
           >

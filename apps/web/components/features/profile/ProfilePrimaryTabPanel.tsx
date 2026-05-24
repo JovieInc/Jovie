@@ -1,18 +1,21 @@
 'use client';
 
 import { Bell, CheckCircle2 } from 'lucide-react';
+import { useCallback, useEffect, useState } from 'react';
 import { AboutSection } from '@/features/profile/AboutSection';
 import { ArtistNotificationsCTA } from '@/features/profile/artist-notifications-cta/ArtistNotificationsCTA';
+import { TwoStepNotificationsCTA } from '@/features/profile/artist-notifications-cta/TwoStepNotificationsCTA';
+import type { NotificationSourceContext } from '@/features/profile/artist-notifications-cta/types';
 import type {
   ProfilePreviewNotificationsState,
   ProfilePrimaryTab,
   ProfileRenderMode,
 } from '@/features/profile/contracts';
 import type { PublicRelease } from '@/features/profile/releases/types';
-import { StaticListenInterface } from '@/features/profile/StaticListenInterface';
 import { TourDrawerContent } from '@/features/profile/TourModePanel';
 import { ReleasesView } from '@/features/profile/views/ReleasesView';
 import type { AvailableDSP } from '@/lib/dsp';
+import type { ProfileAlertOptInVariant } from '@/lib/flags/contracts';
 import type { TourDateViewModel } from '@/lib/tour-dates/types';
 import { cn } from '@/lib/utils';
 import type { Artist } from '@/types/db';
@@ -20,8 +23,9 @@ import type { NotificationContentType } from '@/types/notifications';
 import type { PressPhoto } from '@/types/press-photos';
 
 const PANEL_CLASS_NAME =
-  'rounded-[34px] border border-white/8 bg-[linear-gradient(180deg,rgba(255,255,255,0.05),rgba(255,255,255,0.025))] p-5 shadow-[0_28px_72px_rgba(0,0,0,0.26)] backdrop-blur-2xl';
+  'rounded-[var(--profile-card-radius)] border border-[color:var(--profile-panel-border)] bg-[color:var(--profile-content-bg)] p-5 shadow-[var(--profile-panel-shadow)] backdrop-blur-2xl';
 const OTP_SLOT_KEYS = ['a', 'b', 'c', 'd', 'e', 'f'] as const;
+const NATIVE_PANEL_CLASS_NAME = '-mx-4 space-y-0 pb-2';
 
 interface ProfilePrimaryTabPanelProps {
   readonly mode: Exclude<ProfilePrimaryTab, 'profile'>;
@@ -31,6 +35,7 @@ interface ProfilePrimaryTabPanelProps {
   readonly dsps: AvailableDSP[];
   readonly enableDynamicEngagement?: boolean;
   readonly subscribeTwoStep?: boolean;
+  readonly alertOptInVariant?: ProfileAlertOptInVariant;
   readonly isSubscribed: boolean;
   readonly contentPrefs: Record<NotificationContentType, boolean>;
   readonly onTogglePref: (key: NotificationContentType) => void;
@@ -41,6 +46,7 @@ interface ProfilePrimaryTabPanelProps {
   readonly allowPhotoDownloads?: boolean;
   readonly tourDates?: readonly TourDateViewModel[];
   readonly releases?: readonly PublicRelease[];
+  readonly alertSourceContext?: NotificationSourceContext;
   readonly previewNotificationsState?: ProfilePreviewNotificationsState;
   readonly onFlowClosed?: () => void;
   readonly onSubscriptionActivated?: () => void;
@@ -76,8 +82,8 @@ function PreviewAlertsPanel({
     state.kind === 'status'
       ? 'Alerts On'
       : isSubscribed
-        ? 'Manage Alerts'
-        : 'Turn On Alerts';
+        ? 'Manage alerts'
+        : 'Get alerts';
   const resolvedBody =
     state.helper ??
     (state.kind === 'status'
@@ -110,7 +116,7 @@ function PreviewAlertsPanel({
         {state.kind === 'button' ? (
           <div className='inline-flex items-center gap-2 rounded-full border border-white/14 bg-white/[0.08] px-4 py-3 text-sm font-semibold text-white'>
             <Bell className='h-4 w-4' />
-            <span>{isSubscribed ? 'Manage alerts' : 'Turn on alerts'}</span>
+            <span>{isSubscribed ? 'Manage alerts' : 'Get alerts'}</span>
           </div>
         ) : null}
 
@@ -150,21 +156,37 @@ function PreviewAlertsPanel({
 }
 
 function SubscribePanel({
-  renderMode,
   artist,
-  notificationsPortalContainer,
   isSubscribed,
+  contentPrefs,
+  onTogglePref,
+  onUnsubscribe,
+  isUnsubscribing,
+  renderMode,
+  notificationsPortalContainer,
+  subscribeTwoStep,
+  alertOptInVariant,
   previewNotificationsState,
   onFlowClosed,
   onSubscriptionActivated,
+  keepSubscribeFlowMounted = false,
+  sourceContext,
 }: Readonly<{
-  renderMode: ProfileRenderMode;
   artist: Artist;
-  notificationsPortalContainer?: HTMLElement | null;
   isSubscribed: boolean;
+  contentPrefs: Record<NotificationContentType, boolean>;
+  onTogglePref: (key: NotificationContentType) => void;
+  onUnsubscribe: () => void;
+  isUnsubscribing: boolean;
+  renderMode: ProfileRenderMode;
+  notificationsPortalContainer?: HTMLElement | null;
+  subscribeTwoStep?: boolean;
+  alertOptInVariant?: ProfileAlertOptInVariant;
   previewNotificationsState?: ProfilePreviewNotificationsState;
   onFlowClosed?: () => void;
   onSubscriptionActivated?: () => void;
+  keepSubscribeFlowMounted?: boolean;
+  sourceContext?: NotificationSourceContext;
 }>) {
   if (renderMode === 'preview') {
     return (
@@ -173,7 +195,7 @@ function SubscribePanel({
           previewNotificationsState ?? {
             kind: 'button',
             tone: 'quiet',
-            label: 'Turn on alerts',
+            label: 'Get alerts',
           }
         }
         isSubscribed={isSubscribed}
@@ -181,17 +203,229 @@ function SubscribePanel({
     );
   }
 
+  if (!isSubscribed || keepSubscribeFlowMounted) {
+    return (
+      <div
+        className={NATIVE_PANEL_CLASS_NAME}
+        data-testid='profile-primary-tab-subscribe'
+      >
+        {subscribeTwoStep ? (
+          <TwoStepNotificationsCTA
+            artist={artist}
+            startExpanded
+            presentation='inline'
+            portalContainer={notificationsPortalContainer}
+            onFlowClosed={onFlowClosed}
+            onSubscriptionActivated={onSubscriptionActivated}
+            experimentVariant={alertOptInVariant}
+            source={sourceContext?.ctaLocation ?? 'subscribe_tab'}
+            sourceContext={sourceContext}
+          />
+        ) : (
+          <ArtistNotificationsCTA
+            artist={artist}
+            presentation='inline'
+            variant='button'
+            autoOpen
+            forceExpanded
+            hideListenFallback
+            source={sourceContext?.ctaLocation ?? 'subscribe_tab'}
+            sourceContext={sourceContext}
+            portalContainer={notificationsPortalContainer}
+            onFlowClosed={onFlowClosed}
+            onSubscriptionActivated={onSubscriptionActivated}
+            experimentVariant={alertOptInVariant}
+          />
+        )}
+      </div>
+    );
+  }
+
   return (
-    <ArtistNotificationsCTA
-      artist={artist}
-      presentation='overlay'
-      portalContainer={notificationsPortalContainer}
-      autoOpen
-      forceExpanded
-      hideTrigger
-      onFlowClosed={onFlowClosed}
-      onSubscriptionActivated={onSubscriptionActivated}
+    <AlertsSettingsView
+      isSubscribed={isSubscribed}
+      contentPrefs={contentPrefs}
+      onTogglePref={onTogglePref}
+      onUnsubscribe={onUnsubscribe}
+      isUnsubscribing={isUnsubscribing}
     />
+  );
+}
+
+function ProfileEmptyState({
+  artist,
+  title,
+  body,
+  triggerLabel,
+  sourceContext,
+}: Readonly<{
+  artist: Artist;
+  title: string;
+  body: string;
+  triggerLabel: string;
+  sourceContext: NotificationSourceContext;
+}>) {
+  return (
+    <div className='flex min-h-[36vh] flex-col items-center justify-center px-6 py-12 text-center'>
+      <p className='text-[17px] font-semibold tracking-[-0.018em] text-white'>
+        {title}
+      </p>
+      <p className='mt-2 max-w-[25ch] text-[12.5px] leading-5 text-white/52'>
+        {body}
+      </p>
+      <div className='mt-5'>
+        <ArtistNotificationsCTA
+          artist={artist}
+          variant='button'
+          presentation='overlay'
+          hideListenFallback
+          source={sourceContext.ctaLocation}
+          sourceContext={sourceContext}
+          triggerLabel={triggerLabel}
+        />
+      </div>
+    </div>
+  );
+}
+
+function SettingsToggle({
+  checked,
+  disabled,
+}: Readonly<{
+  checked: boolean;
+  disabled?: boolean;
+}>) {
+  return (
+    <span
+      className={cn(
+        'relative h-[26px] w-[42px] shrink-0 rounded-full border p-0.5 transition-colors duration-subtle',
+        checked
+          ? 'border-white/40 bg-white'
+          : 'border-white/14 bg-white/[0.08]',
+        disabled && 'opacity-45'
+      )}
+      aria-hidden='true'
+    >
+      <span
+        className={cn(
+          'block h-[22px] w-[22px] rounded-full shadow-[0_4px_10px_rgba(0,0,0,0.22)] transition-transform duration-subtle',
+          checked ? 'translate-x-4 bg-black' : 'translate-x-0 bg-white'
+        )}
+      />
+    </span>
+  );
+}
+
+function AlertsSettingsRow({
+  label,
+  description,
+  checked,
+  disabled,
+  onClick,
+}: Readonly<{
+  label: string;
+  description: string;
+  checked: boolean;
+  disabled?: boolean;
+  onClick: () => void;
+}>) {
+  return (
+    <button
+      type='button'
+      onClick={onClick}
+      disabled={disabled}
+      role='switch'
+      aria-checked={checked}
+      className='flex min-h-[58px] w-full items-center gap-3 border-t border-white/[0.075] px-4 py-3 text-left transition-colors duration-subtle first:border-t-0 hover:bg-white/[0.03] disabled:cursor-default disabled:hover:bg-transparent'
+    >
+      <div className='min-w-0 flex-1'>
+        <p className='truncate text-[14px] font-medium tracking-[-0.005em] text-white'>
+          {label}
+        </p>
+        <p className='truncate text-[11.5px] leading-4 text-white/50'>
+          {description}
+        </p>
+      </div>
+      <SettingsToggle checked={checked} disabled={disabled} />
+    </button>
+  );
+}
+
+function AlertsSettingsView({
+  isSubscribed,
+  contentPrefs,
+  onTogglePref,
+  onUnsubscribe,
+  isUnsubscribing,
+}: Readonly<{
+  isSubscribed: boolean;
+  contentPrefs: Record<NotificationContentType, boolean>;
+  onTogglePref: (key: NotificationContentType) => void;
+  onUnsubscribe: () => void;
+  isUnsubscribing: boolean;
+}>) {
+  const disabled = !isSubscribed;
+
+  return (
+    <div
+      className={NATIVE_PANEL_CLASS_NAME}
+      data-testid='profile-alerts-settings'
+    >
+      <div className='flex items-baseline justify-between px-4 pb-2 pt-3'>
+        <h2 className='text-[20px] font-semibold leading-none tracking-[-0.014em] text-white'>
+          Alerts
+        </h2>
+        <span className='text-[13px] font-medium text-white/52'>
+          {isSubscribed ? 'On' : 'Off'}
+        </span>
+      </div>
+
+      <div className='border-y border-white/[0.075]'>
+        <AlertsSettingsRow
+          label='New Music'
+          description='Singles, albums, and videos.'
+          checked={contentPrefs.newMusic}
+          disabled={disabled}
+          onClick={() => onTogglePref('newMusic')}
+        />
+        <AlertsSettingsRow
+          label='Events'
+          description='Tour dates and ticket updates.'
+          checked={contentPrefs.tourDates}
+          disabled={disabled}
+          onClick={() => onTogglePref('tourDates')}
+        />
+        <AlertsSettingsRow
+          label='Merch'
+          description='Drops, restocks, and low-stock updates.'
+          checked={contentPrefs.merch}
+          disabled={disabled}
+          onClick={() => onTogglePref('merch')}
+        />
+        <AlertsSettingsRow
+          label='General'
+          description='Occasional artist updates.'
+          checked={contentPrefs.general}
+          disabled={disabled}
+          onClick={() => onTogglePref('general')}
+        />
+      </div>
+
+      {isSubscribed ? (
+        <button
+          type='button'
+          onClick={onUnsubscribe}
+          disabled={isUnsubscribing}
+          className='mt-5 w-full px-4 py-3 text-center text-[14px] font-semibold text-white/72 transition-colors duration-subtle hover:text-white disabled:cursor-not-allowed disabled:text-white/36'
+        >
+          {isUnsubscribing ? 'Turning off...' : 'Turn off alerts'}
+        </button>
+      ) : (
+        <p className='px-4 pt-4 text-[12px] leading-5 text-white/42'>
+          Alert preferences appear here after alerts are enabled.
+        </p>
+      )}
+    </div>
   );
 }
 
@@ -200,54 +434,109 @@ export function ProfilePrimaryTabPanel({
   renderMode = 'interactive',
   artist,
   notificationsPortalContainer,
-  dsps,
-  enableDynamicEngagement = false,
   subscribeTwoStep = false,
+  alertOptInVariant,
   isSubscribed,
+  contentPrefs,
+  onTogglePref,
+  onUnsubscribe,
+  isUnsubscribing,
   genres,
   pressPhotos = [],
   allowPhotoDownloads = false,
   tourDates = [],
   releases = [],
+  alertSourceContext,
   previewNotificationsState,
   onFlowClosed,
   onSubscriptionActivated,
 }: Readonly<ProfilePrimaryTabPanelProps>) {
+  const [keepSubscribeFlowMounted, setKeepSubscribeFlowMounted] =
+    useState(false);
+
+  useEffect(() => {
+    if (!isSubscribed) {
+      setKeepSubscribeFlowMounted(true);
+    }
+  }, [isSubscribed]);
+
+  const handleSubscribeFlowClosed = useCallback(() => {
+    setKeepSubscribeFlowMounted(false);
+    onFlowClosed?.();
+  }, [onFlowClosed]);
+
+  const handleSubscriptionActivated = useCallback(() => {
+    setKeepSubscribeFlowMounted(true);
+    onSubscriptionActivated?.();
+  }, [onSubscriptionActivated]);
+  const musicEmptySourceContext: NotificationSourceContext = {
+    artistId: artist.id,
+    profileId: artist.id,
+    profileSlug: artist.handle,
+    currentTab: 'music',
+    ctaLocation: 'music_empty_state',
+    intent: 'music_alerts',
+  };
+  const eventsEmptySourceContext: NotificationSourceContext = {
+    artistId: artist.id,
+    profileId: artist.id,
+    profileSlug: artist.handle,
+    currentTab: 'events',
+    ctaLocation: 'events_empty_state',
+    intent: 'event_alerts',
+  };
+  const subscribeSourceContext: NotificationSourceContext =
+    alertSourceContext ?? {
+      artistId: artist.id,
+      profileId: artist.id,
+      profileSlug: artist.handle,
+      currentTab: 'alerts',
+      ctaLocation: 'subscribe_tab',
+      intent: 'general_alerts',
+    };
+
   if (mode === 'listen') {
     const visibleReleases = releases.filter(release => Boolean(release.slug));
 
     if (visibleReleases.length > 0) {
       return (
         <div
-          className={PANEL_CLASS_NAME}
+          className='-mx-4 space-y-4 pb-2'
           data-testid='profile-primary-tab-releases'
         >
-          <SectionIntro title='Releases' />
-          <ReleasesView
-            releases={visibleReleases}
-            artistHandle={artist.handle}
-            artistName={artist.name}
-          />
+          <div>
+            <div className='px-4 pb-2 pt-3'>
+              <h2 className='text-[20px] font-semibold leading-none tracking-[-0.014em] text-white'>
+                Music
+              </h2>
+            </div>
+            <ReleasesView
+              releases={visibleReleases}
+              artistId={artist.id}
+              artistHandle={artist.handle}
+              artistName={artist.name}
+            />
+          </div>
         </div>
       );
     }
 
     return (
       <div
-        className={PANEL_CLASS_NAME}
+        className={NATIVE_PANEL_CLASS_NAME}
         data-testid='profile-primary-tab-listen'
       >
-        <SectionIntro title='Music' />
-        <StaticListenInterface
+        <div className='px-4 pb-2 pt-3'>
+          <h2 className='text-[20px] font-semibold leading-none tracking-[-0.014em] text-white'>
+            Music
+          </h2>
+        </div>
+        <ProfileEmptyState
           artist={artist}
-          handle={artist.handle}
-          dspsOverride={dsps}
-          enableDynamicEngagement={enableDynamicEngagement}
-          renderMode={renderMode}
-          containerClassName='max-w-none'
-          providerButtonClassName='rounded-[22px] border-white/8 bg-white/[0.045] px-4 py-3.5 text-white hover:bg-white/[0.08]'
-          emptyStateClassName='border-white/8 bg-white/[0.04] shadow-none'
-          hideHelpText
+          title='No Music'
+          body='Get a note when the first release lands.'
+          triggerLabel='Turn on alerts'
+          sourceContext={musicEmptySourceContext}
         />
       </div>
     );
@@ -255,9 +544,21 @@ export function ProfilePrimaryTabPanel({
 
   if (mode === 'tour') {
     return (
-      <div className={PANEL_CLASS_NAME} data-testid='profile-primary-tab-tour'>
-        <SectionIntro title='Events' />
-        <TourDrawerContent artist={artist} tourDates={[...tourDates]} />
+      <div
+        className={NATIVE_PANEL_CLASS_NAME}
+        data-testid='profile-primary-tab-tour'
+      >
+        <div className='px-4 pb-2 pt-3'>
+          <h2 className='text-[20px] font-semibold leading-none tracking-[-0.014em] text-white'>
+            Events
+          </h2>
+        </div>
+        <TourDrawerContent
+          artist={artist}
+          tourDates={[...tourDates]}
+          emptyStateSourceContext={eventsEmptySourceContext}
+          renderMode={renderMode}
+        />
       </div>
     );
   }
@@ -265,13 +566,21 @@ export function ProfilePrimaryTabPanel({
   if (mode === 'subscribe') {
     return (
       <SubscribePanel
-        renderMode={renderMode}
         artist={artist}
-        notificationsPortalContainer={notificationsPortalContainer}
+        renderMode={renderMode}
         isSubscribed={isSubscribed}
+        contentPrefs={contentPrefs}
+        onTogglePref={onTogglePref}
+        onUnsubscribe={onUnsubscribe}
+        isUnsubscribing={isUnsubscribing}
+        notificationsPortalContainer={notificationsPortalContainer}
+        subscribeTwoStep={subscribeTwoStep}
+        alertOptInVariant={alertOptInVariant}
         previewNotificationsState={previewNotificationsState}
-        onFlowClosed={onFlowClosed}
-        onSubscriptionActivated={onSubscriptionActivated}
+        onFlowClosed={handleSubscribeFlowClosed}
+        onSubscriptionActivated={handleSubscriptionActivated}
+        keepSubscribeFlowMounted={keepSubscribeFlowMounted}
+        sourceContext={subscribeSourceContext}
       />
     );
   }

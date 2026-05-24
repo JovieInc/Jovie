@@ -22,6 +22,11 @@ If neither is present, the workflows cannot find the Linear issue and state stay
 
 ## Creating PRs with Auto-merge
 
+Agent automation has a separate capacity guard: Linear dispatch, orchestrator
+pickup, and the agent push-to-PR bridge defer new agent work when 5 agent PRs
+are already open. The push-to-PR bridge creates draft PRs; verification and
+agent pipeline jobs decide when they are ready for auto-merge.
+
 ### Option 1: Helper Script (Recommended)
 ```bash
 ./scripts/create-pr.sh "feat: add user authentication" "Implement OAuth login with Google and GitHub providers"
@@ -70,6 +75,7 @@ The auto-merge workflow will:
 2. **Use conventional commit format** in PR titles
 3. **Add blocking labels** if PR needs human review
 4. **Monitor CI status** - auto-merge only triggers after green CI
+5. **Avoid CodeRabbit rate limits** - batch commits and avoid rapid-fire re-reviews (wait 1–2 minutes if prompted)
 
 ## Troubleshooting
 
@@ -78,6 +84,11 @@ The auto-merge workflow will:
 - Verify CI checks are passing
 - Ensure no blocking labels are present
 - Check workflow logs in GitHub Actions
+
+### CodeRabbit says “rate limit exceeded”?
+- Don’t spam `@coderabbitai review` or push many tiny commits in a short window; batch changes into fewer commits.
+- Wait the cooldown time shown in the CodeRabbit comment before re-triggering review.
+- If the comment mentions usage credits are exhausted, either top up credits or skip CodeRabbit until credits are restored.
 
 ### Need to disable auto-merge?
 ```bash

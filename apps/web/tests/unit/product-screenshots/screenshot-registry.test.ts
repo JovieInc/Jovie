@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { ARTIST_PROFILE_SECTION_SCREENSHOT_ORDER } from '@/data/artistProfilePageOrder';
+import { HOMEPAGE_LAUNCH_COPY } from '@/data/homepageLaunchCopy';
 import { CANONICAL_SURFACES } from '@/lib/canonical-surfaces';
 import { SCREENSHOT_SCENARIOS } from '../../../lib/screenshots/registry';
 
@@ -15,6 +16,9 @@ const TIM_WHITE_PROFILE_SCREENSHOT_IDS = [
   'tim-white-profile-listen-mobile',
   'tim-white-profile-playlist-fallback-mobile',
   'tim-white-profile-listen-fallback-mobile',
+  'tim-white-profile-alerts-fallback-mobile',
+  'tim-white-profile-events-empty-mobile',
+  'tim-white-profile-more-menu-mobile',
 ] as const;
 
 describe('screenshot registry', () => {
@@ -131,6 +135,88 @@ describe('screenshot registry', () => {
       expect(
         scenario.publicExportPath?.startsWith('artist-profile-mode-') ?? false
       ).toBe(false);
+    }
+  });
+
+  it('waits for compact profile shell on desktop captures (stable post-shell-migration selector)', () => {
+    const desktopProfileIds = [
+      'tim-white-profile-live-desktop',
+      'tim-white-profile-mainstream-desktop',
+      'public-profile-desktop',
+    ];
+
+    for (const id of desktopProfileIds) {
+      const scenario = SCREENSHOT_SCENARIOS.find(
+        currentScenario => currentScenario.id === id
+      );
+
+      expect(scenario?.waitFor).toBe('[data-testid="profile-compact-shell"]');
+    }
+  });
+
+  it('keeps homepage artist profile carousel screenshots synced to Tim White profile demo captures', () => {
+    const cardScenarioIds = HOMEPAGE_LAUNCH_COPY.artistProfiles.cards.map(
+      card => card.screenshotScenarioId
+    );
+
+    expect(cardScenarioIds).toEqual([
+      'tim-white-profile-pay-mobile',
+      'tim-white-profile-listen-mobile',
+      'tim-white-profile-subscribe-mobile',
+      'tim-white-profile-tour-mobile',
+      'tim-white-profile-presave-mobile',
+    ]);
+    expect(cardScenarioIds).not.toContain('public-profile-mobile');
+
+    for (const id of cardScenarioIds) {
+      const scenario = SCREENSHOT_SCENARIOS.find(
+        currentScenario => currentScenario.id === id
+      );
+
+      expect(scenario?.route).toContain('/demo/showcase/tim-white-profile');
+      expect(scenario?.viewport).toBe('mobile');
+      expect(scenario?.consumers).toContain('marketing-export');
+      expect(scenario?.publicExportPath).toMatch(
+        /^tim-white-profile-.+-phone\.png$/
+      );
+      expect(scenario?.publicExportPath).not.toBe('profile-phone.png');
+    }
+  });
+
+  it('opens the Shell v1 releases hero screenshot on a seeded release detail rail', () => {
+    const scenario = SCREENSHOT_SCENARIOS.find(
+      currentScenario => currentScenario.id === 'shell-v1-releases-desktop'
+    );
+
+    expect(scenario?.route).toBe(
+      '/exp/shell-v1?view=releases&release=the-deep-end&capture=marketing'
+    );
+    expect(scenario?.interaction).toBe('open-shell-releases');
+    expect(scenario?.publicExportPath).toBe('shell-v1-releases.png');
+  });
+
+  it('hides the Shell v1 music player on the marketing library screenshot', () => {
+    const scenario = SCREENSHOT_SCENARIOS.find(
+      currentScenario => currentScenario.id === 'shell-v1-library-desktop'
+    );
+
+    expect(scenario?.route).toBe(
+      '/exp/shell-v1?view=library&capture=marketing&player=off'
+    );
+    expect(scenario?.publicExportPath).toBe('shell-v1-library.png');
+  });
+
+  it('keeps Shell v1 marketing screenshots out of admin mode', () => {
+    const shellScenarios = SCREENSHOT_SCENARIOS.filter(
+      scenario =>
+        scenario.id.startsWith('shell-v1-') &&
+        scenario.consumers.includes('marketing-export')
+    );
+
+    expect(shellScenarios.length).toBeGreaterThan(0);
+
+    for (const scenario of shellScenarios) {
+      expect(scenario.route).toContain('capture=marketing');
     }
   });
 

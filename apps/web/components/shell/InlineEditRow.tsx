@@ -134,7 +134,7 @@ export function InlineEditRow({
           aria-label={`Edit ${label}`}
           className={cn(
             valueClass,
-            'bg-transparent outline-none focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary-token rounded-sm'
+            'bg-transparent outline-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/24 rounded-sm'
           )}
         />
       </div>
@@ -142,12 +142,11 @@ export function InlineEditRow({
   }
 
   return (
-    // biome-ignore lint/a11y/noStaticElementInteractions: row click opens an inline edit input above; keyboard activation is on the inner pencil button (a real <button>)
-    // biome-ignore lint/a11y/noNoninteractiveElementInteractions: same — handlers route to a real button for keyboard users
-    // biome-ignore lint/a11y/useKeyWithClickEvents: inner pencil button is the keyboard-accessible affordance
+    // biome-ignore lint/a11y/noStaticElementInteractions: role is conditionally 'button' — static analysis can't resolve the ternary
+    // biome-ignore lint/a11y/noNoninteractiveElementInteractions: same — handlers route to enterEdit only when non-readOnly
     <div
       className={cn(
-        'group/row flex items-center gap-3 h-8 px-2 rounded-md transition-colors duration-150 ease-out',
+        'group/row flex items-center gap-3 h-8 px-2 rounded-md transition-colors duration-subtle ease-subtle',
         readOnly
           ? 'hover:bg-transparent'
           : 'cursor-pointer hover:bg-surface-1/40',
@@ -155,6 +154,18 @@ export function InlineEditRow({
       )}
       onClick={readOnly ? undefined : enterEdit}
       onDoubleClick={readOnly ? undefined : enterEdit}
+      onKeyDown={
+        readOnly
+          ? undefined
+          : e => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                enterEdit();
+              }
+            }
+      }
+      role={readOnly ? undefined : 'button'}
+      tabIndex={readOnly ? undefined : 0}
       title={readOnly ? undefined : 'Click to edit'}
     >
       <dt className='w-[88px] shrink-0 text-[11px] text-quaternary-token'>
@@ -169,7 +180,7 @@ export function InlineEditRow({
             enterEdit();
           }}
           aria-label={`Edit ${label}`}
-          className='shrink-0 inline-flex items-center justify-center h-5 w-5 rounded text-quaternary-token hover:text-primary-token hover:bg-surface-1/60 opacity-0 group-hover/row:opacity-100 focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-token transition-opacity duration-150 ease-out'
+          className='shrink-0 inline-flex items-center justify-center h-5 w-5 rounded text-quaternary-token hover:text-primary-token hover:bg-surface-1/60 opacity-0 group-hover/row:opacity-100 focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/55 focus-visible:ring-offset-2 focus-visible:ring-offset-(--linear-bg-page) transition-opacity duration-subtle ease-subtle'
         >
           <Pencil className='h-3 w-3' strokeWidth={2.25} />
         </button>

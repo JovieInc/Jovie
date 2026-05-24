@@ -5,6 +5,7 @@ type BaseEventProps = {
   readonly artist_id: string | null;
   readonly channel?: string;
   readonly source?: string;
+  readonly source_context?: Record<string, unknown>;
 };
 
 type ErrorEventProps = BaseEventProps & {
@@ -21,6 +22,7 @@ type SubscribeSuccessProps = {
   readonly phone_present: boolean;
   readonly country_code?: string;
   readonly source: string;
+  readonly source_context?: Record<string, unknown>;
   readonly creator_is_pro: boolean;
   readonly dynamic_enabled: boolean;
 };
@@ -43,6 +45,7 @@ export const extractPayloadProps = (
   phone_length: number;
   source: string;
   method: string;
+  source_context?: Record<string, unknown>;
 } => ({
   artist_id: typeof payload.artist_id === 'string' ? payload.artist_id : null,
   channel: typeof payload.channel === 'string' ? payload.channel : 'email',
@@ -50,6 +53,12 @@ export const extractPayloadProps = (
   phone_length: typeof payload.phone === 'string' ? payload.phone.length : 0,
   source: typeof payload.source === 'string' ? payload.source : 'unknown',
   method: typeof payload.method === 'string' ? payload.method : 'api',
+  source_context:
+    payload.source_context &&
+    typeof payload.source_context === 'object' &&
+    !Array.isArray(payload.source_context)
+      ? (payload.source_context as Record<string, unknown>)
+      : undefined,
 });
 
 /**
@@ -73,6 +82,7 @@ export const trackSubscribeAttempt = async (
     email_length: props.email_length,
     phone_length: props.phone_length,
     source: props.source,
+    source_context: props.source_context,
   });
 };
 
@@ -87,6 +97,7 @@ export const trackSubscribeError = async (
     error_type: props.error_type,
     validation_errors: props.validation_errors,
     source: props.source,
+    source_context: props.source_context,
   });
 };
 
@@ -103,6 +114,7 @@ export const trackSubscribeSuccess = async (
     phone_present: props.phone_present,
     country_code: props.country_code,
     source: props.source,
+    source_context: props.source_context,
     creator_is_pro: props.creator_is_pro,
     dynamic_enabled: props.dynamic_enabled,
   });

@@ -14,15 +14,21 @@ const mockDbExecute = vi.hoisted(() => vi.fn());
 const mockDbTransaction = vi.hoisted(() => vi.fn());
 const mockSendNotification = vi.hoisted(() => vi.fn());
 const mockBuildWaitlistInviteEmail = vi.hoisted(() => vi.fn());
+const mockGetWaitlistSettings = vi.hoisted(() => vi.fn());
 const mockTryReserveAutoAcceptSlot = vi.hoisted(() => vi.fn());
 const mockWithSystemIngestionSession = vi.hoisted(() => vi.fn());
 const mockFinalizeWaitlistApproval = vi.hoisted(() => vi.fn());
 const mockCaptureCriticalError = vi.hoisted(() => vi.fn());
+const mockApproveWaitlistEntryInTx = vi.hoisted(() => vi.fn());
+const mockEnqueueWaitlistEmailJob = vi.hoisted(() => vi.fn());
+const mockEnforceOnboardingRateLimit = vi.hoisted(() => vi.fn());
 
 vi.mock('@clerk/nextjs/server', () => ({
   auth: mockAuth,
   currentUser: mockCurrentUser,
 }));
+
+const mockDoesTableExist = vi.hoisted(() => vi.fn());
 
 vi.mock('@/lib/db', () => ({
   db: {
@@ -32,6 +38,7 @@ vi.mock('@/lib/db', () => ({
     execute: mockDbExecute,
     transaction: mockDbTransaction,
   },
+  doesTableExist: mockDoesTableExist,
   waitlistEntries: {},
 }));
 
@@ -60,7 +67,12 @@ vi.mock('@/lib/waitlist/invite', () => ({
 }));
 
 vi.mock('@/lib/waitlist/settings', () => ({
+  getWaitlistSettings: mockGetWaitlistSettings,
   tryReserveAutoAcceptSlot: mockTryReserveAutoAcceptSlot,
+}));
+
+vi.mock('@/lib/waitlist/email-jobs', () => ({
+  enqueueWaitlistEmailJob: mockEnqueueWaitlistEmailJob,
 }));
 
 vi.mock('@/lib/ingestion/session', () => ({
@@ -68,7 +80,7 @@ vi.mock('@/lib/ingestion/session', () => ({
 }));
 
 vi.mock('@/lib/waitlist/approval', () => ({
-  approveWaitlistEntryInTx: vi.fn(),
+  approveWaitlistEntryInTx: mockApproveWaitlistEntryInTx,
   finalizeWaitlistApproval: mockFinalizeWaitlistApproval,
 }));
 
@@ -77,7 +89,14 @@ vi.mock('@/lib/notifications/providers/slack', () => ({
 }));
 
 vi.mock('@/lib/onboarding/rate-limit', () => ({
-  enforceOnboardingRateLimit: vi.fn().mockResolvedValue(undefined),
+  enforceOnboardingRateLimit: mockEnforceOnboardingRateLimit,
+  getOnboardingRateLimitMessage: (error: unknown) => {
+    if (!(error instanceof Error)) return null;
+    const prefix = '[RATE_LIMITED] ';
+    return error.message.startsWith(prefix)
+      ? error.message.slice(prefix.length)
+      : null;
+  },
 }));
 
 vi.mock('@/lib/utils/ip-extraction', () => ({
@@ -116,6 +135,9 @@ function createTransactionMock(
     const mockValues = vi.fn().mockReturnValue({
       returning: mockReturning,
       onConflictDoUpdate: mockOnConflict,
+      onConflictDoNothing: vi.fn().mockReturnValue({
+        returning: mockReturning,
+      }),
     });
     const mockWhere = vi.fn().mockReturnValue({
       limit: vi.fn().mockResolvedValue(selectResult),
@@ -155,9 +177,24 @@ describe('Waitlist API', () => {
     );
 
     // Default: no auto-accept slot available
+    mockGetWaitlistSettings.mockResolvedValue({
+      gateEnabled: true,
+      autoAcceptEnabled: false,
+      autoAcceptAfterDays: 7,
+      autoAcceptDailyLimit: 0,
+      autoAcceptedToday: 0,
+      autoAcceptResetsAt: new Date(Date.now() + 86_400_000),
+    });
     mockTryReserveAutoAcceptSlot.mockResolvedValue({ shouldAutoAccept: false });
+    // Default: approval not granted
+    mockApproveWaitlistEntryInTx.mockResolvedValue({
+      outcome: 'capacity_full',
+    });
+    mockDoesTableExist.mockResolvedValue(true);
     mockFinalizeWaitlistApproval.mockResolvedValue(undefined);
     mockCaptureCriticalError.mockResolvedValue(undefined);
+    mockEnqueueWaitlistEmailJob.mockResolvedValue('job-1');
+    mockEnforceOnboardingRateLimit.mockResolvedValue(undefined);
     mockBuildWaitlistInviteEmail.mockReturnValue({
       message: {
         id: 'waitlist_welcome:profile_auto',
@@ -167,8 +204,17 @@ describe('Waitlist API', () => {
       inviteUrl: 'https://example.com/signin',
     });
     mockSendNotification.mockResolvedValue({ delivered: ['email'] });
+    // Provide a tx object that delegates to the per-test db mocks so tests that
+    // set up mockDbSelect/mockDbInsert/etc. work correctly inside the
+    // withSystemIngestionSession callback.
     mockWithSystemIngestionSession.mockImplementation(
-      async (fn: (tx: unknown) => unknown) => fn({})
+      async (fn: (tx: unknown) => unknown) =>
+        fn({
+          select: mockDbSelect,
+          insert: mockDbInsert,
+          update: mockDbUpdate,
+          execute: mockDbExecute,
+        })
     );
   });
 
@@ -198,16 +244,46 @@ describe('Waitlist API', () => {
       expect(data.hasEntry).toBe(false);
     });
 
+    it('does not fall back to an unverified primary email', async () => {
+      mockAuth.mockResolvedValue({ userId: 'user_123' });
+      mockCurrentUser.mockResolvedValue({
+        emailAddresses: [
+          {
+            emailAddress: 'unverified@example.com',
+            verification: { status: 'unverified' },
+          },
+        ],
+        primaryEmailAddress: {
+          emailAddress: 'unverified@example.com',
+        },
+      });
+
+      const { GET } = await routeModulePromise;
+      const response = await GET();
+      const data = await response.json();
+
+      expect(response.status).toBe(400);
+      expect(data.hasEntry).toBe(false);
+      expect(mockDbSelect).not.toHaveBeenCalled();
+    });
+
     it('returns waitlist entry status for authenticated user', async () => {
       mockAuth.mockResolvedValue({ userId: 'user_123' });
       mockCurrentUser.mockResolvedValue({
-        emailAddresses: [{ emailAddress: 'test@example.com' }],
+        emailAddresses: [
+          {
+            emailAddress: 'test@example.com',
+            verification: { status: 'verified' },
+          },
+        ],
       });
       mockDbSelect.mockReturnValue({
         from: vi.fn().mockReturnValue({
           where: vi.fn().mockReturnValue({
             orderBy: vi.fn().mockReturnValue({
-              limit: vi.fn().mockResolvedValue([]),
+              limit: vi
+                .fn()
+                .mockResolvedValue([{ id: 'entry_123', status: 'new' }]),
             }),
             limit: vi
               .fn()
@@ -250,7 +326,12 @@ describe('Waitlist API', () => {
     it('returns 400 for invalid request body', async () => {
       mockAuth.mockResolvedValue({ userId: 'user_123' });
       mockCurrentUser.mockResolvedValue({
-        emailAddresses: [{ emailAddress: 'test@example.com' }],
+        emailAddresses: [
+          {
+            emailAddress: 'test@example.com',
+            verification: { status: 'verified' },
+          },
+        ],
         fullName: 'Test User',
       });
       mockDbExecute.mockResolvedValue({ rows: [{ table_exists: true }] });
@@ -279,10 +360,81 @@ describe('Waitlist API', () => {
       expect(data.success).toBe(false);
     });
 
+    it('returns 429 when a waitlist submission is rate limited', async () => {
+      mockAuth.mockResolvedValue({ userId: 'user_123' });
+      mockEnforceOnboardingRateLimit.mockRejectedValue(
+        new Error(
+          '[RATE_LIMITED] Too many onboarding attempts. Please try again in 1 hour.'
+        )
+      );
+
+      const { POST } = await routeModulePromise;
+      const request = new Request('http://localhost/api/waitlist', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          primaryGoal: 'streams',
+          primarySocialUrl: 'https://instagram.com/test',
+        }),
+      });
+
+      const response = await POST(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(429);
+      expect(data).toMatchObject({
+        success: false,
+        code: 'rate_limited',
+        error: 'Too many onboarding attempts. Please try again in 1 hour.',
+      });
+      expect(mockCurrentUser).not.toHaveBeenCalled();
+      expect(mockDbTransaction).not.toHaveBeenCalled();
+    });
+
+    it('rejects submissions when only the primary email is unverified', async () => {
+      mockAuth.mockResolvedValue({ userId: 'user_123' });
+      mockCurrentUser.mockResolvedValue({
+        emailAddresses: [
+          {
+            emailAddress: 'unverified@example.com',
+            verification: { status: 'unverified' },
+          },
+        ],
+        primaryEmailAddress: {
+          emailAddress: 'unverified@example.com',
+        },
+        fullName: 'Unverified User',
+      });
+      mockDoesTableExist.mockResolvedValue(true);
+
+      const { POST } = await routeModulePromise;
+      const request = new Request('http://localhost/api/waitlist', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          primaryGoal: 'streams',
+          primarySocialUrl: 'https://instagram.com/unverified',
+        }),
+      });
+
+      const response = await POST(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(403);
+      expect(data.success).toBe(false);
+      expect(data.code).toBe('email_unverified');
+      expect(mockDbTransaction).not.toHaveBeenCalled();
+    });
+
     it.skip('creates waitlist entry successfully', async () => {
       mockAuth.mockResolvedValue({ userId: 'user_123' });
       mockCurrentUser.mockResolvedValue({
-        emailAddresses: [{ emailAddress: 'test@example.com' }],
+        emailAddresses: [
+          {
+            emailAddress: 'test@example.com',
+            verification: { status: 'verified' },
+          },
+        ],
         fullName: 'Test User',
       });
       mockDbExecute.mockResolvedValue({ rows: [{ table_exists: true }] });
@@ -325,19 +477,34 @@ describe('Waitlist API', () => {
     it('does not downgrade user status when re-submitting with a claimed entry', async () => {
       mockAuth.mockResolvedValue({ userId: 'user_claimed' });
       mockCurrentUser.mockResolvedValue({
-        emailAddresses: [{ emailAddress: 'claimed@example.com' }],
+        emailAddresses: [
+          {
+            emailAddress: 'claimed@example.com',
+            verification: { status: 'verified' },
+          },
+        ],
         fullName: 'Claimed User',
       });
-      mockDbExecute.mockResolvedValue({ rows: [{ table_exists: true }] });
+      mockDbExecute.mockResolvedValue({ rows: [] });
 
-      // Existing entry with status 'claimed' (already approved)
+      // Existing entry with status 'claimed' (already approved).
+      // The select chain must support both orderBy→limit (findLatestEntryByEmail)
+      // and plain limit (upsertUserStatus users lookup).
+      const claimedEntry = [{ id: 'entry_claimed', status: 'claimed' }];
       mockDbSelect.mockReturnValue({
         from: vi.fn().mockReturnValue({
           where: vi.fn().mockReturnValue({
-            limit: vi
-              .fn()
-              .mockResolvedValue([{ id: 'entry_claimed', status: 'claimed' }]),
+            orderBy: vi.fn().mockReturnValue({
+              limit: vi.fn().mockResolvedValue(claimedEntry),
+            }),
+            limit: vi.fn().mockResolvedValue([]),
           }),
+        }),
+      });
+
+      mockDbUpdate.mockReturnValue({
+        set: vi.fn().mockReturnValue({
+          where: vi.fn().mockResolvedValue(undefined),
         }),
       });
 
@@ -348,6 +515,7 @@ describe('Waitlist API', () => {
           insertValuesCalls.push(arg);
           return {
             onConflictDoUpdate: vi.fn().mockResolvedValue(undefined),
+            returning: vi.fn().mockResolvedValue([]),
           };
         }),
       });
@@ -380,10 +548,15 @@ describe('Waitlist API', () => {
       expect(pendingUpsert).toBeUndefined();
     });
 
-    it('does not send welcome email when auto-approval succeeds (user bypassed waitlist)', async () => {
+    it('does not send invite email when open signup approval succeeds', async () => {
       mockAuth.mockResolvedValue({ userId: 'user_auto' });
       mockCurrentUser.mockResolvedValue({
-        emailAddresses: [{ emailAddress: 'auto@example.com' }],
+        emailAddresses: [
+          {
+            emailAddress: 'auto@example.com',
+            verification: { status: 'verified' },
+          },
+        ],
         fullName: 'Auto User',
       });
       mockDbExecute.mockResolvedValue({ rows: [{ table_exists: true }] });
@@ -404,6 +577,9 @@ describe('Waitlist API', () => {
         values: vi.fn().mockReturnValue({
           returning: mockReturning,
           onConflictDoUpdate: mockOnConflict,
+          onConflictDoNothing: vi.fn().mockReturnValue({
+            returning: mockReturning,
+          }),
         }),
       });
       mockDbUpdate.mockReturnValue({
@@ -412,18 +588,39 @@ describe('Waitlist API', () => {
         }),
       });
 
-      // Auto-accept slot available
-      mockTryReserveAutoAcceptSlot.mockResolvedValue({
-        shouldAutoAccept: true,
+      mockGetWaitlistSettings.mockResolvedValueOnce({
+        gateEnabled: false,
+        autoAcceptEnabled: true,
+        autoAcceptAfterDays: 7,
+        autoAcceptDailyLimit: 10,
+        autoAcceptedToday: 0,
+        autoAcceptResetsAt: new Date(Date.now() + 86_400_000),
       });
 
-      // Approval succeeds
-      mockWithSystemIngestionSession.mockResolvedValue({
+      // Open signup approval succeeds — approveWaitlistEntryInTx returns approved outcome
+      mockApproveWaitlistEntryInTx.mockResolvedValue({
         outcome: 'approved',
         profileId: 'profile_auto',
         email: 'auto@example.com',
         fullName: 'Auto User',
         clerkId: 'clerk_auto',
+      });
+
+      // No existing entry; select chain supports both orderBy→limit and plain limit
+      mockDbSelect.mockReturnValue({
+        from: vi.fn().mockReturnValue({
+          where: vi.fn().mockReturnValue({
+            orderBy: vi.fn().mockReturnValue({
+              limit: vi.fn().mockResolvedValue([]),
+            }),
+            limit: vi.fn().mockResolvedValue([]),
+          }),
+        }),
+      });
+      mockDbUpdate.mockReturnValue({
+        set: vi.fn().mockReturnValue({
+          where: vi.fn().mockResolvedValue(undefined),
+        }),
       });
 
       const { POST } = await routeModulePromise;
@@ -440,24 +637,33 @@ describe('Waitlist API', () => {
       const data = await response.json();
 
       expect(response.status).toBe(200);
-      expect(data.status).toBe('claimed');
+      expect(data.status).toBe('approved');
       expect(mockFinalizeWaitlistApproval).toHaveBeenCalled();
+      expect(mockTryReserveAutoAcceptSlot).not.toHaveBeenCalled();
 
-      // Auto-approved users should NOT get the "off the waitlist" email
+      // Open-signup approvals should NOT get the "off the waitlist" email
       expect(mockSendNotification).not.toHaveBeenCalled();
       expect(mockBuildWaitlistInviteEmail).not.toHaveBeenCalled();
     });
 
-    it('does not send welcome email when auto-approval slot is not available', async () => {
+    it('does not approve fresh submissions when delayed auto-accept has capacity', async () => {
       mockAuth.mockResolvedValue({ userId: 'user_no_slot' });
       mockCurrentUser.mockResolvedValue({
-        emailAddresses: [{ emailAddress: 'noslot@example.com' }],
+        emailAddresses: [
+          {
+            emailAddress: 'noslot@example.com',
+            verification: { status: 'verified' },
+          },
+        ],
         fullName: 'No Slot User',
       });
-      mockDbExecute.mockResolvedValue({ rows: [{ table_exists: true }] });
+      mockDbExecute.mockResolvedValue({ rows: [] });
       mockDbSelect.mockReturnValue({
         from: vi.fn().mockReturnValue({
           where: vi.fn().mockReturnValue({
+            orderBy: vi.fn().mockReturnValue({
+              limit: vi.fn().mockResolvedValue([]),
+            }),
             limit: vi.fn().mockResolvedValue([]),
           }),
         }),
@@ -468,6 +674,9 @@ describe('Waitlist API', () => {
         values: vi.fn().mockReturnValue({
           returning: mockReturning,
           onConflictDoUpdate: mockOnConflict,
+          onConflictDoNothing: vi.fn().mockReturnValue({
+            returning: mockReturning,
+          }),
         }),
       });
       mockDbUpdate.mockReturnValue({
@@ -476,9 +685,13 @@ describe('Waitlist API', () => {
         }),
       });
 
-      // No auto-accept slot
-      mockTryReserveAutoAcceptSlot.mockResolvedValue({
-        shouldAutoAccept: false,
+      mockGetWaitlistSettings.mockResolvedValueOnce({
+        gateEnabled: true,
+        autoAcceptEnabled: true,
+        autoAcceptAfterDays: 7,
+        autoAcceptDailyLimit: 10,
+        autoAcceptedToday: 0,
+        autoAcceptResetsAt: new Date(Date.now() + 86_400_000),
       });
 
       const { POST } = await routeModulePromise;
@@ -495,33 +708,47 @@ describe('Waitlist API', () => {
       const data = await response.json();
 
       expect(response.status).toBe(200);
-      expect(data.status).toBe('new');
+      expect(data.status).toBe('waitlisted');
+      expect(mockTryReserveAutoAcceptSlot).not.toHaveBeenCalled();
+      expect(mockApproveWaitlistEntryInTx).not.toHaveBeenCalled();
       expect(mockSendNotification).not.toHaveBeenCalled();
       expect(mockBuildWaitlistInviteEmail).not.toHaveBeenCalled();
     });
 
-    it('captures critical error and returns new status when auto-approval yields no_profile', async () => {
-      mockAuth.mockResolvedValue({ userId: 'user_noprofile' });
+    it('returns waitlisted status and no email when delayed auto-accept is disabled', async () => {
+      mockAuth.mockResolvedValue({ userId: 'user_noapproval' });
       mockCurrentUser.mockResolvedValue({
-        emailAddresses: [{ emailAddress: 'noprofile@example.com' }],
-        fullName: 'No Profile User',
+        emailAddresses: [
+          {
+            emailAddress: 'noapproval@example.com',
+            verification: { status: 'verified' },
+          },
+        ],
+        fullName: 'No Approval User',
       });
-      mockDbExecute.mockResolvedValue({ rows: [{ table_exists: true }] });
+      mockDbExecute.mockResolvedValue({ rows: [] });
+      // No existing entry; supports both orderBy→limit and plain limit
       mockDbSelect.mockReturnValue({
         from: vi.fn().mockReturnValue({
           where: vi.fn().mockReturnValue({
+            orderBy: vi.fn().mockReturnValue({
+              limit: vi.fn().mockResolvedValue([]),
+            }),
             limit: vi.fn().mockResolvedValue([]),
           }),
         }),
       });
       const mockReturning = vi
         .fn()
-        .mockResolvedValue([{ id: 'entry_noprofile' }]);
+        .mockResolvedValue([{ id: 'entry_noapproval' }]);
       const mockOnConflict = vi.fn().mockResolvedValue(undefined);
       mockDbInsert.mockReturnValue({
         values: vi.fn().mockReturnValue({
           returning: mockReturning,
           onConflictDoUpdate: mockOnConflict,
+          onConflictDoNothing: vi.fn().mockReturnValue({
+            returning: mockReturning,
+          }),
         }),
       });
       mockDbUpdate.mockReturnValue({
@@ -530,20 +757,13 @@ describe('Waitlist API', () => {
         }),
       });
 
-      mockTryReserveAutoAcceptSlot.mockResolvedValue({
-        shouldAutoAccept: true,
-      });
-      mockWithSystemIngestionSession.mockResolvedValue({
-        outcome: 'no_profile',
-      });
-
       const { POST } = await routeModulePromise;
       const request = new Request('http://localhost/api/waitlist', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           primaryGoal: 'streams',
-          primarySocialUrl: 'https://instagram.com/noprofileuser',
+          primarySocialUrl: 'https://instagram.com/noapprovaluser',
         }),
       });
 
@@ -551,13 +771,11 @@ describe('Waitlist API', () => {
       const data = await response.json();
 
       expect(response.status).toBe(200);
-      expect(data.status).toBe('new');
-      expect(mockCaptureCriticalError).toHaveBeenCalledWith(
-        expect.stringContaining('no_profile'),
-        expect.any(Error),
-        expect.any(Object)
-      );
+      expect(data.status).toBe('waitlisted');
+      expect(mockTryReserveAutoAcceptSlot).not.toHaveBeenCalled();
+      expect(mockApproveWaitlistEntryInTx).not.toHaveBeenCalled();
       expect(mockSendNotification).not.toHaveBeenCalled();
+      expect(mockFinalizeWaitlistApproval).not.toHaveBeenCalled();
     });
 
     it.skip('sets users.userStatus to waitlist_pending after submission', async () => {
@@ -601,7 +819,12 @@ describe('Waitlist API', () => {
 
       mockAuth.mockResolvedValue({ userId: 'user_123' });
       mockCurrentUser.mockResolvedValue({
-        emailAddresses: [{ emailAddress: 'test@example.com' }],
+        emailAddresses: [
+          {
+            emailAddress: 'test@example.com',
+            verification: { status: 'verified' },
+          },
+        ],
         fullName: 'Test User',
       });
       mockDbExecute.mockResolvedValue({ rows: [{ table_exists: true }] });

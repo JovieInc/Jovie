@@ -1,46 +1,23 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
-
-vi.mock('@/components/organisms/MarketingSignInModal', () => ({
-  MarketingSignInModal: ({ onClose }: { onClose: () => void }) => (
-    <div data-testid='marketing-signin-modal'>
-      <button type='button' onClick={onClose}>
-        close
-      </button>
-    </div>
-  ),
-}));
+import { render, screen } from '@testing-library/react';
+import { describe, expect, it } from 'vitest';
 
 import { MarketingSignInLink } from '@/components/organisms/MarketingSignInLink';
+import { APP_ROUTES } from '@/constants/routes';
 
 describe('MarketingSignInLink', () => {
-  it('does not mount the modal until the button is clicked', () => {
+  it('renders a direct sign-in link for intercepted auth navigation', () => {
     render(<MarketingSignInLink />);
-    expect(
-      screen.queryByTestId('marketing-signin-modal')
-    ).not.toBeInTheDocument();
-  });
-
-  it('opens the modal on click and closes it again', async () => {
-    render(<MarketingSignInLink />);
-    fireEvent.click(screen.getByRole('button', { name: /sign in/i }));
-    const modal = await waitFor(() =>
-      screen.getByTestId('marketing-signin-modal')
-    );
-    fireEvent.click(modal.querySelector('button') as HTMLButtonElement);
-    await waitFor(() =>
-      expect(
-        screen.queryByTestId('marketing-signin-modal')
-      ).not.toBeInTheDocument()
+    expect(screen.getByRole('link', { name: /sign in/i })).toHaveAttribute(
+      'href',
+      APP_ROUTES.SIGNIN
     );
   });
 
-  it('wires prefetch handlers on the trigger to warm the modal chunk', () => {
-    render(<MarketingSignInLink />);
-    const trigger = screen.getByRole('button', { name: /sign in/i });
-    // Should not throw — hover/focus trigger the prefetch side effect.
-    fireEvent.mouseEnter(trigger);
-    fireEvent.focus(trigger);
-    expect(trigger).toBeInTheDocument();
+  it('renders the pill variant as a sign-in link', () => {
+    render(<MarketingSignInLink variant='pill' />);
+    expect(screen.getByRole('link', { name: /sign in/i })).toHaveAttribute(
+      'href',
+      APP_ROUTES.SIGNIN
+    );
   });
 });

@@ -74,6 +74,9 @@ describe('closeButtonStyles', () => {
   it('has focus styles', () => {
     expect(closeButtonStyles.focus).toContain('focus-visible:outline-none');
     expect(closeButtonStyles.focus).toContain('focus-visible:ring-2');
+    expect(closeButtonStyles.focus).toContain(
+      'focus-visible:ring-(--linear-border-focus)'
+    );
   });
 
   it('has disabled styles', () => {
@@ -83,7 +86,9 @@ describe('closeButtonStyles', () => {
   });
 
   it('has offset styles', () => {
-    expect(closeButtonStyles.offset).toContain('ring-offset-background');
+    expect(closeButtonStyles.offset).toContain(
+      'ring-offset-(--linear-bg-page)'
+    );
   });
 });
 
@@ -93,6 +98,6 @@ describe('closeButtonClassName', () => {
     expect(closeButtonClassName).toContain('hover:opacity-100');
     expect(closeButtonClassName).toContain('focus-visible:ring-2');
     expect(closeButtonClassName).toContain('disabled:pointer-events-none');
-    expect(closeButtonClassName).toContain('ring-offset-background');
+    expect(closeButtonClassName).toContain('ring-offset-(--linear-bg-page)');
   });
 });

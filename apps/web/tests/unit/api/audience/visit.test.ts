@@ -6,6 +6,7 @@ const mockPublicVisitLimiterGetStatus = vi.hoisted(() => vi.fn());
 const mockPublicVisitLimiterLimit = vi.hoisted(() => vi.fn());
 const mockDetectBot = vi.hoisted(() => vi.fn());
 const mockDbSelect = vi.hoisted(() => vi.fn());
+const mockDoesColumnExist = vi.hoisted(() => vi.fn());
 const mockDoesTableExist = vi.hoisted(() => vi.fn());
 const mockWithSystemIngestionSession = vi.hoisted(() => vi.fn());
 const mockCheckVisitRateLimit = vi.hoisted(() => vi.fn());
@@ -28,6 +29,7 @@ vi.mock('@/lib/db', () => ({
   db: {
     select: mockDbSelect,
   },
+  doesColumnExist: mockDoesColumnExist,
   doesTableExist: mockDoesTableExist,
 }));
 
@@ -82,7 +84,9 @@ describe('POST /api/audience/visit', () => {
     mockDetectBot.mockReturnValue({ isBot: false });
     mockIsTrackingTokenEnabled.mockReturnValue(false);
     mockCheckVisitRateLimit.mockResolvedValue({ success: true });
+    mockDoesColumnExist.mockResolvedValue(true);
     mockDoesTableExist.mockResolvedValue(true);
+    mockCaptureWarning.mockReset();
     mockCaptureError.mockReset();
   });
 
@@ -525,6 +529,102 @@ describe('POST /api/audience/visit', () => {
     expect(data.fingerprint).toBeDefined();
   });
 
+  it('uses schema-compatible visit writes when optional audience summary columns are absent', async () => {
+    mockDoesColumnExist.mockImplementation(
+      async (tableName: string, columnName: string) => {
+        if (
+          tableName === 'audience_members' &&
+          (columnName === 'latest_referrer_url' ||
+            columnName === 'latest_action_label')
+        ) {
+          return false;
+        }
+
+        return true;
+      }
+    );
+    mockDoesTableExist.mockImplementation(async (tableName: string) => {
+      return tableName === 'daily_profile_views';
+    });
+    mockDbSelect.mockReturnValue({
+      from: vi.fn().mockReturnValue({
+        where: vi.fn().mockReturnValue({
+          limit: vi
+            .fn()
+            .mockResolvedValue([{ id: 'profile_123', isPublic: true }]),
+        }),
+      }),
+    });
+
+    const insertedValues: Record<string, unknown>[] = [];
+    const updatedValues: Record<string, unknown>[] = [];
+    mockWithSystemIngestionSession.mockImplementation(async callback => {
+      const mockInsert = vi.fn().mockReturnValue({
+        values: vi.fn().mockImplementation((value: Record<string, unknown>) => {
+          insertedValues.push(value);
+          return {
+            onConflictDoNothing: vi.fn().mockReturnValue({
+              returning: vi.fn().mockResolvedValue([{ id: 'inserted_member' }]),
+            }),
+            onConflictDoUpdate: vi.fn().mockResolvedValue(undefined),
+          };
+        }),
+      });
+      const mockUpdate = vi.fn().mockReturnValue({
+        set: vi.fn().mockImplementation((value: Record<string, unknown>) => {
+          updatedValues.push(value);
+          return {
+            where: vi.fn().mockResolvedValue(undefined),
+          };
+        }),
+      });
+
+      await callback({
+        select: vi.fn().mockReturnValue({
+          from: vi.fn().mockReturnValue({
+            where: vi.fn().mockReturnValue({
+              limit: vi.fn().mockResolvedValue([]),
+            }),
+          }),
+        }),
+        insert: mockInsert,
+        update: mockUpdate,
+      });
+    });
+
+    const request = new NextRequest('http://localhost/api/audience/visit', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        profileId: '123e4567-e89b-12d3-a456-426614174000',
+        referrer: 'https://example.com/profile',
+      }),
+    });
+
+    const response = await POST(request);
+    const data = await response.json();
+    const audienceMemberInsert = insertedValues.find(
+      value => value.type === 'anonymous'
+    );
+
+    expect(response.status).toBe(200);
+    expect(data.success).toBe(true);
+    expect(data.degraded).toBeUndefined();
+    expect(audienceMemberInsert).toBeDefined();
+    expect(audienceMemberInsert).toEqual(
+      expect.objectContaining({
+        referrerHistory: expect.arrayContaining([
+          expect.objectContaining({ url: 'https://example.com/profile' }),
+        ]),
+      })
+    );
+    expect(audienceMemberInsert).not.toHaveProperty('latestReferrerUrl');
+    expect(updatedValues).toHaveLength(1);
+    expect(updatedValues[0]).toHaveProperty('latestActions');
+    expect(updatedValues[0]).not.toHaveProperty('latestActionLabel');
+    expect(mockCaptureError).not.toHaveBeenCalled();
+  });
+
   it('fails soft when optional persistence degrades after fingerprint resolution', async () => {
     mockDbSelect.mockReturnValue({
       from: vi.fn().mockReturnValue({
@@ -554,7 +654,7 @@ describe('POST /api/audience/visit', () => {
     expect(data.success).toBe(true);
     expect(data.degraded).toBe(true);
     expect(data.fingerprint).toBeDefined();
-    expect(mockCaptureError).toHaveBeenCalledWith(
+    expect(mockCaptureWarning).toHaveBeenCalledWith(
       'Audience visit persistence degraded',
       expect.any(Error),
       expect.objectContaining({
@@ -873,6 +973,11 @@ describe('POST /api/audience/visit', () => {
             onConflictDoNothing: vi.fn().mockReturnValue({
               returning: vi.fn().mockResolvedValue([{ id: 'inserted_member' }]),
             }),
+          }),
+        }),
+        update: vi.fn().mockReturnValue({
+          set: vi.fn().mockReturnValue({
+            where: vi.fn().mockResolvedValue(undefined),
           }),
         }),
       });

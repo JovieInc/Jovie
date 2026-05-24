@@ -1,6 +1,17 @@
 'use client';
+
+import React from 'react';
+import { ShellListRowFrame } from '@/components/organisms/table/atoms/ShellListRowFrame';
 import type { ReleaseTaskView } from '@/lib/release-tasks/types';
+import { cn } from '@/lib/utils';
 import { ReleaseTaskDueBadge } from './ReleaseTaskDueBadge';
+import {
+  isReleaseTaskAutomated,
+  isReleaseTaskDone,
+  ReleaseTaskAutoBadge,
+  ReleaseTaskCheckbox,
+  ReleaseTaskTitleText,
+} from './ReleaseTaskRowPrimitives';
 
 interface ReleaseTaskCompactRowProps {
   readonly task: ReleaseTaskView;
@@ -8,41 +19,50 @@ interface ReleaseTaskCompactRowProps {
   readonly onNavigate: (taskId: string) => void;
 }
 
-export function ReleaseTaskCompactRow({
+/**
+ * ReleaseTaskCompactRow — compact list row renderer for release tasks.
+ * High-churn over real production ReleaseTaskView data (status toggles, due dates, AI badges).
+ *
+ * Memoized + canonical focus rings + DS subtle motion only (shell handoff rot 20).
+ */
+export const ReleaseTaskCompactRow = React.memo(function ReleaseTaskCompactRow({
   task,
   onToggle,
   onNavigate,
 }: ReleaseTaskCompactRowProps) {
-  const isDone = task.status === 'done';
-  const isAi = task.assigneeType === 'ai_workflow';
+  const isDone = isReleaseTaskDone(task);
+  const isAi = isReleaseTaskAutomated(task);
 
   return (
-    <div className='flex items-center gap-2 px-3 py-0.5 min-h-[28px] group hover:bg-surface-1 rounded transition-colors'>
-      <input
-        type='checkbox'
-        checked={isDone}
-        disabled={isAi}
-        onChange={() => onToggle(task.id, !isDone)}
-        className='h-3 w-3 flex-shrink-0 rounded accent-[var(--linear-accent,#5e6ad2)] cursor-pointer disabled:cursor-default disabled:opacity-60'
-        aria-label={`Mark "${task.title}" as ${isDone ? 'incomplete' : 'complete'}`}
+    <ShellListRowFrame className='flex min-h-[28px] items-center gap-2 px-3 py-0.5'>
+      <ReleaseTaskCheckbox
+        task={task}
+        isDone={isDone}
+        onToggle={onToggle}
+        className='h-3 w-3'
       />
       <button
         type='button'
         onClick={() => onNavigate(task.id)}
-        className={`flex-1 text-left text-[11.5px] truncate transition-colors ${
-          isDone
-            ? 'text-tertiary-token line-through opacity-60'
-            : 'text-primary-token'
-        } ${isAi ? 'opacity-70' : 'hover:text-[var(--linear-accent,#5e6ad2)]'}`}
+        className={cn(
+          'flex-1 text-left text-[11.5px] truncate transition-colors duration-subtle ease-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/55 focus-visible:ring-offset-2 focus-visible:ring-offset-(--linear-bg-page) outline-none',
+          isAi ? 'opacity-70' : 'hover:text-accent'
+        )}
       >
-        {task.title}
-        {isAi && <span className='ml-1 text-3xs text-purple-500'>AI</span>}
+        <ReleaseTaskTitleText className='block' isDone={isDone}>
+          {task.title}
+          {isAi && (
+            <ReleaseTaskAutoBadge className='ml-1 text-purple-500'>
+              AI
+            </ReleaseTaskAutoBadge>
+          )}
+        </ReleaseTaskTitleText>
       </button>
       <ReleaseTaskDueBadge
         dueDate={task.dueDate}
         dueDaysOffset={task.dueDaysOffset}
         isCompleted={isDone}
       />
-    </div>
+    </ShellListRowFrame>
   );
-}
+});

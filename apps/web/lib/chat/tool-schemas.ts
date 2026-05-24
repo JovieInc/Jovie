@@ -7,6 +7,7 @@
  */
 
 import { z } from 'zod';
+import { interviewSignalSchema } from './tools/onboarding-signals';
 
 // ---------------------------------------------------------------------------
 // Schema definitions (descriptions + Zod input schemas)
@@ -72,6 +73,75 @@ export const TOOL_SCHEMAS = {
         .describe('The feedback message from the artist'),
     }),
   },
+
+  // -------------------------------------------------------------------------
+  // Onboarding tools (JOV-2132 PR 2) — available only in mode='onboarding'.
+  // -------------------------------------------------------------------------
+
+  searchSpotifyArtist: {
+    description:
+      'Open the Spotify artist picker popout in the chat. Use this on the FIRST turn the visitor mentions being a musician/artist, or whenever you need to identify which artist they are. The widget calls /api/spotify/search and renders suggestion cards; pass the query if the visitor has already named themselves, otherwise leave it empty to let them type.',
+    inputSchema: z.object({
+      query: z
+        .string()
+        .max(200)
+        .optional()
+        .describe('Pre-fill search query (artist name or shorthand)'),
+    }),
+  },
+
+  confirmSpotifyArtist: {
+    description:
+      'Lock in the Spotify artist the visitor picked. This pulls Spotify enrichment (avatar, name, followers, popularity, genres) and is the trigger for the profile-preview reveal stage. Call this ONLY after the user has explicitly selected a candidate from searchSpotifyArtist results.',
+    inputSchema: z.object({
+      spotifyArtistId: z
+        .string()
+        .min(1)
+        .max(64)
+        .describe(
+          'Spotify artist ID (alphanumeric, e.g. "4uA0L8H4DcXmKkJtGTQGzz")'
+        ),
+    }),
+  },
+
+  checkHandle: {
+    description:
+      'Check whether a Jovie handle (username) is available. Use after the visitor has been identified (Spotify pick or self-named) to claim their handle. The widget shows green-check / red-x with suggestions if taken. Pass the proposed handle without the @ prefix.',
+    inputSchema: z.object({
+      handle: z
+        .string()
+        .min(1)
+        .max(30)
+        .regex(
+          /^[a-z0-9._-]+$/i,
+          'Handle can only contain letters, numbers, dots, dashes, underscores'
+        )
+        .describe('Proposed handle (without @ prefix)'),
+    }),
+  },
+
+  recordInterviewSignal: {
+    description:
+      'Silently record qualifying signal you learned this turn. Use whenever the visitor reveals their release stage, audience size band, what tool they currently use, or any objection / hesitation they raised. No UI surface — this is for analytics + later proposeNextStep scoring. Always pass at least one field; never call this with an empty signal.',
+    inputSchema: interviewSignalSchema,
+  },
+
+  proposeNextStep: {
+    description:
+      'Decide whether to render the checkout card, the waitlist confirmation card, or continue the interview. Call this once you believe you have enough signal (typically after confirmSpotifyArtist + checkHandle, OR after 2+ interview turns). The server runs the deterministic evaluator — you do NOT score the decision, you trigger the evaluation.',
+    inputSchema: z.object({}),
+  },
+
+  proposeCheckout: {
+    description:
+      'Render the checkout card. Only call this AFTER proposeNextStep returned instant_access. The card defaults to a route-handoff to /onboarding/checkout (Stripe Embedded Checkout iframe is behind a separate flag pending CSP verification).',
+    inputSchema: z.object({
+      plan: z
+        .enum(['free', 'pro', 'max'])
+        .optional()
+        .describe('Plan intent. If omitted the user picks on the next screen.'),
+    }),
+  },
 } as const;
 
 // ---------------------------------------------------------------------------
@@ -85,4 +155,19 @@ export const FREE_TIER_TOOLS = [
   'proposeSocialLink',
   'proposeSocialLinkRemoval',
   'submitFeedback',
+] as const satisfies readonly ToolSchemaKey[];
+
+/**
+ * Onboarding-mode tool set (JOV-2132 PR 2). These are the only tools exposed
+ * to the LLM when `mode='onboarding'`. proposeSocialLink is reused from the
+ * authenticated set; the rest are new.
+ */
+export const ONBOARDING_TOOLS = [
+  'searchSpotifyArtist',
+  'confirmSpotifyArtist',
+  'checkHandle',
+  'proposeSocialLink',
+  'recordInterviewSignal',
+  'proposeNextStep',
+  'proposeCheckout',
 ] as const satisfies readonly ToolSchemaKey[];

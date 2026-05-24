@@ -1,8 +1,24 @@
-// Fan-facing notification channels stored in the DB today
+/**
+ * Fan-facing subscription channel — the values a fan can choose from when
+ * subscribing on a public profile and the values persisted in the DB
+ * (`notification_subscriptions.channel`, `notification_contacts.*Status`).
+ *
+ * Use this type for: subscribe/unsubscribe flows, fan preferences UI, DB-row
+ * shapes. Do NOT use it as the dispatch enum on `sendNotification()` — see
+ * `NotificationDeliveryChannel` below.
+ */
 export type NotificationChannel = 'sms' | 'email';
 
-// App-wide delivery channels (allows future push/in-app support)
-export type NotificationDeliveryChannel = 'email' | 'push' | 'in_app';
+/**
+ * App-wide outbound delivery channel — the transports `sendNotification()`
+ * can target. Superset of `NotificationChannel`:
+ *   - `email`, `sms` overlap with `NotificationChannel` (fan-facing)
+ *   - `push`, `in_app` are creator-facing only
+ *
+ * Both fan and creator code paths converge on this enum for outbound
+ * dispatch; there is no shadow type. See `docs/NOTIFICATION_GUIDELINES.md`.
+ */
+export type NotificationDeliveryChannel = 'email' | 'sms' | 'push' | 'in_app';
 
 export type NotificationCategory = 'transactional' | 'product' | 'marketing';
 
@@ -16,6 +32,7 @@ export interface NotificationPreferences {
 
 export interface NotificationTarget {
   email?: string | null;
+  phone?: string | null;
   name?: string | null;
   userId?: string;
   clerkUserId?: string;
@@ -49,6 +66,7 @@ export interface SenderContext {
 export interface NotificationMessage {
   id?: string;
   dedupKey?: string;
+  idempotencyKey?: string;
   category: NotificationCategory;
   subject: string;
   text: string;
@@ -86,6 +104,7 @@ export interface EmailMessage {
   subject: string;
   text: string;
   html?: string;
+  idempotencyKey?: string;
   replyTo?: string;
   headers?: Record<string, string>;
   from?: string;

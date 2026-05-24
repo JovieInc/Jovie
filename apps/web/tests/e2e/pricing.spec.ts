@@ -39,24 +39,66 @@ test.describe('Pricing Page', () => {
     // Check main heading
     await expect(page.locator('h1')).toHaveText('Pricing');
     await expect(
-      page.getByRole('heading', { name: 'Artist profiles built to convert.' })
+      page.getByRole('heading', { name: 'Artist profiles built to convert' })
     ).toBeVisible();
     await expect(
       page.getByRole('heading', {
-        name: 'Capture every fan. Send them every release automatically.',
+        name: 'Capture fans once. Bring them back automatically.',
       })
     ).toBeVisible();
 
     // Check that pricing tiers are visible
-    await expect(page.locator('table').first()).toContainText('Free');
-    await expect(page.locator('table').first()).toContainText('$0');
-    await expect(page.locator('table').first()).toContainText('Pro');
+    await expect(page.getByTestId('marketing-pricing-plan-free')).toContainText(
+      'Free'
+    );
+    await expect(page.getByTestId('marketing-pricing-plan-free')).toContainText(
+      '$0'
+    );
+    await expect(page.getByTestId('marketing-pricing-plan-pro')).toContainText(
+      'Pro'
+    );
+    await expect(page.getByTestId('marketing-pricing-plan-pro')).toContainText(
+      'Waitlist'
+    );
+    await expect(
+      page.getByTestId('marketing-pricing-plan-enterprise')
+    ).toHaveCount(0);
+    await expect(page.getByTestId('marketing-pricing-plan-team')).toHaveCount(
+      0
+    );
   });
 
   test('has working call-to-action buttons', async ({ page }) => {
-    const freeTierCta = page.getByRole('link', { name: 'Start Free' }).first();
+    const freeTierCta = page
+      .getByRole('link', { name: 'Claim your profile' })
+      .first();
     await expect(freeTierCta).toBeVisible();
-    await expect(freeTierCta).toHaveAttribute('href', /\/signup/);
+    await expect(freeTierCta).toHaveAttribute('href', /\/signup\?plan=free/);
+    await expect(
+      page.getByTestId('marketing-pricing-plan-pro').getByRole('link', {
+        name: 'Request Access',
+      })
+    ).toHaveAttribute('href', '/signup?plan=pro');
+    const requestAccessButtonsOnGrid = await page
+      .locator('.marketing-pricing-plan-card')
+      .evaluateAll(cards =>
+        cards.map(card => {
+          const cta = card.querySelector<HTMLElement>(
+            '.marketing-pricing-plan-card__cta'
+          );
+          const cardRect = card.getBoundingClientRect();
+          const ctaRect = cta?.getBoundingClientRect();
+          if (!ctaRect) return false;
+          return (
+            Math.abs(
+              cardRect.left +
+                cardRect.width / 2 -
+                (ctaRect.left + ctaRect.width / 2)
+            ) <= 1 && ctaRect.right <= cardRect.right
+          );
+        })
+      );
+    expect(requestAccessButtonsOnGrid).toEqual([true, true]);
     await expect(
       page.getByRole('link', { name: 'Explore Artist Profiles' }).first()
     ).toBeVisible();

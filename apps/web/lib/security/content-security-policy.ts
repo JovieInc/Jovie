@@ -67,9 +67,13 @@ const STATIC_CSP_PARTS = {
   objectSrc: "object-src 'none'",
   frameAncestors: "frame-ancestors 'none'",
   formAction: "form-action 'self'",
-  styleSrc: "style-src 'self' 'unsafe-inline'",
+  // Google Fonts (fonts.googleapis.com for the stylesheet, fonts.gstatic.com
+  // for the woff2 files) are loaded by /pitch/index.html (Manrope + JetBrains
+  // Mono — not in the self-hosted font set). The marketing app otherwise uses
+  // next/font and self-hosted Geist/DM Sans/Satoshi.
+  styleSrc: "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
   fontSrc:
-    "font-src 'self' data: https://vercel.live https://assets.vercel.com",
+    "font-src 'self' data: https://fonts.gstatic.com https://vercel.live https://assets.vercel.com",
   // Pre-computed media-src from canonical media domain registry
   // @see constants/platforms/cdn-domains.ts
   mediaSrc: ["media-src 'self'", ...getCspMediaSrcDomains()].join(' '),
@@ -94,6 +98,7 @@ const STATIC_CSP_PARTS = {
     'https://*.clerk.services',
     'https://*.clerk.accounts.dev',
     'https://clerk.jov.ie',
+    'https://clerk.staging.jov.ie',
     'https://challenges.cloudflare.com',
     'https://r2.leadsy.ai',
     'https://tag.trovo-tag.com',
@@ -113,12 +118,14 @@ const STATIC_CSP_PARTS = {
     'https://*.clerk.services',
     'https://*.clerk.accounts.dev',
     'https://clerk.jov.ie',
+    'https://clerk.staging.jov.ie',
     'https://api.stripe.com',
     'https://*.ingest.sentry.io',
     'https://*.ingest.us.sentry.io',
     'https://*.sentry.io',
     'wss://*.clerk.com',
     'wss://distinct-giraffe-5.clerk.accounts.dev',
+    'wss://clerk.staging.jov.ie',
     'https://jov.ie',
     'https://challenges.cloudflare.com',
     'https://clerk-telemetry.com',
@@ -126,6 +133,12 @@ const STATIC_CSP_PARTS = {
     'wss://ws-us3.pusher.com',
     'https://r2.leadsy.ai',
     'https://wvbknd.leadsy.ai',
+    // Google OAuth + AI Connector APIs (JOV-2230)
+    'https://accounts.google.com',
+    'https://oauth2.googleapis.com',
+    'https://www.googleapis.com',
+    'https://gmail.googleapis.com',
+    'https://calendar-pa.clients6.google.com',
   ].join(' '),
 
   // Pre-computed frame-src prefix (excludes dev-only vercel.live)
@@ -136,6 +149,7 @@ const STATIC_CSP_PARTS = {
     'https://*.clerk.com',
     'https://*.clerk.accounts.dev',
     'https://distinct-giraffe-5.clerk.accounts.dev',
+    'https://clerk.staging.jov.ie',
     'https://challenges.cloudflare.com',
   ].join(' '),
 } as const;

@@ -138,7 +138,11 @@ describe('TourModePanel', () => {
   it('renders empty state when no tour dates', () => {
     render(<TourModePanel artist={artist} tourDates={[]} />);
     expect(screen.getByTestId('tour-drawer-content')).toBeInTheDocument();
-    expect(screen.getByText('No upcoming events.')).toBeInTheDocument();
+    expect(screen.getByText('No Events')).toBeInTheDocument();
+    expect(screen.getByTestId('mock-notifications-cta')).toHaveAttribute(
+      'data-source',
+      'events_empty_state'
+    );
   });
 
   it('renders the styled all-shows list when no geolocation is available', () => {
@@ -151,20 +155,22 @@ describe('TourModePanel', () => {
     expect(screen.getByText('Upcoming')).toBeInTheDocument();
   });
 
-  it('highlights the nearest upcoming show when the user has nearby dates', () => {
+  it('renders a nearby group before upcoming shows when the user has nearby dates', () => {
     locationMock.location = { latitude: 51.507, longitude: -0.128 }; // London
     render(<TourModePanel artist={artist} tourDates={[londonDate, nycDate]} />);
 
-    expect(screen.getByText('Near You')).toBeInTheDocument();
+    expect(screen.getByText('Nearby')).toBeInTheDocument();
+    expect(screen.getByText('Upcoming')).toBeInTheDocument();
     expect(screen.getByText('The O2')).toBeInTheDocument();
     expect(screen.getByText('Madison Square Garden')).toBeInTheDocument();
   });
 
-  it('falls back to an upcoming highlight when no nearby dates exist', () => {
+  it('hides the nearby group when no nearby dates exist', () => {
     locationMock.location = { latitude: 0, longitude: -160 };
     render(<TourModePanel artist={artist} tourDates={[londonDate, nycDate]} />);
 
     expect(screen.getByText('Upcoming')).toBeInTheDocument();
+    expect(screen.queryByText('Nearby')).not.toBeInTheDocument();
     expect(screen.getByText('The O2')).toBeInTheDocument();
     expect(
       screen.queryByTestId('mock-notifications-cta')

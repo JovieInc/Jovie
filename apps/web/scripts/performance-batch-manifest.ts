@@ -297,9 +297,7 @@ const PERF_ISSUES = [
     title: 'Releases workspace FCP is too slow',
     kind: 'timing-budget',
     surface: 'creator-app',
-    evidence: [
-      'Direct load for `/app/dashboard/releases` observed about 3032ms FCP.',
-    ],
+    evidence: ['Direct load for `/app/releases` observed about 3032ms FCP.'],
     batchId: 'B3-releases-workspace',
     checks: ['creator-releases-budget-pass', 'creator-releases-direct-metrics'],
   },
@@ -308,9 +306,7 @@ const PERF_ISSUES = [
     title: 'Releases workspace request count is too high',
     kind: 'network-churn',
     surface: 'creator-app',
-    evidence: [
-      'Direct load for `/app/dashboard/releases` observed 94 requests.',
-    ],
+    evidence: ['Direct load for `/app/releases` observed 94 requests.'],
     batchId: 'B3-releases-workspace',
     checks: ['creator-releases-direct-metrics'],
   },
@@ -320,7 +316,7 @@ const PERF_ISSUES = [
     kind: 'resource-budget',
     surface: 'creator-app',
     evidence: [
-      'Direct load for `/app/dashboard/releases` observed about 822KB JS and 159KB CSS.',
+      'Direct load for `/app/releases` observed about 822KB JS and 159KB CSS.',
     ],
     batchId: 'B3-releases-workspace',
     checks: ['creator-releases-direct-metrics'],
@@ -502,10 +498,9 @@ const PERF_BATCHES = [
       {
         id: 'onboarding-summary',
         label:
-          'Onboarding emits a strict summary with the incomplete creator baseline',
+          'Chat onboarding emits a strict summary for the canonical /start entrypoint',
         kind: 'budget-route',
         expectation: 'summary',
-        authPersona: 'creator',
         routeIds: ['onboarding'],
       },
       {
@@ -518,7 +513,7 @@ const PERF_BATCHES = [
       },
     ],
     qaScope: [
-      'Re-run screenshot parity for `/tim`, `/app`, `/onboarding`, and `/app/dashboard/releases`.',
+      'Re-run screenshot parity for `/tim`, `/app`, `/start`, and `/app/releases`.',
       'Verify the ship runner uses the queue handoff instead of falling back to ad hoc perf commands.',
     ],
     shipLabels: ['testing'],
@@ -630,9 +625,9 @@ const PERF_BATCHES = [
         kind: 'direct-metrics',
         expectation: 'pass',
         authPersona: 'creator-ready',
-        path: APP_ROUTES.DASHBOARD_RELEASES,
+        path: APP_ROUTES.RELEASES,
         directMetrics: {
-          finalPath: APP_ROUTES.DASHBOARD_RELEASES,
+          finalPath: APP_ROUTES.RELEASES,
           requests: 69,
           scriptKB: 700,
         },
@@ -655,10 +650,9 @@ const PERF_BATCHES = [
       {
         id: 'onboarding-budget-pass',
         label:
-          'Onboarding passes strict budgets with the incomplete creator baseline',
+          'Chat onboarding passes strict budgets for the canonical /start entrypoint',
         kind: 'budget-route',
         expectation: 'pass',
-        authPersona: 'creator',
         routeIds: ['onboarding'],
       },
       {
@@ -666,22 +660,21 @@ const PERF_BATCHES = [
         label: 'Onboarding direct metrics hit the request and CSS targets',
         kind: 'direct-metrics',
         expectation: 'pass',
-        authPersona: 'creator',
-        path: '/onboarding',
+        path: APP_ROUTES.START,
         directMetrics: {
-          cssKB: 220,
-          finalPath: '/onboarding',
+          cssKB: 200,
+          finalPath: APP_ROUTES.START,
           requests: 79,
         },
       },
     ],
     qaScope: [
-      'Run screenshot parity on onboarding after the client form finishes hydrating.',
-      'QA the full onboarding flow with the incomplete creator baseline.',
+      'Run screenshot parity on `/start` after the chat shell finishes hydrating.',
+      'QA the full chat onboarding flow from anonymous `/start` through checkout handoff.',
     ],
     shipLabels: ['testing'],
     doneRule:
-      '`/onboarding` passes manifest budgets, stays below 80 requests, and ships less than 220KB CSS.',
+      '`/start` passes manifest budgets, stays below 80 requests, and ships less than 200KB CSS.',
   },
   {
     id: 'B5-home',

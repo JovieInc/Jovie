@@ -4,6 +4,8 @@ import {
   hasClerkOriginMismatchSignal,
   isClerkHandshakeUrl,
   isClerkOriginMismatchMessage,
+  resolveBypassFallbackUserId,
+  resolveBypassSessionUrls,
 } from './clerk-auth';
 
 describe('clerk-auth helpers', () => {
@@ -50,9 +52,40 @@ describe('clerk-auth helpers', () => {
     ).toBe(false);
   });
 
-  it('only allows creator persona fallback for bypass auth', () => {
+  it('allows explicit user fallback for any bypass persona', () => {
     expect(canFallbackToBypassUserId('creator')).toBe(true);
-    expect(canFallbackToBypassUserId('admin')).toBe(false);
+    expect(canFallbackToBypassUserId('creator-ready')).toBe(true);
+    expect(canFallbackToBypassUserId('admin')).toBe(true);
     expect(canFallbackToBypassUserId(null)).toBe(false);
+  });
+
+  it('prefers the seeded bypass user over per-test overrides for persona fallback', () => {
+    const originalUserId = process.env.E2E_CLERK_USER_ID;
+    process.env.E2E_CLERK_USER_ID = 'seeded-ci-user';
+
+    try {
+      expect(
+        resolveBypassFallbackUserId('creator-ready', 'ad-hoc-test-user')
+      ).toBe('seeded-ci-user');
+      expect(resolveBypassFallbackUserId(null, 'ad-hoc-test-user')).toBe(
+        'ad-hoc-test-user'
+      );
+    } finally {
+      if (originalUserId === undefined) {
+        delete process.env.E2E_CLERK_USER_ID;
+      } else {
+        process.env.E2E_CLERK_USER_ID = originalUserId;
+      }
+    }
+  });
+
+  it('resolves localhost bypass session urls with an IPv4 fallback', () => {
+    expect(resolveBypassSessionUrls('http://localhost:3100')).toEqual([
+      'http://localhost:3100/api/dev/test-auth/session',
+      'http://127.0.0.1:3100/api/dev/test-auth/session',
+    ]);
+    expect(resolveBypassSessionUrls('http://127.0.0.1:3100')).toEqual([
+      'http://127.0.0.1:3100/api/dev/test-auth/session',
+    ]);
   });
 });

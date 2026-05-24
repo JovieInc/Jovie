@@ -283,7 +283,9 @@ function generateRepoModeSection(): string {
 Always flag anything that looks wrong — one sentence, what you noticed and its impact.`;
 }
 
-export function generateTestFailureTriage(): string {
+export function generateTestFailureTriage(ctx: TemplateContext): string {
+  const linearFollowupsPath = `${ctx.paths.skillRoot}/review/LINEAR-followups.md`;
+
   return `## Test Failure Ownership Triage
 
 When tests fail, do NOT immediately stop. First, determine ownership:
@@ -324,7 +326,7 @@ Use AskUserQuestion:
 >
 > RECOMMENDATION: Choose A — fix now while the context is fresh. Completeness: 9/10.
 > A) Investigate and fix now (human: ~2-4h / CC: ~15min) — Completeness: 10/10
-> B) Add as P0 TODO — fix after this branch lands — Completeness: 7/10
+> B) Create required Linear follow-up — fix after this branch lands — Completeness: 7/10
 > C) Skip — I know about this, ship anyway — Completeness: 3/10
 
 **If REPO_MODE is \`collaborative\` or \`unknown\`:**
@@ -340,7 +342,7 @@ Use AskUserQuestion:
 > RECOMMENDATION: Choose B — assign it to whoever broke it so the right person fixes it. Completeness: 9/10.
 > A) Investigate and fix now anyway — Completeness: 10/10
 > B) Blame + assign GitHub issue to the author — Completeness: 9/10
-> C) Add as P0 TODO — Completeness: 7/10
+> C) Create required Linear follow-up — Completeness: 7/10
 > D) Skip — ship anyway — Completeness: 3/10
 
 ### Step T4: Execute the chosen action
@@ -351,11 +353,11 @@ Use AskUserQuestion:
 - Commit the fix separately from the branch's changes: \`git commit -m "fix: pre-existing test failure in <test-file>"\`
 - Continue with the workflow.
 
-**If "Add as P0 TODO":**
-- If \`TODOS.md\` exists, add the entry following the format in \`review/TODOS-format.md\` (or \`.claude/skills/review/TODOS-format.md\`).
-- If \`TODOS.md\` does not exist, create it with the standard header and add the entry.
-- Entry should include: title, the error output, which branch it was noticed on, and priority P0.
-- Continue with the workflow — treat the pre-existing failure as non-blocking.
+**If "Create required Linear follow-up":**
+- Create a Linear issue using the format in \`${linearFollowupsPath}\`.
+- Classify it as Required. Include the failing test name, first relevant error lines, current branch, source PR if available, and why this can be handled separately.
+- Do not add the \`automated\` label unless a human explicitly asks for unattended dispatch.
+- Continue with the workflow — treat the pre-existing failure as non-blocking once the Linear issue ID is captured.
 
 **If "Blame + assign GitHub issue" (collaborative only):**
 - Find who likely broke it. Check BOTH the test file AND the production code it tests:

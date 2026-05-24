@@ -73,7 +73,7 @@ describe('dev-test-auth.server', () => {
     });
   });
 
-  it('allows trusted preview hosts when bypass mode is enabled', async () => {
+  it('allows trusted preview hosts but rejects wildcard Vercel hosts when bypass mode is enabled', async () => {
     vi.stubEnv('E2E_USE_TEST_AUTH_BYPASS', '1');
     const { getDevTestAuthAvailability } = await import(
       '@/lib/auth/dev-test-auth.server'
@@ -88,8 +88,8 @@ describe('dev-test-auth.server', () => {
       getDevTestAuthAvailability('jovie-git-feature-123-jovie.vercel.app')
     ).toEqual({
       enabled: true,
-      trustedHost: true,
-      reason: null,
+      trustedHost: false,
+      reason: 'Only available on loopback and private dev hosts',
     });
   });
 
@@ -108,6 +108,23 @@ describe('dev-test-auth.server', () => {
     });
   });
 
+  it('ignores spoofed x-vercel-env header for production guard (only real process.env is honored)', async () => {
+    vi.stubEnv('E2E_USE_TEST_AUTH_BYPASS', '1');
+    vi.stubEnv('NODE_ENV', 'development');
+    vi.stubEnv('VERCEL_ENV', 'development');
+    const { getDevTestAuthAvailability } = await import(
+      '@/lib/auth/dev-test-auth.server'
+    );
+
+    // Spoofed headers (e.g. x-vercel-env in request) have no effect —
+    // the production check reads process.env only (defence in depth per register).
+    expect(getDevTestAuthAvailability('localhost')).toEqual({
+      enabled: true,
+      trustedHost: true,
+      reason: null,
+    });
+  });
+
   it('provisions the creator persona with a claimed profile baseline', async () => {
     const { ensureDevTestAuthActor } = await import(
       '@/lib/auth/dev-test-auth.server'
@@ -118,6 +135,13 @@ describe('dev-test-auth.server', () => {
       expect.objectContaining({
         email: 'browse+clerk_test@jov.ie',
         username: 'browse-test-user',
+      })
+    );
+    expect(mockEnsureUserRecord).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.not.objectContaining({
+        plan: expect.anything(),
+        isPro: expect.anything(),
       })
     );
     expect(mockEnsureCreatorProfileRecord).toHaveBeenCalledWith(
@@ -166,6 +190,14 @@ describe('dev-test-auth.server', () => {
       expect.objectContaining({
         email: 'browse-ready+clerk_test@jov.ie',
         username: 'browse-ready-user',
+      })
+    );
+    expect(mockEnsureUserRecord).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        plan: 'pro',
+        isPro: true,
+        billingUpdatedAt: expect.any(Date),
       })
     );
     expect(mockEnsureCreatorProfileRecord).toHaveBeenCalledWith(

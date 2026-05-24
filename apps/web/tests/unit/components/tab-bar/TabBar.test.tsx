@@ -53,7 +53,7 @@ vi.mock('@jovie/ui', () => ({
   useTabOverflow: ({
     options,
   }: {
-    readonly options: readonly Array<{ value: string; label: ReactNode }>;
+    readonly options: ReadonlyArray<{ value: string; label: ReactNode }>;
   }) => ({
     containerRef: { current: null },
     moreButtonRef: { current: null },

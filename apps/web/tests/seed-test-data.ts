@@ -216,6 +216,7 @@ export function isRetryableSeedDatabaseError(error: unknown): boolean {
     message.includes('requested endpoint could not be found') ||
     message.includes("you don't have access to it") ||
     message.includes('connection terminated unexpectedly') ||
+    message.includes('connection closed') ||
     message.includes('server closed the connection unexpectedly') ||
     message.includes('the database system is starting up') ||
     message.includes('fetch failed') ||
@@ -286,6 +287,7 @@ type SeededReleaseValues = Pick<
   | 'slug'
   | 'releaseType'
   | 'releaseDate'
+  | 'revealDate'
   | 'artworkUrl'
   | 'totalTracks'
   | 'upc'
@@ -364,6 +366,7 @@ interface TestRelease {
   slug: string;
   releaseType: 'single' | 'album' | 'ep' | 'compilation';
   releaseDate: Date;
+  revealDate?: Date | null;
   artworkUrl: string;
   spotifyUrl: string;
   totalTracks: number;
@@ -868,6 +871,7 @@ const TEST_RELEASES: TestRelease[] = [
     slug: 'future-glow',
     releaseType: 'single',
     releaseDate: getFutureReleaseDate(),
+    revealDate: new Date('2024-01-01T00:00:00.000Z'),
     artworkUrl: DEFAULT_TEST_RELEASE_ARTWORK_URL,
     spotifyUrl: 'https://open.spotify.com/album/2BB4d3cOWNNsVw41Gqt2aa',
     totalTracks: 1,
@@ -926,28 +930,30 @@ async function seedReleasesForProfile(
   }
 
   for (const release of TEST_RELEASES) {
-    let releaseId = existingBySlug.get(release.slug);
+    const existingReleaseId = existingBySlug.get(release.slug);
+    const releaseValues = {
+      creatorProfileId: profileId,
+      title: release.title,
+      slug: release.slug,
+      releaseType: release.releaseType,
+      releaseDate: release.releaseDate,
+      revealDate: release.revealDate ?? null,
+      artworkUrl: release.artworkUrl,
+      totalTracks: release.totalTracks,
+      upc: release.upc,
+      label: release.label,
+      sourceType: 'manual' as const,
+    } satisfies SeededReleaseValues;
 
-    // Create release if it doesn't exist
-    if (!releaseId) {
-      releaseId = await ensureRelease({
-        creatorProfileId: profileId,
-        title: release.title,
-        slug: release.slug,
-        releaseType: release.releaseType,
-        releaseDate: release.releaseDate,
-        artworkUrl: release.artworkUrl,
-        totalTracks: release.totalTracks,
-        upc: release.upc,
-        label: release.label,
-        sourceType: 'manual',
-      });
+    const releaseId = await ensureRelease(releaseValues);
+
+    if (!existingReleaseId) {
       console.log(
         `    ✓ Created release: ${release.title} (${release.releaseType}, ${release.totalTracks} tracks)`
       );
       existingBySlug.set(release.slug, releaseId);
     } else {
-      console.log(`    ✓ Release exists: ${release.title}`);
+      console.log(`    ✓ Ensured release: ${release.title}`);
     }
 
     // Add Spotify provider link with upsert behavior (onConflictDoNothing)
@@ -997,7 +1003,13 @@ async function seedReleasesForProfile(
 
     // Seed tracks if provided
     if (release.tracks && release.tracks.length > 0) {
-      await seedTracksForRelease(db, releaseId, profileId, release.tracks);
+      await seedTracksForRelease(
+        db,
+        releaseId,
+        profileId,
+        release.tracks,
+        release.spotifyUrl
+      );
     }
 
     console.log(`    ✓ Ensured Spotify link for ${release.title}`);
@@ -1049,7 +1061,8 @@ async function seedTracksForRelease(
   db: ReturnType<typeof drizzle>,
   releaseId: string,
   profileId: string,
-  tracks: TestTrack[]
+  tracks: TestTrack[],
+  releaseSpotifyUrl: string
 ) {
   const trackValues = tracks.map(track => ({
     releaseId,
@@ -1065,6 +1078,31 @@ async function seedTracksForRelease(
   }));
 
   await db.insert(discogTracks).values(trackValues).onConflictDoNothing();
+
+  const seededTracks = await db
+    .select({ id: discogTracks.id, slug: discogTracks.slug })
+    .from(discogTracks)
+    .where(eq(discogTracks.releaseId, releaseId));
+  const expectedTrackSlugs = new Set(tracks.map(track => track.slug));
+
+  for (const track of seededTracks) {
+    if (!expectedTrackSlugs.has(track.slug)) {
+      continue;
+    }
+
+    await db
+      .insert(providerLinks)
+      .values({
+        providerId: 'spotify',
+        ownerType: 'track',
+        trackId: track.id,
+        url: `${releaseSpotifyUrl}?track=${encodeURIComponent(track.slug)}`,
+        isPrimary: true,
+        sourceType: 'manual',
+      })
+      .onConflictDoNothing();
+  }
+
   console.log(`      ✓ Ensured ${tracks.length} tracks`);
 }
 
@@ -1082,8 +1120,8 @@ export async function seedTestData(options: SeedTestDataOptions = {}) {
   const sql = neon(databaseUrl);
   const db = drizzle(sql, { schema });
   const seedRetryOptions = {
-    attempts: process.env.CI ? 4 : 2,
-    initialDelayMs: 1_500,
+    attempts: process.env.CI ? 6 : 2,
+    initialDelayMs: process.env.CI ? 2_000 : 1_500,
     label: 'E2E seed database access',
   } as const;
 

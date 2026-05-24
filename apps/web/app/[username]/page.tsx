@@ -1,17 +1,16 @@
 import { type Metadata } from 'next';
 import { notFound } from 'next/navigation';
 
-export const dynamic = 'force-dynamic';
+// No `export const dynamic` here — the parent layout sets `revalidate: 3600`
+// (ISR). The public profile route must stay ISR-cacheable; avoid any Dynamic
+// API (cookies(), headers()) in this RSC tree.
 
 import type { PublicRelease } from '@/components/features/profile/releases/types';
 import { BASE_URL } from '@/constants/app';
 import { ErrorBanner } from '@/features/feedback/ErrorBanner';
 import { DesktopQrOverlayClient } from '@/features/profile/DesktopQrOverlayClient';
 import { ProfileViewTracker } from '@/features/profile/ProfileViewTracker';
-import {
-  getProfileMode,
-  getProfileModeDefinition,
-} from '@/features/profile/registry';
+import { getProfileModeDefinition } from '@/features/profile/registry';
 import { StaticArtistPage } from '@/features/profile/StaticArtistPage';
 import { JoviePixel } from '@/features/tracking/JoviePixel';
 import { getClientTrackingToken } from '@/lib/analytics/tracking-token';
@@ -24,11 +23,16 @@ import {
   buildListenActions,
 } from '@/lib/constants/schemas';
 import { toPublicContacts } from '@/lib/contacts/mapper';
-// eslint-disable-next-line no-restricted-imports -- Schema barrel import needed for types
-import type { DiscogRelease } from '@/lib/db/schema';
 import { getReleasesForProfileLite } from '@/lib/discography/queries';
 import { captureError } from '@/lib/error-tracking';
+// ISR-safe: profile-variant.ts does NOT import cookies() — no dynamic opt-in
+import { getProfileAlertOptInVariant } from '@/lib/flags/profile-variant';
 import { getConfirmedFeaturedPlaylistFallback } from '@/lib/profile/featured-playlist-fallback';
+import {
+  buildPublicProfileMetadata,
+  PROFILE_ERROR_METADATA,
+  PROFILE_NOT_FOUND_METADATA,
+} from '@/lib/profile/metadata';
 import { isShopEnabled } from '@/lib/profile/shop-settings';
 import { getUpcomingTourDatesForProfile } from '@/lib/tour-dates/queries';
 import type { TourDateViewModel } from '@/lib/tour-dates/types';
@@ -268,9 +272,6 @@ interface Props {
   readonly params: Promise<{
     readonly username: string;
   }>;
-  readonly searchParams?: Promise<{
-    readonly mode?: string | string[];
-  }>;
 }
 
 async function getPublicTourDates(
@@ -311,17 +312,9 @@ async function getPublicReleases(
   }
 }
 
-export default async function ArtistPage({
-  params,
-  searchParams,
-}: Readonly<Props>) {
+export default async function ArtistPage({ params }: Readonly<Props>) {
   const { username } = await params;
-  const resolvedSearchParams = await searchParams;
-  const requestedMode = getProfileMode(
-    Array.isArray(resolvedSearchParams?.mode)
-      ? resolvedSearchParams?.mode[0]
-      : resolvedSearchParams?.mode
-  );
+  const initialMode = 'profile';
 
   // Early reject obviously invalid usernames before hitting the database
   if (
@@ -334,6 +327,13 @@ export default async function ArtistPage({
 
   const isPublicNoAuthSmoke = process.env.PUBLIC_NOAUTH_SMOKE === '1';
   const viewerCountryCode = null;
+
+  // IMPORTANT: Do NOT read cookies() here — it would opt this ISR route into
+  // dynamic rendering, defeating the revalidate: 3600 set in layout.tsx.
+  // The jv_aid cookie is set by middleware on every request (analytics still
+  // work). The alertOptInVariant defaults to 'button' for ISR; ProfileCompactTemplate
+  // renders AnonCookieBootstrap which resolves the per-user variant client-side
+  // via /api/profile/audience-anon-cookie and updates its own state.
 
   const profileResult = await getProfileAndLinks(username);
   const {
@@ -407,8 +407,8 @@ export default async function ArtistPage({
     artist.name
   );
   const showPayButton = links.some(link => link.platform === 'venmo');
-  const showBackButton = requestedMode !== 'profile';
-  const subtitle = getProfileModeDefinition(requestedMode).subtitle;
+  const showBackButton = false;
+  const subtitle = getProfileModeDefinition(initialMode).subtitle;
 
   // Read profile photo download settings
   const profileSettings =
@@ -424,9 +424,13 @@ export default async function ArtistPage({
 
   // Await tour dates + releases (started above, non-blocking — errors logged then resolve to empty)
   // Sort server-side so the client doesn't need a useMemo sort
-  const [tourDatesRaw, allReleases] = await Promise.all([
+  const [tourDatesRaw, allReleases, alertOptInVariant] = await Promise.all([
     tourDatesPromise.catch(() => [] as TourDateViewModel[]),
     releasesPromise,
+    // stableId is null for ISR renders — returns the default 'button' variant.
+    // AnonCookieBootstrap resolves the per-user variant on the client side.
+    // .catch ensures a Statsig outage doesn't fail the whole ISR page render.
+    getProfileAlertOptInVariant(null).catch(() => 'button' as const),
   ]);
   const tourDates = [...tourDatesRaw].sort(
     (a, b) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime()
@@ -471,7 +475,7 @@ export default async function ArtistPage({
       {/* Server-side pixel tracking */}
       {isPublicNoAuthSmoke ? null : <JoviePixel profileId={profile.id} />}
       <StaticArtistPage
-        mode={requestedMode}
+        mode={initialMode}
         artist={artist}
         socialLinks={links}
         viewerCountryCode={viewerCountryCode}
@@ -486,6 +490,7 @@ export default async function ArtistPage({
         allowPhotoDownloads={allowPhotoDownloads}
         pressPhotos={pressPhotos}
         subscribeTwoStep
+        alertOptInVariant={alertOptInVariant}
         genres={genres}
         tourDates={tourDates}
         visitTrackingToken={visitTrackingToken}
@@ -504,126 +509,22 @@ export default async function ArtistPage({
   );
 }
 
-const PROFILE_NOT_FOUND_METADATA: Metadata = {
-  title: 'Profile Not Found',
-  description: 'The requested profile could not be found.',
-};
-
-function buildProfileDescription(
-  profile: CreatorProfile,
-  artistName: string,
-  genres: string[] | null
-): string {
-  const locationPrefix = profile.location ? `${profile.location}-based ` : '';
-  const genreText =
-    genres && genres.length > 0 ? `${genres.slice(0, 3).join(', ')} ` : '';
-  const bioSnippet = profile.bio
-    ? profile.bio.slice(0, 155).trim()
-    : `Discover ${artistName}'s music`;
-
-  if (profile.bio) {
-    const suffix = profile.bio.length > 155 ? '...' : '';
-    const genreSuffix =
-      genres && genres.length > 0
-        ? `. ${genres.slice(0, 3).join(', ')} artist`
-        : '';
-    return `${bioSnippet}${suffix}${genreSuffix}. Stream on Spotify, Apple Music & more on Jovie.`;
-  }
-
-  const descriptor = `${locationPrefix}${genreText}`.trim();
-  return descriptor
-    ? `${descriptor} artist. Stream ${artistName}'s music on Spotify, Apple Music & more on Jovie.`
-    : `Stream ${artistName}'s music on Spotify, Apple Music & more on Jovie.`;
-}
-
-function buildProfileMetadata(
-  profile: CreatorProfile,
-  genres: string[] | null,
-  latestRelease?: DiscogRelease | null
-): Metadata {
-  const artistName = profile.display_name || profile.username;
-  const normalizedUsername =
-    profile.username_normalized || profile.username.toLowerCase();
-  const profileUrl = `${BASE_URL}/${normalizedUsername}`;
-  const title = artistName;
-  const socialTitle = `${artistName} | Jovie`;
-  const description = buildProfileDescription(profile, artistName, genres);
-
-  const baseKeywords = [
-    artistName,
-    `${artistName} music`,
-    `${artistName} songs`,
-    `${artistName} artist`,
-    'music artist',
-    'streaming links',
-    'spotify',
-    'apple music',
-  ];
-  const genreKeywords = genres?.slice(0, 5) ?? [];
-  const keywords = [...baseKeywords, ...genreKeywords];
-
-  return {
-    title,
-    description,
-    keywords,
-    authors: [{ name: artistName }],
-    creator: artistName,
-    metadataBase: new URL(BASE_URL),
-    alternates: {
-      canonical: profileUrl,
-    },
-    robots: {
-      index: true,
-      follow: true,
-      googleBot: {
-        index: true,
-        follow: true,
-        'max-video-preview': -1,
-        'max-image-preview': 'large',
-        'max-snippet': -1,
-      },
-    },
-    openGraph: {
-      type: 'profile',
-      title: socialTitle,
-      description,
-      url: profileUrl,
-      siteName: 'Jovie',
-      locale: 'en_US',
-    },
-    twitter: {
-      card: 'summary_large_image',
-      title: socialTitle,
-      description,
-      creator: '@jovieapp',
-      site: '@jovieapp',
-    },
-    other: {
-      // Note: OG-namespace tags (music:*, profile:*) require property= semantics
-      // which metadata.other cannot provide (it renders name=). These signals are
-      // covered by JSON-LD structured data instead. Only non-OG tags go here.
-      ...(profile.is_verified && { 'profile:verified': 'true' }),
-      ...(profile.location && { 'geo.placename': profile.location }),
-    },
-  };
-}
-
-// Generate metadata for the page with comprehensive SEO
+// Generate metadata for the page with comprehensive SEO.
+// Delegates to the shared builder in lib/profile/metadata.ts so that the
+// canonical profile metadata shape is defined in one place and consumed by
+// every public-profile route.
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { username } = await params;
   const profileResult = await getProfileAndLinks(username);
-  const { profile, genres, latestRelease, status } = profileResult;
+  const { profile, genres, status } = profileResult;
 
   if (status === 'error') {
-    return {
-      title: 'Profile temporarily unavailable',
-      description: 'We are working to restore this profile. Please try again.',
-    };
+    return PROFILE_ERROR_METADATA;
   }
 
   if (!profile) {
     return PROFILE_NOT_FOUND_METADATA;
   }
 
-  return buildProfileMetadata(profile, genres, latestRelease);
+  return buildPublicProfileMetadata({ profile, genres });
 }

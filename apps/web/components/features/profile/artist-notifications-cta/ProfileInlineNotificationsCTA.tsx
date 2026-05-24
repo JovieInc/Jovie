@@ -5,6 +5,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useProfileNotifications } from '@/components/organisms/profile-shell/ProfileNotificationsContext';
 import { useUserSafe } from '@/hooks/useClerkSafe';
 import { track } from '@/lib/analytics';
+import type { ProfileAlertOptInVariant } from '@/lib/flags/contracts';
 import { readArtistEmailReadyFromSettings } from '@/lib/notifications/artist-email';
 import { normalizeSubscriptionEmail } from '@/lib/notifications/validation';
 import { readProfileAccentTheme } from '@/lib/profile/profile-theme';
@@ -25,7 +26,12 @@ import {
   subscriptionPrimaryActionClassName,
   subscriptionPrimaryLinkClassName,
 } from './shared';
-import type { NotificationSource } from './types';
+import {
+  buildNotificationSourceContext,
+  type NotificationSource,
+  type NotificationSourceContext,
+  resolveNotificationSource,
+} from './types';
 import { useSubscriptionForm } from './useSubscriptionForm';
 
 type FlowOrigin = 'manage' | 'subscribe';
@@ -42,6 +48,9 @@ export interface ProfileInlineNotificationsCTAProps {
   readonly onFlowClosed?: () => void;
   readonly onSubscriptionActivated?: () => void;
   readonly source?: NotificationSource;
+  readonly sourceContext?: NotificationSourceContext;
+  readonly triggerLabel?: string;
+  readonly experimentVariant?: ProfileAlertOptInVariant;
 }
 
 const DEFAULT_ALERT_PREFS: Record<NotificationContentType, boolean> = {
@@ -134,6 +143,9 @@ export function ProfileInlineNotificationsCTA({
   onFlowClosed,
   onSubscriptionActivated,
   source,
+  sourceContext,
+  triggerLabel: triggerLabelProp,
+  experimentVariant,
 }: ProfileInlineNotificationsCTAProps) {
   const { contentPreferences, artistEmail, subscriptionDetails } =
     useProfileNotifications();
@@ -155,7 +167,12 @@ export function ProfileInlineNotificationsCTA({
     subscribedChannels,
     openSubscription,
     hydrationStatus,
-  } = useSubscriptionForm({ artist, source });
+  } = useSubscriptionForm({
+    artist,
+    source,
+    sourceContext,
+    experimentVariant,
+  });
   const { user } = useUserSafe();
   const nameMutation = useUpdateSubscriberNameMutation();
   const birthdayMutation = useUpdateSubscriberBirthdayMutation();
@@ -176,12 +193,28 @@ export function ProfileInlineNotificationsCTA({
   const [nameInput, setNameInput] = useState('');
   const [birthdayInput, setBirthdayInput] = useState('');
   const [birthdayHintShown, setBirthdayHintShown] = useState(false);
-  const [alertPrefs, setAlertPrefs] = useState(DEFAULT_ALERT_PREFS);
-  const [artistEmailOptIn, setArtistEmailOptIn] = useState(false);
+  const [alertPrefs, setAlertPrefs] = useState<
+    Record<NotificationContentType, boolean>
+  >(() => {
+    // Seed from server preferences when the user is already subscribed at mount,
+    // so all three entry points (inline CTA, notifications drawer, subscribe
+    // drawer) start from the same canonical state rather than DEFAULT_ALERT_PREFS.
+    if (isSubscribed && contentPreferences) {
+      return { ...DEFAULT_ALERT_PREFS, ...contentPreferences };
+    }
+    return DEFAULT_ALERT_PREFS;
+  });
+  const [artistEmailOptIn, setArtistEmailOptIn] = useState(() =>
+    isSubscribed ? (artistEmail?.optedIn ?? false) : false
+  );
   const [canEditPreferences, setCanEditPreferences] = useState(isSubscribed);
   const subscribedEmailRef = useRef('');
   const hasAutoOpenedRef = useRef(false);
   const activatedInCurrentFlowRef = useRef(false);
+  const otpVerificationInFlightRef = useRef(false);
+  const previousOtpLengthRef = useRef(otpCode.length);
+  const pendingCompletedOtpRef = useRef<string | null>(null);
+  const autoSubmittedOtpRef = useRef<string | null>(null);
 
   const isInline = presentation === 'inline';
   const artistEmailReady = readArtistEmailReadyFromSettings(artist.settings);
@@ -199,6 +232,31 @@ export function ProfileInlineNotificationsCTA({
   const flowChannel = isSmsOnlyManageFlow ? 'sms' : 'email';
   const showArtistEmailSection = flowChannel === 'email';
   const primaryUserEmail = user?.primaryEmailAddress?.emailAddress ?? '';
+  const resolvedSource = resolveNotificationSource(source, sourceContext);
+  const analyticsBase = useMemo(
+    () =>
+      buildNotificationSourceContext(artist, {
+        artistId: sourceContext?.artistId,
+        profileId: sourceContext?.profileId,
+        profileSlug: sourceContext?.profileSlug,
+        currentTab: sourceContext?.currentTab ?? 'home',
+        ctaLocation: resolvedSource,
+        intent: sourceContext?.intent ?? 'general_alerts',
+        releaseId: sourceContext?.releaseId,
+        eventId: sourceContext?.eventId,
+      }),
+    [
+      artist,
+      resolvedSource,
+      sourceContext?.artistId,
+      sourceContext?.currentTab,
+      sourceContext?.eventId,
+      sourceContext?.intent,
+      sourceContext?.profileId,
+      sourceContext?.profileSlug,
+      sourceContext?.releaseId,
+    ]
+  );
 
   const markSubscriptionActivated = useCallback(() => {
     activatedInCurrentFlowRef.current = true;
@@ -243,20 +301,35 @@ export function ProfileInlineNotificationsCTA({
     }
 
     setIsFlowOpen(true);
+    track('alert_cta_click', {
+      ...analyticsBase,
+      source: resolvedSource,
+      alert_opt_in_variant: experimentVariant,
+      flow_origin: isSubscribed ? 'manage' : 'subscribe',
+    });
+    track('alert_signup_start', {
+      ...analyticsBase,
+      source: resolvedSource,
+      alert_opt_in_variant: experimentVariant,
+      flow_origin: isSubscribed ? 'manage' : 'subscribe',
+    });
     track('subscribe_step_reveal', {
       handle: artist.handle,
-      source: source ?? 'profile_inline',
+      source: resolvedSource,
+      alert_opt_in_variant: experimentVariant,
     });
   }, [
+    analyticsBase,
     artist.handle,
     emailInput,
+    experimentVariant,
     handleChannelChange,
     handleEmailChange,
     isSubscribed,
     onManageNotifications,
     openSubscription,
     primaryUserEmail,
-    source,
+    resolvedSource,
     syncPreferencesFromStatus,
   ]);
 
@@ -289,15 +362,31 @@ export function ProfileInlineNotificationsCTA({
       !(isInline || autoOpen) ||
       !isFlowOpen ||
       !isSubscribed ||
-      activatedInCurrentFlowRef.current
+      activatedInCurrentFlowRef.current ||
+      (flowOrigin === 'subscribe' &&
+        (step === 'otp' ||
+          step === 'name' ||
+          step === 'birthday' ||
+          step === 'done'))
     ) {
       return;
     }
 
+    // Sync server preferences before transitioning to manage mode so that the
+    // preferences step shows the actual saved values, not DEFAULT_ALERT_PREFS.
+    syncPreferencesFromStatus();
     setFlowOrigin('manage');
     setCanEditPreferences(true);
     setStep('preferences');
-  }, [autoOpen, isFlowOpen, isInline, isSubscribed]);
+  }, [
+    autoOpen,
+    flowOrigin,
+    isFlowOpen,
+    isInline,
+    isSubscribed,
+    step,
+    syncPreferencesFromStatus,
+  ]);
 
   const activeEmail = useMemo(
     () =>
@@ -375,7 +464,12 @@ export function ProfileInlineNotificationsCTA({
   ]);
 
   const handleOtpSubmit = useCallback(async () => {
-    const result = await handleVerifyOtp();
+    if (otpVerificationInFlightRef.current) return;
+    otpVerificationInFlightRef.current = true;
+
+    const result = await handleVerifyOtp().finally(() => {
+      otpVerificationInFlightRef.current = false;
+    });
     if (result !== 'subscribed') return;
 
     subscribedEmailRef.current =
@@ -393,7 +487,12 @@ export function ProfileInlineNotificationsCTA({
     async (value: string) => {
       handleOtpChange(value);
       if (value.length !== 6) return;
-      const result = await handleVerifyOtp(value);
+      if (otpVerificationInFlightRef.current) return;
+      otpVerificationInFlightRef.current = true;
+
+      const result = await handleVerifyOtp(value).finally(() => {
+        otpVerificationInFlightRef.current = false;
+      });
       if (result !== 'subscribed') return;
 
       subscribedEmailRef.current =
@@ -412,28 +511,61 @@ export function ProfileInlineNotificationsCTA({
     ]
   );
 
-  const handleNameSubmit = useCallback(async () => {
-    const trimmed = nameInput.trim();
-    if (!trimmed || !activeEmail) {
-      setStep('birthday');
+  useEffect(() => {
+    const previousOtpLength = previousOtpLengthRef.current;
+    previousOtpLengthRef.current = otpCode.length;
+
+    if (step !== 'otp') {
+      pendingCompletedOtpRef.current = null;
       return;
     }
 
-    try {
-      await nameMutation.mutateAsync({
+    if (otpCode.length < 6) {
+      pendingCompletedOtpRef.current = null;
+      autoSubmittedOtpRef.current = null;
+      return;
+    }
+
+    if (previousOtpLength < 6) {
+      pendingCompletedOtpRef.current = otpCode;
+    }
+
+    if (pendingCompletedOtpRef.current !== otpCode) {
+      return;
+    }
+
+    if (autoSubmittedOtpRef.current === otpCode) {
+      return;
+    }
+
+    if (isSubmitting || otpVerificationInFlightRef.current) {
+      return;
+    }
+
+    pendingCompletedOtpRef.current = null;
+    autoSubmittedOtpRef.current = otpCode;
+    handleOtpSubmit().catch(() => {});
+  }, [handleOtpSubmit, isSubmitting, otpCode, step]);
+
+  const handleNameSubmit = useCallback(() => {
+    const trimmed = nameInput.trim();
+    setStep('birthday');
+
+    if (!trimmed || !activeEmail) {
+      return;
+    }
+
+    nameMutation
+      .mutateAsync({
         artistId: artist.id,
         email: activeEmail,
         name: trimmed,
-      });
-    } catch {
-      // Best-effort, do not block the flow on profile enrichment.
-    }
-
-    setStep('birthday');
+      })
+      .catch(() => {});
   }, [activeEmail, artist.id, nameInput, nameMutation]);
 
   const handleBirthdaySubmit = useCallback(
-    async (overrideDigits?: string) => {
+    (overrideDigits?: string) => {
       const digits = (overrideDigits ?? birthdayInput).replaceAll(/[^\d]/g, '');
 
       if (digits.length < 8) {
@@ -454,15 +586,17 @@ export function ProfileInlineNotificationsCTA({
       }
 
       if (activeEmail) {
-        try {
-          await birthdayMutation.mutateAsync({
+        setCanEditPreferences(true);
+        setStep('done');
+
+        birthdayMutation
+          .mutateAsync({
             artistId: artist.id,
             email: activeEmail,
             birthday: birthdayDigitsToStorage(digits),
-          });
-        } catch {
-          // Best-effort, do not block the flow on profile enrichment.
-        }
+          })
+          .catch(() => {});
+        return;
       }
 
       setCanEditPreferences(true);
@@ -528,16 +662,30 @@ export function ProfileInlineNotificationsCTA({
       }
     }
 
+    const selectedAlertToggles = Object.entries(alertPrefs)
+      .filter(([, enabled]) => enabled)
+      .map(([key]) => key);
+
+    track('alert_signup_complete', {
+      ...analyticsBase,
+      source: resolvedSource,
+      alert_opt_in_variant: experimentVariant,
+      selected_alert_toggles: selectedAlertToggles,
+      artist_email_opt_in: artistEmailOptIn,
+      signup_completion_result: 'success',
+    });
+
     setStep('done');
   }, [
     activeEmail,
-    alertPrefs.merch,
-    alertPrefs.newMusic,
-    alertPrefs.tourDates,
+    alertPrefs,
+    analyticsBase,
     artist.id,
     artistEmailOptIn,
     canEditPreferences,
+    experimentVariant,
     prefsMutation,
+    resolvedSource,
     showArtistEmailSection,
     subscriptionDetails.sms,
   ]);
@@ -557,7 +705,9 @@ export function ProfileInlineNotificationsCTA({
     return null;
   }
 
-  const triggerLabel = isSubscribed ? 'Manage Alerts' : 'Turn on alerts';
+  const triggerLabel = isSubscribed
+    ? 'Manage alerts'
+    : (triggerLabelProp ?? 'Get alerts');
   const triggerClassName = getTriggerClassName(variant);
   const trigger =
     isInline || hideTrigger ? null : (

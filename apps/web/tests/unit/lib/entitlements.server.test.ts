@@ -80,6 +80,8 @@ describe('getCurrentUserEntitlements', () => {
       canAccessWhiteLabel: false,
       canAccessAbTesting: false,
       aiPitchGenPerRelease: 1,
+      canAccessAiRetouching: false,
+      aiRetouchDailyLimit: null,
     });
   });
 
@@ -102,7 +104,10 @@ describe('getCurrentUserEntitlements', () => {
   });
 
   it('billing failure preserves admin status in degraded result', async () => {
-    mockCachedAuth.mockResolvedValue({ userId: 'user_admin' });
+    mockCachedAuth.mockResolvedValue({
+      userId: 'user_admin',
+      has: vi.fn().mockReturnValue(true),
+    });
     mockCachedCurrentUser.mockResolvedValue({
       primaryEmailAddress: { emailAddress: 'admin@example.com' },
     });
@@ -225,6 +230,8 @@ describe('getCurrentUserEntitlements', () => {
       canAccessWhiteLabel: false,
       canAccessAbTesting: false,
       aiPitchGenPerRelease: 1,
+      canAccessAiRetouching: false,
+      aiRetouchDailyLimit: null,
     });
   });
 
@@ -291,6 +298,8 @@ describe('getCurrentUserEntitlements', () => {
       smartLinksLimit: null,
       aiDailyMessageLimit: 100,
       aiPitchGenPerRelease: 5,
+      canAccessAiRetouching: true,
+      aiRetouchDailyLimit: 10,
     });
   });
 
@@ -357,11 +366,55 @@ describe('getCurrentUserEntitlements', () => {
       smartLinksLimit: null,
       aiDailyMessageLimit: 500,
       aiPitchGenPerRelease: null,
+      canAccessAiRetouching: true,
+      aiRetouchDailyLimit: 50,
     });
   });
 
+  it('maps billing data for a trialing user (plan transition + trial days calc)', async () => {
+    // Use a generous window so tiny execution delay doesn't flip the floor day count
+    const trialEnd = new Date(Date.now() + 1000 * 60 * 60 * 24 * 10 + 3600_000); // ~10.04 days
+    const now = new Date();
+    const expectedDays = Math.max(
+      0,
+      Math.floor((trialEnd.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
+    );
+    mockCachedAuth.mockResolvedValue({ userId: 'user_trial' });
+    mockCachedCurrentUser.mockResolvedValue({
+      primaryEmailAddress: { emailAddress: 'trial@example.com' },
+    });
+    mockIsAdmin.mockResolvedValue(false);
+    mockGetUserBillingInfo.mockResolvedValue({
+      success: true,
+      data: {
+        userId: 'db_user_id',
+        email: 'trial@example.com',
+        isAdmin: false,
+        isPro: false, // trials have isPro=false in DB but get pro entitlements
+        plan: 'trial',
+        stripeCustomerId: null,
+        stripeSubscriptionId: null,
+        trialEndsAt: trialEnd,
+      },
+    });
+
+    const entitlements = await getCurrentUserEntitlements();
+
+    expect(entitlements.plan).toBe('trial');
+    expect(entitlements.isTrialing).toBe(true);
+    expect(entitlements.trialEndsAt).toBe(trialEnd.toISOString());
+    expect(entitlements.trialDaysRemaining).toBe(expectedDays);
+    expect(entitlements.isPro).toBe(true); // via isProPlan('trial')
+    expect(entitlements.canAccessTasksWorkspace).toBe(true); // trial gets pro booleans
+    expect(entitlements.aiDailyMessageLimit).toBe(25); // trial-specific limit (not pro's 100)
+    expect(entitlements.contactsLimit).toBe(250); // trial-specific
+  });
+
   it('admin status is fetched independently of billing', async () => {
-    mockCachedAuth.mockResolvedValue({ userId: 'user_admin' });
+    mockCachedAuth.mockResolvedValue({
+      userId: 'user_admin',
+      has: vi.fn().mockReturnValue(true),
+    });
     mockCachedCurrentUser.mockResolvedValue({
       primaryEmailAddress: { emailAddress: 'admin@example.com' },
     });
@@ -383,6 +436,33 @@ describe('getCurrentUserEntitlements', () => {
 
     // isAdmin comes from the role check (Redis), not from billing DB
     expect(entitlements.isAdmin).toBe(true);
+  });
+
+  it('does not treat an admin role as admin without fresh MFA reverification', async () => {
+    mockCachedAuth.mockResolvedValue({
+      userId: 'user_admin',
+      has: vi.fn().mockReturnValue(false),
+    });
+    mockCachedCurrentUser.mockResolvedValue({
+      primaryEmailAddress: { emailAddress: 'admin@example.com' },
+    });
+    mockIsAdmin.mockResolvedValue(true);
+    mockGetUserBillingInfo.mockResolvedValue({
+      success: true,
+      data: {
+        userId: 'db_user_id',
+        email: 'admin@example.com',
+        isAdmin: false,
+        isPro: false,
+        plan: 'free',
+        stripeCustomerId: null,
+        stripeSubscriptionId: null,
+      },
+    });
+
+    const entitlements = await getCurrentUserEntitlements();
+
+    expect(entitlements.isAdmin).toBe(false);
   });
 
   it('defaults to pro plan when isPro=true but dbPlan is null', async () => {
@@ -497,7 +577,10 @@ describe('getCurrentUserEntitlements', () => {
   });
 
   it('admin who is also a pro subscriber gets both flags', async () => {
-    mockCachedAuth.mockResolvedValue({ userId: 'user_admin_pro' });
+    mockCachedAuth.mockResolvedValue({
+      userId: 'user_admin_pro',
+      has: vi.fn().mockReturnValue(true),
+    });
     mockCachedCurrentUser.mockResolvedValue({
       primaryEmailAddress: { emailAddress: 'adminpro@example.com' },
     });

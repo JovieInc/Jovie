@@ -4,6 +4,29 @@
  * These flags must remain build-time constants so homepage and marketing routes
  * stay fully static.
  */
+const IS_VERCEL_PRODUCTION = process.env.VERCEL_ENV === 'production';
+const SHOW_FORGEUI_MARKETING_UPDATES =
+  process.env.NEXT_PUBLIC_SHOW_FORGEUI_MARKETING_UPDATES === 'true' ||
+  !IS_VERCEL_PRODUCTION;
+const SHOW_HOME_REFRESH_2026 =
+  process.env.NEXT_PUBLIC_SHOW_HOME_REFRESH_2026 === 'true';
+const SHOW_MARKETING_CENTER_NAV =
+  process.env.NEXT_PUBLIC_SHOW_MARKETING_CENTER_NAV === 'true' ||
+  process.env.NEXT_PUBLIC_SHOW_HOMEPAGE_CENTER_NAV === 'true';
+const SHOW_HOMEPAGE_CENTER_NAV =
+  process.env.NEXT_PUBLIC_SHOW_HOMEPAGE_CENTER_NAV === 'true' ||
+  SHOW_MARKETING_CENTER_NAV;
+const SHOW_MARKETING_FULL_FOOTER =
+  process.env.NEXT_PUBLIC_SHOW_MARKETING_FULL_FOOTER === 'true';
+const HOMEPAGE_UNLOCKED_SECTIONS_SETTING =
+  process.env.NEXT_PUBLIC_SHOW_HOMEPAGE_UNLOCKED_SECTIONS;
+const SHOW_HOMEPAGE_UNLOCKED_SECTIONS =
+  HOMEPAGE_UNLOCKED_SECTIONS_SETTING !== 'false';
+const SHOW_HOMEPAGE_FRIDAY_RHYTHM =
+  process.env.NEXT_PUBLIC_SHOW_HOMEPAGE_FRIDAY_RHYTHM === 'true';
+const SHOW_HOMEPAGE_AI_COMPOSER_SECTION =
+  process.env.NEXT_PUBLIC_SHOW_HOMEPAGE_AI_COMPOSER_SECTION === 'true';
+
 export const FEATURE_FLAGS = {
   SHOW_EXAMPLE_PROFILES_CAROUSEL: false,
   SHOW_SEE_IT_IN_ACTION: false,
@@ -19,10 +42,31 @@ export const FEATURE_FLAGS = {
   SHOW_HOMEPAGE_V2_SPOTLIGHT: true,
   SHOW_HOMEPAGE_V2_CAPTURE_REACTIVATE: true,
   SHOW_HOMEPAGE_V2_POWER_GRID: false,
-  SHOW_HOMEPAGE_V2_PRICING: true,
+  SHOW_HOMEPAGE_V2_PRICING: false,
   SHOW_HOMEPAGE_V2_FINAL_CTA: true,
+  // "What Jovie finds" 3-card section. Off for prelaunch until the
+  // opportunity-type cards land harder.
+  SHOW_HOMEPAGE_GO_LIVE_SECTION: false,
+  // FAQ section. Off for prelaunch — answers will firm up post-waitlist
+  // when we know what people actually ask.
+  SHOW_HOMEPAGE_FAQ: false,
+  // Prelaunch waitlist gate. When true, public-front-door CTAs on the
+  // marketing homepage render as "Request access" (waitlisting everyone who
+  // comes in). When false, they revert to "Claim your free profile". The
+  // server-side waitlist gate (`isWaitlistGateEnabled`) handles routing once
+  // a user hits /signup; this flag only controls marketing copy. Flip to
+  // false to open the doors.
+  WAITLIST_ENABLED: true,
   SHOW_HOMEPAGE_V2_FOOTER_LINKS: false,
   SHOW_ARTIST_PROFILE_PAY_FLOW_VIDEO: true,
+  SHOW_FORGEUI_MARKETING_UPDATES,
+  SHOW_HOMEPAGE_AI_COMPOSER_SECTION,
+  SHOW_HOMEPAGE_CENTER_NAV,
+  SHOW_HOMEPAGE_FRIDAY_RHYTHM,
+  SHOW_HOMEPAGE_UNLOCKED_SECTIONS,
+  SHOW_HOME_REFRESH_2026,
+  SHOW_MARKETING_FULL_FOOTER,
+  SHOW_MARKETING_CENTER_NAV,
   SHOW_HOME_V1_DESIGN: false,
   SHOW_PUBLIC_PROFILE_V1_DESIGN: false,
 } as const;

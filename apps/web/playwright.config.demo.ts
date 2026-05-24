@@ -1,5 +1,5 @@
 /**
- * Playwright config for YC demo recording.
+ * Playwright config for founder demo recording.
  *
  * Extends the main config (inherits globalSetup, webServer, Vercel bypass
  * headers) and overrides only what's needed for demo video capture:
@@ -7,7 +7,7 @@
  * - 1280x720 viewport for standard HD
  * - Single worker (serial recording)
  * - 5-minute timeout (multi-DSP enrichment can take 120s)
- * - No auth-setup project (demo handles auth inline)
+ * - No auth-setup project (the route is a deterministic recording surface)
  *
  * Usage:
  *   pnpm run demo:record
@@ -22,7 +22,8 @@ const baseUrl = process.env.BASE_URL ?? `http://127.0.0.1:${port}`;
 export default defineConfig({
   ...baseConfig,
   testDir: './tests/e2e',
-  testMatch: /yc-demo\.spec\.ts/,
+  testMatch: /founder-demo-video\.spec\.ts/,
+  grep: /founder-led 90-second recording surface/,
   workers: 1,
   timeout: 300_000,
   retries: 0,

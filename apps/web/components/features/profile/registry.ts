@@ -30,7 +30,7 @@ export const PROFILE_MODE_REGISTRY: Record<ProfileMode, ProfileModeDefinition> =
     },
     pay: {
       mode: 'pay',
-      subtitle: 'Support',
+      subtitle: 'Pay',
       pathSegment: 'pay',
       shell: {
         showBackButton: true,
@@ -78,7 +78,7 @@ export const PROFILE_MODE_REGISTRY: Record<ProfileMode, ProfileModeDefinition> =
     },
     tour: {
       mode: 'tour',
-      subtitle: 'Tour dates',
+      subtitle: 'Events',
       pathSegment: 'tour',
       shell: {
         showBackButton: true,

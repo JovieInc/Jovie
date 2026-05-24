@@ -47,7 +47,7 @@ const DASHBOARD_PAGES = FAST_ITERATION
   ? [{ path: APP_ROUTES.CHAT, name: 'Chat' }]
   : [
       { path: APP_ROUTES.CHAT, name: 'Chat' },
-      { path: APP_ROUTES.DASHBOARD_AUDIENCE, name: 'Audience' },
+      { path: APP_ROUTES.AUDIENCE, name: 'Audience' },
     ];
 
 async function settleAdminNavigation(page: import('@playwright/test').Page) {
@@ -368,7 +368,7 @@ test.describe('Admin Navigation Persistence @smoke', () => {
     const allPages = [
       APP_ROUTES.CHAT,
       APP_ROUTES.ADMIN,
-      APP_ROUTES.DASHBOARD_RELEASES,
+      APP_ROUTES.RELEASES,
       APP_ROUTES.ADMIN_USERS,
       APP_ROUTES.CHAT,
       APP_ROUTES.ADMIN_ACTIVITY,
@@ -505,7 +505,7 @@ test.describe('Admin Navigation Persistence @smoke', () => {
         name: 'Admin Users',
       },
       {
-        selector: `a[href="${APP_ROUTES.DASHBOARD_AUDIENCE}"]`,
+        selector: `a[href="${APP_ROUTES.AUDIENCE}"]`,
         name: 'Audience',
       },
     ];

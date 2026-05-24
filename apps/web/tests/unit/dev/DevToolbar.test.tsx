@@ -26,19 +26,23 @@ vi.mock('@/lib/flags/contracts', () => ({
     CLAIM_HANDLE: 'code:CLAIM_HANDLE',
     HERO_SPOTIFY: 'code:HERO_SPOTIFY',
     BILLING_UPGRADE: 'code:BILLING_UPGRADE',
-    THREADS_ENABLED: 'code:THREADS_ENABLED',
-    SHELL_CHAT_V1: 'code:SHELL_CHAT_V1',
+    SPOTIFY_OAUTH: 'code:SPOTIFY_OAUTH',
+    DESIGN_V1: 'code:DESIGN_V1',
+    SHELL_CHAT_V1: 'code:DESIGN_V1',
   },
   APP_FLAG_DEFAULTS: {
     CLAIM_HANDLE: false,
     HERO_SPOTIFY: false,
     BILLING_UPGRADE: false,
-    THREADS_ENABLED: false,
+    SPOTIFY_OAUTH: false,
+    DESIGN_V1: false,
     SHELL_CHAT_V1: false,
   },
+  DESIGN_V1_ALIAS_FLAGS: ['SHELL_CHAT_V1'],
 }));
 
 import { DevToolbar } from '@/components/features/dev/DevToolbar';
+import { isDevToolbarSuppressedPath } from '@/components/features/dev/DevToolbarGate';
 
 const TOOLBAR_HIDDEN_KEY = '__dev_toolbar_hidden';
 const TOOLBAR_OPEN_KEY = '__dev_toolbar_open';
@@ -88,6 +92,17 @@ describe('DevToolbar', () => {
   afterEach(() => {
     cleanup();
     document.documentElement.style.setProperty('--dev-toolbar-height', '0px');
+  });
+
+  describe('gate suppression', () => {
+    it('suppresses demo capture routes without suppressing normal app routes', () => {
+      expect(isDevToolbarSuppressedPath('/demovideo')).toBe(true);
+      expect(isDevToolbarSuppressedPath('/demo')).toBe(true);
+      expect(isDevToolbarSuppressedPath('/demo/video')).toBe(true);
+      expect(isDevToolbarSuppressedPath('/demo/founder-video')).toBe(true);
+      expect(isDevToolbarSuppressedPath('/app/dashboard/releases')).toBe(false);
+      expect(isDevToolbarSuppressedPath('/start')).toBe(false);
+    });
   });
 
   // ─── Show/Hide ───────────────────────────────────────────────
@@ -357,8 +372,9 @@ describe('DevToolbar', () => {
       renderToolbar();
 
       expect(screen.getByText('claim handle')).toBeInTheDocument();
-      expect(screen.getByText('threads enabled')).toBeInTheDocument();
-      expect(screen.getByText('shell chat v1')).toBeInTheDocument();
+      expect(screen.getByText('spotify oauth')).toBeInTheDocument();
+      expect(screen.getByText('design v1')).toBeInTheDocument();
+      expect(screen.queryByText('shell chat v1')).not.toBeInTheDocument();
     });
 
     it('shows source label for each non-overridden flag', () => {
@@ -384,7 +400,7 @@ describe('DevToolbar', () => {
       ).toBeInTheDocument();
     });
 
-    it('sets the SHELL_CHAT_V1 override on click', () => {
+    it('sets the DESIGN_V1 override on click', () => {
       renderToolbar();
 
       fireEvent.click(screen.getByRole('button', { name: /New Design/ }));
@@ -392,16 +408,16 @@ describe('DevToolbar', () => {
       expect(
         JSON.parse(localStorage.getItem(FF_OVERRIDES_KEY) ?? '{}')
       ).toEqual({
-        'code:SHELL_CHAT_V1': true,
+        'code:DESIGN_V1': true,
       });
     });
 
-    it('clears the SHELL_CHAT_V1 override when toggled back to the server default', () => {
-      // Server default for SHELL_CHAT_V1 is false. When the user has an
+    it('clears the DESIGN_V1 override when toggled back to the server default', () => {
+      // Server default for DESIGN_V1 is false. When the user has an
       // override of `true` and toggles back, the result (false) matches
       // the server default, so we remove the override entirely instead of
       // recording a no-op `false` value. Keeps the override count honest.
-      setLocalOverrides({ 'code:SHELL_CHAT_V1': true });
+      setLocalOverrides({ 'code:DESIGN_V1': true });
       renderToolbar();
 
       const toggle = screen.getByRole('button', { name: /New Design/ });
@@ -414,11 +430,11 @@ describe('DevToolbar', () => {
       ).toEqual({});
     });
 
-    it('drops the override badge when SHELL_CHAT_V1 is toggled back to default', () => {
+    it('drops the override badge when DESIGN_V1 is toggled back to default', () => {
       // Companion to the test above: the user-meaningful override count
       // returns to zero when an override is cleared, so the collapsed
       // badge should disappear (no "0 overrides" pill flicker).
-      setLocalOverrides({ 'code:SHELL_CHAT_V1': true });
+      setLocalOverrides({ 'code:DESIGN_V1': true });
       renderToolbar();
 
       expect(screen.getByText('1 override')).toBeInTheDocument();
@@ -437,6 +453,20 @@ describe('DevToolbar', () => {
       fireEvent.click(screen.getByRole('button', { name: /New Design/ }));
 
       expect(screen.getByText('1 override')).toBeInTheDocument();
+    });
+
+    it('keeps the Design Studio shortcut hidden until DESIGN_V1 is on', () => {
+      renderToolbar();
+
+      expect(
+        screen.queryByRole('link', { name: 'Design Studio' })
+      ).not.toBeInTheDocument();
+
+      fireEvent.click(screen.getByRole('button', { name: /New Design/ }));
+
+      expect(
+        screen.getByRole('link', { name: 'Design Studio' })
+      ).toHaveAttribute('href', '/exp/page-builder');
     });
 
     it('syncs the override to shell flag consumers outside the toolbar', async () => {
@@ -502,7 +532,7 @@ describe('DevToolbar', () => {
     it('shows correct override count for multiple overrides', () => {
       setLocalOverrides({
         'code:CLAIM_HANDLE': true,
-        'code:THREADS_ENABLED': true,
+        'code:SPOTIFY_OAUTH': true,
       });
       localStorage.setItem(TOOLBAR_OPEN_KEY, '1');
       renderToolbar();
@@ -588,7 +618,7 @@ describe('DevToolbar', () => {
     it('uses plural for multiple overrides', () => {
       setLocalOverrides({
         'code:CLAIM_HANDLE': true,
-        'code:THREADS_ENABLED': true,
+        'code:SPOTIFY_OAUTH': true,
       });
       renderToolbar();
 
@@ -695,6 +725,196 @@ describe('DevToolbar', () => {
     });
   });
 
+  // ─── Test Persona Switcher ─────────────────────────────────
+
+  describe('test persona switcher', () => {
+    let fetchSpy: ReturnType<typeof vi.fn>;
+    let reloadSpy: ReturnType<typeof vi.fn>;
+    const originalLocation = window.location;
+
+    function mockSessionResponse(
+      overrides?: Partial<{
+        enabled: boolean;
+        trustedHost: boolean;
+        active: boolean;
+        persona: 'creator' | 'creator-ready' | 'admin' | null;
+        userId: string | null;
+        email: string | null;
+        profilePath: string | null;
+        reason: string | null;
+      }>
+    ) {
+      return {
+        ok: true,
+        json: () =>
+          Promise.resolve({
+            enabled: true,
+            trustedHost: true,
+            active: false,
+            persona: null,
+            userId: null,
+            email: null,
+            profilePath: null,
+            reason: null,
+            ...overrides,
+          }),
+      };
+    }
+
+    beforeEach(() => {
+      fetchSpy = vi.fn().mockResolvedValue(mockSessionResponse());
+      vi.stubGlobal('fetch', fetchSpy);
+      reloadSpy = vi.fn();
+      Object.defineProperty(window, 'location', {
+        value: {
+          ...originalLocation,
+          pathname: '/app/dashboard',
+          reload: reloadSpy,
+        },
+        writable: true,
+        configurable: true,
+      });
+    });
+
+    afterEach(() => {
+      Object.defineProperty(window, 'location', {
+        value: originalLocation,
+        configurable: true,
+        writable: true,
+      });
+      vi.unstubAllGlobals();
+    });
+
+    it('renders a persona button outside production', () => {
+      renderToolbar();
+
+      expect(
+        screen.getByRole('button', { name: 'Test Persona' })
+      ).toBeInTheDocument();
+    });
+
+    it('does not render the persona button in production', () => {
+      renderToolbar({ env: 'production' });
+
+      expect(
+        screen.queryByRole('button', { name: 'Test Persona' })
+      ).not.toBeInTheDocument();
+    });
+
+    it('loads and displays the active persona when opened', async () => {
+      fetchSpy.mockResolvedValueOnce(
+        mockSessionResponse({
+          active: true,
+          persona: 'creator-ready',
+          userId: 'user_ready',
+          email: 'browse-ready+clerk_test@jov.ie',
+          profilePath: '/browse-ready-user',
+        })
+      );
+
+      renderToolbar();
+      fireEvent.click(screen.getByRole('button', { name: 'Test Persona' }));
+
+      expect(await screen.findByText('Pro Creator')).toBeInTheDocument();
+      expect(
+        screen.getByText('Active: browse-ready+clerk_test@jov.ie')
+      ).toBeInTheDocument();
+      expect(screen.getByText('/browse-ready-user')).toBeInTheDocument();
+      expect(
+        screen.getByRole('menuitem', { name: /Pro Creator/ })
+      ).toBeDisabled();
+      expect(fetchSpy).toHaveBeenCalledWith(
+        '/api/dev/test-auth/session',
+        expect.objectContaining({
+          signal: expect.any(AbortSignal),
+        })
+      );
+    });
+
+    it('shows disabled explanatory text when test auth is unavailable', async () => {
+      fetchSpy.mockResolvedValueOnce(
+        mockSessionResponse({
+          enabled: false,
+          trustedHost: true,
+          reason: 'E2E_USE_TEST_AUTH_BYPASS is not enabled',
+        })
+      );
+
+      renderToolbar();
+      fireEvent.click(screen.getByRole('button', { name: 'Test Persona' }));
+
+      expect(
+        await screen.findByText('E2E_USE_TEST_AUTH_BYPASS is not enabled')
+      ).toBeInTheDocument();
+      expect(screen.queryByText('Free Creator')).not.toBeInTheDocument();
+    });
+
+    it('switches personas through the dev test-auth session endpoint', async () => {
+      fetchSpy
+        .mockResolvedValueOnce(mockSessionResponse())
+        .mockResolvedValueOnce({
+          ok: true,
+          json: () =>
+            Promise.resolve({
+              success: true,
+              persona: 'creator-ready',
+              userId: 'user_ready',
+              email: 'browse-ready+clerk_test@jov.ie',
+              profilePath: '/browse-ready-user',
+            }),
+        });
+
+      renderToolbar();
+      fireEvent.click(screen.getByRole('button', { name: 'Test Persona' }));
+      fireEvent.click(
+        await screen.findByRole('menuitem', { name: /Pro Creator/ })
+      );
+
+      await waitFor(() => {
+        expect(fetchSpy).toHaveBeenLastCalledWith(
+          '/api/dev/test-auth/session',
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ persona: 'creator-ready' }),
+          }
+        );
+      });
+      expect(reloadSpy).toHaveBeenCalled();
+    });
+
+    it('exits an active test persona through DELETE /session', async () => {
+      fetchSpy
+        .mockResolvedValueOnce(
+          mockSessionResponse({
+            active: true,
+            persona: 'creator',
+            userId: 'user_creator',
+            email: 'browse+clerk_test@jov.ie',
+            profilePath: '/browse-test-user',
+          })
+        )
+        .mockResolvedValueOnce({
+          ok: true,
+          json: () => Promise.resolve({ success: true }),
+        });
+
+      renderToolbar();
+      fireEvent.click(screen.getByRole('button', { name: 'Test Persona' }));
+      fireEvent.click(
+        await screen.findByRole('menuitem', { name: 'Exit Persona' })
+      );
+
+      await waitFor(() => {
+        expect(fetchSpy).toHaveBeenLastCalledWith(
+          '/api/dev/test-auth/session',
+          { method: 'DELETE' }
+        );
+      });
+      expect(reloadSpy).toHaveBeenCalled();
+    });
+  });
+
   // ─── Expand/Collapse ───────────────────────────────────────
 
   describe('expand/collapse', () => {
@@ -726,7 +946,9 @@ describe('DevToolbar', () => {
       vi.stubGlobal('fetch', fetchSpy);
       setTimeoutSpy = vi
         .spyOn(globalThis, 'setTimeout')
-        .mockImplementation((() => 0) as typeof globalThis.setTimeout);
+        .mockImplementation(
+          (() => 0) as unknown as typeof globalThis.setTimeout
+        );
     });
 
     afterEach(() => {

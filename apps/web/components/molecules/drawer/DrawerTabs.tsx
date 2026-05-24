@@ -36,7 +36,15 @@ export interface DrawerTabsProps<T extends string> {
  */
 export function DrawerTabs<T extends string>({
   overflowMode = 'collapse',
+  distribution = 'fill',
   ...props
 }: DrawerTabsProps<T>) {
-  return <TabBar {...props} overflowMode={overflowMode} variant='drawer' />;
+  return (
+    <TabBar
+      {...props}
+      distribution={distribution}
+      overflowMode={overflowMode}
+      variant='drawer'
+    />
+  );
 }

@@ -15,7 +15,12 @@ import {
 } from '@/components/organisms/table';
 import { PlatformPill } from '@/features/dashboard/atoms/PlatformPill';
 import type { WaitlistEntryRow } from '@/lib/admin/types';
-import { PLATFORM_LABELS, PRIMARY_GOAL_LABELS } from '../constants';
+import {
+  PLATFORM_LABELS,
+  PRIMARY_GOAL_LABELS,
+  STATUS_LABELS,
+  STATUS_VARIANTS,
+} from '../constants';
 
 /**
  * Renders a name cell with primary token styling
@@ -137,24 +142,9 @@ export function renderHeardAboutCell(value: string | null) {
  * Renders the status badge cell
  */
 export function renderStatusCell(status: WaitlistEntryRow['status']) {
-  const statusLabels: Record<WaitlistEntryRow['status'], string> = {
-    new: 'New',
-    invited: 'Invited',
-    claimed: 'Claimed',
-  };
-
-  const statusVariants: Record<
-    WaitlistEntryRow['status'],
-    'primary' | 'secondary' | 'success' | 'warning' | 'error'
-  > = {
-    new: 'primary',
-    invited: 'warning',
-    claimed: 'success',
-  };
-
   return (
-    <Badge size='sm' variant={statusVariants[status]}>
-      {statusLabels[status]}
+    <Badge size='sm' variant={STATUS_VARIANTS[status]}>
+      {STATUS_LABELS[status]}
     </Badge>
   );
 }

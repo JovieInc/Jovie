@@ -63,9 +63,21 @@ function formatMetricValue(
 }
 
 /** Bar opacity classes that progressively fade to reinforce the narrowing funnel */
-const BAR_OPACITY = ['bg-accent/15', 'bg-accent/10', 'bg-accent/6'] as const;
+const BAR_OPACITY = [
+  'bg-[color-mix(in_oklab,var(--accent-analytics)_52%,transparent)]',
+  'bg-[color-mix(in_oklab,var(--accent-analytics)_36%,transparent)]',
+  'bg-[color-mix(in_oklab,var(--accent-analytics)_24%,transparent)]',
+] as const;
 
 const TRACK_BG = 'bg-surface-2';
+
+function formatRankedLabel(label: string): string {
+  try {
+    return decodeURIComponent(label);
+  } catch {
+    return label;
+  }
+}
 
 /** Single stage in the vertical funnel waterfall */
 function FunnelStage({
@@ -96,9 +108,9 @@ function FunnelStage({
   }
 
   return (
-    <div className='space-y-1.5 px-3 py-2'>
+    <div className='space-y-1.5 px-3.5 py-2.5'>
       <div className='flex items-baseline justify-between gap-2'>
-        <span className='text-[11.5px] font-caption text-secondary-token'>
+        <span className='text-[12px] font-caption text-secondary-token'>
           {label}
         </span>
         <span className='flex items-baseline gap-1.5'>
@@ -115,7 +127,7 @@ function FunnelStage({
       <div className={cn('h-1.5 rounded-full', TRACK_BG)}>
         <div
           className={cn(
-            'h-full rounded-full transition-[width] duration-300 ease-out',
+            'h-full rounded-full transition-[width] duration-cinematic ease-out',
             BAR_OPACITY[barIndex] ?? BAR_OPACITY.at(-1)
           )}
           style={{ width: `${Math.max(barPercent, 2)}%` }}
@@ -221,7 +233,7 @@ function RankedList({
             </span>
             <IconComponent className='h-3.5 w-3.5 text-tertiary-token' />
             <span className='truncate text-app text-secondary-token transition-colors group-hover:text-primary-token'>
-              {item.label}
+              {formatRankedLabel(item.label)}
             </span>
           </div>
           <span className='ml-2 text-app font-semibold text-primary-token tabular-nums'>
@@ -279,6 +291,7 @@ export function AnalyticsSidebarView({
       data-testid={testId}
       headerMode='minimal'
       hideMinimalHeaderBar
+      entityHeaderSurface='flat'
       entityHeader={
         <DrawerSurfaceCard variant='card' className='overflow-hidden'>
           <div className='relative p-3.5'>
@@ -289,9 +302,9 @@ export function AnalyticsSidebarView({
                 onClose={onClose}
               />
             </div>
-            <div className='flex items-start justify-between gap-3 pr-8'>
-              <div className='space-y-0.5'>
-                <p className='text-mid font-semibold tracking-[-0.016em] text-primary-token'>
+            <div className='space-y-3 pr-8'>
+              <div className='space-y-1'>
+                <p className='whitespace-nowrap text-mid font-semibold tracking-[-0.016em] text-primary-token'>
                   Audience funnel
                 </p>
                 <p className='text-xs leading-[16px] text-secondary-token'>
@@ -304,7 +317,8 @@ export function AnalyticsSidebarView({
                   onValueChange={onRangeChange}
                   options={RANGE_OPTIONS}
                   size='sm'
-                  className='shrink-0'
+                  className='w-full'
+                  triggerClassName='flex-1'
                   aria-label='Analytics time range'
                 />
               ) : null}
@@ -315,7 +329,7 @@ export function AnalyticsSidebarView({
     >
       <div
         className={cn(
-          'flex min-h-0 flex-1 flex-col space-y-2 transition-opacity duration-150',
+          'flex min-h-0 flex-1 flex-col space-y-2 transition-opacity duration-subtle',
           isFetching && !loading && 'opacity-70'
         )}
       >
@@ -324,21 +338,27 @@ export function AnalyticsSidebarView({
           <FunnelCard stages={stages} loading={loading} />
 
           {/* Engagement — compact 2-col, secondary to the funnel */}
-          <DrawerStatGrid variant='card'>
-            <div className='px-3 py-2'>
+          <DrawerStatGrid
+            variant='card'
+            className={cn(
+              'gap-1 divide-x-0 p-2',
+              showTipLinkVisits ? 'grid-cols-3' : 'grid-cols-2'
+            )}
+          >
+            <div className='rounded-lg px-2 py-2'>
               <StatTile
                 label='Link Clicks'
                 value={formatMetricValue(loading, data?.total_clicks)}
               />
             </div>
-            <div className='px-3 py-2'>
+            <div className='rounded-lg px-2 py-2'>
               <StatTile
                 label='Listen Clicks'
                 value={formatMetricValue(loading, data?.listen_clicks)}
               />
             </div>
             {showTipLinkVisits ? (
-              <div className='px-3 py-2'>
+              <div className='rounded-lg px-2 py-2'>
                 <StatTile
                   label='Tip Link Visits'
                   value={formatMetricValue(loading, data?.tip_link_visits)}
@@ -356,7 +376,7 @@ export function AnalyticsSidebarView({
               options={ANALYTICS_TAB_OPTIONS}
               className='w-full'
               ariaLabel='Analytics data tabs'
-              distribution='intrinsic'
+              distribution='fill'
             />
           }
           contentClassName='pt-2'

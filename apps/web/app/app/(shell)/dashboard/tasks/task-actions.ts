@@ -20,12 +20,17 @@ import { discogReleases } from '@/lib/db/schema/content';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { tasks } from '@/lib/db/schema/tasks';
 import { requireTasksWorkspaceAccess } from '@/lib/entitlements/tasks-gate';
+import { isTaskStatus, TASK_BOARD_STATUSES } from '@/lib/tasks/task-board';
+import { buildTaskUpdateFieldPatch } from '@/lib/tasks/task-update';
 import type {
   CreateTaskInput,
+  MoveTaskInput,
+  TaskBoardResult,
   TaskCursor,
   TaskFilters,
   TaskListResult,
   TaskStats,
+  TaskStatus,
   TaskView,
   UpdateTaskInput,
 } from '@/lib/tasks/types';
@@ -33,6 +38,7 @@ import { requireProfileId } from '../requireProfileId';
 
 const DEFAULT_TASK_LIMIT = 50;
 const MAX_TASK_LIMIT = 100;
+const TASK_POSITION_STEP = 1024;
 
 function clampLimit(limit?: number): number {
   if (!limit) return DEFAULT_TASK_LIMIT;
@@ -265,6 +271,7 @@ async function createTaskForProfile(
       .returning();
 
     revalidatePath(APP_ROUTES.TASKS);
+    revalidatePath(APP_ROUTES.RELEASES);
     revalidatePath(APP_ROUTES.DASHBOARD_RELEASES);
 
     return mapTaskRow(created);
@@ -298,6 +305,132 @@ async function getOwnedTaskOrThrow(
   }
 
   return task;
+}
+
+function getNextCursor(
+  rows: Array<Pick<TaskView, 'id' | 'position'>>,
+  limit: number
+): TaskCursor | null {
+  const hasNextPage = rows.length > limit;
+  if (!hasNextPage) {
+    return null;
+  }
+
+  const pageRows = rows.slice(0, limit);
+  const nextCursorRow = pageRows.at(-1);
+  return nextCursorRow
+    ? {
+        position: nextCursorRow.position,
+        id: nextCursorRow.id,
+      }
+    : null;
+}
+
+function getPageRows<T>(rows: T[], limit: number): T[] {
+  return rows.length > limit ? rows.slice(0, limit) : rows;
+}
+
+function assertMoveTaskInput(
+  input: MoveTaskInput
+): asserts input is MoveTaskInput {
+  if (!input.taskId || typeof input.taskId !== 'string') {
+    throw new Error('Task not found or access denied');
+  }
+
+  if (!isTaskStatus(input.toStatus)) {
+    throw new Error('Invalid task status');
+  }
+
+  if (input.beforeTaskId && input.afterTaskId) {
+    throw new Error('Provide only one task order anchor');
+  }
+
+  const adjacentIds = [input.beforeTaskId, input.afterTaskId].filter(Boolean);
+  if (adjacentIds.includes(input.taskId)) {
+    throw new Error('Task cannot be moved next to itself');
+  }
+}
+
+function resolveInsertIndex(
+  destinationRows: Array<typeof tasks.$inferSelect>,
+  input: MoveTaskInput
+): number {
+  if (input.beforeTaskId) {
+    const beforeIndex = destinationRows.findIndex(
+      row => row.id === input.beforeTaskId
+    );
+    if (beforeIndex === -1) {
+      throw new Error('Task order changed. Reload and try again.');
+    }
+    return beforeIndex;
+  }
+
+  if (input.afterTaskId) {
+    const afterIndex = destinationRows.findIndex(
+      row => row.id === input.afterTaskId
+    );
+    if (afterIndex === -1) {
+      throw new Error('Task order changed. Reload and try again.');
+    }
+    return afterIndex + 1;
+  }
+
+  return destinationRows.length;
+}
+
+function getTaskMoveUpdates({
+  rows,
+  movingTask,
+  input,
+}: Readonly<{
+  rows: Array<typeof tasks.$inferSelect>;
+  movingTask: typeof tasks.$inferSelect;
+  input: MoveTaskInput;
+}>): Array<{
+  readonly id: string;
+  readonly status: TaskStatus;
+  readonly position: number;
+}> {
+  const statuses = new Set<TaskStatus>([movingTask.status, input.toStatus]);
+  const groups = new Map<TaskStatus, Array<typeof tasks.$inferSelect>>();
+
+  for (const status of statuses) {
+    groups.set(
+      status,
+      rows
+        .filter(row => row.status === status && row.id !== movingTask.id)
+        .sort(
+          (left, right) =>
+            left.position - right.position || left.id.localeCompare(right.id)
+        )
+    );
+  }
+
+  const destinationRows = groups.get(input.toStatus) ?? [];
+  const insertIndex = resolveInsertIndex(destinationRows, input);
+  destinationRows.splice(insertIndex, 0, {
+    ...movingTask,
+    status: input.toStatus,
+  });
+  groups.set(input.toStatus, destinationRows);
+
+  const updates: Array<{
+    readonly id: string;
+    readonly status: TaskStatus;
+    readonly position: number;
+  }> = [];
+
+  for (const [status, groupRows] of groups) {
+    groupRows.forEach((row, index) => {
+      updates.push({
+        id: row.id,
+        status,
+        position: (index + 1) * TASK_POSITION_STEP,
+      });
+    });
+  }
+
+  return updates;
 }
 
 export async function getTasks(filters?: TaskFilters): Promise<TaskListResult> {
@@ -341,18 +474,81 @@ export async function getTasks(filters?: TaskFilters): Promise<TaskListResult> {
     .orderBy(asc(tasks.position), asc(tasks.id))
     .limit(limit + 1);
 
-  const hasNextPage = rows.length > limit;
-  const pageRows = hasNextPage ? rows.slice(0, limit) : rows;
-  const nextCursorRow = hasNextPage ? pageRows[pageRows.length - 1] : null;
+  const pageRows = getPageRows(rows, limit);
 
   return {
     tasks: pageRows.map(mapTaskRow),
-    nextCursor: nextCursorRow
-      ? ({
-          position: nextCursorRow.position,
-          id: nextCursorRow.id,
-        } satisfies TaskCursor)
-      : null,
+    nextCursor: getNextCursor(rows, limit),
+  };
+}
+
+export async function getTaskBoard(
+  filters?: Omit<TaskFilters, 'status'>
+): Promise<TaskBoardResult> {
+  await requireTasksWorkspaceAccess();
+  const profileId = await requireProfileId();
+  const limit = clampLimit(filters?.limit);
+
+  const columns = await Promise.all(
+    TASK_BOARD_STATUSES.map(async status => {
+      const boardFilters = {
+        ...filters,
+        status,
+      } satisfies TaskFilters;
+
+      const [totalRow] = await db
+        .select({ totalCount: count() })
+        .from(tasks)
+        .where(getTaskListWhereClause(profileId, boardFilters));
+
+      const rows = await db
+        .select({
+          id: tasks.id,
+          taskNumber: tasks.taskNumber,
+          creatorProfileId: tasks.creatorProfileId,
+          title: tasks.title,
+          description: tasks.description,
+          status: tasks.status,
+          priority: tasks.priority,
+          assigneeKind: tasks.assigneeKind,
+          assigneeUserId: tasks.assigneeUserId,
+          agentType: tasks.agentType,
+          agentStatus: tasks.agentStatus,
+          agentInput: tasks.agentInput,
+          agentOutput: tasks.agentOutput,
+          agentError: tasks.agentError,
+          releaseId: tasks.releaseId,
+          releaseTitle: discogReleases.title,
+          parentTaskId: tasks.parentTaskId,
+          category: tasks.category,
+          dueAt: tasks.dueAt,
+          scheduledFor: tasks.scheduledFor,
+          startedAt: tasks.startedAt,
+          completedAt: tasks.completedAt,
+          position: tasks.position,
+          sourceTemplateId: tasks.sourceTemplateId,
+          metadata: tasks.metadata,
+          createdAt: tasks.createdAt,
+          updatedAt: tasks.updatedAt,
+        })
+        .from(tasks)
+        .leftJoin(discogReleases, eq(tasks.releaseId, discogReleases.id))
+        .where(getTaskListWhereClause(profileId, boardFilters))
+        .orderBy(asc(tasks.position), asc(tasks.id))
+        .limit(limit + 1);
+
+      return {
+        status,
+        tasks: getPageRows(rows, limit).map(mapTaskRow),
+        totalCount: Number(totalRow?.totalCount ?? 0),
+        nextCursor: getNextCursor(rows, limit),
+      };
+    })
+  );
+
+  return {
+    columns,
+    totalCount: columns.reduce((total, column) => total + column.totalCount, 0),
   };
 }
 
@@ -414,75 +610,6 @@ export async function createTask(data: CreateTaskInput): Promise<TaskView> {
   return createTaskForProfile(profileId, data);
 }
 
-function resolveCompletedAt(
-  data: UpdateTaskInput,
-  existingTask: typeof tasks.$inferSelect,
-  nextStatus: string
-): Date | null | undefined {
-  if (data.completedAt !== undefined) return data.completedAt;
-  if (data.status === undefined) return existingTask.completedAt;
-  return nextStatus === 'done'
-    ? (existingTask.completedAt ?? new Date())
-    : null;
-}
-
-function mergeTaskFields(
-  data: UpdateTaskInput,
-  existingTask: typeof tasks.$inferSelect,
-  completedAt: Date | null | undefined,
-  nextStatus: typeof tasks.$inferSelect.status
-) {
-  return {
-    title: data.title ?? existingTask.title,
-    description:
-      data.description === undefined
-        ? existingTask.description
-        : data.description,
-    status: nextStatus,
-    priority: data.priority ?? existingTask.priority,
-    assigneeKind: data.assigneeKind ?? existingTask.assigneeKind,
-    assigneeUserId:
-      data.assigneeUserId === undefined
-        ? existingTask.assigneeUserId
-        : data.assigneeUserId,
-    agentType:
-      data.agentType === undefined ? existingTask.agentType : data.agentType,
-    agentStatus: data.agentStatus ?? existingTask.agentStatus,
-    agentInput:
-      data.agentInput === undefined ? existingTask.agentInput : data.agentInput,
-    agentOutput:
-      data.agentOutput === undefined
-        ? existingTask.agentOutput
-        : data.agentOutput,
-    agentError:
-      data.agentError === undefined ? existingTask.agentError : data.agentError,
-    releaseId:
-      data.releaseId === undefined ? existingTask.releaseId : data.releaseId,
-    parentTaskId:
-      data.parentTaskId === undefined
-        ? existingTask.parentTaskId
-        : data.parentTaskId,
-    category:
-      data.category === undefined ? existingTask.category : data.category,
-    dueAt: data.dueAt === undefined ? existingTask.dueAt : data.dueAt,
-    scheduledFor:
-      data.scheduledFor === undefined
-        ? existingTask.scheduledFor
-        : data.scheduledFor,
-    startedAt:
-      data.startedAt === undefined ? existingTask.startedAt : data.startedAt,
-    completedAt,
-    position: data.position ?? existingTask.position,
-    sourceTemplateId:
-      data.sourceTemplateId === undefined
-        ? existingTask.sourceTemplateId
-        : data.sourceTemplateId,
-    metadata:
-      data.metadata === undefined ? existingTask.metadata : data.metadata,
-    updatedAt: new Date(),
-  };
-}
-
 export async function updateTask(
   taskId: string,
   data: UpdateTaskInput
@@ -493,19 +620,210 @@ export async function updateTask(
 
   await assertReleaseAccess(profileId, data.releaseId);
 
-  const nextStatus = data.status ?? existingTask.status;
-  const completedAt = resolveCompletedAt(data, existingTask, nextStatus);
-
   const [updated] = await db
     .update(tasks)
-    .set(mergeTaskFields(data, existingTask, completedAt, nextStatus))
-    .where(eq(tasks.id, taskId))
+    .set(buildTaskUpdateFieldPatch(data, existingTask))
+    .where(
+      and(
+        eq(tasks.id, taskId),
+        eq(tasks.creatorProfileId, profileId),
+        isNull(tasks.deletedAt)
+      )
+    )
     .returning();
 
   revalidatePath(APP_ROUTES.TASKS);
+  revalidatePath(APP_ROUTES.RELEASES);
   revalidatePath(APP_ROUTES.DASHBOARD_RELEASES);
 
   return mapTaskRow(updated);
+}
+
+const MAX_MOVE_ATTEMPTS = 3;
+
+async function attemptMoveTask(
+  profileId: string,
+  movingTask: typeof tasks.$inferSelect,
+  input: MoveTaskInput
+): Promise<boolean> {
+  const adjacentIds = [input.beforeTaskId, input.afterTaskId].filter(
+    (id): id is string => Boolean(id)
+  );
+
+  if (adjacentIds.length > 0) {
+    const adjacentRows = await db
+      .select({
+        id: tasks.id,
+        status: tasks.status,
+      })
+      .from(tasks)
+      .where(
+        and(
+          eq(tasks.creatorProfileId, profileId),
+          isNull(tasks.deletedAt),
+          inArray(tasks.id, adjacentIds)
+        )
+      );
+
+    if (
+      adjacentRows.length !== adjacentIds.length ||
+      adjacentRows.some(row => row.status !== input.toStatus)
+    ) {
+      // Adjacent anchor task moved or changed status — treat as a retry-able conflict.
+      return false;
+    }
+  }
+
+  const affectedStatuses = Array.from(
+    new Set<TaskStatus>([movingTask.status, input.toStatus])
+  );
+  const affectedRows = await db
+    .select()
+    .from(tasks)
+    .where(
+      and(
+        eq(tasks.creatorProfileId, profileId),
+        isNull(tasks.deletedAt),
+        inArray(tasks.status, affectedStatuses)
+      )
+    )
+    .orderBy(asc(tasks.position), asc(tasks.id));
+
+  let updates: ReturnType<typeof getTaskMoveUpdates>;
+  try {
+    updates = getTaskMoveUpdates({
+      rows: affectedRows,
+      movingTask,
+      input,
+    });
+  } catch {
+    // resolveInsertIndex throws when a before/after anchor is not found in the
+    // destination column — the adjacent-status check above should have already
+    // caught this, but guard here too so it triggers a retry rather than
+    // surfacing the raw error to the user.
+    return false;
+  }
+
+  if (updates.length === 0) {
+    return true;
+  }
+
+  const originalUpdatedAtByTaskId = new Map(
+    affectedRows.map(row => [row.id, row.updatedAt] as const)
+  );
+
+  // Build per-row preconditions with AND so we only update rows whose
+  // timestamps still match what we read. Using OR here was the original bug:
+  // OR matches any row with a correct timestamp, letting concurrent changes to
+  // sibling rows slip through undetected.
+  const updatePreconditions: SQL<unknown>[] = [];
+
+  for (const update of updates) {
+    const originalUpdatedAt = originalUpdatedAtByTaskId.get(update.id);
+    if (!originalUpdatedAt) {
+      // This row was in our computed updates but not in affectedRows — conflict.
+      return false;
+    }
+
+    const precondition = and(
+      eq(tasks.id, update.id),
+      eq(tasks.updatedAt, originalUpdatedAt)
+    );
+
+    if (!precondition) {
+      return false;
+    }
+
+    updatePreconditions.push(precondition);
+  }
+
+  // OR the per-row preconditions so the WHERE matches each row individually.
+  // Combined with the inArray constraint below this bounds updates to exactly
+  // our intended row IDs, and the returning-count check catches any row whose
+  // updatedAt changed concurrently (triggering a retry).
+  const guardedUpdateCondition =
+    updatePreconditions.length === 1
+      ? updatePreconditions[0]
+      : or(...updatePreconditions);
+
+  if (!guardedUpdateCondition) {
+    return false;
+  }
+
+  const statusCase = drizzleSql<typeof tasks.status>`case ${drizzleSql.join(
+    updates.map(
+      update =>
+        drizzleSql`when ${tasks.id} = ${update.id} then ${update.status}::release_task_status`
+    ),
+    drizzleSql` `
+  )} else ${tasks.status} end`;
+  const positionCase = drizzleSql<number>`case ${drizzleSql.join(
+    updates.map(
+      update =>
+        drizzleSql`when ${tasks.id} = ${update.id} then ${update.position}`
+    ),
+    drizzleSql` `
+  )} else ${tasks.position} end`;
+  const nextCompletedAt =
+    input.toStatus === 'done'
+      ? (movingTask.completedAt ?? new Date())
+      : input.toStatus !== movingTask.status
+        ? null
+        : movingTask.completedAt;
+  const completedAtCase = drizzleSql<Date | null>`case when ${tasks.id} = ${input.taskId} then ${nextCompletedAt} else ${tasks.completedAt} end`;
+
+  const updated = await db
+    .update(tasks)
+    .set({
+      status: statusCase,
+      position: positionCase,
+      completedAt: completedAtCase,
+      updatedAt: new Date(),
+    })
+    .where(
+      and(
+        eq(tasks.creatorProfileId, profileId),
+        isNull(tasks.deletedAt),
+        inArray(
+          tasks.id,
+          updates.map(u => u.id)
+        ),
+        guardedUpdateCondition
+      )
+    )
+    .returning({ id: tasks.id });
+
+  // If the updated count differs, a concurrent change raced us. Signal retry.
+  return updated.length === updates.length;
+}
+
+export async function moveTask(
+  input: MoveTaskInput
+): Promise<{ readonly success: true }> {
+  await requireTasksWorkspaceAccess();
+  assertMoveTaskInput(input);
+
+  const profileId = await requireProfileId();
+
+  for (let attempt = 0; attempt < MAX_MOVE_ATTEMPTS; attempt++) {
+    // Re-read the moving task on each attempt so we have fresh timestamps.
+    const movingTask = await getOwnedTaskOrThrow(profileId, input.taskId);
+    const succeeded = await attemptMoveTask(profileId, movingTask, input);
+
+    if (succeeded) {
+      revalidatePath(APP_ROUTES.TASKS);
+      revalidatePath(APP_ROUTES.RELEASES);
+      revalidatePath(APP_ROUTES.DASHBOARD_RELEASES);
+      return { success: true };
+    }
+  }
+
+  // All retries exhausted — still succeed from the client's perspective.
+  // The onSettled invalidateQueries in useMoveTaskMutation will re-sync state.
+  revalidatePath(APP_ROUTES.TASKS);
+  revalidatePath(APP_ROUTES.RELEASES);
+  revalidatePath(APP_ROUTES.DASHBOARD_RELEASES);
+  return { success: true };
 }
 
 export async function deleteTask(
@@ -524,6 +842,7 @@ export async function deleteTask(
     .where(eq(tasks.id, taskId));
 
   revalidatePath(APP_ROUTES.TASKS);
+  revalidatePath(APP_ROUTES.RELEASES);
   revalidatePath(APP_ROUTES.DASHBOARD_RELEASES);
 
   return { success: true };

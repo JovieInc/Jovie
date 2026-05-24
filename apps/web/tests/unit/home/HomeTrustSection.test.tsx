@@ -18,13 +18,15 @@ describe('HomeTrustSection', () => {
       'data-presentation',
       'card'
     );
-    expect(screen.getByText('Trusted by artists on')).toBeInTheDocument();
+    expect(
+      screen.getByText('Trusted by artists and teams releasing on')
+    ).toBeInTheDocument();
     expect(screen.getByLabelText('Universal Music Group')).toBeInTheDocument();
     expect(screen.getByLabelText('AWAL')).toBeInTheDocument();
   });
 
   it('renders the homepage inline strip presentation when requested', () => {
-    render(
+    const { container } = render(
       <HomeTrustSection
         presentation='inline-strip'
         label='Trusted by artists'
@@ -37,6 +39,16 @@ describe('HomeTrustSection', () => {
     );
     expect(screen.getByText('Trusted by artists')).toBeInTheDocument();
     expect(screen.getByAltText('Black Hole Recordings')).toBeInTheDocument();
+    // Text-only logos (BlancoYNegro, RecPlay, DiscoWax) removed — JOV-2075
     expect(screen.queryByLabelText('disco:wax')).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('Blanco y Negro')).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('rec play')).not.toBeInTheDocument();
+    expect(container.querySelector('.homepage-trust-logo-grid')).toBeTruthy();
+    expect(
+      container.querySelectorAll('.homepage-trust-logo-slot')
+    ).toHaveLength(5);
+    expect(
+      container.querySelectorAll('[data-mobile-logo="secondary"]')
+    ).toHaveLength(1);
   });
 });

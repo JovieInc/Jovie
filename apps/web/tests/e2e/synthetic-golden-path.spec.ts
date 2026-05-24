@@ -1,180 +1,31 @@
 import { expect, test } from '@playwright/test';
 import { SMOKE_TIMEOUTS, waitForHydration } from './utils/smoke-test-utils';
 
-// Override global storageState to run these tests as unauthenticated
+/**
+ * Synthetic Monitoring — Critical page health + performance baseline.
+ *
+ * The legacy email/OTP signup canary that previously lived in this file
+ * has moved to `synthetic-legacy-otp.spec.ts` (gated behind
+ * `E2E_PROD_LEGACY_CANARY` at the workflow level) and is being replaced
+ * by the Layer A UI smoke in `synthetic-auth-ui.spec.ts` (JOV-2446).
+ *
+ * This file keeps the always-on critical-page health checks and
+ * performance baseline. Neither depends on signup/auth.
+ */
+
+// Override global storageState to run these tests as unauthenticated.
 test.use({ storageState: { cookies: [], origins: [] } });
 
-const HOMEPAGE_INTENT_PROMPT = 'Help me launch my artist profile';
+const HOMEPAGE_PRIMARY_CTA_TEST_ID = 'homepage-primary-cta';
 const SIGNUP_PATH = '/signup';
-
-/**
- * Synthetic Monitoring Golden Path Test
- *
- * This test is specifically designed for production synthetic monitoring:
- * - Uses throwaway accounts with auto-cleanup
- * - Runs every 5-10 minutes in production
- * - Alerts on failure via Slack
- * - Minimal assertions focused on critical functionality
- * - Handles production-specific edge cases
- */
+const START_PATH = '/start';
+const TURNSTILE_CONFIG_ERROR = 'turnstile is not configured';
 
 test.describe('Synthetic Monitoring - Golden Path', () => {
   // Only run in synthetic monitoring mode
   test.beforeEach(async () => {
     if (process.env.E2E_SYNTHETIC_MODE !== 'true') {
       test.skip();
-    }
-  });
-
-  test('Production golden path monitoring', async ({ page }) => {
-    test.setTimeout(120_000); // 2 minutes for production environment
-
-    // Generate unique throwaway account
-    const timestamp = Date.now();
-    const testEmail = `synthetic-${timestamp}@jovie-monitoring.test`;
-    const testHandle = `synth${timestamp}`;
-
-    console.log(
-      `[Synthetic] Testing with: ${testEmail}, handle: ${testHandle}`
-    );
-
-    try {
-      // Intercept analytics to prevent test interference
-      await page.route('**/api/profile/view', route =>
-        route.fulfill({ status: 200, body: '{}' })
-      );
-      await page.route('**/api/audience/visit', route =>
-        route.fulfill({ status: 200, body: '{}' })
-      );
-      await page.route('**/api/track', route =>
-        route.fulfill({ status: 200, body: '{}' })
-      );
-
-      // CRITICAL PATH 1: Homepage loads
-      console.log('[Synthetic] Step 1: Homepage load test');
-      await page.goto('/', {
-        waitUntil: 'commit',
-        timeout: SMOKE_TIMEOUTS.NAVIGATION,
-      });
-      await waitForHydration(page);
-
-      // Essential homepage entry point
-      const promptInput = page.locator('#homepage-intent-input');
-      await expect(promptInput).toBeVisible({
-        timeout: 15000,
-      });
-
-      // CRITICAL PATH 2: Sign up flow initiation
-      console.log('[Synthetic] Step 2: Sign up flow test');
-      await promptInput.fill(HOMEPAGE_INTENT_PROMPT);
-      await page.getByRole('button', { name: 'Submit prompt' }).click();
-      await expect(page).toHaveURL(new RegExp(SIGNUP_PATH), {
-        timeout: 20000,
-      });
-
-      // CRITICAL PATH 3: Clerk registration
-      console.log('[Synthetic] Step 3: Clerk registration test');
-      const emailInput = page
-        .locator('input[name="emailAddress"], input[type="email"]')
-        .first();
-      await emailInput.waitFor({ state: 'visible', timeout: 15000 });
-      await emailInput.fill(testEmail);
-
-      const passwordInput = page
-        .locator('input[name="password"], input[type="password"]')
-        .first();
-      await passwordInput.fill('SyntheticTest123!');
-
-      // Handle both test and production Clerk flows
-      const submitButton = page
-        .getByRole('button', { name: /continue|sign up/i })
-        .first();
-      await submitButton.click();
-
-      // Wait for navigation after submit instead of arbitrary timeout
-      await page.waitForLoadState('domcontentloaded');
-
-      // Production environment might require email verification
-      // Skip verification if in test mode, otherwise handle production flow
-      if (process.env.E2E_ENVIRONMENT === 'production') {
-        // In production, we might need to handle verification differently
-        // This is a placeholder for production-specific verification handling
-        try {
-          const verifyButton = page.getByRole('button', {
-            name: /verify|continue/i,
-          });
-          if (await verifyButton.isVisible({ timeout: 5000 })) {
-            await verifyButton.click();
-          }
-        } catch {
-          console.log('[Synthetic] No verification step needed');
-        }
-      }
-
-      // CRITICAL PATH 4: Onboarding flow
-      console.log('[Synthetic] Step 4: Onboarding flow test');
-      await expect(page).toHaveURL('/onboarding', { timeout: 45000 });
-
-      const usernameInput = page.getByLabel('Claim your handle');
-      await expect(usernameInput).toBeVisible({ timeout: 15000 });
-
-      await usernameInput.fill(testHandle);
-      // Poll for validation to clear instead of arbitrary wait
-      await expect
-        .poll(
-          async () => {
-            const claimBtn = page.getByTestId('onboarding-handle-submit');
-            return claimBtn.isEnabled().catch(() => false);
-          },
-          { timeout: SMOKE_TIMEOUTS.VISIBILITY, intervals: [300, 500, 1000] }
-        )
-        .toBeTruthy();
-
-      const claimButton = page.getByTestId('onboarding-handle-submit');
-      await expect(claimButton).toBeEnabled({ timeout: 15000 });
-      await claimButton.click();
-
-      // CRITICAL PATH 5: Onboarding continuation
-      console.log('[Synthetic] Step 5: Onboarding continuation test');
-      await expect(page).toHaveURL(/\/onboarding.*resume=spotify/, {
-        timeout: 45000,
-      });
-
-      await expect(
-        page.getByPlaceholder(/search by artist name or paste a spotify link/i)
-      ).toBeVisible({ timeout: 15000 });
-
-      // CRITICAL PATH 6: Public profile accessibility
-      console.log('[Synthetic] Step 6: Public profile test');
-      await page.goto(`/${testHandle}`, {
-        waitUntil: 'commit',
-        timeout: SMOKE_TIMEOUTS.NAVIGATION,
-      });
-      await waitForHydration(page);
-
-      await expect(page).toHaveURL(`/${testHandle}`);
-      const publicProfile = page.locator('[data-test="public-profile-root"]');
-      await expect(publicProfile).toBeVisible({ timeout: 15000 });
-
-      console.log('[Synthetic] ✅ All critical paths verified successfully');
-    } catch (error) {
-      console.error('[Synthetic] ❌ Critical path failure:', error);
-
-      // Capture additional debug info for production failures
-      const currentUrl = page.url();
-      const pageTitle = await page.title().catch(() => 'Unknown');
-
-      console.error('[Synthetic] Debug info:', {
-        currentUrl,
-        pageTitle,
-        testEmail,
-        testHandle,
-        environment: process.env.E2E_ENVIRONMENT,
-        timestamp: new Date().toISOString(),
-      });
-
-      // Re-throw to fail the test
-      throw error;
     }
   });
 
@@ -194,6 +45,7 @@ test.describe('Synthetic Monitoring - Golden Path', () => {
 
     const criticalPages = [
       { path: '/', name: 'Homepage' },
+      { path: START_PATH, name: 'Start Onboarding Chat' },
       { path: '/dualipa', name: 'Profile Page' },
       { path: '/dualipa?mode=listen', name: 'Listen Mode' },
       { path: '/dualipa?mode=pay', name: 'Pay Mode' },
@@ -219,6 +71,7 @@ test.describe('Synthetic Monitoring - Golden Path', () => {
         'text="500"',
         'text="Internal Server Error"',
         'text="Something went wrong"',
+        `text="${TURNSTILE_CONFIG_ERROR}"`,
         '[data-testid="error-boundary"]',
       ];
 
@@ -272,7 +125,10 @@ test.describe('Synthetic Monitoring - Golden Path', () => {
     }
 
     // Check for performance-critical elements
-    await expect(page.locator('#homepage-intent-input')).toBeVisible({
+    await expect(page.getByTestId('homepage-hero-shell')).toBeVisible({
+      timeout: 5000,
+    });
+    await expect(page.getByTestId(HOMEPAGE_PRIMARY_CTA_TEST_ID)).toBeVisible({
       timeout: 5000,
     });
 

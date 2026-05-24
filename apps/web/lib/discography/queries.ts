@@ -20,6 +20,7 @@ import {
   releaseArtists,
 } from '@/lib/db/schema/content';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
+import { publicReleaseEligibilitySqlPredicate } from '@/lib/profile/public-release-eligibility';
 import { resolveTrackProviderLinks } from './track-provider-links';
 
 /**
@@ -47,6 +48,7 @@ export interface PublicDiscogReleaseLite {
   slug: string | null;
   releaseType: DiscogRelease['releaseType'];
   releaseDate: string | null;
+  revealDate: string | null;
   artworkUrl: string | null;
 }
 
@@ -224,9 +226,7 @@ export async function getLatestReleaseForProfile(
     .where(
       and(
         eq(discogReleases.creatorProfileId, creatorProfileId),
-        isNull(discogReleases.deletedAt),
-        ne(discogReleases.status, 'draft'),
-        drizzleSql`(${discogReleases.revealDate} IS NULL OR ${discogReleases.revealDate} <= NOW())`
+        publicReleaseEligibilitySqlPredicate()
       )
     )
     .orderBy(drizzleSql`${discogReleases.releaseDate} DESC NULLS LAST`)
@@ -278,10 +278,8 @@ export async function getLatestReleaseByUsername(
     .where(
       and(
         eq(creatorProfiles.usernameNormalized, usernameNormalized),
-        isNull(discogReleases.deletedAt),
-        ne(discogReleases.status, 'draft'),
         ne(discogReleases.releaseType, 'music_video'),
-        drizzleSql`(${discogReleases.revealDate} IS NULL OR ${discogReleases.revealDate} <= NOW())`
+        publicReleaseEligibilitySqlPredicate()
       )
     )
     .orderBy(drizzleSql`${discogReleases.releaseDate} DESC NULLS LAST`)
@@ -299,8 +297,7 @@ export async function getReleaseStatsByUsername(
 ): Promise<{ releaseCount: number; topReleaseTitles: string[] }> {
   const publicFilter = and(
     eq(creatorProfiles.usernameNormalized, usernameNormalized),
-    isNull(discogReleases.deletedAt),
-    ne(discogReleases.status, 'draft')
+    publicReleaseEligibilitySqlPredicate()
   );
   const [countResult, topReleases] = await Promise.all([
     db
@@ -347,16 +344,15 @@ export async function getReleasesForProfileLite(
       slug: discogReleases.slug,
       releaseType: discogReleases.releaseType,
       releaseDate: discogReleases.releaseDate,
+      revealDate: discogReleases.revealDate,
       artworkUrl: discogReleases.artworkUrl,
     })
     .from(discogReleases)
     .where(
       and(
         eq(discogReleases.creatorProfileId, creatorProfileId),
-        isNull(discogReleases.deletedAt),
-        ne(discogReleases.status, 'draft'),
         // Intentionally includes music videos for the public releases drawer.
-        drizzleSql`(${discogReleases.revealDate} IS NULL OR ${discogReleases.revealDate} <= NOW())`
+        publicReleaseEligibilitySqlPredicate()
       )
     )
     .orderBy(drizzleSql`${discogReleases.releaseDate} DESC NULLS LAST`)
@@ -371,6 +367,7 @@ export async function getReleasesForProfileLite(
   return releases.map(release => ({
     ...release,
     releaseDate: release.releaseDate?.toISOString() ?? null,
+    revealDate: release.revealDate?.toISOString() ?? null,
     artistNames: artistNamesByRelease.get(release.id) ?? [],
   }));
 }
@@ -434,6 +431,56 @@ export async function getReleasesForProfile(
     artistNames: artistNamesByRelease.get(release.id) ?? [],
     trackSummary: trackSummaries.get(release.id),
   }));
+}
+
+/**
+ * Get one release for a creator profile with the same related data used by the
+ * release matrix, without loading the full catalog.
+ */
+export async function getReleaseForProfileById(
+  creatorProfileId: string,
+  releaseId: string,
+  options?: { includeDrafts?: boolean }
+): Promise<ReleaseWithProviders | null> {
+  const filters = [
+    eq(discogReleases.creatorProfileId, creatorProfileId),
+    eq(discogReleases.id, releaseId),
+    isNull(discogReleases.deletedAt),
+  ];
+  if (!options?.includeDrafts) {
+    filters.push(ne(discogReleases.status, 'draft'));
+  }
+
+  const [release] = await db
+    .select()
+    .from(discogReleases)
+    .where(and(...filters))
+    .limit(1);
+
+  if (!release) {
+    return null;
+  }
+
+  const [trackSummaries, artistNamesByRelease, links] = await Promise.all([
+    getTrackSummariesForReleases([release.id]),
+    getArtistNamesForReleases([release.id]),
+    db
+      .select()
+      .from(providerLinks)
+      .where(
+        and(
+          eq(providerLinks.ownerType, 'release'),
+          eq(providerLinks.releaseId, release.id)
+        )
+      ),
+  ]);
+
+  return {
+    ...release,
+    artistNames: artistNamesByRelease.get(release.id) ?? [],
+    providerLinks: links,
+    trackSummary: trackSummaries.get(release.id),
+  };
 }
 
 /**
@@ -1014,6 +1061,7 @@ export interface TrackWithProviders {
   previewUrl: string | null;
   audioUrl: string | null;
   audioFormat: string | null;
+  lyrics: string | null;
   metadata: Record<string, unknown> | null;
   providerLinks: ProviderLink[];
 }
@@ -1111,6 +1159,7 @@ export async function getTracksForReleaseWithProviders(
     previewUrl: track.previewUrl,
     audioUrl: track.audioUrl,
     audioFormat: track.audioFormat,
+    lyrics: track.lyrics,
     metadata: track.metadata ?? null,
     providerLinks: resolveTrackProviderLinks(
       linksByTrack.get(track.id) ?? [],
@@ -1361,6 +1410,7 @@ export interface ReleaseTrackWithProviders {
   previewUrl: string | null;
   audioUrl: string | null;
   audioFormat: string | null;
+  lyrics: string | null;
   metadata: Record<string, unknown> | null;
   providerLinks: ProviderLink[];
 }
@@ -1464,6 +1514,7 @@ export async function getReleaseTracksForReleaseWithProviders(
     previewUrl: rec.previewUrl,
     audioUrl: rec.audioUrl,
     audioFormat: rec.audioFormat,
+    lyrics: rec.lyrics,
     metadata: rec.metadata ?? null,
     providerLinks: resolveTrackProviderLinks(
       linksByReleaseTrack.get(rt.id) ?? [],

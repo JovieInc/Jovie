@@ -165,12 +165,12 @@ describe('ProfileInlineNotificationsCTA', () => {
 
     render(<ProfileInlineNotificationsCTA artist={makeArtist()} />);
 
-    fireEvent.click(screen.getByRole('button', { name: /turn on alerts/i }));
+    fireEvent.click(screen.getByRole('button', { name: /get alerts/i }));
 
     expect(formState.handleChannelChange).toHaveBeenCalledWith('email');
     expect(formState.openSubscription).toHaveBeenCalled();
     expect(await screen.findByRole('dialog')).toBeInTheDocument();
-    expect(screen.getByText('Enter your email')).toBeInTheDocument();
+    expect(screen.getByText('Email Alerts')).toBeInTheDocument();
     expect(screen.getByTestId('mobile-email-input')).toBeInTheDocument();
     expect(screen.queryByText('Sent by Test Artist')).not.toBeInTheDocument();
   }, 10_000);
@@ -180,9 +180,9 @@ describe('ProfileInlineNotificationsCTA', () => {
 
     render(<ProfileInlineNotificationsCTA artist={makeArtist()} />);
 
-    fireEvent.click(screen.getByRole('button', { name: /turn on alerts/i }));
+    fireEvent.click(screen.getByRole('button', { name: /get alerts/i }));
 
-    expect(await screen.findByText('Enter your email')).toBeInTheDocument();
+    expect(await screen.findByText('Email Alerts')).toBeInTheDocument();
   });
 
   it('routes subscribed users into manage mode when a handler is provided', () => {
@@ -239,7 +239,7 @@ describe('ProfileInlineNotificationsCTA', () => {
     expect(screen.getByText('Sent from Jovie')).toBeInTheDocument();
     expect(screen.getByText('Sent by Test Artist')).toBeInTheDocument();
     expect(
-      screen.getByRole('switch', { name: /subscribe to other alerts/i })
+      screen.getByRole('switch', { name: /artist emails/i })
     ).toBeChecked();
   });
 
@@ -254,7 +254,7 @@ describe('ProfileInlineNotificationsCTA', () => {
       />
     );
 
-    expect(await screen.findByText('Enter your email')).toBeInTheDocument();
+    expect(await screen.findByText('Email Alerts')).toBeInTheDocument();
 
     mockUseProfileNotifications.mockReturnValue(
       buildProfileNotifications({
@@ -291,7 +291,7 @@ describe('ProfileInlineNotificationsCTA', () => {
       <ProfileInlineNotificationsCTA artist={makeArtist()} autoOpen />
     );
 
-    expect(await screen.findByText('Enter your email')).toBeInTheDocument();
+    expect(await screen.findByText('Email Alerts')).toBeInTheDocument();
 
     mockUseProfileNotifications.mockReturnValue(
       buildProfileNotifications({
@@ -315,6 +315,119 @@ describe('ProfileInlineNotificationsCTA', () => {
     );
 
     expect(await screen.findByText('Alerts')).toBeInTheDocument();
+  });
+
+  it('submits a completed OTP after the email submit settles', async () => {
+    const handleSubscribe = vi.fn().mockResolvedValue('pending_confirmation');
+    const handleVerifyOtp = vi.fn().mockResolvedValue('subscribed');
+    mockUseSubscriptionForm.mockReturnValue(
+      buildFormState({
+        emailInput: 'fan@test.com',
+        handleSubscribe,
+        handleVerifyOtp,
+      })
+    );
+
+    const view = render(
+      <ProfileInlineNotificationsCTA artist={makeArtist()} autoOpen />
+    );
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Continue' }));
+    expect(await screen.findByText('Enter the code')).toBeInTheDocument();
+
+    mockUseSubscriptionForm.mockReturnValue(
+      buildFormState({
+        emailInput: 'fan@test.com',
+        otpCode: '123456',
+        isSubmitting: true,
+        handleSubscribe,
+        handleVerifyOtp,
+      })
+    );
+    view.rerender(
+      <ProfileInlineNotificationsCTA artist={makeArtist()} autoOpen />
+    );
+
+    expect(handleVerifyOtp).not.toHaveBeenCalled();
+
+    mockUseSubscriptionForm.mockReturnValue(
+      buildFormState({
+        emailInput: 'fan@test.com',
+        otpCode: '123456',
+        isSubmitting: false,
+        handleSubscribe,
+        handleVerifyOtp,
+      })
+    );
+    view.rerender(
+      <ProfileInlineNotificationsCTA artist={makeArtist()} autoOpen />
+    );
+
+    await waitFor(() => {
+      expect(handleVerifyOtp).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  it('does not retry a failed OTP auto-submit for the same code', async () => {
+    const handleSubscribe = vi.fn().mockResolvedValue('pending_confirmation');
+    const handleVerifyOtp = vi.fn().mockResolvedValue('error');
+    mockUseSubscriptionForm.mockReturnValue(
+      buildFormState({
+        emailInput: 'fan@test.com',
+        handleSubscribe,
+        handleVerifyOtp,
+      })
+    );
+
+    const view = render(
+      <ProfileInlineNotificationsCTA artist={makeArtist()} autoOpen />
+    );
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Continue' }));
+    expect(await screen.findByText('Enter the code')).toBeInTheDocument();
+
+    mockUseSubscriptionForm.mockReturnValue(
+      buildFormState({
+        emailInput: 'fan@test.com',
+        otpCode: '123456',
+        handleSubscribe,
+        handleVerifyOtp,
+      })
+    );
+    view.rerender(
+      <ProfileInlineNotificationsCTA artist={makeArtist()} autoOpen />
+    );
+
+    await waitFor(() => {
+      expect(handleVerifyOtp).toHaveBeenCalledTimes(1);
+    });
+
+    mockUseSubscriptionForm.mockReturnValue(
+      buildFormState({
+        emailInput: 'fan@test.com',
+        otpCode: '123456',
+        isSubmitting: true,
+        handleSubscribe,
+        handleVerifyOtp,
+      })
+    );
+    view.rerender(
+      <ProfileInlineNotificationsCTA artist={makeArtist()} autoOpen />
+    );
+
+    mockUseSubscriptionForm.mockReturnValue(
+      buildFormState({
+        emailInput: 'fan@test.com',
+        otpCode: '123456',
+        handleSubscribe,
+        handleVerifyOtp,
+      })
+    );
+    view.rerender(
+      <ProfileInlineNotificationsCTA artist={makeArtist()} autoOpen />
+    );
+
+    expect(handleVerifyOtp).toHaveBeenCalledTimes(1);
   });
 
   it('submits Jovie preferences and artist email consent together', async () => {
@@ -352,9 +465,7 @@ describe('ProfileInlineNotificationsCTA', () => {
 
     await screen.findByText('Alerts');
 
-    fireEvent.click(
-      screen.getByRole('switch', { name: /subscribe to other alerts/i })
-    );
+    fireEvent.click(screen.getByRole('switch', { name: /artist emails/i }));
     fireEvent.click(screen.getByRole('button', { name: /save & finish/i }));
 
     await waitFor(() => {

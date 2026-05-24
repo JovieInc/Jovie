@@ -5,7 +5,6 @@
  * - Storing full name in private metadata (for display purposes)
  * - Syncing initial Jovie metadata to Clerk
  * - Cancelling any active outbound sales/prospecting sequences for the email
- * - Sending a personal founder welcome email
  *
  * NOTE: Username suggestions are generated on-the-fly in the onboarding flow,
  * not stored in Clerk metadata. Usernames are stored only in the database.
@@ -14,13 +13,7 @@
 import { clerkClient } from '@clerk/nextjs/server';
 import { syncAllClerkMetadata } from '@/lib/auth/clerk-sync';
 import { stopEnrollmentsForEmail } from '@/lib/email/campaigns/enrollment';
-import { sendEmail } from '@/lib/email/send';
-import { getFounderWelcomeEmail } from '@/lib/email/templates/founder-welcome';
 import { notifySlackSignup } from '@/lib/notifications/providers/slack';
-import {
-  formatFounderSender,
-  getSenderPolicy,
-} from '@/lib/notifications/sender-policy';
 import { logger } from '@/lib/utils/logger';
 import type {
   ClerkEventType,
@@ -80,22 +73,6 @@ async function handleUserCreated(
     if (primaryEmail) {
       stopEnrollmentsForEmail(primaryEmail, 'claimed').catch(err => {
         logger.warn('[user-created] Failed to stop outbound sequences', err);
-      });
-
-      // Send personal founder welcome email
-      const welcomeEmail = getFounderWelcomeEmail({
-        firstName: user.first_name ?? null,
-      });
-      const founderSender = getSenderPolicy('founder');
-      sendEmail({
-        to: primaryEmail,
-        from: formatFounderSender(),
-        replyTo: founderSender.replyToEmail,
-        subject: welcomeEmail.subject,
-        text: welcomeEmail.text,
-        html: welcomeEmail.html,
-      }).catch(err => {
-        logger.warn('[user-created] Founder welcome email failed', err);
       });
     }
 

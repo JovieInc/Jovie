@@ -1,14 +1,16 @@
-import type { ReactNode } from 'react';
+import type { ComponentPropsWithoutRef, ReactNode } from 'react';
 import { ContentSectionHeader } from '@/components/molecules/ContentSectionHeader';
 import { AppShellContentPanel } from '@/components/organisms/AppShellContentPanel';
 import { cn } from '@/lib/utils';
 
-export interface PageShellProps {
+export interface PageShellProps
+  extends Omit<ComponentPropsWithoutRef<'section'>, 'children'> {
   readonly children: ReactNode;
   readonly toolbar?: ReactNode;
   readonly maxWidth?: 'full' | 'wide' | 'reading' | 'form';
   readonly frame?: 'none' | 'content-container';
   readonly contentPadding?: 'none' | 'compact' | 'default';
+  readonly surfaceMode?: 'default' | 'table';
   readonly scroll?: 'panel' | 'page';
   readonly className?: string;
   readonly surfaceClassName?: string;
@@ -58,11 +60,13 @@ export function PageShell({
   maxWidth = 'full',
   frame = 'none',
   contentPadding = 'none',
+  surfaceMode = 'default',
   scroll = 'panel',
   className,
   surfaceClassName,
   contentClassName,
   'data-testid': testId,
+  ...sectionProps
 }: PageShellProps) {
   return (
     <AppShellContentPanel
@@ -70,11 +74,13 @@ export function PageShell({
       maxWidth={maxWidth}
       frame={frame}
       contentPadding={contentPadding}
+      surfaceMode={surfaceMode}
       scroll={scroll}
       className={className}
       surfaceClassName={surfaceClassName}
       contentClassName={contentClassName}
       data-testid={testId}
+      {...sectionProps}
     >
       {children}
     </AppShellContentPanel>

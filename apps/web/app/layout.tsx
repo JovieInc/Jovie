@@ -3,23 +3,42 @@ import localFont from 'next/font/local';
 import React from 'react';
 import { APP_NAME, BASE_URL } from '@/constants/app';
 import './globals.css';
+// JOV-2145: HeaderNav.css is imported here so that the marketing-glass-header
+// visibility rules load on EVERY route, not just pages inside the (home) and
+// (marketing) route groups. The component-side import in HeaderNav.tsx is the
+// canonical declaration; Next.js's not-found.tsx CSS extraction doesn't always
+// traverse client-component CSS imports, so we ground the bundle here too.
+import '@/components/organisms/HeaderNav.css';
+import '@/components/site/MarketingFooter.css';
 import { CookieBannerMount } from '@/components/organisms/CookieBannerMount';
 import { InstantlyPixel } from '@/components/providers/InstantlyPixel';
 import { getRootLayoutChromeState } from '@/lib/demo-recording';
 import { publicEnv } from '@/lib/env-public';
 
 const inter = localFont({
-  src: '../public/fonts/Inter-Variable.woff2',
+  src: '../public/fonts/Inter-Latin.woff2',
   variable: '--font-inter',
-  display: 'swap',
+  display: 'optional',
   weight: '100 900',
 });
 
 const satoshi = localFont({
-  src: '../public/fonts/Satoshi-Variable.woff2',
+  src: '../public/fonts/Satoshi-Latin.woff2',
   variable: '--font-satoshi',
-  display: 'swap',
+  display: 'optional',
   weight: '300 900',
+});
+
+// JOV-2267: DM Sans is only used in below-fold marketing sections
+// (HomeLoopDiagramSection, HomeStatQuoteSection, HomeBentoPairs) via
+// --marketing-font-body. Setting preload:false prevents a 68KB preload hint
+// on every page; display:'optional' already suppresses FOUT.
+const dmSans = localFont({
+  src: '../public/fonts/DMSans-Latin.woff2',
+  variable: '--font-dm-sans',
+  display: 'optional',
+  preload: false,
+  weight: '100 1000',
 });
 
 export const metadata: Metadata = {
@@ -147,9 +166,8 @@ export default async function RootLayout({
   children: React.ReactNode;
   auth: React.ReactNode;
 }>) {
-  const isE2EClientRuntime =
-    process.env.NEXT_PUBLIC_E2E_MODE === '1' ||
-    process.env.E2E_USE_TEST_AUTH_BYPASS === '1';
+  const isE2EClientRuntime = process.env.NEXT_PUBLIC_E2E_MODE === '1';
+  const isTestAuthBypassRuntime = process.env.E2E_USE_TEST_AUTH_BYPASS === '1';
   const clerkMockEnabled = process.env.NEXT_PUBLIC_CLERK_MOCK === '1';
   const clerkProxyDisabled =
     process.env.NEXT_PUBLIC_CLERK_PROXY_DISABLED === '1';
@@ -187,7 +205,7 @@ export default async function RootLayout({
     );
   }
 
-  const bodyClassName = `${inter.variable} ${satoshi.variable} font-sans antialiased bg-base text-primary-token`;
+  const bodyClassName = `${inter.variable} ${satoshi.variable} ${dmSans.variable} font-sans antialiased bg-base text-primary-token`;
 
   const content = (
     <>
@@ -205,13 +223,17 @@ export default async function RootLayout({
       className='dark'
       data-clerk-mock={clerkMockEnabled ? '1' : undefined}
       data-clerk-proxy-disabled={clerkProxyDisabled ? '1' : undefined}
-      data-e2e-mode={isE2EClientRuntime ? '1' : undefined}
+      data-e2e-mode={
+        isE2EClientRuntime || isTestAuthBypassRuntime ? '1' : undefined
+      }
       data-demo-recording={isDemoRecording ? '1' : undefined}
       data-dev-chrome-disabled={shouldRenderDevChrome ? undefined : '1'}
       data-scroll-behavior='smooth'
       suppressHydrationWarning
     >
       <head suppressHydrationWarning>
+        {/* eslint-disable-next-line @next/next/no-sync-scripts -- Electron runtime marker must run before first paint. */}
+        <script src='/electron-runtime-init.js' />
         {/* eslint-disable-next-line @next/next/no-sync-scripts -- Theme init must run before first paint and stays static in /public. */}
         <script src='/theme-init.js' />
       </head>

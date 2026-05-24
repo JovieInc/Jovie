@@ -45,13 +45,26 @@ vi.mock('@/lib/db/schema/content', () => ({
     updatedAt: 'updatedAt',
     artworkUrl: 'artworkUrl',
     creatorProfileId: 'creatorProfileId',
+    deletedAt: 'deletedAt',
     id: 'id',
+    releaseDate: 'releaseDate',
+    revealDate: 'revealDate',
+    status: 'status',
   },
   discogRecordings: {
     slug: 'slug',
     updatedAt: 'updatedAt',
     creatorProfileId: 'creatorProfileId',
     id: 'id',
+  },
+  discogReleaseTracks: {
+    releaseId: 'releaseId',
+    recordingId: 'recordingId',
+  },
+  providerLinks: {
+    ownerType: 'ownerType',
+    releaseId: 'releaseId',
+    url: 'url',
   },
 }));
 
@@ -72,13 +85,20 @@ vi.mock('@/lib/db/schema/profiles', () => ({
     username: 'username',
     usernameNormalized: 'usernameNormalized',
     updatedAt: 'updatedAt',
+    avatarUrl: 'avatarUrl',
     isPublic: 'isPublic',
     id: 'id',
   },
 }));
 
 vi.mock('drizzle-orm', () => ({
+  and: queryMock,
   eq: queryMock,
+  isNotNull: queryMock,
+  isNull: queryMock,
+  ne: queryMock,
+  or: queryMock,
+  sql: queryMock,
 }));
 
 vi.mock('@sentry/nextjs', () => ({

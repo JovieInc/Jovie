@@ -1,17 +1,18 @@
 'use server';
 
 import { redirect } from 'next/navigation';
-import { getDashboardData } from './actions';
+import { APP_ROUTES } from '@/constants/routes';
+import { getDashboardDataEssential } from './actions';
 
 export async function requireProfileId(): Promise<string> {
-  const data = await getDashboardData();
+  const data = await getDashboardDataEssential();
 
   if (data.needsOnboarding && !data.dashboardLoadError) {
-    redirect('/onboarding');
+    redirect(APP_ROUTES.START);
   }
 
   if (!data.selectedProfile) {
-    redirect('/onboarding');
+    redirect(APP_ROUTES.START);
   }
 
   return data.selectedProfile.id;

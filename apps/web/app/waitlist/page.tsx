@@ -1,14 +1,41 @@
 import { redirect } from 'next/navigation';
+import { WaitlistSuccessView } from '@/components/features/waitlist/WaitlistSuccessView';
+import { APP_ROUTES } from '@/constants/routes';
+import { CanonicalUserState, resolveUserState } from '@/lib/auth/gate';
 
 /**
- * Waitlist gate is permanently disabled — all signups go straight to onboarding.
- * This page exists as a server-side redirect for bookmarks, stale caches, and
- * CTA links that still point to /waitlist.
+ * Legacy /waitlist route.
  *
- * The waitlist infrastructure (DB tables, API routes, admin tools) is preserved
- * for future demand control. To re-enable, restore isWaitlistGateEnabled() in
- * lib/waitlist/settings.ts and restore this page from git history.
+ * Anonymous visitors funnel into /start (the new front door, JOV-2132).
+ * Authenticated visitors stay here and see the appropriate confirmation
+ * view — they must NEVER bounce back to /start, because the proxy can
+ * rewrite /start to /waitlist for needs-waitlist users and create a
+ * server-side redirect loop (JOV-2161).
  */
-export default function WaitlistPage() {
-  redirect('/onboarding');
+export default async function WaitlistPage() {
+  const authResult = await resolveUserState();
+
+  if (authResult.state === CanonicalUserState.BANNED) {
+    redirect(APP_ROUTES.UNAVAILABLE);
+  }
+  if (authResult.state === CanonicalUserState.USER_CREATION_FAILED) {
+    redirect('/error/user-creation-failed');
+  }
+  if (authResult.state === CanonicalUserState.ACTIVE) {
+    redirect(APP_ROUTES.DASHBOARD);
+  }
+  if (authResult.state === CanonicalUserState.NEEDS_ONBOARDING) {
+    redirect(APP_ROUTES.START);
+  }
+
+  // Anonymous visitors get the new front-door chat.
+  if (authResult.state === CanonicalUserState.UNAUTHENTICATED) {
+    redirect(APP_ROUTES.START);
+  }
+
+  // Authenticated visitors in WAITLIST_PENDING, NEEDS_WAITLIST_SUBMISSION,
+  // NEEDS_DB_USER, or any future state render the confirmation view in
+  // place. Redirecting them back to /start would loop through the proxy's
+  // needsWaitlist rewrite.
+  return <WaitlistSuccessView />;
 }

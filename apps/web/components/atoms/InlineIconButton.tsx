@@ -6,11 +6,15 @@ import type {
   ButtonHTMLAttributes,
   ReactNode,
 } from 'react';
+import React from 'react';
 
 import { cn } from '@/lib/utils';
 
+// Shell handoff rotation 22: upgraded base for all drawer/edit affordance
+// icon buttons (used by DrawerEditableTextField triggers + actions) to
+// canonical focus rings + DS subtle motion. Predecessor: rot 21 InlineEditRow.
 export const INLINE_ICON_BUTTON_BASE_CLASSNAME =
-  'h-auto w-auto shrink-0 rounded-full border border-transparent bg-transparent p-0.5 text-secondary-token leading-none shadow-none transition-[opacity,background-color,color,box-shadow] duration-150 hover:bg-surface-1 focus-visible:bg-surface-1 focus-visible:ring-1 focus-visible:ring-(--linear-border-focus) [&_svg]:block';
+  'h-auto w-auto shrink-0 rounded-full border border-transparent bg-transparent p-0.5 text-secondary-token leading-none shadow-none transition-[opacity,background-color,color,box-shadow] duration-subtle ease-subtle hover:bg-surface-1 focus-visible:outline-none focus-visible:bg-surface-1 focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/55 focus-visible:ring-offset-2 focus-visible:ring-offset-(--linear-bg-page) [&_svg]:block';
 
 export const INLINE_ICON_BUTTON_VISIBLE_CLASSNAME =
   'p-0.5 opacity-60 hover:opacity-100 focus-visible:opacity-100';
@@ -38,7 +42,9 @@ export type InlineIconButtonProps =
   | InlineIconButtonAnchorProps
   | InlineIconButtonButtonProps;
 
-export function InlineIconButton(props: InlineIconButtonProps) {
+export const InlineIconButton = React.memo(function InlineIconButton(
+  props: InlineIconButtonProps
+) {
   if ('href' in props && typeof props.href === 'string') {
     const {
       children,
@@ -92,4 +98,4 @@ export function InlineIconButton(props: InlineIconButtonProps) {
       {children}
     </Button>
   );
-}
+});

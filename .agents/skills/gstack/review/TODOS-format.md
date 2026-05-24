@@ -1,6 +1,6 @@
 # TODOS.md Format Reference
 
-Shared reference for the canonical TODOS.md format. Referenced by `/ship` (Step 5.5) and `/plan-ceo-review` (TODOS.md updates section) to ensure consistent TODO item structure.
+Legacy reference for older `TODOS.md` files. New follow-up work must be captured in Linear using `review/LINEAR-followups.md`; do not add new items here.
 
 ---
 

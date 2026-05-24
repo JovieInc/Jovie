@@ -4,13 +4,16 @@
 # original Linear ticket intent. Prevents agent-generated PRs from drifting
 # beyond the requested scope — the failure mode that tests alone can't catch.
 #
-# TRIGGER: PR opened/synchronized on agent branches (linear/*, claude/*, codegen-bot/*)
+# TRIGGER: PR opened/synchronized on agent branches (linear/*, claude/*, codegen-bot/*, codex/*, */jov-*)
 #
 # HOW IT WORKS:
 # 1. Extracts Linear ticket intent from PR body (populated by linear-ai-orchestrator)
 # 2. Gets the full diff of the PR
-# 3. Sends diff + intent to OpenAI GPT-4o for scope alignment judgment
-# 4. Reports pass/fail as a commit status (used as required check for auto-approve)
+# 3. If an API key is configured, sends diff + intent to OpenAI GPT-4o for
+#    scope alignment judgment
+# 4. If no API key is configured, skips the LLM call and reports a deterministic
+#    human-review status so CI does not burn tokens or fail inconclusively
+# 5. Reports pass/fail/skip as a commit status (used as required check for auto-approve)
 #
 # SAFETY:
 # - Read-only: does not modify code, only reports status
@@ -46,12 +49,13 @@ jobs:
         startsWith(github.event.pull_request.head.ref, 'linear/') ||
         startsWith(github.event.pull_request.head.ref, 'claude/') ||
         startsWith(github.event.pull_request.head.ref, 'codegen-bot/') ||
-        startsWith(github.event.pull_request.head.ref, 'codex/')
+        startsWith(github.event.pull_request.head.ref, 'codex/') ||
+        contains(github.event.pull_request.head.ref, '/jov-')
       )
     steps:
       - name: Generate Jovie Bot token
         id: app-token
-        uses: actions/create-github-app-token@f8d387b68d61c58ab83c6c016672934102569859 # v3.0.0
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
         with:
           app-id: ${{ vars.JOVIE_BOT_APP_ID }}
           private-key: ${{ secrets.JOVIE_BOT_PRIVATE_KEY }}
@@ -130,9 +134,23 @@ jobs:
 
           echo "diff=$(echo "$FULL_DIFF" | base64 -w0)" >> "$GITHUB_OUTPUT"
 
+      - name: Check scope judge API key
+        id: judge-key
+        if: steps.intent.outputs.has_intent == 'true' && steps.diff.outputs.has_diff == 'true'
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        run: |
+          if [[ -n "$OPENAI_API_KEY" ]]; then
+            echo "Scope judge API key is configured."
+            echo "has_key=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "Scope judge API key is not configured. Skipping LLM-backed scope judgment."
+            echo "has_key=false" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Run scope alignment judge (OpenAI)
         id: judge
-        if: steps.intent.outputs.has_intent == 'true' && steps.diff.outputs.has_diff == 'true'
+        if: steps.intent.outputs.has_intent == 'true' && steps.diff.outputs.has_diff == 'true' && steps.judge-key.outputs.has_key == 'true'
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
         run: |
@@ -213,7 +231,7 @@ jobs:
           fi
 
       - name: Report scope judge status
-        if: steps.intent.outputs.has_intent == 'true' && steps.diff.outputs.has_diff == 'true'
+        if: steps.intent.outputs.has_intent == 'true' && steps.diff.outputs.has_diff == 'true' && steps.judge-key.outputs.has_key == 'true'
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
         run: |
@@ -239,6 +257,19 @@ jobs:
             -f state="$STATE" \
             -f target_url="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" \
             -f description="$DESCRIPTION" \
+            -f context="scope-judge"
+
+      - name: Skip status (scope judge API key missing)
+        if: steps.intent.outputs.has_intent == 'true' && steps.diff.outputs.has_diff == 'true' && steps.judge-key.outputs.has_key != 'true'
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: |
+          SHA="${{ github.event.pull_request.head.sha }}"
+
+          gh api repos/${{ github.repository }}/statuses/$SHA \
+            -f state="failure" \
+            -f target_url="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" \
+            -f description="Scope judge skipped - API key missing; human review required" \
             -f context="scope-judge"
 
       - name: Skip status (no Linear intent found)

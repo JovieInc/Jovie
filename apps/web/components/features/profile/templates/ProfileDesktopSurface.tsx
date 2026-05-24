@@ -30,8 +30,10 @@ import type {
 import type { DrawerView } from '@/features/profile/ProfileUnifiedDrawer';
 import { ProfileUnifiedDrawer } from '@/features/profile/ProfileUnifiedDrawer';
 import { resolveProfileSurfaceState } from '@/features/profile/profile-surface-state';
+import { StaticListenInterface } from '@/features/profile/StaticListenInterface';
 import { ReleasesView } from '@/features/profile/views/ReleasesView';
 import { sortDSPsByGeoPopularity } from '@/lib/dsp';
+import type { ProfileAlertOptInVariant } from '@/lib/flags/contracts';
 import { readArtistEmailReadyFromSettings } from '@/lib/notifications/artist-email';
 import { getCanonicalProfileDSPs } from '@/lib/profile-dsps';
 import { buildProfileShareContext } from '@/lib/share/context';
@@ -49,11 +51,11 @@ const PRIMARY_TABS: ReadonlyArray<{
   label: string;
   icon: typeof House;
 }> = [
-  { mode: 'profile', label: 'Home', icon: House },
+  { mode: 'profile', label: 'Profile', icon: House },
   { mode: 'listen', label: 'Music', icon: Music2 },
   { mode: 'tour', label: 'Events', icon: CalendarDays },
   { mode: 'subscribe', label: 'Alerts', icon: Bell },
-  { mode: 'about', label: 'Profile', icon: UserRound },
+  { mode: 'about', label: 'About', icon: UserRound },
 ];
 
 interface ProfileDesktopSurfaceProps {
@@ -73,6 +75,7 @@ interface ProfileDesktopSurfaceProps {
   readonly profileSettings?: {
     readonly showOldReleases?: boolean;
   } | null;
+  readonly alertOptInVariant?: ProfileAlertOptInVariant;
   readonly genres?: string[] | null;
   readonly pressPhotos?: PressPhoto[];
   readonly allowPhotoDownloads?: boolean;
@@ -170,12 +173,14 @@ function DesktopSurfaceCard({
   onAction,
   children,
   className,
+  testId,
 }: Readonly<{
   title: string;
   actionLabel?: string;
   onAction?: () => void;
   children: React.ReactNode;
   className?: string;
+  testId?: string;
 }>) {
   return (
     <section
@@ -183,6 +188,7 @@ function DesktopSurfaceCard({
         'rounded-[18px] border border-white/6 bg-white/[0.025] p-5',
         className
       )}
+      data-testid={testId}
     >
       <div className='mb-4 flex items-center justify-between gap-4'>
         <h2 className='text-[16px] font-semibold tracking-[-0.02em] text-white'>
@@ -192,7 +198,7 @@ function DesktopSurfaceCard({
           <button
             type='button'
             onClick={onAction}
-            className='inline-flex items-center gap-1.5 text-[13px] font-medium tracking-[-0.015em] text-white/56 transition-colors duration-200 hover:text-white'
+            className='inline-flex items-center gap-1.5 text-[13px] font-medium tracking-[-0.015em] text-white/56 transition-colors duration-subtle hover:text-white'
           >
             <span>{actionLabel}</span>
             <ChevronRight className='h-4 w-4' />
@@ -222,6 +228,7 @@ export function ProfileDesktopSurface({
   showPayButton = true,
   latestRelease,
   profileSettings,
+  alertOptInVariant = 'button',
   genres,
   pressPhotos = [],
   allowPhotoDownloads = false,
@@ -260,7 +267,16 @@ export function ProfileDesktopSurface({
       ),
     [artist, socialLinks, viewerCountryCode]
   );
-  const activePrimaryTab = getDesktopBaseMode(activeMode);
+  const baseActivePrimaryTab = getDesktopBaseMode(activeMode);
+  const hasTourDates = tourDates.length > 0;
+  const activePrimaryTab =
+    baseActivePrimaryTab === 'tour' && !hasTourDates
+      ? 'profile'
+      : baseActivePrimaryTab;
+  const visiblePrimaryTabs = useMemo(
+    () => PRIMARY_TABS.filter(tab => tab.mode !== 'tour' || hasTourDates),
+    [hasTourDates]
+  );
   const surfaceState = useMemo(
     () =>
       resolveProfileSurfaceState({
@@ -323,7 +339,7 @@ export function ProfileDesktopSurface({
   const artistEmailReady = readArtistEmailReadyFromSettings(artist.settings);
   const showArtistEmailRow = isSubscribed && artistEmailReady;
   const primaryActionControlClassName =
-    'inline-flex h-11 items-center gap-2 rounded-full bg-white px-4 text-[13px] font-semibold tracking-[-0.01em] text-black transition-colors duration-200 hover:bg-white/88';
+    'inline-flex h-11 items-center gap-2 rounded-full bg-white px-4 text-[13px] font-semibold tracking-[-0.01em] text-black transition-colors duration-subtle hover:bg-white/88';
   const PrimaryActionIcon = primaryAction.kind === 'tour' ? CalendarDays : Play;
   let primaryActionElement: React.ReactNode;
   if (primaryAction.kind === 'subscribe') {
@@ -333,6 +349,7 @@ export function ProfileDesktopSurface({
         portalContainer={notificationsPortalContainer}
         variant='hero'
         presentation='modal'
+        experimentVariant={alertOptInVariant}
         onManageNotifications={() => onModeSelect('subscribe')}
       />
     );
@@ -362,9 +379,12 @@ export function ProfileDesktopSurface({
   }
 
   const homeOverview = (
-    <div className='grid min-h-0 flex-1 gap-4 xl:grid-cols-[minmax(0,1.55fr)_minmax(360px,0.9fr)]'>
-      <div className='grid min-h-0 gap-3.5'>
-        <section className='relative min-h-[548px] overflow-hidden rounded-[26px] bg-[#0a0c10]'>
+    <div className='grid min-h-0 min-w-0 flex-1 gap-4 xl:grid-cols-[minmax(0,1fr)_360px] 2xl:grid-cols-[minmax(0,1.55fr)_minmax(360px,0.9fr)]'>
+      <div className='grid min-h-0 min-w-0 gap-3.5'>
+        <section
+          className='relative aspect-[4/5] h-[min(620px,calc(100dvh-180px))] min-h-[420px] min-w-0 max-w-[520px] overflow-hidden rounded-[26px] bg-[color:var(--profile-stage-bg)]'
+          data-testid='profile-desktop-cover'
+        >
           <div className='absolute inset-0'>
             {heroImageUrl ? (
               <ImageWithFallback
@@ -393,6 +413,7 @@ export function ProfileDesktopSurface({
               <div className='space-y-2.5'>
                 <Link
                   href={profileHref}
+                  data-testid='profile-header'
                   className='inline-flex max-w-[820px] items-start gap-2 rounded-md text-[clamp(3rem,6vw,5.75rem)] font-semibold leading-[0.92] tracking-[-0.06em] text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--focus-ring))] focus-visible:ring-offset-2 focus-visible:ring-offset-transparent'
                 >
                   <span className='line-clamp-2'>{artist.name}</span>
@@ -427,7 +448,7 @@ export function ProfileDesktopSurface({
                         href={link.url}
                         target='_blank'
                         rel='noopener noreferrer'
-                        className='inline-flex h-10 w-10 items-center justify-center rounded-full text-white drop-shadow-[0_2px_10px_rgba(0,0,0,0.45)] transition-opacity duration-200 hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/80 focus-visible:ring-offset-2 focus-visible:ring-offset-transparent'
+                        className='inline-flex h-10 w-10 items-center justify-center text-white/78 drop-shadow-[0_2px_10px_rgba(0,0,0,0.45)] transition-colors duration-subtle hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/80 focus-visible:ring-offset-2 focus-visible:ring-offset-transparent'
                         aria-label={link.platform}
                       >
                         <SocialIcon
@@ -443,10 +464,13 @@ export function ProfileDesktopSurface({
           </div>
         </section>
 
-        <div className='grid gap-3.5 xl:grid-cols-[minmax(0,1.12fr)_minmax(320px,0.88fr)]'>
+        <div
+          className='grid gap-3.5 xl:grid-cols-[minmax(0,1.12fr)_minmax(320px,0.88fr)]'
+          data-testid='profile-desktop-secondary-grid'
+        >
           <DesktopSurfaceCard
-            title='All Shows'
-            actionLabel='View all shows'
+            title='Events'
+            actionLabel='View Events'
             onAction={() => onModeSelect('tour')}
           >
             <div className='space-y-2'>
@@ -477,7 +501,7 @@ export function ProfileDesktopSurface({
                     {tourDate.ticketUrl ? (
                       <a
                         href={tourDate.ticketUrl}
-                        className='inline-flex h-9 items-center rounded-full border border-white/12 px-3 text-[12px] font-medium text-white/82 transition-colors duration-200 hover:bg-white/[0.04]'
+                        className='inline-flex h-9 items-center rounded-full border border-white/12 px-3 text-[12px] font-medium text-white/82 transition-colors duration-subtle hover:bg-white/[0.04]'
                       >
                         Tickets
                       </a>
@@ -505,7 +529,7 @@ export function ProfileDesktopSurface({
                         ? `/${artist.handle}/${release.slug}`
                         : undefined
                     }
-                    className='grid grid-cols-[56px_minmax(0,1fr)_40px_28px] items-center gap-3 rounded-[18px] bg-white/[0.025] px-3 py-3 transition-colors duration-200 hover:bg-white/[0.04]'
+                    className='grid grid-cols-[56px_minmax(0,1fr)_40px_28px] items-center gap-3 rounded-[18px] bg-white/[0.025] px-3 py-3 transition-colors duration-subtle hover:bg-white/[0.04]'
                   >
                     <div className='relative h-14 w-14 overflow-hidden rounded-[14px]'>
                       <ImageWithFallback
@@ -514,6 +538,7 @@ export function ProfileDesktopSurface({
                         fill
                         sizes='56px'
                         className='object-cover'
+                        fallbackVariant='release'
                       />
                     </div>
                     <div className='min-w-0'>
@@ -545,96 +570,37 @@ export function ProfileDesktopSurface({
         </div>
       </div>
 
-      <div className='grid min-h-0 gap-3.5'>
-        <DesktopSurfaceCard title='Latest Release'>
-          {latestVisibleRelease ? (
-            <div className='flex gap-4'>
-              <div className='relative h-[128px] w-[128px] overflow-hidden rounded-[20px]'>
-                <ImageWithFallback
-                  src={latestVisibleRelease.artworkUrl}
-                  alt={latestVisibleRelease.title}
-                  fill
-                  sizes='128px'
-                  className='object-cover'
-                />
-              </div>
-              <div className='min-w-0 flex-1 space-y-4'>
-                <div className='space-y-1.5'>
-                  <p className='truncate text-[18px] font-semibold tracking-[-0.03em] text-white'>
-                    {latestVisibleRelease.title}
-                  </p>
-                  <p className='text-[14px] text-white/48'>
-                    {formatReleaseMeta(
-                      latestVisibleRelease.releaseType,
-                      latestVisibleRelease.releaseDate
-                    )}
-                  </p>
-                </div>
-                <div className='flex flex-wrap items-center gap-2.5'>
-                  <button
-                    type='button'
-                    onClick={onPlayClick}
-                    className='inline-flex h-11 w-11 items-center justify-center rounded-full border border-white/12 bg-black/32 text-white transition-colors duration-200 hover:bg-black/48'
-                    aria-label='Play'
-                  >
-                    <Play className='ml-0.5 h-4 w-4 fill-current' />
-                  </button>
-                  {latestVisibleRelease.slug ? (
-                    <a
-                      href={`/${artist.handle}/${latestVisibleRelease.slug}`}
-                      className='inline-flex h-11 items-center rounded-full border border-white/12 px-4 text-[14px] font-medium text-white/84 transition-colors duration-200 hover:bg-white/[0.04]'
-                    >
-                      View Release
-                    </a>
-                  ) : null}
-                </div>
-              </div>
-            </div>
-          ) : (
-            <EmptySurfaceBlock>{emptyState.release}</EmptySurfaceBlock>
-          )}
-        </DesktopSurfaceCard>
-
-        <DesktopSurfaceCard title='More Music'>
-          {visibleReleases.length > 0 ? (
-            <div className='grid grid-cols-3 gap-3'>
-              {visibleReleases.slice(0, 3).map(release => (
-                <a
-                  key={release.id}
-                  href={
-                    release.slug
-                      ? `/${artist.handle}/${release.slug}`
-                      : undefined
-                  }
-                >
-                  <div className='relative aspect-[0.95] overflow-hidden rounded-[22px] border border-white/8'>
-                    <ImageWithFallback
-                      src={release.artworkUrl}
-                      alt={release.title}
-                      fill
-                      sizes='180px'
-                      className='object-cover'
-                    />
-                  </div>
-                  <p className='mt-3 truncate text-[16px] font-medium tracking-[-0.025em] text-white'>
-                    {release.title}
-                  </p>
-                  <p className='mt-1 truncate text-[13px] text-white/44'>
-                    {formatReleaseMeta(
-                      release.releaseType,
-                      release.releaseDate
-                    )}
-                  </p>
-                </a>
-              ))}
-            </div>
-          ) : (
-            <EmptySurfaceBlock>{emptyState.homeProof}</EmptySurfaceBlock>
-          )}
-        </DesktopSurfaceCard>
-
-        <DesktopSurfaceCard title='Alerts'>
+      <div className='grid min-h-0 min-w-0 gap-3.5'>
+        <DesktopSurfaceCard title='Alerts' testId='profile-desktop-alerts-card'>
           <div className='space-y-4'>
+            {!isSubscribed ? (
+              <button
+                type='button'
+                onClick={() => onModeSelect('subscribe')}
+                className='flex min-h-[58px] w-full items-center justify-between gap-4 rounded-[18px] border border-white/8 bg-white/[0.035] px-4 text-left transition-colors duration-subtle hover:bg-white/[0.055]'
+              >
+                <span className='min-w-0'>
+                  <span className='block truncate text-[15px] font-semibold tracking-[-0.015em] text-white'>
+                    Release Alerts
+                  </span>
+                  <span className='block truncate text-[12px] leading-5 text-white/48'>
+                    New music, shows, and merch.
+                  </span>
+                </span>
+                {alertOptInVariant === 'toggle' ? (
+                  <span
+                    className='relative h-[26px] w-[42px] shrink-0 rounded-full border border-white/16 bg-white/10 p-0.5'
+                    aria-hidden='true'
+                  >
+                    <span className='block h-[22px] w-[22px] rounded-full bg-white shadow-[0_4px_10px_rgba(0,0,0,0.22)]' />
+                  </span>
+                ) : (
+                  <span className='inline-flex h-8 shrink-0 items-center rounded-full bg-white px-3 text-[12px] font-semibold text-black'>
+                    Get alerts
+                  </span>
+                )}
+              </button>
+            ) : null}
             <div className='space-y-3'>
               {[
                 { key: 'newMusic', label: 'New Music', icon: Music2 },
@@ -674,22 +640,22 @@ export function ProfileDesktopSurface({
                     <p className='text-[13px] font-semibold tracking-[-0.01em] text-white/44'>
                       Sent by {artist.name}
                     </p>
-                    <p className='text-[14px] leading-6 text-white/58'>
-                      Share your email with {artist.name} to receive occasional
-                      emails about related things.
+                    <p className='text-[14px] leading-5 text-white/58'>
+                      Share your email with {artist.name} for occasional artist
+                      emails.
                     </p>
                   </div>
                   <div className='flex items-center justify-between gap-4'>
                     <div className='flex items-center gap-3'>
                       <Mail className='size-4 text-white/62' />
                       <span className='text-[14px] font-medium tracking-[-0.015em] text-white/84'>
-                        Subscribe to Other Alerts
+                        Artist Emails
                       </span>
                     </div>
                     <Switch
                       checked={isSubscribed}
                       onCheckedChange={() => onModeSelect('subscribe')}
-                      aria-label='Subscribe to other alerts'
+                      aria-label='Artist emails'
                       className='data-[state=checked]:bg-white/36 data-[state=unchecked]:bg-white/14'
                     />
                   </div>
@@ -705,10 +671,15 @@ export function ProfileDesktopSurface({
   const nonHomeContent =
     activePrimaryTab === 'listen' ? (
       <div className='grid min-h-0 flex-1 gap-3.5 xl:grid-cols-[minmax(0,1.3fr)_360px]'>
-        <DesktopSurfaceCard title='Releases' className='min-h-0'>
+        <DesktopSurfaceCard
+          title='Releases'
+          className='min-h-0'
+          testId='profile-primary-tab-releases'
+        >
           {visibleReleases.length > 0 ? (
             <ReleasesView
               releases={visibleReleases}
+              artistId={artist.id}
               artistHandle={artist.handle}
               artistName={artist.name}
             />
@@ -717,6 +688,17 @@ export function ProfileDesktopSurface({
           )}
         </DesktopSurfaceCard>
         <div className='grid gap-3.5'>
+          <DesktopSurfaceCard title='Listen'>
+            <StaticListenInterface
+              artist={artist}
+              handle={artist.handle}
+              dspsOverride={mergedDSPs}
+              containerClassName='max-w-none'
+              providerButtonClassName='rounded-[18px] border-white/8 bg-white/[0.045] px-4 py-3.5 text-white hover:bg-white/[0.08]'
+              emptyStateClassName='rounded-[18px] border-white/8 bg-white/[0.04] shadow-none'
+              hideHelpText
+            />
+          </DesktopSurfaceCard>
           <DesktopSurfaceCard title='Latest Release'>
             <div className='space-y-4'>
               <div className='relative aspect-square overflow-hidden rounded-[22px] border border-white/8'>
@@ -726,6 +708,7 @@ export function ProfileDesktopSurface({
                   fill
                   sizes='320px'
                   className='object-cover'
+                  fallbackVariant='release'
                 />
               </div>
               <div>
@@ -743,23 +726,27 @@ export function ProfileDesktopSurface({
           </DesktopSurfaceCard>
           {hasTip ? (
             <DesktopSurfaceCard
-              title='Support'
-              actionLabel='Open Support'
+              title='Pay'
+              actionLabel='Open Pay'
               onAction={() => onDrawerViewChange('pay')}
             >
               <button
                 type='button'
                 onClick={() => onDrawerViewChange('pay')}
-                className='inline-flex h-12 items-center rounded-full border border-white/12 px-4 text-[14px] font-medium text-white/84 transition-colors duration-200 hover:bg-white/[0.04]'
+                className='inline-flex h-12 items-center rounded-full border border-white/12 px-4 text-[14px] font-medium text-white/84 transition-colors duration-subtle hover:bg-white/[0.04]'
               >
-                Support {artist.name}
+                Pay {artist.name}
               </button>
             </DesktopSurfaceCard>
           ) : null}
         </div>
       </div>
     ) : activePrimaryTab === 'tour' ? (
-      <DesktopSurfaceCard title='All Shows' className='flex-1'>
+      <DesktopSurfaceCard
+        title='Events'
+        className='flex-1'
+        testId='profile-primary-tab-tour'
+      >
         <div className='space-y-2'>
           {upcomingTourDates.length > 0 ? (
             upcomingTourDates.map(tourDate => (
@@ -791,7 +778,7 @@ export function ProfileDesktopSurface({
                 {tourDate.ticketUrl ? (
                   <a
                     href={tourDate.ticketUrl}
-                    className='inline-flex h-11 items-center rounded-full border border-white/12 px-4 text-[14px] font-medium text-white/84 transition-colors duration-200 hover:bg-white/[0.04]'
+                    className='inline-flex h-11 items-center rounded-full border border-white/12 px-4 text-[14px] font-medium text-white/84 transition-colors duration-subtle hover:bg-white/[0.04]'
                   >
                     Tickets
                   </a>
@@ -804,7 +791,11 @@ export function ProfileDesktopSurface({
         </div>
       </DesktopSurfaceCard>
     ) : activePrimaryTab === 'about' ? (
-      <DesktopSurfaceCard title='Profile' className='flex-1'>
+      <DesktopSurfaceCard
+        title='Profile'
+        className='flex-1'
+        testId='profile-primary-tab-about'
+      >
         <AboutSection
           artist={artist}
           genres={genres}
@@ -828,7 +819,7 @@ export function ProfileDesktopSurface({
             className='flex min-w-0 items-center gap-1 rounded-full bg-black/24 p-1 backdrop-blur-xl'
             aria-label='Profile navigation'
           >
-            {PRIMARY_TABS.map(tab => {
+            {visiblePrimaryTabs.map(tab => {
               const Icon = tab.icon;
               const isActive = activePrimaryTab === tab.mode;
               return (
@@ -836,17 +827,18 @@ export function ProfileDesktopSurface({
                   key={tab.mode}
                   type='button'
                   onClick={() => onModeSelect(tab.mode)}
+                  data-testid={`profile-primary-tab-${tab.mode}`}
                   className={cn(
-                    'inline-flex h-10 min-w-0 items-center gap-2 rounded-full px-3 text-[13px] font-medium tracking-[-0.01em] transition-colors duration-200',
+                    'inline-flex h-10 min-w-0 items-center gap-2 rounded-full px-3 text-[13px] font-medium tracking-[-0.01em] transition-colors duration-subtle active:bg-white/[0.08]',
                     isActive
-                      ? 'bg-white/[0.1] text-white'
-                      : 'text-white/50 hover:bg-white/[0.05] hover:text-white/78'
+                      ? 'text-white'
+                      : 'text-white/50 hover:text-white/78'
                   )}
                   aria-current={isActive ? 'page' : undefined}
                 >
                   <Icon
                     className={cn(
-                      'h-4 w-4 shrink-0 transition-colors duration-200',
+                      'h-4 w-4 shrink-0 transition-colors duration-subtle',
                       isActive && 'text-white'
                     )}
                   />
@@ -859,8 +851,8 @@ export function ProfileDesktopSurface({
           <button
             type='button'
             onClick={onOpenMenu}
-            className='inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-black/28 text-white backdrop-blur-xl transition-colors duration-200 hover:bg-black/44'
-            aria-label='More options'
+            className='inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-black/28 text-white backdrop-blur-xl transition-colors duration-subtle hover:bg-black/44'
+            aria-label='Menu'
           >
             <MoreHorizontal className='h-5 w-5' />
           </button>
@@ -868,7 +860,7 @@ export function ProfileDesktopSurface({
 
         <div className='relative flex min-h-0 flex-1 flex-col overflow-hidden'>
           <div className='pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,rgba(255,255,255,0.025),transparent_34%)]' />
-          <div className='relative z-10 flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto overscroll-contain p-5 pt-4 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden'>
+          <div className='relative z-10 flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto overscroll-contain [touch-action:pan-y] [will-change:scroll-position] p-5 pt-4 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden'>
             {nonHomeContent}
           </div>
         </div>
@@ -880,6 +872,7 @@ export function ProfileDesktopSurface({
             portalContainer={notificationsPortalContainer}
             autoOpen
             hideTrigger
+            experimentVariant={alertOptInVariant}
             onFlowClosed={onAlertsModalClose}
           />
         ) : null}
@@ -902,6 +895,7 @@ export function ProfileDesktopSurface({
           shareContext={shareContext}
           hasTip={hasTip}
           hasContacts={hasContacts}
+          hasTourDates={hasTourDates}
           genres={genres}
           pressPhotos={pressPhotos}
           allowPhotoDownloads={allowPhotoDownloads}

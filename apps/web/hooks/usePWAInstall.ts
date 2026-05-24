@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { isElectronRuntime } from '@/lib/desktop/electron-bridge';
 import {
   isSwEnabled,
   registerServiceWorker,
@@ -26,7 +27,7 @@ const DISMISS_DURATION_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
 // hydrates and useEffect runs.  Stash it so the hook can pick it up later.
 let _earlyPromptEvent: BeforeInstallPromptEvent | null = null;
 
-if (typeof window !== 'undefined') {
+if (typeof window !== 'undefined' && !isElectronRuntime()) {
   // Register the service worker early -- Chrome requires a registered SW with
   // a fetch handler before it will fire beforeinstallprompt.
   // In development, skip registration (and unregister any stale SW) unless
@@ -73,12 +74,19 @@ function isStandalone(): boolean {
 
 export function usePWAInstall() {
   const deferredPrompt = useRef<BeforeInstallPromptEvent | null>(null);
+  const isElectron = isElectronRuntime();
   const [canPrompt, setCanPrompt] = useState(false);
-  const [isInstalled, setIsInstalled] = useState(isStandalone);
+  const [isInstalled, setIsInstalled] = useState(
+    () => !isElectron && isStandalone()
+  );
   const isIOS =
-    typeof navigator !== 'undefined' && isIOSSafari() && !isStandalone();
+    !isElectron &&
+    typeof navigator !== 'undefined' &&
+    isIOSSafari() &&
+    !isStandalone();
 
   useEffect(() => {
+    if (isElectronRuntime()) return;
     if (isStandalone() || isDismissed()) return;
 
     // iOS Safari doesn't fire beforeinstallprompt — detect it separately

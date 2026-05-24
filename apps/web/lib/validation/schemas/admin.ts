@@ -140,7 +140,14 @@ export type WaitlistGoal = z.infer<typeof waitlistGoalSchema>;
 /**
  * Pricing plan enum values for waitlist submissions.
  */
-export const waitlistPlanValues = ['free', 'branding', 'pro', 'max'] as const;
+export const waitlistPlanValues = [
+  'free',
+  'branding',
+  'pro',
+  'team',
+  'enterprise',
+  'max',
+] as const;
 
 /**
  * Pricing plan validation schema.
@@ -202,6 +209,7 @@ export type WaitlistApprovePayload = z.infer<typeof waitlistApproveSchema>;
 export const waitlistSettingsUpdateSchema = z.object({
   gateEnabled: z.boolean(),
   autoAcceptEnabled: z.boolean(),
+  autoAcceptAfterDays: z.number().int().min(1).max(365),
   autoAcceptDailyLimit: z.number().int().min(0).max(10_000),
 });
 

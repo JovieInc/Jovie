@@ -9,13 +9,15 @@ import {
   Copy,
   Link2,
   Loader2,
-  MoreHorizontal,
   Plus,
   Trash2,
 } from 'lucide-react';
 import Link from 'next/link';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
+import { toast } from 'sonner';
 import { Icon } from '@/components/atoms/Icon';
+import { TableActionMenu } from '@/components/atoms/table-action-menu/TableActionMenu';
+import { ConfirmDialog } from '@/components/molecules/ConfirmDialog';
 import { ContentSectionHeader } from '@/components/molecules/ContentSectionHeader';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import {
@@ -24,8 +26,18 @@ import {
   DrawerSurfaceCard,
 } from '@/components/molecules/drawer';
 import { Dialog, DialogBody, DialogTitle } from '@/components/organisms/Dialog';
+import { TableIconButton } from '@/components/organisms/table';
 import { BASE_URL } from '@/constants/app';
 import { APP_ROUTES } from '@/constants/routes';
+import {
+  InvestorTable,
+  InvestorTableBody,
+  InvestorTableCell,
+  InvestorTableHead,
+  InvestorTableHeaderCell,
+  InvestorTableHeaderRow,
+  InvestorTableRow,
+} from '../_components/InvestorTablePrimitives';
 
 // ---------------------------------------------------------------------------
 // Types (mirrored from schema to avoid server-only import in client component)
@@ -355,28 +367,31 @@ function StatusBadge({ isActive }: { readonly isActive: boolean }) {
 function LinkActions({
   link,
   onToggleActive,
-  onDelete,
+  onRequestDelete,
 }: {
   readonly link: InvestorLinkWithCounts;
   readonly onToggleActive: (id: string, isActive: boolean) => void;
-  readonly onDelete: (id: string) => void;
+  readonly onRequestDelete: () => void;
 }) {
-  const [menuOpen, setMenuOpen] = useState(false);
   const [copied, setCopied] = useState(false);
-  const menuRef = useRef<HTMLDivElement>(null);
 
   const shareableUrl = `${BASE_URL}/investor-portal?t=${link.token}`;
-
-  useEffect(() => {
-    if (!menuOpen) return;
-    const handler = (e: MouseEvent) => {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
-        setMenuOpen(false);
-      }
-    };
-    document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
-  }, [menuOpen]);
+  const actionItems = [
+    {
+      id: link.isActive ? 'deactivate' : 'reactivate',
+      label: link.isActive ? 'Deactivate' : 'Reactivate',
+      icon: link.isActive ? CircleSlash : CheckCircle2,
+      onClick: () => onToggleActive(link.id, !link.isActive),
+    },
+    { id: 'separator', label: '' },
+    {
+      id: 'delete',
+      label: 'Delete',
+      icon: Trash2,
+      variant: 'destructive' as const,
+      onClick: onRequestDelete,
+    },
+  ];
 
   const handleCopy = async () => {
     try {
@@ -390,71 +405,20 @@ function LinkActions({
 
   return (
     <div className='flex items-center gap-2'>
-      <Button
-        variant='ghost'
-        size='sm'
+      <TableIconButton
+        ariaLabel='Copy shareable URL'
+        className='text-tertiary-token'
+        icon={
+          copied ? (
+            <Check className='h-3.5 w-3.5 text-success' />
+          ) : (
+            <Copy className='h-3.5 w-3.5' />
+          )
+        }
         onClick={handleCopy}
-        title='Copy shareable URL'
-        className='h-8 px-2'
-      >
-        {copied ? (
-          <Check className='h-3.5 w-3.5 text-success' />
-        ) : (
-          <Copy className='h-3.5 w-3.5' />
-        )}
-      </Button>
-      <div className='relative' ref={menuRef}>
-        <Button
-          variant='ghost'
-          size='sm'
-          onClick={() => setMenuOpen(!menuOpen)}
-          className='h-8 px-2'
-        >
-          <MoreHorizontal className='h-3.5 w-3.5' />
-        </Button>
-        {menuOpen && (
-          <div className='absolute right-0 top-full z-50 mt-1 w-44 rounded-lg border border-subtle bg-(--linear-app-content-surface) p-1 shadow-popover'>
-            <button
-              type='button'
-              className='flex w-full items-center gap-2 rounded-md px-2.5 py-1.5 text-app text-secondary-token transition-colors hover:bg-surface-0 hover:text-primary-token'
-              onClick={() => {
-                onToggleActive(link.id, !link.isActive);
-                setMenuOpen(false);
-              }}
-            >
-              {link.isActive ? (
-                <>
-                  <CircleSlash className='h-3.5 w-3.5' />
-                  Deactivate
-                </>
-              ) : (
-                <>
-                  <CheckCircle2 className='h-3.5 w-3.5' />
-                  Reactivate
-                </>
-              )}
-            </button>
-            <button
-              type='button'
-              className='flex w-full items-center gap-2 rounded-md px-2.5 py-1.5 text-app text-destructive transition-colors hover:bg-destructive/8'
-              onClick={() => {
-                setMenuOpen(false);
-                // Deactivates the link (soft-delete) — confirm first
-                if (
-                  globalThis.confirm(
-                    `Delete "${link.label}"? The link will be permanently removed.`
-                  )
-                ) {
-                  onDelete(link.id);
-                }
-              }}
-            >
-              <Trash2 className='h-3.5 w-3.5' />
-              Delete
-            </button>
-          </div>
-        )}
-      </div>
+        tooltip='Copy shareable URL'
+      />
+      <TableActionMenu items={actionItems} align='end' />
     </div>
   );
 }
@@ -468,6 +432,8 @@ export function InvestorLinksManager() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
+  const [pendingDeleteLink, setPendingDeleteLink] =
+    useState<InvestorLinkWithCounts | null>(null);
 
   const fetchLinks = useCallback(async () => {
     try {
@@ -506,7 +472,6 @@ export function InvestorLinksManager() {
 
   const handleDelete = async (id: string) => {
     const original = links.find(l => l.id === id);
-    // Optimistic soft-delete (matches server behavior: sets isActive=false)
     setLinks(prev =>
       prev.map(l => (l.id === id ? { ...l, isActive: false } : l))
     );
@@ -515,8 +480,7 @@ export function InvestorLinksManager() {
         method: 'DELETE',
       });
       if (!res.ok) throw new Error('Failed to delete link');
-    } catch {
-      // Revert on failure — restore original isActive state
+    } catch (err) {
       if (original) {
         setLinks(prev =>
           prev.map(l =>
@@ -524,6 +488,7 @@ export function InvestorLinksManager() {
           )
         );
       }
+      throw err;
     }
   };
 
@@ -543,7 +508,7 @@ export function InvestorLinksManager() {
             <div
               // biome-ignore lint/suspicious/noArrayIndexKey: static skeleton placeholders never reorder
               key={`skeleton-${i}`}
-              className='h-11 animate-pulse rounded-xl bg-surface-0'
+              className='h-11 animate-pulse rounded-lg bg-surface-0'
             />
           ))}
         </div>
@@ -576,6 +541,9 @@ export function InvestorLinksManager() {
       <ContentSurfaceCard className='overflow-hidden p-0'>
         <ContentSectionHeader
           title='Manage investor links'
+          className='flex-col items-start gap-2 py-3 sm:flex-row sm:items-center sm:gap-2 sm:py-1.5'
+          titleClassName='overflow-visible whitespace-normal sm:overflow-hidden sm:whitespace-nowrap'
+          actionsClassName='ml-0 w-full justify-end sm:ml-auto sm:w-auto'
           subtitle={(() => {
             if (links.length === 0)
               return 'Create shareable entry points into the investor portal.';
@@ -613,64 +581,59 @@ export function InvestorLinksManager() {
             </Button>
           </div>
         ) : (
-          <div className='overflow-x-auto'>
-            <table className='w-full min-w-[700px] border-collapse text-app'>
-              <thead className='bg-surface-0'>
-                <tr className='border-b border-subtle text-left text-2xs uppercase tracking-[0.08em] text-tertiary-token'>
-                  <th className='px-4 py-2.5 font-semibold'>Label</th>
-                  <th className='px-4 py-2.5 font-semibold'>Investor</th>
-                  <th className='px-4 py-2.5 font-semibold'>Stage</th>
-                  <th className='px-4 py-2.5 font-semibold'>Status</th>
-                  <th className='px-4 py-2.5 font-semibold'>Created</th>
-                  <th className='px-4 py-2.5 text-right font-semibold'>
-                    Actions
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {links.map(link => (
-                  <tr
-                    key={link.id}
-                    className='border-b border-subtle bg-transparent transition-colors duration-150 hover:bg-surface-1'
-                  >
-                    <td className='px-4 py-3 align-middle'>
-                      <span className='font-semibold text-primary-token'>
-                        {link.label}
-                      </span>
-                    </td>
-                    <td className='px-4 py-3 align-middle text-secondary-token'>
-                      <div>
-                        <span>{link.investorName || 'Unknown'}</span>
-                        {link.email && (
-                          <span className='ml-1 text-2xs text-tertiary-token'>
-                            ({link.email})
-                          </span>
-                        )}
-                      </div>
-                    </td>
-                    <td className='px-4 py-3 align-middle'>
-                      <StageBadge stage={link.stage} />
-                    </td>
-                    <td className='px-4 py-3 align-middle'>
-                      <StatusBadge isActive={link.isActive} />
-                    </td>
-                    <td className='px-4 py-3 align-middle text-secondary-token'>
-                      {new Date(link.createdAt).toLocaleDateString()}
-                    </td>
-                    <td className='px-4 py-3 align-middle'>
-                      <div className='flex justify-end'>
-                        <LinkActions
-                          link={link}
-                          onToggleActive={handleToggleActive}
-                          onDelete={handleDelete}
-                        />
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <InvestorTable minWidth='min-w-[700px]'>
+            <InvestorTableHead>
+              <InvestorTableHeaderRow>
+                <InvestorTableHeaderCell>Label</InvestorTableHeaderCell>
+                <InvestorTableHeaderCell>Investor</InvestorTableHeaderCell>
+                <InvestorTableHeaderCell>Stage</InvestorTableHeaderCell>
+                <InvestorTableHeaderCell>Status</InvestorTableHeaderCell>
+                <InvestorTableHeaderCell>Created</InvestorTableHeaderCell>
+                <InvestorTableHeaderCell align='right'>
+                  Actions
+                </InvestorTableHeaderCell>
+              </InvestorTableHeaderRow>
+            </InvestorTableHead>
+            <InvestorTableBody>
+              {links.map(link => (
+                <InvestorTableRow key={link.id}>
+                  <InvestorTableCell>
+                    <span className='font-semibold text-primary-token'>
+                      {link.label}
+                    </span>
+                  </InvestorTableCell>
+                  <InvestorTableCell className='text-secondary-token'>
+                    <div>
+                      <span>{link.investorName || 'Unknown'}</span>
+                      {link.email && (
+                        <span className='ml-1 text-2xs text-tertiary-token'>
+                          ({link.email})
+                        </span>
+                      )}
+                    </div>
+                  </InvestorTableCell>
+                  <InvestorTableCell>
+                    <StageBadge stage={link.stage} />
+                  </InvestorTableCell>
+                  <InvestorTableCell>
+                    <StatusBadge isActive={link.isActive} />
+                  </InvestorTableCell>
+                  <InvestorTableCell className='text-secondary-token'>
+                    {new Date(link.createdAt).toLocaleDateString()}
+                  </InvestorTableCell>
+                  <InvestorTableCell>
+                    <div className='flex justify-end'>
+                      <LinkActions
+                        link={link}
+                        onToggleActive={handleToggleActive}
+                        onRequestDelete={() => setPendingDeleteLink(link)}
+                      />
+                    </div>
+                  </InvestorTableCell>
+                </InvestorTableRow>
+              ))}
+            </InvestorTableBody>
+          </InvestorTable>
         )}
       </ContentSurfaceCard>
 
@@ -678,6 +641,30 @@ export function InvestorLinksManager() {
         open={createDialogOpen}
         onClose={() => setCreateDialogOpen(false)}
         onCreated={handleCreated}
+      />
+
+      <ConfirmDialog
+        open={pendingDeleteLink !== null}
+        onOpenChange={open => {
+          if (!open) setPendingDeleteLink(null);
+        }}
+        title='Delete investor link?'
+        description={
+          pendingDeleteLink
+            ? `"${pendingDeleteLink.label}" will stop working. Anyone with this URL will see a 404.`
+            : ''
+        }
+        confirmLabel='Delete'
+        variant='destructive'
+        onConfirm={async () => {
+          if (!pendingDeleteLink) return;
+          try {
+            await handleDelete(pendingDeleteLink.id);
+            toast.success('Investor link deleted');
+          } catch {
+            toast.error("Couldn't delete investor link");
+          }
+        }}
       />
     </>
   );

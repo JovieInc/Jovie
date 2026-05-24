@@ -22,9 +22,6 @@ import {
 } from './ScrubGradient';
 import { Tooltip } from './Tooltip';
 
-const DURATION_CINEMATIC = 420;
-const EASE_CINEMATIC = 'cubic-bezier(0.32, 0.72, 0, 1)';
-
 export interface AudioBarTrack {
   /** Used for accessible labels and ISRC-style follow-ups elsewhere. */
   readonly id: string;
@@ -73,6 +70,7 @@ export interface AudioBarTrack {
 export function AudioBar({
   isPlaying,
   onPlay,
+  onSeek,
   onShuffle,
   onPrevious,
   onNext,
@@ -92,18 +90,19 @@ export function AudioBar({
 }: {
   readonly isPlaying: boolean;
   readonly onPlay: () => void;
+  readonly onSeek?: (time: number) => void;
   readonly onShuffle?: () => void;
   readonly onPrevious?: () => void;
   readonly onNext?: () => void;
-  readonly onCollapse: () => void;
+  readonly onCollapse?: () => void;
   readonly currentTime: number;
   readonly duration: number;
   readonly cues?: readonly ScrubCue[];
-  readonly loopMode: LoopMode;
-  readonly onCycleLoop: () => void;
+  readonly loopMode?: LoopMode;
+  readonly onCycleLoop?: () => void;
   readonly loopSection?: ScrubLoopSection;
-  readonly waveformOn: boolean;
-  readonly onToggleWaveform: () => void;
+  readonly waveformOn?: boolean;
+  readonly onToggleWaveform?: () => void;
   readonly lyricsActive?: boolean;
   readonly onOpenLyrics?: () => void;
   readonly track: AudioBarTrack;
@@ -111,22 +110,26 @@ export function AudioBar({
 }) {
   const transportButtons = (
     <div className='flex items-center gap-1.5 justify-self-center'>
-      <IconBtn
-        label='Shuffle'
-        tooltipSide='top'
-        tone='ghost'
-        onClick={onShuffle}
-      >
-        <Shuffle className='h-3.5 w-3.5' strokeWidth={2.25} />
-      </IconBtn>
-      <IconBtn
-        label='Previous'
-        tooltipSide='top'
-        tone='ghost'
-        onClick={onPrevious}
-      >
-        <SkipBack className='h-4 w-4' strokeWidth={2.5} fill='currentColor' />
-      </IconBtn>
+      {onShuffle && (
+        <IconBtn
+          label='Shuffle'
+          tooltipSide='top'
+          tone='ghost'
+          onClick={onShuffle}
+        >
+          <Shuffle className='h-3.5 w-3.5' strokeWidth={2.25} />
+        </IconBtn>
+      )}
+      {onPrevious && (
+        <IconBtn
+          label='Previous'
+          tooltipSide='top'
+          tone='ghost'
+          onClick={onPrevious}
+        >
+          <SkipBack className='h-4 w-4' strokeWidth={2.5} fill='currentColor' />
+        </IconBtn>
+      )}
       <Tooltip
         label={isPlaying ? 'Pause' : 'Play'}
         shortcut={SHORTCUTS.playPause}
@@ -135,7 +138,7 @@ export function AudioBar({
         <button
           type='button'
           onClick={onPlay}
-          className='h-8 w-8 rounded-full grid place-items-center bg-primary text-on-primary transition-transform duration-150 ease-out hover:scale-[1.04] active:scale-95'
+          className='h-8 w-8 rounded-full grid place-items-center bg-primary text-on-primary transition-colors duration-subtle ease-subtle hover:bg-primary/90'
           aria-label={isPlaying ? 'Pause (space)' : 'Play (space)'}
         >
           {isPlaying ? (
@@ -153,14 +156,18 @@ export function AudioBar({
           )}
         </button>
       </Tooltip>
-      <IconBtn label='Next' tooltipSide='top' tone='ghost' onClick={onNext}>
-        <SkipForward
-          className='h-4 w-4'
-          strokeWidth={2.5}
-          fill='currentColor'
-        />
-      </IconBtn>
-      <LoopBtn mode={loopMode} onClick={onCycleLoop} />
+      {onNext && (
+        <IconBtn label='Next' tooltipSide='top' tone='ghost' onClick={onNext}>
+          <SkipForward
+            className='h-4 w-4'
+            strokeWidth={2.5}
+            fill='currentColor'
+          />
+        </IconBtn>
+      )}
+      {loopMode && onCycleLoop && (
+        <LoopBtn mode={loopMode} onClick={onCycleLoop} />
+      )}
     </div>
   );
 
@@ -168,7 +175,7 @@ export function AudioBar({
     <div className='flex items-center gap-1.5 justify-self-end'>
       {track.hasLyrics && onOpenLyrics && (
         <IconBtn
-          label='Lyrics'
+          label={lyricsActive ? 'Close lyrics' : 'Lyrics'}
           shortcut={SHORTCUTS.toggleLyrics}
           onClick={onOpenLyrics}
           active={lyricsActive}
@@ -178,29 +185,33 @@ export function AudioBar({
           <Mic2 className='h-3.5 w-3.5' strokeWidth={2.25} />
         </IconBtn>
       )}
-      <IconBtn
-        label={waveformOn ? 'Hide waveform' : 'Show waveform'}
-        shortcut={SHORTCUTS.toggleWaveform}
-        onClick={onToggleWaveform}
-        active={waveformOn}
-        tooltipSide='top'
-        tone='ghost'
-      >
-        {waveformOn ? (
-          <AudioLines className='h-3.5 w-3.5' strokeWidth={2.25} />
-        ) : (
-          <AudioWaveform className='h-3.5 w-3.5' strokeWidth={2.25} />
-        )}
-      </IconBtn>
-      <IconBtn
-        label='Minimize player'
-        shortcut={SHORTCUTS.toggleBar}
-        onClick={onCollapse}
-        tooltipSide='top'
-        tone='ghost'
-      >
-        <Minimize2 className='h-3.5 w-3.5' strokeWidth={2.25} />
-      </IconBtn>
+      {typeof waveformOn === 'boolean' && onToggleWaveform && (
+        <IconBtn
+          label={waveformOn ? 'Hide waveform' : 'Show waveform'}
+          shortcut={SHORTCUTS.toggleWaveform}
+          onClick={onToggleWaveform}
+          active={waveformOn}
+          tooltipSide='top'
+          tone='ghost'
+        >
+          {waveformOn ? (
+            <AudioLines className='h-3.5 w-3.5' strokeWidth={2.25} />
+          ) : (
+            <AudioWaveform className='h-3.5 w-3.5' strokeWidth={2.25} />
+          )}
+        </IconBtn>
+      )}
+      {onCollapse && (
+        <IconBtn
+          label='Minimize player'
+          shortcut={SHORTCUTS.toggleBar}
+          onClick={onCollapse}
+          tooltipSide='top'
+          tone='ghost'
+        >
+          <Minimize2 className='h-3.5 w-3.5' strokeWidth={2.25} />
+        </IconBtn>
+      )}
     </div>
   );
 
@@ -222,13 +233,14 @@ export function AudioBar({
             maxHeight: waveformOn ? 40 : 0,
             opacity: waveformOn ? 1 : 0,
             transform: waveformOn ? 'translateY(0)' : 'translateY(6px)',
-            transition: `max-height ${DURATION_CINEMATIC}ms ${EASE_CINEMATIC}, opacity ${DURATION_CINEMATIC}ms ${EASE_CINEMATIC}, transform ${DURATION_CINEMATIC}ms ${EASE_CINEMATIC}`,
+            transition: `max-height var(--ds-motion-cinematic-duration) var(--ds-motion-cinematic-easing), opacity var(--ds-motion-cinematic-duration) var(--ds-motion-cinematic-easing), transform var(--ds-motion-cinematic-duration) var(--ds-motion-cinematic-easing)`,
           }}
         >
           <div className='pt-1.5 pb-1.5'>
             <ScrubGradient
               currentTime={currentTime}
               duration={duration}
+              onSeek={onSeek}
               cues={cues}
               loopMode={loopMode}
               loopSection={loopSection}

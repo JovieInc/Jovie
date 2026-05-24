@@ -14,9 +14,9 @@ on:
 
 jobs:
   synthetic-test:
-    name: Golden Path Synthetic Test
+    name: Production Synthetic Tests
     runs-on: ubuntu-latest
-    timeout-minutes: 12
+    timeout-minutes: 20
 
     steps:
       - name: Safety check - only run on schedule or manual dispatch
@@ -51,7 +51,13 @@ jobs:
           sudo apt-get update && sudo apt-get install -y doppler
           doppler --version
 
-      - name: Run Golden Path Test
+      - name: Check production signup readiness
+        env:
+          DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN_PRD }}
+        run: |
+          doppler run -- pnpm --filter=@jovie/web exec tsx scripts/check-signup-readiness.ts --target=prd --source=env
+
+      - name: Run Layer A Auth UI Canary (JOV-2446)
         env:
           DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN_PRD }}
           BASE_URL: https://jov.ie
@@ -59,9 +65,41 @@ jobs:
           E2E_SKIP_WEB_SERVER: '1'
           E2E_SYNTHETIC_MODE: 'true'
           E2E_ENVIRONMENT: production
-          PLAYWRIGHT_JSON_OUTPUT_NAME: test-results/results.json
+          SYNTHETIC_PLAYWRIGHT_JSON_OUTPUT_FILE: test-results/synthetic-auth-ui-results.json
         run: |
-          doppler run -- pnpm --filter=@jovie/web exec playwright test tests/e2e/synthetic-golden-path.spec.ts --project=chromium --reporter=line,json --output=test-results
+          doppler run -- pnpm --filter=@jovie/web exec playwright test tests/e2e/synthetic-auth-ui.spec.ts --config=playwright.synthetic.config.ts --project=chromium-synthetic --output=test-results/synthetic-auth-ui
+        continue-on-error: true
+
+      - name: Run Golden Path Health + Performance
+        env:
+          DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN_PRD }}
+          BASE_URL: https://jov.ie
+          PLAYWRIGHT_TEST_BASE_URL: https://jov.ie
+          E2E_SKIP_WEB_SERVER: '1'
+          E2E_SYNTHETIC_MODE: 'true'
+          E2E_ENVIRONMENT: production
+          SYNTHETIC_PLAYWRIGHT_JSON_OUTPUT_FILE: test-results/synthetic-golden-path-results.json
+        run: |
+          doppler run -- pnpm --filter=@jovie/web exec playwright test tests/e2e/synthetic-golden-path.spec.ts --config=playwright.synthetic.config.ts --project=chromium-synthetic --output=test-results/synthetic-golden-path
+        continue-on-error: true
+
+      - name: Run Legacy OTP Signup Canary (gated, JOV-2446 cutover)
+        # Skip this step entirely once Layer A is proven green and the Clerk
+        # dashboard has flipped to SSO-only — set repo variable
+        # `E2E_PROD_LEGACY_CANARY=0` to disable. Default is to run during the
+        # cutover window so monitoring does not go dark between merge and
+        # dashboard flip.
+        if: ${{ vars.E2E_PROD_LEGACY_CANARY != '0' }}
+        env:
+          DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN_PRD }}
+          BASE_URL: https://jov.ie
+          PLAYWRIGHT_TEST_BASE_URL: https://jov.ie
+          E2E_SKIP_WEB_SERVER: '1'
+          E2E_SYNTHETIC_MODE: 'true'
+          E2E_ENVIRONMENT: production
+          SYNTHETIC_PLAYWRIGHT_JSON_OUTPUT_FILE: test-results/synthetic-legacy-otp-results.json
+        run: |
+          doppler run -- pnpm --filter=@jovie/web exec playwright test tests/e2e/synthetic-legacy-otp.spec.ts --config=playwright.synthetic.config.ts --project=chromium-synthetic --output=test-results/synthetic-legacy-otp
         continue-on-error: true
 
       - name: Run Public Profile Smoke Test (JOV-1653)
@@ -72,9 +110,9 @@ jobs:
           E2E_SKIP_WEB_SERVER: '1'
           E2E_SYNTHETIC_MODE: 'true'
           E2E_ENVIRONMENT: production
-          PLAYWRIGHT_JSON_OUTPUT_NAME: test-results/public-profile-smoke-results.json
+          SYNTHETIC_PLAYWRIGHT_JSON_OUTPUT_FILE: test-results/public-profile-smoke-results.json
         run: |
-          doppler run -- pnpm --filter=@jovie/web exec playwright test tests/e2e/public-profile-smoke.spec.ts --project=chromium --reporter=line,json --output=test-results
+          doppler run -- pnpm --filter=@jovie/web exec playwright test tests/e2e/public-profile-smoke.spec.ts --config=playwright.synthetic.config.ts --project=chromium-synthetic --output=test-results/public-profile-smoke
         continue-on-error: true
 
       - name: Upload Public Profile Smoke Screenshots
@@ -86,22 +124,47 @@ jobs:
           if-no-files-found: ignore
           retention-days: 14
 
-      - name: Cleanup Synthetic E2E Users
+      - name: Confirm scoped synthetic cleanup
         if: always()
-        continue-on-error: true
-        env:
-          DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN_PRD }}
         run: |
-          cd apps/web
-          doppler run -- pnpm tsx scripts/cleanup-e2e-users.ts --force
+          echo "Production signup canary cleanup is scoped inside synthetic-golden-path.spec.ts by exact plus-addressed email."
+          echo "No broad production Clerk cleanup script is run from this workflow."
 
       - name: Parse test results
         id: test-results
+        env:
+          LEGACY_CANARY_ENABLED: ${{ vars.E2E_PROD_LEGACY_CANARY != '0' && '1' || '0' }}
         run: |
           node <<'NODE'
           const fs = require('node:fs');
+          const legacyCanaryEnabled = process.env.LEGACY_CANARY_ENABLED === '1';
 
-          const resultsFile = 'apps/web/test-results/results.json';
+          const resultFiles = [
+            {
+              name: 'synthetic-auth-ui',
+              path: 'apps/web/test-results/synthetic-auth-ui-results.json',
+              required: true,
+            },
+            {
+              name: 'synthetic-golden-path',
+              path: 'apps/web/test-results/synthetic-golden-path-results.json',
+              required: true,
+            },
+            {
+              name: 'public-profile-smoke',
+              path: 'apps/web/test-results/public-profile-smoke-results.json',
+              required: true,
+            },
+            {
+              // Optional — legacy OTP canary is gated at the workflow level on
+              // `E2E_PROD_LEGACY_CANARY` (JOV-2446). When the step is skipped,
+              // no results file is produced and we must NOT treat that as an
+              // error.
+              name: 'synthetic-legacy-otp',
+              path: 'apps/web/test-results/synthetic-legacy-otp-results.json',
+              required: legacyCanaryEnabled,
+            },
+          ];
           const outputFile = process.env.GITHUB_OUTPUT;
 
           function emit(line) {
@@ -118,29 +181,58 @@ jobs:
             emit('EOF');
           }
 
-          if (!fs.existsSync(resultsFile)) {
-            emit('test_status=error');
-            emitMultiline('failed_tests', ['Test results file not found']);
-            process.exit(0);
-          }
-
-          const results = JSON.parse(fs.readFileSync(resultsFile, 'utf8'));
           const specs = [];
+          const missingResults = [];
 
-          function collectSpecs(suites = []) {
+          function collectSpecs(suites = [], source) {
             for (const suite of suites) {
-              specs.push(...(suite.specs ?? []));
-              collectSpecs(suite.suites ?? []);
+              specs.push(
+                ...(suite.specs ?? []).map(spec => ({ source, spec }))
+              );
+              collectSpecs(suite.suites ?? [], source);
             }
           }
 
-          collectSpecs(results.suites ?? []);
+          for (const resultFile of resultFiles) {
+            if (!fs.existsSync(resultFile.path)) {
+              if (resultFile.required !== false) {
+                missingResults.push(
+                  `${resultFile.name}: Test results file not found (${resultFile.path})`
+                );
+              } else {
+                console.log(
+                  `${resultFile.name}: optional results not produced (step likely skipped); ignoring.`
+                );
+              }
+              continue;
+            }
 
-          const tests = specs.flatMap(spec =>
-            (spec.tests ?? []).map(testCase => ({ spec, testCase }))
+            try {
+              const results = JSON.parse(
+                fs.readFileSync(resultFile.path, 'utf8')
+              );
+              collectSpecs(results.suites ?? [], resultFile.name);
+            } catch (error) {
+              missingResults.push(
+                `${resultFile.name}: Failed to parse ${resultFile.path}: ${error.message}`
+              );
+            }
+          }
+
+          const tests = specs.flatMap(({ source, spec }) =>
+            (spec.tests ?? []).map(testCase => ({ source, spec, testCase }))
           );
           const skipped = tests.filter(({ testCase }) =>
+            testCase.status === 'skipped' ||
             (testCase.results ?? []).some(result => result.status === 'skipped')
+          );
+          const warnings = tests.flatMap(({ source, spec, testCase }) =>
+            (testCase.results ?? []).flatMap(result =>
+              [...(result.stdout ?? []), ...(result.stderr ?? [])]
+                .map(entry => entry.text ?? '')
+                .filter(text => text.includes('[Synthetic][warning]'))
+                .map(text => `${source}: ${spec.title}: ${text.trim()}`)
+            )
           );
           const flaky = tests.filter(({ testCase }) => testCase.status === 'flaky');
           const failed = tests.filter(
@@ -156,16 +248,25 @@ jobs:
           emit(`passed_tests=${passed.length}`);
           emit(`flaky_tests=${flaky.length}`);
           emit(`skipped_tests=${skipped.length}`);
+          emit(`warning_count=${warnings.length}`);
 
           const details = [
-            ...failed.map(({ spec }) => spec.title),
+            ...missingResults,
+            ...failed.map(({ source, spec }) => `${source}: ${spec.title}`),
             ...(skipped.length > 0
-              ? ['Skipped tests:', ...skipped.map(({ spec }) => spec.title)]
+              ? [
+                  'Skipped tests:',
+                  ...skipped.map(({ source, spec }) => `${source}: ${spec.title}`),
+                ]
               : []),
           ];
           emitMultiline('failed_tests', details);
+          emitMultiline('test_warnings', warnings);
+          for (const warning of warnings) {
+            console.log(`::warning::${warning}`);
+          }
 
-          if (tests.length === 0) {
+          if (missingResults.length > 0 || tests.length === 0) {
             emit('test_status=error');
           } else if (failed.length > 0 || skipped.length > 0) {
             emit('test_status=failed');
@@ -201,7 +302,7 @@ jobs:
           author_name: 'Synthetic Monitoring'
           custom_payload: |
             {
-              "text": "🚨 Golden Path Test Failed - jov.ie",
+              "text": "Production Synthetic Monitoring Failed - jov.ie",
               "attachments": [
                 {
                   "color": "danger",
@@ -237,7 +338,7 @@ jobs:
           author_name: 'Synthetic Monitoring'
           custom_payload: |
             {
-              "text": "✅ Golden Path Health Check - jov.ie",
+              "text": "Production Synthetic Monitoring Passed - jov.ie",
               "attachments": [
                 {
                   "color": "good",
@@ -249,7 +350,7 @@ jobs:
                     },
                     {
                       "title": "Status",
-                      "value": "All critical user journeys passing",
+                      "value": "Production signup and public-profile synthetic checks passing",
                       "short": false
                     },
                     {

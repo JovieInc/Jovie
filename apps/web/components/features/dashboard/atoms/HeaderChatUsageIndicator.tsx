@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { memo } from 'react';
 import { APP_ROUTES, isDemoRoutePath } from '@/constants/routes';
+import { getChatUsageCopy } from '@/lib/chat-usage/copy';
 import { env } from '@/lib/env-client';
 import { useChatUsageQuery } from '@/lib/queries';
 
@@ -26,25 +27,17 @@ export const HeaderChatUsageIndicator = memo(
       return null;
     }
 
-    const isExhausted = data.isExhausted;
-    const pluralSuffix = data.remaining === 1 ? '' : 's';
-    const label = isExhausted
-      ? 'Daily chat limit reached'
-      : `${data.remaining} message${pluralSuffix} left`;
+    const copy = getChatUsageCopy(data);
 
     return (
       <Link
         href={APP_ROUTES.PRICING}
         className='group inline-flex items-center gap-1.5 rounded-lg border border-amber-400/35 bg-amber-500/10 px-2.5 py-1.5 text-app font-caption text-amber-800 transition-colors hover:bg-amber-500/20 dark:text-amber-200'
-        aria-label={
-          isExhausted
-            ? 'Daily AI message limit reached. Open pricing to upgrade.'
-            : `Only ${data.remaining} AI messages left today. Open pricing to upgrade.`
-        }
+        aria-label={copy.headerAriaLabel}
       >
         <AlertTriangle className='h-3.5 w-3.5 shrink-0' />
         <span className='max-sm:hidden sm:inline'>Chat</span>
-        <span className='tabular-nums'>{label}</span>
+        <span className='tabular-nums'>{copy.headerLabel}</span>
       </Link>
     );
   }

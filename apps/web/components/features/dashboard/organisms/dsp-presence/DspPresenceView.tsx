@@ -7,8 +7,8 @@ import type {
   DspPresenceData,
   DspPresenceItem,
 } from '@/app/app/(shell)/dashboard/presence/actions';
-import { useTableMeta } from '@/components/organisms/AuthShellWrapper';
 import { PageShell } from '@/components/organisms/PageShell';
+import { useTableMeta } from '@/contexts/TableMetaContext';
 import { useRegisterRightPanel } from '@/hooks/useRegisterRightPanel';
 import { SIDEBAR_WIDTH } from '@/lib/constants/layout';
 import { queryKeys } from '@/lib/queries/keys';

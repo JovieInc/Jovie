@@ -1,6 +1,8 @@
 import { render, screen } from '@testing-library/react';
 import type { ReactNode } from 'react';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+
+let keyboardVisible = false;
 
 vi.mock('@clerk/nextjs', () => ({
   SignOutButton: ({ children }: { readonly children: ReactNode }) => children,
@@ -42,10 +44,14 @@ vi.mock('@/components/atoms/BrandLogo', () => ({
 }));
 
 vi.mock('@/hooks/useMobileKeyboard', () => ({
-  useMobileKeyboard: () => ({ isKeyboardVisible: false }),
+  useMobileKeyboard: () => ({ isKeyboardVisible: keyboardVisible }),
 }));
 
 describe('AuthLayout', () => {
+  beforeEach(() => {
+    keyboardVisible = false;
+  });
+
   it('renders a skip link to a focusable main landmark', async () => {
     const { AuthLayout } = await import('@/features/auth/AuthLayout');
 
@@ -78,7 +84,7 @@ describe('AuthLayout', () => {
     );
   });
 
-  it('renders the footer prompt and link through the auth shell contract', async () => {
+  it('keeps the footer prompt opt-in through the auth shell contract', async () => {
     const { AuthLayout } = await import('@/features/auth/AuthLayout');
 
     render(
@@ -87,6 +93,7 @@ describe('AuthLayout', () => {
         footerPrompt='Need an account?'
         footerLinkText='Join now'
         footerLinkHref='/signup'
+        showFooterPrompt
       >
         <div>Auth form body</div>
       </AuthLayout>
@@ -121,6 +128,7 @@ describe('AuthLayout', () => {
     expect(
       screen.getByRole('button', { name: 'Open menu' })
     ).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Log out' })).toBeInTheDocument();
   });
 
   it('keeps the split auth rail mounted when the split layout variant is used', async () => {
@@ -133,5 +141,30 @@ describe('AuthLayout', () => {
     );
 
     expect(document.querySelector('.auth-showcase-panel')).not.toBeNull();
+  });
+
+  it('hides non-form chrome while the mobile keyboard is visible', async () => {
+    keyboardVisible = true;
+    const { AuthLayout } = await import('@/features/auth/AuthLayout');
+
+    render(
+      <AuthLayout
+        formTitle='Sign In'
+        footerPrompt='Need an account?'
+        footerLinkText='Join now'
+        footerLinkHref='/signup'
+      >
+        <div>Auth form body</div>
+      </AuthLayout>
+    );
+
+    const logoLink = screen.getByLabelText('Go to homepage');
+    expect(logoLink).toHaveAttribute('tabIndex', '-1');
+    expect(screen.getByRole('heading', { hidden: true })).toHaveAttribute(
+      'aria-hidden',
+      'true'
+    );
+    expect(screen.queryByText('Need an account?')).not.toBeInTheDocument();
+    expect(screen.getByRole('main')).toHaveTextContent('Auth form body');
   });
 });

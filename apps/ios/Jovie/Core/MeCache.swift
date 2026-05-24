@@ -39,6 +39,11 @@ actor MeCache {
     }
   }
 
+  func remove(for clerkUserID: String) {
+    memory[clerkUserID] = nil
+    defaults.removeObject(forKey: cacheKey(for: clerkUserID))
+  }
+
   private func cacheKey(for clerkUserID: String) -> String {
     "ie.jov.Jovie.mobileMe.\(clerkUserID)"
   }

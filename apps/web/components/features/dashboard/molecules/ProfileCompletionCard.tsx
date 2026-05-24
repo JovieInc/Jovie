@@ -1,11 +1,19 @@
 'use client';
 
 import { AlertCircle, ArrowRight, Sparkles, X } from 'lucide-react';
+import { motion } from 'motion/react';
 import Link from 'next/link';
 import { memo, useCallback, useEffect, useState } from 'react';
 import { useDashboardData } from '@/app/app/(shell)/dashboard/DashboardDataContext';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { captureWarning } from '@/lib/error-tracking';
+
+const SPRING = {
+  type: 'spring',
+  damping: 10,
+  mass: 0.75,
+  stiffness: 100,
+} as const;
 
 function getStorageKey(profileId: string, percentage: number): string {
   return `jovie_profile_completion_dismissed:${profileId}:${percentage}`;
@@ -92,21 +100,28 @@ export const ProfileCompletionCard = memo(
               <p className='text-app text-secondary-token'>{subtext}</p>
             </div>
 
-            <progress
-              className='h-1.5 w-full overflow-hidden rounded-full bg-surface-0 [&::-moz-progress-bar]:rounded-full [&::-moz-progress-bar]:bg-accent [&::-webkit-progress-bar]:rounded-full [&::-webkit-progress-bar]:bg-surface-0 [&::-webkit-progress-value]:rounded-full [&::-webkit-progress-value]:bg-accent [&::-webkit-progress-value]:transition-all [&::-webkit-progress-value]:duration-500'
-              max={100}
-              value={completionPercentage}
+            <div
+              className='h-1.5 w-full overflow-hidden rounded-full bg-surface-0'
+              role='progressbar'
+              aria-valuenow={completionPercentage}
+              aria-valuemin={0}
+              aria-valuemax={100}
               aria-label='Profile completion'
             >
-              {completionPercentage}%
-            </progress>
+              <motion.div
+                className='h-full rounded-full bg-accent'
+                initial={{ width: 0 }}
+                animate={{ width: `${completionPercentage}%` }}
+                transition={SPRING}
+              />
+            </div>
 
             <ul className='space-y-1.5'>
               {primarySteps.map(step => (
                 <li key={step.id}>
                   <Link
                     href={step.href}
-                    className='group flex items-center justify-between gap-3 rounded-md border border-transparent px-3 py-2 transition-[background-color,border-color] duration-150 hover:border-(--linear-app-frame-seam) hover:bg-surface-0'
+                    className='group flex items-center justify-between gap-3 rounded-md border border-transparent px-3 py-2 transition-[background-color,border-color] duration-subtle hover:border-(--linear-app-frame-seam) hover:bg-surface-0'
                   >
                     <div className='min-w-0'>
                       <p className='text-app font-caption text-primary-token'>
@@ -117,7 +132,7 @@ export const ProfileCompletionCard = memo(
                       </p>
                     </div>
                     <ArrowRight
-                      className='h-4 w-4 shrink-0 text-tertiary-token transition-transform group-hover:translate-x-0.5'
+                      className='h-4 w-4 shrink-0 text-tertiary-token transition-colors group-hover:text-secondary-token'
                       aria-hidden='true'
                     />
                   </Link>
@@ -131,7 +146,7 @@ export const ProfileCompletionCard = memo(
               type='button'
               onClick={handleDismiss}
               aria-label='Dismiss profile completion card'
-              className='shrink-0 rounded-lg border border-(--linear-app-frame-seam) p-1.5 text-tertiary-token transition-[background-color,border-color,color,box-shadow] duration-150 hover:bg-surface-0 hover:text-primary-token focus-visible:outline-none focus-visible:border-(--linear-border-focus) focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)'
+              className='shrink-0 rounded-lg border border-(--linear-app-frame-seam) p-1.5 text-tertiary-token transition-[background-color,border-color,color,box-shadow] duration-subtle hover:bg-surface-0 hover:text-primary-token focus-visible:outline-none focus-visible:border-(--linear-border-focus) focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)'
             >
               <X className='h-4 w-4' aria-hidden='true' />
             </button>

@@ -6,9 +6,27 @@ import {
   APP_FLAG_KEYS,
   APP_FLAG_TO_STATSIG_GATE,
   type AppFlagName,
+  type ProfileAlertOptInVariant,
   type SubscribeCTAVariant,
 } from './contracts';
-import { getStatsigGateValue, getSubscribeCTAVariantValue } from './statsig';
+import {
+  getProfileAlertOptInVariantValue,
+  getStatsigGateValue,
+  getSubscribeCTAVariantValue,
+} from './statsig';
+
+/**
+ * RELEASE_PLAN_DEMO is the YC wedge demo page.
+ * It is off by default in production but on in dev and preview so that
+ * the demo recorder and QA passes can visit /app/dashboard/release-plan
+ * without needing a localStorage override or Statsig gate.
+ *
+ * In production, the page stays hidden behind the default=false.
+ * To enable it for a production demo session, set the localStorage override:
+ *   localStorage.setItem('__ff_overrides', JSON.stringify({ 'code:RELEASE_PLAN_DEMO': true }))
+ * or use the DevToolbar flag panel.
+ */
+const IS_VERCEL_PRODUCTION = process.env.VERCEL_ENV === 'production';
 
 type FlagEntities = {
   userId: string | null;
@@ -41,25 +59,32 @@ function buildBooleanFlag(flagName: AppFlagName): Flag<boolean, FlagEntities> {
 }
 
 export const APP_FLAG_REGISTRY = {
-  PROFILE_V2: buildBooleanFlag('PROFILE_V2'),
-  CLAIM_HANDLE: buildBooleanFlag('CLAIM_HANDLE'),
-  HERO_SPOTIFY_CLAIM_FLOW: buildBooleanFlag('HERO_SPOTIFY_CLAIM_FLOW'),
   BILLING_UPGRADE_DIRECT: buildBooleanFlag('BILLING_UPGRADE_DIRECT'),
-  SUBSCRIBE_TWO_STEP: buildBooleanFlag('SUBSCRIBE_TWO_STEP'),
-  LATEST_RELEASE_CARD: buildBooleanFlag('LATEST_RELEASE_CARD'),
   SMARTLINK_PRE_SAVE: buildBooleanFlag('SMARTLINK_PRE_SAVE'),
   IOS_APPLE_MUSIC_PRIORITY: buildBooleanFlag('IOS_APPLE_MUSIC_PRIORITY'),
   SPOTIFY_OAUTH: buildBooleanFlag('SPOTIFY_OAUTH'),
   STRIPE_CONNECT_ENABLED: buildBooleanFlag('STRIPE_CONNECT_ENABLED'),
-  ENABLE_LIGHT_MODE: buildBooleanFlag('ENABLE_LIGHT_MODE'),
-  SHOW_AUDIENCE_CRM_SECTION: buildBooleanFlag('SHOW_AUDIENCE_CRM_SECTION'),
-  THREADS_ENABLED: buildBooleanFlag('THREADS_ENABLED'),
-  PWA_INSTALL_BANNER: buildBooleanFlag('PWA_INSTALL_BANNER'),
-  SHOW_RELEASE_TOOLBAR_EXTRAS: buildBooleanFlag('SHOW_RELEASE_TOOLBAR_EXTRAS'),
   PLAYLIST_ENGINE: buildBooleanFlag('PLAYLIST_ENGINE'),
   ALBUM_ART_GENERATION: buildBooleanFlag('ALBUM_ART_GENERATION'),
   CHAT_JANK_MONITOR: buildBooleanFlag('CHAT_JANK_MONITOR'),
-  RELEASE_PLAN_DEMO: buildBooleanFlag('RELEASE_PLAN_DEMO'),
+  IOS_APP_ALPHA_ACCESS: buildBooleanFlag('IOS_APP_ALPHA_ACCESS'),
+  // RELEASE_PLAN_DEMO is on by default in dev/preview so QA and the demo
+  // recorder can visit /app/dashboard/release-plan without a manual override.
+  // Production keeps it off (default=false) — enable via localStorage override
+  // or DevToolbar for live demo sessions.
+  RELEASE_PLAN_DEMO: flag<boolean, FlagEntities>({
+    key: APP_FLAG_KEYS.RELEASE_PLAN_DEMO,
+    defaultValue: APP_FLAG_DEFAULTS.RELEASE_PLAN_DEMO,
+    description: APP_FLAG_DESCRIPTIONS.RELEASE_PLAN_DEMO,
+    options: [
+      { label: 'Off', value: false },
+      { label: 'On', value: true },
+    ],
+    async decide() {
+      return !IS_VERCEL_PRODUCTION;
+    },
+  }),
+  DESIGN_V1: buildBooleanFlag('DESIGN_V1'),
   SHELL_CHAT_V1: buildBooleanFlag('SHELL_CHAT_V1'),
   DESIGN_V1_RELEASES: buildBooleanFlag('DESIGN_V1_RELEASES'),
   DESIGN_V1_TASKS: buildBooleanFlag('DESIGN_V1_TASKS'),
@@ -68,6 +93,7 @@ export const APP_FLAG_REGISTRY = {
   DESIGN_V1_LIBRARY: buildBooleanFlag('DESIGN_V1_LIBRARY'),
   DESIGN_V1_AUTH: buildBooleanFlag('DESIGN_V1_AUTH'),
   DESIGN_V1_ONBOARDING: buildBooleanFlag('DESIGN_V1_ONBOARDING'),
+  AI_CONNECTORS_BETA: buildBooleanFlag('AI_CONNECTORS_BETA'),
 } as const satisfies Record<AppFlagName, Flag<boolean, FlagEntities>>;
 
 export const SUBSCRIBE_CTA_VARIANT_FLAG = flag<
@@ -80,6 +106,19 @@ export const SUBSCRIBE_CTA_VARIANT_FLAG = flag<
   options: ['two_step', 'inline'],
   async decide({ entities }) {
     return getSubscribeCTAVariantValue(entities?.userId ?? null);
+  },
+});
+
+export const PROFILE_ALERT_OPTIN_VARIANT_FLAG = flag<
+  ProfileAlertOptInVariant,
+  FlagEntities
+>({
+  key: 'profile_alert_optin_cta_variant',
+  defaultValue: 'button',
+  description: 'Public profile alert opt-in CTA variant',
+  options: ['button', 'toggle'],
+  async decide({ entities }) {
+    return getProfileAlertOptInVariantValue(entities?.userId ?? null);
   },
 });
 

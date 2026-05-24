@@ -53,4 +53,9 @@ describe('DspAvatarStack', () => {
     expect(screen.getByText('Apple Music')).toBeInTheDocument();
     expect(screen.getByText('YouTube')).toBeInTheDocument();
   });
+
+  it('keeps the popover above shell chrome', () => {
+    render(<DspAvatarStack dsps={ITEMS} />);
+    expect(screen.getByRole('tooltip').className).toContain('z-[150]');
+  });
 });

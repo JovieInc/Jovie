@@ -43,6 +43,9 @@ vi.mock('@/features/dashboard/organisms/SettingsContactsSection', () => ({
 vi.mock('@/features/dashboard/organisms/SettingsPaymentsSection', () => ({
   SettingsPaymentsSection: () => <div>Payments</div>,
 }));
+vi.mock('@/features/dashboard/organisms/SettingsUsageStatsSection', () => ({
+  SettingsUsageStatsSection: () => <div>Usage Stats Section</div>,
+}));
 vi.mock('@/features/dashboard/organisms/SettingsTouringSection', () => ({
   SettingsTouringSection: () => <div>Touring</div>,
 }));
@@ -107,6 +110,7 @@ describe('SettingsPolished', () => {
     expect(
       screen.getByRole('link', { name: 'Billing & Subscription' })
     ).toBeVisible();
+    expect(screen.getByRole('link', { name: 'Usage Stats' })).toBeVisible();
     expect(document.getElementById('contacts')).toBeTruthy();
     expect(document.getElementById('touring')).toBeNull();
     expect(screen.getByRole('link', { name: 'Touring' })).toHaveAttribute(

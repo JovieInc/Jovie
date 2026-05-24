@@ -45,7 +45,7 @@ const LEVEL_CONFIG: Record<
   },
   anonymous: {
     label: 'Anonymous',
-    iconClassName: 'text-zinc-400',
+    iconClassName: 'text-tertiary-token',
     labelClassName: 'text-tertiary-token',
   },
 };

@@ -58,6 +58,7 @@ describe('dashboard drawer chrome', () => {
     expect(
       screen.queryByText('Audience member details')
     ).not.toBeInTheDocument();
+    expect(screen.getByText('Alex Fan')).toBeInTheDocument();
   });
 
   it('audience member drawer uses the tabbed card as the scroll region', () => {

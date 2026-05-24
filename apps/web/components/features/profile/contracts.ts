@@ -1,4 +1,5 @@
 import type { DiscogRelease } from '@/lib/db/schema/content';
+import type { ProfileAlertOptInVariant } from '@/lib/flags/contracts';
 import type { ConfirmedFeaturedPlaylistFallback } from '@/lib/profile/featured-playlist-fallback';
 import type { TourDateViewModel } from '@/lib/tour-dates/types';
 import type { AvatarSize } from '@/lib/utils/avatar-sizes';
@@ -60,11 +61,6 @@ export const PROFILE_PRIMARY_TAB_KEYS = [
 
 export type ProfilePrimaryTab = (typeof PROFILE_PRIMARY_TAB_KEYS)[number];
 
-export interface ProfileRailCard {
-  readonly id: string;
-  readonly kind: 'release' | 'tour' | 'alerts' | 'playlist' | 'listen';
-}
-
 export type ProfileShowcaseStateId =
   | 'mock-home'
   | 'streams-latest'
@@ -74,6 +70,9 @@ export type ProfileShowcaseStateId =
   | 'tour-nearby'
   | 'playlist-fallback'
   | 'listen-fallback'
+  | 'alerts-fallback'
+  | 'events-empty'
+  | 'more-menu'
   | 'fans-opt-in'
   | 'fans-confirmed'
   | 'fans-song-alert'
@@ -98,6 +97,7 @@ export type ProfileShowcaseDrawerView =
   | 'tour'
   | 'pay'
   | 'contact'
+  | 'menu'
   | null;
 
 export interface ProfilePreviewNotificationsState {
@@ -161,6 +161,7 @@ export interface ProfilePublicViewModel {
   readonly allowPhotoDownloads: boolean;
   readonly pressPhotos: PressPhoto[];
   readonly subscribeTwoStep: boolean;
+  readonly alertOptInVariant: ProfileAlertOptInVariant;
   readonly genres?: string[] | null;
   readonly tourDates: TourDateViewModel[];
   readonly visitTrackingToken?: string;

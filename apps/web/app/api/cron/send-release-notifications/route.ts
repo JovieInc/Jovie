@@ -1,4 +1,4 @@
-import { and, sql as drizzleSql, eq, lt, lte } from 'drizzle-orm';
+import { and, sql as drizzleSql, eq, inArray, lt, lte } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 import { verifyCronRequest } from '@/lib/cron/auth';
 import { db } from '@/lib/db';
@@ -15,6 +15,7 @@ import {
   type ReleaseNotificationEligibilityReason,
 } from '@/lib/notifications/release-eligibility';
 import { sendNotification } from '@/lib/notifications/service';
+import { buildReleaseDaySmsBody } from '@/lib/notifications/templates/release-day-sms';
 import { toISOStringSafe } from '@/lib/utils/date';
 import { logger } from '@/lib/utils/logger';
 import type { SenderContext } from '@/types/notifications';
@@ -312,7 +313,7 @@ async function batchFetchReleases(releaseIds: string[]) {
       sourceType: discogReleases.sourceType,
     })
     .from(discogReleases)
-    .where(drizzleSql`${discogReleases.id} = ANY(${releaseIds})`);
+    .where(inArray(discogReleases.id, releaseIds));
 
   return new Map(releases.map(r => [r.id, r]));
 }
@@ -334,7 +335,7 @@ async function batchFetchCreatorProfiles(creatorProfileIds: string[]) {
     })
     .from(creatorProfiles)
     .leftJoin(users, eq(users.id, creatorProfiles.userId))
-    .where(drizzleSql`${creatorProfiles.id} = ANY(${creatorProfileIds})`);
+    .where(inArray(creatorProfiles.id, creatorProfileIds));
 
   return new Map(creators.map(c => [c.id, c]));
 }
@@ -353,7 +354,7 @@ async function batchFetchSubscribers(subscriptionIds: string[]) {
     .from(notificationSubscriptions)
     .where(
       and(
-        drizzleSql`${notificationSubscriptions.id} = ANY(${subscriptionIds})`,
+        inArray(notificationSubscriptions.id, subscriptionIds),
         drizzleSql`${notificationSubscriptions.unsubscribedAt} IS NULL`,
         drizzleSql`${notificationSubscriptions.confirmedAt} IS NOT NULL`,
         drizzleSql`(${notificationSubscriptions.preferences}->>'releaseDay')::boolean = true`
@@ -376,7 +377,7 @@ async function batchFetchStreamingLinks(releaseIds: string[]) {
     .where(
       and(
         eq(providerLinks.ownerType, 'release'),
-        drizzleSql`${providerLinks.releaseId} = ANY(${releaseIds})`
+        inArray(providerLinks.releaseId, releaseIds)
       )
     );
 
@@ -440,6 +441,56 @@ async function sendEmailNotification(
   );
 
   return success ? 'sent' : 'failed';
+}
+
+async function sendSmsNotification(
+  ctx: ProcessingContext,
+  subscriber: { phone: string },
+  smsInputs: {
+    artistName: string;
+    releaseTitle: string;
+    username: string;
+    slug: string;
+  },
+  senderContext: SenderContext
+): Promise<ProcessResult> {
+  const body = buildReleaseDaySmsBody(smsInputs);
+
+  const result = await sendNotification(
+    {
+      id: ctx.notification.id,
+      // SMS has no separate subject; reuse text so the dispatch contract holds.
+      subject: body,
+      text: body,
+      channels: ['sms'],
+      category: 'marketing',
+      senderContext,
+    },
+    { phone: subscriber.phone }
+  );
+
+  const success = result.delivered?.length > 0;
+
+  let status: 'sent' | 'failed' | 'cancelled';
+  let error: string | null;
+
+  if (success) {
+    status = 'sent';
+    error = null;
+  } else if ((result.skipped?.length ?? 0) > 0) {
+    // Suppressed/stopped SMS — don't bill or alarm, just mark cancelled
+    status = 'cancelled';
+    error = null;
+  } else {
+    status = 'failed';
+    error = result.errors?.[0]?.error ?? 'Unknown error';
+  }
+
+  await updateNotificationStatus(ctx.notification.id, ctx.now, status, error);
+
+  return (
+    success ? 'sent' : (result.skipped?.length ?? 0) > 0 ? 'skipped' : 'failed'
+  ) as ProcessResult;
 }
 
 async function processNotificationWithBatchedData(ctx: {
@@ -596,13 +647,27 @@ async function processNotificationWithBatchedData(ctx: {
     }
 
     if (subscriber.channel === 'sms' && subscriber.phone) {
-      await updateNotificationStatus(
-        notification.id,
-        now,
-        'failed',
-        'SMS channel not yet implemented'
+      const result = await sendSmsNotification(
+        { now, notification },
+        { phone: subscriber.phone },
+        {
+          artistName,
+          releaseTitle: release.title,
+          username: creator.usernameNormalized,
+          slug: release.slug,
+        },
+        senderContext
       );
-      return 'failed';
+
+      if (result === 'sent' && trialState.isTrialing && creator.ownerUserId) {
+        await persistTrialNotificationCount(
+          notification.id,
+          creator.ownerUserId,
+          trialState
+        );
+      }
+
+      return result;
     }
 
     await updateNotificationStatus(

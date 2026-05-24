@@ -64,10 +64,20 @@ export async function POST(request: Request) {
       return NextResponse.json(
         {
           success: true,
-          status: 'new',
+          status: 'waitlisted',
           message: 'Entry is already unapproved',
         },
         { status: 200, headers: NO_STORE_HEADERS }
+      );
+    }
+
+    if (result.outcome === 'terminal') {
+      return NextResponse.json(
+        {
+          success: false,
+          error: `Cannot disapprove entry with status: ${result.status}`,
+        },
+        { status: 409, headers: NO_STORE_HEADERS }
       );
     }
 
@@ -76,7 +86,7 @@ export async function POST(request: Request) {
     return NextResponse.json(
       {
         success: true,
-        status: 'new',
+        status: 'waitlisted',
         message: 'Waitlist approval revoked successfully.',
       },
       { status: 200, headers: NO_STORE_HEADERS }

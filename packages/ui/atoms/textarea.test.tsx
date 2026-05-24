@@ -40,6 +40,17 @@ describe('Textarea', () => {
       );
     });
 
+    it('applies Jovie focus token classes', () => {
+      render(<Textarea data-testid='textarea' />);
+      const textarea = screen.getByTestId('textarea');
+      expect(textarea.className).toContain(
+        'focus-visible:border-(--linear-border-focus)'
+      );
+      expect(textarea.className).toContain(
+        'focus-visible:ring-(--linear-border-focus)'
+      );
+    });
+
     it('applies error variant classes', () => {
       render(<Textarea variant='error' data-testid='textarea' />);
       const textarea = screen.getByTestId('textarea');

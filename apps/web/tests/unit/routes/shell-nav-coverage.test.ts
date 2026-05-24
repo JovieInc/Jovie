@@ -6,6 +6,7 @@ import {
   adminSettingsNavItem,
   adminSettingsNavigation,
   artistSettingsNavigation,
+  libraryNavItem,
   paymentsNavItem,
   primaryNavigation,
   settingsNavItem,
@@ -14,25 +15,29 @@ import {
 
 const SHELL_ROOT = path.resolve(__dirname, '../../../app/app/(shell)');
 
-const NAV_ROUTE_PAGE_ALIASES: Record<string, string> = {};
-
 const INTENTIONAL_INTERNAL_ROUTES: Record<string, string> = {
   '/app': 'Shell root entry page',
   '/app/chat/[id]': 'Thread detail is reached from chat history',
   '/app/admin/investors/links': 'Sub-tool reached from Investors workspace',
   '/app/admin/investors/settings':
     'Sub-tool reached from Investors workspace actions',
+  '/app/admin/interviews': 'Internal admin review workspace (manual entry)',
   '/app/admin/playlists': 'Internal admin workflow (manual entry)',
   '/app/dashboard/releases/[releaseId]/tasks':
     'Dynamic workflow route reached from releases actions',
+  '/app/releases/[releaseId]/tasks':
+    'Canonical dynamic workflow route reached from release actions',
   '/app/dashboard/releases/[releaseId]/downloads':
     'Internal release workflow (manual entry)',
+  '/app/dashboard/releases':
+    'Legacy releases workspace retained for old bookmarks',
+  '/app/dashboard/tasks': 'Legacy tasks workspace retained for old bookmarks',
   '/app/settings/retargeting-ads':
     'Legacy settings route redirected to Audience',
   '/app/dashboard/release-plan':
     'Release plan demo page (gated by RELEASE_PLAN_DEMO flag)',
-  '/app/calendar':
-    'Releases + release-moments calendar; reachable by URL until nav placement is finalised',
+  '/app/insights':
+    'AI insights workspace is reachable from dashboard widgets and direct app links until nav placement is finalised',
   '/app/lyrics/[trackId]':
     'Cinematic lyrics surface reached from the AudioBar lyrics button',
 };
@@ -84,12 +89,17 @@ function findShellPages(dir: string = SHELL_ROOT): ShellPage[] {
 }
 
 function isRedirectStub(source: string): boolean {
-  return /\bredirect\(/.test(source) || /\bpermanentRedirect\(/.test(source);
+  return (
+    /\bredirect\(/.test(source) ||
+    /\bpermanentRedirect\(/.test(source) ||
+    /\bredirectFromEarningsRoute\(/.test(source)
+  );
 }
 
 function getNavRoutePaths(): Set<string> {
   const navItems = [
     ...primaryNavigation,
+    libraryNavItem,
     settingsNavItem,
     ...userSettingsNavigation,
     paymentsNavItem,
@@ -99,9 +109,7 @@ function getNavRoutePaths(): Set<string> {
     ...adminSettingsNavigation,
   ];
 
-  return new Set(
-    navItems.map(item => NAV_ROUTE_PAGE_ALIASES[item.href] ?? item.href)
-  );
+  return new Set(navItems.map(item => item.href));
 }
 
 describe('shell route coverage', () => {
@@ -137,5 +145,42 @@ describe('shell route coverage', () => {
       .sort();
 
     expect(staleAllowlistEntries).toEqual([]);
+  });
+
+  it('keeps release task implementation owned by the canonical shell route', () => {
+    const canonicalPage = pageByRoute.get('/app/releases/[releaseId]/tasks');
+    const legacyPage = pageByRoute.get(
+      '/app/dashboard/releases/[releaseId]/tasks'
+    );
+
+    expect(canonicalPage?.source).toContain(
+      "import { ReleaseTasksRoute } from './ReleaseTasksRoute';"
+    );
+    expect(legacyPage?.source).toContain(
+      '@/app/app/(shell)/releases/[releaseId]/tasks/ReleaseTasksRoute'
+    );
+  });
+
+  it('keeps release list data ownership outside the legacy dashboard route', () => {
+    const canonicalPage = pageByRoute.get('/app/releases');
+    const legacyPage = pageByRoute.get('/app/dashboard/releases');
+    const canonicalRoutePath = path.join(
+      SHELL_ROOT,
+      'releases/ReleasesRoute.tsx'
+    );
+    const canonicalRouteSource = fs.readFileSync(canonicalRoutePath, 'utf8');
+
+    expect(canonicalPage?.source).toContain(
+      "import { ReleasesRoute } from './ReleasesRoute';"
+    );
+    expect(legacyPage?.source).toContain(
+      "import { ReleasesRoute } from '../../releases/ReleasesRoute';"
+    );
+    expect(canonicalRouteSource).toContain(
+      '@/lib/releases/release-matrix-loader'
+    );
+    expect(canonicalRouteSource).not.toContain(
+      'dashboard/releases/release-matrix-loader'
+    );
   });
 });

@@ -112,7 +112,9 @@ async function globalSetup() {
   });
 
   // Seed test database with required profiles for smoke tests
-  if (process.env.DATABASE_URL) {
+  if (process.env.E2E_SKIP_SEED === '1') {
+    console.log('ℹ E2E_SKIP_SEED=1, skipping test data seeding');
+  } else if (process.env.DATABASE_URL) {
     try {
       console.log('🌱 Seeding test data...');
       await seedTestData();
@@ -129,6 +131,12 @@ async function globalSetup() {
     console.log('ℹ DATABASE_URL not set, skipping test data seeding');
   }
 
+  if (process.env.E2E_SKIP_WARMUP === '1') {
+    console.log('ℹ E2E_SKIP_WARMUP=1, skipping Turbopack route warmup');
+    console.log(`✅ E2E global setup complete in ${Date.now() - startTime}ms`);
+    return;
+  }
+
   // Warm up critical Turbopack routes before tests start
   // This pre-compiles /signin and /app so auth.setup.ts doesn't timeout waiting
   const baseURL = process.env.BASE_URL || 'http://localhost:3100';
@@ -142,8 +150,9 @@ async function globalSetup() {
     '/api/stripe/checkout',
     '/api/stripe/pricing-options',
     APP_ROUTES.CHAT, // auth.setup.ts navigates here — warm up to avoid cold-compile 404
-    APP_ROUTES.DASHBOARD_RELEASES,
-    APP_ROUTES.DASHBOARD_AUDIENCE,
+    APP_ROUTES.LIBRARY,
+    APP_ROUTES.RELEASES,
+    APP_ROUTES.AUDIENCE,
     APP_ROUTES.PRESENCE,
     APP_ROUTES.EARNINGS,
     APP_ROUTES.DASHBOARD_PROFILE,
@@ -164,6 +173,32 @@ async function globalSetup() {
     } catch {
       console.log(
         `  ⚠ ${route} warmup failed (will compile on first test visit)`
+      );
+    }
+  }
+
+  const apiWarmupRequests = [
+    {
+      body: JSON.stringify({}),
+      headers: { 'Content-Type': 'application/json' },
+      method: 'POST',
+      route: '/api/onboarding/welcome-chat',
+    },
+  ];
+
+  for (const request of apiWarmupRequests) {
+    try {
+      const res = await fetch(`${baseURL}${request.route}`, {
+        body: request.body,
+        headers: request.headers,
+        method: request.method,
+        signal: AbortSignal.timeout(120_000),
+        redirect: 'follow',
+      });
+      console.log(`  ✓ ${request.route} (${res.status}) warmed up`);
+    } catch {
+      console.log(
+        `  ⚠ ${request.route} warmup failed (will compile on first test visit)`
       );
     }
   }

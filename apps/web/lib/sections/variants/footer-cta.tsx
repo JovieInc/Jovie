@@ -50,10 +50,10 @@ export const FOOTER_CTA_VARIANTS: readonly SectionVariant[] = [
     category: 'footer-cta',
     label: 'CTASection (organism)',
     description:
-      'Orphaned generic CTA. Zero call sites — slated for deletion in PR 3.',
+      'Generic CTA used only by PayPromo, which is itself dormant behind NEXT_PUBLIC_FEATURE_TIPS. Delete both together when the Tips feature is officially shelved.',
     componentPath: 'components/organisms/CTASection.tsx',
-    usedIn: [],
-    status: 'orphaned',
+    usedIn: ['PayPromo (dormant, feature-flagged)'],
+    status: 'consolidate',
     mergeInto: 'marketing-final-cta-default',
     render: () => <MarketingFinalCTA />,
   },

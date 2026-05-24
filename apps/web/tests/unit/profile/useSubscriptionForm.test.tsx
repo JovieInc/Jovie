@@ -122,4 +122,97 @@ describe('useSubscriptionForm', () => {
       Date.now() + 30_000
     );
   });
+
+  it('fires otp_verified event with source context on successful OTP verification (JOV-2360)', async () => {
+    mockVerifyOtpMutateAsync.mockResolvedValueOnce({ success: true });
+
+    const { result } = renderHook(() =>
+      useSubscriptionForm({
+        artist,
+        source: 'subscribe_tab',
+        experimentVariant: 'toggle',
+      })
+    );
+
+    await act(async () => {
+      result.current.handleEmailChange('fan@example.com');
+    });
+
+    await act(async () => {
+      await result.current.handleVerifyOtp('123456');
+    });
+
+    expect(mockTrack).toHaveBeenCalledWith(
+      'otp_verified',
+      expect.objectContaining({
+        source: 'subscribe_tab',
+        channel: 'email',
+        handle: artist.handle,
+        alert_opt_in_variant: 'toggle',
+      })
+    );
+  });
+
+  it('fires otp_verify_error event with source context on OTP verification failure (JOV-2360)', async () => {
+    mockVerifyOtpMutateAsync.mockRejectedValueOnce(
+      new Error('Invalid verification code')
+    );
+
+    const { result } = renderHook(() =>
+      useSubscriptionForm({
+        artist,
+        source: 'hero_alerts_button',
+        experimentVariant: 'control',
+      })
+    );
+
+    await act(async () => {
+      result.current.handleEmailChange('fan@example.com');
+    });
+
+    await act(async () => {
+      await result.current.handleVerifyOtp('654321');
+    });
+
+    expect(mockTrack).toHaveBeenCalledWith(
+      'otp_verify_error',
+      expect.objectContaining({
+        source: 'hero_alerts_button',
+        channel: 'email',
+        handle: artist.handle,
+        alert_opt_in_variant: 'control',
+      })
+    );
+  });
+
+  it('includes alert opt-in experiment variant in subscribe analytics', async () => {
+    mockSubscribeMutateAsync.mockResolvedValueOnce({
+      pendingConfirmation: false,
+    });
+
+    const { result } = renderHook(() =>
+      useSubscriptionForm({ artist, experimentVariant: 'toggle' })
+    );
+
+    await act(async () => {
+      result.current.handleEmailChange('fan@example.com');
+    });
+
+    await act(async () => {
+      await result.current.handleSubscribe();
+    });
+
+    expect(mockTrack).toHaveBeenCalledWith(
+      'subscribe_click',
+      expect.objectContaining({
+        alert_opt_in_variant: 'toggle',
+      })
+    );
+    expect(mockTrack).toHaveBeenCalledWith(
+      'notifications_subscribe_success',
+      expect.objectContaining({
+        alert_opt_in_variant: 'toggle',
+      })
+    );
+  });
 });

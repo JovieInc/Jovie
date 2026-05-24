@@ -2,7 +2,11 @@ import * as Sentry from '@sentry/nextjs';
 import { headers } from 'next/headers';
 import { redirect, unstable_rethrow } from 'next/navigation';
 import { Suspense } from 'react';
-import { AppShellSkeleton } from '@/components/organisms/AppShellSkeleton';
+import { CinematicAppBoot } from '@/components/organisms/CinematicAppBoot';
+import { PersistentAudioBar } from '@/components/organisms/PersistentAudioBar';
+import { NuqsProvider } from '@/components/providers/NuqsProvider';
+import { LyricsRouteSkeleton } from '@/components/shell/LyricsRouteSkeleton';
+import { TasksRouteSkeleton } from '@/components/shell/TasksRouteSkeleton';
 import { APP_ROUTES } from '@/constants/routes';
 import { ErrorBanner } from '@/features/feedback/ErrorBanner';
 import { buildAppShellSignInUrl } from '@/lib/auth/build-app-shell-signin-url';
@@ -11,9 +15,13 @@ import { getAppFlagValue } from '@/lib/flags/server';
 import ChatLoading from './chat/loading';
 import { DashboardShellContent } from './DashboardShellContent';
 import { ReleaseTableSkeleton } from './dashboard/releases/loading';
+import { LibraryLoadingState } from './library/LibrarySurface';
 import {
   isChatShellRoute,
+  isLibraryShellRoute,
+  isLyricsShellRoute,
   isReleasesShellRoute,
+  isTasksShellRoute,
   resolveAppShellRequestPath,
 } from './shell-route-matches';
 
@@ -47,26 +55,38 @@ export default async function AppShellLayout({
     // matches the post-resolve AppShellFrame layout. Without this, flag-on
     // users would flash a 'legacy' skeleton then snap to the rounded
     // 'shellChatV1' frame once DashboardShellContent resolves.
-    const shellChatV1 = await getAppFlagValue('SHELL_CHAT_V1', {
+    const shellChatV1 = await getAppFlagValue('DESIGN_V1', {
       userId: auth.userId,
     });
     const shellVariant = shellChatV1 ? 'shellChatV1' : 'legacy';
+    const audioPlayer = <PersistentAudioBar variant={shellVariant} />;
 
-    let shellFallback: React.ReactNode;
+    // Pick the route-specific skeleton main slot.
+    let routeMain: React.ReactNode = undefined;
     if (isChatShellRoute(pathname)) {
-      shellFallback = (
-        <AppShellSkeleton main={<ChatLoading />} variant={shellVariant} />
-      );
+      routeMain = <ChatLoading />;
     } else if (isReleasesShellRoute(pathname)) {
-      shellFallback = (
-        <AppShellSkeleton
-          main={<ReleaseTableSkeleton showHeader={false} />}
-          variant={shellVariant}
-        />
-      );
-    } else {
-      shellFallback = <AppShellSkeleton variant={shellVariant} />;
+      routeMain = <ReleaseTableSkeleton showHeader={false} />;
+    } else if (isLibraryShellRoute(pathname)) {
+      routeMain = <LibraryLoadingState />;
+    } else if (isLyricsShellRoute(pathname)) {
+      routeMain = <LyricsRouteSkeleton />;
+    } else if (isTasksShellRoute(pathname)) {
+      routeMain = <TasksRouteSkeleton />;
     }
+
+    // CinematicAppBoot internally renders <AppShellSkeleton main={routeMain}
+    // variant={shellVariant} /> unless this is the FIRST shell mount of the
+    // tab AND prefers-reduced-motion is off, in which case it plays a 2.4s
+    // cinematic timeline before the underlying tree resolves. Per-tab gate
+    // via sessionStorage flag `jovie:cinematic-boot-played`.
+    const shellFallback = (
+      <CinematicAppBoot
+        main={routeMain}
+        audioPlayer={audioPlayer}
+        variant={shellVariant}
+      />
+    );
 
     // Ban check moved inside DashboardShellContent (runs in parallel with
     // shell data fetch). Banned users are 1-in-a-million — their experience
@@ -75,12 +95,17 @@ export default async function AppShellLayout({
 
     // Stream the shell: the route-aware skeleton renders at first byte while
     // DashboardShellContent resolves dashboard data + feature flags.
+    // Mount NuqsProvider at the shell layer so every client component under
+    // /app/(shell)/* (e.g. DashboardAudienceClient) has a NuqsAdapter context
+    // during SSR and hydration, regardless of how CoreProviders resolves above.
     return (
-      <Suspense fallback={shellFallback}>
-        <DashboardShellContent userId={auth.userId} pathname={pathname}>
-          {children}
-        </DashboardShellContent>
-      </Suspense>
+      <NuqsProvider>
+        <Suspense fallback={shellFallback}>
+          <DashboardShellContent userId={auth.userId} pathname={pathname}>
+            {children}
+          </DashboardShellContent>
+        </Suspense>
+      </NuqsProvider>
     );
   } catch (error) {
     unstable_rethrow(error);

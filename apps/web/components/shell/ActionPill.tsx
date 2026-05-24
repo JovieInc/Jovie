@@ -39,7 +39,7 @@ export function ActionPill({
       type={type}
       onClick={onClick}
       className={cn(
-        'inline-flex items-center gap-1.5 h-7 px-3.5 rounded-full bg-white text-black text-[12px] font-medium hover:bg-white/90 transition-colors duration-150 ease-out',
+        'inline-flex items-center gap-1.5 h-7 px-3.5 rounded-full bg-white text-black text-[12px] font-medium hover:bg-white/90 transition-colors duration-subtle ease-subtle',
         className
       )}
     >

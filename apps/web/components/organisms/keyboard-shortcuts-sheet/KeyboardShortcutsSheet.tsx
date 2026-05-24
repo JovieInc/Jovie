@@ -129,6 +129,7 @@ export function KeyboardShortcutsSheet() {
       general: [],
       navigation: [],
       actions: [],
+      player: [],
     };
 
     for (const shortcut of filteredShortcuts) {

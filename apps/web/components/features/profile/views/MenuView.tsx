@@ -1,14 +1,38 @@
 'use client';
 
-import { Disc3, Mail, Share2, Wallet } from 'lucide-react';
 import { PROFILE_DRAWER_MENU_ITEM_CLASS } from '../profile-drawer-classes';
-import type { ProfileViewKey } from './registry';
+import { PROFILE_VIEW_REGISTRY, type ProfileViewKey } from './registry';
 
-const ICON_CLASS = 'size-4 text-white/40';
+const ICON_CLASS = 'size-4 text-quaternary-token';
+const MENU_ENTRIES = [
+  {
+    key: 'share',
+    isVisible: () => true,
+  },
+  {
+    key: 'pay',
+    isVisible: ({ hasTip }: MenuViewVisibility) => hasTip,
+  },
+  {
+    key: 'contact',
+    isVisible: ({ hasContacts }: MenuViewVisibility) => hasContacts,
+  },
+] as const satisfies readonly {
+  readonly key: ProfileViewKey;
+  readonly isVisible: (visibility: MenuViewVisibility) => boolean;
+}[];
+
+interface MenuViewVisibility {
+  readonly hasReleases: boolean;
+  readonly hasTourDates: boolean;
+  readonly hasTip: boolean;
+  readonly hasContacts: boolean;
+}
 
 export interface MenuViewProps {
   readonly onNavigate: (view: ProfileViewKey) => void;
   readonly hasReleases: boolean;
+  readonly hasTourDates: boolean;
   readonly hasTip: boolean;
   readonly hasContacts: boolean;
 }
@@ -18,65 +42,43 @@ export interface MenuViewProps {
  * tap the profile's overflow menu.
  *
  * Pure view component — no title or shell. Entries are data-dependent; the
- * caller passes in visibility flags. Order is preserved verbatim from the
- * legacy in-drawer render and does NOT yet use
- * `PROFILE_VIEW_REGISTRY.menuOrder` — that reconciliation is intentionally
- * deferred to plan PR 3a so the registry-driven order doesn't land as a
- * hidden behavior change underneath the route rewrite.
+ * caller passes in visibility flags. Bottom-tab destinations stay out of this
+ * overflow menu so navigation copy does not repeat across surfaces.
  */
 export function MenuView({
   onNavigate,
   hasReleases,
+  hasTourDates,
   hasTip,
   hasContacts,
 }: MenuViewProps) {
+  const visibility = {
+    hasReleases,
+    hasTourDates,
+    hasTip,
+    hasContacts,
+  };
+  const visibleEntries = MENU_ENTRIES.filter(entry =>
+    entry.isVisible(visibility)
+  ).map(entry => PROFILE_VIEW_REGISTRY[entry.key]);
+
   return (
     <div className='flex flex-col gap-0.5' role='menu'>
-      <button
-        type='button'
-        role='menuitem'
-        className={PROFILE_DRAWER_MENU_ITEM_CLASS}
-        onClick={() => onNavigate('share')}
-      >
-        <Share2 className={ICON_CLASS} />
-        Share Profile
-      </button>
-
-      {hasReleases ? (
-        <button
-          type='button'
-          role='menuitem'
-          className={PROFILE_DRAWER_MENU_ITEM_CLASS}
-          onClick={() => onNavigate('releases')}
-        >
-          <Disc3 className={ICON_CLASS} />
-          Releases
-        </button>
-      ) : null}
-
-      {hasTip ? (
-        <button
-          type='button'
-          role='menuitem'
-          className={PROFILE_DRAWER_MENU_ITEM_CLASS}
-          onClick={() => onNavigate('pay')}
-        >
-          <Wallet className={ICON_CLASS} />
-          Support
-        </button>
-      ) : null}
-
-      {hasContacts ? (
-        <button
-          type='button'
-          role='menuitem'
-          className={PROFILE_DRAWER_MENU_ITEM_CLASS}
-          onClick={() => onNavigate('contact')}
-        >
-          <Mail className={ICON_CLASS} />
-          Contact
-        </button>
-      ) : null}
+      {visibleEntries.map(entry => {
+        const Icon = entry.icon;
+        return (
+          <button
+            key={entry.key}
+            type='button'
+            role='menuitem'
+            className={PROFILE_DRAWER_MENU_ITEM_CLASS}
+            onClick={() => onNavigate(entry.key)}
+          >
+            <Icon className={ICON_CLASS} />
+            {entry.title}
+          </button>
+        );
+      })}
     </div>
   );
 }

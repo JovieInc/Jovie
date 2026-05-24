@@ -23,18 +23,18 @@ describe('determineReleasePhase', () => {
     );
   });
 
-  it('returns revealed when revealDate is null and releaseDate is in the future', () => {
+  it('returns mystery when revealDate is null and releaseDate is in the future', () => {
     expect(determineReleasePhase(DATES.futureRelease, null, now)).toBe(
-      'revealed'
+      'mystery'
     );
   });
 
-  it('returns released when both dates are null', () => {
-    expect(determineReleasePhase(null, null, now)).toBe('released');
+  it('returns mystery when both dates are null', () => {
+    expect(determineReleasePhase(null, null, now)).toBe('mystery');
   });
 
-  it('returns released when revealDate is past and releaseDate is null', () => {
-    expect(determineReleasePhase(null, DATES.pastReveal, now)).toBe('released');
+  it('returns mystery when revealDate is past and releaseDate is null', () => {
+    expect(determineReleasePhase(null, DATES.pastReveal, now)).toBe('mystery');
   });
 
   it('accepts Date objects', () => {

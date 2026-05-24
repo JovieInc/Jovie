@@ -30,12 +30,14 @@ export type AdminOutreachQueue = (typeof adminOutreachQueues)[number];
 
 export type AdminWorkspaceId =
   | 'overview'
+  | 'ops'
   | 'people'
   | 'growth'
   | 'platform_connections'
   | 'activity'
   | 'investors'
   | 'screenshots'
+  | 'costs'
   | 'share_studio';
 
 export type AdminNavigationSection = 'workspaces' | 'utilities';
@@ -50,6 +52,7 @@ export interface AdminNavRegistryItem {
 
 export const ADMIN_PRIMARY_WORKSPACE_IDS = [
   'overview',
+  'ops',
   'people',
   'growth',
   'platform_connections',
@@ -60,6 +63,7 @@ export const ADMIN_SETTINGS_TOOL_IDS = [
   'investors',
   'screenshots',
   'share_studio',
+  'costs',
 ] as const satisfies readonly AdminWorkspaceId[];
 
 export const ADMIN_NAV_REGISTRY: readonly AdminNavRegistryItem[] = [
@@ -68,6 +72,13 @@ export const ADMIN_NAV_REGISTRY: readonly AdminNavRegistryItem[] = [
     label: 'Overview',
     href: APP_ROUTES.ADMIN,
     description: 'Operator launchpad for business, people, and system health',
+    section: 'workspaces',
+  },
+  {
+    id: 'ops',
+    label: 'Ops',
+    href: APP_ROUTES.ADMIN_OPS,
+    description: 'Live operations: deploys, AI ops, runway, blockers',
     section: 'workspaces',
   },
   {
@@ -110,6 +121,14 @@ export const ADMIN_NAV_REGISTRY: readonly AdminNavRegistryItem[] = [
     label: 'Screenshots',
     href: APP_ROUTES.ADMIN_SCREENSHOTS,
     description: 'Generated docs and QA screenshots',
+    section: 'utilities',
+  },
+  {
+    id: 'costs',
+    label: 'Costs',
+    href: APP_ROUTES.ADMIN_COSTS,
+    description:
+      'Company infra, AI gateway, Neon, and vendor spend (30-day view)',
     section: 'utilities',
   },
   {

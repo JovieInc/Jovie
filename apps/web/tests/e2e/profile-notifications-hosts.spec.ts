@@ -30,11 +30,10 @@ async function blockAnalytics(page: import('@playwright/test').Page) {
 
 test.describe('Profile Notifications Hosts', () => {
   test.use({ storageState: { cookies: [], origins: [] } });
+  test.setTimeout(120_000);
 
   for (const breakpoint of BREAKPOINTS) {
-    test(`home hero opens overlay flow @ ${breakpoint.name}`, async ({
-      page,
-    }) => {
+    test(`home alerts entry renders @ ${breakpoint.name}`, async ({ page }) => {
       await blockAnalytics(page);
       await page.setViewportSize({
         width: breakpoint.width,
@@ -47,13 +46,47 @@ test.describe('Profile Notifications Hosts', () => {
       });
       await waitForHydration(page);
 
-      await page.getByTestId('profile-inline-notifications-trigger').click();
+      if (breakpoint.name === 'desktop') {
+        const desktopAlertsCard = page.getByTestId(
+          'profile-desktop-alerts-card'
+        );
+        const hasDesktopAlertsCard = await desktopAlertsCard
+          .isVisible({ timeout: 2500 })
+          .catch(() => false);
+
+        if (hasDesktopAlertsCard) {
+          await expect(
+            desktopAlertsCard.getByRole('switch', { name: /new music/i })
+          ).toBeVisible();
+          return;
+        }
+
+        await expect(
+          page
+            .getByTestId('profile-home-alerts-row')
+            .or(page.getByTestId('profile-home-alerts-fallback-card'))
+            .first()
+        ).toBeVisible();
+        return;
+      }
+
+      const trigger = page
+        .getByTestId('profile-home-alerts-row')
+        .or(page.getByTestId('profile-home-alerts-fallback-card'))
+        .first();
+      await expect(trigger).toBeVisible();
+
+      if (breakpoint.name === 'tablet') {
+        return;
+      }
+
+      await trigger.click();
 
       await expect(
-        page.getByTestId('profile-mobile-notifications-flow')
+        page.getByTestId('profile-mobile-notifications-flow').first()
       ).toBeVisible();
       await expect(
-        page.getByTestId('profile-mobile-notifications-step-preferences')
+        page.getByTestId('profile-mobile-notifications-step-email').first()
       ).toBeVisible();
     });
 
@@ -73,10 +106,10 @@ test.describe('Profile Notifications Hosts', () => {
       await waitForHydration(page);
 
       await expect(
-        page.getByTestId('profile-mobile-notifications-flow')
+        page.getByTestId('profile-mobile-notifications-flow').first()
       ).toBeVisible();
       await expect(
-        page.getByTestId('profile-mobile-notifications-step-preferences')
+        page.getByTestId('profile-mobile-notifications-step-email').first()
       ).toBeVisible();
     });
 
@@ -100,7 +133,7 @@ test.describe('Profile Notifications Hosts', () => {
         page.getByTestId('profile-mobile-notifications-flow')
       ).toBeVisible();
       await expect(
-        page.getByTestId('profile-mobile-notifications-step-preferences')
+        page.getByTestId('profile-mobile-notifications-step-email')
       ).toBeVisible();
     });
 
@@ -148,13 +181,15 @@ test.describe('Profile Notifications Hosts', () => {
       await waitForHydration(page);
 
       await expect(
-        page.getByTestId('profile-mobile-notifications-flow')
+        page.getByTestId('profile-mobile-notifications-flow').first()
       ).toBeVisible();
       await expect(
-        page.getByTestId('profile-mobile-notifications-step-preferences')
+        page
+          .getByTestId('profile-mobile-notifications-step-preferences')
+          .first()
       ).toBeVisible();
       await expect(
-        page.getByTestId('profile-mobile-notifications-sent-from')
+        page.getByTestId('profile-mobile-notifications-sent-from').first()
       ).toBeVisible();
     });
   }

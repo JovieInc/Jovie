@@ -18,11 +18,12 @@ import {
   ExportCSVButton,
   PAGE_TOOLBAR_END_GROUP_CLASS,
   PAGE_TOOLBAR_META_TEXT_CLASS,
+  rowState,
   TableBulkActionsToolbar,
-  UnifiedTable,
   useRowSelection,
 } from '@/components/organisms/table';
 import { getProfileUrl } from '@/constants/domains';
+import { AdminDataTable } from '@/features/admin/table/AdminDataTable';
 import {
   AdminTableHeader,
   AdminTableSubheader,
@@ -31,13 +32,14 @@ import { AdminTableShell } from '@/features/admin/table/AdminTableShell';
 import { useAdminTableKeyboardNavigation } from '@/features/admin/table/useAdminTableKeyboardNavigation';
 import { useCreatorActions } from '@/features/admin/useCreatorActions';
 import { useCreatorVerification } from '@/features/admin/useCreatorVerification';
+import { EmailSignatureDialog } from '@/features/dashboard/molecules/EmailSignatureDialog';
 import { useRegisterRightPanel } from '@/hooks/useRegisterRightPanel';
 import {
   CREATORS_CSV_FILENAME_PREFIX,
   creatorsCSVColumns,
 } from '@/lib/admin/csv-configs/creators';
 import type { AdminCreatorProfileRow } from '@/lib/admin/types';
-import { TABLE_MIN_WIDTHS } from '@/lib/constants/layout';
+import { buildSignatureInputFromProfile } from '@/lib/email-signature/profile-input';
 import { useAdminCreatorsInfiniteQuery } from '@/lib/queries';
 import { cn } from '@/lib/utils';
 import { AdminProfileSidebar } from './AdminProfileSidebar';
@@ -110,6 +112,34 @@ export function AdminCreatorProfilesUnified({
     clearDeleteProfile,
     clearInviteProfile,
   } = useDialogState();
+
+  const [signatureProfile, setSignatureProfile] =
+    useState<AdminCreatorProfileRow | null>(null);
+  const openEmailSignatureDialog = useCallback(
+    (profile: AdminCreatorProfileRow) => {
+      setSignatureProfile(profile);
+    },
+    []
+  );
+  const signatureInput = useMemo(
+    () =>
+      signatureProfile
+        ? buildSignatureInputFromProfile({
+            profile: {
+              username: signatureProfile.username,
+              displayName: signatureProfile.displayName,
+              avatarUrl: signatureProfile.avatarUrl,
+              genres: signatureProfile.genres,
+              location: signatureProfile.location,
+            },
+            socials: signatureProfile.socialLinks?.map(link => ({
+              label: link.displayText ?? link.platform,
+              url: link.url,
+            })),
+          })
+        : null,
+    [signatureProfile]
+  );
 
   // Load all data without server-side search — filter client-side instead
   const { data, fetchNextPage, hasNextPage, isFetchingNextPage } =
@@ -205,6 +235,7 @@ export function AdminCreatorProfilesUnified({
     toggleMarketing,
     openDeleteDialog,
     openInviteDialog,
+    openEmailSignatureDialog,
   });
 
   const {
@@ -389,14 +420,10 @@ export function AdminCreatorProfilesUnified({
     const isSelected = profile.id === selectedIdRef.current;
 
     if (isChecked || isSelected) {
-      return cn(
-        'group cursor-pointer bg-(--linear-row-selected) shadow-[inset_1px_0_0_0_var(--linear-border-focus)] hover:bg-(--linear-row-selected)'
-      );
+      return cn('group cursor-pointer', rowState.selected);
     }
 
-    return cn(
-      'group cursor-pointer bg-transparent transition-colors duration-100 ease-out hover:bg-(--linear-row-hover)'
-    );
+    return cn('group cursor-pointer', rowState.hover);
   }, []);
 
   // Register right panel with AuthShell instead of rendering inline.
@@ -482,7 +509,7 @@ export function AdminCreatorProfilesUnified({
           }
         >
           {() => (
-            <UnifiedTable
+            <AdminDataTable
               data={filteredProfiles}
               columns={columns}
               isLoading={false}
@@ -505,12 +532,9 @@ export function AdminCreatorProfilesUnified({
               getRowClassName={getRowClassName}
               onRowClick={handleRowClick}
               getContextMenuItems={getContextMenuItems}
-              enableVirtualization={true}
               // Disabled: this table uses page-level useAdminTableKeyboardNavigation
               // for arrow-key nav, which conflicts with UnifiedTable's row-level focus tracking.
               enableKeyboardNavigation={false}
-              minWidth={`${TABLE_MIN_WIDTHS.MEDIUM}px`}
-              className='text-[12.5px] [&_thead_th]:py-1 [&_thead_th]:text-3xs [&_thead_th]:tracking-[0.07em]'
               hasNextPage={hasNextPage}
               isFetchingNextPage={isFetchingNextPage}
               onLoadMore={() => {
@@ -556,6 +580,11 @@ export function AdminCreatorProfilesUnified({
         onSuccess={() => {
           clearInviteProfile();
         }}
+      />
+      <EmailSignatureDialog
+        open={signatureProfile !== null}
+        onClose={() => setSignatureProfile(null)}
+        input={signatureInput}
       />
     </>
   );

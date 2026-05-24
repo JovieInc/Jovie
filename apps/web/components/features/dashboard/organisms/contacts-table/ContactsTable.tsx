@@ -2,15 +2,16 @@
 
 import { Plus, UserPlus } from 'lucide-react';
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useTableMeta } from '@/components/organisms/AuthShellWrapper';
 import { EmptyState } from '@/components/organisms/EmptyState';
 import {
   convertToCommonDropdownItems,
   PAGE_TOOLBAR_META_TEXT_CLASS,
   PageToolbar,
+  rowState,
   UnifiedTable,
 } from '@/components/organisms/table';
 import { useSetHeaderActions } from '@/contexts/HeaderActionsContext';
+import { useTableMeta } from '@/contexts/TableMetaContext';
 import { DashboardHeaderActionButton } from '@/features/dashboard/atoms/DashboardHeaderActionButton';
 import { DashboardHeaderActionGroup } from '@/features/dashboard/atoms/DashboardHeaderActionGroup';
 import { DrawerToggleButton } from '@/features/dashboard/atoms/DrawerToggleButton';
@@ -181,8 +182,7 @@ export const ContactsTable = memo(function ContactsTable({
 
   const getRowClassName = useCallback(
     (contact: EditableContact) => {
-      // Selected row: solid bg (override base hover)
-      return selectedContactId === contact.id ? 'bg-white/[0.04]' : '';
+      return selectedContactId === contact.id ? rowState.selected : '';
     },
     [selectedContactId]
   );

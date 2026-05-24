@@ -59,11 +59,20 @@ The public URL of your application.
 
 **Default:** `https://jov.ie`
 
-## Analytics & Feature Flags (Statsig)
+### `IOS_TESTFLIGHT_PUBLIC_LINK`
 
-### `NEXT_PUBLIC_STATSIG_CLIENT_KEY`
+Optional internal TestFlight install URL used by authenticated, alpha-gated iOS
+download surfaces. Leave unset to keep the iOS alpha visible but not directly
+installable from web UI.
 
-Public Statsig client SDK key. Analytics and feature gates remain disabled when this is missing.
+## Feature Flags (Statsig)
+
+### `STATSIG_SERVER_SECRET`
+
+Server-side Statsig secret used by `apps/web/lib/flags/statsig.ts`.
+Feature gates and experiments remain disabled and fall back to safe defaults
+when this is missing. The app does not currently load a Statsig browser SDK, so
+no public Statsig client key is required.
 
 ## Stripe Billing
 

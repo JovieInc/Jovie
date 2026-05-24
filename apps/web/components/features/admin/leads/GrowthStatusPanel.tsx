@@ -81,25 +81,25 @@ export function GrowthStatusPanel() {
               label='Pipeline'
               value={settings.enabled ? 'Active' : 'Paused'}
               subtitle={`Mode: ${detectSpeed(settings) === 'custom' ? 'Custom' : detectSpeed(settings)}`}
-              className='h-full bg-surface-0 shadow-none'
+              className='h-full'
             />
             <ContentMetricCard
               label='Query Budget'
               value={`${settings.queriesUsedToday}/${settings.dailyQueryBudget}`}
               subtitle='Used today'
-              className='h-full bg-surface-0 shadow-none'
+              className='h-full'
             />
             <ContentMetricCard
               label='Auto-Ingested'
               value={settings.autoIngestedToday}
               subtitle={`Limit ${settings.autoIngestDailyLimit} per day`}
-              className='h-full bg-surface-0 shadow-none'
+              className='h-full'
             />
             <ContentMetricCard
               label='Send Cap'
               value={settings.dailySendCap}
               subtitle={`${settings.maxPerHour}/hour max`}
-              className='h-full bg-surface-0 shadow-none'
+              className='h-full'
             />
           </div>
         ) : (

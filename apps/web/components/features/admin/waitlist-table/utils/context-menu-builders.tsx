@@ -74,21 +74,41 @@ export function createStatusActionMenuItems(
   entry: WaitlistEntryRow,
   approveEntry: (
     entry: Pick<WaitlistEntryRow, 'id' | 'status'>
-  ) => Promise<void>
+  ) => Promise<void>,
+  resendInvite?: (entry: Pick<WaitlistEntryRow, 'id'>) => Promise<void>
 ): ContextMenuItemType[] {
-  const isApproved = entry.status === 'invited' || entry.status === 'claimed';
+  const isApproved = entry.status === 'invited' || entry.status === 'approved';
+  const isSignedUp = entry.status === 'signed_up' || entry.status === 'claimed';
+  const canResendInvite =
+    entry.status === 'invited' || entry.status === 'approved';
 
-  return [
-    {
-      id: 'approve',
-      label: isApproved ? 'Disapprove' : 'Approve',
-      icon: <ClipboardList className='h-3.5 w-3.5' />,
+  const items: ContextMenuItemType[] = isSignedUp
+    ? []
+    : [
+        {
+          id: 'approve',
+          label: isApproved ? 'Disapprove' : 'Approve',
+          icon: <ClipboardList className='h-3.5 w-3.5' />,
+          onClick: () => {
+            void approveEntry({ id: entry.id, status: entry.status });
+          },
+          disabled: false,
+        },
+      ];
+
+  if (canResendInvite && resendInvite) {
+    items.push({
+      id: 'resend-invite',
+      label: 'Resend invite',
+      icon: <Mail className='h-3.5 w-3.5' />,
       onClick: () => {
-        void approveEntry({ id: entry.id, status: entry.status });
+        void resendInvite({ id: entry.id });
       },
       disabled: false,
-    },
-  ];
+    });
+  }
+
+  return items;
 }
 
 /**
@@ -99,13 +119,14 @@ export function buildContextMenuItems(
   copyToClipboard: (text: string, label: string) => void,
   approveEntry: (
     entry: Pick<WaitlistEntryRow, 'id' | 'status'>
-  ) => Promise<void>
+  ) => Promise<void>,
+  resendInvite?: (entry: Pick<WaitlistEntryRow, 'id'>) => Promise<void>
 ): ContextMenuItemType[] {
   return [
     ...createCopyMenuItems(entry, copyToClipboard),
     { type: 'separator' },
     ...createExternalLinkMenuItems(entry),
     { type: 'separator' },
-    ...createStatusActionMenuItems(entry, approveEntry),
+    ...createStatusActionMenuItems(entry, approveEntry, resendInvite),
   ];
 }

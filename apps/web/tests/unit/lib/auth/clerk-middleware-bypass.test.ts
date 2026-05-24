@@ -119,6 +119,22 @@ describe('shouldBypassClerkForRequest', () => {
       shouldBypassClerkForRequest({
         cookies: [],
         pathInfo: PUBLIC_PATH_INFO,
+        pathname: '/auth/start',
+      })
+    ).toBe(false);
+
+    expect(
+      shouldBypassClerkForRequest({
+        cookies: [],
+        pathInfo: PUBLIC_PATH_INFO,
+        pathname: '/auth/callback',
+      })
+    ).toBe(false);
+
+    expect(
+      shouldBypassClerkForRequest({
+        cookies: [],
+        pathInfo: PUBLIC_PATH_INFO,
         pathname: '/__clerk/v1/client',
       })
     ).toBe(false);

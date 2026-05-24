@@ -1,3 +1,4 @@
+import { getMarketingExportImage } from '@/lib/screenshots/registry';
 import type { MarketingFeatureTile } from './marketingFeatureTiles';
 
 export const ARTIST_NOTIFICATIONS_SPEC_TILES: readonly MarketingFeatureTile[] =
@@ -12,7 +13,8 @@ export const ARTIST_NOTIFICATIONS_SPEC_TILES: readonly MarketingFeatureTile[] =
       layoutClassName:
         'xl:col-start-1 xl:row-start-1 xl:col-span-5 xl:row-span-2',
       visual: 'screenshot',
-      screenshotSrc: '/product-screenshots/tim-white-profile-listen-phone.png',
+      screenshotSrc: getMarketingExportImage('tim-white-profile-listen-mobile')
+        .publicUrl,
       screenshotAlt:
         'Jovie artist profile showing the latest release at the top of the page.',
       screenshotWidth: 660,
@@ -29,8 +31,8 @@ export const ARTIST_NOTIFICATIONS_SPEC_TILES: readonly MarketingFeatureTile[] =
       layoutClassName:
         'xl:col-start-6 xl:row-start-1 xl:col-span-4 xl:row-span-2',
       visual: 'screenshot',
-      screenshotSrc:
-        '/product-screenshots/artist-spec-geo-insights-desktop.png',
+      screenshotSrc: getMarketingExportImage('artist-spec-geo-insights-desktop')
+        .publicUrl,
       screenshotAlt:
         'Jovie geo insights showing cities where fan attention is building.',
       screenshotWidth: 344,
@@ -47,8 +49,9 @@ export const ARTIST_NOTIFICATIONS_SPEC_TILES: readonly MarketingFeatureTile[] =
       layoutClassName:
         'xl:col-start-10 xl:row-start-1 xl:col-span-3 xl:row-span-1',
       visual: 'screenshot',
-      screenshotSrc:
-        '/product-screenshots/tim-white-profile-subscribe-phone.png',
+      screenshotSrc: getMarketingExportImage(
+        'tim-white-profile-subscribe-mobile'
+      ).publicUrl,
       screenshotAlt:
         'Jovie artist profile showing the subscribe surface for fan capture.',
       screenshotWidth: 660,
@@ -65,8 +68,9 @@ export const ARTIST_NOTIFICATIONS_SPEC_TILES: readonly MarketingFeatureTile[] =
       layoutClassName:
         'xl:col-start-10 xl:row-start-2 xl:col-span-3 xl:row-span-1',
       visual: 'screenshot',
-      screenshotSrc:
-        '/product-screenshots/artist-spec-sync-settings-desktop.png',
+      screenshotSrc: getMarketingExportImage(
+        'artist-spec-sync-settings-desktop'
+      ).publicUrl,
       screenshotAlt:
         'Jovie settings showing always-in-sync controls for artist surfaces.',
       screenshotWidth: 970,
@@ -83,7 +87,8 @@ export const ARTIST_NOTIFICATIONS_SPEC_TILES: readonly MarketingFeatureTile[] =
       layoutClassName:
         'xl:col-start-1 xl:row-start-3 xl:col-span-12 xl:row-span-2',
       visual: 'screenshot',
-      screenshotSrc: '/product-screenshots/profile-desktop.png',
+      screenshotSrc: getMarketingExportImage('public-profile-desktop')
+        .publicUrl,
       screenshotAlt:
         'Jovie artist profile on desktop with the primary release destination in view.',
       screenshotWidth: 1440,

@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { BrandLogo } from '@/components/atoms/BrandLogo';
+import { JovieMarkElectric } from '@/components/atoms/JovieMarkElectric';
 
 // Delay before showing loading message (milliseconds)
 const LOADING_MESSAGE_DELAY_MS = 2000;
@@ -26,14 +26,9 @@ export function AuthLoader() {
   return (
     <div className='flex h-full w-full items-center justify-center'>
       <div className='flex flex-col items-center gap-3'>
-        <BrandLogo
-          size={32}
-          tone='muted'
-          className='animate-pulse'
-          aria-hidden
-        />
+        <JovieMarkElectric size={32} />
         <p
-          className={`text-xs text-tertiary-token transition-opacity duration-300 ${
+          className={`text-xs text-tertiary-token transition-opacity duration-subtle ${
             showMessage ? 'opacity-100' : 'opacity-0'
           }`}
           aria-hidden={!showMessage}

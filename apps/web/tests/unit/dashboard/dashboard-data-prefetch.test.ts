@@ -55,16 +55,18 @@ vi.mock('react', async () => {
 
   return {
     ...actual,
-    cache: <T>(fn: () => Promise<T>) => {
+    cache: <TArgs extends unknown[], TResult>(
+      fn: (...args: TArgs) => Promise<TResult>
+    ) => {
       if (!cacheStore.has(fn)) {
         cacheStore.set(fn, { promise: null });
       }
       const entry = cacheStore.get(fn)!;
-      return () => {
+      return (...args: TArgs) => {
         if (!entry.promise) {
-          entry.promise = fn();
+          entry.promise = fn(...args);
         }
-        return entry.promise as Promise<T>;
+        return entry.promise as Promise<TResult>;
       };
     },
   };
@@ -159,6 +161,7 @@ vi.mock('@/lib/db', () => ({
     }),
     execute: vi.fn().mockResolvedValue({}),
   },
+  doesTableExist: vi.fn(async () => false),
 }));
 
 vi.mock('@/lib/db/query-timeout', () => ({
@@ -187,6 +190,7 @@ vi.mock('@/lib/db/schema/auth', () => ({
 vi.mock('@/lib/db/schema/links', () => ({
   socialLinks: {
     creatorProfileId: 'creatorProfileId',
+    isActive: 'isActive',
     state: 'state',
     platformType: 'platformType',
     platform: 'platform',
@@ -194,6 +198,12 @@ vi.mock('@/lib/db/schema/links', () => ({
 }));
 
 vi.mock('@/lib/db/schema/profiles', () => ({
+  creatorDistributionEvents: {
+    createdAt: 'createdAt',
+    creatorProfileId: 'creatorProfileId',
+    eventType: 'eventType',
+    platform: 'platform',
+  },
   creatorProfiles: { userId: 'userId', id: 'id', createdAt: 'createdAt' },
 }));
 
@@ -273,8 +283,10 @@ describe('dashboard data prefetch', () => {
   });
 
   it('retries shell user lookup after auth reconciliation when the clerk row is missing', async () => {
-    // The shell path uses withDbSession (no transaction) + db directly.
-    // Mock db to return empty on first user lookup, then found on retry.
+    // The shell path must keep profile reads inside the same transaction-scoped
+    // session because creator profile visibility depends on RLS.
+    // The cached shell fetch now returns the empty snapshot first, then the
+    // fresh retry performs auth reconciliation and recovers the user row.
     const profile = {
       id: 'profile_1',
       userId: 'user_db_1',
@@ -287,9 +299,15 @@ describe('dashboard data prefetch', () => {
       updatedAt: new Date('2026-03-31T00:00:00.000Z'),
     };
 
-    const { db } = await import('@/lib/db');
-    const dbSelectMock = vi.mocked(db.select);
-    dbSelectMock
+    const selectMock = vi
+      .fn()
+      .mockReturnValueOnce({
+        from: vi.fn().mockReturnValue({
+          where: vi.fn().mockReturnValue({
+            limit: vi.fn().mockResolvedValue([]),
+          }),
+        }),
+      } as never)
       .mockReturnValueOnce({
         from: vi.fn().mockReturnValue({
           where: vi.fn().mockReturnValue({
@@ -317,6 +335,13 @@ describe('dashboard data prefetch', () => {
           }),
         }),
       } as never);
+    withDbSessionTxMock
+      .mockImplementationOnce(async handler =>
+        handler({ select: selectMock }, 'user_123')
+      )
+      .mockImplementationOnce(async handler =>
+        handler({ select: selectMock }, 'user_123')
+      );
 
     const { getDashboardShellData } = await import(
       '@/app/app/(shell)/dashboard/actions/dashboard-data'
@@ -326,7 +351,11 @@ describe('dashboard data prefetch', () => {
 
     expect(resolveUserStateMock).toHaveBeenCalledWith({
       createDbUserIfMissing: true,
+      knownClerkUserId: 'user_123',
     });
+    expect(resolveUserStateMock).toHaveBeenCalledTimes(1);
+    expect(withDbSessionTxMock).toHaveBeenCalledTimes(2);
+    expect(withDbSessionMock).not.toHaveBeenCalled();
     expect(result.user?.id).toBe('user_db_1');
     expect(result.selectedProfile?.id).toBe('profile_1');
     expect(result.needsOnboarding).toBe(false);
@@ -343,9 +372,8 @@ describe('dashboard data prefetch', () => {
       updatedAt: new Date('2026-03-31T00:00:00.000Z'),
     };
 
-    // Shell path now uses withDbSession (no transaction).
     // First call returns empty profile, second returns recovered profile.
-    withDbSessionMock
+    withDbSessionTxMock
       .mockImplementationOnce(async () => ({
         ...baseDashboardResponse,
         creatorProfiles: [],
@@ -365,12 +393,14 @@ describe('dashboard data prefetch', () => {
 
     const result = await getDashboardShellData('user_123');
 
-    expect(withDbSessionMock).toHaveBeenCalledTimes(2);
+    expect(withDbSessionTxMock).toHaveBeenCalledTimes(2);
+    expect(withDbSessionMock).not.toHaveBeenCalled();
     expect(result.selectedProfile?.id).toBe('profile_1');
     expect(result.needsOnboarding).toBe(false);
   });
 
   it('bypasses creator onboarding checks for admins on full dashboard data', async () => {
+    checkAdminRoleMock.mockResolvedValue(true);
     getCurrentUserEntitlementsMock.mockResolvedValue({
       userId: 'user_123',
       email: 'admin@example.com',
@@ -400,6 +430,40 @@ describe('dashboard data prefetch', () => {
 
     expect(result.isAdmin).toBe(true);
     expect(result.needsOnboarding).toBe(false);
+  });
+
+  it('keeps full dashboard admin navigation role-based when MFA is stale', async () => {
+    checkAdminRoleMock.mockResolvedValue(true);
+    getCurrentUserEntitlementsMock.mockResolvedValue({
+      userId: 'user_123',
+      email: 'admin@example.com',
+      isAuthenticated: true,
+      isAdmin: false,
+      isPro: false,
+      hasAdvancedFeatures: false,
+      canRemoveBranding: false,
+    });
+    withDbSessionTxMock.mockResolvedValue({
+      ...baseDashboardResponse,
+      selectedProfile: {
+        id: 'admin_profile',
+        username: null,
+        displayName: 'Admin',
+        isPublic: false,
+        onboardingCompletedAt: new Date('2026-03-31T00:00:00.000Z'),
+      },
+      needsOnboarding: true,
+    });
+
+    const { getDashboardData } = await import(
+      '@/app/app/(shell)/dashboard/actions/dashboard-data'
+    );
+
+    const result = await getDashboardData();
+
+    expect(result.isAdmin).toBe(true);
+    expect(result.needsOnboarding).toBe(false);
+    expect(checkAdminRoleMock).toHaveBeenCalledWith('user_123');
   });
 
   it('bypasses creator onboarding checks for admins on shell data', async () => {

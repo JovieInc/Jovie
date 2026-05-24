@@ -24,7 +24,7 @@ export function PickerLink({ href, label, className }: PickerLinkProps) {
     <a
       href={href}
       className={cn(
-        'flex items-center justify-between h-6 px-1.5 rounded text-[11px] text-secondary-token hover:bg-surface-1 hover:text-primary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-token transition-colors duration-150 ease-out',
+        'flex items-center justify-between h-6 px-1.5 rounded text-[11px] text-secondary-token hover:bg-surface-1 hover:text-primary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-token transition-colors duration-subtle ease-subtle',
         className
       )}
     >

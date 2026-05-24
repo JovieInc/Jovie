@@ -37,9 +37,11 @@ const videoMode: 'off' | 'retain-on-failure' =
 
 const stableLocalServerCommand =
   process.env.E2E_WEB_SERVER_COMMAND ?? 'pnpm run dev:local:playwright';
+// Pin Doppler scope explicitly so worktrees never inherit whichever scope
+// happens to be active in the parent shell. See .claude/rules/environment.md.
 const webServerCommand = process.env.DATABASE_URL
   ? stableLocalServerCommand
-  : `doppler run -- ${stableLocalServerCommand}`;
+  : `doppler run --project jovie-web --config dev -- ${stableLocalServerCommand}`;
 
 function getRetries(): number {
   if (!isCI) return 0;

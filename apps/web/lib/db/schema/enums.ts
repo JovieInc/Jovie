@@ -193,6 +193,14 @@ export const waitlistStatusEnum = pgEnum('waitlist_status', [
   'new',
   'invited',
   'claimed',
+  'chat_started',
+  'qualified',
+  'waitlisted',
+  'approved',
+  'signed_up',
+  'rejected',
+  'expired',
+  'blocked',
 ]);
 
 export const waitlistInviteStatusEnum = pgEnum('waitlist_invite_status', [
@@ -431,6 +439,18 @@ export const chatMessageRoleEnum = pgEnum('chat_message_role', [
   'assistant',
 ]);
 
+export const chatTurnStatusEnum = pgEnum('chat_turn_status', [
+  'reserved',
+  'running',
+  'streaming',
+  'completed',
+  'failed_tool_unavailable',
+  'failed_model_error',
+  'failed_timeout',
+  'failed_network',
+  'canceled',
+]);
+
 // AI Insights Enums
 export const insightCategoryEnum = pgEnum('insight_category', [
   'geographic',
@@ -634,3 +654,86 @@ export const referralCommissionStatusEnum = pgEnum(
     'cancelled', // Commission cancelled (e.g., refund/chargeback)
   ]
 );
+
+// ---------------------------------------------------------------------------
+// AI Connector Enums (v1)
+// ---------------------------------------------------------------------------
+
+export const connectorProviderEnum = pgEnum('connector_provider', [
+  'spotify',
+  'apple_music',
+  'youtube',
+  'instagram',
+  'tiktok',
+  'soundcloud',
+]);
+
+export const connectorStatusEnum = pgEnum('connector_status', [
+  'connected',
+  'disconnected',
+  'error',
+  'reauth_required',
+]);
+
+export const webhookProviderEnum = pgEnum('webhook_provider', [
+  'spotify',
+  'apple_music',
+  'youtube',
+  'instagram',
+  'tiktok',
+  'soundcloud',
+]);
+
+export const contextFactKindEnum = pgEnum('context_fact_kind', [
+  'streaming_stats',
+  'audience_demographics',
+  'release_performance',
+  'social_engagement',
+  'playlist_placement',
+  'other',
+]);
+
+export const suggestedActionStatusEnum = pgEnum('suggested_action_status', [
+  'pending',
+  'accepted',
+  'dismissed',
+  'completed',
+]);
+
+export const agentRunStatusEnum = pgEnum('agent_run_status', [
+  'queued',
+  'running',
+  'waiting_for_approval',
+  'completed',
+  'failed',
+]);
+
+export const workflowRunStatusEnum = pgEnum('workflow_run_status', [
+  'pending',
+  'running',
+  'waiting_for_approval',
+  'completed',
+  'failed',
+  'cancelled',
+]);
+
+// ---------------------------------------------------------------------------
+// Agent Registry Enums (v1)
+// ---------------------------------------------------------------------------
+
+export const skillKindEnum = pgEnum('skill_kind', [
+  'vertical_agent',
+  'tool',
+  'style',
+]);
+
+export const retouchJobStatusEnum = pgEnum('retouch_job_status', [
+  'queued',
+  'running',
+  'identity_check_failed',
+  'identity_check_retrying',
+  'completed',
+  'failed',
+  'rejected_by_user',
+  'accepted_by_user',
+]);

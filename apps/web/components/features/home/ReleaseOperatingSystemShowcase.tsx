@@ -6,6 +6,9 @@ import {
   HOME_RELEASE_AI_CONTEXT,
 } from '@/features/home/home-surface-seed';
 import { MarketingSurfaceCard } from '@/features/home/MarketingSurfaceCard';
+import { getMarketingExportImage } from '@/lib/screenshots/registry';
+
+const RELEASE_TASKS_IMAGE = getMarketingExportImage('release-tasks-desktop');
 
 function MonitoringPanel() {
   return (
@@ -47,7 +50,7 @@ export function ReleaseOperatingSystemShowcase() {
       <div className='space-y-4 lg:hidden'>
         <div data-testid='homepage-release-operating-system-tasks'>
           <MarketingSurfaceCard
-            src='/product-screenshots/release-tasks-active.png'
+            src={RELEASE_TASKS_IMAGE.publicUrl}
             alt='Jovie release task manager with a populated campaign checklist'
             aspectRatio='16 / 10'
             objectPosition='center top'
@@ -86,7 +89,7 @@ export function ReleaseOperatingSystemShowcase() {
           data-testid='homepage-release-operating-system-tasks'
         >
           <MarketingSurfaceCard
-            src='/product-screenshots/release-tasks-active.png'
+            src={RELEASE_TASKS_IMAGE.publicUrl}
             alt='Jovie release task manager with a populated campaign checklist'
             aspectRatio='16 / 10'
             objectPosition='center top'

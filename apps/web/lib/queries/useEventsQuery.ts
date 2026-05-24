@@ -3,38 +3,49 @@
 import { useQuery } from '@tanstack/react-query';
 import { loadTourDates } from '@/app/app/(shell)/dashboard/tour-dates/actions';
 import { queryKeys, STANDARD_NO_REMOUNT_CACHE } from '@/lib/queries';
-import type { TourDateViewModel } from '@/lib/tour-dates/types';
+import type {
+  ConfirmationStatusValue,
+  EventTypeValue,
+  TourDateProviderValue,
+  TourDateViewModel,
+} from '@/lib/tour-dates/types';
 
 /**
  * Forward-compatible event record returned by the chat composer's event
- * provider. Today every record is a tour date (mapped from
- * `tourDates` via {@link loadTourDates}); future event types (meetups,
- * charity gigs, TV guest spots) will land alongside without changing the
- * call sites.
- *
- * Mapping lives only in this file — when the backend later splits event
- * types out of the `tourDates` table, only this mapper changes.
+ * provider and consumed by the unified calendar. Today every record is
+ * derived from `tourDates`; the broader `eventType` enum (livestream,
+ * listening party, AMA, signing) sits alongside `tour` so that future
+ * non-tour event types can land without changing call sites.
  */
 export interface EventRecord {
   readonly id: string;
-  /** Venue name, e.g. "Brooklyn Steel". Falls back to tour-date title or city. */
+  /** Display title. Prefers custom title, then venue name, then city. */
   readonly title: string;
   /** "city · provider", e.g. "Brooklyn, NY · Bandsintown". */
   readonly subtitle: string;
   /** ISO start timestamp for the event. */
   readonly eventDate: string;
-  readonly eventType: 'tour' | 'meetup' | 'guest' | 'charity' | 'other';
+  /** IANA timezone for event-local date bucketing on the calendar grid. */
+  readonly timezone: string | null;
+  readonly eventType: EventTypeValue;
+  readonly confirmationStatus: ConfirmationStatusValue;
+  readonly providerKey: TourDateProviderValue;
+  readonly reviewedAt: string | null;
+  readonly lastSyncedAt: string | null;
   readonly venue?: string;
   readonly city?: string;
+  /** Human-friendly provider label, e.g. "Bandsintown". */
   readonly provider?: string;
   /** Human-friendly status badge text, e.g. "Sold out". */
   readonly status?: string;
+  readonly ticketUrl?: string;
   readonly capacity?: number;
 }
 
-function formatProvider(provider: TourDateViewModel['provider']): string {
+function formatProvider(provider: TourDateProviderValue): string {
   if (provider === 'bandsintown') return 'Bandsintown';
   if (provider === 'songkick') return 'Songkick';
+  if (provider === 'admin_import') return 'Admin Import';
   return 'Manual';
 }
 
@@ -64,14 +75,20 @@ export function tourDateToEventRecord(td: TourDateViewModel): EventRecord {
   const subtitle = `${location} · ${providerLabel}`;
   return {
     id: td.id,
-    title: td.venueName || td.title || td.city,
+    title: td.title || td.venueName || td.city,
     subtitle,
     eventDate: td.startDate,
-    eventType: 'tour',
+    timezone: td.timezone,
+    eventType: td.eventType,
+    confirmationStatus: td.confirmationStatus,
+    providerKey: td.provider,
+    reviewedAt: td.reviewedAt,
+    lastSyncedAt: td.lastSyncedAt,
     venue: td.venueName,
     city: location,
     provider: providerLabel,
     status: formatStatus(td.ticketStatus),
+    ticketUrl: td.ticketUrl ?? undefined,
   };
 }
 
@@ -85,7 +102,7 @@ export function useEventsQuery(profileId: string) {
     queryKey: queryKeys.events.list(profileId),
     // eslint-disable-next-line @jovie/require-abort-signal -- server action, signal not passable
     queryFn: async (): Promise<EventRecord[]> => {
-      const dates = await loadTourDates();
+      const dates = await loadTourDates(profileId);
       return dates.map(tourDateToEventRecord);
     },
     ...STANDARD_NO_REMOUNT_CACHE,

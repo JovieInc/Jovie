@@ -8,7 +8,7 @@
 import { and, sql as drizzleSql, eq, isNotNull } from 'drizzle-orm';
 import { unstable_cache } from 'next/cache';
 import { cache } from 'react';
-import { db } from '@/lib/db';
+import { db, doesColumnExist } from '@/lib/db';
 import {
   type ArtistRole,
   artists,
@@ -24,6 +24,7 @@ import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { promoDownloads } from '@/lib/db/schema/promo-downloads';
 import { getCreatorEntitlements } from '@/lib/entitlements/creator-plan';
 import { env } from '@/lib/env-server';
+import { publicReleaseEligibilitySqlPredicate } from '@/lib/profile/public-release-eligibility';
 import { toISOStringOrNull } from '@/lib/utils/date';
 import { logger } from '@/lib/utils/logger';
 import { shouldBypassPublicProfileQaCache } from '../../_lib/public-profile-qa';
@@ -258,22 +259,38 @@ export interface CachedContentData {
  * Fetch creator by normalized username.
  */
 const fetchCreatorByUsername = async (usernameNormalized: string) => {
+  const smartLinkCreatorSelect = {
+    id: creatorProfiles.id,
+    userId: creatorProfiles.userId,
+    displayName: creatorProfiles.displayName,
+    username: creatorProfiles.username,
+    usernameNormalized: creatorProfiles.usernameNormalized,
+    avatarUrl: creatorProfiles.avatarUrl,
+    settings: creatorProfiles.settings,
+  };
+
+  if (await doesColumnExist('creator_profiles', 'is_claimed')) {
+    const [creator] = await db
+      .select({
+        ...smartLinkCreatorSelect,
+        isClaimed: creatorProfiles.isClaimed,
+      })
+      .from(creatorProfiles)
+      .where(eq(creatorProfiles.usernameNormalized, usernameNormalized))
+      .limit(1);
+
+    return creator ?? null;
+  }
+
   const [creator] = await db
-    .select({
-      id: creatorProfiles.id,
-      userId: creatorProfiles.userId,
-      displayName: creatorProfiles.displayName,
-      username: creatorProfiles.username,
-      usernameNormalized: creatorProfiles.usernameNormalized,
-      avatarUrl: creatorProfiles.avatarUrl,
-      settings: creatorProfiles.settings,
-      isClaimed: creatorProfiles.isClaimed,
-    })
+    .select(smartLinkCreatorSelect)
     .from(creatorProfiles)
     .where(eq(creatorProfiles.usernameNormalized, usernameNormalized))
     .limit(1);
 
-  return creator ?? null;
+  // Schema-rollout fallback only: this is not canonical profile state.
+  // Revisit once creator_profiles.is_claimed exists in every environment.
+  return creator ? { ...creator, isClaimed: true } : null;
 };
 
 /**
@@ -330,7 +347,8 @@ const fetchContentBySlug = async (
     .where(
       and(
         eq(discogReleases.creatorProfileId, creatorProfileId),
-        eq(discogReleases.slug, slug)
+        eq(discogReleases.slug, slug),
+        publicReleaseEligibilitySqlPredicate()
       )
     )
     .limit(1);
@@ -437,7 +455,12 @@ const fetchContentBySlug = async (
         discogReleases,
         eq(discogReleaseTracks.releaseId, discogReleases.id)
       )
-      .where(eq(discogReleaseTracks.recordingId, recording.id))
+      .where(
+        and(
+          eq(discogReleaseTracks.recordingId, recording.id),
+          publicReleaseEligibilitySqlPredicate()
+        )
+      )
       .orderBy(discogReleases.releaseDate)
       .limit(1);
 
@@ -449,6 +472,7 @@ const fetchContentBySlug = async (
             .select({
               artworkUrl: discogReleases.artworkUrl,
               releaseDate: discogReleases.releaseDate,
+              revealDate: discogReleases.revealDate,
               slug: discogReleases.slug,
               title: discogReleases.title,
             })
@@ -476,6 +500,10 @@ const fetchContentBySlug = async (
       fetchRecordingCredits(recording.id),
     ]);
 
+    if (!releaseData || links.length === 0) {
+      return null;
+    }
+
     return {
       type: 'track',
       id: recording.id,
@@ -483,6 +511,7 @@ const fetchContentBySlug = async (
       slug: recording.slug,
       artworkUrl: releaseData?.artworkUrl ?? null,
       releaseDate: toISOStringOrNull(releaseData?.releaseDate),
+      revealDate: toISOStringOrNull(releaseData?.revealDate),
       providerLinks: links,
       previewUrl: recording.previewUrl,
       previewMetadata: recording.previewMetadata ?? null,
@@ -520,11 +549,17 @@ const fetchContentBySlug = async (
         .select({
           artworkUrl: discogReleases.artworkUrl,
           releaseDate: discogReleases.releaseDate,
+          revealDate: discogReleases.revealDate,
           slug: discogReleases.slug,
           title: discogReleases.title,
         })
         .from(discogReleases)
-        .where(eq(discogReleases.id, track.releaseId))
+        .where(
+          and(
+            eq(discogReleases.id, track.releaseId),
+            publicReleaseEligibilitySqlPredicate()
+          )
+        )
         .limit(1)
         .then(rows => rows[0]),
       db
@@ -543,6 +578,10 @@ const fetchContentBySlug = async (
         ),
     ]);
 
+    if (!releaseData || links.length === 0) {
+      return null;
+    }
+
     return {
       type: 'track',
       id: track.id,
@@ -550,6 +589,7 @@ const fetchContentBySlug = async (
       slug: track.slug,
       artworkUrl: releaseData?.artworkUrl ?? null,
       releaseDate: toISOStringOrNull(releaseData?.releaseDate),
+      revealDate: toISOStringOrNull(releaseData?.revealDate),
       providerLinks: links,
       previewUrl: track.previewUrl,
       previewMetadata: null,
@@ -658,11 +698,17 @@ export const getTrackBySlugInRelease = cache(
             .select({
               artworkUrl: discogReleases.artworkUrl,
               releaseDate: discogReleases.releaseDate,
+              revealDate: discogReleases.revealDate,
               slug: discogReleases.slug,
               title: discogReleases.title,
             })
             .from(discogReleases)
-            .where(eq(discogReleases.id, releaseId))
+            .where(
+              and(
+                eq(discogReleases.id, releaseId),
+                publicReleaseEligibilitySqlPredicate()
+              )
+            )
             .limit(1),
           db
             .select({
@@ -716,6 +762,10 @@ export const getTrackBySlugInRelease = cache(
         }
       }
 
+      if (!releaseData || links.length === 0) {
+        return null;
+      }
+
       return {
         type: 'track',
         id: releaseTrack.recordingId,
@@ -723,6 +773,7 @@ export const getTrackBySlugInRelease = cache(
         slug: releaseTrack.slug ?? trackSlug,
         artworkUrl: releaseData?.artworkUrl ?? null,
         releaseDate: releaseData?.releaseDate ?? null,
+        revealDate: releaseData?.revealDate ?? null,
         providerLinks: links,
         previewUrl: recording?.previewUrl ?? null,
         previewMetadata: recording?.previewMetadata ?? null,
@@ -758,11 +809,17 @@ export const getTrackBySlugInRelease = cache(
           .select({
             artworkUrl: discogReleases.artworkUrl,
             releaseDate: discogReleases.releaseDate,
+            revealDate: discogReleases.revealDate,
             slug: discogReleases.slug,
             title: discogReleases.title,
           })
           .from(discogReleases)
-          .where(eq(discogReleases.id, releaseId))
+          .where(
+            and(
+              eq(discogReleases.id, releaseId),
+              publicReleaseEligibilitySqlPredicate()
+            )
+          )
           .limit(1),
         db
           .select({
@@ -780,6 +837,10 @@ export const getTrackBySlugInRelease = cache(
           ),
       ]);
 
+      if (!releaseData || links.length === 0) {
+        return null;
+      }
+
       return {
         type: 'track',
         id: legacyTrack.id,
@@ -787,6 +848,7 @@ export const getTrackBySlugInRelease = cache(
         slug: legacyTrack.slug,
         artworkUrl: releaseData?.artworkUrl ?? null,
         releaseDate: releaseData?.releaseDate ?? null,
+        revealDate: releaseData?.revealDate ?? null,
         providerLinks: links,
         previewUrl: legacyTrack.previewUrl,
         previewMetadata: null,
@@ -890,7 +952,8 @@ export async function getFeaturedSmartLinkStaticParams(
       .where(
         and(
           eq(creatorProfiles.isPublic, true),
-          eq(creatorProfiles.isFeatured, true)
+          eq(creatorProfiles.isFeatured, true),
+          publicReleaseEligibilitySqlPredicate()
         )
       )
       .orderBy(
@@ -949,7 +1012,8 @@ export async function getFeaturedTrackStaticParams(
         and(
           eq(creatorProfiles.isPublic, true),
           eq(creatorProfiles.isFeatured, true),
-          isNotNull(discogReleaseTracks.slug)
+          isNotNull(discogReleaseTracks.slug),
+          publicReleaseEligibilitySqlPredicate()
         )
       )
       .orderBy(

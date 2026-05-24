@@ -37,7 +37,6 @@
         "@radix-ui/react-alert-dialog",
         "@radix-ui/react-avatar",
         "@radix-ui/react-checkbox",
-        "@radix-ui/react-dropdown-menu",
         "@radix-ui/react-label",
         "@radix-ui/react-radio-group",
         "@radix-ui/react-select",
@@ -78,6 +77,17 @@
         "config": ["eslint.config.js", "eslint-server-boundaries.config.js"]
       },
       "drizzle": false
+    },
+    "apps/desktop": {
+      "entry": ["src/**/*.ts", "scripts/**/*.{js,mjs,cjs}"],
+      "project": ["src/**/*.ts", "scripts/**/*.{js,mjs,cjs}"],
+      "ignoreDependencies": [
+        "electron",
+        "electron-builder",
+        "sharp",
+        "cross-env",
+        "@electron/fuses"
+      ]
     },
     "apps/should-i-make": {
       "entry": ["next.config.{js,ts}"],

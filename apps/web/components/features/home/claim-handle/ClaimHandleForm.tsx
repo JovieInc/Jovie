@@ -14,6 +14,7 @@ import {
 } from 'react';
 import { LoadingSpinner } from '@/components/atoms/LoadingSpinner';
 import { BASE_URL } from '@/constants/app';
+import { APP_ROUTES } from '@/constants/routes';
 import { useAuthSafe } from '@/hooks/useClerkSafe';
 import { track } from '@/lib/analytics';
 import { cn } from '@/lib/utils';
@@ -193,7 +194,7 @@ export function ClaimHandleForm({
   useEffect(() => {
     if (available === true && handle) {
       router.prefetch(
-        `/onboarding?handle=${encodeURIComponent(handle.toLowerCase())}`
+        `${APP_ROUTES.START}?handle=${encodeURIComponent(handle.toLowerCase())}`
       );
     }
   }, [available, handle, router]);
@@ -224,12 +225,14 @@ export function ClaimHandleForm({
         });
       }
 
-      const target = `/onboarding?handle=${encodeURIComponent(normalizedHandle)}`;
+      const target = `${APP_ROUTES.START}?handle=${encodeURIComponent(normalizedHandle)}`;
 
       setNavigating(true);
 
       if (!isSignedIn) {
-        router.push(`/signup?redirect_url=${encodeURIComponent(target)}`);
+        router.push(
+          `${APP_ROUTES.SIGNUP}?redirect_url=${encodeURIComponent(target)}`
+        );
         return;
       }
 
@@ -304,7 +307,7 @@ export function ClaimHandleForm({
       <div
         className={cn(
           'claim-input-row',
-          'relative flex w-full items-center gap-2 transition-all duration-slower ease-[cubic-bezier(0.16,1,0.3,1)]',
+          'relative flex w-full items-center gap-2 transition-[background,border-color,box-shadow] duration-cinematic ease-cinematic',
           sizeRoundingClass,
           isAvailable && 'claim-input-row--available'
         )}
@@ -368,11 +371,11 @@ export function ClaimHandleForm({
           data-testid={submitButtonTestId}
           aria-busy={checkingAvail || navigating}
           className={cn(
-            'group shrink-0 inline-flex items-center justify-center gap-1.5 transition-all duration-slow focus-ring-themed',
+            'group shrink-0 inline-flex items-center justify-center gap-1.5 transition-[background,opacity,filter] duration-slow focus-ring-themed',
             buttonRoundingClass,
             isDisabled
               ? 'cursor-not-allowed opacity-40'
-              : 'hover:brightness-110 active:scale-[0.98]'
+              : 'hover:brightness-110'
           )}
           style={buttonStyle}
         >

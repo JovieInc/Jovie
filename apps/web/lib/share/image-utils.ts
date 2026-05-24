@@ -34,15 +34,19 @@ async function loadFontBuffer(fileName: string): Promise<ArrayBuffer> {
 }
 
 /**
- * Load Satoshi Variable font as ArrayBuffer for ImageResponse.
+ * Load a Satoshi static font as ArrayBuffer for ImageResponse.
  * Throws on failure so callers never cache images with fallback fonts.
  */
 export async function loadSatoshiFont(): Promise<ArrayBuffer> {
-  return loadFontBuffer('Satoshi-Variable.woff2');
+  return loadFontBuffer('Satoshi-Bold.ttf');
+}
+
+export async function loadDMSansFont(): Promise<ArrayBuffer> {
+  return loadFontBuffer('DMSans-Regular.ttf');
 }
 
 export async function loadSourceSerifFont(): Promise<ArrayBuffer> {
-  return loadFontBuffer('SourceSerif4-Variable.woff2');
+  return loadFontBuffer('SourceSerif4-SemiBold.ttf');
 }
 
 export async function loadShareFonts(): Promise<{

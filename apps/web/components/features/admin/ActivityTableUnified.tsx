@@ -5,13 +5,11 @@ import type { CellContext, ColumnDef } from '@tanstack/react-table';
 import { createColumnHelper } from '@tanstack/react-table';
 import { Activity } from 'lucide-react';
 import { useMemo } from 'react';
-import {
-  PAGE_TOOLBAR_META_TEXT_CLASS,
-  UnifiedTable,
-} from '@/components/organisms/table';
+import { PAGE_TOOLBAR_META_TEXT_CLASS } from '@/components/organisms/table';
+import { AdminDataTable } from '@/features/admin/table/AdminDataTable';
 import { AdminTableSubheader } from '@/features/admin/table/AdminTableHeader';
 import type { AdminActivityItem, AdminActivityStatus } from '@/lib/admin/types';
-import { TABLE_MIN_WIDTHS, TABLE_ROW_HEIGHTS } from '@/lib/constants/layout';
+import { TABLE_ROW_HEIGHTS } from '@/lib/constants/layout';
 
 const statusVariant: Record<
   AdminActivityStatus,
@@ -72,9 +70,6 @@ interface ActivityTableUnifiedProps {
   readonly items: AdminActivityItem[];
 }
 
-/** Standard row class for activity table */
-const getRowClassName = () => 'group hover:bg-(--linear-row-hover)';
-
 const columnHelper = createColumnHelper<AdminActivityItem>();
 
 // Column definitions are shared between the live table and its skeleton so that
@@ -123,9 +118,6 @@ const ACTIVITY_SKELETON_COLUMN_CONFIG = [
   { width: '64px', variant: 'badge' as const }, // Status badge
 ];
 
-const ACTIVITY_TABLE_CLASSNAME =
-  'text-[12.5px] [&_thead_th]:py-1 [&_thead_th]:text-3xs [&_thead_th]:tracking-[0.07em]';
-
 const ACTIVITY_SUBHEADER = (
   <AdminTableSubheader
     start={<p className={PAGE_TOOLBAR_META_TEXT_CLASS}>Last 7 days.</p>}
@@ -152,7 +144,7 @@ export function ActivityTableUnified({
     >
       {ACTIVITY_SUBHEADER}
       <div className='overflow-x-auto'>
-        <UnifiedTable
+        <AdminDataTable
           data={items}
           columns={columns}
           isLoading={false}
@@ -170,10 +162,6 @@ export function ActivityTableUnified({
             </div>
           }
           getRowId={row => row.id}
-          getRowClassName={getRowClassName}
-          enableVirtualization={true}
-          minWidth={`${TABLE_MIN_WIDTHS.MEDIUM}px`}
-          className={ACTIVITY_TABLE_CLASSNAME}
         />
       </div>
     </div>
@@ -208,15 +196,13 @@ export function ActivityTableSkeleton({
     <div className={ACTIVITY_CONTAINER_CLASSNAME} aria-busy='true'>
       {ACTIVITY_SUBHEADER}
       <div className='overflow-x-auto'>
-        <UnifiedTable<AdminActivityItem>
+        <AdminDataTable<AdminActivityItem>
           data={[]}
           columns={columns}
           isLoading
           skeletonRows={rows}
           skeletonColumnConfig={ACTIVITY_SKELETON_COLUMN_CONFIG}
           rowHeight={TABLE_ROW_HEIGHTS.STANDARD}
-          minWidth={`${TABLE_MIN_WIDTHS.MEDIUM}px`}
-          className={ACTIVITY_TABLE_CLASSNAME}
         />
       </div>
     </div>

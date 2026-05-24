@@ -5,6 +5,7 @@ import { getProfileReleaseVisibility } from '@/lib/profile/release-visibility';
 import type { TourDateViewModel } from '@/lib/tour-dates/types';
 import type { AvatarSize } from '@/lib/utils/avatar-sizes';
 import { getHeaderSocialLinks } from '@/lib/utils/context-aware-links';
+import { isDefaultAvatarUrl } from '@/lib/utils/dsp-images';
 import type { Artist, LegacySocialLink } from '@/types/db';
 
 export type ProfileSurfaceLatestRelease = {
@@ -278,12 +279,15 @@ export function resolveProfileSurfaceState(params: {
     now,
   } = params;
 
-  const heroImageUrl = unwrapNextImageUrl(
+  const rawHeroImageUrl = unwrapNextImageUrl(
     photoDownloadSizes.find(size => size.key === 'large')?.url ??
       photoDownloadSizes.find(size => size.key === 'original')?.url ??
       artist.image_url ??
       null
   );
+  const heroImageUrl = isDefaultAvatarUrl(rawHeroImageUrl)
+    ? null
+    : rawHeroImageUrl;
   const releaseVisibility = getProfileReleaseVisibility(
     latestRelease,
     profileSettings

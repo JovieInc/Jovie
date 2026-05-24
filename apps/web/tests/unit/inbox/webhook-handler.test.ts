@@ -5,6 +5,7 @@
  * and tests the POST handler's behavior for various inbound scenarios.
  */
 
+import { createHmac } from 'node:crypto';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 // ---------------------------------------------------------------------------
@@ -100,9 +101,16 @@ vi.mock('@/lib/db/schema/inbox', () => ({
   },
 }));
 
+// Default mock secret. Individual tests may override
+// (see "fail closed when secret is missing" cases).
+// Hoisted so it is available when the vi.mock() factory runs.
+const TEST_WEBHOOK_SECRET = vi.hoisted(
+  () => 'whsec_dGVzdC1zZWNyZXQtZm9yLXVuaXQtdGVzdHM='
+);
+
 vi.mock('@/lib/env-server', () => ({
   env: {
-    RESEND_INBOUND_WEBHOOK_SECRET: undefined,
+    RESEND_INBOUND_WEBHOOK_SECRET: TEST_WEBHOOK_SECRET,
     RESEND_API_KEY: 'test-key',
   },
 }));
@@ -140,11 +148,52 @@ import { POST } from '@/app/api/webhooks/resend-inbound/route';
 // Helpers
 // ---------------------------------------------------------------------------
 
-function makeRequest(body: unknown): Request {
+/**
+ * Build a signed svix-style v1 signature for the given payload + timestamp.
+ * Mirrors the verification path in route.ts so the handler accepts the request.
+ */
+function signPayload(
+  rawBody: string,
+  timestamp: string,
+  secret: string
+): string {
+  const secretBytes = Buffer.from(
+    secret.startsWith('whsec_') ? secret.slice(6) : secret,
+    'base64'
+  );
+  const signature = createHmac('sha256', secretBytes)
+    .update(`${timestamp}.${rawBody}`)
+    .digest('base64');
+  return `v1,${signature}`;
+}
+
+function makeRequest(
+  body: unknown,
+  opts: {
+    headers?: Record<string, string>;
+    omitSignature?: boolean;
+  } = {}
+): Request {
+  const rawBody = typeof body === 'string' ? body : JSON.stringify(body);
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    ...(opts.headers ?? {}),
+  };
+
+  if (!opts.omitSignature) {
+    const timestamp = Math.floor(Date.now() / 1000).toString();
+    headers['svix-timestamp'] = timestamp;
+    headers['svix-signature'] = signPayload(
+      rawBody,
+      timestamp,
+      TEST_WEBHOOK_SECRET
+    );
+  }
+
   return new Request('https://example.com/api/webhooks/resend-inbound', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: typeof body === 'string' ? body : JSON.stringify(body),
+    headers,
+    body: rawBody,
   });
 }
 
@@ -197,7 +246,7 @@ describe('POST /api/webhooks/resend-inbound', () => {
     // Default: no existing thread
     mockFindThread.mockResolvedValue(null);
 
-    // Default: insert returns new thread ID
+    // Default: insert returns new chat ID
     mockDbInsertReturning.mockResolvedValue([{ id: 'thread-new' }]);
 
     // Default: classification succeeds
@@ -216,10 +265,8 @@ describe('POST /api/webhooks/resend-inbound', () => {
   // -------------------------------------------------------------------
 
   it('returns 400 for invalid JSON body', async () => {
-    const req = new Request('https://example.com/api/webhooks/resend-inbound', {
-      method: 'POST',
-      body: 'not json {{{',
-    });
+    // Sign the raw body so the request gets past signature verification.
+    const req = makeRequest('not json {{{');
 
     const res = await POST(req as never);
     expect(res.status).toBe(400);
@@ -286,7 +333,7 @@ describe('POST /api/webhooks/resend-inbound', () => {
       })
     );
 
-    // Should have inserted a new thread (via db.insert)
+    // Should have inserted a new chat (via db.insert)
     expect(mockDbInsert).toHaveBeenCalled();
 
     // Should have stored the inbound email (second insert call)
@@ -328,10 +375,10 @@ describe('POST /api/webhooks/resend-inbound', () => {
 
     expect(res.status).toBe(200);
 
-    // Should update the existing thread (messageCount + 1), not insert a new one
+    // Should update the existing chat (messageCount + 1), not insert a new one
     expect(mockDbUpdate).toHaveBeenCalled();
 
-    // Should NOT classify on existing threads (classification only for new threads)
+    // Should NOT classify on existing chats (classification only for new chats)
     expect(mockClassifyEmail).not.toHaveBeenCalled();
 
     // Should log success
@@ -360,10 +407,10 @@ describe('POST /api/webhooks/resend-inbound', () => {
     // Classification was called but returned null
     expect(mockClassifyEmail).toHaveBeenCalled();
 
-    // Thread should still be created — the update with classification data
+    // Chat should still be created — the update with classification data
     // should NOT happen when classification is null. We verify by checking
     // that db.update was NOT called after thread creation (update is only
-    // called for classification results on new threads).
+    // called for classification results on new chats).
     // The insert for the thread + the insert for the email should still happen.
     expect(mockDbInsert).toHaveBeenCalledTimes(2);
 
@@ -435,22 +482,100 @@ describe('POST /api/webhooks/resend-inbound', () => {
 
   // -------------------------------------------------------------------
   // 10. Signature bypass prevention — requires headers when secret set
+  //
+  // Regression test for the fail-closed signature verification fix:
+  // a POST that omits the svix-signature/svix-timestamp headers must
+  // be rejected with 401, regardless of whether the secret is set or
+  // which NODE_ENV the handler is running under.
   // -------------------------------------------------------------------
 
-  it('returns 401 when webhook secret is configured but signature headers are missing', async () => {
-    const { env: mockEnv } = await import('@/lib/env-server');
-    const original = mockEnv.RESEND_INBOUND_WEBHOOK_SECRET;
-    (mockEnv as Record<string, unknown>).RESEND_INBOUND_WEBHOOK_SECRET =
-      'whsec_test123';
-
-    const req = makeRequest(validPayload());
+  it('returns 401 when signature headers are missing (regardless of NODE_ENV)', async () => {
+    const req = makeRequest(validPayload(), { omitSignature: true });
     const res = await POST(req as never);
 
     expect(res.status).toBe(401);
     const json = await res.json();
     expect(json.error).toBe('Missing signature headers');
 
+    // Must never have touched the DB on the bypass path.
+    expect(mockDbSelect).not.toHaveBeenCalled();
+    expect(mockDbInsert).not.toHaveBeenCalled();
+  });
+
+  // -------------------------------------------------------------------
+  // 11. Signature bypass prevention — rejects forged/invalid signature
+  // -------------------------------------------------------------------
+
+  it('returns 401 when signature is present but invalid', async () => {
+    const rawBody = JSON.stringify(validPayload());
+    const timestamp = Math.floor(Date.now() / 1000).toString();
+
+    const req = new Request('https://example.com/api/webhooks/resend-inbound', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'svix-timestamp': timestamp,
+        'svix-signature': 'v1,not-a-real-signature',
+      },
+      body: rawBody,
+    });
+
+    const res = await POST(req as never);
+
+    expect(res.status).toBe(401);
+    const json = await res.json();
+    expect(json.error).toBe('Invalid signature');
+
+    // Must never have touched the DB on the bypass path.
+    expect(mockDbSelect).not.toHaveBeenCalled();
+    expect(mockDbInsert).not.toHaveBeenCalled();
+  });
+
+  // -------------------------------------------------------------------
+  // 12. Fail closed when secret is not configured (any NODE_ENV)
+  //
+  // Regression test for JOV-2262: previously the handler only failed
+  // closed when NODE_ENV === 'production'. The fix routes every
+  // environment through the same fail-closed path.
+  // -------------------------------------------------------------------
+
+  it.each([
+    'development',
+    'test',
+    'preview',
+    'production',
+  ] as const)('returns 500 when webhook secret is not configured (NODE_ENV=%s)', async nodeEnv => {
+    const { env: mockEnv } = await import('@/lib/env-server');
+    const original = mockEnv.RESEND_INBOUND_WEBHOOK_SECRET;
     (mockEnv as Record<string, unknown>).RESEND_INBOUND_WEBHOOK_SECRET =
-      original;
+      undefined;
+
+    const previousNodeEnv = process.env.NODE_ENV;
+    vi.stubEnv('NODE_ENV', nodeEnv);
+
+    try {
+      // Even with a "valid" looking signature, missing secret must 500.
+      const req = makeRequest(validPayload(), { omitSignature: true });
+      const res = await POST(req as never);
+
+      expect(res.status).toBe(500);
+      const json = await res.json();
+      expect(json.error).toBe('Webhook not configured');
+      expect(mockLoggerError).toHaveBeenCalledWith(
+        'RESEND_INBOUND_WEBHOOK_SECRET not configured'
+      );
+
+      // Must never have touched the DB on the bypass path.
+      expect(mockDbSelect).not.toHaveBeenCalled();
+      expect(mockDbInsert).not.toHaveBeenCalled();
+    } finally {
+      (mockEnv as Record<string, unknown>).RESEND_INBOUND_WEBHOOK_SECRET =
+        original;
+      if (previousNodeEnv === undefined) {
+        vi.unstubAllEnvs();
+      } else {
+        vi.stubEnv('NODE_ENV', previousNodeEnv);
+      }
+    }
   });
 });

@@ -50,7 +50,7 @@ describe('dropdown-styles', () => {
 
   describe('content base styles', () => {
     it('DROPDOWN_CONTENT_BASE includes z-index, border, and background', () => {
-      expect(DROPDOWN_CONTENT_BASE).toContain('z-[70]');
+      expect(DROPDOWN_CONTENT_BASE).toContain('z-[90]');
       expect(DROPDOWN_CONTENT_BASE).toContain('border');
       expect(DROPDOWN_CONTENT_BASE).toContain('bg-');
       expect(DROPDOWN_CONTENT_BASE).toContain('rounded-');
@@ -134,6 +134,18 @@ describe('dropdown-styles', () => {
       expect(MENU_ITEM_BASE).toContain('gap-1.5');
     });
 
+    it('menu rows use tokenized focus-visible rings', () => {
+      expect(MENU_ITEM_BASE).toContain(
+        'focus-visible:ring-(--linear-border-focus)'
+      );
+      expect(MENU_ITEM_COMPACT).toContain(
+        'focus-visible:ring-(--linear-border-focus)'
+      );
+      expect(CHECKBOX_RADIO_ITEM_BASE).toContain(
+        'focus-visible:ring-(--linear-border-focus)'
+      );
+    });
+
     it('MENU_ITEM_COMPACT uses smaller sizing', () => {
       expect(MENU_ITEM_COMPACT).toContain('text-[12.5px]');
       expect(MENU_ITEM_COMPACT).toContain('leading-4');
@@ -179,7 +191,12 @@ describe('dropdown-styles', () => {
   describe('trigger styles', () => {
     it('SELECT_TRIGGER_BASE includes border and focus styles', () => {
       expect(SELECT_TRIGGER_BASE).toContain('border');
-      expect(SELECT_TRIGGER_BASE).toContain('focus-visible:');
+      expect(SELECT_TRIGGER_BASE).toContain(
+        'focus-visible:border-(--linear-border-focus)'
+      );
+      expect(SELECT_TRIGGER_BASE).toContain(
+        'focus-visible:ring-(--linear-border-focus)'
+      );
       expect(SELECT_TRIGGER_BASE).toContain('disabled:opacity-50');
     });
   });

@@ -184,6 +184,7 @@ export function ChangelogEmailSignup() {
                 ref={inputRef}
                 type='email'
                 inputSize='lg'
+                aria-label='Email address for product updates'
                 placeholder='you@example.com'
                 value={email}
                 onChange={e => {

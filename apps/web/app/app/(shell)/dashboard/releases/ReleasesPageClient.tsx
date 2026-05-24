@@ -2,6 +2,7 @@
 
 import dynamic from 'next/dynamic';
 import { useDashboardData } from '@/app/app/(shell)/dashboard/DashboardDataContext';
+import { ShellReleasesView } from '@/components/features/dashboard/organisms/release-provider-matrix/shell-releases/ShellReleasesView';
 import { PageErrorState } from '@/features/feedback/PageErrorState';
 import { useAppFlag } from '@/lib/flags/client';
 import { useReleasesQuery } from '@/lib/queries/useReleasesQuery';
@@ -13,16 +14,6 @@ const ReleasesExperience = dynamic(
     import('@/features/dashboard/organisms/release-provider-matrix').then(
       mod => mod.ReleasesExperience
     ),
-  {
-    loading: () => <ReleaseTableSkeleton showHeader={false} />,
-  }
-);
-
-const ShellReleasesView = dynamic(
-  () =>
-    import(
-      '@/features/dashboard/organisms/release-provider-matrix/shell-releases/ShellReleasesView'
-    ).then(mod => mod.ShellReleasesView),
   {
     loading: () => <ReleaseTableSkeleton showHeader={false} />,
   }
@@ -40,8 +31,7 @@ const ShellReleasesView = dynamic(
 export function ReleasesPageClient() {
   const { selectedProfile } = useDashboardData();
   const profileId = selectedProfile?.id ?? '';
-  const shellChatV1Enabled = useAppFlag('SHELL_CHAT_V1');
-  const designV1ReleasesEnabled = useAppFlag('DESIGN_V1_RELEASES');
+  const designV1ReleasesEnabled = useAppFlag('DESIGN_V1');
 
   const {
     data: releases,
@@ -81,7 +71,7 @@ export function ReleasesPageClient() {
       <PageErrorState
         title='Unable to load releases'
         message='We could not load your releases. Retry the request or refresh the page.'
-        error={error as Error | undefined}
+        error={error instanceof Error ? error : undefined}
         actionLabel='Retry load'
         onRetry={() => {
           void refetch();
@@ -95,8 +85,24 @@ export function ReleasesPageClient() {
     );
   }
 
-  if (shellChatV1Enabled && !designV1ReleasesEnabled) {
-    return <ShellReleasesView releases={releases ?? []} />;
+  if (releases === undefined) {
+    return <ReleaseTableSkeleton showHeader={false} />;
+  }
+
+  if (designV1ReleasesEnabled) {
+    return (
+      <ShellReleasesView
+        releases={releases ?? []}
+        providerConfig={providerConfig}
+        primaryProviders={primaryProviderKeys}
+        artistName={spotifyArtistName ?? appleMusicArtistName ?? null}
+        allowArtworkDownloads={allowArtworkDownloads}
+        spotifyConnected={spotifyConnected}
+        appleMusicConnected={appleMusicConnected}
+        initialImporting={spotifyImportStatus === 'importing'}
+        initialTotalCount={spotifyImportTotal}
+      />
+    );
   }
 
   return (

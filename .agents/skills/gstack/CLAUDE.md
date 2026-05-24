@@ -16,6 +16,7 @@ bun run dev <cmd>    # run CLI in dev mode, e.g. bun run dev goto https://exampl
 bun run build        # gen docs + compile binaries
 bun run gen:skill-docs  # regenerate SKILL.md files from templates
 bun run skill:check  # health dashboard for all skills
+bun run skill:size-check  # prompt-size ratchet for templates and generated skills
 bun run dev:skill    # watch mode: auto-regen + validate on change
 bun run eval:list    # list all eval runs from ~/.gstack-dev/evals/
 bun run eval:compare # compare two eval runs (auto-picks most recent)
@@ -130,6 +131,28 @@ files by accepting either side. Instead: (1) resolve conflicts on the `.tmpl` te
 and `scripts/gen-skill-docs.ts` (the sources of truth), (2) run `bun run gen:skill-docs`
 to regenerate all SKILL.md files, (3) stage the regenerated files. Accepting one side's
 generated output silently drops the other side's template changes.
+
+## Prompt-size and skill architecture
+
+The skill system is optimized for stable shared context plus thin task-specific leaves.
+Do not copy the same routing, telemetry, safety, voice, or release policy into every
+leaf skill. Put shared behavior in the root template, resolver fragments, hooks,
+settings, or repo rules, then keep each leaf skill focused on:
+
+1. when to invoke
+2. required inputs
+3. workflow
+4. verification
+5. output contract
+6. escalation conditions
+
+Use progressive disclosure. If a leaf skill needs detailed examples, framework variants,
+or long checklists, move them to a directly linked reference file and load that file only
+when needed. If a workflow repeats exact commands or parsing logic, add a script.
+
+`bun run skill:size-check` is a ratchet based on the current system size, not the final
+goal. New work should stay under the budget and, when practical, reduce the largest
+templates before expanding them.
 
 ## Platform-agnostic design
 

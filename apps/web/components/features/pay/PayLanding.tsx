@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 import { MarketingContainer, MarketingHero } from '@/components/marketing';
+import { APP_ROUTES } from '@/constants/routes';
 import { ClaimHandleForm } from '@/features/home/claim-handle';
 
 /* -------------------------------------------------------------------------- */
@@ -292,7 +293,7 @@ function TipsFinalCTA() {
             </p>
             <div className='mt-6'>
               <Button size='lg' className='public-action-primary' asChild>
-                <Link href='/signup'>
+                <Link href={APP_ROUTES.SIGNUP}>
                   Claim Your Handle
                   <ArrowRight className='ml-2 h-4 w-4' />
                 </Link>

@@ -657,7 +657,10 @@ Options:
 - A) Accept the outside voice's recommendation (I'll apply this change)
 - B) Keep the current approach (reject the outside voice)
 - C) Investigate further before deciding
-- D) Add to TODOS.md for later
+- D) Create candidate Linear follow-up for later
+
+If the user chooses D, create the candidate issue using the canonical format in
+\`review/LINEAR-followups.md\`, then show the created Linear issue ID before continuing.
 
 Wait for the user's response. Do NOT default to accepting because you agree with the
 outside voice. If the user chooses B, the current approach stands — do not re-argue.
@@ -807,10 +810,10 @@ After producing the completion checklist:
   - RECOMMENDATION: depends on item count and severity. If 1-2 minor items (docs, config), recommend B. If core functionality is missing, recommend A.
   - Options:
     A) Stop — implement the missing items before shipping
-    B) Ship anyway — defer these to a follow-up (will create P1 TODOs in Step 5.5)
+    B) Ship anyway — create required Linear follow-up issues before PR/final closeout
     C) These items were intentionally dropped — remove from scope
   - If A: STOP. List the missing items for the user to implement.
-  - If B: Continue. For each NOT DONE item, create a P1 TODO in Step 5.5 with "Deferred from plan: {plan file path}".
+  - If B: Continue. For each NOT DONE item, create a Required Linear follow-up issue using \`review/LINEAR-followups.md\` with "Deferred from plan: {plan file path}", then record the created issue IDs in PR/final output.
   - If C: Continue. Note in PR body: "Plan items intentionally dropped: {list}."
 
 **No plan file found:** Skip entirely. "No plan file detected — skipping plan completion audit."
@@ -879,7 +882,7 @@ The plan completion results augment the existing Scope Drift Detection. If a pla
 - **Items in the diff that don't match any plan item** become evidence for **SCOPE CREEP** detection.
 - **HIGH-impact discrepancies** trigger AskUserQuestion:
   - Show the investigation findings
-  - Options: A) Stop and implement missing items, B) Ship anyway + create P1 TODOs, C) Intentionally dropped
+  - Options: A) Stop and implement missing items, B) Ship anyway + create required Linear follow-up issues using \`review/LINEAR-followups.md\` and record their IDs, C) Intentionally dropped
 
 This is **INFORMATIONAL** unless HIGH-impact discrepancies are found (then it gates via AskUserQuestion).
 

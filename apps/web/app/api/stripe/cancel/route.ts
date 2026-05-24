@@ -1,7 +1,12 @@
 /**
  * Stripe Subscription Cancellation API
- * Cancels the user's subscription in-app with immediate effect.
- * The webhook handler (subscription.deleted) will revoke pro access.
+ *
+ * Schedules cancellation at the end of the current billing period (industry
+ * norm). The user keeps Pro access until `current_period_end`; Stripe fires
+ * `customer.subscription.updated` immediately and
+ * `customer.subscription.deleted` at the boundary when access is revoked.
+ *
+ * @see JOV-2180 — subset #1 (cancel period-end)
  */
 
 import { NextResponse } from 'next/server';
@@ -53,20 +58,41 @@ export async function POST() {
       );
     }
 
-    // Cancel the subscription via Stripe
+    // Schedule cancellation at end of current billing period
     const cancelledSubscription =
       await cancelSubscription(stripeSubscriptionId);
 
-    logger.info('Subscription cancelled in-app', {
+    // Stripe SDK types for `current_period_end` vary by API version; read it
+    // defensively so we can surface the cancel-on date to the client.
+    const rawPeriodEnd = Reflect.get(
+      cancelledSubscription,
+      'current_period_end'
+    );
+    const cancelAtSeconds =
+      typeof cancelledSubscription.cancel_at === 'number'
+        ? cancelledSubscription.cancel_at
+        : typeof rawPeriodEnd === 'number'
+          ? rawPeriodEnd
+          : null;
+    const cancelAtIso =
+      cancelAtSeconds !== null
+        ? new Date(cancelAtSeconds * 1000).toISOString()
+        : null;
+
+    logger.info('Subscription scheduled to cancel at period end', {
       userId,
       subscriptionId: stripeSubscriptionId,
       status: cancelledSubscription.status,
+      cancelAtPeriodEnd: cancelledSubscription.cancel_at_period_end,
+      cancelAt: cancelAtIso,
     });
 
     return NextResponse.json(
       {
         success: true,
         status: cancelledSubscription.status,
+        cancelAtPeriodEnd: cancelledSubscription.cancel_at_period_end === true,
+        cancelAt: cancelAtIso,
       },
       { headers: NO_STORE_HEADERS }
     );

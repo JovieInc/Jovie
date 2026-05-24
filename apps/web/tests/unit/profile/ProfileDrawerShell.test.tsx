@@ -168,6 +168,49 @@ describe('ProfileDrawerShell', () => {
     expect(onBack).toHaveBeenCalledTimes(1);
   });
 
+  // Regression: body must use definite height (not min-h) so overflow-y-auto
+  // activates when content exceeds the drawer envelope. min-h alone lets the
+  // body grow past the parent's max-h and get clipped (JOV-1993).
+  it('gives the drawer body a definite height plus overflow-y-auto for scroll', () => {
+    render(
+      <ProfileDrawerShell
+        open
+        onOpenChange={vi.fn()}
+        title='About'
+        dataTestId='scroll-drawer'
+      >
+        <div data-testid='drawer-body-content'>Body</div>
+      </ProfileDrawerShell>
+    );
+
+    const body = screen.getByTestId('drawer-body-content').parentElement;
+    expect(body).not.toBeNull();
+    expect(body?.className).toMatch(/\boverflow-y-auto\b/);
+    expect(body?.className).toMatch(
+      /\bh-\[calc\(var\(--profile-drawer-height-max\)/
+    );
+    expect(body?.className).not.toMatch(
+      /\bmin-h-\[calc\(var\(--profile-drawer-height-max\)/
+    );
+  });
+
+  // Regression: tapping the overlay must dismiss the standalone (vaul) drawer.
+  // Mobile Safari does not reliably trigger Radix's onPointerDownOutside on
+  // single-finger taps, so the shell adds an explicit onClick on Drawer.Overlay.
+  it('closes the standalone drawer when the backdrop is tapped', () => {
+    const onOpenChange = vi.fn();
+
+    render(
+      <ProfileDrawerShell open onOpenChange={onOpenChange} title='Menu'>
+        <div>Drawer body</div>
+      </ProfileDrawerShell>
+    );
+
+    fireEvent.click(screen.getByTestId('profile-drawer-overlay'));
+
+    expect(onOpenChange).toHaveBeenCalledWith(false);
+  });
+
   it('anchors embedded drawers flush to the phone shell instead of floating them', () => {
     render(
       <ProfileDrawerShell

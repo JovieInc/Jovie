@@ -33,7 +33,8 @@ export function WaitlistKanbanCard({
   approveStatus = 'idle',
   onApprove,
 }: WaitlistKanbanCardProps) {
-  const isApproved = entry.status === 'invited' || entry.status === 'claimed';
+  const isApproved = entry.status === 'invited' || entry.status === 'approved';
+  const isSignedUp = entry.status === 'signed_up' || entry.status === 'claimed';
   const statusVariant = STATUS_VARIANTS[entry.status] ?? 'secondary';
   const platformLabel =
     PLATFORM_LABELS[entry.primarySocialPlatform] ?? entry.primarySocialPlatform;
@@ -45,7 +46,7 @@ export function WaitlistKanbanCard({
     <ContentSurfaceCard
       className={cn(
         'bg-[color-mix(in_oklab,var(--linear-bg-surface-0)_96%,transparent)] p-2.5',
-        'transition-[border-color,box-shadow,background-color] duration-150 hover:border-default hover:bg-surface-0',
+        'transition-[border-color,box-shadow,background-color] duration-subtle hover:border-default hover:bg-surface-0',
         'cursor-grab active:cursor-grabbing'
       )}
     >
@@ -128,13 +129,16 @@ export function WaitlistKanbanCard({
             variant='primary'
             className='h-8 w-full text-xs'
             disabled={
-              approveStatus === 'approving' || approveStatus === 'disapproving'
+              isSignedUp ||
+              approveStatus === 'approving' ||
+              approveStatus === 'disapproving'
             }
             onClick={onApprove}
           >
             {(() => {
               if (approveStatus === 'approving') return 'Approving…';
               if (approveStatus === 'disapproving') return 'Disapproving…';
+              if (isSignedUp) return 'Signed up';
               return isApproved ? 'Disapprove' : 'Approve';
             })()}
           </Button>

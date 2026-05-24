@@ -180,3 +180,75 @@ export function extractHandleFromUrl(urlRaw: string): string | null {
     return null;
   }
 }
+
+/**
+ * Strip trailing forward slashes from a path without using regex.
+ *
+ * Avoids the regex-DoS analyzer false-positive on `/\/+$/` and is
+ * faster: a tight loop with index math instead of regex backtracking
+ * machinery. Bounded by string length, never re-enters.
+ */
+function stripTrailingSlashes(path: string): string {
+  let end = path.length;
+  while (end > 0 && path.charCodeAt(end - 1) === 47 /* '/' */) end -= 1;
+  return end === path.length ? path : path.slice(0, end);
+}
+
+/**
+ * Strip a leading `www.` host prefix without using regex.
+ *
+ * Mirrors `stripTrailingSlashes`: index check + slice, no backtracking.
+ */
+function stripLeadingWww(host: string): string {
+  return host.startsWith('www.') ? host.slice(4) : host;
+}
+
+/**
+ * Produce a stable key for deduping a link by `(platform, url)`.
+ *
+ * Two URLs that resolve to the same destination on the same platform
+ * (trailing slash, casing, `www.` prefix, fragment noise) must collapse
+ * to the same key. The query string is preserved (lowercased): URLs
+ * like `facebook.com/profile.php?id=1` and `…?id=2` are distinct
+ * destinations and must NOT collapse (CodeRabbit JOV-2149 review).
+ *
+ * Invalid URLs fall back to the trimmed raw string so we don't drop
+ * rows we can't parse.
+ */
+function dedupeKey(platform: string, urlRaw: string): string {
+  const p = platform.trim().toLowerCase();
+  try {
+    const u = new URL(urlRaw);
+    const host = stripLeadingWww(u.hostname.toLowerCase());
+    const path = stripTrailingSlashes(u.pathname).toLowerCase();
+    // Preserve query components — `?id=1` vs `?id=2` are distinct.
+    const search = u.search.toLowerCase();
+    return `${p}|${host}${path}${search}`;
+  } catch {
+    return `${p}|${urlRaw.trim().toLowerCase()}`;
+  }
+}
+
+/**
+ * Deduplicate a list of links by `(platform, normalized-url)`.
+ *
+ * - Preserves the first occurrence of each unique key (input order stable).
+ * - Multiple legitimate channels on the same platform with different URLs
+ *   (e.g. two distinct YouTube channels) are kept.
+ * - Identical or near-identical rows (trailing slash, casing, www prefix)
+ *   collapse to a single row.
+ * - Pure: never mutates input, never invents output.
+ */
+export function dedupeLinks<L extends { platform: string; url: string }>(
+  links: readonly L[]
+): L[] {
+  const seen = new Set<string>();
+  const out: L[] = [];
+  for (const link of links) {
+    const key = dedupeKey(link.platform, link.url);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(link);
+  }
+  return out;
+}

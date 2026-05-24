@@ -242,7 +242,7 @@ export function ReleaseTaskChecklist({
         className='flex shrink-0 items-center gap-2 px-4 py-2'
         initial={animateEntrance ? { opacity: 0, y: -8 } : false}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.3 }}
+        transition={{ duration: 0.15, ease: [0.4, 0, 0.2, 1] }}
       >
         <ReleaseTaskProgressBar
           done={totalDone}
@@ -264,7 +264,7 @@ export function ReleaseTaskChecklist({
           <button
             type='button'
             onClick={onNavigateToFullPage}
-            className='flex-shrink-0 text-3xs text-[var(--linear-accent,#5e6ad2)] hover:underline'
+            className='flex-shrink-0 text-3xs text-accent hover:underline'
           >
             Open &rarr;
           </button>
@@ -315,9 +315,9 @@ export function ReleaseTaskChecklist({
               initial={animateEntrance ? { opacity: 0, y: 12 } : false}
               animate={{ opacity: 1, y: 0 }}
               transition={{
-                duration: 0.25,
+                duration: 0.15,
                 delay: groupDelay,
-                ease: 'easeOut',
+                ease: [0.4, 0, 0.2, 1],
               }}
             >
               <ReleaseTaskCategoryGroup
@@ -345,9 +345,9 @@ export function ReleaseTaskChecklist({
                         ...(animateEntrance && { filter: 'blur(0px)' }),
                       }}
                       transition={{
-                        duration: 0.25,
+                        duration: 0.15,
                         delay: taskDelay,
-                        ease: 'easeOut',
+                        ease: [0.4, 0, 0.2, 1],
                       }}
                     >
                       {variant === 'compact' ? (

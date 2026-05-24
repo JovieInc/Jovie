@@ -203,6 +203,7 @@ export {
 } from './useBuildInfoQuery';
 // Campaign invites
 export {
+  type CampaignInviteListItem,
   type CampaignPreviewResponse,
   type CampaignStats,
   type CampaignStatsResponse,
@@ -219,6 +220,8 @@ export {
   useSaveCampaignSettings,
   useSendCampaignInvitesMutation,
 } from './useCampaignInvites';
+// Chat capabilities query
+export { useChatCapabilitiesQuery } from './useChatCapabilitiesQuery';
 // Chat conversation query
 export { useChatConversationQuery } from './useChatConversationQuery';
 // Chat conversations list query
@@ -527,9 +530,11 @@ export {
 // Waitlist mutations (admin + public)
 export {
   type ApproveWaitlistInput,
+  type ResendWaitlistInviteInput,
   type UpdateWaitlistStatusInput,
   useApproveWaitlistMutation,
   useDisapproveWaitlistMutation,
+  useResendWaitlistInviteMutation,
   useUpdateWaitlistStatusMutation,
   useWaitlistSubmitMutation,
   type WaitlistMutationResponse,

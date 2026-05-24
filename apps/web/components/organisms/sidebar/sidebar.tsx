@@ -57,7 +57,7 @@ export const Sidebar = React.forwardRef<
             className='w-(--sidebar-width) bg-sidebar p-0 text-sidebar-foreground [&>button]:hidden'
             style={
               {
-                '--sidebar-width': '244px',
+                '--sidebar-width': 'var(--linear-app-sidebar-width)',
               } as React.CSSProperties
             }
             side={side}
@@ -72,7 +72,7 @@ export const Sidebar = React.forwardRef<
         {!isMobile && (
           <div
             ref={ref}
-            className='group peer max-lg:hidden shrink-0 overflow-visible text-sidebar-foreground lg:sticky lg:top-0'
+            className='group peer max-lg:hidden shrink-0 overflow-visible text-sidebar-foreground lg:sticky lg:top-0 lg:z-10'
             data-state={state}
             data-collapsible={state === 'closed' ? collapsible : ''}
             data-variant={variant}
@@ -80,7 +80,7 @@ export const Sidebar = React.forwardRef<
           >
             <div
               className={cn(
-                'duration-normal relative h-full w-(--sidebar-width) overflow-hidden transition-[width,transform,opacity] ease-interactive motion-reduce:transition-none',
+                'duration-cinematic relative h-full w-(--sidebar-width) overflow-hidden transition-[width,transform,opacity] ease-cinematic motion-reduce:transition-none',
                 'group-data-[collapsible=offcanvas]:w-0',
                 state === 'closed' &&
                   collapsible === 'offcanvas' &&
@@ -105,7 +105,7 @@ export const Sidebar = React.forwardRef<
             >
               <div
                 data-sidebar='sidebar'
-                className='pointer-events-auto flex h-full w-full flex-col overflow-clip bg-sidebar transition-[background-color] duration-normal ease-interactive lg:rounded-[var(--linear-app-shell-radius)] group-data-[variant=floating]:rounded-[14px] group-data-[variant=floating]:border group-data-[variant=floating]:border-sidebar-border group-data-[variant=floating]:shadow group-data-[variant=inset]:border-r group-data-[variant=inset]:border-sidebar-border'
+                className='pointer-events-auto flex h-full w-full flex-col overflow-clip bg-sidebar transition-[background-color] duration-normal ease-interactive lg:rounded-[var(--linear-app-shell-radius)] lg:shadow-[var(--linear-app-sidebar-shadow)] group-data-[variant=floating]:rounded-[14px] group-data-[variant=floating]:border group-data-[variant=floating]:border-sidebar-border group-data-[variant=floating]:shadow group-data-[variant=inset]:border-r group-data-[variant=inset]:border-sidebar-border'
               >
                 {children}
               </div>

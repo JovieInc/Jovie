@@ -321,14 +321,13 @@ describe('useCancelSubscriptionMutation', () => {
     );
   });
 
-  it('should optimistically set billing status to free during mutation', async () => {
-    // Seed the billing status cache with a pro subscription via a query
-    // so the data persists through cancelQueries
+  it('should preserve pro billing status during cancel mutation (JOV-2180: cancel at period end)', async () => {
+    // Pro access continues until current_period_end after cancel; the cache
+    // must NOT optimistically flip to free.
     queryClient.setQueryData(['billing', 'status'], {
       isPro: true,
       plan: 'pro',
     });
-    // Keep a query observer alive so the data is not garbage collected
     const unsubscribe = queryClient.getQueryCache().subscribe(() => {});
 
     let resolveCancel!: (value: unknown) => void;
@@ -341,12 +340,11 @@ describe('useCancelSubscriptionMutation', () => {
       wrapper: TestWrapper,
     });
 
-    // Fire the mutation and let onMutate run
     await act(async () => {
       result.current.mutate(undefined);
     });
 
-    // The optimistic update should have set isPro=false, plan=free
+    // During the in-flight cancellation, isPro/plan must stay unchanged.
     await waitFor(() => {
       const status = queryClient.getQueryData(['billing', 'status']) as
         | {
@@ -355,13 +353,17 @@ describe('useCancelSubscriptionMutation', () => {
           }
         | undefined;
       expect(status).toBeDefined();
-      expect(status!.isPro).toBe(false);
-      expect(status!.plan).toBe('free');
+      expect(status!.isPro).toBe(true);
+      expect(status!.plan).toBe('pro');
     });
 
-    // Resolve the mutation to clean up
     await act(async () => {
-      resolveCancel({ success: true });
+      resolveCancel({
+        success: true,
+        status: 'active',
+        cancelAtPeriodEnd: true,
+        cancelAt: '2026-06-15T00:00:00.000Z',
+      });
     });
 
     unsubscribe();

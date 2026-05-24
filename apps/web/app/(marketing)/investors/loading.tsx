@@ -3,7 +3,7 @@
  */
 export default function InvestorsLoading() {
   return (
-    <div className='min-h-screen bg-white dark:bg-[#0D0E12]'>
+    <div className='min-h-screen bg-page'>
       <section className='relative flex min-h-[80vh] flex-col items-center justify-center px-4 py-20 text-center'>
         {/* Title skeleton */}
         <div className='h-12 w-72 skeleton rounded-lg mb-4' />

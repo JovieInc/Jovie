@@ -1,7 +1,7 @@
 import 'server-only';
 
 import * as Sentry from '@sentry/nextjs';
-import { eq } from 'drizzle-orm';
+import { sql as drizzleSql, eq } from 'drizzle-orm';
 import { db } from '@/lib/db';
 import {
   getDeepErrorMessage,
@@ -14,10 +14,18 @@ import { waitlistEntries } from '@/lib/db/schema/waitlist';
 import { captureCriticalError, captureError } from '@/lib/error-tracking';
 import { normalizeEmail } from '@/lib/utils/email';
 import { isWaitlistGateEnabled } from '@/lib/waitlist/settings';
+import {
+  type WaitlistStatus as CanonicalWaitlistStatus,
+  isWaitlistApprovedStatus,
+  isWaitlistPendingStatus,
+} from '@/lib/waitlist/state-machine';
 import { getCachedAuth, getCachedCurrentUser } from './cached';
-import { CanonicalUserState } from './canonical-user-state';
+import {
+  CanonicalUserState,
+  getRedirectForState,
+  resolveCanonicalState,
+} from './canonical-user-state';
 import { syncEmailFromClerk } from './clerk-sync';
-import { resolveProfileState } from './profile-state-resolver';
 import { checkUserStatus } from './status-checker';
 
 export type { UserStateInput } from './canonical-user-state';
@@ -52,6 +60,32 @@ export interface AuthGateResult {
     isPro: boolean;
     email: string | null;
     errorCode?: string;
+  };
+}
+
+function canUseE2ETestAuthFallback(): boolean {
+  return (
+    process.env.E2E_USE_TEST_AUTH_BYPASS === '1' &&
+    process.env.NEXT_PUBLIC_E2E_MODE === '1' &&
+    process.env.VERCEL_ENV !== 'preview'
+  );
+}
+
+function createE2ETestAuthGateResult(
+  clerkUserId: string,
+  email: string | null
+): AuthGateResult {
+  return {
+    state: CanonicalUserState.ACTIVE,
+    clerkUserId,
+    dbUserId: '00000000-0000-4000-8000-000000000101',
+    profileId: '00000000-0000-4000-8000-000000000102',
+    redirectTo: null,
+    context: {
+      isAdmin: false,
+      isPro: true,
+      email: email ?? 'e2e-chat-smoke@example.test',
+    },
   };
 }
 
@@ -329,7 +363,7 @@ async function handleMissingDbUser(
       clerkUserId,
       dbUserId: null,
       profileId: null,
-      redirectTo: '/onboarding?fresh_signup=true',
+      redirectTo: '/start?fresh_signup=true',
       context: { ...baseContext, email },
     };
   }
@@ -344,25 +378,46 @@ async function handleMissingDbUser(
     throw new TypeError('Email is required for user creation');
   }
 
-  // Check waitlist status before creating user (only when waitlist is enabled)
+  // Check waitlist status before creating user. Gate OFF opens daily intake
+  // capacity; it does not skip the access request flow for brand-new accounts.
   let waitlistEntryId: string | undefined;
 
-  if (waitlistGateEnabled) {
-    const waitlistResult = await checkWaitlistAccessInternal(email);
+  const waitlistResult = await checkWaitlistAccessInternal(email);
 
-    if (waitlistResult.status === 'new' || !waitlistResult.status) {
-      return {
-        state: CanonicalUserState.NEEDS_WAITLIST_SUBMISSION,
-        clerkUserId,
-        dbUserId: null,
-        profileId: null,
-        redirectTo: '/waitlist',
-        context: { ...baseContext, email },
-      };
-    }
-
-    waitlistEntryId = waitlistResult.entryId ?? undefined;
+  if (isWaitlistPendingStatus(waitlistResult.status)) {
+    return {
+      state: CanonicalUserState.WAITLIST_PENDING,
+      clerkUserId,
+      dbUserId: null,
+      profileId: null,
+      redirectTo: '/waitlist',
+      context: { ...baseContext, email },
+    };
   }
+
+  if (!waitlistResult.status) {
+    return {
+      state: CanonicalUserState.NEEDS_WAITLIST_SUBMISSION,
+      clerkUserId,
+      dbUserId: null,
+      profileId: null,
+      redirectTo: '/waitlist',
+      context: { ...baseContext, email },
+    };
+  }
+
+  if (!isWaitlistApprovedStatus(waitlistResult.status)) {
+    return {
+      state: CanonicalUserState.WAITLIST_PENDING,
+      clerkUserId,
+      dbUserId: null,
+      profileId: null,
+      redirectTo: '/waitlist',
+      context: { ...baseContext, email },
+    };
+  }
+
+  waitlistEntryId = waitlistResult.entryId ?? undefined;
 
   // Create the user (without waitlist entry when waitlist is disabled)
   const newUserId = await createUserWithRetry(
@@ -412,9 +467,22 @@ async function handleMissingDbUser(
  * @param options.createDbUserIfMissing - If true, creates a DB user row when missing (default: true)
  */
 export async function resolveUserState(
-  options: { createDbUserIfMissing?: boolean } = {}
+  options: {
+    createDbUserIfMissing?: boolean;
+    /**
+     * Pre-resolved Clerk user ID. When provided, skips calling auth() and
+     * currentUser() — both of which read request headers and must NOT be
+     * called inside unstable_cache or "use cache" boundaries.
+     *
+     * Pass this when the Clerk user ID is already known (e.g. from a cached
+     * function that received it as a parameter). In this case email will be
+     * null, so user creation via handleMissingDbUser will fail gracefully
+     * rather than throwing a ClerkUseCacheError.
+     */
+    knownClerkUserId?: string;
+  } = {}
 ): Promise<AuthGateResult> {
-  const { createDbUserIfMissing = true } = options;
+  const { createDbUserIfMissing = true, knownClerkUserId } = options;
 
   // Default empty result
   const emptyResult: AuthGateResult = {
@@ -430,49 +498,100 @@ export async function resolveUserState(
     },
   };
 
-  // 1. Check Clerk authentication (parallelize both calls for performance)
-  const [authResult, clerkUser] = await Promise.all([
-    getCachedAuth(),
-    getCachedCurrentUser(),
-  ]);
+  // 1. Resolve the Clerk user ID.
+  //
+  // When knownClerkUserId is provided (e.g. from a cached function), skip
+  // getCachedAuth() and getCachedCurrentUser() — both access headers()
+  // internally and will throw ClerkUseCacheError inside unstable_cache scopes.
+  let clerkUserId: string | null;
+  let email: string | null;
 
-  const { userId: clerkUserId } = authResult;
+  if (knownClerkUserId) {
+    clerkUserId = knownClerkUserId;
+    // Email is unavailable without getCachedCurrentUser(). User creation will
+    // fail gracefully in handleMissingDbUser if email is required.
+    email = null;
+  } else {
+    const [authResult, clerkUser] = await Promise.all([
+      getCachedAuth(),
+      getCachedCurrentUser(),
+    ]);
+
+    clerkUserId = authResult.userId;
+    if (!clerkUserId) {
+      return emptyResult;
+    }
+
+    // Get the primary verified email — verified emails are the source of truth
+    // for identity. Prefer a verified address over index [0] (may be unverified).
+    email =
+      clerkUser?.emailAddresses?.find(
+        e => e.verification?.status === 'verified'
+      )?.emailAddress ?? null;
+  }
+
   if (!clerkUserId) {
     return emptyResult;
   }
 
-  // Get the primary verified email — verified emails are the source of truth for identity.
-  // Prefer a verified address over index [0] which may be unverified.
-  const email =
-    clerkUser?.emailAddresses?.find(e => e.verification?.status === 'verified')
-      ?.emailAddress ??
-    clerkUser?.primaryEmailAddress?.emailAddress ??
-    null;
-
   // 2. Query DB user AND profile in a single JOIN query (performance optimization)
   // This reduces database round trips from 2 to 1
-  const [dbResult] = await db
-    .select({
-      // User fields
-      id: users.id,
-      email: users.email,
-      userStatus: users.userStatus,
-      isAdmin: users.isAdmin,
-      isPro: users.isPro,
-      deletedAt: users.deletedAt,
-      // Profile fields (nullable from LEFT JOIN)
-      profileId: creatorProfiles.id,
-      profileUsername: creatorProfiles.username,
-      profileUsernameNormalized: creatorProfiles.usernameNormalized,
-      profileDisplayName: creatorProfiles.displayName,
-      profileIsPublic: creatorProfiles.isPublic,
-      profileAvatarUrl: creatorProfiles.avatarUrl,
-      profileOnboardingCompletedAt: creatorProfiles.onboardingCompletedAt,
-    })
-    .from(users)
-    .leftJoin(creatorProfiles, eq(creatorProfiles.id, users.activeProfileId))
-    .where(eq(users.clerkId, clerkUserId))
-    .limit(1);
+  let dbResult:
+    | {
+        id: string;
+        email: string | null;
+        userStatus: string | null;
+        isAdmin: boolean | null;
+        isPro: boolean | null;
+        deletedAt: Date | null;
+        profileId: string | null;
+        profileUsername: string | null;
+        profileUsernameNormalized: string | null;
+        profileDisplayName: string | null;
+        profileIsPublic: boolean | null;
+        profileAvatarUrl: string | null;
+        profileOnboardingCompletedAt: Date | null;
+      }
+    | undefined;
+
+  try {
+    [dbResult] = await db
+      .select({
+        // User fields
+        id: users.id,
+        email: users.email,
+        userStatus: users.userStatus,
+        isAdmin: users.isAdmin,
+        isPro: users.isPro,
+        deletedAt: users.deletedAt,
+        // Profile fields (nullable from LEFT JOIN)
+        profileId: creatorProfiles.id,
+        profileUsername: creatorProfiles.username,
+        profileUsernameNormalized: creatorProfiles.usernameNormalized,
+        profileDisplayName: creatorProfiles.displayName,
+        profileIsPublic: creatorProfiles.isPublic,
+        profileAvatarUrl: creatorProfiles.avatarUrl,
+        profileOnboardingCompletedAt: creatorProfiles.onboardingCompletedAt,
+      })
+      .from(users)
+      .leftJoin(creatorProfiles, eq(creatorProfiles.id, users.activeProfileId))
+      .where(eq(users.clerkId, clerkUserId))
+      .limit(1);
+  } catch (error) {
+    if (canUseE2ETestAuthFallback()) {
+      Sentry.addBreadcrumb({
+        category: 'auth-gate',
+        level: 'warning',
+        message: 'Using E2E test auth fallback after DB lookup failure',
+        data: {
+          clerkUserId,
+          error: error instanceof Error ? error.message : String(error),
+        },
+      });
+      return createE2ETestAuthGateResult(clerkUserId, email);
+    }
+    throw error;
+  }
 
   // Extract user data from result (may be undefined if no user exists)
   const dbUser = dbResult
@@ -528,6 +647,18 @@ export async function resolveUserState(
 
   // 2b. If no DB user exists, create one if requested
   let dbUserId: string | null = dbUser?.id ?? null;
+  let currentUserStatus = dbUser?.userStatus ?? null;
+  let currentDeletedAt = dbUser?.deletedAt ?? null;
+
+  if (!dbUserId && canUseE2ETestAuthFallback()) {
+    Sentry.addBreadcrumb({
+      category: 'auth-gate',
+      level: 'warning',
+      message: 'Using E2E test auth fallback for missing DB user',
+      data: { clerkUserId },
+    });
+    return createE2ETestAuthGateResult(clerkUserId, email);
+  }
 
   // Profile from the JOIN query (only valid if dbUser exists)
   let profile = dbResult?.profileId
@@ -562,19 +693,36 @@ export async function resolveUserState(
 
     // Otherwise, we got the new user ID
     dbUserId = creationResult.dbUserId;
+    const [createdUser] = await db
+      .select({
+        userStatus: users.userStatus,
+        deletedAt: users.deletedAt,
+      })
+      .from(users)
+      .where(eq(users.id, dbUserId))
+      .limit(1);
+    currentUserStatus = createdUser?.userStatus ?? null;
+    currentDeletedAt = createdUser?.deletedAt ?? null;
     // New user won't have a profile yet
     profile = null;
   }
 
-  // Resolve user state based on profile status
-  const profileState = resolveProfileState(profile);
+  const waitlistGateEnabled = await isWaitlistGateEnabled();
+  const state = resolveCanonicalState({
+    isAuthenticated: true,
+    hasDbUser: Boolean(dbUserId),
+    userStatus: currentUserStatus,
+    deletedAt: currentDeletedAt,
+    waitlistGateEnabled,
+    profile,
+  });
 
   return {
-    state: profileState.state,
+    state,
     clerkUserId,
     dbUserId,
-    profileId: profileState.profileId,
-    redirectTo: profileState.redirectTo,
+    profileId: profile?.id ?? null,
+    redirectTo: getRedirectForState(state),
     context: {
       isAdmin: dbUser?.isAdmin ?? false,
       isPro: dbUser?.isPro ?? false,
@@ -587,8 +735,7 @@ export async function resolveUserState(
 // Waitlist Access Helpers (exported for reuse)
 // =============================================================================
 
-// Valid waitlist statuses: 'new' (submitted), 'claimed' (approved).
-export type WaitlistStatus = 'new' | 'claimed';
+export type WaitlistStatus = CanonicalWaitlistStatus;
 
 export interface WaitlistAccessResult {
   entryId: string | null;
@@ -613,17 +760,26 @@ export async function getWaitlistAccess(
  */
 async function checkWaitlistAccessInternal(email: string): Promise<{
   entryId: string | null;
-  status: 'new' | 'claimed' | null;
+  status: WaitlistStatus | null;
 }> {
   const normalizedEmail = normalizeEmail(email);
 
+  // JOV-1963: order by createdAt DESC so the LATEST waitlist entry wins when
+  // a single email has multiple entries. Previously the query relied on
+  // arbitrary ordering, which could surface a stale `'new'` row even after
+  // the user had been invited or claimed access.
   const [entry] = await db
     .select({
       id: waitlistEntries.id,
       status: waitlistEntries.status,
     })
     .from(waitlistEntries)
-    .where(eq(waitlistEntries.email, normalizedEmail))
+    .where(
+      drizzleSql`${waitlistEntries.emailNormalized} = ${normalizedEmail} OR lower(${waitlistEntries.email}) = ${normalizedEmail}`
+    )
+    .orderBy(
+      drizzleSql`${waitlistEntries.canonical} DESC, ${waitlistEntries.createdAt} DESC`
+    )
     .limit(1);
 
   if (!entry) {
@@ -632,7 +788,7 @@ async function checkWaitlistAccessInternal(email: string): Promise<{
 
   return {
     entryId: entry.id,
-    status: entry.status as 'new' | 'claimed',
+    status: entry.status,
   };
 }
 

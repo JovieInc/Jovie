@@ -49,7 +49,7 @@ export default function GlobalError({
               body {
                 font-family: Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
                 font-feature-settings: "cv01", "ss03";
-                background-color: #08090a;
+                background-color: #06070a;
                 color: #ffffff;
                 min-height: 100dvh;
                 display: flex;
@@ -133,7 +133,7 @@ export default function GlobalError({
 
               .btn-primary {
                 background: #e6e6e6;
-                color: #08090a;
+                color: #06070a;
               }
 
               .btn-primary:hover {

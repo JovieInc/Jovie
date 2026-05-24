@@ -1,6 +1,8 @@
 import Link from 'next/link';
 import type { ArtistProfileLandingCopy } from '@/data/artistProfileCopy';
 import type { ArtistProfileSocialProofData } from '@/data/socialProof';
+import { cn } from '@/lib/utils';
+import { SHELL_H2_CLASS, SHELL_LEAD_CLASS } from './ArtistProfileSectionHeader';
 import { ArtistProfileSectionShell } from './ArtistProfileSectionShell';
 
 interface ArtistProfileSocialProofProps {
@@ -15,14 +17,11 @@ export function ArtistProfileSocialProof({
   return (
     <ArtistProfileSectionShell>
       <div className='max-w-[34rem]'>
-        <h2
-          aria-label={socialProof.headline}
-          className='max-w-none text-[clamp(2.7rem,5.25vw,4.6rem)] font-[650] leading-[0.94] tracking-[-0.072em] text-primary-token'
-        >
+        <h2 aria-label={socialProof.headline} className={SHELL_H2_CLASS}>
           <span className='block'>Built by an artist.</span>
-          <span className='mt-1 block'>For artists.</span>
+          <span className='block'>For artists.</span>
         </h2>
-        <p className='mt-5 max-w-[28rem] text-[clamp(1rem,1.55vw,1.16rem)] leading-[1.65] tracking-[-0.02em] text-secondary-token'>
+        <p className={cn(SHELL_LEAD_CLASS, 'mt-5 max-w-[30rem] sm:mt-6')}>
           {socialProof.intro}
         </p>
       </div>
@@ -50,7 +49,7 @@ export function ArtistProfileSocialProof({
 
       {!proofData.hasRealQuotes && proofData.founderQuote ? (
         <article className='mx-auto mt-6 max-w-[1120px] overflow-hidden rounded-[1.9rem] border border-black/10 bg-white px-6 py-6 text-black shadow-[0_22px_60px_rgba(0,0,0,0.16)] sm:px-8 sm:py-7 lg:px-10 lg:py-8'>
-          <blockquote className='max-w-[50rem] text-pretty text-[clamp(1.45rem,2.7vw,2.35rem)] font-semibold leading-[1.12] tracking-[-0.045em] text-black'>
+          <blockquote className='max-w-[48rem] text-pretty text-[clamp(1.375rem,2.4vw,2rem)] font-semibold leading-[1.18] tracking-[-0.025em] text-black'>
             “{proofData.founderQuote.quote}”
           </blockquote>
           <div className='mt-6 flex flex-col gap-1 text-left'>

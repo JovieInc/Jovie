@@ -5,34 +5,41 @@ import { useAsyncRateLimiter } from '@tanstack/react-pacer';
 import { useQueryClient } from '@tanstack/react-query';
 import { DefaultChatTransport, type UIMessage } from 'ai';
 import { useRouter } from 'next/navigation';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useReducer,
+  useRef,
+  useState,
+} from 'react';
+import { track } from '@/lib/analytics';
 import { matchCommand } from '@/lib/chat/command-registry';
 import { consumePendingChatPrompt } from '@/lib/chat/open-chat-with-prompt';
-import type {
-  ChatPersistenceMessage,
-  PendingToolPersistenceEnvelope,
-} from '@/lib/chat/tool-events';
 import { PACER_TIMING } from '@/lib/pacer/hooks/timing';
-import {
-  FetchError,
-  queryKeys,
-  useAddMessagesMutation,
-  useChatConversationQuery,
-  useCreateConversationMutation,
-} from '@/lib/queries';
-import { addBreadcrumb, captureException } from '@/lib/sentry/client-lite';
+import { queryKeys, useChatConversationQuery } from '@/lib/queries';
+import { captureException } from '@/lib/sentry/client-lite';
 import { logger } from '@/lib/utils/logger';
 
+import { hydratePersistedMessageParts } from '../message-parts';
 import {
-  extractPersistableToolCalls,
-  hydratePersistedMessageParts,
-} from '../message-parts';
-import type { ArtistContext, ChatError, FileUIPart } from '../types';
+  type ChatTimelineEvent,
+  type ChatTimelineServerMessage,
+  type ChatTimelineState,
+  createInitialChatTimelineState,
+  reduceChatTimeline,
+  selectRenderableMessages,
+} from '../timeline/chat-timeline';
+import type {
+  ArtistContext,
+  ChatConversationCreatePhase,
+  ChatError,
+  FileUIPart,
+} from '../types';
 import { MAX_MESSAGE_LENGTH } from '../types';
 import {
   extractErrorMetadata,
   getErrorType,
-  getMessageText,
   getPreferredErrorMessage,
 } from '../utils';
 import { composeMessage, useChipTray } from './useChipTray';
@@ -43,7 +50,10 @@ interface UseJovieChatOptions {
   /** @deprecated Use profileId instead. Client-provided artist context for backward compatibility. */
   readonly artistContext?: ArtistContext; // NOSONAR - kept for backward compatibility
   readonly conversationId?: string | null;
-  readonly onConversationCreate?: (conversationId: string) => void;
+  readonly onConversationCreate?: (
+    conversationId: string,
+    phase?: ChatConversationCreatePhase
+  ) => void;
   /** Artist username — used by deterministic commands (e.g. "preview my profile") */
   readonly username?: string;
 }
@@ -59,6 +69,58 @@ const TITLE_POLL_MAX_DURATION_MS = 15_000;
 
 /** Number of fast poll intervals to allow before backing off. */
 const TITLE_POLL_FAST_WINDOW_MS = TITLE_POLL_FAST_INTERVAL_MS * 3;
+const TIMELINE_CACHE_LIMIT = 20;
+const timelineStateCache = new Map<string, ChatTimelineState>();
+
+type ChatTurnSource = 'typed' | 'quick_action' | 'slash_command';
+
+interface SubmitChatMessageOptions {
+  readonly source?: ChatTurnSource;
+  readonly toolIntent?: string | null;
+}
+
+interface ChatTurnMetadata {
+  readonly conversationId?: string;
+  readonly turnId?: string;
+  readonly requestId?: string;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null;
+}
+
+function extractChatTurnMetadata(value: unknown): ChatTurnMetadata | null {
+  if (!isRecord(value)) return null;
+  const conversationId =
+    typeof value.conversationId === 'string' ? value.conversationId : undefined;
+  const turnId = typeof value.turnId === 'string' ? value.turnId : undefined;
+  const requestId =
+    typeof value.requestId === 'string' ? value.requestId : undefined;
+
+  if (!conversationId && !turnId && !requestId) return null;
+  return { conversationId, turnId, requestId };
+}
+
+function inferToolIntentFromPrompt(text: string): string | null {
+  const normalized = text.trim().toLowerCase();
+  const mentionsAlbumArt =
+    /\balbum\s+art\b/.test(normalized) ||
+    /\bcover\s+art\b/.test(normalized) ||
+    /\bartwork\b/.test(normalized);
+  const asksForGeneration = /\b(generate|create|make|design|produce)\b/.test(
+    normalized
+  );
+  const asksForBrief =
+    /\bbrief\b/.test(normalized) || /\bdraft\b/.test(normalized);
+
+  return mentionsAlbumArt && asksForGeneration && !asksForBrief
+    ? 'album_art_generation'
+    : null;
+}
+
+function inferToolIntentFromSkill(id: string): string | null {
+  return id === 'generateAlbumArt' ? 'album_art_generation' : id;
+}
 
 function getTitlePollIntervalMs(
   titlePollingSince: number | null,
@@ -79,6 +141,74 @@ function getTitlePollIntervalMs(
     : TITLE_POLL_BACKOFF_INTERVAL_MS;
 }
 
+function toError(value: unknown): Error {
+  return value instanceof Error ? value : new Error('Chat send failed');
+}
+
+function getMessageParts(message: UIMessage | undefined): UIMessage['parts'] {
+  return Array.isArray(message?.parts) ? message.parts : [];
+}
+
+function getLastAssistantMessage(messages: readonly UIMessage[]) {
+  for (let i = messages.length - 1; i >= 0; i--) {
+    if (messages[i]?.role === 'assistant') {
+      return messages[i];
+    }
+  }
+  return undefined;
+}
+
+function getPartsSignature(parts: UIMessage['parts']): string {
+  return JSON.stringify(parts);
+}
+
+function summarizeTimelineState(state: ChatTimelineState) {
+  return {
+    conversationId: state.conversationId,
+    phase: state.phase,
+    messageCount: state.messages.length,
+    activeClientTurnId: state.activeClientTurnId,
+    statuses: state.messages.map(message => ({
+      id: message.id,
+      role: message.role,
+      status: message.status,
+      turnId: message.turnId,
+      serverMessageId: message.serverMessageId,
+    })),
+  };
+}
+
+function getCachedTimelineState(conversationId: string | null) {
+  if (!conversationId) {
+    return createInitialChatTimelineState(null);
+  }
+  return (
+    timelineStateCache.get(conversationId) ??
+    createInitialChatTimelineState(conversationId)
+  );
+}
+
+function cacheTimelineState(state: ChatTimelineState) {
+  if (!state.conversationId) return;
+  timelineStateCache.set(state.conversationId, state);
+  while (timelineStateCache.size > TIMELINE_CACHE_LIMIT) {
+    const oldestKey = timelineStateCache.keys().next().value;
+    if (!oldestKey) break;
+    timelineStateCache.delete(oldestKey);
+  }
+}
+
+function isTimelineDebugEnabled(): boolean {
+  if (process.env.NODE_ENV !== 'production') return true;
+  try {
+    return (
+      globalThis.localStorage?.getItem('jovie:chat-timeline-debug') === '1'
+    );
+  } catch {
+    return false;
+  }
+}
+
 export function useJovieChat({
   profileId,
   artistContext, // NOSONAR - kept for backward compatibility
@@ -89,7 +219,10 @@ export function useJovieChat({
   const router = useRouter();
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const lastAttemptedMessageRef = useRef<string>('');
-  const hasHydratedRef = useRef<string | null>(null);
+  const activeClientTurnIdRef = useRef<string | null>(null);
+  const streamRevisionRef = useRef(0);
+  const lastAssistantPartsSignatureRef = useRef<string | null>(null);
+  const loadedConversationIdsRef = useRef<Set<string>>(new Set());
   const [input, setInput] = useState('');
   const chipTray = useChipTray();
   const [chatError, setChatError] = useState<ChatError | null>(null);
@@ -98,20 +231,51 @@ export function useJovieChat({
   const [activeConversationId, setActiveConversationId] = useState<
     string | null
   >(conversationId ?? null);
-  const pendingMessagesRef = useRef<PendingToolPersistenceEnvelope | null>(
-    null
-  );
-  const pendingInitialSendRef = useRef<{
-    text: string;
-    files?: FileUIPart[];
-  } | null>(null);
-  /** Deferred navigation callback — called only after the AI stream completes
-   *  to prevent component remount from killing the in-flight response (JOV-1233). */
-  const deferredNavigationRef = useRef<{
-    callback: (conversationId: string) => void;
-    conversationId: string;
-  } | null>(null);
   const queryClient = useQueryClient();
+  const [timelineState, dispatchTimeline] = useReducer(
+    reduceChatTimeline,
+    activeConversationId,
+    getCachedTimelineState
+  );
+  const timelineStateRef = useRef(timelineState);
+  useEffect(() => {
+    timelineStateRef.current = timelineState;
+    cacheTimelineState(timelineState);
+  }, [timelineState]);
+  const dispatchTimelineEvent = useCallback((event: ChatTimelineEvent) => {
+    const previousState = timelineStateRef.current;
+    const nextState = reduceChatTimeline(previousState, event);
+    timelineStateRef.current = nextState;
+    cacheTimelineState(nextState);
+    const ignoredAsStale = nextState.diagnostics.some(
+      diagnostic =>
+        diagnostic.event === event.type &&
+        diagnostic.type === 'stale-event-ignored'
+    );
+
+    if (isTimelineDebugEnabled() || ignoredAsStale) {
+      const payload = {
+        eventName: event.type,
+        conversationId:
+          event.conversationId ?? nextState.conversationId ?? null,
+        requestId: event.requestId ?? null,
+        previousState: summarizeTimelineState(previousState),
+        nextState: summarizeTimelineState(nextState),
+        ignoredAsStale,
+        timestamp: Date.now(),
+      };
+
+      logger.info('chat_timeline.transition', payload, 'chat-timeline');
+      try {
+        track('chat_timeline.transition', payload);
+      } catch {
+        // Analytics failures must not affect chat state.
+      }
+    }
+
+    dispatchTimeline(event);
+  }, []);
+  const messages = selectRenderableMessages(timelineState);
 
   // Track whether we're waiting for title generation from the server.
   // Set to a timestamp when title generation is initiated, cleared when title arrives.
@@ -119,9 +283,29 @@ export function useJovieChat({
     null
   );
 
-  // Mutations for persistence
-  const createConversationMutation = useCreateConversationMutation();
-  const addMessagesMutation = useAddMessagesMutation();
+  const adoptServerConversationId = useCallback(
+    (
+      nextConversationId: string,
+      phase: ChatConversationCreatePhase = 'reserved'
+    ) => {
+      if (!nextConversationId) {
+        return;
+      }
+
+      const isNewConversation = nextConversationId !== activeConversationId;
+      // Reserving a server conversation updates browser history only. Switching
+      // the hook's chat id before the AI SDK stream finishes recreates the
+      // internal chat instance and drops in-flight tokens.
+      if (isNewConversation && phase === 'completed') {
+        setActiveConversationId(nextConversationId);
+      }
+
+      if (phase === 'completed') {
+        onConversationCreate?.(nextConversationId, phase);
+      }
+    },
+    [activeConversationId, onConversationCreate]
+  );
 
   // Determine whether to poll: only while we're actively waiting for a title
   // and haven't exceeded the max poll duration.
@@ -150,12 +334,40 @@ export function useJovieChat({
             ? { conversationId: activeConversationId }
             : {}),
         },
+        fetch: async (input, init) => {
+          const response = await globalThis.fetch(input, init);
+          const serverConversationId =
+            response.headers.get('x-conversation-id');
+          const serverTurnId = response.headers.get('x-chat-turn-id');
+          const clientTurnId = activeClientTurnIdRef.current;
+          if (serverConversationId) {
+            adoptServerConversationId(serverConversationId, 'reserved');
+          }
+          if (serverConversationId && clientTurnId) {
+            dispatchTimelineEvent({
+              type: 'message.send.acknowledged',
+              conversationId: serverConversationId,
+              clientTurnId,
+              turnId: serverTurnId,
+              requestId: serverTurnId ?? undefined,
+              now: Date.now(),
+            });
+          }
+          return response;
+        },
       }),
-    [profileId, artistContext, activeConversationId]
+    [
+      profileId,
+      artistContext,
+      activeConversationId,
+      adoptServerConversationId,
+      dispatchTimelineEvent,
+    ]
   );
 
-  // Convert loaded messages to the UIMessage format useChat expects
-  const initialMessages = useMemo(() => {
+  // Convert loaded messages to canonical timeline input. Query data feeds the
+  // reducer as merge events; it never directly replaces rendered messages.
+  const persistedTimelineMessages = useMemo(() => {
     if (!existingConversation?.messages) return undefined;
     return existingConversation.messages.map(
       (msg: {
@@ -164,33 +376,35 @@ export function useJovieChat({
         content: string;
         toolCalls?: unknown;
         createdAt: string;
-      }) => ({
+        clientMessageId?: string | null;
+        turnId?: string | null;
+        requestId?: string | null;
+      }): ChatTimelineServerMessage => ({
         id: msg.id,
         role: msg.role as 'user' | 'assistant',
         parts: hydratePersistedMessageParts(
           msg.content,
           msg.toolCalls
-        ) as UIMessage['parts'],
+        ) as ChatTimelineServerMessage['parts'],
         createdAt: new Date(msg.createdAt),
+        clientMessageId: msg.clientMessageId ?? null,
+        turnId: msg.turnId ?? null,
+        requestId: msg.requestId ?? null,
       })
     );
   }, [existingConversation]);
 
-  const {
-    messages,
-    sendMessage,
-    status,
-    setMessages,
-    stop: rawStop,
-  } = useChat({
-    id: activeConversationId ?? 'new-chat',
-    transport,
-    onError: error => {
+  const handleChatFailure = useCallback(
+    (
+      error: Error,
+      errorType: 'send' | 'stream',
+      clientTurnId = activeClientTurnIdRef.current
+    ) => {
       captureException(error, {
         tags: {
           feature: 'ai-chat',
           source: 'useJovieChat',
-          errorType: 'stream',
+          errorType,
         },
         extra: {
           profileId: profileId ?? null,
@@ -198,65 +412,179 @@ export function useJovieChat({
         },
       });
 
-      const errorType = getErrorType(error);
+      const chatErrorType = getErrorType(error);
       const metadata = extractErrorMetadata(error);
 
       setChatError({
-        type: errorType,
-        message: getPreferredErrorMessage(error, errorType, metadata),
+        type: chatErrorType,
+        message: getPreferredErrorMessage(error, chatErrorType, metadata),
         retryAfter: metadata.retryAfter,
         errorCode: metadata.errorCode,
         requestId: metadata.requestId,
         failedMessage: lastAttemptedMessageRef.current,
       });
 
-      // Restore the user's message so they don't lose it
       if (lastAttemptedMessageRef.current) {
         setInput(lastAttemptedMessageRef.current);
+      }
+
+      if (clientTurnId) {
+        dispatchTimelineEvent({
+          type: 'assistant.stream.failed',
+          conversationId: activeConversationId,
+          clientTurnId,
+          requestId: clientTurnId,
+          error: getPreferredErrorMessage(error, chatErrorType, metadata),
+          now: Date.now(),
+        });
+      }
+      activeClientTurnIdRef.current = null;
+      setIsSubmitting(false);
+    },
+    [activeConversationId, dispatchTimelineEvent, profileId]
+  );
+
+  const {
+    messages: sdkMessages,
+    sendMessage,
+    status,
+    stop: rawStop,
+  } = useChat({
+    id: activeConversationId ?? 'new-chat',
+    transport,
+    onFinish: ({ message }) => {
+      const metadata = extractChatTurnMetadata(message.metadata);
+      const finishedConversationId =
+        metadata?.conversationId ?? activeConversationId;
+      const clientTurnId = activeClientTurnIdRef.current;
+
+      if (clientTurnId) {
+        dispatchTimelineEvent({
+          type: 'assistant.stream.completed',
+          conversationId: finishedConversationId,
+          clientTurnId,
+          turnId: metadata?.turnId,
+          requestId: metadata?.requestId,
+          parts: getMessageParts(message as UIMessage),
+          now: Date.now(),
+        });
+      }
+      if (metadata?.conversationId) {
+        adoptServerConversationId(metadata.conversationId, 'completed');
       }
 
       queryClient.invalidateQueries({
         queryKey: queryKeys.chat.usage(),
       });
-
-      // Clear pending messages ref so the persistence effect doesn't
-      // keep trying to find an assistant message that will never arrive
-      pendingMessagesRef.current = null;
-      setIsSubmitting(false);
-
-      // Fire deferred navigation on error too so the URL updates (JOV-1233)
-      if (deferredNavigationRef.current) {
-        const { callback, conversationId: navId } =
-          deferredNavigationRef.current;
-        deferredNavigationRef.current = null;
-        callback(navId);
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.chat.conversations(),
+      });
+      if (finishedConversationId) {
+        queryClient.invalidateQueries({
+          queryKey: queryKeys.chat.conversation(finishedConversationId),
+        });
       }
+
+      activeClientTurnIdRef.current = null;
+      setIsSubmitting(false);
+    },
+    onError: error => {
+      handleChatFailure(error, 'stream', activeClientTurnIdRef.current);
+
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.chat.usage(),
+      });
     },
   });
 
-  // Sync initial messages when loaded — but only once per conversation to avoid
-  // overwriting freshly streamed messages when the effect re-fires after
-  // persistence refetch updates initialMessages.
+  // Query data merges into the canonical timeline. It must never replace the
+  // rendered list wholesale because optimistic/streaming rows may be newer.
   useEffect(() => {
-    if (status !== 'ready') return;
-    if (!initialMessages || initialMessages.length === 0) return;
-    if (hasHydratedRef.current === activeConversationId) return;
+    if (!activeConversationId || !isLoadingConversation) return;
+    if (loadedConversationIdsRef.current.has(activeConversationId)) return;
+    dispatchTimelineEvent({
+      type: 'conversation.load.started',
+      conversationId: activeConversationId,
+      requestId: activeConversationId,
+      now: Date.now(),
+    });
+  }, [activeConversationId, dispatchTimelineEvent, isLoadingConversation]);
 
-    setMessages(initialMessages);
-    hasHydratedRef.current = activeConversationId;
-  }, [initialMessages, setMessages, status, activeConversationId]);
+  useEffect(() => {
+    if (!activeConversationId || !persistedTimelineMessages) return;
+    if (existingConversation?.conversation?.id !== activeConversationId) return;
+
+    const hasLoaded =
+      loadedConversationIdsRef.current.has(activeConversationId);
+    dispatchTimelineEvent({
+      type: hasLoaded
+        ? 'conversation.refetch.succeeded'
+        : 'conversation.load.succeeded',
+      conversationId: activeConversationId,
+      requestId: activeConversationId,
+      messages: persistedTimelineMessages,
+      receivedAt: Date.now(),
+    });
+    loadedConversationIdsRef.current.add(activeConversationId);
+  }, [
+    activeConversationId,
+    dispatchTimelineEvent,
+    existingConversation?.conversation?.id,
+    persistedTimelineMessages,
+  ]);
+
+  useEffect(() => {
+    const clientTurnId = activeClientTurnIdRef.current;
+    if (!clientTurnId) return;
+
+    const assistantMessage = getLastAssistantMessage(sdkMessages);
+    const parts = getMessageParts(assistantMessage);
+    if (status === 'streaming' && parts.length === 0) {
+      dispatchTimelineEvent({
+        type: 'assistant.stream.started',
+        conversationId: activeConversationId,
+        clientTurnId,
+        requestId: clientTurnId,
+        now: Date.now(),
+      });
+      return;
+    }
+
+    if (parts.length === 0) return;
+    const signature = getPartsSignature(parts);
+    if (signature === lastAssistantPartsSignatureRef.current) return;
+
+    lastAssistantPartsSignatureRef.current = signature;
+    streamRevisionRef.current += 1;
+    dispatchTimelineEvent({
+      type: 'assistant.stream.delta',
+      conversationId: activeConversationId,
+      clientTurnId,
+      requestId: clientTurnId,
+      parts,
+      revision: streamRevisionRef.current,
+      now: Date.now(),
+    });
+  }, [activeConversationId, dispatchTimelineEvent, sdkMessages, status]);
 
   // Wrap stop to clear submission state so the composer re-enables immediately
   // instead of waiting for the 30s safety timeout.
-  // NOTE: We intentionally do NOT clear pendingMessagesRef here. When the stream
-  // aborts, status will transition back to 'ready', and the persistence effect
-  // needs pendingMessagesRef to still be populated so it can save the user message
-  // (and any partial assistant response) to the database. Clearing it here would
-  // cause aborted turns to silently disappear on reload.
   const stop = useCallback(() => {
+    const clientTurnId = activeClientTurnIdRef.current;
     rawStop();
+    if (clientTurnId) {
+      dispatchTimelineEvent({
+        type: 'assistant.stream.failed',
+        conversationId: activeConversationId,
+        clientTurnId,
+        requestId: clientTurnId,
+        error: 'Response stopped.',
+        now: Date.now(),
+      });
+      activeClientTurnIdRef.current = null;
+    }
     setIsSubmitting(false);
-  }, [rawStop]);
+  }, [activeConversationId, dispatchTimelineEvent, rawStop]);
 
   const isLoading = status === 'streaming' || status === 'submitted';
   const hasMessages = messages.length > 0;
@@ -295,277 +623,42 @@ export function useJovieChat({
     return () => clearTimeout(timer);
   }, [titlePollingSince]);
 
-  // Safety timeout: if isSubmitting stays true for more than 30 seconds,
-  // force-clear it to prevent the input from being permanently blocked.
-  // This guards against edge cases where the status/persistence effects
-  // fail to clear the flag (e.g. stream silently drops, component re-mounts).
-  useEffect(() => {
-    if (!isSubmitting) return;
-
-    const safetyTimer = globalThis.setTimeout(() => {
-      setIsSubmitting(false);
-      pendingMessagesRef.current = null;
-    }, 30_000);
-
-    return () => {
-      globalThis.clearTimeout(safetyTimer);
-    };
-  }, [isSubmitting]);
-
   // Clear error when user starts typing
   useEffect(() => {
-    if (input && chatError) {
+    if (
+      input &&
+      chatError &&
+      (!chatError.failedMessage || input !== chatError.failedMessage)
+    ) {
       setChatError(null);
     }
   }, [input, chatError]);
 
   // Sync activeConversationId when parent prop changes
   useEffect(() => {
-    setActiveConversationId(conversationId ?? null);
-  }, [conversationId]);
-
-  // Ensure the first message in a new chat is sent only after activeConversationId
-  // has been committed, so transport includes conversationId on the request.
-  // Navigation is deferred until the stream completes to prevent the component
-  // remount from killing the in-flight AI response (JOV-1233).
-  useEffect(() => {
-    if (!activeConversationId || !pendingInitialSendRef.current) return;
-
-    const pendingPayload = pendingInitialSendRef.current;
-    pendingInitialSendRef.current = null;
-
-    sendMessage({
-      text: pendingPayload.text,
-      ...(pendingPayload.files && pendingPayload.files.length > 0
-        ? { files: pendingPayload.files }
-        : {}),
-    });
-  }, [activeConversationId, sendMessage]);
-
-  // Save messages to database when streaming completes.
-  // FIX: Don't clear pendingMessagesRef unless we successfully extracted the
-  // assistant message. If the assistant message is empty, leave the ref so
-  // the next render (when messages updates) will try extraction again.
-  useEffect(() => {
-    if (status !== 'ready') return;
-    if (!pendingMessagesRef.current) {
-      setIsSubmitting(false);
-      return;
-    }
-    if (!activeConversationId) {
-      // No conversation yet - wait for it
+    const nextConversationId = conversationId ?? null;
+    if (activeConversationId === nextConversationId) {
       return;
     }
 
-    // Extract assistant message from the completed stream
-    const lastAssistantMessage = [...messages]
-      .reverse()
-      .find(m => m.role === 'assistant');
-
-    if (!lastAssistantMessage) {
-      // No assistant message yet - leave pending for next render
-      return;
-    }
-
-    const assistantText = getMessageText(lastAssistantMessage.parts);
-    const toolCalls = extractPersistableToolCalls(lastAssistantMessage.parts);
-
-    if (!assistantText && (!toolCalls || toolCalls.length === 0)) {
-      // Assistant message exists but has no persisted text or tool payload yet - leave pending
-      return;
-    }
-
-    const { userMessage } = pendingMessagesRef.current;
-
-    // Build messages to persist - user message may be empty if already persisted during conversation creation
-    const messagesToPersist: ChatPersistenceMessage[] = [];
-
-    if (userMessage) {
-      messagesToPersist.push({ role: 'user', content: userMessage });
-    }
-
-    messagesToPersist.push({
-      role: 'assistant',
-      content: assistantText,
-      ...(toolCalls ? { toolCalls } : {}),
-    });
-
-    addMessagesMutation.mutate(
-      {
-        conversationId: activeConversationId,
-        messages: messagesToPersist,
-      },
-      {
-        onSuccess: data => {
-          pendingMessagesRef.current = null;
-          setIsSubmitting(false);
-          queryClient.invalidateQueries({
-            queryKey: queryKeys.chat.conversation(activeConversationId),
-          });
-          queryClient.invalidateQueries({
-            queryKey: queryKeys.chat.conversations(),
-          });
-
-          // If the server indicated title generation was kicked off,
-          // start polling so the title auto-updates in sidebar + header.
-          if (data?.titlePending) {
-            setTitlePollingSince(Date.now());
-          }
-
-          if (!assistantText && toolCalls && toolCalls.length > 0) {
-            addBreadcrumb({
-              category: 'ai-chat',
-              message: 'Persisted tool-only assistant response',
-              level: 'info',
-              data: {
-                conversationId: activeConversationId,
-                toolCount: toolCalls.length,
-              },
-            });
-          }
-
-          if (deferredNavigationRef.current) {
-            const { callback, conversationId: navConversationId } =
-              deferredNavigationRef.current;
-            deferredNavigationRef.current = null;
-            callback(navConversationId);
-          }
-        },
-        onError: err => {
-          const isTransient = err instanceof FetchError && err.isRetryable();
-
-          if (isTransient) {
-            addBreadcrumb({
-              category: 'ai-chat',
-              message: `Message persistence failed after retries: ${err.message}`,
-              level: 'warning',
-              data: {
-                status: err.status,
-                profileId: profileId ?? null,
-                conversationId: activeConversationId,
-              },
-            });
-          } else {
-            captureException(err, {
-              tags: {
-                feature: 'ai-chat',
-                source: 'useJovieChat',
-                errorType: 'message-persistence',
-              },
-              extra: {
-                profileId: profileId ?? null,
-                conversationId: activeConversationId,
-                messageCount: messagesToPersist.length,
-              },
-            });
-          }
-          logger.error('[useJovieChat] Failed to save messages:', err);
-          setChatError({
-            type: 'server',
-            message:
-              'Your response arrived, but we could not save it yet. Please retry in a moment.',
-            errorCode: 'MESSAGE_PERSIST_FAILED',
-            failedMessage: lastAttemptedMessageRef.current,
-          });
-          setIsSubmitting(false);
-        },
+    if (activeConversationId && nextConversationId === null) {
+      const reservedPath = `/app/chat/${encodeURIComponent(activeConversationId)}`;
+      if (globalThis.location?.pathname === reservedPath) {
+        return;
       }
-    );
-  }, [
-    status,
-    activeConversationId,
-    addMessagesMutation,
-    queryClient,
-    messages,
-    profileId,
-  ]);
+    }
 
-  // Extracted helper: create a new conversation and set up pending refs.
-  // Returns true on success, false on failure (error state already set).
-  const handleCreateConversation = useCallback(
-    async (
-      trimmedText: string,
-      payload: { text: string; files?: FileUIPart[] }
-    ): Promise<boolean> => {
-      try {
-        const result = await createConversationMutation.mutateAsync({
-          initialMessage: trimmedText || '(image attachment)',
-        });
-        setActiveConversationId(result.conversation.id);
-
-        // User message already persisted via initialMessage in conversation creation.
-        // Only store pending ref to persist the assistant response.
-        pendingMessagesRef.current = {
-          userMessage: '', // Empty - already persisted via initialMessage
-        };
-
-        // Store the send payload for the effect that fires after activeConversationId updates.
-        pendingInitialSendRef.current = payload;
-
-        // Defer navigation until the AI stream completes (status === 'ready').
-        // Navigating earlier would remount the component and kill the stream (JOV-1233).
-        if (onConversationCreate) {
-          deferredNavigationRef.current = {
-            callback: onConversationCreate,
-            conversationId: result.conversation.id,
-          };
-        }
-
-        setInput('');
-
-        return true;
-      } catch (err) {
-        // Transient server errors (5xx, timeout, rate-limit) were already
-        // retried by TanStack Query. Only log a breadcrumb to reduce Sentry
-        // noise for temporary outages (JOV-1352).
-        const isTransient = err instanceof FetchError && err.isRetryable();
-
-        if (isTransient) {
-          addBreadcrumb({
-            category: 'ai-chat',
-            message: `Conversation create failed after retries: ${err.message}`,
-            level: 'warning',
-            data: {
-              status: err.status,
-              profileId: profileId ?? null,
-            },
-          });
-        } else {
-          captureException(err, {
-            tags: {
-              feature: 'ai-chat',
-              source: 'useJovieChat',
-              errorType: 'conversation-create',
-            },
-            extra: {
-              profileId: profileId ?? null,
-              conversationId: activeConversationId,
-            },
-          });
-        }
-        logger.error('[useJovieChat] Failed to create conversation:', err);
-        setChatError({
-          type: 'server',
-          message:
-            'We could not start a new conversation right now. Please try again.',
-          errorCode: 'CONVERSATION_CREATE_FAILED',
-          failedMessage: trimmedText,
-        });
-        setIsSubmitting(false);
-        return false;
-      }
-    },
-    [
-      createConversationMutation,
-      onConversationCreate,
-      setActiveConversationId,
-      profileId,
-      activeConversationId,
-      setInput,
-      setChatError,
-      setIsSubmitting,
-    ]
-  );
+    setActiveConversationId(nextConversationId);
+    activeClientTurnIdRef.current = null;
+    streamRevisionRef.current = 0;
+    lastAssistantPartsSignatureRef.current = null;
+    dispatchTimelineEvent({
+      type: 'conversation.switched',
+      conversationId: nextConversationId,
+      requestId: nextConversationId ?? 'new-chat',
+      now: Date.now(),
+    });
+  }, [activeConversationId, conversationId, dispatchTimelineEvent]);
 
   /** Try to handle text as a deterministic command. Returns true if handled. */
   const tryHandleCommand = useCallback(
@@ -574,32 +667,33 @@ export function useJovieChat({
       const command = matchCommand(trimmedText, commandCtx);
       if (!command) return false;
 
-      const userMsg = {
-        id: `cmd-user-${crypto.randomUUID()}`,
-        role: 'user' as const,
-        parts: [{ type: 'text' as const, text: trimmedText }],
-        createdAt: new Date(),
-      };
-      const assistantMsg = {
-        id: `cmd-assistant-${crypto.randomUUID()}`,
-        role: 'assistant' as const,
-        parts: [{ type: 'text' as const, text: command.confirmationMessage }],
-        createdAt: new Date(),
-      };
-      setMessages(prev => [...prev, userMsg, assistantMsg]);
+      dispatchTimelineEvent({
+        type: 'deterministic.command.completed',
+        conversationId: activeConversationId,
+        clientTurnId: `cmd-${crypto.randomUUID()}`,
+        userParts: [{ type: 'text' as const, text: trimmedText }],
+        assistantParts: [
+          { type: 'text' as const, text: command.confirmationMessage },
+        ],
+        now: Date.now(),
+      });
       setInput('');
       command.execute(commandCtx);
       return true;
     },
-    [username, router, setMessages, setInput]
+    [activeConversationId, dispatchTimelineEvent, username, router, setInput]
   );
 
   // Core submit logic
   const doSubmit = useCallback(
-    async (text: string, files?: FileUIPart[]) => {
+    async (
+      text: string,
+      files?: FileUIPart[],
+      options?: SubmitChatMessageOptions
+    ): Promise<boolean> => {
       const hasFiles = files && files.length > 0;
-      if (!text.trim() && !hasFiles) return;
-      if (isLoading || isSubmitting) return;
+      if (!text.trim() && !hasFiles) return false;
+      if (isLoading || isSubmitting) return false;
 
       // Validate message length
       if (text.length > MAX_MESSAGE_LENGTH) {
@@ -607,13 +701,13 @@ export function useJovieChat({
           type: 'unknown',
           message: `Message is too long. Maximum is ${MAX_MESSAGE_LENGTH} characters.`,
         });
-        return;
+        return false;
       }
 
       const trimmedText = text.trim();
 
       // Check for deterministic commands before hitting AI
-      if (!hasFiles && tryHandleCommand(trimmedText)) return;
+      if (!hasFiles && tryHandleCommand(trimmedText)) return true;
 
       const payload = {
         text: trimmedText,
@@ -625,29 +719,53 @@ export function useJovieChat({
 
       setChatError(null);
       setIsSubmitting(true);
+      const clientTurnId = crypto.randomUUID();
+      activeClientTurnIdRef.current = clientTurnId;
+      streamRevisionRef.current = 0;
+      lastAssistantPartsSignatureRef.current = null;
+      const toolIntent =
+        options?.toolIntent ?? inferToolIntentFromPrompt(trimmedText);
 
-      if (activeConversationId) {
-        // Store pending message for persistence (both user and assistant)
-        pendingMessagesRef.current = {
-          userMessage: trimmedText,
-        };
-      } else {
-        // No active conversation — create one first, then return
-        // (sendMessage is dispatched by the effect watching activeConversationId)
-        const created = await handleCreateConversation(trimmedText, payload);
-        if (!created) return;
-        return;
+      const sendOptions = {
+        body: {
+          clientTurnId,
+          clientMessageId: `${clientTurnId}:user`,
+          source: options?.source ?? 'typed',
+          ...(toolIntent ? { toolIntent } : {}),
+        },
+      };
+      dispatchTimelineEvent({
+        type: 'message.send.started',
+        conversationId: activeConversationId,
+        clientTurnId,
+        clientMessageId: `${clientTurnId}:user`,
+        requestId: clientTurnId,
+        parts: [
+          { type: 'text' as const, text: trimmedText },
+          ...(files ?? []),
+        ] as UIMessage['parts'],
+        now: Date.now(),
+      });
+
+      try {
+        const result = sendMessage(payload, sendOptions);
+        setInput('');
+        void Promise.resolve(result).catch(value => {
+          handleChatFailure(toError(value), 'send', clientTurnId);
+        });
+        return true;
+      } catch (error) {
+        handleChatFailure(toError(error), 'send', clientTurnId);
+        return false;
       }
-
-      sendMessage(payload);
-      setInput('');
     },
     [
+      activeConversationId,
+      dispatchTimelineEvent,
+      handleChatFailure,
       isLoading,
       isSubmitting,
       sendMessage,
-      activeConversationId,
-      handleCreateConversation,
       tryHandleCommand,
     ]
   );
@@ -661,8 +779,16 @@ export function useJovieChat({
   }, [chatError, doSubmit]);
 
   const rateLimitedSubmitter = useAsyncRateLimiter(
-    async ({ text, files }: { text: string; files?: FileUIPart[] }) => {
-      await doSubmit(text, files);
+    async ({
+      text,
+      files,
+      source,
+      toolIntent,
+    }: { text: string; files?: FileUIPart[] } & SubmitChatMessageOptions) => {
+      const submitted = await doSubmit(text, files, { source, toolIntent });
+      if (submitted) {
+        chipTray.clear();
+      }
     },
     {
       limit: 1,
@@ -695,25 +821,38 @@ export function useJovieChat({
     (e?: React.FormEvent, files?: FileUIPart[]) => {
       e?.preventDefault();
       const composed = composeMessage(chipTray.chips, input);
-      rateLimitedSubmitter.maybeExecute({ text: composed, files });
-      chipTray.clear();
+      const skillChip = chipTray.chips.find(chip => chip.type === 'skill');
+      rateLimitedSubmitter.maybeExecute({
+        text: composed,
+        files,
+        source: skillChip ? 'slash_command' : 'typed',
+        toolIntent: skillChip ? inferToolIntentFromSkill(skillChip.id) : null,
+      });
     },
     [chipTray, input, rateLimitedSubmitter]
   );
 
   const handleSuggestedPrompt = useCallback(
     (prompt: string) => {
-      rateLimitedSubmitter.maybeExecute({ text: prompt });
+      rateLimitedSubmitter.maybeExecute({
+        text: prompt,
+        source: 'quick_action',
+        toolIntent: inferToolIntentFromPrompt(prompt),
+      });
     },
     [rateLimitedSubmitter]
   );
 
+  // Consume a pending prompt set before the chat component mounted
+  // (e.g. via "open-chat-with-prompt"). This is programmatic/automated, not
+  // a repeated user action, so it bypasses the client-side rate limiter to
+  // avoid consuming the first-message slot and blocking the user's first send.
   useEffect(() => {
     const pendingPrompt = consumePendingChatPrompt();
     if (!pendingPrompt) return;
 
-    rateLimitedSubmitter.maybeExecute({ text: pendingPrompt });
-  }, [rateLimitedSubmitter]);
+    doSubmit(pendingPrompt);
+  }, [doSubmit]);
 
   useEffect(() => {
     const handlePromptEvent = (event: Event) => {
@@ -776,7 +915,10 @@ export function useJovieChat({
     isLoading,
     isSubmitting,
     hasMessages,
-    isLoadingConversation: isLoadingConversation && !!activeConversationId,
+    isLoadingConversation:
+      timelineState.phase === 'initial-loading' &&
+      !!activeConversationId &&
+      messages.length === 0,
     status,
     activeConversationId,
     /** Auto-generated or user-set conversation title (null if not yet generated) */

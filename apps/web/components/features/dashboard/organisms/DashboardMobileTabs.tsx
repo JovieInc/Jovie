@@ -1,14 +1,16 @@
 'use client';
 
-import { useCallback } from 'react';
+import { useCallback, useMemo } from 'react';
 import { useDashboardData } from '@/app/app/(shell)/dashboard/DashboardDataContext';
 import {
   adminNavigation,
+  libraryNavItem,
   mobileExpandedNavigation,
   mobilePrimaryNavigation,
 } from '@/features/dashboard/dashboard-nav';
 import type { NavItem } from '@/features/dashboard/dashboard-nav/types';
 import { useAuthSafe } from '@/hooks/useClerkSafe';
+import { useAppFlag } from '@/lib/flags/client';
 import { cn } from '@/lib/utils';
 
 import { LiquidGlassMenu, type LiquidGlassMenuItem } from './LiquidGlassMenu';
@@ -18,7 +20,6 @@ function toMenuItem(item: NavItem): LiquidGlassMenuItem {
 }
 
 const PRIMARY_ITEMS = mobilePrimaryNavigation.map(toMenuItem);
-const EXPANDED_ITEMS = mobileExpandedNavigation.map(toMenuItem);
 const ADMIN_ITEMS = adminNavigation.map(toMenuItem);
 
 export interface DashboardMobileTabsProps {
@@ -30,6 +31,15 @@ export function DashboardMobileTabs({
 }: DashboardMobileTabsProps): React.JSX.Element {
   const { isAdmin } = useDashboardData();
   const { signOut } = useAuthSafe();
+  const shellChatLibraryEnabled = useAppFlag('SHELL_CHAT_V1');
+  const expandedItems = useMemo(
+    () =>
+      (shellChatLibraryEnabled
+        ? [libraryNavItem, ...mobileExpandedNavigation]
+        : mobileExpandedNavigation
+      ).map(toMenuItem),
+    [shellChatLibraryEnabled]
+  );
 
   const handleSignOut = useCallback(async () => {
     await signOut({ redirectUrl: '/' });
@@ -38,7 +48,7 @@ export function DashboardMobileTabs({
   return (
     <LiquidGlassMenu
       primaryItems={PRIMARY_ITEMS}
-      expandedItems={EXPANDED_ITEMS}
+      expandedItems={expandedItems}
       adminItems={isAdmin ? ADMIN_ITEMS : undefined}
       onSignOut={handleSignOut}
       className={cn('lg:hidden', className)}

@@ -113,13 +113,11 @@ async function assertDashboardPageContent(
 ) {
   if (pageConfig.name === 'Chat') {
     const chatReady = page
-      .locator(
-        'textarea, [contenteditable="true"], button:has-text("New thread")'
-      )
+      .locator('textarea, [contenteditable="true"], a[href="/app/chat"]')
       .first();
     await expect(
       chatReady,
-      'Dashboard/Chat: composer or new thread CTA should be visible'
+      'Dashboard/Chat: composer or new chat CTA should be visible'
     ).toBeVisible({ timeout: SMOKE_TIMEOUTS.VISIBILITY });
     return;
   }
@@ -580,20 +578,20 @@ test.describe('Content Gate — Authenticated Pages', () => {
     const dashboardPages = fastIteration
       ? [
           {
-            path: APP_ROUTES.DASHBOARD_RELEASES,
+            path: APP_ROUTES.RELEASES,
             name: 'Releases',
             readyText: /releases|music|tracks/i,
           },
         ]
       : [
           {
-            path: APP_ROUTES.DASHBOARD_AUDIENCE,
+            path: APP_ROUTES.AUDIENCE,
             name: 'Audience',
             minLength: 10,
             readyText: /audience|fans|subscribers/i,
           },
           {
-            path: APP_ROUTES.DASHBOARD_RELEASES,
+            path: APP_ROUTES.RELEASES,
             name: 'Releases',
             readyText: /releases|music|tracks/i,
           },

@@ -3,6 +3,8 @@
 # dependencies
 /node_modules
 apps/web/node_modules
+/.bundle/
+/vendor/bundle/
 /.pnp
 .pnp.js
 
@@ -24,8 +26,15 @@ apps/web/artifacts/
 /.next/
 /out/
 
+# braintrust local CLI cache
+.bt/
+
+# swc cache
+apps/web/.swc/
+
 # production
 /build
+/.build/
 
 # misc
 .DS_Store
@@ -38,6 +47,9 @@ apps/web/artifacts/
 
 # vercel
 .vercel
+
+# Vercel Workflow DevKit local world state
+.workflow-data/
 
 # typescript
 *.tsbuildinfo
@@ -72,6 +84,7 @@ storybook-static/
 apps/should-i-make/node_modules
 apps/should-i-make/.next
 packages/ui/node_modules
+packages/*/node_modules
 
 # Turborepo
 .turbo
@@ -80,6 +93,8 @@ doppler.yaml
 # Local git worktrees (should never be committed)
 .worktrees/
 /.issues/
+# GBrain per-worktree source state
+/.gbrain-source
 
 # Screenshot pipeline artifacts
 ideation/screenshots/
@@ -93,6 +108,7 @@ DerivedData/
 *.xcworkspace/xcuserdata/
 *.xcodeproj/xcuserdata/
 apps/ios/Jovie/Configuration.local.plist
+fastlane/report.xml
 
 # Auto Claude generated files
 .auto-claude/
@@ -105,3 +121,23 @@ output/
 .gstack/
 .claude/skills/gstack/
 .claude/scheduled_tasks.lock
+
+# Ruflo MCP local state (sqlite + vector index, never committed)
+.claude-flow/
+.swarm/
+ruvector.db
+
+# AgentOS run artifacts (binary outputs not source-controlled)
+agentos/runs/**/artifacts/
+.hermes/
+agentos/
+docs/leads/
+*.bak
+*.bak2
+*.backup
+apps/web/exp/
+apps/web/.final-shots/
+apps/web/.tmp-polish-baseline/
+apps/desktop/
+apps/extension/
+.agents/

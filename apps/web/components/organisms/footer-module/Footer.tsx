@@ -1,22 +1,11 @@
 'use client';
 
-import dynamic from 'next/dynamic';
 import Link from 'next/link';
 import { Copyright } from '@/components/atoms/Copyright';
 import { FooterBranding } from '@/components/molecules/FooterBranding';
 import { FooterNavigation } from '@/components/molecules/FooterNavigation';
 import { APP_ROUTES } from '@/constants/routes';
-import { useAppFlag } from '@/lib/flags/client';
 import { cn } from '@/lib/utils';
-
-// Dynamic import to exclude ThemeToggle from bundle when not used
-const ThemeToggle = dynamic(
-  () =>
-    import('@/components/site/theme-toggle').then(mod => ({
-      default: mod.ThemeToggle,
-    })),
-  { ssr: false }
-);
 
 const FOOTER_COLUMNS = [
   {
@@ -40,8 +29,8 @@ const FOOTER_COLUMNS = [
     id: 'account',
     heading: 'Account',
     links: [
-      { href: '/signin', label: 'Log in' },
-      { href: '/signup', label: 'Get started' },
+      { href: APP_ROUTES.SIGNIN, label: 'Log in' },
+      { href: APP_ROUTES.SIGNUP, label: 'Get started' },
     ],
   },
   {
@@ -73,15 +62,11 @@ import type { FooterProps } from './types';
 export function Footer({
   variant = 'marketing',
   artistHandle,
-  showThemeToggle = false,
-  themeShortcutKey,
   className = '',
   brandingMark = 'icon',
   containerSize = 'lg',
   links,
 }: FooterProps) {
-  const isLightModeEnabled = useAppFlag('ENABLE_LIGHT_MODE');
-  const effectiveShowThemeToggle = showThemeToggle && isLightModeEnabled;
   const maxWidthClass = CONTAINER_SIZES[containerSize];
 
   const variantConfigs = getVariantConfigs(maxWidthClass, containerSize);
@@ -143,7 +128,7 @@ export function Footer({
             containerSize === 'homepage'
               ? 'px-5 sm:px-6 lg:px-0'
               : 'mx-auto px-6 lg:px-8',
-            'pt-16 pb-14',
+            'pt-12 pb-10 md:pt-16 md:pb-14 2xl:pt-20 2xl:pb-16',
             maxWidthClass
           )}
         >
@@ -195,7 +180,7 @@ export function Footer({
                 <Link
                   href={APP_ROUTES.LEGAL_PRIVACY}
                   prefetch={false}
-                  className='text-app tracking-[-0.01em] transition-colors duration-100 hover:[color:var(--linear-text-primary)]'
+                  className='text-app tracking-[-0.01em] transition-colors duration-subtle hover:[color:var(--linear-text-primary)]'
                   style={{ color: 'var(--linear-text-tertiary)' }}
                 >
                   Privacy
@@ -203,7 +188,7 @@ export function Footer({
                 <Link
                   href={APP_ROUTES.LEGAL_TERMS}
                   prefetch={false}
-                  className='text-app tracking-[-0.01em] transition-colors duration-100 hover:[color:var(--linear-text-primary)]'
+                  className='text-app tracking-[-0.01em] transition-colors duration-subtle hover:[color:var(--linear-text-primary)]'
                   style={{ color: 'var(--linear-text-tertiary)' }}
                 >
                   Terms
@@ -242,7 +227,7 @@ export function Footer({
           containerSize === 'homepage'
             ? 'px-5 sm:px-6 lg:px-0'
             : 'mx-auto px-6 lg:px-8',
-          'flex flex-col md:flex-row items-center justify-between gap-4 py-8 md:py-10',
+          'flex flex-col md:flex-row items-center justify-between gap-4 py-12 md:py-16 2xl:py-20',
           CONTAINER_SIZES[containerSize]
         )}
       >
@@ -258,31 +243,13 @@ export function Footer({
                       key={link.href}
                       href={link.href}
                       prefetch={false}
-                      className='text-app leading-[19.5px] font-normal tracking-[-0.01em] transition-colors duration-100 hover:[color:var(--linear-text-secondary)]'
+                      className='text-app leading-[19.5px] font-normal tracking-[-0.01em] transition-colors duration-subtle hover:[color:var(--linear-text-secondary)]'
                       style={{ color: 'var(--linear-text-tertiary)' }}
                     >
                       {link.label}
                     </Link>
                   ))}
                 </nav>
-              )}
-              {effectiveShowThemeToggle && (
-                <>
-                  <div className='flex items-center md:hidden'>
-                    <ThemeToggle
-                      appearance='icon'
-                      shortcutKey={themeShortcutKey}
-                      variant='linear'
-                    />
-                  </div>
-                  <div className='max-md:hidden md:flex items-center'>
-                    <ThemeToggle
-                      appearance={config.themeAppearance}
-                      shortcutKey={themeShortcutKey}
-                      variant='linear'
-                    />
-                  </div>
-                </>
               )}
             </div>
             <Copyright

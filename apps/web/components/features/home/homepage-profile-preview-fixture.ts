@@ -14,10 +14,6 @@ import type { PublicContact } from '@/types/contacts';
 import type { Artist, LegacySocialLink } from '@/types/db';
 
 const CREATED_AT = '2026-01-10T00:00:00.000Z';
-const MOCK_HOME_HERO_IMAGE_URL =
-  '/images/mock-profile/tim-white-dont-look-down-hero.jpg';
-const MOCK_HOME_CARD_IMAGE_URL =
-  '/images/mock-profile/tim-white-dont-look-down-card.jpg';
 
 type HomepageContactInput = {
   readonly id: string;
@@ -192,8 +188,8 @@ export const HOMEPAGE_PROFILE_PREVIEW_ARTIST: Artist = {
 export const HOMEPAGE_PROFILE_PREVIEW_MOCK_HOME_ARTIST: Artist = {
   ...HOMEPAGE_PROFILE_PREVIEW_ARTIST,
   id: 'homepage-preview-artist-mock-home',
-  image_url: MOCK_HOME_HERO_IMAGE_URL,
-  tagline: "Don't Look Down",
+  image_url: TIM_WHITE_PROFILE.avatarSrc,
+  tagline: HOMEPAGE_PROFILE_PREVIEW_ARTIST.tagline,
   settings: {
     ...(HOMEPAGE_PROFILE_PREVIEW_ARTIST.settings ?? {}),
     heroRoleLabel: 'DJ / Producer',
@@ -201,8 +197,8 @@ export const HOMEPAGE_PROFILE_PREVIEW_MOCK_HOME_ARTIST: Artist = {
   theme: {
     profileAccent: {
       version: 1,
-      primaryHex: '#ed9962',
-      sourceUrl: MOCK_HOME_HERO_IMAGE_URL,
+      primaryHex: '#d3834e',
+      sourceUrl: TIM_WHITE_PROFILE.avatarSrc,
     },
   },
 };
@@ -213,7 +209,9 @@ export const HOMEPAGE_PROFILE_PREVIEW_SOCIAL_LINKS: readonly LegacySocialLink[] 
       id: 'homepage-preview-spotify',
       artist_id: HOMEPAGE_PROFILE_PREVIEW_ARTIST.id,
       platform: 'spotify',
-      url: HOMEPAGE_PROFILE_PREVIEW_ARTIST.spotify_url ?? 'https://spotify.com',
+      url:
+        HOMEPAGE_PROFILE_PREVIEW_ARTIST.spotify_url ??
+        TIM_WHITE_PROFILE.spotifyUrl,
       clicks: 1820,
       created_at: CREATED_AT,
       is_visible: true,
@@ -264,7 +262,7 @@ export const HOMEPAGE_PROFILE_PREVIEW_MOCK_HOME_SOCIAL_LINKS: readonly LegacySoc
       platform: 'spotify',
       url:
         HOMEPAGE_PROFILE_PREVIEW_MOCK_HOME_ARTIST.spotify_url ??
-        'https://open.spotify.com/artist/4u',
+        TIM_WHITE_PROFILE.spotifyUrl,
       clicks: 1820,
       created_at: CREATED_AT,
       is_visible: true,
@@ -325,6 +323,9 @@ export const HOMEPAGE_PROFILE_PREVIEW_TOUR_DATES: readonly TourDateViewModel[] =
       profileId: HOMEPAGE_PROFILE_PREVIEW_ARTIST.id,
       externalId: 'tour-1',
       provider: 'manual',
+      eventType: 'tour',
+      confirmationStatus: 'confirmed',
+      reviewedAt: CREATED_AT,
       title: 'The Deep End Tour',
       startDate: '2026-05-18T03:00:00.000Z',
       startTime: '20:00',
@@ -346,6 +347,9 @@ export const HOMEPAGE_PROFILE_PREVIEW_TOUR_DATES: readonly TourDateViewModel[] =
       profileId: HOMEPAGE_PROFILE_PREVIEW_ARTIST.id,
       externalId: 'tour-2',
       provider: 'manual',
+      eventType: 'tour',
+      confirmationStatus: 'confirmed',
+      reviewedAt: CREATED_AT,
       title: 'The Deep End Tour',
       startDate: '2026-05-24T03:00:00.000Z',
       startTime: '21:00',
@@ -367,6 +371,9 @@ export const HOMEPAGE_PROFILE_PREVIEW_TOUR_DATES: readonly TourDateViewModel[] =
       profileId: HOMEPAGE_PROFILE_PREVIEW_ARTIST.id,
       externalId: 'tour-3',
       provider: 'manual',
+      eventType: 'tour',
+      confirmationStatus: 'confirmed',
+      reviewedAt: CREATED_AT,
       title: 'The Deep End Tour',
       startDate: '2026-06-07T03:00:00.000Z',
       startTime: '20:00',
@@ -388,6 +395,9 @@ export const HOMEPAGE_PROFILE_PREVIEW_TOUR_DATES: readonly TourDateViewModel[] =
       profileId: HOMEPAGE_PROFILE_PREVIEW_ARTIST.id,
       externalId: 'tour-4',
       provider: 'manual',
+      eventType: 'tour',
+      confirmationStatus: 'confirmed',
+      reviewedAt: CREATED_AT,
       title: 'The Deep End Tour',
       startDate: '2026-06-14T03:00:00.000Z',
       startTime: '20:00',
@@ -409,6 +419,9 @@ export const HOMEPAGE_PROFILE_PREVIEW_TOUR_DATES: readonly TourDateViewModel[] =
       profileId: HOMEPAGE_PROFILE_PREVIEW_ARTIST.id,
       externalId: 'tour-5',
       provider: 'manual',
+      eventType: 'tour',
+      confirmationStatus: 'confirmed',
+      reviewedAt: CREATED_AT,
       title: 'The Deep End Tour',
       startDate: '2026-06-21T03:00:00.000Z',
       startTime: '20:00',
@@ -430,6 +443,9 @@ export const HOMEPAGE_PROFILE_PREVIEW_TOUR_DATES: readonly TourDateViewModel[] =
       profileId: HOMEPAGE_PROFILE_PREVIEW_ARTIST.id,
       externalId: 'tour-6',
       provider: 'manual',
+      eventType: 'tour',
+      confirmationStatus: 'confirmed',
+      reviewedAt: CREATED_AT,
       title: 'The Deep End Tour',
       startDate: '2026-06-28T03:00:00.000Z',
       startTime: '20:00',
@@ -451,6 +467,9 @@ export const HOMEPAGE_PROFILE_PREVIEW_TOUR_DATES: readonly TourDateViewModel[] =
       profileId: HOMEPAGE_PROFILE_PREVIEW_ARTIST.id,
       externalId: 'tour-7',
       provider: 'manual',
+      eventType: 'tour',
+      confirmationStatus: 'confirmed',
+      reviewedAt: CREATED_AT,
       title: 'The Deep End Tour',
       startDate: '2026-07-05T03:00:00.000Z',
       startTime: '20:00',
@@ -472,6 +491,9 @@ export const HOMEPAGE_PROFILE_PREVIEW_TOUR_DATES: readonly TourDateViewModel[] =
       profileId: HOMEPAGE_PROFILE_PREVIEW_ARTIST.id,
       externalId: 'tour-8',
       provider: 'manual',
+      eventType: 'tour',
+      confirmationStatus: 'confirmed',
+      reviewedAt: CREATED_AT,
       title: 'The Deep End Tour',
       startDate: '2026-07-11T03:00:00.000Z',
       startTime: '20:00',
@@ -497,7 +519,10 @@ export const HOMEPAGE_PROFILE_PREVIEW_MOCK_HOME_TOUR_DATES: readonly TourDateVie
       profileId: HOMEPAGE_PROFILE_PREVIEW_MOCK_HOME_ARTIST.id,
       externalId: 'tour-mock-home-1',
       provider: 'manual',
-      title: "Don't Look Down Tour",
+      eventType: 'tour',
+      confirmationStatus: 'confirmed',
+      reviewedAt: CREATED_AT,
+      title: 'The Deep End Tour',
       startDate: '2026-06-21',
       startTime: '20:00',
       timezone: 'America/Los_Angeles',
@@ -520,7 +545,7 @@ export const HOMEPAGE_PROFILE_PREVIEW_RELEASES = {
     title: HOME_RELEASE_DESTINATION_PRESAVE_MOCK.title,
     slug: 'the-deep-end',
     artworkUrl: '/img/releases/the-deep-end.jpg',
-    releaseDate: '2026-05-01T07:00:00.000Z',
+    releaseDate: '2027-07-01T07:00:00.000Z',
     revealDate: '2026-04-18T07:00:00.000Z',
     releaseType: 'single',
     metadata: {
@@ -540,26 +565,19 @@ export const HOMEPAGE_PROFILE_PREVIEW_RELEASES = {
 } as const;
 
 export const HOMEPAGE_PROFILE_PREVIEW_MOCK_HOME_RELEASE = {
-  title: "Don't Look Down",
-  slug: 'dont-look-down',
-  artworkUrl: MOCK_HOME_CARD_IMAGE_URL,
-  releaseDate: '2025-10-01T07:00:00.000Z',
-  releaseType: 'single',
-  metadata: {
-    artistNames: ['Tim White'],
-  },
+  ...HOMEPAGE_PROFILE_PREVIEW_RELEASES.live,
 } as const;
 
 export const HOMEPAGE_PROFILE_PREVIEW_DRAWER_RELEASES: readonly PublicRelease[] =
   [
     {
       id: 'drawer-release-1',
-      title: "Don't Look Down",
-      slug: 'dont-look-down',
+      title: HOMEPAGE_PROFILE_PREVIEW_RELEASES.live.title,
+      slug: HOMEPAGE_PROFILE_PREVIEW_RELEASES.live.slug,
       releaseType: 'single',
-      releaseDate: '2024-11-01T07:00:00.000Z',
-      artworkUrl: '/images/mock-profile/tim-white-dont-look-down-card.jpg',
-      artistNames: ['Tim White'],
+      releaseDate: HOMEPAGE_PROFILE_PREVIEW_RELEASES.live.releaseDate,
+      artworkUrl: HOMEPAGE_PROFILE_PREVIEW_RELEASES.live.artworkUrl,
+      artistNames: ['Cosmic Gate', 'Tim White'],
     },
     {
       id: 'drawer-release-2',
@@ -696,6 +714,13 @@ export const HOMEPAGE_PROFILE_SHOWCASE_STATES: Readonly<
     label: 'Listen Fallback',
     helper: 'Keep a clean listen action live when nothing else should lead.',
   }),
+  'alerts-fallback': createQuietButtonShowcaseState({
+    id: 'alerts-fallback',
+    latestReleaseKey: 'none',
+    label: 'Alerts Fallback',
+    helper:
+      'When there is no release, tour, playlist, or merch item, alerts become the action.',
+  }),
   'fans-opt-in': createComposeShowcaseState({
     id: 'fans-opt-in',
     latestReleaseKey: 'live',
@@ -790,6 +815,27 @@ export const HOMEPAGE_PROFILE_SHOWCASE_STATES: Readonly<
     label: 'Next Date Live',
     helper: 'Lead with the next date and open the full run from there.',
     drawerView: 'tour',
+    showSubscriptionConfirmedBanner: false,
+  }),
+  'events-empty': createShowcaseState({
+    id: 'events-empty',
+    latestReleaseKey: 'none',
+    kind: 'button',
+    tone: 'quiet',
+    label: 'Events Empty',
+    helper: 'The empty Events tab should still offer alerts.',
+    drawerView: 'tour',
+    showSubscriptionConfirmedBanner: false,
+  }),
+  'more-menu': createShowcaseState({
+    id: 'more-menu',
+    latestReleaseKey: 'live',
+    kind: 'button',
+    tone: 'quiet',
+    label: 'More Menu',
+    helper: 'The compact profile menu should fit above the bottom nav.',
+    drawerView: 'menu',
+    releaseActionLabel: 'Listen',
     showSubscriptionConfirmedBanner: false,
   }),
   'tips-open': createQuietButtonShowcaseState({

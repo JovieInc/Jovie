@@ -1,3 +1,4 @@
+import { Check } from 'lucide-react';
 import { type ReactNode } from 'react';
 
 export interface SetupTaskItemProps {
@@ -18,7 +19,7 @@ export function SetupTaskItem({
   action,
 }: SetupTaskItemProps): React.ReactElement {
   return (
-    <li className='flex h-full flex-col gap-3 rounded-xl border border-(--linear-app-frame-seam) bg-(--linear-app-content-surface) p-4 shadow-none'>
+    <li className='flex h-full flex-col gap-3 rounded-xl border border-subtle bg-surface-1 p-4 shadow-none'>
       <div className='flex items-center gap-2'>
         <div
           className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-app font-caption ${
@@ -28,7 +29,7 @@ export function SetupTaskItem({
           }`}
           aria-hidden='true'
         >
-          {complete ? '✓' : index}
+          {complete ? <Check className='h-3.5 w-3.5' /> : index}
         </div>
         <p className='truncate text-app font-semibold text-primary-token'>
           {title}

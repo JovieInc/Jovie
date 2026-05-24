@@ -1,0 +1,274 @@
+# Agent Landing Sweep
+#
+# PURPOSE: Scheduled fallback for the event-driven agent-pipeline approve job.
+# Sweeps all open, non-draft agent PRs every 15 minutes and enables auto-merge
+# on any that are CI-green, scope-judge-passed, CodeRabbit-unblocked, and free
+# of sensitive file changes or the needs-human label.
+#
+# WHY A CRON IN ADDITION TO workflow_run EVENTS:
+# The event-driven path in agent-pipeline.yml fires when CI or Scope Judge
+# *completes*. PRs that passed CI before the pipeline was listening, workflows
+# that fired but silently failed, or GitHub Actions delivery delays can leave
+# eligible PRs stuck in "approved but not yet auto-merged" limbo. This sweep
+# acts as a reliable 15-minute safety net that catches those cases.
+#
+# GUARDRAILS (same as agent-pipeline.yml approve job):
+# 1. Only agent branches (linear/*, claude/*, codegen-bot/*, codex/*, */jov-*)
+# 2. Not a draft PR
+# 3. No needs-human label
+# 4. CI PR Ready check = success
+# 5. Scope judge = success
+# 6. CodeRabbit not blocking (no CHANGES_REQUESTED)
+# 7. No sensitive files (.github/, drizzle/migrations/, auth, billing, stripe,
+#    middleware, .env, package.json, pnpm-lock.yaml)
+# 8. Queue pressure guard: defers if 12+ other PRs already queued for auto-merge
+#
+# RELATIONSHIP TO agent-pipeline.yml:
+# This workflow is idempotent. Enabling auto-merge on an already-queued PR is
+# a no-op. It will not double-merge or interfere with the event-driven path.
+
+name: Agent Landing Sweep
+
+on:
+  schedule:
+    # Every 15 minutes — matches the linear-ai-dispatcher cadence
+    - cron: '*/15 * * * *'
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Log eligible PRs without enabling auto-merge'
+        required: false
+        default: 'false'
+
+permissions: {}
+
+concurrency:
+  group: agent-landing-sweep
+  cancel-in-progress: false
+
+jobs:
+  sweep:
+    name: Sweep Eligible Agent PRs
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    permissions:
+      contents: read
+      pull-requests: write
+      statuses: read
+
+    steps:
+      - name: Generate Jovie Bot token
+        id: app-token
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        with:
+          app-id: ${{ vars.JOVIE_BOT_APP_ID }}
+          private-key: ${{ secrets.JOVIE_BOT_PRIVATE_KEY }}
+
+      - name: Sweep and land eligible agent PRs
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          GH_REPO: ${{ github.repository }}
+          DRY_RUN: ${{ inputs.dry_run || 'false' }}
+          READY_THRESHOLD: '12'
+        run: |
+          set -euo pipefail
+
+          echo "=== Agent Landing Sweep ==="
+          echo "Repository: $GH_REPO"
+          echo "Dry run: $DRY_RUN"
+
+          # ------------------------------------------------------------------
+          # 1. Collect all open, non-draft PRs
+          # ------------------------------------------------------------------
+          ALL_PRS=$(gh api --paginate --slurp "repos/$GH_REPO/pulls?state=open&per_page=100" \
+            | jq '[.[][] | select(.draft == false) | {
+                number: .number,
+                title: .title,
+                head_ref: .head.ref,
+                head_sha: .head.sha,
+                labels: [.labels[].name],
+                auto_merge: (.auto_merge != null)
+              }]')
+
+          TOTAL=$(echo "$ALL_PRS" | jq 'length')
+          echo "Open non-draft PRs: $TOTAL"
+
+          # ------------------------------------------------------------------
+          # 2. Filter to agent branches
+          # ------------------------------------------------------------------
+          AGENT_PRS=$(echo "$ALL_PRS" | jq '[.[] | select(
+            (.head_ref | test("^(linear/|claude/|codegen-bot/|codex/)"; "i"))
+            or (.head_ref | test("(^|/)jov-[0-9]+"; "i"))
+          )]')
+
+          AGENT_TOTAL=$(echo "$AGENT_PRS" | jq 'length')
+          echo "Agent PRs (non-draft): $AGENT_TOTAL"
+
+          if [[ "$AGENT_TOTAL" -eq 0 ]]; then
+            echo "No open agent PRs to sweep."
+            exit 0
+          fi
+
+          # ------------------------------------------------------------------
+          # 3. Queue pressure check (same threshold as agent-pipeline.yml)
+          # ------------------------------------------------------------------
+          READY_COUNT=$(echo "$ALL_PRS" | jq '[.[] | select(.auto_merge == true)] | length')
+
+          echo "Auto-merge PRs in queue: $READY_COUNT / $READY_THRESHOLD"
+
+          if [[ "$READY_COUNT" -ge "$READY_THRESHOLD" ]]; then
+            echo "Queue pressure is high ($READY_COUNT / $READY_THRESHOLD). Skipping sweep to avoid saturation."
+            exit 0
+          fi
+
+          # ------------------------------------------------------------------
+          # 4. Sensitive path patterns (mirror agent-pipeline.yml)
+          # ------------------------------------------------------------------
+          SENSITIVE_PATTERNS=(
+            "^\.github/"
+            "^drizzle/migrations/"
+            "^apps/web/lib/auth/"
+            "^apps/web/lib/db/"
+            "^apps/web/app/api/.*/billing"
+            "^apps/web/lib/stripe/"
+            "^apps/web/middleware"
+            "^\.env"
+            "^CODEOWNERS"
+            "^agents\.md"
+            "^CLAUDE\.md"
+            "package\.json$"
+            "pnpm-lock\.yaml$"
+          )
+
+          # ------------------------------------------------------------------
+          # 5. Walk each agent PR and evaluate eligibility
+          # ------------------------------------------------------------------
+          LANDED=0
+          SKIPPED=0
+
+          while IFS= read -r PR; do
+            PR_NUMBER=$(echo "$PR" | jq -r '.number')
+            PR_TITLE=$(echo "$PR" | jq -r '.title')
+            PR_SHA=$(echo "$PR" | jq -r '.head_sha')
+            PR_BRANCH=$(echo "$PR" | jq -r '.head_ref')
+            PR_AUTO_MERGE=$(echo "$PR" | jq -r '.auto_merge')
+            LABELS=$(echo "$PR" | jq -r '[.labels[]] | join(",")')
+
+            echo ""
+            echo "--- PR #$PR_NUMBER: $PR_TITLE ---"
+            echo "Branch: $PR_BRANCH"
+            echo "SHA: $PR_SHA"
+            echo "Labels: ${LABELS:-none}"
+            echo "Auto-merge already enabled: $PR_AUTO_MERGE"
+
+            # Skip if already queued for auto-merge (idempotency guard)
+            if [[ "$PR_AUTO_MERGE" == "true" ]]; then
+              echo "Auto-merge already enabled. Skipping."
+              SKIPPED=$((SKIPPED + 1))
+              continue
+            fi
+
+            # Gate: needs-human label is a hard stop
+            if echo "$LABELS" | grep -q "needs-human"; then
+              echo "Has needs-human label. Skipping."
+              SKIPPED=$((SKIPPED + 1))
+              continue
+            fi
+
+            # Gate: automerge or ai:ready-to-merge label required
+            # (PRs not explicitly marked for auto-landing are not swept)
+            if ! echo "$LABELS" | grep -qE "(^|,)(automerge|auto-approved|ai:ready-to-merge)(,|$)"; then
+              echo "No automerge/auto-approved/ai:ready-to-merge label. Skipping — not explicitly queued for auto-landing."
+              SKIPPED=$((SKIPPED + 1))
+              continue
+            fi
+
+            # Gate: CI PR Ready check must pass
+            CI_PR_READY=$(gh api --paginate --slurp "repos/$GH_REPO/commits/$PR_SHA/check-runs?per_page=100" 2>/dev/null \
+              | jq -r '[.[].check_runs[] | select(.name == "PR Ready")] | sort_by(.completed_at) | last | .conclusion // "pending"' \
+              || echo "unknown")
+            echo "CI PR Ready: $CI_PR_READY"
+
+            if [[ "$CI_PR_READY" != "success" ]]; then
+              echo "CI PR Ready is not success ($CI_PR_READY). Skipping."
+              SKIPPED=$((SKIPPED + 1))
+              continue
+            fi
+
+            # Gate: Scope judge must pass
+            SCOPE_STATUS=$(gh api "repos/$GH_REPO/commits/$PR_SHA/status" \
+              --jq '[.statuses[] | select(.context == "scope-judge")] | sort_by(.updated_at) | last | .state // "pending"' \
+              2>/dev/null || echo "unknown")
+            echo "Scope judge: $SCOPE_STATUS"
+
+            if [[ "$SCOPE_STATUS" != "success" ]]; then
+              echo "Scope judge has not passed ($SCOPE_STATUS). Skipping."
+              SKIPPED=$((SKIPPED + 1))
+              continue
+            fi
+
+            # Gate: CodeRabbit must not be blocking
+            if ! CR_STATE=$(gh api --paginate --slurp "repos/$GH_REPO/pulls/$PR_NUMBER/reviews?per_page=100" 2>/dev/null \
+              | jq -r '[.[][] | select(.user.login == "coderabbitai[bot]")] | sort_by(.submitted_at) | last | .state // "none"'); then
+              echo "Could not fetch CodeRabbit review state. Skipping."
+              SKIPPED=$((SKIPPED + 1))
+              continue
+            fi
+            echo "CodeRabbit review: $CR_STATE"
+
+            if [[ "$CR_STATE" == "CHANGES_REQUESTED" ]]; then
+              echo "CodeRabbit has requested changes. Skipping."
+              SKIPPED=$((SKIPPED + 1))
+              continue
+            fi
+
+            # Gate: sensitive file check
+            if ! CHANGED_FILES=$(gh pr diff "$PR_NUMBER" --repo "$GH_REPO" --name-only 2>/dev/null); then
+              echo "Could not fetch changed files for PR #$PR_NUMBER. Skipping."
+              SKIPPED=$((SKIPPED + 1))
+              continue
+            fi
+            SENSITIVE_FOUND=""
+            for pattern in "${SENSITIVE_PATTERNS[@]}"; do
+              MATCHES=$(echo "$CHANGED_FILES" | grep -Ei "$pattern" || true)
+              if [[ -n "$MATCHES" ]]; then
+                SENSITIVE_FOUND="${SENSITIVE_FOUND}${MATCHES}\n"
+              fi
+            done
+
+            if [[ -n "$SENSITIVE_FOUND" ]]; then
+              echo "Sensitive files changed — requires human review:"
+              echo -e "$SENSITIVE_FOUND"
+              SKIPPED=$((SKIPPED + 1))
+              continue
+            fi
+
+            EFFECTIVE_READY_COUNT=$((READY_COUNT + LANDED))
+            if [[ "$EFFECTIVE_READY_COUNT" -ge "$READY_THRESHOLD" ]]; then
+              echo "Queue pressure reached threshold ($EFFECTIVE_READY_COUNT / $READY_THRESHOLD). Skipping remaining eligible PRs."
+              SKIPPED=$((SKIPPED + 1))
+              break
+            fi
+
+            # All gates passed — enable auto-merge
+            echo "All gates passed for PR #$PR_NUMBER."
+
+            if [[ "${DRY_RUN,,}" == "true" ]]; then
+              echo "[DRY RUN] Would enable auto-merge on PR #$PR_NUMBER."
+              LANDED=$((LANDED + 1))
+              continue
+            fi
+
+            if gh pr merge "$PR_NUMBER" --auto --squash 2>/dev/null; then
+              echo "Auto-merge enabled for PR #$PR_NUMBER."
+              LANDED=$((LANDED + 1))
+            else
+              echo "::warning::Failed to enable auto-merge on PR #$PR_NUMBER (may already be queued or ineligible)."
+              SKIPPED=$((SKIPPED + 1))
+            fi
+          done < <(echo "$AGENT_PRS" | jq -c '.[]')
+
+          echo ""
+          echo "=== Sweep complete ==="
+          echo "Auto-merge enabled: $LANDED"
+          echo "Skipped: $SKIPPED"

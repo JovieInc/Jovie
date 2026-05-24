@@ -1,24 +1,31 @@
-// Central registry of keyboard shortcuts surfaced via Tooltip's kbd chip.
-// Symbols: `⌘K`, `⌥/`, `Hold ⌘J`, `[`, `Esc`. Use `⌘` not `Cmd`, `⌥`
-// not `Alt`, for visual density.
+// Backward-compat shim. All shortcut data now lives in keyboard-shortcuts.ts.
+// Do not add new entries here. Migrate callers to import from keyboard-shortcuts.ts directly.
+
+import { KEYBOARD_SHORTCUTS } from './keyboard-shortcuts';
 
 export interface ShortcutHint {
   readonly keys: string;
   readonly description: string;
 }
 
+function makeHint(id: string): ShortcutHint {
+  const s = KEYBOARD_SHORTCUTS.find(x => x.id === id);
+  if (!s) throw new Error(`[shortcuts] Unknown shortcut id: ${id}`);
+  return { keys: s.keys, description: s.description ?? s.label };
+}
+
 export const SHORTCUTS = {
-  search: { keys: '⌘K', description: 'Open search / filter bar' },
-  searchSlash: { keys: '/', description: 'Open search (no modifier)' },
-  toggleSidebar: { keys: '[', description: 'Toggle sidebar dock / float' },
-  toggleSidebarTab: { keys: 'Tab', description: 'Toggle sidebar dock / float' },
-  toggleBar: { keys: '`', description: 'Toggle audio bar in / out' },
-  toggleBarAlt: { keys: '⌘\\', description: 'Toggle audio bar (alt)' },
-  toggleWaveform: { keys: 'W', description: 'Toggle waveform drawer' },
-  toggleLyrics: { keys: 'L', description: 'Open / close the lyrics view' },
-  playPause: { keys: 'Space', description: 'Play / pause current track' },
-  jovieDictate: { keys: 'Hold ⌘J', description: 'Push-to-talk to Jovie' },
-  closeOverlay: { keys: 'Esc', description: 'Close overlay / clear input' },
+  search: makeHint('command-menu'),
+  searchSlash: makeHint('player-search-slash'),
+  toggleSidebar: makeHint('player-toggle-sidebar'),
+  toggleSidebarTab: makeHint('player-toggle-sidebar-tab'),
+  toggleBar: makeHint('player-toggle-bar'),
+  toggleBarAlt: makeHint('player-toggle-bar-alt'),
+  toggleWaveform: makeHint('player-toggle-waveform'),
+  toggleLyrics: makeHint('player-toggle-lyrics'),
+  playPause: makeHint('player-play-pause'),
+  jovieDictate: makeHint('player-dictate'),
+  closeOverlay: makeHint('player-close-overlay'),
 } as const satisfies Record<string, ShortcutHint>;
 
 export type ShortcutKey = keyof typeof SHORTCUTS;

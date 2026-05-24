@@ -14,6 +14,7 @@ import { unstable_cache } from 'next/cache';
 import { z } from 'zod';
 import { withDbSessionTx } from '@/lib/auth/session';
 import { CACHE_TAGS, CACHE_TTL, createAudienceDataTag } from '@/lib/cache/tags';
+import { doesColumnExist } from '@/lib/db';
 import {
   buildCursorCondition,
   decodeCursor,
@@ -111,6 +112,34 @@ const MEMBER_SORT_COLUMNS = {
   createdAt: audienceMembers.firstSeenAt,
 } as const;
 
+export interface AudienceMemberColumnAvailability {
+  hasActiveAlerts: boolean;
+  activeAlertChannels: boolean;
+  lastAlertConfirmedAt: boolean;
+}
+
+const FALLBACK_AUDIENCE_MEMBER_COLUMN_AVAILABILITY: AudienceMemberColumnAvailability =
+  {
+    hasActiveAlerts: false,
+    activeAlertChannels: false,
+    lastAlertConfirmedAt: false,
+  };
+
+async function getAudienceMemberColumnAvailability(): Promise<AudienceMemberColumnAvailability> {
+  const [hasActiveAlerts, activeAlertChannels, lastAlertConfirmedAt] =
+    await Promise.all([
+      doesColumnExist('audience_members', 'has_active_alerts'),
+      doesColumnExist('audience_members', 'active_alert_channels'),
+      doesColumnExist('audience_members', 'last_alert_confirmed_at'),
+    ]);
+
+  return {
+    hasActiveAlerts,
+    activeAlertChannels,
+    lastAlertConfirmedAt,
+  };
+}
+
 /**
  * Build ownership filter based on clerk user ID
  */
@@ -157,6 +186,9 @@ function transformMemberRow(member: {
   ltvTicketSalesCents: number | null;
   tags: string[] | null;
   lastSeenAt: Date;
+  hasActiveAlerts: boolean | null;
+  activeAlertChannels: unknown;
+  lastAlertConfirmedAt: Date | null;
 }): AudienceServerRow {
   return {
     id: member.id,
@@ -173,6 +205,11 @@ function transformMemberRow(member: {
     utmParams: normalizeUtmParams(member.utmParams),
     email: member.email,
     phone: member.phone,
+    // Members captured via Spotify auth or gated content are visible to the
+    // creator who owns the audience. Subscribers override this flag based on
+    // artist-email opt-in state (see fetchSubscribersData). New cells must
+    // read this flag and fall back to phone/anonymous when false.
+    emailVisibleToArtist: member.email != null,
     spotifyConnected: Boolean(member.spotifyConnected),
     purchaseCount: member.purchaseCount,
     tipAmountTotalCents: member.tipAmountTotalCents ?? 0,
@@ -184,7 +221,22 @@ function transformMemberRow(member: {
     tags: Array.isArray(member.tags) ? member.tags : [],
     deviceType: member.deviceType,
     lastSeenAt: toISOStringOrNull(member.lastSeenAt),
+    hasActiveAlerts: Boolean(member.hasActiveAlerts),
+    activeAlertChannels: normalizeAlertChannels(member.activeAlertChannels),
+    lastAlertConfirmedAt: toISOStringOrNull(member.lastAlertConfirmedAt),
   };
+}
+
+const ALERT_CHANNEL_VALUES = new Set(['sms', 'email', 'push']);
+
+function normalizeAlertChannels(
+  value: unknown
+): Array<'sms' | 'email' | 'push'> {
+  if (!Array.isArray(value)) return [];
+  return value.filter(
+    (c): c is 'sms' | 'email' | 'push' =>
+      typeof c === 'string' && ALERT_CHANNEL_VALUES.has(c)
+  );
 }
 
 function normalizeLocationLabel(
@@ -299,7 +351,8 @@ function buildClickAggSubquery(tx: DbSessionTx, profileId: string) {
  */
 function buildMemberSelectFields(
   includeDetails: boolean,
-  clickAgg: ReturnType<typeof buildClickAggSubquery>
+  clickAgg: ReturnType<typeof buildClickAggSubquery>,
+  columns: AudienceMemberColumnAvailability = FALLBACK_AUDIENCE_MEMBER_COLUMN_AVAILABILITY
 ) {
   return {
     id: audienceMembers.id,
@@ -341,13 +394,25 @@ function buildMemberSelectFields(
     ltvTicketSalesCents: drizzleSql<number>`0`.as('ltv_ticket_sales_cents'),
     tags: audienceMembers.tags,
     lastSeenAt: audienceMembers.lastSeenAt,
+    hasActiveAlerts: columns.hasActiveAlerts
+      ? audienceMembers.hasActiveAlerts
+      : drizzleSql<boolean>`false`.as('has_active_alerts'),
+    activeAlertChannels: columns.activeAlertChannels
+      ? audienceMembers.activeAlertChannels
+      : drizzleSql<unknown[]>`'[]'::jsonb`.as('active_alert_channels'),
+    lastAlertConfirmedAt: columns.lastAlertConfirmedAt
+      ? audienceMembers.lastAlertConfirmedAt
+      : drizzleSql<Date | null>`NULL::timestamp`.as('last_alert_confirmed_at'),
   };
 }
 
 /**
  * Map a single segment filter ID to its drizzle condition.
  */
-function segmentToCondition(segment: string) {
+function segmentToCondition(
+  segment: string,
+  columns: AudienceMemberColumnAvailability = FALLBACK_AUDIENCE_MEMBER_COLUMN_AVAILABILITY
+) {
   switch (segment) {
     case 'highIntent':
       return eq(audienceMembers.intentLevel, 'high');
@@ -360,10 +425,20 @@ function segmentToCondition(segment: string) {
         audienceMembers.lastSeenAt,
         drizzleSql`NOW() - INTERVAL '24 hours'`
       );
+    case 'alertsOn':
+      if (!columns.hasActiveAlerts) {
+        return drizzleSql<boolean>`false`;
+      }
+      return eq(audienceMembers.hasActiveAlerts, true);
     default:
       return null;
   }
 }
+
+export const __testing = {
+  buildMemberSelectFields,
+  segmentToCondition,
+};
 
 /**
  * Build segment filter condition based on multiple segment filters.
@@ -371,11 +446,14 @@ function segmentToCondition(segment: string) {
  * (union): selecting multiple segments shows members matching ANY of the
  * selected segments, matching the behavior in the API route.
  */
-function buildSegmentFilter(segments: string[] | undefined) {
+function buildSegmentFilter(
+  segments: string[] | undefined,
+  columns: AudienceMemberColumnAvailability
+) {
   if (!segments || segments.length === 0) return drizzleSql<boolean>`true`;
 
   const conditions = segments
-    .map(segmentToCondition)
+    .map(segment => segmentToCondition(segment, columns))
     .filter((c): c is NonNullable<typeof c> => c !== null);
 
   if (conditions.length === 0) return drizzleSql<boolean>`true`;
@@ -396,11 +474,13 @@ async function fetchMembersData(
     memberId: string | undefined;
     viewFilter: AudienceView;
     segmentFilter?: string[];
+    columns: AudienceMemberColumnAvailability;
   }
 ): Promise<
   Omit<AudienceServerData, 'view' | 'subscriberCount' | 'totalAudienceCount'>
 > {
-  const { includeDetails, memberId, viewFilter, segmentFilter } = options;
+  const { includeDetails, memberId, viewFilter, segmentFilter, columns } =
+    options;
   const safe = parseMemberQueryParams(searchParams);
   const sortColumn = MEMBER_SORT_COLUMNS[safe.sort];
   const orderFn = safe.direction === 'asc' ? asc : desc;
@@ -415,7 +495,7 @@ async function fetchMembersData(
   } else {
     typeCondition = drizzleSql<boolean>`true`;
   }
-  const segmentCondition = buildSegmentFilter(segmentFilter);
+  const segmentCondition = buildSegmentFilter(segmentFilter, columns);
 
   // Keyset cursor WHERE clause — avoids full-table OFFSET scan (JOV-1254).
   let cursorCondition: SQL<unknown> = drizzleSql`true`;
@@ -447,7 +527,7 @@ async function fetchMembersData(
   const clickAgg = buildClickAggSubquery(tx, selectedProfileId);
 
   const baseQuery = tx
-    .select(buildMemberSelectFields(includeDetails, clickAgg))
+    .select(buildMemberSelectFields(includeDetails, clickAgg, columns))
     .from(audienceMembers)
     .innerJoin(
       creatorProfiles,
@@ -725,13 +805,19 @@ function buildDataPromise(
   selectedProfileId: string,
   view: AudienceView,
   searchParams: SearchParams,
-  options: { includeDetails: boolean; memberId?: string; segments?: string[] }
+  options: {
+    includeDetails: boolean;
+    memberId?: string;
+    segments?: string[];
+    columns: AudienceMemberColumnAvailability;
+  }
 ) {
   return fetchMembersData(tx, clerkUserId, selectedProfileId, searchParams, {
     includeDetails: options.includeDetails,
     memberId: options.memberId,
     viewFilter: view,
     segmentFilter: options.segments,
+    columns: options.columns,
   });
 }
 
@@ -748,6 +834,8 @@ async function fetchAudienceData(
   view: AudienceView,
   segments: string[] | undefined
 ): Promise<AudienceServerData> {
+  const columns = await getAudienceMemberColumnAvailability();
+
   return await withDbSessionTx(async (tx, clerkUserId) => {
     const data = await buildDataPromise(
       tx,
@@ -755,7 +843,7 @@ async function fetchAudienceData(
       selectedProfileId,
       view,
       searchParams,
-      { includeDetails, memberId, segments }
+      { includeDetails, memberId, segments, columns }
     );
 
     // Exact subscriber/audience counts are omitted per JOV-1262 —

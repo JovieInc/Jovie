@@ -12,16 +12,11 @@
 export const SIDEBAR_WIDTH = 360; // px
 
 /**
- * Standard table row heights
- *
- * All tables now use a denser 36px baseline to better match the authenticated shell density.
- * - COMPACT/STANDARD: 36px - unified row height for all tables
- * - TALL: 56px - deprecated, kept for backwards compatibility
+ * Standard table row heights — unified 40px baseline across all tables.
  */
 export const TABLE_ROW_HEIGHTS = {
-  COMPACT: 40, // Unified standard row height
-  STANDARD: 40, // Same as COMPACT - all tables use 40px
-  TALL: 56, // Deprecated - remove after full migration
+  COMPACT: 40,
+  STANDARD: 40,
 } as const;
 
 /**

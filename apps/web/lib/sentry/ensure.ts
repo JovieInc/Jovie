@@ -1,6 +1,9 @@
 import { register } from '@/instrumentation';
 
 let initializationPromise: Promise<void> | null = null;
+const shouldSkipLocalSentry =
+  process.env.NODE_ENV === 'development' &&
+  process.env.JOVIE_ENABLE_LOCAL_SENTRY !== '1';
 
 /** Timeout for Sentry initialization to prevent blocking renders.
  * Extended in development since cold starts are slower and we don't need
@@ -16,6 +19,10 @@ const SENTRY_INIT_TIMEOUT_MS =
  * If initialization times out, Sentry will continue initializing in the background.
  */
 export function ensureSentry(): Promise<void> {
+  if (shouldSkipLocalSentry) {
+    return Promise.resolve();
+  }
+
   if (!initializationPromise) {
     const sentryInit = register().catch(error => {
       console.error('[Sentry] Failed to initialize SDK', error);

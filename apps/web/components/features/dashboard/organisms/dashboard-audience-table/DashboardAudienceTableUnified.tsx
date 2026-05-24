@@ -2,13 +2,7 @@
 
 import { Button, CommonDropdown, type CommonDropdownItem } from '@jovie/ui';
 import { useQueryClient } from '@tanstack/react-query';
-import {
-  type ColumnDef,
-  createColumnHelper,
-  type OnChangeFn,
-  type SortingState,
-  type VisibilityState,
-} from '@tanstack/react-table';
+import { type OnChangeFn, type SortingState } from '@tanstack/react-table';
 import { Copy, Download, ExternalLink, Users } from 'lucide-react';
 import * as React from 'react';
 import { memo, useMemo } from 'react';
@@ -36,7 +30,6 @@ import {
 import { useAudiencePanel } from '@/features/dashboard/organisms/AudiencePanelContext';
 import { AudienceMemberSidebar } from '@/features/dashboard/organisms/audience-member-sidebar';
 import { useRegisterRightPanel } from '@/hooks/useRegisterRightPanel';
-import { TABLE_MIN_WIDTHS } from '@/lib/constants/layout';
 import { captureError } from '@/lib/error-tracking';
 import { queryKeys } from '@/lib/queries';
 import { cn } from '@/lib/utils';
@@ -56,20 +49,16 @@ import {
 } from './AudienceTableContext';
 import { AudienceTableSubheader } from './AudienceTableSubheader';
 import { buildAudienceActions } from './audience-actions';
+import { NowMsProvider } from './cells';
+import {
+  AUDIENCE_TABLE_CONTAINER_CLASS,
+  buildAudienceMemberColumns,
+  getAudienceColumnVisibility,
+  getAudienceTableMinWidth,
+} from './table-config';
 import type { DashboardAudienceTableProps } from './types';
 import { useDashboardAudienceTable } from './useDashboardAudienceTable';
 import { copyTextToClipboard, downloadVCard } from './utils';
-import {
-  renderEngagementCell,
-  renderLastSeenActionCell,
-  renderLocationCellFromRow,
-  renderLtvCell,
-  renderSourceCell,
-  SelectCell,
-  UserCellWithTouring,
-} from './utils/column-renderers';
-
-const memberColumnHelper = createColumnHelper<AudienceMember>();
 
 function getSrDescription(isEmpty: boolean): string {
   if (isEmpty) {
@@ -78,22 +67,22 @@ function getSrDescription(isEmpty: boolean): string {
   return 'Every visitor, anonymous or identified, lives in this table.';
 }
 
-/** Map column ID → server sort field for URL state bridge.
- * Note: Value sorts by engagement score (server proxy for LTV — no computed LTV column exists). */
+/** Map column ID → server sort field for URL state bridge. */
 const COLUMN_SORT_MAP: Record<string, string> = {
-  engagement: 'visits',
-  value: 'engagement',
-  lastSeen: 'lastSeen',
+  engagement: 'engagement',
+  last: 'lastSeen',
 };
 
 /** Reverse map: server sort field → column ID.
- * Includes legacy mappings (intent, type) so bookmarked URLs degrade gracefully. */
+ * Includes legacy mappings (visits, intent, type, value) so bookmarked URLs
+ * from the prior layout degrade gracefully to the new engagement column. */
 const SORT_FIELD_TO_COLUMN: Record<string, string> = {
   visits: 'engagement',
   intent: 'engagement',
   type: 'engagement',
-  engagement: 'value',
-  lastSeen: 'lastSeen',
+  value: 'engagement',
+  engagement: 'engagement',
+  lastSeen: 'last',
 };
 
 const PROFILE_QR_SOURCE_NAME = 'Profile QR';
@@ -119,125 +108,22 @@ function sanitizeQrFilename(value: string): string {
     .replaceAll(/^-|-$/g, '');
 }
 
-/**
- * Consolidated column layout — fewer, denser columns.
- *
- * Layout: Select | User (flex, with type dot) | Location | Engagement | Value | Last Seen
- */
-const MEMBER_COLUMNS: ColumnDef<AudienceMember, any>[] = [
-  memberColumnHelper.display({
-    id: 'select',
-    header: () => null,
-    cell: SelectCell,
-    size: 40,
-    enableSorting: false,
-  }),
-  memberColumnHelper.accessor('displayName', {
-    id: 'user',
-    header: 'User',
-    cell: UserCellWithTouring,
-    size: 9999,
-    minSize: 220,
-    enableSorting: false,
-  }),
-  memberColumnHelper.accessor('locationLabel', {
-    id: 'location',
-    header: 'Location',
-    cell: renderLocationCellFromRow,
-    size: 140,
-    enableSorting: false,
-  }),
-  memberColumnHelper.accessor('referrerHistory', {
-    id: 'source',
-    header: () => <div className='text-right'>Source</div>,
-    cell: renderSourceCell,
-    size: 48,
-    enableSorting: false,
-    meta: { className: 'text-right' },
-  }),
-  memberColumnHelper.accessor('visits', {
-    id: 'engagement',
-    header: 'Engagement',
-    cell: renderEngagementCell,
-    size: 100,
-    enableSorting: true,
-  }),
-  memberColumnHelper.accessor('tipAmountTotalCents', {
-    id: 'value',
-    header: 'Value',
-    cell: renderLtvCell,
-    size: 90,
-    enableSorting: true,
-  }),
-  memberColumnHelper.accessor('latestActions', {
-    id: 'lastSeen',
-    header: 'Last Activity',
-    cell: renderLastSeenActionCell,
-    size: 180,
-    enableSorting: true,
-  }),
-];
-
-type AudienceTableLayout = 'narrow' | 'medium' | 'wide';
-
-function getAudienceTableLayout(width: number): AudienceTableLayout {
-  if (width < 720) {
-    return 'narrow';
-  }
-  if (width < 960) {
-    return 'medium';
-  }
-  return 'wide';
-}
-
-/** Responsive column visibility by viewport width.
- *
- * Progressive hiding is based on the measured desktop table container width,
- * not the window width, so the layout adapts correctly with the shell sidebar
- * and right drawer both open and closed.
- */
-function getColumnVisibility(width: number): VisibilityState {
-  switch (getAudienceTableLayout(width)) {
-    case 'narrow':
-      return {
-        location: false,
-        source: false,
-        value: false,
-        engagement: false,
-        lastSeen: false,
-      };
-    case 'medium':
-      return { location: false, value: false };
-    case 'wide':
-    default:
-      return {};
-  }
-}
-
-function getTableMinWidth(width: number): number {
-  switch (getAudienceTableLayout(width)) {
-    case 'narrow':
-      return 480;
-    case 'medium':
-      return 640;
-    case 'wide':
-    default:
-      return TABLE_MIN_WIDTHS.SMALL;
-  }
-}
-
 /** Mobile card list — plain rendering (no virtualization needed for paginated data). */
 const MobileCardList = memo(function MobileCardList({
   rows,
+  mode,
   selectedMemberId,
   onTap,
+  onAction,
   hasNextPage,
   isFetchingNextPage,
   onLoadMore,
 }: {
   rows: AudienceMember[];
+  mode: 'members' | 'subscribers';
   selectedMemberId: string | null;
   onTap: (member: AudienceMember) => void;
+  onAction?: (member: AudienceMember) => void;
   hasNextPage?: boolean;
   isFetchingNextPage?: boolean;
   onLoadMore?: () => void;
@@ -251,9 +137,10 @@ const MobileCardList = memo(function MobileCardList({
         >
           <AudienceMobileCard
             member={member}
-            mode='members'
+            mode={mode}
             isSelected={selectedMemberId === member.id}
             onTap={onTap}
+            onAction={onAction}
           />
         </div>
       ))}
@@ -324,9 +211,12 @@ export const DashboardAudienceTableUnified = memo(
 
     const [desktopTableNode, setDesktopTableNode] =
       React.useState<HTMLDivElement | null>(null);
-    const [desktopTableWidth, setDesktopTableWidth] = React.useState<number>(
-      TABLE_MIN_WIDTHS.SMALL
-    );
+    // Initialize to "wide" tier so SSR + first paint show ALL columns.
+    // Otherwise SSR renders with progressive hiding active, and the row
+    // memoization prevents restoring hidden cells once ResizeObserver
+    // measures the real width on a wide screen.
+    const [desktopTableWidth, setDesktopTableWidth] =
+      React.useState<number>(1280);
 
     React.useEffect(() => {
       const node = desktopTableNode;
@@ -364,28 +254,25 @@ export const DashboardAudienceTableUnified = memo(
     }, [desktopTableNode]);
 
     const columnVisibility = React.useMemo(
-      () => getColumnVisibility(desktopTableWidth),
+      () => getAudienceColumnVisibility(desktopTableWidth),
       [desktopTableWidth]
     );
 
     const hiddenMetadataColumns = React.useMemo(
       () => ({
-        location: columnVisibility.location === false,
-        source: columnVisibility.source === false,
+        location: false,
+        source: false,
         engagement: columnVisibility.engagement === false,
-        lastSeen: columnVisibility.lastSeen === false,
+        lastSeen: columnVisibility.last === false,
       }),
       [columnVisibility]
     );
 
     const hasMetadataSubtitle =
-      hiddenMetadataColumns.location ||
-      hiddenMetadataColumns.source ||
-      hiddenMetadataColumns.engagement ||
-      hiddenMetadataColumns.lastSeen;
+      hiddenMetadataColumns.engagement || hiddenMetadataColumns.lastSeen;
 
     const tableMinWidth = React.useMemo(
-      () => `${getTableMinWidth(desktopTableWidth)}px`,
+      () => `${getAudienceTableMinWidth(desktopTableWidth)}px`,
       [desktopTableWidth]
     );
 
@@ -741,7 +628,7 @@ export const DashboardAudienceTableUnified = memo(
       ]
     );
 
-    const columns = MEMBER_COLUMNS;
+    const columns = useMemo(() => buildAudienceMemberColumns(mode), [mode]);
 
     // Stable context: callbacks that rarely change — consumers won't re-render on selection/menu toggle
     const stableContextValue = useMemo(
@@ -950,104 +837,109 @@ export const DashboardAudienceTableUnified = memo(
     }, [headerActions, setHeaderActions]);
 
     return (
-      <AudienceTableStableProvider value={stableContextValue}>
-        <AudienceTableVolatileProvider value={volatileContextValue}>
-          <PageShell
-            className='overflow-hidden'
-            data-testid={testId}
-            toolbar={
-              <AudienceTableSubheader
-                view={view}
-                onViewChange={onViewChange}
-                filters={filters}
-                onFiltersChange={onFiltersChange}
-                rows={rows}
-                selectedIds={selectedIds}
-                subscriberCount={subscriberCount}
-                totalAudienceCount={totalAudienceCount}
-                total={total}
-              />
-            }
-          >
-            <h1 className='sr-only'>
-              {rows.length === 0 ? 'Audience' : 'Audience CRM'}
-            </h1>
-            <p className='sr-only'>{getSrDescription(rows.length === 0)}</p>
+      <NowMsProvider>
+        <AudienceTableStableProvider value={stableContextValue}>
+          <AudienceTableVolatileProvider value={volatileContextValue}>
+            <PageShell
+              className='overflow-hidden'
+              data-testid={testId}
+              surfaceMode='table'
+              toolbar={
+                <AudienceTableSubheader
+                  view={view}
+                  onViewChange={onViewChange}
+                  filters={filters}
+                  onFiltersChange={onFiltersChange}
+                  rows={rows}
+                  selectedIds={selectedIds}
+                  subscriberCount={subscriberCount}
+                  totalAudienceCount={totalAudienceCount}
+                  total={total}
+                />
+              }
+            >
+              <h1 className='sr-only'>
+                {rows.length === 0 ? 'Audience' : 'Audience CRM'}
+              </h1>
+              <p className='sr-only'>{getSrDescription(rows.length === 0)}</p>
 
-            <div className='flex-1 min-h-0 flex flex-col'>
-              {/* Scrollable content area */}
-              <div className='flex-1 min-h-0 overflow-auto'>
-                {rows.length === 0 ? (
-                  <EmptyState
-                    icon={emptyStateIcon}
-                    heading={emptyStateHeading}
-                    description={emptyStateDescription}
-                    action={emptyStatePrimaryAction}
-                    secondaryAction={emptyStateSecondaryAction}
-                    testId='dashboard-audience-empty-state'
-                  />
-                ) : (
-                  <>
-                    {/* Mobile card list (virtualized) */}
-                    <MobileCardList
-                      rows={rows}
-                      selectedMemberId={selectedMember?.id ?? null}
-                      onTap={setSelectedMember}
-                      hasNextPage={hasNextPage}
-                      isFetchingNextPage={isFetchingNextPage}
-                      onLoadMore={onLoadMore}
+              <div className='flex-1 min-h-0 flex flex-col'>
+                {/* Scrollable content area */}
+                <div className='flex-1 min-h-0 overflow-auto'>
+                  {rows.length === 0 ? (
+                    <EmptyState
+                      icon={emptyStateIcon}
+                      heading={emptyStateHeading}
+                      description={emptyStateDescription}
+                      action={emptyStatePrimaryAction}
+                      secondaryAction={emptyStateSecondaryAction}
+                      testId='dashboard-audience-empty-state'
                     />
-
-                    {/* Desktop table */}
-                    <div
-                      ref={setDesktopTableNode}
-                      className='max-md:hidden h-full'
-                    >
-                      <UnifiedTable
-                        data={rows}
-                        columns={columns}
-                        isLoading={false}
-                        emptyState={
-                          <EmptyState
-                            icon={emptyStateIcon}
-                            heading={emptyStateHeading}
-                            description={emptyStateDescription}
-                            action={emptyStatePrimaryAction}
-                            secondaryAction={emptyStateSecondaryAction}
-                            testId='dashboard-audience-empty-state'
-                          />
-                        }
-                        getRowId={row => row.id}
-                        enableVirtualization={true}
-                        enableKeyboardNavigation={true}
-                        sorting={sorting}
-                        onSortingChange={handleSortingChange}
-                        columnVisibility={columnVisibility}
-                        minWidth={tableMinWidth}
-                        className='text-app'
-                        getRowClassName={getRowClassName}
-                        onRowClick={row => handleViewProfile(row)}
-                        onFocusedRowChange={handleFocusedRowChange}
-                        getContextMenuItems={getContextMenuItems}
+                  ) : (
+                    <>
+                      {/* Mobile card list (virtualized) */}
+                      <MobileCardList
+                        rows={rows}
+                        mode={mode}
+                        selectedMemberId={selectedMember?.id ?? null}
+                        onTap={setSelectedMember}
+                        onAction={handleSendNotification}
                         hasNextPage={hasNextPage}
                         isFetchingNextPage={isFetchingNextPage}
                         onLoadMore={onLoadMore}
-                        containerClassName='h-full px-2.5 pb-2.5 pt-0.5 md:px-3 md:pb-3 md:pt-1'
                       />
-                    </div>
-                  </>
-                )}
-              </div>
-            </div>
 
-            <div className='sr-only' aria-live='polite' aria-atomic='true'>
-              {rows.length > 0 && `Showing ${rows.length} members`}
-              {selectedCount > 0 &&
-                `. ${selectedCount} ${selectedCount === 1 ? 'row' : 'rows'} selected`}
-            </div>
-          </PageShell>
-        </AudienceTableVolatileProvider>
-      </AudienceTableStableProvider>
+                      {/* Desktop table */}
+                      <div
+                        ref={setDesktopTableNode}
+                        className='max-md:hidden h-full'
+                      >
+                        <UnifiedTable
+                          data={rows}
+                          columns={columns}
+                          isLoading={false}
+                          emptyState={
+                            <EmptyState
+                              icon={emptyStateIcon}
+                              heading={emptyStateHeading}
+                              description={emptyStateDescription}
+                              action={emptyStatePrimaryAction}
+                              secondaryAction={emptyStateSecondaryAction}
+                              testId='dashboard-audience-empty-state'
+                            />
+                          }
+                          getRowId={row => row.id}
+                          enableVirtualization={true}
+                          enableKeyboardNavigation={true}
+                          sorting={sorting}
+                          onSortingChange={handleSortingChange}
+                          columnVisibility={columnVisibility}
+                          minWidth={tableMinWidth}
+                          className='text-app'
+                          getRowClassName={getRowClassName}
+                          onRowClick={row => handleViewProfile(row)}
+                          onFocusedRowChange={handleFocusedRowChange}
+                          getContextMenuItems={getContextMenuItems}
+                          hasNextPage={hasNextPage}
+                          isFetchingNextPage={isFetchingNextPage}
+                          onLoadMore={onLoadMore}
+                          containerClassName={AUDIENCE_TABLE_CONTAINER_CLASS}
+                        />
+                      </div>
+                    </>
+                  )}
+                </div>
+              </div>
+
+              <div className='sr-only' aria-live='polite' aria-atomic='true'>
+                {rows.length > 0 && `Showing ${rows.length} members`}
+                {selectedCount > 0 &&
+                  `. ${selectedCount} ${selectedCount === 1 ? 'row' : 'rows'} selected`}
+              </div>
+            </PageShell>
+          </AudienceTableVolatileProvider>
+        </AudienceTableStableProvider>
+      </NowMsProvider>
     );
   }
 );

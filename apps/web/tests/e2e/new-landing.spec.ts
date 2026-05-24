@@ -31,28 +31,28 @@ test.describe('/new landing page', () => {
   }) => {
     await gotoLanding(page);
 
+    const headerNav = page.getByTestId('header-nav');
+
     await expect(page.getByTestId('homepage-v2-shell')).toBeVisible();
     await expect(
-      page.getByRole('link', { name: 'Artist Profiles', exact: true })
+      headerNav.getByRole('button', { name: 'Features', exact: true })
     ).toBeVisible();
     await expect(
-      page.getByRole('link', { name: 'Pricing', exact: true })
+      headerNav.getByRole('button', { name: 'Resources', exact: true })
     ).toBeVisible();
     await expect(
-      page.getByRole('link', { name: 'Support', exact: true })
-    ).toBeVisible();
+      headerNav.getByRole('link', { name: 'Pricing', exact: true })
+    ).toHaveAttribute('href', APP_ROUTES.PRICING);
     await expect(page.getByTestId('homepage-v2-hero')).toBeVisible();
     await expect(
       page.getByTestId('homepage-v2-hero-primary-cta')
     ).toBeVisible();
 
     await expect(
-      page.getByRole('heading', { name: /make every release feel bigger/i })
+      page.getByRole('heading', { name: /your ai artist manager/i })
     ).toBeVisible();
     await expect(
-      page.getByText(
-        /artist profiles, smart links, fan capture, and reactivation/i
-      )
+      page.getByText(/plan releases, create assets, pitch playlists/i)
     ).toBeVisible();
 
     await expect(page.getByTestId('homepage-v2-system-overview')).toBeVisible();
@@ -65,15 +65,15 @@ test.describe('/new landing page', () => {
 
     await expect(
       page.getByRole('heading', {
-        name: 'One system for the whole release cycle.',
+        name: 'What Jovie Handles for You.',
       })
     ).toBeVisible();
     await expect(
-      page.getByRole('heading', { name: 'Artist profiles built to convert.' })
+      page.getByRole('heading', { name: 'One Link. Always In Sync.' })
     ).toBeVisible();
     await expect(
       page.getByRole('heading', {
-        name: 'Capture every fan. Send them every release automatically.',
+        name: 'Build the List Once. Keep It Working.',
       })
     ).toBeVisible();
     await expect(page.getByRole('button', { name: 'Open menu' })).toHaveCount(
@@ -81,17 +81,8 @@ test.describe('/new landing page', () => {
     );
 
     await expect(
-      page.getByTestId('homepage-v2-release-pages-preview')
-    ).toBeVisible();
-    await expect(
-      page.getByRole('link', { name: 'See Artist Profiles' })
+      page.getByRole('link', { name: 'Explore Artist Profiles' })
     ).toHaveAttribute('href', APP_ROUTES.ARTIST_PROFILES);
-    await expect(
-      page.getByRole('link', { name: 'See audience features' })
-    ).toHaveAttribute(
-      'href',
-      `${APP_ROUTES.ARTIST_PROFILES}#capture-every-fan`
-    );
     await expect(page.locator('body')).not.toContainText('Page not found');
 
     await expect(page.locator('meta[name="robots"]')).toHaveAttribute(
@@ -103,15 +94,16 @@ test.describe('/new landing page', () => {
   test('navigates hero CTA to signup', async ({ page }) => {
     await gotoLanding(page);
 
-    await page.getByTestId('homepage-v2-hero-primary-cta').click();
-
-    await expect(page).toHaveURL(/\/signup$/);
+    await expect(
+      page.getByTestId('homepage-v2-hero-primary-cta')
+    ).toHaveAttribute('href', APP_ROUTES.SIGNUP);
   });
 
   test('routes deep links to artist profiles anchors', async ({ page }) => {
     await gotoLanding(page);
-    await page.getByRole('link', { name: 'See audience features' }).click();
-    await expect(page).toHaveURL(/\/artist-profiles#capture-every-fan$/);
+    await expect(
+      page.getByRole('link', { name: 'Explore Artist Profiles' })
+    ).toHaveAttribute('href', APP_ROUTES.ARTIST_PROFILES);
   });
 
   test('shows canonical pricing teaser and no live link for release pages', async ({
@@ -119,21 +111,18 @@ test.describe('/new landing page', () => {
   }) => {
     await gotoLanding(page);
 
-    await expect(page.getByTestId('homepage-v2-pricing-free')).toContainText(
+    await expect(page.getByTestId('marketing-pricing-plan-free')).toContainText(
       'Free'
     );
-    await expect(page.getByTestId('homepage-v2-pricing-free')).toContainText(
+    await expect(page.getByTestId('marketing-pricing-plan-free')).toContainText(
       '$0'
     );
-    await expect(page.getByTestId('homepage-v2-pricing-pro')).toContainText(
+    await expect(page.getByTestId('marketing-pricing-plan-pro')).toContainText(
       'Pro'
     );
-    await expect(page.getByTestId('homepage-v2-pricing-pro')).toContainText(
-      '$39/mo'
+    await expect(page.getByTestId('marketing-pricing-plan-pro')).toContainText(
+      '$39'
     );
-    await expect(
-      page.getByTestId('homepage-v2-release-pages-preview')
-    ).toContainText('Preview');
     await expect(page.getByRole('link', { name: 'Release Pages' })).toHaveCount(
       0
     );

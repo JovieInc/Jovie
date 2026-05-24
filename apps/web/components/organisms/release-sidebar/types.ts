@@ -162,6 +162,13 @@ export interface ReleaseSidebarProps {
   readonly readOnly?: boolean;
   /** Optional static track data used instead of the live sidebar API */
   readonly tracksOverride?: ReleaseSidebarTrack[];
+  /**
+   * When provided, each track row in the Tracks section becomes clickable and
+   * invokes this callback with the data needed to open the track drawer.
+   */
+  readonly onTrackClick?: (
+    track: import('./TrackSidebar').TrackSidebarData
+  ) => void;
   /** Optional static analytics data used instead of the live sidebar API */
   readonly analyticsOverride?: ReleaseSidebarAnalytics | null;
   /** Disable live credits fetching for auth-free mirrors like /demo. */

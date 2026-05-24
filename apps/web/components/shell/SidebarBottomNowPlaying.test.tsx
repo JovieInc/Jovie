@@ -56,4 +56,18 @@ describe('SidebarBottomNowPlaying', () => {
     fireEvent.click(screen.getByLabelText('Play'));
     expect(onPlay).toHaveBeenCalledOnce();
   });
+
+  it('merges shell chrome classes from the caller', () => {
+    const { container } = render(
+      <SidebarBottomNowPlaying
+        track={fullTrack}
+        isPlaying={false}
+        onPlay={() => {}}
+        className='ring-1 ring-primary'
+      />
+    );
+
+    expect(container.firstChild).toHaveClass('ring-1');
+    expect(container.firstChild).toHaveClass('ring-primary');
+  });
 });

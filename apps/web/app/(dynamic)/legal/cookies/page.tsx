@@ -25,13 +25,6 @@ export default async function CookiesPage() {
   return (
     <LegalPage
       doc={doc}
-      hero={{
-        eyebrow: 'Cookie policy',
-        title: 'Your choices, your cookies',
-        description:
-          'We use cookies to improve your experience. Here is exactly what we collect and why.',
-        highlight: 'Full transparency',
-      }}
       contactEmail='privacy@jov.ie'
       supportDescription='Questions about cookies or tracking?'
     />

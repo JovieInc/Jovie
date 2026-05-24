@@ -1,7 +1,7 @@
 {
   "framework": "nextjs",
   "installCommand": "corepack enable && corepack pnpm install",
-  "buildCommand": "corepack pnpm turbo build --filter=@jovie/web",
+  "buildCommand": "env -u TURBO_REMOTE_ONLY corepack pnpm turbo build --filter=@jovie/web",
   "ignoreCommand": "bash -c 'R=$VERCEL_GIT_COMMIT_REF;[[ $R == main || $R == production || $R =~ ^(codex|claude|codegen-bot|linear)/ ]] && exit 0;npx turbo-ignore @jovie/web'",
   "github": {
     "autoAlias": false
@@ -22,7 +22,7 @@
     },
     {
       "path": "/api/cron/process-ingestion-jobs",
-      "schedule": "* * * * *"
+      "schedule": "*/6 * * * *"
     },
     {
       "path": "/api/cron/summarize-interviews",
@@ -31,13 +31,37 @@
     {
       "path": "/api/cron/generate-playlist",
       "schedule": "0 6 * * *"
+    },
+    {
+      "path": "/api/cron/process-pre-saves",
+      "schedule": "0 2 * * *"
+    },
+    {
+      "path": "/api/cron/monitor-metadata-submissions",
+      "schedule": "0 * * * *"
+    },
+    {
+      "path": "/api/cron/process-metadata-submissions",
+      "schedule": "0 4 * * *"
+    },
+    {
+      "path": "/api/cron/process-workflow-runs",
+      "schedule": "*/6 * * * *"
+    },
+    {
+      "path": "/api/cron/public-profile-canary",
+      "schedule": "13 6 * * *"
+    },
+    {
+      "path": "/api/cron/clerk-config-audit",
+      "schedule": "*/30 * * * *"
     }
   ],
   "functions": {
-    "apps/web/app/api/**/*.ts": {
+    "app/api/**/*": {
       "maxDuration": 30
     },
-    "apps/web/app/api/cron/**/*.ts": {
+    "app/api/cron/**/*": {
       "maxDuration": 300
     }
   },

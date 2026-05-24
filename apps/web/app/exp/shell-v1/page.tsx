@@ -74,8 +74,10 @@ import {
   Users,
   X,
 } from 'lucide-react';
+import { useSearchParams } from 'next/navigation';
 import {
   createContext,
+  Suspense,
   useCallback,
   useContext,
   useEffect,
@@ -93,6 +95,7 @@ import type {
 import {
   emptyFilters as emptyLibraryFilters,
   generateAssets as generateLibraryAssets,
+  LIBRARY_DEMO_NOW_MS,
   Drawer as LibraryDrawer,
   EmptyState as LibraryEmptyState,
   Grid as LibraryGrid,
@@ -173,6 +176,7 @@ import { ThreadView as ShellThreadView } from '@/components/shell/ThreadView';
 import { Tooltip } from '@/components/shell/Tooltip';
 import { TypeBadge } from '@/components/shell/TypeBadge';
 import { dropDateMeta } from '@/lib/format-drop-date';
+import { relativeDate as formatRelativeDate } from '@/lib/format-relative-date';
 // ---------------------------------------------------------------------------
 // DESIGN RULE — NO AI-SLOP GRADIENTS ON UI CHROME
 // ---------------------------------------------------------------------------
@@ -206,6 +210,13 @@ import { dropDateMeta } from '@/lib/format-drop-date';
 import { SHORTCUTS } from '@/lib/shortcuts';
 import { cn } from '@/lib/utils';
 
+function isSelfActivationKey(event: React.KeyboardEvent<HTMLElement>): boolean {
+  return (
+    event.currentTarget === event.target &&
+    (event.key === 'Enter' || event.code === 'Space')
+  );
+}
+
 type CanvasView =
   | 'demo'
   | 'releases'
@@ -216,6 +227,23 @@ type CanvasView =
   | 'settings'
   | 'thread'
   | 'onboarding';
+
+function parseCanvasViewParam(value: string | null): CanvasView {
+  switch (value) {
+    case 'demo':
+    case 'releases':
+    case 'tracks':
+    case 'tasks':
+    case 'library':
+    case 'lyrics':
+    case 'settings':
+    case 'thread':
+    case 'onboarding':
+      return value;
+    default:
+      return 'demo';
+  }
+}
 
 type TrackInfo = {
   id: string;
@@ -275,19 +303,19 @@ const SELECTED_ROW_CLASSES = [
   'before:h-3.5 before:w-[3px] before:rounded-full before:bg-cyan-300/0',
   'data-[focused]:before:bg-cyan-300/85',
   'data-[selected]:before:bg-cyan-300/85',
-  'before:transition-colors before:duration-150 before:ease-out',
+  'before:transition-colors before:duration-subtle before:ease-out',
 ].join(' ');
 
 const TRACK = {
-  title: 'Lost in the Light',
-  artist: 'Bahamas',
-  album: 'Bahamas Is Afie',
+  title: 'The Deep End',
+  artist: 'Cosmic Gate & Tim White',
+  album: 'Materia Chapter.One',
   version: 'Album Version',
-  bpm: 96,
-  key: 'A min',
-  artwork: 'https://picsum.photos/seed/lost-in-the-light/400/400',
+  bpm: 128,
+  key: 'F min',
+  artwork: '/img/releases/the-deep-end.jpg',
   currentTime: 78,
-  duration: 213,
+  duration: 205,
 };
 
 // Demo loop section (percent-of-track) used when loopMode === 'section'.
@@ -340,24 +368,24 @@ type Thread = {
 const THREADS: Thread[] = [
   {
     id: 'thr-1',
-    title: 'Generating lyric video for Lost in the Light',
+    title: 'Rendering 9:16 lyric video for The Deep End',
     status: 'running',
     entityKind: 'release',
-    entityId: 'lost-in-the-light',
+    entityId: 'the-deep-end',
     updatedAt: '2026-04-26T09:48:00Z',
   },
   {
     id: 'thr-2',
-    title: 'Drafting Detroit booking pitch',
+    title: 'Drafting Movement Festival booking pitch',
     status: 'running',
     updatedAt: '2026-04-26T09:31:00Z',
   },
   {
     id: 'thr-3',
-    title: 'Spotify Canvas regenerated for Stronger Than That',
+    title: 'Spotify Canvas approved for Take Me Over',
     status: 'complete',
     entityKind: 'release',
-    entityId: 'stronger-than-that',
+    entityId: 'take-me-over',
     updatedAt: '2026-04-26T08:12:00Z',
     unread: true,
   },
@@ -379,7 +407,7 @@ const THREADS: Thread[] = [
   },
   {
     id: 'thr-6',
-    title: 'Rendering 9:16 lyric video for All the Time',
+    title: 'Generating vertical lyric video for Never Say A Word',
     status: 'running',
     entityKind: 'task',
     entityId: 'J-126',
@@ -402,8 +430,13 @@ const ADMIN_ITEMS: NavItem[] = [
 ];
 
 const ARTIST_WORKSPACES: Workspace[] = [
-  { id: 'bahamas', name: 'Bahamas', initials: 'BA', items: ARTIST_ITEMS },
-  { id: 'sade', name: 'Sade', initials: 'SA', items: [] },
+  { id: 'tim-white', name: 'Tim White', initials: 'TW', items: ARTIST_ITEMS },
+  {
+    id: 'cosmic-gate',
+    name: 'Cosmic Gate',
+    initials: 'CG',
+    items: [],
+  },
 ];
 
 const ADMIN_WORKSPACE: Workspace = {
@@ -412,6 +445,21 @@ const ADMIN_WORKSPACE: Workspace = {
   initials: 'AD',
   items: ADMIN_ITEMS,
 };
+
+function canvasViewForNavItem(label: string): CanvasView | null {
+  switch (label) {
+    case 'Dashboard':
+      return 'demo';
+    case 'Releases':
+      return 'releases';
+    case 'Tasks':
+      return 'tasks';
+    case 'Library':
+      return 'library';
+    default:
+      return null;
+  }
+}
 
 // --- Releases mock ---------------------------------------------------------
 type ReleaseType = 'Single' | 'EP' | 'Album';
@@ -450,74 +498,325 @@ type Release = {
 
 const RELEASES: Release[] = [
   {
-    id: 'lost-in-the-light',
-    title: 'Lost in the Light',
-    artist: 'Bahamas',
-    album: 'Bahamas Is Afie',
+    id: 'the-deep-end',
+    title: 'The Deep End',
+    artist: 'Cosmic Gate & Tim White',
+    album: 'Materia Chapter.One',
     type: 'Single',
-    releaseDate: '2026-04-12',
-    artwork: 'https://picsum.photos/seed/lost-in-the-light/400/400',
-    bpm: 96,
-    key: 'A min',
+    releaseDate: '2017-03-03',
+    artwork: '/img/releases/the-deep-end.jpg',
+    bpm: 128,
+    key: 'F min',
     version: 'Album Version',
     dsps: { spotify: 'live', apple: 'live', youtube: 'live', tidal: 'live' },
-    weeklyStreams: 12_400,
-    weeklyDelta: 8,
-    tasksOpen: 0,
+    weeklyStreams: 18_300,
+    weeklyDelta: 11,
+    tasksOpen: 1,
     pitchReady: true,
     agent: 'idle',
-    durationSec: 213,
+    durationSec: 205,
     waveformSeed: 1,
     cues: [
       { at: 6, kind: 'intro', label: 'Intro' },
-      { at: 26, kind: 'verse', label: 'Verse 1' },
-      { at: 52, kind: 'chorus', label: 'Chorus' },
-      { at: 73, kind: 'verse', label: 'Verse 2' },
-      { at: 88, kind: 'drop', label: 'Drop' },
+      { at: 31, kind: 'verse', label: 'Vocal' },
+      { at: 72, kind: 'chorus', label: 'Hook' },
+      { at: 98, kind: 'drop', label: 'Drop' },
+      { at: 154, kind: 'outro', label: 'Outro' },
     ],
   },
   {
-    id: 'stronger-than-that',
-    title: 'Stronger Than That',
-    artist: 'Bahamas',
-    album: 'Sad Hunk',
-    type: 'EP',
-    releaseDate: '2026-03-28',
-    artwork: 'https://picsum.photos/seed/stronger-than-that/400/400',
-    bpm: 112,
-    key: 'D maj',
+    id: 'never-say-a-word',
+    title: 'Never Say A Word',
+    artist: 'Tim White',
+    album: 'Never Say A Word',
+    type: 'Single',
+    releaseDate: '2024-06-21',
+    artwork: '/img/releases/never-say-a-word.jpg',
+    bpm: 122,
+    key: 'G min',
     version: 'Studio',
+    dsps: {
+      spotify: 'live',
+      apple: 'live',
+      youtube: 'live',
+      tidal: 'pending',
+    },
+    weeklyStreams: 14_860,
+    weeklyDelta: 18,
+    tasksOpen: 2,
+    pitchReady: true,
+    agent: 'syncing-art',
+    durationSec: 198,
+    waveformSeed: 7,
+    cues: [
+      { at: 4, kind: 'intro', label: 'Intro' },
+      { at: 28, kind: 'verse', label: 'Verse' },
+      { at: 56, kind: 'chorus', label: 'Chorus' },
+      { at: 92, kind: 'bridge', label: 'Bridge' },
+    ],
+  },
+  {
+    id: 'take-me-over',
+    title: 'Take Me Over',
+    artist: 'Tim White feat. Erica Gibson',
+    album: 'Take Me Over',
+    type: 'Single',
+    releaseDate: '2014-05-06',
+    artwork: '/img/releases/take-me-over.jpg',
+    bpm: 128,
+    key: 'A min',
+    version: 'Single Edit',
+    dsps: {
+      spotify: 'live',
+      apple: 'live',
+      youtube: 'live',
+      tidal: 'missing',
+    },
+    weeklyStreams: 9_420,
+    weeklyDelta: 6,
+    tasksOpen: 0,
+    pitchReady: true,
+    agent: 'idle',
+    durationSec: 232,
+    waveformSeed: 11,
+    cues: [
+      { at: 8, kind: 'intro', label: 'Intro' },
+      { at: 40, kind: 'verse', label: 'Verse' },
+      { at: 74, kind: 'chorus', label: 'Hook' },
+      { at: 128, kind: 'drop', label: 'Drop' },
+    ],
+  },
+  {
+    id: 'all-this-noise',
+    title: 'All This Noise',
+    artist: 'Tim White',
+    album: 'All This Noise',
+    type: 'EP',
+    releaseDate: '2015-08-27',
+    artwork: '/images/mock-profile/tim-white-dont-look-down-card.jpg',
+    bpm: 126,
+    key: 'C maj',
+    version: 'EP',
+    dsps: { spotify: 'live', apple: 'live', youtube: 'live', tidal: 'error' },
+    weeklyStreams: 7_980,
+    weeklyDelta: 4,
+    tasksOpen: 1,
+    pitchReady: true,
+    agent: 'idle',
+    durationSec: 219,
+    waveformSeed: 17,
+    cues: [
+      { at: 12, kind: 'intro', label: 'Intro' },
+      { at: 48, kind: 'verse', label: 'Verse' },
+      { at: 90, kind: 'chorus', label: 'Chorus' },
+      { at: 132, kind: 'drop', label: 'Drop' },
+      { at: 180, kind: 'outro', label: 'Outro' },
+    ],
+  },
+  {
+    id: 'save-the-night',
+    title: 'Save The Night',
+    artist: 'Tim White',
+    album: 'All This Noise',
+    type: 'Single',
+    releaseDate: '2015-08-27',
+    artwork: '/images/mock-profile/drawer-releases/release-1.png',
+    bpm: 102,
+    key: 'G maj',
+    version: 'Studio',
+    dsps: { spotify: 'live', apple: 'live', youtube: 'live', tidal: 'live' },
+    weeklyStreams: 6_240,
+    weeklyDelta: 12,
+    tasksOpen: 0,
+    pitchReady: true,
+    agent: 'idle',
+    durationSec: 191,
+    waveformSeed: 23,
+    cues: [
+      { at: 5, kind: 'intro', label: 'Intro' },
+      { at: 22, kind: 'verse', label: 'Verse' },
+      { at: 60, kind: 'chorus', label: 'Chorus' },
+      { at: 110, kind: 'bridge', label: 'Bridge' },
+    ],
+  },
+  {
+    id: 'trying-too-hard',
+    title: 'Trying Too Hard',
+    artist: 'Tim White',
+    album: 'All This Noise',
+    type: 'Single',
+    releaseDate: '2015-08-27',
+    artwork: '/images/mock-profile/drawer-releases/release-2.png',
+    bpm: 124,
+    key: 'B min',
+    version: 'EP Mix',
+    dsps: { spotify: 'live', apple: 'live', youtube: 'live', tidal: 'live' },
+    weeklyStreams: 3_810,
+    weeklyDelta: -2,
+    tasksOpen: 0,
+    pitchReady: true,
+    agent: 'idle',
+    durationSec: 200,
+    waveformSeed: 31,
+    cues: [
+      { at: 6, kind: 'intro', label: 'Intro' },
+      { at: 28, kind: 'verse', label: 'Verse 1' },
+      { at: 70, kind: 'chorus', label: 'Chorus' },
+      { at: 110, kind: 'verse', label: 'Verse 2' },
+      { at: 150, kind: 'outro', label: 'Outro' },
+    ],
+  },
+  {
+    id: 'california',
+    title: 'California',
+    artist: 'Tim White',
+    album: 'All This Noise',
+    type: 'Single',
+    releaseDate: '2015-08-27',
+    artwork: '/images/mock-profile/drawer-releases/release-3.png',
+    bpm: 118,
+    key: 'D maj',
+    version: 'EP Mix',
+    dsps: { spotify: 'live', apple: 'live', youtube: 'live', tidal: 'live' },
+    weeklyStreams: 3_250,
+    weeklyDelta: 5,
+    tasksOpen: 0,
+    pitchReady: true,
+    agent: 'idle',
+    durationSec: 232,
+    waveformSeed: 37,
+    cues: [
+      { at: 6, kind: 'intro', label: 'Intro' },
+      { at: 30, kind: 'verse', label: 'Verse' },
+      { at: 70, kind: 'chorus', label: 'Hook' },
+      { at: 124, kind: 'outro', label: 'Outro' },
+    ],
+  },
+  {
+    id: 'become-one',
+    title: 'Become One',
+    artist: 'Tim White',
+    album: 'All This Noise',
+    type: 'Single',
+    releaseDate: '2015-08-27',
+    artwork: '/images/mock-profile/drawer-releases/release-4.png',
+    bpm: 120,
+    key: 'E min',
+    version: 'EP Mix',
     dsps: {
       spotify: 'live',
       apple: 'live',
       youtube: 'pending',
       tidal: 'missing',
     },
-    weeklyStreams: 8_730,
-    weeklyDelta: 3,
-    tasksOpen: 2,
+    weeklyStreams: 2_960,
+    weeklyDelta: 2,
+    tasksOpen: 1,
     pitchReady: false,
     agent: 'rescanning-dsps',
-    durationSec: 198,
-    waveformSeed: 7,
+    durationSec: 206,
+    waveformSeed: 41,
     cues: [
-      { at: 4, kind: 'intro', label: 'Intro' },
-      { at: 30, kind: 'verse', label: 'Verse' },
-      { at: 60, kind: 'drop', label: 'Drop' },
-      { at: 96, kind: 'bridge', label: 'Bridge' },
+      { at: 7, kind: 'intro', label: 'Intro' },
+      { at: 32, kind: 'verse', label: 'Verse' },
+      { at: 66, kind: 'chorus', label: 'Hook' },
+      { at: 118, kind: 'drop', label: 'Drop' },
     ],
   },
   {
-    id: 'all-the-time',
-    title: 'All the Time',
-    artist: 'Bahamas',
-    album: 'Earthtones',
+    id: 'revival',
+    title: 'Revival',
+    artist: 'Tom Fall & Tim White',
+    album: 'Revival',
     type: 'Single',
-    releaseDate: '2026-05-09',
-    artwork: 'https://picsum.photos/seed/all-the-time/400/400',
-    bpm: 88,
-    key: 'F maj',
-    version: 'Single Edit',
+    releaseDate: '2016-04-15',
+    artwork: '/images/mock-profile/drawer-releases/release-5.png',
+    bpm: 128,
+    key: 'F min',
+    version: 'Original Mix',
+    dsps: { spotify: 'live', apple: 'live', youtube: 'live', tidal: 'live' },
+    weeklyStreams: 2_620,
+    weeklyDelta: 1,
+    tasksOpen: 0,
+    pitchReady: true,
+    agent: 'idle',
+    durationSec: 226,
+    waveformSeed: 47,
+    cues: [
+      { at: 8, kind: 'intro', label: 'Intro' },
+      { at: 36, kind: 'verse', label: 'Build' },
+      { at: 84, kind: 'drop', label: 'Drop' },
+      { at: 172, kind: 'outro', label: 'Outro' },
+    ],
+  },
+  {
+    id: 'sober',
+    title: 'Sober',
+    artist: 'Jochen Miller & Tim White',
+    album: 'Sober',
+    type: 'Single',
+    releaseDate: '2016-09-02',
+    artwork: '/images/mock-profile/drawer-releases/release-6.png',
+    bpm: 128,
+    key: 'A maj',
+    version: 'Original Mix',
+    dsps: {
+      spotify: 'live',
+      apple: 'live',
+      youtube: 'live',
+      tidal: 'pending',
+    },
+    weeklyStreams: 2_310,
+    weeklyDelta: -1,
+    tasksOpen: 0,
+    pitchReady: true,
+    agent: 'idle',
+    durationSec: 218,
+    waveformSeed: 53,
+    cues: [
+      { at: 8, kind: 'intro', label: 'Intro' },
+      { at: 42, kind: 'verse', label: 'Vocal' },
+      { at: 92, kind: 'drop', label: 'Drop' },
+      { at: 160, kind: 'outro', label: 'Outro' },
+    ],
+  },
+  {
+    id: 'wheels-up',
+    title: 'Wheels Up',
+    artist: 'Lynx & Tim White',
+    album: 'Wheels Up',
+    type: 'Single',
+    releaseDate: '2018-03-16',
+    artwork: '/images/mock-profile/tim-white-dont-look-down-hero.jpg',
+    bpm: 126,
+    key: 'C min',
+    version: 'Original Mix',
+    dsps: { spotify: 'live', apple: 'live', youtube: 'live', tidal: 'live' },
+    weeklyStreams: 1_980,
+    weeklyDelta: 3,
+    tasksOpen: 0,
+    pitchReady: true,
+    agent: 'idle',
+    durationSec: 214,
+    waveformSeed: 59,
+    cues: [
+      { at: 4, kind: 'intro', label: 'Intro' },
+      { at: 34, kind: 'verse', label: 'Verse' },
+      { at: 76, kind: 'drop', label: 'Drop' },
+      { at: 148, kind: 'outro', label: 'Outro' },
+    ],
+  },
+  {
+    id: 'dont-look-down',
+    title: "Don't Look Down",
+    artist: 'Tim White',
+    album: "Don't Look Down",
+    type: 'Single',
+    releaseDate: '2026-05-22',
+    artwork: '/images/mock-profile/tim-white-dont-look-down-card.jpg',
+    bpm: 124,
+    key: 'C min',
+    version: 'Campaign Draft',
     dsps: {
       spotify: 'pending',
       apple: 'pending',
@@ -529,93 +828,13 @@ const RELEASES: Release[] = [
     tasksOpen: 5,
     pitchReady: false,
     agent: 'generating-pitch',
-    durationSec: 224,
-    waveformSeed: 11,
+    durationSec: 204,
+    waveformSeed: 61,
     cues: [
       { at: 8, kind: 'intro', label: 'Intro' },
-      { at: 40, kind: 'verse', label: 'Verse' },
-      { at: 78, kind: 'chorus', label: 'Chorus' },
-      { at: 124, kind: 'outro', label: 'Outro' },
-    ],
-  },
-  {
-    id: 'sunshine-on-my-back',
-    title: 'Sunshine on My Back',
-    artist: 'Bahamas',
-    album: 'Earthtones',
-    type: 'Album',
-    releaseDate: '2026-02-04',
-    artwork: 'https://picsum.photos/seed/sunshine-on-my-back/400/400',
-    bpm: 124,
-    key: 'C maj',
-    version: 'Album',
-    dsps: { spotify: 'live', apple: 'live', youtube: 'live', tidal: 'error' },
-    weeklyStreams: 24_180,
-    weeklyDelta: -4,
-    tasksOpen: 1,
-    pitchReady: true,
-    agent: 'idle',
-    durationSec: 247,
-    waveformSeed: 17,
-    cues: [
-      { at: 12, kind: 'intro', label: 'Intro' },
-      { at: 48, kind: 'verse', label: 'Verse' },
-      { at: 90, kind: 'chorus', label: 'Chorus' },
-      { at: 132, kind: 'drop', label: 'Drop' },
-      { at: 180, kind: 'outro', label: 'Outro' },
-    ],
-  },
-  {
-    id: 'opening-act',
-    title: 'Opening Act',
-    artist: 'Bahamas',
-    album: 'Earthtones',
-    type: 'Single',
-    releaseDate: '2026-01-19',
-    artwork: 'https://picsum.photos/seed/opening-act/400/400',
-    bpm: 102,
-    key: 'G maj',
-    version: 'Studio',
-    dsps: { spotify: 'live', apple: 'live', youtube: 'live', tidal: 'live' },
-    weeklyStreams: 6_240,
-    weeklyDelta: 12,
-    tasksOpen: 0,
-    pitchReady: true,
-    agent: 'idle',
-    durationSec: 184,
-    waveformSeed: 23,
-    cues: [
-      { at: 5, kind: 'intro', label: 'Intro' },
-      { at: 22, kind: 'verse', label: 'Verse' },
-      { at: 60, kind: 'chorus', label: 'Chorus' },
-      { at: 110, kind: 'bridge', label: 'Bridge' },
-    ],
-  },
-  {
-    id: 'bittersweet',
-    title: 'Bittersweet',
-    artist: 'Bahamas',
-    album: 'Bahamas Is Afie',
-    type: 'Single',
-    releaseDate: '2025-12-02',
-    artwork: 'https://picsum.photos/seed/bittersweet/400/400',
-    bpm: 76,
-    key: 'B min',
-    version: 'Acoustic',
-    dsps: { spotify: 'live', apple: 'live', youtube: 'live', tidal: 'live' },
-    weeklyStreams: 3_810,
-    weeklyDelta: -2,
-    tasksOpen: 0,
-    pitchReady: true,
-    agent: 'idle',
-    durationSec: 232,
-    waveformSeed: 31,
-    cues: [
-      { at: 6, kind: 'intro', label: 'Intro' },
-      { at: 28, kind: 'verse', label: 'Verse 1' },
-      { at: 70, kind: 'chorus', label: 'Chorus' },
-      { at: 110, kind: 'verse', label: 'Verse 2' },
-      { at: 150, kind: 'outro', label: 'Outro' },
+      { at: 38, kind: 'verse', label: 'Verse' },
+      { at: 82, kind: 'chorus', label: 'Hook' },
+      { at: 126, kind: 'drop', label: 'Drop' },
     ],
   },
 ];
@@ -687,47 +906,40 @@ const ENTITY_RELEASES: EntityPopoverData[] = RELEASES.map(
 const ENTITY_ARTISTS: EntityPopoverData[] = [
   {
     kind: 'artist',
-    id: 'bahamas',
-    label: 'Bahamas',
-    handle: 'bahamasmusic',
-    followers: 482_000,
-    verified: true,
-    popularity: 64,
-  },
-  {
-    kind: 'artist',
-    id: 'sade',
-    label: 'Sade',
-    handle: 'sade',
-    followers: 9_400_000,
-    verified: true,
-    popularity: 81,
-  },
-  {
-    kind: 'artist',
-    id: 'frank-ocean',
-    label: 'Frank Ocean',
-    handle: 'frankocean',
-    followers: 14_200_000,
-    verified: true,
-    popularity: 88,
-  },
-  {
-    kind: 'artist',
-    id: 'tycho',
-    label: 'Tycho',
-    handle: 'tycho',
-    followers: 1_100_000,
-    verified: true,
-    popularity: 70,
-  },
-  {
-    kind: 'artist',
     id: 'tim-white',
     label: 'Tim White',
     handle: 'timwhite',
-    followers: 1_240,
+    followers: 18_400,
+    verified: true,
+    popularity: 58,
     isYou: true,
+  },
+  {
+    kind: 'artist',
+    id: 'cosmic-gate',
+    label: 'Cosmic Gate',
+    handle: 'cosmicgate',
+    followers: 1_900_000,
+    verified: true,
+    popularity: 76,
+  },
+  {
+    kind: 'artist',
+    id: 'erica-gibson',
+    label: 'Erica Gibson',
+    handle: 'ericagibson',
+    followers: 24_000,
+    verified: true,
+    popularity: 44,
+  },
+  {
+    kind: 'artist',
+    id: 'black-hole-recordings',
+    label: 'Black Hole Recordings',
+    handle: 'blackholerecordings',
+    followers: 860_000,
+    verified: true,
+    popularity: 61,
   },
 ];
 
@@ -799,23 +1011,23 @@ const ENTITY_EVENTS: EntityPopoverData[] = [
 const ENTITY_TRACKS_DEMO: EntityPopoverData[] = [
   {
     kind: 'track',
-    id: 'lost-in-the-light-track',
-    label: 'Lost in the Light',
-    artist: 'Bahamas',
-    releaseTitle: 'Bahamas Is Afie',
-    durationSec: 213,
-    bpm: 96,
-    keyName: 'A min',
+    id: 'the-deep-end-track',
+    label: 'The Deep End',
+    artist: 'Cosmic Gate & Tim White',
+    releaseTitle: 'Materia Chapter.One',
+    durationSec: 205,
+    bpm: 128,
+    keyName: 'F min',
   },
   {
     kind: 'track',
-    id: 'stronger-than-that-track',
-    label: 'Stronger Than That',
-    artist: 'Bahamas',
-    releaseTitle: 'Sad Hunk',
-    durationSec: 198,
-    bpm: 112,
-    keyName: 'D maj',
+    id: 'take-me-over-track',
+    label: 'Take Me Over',
+    artist: 'Tim White feat. Erica Gibson',
+    releaseTitle: 'Take Me Over',
+    durationSec: 232,
+    bpm: 128,
+    keyName: 'A min',
   },
 ];
 
@@ -853,13 +1065,16 @@ function lookupReleaseEntityByAlbum(
   album: string,
   excludeId?: string
 ): EntityPopoverData {
-  // Album titles are not always unique to a single release in the demo —
-  // pick the first match that isn't the current row. Falls through to a
-  // minimal stub so the popover still renders for off-roster album names.
-  const found = ENTITY_RELEASES.find(
+  // Album titles are not always unique in the demo. Prefer another release
+  // from the same album, then fall back to the current album's canonical row.
+  const foundByTitle = ENTITY_RELEASES.find(
     r => r.kind === 'release' && r.label === album && r.id !== excludeId
   );
-  if (found) return found;
+  if (foundByTitle) return foundByTitle;
+  const foundByAlbum =
+    RELEASES.find(r => r.album === album && r.id !== excludeId) ??
+    RELEASES.find(r => r.album === album);
+  if (foundByAlbum) return releaseToEntityPopover(foundByAlbum);
   return { kind: 'release', id: `release:${album}`, label: album };
 }
 
@@ -889,24 +1104,30 @@ type Track = {
 };
 
 const ARTIST_POOL = [
-  'Bahamas',
-  'Sade',
-  'Frank Ocean',
-  'Anderson .Paak',
   'Tim White',
+  'Cosmic Gate',
   'Erica Gibson',
-  'Tycho',
-  'Bonobo',
-  'Khruangbin',
-  'BADBADNOTGOOD',
+  'Tom Fall',
+  'Jochen Miller',
+  'Lynx',
+  'Vigel',
+  'Black Hole Recordings',
+  'Wake Your Mind Records',
+  'Armada Music',
 ];
 const TITLE_POOL = [
-  'Lost in the Light',
-  'Stronger Than That',
-  'All the Time',
-  'Sunshine on My Back',
-  'Opening Act',
-  'Bittersweet',
+  'The Deep End',
+  'Take Me Over',
+  'Never Say A Word',
+  "Don't Look Down",
+  'All This Noise',
+  'Save The Night',
+  'Trying Too Hard',
+  'California',
+  'Become One',
+  'Revival',
+  'Sober',
+  'Wheels Up',
   'Late Night Drift',
   'Slow Burn',
   'High Tide',
@@ -943,12 +1164,12 @@ const TITLE_POOL = [
   'Quiet Now',
 ];
 const ALBUM_POOL = [
-  'Earthtones',
-  'Bahamas Is Afie',
-  'Sad Hunk',
-  'Live to Be Free',
-  'Mid-set',
-  'B-sides',
+  'Materia Chapter.One',
+  'Take Me Over',
+  'Never Say A Word',
+  'All This Noise',
+  "Don't Look Down",
+  'Release Drafts',
   '—',
 ];
 const KEY_PAIRS: Array<[string, string]> = [
@@ -966,12 +1187,12 @@ const KEY_PAIRS: Array<[string, string]> = [
   ['A maj', '11B'],
 ];
 const ARTWORK_POOL = [
-  'https://picsum.photos/seed/jovie-art-a/400/400',
-  'https://picsum.photos/seed/jovie-art-b/400/400',
-  'https://picsum.photos/seed/jovie-art-c/400/400',
-  'https://picsum.photos/seed/jovie-art-d/400/400',
-  'https://picsum.photos/seed/jovie-art-e/400/400',
-  'https://picsum.photos/seed/jovie-art-f/400/400',
+  '/img/releases/the-deep-end.jpg',
+  '/img/releases/take-me-over.jpg',
+  '/img/releases/never-say-a-word.jpg',
+  '/images/mock-profile/tim-white-dont-look-down-card.jpg',
+  '/images/mock-profile/drawer-releases/release-1.png',
+  '/images/mock-profile/drawer-releases/release-2.png',
 ];
 
 function pick<T>(arr: readonly T[], i: number): T {
@@ -1059,24 +1280,24 @@ function generateTracks(n: number): Track[] {
 
 const TRACKS: Track[] = [
   {
-    id: 'lost-in-the-light-track',
-    releaseId: 'lost-in-the-light',
-    title: 'Lost in the Light',
-    artist: 'Bahamas',
-    album: 'Bahamas Is Afie',
+    id: 'the-deep-end-track',
+    releaseId: 'the-deep-end',
+    title: 'The Deep End',
+    artist: 'Cosmic Gate & Tim White',
+    album: 'Materia Chapter.One',
     type: 'Single',
-    bpm: 96,
-    keyNormal: 'A min',
-    keyCamelot: '8A',
+    bpm: 128,
+    keyNormal: 'F min',
+    keyCamelot: '4A',
     rating: 5,
-    energy: 6,
-    durationSec: 213,
+    energy: 9,
+    durationSec: 205,
     isrc: 'USRC12500001',
     status: 'live',
     hasVideo: true,
     hasCanvas: true,
-    artwork: 'https://picsum.photos/seed/lost-in-the-light/400/400',
-    bpmTone: 'mid',
+    artwork: '/img/releases/the-deep-end.jpg',
+    bpmTone: 'high',
     waveformSeed: 1,
     cues: [
       { at: 6, kind: 'intro', label: 'Intro' },
@@ -1086,15 +1307,15 @@ const TRACKS: Track[] = [
     ],
   },
   {
-    id: 'lost-extended-mix',
-    releaseId: 'lost-in-the-light',
-    title: 'Lost in the Light',
-    artist: 'Bahamas',
-    album: 'Bahamas Is Afie',
+    id: 'the-deep-end-extended-mix',
+    releaseId: 'the-deep-end',
+    title: 'The Deep End',
+    artist: 'Cosmic Gate & Tim White',
+    album: 'Materia Chapter.One',
     type: 'Single',
     bpm: 124,
-    keyNormal: 'A min',
-    keyCamelot: '8A',
+    keyNormal: 'F min',
+    keyCamelot: '4A',
     rating: 4,
     energy: 8,
     durationSec: 348,
@@ -1102,7 +1323,7 @@ const TRACKS: Track[] = [
     status: 'live',
     hasVideo: false,
     hasCanvas: true,
-    artwork: 'https://picsum.photos/seed/lost-in-the-light/400/400',
+    artwork: '/img/releases/the-deep-end.jpg',
     bpmTone: 'high',
     waveformSeed: 2,
     cues: [
@@ -1113,24 +1334,24 @@ const TRACKS: Track[] = [
     ],
   },
   {
-    id: 'stronger',
-    releaseId: 'stronger-than-that',
-    title: 'Stronger Than That',
-    artist: 'Bahamas',
-    album: 'Sad Hunk',
-    type: 'EP',
-    bpm: 112,
-    keyNormal: 'D maj',
-    keyCamelot: '10B',
+    id: 'take-me-over-track',
+    releaseId: 'take-me-over',
+    title: 'Take Me Over',
+    artist: 'Tim White feat. Erica Gibson',
+    album: 'Take Me Over',
+    type: 'Single',
+    bpm: 128,
+    keyNormal: 'A min',
+    keyCamelot: '8A',
     rating: 4,
     energy: 7,
-    durationSec: 198,
+    durationSec: 232,
     isrc: 'USRC12500003',
     status: 'live',
     hasVideo: false,
     hasCanvas: true,
-    artwork: 'https://picsum.photos/seed/stronger-than-that/400/400',
-    bpmTone: 'mid',
+    artwork: '/img/releases/take-me-over.jpg',
+    bpmTone: 'high',
     waveformSeed: 7,
     cues: [
       { at: 4, kind: 'intro', label: 'Intro' },
@@ -1140,23 +1361,23 @@ const TRACKS: Track[] = [
     ],
   },
   {
-    id: 'all-the-time',
-    releaseId: 'all-the-time',
-    title: 'All the Time',
-    artist: 'Bahamas',
-    album: 'Earthtones',
+    id: 'never-say-a-word-track',
+    releaseId: 'never-say-a-word',
+    title: 'Never Say A Word',
+    artist: 'Tim White',
+    album: 'Never Say A Word',
     type: 'Single',
-    bpm: 88,
-    keyNormal: 'F maj',
-    keyCamelot: '7B',
+    bpm: 122,
+    keyNormal: 'G min',
+    keyCamelot: '6A',
     rating: 3,
-    energy: 4,
-    durationSec: 224,
+    energy: 6,
+    durationSec: 198,
     status: 'scheduled',
     hasVideo: false,
     hasCanvas: false,
-    artwork: 'https://picsum.photos/seed/all-the-time/400/400',
-    bpmTone: 'low',
+    artwork: '/img/releases/never-say-a-word.jpg',
+    bpmTone: 'mid',
     waveformSeed: 11,
     cues: [
       { at: 8, kind: 'intro', label: 'Intro' },
@@ -1165,13 +1386,13 @@ const TRACKS: Track[] = [
     ],
   },
   {
-    id: 'sunshine',
-    releaseId: 'sunshine-on-my-back',
-    title: 'Sunshine on My Back',
-    artist: 'Bahamas',
-    album: 'Earthtones',
-    type: 'Album',
-    bpm: 124,
+    id: 'all-this-noise-track',
+    releaseId: 'all-this-noise',
+    title: 'All This Noise',
+    artist: 'Tim White',
+    album: 'All This Noise',
+    type: 'EP',
+    bpm: 126,
     keyNormal: 'C maj',
     keyCamelot: '8B',
     rating: 5,
@@ -1181,7 +1402,7 @@ const TRACKS: Track[] = [
     status: 'live',
     hasVideo: true,
     hasCanvas: true,
-    artwork: 'https://picsum.photos/seed/lost-in-the-light/400/400',
+    artwork: '/images/mock-profile/tim-white-dont-look-down-card.jpg',
     bpmTone: 'high',
     waveformSeed: 17,
     cues: [
@@ -1192,11 +1413,11 @@ const TRACKS: Track[] = [
     ],
   },
   {
-    id: 'opening-act',
-    releaseId: 'opening-act',
-    title: 'Opening Act',
-    artist: 'Bahamas',
-    album: 'Earthtones',
+    id: 'save-the-night-track',
+    releaseId: 'save-the-night',
+    title: 'Save The Night',
+    artist: 'Tim White',
+    album: 'All This Noise',
     type: 'Single',
     bpm: 102,
     keyNormal: 'G maj',
@@ -1208,7 +1429,7 @@ const TRACKS: Track[] = [
     status: 'live',
     hasVideo: false,
     hasCanvas: false,
-    artwork: 'https://picsum.photos/seed/stronger-than-that/400/400',
+    artwork: '/images/mock-profile/drawer-releases/release-1.png',
     bpmTone: 'mid',
     waveformSeed: 23,
     cues: [
@@ -1218,11 +1439,11 @@ const TRACKS: Track[] = [
     ],
   },
   {
-    id: 'bittersweet',
-    releaseId: 'bittersweet',
-    title: 'Bittersweet',
-    artist: 'Bahamas',
-    album: 'Bahamas Is Afie',
+    id: 'become-one-track',
+    releaseId: 'become-one',
+    title: 'Become One',
+    artist: 'Tim White',
+    album: 'All This Noise',
     type: 'Single',
     bpm: 76,
     keyNormal: 'B min',
@@ -1234,7 +1455,7 @@ const TRACKS: Track[] = [
     status: 'live',
     hasVideo: false,
     hasCanvas: true,
-    artwork: 'https://picsum.photos/seed/all-the-time/400/400',
+    artwork: '/images/mock-profile/drawer-releases/release-4.png',
     bpmTone: 'low',
     waveformSeed: 31,
     cues: [
@@ -1247,7 +1468,7 @@ const TRACKS: Track[] = [
     id: 'untitled-demo-04',
     releaseId: null,
     title: 'Untitled Demo 04',
-    artist: 'Bahamas',
+    artist: 'Tim White',
     album: '—',
     type: 'Single',
     bpm: 118,
@@ -1259,7 +1480,7 @@ const TRACKS: Track[] = [
     status: 'draft',
     hasVideo: false,
     hasCanvas: false,
-    artwork: 'https://picsum.photos/seed/lost-in-the-light/400/400',
+    artwork: '/images/mock-profile/tim-white-dont-look-down-hero.jpg',
     bpmTone: 'mid',
     waveformSeed: 37,
     cues: [
@@ -1290,39 +1511,39 @@ type Task = {
 const TASKS: Task[] = [
   {
     id: 'J-128',
-    title: 'Confirm artwork for Lost in the Light',
+    title: 'Confirm artwork for The Deep End',
     description:
       'Final mastered files came back. Need to approve the cover art crop for the Spotify Canvas before the smart link goes live next Friday.',
     status: 'in_progress',
     priority: 'high',
     assignee: 'you',
-    releaseId: 'lost-in-the-light',
+    releaseId: 'the-deep-end',
     dueIso: '2026-04-30',
     updatedIso: '2026-04-25',
     labels: ['design', 'distribution'],
   },
   {
     id: 'J-127',
-    title: 'Approve playlist pitch for Stronger Than That',
+    title: 'Approve playlist pitch for Take Me Over',
     description:
       'Jovie drafted a 3-paragraph pitch tuned for indie-folk Spotify editorial. Skim it, edit anything that feels off, and submit.',
     status: 'todo',
     priority: 'high',
     assignee: 'you',
-    releaseId: 'stronger-than-that',
+    releaseId: 'take-me-over',
     dueIso: '2026-04-28',
     updatedIso: '2026-04-25',
     labels: ['pitch'],
   },
   {
     id: 'J-126',
-    title: 'Generate vertical lyric video for All the Time',
+    title: 'Generate vertical lyric video for Never Say A Word',
     description:
       'Stems are uploaded. Jovie will render a 9:16 lyric video with three style passes; pick one when ready.',
     status: 'in_progress',
     priority: 'medium',
     assignee: 'jovie',
-    releaseId: 'all-the-time',
+    releaseId: 'never-say-a-word',
     dueIso: '2026-05-02',
     updatedIso: '2026-04-25',
     labels: ['video', 'social'],
@@ -1333,7 +1554,7 @@ const TASKS: Task[] = [
     status: 'todo',
     priority: 'medium',
     assignee: 'you',
-    releaseId: 'all-the-time',
+    releaseId: 'never-say-a-word',
     dueIso: '2026-05-05',
     updatedIso: '2026-04-24',
     labels: ['social'],
@@ -1351,13 +1572,13 @@ const TASKS: Task[] = [
   },
   {
     id: 'J-123',
-    title: 'Backfill UPC for Sunshine on My Back',
+    title: 'Backfill UPC for All This Noise',
     description:
       'TIDAL flagged the missing UPC. Jovie can pull it from the distributor — confirm the metadata is accurate before sync.',
     status: 'backlog',
     priority: 'medium',
     assignee: 'jovie',
-    releaseId: 'sunshine-on-my-back',
+    releaseId: 'all-this-noise',
     dueIso: null,
     updatedIso: '2026-04-23',
     labels: ['distribution'],
@@ -1375,11 +1596,11 @@ const TASKS: Task[] = [
   },
   {
     id: 'J-121',
-    title: 'Tag Bittersweet stems for the remix pack',
+    title: 'Tag Become One stems for the remix pack',
     status: 'todo',
     priority: 'low',
     assignee: 'you',
-    releaseId: 'bittersweet',
+    releaseId: 'become-one',
     dueIso: null,
     updatedIso: '2026-04-22',
     labels: ['catalog'],
@@ -1401,7 +1622,7 @@ const TASKS: Task[] = [
     status: 'done',
     priority: 'low',
     assignee: 'jovie',
-    releaseId: 'opening-act',
+    releaseId: 'dont-look-down',
     dueIso: null,
     updatedIso: '2026-04-20',
     labels: ['distribution'],
@@ -1431,9 +1652,8 @@ const TASKS: Task[] = [
 ];
 
 // --- Lyrics mock -----------------------------------------------------------
-// Karaoke-style timed lyrics for the currently playing track ("Lost in the
-// Light", 213s). Sixteen lines, hand-paced so verses breathe and the chorus
-// lands on the cue at 0:52. Bahamas-ish: warm, wistful, road-weary.
+// Karaoke-style timed lyrics for the currently playing demo track. Sixteen
+// lines, hand-paced so verses breathe and the chorus lands on the cue at 0:52.
 type LyricLine = { startSec: number; text: string };
 const MOCK_LYRICS: LyricLine[] = [
   { startSec: 6, text: 'I was sleeping in the back of the car' },
@@ -1474,24 +1694,12 @@ function trackFromRelease(r: Release): TrackInfo {
     ).padStart(5, '0')}`,
     // Only the canonical demo track has timed lyrics in MOCK_LYRICS; other
     // releases play but expose no lyrics surface (Mic2 hides for them).
-    hasLyrics: r.id === 'lost-in-the-light',
+    hasLyrics: r.id === 'the-deep-end',
   };
 }
 
 function relativeDate(iso: string, now = new Date('2026-04-25')) {
-  const d = new Date(iso);
-  const days = Math.round(
-    (d.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)
-  );
-  if (days === 0) return 'today';
-  if (days === 1) return 'tomorrow';
-  if (days === -1) return 'yesterday';
-  if (days > 1 && days < 14) return `in ${days}d`;
-  if (days < -1 && days > -14) return `${-days}d ago`;
-  if (days >= 14 && days < 60) return `in ${Math.round(days / 7)}w`;
-  if (days <= -14 && days > -60) return `${Math.round(-days / 7)}w ago`;
-  if (days >= 60) return `in ${Math.round(days / 30)}mo`;
-  return `${Math.round(-days / 30)}mo ago`;
+  return formatRelativeDate(iso, now).toLowerCase();
 }
 
 function formatStreams(n: number) {
@@ -1502,7 +1710,20 @@ function formatStreams(n: number) {
   return `${(n / 1_000_000).toFixed(1)}M`;
 }
 
-export default function ShellV1Experiment() {
+function ShellV1ExperimentContent() {
+  const searchParams = useSearchParams();
+  const initialView = parseCanvasViewParam(searchParams.get('view'));
+  const initialReleaseParam = searchParams.get('release');
+  const hideInternalTools =
+    searchParams.get('capture') === 'marketing' ||
+    searchParams.get('marketing') === '1';
+  const hideNowPlaying =
+    hideInternalTools && searchParams.get('player') === 'off';
+  const initialReleaseId =
+    initialView === 'releases' &&
+    RELEASES.some(release => release.id === initialReleaseParam)
+      ? initialReleaseParam
+      : null;
   const [sidebarMode, setSidebarMode] = useState<'docked' | 'floating'>(
     'docked'
   );
@@ -1518,7 +1739,7 @@ export default function ShellV1Experiment() {
   const [loaderPhase, setLoaderPhase] = useState<'bloom' | 'reveal' | 'done'>(
     'bloom'
   );
-  const [view, setView] = useState<CanvasView>('demo');
+  const [view, setView] = useState<CanvasView>(initialView);
   // Install / upgrade banner — togglable from the dev picker so the
   // styled state is reviewable. Off by default.
   const [installBannerOpen, setInstallBannerOpen] = useState(false);
@@ -1535,8 +1756,12 @@ export default function ShellV1Experiment() {
     RELEASES[0].id
   );
   const [selectedReleaseId, setSelectedReleaseId] = useState<string | null>(
-    null
+    initialReleaseId
   );
+  useEffect(() => {
+    setView(initialView);
+    setSelectedReleaseId(initialReleaseId);
+  }, [initialView, initialReleaseId]);
   // Mock playback position in seconds for the currently playing track.
   // Click a row's waveform → updates this → bottom bar's scrub reflects it.
   const [currentTimeSec, setCurrentTimeSec] = useState(78);
@@ -1901,6 +2126,15 @@ export default function ShellV1Experiment() {
   const currentTrack: TrackInfo = playingRelease
     ? trackFromRelease(playingRelease)
     : trackFromRelease(RELEASES[0]);
+  const nowPlayingProps = hideNowPlaying
+    ? undefined
+    : {
+        track: currentTrack,
+        isPlaying,
+        barCollapsed,
+        onPlay: () => setIsPlaying(p => !p),
+      };
+  const playingDurationSec = playingRelease?.durationSec ?? TRACK.duration;
 
   // Cinematic cold-start sequence. Three phases, total ~900ms:
   //   bloom  (0..380ms): black canvas + centered Jovie mark scales in
@@ -1942,12 +2176,13 @@ export default function ShellV1Experiment() {
     ? {
         opacity: 0,
         pointerEvents: 'none' as const,
-        transition: `opacity 600ms ${EASE_CINEMATIC}`,
+        transition: `opacity var(--ds-motion-cinematic-duration) var(--ds-motion-cinematic-easing)`,
       }
-    : { transition: `opacity 600ms ${EASE_CINEMATIC}` };
+    : {
+        transition: `opacity var(--ds-motion-cinematic-duration) var(--ds-motion-cinematic-easing)`,
+      };
 
-  const pct =
-    (currentTimeSec / (playingRelease?.durationSec ?? TRACK.duration)) * 100;
+  const pct = (currentTimeSec / playingDurationSec) * 100;
 
   // Spacebar = playback toggle. Sidebar collapse uses [ (Linear-style),
   // bar visibility uses Cmd/Ctrl+\. Hold ⌘J anywhere to dictate to Jovie.
@@ -2033,7 +2268,7 @@ export default function ShellV1Experiment() {
             '--linear-app-shell-radius': '12px',
             opacity: mounted ? 1 : 0,
             transform: mounted ? 'scale(1)' : 'scale(0.985)',
-            transition: `opacity 600ms ${EASE_CINEMATIC}, transform 600ms ${EASE_CINEMATIC}, background-color 200ms ease-out`,
+            transition: `opacity var(--ds-motion-cinematic-duration) var(--ds-motion-cinematic-easing), transform var(--ds-motion-cinematic-duration) var(--ds-motion-cinematic-easing), background-color var(--ds-motion-subtle-duration) ease-out`,
           } as React.CSSProperties
         }
         className='shell-v1 flex h-dvh w-full overflow-hidden bg-(--linear-bg-page) lg:gap-2 lg:p-2'
@@ -2148,7 +2383,7 @@ export default function ShellV1Experiment() {
                 ? 'translateX(0)'
                 : 'translateX(-12px)',
             pointerEvents: cinematic || onboardingActive ? 'none' : undefined,
-            transition: `width ${DURATION_CINEMATIC}ms ${EASE_CINEMATIC}, opacity 600ms ${EASE_CINEMATIC}, transform ${DURATION_CINEMATIC}ms ${EASE_CINEMATIC}`,
+            transition: `width ${DURATION_CINEMATIC}ms ${EASE_CINEMATIC}, opacity var(--ds-motion-cinematic-duration) var(--ds-motion-cinematic-easing), transform ${DURATION_CINEMATIC}ms ${EASE_CINEMATIC}`,
           }}
           aria-hidden={
             sidebarMode !== 'docked' || cinematic || onboardingActive
@@ -2165,12 +2400,8 @@ export default function ShellV1Experiment() {
             onSelectThread={openThread}
             onThreadContextMenu={onThreadContextMenu}
             libraryAssetCount={libraryAllAssets.length}
-            nowPlaying={{
-              track: currentTrack,
-              isPlaying,
-              barCollapsed,
-              onPlay: () => setIsPlaying(p => !p),
-            }}
+            hideInternalTools={hideInternalTools}
+            nowPlaying={nowPlayingProps}
             installBanner={{
               open: installBannerOpen,
               onDismiss: () => setInstallBannerOpen(false),
@@ -2215,12 +2446,8 @@ export default function ShellV1Experiment() {
           onSelectThread={openThread}
           onThreadContextMenu={onThreadContextMenu}
           libraryAssetCount={libraryAllAssets.length}
-          nowPlaying={{
-            track: currentTrack,
-            isPlaying,
-            barCollapsed,
-            onPlay: () => setIsPlaying(p => !p),
-          }}
+          hideInternalTools={hideInternalTools}
+          nowPlaying={nowPlayingProps}
           installBanner={{
             open: installBannerOpen,
             onDismiss: () => setInstallBannerOpen(false),
@@ -2233,30 +2460,32 @@ export default function ShellV1Experiment() {
           When the bar collapses, the COMPACT version takes over — it
           renders inside the sidebar bottom slot. The two never appear
           together. */}
-        <div
-          aria-hidden={barCollapsed}
-          // Sits inside the same 32px gutter the audio bar uses (px-8) so
-          // the album art aligns to a virtual grid as if the canvas's
-          // content area extended down past it.
-          className='hidden lg:block fixed bottom-[26px] z-30 w-[224px]'
-          style={{
-            left: sidebarMode === 'docked' ? 264 : 32,
-            opacity: barCollapsed ? 0 : 1,
-            transform: barCollapsed ? 'translateY(8px)' : 'translateY(0)',
-            pointerEvents: barCollapsed ? 'none' : 'auto',
-            transition: `opacity ${DURATION_CINEMATIC}ms ${EASE_CINEMATIC}, transform ${DURATION_CINEMATIC}ms ${EASE_CINEMATIC}, left ${DURATION_CINEMATIC}ms ${EASE_CINEMATIC}`,
-          }}
-        >
-          <div className='px-1 pb-0'>
-            <SidebarNowPlaying
-              collapsed={false}
-              isPlaying={isPlaying}
-              onPlay={() => setIsPlaying(p => !p)}
-              playOverlayVisible={barCollapsed}
-              track={toNowPlayingTrack(currentTrack)}
-            />
+        {!hideNowPlaying ? (
+          <div
+            aria-hidden={barCollapsed}
+            // Sits inside the same 32px gutter the audio bar uses (px-8) so
+            // the album art aligns to a virtual grid as if the canvas's
+            // content area extended down past it.
+            className='hidden lg:block fixed bottom-[26px] z-30 w-[224px]'
+            style={{
+              left: sidebarMode === 'docked' ? 264 : 32,
+              opacity: barCollapsed ? 0 : 1,
+              transform: barCollapsed ? 'translateY(8px)' : 'translateY(0)',
+              pointerEvents: barCollapsed ? 'none' : 'auto',
+              transition: `opacity ${DURATION_CINEMATIC}ms ${EASE_CINEMATIC}, transform ${DURATION_CINEMATIC}ms ${EASE_CINEMATIC}, left ${DURATION_CINEMATIC}ms ${EASE_CINEMATIC}`,
+            }}
+          >
+            <div className='px-1 pb-0'>
+              <SidebarNowPlaying
+                collapsed={false}
+                isPlaying={isPlaying}
+                onPlay={() => setIsPlaying(p => !p)}
+                playOverlayVisible={barCollapsed}
+                track={toNowPlayingTrack(currentTrack)}
+              />
+            </div>
           </div>
-        </div>
+        ) : null}
 
         <div
           className='flex min-h-0 min-w-0 flex-1 flex-col lg:gap-2'
@@ -2264,11 +2493,13 @@ export default function ShellV1Experiment() {
             // Reserve room for the fixed-bottom AudioBar so canvas content
             // never sits hidden underneath. Falls to 0 when collapsed.
             paddingBottom:
-              barCollapsed || cinematic || onboardingActive ? 0 : 80,
+              hideNowPlaying || barCollapsed || cinematic || onboardingActive
+                ? 0
+                : 80,
             transition:
               cinematic || onboardingActive
-                ? `padding-bottom 600ms ${EASE_CINEMATIC}`
-                : 'padding-bottom 150ms ease-out',
+                ? `padding-bottom var(--ds-motion-cinematic-duration) var(--ds-motion-cinematic-easing)`
+                : `padding-bottom var(--ds-motion-subtle-duration) ease-out`,
           }}
         >
           <main className='relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-surface-0 lg:rounded-[var(--linear-app-shell-radius)] lg:border lg:border-(--linear-app-shell-border) lg:bg-(--linear-app-content-surface) lg:shadow-[var(--linear-app-shell-shadow)]'>
@@ -2545,7 +2776,7 @@ export default function ShellV1Experiment() {
                 type='button'
                 onClick={() => setBarCollapsed(false)}
                 aria-label='Show audio bar (`)'
-                className='absolute bottom-3 right-3 z-30 hidden lg:grid h-7 w-7 place-items-center rounded-md text-quaternary-token hover:text-primary-token hover:bg-surface-1/70 transition-[opacity,color,background-color] duration-150 ease-out'
+                className='absolute bottom-3 right-3 z-30 hidden lg:grid h-7 w-7 place-items-center rounded-md text-quaternary-token hover:text-primary-token hover:bg-surface-1/70 transition-[opacity,color,background-color] duration-subtle ease-out'
                 style={{
                   opacity:
                     barCollapsed && !cinematic && !onboardingActive ? 1 : 0,
@@ -2566,16 +2797,27 @@ export default function ShellV1Experiment() {
             canvas reflow. Earlier rendering inside the canvas column meant
             buttons shifted horizontally whenever the column width changed. */}
         <div
-          aria-hidden={barCollapsed || cinematic || onboardingActive}
+          aria-hidden={
+            hideNowPlaying || barCollapsed || cinematic || onboardingActive
+          }
           className='fixed inset-x-0 bottom-0 z-30 hidden lg:block overflow-hidden bg-(--linear-bg-page)'
           style={{
-            maxHeight: barCollapsed || cinematic || onboardingActive ? 0 : 80,
-            opacity: barCollapsed || cinematic || onboardingActive ? 0 : 1,
-            pointerEvents: cinematic || onboardingActive ? 'none' : undefined,
+            maxHeight:
+              hideNowPlaying || barCollapsed || cinematic || onboardingActive
+                ? 0
+                : 80,
+            opacity:
+              hideNowPlaying || barCollapsed || cinematic || onboardingActive
+                ? 0
+                : 1,
+            pointerEvents:
+              hideNowPlaying || cinematic || onboardingActive
+                ? 'none'
+                : undefined,
             transition:
               cinematic || onboardingActive
-                ? `max-height 600ms ${EASE_CINEMATIC}, opacity 600ms ${EASE_CINEMATIC}`
-                : `max-height 150ms ease-out, opacity 150ms ease-out`,
+                ? `max-height var(--ds-motion-cinematic-duration) var(--ds-motion-cinematic-easing), opacity var(--ds-motion-cinematic-duration) var(--ds-motion-cinematic-easing)`
+                : `max-height var(--ds-motion-subtle-duration) ease-out, opacity var(--ds-motion-subtle-duration) ease-out`,
           }}
         >
           <AudioBar
@@ -2583,7 +2825,7 @@ export default function ShellV1Experiment() {
             onPlay={() => setIsPlaying(p => !p)}
             onCollapse={() => setBarCollapsed(true)}
             currentTime={currentTimeSec}
-            duration={TRACK.duration}
+            duration={playingDurationSec}
             loopMode={loopMode}
             onCycleLoop={() =>
               setLoopMode(m =>
@@ -2605,15 +2847,22 @@ export default function ShellV1Experiment() {
             Always mounted; fades + drops 6px on collapse so the bar retires
             instead of popping off. */}
         <div
-          aria-hidden={barCollapsed || cinematic || onboardingActive}
+          aria-hidden={
+            hideNowPlaying || barCollapsed || cinematic || onboardingActive
+          }
           style={{
-            opacity: barCollapsed || cinematic || onboardingActive ? 0 : 1,
+            opacity:
+              hideNowPlaying || barCollapsed || cinematic || onboardingActive
+                ? 0
+                : 1,
             transform:
-              barCollapsed || cinematic || onboardingActive
+              hideNowPlaying || barCollapsed || cinematic || onboardingActive
                 ? 'translateY(6px)'
                 : 'translateY(0)',
             pointerEvents:
-              barCollapsed || cinematic || onboardingActive ? 'none' : 'auto',
+              hideNowPlaying || barCollapsed || cinematic || onboardingActive
+                ? 'none'
+                : 'auto',
             transition: `opacity ${DURATION_CINEMATIC}ms ${EASE_CINEMATIC}, transform ${DURATION_CINEMATIC}ms ${EASE_CINEMATIC}`,
           }}
         >
@@ -2627,7 +2876,7 @@ export default function ShellV1Experiment() {
             isPlaying={isPlaying}
             onPlay={() => setIsPlaying(p => !p)}
             currentTime={currentTimeSec}
-            duration={TRACK.duration}
+            duration={playingDurationSec}
             track={toNowPlayingTrack(currentTrack)}
           />
         </div>
@@ -2642,11 +2891,11 @@ export default function ShellV1Experiment() {
           onClick={() => setView('demo')}
           aria-label='Exit screening room (Esc)'
           title='Exit screening room (Esc)'
-          className='fixed top-4 right-4 z-50 h-7 w-7 grid place-items-center rounded-md text-quaternary-token hover:text-primary-token hover:bg-surface-1/70 transition-colors duration-150 ease-out'
+          className='fixed top-4 right-4 z-50 h-7 w-7 grid place-items-center rounded-md text-quaternary-token hover:text-primary-token hover:bg-surface-1/70 transition-colors duration-subtle ease-out'
           style={{
             opacity: cinematic ? 1 : 0,
             pointerEvents: cinematic ? 'auto' : 'none',
-            transition: `opacity 600ms ${EASE_CINEMATIC}`,
+            transition: `opacity var(--ds-motion-cinematic-duration) var(--ds-motion-cinematic-easing)`,
           }}
         >
           <X className='h-4 w-4' strokeWidth={2.25} />
@@ -2657,6 +2906,14 @@ export default function ShellV1Experiment() {
         />
       </div>
     </EntityActivateContext.Provider>
+  );
+}
+
+export default function ShellV1Experiment() {
+  return (
+    <Suspense fallback={<div className='min-h-screen bg-[#050608]' />}>
+      <ShellV1ExperimentContent />
+    </Suspense>
   );
 }
 
@@ -2678,6 +2935,7 @@ function FloatingSidebarLayer({
   onSelectThread,
   onThreadContextMenu,
   libraryAssetCount,
+  hideInternalTools = false,
   nowPlaying,
   installBanner,
 }: {
@@ -2693,6 +2951,7 @@ function FloatingSidebarLayer({
   onSelectThread?: (id: string) => void;
   onThreadContextMenu?: (e: React.MouseEvent, thread: Thread) => void;
   libraryAssetCount: number;
+  hideInternalTools?: boolean;
   nowPlaying?: {
     track: TrackInfo;
     isPlaying: boolean;
@@ -2761,6 +3020,7 @@ function FloatingSidebarLayer({
           onSelectThread={onSelectThread}
           onThreadContextMenu={onThreadContextMenu}
           libraryAssetCount={libraryAssetCount}
+          hideInternalTools={hideInternalTools}
           nowPlaying={nowPlaying}
           installBanner={installBanner}
         />
@@ -2782,6 +3042,7 @@ function Sidebar({
   onSelectThread,
   onThreadContextMenu,
   libraryAssetCount,
+  hideInternalTools = false,
   nowPlaying,
   installBanner,
 }: {
@@ -2814,6 +3075,7 @@ function Sidebar({
   onThreadContextMenu?: (e: React.MouseEvent, thread: Thread) => void;
   // Asset count for the Library nav item — when 0, hide the row.
   libraryAssetCount: number;
+  hideInternalTools?: boolean;
   // Simplified now-playing pinned to the sidebar bottom. Only renders
   // when the audio bar is open at the bottom of the canvas — that's
   // when the floating bottom-left card disappears and is replaced by
@@ -2866,8 +3128,8 @@ function Sidebar({
   const showPin = justOpened;
   // Per-workspace open state. Active workspace defaults open.
   const [openWs, setOpenWs] = useState<Record<string, boolean>>({
-    bahamas: true,
-    sade: false,
+    'tim-white': true,
+    'cosmic-gate': false,
     admin: false,
   });
 
@@ -2894,7 +3156,7 @@ function Sidebar({
               type='button'
               onClick={() => onSelectView?.('demo')}
               aria-label={`Back from ${contextLabel}`}
-              className='flex-1 inline-flex items-center gap-2 h-7 pl-2.5 pr-2 rounded-md hover:bg-surface-1/60 transition-colors duration-150 ease-out cursor-pointer min-w-0 text-secondary-token hover:text-primary-token'
+              className='flex-1 inline-flex items-center gap-2 h-7 pl-2.5 pr-2 rounded-md hover:bg-surface-1/60 transition-colors duration-subtle ease-out cursor-pointer min-w-0 text-secondary-token hover:text-primary-token'
             >
               <ChevronLeft
                 className='h-3.5 w-3.5 shrink-0 text-tertiary-token'
@@ -2908,8 +3170,8 @@ function Sidebar({
               </span>
             </button>
           ) : (
-            <UserMenu>
-              <span className='flex-1 inline-flex items-center gap-2.5 h-7 pl-3 pr-2 rounded-md hover:bg-surface-1/60 transition-colors duration-150 ease-out cursor-pointer min-w-0'>
+            <UserMenu hideInternalTools={hideInternalTools}>
+              <span className='flex-1 inline-flex items-center gap-2.5 h-7 pl-3 pr-2 rounded-md hover:bg-surface-1/60 transition-colors duration-subtle ease-out cursor-pointer min-w-0'>
                 <BrandLogo
                   size={16}
                   rounded={false}
@@ -2932,7 +3194,7 @@ function Sidebar({
               if (showPin) onPin();
               else onSelectView?.('demo');
             }}
-            className='absolute right-2 h-5 w-5 rounded-full grid place-items-center text-quaternary-token hover:text-primary-token hover:bg-surface-1 transition-[opacity,color,background-color] duration-300 ease-out'
+            className='absolute right-2 h-5 w-5 rounded-full grid place-items-center text-quaternary-token hover:text-primary-token hover:bg-surface-1 transition-[opacity,color,background-color] duration-subtle ease-out'
             style={{
               opacity: trailingVisible ? 1 : 0,
               pointerEvents: trailingVisible ? 'auto' : 'none',
@@ -2960,7 +3222,7 @@ function Sidebar({
             <span className='relative h-2.5 w-2.5'>
               <span
                 aria-hidden='true'
-                className='absolute inset-0 grid place-items-center transition-opacity duration-300 ease-out'
+                className='absolute inset-0 grid place-items-center transition-opacity duration-subtle ease-out'
                 style={{ opacity: showPin ? 1 : 0 }}
               >
                 {variant === 'floating' ? (
@@ -2971,7 +3233,7 @@ function Sidebar({
               </span>
               <span
                 aria-hidden='true'
-                className='absolute inset-0 grid place-items-center transition-opacity duration-300 ease-out'
+                className='absolute inset-0 grid place-items-center transition-opacity duration-subtle ease-out'
                 style={{ opacity: showPin ? 0 : 1 }}
               >
                 <SquarePen className='h-2.5 w-2.5' strokeWidth={2.25} />
@@ -3003,7 +3265,7 @@ function Sidebar({
                 type='button'
                 onClick={() => settingsProps.onSelectSection(s.id)}
                 className={cn(
-                  'w-full flex flex-col items-start gap-0.5 px-2.5 py-1.5 rounded-md text-left transition-colors duration-150 ease-out',
+                  'w-full flex flex-col items-start gap-0.5 px-2.5 py-1.5 rounded-md text-left transition-colors duration-subtle ease-out',
                   active
                     ? 'bg-surface-1/80 text-primary-token'
                     : 'text-secondary-token hover:bg-surface-1/50 hover:text-primary-token'
@@ -3101,7 +3363,48 @@ function Sidebar({
                 collapsed={collapsed}
                 tight={tight}
               >
-                {ws.items.map(item => (
+                {ws.items.map(item => {
+                  const view = canvasViewForNavItem(item.label);
+                  return (
+                    <SidebarNavItem
+                      key={item.label}
+                      item={{
+                        ...item,
+                        active:
+                          view !== null
+                            ? activeView === view
+                            : item.active && activeView === 'demo',
+                        onActivate:
+                          view && onSelectView
+                            ? () => onSelectView(view)
+                            : item.onActivate,
+                      }}
+                      collapsed={collapsed}
+                      nested={!collapsed}
+                      tight={tight}
+                    />
+                  );
+                })}
+              </SidebarSection>
+            ))}
+          </div>
+
+          {hideInternalTools ? null : (
+            <div>
+              <SidebarSection
+                name={ADMIN_WORKSPACE.name}
+                open={openWs[ADMIN_WORKSPACE.id] ?? false}
+                onToggle={() =>
+                  setOpenWs(s => ({
+                    ...s,
+                    [ADMIN_WORKSPACE.id]: !(s[ADMIN_WORKSPACE.id] ?? false),
+                  }))
+                }
+                itemCount={ADMIN_WORKSPACE.items.length}
+                collapsed={collapsed}
+                tight={tight}
+              >
+                {ADMIN_WORKSPACE.items.map(item => (
                   <SidebarNavItem
                     key={item.label}
                     item={item}
@@ -3111,35 +3414,8 @@ function Sidebar({
                   />
                 ))}
               </SidebarSection>
-            ))}
-          </div>
-
-          {/* Admin — separate, no section header */}
-          <div>
-            <SidebarSection
-              name={ADMIN_WORKSPACE.name}
-              open={openWs[ADMIN_WORKSPACE.id] ?? false}
-              onToggle={() =>
-                setOpenWs(s => ({
-                  ...s,
-                  [ADMIN_WORKSPACE.id]: !(s[ADMIN_WORKSPACE.id] ?? false),
-                }))
-              }
-              itemCount={ADMIN_WORKSPACE.items.length}
-              collapsed={collapsed}
-              tight={tight}
-            >
-              {ADMIN_WORKSPACE.items.map(item => (
-                <SidebarNavItem
-                  key={item.label}
-                  item={item}
-                  collapsed={collapsed}
-                  nested={!collapsed}
-                  tight={tight}
-                />
-              ))}
-            </SidebarSection>
-          </div>
+            </div>
+          )}
         </nav>
       )}
 
@@ -3242,7 +3518,7 @@ function CanvasSubheader({
               type='button'
               onClick={() => onSubview(t.id)}
               className={cn(
-                'h-7 px-2.5 rounded-md text-[12.5px] font-caption tracking-[-0.012em] transition-colors duration-150 ease-out inline-flex items-center gap-1.5',
+                'h-7 px-2.5 rounded-md text-[12.5px] font-caption tracking-[-0.012em] transition-colors duration-subtle ease-out inline-flex items-center gap-1.5',
                 active
                   ? 'text-primary-token bg-surface-1/80'
                   : 'text-tertiary-token hover:text-primary-token hover:bg-surface-1/50'
@@ -3268,7 +3544,7 @@ function CanvasSubheader({
               type='button'
               onClick={onAddView}
               aria-label='Add view'
-              className='h-7 w-7 rounded-md grid place-items-center text-quaternary-token hover:text-primary-token hover:bg-surface-1/50 transition-colors duration-150 ease-out'
+              className='h-7 w-7 rounded-md grid place-items-center text-quaternary-token hover:text-primary-token hover:bg-surface-1/50 transition-colors duration-subtle ease-out'
             >
               <Plus className='h-3.5 w-3.5' strokeWidth={2.25} />
             </button>
@@ -3564,7 +3840,7 @@ function Header({
         <button
           type='button'
           onClick={onToggleSidebar}
-          className='h-7 w-7 rounded-full grid place-items-center text-quaternary-token hover:text-primary-token hover:bg-surface-1 transition-colors duration-150 ease-out shrink-0'
+          className='h-7 w-7 rounded-full grid place-items-center text-quaternary-token hover:text-primary-token hover:bg-surface-1 transition-colors duration-subtle ease-out shrink-0'
           aria-label={
             sidebarHidden
               ? 'Dock sidebar ([)'
@@ -3583,7 +3859,7 @@ function Header({
             opacity: searchOpen ? 0 : 1,
             transform: searchOpen ? 'translateY(-2px)' : 'translateY(0)',
             pointerEvents: searchOpen ? 'none' : 'auto',
-            transition: `opacity 250ms ${EASE_CINEMATIC}, transform 250ms ${EASE_CINEMATIC}`,
+            transition: `opacity var(--ds-motion-subtle-duration) var(--ds-motion-cinematic-easing), transform var(--ds-motion-subtle-duration) var(--ds-motion-cinematic-easing)`,
           }}
         >
           {trail.map((crumb, i) => (
@@ -3601,7 +3877,7 @@ function Header({
                   'truncate text-[13px] font-semibold tracking-[-0.018em]',
                   crumb.emphasis
                     ? 'text-secondary-token'
-                    : 'text-tertiary-token/80 hover:text-secondary-token cursor-default transition-colors duration-150 ease-out'
+                    : 'text-tertiary-token/80 hover:text-secondary-token cursor-default transition-colors duration-subtle ease-out'
                 )}
               >
                 {crumb.label}
@@ -3618,7 +3894,7 @@ function Header({
             opacity: searchOpen ? 1 : 0,
             transform: searchOpen ? 'translateY(0)' : 'translateY(2px)',
             pointerEvents: searchOpen ? 'auto' : 'none',
-            transition: `opacity 250ms ${EASE_CINEMATIC}, transform 250ms ${EASE_CINEMATIC}`,
+            transition: `opacity var(--ds-motion-subtle-duration) var(--ds-motion-cinematic-easing), transform var(--ds-motion-subtle-duration) var(--ds-motion-cinematic-easing)`,
           }}
         >
           <PillSearch
@@ -3643,7 +3919,7 @@ function Header({
             type='button'
             onClick={onToggleRightRail}
             className={cn(
-              'h-7 w-7 rounded-full grid place-items-center transition-colors duration-150 ease-out shrink-0',
+              'h-7 w-7 rounded-full grid place-items-center transition-colors duration-subtle ease-out shrink-0',
               rightRailOpen
                 ? 'text-primary-token bg-surface-1'
                 : 'text-quaternary-token hover:text-primary-token hover:bg-surface-1'
@@ -3692,7 +3968,13 @@ function pageActionForView(view: CanvasView): {
   }
 }
 
-function UserMenu({ children }: { children: React.ReactNode }) {
+function UserMenu({
+  children,
+  hideInternalTools = false,
+}: Readonly<{
+  children: React.ReactNode;
+  hideInternalTools?: boolean;
+}>) {
   return (
     <ShellDropdown
       align='start'
@@ -3715,7 +3997,9 @@ function UserMenu({ children }: { children: React.ReactNode }) {
         entity={ENTITY_CURRENT_USER}
       />
       <ShellDropdown.Item icon={Settings} label='Settings' shortcut='⌘,' />
-      <ShellDropdown.Item icon={Shield} label='Admin' />
+      {hideInternalTools ? null : (
+        <ShellDropdown.Item icon={Shield} label='Admin' />
+      )}
       <ShellDropdown.Separator />
       <ShellDropdown.Item icon={LogOut} label='Sign out' tone='danger' />
     </ShellDropdown>
@@ -3756,16 +4040,16 @@ const SUGGESTIONS: JovieSuggestion[] = [
   {
     id: 'sug-3',
     kind: 'release',
-    title: 'Lost in the Light needs Spotify Canvas',
-    body: 'Drops in 6 days. I have three Canvas options ready — pick one, or I’ll ship the lead pick on Wednesday.',
+    title: 'The Deep End needs Spotify Canvas',
+    body: 'The release is live. I have three Canvas options ready — pick one, or I’ll ship the lead pick on Wednesday.',
     action: 'Pick Canvas',
     rank: 3,
   },
   {
     id: 'sug-4',
     kind: 'pitch',
-    title: 'Editorial pitch ready for Stronger Than That',
-    body: 'I drafted the Spotify editorial pitch. It hits Indigo (folk-pop) and Fresh Finds. Send when you’re ready.',
+    title: 'Editorial pitch ready for Take Me Over',
+    body: 'I drafted the Spotify editorial pitch. It highlights the Erica Gibson feature and the release story. Send when you’re ready.',
     action: 'Send pitch',
     rank: 4,
   },
@@ -3779,15 +4063,7 @@ function DashboardHome() {
     []
   );
   const current = sorted[index] ?? sorted[0];
-  const hour = new Date().getHours();
-  const greeting =
-    hour < 5
-      ? 'Up late, Tim'
-      : hour < 12
-        ? 'Good morning, Tim'
-        : hour < 18
-          ? 'Afternoon, Tim'
-          : 'Evening, Tim';
+  const greeting = 'Good morning, Tim';
   const advance = () => setIndex(i => (i + 1) % sorted.length);
 
   return (
@@ -3822,7 +4098,7 @@ function DashboardHome() {
           for the morphing pill surface, slash picker, and chip tray.
           Backend wiring (useJovieChat / streaming / images) stays stubbed
           for the design pass — those wires land at flip-time. */}
-      <div className='shrink-0 mt-4 max-w-[560px] w-full mx-auto'>
+      <div className='shrink-0 mt-4 max-w-[45rem] w-full mx-auto'>
         <ChatInput
           value={composerValue}
           onChange={setComposerValue}
@@ -3868,7 +4144,7 @@ type ContextMenuItem =
 // Render a string with any matching release titles wrapped in EntityRef.
 // Releases are matched by literal substring (case-insensitive). First match
 // wins so we don't double-wrap overlapping titles. Used in Task list /
-// detail to make "Confirm artwork for Lost in the Light" hoverable.
+// detail to make release-specific task titles hoverable.
 function renderWithEntities(
   text: string,
   releases: Release[],
@@ -3890,7 +4166,7 @@ function renderWithEntities(
   const before = text.slice(0, bestStart);
   const match = text.slice(bestStart, bestEnd);
   const after = text.slice(bestEnd);
-  const entity = lookupReleaseEntityByAlbum(bestRelease.album, bestRelease.id);
+  const entity = releaseToEntityPopover(bestRelease);
   return (
     <>
       {before}
@@ -3940,9 +4216,10 @@ const LIBRARY_SAVED_PREDICATES: Record<
   approved: a => a.status === 'approved',
   reels: a => a.aspect === '9:16',
   review: a => a.status === 'review',
-  'this-noise': a => a.release === 'this-noise',
+  'deep-end': a => a.release === 'the-deep-end',
   'this-week': a => {
-    const days = (Date.now() - new Date(a.addedAt).getTime()) / 86400000;
+    const days =
+      (LIBRARY_DEMO_NOW_MS - new Date(a.addedAt).getTime()) / 86400000;
     return days <= 7 && a.generatedBy === 'jovie';
   },
 };
@@ -4022,8 +4299,7 @@ function LibraryShellEmbed({
       className='h-full w-full grid overflow-hidden'
       style={{
         gridTemplateColumns: drawerOpen ? '1fr 388px' : '1fr 0px',
-        transition:
-          'grid-template-columns 420ms cubic-bezier(0.32, 0.72, 0, 1)',
+        transition: `grid-template-columns var(--ds-motion-cinematic-duration) var(--ds-motion-cinematic-easing)`,
       }}
     >
       <div className='flex flex-col min-w-0 overflow-hidden'>
@@ -4169,7 +4445,7 @@ function mockThreadMarkdown(thread: Thread): string {
       '2. Generated 3 candidate frames at 1080×1920',
       '3. Locking the chorus crop now',
       '',
-      'I’ll drop the final clip in **Lost in the Light** when ready.',
+      'I’ll drop the final clip in **The Deep End** when ready.',
     ].join('\n');
   }
   return [
@@ -4177,7 +4453,7 @@ function mockThreadMarkdown(thread: Thread): string {
     '',
     '- Lyric video (1080×1920, 0:34) — added to the library',
     '- Smart link updated with a Spotify Canvas variant',
-    '- Pinned a quick approval task on **Lost in the Light**',
+    '- Pinned a quick approval task on **The Deep End**',
     '',
     'Open the release page to confirm the render before I push it live.',
   ].join('\n');
@@ -4198,17 +4474,17 @@ function ThreadView({ thread }: { thread: Thread }) {
       {thread.status === 'complete' && (
         <>
           <ThreadImageCard
-            prompt='Lost in the Light · Spotify Canvas'
+            prompt='The Deep End · Spotify Canvas'
             status='ready'
             previewUrl={THREAD_DEMO_PREVIEW}
           />
           <ThreadAudioCard
-            title='Lost in the Light'
-            artist='Bahamas'
+            title='The Deep End'
+            artist='Cosmic Gate & Tim White'
             duration='3:33'
           />
           <ThreadVideoCard
-            title='Lost in the Light · lyric video'
+            title='The Deep End · lyric video'
             durationSec={34}
           />
         </>
@@ -4216,7 +4492,7 @@ function ThreadView({ thread }: { thread: Thread }) {
       {thread.status === 'running' && (
         <>
           <ThreadImageCard
-            prompt='Lost in the Light · Spotify Canvas'
+            prompt='The Deep End · Spotify Canvas'
             status='generating'
           />
           <ThreadTurn speaker='jovie' subtle>
@@ -4282,7 +4558,7 @@ function OnboardingCanvas({ onComplete }: { onComplete: () => void }) {
                 <button
                   type='button'
                   onClick={onComplete}
-                  className='inline-flex items-center gap-1.5 h-8 px-4 rounded-full text-[12px] font-medium bg-white text-black hover:brightness-110 active:scale-[0.99] shadow-[0_4px_14px_rgba(0,0,0,0.35),inset_0_1px_0_rgba(255,255,255,0.45)] transition-all duration-150 ease-out'
+                  className='inline-flex items-center gap-1.5 h-8 px-4 rounded-full text-[12px] font-medium bg-white text-black hover:brightness-110 active:scale-[0.99] shadow-[0_4px_14px_rgba(0,0,0,0.35),inset_0_1px_0_rgba(255,255,255,0.45)] transition-colors duration-subtle ease-out'
                 >
                   Open Jovie
                   <ArrowRight className='h-3 w-3' strokeWidth={2.5} />
@@ -4301,7 +4577,7 @@ function OnboardingCanvas({ onComplete }: { onComplete: () => void }) {
           opacity: stage === 'welcome' ? 1 : 0,
           maxHeight: stage === 'welcome' ? 100 : 0,
           overflow: 'hidden',
-          transition: `opacity 300ms ${EASE_CINEMATIC}, max-height 600ms ${EASE_CINEMATIC}`,
+          transition: `opacity var(--ds-motion-subtle-duration) var(--ds-motion-cinematic-easing), max-height var(--ds-motion-cinematic-duration) var(--ds-motion-cinematic-easing)`,
         }}
       >
         <BrandLogo
@@ -4322,7 +4598,7 @@ function OnboardingCanvas({ onComplete }: { onComplete: () => void }) {
           it doesn't lose focus mid-animation. Bottom padding animates
           from a tall spacer (centered) to chat-pinned. */}
       <footer className='shrink-0 px-8 pt-2'>
-        <div className='max-w-2xl mx-auto'>
+        <div className='mx-auto max-w-[45rem]'>
           <ChatInput
             value={draft}
             onChange={setDraft}
@@ -4344,7 +4620,7 @@ function OnboardingCanvas({ onComplete }: { onComplete: () => void }) {
         className='shrink-0'
         style={{
           maxHeight: stage === 'welcome' ? 'calc(45vh - 80px)' : '16px',
-          transition: `max-height 600ms ${EASE_CINEMATIC}`,
+          transition: `max-height var(--ds-motion-cinematic-duration) var(--ds-motion-cinematic-easing)`,
         }}
       />
     </article>
@@ -4395,7 +4671,7 @@ function settingsRowsFor(id: SettingsSectionId): Array<{
   const editBtn = (
     <button
       type='button'
-      className='inline-flex items-center h-7 px-3 rounded-md text-[12px] text-secondary-token hover:text-primary-token border border-(--linear-app-shell-border) bg-(--surface-0) hover:bg-surface-1/60 transition-colors duration-150 ease-out'
+      className='inline-flex items-center h-7 px-3 rounded-md text-[12px] text-secondary-token hover:text-primary-token border border-(--linear-app-shell-border) bg-(--surface-0) hover:bg-surface-1/60 transition-colors duration-subtle ease-out'
     >
       Edit
     </button>
@@ -4475,7 +4751,7 @@ function settingsRowsFor(id: SettingsSectionId): Array<{
           control: (
             <button
               type='button'
-              className='inline-flex items-center h-7 px-3 rounded-md text-[12px] font-medium bg-white text-black hover:brightness-110 active:scale-[0.99] transition-all duration-150 ease-out'
+              className='inline-flex items-center h-7 px-3 rounded-md text-[12px] font-medium bg-white text-black hover:brightness-110 active:scale-[0.99] transition-colors duration-subtle ease-out'
             >
               Upgrade to Pro
             </button>
@@ -4509,7 +4785,7 @@ function settingsRowsFor(id: SettingsSectionId): Array<{
           control: (
             <button
               type='button'
-              className='inline-flex items-center h-7 px-3 rounded-md text-[12px] text-secondary-token hover:text-primary-token border border-(--linear-app-shell-border) bg-(--surface-0) hover:bg-surface-1/60 transition-colors duration-150 ease-out'
+              className='inline-flex items-center h-7 px-3 rounded-md text-[12px] text-secondary-token hover:text-primary-token border border-(--linear-app-shell-border) bg-(--surface-0) hover:bg-surface-1/60 transition-colors duration-subtle ease-out'
             >
               Connect
             </button>
@@ -4521,7 +4797,7 @@ function settingsRowsFor(id: SettingsSectionId): Array<{
           control: (
             <button
               type='button'
-              className='inline-flex items-center h-7 px-3 rounded-md text-[12px] text-secondary-token hover:text-primary-token border border-(--linear-app-shell-border) bg-(--surface-0) hover:bg-surface-1/60 transition-colors duration-150 ease-out'
+              className='inline-flex items-center h-7 px-3 rounded-md text-[12px] text-secondary-token hover:text-primary-token border border-(--linear-app-shell-border) bg-(--surface-0) hover:bg-surface-1/60 transition-colors duration-subtle ease-out'
             >
               Connect
             </button>
@@ -4536,7 +4812,7 @@ function settingsRowsFor(id: SettingsSectionId): Array<{
           control: (
             <button
               type='button'
-              className='inline-flex items-center h-7 px-3 rounded-md text-[12px] text-secondary-token hover:text-rose-200 border border-(--linear-app-shell-border) bg-(--surface-0) hover:border-rose-400/40 hover:bg-rose-500/[0.06] transition-colors duration-150 ease-out'
+              className='inline-flex items-center h-7 px-3 rounded-md text-[12px] text-secondary-token hover:text-rose-200 border border-(--linear-app-shell-border) bg-(--surface-0) hover:border-rose-400/40 hover:bg-rose-500/[0.06] transition-colors duration-subtle ease-out'
             >
               Reset workspace
             </button>
@@ -4549,7 +4825,7 @@ function settingsRowsFor(id: SettingsSectionId): Array<{
           control: (
             <button
               type='button'
-              className='inline-flex items-center h-7 px-3 rounded-md text-[12px] text-secondary-token hover:text-rose-200 border border-(--linear-app-shell-border) bg-(--surface-0) hover:border-rose-400/40 hover:bg-rose-500/[0.06] transition-colors duration-150 ease-out'
+              className='inline-flex items-center h-7 px-3 rounded-md text-[12px] text-secondary-token hover:text-rose-200 border border-(--linear-app-shell-border) bg-(--surface-0) hover:border-rose-400/40 hover:bg-rose-500/[0.06] transition-colors duration-subtle ease-out'
             >
               Delete account
             </button>
@@ -4734,16 +5010,20 @@ function ReleaseRow({
 }) {
   const runningThread = findRunningThreadFor('release', release.id, THREADS);
   return (
-    // biome-ignore lint/a11y/noNoninteractiveElementInteractions: list row activates via parent section's keyboard handler; mouse-click is a convenience
-    // biome-ignore lint/a11y/useKeyWithClickEvents: see above — parent section handles ↑/↓/Enter/Space/Esc
+    // biome-ignore lint/a11y/noNoninteractiveElementInteractions: parent section owns keyboard navigation; row listener mirrors click for Sonar.
     <li
       ref={rowRef}
       onClick={onSelect}
+      onKeyDown={event => {
+        if (!isSelfActivationKey(event)) return;
+        event.preventDefault();
+        onSelect();
+      }}
       onContextMenu={e => onContextMenu?.(e, release)}
       data-selected={isSelected || undefined}
       data-focused={isFocused || undefined}
       className={cn(
-        'group/row relative grid items-center gap-3 h-[52px] rounded-md pl-2 pr-3 cursor-pointer transition-colors duration-150 ease-out focus:outline-none',
+        'group/row relative grid items-center gap-3 h-[52px] rounded-md pl-2 pr-3 cursor-pointer transition-colors duration-subtle ease-out focus:outline-none',
         // [#] [art] [title/artist+badge fluid] [date] [right cluster: streams + DSP stack]
         drawerOpen
           ? 'grid-cols-[24px_40px_minmax(0,1fr)_auto]'
@@ -4758,7 +5038,7 @@ function ReleaseRow({
       <div className='relative grid place-items-center w-6'>
         <span
           className={cn(
-            'text-[12px] tabular-nums text-quaternary-token transition-opacity duration-150 ease-out',
+            'text-[12px] tabular-nums text-quaternary-token transition-opacity duration-subtle ease-out',
             (isCurrentTrack || isPlaying) && 'opacity-0',
             !isCurrentTrack && 'group-hover/row:opacity-0'
           )}
@@ -4773,7 +5053,7 @@ function ReleaseRow({
             onPlay();
           }}
           className={cn(
-            'absolute inset-0 grid place-items-center text-primary-token transition-opacity duration-150 ease-out',
+            'absolute inset-0 grid place-items-center text-primary-token transition-opacity duration-subtle ease-out',
             isCurrentTrack
               ? 'opacity-0'
               : 'opacity-0 group-hover/row:opacity-100'
@@ -4819,7 +5099,7 @@ function ReleaseRow({
               e.stopPropagation();
               onFilterByArtist(release.artist);
             }}
-            className='hover:text-primary-token transition-colors duration-150 ease-out'
+            className='hover:text-primary-token transition-colors duration-subtle ease-out'
             title='Filter by artist'
           >
             {release.artist}
@@ -4892,7 +5172,7 @@ function ReleaseRowMoreMenu({ release }: { release: Release }) {
             type='button'
             aria-label='Release actions'
             className={cn(
-              'h-5 w-5 rounded grid place-items-center text-quaternary-token hover:text-primary-token hover:bg-surface-2/70 transition-opacity duration-150 ease-out',
+              'h-5 w-5 rounded grid place-items-center text-quaternary-token hover:text-primary-token hover:bg-surface-2/70 transition-opacity duration-subtle ease-out',
               'opacity-0 group-hover/row:opacity-100 focus-visible:opacity-100 data-[state=open]:opacity-100 data-[state=open]:text-primary-token'
             )}
           >
@@ -5058,6 +5338,7 @@ function ReleaseDrawer({
   return (
     <aside
       aria-hidden={!open}
+      data-testid='shell-v1-release-drawer'
       // Each card floats on the page bg as its own elevated peer — no
       // dividing line between drawer and canvas, no shared border. The gap
       // around the cards is the visual separator. Page bg is darkest;
@@ -5066,7 +5347,7 @@ function ReleaseDrawer({
       style={{
         opacity: open ? 1 : 0,
         transform: open ? 'translateX(0)' : 'translateX(16px)',
-        transition: `opacity 220ms ${EASE_CINEMATIC}, transform ${DURATION_CINEMATIC}ms ${EASE_CINEMATIC}`,
+        transition: `opacity var(--ds-motion-subtle-duration) var(--ds-motion-cinematic-easing), transform ${DURATION_CINEMATIC}ms var(--ds-motion-cinematic-easing)`,
         width: '100%',
         minWidth: 0,
       }}
@@ -5493,7 +5774,7 @@ function DrawerDistribution({ release }: { release: Release }) {
                 <li key={p.id}>
                   <button
                     type='button'
-                    className='w-full flex items-center gap-2.5 h-7 px-2 rounded-md text-[12px] text-secondary-token hover:bg-surface-1/40 hover:text-primary-token transition-colors duration-150 ease-out'
+                    className='w-full flex items-center gap-2.5 h-7 px-2 rounded-md text-[12px] text-secondary-token hover:bg-surface-1/40 hover:text-primary-token transition-colors duration-subtle ease-out'
                   >
                     <span
                       className='h-[16px] w-[16px] rounded grid place-items-center text-[8.5px] font-semibold text-white shrink-0'
@@ -5828,7 +6109,7 @@ function TracksView({
           <button
             type='button'
             onClick={onKeyModeToggle}
-            className='w-[58px] shrink-0 inline-flex items-center justify-end gap-1 text-[9.5px] uppercase tracking-[0.12em] font-medium text-quaternary-token/85 hover:text-secondary-token transition-colors duration-150 ease-out'
+            className='w-[58px] shrink-0 inline-flex items-center justify-end gap-1 text-[9.5px] uppercase tracking-[0.12em] font-medium text-quaternary-token/85 hover:text-secondary-token transition-colors duration-subtle ease-out'
             title={`Switch to ${keyMode === 'normal' ? 'Camelot' : 'standard'} key notation`}
           >
             {keyMode === 'normal' ? 'Key' : 'Cam'}
@@ -5925,15 +6206,19 @@ function TrackRow({
   const showPlayingBars = isPlaying && !muteHighlight;
   const runningThread = findRunningThreadFor('track', track.id, THREADS);
   return (
-    // biome-ignore lint/a11y/noNoninteractiveElementInteractions: parent section delegates ↑/↓/Space; row click is a focus convenience
-    // biome-ignore lint/a11y/useKeyWithClickEvents: same
+    // biome-ignore lint/a11y/noNoninteractiveElementInteractions: parent section owns keyboard navigation; row listener mirrors click for Sonar.
     <li
       ref={rowRef}
       onClick={onSelect}
+      onKeyDown={event => {
+        if (!isSelfActivationKey(event)) return;
+        event.preventDefault();
+        onSelect();
+      }}
       onContextMenu={e => onContextMenu?.(e, track)}
       data-focused={isFocused || undefined}
       className={cn(
-        'group/row relative flex items-center gap-3 h-[44px] pl-2 pr-3 rounded-md cursor-pointer transition-colors duration-150 ease-out focus:outline-none',
+        'group/row relative flex items-center gap-3 h-[44px] pl-2 pr-3 rounded-md cursor-pointer transition-colors duration-subtle ease-out focus:outline-none',
         !isFocused && !kbActive && 'hover:bg-surface-1/40',
         SELECTED_ROW_CLASSES
       )}
@@ -5942,7 +6227,7 @@ function TrackRow({
       <div className='relative w-5 shrink-0 grid place-items-center'>
         <span
           className={cn(
-            'text-[11px] tabular-nums text-quaternary-token transition-opacity duration-150 ease-out',
+            'text-[11px] tabular-nums text-quaternary-token transition-opacity duration-subtle ease-out',
             showPlayingBars && 'opacity-0',
             !isCurrentTrack && 'group-hover/row:opacity-0'
           )}
@@ -5957,7 +6242,7 @@ function TrackRow({
             onPlay();
           }}
           className={cn(
-            'absolute inset-0 grid place-items-center text-primary-token transition-opacity duration-150 ease-out',
+            'absolute inset-0 grid place-items-center text-primary-token transition-opacity duration-subtle ease-out',
             isCurrentTrack
               ? 'opacity-0'
               : 'opacity-0 group-hover/row:opacity-100'
@@ -5982,8 +6267,8 @@ function TrackRow({
       <ArtworkThumb src={track.artwork} title={track.title} size={28} />
 
       {/* Title (with feat. subtitle for collabs). We're inside an artist
-          context (Bahamas / Dashboard breadcrumb), so the primary artist
-          is implicit — only collaborators surface here. */}
+          context, so the primary artist is implicit — only collaborators
+          surface here. */}
       <div className='flex-1 min-w-0'>
         <div className='flex items-baseline gap-2 min-w-0'>
           <span className='truncate text-[13px] font-caption text-primary-token tracking-[-0.012em]'>
@@ -6013,7 +6298,7 @@ function TrackRow({
           playing/selected row's waveform pops by contrast. */}
       <div
         className={cn(
-          'w-[176px] shrink-0 transition-opacity duration-150 ease-out',
+          'w-[176px] shrink-0 transition-opacity duration-subtle ease-out',
           isCurrentTrack || isFocused
             ? 'opacity-100'
             : 'opacity-60 group-hover/row:opacity-90'
@@ -6199,7 +6484,7 @@ function TasksView({
           </span>
           <button
             type='button'
-            className='ml-auto h-6 px-2 rounded-md text-[10.5px] uppercase tracking-[0.08em] text-tertiary-token hover:text-primary-token hover:bg-surface-1 transition-colors duration-150 ease-out'
+            className='ml-auto h-6 px-2 rounded-md text-[10.5px] uppercase tracking-[0.08em] text-tertiary-token hover:text-primary-token hover:bg-surface-1 transition-colors duration-subtle ease-out'
           >
             Filter
           </button>
@@ -6287,15 +6572,19 @@ function TaskListItem({
 }) {
   const runningThread = findRunningThreadFor('task', task.id, THREADS);
   return (
-    // biome-ignore lint/a11y/noNoninteractiveElementInteractions: parent section delegates ↑/↓
-    // biome-ignore lint/a11y/useKeyWithClickEvents: same
+    // biome-ignore lint/a11y/noNoninteractiveElementInteractions: parent section owns keyboard navigation; row listener mirrors click for Sonar.
     <li
       ref={rowRef}
       onClick={onSelect}
+      onKeyDown={event => {
+        if (!isSelfActivationKey(event)) return;
+        event.preventDefault();
+        onSelect();
+      }}
       onContextMenu={e => onContextMenu?.(e, task)}
       data-focused={isFocused || isSelected || undefined}
       className={cn(
-        'group/row relative flex items-start gap-3 py-2 pl-2 pr-3 rounded-md cursor-pointer transition-colors duration-150 ease-out',
+        'group/row relative flex items-start gap-3 py-2 pl-2 pr-3 rounded-md cursor-pointer transition-colors duration-subtle ease-out',
         !isFocused && !isSelected && !kbActive && 'hover:bg-surface-1/40',
         SELECTED_ROW_CLASSES
       )}
@@ -6373,7 +6662,7 @@ function TaskRowMoreMenu({ task: _task }: { task: Task }) {
             type='button'
             aria-label='Task actions'
             className={cn(
-              'h-5 w-5 rounded grid place-items-center text-quaternary-token hover:text-primary-token hover:bg-surface-2/70 transition-opacity duration-150 ease-out',
+              'h-5 w-5 rounded grid place-items-center text-quaternary-token hover:text-primary-token hover:bg-surface-2/70 transition-opacity duration-subtle ease-out',
               'opacity-0 group-hover/row:opacity-100 focus-visible:opacity-100 data-[state=open]:opacity-100 data-[state=open]:text-primary-token'
             )}
           >

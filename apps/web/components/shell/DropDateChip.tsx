@@ -1,5 +1,6 @@
 import { Calendar } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { ShellMetadataChip } from './ShellMetadataChip';
 
 export type DropDateTone = 'past' | 'soon' | 'future';
 
@@ -15,6 +16,16 @@ export interface DropDateChipProps {
   readonly className?: string;
 }
 
+function normalizeDropDateLabel(label: string): string {
+  const match = label.trim().match(/^(\d+)d ago$/);
+  if (!match) return label;
+
+  const days = Number(match[1]);
+  if (!Number.isFinite(days) || days < 365) return label;
+
+  return `${Math.max(1, Math.round(days / 365))}y ago`;
+}
+
 /**
  * DropDateChip — calendar-iconified pill for release-date messaging.
  * `'soon'` lights up cyan to call attention; `'past'` and `'future'`
@@ -28,24 +39,23 @@ export interface DropDateChipProps {
  */
 export function DropDateChip({ label, tone, className }: DropDateChipProps) {
   const isSoon = tone === 'soon';
+  const normalizedLabel = normalizeDropDateLabel(label);
+
   return (
-    <span
-      className={cn(
-        'inline-flex items-center gap-1.5 h-[18px] pl-1.5 pr-2 rounded border text-[10px] font-caption uppercase tracking-[0.06em] whitespace-nowrap',
-        isSoon
-          ? 'border-cyan-300/40 bg-cyan-500/10 text-cyan-200/90'
-          : 'border-(--linear-app-shell-border)/70 bg-(--surface-1)/40 text-tertiary-token',
-        className
-      )}
+    <ShellMetadataChip
+      tone={isSoon ? 'soon' : 'neutral'}
+      className={className}
+      icon={
+        <Calendar
+          className={cn(
+            'h-2.5 w-2.5',
+            isSoon ? 'text-cyan-300/80' : 'text-quaternary-token'
+          )}
+          strokeWidth={2.25}
+        />
+      }
     >
-      <Calendar
-        className={cn(
-          'h-2.5 w-2.5 shrink-0',
-          isSoon ? 'text-cyan-300/80' : 'text-quaternary-token'
-        )}
-        strokeWidth={2.25}
-      />
-      <span>{label}</span>
-    </span>
+      {normalizedLabel}
+    </ShellMetadataChip>
   );
 }

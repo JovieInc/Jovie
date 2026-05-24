@@ -18,6 +18,7 @@ struct VenueModeView: View {
             .scaledToFit()
             .padding(24)
             .background(Color.white, in: RoundedRectangle(cornerRadius: 28, style: .continuous))
+            .accessibilityLabel("Fullscreen Profile QR Code")
         }
 
         Button("Done") {

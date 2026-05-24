@@ -1,9 +1,9 @@
 import { TooltipProvider } from '@jovie/ui';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { fireEvent, screen } from '@testing-library/react';
+import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import type { ComponentProps, ReactNode } from 'react';
-import { describe, expect, it, vi } from 'vitest';
+import { type ComponentProps, type ReactNode, useState } from 'react';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { ChatInput } from '@/components/jovie/components/ChatInput';
 import { fastRender } from '@/tests/utils/fast-render';
@@ -77,6 +77,69 @@ vi.mock('motion/react', () => ({
   useReducedMotion: () => false,
 }));
 
+class MockSpeechRecognition extends EventTarget {
+  static instances: MockSpeechRecognition[] = [];
+
+  continuous = false;
+  interimResults = false;
+  lang = '';
+  onresult: ((event: Event) => void) | null = null;
+  onend: (() => void) | null = null;
+  onerror: ((event: Event) => void) | null = null;
+  start = vi.fn();
+  stop = vi.fn();
+
+  constructor() {
+    super();
+    MockSpeechRecognition.instances.push(this);
+  }
+}
+
+function installMockSpeechRecognition() {
+  Object.defineProperty(window, 'SpeechRecognition', {
+    configurable: true,
+    value: MockSpeechRecognition,
+  });
+}
+
+function removeMockSpeechRecognition() {
+  MockSpeechRecognition.instances = [];
+  Reflect.deleteProperty(window, 'SpeechRecognition');
+  Reflect.deleteProperty(window, 'webkitSpeechRecognition');
+}
+
+function setElectronAPI(api: object) {
+  Object.defineProperty(window, 'electronAPI', {
+    configurable: true,
+    writable: true,
+    value: api,
+  });
+}
+
+function removeElectronAPI() {
+  Reflect.deleteProperty(window, 'electronAPI');
+  delete document.documentElement.dataset.desktopRuntime;
+}
+
+function ControlledChatInputHarness() {
+  const [value, setValue] = useState('');
+
+  return (
+    <ChatInput
+      value={value}
+      onChange={setValue}
+      onSubmit={vi.fn()}
+      isLoading={false}
+      isSubmitting={false}
+    />
+  );
+}
+
+afterEach(() => {
+  removeMockSpeechRecognition();
+  removeElectronAPI();
+});
+
 describe('ChatInput', () => {
   const baseProps = {
     value: 'Hello there',
@@ -121,7 +184,7 @@ describe('ChatInput', () => {
     expect(getByRole('menu')).toBeInTheDocument();
   });
 
-  it('reveals quick actions when the composer is focused', () => {
+  it('renders quick actions inside the slash menu instead of below the composer', () => {
     const onQuickActionSelect = vi.fn();
     fastRender(
       withProviders(
@@ -142,10 +205,326 @@ describe('ChatInput', () => {
     fireEvent.focus(
       screen.getByRole('textbox', { name: /chat message input/i })
     );
+    fireEvent.change(
+      screen.getByRole('textbox', { name: /chat message input/i }),
+      {
+        target: { value: '/' },
+      }
+    );
 
-    expect(screen.getByTestId('chat-input-quick-actions')).toBeInTheDocument();
+    expect(screen.queryByTestId('chat-input-quick-actions')).toBeNull();
+    expect(screen.getByTestId('slash-command-menu')).toBeInTheDocument();
+    expect(screen.getByText('Suggestions')).toBeInTheDocument();
+
+    const action = screen.getByText('Summarize this thread').closest('button');
+    expect(action).toBeTruthy();
+    fireEvent.mouseDown(action!);
+    expect(onQuickActionSelect).toHaveBeenCalledWith(
+      'Summarize this thread in three concise bullets.'
+    );
+  });
+
+  it('renders the elevated no-shadow composer geometry', () => {
+    fastRender(
+      withProviders(
+        <ChatInput {...baseProps} value='' onImageAttach={vi.fn()} />
+      )
+    );
+
+    const surface = screen.getByTestId('chat-composer-surface');
+    expect(surface.className).toContain('--linear-app-content-surface');
+    expect(surface.className).toContain('--linear-app-frame-seam');
+    expect(surface.className).toContain('shadow-none');
+    expect(surface.className).toContain('--linear-border-focus');
+
+    const textarea = screen.getByRole('textbox', {
+      name: /chat message input/i,
+    });
+    expect(textarea.className).toContain('text-[15px]');
+    expect(textarea.className).toContain('leading-6');
+    expect(textarea.className).toContain('text-white/92');
+    expect(textarea.className).toContain('focus-visible:shadow-none!');
+    expect(textarea).toHaveStyle({
+      boxShadow: 'none',
+      outline: 'none',
+    });
+
+    for (const buttonName of [
+      /attachment options/i,
+      /dictation unavailable/i,
+      /send message/i,
+    ]) {
+      expect(
+        screen.getByRole('button', { name: buttonName }).className
+      ).toMatch(/h-8 w-8/);
+    }
+  });
+
+  it('renders the larger hero composer geometry for the empty state', () => {
+    fastRender(
+      withProviders(
+        <ChatInput
+          {...baseProps}
+          value=''
+          onImageAttach={vi.fn()}
+          variant='hero'
+        />
+      )
+    );
+
+    const surface = screen.getByTestId('chat-composer-surface');
+    expect(surface.getAttribute('data-variant')).toBe('hero');
+    expect(surface.style.maxWidth).toBe('min(calc(100vw - 32px), 840px)');
+    expect(surface.style.borderRadius).toBe('36px');
+
+    expect(surface.firstElementChild?.firstElementChild?.className).toContain(
+      'min-h-[52px]'
+    );
+
+    const inlineField = screen.getByTestId('chat-input-inline-field');
+    expect(inlineField.className).toContain('min-h-8');
+
+    const textarea = screen.getByRole('textbox', {
+      name: /chat message input/i,
+    });
+    expect(textarea.className).toContain('text-[15px]');
+    expect(textarea.className).toContain('leading-6');
+  });
+
+  it('renders the larger hero pill geometry even while typing the first message in an empty chat', () => {
+    fastRender(
+      withProviders(
+        <ChatInput
+          {...baseProps}
+          value='draft message'
+          onImageAttach={vi.fn()}
+          variant='hero'
+        />
+      )
+    );
+
+    const surface = screen.getByTestId('chat-composer-surface');
+    expect(surface.style.borderRadius).toBe('36px');
+
+    expect(surface.firstElementChild?.firstElementChild?.className).toContain(
+      'min-h-[52px]'
+    );
+  });
+
+  it('renders the grid layout (not pill) for hero variant when pending images are present', () => {
+    const pendingImages = [
+      {
+        id: 'p1',
+        name: 'preview.png',
+        mediaType: 'image/png',
+        previewUrl: 'blob:mock',
+        dataUrl: 'data:image/png;base64,AAAA',
+      },
+    ];
+    fastRender(
+      withProviders(
+        <ChatInput
+          {...baseProps}
+          value=''
+          onImageAttach={vi.fn()}
+          pendingImages={pendingImages}
+          onRemoveImage={vi.fn()}
+          variant='hero'
+        />
+      )
+    );
+
+    const surface = screen.getByTestId('chat-composer-surface');
+    expect(surface.style.borderRadius).toBe('36px'); // geometry still 36 for hero non-entity
+
+    const inlineField = screen.getByTestId('chat-input-inline-field');
+    const container = inlineField.parentElement;
+    expect(container?.className).toContain('min-h-[64px]');
+    expect(container?.className).toContain('grid');
+    expect(container?.className).not.toContain('min-h-[52px]');
+  });
+
+  it('keeps a quiet disabled dictation control when speech input is unavailable', () => {
+    fastRender(withProviders(<ChatInput {...baseProps} />));
+
+    const dictationButton = screen.getByRole('button', {
+      name: /dictation unavailable/i,
+    });
+
+    expect(dictationButton).toBeDisabled();
+    expect(screen.getByRole('button', { name: /send message/i })).toBeEnabled();
+  });
+
+  it('toggles dictation when speech input is supported', async () => {
+    const user = userEvent.setup();
+    installMockSpeechRecognition();
+
+    fastRender(withProviders(<ChatInput {...baseProps} />));
+
+    const dictationButton = await screen.findByRole('button', {
+      name: /dictate message/i,
+    });
+    await waitFor(() => expect(dictationButton).toBeEnabled());
+
+    await user.click(dictationButton);
+
+    expect(MockSpeechRecognition.instances).toHaveLength(1);
+    expect(MockSpeechRecognition.instances[0]?.start).toHaveBeenCalledTimes(1);
     expect(
-      screen.getByRole('button', { name: 'Summarize this thread' })
+      screen.getByRole('button', { name: /stop dictation/i })
+    ).toBeEnabled();
+
+    await user.click(screen.getByRole('button', { name: /stop dictation/i }));
+
+    expect(MockSpeechRecognition.instances[0]?.stop).toHaveBeenCalledTimes(1);
+    expect(
+      screen.getByRole('button', { name: /dictate message/i })
+    ).toBeEnabled();
+  });
+
+  it('keeps dictation disabled in stale Electron when the desktop bridge cannot allow fallback', async () => {
+    installMockSpeechRecognition();
+    setElectronAPI({ versions: { app: '0.1.0' } });
+
+    fastRender(withProviders(<ChatInput {...baseProps} />));
+
+    const dictationButton = screen.getByRole('button', {
+      name: /dictation unavailable/i,
+    });
+    await waitFor(() => expect(dictationButton).toBeDisabled());
+    expect(MockSpeechRecognition.instances).toHaveLength(0);
+  });
+
+  it('uses Web Speech fallback when the Electron bridge allows trusted dictation', async () => {
+    const user = userEvent.setup();
+    installMockSpeechRecognition();
+    setElectronAPI({
+      getDictationStatus: vi.fn().mockResolvedValue({
+        ok: true,
+        nativeAvailable: false,
+        webSpeechFallbackAllowed: true,
+        mode: 'web-speech',
+        reason: 'native-unavailable',
+      }),
+    });
+
+    fastRender(withProviders(<ChatInput {...baseProps} />));
+
+    const dictationButton = await screen.findByRole('button', {
+      name: /dictate message/i,
+    });
+    await waitFor(() => expect(dictationButton).toBeEnabled());
+    await user.click(dictationButton);
+
+    expect(MockSpeechRecognition.instances).toHaveLength(1);
+    expect(MockSpeechRecognition.instances[0]?.start).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps structured chips inline with the editable text field', () => {
+    fastRender(
+      withProviders(
+        <ChatInput
+          {...baseProps}
+          value=''
+          chips={[
+            {
+              type: 'entity',
+              kind: 'release',
+              id: 'rel_1',
+              label: 'Performance Budget',
+              uid: 'chip-release-1',
+            },
+          ]}
+          onRemoveChipAt={vi.fn()}
+        />
+      )
+    );
+
+    const inlineField = screen.getByTestId('chat-input-inline-field');
+    expect(
+      within(inlineField).getByText('Performance Budget')
     ).toBeInTheDocument();
+    expect(screen.getByTitle('Release: Performance Budget')).toHaveStyle({
+      '--jovie-entity-accent': 'var(--geist-purple-solid)',
+    });
+    expect(inlineField).toContainElement(
+      screen.getByRole('textbox', { name: /chat message input/i })
+    );
+    expect(screen.getByTestId('chat-input-chip-tray')).toHaveClass('contents');
+  });
+
+  it('lets keyboard users remove skill chips', async () => {
+    const user = userEvent.setup();
+    const onRemoveChipAt = vi.fn();
+
+    fastRender(
+      withProviders(
+        <ChatInput
+          {...baseProps}
+          value=''
+          chips={[
+            {
+              type: 'skill',
+              id: 'generateAlbumArt',
+              uid: 'chip-skill-1',
+            },
+          ]}
+          onRemoveChipAt={onRemoveChipAt}
+        />
+      )
+    );
+
+    screen
+      .getByRole('button', { name: /remove generate album art skill/i })
+      .focus();
+    await user.keyboard('{Enter}');
+
+    expect(onRemoveChipAt).toHaveBeenCalledWith(0);
+  });
+
+  it('keeps empty submit disabled until content or attachments are present', async () => {
+    const user = userEvent.setup();
+    const onSubmit = vi.fn();
+    fastRender(
+      withProviders(<ChatInput {...baseProps} value='' onSubmit={onSubmit} />)
+    );
+
+    const sendButton = screen.getByRole('button', { name: /send message/i });
+    expect(sendButton).toBeDisabled();
+    await user.click(sendButton);
+    expect(onSubmit).not.toHaveBeenCalled();
+  });
+
+  it('enables send when textarea DOM input is replayed into controlled state', async () => {
+    fastRender(withProviders(<ControlledChatInputHarness />));
+
+    const textarea = screen.getByRole('textbox', {
+      name: /chat message input/i,
+    });
+    const sendButton = screen.getByRole('button', { name: /send message/i });
+    expect(sendButton).toBeDisabled();
+
+    fireEvent.input(textarea, {
+      target: { value: 'typed while the page was still hydrating' },
+    });
+
+    await waitFor(() => expect(sendButton).toBeEnabled());
+  });
+
+  it('shows the stop action while streaming even when the draft is empty', async () => {
+    const user = userEvent.setup();
+    const onStop = vi.fn();
+    fastRender(
+      withProviders(
+        <ChatInput {...baseProps} value='' isStreaming onStop={onStop} />
+      )
+    );
+
+    const stopButton = screen.getByRole('button', {
+      name: /stop generating/i,
+    });
+    expect(stopButton).toBeEnabled();
+    await user.click(stopButton);
+    expect(onStop).toHaveBeenCalledTimes(1);
   });
 });

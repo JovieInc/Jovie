@@ -8,11 +8,10 @@ import {
 } from '@jovie/ui';
 import {
   ArrowLeft,
-  ChevronDown,
   Copy,
-  Download,
+  PanelLeftClose,
   RefreshCw,
-  SquarePen,
+  Settings,
 } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
@@ -29,12 +28,14 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
+  useSidebar,
 } from '@/components/organisms/Sidebar';
 import { UserButton } from '@/components/organisms/user-button';
 import { InstallBanner } from '@/components/shell/InstallBanner';
 import { Tooltip } from '@/components/shell/Tooltip';
 import { BASE_URL } from '@/constants/domains';
 import { APP_ROUTES, isDemoRoutePath } from '@/constants/routes';
+import { useShellSidebarOverride } from '@/contexts/ShellSidebarOverrideContext';
 import { DashboardNav } from '@/features/dashboard/dashboard-nav';
 import {
   adminSettingsNavItem,
@@ -47,22 +48,21 @@ import { SidebarInstallBanner } from '@/features/feedback/SidebarInstallBanner';
 import { SidebarUpgradeBanner } from '@/features/feedback/SidebarUpgradeBanner';
 import { copyToClipboard } from '@/hooks/useClipboard';
 import { useProfileData } from '@/hooks/useProfileData';
-import { usePWAInstall } from '@/hooks/usePWAInstall';
+import { SIDEBAR_KEYBOARD_SHORTCUT_BARE } from '@/hooks/useSidebarKeyboardShortcut';
+import { useIsElectronRuntime } from '@/lib/desktop/electron-bridge';
 import { env } from '@/lib/env-client';
 import { useAppFlag } from '@/lib/flags/client';
-import { TOAST_MESSAGES } from '@/lib/hooks/useNotifications';
 import {
   useVersionMonitor,
   type VersionMismatchInfo,
 } from '@/lib/hooks/useVersionMonitor';
 import { useDashboardProfileQuery } from '@/lib/queries/useDashboardProfileQuery';
-import { usePlanGate } from '@/lib/queries/usePlanGate';
 import { cn } from '@/lib/utils';
 import { ProfileSwitcher } from './ProfileSwitcher';
 import { SidebarBottomNowPlayingBridge } from './SidebarBottomNowPlayingBridge';
 
 export interface UnifiedSidebarProps {
-  readonly section: 'admin' | 'dashboard' | 'settings';
+  readonly section: 'admin' | 'dashboard' | 'library' | 'settings';
 }
 
 const VERSION_DISMISSAL_KEY = 'jovie-version-update-dismissed';
@@ -209,45 +209,65 @@ function SettingsNavigation({
   );
 }
 
-/** Workspace button (logo + name) or back button for settings */
+/**
+ * Visible dock/pin affordance for the New Design sidebar. Opens/closes the
+ * sidebar in a way users can discover without keyboard knowledge; the same
+ * state is persisted by the existing sidebar:state cookie via the SidebarContext.
+ */
+function SidebarDockButton() {
+  const { toggleSidebar } = useSidebar();
+  return (
+    <Tooltip
+      label='Collapse sidebar'
+      side='bottom'
+      shortcut={{
+        keys: SIDEBAR_KEYBOARD_SHORTCUT_BARE,
+        description: 'Toggle sidebar',
+      }}
+      className='ml-auto group-data-[collapsible=icon]:hidden'
+    >
+      <button
+        type='button'
+        aria-label='Collapse sidebar'
+        data-sidebar-dock-button='true'
+        onClick={toggleSidebar}
+        className='flex size-7 shrink-0 items-center justify-center rounded-[10px] bg-transparent text-sidebar-item-icon transition-[background,color] duration-normal ease-interactive hover:bg-sidebar-accent/60 hover:text-sidebar-item-foreground focus-visible:outline-none focus-visible:bg-sidebar-accent/60 focus-visible:text-sidebar-item-foreground'
+      >
+        <PanelLeftClose className='size-3' />
+      </button>
+    </Tooltip>
+  );
+}
+
+/** Logo (clean header) or back button for settings/library */
 function SidebarHeaderNav({
-  isInSettings,
+  isRouteSidebar,
   isAdmin,
   isDashboardOrAdmin,
-  profileHref,
   hasMultipleProfiles,
   isDemoRoute,
+  routeBackHref = APP_ROUTES.DASHBOARD,
+  routeBackLabel = 'Back to App',
 }: Readonly<{
-  isInSettings: boolean;
+  isRouteSidebar: boolean;
   isAdmin: boolean;
   isDashboardOrAdmin: boolean;
-  profileHref: string | undefined;
   hasMultipleProfiles: boolean;
   isDemoRoute: boolean;
+  routeBackHref?: string;
+  routeBackLabel?: string;
 }>) {
-  const shellChatV1Enabled = useAppFlag('SHELL_CHAT_V1');
-  const newThreadLink = (
-    <Link
-      href={APP_ROUTES.CHAT}
-      aria-label='New thread'
-      className={cn(
-        'flex size-7 shrink-0 items-center justify-center rounded-[10px] bg-transparent text-sidebar-item-icon transition-[background,color] duration-normal ease-interactive hover:bg-sidebar-accent/60 hover:text-sidebar-item-foreground focus-visible:outline-none focus-visible:bg-sidebar-accent/60 focus-visible:text-sidebar-item-foreground',
-        !shellChatV1Enabled && 'ml-auto group-data-[collapsible=icon]:hidden'
-      )}
-    >
-      <SquarePen className='size-3' />
-    </Link>
-  );
+  const isDesktop = useIsElectronRuntime();
 
   return (
     <div className='flex w-full items-center'>
       {(() => {
-        if (isInSettings) {
+        if (isRouteSidebar) {
           return (
             <div className='flex w-full items-center gap-2'>
               <Link
-                href={APP_ROUTES.DASHBOARD}
-                aria-label='Back to App'
+                href={routeBackHref}
+                aria-label={routeBackLabel}
                 className={cn(
                   'inline-flex h-6 shrink-0 items-center gap-1 rounded-lg px-2 text-xs text-sidebar-item-foreground transition-[background,border-color,color] duration-normal ease-interactive hover:bg-sidebar-accent/55 hover:text-sidebar-item-foreground focus-visible:outline-none focus-visible:bg-sidebar-accent/55 focus-visible:text-sidebar-item-foreground [font-weight:var(--font-weight-nav)]',
                   'group-data-[collapsible=icon]:size-7 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0'
@@ -258,7 +278,7 @@ function SidebarHeaderNav({
                   aria-hidden='true'
                 />
                 <span className='truncate group-data-[collapsible=icon]:hidden'>
-                  Back to App
+                  {routeBackLabel}
                 </span>
               </Link>
             </div>
@@ -287,61 +307,37 @@ function SidebarHeaderNav({
         if (hasMultipleProfiles && !isAdmin) {
           return <ProfileSwitcher />;
         }
+        // Clean header: Jovie logo + wordmark for identity (matches Linear's
+        // workspace pill pattern). User menu lives in the bottom Settings button.
         return (
-          <UserButton
-            profileHref={profileHref}
-            settingsHref={APP_ROUTES.SETTINGS}
-            trigger={
-              <button
-                type='button'
-                aria-label='Open workspace menu'
-                className={cn(
-                  'flex h-7 w-full items-center gap-1.5 rounded-[10px] px-2.5 transition-[background,border-color,color] duration-normal ease-interactive hover:bg-sidebar-accent/60 focus-visible:outline-none focus-visible:bg-sidebar-accent/60',
-                  'group-data-[collapsible=icon]:justify-center'
-                )}
-              >
-                <BrandLogo
-                  size={14}
-                  tone='auto'
-                  rounded={false}
-                  className='rounded-sm shrink-0'
-                />
-                <span className='truncate flex-1 text-left text-app tracking-tight text-sidebar-item-foreground group-data-[collapsible=icon]:hidden [font-weight:var(--font-weight-nav)]'>
-                  {isAdmin ? 'Admin' : 'Jovie'}
-                </span>
-                <ChevronDown
-                  className='size-2.5 shrink-0 text-sidebar-item-icon group-data-[collapsible=icon]:hidden'
-                  aria-hidden='true'
-                />
-              </button>
-            }
-          />
+          <div
+            className={cn(
+              'flex h-7 w-full items-center gap-1.5 px-2.5',
+              'group-data-[collapsible=icon]:justify-center'
+            )}
+          >
+            <BrandLogo
+              size={14}
+              tone='auto'
+              rounded={false}
+              className='rounded-sm shrink-0'
+            />
+            <span className='truncate text-app tracking-tight text-sidebar-item-foreground [font-weight:var(--font-weight-nav)] group-data-[collapsible=icon]:hidden'>
+              Jovie
+            </span>
+          </div>
         );
       })()}
 
-      {!isInSettings &&
-        isDashboardOrAdmin &&
-        (shellChatV1Enabled ? (
-          <Tooltip
-            label='New thread'
-            side='bottom'
-            className='ml-auto group-data-[collapsible=icon]:hidden'
-          >
-            {newThreadLink}
-          </Tooltip>
-        ) : (
-          newThreadLink
-        ))}
+      {!isDesktop && !isRouteSidebar && isDashboardOrAdmin ? (
+        <SidebarDockButton />
+      ) : null}
     </div>
   );
 }
 
 function ShellSidebarInstallBanner() {
   const isPassiveRuntime = env.IS_TEST || env.IS_E2E;
-  const { isPro, isTrialing } = usePlanGate();
-  const isPaidPro = isPro && !isTrialing;
-  const pwaInstallEnabled = useAppFlag('PWA_INSTALL_BANNER');
-  const { canPrompt, isIOS, install, dismiss: dismissPwa } = usePWAInstall();
   const [versionUpdate, setVersionUpdate] =
     useState<VersionMismatchInfo | null>(null);
   const [showVersionBanner, setShowVersionBanner] = useState(false);
@@ -396,42 +392,24 @@ function ShellSidebarInstallBanner() {
     return null;
   }
 
-  if (showVersionBanner && versionUpdate) {
-    const title = versionUpdate.newVersion
-      ? `New Version Available (v${versionUpdate.newVersion})`
-      : 'New Version Available';
-
-    return (
-      <InstallBanner
-        open
-        icon={RefreshCw}
-        title={title}
-        description='An improved version of Jovie is available. Reload to update.'
-        ctaLabel='Reload'
-        ctaIcon={RefreshCw}
-        onCta={reload}
-        onDismiss={dismissVersionUpdate}
-        className='group-data-[collapsible=icon]:hidden'
-      />
-    );
+  if (!showVersionBanner || !versionUpdate) {
+    return null;
   }
 
-  if (!pwaInstallEnabled || !isPaidPro || !canPrompt) return null;
+  const title = versionUpdate.newVersion
+    ? `New Version Available (v${versionUpdate.newVersion})`
+    : 'New Version Available';
 
   return (
     <InstallBanner
       open
-      icon={Download}
-      title={TOAST_MESSAGES.PWA_INSTALL}
-      description={
-        isIOS
-          ? TOAST_MESSAGES.PWA_INSTALL_IOS
-          : TOAST_MESSAGES.PWA_INSTALL_DESCRIPTION
-      }
-      ctaLabel={isIOS ? 'Dismiss' : 'Install'}
-      ctaIcon={isIOS ? null : Download}
-      onCta={isIOS ? dismissPwa : install}
-      onDismiss={dismissPwa}
+      icon={RefreshCw}
+      title={title}
+      description='An improved version of Jovie is available. Reload to update.'
+      ctaLabel='Reload'
+      ctaIcon={RefreshCw}
+      onCta={reload}
+      onDismiss={dismissVersionUpdate}
       className='group-data-[collapsible=icon]:hidden'
     />
   );
@@ -440,18 +418,23 @@ function ShellSidebarInstallBanner() {
 /**
  * UnifiedSidebar - Single sidebar component for all post-auth sections
  *
- * Header workspace button (logo + name) opens user menu dropdown (Linear-style).
- * Settings section shows a back button instead.
- * No footer — user menu lives in the header.
+ * Header now shows a clean Jovie logo only (no workspace/user button).
+ * The user menu (with profile, settings, billing, sign out, etc.) is opened
+ * via a native "Settings" button at the bottom of the sidebar (above Now Playing).
+ * The version string (vX.Y.Z + optional sha) is now rendered inside the user
+ * menu (visible to everyone) instead of the previous admin-only footer.
  */
 export function UnifiedSidebar({ section }: UnifiedSidebarProps) {
-  const { isAdmin: isUserAdmin, creatorProfiles } = useDashboardData();
-  const shellChatV1Enabled = useAppFlag('SHELL_CHAT_V1');
+  const { creatorProfiles } = useDashboardData();
+  const shellChatV1Enabled = useAppFlag('DESIGN_V1');
+  const sidebarOverride = useShellSidebarOverride();
   const pathname = usePathname();
   const isDemoRoute = isDemoRoutePath(pathname);
   const isInSettings = section === 'settings';
   const isAdmin = section === 'admin';
-  const isDashboardOrAdmin = section !== 'settings';
+  const isInLibrary = section === 'library';
+  const isRouteSidebar = isInSettings || isInLibrary;
+  const isDashboardOrAdmin = section === 'dashboard' || section === 'admin';
   const hasMultipleProfiles = creatorProfiles.length >= 2;
 
   const { profileHref } = useProfileData(isDashboardOrAdmin);
@@ -463,56 +446,75 @@ export function UnifiedSidebar({ section }: UnifiedSidebarProps) {
       className={cn(
         'bg-base',
         '[--sidebar-width:var(--linear-app-sidebar-width)]',
-        'transition-[width,transform] duration-normal ease-interactive'
+        'transition-[width,transform] duration-cinematic ease-cinematic'
       )}
     >
       <SidebarHeader
+        data-electron-drag-region='true'
         className={cn(
           'relative justify-center gap-0 px-2.5',
           'h-(--linear-app-header-height-compact) py-0.5'
         )}
       >
         <SidebarHeaderNav
-          isInSettings={isInSettings}
+          isRouteSidebar={isRouteSidebar}
           isAdmin={isAdmin}
           isDashboardOrAdmin={isDashboardOrAdmin}
-          profileHref={profileHref}
           hasMultipleProfiles={hasMultipleProfiles}
           isDemoRoute={isDemoRoute}
+          routeBackHref={sidebarOverride?.backHref}
+          routeBackLabel={sidebarOverride?.backLabel}
         />
       </SidebarHeader>
 
       <SidebarContent className='min-h-0 flex-1 px-2.5 pb-2.5 pt-1.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden'>
         <SidebarGroup className='flex min-h-0 flex-1 flex-col pb-1'>
           <SidebarGroupContent className='flex-1'>
-            {isDashboardOrAdmin ? (
-              <DashboardNav />
-            ) : (
+            {isInSettings ? (
               <SettingsNavigation pathname={pathname} section={section} />
+            ) : isInLibrary ? (
+              (sidebarOverride?.content ?? (
+                <div className='px-2.5 py-2 text-xs text-sidebar-muted'>
+                  Loading Library
+                </div>
+              ))
+            ) : (
+              <DashboardNav />
             )}
           </SidebarGroupContent>
         </SidebarGroup>
       </SidebarContent>
 
-      {isInSettings ? null : (
+      {isRouteSidebar ? null : (
         <div className='mt-auto shrink-0'>
+          {/* Bottom Settings button opens the existing user menu via UserButton.
+              Uses Sidebar atoms for native feel (icon + label, tooltip in icon mode).
+              Placed above Now Playing / audio area. */}
+          <div className='px-2.5 py-0.5'>
+            <SidebarMenu>
+              <SidebarMenuItem>
+                <UserButton
+                  profileHref={profileHref}
+                  settingsHref={APP_ROUTES.SETTINGS}
+                  trigger={
+                    <SidebarMenuButton tooltip='Settings'>
+                      <Settings className='size-3.5' />
+                      <span className='truncate group-data-[collapsible=icon]:hidden'>
+                        Settings
+                      </span>
+                    </SidebarMenuButton>
+                  }
+                />
+              </SidebarMenuItem>
+            </SidebarMenu>
+          </div>
+
           <SidebarBottomNowPlayingBridge />
           {isDemoRoute ? null : <SidebarUpgradeBanner />}
           {shellChatV1Enabled ? (
             <ShellSidebarInstallBanner />
           ) : (
             <SidebarInstallBanner />
-          )}
-
-          {isUserAdmin && (
-            <div className='pl-2 pr-3.5 pb-2 pt-1'>
-              <span className='text-2xs text-sidebar-muted select-none'>
-                v{process.env.NEXT_PUBLIC_APP_VERSION ?? '0.0.0'}
-                {process.env.NEXT_PUBLIC_BUILD_SHA
-                  ? ` (${process.env.NEXT_PUBLIC_BUILD_SHA})`
-                  : ''}
-              </span>
-            </div>
           )}
         </div>
       )}

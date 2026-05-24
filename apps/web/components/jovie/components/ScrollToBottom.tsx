@@ -32,9 +32,9 @@ export function ScrollToBottom({ visible, onClick }: ScrollToBottomProps) {
             'inline-flex items-center gap-2 rounded-full',
             'border border-subtle bg-surface-1/95 px-3.5 py-2 backdrop-blur',
             'text-2xs font-medium uppercase tracking-[0.16em] text-secondary-token',
-            'shadow-[0_10px_32px_-20px_rgba(15,23,42,0.7)] transition-all',
-            'hover:-translate-y-0.5 hover:bg-surface-2 hover:text-primary-token',
-            'focus:outline-none focus:ring-2 focus:ring-accent/20'
+            'shadow-[0_10px_32px_-20px_rgba(15,23,42,0.7)] transition-[background-color,color,opacity,box-shadow]',
+            'hover:bg-surface-2 hover:text-primary-token',
+            'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/20'
           )}
           aria-label='Scroll to latest messages'
         >

@@ -6,6 +6,7 @@ import {
   type AppFlagName,
   type AppFlagSnapshot,
   LEGACY_STATSIG_GATE_KEYS,
+  type ProfileAlertOptInVariant,
   type StatsigFeatureFlagsBootstrap,
   type SubscribeCTAVariant,
 } from './contracts';
@@ -14,7 +15,11 @@ import {
   getAppFlagOverrideValue,
   parseAppFlagOverrides,
 } from './overrides';
-import { APP_FLAG_REGISTRY, SUBSCRIBE_CTA_VARIANT_FLAG } from './registry';
+import {
+  APP_FLAG_REGISTRY,
+  PROFILE_ALERT_OPTIN_VARIANT_FLAG,
+  SUBSCRIBE_CTA_VARIANT_FLAG,
+} from './registry';
 
 function shouldHonorClientFlagOverrides(): boolean {
   return !(
@@ -98,6 +103,16 @@ export async function getSubscribeCTAVariant(
   return SUBSCRIBE_CTA_VARIANT_FLAG.run({
     identify: {
       userId,
+    },
+  });
+}
+
+export async function getProfileAlertOptInVariant(
+  stableId: string | null
+): Promise<ProfileAlertOptInVariant> {
+  return PROFILE_ALERT_OPTIN_VARIANT_FLAG.run({
+    identify: {
+      userId: stableId,
     },
   });
 }

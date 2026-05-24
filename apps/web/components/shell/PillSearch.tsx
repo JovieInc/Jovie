@@ -34,8 +34,16 @@ export interface PillSearchProps {
   readonly titleOptions: readonly string[];
   /** Distinct album names. */
   readonly albumOptions: readonly string[];
+  /** Distinct status values. Defaults to release status values. */
+  readonly statusOptions?: readonly string[];
+  /** Distinct "has" values. Defaults to release asset values. */
+  readonly hasOptions?: readonly string[];
   /** Called when the user hits Esc on an empty input or focus leaves the surface. */
   readonly onClose: () => void;
+  readonly ariaLabel?: string;
+  readonly placeholder?: string;
+  /** Restrict suggestions and slash fields to the route's supported filters. */
+  readonly allowedFields?: readonly FilterField[];
 }
 
 type Suggestion =
@@ -87,7 +95,9 @@ function fieldValueOptions(
   field: FilterField,
   artistOptions: readonly string[],
   titleOptions: readonly string[],
-  albumOptions: readonly string[]
+  albumOptions: readonly string[],
+  statusOptions: readonly string[],
+  hasOptions: readonly string[]
 ): readonly string[] {
   switch (field) {
     case 'artist':
@@ -97,9 +107,9 @@ function fieldValueOptions(
     case 'album':
       return albumOptions;
     case 'status':
-      return STATUS_VALUES;
+      return statusOptions;
     case 'has':
-      return HAS_VALUES;
+      return hasOptions;
   }
 }
 
@@ -143,7 +153,12 @@ export function PillSearch({
   artistOptions,
   titleOptions,
   albumOptions,
+  statusOptions = STATUS_VALUES,
+  hasOptions = HAS_VALUES,
   onClose,
+  ariaLabel = 'Filter tracks',
+  placeholder = 'Type to filter',
+  allowedFields,
 }: PillSearchProps) {
   const [text, setText] = useState('');
   const [dropdownOpen, setDropdownOpen] = useState(false);
@@ -152,6 +167,14 @@ export function PillSearch({
   const wrapperRef = useRef<HTMLDivElement>(null);
   const listboxId = useId();
   const optionIdPrefix = useId();
+  const effectiveFields = useMemo(
+    () => allowedFields ?? (Object.keys(FIELD_LABEL) as FilterField[]),
+    [allowedFields]
+  );
+  const allowedFieldSet = useMemo(
+    () => new Set<FilterField>(effectiveFields),
+    [effectiveFields]
+  );
 
   useEffect(() => {
     if (!active) return undefined;
@@ -169,11 +192,10 @@ export function PillSearch({
     if (!text) return [];
     const slash = parseSlash(text);
 
-    if (slash && slash.kind === 'choosing') {
+    if (slash?.kind === 'choosing') {
       const q = slash.query.toLowerCase();
-      const fields = Object.keys(FIELD_LABEL) as FilterField[];
       const acc: Suggestion[] = [];
-      for (const f of fields) {
+      for (const f of effectiveFields) {
         const labelMatch = fuzzy(q, FIELD_LABEL[f]);
         const aliasMatch = Object.entries(SLASH_ALIAS).reduce(
           (m, [alias, target]) =>
@@ -190,13 +212,16 @@ export function PillSearch({
       return acc.sort((a, b) => b.score - a.score).slice(0, 8);
     }
 
-    if (slash && slash.kind === 'scoped') {
+    if (slash?.kind === 'scoped') {
+      if (!allowedFieldSet.has(slash.field)) return [];
       const q = slash.query.toLowerCase().trim();
       const opts = fieldValueOptions(
         slash.field,
         artistOptions,
         titleOptions,
-        albumOptions
+        albumOptions,
+        statusOptions,
+        hasOptions
       );
       return opts
         .map(v => ({
@@ -212,33 +237,53 @@ export function PillSearch({
 
     const q = text.trim();
     const out: Suggestion[] = [];
-    artistOptions.forEach(v => {
-      const s = fuzzy(q, v);
-      if (s > 0)
-        out.push({ kind: 'value', field: 'artist', value: v, score: s + 5 });
-    });
-    titleOptions.forEach(v => {
-      const s = fuzzy(q, v);
-      if (s > 0)
-        out.push({ kind: 'value', field: 'title', value: v, score: s });
-    });
-    albumOptions.forEach(v => {
-      const s = fuzzy(q, v);
-      if (s > 0)
-        out.push({ kind: 'value', field: 'album', value: v, score: s });
-    });
-    STATUS_VALUES.forEach(v => {
-      const s = fuzzy(q, v);
-      if (s > 0)
-        out.push({ kind: 'value', field: 'status', value: v, score: s });
-    });
-    HAS_VALUES.forEach(v => {
-      const s = fuzzy(q, v);
-      if (s > 0) out.push({ kind: 'value', field: 'has', value: v, score: s });
-    });
+    if (allowedFieldSet.has('artist')) {
+      artistOptions.forEach(v => {
+        const s = fuzzy(q, v);
+        if (s > 0)
+          out.push({ kind: 'value', field: 'artist', value: v, score: s + 5 });
+      });
+    }
+    if (allowedFieldSet.has('title')) {
+      titleOptions.forEach(v => {
+        const s = fuzzy(q, v);
+        if (s > 0)
+          out.push({ kind: 'value', field: 'title', value: v, score: s });
+      });
+    }
+    if (allowedFieldSet.has('album')) {
+      albumOptions.forEach(v => {
+        const s = fuzzy(q, v);
+        if (s > 0)
+          out.push({ kind: 'value', field: 'album', value: v, score: s });
+      });
+    }
+    if (allowedFieldSet.has('status')) {
+      statusOptions.forEach(v => {
+        const s = fuzzy(q, v);
+        if (s > 0)
+          out.push({ kind: 'value', field: 'status', value: v, score: s });
+      });
+    }
+    if (allowedFieldSet.has('has')) {
+      hasOptions.forEach(v => {
+        const s = fuzzy(q, v);
+        if (s > 0)
+          out.push({ kind: 'value', field: 'has', value: v, score: s });
+      });
+    }
     out.sort((a, b) => b.score - a.score);
     return out.slice(0, 8);
-  }, [text, artistOptions, titleOptions, albumOptions]);
+  }, [
+    allowedFieldSet,
+    artistOptions,
+    titleOptions,
+    albumOptions,
+    statusOptions,
+    hasOptions,
+    effectiveFields,
+    text,
+  ]);
 
   function commitSuggestion(sug: Suggestion) {
     if (sug.kind === 'value') {
@@ -323,8 +368,8 @@ export function PillSearch({
     : undefined;
 
   return (
-    <div ref={wrapperRef} className='relative w-full'>
-      <div className='flex items-center gap-1.5 flex-wrap min-h-7 pr-1'>
+    <div ref={wrapperRef} className='relative h-full w-full min-w-0'>
+      <div className='flex h-full min-h-0 items-center gap-1.5 overflow-hidden pr-0.5'>
         <Search
           className='h-3.5 w-3.5 text-quaternary-token shrink-0'
           strokeWidth={2.25}
@@ -350,22 +395,19 @@ export function PillSearch({
             setDropdownOpen(false);
           }}
           role='combobox'
-          aria-label='Filter tracks'
+          aria-label={ariaLabel}
+          data-app-search-field='true'
           aria-expanded={dropdownVisible}
           aria-controls={listboxId}
           aria-autocomplete='list'
           aria-activedescendant={activeOptionId}
-          placeholder={
-            pills.length === 0
-              ? 'Type to filter — / for fields'
-              : 'and… (/ for fields)'
-          }
-          className='flex-1 min-w-[120px] bg-transparent text-[13px] text-primary-token placeholder:text-tertiary-token outline-none focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-cyan-500/30 rounded-sm'
+          placeholder={pills.length === 0 ? placeholder : 'and…'}
+          className='h-6 min-w-[96px] flex-1 rounded-sm bg-transparent text-[13px] text-primary-token outline-none placeholder:text-tertiary-token focus:outline-none focus:ring-0 focus:shadow-none focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)/25 focus-visible:ring-offset-0 focus-visible:shadow-none'
         />
         <button
           type='button'
           onClick={onClose}
-          className='shrink-0 inline-flex items-center h-5 px-1.5 rounded text-[10px] font-caption uppercase tracking-[0.06em] text-quaternary-token hover:text-primary-token hover:bg-surface-1/60 transition-colors duration-150 ease-out'
+          className='inline-flex h-5 shrink-0 items-center rounded px-1.5 text-[11px] font-medium text-quaternary-token transition-colors duration-subtle ease-subtle hover:bg-surface-1/60 hover:text-primary-token'
           aria-label='Close search'
         >
           Esc
@@ -377,7 +419,7 @@ export function PillSearch({
           id={listboxId}
           role='listbox'
           tabIndex={-1}
-          className='absolute left-0 right-0 top-9 z-40 rounded-lg border border-(--linear-app-shell-border) bg-(--linear-app-content-surface) shadow-[0_18px_60px_rgba(0,0,0,0.32)] py-1 max-h-[320px] overflow-y-auto'
+          className='absolute left-0 right-0 top-[calc(100%+6px)] z-40 max-h-[320px] overflow-y-auto rounded-lg border border-(--linear-app-shell-border) bg-(--linear-app-content-surface) py-1 shadow-[0_18px_60px_rgba(0,0,0,0.32)]'
         >
           {suggestions.map((sug, i) => {
             const optionId = `${optionIdPrefix}-${i}`;
@@ -394,7 +436,7 @@ export function PillSearch({
                   commitSuggestion(sug);
                 }}
                 className={cn(
-                  'w-full flex items-center gap-2 px-2.5 py-1.5 text-left text-[12.5px] transition-colors duration-100 ease-out',
+                  'w-full flex items-center gap-2 px-2.5 py-1.5 text-left text-[12.5px] transition-colors duration-subtle ease-subtle',
                   i === highlight
                     ? 'bg-cyan-500/10 text-primary-token'
                     : 'text-secondary-token hover:bg-surface-1/60'
@@ -447,19 +489,19 @@ function PillChip({
   onRemoveValue,
 }: PillChipProps) {
   return (
-    <span className='group/pill inline-flex items-center h-[22px] rounded-md border border-cyan-500/30 bg-cyan-500/10 text-[11.5px] font-caption text-secondary-token tracking-[-0.005em] overflow-hidden'>
+    <span className='group/pill inline-flex h-[22px] max-w-[220px] shrink-0 items-center overflow-hidden rounded-md border border-cyan-500/30 bg-cyan-500/10 text-[11.5px] font-caption text-secondary-token'>
       <span className='px-1.5 text-cyan-300/90 uppercase text-[10px] tracking-[0.06em] border-r border-cyan-500/20'>
         {FIELD_LABEL[pill.field]}
       </span>
       <button
         type='button'
         onClick={onToggleOp}
-        className='px-1.5 text-tertiary-token hover:text-primary-token transition-colors duration-150 ease-out'
+        className='px-1.5 text-tertiary-token hover:text-primary-token transition-colors duration-subtle ease-subtle'
         title='Toggle is / is not'
       >
         {pill.op}
       </button>
-      <span className='inline-flex items-center gap-0.5 pr-0.5'>
+      <span className='inline-flex min-w-0 items-center gap-0.5 pr-0.5'>
         {pill.values.map((v, i) => (
           <span key={v} className='inline-flex items-center'>
             {i > 0 && (
@@ -467,12 +509,12 @@ function PillChip({
                 or
               </span>
             )}
-            <span className='inline-flex items-center bg-cyan-500/15 px-1.5 h-[18px] rounded text-cyan-100/95'>
-              {v}
+            <span className='inline-flex h-[18px] min-w-0 items-center rounded bg-cyan-500/15 px-1.5 text-cyan-100/95'>
+              <span className='truncate'>{v}</span>
               <button
                 type='button'
                 onClick={() => onRemoveValue(v)}
-                className='ml-1 text-cyan-300/70 hover:text-cyan-100 transition-colors duration-150 ease-out'
+                className='ml-1 text-cyan-300/70 hover:text-cyan-100 transition-colors duration-subtle ease-subtle'
                 aria-label={`Remove ${v}`}
               >
                 ×
@@ -484,7 +526,7 @@ function PillChip({
       <button
         type='button'
         onClick={onRemove}
-        className='px-1.5 text-cyan-300/70 hover:text-cyan-100 transition-colors duration-150 ease-out'
+        className='px-1.5 text-cyan-300/70 hover:text-cyan-100 transition-colors duration-subtle ease-subtle'
         aria-label='Remove filter'
       >
         ×

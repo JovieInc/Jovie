@@ -1,7 +1,9 @@
 'use client';
 
+import type { ProfileAlertOptInVariant } from '@/lib/flags/contracts';
 import type { Artist } from '@/types/db';
 import { ProfileInlineNotificationsCTA } from './ProfileInlineNotificationsCTA';
+import type { NotificationSource, NotificationSourceContext } from './types';
 
 interface TwoStepNotificationsCTAProps {
   readonly artist: Artist;
@@ -10,6 +12,9 @@ interface TwoStepNotificationsCTAProps {
   readonly portalContainer?: HTMLElement | null;
   readonly onFlowClosed?: () => void;
   readonly onSubscriptionActivated?: () => void;
+  readonly experimentVariant?: ProfileAlertOptInVariant;
+  readonly source?: NotificationSource;
+  readonly sourceContext?: NotificationSourceContext;
 }
 
 export function TwoStepNotificationsCTA({
@@ -19,6 +24,9 @@ export function TwoStepNotificationsCTA({
   portalContainer,
   onFlowClosed,
   onSubscriptionActivated,
+  experimentVariant,
+  source,
+  sourceContext,
 }: TwoStepNotificationsCTAProps) {
   return (
     <ProfileInlineNotificationsCTA
@@ -29,6 +37,9 @@ export function TwoStepNotificationsCTA({
       autoOpen={startExpanded}
       onFlowClosed={onFlowClosed}
       onSubscriptionActivated={onSubscriptionActivated}
+      experimentVariant={experimentVariant}
+      source={source}
+      sourceContext={sourceContext}
     />
   );
 }

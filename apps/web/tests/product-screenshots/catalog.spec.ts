@@ -8,6 +8,11 @@ import {
 } from 'node:fs/promises';
 import { join } from 'node:path';
 import { expect, test } from '@playwright/test';
+import { APP_FLAG_OVERRIDE_KEYS } from '@/lib/flags/contracts';
+import {
+  APP_FLAG_OVERRIDES_COOKIE,
+  FF_OVERRIDES_KEY,
+} from '@/lib/flags/overrides';
 import {
   getScreenshotScenario,
   SCREENSHOT_SCENARIOS,
@@ -27,6 +32,15 @@ import {
   waitForImages,
   waitForSettle,
 } from './helpers';
+
+// Force DESIGN_V1 (and its SHELL_CHAT_V1 alias) on for every catalog scenario.
+// The override slot for both flag names is `code:DESIGN_V1`, so a single entry
+// covers the entire New Design surface. We pin this explicitly so a future
+// change to APP_FLAG_DEFAULTS or the Statsig gate cannot silently flip
+// marketing/product screenshots back to the legacy shell.
+const SCREENSHOT_FLAG_OVERRIDES = JSON.stringify({
+  [APP_FLAG_OVERRIDE_KEYS.DESIGN_V1]: true,
+});
 
 const MANIFEST_PATH = join(CATALOG_OUTPUT_DIR, 'manifest.json');
 
@@ -187,6 +201,22 @@ async function syncPublicExport(catalogPath: string, publicExportPath: string) {
   await copyFile(catalogPath, exportPath);
 }
 
+async function assertNoShellInternalChrome(
+  page: import('@playwright/test').Page,
+  scenario: (typeof SCREENSHOT_SCENARIOS)[number]
+) {
+  if (
+    !scenario.id.startsWith('shell-v1-') ||
+    !scenario.consumers.includes('marketing-export')
+  ) {
+    return;
+  }
+
+  await expect(
+    page.locator('.shell-v1 aside').getByText('Admin', { exact: true })
+  ).toHaveCount(0);
+}
+
 async function prepareScenario(
   page: import('@playwright/test').Page,
   id: string
@@ -197,13 +227,28 @@ async function prepareScenario(
   }
 
   const viewport = SCREENSHOT_VIEWPORTS[scenario.viewport];
-  await page.clock.setFixedTime(
-    new Date(scenario.fixedNow ?? SCREENSHOT_CLOCK_ISO)
-  );
+  // shell-v1 scenarios use deterministic demo dates internally, and mocking
+  // the browser clock can interfere with loader animation timers.
+  if (!scenario.id.startsWith('shell-v1-')) {
+    await page.clock.setFixedTime(
+      new Date(scenario.fixedNow ?? SCREENSHOT_CLOCK_ISO)
+    );
+  }
   await page.emulateMedia({
     reducedMotion: scenario.reducedMotion ? 'reduce' : 'no-preference',
   });
   await page.setViewportSize(viewport);
+  await page.addInitScript(
+    ({ cookieName, key, value }) => {
+      localStorage.setItem(key, value);
+      document.cookie = `${cookieName}=${encodeURIComponent(value)}; path=/; SameSite=Lax`;
+    },
+    {
+      cookieName: APP_FLAG_OVERRIDES_COOKIE,
+      key: FF_OVERRIDES_KEY,
+      value: SCREENSHOT_FLAG_OVERRIDES,
+    }
+  );
   await page.goto(scenario.route, {
     waitUntil: 'domcontentloaded',
     timeout: TIMEOUTS.NAVIGATION,
@@ -232,6 +277,64 @@ async function prepareScenario(
       await waitForSettle(page);
       await expect(dspsTab).toHaveAttribute('aria-selected', 'true');
     }
+  }
+
+  if (
+    scenario.interaction === 'open-shell-library' ||
+    scenario.interaction === 'open-shell-releases'
+  ) {
+    await waitForSettle(page, 250);
+  }
+
+  await assertNoShellInternalChrome(page, scenario);
+
+  if (scenario.interaction === 'open-shell-library') {
+    await expect(page.getByText('All assets').first()).toBeVisible({
+      timeout: TIMEOUTS.CONTENT_VISIBLE,
+    });
+    await expect(page.getByText('The Deep End — album art')).toBeVisible();
+    await expect(page.getByText('Take Me Over').first()).toBeVisible();
+    await expect(
+      page.getByText('Tim White press photo 03', { exact: true })
+    ).toBeVisible();
+  }
+
+  if (scenario.interaction === 'open-shell-releases') {
+    await expect(page.getByText('The Deep End').first()).toBeVisible({
+      timeout: TIMEOUTS.CONTENT_VISIBLE,
+    });
+    await expect(
+      page.getByText('Cosmic Gate & Tim White').first()
+    ).toBeVisible();
+    await expect(page.getByText('Take Me Over').first()).toBeVisible();
+    await expect(page.getByTestId('shell-v1-release-drawer')).toBeVisible();
+    await page.getByRole('tab', { name: 'Distribution' }).click();
+    await expect(
+      page.getByRole('tab', { name: 'Distribution' })
+    ).toHaveAttribute('aria-selected', 'true');
+    await expect(
+      page
+        .getByTestId('shell-v1-release-drawer')
+        .getByText('Spotify', { exact: true })
+        .first()
+    ).toBeVisible();
+  }
+
+  if (scenario.id === 'release-presave-mobile') {
+    await expect(
+      page.getByRole('heading', { name: 'The Deep End' })
+    ).toBeVisible({
+      timeout: TIMEOUTS.CONTENT_VISIBLE,
+    });
+    await expect(page.getByText('Cosmic Gate & Tim White')).toBeVisible();
+    await expect(page.getByAltText('The Deep End artwork')).toBeVisible();
+    await expect(page.getByText('Listen everywhere')).toBeVisible();
+    await expect(page.getByText('Spotify')).toBeVisible();
+    await expect(page.getByText('Amazon Music')).toBeVisible();
+    await expect(page.getByTestId('smart-link-brand-mark')).toHaveCount(0);
+    await expect(
+      page.getByRole('button', { name: 'More options' })
+    ).toHaveCount(0);
   }
 
   await waitForImages(page).catch(() => {});

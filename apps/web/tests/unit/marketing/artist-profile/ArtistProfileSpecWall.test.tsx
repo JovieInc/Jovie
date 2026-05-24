@@ -5,7 +5,7 @@ import { ARTIST_PROFILE_COPY } from '@/data/artistProfileCopy';
 import { ARTIST_PROFILE_SPEC_TILES } from '@/data/artistProfileFeatures';
 
 describe('ArtistProfileSpecWall', () => {
-  it('renders the compact seven-tile spec wall without legacy slop copy', () => {
+  it('renders the compact eight-tile spec wall without legacy slop copy', () => {
     render(
       <ArtistProfileSpecWall
         specWall={ARTIST_PROFILE_COPY.specWall}
@@ -28,6 +28,7 @@ describe('ArtistProfileSpecWall', () => {
     const titles = headings.map(heading => heading.textContent);
 
     expect(titles).toEqual([
+      'Audience Quality Filtering',
       'Rich Analytics',
       'Geo Insights',
       'Always in Sync',
@@ -50,24 +51,24 @@ describe('ArtistProfileSpecWall', () => {
       expect(within(card).getByRole('img')).toBeInTheDocument();
     }
 
-    const richAnalyticsCard = screen
-      .getByRole('heading', { name: 'Rich Analytics' })
+    const audienceQualityCard = screen
+      .getByRole('heading', { name: 'Audience Quality Filtering' })
       .closest('article');
 
-    expect(richAnalyticsCard).not.toBeNull();
+    expect(audienceQualityCard).not.toBeNull();
 
-    if (richAnalyticsCard) {
+    if (audienceQualityCard) {
       expect(
-        within(richAnalyticsCard).getByRole('img', {
-          name: ARTIST_PROFILE_SPEC_TILES[0].screenshotAlt,
+        within(audienceQualityCard).getByRole('img', {
+          name: 'Audience quality filtering preview',
         })
+      ).toBeInTheDocument();
+      expect(
+        within(audienceQualityCard).getByText('Actual Fans')
       ).toBeInTheDocument();
     }
 
     expect(screen.queryByText('Power features')).not.toBeInTheDocument();
-    expect(
-      screen.queryByText('Audience quality filtering')
-    ).not.toBeInTheDocument();
     expect(screen.queryByText('Opinionated design')).not.toBeInTheDocument();
     expect(screen.queryByText('Product philosophy')).not.toBeInTheDocument();
   });

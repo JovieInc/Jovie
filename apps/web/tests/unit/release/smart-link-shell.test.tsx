@@ -120,8 +120,13 @@ describe('SmartLinkShell', () => {
   it('calls onMenuOpen when menu button is clicked', () => {
     const onMenuOpen = vi.fn();
     render(<SmartLinkShell {...defaultProps} onMenuOpen={onMenuOpen} />);
-    fireEvent.click(screen.getByRole('button', { name: /more options/i }));
+    fireEvent.click(screen.getByRole('button', { name: 'Menu' }));
     expect(onMenuOpen).toHaveBeenCalledTimes(1);
+  });
+
+  it('can hide the menu button for clean marketing screenshots', () => {
+    render(<SmartLinkShell {...defaultProps} showMenuButton={false} />);
+    expect(screen.queryByRole('button', { name: 'Menu' })).toBeNull();
   });
 
   it('renders children content', () => {

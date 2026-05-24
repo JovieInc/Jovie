@@ -1,14 +1,22 @@
 'use client';
 
 import { Button, Input } from '@jovie/ui';
-import { ArrowDown, ArrowUp, Search, X } from 'lucide-react';
+import { ArrowDown, ArrowUp, Settings2 } from 'lucide-react';
 import type { FormEvent } from 'react';
-import { AppSearchField } from '@/components/molecules/AppSearchField';
 import {
   TableFilterDropdown,
   type TableFilterDropdownCategory,
 } from '@/components/molecules/filters';
-import { PageToolbarActionButton } from '@/components/organisms/table';
+import { HeaderSearchAction } from '@/components/molecules/HeaderSearchAction';
+import { TabBar } from '@/components/molecules/tab-bar/TabBar';
+import {
+  PageToolbar,
+  PageToolbarActionButton,
+} from '@/components/organisms/table';
+import {
+  DisplayMenuDropdown,
+  type ViewMode,
+} from '@/components/organisms/table/molecules/DisplayMenuDropdown';
 import { cn } from '@/lib/utils';
 
 export type TaskSubviewId = 'all' | 'mine' | 'jovie';
@@ -20,22 +28,25 @@ export interface TaskSubviewOption {
 }
 
 export interface TaskWorkspaceHeaderBarProps {
-  readonly mode: 'default' | 'search' | 'create';
-  readonly search: string;
+  readonly mode: 'default' | 'create';
   readonly draftTitle: string;
   readonly taskCount: number;
   readonly subviews: ReadonlyArray<TaskSubviewOption>;
   readonly activeSubview: TaskSubviewId;
   readonly onSubviewChange: (subview: TaskSubviewId) => void;
-  readonly onSearchChange: (value: string) => void;
   readonly onDraftTitleChange: (value: string) => void;
-  readonly onEnterSearch: () => void;
-  readonly onExitSearch: () => void;
   readonly onCancelCreate: () => void;
   readonly onSubmitCreate: (event: FormEvent<HTMLFormElement>) => void;
   readonly createPending: boolean;
+  readonly searchValue: string;
+  readonly onSearchValueChange: (value: string) => void;
+  readonly onClearSearch: () => void;
   readonly filterCategories: ReadonlyArray<TableFilterDropdownCategory>;
   readonly onClearFilters: () => void;
+  readonly viewMode: ViewMode;
+  readonly onViewModeChange: (viewMode: ViewMode) => void;
+  readonly showCancelledColumn: boolean;
+  readonly onShowCancelledColumnChange: (showCancelledColumn: boolean) => void;
   readonly showTaskNavigation?: boolean;
   readonly canSelectPrevious?: boolean;
   readonly canSelectNext?: boolean;
@@ -45,18 +56,21 @@ export interface TaskWorkspaceHeaderBarProps {
 
 export function TaskWorkspaceHeaderBar({
   mode,
-  search,
   draftTitle,
   taskCount,
-  onSearchChange,
   onDraftTitleChange,
-  onEnterSearch,
-  onExitSearch,
   onCancelCreate,
   onSubmitCreate,
   createPending,
+  searchValue,
+  onSearchValueChange,
+  onClearSearch,
   filterCategories,
   onClearFilters,
+  viewMode,
+  onViewModeChange,
+  showCancelledColumn,
+  onShowCancelledColumnChange,
   showTaskNavigation = false,
   canSelectPrevious = false,
   canSelectNext = false,
@@ -68,129 +82,126 @@ export function TaskWorkspaceHeaderBar({
 }: Readonly<TaskWorkspaceHeaderBarProps>) {
   const createFormId = 'task-workspace-create-form';
 
-  return (
-    <div
-      data-testid='tasks-workspace-subheader'
-      className='flex h-[var(--linear-app-header-height-compact)] min-h-[var(--linear-app-header-height-compact)] items-center justify-between gap-3 px-app-header'
-    >
-      <div className='min-w-0 flex-1'>
-        {mode === 'search' && (
-          <AppSearchField
-            value={search}
-            onChange={onSearchChange}
-            onEscape={onExitSearch}
-            placeholder='Search Tasks'
-            ariaLabel='Search tasks'
-            autoFocus
-            className='h-8 max-w-[28rem] bg-transparent'
-            inputClassName='text-xs'
-          />
-        )}
-        {mode === 'create' && (
-          <form
-            id={createFormId}
-            onSubmit={onSubmitCreate}
-            className='flex min-w-0 items-center gap-2'
-          >
-            <Input
-              value={draftTitle}
-              onChange={event => onDraftTitleChange(event.target.value)}
-              placeholder='Draft press release, update bio, pitch sync supervisor...'
-              aria-label='New task name'
-              autoFocus
-              className='h-8 max-w-[32rem] min-w-0'
-            />
-          </form>
-        )}
-        {mode !== 'search' && mode !== 'create' && (
-          <TaskSubviewTabs
-            subviews={subviews}
-            activeSubview={activeSubview}
-            onSubviewChange={onSubviewChange}
-            taskCount={taskCount}
-          />
-        )}
-      </div>
+  const toolbarStart =
+    mode === 'create' ? (
+      <form
+        id={createFormId}
+        onSubmit={onSubmitCreate}
+        className='flex min-w-0 flex-1 items-center gap-2'
+      >
+        <Input
+          value={draftTitle}
+          onChange={event => onDraftTitleChange(event.target.value)}
+          placeholder='Draft press release, update bio, pitch sync supervisor...'
+          aria-label='New task name'
+          autoFocus
+          className='h-8 max-w-[32rem] min-w-0'
+        />
+      </form>
+    ) : (
+      <TaskSubviewTabs
+        subviews={subviews}
+        activeSubview={activeSubview}
+        onSubviewChange={onSubviewChange}
+        taskCount={taskCount}
+      />
+    );
 
-      <div className='flex shrink-0 items-center gap-1'>
-        {mode === 'create' ? (
-          <>
-            <Button
-              type='submit'
-              size='sm'
-              form={createFormId}
-              disabled={createPending || !draftTitle.trim()}
-              className='h-7 px-2.5'
-            >
-              Create
-            </Button>
-            <Button
-              type='button'
-              variant='secondary'
-              size='sm'
-              onClick={onCancelCreate}
-              className='h-7 px-2.5'
-            >
-              Cancel
-            </Button>
-          </>
-        ) : (
-          <>
-            {mode === 'search' ? (
-              <PageToolbarActionButton
-                ariaLabel='Close search'
-                label='Close search'
-                onClick={onExitSearch}
-                icon={<X className='h-3.5 w-3.5' />}
-                iconOnly
-                tooltipLabel='Close search'
-              />
-            ) : (
-              <PageToolbarActionButton
-                ariaLabel='Search tasks'
-                label='Search tasks'
-                onClick={onEnterSearch}
-                tooltipLabel='Search'
-                tooltipShortcut='/'
-                iconOnly
-                data-app-search-trigger='true'
-                icon={<Search className='h-3.5 w-3.5' />}
-              />
-            )}
-            <div className={cn(mode === 'search' && 'opacity-100')}>
-              <TableFilterDropdown
-                categories={filterCategories}
-                onClearAll={onClearFilters}
-                iconOnly
-                align='end'
-                shortcutHint='S'
-              />
-            </div>
-            {showTaskNavigation ? (
-              <div className='flex items-center gap-0.5'>
-                <PageToolbarActionButton
-                  ariaLabel='Previous task'
-                  label='Previous task'
-                  onClick={onSelectPrevious}
-                  tooltipLabel='Previous task'
-                  disabled={!canSelectPrevious}
-                  iconOnly
-                  icon={<ArrowUp className='h-3.5 w-3.5' />}
-                />
-                <PageToolbarActionButton
-                  ariaLabel='Next task'
-                  label='Next task'
-                  onClick={onSelectNext}
-                  tooltipLabel='Next task'
-                  disabled={!canSelectNext}
-                  iconOnly
-                  icon={<ArrowDown className='h-3.5 w-3.5' />}
-                />
-              </div>
-            ) : null}
-          </>
-        )}
-      </div>
+  const toolbarEnd =
+    mode === 'create' ? (
+      <>
+        <Button
+          type='submit'
+          size='sm'
+          form={createFormId}
+          disabled={createPending || !draftTitle.trim()}
+          className='h-7 px-2.5'
+        >
+          Create
+        </Button>
+        <Button
+          type='button'
+          variant='secondary'
+          size='sm'
+          onClick={onCancelCreate}
+          className='h-7 px-2.5'
+        >
+          Cancel
+        </Button>
+      </>
+    ) : (
+      <>
+        <HeaderSearchAction
+          searchValue={searchValue}
+          onSearchValueChange={onSearchValueChange}
+          onClearAction={onClearSearch}
+          placeholder='Search tasks'
+          ariaLabel='Search tasks'
+          submitAriaLabel='Search tasks'
+          tooltipLabel='Search'
+          className='hidden h-7 text-xs text-tertiary-token hover:text-primary-token lg:flex'
+        />
+        <TableFilterDropdown
+          categories={filterCategories}
+          onClearAll={onClearFilters}
+          iconOnly
+          align='end'
+          shortcutHint='S'
+        />
+        <DisplayMenuDropdown
+          viewMode={viewMode}
+          availableViewModes={['board', 'list']}
+          onViewModeChange={onViewModeChange}
+          availableColumns={[{ id: 'cancelled', label: 'Cancelled' }]}
+          columnVisibility={{ cancelled: showCancelledColumn }}
+          onColumnVisibilityChange={(columnId, visible) => {
+            if (columnId === 'cancelled') {
+              onShowCancelledColumnChange(visible);
+            }
+          }}
+          trigger={
+            <PageToolbarActionButton
+              ariaLabel='Display options'
+              label='Display options'
+              tooltipLabel='Display'
+              iconOnly
+              icon={<Settings2 className='h-3.5 w-3.5' />}
+            />
+          }
+        />
+        {showTaskNavigation ? (
+          <div className='flex items-center gap-0.5'>
+            <PageToolbarActionButton
+              ariaLabel='Previous task'
+              label='Previous task'
+              onClick={onSelectPrevious}
+              tooltipLabel='Previous task'
+              disabled={!canSelectPrevious}
+              iconOnly
+              icon={<ArrowUp className='h-3.5 w-3.5' />}
+            />
+            <PageToolbarActionButton
+              ariaLabel='Next task'
+              label='Next task'
+              onClick={onSelectNext}
+              tooltipLabel='Next task'
+              disabled={!canSelectNext}
+              iconOnly
+              icon={<ArrowDown className='h-3.5 w-3.5' />}
+            />
+          </div>
+        ) : null}
+      </>
+    );
+
+  return (
+    <div data-testid='tasks-workspace-subheader' className='contents'>
+      <PageToolbar
+        start={toolbarStart}
+        end={toolbarEnd}
+        className='h-[var(--linear-app-header-height-compact)] min-h-[var(--linear-app-header-height-compact)]'
+        startClassName={mode === 'create' ? 'overflow-visible' : undefined}
+      />
     </div>
   );
 }
@@ -221,43 +232,25 @@ export function TaskSubviewTabs({
   }
 
   return (
-    <div
-      role='tablist'
-      aria-label='Task subviews'
-      className={cn(
-        'flex min-w-0 items-center gap-0.5 overflow-x-auto pl-0.5',
-        className
-      )}
-    >
-      {subviews.map(subview => {
-        const isActive = activeSubview === subview.id;
-
-        return (
-          <button
-            key={subview.id}
-            type='button'
-            role='tab'
-            aria-selected={isActive}
-            onClick={() => onSubviewChange(subview.id)}
-            className={cn(
-              'inline-flex h-7 shrink-0 items-center gap-1.5 rounded-md px-2.5 text-[12.5px] font-semibold tracking-[-0.012em] transition-[background-color,color]',
-              isActive
-                ? 'bg-surface-1 text-primary-token'
-                : 'text-tertiary-token hover:bg-surface-1/60 hover:text-primary-token'
-            )}
-          >
+    <TabBar<TaskSubviewId>
+      value={activeSubview}
+      onValueChange={onSubviewChange}
+      ariaLabel='Task subviews'
+      overflowMode='scroll'
+      variant='segment'
+      className={cn('pl-0.5', className)}
+      triggerClassName='gap-1.5 px-2.5 text-[12.5px]'
+      options={subviews.map(subview => ({
+        value: subview.id,
+        label: (
+          <span className='inline-flex min-w-0 items-center gap-1.5'>
             <span>{subview.label}</span>
-            <span
-              className={cn(
-                'text-[10.5px] tabular-nums',
-                isActive ? 'text-tertiary-token' : 'text-quaternary-token'
-              )}
-            >
+            <span className='text-[10.5px] tabular-nums opacity-70'>
               {subview.count}
             </span>
-          </button>
-        );
-      })}
-    </div>
+          </span>
+        ),
+      }))}
+    />
   );
 }

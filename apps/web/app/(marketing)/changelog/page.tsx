@@ -114,10 +114,7 @@ export default async function ChangelogPage() {
         <h1 className='marketing-h1-linear mb-4 mt-6 max-w-[10ch]'>
           What&apos;s new
         </h1>
-        <p
-          className='marketing-lead-linear mb-4 max-w-[34rem]'
-          style={{ color: 'var(--linear-text-secondary)' }}
-        >
+        <p className='marketing-lead-linear mb-4 max-w-[34rem] text-secondary-token'>
           Follow our journey building the future of music.
         </p>
         <div className='flex flex-wrap items-center gap-3'>
@@ -129,7 +126,7 @@ export default async function ChangelogPage() {
           )}
           <Link
             href='/changelog/feed.xml'
-            className='text-xs opacity-40 hover:opacity-70 transition-opacity'
+            className='text-xs text-secondary-token transition-colors hover:text-primary-token'
           >
             RSS Feed
           </Link>
@@ -141,7 +138,9 @@ export default async function ChangelogPage() {
         <div className='marketing-divider mb-10' />
         <div className='max-w-3xl'>
           {releases.length === 0 ? (
-            <p className='opacity-40'>No updates yet. Check back soon!</p>
+            <p className='text-secondary-token'>
+              No updates yet. Check back soon!
+            </p>
           ) : (
             <div className='space-y-10'>
               {releases.map(release => (
@@ -168,7 +167,7 @@ export default async function ChangelogPage() {
                       v{release.version}
                     </Badge>
                     {release.date && (
-                      <span className='text-xs opacity-40'>
+                      <span className='text-xs text-tertiary-token'>
                         {formatDate(release.date)}
                       </span>
                     )}

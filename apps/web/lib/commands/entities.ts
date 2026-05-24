@@ -20,6 +20,7 @@
 
 import type { ReactNode } from 'react';
 import type { EntityKind } from '@/lib/chat/tokens';
+import type { EventTypeValue } from '@/lib/tour-dates/types';
 
 /**
  * Per-kind rich metadata used by the entity preview pane in the chat
@@ -63,7 +64,7 @@ export type EntityRefMeta =
       readonly provider?: string;
       readonly status?: string;
       readonly capacity?: number;
-      readonly eventType?: 'tour' | 'meetup' | 'guest' | 'charity' | 'other';
+      readonly eventType?: EventTypeValue;
     };
 
 export interface EntityRef {
@@ -93,6 +94,13 @@ export type UseEntitySearch = (query: string) => EntitySearchResult;
 
 export interface EntityProvider {
   readonly kind: EntityKind;
+  /**
+   * Stable semantic identity for dev duplicate-registration checks.
+   * Providers that are recreated for the same profile/scope should keep the
+   * same key so React Strict Mode and route remounts do not look like wiring
+   * bugs.
+   */
+  readonly registryKey?: string;
   readonly label: string;
   readonly useSearch: UseEntitySearch;
   readonly renderChip: (ref: EntityRef) => ReactNode;
@@ -103,11 +111,46 @@ export interface EntityProvider {
  * Kept as a mutable record so providers can register lazily from their own
  * files without forcing this module to import every hook at load time.
  */
-const PROVIDERS: Partial<Record<EntityKind, EntityProvider>> = {};
+interface ProviderRegistryEntry {
+  provider: EntityProvider;
+  registrations: number;
+}
 
-export function registerEntityProvider(provider: EntityProvider): void {
+const PROVIDERS: Partial<Record<EntityKind, ProviderRegistryEntry>> = {};
+
+function isSameProvider(
+  left: EntityProvider | undefined,
+  right: EntityProvider
+): boolean {
+  return (
+    left === right ||
+    (left?.registryKey !== undefined && left.registryKey === right.registryKey)
+  );
+}
+
+function createProviderDisposer(provider: EntityProvider): () => void {
+  let disposed = false;
+
+  return () => {
+    if (disposed) {
+      return;
+    }
+
+    disposed = true;
+    unregisterEntityProvider(provider);
+  };
+}
+
+export function registerEntityProvider(provider: EntityProvider): () => void {
   const existing = PROVIDERS[provider.kind];
-  if (existing && existing !== provider) {
+
+  if (existing && isSameProvider(existing.provider, provider)) {
+    existing.provider = provider;
+    existing.registrations += 1;
+    return createProviderDisposer(provider);
+  }
+
+  if (existing) {
     // Dev warning only — multiple mount/unmount cycles (React strict mode,
     // test renders, profile switches) legitimately create new provider
     // instances for the same kind. Overwrite is the sane default; a true
@@ -117,13 +160,30 @@ export function registerEntityProvider(provider: EntityProvider): void {
         `If this is unexpected, check that the registrar is only mounted once.`
     );
   }
-  PROVIDERS[provider.kind] = provider;
+  PROVIDERS[provider.kind] = { provider, registrations: 1 };
+
+  return createProviderDisposer(provider);
+}
+
+export function unregisterEntityProvider(provider: EntityProvider): void {
+  const existing = PROVIDERS[provider.kind];
+
+  if (!existing || !isSameProvider(existing.provider, provider)) {
+    return;
+  }
+
+  if (existing.registrations > 1) {
+    existing.registrations -= 1;
+    return;
+  }
+
+  delete PROVIDERS[provider.kind];
 }
 
 export function getEntityProvider(
   kind: EntityKind
 ): EntityProvider | undefined {
-  return PROVIDERS[kind];
+  return PROVIDERS[kind]?.provider;
 }
 
 export function listRegisteredKinds(): EntityKind[] {

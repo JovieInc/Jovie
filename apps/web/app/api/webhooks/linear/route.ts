@@ -1,3 +1,27 @@
+/**
+ * Linear Webhook Handler
+ *
+ * Bridges Linear → GitHub repository_dispatch so Claude Code can pick up work
+ * autonomously. Two trigger types:
+ *
+ * 1. Issue moved to "Todo" / unstarted state → dispatches `linear_todo_ready`
+ * 2. CodeRabbit posts an implementation-plan comment → dispatches
+ *    `linear_plan_ready` (with verify_required / simplify_bounded / model_tier
+ *    parsed from the comment body's automation contract)
+ *
+ * Auth: HMAC-SHA256 verification against LINEAR_WEBHOOK_SECRET via the
+ * `linear-signature` header. Missing → 400, invalid → 401.
+ *
+ * Dedupe: per (issueId × updatedAt × kind) lock held in Redis for 60s. Lock
+ * release on dispatch failure ensures Linear's retry can succeed. If Redis is
+ * unavailable, we 503 rather than risk double-dispatching.
+ *
+ * Side effects: POSTs to
+ * `https://api.github.com/repos/{owner}/{repo}/dispatches` with
+ * GH_DISPATCH_TOKEN. Repo defaults to JovieInc/Jovie unless
+ * VERCEL_GIT_REPO_OWNER / VERCEL_GIT_REPO_SLUG override.
+ */
+
 import { createHmac, timingSafeEqual } from 'node:crypto';
 import { NextRequest, NextResponse } from 'next/server';
 
@@ -244,8 +268,8 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const owner = process.env.VERCEL_GIT_REPO_OWNER ?? 'TheBlackFuture';
-    const repo = process.env.VERCEL_GIT_REPO_SLUG ?? 'Jovie';
+    const owner = env.VERCEL_GIT_REPO_OWNER ?? 'JovieInc';
+    const repo = env.VERCEL_GIT_REPO_SLUG ?? 'Jovie';
     const automationContract = getAutomationContract(payload, isPlanReadyEvent);
 
     const dispatchResponse = await serverFetch(

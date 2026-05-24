@@ -8,7 +8,11 @@
 
 import type { DashboardData } from '@/app/app/(shell)/dashboard/actions/dashboard-data';
 import type { CreatorProfile } from '@/lib/db/schema/profiles';
-import { INTERNAL_DJ_DEMO_PERSONA } from '@/lib/demo-personas';
+import {
+  type DemoPersonaProfile,
+  FOUNDER_DEMO_PERSONA,
+  INTERNAL_DJ_DEMO_PERSONA,
+} from '@/lib/demo-personas';
 
 const now = new Date();
 const DEFAULT_PERSONA = INTERNAL_DJ_DEMO_PERSONA.profile;
@@ -85,6 +89,11 @@ const DEFAULT_DEMO_PROFILE: CreatorProfile = {
   stripeAccountId: null,
   stripeOnboardingComplete: false,
   stripePayoutsEnabled: false,
+  stripeChargesEnabled: false,
+  stripeDetailsSubmitted: false,
+  stripePayoutEmail: null,
+  stripeConnectLastSyncedAt: null,
+  stripeConnectLastEventAt: null,
   nextTaskNumber: 1,
   smsAccessRequestedAt: null,
   discoveredPixels: null,
@@ -119,7 +128,44 @@ export function buildDemoProfile(creator?: {
   };
 }
 
+function buildDemoProfileFromPersona(
+  persona: DemoPersonaProfile,
+  id: string
+): CreatorProfile {
+  return {
+    ...DEFAULT_DEMO_PROFILE,
+    id,
+    username: persona.handle,
+    usernameNormalized: persona.handle.toLowerCase(),
+    displayName: persona.displayName,
+    bio: persona.bio,
+    venmoHandle: persona.venmoHandle,
+    avatarUrl: persona.avatarSrc,
+    spotifyUrl: persona.spotifyUrl,
+    appleMusicUrl: persona.appleMusicUrl,
+    youtubeUrl: persona.youtubeUrl,
+    spotifyId: persona.spotifyArtistId,
+    appleMusicId: persona.appleMusicArtistId,
+    youtubeMusicId: persona.youtubeMusicArtistId,
+    deezerId: persona.deezerArtistId,
+    tidalId: persona.tidalArtistId,
+    soundcloudId: persona.soundcloudArtistId,
+    bandsintownArtistName: persona.bandsintownArtistName,
+    isFeatured: persona.isFeaturedByDefault,
+    isClaimed: persona.isClaimedByDefault,
+    genres: [...persona.genres],
+    location: persona.location,
+    activeSinceYear: persona.activeSinceYear,
+    spotifyFollowers: persona.spotifyFollowers,
+    spotifyPopularity: persona.spotifyPopularity,
+  };
+}
+
 const DEMO_PROFILE = DEFAULT_DEMO_PROFILE;
+const FOUNDER_DEMO_PROFILE = buildDemoProfileFromPersona(
+  FOUNDER_DEMO_PERSONA.profile,
+  'demo-founder-profile'
+);
 
 /** Default dashboard data using the internal Calvin Harris demo persona. */
 export const DEMO_DASHBOARD_DATA: DashboardData = {
@@ -162,3 +208,9 @@ export function buildDemoDashboardData(
     selectedProfile: profile,
   };
 }
+
+export const FOUNDER_DEMO_DASHBOARD_DATA: DashboardData = {
+  ...DEMO_DASHBOARD_DATA,
+  creatorProfiles: [FOUNDER_DEMO_PROFILE],
+  selectedProfile: FOUNDER_DEMO_PROFILE,
+};
