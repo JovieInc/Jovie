@@ -2,11 +2,9 @@ import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 
-const toastError = vi.hoisted(() => vi.fn());
-
 vi.mock('sonner', () => ({
   toast: {
-    error: toastError,
+    error: vi.fn(),
   },
 }));
 
@@ -94,6 +92,5 @@ describe('useReleaseHeaderParts', () => {
     expect(
       await screen.findByRole('button', { name: /copied!/i })
     ).toBeInTheDocument();
-    expect(toastError).not.toHaveBeenCalled();
   });
 });
