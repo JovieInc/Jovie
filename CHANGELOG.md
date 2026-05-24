@@ -5,6 +5,15 @@
      5|The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
      6|and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.5.44] - 2026-05-24
+
+> [internal] Jovie chat now has a Promptfoo baseline eval suite that exercises the production chat runner with synthetic artist fixtures, making support quality, retrieval grounding, tool use, privacy, and onboarding regressions measurable.
+
+### Added
+
+- **[internal] Promptfoo chat baseline evals (JOV-2561)**: added a small Promptfoo suite for the web chat path, a custom provider around `executeChatTurn()`, synthetic Luna Waves fixtures, eval-only tool stubs, and JavaScript assertions covering support quality, retrieval grounding, tool-call correctness, privacy, business rules, onboarding task completion, and Jovie voice.
+- **[internal] Eval command and docs**: added `pnpm run evals` from the repo root and documented required env, baseline scope, and known route-level gaps for auth, billing, rate limits, DB persistence, mobile chat, Clerk, Spotify, and Stripe.
+
 ## [26.5.43] - 2026-05-24
 
 > The Mac Electron auth handoff now fails closed on callback replay and keeps the browser-open retry controls bounded.

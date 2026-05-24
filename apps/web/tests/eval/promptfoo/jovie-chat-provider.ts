@@ -1,0 +1,583 @@
+import { type ToolSet, tool, type UIMessage } from 'ai';
+import { z } from 'zod';
+import { executeChatTurn, selectKnowledgeContextForTurn } from '@/lib/chat/run';
+import {
+  FREE_TIER_TOOLS,
+  ONBOARDING_TOOLS,
+  TOOL_SCHEMAS,
+} from '@/lib/chat/tool-schemas';
+import type { ReleaseContext } from '@/lib/chat/types';
+import { getEntitlements, type PlanId } from '@/lib/entitlements/registry';
+import {
+  buildTestArtistContext,
+  buildTestReleases,
+} from '../../fixtures/chat-context';
+
+type EvalVars = Record<string, unknown>;
+
+type ToolExecution = {
+  readonly name: string;
+  readonly input: unknown;
+  readonly output: unknown;
+};
+
+type ProviderOptions = {
+  readonly id?: string;
+  readonly config?: Record<string, unknown>;
+};
+
+type CallApiContext = {
+  readonly vars?: EvalVars;
+};
+
+type CallApiOptions = {
+  readonly abortSignal?: AbortSignal;
+};
+
+type ProviderResponse = {
+  readonly output?: string;
+  readonly raw?: unknown;
+  readonly format?: string;
+  readonly latencyMs?: number;
+  readonly tokenUsage?: {
+    readonly prompt?: number;
+    readonly completion?: number;
+    readonly total?: number;
+  };
+  readonly error?: string;
+};
+
+const EVAL_PROFILE_ID = '00000000-0000-4000-8000-000000002561';
+const EVAL_CONVERSATION_ID = 'promptfoo-eval-conversation';
+const EVAL_USER_ID = 'promptfoo-eval-user';
+
+const ADVANCED_TOOL_SCHEMAS = {
+  showTopInsights: {
+    description:
+      'Show the artist their top audience, release, track, and monetization signals as structured insight cards.',
+    inputSchema: z.object({}),
+  },
+  proposeProfileEdit: {
+    description:
+      'Propose editing an editable artist profile field. Only displayName and bio are editable in chat.',
+    inputSchema: z.object({
+      field: z.enum(['displayName', 'bio']),
+      newValue: z.string().min(1).max(500),
+      sourceUrl: z.string().url().optional(),
+      sourceTitle: z.string().max(200).optional(),
+    }),
+  },
+  importBioFromUrl: {
+    description:
+      'Import an artist bio candidate from a website, link-in-bio page, or press-kit URL.',
+    inputSchema: z.object({
+      url: z.string().url(),
+    }),
+  },
+  checkCanvasStatus: {
+    description:
+      "Check which of the artist's releases have Spotify Canvas videos set and which are missing them.",
+    inputSchema: z.object({
+      includeAll: z.boolean().optional(),
+    }),
+  },
+  suggestRelatedArtists: {
+    description:
+      "Suggest related artists for playlist pitching, ad targeting, and collaboration based on the artist's context.",
+    inputSchema: z.object({
+      purpose: z.enum([
+        'playlist_pitching',
+        'ad_targeting',
+        'collaboration',
+        'all',
+      ]),
+      count: z.number().int().min(3).max(15).optional(),
+    }),
+  },
+  writeWorldClassBio: {
+    description:
+      'Write a world-class artist bio in an editorial style suitable for Spotify, Apple Music, and press use.',
+    inputSchema: z.object({
+      goal: z
+        .enum(['spotify', 'apple_music', 'press_kit', 'general'])
+        .optional(),
+      tone: z
+        .enum(['cinematic', 'intimate', 'confident', 'elevated'])
+        .optional(),
+      maxWords: z.number().int().min(80).max(350).optional(),
+    }),
+  },
+  generateCanvasPlan: {
+    description:
+      'Generate a detailed plan for creating a Spotify Canvas video from album artwork.',
+    inputSchema: z.object({
+      releaseTitle: z.string(),
+      motionPreference: z
+        .enum(['zoom', 'pan', 'particles', 'morph', 'ambient'])
+        .optional(),
+    }),
+  },
+  createPromoStrategy: {
+    description:
+      'Create a promotion strategy for a release, including social video, TikTok, Canvas, and ad targeting recommendations.',
+    inputSchema: z.object({
+      releaseTitle: z.string().optional(),
+      budget: z.enum(['free', 'low', 'medium', 'high']).optional(),
+      platforms: z
+        .array(
+          z.enum(['tiktok', 'instagram', 'youtube', 'spotify', 'hulu', 'meta'])
+        )
+        .optional(),
+    }),
+  },
+  markCanvasUploaded: {
+    description:
+      'Mark a release as having a Spotify Canvas video uploaded after the artist confirms it is set in Spotify for Artists.',
+    inputSchema: z.object({
+      releaseTitle: z.string(),
+    }),
+  },
+  createRelease: {
+    description:
+      "Create a new release in the artist's discography. Ask for title and release type before calling.",
+    inputSchema: z.object({
+      title: z.string().min(1).max(200),
+      releaseType: z.enum([
+        'single',
+        'ep',
+        'album',
+        'compilation',
+        'live',
+        'mixtape',
+        'other',
+      ]),
+      releaseDate: z
+        .string()
+        .regex(/^\d{4}-\d{2}-\d{2}$/)
+        .optional(),
+      label: z.string().max(200).optional(),
+      upc: z.string().max(20).optional(),
+    }),
+  },
+  formatLyrics: {
+    description:
+      'Format lyrics to Apple Music guidelines. Use when an artist asks to clean up or format lyrics.',
+    inputSchema: z.object({
+      lyrics: z.string().min(1).max(10000),
+    }),
+  },
+  generateReleasePitch: {
+    description:
+      'Generate playlist pitches for a release. Ask which release to pitch if unclear.',
+    inputSchema: z.object({
+      releaseTitle: z.string().max(200),
+      instructions: z.string().max(500).optional(),
+    }),
+  },
+} as const;
+
+const ALL_EVAL_TOOL_SCHEMAS = {
+  ...TOOL_SCHEMAS,
+  ...ADVANCED_TOOL_SCHEMAS,
+};
+
+const PAID_TOOL_NAMES = [
+  ...FREE_TIER_TOOLS,
+  'showTopInsights',
+  'proposeProfileEdit',
+  'importBioFromUrl',
+  'checkCanvasStatus',
+  'suggestRelatedArtists',
+  'writeWorldClassBio',
+  'generateCanvasPlan',
+  'generateAlbumArt',
+  'createPromoStrategy',
+  'markCanvasUploaded',
+  'formatLyrics',
+  'createRelease',
+  'generateReleasePitch',
+] as const;
+
+function toObject(value: unknown): Record<string, unknown> {
+  return value && typeof value === 'object' && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : {};
+}
+
+function toPlanId(value: unknown): PlanId {
+  if (value === undefined) {
+    return 'pro';
+  }
+
+  if (
+    value === 'free' ||
+    value === 'trial' ||
+    value === 'pro' ||
+    value === 'max'
+  ) {
+    return value;
+  }
+
+  throw new RangeError(`Invalid eval vars.plan: ${String(value)}`);
+}
+
+function toMode(value: unknown): 'app' | 'onboarding' {
+  return value === 'onboarding' ? 'onboarding' : 'app';
+}
+
+function toBoolean(value: unknown, fallback: boolean): boolean {
+  return typeof value === 'boolean' ? value : fallback;
+}
+
+function toUiMessages(prompt: string, vars: EvalVars): UIMessage[] {
+  const rawMessages = Array.isArray(vars.messages) ? vars.messages : null;
+
+  if (!rawMessages) {
+    return [
+      {
+        id: 'eval-message-1',
+        role: 'user',
+        parts: [{ type: 'text', text: prompt }],
+      } as UIMessage,
+    ];
+  }
+
+  return rawMessages.map((raw, index) => {
+    const message = toObject(raw);
+    const role = message.role === 'assistant' ? 'assistant' : 'user';
+    const text =
+      typeof message.text === 'string'
+        ? message.text
+        : typeof message.content === 'string'
+          ? message.content
+          : '';
+
+    return {
+      id: typeof message.id === 'string' ? message.id : `eval-message-${index}`,
+      role,
+      parts: [{ type: 'text', text }],
+    } as UIMessage;
+  });
+}
+
+function buildEvalReleases(vars: EvalVars): ReleaseContext[] {
+  const overrides = Array.isArray(vars.releaseOverrides)
+    ? (vars.releaseOverrides as Parameters<typeof buildTestReleases>[0])
+    : undefined;
+
+  return buildTestReleases(overrides).map((release, index) => ({
+    id: `00000000-0000-4000-8000-000000000${index + 1}00`,
+    title: release.title,
+    releaseType: release.releaseType,
+    releaseDate: release.releaseDate,
+    artworkUrl: `https://cdn.jov.ie/eval/${index + 1}.jpg`,
+    spotifyPopularity: 35 + index,
+    totalTracks: release.totalTracks,
+    canvasStatus: index === 0 ? 'not_set' : 'uploaded',
+    metadata: null,
+  }));
+}
+
+function getToolNamesForTurn(mode: 'app' | 'onboarding', plan: PlanId) {
+  if (mode === 'onboarding') return ONBOARDING_TOOLS;
+  return plan === 'free' ? FREE_TIER_TOOLS : PAID_TOOL_NAMES;
+}
+
+function configuredToolResult(
+  vars: EvalVars,
+  toolName: string
+): unknown | undefined {
+  const toolResults = toObject(vars.toolResults);
+  return Object.hasOwn(toolResults, toolName)
+    ? toolResults[toolName]
+    : undefined;
+}
+
+function defaultToolResult(toolName: string, input: unknown): unknown {
+  const args = toObject(input);
+
+  switch (toolName) {
+    case 'proposeAvatarUpload':
+      return { success: true, action: 'avatar_upload' };
+    case 'proposeSocialLink': {
+      const url = typeof args.url === 'string' ? args.url : '';
+      return {
+        success: true,
+        action: 'propose_social_link',
+        normalizedUrl: url,
+        originalUrl: url,
+        platform: url.includes('instagram')
+          ? { id: 'instagram', name: 'Instagram' }
+          : { id: 'website', name: 'Website' },
+        suggestedTitle: url.includes('instagram') ? 'Instagram' : 'Website',
+      };
+    }
+    case 'proposeSocialLinkRemoval': {
+      const platform =
+        typeof args.platform === 'string'
+          ? args.platform.toLowerCase()
+          : 'link';
+      return {
+        success: true,
+        action: 'remove_link',
+        platform,
+        url: `https://${platform}.com/lunawaves`,
+      };
+    }
+    case 'submitFeedback':
+      return { success: true, message: 'Feedback recorded.' };
+    case 'showTopInsights':
+      return {
+        success: true,
+        title: 'Top signals',
+        totalActive: 0,
+        insights: [],
+      };
+    case 'proposeProfileEdit':
+      return { success: true, action: 'profile_edit_preview', ...args };
+    case 'importBioFromUrl':
+      return {
+        ok: true,
+        candidateBio:
+          'Luna Waves builds ambient electronic songs around field recordings and soft modular textures.',
+        sourceUrl: args.url,
+        sourceTitle: 'Luna Waves press kit',
+      };
+    case 'checkCanvasStatus':
+      return {
+        success: true,
+        summary: { total: 3, withCanvas: 1, withoutCanvas: 2 },
+        releases: [{ title: 'Tidal Drift', hasArtwork: true }],
+      };
+    case 'confirmSpotifyArtist':
+      return {
+        action: 'spotify_artist_confirmed',
+        spotifyArtistId: args.spotifyArtistId,
+        artist: {
+          id: args.spotifyArtistId,
+          name: 'Luna Waves',
+          url: 'https://open.spotify.com/artist/spotify-luna-123',
+          imageUrl: 'https://cdn.jov.ie/eval/luna-waves.jpg',
+          followers: 12500,
+          popularity: 45,
+          genres: ['ambient', 'electronic', 'downtempo'],
+        },
+        summary: 'Luna Waves matched on Spotify.',
+      };
+    case 'checkHandle':
+      return {
+        action: 'check_handle',
+        handle: typeof args.handle === 'string' ? args.handle : 'lunawaves',
+        available: true,
+        summary: 'Handle is available.',
+      };
+    case 'recordInterviewSignal':
+      return {
+        action: 'signal_recorded',
+        signalCount: 1,
+        summary: 'Signal noted.',
+      };
+    case 'proposeNextStep':
+      return {
+        action: 'propose_next_step',
+        decision: { kind: 'needs_more_info', reason: 'Synthetic eval signal.' },
+        summary: 'Next step: needs more info.',
+      };
+    case 'proposeCheckout':
+      return {
+        action: 'propose_checkout',
+        plan: args.plan ?? null,
+        handoffUrl:
+          typeof args.plan === 'string'
+            ? `/onboarding/checkout?plan=${encodeURIComponent(args.plan)}`
+            : '/onboarding/checkout',
+        summary: 'Checkout handoff ready.',
+      };
+    default:
+      return { success: true, action: toolName, input: args };
+  }
+}
+
+function buildEvalTools(
+  toolNames: readonly string[],
+  vars: EvalVars,
+  executions: ToolExecution[]
+): ToolSet {
+  const tools: ToolSet = {};
+
+  for (const toolName of toolNames) {
+    const schema =
+      ALL_EVAL_TOOL_SCHEMAS[toolName as keyof typeof ALL_EVAL_TOOL_SCHEMAS];
+    if (!schema) continue;
+
+    const evalToolDefinition = {
+      description: schema.description,
+      inputSchema: schema.inputSchema,
+      execute: async (input: unknown) => {
+        const output =
+          configuredToolResult(vars, toolName) ??
+          defaultToolResult(toolName, input);
+        executions.push({ name: toolName, input, output });
+        return output;
+      },
+    };
+
+    tools[toolName] = tool(
+      evalToolDefinition as unknown as Parameters<typeof tool>[0]
+    );
+  }
+
+  return tools;
+}
+
+function toPromptfooUsage(usage: Record<string, unknown> | null | undefined) {
+  if (!usage) return undefined;
+
+  const prompt =
+    typeof usage.inputTokens === 'number'
+      ? usage.inputTokens
+      : typeof usage.promptTokens === 'number'
+        ? usage.promptTokens
+        : undefined;
+  const completion =
+    typeof usage.outputTokens === 'number'
+      ? usage.outputTokens
+      : typeof usage.completionTokens === 'number'
+        ? usage.completionTokens
+        : undefined;
+  const total =
+    typeof usage.totalTokens === 'number'
+      ? usage.totalTokens
+      : typeof prompt === 'number' && typeof completion === 'number'
+        ? prompt + completion
+        : undefined;
+
+  return { prompt, completion, total };
+}
+
+function safeError(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
+
+export default class JovieChatPromptfooProvider {
+  private readonly providerId: string;
+
+  constructor(options: ProviderOptions = {}) {
+    this.providerId = options.id ?? 'jovie-chat-execute-turn';
+  }
+
+  id() {
+    return this.providerId;
+  }
+
+  async callApi(
+    prompt: string,
+    context?: CallApiContext,
+    options?: CallApiOptions
+  ): Promise<ProviderResponse> {
+    const startedAt = Date.now();
+    const vars = context?.vars ?? {};
+    const mode = toMode(vars.mode);
+    const plan = toPlanId(vars.plan);
+    const uiMessages = toUiMessages(prompt, vars);
+    const toolExecutions: ToolExecution[] = [];
+    const toolNames = getToolNamesForTurn(mode, plan);
+    const tools = buildEvalTools(toolNames, vars, toolExecutions);
+    const artistOverrides = toObject(vars.artistOverrides);
+    const artistContext =
+      mode === 'app'
+        ? buildTestArtistContext(
+            artistOverrides as Parameters<typeof buildTestArtistContext>[0]
+          )
+        : null;
+    const releases = mode === 'app' ? buildEvalReleases(vars) : [];
+    const knowledgeContext =
+      mode === 'app' ? selectKnowledgeContextForTurn(uiMessages) : '';
+    const abortController = new AbortController();
+    const upstreamAbortSignal = options?.abortSignal;
+    const onAbort = () => {
+      abortController.abort(upstreamAbortSignal?.reason);
+    };
+
+    if (upstreamAbortSignal?.aborted) {
+      onAbort();
+    } else {
+      upstreamAbortSignal?.addEventListener('abort', onAbort, { once: true });
+    }
+
+    try {
+      const turn = await executeChatTurn({
+        uiMessages,
+        artistContext,
+        releases,
+        resolvedProfileId: mode === 'app' ? EVAL_PROFILE_ID : null,
+        resolvedConversationId: EVAL_CONVERSATION_ID,
+        userId: mode === 'app' ? EVAL_USER_ID : null,
+        userPlan: plan,
+        planLimits: getEntitlements(plan),
+        insightsEnabled: toBoolean(vars.insightsEnabled, plan !== 'free'),
+        forceLightModel: toBoolean(vars.forceLightModel, false),
+        tools,
+        signal: abortController.signal,
+        requestId: 'promptfoo-eval',
+        telemetry: {
+          setTags: () => undefined,
+          setExtra: () => undefined,
+          captureException: () => undefined,
+        },
+        mode,
+      });
+
+      const [text, toolCalls, toolResults, steps, usage, finishReason] =
+        await Promise.all([
+          turn.streamResult.text,
+          turn.streamResult.toolCalls,
+          turn.streamResult.toolResults,
+          turn.streamResult.steps,
+          turn.streamResult.totalUsage,
+          turn.streamResult.finishReason,
+        ]);
+
+      const payload = {
+        text,
+        selectedModel: turn.selectedModel,
+        mode,
+        plan,
+        toolNames: turn.toolNames,
+        toolCalls,
+        toolResults,
+        toolExecutions,
+        steps,
+        finishReason,
+        usage,
+        knowledgeContext,
+        knowledgeContextSelected: knowledgeContext.length > 0,
+        systemPromptChars: turn.systemPrompt.length,
+        modelMessages: turn.modelMessages.map(message => ({
+          role: message.role,
+          content:
+            typeof message.content === 'string'
+              ? message.content
+              : Array.isArray(message.content)
+                ? message.content
+                : '[non-text content]',
+        })),
+      };
+
+      return {
+        output: JSON.stringify(payload),
+        raw: payload,
+        format: 'json',
+        latencyMs: Date.now() - startedAt,
+        tokenUsage: toPromptfooUsage(usage as Record<string, unknown>),
+      };
+    } catch (error) {
+      return {
+        error: safeError(error),
+        latencyMs: Date.now() - startedAt,
+      };
+    } finally {
+      upstreamAbortSignal?.removeEventListener('abort', onAbort);
+    }
+  }
+}
