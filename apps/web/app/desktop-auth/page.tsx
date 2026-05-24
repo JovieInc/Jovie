@@ -28,6 +28,21 @@ function formatOpenError(reason?: string): string {
   return 'The browser did not open. Try again, or close this window and start sign-in again.';
 }
 
+function formatBrowserOpenStatus(
+  openState: BrowserOpenState,
+  openError: string | null
+): string | null {
+  if (openState === 'opening') {
+    return 'Opening your browser...';
+  }
+
+  if (openState === 'opened') {
+    return 'Continue sign-in in your browser.';
+  }
+
+  return openError;
+}
+
 async function openWithTimeout(authUrl: string) {
   let timeoutId: ReturnType<typeof setTimeout> | undefined;
   try {
@@ -96,12 +111,7 @@ function DesktopAuthContent() {
     };
   }, [authUrl, canAutoOpen]);
 
-  const statusText =
-    openState === 'opening'
-      ? 'Opening your browser...'
-      : openState === 'opened'
-        ? 'Continue sign-in in your browser.'
-        : openError;
+  const statusText = formatBrowserOpenStatus(openState, openError);
 
   return (
     <main className='grid min-h-dvh place-items-center bg-[#06070a] px-6 text-white [color-scheme:dark]'>

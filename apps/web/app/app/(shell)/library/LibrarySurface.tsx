@@ -1439,9 +1439,9 @@ function LibraryAudioDropzone({
         className='sr-only'
         aria-label={`Upload audio for ${asset.title}`}
       />
-      <div className='min-h-5 pt-1.5 text-2xs' role='status'>
+      <output className='min-h-5 pt-1.5 text-2xs'>
         {uploadError ? <p className='text-error'>{uploadError}</p> : null}
-      </div>
+      </output>
     </div>
   );
 }
@@ -1536,8 +1536,14 @@ function AssetDrawer({
   const current = asset ?? stickyAsset;
   const closedInteractiveProps = open ? {} : { tabIndex: -1 };
   const closedTabIndex = open ? undefined : -1;
-  const isPreviewPlaying = Boolean(
-    current && playingPreviewId === current.id && activePreviewId === current.id
+  const currentId = current?.id ?? null;
+  const isPreviewPlaying =
+    currentId !== null &&
+    currentId === playingPreviewId &&
+    currentId === activePreviewId;
+  const closedDrawerClassName = cn(
+    'pointer-events-none opacity-0',
+    isDesktopLayout ? null : 'translate-y-2 hidden'
   );
 
   return (
@@ -1549,12 +1555,7 @@ function AssetDrawer({
         isDesktopLayout
           ? 'static z-auto rounded-none border-y-0 border-r-0 shadow-none'
           : 'fixed inset-x-3 bottom-20 top-16 z-40 rounded-lg border shadow-[0_18px_48px_rgba(0,0,0,0.28)]',
-        open
-          ? 'translate-y-0 opacity-100'
-          : cn(
-              'pointer-events-none opacity-0',
-              isDesktopLayout ? null : 'translate-y-2 hidden'
-            )
+        open ? 'translate-y-0 opacity-100' : closedDrawerClassName
       )}
       data-testid='library-asset-drawer'
     >
@@ -1744,16 +1745,16 @@ function LibraryStatusBar({
   readonly view: LibraryViewMode;
   readonly activePreviewTitle: string | null;
 }) {
+  const playbackSummary = activePreviewTitle
+    ? `Playing ${activePreviewTitle}`
+    : `${SORT_LABELS[sort]} - ${view === 'grid' ? 'Grid' : 'List'}`;
+
   return (
     <div className='hidden h-8 shrink-0 items-center justify-between gap-3 border-t border-subtle bg-(--linear-app-content-surface) px-3 text-[11px] text-tertiary-token sm:flex'>
       <span className='min-w-0 truncate'>
         {visibleCount} of {totalCount} Releases
       </span>
-      <span className='min-w-0 truncate text-right'>
-        {activePreviewTitle
-          ? `Playing ${activePreviewTitle}`
-          : `${SORT_LABELS[sort]} - ${view === 'grid' ? 'Grid' : 'List'}`}
-      </span>
+      <span className='min-w-0 truncate text-right'>{playbackSummary}</span>
     </div>
   );
 }
@@ -1965,6 +1966,11 @@ export function LibrarySurface({
     [router]
   );
 
+  const drawerColumnWidth = drawerOpen ? '360px' : '0px';
+  const libraryGridTemplateColumns = isDesktopLayout
+    ? `minmax(16rem,17.5rem) minmax(0,1fr) ${drawerColumnWidth}`
+    : 'minmax(0, 1fr)';
+
   if (effectiveAssets.length === 0) {
     return <EmptyCatalog />;
   }
@@ -2001,9 +2007,7 @@ export function LibrarySurface({
         className='grid h-full min-h-0 flex-1 overflow-hidden'
         style={
           {
-            gridTemplateColumns: isDesktopLayout
-              ? `minmax(16rem,17.5rem) minmax(0,1fr) ${drawerOpen ? '360px' : '0px'}`
-              : 'minmax(0, 1fr)',
+            gridTemplateColumns: libraryGridTemplateColumns,
             transition:
               'grid-template-columns var(--duration-cinematic) var(--ease-cinematic)',
           } as CSSProperties
