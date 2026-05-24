@@ -263,6 +263,13 @@ export function JovieChat({
   const messageViewportPaddingBottom = shouldReservePickerClearance
     ? CHAT_PICKER_THREAD_CLEARANCE
     : undefined;
+  const virtualizedMessageViewportBaseHeight = Math.max(
+    virtualizer.getTotalSize(),
+    scrollContainerRef.current?.clientHeight ?? 0
+  );
+  const virtualizedMessageViewportHeight = messageViewportPaddingBottom
+    ? `calc(${virtualizedMessageViewportBaseHeight}px + ${messageViewportPaddingBottom})`
+    : virtualizedMessageViewportBaseHeight;
 
   useEffect(() => {
     if (!shouldReservePickerClearance || !isStuckToBottom) return;
@@ -454,11 +461,7 @@ export function JovieChat({
                       className='mx-auto flex min-h-full w-full max-w-[44rem] flex-col'
                       style={{
                         position: 'relative',
-                        height: Math.max(
-                          virtualizer.getTotalSize(),
-                          scrollContainerRef.current?.clientHeight ?? 0
-                        ),
-                        paddingBottom: messageViewportPaddingBottom,
+                        height: virtualizedMessageViewportHeight,
                       }}
                     >
                       {virtualizer.getVirtualItems().map(virtualItem => {

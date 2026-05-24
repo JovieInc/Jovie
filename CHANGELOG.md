@@ -5,6 +5,18 @@
      5|The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
      6|and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.5.46] - 2026-05-24
+
+> Virtualized chat threads now reserve slash-command picker clearance in the scroll geometry itself.
+
+### Fixed
+
+- **Virtualized slash-command clearance (JOV-2566)**: adds flyout clearance to the virtualized message spacer height instead of fixed-height padding, so long threads keep the latest message clear of the slash picker.
+
+### Added
+
+- **Virtualized flyout regression coverage**: extends the populated chat flyout Playwright fixture past the virtualization threshold so the smoke invariant covers long-thread geometry.
+
 ## [26.5.45] - 2026-05-24
 
 > Chat slash-command flyouts and rich chip previews now stay above the transcript, clear active messages, and preserve composer geometry across desktop and mobile shells.
