@@ -366,6 +366,10 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
       [onSubmit]
     );
 
+    const handleSendClick = useCallback(() => {
+      onSubmit();
+    }, [onSubmit]);
+
     const handleKeyDown = useCallback(
       (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
         if (e.nativeEvent.isComposing) return;
@@ -566,6 +570,7 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
                       handleMicToggle={handleMicToggle}
                       canSend={canSend}
                       isStreaming={isStreaming}
+                      onSend={handleSendClick}
                       onStop={onStop}
                       setIsFocused={setIsFocused}
                       hasPendingImages={hasPendingImages}
@@ -641,6 +646,7 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
                   handleMicToggle={handleMicToggle}
                   canSend={canSend}
                   isStreaming={isStreaming}
+                  onSend={handleSendClick}
                   onStop={onStop}
                   setIsFocused={setIsFocused}
                   hasPendingImages={hasPendingImages}
@@ -714,6 +720,7 @@ interface InputRowProps {
   readonly handleMicToggle: () => void;
   readonly canSend: boolean;
   readonly isStreaming: boolean;
+  readonly onSend: () => void;
   readonly onStop?: () => void;
   readonly setIsFocused: (focused: boolean) => void;
   readonly hasPendingImages: boolean;
@@ -760,6 +767,7 @@ function InputRow({
   handleMicToggle,
   canSend,
   isStreaming,
+  onSend,
   onStop,
   setIsFocused,
   hasPendingImages,
@@ -906,6 +914,7 @@ function InputRow({
               isSubmitting={isSubmitting}
               reducedMotion={reducedMotion}
               onMouseDown={handlePreserveFocus}
+              onSend={onSend}
               onStop={onStop}
             />
           </div>

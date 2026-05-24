@@ -39,11 +39,13 @@ let mockMessages: Array<{
 }> = [];
 let mockConversationData:
   | {
-      conversation?: { title: string | null };
+      conversation?: { id?: string; title: string | null };
       messages?: Array<{
         id: string;
         role: string;
         content: string;
+        clientMessageId?: string | null;
+        turnId?: string | null;
         createdAt: string;
       }>;
     }
@@ -201,6 +203,7 @@ describe('useJovieChat', () => {
 
   it('does not overwrite in-flight first message with loaded conversation sync while streaming', () => {
     mockConversationData = {
+      conversation: { id: 'conv_123', title: null },
       messages: [
         {
           id: 'db_1',
@@ -227,6 +230,47 @@ describe('useJovieChat', () => {
     expect(setMessagesMock).not.toHaveBeenCalled();
   });
 
+  it('merges loaded conversation messages into the canonical timeline without SDK replacement', () => {
+    mockConversationData = {
+      conversation: { id: 'conv_merge', title: null },
+      messages: [
+        {
+          id: 'db_user_1',
+          role: 'user',
+          content: 'Persisted hello',
+          clientMessageId: 'turn_1:user',
+          turnId: 'turn_server_1',
+          createdAt: '2026-01-01T00:00:00.000Z',
+        },
+        {
+          id: 'db_assistant_1',
+          role: 'assistant',
+          content: 'Persisted answer',
+          turnId: 'turn_server_1',
+          createdAt: '2026-01-01T00:00:01.000Z',
+        },
+      ],
+    };
+
+    const { result } = renderHook(() =>
+      useJovieChat({ profileId: 'profile_1', conversationId: 'conv_merge' })
+    );
+
+    expect(setMessagesMock).not.toHaveBeenCalled();
+    expect(result.current.messages).toMatchObject([
+      {
+        id: 'user:turn_1',
+        role: 'user',
+        status: 'complete',
+      },
+      {
+        id: 'assistant:turn_server_1',
+        role: 'assistant',
+        status: 'complete',
+      },
+    ]);
+  });
+
   it('sends the first message immediately through the chat turn boundary', async () => {
     const { result } = renderHook(() =>
       useJovieChat({ profileId: 'profile_1' })
@@ -238,6 +282,16 @@ describe('useJovieChat', () => {
 
     expect(mutateAsyncMock).not.toHaveBeenCalled();
     expect(sendMessageMock).toHaveBeenCalledTimes(1);
+    expect(result.current.messages).toMatchObject([
+      {
+        role: 'user',
+        status: 'sending',
+      },
+      {
+        role: 'assistant',
+        status: 'pending',
+      },
+    ]);
     expect(sendMessageMock).toHaveBeenCalledWith(
       expect.objectContaining({
         conversationIdAtSend: null,

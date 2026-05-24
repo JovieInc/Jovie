@@ -215,20 +215,43 @@ async function findDevTestAuthSession(
   clerkUserId: string,
   requestedPersona: DevTestAuthPersona | null
 ): Promise<DevTestAuthSession> {
-  const [matchedUser] = await db
-    .select({
-      dbUserId: users.id,
-      clerkUserId: users.clerkId,
-      email: users.email,
-      fullName: users.name,
-      isAdmin: users.isAdmin,
-      username: creatorProfiles.username,
-      displayName: creatorProfiles.displayName,
-    })
-    .from(users)
-    .leftJoin(creatorProfiles, eq(creatorProfiles.id, users.activeProfileId))
-    .where(eq(users.clerkId, clerkUserId))
-    .limit(1);
+  let matchedUser:
+    | {
+        dbUserId: string;
+        clerkUserId: string;
+        email: string | null;
+        fullName: string | null;
+        isAdmin: boolean;
+        username: string | null;
+        displayName: string | null;
+      }
+    | undefined;
+
+  try {
+    [matchedUser] = await db
+      .select({
+        dbUserId: users.id,
+        clerkUserId: users.clerkId,
+        email: users.email,
+        fullName: users.name,
+        isAdmin: users.isAdmin,
+        username: creatorProfiles.username,
+        displayName: creatorProfiles.displayName,
+      })
+      .from(users)
+      .leftJoin(creatorProfiles, eq(creatorProfiles.id, users.activeProfileId))
+      .where(eq(users.clerkId, clerkUserId))
+      .limit(1);
+  } catch (error) {
+    logger.warn('Falling back to synthetic dev test auth actor', {
+      clerkUserId,
+      error,
+    });
+    return getFallbackActorFromPersona(
+      clerkUserId,
+      requestedPersona ?? 'creator'
+    );
+  }
 
   if (!matchedUser) {
     return getFallbackActorFromPersona(

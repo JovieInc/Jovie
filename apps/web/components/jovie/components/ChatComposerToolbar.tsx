@@ -53,6 +53,7 @@ export interface ComposerSendButtonProps {
   readonly isSubmitting: boolean;
   readonly reducedMotion: boolean | null;
   readonly onMouseDown: (event: React.MouseEvent<HTMLButtonElement>) => void;
+  readonly onSend?: () => void;
   readonly onStop?: () => void;
 }
 
@@ -63,6 +64,7 @@ export function ComposerSendButton({
   isSubmitting,
   reducedMotion,
   onMouseDown,
+  onSend,
   onStop,
 }: ComposerSendButtonProps) {
   const showStop = isStreaming && Boolean(onStop);
@@ -73,9 +75,9 @@ export function ComposerSendButton({
   return (
     <SimpleTooltip content={showStop ? 'Stop generating' : 'Send message'}>
       <button
-        type={showStop ? 'button' : 'submit'}
+        type='button'
         onMouseDown={onMouseDown}
-        onClick={showStop ? onStop : undefined}
+        onClick={showStop ? onStop : onSend}
         disabled={!showStop && !canSend}
         className={cn(
           'flex h-8 w-8 shrink-0 items-center justify-center rounded-full transition-[background-color,color,box-shadow] duration-fast',

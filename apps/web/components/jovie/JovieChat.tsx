@@ -25,20 +25,15 @@ import {
   useJovieChat,
   useStickToBottom,
 } from './hooks';
-import type { JovieChatProps, MessagePart } from './types';
+import type { JovieChatProps } from './types';
 
-/** Sentinel ID for the synthetic thinking placeholder */
-const THINKING_PLACEHOLDER_ID = 'thinking-placeholder';
 const VIRTUALIZATION_THRESHOLD = 12;
 
 function findLastAssistantIndex(
   messages: readonly { id: string; role: string }[]
 ): number {
   for (let i = messages.length - 1; i >= 0; i--) {
-    if (
-      messages[i].role === 'assistant' &&
-      messages[i].id !== THINKING_PLACEHOLDER_ID
-    ) {
+    if (messages[i].role === 'assistant') {
       return i;
     }
   }
@@ -104,33 +99,6 @@ export function JovieChat({
     disabled: isLoading || isSubmitting,
   });
 
-  // ─── Synthetic thinking message (render-only) ───────────────────
-  // Append a placeholder when waiting for the AI to start responding.
-  // This is a displayMessages array, NOT a modification to the real messages.
-  const lastMessage = messages[messages.length - 1];
-  const showPendingBootstrap = messages.length === 0 && isSubmitting;
-  const displayMessages =
-    isLoading && lastMessage?.role === 'user'
-      ? [
-          ...messages,
-          {
-            id: THINKING_PLACEHOLDER_ID,
-            role: 'assistant' as const,
-            parts: [] as MessagePart[],
-            createdAt: new Date(),
-          },
-        ]
-      : showPendingBootstrap
-        ? [
-            {
-              id: THINKING_PLACEHOLDER_ID,
-              role: 'assistant' as const,
-              parts: [] as MessagePart[],
-              createdAt: new Date(),
-            },
-          ]
-        : messages;
-
   // ─── Sticky scroll via ResizeObserver ────────────────────────────
   const {
     isStuckToBottom,
@@ -138,7 +106,7 @@ export function JovieChat({
     onScroll,
     totalSizeRef,
     scrollContainerRef,
-  } = useStickToBottom({ messageCount: displayMessages.length });
+  } = useStickToBottom({ messageCount: messages.length });
 
   // ─── Chat jank instrumentation (flag-gated) ─────────────────
   const jankMonitorEnabled = useAppFlag('CHAT_JANK_MONITOR');
@@ -246,19 +214,18 @@ export function JovieChat({
 
   // Virtualizer
   const virtualizer = useVirtualizer({
-    count: displayMessages.length,
+    count: messages.length,
     getScrollElement: () => scrollContainerRef.current,
     estimateSize: () => 80,
     overscan: 5,
     measureElement: el => el.getBoundingClientRect().height,
   });
-  const shouldVirtualizeMessages =
-    displayMessages.length > VIRTUALIZATION_THRESHOLD;
+  const shouldVirtualizeMessages = messages.length > VIRTUALIZATION_THRESHOLD;
 
   const scrollToBottom = useCallback(() => {
-    if (displayMessages.length > 0) {
+    if (messages.length > 0) {
       if (shouldVirtualizeMessages) {
-        virtualizer.scrollToIndex(displayMessages.length - 1, {
+        virtualizer.scrollToIndex(messages.length - 1, {
           align: 'end',
           behavior: 'smooth',
         });
@@ -278,17 +245,17 @@ export function JovieChat({
       setStuckToBottom(true);
     }
   }, [
-    displayMessages.length,
+    messages.length,
     scrollContainerRef,
     setStuckToBottom,
     shouldVirtualizeMessages,
     virtualizer,
   ]);
 
-  const lastAssistantIndex = findLastAssistantIndex(displayMessages);
+  const lastAssistantIndex = findLastAssistantIndex(messages);
 
   const isStreaming = status === 'streaming';
-  const showThreadView = hasMessages || showPendingBootstrap;
+  const showThreadView = hasMessages;
 
   // Show skeleton while fetching existing conversation
   if (isLoadingConversation) {
@@ -477,10 +444,11 @@ export function JovieChat({
                       }}
                     >
                       {virtualizer.getVirtualItems().map(virtualItem => {
-                        const message = displayMessages[virtualItem.index];
+                        const message = messages[virtualItem.index];
                         const index = virtualItem.index;
                         const isThinking =
-                          message.id === THINKING_PLACEHOLDER_ID;
+                          message.role === 'assistant' &&
+                          message.status === 'pending';
                         return (
                           <div
                             key={message.id}
@@ -523,9 +491,10 @@ export function JovieChat({
                       ref={totalSizeRef}
                       className='mx-auto flex min-h-full w-full max-w-[44rem] flex-col'
                     >
-                      {displayMessages.map((message, index) => {
+                      {messages.map((message, index) => {
                         const isThinking =
-                          message.id === THINKING_PLACEHOLDER_ID;
+                          message.role === 'assistant' &&
+                          message.status === 'pending';
                         return (
                           <div key={message.id} className='pb-4'>
                             <ChatMessage

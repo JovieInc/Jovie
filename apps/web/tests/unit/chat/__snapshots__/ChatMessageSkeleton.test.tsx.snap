@@ -21,22 +21,10 @@ exports[`ChatMessageSkeleton > matches snapshot 1`] = `
     class="flex justify-start"
   >
     <div
-      class="max-w-[78%] space-y-1.5"
+      class="w-full max-w-[78%] space-y-2 text-[15px] leading-7"
     >
       <div
-        class="flex items-center gap-2 pl-0.5"
-      >
-        <div
-          aria-hidden="true"
-          class="skeleton motion-reduce:animate-none h-5.5 w-5.5 rounded-full"
-        />
-        <div
-          aria-hidden="true"
-          class="skeleton motion-reduce:animate-none rounded-sm h-3 w-8"
-        />
-      </div>
-      <div
-        class="space-y-2 rounded-[18px] border border-subtle bg-surface-1 px-4 py-3.5"
+        class="space-y-2 pl-0.5"
       >
         <div
           aria-hidden="true"

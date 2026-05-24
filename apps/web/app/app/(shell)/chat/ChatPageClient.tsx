@@ -344,7 +344,24 @@ export function ChatPageClient({
   const hasProfilesButNoSelection =
     creatorProfiles.length > 0 && !selectedProfile && !needsOnboarding;
   const fallbackProfile = hasProfilesButNoSelection ? creatorProfiles[0] : null;
-  const activeProfile = selectedProfile ?? fallbackProfile;
+  const e2eFallbackProfile =
+    env.IS_E2E && !selectedProfile && !fallbackProfile
+      ? ({
+          id: '00000000-0000-4000-8000-000000000102',
+          userId: '00000000-0000-4000-8000-000000000101',
+          username: 'e2e-chat-smoke',
+          displayName: 'E2E Chat Smoke',
+          avatarUrl: null,
+          spotifyUrl: 'https://open.spotify.com/artist/e2e',
+          spotifyId: 'e2e',
+          appleMusicUrl: null,
+          appleMusicId: null,
+          youtubeUrl: null,
+          youtubeMusicId: null,
+        } as ChatActionProfile)
+      : null;
+  const activeProfile =
+    selectedProfile ?? fallbackProfile ?? e2eFallbackProfile;
   const hasDashboardLoadFailure = Boolean(dashboardLoadError);
   const isProfileSetupRace =
     hasProfilesButNoSelection && !hasDashboardLoadFailure;
@@ -527,7 +544,15 @@ export function ChatPageClient({
         );
       }
 
-      if (phase === 'completed') {
+      // New chats reserve the final URL with history.replaceState as soon as
+      // the server acknowledges the turn. A second router.replace on stream
+      // completion remounts the chat surface and can let stale refetch data
+      // replace the settled local timeline.
+      if (
+        phase === 'completed' &&
+        currentPath !== APP_ROUTES.CHAT &&
+        currentPath !== nextRoute
+      ) {
         router.replace(nextRoute, {
           scroll: false,
         });

@@ -63,6 +63,11 @@ const PRODUCTION_VARS = [
     label: 'URL Encryption',
     validate: (v: string) => v !== 'default-key-change-in-production-32-chars',
   },
+  {
+    key: 'AI_GATEWAY_API_KEY',
+    label: 'AI Gateway',
+    validate: (v: string) => v.length > 0,
+  },
 ] as const;
 
 interface ValidationResult {

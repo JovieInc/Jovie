@@ -33,6 +33,8 @@ export interface ChatMessage {
   role: 'user' | 'assistant';
   content: string;
   toolCalls?: PersistedToolEvent[];
+  clientMessageId?: string | null;
+  turnId?: string | null;
   createdAt: string;
 }
 
