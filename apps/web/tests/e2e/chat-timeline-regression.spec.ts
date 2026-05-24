@@ -124,6 +124,7 @@ test.use({ storageState: { cookies: [], origins: [] } });
 test('send and stream stay visible through stale refetch without skeleton cascade', async ({
   page,
 }) => {
+  // Skip outside the explicit dev-auth E2E lane; chat shell entry needs a bypassed Clerk session.
   test.skip(
     process.env.E2E_USE_TEST_AUTH_BYPASS !== '1',
     'Requires E2E_USE_TEST_AUTH_BYPASS=1'

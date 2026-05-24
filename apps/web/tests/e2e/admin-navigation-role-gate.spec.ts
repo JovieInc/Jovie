@@ -9,6 +9,7 @@ test.describe('Admin navigation role gate', () => {
     page,
   }) => {
     test.setTimeout(180_000);
+    // Skip outside the explicit dev-auth E2E lane; this test needs the admin bypass persona.
     test.skip(
       process.env.E2E_USE_TEST_AUTH_BYPASS !== '1',
       'dev-auth bypass not enabled'
