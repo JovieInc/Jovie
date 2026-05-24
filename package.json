@@ -84,6 +84,7 @@
     "lint:fix": "node scripts/turbo-local.mjs lint:fix",
     "typecheck": "node scripts/run-scoped-turbo-task.mjs typecheck",
     "test": "node scripts/turbo-local.mjs test",
+    "evals": "doppler run --project jovie-web --config dev -- pnpm --filter @jovie/web run evals",
     "test:web": "doppler run --project jovie-web --config dev -- pnpm --filter @jovie/web run test",
     "test:web:changed": "doppler run --project jovie-web --config dev -- pnpm --filter @jovie/web run test -- --changed",
     "test:web:watch": "doppler run --project jovie-web --config dev -- pnpm --filter @jovie/web run test:watch",
