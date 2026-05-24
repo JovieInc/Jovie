@@ -7,6 +7,7 @@ import {
   useRef,
   useState,
 } from 'react';
+import { shouldSuppressCookieBannerForPathname } from '@/lib/cookies/banner-visibility';
 import type { Consent } from '@/lib/cookies/consent';
 import { COOKIE_BANNER_REQUIRED_COOKIE } from '@/lib/cookies/consent-regions';
 import { setConsentState } from '@/lib/tracking/consent';
@@ -28,7 +29,7 @@ declare global {
 }
 
 function shouldMountCookieBanner(pathname: string): boolean {
-  if (pathname.startsWith('/app') || pathname.startsWith('/demo')) {
+  if (shouldSuppressCookieBannerForPathname(pathname)) {
     return false;
   }
 

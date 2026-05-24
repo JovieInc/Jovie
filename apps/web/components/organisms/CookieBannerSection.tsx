@@ -7,6 +7,7 @@ import { useEffect, useState } from 'react';
 import { CookieActions } from '@/components/molecules/CookieActions';
 import { CookieModal } from '@/components/organisms/CookieModal';
 import { APP_ROUTES } from '@/constants/routes';
+import { shouldSuppressCookieBannerForPathname } from '@/lib/cookies/banner-visibility';
 import { saveConsent } from '@/lib/cookies/consent';
 import { COOKIE_BANNER_REQUIRED_COOKIE } from '@/lib/cookies/consent-regions';
 import { setConsentState } from '@/lib/tracking/consent';
@@ -30,8 +31,7 @@ function isBannerRequiredFromCookie(): boolean {
 
 export function CookieBannerSection() {
   const pathname = usePathname();
-  const isDashboard = Boolean(pathname?.startsWith('/app'));
-  const isDemo = Boolean(pathname?.startsWith('/demo'));
+  const isSuppressedPath = shouldSuppressCookieBannerForPathname(pathname);
 
   const [visible, setVisible] = useState(false);
   const [customize, setCustomize] = useState(false);
@@ -40,7 +40,7 @@ export function CookieBannerSection() {
   const [saveError, setSaveError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (isDashboard || isDemo) {
+    if (isSuppressedPath) {
       setVisible(false);
       return;
     }
@@ -57,7 +57,7 @@ export function CookieBannerSection() {
     } catch {
       setVisible(true);
     }
-  }, [isDashboard, isDemo]);
+  }, [isSuppressedPath]);
 
   useEffect(() => {
     if (!visible) {
@@ -75,7 +75,7 @@ export function CookieBannerSection() {
 
     const root = document.documentElement;
 
-    if (!visible || isDashboard) {
+    if (!visible || isSuppressedPath) {
       root.style.removeProperty('--cookie-banner-h');
       return;
     }
@@ -101,7 +101,7 @@ export function CookieBannerSection() {
       ro.disconnect();
       root.style.removeProperty('--cookie-banner-h');
     };
-  }, [visible, isDashboard]);
+  }, [visible, isSuppressedPath]);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -178,7 +178,7 @@ export function CookieBannerSection() {
 
   return (
     <>
-      {visible && !isDashboard ? (
+      {visible && !isSuppressedPath ? (
         <aside
           aria-label='Cookie consent'
           data-testid='cookie-banner'

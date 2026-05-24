@@ -230,6 +230,7 @@ describe('CookieBannerMount global preferences controller', () => {
     setCookie('');
     localStorage.clear();
     globalThis.JVConsent = undefined;
+    history.pushState({}, '', '/');
   });
 
   it('opens cookie preferences from the global menu event without a mounted banner', async () => {
@@ -252,6 +253,21 @@ describe('CookieBannerMount global preferences controller', () => {
         screen.getByRole('dialog', { name: /cookie preferences/i })
       ).toBeInTheDocument();
     });
+  });
+
+  it('does not mount the visible banner on desktop auth handoff routes', async () => {
+    history.pushState({}, '', '/desktop-auth');
+    setCookie('jv_cc_required=1');
+    const { CookieBannerMount } = await import(
+      '@/components/organisms/CookieBannerMount'
+    );
+
+    render(<CookieBannerMount />);
+
+    await vi.waitFor(() => {
+      expect(globalThis.JVConsent).toBeDefined();
+    });
+    expect(screen.queryByTestId('cookie-banner')).not.toBeInTheDocument();
   });
 
   it('persists preferences opened from the global controller', async () => {

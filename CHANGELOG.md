@@ -7,7 +7,7 @@
 
 ## [26.5.41] - 2026-05-24
 
-> Jovie can now create Jovie-owned merch cards from chat, publish them to public artist profiles, collect payment through platform Stripe Checkout, route paid orders to Printful, and accrue manual artist payout liability.
+> Jovie can now create Jovie-owned merch cards from chat, publish them to public artist profiles, collect payment through platform Stripe Checkout, route paid orders to Printful, and accrue manual artist payout liability. The Mac Electron app also has a repaired browser auth handoff.
 
 ### Added
 
@@ -18,6 +18,12 @@
 ### Changed
 
 - **Cron/docs/env coverage**: scheduled `/api/cron/process-merch-fulfillment` every 10 minutes and documented the new schema, API routes, webhooks, Statsig gate, and Printful/Stripe merch env vars.
+- **Electron auth handoff**: the Mac app now hides the main app shell while the browser handoff is active, reports failed browser launches back to the renderer, and declares the production `jovie://` auth-return protocol in the app bundle.
+
+### Fixed
+
+- **Native auth callback**: `/auth/callback` now consumes the already-validated auth state without re-reading it after native exchange creation, preventing valid Electron callbacks from falling into the `Auth state expired` response.
+- **Auth-surface cookie banner**: the visible cookie banner is suppressed on desktop/native auth utility routes while the normal cookie preferences controller remains mounted elsewhere.
 
 ## [26.5.35] - 2026-05-21
 

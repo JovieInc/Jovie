@@ -39,6 +39,9 @@ describe('DesktopAuthPage', () => {
       expect(openDesktopAuthUrlMock).toHaveBeenCalledTimes(1);
       expect(openDesktopAuthUrlMock).toHaveBeenCalledWith(expectedAuthUrl);
     });
+    expect(
+      await screen.findByText('Continue sign-in in your browser.')
+    ).toBeInTheDocument();
 
     fireEvent.click(
       screen.getByRole('button', { name: 'Continue in browser' })
@@ -51,5 +54,39 @@ describe('DesktopAuthPage', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Cancel sign-in' }));
 
     expect(closeDesktopAuthWindowMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps continue retryable and shows a stable failure message when browser launch fails', async () => {
+    openDesktopAuthUrlMock.mockResolvedValueOnce({
+      ok: false,
+      reason: 'open-external-failed',
+    });
+    const { default: DesktopAuthPage } = await import(
+      '../../../app/desktop-auth/page'
+    );
+
+    render(<DesktopAuthPage />);
+
+    const continueButton = screen.getByRole('button', {
+      name: 'Continue in browser',
+    });
+
+    await waitFor(() => {
+      expect(openDesktopAuthUrlMock).toHaveBeenCalledTimes(1);
+    });
+    expect(continueButton).toBeEnabled();
+    expect(
+      await screen.findByText(/The browser did not open/i)
+    ).toBeInTheDocument();
+
+    openDesktopAuthUrlMock.mockResolvedValueOnce({ ok: true });
+    fireEvent.click(continueButton);
+
+    await waitFor(() => {
+      expect(openDesktopAuthUrlMock).toHaveBeenCalledTimes(2);
+    });
+    expect(
+      await screen.findByText('Continue sign-in in your browser.')
+    ).toBeInTheDocument();
   });
 });
