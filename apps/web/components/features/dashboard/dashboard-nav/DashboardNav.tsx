@@ -23,7 +23,10 @@ import { APP_ROUTES, isDemoRoutePath } from '@/constants/routes';
 import { useAppFlag } from '@/lib/flags/client';
 import { NAV_SHORTCUTS } from '@/lib/keyboard-shortcuts';
 import { usePlanGate } from '@/lib/queries';
-import { useChatConversationsQuery } from '@/lib/queries/useChatConversationsQuery';
+import {
+  type ChatConversation,
+  useChatConversationsQuery,
+} from '@/lib/queries/useChatConversationsQuery';
 import { useTaskStatsQuery } from '@/lib/queries/useTasksQuery';
 import {
   adminNavigationSections,
@@ -58,6 +61,24 @@ const FAILED_CHAT_TURN_STATUSES = new Set([
   'failed_timeout',
   'failed_network',
 ]);
+
+function getSidebarThreadStatus(
+  latestTurnStatus: ChatConversation['latestTurnStatus']
+): SidebarThread['status'] {
+  if (!latestTurnStatus) {
+    return 'complete';
+  }
+
+  if (IN_PROGRESS_CHAT_TURN_STATUSES.has(latestTurnStatus)) {
+    return 'running';
+  }
+
+  if (FAILED_CHAT_TURN_STATUSES.has(latestTurnStatus)) {
+    return 'errored';
+  }
+
+  return 'complete';
+}
 
 function readThreadReadState(): Record<string, string> {
   try {
@@ -452,12 +473,6 @@ export function DashboardNav(_: DashboardNavProps) {
     () =>
       (conversations ?? []).map(conversation => {
         const latestTurnStatus = conversation.latestTurnStatus ?? null;
-        const isRunning = latestTurnStatus
-          ? IN_PROGRESS_CHAT_TURN_STATUSES.has(latestTurnStatus)
-          : false;
-        const isFailed = latestTurnStatus
-          ? FAILED_CHAT_TURN_STATUSES.has(latestTurnStatus)
-          : false;
         const isUnread =
           activeThreadId !== conversation.id &&
           conversation.latestMessageRole === 'assistant' &&
@@ -470,7 +485,7 @@ export function DashboardNav(_: DashboardNavProps) {
           id: conversation.id,
           href: `${APP_ROUTES.CHAT}/${encodeURIComponent(conversation.id)}`,
           title: conversation.title?.trim() || 'Untitled thread',
-          status: isRunning ? 'running' : isFailed ? 'errored' : 'complete',
+          status: getSidebarThreadStatus(latestTurnStatus),
           updatedAt: conversation.updatedAt,
           unread: isUnread,
         };

@@ -33,6 +33,36 @@ interface SidebarNavChromeOptions {
   readonly className?: string;
 }
 
+const SIDEBAR_PRIMARY_CHROME =
+  'border-[color-mix(in_oklab,var(--linear-app-frame-seam)_78%,transparent)] bg-[color-mix(in_oklab,var(--linear-app-content-surface)_92%,white_8%)] text-primary-token shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] hover:bg-[color-mix(in_oklab,var(--linear-app-content-surface)_86%,white_14%)]';
+
+const SIDEBAR_ACTIVE_CHROME =
+  'border-sidebar-border bg-sidebar-accent-active text-primary-token font-medium shadow-[inset_0_1px_0_rgba(255,255,255,0.04),inset_0_0_0_1px_color-mix(in_oklab,var(--linear-app-frame-seam)_62%,transparent)]';
+
+function getInactiveColor(nested?: boolean): string {
+  if (nested) {
+    return 'text-sidebar-muted/65 hover:bg-sidebar-accent hover:text-sidebar-item-foreground';
+  }
+
+  return 'text-sidebar-muted/80 hover:bg-sidebar-accent hover:text-sidebar-item-foreground';
+}
+
+function getToneClassName({
+  active,
+  nested,
+  tone,
+}: Pick<SidebarNavChromeOptions, 'active' | 'nested' | 'tone'>): string {
+  if (active) {
+    return SIDEBAR_ACTIVE_CHROME;
+  }
+
+  if (tone === 'primary') {
+    return SIDEBAR_PRIMARY_CHROME;
+  }
+
+  return getInactiveColor(nested);
+}
+
 export function getSidebarNavRowClassName({
   active,
   collapsed,
@@ -42,11 +72,6 @@ export function getSidebarNavRowClassName({
   className,
 }: SidebarNavChromeOptions) {
   const nonCollapsedSize = tight ? 'h-6 px-2.5' : 'h-7 px-2.5';
-  const inactiveColor = nested
-    ? 'text-sidebar-muted/65 hover:bg-sidebar-accent hover:text-sidebar-item-foreground'
-    : 'text-sidebar-muted/80 hover:bg-sidebar-accent hover:text-sidebar-item-foreground';
-  const primaryChrome =
-    'border-[color-mix(in_oklab,var(--linear-app-frame-seam)_78%,transparent)] bg-[color-mix(in_oklab,var(--linear-app-content-surface)_92%,white_8%)] text-primary-token shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] hover:bg-[color-mix(in_oklab,var(--linear-app-content-surface)_86%,white_14%)]';
 
   return cn(
     'relative grid items-center rounded-full w-full border border-transparent transition-[background-color,border-color,box-shadow,color] duration-subtle ease-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/55 focus-visible:ring-offset-2 focus-visible:ring-offset-(--linear-bg-page)',
@@ -62,11 +87,7 @@ export function getSidebarNavRowClassName({
           nonCollapsedSize,
           'group-data-[collapsible=icon]:grid-cols-1 group-data-[collapsible=icon]:place-items-center'
         ),
-    active
-      ? 'border-sidebar-border bg-sidebar-accent-active text-primary-token font-medium shadow-[inset_0_1px_0_rgba(255,255,255,0.04),inset_0_0_0_1px_color-mix(in_oklab,var(--linear-app-frame-seam)_62%,transparent)]'
-      : tone === 'primary'
-        ? primaryChrome
-        : inactiveColor,
+    getToneClassName({ active, nested, tone }),
     className
   );
 }

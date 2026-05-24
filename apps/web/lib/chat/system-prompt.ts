@@ -217,17 +217,7 @@ function buildAccountAccessSection(
 ): string {
   if (!accountContext) return '';
 
-  const merchAvailable =
-    accountContext.billingVerification !== 'unavailable' &&
-    accountContext.flags.merchMvp &&
-    accountContext.entitlements.canAccessMerchCreation;
-  const merchLine = merchAvailable
-    ? 'Available'
-    : accountContext.billingVerification === 'unavailable'
-      ? 'Unavailable because billing verification is temporarily unavailable'
-      : accountContext.flags.merchMvp
-        ? 'Unavailable on this plan'
-        : 'Unavailable because the merch rollout flag is off';
+  const merchLine = buildMerchAccessLine(accountContext);
   const usageLine = accountContext.usage
     ? `${accountContext.usage.used} used, ${accountContext.usage.remaining} remaining of ${accountContext.usage.dailyLimit}`
     : 'Unavailable while billing verification is unavailable';
@@ -254,6 +244,22 @@ Safe account actions:
 - Use openBillingPortal for billing management handoff. Never change subscriptions, email, username, connected accounts, or OAuth providers from chat.${mismatchLine}
 
 `;
+}
+
+function buildMerchAccessLine(accountContext: AccountPromptContext): string {
+  if (accountContext.billingVerification === 'unavailable') {
+    return 'Unavailable because billing verification is temporarily unavailable';
+  }
+
+  if (!accountContext.flags.merchMvp) {
+    return 'Unavailable because the merch rollout flag is off';
+  }
+
+  if (!accountContext.entitlements.canAccessMerchCreation) {
+    return 'Unavailable on this plan';
+  }
+
+  return 'Available';
 }
 
 function buildAnalyticsSection(options?: {

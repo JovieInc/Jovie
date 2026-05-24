@@ -13,6 +13,18 @@ function buildAbsoluteUrl(path: string): string {
   return new URL(path, baseUrl).toString();
 }
 
+function getAccountNextAction(accountContext: ChatAccountContext): string {
+  if (accountContext.billingVerification === 'unavailable') {
+    return 'Retry billing verification before changing paid-feature access.';
+  }
+
+  if (accountContext.merchAccess.available) {
+    return 'Merch creation is available when the merch rollout flag is enabled.';
+  }
+
+  return 'Use billing settings to manage plan access.';
+}
+
 export function buildAccountStatusPayload(accountContext: ChatAccountContext) {
   return {
     success: true as const,
@@ -25,12 +37,7 @@ export function buildAccountStatusPayload(accountContext: ChatAccountContext) {
     merchAccess: accountContext.merchAccess,
     entitlements: accountContext.entitlements,
     billing: accountContext.billing,
-    nextAction:
-      accountContext.billingVerification === 'unavailable'
-        ? 'Retry billing verification before changing paid-feature access.'
-        : accountContext.merchAccess.available
-          ? 'Merch creation is available when the merch rollout flag is enabled.'
-          : 'Use billing settings to manage plan access.',
+    nextAction: getAccountNextAction(accountContext),
   };
 }
 

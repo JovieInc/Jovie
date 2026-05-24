@@ -101,6 +101,66 @@ function buildTooltip(
   };
 }
 
+interface NavMenuInteractiveElementProps {
+  readonly item: NavItem;
+  readonly isActive: boolean;
+  readonly prefetch?: boolean;
+  readonly preventNavigation: boolean;
+  readonly renderAsButton: boolean;
+  readonly className: string;
+  readonly onButtonClick: () => void;
+  readonly onLinkClick: (event: MouseEvent<HTMLAnchorElement>) => void;
+  readonly onPressStart: () => void;
+  readonly onPrefetch?: () => void;
+  readonly children: ReactNode;
+}
+
+function NavMenuInteractiveElement({
+  item,
+  isActive,
+  prefetch,
+  preventNavigation,
+  renderAsButton,
+  className,
+  onButtonClick,
+  onLinkClick,
+  onPressStart,
+  onPrefetch,
+  children,
+}: NavMenuInteractiveElementProps) {
+  if (renderAsButton) {
+    return (
+      <button
+        type='button'
+        onClick={onButtonClick}
+        onPointerDown={onPressStart}
+        onMouseEnter={onPrefetch}
+        onFocus={onPrefetch}
+        aria-pressed={isActive}
+        className={className}
+      >
+        {children}
+      </button>
+    );
+  }
+
+  return (
+    <Link
+      href={item.href}
+      prefetch={prefetch}
+      onClick={onLinkClick}
+      onPointerDown={onPressStart}
+      onMouseEnter={onPrefetch}
+      onFocus={onPrefetch}
+      aria-current={isActive ? 'page' : undefined}
+      aria-disabled={preventNavigation || undefined}
+      className={className}
+    >
+      {children}
+    </Link>
+  );
+}
+
 export function NavMenuItem({
   item,
   isActive,
@@ -317,63 +377,37 @@ export function NavMenuItem({
               side='right'
               block
             >
-              {renderAsButton ? (
-                <button
-                  type='button'
-                  onClick={handleButtonClick}
-                  onPointerDown={handlePressStart}
-                  onMouseEnter={onPrefetch}
-                  onFocus={onPrefetch}
-                  aria-pressed={isActive}
-                  className={shellNavClassName}
-                >
-                  {shellInnerContent}
-                </button>
-              ) : (
-                <Link
-                  href={item.href}
-                  prefetch={prefetch}
-                  onClick={handleLinkClick}
-                  onPointerDown={handlePressStart}
-                  onMouseEnter={onPrefetch}
-                  onFocus={onPrefetch}
-                  aria-current={isActive ? 'page' : undefined}
-                  aria-disabled={preventNavigation || undefined}
-                  className={shellNavClassName}
-                >
-                  {shellInnerContent}
-                </Link>
-              )}
+              <NavMenuInteractiveElement
+                item={item}
+                isActive={isActive}
+                prefetch={prefetch}
+                preventNavigation={preventNavigation}
+                renderAsButton={renderAsButton}
+                className={shellNavClassName}
+                onButtonClick={handleButtonClick}
+                onLinkClick={handleLinkClick}
+                onPressStart={handlePressStart}
+                onPrefetch={onPrefetch}
+              >
+                {shellInnerContent}
+              </NavMenuInteractiveElement>
             </Tooltip>
           ) : (
             <SidebarMenuButton asChild isActive={isActive} tooltip={tooltip}>
-              {renderAsButton ? (
-                <button
-                  type='button'
-                  onClick={handleButtonClick}
-                  onPointerDown={handlePressStart}
-                  onMouseEnter={onPrefetch}
-                  onFocus={onPrefetch}
-                  aria-pressed={isActive}
-                  className='flex w-full min-w-0 items-center group-data-[collapsible=icon]:mx-auto group-data-[collapsible=icon]:justify-center'
-                >
-                  {innerContent}
-                </button>
-              ) : (
-                <Link
-                  href={item.href}
-                  prefetch={prefetch}
-                  onClick={handleLinkClick}
-                  onPointerDown={handlePressStart}
-                  onMouseEnter={onPrefetch}
-                  onFocus={onPrefetch}
-                  aria-current={isActive ? 'page' : undefined}
-                  aria-disabled={preventNavigation || undefined}
-                  className='flex w-full min-w-0 items-center group-data-[collapsible=icon]:mx-auto group-data-[collapsible=icon]:justify-center'
-                >
-                  {innerContent}
-                </Link>
-              )}
+              <NavMenuInteractiveElement
+                item={item}
+                isActive={isActive}
+                prefetch={prefetch}
+                preventNavigation={preventNavigation}
+                renderAsButton={renderAsButton}
+                className='flex w-full min-w-0 items-center group-data-[collapsible=icon]:mx-auto group-data-[collapsible=icon]:justify-center'
+                onButtonClick={handleButtonClick}
+                onLinkClick={handleLinkClick}
+                onPressStart={handlePressStart}
+                onPrefetch={onPrefetch}
+              >
+                {innerContent}
+              </NavMenuInteractiveElement>
             </SidebarMenuButton>
           )}
           {!shellNavItem && item.badge != null && (
