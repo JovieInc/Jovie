@@ -18,7 +18,7 @@ export function TokenCopyButton({ token }: Readonly<TokenCopyButtonProps>) {
       .writeText(token)
       .then(() => {
         setCopied(true);
-        globalThis.setTimeout(() => setCopied(false), 1500);
+        setTimeout(() => setCopied(false), 1500);
       })
       .catch(() => {
         // Ignore clipboard failures in insecure/local contexts.
@@ -31,7 +31,7 @@ export function TokenCopyButton({ token }: Readonly<TokenCopyButtonProps>) {
         className={cn(
           'min-w-0 max-w-[10rem] font-mono text-2xs text-tertiary-token',
           isRevealed
-            ? 'overflow-x-auto whitespace-nowrap'
+            ? 'break-all whitespace-normal'
             : 'truncate overflow-hidden'
         )}
       >
@@ -59,7 +59,11 @@ export function TokenCopyButton({ token }: Readonly<TokenCopyButtonProps>) {
         aria-label='Copy full investor token'
       >
         {copied ? (
-          <Check className='h-3 w-3 text-success' aria-hidden='true' />
+          <Check
+            className='h-3 w-3 text-success'
+            aria-hidden='true'
+            data-testid='token-copy-success'
+          />
         ) : (
           <Copy className='h-3 w-3' aria-hidden='true' />
         )}
