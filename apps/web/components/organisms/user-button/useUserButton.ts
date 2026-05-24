@@ -135,10 +135,14 @@ export function useUserButton({
   };
 
   useEffect(() => {
-    if (
+    const shouldNotifyBillingStatusError =
       hasLoadedUser &&
-      billingStatus.error &&
-      shouldSurfaceBillingStatusError &&
+      !billingStatus.loading &&
+      Boolean(billingStatus.error) &&
+      shouldSurfaceBillingStatusError;
+
+    if (
+      shouldNotifyBillingStatusError &&
       !hasNotifiedBillingErrorThisSession(billingStatusErrorToastSessionKey)
     ) {
       toast.error(
@@ -149,6 +153,7 @@ export function useUserButton({
     }
   }, [
     billingStatus.error,
+    billingStatus.loading,
     billingStatusErrorToastSessionKey,
     hasLoadedUser,
     shouldSurfaceBillingStatusError,
