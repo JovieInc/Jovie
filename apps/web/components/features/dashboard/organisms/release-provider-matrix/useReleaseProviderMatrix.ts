@@ -95,6 +95,8 @@ export function useReleaseProviderMatrix({
   rawRowsRef.current = rawRows;
   const providerConfigRef = useRef(providerConfig);
   providerConfigRef.current = providerConfig;
+  const saveProviderMutateRef = useRef(saveProviderMutation.mutate);
+  saveProviderMutateRef.current = saveProviderMutation.mutate;
 
   // No custom sorting needed - UnifiedTable handles this
   const rows = rawRows;
@@ -245,12 +247,22 @@ export function useReleaseProviderMatrix({
       if (!release) return;
 
       try {
-        const updated = await saveProviderMutation.mutateAsync({
-          profileId: release.profileId,
-          releaseId,
-          provider,
-          url,
-        });
+        const updated = await new Promise<ReleaseViewModel>(
+          (resolve, reject) => {
+            saveProviderMutateRef.current(
+              {
+                profileId: release.profileId,
+                releaseId,
+                provider,
+                url,
+              },
+              {
+                onSuccess: resolve,
+                onError: reject,
+              }
+            );
+          }
+        );
         updateRow(updated);
         toast.success(
           `${providerConfigRef.current[provider].label} link added`
@@ -266,7 +278,7 @@ export function useReleaseProviderMatrix({
         throw error;
       }
     },
-    [saveProviderMutation, updateRow]
+    [updateRow]
   );
 
   const handleReset = (provider: ProviderKey) => {

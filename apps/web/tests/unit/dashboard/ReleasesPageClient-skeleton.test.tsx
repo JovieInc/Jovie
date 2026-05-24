@@ -32,6 +32,13 @@ vi.mock('@/features/dashboard/organisms/release-provider-matrix', () => ({
   ),
 }));
 
+vi.mock(
+  '@/components/features/dashboard/organisms/release-provider-matrix/shell-releases/ShellReleasesView',
+  () => ({
+    ShellReleasesView: () => <div data-testid='shell-releases-view' />,
+  })
+);
+
 vi.mock('@/app/app/(shell)/dashboard/releases/loading', () => ({
   ReleaseTableSkeleton: () => <div data-testid='release-table-skeleton' />,
 }));
@@ -97,9 +104,9 @@ describe('ReleasesPageClient skeleton behavior', () => {
     expect(screen.getByTestId('dynamic-stub')).toBeDefined();
   });
 
-  it('renders the error state on isError regardless of data', async () => {
+  it('renders the error state when isError and no data are present', async () => {
     useReleasesQueryMock.mockReturnValue({
-      data: [],
+      data: undefined,
       isError: true,
     });
 
@@ -107,5 +114,17 @@ describe('ReleasesPageClient skeleton behavior', () => {
 
     expect(screen.getByTestId('page-error-state')).toBeDefined();
     expect(screen.queryByTestId('release-table-skeleton')).toBeNull();
+  });
+
+  it('keeps the releases view mounted during background refetch errors', async () => {
+    useReleasesQueryMock.mockReturnValue({
+      data: [],
+      isError: true,
+    });
+
+    await renderPage();
+
+    expect(screen.queryByTestId('page-error-state')).toBeNull();
+    expect(screen.getByTestId('dynamic-stub')).toBeDefined();
   });
 });
