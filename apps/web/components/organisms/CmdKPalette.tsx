@@ -277,7 +277,7 @@ export function CmdKPalette({
             </span>
           </div>
           <div
-            className='max-h-[420px] overflow-y-auto px-1.5 pb-1.5 pt-1'
+            className='max-h-[420px] overflow-y-auto px-2 pb-2 pt-1.5'
             role='listbox'
             aria-label='Command palette results'
           >
