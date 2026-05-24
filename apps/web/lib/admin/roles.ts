@@ -58,7 +58,18 @@ export const isAdmin = cache(async function isAdmin(
     }
   }
 
-  return queryAdminRoleFromDB(userId);
+  try {
+    return await queryAdminRoleFromDB(userId);
+  } catch (error) {
+    captureWarning(
+      '[admin/roles] Database query failed, treating as non-admin',
+      {
+        error,
+        userId,
+      }
+    );
+    return false;
+  }
 });
 
 export function invalidateAdminCache(userId: string): void {

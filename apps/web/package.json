@@ -64,6 +64,7 @@
     "test:e2e:synthetic": "playwright test --config=playwright.synthetic.config.ts",
     "test:e2e:golden-path": "playwright test tests/e2e/golden-path.spec.ts",
     "test:e2e:golden-path:ci": "CI=true playwright test tests/e2e/golden-path.spec.ts --project=chromium",
+    "test:e2e:chat-production": "playwright test --config=playwright.chat-production.config.ts",
     "admin:seed": "NODE_OPTIONS=--conditions=react-server tsx tests/seed-admin-test-data.ts",
     "admin:visual": "playwright test tests/e2e/admin-visual-regression.spec.ts",
     "admin:visual:update": "playwright test tests/e2e/admin-visual-regression.spec.ts --update-snapshots",

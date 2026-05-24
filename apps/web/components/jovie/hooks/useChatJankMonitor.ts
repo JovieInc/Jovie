@@ -16,7 +16,7 @@ import {
 import { logger } from '@/lib/utils/logger';
 
 /** Client-local id prefixes (anything else is treated as server-assigned). */
-const CLIENT_ID_PREFIXES = ['cmd-', 'client-', 'temp-'];
+const CLIENT_ID_PREFIXES = ['cmd-', 'client-', 'temp-', 'user:', 'assistant:'];
 
 function isServerId(id: string): boolean {
   return !CLIENT_ID_PREFIXES.some(p => id.startsWith(p));

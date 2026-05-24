@@ -5,14 +5,31 @@ import { useAsyncRateLimiter } from '@tanstack/react-pacer';
 import { useQueryClient } from '@tanstack/react-query';
 import { DefaultChatTransport, type UIMessage } from 'ai';
 import { useRouter } from 'next/navigation';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useReducer,
+  useRef,
+  useState,
+} from 'react';
+import { track } from '@/lib/analytics';
 import { matchCommand } from '@/lib/chat/command-registry';
 import { consumePendingChatPrompt } from '@/lib/chat/open-chat-with-prompt';
 import { PACER_TIMING } from '@/lib/pacer/hooks/timing';
 import { queryKeys, useChatConversationQuery } from '@/lib/queries';
 import { captureException } from '@/lib/sentry/client-lite';
+import { logger } from '@/lib/utils/logger';
 
 import { hydratePersistedMessageParts } from '../message-parts';
+import {
+  type ChatTimelineEvent,
+  type ChatTimelineServerMessage,
+  type ChatTimelineState,
+  createInitialChatTimelineState,
+  reduceChatTimeline,
+  selectRenderableMessages,
+} from '../timeline/chat-timeline';
 import type {
   ArtistContext,
   ChatConversationCreatePhase,
@@ -52,6 +69,8 @@ const TITLE_POLL_MAX_DURATION_MS = 15_000;
 
 /** Number of fast poll intervals to allow before backing off. */
 const TITLE_POLL_FAST_WINDOW_MS = TITLE_POLL_FAST_INTERVAL_MS * 3;
+const TIMELINE_CACHE_LIMIT = 20;
+const timelineStateCache = new Map<string, ChatTimelineState>();
 
 type ChatTurnSource = 'typed' | 'quick_action' | 'slash_command';
 
@@ -126,6 +145,70 @@ function toError(value: unknown): Error {
   return value instanceof Error ? value : new Error('Chat send failed');
 }
 
+function getMessageParts(message: UIMessage | undefined): UIMessage['parts'] {
+  return Array.isArray(message?.parts) ? message.parts : [];
+}
+
+function getLastAssistantMessage(messages: readonly UIMessage[]) {
+  for (let i = messages.length - 1; i >= 0; i--) {
+    if (messages[i]?.role === 'assistant') {
+      return messages[i];
+    }
+  }
+  return undefined;
+}
+
+function getPartsSignature(parts: UIMessage['parts']): string {
+  return JSON.stringify(parts);
+}
+
+function summarizeTimelineState(state: ChatTimelineState) {
+  return {
+    conversationId: state.conversationId,
+    phase: state.phase,
+    messageCount: state.messages.length,
+    activeClientTurnId: state.activeClientTurnId,
+    statuses: state.messages.map(message => ({
+      id: message.id,
+      role: message.role,
+      status: message.status,
+      turnId: message.turnId,
+      serverMessageId: message.serverMessageId,
+    })),
+  };
+}
+
+function getCachedTimelineState(conversationId: string | null) {
+  if (!conversationId) {
+    return createInitialChatTimelineState(null);
+  }
+  return (
+    timelineStateCache.get(conversationId) ??
+    createInitialChatTimelineState(conversationId)
+  );
+}
+
+function cacheTimelineState(state: ChatTimelineState) {
+  if (!state.conversationId) return;
+  timelineStateCache.set(state.conversationId, state);
+  while (timelineStateCache.size > TIMELINE_CACHE_LIMIT) {
+    const oldestKey = timelineStateCache.keys().next().value;
+    if (!oldestKey) break;
+    timelineStateCache.delete(oldestKey);
+  }
+}
+
+function isTimelineDebugEnabled(): boolean {
+  if (process.env.NODE_ENV !== 'production') return true;
+  try {
+    return (
+      globalThis.localStorage?.getItem('jovie:chat-timeline-debug') === '1'
+    );
+  } catch {
+    return false;
+  }
+}
+
 export function useJovieChat({
   profileId,
   artistContext, // NOSONAR - kept for backward compatibility
@@ -136,7 +219,10 @@ export function useJovieChat({
   const router = useRouter();
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const lastAttemptedMessageRef = useRef<string>('');
-  const hasHydratedRef = useRef<string | null>(null);
+  const activeClientTurnIdRef = useRef<string | null>(null);
+  const streamRevisionRef = useRef(0);
+  const lastAssistantPartsSignatureRef = useRef<string | null>(null);
+  const loadedConversationIdsRef = useRef<Set<string>>(new Set());
   const [input, setInput] = useState('');
   const chipTray = useChipTray();
   const [chatError, setChatError] = useState<ChatError | null>(null);
@@ -146,6 +232,50 @@ export function useJovieChat({
     string | null
   >(conversationId ?? null);
   const queryClient = useQueryClient();
+  const [timelineState, dispatchTimeline] = useReducer(
+    reduceChatTimeline,
+    activeConversationId,
+    getCachedTimelineState
+  );
+  const timelineStateRef = useRef(timelineState);
+  useEffect(() => {
+    timelineStateRef.current = timelineState;
+    cacheTimelineState(timelineState);
+  }, [timelineState]);
+  const dispatchTimelineEvent = useCallback((event: ChatTimelineEvent) => {
+    const previousState = timelineStateRef.current;
+    const nextState = reduceChatTimeline(previousState, event);
+    timelineStateRef.current = nextState;
+    cacheTimelineState(nextState);
+    const ignoredAsStale = nextState.diagnostics.some(
+      diagnostic =>
+        diagnostic.event === event.type &&
+        diagnostic.type === 'stale-event-ignored'
+    );
+
+    if (isTimelineDebugEnabled() || ignoredAsStale) {
+      const payload = {
+        eventName: event.type,
+        conversationId:
+          event.conversationId ?? nextState.conversationId ?? null,
+        requestId: event.requestId ?? null,
+        previousState: summarizeTimelineState(previousState),
+        nextState: summarizeTimelineState(nextState),
+        ignoredAsStale,
+        timestamp: Date.now(),
+      };
+
+      logger.info('chat_timeline.transition', payload, 'chat-timeline');
+      try {
+        track('chat_timeline.transition', payload);
+      } catch {
+        // Analytics failures must not affect chat state.
+      }
+    }
+
+    dispatchTimeline(event);
+  }, []);
+  const messages = selectRenderableMessages(timelineState);
 
   // Track whether we're waiting for title generation from the server.
   // Set to a timestamp when title generation is initiated, cleared when title arrives.
@@ -163,11 +293,14 @@ export function useJovieChat({
       }
 
       const isNewConversation = nextConversationId !== activeConversationId;
-      if (isNewConversation) {
+      // Reserving a server conversation updates browser history only. Switching
+      // the hook's chat id before the AI SDK stream finishes recreates the
+      // internal chat instance and drops in-flight tokens.
+      if (isNewConversation && phase === 'completed') {
         setActiveConversationId(nextConversationId);
       }
 
-      if (isNewConversation || phase === 'completed') {
+      if (phase === 'completed') {
         onConversationCreate?.(nextConversationId, phase);
       }
     },
@@ -205,17 +338,36 @@ export function useJovieChat({
           const response = await globalThis.fetch(input, init);
           const serverConversationId =
             response.headers.get('x-conversation-id');
+          const serverTurnId = response.headers.get('x-chat-turn-id');
+          const clientTurnId = activeClientTurnIdRef.current;
           if (serverConversationId) {
             adoptServerConversationId(serverConversationId, 'reserved');
+          }
+          if (serverConversationId && clientTurnId) {
+            dispatchTimelineEvent({
+              type: 'message.send.acknowledged',
+              conversationId: serverConversationId,
+              clientTurnId,
+              turnId: serverTurnId,
+              requestId: serverTurnId ?? undefined,
+              now: Date.now(),
+            });
           }
           return response;
         },
       }),
-    [profileId, artistContext, activeConversationId, adoptServerConversationId]
+    [
+      profileId,
+      artistContext,
+      activeConversationId,
+      adoptServerConversationId,
+      dispatchTimelineEvent,
+    ]
   );
 
-  // Convert loaded messages to the UIMessage format useChat expects
-  const initialMessages = useMemo(() => {
+  // Convert loaded messages to canonical timeline input. Query data feeds the
+  // reducer as merge events; it never directly replaces rendered messages.
+  const persistedTimelineMessages = useMemo(() => {
     if (!existingConversation?.messages) return undefined;
     return existingConversation.messages.map(
       (msg: {
@@ -224,20 +376,30 @@ export function useJovieChat({
         content: string;
         toolCalls?: unknown;
         createdAt: string;
-      }) => ({
+        clientMessageId?: string | null;
+        turnId?: string | null;
+        requestId?: string | null;
+      }): ChatTimelineServerMessage => ({
         id: msg.id,
         role: msg.role as 'user' | 'assistant',
         parts: hydratePersistedMessageParts(
           msg.content,
           msg.toolCalls
-        ) as UIMessage['parts'],
+        ) as ChatTimelineServerMessage['parts'],
         createdAt: new Date(msg.createdAt),
+        clientMessageId: msg.clientMessageId ?? null,
+        turnId: msg.turnId ?? null,
+        requestId: msg.requestId ?? null,
       })
     );
   }, [existingConversation]);
 
   const handleChatFailure = useCallback(
-    (error: Error, errorType: 'send' | 'stream') => {
+    (
+      error: Error,
+      errorType: 'send' | 'stream',
+      clientTurnId = activeClientTurnIdRef.current
+    ) => {
       captureException(error, {
         tags: {
           feature: 'ai-chat',
@@ -266,16 +428,26 @@ export function useJovieChat({
         setInput(lastAttemptedMessageRef.current);
       }
 
+      if (clientTurnId) {
+        dispatchTimelineEvent({
+          type: 'assistant.stream.failed',
+          conversationId: activeConversationId,
+          clientTurnId,
+          requestId: clientTurnId,
+          error: getPreferredErrorMessage(error, chatErrorType, metadata),
+          now: Date.now(),
+        });
+      }
+      activeClientTurnIdRef.current = null;
       setIsSubmitting(false);
     },
-    [activeConversationId, profileId]
+    [activeConversationId, dispatchTimelineEvent, profileId]
   );
 
   const {
-    messages,
+    messages: sdkMessages,
     sendMessage,
     status,
-    setMessages,
     stop: rawStop,
   } = useChat({
     id: activeConversationId ?? 'new-chat',
@@ -284,7 +456,19 @@ export function useJovieChat({
       const metadata = extractChatTurnMetadata(message.metadata);
       const finishedConversationId =
         metadata?.conversationId ?? activeConversationId;
+      const clientTurnId = activeClientTurnIdRef.current;
 
+      if (clientTurnId) {
+        dispatchTimelineEvent({
+          type: 'assistant.stream.completed',
+          conversationId: finishedConversationId,
+          clientTurnId,
+          turnId: metadata?.turnId,
+          requestId: metadata?.requestId,
+          parts: getMessageParts(message as UIMessage),
+          now: Date.now(),
+        });
+      }
       if (metadata?.conversationId) {
         adoptServerConversationId(metadata.conversationId, 'completed');
       }
@@ -301,10 +485,11 @@ export function useJovieChat({
         });
       }
 
+      activeClientTurnIdRef.current = null;
       setIsSubmitting(false);
     },
     onError: error => {
-      handleChatFailure(error, 'stream');
+      handleChatFailure(error, 'stream', activeClientTurnIdRef.current);
 
       queryClient.invalidateQueries({
         queryKey: queryKeys.chat.usage(),
@@ -312,24 +497,94 @@ export function useJovieChat({
     },
   });
 
-  // Sync initial messages when loaded — but only once per conversation to avoid
-  // overwriting freshly streamed messages when the effect re-fires after
-  // persistence refetch updates initialMessages.
+  // Query data merges into the canonical timeline. It must never replace the
+  // rendered list wholesale because optimistic/streaming rows may be newer.
   useEffect(() => {
-    if (status !== 'ready') return;
-    if (!initialMessages || initialMessages.length === 0) return;
-    if (hasHydratedRef.current === activeConversationId) return;
+    if (!activeConversationId || !isLoadingConversation) return;
+    if (loadedConversationIdsRef.current.has(activeConversationId)) return;
+    dispatchTimelineEvent({
+      type: 'conversation.load.started',
+      conversationId: activeConversationId,
+      requestId: activeConversationId,
+      now: Date.now(),
+    });
+  }, [activeConversationId, dispatchTimelineEvent, isLoadingConversation]);
 
-    setMessages(initialMessages);
-    hasHydratedRef.current = activeConversationId;
-  }, [initialMessages, setMessages, status, activeConversationId]);
+  useEffect(() => {
+    if (!activeConversationId || !persistedTimelineMessages) return;
+    if (existingConversation?.conversation?.id !== activeConversationId) return;
+
+    const hasLoaded =
+      loadedConversationIdsRef.current.has(activeConversationId);
+    dispatchTimelineEvent({
+      type: hasLoaded
+        ? 'conversation.refetch.succeeded'
+        : 'conversation.load.succeeded',
+      conversationId: activeConversationId,
+      requestId: activeConversationId,
+      messages: persistedTimelineMessages,
+      receivedAt: Date.now(),
+    });
+    loadedConversationIdsRef.current.add(activeConversationId);
+  }, [
+    activeConversationId,
+    dispatchTimelineEvent,
+    existingConversation?.conversation?.id,
+    persistedTimelineMessages,
+  ]);
+
+  useEffect(() => {
+    const clientTurnId = activeClientTurnIdRef.current;
+    if (!clientTurnId) return;
+
+    const assistantMessage = getLastAssistantMessage(sdkMessages);
+    const parts = getMessageParts(assistantMessage);
+    if (status === 'streaming' && parts.length === 0) {
+      dispatchTimelineEvent({
+        type: 'assistant.stream.started',
+        conversationId: activeConversationId,
+        clientTurnId,
+        requestId: clientTurnId,
+        now: Date.now(),
+      });
+      return;
+    }
+
+    if (parts.length === 0) return;
+    const signature = getPartsSignature(parts);
+    if (signature === lastAssistantPartsSignatureRef.current) return;
+
+    lastAssistantPartsSignatureRef.current = signature;
+    streamRevisionRef.current += 1;
+    dispatchTimelineEvent({
+      type: 'assistant.stream.delta',
+      conversationId: activeConversationId,
+      clientTurnId,
+      requestId: clientTurnId,
+      parts,
+      revision: streamRevisionRef.current,
+      now: Date.now(),
+    });
+  }, [activeConversationId, dispatchTimelineEvent, sdkMessages, status]);
 
   // Wrap stop to clear submission state so the composer re-enables immediately
   // instead of waiting for the 30s safety timeout.
   const stop = useCallback(() => {
+    const clientTurnId = activeClientTurnIdRef.current;
     rawStop();
+    if (clientTurnId) {
+      dispatchTimelineEvent({
+        type: 'assistant.stream.failed',
+        conversationId: activeConversationId,
+        clientTurnId,
+        requestId: clientTurnId,
+        error: 'Response stopped.',
+        now: Date.now(),
+      });
+      activeClientTurnIdRef.current = null;
+    }
     setIsSubmitting(false);
-  }, [rawStop]);
+  }, [activeConversationId, dispatchTimelineEvent, rawStop]);
 
   const isLoading = status === 'streaming' || status === 'submitted';
   const hasMessages = messages.length > 0;
@@ -368,22 +623,6 @@ export function useJovieChat({
     return () => clearTimeout(timer);
   }, [titlePollingSince]);
 
-  // Safety timeout: if isSubmitting stays true for more than 30 seconds,
-  // force-clear it to prevent the input from being permanently blocked.
-  // This guards against edge cases where the status/persistence effects
-  // fail to clear the flag (e.g. stream silently drops, component re-mounts).
-  useEffect(() => {
-    if (!isSubmitting) return;
-
-    const safetyTimer = globalThis.setTimeout(() => {
-      setIsSubmitting(false);
-    }, 30_000);
-
-    return () => {
-      globalThis.clearTimeout(safetyTimer);
-    };
-  }, [isSubmitting]);
-
   // Clear error when user starts typing
   useEffect(() => {
     if (
@@ -397,8 +636,29 @@ export function useJovieChat({
 
   // Sync activeConversationId when parent prop changes
   useEffect(() => {
-    setActiveConversationId(conversationId ?? null);
-  }, [conversationId]);
+    const nextConversationId = conversationId ?? null;
+    if (activeConversationId === nextConversationId) {
+      return;
+    }
+
+    if (activeConversationId && nextConversationId === null) {
+      const reservedPath = `/app/chat/${encodeURIComponent(activeConversationId)}`;
+      if (globalThis.location?.pathname === reservedPath) {
+        return;
+      }
+    }
+
+    setActiveConversationId(nextConversationId);
+    activeClientTurnIdRef.current = null;
+    streamRevisionRef.current = 0;
+    lastAssistantPartsSignatureRef.current = null;
+    dispatchTimelineEvent({
+      type: 'conversation.switched',
+      conversationId: nextConversationId,
+      requestId: nextConversationId ?? 'new-chat',
+      now: Date.now(),
+    });
+  }, [activeConversationId, conversationId, dispatchTimelineEvent]);
 
   /** Try to handle text as a deterministic command. Returns true if handled. */
   const tryHandleCommand = useCallback(
@@ -407,24 +667,21 @@ export function useJovieChat({
       const command = matchCommand(trimmedText, commandCtx);
       if (!command) return false;
 
-      const userMsg = {
-        id: `cmd-user-${crypto.randomUUID()}`,
-        role: 'user' as const,
-        parts: [{ type: 'text' as const, text: trimmedText }],
-        createdAt: new Date(),
-      };
-      const assistantMsg = {
-        id: `cmd-assistant-${crypto.randomUUID()}`,
-        role: 'assistant' as const,
-        parts: [{ type: 'text' as const, text: command.confirmationMessage }],
-        createdAt: new Date(),
-      };
-      setMessages(prev => [...prev, userMsg, assistantMsg]);
+      dispatchTimelineEvent({
+        type: 'deterministic.command.completed',
+        conversationId: activeConversationId,
+        clientTurnId: `cmd-${crypto.randomUUID()}`,
+        userParts: [{ type: 'text' as const, text: trimmedText }],
+        assistantParts: [
+          { type: 'text' as const, text: command.confirmationMessage },
+        ],
+        now: Date.now(),
+      });
       setInput('');
       command.execute(commandCtx);
       return true;
     },
-    [username, router, setMessages, setInput]
+    [activeConversationId, dispatchTimelineEvent, username, router, setInput]
   );
 
   // Core submit logic
@@ -463,6 +720,9 @@ export function useJovieChat({
       setChatError(null);
       setIsSubmitting(true);
       const clientTurnId = crypto.randomUUID();
+      activeClientTurnIdRef.current = clientTurnId;
+      streamRevisionRef.current = 0;
+      lastAssistantPartsSignatureRef.current = null;
       const toolIntent =
         options?.toolIntent ?? inferToolIntentFromPrompt(trimmedText);
 
@@ -474,20 +734,40 @@ export function useJovieChat({
           ...(toolIntent ? { toolIntent } : {}),
         },
       };
+      dispatchTimelineEvent({
+        type: 'message.send.started',
+        conversationId: activeConversationId,
+        clientTurnId,
+        clientMessageId: `${clientTurnId}:user`,
+        requestId: clientTurnId,
+        parts: [
+          { type: 'text' as const, text: trimmedText },
+          ...(files ?? []),
+        ] as UIMessage['parts'],
+        now: Date.now(),
+      });
 
       try {
         const result = sendMessage(payload, sendOptions);
         setInput('');
         void Promise.resolve(result).catch(value => {
-          handleChatFailure(toError(value), 'send');
+          handleChatFailure(toError(value), 'send', clientTurnId);
         });
         return true;
       } catch (error) {
-        handleChatFailure(toError(error), 'send');
+        handleChatFailure(toError(error), 'send', clientTurnId);
         return false;
       }
     },
-    [handleChatFailure, isLoading, isSubmitting, sendMessage, tryHandleCommand]
+    [
+      activeConversationId,
+      dispatchTimelineEvent,
+      handleChatFailure,
+      isLoading,
+      isSubmitting,
+      sendMessage,
+      tryHandleCommand,
+    ]
   );
 
   // Retry the last failed message
@@ -636,7 +916,9 @@ export function useJovieChat({
     isSubmitting,
     hasMessages,
     isLoadingConversation:
-      isLoadingConversation && !!activeConversationId && messages.length === 0,
+      timelineState.phase === 'initial-loading' &&
+      !!activeConversationId &&
+      messages.length === 0,
     status,
     activeConversationId,
     /** Auto-generated or user-set conversation title (null if not yet generated) */

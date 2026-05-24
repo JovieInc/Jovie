@@ -87,6 +87,8 @@ export async function GET(req: Request, { params }: RouteParams) {
         role: chatMessages.role,
         content: chatMessages.content,
         toolCalls: chatMessages.toolCalls,
+        clientMessageId: chatMessages.clientMessageId,
+        turnId: chatMessages.turnId,
         createdAt: chatMessages.createdAt,
       })
       .from(chatMessages)
