@@ -7,11 +7,9 @@ import { OPEN_COMMAND_PALETTE_EVENT } from '@/components/organisms/command-palet
 import { APP_ROUTES } from '@/constants/routes';
 import {
   mockClearPendingShell,
-  mockOpenPreviewPanel,
   mockRouterPush,
   mockShowPendingShell,
   mockToastInfo,
-  mockTogglePreviewPanel,
   mockUseChatConversationsQuery,
   mockUsePathname,
   renderDashboardNav,
@@ -53,7 +51,10 @@ describe('DashboardNav interactions', () => {
   it('renders the full primary navigation config', () => {
     renderDashboardNav({ renderFn: render });
 
-    expect(screen.getByRole('button', { name: 'Profile' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Profile' })).toHaveAttribute(
+      'href',
+      APP_ROUTES.SETTINGS_ARTIST_PROFILE
+    );
     expect(screen.getByRole('link', { name: 'Releases' })).toHaveAttribute(
       'href',
       APP_ROUTES.RELEASES
@@ -103,9 +104,8 @@ describe('DashboardNav interactions', () => {
       'aria-current',
       'page'
     );
-    expect(screen.getByRole('button', { name: 'Profile' })).not.toHaveAttribute(
-      'aria-pressed',
-      'true'
+    expect(screen.getByRole('link', { name: 'Profile' })).not.toHaveAttribute(
+      'aria-current'
     );
   });
 
@@ -127,43 +127,50 @@ describe('DashboardNav interactions', () => {
   it('exposes icon and label content for each navigation item', () => {
     renderDashboardNav({ renderFn: render });
 
-    const profileButton = screen.getByRole('button', { name: 'Profile' });
+    const profileLink = screen.getByRole('link', { name: 'Profile' });
     // In the new shell nav design (DESIGN_V1 on by default), the icon is rendered
     // directly as an SVG element rather than inside a data-sidebar-icon wrapper span.
-    const iconNode = profileButton.querySelector('svg');
-    const labelNode = profileButton.querySelector('span.truncate');
+    const iconNode = profileLink.querySelector('svg');
+    const labelNode = profileLink.querySelector('span.truncate');
 
     expect(iconNode).toBeTruthy();
     expect(labelNode).toHaveTextContent('Profile');
     expect(labelNode).toHaveClass('group-data-[collapsible=icon]:hidden');
   });
 
-  it('profile button toggles the drawer when already on chat', async () => {
-    const user = userEvent.setup();
-
+  it('profile row navigates directly to profile settings on chat routes', () => {
     mockUsePathname.mockReturnValueOnce(APP_ROUTES.CHAT);
     renderDashboardNav({ renderFn: render });
 
-    const profileButton = screen.getByRole('button', { name: 'Profile' });
-    await user.click(profileButton);
-
-    expect(mockTogglePreviewPanel).toHaveBeenCalledTimes(1);
+    expect(screen.getByRole('link', { name: 'Profile' })).toHaveAttribute(
+      'href',
+      APP_ROUTES.SETTINGS_ARTIST_PROFILE
+    );
     expect(mockRouterPush).not.toHaveBeenCalled();
   });
 
-  it('keeps the shell nav profile button wired to the same drawer action', async () => {
-    const user = userEvent.setup();
-
+  it('keeps profile overflow as the secondary action surface', () => {
     mockUsePathname.mockReturnValueOnce(APP_ROUTES.CHAT);
     renderDashboardNav({
       renderFn: render,
       appFlags: { DESIGN_V1: true },
+      overrides: {
+        selectedProfile: {
+          id: 'profile_123',
+          displayName: 'Tim White',
+          username: 'tim',
+          usernameNormalized: 'tim',
+        } as DashboardData['selectedProfile'],
+      },
     });
 
-    await user.click(screen.getByRole('button', { name: 'Profile' }));
-
-    expect(mockTogglePreviewPanel).toHaveBeenCalledTimes(1);
-    expect(mockRouterPush).not.toHaveBeenCalled();
+    expect(screen.getByRole('link', { name: 'Profile' })).toHaveAttribute(
+      'href',
+      APP_ROUTES.SETTINGS_ARTIST_PROFILE
+    );
+    expect(
+      screen.getByRole('button', { name: 'More actions' })
+    ).toBeInTheDocument();
   });
 
   it('opens command search from the Design V1 sidebar search row', async () => {
@@ -223,7 +230,7 @@ describe('DashboardNav interactions', () => {
         Node.DOCUMENT_POSITION_FOLLOWING
     ).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Search' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Profile' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Profile' })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Releases' })).toHaveAttribute(
       'href',
       APP_ROUTES.RELEASES
@@ -307,17 +314,15 @@ describe('DashboardNav interactions', () => {
     ).not.toBeInTheDocument();
   });
 
-  it('profile button navigates to chat before opening the drawer off chat routes', async () => {
-    const user = userEvent.setup();
-
+  it('profile row remains a direct settings link off chat routes', () => {
     mockUsePathname.mockReturnValueOnce(APP_ROUTES.AUDIENCE);
     renderDashboardNav({ renderFn: render });
 
-    await user.click(screen.getByRole('button', { name: 'Profile' }));
-
-    expect(mockRouterPush).toHaveBeenCalledWith(APP_ROUTES.CHAT);
-    expect(mockOpenPreviewPanel).toHaveBeenCalledTimes(1);
-    expect(mockTogglePreviewPanel).not.toHaveBeenCalled();
+    expect(screen.getByRole('link', { name: 'Profile' })).toHaveAttribute(
+      'href',
+      APP_ROUTES.SETTINGS_ARTIST_PROFILE
+    );
+    expect(mockRouterPush).not.toHaveBeenCalled();
   });
 
   it('shows the releases pending shell once for a pointer click', async () => {

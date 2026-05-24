@@ -65,6 +65,7 @@ export const profileNavItem: NavItem = {
 };
 
 export const primaryNavigation: NavItem[] = [
+  newThreadNavItem,
   profileNavItem,
   {
     name: 'Releases',
