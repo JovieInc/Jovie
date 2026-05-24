@@ -285,17 +285,19 @@ export const ShellReleaseRow = memo(function ShellReleaseRow({
         <div className={shellReleaseRowTypography.subtitle}>{artistLabel}</div>
       </div>
 
-      <div className='hidden md:inline-flex shrink-0'>
+      <div className='hidden w-24 shrink-0 justify-start md:inline-flex'>
         <StatusBadge status={status} />
       </div>
 
       {dropMeta ? (
-        <div className='hidden lg:inline-flex shrink-0'>
+        <div className='hidden w-28 shrink-0 justify-start lg:inline-flex'>
           <DropDateChip tone={dropMeta.tone} label={dropMeta.label} />
         </div>
-      ) : null}
+      ) : (
+        <span className='hidden w-28 shrink-0 lg:block' aria-hidden='true' />
+      )}
 
-      <div className='hidden md:inline-flex shrink-0'>
+      <div className='hidden w-20 shrink-0 justify-start md:inline-flex'>
         <DspAvatarStack dsps={dspItems} />
       </div>
 
@@ -306,21 +308,26 @@ export const ShellReleaseRow = memo(function ShellReleaseRow({
       />
 
       {actionMenuItems && actionMenuItems.length > 0 ? (
-        <TableActionMenu items={actionMenuItems} trigger='custom' align='end'>
-          <button
-            type='button'
-            onClick={e => e.stopPropagation()}
-            onKeyDown={e => e.stopPropagation()}
-            aria-label={`Release actions for ${release.title}`}
-            className={cn(
-              'shrink-0 h-7 w-7 rounded-md grid place-items-center text-quaternary-token hover:text-primary-token hover:bg-surface-2/70 transition-[opacity,color,background-color] duration-subtle ease-subtle',
-              'opacity-0 group-hover/row:opacity-100 focus-visible:opacity-100 data-[state=open]:opacity-100',
-              isSelected && 'opacity-100'
-            )}
-          >
-            <MoreHorizontal className='h-3 w-3' strokeWidth={2.25} />
-          </button>
-        </TableActionMenu>
+        <div
+          className='h-7 w-7 shrink-0'
+          data-testid='shell-release-row-actions'
+        >
+          <TableActionMenu items={actionMenuItems} trigger='custom' align='end'>
+            <button
+              type='button'
+              onClick={e => e.stopPropagation()}
+              onKeyDown={e => e.stopPropagation()}
+              aria-label={`Release actions for ${release.title}`}
+              className={cn(
+                'shrink-0 h-7 w-7 rounded-md grid place-items-center text-quaternary-token hover:text-primary-token hover:bg-surface-2/70 transition-[opacity,color,background-color] duration-subtle ease-subtle',
+                'opacity-0 group-hover/row:opacity-100 focus-visible:opacity-100 data-[state=open]:opacity-100',
+                isSelected && 'opacity-100'
+              )}
+            >
+              <MoreHorizontal className='h-3 w-3' strokeWidth={2.25} />
+            </button>
+          </TableActionMenu>
+        </div>
       ) : null}
     </ShellListRowFrame>
   );

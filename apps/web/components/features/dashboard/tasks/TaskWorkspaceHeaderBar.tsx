@@ -1,7 +1,7 @@
 'use client';
 
 import { Button, Input } from '@jovie/ui';
-import { ArrowDown, ArrowUp, Settings2 } from 'lucide-react';
+import { ArrowDown, ArrowUp, Plus, Settings2 } from 'lucide-react';
 import type { FormEvent } from 'react';
 import {
   TableFilterDropdown,
@@ -43,6 +43,7 @@ export interface TaskWorkspaceHeaderBarProps {
   readonly onClearSearch: () => void;
   readonly filterCategories: ReadonlyArray<TableFilterDropdownCategory>;
   readonly onClearFilters: () => void;
+  readonly onCreateTask: () => void;
   readonly viewMode: ViewMode;
   readonly onViewModeChange: (viewMode: ViewMode) => void;
   readonly showCancelledColumn: boolean;
@@ -67,6 +68,7 @@ export function TaskWorkspaceHeaderBar({
   onClearSearch,
   filterCategories,
   onClearFilters,
+  onCreateTask,
   viewMode,
   onViewModeChange,
   showCancelledColumn,
@@ -148,6 +150,13 @@ export function TaskWorkspaceHeaderBar({
           align='end'
           shortcutHint='S'
         />
+        <PageToolbarActionButton
+          ariaLabel='Create task'
+          label='New Task'
+          onClick={onCreateTask}
+          icon={<Plus className='h-3.5 w-3.5' />}
+          className='hidden bg-primary-token px-2.5 text-on-primary hover:bg-primary-token/90 hover:text-on-primary lg:inline-flex'
+        />
         <DisplayMenuDropdown
           viewMode={viewMode}
           availableViewModes={['board', 'list']}
@@ -201,6 +210,7 @@ export function TaskWorkspaceHeaderBar({
         end={toolbarEnd}
         className='h-[var(--linear-app-header-height-compact)] min-h-[var(--linear-app-header-height-compact)]'
         startClassName={mode === 'create' ? 'overflow-visible' : undefined}
+        endClassName='gap-0.5'
       />
     </div>
   );
@@ -238,8 +248,8 @@ export function TaskSubviewTabs({
       ariaLabel='Task subviews'
       overflowMode='scroll'
       variant='segment'
-      className={cn('pl-0.5', className)}
-      triggerClassName='gap-1.5 px-2.5 text-[12.5px]'
+      className={cn('pl-0', className)}
+      triggerClassName='gap-1.5 px-2 text-[12px]'
       options={subviews.map(subview => ({
         value: subview.id,
         label: (

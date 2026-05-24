@@ -348,7 +348,7 @@ function TaskBoardColumn({
           'border-[color-mix(in_oklab,var(--linear-border-focus)_70%,transparent)] bg-[color-mix(in_oklab,var(--linear-row-hover)_36%,var(--linear-app-content-surface))]'
       )}
     >
-      <div className='flex h-10 min-h-10 items-center justify-between gap-2 border-b border-subtle px-3'>
+      <div className='sticky top-0 z-10 flex h-10 min-h-10 items-center justify-between gap-2 border-b border-subtle bg-surface-0 px-3'>
         <div className='flex min-w-0 items-center gap-2'>
           <StatusIcon
             className={cn(
@@ -517,32 +517,6 @@ const TaskBoardCard = memo(function TaskBoardCard({
         {task.title}
       </p>
 
-      <div className='mt-2.5 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1.5 text-[10.5px] leading-none text-secondary-token'>
-        <span className='inline-flex items-center gap-1 text-secondary-token'>
-          <PriorityBars
-            bars={priority.bars}
-            accentColor={priorityAccent.solid}
-          />
-          <span>{priority.label}</span>
-        </span>
-        <span className='inline-flex min-w-0 items-center gap-1.5'>
-          <UserAvatar name={assignee.avatarName} size='xs' />
-          <span className='truncate'>{assignee.label}</span>
-        </span>
-        {agentLabel ? (
-          <span
-            className={cn(
-              'rounded-full border px-1.5 py-0.5 text-[10px] font-semibold',
-              task.agentStatus === 'failed'
-                ? 'border-error/30 text-error'
-                : 'border-subtle text-tertiary-token'
-            )}
-          >
-            {agentLabel}
-          </span>
-        ) : null}
-      </div>
-
       <div className='mt-2.5 flex min-h-5 min-w-0 items-center justify-between gap-2'>
         <div className='min-w-0 flex-1'>
           {task.releaseTitle ? (
@@ -561,6 +535,32 @@ const TaskBoardCard = memo(function TaskBoardCard({
             dueDaysOffset={null}
             isCompleted={task.status === 'done' || task.status === 'cancelled'}
           />
+        ) : null}
+      </div>
+
+      <div className='mt-2.5 flex min-w-0 flex-wrap items-center gap-1.5 text-[10.5px] leading-none text-secondary-token'>
+        <span className='inline-flex items-center gap-1 rounded-full border border-subtle px-1.5 py-0.5 text-tertiary-token'>
+          <PriorityBars
+            bars={priority.bars}
+            accentColor={priorityAccent.solid}
+          />
+          <span>{priority.label}</span>
+        </span>
+        <span className='inline-flex min-w-0 items-center gap-1.5 rounded-full border border-subtle px-1.5 py-0.5 text-tertiary-token'>
+          <UserAvatar name={assignee.avatarName} size='xs' />
+          <span className='truncate'>{assignee.label}</span>
+        </span>
+        {agentLabel ? (
+          <span
+            className={cn(
+              'rounded-full border px-1.5 py-0.5 text-[10px] font-semibold',
+              task.agentStatus === 'failed'
+                ? 'border-error/30 text-error'
+                : 'border-subtle text-tertiary-token'
+            )}
+          >
+            {agentLabel}
+          </span>
         ) : null}
       </div>
     </div>

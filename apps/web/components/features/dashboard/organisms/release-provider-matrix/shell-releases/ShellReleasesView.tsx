@@ -833,9 +833,12 @@ export function ShellReleasesView({
       albumOptions,
       totalCount: rows.length,
       visibleCount: visibleReleases.length,
-      triggerLabel: 'Filter',
+      triggerLabel:
+        pills.length > 0
+          ? `Filter Releases (${pills.length})`
+          : 'Filter Releases',
       ariaLabel: 'Filter releases',
-      placeholder: 'Filter releases',
+      placeholder: 'Search releases',
       allowedFields: ['artist', 'title', 'album', 'status', 'has'] as const,
     }),
     [

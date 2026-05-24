@@ -1913,6 +1913,7 @@ export function TasksPageClient() {
           onClick={() => setHeaderMode('create')}
           pressed={headerMode === 'create'}
           hideLabelOnMobile
+          className='lg:hidden'
         />
       </DashboardHeaderActionGroup>
     ),
@@ -2114,6 +2115,7 @@ export function TasksPageClient() {
               onClearSearch={() => setSearch('')}
               filterCategories={taskFilterCategories}
               onClearFilters={clearFilters}
+              onCreateTask={() => setHeaderMode('create')}
               viewMode={viewMode}
               onViewModeChange={setViewMode}
               showCancelledColumn={showCancelledColumn}

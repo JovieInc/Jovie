@@ -300,7 +300,7 @@ describe('surface elevation guardrails', () => {
 
     expect(shellReleasesView).toContain('useRegisterHeaderSearch');
     expect(shellReleasesView).toContain("key: 'shell-releases'");
-    expect(shellReleasesView).toContain("triggerLabel: 'Filter'");
+    expect(shellReleasesView).toContain('Filter Releases');
     expect(shellReleasesView).not.toMatch(
       /const\s*\[\s*searchOpen\s*,\s*setSearchOpen\s*\]\s*=\s*useState/
     );
@@ -352,7 +352,7 @@ describe('surface elevation guardrails', () => {
 
     expect(librarySurface).toContain('useRegisterHeaderSearch');
     expect(librarySurface).toContain("key: 'library'");
-    expect(librarySurface).toContain("triggerLabel: 'Filter'");
+    expect(librarySurface).toContain('Filter Library');
     expect(librarySurface).not.toContain('OPEN_COMMAND_PALETTE_EVENT');
     expect(appShellLoading).toContain('isLibraryShellRoute');
     expect(appShellLoading).toContain('LibraryLoadingState');

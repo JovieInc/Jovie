@@ -62,6 +62,7 @@ export function NewReleaseHeaderAction({
         label={isSyncing ? 'Syncing...' : 'Sync from Spotify'}
         hideLabelOnMobile
         tooltipLabel='Sync from Spotify'
+        className='bg-primary-token text-on-primary hover:bg-primary-token/90 hover:text-on-primary'
       />
     );
   }
@@ -74,13 +75,16 @@ export function NewReleaseHeaderAction({
           variant='ghost'
           size='sm'
           aria-label='Create a new release'
-          className={cn(DASHBOARD_HEADER_ACTION_TEXT_BUTTON_CLASS, 'pr-1.5')}
+          className={cn(
+            DASHBOARD_HEADER_ACTION_TEXT_BUTTON_CLASS,
+            'bg-primary-token pr-1.5 text-on-primary hover:bg-primary-token/90 hover:text-on-primary'
+          )}
           data-testid='new-release-header-trigger'
         >
           <Icon name='Plus' className='h-3.5 w-3.5' strokeWidth={2} />
           <span className='max-sm:hidden sm:inline'>New release</span>
           <ChevronDown
-            className='h-3 w-3 text-tertiary-token'
+            className='h-3 w-3 text-on-primary/80'
             strokeWidth={2}
             aria-hidden='true'
           />

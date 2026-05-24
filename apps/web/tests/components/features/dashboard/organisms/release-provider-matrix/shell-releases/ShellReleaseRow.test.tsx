@@ -116,6 +116,24 @@ describe('ShellReleaseRow audio affordance', () => {
     ).not.toBeInTheDocument();
   });
 
+  it('does not reserve a row action slot when the release has no actions', () => {
+    render(
+      <ShellReleaseRow
+        release={fakeRelease({
+          id: 'r1',
+          title: 'No Actions',
+          previewUrl: null,
+        })}
+        isSelected={false}
+        onSelect={() => undefined}
+      />
+    );
+
+    expect(
+      screen.queryByTestId('shell-release-row-actions')
+    ).not.toBeInTheDocument();
+  });
+
   it('renders a production-backed play overlay when previewUrl exists', () => {
     render(
       <ShellReleaseRow
