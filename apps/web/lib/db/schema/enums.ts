@@ -771,12 +771,11 @@ export const agentRunStatusEnum = pgEnum('agent_run_status', [
 ]);
 
 export const workflowRunStatusEnum = pgEnum('workflow_run_status', [
-  'pending',
+  'queued',
   'running',
   'waiting_for_approval',
   'completed',
   'failed',
-  'cancelled',
 ]);
 
 // ---------------------------------------------------------------------------

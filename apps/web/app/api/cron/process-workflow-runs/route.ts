@@ -19,13 +19,13 @@
  * we move to event-driven enqueue (see JOV-2500 follow-on).
  *
  * Design:
- * - CAS claim: UPDATE ... SET status='running' WHERE status='pending' AND runAt<=now()
+ * - CAS claim: UPDATE ... SET status='running' WHERE status='queued' AND runAt<=now()
  * - Process MAX_RUNS_PER_TICK runs, MAX_CONCURRENT_RUNS in parallel
  * - Unknown workflow kinds are failed immediately (fail-closed)
  *
  * Cost impact: 1 DB query/tick + up to 20 Google Calendar API calls/tick
  * at 240 ticks/day = max 4,800 Google API calls/day at full load.
- * In practice: only runs when there are pending workflow_runs rows.
+ * In practice: only runs when there are queued workflow_runs rows.
  */
 
 import { and, eq, inArray, lte } from 'drizzle-orm';
@@ -55,28 +55,28 @@ export async function GET(request: Request): Promise<Response> {
   const now = new Date();
 
   try {
-    // Step 1: SELECT up to MAX_RUNS_PER_TICK pending runs (uses LIMIT)
-    const pendingRuns = await db
+    // Step 1: SELECT up to MAX_RUNS_PER_TICK queued runs (uses LIMIT)
+    const queuedRuns = await db
       .select({ id: workflowRuns.id, kind: workflowRuns.kind })
       .from(workflowRuns)
       .where(
-        and(eq(workflowRuns.status, 'pending'), lte(workflowRuns.runAt, now))
+        and(eq(workflowRuns.status, 'queued'), lte(workflowRuns.runAt, now))
       )
       .limit(MAX_RUNS_PER_TICK);
 
-    if (pendingRuns.length === 0) {
+    if (queuedRuns.length === 0) {
       return NextResponse.json({ ok: true, processed: 0 });
     }
 
     // Step 2: CAS claim by ID — atomically transition to 'running'
-    const pendingIds = pendingRuns.map(r => r.id);
+    const queuedIds = queuedRuns.map(r => r.id);
     const claimed = await db
       .update(workflowRuns)
       .set({ status: 'running', updatedAt: now })
       .where(
         and(
-          inArray(workflowRuns.id, pendingIds),
-          eq(workflowRuns.status, 'pending')
+          inArray(workflowRuns.id, queuedIds),
+          eq(workflowRuns.status, 'queued')
         )
       )
       .returning({
