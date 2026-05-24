@@ -271,7 +271,7 @@ export default function PromoDownloadsPage() {
               aria-label='Upload promo download audio file'
             />
             <output
-              className='min-h-9 border-t border-transparent px-3 py-2.5 text-xs sm:px-4'
+              className='block min-h-9 border-t border-transparent px-3 py-2.5 text-xs sm:px-4'
               aria-live='polite'
             >
               {uploadError ? <p className='text-error'>{uploadError}</p> : null}
