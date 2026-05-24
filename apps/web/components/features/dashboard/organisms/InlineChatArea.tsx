@@ -272,7 +272,7 @@ export const InlineChatArea = forwardRef<
             )}
 
             {/* Loading indicator — rendered outside virtualizer */}
-            {isLoading && messages[messages.length - 1]?.role === 'user' && (
+            {isLoading && messages.at(-1)?.role === 'user' && (
               <div className='flex gap-3 pb-4'>
                 <div className='flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-surface-2'>
                   <BrandLogo size={14} tone='auto' />
