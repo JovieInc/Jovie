@@ -107,7 +107,10 @@ async function assertAuthShellReady(page: Page, expectedMode: string) {
 test.describe('Synthetic Monitoring — Layer A (auth UI, SSO-only)', () => {
   test.beforeEach(async () => {
     if (process.env.E2E_SYNTHETIC_MODE !== 'true') {
-      test.skip();
+      test.skip(
+        true,
+        'Synthetic auth UI canary only runs when E2E_SYNTHETIC_MODE=true.'
+      );
     }
   });
 
