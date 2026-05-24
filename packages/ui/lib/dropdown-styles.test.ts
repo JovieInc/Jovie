@@ -56,11 +56,11 @@ describe('dropdown-styles', () => {
       expect(DROPDOWN_CONTENT_BASE).toContain('rounded-');
     });
 
-    it('default base uses default border token and p-0.5 padding', () => {
+    it('default base uses default border token and p-1 padding', () => {
       expect(DROPDOWN_CONTENT_BASE).toContain(
         'border-(--linear-border-default)'
       );
-      expect(DROPDOWN_CONTENT_BASE).toContain('p-0.5');
+      expect(DROPDOWN_CONTENT_BASE).toContain('p-1');
     });
 
     it('compact base uses p-0.5 padding', () => {
@@ -111,7 +111,6 @@ describe('dropdown-styles', () => {
       expect(dropdownMenuContentCompactClasses).toContain(
         DROPDOWN_CONTENT_COMPACT_BASE
       );
-      // Both compact and standard use p-0.5 padding; retained for explicit contract coverage
       expect(DROPDOWN_CONTENT_COMPACT_BASE).toContain('p-0.5');
     });
 
@@ -127,11 +126,11 @@ describe('dropdown-styles', () => {
 
   describe('menu item styles', () => {
     it('MENU_ITEM_BASE includes default sizing', () => {
-      expect(MENU_ITEM_BASE).toContain('text-[12.5px]');
-      expect(MENU_ITEM_BASE).toContain('leading-4');
+      expect(MENU_ITEM_BASE).toContain('text-[13px]');
+      expect(MENU_ITEM_BASE).toContain('leading-5');
       expect(MENU_ITEM_BASE).toContain('font-[400]');
-      expect(MENU_ITEM_BASE).toContain('py-1');
-      expect(MENU_ITEM_BASE).toContain('gap-1.5');
+      expect(MENU_ITEM_BASE).toContain('py-1.5');
+      expect(MENU_ITEM_BASE).toContain('gap-2');
     });
 
     it('menu rows use tokenized focus-visible rings', () => {
@@ -180,7 +179,7 @@ describe('dropdown-styles', () => {
 
     it('MENU_SEPARATOR_BASE styles a horizontal rule', () => {
       expect(MENU_SEPARATOR_BASE).toContain('h-px');
-      expect(MENU_SEPARATOR_BASE).toContain('my-px');
+      expect(MENU_SEPARATOR_BASE).toContain('my-1');
     });
 
     it('MENU_SHORTCUT_BASE uses ml-auto alignment', () => {
