@@ -5,6 +5,18 @@
      5|The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
      6|and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.5.47] - 2026-05-24
+
+> [internal] Jovie's Promptfoo chat evals now include mobile route-contract coverage and clearer live-model stream error diagnostics.
+
+### Added
+
+- **[internal] Mobile chat route eval coverage (JOV-2562)**: extends the Promptfoo suite with deterministic `POST /api/mobile/v1/chat/turns` contract cases for missing session, invalid request bodies, and the current `MOBILE_CHAT_RUNTIME_DISABLED` NDJSON response, including assertions that the disabled route does not persist data or execute tools.
+
+### Changed
+
+- **[internal] Promptfoo stream diagnostics**: captures eval-only `executeChatTurn()` stream errors so provider failures expose gateway and model-provider causes instead of returning only the generic AI SDK no-output message.
+
 ## [26.5.46] - 2026-05-24
 
 > Virtualized chat threads now reserve slash-command picker clearance in the scroll geometry itself.
