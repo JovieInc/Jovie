@@ -6,7 +6,7 @@ import type {
   DailyBucket,
   ShippingVelocityResponse,
 } from '@/app/api/admin/hud/shipping-velocity/route';
-import { AdminToolPage } from '@/components/features/admin/layout/AdminToolPage';
+import { AdminPage } from '@/components/features/admin/layout/AdminPage';
 import { APP_ROUTES } from '@/constants/routes';
 import { getPublicProfileCanaryStatus } from '@/lib/admin/ops-queries';
 import { env } from '@/lib/env-server';
@@ -119,7 +119,7 @@ export default async function AdminOpsPage({
     : null;
 
   return (
-    <AdminToolPage
+    <AdminPage
       title='Ops'
       description='Live operations: deploys, AI ops, runway, blockers.'
       testId='admin-ops-page'
@@ -185,6 +185,6 @@ export default async function AdminOpsPage({
         initialShippingData={shippingPrefetch?.data}
         initialShippingCachedAt={shippingPrefetch?.cachedAt}
       />
-    </AdminToolPage>
+    </AdminPage>
   );
 }
