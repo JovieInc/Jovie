@@ -32,7 +32,10 @@ RUN curl -fsSL https://bun.sh/install -o /tmp/bun-install.sh \
     && rm -f /tmp/bun-install.sh
 
 # Claude CLI
-RUN npm i -g @anthropic-ai/claude-code@2.1.150
+RUN curl -fsSL https://registry.npmjs.org/@anthropic-ai/claude-code/-/claude-code-2.1.150.tgz -o /tmp/claude-code.tgz \
+    && echo "9f278eca873fa661864697dfc8f535eafe5c6a6a73b64ca7c9115c34aa83ee906f23468f7e58c6562dc28b329bbbbfddc753228de13d5e2434907935b66c791a  /tmp/claude-code.tgz" | sha512sum -c - \
+    && npm install -g /tmp/claude-code.tgz \
+    && rm -f /tmp/claude-code.tgz
 
 # Playwright system deps (Chromium) — needed for browse E2E tests
 RUN npx --yes playwright@1.60.0 install-deps chromium
