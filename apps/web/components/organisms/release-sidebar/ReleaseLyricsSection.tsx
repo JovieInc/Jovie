@@ -22,6 +22,7 @@ import { LINEAR_SURFACE } from '@/features/dashboard/tokens';
 import { LYRICS_FORMAT_LABELS, type LyricsFormat } from '@/lib/lyrics/types';
 import { cn } from '@/lib/utils';
 import { ReleaseActionErrorCard } from './ReleaseActionErrorCard';
+import { createVoidRetryHandler } from './utils';
 
 /** Auto-save debounce delay in milliseconds */
 const AUTO_SAVE_DELAY_MS = 1500;
@@ -134,9 +135,7 @@ export function ReleaseLyricsSection({
         kind: 'save',
         message,
         actionLabel: 'Retry save',
-        onRetry: () => {
-          void performAutoSave();
-        },
+        onRetry: createVoidRetryHandler(performAutoSave),
       });
       toast.error(message);
     }
@@ -192,9 +191,7 @@ export function ReleaseLyricsSection({
           kind: 'format',
           message,
           actionLabel: 'Retry format',
-          onRetry: () => {
-            void handleFormat(format);
-          },
+          onRetry: createVoidRetryHandler(() => handleFormat(format)),
         });
         toast.error(message);
       } finally {

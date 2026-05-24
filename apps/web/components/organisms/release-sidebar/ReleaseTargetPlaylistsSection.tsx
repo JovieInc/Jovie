@@ -8,6 +8,7 @@ import { DrawerSurfaceCard } from '@/components/molecules/drawer';
 import { LINEAR_SURFACE } from '@/features/dashboard/tokens';
 import { cn } from '@/lib/utils';
 import { ReleaseActionErrorCard } from './ReleaseActionErrorCard';
+import { createVoidRetryHandler } from './utils';
 
 interface ReleaseTargetPlaylistsSectionProps {
   readonly releaseId: string;
@@ -68,9 +69,7 @@ export function ReleaseTargetPlaylistsSection({
     }
   }, [onSave, readOnly, value, releaseId]);
 
-  const handleRetry = useCallback(() => {
-    void handleBlur();
-  }, [handleBlur]);
+  const handleRetry = createVoidRetryHandler(handleBlur);
 
   return (
     <DrawerSurfaceCard

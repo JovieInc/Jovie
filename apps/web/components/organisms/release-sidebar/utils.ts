@@ -37,3 +37,11 @@ export function isValidUrl(value: string): boolean {
     return false;
   }
 }
+
+export function createVoidRetryHandler(
+  action: () => Promise<unknown> | void
+): () => void {
+  return () => {
+    void action();
+  };
+}

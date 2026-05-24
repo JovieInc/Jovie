@@ -8,7 +8,7 @@ import type {
   ReleaseSidebarActionError,
   ReleaseSidebarProps,
 } from './types';
-import { isFormElement, isValidUrl } from './utils';
+import { createVoidRetryHandler, isFormElement, isValidUrl } from './utils';
 
 export interface UseReleaseSidebarReturn {
   isAddingLink: boolean;
@@ -154,9 +154,7 @@ export function useReleaseSidebar({
         message:
           'The link was not saved. Your draft is still here, so you can retry or adjust the URL.',
         actionLabel: 'Try again',
-        onRetry: () => {
-          void handleAddLink();
-        },
+        onRetry: createVoidRetryHandler(handleAddLink),
       });
       console.error('Failed to add DSP link', error);
     } finally {
@@ -181,9 +179,7 @@ export function useReleaseSidebar({
           message:
             'The link is still available. Try the action again if you want to remove it.',
           actionLabel: 'Try again',
-          onRetry: () => {
-            void handleRemoveLink(provider);
-          },
+          onRetry: createVoidRetryHandler(() => handleRemoveLink(provider)),
         });
         console.error('Failed to remove DSP link', error);
       } finally {
