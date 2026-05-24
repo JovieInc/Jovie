@@ -2,10 +2,9 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const hoisted = vi.hoisted(() => ({
   auth: vi.fn(),
+  consumeStoredAuthState: vi.fn(),
   captureError: vi.fn().mockResolvedValue(undefined),
   createStoredNativeExchangeCode: vi.fn(),
-  deleteStoredAuthState: vi.fn(),
-  readStoredAuthState: vi.fn(),
   trackServerEvent: vi.fn().mockResolvedValue(undefined),
 }));
 
@@ -14,9 +13,8 @@ vi.mock('@clerk/nextjs/server', () => ({
 }));
 
 vi.mock('@/lib/auth/routing-state.server', () => ({
+  consumeStoredAuthState: hoisted.consumeStoredAuthState,
   createStoredNativeExchangeCode: hoisted.createStoredNativeExchangeCode,
-  deleteStoredAuthState: hoisted.deleteStoredAuthState,
-  readStoredAuthState: hoisted.readStoredAuthState,
 }));
 
 vi.mock('@/lib/error-tracking', () => ({
@@ -36,7 +34,7 @@ describe('GET /auth/callback', () => {
       '00000000-0000-4000-8000-000000000001'
     );
     hoisted.auth.mockResolvedValue({ userId: 'user_123' });
-    hoisted.readStoredAuthState.mockResolvedValue({
+    hoisted.consumeStoredAuthState.mockResolvedValue({
       client: 'electron',
       intent: 'sign_in',
       returnTo: '/app/chat?runtime=electron',
@@ -57,10 +55,9 @@ describe('GET /auth/callback', () => {
       expiresAt: 62_000,
       consumedAt: null,
     });
-    hoisted.deleteStoredAuthState.mockResolvedValue(undefined);
   });
 
-  it('creates the native exchange from the validated state without re-reading state', async () => {
+  it('creates the native exchange from the consumed state without re-reading state', async () => {
     const response = await GET(
       new Request('https://jov.ie/auth/callback?state=state_123')
     );
@@ -69,7 +66,10 @@ describe('GET /auth/callback', () => {
     expect(response.headers.get('location')).toBe(
       'jovie://auth/complete?code=00000000000040008000000000000001&state=state_123'
     );
-    expect(hoisted.readStoredAuthState).toHaveBeenCalledTimes(1);
+    expect(hoisted.consumeStoredAuthState).toHaveBeenCalledTimes(1);
+    expect(hoisted.consumeStoredAuthState).toHaveBeenCalledWith({
+      state: 'state_123',
+    });
     expect(hoisted.createStoredNativeExchangeCode).toHaveBeenCalledWith({
       code: '00000000000040008000000000000001',
       client: 'electron',
@@ -78,11 +78,24 @@ describe('GET /auth/callback', () => {
       returnTo: '/app/chat?runtime=electron',
       codeChallenge: 'challenge_123',
     });
-    expect(hoisted.deleteStoredAuthState).toHaveBeenCalledWith({
-      state: 'state_123',
-    });
     expect(
+      hoisted.consumeStoredAuthState.mock.invocationCallOrder[0]
+    ).toBeLessThan(
       hoisted.createStoredNativeExchangeCode.mock.invocationCallOrder[0]
-    ).toBeLessThan(hoisted.deleteStoredAuthState.mock.invocationCallOrder[0]);
+    );
+  });
+
+  it('does not create a native exchange when the auth state was already consumed', async () => {
+    hoisted.consumeStoredAuthState.mockResolvedValueOnce(null);
+
+    const response = await GET(
+      new Request('https://jov.ie/auth/callback?state=state_123')
+    );
+
+    expect(response.status).toBe(410);
+    await expect(response.json()).resolves.toEqual({
+      error: 'Auth state expired',
+    });
+    expect(hoisted.createStoredNativeExchangeCode).not.toHaveBeenCalled();
   });
 });
