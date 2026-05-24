@@ -347,7 +347,7 @@ function ConnectedReleaseEmptyState({
         <div className='mb-2.5 flex h-9 w-9 items-center justify-center rounded-[10px] border border-subtle bg-surface-1'>
           <Icon
             name='Disc3'
-            className='h-4 w-4 text-tertiary-token'
+            className='size-4 text-tertiary-token'
             aria-hidden='true'
           />
         </div>
@@ -368,7 +368,7 @@ function ConnectedReleaseEmptyState({
             <Icon
               name={isSyncing ? 'Loader2' : 'RefreshCw'}
               className={cn(
-                'h-4 w-4',
+                'size-4',
                 isSyncing && 'animate-spin motion-reduce:animate-none'
               )}
               aria-hidden='true'
@@ -381,7 +381,7 @@ function ConnectedReleaseEmptyState({
               className='h-7 rounded-lg px-2.5 text-2xs inline-flex items-center gap-2'
               data-testid='create-release-empty-state'
             >
-              <Icon name='Plus' className='h-4 w-4' aria-hidden='true' />
+              <Icon name='Plus' className='size-4' aria-hidden='true' />
               Create Release
             </DrawerButton>
           ) : null}
@@ -682,20 +682,24 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
 
   // Smart link gating
   const planGate = usePlanGate();
+  const entitlementOverrides = experienceAdapter?.entitlements;
   const releasePlanEntitlementOverride =
-    experienceAdapter?.entitlements?.canGenerateReleasePlans;
-  const {
-    smartLinksLimit,
-    isPro,
-    canCreateManualReleases,
-    canGenerateAlbumArt,
-    canGenerateReleasePlans,
-    canEditSmartLinks,
-    canAccessFutureReleases,
-  } = {
-    ...planGate,
-    ...experienceAdapter?.entitlements,
-  };
+    entitlementOverrides?.canGenerateReleasePlans;
+  const smartLinksLimit =
+    entitlementOverrides?.smartLinksLimit ?? planGate.smartLinksLimit;
+  const isPro = entitlementOverrides?.isPro ?? planGate.isPro;
+  const canCreateManualReleases =
+    entitlementOverrides?.canCreateManualReleases ??
+    planGate.canCreateManualReleases;
+  const canGenerateAlbumArt =
+    entitlementOverrides?.canGenerateAlbumArt ?? planGate.canGenerateAlbumArt;
+  const canGenerateReleasePlans =
+    releasePlanEntitlementOverride ?? planGate.canGenerateReleasePlans;
+  const canEditSmartLinks =
+    entitlementOverrides?.canEditSmartLinks ?? planGate.canEditSmartLinks;
+  const canAccessFutureReleases =
+    entitlementOverrides?.canAccessFutureReleases ??
+    planGate.canAccessFutureReleases;
   const isReleasePlanGateLoading =
     (planGate.isLoading || planGate.isError) &&
     releasePlanEntitlementOverride === undefined;
