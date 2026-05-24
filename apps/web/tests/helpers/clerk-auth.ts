@@ -684,9 +684,7 @@ async function waitForShellReadyAfterAuth(page: Page): Promise<void> {
     const dashNav = page.locator('nav[aria-label="Dashboard navigation"]');
     const userButton = page.locator('[data-clerk-element="userButton"]');
     const chatComposer = page
-      .locator(
-        'textarea, [contenteditable="true"], button[aria-label="New chat"]'
-      )
+      .locator('textarea, [contenteditable="true"], a[href="/app/chat"]')
       .first();
     const main = page.locator('main').first();
     const isShellReady = async () =>
@@ -1245,9 +1243,7 @@ export async function ensureSignedInUser(
     const dashNav = page.locator('nav[aria-label="Dashboard navigation"]');
     const userButton = page.locator('[data-clerk-element="userButton"]');
     const chatComposer = page
-      .locator(
-        'textarea, [contenteditable="true"], button[aria-label="New chat"]'
-      )
+      .locator('textarea, [contenteditable="true"], a[href="/app/chat"]')
       .first();
     const main = page.locator('main').first();
     const isShellReady = async () =>

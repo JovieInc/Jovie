@@ -930,10 +930,7 @@ const CREATOR_SHELL_ROUTES = [
     warmupStrategy: 'authenticated-route',
     measureMode: 'page-load',
     readySelectors: {
-      content: [
-        'button[aria-label="New chat"]',
-        '[placeholder*="ask jovie" i]',
-      ],
+      content: ['a[href="/app/chat"]', '[placeholder*="ask jovie" i]'],
       loading: ['[data-testid="chat-loading"]'],
     },
     timings: [
@@ -1182,10 +1179,7 @@ const CREATOR_ALIAS_ROUTES = [
     warmupStrategy: 'authenticated-route',
     measureMode: 'redirect',
     readySelectors: {
-      content: [
-        'button[aria-label="New chat"]',
-        '[placeholder*="ask jovie" i]',
-      ],
+      content: ['a[href="/app/chat"]', '[placeholder*="ask jovie" i]'],
       redirectDestinations: [APP_ROUTES.DASHBOARD],
     },
     timings: [
@@ -1205,10 +1199,7 @@ const CREATOR_ALIAS_ROUTES = [
     warmupStrategy: 'authenticated-route',
     measureMode: 'redirect',
     readySelectors: {
-      content: [
-        'button[aria-label="New chat"]',
-        '[placeholder*="ask jovie" i]',
-      ],
+      content: ['a[href="/app/chat"]', '[placeholder*="ask jovie" i]'],
       redirectDestinations: [APP_ROUTES.CHAT, APP_ROUTES.CHAT_PROFILE_PANEL],
     },
     timings: [
@@ -1228,10 +1219,7 @@ const CREATOR_ALIAS_ROUTES = [
     warmupStrategy: 'authenticated-route',
     measureMode: 'redirect',
     readySelectors: {
-      content: [
-        'button[aria-label="New chat"]',
-        '[placeholder*="ask jovie" i]',
-      ],
+      content: ['a[href="/app/chat"]', '[placeholder*="ask jovie" i]'],
       redirectDestinations: [APP_ROUTES.CHAT, APP_ROUTES.CHAT_PROFILE_PANEL],
     },
     timings: [

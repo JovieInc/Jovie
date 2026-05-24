@@ -52,7 +52,7 @@ const ADMIN_DEFAULT_BUDGET_MS = 15_000;
 const PUBLIC_DEFAULT_BUDGET_MS = 15_000;
 
 const CHAT_CONTENT_SELECTOR =
-  '[placeholder*="ask jovie" i], [placeholder*="Ask Jovie" i], button[aria-label="New chat"], textarea, [contenteditable="true"], main';
+  '[placeholder*="ask jovie" i], [placeholder*="Ask Jovie" i], a[href="/app/chat"], textarea, [contenteditable="true"], main';
 const RELEASE_TASKS_ROUTE = `${APP_ROUTES.RELEASES}/[releaseId]/tasks`;
 const DASHBOARD_TIPPING_ROUTE = `${APP_ROUTES.DASHBOARD}/tipping`;
 const DASHBOARD_CONTACTS_ROUTE = `${APP_ROUTES.DASHBOARD}/contacts`;

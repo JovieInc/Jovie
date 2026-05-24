@@ -10,7 +10,6 @@ import {
   ArrowLeft,
   Copy,
   PanelLeftClose,
-  Plus,
   RefreshCw,
   Settings,
 } from 'lucide-react';
@@ -245,7 +244,6 @@ function SidebarHeaderNav({
   isRouteSidebar,
   isAdmin,
   isDashboardOrAdmin,
-  profileHref,
   hasMultipleProfiles,
   isDemoRoute,
   routeBackHref = APP_ROUTES.DASHBOARD,
@@ -254,26 +252,12 @@ function SidebarHeaderNav({
   isRouteSidebar: boolean;
   isAdmin: boolean;
   isDashboardOrAdmin: boolean;
-  profileHref: string | undefined;
   hasMultipleProfiles: boolean;
   isDemoRoute: boolean;
   routeBackHref?: string;
   routeBackLabel?: string;
 }>) {
-  const shellChatV1Enabled = useAppFlag('DESIGN_V1');
   const isDesktop = useIsElectronRuntime();
-  const newChatLink = (
-    <Link
-      href={APP_ROUTES.CHAT}
-      aria-label='New chat'
-      className={cn(
-        'flex size-7 shrink-0 items-center justify-center rounded-[10px] bg-transparent text-sidebar-item-icon transition-[background,color] duration-normal ease-interactive hover:bg-sidebar-accent/60 hover:text-sidebar-item-foreground focus-visible:outline-none focus-visible:bg-sidebar-accent/60 focus-visible:text-sidebar-item-foreground',
-        !shellChatV1Enabled && 'ml-auto group-data-[collapsible=icon]:hidden'
-      )}
-    >
-      <Plus aria-hidden='true' className='size-3.5' />
-    </Link>
-  );
 
   return (
     <div className='flex w-full items-center'>
@@ -345,20 +329,9 @@ function SidebarHeaderNav({
         );
       })()}
 
-      {!isRouteSidebar &&
-        isDashboardOrAdmin &&
-        (shellChatV1Enabled ? (
-          !isDesktop ? (
-            <div className='ml-auto flex items-center gap-0.5 group-data-[collapsible=icon]:hidden'>
-              <Tooltip label='New chat' side='bottom'>
-                {newChatLink}
-              </Tooltip>
-              <SidebarDockButton />
-            </div>
-          ) : null
-        ) : (
-          newChatLink
-        ))}
+      {!isDesktop && !isRouteSidebar && isDashboardOrAdmin ? (
+        <SidebarDockButton />
+      ) : null}
     </div>
   );
 }
@@ -487,7 +460,6 @@ export function UnifiedSidebar({ section }: UnifiedSidebarProps) {
           isRouteSidebar={isRouteSidebar}
           isAdmin={isAdmin}
           isDashboardOrAdmin={isDashboardOrAdmin}
-          profileHref={profileHref}
           hasMultipleProfiles={hasMultipleProfiles}
           isDemoRoute={isDemoRoute}
           routeBackHref={sidebarOverride?.backHref}

@@ -15,7 +15,6 @@ import { useRightPanel } from '@/contexts/RightPanelContext';
 import { DashboardHeader } from '@/features/dashboard/organisms/DashboardHeader';
 import { DashboardMobileTabs } from '@/features/dashboard/organisms/DashboardMobileTabs';
 import { MobileProfileDrawer } from '@/features/dashboard/organisms/MobileProfileDrawer';
-import { useIsElectronRuntime } from '@/lib/desktop/electron-bridge';
 import { useAppFlag } from '@/lib/flags/client';
 import type { DashboardBreadcrumbItem } from '@/types/dashboard';
 import { AppShellFrame } from './AppShellFrame';
@@ -53,10 +52,9 @@ function AuthShellInner({
   const previewPanelState = usePreviewPanelState();
   const headerActionsState = useOptionalHeaderActions();
   const shellChatV1Enabled = useAppFlag('DESIGN_V1');
-  const isElectron = useIsElectronRuntime();
 
   const sidebarTrigger =
-    isMobile || (shellChatV1Enabled && isElectron) ? null : <SidebarTrigger />;
+    isMobile || shellChatV1Enabled ? null : <SidebarTrigger />;
 
   const isInSettings = section === 'settings';
   const hideTopHeader = isInSettings || isLyricsRoute;

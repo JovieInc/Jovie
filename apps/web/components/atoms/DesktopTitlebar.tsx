@@ -55,8 +55,11 @@ export function DesktopTitlebar() {
             data-testid='electron-titlebar-sidebar-cell'
             className='flex min-w-0 items-center gap-1.5 px-2.5'
           >
-            {/* Traffic-light clearance — macOS hiddenInset reserves ~72px on the left */}
-            <div className='w-[72px] shrink-0' aria-hidden='true' />
+            <div
+              data-testid='electron-traffic-light-safe-area'
+              className='w-[var(--electron-traffic-light-safe-width)] shrink-0'
+              aria-hidden='true'
+            />
             {/* Single canonical sidebar toggle for Electron — the in-sidebar
                 SidebarDockButton is not rendered in desktop runtime */}
             <button

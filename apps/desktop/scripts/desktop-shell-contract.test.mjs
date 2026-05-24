@@ -23,7 +23,15 @@ test('desktop window enters the authenticated chat shell instead of the web root
   );
   assert.match(
     mainSource,
-    /const MACOS_TRAFFIC_LIGHT_POSITION = \{ x: 20, y: 17 \} as const;/
+    /const MACOS_TRAFFIC_LIGHT_X = 20;/
+  );
+  assert.match(
+    mainSource,
+    /const MACOS_TRAFFIC_LIGHT_Y = 17;/
+  );
+  assert.match(
+    mainSource,
+    /const MACOS_TRAFFIC_LIGHT_POSITION = \{\s*x: MACOS_TRAFFIC_LIGHT_X,\s*y: MACOS_TRAFFIC_LIGHT_Y,\s*\} as const;/
   );
   assert.match(
     mainSource,
@@ -52,6 +60,9 @@ test('desktop window fails into a branded Jovie recovery surface', async () => {
   assert.match(mainSource, /Built for artists/);
   assert.match(mainSource, /Desktop shell runtime: Electron/);
   assert.match(mainSource, /data:text\/html;charset=utf-8/);
+  assert.match(mainSource, /function escapeHtmlAttribute\(value: string\): string/);
+  assert.match(mainSource, /<a class="primary" href="\$\{retryUrl\}">Retry<\/a>/);
+  assert.doesNotMatch(mainSource, /onclick="window\.location\.href/);
   assert.match(mainSource, /did-fail-load/);
   assert.match(mainSource, /NAVIGATION_ABORTED_ERROR_CODE/);
   assert.match(mainSource, /showDesktopLoadFailure\(win\)/);
@@ -209,6 +220,10 @@ test('hosted web app has an early Electron runtime marker before first paint', a
   const webRoot = join(desktopRoot, '..', 'web');
   const rootLayout = await readFile(join(webRoot, 'app/layout.tsx'), 'utf8');
   const globalsCss = await readFile(join(webRoot, 'app/globals.css'), 'utf8');
+  const titlebarSource = await readFile(
+    join(webRoot, 'components/atoms/DesktopTitlebar.tsx'),
+    'utf8'
+  );
   const runtimeInit = await readFile(
     join(webRoot, 'public/electron-runtime-init.js'),
     'utf8'
@@ -220,4 +235,23 @@ test('hosted web app has an early Electron runtime marker before first paint', a
   assert.match(runtimeInit, /root\.dataset\.desktopRuntime = 'electron'/);
   assert.match(runtimeInit, /root\.dataset\.devChromeDisabled = '1'/);
   assert.match(globalsCss, /--electron-titlebar-height: 40px;/);
+  assert.match(globalsCss, /--electron-traffic-light-safe-width: 72px;/);
+  assert.match(globalsCss, /--electron-traffic-light-x: 20px;/);
+  assert.match(globalsCss, /--electron-traffic-light-y: 17px;/);
+  assert.match(
+    globalsCss,
+    /--electron-sidebar-width: var\(--linear-app-sidebar-width\);/
+  );
+  assert.match(globalsCss, /--electron-sidebar-collapsed-width: 52px;/);
+  assert.match(
+    globalsCss,
+    /grid-template-columns: var\(--electron-sidebar-width\) minmax\(0, 1fr\);/
+  );
+  assert.doesNotMatch(globalsCss, /grid-template-columns: var\(--linear-app-sidebar-width\)/);
+  assert.match(titlebarSource, /data-testid='electron-traffic-light-safe-area'/);
+  assert.match(
+    titlebarSource,
+    /w-\[var\(--electron-traffic-light-safe-width\)\]/
+  );
+  assert.doesNotMatch(titlebarSource, /w-\[72px\]/);
 });

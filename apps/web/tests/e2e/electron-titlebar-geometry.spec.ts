@@ -6,8 +6,8 @@
  *    sidebar toggle + update pill; main-cell is a plain drag region (no header —
  *    page headers moved into
  *    the elevated content card below).
- * 2. No duplicate sidebar toggles — only one [data-sidebar-dock-button] per page and
- *    it must not also have [data-testid="electron-sidebar-toggle"] as a sibling.
+ * 2. No duplicate sidebar toggles — Electron gets exactly one titlebar toggle,
+ *    zero web dock/header triggers, and zero sidebar-header plus controls.
  * 3. The sidebar-cell width equals the CSS sidebar-width token, confirming rail alignment.
  *    (In a real Electron run the CSS `padding-left` rule for shellChatV1 takes effect;
  *    in the browser we verify the column structure is present and correctly attributed.)
@@ -21,12 +21,12 @@
  */
 
 import { expect, type Page, test } from '@playwright/test';
+import { APP_ROUTES } from '@/constants/routes';
 import { APP_FLAG_OVERRIDE_KEYS } from '@/lib/flags/contracts';
 import {
   APP_FLAG_OVERRIDES_COOKIE,
   FF_OVERRIDES_KEY,
 } from '@/lib/flags/overrides';
-import { setTestAuthBypassSession } from '../helpers/clerk-auth';
 
 test.use({ storageState: { cookies: [], origins: [] } });
 
@@ -53,22 +53,65 @@ async function forceDesignV1(page: Page): Promise<void> {
   );
 }
 
-async function gotoChatRoute(page: Page): Promise<void> {
+async function forceElectronRuntime(page: Page): Promise<void> {
+  await page.evaluate(() => {
+    Object.defineProperty(window, 'electronAPI', {
+      configurable: true,
+      value: {},
+    });
+    document.documentElement.dataset.desktopRuntime = 'electron';
+  });
+}
+
+async function gotoShellRoute(
+  page: Page,
+  route: string = APP_ROUTES.CALENDAR,
+  persona: 'admin' | 'creator-ready' = 'creator-ready'
+): Promise<void> {
   const maxAttempts = 3;
+  const authEntryUrl = `/api/dev/test-auth/enter?persona=${persona}&redirect=${encodeURIComponent(
+    route
+  )}`;
+  const routePattern = new RegExp(route.replaceAll('/', '\\/'));
+
   for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
     try {
-      await page.goto('/app/chat', {
+      await page.goto(authEntryUrl, {
         timeout: 120_000,
         waitUntil: 'domcontentloaded',
       });
+      await page.waitForURL(routePattern, { timeout: 60_000 });
+      await forceElectronRuntime(page);
       return;
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       const shouldRetry =
-        attempt < maxAttempts && /ERR_EMPTY_RESPONSE|ECONNRESET/i.test(message);
+        attempt < maxAttempts &&
+        /ERR_CONNECTION_REFUSED|ERR_EMPTY_RESPONSE|ECONNRESET/i.test(message);
       if (!shouldRetry) throw error;
       await page.waitForTimeout(1000 * attempt);
     }
+  }
+}
+
+async function assertElectronShellControls(
+  page: Page,
+  expectedNewChatRows: 0 | 1
+): Promise<void> {
+  await expect(
+    page.locator('[data-testid="electron-sidebar-toggle"]')
+  ).toHaveCount(1);
+  await expect(page.locator('[data-sidebar-dock-button="true"]')).toHaveCount(
+    0
+  );
+  await expect(page.locator('[data-sidebar="trigger"]')).toHaveCount(0);
+  await expect(page.locator('header a[aria-label="New chat"]')).toHaveCount(0);
+  const newChatRowCount = await page
+    .getByRole('link', { name: 'New chat' })
+    .count();
+  expect(newChatRowCount).toBeLessThanOrEqual(1);
+  if (expectedNewChatRows === 1) {
+    expect(newChatRowCount).toBe(1);
   }
 }
 
@@ -82,13 +125,7 @@ test('titlebar DOM has a single sidebar toggle and an empty main-cell drag regio
   test.setTimeout(180_000);
 
   await forceDesignV1(page);
-  await setTestAuthBypassSession(
-    page,
-    'creator-ready',
-    'e2e-titlebar-geometry-user'
-  );
-  await gotoChatRoute(page);
-  await page.waitForURL(/\/app\/chat/, { timeout: 60_000 });
+  await gotoShellRoute(page);
 
   // Wait for shell frame to be present
   await expect(page.locator('[data-app-shell-frame="true"]')).toBeVisible({
@@ -116,6 +153,9 @@ test('titlebar DOM has a single sidebar toggle and an empty main-cell drag regio
   ).toBeAttached();
   await expect(
     sidebarCell.locator('[data-testid="electron-sidebar-toggle"]')
+  ).toBeAttached();
+  await expect(
+    sidebarCell.locator('[data-testid="electron-traffic-light-safe-area"]')
   ).toBeAttached();
 
   // Main cell exists as a drag region but contains no chrome — the page header
@@ -145,31 +185,27 @@ test('no duplicate sidebar dock button and titlebar toggle on the same page', as
   test.setTimeout(180_000);
 
   await forceDesignV1(page);
-  await setTestAuthBypassSession(
-    page,
-    'creator-ready',
-    'e2e-titlebar-dedup-user'
-  );
-  await gotoChatRoute(page);
-  await page.waitForURL(/\/app\/chat/, { timeout: 60_000 });
+  await gotoShellRoute(page);
 
   await expect(page.locator('[data-app-shell-frame="true"]')).toBeVisible({
     timeout: 30_000,
   });
 
-  // At most one in-sidebar dock button per page.
-  const dockButtons = page.locator('[data-sidebar-dock-button="true"]');
-  const dockCount = await dockButtons.count();
-  expect(
-    dockCount,
-    'at most one sidebar dock button in the DOM'
-  ).toBeLessThanOrEqual(1);
+  await expect(page.locator('[data-sidebar-dock-button="true"]')).toHaveCount(
+    0
+  );
+  await expect(page.locator('[data-sidebar="trigger"]')).toHaveCount(0);
+  await expect(page.locator('header a[aria-label="New chat"]')).toHaveCount(0);
+  await expect(
+    page.locator('[data-testid="electron-sidebar-toggle"]')
+  ).toHaveCount(1);
+  await expect(page.getByRole('link', { name: 'New chat' })).toHaveCount(1);
 
   // The titlebar sidebar toggle must be present (it is the canonical one in Electron).
-  const titlebartoggle = page.locator(
+  const titlebarToggle = page.locator(
     '[data-testid="electron-sidebar-toggle"]'
   );
-  await expect(titlebartoggle).toBeAttached();
+  await expect(titlebarToggle).toBeAttached();
 });
 
 test('titlebar sidebar-cell width matches CSS sidebar-width token (rail alignment)', async ({
@@ -183,29 +219,37 @@ test('titlebar sidebar-cell width matches CSS sidebar-width token (rail alignmen
 
   await page.setViewportSize({ width: 1440, height: 900 });
   await forceDesignV1(page);
-  await setTestAuthBypassSession(
-    page,
-    'creator-ready',
-    'e2e-titlebar-rail-user'
-  );
-  await gotoChatRoute(page);
-  await page.waitForURL(/\/app\/chat/, { timeout: 60_000 });
+  await gotoShellRoute(page);
 
   await expect(page.locator('[data-app-shell-frame="true"]')).toBeVisible({
     timeout: 30_000,
   });
 
-  // Read the resolved sidebar width from the CSS custom property.
-  const sidebarWidthPx = await page.evaluate(() => {
+  const tokens = await page.evaluate(() => {
     const rootStyle = getComputedStyle(document.documentElement);
-    const raw = rootStyle.getPropertyValue('--linear-app-sidebar-width').trim();
-    // Parse px value
-    const match = /^([\d.]+)px$/.exec(raw);
-    return match ? Number.parseFloat(match[1]) : null;
+    const readPx = (name: string) => {
+      const raw = rootStyle.getPropertyValue(name).trim();
+      const match = /^([\d.]+)px$/.exec(raw);
+      return match ? Number.parseFloat(match[1]) : null;
+    };
+    return {
+      titlebarHeight: readPx('--electron-titlebar-height'),
+      trafficLightSafeWidth: readPx('--electron-traffic-light-safe-width'),
+      trafficLightX: readPx('--electron-traffic-light-x'),
+      trafficLightY: readPx('--electron-traffic-light-y'),
+      sidebarWidth: readPx('--electron-sidebar-width'),
+      collapsedSidebarWidth: readPx('--electron-sidebar-collapsed-width'),
+    };
   });
 
   // If we can read the token, check the sidebar column width matches.
-  if (sidebarWidthPx !== null && sidebarWidthPx > 0) {
+  expect(tokens.titlebarHeight).toBe(40);
+  expect(tokens.trafficLightSafeWidth).toBe(72);
+  expect(tokens.trafficLightX).toBe(20);
+  expect(tokens.trafficLightY).toBe(17);
+  expect(tokens.collapsedSidebarWidth).toBe(52);
+
+  if (tokens.sidebarWidth !== null && tokens.sidebarWidth > 0) {
     const sidebarCell = page.locator(
       '[data-testid="electron-titlebar-sidebar-cell"]'
     );
@@ -216,7 +260,7 @@ test('titlebar sidebar-cell width matches CSS sidebar-width token (rail alignmen
     // The structural tests above already validate the DOM layout.
     // Here we only check the token resolves to a non-zero positive value.
     expect(
-      sidebarWidthPx,
+      tokens.sidebarWidth,
       'sidebar width token is a positive pixel value'
     ).toBeGreaterThan(0);
 
@@ -224,9 +268,66 @@ test('titlebar sidebar-cell width matches CSS sidebar-width token (rail alignmen
       // Inside Electron, the titlebar IS visible — verify the sidebar-cell width
       // matches the token value within 1px tolerance (allows for sub-pixel rounding).
       expect(
-        Math.abs(box.width - sidebarWidthPx),
-        `titlebar sidebar-cell width (${box.width}px) matches sidebar-width token (${sidebarWidthPx}px)`
+        Math.abs(box.width - tokens.sidebarWidth),
+        `titlebar sidebar-cell width (${box.width}px) matches sidebar-width token (${tokens.sidebarWidth}px)`
       ).toBeLessThanOrEqual(1);
     }
+  }
+});
+
+test('Electron shell keeps one control contract across chat, calendar, tasks, releases, settings, and admin routes', async ({
+  page,
+}) => {
+  test.skip(
+    process.env.E2E_USE_TEST_AUTH_BYPASS !== '1',
+    'Requires E2E_USE_TEST_AUTH_BYPASS=1'
+  );
+  test.setTimeout(240_000);
+
+  await forceDesignV1(page);
+
+  const routeChecks: ReadonlyArray<{
+    readonly route: string;
+    readonly persona: 'admin' | 'creator-ready';
+    readonly expectedNewChatRows: number;
+  }> = [
+    {
+      route: APP_ROUTES.CHAT,
+      persona: 'creator-ready',
+      expectedNewChatRows: 1,
+    },
+    {
+      route: APP_ROUTES.CALENDAR,
+      persona: 'creator-ready',
+      expectedNewChatRows: 1,
+    },
+    {
+      route: APP_ROUTES.TASKS,
+      persona: 'creator-ready',
+      expectedNewChatRows: 1,
+    },
+    {
+      route: APP_ROUTES.RELEASES,
+      persona: 'creator-ready',
+      expectedNewChatRows: 1,
+    },
+    {
+      route: APP_ROUTES.SETTINGS_ACCOUNT,
+      persona: 'creator-ready',
+      expectedNewChatRows: 0,
+    },
+    {
+      route: APP_ROUTES.ADMIN_OPS,
+      persona: 'admin',
+      expectedNewChatRows: 0,
+    },
+  ];
+
+  for (const { route, persona, expectedNewChatRows } of routeChecks) {
+    await gotoShellRoute(page, route, persona);
+    await expect(
+      page.locator('[data-testid="electron-titlebar-row"]')
+    ).toBeAttached({ timeout: 30_000 });
+    await assertElectronShellControls(page, expectedNewChatRows);
   }
 });

@@ -60,6 +60,12 @@ describe('DesktopTitlebar', () => {
     ).toContainElement(screen.getByTestId('electron-sidebar-toggle'));
     expect(
       screen.getByTestId('electron-titlebar-sidebar-cell')
+    ).toContainElement(screen.getByTestId('electron-traffic-light-safe-area'));
+    expect(screen.getByTestId('electron-traffic-light-safe-area')).toHaveClass(
+      'w-[var(--electron-traffic-light-safe-width)]'
+    );
+    expect(
+      screen.getByTestId('electron-titlebar-sidebar-cell')
     ).toContainElement(screen.getByTestId('electron-nav-back'));
     expect(
       screen.getByTestId('electron-titlebar-sidebar-cell')
@@ -73,6 +79,9 @@ describe('DesktopTitlebar', () => {
     expect(
       screen.getByRole('button', { name: 'Collapse sidebar' })
     ).toBeInTheDocument();
+    expect(
+      screen.queryByRole('link', { name: 'New chat' })
+    ).not.toBeInTheDocument();
   });
 
   it('renders no Electron controls in the browser runtime', () => {
