@@ -198,6 +198,9 @@ describe('getCurrentUserEntitlements', () => {
       isTrialing: false,
       trialEndsAt: null,
       trialDaysRemaining: null,
+      billingVerification: 'verified',
+      hasStripeCustomer: false,
+      hasStripeSubscription: false,
       isPro: false,
       hasAdvancedFeatures: false,
       canExportContacts: false,
@@ -267,6 +270,9 @@ describe('getCurrentUserEntitlements', () => {
       isTrialing: false,
       trialEndsAt: null,
       trialDaysRemaining: null,
+      billingVerification: 'verified',
+      hasStripeCustomer: true,
+      hasStripeSubscription: true,
       isPro: true,
       hasAdvancedFeatures: false,
       canExportContacts: true,
@@ -306,6 +312,70 @@ describe('getCurrentUserEntitlements', () => {
     });
   });
 
+  it('normalizes stale free plan rows to pro when billing says isPro=true', async () => {
+    mockCachedAuth.mockResolvedValue({ userId: 'user_tim' });
+    mockCachedCurrentUser.mockResolvedValue({
+      primaryEmailAddress: { emailAddress: 'tim@jov.ie' },
+    });
+    mockIsAdmin.mockResolvedValue(false);
+    mockGetUserBillingInfo.mockResolvedValue({
+      success: true,
+      data: {
+        userId: 'db_user_id',
+        email: 'tim@jov.ie',
+        isAdmin: false,
+        isPro: true,
+        plan: 'free',
+        stripeCustomerId: 'cus_tim',
+        stripeSubscriptionId: 'sub_tim',
+      },
+    });
+
+    const entitlements = await getCurrentUserEntitlements();
+
+    expect(entitlements.plan).toBe('pro');
+    expect(entitlements.isPro).toBe(true);
+    expect(entitlements.canAccessMerchCreation).toBe(true);
+    expect(entitlements.billingVerification).toBe('verified');
+    expect(entitlements.billingPlanMismatch).toEqual({
+      rawPlan: 'free',
+      normalizedPlan: 'pro',
+      reason: 'is_pro_true_with_non_paid_plan',
+    });
+  });
+
+  it('normalizes missing plan rows to pro when billing says isPro=true', async () => {
+    mockCachedAuth.mockResolvedValue({ userId: 'user_missing_plan' });
+    mockCachedCurrentUser.mockResolvedValue({
+      primaryEmailAddress: { emailAddress: 'missing-plan@example.com' },
+    });
+    mockIsAdmin.mockResolvedValue(false);
+    mockGetUserBillingInfo.mockResolvedValue({
+      success: true,
+      data: {
+        userId: 'db_user_id',
+        email: 'missing-plan@example.com',
+        isAdmin: false,
+        isPro: true,
+        plan: null,
+        stripeCustomerId: 'cus_missing',
+        stripeSubscriptionId: 'sub_missing',
+      },
+    });
+
+    const entitlements = await getCurrentUserEntitlements();
+
+    expect(entitlements.plan).toBe('pro');
+    expect(entitlements.isPro).toBe(true);
+    expect(entitlements.canAccessMerchCreation).toBe(true);
+    expect(entitlements.billingVerification).toBe('verified');
+    expect(entitlements.billingPlanMismatch).toEqual({
+      rawPlan: null,
+      normalizedPlan: 'pro',
+      reason: 'is_pro_true_with_non_paid_plan',
+    });
+  });
+
   it('maps billing data for a max user (backward compat: DB may store growth)', async () => {
     mockCachedAuth.mockResolvedValue({ userId: 'user_growth' });
     mockCachedCurrentUser.mockResolvedValue({
@@ -336,6 +406,9 @@ describe('getCurrentUserEntitlements', () => {
       isTrialing: false,
       trialEndsAt: null,
       trialDaysRemaining: null,
+      billingVerification: 'verified',
+      hasStripeCustomer: true,
+      hasStripeSubscription: true,
       isPro: true,
       hasAdvancedFeatures: true,
       canExportContacts: true,

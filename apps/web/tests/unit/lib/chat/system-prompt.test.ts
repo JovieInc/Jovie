@@ -73,4 +73,85 @@ describe('buildSystemPrompt', () => {
       'you do not have access to insight cards in this session'
     );
   });
+
+  it('injects verified account context without exposing Stripe identifiers', () => {
+    const prompt = buildSystemPrompt(baseContext, [], {
+      aiCanUseTools: true,
+      aiDailyMessageLimit: 100,
+      accountContext: {
+        email: 'tim@jov.ie',
+        plan: 'pro',
+        displayPlan: 'Pro',
+        isPro: true,
+        billingVerification: 'verified',
+        planMismatch: {
+          rawPlan: 'free',
+          normalizedPlan: 'pro',
+          reason: 'is_pro_true_with_non_paid_plan',
+        },
+        usage: {
+          dailyLimit: 100,
+          used: 7,
+          remaining: 93,
+          resetAt: '2026-05-24T07:00:00.000Z',
+          monthlyLimit: 3100,
+          monthlyUsed: 7,
+          monthlyRemaining: 3093,
+          monthlyResetAt: '2026-06-01T00:00:00.000Z',
+        },
+        entitlements: {
+          aiCanUseTools: true,
+          canAccessMerchCreation: true,
+          canGenerateAlbumArt: true,
+          canAccessAdvancedAnalytics: true,
+        },
+        flags: { merchMvp: true },
+        billing: {
+          hasStripeCustomer: true,
+          hasStripeSubscription: true,
+        },
+      },
+    });
+
+    expect(prompt).toContain('## Account & Access');
+    expect(prompt).toContain('- **Account Email:** tim@jov.ie');
+    expect(prompt).toContain('- **Plan:** Pro');
+    expect(prompt).toContain('- **Merch Creation:** Available');
+    expect(prompt).toContain(
+      '- **AI Usage Today:** 7 used, 93 remaining of 100'
+    );
+    expect(prompt).toContain('Billing row mismatch detected');
+    expect(prompt).not.toContain('cus_');
+    expect(prompt).not.toContain('sub_');
+  });
+
+  it('does not show Free-plan limitations when billing verification is unavailable', () => {
+    const prompt = buildSystemPrompt(baseContext, [], {
+      aiCanUseTools: false,
+      aiDailyMessageLimit: 10,
+      accountContext: {
+        email: 'tim@jov.ie',
+        plan: 'free',
+        displayPlan: 'Unverified',
+        isPro: false,
+        billingVerification: 'unavailable',
+        planMismatch: null,
+        usage: null,
+        entitlements: {
+          aiCanUseTools: false,
+          canAccessMerchCreation: false,
+          canGenerateAlbumArt: false,
+          canAccessAdvancedAnalytics: false,
+        },
+        flags: { merchMvp: true },
+        billing: {
+          hasStripeCustomer: false,
+          hasStripeSubscription: false,
+        },
+      },
+    });
+
+    expect(prompt).toContain('Billing verification is temporarily unavailable');
+    expect(prompt).not.toContain('This artist is on the Free plan');
+  });
 });

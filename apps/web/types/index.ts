@@ -286,7 +286,18 @@ export function getSocialPlatformLabel(platform: SocialPlatform): string {
   );
 }
 
-export type UserPlan = 'free' | 'trial' | 'founding' | 'pro' | 'max';
+export type UserPlan = 'free' | 'trial' | 'founding' | 'pro' | 'max' | 'growth';
+
+export type BillingVerificationState =
+  | 'verified'
+  | 'missing_user'
+  | 'unavailable';
+
+export interface BillingPlanMismatch {
+  rawPlan: string | null;
+  normalizedPlan: UserPlan;
+  reason: string;
+}
 
 export interface UserEntitlements {
   userId: string | null;
@@ -327,10 +338,17 @@ export interface UserEntitlements {
   canAccessWebhooks: boolean;
   canAccessWhiteLabel: boolean;
   canAccessAbTesting: boolean;
+  canAccessMerchCreation: boolean;
+  canAccessAiRetouching: boolean;
+  billingVerification?: BillingVerificationState;
+  billingPlanMismatch?: BillingPlanMismatch | null;
+  hasStripeCustomer?: boolean;
+  hasStripeSubscription?: boolean;
   // Limits
   analyticsRetentionDays: number | null; // null = unlimited (Max tier)
   contactsLimit: number | null; // null = unlimited
   smartLinksLimit: number | null; // null = unlimited, 25 for free tier
   aiDailyMessageLimit: number;
   aiPitchGenPerRelease: number | null;
+  aiRetouchDailyLimit: number | null;
 }
