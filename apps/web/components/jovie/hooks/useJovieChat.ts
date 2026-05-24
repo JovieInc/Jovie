@@ -747,8 +747,8 @@ export function useJovieChat({
       try {
         const result = sendMessage(payload, sendOptions);
         setInput('');
-        void Promise.resolve(result).catch(value => {
-          handleChatFailure(toError(value), 'send', clientTurnId);
+        void Promise.resolve(result).catch(error_ => {
+          handleChatFailure(toError(error_), 'send', clientTurnId);
         });
         return true;
       } catch (error) {

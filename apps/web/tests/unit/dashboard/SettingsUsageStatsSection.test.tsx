@@ -89,10 +89,10 @@ describe('SettingsUsageStatsSection', () => {
     expect(screen.getByText('Free')).toBeInTheDocument();
     expect(
       screen.getByRole('progressbar', { name: 'Daily Messages usage' })
-    ).toHaveAttribute('aria-valuenow', '4');
+    ).toHaveAttribute('value', '4');
     expect(
       screen.getByRole('progressbar', { name: 'Monthly Capacity usage' })
-    ).toHaveAttribute('aria-valuenow', '24');
+    ).toHaveAttribute('value', '24');
     expect(screen.getByText('6 left')).toBeInTheDocument();
     expect(screen.getByText('286 left')).toBeInTheDocument();
   });
