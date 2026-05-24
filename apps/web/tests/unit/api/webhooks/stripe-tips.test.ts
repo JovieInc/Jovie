@@ -10,6 +10,8 @@ const mockProcessTipCompleted = vi.hoisted(() =>
 );
 const mockDbInsert = vi.hoisted(() => vi.fn());
 const mockDbSelect = vi.hoisted(() => vi.fn());
+const mockDbUpdate = vi.hoisted(() => vi.fn());
+const mockLoggerWarn = vi.hoisted(() => vi.fn());
 
 vi.mock('@/lib/env-server', () => ({
   env: {
@@ -22,6 +24,7 @@ vi.mock('@/lib/db', () => {
     values: vi.fn().mockReturnThis(),
     onConflictDoNothing: vi.fn().mockReturnThis(),
     returning: vi.fn().mockResolvedValue([{ id: 'tip-123' }]),
+    set: vi.fn().mockReturnThis(),
     from: vi.fn().mockReturnThis(),
     where: vi.fn().mockReturnThis(),
     limit: vi.fn().mockResolvedValue([{ id: 'profile-123' }]),
@@ -30,6 +33,7 @@ vi.mock('@/lib/db', () => {
     db: {
       insert: mockDbInsert.mockReturnValue(chainable),
       select: mockDbSelect.mockReturnValue(chainable),
+      update: mockDbUpdate.mockReturnValue(chainable),
     },
   };
 });
@@ -62,7 +66,7 @@ vi.mock('@/lib/utils/logger', () => ({
   logger: {
     error: vi.fn(),
     info: vi.fn(),
-    warn: vi.fn(),
+    warn: mockLoggerWarn,
   },
 }));
 
@@ -78,6 +82,7 @@ describe('POST /api/webhooks/stripe-tips', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.resetModules();
+    mockCaptureCriticalError.mockResolvedValue(undefined);
   });
 
   it('returns 400 when the Stripe signature header is missing', async () => {
@@ -94,6 +99,23 @@ describe('POST /api/webhooks/stripe-tips', () => {
       error: 'No signature',
     });
     expect(mockCaptureCriticalError).not.toHaveBeenCalled();
+  });
+
+  it('returns 400 when Stripe rejects the tip webhook signature', async () => {
+    const { stripe } = await import('@/lib/stripe/client');
+    vi.mocked(stripe.webhooks.constructEvent).mockImplementation(() => {
+      throw new Error('invalid signature');
+    });
+
+    const { POST } = await import('@/app/api/webhooks/stripe-tips/route');
+    const response = await POST(makeRequest());
+
+    expect(response.status).toBe(400);
+    expect(await response.json()).toEqual({
+      error: 'Invalid signature',
+    });
+    expect(mockDbInsert).not.toHaveBeenCalled();
+    expect(mockProcessTipCompleted).not.toHaveBeenCalled();
   });
 
   it('calls processTipCompleted on successful checkout with tipper email', async () => {
@@ -123,6 +145,74 @@ describe('POST /api/webhooks/stripe-tips', () => {
         name: 'Test Fan',
         amountCents: 500,
         source: 'tip',
+      })
+    );
+  });
+
+  it('resolves creator profile by handle when profile_id metadata is absent', async () => {
+    const { stripe } = await import('@/lib/stripe/client');
+    vi.mocked(stripe.webhooks.constructEvent).mockReturnValue({
+      type: 'checkout.session.completed',
+      data: {
+        object: {
+          metadata: { handle: 'TestArtist' },
+          payment_intent: { id: 'pi_from_object' },
+          amount_total: 700,
+          customer_details: { email: 'fan@example.com', name: null },
+          customer_email: null,
+          id: 'cs_handle',
+        },
+      },
+    } as never);
+
+    const { POST } = await import('@/app/api/webhooks/stripe-tips/route');
+    const response = await POST(makeRequest());
+
+    expect(response.status).toBe(200);
+    expect(mockDbSelect).toHaveBeenCalled();
+    expect(mockProcessTipCompleted).toHaveBeenCalledWith(
+      expect.objectContaining({
+        profileId: 'profile-123',
+        email: 'fan@example.com',
+        amountCents: 700,
+        metadata: expect.objectContaining({
+          paymentIntentId: 'pi_from_object',
+          checkoutSessionId: 'cs_handle',
+        }),
+      })
+    );
+  });
+
+  it('acknowledges unattributable checkout sessions and records critical context', async () => {
+    const { stripe } = await import('@/lib/stripe/client');
+    vi.mocked(stripe.webhooks.constructEvent).mockReturnValue({
+      type: 'checkout.session.completed',
+      data: {
+        object: {
+          metadata: {},
+          payment_intent: 'pi_missing_creator',
+          amount_total: 500,
+          customer_details: { email: 'fan@example.com', name: 'Test Fan' },
+          customer_email: null,
+          id: 'cs_missing_creator',
+        },
+      },
+    } as never);
+
+    const { POST } = await import('@/app/api/webhooks/stripe-tips/route');
+    const response = await POST(makeRequest());
+
+    expect(response.status).toBe(200);
+    expect(mockDbInsert).not.toHaveBeenCalled();
+    expect(mockProcessTipCompleted).not.toHaveBeenCalled();
+    expect(mockCaptureCriticalError).toHaveBeenCalledWith(
+      'Tip checkout completed without handle or profile_id metadata',
+      expect.any(Error),
+      expect.objectContaining({
+        route: '/api/webhooks/stripe-tips',
+        session_id: 'cs_missing_creator',
+        amount: 500,
+        customer_email_domain: 'example.com',
       })
     );
   });
@@ -210,5 +300,54 @@ describe('POST /api/webhooks/stripe-tips', () => {
     expect(response.status).toBe(200);
     // Duplicate tip should NOT call processTipCompleted
     expect(mockProcessTipCompleted).not.toHaveBeenCalled();
+  });
+
+  it('marks matching tips refunded when Stripe sends charge.refunded', async () => {
+    const { stripe } = await import('@/lib/stripe/client');
+    vi.mocked(stripe.webhooks.constructEvent).mockReturnValue({
+      type: 'charge.refunded',
+      data: {
+        object: {
+          id: 'ch_123',
+          payment_intent: 'pi_refunded',
+        },
+      },
+    } as never);
+
+    const { POST } = await import('@/app/api/webhooks/stripe-tips/route');
+    const response = await POST(makeRequest());
+
+    expect(response.status).toBe(200);
+    expect(mockDbUpdate).toHaveBeenCalled();
+    const updateChain = mockDbUpdate.mock.results[0]?.value;
+    expect(updateChain.set).toHaveBeenCalledWith(
+      expect.objectContaining({
+        status: 'refunded',
+        updatedAt: expect.any(Date),
+      })
+    );
+  });
+
+  it('does not mutate tips when a refunded charge lacks a payment intent', async () => {
+    const { stripe } = await import('@/lib/stripe/client');
+    vi.mocked(stripe.webhooks.constructEvent).mockReturnValue({
+      type: 'charge.refunded',
+      data: {
+        object: {
+          id: 'ch_missing_pi',
+          payment_intent: null,
+        },
+      },
+    } as never);
+
+    const { POST } = await import('@/app/api/webhooks/stripe-tips/route');
+    const response = await POST(makeRequest());
+
+    expect(response.status).toBe(200);
+    expect(mockDbUpdate).not.toHaveBeenCalled();
+    expect(mockLoggerWarn).toHaveBeenCalledWith(
+      'Charge refunded but no payment_intent ID',
+      { charge_id: 'ch_missing_pi' }
+    );
   });
 });

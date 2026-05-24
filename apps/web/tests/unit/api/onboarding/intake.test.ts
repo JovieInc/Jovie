@@ -8,6 +8,7 @@ const mockDbInsert = vi.hoisted(() => vi.fn());
 const mockSubmitWaitlistAccessRequest = vi.hoisted(() => vi.fn());
 const mockCaptureError = vi.hoisted(() => vi.fn());
 const mockEnforceOnboardingRateLimit = vi.hoisted(() => vi.fn());
+const mockLoggerWarn = vi.hoisted(() => vi.fn());
 
 vi.mock('@/lib/auth/cached', () => ({
   getCachedAuth: mockGetCachedAuth,
@@ -60,7 +61,7 @@ vi.mock('@/lib/error-tracking', () => ({
 
 vi.mock('@/lib/utils/logger', () => ({
   logger: {
-    warn: vi.fn(),
+    warn: mockLoggerWarn,
     info: vi.fn(),
     error: vi.fn(),
   },
@@ -148,6 +149,30 @@ function setupSuccessfulIntakeDb() {
   mockDbInsert.mockReturnValue({ values });
 
   return { onConflictDoUpdate, values };
+}
+
+function selectRows(rows: Array<Record<string, unknown>>) {
+  return {
+    from: vi.fn().mockReturnValue({
+      where: vi.fn().mockReturnValue({
+        limit: vi.fn().mockResolvedValue(rows),
+      }),
+    }),
+  };
+}
+
+function insertUserRows(rows: Array<Record<string, unknown>>) {
+  const returning = vi.fn().mockResolvedValue(rows);
+  const onConflictDoNothing = vi.fn().mockReturnValue({ returning });
+  const values = vi.fn().mockReturnValue({ onConflictDoNothing });
+  return { values, onConflictDoNothing, returning };
+}
+
+function upsertInterviewRows(rows: Array<Record<string, unknown>>) {
+  const returning = vi.fn().mockResolvedValue(rows);
+  const onConflictDoUpdate = vi.fn().mockReturnValue({ returning });
+  const values = vi.fn().mockReturnValue({ onConflictDoUpdate });
+  return { values, onConflictDoUpdate, returning };
 }
 
 describe('POST /api/onboarding/intake — email verification gate', () => {
@@ -343,6 +368,126 @@ describe('POST /api/onboarding/intake — email verification gate', () => {
     });
   });
 
+  it('creates the intake user without overwriting concurrent status fields', async () => {
+    mockCurrentUser.mockResolvedValue({
+      fullName: 'New User',
+      emailAddresses: [
+        {
+          emailAddress: 'new@example.com',
+          verification: { status: 'verified' },
+        },
+      ],
+    });
+    mockSubmitWaitlistAccessRequest.mockResolvedValue({
+      outcome: 'accepted',
+      status: 'active',
+      entryId: 'entry_new',
+    });
+
+    mockDbSelect.mockReturnValueOnce(selectRows([]));
+    const userInsert = insertUserRows([
+      { id: 'new_user', userStatus: 'waitlist_pending' },
+    ]);
+    const interviewInsert = upsertInterviewRows([{ id: 'interview_new' }]);
+    mockDbInsert
+      .mockReturnValueOnce(userInsert)
+      .mockReturnValue(interviewInsert);
+
+    const res = await POST(makeRequest(VALID_BODY));
+
+    expect(res.status).toBe(200);
+    expect(userInsert.values).toHaveBeenCalledWith({
+      clerkId: 'user_clerk_1',
+      email: 'new@example.com',
+      userStatus: 'waitlist_pending',
+    });
+    expect(userInsert.onConflictDoNothing).toHaveBeenCalled();
+    expect(mockSubmitWaitlistAccessRequest).toHaveBeenCalledWith(
+      expect.objectContaining({
+        clerkUserId: 'user_clerk_1',
+        email: 'new@example.com',
+        emailRaw: 'new@example.com',
+      })
+    );
+  });
+
+  it('re-selects the intake user when a concurrent insert wins the conflict', async () => {
+    mockCurrentUser.mockResolvedValue({
+      fullName: 'Racing User',
+      emailAddresses: [
+        {
+          emailAddress: 'race@example.com',
+          verification: { status: 'verified' },
+        },
+      ],
+    });
+    mockSubmitWaitlistAccessRequest.mockResolvedValue({
+      outcome: 'accepted',
+      status: 'active',
+      entryId: 'entry_race',
+    });
+
+    mockDbSelect
+      .mockReturnValueOnce(selectRows([]))
+      .mockReturnValueOnce(
+        selectRows([{ id: 'race_user', userStatus: 'waitlist_pending' }])
+      );
+    const userInsert = insertUserRows([]);
+    const interviewInsert = upsertInterviewRows([{ id: 'interview_race' }]);
+    mockDbInsert
+      .mockReturnValueOnce(userInsert)
+      .mockReturnValue(interviewInsert);
+
+    const res = await POST(makeRequest(VALID_BODY));
+
+    expect(res.status).toBe(200);
+    expect(mockDbSelect).toHaveBeenCalledTimes(2);
+    expect(mockSubmitWaitlistAccessRequest).toHaveBeenCalledWith(
+      expect.objectContaining({
+        clerkUserId: 'user_clerk_1',
+        email: 'race@example.com',
+      })
+    );
+  });
+
+  it('re-selects an existing interview row when upsert returning is empty', async () => {
+    mockCurrentUser.mockResolvedValue({
+      fullName: 'Interview User',
+      emailAddresses: [
+        {
+          emailAddress: 'interview@example.com',
+          verification: { status: 'verified' },
+        },
+      ],
+    });
+    mockSubmitWaitlistAccessRequest.mockResolvedValue({
+      outcome: 'waitlisted_capacity_full',
+      status: 'waitlisted',
+      entryId: 'entry_existing_interview',
+    });
+
+    mockDbSelect
+      .mockReturnValueOnce(
+        selectRows([{ id: 'user_db_1', userStatus: 'waitlist_pending' }])
+      )
+      .mockReturnValueOnce(selectRows([{ id: 'interview_existing' }]));
+    const interviewInsert = upsertInterviewRows([]);
+    interviewInsert.returning
+      .mockResolvedValueOnce([])
+      .mockResolvedValue([{ id: 'interview_updated' }]);
+    mockDbInsert.mockReturnValue(interviewInsert);
+
+    const res = await POST(makeRequest(VALID_BODY));
+
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({
+      success: true,
+      interviewId: 'interview_existing',
+      outcome: 'waitlisted_capacity_full',
+    });
+    expect(mockDbSelect).toHaveBeenCalledTimes(2);
+  });
+
   it('derives full name from username when Clerk fullName missing (executes derive branch)', async () => {
     mockCurrentUser.mockResolvedValue({
       fullName: null,
@@ -425,6 +570,85 @@ describe('POST /api/onboarding/intake — email verification gate', () => {
     expect(mockCaptureError).toHaveBeenCalledWith(
       'onboarding intake transcript save failed',
       expect.any(Error),
+      expect.objectContaining({ route: '/api/onboarding/intake' })
+    );
+  });
+
+  it('logs and still returns the accepted outcome when attaching access metadata fails', async () => {
+    mockCurrentUser.mockResolvedValue({
+      fullName: 'Accepted User',
+      emailAddresses: [
+        {
+          emailAddress: 'accepted@example.com',
+          verification: { status: 'verified' },
+        },
+      ],
+    });
+    mockSubmitWaitlistAccessRequest.mockResolvedValue({
+      outcome: 'accepted',
+      status: 'active',
+      entryId: 'entry_accepted',
+    });
+    mockDbSelect.mockReturnValue({
+      from: vi.fn().mockReturnValue({
+        where: vi.fn().mockReturnValue({
+          limit: vi
+            .fn()
+            .mockResolvedValue([{ id: 'u1', userStatus: 'waitlist_pending' }]),
+        }),
+      }),
+    });
+
+    const returning = vi
+      .fn()
+      .mockResolvedValueOnce([{ id: 'interview_1' }])
+      .mockRejectedValueOnce(new Error('metadata update failed'));
+    const onConflictDoUpdate = vi.fn().mockReturnValue({ returning });
+    const values = vi.fn().mockReturnValue({ onConflictDoUpdate });
+    mockDbInsert.mockReturnValue({ values });
+
+    const res = await POST(makeRequest(VALID_BODY));
+
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({
+      success: true,
+      interviewId: 'interview_1',
+      outcome: 'accepted',
+      status: 'active',
+      entryId: 'entry_accepted',
+    });
+    expect(mockLoggerWarn).toHaveBeenCalledWith(
+      '[onboarding/intake] Failed to attach access outcome to interview',
+      expect.any(Error)
+    );
+    expect(mockCaptureError).toHaveBeenCalledWith(
+      'onboarding intake outcome attach failed',
+      expect.any(Error),
+      expect.objectContaining({
+        route: '/api/onboarding/intake',
+        interviewId: 'interview_1',
+        outcome: 'accepted',
+      })
+    );
+  });
+
+  it('captures unexpected request parsing failures as a 500 contract response', async () => {
+    const res = await POST(
+      new Request('http://localhost/api/onboarding/intake', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: '{',
+      })
+    );
+
+    expect(res.status).toBe(500);
+    expect(await res.json()).toEqual({
+      success: false,
+      error: 'Internal server error',
+    });
+    expect(mockCaptureError).toHaveBeenCalledWith(
+      'onboarding intake submission failed',
+      expect.any(SyntaxError),
       expect.objectContaining({ route: '/api/onboarding/intake' })
     );
   });

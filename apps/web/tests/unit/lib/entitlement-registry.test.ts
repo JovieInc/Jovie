@@ -1,15 +1,19 @@
 import { describe, expect, it } from 'vitest';
 import {
   type BooleanEntitlement,
+  checkBoolean,
   ENTITLEMENT_REGISTRY,
   getAllPlanIds,
   getEntitlements,
+  getLimit,
+  getPlanDisplayName,
   hasAdvancedFeatures,
   isProPlan,
   isValidPlanId,
   type NumericEntitlement,
   type PlanId,
   resolveCanonicalPlanId,
+  resolveChatUsagePlan,
 } from '@/lib/entitlements/registry';
 
 describe('Entitlement Registry Consistency', () => {
@@ -192,6 +196,33 @@ describe('Entitlement Registry Consistency', () => {
       // Yearly should be less than 12x monthly (a discount)
       expect(price.yearly).toBeLessThan(price.monthly * 12);
     }
+  });
+
+  it('exported accessors read booleans, limits, and display names from the registry', () => {
+    expect(checkBoolean('free', 'canAccessPreSave')).toBe(false);
+    expect(checkBoolean('pro', 'canAccessPreSave')).toBe(true);
+    expect(checkBoolean('growth', 'canAccessStripeConnect')).toBe(true);
+    expect(checkBoolean('unknown', 'canAccessStripeConnect')).toBe(false);
+
+    expect(getLimit('free', 'contactsLimit')).toBe(100);
+    expect(getLimit('trial', 'contactsLimit')).toBe(250);
+    expect(getLimit('pro', 'contactsLimit')).toBeNull();
+    expect(getLimit('max', 'aiRetouchDailyLimit')).toBe(50);
+    expect(getLimit('unknown', 'aiRetouchDailyLimit')).toBeNull();
+
+    expect(getPlanDisplayName('founding')).toBe('Pro');
+    expect(getPlanDisplayName('growth')).toBe('Max');
+    expect(getPlanDisplayName(null)).toBe('Free');
+  });
+
+  it('resolveChatUsagePlan narrows billing aliases to the chat quota tiers', () => {
+    expect(resolveChatUsagePlan('max')).toBe('max');
+    expect(resolveChatUsagePlan('growth')).toBe('max');
+    expect(resolveChatUsagePlan('pro')).toBe('pro');
+    expect(resolveChatUsagePlan('founding')).toBe('pro');
+    expect(resolveChatUsagePlan('trial')).toBe('free');
+    expect(resolveChatUsagePlan(null)).toBe('free');
+    expect(resolveChatUsagePlan('enterprise')).toBe('free');
   });
 
   it('registry plan IDs match PlanId type values', () => {
