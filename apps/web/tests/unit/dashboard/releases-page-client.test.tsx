@@ -36,6 +36,10 @@ vi.mock('@/app/app/(shell)/dashboard/DashboardDataContext', () => ({
   useDashboardData: () => ({ selectedProfile: mockProfile }),
 }));
 
+vi.mock('@/lib/flags/client', () => ({
+  useAppFlag: () => false,
+}));
+
 // Mock query hook — default: loaded with empty data
 const mockQueryResult = {
   data: [] as unknown[],

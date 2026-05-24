@@ -74,7 +74,7 @@ export function ReleasesPageClient() {
         error={error instanceof Error ? error : undefined}
         actionLabel='Retry load'
         onRetry={() => {
-          void refetch();
+          refetch();
         }}
         secondaryAction={{
           label: 'Refresh page',

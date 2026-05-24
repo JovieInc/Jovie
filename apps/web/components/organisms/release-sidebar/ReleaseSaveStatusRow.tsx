@@ -1,6 +1,7 @@
 'use client';
 
 import { Check, Loader2 } from 'lucide-react';
+import type { ReactNode } from 'react';
 
 import { ReleaseActionErrorCard } from './ReleaseActionErrorCard';
 import type { ReleaseSaveFeedback } from './utils';
@@ -22,23 +23,36 @@ export function ReleaseSaveStatusRow({
     return <div className={minHeightClassName} />;
   }
 
-  const statusContent =
-    status === 'saving'
-      ? {
-          icon: (
-            <Loader2
-              className='h-3 w-3 animate-spin text-tertiary-token'
-              aria-hidden='true'
-            />
-          ),
-          label: 'Saving…',
-        }
-      : status === 'saved' && !feedback
-        ? {
-            icon: <Check className='h-3 w-3 text-success' aria-hidden='true' />,
-            label: 'Saved',
-          }
-        : null;
+  let statusContent: ReactNode = null;
+  if (status === 'saving') {
+    statusContent = (
+      <>
+        <Loader2
+          className='h-3 w-3 animate-spin text-tertiary-token'
+          aria-hidden='true'
+        />
+        <span className='text-tertiary-token'>Saving…</span>
+      </>
+    );
+  } else if (status === 'saved' && !feedback) {
+    statusContent = (
+      <>
+        <Check className='h-3 w-3 text-success' aria-hidden='true' />
+        <span className='text-tertiary-token'>Saved</span>
+      </>
+    );
+  }
+  let content = statusContent;
+  if (!content && feedback) {
+    content = (
+      <ReleaseActionErrorCard
+        variant='inline'
+        message={feedback.message}
+        actionLabel={feedback.actionLabel}
+        onRetry={feedback.onRetry}
+      />
+    );
+  }
 
   return (
     <div className={minHeightClassName}>
@@ -47,19 +61,7 @@ export function ReleaseSaveStatusRow({
         role='status'
         aria-live='polite'
       >
-        {statusContent ? (
-          <>
-            {statusContent.icon}
-            <span className='text-tertiary-token'>{statusContent.label}</span>
-          </>
-        ) : feedback ? (
-          <ReleaseActionErrorCard
-            variant='inline'
-            message={feedback.message}
-            actionLabel={feedback.actionLabel}
-            onRetry={feedback.onRetry}
-          />
-        ) : null}
+        {content}
       </div>
     </div>
   );

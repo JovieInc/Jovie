@@ -7,7 +7,11 @@ import { toast } from 'sonner';
 import { DrawerSurfaceCard } from '@/components/molecules/drawer';
 import { LINEAR_SURFACE } from '@/features/dashboard/tokens';
 import { cn } from '@/lib/utils';
-import { ReleaseSaveStatusRow } from './ReleaseSaveStatusRow';
+import {
+  type ReleaseSaveStatus,
+  ReleaseSaveStatusRow,
+} from './ReleaseSaveStatusRow';
+import type { ReleaseSaveFeedback } from './utils';
 import { createSaveFeedback, createVoidRetryHandler } from './utils';
 
 interface ReleaseTargetPlaylistsSectionProps {
@@ -70,6 +74,16 @@ export function ReleaseTargetPlaylistsSection({
   }, [onSave, readOnly, value, releaseId]);
 
   const handleRetry = createVoidRetryHandler(handleBlur);
+  let saveStatus: ReleaseSaveStatus = 'idle';
+  if (isSaving) {
+    saveStatus = 'saving';
+  } else if (saveError) {
+    saveStatus = 'error';
+  }
+  let saveFeedback: ReleaseSaveFeedback | null = null;
+  if (saveError) {
+    saveFeedback = createSaveFeedback(saveError, 'Try again', handleRetry);
+  }
 
   return (
     <DrawerSurfaceCard
@@ -100,12 +114,8 @@ export function ReleaseTargetPlaylistsSection({
         your defaults.
       </p>
       <ReleaseSaveStatusRow
-        status={isSaving ? 'saving' : saveError ? 'error' : 'idle'}
-        feedback={
-          saveError
-            ? createSaveFeedback(saveError, 'Try again', handleRetry)
-            : null
-        }
+        status={saveStatus}
+        feedback={saveFeedback}
         minHeightClassName='min-h-[18px]'
       />
       <Input
