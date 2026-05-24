@@ -265,7 +265,6 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
     columnVisibility,
     rowHeight,
     groupByYear,
-    onGroupByYearChange,
     showTracks,
     onShowTracksChange,
   } = useReleaseTablePreferences();
@@ -966,8 +965,6 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
                   selectedIds={selectedIds}
                   filters={filters}
                   onFiltersChange={setFilters}
-                  groupByYear={groupByYear}
-                  onGroupByYearChange={onGroupByYearChange}
                   releaseView={releaseView}
                   onReleaseViewChange={setReleaseView}
                   searchQuery={searchQuery}
