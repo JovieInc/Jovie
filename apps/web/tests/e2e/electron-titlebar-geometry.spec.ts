@@ -118,6 +118,7 @@ async function assertElectronShellControls(
 test('titlebar DOM has a single sidebar toggle and an empty main-cell drag region', async ({
   page,
 }) => {
+  // Skip outside the explicit dev-auth E2E lane; Electron shell setup needs a bypassed Clerk session.
   test.skip(
     process.env.E2E_USE_TEST_AUTH_BYPASS !== '1',
     'Requires E2E_USE_TEST_AUTH_BYPASS=1'
@@ -178,6 +179,7 @@ test('titlebar DOM has a single sidebar toggle and an empty main-cell drag regio
 test('no duplicate sidebar dock button and titlebar toggle on the same page', async ({
   page,
 }) => {
+  // Skip outside the explicit dev-auth E2E lane; duplicate-control checks need a bypassed Clerk session.
   test.skip(
     process.env.E2E_USE_TEST_AUTH_BYPASS !== '1',
     'Requires E2E_USE_TEST_AUTH_BYPASS=1'
@@ -211,6 +213,7 @@ test('no duplicate sidebar dock button and titlebar toggle on the same page', as
 test('titlebar sidebar-cell width matches CSS sidebar-width token (rail alignment)', async ({
   page,
 }) => {
+  // Skip outside the explicit dev-auth E2E lane; titlebar token checks need a bypassed Clerk session.
   test.skip(
     process.env.E2E_USE_TEST_AUTH_BYPASS !== '1',
     'Requires E2E_USE_TEST_AUTH_BYPASS=1'
@@ -278,6 +281,7 @@ test('titlebar sidebar-cell width matches CSS sidebar-width token (rail alignmen
 test('Electron shell keeps one control contract across chat, calendar, tasks, releases, settings, and admin routes', async ({
   page,
 }) => {
+  // Skip outside the explicit dev-auth E2E lane; cross-route Electron controls need bypassed personas.
   test.skip(
     process.env.E2E_USE_TEST_AUTH_BYPASS !== '1',
     'Requires E2E_USE_TEST_AUTH_BYPASS=1'

@@ -296,6 +296,7 @@ async function assertSlashMenuClearsThreadContent(page: Page) {
 test('chat route renders the Shell V1 app frame when forced on', async ({
   page,
 }) => {
+  // Skip outside the explicit dev-auth E2E lane; this route needs a bypassed Clerk session.
   test.skip(
     process.env.E2E_USE_TEST_AUTH_BYPASS !== '1',
     'Requires E2E_USE_TEST_AUTH_BYPASS=1'
@@ -324,6 +325,7 @@ test('chat route renders the Shell V1 app frame when forced on', async ({
 test('chat route picker opens without moving the shell or composer', async ({
   page,
 }) => {
+  // Skip outside the explicit dev-auth E2E lane; picker geometry needs a bypassed Clerk session.
   test.skip(
     process.env.E2E_USE_TEST_AUTH_BYPASS !== '1',
     'Requires E2E_USE_TEST_AUTH_BYPASS=1'
@@ -369,6 +371,7 @@ test('chat route picker opens without moving the shell or composer', async ({
 test('chat route slash picker clears active transcript content in populated threads', async ({
   page,
 }) => {
+  // Skip outside the explicit dev-auth E2E lane; populated thread fixtures need a bypassed Clerk session.
   test.skip(
     process.env.E2E_USE_TEST_AUTH_BYPASS !== '1',
     'Requires E2E_USE_TEST_AUTH_BYPASS=1'
@@ -427,6 +430,7 @@ test('chat route slash picker clears active transcript content in populated thre
 test('chat composer clears mobile shell tabs on tablet and phone', async ({
   page,
 }) => {
+  // Skip outside the explicit dev-auth E2E lane; mobile shell tabs need a bypassed Clerk session.
   test.skip(
     process.env.E2E_USE_TEST_AUTH_BYPASS !== '1',
     'Requires E2E_USE_TEST_AUTH_BYPASS=1'
