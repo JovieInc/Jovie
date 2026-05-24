@@ -65,7 +65,6 @@ import type { FilterPill } from '@/components/shell/pill-search.types';
 import { ShellDropdown } from '@/components/shell/ShellDropdown';
 import { APP_ROUTES } from '@/constants/routes';
 import { useRegisterHeaderSearch } from '@/contexts/HeaderActionsContext';
-import { useRegisterShellSidebarOverride } from '@/contexts/ShellSidebarOverrideContext';
 import { useBreakpoint } from '@/hooks/useBreakpoint';
 import { SKELETON_ROW_COUNT } from '@/lib/constants/layout';
 import { cn } from '@/lib/utils';
@@ -600,9 +599,11 @@ function LibraryRail({
       asset.providers.map(provider => [provider.key, provider.label] as const)
     )
   );
-  const assetKinds = uniqueSorted(
-    assets.flatMap(asset => asset.assetKinds)
-  ) as LibraryAssetKind[];
+  const assetKinds = (
+    uniqueSorted(
+      assets.flatMap(asset => asset.assetKinds)
+    ) as LibraryAssetKind[]
+  ).filter(kind => kind !== 'providers' || providerKeys.length === 0);
   const counts = {
     releaseTypes: countBy(assets, asset => [asset.releaseType]),
     statuses: countBy(assets, asset => [asset.status]),
@@ -665,7 +666,7 @@ function LibraryRail({
               onClick={onClearFilters}
               className='rounded px-1.5 py-0.5 text-2xs text-tertiary-token transition-colors duration-subtle ease-subtle hover:bg-surface-1 hover:text-primary-token'
             >
-              Clear {activeFilterCount}
+              Clear Filters ({activeFilterCount})
             </button>
           ) : null}
         </div>
@@ -911,6 +912,7 @@ function LibraryToolbar({
   totalCount,
   mobileFiltersOpen,
   onToggleMobileFilters,
+  activeFilterCount,
 }: {
   readonly sort: LibrarySortKey;
   readonly onSort: (sort: LibrarySortKey) => void;
@@ -920,6 +922,7 @@ function LibraryToolbar({
   readonly totalCount: number;
   readonly mobileFiltersOpen: boolean;
   readonly onToggleMobileFilters: () => void;
+  readonly activeFilterCount: number;
 }) {
   return (
     <PageToolbar
@@ -932,11 +935,16 @@ function LibraryToolbar({
       end={
         <>
           <PageToolbarActionButton
-            label='Filters'
+            label={
+              activeFilterCount > 0
+                ? `Show Filters (${activeFilterCount})`
+                : 'Show Filters'
+            }
             icon={<Filter className={PAGE_TOOLBAR_ICON_CLASS} />}
             onClick={onToggleMobileFilters}
             aria-expanded={mobileFiltersOpen}
             ariaPressed={mobileFiltersOpen}
+            tooltipLabel={mobileFiltersOpen ? 'Hide filters' : 'Show filters'}
             className='lg:hidden'
           />
           <SortDropdown sort={sort} onSort={onSort} />
@@ -1885,31 +1893,11 @@ export function LibrarySurface({
     setDrawerOpen(true);
   }
 
-  const sidebarNavigation = useMemo(
-    () => (
-      <LibraryRail
-        assets={effectiveAssets}
-        preset={preset}
-        filters={filters}
-        onPreset={setPreset}
-        onFilters={setFilters}
-        onClearFilters={() => setFilters(emptyFilters())}
-      />
-    ),
-    [effectiveAssets, filters, preset]
-  );
-
-  const sidebarOverride = useMemo(
-    () => ({
-      key: 'library',
-      backHref: APP_ROUTES.CHAT,
-      backLabel: 'Back to App',
-      content: sidebarNavigation,
-    }),
-    [sidebarNavigation]
-  );
-
-  useRegisterShellSidebarOverride(sidebarOverride);
+  const activeFilterCount =
+    filters.statuses.size +
+    filters.releaseTypes.size +
+    filters.assetKinds.size +
+    filters.providers.size;
 
   const headerSearchAdapter = useMemo(
     () =>
@@ -1926,9 +1914,12 @@ export function LibrarySurface({
             hasOptions,
             totalCount: effectiveAssets.length,
             visibleCount: visibleAssets.length,
-            triggerLabel: 'Filter',
+            triggerLabel:
+              pills.length > 0
+                ? `Filter Library (${pills.length})`
+                : 'Filter Library',
             ariaLabel: 'Filter library assets',
-            placeholder: 'Filter library',
+            placeholder: 'Search library',
             allowedFields: ['artist', 'title', 'status', 'has'] as const,
           },
     [
@@ -1975,6 +1966,7 @@ export function LibrarySurface({
           totalCount={effectiveAssets.length}
           mobileFiltersOpen={mobileFiltersOpen}
           onToggleMobileFilters={() => setMobileFiltersOpen(value => !value)}
+          activeFilterCount={activeFilterCount}
         />
       }
     >
