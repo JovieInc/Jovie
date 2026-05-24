@@ -126,7 +126,7 @@ export function ImageAttachmentChip({
         </button>
       </PopoverTrigger>
       <PopoverContent
-        className='w-auto max-w-[520px] p-0 overflow-hidden'
+        className='z-[150] max-h-[var(--radix-popover-content-available-height)] w-auto max-w-[min(520px,calc(100vw-24px))] overflow-hidden rounded-xl border border-(--linear-app-frame-seam) bg-surface-1 p-0 shadow-popover'
         sideOffset={6}
         align='start'
         testId='image-attachment-popover-content'
@@ -146,7 +146,7 @@ export function ImageAttachmentChip({
               alt={label}
               width={480}
               height={480}
-              className='h-auto max-h-[480px] w-auto max-w-[480px] object-contain'
+              className='h-auto max-h-[min(480px,calc(var(--radix-popover-content-available-height,520px)-44px),calc(100vh-12rem))] w-auto max-w-[min(480px,calc(100vw-24px))] object-contain'
               unoptimized
             />
           </div>

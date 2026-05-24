@@ -5,6 +5,19 @@
      5|The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
      6|and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.5.45] - 2026-05-24
+
+> Chat slash-command flyouts and rich chip previews now stay above the transcript, clear active messages, and preserve composer geometry across desktop and mobile shells.
+
+### Fixed
+
+- **Chat slash-command flyout layering (JOV-2566)**: the active thread now reserves scroll clearance when the root slash picker opens, keeps the composer pinned, and prevents the picker from colliding with recent assistant replies, tool status rows, and user bubbles.
+- **Rich chip preview surfaces**: transcript entity chips and image attachment chips now use the chat overlay tier, opaque popover surfaces, viewport-bounded sizing, and safer placement around nearby messages.
+
+### Added
+
+- **Flyout and chip regression coverage**: added Playwright coverage for populated chat threads plus focused unit coverage for slash picker geometry, transcript token chips, image attachment chips, multiline bubbles, and chip popover interaction semantics.
+
 ## [26.5.44] - 2026-05-24
 
 > [internal] Jovie chat now has a Promptfoo baseline eval suite that exercises the production chat runner with synthetic artist fixtures, making support quality, retrieval grounding, tool use, privacy, and onboarding regressions measurable.

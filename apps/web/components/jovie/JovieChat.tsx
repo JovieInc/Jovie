@@ -3,7 +3,7 @@
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { ImagePlus } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
-import { useCallback, useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { JovieMarkElectric } from '@/components/atoms/JovieMarkElectric';
 import { useAppFlag } from '@/lib/flags/client';
 import { SUPPORTED_IMAGE_MIME_TYPES } from '@/lib/images/config';
@@ -28,6 +28,7 @@ import {
 import type { JovieChatProps } from './types';
 
 const VIRTUALIZATION_THRESHOLD = 12;
+const CHAT_PICKER_THREAD_CLEARANCE = 'min(340px, calc(100vh - 12rem))';
 
 function findLastAssistantIndex(
   messages: readonly { id: string; role: string }[]
@@ -54,6 +55,7 @@ export function JovieChat({
   const initialQuerySubmitted = useRef(false);
   const initialSkillApplied = useRef(false);
   const imageFileInputRef = useRef<HTMLInputElement>(null);
+  const [composerPickerOpen, setComposerPickerOpen] = useState(false);
   // Track message IDs that were loaded from persistence to skip entrance animation
   const knownMessageIdsRef = useRef<Set<string>>(new Set());
   const {
@@ -256,6 +258,21 @@ export function JovieChat({
 
   const isStreaming = status === 'streaming';
   const showThreadView = hasMessages;
+  const showBottomComposer = showThreadView;
+  const shouldReservePickerClearance = showBottomComposer && composerPickerOpen;
+  const messageViewportPaddingBottom = shouldReservePickerClearance
+    ? CHAT_PICKER_THREAD_CLEARANCE
+    : undefined;
+
+  useEffect(() => {
+    if (!shouldReservePickerClearance || !isStuckToBottom) return;
+    const frame = requestAnimationFrame(() => {
+      const scrollContainer = scrollContainerRef.current;
+      if (!scrollContainer) return;
+      scrollContainer.scrollTop = scrollContainer.scrollHeight;
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [isStuckToBottom, scrollContainerRef, shouldReservePickerClearance]);
 
   // Show skeleton while fetching existing conversation
   if (isLoadingConversation) {
@@ -306,9 +323,8 @@ export function JovieChat({
     onAddSkill: chipTray.addSkill,
     onAddEntity: chipTray.addEntity,
     profileId,
+    onPickerOpenChange: setComposerPickerOpen,
   } as const;
-
-  const showBottomComposer = showThreadView;
 
   const composerSurface = (
     <div className='mx-auto w-full max-w-[45rem]'>
@@ -348,6 +364,7 @@ export function JovieChat({
         ref={dropZoneRef}
         className='relative flex h-full flex-col bg-(--linear-app-content-surface)'
         data-testid='chat-content'
+        data-picker-open={composerPickerOpen ? 'true' : undefined}
         data-design-v1-chat-entities={
           designV1ChatEntitiesEnabled ? 'true' : undefined
         }
@@ -441,6 +458,7 @@ export function JovieChat({
                           virtualizer.getTotalSize(),
                           scrollContainerRef.current?.clientHeight ?? 0
                         ),
+                        paddingBottom: messageViewportPaddingBottom,
                       }}
                     >
                       {virtualizer.getVirtualItems().map(virtualItem => {
@@ -490,6 +508,9 @@ export function JovieChat({
                     <div
                       ref={totalSizeRef}
                       className='mx-auto flex min-h-full w-full max-w-[44rem] flex-col'
+                      style={{
+                        paddingBottom: messageViewportPaddingBottom,
+                      }}
                     >
                       {messages.map((message, index) => {
                         const isThinking =

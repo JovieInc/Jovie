@@ -1,4 +1,4 @@
-import { screen } from '@testing-library/react';
+import { screen, within } from '@testing-library/react';
 import type { ComponentProps, ReactNode } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import { ChatMessage } from '@/components/jovie/components/ChatMessage';
@@ -10,11 +10,13 @@ vi.mock('motion/react', () => ({
       children,
       initial: _initial,
       animate: _animate,
+      layoutId: _layoutId,
       transition: _transition,
       ...props
     }: ComponentProps<'div'> & {
       initial?: unknown;
       animate?: unknown;
+      layoutId?: unknown;
       transition?: unknown;
     }) => <div {...props}>{children}</div>,
   },
@@ -22,7 +24,27 @@ vi.mock('motion/react', () => ({
 }));
 
 vi.mock('@jovie/ui', () => ({
+  Popover: ({ children }: { children: ReactNode }) => <>{children}</>,
+  PopoverContent: ({
+    children,
+    testId = 'popover-content',
+  }: {
+    children: ReactNode;
+    testId?: string;
+  }) => <div data-testid={testId}>{children}</div>,
+  PopoverTrigger: ({ children }: { children: ReactNode }) => <>{children}</>,
   SimpleTooltip: ({ children }: { children: ReactNode }) => <>{children}</>,
+}));
+
+vi.mock('next/image', () => ({
+  default: ({
+    src,
+    alt,
+    unoptimized: _unoptimized,
+    ...rest
+  }: ComponentProps<'img'> & { unoptimized?: boolean }) => (
+    <img src={src as string} alt={alt ?? ''} {...rest} />
+  ),
 }));
 
 vi.mock('next/dynamic', () => ({
@@ -73,5 +95,46 @@ describe('ChatMessage', () => {
     expect(bubble).toHaveAttribute('data-bubble-shape', 'rectangle');
     expect(bubble.className).toContain('rounded-[18px]');
     expect(bubble.className).toContain('py-2');
+  });
+
+  it('renders multiline user messages as rectangles even under the short text limit', () => {
+    const messageProps = {
+      id: 'user-3',
+      role: 'user' as const,
+      parts: [{ type: 'text' as const, text: 'line one\nline two' }],
+    };
+
+    fastRender(<ChatMessage {...messageProps} />);
+
+    const bubble = screen.getByTestId('chat-user-bubble');
+    expect(bubble).toHaveAttribute('data-bubble-shape', 'rectangle');
+    expect(bubble.className).toContain('rounded-[18px]');
+  });
+
+  it('renders image file parts as compact attachment chips, not large inline image grids', () => {
+    const messageProps = {
+      id: 'user-4',
+      role: 'user' as const,
+      parts: [
+        {
+          type: 'file' as const,
+          mediaType: 'image/png',
+          url: 'https://example.com/cover.png',
+          name: 'cover.png',
+        },
+        { type: 'text' as const, text: 'Use this reference' },
+      ],
+    };
+
+    fastRender(<ChatMessage {...messageProps} />);
+
+    const bubble = screen.getByTestId('chat-user-bubble');
+    expect(screen.getByTestId('image-attachment-chip')).toHaveTextContent(
+      'cover.png'
+    );
+    expect(
+      within(bubble).getByTestId('image-attachment-chip-trigger')
+    ).toHaveAttribute('aria-haspopup', 'dialog');
+    expect(bubble).toHaveAttribute('data-bubble-shape', 'rectangle');
   });
 });

@@ -45,11 +45,13 @@ vi.mock('motion/react', () => ({
       children,
       initial: _initial,
       animate: _animate,
+      layoutId: _layoutId,
       transition: _transition,
       ...props
     }: ComponentProps<'div'> & {
       initial?: unknown;
       animate?: unknown;
+      layoutId?: unknown;
       transition?: unknown;
     }) => <div {...props}>{children}</div>,
     textarea: ({
