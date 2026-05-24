@@ -52,7 +52,7 @@ export const DROPDOWN_SLIDE_ANIMATIONS =
  * Border uses --linear-border-default (slightly more opaque than --linear-border-subtle used by separators)
  */
 export const DROPDOWN_CONTENT_BASE =
-  'z-[90] min-w-[184px] overflow-hidden rounded-(--linear-app-radius-menu) border border-(--linear-border-default) bg-(--linear-bg-surface-0) p-0.5 text-(--linear-text-primary) shadow-(--linear-shadow-card-elevated)';
+  'z-[90] min-w-[184px] overflow-hidden rounded-(--linear-app-radius-menu) border border-(--linear-border-default) bg-(--linear-bg-surface-0) p-1 text-(--linear-text-primary) shadow-(--linear-shadow-card-elevated)';
 
 /**
  * Shadow effect for elevated appearance
@@ -163,13 +163,13 @@ export const selectContentClasses = [
  * Used by: DropdownMenuItem, ContextMenuItem, SelectItem
  */
 export const MENU_ITEM_BASE =
-  'relative flex cursor-default select-none items-center gap-1.5 rounded-(--linear-app-radius-item) px-2 py-1 text-[12.5px] font-[400] leading-4 outline-none ' +
+  'relative flex min-h-8 cursor-default select-none items-center gap-2 rounded-(--linear-app-radius-item) px-2.5 py-1.5 text-[13px] font-[400] leading-5 outline-none ' +
   'transition-colors duration-normal ease-interactive ' +
   'text-(--linear-text-secondary) hover:bg-(--linear-bg-surface-1) hover:text-(--linear-text-primary) ' +
   'data-[highlighted]:bg-(--linear-bg-surface-1) data-[highlighted]:text-(--linear-text-primary) ' +
   'data-[disabled]:pointer-events-none data-[disabled]:opacity-[0.46] ' +
   'focus-visible:outline-none focus-visible:bg-(--linear-bg-surface-1) focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)/35 ' +
-  '[&_svg]:pointer-events-none [&_svg]:h-3 [&_svg]:w-3 [&_svg]:shrink-0 [&_svg]:[stroke-width:1.5] [&_svg]:text-(--linear-text-tertiary) ' +
+  '[&_svg]:pointer-events-none [&_svg]:h-4 [&_svg]:w-4 [&_svg]:shrink-0 [&_svg]:[stroke-width:1.5] [&_svg]:text-(--linear-text-tertiary) ' +
   'hover:[&_svg]:text-(--linear-text-primary) data-[highlighted]:[&_svg]:text-(--linear-text-primary)';
 
 /**
@@ -239,14 +239,14 @@ export const MENU_ITEM_COMPACT_DESTRUCTIVE = MENU_ITEM_DESTRUCTIVE;
  * Menu label styles (group headers)
  */
 export const MENU_LABEL_BASE =
-  'px-2 py-1 text-[11px] font-medium text-(--linear-text-tertiary)';
+  'px-2.5 pb-1 pt-1.5 text-[11px] font-medium text-(--linear-text-tertiary)';
 
 /**
  * Menu separator styles
  * Uses design token for border consistency
  */
 export const MENU_SEPARATOR_BASE =
-  '-mx-0.5 my-px h-px bg-(--linear-border-subtle)';
+  '-mx-1 my-1 h-px bg-(--linear-border-subtle)';
 
 /**
  * Keyboard shortcut indicator styles
