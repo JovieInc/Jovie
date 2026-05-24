@@ -75,11 +75,11 @@ const columnHelper = createColumnHelper<AdminActivityItem>();
 // Column definitions are shared between the live table and its skeleton so that
 // loading and loaded states render identical row geometry (no layout shift when
 // the streamed data arrives).
-const ACTIVITY_COLUMNS: ColumnDef<AdminActivityItem, any>[] = [
+const ACTIVITY_COLUMNS = [
   // User column
   columnHelper.accessor('user', {
     id: 'user',
-    header: 'User',
+    header: 'Actor',
     cell: renderUserCell,
     size: 200,
   }),
@@ -94,7 +94,7 @@ const ACTIVITY_COLUMNS: ColumnDef<AdminActivityItem, any>[] = [
   // Timestamp column
   columnHelper.accessor('timestamp', {
     id: 'timestamp',
-    header: 'Timestamp',
+    header: 'Time',
     cell: renderTimestampCell,
     size: 180,
     minSize: 150,
@@ -120,7 +120,11 @@ const ACTIVITY_SKELETON_COLUMN_CONFIG = [
 
 const ACTIVITY_SUBHEADER = (
   <AdminTableSubheader
-    start={<p className={PAGE_TOOLBAR_META_TEXT_CLASS}>Last 7 days.</p>}
+    start={
+      <p className={PAGE_TOOLBAR_META_TEXT_CLASS}>
+        50 most recent admin and system events
+      </p>
+    }
   />
 );
 
@@ -132,8 +136,8 @@ export function ActivityTableUnified({
 }: Readonly<ActivityTableUnifiedProps>) {
   // Bind the shared column definitions through useMemo so React treats the
   // reference as stable across renders.
-  const columns = useMemo<ColumnDef<AdminActivityItem, any>[]>(
-    () => ACTIVITY_COLUMNS,
+  const columns = useMemo(
+    () => ACTIVITY_COLUMNS as ColumnDef<AdminActivityItem, unknown>[],
     []
   );
 
