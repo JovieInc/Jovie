@@ -8,7 +8,7 @@ import { DrawerSurfaceCard } from '@/components/molecules/drawer';
 import { LINEAR_SURFACE } from '@/features/dashboard/tokens';
 import { cn } from '@/lib/utils';
 import { ReleaseSaveStatusRow } from './ReleaseSaveStatusRow';
-import { createVoidRetryHandler } from './utils';
+import { createSaveFeedback, createVoidRetryHandler } from './utils';
 
 interface ReleaseTargetPlaylistsSectionProps {
   readonly releaseId: string;
@@ -103,11 +103,7 @@ export function ReleaseTargetPlaylistsSection({
         status={isSaving ? 'saving' : saveError ? 'error' : 'idle'}
         feedback={
           saveError
-            ? {
-                message: saveError,
-                actionLabel: 'Try again',
-                onRetry: handleRetry,
-              }
+            ? createSaveFeedback(saveError, 'Try again', handleRetry)
             : null
         }
         minHeightClassName='min-h-[18px]'

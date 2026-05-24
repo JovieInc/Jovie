@@ -21,11 +21,9 @@ import { DrawerButton, DrawerSurfaceCard } from '@/components/molecules/drawer';
 import { LINEAR_SURFACE } from '@/features/dashboard/tokens';
 import { LYRICS_FORMAT_LABELS, type LyricsFormat } from '@/lib/lyrics/types';
 import { cn } from '@/lib/utils';
-import {
-  type ReleaseSaveFeedback,
-  ReleaseSaveStatusRow,
-} from './ReleaseSaveStatusRow';
-import { createVoidRetryHandler } from './utils';
+import { ReleaseSaveStatusRow } from './ReleaseSaveStatusRow';
+import type { ReleaseSaveFeedback } from './utils';
+import { createSaveFeedback, createVoidRetryHandler } from './utils';
 
 /** Auto-save debounce delay in milliseconds */
 const AUTO_SAVE_DELAY_MS = 1500;
@@ -121,11 +119,13 @@ export function ReleaseLyricsSection({
     } catch {
       setSaveStatus('error');
       const message = 'Failed to save lyrics. Your draft is still here.';
-      setActionFeedback({
-        message,
-        actionLabel: 'Retry save',
-        onRetry: createVoidRetryHandler(performAutoSave),
-      });
+      setActionFeedback(
+        createSaveFeedback(
+          message,
+          'Retry save',
+          createVoidRetryHandler(performAutoSave)
+        )
+      );
       toast.error(message);
     }
   }, [onSaveLyrics]);
@@ -176,11 +176,13 @@ export function ReleaseLyricsSection({
       } catch {
         const message =
           'Unable to format lyrics right now. Your draft is still here.';
-        setActionFeedback({
-          message,
-          actionLabel: 'Retry format',
-          onRetry: createVoidRetryHandler(() => handleFormat(format)),
-        });
+        setActionFeedback(
+          createSaveFeedback(
+            message,
+            'Retry format',
+            createVoidRetryHandler(() => handleFormat(format))
+          )
+        );
         toast.error(message);
       } finally {
         setIsFormatting(false);

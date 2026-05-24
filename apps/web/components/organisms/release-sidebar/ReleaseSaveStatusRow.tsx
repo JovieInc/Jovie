@@ -3,14 +3,9 @@
 import { Check, Loader2 } from 'lucide-react';
 
 import { ReleaseActionErrorCard } from './ReleaseActionErrorCard';
+import type { ReleaseSaveFeedback } from './utils';
 
 export type ReleaseSaveStatus = 'idle' | 'saving' | 'saved' | 'error';
-
-export interface ReleaseSaveFeedback {
-  readonly message: string;
-  readonly actionLabel: string;
-  readonly onRetry: () => void;
-}
 
 interface ReleaseSaveStatusRowProps {
   readonly status: ReleaseSaveStatus;
@@ -27,6 +22,24 @@ export function ReleaseSaveStatusRow({
     return <div className={minHeightClassName} />;
   }
 
+  const statusContent =
+    status === 'saving'
+      ? {
+          icon: (
+            <Loader2
+              className='h-3 w-3 animate-spin text-tertiary-token'
+              aria-hidden='true'
+            />
+          ),
+          label: 'Saving…',
+        }
+      : status === 'saved' && !feedback
+        ? {
+            icon: <Check className='h-3 w-3 text-success' aria-hidden='true' />,
+            label: 'Saved',
+          }
+        : null;
+
   return (
     <div className={minHeightClassName}>
       <div
@@ -34,18 +47,10 @@ export function ReleaseSaveStatusRow({
         role='status'
         aria-live='polite'
       >
-        {status === 'saving' ? (
+        {statusContent ? (
           <>
-            <Loader2
-              className='h-3 w-3 animate-spin text-tertiary-token'
-              aria-hidden='true'
-            />
-            <span className='text-tertiary-token'>Saving…</span>
-          </>
-        ) : status === 'saved' && !feedback ? (
-          <>
-            <Check className='h-3 w-3 text-success' aria-hidden='true' />
-            <span className='text-tertiary-token'>Saved</span>
+            {statusContent.icon}
+            <span className='text-tertiary-token'>{statusContent.label}</span>
           </>
         ) : feedback ? (
           <ReleaseActionErrorCard
