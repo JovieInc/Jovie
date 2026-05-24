@@ -186,6 +186,7 @@ export function reduceChatTimeline(
         lastEventAt: now,
       };
     case 'conversation.load.succeeded':
+    case 'conversation.refetch.succeeded':
       return mergeServerMessages(state, event.messages, {
         type: event.type,
         conversationId: event.conversationId,
@@ -198,13 +199,6 @@ export function reduceChatTimeline(
         phase: state.messages.length > 0 ? 'ready' : 'error',
         lastEventAt: now,
       };
-    case 'conversation.refetch.succeeded':
-      return mergeServerMessages(state, event.messages, {
-        type: event.type,
-        conversationId: event.conversationId,
-        receivedAt: event.receivedAt ?? now,
-        phase: 'ready',
-      });
     case 'conversation.refetch.failed':
       return { ...state, lastEventAt: now };
     case 'message.send.started':

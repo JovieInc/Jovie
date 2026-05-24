@@ -102,6 +102,42 @@ function isValidEmail(value: string): boolean {
   return true;
 }
 
+function getSignUpUrl(
+  params: URLSearchParams,
+  options: {
+    readonly mobileReturnRoute: string | null;
+    readonly desktopReturnRoute: string | null;
+  }
+): string {
+  if (options.mobileReturnRoute) {
+    return buildAuthRouteUrlWithMobileReturn(APP_ROUTES.SIGNUP, params);
+  }
+
+  if (options.desktopReturnRoute) {
+    return buildAuthRouteUrlWithDesktopReturn(APP_ROUTES.SIGNUP, params);
+  }
+
+  return buildAuthRouteUrl(APP_ROUTES.SIGNUP, params);
+}
+
+function getFallbackRedirectUrl(
+  params: URLSearchParams,
+  options: {
+    readonly mobileReturnRoute: string | null;
+    readonly desktopReturnRoute: string | null;
+  }
+): string | undefined {
+  if (options.mobileReturnRoute) {
+    return buildMobileAuthReturnPath(options.mobileReturnRoute);
+  }
+
+  if (options.desktopReturnRoute) {
+    return buildDesktopAuthReturnPath(options.desktopReturnRoute);
+  }
+
+  return getCentralAuthCallbackPath(params) ?? undefined;
+}
+
 export function SignInPageClient() {
   const searchParams = useSearchParams();
   const email = searchParams.get('email')?.trim() ?? '';
@@ -112,16 +148,12 @@ export function SignInPageClient() {
   const mobileReturnRoute = sanitizeMobileReturnRoute(
     searchParams.get('mobile_return')
   );
-  const signUpUrl = mobileReturnRoute
-    ? buildAuthRouteUrlWithMobileReturn(APP_ROUTES.SIGNUP, searchParams)
-    : desktopReturnRoute
-      ? buildAuthRouteUrlWithDesktopReturn(APP_ROUTES.SIGNUP, searchParams)
-      : buildAuthRouteUrl(APP_ROUTES.SIGNUP, searchParams);
-  const fallbackRedirectUrl = mobileReturnRoute
-    ? buildMobileAuthReturnPath(mobileReturnRoute)
-    : desktopReturnRoute
-      ? buildDesktopAuthReturnPath(desktopReturnRoute)
-      : (getCentralAuthCallbackPath(searchParams) ?? undefined);
+  const authReturnRoutes = { mobileReturnRoute, desktopReturnRoute };
+  const signUpUrl = getSignUpUrl(searchParams, authReturnRoutes);
+  const fallbackRedirectUrl = getFallbackRedirectUrl(
+    searchParams,
+    authReturnRoutes
+  );
   const initialValues = useMemo(
     () => (isValidEmail(email) ? { emailAddress: email } : undefined),
     [email]

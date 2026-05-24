@@ -544,12 +544,14 @@ function createE2EDashboardCoreData(clerkUserId: string): CoreData {
     updatedAt: now,
   } as CreatorProfile;
 
+  const fallbackUser = {
+    id: userId,
+    email: 'e2e-chat-smoke@example.test',
+    clerkUserId,
+  };
+
   return {
-    user: { id: userId, email: 'e2e-chat-smoke@example.test', clerkUserId } as {
-      id: string;
-      email: string;
-      clerkUserId: string;
-    },
+    user: fallbackUser,
     creatorProfiles: [profile],
     selectedProfile: profile,
     avatarQuality: UNKNOWN_AVATAR_QUALITY,
