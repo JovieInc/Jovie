@@ -507,8 +507,13 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
             }}
             className={cn(
               'overflow-hidden border border-[color-mix(in_oklab,var(--linear-app-frame-seam)_84%,transparent)] bg-[linear-gradient(180deg,rgba(255,255,255,0.04)_0%,rgba(255,255,255,0.012)_100%),var(--linear-app-content-surface)] text-primary-token shadow-none',
+              isHero &&
+                'bg-[color-mix(in_oklab,var(--linear-app-content-surface)_88%,black_12%)] shadow-[0_18px_68px_-34px_rgba(0,0,0,0.96),inset_0_1px_0_rgba(255,255,255,0.08)]',
               isExpanded &&
                 'border-[color-mix(in_oklab,var(--linear-border-focus)_46%,var(--linear-app-frame-seam))] bg-[linear-gradient(180deg,rgba(255,255,255,0.052)_0%,rgba(255,255,255,0.016)_100%),var(--linear-app-content-surface)]',
+              isHero &&
+                isExpanded &&
+                'bg-[color-mix(in_oklab,var(--linear-app-content-surface)_82%,white_6%)]',
               'outline-none ring-0 focus-within:border-[color-mix(in_oklab,var(--linear-border-focus)_78%,transparent)] focus-within:ring-1 focus-within:ring-[color-mix(in_oklab,var(--linear-border-focus)_42%,transparent)] focus-within:outline-none',
               isOverLimit && 'border-error',
               showEntitySurface && !isStacked ? 'flex' : 'flex flex-col'
@@ -822,6 +827,18 @@ function InputRow({
         )}
       >
         <div ref={hiddenDivRef} style={HIDDEN_DIV_STYLES} aria-hidden />
+        {useHeroPill && hasAttachButton && onImageAttach ? (
+          <ComposerAttachButton
+            isImageProcessing={isImageProcessing}
+            isLoading={isLoading}
+            isSubmitting={isSubmitting}
+            disabled={attachDisabledForPicker}
+            plusMenuOpen={plusMenuOpen}
+            onOpenChange={setPlusMenuOpen}
+            onMouseDown={handlePreserveFocus}
+            onImageAttach={onImageAttach}
+          />
+        ) : null}
         <div
           data-testid='chat-input-inline-field'
           className={cn(
@@ -895,7 +912,7 @@ function InputRow({
           )}
         >
           <div className='flex min-w-0 items-center gap-2'>
-            {hasAttachButton && onImageAttach ? (
+            {!useHeroPill && hasAttachButton && onImageAttach ? (
               <ComposerAttachButton
                 isImageProcessing={isImageProcessing}
                 isLoading={isLoading}

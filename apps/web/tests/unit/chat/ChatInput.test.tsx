@@ -262,6 +262,28 @@ describe('ChatInput', () => {
     }
   });
 
+  it('keeps the hero attach button ahead of the input field', () => {
+    fastRender(
+      withProviders(
+        <ChatInput
+          {...baseProps}
+          value=''
+          variant='hero'
+          onImageAttach={vi.fn()}
+        />
+      )
+    );
+
+    const attachButton = screen.getByRole('button', {
+      name: /attachment options/i,
+    });
+    const inlineField = screen.getByTestId('chat-input-inline-field');
+
+    expect(attachButton.compareDocumentPosition(inlineField)).toBe(
+      Node.DOCUMENT_POSITION_FOLLOWING
+    );
+  });
+
   it('renders the larger hero composer geometry for the empty state', () => {
     fastRender(
       withProviders(
