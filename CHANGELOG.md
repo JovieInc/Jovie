@@ -5,6 +5,20 @@
      5|The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
      6|and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.5.43] - 2026-05-24
+
+> The Mac Electron auth handoff now fails closed on callback replay and keeps the browser-open retry controls bounded.
+
+### Changed
+
+- **Electron auth handoff window**: extracted the handoff window bounds and removed the indirect `showWindow` path when foregrounding the auth handoff window.
+
+### Fixed
+
+- **Native auth callback replay hardening**: `/auth/callback` now consumes the validated auth state before creating the native exchange code, so replay attempts fail closed and cannot leave auth state alive after exchange creation.
+- **Desktop auth browser retry state**: `Continue in browser` is disabled only while an open attempt is pending, then becomes retryable after success, failure, or timeout.
+- **Desktop auth bridge errors**: explicit IPC failure reasons now reach the renderer instead of being masked by a browser fallback.
+
 ## [26.5.42] - 2026-05-24
 
 > The Mac Electron app now keeps browser sign-in in a dedicated handoff window, returns through the `jovie://` protocol, and avoids auth-route cookie banner noise.
