@@ -259,9 +259,15 @@ export const ContactDetailSidebar = memo(function ContactDetailSidebar({
               <DrawerHero
                 title={contactDisplayName}
                 subtitle={roleLabel}
+                stableLayout
+                titleLineClamp={1}
+                subtitleLineClamp={1}
+                reserveSubtitleSlot
+                reserveMetaSlot
+                metaOverflow='scroll'
                 meta={
                   territorySummary ? (
-                    <div className='flex flex-wrap items-center gap-1.5 text-2xs text-tertiary-token'>
+                    <div className='flex items-center gap-1.5 text-2xs text-tertiary-token'>
                       <Badge
                         size='sm'
                         className='rounded-md border border-subtle bg-surface-0 px-1.5 text-3xs text-secondary-token'

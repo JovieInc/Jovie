@@ -20,16 +20,24 @@ export interface DrawerAnalyticsSummaryCardProps {
   readonly errorMessage?: string;
   readonly testId?: string;
   readonly variant?: 'card' | 'flat';
+  readonly stableLayout?: boolean;
+  readonly reserveFooterSlot?: boolean;
+  readonly metricSlotCount?: 1 | 2;
 }
 
 const METRIC_TILE_CLASSNAME = 'px-3 py-2.5';
+const STABLE_ANALYTICS_BODY_CLASSNAME = 'min-h-[106px]';
+const STABLE_ANALYTICS_FOOTER_CLASSNAME = 'min-h-[40px]';
 
 function MetricTile({
   label,
   value,
   hint,
   id,
-}: Readonly<DrawerAnalyticsSummaryMetric>) {
+  reserveHint = false,
+}: Readonly<DrawerAnalyticsSummaryMetric> & {
+  readonly reserveHint?: boolean;
+}) {
   return (
     <div
       className={METRIC_TILE_CLASSNAME}
@@ -44,8 +52,14 @@ function MetricTile({
       >
         {value}
       </p>
-      {hint ? (
-        <p className='mt-1 text-[10px] leading-[13px] text-tertiary-token'>
+      {hint || reserveHint ? (
+        <p
+          aria-hidden={hint ? undefined : true}
+          className={cn(
+            'mt-1 min-h-[13px] text-[10px] leading-[13px] text-tertiary-token',
+            !hint && 'invisible'
+          )}
+        >
           {hint}
         </p>
       ) : null}
@@ -63,6 +77,97 @@ function LoadingMetricTile() {
   );
 }
 
+function DrawerAnalyticsSummaryBody({
+  state,
+  metrics,
+  emptyMessage,
+  errorMessage,
+  gridClassName,
+  loadingMetricKeys,
+  stableLayout,
+}: Readonly<{
+  state: DrawerAnalyticsSummaryCardProps['state'];
+  metrics: readonly DrawerAnalyticsSummaryMetric[];
+  emptyMessage?: string;
+  errorMessage: string;
+  gridClassName: string;
+  loadingMetricKeys: readonly string[];
+  stableLayout: boolean;
+}>) {
+  if (state === 'loading') {
+    return (
+      <output
+        aria-label='Loading analytics'
+        className={cn('grid gap-2.5', gridClassName)}
+      >
+        {loadingMetricKeys.map(metricKey => (
+          <LoadingMetricTile key={metricKey} />
+        ))}
+      </output>
+    );
+  }
+
+  if (state === 'error') {
+    return (
+      <div className='flex min-h-[72px] items-center'>
+        <p className='text-xs leading-[18px] tracking-[0.01em] text-secondary-token'>
+          {errorMessage}
+        </p>
+      </div>
+    );
+  }
+
+  if (metrics.length > 0) {
+    return (
+      <div className={cn('grid gap-2.5', gridClassName)}>
+        {metrics.map(metric => (
+          <MetricTile key={metric.id} {...metric} reserveHint={stableLayout} />
+        ))}
+      </div>
+    );
+  }
+
+  if (emptyMessage) {
+    return (
+      <div className='flex min-h-[72px] items-center'>
+        <p className='text-xs leading-[18px] tracking-[0.01em] text-secondary-token'>
+          {emptyMessage}
+        </p>
+      </div>
+    );
+  }
+
+  return null;
+}
+
+function DrawerAnalyticsSummaryFooter({
+  footer,
+  reserveFooterSlot,
+  testId,
+}: Readonly<{
+  footer?: ReactNode;
+  reserveFooterSlot: boolean;
+  testId?: string;
+}>) {
+  if (!footer && !reserveFooterSlot) {
+    return null;
+  }
+
+  return (
+    <div
+      aria-hidden={footer ? undefined : true}
+      data-testid={testId ? `${testId}-footer` : undefined}
+      className={cn(
+        'px-3 pb-3',
+        reserveFooterSlot && STABLE_ANALYTICS_FOOTER_CLASSNAME,
+        !footer && 'invisible'
+      )}
+    >
+      {footer ?? '\u00a0'}
+    </div>
+  );
+}
+
 export function DrawerAnalyticsSummaryCard({
   metrics,
   state,
@@ -72,8 +177,12 @@ export function DrawerAnalyticsSummaryCard({
   errorMessage = 'Analytics unavailable',
   testId,
   variant = 'card',
+  stableLayout = false,
+  reserveFooterSlot = false,
+  metricSlotCount,
 }: Readonly<DrawerAnalyticsSummaryCardProps>) {
-  const tileCount = metrics.length > 0 ? metrics.length : 2;
+  const tileCount =
+    metricSlotCount ?? (metrics.length > 0 ? metrics.length : 2);
   const gridClassName = tileCount === 1 ? 'grid-cols-1' : 'grid-cols-2';
   const isBusy = dimmed || state === 'loading';
   const loadingMetricKeys = Array.from(
@@ -90,48 +199,33 @@ export function DrawerAnalyticsSummaryCard({
     >
       <div
         className={cn(
-          'transition-opacity duration-150',
+          'transition-opacity duration-subtle',
           dimmed && 'opacity-60'
         )}
       >
-        <div className='space-y-3 px-3 py-3'>
-          {state === 'loading' ? (
-            <output
-              aria-label='Loading analytics'
-              className={cn('grid gap-2.5', gridClassName)}
-            >
-              {loadingMetricKeys.map(metricKey => (
-                <LoadingMetricTile key={metricKey} />
-              ))}
-            </output>
-          ) : null}
-
-          {state === 'error' ? (
-            <div className='flex min-h-[72px] items-center'>
-              <p className='text-xs leading-[18px] tracking-[0.01em] text-secondary-token'>
-                {errorMessage}
-              </p>
-            </div>
-          ) : null}
-
-          {state === 'ready' && metrics.length > 0 ? (
-            <div className={cn('grid gap-2.5', gridClassName)}>
-              {metrics.map(metric => (
-                <MetricTile key={metric.id} {...metric} />
-              ))}
-            </div>
-          ) : null}
-
-          {state === 'ready' && metrics.length === 0 && emptyMessage ? (
-            <div className='flex min-h-[72px] items-center'>
-              <p className='text-xs leading-[18px] tracking-[0.01em] text-secondary-token'>
-                {emptyMessage}
-              </p>
-            </div>
-          ) : null}
+        <div
+          data-testid={testId ? `${testId}-body` : undefined}
+          className={cn(
+            'space-y-3 px-3 py-3',
+            stableLayout && STABLE_ANALYTICS_BODY_CLASSNAME
+          )}
+        >
+          <DrawerAnalyticsSummaryBody
+            state={state}
+            metrics={metrics}
+            emptyMessage={emptyMessage}
+            errorMessage={errorMessage}
+            gridClassName={gridClassName}
+            loadingMetricKeys={loadingMetricKeys}
+            stableLayout={stableLayout}
+          />
         </div>
 
-        {footer ? <div className='px-3 pb-3'>{footer}</div> : null}
+        <DrawerAnalyticsSummaryFooter
+          footer={footer}
+          reserveFooterSlot={reserveFooterSlot}
+          testId={testId}
+        />
       </div>
     </DrawerSurfaceCard>
   );

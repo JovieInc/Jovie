@@ -292,6 +292,9 @@ export function ReleaseSmartLinkAnalytics({
       errorMessage='Analytics unavailable'
       testId='release-smart-link-analytics'
       variant={variant}
+      stableLayout
+      reserveFooterSlot
+      metricSlotCount={2}
       footer={
         release.smartLinkPath ? (
           <ReleaseSmartLinkControl release={release} artistName={artistName} />

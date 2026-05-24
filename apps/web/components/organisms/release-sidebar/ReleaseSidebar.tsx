@@ -346,6 +346,12 @@ function ReleaseEntityHeader({
         ) : null}
         <DrawerHero
           title={release.title}
+          stableLayout
+          titleLineClamp={2}
+          subtitleLineClamp={2}
+          reserveSubtitleSlot
+          reserveMetaSlot
+          metaOverflow='scroll'
           subtitle={
             artistLine ? (
               <span className='line-clamp-2 block'>{artistLine}</span>

@@ -85,6 +85,13 @@ export {
   SocialIcon,
 } from './SocialIcon';
 export { Spacer } from './Spacer';
+export {
+  STABLE_HEADER_LINE_CLAMP_CLASSNAME,
+  STABLE_HEADER_TITLE_HEIGHT_CLASSNAME,
+  StableHeaderChipRail,
+  type StableHeaderLineCount,
+  StableHeaderTextSlot,
+} from './StableHeaderSlots';
 export type { StatusBadgeProps } from './StatusBadge';
 export { StatusBadge } from './StatusBadge';
 export type { SwipeToRevealProps } from './SwipeToReveal';

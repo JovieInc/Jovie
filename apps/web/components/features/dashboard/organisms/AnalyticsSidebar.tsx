@@ -321,7 +321,9 @@ export function AnalyticsSidebarView({
                   triggerClassName='flex-1'
                   aria-label='Analytics time range'
                 />
-              ) : null}
+              ) : (
+                <div aria-hidden='true' className='h-7 invisible' />
+              )}
             </div>
           </div>
         </DrawerSurfaceCard>

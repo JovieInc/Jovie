@@ -13,6 +13,19 @@ describe('DrawerHero', () => {
     expect(screen.getByText('Bahamas')).toBeInTheDocument();
   });
 
+  it('does not clamp the subtitle by default outside stable layout', () => {
+    render(<DrawerHero title='Lost in the Light' subtitle='Bahamas' />);
+    expect(screen.getByText('Bahamas')).not.toHaveClass('line-clamp-1');
+  });
+
+  it('uses truncate for one-line stable subtitles without changing child layout display', () => {
+    render(
+      <DrawerHero title='Lost in the Light' subtitle='Bahamas' stableLayout />
+    );
+    expect(screen.getByText('Bahamas')).toHaveClass('truncate');
+    expect(screen.getByText('Bahamas')).not.toHaveClass('line-clamp-1');
+  });
+
   it('renders the menu button only when onMenu is provided', () => {
     const a = render(<DrawerHero title='Test' />);
     expect(a.queryByLabelText('Drawer actions')).toBeNull();
@@ -57,5 +70,40 @@ describe('DrawerHero', () => {
     expect(screen.getByTestId('status')).toBeInTheDocument();
     expect(screen.getByTestId('meta')).toBeInTheDocument();
     expect(screen.getByTestId('trailing')).toBeInTheDocument();
+  });
+
+  it('reserves stable subtitle and metadata slots when optional data is missing', () => {
+    render(<DrawerHero title='Test' stableLayout />);
+
+    expect(screen.getByRole('heading', { name: 'Test' })).toHaveClass(
+      'line-clamp-2',
+      'min-h-[44px]'
+    );
+    expect(screen.getByTestId('drawer-hero-subtitle-slot')).toHaveClass(
+      'invisible',
+      'min-h-[16px]'
+    );
+    expect(screen.getByTestId('drawer-hero-meta-slot')).toHaveClass(
+      'invisible'
+    );
+  });
+
+  it('keeps stable metadata in a single horizontal rail', () => {
+    render(
+      <DrawerHero
+        title='Test'
+        stableLayout
+        meta={
+          <>
+            <span>Scheduled</span>
+            <span>Single</span>
+            <span>Spotify</span>
+          </>
+        }
+      />
+    );
+
+    const rail = screen.getByTestId('drawer-hero-meta-slot').firstElementChild;
+    expect(rail).toHaveClass('overflow-x-auto', 'whitespace-nowrap');
   });
 });
