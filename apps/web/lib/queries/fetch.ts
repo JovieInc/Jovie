@@ -86,6 +86,47 @@ async function extractClientErrorMessage(response: Response): Promise<{
   }
 }
 
+function getRequestHeaders(
+  url: string,
+  fetchOptions: RequestInit
+): HeadersInit | undefined {
+  if (!shouldAttachCsrfHeader(url, fetchOptions.method)) {
+    return fetchOptions.headers;
+  }
+
+  const csrfToken = getBrowserCsrfToken();
+  if (!csrfToken) {
+    return fetchOptions.headers;
+  }
+
+  const csrfHeaders = new Headers(fetchOptions.headers);
+  if (!csrfHeaders.has(CSRF_HEADER_NAME)) {
+    csrfHeaders.set(CSRF_HEADER_NAME, csrfToken);
+  }
+  return csrfHeaders;
+}
+
+async function throwFetchErrorForResponse(response: Response): Promise<never> {
+  let message = getFetchErrorMessage(response);
+  let parsedBody: Record<string, unknown> | undefined;
+
+  if (response.status >= 400 && response.status < 500) {
+    const extracted = await extractClientErrorMessage(response);
+    if (extracted.message) message = extracted.message;
+    parsedBody = extracted.parsedBody;
+  }
+
+  throw new FetchError(message, response.status, response, parsedBody);
+}
+
+function normalizeFetchError(error: unknown): never {
+  if (error instanceof FetchError) throw error;
+  if (error instanceof Error && error.name === 'AbortError') {
+    throw new FetchError('Request timeout', 408);
+  }
+  throw error;
+}
+
 export async function fetchWithTimeoutResponse(
   url: string,
   options: FetchOptions = {}
@@ -97,18 +138,7 @@ export async function fetchWithTimeoutResponse(
   linkSignal(controller, externalSignal ?? undefined);
 
   try {
-    let headers = fetchOptions.headers;
-    if (shouldAttachCsrfHeader(url, fetchOptions.method)) {
-      const csrfToken = getBrowserCsrfToken();
-      if (csrfToken) {
-        const csrfHeaders = new Headers(fetchOptions.headers);
-        if (!csrfHeaders.has(CSRF_HEADER_NAME)) {
-          csrfHeaders.set(CSRF_HEADER_NAME, csrfToken);
-          headers = csrfHeaders;
-        }
-      }
-    }
-
+    const headers = getRequestHeaders(url, fetchOptions);
     const requestInit: RequestInit = {
       ...fetchOptions,
       signal: controller.signal,
@@ -120,25 +150,12 @@ export async function fetchWithTimeoutResponse(
     const response = await fetch(url, requestInit);
 
     if (!response.ok) {
-      let message = getFetchErrorMessage(response);
-      let parsedBody: Record<string, unknown> | undefined;
-
-      if (response.status >= 400 && response.status < 500) {
-        const extracted = await extractClientErrorMessage(response);
-        if (extracted.message) message = extracted.message;
-        parsedBody = extracted.parsedBody;
-      }
-
-      throw new FetchError(message, response.status, response, parsedBody);
+      await throwFetchErrorForResponse(response);
     }
 
     return response;
   } catch (error) {
-    if (error instanceof FetchError) throw error;
-    if (error instanceof Error && error.name === 'AbortError') {
-      throw new FetchError('Request timeout', 408);
-    }
-    throw error;
+    normalizeFetchError(error);
   } finally {
     clearTimeout(timeoutId);
   }

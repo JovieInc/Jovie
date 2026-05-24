@@ -20,7 +20,7 @@ function AuthReturnContent() {
   );
 
   useEffect(() => {
-    window.location.href = deepLink;
+    globalThis.location.href = deepLink;
   }, [deepLink]);
 
   return (
