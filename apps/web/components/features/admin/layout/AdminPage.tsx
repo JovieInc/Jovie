@@ -29,8 +29,7 @@ export interface AdminPageProps<
   /**
    * Hero slot renders flush above the first section, no card wrapper. Use for
    * "default alive" metrics (MRR, paying customers, runway, etc.) that should
-   * lead the page. When `hero` and `tabs` are both provided, the tabs surface
-   * renders headerless to avoid stacking competing titles.
+   * lead the page.
    */
   readonly hero?: ReactNode;
   readonly tabs?: AdminPageTabsConfig<TPrimary, TSecondary>;
@@ -49,9 +48,9 @@ export interface AdminPageProps<
  * - Flat page header (title + description + actions), no `ContentSurfaceCard`
  *   wrapper — the route already lives inside the dashboard shell.
  * - Optional `hero` slot directly under the header for primary metrics.
- * - Optional `tabs` slot that delegates to `WorkspaceTabsSurface`. When `hero`
- *   is also present, the surface's title/description is suppressed
- *   (`headerless={true}`).
+ * - Optional `tabs` slot that delegates to `WorkspaceTabsSurface`. The parent
+ *   header owns the route title/description, so the tabs surface renders
+ *   headerless to avoid duplicate page titles.
  * - `space-y-6` outer rhythm matching the canonical dashboard.
  *
  * Use this for new admin pages. Existing pages can migrate incrementally — the
@@ -71,7 +70,7 @@ export function AdminPage<
   children,
   className,
 }: Readonly<AdminPageProps<TPrimary, TSecondary>>) {
-  const headerless = Boolean(hero);
+  const tabsHeaderless = Boolean(tabs);
 
   return (
     <PageShell>
@@ -106,7 +105,7 @@ export function AdminPage<
               secondaryValue={tabs.secondaryValue}
               secondaryOptions={tabs.secondaryOptions}
               clearOnPrimaryChange={tabs.clearOnPrimaryChange}
-              headerless={headerless}
+              headerless={tabsHeaderless}
             >
               <div className='space-y-4' data-testid={viewTestId}>
                 {children}

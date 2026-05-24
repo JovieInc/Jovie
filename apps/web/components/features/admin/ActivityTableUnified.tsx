@@ -79,7 +79,7 @@ const ACTIVITY_COLUMNS: ColumnDef<AdminActivityItem, any>[] = [
   // User column
   columnHelper.accessor('user', {
     id: 'user',
-    header: 'User',
+    header: 'Actor',
     cell: renderUserCell,
     size: 200,
   }),
@@ -94,7 +94,7 @@ const ACTIVITY_COLUMNS: ColumnDef<AdminActivityItem, any>[] = [
   // Timestamp column
   columnHelper.accessor('timestamp', {
     id: 'timestamp',
-    header: 'Timestamp',
+    header: 'Time',
     cell: renderTimestampCell,
     size: 180,
     minSize: 150,
@@ -120,7 +120,11 @@ const ACTIVITY_SKELETON_COLUMN_CONFIG = [
 
 const ACTIVITY_SUBHEADER = (
   <AdminTableSubheader
-    start={<p className={PAGE_TOOLBAR_META_TEXT_CLASS}>Last 7 days.</p>}
+    start={
+      <p className={PAGE_TOOLBAR_META_TEXT_CLASS}>
+        50 most recent admin and system events
+      </p>
+    }
   />
 );
 
