@@ -44,6 +44,9 @@ const SAFE_DIRECTORIES = [TEMP_DIR, process.cwd()].map(d => {
 });
 
 export function validateReadPath(filePath: string): void {
+  if (path.normalize(filePath).split(path.sep).includes('..')) {
+    throw new Error(`Path must be within: ${SAFE_DIRECTORIES.join(', ')}`);
+  }
   // Always resolve to absolute first (fixes relative path symlink bypass)
   const resolved = path.resolve(filePath);
   // Resolve symlinks — throw on non-ENOENT errors

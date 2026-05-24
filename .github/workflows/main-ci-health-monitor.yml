@@ -13,7 +13,7 @@ jobs:
     name: Detect stalled or failing CI on main
     runs-on: ubuntu-latest
     permissions:
-      actions: write
+      actions: read
       contents: read
       pull-requests: read
     outputs:
@@ -33,6 +33,14 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Generate Jovie Bot token
+        id: app-token
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        with:
+          app-id: ${{ vars.JOVIE_BOT_APP_ID }}
+          private-key: ${{ secrets.JOVIE_BOT_PRIVATE_KEY }}
+          permission-actions: write
 
       - name: Evaluate main CI health
         id: evaluate
@@ -75,7 +83,7 @@ jobs:
       - name: Auto-rerun failed deploy (self-healing)
         if: ${{ steps.evaluate.outputs.should_alert == 'true' && steps.evaluate.outputs.failed_run_id != '' }}
         env:
-          GH_TOKEN: ${{ github.token }}
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
           FAILED_RUN_ID: ${{ steps.evaluate.outputs.failed_run_id }}
           GH_REPO: ${{ github.repository }}
         run: |
