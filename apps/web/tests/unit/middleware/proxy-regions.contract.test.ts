@@ -147,7 +147,8 @@ describe('Proxy regions contract (RED 43 — investor / Clerk FAPI / audience / 
       'user-agent': 'curl/8.0',
     });
     // Middleware would hit the degraded path
-    expect(true).toBe(true); // placeholder — real call would exercise the 503 JSON branch
+    expect(mocks.resolveClerkKeys()).toEqual({ status: 'error' });
+    expect(mocks.buildAuthDegradedHtmlResponse()).toBe('<html>degraded</html>');
   });
 
   it('clerkMiddleware mock uses correct (authCallable, req) signature (nit fix)', () => {

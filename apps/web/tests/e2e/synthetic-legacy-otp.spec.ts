@@ -164,7 +164,10 @@ async function verifyPostSignupUsableState(page: Page) {
 test.describe('Synthetic Monitoring - Legacy OTP Signup (JOV-2446 cutover)', () => {
   test.beforeEach(async () => {
     if (process.env.E2E_SYNTHETIC_MODE !== 'true') {
-      test.skip();
+      test.skip(
+        true,
+        'Synthetic legacy OTP canary only runs when E2E_SYNTHETIC_MODE=true.'
+      );
     }
   });
 
