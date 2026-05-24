@@ -670,6 +670,22 @@ export async function processMerchFulfillmentJobs(limit = 5): Promise<{
   return { processed: jobs.length, succeeded, failed };
 }
 
+function resolvePrintfulOrderEventStatus(params: {
+  readonly eventType?: string;
+  readonly orderStatus?: string;
+}): MerchOrder['status'] {
+  switch (params.eventType) {
+    case 'shipment_sent':
+      return 'shipped';
+    case 'shipment_delivered':
+      return 'delivered';
+    case 'order_canceled':
+      return 'cancelled';
+    default:
+      return params.orderStatus === 'failed' ? 'failed' : 'fulfilling';
+  }
+}
+
 export async function handlePrintfulOrderEvent(
   payload: unknown
 ): Promise<void> {
@@ -682,16 +698,10 @@ export async function handlePrintfulOrderEvent(
   const orderPayload = event.data?.order;
   if (!orderPayload?.id && !orderPayload?.external_id) return;
 
-  const status: MerchOrder['status'] =
-    event.type === 'shipment_sent'
-      ? 'shipped'
-      : event.type === 'shipment_delivered'
-        ? 'delivered'
-        : event.type === 'order_canceled'
-          ? 'cancelled'
-          : orderPayload.status === 'failed'
-            ? 'failed'
-            : 'fulfilling';
+  const status = resolvePrintfulOrderEventStatus({
+    eventType: event.type,
+    orderStatus: orderPayload.status,
+  });
 
   const conditions = orderPayload.external_id
     ? eq(merchOrders.printfulExternalId, orderPayload.external_id)
