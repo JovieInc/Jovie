@@ -25,13 +25,13 @@ const FEATURE_FLAGS_TABLE = findSourceFile(
 );
 
 describe('feature flags shell normalization', () => {
-  it('keeps feature flags in the shared admin tool shell', () => {
+  it('keeps feature flags in the shared admin page shell', () => {
     const source = readFileSync(FEATURE_FLAGS_PAGE, 'utf8');
 
-    expect(source).toContain('AdminToolPage');
+    expect(source).toContain('AdminPage');
     expect(source).toContain("testId='feature-flags-page'");
     expect(source).toContain('loadAppShellRouteContext');
-    expect(source).not.toContain('title=');
+    expect(source).toContain("title=''");
     expect(source).not.toContain('description=');
     expect(source).not.toContain('getCachedAuth');
     expect(source).not.toContain('getDashboardDataEssential');
