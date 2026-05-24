@@ -8,14 +8,7 @@ import {
   DropdownMenuTrigger,
   Textarea,
 } from '@jovie/ui';
-import {
-  AlertTriangle,
-  Check,
-  ChevronDown,
-  Copy,
-  Loader2,
-  Sparkles,
-} from 'lucide-react';
+import { Check, ChevronDown, Copy, Loader2, Sparkles } from 'lucide-react';
 import {
   startTransition,
   useCallback,
@@ -28,6 +21,7 @@ import { DrawerButton, DrawerSurfaceCard } from '@/components/molecules/drawer';
 import { LINEAR_SURFACE } from '@/features/dashboard/tokens';
 import { LYRICS_FORMAT_LABELS, type LyricsFormat } from '@/lib/lyrics/types';
 import { cn } from '@/lib/utils';
+import { ReleaseActionErrorCard } from './ReleaseActionErrorCard';
 
 /** Auto-save debounce delay in milliseconds */
 const AUTO_SAVE_DELAY_MS = 1500;
@@ -274,24 +268,12 @@ export function ReleaseLyricsSection({
                   <span className='text-tertiary-token'>Saved</span>
                 </>
               ) : actionFeedback ? (
-                <div className='flex w-full items-start gap-2 rounded-lg border border-destructive/20 bg-destructive/5 px-2.5 py-2'>
-                  <AlertTriangle
-                    className='mt-0.25 h-3.5 w-3.5 shrink-0 text-destructive'
-                    aria-hidden='true'
-                  />
-                  <div className='min-w-0 flex-1'>
-                    <p className='text-secondary-token'>
-                      {actionFeedback.message}
-                    </p>
-                    <DrawerButton
-                      type='button'
-                      onClick={actionFeedback.onRetry}
-                      className='mt-1 h-6 px-2 text-2xs'
-                    >
-                      {actionFeedback.actionLabel}
-                    </DrawerButton>
-                  </div>
-                </div>
+                <ReleaseActionErrorCard
+                  variant='inline'
+                  message={actionFeedback.message}
+                  actionLabel={actionFeedback.actionLabel}
+                  onRetry={actionFeedback.onRetry}
+                />
               ) : null}
             </div>
           ) : null}

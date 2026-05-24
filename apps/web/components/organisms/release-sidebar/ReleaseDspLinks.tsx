@@ -29,6 +29,7 @@ import {
   DrawerSurfaceCard,
   SidebarLinkRow,
 } from '@/components/molecules/drawer';
+import { ReleaseActionErrorCard } from '@/components/organisms/release-sidebar/ReleaseActionErrorCard';
 import { LINEAR_SURFACE } from '@/features/dashboard/tokens';
 import type {
   ProviderConfidence,
@@ -294,43 +295,15 @@ export function ReleaseDspLinks({
 
       {actionError ? (
         <div role='status' aria-live='polite' className='mt-3'>
-          <DrawerSurfaceCard
-            className='space-y-2 rounded-[14px] border border-destructive/20 bg-destructive/5 p-3'
+          <ReleaseActionErrorCard
+            variant='card'
+            title={actionError.title}
+            message={actionError.message}
+            actionLabel={actionError.actionLabel}
+            onRetry={actionError.onRetry}
+            onDismiss={onDismissActionError}
             testId='dsp-link-action-error'
-          >
-            <div className='flex items-start gap-2'>
-              <span className='mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center text-destructive'>
-                <AlertTriangle className='h-4 w-4' aria-hidden='true' />
-              </span>
-              <div className='min-w-0 flex-1 space-y-0.5'>
-                <p className='text-xs font-medium text-primary-token'>
-                  {actionError.title}
-                </p>
-                <p className='text-2xs leading-[15px] text-secondary-token'>
-                  {actionError.message}
-                </p>
-              </div>
-            </div>
-            <div className='flex flex-wrap items-center gap-2'>
-              <DrawerButton
-                type='button'
-                onClick={actionError.onRetry}
-                className='h-7 px-2 text-2xs'
-              >
-                {actionError.actionLabel}
-              </DrawerButton>
-              {onDismissActionError ? (
-                <DrawerButton
-                  type='button'
-                  onClick={onDismissActionError}
-                  tone='ghost'
-                  className='h-7 px-2 text-2xs'
-                >
-                  Dismiss
-                </DrawerButton>
-              ) : null}
-            </div>
-          </DrawerSurfaceCard>
+          />
         </div>
       ) : null}
 

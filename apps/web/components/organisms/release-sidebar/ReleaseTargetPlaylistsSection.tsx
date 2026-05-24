@@ -1,12 +1,13 @@
 'use client';
 
 import { Input } from '@jovie/ui';
-import { AlertTriangle, Loader2 } from 'lucide-react';
+import { Loader2 } from 'lucide-react';
 import { useCallback, useRef, useState } from 'react';
 import { toast } from 'sonner';
-import { DrawerButton, DrawerSurfaceCard } from '@/components/molecules/drawer';
+import { DrawerSurfaceCard } from '@/components/molecules/drawer';
 import { LINEAR_SURFACE } from '@/features/dashboard/tokens';
 import { cn } from '@/lib/utils';
+import { ReleaseActionErrorCard } from './ReleaseActionErrorCard';
 
 interface ReleaseTargetPlaylistsSectionProps {
   readonly releaseId: string;
@@ -101,22 +102,13 @@ export function ReleaseTargetPlaylistsSection({
       </p>
       <div className='min-h-[18px]'>
         {saveError ? (
-          <div
-            className='flex items-start gap-2 rounded-lg border border-destructive/20 bg-destructive/5 px-2.5 py-2 text-2xs text-secondary-token'
-            role='status'
-            aria-live='polite'
-          >
-            <AlertTriangle className='mt-0.25 h-3.5 w-3.5 shrink-0 text-destructive' />
-            <div className='min-w-0 flex-1'>
-              <p>{saveError}</p>
-              <DrawerButton
-                type='button'
-                onClick={handleRetry}
-                className='mt-1 h-6 px-2 text-2xs'
-              >
-                Try again
-              </DrawerButton>
-            </div>
+          <div role='status' aria-live='polite'>
+            <ReleaseActionErrorCard
+              variant='card'
+              message={saveError}
+              actionLabel='Try again'
+              onRetry={handleRetry}
+            />
           </div>
         ) : null}
       </div>
