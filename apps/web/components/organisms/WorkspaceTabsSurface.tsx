@@ -216,7 +216,7 @@ function LinkedTabBar<T extends string>({
                   }
 
                   event.preventDefault();
-                  window.location.assign(href);
+                  globalThis.location.assign(href);
                 }}
                 className={cn(
                   TAB_BAR_SEGMENT_TRIGGER_CLASSNAME,

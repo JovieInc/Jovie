@@ -33,7 +33,7 @@ function getAuthPageForIntent(intent: AuthIntent): string {
 
 function getStringParam(url: URL, key: string): string | null {
   const trimmed = url.searchParams.get(key)?.trim();
-  return trimmed ? trimmed : null;
+  return trimmed || null;
 }
 
 async function trackAuthEvent(

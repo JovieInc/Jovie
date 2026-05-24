@@ -64,11 +64,13 @@ export async function GET(request: Request) {
     });
 
     let exchangeCode: string | undefined;
-    if (stateRecord.client !== 'web') {
+    const nativeClient: NativeAuthClient | null =
+      stateRecord.client === 'web' ? null : stateRecord.client;
+    if (nativeClient) {
       exchangeCode = createExchangeCode();
       await createStoredNativeExchangeCode({
         code: exchangeCode,
-        client: stateRecord.client as NativeAuthClient,
+        client: nativeClient,
         state: stateRecord.state,
         userId,
         returnTo: stateRecord.returnTo,

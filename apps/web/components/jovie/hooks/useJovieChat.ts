@@ -382,10 +382,7 @@ export function useJovieChat({
       }): ChatTimelineServerMessage => ({
         id: msg.id,
         role: msg.role as 'user' | 'assistant',
-        parts: hydratePersistedMessageParts(
-          msg.content,
-          msg.toolCalls
-        ) as ChatTimelineServerMessage['parts'],
+        parts: hydratePersistedMessageParts(msg.content, msg.toolCalls),
         createdAt: new Date(msg.createdAt),
         clientMessageId: msg.clientMessageId ?? null,
         turnId: msg.turnId ?? null,
