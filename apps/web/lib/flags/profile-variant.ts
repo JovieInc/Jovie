@@ -16,7 +16,10 @@
  */
 import 'server-only';
 import type { ProfileAlertOptInVariant } from './contracts';
-import { getProfileAlertOptInVariantValue } from './statsig';
+import {
+  getProfileAlertOptInVariantValue,
+  getStatsigGateValue,
+} from './statsig';
 
 /**
  * Resolves the profile alert opt-in variant for a given stable ID.
@@ -30,4 +33,16 @@ export async function getProfileAlertOptInVariant(
   stableId: string | null
 ): Promise<ProfileAlertOptInVariant> {
   return getProfileAlertOptInVariantValue(stableId);
+}
+
+/**
+ * Resolves the merch MVP gate without touching Next.js request APIs.
+ *
+ * Public profile pages use ISR, so the request-override aware flag helpers are
+ * intentionally avoided here.
+ */
+export async function getMerchMvpEnabled(
+  stableId: string | null
+): Promise<boolean> {
+  return getStatsigGateValue('MERCH_MVP', stableId);
 }

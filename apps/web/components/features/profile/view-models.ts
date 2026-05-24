@@ -1,5 +1,6 @@
 import type { DiscogRelease } from '@/lib/db/schema/content';
 import type { ProfileAlertOptInVariant } from '@/lib/flags/contracts';
+import type { PublicMerchCard } from '@/lib/merch/types';
 import type { ConfirmedFeaturedPlaylistFallback } from '@/lib/profile/featured-playlist-fallback';
 import type { TourDateViewModel } from '@/lib/tour-dates/types';
 import type { AvatarSize } from '@/lib/utils/avatar-sizes';
@@ -44,6 +45,7 @@ interface BuildProfilePublicViewModelInput {
   readonly showNotificationButton?: boolean;
   readonly subtitle?: string;
   readonly releases?: readonly PublicRelease[];
+  readonly merchCards?: readonly PublicMerchCard[];
 }
 
 export function buildProfilePublicViewModel({
@@ -73,6 +75,7 @@ export function buildProfilePublicViewModel({
   showNotificationButton,
   subtitle,
   releases,
+  merchCards,
 }: BuildProfilePublicViewModelInput): ProfilePublicViewModel {
   const resolvedMode = getProfileMode(mode);
   const definition = getProfileModeDefinition(resolvedMode);
@@ -107,6 +110,7 @@ export function buildProfilePublicViewModel({
     profileSettings,
     featuredPlaylistFallback,
     releases,
+    merchCards,
   };
 }
 

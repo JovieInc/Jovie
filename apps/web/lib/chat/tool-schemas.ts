@@ -38,6 +38,95 @@ export const TOOL_SCHEMAS = {
     }),
   },
 
+  createMerch: {
+    description:
+      'Generate exactly three premium merch options for the artist. Use when the artist asks to make merch, create a tee/hoodie/item, or make something that would sell.',
+    inputSchema: z.object({
+      prompt: z.string().max(500).optional(),
+      itemType: z.string().max(80).optional(),
+      makeLive: z.boolean().optional(),
+    }),
+  },
+
+  previewMerchOptions: {
+    description:
+      'Preview three merch design options without publishing them. Use when the artist asks for concepts or wants to see merch ideas first.',
+    inputSchema: z.object({
+      prompt: z.string().max(500).optional(),
+      itemType: z.string().max(80).optional(),
+    }),
+  },
+
+  selectMerchDesign: {
+    description:
+      'Select one of the three merch options from a previous merch generation. Use after the artist picks option 1, 2, or 3.',
+    inputSchema: z
+      .object({
+        generationId: z.string().uuid(),
+        optionNumber: z.number().int().min(1).max(3).optional(),
+        optionId: z.string().uuid().optional(),
+        makeLive: z.boolean().optional(),
+      })
+      .refine(data => data.optionNumber !== undefined || data.optionId, {
+        message: 'Provide either optionNumber or optionId.',
+        path: ['optionNumber'],
+      }),
+  },
+
+  publishMerchCard: {
+    description: 'Publish an existing merch card to the public artist profile.',
+    inputSchema: z.object({
+      merchCardId: z.string().uuid(),
+    }),
+  },
+
+  pauseMerchCard: {
+    description: 'Pause a live merch card so fans can no longer buy it.',
+    inputSchema: z.object({
+      merchCardId: z.string().uuid(),
+    }),
+  },
+
+  unpauseMerchCard: {
+    description: 'Make a paused merch card live again after validating it.',
+    inputSchema: z.object({
+      merchCardId: z.string().uuid(),
+    }),
+  },
+
+  deleteOrArchiveMerchCard: {
+    description:
+      'Archive a merch card. Use for kill/delete/remove merch requests.',
+    inputSchema: z.object({
+      merchCardId: z.string().uuid(),
+    }),
+  },
+
+  reorderMerchCards: {
+    description:
+      'Reorder merch cards on the artist profile. Use when the artist asks to rank, pin, or move merch cards.',
+    inputSchema: z.object({
+      merchCardIds: z.array(z.string().uuid()).min(1).max(12),
+    }),
+  },
+
+  optimizeMerchCards: {
+    description:
+      'Optimize merch card ranking using sales, margin, clicks, recency, and availability.',
+    inputSchema: z.object({}),
+  },
+
+  showMerchSales: {
+    description: 'Show merch revenue and purchase counts for this artist.',
+    inputSchema: z.object({}),
+  },
+
+  showArtistPayouts: {
+    description:
+      'Show internal artist payout liability for merch. Do not imply automatic payout in MVP.',
+    inputSchema: z.object({}),
+  },
+
   proposeSocialLink: {
     description:
       'Propose adding a social link to the artist profile. Pass the full URL. The client will show a confirmation card with the detected platform. Use this when the artist asks to add a link or social profile URL.',

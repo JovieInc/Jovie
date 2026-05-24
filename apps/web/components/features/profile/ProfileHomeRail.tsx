@@ -4,6 +4,7 @@ import { Bell } from 'lucide-react';
 import { useMemo } from 'react';
 import type { NotificationSourceContext } from '@/features/profile/artist-notifications-cta/types';
 import type { ProfileRenderMode } from '@/features/profile/contracts';
+import { ProfileMerchCard } from '@/features/profile/ProfileMerchCard';
 import {
   ProfilePrimaryActionCard,
   type ProfilePrimaryActionCardRelease,
@@ -17,6 +18,7 @@ import { useReleaseAwareNow } from '@/hooks/useReleaseAwareNow';
 import { useTourDateProximity } from '@/hooks/useTourDateProximity';
 import type { UserLocation } from '@/hooks/useUserLocation';
 import { useUserLocation } from '@/hooks/useUserLocation';
+import type { PublicMerchCard } from '@/lib/merch/types';
 import type { ConfirmedFeaturedPlaylistFallback } from '@/lib/profile/featured-playlist-fallback';
 import { getProfileReleaseVisibility } from '@/lib/profile/release-visibility';
 import type { TourDateViewModel } from '@/lib/tour-dates/types';
@@ -39,6 +41,7 @@ interface ProfileHomeRailProps {
   readonly isSubscribed?: boolean;
   readonly viewerLocation?: UserLocation | null;
   readonly resolveNearbyTour?: boolean;
+  readonly merchCards?: readonly PublicMerchCard[];
 }
 
 function getUpcomingTourDates(
@@ -164,6 +167,7 @@ export function ProfileHomeRail({
   isSubscribed = false,
   viewerLocation,
   resolveNearbyTour = true,
+  merchCards = [],
 }: Readonly<ProfileHomeRailProps>) {
   // Re-evaluate visibility at the release boundary so the rail's "Drops in"
   // chrome transitions to "Out Now" when the release drops, even if the
@@ -274,6 +278,9 @@ export function ProfileHomeRail({
           {featureCard}
         </div>
       ) : null}
+      {merchCards.slice(0, 3).map(card => (
+        <ProfileMerchCard key={card.id} artist={artist} card={card} />
+      ))}
       {alertsCard}
     </div>
   );

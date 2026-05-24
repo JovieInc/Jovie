@@ -26,7 +26,11 @@ import { toPublicContacts } from '@/lib/contacts/mapper';
 import { getReleasesForProfileLite } from '@/lib/discography/queries';
 import { captureError } from '@/lib/error-tracking';
 // ISR-safe: profile-variant.ts does NOT import cookies() — no dynamic opt-in
-import { getProfileAlertOptInVariant } from '@/lib/flags/profile-variant';
+import {
+  getMerchMvpEnabled,
+  getProfileAlertOptInVariant,
+} from '@/lib/flags/profile-variant';
+import { getLiveMerchCardsForProfile } from '@/lib/merch/service';
 import { getConfirmedFeaturedPlaylistFallback } from '@/lib/profile/featured-playlist-fallback';
 import {
   buildPublicProfileMetadata,
@@ -312,6 +316,28 @@ async function getPublicReleases(
   }
 }
 
+async function getPublicMerchCards(profileId: string) {
+  try {
+    const merchEnabled = await getMerchMvpEnabled(null);
+    if (!merchEnabled) {
+      return [];
+    }
+
+    return await getLiveMerchCardsForProfile(profileId);
+  } catch (error) {
+    try {
+      await captureError('Error fetching public profile merch cards', error, {
+        profileId,
+        route: '/[username]',
+      });
+    } catch {
+      // Best-effort telemetry only; do not block page rendering.
+    }
+
+    return [];
+  }
+}
+
 export default async function ArtistPage({ params }: Readonly<Props>) {
   const { username } = await params;
   const initialMode = 'profile';
@@ -372,6 +398,7 @@ export default async function ArtistPage({ params }: Readonly<Props>) {
   // synchronous artist conversion, visitor-state, and tracking-token work below.
   const tourDatesPromise = getPublicTourDates(profile.id);
   const releasesPromise = getPublicReleases(profile.id);
+  const merchCardsPromise = getPublicMerchCards(profile.id);
 
   // Convert our profile data to the Artist type expected by components
   const artist = convertCreatorProfileToArtist(profile);
@@ -424,14 +451,16 @@ export default async function ArtistPage({ params }: Readonly<Props>) {
 
   // Await tour dates + releases (started above, non-blocking — errors logged then resolve to empty)
   // Sort server-side so the client doesn't need a useMemo sort
-  const [tourDatesRaw, allReleases, alertOptInVariant] = await Promise.all([
-    tourDatesPromise.catch(() => [] as TourDateViewModel[]),
-    releasesPromise,
-    // stableId is null for ISR renders — returns the default 'button' variant.
-    // AnonCookieBootstrap resolves the per-user variant on the client side.
-    // .catch ensures a Statsig outage doesn't fail the whole ISR page render.
-    getProfileAlertOptInVariant(null).catch(() => 'button' as const),
-  ]);
+  const [tourDatesRaw, allReleases, merchCards, alertOptInVariant] =
+    await Promise.all([
+      tourDatesPromise.catch(() => [] as TourDateViewModel[]),
+      releasesPromise,
+      merchCardsPromise,
+      // stableId is null for ISR renders — returns the default 'button' variant.
+      // AnonCookieBootstrap resolves the per-user variant on the client side.
+      // .catch ensures a Statsig outage doesn't fail the whole ISR page render.
+      getProfileAlertOptInVariant(null).catch(() => 'button' as const),
+    ]);
   const tourDates = [...tourDatesRaw].sort(
     (a, b) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime()
   );
@@ -501,6 +530,7 @@ export default async function ArtistPage({ params }: Readonly<Props>) {
         }}
         featuredPlaylistFallback={featuredPlaylistFallback}
         releases={releases}
+        merchCards={merchCards}
       />
       {isPublicNoAuthSmoke ? null : (
         <DesktopQrOverlayClient handle={artist.handle} />

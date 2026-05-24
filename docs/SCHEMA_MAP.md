@@ -77,6 +77,14 @@ Token read/write must go through `apps/web/lib/connectors/token-vault.ts` — ne
 |-------------|--------|---------------|
 | `billing.ts` | `stripeWebhookEvents`, `billingAuditLog` | `stripeWebhookEvents` used for webhook idempotency |
 
+### Merch
+
+| Schema File | Tables | Key Relations |
+|-------------|--------|---------------|
+| `merch.ts` | `merchGenerationBatches`, `merchDesignOptions`, `merchCards`, `merchOrders`, `merchPayoutLedgerEntries`, `merchFulfillmentJobs` | All rows belong to `creatorProfiles`; selected design options become Jovie-owned merch cards; paid orders enqueue fulfillment jobs and accrue manual payout ledger entries |
+
+`merchCards` are the storefront/business source of truth. Printful IDs, variant maps, placements, print files, mockups, pricing snapshots, learning signals, and performance counters are stored on the Jovie card/order rows. Printful webhook idempotency uses `webhookEvents`; Stripe merch payment idempotency uses order/session/payment IDs plus the separate merch webhook route and a durable `stripeWebhookEvents.processingStartedAt` claim.
+
 ### Admin & Growth
 
 | Schema File | Tables | Key Relations |
@@ -113,7 +121,7 @@ Token read/write must go through `apps/web/lib/connectors/token-vault.ts` — ne
 
 ## Enums
 
-All database enums are defined in `enums.ts`. There are 60+ enums covering statuses, types, and categories across all domains. Always import enums from `@/lib/db/schema` — never redefine enum values in application code.
+All database enums are defined in `enums.ts`. There are 70+ enums covering statuses, types, and categories across all domains. Always import enums from `@/lib/db/schema` — never redefine enum values in application code.
 
 ## Adding a New Table
 

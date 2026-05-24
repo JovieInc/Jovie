@@ -27,6 +27,68 @@ export const playlistStatusEnum = pgEnum('playlist_status', [
   'rejected',
 ]);
 
+export const merchGenerationStatusEnum = pgEnum('merch_generation_status', [
+  'generating',
+  'ready',
+  'failed',
+]);
+
+export const merchDesignLaneEnum = pgEnum('merch_design_lane', [
+  'band_tour_uniform',
+  'fashion_graphic_item',
+  'artist_world_artifact',
+]);
+
+export const merchDesignOptionStatusEnum = pgEnum(
+  'merch_design_option_status',
+  ['candidate', 'selected', 'rejected']
+);
+
+export const merchCardStatusEnum = pgEnum('merch_card_status', [
+  'draft',
+  'live',
+  'paused',
+  'archived',
+  'sold_out',
+  'failed',
+]);
+
+export const merchTechniqueEnum = pgEnum('merch_technique', [
+  'dtg',
+  'embroidery',
+  'cut_and_sew',
+  'sublimation',
+  'other',
+]);
+
+export const merchOrderStatusEnum = pgEnum('merch_order_status', [
+  'checkout_created',
+  'paid',
+  'paid_fulfillment_hold',
+  'paid_fulfillment_failed',
+  'printful_draft_created',
+  'submitted_to_printful',
+  'fulfilling',
+  'shipped',
+  'delivered',
+  'cancelled',
+  'refunded',
+  'failed',
+]);
+
+export const merchPayoutStatusEnum = pgEnum('merch_payout_status', [
+  'accrued',
+  'held_for_refund_window',
+  'ready_to_pay',
+  'paid_manually',
+  'reversed',
+]);
+
+export const merchFulfillmentJobStatusEnum = pgEnum(
+  'merch_fulfillment_job_status',
+  ['queued', 'running', 'succeeded', 'failed', 'blocked']
+);
+
 // Link & Social Enums
 export const linkTypeEnum = pgEnum('link_type', [
   'listen',

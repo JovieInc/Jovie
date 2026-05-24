@@ -5,6 +5,20 @@
      5|The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
      6|and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.5.41] - 2026-05-24
+
+> Jovie can now create Jovie-owned merch cards from chat, publish them to public artist profiles, collect payment through platform Stripe Checkout, route paid orders to Printful, and accrue manual artist payout liability.
+
+### Added
+
+- **Merch MVP (JOV-2560)**: added the `merch_mvp` rollout gate, `canAccessMerchCreation` entitlement, merch chat tools, deterministic production-art generation, Jovie merch card records, public product pages, Stripe Checkout, Printful webhook/fulfillment handling, and a manual payout ledger.
+- **Merch persistence**: added `merch_generation_batches`, `merch_design_options`, `merch_cards`, `merch_orders`, `merch_payout_ledger_entries`, and `merch_fulfillment_jobs` with Printful variant IDs stored as the purchasable/order source of truth.
+- **Merch profile rail**: public profiles now render live merch cards behind the merch gate between the release/tour primary card and alerts. Empty, paused, archived, or gated states render no fake fallback.
+
+### Changed
+
+- **Cron/docs/env coverage**: scheduled `/api/cron/process-merch-fulfillment` every 10 minutes and documented the new schema, API routes, webhooks, Statsig gate, and Printful/Stripe merch env vars.
+
 ## [26.5.35] - 2026-05-21
 
 > The page header now lives inside the elevated content card and moves with the sidebar when you collapse it — matching Linear's layout. The "Update available" button in the desktop app is no longer a tiny featureless circle; it shows the full "Update" pill with icon and label.

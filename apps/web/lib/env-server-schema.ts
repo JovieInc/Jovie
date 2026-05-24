@@ -85,7 +85,14 @@ export const ServerEnvSchema = z.object({
   STRIPE_WEBHOOK_SECRET: z.string().optional(),
   STRIPE_CONNECT_WEBHOOK_SECRET: z.string().optional(),
   STRIPE_WEBHOOK_SECRET_TIPS: z.string().optional(),
+  STRIPE_WEBHOOK_SECRET_MERCH: z.string().optional(),
   TIP_PLATFORM_FEE_PERCENT: z.string().optional(),
+
+  // Printful fulfillment backend
+  PRINTFUL_API_KEY: z.string().optional(),
+  PRINTFUL_API_BASE_URL: z.string().url().optional(),
+  PRINTFUL_STORE_ID: z.string().optional(),
+  PRINTFUL_WEBHOOK_SECRET: z.string().optional(),
 
   // Stripe price IDs for Pro tier (amounts in lib/config/plan-prices.ts)
   STRIPE_PRICE_PRO_MONTHLY: z.string().startsWith('price_').optional(),
@@ -316,7 +323,12 @@ export const ENV_KEYS = [
   'STRIPE_WEBHOOK_SECRET',
   'STRIPE_CONNECT_WEBHOOK_SECRET',
   'STRIPE_WEBHOOK_SECRET_TIPS',
+  'STRIPE_WEBHOOK_SECRET_MERCH',
   'TIP_PLATFORM_FEE_PERCENT',
+  'PRINTFUL_API_KEY',
+  'PRINTFUL_API_BASE_URL',
+  'PRINTFUL_STORE_ID',
+  'PRINTFUL_WEBHOOK_SECRET',
   'STRIPE_PRICE_PRO_MONTHLY',
   'STRIPE_PRICE_PRO_ANNUAL',
   'STRIPE_PRICE_PRO_YEARLY',
