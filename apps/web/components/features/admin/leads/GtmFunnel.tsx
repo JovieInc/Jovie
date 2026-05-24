@@ -2,6 +2,7 @@ import { ChevronRight } from 'lucide-react';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { getLeadFunnelReport } from '@/lib/leads/reporting';
 import type { LeadFunnelCounts } from './LeadPipelineKpis';
+import { getClampedPercent } from './percentages';
 
 export type { LeadFunnelCounts } from './LeadPipelineKpis';
 
@@ -46,12 +47,6 @@ function DropOff({
       {count.toLocaleString()} {label} ({pct}%)
     </span>
   );
-}
-
-export function getClampedPercent(numerator: number, denominator: number) {
-  if (denominator <= 0) return 0;
-  const percent = Math.round((numerator / denominator) * 100);
-  return Math.min(100, Math.max(0, percent));
 }
 
 function formatRate(numerator: number, denominator: number): string {
