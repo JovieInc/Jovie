@@ -50,6 +50,13 @@ export interface DspLink extends ProviderLink {
 
 export type ReleaseSidebarMode = 'admin' | 'view';
 
+export interface ReleaseSidebarActionError {
+  readonly title: string;
+  readonly message: string;
+  readonly actionLabel: string;
+  readonly onRetry: () => void;
+}
+
 export interface ReleaseSidebarProps {
   readonly release: Release | null;
   readonly mode: ReleaseSidebarMode;

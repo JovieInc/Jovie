@@ -575,6 +575,8 @@ export function ReleaseSidebar({
     canRevertArtwork: _canRevertArtwork,
     isAddingDspLink,
     isRemovingDspLink,
+    dspLinkActionError,
+    clearDspLinkActionError,
     handleArtworkUpload,
     handleArtworkRevert,
     handleAddLink,
@@ -955,11 +957,13 @@ export function ReleaseSidebar({
           selectedProvider={selectedProvider}
           isAddingDspLink={isAddingDspLink}
           isRemovingDspLink={isRemovingDspLink}
+          actionError={dspLinkActionError}
           onSetIsAddingLink={setIsAddingLink}
           onSetNewLinkUrl={setNewLinkUrl}
           onSetSelectedProvider={setSelectedProvider}
           onAddLink={handleAddLink}
           onRemoveLink={handleRemoveLink}
+          onDismissActionError={clearDspLinkActionError}
           onNewLinkKeyDown={handleNewLinkKeyDown}
           showHeading={false}
         />

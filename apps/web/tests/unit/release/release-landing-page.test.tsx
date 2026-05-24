@@ -218,6 +218,12 @@ describe('@critical ReleaseLandingPage', () => {
     ];
     render(<ReleaseLandingPage {...defaultProps} providers={noUrlProviders} />);
     expect(screen.getByText('No streaming links available yet.')).toBeDefined();
+    expect(
+      screen.getByRole('link', { name: 'Visit artist profile' })
+    ).toHaveAttribute('href', '/timwhite');
+    expect(
+      screen.getByRole('button', { name: 'Share release' })
+    ).toBeInTheDocument();
   });
 
   it('artist name links to /${handle} when handle exists', () => {

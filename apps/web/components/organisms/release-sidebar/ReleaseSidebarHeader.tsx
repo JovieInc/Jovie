@@ -65,7 +65,11 @@ export function useReleaseHeaderParts({
       return;
     }
     try {
-      await navigator.clipboard?.writeText(releaseId);
+      const clipboard = navigator.clipboard;
+      if (!clipboard?.writeText) {
+        throw new Error('Clipboard unavailable');
+      }
+      await clipboard.writeText(releaseId);
       setIsIdCopied(true);
       if (idCopyTimeoutRef.current) clearTimeout(idCopyTimeoutRef.current);
       idCopyTimeoutRef.current = setTimeout(() => setIsIdCopied(false), 2000);
@@ -89,7 +93,6 @@ export function useReleaseHeaderParts({
   }
 
   if (hasRelease && release?.id) {
-    /* eslint-disable-next-line react-hooks/refs -- Lucide icons are forwardRef components, not React refs */
     overflowActions.push({
       id: 'copy-id',
       label: isIdCopied ? 'Copied!' : 'Copy release ID',

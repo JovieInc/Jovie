@@ -6,6 +6,7 @@
  * Uses SocialIcon for consistent branding and centralized icon loading.
  */
 
+import { CircleHelp } from 'lucide-react';
 import { useTheme } from 'next-themes';
 import { useEffect, useMemo, useState } from 'react';
 import { SocialIcon } from '@/components/atoms/SocialIcon';
@@ -65,12 +66,32 @@ export function ProviderIcon({
     setMounted(true);
   }, []);
 
-  const brandColor = PROVIDER_CONFIG[provider].accent;
+  const providerConfig = PROVIDER_CONFIG[provider];
+  const platform = PROVIDER_PLATFORM_MAP[provider];
+  const brandColor = providerConfig?.accent ?? 'currentColor';
   const isDark = mounted ? resolvedTheme === 'dark' : false;
   const color = useMemo(
     () => getContrastSafeIconColor(brandColor, isDark),
     [brandColor, isDark]
   );
+
+  if (!providerConfig || !platform) {
+    return (
+      <span
+        className={cn(
+          'inline-flex shrink-0 items-center justify-center',
+          className
+        )}
+        style={{ color }}
+      >
+        <CircleHelp
+          className='h-full w-full'
+          aria-hidden={ariaLabel ? undefined : true}
+          aria-label={ariaLabel}
+        />
+      </span>
+    );
+  }
 
   return (
     <span
@@ -81,7 +102,7 @@ export function ProviderIcon({
       style={{ color }}
     >
       <SocialIcon
-        platform={PROVIDER_PLATFORM_MAP[provider]}
+        platform={platform}
         className='h-full w-full'
         aria-hidden={ariaLabel ? undefined : true}
         aria-label={ariaLabel}

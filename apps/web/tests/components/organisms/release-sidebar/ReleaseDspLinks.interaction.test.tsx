@@ -118,10 +118,16 @@ vi.mock('@/components/molecules/drawer', () => ({
   DrawerSurfaceCard: ({
     children,
     className,
+    testId,
   }: {
     children: React.ReactNode;
     className?: string;
-  }) => <div className={className}>{children}</div>,
+    testId?: string;
+  }) => (
+    <div className={className} data-testid={testId}>
+      {children}
+    </div>
+  ),
   DrawerFormGridRow: ({
     children,
     label,
@@ -275,5 +281,43 @@ describe('ReleaseDspLinks interactions', () => {
 
     await user.click(screen.getByRole('button', { name: 'Remove Spotify' }));
     expect(onRemoveLink).toHaveBeenCalledWith('spotify');
+  });
+
+  it('shows a retryable inline error when a DSP mutation fails', async () => {
+    const user = userEvent.setup();
+    const onRetry = vi.fn();
+
+    render(
+      <ReleaseDspLinks
+        release={createMockRelease()}
+        providerConfig={providerConfig}
+        isEditable
+        isAddingLink={false}
+        newLinkUrl=''
+        selectedProvider={null}
+        isAddingDspLink={false}
+        isRemovingDspLink={null}
+        actionError={{
+          title: 'Unable to add DSP link',
+          message: 'The link was not saved. Your draft is still here.',
+          actionLabel: 'Try again',
+          onRetry,
+        }}
+        onSetIsAddingLink={onSetIsAddingLink}
+        onSetNewLinkUrl={onSetNewLinkUrl}
+        onSetSelectedProvider={onSetSelectedProvider}
+        onAddLink={onAddLink}
+        onRemoveLink={onRemoveLink}
+        onDismissActionError={vi.fn()}
+        onNewLinkKeyDown={vi.fn()}
+      />
+    );
+
+    expect(screen.getByTestId('dsp-link-action-error')).toHaveTextContent(
+      'Unable to add DSP link'
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Try again' }));
+    expect(onRetry).toHaveBeenCalledTimes(1);
   });
 });

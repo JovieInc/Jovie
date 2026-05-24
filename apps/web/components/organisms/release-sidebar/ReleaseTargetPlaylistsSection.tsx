@@ -7,6 +7,12 @@ import { toast } from 'sonner';
 import { DrawerSurfaceCard } from '@/components/molecules/drawer';
 import { LINEAR_SURFACE } from '@/features/dashboard/tokens';
 import { cn } from '@/lib/utils';
+import {
+  type ReleaseSaveStatus,
+  ReleaseSaveStatusRow,
+} from './ReleaseSaveStatusRow';
+import type { ReleaseSaveFeedback } from './utils';
+import { createSaveFeedback, createVoidRetryHandler } from './utils';
 
 interface ReleaseTargetPlaylistsSectionProps {
   readonly releaseId: string;
@@ -37,6 +43,7 @@ export function ReleaseTargetPlaylistsSection({
   const initialValue = joinPlaylists(targetPlaylists);
   const [value, setValue] = useState(initialValue);
   const [isSaving, setIsSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
   const lastSavedRef = useRef(initialValue);
 
   const handleBlur = useCallback(async () => {
@@ -49,16 +56,34 @@ export function ReleaseTargetPlaylistsSection({
     if (currentJoined === lastSavedRef.current) return;
 
     setIsSaving(true);
+    setSaveError(null);
     try {
       await onSave(releaseId, parsed);
       setValue(currentJoined);
       lastSavedRef.current = currentJoined;
+      setSaveError(null);
+      toast.success('Target playlists saved');
     } catch {
-      toast.error('Failed to save target playlists');
+      const message =
+        'Failed to save target playlists. Your draft is still here.';
+      setSaveError(message);
+      toast.error(message);
     } finally {
       setIsSaving(false);
     }
   }, [onSave, readOnly, value, releaseId]);
+
+  const handleRetry = createVoidRetryHandler(handleBlur);
+  let saveStatus: ReleaseSaveStatus = 'idle';
+  if (isSaving) {
+    saveStatus = 'saving';
+  } else if (saveError) {
+    saveStatus = 'error';
+  }
+  let saveFeedback: ReleaseSaveFeedback | null = null;
+  if (saveError) {
+    saveFeedback = createSaveFeedback(saveError, 'Try again', handleRetry);
+  }
 
   return (
     <DrawerSurfaceCard
@@ -88,11 +113,19 @@ export function ReleaseTargetPlaylistsSection({
         Playlists you&apos;re targeting for this release. Leave blank to use
         your defaults.
       </p>
+      <ReleaseSaveStatusRow
+        status={saveStatus}
+        feedback={saveFeedback}
+        minHeightClassName='min-h-[18px]'
+      />
       <Input
         type='text'
         id={`target-playlists-${releaseId}`}
         value={value}
-        onChange={e => setValue(e.target.value)}
+        onChange={e => {
+          setValue(e.target.value);
+          setSaveError(null);
+        }}
         onBlur={handleBlur}
         placeholder='e.g. Pollen, Butter, Lorem'
         maxLength={310}

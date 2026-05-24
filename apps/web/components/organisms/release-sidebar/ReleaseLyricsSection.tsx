@@ -21,6 +21,9 @@ import { DrawerButton, DrawerSurfaceCard } from '@/components/molecules/drawer';
 import { LINEAR_SURFACE } from '@/features/dashboard/tokens';
 import { LYRICS_FORMAT_LABELS, type LyricsFormat } from '@/lib/lyrics/types';
 import { cn } from '@/lib/utils';
+import { ReleaseSaveStatusRow } from './ReleaseSaveStatusRow';
+import type { ReleaseSaveFeedback } from './utils';
+import { createSaveFeedback, createVoidRetryHandler } from './utils';
 
 /** Auto-save debounce delay in milliseconds */
 const AUTO_SAVE_DELAY_MS = 1500;
@@ -28,7 +31,9 @@ const AUTO_SAVE_DELAY_MS = 1500;
 /** All available format options in display order */
 const FORMAT_OPTIONS: LyricsFormat[] = ['apple-music', 'deezer', 'genius'];
 
-type SaveStatus = 'idle' | 'saving' | 'saved';
+type SaveStatus = 'idle' | 'saving' | 'saved' | 'error';
+
+type ActionFeedback = ReleaseSaveFeedback | null;
 
 interface ReleaseLyricsSectionProps {
   readonly releaseId: string;
@@ -57,6 +62,7 @@ export function ReleaseLyricsSection({
   const [isCopying, setIsCopying] = useState(false);
   const [isFormatting, setIsFormatting] = useState(false);
   const [saveStatus, setSaveStatus] = useState<SaveStatus>('idle');
+  const [actionFeedback, setActionFeedback] = useState<ActionFeedback>(null);
   const [selectedFormat, setSelectedFormat] =
     useState<LyricsFormat>('apple-music');
 
@@ -78,6 +84,7 @@ export function ReleaseLyricsSection({
   useEffect(() => {
     setDraftLyrics(lyrics ?? '');
     setSaveStatus('idle');
+    setActionFeedback(null);
   }, [lyrics, releaseId]);
 
   // Auto-save implementation
@@ -90,10 +97,16 @@ export function ReleaseLyricsSection({
     // Only save if there are actual changes
     if (currentDraft === currentLyrics) return;
 
+    if (savedIndicatorTimerRef.current) {
+      clearTimeout(savedIndicatorTimerRef.current);
+      savedIndicatorTimerRef.current = null;
+    }
     setSaveStatus('saving');
+    setActionFeedback(null);
     try {
       await onSaveLyrics(currentReleaseId, currentDraft);
       setSaveStatus('saved');
+      setActionFeedback(null);
 
       // Clear "Saved" indicator after 2s
       if (savedIndicatorTimerRef.current) {
@@ -104,8 +117,16 @@ export function ReleaseLyricsSection({
         2000
       );
     } catch {
-      setSaveStatus('idle');
-      toast.error('Failed to auto-save lyrics');
+      setSaveStatus('error');
+      const message = 'Failed to save lyrics. Your draft is still here.';
+      setActionFeedback(
+        createSaveFeedback(
+          message,
+          'Retry save',
+          createVoidRetryHandler(performAutoSave)
+        )
+      );
+      toast.error(message);
     }
   }, [onSaveLyrics]);
 
@@ -145,13 +166,24 @@ export function ReleaseLyricsSection({
       if (!onFormatLyrics || !draftLyrics.trim()) return;
       setSelectedFormat(format);
       setIsFormatting(true);
+      setActionFeedback(null);
       try {
         const changes = await onFormatLyrics(releaseId, draftLyrics, format);
         if (changes.length > 0) {
           toast.info(changes.join(' · '));
         }
+        setActionFeedback(null);
       } catch {
-        toast.error('Unable to format lyrics right now');
+        const message =
+          'Unable to format lyrics right now. Your draft is still here.';
+        setActionFeedback(
+          createSaveFeedback(
+            message,
+            'Retry format',
+            createVoidRetryHandler(() => handleFormat(format))
+          )
+        );
+        toast.error(message);
       } finally {
         setIsFormatting(false);
       }
@@ -190,28 +222,21 @@ export function ReleaseLyricsSection({
         <Textarea
           placeholder='Paste your lyrics here'
           value={draftLyrics}
-          onChange={event => setDraftLyrics(event.target.value)}
+          onChange={event => {
+            setDraftLyrics(event.target.value);
+            setActionFeedback(null);
+            if (saveStatus !== 'saving') {
+              setSaveStatus('idle');
+            }
+          }}
           rows={draftLyrics ? 10 : 4}
           disabled={!isEditable || isSaving}
           className='min-h-[140px] resize-y border-(--linear-app-frame-seam) bg-surface-0 text-xs'
         />
         {/* Auto-save status indicator */}
-        {saveStatus !== 'idle' && (
-          <div className='flex items-center gap-1 text-2xs text-tertiary-token'>
-            {saveStatus === 'saving' && (
-              <>
-                <Loader2 className='h-3 w-3 animate-spin' aria-hidden='true' />
-                <span>Saving…</span>
-              </>
-            )}
-            {saveStatus === 'saved' && (
-              <>
-                <Check className='h-3 w-3 text-success' aria-hidden='true' />
-                <span>Saved</span>
-              </>
-            )}
-          </div>
-        )}
+        <div className='min-h-[22px]'>
+          <ReleaseSaveStatusRow status={saveStatus} feedback={actionFeedback} />
+        </div>
       </div>
 
       <div className='flex flex-wrap items-center gap-2 border-t border-(--linear-app-frame-seam) px-3 py-2.5'>
