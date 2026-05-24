@@ -41,16 +41,63 @@ mark_linear() {
   [ -z "$key" ] && return 0
   local sid="721e032a-fe72-4374-9a61-d9976d079e1e"
   local iid
-  iid=$(curl -s -X POST https://api.linear.app/graphql \
-    -H "Content-Type: application/json" \
-    -H "Authorization: $key" \
-    -d "{\"query\":\"{ issueSearch(term:\\\"$linear_id\\\") { nodes { id identifier } } }\"}" \
-    | python3 -c "import sys,json;d=json.load(sys.stdin);print([n['id'] for n in d['data']['issueSearch']['nodes'] if n['identifier']=='$linear_id'][0] if any(n['identifier']=='$linear_id' for n in d['data']['issueSearch']['nodes']) else '')" 2>/dev/null) || true
+  iid=$(
+    LINEAR_API_KEY="$key" LINEAR_ID="$linear_id" python3 <<'PY' 2>/dev/null
+import json
+import os
+import urllib.request
+
+linear_id = os.environ["LINEAR_ID"]
+payload = {
+    "query": "query($term: String!) { issueSearch(term: $term) { nodes { id identifier } } }",
+    "variables": {"term": linear_id},
+}
+request = urllib.request.Request(
+    "https://api.linear.app/graphql",
+    data=json.dumps(payload).encode("utf-8"),
+    headers={
+        "Content-Type": "application/json",
+        "Authorization": os.environ["LINEAR_API_KEY"],
+    },
+)
+with urllib.request.urlopen(request, timeout=20) as response:
+    data = json.load(response)
+print(
+    next(
+        (
+            node["id"]
+            for node in data["data"]["issueSearch"]["nodes"]
+            if node["identifier"] == linear_id
+        ),
+        "",
+    )
+)
+PY
+  ) || true
   if [ -n "$iid" ]; then
-    curl -s -X POST https://api.linear.app/graphql \
-      -H "Content-Type: application/json" \
-      -H "Authorization: $key" \
-      -d "{\"query\":\"mutation { issueUpdate(id:\\\"$iid\\\", input: { stateId: \\\"$sid\\\" }) { success } }\"}" > /dev/null
+    LINEAR_API_KEY="$key" LINEAR_ISSUE_ID="$iid" LINEAR_STATE_ID="$sid" python3 <<'PY' >/dev/null 2>&1
+import json
+import os
+import urllib.request
+
+payload = {
+    "query": "mutation($id: String!, $stateId: String!) { issueUpdate(id: $id, input: { stateId: $stateId }) { success } }",
+    "variables": {
+        "id": os.environ["LINEAR_ISSUE_ID"],
+        "stateId": os.environ["LINEAR_STATE_ID"],
+    },
+}
+request = urllib.request.Request(
+    "https://api.linear.app/graphql",
+    data=json.dumps(payload).encode("utf-8"),
+    headers={
+        "Content-Type": "application/json",
+        "Authorization": os.environ["LINEAR_API_KEY"],
+    },
+)
+with urllib.request.urlopen(request, timeout=20) as response:
+    response.read()
+PY
     log "linear: $linear_id -> In Progress"
   fi
 }
