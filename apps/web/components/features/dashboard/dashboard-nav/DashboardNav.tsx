@@ -369,7 +369,7 @@ export function DashboardNav(_: DashboardNavProps) {
     // the timer so a cleanup that fires before the timer runs (fast route
     // change) leaves the ref null and a later visit will retry.
     const handle = setTimeout(() => {
-      void warmReleasesRoute();
+      warmReleasesRoute().catch(() => {});
     }, 300);
 
     return () => clearTimeout(handle);
@@ -381,10 +381,10 @@ export function DashboardNav(_: DashboardNavProps) {
       const prefetchDelayMs = itemId === 'releases' ? 0 : 150;
       prefetchTimerRef.current = setTimeout(() => {
         if (itemId === 'releases') {
-          void warmReleasesRoute();
+          warmReleasesRoute().catch(() => {});
           return;
         }
-        void import('@/lib/queries/prefetch-dashboard')
+        import('@/lib/queries/prefetch-dashboard')
           .then(({ prefetchForRoute }) =>
             prefetchForRoute(itemId, queryClient, profileId || undefined)
           )
@@ -479,7 +479,7 @@ export function DashboardNav(_: DashboardNavProps) {
   );
 
   const handleRetryThreads = useCallback(() => {
-    void refetchConversations();
+    Promise.resolve(refetchConversations()).catch(() => {});
   }, [refetchConversations]);
 
   // Memoize renderNavItem to prevent creating new functions on every render

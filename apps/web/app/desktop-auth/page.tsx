@@ -79,15 +79,17 @@ function DesktopAuthContent() {
     autoOpenedRef.current = true;
     setOpenState('opening');
     setOpenError(null);
-    void openWithTimeout(authUrl).then(result => {
-      if (!isActive) return;
-      if (result.ok) {
-        setOpenState('opened');
-      } else {
-        setOpenState('error');
-        setOpenError(formatOpenError(result.reason));
-      }
-    });
+    openWithTimeout(authUrl)
+      .then(result => {
+        if (!isActive) return;
+        if (result.ok) {
+          setOpenState('opened');
+        } else {
+          setOpenState('error');
+          setOpenError(formatOpenError(result.reason));
+        }
+      })
+      .catch(() => {});
 
     return () => {
       isActive = false;
@@ -118,7 +120,7 @@ function DesktopAuthContent() {
             className='inline-flex h-10 w-full items-center justify-center rounded-full bg-white px-4 text-[13px] font-medium text-black transition-colors hover:bg-white/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/35 disabled:cursor-not-allowed disabled:opacity-55'
             disabled={!authUrl || openState === 'opening'}
             onClick={() => {
-              void openAuthUrl();
+              openAuthUrl().catch(() => {});
             }}
           >
             Continue in browser
@@ -127,7 +129,7 @@ function DesktopAuthContent() {
             type='button'
             className='inline-flex h-10 w-full items-center justify-center rounded-full border border-white/10 px-4 text-[13px] font-medium text-white/72 transition-colors hover:bg-white/[0.06] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/25'
             onClick={() => {
-              void closeDesktopAuthWindow();
+              closeDesktopAuthWindow().catch(() => {});
             }}
           >
             Cancel sign-in

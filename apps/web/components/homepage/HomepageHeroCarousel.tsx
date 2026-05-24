@@ -39,13 +39,18 @@ function getOffset(index: number, activeIndex: number): number {
 function getSlideStyle(offset: number): CSSProperties {
   const distance = Math.abs(offset);
   const isVisible = distance <= 1;
+  const isActive = distance === 0;
 
   return {
     '--carousel-offset': offset,
-    '--carousel-opacity': isVisible ? (distance === 0 ? 1 : 0.16) : 0,
-    '--carousel-scale': distance === 0 ? 1 : 0.94,
+    '--carousel-opacity': isVisible ? getSlideOpacity(isActive) : 0,
+    '--carousel-scale': isActive ? 1 : 0.94,
     '--carousel-z': HOMEPAGE_HERO_CAROUSEL_SLIDES.length - distance,
   } as CSSProperties;
+}
+
+function getSlideOpacity(isActive: boolean) {
+  return isActive ? 1 : 0.16;
 }
 
 function ProductProofImage({
