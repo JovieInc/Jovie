@@ -3,11 +3,7 @@ import { KpiItem } from '@/components/features/admin/KpiItem';
 import { ContentSectionHeader } from '@/components/molecules/ContentSectionHeader';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { getLeadFunnelReport } from '@/lib/leads/reporting';
-
-function formatRate(value: number | null): string {
-  if (value === null) return '--';
-  return `${(value * 100).toFixed(1)}%`;
-}
+import { formatClampedPercent } from './percentages';
 
 function BreakdownList({
   title,
@@ -89,19 +85,19 @@ export async function LeadGtmInsights() {
             />
             <KpiItem
               title='Claim Rate'
-              value={formatRate(claimRate)}
+              value={formatClampedPercent(claimRate)}
               metadata={<span>Claim page views / contacted</span>}
               icon={Link2}
             />
             <KpiItem
               title='Signup Rate'
-              value={formatRate(signupRate)}
+              value={formatClampedPercent(signupRate)}
               metadata={<span>Signups / claim page views</span>}
               icon={TrendingUp}
             />
             <KpiItem
               title='Paid Rate'
-              value={formatRate(paidRate)}
+              value={formatClampedPercent(paidRate)}
               metadata={<span>Paid conversions / signups</span>}
               icon={BarChart2}
             />
