@@ -63,7 +63,7 @@ async function openWithTimeout(authUrl: string) {
 }
 
 function getAppOrigin(): string {
-  return typeof globalThis.window === 'undefined'
+  return globalThis.window === undefined
     ? 'https://jov.ie'
     : globalThis.window.location.origin;
 }
