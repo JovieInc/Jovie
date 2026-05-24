@@ -21,8 +21,8 @@ describe('admin agent run detail shell normalization', () => {
   it('keeps the run detail route inside the shared admin shell', () => {
     const source = readFileSync(AGENT_RUN_DETAIL_ROUTE, 'utf8');
 
-    expect(source).toContain('import { AdminToolPage }');
-    expect(source).toContain('<AdminToolPage');
+    expect(source).toContain('import { AdminPage }');
+    expect(source).toContain('<AdminPage');
     expect(source).toContain("testId='admin-agent-run-detail-page'");
     expect(source).toContain('max-w-(--app-shell-content-max-reading)');
     expect(source).not.toMatch(/className=['"][^'"]*\bp-6\b[^'"]*['"]/);

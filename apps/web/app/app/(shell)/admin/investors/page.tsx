@@ -10,7 +10,7 @@ import {
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { Suspense } from 'react';
-import { AdminToolPage } from '@/components/features/admin/layout/AdminToolPage';
+import { AdminPage } from '@/components/features/admin/layout/AdminPage';
 import { ContentSectionHeader } from '@/components/molecules/ContentSectionHeader';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { UnifiedTableSkeleton } from '@/components/organisms/table';
@@ -108,7 +108,7 @@ const INVESTOR_TABLE_SKELETON_COLUMN_CONFIG = [
  */
 export default function InvestorPipelinePage() {
   return (
-    <AdminToolPage
+    <AdminPage
       title='Investors'
       description='Track investor links, view signals, and active fundraising conversations.'
       testId='admin-investors-page'
@@ -127,7 +127,7 @@ export default function InvestorPipelinePage() {
       <Suspense fallback={<TableSkeleton />}>
         <InvestorPipelineTable />
       </Suspense>
-    </AdminToolPage>
+    </AdminPage>
   );
 }
 

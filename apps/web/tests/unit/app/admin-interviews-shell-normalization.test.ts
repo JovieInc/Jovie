@@ -17,8 +17,8 @@ describe('admin interviews shell normalization', () => {
   it('keeps the route inside the canonical admin shell', () => {
     const source = readFileSync(ADMIN_INTERVIEWS_ROUTE, 'utf8');
 
-    expect(source).toContain('import { AdminToolPage }');
-    expect(source).toContain('<AdminToolPage');
+    expect(source).toContain('import { AdminPage }');
+    expect(source).toContain('<AdminPage');
     expect(source).toContain("testId='admin-interviews-page'");
     expect(source).not.toContain("className='space-y-4 p-6'");
     expect(source).not.toContain('<header>');
