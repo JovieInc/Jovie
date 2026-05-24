@@ -21,7 +21,10 @@ import { DrawerButton, DrawerSurfaceCard } from '@/components/molecules/drawer';
 import { LINEAR_SURFACE } from '@/features/dashboard/tokens';
 import { LYRICS_FORMAT_LABELS, type LyricsFormat } from '@/lib/lyrics/types';
 import { cn } from '@/lib/utils';
-import { ReleaseActionErrorCard } from './ReleaseActionErrorCard';
+import {
+  type ReleaseSaveFeedback,
+  ReleaseSaveStatusRow,
+} from './ReleaseSaveStatusRow';
 import { createVoidRetryHandler } from './utils';
 
 /** Auto-save debounce delay in milliseconds */
@@ -32,20 +35,7 @@ const FORMAT_OPTIONS: LyricsFormat[] = ['apple-music', 'deezer', 'genius'];
 
 type SaveStatus = 'idle' | 'saving' | 'saved' | 'error';
 
-type ActionFeedback =
-  | {
-      readonly kind: 'save';
-      readonly message: string;
-      readonly actionLabel: string;
-      readonly onRetry: () => void;
-    }
-  | {
-      readonly kind: 'format';
-      readonly message: string;
-      readonly actionLabel: string;
-      readonly onRetry: () => void;
-    }
-  | null;
+type ActionFeedback = ReleaseSaveFeedback | null;
 
 interface ReleaseLyricsSectionProps {
   readonly releaseId: string;
@@ -132,7 +122,6 @@ export function ReleaseLyricsSection({
       setSaveStatus('error');
       const message = 'Failed to save lyrics. Your draft is still here.';
       setActionFeedback({
-        kind: 'save',
         message,
         actionLabel: 'Retry save',
         onRetry: createVoidRetryHandler(performAutoSave),
@@ -188,7 +177,6 @@ export function ReleaseLyricsSection({
         const message =
           'Unable to format lyrics right now. Your draft is still here.';
         setActionFeedback({
-          kind: 'format',
           message,
           actionLabel: 'Retry format',
           onRetry: createVoidRetryHandler(() => handleFormat(format)),
@@ -245,35 +233,7 @@ export function ReleaseLyricsSection({
         />
         {/* Auto-save status indicator */}
         <div className='min-h-[22px]'>
-          {saveStatus !== 'idle' || actionFeedback ? (
-            <div
-              className='flex items-center gap-1 text-2xs'
-              role='status'
-              aria-live='polite'
-            >
-              {saveStatus === 'saving' ? (
-                <>
-                  <Loader2
-                    className='h-3 w-3 animate-spin text-tertiary-token'
-                    aria-hidden='true'
-                  />
-                  <span className='text-tertiary-token'>Saving…</span>
-                </>
-              ) : saveStatus === 'saved' && !actionFeedback ? (
-                <>
-                  <Check className='h-3 w-3 text-success' aria-hidden='true' />
-                  <span className='text-tertiary-token'>Saved</span>
-                </>
-              ) : actionFeedback ? (
-                <ReleaseActionErrorCard
-                  variant='inline'
-                  message={actionFeedback.message}
-                  actionLabel={actionFeedback.actionLabel}
-                  onRetry={actionFeedback.onRetry}
-                />
-              ) : null}
-            </div>
-          ) : null}
+          <ReleaseSaveStatusRow status={saveStatus} feedback={actionFeedback} />
         </div>
       </div>
 

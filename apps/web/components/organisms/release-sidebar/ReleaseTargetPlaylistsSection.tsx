@@ -7,7 +7,7 @@ import { toast } from 'sonner';
 import { DrawerSurfaceCard } from '@/components/molecules/drawer';
 import { LINEAR_SURFACE } from '@/features/dashboard/tokens';
 import { cn } from '@/lib/utils';
-import { ReleaseActionErrorCard } from './ReleaseActionErrorCard';
+import { ReleaseSaveStatusRow } from './ReleaseSaveStatusRow';
 import { createVoidRetryHandler } from './utils';
 
 interface ReleaseTargetPlaylistsSectionProps {
@@ -99,18 +99,19 @@ export function ReleaseTargetPlaylistsSection({
         Playlists you&apos;re targeting for this release. Leave blank to use
         your defaults.
       </p>
-      <div className='min-h-[18px]'>
-        {saveError ? (
-          <div role='status' aria-live='polite'>
-            <ReleaseActionErrorCard
-              variant='card'
-              message={saveError}
-              actionLabel='Try again'
-              onRetry={handleRetry}
-            />
-          </div>
-        ) : null}
-      </div>
+      <ReleaseSaveStatusRow
+        status={isSaving ? 'saving' : saveError ? 'error' : 'idle'}
+        feedback={
+          saveError
+            ? {
+                message: saveError,
+                actionLabel: 'Try again',
+                onRetry: handleRetry,
+              }
+            : null
+        }
+        minHeightClassName='min-h-[18px]'
+      />
       <Input
         type='text'
         id={`target-playlists-${releaseId}`}
