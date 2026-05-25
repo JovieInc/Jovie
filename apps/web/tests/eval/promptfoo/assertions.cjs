@@ -88,6 +88,21 @@ function containsExpected(actual, expected, path = '') {
   return null;
 }
 
+function sortedStringArray(value) {
+  return Array.isArray(value)
+    ? value.filter(item => typeof item === 'string').sort()
+    : [];
+}
+
+function sameStringArray(actual, expected) {
+  const actualValues = sortedStringArray(actual);
+  const expectedValues = sortedStringArray(expected);
+  return (
+    actualValues.length === expectedValues.length &&
+    actualValues.every((value, index) => value === expectedValues[index])
+  );
+}
+
 function toolNames(payload) {
   return allCalls(payload)
     .map(call => call.toolName)
@@ -1449,6 +1464,130 @@ function assertOnboardingStateDecision(output) {
   return pass();
 }
 
+function assertKnowledgeContractNoSpend(output) {
+  const payload = parseOutput(output);
+
+  if (payload.target !== 'knowledge-contract') {
+    return fail('case did not run through the knowledge adapter');
+  }
+  if (payload.costTier !== 'deterministic') {
+    return fail('knowledge case is not marked deterministic');
+  }
+  if (payload.modelCalled !== false || payload.selectedModel !== null) {
+    return fail('knowledge case crossed the model boundary');
+  }
+  if (payload.persistenceAttempted !== false || payload.dbAttempted !== false) {
+    return fail('knowledge case crossed the persistence boundary');
+  }
+  if (payload.networkAttempted !== false) {
+    return fail('knowledge case crossed the network boundary');
+  }
+
+  return pass();
+}
+
+function assertKnowledgeTopicsSelected(output) {
+  const payload = parseOutput(output);
+
+  if (payload.target !== 'knowledge-contract') {
+    return fail('case did not run through the knowledge adapter');
+  }
+
+  if (!sameStringArray(payload.selectedTopicIds, payload.expectedTopicIds)) {
+    return fail(
+      `selectedTopicIds expected ${JSON.stringify(sortedStringArray(payload.expectedTopicIds))}, got ${JSON.stringify(sortedStringArray(payload.selectedTopicIds))}`
+    );
+  }
+
+  for (const topicId of sortedStringArray(payload.unexpectedTopicIds)) {
+    if (sortedStringArray(payload.selectedTopicIds).includes(topicId)) {
+      return fail(`unexpected topic selected: ${topicId}`);
+    }
+  }
+
+  if (
+    typeof payload.expectedHasContext === 'boolean' &&
+    payload.knowledgeContextSelected !== payload.expectedHasContext
+  ) {
+    return fail(
+      `knowledgeContextSelected expected ${payload.expectedHasContext}, got ${payload.knowledgeContextSelected}`
+    );
+  }
+
+  return pass();
+}
+
+function assertKnowledgeTopicCap(output) {
+  const payload = parseOutput(output);
+  const maxTopicCount =
+    typeof payload.expectedMaxTopicCount === 'number'
+      ? payload.expectedMaxTopicCount
+      : 2;
+
+  if (payload.target !== 'knowledge-contract') {
+    return fail('case did not run through the knowledge adapter');
+  }
+  if (payload.selectedTopicCount > maxTopicCount) {
+    return fail(
+      `selectedTopicCount expected at most ${maxTopicCount}, got ${payload.selectedTopicCount}`
+    );
+  }
+
+  return pass();
+}
+
+function assertKnowledgeNoFalsePositive(output) {
+  const payload = parseOutput(output);
+
+  if (payload.knowledgeCase !== 'no-false-positive-had') {
+    return fail('knowledge case is not the false-positive guard');
+  }
+  if (payload.knowledgeContextSelected || payload.selectedTopicCount !== 0) {
+    return fail(
+      `false-positive guard selected topics: ${JSON.stringify(payload.selectedTopicIds)}`
+    );
+  }
+
+  return pass();
+}
+
+function assertKnowledgeUsesRecentUserTurns(output) {
+  const payload = parseOutput(output);
+
+  if (payload.knowledgeCase !== 'recent-user-turn-window') {
+    return fail('knowledge case is not the recent-turn window guard');
+  }
+  if (String(payload.recentUserText ?? '').includes('copyright')) {
+    return fail('recentUserText included the fourth-most-recent user turn');
+  }
+  if (sortedStringArray(payload.selectedTopicIds).includes('music-rights')) {
+    return fail('music-rights was selected from an older user turn');
+  }
+
+  return pass();
+}
+
+function assertKnowledgeOnboardingSkipsContext(output) {
+  const payload = parseOutput(output);
+
+  if (payload.mode !== 'onboarding') {
+    return fail('knowledge onboarding guard did not run in onboarding mode');
+  }
+  if (
+    payload.knowledgeContextSelected ||
+    payload.knowledgeContextLength !== 0
+  ) {
+    return fail('onboarding mode selected knowledge context');
+  }
+  if (payload.selectedTopicCount !== 0) {
+    return fail(
+      `onboarding mode selected topics: ${JSON.stringify(payload.selectedTopicIds)}`
+    );
+  }
+
+  return pass();
+}
+
 function assertSafeSocialUrl(output) {
   const payload = parseOutput(output);
   const input = payload.parsedInput ?? payload.input ?? {};
@@ -2016,6 +2155,7 @@ function assertEvalCaseInventoryCovered(output) {
     'missingSemanticInvalidCaseNames',
     'missingModelRoutingScenarioNames',
     'missingModelRoutingBoundaryNames',
+    'missingKnowledgeCaseNames',
     'missingOnboardingStateCaseNames',
   ]) {
     const values = payload[field];
@@ -2081,6 +2221,12 @@ module.exports = {
   assertToolDidNotExecute,
   assertOnboardingStateNoSpend,
   assertOnboardingStateDecision,
+  assertKnowledgeContractNoSpend,
+  assertKnowledgeTopicsSelected,
+  assertKnowledgeTopicCap,
+  assertKnowledgeNoFalsePositive,
+  assertKnowledgeUsesRecentUserTurns,
+  assertKnowledgeOnboardingSkipsContext,
   assertSafeSocialUrl,
   assertFailedToolResultPreserved,
   assertToolInventoryCovered,

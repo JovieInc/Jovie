@@ -12,6 +12,7 @@ import {
   TEST_MODE_HEADER,
   TEST_USER_ID_HEADER,
 } from '@/lib/auth/test-mode-constants';
+import { KNOWLEDGE_TOPICS } from '@/lib/chat/knowledge/topics';
 import {
   canUseLightModel,
   executeChatTurn,
@@ -58,6 +59,7 @@ type EvalVars = Record<string, unknown>;
 type EvalTarget =
   | 'chat-turn'
   | 'eval-case-inventory'
+  | 'knowledge-contract'
   | 'model-contract'
   | 'mobile-chat-route'
   | 'onboarding-state-contract'
@@ -381,6 +383,13 @@ const REQUIRED_ONBOARDING_STATE_CASES = [
   'weak-signal-force-waitlist',
   'weak-signal-needs-more-info',
 ] as const;
+const REQUIRED_KNOWLEDGE_CASES = [
+  'monetization-only',
+  'no-false-positive-had',
+  'onboarding-skips-knowledge',
+  'recent-user-turn-window',
+  'release-playlist-topic-cap',
+] as const;
 const CHAT_SLASH_SKILL_NAMES = commandsForSurface('chat-slash')
   .filter(command => command.kind === 'skill')
   .map(command => command.id)
@@ -433,6 +442,7 @@ function toMode(value: unknown): 'app' | 'onboarding' {
 function toTarget(value: unknown): EvalTarget {
   if (
     value === 'eval-case-inventory' ||
+    value === 'knowledge-contract' ||
     value === 'mobile-chat-route' ||
     value === 'model-contract' ||
     value === 'onboarding-state-contract' ||
@@ -1960,6 +1970,96 @@ function toUiMessages(prompt: string, vars: EvalVars): UIMessage[] {
   });
 }
 
+function stringArrayValue(value: unknown): string[] {
+  if (typeof value === 'string') {
+    return value
+      .split(',')
+      .map(item => item.trim())
+      .filter(item => item.length > 0)
+      .sort();
+  }
+
+  return Array.isArray(value)
+    ? value.filter((item): item is string => typeof item === 'string').sort()
+    : [];
+}
+
+function userTextFromMessages(uiMessages: readonly UIMessage[]): string[] {
+  return uiMessages
+    .filter(message => message.role === 'user')
+    .flatMap(message =>
+      message.parts
+        .filter(
+          (part): part is { type: 'text'; text: string } =>
+            part.type === 'text' && typeof part.text === 'string'
+        )
+        .map(part => part.text)
+    );
+}
+
+function selectedKnowledgeTopicIds(knowledgeContext: string): string[] {
+  if (knowledgeContext.length === 0) return [];
+
+  return KNOWLEDGE_TOPICS.filter(
+    topic =>
+      topic.content.length > 0 && knowledgeContext.includes(topic.content)
+  )
+    .map(topic => topic.id)
+    .sort();
+}
+
+function evaluateKnowledgeContract(prompt: string, vars: EvalVars) {
+  const knowledgeCase =
+    typeof vars.knowledgeCase === 'string' ? vars.knowledgeCase : 'unspecified';
+  const mode = toMode(vars.mode);
+  const uiMessages = toUiMessages(prompt, vars);
+  const userTexts = userTextFromMessages(uiMessages);
+  const recentUserText = [...userTexts].reverse().slice(0, 3).join(' ');
+  const knowledgeContext =
+    mode === 'onboarding' ? '' : selectKnowledgeContextForTurn(uiMessages);
+  const selectedTopicIds = selectedKnowledgeTopicIds(knowledgeContext);
+
+  return {
+    target: 'knowledge-contract',
+    adapter: 'knowledge-contract',
+    costTier: 'deterministic',
+    text: '',
+    selectedModel: null,
+    modelCalled: false,
+    persistenceAttempted: false,
+    dbAttempted: false,
+    networkAttempted: false,
+    mode,
+    knowledgeCase,
+    messageCount: uiMessages.length,
+    userText: userTexts.join('\n'),
+    recentUserText,
+    knowledgeContextSelected: knowledgeContext.length > 0,
+    knowledgeContextLength: knowledgeContext.length,
+    selectedTopicIds,
+    selectedTopicCount: selectedTopicIds.length,
+    selectedTopicPreviews: KNOWLEDGE_TOPICS.filter(topic =>
+      selectedTopicIds.includes(topic.id)
+    ).map(topic => ({
+      id: topic.id,
+      preview: topic.content.slice(0, 180),
+    })),
+    expectedTopicIds: stringArrayValue(vars.expectedTopicIds),
+    unexpectedTopicIds: stringArrayValue(vars.unexpectedTopicIds),
+    expectedHasContext:
+      typeof vars.expectedHasContext === 'boolean'
+        ? vars.expectedHasContext
+        : null,
+    expectedMaxTopicCount:
+      typeof vars.expectedMaxTopicCount === 'number'
+        ? vars.expectedMaxTopicCount
+        : 2,
+    toolCalls: [],
+    toolResults: [],
+    toolExecutions: [],
+  };
+}
+
 function buildEvalReleases(vars: EvalVars): ReleaseContext[] {
   const overrides = Array.isArray(vars.releaseOverrides)
     ? (vars.releaseOverrides as Parameters<typeof buildTestReleases>[0])
@@ -3143,6 +3243,7 @@ type EvalCaseSummary = {
   readonly modelScenario: string | null;
   readonly expectedModel: string | null;
   readonly eventCase: string | null;
+  readonly knowledgeCase: string | null;
   readonly renderCase: string | null;
   readonly stateCase: string | null;
   readonly mode: string | null;
@@ -3229,6 +3330,7 @@ function parseEvalCaseSummary(block: string): EvalCaseSummary {
     modelScenario: scalarValue(block, 'modelScenario'),
     expectedModel: scalarValue(block, 'expectedModel'),
     eventCase: scalarValue(block, 'eventCase'),
+    knowledgeCase: scalarValue(block, 'knowledgeCase'),
     renderCase: scalarValue(block, 'renderCase'),
     stateCase: scalarValue(block, 'stateCase'),
     mode: scalarValue(block, 'mode') ?? 'app',
@@ -3350,6 +3452,15 @@ function evaluateEvalCaseInventory(vars: EvalVars) {
           expectedModel === 'light' || expectedModel === 'primary'
       )
   );
+  const knowledgeCaseNames = uniqueSorted(
+    deterministicCases
+      .filter(testCase => testCase.target === 'knowledge-contract')
+      .map(testCase => testCase.knowledgeCase)
+      .filter(
+        (knowledgeCase): knowledgeCase is string =>
+          typeof knowledgeCase === 'string'
+      )
+  );
   const onboardingStateCaseNames = uniqueSorted(
     deterministicCases
       .filter(testCase => testCase.target === 'onboarding-state-contract')
@@ -3440,6 +3551,12 @@ function evaluateEvalCaseInventory(vars: EvalVars) {
     missingModelRoutingBoundaryNames: missingNames(
       ['light', 'primary'],
       modelRoutingBoundaryNames
+    ),
+    requiredKnowledgeCaseNames: [...REQUIRED_KNOWLEDGE_CASES],
+    knowledgeCaseNames,
+    missingKnowledgeCaseNames: missingNames(
+      REQUIRED_KNOWLEDGE_CASES,
+      knowledgeCaseNames
     ),
     requiredOnboardingStateCaseNames: [...REQUIRED_ONBOARDING_STATE_CASES],
     onboardingStateCaseNames,
@@ -3551,6 +3668,16 @@ export default class JovieChatPromptfooProvider {
 
     if (target === 'model-contract') {
       const payload = evaluateModelContract(prompt, vars);
+      return {
+        output: JSON.stringify(payload),
+        raw: payload,
+        format: 'json',
+        latencyMs: Date.now() - startedAt,
+      };
+    }
+
+    if (target === 'knowledge-contract') {
+      const payload = evaluateKnowledgeContract(prompt, vars);
       return {
         output: JSON.stringify(payload),
         raw: payload,
