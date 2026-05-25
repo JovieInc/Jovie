@@ -70,6 +70,7 @@ type EvalTarget =
   | 'mobile-chat-route'
   | 'onboarding-welcome-chat-contract'
   | 'onboarding-state-contract'
+  | 'onboarding-tool-sequence-contract'
   | 'prompt-context-contract'
   | 'tool-access-contract'
   | 'tool-contract'
@@ -394,6 +395,12 @@ const REQUIRED_ONBOARDING_STATE_CASES = [
   'weak-signal-force-waitlist',
   'weak-signal-needs-more-info',
 ] as const;
+const REQUIRED_ONBOARDING_TOOL_SEQUENCE_CASES = [
+  'instant-access-next-step-before-checkout',
+  'premature-next-step-blocked-before-identity',
+  'spotify-confirmation-observation-next-step',
+  'waitlist-outcome-no-checkout',
+] as const;
 const REQUIRED_WELCOME_CHAT_CASES = [
   'claims-current-session-orphan-before-creating-new',
   'creates-new-welcome-chat-with-route-panel-profile-from-onboarding',
@@ -477,6 +484,7 @@ function toTarget(value: unknown): EvalTarget {
     value === 'model-contract' ||
     value === 'onboarding-welcome-chat-contract' ||
     value === 'onboarding-state-contract' ||
+    value === 'onboarding-tool-sequence-contract' ||
     value === 'prompt-context-contract' ||
     value === 'tool-access-contract' ||
     value === 'tool-contract' ||
@@ -3232,6 +3240,209 @@ function evaluateOnboardingStateContract(vars: EvalVars) {
   };
 }
 
+function executeSequenceSpotifyConfirmation(
+  state: EvalOnboardingState,
+  spotifyArtistId = 'spotify-luna-123'
+): ToolExecution {
+  const input = { spotifyArtistId };
+  const output = defaultToolResult('confirmSpotifyArtist', input);
+  const artist = toObject(toObject(output).artist);
+
+  state.spotifyArtistId = spotifyArtistId;
+  state.spotifyArtistName =
+    typeof artist.name === 'string' ? artist.name : 'Luna Waves';
+  state.spotifyImageUrl =
+    typeof artist.imageUrl === 'string' ? artist.imageUrl : null;
+  state.spotifyGenres = Array.isArray(artist.genres)
+    ? artist.genres.filter(
+        (genre): genre is string => typeof genre === 'string'
+      )
+    : [];
+  state.spotifyPopularity = nullableNumber(artist.popularity);
+  state.spotifyFollowers = nullableNumber(artist.followers);
+
+  return { name: 'confirmSpotifyArtist', input, output };
+}
+
+function executeSequenceHandleCheck(handle = 'lunawaves'): ToolExecution {
+  const input = { handle };
+
+  return {
+    name: 'checkHandle',
+    input,
+    output: defaultToolResult('checkHandle', input),
+  };
+}
+
+function executeSequenceSignal(
+  state: EvalOnboardingState,
+  signal: EvalInterviewSignal
+): ToolExecution {
+  const parsed = interviewSignalSchema.parse(signal);
+  state.signals.push(parsed);
+
+  return {
+    name: 'recordInterviewSignal',
+    input: parsed,
+    output: {
+      action: 'signal_recorded',
+      signalCount: state.signals.length,
+      summary: 'Signal noted.',
+    },
+  };
+}
+
+function sequenceNextStepDecision(state: EvalOnboardingState) {
+  const timestampBase = WEB_CHAT_EVAL_EPOCH_SECONDS * 1000;
+  const collapsedSignal = collapseInterviewSignals(
+    state.signals.map((signal, index) => ({
+      ...signal,
+      recordedAt: new Date(timestampBase + index * 1000).toISOString(),
+    }))
+  );
+  const nextStepDecision = evaluateAccessSignal({
+    signal: collapsedSignal,
+    spotifyFollowers: state.spotifyFollowers,
+    turnCount: state.turnCount,
+  });
+
+  return { collapsedSignal, nextStepDecision };
+}
+
+function executeSequenceNextStep(state: EvalOnboardingState): {
+  readonly execution: ToolExecution;
+  readonly collapsedSignal: EvalInterviewSignal;
+  readonly nextStepDecision: ReturnType<typeof evaluateAccessSignal>;
+} {
+  const { collapsedSignal, nextStepDecision } = sequenceNextStepDecision(state);
+  const output = {
+    action: 'propose_next_step',
+    decision: nextStepDecision,
+    summary: `Next step: ${nextStepDecision.kind.replaceAll('_', ' ')}.`,
+  };
+
+  return {
+    execution: {
+      name: 'proposeNextStep',
+      input: {},
+      output,
+    },
+    collapsedSignal,
+    nextStepDecision,
+  };
+}
+
+function executeSequenceCheckout(plan: 'pro' | 'max' | 'free' = 'pro') {
+  const input = { plan };
+
+  return {
+    name: 'proposeCheckout',
+    input,
+    output: defaultToolResult('proposeCheckout', input),
+  };
+}
+
+function evaluateOnboardingToolSequenceContract(vars: EvalVars) {
+  const sequenceCase =
+    typeof vars.sequenceCase === 'string'
+      ? vars.sequenceCase
+      : 'spotify-confirmation-observation-next-step';
+  const state = createEvalOnboardingState(vars);
+  const stateBefore = cloneJson(state);
+  const toolExecutions: ToolExecution[] = [];
+  const blockedSteps: Array<{
+    readonly toolName: string;
+    readonly reason: string;
+  }> = [];
+  let collapsedSignal: EvalInterviewSignal = {};
+  let nextStepDecision: ReturnType<typeof evaluateAccessSignal> | null = null;
+
+  if (sequenceCase === 'premature-next-step-blocked-before-identity') {
+    blockedSteps.push({
+      toolName: 'proposeNextStep',
+      reason: 'spotify_identity_missing',
+    });
+    toolExecutions.push({
+      name: 'searchSpotifyArtist',
+      input: { query: 'Luna Waves' },
+      output: defaultToolResult('searchSpotifyArtist', { query: 'Luna Waves' }),
+    });
+  } else if (sequenceCase === 'waitlist-outcome-no-checkout') {
+    state.turnCount = MAX_INTERVIEW_TURNS_BEFORE_FORCE;
+    toolExecutions.push(
+      executeSequenceSignal(state, { audienceBand: 'under_500' })
+    );
+    const nextStep = executeSequenceNextStep(state);
+    collapsedSignal = nextStep.collapsedSignal;
+    nextStepDecision = nextStep.nextStepDecision;
+    toolExecutions.push(nextStep.execution);
+  } else {
+    toolExecutions.push(executeSequenceSpotifyConfirmation(state));
+
+    if (sequenceCase === 'instant-access-next-step-before-checkout') {
+      toolExecutions.push(executeSequenceHandleCheck());
+      toolExecutions.push(
+        executeSequenceSignal(state, {
+          releaseStage: 'announced_unreleased',
+          audienceBand: '500_to_5k',
+        })
+      );
+    } else {
+      toolExecutions.push(
+        executeSequenceSignal(state, {
+          audienceBand: '5k_to_50k',
+          freeNote: 'Spotify profile confirmed with 12500 followers.',
+        })
+      );
+    }
+
+    const nextStep = executeSequenceNextStep(state);
+    collapsedSignal = nextStep.collapsedSignal;
+    nextStepDecision = nextStep.nextStepDecision;
+    toolExecutions.push(nextStep.execution);
+
+    if (
+      sequenceCase === 'instant-access-next-step-before-checkout' &&
+      nextStepDecision.kind === 'instant_access'
+    ) {
+      toolExecutions.push(executeSequenceCheckout('pro'));
+    }
+  }
+
+  const toolCallOrder = toolExecutions.map(execution => execution.name);
+
+  return {
+    target: 'onboarding-tool-sequence-contract',
+    adapter: 'onboarding-tool-sequence-contract',
+    costTier: 'deterministic',
+    text: '',
+    selectedModel: null,
+    modelCalled: false,
+    persistenceAttempted: false,
+    dbAttempted: false,
+    networkAttempted: false,
+    sequenceCase,
+    mode: 'onboarding',
+    availableToolNames: [...ONBOARDING_TOOLS],
+    stateBefore,
+    stateAfter: cloneJson(state),
+    blockedSteps,
+    toolCallOrder,
+    collapsedSignal,
+    nextStepDecision,
+    checkoutCalled: toolCallOrder.includes('proposeCheckout'),
+    toolCalls: toolExecutions.map(execution => ({
+      toolName: execution.name,
+      input: execution.input,
+    })),
+    toolResults: toolExecutions.map(execution => ({
+      toolName: execution.name,
+      output: execution.output,
+    })),
+    toolExecutions,
+  };
+}
+
 function buildEvalTools(
   toolNames: readonly string[],
   vars: EvalVars,
@@ -3989,6 +4200,7 @@ type EvalCaseSummary = {
   readonly knowledgeCase: string | null;
   readonly promptCase: string | null;
   readonly renderCase: string | null;
+  readonly sequenceCase: string | null;
   readonly stateCase: string | null;
   readonly welcomeCase: string | null;
   readonly mode: string | null;
@@ -4079,6 +4291,7 @@ function parseEvalCaseSummary(block: string): EvalCaseSummary {
     knowledgeCase: scalarValue(block, 'knowledgeCase'),
     promptCase: scalarValue(block, 'promptCase'),
     renderCase: scalarValue(block, 'renderCase'),
+    sequenceCase: scalarValue(block, 'sequenceCase'),
     stateCase: scalarValue(block, 'stateCase'),
     welcomeCase: scalarValue(block, 'welcomeCase'),
     mode: scalarValue(block, 'mode') ?? 'app',
@@ -4231,6 +4444,17 @@ function evaluateEvalCaseInventory(vars: EvalVars) {
       .map(testCase => testCase.stateCase)
       .filter((stateCase): stateCase is string => typeof stateCase === 'string')
   );
+  const onboardingToolSequenceCaseNames = uniqueSorted(
+    deterministicCases
+      .filter(
+        testCase => testCase.target === 'onboarding-tool-sequence-contract'
+      )
+      .map(testCase => testCase.sequenceCase)
+      .filter(
+        (sequenceCase): sequenceCase is string =>
+          typeof sequenceCase === 'string'
+      )
+  );
   const welcomeChatCaseNames = uniqueSorted(
     deterministicCases
       .filter(
@@ -4349,6 +4573,14 @@ function evaluateEvalCaseInventory(vars: EvalVars) {
     missingOnboardingStateCaseNames: missingNames(
       REQUIRED_ONBOARDING_STATE_CASES,
       onboardingStateCaseNames
+    ),
+    requiredOnboardingToolSequenceCaseNames: [
+      ...REQUIRED_ONBOARDING_TOOL_SEQUENCE_CASES,
+    ],
+    onboardingToolSequenceCaseNames,
+    missingOnboardingToolSequenceCaseNames: missingNames(
+      REQUIRED_ONBOARDING_TOOL_SEQUENCE_CASES,
+      onboardingToolSequenceCaseNames
     ),
     requiredWelcomeChatCaseNames: [...REQUIRED_WELCOME_CHAT_CASES],
     welcomeChatCaseNames,
@@ -4490,6 +4722,16 @@ export default class JovieChatPromptfooProvider {
 
     if (target === 'onboarding-state-contract') {
       const payload = evaluateOnboardingStateContract(vars);
+      return {
+        output: JSON.stringify(payload),
+        raw: payload,
+        format: 'json',
+        latencyMs: Date.now() - startedAt,
+      };
+    }
+
+    if (target === 'onboarding-tool-sequence-contract') {
+      const payload = evaluateOnboardingToolSequenceContract(vars);
       return {
         output: JSON.stringify(payload),
         raw: payload,

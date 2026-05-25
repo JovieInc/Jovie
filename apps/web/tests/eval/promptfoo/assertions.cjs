@@ -1464,6 +1464,185 @@ function assertOnboardingStateDecision(output) {
   return pass();
 }
 
+function onboardingSequencePayload(output) {
+  const payload = parseOutput(output);
+
+  if (payload.target !== 'onboarding-tool-sequence-contract') {
+    return {
+      payload,
+      error: 'case did not run through the onboarding tool-sequence adapter',
+    };
+  }
+
+  return { payload, error: null };
+}
+
+function sequenceToolOrder(payload) {
+  return Array.isArray(payload.toolCallOrder) ? payload.toolCallOrder : [];
+}
+
+function sequenceToolResults(payload) {
+  return Array.isArray(payload.toolResults) ? payload.toolResults : [];
+}
+
+function sequenceIndex(payload, toolName) {
+  return sequenceToolOrder(payload).indexOf(toolName);
+}
+
+function assertOnboardingSequenceNoSpend(output) {
+  const { payload, error } = onboardingSequencePayload(output);
+  if (error) return fail(error);
+
+  if (payload.costTier !== 'deterministic') {
+    return fail('onboarding sequence case is not marked deterministic');
+  }
+  if (payload.modelCalled !== false || payload.selectedModel !== null) {
+    return fail('onboarding sequence crossed the model boundary');
+  }
+  if (payload.persistenceAttempted !== false || payload.dbAttempted !== false) {
+    return fail('onboarding sequence crossed the persistence boundary');
+  }
+  if (payload.networkAttempted !== false) {
+    return fail('onboarding sequence crossed the network boundary');
+  }
+
+  return pass();
+}
+
+function assertOnboardingSequenceOrder(output) {
+  const { payload, error } = onboardingSequencePayload(output);
+  if (error) return fail(error);
+
+  const order = sequenceToolOrder(payload);
+  if (
+    order.length === 0 &&
+    payload.sequenceCase !== 'premature-next-step-blocked-before-identity'
+  ) {
+    return fail('onboarding sequence did not execute any tools');
+  }
+  if (order.some(toolName => !payload.availableToolNames?.includes(toolName))) {
+    return fail(`sequence used unavailable tool: ${order.join(', ')}`);
+  }
+
+  return pass();
+}
+
+function assertOnboardingObservationAfterSpotify(output) {
+  const { payload, error } = onboardingSequencePayload(output);
+  if (error) return fail(error);
+
+  if (payload.sequenceCase !== 'spotify-confirmation-observation-next-step') {
+    return fail(
+      'sequence case is not spotify-confirmation-observation-next-step'
+    );
+  }
+  const confirmIndex = sequenceIndex(payload, 'confirmSpotifyArtist');
+  const signalIndex = sequenceIndex(payload, 'recordInterviewSignal');
+  const nextStepIndex = sequenceIndex(payload, 'proposeNextStep');
+  if (
+    !(
+      confirmIndex >= 0 &&
+      signalIndex > confirmIndex &&
+      nextStepIndex > signalIndex
+    )
+  ) {
+    return fail('Spotify confirmation, signal, and next step were not ordered');
+  }
+  if (payload.stateAfter?.spotifyArtistId !== 'spotify-luna-123') {
+    return fail('Spotify confirmation did not update onboarding state');
+  }
+  if (payload.stateAfter?.signals?.length !== 1) {
+    return fail('Spotify observation did not record exactly one signal');
+  }
+  if (payload.nextStepDecision?.kind !== 'instant_access') {
+    return fail('confirmed Spotify sequence did not reach instant access');
+  }
+
+  return pass();
+}
+
+function assertOnboardingCheckoutAfterInstantAccess(output) {
+  const { payload, error } = onboardingSequencePayload(output);
+  if (error) return fail(error);
+
+  if (payload.sequenceCase !== 'instant-access-next-step-before-checkout') {
+    return fail(
+      'sequence case is not instant-access-next-step-before-checkout'
+    );
+  }
+  const nextStepIndex = sequenceIndex(payload, 'proposeNextStep');
+  const checkoutIndex = sequenceIndex(payload, 'proposeCheckout');
+  if (payload.nextStepDecision?.kind !== 'instant_access') {
+    return fail('checkout sequence did not first produce instant access');
+  }
+  if (!(checkoutIndex > nextStepIndex && nextStepIndex >= 0)) {
+    return fail('checkout was not called after proposeNextStep');
+  }
+  const checkoutResult = sequenceToolResults(payload).find(
+    result => result.toolName === 'proposeCheckout'
+  );
+  if (
+    !/\/onboarding\/checkout\?plan=pro/.test(
+      checkoutResult?.output?.handoffUrl ?? ''
+    )
+  ) {
+    return fail('checkout handoff URL is missing the Pro onboarding route');
+  }
+
+  return pass();
+}
+
+function assertOnboardingNoCheckoutForWaitlist(output) {
+  const { payload, error } = onboardingSequencePayload(output);
+  if (error) return fail(error);
+
+  if (payload.sequenceCase !== 'waitlist-outcome-no-checkout') {
+    return fail('sequence case is not waitlist-outcome-no-checkout');
+  }
+  if (payload.nextStepDecision?.kind !== 'waitlist') {
+    return fail('waitlist sequence did not produce a waitlist decision');
+  }
+  if (payload.checkoutCalled !== false) {
+    return fail('waitlist sequence called checkout');
+  }
+  if (sequenceToolOrder(payload).includes('proposeCheckout')) {
+    return fail('waitlist sequence included proposeCheckout in order');
+  }
+
+  return pass();
+}
+
+function assertOnboardingBlocksPrematureNextStep(output) {
+  const { payload, error } = onboardingSequencePayload(output);
+  if (error) return fail(error);
+
+  if (payload.sequenceCase !== 'premature-next-step-blocked-before-identity') {
+    return fail(
+      'sequence case is not premature-next-step-blocked-before-identity'
+    );
+  }
+  const blocked = Array.isArray(payload.blockedSteps)
+    ? payload.blockedSteps
+    : [];
+  if (
+    !blocked.some(
+      step =>
+        step.toolName === 'proposeNextStep' &&
+        step.reason === 'spotify_identity_missing'
+    )
+  ) {
+    return fail('premature next step was not blocked on Spotify identity');
+  }
+  if (sequenceToolOrder(payload).includes('proposeNextStep')) {
+    return fail('blocked sequence still executed proposeNextStep');
+  }
+  if (sequenceToolOrder(payload)[0] !== 'searchSpotifyArtist') {
+    return fail('blocked sequence did not route back to Spotify search');
+  }
+
+  return pass();
+}
+
 function assertKnowledgeContractNoSpend(output) {
   const payload = parseOutput(output);
 
@@ -2745,6 +2924,7 @@ function assertEvalCaseInventoryCovered(output) {
     'missingPromptContextCaseNames',
     'missingToolAccessCaseNames',
     'missingOnboardingStateCaseNames',
+    'missingOnboardingToolSequenceCaseNames',
     'missingWelcomeChatCaseNames',
   ]) {
     const values = payload[field];
@@ -2810,6 +2990,12 @@ module.exports = {
   assertToolDidNotExecute,
   assertOnboardingStateNoSpend,
   assertOnboardingStateDecision,
+  assertOnboardingSequenceNoSpend,
+  assertOnboardingSequenceOrder,
+  assertOnboardingObservationAfterSpotify,
+  assertOnboardingCheckoutAfterInstantAccess,
+  assertOnboardingNoCheckoutForWaitlist,
+  assertOnboardingBlocksPrematureNextStep,
   assertKnowledgeContractNoSpend,
   assertKnowledgeTopicsSelected,
   assertKnowledgeTopicCap,
