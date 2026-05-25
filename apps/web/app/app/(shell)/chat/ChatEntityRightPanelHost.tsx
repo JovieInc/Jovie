@@ -4,23 +4,31 @@ import { Button } from '@jovie/ui';
 import {
   Calendar,
   CheckSquare,
+  Copy,
   Disc3,
+  ExternalLink,
   ImageIcon,
   Link as LinkIcon,
   MessageSquareText,
   Music2,
+  Smartphone,
   UserRound,
   X,
 } from 'lucide-react';
 import dynamic from 'next/dynamic';
 import Image from 'next/image';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { type ReactNode, useEffect, useMemo, useState } from 'react';
 import { usePreviewPanelState } from '@/app/app/(shell)/dashboard/PreviewPanelContext';
 import { ReleaseTaskChecklist } from '@/components/features/dashboard/release-tasks/ReleaseTaskChecklist';
 import { CompactReleasePlanUpgradeCard } from '@/components/features/dashboard/tasks/TasksUpgradeInterstitial';
+import {
+  type ContextMenuItemType,
+  TableContextMenu,
+} from '@/components/organisms/table';
 import { ErrorBoundary } from '@/components/providers/ErrorBoundary';
-import { buildReleaseTasksRoute } from '@/constants/routes';
+import { APP_ROUTES, buildReleaseTasksRoute } from '@/constants/routes';
 import { useRegisterRightPanel } from '@/hooks/useRegisterRightPanel';
 import type { ReleaseViewModel } from '@/lib/discography/types';
 import { usePlanGate } from '@/lib/queries';
@@ -220,13 +228,141 @@ function ChatEntityContextCard({
   );
 }
 
+function buildChatContextMenuItems({
+  title,
+  href,
+  onInspect,
+  onDismiss,
+}: Readonly<{
+  title: string;
+  href?: string | null;
+  onInspect?: () => void;
+  onDismiss?: () => void;
+}>): ContextMenuItemType[] {
+  const items: ContextMenuItemType[] = [];
+
+  if (onInspect) {
+    items.push({
+      id: 'inspect',
+      label: `Inspect ${title}`,
+      icon: <ExternalLink className='h-3.5 w-3.5' />,
+      onClick: onInspect,
+    });
+  }
+
+  if (href) {
+    items.push({
+      id: 'open',
+      label: `Open ${title}`,
+      icon: <ExternalLink className='h-3.5 w-3.5' />,
+      onClick: () => {
+        window.location.assign(href);
+      },
+    });
+  }
+
+  items.push({
+    id: 'copy-title',
+    label: 'Copy Title',
+    icon: <Copy className='h-3.5 w-3.5' />,
+    onClick: () => {
+      void globalThis.navigator?.clipboard?.writeText(title);
+    },
+  });
+
+  if (onDismiss) {
+    items.push(
+      { type: 'separator' },
+      {
+        id: 'dismiss',
+        label: 'Dismiss Context',
+        icon: <X className='h-3.5 w-3.5' />,
+        onClick: onDismiss,
+      }
+    );
+  }
+
+  return items;
+}
+
+function ChatReleaseContextCard({
+  target,
+  profileId,
+  onDismiss,
+}: Readonly<{
+  target: ChatRailContextTarget;
+  profileId: string;
+  onDismiss: (focusKey: string) => void;
+}>) {
+  const { data: release = null, isLoading } = useReleaseEntityQuery(
+    profileId,
+    target.id
+  );
+  const title = release?.title ?? target.label?.trim() ?? 'Release';
+  const meta = release
+    ? `${releaseTypeLabel(release.releaseType)} Context`
+    : isLoading
+      ? 'Loading Release'
+      : 'Release Context';
+
+  return (
+    <TableContextMenu
+      items={buildChatContextMenuItems({
+        title,
+        href: release?.smartLinkPath,
+        onDismiss: () => onDismiss(target.focusKey),
+      })}
+    >
+      <div
+        data-testid='chat-rail-context-card'
+        data-context-kind='release'
+        className='group relative flex min-w-0 items-center gap-3 rounded-lg px-3 py-2.5 text-left transition-colors hover:bg-surface-1'
+      >
+        <div className='relative h-9 w-9 shrink-0 overflow-hidden rounded-lg bg-surface-1 text-tertiary-token'>
+          {release?.artworkUrl ? (
+            <Image
+              src={release.artworkUrl}
+              alt=''
+              fill
+              sizes='36px'
+              className='object-cover'
+            />
+          ) : (
+            <div className='flex h-full w-full items-center justify-center'>
+              <Disc3 className='h-3.5 w-3.5' />
+            </div>
+          )}
+        </div>
+        <div className='min-w-0 flex-1'>
+          <p className='truncate text-[13px] font-semibold text-primary-token'>
+            {title}
+          </p>
+          <p className='truncate text-[11.5px] text-tertiary-token'>{meta}</p>
+        </div>
+        <Button
+          type='button'
+          variant='ghost'
+          size='icon'
+          aria-label='Dismiss release context'
+          onClick={() => onDismiss(target.focusKey)}
+          className='h-7 w-7 shrink-0 opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100'
+        >
+          <X className='h-3.5 w-3.5' />
+        </Button>
+      </div>
+    </TableContextMenu>
+  );
+}
+
 function ChatRailContextCards({
   targets,
   profileContext,
+  profileId,
   onDismiss,
 }: Readonly<{
   targets: readonly ChatRailContextTarget[];
   profileContext?: ChatProfileContextSummary | null;
+  profileId?: string | null;
   onDismiss: (focusKey: string) => void;
 }>) {
   if (targets.length === 0) {
@@ -242,6 +378,13 @@ function ChatRailContextCards({
               key={target.focusKey}
               profile={profileContext}
               target={target}
+              onDismiss={onDismiss}
+            />
+          ) : target.kind === 'release' && profileId ? (
+            <ChatReleaseContextCard
+              key={target.focusKey}
+              target={target}
+              profileId={profileId}
               onDismiss={onDismiss}
             />
           ) : (
@@ -302,201 +445,240 @@ function ChatReleaseEntityPanel({
     Boolean(visibleProviders && visibleProviders.length > 0);
   const shouldShowReleaseTasksSection =
     isTasksWorkspaceGateLoading || canAccessTasksWorkspace || showTasksUpgrade;
+  const contextMenuItems = useMemo<ContextMenuItemType[]>(
+    () =>
+      buildChatContextMenuItems({
+        title: release?.title ?? label ?? 'Release',
+        href: release?.smartLinkPath,
+        onInspect: release
+          ? () => router.push(buildReleaseTasksRoute(release.id))
+          : undefined,
+      }),
+    [label, release, router]
+  );
 
   useEffect(() => {
     setShowTasksUpgrade(true);
   }, [release?.id]);
 
   return (
-    <aside
-      className='flex h-full min-h-0 w-full flex-col overflow-hidden bg-(--linear-app-content-surface)'
-      data-testid='chat-release-entity-panel'
-    >
-      <div className='flex shrink-0 items-center justify-between border-b border-[color-mix(in_oklab,var(--linear-app-shell-border)_64%,transparent)] px-4 py-3'>
-        <div className='min-w-0'>
-          <p className='text-[11px] text-tertiary-token'>Release</p>
-          <h2 className='truncate text-[13px] font-semibold text-primary-token'>
-            {release?.title ?? label ?? 'Release'}
-          </h2>
+    <TableContextMenu items={contextMenuItems}>
+      <aside
+        className='flex h-full min-h-0 w-full flex-col overflow-hidden bg-(--linear-app-content-surface)'
+        data-testid='chat-release-entity-panel'
+      >
+        <div className='flex shrink-0 items-center justify-between border-b border-[color-mix(in_oklab,var(--linear-app-shell-border)_64%,transparent)] px-4 py-3'>
+          <div className='min-w-0'>
+            <p className='text-[11px] text-tertiary-token'>Release</p>
+            <h2 className='truncate text-[13px] font-semibold text-primary-token'>
+              {release?.title ?? label ?? 'Release'}
+            </h2>
+          </div>
+          <Button
+            type='button'
+            variant='ghost'
+            size='icon'
+            aria-label='Close entity panel'
+            onClick={onClose}
+            className='h-8 w-8 shrink-0'
+          >
+            <X className='h-4 w-4' />
+          </Button>
         </div>
-        <Button
-          type='button'
-          variant='ghost'
-          size='icon'
-          aria-label='Close entity panel'
-          onClick={onClose}
-          className='h-8 w-8 shrink-0'
-        >
-          <X className='h-4 w-4' />
-        </Button>
-      </div>
 
-      {loading ? (
-        <div
-          className='flex flex-1 items-center justify-center px-6'
-          role='status'
-          aria-live='polite'
-        >
-          <span className='sr-only'>Loading release…</span>
+        {loading ? (
           <div
-            className='h-4 w-28 rounded skeleton motion-reduce:animate-none'
-            aria-hidden='true'
-          />
-        </div>
-      ) : release ? (
-        <div className='min-h-0 flex-1 overflow-y-auto'>
-          <div className='px-4 py-4'>
-            <div className='flex items-start gap-3'>
-              <div className='relative h-16 w-16 shrink-0 overflow-hidden rounded-lg bg-surface-1'>
-                {release.artworkUrl ? (
-                  <Image
-                    src={release.artworkUrl}
-                    alt=''
-                    fill
-                    className='object-cover'
-                    sizes='64px'
-                  />
-                ) : (
-                  <div className='flex h-full w-full items-center justify-center text-tertiary-token'>
-                    <Disc3 className='h-5 w-5' />
-                  </div>
-                )}
-              </div>
-              <div className='min-w-0 flex-1'>
-                <h3 className='text-[17px] font-semibold leading-tight text-primary-token'>
-                  {release.title}
-                </h3>
-                <div className='mt-2 flex flex-wrap items-center gap-1.5 text-[11px] text-secondary-token'>
-                  <span className='inline-flex items-center gap-1 rounded-md bg-surface-1 px-1.5 py-1'>
-                    <Disc3 className='h-3 w-3 text-tertiary-token' />
-                    {releaseTypeLabel(release.releaseType)}
-                  </span>
-                  {releaseDate ? (
+            className='flex flex-1 items-center justify-center px-6'
+            role='status'
+            aria-live='polite'
+          >
+            <span className='sr-only'>Loading release…</span>
+            <div
+              className='h-4 w-28 rounded skeleton motion-reduce:animate-none'
+              aria-hidden='true'
+            />
+          </div>
+        ) : release ? (
+          <div className='min-h-0 flex-1 overflow-y-auto'>
+            <div className='px-4 py-4'>
+              <div className='flex items-start gap-3'>
+                <div className='relative h-16 w-16 shrink-0 overflow-hidden rounded-lg bg-surface-1'>
+                  {release.artworkUrl ? (
+                    <Image
+                      src={release.artworkUrl}
+                      alt=''
+                      fill
+                      className='object-cover'
+                      sizes='64px'
+                    />
+                  ) : (
+                    <div className='flex h-full w-full items-center justify-center text-tertiary-token'>
+                      <Disc3 className='h-5 w-5' />
+                    </div>
+                  )}
+                </div>
+                <div className='min-w-0 flex-1'>
+                  <h3 className='text-[17px] font-semibold leading-tight text-primary-token'>
+                    {release.title}
+                  </h3>
+                  <div className='mt-2 flex flex-wrap items-center gap-1.5 text-[11px] text-secondary-token'>
                     <span className='inline-flex items-center gap-1 rounded-md bg-surface-1 px-1.5 py-1'>
-                      <Calendar className='h-3 w-3 text-tertiary-token' />
-                      {releaseDate}
+                      <Disc3 className='h-3 w-3 text-tertiary-token' />
+                      {releaseTypeLabel(release.releaseType)}
                     </span>
-                  ) : null}
-                  <span className='rounded-md bg-surface-1 px-1.5 py-1'>
-                    {release.status}
-                  </span>
+                    {releaseDate ? (
+                      <span className='inline-flex items-center gap-1 rounded-md bg-surface-1 px-1.5 py-1'>
+                        <Calendar className='h-3 w-3 text-tertiary-token' />
+                        {releaseDate}
+                      </span>
+                    ) : null}
+                    <span className='rounded-md bg-surface-1 px-1.5 py-1'>
+                      {release.status}
+                    </span>
+                  </div>
                 </div>
               </div>
             </div>
-          </div>
 
-          {hasMedia ? (
-            <ChatEntityPanelSection
-              title='Media'
-              icon={<ImageIcon className='h-3.5 w-3.5 text-tertiary-token' />}
-            >
-              <div className='space-y-3'>
-                {release.previewUrl ? (
-                  <div className='rounded-lg bg-surface-1 px-3 py-2.5'>
-                    <div className='mb-2 flex items-center gap-2 text-[11.5px] font-semibold text-secondary-token'>
-                      <Music2 className='h-3.5 w-3.5 text-tertiary-token' />
-                      Preview
-                    </div>
-                    <audio
-                      controls
-                      src={release.previewUrl}
-                      className='h-8 w-full'
-                    >
-                      <track kind='captions' />
-                    </audio>
-                  </div>
-                ) : null}
-
-                {visibleProviders && visibleProviders.length > 0 ? (
-                  <div className='space-y-1'>
-                    {visibleProviders.slice(0, 6).map(provider => (
-                      <a
-                        key={`${provider.key}:${provider.url}`}
-                        href={provider.url}
-                        target='_blank'
-                        rel='noreferrer'
-                        className='flex min-w-0 items-center gap-2 rounded-md px-2 py-1.5 text-[12px] text-secondary-token transition-colors hover:bg-surface-1 hover:text-primary-token focus-visible:bg-surface-1 focus-visible:outline-none'
-                      >
-                        <LinkIcon className='h-3.5 w-3.5 shrink-0 text-tertiary-token' />
-                        <span className='min-w-0 flex-1 truncate'>
-                          {provider.label}
-                        </span>
-                        <span
-                          className={cn(
-                            'h-1.5 w-1.5 rounded-full',
-                            provider.isPrimary
-                              ? 'bg-green-500'
-                              : 'bg-tertiary-token'
-                          )}
-                        />
-                      </a>
-                    ))}
-                  </div>
-                ) : null}
-              </div>
-            </ChatEntityPanelSection>
-          ) : null}
-
-          {threadTitle ? (
-            <ChatEntityPanelSection
-              title='Thread'
-              icon={
-                <MessageSquareText className='h-3.5 w-3.5 text-tertiary-token' />
-              }
-            >
-              <div className='rounded-lg bg-surface-1 px-3 py-2.5 text-[12px] text-secondary-token'>
-                <p className='truncate font-semibold text-primary-token'>
-                  {threadTitle}
-                </p>
-                <p className='mt-1 text-tertiary-token'>
-                  This release was referenced in the current chat thread.
-                </p>
-              </div>
-            </ChatEntityPanelSection>
-          ) : null}
-
-          {shouldShowReleaseTasksSection ? (
-            <ChatEntityPanelSection
-              title='Tasks'
-              icon={<CheckSquare className='h-3.5 w-3.5 text-tertiary-token' />}
-            >
-              {isTasksWorkspaceGateLoading ? (
-                <div
-                  className='rounded-lg border border-subtle bg-surface-1 px-3 py-3'
-                  data-testid='chat-release-tasks-loading-state'
-                >
-                  <div
-                    className='h-4 w-28 rounded skeleton motion-reduce:animate-none'
-                    aria-hidden='true'
-                  />
-                  <div
-                    className='mt-3 h-20 rounded-md skeleton motion-reduce:animate-none'
-                    aria-hidden='true'
-                  />
-                </div>
-              ) : canAccessTasksWorkspace ? (
-                <ReleaseTaskChecklist
-                  releaseId={release.id}
-                  variant='compact'
-                  releaseDate={release.releaseDate}
-                  onNavigateToFullPage={() =>
+            {release ? (
+              <div className='flex flex-wrap gap-1.5 px-4 pb-4'>
+                <button
+                  type='button'
+                  onClick={() =>
                     router.push(buildReleaseTasksRoute(release.id))
                   }
-                />
-              ) : showTasksUpgrade ? (
-                <CompactReleasePlanUpgradeCard
-                  onDismiss={() => setShowTasksUpgrade(false)}
-                />
-              ) : null}
-            </ChatEntityPanelSection>
-          ) : null}
-        </div>
-      ) : (
-        <div className='flex flex-1 items-center justify-center px-6 text-center text-[13px] text-tertiary-token'>
-          This release is not available in the current profile.
-        </div>
-      )}
-    </aside>
+                  className='inline-flex h-8 items-center gap-1.5 rounded-md border border-subtle bg-surface-1 px-3 text-xs font-medium text-primary-token transition-colors hover:border-default hover:bg-surface-2'
+                >
+                  <CheckSquare className='h-3.5 w-3.5 text-tertiary-token' />
+                  Tasks
+                </button>
+                {release.smartLinkPath ? (
+                  <Link
+                    href={release.smartLinkPath}
+                    className='inline-flex h-8 items-center gap-1.5 rounded-md border border-subtle bg-surface-1 px-3 text-xs font-medium text-primary-token transition-colors hover:border-default hover:bg-surface-2'
+                  >
+                    <ExternalLink className='h-3.5 w-3.5 text-tertiary-token' />
+                    Open
+                  </Link>
+                ) : null}
+              </div>
+            ) : null}
+
+            {hasMedia ? (
+              <ChatEntityPanelSection
+                title='Media'
+                icon={<ImageIcon className='h-3.5 w-3.5 text-tertiary-token' />}
+              >
+                <div className='space-y-3'>
+                  {release.previewUrl ? (
+                    <div className='rounded-lg bg-surface-1 px-3 py-2.5'>
+                      <div className='mb-2 flex items-center gap-2 text-[11.5px] font-semibold text-secondary-token'>
+                        <Music2 className='h-3.5 w-3.5 text-tertiary-token' />
+                        Preview
+                      </div>
+                      <audio
+                        controls
+                        src={release.previewUrl}
+                        className='h-8 w-full'
+                      >
+                        <track kind='captions' />
+                      </audio>
+                    </div>
+                  ) : null}
+
+                  {visibleProviders && visibleProviders.length > 0 ? (
+                    <div className='space-y-1'>
+                      {visibleProviders.slice(0, 6).map(provider => (
+                        <a
+                          key={`${provider.key}:${provider.url}`}
+                          href={provider.url}
+                          target='_blank'
+                          rel='noreferrer'
+                          className='flex min-w-0 items-center gap-2 rounded-md px-2 py-1.5 text-[12px] text-secondary-token transition-colors hover:bg-surface-1 hover:text-primary-token focus-visible:bg-surface-1 focus-visible:outline-none'
+                        >
+                          <LinkIcon className='h-3.5 w-3.5 shrink-0 text-tertiary-token' />
+                          <span className='min-w-0 flex-1 truncate'>
+                            {provider.label}
+                          </span>
+                          <span
+                            className={cn(
+                              'h-1.5 w-1.5 rounded-full',
+                              provider.isPrimary
+                                ? 'bg-green-500'
+                                : 'bg-tertiary-token'
+                            )}
+                          />
+                        </a>
+                      ))}
+                    </div>
+                  ) : null}
+                </div>
+              </ChatEntityPanelSection>
+            ) : null}
+
+            {threadTitle ? (
+              <ChatEntityPanelSection
+                title='Chat'
+                icon={
+                  <MessageSquareText className='h-3.5 w-3.5 text-tertiary-token' />
+                }
+              >
+                <div className='rounded-lg bg-surface-1 px-3 py-2.5 text-[12px] text-secondary-token'>
+                  <p className='truncate font-semibold text-primary-token'>
+                    {threadTitle}
+                  </p>
+                  <p className='mt-1 text-tertiary-token'>
+                    This release was referenced in the current chat.
+                  </p>
+                </div>
+              </ChatEntityPanelSection>
+            ) : null}
+
+            {shouldShowReleaseTasksSection ? (
+              <ChatEntityPanelSection
+                title='Tasks'
+                icon={
+                  <CheckSquare className='h-3.5 w-3.5 text-tertiary-token' />
+                }
+              >
+                {isTasksWorkspaceGateLoading ? (
+                  <div
+                    className='rounded-lg border border-subtle bg-surface-1 px-3 py-3'
+                    data-testid='chat-release-tasks-loading-state'
+                  >
+                    <div
+                      className='h-4 w-28 rounded skeleton motion-reduce:animate-none'
+                      aria-hidden='true'
+                    />
+                    <div
+                      className='mt-3 h-20 rounded-md skeleton motion-reduce:animate-none'
+                      aria-hidden='true'
+                    />
+                  </div>
+                ) : canAccessTasksWorkspace ? (
+                  <ReleaseTaskChecklist
+                    releaseId={release.id}
+                    variant='compact'
+                    releaseDate={release.releaseDate}
+                    onNavigateToFullPage={() =>
+                      router.push(buildReleaseTasksRoute(release.id))
+                    }
+                  />
+                ) : showTasksUpgrade ? (
+                  <CompactReleasePlanUpgradeCard
+                    onDismiss={() => setShowTasksUpgrade(false)}
+                  />
+                ) : null}
+              </ChatEntityPanelSection>
+            ) : null}
+          </div>
+        ) : (
+          <div className='flex flex-1 items-center justify-center px-6 text-center text-[13px] text-tertiary-token'>
+            This release is not available in the current profile.
+          </div>
+        )}
+      </aside>
+    </TableContextMenu>
   );
 }
 
@@ -699,6 +881,165 @@ function ChatTourDateEntityPanelLoader({
   );
 }
 
+function ChatProfileBentoPanel({
+  profile,
+  onClose,
+}: Readonly<{
+  profile: ChatProfileContextSummary | null | undefined;
+  onClose: () => void;
+}>) {
+  const displayName =
+    profile?.displayName?.trim() || profile?.username?.trim() || 'Profile';
+  const username = profile?.username?.trim() || null;
+  const publicHref = username ? `/${username}` : APP_ROUTES.PROFILE;
+  const completion =
+    typeof profile?.completionPercentage === 'number'
+      ? Math.round(profile.completionPercentage)
+      : null;
+
+  const contextMenuItems = useMemo<ContextMenuItemType[]>(
+    () =>
+      buildChatContextMenuItems({
+        title: displayName,
+        href: publicHref,
+        onDismiss: onClose,
+      }),
+    [displayName, onClose, publicHref]
+  );
+
+  return (
+    <TableContextMenu items={contextMenuItems}>
+      <aside
+        className='flex h-full min-h-0 w-full flex-col overflow-hidden bg-(--linear-app-content-surface)'
+        data-testid='chat-profile-bento-panel'
+      >
+        <div className='flex shrink-0 items-center justify-between border-b border-[color-mix(in_oklab,var(--linear-app-shell-border)_64%,transparent)] px-4 py-3'>
+          <div className='min-w-0'>
+            <p className='text-[11px] text-tertiary-token'>Profile</p>
+            <h2 className='truncate text-[13px] font-semibold text-primary-token'>
+              {displayName}
+            </h2>
+          </div>
+          <Button
+            type='button'
+            variant='ghost'
+            size='icon'
+            aria-label='Close profile panel'
+            onClick={onClose}
+            className='h-8 w-8 shrink-0'
+          >
+            <X className='h-4 w-4' />
+          </Button>
+        </div>
+
+        <div className='min-h-0 flex-1 overflow-y-auto p-4'>
+          <div className='relative min-h-[300px] overflow-hidden rounded-lg border border-white/12 bg-[linear-gradient(135deg,#11151d_0%,#202735_46%,#121821_100%)] px-4 py-5 text-white shadow-[0_22px_52px_rgba(0,0,0,0.28)]'>
+            <div className='relative z-10 flex items-center gap-3'>
+              <div className='relative h-14 w-14 shrink-0 overflow-hidden rounded-2xl bg-white/14 text-sm font-semibold text-white'>
+                {profile?.avatarUrl ? (
+                  <Image
+                    src={profile.avatarUrl}
+                    alt=''
+                    fill
+                    sizes='56px'
+                    className='object-cover'
+                  />
+                ) : (
+                  <div className='flex h-full w-full items-center justify-center'>
+                    {profile ? getProfileInitials(profile) : 'P'}
+                  </div>
+                )}
+              </div>
+              <div className='min-w-0'>
+                <h3 className='truncate text-[20px] font-semibold leading-6'>
+                  {displayName}
+                </h3>
+                {username ? (
+                  <p className='mt-1 truncate text-xs text-white/68'>
+                    /{username}
+                  </p>
+                ) : null}
+              </div>
+            </div>
+
+            <div className='relative z-10 mt-5 flex flex-wrap gap-1.5 text-[11px] text-white/80'>
+              {completion !== null ? (
+                <span className='rounded-md border border-white/14 bg-white/10 px-2 py-1'>
+                  {completion}% Complete
+                </span>
+              ) : null}
+              <span className='rounded-md border border-white/14 bg-white/10 px-2 py-1'>
+                {profile?.hasMusicLinks ? 'Music Connected' : 'Music Links'}
+              </span>
+              <span className='rounded-md border border-white/14 bg-white/10 px-2 py-1'>
+                {profile?.hasSocialLinks ? 'Social Connected' : 'Social Links'}
+              </span>
+            </div>
+
+            <div className='absolute bottom-[-34px] right-4 h-[212px] w-[106px] rounded-[24px] border border-white/25 bg-black p-1 shadow-2xl'>
+              <div className='relative h-full overflow-hidden rounded-[20px] bg-[#111318]'>
+                <div className='mx-auto mt-2 h-1.5 w-10 rounded-full bg-white/20' />
+                <div className='mx-3 mt-5 overflow-hidden rounded-xl bg-white/10 p-2'>
+                  <div className='relative mx-auto h-12 w-12 overflow-hidden rounded-xl bg-white/12'>
+                    {profile?.avatarUrl ? (
+                      <Image
+                        src={profile.avatarUrl}
+                        alt=''
+                        fill
+                        sizes='48px'
+                        className='object-cover'
+                      />
+                    ) : (
+                      <div className='flex h-full w-full items-center justify-center text-xs text-white/78'>
+                        {profile ? getProfileInitials(profile) : 'P'}
+                      </div>
+                    )}
+                  </div>
+                  <div className='mt-3 h-2 rounded-full bg-white/24' />
+                  <div className='mt-2 h-2 w-2/3 rounded-full bg-white/12' />
+                </div>
+                <div className='absolute bottom-4 left-3 right-3 grid gap-1'>
+                  <div className='h-6 rounded-md bg-white/14' />
+                  <div className='h-6 rounded-md bg-white/8' />
+                </div>
+              </div>
+            </div>
+
+            <Smartphone
+              className='absolute bottom-4 left-4 h-5 w-5 text-white/42'
+              aria-hidden='true'
+            />
+          </div>
+
+          <div className='mt-4 space-y-1'>
+            <Link
+              href={publicHref}
+              className='flex h-9 items-center justify-between rounded-md px-2.5 text-sm text-primary-token transition-colors hover:bg-surface-1'
+            >
+              <span>Open Public Profile</span>
+              <ExternalLink className='h-3.5 w-3.5 text-tertiary-token' />
+            </Link>
+            <Link
+              href={APP_ROUTES.LIBRARY}
+              className='flex h-9 items-center justify-between rounded-md px-2.5 text-sm text-primary-token transition-colors hover:bg-surface-1'
+            >
+              <span>Library</span>
+              <ExternalLink className='h-3.5 w-3.5 text-tertiary-token' />
+            </Link>
+            <Link
+              href={APP_ROUTES.TASKS}
+              className='flex h-9 items-center justify-between rounded-md px-2.5 text-sm text-primary-token transition-colors hover:bg-surface-1'
+            >
+              <span>Tasks</span>
+              <ExternalLink className='h-3.5 w-3.5 text-tertiary-token' />
+            </Link>
+          </div>
+        </div>
+      </aside>
+    </TableContextMenu>
+  );
+}
+
 export function ChatEntityRightPanelHost({
   enablePreviewPanel,
   enableChatEntityPanels = false,
@@ -706,7 +1047,8 @@ export function ChatEntityRightPanelHost({
   profileContext,
   threadTitle,
 }: Readonly<ChatEntityRightPanelHostProps>) {
-  const { isOpen: isPreviewPanelOpen } = usePreviewPanelState();
+  const { close: closePreviewPanel, isOpen: isPreviewPanelOpen } =
+    usePreviewPanelState();
   const { target, contextTargets, close, dismissContext } =
     useChatEntityPanel();
 
@@ -716,6 +1058,7 @@ export function ChatEntityRightPanelHost({
         <ChatRailContextCards
           targets={contextTargets}
           profileContext={profileContext}
+          profileId={profileId}
           onDismiss={dismissContext}
         />
       ) : null;
@@ -800,11 +1143,19 @@ export function ChatEntityRightPanelHost({
 
     return (
       <ErrorBoundary fallback={null}>
-        <ProfileContactSidebar />
+        {profileContext ? (
+          <ChatProfileBentoPanel
+            profile={profileContext}
+            onClose={closePreviewPanel}
+          />
+        ) : (
+          <ProfileContactSidebar />
+        )}
       </ErrorBoundary>
     );
   }, [
     close,
+    closePreviewPanel,
     contextTargets,
     dismissContext,
     enableChatEntityPanels,

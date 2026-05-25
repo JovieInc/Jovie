@@ -22,6 +22,7 @@ Element.prototype.scrollIntoView = vi.fn();
 
 const navigationMock = vi.hoisted(() => ({
   refresh: vi.fn(),
+  searchParams: new URLSearchParams(),
 }));
 
 const blobUploadMock = vi.hoisted(() => vi.fn());
@@ -61,8 +62,10 @@ vi.mock('@vercel/blob/client', () => ({
 
 vi.mock('next/navigation', () => ({
   useRouter: () => ({
+    push: vi.fn(),
     refresh: navigationMock.refresh,
   }),
+  useSearchParams: () => navigationMock.searchParams,
 }));
 
 vi.mock('sonner', () => ({
@@ -187,10 +190,10 @@ describe('LibrarySurface', () => {
   it('renders an empty read-only library state with a releases escape hatch', () => {
     renderLibrary([]);
 
-    expect(screen.getByText('No Release Assets')).toBeDefined();
+    expect(screen.getByText('No Library Items')).toBeDefined();
     expect(
       screen.getByText(
-        'Releases and artwork will appear here after your catalog is connected.'
+        'Releases, merch, images, videos, and audio will appear here as they land.'
       )
     ).toBeDefined();
     expect(screen.getByRole('link', { name: 'Open Releases' })).toHaveAttribute(
@@ -241,6 +244,56 @@ describe('LibrarySurface', () => {
       'aria-hidden',
       'true'
     );
+  });
+
+  it('renders merch assets with prices and the shared detail drawer', () => {
+    renderLibrary([
+      buildAsset({
+        id: 'merch-card-1',
+        title: 'Never Say A Word Hoodie',
+        artworkUrl: 'https://cdn.example.com/hoodie.png',
+        smartLinkPath: '/app/library?view=merch',
+        releaseDate: '2026-05-25T00:00:00.000Z',
+        itemKind: 'merch',
+        itemStatusLabel: 'Draft',
+        primaryActionLabel: 'Open Merch',
+        primaryActionHref: '/app/library?view=merch',
+        productType: 'hoodie',
+        retailPriceLabel: '$68.00',
+        artistPayoutLabel: '$22.00',
+        jovieMarginLabel: '$9.00',
+        description: 'Black hoodie with Never Say A Word cover art.',
+        previewUrl: null,
+        providerCount: 0,
+        providers: [],
+        hasLyrics: false,
+        assetKinds: ['artwork'],
+      }),
+    ]);
+
+    expect(
+      screen.getByRole('heading', { name: 'Never Say A Word Hoodie' })
+    ).toBeInTheDocument();
+    expect(screen.getByText('$68.00')).toBeInTheDocument();
+
+    fireEvent.click(
+      screen.getByRole('button', {
+        name: /Inspect Never Say A Word Hoodie/u,
+      })
+    );
+
+    const drawer = within(screen.getByTestId('library-asset-drawer'));
+    expect(drawer.getAllByText('Merch').length).toBeGreaterThan(0);
+    expect(
+      drawer.getByText('Black hoodie with Never Say A Word cover art.')
+    ).toBeInTheDocument();
+    expect(drawer.getByText('$22.00')).toBeInTheDocument();
+    expect(drawer.getByText('$9.00')).toBeInTheDocument();
+    expect(drawer.getByRole('link', { name: /Open Merch/u })).toHaveAttribute(
+      'href',
+      '/app/library?view=merch'
+    );
+    expect(screen.queryByTestId('library-audio-dropzone')).toBeNull();
   });
 
   it('uses shell focus tokens for library cards and drawer actions', () => {
@@ -468,7 +521,7 @@ describe('LibrarySurface', () => {
     ).not.toBeInTheDocument();
   });
 
-  it('filters release assets from the Library navigation', () => {
+  it('filters library assets from the Library navigation', async () => {
     renderLibrary([
       buildAsset(),
       buildAsset({
@@ -486,16 +539,18 @@ describe('LibrarySurface', () => {
     ]);
 
     fireEvent.click(screen.getByRole('button', { name: 'Show filters' }));
-    fireEvent.click(screen.getByRole('button', { name: /Needs Assets/u }));
+    fireEvent.click(screen.getByRole('button', { name: /Audio/u }));
 
-    expect(
-      screen.getByRole('heading', { name: 'Never Say A Word' })
-    ).toBeInTheDocument();
-    expect(
-      screen.queryByRole('heading', { name: 'Take Me Over' })
-    ).not.toBeInTheDocument();
+    await waitFor(() => {
+      expect(
+        screen.getByRole('heading', { name: 'Take Me Over' })
+      ).toBeInTheDocument();
+      expect(
+        screen.queryByRole('heading', { name: 'Never Say A Word' })
+      ).not.toBeInTheDocument();
+    });
 
-    fireEvent.click(screen.getByRole('button', { name: /All Releases/u }));
+    fireEvent.click(screen.getByRole('button', { name: /^All/u }));
 
     expect(
       screen.getByRole('heading', { name: 'Take Me Over' })
@@ -528,11 +583,10 @@ describe('LibrarySurface', () => {
       screen.getByRole('navigation', { name: 'Library navigation' })
     ).toBeInTheDocument();
     expect(
-      screen.getByRole('button', { name: /All Releases/u })
-    ).toBeInTheDocument();
-    expect(
-      screen.getByRole('button', { name: /Needs Assets/u })
-    ).toBeInTheDocument();
+      screen.queryByRole('button', { name: /All Releases/u })
+    ).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Merch/u })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Audio/u })).toBeInTheDocument();
   });
 
   it('keeps library filters reachable on desktop without taking over the shell sidebar', async () => {

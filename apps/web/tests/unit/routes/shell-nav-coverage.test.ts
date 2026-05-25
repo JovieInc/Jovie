@@ -162,7 +162,7 @@ describe('shell route coverage', () => {
     );
   });
 
-  it('keeps release list data ownership outside the legacy dashboard route', () => {
+  it('keeps release list routes aliased to Library while legacy dashboard keeps matrix ownership', () => {
     const canonicalPage = pageByRoute.get('/app/releases');
     const legacyPage = pageByRoute.get('/app/dashboard/releases');
     const canonicalRoutePath = path.join(
@@ -171,9 +171,8 @@ describe('shell route coverage', () => {
     );
     const canonicalRouteSource = fs.readFileSync(canonicalRoutePath, 'utf8');
 
-    expect(canonicalPage?.source).toContain(
-      "import { ReleasesRoute } from './ReleasesRoute';"
-    );
+    expect(canonicalPage?.source).toContain('redirect(');
+    expect(canonicalPage?.source).toContain('view=releases');
     expect(legacyPage?.source).toContain(
       "import { ReleasesRoute } from '../../releases/ReleasesRoute';"
     );
