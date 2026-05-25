@@ -5,6 +5,18 @@
      5|The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
      6|and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.5.49] - 2026-05-25
+
+> Jovie profiles can now be added to Apple Wallet through first-party PassKit infrastructure.
+
+### Added
+
+- **First-party Apple Wallet profile passes (JOV-2568)**: adds the `APPLE_WALLET_PROFILE_PASS` flag, Apple PassKit signing configuration, Wallet pass/device/registration schema, `.pkpass` generation, Apple Wallet update-service routes, tracked Wallet source links, scan classification, mobile API availability, iOS add-pass support, web share actions, and rare chat CTAs for explicit sharing intent.
+
+### Fixed
+
+- **Wallet/mobile dev-auth API coverage**: routes that accept mobile session tokens now use the shared auth helper so local test-auth bypass and signed mobile requests both resolve auth consistently.
+
 ## [26.5.48] - 2026-05-24
 
 > [internal] Promptfoo now checks the web chat route's pre-model auth, billing, privacy, and kill-switch contracts.
