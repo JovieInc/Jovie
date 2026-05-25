@@ -54,14 +54,14 @@ export function ErrorDisplay({
       role='alert'
       aria-live='assertive'
       aria-atomic='true'
-      className='rounded-[14px] border border-(--linear-app-frame-seam) bg-surface-0 p-3.5 shadow-[0_16px_40px_-28px_rgba(0,0,0,0.75)]'
+      className='w-full text-primary-token'
     >
-      <div className='flex items-start gap-3'>
-        <div className='mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-error/25 bg-transparent text-error'>
-          <ErrorIcon className='size-4.5' />
+      <div className='flex items-start gap-2.5 py-1.5'>
+        <div className='mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center text-error'>
+          <ErrorIcon className='size-4' strokeWidth={2.25} />
         </div>
-        <div className='min-w-0 flex-1 space-y-2.5'>
-          <div className='space-y-0.5'>
+        <div className='min-w-0 flex-1'>
+          <div>
             <p className='text-[13px] font-medium leading-5 text-primary-token'>
               Message paused
             </p>
@@ -74,8 +74,8 @@ export function ErrorDisplay({
           </div>
 
           {supportCode && (
-            <div className='flex flex-wrap items-center gap-2 rounded-[10px] border border-(--linear-app-frame-seam) bg-surface-0 px-3 py-2 text-xs text-tertiary-token'>
-              <span className='text-[10px] font-medium tracking-[-0.01em] text-secondary-token'>
+            <div className='mt-1 flex flex-wrap items-center gap-2 text-xs text-tertiary-token'>
+              <span className='text-[11px] font-medium tracking-[-0.01em] text-secondary-token'>
                 Reference
               </span>
               <span className='font-mono text-primary-token'>
@@ -86,7 +86,7 @@ export function ErrorDisplay({
                 variant='ghost'
                 size='sm'
                 onClick={handleCopySupportCode}
-                className='ml-auto h-7 gap-1 rounded-[8px] px-2.5 text-2xs font-medium tracking-[-0.01em]'
+                className='h-7 gap-1 rounded-[8px] px-2 text-2xs font-medium tracking-[-0.01em]'
                 aria-label='Copy support reference'
               >
                 <Copy className='size-3' />
@@ -98,11 +98,11 @@ export function ErrorDisplay({
           {chatError.failedMessage && !chatError.retryAfter && (
             <Button
               type='button'
-              variant='secondary'
+              variant='ghost'
               size='sm'
               onClick={onRetry}
               disabled={isLoading || isSubmitting}
-              className='h-8 gap-2 rounded-[10px] px-3 text-2xs font-medium tracking-[-0.01em]'
+              className='mt-2 h-7 gap-1.5 rounded-[8px] px-2 text-2xs font-medium tracking-[-0.01em] text-error hover:bg-error/10 hover:text-error'
             >
               <RefreshCw className='size-3.5' />
               Retry message

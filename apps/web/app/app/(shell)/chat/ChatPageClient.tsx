@@ -306,6 +306,8 @@ export function ChatPageClient({
     dashboardLoadError,
     isFirstSession: dashboardIsFirstSession,
     profileCompletion,
+    hasMusicLinks,
+    hasSocialLinks,
   } = useDashboardData();
   const { setPreviewData } = usePreviewPanelData();
   const { open: openPreviewPanel } = usePreviewPanelState();
@@ -856,6 +858,15 @@ export function ChatPageClient({
         enablePreviewPanel={shouldHydratePreviewPanel}
         enableChatEntityPanels={designV1ChatEntitiesEnabled}
         profileId={activeProfile.id}
+        profileContext={{
+          id: activeProfile.id,
+          displayName: activeProfile.displayName,
+          username: activeProfile.username,
+          avatarUrl: activeProfile.avatarUrl,
+          completionPercentage: profileCompletion.percentage,
+          hasMusicLinks,
+          hasSocialLinks,
+        }}
         threadTitle={currentThreadTitle}
       />
       <ErrorBoundary

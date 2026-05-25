@@ -5,6 +5,20 @@
      5|The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
      6|and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.5.50] - 2026-05-24
+
+> Chat now keeps profile and entity context visible in the right rail while tool work reads like a native inline activity feed instead of boxed status cards.
+
+### Added
+
+- **Chat context rail cards (JOV-2567)**: structured entity tokens and profile-related tool activity now upsert compact right-rail context cards above any open release/contact/tour-date child panel, with dedupe and dismissal handled separately from the full child panel target.
+- **Inline tool activity feed**: generic tool calls now render as compact activity rows, with multi-tool responses connected by a timeline line and failed/denied calls exposed as inline alert rows.
+
+### Changed
+
+- **Chat error and artifact polish**: composer failures now render inside the transcript with retry/support-reference affordances, generation artifacts share a cyan-accent surface, and composer icons use heavier strokes without changing the current button footprint.
+- **Library selection polish**: selected library grid/list items use the cyan rail/ring treatment scoped to the library surface instead of changing global table selection tokens.
+
 ## [26.5.49] - 2026-05-24
 
 > [internal] Jovie iOS now reports auth and deep-link diagnostics through provider-agnostic observability.
