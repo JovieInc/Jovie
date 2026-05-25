@@ -36,9 +36,16 @@ interface PitchResult {
   readonly generic: string;
 }
 
+interface PitchDraftResult {
+  readonly destinationLabel: string;
+  readonly subjectLine: string | null;
+  readonly body: string;
+}
+
 interface ChatPitchCardProps {
   readonly state: 'loading' | 'success' | 'error';
   readonly releaseTitle?: string;
+  readonly pitch?: PitchDraftResult;
   readonly pitches?: PitchResult;
   readonly error?: string;
 }
@@ -83,7 +90,7 @@ function PitchBlock({
   label,
   text,
   limit,
-}: Readonly<{ label: string; text: string; limit: number }>) {
+}: Readonly<{ label: string; text: string; limit?: number }>) {
   const [expanded, setExpanded] = useState(false);
   const isLong = text.length > 180;
 
@@ -94,14 +101,16 @@ function PitchBlock({
           {label}
         </span>
         <div className='flex items-center gap-1.5'>
-          <span
-            className={cn(
-              'text-[10px] tabular-nums',
-              text.length > limit ? 'text-red-500' : 'text-tertiary-token'
-            )}
-          >
-            {text.length}/{limit}
-          </span>
+          {limit ? (
+            <span
+              className={cn(
+                'text-[10px] tabular-nums',
+                text.length > limit ? 'text-red-500' : 'text-tertiary-token'
+              )}
+            >
+              {text.length}/{limit}
+            </span>
+          ) : null}
           <CopyButton text={text} platform={label} />
         </div>
       </div>
@@ -129,12 +138,13 @@ function PitchBlock({
 export function ChatPitchCard({
   state,
   releaseTitle,
+  pitch,
   pitches,
   error,
 }: ChatPitchCardProps) {
   if (state === 'loading') {
     return (
-      <ChatGenerationArtifactSurface title='Generating Pitches'>
+      <ChatGenerationArtifactSurface title='Generating Pitch'>
         <div className='relative overflow-hidden rounded-lg bg-surface-0 p-2'>
           <div
             aria-hidden='true'
@@ -177,11 +187,41 @@ export function ChatPitchCard({
     );
   }
 
+  if (pitch) {
+    const copyText = pitch.subjectLine
+      ? `Subject: ${pitch.subjectLine}\n\n${pitch.body}`
+      : pitch.body;
+
+    return (
+      <ChatGenerationArtifactSurface
+        title='Generated Pitch'
+        subtitle={
+          releaseTitle
+            ? `${releaseTitle} · ${pitch.destinationLabel}`
+            : pitch.destinationLabel
+        }
+      >
+        <div className='space-y-2'>
+          {pitch.subjectLine ? (
+            <PitchBlock label='Subject' text={pitch.subjectLine} limit={120} />
+          ) : null}
+          <PitchBlock label='Pitch' text={pitch.body} />
+          <div className='flex items-center justify-between rounded-lg border border-subtle bg-surface-1 px-2.5 py-2'>
+            <span className='min-w-0 truncate text-2xs text-secondary-token'>
+              Full draft
+            </span>
+            <CopyButton text={copyText} platform='Pitch' />
+          </div>
+        </div>
+      </ChatGenerationArtifactSurface>
+    );
+  }
+
   if (!pitches) return null;
 
   return (
     <ChatGenerationArtifactSurface
-      title='Pitch Builder'
+      title='Generated Pitches'
       subtitle={releaseTitle ?? null}
     >
       <div className='space-y-2'>

@@ -66,10 +66,6 @@ export interface ReleaseExperienceAdapter {
     releaseId: string,
     isrc: string | null
   ) => Promise<void>;
-  readonly onSaveTargetPlaylists?: (
-    releaseId: string,
-    targetPlaylists: string[]
-  ) => Promise<void>;
   readonly onFormatLyrics?: (
     releaseId: string,
     lyrics: string
@@ -145,10 +141,6 @@ export interface UseReleaseProviderMatrixReturn {
     isrc: string | null
   ) => Promise<void>;
   handleSaveLyrics: (releaseId: string, lyrics: string) => Promise<void>;
-  handleSaveTargetPlaylists: (
-    releaseId: string,
-    targetPlaylists: string[]
-  ) => Promise<void>;
   handleFormatLyrics: (releaseId: string, lyrics: string) => Promise<string[]>;
   isLyricsSaving: boolean;
   setDrafts: React.Dispatch<React.SetStateAction<DraftState>>;

@@ -14,7 +14,7 @@ import { TIM_WHITE_PROFILE } from '@/lib/tim-white';
 const SUGGESTIONS = [
   'Plan my next release',
   'Prepare my profile update',
-  'Draft a playlist pitch',
+  'Draft a release pitch',
   'Turn fans into subscribers',
 ] as const;
 

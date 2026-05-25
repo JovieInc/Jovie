@@ -103,12 +103,12 @@ export const HOMEPAGE_V2_COPY: HomepageV2Copy = {
   seo: {
     title: 'Jovie | Your AI Artist Manager.',
     description:
-      'Plan releases, create assets, pitch playlists, and keep every drop moving from one AI workspace for artists.',
+      'Plan releases, create assets, draft pitches, and keep every drop moving from one AI workspace for artists.',
   },
   hero: {
     headline: 'Your AI Artist Manager.',
     subhead:
-      'Plan releases, create assets, pitch playlists, and promote every drop from one AI workspace.',
+      'Plan releases, create assets, draft pitches, and promote every drop from one AI workspace.',
     primaryCtaLabel: 'Start Free',
     secondaryCtaLabel: 'Explore Artist Profiles',
     microproof: 'Start free. 14-day Pro trial. No credit card required.',

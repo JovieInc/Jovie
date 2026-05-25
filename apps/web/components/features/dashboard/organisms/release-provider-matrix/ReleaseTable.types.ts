@@ -24,6 +24,7 @@ export interface ReleaseTableProps {
   readonly onDelete?: (releaseId: string) => void;
   readonly canGenerateAlbumArt?: boolean;
   readonly onGenerateAlbumArt?: (release: ReleaseViewModel) => void;
+  readonly onGeneratePitch?: (release: ReleaseViewModel) => void;
   readonly columnVisibility?: Record<string, boolean>;
   readonly rowHeight?: number;
   readonly onFocusedRowChange?: (release: ReleaseViewModel) => void;

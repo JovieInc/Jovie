@@ -41,6 +41,7 @@ import { useCodeFlag } from '@/lib/feature-flags/client';
 import { useAppFlag } from '@/lib/flags/client';
 import { QueryErrorBoundary, usePlanGate } from '@/lib/queries';
 import type { ReleaseContext } from '@/lib/release-tasks/applicability';
+import { buildReleasePitchChatPrompt } from '@/lib/services/pitch/targets';
 import { cn } from '@/lib/utils';
 import { useImportPolling } from './hooks/useImportPolling';
 import { useReleaseTablePreferences } from './hooks/useReleaseTablePreferences';
@@ -564,7 +565,6 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
     handleSaveMetadata,
     handleSavePrimaryIsrc,
     handleSaveLyrics,
-    handleSaveTargetPlaylists,
     handleFormatLyrics,
     isLyricsSaving,
   } = useReleaseProviderMatrix({ releases, providerConfig, primaryProviders });
@@ -714,6 +714,19 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
             instruction: 'Show three options.',
           }
         )}`,
+        router
+      );
+    },
+    [router]
+  );
+
+  const handleGeneratePitch = useCallback(
+    (release: ReleaseViewModel) => {
+      openChatWithPrompt(
+        buildReleasePitchChatPrompt({
+          releaseId: release.id,
+          releaseTitle: release.title,
+        }),
         router
       );
     },
@@ -1125,6 +1138,7 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
           onArtistClick={name => setSearchQuery(name)}
           canGenerateAlbumArt={showGenerateAlbumArtAction}
           onGenerateAlbumArt={handleGenerateAlbumArt}
+          onGeneratePitch={handleGeneratePitch}
           onClose={closeEditor}
           onRefresh={releaseSidebarHandlers.refresh}
           isRefreshing={refreshingReleaseId === editingRelease?.id}
@@ -1143,10 +1157,6 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
             experienceAdapter?.onSavePrimaryIsrc ?? handleSavePrimaryIsrc
           }
           onSaveLyrics={experienceAdapter?.onSaveLyrics ?? handleSaveLyrics}
-          onSaveTargetPlaylists={
-            experienceAdapter?.onSaveTargetPlaylists ??
-            handleSaveTargetPlaylists
-          }
           onFormatLyrics={releaseSidebarHandlers.formatLyrics}
           isLyricsSaving={isLyricsSaving}
           isSaving={isSaving}
@@ -1173,6 +1183,7 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
     artistName,
     showGenerateAlbumArtAction,
     handleGenerateAlbumArt,
+    handleGeneratePitch,
     closeEditor,
     closeTrackDrawer,
     experienceAdapter,
@@ -1190,7 +1201,6 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
     handleSaveMetadata,
     handleSavePrimaryIsrc,
     handleSaveLyrics,
-    handleSaveTargetPlaylists,
     isLyricsSaving,
     isSaving,
     allowArtworkDownloads,
@@ -1273,6 +1283,7 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
                 onDelete={handleDeleteRequest}
                 canGenerateAlbumArt={showGenerateAlbumArtAction}
                 onGenerateAlbumArt={handleGenerateAlbumArt}
+                onGeneratePitch={handleGeneratePitch}
                 columnVisibility={columnVisibility}
                 rowHeight={designV1ReleasesEnabled ? 46 : rowHeight}
                 showTracks={showTracks}

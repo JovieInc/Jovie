@@ -47,6 +47,7 @@ export function ReleaseTableWithTracks({
   onEdit,
   canGenerateAlbumArt,
   onGenerateAlbumArt,
+  onGeneratePitch,
   columnVisibility,
   rowHeight = TABLE_ROW_HEIGHTS.STANDARD + 4,
   onFocusedRowChange,
@@ -79,6 +80,7 @@ export function ReleaseTableWithTracks({
         onCopy,
         canGenerateAlbumArt,
         onGenerateAlbumArt,
+        onGeneratePitch,
         artistName,
         isSmartLinkLocked,
         getSmartLinkLockReason,
@@ -88,6 +90,7 @@ export function ReleaseTableWithTracks({
       onCopy,
       canGenerateAlbumArt,
       onGenerateAlbumArt,
+      onGeneratePitch,
       artistName,
       isSmartLinkLocked,
       getSmartLinkLockReason,
@@ -308,6 +311,7 @@ export function ReleaseTableWithTracks({
         onCopy={onCopy}
         canGenerateAlbumArt={canGenerateAlbumArt}
         onGenerateAlbumArt={onGenerateAlbumArt}
+        onGeneratePitch={onGeneratePitch}
         isSmartLinkLocked={isSmartLinkLocked}
         getSmartLinkLockReason={getSmartLinkLockReason}
         groupByYear={groupByYear}

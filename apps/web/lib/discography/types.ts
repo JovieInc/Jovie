@@ -173,12 +173,18 @@ export interface ReleaseViewModel {
   previewUrl?: string | null;
   previewCounts?: PreviewCounts;
   providerCounts?: ProviderConfidenceSummary;
-  /** AI-generated playlist pitches per platform */
+  /** Latest AI-generated release pitch draft or legacy per-platform pitch set */
   generatedPitches?: {
-    spotify: string;
-    amazon: string;
-    appleMusic: string;
-    generic: string;
+    spotify?: string;
+    amazon?: string;
+    appleMusic?: string;
+    generic?: string;
+    target?: string;
+    platform?: string | null;
+    destinationLabel?: string;
+    audience?: string;
+    subjectLine?: string | null;
+    body?: string;
     generatedAt: string;
     modelUsed: string;
   } | null;

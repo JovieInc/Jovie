@@ -77,11 +77,18 @@ describe('sync-skills-catalog', () => {
     }
   });
 
-  it('v1 registry has zero tool-kind entries', () => {
-    const toolCount = Object.values(SKILL_REGISTRY).filter(
-      s => s.kind === 'tool'
-    ).length;
-    expect(toolCount).toBe(0);
+  it('v1 registry includes the chat-first pitch tool', () => {
+    const pitchTool = SKILL_REGISTRY.generateReleasePitch as ToolDefinition;
+
+    expect(pitchTool).toEqual(
+      expect.objectContaining({
+        id: 'generateReleasePitch',
+        kind: 'tool',
+        entitlement: 'aiCanUseTools',
+        inputSchemaZodPath: 'apps/web/lib/chat/tool-schemas.ts',
+        outputSchemaZodPath: 'apps/web/components/jovie/tool-ui.tsx',
+      })
+    );
   });
 
   it('upserts non-tool skills with conflict guards', async () => {

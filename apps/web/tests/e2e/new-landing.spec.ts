@@ -52,7 +52,7 @@ test.describe('/new landing page', () => {
       page.getByRole('heading', { name: /your ai artist manager/i })
     ).toBeVisible();
     await expect(
-      page.getByText(/plan releases, create assets, pitch playlists/i)
+      page.getByText(/plan releases, create assets, draft pitches/i)
     ).toBeVisible();
 
     await expect(page.getByTestId('homepage-v2-system-overview')).toBeVisible();

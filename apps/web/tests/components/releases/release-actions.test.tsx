@@ -112,6 +112,31 @@ describe('buildReleaseActions', () => {
     });
   });
 
+  it('adds the chat-first generate pitch action when a handler is provided', () => {
+    const onGeneratePitch = vi.fn();
+    const release = createRelease();
+    const items = buildReleaseActions({
+      release,
+      onEdit: vi.fn(),
+      onCopy: vi.fn(),
+      onGeneratePitch,
+    });
+
+    const generatePitch = items.find(
+      item => 'id' in item && item.id === 'generate-pitch'
+    );
+
+    expect(generatePitch).toMatchObject({
+      id: 'generate-pitch',
+      label: 'Generate pitch',
+    });
+    if (!generatePitch || !('onClick' in generatePitch)) {
+      throw new Error('Expected generate pitch action');
+    }
+    generatePitch.onClick?.();
+    expect(onGeneratePitch).toHaveBeenCalledWith(release);
+  });
+
   it('shows a disabled scheduled smart-link label at top level when locked by schedule', () => {
     const items = buildReleaseActions({
       release: createRelease(),

@@ -29,6 +29,7 @@ interface MobileReleaseListProps {
   ) => Promise<string>;
   readonly canGenerateAlbumArt?: boolean;
   readonly onGenerateAlbumArt?: (release: ReleaseViewModel) => void;
+  readonly onGeneratePitch?: (release: ReleaseViewModel) => void;
   readonly isSmartLinkLocked?: (releaseId: string) => boolean;
   readonly getSmartLinkLockReason?: (releaseId: string) => SmartLinkLockReason;
   readonly groupByYear?: boolean;
@@ -40,7 +41,7 @@ interface YearGroup {
 }
 
 /** Width of the revealed swipe action buttons (px) */
-const SWIPE_ACTIONS_WIDTH = 192;
+const SWIPE_ACTIONS_WIDTH = 256;
 
 function groupReleasesByYear(releases: ReleaseViewModel[]): YearGroup[] {
   const groups = new Map<string, ReleaseViewModel[]>();
@@ -82,6 +83,7 @@ const SwipeActions = memo(function SwipeActions({
   onCopy,
   canGenerateAlbumArt,
   onGenerateAlbumArt,
+  onGeneratePitch,
   isLocked,
   lockReason,
 }: {
@@ -94,6 +96,7 @@ const SwipeActions = memo(function SwipeActions({
   ) => Promise<string>;
   readonly canGenerateAlbumArt?: boolean;
   readonly onGenerateAlbumArt?: (release: ReleaseViewModel) => void;
+  readonly onGeneratePitch?: (release: ReleaseViewModel) => void;
   readonly isLocked: boolean;
   readonly lockReason?: SmartLinkLockReason;
 }) {
@@ -141,6 +144,20 @@ const SwipeActions = memo(function SwipeActions({
           <span className={mobileReleaseTokens.swipeActions.label}>Art</span>
         </button>
       ) : null}
+      {onGeneratePitch ? (
+        <button
+          type='button'
+          onClick={() => onGeneratePitch(release)}
+          className={cn(
+            mobileReleaseTokens.swipeActions.button,
+            mobileReleaseTokens.swipeActions.edit
+          )}
+          aria-label={`Generate pitch for ${release.title}`}
+        >
+          <Icon name='Sparkles' className='h-4 w-4' aria-hidden='true' />
+          <span className={mobileReleaseTokens.swipeActions.label}>Pitch</span>
+        </button>
+      ) : null}
       <button
         type='button'
         onClick={handleCopy}
@@ -182,6 +199,7 @@ const MobileReleaseRow = memo(function MobileReleaseRow({
   onCopy,
   canGenerateAlbumArt,
   onGenerateAlbumArt,
+  onGeneratePitch,
   isSmartLinkLocked,
   getSmartLinkLockReason,
 }: {
@@ -195,6 +213,7 @@ const MobileReleaseRow = memo(function MobileReleaseRow({
   ) => Promise<string>;
   readonly canGenerateAlbumArt?: boolean;
   readonly onGenerateAlbumArt?: (release: ReleaseViewModel) => void;
+  readonly onGeneratePitch?: (release: ReleaseViewModel) => void;
   readonly isSmartLinkLocked?: (releaseId: string) => boolean;
   readonly getSmartLinkLockReason?: (releaseId: string) => SmartLinkLockReason;
 }) {
@@ -220,6 +239,7 @@ const MobileReleaseRow = memo(function MobileReleaseRow({
           onCopy={onCopy}
           canGenerateAlbumArt={canGenerateAlbumArt}
           onGenerateAlbumArt={onGenerateAlbumArt}
+          onGeneratePitch={onGeneratePitch}
           isLocked={isLocked}
           lockReason={lockReason}
         />
@@ -303,6 +323,7 @@ export const MobileReleaseList = memo(function MobileReleaseList({
   onCopy,
   canGenerateAlbumArt,
   onGenerateAlbumArt,
+  onGeneratePitch,
   isSmartLinkLocked,
   getSmartLinkLockReason,
   groupByYear = false,
@@ -334,6 +355,7 @@ export const MobileReleaseList = memo(function MobileReleaseList({
                   onCopy={onCopy}
                   canGenerateAlbumArt={canGenerateAlbumArt}
                   onGenerateAlbumArt={onGenerateAlbumArt}
+                  onGeneratePitch={onGeneratePitch}
                   isSmartLinkLocked={isSmartLinkLocked}
                   getSmartLinkLockReason={getSmartLinkLockReason}
                 />
@@ -360,6 +382,7 @@ export const MobileReleaseList = memo(function MobileReleaseList({
             onCopy={onCopy}
             canGenerateAlbumArt={canGenerateAlbumArt}
             onGenerateAlbumArt={onGenerateAlbumArt}
+            onGeneratePitch={onGeneratePitch}
             isSmartLinkLocked={isSmartLinkLocked}
             getSmartLinkLockReason={getSmartLinkLockReason}
           />

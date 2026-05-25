@@ -38,6 +38,7 @@ import { openChatWithPrompt } from '@/lib/chat/open-chat-with-prompt';
 import type { ProviderKey, ReleaseViewModel } from '@/lib/discography/types';
 import { useAppFlag } from '@/lib/flags/client';
 import { usePlanGate } from '@/lib/queries';
+import { buildReleasePitchChatPrompt } from '@/lib/services/pitch/targets';
 import { cn } from '@/lib/utils';
 import {
   type AppleMusicArtistSelection,
@@ -397,7 +398,6 @@ export function ShellReleasesView({
     handleSaveMetadata,
     handleSavePrimaryIsrc,
     handleSaveLyrics,
-    handleSaveTargetPlaylists,
     handleFormatLyrics,
     isLyricsSaving,
   } = useReleaseProviderMatrix({
@@ -557,6 +557,19 @@ export function ShellReleasesView({
     [router]
   );
 
+  const handleGeneratePitch = useCallback(
+    (release: ReleaseViewModel) => {
+      openChatWithPrompt(
+        buildReleasePitchChatPrompt({
+          releaseId: release.id,
+          releaseTitle: release.title,
+        }),
+        router
+      );
+    },
+    [router]
+  );
+
   const actionMenusByReleaseId = useMemo(() => {
     return new Map(
       visibleReleases.map(release => [
@@ -572,6 +585,7 @@ export function ShellReleasesView({
             onDelete: handleDeleteRequest,
             canGenerateAlbumArt: showGenerateAlbumArtAction,
             onGenerateAlbumArt: handleGenerateAlbumArt,
+            onGeneratePitch: handleGeneratePitch,
           })
         ),
       ])
@@ -582,6 +596,7 @@ export function ShellReleasesView({
     handleCopy,
     handleDeleteRequest,
     handleGenerateAlbumArt,
+    handleGeneratePitch,
     isSmartLinkLocked,
     openEditor,
     showGenerateAlbumArtAction,
@@ -747,7 +762,6 @@ export function ShellReleasesView({
       onSaveMetadata: handleSaveMetadata,
       onSavePrimaryIsrc: handleSavePrimaryIsrc,
       onSaveLyrics: handleSaveLyrics,
-      onSaveTargetPlaylists: handleSaveTargetPlaylists,
       onFormatLyrics: handleFormatLyrics,
       isLyricsSaving,
       isSaving,
@@ -755,6 +769,7 @@ export function ShellReleasesView({
       readOnly: !canEditSmartLinks,
       canGenerateAlbumArt: showGenerateAlbumArtAction,
       onGenerateAlbumArt: handleGenerateAlbumArt,
+      onGeneratePitch: handleGeneratePitch,
       showCredits: true,
       designV1: true,
       onCanvasStatusUpdate: handleCanvasStatusUpdate,
@@ -794,6 +809,7 @@ export function ShellReleasesView({
     handleCanvasStatusUpdate,
     handleFormatLyrics,
     handleGenerateAlbumArt,
+    handleGeneratePitch,
     handleRefreshRelease,
     handleReleaseArtworkUploaded,
     handleReleaseChange,
@@ -801,7 +817,6 @@ export function ShellReleasesView({
     handleSaveLyrics,
     handleSaveMetadata,
     handleSavePrimaryIsrc,
-    handleSaveTargetPlaylists,
     isLyricsSaving,
     isReleaseSidebarOpen,
     isRescanningIsrc,

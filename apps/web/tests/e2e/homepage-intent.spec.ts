@@ -207,7 +207,7 @@ test.describe('Homepage chat intake — ID-keyed intent store + viewport-split a
     await page.goto('/');
 
     const pills = page.getByRole('button', {
-      name: /Plan a release|Generate album art|Pitch playlists|Build artist profile|Analyze momentum/,
+      name: /Plan a release|Generate album art|Generate pitch|Build artist profile|Analyze momentum/,
     });
     const pillCount = await pills.count();
     test.skip(

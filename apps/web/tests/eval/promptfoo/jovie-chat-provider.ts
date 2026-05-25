@@ -234,10 +234,28 @@ const ADVANCED_TOOL_SCHEMAS = {
   },
   generateReleasePitch: {
     description:
-      'Generate playlist pitches for a release. Ask which release to pitch if unclear.',
+      'Generate one destination-aware release pitch. Ask where to pitch it if unclear.',
     inputSchema: z.object({
-      releaseTitle: z.string().max(200),
-      instructions: z.string().max(500).optional(),
+      releaseTitle: z.string().max(200).optional(),
+      releaseId: z.string().uuid().optional(),
+      target: z
+        .enum([
+          'playlist',
+          'radio',
+          'sirius_xm',
+          'install',
+          'playback',
+          'editorial_post',
+          'record_label',
+          'collaborator',
+        ])
+        .optional(),
+      platform: z
+        .enum(['spotify', 'apple_music', 'amazon_music', 'music_supervisor'])
+        .optional(),
+      taskTitle: z.string().max(200).optional(),
+      taskCategory: z.string().max(100).optional(),
+      instructions: z.string().max(700).optional(),
     }),
   },
 } as const;
@@ -2291,11 +2309,17 @@ function syntheticArtifactOutputFor(toolName: string): Record<string, unknown> {
       return {
         success: true,
         releaseTitle: 'Tidal Drift',
-        pitches: {
-          spotify: 'Synthetic Spotify pitch for Tidal Drift.',
-          appleMusic: 'Synthetic Apple Music pitch for Tidal Drift.',
-          amazon: 'Synthetic Amazon pitch for Tidal Drift.',
-          generic: 'Synthetic generic pitch for Tidal Drift.',
+        destinationLabel: 'Spotify Playlist',
+        target: 'playlist',
+        pitch: {
+          target: 'playlist',
+          platform: 'spotify',
+          destinationLabel: 'Spotify Playlist',
+          audience: 'streaming editorial or independent playlist curator',
+          subjectLine: 'Tidal Drift pitch',
+          body: 'Synthetic Spotify playlist pitch for Tidal Drift.',
+          generatedAt: '2026-05-25T00:00:00.000Z',
+          modelUsed: 'eval',
         },
       };
     case 'proposeAvatarUpload':
@@ -2376,16 +2400,19 @@ function hasGeneratedAlbumArtOutput(output: Record<string, unknown>): boolean {
 }
 
 function hasReleasePitchOutput(output: Record<string, unknown>): boolean {
-  const pitches = toObject(output.pitches);
+  const pitch = toObject(output.pitch);
 
   return (
     output.success === true &&
     (output.releaseTitle === undefined ||
       typeof output.releaseTitle === 'string') &&
-    typeof pitches.spotify === 'string' &&
-    typeof pitches.appleMusic === 'string' &&
-    typeof pitches.amazon === 'string' &&
-    typeof pitches.generic === 'string'
+    typeof output.destinationLabel === 'string' &&
+    typeof pitch.target === 'string' &&
+    (typeof pitch.platform === 'string' || pitch.platform === null) &&
+    typeof pitch.destinationLabel === 'string' &&
+    typeof pitch.audience === 'string' &&
+    (typeof pitch.subjectLine === 'string' || pitch.subjectLine === null) &&
+    typeof pitch.body === 'string'
   );
 }
 

@@ -12,7 +12,6 @@ import {
   saveProviderOverride,
   saveReleaseLyrics,
   saveReleaseMetadata,
-  saveReleaseTargetPlaylists,
   syncFromSpotify,
 } from '@/app/app/(shell)/dashboard/releases/actions';
 import type { ProviderKey, ReleaseViewModel } from '@/lib/discography/types';
@@ -322,10 +321,6 @@ function useReleaseMutation<T>(
 
 export function useSaveReleaseLyricsMutation(profileId: string) {
   return useReleaseMutation(profileId, saveReleaseLyrics);
-}
-
-export function useSaveReleaseTargetPlaylistsMutation(profileId: string) {
-  return useReleaseMutation(profileId, saveReleaseTargetPlaylists);
 }
 
 export function useSaveCanvasStatusMutation(profileId: string) {

@@ -12,8 +12,15 @@ import { gateway } from '@ai-sdk/gateway';
 import { z } from 'zod';
 import { generateObject } from '@/lib/ai/sdk';
 import { PITCH_MODEL } from '@/lib/constants/ai-models';
-import { buildSystemPrompt, buildUserPrompt } from './prompts';
 import {
+  buildPitchDraftSystemPrompt,
+  buildPitchDraftUserPrompt,
+  buildSystemPrompt,
+  buildUserPrompt,
+} from './prompts';
+import type { PitchDestination } from './targets';
+import {
+  type PitchDraftGenerationResult,
   type PitchGenerationResult,
   type PitchInput,
   PLATFORM_LIMITS,
@@ -24,6 +31,11 @@ const pitchResponseSchema = z.object({
   appleMusic: z.string().max(PLATFORM_LIMITS.appleMusic),
   amazon: z.string().max(PLATFORM_LIMITS.amazon),
   generic: z.string().max(PLATFORM_LIMITS.generic),
+});
+
+const pitchDraftResponseSchema = z.object({
+  subjectLine: z.string().max(120).nullable(),
+  body: z.string().max(2000),
 });
 
 /**
@@ -84,6 +96,52 @@ export async function generatePitches(
 
   return {
     pitches,
+    promptTokens: usage.inputTokens ?? 0,
+    completionTokens: usage.outputTokens ?? 0,
+  };
+}
+
+/**
+ * Generates one destination-aware pitch draft for chat.
+ */
+export async function generatePitchDraft(params: {
+  readonly input: PitchInput;
+  readonly destination: PitchDestination;
+  readonly instructions?: string;
+}): Promise<PitchDraftGenerationResult> {
+  const { input, destination, instructions } = params;
+  const { object, usage } = await generateObject({
+    model: gateway(PITCH_MODEL),
+    schema: pitchDraftResponseSchema,
+    system: buildPitchDraftSystemPrompt(),
+    prompt: buildPitchDraftUserPrompt({ input, destination, instructions }),
+    temperature: 0.4,
+    maxOutputTokens: 1200,
+    experimental_telemetry: {
+      isEnabled: true,
+      recordInputs: true,
+      recordOutputs: true,
+      functionId: 'jovie-pitch-draft-generator',
+      metadata: {
+        model: PITCH_MODEL,
+        target: destination.target,
+        platform: destination.platform ?? 'none',
+      },
+    },
+  });
+
+  return {
+    pitch: {
+      target: destination.target,
+      platform: destination.platform,
+      destinationLabel: destination.label,
+      audience: destination.audience,
+      subjectLine: object.subjectLine?.trim() || null,
+      body: truncateToLimit(object.body.trim(), destination.characterLimit),
+      generatedAt: new Date().toISOString(),
+      modelUsed: PITCH_MODEL,
+    },
+    destination,
     promptTokens: usage.inputTokens ?? 0,
     completionTokens: usage.outputTokens ?? 0,
   };

@@ -79,7 +79,6 @@ import { buildCanvasMetadata } from '@/lib/services/canvas/service';
 import type { CanvasStatus } from '@/lib/services/canvas/types';
 import { slugify } from '@/lib/utils';
 import { throwIfRedirect } from '@/lib/utils/redirect-error';
-import { targetPlaylistsSchema } from '@/lib/validation/schemas/dashboard/profile';
 import { getDashboardDataEssential, getDashboardShellData } from '../actions';
 
 export type { ReleaseProfileContext } from '@/lib/releases/release-types';
@@ -432,20 +431,6 @@ export async function saveReleaseLyrics(params: {
       (release?.metadata as Record<string, unknown> | null) ?? {};
     await updateReleaseColumns(releaseId, profileId, {
       metadata: { ...metadata, lyrics: params.lyrics },
-    });
-  });
-}
-
-export async function saveReleaseTargetPlaylists(params: {
-  profileId: string;
-  releaseId: string;
-  targetPlaylists: string[];
-}): Promise<ReleaseViewModel> {
-  return mutateRelease(params, async (releaseId, profileId) => {
-    const parsed = targetPlaylistsSchema.parse(params.targetPlaylists);
-    const validated = parsed ?? [];
-    await updateReleaseColumns(releaseId, profileId, {
-      targetPlaylists: validated.length > 0 ? validated : null,
     });
   });
 }

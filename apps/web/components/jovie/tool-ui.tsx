@@ -269,7 +269,17 @@ function ToolActivityFeed({
 
 function isPitchOutput(value: unknown): value is {
   readonly releaseTitle?: string;
-  readonly pitches: {
+  readonly pitch?: {
+    readonly target: string;
+    readonly platform: string | null;
+    readonly destinationLabel: string;
+    readonly audience: string;
+    readonly subjectLine: string | null;
+    readonly body: string;
+    readonly generatedAt: string;
+    readonly modelUsed: string;
+  };
+  readonly pitches?: {
     readonly spotify: string;
     readonly appleMusic: string;
     readonly amazon: string;
@@ -277,13 +287,37 @@ function isPitchOutput(value: unknown): value is {
   };
   readonly success: true;
 } {
-  if (!isRecord(value) || value.success !== true || !isRecord(value.pitches)) {
+  if (!isRecord(value) || value.success !== true) {
+    return false;
+  }
+
+  if (
+    value.releaseTitle !== undefined &&
+    typeof value.releaseTitle !== 'string'
+  ) {
+    return false;
+  }
+
+  if (isRecord(value.pitch)) {
+    return (
+      typeof value.pitch.target === 'string' &&
+      (typeof value.pitch.platform === 'string' ||
+        value.pitch.platform === null) &&
+      typeof value.pitch.destinationLabel === 'string' &&
+      typeof value.pitch.audience === 'string' &&
+      (typeof value.pitch.subjectLine === 'string' ||
+        value.pitch.subjectLine === null) &&
+      typeof value.pitch.body === 'string' &&
+      typeof value.pitch.generatedAt === 'string' &&
+      typeof value.pitch.modelUsed === 'string'
+    );
+  }
+
+  if (!isRecord(value.pitches)) {
     return false;
   }
 
   return (
-    (value.releaseTitle === undefined ||
-      typeof value.releaseTitle === 'string') &&
     typeof value.pitches.spotify === 'string' &&
     typeof value.pitches.appleMusic === 'string' &&
     typeof value.pitches.amazon === 'string' &&
@@ -382,6 +416,7 @@ function renderReleasePitchArtifact(event: PersistedToolEvent): ReactNode {
     <ChatPitchCard
       state='success'
       releaseTitle={event.output.releaseTitle}
+      pitch={event.output.pitch}
       pitches={event.output.pitches}
     />
   );

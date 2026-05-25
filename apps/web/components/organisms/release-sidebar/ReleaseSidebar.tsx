@@ -57,19 +57,19 @@ import {
   buildArtworkSizes,
 } from '@/features/release/AlbumArtworkContextMenu';
 import { copyToClipboard } from '@/hooks/useClipboard';
+import { openChatWithPrompt } from '@/lib/chat/open-chat-with-prompt';
 import type { ProviderConfidence, ProviderKey } from '@/lib/discography/types';
 import { dropDateMeta } from '@/lib/format-drop-date';
 import { usePlanGate } from '@/lib/queries';
 import type { CanvasStatus } from '@/lib/services/canvas/types';
+import { buildReleasePitchChatPrompt } from '@/lib/services/pitch/targets';
 import { cn } from '@/lib/utils';
 import { formatTimeAgo } from '@/lib/utils/date-formatting';
 import { getBaseUrl } from '@/lib/utils/platform-detection';
 import { ReleaseDspLinks } from './ReleaseDspLinks';
 import { ReleaseLyricsSection } from './ReleaseLyricsSection';
-import { ReleasePitchSection } from './ReleasePitchSection';
 import { ReleasePropertiesPanel } from './ReleasePropertiesPanel';
 import { ReleaseSmartLinkAnalytics } from './ReleaseSmartLinkAnalytics';
-import { ReleaseTargetPlaylistsSection } from './ReleaseTargetPlaylistsSection';
 import { ReleaseTrackList } from './ReleaseTrackList';
 import type { Release, ReleaseSidebarProps } from './types';
 import { useReleaseSidebar } from './useReleaseSidebar';
@@ -79,7 +79,7 @@ import { isValidUrl } from './utils';
 const RELEASE_SIDEBAR_CARD_CLASSNAME = 'overflow-hidden';
 const PLATFORM_RESCAN_COOLDOWN_MS = 5 * 60 * 1000;
 
-type ReleaseSidebarTab = 'overview' | 'dsps' | 'tasks' | 'pitch';
+type ReleaseSidebarTab = 'overview' | 'dsps' | 'tasks';
 
 const RELEASE_TYPE_LABELS: Record<string, string> = {
   single: 'Single',
@@ -542,6 +542,7 @@ export function ReleaseSidebar({
   onArtistClick,
   canGenerateAlbumArt,
   onGenerateAlbumArt,
+  onGeneratePitch,
   onClose,
   onRefresh,
   isRefreshing = false,
@@ -552,7 +553,6 @@ export function ReleaseSidebar({
   onRemoveDspLink,
   onRescanIsrc,
   isRescanningIsrc = false,
-  onSaveTargetPlaylists,
   onSaveLyrics,
   onSaveMetadata,
   onSavePrimaryIsrc,
@@ -711,6 +711,19 @@ export function ReleaseSidebar({
     []
   );
 
+  const handleGeneratePitch = useCallback(
+    (selectedRelease: Release) => {
+      openChatWithPrompt(
+        buildReleasePitchChatPrompt({
+          releaseId: selectedRelease.id,
+          releaseTitle: selectedRelease.title,
+        }),
+        router
+      );
+    },
+    [router]
+  );
+
   const contextMenuItems = useMemo<CommonDropdownItem[]>(() => {
     if (!release) return [];
 
@@ -725,6 +738,7 @@ export function ReleaseSidebar({
         artistName,
         canGenerateAlbumArt,
         onGenerateAlbumArt,
+        onGeneratePitch: onGeneratePitch ?? handleGeneratePitch,
       })
     );
 
@@ -755,7 +769,9 @@ export function ReleaseSidebar({
     handleCopyReleasePath,
     artistName,
     canGenerateAlbumArt,
+    handleGeneratePitch,
     onGenerateAlbumArt,
+    onGeneratePitch,
     isRefreshing,
     onRefresh,
     router,
@@ -783,7 +799,6 @@ export function ReleaseSidebar({
       { value: 'overview' as const, label: 'Overview' },
       { value: 'dsps' as const, label: 'Links' },
       { value: 'tasks' as const, label: 'Tasks' },
-      { value: 'pitch' as const, label: 'Pitch' },
     ];
 
     return options;
@@ -1005,28 +1020,6 @@ export function ReleaseSidebar({
               onDismiss={handleDismissTasksUpgrade}
             />
           ) : null}
-        </div>
-      );
-    }
-
-    if (activeTab === 'pitch') {
-      return (
-        <div className='space-y-3' data-testid='release-pitch-tab'>
-          <ReleaseTargetPlaylistsSection
-            key={release.id}
-            releaseId={release.id}
-            targetPlaylists={release.targetPlaylists}
-            onSave={readOnly ? undefined : onSaveTargetPlaylists}
-            readOnly={readOnly}
-            variant='flat'
-          />
-          {readOnly ? null : (
-            <ReleasePitchSection
-              releaseId={release.id}
-              existingPitches={release.generatedPitches}
-              variant='flat'
-            />
-          )}
         </div>
       );
     }

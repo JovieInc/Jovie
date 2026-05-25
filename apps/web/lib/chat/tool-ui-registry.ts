@@ -255,9 +255,9 @@ export const TOOL_UI_REGISTRY = {
     label: 'Release pitch',
     uiHint: 'artifact',
     renderer: 'artifact',
-    loadingTitle: 'Writing your pitches…',
-    successTitle: 'Pitches ready',
-    errorTitle: "Couldn't write your pitches",
+    loadingTitle: 'Writing your pitch…',
+    successTitle: 'Pitch ready',
+    errorTitle: "Couldn't write your pitch",
   },
   searchSpotifyArtist: {
     label: 'Spotify artist',

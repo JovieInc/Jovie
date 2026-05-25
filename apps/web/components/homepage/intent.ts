@@ -31,8 +31,8 @@ export const PILLS: readonly HomepagePill[] = [
   },
   {
     id: 'pitch_playlists',
-    label: 'Pitch playlists',
-    insertedPrompt: 'Pitch playlists for ',
+    label: 'Generate pitch',
+    insertedPrompt: 'Generate a pitch for ',
   },
   {
     id: 'build_artist_profile',
