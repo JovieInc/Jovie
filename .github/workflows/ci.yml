@@ -107,11 +107,11 @@ jobs:
             exit 0
           fi
 
-          PROMPTFOO_HARNESS_FILE_PATTERN='^apps/web/tests/eval/promptfoo/'
-          PROMPTFOO_HARNESS_ALLOWED_PATTERN='^(\.github/workflows/ci\.yml|apps/web/tests/eval/promptfoo/.*|apps/web/package.*\.json|package.*\.json|pnpm-lock\.yaml)$'
-          if echo "$CHANGED_FILES" | grep -q -E "$PROMPTFOO_HARNESS_FILE_PATTERN" &&
-            ! echo "$CHANGED_FILES" | grep -v -E "$PROMPTFOO_HARNESS_ALLOWED_PATTERN" | grep -q .; then
-            echo "Promptfoo harness-only change: running deterministic eval CI and core static checks."
+          PROMPTFOO_INFRA_TRIGGER_PATTERN='^(\.github/workflows/evals-periodic\.yml|\.github/workflows/README\.md|apps/web/tests/eval/promptfoo/)'
+          PROMPTFOO_INFRA_ALLOWED_PATTERN='^(\.github/workflows/ci\.yml|\.github/workflows/evals-periodic\.yml|\.github/workflows/README\.md|apps/web/tests/eval/promptfoo/.*|apps/web/package.*\.json|package.*\.json|pnpm-lock\.yaml)$'
+          if echo "$CHANGED_FILES" | grep -q -E "$PROMPTFOO_INFRA_TRIGGER_PATTERN" &&
+            ! echo "$CHANGED_FILES" | grep -v -E "$PROMPTFOO_INFRA_ALLOWED_PATTERN" | grep -q .; then
+            echo "Promptfoo eval-infrastructure-only change: running deterministic eval CI and core static checks."
             echo "has_code_changes=true" >> "$GITHUB_OUTPUT"
             echo "run_promptfoo_evals=true" >> "$GITHUB_OUTPUT"
             for t in run_build run_test run_public_lighthouse run_dashboard_lighthouse run_onboarding_lighthouse run_admin_lighthouse run_chat_lighthouse run_e2e run_drizzle run_neon; do
