@@ -5,6 +5,17 @@
      5|The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
      6|and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.5.52] - 2026-05-25
+
+> Shell chrome now reads calmer, with the sidebar collapse control in the header, the library route using one shell, and the chat composer/settings surfaces tightened up.
+
+### Fixed
+
+- **Shell navigation chrome**: removed the highlighted `New chat` treatment, moved the web collapse control into the header cluster, and kept the thicker collapse icon so the shell behaves the same in web and desktop contexts.
+- **Library shell cleanup**: registered the library route sidebar override, removed duplicate sidebar loading fallback behavior, and retuned the filter, release-date, and status surfaces to the shell-v1 accent palette.
+- **Chat composer stability**: tightened focus restoration after send, simplified the attachment menu copy, and gave dictation a visible active state with the updated shell button treatment.
+- **Settings hierarchy and usage meter**: flattened duplicated settings headers, normalized sidebar labels, and updated usage counters and progress fills to the Geist accent colors.
+
 ## [26.5.51] - 2026-05-25
 
 > iOS native sign-in now completes the HTTPS browser callback path, exchanges the custom-scheme return, persists the session, and lands in the authenticated shell.
