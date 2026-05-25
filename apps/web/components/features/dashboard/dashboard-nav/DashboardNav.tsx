@@ -16,25 +16,26 @@ import {
 } from '@/components/organisms/Sidebar';
 import { SidebarCollapsibleGroup } from '@/components/organisms/SidebarCollapsibleGroup';
 import {
+  readThreadReadState,
   type SidebarThread,
   SidebarThreadsSection,
+  toSidebarThread,
+  writeThreadReadState,
 } from '@/components/shell/SidebarThreadsSection';
 import { APP_ROUTES, isDemoRoutePath } from '@/constants/routes';
 import { useAppFlag } from '@/lib/flags/client';
 import { NAV_SHORTCUTS } from '@/lib/keyboard-shortcuts';
 import { usePlanGate } from '@/lib/queries';
-import {
-  type ChatConversation,
-  useChatConversationsQuery,
-} from '@/lib/queries/useChatConversationsQuery';
+import { useChatConversationsQuery } from '@/lib/queries/useChatConversationsQuery';
 import { useTaskStatsQuery } from '@/lib/queries/useTasksQuery';
 import {
   adminNavigationSections,
   artistSettingsNavigation,
   calendarNavItem,
-  libraryNavItem,
   newThreadNavItem,
   primaryNavigation,
+  profileNavItem,
+  settingsNavItem,
   userSettingsNavigation,
 } from './config';
 import { NavMenuItem } from './NavMenuItem';
@@ -46,80 +47,9 @@ const searchNavItem: NavItem = {
   href: APP_ROUTES.CHAT,
   id: 'search',
   icon: Search,
-  description: 'Search routes, releases, artists, and threads',
+  description:
+    'Search app content across threads, releases, artists, tasks, and more',
 };
-
-const THREAD_READ_STORAGE_KEY = 'jovie:sidebar-thread-read-at';
-const IN_PROGRESS_CHAT_TURN_STATUSES = new Set([
-  'reserved',
-  'running',
-  'streaming',
-]);
-const FAILED_CHAT_TURN_STATUSES = new Set([
-  'failed_tool_unavailable',
-  'failed_model_error',
-  'failed_timeout',
-  'failed_network',
-]);
-
-function getSidebarThreadStatus(
-  latestTurnStatus: ChatConversation['latestTurnStatus']
-): SidebarThread['status'] {
-  if (!latestTurnStatus) {
-    return 'complete';
-  }
-
-  if (IN_PROGRESS_CHAT_TURN_STATUSES.has(latestTurnStatus)) {
-    return 'running';
-  }
-
-  if (FAILED_CHAT_TURN_STATUSES.has(latestTurnStatus)) {
-    return 'errored';
-  }
-
-  return 'complete';
-}
-
-function readThreadReadState(): Record<string, string> {
-  try {
-    const stored = globalThis.localStorage?.getItem(THREAD_READ_STORAGE_KEY);
-    if (!stored) return {};
-    const parsed = JSON.parse(stored) as unknown;
-    if (!parsed || typeof parsed !== 'object') return {};
-
-    return Object.fromEntries(
-      Object.entries(parsed as Record<string, unknown>).filter(
-        (entry): entry is [string, string] => typeof entry[1] === 'string'
-      )
-    );
-  } catch {
-    return {};
-  }
-}
-
-function writeThreadReadState(value: Record<string, string>): void {
-  try {
-    globalThis.localStorage?.setItem(
-      THREAD_READ_STORAGE_KEY,
-      JSON.stringify(value)
-    );
-  } catch {
-    // Storage can be unavailable in restricted browsers; row state still works.
-  }
-}
-
-function isTimestampAfter(
-  candidate: string | null | undefined,
-  baseline: string | null | undefined
-): boolean {
-  if (!candidate) return false;
-  if (!baseline) return true;
-  const candidateMs = Date.parse(candidate);
-  const baselineMs = Date.parse(baseline);
-  return Number.isFinite(candidateMs) && Number.isFinite(baselineMs)
-    ? candidateMs > baselineMs
-    : candidate > baseline;
-}
 
 type DashboardNavSection = {
   readonly key: string;
@@ -127,8 +57,8 @@ type DashboardNavSection = {
   readonly items: NavItem[];
 };
 
-type ArtistWorkspaceNavSection = {
-  readonly key: 'artist-workspace';
+type MoreNavSection = {
+  readonly key: 'more';
   readonly label: string;
   readonly items: NavItem[];
 };
@@ -186,7 +116,6 @@ export function DashboardNav(_: DashboardNavProps) {
   const router = useRouter();
   const queryClient = useQueryClient();
   const shellChatV1Enabled = useAppFlag('DESIGN_V1');
-  const shellChatLibraryEnabled = useAppFlag('SHELL_CHAT_V1');
   const [threadReadAtById, setThreadReadAtById] =
     useState<Record<string, string>>(readThreadReadState);
   const username =
@@ -245,11 +174,11 @@ export function DashboardNav(_: DashboardNavProps) {
 
   // Settings nav: "General" (user) and artist name (or "Artist") groups
   const artistSettingsLabel = artistName || 'Artist';
-  const artistWorkspaceLabel = artistName || 'Artist';
+  const moreLabel = 'More';
 
   // Memoize nav sections for dashboard (non-settings) mode
-  const { artistWorkspaceSection, navSections } = useMemo<{
-    readonly artistWorkspaceSection: ArtistWorkspaceNavSection | null;
+  const { moreSection, navSections } = useMemo<{
+    readonly moreSection: MoreNavSection | null;
     readonly navSections: DashboardNavSection[];
   }>(() => {
     const decorateItem = (item: NavItem): NavItem =>
@@ -267,62 +196,57 @@ export function DashboardNav(_: DashboardNavProps) {
             })(),
           }
         : item;
-    const primaryItems = shellChatLibraryEnabled
-      ? [
-          ...primaryNavigation.slice(0, 2),
-          libraryNavItem,
-          ...primaryNavigation.slice(2),
-        ]
-      : primaryNavigation;
+
+    const releaseItem = primaryNavigation.find(item => item.id === 'releases');
+    const audienceItem = primaryNavigation.find(item => item.id === 'audience');
+    const tasksItem = primaryNavigation.find(item => item.id === 'tasks');
 
     if (shellChatV1Enabled) {
-      const profileItem = primaryNavigation.find(item => item.id === 'profile');
-      const releaseItem = primaryNavigation.find(
-        item => item.id === 'releases'
-      );
-      const audienceItem = primaryNavigation.find(
-        item => item.id === 'audience'
-      );
-      const tasksItem = primaryNavigation.find(item => item.id === 'tasks');
-
       return {
-        artistWorkspaceSection: {
-          key: 'artist-workspace',
-          label: artistWorkspaceLabel,
-          items: [profileItem, releaseItem, audienceItem]
-            .filter((item): item is NavItem => Boolean(item))
-            .map(decorateItem),
+        moreSection: {
+          key: 'more',
+          label: moreLabel,
+          items: [profileNavItem, settingsNavItem].map(decorateItem),
         },
         navSections: [
           {
-            key: 'user-work',
+            key: 'work',
+            label: 'Work',
             items: [
-              newThreadNavItem,
+              decorateItem(newThreadNavItem),
               searchNavItem,
-              calendarNavItem,
               ...(tasksItem ? [decorateItem(tasksItem)] : []),
-              ...(shellChatLibraryEnabled ? [libraryNavItem] : []),
+              decorateItem(calendarNavItem),
             ],
+          },
+          {
+            key: 'catalog',
+            label: 'Catalog',
+            items: releaseItem ? [decorateItem(releaseItem)] : [],
+          },
+          {
+            key: 'growth',
+            label: 'Growth',
+            items: audienceItem ? [decorateItem(audienceItem)] : [],
           },
         ],
       };
     }
 
     return {
-      artistWorkspaceSection: null,
+      moreSection: null,
       navSections: [
         {
           key: 'primary',
-          items: primaryItems.map(decorateItem),
+          items: primaryNavigation.map(decorateItem),
         },
       ],
     };
   }, [
-    artistWorkspaceLabel,
     canAccessTasksWorkspace,
     isPlanGateLoading,
+    moreLabel,
     shellChatV1Enabled,
-    shellChatLibraryEnabled,
     taskStats,
   ]);
 
@@ -471,25 +395,12 @@ export function DashboardNav(_: DashboardNavProps) {
 
   const sidebarThreads = useMemo<SidebarThread[]>(
     () =>
-      (conversations ?? []).map(conversation => {
-        const latestTurnStatus = conversation.latestTurnStatus ?? null;
-        const isUnread =
-          activeThreadId !== conversation.id &&
-          conversation.latestMessageRole === 'assistant' &&
-          isTimestampAfter(
-            conversation.updatedAt,
-            threadReadAtById[conversation.id]
-          );
-
-        return {
-          id: conversation.id,
-          href: `${APP_ROUTES.CHAT}/${encodeURIComponent(conversation.id)}`,
-          title: conversation.title?.trim() || 'Untitled thread',
-          status: getSidebarThreadStatus(latestTurnStatus),
-          updatedAt: conversation.updatedAt,
-          unread: isUnread,
-        };
-      }),
+      (conversations ?? []).map(conversation =>
+        toSidebarThread(conversation, {
+          activeThreadId,
+          readAt: threadReadAtById[conversation.id],
+        })
+      ),
     [activeThreadId, conversations, threadReadAtById]
   );
 
@@ -615,6 +526,12 @@ export function DashboardNav(_: DashboardNavProps) {
           <SidebarThreadsSection
             threads={sidebarThreads}
             activeThreadId={activeThreadId}
+            allThreadsActive={
+              normalizeTrailingSlash(pathname) === APP_ROUTES.THREADS
+            }
+            onNewThread={() => {
+              router.push(APP_ROUTES.CHAT);
+            }}
             state={
               conversationsError
                 ? 'error'
@@ -629,14 +546,14 @@ export function DashboardNav(_: DashboardNavProps) {
         </div>
       ) : null}
 
-      {artistWorkspaceSection ? (
-        <div data-nav-section={artistWorkspaceSection.key} className='mt-3'>
+      {moreSection ? (
+        <div data-nav-section={moreSection.key} className='mt-3'>
           <SidebarCollapsibleGroup
-            label={artistWorkspaceSection.label}
+            label={moreSection.label}
             defaultOpen={false}
-            storageKey={artistWorkspaceSection.key}
+            storageKey={moreSection.key}
           >
-            {renderSection(artistWorkspaceSection.items)}
+            {renderSection(moreSection.items)}
           </SidebarCollapsibleGroup>
         </div>
       ) : null}

@@ -4,13 +4,11 @@ import { useCallback, useMemo } from 'react';
 import { useDashboardData } from '@/app/app/(shell)/dashboard/DashboardDataContext';
 import {
   adminNavigation,
-  libraryNavItem,
   mobileExpandedNavigation,
   mobilePrimaryNavigation,
 } from '@/features/dashboard/dashboard-nav';
 import type { NavItem } from '@/features/dashboard/dashboard-nav/types';
 import { useAuthSafe } from '@/hooks/useClerkSafe';
-import { useAppFlag } from '@/lib/flags/client';
 import { cn } from '@/lib/utils';
 
 import { LiquidGlassMenu, type LiquidGlassMenuItem } from './LiquidGlassMenu';
@@ -31,14 +29,9 @@ export function DashboardMobileTabs({
 }: DashboardMobileTabsProps): React.JSX.Element {
   const { isAdmin } = useDashboardData();
   const { signOut } = useAuthSafe();
-  const shellChatLibraryEnabled = useAppFlag('SHELL_CHAT_V1');
   const expandedItems = useMemo(
-    () =>
-      (shellChatLibraryEnabled
-        ? [libraryNavItem, ...mobileExpandedNavigation]
-        : mobileExpandedNavigation
-      ).map(toMenuItem),
-    [shellChatLibraryEnabled]
+    () => mobileExpandedNavigation.map(toMenuItem),
+    []
   );
 
   const handleSignOut = useCallback(async () => {

@@ -24,6 +24,9 @@ describe('DashboardNav', () => {
       renderFn: fastRender,
     });
 
+    expect(getByRole('link', { name: 'New thread' }).getAttribute('href')).toBe(
+      APP_ROUTES.CHAT
+    );
     expect(getByRole('link', { name: 'Profile' }).getAttribute('href')).toBe(
       APP_ROUTES.SETTINGS_ARTIST_PROFILE
     );
@@ -35,19 +38,17 @@ describe('DashboardNav', () => {
       APP_ROUTES.TASKS
     );
     expect(getByRole('link', { name: 'Audience' })).toBeDefined();
-    expect(getByRole('link', { name: 'Library' })).toBeDefined();
+    expect(queryByRole('link', { name: 'Library' })).toBeNull();
     expect(queryByRole('link', { name: 'Earnings' })).toBeNull();
   });
 
-  it('renders Library navigation only when the new design flag is enabled', () => {
-    const { getByRole } = renderDashboardNav({
+  it('does not render Library navigation in the grouped shell', () => {
+    const { queryByRole } = renderDashboardNav({
       renderFn: fastRender,
-      appFlags: { SHELL_CHAT_V1: true },
+      appFlags: { DESIGN_V1: true },
     });
 
-    expect(getByRole('link', { name: 'Library' }).getAttribute('href')).toBe(
-      APP_ROUTES.LIBRARY
-    );
+    expect(queryByRole('link', { name: 'Library' })).toBeNull();
   });
 
   it('renders Calendar in the Design V1 user work section', () => {
@@ -80,7 +81,7 @@ describe('DashboardNav', () => {
     expect(releasesLink.getAttribute('aria-current')).toBe('page');
   });
 
-  it('only marks New chat active on the chat root', () => {
+  it('only marks New thread active on the chat root', () => {
     mockUsePathname.mockReturnValueOnce(`${APP_ROUTES.CHAT}/thread-123`);
 
     const { getByRole } = renderDashboardNav({
@@ -89,11 +90,11 @@ describe('DashboardNav', () => {
     });
 
     expect(
-      getByRole('link', { name: 'New chat' }).getAttribute('aria-current')
+      getByRole('link', { name: 'New thread' }).getAttribute('aria-current')
     ).toBeNull();
   });
 
-  it('keeps New chat on the default shell tone when it is inactive', () => {
+  it('keeps New thread on the default shell tone when it is inactive', () => {
     mockUsePathname.mockReturnValueOnce(APP_ROUTES.RELEASES);
 
     const { getByRole } = renderDashboardNav({
@@ -101,20 +102,20 @@ describe('DashboardNav', () => {
       appFlags: { DESIGN_V1: true },
     });
 
-    const newChatLink = getByRole('link', { name: 'New chat' });
-    expect(newChatLink.className).toContain('text-sidebar-muted/80');
-    expect(newChatLink.className).not.toContain(
+    const newThreadLink = getByRole('link', { name: 'New thread' });
+    expect(newThreadLink.className).toContain('text-sidebar-muted/80');
+    expect(newThreadLink.className).not.toContain(
       'bg-[color-mix(in_oklab,var(--linear-app-content-surface)_92%,white_8%)]'
     );
   });
 
-  it('renders one canonical New chat nav row in Design V1', () => {
+  it('renders one canonical New thread nav row in Design V1', () => {
     const { getAllByRole } = renderDashboardNav({
       renderFn: fastRender,
       appFlags: { DESIGN_V1: true },
     });
 
-    expect(getAllByRole('link', { name: 'New chat' })).toHaveLength(1);
+    expect(getAllByRole('link', { name: 'New thread' })).toHaveLength(1);
   });
 
   it('opens the global command palette from Search instead of navigating', () => {
@@ -193,8 +194,8 @@ describe('DashboardNav', () => {
       appFlags: { DESIGN_V1: true },
     });
 
-    const newChatLink = getByRole('link', { name: 'New chat' });
-    expect(newChatLink.className).toContain(
+    const newThreadLink = getByRole('link', { name: 'New thread' });
+    expect(newThreadLink.className).toContain(
       'group-data-[collapsible=icon]:justify-center'
     );
     expect(mockUseChatConversationsQuery).toHaveBeenCalledWith({
@@ -203,19 +204,29 @@ describe('DashboardNav', () => {
     });
   });
 
-  it('differentiates primary and secondary nav styling', () => {
-    const { container } = renderDashboardNav({ renderFn: fastRender });
+  it('renders the grouped Work, Catalog, Growth, and More sections', () => {
+    const { getByRole, queryByRole } = renderDashboardNav({
+      renderFn: fastRender,
+      appFlags: { DESIGN_V1: true },
+    });
 
-    const nav = container.querySelector('nav');
-    const menus = nav?.querySelectorAll('[data-sidebar="menu"]') ?? [];
-
-    expect(menus.length).toBeGreaterThanOrEqual(1);
-
-    const primaryMenuParent = (menus[0] as HTMLElement | undefined)
-      ?.parentElement;
-    const primaryGroup = primaryMenuParent?.parentElement;
-
-    expect(primaryGroup?.className).toMatch(/space-y-/);
+    expect(getByRole('button', { name: 'Work' })).toHaveAttribute(
+      'aria-expanded',
+      'true'
+    );
+    expect(getByRole('button', { name: 'Catalog' })).toHaveAttribute(
+      'aria-expanded',
+      'true'
+    );
+    expect(getByRole('button', { name: 'Growth' })).toHaveAttribute(
+      'aria-expanded',
+      'true'
+    );
+    expect(getByRole('button', { name: 'More' })).toHaveAttribute(
+      'aria-expanded',
+      'false'
+    );
+    expect(queryByRole('link', { name: 'Library' })).toBeNull();
   });
 
   it('renders full admin navigation for admin users', () => {
@@ -235,7 +246,7 @@ describe('DashboardNav', () => {
     );
   });
 
-  it('defaults artist workspace and admin groups collapsed', () => {
+  it('defaults More and Admin groups collapsed', () => {
     const { getByRole } = renderDashboardNav({
       renderFn: fastRender,
       overrides: {
@@ -249,7 +260,7 @@ describe('DashboardNav', () => {
       },
     });
 
-    expect(getByRole('button', { name: 'Tim White' })).toHaveAttribute(
+    expect(getByRole('button', { name: 'More' })).toHaveAttribute(
       'aria-expanded',
       'false'
     );
@@ -259,8 +270,8 @@ describe('DashboardNav', () => {
     );
   });
 
-  it('remembers an expanded artist workspace group', () => {
-    localStorage.setItem('jovie:sidebar-section:artist-workspace', 'open');
+  it('remembers an expanded More group', () => {
+    localStorage.setItem('jovie:sidebar-section:more', 'open');
 
     const { getByRole } = renderDashboardNav({
       renderFn: fastRender,
@@ -274,7 +285,7 @@ describe('DashboardNav', () => {
       },
     });
 
-    expect(getByRole('button', { name: 'Tim White' })).toHaveAttribute(
+    expect(getByRole('button', { name: 'More' })).toHaveAttribute(
       'aria-expanded',
       'true'
     );
@@ -289,17 +300,15 @@ describe('DashboardNav', () => {
     expect(audienceLink.getAttribute('aria-current')).toBe('page');
   });
 
-  it('applies active state to Library when the flagged route is current', () => {
+  it('does not surface Library as a nav item even when the legacy route is current', () => {
     mockUsePathname.mockReturnValueOnce(APP_ROUTES.DASHBOARD_LIBRARY);
 
-    const { getByRole } = renderDashboardNav({
+    const { queryByRole } = renderDashboardNav({
       renderFn: fastRender,
-      appFlags: { SHELL_CHAT_V1: true },
+      appFlags: { DESIGN_V1: true },
     });
 
-    expect(
-      getByRole('link', { name: 'Library' }).getAttribute('aria-current')
-    ).toBe('page');
+    expect(queryByRole('link', { name: 'Library' })).toBeNull();
   });
 
   it('renders settings groups with the selected artist name', () => {

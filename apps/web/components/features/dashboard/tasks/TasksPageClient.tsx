@@ -1336,7 +1336,7 @@ export function TasksPageClient() {
   );
   const [assigneeFilter, setAssigneeFilter] = useState<
     TaskAssigneeKind | 'all'
-  >('all');
+  >('human');
   const [mobileScope, setMobileScope] = useState<MobileTaskScope>('all');
   const [showCancelledColumn, setShowCancelledColumn] = useState(false);
   const [draftTitle, setDraftTitle] = useState('');
@@ -1517,7 +1517,7 @@ export function TasksPageClient() {
     Boolean(deferredSearch.trim()) ||
     statusFilter !== 'all' ||
     priorityFilter !== 'all' ||
-    assigneeFilter !== 'all';
+    assigneeFilter !== 'human';
   const isResolvingProfile = !profileId || !hasResolvedResponsiveLayout;
   const isActiveBoardLoading = isResolvingProfile || isBoardLoading;
   const isActiveListLoading = isResolvingProfile || isLoading;
@@ -1534,7 +1534,7 @@ export function TasksPageClient() {
     setSearch('');
     setStatusFilter('all');
     setPriorityFilter('all');
-    setAssigneeFilter('all');
+    setAssigneeFilter('human');
     setMobileScope('all');
   }, []);
   const openReleases = useCallback(() => {

@@ -6,7 +6,6 @@ import {
   adminSettingsNavItem,
   adminSettingsNavigation,
   artistSettingsNavigation,
-  libraryNavItem,
   paymentsNavItem,
   primaryNavigation,
   settingsNavItem,
@@ -18,6 +17,9 @@ const SHELL_ROOT = path.resolve(__dirname, '../../../app/app/(shell)');
 const INTENTIONAL_INTERNAL_ROUTES: Record<string, string> = {
   '/app': 'Shell root entry page',
   '/app/chat/[id]': 'Thread detail is reached from chat history',
+  '/app/library':
+    'Canonical library page retained as the assets readiness surface',
+  '/app/threads': 'All threads index reached from the sidebar link',
   '/app/admin/investors/links': 'Sub-tool reached from Investors workspace',
   '/app/admin/investors/settings':
     'Sub-tool reached from Investors workspace actions',
@@ -99,7 +101,6 @@ function isRedirectStub(source: string): boolean {
 function getNavRoutePaths(): Set<string> {
   const navItems = [
     ...primaryNavigation,
-    libraryNavItem,
     settingsNavItem,
     ...userSettingsNavigation,
     paymentsNavItem,
