@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { type ToolSet, tool, type UIMessage } from 'ai';
 import { z } from 'zod';
 import { APP_ROUTES } from '@/constants/routes';
@@ -35,6 +37,7 @@ import {
 type EvalVars = Record<string, unknown>;
 type EvalTarget =
   | 'chat-turn'
+  | 'eval-case-inventory'
   | 'model-contract'
   | 'mobile-chat-route'
   | 'tool-contract'
@@ -94,6 +97,7 @@ const MOBILE_CHAT_NDJSON_HEADERS = {
   ...NO_STORE_HEADERS,
   'Content-Type': 'application/x-ndjson; charset=utf-8',
 } as const;
+const PROMPTFOO_CONFIG_PATH = 'tests/eval/promptfoo/promptfooconfig.yaml';
 
 const ADVANCED_TOOL_SCHEMAS = {
   showTopInsights: {
@@ -292,6 +296,30 @@ const GENERIC_ARTIFACT_RENDERER_TOOL_NAMES = [
 const GENERIC_ARTIFACT_RENDERER_NAME_SET = new Set<string>(
   GENERIC_ARTIFACT_RENDERER_TOOL_NAMES
 );
+const REQUIRED_TOOL_EVENT_CASES = [
+  'approval-requested',
+  'approval-responded',
+  'dedupe-latest',
+  'denied',
+  'invalid',
+  'inventory',
+  'legacy-failure',
+  'legacy-success',
+] as const;
+const REQUIRED_FREE_UNAVAILABLE_TOOL_NAMES = [
+  'createMerch',
+  'generateAlbumArt',
+  'showArtistPayouts',
+] as const;
+const REQUIRED_ONBOARDING_UNAVAILABLE_TOOL_NAMES = [
+  'generateAlbumArt',
+  'openBillingPortal',
+  'submitFeedback',
+] as const;
+const REQUIRED_SEMANTIC_INVALID_TOOL_NAMES = [
+  'proposeSocialLink',
+  'proposeSocialLinkRemoval',
+] as const;
 const CHAT_SLASH_SKILL_NAMES = commandsForSurface('chat-slash')
   .filter(command => command.kind === 'skill')
   .map(command => command.id)
@@ -343,6 +371,7 @@ function toMode(value: unknown): 'app' | 'onboarding' {
 
 function toTarget(value: unknown): EvalTarget {
   if (
+    value === 'eval-case-inventory' ||
     value === 'mobile-chat-route' ||
     value === 'model-contract' ||
     value === 'tool-contract' ||
@@ -1863,6 +1892,270 @@ function evaluateToolRenderContract(vars: EvalVars) {
   };
 }
 
+type EvalCaseSummary = {
+  readonly description: string;
+  readonly cost: string | null;
+  readonly target: string | null;
+  readonly toolName: string | null;
+  readonly eventCase: string | null;
+  readonly renderCase: string | null;
+  readonly mode: string | null;
+  readonly plan: string | null;
+  readonly assertions: readonly string[];
+  readonly coveredTools: readonly string[];
+};
+
+function uniqueSorted(values: readonly string[]): string[] {
+  return [...new Set(values)].sort();
+}
+
+function scalarValue(block: string, key: string): string | null {
+  const match = block.match(new RegExp(`\\n\\s+${key}:\\s*([^\\n#]+)`));
+  if (!match?.[1]) return null;
+
+  return match[1].trim().replace(/^['"]|['"]$/g, '') || null;
+}
+
+function listValuesAfter(block: string, key: string): string[] {
+  const lines = block.split('\n');
+  const values: string[] = [];
+  const keyPattern = new RegExp(`^\\s+${key}:\\s*$`);
+
+  for (let index = 0; index < lines.length; index += 1) {
+    if (!keyPattern.test(lines[index] ?? '')) continue;
+
+    for (let itemIndex = index + 1; itemIndex < lines.length; itemIndex += 1) {
+      const item = lines[itemIndex]?.match(/^ {10}-\s+(.+?)\s*$/);
+      if (!item?.[1]) break;
+      values.push(item[1].trim().replace(/^['"]|['"]$/g, ''));
+    }
+  }
+
+  return values;
+}
+
+function extractPromptfooTestBlocks(configText: string): string[] {
+  const testsStart = configText.match(/^tests:\s*$/m);
+  if (!testsStart?.index) return [];
+
+  const lines = configText.slice(testsStart.index).split('\n');
+  const blocks: string[] = [];
+  let current: string[] = [];
+
+  for (const line of lines) {
+    if (/^  - description:/.test(line)) {
+      if (current.length > 0) {
+        blocks.push(current.join('\n'));
+      }
+      current = [line];
+      continue;
+    }
+
+    if (current.length > 0) {
+      current.push(line);
+    }
+  }
+
+  if (current.length > 0) {
+    blocks.push(current.join('\n'));
+  }
+
+  return blocks;
+}
+
+function parseEvalCaseSummary(block: string): EvalCaseSummary {
+  const description =
+    block
+      .match(/^  - description:\s*(.+)$/m)?.[1]
+      ?.trim()
+      .replace(/^['"]|['"]$/g, '') ?? 'Untitled eval case';
+  const assertions = uniqueSorted(
+    [...block.matchAll(/value:\s*file:\/\/assertions\.cjs:([A-Za-z0-9_]+)/g)]
+      .map(match => match[1])
+      .filter((value): value is string => typeof value === 'string')
+  );
+
+  return {
+    description,
+    cost: scalarValue(block, 'cost'),
+    target: scalarValue(block, 'target') ?? 'chat-turn',
+    toolName: scalarValue(block, 'toolName'),
+    eventCase: scalarValue(block, 'eventCase'),
+    renderCase: scalarValue(block, 'renderCase'),
+    mode: scalarValue(block, 'mode') ?? 'app',
+    plan: scalarValue(block, 'plan') ?? 'pro',
+    assertions,
+    coveredTools: listValuesAfter(block, 'coveredTools'),
+  };
+}
+
+function parsePromptfooCaseSummaries(configText: string): EvalCaseSummary[] {
+  return extractPromptfooTestBlocks(configText).map(parseEvalCaseSummary);
+}
+
+function caseHasAssertion(
+  testCase: EvalCaseSummary,
+  assertionName: string
+): boolean {
+  return testCase.assertions.includes(assertionName);
+}
+
+function toolNamesForCases(
+  cases: readonly EvalCaseSummary[],
+  predicate: (testCase: EvalCaseSummary) => boolean
+): string[] {
+  return uniqueSorted(
+    cases
+      .filter(predicate)
+      .map(testCase => testCase.toolName)
+      .filter((toolName): toolName is string => typeof toolName === 'string')
+  );
+}
+
+function missingNames(
+  required: readonly string[],
+  covered: readonly string[]
+): string[] {
+  const coveredSet = new Set(covered);
+  return required.filter(name => !coveredSet.has(name)).sort();
+}
+
+function evaluateEvalCaseInventory(vars: EvalVars) {
+  const configPath =
+    typeof vars.configPath === 'string' && vars.configPath.trim().length > 0
+      ? vars.configPath.trim()
+      : PROMPTFOO_CONFIG_PATH;
+  const configText = readFileSync(resolve(process.cwd(), configPath), 'utf8');
+  const cases = parsePromptfooCaseSummaries(configText);
+  const deterministicCases = cases.filter(
+    testCase => testCase.cost === 'deterministic'
+  );
+  const liveCases = cases.filter(testCase => testCase.cost === 'live');
+  const firstToolInventoryCase = deterministicCases.find(
+    testCase => testCase.target === 'tool-inventory'
+  );
+  const inventoryCoveredToolNames = uniqueSorted(
+    firstToolInventoryCase?.coveredTools ?? []
+  );
+  const toolContractExecutedNames = toolNamesForCases(
+    deterministicCases,
+    testCase =>
+      testCase.target === 'tool-contract' &&
+      caseHasAssertion(testCase, 'assertToolExecuted')
+  );
+  const genericArtifactRenderCaseNames = toolNamesForCases(
+    deterministicCases,
+    testCase =>
+      testCase.target === 'tool-render-contract' &&
+      testCase.renderCase === 'artifact-success' &&
+      caseHasAssertion(testCase, 'assertToolRenderSucceededArtifact')
+  );
+  const toolEventCaseNames = uniqueSorted(
+    deterministicCases
+      .filter(testCase => testCase.target === 'tool-event-contract')
+      .map(testCase => testCase.eventCase)
+      .filter((eventCase): eventCase is string => typeof eventCase === 'string')
+  );
+  const freeUnavailableCaseNames = toolNamesForCases(
+    deterministicCases,
+    testCase =>
+      testCase.target === 'tool-contract' &&
+      testCase.mode === 'app' &&
+      testCase.plan === 'free' &&
+      caseHasAssertion(testCase, 'assertToolUnavailable')
+  );
+  const onboardingUnavailableCaseNames = toolNamesForCases(
+    deterministicCases,
+    testCase =>
+      testCase.target === 'tool-contract' &&
+      testCase.mode === 'onboarding' &&
+      caseHasAssertion(testCase, 'assertToolUnavailable')
+  );
+  const semanticInvalidCaseNames = toolNamesForCases(
+    deterministicCases,
+    testCase =>
+      testCase.target === 'tool-contract' &&
+      caseHasAssertion(testCase, 'assertToolSemanticInvalid')
+  );
+  const knownToolNames = new Set(ALL_EVAL_TOOL_NAMES);
+
+  return {
+    target: 'eval-case-inventory',
+    adapter: 'eval-case-inventory',
+    costTier: 'deterministic',
+    text: '',
+    selectedModel: null,
+    modelCalled: false,
+    persistenceAttempted: false,
+    configPath,
+    caseCount: cases.length,
+    deterministicCaseCount: deterministicCases.length,
+    liveCaseCount: liveCases.length,
+    targetCounts: deterministicCases.reduce<Record<string, number>>(
+      (counts, testCase) => {
+        const target = testCase.target ?? 'chat-turn';
+        counts[target] = (counts[target] ?? 0) + 1;
+        return counts;
+      },
+      {}
+    ),
+    requiredToolNames: ALL_EVAL_TOOL_NAMES,
+    toolContractExecutedNames,
+    missingToolContractExecutedNames: missingNames(
+      ALL_EVAL_TOOL_NAMES,
+      toolContractExecutedNames
+    ),
+    unknownToolContractExecutedNames: toolContractExecutedNames.filter(
+      toolName => !knownToolNames.has(toolName)
+    ),
+    inventoryCoveredToolNames,
+    missingInventoryCoveredToolNames: missingNames(
+      ALL_EVAL_TOOL_NAMES,
+      inventoryCoveredToolNames
+    ),
+    unknownInventoryCoveredToolNames: inventoryCoveredToolNames.filter(
+      toolName => !knownToolNames.has(toolName)
+    ),
+    requiredGenericArtifactRendererToolNames: [
+      ...GENERIC_ARTIFACT_RENDERER_TOOL_NAMES,
+    ],
+    genericArtifactRenderCaseNames,
+    missingGenericArtifactRenderCaseNames: missingNames(
+      GENERIC_ARTIFACT_RENDERER_TOOL_NAMES,
+      genericArtifactRenderCaseNames
+    ),
+    requiredToolEventCases: [...REQUIRED_TOOL_EVENT_CASES],
+    toolEventCaseNames,
+    missingToolEventCaseNames: missingNames(
+      REQUIRED_TOOL_EVENT_CASES,
+      toolEventCaseNames
+    ),
+    requiredFreeUnavailableToolNames: [...REQUIRED_FREE_UNAVAILABLE_TOOL_NAMES],
+    freeUnavailableCaseNames,
+    missingFreeUnavailableCaseNames: missingNames(
+      REQUIRED_FREE_UNAVAILABLE_TOOL_NAMES,
+      freeUnavailableCaseNames
+    ),
+    requiredOnboardingUnavailableToolNames: [
+      ...REQUIRED_ONBOARDING_UNAVAILABLE_TOOL_NAMES,
+    ],
+    onboardingUnavailableCaseNames,
+    missingOnboardingUnavailableCaseNames: missingNames(
+      REQUIRED_ONBOARDING_UNAVAILABLE_TOOL_NAMES,
+      onboardingUnavailableCaseNames
+    ),
+    requiredSemanticInvalidToolNames: [...REQUIRED_SEMANTIC_INVALID_TOOL_NAMES],
+    semanticInvalidCaseNames,
+    missingSemanticInvalidCaseNames: missingNames(
+      REQUIRED_SEMANTIC_INVALID_TOOL_NAMES,
+      semanticInvalidCaseNames
+    ),
+    toolCalls: [],
+    toolResults: [],
+    toolExecutions: [],
+  };
+}
+
 function toPromptfooUsage(usage: Record<string, unknown> | null | undefined) {
   if (!usage) return undefined;
 
@@ -1924,6 +2217,16 @@ export default class JovieChatPromptfooProvider {
 
     if (target === 'web-chat-route') {
       const payload = evaluateWebChatRouteContract(prompt, vars);
+      return {
+        output: JSON.stringify(payload),
+        raw: payload,
+        format: 'json',
+        latencyMs: Date.now() - startedAt,
+      };
+    }
+
+    if (target === 'eval-case-inventory') {
+      const payload = evaluateEvalCaseInventory(vars);
       return {
         output: JSON.stringify(payload),
         raw: payload,

@@ -740,6 +740,18 @@ tests:
       - type: javascript
         value: file://assertions.cjs:assertSlashSkillVisibilityCovered
 
+  - description: Eval case inventory covers every deterministic tool lane
+    metadata:
+      cost: deterministic
+    vars:
+      input: "Eval case inventory check"
+      target: eval-case-inventory
+    assert:
+      - type: javascript
+        value: file://assertions.cjs:assertDeterministicNoSpend
+      - type: javascript
+        value: file://assertions.cjs:assertEvalCaseInventoryCovered
+
   - description: Tool event inventory hydrates every eval tool
     metadata:
       cost: deterministic
@@ -874,6 +886,93 @@ tests:
       toolName: proposeSocialLink
       renderCase: artifact-success
       profileIdPresent: true
+    assert:
+      - type: javascript
+        value: file://assertions.cjs:assertDeterministicNoSpend
+      - type: javascript
+        value: file://assertions.cjs:assertToolRenderSucceededArtifact
+
+  - description: Tool rendering shows succeeded avatar upload as artifact card
+    metadata:
+      cost: deterministic
+    vars:
+      input: "Render a succeeded avatar upload artifact."
+      target: tool-render-contract
+      toolName: proposeAvatarUpload
+      renderCase: artifact-success
+    assert:
+      - type: javascript
+        value: file://assertions.cjs:assertDeterministicNoSpend
+      - type: javascript
+        value: file://assertions.cjs:assertToolRenderSucceededArtifact
+
+  - description: Tool rendering shows succeeded profile edit as artifact card
+    metadata:
+      cost: deterministic
+    vars:
+      input: "Render a succeeded profile edit artifact."
+      target: tool-render-contract
+      toolName: proposeProfileEdit
+      renderCase: artifact-success
+      profileIdPresent: true
+    assert:
+      - type: javascript
+        value: file://assertions.cjs:assertDeterministicNoSpend
+      - type: javascript
+        value: file://assertions.cjs:assertToolRenderSucceededArtifact
+
+  - description: Tool rendering shows succeeded social link removal as artifact card
+    metadata:
+      cost: deterministic
+    vars:
+      input: "Render a succeeded social link removal artifact."
+      target: tool-render-contract
+      toolName: proposeSocialLinkRemoval
+      renderCase: artifact-success
+      profileIdPresent: true
+    assert:
+      - type: javascript
+        value: file://assertions.cjs:assertDeterministicNoSpend
+      - type: javascript
+        value: file://assertions.cjs:assertToolRenderSucceededArtifact
+
+  - description: Tool rendering shows succeeded insights as artifact card
+    metadata:
+      cost: deterministic
+    vars:
+      input: "Render a succeeded insights artifact."
+      target: tool-render-contract
+      toolName: showTopInsights
+      renderCase: artifact-success
+    assert:
+      - type: javascript
+        value: file://assertions.cjs:assertDeterministicNoSpend
+      - type: javascript
+        value: file://assertions.cjs:assertToolRenderSucceededArtifact
+
+  - description: Tool rendering shows succeeded album art as artifact card
+    metadata:
+      cost: deterministic
+    vars:
+      input: "Render a succeeded album art artifact."
+      target: tool-render-contract
+      toolName: generateAlbumArt
+      renderCase: artifact-success
+      profileIdPresent: true
+    assert:
+      - type: javascript
+        value: file://assertions.cjs:assertDeterministicNoSpend
+      - type: javascript
+        value: file://assertions.cjs:assertToolRenderSucceededArtifact
+
+  - description: Tool rendering shows succeeded release pitch as artifact card
+    metadata:
+      cost: deterministic
+    vars:
+      input: "Render a succeeded release pitch artifact."
+      target: tool-render-contract
+      toolName: generateReleasePitch
+      renderCase: artifact-success
     assert:
       - type: javascript
         value: file://assertions.cjs:assertDeterministicNoSpend
@@ -2229,6 +2328,27 @@ tests:
       plan: free
       toolInput:
         url: ftp://lunawaves.example/profile
+    assert:
+      - type: javascript
+        value: file://assertions.cjs:assertDeterministicNoSpend
+      - type: javascript
+        value: file://assertions.cjs:assertToolAvailable
+      - type: javascript
+        value: file://assertions.cjs:assertToolSemanticInvalid
+      - type: javascript
+        value: file://assertions.cjs:assertToolDidNotExecute
+
+  - description: Empty social link removal argument does not execute
+    metadata:
+      cost: deterministic
+    vars:
+      input: "Remove a link without saying which platform."
+      target: tool-contract
+      toolName: proposeSocialLinkRemoval
+      mode: app
+      plan: free
+      toolInput:
+        platform: ""
     assert:
       - type: javascript
         value: file://assertions.cjs:assertDeterministicNoSpend

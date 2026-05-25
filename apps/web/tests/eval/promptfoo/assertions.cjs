@@ -1342,6 +1342,42 @@ function assertToolRenderUnimplementedArtifactFallsBack(output) {
   return pass();
 }
 
+function assertEvalCaseInventoryCovered(output) {
+  const payload = parseOutput(output);
+
+  if (payload.target !== 'eval-case-inventory') {
+    return fail('case did not run through the eval-case-inventory adapter');
+  }
+  if (payload.deterministicCaseCount < 1) {
+    return fail('eval case inventory found no deterministic cases');
+  }
+  if (payload.liveCaseCount < 1) {
+    return fail('eval case inventory found no live/manual cases');
+  }
+
+  for (const field of [
+    'missingToolContractExecutedNames',
+    'unknownToolContractExecutedNames',
+    'missingInventoryCoveredToolNames',
+    'unknownInventoryCoveredToolNames',
+    'missingGenericArtifactRenderCaseNames',
+    'missingToolEventCaseNames',
+    'missingFreeUnavailableCaseNames',
+    'missingOnboardingUnavailableCaseNames',
+    'missingSemanticInvalidCaseNames',
+  ]) {
+    const values = payload[field];
+    if (!Array.isArray(values)) {
+      return fail(`eval case inventory missing ${field}`);
+    }
+    if (values.length > 0) {
+      return fail(`${field}: ${values.join(', ')}`);
+    }
+  }
+
+  return pass();
+}
+
 module.exports = {
   assertNoPromptLeak,
   assertGroundedReleaseLeadTime,
@@ -1399,4 +1435,5 @@ module.exports = {
   assertToolRenderStatusSuccess,
   assertToolRenderMissingProfileFallsBack,
   assertToolRenderUnimplementedArtifactFallsBack,
+  assertEvalCaseInventoryCovered,
 };
