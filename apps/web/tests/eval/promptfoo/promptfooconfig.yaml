@@ -715,6 +715,7 @@ tests:
     vars:
       input: "How should I set up my pre-save?"
       target: model-contract
+      modelScenario: free-no-tool-light
       plan: free
       aiCanUseTools: false
       expectedModel: light
@@ -730,6 +731,7 @@ tests:
     vars:
       input: "add my instagram https://instagram.com/lunawaves"
       target: model-contract
+      modelScenario: simple-pro-tool-light
       plan: pro
       expectedModel: light
     assert:
@@ -744,6 +746,7 @@ tests:
     vars:
       input: "Build a detailed six-week campaign strategy for my next release, including audience segments, content themes, playlist pitching, merch timing, and what to measure each week."
       target: model-contract
+      modelScenario: complex-pro-strategy-primary
       plan: pro
       expectedModel: primary
     assert:
@@ -758,6 +761,7 @@ tests:
     vars:
       input: "Build a detailed six-week campaign strategy for my next release, including audience segments, content themes, playlist pitching, merch timing, and what to measure each week."
       target: model-contract
+      modelScenario: force-light-override
       plan: pro
       forceLightModel: true
       expectedModel: light
@@ -773,6 +777,7 @@ tests:
     vars:
       input: "add my instagram https://instagram.com/lunawaves"
       target: model-contract
+      modelScenario: long-pro-conversation-primary
       plan: pro
       expectedModel: primary
       messages:
