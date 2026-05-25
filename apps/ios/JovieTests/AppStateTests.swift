@@ -39,12 +39,15 @@ private final class MockBrightnessController: BrightnessControlling, @unchecked 
   func restoreBrightness() async {}
 }
 
+@Suite(.serialized)
 @MainActor
 struct AppStateTests {
   private let configuration = AppConfiguration(
     clerkPublishableKey: "pk_test_123",
     apiBaseURL: URL(string: "http://localhost:3100")!,
-    webBaseURL: URL(string: "https://jov.ie")!
+    webBaseURL: URL(string: "https://jov.ie")!,
+    sentryDSN: nil,
+    observabilityEnvironment: "test"
   )
 
   @Test func mapsReadyResponseToReadyRoute() async throws {
@@ -108,6 +111,54 @@ struct AppStateTests {
     #expect(appState.activeUserID == nil)
     #expect(appState.isOffline == false)
     #expect(await repository.clearedUsers() == ["user_123"])
+  }
+
+  @Test func signedInUserSetsObservabilityUserID() async throws {
+    let observability = RecordingObservabilityProvider()
+    Observability.useProviderForTesting(observability)
+    defer { Observability.resetForTesting() }
+    let userID = "observability_user_123"
+
+    let repository = MockRepository(
+      nextResult: .success(
+        MeRepositoryResult(response: .previewReady, isStale: false)
+      )
+    )
+    let appState = AppState(
+      configuration: configuration,
+      launchMode: .live,
+      repository: repository,
+      brightnessManager: MockBrightnessController()
+    )
+    appState.didLoadClerk = true
+
+    await appState.handleSignedInUserChange(userID)
+
+    #expect(observability.userIDs.filter { $0 == userID } == [userID])
+  }
+
+  @Test func signedOutTransitionClearsObservabilityUserID() async throws {
+    let observability = RecordingObservabilityProvider()
+    Observability.useProviderForTesting(observability)
+    defer { Observability.resetForTesting() }
+
+    let repository = MockRepository(
+      nextResult: .success(
+        MeRepositoryResult(response: .previewReady, isStale: false)
+      )
+    )
+    let appState = AppState(
+      configuration: configuration,
+      launchMode: .live,
+      repository: repository,
+      brightnessManager: MockBrightnessController()
+    )
+    appState.didLoadClerk = true
+
+    await appState.handleSignedInUserChange("observability_user_123")
+    await appState.handleSignedInUserChange(nil)
+
+    #expect(observability.clearUserCount == 1)
   }
 
   @Test func duplicateSignedInUserLoadIsIgnoredWhileInFlight() async throws {

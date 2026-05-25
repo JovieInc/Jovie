@@ -26,6 +26,14 @@
 		8747690FEEF7BD069EBF7430 /* MeRepository.swift in Sources */ = {isa = PBXBuildFile; fileRef = 28FBA9F0D12E0BD1CB8B0B09 /* MeRepository.swift */; };
 		89B2D98342D65781B5E80A72 /* JovieApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00BCF42EFB99B5DAB4E0F400 /* JovieApp.swift */; };
 		964DEFE0F4D4206832B6888E /* RootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 969DB5F8041C9A004CDB5234 /* RootView.swift */; };
+		A0B10F000000000000000006 /* ObservabilityTypes.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0B10F000000000000000001 /* ObservabilityTypes.swift */; };
+		A0B10F000000000000000007 /* NoopObservabilityProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0B10F000000000000000002 /* NoopObservabilityProvider.swift */; };
+		A0B10F000000000000000008 /* ObservabilityRedactor.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0B10F000000000000000003 /* ObservabilityRedactor.swift */; };
+		A0B10F000000000000000009 /* Observability.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0B10F000000000000000004 /* Observability.swift */; };
+		A0B10F00000000000000000A /* SentryObservabilityProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0B10F000000000000000005 /* SentryObservabilityProvider.swift */; };
+		A0B10F00000000000000000E /* ObservabilityTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0B10F00000000000000000C /* ObservabilityTests.swift */; };
+		A0B10F00000000000000000F /* ObservabilityRedactionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0B10F00000000000000000D /* ObservabilityRedactionTests.swift */; };
+		A0B10F000000000000000012 /* Sentry in Frameworks */ = {isa = PBXBuildFile; productRef = A0B10F000000000000000011 /* Sentry */; };
 		A13F86A7D4F0C7F83D2BB000 /* ScreenBrightnessManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3FA81B967152B211E5988375 /* ScreenBrightnessManager.swift */; };
 		ADC14533827EFD888D1ED50F /* QRCodeRenderer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000F426E1AB94DD5401C3341 /* QRCodeRenderer.swift */; };
 		B0B0995CD42EDBEAFBAABE04 /* JovieUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 611EE527D20DC6F6872CBF33 /* JovieUITests.swift */; };
@@ -95,6 +103,13 @@
 		98CC57081FA315DA3E260B77 /* ClerkTokenProvider.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ClerkTokenProvider.swift; sourceTree = "<group>"; };
 		9924B177AFB753A4C23A4098 /* APIClient.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = APIClient.swift; sourceTree = "<group>"; };
 		A108B03BA602F4C24B54E590 /* Inter-Variable.ttf */ = {isa = PBXFileReference; includeInIndex = 1; path = "Inter-Variable.ttf"; sourceTree = "<group>"; };
+		A0B10F000000000000000001 /* ObservabilityTypes.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ObservabilityTypes.swift; sourceTree = "<group>"; };
+		A0B10F000000000000000002 /* NoopObservabilityProvider.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = NoopObservabilityProvider.swift; sourceTree = "<group>"; };
+		A0B10F000000000000000003 /* ObservabilityRedactor.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ObservabilityRedactor.swift; sourceTree = "<group>"; };
+		A0B10F000000000000000004 /* Observability.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = Observability.swift; sourceTree = "<group>"; };
+		A0B10F000000000000000005 /* SentryObservabilityProvider.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SentryObservabilityProvider.swift; sourceTree = "<group>"; };
+		A0B10F00000000000000000C /* ObservabilityTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ObservabilityTests.swift; sourceTree = "<group>"; };
+		A0B10F00000000000000000D /* ObservabilityRedactionTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ObservabilityRedactionTests.swift; sourceTree = "<group>"; };
 		A93DB506915B418D06E897A4 /* AppStateTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AppStateTests.swift; sourceTree = "<group>"; };
 		B4D156B3220339CAB0DBE1DD /* SplashView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SplashView.swift; sourceTree = "<group>"; };
 		B83A77F0A36DF3E6D5C77C2F /* MobileMeResponseTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MobileMeResponseTests.swift; sourceTree = "<group>"; };
@@ -132,6 +147,7 @@
 				33F1DF8D4B8D292316335711 /* Foundation.framework in Frameworks */,
 				4C46B1496145C062FB2FE978 /* ClerkKit in Frameworks */,
 				E6EA9EC85A52208BEFC20DF0 /* ClerkKitUI in Frameworks */,
+				A0B10F000000000000000012 /* Sentry in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -190,6 +206,8 @@
 				A93DB506915B418D06E897A4 /* AppStateTests.swift */,
 				191669F70597A1039C74C0B1 /* MeRepositoryTests.swift */,
 				B83A77F0A36DF3E6D5C77C2F /* MobileMeResponseTests.swift */,
+				A0B10F00000000000000000D /* ObservabilityRedactionTests.swift */,
+				A0B10F00000000000000000C /* ObservabilityTests.swift */,
 				448ADF9C21BB11784C6AD119 /* QRCodeRendererTests.swift */,
 				178C37B20F46EAF919EB2031 /* ScreenBrightnessManagerTests.swift */,
 			);
@@ -259,6 +277,7 @@
 				918FBCBCF600AA8C10191F60 /* MeCache.swift */,
 				28FBA9F0D12E0BD1CB8B0B09 /* MeRepository.swift */,
 				3EC2367922F1F00AB0AF1164 /* MobileMeResponse.swift */,
+				A0B10F00000000000000000B /* Observability */,
 				000F426E1AB94DD5401C3341 /* QRCodeRenderer.swift */,
 				3FA81B967152B211E5988375 /* ScreenBrightnessManager.swift */,
 			);
@@ -300,6 +319,19 @@
 			);
 			name = Dashboard;
 			path = Dashboard;
+			sourceTree = "<group>";
+		};
+		A0B10F00000000000000000B /* Observability */ = {
+			isa = PBXGroup;
+			children = (
+				A0B10F000000000000000004 /* Observability.swift */,
+				A0B10F000000000000000003 /* ObservabilityRedactor.swift */,
+				A0B10F000000000000000001 /* ObservabilityTypes.swift */,
+				A0B10F000000000000000002 /* NoopObservabilityProvider.swift */,
+				A0B10F000000000000000005 /* SentryObservabilityProvider.swift */,
+			);
+			name = Observability;
+			path = Observability;
 			sourceTree = "<group>";
 		};
 		CD1E4E5554DA1BC0E409C363 /* App */ = {
@@ -362,6 +394,7 @@
 			packageProductDependencies = (
 				0199C257CC5EA4F6FD36397D /* ClerkKit */,
 				37321F1DC431FDA58D969E72 /* ClerkKitUI */,
+				A0B10F000000000000000011 /* Sentry */,
 			);
 			productName = Jovie;
 			productReference = 95CA509F09ADCA8A54FCC85A /* Jovie.app */;
@@ -426,6 +459,7 @@
 			minimizedProjectReferenceProxies = 0;
 			packageReferences = (
 				5AD3ED31588BC6880D95DAC6 /* XCRemoteSwiftPackageReference "clerk-ios" */,
+				A0B10F000000000000000010 /* XCRemoteSwiftPackageReference "sentry-cocoa" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 55D872945D057DBB23C014CF /* Products */;
@@ -477,6 +511,8 @@
 				EE4CBA88057592FAFCD7F926 /* AppStateTests.swift in Sources */,
 				FDD930D67ACF374B16E87FDE /* MeRepositoryTests.swift in Sources */,
 				CE7C4C47EFA23AFA2B205BE4 /* MobileMeResponseTests.swift in Sources */,
+				A0B10F00000000000000000F /* ObservabilityRedactionTests.swift in Sources */,
+				A0B10F00000000000000000E /* ObservabilityTests.swift in Sources */,
 				BD6A822847064E6F3E3E5228 /* QRCodeRendererTests.swift in Sources */,
 				DA762182661489283A851F6B /* ScreenBrightnessManagerTests.swift in Sources */,
 			);
@@ -493,6 +529,11 @@
 				4CA1C477ECC6B7B40EA17787 /* LaunchMode.swift in Sources */,
 				61A81E78D0B448B6A68F45AD /* MobileAuthReturn.swift in Sources */,
 				964DEFE0F4D4206832B6888E /* RootView.swift in Sources */,
+				A0B10F000000000000000006 /* ObservabilityTypes.swift in Sources */,
+				A0B10F000000000000000007 /* NoopObservabilityProvider.swift in Sources */,
+				A0B10F000000000000000008 /* ObservabilityRedactor.swift in Sources */,
+				A0B10F000000000000000009 /* Observability.swift in Sources */,
+				A0B10F00000000000000000A /* SentryObservabilityProvider.swift in Sources */,
 				E26FB0F0CBAA2DE24B6BC572 /* APIClient.swift in Sources */,
 				D9CF5232BCCF1F895975D7B7 /* ClerkTokenProvider.swift in Sources */,
 				F8BC948A5A68297B746E217F /* MeCache.swift in Sources */,
@@ -859,6 +900,14 @@
 				minimumVersion = 1.0.0;
 			};
 		};
+		A0B10F000000000000000010 /* XCRemoteSwiftPackageReference "sentry-cocoa" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/getsentry/sentry-cocoa.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 9.14.0;
+			};
+		};
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
@@ -871,6 +920,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = 5AD3ED31588BC6880D95DAC6 /* XCRemoteSwiftPackageReference "clerk-ios" */;
 			productName = ClerkKitUI;
+		};
+		A0B10F000000000000000011 /* Sentry */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = A0B10F000000000000000010 /* XCRemoteSwiftPackageReference "sentry-cocoa" */;
+			productName = Sentry;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

@@ -345,8 +345,28 @@ struct LiveRootContainer: View {
 
         do {
           let userID = try await LiveAuthBootstrapper.signInFromEnvironment()
+          Observability.addBreadcrumb(
+            .clerkSessionExchangeSucceeded,
+            context: ["stage": "live_auth_bootstrap"]
+          )
           await appState.handleSignedInUserChange(userID)
         } catch {
+          Observability.addBreadcrumb(
+            .clerkSessionExchangeFailed,
+            level: .error,
+            context: observabilityFailureContext(
+              stage: "live_auth_bootstrap",
+              error: error
+            )
+          )
+          Observability.captureError(
+            error,
+            event: .clerkSessionExchangeFailed,
+            context: observabilityFailureContext(
+              stage: "live_auth_bootstrap",
+              error: error
+            )
+          )
           appState.route = .ready
           appState.dashboardState = .error(
             error.localizedDescription.isEmpty
@@ -363,7 +383,29 @@ struct LiveRootContainer: View {
 
   @MainActor
   private func handleAuthReturn(_ url: URL) {
-    guard let authReturn = MobileAuthReturnParser.parse(url) else { return }
+    Observability.addBreadcrumb(
+      .deepLinkReceived,
+      context: ["url": url]
+    )
+
+    guard let authReturn = MobileAuthReturnParser.parse(url) else {
+      Observability.addBreadcrumb(
+        .deepLinkRouteUnmatched,
+        level: .warning,
+        context: ["url": url]
+      )
+      Observability.addBreadcrumb(
+        .deepLinkParseFailed,
+        level: .warning,
+        context: ["url": url]
+      )
+      return
+    }
+
+    Observability.addBreadcrumb(
+      .deepLinkRouteMatched,
+      context: ["route": "auth_return", "url": url]
+    )
     handleAuthReturn(authReturn)
   }
 
@@ -374,14 +416,28 @@ struct LiveRootContainer: View {
     appState.route = .launching
 
     authReturnTask = Task { @MainActor in
+      let span = Observability.startSpan(
+        name: .clerkSessionExchangeStarted,
+        context: ["stage": "native_auth_return"]
+      )
       defer {
+        span.finish()
         authReturnTask = nil
       }
 
       do {
+        Observability.addBreadcrumb(
+          .clerkSessionExchangeStarted,
+          context: ["stage": "native_auth_return"]
+        )
         let exchangeResponse = try await NativeAuthExchangeClient(
           baseURL: appState.configuration.webBaseURL
         ).exchange(authReturn)
+        Observability.addBreadcrumb(
+          .clerkSessionExchangeSucceeded,
+          context: ["stage": "native_auth_exchange"]
+        )
+
         let signIn = try await clerk.auth.signInWithTicket(exchangeResponse.ticket)
 
         if let sessionID = signIn.createdSessionId,
@@ -397,11 +453,27 @@ struct LiveRootContainer: View {
           throw MobileAuthReturnError.missingSignedInUser
         }
 
+        Observability.addBreadcrumb(.nativeSessionPersisted)
         await appState.handleSignedInUserChange(userID)
       } catch {
         guard !(error is CancellationError), !Task.isCancelled else {
           return
         }
+
+        let context = observabilityFailureContext(
+          stage: "native_auth_return",
+          error: error
+        )
+        Observability.addBreadcrumb(
+          .clerkSessionExchangeFailed,
+          level: .error,
+          context: context
+        )
+        Observability.captureError(
+          error,
+          event: .clerkSessionExchangeFailed,
+          context: context
+        )
 
         if error is MobileAuthReturnError {
           try? await clerk.auth.signOut()
@@ -419,6 +491,29 @@ struct LiveRootContainer: View {
         authErrorMessage = "Couldn't finish sign-in. Try again."
       }
     }
+  }
+
+  private func observabilityFailureContext(
+    stage: String,
+    error: Error
+  ) -> ObservabilityContext {
+    var context: ObservabilityContext = [
+      "stage": stage,
+      "error_type": String(describing: type(of: error)),
+    ]
+
+    if let error = error as? NativeAuthExchangeError {
+      switch error {
+      case let .requestFailed(statusCode):
+        context["status_code"] = statusCode
+      case let .transportFailed(code):
+        context["transport_code"] = code
+      case .decodingFailed, .invalidResponse:
+        break
+      }
+    }
+
+    return context
   }
 }
 

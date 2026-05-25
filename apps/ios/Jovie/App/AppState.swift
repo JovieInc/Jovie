@@ -86,6 +86,7 @@ final class AppState {
     activeUserID = userID
 
     guard let userID else {
+      Observability.clearUser()
       loadingUserID = nil
       route = .signedOut
       dashboardState = .idle
@@ -93,6 +94,7 @@ final class AppState {
       return
     }
 
+    Observability.setUser(id: userID)
     loadingUserID = userID
     defer {
       if loadingUserID == userID {
@@ -113,9 +115,17 @@ final class AppState {
       case .ready:
         route = .ready
         dashboardState = .loaded(result.response)
+        Observability.addBreadcrumb(
+          .appRouteAfterLogin,
+          context: ["route": "ready"]
+        )
       case .needsOnboarding:
         route = .needsOnboarding
         dashboardState = .idle
+        Observability.addBreadcrumb(
+          .appRouteAfterLogin,
+          context: ["route": "needs_onboarding"]
+        )
       }
     } catch {
       guard activeUserID == userID, loadingUserID == userID else { return }
@@ -123,6 +133,7 @@ final class AppState {
       if let error = error as? APIClientError {
         switch error {
         case .missingToken, .requestFailed(statusCode: 401):
+          Observability.clearUser()
           route = .signedOut
           dashboardState = .idle
           isOffline = false
@@ -144,6 +155,7 @@ final class AppState {
 
   func signOut() async {
     let userID = activeUserID
+    Observability.clearUser()
     activeUserID = nil
     loadingUserID = nil
     route = .signedOut

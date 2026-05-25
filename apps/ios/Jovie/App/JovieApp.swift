@@ -9,6 +9,17 @@ struct JovieApp: App {
     let launchMode = LaunchMode.current()
     let configuration = launchMode.usesLiveClerk ? AppConfiguration.load() : .mock
 
+    Observability.configure(
+      environment: configuration.observabilityEnvironment,
+      dsn: configuration.sentryDSN,
+      isEnabled: launchMode == .live
+    )
+    Observability.setTag(key: "platform", value: "ios")
+    Observability.setTag(
+      key: "launch_mode",
+      value: String(describing: launchMode)
+    )
+
     if launchMode.usesLiveClerk {
       Clerk.configure(
         publishableKey: configuration.clerkPublishableKey,
