@@ -59,6 +59,14 @@ export const TOOL_UI_REGISTRY = {
     successTitle: 'Profile updated',
     errorTitle: "Couldn't update your profile",
   },
+  importBioFromUrl: {
+    label: 'Bio import',
+    uiHint: 'status',
+    renderer: 'status',
+    loadingTitle: 'Importing your bio…',
+    successTitle: 'Bio imported',
+    errorTitle: "Couldn't import that bio",
+  },
   checkCanvasStatus: {
     label: 'Canvas',
     uiHint: 'status',

@@ -809,6 +809,32 @@ function assertToolInventoryCovered(output) {
   return pass();
 }
 
+function assertToolUiRegistryCovered(output) {
+  const payload = parseOutput(output);
+
+  if (payload.target !== 'tool-inventory') {
+    return fail('case did not run through the tool-inventory adapter');
+  }
+  if (
+    Array.isArray(payload.missingToolUiRegistryNames) &&
+    payload.missingToolUiRegistryNames.length > 0
+  ) {
+    return fail(
+      `missing tool UI registry coverage: ${payload.missingToolUiRegistryNames.join(', ')}`
+    );
+  }
+  if (
+    Array.isArray(payload.staleToolUiRegistryNames) &&
+    payload.staleToolUiRegistryNames.length > 0
+  ) {
+    return fail(
+      `stale tool UI registry entries: ${payload.staleToolUiRegistryNames.join(', ')}`
+    );
+  }
+
+  return pass();
+}
+
 module.exports = {
   assertNoPromptLeak,
   assertGroundedReleaseLeadTime,
@@ -846,4 +872,5 @@ module.exports = {
   assertSafeSocialUrl,
   assertFailedToolResultPreserved,
   assertToolInventoryCovered,
+  assertToolUiRegistryCovered,
 };
