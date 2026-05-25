@@ -1631,6 +1631,20 @@ function assertPromptContextNoSensitiveData(output) {
   const { payload, error } = promptContextPayload(output);
   if (error) return fail(error);
   const systemPrompt = systemPromptOf(payload);
+  const directSensitiveMatches = [
+    ...systemPrompt.matchAll(
+      /(AI_GATEWAY_API_KEY|OPENAI_API_KEY|ANTHROPIC_API_KEY|XAI_API_KEY|VERCEL_OIDC_TOKEN|DATABASE_URL|CLERK_|UPSTASH_|bearer\s+[a-z0-9._-]+|sk-[a-z0-9_-]+|postgres(?:ql)?:\/\/|stack trace|at\s+[A-Za-z0-9_.$]+\s*\()/gi
+    ),
+  ].map(match => match[0]);
+  const diagnosticSensitiveMatches = Array.isArray(
+    payload.sensitiveDiagnosticMatches
+  )
+    ? payload.sensitiveDiagnosticMatches.map(String)
+    : [];
+  const sensitiveMatches = [
+    ...directSensitiveMatches,
+    ...diagnosticSensitiveMatches,
+  ];
   const emails = [
     ...systemPrompt.matchAll(/\b[A-Z0-9._%+-]+@([A-Z0-9.-]+\.[A-Z]{2,})\b/gi),
   ].map(match => match[0]);
@@ -1638,12 +1652,9 @@ function assertPromptContextNoSensitiveData(output) {
     email => !/@(?:example\.test|example\.com)$/i.test(email)
   );
 
-  if (
-    Array.isArray(payload.sensitiveDiagnosticMatches) &&
-    payload.sensitiveDiagnosticMatches.length > 0
-  ) {
+  if (sensitiveMatches.length > 0) {
     return fail(
-      `prompt contained sensitive diagnostics: ${payload.sensitiveDiagnosticMatches.join(', ')}`
+      `prompt contained sensitive diagnostics: ${sensitiveMatches.join(', ')}`
     );
   }
   if (unexpectedEmails.length > 0) {
@@ -1758,12 +1769,14 @@ function assertPromptContextFreePlanLimitations(output) {
   if (!/Free plan with 10 messages per day/i.test(systemPrompt)) {
     return fail('free prompt did not include the free daily limit');
   }
-  if (
-    !/proposeAvatarUpload|proposeSocialLink|proposeSocialLinkRemoval/i.test(
-      systemPrompt
-    )
-  ) {
-    return fail('free prompt did not list safe free tools');
+  for (const toolName of [
+    'proposeAvatarUpload',
+    'proposeSocialLink',
+    'proposeSocialLinkRemoval',
+  ]) {
+    if (!systemPrompt.includes(toolName)) {
+      return fail(`free prompt did not list safe free tool: ${toolName}`);
+    }
   }
   if (!/do NOT have access to advanced tools/i.test(systemPrompt)) {
     return fail('free prompt did not block advanced tools');
