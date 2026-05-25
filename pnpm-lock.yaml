@@ -139,8 +139,8 @@ importers:
         specifier: ^7.0.3
         version: 7.0.3
       electron:
-        specifier: ^42.0.0
-        version: 42.0.0
+        specifier: ^42.2.0
+        version: 42.2.0
       electron-builder:
         specifier: ^25.0.0
         version: 25.1.8(electron-builder-squirrel-windows@25.1.8)
@@ -6940,14 +6940,11 @@ packages:
   '@types/node@22.19.17':
     resolution: {integrity: sha512-wGdMcf+vPYM6jikpS/qhg6WiqSV/OhG+jeeHT/KlVqxYfD40iYJf9/AE1uQxVWFvU7MipKRkRv8NSHiCGgPr8Q==}
 
-  '@types/node@22.19.18':
-    resolution: {integrity: sha512-9v00a+dn2yWVsYDEunWC4g/TcRKVq3r8N5FuZp7u0SGrPvdN9c2yXI9bBuf5Fl0hNCb+QTIePTn5pJs2pwBOQQ==}
-
   '@types/node@22.19.19':
     resolution: {integrity: sha512-dyh/xO2Fh5bYrfWaaqGrRQQGkNdmYw6AmaAUvYeUMNTWQtvb796ikLdmTchRmOlOiIJ1TDXfWgVx1QkUlQ6Hew==}
 
-  '@types/node@24.12.3':
-    resolution: {integrity: sha512-8oljBDGun9cIsZRJR6fkihn0TSXJI0UDOOhncYaERq6M0JMDoPLxyscwruJcb4GKS6dvK/d8xebYBg27h/duaQ==}
+  '@types/node@24.12.4':
+    resolution: {integrity: sha512-GUUEShf+PBCGW2KaXwcIt3Yk+e3pkKwWKb9GSyM9WQVE+ep2jzmHdGsHzu4wgcZy5fN9FBdVzjpBQsYlpfpgLA==}
 
   '@types/node@25.5.0':
     resolution: {integrity: sha512-jp2P3tQMSxWugkCUKLRPVUpGaL5MVFwF8RDuSRztfwgN1wmqJeMSbKlnEtQqU8UrhTmzEmZdu2I6v2dpp7XIxw==}
@@ -9786,8 +9783,8 @@ packages:
   electron-updater@6.8.3:
     resolution: {integrity: sha512-Z6sgw3jgbikWKXei1ENdqFOxBP0WlXg3TtKfz0rgw2vIZFJUyI4pD7ZN7jrkm7EoMK+tcm/qTnPUdqfZukBlBQ==}
 
-  electron@42.0.0:
-    resolution: {integrity: sha512-in5jnW/Ywy3Rh3FPr4MR80exPEkywKYAmDJRZ/gIKlr8VXEi3zXgiAZbf0Si7KRccHTF2y8euVMRz7M6HqTjMA==}
+  electron@42.2.0:
+    resolution: {integrity: sha512-b2Tc7sIKiZEl0tBVwFM5GJ+FT5KYhmy9QJHjx8BGVZPVW2SctXWEvrE959ElB56qw7H05dBkhlikDA1DmpaAMw==}
     engines: {node: '>= 22.12.0'}
     hasBin: true
 
@@ -15314,8 +15311,8 @@ packages:
   tldts-core@6.1.86:
     resolution: {integrity: sha512-Je6p7pkk+KMzMv2XXKmAE3McmolOQFdxkKw0R8EYNr7sELW46JqnNeTX8ybPiQgvg1ymCoF8LXs5fzFaZvJPTA==}
 
-  tldts-core@7.3.1:
-    resolution: {integrity: sha512-CSjiLuHll9lt9l+jf0poLVfgddqGAj4vUHoipeTPx3RvVjgCu/krg7t7lsW000y9vNBP34FbXH8S6BuciRtoIw==}
+  tldts-core@7.4.0:
+    resolution: {integrity: sha512-/mb9kRld+x1sIMXxWNOAp5m6C+D4GrAORWlJkOJ5dElvxdN1eutz/o7qHLp9gFvDF4Y3/L2xeScoxz6AbEo8rQ==}
 
   tldts-icann@6.1.86:
     resolution: {integrity: sha512-NFxmRT2lAEMcCOBgeZ0NuM0zsK/xgmNajnY6n4S1mwAKocft2s2ise1O3nQxrH3c+uY6hgHUV9GGNVp7tUE4Sg==}
@@ -15324,8 +15321,8 @@ packages:
     resolution: {integrity: sha512-WMi/OQ2axVTf/ykqCQgXiIct+mSQDFdH2fkwhPwgEwvJ1kSzZRiinb0zF2Xb8u4+OqPChmyI6MEu4EezNJz+FQ==}
     hasBin: true
 
-  tldts@7.3.1:
-    resolution: {integrity: sha512-+tHFHaNlvYCC1g4cwAcPWy/0BXvWZCMVk6WwohwXUupkcFYKpX3EH1jD8gRMIbDBbVKGKzacFf9aSsdXISKz0g==}
+  tldts@7.4.0:
+    resolution: {integrity: sha512-yHBe+zVfzNZ3QfTPW/Z6KK1G2t340gFjMHqI/4KKSt/abzYydzuCnpqdaF5gCCABby+9Yfbj59oR5F2Fd5CBzg==}
     hasBin: true
 
   tmp-promise@3.0.3:
@@ -18210,7 +18207,7 @@ snapshots:
       env-paths: 3.0.0
       graceful-fs: 4.2.11
       progress: 2.0.3
-      semver: 7.8.0
+      semver: 7.8.1
       sumchecker: 3.0.1
     optionalDependencies:
       undici: 6.25.0
@@ -23023,7 +23020,7 @@ snapshots:
     dependencies:
       '@types/http-cache-semantics': 4.2.0
       '@types/keyv': 3.1.4
-      '@types/node': 22.19.18
+      '@types/node': 22.19.19
       '@types/responselike': 1.0.3
 
   '@types/chai@5.2.3':
@@ -23033,7 +23030,7 @@ snapshots:
 
   '@types/connect@3.4.38':
     dependencies:
-      '@types/node': 22.19.18
+      '@types/node': 22.19.19
 
   '@types/cors@2.8.19':
     dependencies:
@@ -23193,7 +23190,7 @@ snapshots:
 
   '@types/fs-extra@9.0.13':
     dependencies:
-      '@types/node': 22.19.18
+      '@types/node': 22.19.19
 
   '@types/geojson@7946.0.16': {}
 
@@ -23230,12 +23227,12 @@ snapshots:
 
   '@types/keyv@3.1.4':
     dependencies:
-      '@types/node': 22.19.18
+      '@types/node': 22.19.19
 
   '@types/liftoff@4.0.3':
     dependencies:
       '@types/fined': 1.1.5
-      '@types/node': 22.19.18
+      '@types/node': 22.19.19
 
   '@types/md5@2.3.6': {}
 
@@ -23249,7 +23246,7 @@ snapshots:
 
   '@types/mysql@2.15.27':
     dependencies:
-      '@types/node': 22.19.18
+      '@types/node': 22.19.19
 
   '@types/nlcst@2.0.3':
     dependencies:
@@ -23276,15 +23273,11 @@ snapshots:
     dependencies:
       undici-types: 6.21.0
 
-  '@types/node@22.19.18':
-    dependencies:
-      undici-types: 6.21.0
-
   '@types/node@22.19.19':
     dependencies:
       undici-types: 6.21.0
 
-  '@types/node@24.12.3':
+  '@types/node@24.12.4':
     dependencies:
       undici-types: 7.16.0
 
@@ -23303,13 +23296,13 @@ snapshots:
 
   '@types/pg@8.15.6':
     dependencies:
-      '@types/node': 22.19.18
+      '@types/node': 22.19.19
       pg-protocol: 1.13.0
       pg-types: 2.2.0
 
   '@types/pg@8.20.0':
     dependencies:
-      '@types/node': 22.19.18
+      '@types/node': 22.19.19
       pg-protocol: 1.13.0
       pg-types: 2.2.0
 
@@ -23317,7 +23310,7 @@ snapshots:
 
   '@types/plist@3.0.5':
     dependencies:
-      '@types/node': 22.19.18
+      '@types/node': 22.19.19
       xmlbuilder: 15.1.1
     optional: true
 
@@ -23337,7 +23330,7 @@ snapshots:
 
   '@types/responselike@1.0.3':
     dependencies:
-      '@types/node': 22.19.18
+      '@types/node': 22.19.19
 
   '@types/retry@0.12.0':
     optional: true
@@ -23349,11 +23342,11 @@ snapshots:
 
   '@types/tedious@4.0.14':
     dependencies:
-      '@types/node': 22.19.18
+      '@types/node': 22.19.19
 
   '@types/through@0.0.33':
     dependencies:
-      '@types/node': 22.19.18
+      '@types/node': 22.19.19
 
   '@types/tough-cookie@4.0.0':
     optional: true
@@ -23398,7 +23391,7 @@ snapshots:
 
   '@types/yauzl@2.10.3':
     dependencies:
-      '@types/node': 22.19.18
+      '@types/node': 22.19.19
     optional: true
 
   '@typescript-eslint/eslint-plugin@8.58.1(@typescript-eslint/parser@8.58.1(eslint@10.2.1(jiti@2.6.1))(typescript@6.0.3))(eslint@10.2.1(jiti@2.6.1))(typescript@6.0.3)':
@@ -25754,7 +25747,7 @@ snapshots:
 
   chrome-launcher@0.13.4:
     dependencies:
-      '@types/node': 22.19.18
+      '@types/node': 22.19.19
       escape-string-regexp: 1.0.5
       is-wsl: 2.2.0
       lighthouse-logger: 1.2.0
@@ -25774,7 +25767,7 @@ snapshots:
 
   chrome-launcher@1.2.1:
     dependencies:
-      '@types/node': 22.19.18
+      '@types/node': 22.19.19
       escape-string-regexp: 4.0.0
       is-wsl: 2.2.0
       lighthouse-logger: 2.0.2
@@ -26846,10 +26839,10 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  electron@42.0.0:
+  electron@42.2.0:
     dependencies:
       '@electron/get': 5.0.0
-      '@types/node': 24.12.3
+      '@types/node': 24.12.4
       extract-zip: 2.0.1
     transitivePeerDependencies:
       - supports-color
@@ -33666,7 +33659,7 @@ snapshots:
 
   speedline-core@1.4.3:
     dependencies:
-      '@types/node': 22.19.18
+      '@types/node': 22.19.19
       image-ssim: 0.2.0
       jpeg-js: 0.4.4
 
@@ -34215,7 +34208,7 @@ snapshots:
 
   tldts-core@6.1.86: {}
 
-  tldts-core@7.3.1:
+  tldts-core@7.4.0:
     optional: true
 
   tldts-icann@6.1.86:
@@ -34226,9 +34219,9 @@ snapshots:
     dependencies:
       tldts-core: 6.1.86
 
-  tldts@7.3.1:
+  tldts@7.4.0:
     dependencies:
-      tldts-core: 7.3.1
+      tldts-core: 7.4.0
     optional: true
 
   tmp-promise@3.0.3:
@@ -34271,7 +34264,7 @@ snapshots:
 
   tough-cookie@6.0.1:
     dependencies:
-      tldts: 7.3.1
+      tldts: 7.4.0
     optional: true
 
   tr46@0.0.3: {}
