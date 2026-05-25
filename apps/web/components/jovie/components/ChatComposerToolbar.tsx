@@ -40,10 +40,13 @@ function getButtonIcon(
   if (isLoading || isSubmitting) {
     return {
       key: 'loading',
-      icon: <Loader2 className='h-3.5 w-3.5 animate-spin' />,
+      icon: <Loader2 className='h-4 w-4 animate-spin' strokeWidth={2.25} />,
     };
   }
-  return { key: 'send', icon: <ArrowUp className='h-3.5 w-3.5' /> };
+  return {
+    key: 'send',
+    icon: <ArrowUp className='h-4 w-4' strokeWidth={2.35} />,
+  };
 }
 
 export interface ComposerSendButtonProps {
@@ -145,9 +148,9 @@ export function ComposerAttachButton({
           aria-label='Attachment options'
         >
           {isImageProcessing ? (
-            <Loader2 className='h-3.5 w-3.5 animate-spin' />
+            <Loader2 className='h-4 w-4 animate-spin' strokeWidth={2.25} />
           ) : (
-            <Plus className='h-3.5 w-3.5' strokeWidth={1.6} />
+            <Plus className='h-4 w-4' strokeWidth={2.25} />
           )}
         </button>
       </DropdownMenuTrigger>
@@ -223,9 +226,9 @@ export function ComposerMicButton({
         aria-pressed={isListening}
       >
         {isListening ? (
-          <MicOff className='h-3.5 w-3.5' />
+          <MicOff className='h-4 w-4' strokeWidth={2.25} />
         ) : (
-          <Mic className='h-3.5 w-3.5' />
+          <Mic className='h-4 w-4' strokeWidth={2.25} />
         )}
       </button>
     </SimpleTooltip>

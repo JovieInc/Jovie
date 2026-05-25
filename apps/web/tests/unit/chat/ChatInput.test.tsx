@@ -186,6 +186,26 @@ describe('ChatInput', () => {
     expect(getByRole('menu')).toBeInTheDocument();
   });
 
+  it('keeps composer controls at stable dimensions while using heavier icons', () => {
+    const { getByRole } = fastRender(
+      withProviders(<ChatInput {...baseProps} onImageAttach={vi.fn()} />)
+    );
+
+    const attachButton = getByRole('button', { name: /attachment options/i });
+    const sendButton = getByRole('button', { name: /send message/i });
+
+    expect(attachButton.className).toContain('h-9');
+    expect(attachButton.className).toContain('w-9');
+    expect(sendButton.className).toContain('h-9');
+    expect(sendButton.className).toContain('w-9');
+    expect(attachButton.querySelector('svg')?.getAttribute('class')).toContain(
+      'h-4'
+    );
+    expect(sendButton.querySelector('svg')?.getAttribute('class')).toContain(
+      'h-4'
+    );
+  });
+
   it('renders quick actions inside the slash menu instead of below the composer', () => {
     const onQuickActionSelect = vi.fn();
     fastRender(

@@ -9,6 +9,7 @@ import {
 } from '@/lib/queries';
 import { cn } from '@/lib/utils';
 import type { ChatAlbumArtToolResult } from '../types';
+import { ChatGenerationArtifactSurface } from './ChatGenerationArtifactSurface';
 
 interface ChatAlbumArtCardProps {
   readonly result: ChatAlbumArtToolResult;
@@ -115,8 +116,8 @@ export function ChatAlbumArtCard({ result, profileId }: ChatAlbumArtCardProps) {
 
   if (!result.success) {
     return (
-      <output className='block rounded-xl border border-subtle bg-surface-1 p-3 text-app text-primary-token'>
-        <span className='block font-medium'>Album Art Failed</span>
+      <output className='block text-app text-primary-token'>
+        <span className='block font-medium text-red-500'>Album Art Failed</span>
         <span className='mt-1 block text-secondary-token'>{result.error}</span>
         {result.retryable ? (
           <span className='mt-2 block text-xs text-tertiary-token'>
@@ -129,7 +130,10 @@ export function ChatAlbumArtCard({ result, profileId }: ChatAlbumArtCardProps) {
 
   if (result.state === 'needs_release_target') {
     return (
-      <div className='rounded-xl border border-subtle bg-surface-1 p-3'>
+      <ChatGenerationArtifactSurface
+        title='Album Art'
+        subtitle='Choose a release'
+      >
         <div className='text-app font-medium text-primary-token'>
           Choose Release
         </div>
@@ -156,7 +160,7 @@ export function ChatAlbumArtCard({ result, profileId }: ChatAlbumArtCardProps) {
             Create Release With Art
           </Button>
         </div>
-      </div>
+      </ChatGenerationArtifactSurface>
     );
   }
 
@@ -166,17 +170,12 @@ export function ChatAlbumArtCard({ result, profileId }: ChatAlbumArtCardProps) {
   else if (result.hasExistingArtwork) applyButtonLabel = 'Replace Artwork';
 
   return (
-    <div className='rounded-xl border border-subtle bg-surface-1 p-3'>
-      <div className='flex items-center justify-between gap-3'>
-        <div className='min-w-0'>
-          <div className='truncate text-app font-medium text-primary-token'>
-            {result.releaseTitle}
-          </div>
-          <div className='truncate text-xs text-secondary-token'>
-            {hasAppliedSelectedCandidate ? 'Artwork Applied' : 'Select Artwork'}
-          </div>
-        </div>
-      </div>
+    <ChatGenerationArtifactSurface
+      title={result.releaseTitle}
+      subtitle={
+        hasAppliedSelectedCandidate ? 'Artwork Applied' : 'Select Artwork'
+      }
+    >
       <div className='mt-3 grid grid-cols-3 gap-2 max-sm:flex max-sm:overflow-x-auto'>
         {result.candidates.map(candidate => {
           const isSelected = candidate.id === selectedCandidateId;
@@ -188,7 +187,7 @@ export function ChatAlbumArtCard({ result, profileId }: ChatAlbumArtCardProps) {
               className={cn(
                 'group relative aspect-square min-w-24 overflow-hidden rounded-lg border bg-surface-2 text-left transition-colors',
                 isSelected
-                  ? 'border-accent shadow-sm'
+                  ? 'border-cyan-400/60 shadow-[inset_0_0_0_1px_rgb(103_232_249_/_0.18)]'
                   : 'border-subtle hover:border-secondary-token'
               )}
               aria-pressed={isSelected}
@@ -245,6 +244,6 @@ export function ChatAlbumArtCard({ result, profileId }: ChatAlbumArtCardProps) {
           Could not apply artwork. Try again.
         </output>
       ) : null}
-    </div>
+    </ChatGenerationArtifactSurface>
   );
 }

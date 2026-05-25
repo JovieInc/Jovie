@@ -401,11 +401,12 @@ test('chat route slash picker clears active transcript content in populated thre
 
     const { composer, input } = shellChatFrameLocators(page);
     await expect(composer).toBeVisible({ timeout: 30_000 });
-    await expect(
-      page.getByTestId('chat-message-reply').filter({
-        hasText: 'Your bio is currently not set',
-      })
-    ).toBeVisible({ timeout: 30_000 });
+
+    const latestAssistantReply = page.getByTestId('chat-message-reply').filter({
+      hasText: 'Your bio is currently not set',
+    });
+    await latestAssistantReply.scrollIntoViewIfNeeded({ timeout: 30_000 });
+    await expect(latestAssistantReply).toBeVisible({ timeout: 30_000 });
 
     const beforeBox = await composer.boundingBox();
     await input.fill('/t');

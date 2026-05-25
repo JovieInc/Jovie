@@ -137,4 +137,67 @@ describe('ChatMessage', () => {
     ).toHaveAttribute('aria-haspopup', 'dialog');
     expect(bubble).toHaveAttribute('data-bubble-shape', 'rectangle');
   });
+
+  it('renders one generic tool as an inline activity row without card chrome', () => {
+    const messageProps = {
+      id: 'assistant-tool-1',
+      role: 'assistant' as const,
+      parts: [
+        {
+          type: 'dynamic-tool' as const,
+          toolName: 'summarizeAudience',
+          toolCallId: 'tool-1',
+          state: 'output-available' as const,
+          output: { summary: 'Audience summary complete.' },
+        },
+      ],
+    };
+
+    fastRender(<ChatMessage {...messageProps} />);
+
+    const statusRow = screen.getByTestId('tool-status-row');
+    expect(statusRow.className).not.toContain('rounded-xl');
+    expect(statusRow.className).not.toContain('border');
+    expect(screen.getByTestId('tool-activity-feed')).toHaveAttribute(
+      'data-tool-count',
+      '1'
+    );
+    expect(screen.queryByTestId('tool-activity-timeline-line')).toBeNull();
+  });
+
+  it('connects multiple generic tools with timeline lines', () => {
+    const messageProps = {
+      id: 'assistant-tool-2',
+      role: 'assistant' as const,
+      parts: [
+        {
+          type: 'dynamic-tool' as const,
+          toolName: 'writeWorldClassBio',
+          toolCallId: 'tool-1',
+          state: 'output-available' as const,
+          output: { summary: 'Bio ready.' },
+        },
+        {
+          type: 'dynamic-tool' as const,
+          toolName: 'submitFeedback',
+          toolCallId: 'tool-2',
+          state: 'output-error' as const,
+          errorText: 'Feedback failed.',
+        },
+      ],
+    };
+
+    fastRender(<ChatMessage {...messageProps} />);
+
+    expect(screen.getByTestId('tool-activity-feed')).toHaveAttribute(
+      'data-tool-count',
+      '2'
+    );
+    expect(screen.getAllByTestId('tool-status-row')).toHaveLength(2);
+    expect(screen.getAllByTestId('tool-activity-timeline-line')).toHaveLength(
+      2
+    );
+    expect(screen.getByText("Couldn't send your feedback")).toBeInTheDocument();
+    expect(screen.getByText('Feedback failed.')).toBeInTheDocument();
+  });
 });

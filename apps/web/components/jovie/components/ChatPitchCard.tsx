@@ -1,11 +1,14 @@
 'use client';
 
-import { Sparkles } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import { CopyToggleIcon } from '@/components/atoms/CopyToggleIcon';
 import { PLATFORM_LIMITS } from '@/lib/services/pitch/types';
 import { cn } from '@/lib/utils';
+import {
+  CHAT_GENERATION_SHIMMER_BG,
+  ChatGenerationArtifactSurface,
+} from './ChatGenerationArtifactSurface';
 
 const PLATFORM_CONFIG = [
   { key: 'spotify' as const, label: 'Spotify', limit: PLATFORM_LIMITS.spotify },
@@ -131,54 +134,56 @@ export function ChatPitchCard({
 }: ChatPitchCardProps) {
   if (state === 'loading') {
     return (
-      <div className='mt-3 rounded-[20px] border border-(--linear-app-frame-seam) bg-surface-0 p-4'>
-        <div className='mb-3 flex items-center gap-2'>
-          <Sparkles className='h-4 w-4 animate-pulse text-accent-token' />
-          <span className='text-app font-medium text-secondary-token'>
-            Generating pitches…
-          </span>
-        </div>
-        <div className='space-y-2'>
-          {[1, 2, 3, 4].map(i => (
-            <div key={i} className='animate-pulse rounded-lg bg-surface-1 p-3'>
-              <div className='mb-2 h-3 w-20 rounded bg-surface-2' />
-              <div className='space-y-1.5'>
-                <div className='h-2.5 w-full rounded bg-surface-2' />
-                <div className='h-2.5 w-3/4 rounded bg-surface-2' />
+      <ChatGenerationArtifactSurface title='Generating Pitches'>
+        <div className='relative overflow-hidden rounded-lg bg-surface-0 p-2'>
+          <div
+            aria-hidden='true'
+            className='absolute inset-0'
+            style={{
+              backgroundImage: CHAT_GENERATION_SHIMMER_BG,
+              backgroundSize: '200% 100%',
+              animation: 'shimmer 2.4s ease-in-out infinite',
+            }}
+          />
+          <div className='relative space-y-2'>
+            {[1, 2, 3, 4].map(i => (
+              <div
+                key={i}
+                className='animate-pulse rounded-lg bg-surface-1 p-3'
+              >
+                <div className='mb-2 h-3 w-20 rounded bg-surface-2' />
+                <div className='space-y-1.5'>
+                  <div className='h-2.5 w-full rounded bg-surface-2' />
+                  <div className='h-2.5 w-3/4 rounded bg-surface-2' />
+                </div>
               </div>
-            </div>
-          ))}
+            ))}
+          </div>
         </div>
-      </div>
+      </ChatGenerationArtifactSurface>
     );
   }
 
   if (state === 'error') {
     return (
-      <div className='mt-3 rounded-[20px] border border-red-500/20 bg-surface-0 p-4'>
-        <div className='flex items-center gap-2'>
-          <Sparkles className='h-4 w-4 text-red-500' />
-          <span className='text-app font-medium text-red-500'>
-            Pitch generation failed
-          </span>
-        </div>
+      <output className='block text-app text-primary-token'>
+        <span className='block font-medium text-red-500'>
+          Pitch Generation Failed
+        </span>
         {error && (
           <p className='mt-1.5 text-xs text-secondary-token'>{error}</p>
         )}
-      </div>
+      </output>
     );
   }
 
   if (!pitches) return null;
 
   return (
-    <div className='mt-3 rounded-[20px] border border-(--linear-app-frame-seam) bg-surface-0 p-4'>
-      <div className='mb-3 flex items-center gap-2'>
-        <Sparkles className='h-4 w-4 text-accent-token' />
-        <span className='text-app font-medium text-secondary-token'>
-          Pitch Builder{releaseTitle ? ` — ${releaseTitle}` : ''}
-        </span>
-      </div>
+    <ChatGenerationArtifactSurface
+      title='Pitch Builder'
+      subtitle={releaseTitle ?? null}
+    >
       <div className='space-y-2'>
         {PLATFORM_CONFIG.map(({ key, label, limit }) => {
           const text = pitches[key];
@@ -188,6 +193,6 @@ export function ChatPitchCard({
           );
         })}
       </div>
-    </div>
+    </ChatGenerationArtifactSurface>
   );
 }
