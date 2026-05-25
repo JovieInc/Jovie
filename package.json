@@ -99,6 +99,7 @@
     "evals:live": "doppler run --project jovie-web --config dev -- pnpm --filter @jovie/web run evals:live",
     "evals:live:all": "doppler run --project jovie-web --config dev -- pnpm --filter @jovie/web run evals:live:all",
     "evals:live:http": "doppler run --project jovie-web --config dev -- pnpm --filter @jovie/web run evals:live:http",
+    "evals:live:http:rate-limit": "doppler run --project jovie-web --config dev -- pnpm --filter @jovie/web run evals:live:http:rate-limit",
     "test:web": "doppler run --project jovie-web --config dev -- pnpm --filter @jovie/web run test",
     "test:web:changed": "doppler run --project jovie-web --config dev -- pnpm --filter @jovie/web run test -- --changed",
     "test:web:watch": "doppler run --project jovie-web --config dev -- pnpm --filter @jovie/web run test:watch",

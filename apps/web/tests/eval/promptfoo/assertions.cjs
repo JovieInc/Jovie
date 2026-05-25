@@ -675,14 +675,56 @@ function assertLiveHttpWebRouteNoModel(output) {
   if (payload.target !== 'web-chat-http-route') {
     return fail('case did not run through the live HTTP web chat adapter');
   }
-  if (payload.costTier !== 'live-http') {
-    return fail('case is not marked as live-http');
+  if (
+    payload.costTier !== 'live-http' &&
+    payload.costTier !== 'live-rate-limit'
+  ) {
+    return fail('case is not marked as a live HTTP cost tier');
   }
   if (payload.selectedModel !== null) {
     return fail('live HTTP no-model case selected a model');
   }
   if (payload.modelCalled !== false) {
     return fail('live HTTP no-model case reported a model call');
+  }
+
+  return pass();
+}
+
+function assertLiveHttpOnboardingRateLimitUnavailable(output) {
+  const payload = parseOutput(output);
+  const response = payload.response ?? {};
+  const responseText = String(response.responseText ?? payload.text ?? '');
+
+  if (payload.target !== 'web-chat-http-route') {
+    return fail('case did not run through the live HTTP web chat adapter');
+  }
+  if (payload.costTier !== 'live-rate-limit') {
+    return fail('case is not marked as live-rate-limit');
+  }
+  if (response.status !== 429) {
+    return fail(`expected live HTTP 429, got ${String(response.status)}`);
+  }
+  if (response.responseJson?.errorCode !== 'RATE_LIMITED') {
+    return fail('missing live RATE_LIMITED error code');
+  }
+  if (!response.headers?.['retry-after']) {
+    return fail('missing live Retry-After header');
+  }
+  if (!response.headers?.['x-ratelimit-limit']) {
+    return fail('missing live X-RateLimit-Limit header');
+  }
+  if (!response.headers?.['x-ratelimit-remaining']) {
+    return fail('missing live X-RateLimit-Remaining header');
+  }
+  if (!/rate limit|temporarily unavailable|too many/i.test(responseText)) {
+    return fail('missing live rate-limit explanation');
+  }
+  if (payload.modelDispatchPrevented !== true) {
+    return fail('rate-limit case did not prove model dispatch was bypassed');
+  }
+  if (payload.persistenceAttempted !== false) {
+    return fail('rate-limit live HTTP case attempted persistence');
   }
 
   return pass();
@@ -1639,6 +1681,7 @@ module.exports = {
   assertWebRouteContractOnlySuccess,
   assertDeterministicNoSpend,
   assertLiveHttpWebRouteNoModel,
+  assertLiveHttpOnboardingRateLimitUnavailable,
   assertLiveHttpUnauthorized,
   assertLiveHttpInvalidJson,
   assertLiveHttpMissingContext,

@@ -52,7 +52,23 @@ cleanup() {
 }
 trap cleanup EXIT INT TERM
 
+ENV_UNSET_ARGS=()
+if [ "${JOVIE_DISABLE_REDIS_FOR_EVALS:-0}" = "1" ]; then
+  ENV_UNSET_ARGS+=(-u UPSTASH_REDIS_REST_URL -u UPSTASH_REDIS_REST_TOKEN)
+  echo "Starting dev server with Redis env disabled for isolated evals" >&2
+fi
+if [ "${JOVIE_DISABLE_MODEL_KEYS_FOR_EVALS:-0}" = "1" ]; then
+  ENV_UNSET_ARGS+=(
+    -u AI_GATEWAY_API_KEY
+    -u OPENAI_API_KEY
+    -u ANTHROPIC_API_KEY
+    -u XAI_API_KEY
+  )
+  echo "Starting dev server with model provider env disabled for isolated evals" >&2
+fi
+
 doppler run --project jovie-web --config dev -- env \
+  "${ENV_UNSET_ARGS[@]}" \
   E2E_USE_TEST_AUTH_BYPASS="${E2E_USE_TEST_AUTH_BYPASS:-1}" \
   NEXT_PUBLIC_CLERK_MOCK="${NEXT_PUBLIC_CLERK_MOCK:-1}" \
   NEXT_PUBLIC_CLERK_PROXY_DISABLED="${NEXT_PUBLIC_CLERK_PROXY_DISABLED:-1}" \
