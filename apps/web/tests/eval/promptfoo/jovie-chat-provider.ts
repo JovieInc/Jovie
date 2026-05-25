@@ -19,6 +19,10 @@ import {
   selectKnowledgeContextForTurn,
 } from '@/lib/chat/run';
 import {
+  canUsePaidChatTools,
+  resolveChatTurnPlanLimits,
+} from '@/lib/chat/tool-access';
+import {
   decodeToolEvents,
   type PersistedToolEvent,
   persistedToolEventsSchema,
@@ -63,6 +67,7 @@ type EvalTarget =
   | 'model-contract'
   | 'mobile-chat-route'
   | 'onboarding-state-contract'
+  | 'tool-access-contract'
   | 'tool-contract'
   | 'tool-event-contract'
   | 'tool-render-contract'
@@ -390,6 +395,7 @@ const REQUIRED_KNOWLEDGE_CASES = [
   'recent-user-turn-window',
   'release-playlist-topic-cap',
 ] as const;
+const REQUIRED_TOOL_ACCESS_CASES = ['billing-mode-matrix'] as const;
 const CHAT_SLASH_SKILL_NAMES = commandsForSurface('chat-slash')
   .filter(command => command.kind === 'skill')
   .map(command => command.id)
@@ -446,6 +452,7 @@ function toTarget(value: unknown): EvalTarget {
     value === 'mobile-chat-route' ||
     value === 'model-contract' ||
     value === 'onboarding-state-contract' ||
+    value === 'tool-access-contract' ||
     value === 'tool-contract' ||
     value === 'tool-event-contract' ||
     value === 'tool-render-contract' ||
@@ -2136,6 +2143,188 @@ function getToolNamesForTurn(
   return toolNames;
 }
 
+type ToolAccessScenarioInput = {
+  readonly name: string;
+  readonly mode: 'app' | 'onboarding';
+  readonly plan: PlanId;
+  readonly billingVerification?: 'verified' | 'missing_user' | 'unavailable';
+  readonly aiCanUseTools?: boolean;
+  readonly expectedPaidToolAccess: boolean | null;
+  readonly expectedTurnAiCanUseTools: boolean | null;
+  readonly expectedToolNames: readonly string[];
+};
+
+function syntheticAccountContext(
+  scenario: ToolAccessScenarioInput
+): Parameters<typeof canUsePaidChatTools>[0] {
+  const planLimits = getEntitlements(scenario.plan);
+
+  return {
+    billingVerification: scenario.billingVerification ?? 'verified',
+    isPro: scenario.plan !== 'free',
+    planLimits: {
+      ...planLimits,
+      booleans: {
+        ...planLimits.booleans,
+        aiCanUseTools:
+          scenario.aiCanUseTools ?? planLimits.booleans.aiCanUseTools,
+      },
+    },
+  } as Parameters<typeof canUsePaidChatTools>[0];
+}
+
+function buildToolAccessScenario(scenario: ToolAccessScenarioInput) {
+  const expectedToolNames = [...scenario.expectedToolNames].sort();
+  const accountContext =
+    scenario.mode === 'app' ? syntheticAccountContext(scenario) : null;
+  const paidToolAccess = accountContext
+    ? canUsePaidChatTools(accountContext)
+    : null;
+  const turnPlanLimits = accountContext
+    ? resolveChatTurnPlanLimits(accountContext)
+    : null;
+  const availableToolNames = [
+    ...getToolNamesForTurn(scenario.mode, scenario.plan, {
+      billingVerification: scenario.billingVerification,
+      aiCanUseTools:
+        turnPlanLimits?.booleans.aiCanUseTools ?? scenario.aiCanUseTools,
+    }),
+  ].sort();
+  const availableSet = new Set(availableToolNames);
+  const expectedSet = new Set(expectedToolNames);
+  const missingToolNames = expectedToolNames.filter(
+    toolName => !availableSet.has(toolName)
+  );
+  const unexpectedToolNames = availableToolNames.filter(
+    toolName => !expectedSet.has(toolName)
+  );
+
+  return {
+    name: scenario.name,
+    mode: scenario.mode,
+    plan: scenario.plan,
+    billingVerification: scenario.billingVerification ?? 'verified',
+    inputAiCanUseTools:
+      scenario.aiCanUseTools ??
+      getEntitlements(scenario.plan).booleans.aiCanUseTools,
+    paidToolAccess,
+    expectedPaidToolAccess: scenario.expectedPaidToolAccess,
+    turnAiCanUseTools: turnPlanLimits?.booleans.aiCanUseTools ?? null,
+    expectedTurnAiCanUseTools: scenario.expectedTurnAiCanUseTools,
+    availableToolNames,
+    expectedToolNames,
+    missingToolNames,
+    unexpectedToolNames,
+  };
+}
+
+function evaluateToolAccessContract(vars: EvalVars) {
+  const accessCase =
+    typeof vars.accessCase === 'string' ? vars.accessCase : 'unspecified';
+  const scenarios = [
+    buildToolAccessScenario({
+      name: 'app-free-verified',
+      mode: 'app',
+      plan: 'free',
+      billingVerification: 'verified',
+      expectedPaidToolAccess: false,
+      expectedTurnAiCanUseTools: false,
+      expectedToolNames: FREE_APP_TOOL_NAMES,
+    }),
+    buildToolAccessScenario({
+      name: 'app-pro-verified',
+      mode: 'app',
+      plan: 'pro',
+      billingVerification: 'verified',
+      expectedPaidToolAccess: true,
+      expectedTurnAiCanUseTools: true,
+      expectedToolNames: PAID_TOOL_NAMES,
+    }),
+    buildToolAccessScenario({
+      name: 'app-trial-verified',
+      mode: 'app',
+      plan: 'trial',
+      billingVerification: 'verified',
+      expectedPaidToolAccess: true,
+      expectedTurnAiCanUseTools: true,
+      expectedToolNames: PAID_TOOL_NAMES,
+    }),
+    buildToolAccessScenario({
+      name: 'app-max-verified',
+      mode: 'app',
+      plan: 'max',
+      billingVerification: 'verified',
+      expectedPaidToolAccess: true,
+      expectedTurnAiCanUseTools: true,
+      expectedToolNames: PAID_TOOL_NAMES,
+    }),
+    buildToolAccessScenario({
+      name: 'app-pro-billing-missing-user',
+      mode: 'app',
+      plan: 'pro',
+      billingVerification: 'missing_user',
+      expectedPaidToolAccess: false,
+      expectedTurnAiCanUseTools: false,
+      expectedToolNames: FREE_APP_TOOL_NAMES,
+    }),
+    buildToolAccessScenario({
+      name: 'app-pro-billing-unavailable',
+      mode: 'app',
+      plan: 'pro',
+      billingVerification: 'unavailable',
+      expectedPaidToolAccess: false,
+      expectedTurnAiCanUseTools: false,
+      expectedToolNames: FREE_APP_TOOL_NAMES,
+    }),
+    buildToolAccessScenario({
+      name: 'app-pro-ai-tools-disabled',
+      mode: 'app',
+      plan: 'pro',
+      billingVerification: 'verified',
+      aiCanUseTools: false,
+      expectedPaidToolAccess: false,
+      expectedTurnAiCanUseTools: false,
+      expectedToolNames: FREE_APP_TOOL_NAMES,
+    }),
+    buildToolAccessScenario({
+      name: 'onboarding-free',
+      mode: 'onboarding',
+      plan: 'free',
+      expectedPaidToolAccess: null,
+      expectedTurnAiCanUseTools: null,
+      expectedToolNames: ONBOARDING_TOOLS,
+    }),
+  ];
+
+  return {
+    target: 'tool-access-contract',
+    adapter: 'tool-access-contract',
+    costTier: 'deterministic',
+    text: '',
+    selectedModel: null,
+    modelCalled: false,
+    persistenceAttempted: false,
+    dbAttempted: false,
+    networkAttempted: false,
+    accessCase,
+    scenarioNames: scenarios.map(scenario => scenario.name),
+    requiredScenarioNames: [
+      'app-free-verified',
+      'app-pro-verified',
+      'app-trial-verified',
+      'app-max-verified',
+      'app-pro-billing-missing-user',
+      'app-pro-billing-unavailable',
+      'app-pro-ai-tools-disabled',
+      'onboarding-free',
+    ],
+    scenarios,
+    toolCalls: [],
+    toolResults: [],
+    toolExecutions: [],
+  };
+}
+
 function configuredToolResult(
   vars: EvalVars,
   toolName: string
@@ -3239,6 +3428,7 @@ type EvalCaseSummary = {
   readonly description: string;
   readonly cost: string | null;
   readonly target: string | null;
+  readonly accessCase: string | null;
   readonly toolName: string | null;
   readonly modelScenario: string | null;
   readonly expectedModel: string | null;
@@ -3326,6 +3516,7 @@ function parseEvalCaseSummary(block: string): EvalCaseSummary {
     description,
     cost: scalarValue(block, 'cost'),
     target: scalarValue(block, 'target') ?? 'chat-turn',
+    accessCase: scalarValue(block, 'accessCase'),
     toolName: scalarValue(block, 'toolName'),
     modelScenario: scalarValue(block, 'modelScenario'),
     expectedModel: scalarValue(block, 'expectedModel'),
@@ -3461,6 +3652,14 @@ function evaluateEvalCaseInventory(vars: EvalVars) {
           typeof knowledgeCase === 'string'
       )
   );
+  const toolAccessCaseNames = uniqueSorted(
+    deterministicCases
+      .filter(testCase => testCase.target === 'tool-access-contract')
+      .map(testCase => testCase.accessCase)
+      .filter(
+        (accessCase): accessCase is string => typeof accessCase === 'string'
+      )
+  );
   const onboardingStateCaseNames = uniqueSorted(
     deterministicCases
       .filter(testCase => testCase.target === 'onboarding-state-contract')
@@ -3557,6 +3756,12 @@ function evaluateEvalCaseInventory(vars: EvalVars) {
     missingKnowledgeCaseNames: missingNames(
       REQUIRED_KNOWLEDGE_CASES,
       knowledgeCaseNames
+    ),
+    requiredToolAccessCaseNames: [...REQUIRED_TOOL_ACCESS_CASES],
+    toolAccessCaseNames,
+    missingToolAccessCaseNames: missingNames(
+      REQUIRED_TOOL_ACCESS_CASES,
+      toolAccessCaseNames
     ),
     requiredOnboardingStateCaseNames: [...REQUIRED_ONBOARDING_STATE_CASES],
     onboardingStateCaseNames,
@@ -3688,6 +3893,16 @@ export default class JovieChatPromptfooProvider {
 
     if (target === 'onboarding-state-contract') {
       const payload = evaluateOnboardingStateContract(vars);
+      return {
+        output: JSON.stringify(payload),
+        raw: payload,
+        format: 'json',
+        latencyMs: Date.now() - startedAt,
+      };
+    }
+
+    if (target === 'tool-access-contract') {
+      const payload = evaluateToolAccessContract(vars);
       return {
         output: JSON.stringify(payload),
         raw: payload,

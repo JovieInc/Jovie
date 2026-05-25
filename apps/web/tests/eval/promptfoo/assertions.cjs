@@ -1588,6 +1588,81 @@ function assertKnowledgeOnboardingSkipsContext(output) {
   return pass();
 }
 
+function assertToolAccessContractNoSpend(output) {
+  const payload = parseOutput(output);
+
+  if (payload.target !== 'tool-access-contract') {
+    return fail('case did not run through the tool-access adapter');
+  }
+  if (payload.costTier !== 'deterministic') {
+    return fail('tool access case is not marked deterministic');
+  }
+  if (payload.modelCalled !== false || payload.selectedModel !== null) {
+    return fail('tool access case crossed the model boundary');
+  }
+  if (payload.persistenceAttempted !== false || payload.dbAttempted !== false) {
+    return fail('tool access case crossed the persistence boundary');
+  }
+  if (payload.networkAttempted !== false) {
+    return fail('tool access case crossed the network boundary');
+  }
+
+  return pass();
+}
+
+function assertToolAccessMatrix(output) {
+  const payload = parseOutput(output);
+  const scenarios = Array.isArray(payload.scenarios) ? payload.scenarios : [];
+  const scenarioNames = scenarios
+    .map(scenario => scenario.name)
+    .filter(name => typeof name === 'string');
+
+  if (payload.target !== 'tool-access-contract') {
+    return fail('case did not run through the tool-access adapter');
+  }
+  if (payload.accessCase !== 'billing-mode-matrix') {
+    return fail('tool access case is not the billing/mode matrix');
+  }
+  if (scenarios.length === 0) {
+    return fail('tool access matrix produced no scenarios');
+  }
+
+  for (const requiredName of sortedStringArray(payload.requiredScenarioNames)) {
+    if (!scenarioNames.includes(requiredName)) {
+      return fail(`missing tool access scenario: ${requiredName}`);
+    }
+  }
+
+  for (const scenario of scenarios) {
+    if (
+      scenario.paidToolAccess !== scenario.expectedPaidToolAccess ||
+      scenario.turnAiCanUseTools !== scenario.expectedTurnAiCanUseTools
+    ) {
+      return fail(
+        `${scenario.name} gating mismatch: paidToolAccess=${String(scenario.paidToolAccess)}, turnAiCanUseTools=${String(scenario.turnAiCanUseTools)}`
+      );
+    }
+    if (
+      Array.isArray(scenario.missingToolNames) &&
+      scenario.missingToolNames.length > 0
+    ) {
+      return fail(
+        `${scenario.name} missing tools: ${scenario.missingToolNames.join(', ')}`
+      );
+    }
+    if (
+      Array.isArray(scenario.unexpectedToolNames) &&
+      scenario.unexpectedToolNames.length > 0
+    ) {
+      return fail(
+        `${scenario.name} unexpected tools: ${scenario.unexpectedToolNames.join(', ')}`
+      );
+    }
+  }
+
+  return pass();
+}
+
 function assertSafeSocialUrl(output) {
   const payload = parseOutput(output);
   const input = payload.parsedInput ?? payload.input ?? {};
@@ -2156,6 +2231,7 @@ function assertEvalCaseInventoryCovered(output) {
     'missingModelRoutingScenarioNames',
     'missingModelRoutingBoundaryNames',
     'missingKnowledgeCaseNames',
+    'missingToolAccessCaseNames',
     'missingOnboardingStateCaseNames',
   ]) {
     const values = payload[field];
@@ -2227,6 +2303,8 @@ module.exports = {
   assertKnowledgeNoFalsePositive,
   assertKnowledgeUsesRecentUserTurns,
   assertKnowledgeOnboardingSkipsContext,
+  assertToolAccessContractNoSpend,
+  assertToolAccessMatrix,
   assertSafeSocialUrl,
   assertFailedToolResultPreserved,
   assertToolInventoryCovered,

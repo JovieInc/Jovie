@@ -1067,6 +1067,19 @@ tests:
       - type: javascript
         value: file://assertions.cjs:assertKnowledgeOnboardingSkipsContext
 
+  - description: Tool access matrix matches billing and mode gates
+    metadata:
+      cost: deterministic
+    vars:
+      input: "Validate tool access without dispatching a model."
+      target: tool-access-contract
+      accessCase: billing-mode-matrix
+    assert:
+      - type: javascript
+        value: file://assertions.cjs:assertToolAccessContractNoSpend
+      - type: javascript
+        value: file://assertions.cjs:assertToolAccessMatrix
+
   - description: Tool event inventory hydrates every eval tool
     metadata:
       cost: deterministic
