@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { shouldExcludeSelfByHandle } from '@/lib/analytics/self-exclusion';
 import { captureError } from '@/lib/error-tracking';
 import { NO_STORE_HEADERS } from '@/lib/http/headers';
-import { publicProfileLimiter } from '@/lib/rate-limit';
+import { createRateLimitHeaders, publicProfileLimiter } from '@/lib/rate-limit';
 import { incrementProfileViews } from '@/lib/services/profile';
 import { detectBot } from '@/lib/utils/bot-detection';
 import { extractClientIP } from '@/lib/utils/ip-extraction';
@@ -51,21 +51,15 @@ export async function POST(request: NextRequest) {
     const rateLimitResult = await publicProfileLimiter.limit(clientIP);
 
     if (!rateLimitResult.success) {
-      const retryAfterSeconds = Math.ceil(
-        (rateLimitResult.reset.getTime() - Date.now()) / 1000
-      );
-      return NextResponse.json(
-        { error: 'Rate limit exceeded' },
-        {
-          status: 429,
-          headers: {
-            ...NO_STORE_HEADERS,
-            'Retry-After': String(Math.max(retryAfterSeconds, 1)),
-            'X-RateLimit-Limit': String(rateLimitResult.limit),
-            'X-RateLimit-Remaining': String(rateLimitResult.remaining),
-          },
-        }
-      );
+      // Profile view tracking is best-effort. If we are rate-limited, return a
+      // silent success so browsers do not surface noisy console errors.
+      return new NextResponse(null, {
+        status: 204,
+        headers: {
+          ...NO_STORE_HEADERS,
+          ...createRateLimitHeaders(rateLimitResult),
+        },
+      });
     }
 
     const botResult = detectBot(request, '/api/profile/view');
