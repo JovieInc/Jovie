@@ -1,11 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const hoisted = vi.hoisted(() => ({
-  authMock: vi.fn(),
+  getMobileSessionUserIdMock: vi.fn(),
 }));
 
-vi.mock('@clerk/nextjs/server', () => ({
-  auth: hoisted.authMock,
+vi.mock('@/lib/mobile/session-auth', () => ({
+  getMobileSessionUserId: hoisted.getMobileSessionUserIdMock,
 }));
 
 const routeModulePromise = import('@/app/api/mobile/v1/chat/turns/route');
@@ -17,11 +17,11 @@ async function text(response: Response) {
 describe('POST /api/mobile/v1/chat/turns', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    hoisted.authMock.mockResolvedValue({ userId: 'user_123' });
+    hoisted.getMobileSessionUserIdMock.mockResolvedValue('user_123');
   });
 
   it('returns 401 when the mobile session token is missing', async () => {
-    hoisted.authMock.mockResolvedValue({ userId: null });
+    hoisted.getMobileSessionUserIdMock.mockResolvedValue(null);
 
     const { POST } = await routeModulePromise;
     const response = await POST(

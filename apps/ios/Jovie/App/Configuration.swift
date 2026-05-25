@@ -42,19 +42,19 @@ struct AppConfiguration: Sendable {
       key: String,
       envKeys: [String]
     ) -> String? {
-      if let value = values?[key] as? String {
-        let trimmedValue = value.trimmingCharacters(in: .whitespacesAndNewlines)
-        if !trimmedValue.isEmpty {
-          return trimmedValue
-        }
-      }
-
       for envKey in envKeys {
         if let value = ProcessInfo.processInfo.environment[envKey] {
           let trimmedValue = value.trimmingCharacters(in: .whitespacesAndNewlines)
           if !trimmedValue.isEmpty {
             return trimmedValue
           }
+        }
+      }
+
+      if let value = values?[key] as? String {
+        let trimmedValue = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !trimmedValue.isEmpty {
+          return trimmedValue
         }
       }
 

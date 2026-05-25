@@ -44,7 +44,10 @@ enum NativeAuthExchangeError: Error, Equatable, LocalizedError {
 }
 
 struct NativeAuthExchangeResponse: Decodable, Equatable {
-  let ticket: String
+  let ticket: String?
+  let sessionToken: String?
+  let sessionId: String?
+  let userId: String?
   let returnTo: String
   let expiresInSeconds: Int
 }
@@ -95,16 +98,23 @@ struct NativeAuthExchangeClient: Sendable {
     }
 
     guard let httpResponse = response as? HTTPURLResponse else {
+      MobileAuthDiagnostics.record("native_exchange_invalid_response")
       throw NativeAuthExchangeError.invalidResponse
     }
 
     guard (200 ... 299).contains(httpResponse.statusCode) else {
+      MobileAuthDiagnostics.record(
+        "native_exchange_failed",
+        detail: "status=\(httpResponse.statusCode)"
+      )
       throw NativeAuthExchangeError.requestFailed(statusCode: httpResponse.statusCode)
     }
 
     do {
+      MobileAuthDiagnostics.record("native_exchange_succeeded")
       return try decoder.decode(NativeAuthExchangeResponse.self, from: data)
     } catch {
+      MobileAuthDiagnostics.record("native_exchange_decode_failed")
       throw NativeAuthExchangeError.decodingFailed
     }
   }
@@ -169,20 +179,31 @@ struct APIClient: APIClientProtocol, Sendable {
     }
 
     guard let httpResponse = response as? HTTPURLResponse else {
+      MobileAuthDiagnostics.record("mobile_me_invalid_response")
       throw APIClientError.invalidResponse
     }
 
     if httpResponse.statusCode == 401, !forceRefresh {
+      MobileAuthDiagnostics.record("mobile_me_retrying", detail: "status=401")
       return try await sendMeRequest(forceRefresh: true)
     }
 
     guard (200 ... 299).contains(httpResponse.statusCode) else {
+      MobileAuthDiagnostics.record(
+        "mobile_me_failed",
+        detail: "status=\(httpResponse.statusCode)"
+      )
       throw APIClientError.requestFailed(statusCode: httpResponse.statusCode)
     }
 
     do {
+      MobileAuthDiagnostics.record(
+        "mobile_me_succeeded",
+        detail: "status=\(httpResponse.statusCode)"
+      )
       return try decoder.decode(MobileMeResponse.self, from: data)
     } catch {
+      MobileAuthDiagnostics.record("mobile_me_decode_failed")
       throw APIClientError.decodingFailed
     }
   }

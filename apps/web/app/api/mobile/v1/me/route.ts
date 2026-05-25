@@ -1,10 +1,10 @@
-import { auth } from '@clerk/nextjs/server';
 import { NextResponse } from 'next/server';
 import { getAppUrl, getProfileUrl } from '@/constants/domains';
 import { isProfileComplete } from '@/lib/auth/profile-completeness';
 import { getSessionContext, SESSION_ERRORS } from '@/lib/auth/session';
 import { captureError } from '@/lib/error-tracking';
 import { NO_STORE_HEADERS } from '@/lib/http/headers';
+import { getMobileSessionUserId } from '@/lib/mobile/session-auth';
 
 export const runtime = 'nodejs';
 
@@ -35,9 +35,9 @@ function buildNeedsOnboardingResponse(): NextResponse {
   });
 }
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
-    const { userId } = await auth({ acceptsToken: 'session_token' });
+    const userId = await getMobileSessionUserId(request);
     if (!userId) {
       return NextResponse.json(
         { error: 'Unauthorized' },

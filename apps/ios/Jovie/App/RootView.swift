@@ -21,13 +21,68 @@ private enum LiveAuthBootstrapError: LocalizedError {
 }
 
 private enum MobileAuthReturnError: LocalizedError {
+  case clerkDidNotLoad
+  case missingExchangeCredential
+  case missingSessionToken(status: String, createdSessionID: String?, activeSessionID: String?, sessionCount: Int)
   case missingSignedInUser
 
   var errorDescription: String? {
     switch self {
+    case .clerkDidNotLoad:
+      "Clerk did not finish initializing before the native auth callback was handled."
+    case .missingExchangeCredential:
+      "The native auth exchange did not return a usable session credential."
+    case let .missingSessionToken(status, createdSessionID, activeSessionID, sessionCount):
+      "Clerk ticket sign-in completed without a session token. status=\(status) createdSessionID=\(createdSessionID ?? "nil") activeSessionID=\(activeSessionID ?? "nil") sessionCount=\(sessionCount)"
     case .missingSignedInUser:
       "You're signed in, but we couldn't load your profile. Try again."
     }
+  }
+}
+
+private struct MobileAuthFinalizationStageError: LocalizedError {
+  let stage: String
+  let underlyingError: Error
+
+  var errorDescription: String? {
+    let message = underlyingError.localizedDescription.isEmpty
+      ? String(describing: underlyingError)
+      : underlyingError.localizedDescription
+    return "Native auth \(stage) failed: \(message)"
+  }
+}
+
+@MainActor
+private func waitForClerkLoaded(_ clerk: Clerk) async throws {
+  if clerk.isLoaded { return }
+
+  for _ in 0..<60 {
+    try Task.checkCancellation()
+    try await Task.sleep(nanoseconds: 50_000_000)
+
+    if clerk.isLoaded { return }
+  }
+
+  _ = try await clerk.refreshEnvironment()
+  _ = try await clerk.refreshClient()
+
+  guard clerk.isLoaded else {
+    throw MobileAuthReturnError.clerkDidNotLoad
+  }
+}
+
+@MainActor
+private func runMobileAuthFinalizationStage<Value>(
+  _ stage: String,
+  operation: () async throws -> Value
+) async throws -> Value {
+  do {
+    return try await operation()
+  } catch {
+    throw MobileAuthFinalizationStageError(
+      stage: stage,
+      underlyingError: error
+    )
   }
 }
 
@@ -46,22 +101,14 @@ private enum LiveAuthBootstrapper {
 
     try? await Clerk.shared.auth.signOut()
 
-    let signIn: SignIn
-    do {
-      signIn = try await Clerk.shared.auth.signIn(emailAddress)
-    } catch {
-      throw LiveAuthBootstrapError.bootstrapFailed(
-        stage: "signIn",
-        message: error.localizedDescription
-      )
-    }
-
     let preparedSignIn: SignIn
     do {
-      preparedSignIn = try await signIn.sendEmailCode()
+      preparedSignIn = try await Clerk.shared.auth.signInWithEmailCode(
+        emailAddress: emailAddress
+      )
     } catch {
       throw LiveAuthBootstrapError.bootstrapFailed(
-        stage: "sendEmailCode",
+        stage: "signInWithEmailCode",
         message: error.localizedDescription
       )
     }
@@ -120,6 +167,7 @@ private struct AppContentView: View {
   let authErrorMessage: String?
   let onLogout: @MainActor () async -> Void
   let onAuthReturn: @MainActor (MobileAuthReturn) -> Void
+  let onAuthError: @MainActor (String?) -> Void
 
   var body: some View {
     Group {
@@ -131,7 +179,8 @@ private struct AppContentView: View {
           isMock: !appState.launchMode.usesLiveClerk,
           webBaseURL: appState.configuration.webBaseURL,
           errorMessage: authErrorMessage,
-          onAuthReturn: onAuthReturn
+          onAuthReturn: onAuthReturn,
+          onAuthError: onAuthError
         )
       case .needsOnboarding:
         AppShellView(
@@ -259,6 +308,7 @@ struct RootView: View {
   let authErrorMessage: String?
   let onLogout: @MainActor () async -> Void
   let onAuthReturn: @MainActor (MobileAuthReturn) -> Void
+  let onAuthError: @MainActor (String?) -> Void
 
   var body: some View {
     ZStack {
@@ -266,7 +316,8 @@ struct RootView: View {
         appState: appState,
         authErrorMessage: authErrorMessage,
         onLogout: onLogout,
-        onAuthReturn: onAuthReturn
+        onAuthReturn: onAuthReturn,
+        onAuthError: onAuthError
       )
 
 #if DEBUG
@@ -290,6 +341,84 @@ struct RootView: View {
 }
 
 #if DEBUG
+private enum LiveAuthUITestStatus {
+  static let statusKey = "liveAuthUITestStatus"
+  static let errorKey = "liveAuthUITestError"
+  static let userIDKey = "liveAuthUITestUserID"
+
+  @MainActor
+  static func set(_ status: String, error: String? = nil, userID: String? = nil) {
+    let defaults = UserDefaults.standard
+    defaults.set(status, forKey: statusKey)
+
+    if let error {
+      defaults.set(error, forKey: errorKey)
+    } else {
+      defaults.removeObject(forKey: errorKey)
+    }
+
+    if let userID {
+      defaults.set(userID, forKey: userIDKey)
+    } else if status == "starting" {
+      defaults.removeObject(forKey: userIDKey)
+    }
+
+    defaults.synchronize()
+  }
+
+  @MainActor
+  static func setRouteStatus(_ route: AppRouter, userID: String) {
+    switch route {
+    case .ready:
+      set("ready", userID: userID)
+    case .needsOnboarding:
+      set("needs_onboarding", userID: userID)
+    case .launching:
+      set("launching", userID: userID)
+    case .signedOut:
+      set("signed_out", userID: userID)
+    }
+  }
+}
+
+private enum LiveAuthCallbackLaunchInput {
+  static func pendingCodeVerifier(processInfo: ProcessInfo = .processInfo) -> String? {
+    let verifier = processInfo.environment["JOVIE_IOS_PENDING_CODE_VERIFIER"]?
+      .trimmingCharacters(in: .whitespacesAndNewlines)
+
+    guard let verifier, !verifier.isEmpty else {
+      return nil
+    }
+
+    return verifier
+  }
+
+  static func callbackURL(processInfo: ProcessInfo = .processInfo) -> URL? {
+    guard let value = argumentValue(
+      after: "-ui-testing-open-auth-callback",
+      in: processInfo.arguments
+    ) else {
+      return nil
+    }
+
+    return URL(string: value)
+  }
+
+  private static func argumentValue(after flag: String, in arguments: [String]) -> String? {
+    guard let flagIndex = arguments.firstIndex(of: flag) else {
+      return nil
+    }
+
+    let valueIndex = arguments.index(after: flagIndex)
+    guard arguments.indices.contains(valueIndex) else {
+      return nil
+    }
+
+    let value = arguments[valueIndex].trimmingCharacters(in: .whitespacesAndNewlines)
+    return value.isEmpty ? nil : value
+  }
+}
+
 private struct UITestExitButton: View {
   var body: some View {
     VStack {
@@ -313,13 +442,120 @@ private struct UITestExitButton: View {
     .ignoresSafeArea()
   }
 }
+
+struct UITestingAuthCallbackRoot: View {
+  @Bindable var appState: AppState
+  @State private var authErrorMessage: String?
+  @State private var handledStates: Set<String> = []
+  @State private var liveUserID: String?
+
+  private let expectedCode = "test_code"
+  private let expectedVerifier = "test_verifier"
+  private let statusKey = "ie.jov.Jovie.authCallbackUITestStatus"
+  private let handledCountKey = "ie.jov.Jovie.authCallbackUITestHandledCount"
+
+  var body: some View {
+    RootView(
+      appState: appState,
+      liveUserID: liveUserID,
+      authErrorMessage: authErrorMessage,
+      onLogout: { await appState.signOut() },
+      onAuthReturn: handleAuthReturn,
+      onAuthError: { authErrorMessage = $0 }
+    )
+    .onOpenURL { url in
+      handleCallbackURL(url)
+    }
+    .onReceive(NotificationCenter.default.publisher(for: .jovieAuthCallbackURL)) { notification in
+      guard let url = notification.object as? URL else { return }
+      handleCallbackURL(url)
+    }
+    .task {
+      await MainActor.run {
+        UserDefaults.standard.removeObject(forKey: statusKey)
+        UserDefaults.standard.removeObject(forKey: handledCountKey)
+        UserDefaults.standard.set("waiting", forKey: statusKey)
+        UserDefaults.standard.set(0, forKey: handledCountKey)
+        MobileAuthPendingStore.shared.save(codeVerifier: expectedVerifier)
+        for url in MobileAuthCallbackURLInbox.shared.drain() {
+          handleCallbackURL(url)
+        }
+      }
+    }
+  }
+
+  @MainActor
+  private func handleCallbackURL(_ url: URL) {
+    if let state = MobileAuthReturnParser.callbackState(url),
+       handledStates.contains(state)
+    {
+      return
+    }
+
+    Task { @MainActor in
+      if let providerError = MobileAuthReturnParser.parseProviderError(url) {
+        authErrorMessage = providerError.userMessage
+        UserDefaults.standard.set("error", forKey: statusKey)
+        return
+      }
+
+      if let state = MobileAuthReturnParser.callbackState(url),
+         handledStates.contains(state)
+      {
+        return
+      }
+
+      if let authReturn = await MobileAuthReturnParser.parse(url, pendingStore: .shared) {
+        handleAuthReturn(authReturn)
+        return
+      }
+
+      guard MobileAuthReturnParser.isCodeCallback(url) else { return }
+
+      try? await Task.sleep(nanoseconds: 250_000_000)
+
+      guard let authReturn = await MobileAuthReturnParser.parse(url, pendingStore: .shared) else {
+        authErrorMessage = "Couldn't finish sign-in. Try again."
+        UserDefaults.standard.set("error", forKey: statusKey)
+        return
+      }
+
+      handleAuthReturn(authReturn)
+    }
+  }
+
+  @MainActor
+  private func handleAuthReturn(_ authReturn: MobileAuthReturn) {
+    guard !handledStates.contains(authReturn.state) else { return }
+    handledStates.insert(authReturn.state)
+
+    guard authReturn.code == expectedCode,
+          authReturn.codeVerifier == expectedVerifier
+    else {
+      authErrorMessage = "Couldn't finish sign-in. Try again."
+      return
+    }
+
+    authErrorMessage = nil
+    liveUserID = "user_ui_auth_callback"
+    appState.activeUserID = "user_ui_auth_callback"
+    appState.route = .ready
+    appState.dashboardState = .loaded(.previewReady)
+    appState.isOffline = false
+    UserDefaults.standard.set(handledStates.count, forKey: handledCountKey)
+    UserDefaults.standard.set("ready", forKey: statusKey)
+  }
+}
 #endif
 
 struct LiveRootContainer: View {
   @Environment(Clerk.self) private var clerk
   @Bindable var appState: AppState
   @State private var didBootstrapLiveAuth = false
+  @State private var didHydrateNativeSession = false
+  @State private var didHandleLaunchAuthCallback = false
   @State private var authReturnTask: Task<Void, Never>?
+  @State private var handledAuthReturnStates: Set<String> = []
   @State private var authErrorMessage: String?
 
   var body: some View {
@@ -331,11 +567,64 @@ struct LiveRootContainer: View {
         try? await clerk.auth.signOut()
         await appState.signOut()
       },
-      onAuthReturn: handleAuthReturn
+      onAuthReturn: handleAuthReturn,
+      onAuthError: { authErrorMessage = $0 }
     )
       .onOpenURL { url in
         handleAuthReturn(url)
       }
+      .onReceive(NotificationCenter.default.publisher(for: .jovieAuthCallbackURL)) { notification in
+        guard let url = notification.object as? URL else { return }
+        handleAuthReturn(url)
+      }
+      .task {
+        for url in MobileAuthCallbackURLInbox.shared.drain() {
+          handleAuthReturn(url)
+        }
+      }
+      .task(id: appState.didLoadClerk) {
+        guard appState.didLoadClerk,
+              didHydrateNativeSession == false,
+              clerk.user == nil,
+              let nativeSession = NativeSessionTokenStore.load()
+        else {
+          return
+        }
+
+        didHydrateNativeSession = true
+        MobileAuthDiagnostics.record("native_session_hydrated")
+        await appState.handleSignedInUserChange(nativeSession.userID)
+      }
+#if DEBUG
+      .task(id: appState.route) {
+        guard appState.launchMode == .uiTestingLiveAuth,
+              let activeUserID = appState.activeUserID
+        else {
+          return
+        }
+
+        LiveAuthUITestStatus.setRouteStatus(appState.route, userID: activeUserID)
+      }
+
+      .task {
+        guard appState.launchMode == .uiTestingLiveAuth,
+              didHandleLaunchAuthCallback == false
+        else {
+          return
+        }
+
+        didHandleLaunchAuthCallback = true
+
+        if let verifier = LiveAuthCallbackLaunchInput.pendingCodeVerifier() {
+          LiveAuthUITestStatus.set("waiting")
+          MobileAuthPendingStore.shared.save(codeVerifier: verifier)
+        }
+
+        if let callbackURL = LiveAuthCallbackLaunchInput.callbackURL() {
+          handleAuthReturn(callbackURL)
+        }
+      }
+#endif
       .task(id: appState.launchMode.requiresAutoAuth) {
         guard appState.launchMode.requiresAutoAuth, didBootstrapLiveAuth == false else {
           return
@@ -344,12 +633,19 @@ struct LiveRootContainer: View {
         didBootstrapLiveAuth = true
 
         do {
+#if DEBUG
+          LiveAuthUITestStatus.set("starting")
+#endif
           let userID = try await LiveAuthBootstrapper.signInFromEnvironment()
           Observability.addBreadcrumb(
             .clerkSessionExchangeSucceeded,
             context: ["stage": "live_auth_bootstrap"]
           )
           await appState.handleSignedInUserChange(userID)
+
+#if DEBUG
+          LiveAuthUITestStatus.setRouteStatus(appState.route, userID: userID)
+#endif
         } catch {
           Observability.addBreadcrumb(
             .clerkSessionExchangeFailed,
@@ -367,6 +663,14 @@ struct LiveRootContainer: View {
               error: error
             )
           )
+#if DEBUG
+          LiveAuthUITestStatus.set(
+            "error",
+            error: error.localizedDescription.isEmpty
+              ? "Live auth bootstrap failed."
+              : error.localizedDescription
+          )
+#endif
           appState.route = .ready
           appState.dashboardState = .error(
             error.localizedDescription.isEmpty
@@ -388,32 +692,100 @@ struct LiveRootContainer: View {
       context: ["url": url]
     )
 
-    guard let authReturn = MobileAuthReturnParser.parse(url) else {
-      Observability.addBreadcrumb(
-        .deepLinkRouteUnmatched,
-        level: .warning,
-        context: ["url": url]
-      )
-      Observability.addBreadcrumb(
-        .deepLinkParseFailed,
-        level: .warning,
-        context: ["url": url]
-      )
+    if let state = MobileAuthReturnParser.callbackState(url),
+       handledAuthReturnStates.contains(state)
+    {
       return
     }
 
-    Observability.addBreadcrumb(
-      .deepLinkRouteMatched,
-      context: ["route": "auth_return", "url": url]
-    )
-    handleAuthReturn(authReturn)
+    Task { @MainActor in
+      if let providerError = MobileAuthReturnParser.parseProviderError(url) {
+        Observability.addBreadcrumb(
+          .deepLinkRouteMatched,
+          level: .warning,
+          context: ["route": "auth_error", "url": url]
+        )
+        authReturnTask?.cancel()
+        authReturnTask = nil
+        await appState.signOut()
+        authErrorMessage = providerError.userMessage
+        MobileAuthDiagnostics.record("auth_callback_provider_error", detail: providerError.error)
+#if DEBUG
+        LiveAuthUITestStatus.set("error", error: providerError.userMessage)
+#endif
+        return
+      }
+
+      if let state = MobileAuthReturnParser.callbackState(url),
+         handledAuthReturnStates.contains(state)
+      {
+        return
+      }
+
+      if let authReturn = await MobileAuthReturnParser.parse(url, pendingStore: .shared) {
+        Observability.addBreadcrumb(
+          .deepLinkRouteMatched,
+          context: ["route": "auth_return", "url": url]
+        )
+        handleAuthReturn(authReturn)
+        return
+      }
+
+      guard MobileAuthReturnParser.isCodeCallback(url) else {
+        Observability.addBreadcrumb(
+          .deepLinkRouteUnmatched,
+          level: .warning,
+          context: ["url": url]
+        )
+        Observability.addBreadcrumb(
+          .deepLinkParseFailed,
+          level: .warning,
+          context: ["url": url]
+        )
+        return
+      }
+
+      try? await Task.sleep(nanoseconds: 250_000_000)
+
+      guard let authReturn = await MobileAuthReturnParser.parse(url, pendingStore: .shared) else {
+        Observability.addBreadcrumb(
+          .deepLinkParseFailed,
+          level: .warning,
+          context: ["reason": "missing_pending_verifier", "url": url]
+        )
+        await appState.signOut()
+        authErrorMessage = "Couldn't finish sign-in. Try again."
+        MobileAuthDiagnostics.record("auth_callback_missing_verifier")
+#if DEBUG
+        LiveAuthUITestStatus.set(
+          "error",
+          error: "Missing pending native auth code verifier."
+        )
+#endif
+        return
+      }
+
+      Observability.addBreadcrumb(
+        .deepLinkRouteMatched,
+        context: ["route": "auth_return", "url": url]
+      )
+      handleAuthReturn(authReturn)
+    }
   }
 
   @MainActor
   private func handleAuthReturn(_ authReturn: MobileAuthReturn) {
+    guard !handledAuthReturnStates.contains(authReturn.state) else { return }
+    handledAuthReturnStates.insert(authReturn.state)
+
     authReturnTask?.cancel()
     authErrorMessage = nil
     appState.route = .launching
+    MobileAuthDiagnostics.record("auth_finalization_started")
+#if DEBUG
+    NativeTicketSignInDiagnostics.clear()
+    LiveAuthUITestStatus.set("exchanging")
+#endif
 
     authReturnTask = Task { @MainActor in
       let span = Observability.startSpan(
@@ -430,31 +802,151 @@ struct LiveRootContainer: View {
           .clerkSessionExchangeStarted,
           context: ["stage": "native_auth_return"]
         )
-        let exchangeResponse = try await NativeAuthExchangeClient(
-          baseURL: appState.configuration.webBaseURL
-        ).exchange(authReturn)
+        try await runMobileAuthFinalizationStage("waitForClerkStartup") {
+          try await waitForClerkLoaded(clerk)
+        }
+
+        let exchangeResponse = try await runMobileAuthFinalizationStage("exchange") {
+          try await NativeAuthExchangeClient(
+            baseURL: appState.configuration.webBaseURL
+          ).exchange(authReturn)
+        }
         Observability.addBreadcrumb(
           .clerkSessionExchangeSucceeded,
           context: ["stage": "native_auth_exchange"]
         )
 
-        let signIn = try await clerk.auth.signInWithTicket(exchangeResponse.ticket)
+        if let sessionToken = exchangeResponse.sessionToken,
+           let userID = exchangeResponse.userId,
+           sessionToken.isEmpty == false,
+           userID.isEmpty == false
+        {
+          NativeSessionTokenStore.save(
+            token: sessionToken,
+            userID: userID,
+            expiresAt: Date().addingTimeInterval(
+              TimeInterval(exchangeResponse.expiresInSeconds)
+            )
+          )
+          MobileAuthDiagnostics.record("native_exchange_session_token_received")
+          Observability.addBreadcrumb(
+            .clerkSessionExchangeSucceeded,
+            context: ["stage": "native_session_token"]
+          )
+          Observability.addBreadcrumb(.nativeSessionPersisted)
+          await appState.handleSignedInUserChange(userID)
+#if DEBUG
+          LiveAuthUITestStatus.setRouteStatus(appState.route, userID: userID)
+#endif
+          return
+        }
+
+        guard let ticket = exchangeResponse.ticket, ticket.isEmpty == false else {
+          throw MobileAuthReturnError.missingExchangeCredential
+        }
+
+        MobileAuthDiagnostics.record("native_exchange_ticket_received")
+
+        let signIn = try await runMobileAuthFinalizationStage("signInWithTicket") {
+          try await clerk.auth.signInWithTicket(ticket)
+        }
+        Observability.addBreadcrumb(
+          .clerkSessionExchangeSucceeded,
+          context: ["stage": "clerk_ticket_sign_in"]
+        )
+        MobileAuthDiagnostics.record(
+          "clerk_ticket_sign_in_succeeded",
+          detail: "status=\(signIn.status.rawValue),createdSession=\(signIn.createdSessionId != nil)"
+        )
+
+        _ = try await runMobileAuthFinalizationStage("refreshClientAfterTicket") {
+          try await clerk.refreshClient()
+        }
+        MobileAuthDiagnostics.record(
+          "clerk_client_refreshed",
+          detail: "sessionCount=\(clerk.auth.sessions.count)"
+        )
 
         if let sessionID = signIn.createdSessionId,
            clerk.session?.id != sessionID
         {
-          try await clerk.auth.setActive(sessionId: sessionID)
+          var setActiveSummary = "activeSession=\(clerk.session != nil),sessionCount=\(clerk.auth.sessions.count)"
+#if DEBUG
+          if let diagnostics = NativeTicketSignInDiagnostics.summary() {
+            setActiveSummary += ",\(diagnostics)"
+          }
+#endif
+          try await runMobileAuthFinalizationStage("setActiveCreatedSession(\(setActiveSummary))") {
+            try await clerk.auth.setActive(sessionId: sessionID)
+          }
+          _ = try await runMobileAuthFinalizationStage("refreshClientAfterSetActive") {
+            try await clerk.refreshClient()
+          }
         }
 
-        _ = try await clerk.refreshClient()
-        _ = try await ClerkTokenProvider().bearerToken(forceRefresh: false)
+        var sessionToken = try await runMobileAuthFinalizationStage("getTokenAfterTicket") {
+          try await clerk.auth.getToken()
+        }
+
+        if sessionToken?.isEmpty != false {
+          _ = try await runMobileAuthFinalizationStage("refreshClientAfterTicket") {
+            try await clerk.refreshClient()
+          }
+          sessionToken = try await runMobileAuthFinalizationStage("getTokenAfterRefresh") {
+            try await clerk.auth.getToken()
+          }
+        }
+
+        if sessionToken?.isEmpty != false {
+          let fallbackSessionID = signIn.createdSessionId ?? clerk.auth.sessions.first?.id
+          var signInSummary = "status=\(signIn.status.rawValue),createdSession=\(signIn.createdSessionId != nil),activeSession=\(clerk.session != nil),sessionCount=\(clerk.auth.sessions.count)"
+#if DEBUG
+          if let diagnostics = NativeTicketSignInDiagnostics.summary() {
+            signInSummary += ",\(diagnostics)"
+          }
+#endif
+
+          guard let sessionID = fallbackSessionID else {
+            throw MobileAuthReturnError.missingSessionToken(
+              status: signIn.status.rawValue,
+              createdSessionID: signIn.createdSessionId,
+              activeSessionID: clerk.session?.id,
+              sessionCount: clerk.auth.sessions.count
+            )
+          }
+
+          try await runMobileAuthFinalizationStage("setActiveFallbackSession(\(signInSummary))") {
+            try await clerk.auth.setActive(sessionId: sessionID)
+          }
+          _ = try await runMobileAuthFinalizationStage("refreshClientAfterFallbackSession") {
+            try await clerk.refreshClient()
+          }
+          sessionToken = try await runMobileAuthFinalizationStage("getTokenAfterFallbackSession") {
+            try await clerk.auth.getToken()
+          }
+        }
+
+        guard sessionToken?.isEmpty == false else {
+          MobileAuthDiagnostics.record("clerk_token_missing")
+          throw MobileAuthReturnError.missingSessionToken(
+            status: signIn.status.rawValue,
+            createdSessionID: signIn.createdSessionId,
+            activeSessionID: clerk.session?.id,
+            sessionCount: clerk.auth.sessions.count
+          )
+        }
+        MobileAuthDiagnostics.record("clerk_token_ready")
 
         guard let userID = clerk.user?.id else {
+          MobileAuthDiagnostics.record("clerk_user_missing")
           throw MobileAuthReturnError.missingSignedInUser
         }
 
         Observability.addBreadcrumb(.nativeSessionPersisted)
         await appState.handleSignedInUserChange(userID)
+#if DEBUG
+        LiveAuthUITestStatus.setRouteStatus(appState.route, userID: userID)
+#endif
       } catch {
         guard !(error is CancellationError), !Task.isCancelled else {
           return
@@ -479,6 +971,15 @@ struct LiveRootContainer: View {
           try? await clerk.auth.signOut()
           await appState.signOut()
           authErrorMessage = "Couldn't finish sign-in. Try again."
+          MobileAuthDiagnostics.record("auth_finalization_failed", detail: error.localizedDescription)
+#if DEBUG
+          LiveAuthUITestStatus.set(
+            "error",
+            error: error.localizedDescription.isEmpty
+              ? "Native auth callback exchange failed."
+              : error.localizedDescription
+          )
+#endif
           return
         }
 
@@ -489,6 +990,15 @@ struct LiveRootContainer: View {
         }
 
         authErrorMessage = "Couldn't finish sign-in. Try again."
+        MobileAuthDiagnostics.record("auth_finalization_failed", detail: error.localizedDescription)
+#if DEBUG
+        LiveAuthUITestStatus.set(
+          "error",
+          error: error.localizedDescription.isEmpty
+            ? "Native auth callback exchange failed."
+            : error.localizedDescription
+        )
+#endif
       }
     }
   }

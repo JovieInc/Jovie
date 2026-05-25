@@ -52,12 +52,17 @@ final class AppState {
     }
 
     switch launchMode {
-    case .live, .uiTestingAutoAuth, .uiTestingLiveAuth:
+    case .live, .uiTestingAutoAuth, .uiTestingLiveAuth, .uiTestingRealBrowserAuth:
       didLoadClerk = true
     case .unitTesting:
       route = .signedOut
       dashboardState = .idle
       isOffline = false
+    case .uiTestingAuthCallback:
+      if route == .launching {
+        route = .signedOut
+        dashboardState = .idle
+      }
     case .uiTestingSignedOut:
       route = .signedOut
       dashboardState = .idle
@@ -91,6 +96,7 @@ final class AppState {
       route = .signedOut
       dashboardState = .idle
       isOffline = false
+      MobileAuthDiagnostics.record("route_signed_out")
       return
     }
 
@@ -105,6 +111,7 @@ final class AppState {
     route = .launching
     dashboardState = .loading
     isOffline = false
+    MobileAuthDiagnostics.record("mobile_me_loading")
 
     do {
       let result = try await repository.loadMe(for: userID)
@@ -119,12 +126,17 @@ final class AppState {
           .appRouteAfterLogin,
           context: ["route": "ready"]
         )
+        MobileAuthDiagnostics.record("route_ready", detail: "state=ready")
       case .needsOnboarding:
         route = .needsOnboarding
         dashboardState = .idle
         Observability.addBreadcrumb(
           .appRouteAfterLogin,
           context: ["route": "needs_onboarding"]
+        )
+        MobileAuthDiagnostics.record(
+          "route_needs_onboarding",
+          detail: "state=needs_onboarding"
         )
       }
     } catch {
@@ -137,6 +149,7 @@ final class AppState {
           route = .signedOut
           dashboardState = .idle
           isOffline = false
+          MobileAuthDiagnostics.record("route_signed_out", detail: error.localizedDescription)
           return
         case .decodingFailed, .invalidResponse, .transportFailed, .requestFailed:
           break
@@ -146,6 +159,7 @@ final class AppState {
       route = .ready
       dashboardState = .error("Couldn't load your profile.")
       isOffline = false
+      MobileAuthDiagnostics.record("mobile_me_error", detail: error.localizedDescription)
     }
   }
 
@@ -154,6 +168,8 @@ final class AppState {
   }
 
   func signOut() async {
+    NativeSessionTokenStore.clear()
+
     let userID = activeUserID
     Observability.clearUser()
     activeUserID = nil
@@ -161,6 +177,7 @@ final class AppState {
     route = .signedOut
     dashboardState = .idle
     isOffline = false
+    MobileAuthDiagnostics.record("route_signed_out")
 
     if let userID {
       await repository.clearCachedUser(userID)
