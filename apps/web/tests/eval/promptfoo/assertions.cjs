@@ -402,6 +402,12 @@ function assertNoRoutePersistence(output) {
   return pass();
 }
 
+function assertDeterministicRouteNoSideEffects(output) {
+  const spendResult = assertDeterministicNoSpend(output);
+  if (!spendResult.pass) return spendResult;
+  return assertNoRoutePersistence(output);
+}
+
 function assertWebRouteUnauthorized(output) {
   const payload = parseOutput(output);
   const responseText = String(payload.responseText ?? '');
@@ -524,6 +530,78 @@ function assertWebRouteBillingRateLimit(output) {
   }
   if (/luna\.private@example\.com/i.test(responseText)) {
     return fail('rate-limit response echoed sensitive request content');
+  }
+
+  return pass();
+}
+
+function assertWebRouteStandardRateLimit(output) {
+  const payload = parseOutput(output);
+  const responseText = String(payload.responseText ?? '');
+
+  if (payload.target !== 'web-chat-route') {
+    return fail('case did not run through the web chat route contract');
+  }
+  if (payload.status !== 429) {
+    return fail(`expected 429, got ${String(payload.status)}`);
+  }
+  if (payload.responseJson?.errorCode !== 'RATE_LIMITED') {
+    return fail('missing RATE_LIMITED error code');
+  }
+  if (!payload.headers?.['Retry-After']) {
+    return fail('missing Retry-After header');
+  }
+  if (!/chat limit|try again later/i.test(responseText)) {
+    return fail('missing standard quota rate-limit guidance');
+  }
+  if (/billing status|billing settings/i.test(responseText)) {
+    return fail('standard rate-limit path used billing-outage guidance');
+  }
+
+  return pass();
+}
+
+function assertWebRouteMessageValidation(output) {
+  const payload = parseOutput(output);
+  const expected = String(payload.request?.expectedError ?? '');
+
+  if (payload.target !== 'web-chat-route') {
+    return fail('case did not run through the web chat route contract');
+  }
+  if (payload.status !== 400) {
+    return fail(`expected 400, got ${String(payload.status)}`);
+  }
+  if (!expected) {
+    return fail('route validation case did not include expectedError');
+  }
+  if (payload.responseJson?.error !== expected) {
+    return fail(
+      `expected "${expected}", got "${String(payload.responseJson?.error ?? '')}"`
+    );
+  }
+  if (payload.modelCalled !== false) {
+    return fail('invalid message route case attempted a model call');
+  }
+
+  return pass();
+}
+
+function assertWebRouteContractOnlySuccess(output) {
+  const payload = parseOutput(output);
+
+  if (payload.target !== 'web-chat-route') {
+    return fail('case did not run through the web chat route contract');
+  }
+  if (payload.status !== 200) {
+    return fail(`expected 200, got ${String(payload.status)}`);
+  }
+  if (payload.contractOnly !== true) {
+    return fail('successful deterministic route case was not contract-only');
+  }
+  if (
+    !/stops before model dispatch/i.test(payload.responseJson?.message ?? '')
+  ) {
+    return fail('contract-only response did not document the model boundary');
   }
 
   return pass();
@@ -747,12 +825,16 @@ module.exports = {
   assertMobileRouteInvalidBody,
   assertMobileRouteRuntimeDisabled,
   assertNoRoutePersistence,
+  assertDeterministicRouteNoSideEffects,
   assertWebRouteUnauthorized,
   assertWebRouteInvalidJson,
   assertWebRouteMissingProfile,
   assertWebRouteClientTurnRequiresProfile,
   assertWebRouteChatDisabled,
   assertWebRouteBillingRateLimit,
+  assertWebRouteStandardRateLimit,
+  assertWebRouteMessageValidation,
+  assertWebRouteContractOnlySuccess,
   assertDeterministicNoSpend,
   assertToolAvailable,
   assertToolUnavailable,
