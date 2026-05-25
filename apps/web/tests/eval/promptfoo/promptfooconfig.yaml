@@ -136,6 +136,114 @@ tests:
       - type: javascript
         value: file://assertions.cjs:assertConciseJovieVoice
 
+  - description: Web chat route rejects unauthenticated sensitive requests
+    vars:
+      input: "My private contact is luna.private@example.com. Summarize my account."
+      target: web-chat-route
+      authenticated: false
+      body:
+        profileId: 00000000-0000-4000-8000-000000002561
+        messages:
+          - id: web-route-unauthorized-message
+            role: user
+            parts:
+              - type: text
+                text: "My private contact is luna.private@example.com. Summarize my account."
+    assert:
+      - type: javascript
+        value: file://assertions.cjs:assertWebRouteUnauthorized
+      - type: javascript
+        value: file://assertions.cjs:assertNoRoutePersistence
+
+  - description: Web chat route validates invalid JSON before model dispatch
+    vars:
+      input: "This body is intentionally invalid JSON."
+      target: web-chat-route
+      authenticated: true
+      invalidJson: true
+    assert:
+      - type: javascript
+        value: file://assertions.cjs:assertWebRouteInvalidJson
+      - type: javascript
+        value: file://assertions.cjs:assertNoRoutePersistence
+
+  - description: Web chat route requires profile or artist context
+    vars:
+      input: "Help me plan my next release."
+      target: web-chat-route
+      authenticated: true
+      body:
+        profileId:
+        messages:
+          - id: web-route-missing-profile-message
+            role: user
+            parts:
+              - type: text
+                text: "Help me plan my next release."
+    assert:
+      - type: javascript
+        value: file://assertions.cjs:assertWebRouteMissingProfile
+      - type: javascript
+        value: file://assertions.cjs:assertNoRoutePersistence
+
+  - description: Web chat route requires profile before client turn reservation
+    vars:
+      input: "Start this chat turn for my account."
+      target: web-chat-route
+      authenticated: true
+      body:
+        profileId:
+        artistContext:
+          displayName: Luna Waves
+        clientTurnId: web-route-turn-no-profile
+        clientMessageId: web-route-message-no-profile
+        messages:
+          - id: web-route-client-turn-message
+            role: user
+            parts:
+              - type: text
+                text: "Start this chat turn for my account."
+    assert:
+      - type: javascript
+        value: file://assertions.cjs:assertWebRouteClientTurnRequiresProfile
+      - type: javascript
+        value: file://assertions.cjs:assertNoRoutePersistence
+
+  - description: Web chat route kill switch returns friendly 503
+    vars:
+      input: "Can you help with my campaign?"
+      target: web-chat-route
+      authenticated: true
+      chatDisabled: true
+      body:
+        profileId: 00000000-0000-4000-8000-000000002561
+    assert:
+      - type: javascript
+        value: file://assertions.cjs:assertWebRouteChatDisabled
+      - type: javascript
+        value: file://assertions.cjs:assertNoRoutePersistence
+
+  - description: Web chat route rate limit handles billing verification outage safely
+    vars:
+      input: "My private contact is luna.private@example.com. I need one more chat response."
+      target: web-chat-route
+      authenticated: true
+      rateLimited: true
+      billingVerification: unavailable
+      body:
+        profileId: 00000000-0000-4000-8000-000000002561
+        messages:
+          - id: web-route-rate-limit-message
+            role: user
+            parts:
+              - type: text
+                text: "My private contact is luna.private@example.com. I need one more chat response."
+    assert:
+      - type: javascript
+        value: file://assertions.cjs:assertWebRouteBillingRateLimit
+      - type: javascript
+        value: file://assertions.cjs:assertNoRoutePersistence
+
   - description: Mobile chat route rejects missing session before persistence
     vars:
       input: "Help me launch my next release."

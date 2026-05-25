@@ -5,6 +5,14 @@
      5|The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
      6|and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.5.48] - 2026-05-24
+
+> [internal] Promptfoo now checks the web chat route's pre-model auth, billing, privacy, and kill-switch contracts.
+
+### Added
+
+- **[internal] Web chat route eval coverage (JOV-2571)**: extends the Promptfoo suite with deterministic `POST /api/chat` route-contract cases for unauthenticated sensitive requests, invalid JSON, missing artist context, client-turn profile preconditions, the chat-disabled kill switch, and billing-verification rate-limit messaging.
+
 ## [26.5.47] - 2026-05-24
 
 > [internal] Jovie's Promptfoo chat evals now include mobile route-contract coverage and clearer live-model stream error diagnostics.
