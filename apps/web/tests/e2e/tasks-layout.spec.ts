@@ -3,6 +3,12 @@ import { expect, type Page, type TestInfo, test } from '@playwright/test';
 import { and, asc, desc, eq, isNull, or } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/neon-http';
 import { APP_ROUTES } from '@/constants/routes';
+import {
+  TEST_AUTH_BYPASS_MODE,
+  TEST_MODE_COOKIE,
+  TEST_PERSONA_COOKIE,
+  TEST_USER_ID_COOKIE,
+} from '@/lib/auth/test-mode';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { tasks } from '@/lib/db/schema/tasks';
 import type {
@@ -13,7 +19,7 @@ import type {
 import {
   ensureSignedInUser,
   hasClerkCredentials,
-  setTestAuthBypassSession,
+  resolveBypassFallbackUserId,
 } from '../helpers/clerk-auth';
 
 const LAYOUT_TASK_TITLE = 'Layout QA task fixture';
@@ -70,6 +76,38 @@ async function stubPassiveTracking(page: Page): Promise<void> {
   await page.route('**/api/track', route =>
     route.fulfill({ status: 200, body: '{}' })
   );
+}
+
+async function seedTaskLayoutBypassSession(page: Page): Promise<void> {
+  const baseUrl = process.env.BASE_URL ?? 'http://localhost:3100';
+  const userId = resolveBypassFallbackUserId(TASKS_LAYOUT_PERSONA);
+
+  if (!userId) {
+    throw new Error(
+      'E2E_CLERK_USER_ID is required for task layout bypass auth seeding.'
+    );
+  }
+
+  await page.context().addCookies([
+    {
+      name: TEST_MODE_COOKIE,
+      value: TEST_AUTH_BYPASS_MODE,
+      url: baseUrl,
+      sameSite: 'Lax',
+    },
+    {
+      name: TEST_USER_ID_COOKIE,
+      value: userId,
+      url: baseUrl,
+      sameSite: 'Lax',
+    },
+    {
+      name: TEST_PERSONA_COOKIE,
+      value: TASKS_LAYOUT_PERSONA,
+      url: baseUrl,
+      sameSite: 'Lax',
+    },
+  ]);
 }
 
 async function ensureTaskExists(): Promise<LayoutTaskFixture> {
@@ -207,13 +245,6 @@ async function setTaskViewMode(
   page: Page,
   viewMode: 'board' | 'list'
 ): Promise<void> {
-  await page.context().addInitScript(
-    ({ key, value }) => {
-      window.localStorage.setItem(key, value);
-    },
-    { key: TASK_VIEW_MODE_STORAGE_KEY, value: viewMode }
-  );
-
   await page
     .evaluate(
       ({ key, value }) => {
@@ -231,17 +262,46 @@ async function setTaskViewMode(
   );
 }
 
+async function clearTaskViewMode(page: Page): Promise<void> {
+  await page
+    .evaluate(key => {
+      window.localStorage.removeItem(key);
+    }, TASK_VIEW_MODE_STORAGE_KEY)
+    .catch(() => undefined);
+
+  await page.addInitScript(
+    ({ key }) => {
+      window.localStorage.removeItem(key);
+    },
+    { key: TASK_VIEW_MODE_STORAGE_KEY }
+  );
+}
+
 async function gotoTasksRoute(page: Page): Promise<void> {
   let lastError: unknown;
 
   for (let attempt = 1; attempt <= 2; attempt += 1) {
     try {
-      await page.goto(APP_ROUTES.TASKS, {
-        waitUntil: 'domcontentloaded',
-        timeout: 90_000,
-      });
-      await expect(page).toHaveURL(url => url.pathname === APP_ROUTES.TASKS, {
+      try {
+        await page.goto(APP_ROUTES.TASKS, {
+          waitUntil: 'commit',
+          timeout: 180_000,
+        });
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        if (
+          !message.includes('ERR_ABORTED') &&
+          !message.includes('frame was detached')
+        ) {
+          throw error;
+        }
+      }
+
+      await expect(page).toHaveURL(APP_ROUTES.TASKS, {
         timeout: 30_000,
+      });
+      await expect(page.getByTestId('tasks-workspace')).toBeVisible({
+        timeout: 90_000,
       });
       return;
     } catch (error) {
@@ -264,24 +324,26 @@ async function fillTaskSearch(page: Page, taskTitle: string): Promise<void> {
     .catch(() => false);
 
   if (!searchboxVisible) {
-    await page.getByRole('button', { name: 'Search tasks' }).click();
+    const searchButton = page.getByRole('button', { name: 'Search tasks' });
+    await expect(searchButton).toBeVisible({ timeout: 90_000 });
+    await searchButton.click();
   }
 
+  await expect(searchbox).toBeVisible({ timeout: 90_000 });
   await searchbox.fill(taskTitle);
 }
 
 async function ensureBoardViewMode(page: Page): Promise<void> {
   const board = page.getByTestId('tasks-board');
-  const boardRendered = await board
-    .isVisible({ timeout: 5_000 })
-    .catch(() => false);
-
-  if (boardRendered) {
+  if (await board.isVisible({ timeout: 10_000 }).catch(() => false)) {
     return;
   }
 
-  await page.getByRole('button', { name: 'Display options' }).click();
+  const displayOptions = page.getByRole('button', { name: 'Display options' });
+  await expect(displayOptions).toBeVisible({ timeout: 90_000 });
+  await displayOptions.click();
   await page.getByRole('button', { name: 'Board view' }).click();
+  await expect(board).toBeVisible({ timeout: 90_000 });
 }
 
 async function selectTaskMetaOption(
@@ -447,8 +509,10 @@ test.describe('Tasks layout', () => {
 
     await stubPassiveTracking(page);
     if (process.env.E2E_USE_TEST_AUTH_BYPASS === '1') {
-      await setTestAuthBypassSession(page, TASKS_LAYOUT_PERSONA);
+      await seedTaskLayoutBypassSession(page);
+      return;
     }
+
     await ensureSignedInUser(page);
   });
 
@@ -463,6 +527,59 @@ test.describe('Tasks layout', () => {
       page,
     }, testInfo) => {
       await assertTasksLayout(page, testInfo, viewport);
+    });
+
+    test(`defaults fresh visits to list mode at ${viewport.name}`, async ({
+      page,
+    }, testInfo) => {
+      const { title: taskTitle } = await ensureTaskExists();
+
+      await clearTaskViewMode(page);
+      await page.setViewportSize({
+        width: viewport.width,
+        height: viewport.height,
+      });
+
+      await gotoTasksRoute(page);
+      await expect(page.getByTestId('tasks-workspace')).toBeVisible({
+        timeout: 30_000,
+      });
+      await expect(page.getByTestId('task-list-pane')).toBeVisible({
+        timeout: 30_000,
+      });
+      await expect(page.getByTestId('tasks-board')).not.toBeVisible();
+      await expect(page.getByTestId('task-document-pane')).toBeVisible({
+        timeout: 90_000,
+      });
+      await expect(
+        page.getByText('Pick a task from the list to see what it needs.')
+      ).toBeVisible();
+
+      const targetRow = getTaskRowByTitle(page, taskTitle);
+      await expect(targetRow).toBeVisible({ timeout: 30_000 });
+      await targetRow.click();
+
+      await expect(getVisibleTaskTitleEditor(page)).toHaveValue(taskTitle, {
+        timeout: 15_000,
+      });
+
+      await page.getByRole('button', { name: 'Display options' }).click();
+      await page.getByRole('button', { name: 'Board view' }).click();
+
+      await expect(page.getByTestId('tasks-board')).toBeVisible({
+        timeout: 60_000,
+      });
+      await expect(page.getByTestId('tasks-board-column-backlog')).toBeVisible({
+        timeout: 30_000,
+      });
+      await expect(page.getByText(taskTitle).first()).toBeVisible({
+        timeout: 30_000,
+      });
+
+      await testInfo.attach(`tasks-default-list-${viewport.name}`, {
+        body: await page.getByTestId('tasks-workspace').screenshot(),
+        contentType: 'image/png',
+      });
     });
   }
 

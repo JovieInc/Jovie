@@ -1,5 +1,6 @@
 import 'server-only';
 
+import { isAdmin as checkAdminRole } from '@/lib/admin/roles';
 import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
 import { env } from '@/lib/env-server';
 import type { HudAccessMode } from '@/types/hud';
@@ -18,7 +19,11 @@ export async function authorizeHud(
 
   try {
     const entitlements = await getCurrentUserEntitlements();
-    if (entitlements.isAuthenticated && entitlements.isAdmin) {
+    if (
+      entitlements.isAuthenticated &&
+      entitlements.userId &&
+      (entitlements.isAdmin || (await checkAdminRole(entitlements.userId)))
+    ) {
       return { ok: true, mode: 'admin' };
     }
   } catch {
