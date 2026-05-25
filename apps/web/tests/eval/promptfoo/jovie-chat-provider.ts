@@ -29,6 +29,14 @@ import {
   TOOL_SCHEMAS,
 } from '@/lib/chat/tool-schemas';
 import { getToolUiConfig, TOOL_UI_REGISTRY } from '@/lib/chat/tool-ui-registry';
+import {
+  evaluateAccessSignal,
+  MAX_INTERVIEW_TURNS_BEFORE_FORCE,
+} from '@/lib/chat/tools/onboarding-access-eval';
+import {
+  collapseInterviewSignals,
+  interviewSignalSchema,
+} from '@/lib/chat/tools/onboarding-signals';
 import type { ReleaseContext } from '@/lib/chat/types';
 import {
   COMMANDS,
@@ -52,6 +60,7 @@ type EvalTarget =
   | 'eval-case-inventory'
   | 'model-contract'
   | 'mobile-chat-route'
+  | 'onboarding-state-contract'
   | 'tool-contract'
   | 'tool-event-contract'
   | 'tool-render-contract'
@@ -366,6 +375,12 @@ const REQUIRED_MODEL_ROUTING_SCENARIOS = [
   'long-pro-conversation-primary',
   'simple-pro-tool-light',
 ] as const;
+const REQUIRED_ONBOARDING_STATE_CASES = [
+  'latest-signal-instant-access',
+  'spotify-followers-instant-access',
+  'weak-signal-force-waitlist',
+  'weak-signal-needs-more-info',
+] as const;
 const CHAT_SLASH_SKILL_NAMES = commandsForSurface('chat-slash')
   .filter(command => command.kind === 'skill')
   .map(command => command.id)
@@ -420,6 +435,7 @@ function toTarget(value: unknown): EvalTarget {
     value === 'eval-case-inventory' ||
     value === 'mobile-chat-route' ||
     value === 'model-contract' ||
+    value === 'onboarding-state-contract' ||
     value === 'tool-contract' ||
     value === 'tool-event-contract' ||
     value === 'tool-render-contract' ||
@@ -2219,6 +2235,161 @@ function defaultToolResult(toolName: string, input: unknown): unknown {
   }
 }
 
+type EvalInterviewSignal = z.infer<typeof interviewSignalSchema>;
+
+type EvalOnboardingState = {
+  sessionId: string;
+  spotifyArtistId: string | null;
+  spotifyArtistName: string | null;
+  spotifyImageUrl: string | null;
+  spotifyGenres: string[];
+  spotifyPopularity: number | null;
+  spotifyFollowers: number | null;
+  signals: EvalInterviewSignal[];
+  turnCount: number;
+};
+
+function nullableNumber(value: unknown): number | null {
+  return typeof value === 'number' && Number.isFinite(value) ? value : null;
+}
+
+function cloneJson<T>(value: T): T {
+  return JSON.parse(JSON.stringify(value)) as T;
+}
+
+function createEvalOnboardingState(vars: EvalVars): EvalOnboardingState {
+  const initialState = toObject(vars.initialState);
+  const turnCount =
+    typeof vars.turnCount === 'number' && Number.isInteger(vars.turnCount)
+      ? vars.turnCount
+      : 1;
+
+  return {
+    sessionId:
+      typeof initialState.sessionId === 'string'
+        ? initialState.sessionId
+        : 'promptfoo-onboarding-state',
+    spotifyArtistId:
+      typeof initialState.spotifyArtistId === 'string'
+        ? initialState.spotifyArtistId
+        : null,
+    spotifyArtistName:
+      typeof initialState.spotifyArtistName === 'string'
+        ? initialState.spotifyArtistName
+        : null,
+    spotifyImageUrl:
+      typeof initialState.spotifyImageUrl === 'string'
+        ? initialState.spotifyImageUrl
+        : null,
+    spotifyGenres: Array.isArray(initialState.spotifyGenres)
+      ? initialState.spotifyGenres.filter(
+          (genre): genre is string => typeof genre === 'string'
+        )
+      : [],
+    spotifyPopularity: nullableNumber(initialState.spotifyPopularity),
+    spotifyFollowers: nullableNumber(initialState.spotifyFollowers),
+    signals: [],
+    turnCount,
+  };
+}
+
+function evaluateOnboardingStateContract(vars: EvalVars) {
+  const stateCase =
+    typeof vars.stateCase === 'string' ? vars.stateCase : 'unspecified';
+  const state = createEvalOnboardingState(vars);
+  const stateBefore = cloneJson(state);
+  const rawSignals = Array.isArray(vars.signals) ? vars.signals : [];
+  const errors: string[] = [];
+  const toolExecutions: ToolExecution[] = [];
+
+  for (const [index, rawSignal] of rawSignals.entries()) {
+    const parsed = interviewSignalSchema.safeParse(rawSignal);
+    if (!parsed.success) {
+      errors.push(
+        ...schemaErrorMessages(parsed).map(
+          message => `signals.${index}: ${message}`
+        )
+      );
+      continue;
+    }
+
+    state.signals.push(parsed.data);
+    toolExecutions.push({
+      name: 'recordInterviewSignal',
+      input: parsed.data,
+      output: {
+        action: 'signal_recorded',
+        signalCount: state.signals.length,
+        summary: 'Signal noted.',
+      },
+    });
+  }
+
+  const timestampBase = WEB_CHAT_EVAL_EPOCH_SECONDS * 1000;
+  const collapsedSignal = collapseInterviewSignals(
+    state.signals.map((signal, index) => ({
+      ...signal,
+      recordedAt: new Date(timestampBase + index * 1000).toISOString(),
+    }))
+  );
+  const nextStepDecision = evaluateAccessSignal({
+    signal: collapsedSignal,
+    spotifyFollowers: state.spotifyFollowers,
+    turnCount: state.turnCount,
+  });
+  const nextStepOutput = {
+    action: 'propose_next_step',
+    decision: nextStepDecision,
+    summary: `Next step: ${nextStepDecision.kind.replaceAll('_', ' ')}.`,
+  };
+  toolExecutions.push({
+    name: 'proposeNextStep',
+    input: {},
+    output: nextStepOutput,
+  });
+
+  return {
+    target: 'onboarding-state-contract',
+    adapter: 'onboarding-state-contract',
+    costTier: 'deterministic',
+    text: '',
+    selectedModel: null,
+    modelCalled: false,
+    persistenceAttempted: false,
+    dbAttempted: false,
+    networkAttempted: false,
+    stateCase,
+    mode: 'onboarding',
+    turnCount: state.turnCount,
+    maxTurnCap: MAX_INTERVIEW_TURNS_BEFORE_FORCE,
+    signalCount: state.signals.length,
+    stateBefore,
+    stateAfter: cloneJson(state),
+    collapsedSignal,
+    nextStepDecision,
+    expectedDecision: toObject(vars.expectedDecision),
+    expectedCollapsedSignal: toObject(vars.expectedCollapsedSignal),
+    expectedSignalCount:
+      typeof vars.expectedSignalCount === 'number'
+        ? vars.expectedSignalCount
+        : null,
+    errors,
+    steps: toolExecutions.map(execution => ({
+      toolCalls: [{ toolName: execution.name, input: execution.input }],
+      toolResults: [{ toolName: execution.name, output: execution.output }],
+    })),
+    toolCalls: toolExecutions.map(execution => ({
+      toolName: execution.name,
+      input: execution.input,
+    })),
+    toolResults: toolExecutions.map(execution => ({
+      toolName: execution.name,
+      output: execution.output,
+    })),
+    toolExecutions,
+  };
+}
+
 function buildEvalTools(
   toolNames: readonly string[],
   vars: EvalVars,
@@ -2973,6 +3144,7 @@ type EvalCaseSummary = {
   readonly expectedModel: string | null;
   readonly eventCase: string | null;
   readonly renderCase: string | null;
+  readonly stateCase: string | null;
   readonly mode: string | null;
   readonly plan: string | null;
   readonly assertions: readonly string[];
@@ -3058,6 +3230,7 @@ function parseEvalCaseSummary(block: string): EvalCaseSummary {
     expectedModel: scalarValue(block, 'expectedModel'),
     eventCase: scalarValue(block, 'eventCase'),
     renderCase: scalarValue(block, 'renderCase'),
+    stateCase: scalarValue(block, 'stateCase'),
     mode: scalarValue(block, 'mode') ?? 'app',
     plan: scalarValue(block, 'plan') ?? 'pro',
     assertions,
@@ -3177,6 +3350,12 @@ function evaluateEvalCaseInventory(vars: EvalVars) {
           expectedModel === 'light' || expectedModel === 'primary'
       )
   );
+  const onboardingStateCaseNames = uniqueSorted(
+    deterministicCases
+      .filter(testCase => testCase.target === 'onboarding-state-contract')
+      .map(testCase => testCase.stateCase)
+      .filter((stateCase): stateCase is string => typeof stateCase === 'string')
+  );
   const knownToolNames = new Set(ALL_EVAL_TOOL_NAMES);
 
   return {
@@ -3261,6 +3440,12 @@ function evaluateEvalCaseInventory(vars: EvalVars) {
     missingModelRoutingBoundaryNames: missingNames(
       ['light', 'primary'],
       modelRoutingBoundaryNames
+    ),
+    requiredOnboardingStateCaseNames: [...REQUIRED_ONBOARDING_STATE_CASES],
+    onboardingStateCaseNames,
+    missingOnboardingStateCaseNames: missingNames(
+      REQUIRED_ONBOARDING_STATE_CASES,
+      onboardingStateCaseNames
     ),
     toolCalls: [],
     toolResults: [],
@@ -3366,6 +3551,16 @@ export default class JovieChatPromptfooProvider {
 
     if (target === 'model-contract') {
       const payload = evaluateModelContract(prompt, vars);
+      return {
+        output: JSON.stringify(payload),
+        raw: payload,
+        format: 'json',
+        latencyMs: Date.now() - startedAt,
+      };
+    }
+
+    if (target === 'onboarding-state-contract') {
+      const payload = evaluateOnboardingStateContract(vars);
       return {
         output: JSON.stringify(payload),
         raw: payload,

@@ -2068,6 +2068,102 @@ tests:
       - type: javascript
         value: file://assertions.cjs:assertToolExecuted
 
+  - description: Onboarding state records latest signal before next-step
+    metadata:
+      cost: deterministic
+    vars:
+      input: "I have about 3,000 fans and my single is announced."
+      target: onboarding-state-contract
+      stateCase: latest-signal-instant-access
+      turnCount: 1
+      signals:
+        - releaseStage: pre_announce
+          audienceBand: under_500
+        - releaseStage: announced_unreleased
+          audienceBand: 500_to_5k
+      expectedSignalCount: 2
+      expectedCollapsedSignal:
+        releaseStage: announced_unreleased
+        audienceBand: 500_to_5k
+      expectedDecision:
+        kind: instant_access
+        rationale: audience_500_to_5k_with_active_release_announced_unreleased
+        score: 70
+    assert:
+      - type: javascript
+        value: file://assertions.cjs:assertOnboardingStateNoSpend
+      - type: javascript
+        value: file://assertions.cjs:assertOnboardingStateDecision
+
+  - description: Onboarding state asks for more info before turn cap
+    metadata:
+      cost: deterministic
+    vars:
+      input: "I'm still early, under 500 fans."
+      target: onboarding-state-contract
+      stateCase: weak-signal-needs-more-info
+      turnCount: 2
+      signals:
+        - audienceBand: under_500
+      expectedSignalCount: 1
+      expectedCollapsedSignal:
+        audienceBand: under_500
+      expectedDecision:
+        kind: needs_more_info
+        rationale: insufficient_signal
+        score: 10
+    assert:
+      - type: javascript
+        value: file://assertions.cjs:assertOnboardingStateNoSpend
+      - type: javascript
+        value: file://assertions.cjs:assertOnboardingStateDecision
+
+  - description: Onboarding state forces waitlist at max turn cap
+    metadata:
+      cost: deterministic
+    vars:
+      input: "I do not have much audience signal yet."
+      target: onboarding-state-contract
+      stateCase: weak-signal-force-waitlist
+      turnCount: 3
+      signals:
+        - audienceBand: under_500
+      expectedSignalCount: 1
+      expectedCollapsedSignal:
+        audienceBand: under_500
+      expectedDecision:
+        kind: waitlist
+        rationale: max_turns_reached_3
+        score: 30
+    assert:
+      - type: javascript
+        value: file://assertions.cjs:assertOnboardingStateNoSpend
+      - type: javascript
+        value: file://assertions.cjs:assertOnboardingStateDecision
+
+  - description: Onboarding state grants instant access from Spotify followers
+    metadata:
+      cost: deterministic
+    vars:
+      input: "Spotify says Luna Waves has enough followers."
+      target: onboarding-state-contract
+      stateCase: spotify-followers-instant-access
+      turnCount: 1
+      initialState:
+        spotifyFollowers: 12500
+      signals: []
+      expectedSignalCount: 0
+      expectedCollapsedSignal: {}
+      expectedDecision:
+        kind: instant_access
+        rationale: spotify_followers_12500
+        score: 90
+    assert:
+      - type: javascript
+        value: file://assertions.cjs:assertOnboardingStateNoSpend
+      - type: javascript
+        value: file://assertions.cjs:assertOnboardingStateDecision
+
   - description: Free plan blocks paid album art tool
     metadata:
       cost: deterministic
