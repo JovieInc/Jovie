@@ -69,6 +69,9 @@ import {
   IntentCategory,
 } from '@/lib/intent-detection/types';
 import { buildWelcomeMessage } from '@/lib/services/onboarding/welcome-message';
+import { detectPlatform } from '@/lib/utils/platform-detection/detector';
+import { validateSocialLinkUrl } from '@/lib/utils/url-validation';
+import { httpUrlSchema } from '@/lib/validation/schemas/base';
 import {
   buildTestArtistContext,
   buildTestReleases,
@@ -76,6 +79,7 @@ import {
 
 type EvalVars = Record<string, unknown>;
 type EvalTarget =
+  | 'chat-confirm-route'
   | 'chat-turn'
   | 'eval-case-inventory'
   | 'knowledge-contract'
@@ -131,7 +135,14 @@ const EVAL_CONVERSATION_ID = 'promptfoo-eval-conversation';
 const EVAL_TURN_ID = 'promptfoo-eval-turn';
 const EVAL_USER_ID = 'promptfoo-eval-user';
 const WEB_CHAT_ROUTE_PATH = '/api/chat';
+const CHAT_CONFIRM_ROUTE_PATHS = {
+  'album-art-apply': '/api/chat/album-art/apply',
+  'confirm-edit': '/api/chat/confirm-edit',
+  'confirm-link': '/api/chat/confirm-link',
+  'confirm-remove-link': '/api/chat/confirm-remove-link',
+} as const;
 const WEB_CHAT_REQUEST_ID = 'promptfoo-web-chat-route';
+const CHAT_CONFIRM_REQUEST_ID = 'promptfoo-chat-confirm-route';
 const WEB_CHAT_EVAL_EPOCH_SECONDS = 1_700_000_000;
 const MOBILE_CHAT_ROUTE_PATH = '/api/mobile/v1/chat/turns';
 const ONBOARDING_WELCOME_CHAT_ROUTE_PATH = '/api/onboarding/welcome-chat';
@@ -166,6 +177,20 @@ const REQUIRED_WEB_CHAT_PREMODEL_CASES = [
   'client-turn-duplicate-completed-tool-replay',
   'reserved-turn-rate-limit-terminal',
   'reserved-turn-album-art-unavailable',
+] as const;
+const REQUIRED_CHAT_CONFIRM_ROUTE_CASES = [
+  'album-art-apply-feature-disabled',
+  'album-art-apply-invalid-request',
+  'album-art-apply-plan-unavailable',
+  'album-art-apply-success',
+  'confirm-edit-ownership-mismatch',
+  'confirm-edit-success',
+  'confirm-edit-unauthorized',
+  'confirm-link-rejects-unsafe-url',
+  'confirm-link-success',
+  'confirm-remove-link-invalid-request',
+  'confirm-remove-link-link-not-found',
+  'confirm-remove-link-success',
 ] as const;
 
 let liveHttpEvalDb: ReturnType<typeof drizzle> | null = null;
@@ -574,6 +599,7 @@ function toMode(value: unknown): 'app' | 'onboarding' {
 
 function toTarget(value: unknown): EvalTarget {
   if (
+    value === 'chat-confirm-route' ||
     value === 'eval-case-inventory' ||
     value === 'knowledge-contract' ||
     value === 'mobile-chat-route' ||
@@ -668,6 +694,317 @@ function buildDefaultWebChatBody(
       },
     ],
     ...body,
+  };
+}
+
+type ChatConfirmRoute = keyof typeof CHAT_CONFIRM_ROUTE_PATHS;
+
+const CONFIRM_EDIT_SCHEMA = z.object({
+  profileId: z.string().uuid(),
+  field: z.enum(['displayName', 'bio']),
+  newValue: z.string(),
+  conversationId: z.string().uuid().optional(),
+  messageId: z.string().uuid().optional(),
+});
+
+const CONFIRM_LINK_SCHEMA = z.object({
+  profileId: z.string().uuid(),
+  platform: z.string().min(1),
+  url: httpUrlSchema,
+  normalizedUrl: httpUrlSchema,
+});
+
+const CONFIRM_REMOVE_LINK_SCHEMA = z.object({
+  profileId: z.string().uuid(),
+  linkId: z.string().uuid(),
+});
+
+const ALBUM_ART_APPLY_SCHEMA = z.object({
+  profileId: z.string().uuid(),
+  releaseId: z.string().uuid(),
+  generationId: z.string().uuid(),
+  candidateId: z.string().uuid(),
+});
+
+function toChatConfirmRoute(value: unknown): ChatConfirmRoute {
+  if (
+    value === 'album-art-apply' ||
+    value === 'confirm-edit' ||
+    value === 'confirm-link' ||
+    value === 'confirm-remove-link'
+  ) {
+    return value;
+  }
+
+  return 'confirm-edit';
+}
+
+function buildDefaultChatConfirmBody(
+  route: ChatConfirmRoute,
+  body: Record<string, unknown>
+): Record<string, unknown> {
+  const base = (() => {
+    switch (route) {
+      case 'album-art-apply':
+        return {
+          profileId: EVAL_PROFILE_ID,
+          releaseId: '00000000-0000-4000-8000-000000002571',
+          generationId: '00000000-0000-4000-8000-000000002572',
+          candidateId: '00000000-0000-4000-8000-000000002573',
+        };
+      case 'confirm-link':
+        return {
+          profileId: EVAL_PROFILE_ID,
+          platform: 'instagram',
+          url: 'https://instagram.com/lunawaves',
+          normalizedUrl: 'https://instagram.com/lunawaves',
+        };
+      case 'confirm-remove-link':
+        return {
+          profileId: EVAL_PROFILE_ID,
+          linkId: '00000000-0000-4000-8000-000000002574',
+        };
+      case 'confirm-edit':
+        return {
+          profileId: EVAL_PROFILE_ID,
+          field: 'displayName',
+          newValue: 'Luna Waves',
+          conversationId: '00000000-0000-4000-8000-000000002575',
+          messageId: '00000000-0000-4000-8000-000000002576',
+        };
+    }
+  })();
+
+  return { ...base, ...body };
+}
+
+function evaluateChatConfirmRouteContract(vars: EvalVars) {
+  const route = toChatConfirmRoute(vars.confirmRoute);
+  const body = buildDefaultChatConfirmBody(route, toObject(vars.body));
+  const authenticated = toBoolean(vars.authenticated, true);
+  const requestId =
+    typeof vars.requestId === 'string' && vars.requestId.trim().length > 0
+      ? vars.requestId.trim().slice(0, 120)
+      : CHAT_CONFIRM_REQUEST_ID;
+  const headers = { 'x-request-id': requestId };
+  const basePayload = {
+    target: 'chat-confirm-route',
+    adapter: 'route-contract',
+    productionPath: CHAT_CONFIRM_ROUTE_PATHS[route],
+    productionHandler:
+      route === 'album-art-apply'
+        ? 'apps/web/app/api/chat/album-art/apply/route.ts'
+        : `apps/web/app/api/chat/${route}/route.ts`,
+    routeImportAvailable: false,
+    routeImportGap:
+      'Promptfoo runs outside the Next/Clerk/DB server context, so this eval mirrors checked-in chat confirmation route contracts instead of importing POST directly.',
+    request: {
+      authenticated,
+      body,
+      confirmRoute: route,
+      confirmRouteCase:
+        typeof vars.confirmRouteCase === 'string'
+          ? vars.confirmRouteCase
+          : undefined,
+      invalidJson: toBoolean(vars.invalidJson, false),
+      profileLookup:
+        typeof vars.profileLookup === 'string' ? vars.profileLookup : 'found',
+      ownerMatched: toBoolean(vars.ownerMatched, true),
+      linkLookup:
+        typeof vars.linkLookup === 'string' ? vars.linkLookup : 'found',
+      albumArtFeature:
+        typeof vars.albumArtFeature === 'string'
+          ? vars.albumArtFeature
+          : 'enabled',
+      albumArtEntitled: toBoolean(vars.albumArtEntitled, true),
+      albumArtApplyOutcome:
+        typeof vars.albumArtApplyOutcome === 'string'
+          ? vars.albumArtApplyOutcome
+          : 'success',
+    },
+    costTier: 'deterministic',
+    text: '',
+    selectedModel: null,
+    modelCalled: false,
+    toolCalls: [],
+    toolResults: [],
+    toolExecutions: [],
+    persistenceAttempted: false,
+    dbAttempted: false,
+    networkAttempted: false,
+    requestId,
+  };
+  const response = (status: number, responseJson: Record<string, unknown>) => ({
+    ...basePayload,
+    status,
+    headers,
+    responseJson,
+    responseText: JSON.stringify(responseJson),
+  });
+
+  if (!authenticated) {
+    return response(401, { error: 'Unauthorized' });
+  }
+
+  if (route === 'album-art-apply') {
+    if (vars.albumArtFeature === 'disabled') {
+      return response(404, {
+        error: 'Album art generation is currently unavailable.',
+      });
+    }
+    if (toBoolean(vars.albumArtEntitled, true) === false) {
+      return response(403, {
+        error: 'Album art generation requires a Pro plan.',
+      });
+    }
+  }
+
+  if (toBoolean(vars.invalidJson, false)) {
+    return response(400, { error: 'Invalid JSON body' });
+  }
+
+  if (route === 'confirm-edit') {
+    const parsed = CONFIRM_EDIT_SCHEMA.safeParse(body);
+    if (!parsed.success) {
+      return response(400, {
+        error: 'Invalid request',
+        details: parsed.error.flatten(),
+      });
+    }
+
+    if (vars.profileLookup === 'missing') {
+      return response(404, { error: 'Profile not found' });
+    }
+    if (toBoolean(vars.ownerMatched, true) === false) {
+      return response(403, { error: 'Unauthorized - not your profile' });
+    }
+
+    return {
+      ...response(200, {
+        success: true,
+        field: parsed.data.field,
+        newValue: parsed.data.newValue,
+      }),
+      profileUpdateWouldBeAttempted: true,
+      auditWouldBeWritten: true,
+      auditAction: 'profile_edit',
+      ownershipModel: 'creator-profile-user-id',
+      oldValueStubbed: true,
+      persistenceStubbed: true,
+    };
+  }
+
+  if (route === 'confirm-link') {
+    const parsed = CONFIRM_LINK_SCHEMA.safeParse(body);
+    if (!parsed.success) {
+      return response(400, {
+        error: 'Invalid request',
+        details: parsed.error.flatten(),
+      });
+    }
+
+    if (vars.profileLookup === 'missing') {
+      return response(404, { error: 'Profile not found' });
+    }
+    if (toBoolean(vars.ownerMatched, true) === false) {
+      return response(403, { error: 'Unauthorized - not your profile' });
+    }
+
+    const urlValidation = validateSocialLinkUrl(parsed.data.normalizedUrl);
+    if (!urlValidation.valid) {
+      return response(400, {
+        error: urlValidation.error ?? 'Invalid URL',
+      });
+    }
+
+    const detected = detectPlatform(parsed.data.normalizedUrl);
+    if (!detected.isValid) {
+      return response(400, {
+        error: detected.error ?? 'Unsupported platform URL',
+      });
+    }
+
+    const linkId =
+      typeof vars.existingLinkId === 'string'
+        ? vars.existingLinkId
+        : '00000000-0000-4000-8000-000000002577';
+
+    return {
+      ...response(200, {
+        success: true,
+        platform: detected.platform.id,
+        linkId,
+      }),
+      socialLinkWriteWouldBeAttempted: true,
+      socialLinkAction: toBoolean(vars.existingLink, false)
+        ? 'update_existing'
+        : 'insert_new',
+      detectedPlatform: detected.platform.id,
+      normalizedUrl: detected.normalizedUrl,
+      auditWouldBeWritten: true,
+      auditAction: 'add_social_link',
+      syncPrimaryMusicUrlsWouldBeAttempted: true,
+      ownershipModel: 'creator-profile-clerk-id-join',
+      persistenceStubbed: true,
+    };
+  }
+
+  if (route === 'confirm-remove-link') {
+    const parsed = CONFIRM_REMOVE_LINK_SCHEMA.safeParse(body);
+    if (!parsed.success) {
+      return response(400, {
+        error: 'Invalid request',
+        details: parsed.error.flatten(),
+      });
+    }
+
+    if (vars.profileLookup === 'missing') {
+      return response(404, { error: 'Profile not found' });
+    }
+    if (toBoolean(vars.ownerMatched, true) === false) {
+      return response(403, { error: 'Unauthorized - not your profile' });
+    }
+    if (vars.linkLookup === 'missing') {
+      return response(404, { error: 'Link not found' });
+    }
+
+    return {
+      ...response(200, { success: true, platform: 'instagram' }),
+      socialLinkWriteWouldBeAttempted: true,
+      socialLinkAction: 'soft_delete',
+      linkStateWouldBecome: 'rejected',
+      linkActiveWouldBecome: false,
+      auditWouldBeWritten: true,
+      auditAction: 'remove_social_link',
+      syncPrimaryMusicUrlsWouldBeAttempted: true,
+      ownershipModel: 'creator-profile-user-id',
+      persistenceStubbed: true,
+    };
+  }
+
+  const parsed = ALBUM_ART_APPLY_SCHEMA.safeParse(body);
+  if (!parsed.success) {
+    return response(400, {
+      error: 'Invalid request',
+      details: parsed.error.flatten().fieldErrors,
+    });
+  }
+
+  if (vars.albumArtApplyOutcome === 'not-found') {
+    return response(404, { error: 'Generated album art not found' });
+  }
+
+  return {
+    ...response(200, {
+      success: true,
+      releaseId: parsed.data.releaseId,
+      generationId: parsed.data.generationId,
+      candidateId: parsed.data.candidateId,
+      artworkUrl: 'https://cdn.jov.ie/eval/album-art-applied.jpg',
+    }),
+    albumArtApplyWouldBeAttempted: true,
+    albumArtResultStubbed: true,
+    persistenceStubbed: true,
   };
 }
 
@@ -5090,6 +5427,7 @@ type EvalCaseSummary = {
   readonly mode: string | null;
   readonly plan: string | null;
   readonly assertions: readonly string[];
+  readonly confirmRouteCase: string | null;
   readonly coveredTools: readonly string[];
 };
 
@@ -5183,6 +5521,7 @@ function parseEvalCaseSummary(block: string): EvalCaseSummary {
     mode: scalarValue(block, 'mode') ?? 'app',
     plan: scalarValue(block, 'plan') ?? 'pro',
     assertions,
+    confirmRouteCase: scalarValue(block, 'confirmRouteCase'),
     coveredTools: listValuesAfter(block, 'coveredTools'),
   };
 }
@@ -5369,6 +5708,15 @@ function evaluateEvalCaseInventory(vars: EvalVars) {
           typeof webRouteCase === 'string'
       )
   );
+  const chatConfirmRouteCaseNames = uniqueSorted(
+    deterministicCases
+      .filter(testCase => testCase.target === 'chat-confirm-route')
+      .map(testCase => testCase.confirmRouteCase)
+      .filter(
+        (confirmRouteCase): confirmRouteCase is string =>
+          typeof confirmRouteCase === 'string'
+      )
+  );
   const knownToolNames = new Set(ALL_EVAL_TOOL_NAMES);
 
   return {
@@ -5504,6 +5852,12 @@ function evaluateEvalCaseInventory(vars: EvalVars) {
       REQUIRED_WEB_CHAT_PREMODEL_CASES,
       webChatPremodelCaseNames
     ),
+    requiredChatConfirmRouteCaseNames: [...REQUIRED_CHAT_CONFIRM_ROUTE_CASES],
+    chatConfirmRouteCaseNames,
+    missingChatConfirmRouteCaseNames: missingNames(
+      REQUIRED_CHAT_CONFIRM_ROUTE_CASES,
+      chatConfirmRouteCaseNames
+    ),
     toolCalls: [],
     toolResults: [],
     toolExecutions: [],
@@ -5558,6 +5912,16 @@ export default class JovieChatPromptfooProvider {
     const startedAt = Date.now();
     const vars = context?.vars ?? {};
     const target = toTarget(vars.target);
+
+    if (target === 'chat-confirm-route') {
+      const payload = evaluateChatConfirmRouteContract(vars);
+      return {
+        output: JSON.stringify(payload),
+        raw: payload,
+        format: 'json',
+        latencyMs: Date.now() - startedAt,
+      };
+    }
 
     if (target === 'mobile-chat-route') {
       const payload = evaluateMobileChatRouteContract(prompt, vars);

@@ -984,6 +984,289 @@ function assertWebRouteAlbumArtUnavailablePreflight(output) {
   return pass();
 }
 
+function assertChatConfirmRouteUnauthorized(output) {
+  const payload = parseOutput(output);
+
+  if (payload.target !== 'chat-confirm-route') {
+    return fail('case did not run through the chat confirmation route adapter');
+  }
+  if (payload.status !== 401) {
+    return fail(`expected 401, got ${String(payload.status)}`);
+  }
+  if (payload.responseJson?.error !== 'Unauthorized') {
+    return fail('missing Unauthorized response body');
+  }
+  if (/luna\.private@example\.com/i.test(payload.responseText ?? '')) {
+    return fail(
+      'unauthorized confirmation route echoed sensitive request data'
+    );
+  }
+  if (payload.modelCalled !== false || payload.persistenceAttempted !== false) {
+    return fail(
+      'unauthorized confirmation route crossed a side-effect boundary'
+    );
+  }
+
+  return pass();
+}
+
+function assertChatConfirmRouteInvalidRequest(output) {
+  const payload = parseOutput(output);
+
+  if (payload.target !== 'chat-confirm-route') {
+    return fail('case did not run through the chat confirmation route adapter');
+  }
+  if (payload.status !== 400) {
+    return fail(`expected 400, got ${String(payload.status)}`);
+  }
+  if (payload.responseJson?.error !== 'Invalid request') {
+    return fail('missing Invalid request response body');
+  }
+  if (!payload.responseJson?.details) {
+    return fail('invalid request did not expose validation details');
+  }
+  if (payload.modelCalled !== false || payload.persistenceAttempted !== false) {
+    return fail('invalid confirmation route crossed a side-effect boundary');
+  }
+
+  return pass();
+}
+
+function assertChatConfirmRouteOwnershipBlocked(output) {
+  const payload = parseOutput(output);
+
+  if (payload.target !== 'chat-confirm-route') {
+    return fail('case did not run through the chat confirmation route adapter');
+  }
+  if (payload.status !== 403) {
+    return fail(`expected 403, got ${String(payload.status)}`);
+  }
+  if (payload.responseJson?.error !== 'Unauthorized - not your profile') {
+    return fail('missing profile ownership refusal');
+  }
+  if (payload.modelCalled !== false || payload.persistenceAttempted !== false) {
+    return fail(
+      'ownership-blocked confirmation route crossed a side-effect boundary'
+    );
+  }
+
+  return pass();
+}
+
+function assertConfirmEditSuccess(output) {
+  const payload = parseOutput(output);
+
+  if (payload.target !== 'chat-confirm-route') {
+    return fail('case did not run through the chat confirmation route adapter');
+  }
+  if (payload.request?.confirmRoute !== 'confirm-edit') {
+    return fail('case did not exercise confirm-edit');
+  }
+  if (payload.status !== 200 || payload.responseJson?.success !== true) {
+    return fail(`expected confirm-edit success, got ${String(payload.status)}`);
+  }
+  if (payload.responseJson?.field !== 'displayName') {
+    return fail('confirm-edit did not preserve the requested editable field');
+  }
+  if (payload.profileUpdateWouldBeAttempted !== true) {
+    return fail('confirm-edit did not reach the profile update boundary');
+  }
+  if (
+    payload.auditWouldBeWritten !== true ||
+    payload.auditAction !== 'profile_edit'
+  ) {
+    return fail('confirm-edit did not reach the audit-log boundary');
+  }
+  if (
+    payload.persistenceAttempted !== false ||
+    payload.persistenceStubbed !== true
+  ) {
+    return fail('confirm-edit attempted real persistence');
+  }
+
+  return pass();
+}
+
+function assertConfirmLinkRejectsUnsafeUrl(output) {
+  const payload = parseOutput(output);
+
+  if (payload.target !== 'chat-confirm-route') {
+    return fail('case did not run through the chat confirmation route adapter');
+  }
+  if (payload.request?.confirmRoute !== 'confirm-link') {
+    return fail('case did not exercise confirm-link');
+  }
+  if (payload.status !== 400) {
+    return fail(`expected 400, got ${String(payload.status)}`);
+  }
+  if (
+    !/internal\/private|metadata|invalid url/i.test(
+      payload.responseJson?.error ?? ''
+    )
+  ) {
+    return fail('confirm-link did not reject the unsafe URL');
+  }
+  if (payload.socialLinkWriteWouldBeAttempted === true) {
+    return fail('unsafe social URL reached the write boundary');
+  }
+
+  return pass();
+}
+
+function assertConfirmLinkSuccess(output) {
+  const payload = parseOutput(output);
+
+  if (payload.target !== 'chat-confirm-route') {
+    return fail('case did not run through the chat confirmation route adapter');
+  }
+  if (payload.request?.confirmRoute !== 'confirm-link') {
+    return fail('case did not exercise confirm-link');
+  }
+  if (payload.status !== 200 || payload.responseJson?.success !== true) {
+    return fail(`expected confirm-link success, got ${String(payload.status)}`);
+  }
+  if (
+    payload.responseJson?.platform !== 'instagram' ||
+    payload.detectedPlatform !== 'instagram'
+  ) {
+    return fail('confirm-link did not server-side detect Instagram');
+  }
+  if (payload.normalizedUrl !== 'https://instagram.com/lunawaves') {
+    return fail('confirm-link did not preserve the safe synthetic URL');
+  }
+  if (
+    payload.socialLinkWriteWouldBeAttempted !== true ||
+    payload.auditWouldBeWritten !== true ||
+    payload.syncPrimaryMusicUrlsWouldBeAttempted !== true
+  ) {
+    return fail('confirm-link did not reach write, audit, and sync boundaries');
+  }
+  if (
+    payload.persistenceAttempted !== false ||
+    payload.persistenceStubbed !== true
+  ) {
+    return fail('confirm-link attempted real persistence');
+  }
+
+  return pass();
+}
+
+function assertConfirmRemoveLinkNotFound(output) {
+  const payload = parseOutput(output);
+
+  if (payload.target !== 'chat-confirm-route') {
+    return fail('case did not run through the chat confirmation route adapter');
+  }
+  if (payload.request?.confirmRoute !== 'confirm-remove-link') {
+    return fail('case did not exercise confirm-remove-link');
+  }
+  if (payload.status !== 404) {
+    return fail(`expected 404, got ${String(payload.status)}`);
+  }
+  if (payload.responseJson?.error !== 'Link not found') {
+    return fail('missing link-not-found response');
+  }
+  if (payload.socialLinkWriteWouldBeAttempted === true) {
+    return fail('missing link reached the write boundary');
+  }
+
+  return pass();
+}
+
+function assertConfirmRemoveLinkSuccess(output) {
+  const payload = parseOutput(output);
+
+  if (payload.target !== 'chat-confirm-route') {
+    return fail('case did not run through the chat confirmation route adapter');
+  }
+  if (payload.request?.confirmRoute !== 'confirm-remove-link') {
+    return fail('case did not exercise confirm-remove-link');
+  }
+  if (payload.status !== 200 || payload.responseJson?.success !== true) {
+    return fail(
+      `expected confirm-remove-link success, got ${String(payload.status)}`
+    );
+  }
+  if (
+    payload.socialLinkAction !== 'soft_delete' ||
+    payload.linkStateWouldBecome !== 'rejected' ||
+    payload.linkActiveWouldBecome !== false
+  ) {
+    return fail('confirm-remove-link did not model the soft-delete boundary');
+  }
+  if (
+    payload.auditWouldBeWritten !== true ||
+    payload.auditAction !== 'remove_social_link' ||
+    payload.syncPrimaryMusicUrlsWouldBeAttempted !== true
+  ) {
+    return fail('confirm-remove-link did not reach audit and sync boundaries');
+  }
+  if (
+    payload.persistenceAttempted !== false ||
+    payload.persistenceStubbed !== true
+  ) {
+    return fail('confirm-remove-link attempted real persistence');
+  }
+
+  return pass();
+}
+
+function assertAlbumArtApplyUnavailable(output) {
+  const payload = parseOutput(output);
+
+  if (payload.target !== 'chat-confirm-route') {
+    return fail('case did not run through the chat confirmation route adapter');
+  }
+  if (payload.request?.confirmRoute !== 'album-art-apply') {
+    return fail('case did not exercise album-art apply');
+  }
+  if (payload.status !== 403 && payload.status !== 404) {
+    return fail(`expected 403 or 404, got ${String(payload.status)}`);
+  }
+  if (!/album art generation/i.test(payload.responseJson?.error ?? '')) {
+    return fail('album-art apply did not return the expected safe boundary');
+  }
+  if (payload.albumArtApplyWouldBeAttempted === true) {
+    return fail('unavailable album-art apply reached the apply boundary');
+  }
+
+  return pass();
+}
+
+function assertAlbumArtApplySuccess(output) {
+  const payload = parseOutput(output);
+
+  if (payload.target !== 'chat-confirm-route') {
+    return fail('case did not run through the chat confirmation route adapter');
+  }
+  if (payload.request?.confirmRoute !== 'album-art-apply') {
+    return fail('case did not exercise album-art apply');
+  }
+  if (payload.status !== 200 || payload.responseJson?.success !== true) {
+    return fail(
+      `expected album-art apply success, got ${String(payload.status)}`
+    );
+  }
+  if (payload.albumArtApplyWouldBeAttempted !== true) {
+    return fail('album-art apply did not reach the apply boundary');
+  }
+  if (
+    !/^https:\/\/cdn\.jov\.ie\/eval\//.test(
+      payload.responseJson?.artworkUrl ?? ''
+    )
+  ) {
+    return fail('album-art apply did not return a synthetic CDN URL');
+  }
+  if (
+    payload.persistenceAttempted !== false ||
+    payload.persistenceStubbed !== true
+  ) {
+    return fail('album-art apply attempted real persistence');
+  }
+
+  return pass();
+}
+
 function assertWebRouteOnboardingInvalidMessages(output) {
   const payload = parseOutput(output);
   const expected = String(payload.request?.expectedError ?? '');
@@ -3316,6 +3599,7 @@ function assertEvalCaseInventoryCovered(output) {
     'missingToolResultShapeCaseNames',
     'missingWelcomeChatCaseNames',
     'missingWebChatPremodelCaseNames',
+    'missingChatConfirmRouteCaseNames',
   ]) {
     const values = payload[field];
     if (!Array.isArray(values)) {
@@ -3363,6 +3647,16 @@ module.exports = {
   assertWebRouteClientTurnToolReplay,
   assertWebRouteReservedRateLimitTerminal,
   assertWebRouteAlbumArtUnavailablePreflight,
+  assertChatConfirmRouteUnauthorized,
+  assertChatConfirmRouteInvalidRequest,
+  assertChatConfirmRouteOwnershipBlocked,
+  assertConfirmEditSuccess,
+  assertConfirmLinkRejectsUnsafeUrl,
+  assertConfirmLinkSuccess,
+  assertConfirmRemoveLinkNotFound,
+  assertConfirmRemoveLinkSuccess,
+  assertAlbumArtApplyUnavailable,
+  assertAlbumArtApplySuccess,
   assertWebRouteOnboardingInvalidMessages,
   assertWebRouteOnboardingChatDisabled,
   assertWebRouteOnboardingDispatchContract,
