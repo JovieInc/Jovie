@@ -187,9 +187,7 @@ export function AdminFeedbackTable({
   items,
   loadError = null,
 }: Readonly<AdminFeedbackTableProps>) {
-  const [selectedId, setSelectedId] = useState<string | null>(
-    items[0]?.id ?? null
-  );
+  const [selectedId, setSelectedId] = useState<string | null>(null);
   const { mutateAsync: dismissFeedback } = useDismissFeedbackMutation();
   const [rows, setRows] = useState(items);
   const [dismissingIds, setDismissingIds] = useState<Record<string, true>>({});
