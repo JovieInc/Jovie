@@ -958,6 +958,115 @@ tests:
       - type: javascript
         value: file://assertions.cjs:assertEvalCaseInventoryCovered
 
+  - description: Knowledge routing selects release and playlist topics with cap
+    metadata:
+      cost: deterministic
+    vars:
+      input: "Help me plan my single release date, pre-save, countdown, and Spotify playlist pitch for editorial playlists. I also need revenue ideas from merch."
+      target: knowledge-contract
+      knowledgeCase: release-playlist-topic-cap
+      mode: app
+      expectedTopicIds: "playlist-strategy,release-strategy"
+      unexpectedTopicIds: "monetization"
+      expectedHasContext: true
+      expectedMaxTopicCount: 2
+    assert:
+      - type: javascript
+        value: file://assertions.cjs:assertKnowledgeContractNoSpend
+      - type: javascript
+        value: file://assertions.cjs:assertKnowledgeTopicsSelected
+      - type: javascript
+        value: file://assertions.cjs:assertKnowledgeTopicCap
+
+  - description: Knowledge routing selects monetization for revenue and payout questions
+    metadata:
+      cost: deterministic
+    vars:
+      input: "How much do streams pay, and can merch revenue or artist payouts help Luna Waves make money?"
+      target: knowledge-contract
+      knowledgeCase: monetization-only
+      mode: app
+      expectedTopicIds: "monetization"
+      unexpectedTopicIds: "streaming-metrics"
+      expectedHasContext: true
+      expectedMaxTopicCount: 2
+    assert:
+      - type: javascript
+        value: file://assertions.cjs:assertKnowledgeContractNoSpend
+      - type: javascript
+        value: file://assertions.cjs:assertKnowledgeTopicsSelected
+      - type: javascript
+        value: file://assertions.cjs:assertKnowledgeTopicCap
+
+  - description: Knowledge routing avoids false positives from ordinary words
+    metadata:
+      cost: deterministic
+    vars:
+      input: "I had a rough week and need a simple pep talk before rehearsal."
+      target: knowledge-contract
+      knowledgeCase: no-false-positive-had
+      mode: app
+      expectedTopicIds: ""
+      expectedHasContext: false
+      expectedMaxTopicCount: 2
+    assert:
+      - type: javascript
+        value: file://assertions.cjs:assertKnowledgeContractNoSpend
+      - type: javascript
+        value: file://assertions.cjs:assertKnowledgeTopicsSelected
+      - type: javascript
+        value: file://assertions.cjs:assertKnowledgeNoFalsePositive
+
+  - description: Knowledge routing uses only the last three user turns
+    metadata:
+      cost: deterministic
+    vars:
+      input: "Recent-turn window check"
+      target: knowledge-contract
+      knowledgeCase: recent-user-turn-window
+      mode: app
+      messages:
+        - role: user
+          text: "I need help with copyright, publishing, splits, and who owns the master recording."
+        - role: assistant
+          text: "Got it."
+        - role: user
+          text: "Thanks, unrelated check in."
+        - role: user
+          text: "What should I do today?"
+        - role: user
+          text: "Can you keep this simple?"
+      expectedTopicIds: ""
+      unexpectedTopicIds: "music-rights"
+      expectedHasContext: false
+      expectedMaxTopicCount: 2
+    assert:
+      - type: javascript
+        value: file://assertions.cjs:assertKnowledgeContractNoSpend
+      - type: javascript
+        value: file://assertions.cjs:assertKnowledgeTopicsSelected
+      - type: javascript
+        value: file://assertions.cjs:assertKnowledgeUsesRecentUserTurns
+
+  - description: Knowledge routing skips context for onboarding mode
+    metadata:
+      cost: deterministic
+    vars:
+      input: "I want to schedule a release, make a pre-save, and pitch Spotify editorial playlists."
+      target: knowledge-contract
+      knowledgeCase: onboarding-skips-knowledge
+      mode: onboarding
+      expectedTopicIds: ""
+      expectedHasContext: false
+      expectedMaxTopicCount: 2
+    assert:
+      - type: javascript
+        value: file://assertions.cjs:assertKnowledgeContractNoSpend
+      - type: javascript
+        value: file://assertions.cjs:assertKnowledgeTopicsSelected
+      - type: javascript
+        value: file://assertions.cjs:assertKnowledgeOnboardingSkipsContext
+
   - description: Tool event inventory hydrates every eval tool
     metadata:
       cost: deterministic
