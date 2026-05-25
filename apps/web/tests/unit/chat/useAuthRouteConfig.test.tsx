@@ -17,14 +17,14 @@ describe('useAuthRouteConfig', () => {
     mockUseSearchParams.mockReturnValue(new URLSearchParams());
   });
 
-  it('keeps chat thread detail breadcrumbs pinned to the shared thread label', () => {
+  it('keeps chat detail breadcrumbs pinned to the shared chat label', () => {
     mockUsePathname.mockReturnValue('/app/chat/conv-123');
 
     const { result } = renderHook(() => useAuthRouteConfig());
 
     expect(result.current.breadcrumbs).toEqual([
       {
-        label: 'New thread',
+        label: 'New chat',
         href: '/app/chat/conv-123',
       },
     ]);

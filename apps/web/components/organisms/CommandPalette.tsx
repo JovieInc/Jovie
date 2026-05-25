@@ -8,7 +8,7 @@
  * `SharedCommandPalette` (`CmdKPalette`). This file owns:
  *   - the `Cmd+K` global keydown trigger,
  *   - feeding the palette its `profileId` from `DashboardDataContext`,
- *   - injecting the "Recent threads" section as an additional source.
+ *   - injecting the "Recent chats" section as an additional source.
  */
 
 import { useRouter } from 'next/navigation';
@@ -22,7 +22,7 @@ import { useChatConversationsQuery } from '@/lib/queries';
 import { isFormElement } from '@/lib/utils/keyboard';
 import { OPEN_COMMAND_PALETTE_EVENT } from './command-palette-events';
 
-const RECENT_THREAD_LIMIT = 10;
+const RECENT_CHAT_LIMIT = 10;
 
 export function CommandPalette() {
   // Read the context directly so we don't hit the throwing useDashboardData
@@ -75,27 +75,27 @@ function CommandPaletteInner({ profileId }: CommandPaletteInnerProps) {
   }, []);
 
   const { data: conversations } = useChatConversationsQuery({
-    limit: RECENT_THREAD_LIMIT,
+    limit: RECENT_CHAT_LIMIT,
     enabled: open,
   });
 
-  // Recent threads + standalone "New thread" action are not part of the
+  // Recent chats are not part of the
   // command registry — they're palette-local. We fold them into a synthetic
   // entity section so the shared list+keyboard machinery picks them up.
   const additionalSections = useMemo<PaletteSection[]>(() => {
     const sections: PaletteSection[] = [];
     if (conversations && conversations.length > 0) {
       sections.push({
-        id: 'recent-threads',
-        label: 'Recent threads',
+        id: 'recent-chats',
+        label: 'Recent chats',
         items: conversations.map(convo => {
           const entity: EntityRef = {
             kind: 'track', // Reuses the generic Music2 fallback art.
             id: `thread:${convo.id}`,
-            label: convo.title || 'Untitled thread',
+            label: convo.title || 'Untitled chat',
             meta: {
               kind: 'track',
-              subtitle: 'Thread',
+              subtitle: 'Chat',
             },
           };
           return { kind: 'entity', entity };

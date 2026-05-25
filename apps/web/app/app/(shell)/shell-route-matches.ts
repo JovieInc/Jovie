@@ -73,12 +73,13 @@ export function isChatShellRoute(pathname: string | null): boolean {
   return (
     matchesExactRoute(pathname, APP_ROUTES.DASHBOARD) ||
     matchesRoutePrefix(pathname, APP_ROUTES.CHAT) ||
+    matchesRoutePrefix(pathname, APP_ROUTES.CHATS) ||
     matchesRoutePrefix(pathname, APP_ROUTES.THREADS)
   );
 }
 
 export function isThreadsShellRoute(pathname: string | null): boolean {
-  return matchesRoutePrefix(pathname, APP_ROUTES.THREADS);
+  return matchesRoutePrefix(pathname, APP_ROUTES.CHATS, APP_ROUTES.THREADS);
 }
 
 export function isReleasesShellRoute(pathname: string | null): boolean {

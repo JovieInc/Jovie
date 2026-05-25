@@ -61,12 +61,12 @@ export function useTaskQuery(taskId: string | null, profileId?: string) {
 
 export function useTaskStatsQuery(
   profileId?: string,
-  options?: { readonly enabled?: boolean }
+  options?: { readonly enabled?: boolean; readonly seenAt?: string | null }
 ) {
   return useQuery({
-    queryKey: queryKeys.tasks.stats(profileId),
+    queryKey: [...queryKeys.tasks.stats(profileId), options?.seenAt ?? null],
     // eslint-disable-next-line @jovie/require-abort-signal -- server action, signal not passable
-    queryFn: () => getTaskStats(),
+    queryFn: () => getTaskStats({ newerThan: options?.seenAt ?? null }),
     ...TASK_STATS_CACHE,
     enabled: Boolean(profileId) && (options?.enabled ?? true),
   });

@@ -17,7 +17,7 @@ export interface ThreadViewProps {
   readonly thread: ThreadViewData;
   /** Rendered turns / cards (typically `<ThreadTurn>`s and `<Thread*Card>`s). */
   readonly children: ReactNode;
-  /** Composer slot — defaults to `<ThreadComposer placeholder="Reply to this thread…" />`. */
+  /** Composer slot — defaults to `<ThreadComposer placeholder="Reply to this chat..." />`. */
   readonly composer?: ReactNode;
   /** Submit handler forwarded to the default ThreadComposer. */
   readonly onComposerSubmit?: (text: string) => void;
@@ -26,7 +26,7 @@ export interface ThreadViewProps {
 }
 
 /**
- * ThreadView — ChatGPT/Claude-style thread layout.
+ * ThreadView — ChatGPT/Claude-style chat layout.
  *
  * The article is the height-bound parent; the inner div is the scroll
  * boundary; the composer floats over the messages with a gradient fade
@@ -60,7 +60,7 @@ export function ThreadView({
   children,
   composer,
   onComposerSubmit,
-  composerPlaceholder = 'Reply to this thread…',
+  composerPlaceholder = 'Reply to this chat...',
 }: ThreadViewProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const [atBottom, setAtBottom] = useState(true);

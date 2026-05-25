@@ -36,7 +36,7 @@ vi.mock('@/components/organisms/Sidebar', () => ({
     <div>{children}</div>
   ),
   SidebarTrigger: () => <button type='button'>Toggle Sidebar</button>,
-  useSidebar: () => ({ isMobile: false }),
+  useSidebar: () => ({ isMobile: false, state: 'open' }),
 }));
 
 vi.mock('@/components/organisms/UnifiedSidebar', () => ({

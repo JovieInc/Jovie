@@ -2,7 +2,7 @@
  * Tests for the global Cmd+K shell that wraps CmdKPalette.
  *
  * Asserts: the palette stays mounted (no-op) when there's no DashboardData
- * context, opens on Cmd+K, surfaces recent threads from the conversations
+ * context, opens on Cmd+K, surfaces recent chats from the conversations
  * query, and renders the autofocused search input.
  */
 
@@ -116,15 +116,15 @@ describe('CommandPalette', () => {
     expect(input).toHaveFocus();
   });
 
-  it('lists recent threads with safe fallback titles', () => {
+  it('lists recent chats with safe fallback titles', () => {
     render(withDashboard(<CommandPalette />));
     fireEvent.keyDown(globalThis, { key: 'k', metaKey: true });
-    expect(screen.getByText('Recent threads')).toBeInTheDocument();
+    expect(screen.getByText('Recent chats')).toBeInTheDocument();
     expect(screen.getByText('Q1 release plan')).toBeInTheDocument();
-    expect(screen.getByText('Untitled thread')).toBeInTheDocument();
+    expect(screen.getByText('Untitled chat')).toBeInTheDocument();
   });
 
-  it('routes a recent-thread commit to the chat route', () => {
+  it('routes a recent-chat commit to the chat route', () => {
     pushMock.mockClear();
     render(withDashboard(<CommandPalette />));
     fireEvent.keyDown(globalThis, { key: 'k', metaKey: true });

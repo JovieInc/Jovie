@@ -9,7 +9,7 @@
  *   - skill → router.push(/app/chat?skill=<id>) — chat picks up the chip
  *   - entity (release) → its detail surface (currently `/.../tasks`)
  *   - entity (artist/track) → no-op (no detail page yet)
- *   - additional-section item (e.g. recent thread) → caller-handled via
+ *   - additional-section item (e.g. recent chat) → caller-handled via
  *     `onAdditionalSelect`
  */
 
@@ -50,7 +50,7 @@ interface CmdKPaletteProps {
   readonly onOpenChange: (open: boolean) => void;
   /**
    * Optional extra sections appended after the registry-driven sections.
-   * Used by `CommandPalette` to surface "Recent threads" + "Actions"
+   * Used by `CommandPalette` to surface "Recent chats" + "Actions"
    * without baking them into the registry.
    */
   readonly additionalSectionsAfter?: PaletteSection[];
@@ -248,7 +248,7 @@ export function CmdKPalette({
           Command palette
         </DialogPrimitive.Title>
         <DialogPrimitive.Description className='sr-only'>
-          Search routes, skills, releases, artists, and recent threads.
+          Search routes, skills, releases, artists, and recent chats.
         </DialogPrimitive.Description>
         <div
           className='flex flex-col'
@@ -268,7 +268,7 @@ export function CmdKPalette({
                 setQuery(e.target.value);
                 setSelectedIndex(0);
               }}
-              placeholder='Jump to a page, skill, release, or thread…'
+              placeholder='Jump to a page, skill, release, or chat...'
               className='flex-1 appearance-none bg-transparent text-sm text-primary-token outline-none placeholder:text-tertiary-token focus:outline-none focus-visible:outline-none focus-visible:shadow-[inset_0_0_0_1px_color-mix(in_oklab,var(--linear-border-focus)_45%,transparent)]'
               aria-label='Command palette search'
             />

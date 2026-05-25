@@ -5,7 +5,7 @@ import { Search } from 'lucide-react';
 import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
 import { AppSearchField } from '@/components/molecules/AppSearchField';
-import { PageHeader, PageShell } from '@/components/organisms/PageShell';
+import { PageShell } from '@/components/organisms/PageShell';
 import {
   readThreadReadState,
   type SidebarThread,
@@ -19,14 +19,14 @@ import { useChatConversationsQuery } from '@/lib/queries/useChatConversationsQue
 
 const THREAD_LIMIT = 50;
 
-function ThreadListSkeleton() {
+function ChatListSkeleton() {
   const skeletonRows = ['a', 'b', 'c', 'd', 'e', 'f'];
 
   return (
     <div className='space-y-1.5'>
       {skeletonRows.map(rowId => (
         <div
-          key={`thread-skeleton-${rowId}`}
+          key={`chat-skeleton-${rowId}`}
           className='flex h-7 items-center gap-2 rounded-full px-2.5'
         >
           <div className='h-1.5 w-1.5 shrink-0 rounded-full skeleton motion-reduce:animate-none' />
@@ -37,7 +37,7 @@ function ThreadListSkeleton() {
   );
 }
 
-export function ThreadsPageClient() {
+export function ChatsPageClient() {
   const [query, setQuery] = useState('');
   const [threadReadAtById, setThreadReadAtById] =
     useState<Record<string, string>>(readThreadReadState);
@@ -98,38 +98,32 @@ export function ThreadsPageClient() {
 
   return (
     <PageShell
-      data-testid='threads-page'
+      data-testid='chats-page'
       className='h-full'
       frame='content-container'
       contentPadding='none'
       surfaceMode='default'
     >
       <div className='flex h-full min-h-0 flex-col'>
-        <PageHeader
-          title='Threads'
-          description='Recent conversations, sorted by the last update.'
-          action={
-            <Button asChild variant='secondary' size='sm'>
-              <Link href={APP_ROUTES.CHAT}>New thread</Link>
-            </Button>
-          }
-          className='shrink-0'
-        />
-
         <div className='shrink-0 border-b border-[color-mix(in_oklab,var(--linear-app-frame-seam)_44%,transparent)] px-4 py-3 sm:px-6'>
-          <AppSearchField
-            value={query}
-            onChange={setQuery}
-            placeholder='Search threads'
-            ariaLabel='Search threads'
-            className='max-w-2xl'
-            inputClassName='text-[13px]'
-          />
+          <div className='flex items-center gap-2'>
+            <AppSearchField
+              value={query}
+              onChange={setQuery}
+              placeholder='Search chats'
+              ariaLabel='Search chats'
+              className='max-w-2xl flex-1'
+              inputClassName='text-[13px]'
+            />
+            <Button asChild variant='secondary' size='sm'>
+              <Link href={APP_ROUTES.CHAT}>New Chat</Link>
+            </Button>
+          </div>
           <div className='mt-2 flex items-center gap-3 text-[11px] text-tertiary-token'>
-            <span>{sidebarThreads.length} threads</span>
+            <span>{sidebarThreads.length} chats</span>
             <span className='inline-flex items-center gap-1'>
               <Search className='h-3 w-3' />
-              Search is local to thread titles and statuses
+              Search is local to chat titles and statuses
             </span>
             {unreadCount > 0 ? <span>{unreadCount} unread</span> : null}
           </div>
@@ -137,11 +131,11 @@ export function ThreadsPageClient() {
 
         <div className='min-h-0 flex-1 overflow-y-auto px-4 py-4 sm:px-6'>
           {isLoading ? (
-            <ThreadListSkeleton />
+            <ChatListSkeleton />
           ) : isError ? (
             <PageErrorState
-              title='Unable to load threads'
-              message='We could not load your recent threads. Retry the request or refresh the page.'
+              title='Unable to load chats'
+              message='We could not load your recent chats. Retry the request or refresh the page.'
               error={error instanceof Error ? error : undefined}
               actionLabel='Retry load'
               onRetry={() => {
@@ -157,16 +151,16 @@ export function ThreadsPageClient() {
               <div className='max-w-sm space-y-3'>
                 <p className='text-[14px] font-semibold text-primary-token'>
                   {normalizedQuery
-                    ? `No threads match "${trimmedQuery}".`
-                    : 'No threads yet'}
+                    ? `No chats match "${trimmedQuery}".`
+                    : 'No chats yet'}
                 </p>
                 <p className='text-[13px] leading-6 text-secondary-token'>
                   {normalizedQuery
                     ? 'Clear the search or try a different phrase.'
-                    : 'Start a new thread to see conversations appear here.'}
+                    : 'Start a new chat to see conversations appear here.'}
                 </p>
                 <Button asChild variant='secondary' size='sm'>
-                  <Link href={APP_ROUTES.CHAT}>New thread</Link>
+                  <Link href={APP_ROUTES.CHAT}>New Chat</Link>
                 </Button>
               </div>
             </div>
@@ -188,3 +182,5 @@ export function ThreadsPageClient() {
     </PageShell>
   );
 }
+
+export { ChatsPageClient as ThreadsPageClient };

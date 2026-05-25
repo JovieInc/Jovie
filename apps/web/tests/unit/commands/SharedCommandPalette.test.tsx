@@ -2,7 +2,7 @@
  * Tests for the cmd+k surface of SharedCommandPalette.
  *
  * Asserts surface filtering (cmdk includes nav + skills, chat-slash skips
- * nav), commit routing for nav and skill items, and recent-thread injection
+ * nav), commit routing for nav and skill items, and recent-chat injection
  * via the additional-sections slot.
  */
 
@@ -129,14 +129,14 @@ describe('SharedCommandPalette (cmd+k surface)', () => {
     );
   });
 
-  it('adds Threads as a cmd+k-only nav route', () => {
+  it('adds Chats as a cmd+k-only nav route', () => {
     expect(commandsForSurface('cmdk')).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
           kind: 'nav',
-          id: 'go-threads',
-          label: 'Threads',
-          href: APP_ROUTES.THREADS,
+          id: 'go-chats',
+          label: 'Chats',
+          href: APP_ROUTES.CHATS,
         }),
       ])
     );
@@ -144,7 +144,7 @@ describe('SharedCommandPalette (cmd+k surface)', () => {
       expect.arrayContaining([
         expect.objectContaining({
           kind: 'nav',
-          id: 'go-threads',
+          id: 'go-chats',
         }),
       ])
     );
@@ -246,7 +246,7 @@ describe('SharedCommandPalette (cmd+k surface)', () => {
     expect(pushMock).toHaveBeenCalledWith('/app/releases/rel-1/tasks');
   });
 
-  it('renders additional sections (e.g. recent threads) and routes via callback', () => {
+  it('renders additional sections (e.g. recent chats) and routes via callback', () => {
     pushMock.mockClear();
     const onAdditionalSelect = vi.fn();
     render(
@@ -256,8 +256,8 @@ describe('SharedCommandPalette (cmd+k surface)', () => {
         onOpenChange={vi.fn()}
         additionalSectionsAfter={[
           {
-            id: 'recent-threads',
-            label: 'Recent threads',
+            id: 'recent-chats',
+            label: 'Recent chats',
             items: [
               {
                 kind: 'entity',
@@ -265,7 +265,7 @@ describe('SharedCommandPalette (cmd+k surface)', () => {
                   kind: 'track',
                   id: 'thread:abc',
                   label: 'Album planning',
-                  meta: { kind: 'track', subtitle: 'Thread' },
+                  meta: { kind: 'track', subtitle: 'Chat' },
                 },
               },
             ],
@@ -274,7 +274,7 @@ describe('SharedCommandPalette (cmd+k surface)', () => {
         onAdditionalSelect={onAdditionalSelect}
       />
     );
-    expect(screen.getByText('Recent threads')).toBeInTheDocument();
+    expect(screen.getByText('Recent chats')).toBeInTheDocument();
     const threadRow = screen
       .getAllByRole('option')
       .find(el => el.textContent?.includes('Album planning'));

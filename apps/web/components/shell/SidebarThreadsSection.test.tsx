@@ -64,7 +64,7 @@ describe('SidebarThreadsSection', () => {
 
     const threadLink = screen.getByRole('link', { name: 'Pitch tasks' });
     const actionsButton = screen.getByRole('button', {
-      name: 'Thread actions for Pitch tasks',
+      name: 'Chat actions for Pitch tasks',
     });
 
     fireEvent.contextMenu(threadLink);
@@ -79,7 +79,7 @@ describe('SidebarThreadsSection', () => {
     });
   });
 
-  it('shows an all threads link when threads are present', () => {
+  it('shows an all chats link when chats are present', () => {
     render(
       <SidebarThreadsSection
         threads={threads}
@@ -90,9 +90,9 @@ describe('SidebarThreadsSection', () => {
       />
     );
 
-    const allThreadsLink = screen.getByRole('link', { name: 'All threads' });
+    const allThreadsLink = screen.getByRole('link', { name: 'All Chats' });
 
-    expect(allThreadsLink).toHaveAttribute('href', APP_ROUTES.THREADS);
+    expect(allThreadsLink).toHaveAttribute('href', APP_ROUTES.CHATS);
     expect(allThreadsLink).toHaveAttribute('aria-current', 'page');
   });
 
@@ -123,7 +123,7 @@ describe('SidebarThreadsSection', () => {
     expect(onSelect).toHaveBeenCalledWith('draft-thread');
   });
 
-  it('shows a new thread empty-state action when no threads are available', () => {
+  it('shows a new chat empty-state action when no chats are available', () => {
     const onNewThread = vi.fn();
 
     render(
@@ -136,7 +136,7 @@ describe('SidebarThreadsSection', () => {
       />
     );
 
-    const newThreadButton = screen.getByRole('button', { name: 'New thread' });
+    const newThreadButton = screen.getByRole('button', { name: 'New Chat' });
 
     fireEvent.click(newThreadButton);
     expect(onNewThread).toHaveBeenCalledTimes(1);

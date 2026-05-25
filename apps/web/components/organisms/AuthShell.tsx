@@ -3,6 +3,7 @@
 import type { ReactNode } from 'react';
 import { useMemo } from 'react';
 import { usePreviewPanelState } from '@/app/app/(shell)/dashboard/PreviewPanelContext';
+import { SidebarCollapseButton } from '@/components/molecules/sidebar-collapse-button/SidebarCollapseButton';
 import {
   SidebarProvider,
   SidebarTrigger,
@@ -47,14 +48,19 @@ function AuthShellInner({
   isLyricsRoute = false,
   children,
 }: Readonly<Omit<AuthShellProps, 'children'> & { children: ReactNode }>) {
-  const { isMobile } = useSidebar();
+  const { isMobile, state: sidebarState } = useSidebar();
   const rightPanel = useRightPanel();
   const previewPanelState = usePreviewPanelState();
   const headerActionsState = useOptionalHeaderActions();
   const shellChatV1Enabled = useAppFlag('DESIGN_V1');
 
-  const sidebarTrigger =
-    isMobile || shellChatV1Enabled ? null : <SidebarTrigger />;
+  const sidebarTrigger = isMobile ? null : shellChatV1Enabled ? (
+    sidebarState === 'closed' ? (
+      <SidebarCollapseButton />
+    ) : null
+  ) : (
+    <SidebarTrigger />
+  );
 
   const isInSettings = section === 'settings';
   const hideTopHeader = isInSettings || isLyricsRoute;

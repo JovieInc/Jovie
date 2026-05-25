@@ -16,10 +16,11 @@ const SHELL_ROOT = path.resolve(__dirname, '../../../app/app/(shell)');
 
 const INTENTIONAL_INTERNAL_ROUTES: Record<string, string> = {
   '/app': 'Shell root entry page',
+  '/app/chats': 'Canonical chat index reached from the sidebar link',
   '/app/chat/[id]': 'Thread detail is reached from chat history',
   '/app/library':
-    'Canonical library page retained as the assets readiness surface',
-  '/app/threads': 'All threads index reached from the sidebar link',
+    'Canonical library page for releases, merch, images, videos, and audio',
+  '/app/threads': 'Legacy all threads route redirects to chats',
   '/app/admin/investors/links': 'Sub-tool reached from Investors workspace',
   '/app/admin/investors/settings':
     'Sub-tool reached from Investors workspace actions',
@@ -110,7 +111,9 @@ function getNavRoutePaths(): Set<string> {
     ...adminSettingsNavigation,
   ];
 
-  return new Set(navItems.map(item => item.href));
+  return new Set(
+    navItems.map(item => new URL(item.href, 'https://jovie.local').pathname)
+  );
 }
 
 describe('shell route coverage', () => {
