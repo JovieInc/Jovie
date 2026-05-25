@@ -11,6 +11,8 @@ export function GET() {
   const version = process.env.NEXT_PUBLIC_APP_VERSION ?? '0.0.0';
   const environment = process.env.VERCEL_ENV;
   const isDevelopment = process.env.NODE_ENV !== 'production';
+  const buildSha = process.env.NEXT_PUBLIC_BUILD_SHA?.trim();
+  const runtimeCommitSha = process.env.VERCEL_GIT_COMMIT_SHA?.slice(0, 7);
 
   if (_cachedBuildId === undefined) {
     try {
@@ -32,7 +34,7 @@ export function GET() {
     buildId: _cachedBuildId,
     version,
     deployedAt: process.env.VERCEL_DEPLOYMENT_TIME || Date.now(),
-    commitSha: process.env.VERCEL_GIT_COMMIT_SHA?.slice(0, 7),
+    commitSha: buildSha || runtimeCommitSha,
     environment,
   });
 }
