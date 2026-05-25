@@ -1077,6 +1077,7 @@ jobs:
           NEXT_IGNORE_ESLINT: '1'
           NEXT_IGNORE_TYPECHECK: '1'
           NEXT_PRIVATE_SKIP_SIZE_CHECK: 'true'
+          SKIP_SKILLS_CATALOG_SYNC: '1'
 
       - name: Run Lighthouse CI (public launch thresholds)
         run: |
@@ -1215,6 +1216,7 @@ jobs:
           NEXT_IGNORE_ESLINT: '1'
           NEXT_IGNORE_TYPECHECK: '1'
           NEXT_PRIVATE_SKIP_SIZE_CHECK: 'true'
+          SKIP_SKILLS_CATALOG_SYNC: '1'
 
       - name: Run authenticated dashboard Lighthouse
         if: steps.check_changes.outputs.run_full_ci == 'true'
@@ -1359,6 +1361,7 @@ jobs:
           NEXT_IGNORE_ESLINT: '1'
           NEXT_IGNORE_TYPECHECK: '1'
           NEXT_PRIVATE_SKIP_SIZE_CHECK: 'true'
+          SKIP_SKILLS_CATALOG_SYNC: '1'
 
       - name: Run authenticated onboarding Lighthouse
         run: |
@@ -1493,6 +1496,7 @@ jobs:
           NEXT_IGNORE_ESLINT: '1'
           NEXT_IGNORE_TYPECHECK: '1'
           NEXT_PRIVATE_SKIP_SIZE_CHECK: 'true'
+          SKIP_SKILLS_CATALOG_SYNC: '1'
 
       - name: Run authenticated admin Lighthouse
         run: |
@@ -1628,6 +1632,7 @@ jobs:
           NEXT_IGNORE_ESLINT: '1'
           NEXT_IGNORE_TYPECHECK: '1'
           NEXT_PRIVATE_SKIP_SIZE_CHECK: 'true'
+          SKIP_SKILLS_CATALOG_SYNC: '1'
 
       - name: Run authenticated chat Lighthouse
         run: |
