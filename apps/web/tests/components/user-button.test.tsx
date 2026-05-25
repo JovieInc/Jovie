@@ -15,6 +15,7 @@ vi.mock('@/lib/queries', () => ({
   usePricingOptionsQuery: vi.fn(),
   useCheckoutMutation: vi.fn(),
   usePortalMutation: vi.fn(),
+  useFeedbackMutation: vi.fn(),
 }));
 
 vi.mock('next/navigation', () => ({
@@ -58,6 +59,7 @@ import { track } from '@/lib/analytics';
 import {
   useBillingStatusQuery,
   useCheckoutMutation,
+  useFeedbackMutation,
   usePortalMutation,
   usePricingOptionsQuery,
 } from '@/lib/queries';
@@ -73,6 +75,7 @@ const mockUseBillingStatusQuery = vi.mocked(useBillingStatusQuery);
 const mockUsePricingOptionsQuery = vi.mocked(usePricingOptionsQuery);
 const mockUseCheckoutMutation = vi.mocked(useCheckoutMutation);
 const mockUsePortalMutation = vi.mocked(usePortalMutation);
+const mockUseFeedbackMutation = vi.mocked(useFeedbackMutation);
 const mockUseUserSafe = vi.mocked(useUserSafe);
 const mockUseAuthSafe = vi.mocked(useAuthSafe);
 const mockUseRouter = vi.mocked(useRouter);
@@ -128,6 +131,12 @@ describe('UserButton billing actions', () => {
         });
         return response.json();
       }),
+      isPending: false,
+      isError: false,
+    } as any);
+
+    mockUseFeedbackMutation.mockReturnValue({
+      mutateAsync: vi.fn().mockResolvedValue({ ok: true, id: 'feedback_test' }),
       isPending: false,
       isError: false,
     } as any);
