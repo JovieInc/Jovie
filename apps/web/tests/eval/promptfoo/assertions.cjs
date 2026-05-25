@@ -835,6 +835,192 @@ function assertToolUiRegistryCovered(output) {
   return pass();
 }
 
+function firstEvent(payload) {
+  return Array.isArray(payload.events) ? payload.events[0] : undefined;
+}
+
+function firstMessagePart(payload) {
+  return Array.isArray(payload.messageParts)
+    ? payload.messageParts[0]
+    : undefined;
+}
+
+function assertToolEventInventoryCovered(output) {
+  const payload = parseOutput(output);
+
+  if (payload.target !== 'tool-event-contract') {
+    return fail('case did not run through the tool-event-contract adapter');
+  }
+  if (payload.source !== 'v2') {
+    return fail(`expected v2 tool events, got ${String(payload.source)}`);
+  }
+  if (payload.schemaValid !== true) {
+    return fail('tool events did not pass persisted schema validation');
+  }
+  if (
+    Array.isArray(payload.missingEventToolNames) &&
+    payload.missingEventToolNames.length > 0
+  ) {
+    return fail(
+      `missing persisted tool events: ${payload.missingEventToolNames.join(', ')}`
+    );
+  }
+  if (
+    Array.isArray(payload.missingHydratedToolNames) &&
+    payload.missingHydratedToolNames.length > 0
+  ) {
+    return fail(
+      `missing hydrated tool parts: ${payload.missingHydratedToolNames.join(', ')}`
+    );
+  }
+
+  return pass();
+}
+
+function assertToolEventHydratesSuccess(output) {
+  const payload = parseOutput(output);
+  const event = firstEvent(payload);
+  const part = firstMessagePart(payload);
+
+  if (payload.target !== 'tool-event-contract') {
+    return fail('case did not run through the tool-event-contract adapter');
+  }
+  if (payload.schemaValid !== true) {
+    return fail('tool event schema was invalid');
+  }
+  if (event?.state !== 'succeeded') {
+    return fail(`expected succeeded event, got ${String(event?.state)}`);
+  }
+  if (part?.state !== 'output-available') {
+    return fail(`expected output-available part, got ${String(part?.state)}`);
+  }
+  if (part?.toolName !== payload.toolName) {
+    return fail('hydrated part tool name did not match');
+  }
+
+  return pass();
+}
+
+function assertToolEventFailurePreserved(output) {
+  const payload = parseOutput(output);
+  const event = firstEvent(payload);
+  const part = firstMessagePart(payload);
+
+  if (payload.source !== 'legacy') {
+    return fail(`expected legacy source, got ${String(payload.source)}`);
+  }
+  if (event?.state !== 'failed') {
+    return fail(`expected failed event, got ${String(event?.state)}`);
+  }
+  if (!/provider unavailable/i.test(event?.errorMessage ?? '')) {
+    return fail('failed event did not preserve provider error text');
+  }
+  if (part?.state !== 'output-error') {
+    return fail(`expected output-error part, got ${String(part?.state)}`);
+  }
+  if (!/provider unavailable/i.test(part?.errorText ?? '')) {
+    return fail('hydrated failed part did not preserve provider error text');
+  }
+
+  return pass();
+}
+
+function assertToolEventApprovalRequested(output) {
+  const payload = parseOutput(output);
+  const event = firstEvent(payload);
+  const part = firstMessagePart(payload);
+
+  if (event?.state !== 'needs-approval') {
+    return fail(`expected needs-approval event, got ${String(event?.state)}`);
+  }
+  if (part?.state !== 'approval-requested') {
+    return fail(`expected approval-requested part, got ${String(part?.state)}`);
+  }
+  if (!part?.approval?.id) {
+    return fail('approval-requested part is missing approval id');
+  }
+
+  return pass();
+}
+
+function assertToolEventApprovalResponded(output) {
+  const payload = parseOutput(output);
+  const event = firstEvent(payload);
+  const part = firstMessagePart(payload);
+
+  if (event?.approval?.approved !== true) {
+    return fail('event did not preserve approved=true');
+  }
+  if (part?.state !== 'approval-responded') {
+    return fail(`expected approval-responded part, got ${String(part?.state)}`);
+  }
+  if (part?.approval?.approved !== true) {
+    return fail('hydrated part did not preserve approved=true');
+  }
+
+  return pass();
+}
+
+function assertToolEventDeniedHydrated(output) {
+  const payload = parseOutput(output);
+  const event = firstEvent(payload);
+  const part = firstMessagePart(payload);
+
+  if (event?.state !== 'denied') {
+    return fail(`expected denied event, got ${String(event?.state)}`);
+  }
+  if (part?.state !== 'output-denied') {
+    return fail(`expected output-denied part, got ${String(part?.state)}`);
+  }
+  if (part?.approval?.approved !== false) {
+    return fail('hydrated denied part did not preserve approved=false');
+  }
+
+  return pass();
+}
+
+function assertToolEventDedupeUsesLatest(output) {
+  const payload = parseOutput(output);
+  const event = firstEvent(payload);
+  const part = firstMessagePart(payload);
+
+  if (!Array.isArray(payload.events) || payload.events.length !== 1) {
+    return fail(`expected one deduped event, got ${payload.events?.length}`);
+  }
+  if (event?.state !== 'succeeded') {
+    return fail(`expected latest succeeded event, got ${String(event?.state)}`);
+  }
+  if (!/latest synthetic result/i.test(event?.summary ?? '')) {
+    return fail('deduped event did not keep latest summary');
+  }
+  if (part?.state !== 'output-available') {
+    return fail(`expected output-available part, got ${String(part?.state)}`);
+  }
+
+  return pass();
+}
+
+function assertToolEventInvalidRejected(output) {
+  const payload = parseOutput(output);
+
+  if (payload.source !== 'invalid') {
+    return fail(`expected invalid source, got ${String(payload.source)}`);
+  }
+  if (payload.schemaValid !== true) {
+    return fail(
+      'empty invalid decode result should still satisfy event schema'
+    );
+  }
+  if (Array.isArray(payload.events) && payload.events.length > 0) {
+    return fail('invalid payload produced persisted tool events');
+  }
+  if (Array.isArray(payload.messageParts) && payload.messageParts.length > 0) {
+    return fail('invalid payload produced hydrated message parts');
+  }
+
+  return pass();
+}
+
 module.exports = {
   assertNoPromptLeak,
   assertGroundedReleaseLeadTime,
@@ -873,4 +1059,12 @@ module.exports = {
   assertFailedToolResultPreserved,
   assertToolInventoryCovered,
   assertToolUiRegistryCovered,
+  assertToolEventInventoryCovered,
+  assertToolEventHydratesSuccess,
+  assertToolEventFailurePreserved,
+  assertToolEventApprovalRequested,
+  assertToolEventApprovalResponded,
+  assertToolEventDeniedHydrated,
+  assertToolEventDedupeUsesLatest,
+  assertToolEventInvalidRejected,
 };

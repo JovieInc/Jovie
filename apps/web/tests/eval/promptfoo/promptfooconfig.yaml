@@ -651,6 +651,118 @@ tests:
       - type: javascript
         value: file://assertions.cjs:assertToolUiRegistryCovered
 
+  - description: Tool event inventory hydrates every eval tool
+    metadata:
+      cost: deterministic
+    vars:
+      input: "Tool event inventory check"
+      target: tool-event-contract
+      toolName: showTopInsights
+      eventCase: inventory
+    assert:
+      - type: javascript
+        value: file://assertions.cjs:assertDeterministicNoSpend
+      - type: javascript
+        value: file://assertions.cjs:assertToolEventInventoryCovered
+
+  - description: Legacy successful tool result hydrates to output card
+    metadata:
+      cost: deterministic
+    vars:
+      input: "Hydrate a successful release pitch result."
+      target: tool-event-contract
+      toolName: generateReleasePitch
+      eventCase: legacy-success
+    assert:
+      - type: javascript
+        value: file://assertions.cjs:assertDeterministicNoSpend
+      - type: javascript
+        value: file://assertions.cjs:assertToolEventHydratesSuccess
+
+  - description: Legacy failed tool result persists as failed event
+    metadata:
+      cost: deterministic
+    vars:
+      input: "Hydrate a failed social removal result."
+      target: tool-event-contract
+      toolName: proposeSocialLinkRemoval
+      eventCase: legacy-failure
+    assert:
+      - type: javascript
+        value: file://assertions.cjs:assertDeterministicNoSpend
+      - type: javascript
+        value: file://assertions.cjs:assertToolEventFailurePreserved
+
+  - description: Approval request hydrates without implying completion
+    metadata:
+      cost: deterministic
+    vars:
+      input: "Hydrate a feedback approval request."
+      target: tool-event-contract
+      toolName: submitFeedback
+      eventCase: approval-requested
+    assert:
+      - type: javascript
+        value: file://assertions.cjs:assertDeterministicNoSpend
+      - type: javascript
+        value: file://assertions.cjs:assertToolEventApprovalRequested
+
+  - description: Approval response preserves approved state
+    metadata:
+      cost: deterministic
+    vars:
+      input: "Hydrate an approved feedback action."
+      target: tool-event-contract
+      toolName: submitFeedback
+      eventCase: approval-responded
+    assert:
+      - type: javascript
+        value: file://assertions.cjs:assertDeterministicNoSpend
+      - type: javascript
+        value: file://assertions.cjs:assertToolEventApprovalResponded
+
+  - description: Denied tool action hydrates as denied
+    metadata:
+      cost: deterministic
+    vars:
+      input: "Hydrate a denied profile edit."
+      target: tool-event-contract
+      toolName: proposeProfileEdit
+      eventCase: denied
+    assert:
+      - type: javascript
+        value: file://assertions.cjs:assertDeterministicNoSpend
+      - type: javascript
+        value: file://assertions.cjs:assertToolEventDeniedHydrated
+
+  - description: Duplicate tool events keep latest state
+    metadata:
+      cost: deterministic
+    vars:
+      input: "Hydrate duplicate merch events."
+      target: tool-event-contract
+      toolName: createMerch
+      eventCase: dedupe-latest
+    assert:
+      - type: javascript
+        value: file://assertions.cjs:assertDeterministicNoSpend
+      - type: javascript
+        value: file://assertions.cjs:assertToolEventDedupeUsesLatest
+
+  - description: Invalid tool event payload is rejected without hydration
+    metadata:
+      cost: deterministic
+    vars:
+      input: "Reject invalid tool event payload."
+      target: tool-event-contract
+      toolName: showUsage
+      eventCase: invalid
+    assert:
+      - type: javascript
+        value: file://assertions.cjs:assertDeterministicNoSpend
+      - type: javascript
+        value: file://assertions.cjs:assertToolEventInvalidRejected
+
   - description: Tool contract accepts free avatar upload
     metadata:
       cost: deterministic
