@@ -5,6 +5,26 @@
      5|The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
      6|and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.5.53] - 2026-05-25
+
+> Admin People is now stable enough to trust during waitlist review, with flatter insights, clearer chat qualification, and proof of the full waitlist path.
+
+### Added
+
+- **Waitlist golden-path coverage (JOV-2572)**: adds local browser coverage for homepage to signup, chat qualification, waitlisting, admin approval, and app entry, with screenshots and video artifacts.
+- **Waitlist integrity signal (JOV-2572)**: Admin > People > Waitlist now surfaces missing user/waitlist links so signup drift is visible instead of looking like a clean table.
+
+### Changed
+
+- **Cleaner admin People tables**: Waitlist, Users, Releases, and Feedback use flatter shells, fixed row geometry, and compact release artwork so real data no longer blows up table rows.
+- **White homepage outcome cards**: artist-profile bento cards now use white surfaces with black text for the sharper Apple-style treatment.
+- **More useful chat qualification**: onboarding chat now pushes toward concrete artist, release, and profile context before putting qualified users on the waitlist.
+
+### Fixed
+
+- **Feedback visibility**: feedback posts now require confirmed persistence, and Admin Feedback reports load errors instead of disguising them as zero feedback.
+- **Insight card over-framing**: chat and dashboard insight cards drop the extra nested card treatment.
+
 ## [26.5.52] - 2026-05-25
 
 > Shell chrome now reads calmer, with the sidebar collapse control in the header, the library route using one shell, and the chat composer/settings surfaces tightened up.
