@@ -37,6 +37,7 @@ import {
 } from './default-catalog';
 import { buildMerchPricingSnapshot, formatMerchMoney } from './pricing';
 import type {
+  LibraryMerchCard,
   MerchDesignLane,
   MerchGenerationOptionView,
   MerchGenerationResult,
@@ -375,6 +376,27 @@ function toPublicMerchCard(card: MerchCard): PublicMerchCard {
     rankScore: card.rankScore,
     position: card.position,
     pinned: card.pinned,
+  };
+}
+
+function toLibraryMerchCard(card: MerchCard): LibraryMerchCard {
+  return {
+    id: card.id,
+    status: card.status,
+    title: card.title,
+    description: card.description,
+    productType: card.productType,
+    primaryImageUrl: card.primaryImageUrl,
+    mockupUrls: card.mockupUrls,
+    retailPriceCents: card.retailPriceCents,
+    artistPayoutPerUnitEstimateCents: card.artistPayoutPerUnitEstimateCents,
+    jovieMarginPerUnitEstimateCents: card.jovieMarginPerUnitEstimateCents,
+    rankScore: card.rankScore,
+    position: card.position,
+    pinned: card.pinned,
+    createdAt: card.createdAt.toISOString(),
+    updatedAt: card.updatedAt.toISOString(),
+    publishedAt: card.publishedAt?.toISOString() ?? null,
   };
 }
 
@@ -797,6 +819,29 @@ export async function getLiveMerchCardsForProfile(
     .limit(6);
 
   return cards.map(toPublicMerchCard);
+}
+
+export async function getLibraryMerchCardsForProfile(
+  profileId: string
+): Promise<LibraryMerchCard[]> {
+  const cards = await db
+    .select()
+    .from(merchCards)
+    .where(
+      and(
+        eq(merchCards.creatorProfileId, profileId),
+        ne(merchCards.status, 'archived')
+      )
+    )
+    .orderBy(
+      desc(merchCards.pinned),
+      asc(merchCards.position),
+      desc(merchCards.rankScore),
+      desc(merchCards.updatedAt)
+    )
+    .limit(100);
+
+  return cards.map(toLibraryMerchCard);
 }
 
 export async function getPublicMerchCard(params: {

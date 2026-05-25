@@ -1,5 +1,6 @@
 import { APP_ROUTES } from '@/constants/routes';
 import { captureError } from '@/lib/error-tracking';
+import { getLibraryMerchCardsForProfile } from '@/lib/merch/service';
 import { queryKeys } from '@/lib/queries';
 import { HydrateClient } from '@/lib/queries/HydrateClient';
 import { getDehydratedState, getQueryClient } from '@/lib/queries/server';
@@ -23,13 +24,19 @@ export default async function LibraryPage() {
   }
 
   const profileId = routeContext.profileId;
+  let merchCards: Awaited<ReturnType<typeof getLibraryMerchCardsForProfile>> =
+    [];
   if (profileId) {
     const queryClient = getQueryClient();
     try {
-      await queryClient.fetchQuery({
-        queryKey: queryKeys.releases.matrix(profileId),
-        queryFn: () => loadReleaseMatrix(profileId),
-      });
+      const [_releases, merch] = await Promise.all([
+        queryClient.fetchQuery({
+          queryKey: queryKeys.releases.matrix(profileId),
+          queryFn: () => loadReleaseMatrix(profileId),
+        }),
+        getLibraryMerchCardsForProfile(profileId),
+      ]);
+      merchCards = merch;
     } catch (error) {
       void captureError(
         'Release matrix prefetch failed on library page',
@@ -43,7 +50,7 @@ export default async function LibraryPage() {
 
   return (
     <HydrateClient state={getDehydratedState()}>
-      <LibraryPageClient />
+      <LibraryPageClient merchCards={merchCards} />
     </HydrateClient>
   );
 }

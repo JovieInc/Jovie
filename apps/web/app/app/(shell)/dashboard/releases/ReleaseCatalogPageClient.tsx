@@ -6,10 +6,14 @@ import {
   LibraryLoadingState,
   LibrarySurface,
 } from '@/app/app/(shell)/library/LibrarySurface';
-import { buildLibraryReleaseAssets } from '@/app/app/(shell)/library/library-data';
+import {
+  buildLibraryMerchAssets,
+  buildLibraryReleaseAssets,
+} from '@/app/app/(shell)/library/library-data';
 import { ShellReleasesView } from '@/components/features/dashboard/organisms/release-provider-matrix/shell-releases/ShellReleasesView';
 import { PageErrorState } from '@/features/feedback/PageErrorState';
 import { useAppFlag } from '@/lib/flags/client';
+import type { LibraryMerchCard } from '@/lib/merch/types';
 import { useReleasesQuery } from '@/lib/queries/useReleasesQuery';
 import { primaryProviderKeys, providerConfig } from './config';
 import { ReleaseTableSkeleton } from './loading';
@@ -28,10 +32,12 @@ export type ReleaseCatalogView = 'list' | 'assets';
 
 interface ReleaseCatalogPageClientProps {
   readonly view: ReleaseCatalogView;
+  readonly merchCards?: readonly LibraryMerchCard[];
 }
 
 export function ReleaseCatalogPageClient({
   view,
+  merchCards = [],
 }: ReleaseCatalogPageClientProps) {
   const { selectedProfile } = useDashboardData();
   const profileId = selectedProfile?.id ?? '';
@@ -81,7 +87,21 @@ export function ReleaseCatalogPageClient({
       return <LibraryLoadingState />;
     }
 
-    return <LibrarySurface assets={buildLibraryReleaseAssets(releases)} />;
+    const artistName =
+      spotifyArtistName ??
+      appleMusicArtistName ??
+      selectedProfile?.displayName?.trim() ??
+      selectedProfile?.username ??
+      'Artist';
+
+    return (
+      <LibrarySurface
+        assets={[
+          ...buildLibraryReleaseAssets(releases),
+          ...buildLibraryMerchAssets(merchCards, artistName),
+        ]}
+      />
+    );
   }
 
   if (!releases && isLoading) {

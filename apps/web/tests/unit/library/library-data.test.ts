@@ -1,10 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import {
+  buildLibraryMerchAssets,
   buildLibraryReleaseAssets,
   formatLibraryDuration,
   formatLibraryReleaseDate,
 } from '@/app/app/(shell)/library/library-data';
 import type { ReleaseViewModel } from '@/lib/discography/types';
+import type { LibraryMerchCard } from '@/lib/merch/types';
 
 function buildRelease(
   overrides: Partial<ReleaseViewModel> = {}
@@ -109,6 +111,46 @@ describe('library data', () => {
       hasArtwork: false,
       assetKinds: [],
     });
+  });
+
+  it('derives library merch assets from chat-selected merch cards', () => {
+    const cards: LibraryMerchCard[] = [
+      {
+        id: 'merch-1',
+        status: 'draft',
+        title: 'Never Say A Word Hoodie',
+        description: 'Black hoodie with cover art.',
+        productType: 'hoodie',
+        primaryImageUrl: 'https://cdn.example.com/hoodie.png',
+        mockupUrls: ['https://cdn.example.com/mockup.png'],
+        retailPriceCents: 6800,
+        artistPayoutPerUnitEstimateCents: 2200,
+        jovieMarginPerUnitEstimateCents: 900,
+        rankScore: 91,
+        position: 0,
+        pinned: false,
+        createdAt: '2026-05-24T00:00:00.000Z',
+        updatedAt: '2026-05-25T00:00:00.000Z',
+        publishedAt: null,
+      },
+    ];
+
+    expect(buildLibraryMerchAssets(cards, 'Tim White')).toEqual([
+      expect.objectContaining({
+        id: 'merch-merch-1',
+        title: 'Never Say A Word Hoodie',
+        artist: 'Tim White',
+        artworkUrl: 'https://cdn.example.com/hoodie.png',
+        itemKind: 'merch',
+        itemStatusLabel: 'Draft',
+        productType: 'hoodie',
+        primaryActionLabel: 'Open Merch',
+        smartLinkPath: '/app/library?view=merch',
+        retailPriceLabel: '$68.00',
+        artistPayoutLabel: '$22.00',
+        jovieMarginLabel: '$9.00',
+      }),
+    ]);
   });
 
   it('formats release dates without local timezone drift', () => {

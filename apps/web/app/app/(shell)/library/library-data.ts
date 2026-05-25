@@ -1,4 +1,5 @@
 import type { ReleaseViewModel } from '@/lib/discography/types';
+import type { LibraryMerchCard } from '@/lib/merch/types';
 
 export interface LibraryProviderLink {
   readonly key: string;
@@ -13,7 +14,18 @@ export type LibraryAssetKind =
   | 'providers'
   | 'video';
 
+export type LibraryItemKind = 'release' | 'merch' | 'image' | 'video' | 'audio';
+
+export type LibraryView =
+  | 'all'
+  | 'releases'
+  | 'merch'
+  | 'images'
+  | 'videos'
+  | 'audio';
+
 export interface LibraryReleaseAsset {
+  readonly itemKind?: LibraryItemKind;
   readonly id: string;
   readonly title: string;
   readonly artist: string;
@@ -38,6 +50,16 @@ export interface LibraryReleaseAsset {
   readonly upc: string | null;
   readonly distributor: string | null;
   readonly totalDurationMs: number | null;
+  readonly itemStatusLabel?: string;
+  readonly primaryActionLabel?: string;
+  readonly primaryActionHref?: string | null;
+  readonly productType?: string;
+  readonly retailPriceLabel?: string;
+  readonly artistPayoutLabel?: string;
+  readonly jovieMarginLabel?: string;
+  readonly description?: string;
+  readonly createdAt?: string;
+  readonly updatedAt?: string;
 }
 
 function normalizeHttpUrl(value: string | null | undefined): string | null {
@@ -105,6 +127,95 @@ export function buildLibraryReleaseAssets(
       totalDurationMs: release.totalDurationMs ?? null,
     };
   });
+}
+
+function formatMerchCents(cents: number): string {
+  return new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: 'USD',
+  }).format(cents / 100);
+}
+
+function merchStatusToReleaseStatus(
+  status: LibraryMerchCard['status']
+): ReleaseViewModel['status'] {
+  if (status === 'live') return 'released';
+  if (status === 'paused') return 'scheduled';
+  return 'draft';
+}
+
+function formatMerchStatus(status: LibraryMerchCard['status']): string {
+  return status
+    .split('_')
+    .map(part => part.slice(0, 1).toUpperCase() + part.slice(1))
+    .join(' ');
+}
+
+export function buildLibraryMerchAssets(
+  cards: readonly LibraryMerchCard[],
+  artistName: string
+): LibraryReleaseAsset[] {
+  return cards.map(card => {
+    const imageUrl = normalizeHttpUrl(card.primaryImageUrl);
+    return {
+      itemKind: 'merch',
+      id: `merch-${card.id}`,
+      title: card.title,
+      artist: artistName,
+      artworkUrl: imageUrl,
+      previewUrl: null,
+      smartLinkPath: '/app/library?view=merch',
+      releaseDate: card.publishedAt ?? card.updatedAt,
+      releaseType: 'single',
+      status: merchStatusToReleaseStatus(card.status),
+      trackCount: 0,
+      providerCount: 0,
+      providers: [],
+      hasLyrics: false,
+      hasArtwork: Boolean(imageUrl),
+      hasVideoLinks: false,
+      assetKinds: imageUrl ? ['artwork'] : [],
+      genres: [],
+      spotifyPopularity: null,
+      targetPlaylistCount: 0,
+      isExplicit: false,
+      label: null,
+      upc: null,
+      distributor: null,
+      totalDurationMs: null,
+      itemStatusLabel: formatMerchStatus(card.status),
+      primaryActionLabel: 'Open Merch',
+      primaryActionHref: '/app/library?view=merch',
+      productType: card.productType,
+      retailPriceLabel: formatMerchCents(card.retailPriceCents),
+      artistPayoutLabel: formatMerchCents(
+        card.artistPayoutPerUnitEstimateCents
+      ),
+      jovieMarginLabel: formatMerchCents(card.jovieMarginPerUnitEstimateCents),
+      description: card.description,
+      createdAt: card.createdAt,
+      updatedAt: card.updatedAt,
+    };
+  });
+}
+
+export function getLibraryItemKind(
+  asset: LibraryReleaseAsset
+): LibraryItemKind {
+  return asset.itemKind ?? 'release';
+}
+
+export function libraryAssetMatchesView(
+  asset: LibraryReleaseAsset,
+  view: LibraryView
+): boolean {
+  const itemKind = getLibraryItemKind(asset);
+  if (view === 'all') return true;
+  if (view === 'releases') return itemKind === 'release';
+  if (view === 'merch') return itemKind === 'merch';
+  if (view === 'images') return asset.assetKinds.includes('artwork');
+  if (view === 'videos') return asset.assetKinds.includes('video');
+  return Boolean(asset.previewUrl);
 }
 
 export function formatLibraryReleaseDate(value: string | null): string {

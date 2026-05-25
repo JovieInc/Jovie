@@ -270,6 +270,39 @@ describe('ChatEntityRightPanelHost', () => {
     expect(mockUseRegisterRightPanel.mock.calls.at(-1)?.[0]).not.toBeNull();
   });
 
+  it('registers the profile bento rail when preview opens with profile context', () => {
+    mockPreviewPanelOpen = true;
+    mockUseRegisterRightPanel.mockClear();
+
+    render(
+      <ChatEntityPanelProvider>
+        <ChatEntityRightPanelHost
+          enablePreviewPanel
+          profileContext={{
+            id: 'profile-1',
+            displayName: 'Tim White',
+            username: 'tim',
+            avatarUrl: null,
+            completionPercentage: 72,
+            hasMusicLinks: true,
+            hasSocialLinks: false,
+          }}
+        />
+      </ChatEntityPanelProvider>
+    );
+
+    const registeredPanel = mockUseRegisterRightPanel.mock.calls.at(-1)?.[0];
+    expect(registeredPanel).not.toBeNull();
+    render(registeredPanel as React.ReactElement);
+
+    expect(screen.getByTestId('chat-profile-bento-panel')).toBeInTheDocument();
+    expect(screen.getAllByText('Tim White').length).toBeGreaterThan(0);
+    expect(screen.getByText('72% Complete')).toBeInTheDocument();
+    expect(
+      screen.getByRole('link', { name: 'Open Public Profile' })
+    ).toHaveAttribute('href', '/tim');
+  });
+
   it('tracks chat-owned entity targets through the provider', () => {
     render(
       <ChatEntityPanelProvider>
@@ -363,7 +396,7 @@ describe('ChatEntityRightPanelHost', () => {
     expect(
       screen.getByTestId('chat-rail-context-only-panel')
     ).toBeInTheDocument();
-    expect(screen.getByText('Tim White')).toBeInTheDocument();
+    expect(screen.getAllByText('Tim White').length).toBeGreaterThan(0);
     expect(screen.getByText('64% Complete')).toBeInTheDocument();
     expect(screen.queryByTestId('profile-contact-sidebar')).toBeNull();
   });

@@ -91,6 +91,25 @@ export interface PublicMerchCard {
   readonly pinned: boolean;
 }
 
+export interface LibraryMerchCard {
+  readonly id: string;
+  readonly status: MerchCard['status'];
+  readonly title: string;
+  readonly description: string;
+  readonly productType: string;
+  readonly primaryImageUrl: string;
+  readonly mockupUrls: string[];
+  readonly retailPriceCents: number;
+  readonly artistPayoutPerUnitEstimateCents: number;
+  readonly jovieMarginPerUnitEstimateCents: number;
+  readonly rankScore: number;
+  readonly position: number | null;
+  readonly pinned: boolean;
+  readonly createdAt: string;
+  readonly updatedAt: string;
+  readonly publishedAt: string | null;
+}
+
 export interface MerchCheckoutInput {
   readonly merchCardId: string;
   readonly variantKey: string;

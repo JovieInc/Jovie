@@ -368,9 +368,9 @@ export function ChatPageClient({
   const isProfileSetupRace =
     hasProfilesButNoSelection && !hasDashboardLoadFailure;
   const canAutoRetry = isProfileSetupRace && autoRetryCount < 3;
-  const enablePreviewPanel = !env.IS_E2E;
   const fromOnboarding = searchParams.get('from') === 'onboarding';
   const panelParam = searchParams.get('panel');
+  const enablePreviewPanel = !env.IS_E2E || panelParam === 'profile';
   const designV1ChatEntitiesEnabled = useAppFlag('DESIGN_V1');
   // Hydrate the profile panel only for explicit profile entry. Entity mentions
   // use ChatEntityPanelContext and do not need the profile preview fallback.
@@ -546,7 +546,7 @@ export function ChatPageClient({
         );
       }
 
-      // New threads reserve the final URL with history.replaceState as soon as
+      // New chats reserve the final URL with history.replaceState as soon as
       // the server acknowledges the turn. A second router.replace on stream
       // completion remounts the chat surface and can let stale refetch data
       // replace the settled local timeline.
