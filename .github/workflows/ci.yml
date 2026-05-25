@@ -72,17 +72,6 @@ jobs:
         shell: bash
         run: |
           IS_FORK="${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork }}"
-          FULL_CI_LABEL="${{ github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'testing') }}"
-
-          # Force run all if the 'testing' label is present
-          if [[ "$FULL_CI_LABEL" == "true" ]]; then
-            echo "Forcing full CI run due to 'testing' label"
-            for t in run_build run_test run_public_lighthouse run_dashboard_lighthouse run_onboarding_lighthouse run_admin_lighthouse run_chat_lighthouse run_promptfoo_evals run_e2e run_drizzle run_neon has_code_changes; do
-              echo "$t=true" >> "$GITHUB_OUTPUT"
-            done
-            exit 0
-          fi
-
           # Determine changed files
           if [[ "${{ github.event_name }}" == "pull_request" ]]; then
             git fetch origin "${{ github.base_ref }}"
@@ -98,23 +87,37 @@ jobs:
             CHANGED_FILES=$(git diff --name-only HEAD~1 HEAD 2>/dev/null || echo "")
           fi
 
-          # Check if only docs changed (exclude .github/ — workflow changes must run CI)
-          if echo "$CHANGED_FILES" | grep -v -E '^\.(github/)' | grep -v -E '\.(md|txt)$' | wc -l | grep -q '^0$'; then
-            echo "Only documentation files changed"
-            for t in run_build run_test run_public_lighthouse run_dashboard_lighthouse run_onboarding_lighthouse run_admin_lighthouse run_chat_lighthouse run_promptfoo_evals run_e2e run_drizzle run_neon has_code_changes; do
-              echo "$t=false" >> "$GITHUB_OUTPUT"
-            done
-            exit 0
-          fi
+          FULL_CI_LABEL="${{ github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'testing') }}"
 
           PROMPTFOO_INFRA_TRIGGER_PATTERN='^(\.github/workflows/evals-periodic\.yml|\.github/workflows/README\.md|apps/web/tests/eval/promptfoo/)'
           PROMPTFOO_INFRA_ALLOWED_PATTERN='^(\.github/workflows/ci\.yml|\.github/workflows/evals-periodic\.yml|\.github/workflows/README\.md|apps/web/tests/eval/promptfoo/.*|apps/web/package.*\.json|package.*\.json|pnpm-lock\.yaml)$'
           if echo "$CHANGED_FILES" | grep -q -E "$PROMPTFOO_INFRA_TRIGGER_PATTERN" &&
             ! echo "$CHANGED_FILES" | grep -v -E "$PROMPTFOO_INFRA_ALLOWED_PATTERN" | grep -q .; then
-            echo "Promptfoo eval-infrastructure-only change: running deterministic eval CI and core static checks."
+            echo "Promptfoo eval-infrastructure-only change: running deterministic eval CI and core static checks, even if the PR has the testing label."
             echo "has_code_changes=true" >> "$GITHUB_OUTPUT"
             echo "run_promptfoo_evals=true" >> "$GITHUB_OUTPUT"
             for t in run_build run_test run_public_lighthouse run_dashboard_lighthouse run_onboarding_lighthouse run_admin_lighthouse run_chat_lighthouse run_e2e run_drizzle run_neon; do
+              echo "$t=false" >> "$GITHUB_OUTPUT"
+            done
+            exit 0
+          fi
+
+          # Force run all if the 'testing' label is present. Promptfoo eval-infra-only
+          # changes are handled above so the deterministic no-cost lane cannot fan out
+          # into Neon, Lighthouse, or Playwright work by label accident.
+          if [[ "$FULL_CI_LABEL" == "true" ]]; then
+            echo "Forcing full CI run due to 'testing' label"
+            for t in run_build run_test run_public_lighthouse run_dashboard_lighthouse run_onboarding_lighthouse run_admin_lighthouse run_chat_lighthouse run_promptfoo_evals run_e2e run_drizzle run_neon has_code_changes; do
+              echo "$t=true" >> "$GITHUB_OUTPUT"
+            done
+            exit 0
+          fi
+
+          # Check if only docs changed (exclude .github/ — workflow changes must run CI)
+          if ! echo "$CHANGED_FILES" | grep -q -E '^\.github/' &&
+            ! echo "$CHANGED_FILES" | grep -q -v -E '\.(md|txt)$'; then
+            echo "Only documentation files changed"
+            for t in run_build run_test run_public_lighthouse run_dashboard_lighthouse run_onboarding_lighthouse run_admin_lighthouse run_chat_lighthouse run_promptfoo_evals run_e2e run_drizzle run_neon has_code_changes; do
               echo "$t=false" >> "$GITHUB_OUTPUT"
             done
             exit 0
@@ -431,10 +434,10 @@ jobs:
   neon-db:
     name: Neon DB
     needs: [ci-path-changes]
-    # Run for push to main, risky PRs with the testing label, or PRs touching DB-relevant paths.
+    # Run for push to main, testing-labeled full CI, or PRs touching DB-relevant paths.
     # run_neon covers drizzle, lib/db, lib/queries, schema, cron routes, SQL files, and
     # package.json changes. PRs touching only UI/perf/docs skip this job entirely.
-    if: ${{ github.event_name == 'push' || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork == false && (contains(github.event.pull_request.labels.*.name, 'testing') || needs.ci-path-changes.outputs.run_neon == 'true')) }}
+    if: ${{ github.event_name == 'push' || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork == false && needs.ci-path-changes.outputs.run_neon == 'true') }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
     outputs:
@@ -464,7 +467,7 @@ jobs:
           fi
 
       - name: Cleanup old Neon branches (prevent limit errors)
-        if: ${{ github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'testing') || steps.check-backend.outputs.needs_db == 'true' }}
+        if: ${{ github.event_name != 'pull_request' || needs.ci-path-changes.outputs.run_neon == 'true' || steps.check-backend.outputs.needs_db == 'true' }}
         uses: ./.github/actions/neon-branch-cleanup
         with:
           neon_api_key: ${{ secrets.NEON_API_KEY }}
@@ -475,7 +478,7 @@ jobs:
 
       - name: Determine sanitized branch name
         id: sanitize-branch
-        if: ${{ github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'testing') || steps.check-backend.outputs.needs_db == 'true' }}
+        if: ${{ github.event_name != 'pull_request' || needs.ci-path-changes.outputs.run_neon == 'true' || steps.check-backend.outputs.needs_db == 'true' }}
         env:
           RAW_REF: ${{ github.head_ref || github.ref_name }}
           EVENT_NAME: ${{ github.event_name }}
@@ -500,7 +503,7 @@ jobs:
           echo "name=$FINAL" >> "$GITHUB_OUTPUT"
       - name: Create or reuse Neon branch (with retry)
         id: create-branch
-        if: ${{ github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'testing') || steps.check-backend.outputs.needs_db == 'true' }}
+        if: ${{ github.event_name != 'pull_request' || needs.ci-path-changes.outputs.run_neon == 'true' || steps.check-backend.outputs.needs_db == 'true' }}
         uses: ./.github/actions/neon-create-branch-with-retry
         with:
           project_id: ${{ vars.NEON_PROJECT_ID }}
@@ -509,7 +512,7 @@ jobs:
           api_key: ${{ secrets.NEON_API_KEY }}
       - name: Finalize Neon DB URLs
         id: finalize-urls
-        if: ${{ github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'testing') || steps.check-backend.outputs.needs_db == 'true' }}
+        if: ${{ github.event_name != 'pull_request' || needs.ci-path-changes.outputs.run_neon == 'true' || steps.check-backend.outputs.needs_db == 'true' }}
         run: |
           DB_URL="${{ steps.create-branch.outputs.db_url }}"
           DB_URL_POOLED="${{ steps.create-branch.outputs.db_url_pooled }}"
@@ -531,7 +534,7 @@ jobs:
           echo "Neon DB URL resolved for this job."
 
       - name: Persist Neon DB connection artifact
-        if: ${{ github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'testing') || steps.check-backend.outputs.needs_db == 'true' }}
+        if: ${{ github.event_name != 'pull_request' || needs.ci-path-changes.outputs.run_neon == 'true' || steps.check-backend.outputs.needs_db == 'true' }}
         run: |
           mkdir -p /tmp/neon-db-artifact
           jq -n \
@@ -547,7 +550,7 @@ jobs:
             }' > /tmp/neon-db-artifact/connection.json
 
       - name: Upload Neon DB connection artifact
-        if: ${{ github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'testing') || steps.check-backend.outputs.needs_db == 'true' }}
+        if: ${{ github.event_name != 'pull_request' || needs.ci-path-changes.outputs.run_neon == 'true' || steps.check-backend.outputs.needs_db == 'true' }}
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: neon-db-connection-${{ github.run_id }}
@@ -3353,8 +3356,8 @@ jobs:
   # This remains available for opt-in PR validation but does not block production deploys.
   ci-smoke-required:
     name: Extended Smoke (Preview)
-    needs: [ci-fast, ci-build, neon-db, ci-e2e-tests]
-    if: ${{ always() && (github.event_name == 'workflow_dispatch' || (github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'testing'))) }}
+    needs: [ci-fast, ci-build, neon-db, ci-e2e-tests, ci-path-changes]
+    if: ${{ always() && (github.event_name == 'workflow_dispatch' || (github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'testing') && needs.ci-path-changes.outputs.run_e2e == 'true')) }}
     runs-on: ubuntu-latest
     environment: Preview – jovie
     timeout-minutes: 20
