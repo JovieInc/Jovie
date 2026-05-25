@@ -171,6 +171,13 @@ export const COMMANDS: readonly Command[] = [
     APP_ROUTES.CHAT_PROFILE_PANEL
   ),
   nav(
+    'go-threads',
+    'Threads',
+    'Open the all-threads workspace.',
+    'MessageSquare',
+    APP_ROUTES.THREADS
+  ),
+  nav(
     'go-releases',
     'Releases',
     'Manage your release catalog and smart links.',

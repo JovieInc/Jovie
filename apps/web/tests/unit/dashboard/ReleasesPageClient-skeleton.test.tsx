@@ -51,6 +51,10 @@ vi.mock('@/lib/flags/client', () => ({
   useAppFlag: () => false,
 }));
 
+const { ReleasesPageClient } = await import(
+  '@/app/app/(shell)/dashboard/releases/ReleasesPageClient'
+);
+
 describe('ReleasesPageClient skeleton behavior', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -61,10 +65,7 @@ describe('ReleasesPageClient skeleton behavior', () => {
 
   afterEach(() => cleanup());
 
-  async function renderPage() {
-    const { ReleasesPageClient } = await import(
-      '@/app/app/(shell)/dashboard/releases/ReleasesPageClient'
-    );
+  function renderPage() {
     return render(<ReleasesPageClient />);
   }
 
@@ -89,7 +90,7 @@ describe('ReleasesPageClient skeleton behavior', () => {
     await renderPage();
 
     expect(screen.queryByTestId('release-table-skeleton')).toBeNull();
-    expect(screen.getByTestId('dynamic-stub')).toBeDefined();
+    expect(screen.getAllByTestId('dynamic-stub').length).toBeGreaterThan(0);
   });
 
   it('keeps the releases view mounted when populated data is present', async () => {
@@ -101,7 +102,7 @@ describe('ReleasesPageClient skeleton behavior', () => {
     await renderPage();
 
     expect(screen.queryByTestId('release-table-skeleton')).toBeNull();
-    expect(screen.getByTestId('dynamic-stub')).toBeDefined();
+    expect(screen.getAllByTestId('dynamic-stub').length).toBeGreaterThan(0);
   });
 
   it('renders the error state when isError and no data are present', async () => {
@@ -125,6 +126,6 @@ describe('ReleasesPageClient skeleton behavior', () => {
     await renderPage();
 
     expect(screen.queryByTestId('page-error-state')).toBeNull();
-    expect(screen.getByTestId('dynamic-stub')).toBeDefined();
+    expect(screen.getAllByTestId('dynamic-stub').length).toBeGreaterThan(0);
   });
 });

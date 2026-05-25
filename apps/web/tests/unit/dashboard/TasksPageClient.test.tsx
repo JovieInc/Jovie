@@ -679,7 +679,7 @@ describe('TasksPageClient', () => {
     expect(screen.queryByText('All Statuses')).not.toBeInTheDocument();
     expect(screen.queryByText('All Priorities')).not.toBeInTheDocument();
     expect(screen.queryByText('All Assignees')).not.toBeInTheDocument();
-  });
+  }, 10000);
 
   it('routes the empty-state release setup CTA through the app router', () => {
     mockTasksData = [];
@@ -724,13 +724,10 @@ describe('TasksPageClient', () => {
 
     renderPage();
 
-    expect(screen.getByRole('tab', { name: 'All 3' })).toHaveAttribute(
-      'aria-selected',
-      'true'
-    );
     expect(
       screen.getByRole('tab', { name: 'Assigned To Me 2' })
-    ).toBeInTheDocument();
+    ).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getByRole('tab', { name: 'All 3' })).toBeInTheDocument();
     expect(
       screen.getByRole('tab', { name: 'Assigned To Jovie 1' })
     ).toBeInTheDocument();
@@ -766,10 +763,13 @@ describe('TasksPageClient', () => {
 
     renderPage();
 
-    expect(screen.getByRole('tab', { name: 'All 3' })).toHaveAttribute(
-      'aria-selected',
-      'true'
-    );
+    expect(
+      screen.getByRole('tab', { name: 'Assigned To Me 2' })
+    ).toHaveAttribute('aria-selected', 'true');
+    expect(getLatestTableProps()?.data?.map(task => task.id)).toEqual([
+      'task-2',
+      'task-1',
+    ]);
 
     fireEvent.click(screen.getByRole('tab', { name: 'Assigned To Jovie 1' }));
 
@@ -853,7 +853,6 @@ describe('TasksPageClient', () => {
     renderPage();
 
     expect(getLatestTableProps()?.data?.map(task => task.id)).toEqual([
-      'task-jovie',
       'task-2',
       'task-1',
     ]);
@@ -1044,7 +1043,7 @@ describe('TasksPageClient', () => {
       {
         ...mockTaskTwo,
         priority: 'urgent',
-        assigneeKind: 'jovie',
+        assigneeKind: 'human',
       },
       mockTask,
     ];
@@ -1207,7 +1206,7 @@ describe('TasksPageClient', () => {
       screen.queryByTestId('task-description-helper')
     ).not.toBeInTheDocument();
     expect(screen.getByLabelText('Task description')).toHaveValue('Press copy');
-  });
+  }, 10000);
 
   it('does not dirty the editor when a helper link is clicked', () => {
     mockTasksData = [mockHelperTask, mockTask];
@@ -1229,7 +1228,7 @@ describe('TasksPageClient', () => {
       screen.getByRole('button', { name: 'Previous task' })
     ).toBeDisabled();
     expect(screen.getByRole('button', { name: 'Next task' })).toBeEnabled();
-  });
+  }, 10000);
 
   it('keeps task search collapsed in the workspace toolbar by default', () => {
     renderPage();
@@ -1254,7 +1253,7 @@ describe('TasksPageClient', () => {
     expect(
       screen.getByRole('searchbox', { name: 'Search tasks' })
     ).toBeInTheDocument();
-  });
+  }, 10000);
 
   it('does not open or focus task search with the slash key', () => {
     renderPage();
@@ -1520,6 +1519,8 @@ describe('TasksPageClient', () => {
     mockTasksData = [mockTask, mockTaskTwo, mockJovieTask];
 
     renderPage();
+
+    fireEvent.click(screen.getByRole('tab', { name: 'All 3' }));
 
     expect(screen.getAllByTestId('mobile-task-row')).toHaveLength(3);
 

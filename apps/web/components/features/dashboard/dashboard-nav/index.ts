@@ -2,7 +2,6 @@ export {
   adminNavigation,
   artistSettingsNavigation,
   dashboardHome,
-  libraryNavItem,
   mobileExpandedNavigation,
   mobilePrimaryNavigation,
   primaryNavigation,

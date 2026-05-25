@@ -173,7 +173,7 @@ describe('UnifiedSidebar library route', () => {
     );
   });
 
-  it('omits header New chat and web dock controls in Electron dashboard mode', () => {
+  it('omits header New thread and web dock controls in Electron dashboard mode', () => {
     renderUnifiedSidebar({
       designV1: false,
       pathname: APP_ROUTES.DASHBOARD,
@@ -182,7 +182,7 @@ describe('UnifiedSidebar library route', () => {
 
     expect(screen.getByText('Jovie', { selector: 'span' })).toBeInTheDocument();
     expect(
-      screen.queryByRole('link', { name: 'New chat' })
+      screen.queryByRole('link', { name: 'New thread' })
     ).not.toBeInTheDocument();
     expect(
       document.querySelector('[data-sidebar-dock-button="true"]')
@@ -201,7 +201,7 @@ describe('UnifiedSidebar library route', () => {
       document.querySelector('[data-sidebar-dock-button="true"]')
     ).toBeInTheDocument();
     expect(
-      screen.queryByRole('link', { name: 'New chat' })
+      screen.queryByRole('link', { name: 'New thread' })
     ).not.toBeInTheDocument();
   });
 });

@@ -51,6 +51,10 @@ describe('DashboardNav interactions', () => {
   it('renders the full primary navigation config', () => {
     renderDashboardNav({ renderFn: render });
 
+    expect(screen.getByRole('link', { name: 'New thread' })).toHaveAttribute(
+      'href',
+      APP_ROUTES.CHAT
+    );
     expect(screen.getByRole('link', { name: 'Profile' })).toHaveAttribute(
       'href',
       APP_ROUTES.SETTINGS_ARTIST_PROFILE
@@ -63,18 +67,23 @@ describe('DashboardNav interactions', () => {
       'href',
       APP_ROUTES.AUDIENCE
     );
-    expect(screen.getByRole('link', { name: 'Library' })).toBeInTheDocument();
+    expect(
+      screen.queryByRole('link', { name: 'Library' })
+    ).not.toBeInTheDocument();
   });
 
-  it('adds Library to navigation when the new design flag is enabled', () => {
+  it('keeps Library out of the grouped navigation when the design flag is enabled', () => {
     renderDashboardNav({
       renderFn: render,
-      appFlags: { SHELL_CHAT_V1: true },
+      appFlags: { DESIGN_V1: true },
     });
 
-    expect(screen.getByRole('link', { name: 'Library' })).toHaveAttribute(
+    expect(
+      screen.queryByRole('link', { name: 'Library' })
+    ).not.toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'New thread' })).toHaveAttribute(
       'href',
-      APP_ROUTES.LIBRARY
+      APP_ROUTES.CHAT
     );
   });
 
@@ -203,7 +212,7 @@ describe('DashboardNav interactions', () => {
     expect(screen.getByLabelText('Command palette search')).toBeInTheDocument();
   });
 
-  it('groups artist-owned routes under the artist name after the primary Design V1 rows', () => {
+  it('groups the Design V1 shell into Work, Catalog, Growth, and More sections', () => {
     const { container } = renderDashboardNav({
       renderFn: render,
       appFlags: { DESIGN_V1: true },
@@ -218,17 +227,11 @@ describe('DashboardNav interactions', () => {
     });
 
     const primarySection = container.querySelector('[data-nav-section="true"]');
-    const artistGroupButton = screen.getByRole('button', {
-      name: 'Tim White',
-    });
     expect(primarySection).toBeInTheDocument();
-    expect(artistGroupButton).toBeInTheDocument();
-    expect(screen.queryByText('Artist Workspace')).not.toBeInTheDocument();
-    expect(screen.queryByText('Threads')).not.toBeInTheDocument();
-    expect(
-      primarySection!.compareDocumentPosition(artistGroupButton) &
-        Node.DOCUMENT_POSITION_FOLLOWING
-    ).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Work' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Catalog' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Growth' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'More' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Search' })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Profile' })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Releases' })).toHaveAttribute(
@@ -240,7 +243,7 @@ describe('DashboardNav interactions', () => {
       APP_ROUTES.AUDIENCE
     );
     expect(
-      container.querySelector('[data-nav-section="artist-workspace"]')
+      container.querySelector('[data-nav-section="more"]')
     ).toBeInTheDocument();
   });
 
@@ -308,10 +311,10 @@ describe('DashboardNav interactions', () => {
       appFlags: { DESIGN_V1: true },
     });
 
-    expect(screen.getAllByRole('link', { name: 'New chat' })).toHaveLength(1);
+    expect(screen.getAllByRole('link', { name: 'New thread' })).toHaveLength(1);
     expect(
-      screen.queryByRole('button', { name: 'New chat' })
-    ).not.toBeInTheDocument();
+      screen.getByRole('button', { name: 'New thread' })
+    ).toBeInTheDocument();
   });
 
   it('profile row remains a direct settings link off chat routes', () => {

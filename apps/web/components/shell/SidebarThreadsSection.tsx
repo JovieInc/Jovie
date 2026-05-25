@@ -1,9 +1,16 @@
 'use client';
 
-import { MessageSquarePlus, MoreHorizontal, RefreshCw } from 'lucide-react';
+import {
+  ArrowRight,
+  MessageSquarePlus,
+  MoreHorizontal,
+  RefreshCw,
+} from 'lucide-react';
 import Link from 'next/link';
 import type { ReactNode } from 'react';
-import React, { useMemo, useState } from 'react';
+import React, { useMemo } from 'react';
+import { APP_ROUTES } from '@/constants/routes';
+import type { ChatConversation } from '@/lib/queries/useChatConversationsQuery';
 import { cn } from '@/lib/utils';
 import { getSidebarNavRowClassName } from './SidebarNavItem';
 import { Tooltip } from './Tooltip';
@@ -13,6 +20,19 @@ import { Tooltip } from './Tooltip';
 
 export type ThreadStatus = 'running' | 'complete' | 'errored';
 export type SidebarThreadListState = 'idle' | 'loading' | 'error';
+export const THREAD_READ_STORAGE_KEY = 'jovie:sidebar-thread-read-at';
+
+const IN_PROGRESS_CHAT_TURN_STATUSES = new Set([
+  'reserved',
+  'running',
+  'streaming',
+]);
+const FAILED_CHAT_TURN_STATUSES = new Set([
+  'failed_tool_unavailable',
+  'failed_model_error',
+  'failed_timeout',
+  'failed_network',
+]);
 
 export interface SidebarThread {
   readonly id: string;
@@ -31,6 +51,7 @@ export interface SidebarThread {
 export interface SidebarThreadsSectionProps {
   readonly threads: readonly SidebarThread[];
   readonly activeThreadId: string | null;
+  readonly allThreadsActive?: boolean;
   readonly onSelect?: (id: string) => void;
   readonly onThreadContextMenu?: (
     e: React.MouseEvent,
@@ -43,6 +64,93 @@ export interface SidebarThreadsSectionProps {
   readonly tight?: boolean;
   // `collapsed` hides the section entirely (sidebar icon mode).
   readonly collapsed: boolean;
+}
+
+export function getSidebarThreadStatus(
+  latestTurnStatus: string | null | undefined
+): ThreadStatus {
+  if (!latestTurnStatus) {
+    return 'complete';
+  }
+
+  if (IN_PROGRESS_CHAT_TURN_STATUSES.has(latestTurnStatus)) {
+    return 'running';
+  }
+
+  if (FAILED_CHAT_TURN_STATUSES.has(latestTurnStatus)) {
+    return 'errored';
+  }
+
+  return 'complete';
+}
+
+export function readThreadReadState(): Record<string, string> {
+  try {
+    const stored = globalThis.localStorage?.getItem(THREAD_READ_STORAGE_KEY);
+    if (!stored) return {};
+    const parsed = JSON.parse(stored) as unknown;
+    if (!parsed || typeof parsed !== 'object') return {};
+
+    return Object.fromEntries(
+      Object.entries(parsed as Record<string, unknown>).filter(
+        (entry): entry is [string, string] => typeof entry[1] === 'string'
+      )
+    );
+  } catch {
+    return {};
+  }
+}
+
+export function writeThreadReadState(value: Record<string, string>): void {
+  try {
+    globalThis.localStorage?.setItem(
+      THREAD_READ_STORAGE_KEY,
+      JSON.stringify(value)
+    );
+  } catch {
+    // Storage can be unavailable in restricted browsers; row state still works.
+  }
+}
+
+export function isTimestampAfter(
+  candidate: string | null | undefined,
+  baseline: string | null | undefined
+): boolean {
+  if (!candidate) return false;
+  if (!baseline) return true;
+  const candidateMs = Date.parse(candidate);
+  const baselineMs = Date.parse(baseline);
+  return Number.isFinite(candidateMs) && Number.isFinite(baselineMs)
+    ? candidateMs > baselineMs
+    : candidate > baseline;
+}
+
+export function toSidebarThread(
+  conversation: Pick<
+    ChatConversation,
+    'id' | 'title' | 'updatedAt' | 'latestMessageRole' | 'latestTurnStatus'
+  >,
+  options: {
+    readonly activeThreadId?: string | null;
+    readonly readAt?: string | null;
+  } = {}
+): SidebarThread {
+  const activeThreadId = options.activeThreadId ?? null;
+  const readAt = options.readAt ?? null;
+  const latestTurnStatus = conversation.latestTurnStatus ?? null;
+  const unread =
+    activeThreadId !== conversation.id &&
+    conversation.latestMessageRole === 'assistant' &&
+    isTimestampAfter(conversation.updatedAt, readAt);
+
+  return {
+    id: conversation.id,
+    href: `${APP_ROUTES.CHAT}/${encodeURIComponent(conversation.id)}`,
+    title: conversation.title?.trim() || 'Untitled thread',
+    status: getSidebarThreadStatus(latestTurnStatus),
+    updatedAt: conversation.updatedAt,
+    unread,
+  };
 }
 
 function SidebarThreadStatusRow({
@@ -182,6 +290,8 @@ const SidebarThreadRow = React.memo(function SidebarThreadRow({
   );
 });
 
+export { SidebarThreadRow };
+
 // Status dot tones:
 //   running → cyan, anim-calm-breath
 //   errored → rose
@@ -190,6 +300,7 @@ const SidebarThreadRow = React.memo(function SidebarThreadRow({
 export function SidebarThreadsSection({
   threads,
   activeThreadId,
+  allThreadsActive = false,
   onSelect,
   onThreadContextMenu,
   state = 'idle',
@@ -198,8 +309,6 @@ export function SidebarThreadsSection({
   tight,
   collapsed,
 }: SidebarThreadsSectionProps) {
-  const [expanded, setExpanded] = useState(false);
-
   const sorted = useMemo(
     () => [...threads].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)),
     [threads]
@@ -208,10 +317,7 @@ export function SidebarThreadsSection({
   if (collapsed) return null;
   if (state === 'idle' && sorted.length === 0 && !onNewThread) return null;
 
-  const visible = expanded ? sorted.slice(0, 10) : sorted.slice(0, 5);
-  // Show toggle only when there's more than the collapsed slice. Avoids
-  // a "View all" → "no Show less" stuck state on 1–10 threads.
-  const hasMore = sorted.length > 5;
+  const visible = sorted.slice(0, 5);
   const unreadCount = sorted.filter(t => t.unread).length;
   const hasThreads = sorted.length > 0;
 
@@ -229,12 +335,7 @@ export function SidebarThreadsSection({
         )}
       </div>
 
-      <div
-        className={cn(
-          'flex flex-col gap-px',
-          expanded && 'max-h-[320px] overflow-y-auto'
-        )}
-      >
+      <div className='flex flex-col gap-px'>
         {state === 'loading' && !hasThreads ? (
           <SidebarThreadStatusRow
             tight={tight}
@@ -293,7 +394,7 @@ export function SidebarThreadsSection({
               strokeWidth={2.25}
             />
             <span className='min-w-0 truncate justify-self-start'>
-              New chat
+              New thread
             </span>
           </button>
         ) : null}
@@ -314,17 +415,30 @@ export function SidebarThreadsSection({
             />
           );
         })}
+        {hasThreads ? (
+          <Link
+            href={APP_ROUTES.THREADS}
+            aria-current={allThreadsActive ? 'page' : undefined}
+            className={cn(
+              getSidebarNavRowClassName({
+                active: allThreadsActive,
+                tight,
+                tone: 'primary',
+              }),
+              'text-left'
+            )}
+          >
+            <ArrowRight
+              className='h-3.5 w-3.5 shrink-0 justify-self-center text-quaternary-token'
+              aria-hidden='true'
+              strokeWidth={2.25}
+            />
+            <span className='min-w-0 truncate justify-self-start'>
+              All threads
+            </span>
+          </Link>
+        ) : null}
       </div>
-
-      {hasMore && (
-        <button
-          type='button'
-          onClick={() => setExpanded(v => !v)}
-          className='w-full px-3 py-1 text-left text-[11px] font-medium text-quaternary-token transition-[background-color] duration-subtle ease-subtle hover:text-secondary-token'
-        >
-          {expanded ? 'Show less' : 'View all'}
-        </button>
-      )}
     </div>
   );
 }
