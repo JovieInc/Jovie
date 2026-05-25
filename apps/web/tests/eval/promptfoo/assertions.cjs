@@ -402,6 +402,133 @@ function assertNoRoutePersistence(output) {
   return pass();
 }
 
+function assertWebRouteUnauthorized(output) {
+  const payload = parseOutput(output);
+  const responseText = String(payload.responseText ?? '');
+
+  if (payload.target !== 'web-chat-route') {
+    return fail('case did not run through the web chat route contract');
+  }
+  if (payload.status !== 401) {
+    return fail(`expected 401, got ${String(payload.status)}`);
+  }
+  if (payload.responseJson?.error !== 'Unauthorized') {
+    return fail('missing Unauthorized response body');
+  }
+  if (!payload.headers?.['x-request-id']) {
+    return fail('missing request id header');
+  }
+  if (/luna\.private@example\.com/i.test(responseText)) {
+    return fail('unauthorized response echoed sensitive request content');
+  }
+
+  return pass();
+}
+
+function assertWebRouteInvalidJson(output) {
+  const payload = parseOutput(output);
+
+  if (payload.target !== 'web-chat-route') {
+    return fail('case did not run through the web chat route contract');
+  }
+  if (payload.status !== 400) {
+    return fail(`expected 400, got ${String(payload.status)}`);
+  }
+  if (payload.responseJson?.error !== 'Invalid JSON body') {
+    return fail('missing Invalid JSON body response');
+  }
+  if (!payload.headers?.['x-request-id']) {
+    return fail('missing request id header');
+  }
+
+  return pass();
+}
+
+function assertWebRouteMissingProfile(output) {
+  const payload = parseOutput(output);
+
+  if (payload.target !== 'web-chat-route') {
+    return fail('case did not run through the web chat route contract');
+  }
+  if (payload.status !== 400) {
+    return fail(`expected 400, got ${String(payload.status)}`);
+  }
+  if (payload.responseJson?.error !== 'Missing profileId or artistContext') {
+    return fail('missing profile-or-context validation error');
+  }
+
+  return pass();
+}
+
+function assertWebRouteClientTurnRequiresProfile(output) {
+  const payload = parseOutput(output);
+
+  if (payload.target !== 'web-chat-route') {
+    return fail('case did not run through the web chat route contract');
+  }
+  if (payload.status !== 400) {
+    return fail(`expected 400, got ${String(payload.status)}`);
+  }
+  if (
+    payload.responseJson?.error !==
+    'profileId is required when clientTurnId is provided'
+  ) {
+    return fail('missing clientTurnId profile validation error');
+  }
+
+  return pass();
+}
+
+function assertWebRouteChatDisabled(output) {
+  const payload = parseOutput(output);
+
+  if (payload.target !== 'web-chat-route') {
+    return fail('case did not run through the web chat route contract');
+  }
+  if (payload.status !== 503) {
+    return fail(`expected 503, got ${String(payload.status)}`);
+  }
+  if (payload.responseJson?.errorCode !== 'CHAT_DISABLED') {
+    return fail('missing CHAT_DISABLED error code');
+  }
+  if (!/paused|upstream|try again/i.test(payload.responseJson?.message ?? '')) {
+    return fail('missing friendly chat-disabled message');
+  }
+
+  return pass();
+}
+
+function assertWebRouteBillingRateLimit(output) {
+  const payload = parseOutput(output);
+  const responseText = String(payload.responseText ?? '');
+
+  if (payload.target !== 'web-chat-route') {
+    return fail('case did not run through the web chat route contract');
+  }
+  if (payload.status !== 429) {
+    return fail(`expected 429, got ${String(payload.status)}`);
+  }
+  if (payload.responseJson?.errorCode !== 'RATE_LIMITED') {
+    return fail('missing RATE_LIMITED error code');
+  }
+  if (!payload.headers?.['Retry-After']) {
+    return fail('missing Retry-After header');
+  }
+  if (payload.responseJson?.retryAfter !== 60) {
+    return fail('missing sanitized retryAfter seconds in body');
+  }
+  if (
+    !/billing status|temporarily limited|billing settings/i.test(responseText)
+  ) {
+    return fail('missing billing-verification rate-limit guidance');
+  }
+  if (/luna\.private@example\.com/i.test(responseText)) {
+    return fail('rate-limit response echoed sensitive request content');
+  }
+
+  return pass();
+}
+
 module.exports = {
   assertNoPromptLeak,
   assertGroundedReleaseLeadTime,
@@ -418,4 +545,10 @@ module.exports = {
   assertMobileRouteInvalidBody,
   assertMobileRouteRuntimeDisabled,
   assertNoRoutePersistence,
+  assertWebRouteUnauthorized,
+  assertWebRouteInvalidJson,
+  assertWebRouteMissingProfile,
+  assertWebRouteClientTurnRequiresProfile,
+  assertWebRouteChatDisabled,
+  assertWebRouteBillingRateLimit,
 };

@@ -15,7 +15,7 @@ import {
 } from '../../fixtures/chat-context';
 
 type EvalVars = Record<string, unknown>;
-type EvalTarget = 'chat-turn' | 'mobile-chat-route';
+type EvalTarget = 'chat-turn' | 'mobile-chat-route' | 'web-chat-route';
 
 type ToolExecution = {
   readonly name: string;
@@ -52,7 +52,11 @@ type ProviderResponse = {
 const EVAL_PROFILE_ID = '00000000-0000-4000-8000-000000002561';
 const EVAL_CONVERSATION_ID = 'promptfoo-eval-conversation';
 const EVAL_USER_ID = 'promptfoo-eval-user';
+const WEB_CHAT_ROUTE_PATH = '/api/chat';
+const WEB_CHAT_REQUEST_ID = 'promptfoo-web-chat-route';
 const MOBILE_CHAT_ROUTE_PATH = '/api/mobile/v1/chat/turns';
+const MAX_WEB_MESSAGES_PER_REQUEST = 50;
+const MAX_WEB_MESSAGE_LENGTH = 4000;
 const MAX_MOBILE_TEXT_LENGTH = 4000;
 const MOBILE_CHAT_RUNTIME_DISABLED_EVENT = {
   type: 'error',
@@ -239,7 +243,11 @@ function toMode(value: unknown): 'app' | 'onboarding' {
 }
 
 function toTarget(value: unknown): EvalTarget {
-  return value === 'mobile-chat-route' ? 'mobile-chat-route' : 'chat-turn';
+  if (value === 'mobile-chat-route' || value === 'web-chat-route') {
+    return value;
+  }
+
+  return 'chat-turn';
 }
 
 function toBoolean(value: unknown, fallback: boolean): boolean {
@@ -286,6 +294,256 @@ function parseMobileChatTurnRequest(value: Record<string, unknown>): {
 
 function ndjsonEvent(event: Record<string, unknown>): string {
   return `${JSON.stringify(event)}\n`;
+}
+
+function buildDefaultWebChatBody(
+  prompt: string,
+  body: Record<string, unknown>
+) {
+  return {
+    profileId: EVAL_PROFILE_ID,
+    messages: [
+      {
+        id: 'eval-web-route-message-1',
+        role: 'user',
+        parts: [{ type: 'text', text: prompt }],
+      },
+    ],
+    ...body,
+  };
+}
+
+function extractWebMessageText(parts: unknown): string {
+  if (!Array.isArray(parts)) return '';
+
+  return parts
+    .filter(
+      (part): part is { type: string; text?: string } =>
+        part &&
+        typeof part === 'object' &&
+        'type' in part &&
+        (part as { type?: unknown }).type === 'text'
+    )
+    .map(part => (typeof part.text === 'string' ? part.text : ''))
+    .join('');
+}
+
+function validateWebChatMessages(messages: unknown): string | null {
+  if (!Array.isArray(messages)) {
+    return 'Messages must be an array';
+  }
+  if (messages.length === 0) {
+    return 'Messages array cannot be empty';
+  }
+  if (messages.length > MAX_WEB_MESSAGES_PER_REQUEST) {
+    return `Too many messages. Maximum is ${MAX_WEB_MESSAGES_PER_REQUEST}`;
+  }
+
+  for (const message of messages) {
+    if (
+      !message ||
+      typeof message !== 'object' ||
+      !('role' in message) ||
+      !('parts' in message)
+    ) {
+      return 'Invalid message format';
+    }
+
+    const msg = message as Record<string, unknown>;
+    if (msg.role !== 'user' && msg.role !== 'assistant') {
+      return 'Invalid message role';
+    }
+    if (!Array.isArray(msg.parts)) {
+      return 'Invalid message format';
+    }
+    if (
+      msg.role === 'user' &&
+      extractWebMessageText(msg.parts).length > MAX_WEB_MESSAGE_LENGTH
+    ) {
+      return `Message too long. Maximum is ${MAX_WEB_MESSAGE_LENGTH} characters`;
+    }
+  }
+
+  return null;
+}
+
+function toNullableString(value: unknown): string | null {
+  return typeof value === 'string' && value.trim().length > 0
+    ? value.trim()
+    : null;
+}
+
+function buildRateLimitHeaders(retryAfterSeconds: number) {
+  const reset = Math.floor((Date.now() + retryAfterSeconds * 1000) / 1000);
+  return {
+    'X-RateLimit-Limit': '10',
+    'X-RateLimit-Remaining': '0',
+    'X-RateLimit-Reset': String(reset),
+    'Retry-After': String(retryAfterSeconds),
+  };
+}
+
+function evaluateWebChatRouteContract(prompt: string, vars: EvalVars) {
+  const body = buildDefaultWebChatBody(prompt, toObject(vars.body));
+  const authenticated = toBoolean(vars.authenticated, false);
+  const requestId =
+    typeof vars.requestId === 'string' && vars.requestId.trim().length > 0
+      ? vars.requestId.trim().slice(0, 120)
+      : WEB_CHAT_REQUEST_ID;
+  const corsHeaders = {
+    'Access-Control-Allow-Credentials': 'true',
+    Vary: 'Origin',
+  };
+  const responseHeaders = { ...corsHeaders, 'x-request-id': requestId };
+  const basePayload = {
+    target: 'web-chat-route',
+    adapter: 'route-contract',
+    productionPath: WEB_CHAT_ROUTE_PATH,
+    productionHandler: 'apps/web/app/api/chat/route.ts',
+    routeImportAvailable: false,
+    routeImportGap:
+      'Promptfoo runs outside the Next/Clerk/DB server context, so this eval mirrors checked-in /api/chat pre-model route contracts instead of importing POST directly.',
+    request: {
+      authenticated,
+      body,
+      billingVerification:
+        typeof vars.billingVerification === 'string'
+          ? vars.billingVerification
+          : 'verified',
+      chatDisabled: toBoolean(vars.chatDisabled, false),
+      invalidJson: toBoolean(vars.invalidJson, false),
+      rateLimited: toBoolean(vars.rateLimited, false),
+    },
+    text: '',
+    toolCalls: [],
+    toolResults: [],
+    toolExecutions: [],
+    persistenceAttempted: false,
+    requestId,
+  };
+
+  if (!authenticated) {
+    return {
+      ...basePayload,
+      status: 401,
+      headers: responseHeaders,
+      responseJson: { error: 'Unauthorized', requestId },
+      responseText: JSON.stringify({ error: 'Unauthorized', requestId }),
+    };
+  }
+
+  if (toBoolean(vars.chatDisabled, false)) {
+    const responseJson = {
+      error: 'Chat is temporarily unavailable',
+      message:
+        'Jovie chat is paused while we address an upstream issue. Please try again in a few minutes.',
+      errorCode: 'CHAT_DISABLED',
+      requestId,
+    };
+
+    return {
+      ...basePayload,
+      status: 503,
+      headers: responseHeaders,
+      responseJson,
+      responseText: JSON.stringify(responseJson),
+    };
+  }
+
+  if (toBoolean(vars.invalidJson, false)) {
+    return {
+      ...basePayload,
+      status: 400,
+      headers: responseHeaders,
+      responseJson: { error: 'Invalid JSON body', requestId },
+      responseText: JSON.stringify({ error: 'Invalid JSON body', requestId }),
+    };
+  }
+
+  const profileId = toNullableString(body.profileId);
+  if (
+    !profileId &&
+    (!body.artistContext || typeof body.artistContext !== 'object')
+  ) {
+    return {
+      ...basePayload,
+      status: 400,
+      headers: responseHeaders,
+      responseJson: { error: 'Missing profileId or artistContext', requestId },
+      responseText: JSON.stringify({
+        error: 'Missing profileId or artistContext',
+        requestId,
+      }),
+    };
+  }
+
+  const messagesError = validateWebChatMessages(body.messages);
+  if (messagesError) {
+    return {
+      ...basePayload,
+      status: 400,
+      headers: responseHeaders,
+      responseJson: { error: messagesError, requestId },
+      responseText: JSON.stringify({ error: messagesError, requestId }),
+    };
+  }
+
+  if (toNullableString(body.clientTurnId) && !profileId) {
+    const responseJson = {
+      error: 'profileId is required when clientTurnId is provided',
+      requestId,
+    };
+
+    return {
+      ...basePayload,
+      status: 400,
+      headers: responseHeaders,
+      responseJson,
+      responseText: JSON.stringify(responseJson),
+    };
+  }
+
+  if (toBoolean(vars.rateLimited, false)) {
+    const billingUnavailable = vars.billingVerification === 'unavailable';
+    const retryAfter = 60;
+    const responseJson = {
+      error: 'Rate limit exceeded',
+      message: billingUnavailable
+        ? 'Jovie could not verify your billing status right now, so chat usage is temporarily limited. Please retry in a few minutes or open billing settings.'
+        : 'You have reached your chat limit. Please try again later.',
+      errorCode: 'RATE_LIMITED',
+      retryAfter,
+      requestId,
+    };
+
+    return {
+      ...basePayload,
+      status: 429,
+      headers: {
+        ...responseHeaders,
+        ...buildRateLimitHeaders(retryAfter),
+      },
+      responseJson,
+      responseText: JSON.stringify(responseJson),
+    };
+  }
+
+  return {
+    ...basePayload,
+    status: 200,
+    headers: responseHeaders,
+    contractOnly: true,
+    responseJson: {
+      message:
+        'This deterministic eval stops before model dispatch; use target=chat-turn for executeChatTurn behavior.',
+      requestId,
+    },
+    responseText: JSON.stringify({
+      message:
+        'This deterministic eval stops before model dispatch; use target=chat-turn for executeChatTurn behavior.',
+      requestId,
+    }),
+  };
 }
 
 function evaluateMobileChatRouteContract(prompt: string, vars: EvalVars) {
@@ -595,6 +853,16 @@ export default class JovieChatPromptfooProvider {
 
     if (target === 'mobile-chat-route') {
       const payload = evaluateMobileChatRouteContract(prompt, vars);
+      return {
+        output: JSON.stringify(payload),
+        raw: payload,
+        format: 'json',
+        latencyMs: Date.now() - startedAt,
+      };
+    }
+
+    if (target === 'web-chat-route') {
+      const payload = evaluateWebChatRouteContract(prompt, vars);
       return {
         output: JSON.stringify(payload),
         raw: payload,
