@@ -46,14 +46,37 @@ function allExecutions(payload) {
 }
 
 function containsExpected(actual, expected, path = '') {
-  if (!expected || typeof expected !== 'object' || Array.isArray(expected)) {
+  const label = path || 'value';
+
+  if (Array.isArray(expected)) {
+    if (!Array.isArray(actual)) {
+      return `${label} expected array, got ${JSON.stringify(actual)}`;
+    }
+
+    if (actual.length !== expected.length) {
+      return `${label} expected array length ${expected.length}, got ${actual.length}`;
+    }
+
+    for (let index = 0; index < expected.length; index += 1) {
+      const mismatch = containsExpected(
+        actual[index],
+        expected[index],
+        `${label}[${index}]`
+      );
+      if (mismatch) return mismatch;
+    }
+
+    return null;
+  }
+
+  if (!expected || typeof expected !== 'object') {
     return Object.is(actual, expected)
       ? null
-      : `${path || 'value'} expected ${JSON.stringify(expected)}, got ${JSON.stringify(actual)}`;
+      : `${label} expected ${JSON.stringify(expected)}, got ${JSON.stringify(actual)}`;
   }
 
   if (!actual || typeof actual !== 'object' || Array.isArray(actual)) {
-    return `${path || 'value'} expected object, got ${JSON.stringify(actual)}`;
+    return `${label} expected object, got ${JSON.stringify(actual)}`;
   }
 
   for (const [key, expectedValue] of Object.entries(expected)) {
