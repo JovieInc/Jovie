@@ -172,6 +172,48 @@ tests:
       - type: javascript
         value: file://assertions.cjs:assertLiveHttpUnauthorized
 
+  - description: Live HTTP web chat validates invalid JSON before model dispatch
+    metadata:
+      cost: live-http
+    vars:
+      input: "This body is intentionally invalid JSON."
+      target: web-chat-http-route
+      httpCase: invalid-json
+      persona: creator-ready
+    assert:
+      - type: javascript
+        value: file://assertions.cjs:assertLiveHttpWebRouteNoModel
+      - type: javascript
+        value: file://assertions.cjs:assertLiveHttpInvalidJson
+
+  - description: Live HTTP web chat requires profile context before model dispatch
+    metadata:
+      cost: live-http
+    vars:
+      input: "What should I do next?"
+      target: web-chat-http-route
+      httpCase: missing-context
+      persona: creator-ready
+    assert:
+      - type: javascript
+        value: file://assertions.cjs:assertLiveHttpWebRouteNoModel
+      - type: javascript
+        value: file://assertions.cjs:assertLiveHttpMissingContext
+
+  - description: Live HTTP web chat requires profileId before client-turn reservation
+    metadata:
+      cost: live-http
+    vars:
+      input: "Reserve this action without a profile."
+      target: web-chat-http-route
+      httpCase: client-turn-requires-profile
+      persona: creator-ready
+    assert:
+      - type: javascript
+        value: file://assertions.cjs:assertLiveHttpWebRouteNoModel
+      - type: javascript
+        value: file://assertions.cjs:assertLiveHttpClientTurnRequiresProfile
+
   - description: Live HTTP web chat reserves deterministic avatar turn and replays duplicate
     metadata:
       cost: live-http
