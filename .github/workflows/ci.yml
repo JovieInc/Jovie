@@ -58,6 +58,7 @@ jobs:
       run_onboarding_lighthouse: ${{ steps.detect.outputs.run_onboarding_lighthouse }}
       run_admin_lighthouse: ${{ steps.detect.outputs.run_admin_lighthouse }}
       run_chat_lighthouse: ${{ steps.detect.outputs.run_chat_lighthouse }}
+      run_promptfoo_evals: ${{ steps.detect.outputs.run_promptfoo_evals }}
       run_e2e: ${{ steps.detect.outputs.run_e2e }}
       run_drizzle: ${{ steps.detect.outputs.run_drizzle }}
       run_neon: ${{ steps.detect.outputs.run_neon }}
@@ -76,7 +77,7 @@ jobs:
           # Force run all if the 'testing' label is present
           if [[ "$FULL_CI_LABEL" == "true" ]]; then
             echo "Forcing full CI run due to 'testing' label"
-            for t in run_build run_test run_public_lighthouse run_dashboard_lighthouse run_onboarding_lighthouse run_admin_lighthouse run_chat_lighthouse run_e2e run_drizzle run_neon has_code_changes; do
+            for t in run_build run_test run_public_lighthouse run_dashboard_lighthouse run_onboarding_lighthouse run_admin_lighthouse run_chat_lighthouse run_promptfoo_evals run_e2e run_drizzle run_neon has_code_changes; do
               echo "$t=true" >> "$GITHUB_OUTPUT"
             done
             exit 0
@@ -89,7 +90,7 @@ jobs:
           elif [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
             # Manual dispatch: run everything
             echo "Manual dispatch: running all checks"
-            for t in run_build run_test run_public_lighthouse run_dashboard_lighthouse run_onboarding_lighthouse run_admin_lighthouse run_chat_lighthouse run_e2e run_drizzle run_neon has_code_changes; do
+            for t in run_build run_test run_public_lighthouse run_dashboard_lighthouse run_onboarding_lighthouse run_admin_lighthouse run_chat_lighthouse run_promptfoo_evals run_e2e run_drizzle run_neon has_code_changes; do
               echo "$t=true" >> "$GITHUB_OUTPUT"
             done
             exit 0
@@ -100,7 +101,7 @@ jobs:
           # Check if only docs changed (exclude .github/ — workflow changes must run CI)
           if echo "$CHANGED_FILES" | grep -v -E '^\.(github/)' | grep -v -E '\.(md|txt)$' | wc -l | grep -q '^0$'; then
             echo "Only documentation files changed"
-            for t in run_build run_test run_public_lighthouse run_dashboard_lighthouse run_onboarding_lighthouse run_admin_lighthouse run_chat_lighthouse run_e2e run_drizzle run_neon has_code_changes; do
+            for t in run_build run_test run_public_lighthouse run_dashboard_lighthouse run_onboarding_lighthouse run_admin_lighthouse run_chat_lighthouse run_promptfoo_evals run_e2e run_drizzle run_neon has_code_changes; do
               echo "$t=false" >> "$GITHUB_OUTPUT"
             done
             exit 0
@@ -161,6 +162,13 @@ jobs:
             echo "run_chat_lighthouse=true" >> "$GITHUB_OUTPUT"
           else
             echo "run_chat_lighthouse=false" >> "$GITHUB_OUTPUT"
+          fi
+
+          PROMPTFOO_EVAL_PATTERN='^(\.github/workflows/ci\.yml|apps/web/tests/eval/promptfoo/|apps/web/lib/chat/|apps/web/app/api/chat/|apps/web/package.*\.json|package.*\.json|pnpm-lock\.yaml)'
+          if echo "$CHANGED_FILES" | grep -q -E "$PROMPTFOO_EVAL_PATTERN"; then
+            echo "run_promptfoo_evals=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "run_promptfoo_evals=false" >> "$GITHUB_OUTPUT"
           fi
 
           # E2E paths
@@ -293,6 +301,29 @@ jobs:
           else
             pnpm biome ci --reporter=github .
           fi
+
+  ci-promptfoo-evals:
+    name: Promptfoo Evals (deterministic)
+    needs: [ci-path-changes]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    if: ${{ github.event_name == 'workflow_dispatch' || needs.ci-path-changes.outputs.run_promptfoo_evals == 'true' }}
+    env:
+      JOVIE_RUN_LIVE_EVALS: '0'
+      PROMPTFOO_DISABLE_TELEMETRY: '1'
+      PROMPTFOO_DISABLE_UPDATE: '1'
+      PROMPTFOO_NO_TESTCASE_ASSERT_WARNING: '1'
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with: { fetch-depth: 1 }
+      - uses: ./.github/actions/setup-node-pnpm
+      - name: Validate Promptfoo config
+        run: pnpm --filter @jovie/web exec promptfoo validate -c tests/eval/promptfoo/promptfooconfig.yaml
+      - name: Run deterministic Promptfoo evals
+        shell: bash
+        run: |
+          unset AI_GATEWAY_API_KEY OPENAI_API_KEY ANTHROPIC_API_KEY BRAINTRUST_API_KEY
+          pnpm run evals
 
   ci-eslint:
     name: ESLint Server Boundaries
