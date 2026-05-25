@@ -440,6 +440,28 @@ function buildRateLimitHeaders(
 
 function evaluateWebChatRouteContract(prompt: string, vars: EvalVars) {
   const body = buildDefaultWebChatBody(prompt, toObject(vars.body));
+  if (
+    typeof vars.messageCount === 'number' &&
+    Number.isInteger(vars.messageCount)
+  ) {
+    body.messages = Array.from({ length: vars.messageCount }, (_, index) => ({
+      id: `eval-web-route-message-${index + 1}`,
+      role: 'user',
+      parts: [{ type: 'text', text: `message ${index + 1}` }],
+    }));
+  }
+  if (
+    typeof vars.longUserMessageLength === 'number' &&
+    Number.isInteger(vars.longUserMessageLength)
+  ) {
+    body.messages = [
+      {
+        id: 'eval-web-route-long-message',
+        role: 'user',
+        parts: [{ type: 'text', text: 'x'.repeat(vars.longUserMessageLength) }],
+      },
+    ];
+  }
   const authenticated = toBoolean(vars.authenticated, false);
   const requestId =
     typeof vars.requestId === 'string' && vars.requestId.trim().length > 0
@@ -468,6 +490,8 @@ function evaluateWebChatRouteContract(prompt: string, vars: EvalVars) {
       chatDisabled: toBoolean(vars.chatDisabled, false),
       invalidJson: toBoolean(vars.invalidJson, false),
       rateLimited: toBoolean(vars.rateLimited, false),
+      expectedError:
+        typeof vars.expectedError === 'string' ? vars.expectedError : undefined,
     },
     costTier: 'deterministic',
     text: '',
@@ -608,6 +632,12 @@ function evaluateMobileChatRouteContract(prompt: string, vars: EvalVars) {
   const body = toObject(vars.body);
   const requestBody =
     typeof body.text === 'string' ? body : { ...body, text: prompt };
+  if (
+    typeof vars.longMobileTextLength === 'number' &&
+    Number.isInteger(vars.longMobileTextLength)
+  ) {
+    requestBody.text = 'x'.repeat(vars.longMobileTextLength);
+  }
   const authenticated = toBoolean(vars.authenticated, false);
   const basePayload = {
     target: 'mobile-chat-route',
@@ -620,6 +650,7 @@ function evaluateMobileChatRouteContract(prompt: string, vars: EvalVars) {
     request: {
       authenticated,
       body: requestBody,
+      invalidJson: toBoolean(vars.invalidJson, false),
     },
     costTier: 'deterministic',
     text: '',
@@ -642,7 +673,7 @@ function evaluateMobileChatRouteContract(prompt: string, vars: EvalVars) {
   }
 
   const parsed = parseMobileChatTurnRequest(requestBody);
-  if (!parsed) {
+  if (toBoolean(vars.invalidJson, false) || !parsed) {
     return {
       ...basePayload,
       status: 400,
