@@ -82,7 +82,7 @@ const ONBOARDING_INTRO_MESSAGE = {
   parts: [
     {
       type: 'text',
-      text: "Hey, I'm Jovie. What are you working on?",
+      text: "Hey, I'm Jovie. I'll remember this chat so we can pick up where we left off if you sign up. What artist or release are you working on?",
     },
   ],
 } satisfies UIMessage;
@@ -541,7 +541,7 @@ function OnboardingInitialIntro({
         Hey, I&apos;m Jovie.
       </p>
       <p className='mt-2 max-w-[24rem] text-[15px] leading-6 text-secondary-token'>
-        What are you working on?
+        Tell me the artist or release. I&apos;ll remember this if you sign up.
       </p>
     </div>
   );
@@ -900,7 +900,7 @@ export function OnboardingChat({
     onStop: stop,
     // Raw "Securing chat..." text is replaced in follow-up pass with
     // statusBanner skeleton treatment; placeholder stays stable.
-    placeholder: 'Ask Jovie...',
+    placeholder: 'Artist, release, or link...',
     onPickerOpenChange: setComposerPickerOpen,
     chips: chipTray.chips,
     onRemoveChipAt: chipTray.removeAt,

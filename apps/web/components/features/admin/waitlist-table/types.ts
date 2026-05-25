@@ -1,4 +1,7 @@
-import type { WaitlistEntryRow } from '@/lib/admin/types';
+import type {
+  WaitlistEntryRow,
+  WaitlistIntegritySummary,
+} from '@/lib/admin/types';
 
 export interface Column<T> {
   id: string;
@@ -18,6 +21,7 @@ export interface WaitlistTableProps {
   readonly hasNextPage?: boolean;
   readonly isFetchingNextPage?: boolean;
   readonly onLoadMore?: () => void;
+  readonly integrity?: WaitlistIntegritySummary;
   // Optional external selection state (for bulk actions in parent)
   readonly externalSelection?: {
     readonly selectedIds: Set<string>;

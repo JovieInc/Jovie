@@ -10,7 +10,8 @@ interface FeedbackInput {
 }
 
 interface FeedbackResponse {
-  success?: boolean;
+  ok?: boolean;
+  id?: string;
   error?: string;
 }
 
@@ -20,11 +21,18 @@ interface FeedbackResponse {
 export function useFeedbackMutation() {
   return useMutation<FeedbackResponse, Error, FeedbackInput>({
     mutationFn: async input => {
-      return fetchWithTimeout<FeedbackResponse>('/api/feedback', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(input),
-      });
+      const response = await fetchWithTimeout<FeedbackResponse>(
+        '/api/feedback',
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(input),
+        }
+      );
+      if (response.ok !== true) {
+        throw new Error(response.error ?? 'Unable to submit feedback');
+      }
+      return response;
     },
   });
 }

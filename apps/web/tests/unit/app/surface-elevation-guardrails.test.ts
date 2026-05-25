@@ -418,7 +418,7 @@ describe('surface elevation guardrails', () => {
       'lg:rounded-[var(--linear-app-shell-radius)]'
     );
     expect(rightDrawer).not.toContain('lg:border');
-    expect(adminTableShell).toContain('bg-surface-1/96');
+    expect(adminTableShell).toContain('bg-(--linear-app-content-surface)/96');
   });
 
   it('does not use semi-transparent bg-surface-1 in app shell (bg-surface-1/XX)', () => {

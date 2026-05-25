@@ -50,13 +50,13 @@ const PAIRS: ReadonlyArray<readonly [BentoCard, BentoCard]> = [
 
 export function HomeBentoPairs() {
   return (
-    <section className='border-t border-white/[0.04] bg-black px-6 py-32 sm:py-36'>
+    <section className='border-t border-black/[0.08] bg-[#f5f5f7] px-6 py-32 sm:py-36'>
       <div className='mx-auto max-w-[1200px]'>
-        <p className='mb-[18px] font-[var(--marketing-font-body)] text-xs font-semibold uppercase tracking-[0.14em] text-[color:color-mix(in_srgb,var(--geist-purple-solid)_80%,white_20%)]'>
+        <p className='mb-[18px] font-[var(--marketing-font-body)] text-sm font-medium text-black/55'>
           What it does
         </p>
-        <h2 className='m-0 max-w-[20ch] font-[var(--marketing-font-display)] text-[clamp(2.25rem,5vw,3.5rem)] font-bold leading-[1.05] tracking-[-0.028em] text-[#F7F8F8]'>
-          <span className='text-[#62666d]'>Turn attention</span>
+        <h2 className='m-0 max-w-[20ch] font-[var(--marketing-font-display)] text-[clamp(2.25rem,5vw,3.5rem)] font-bold leading-[1.05] tracking-[-0.028em] text-black'>
+          <span className='text-black/45'>Turn attention</span>
           <br />
           <span>into action.</span>
         </h2>
@@ -76,21 +76,21 @@ export function HomeBentoPairs() {
 
 function BentoCardView({ card }: { readonly card: BentoCard }) {
   return (
-    <article className='flex flex-col overflow-hidden rounded-2xl border border-white/[0.06] bg-[#0a0a0b]'>
+    <article className='flex flex-col overflow-hidden rounded-lg border border-black/[0.08] bg-white shadow-[0_18px_70px_-56px_rgba(0,0,0,0.45)]'>
       <div
-        className='relative h-[320px] overflow-hidden border-b border-white/[0.04]'
+        className='relative h-[320px] overflow-hidden border-b border-black/[0.06]'
         style={{
           background:
-            'radial-gradient(120% 80% at 50% 0%, rgba(255,255,255,0.04) 0%, rgba(0,0,0,0) 60%), linear-gradient(180deg, #141518, #0a0a0b)',
+            'radial-gradient(120% 80% at 50% 0%, rgba(0,0,0,0.04) 0%, rgba(0,0,0,0) 60%), linear-gradient(180deg, #ffffff, #f6f6f7)',
         }}
       >
         {card.preview}
       </div>
       <div className='px-9 pt-9 pb-10 text-center'>
-        <h3 className='m-0 font-[var(--marketing-font-display)] text-[22px] font-semibold leading-[1.3] tracking-[-0.012em] text-[#F7F8F8]'>
+        <h3 className='m-0 font-[var(--marketing-font-display)] text-[22px] font-semibold leading-[1.3] tracking-[-0.012em] text-black'>
           {card.title}
         </h3>
-        <p className='mx-auto mt-3 max-w-[46ch] font-[var(--marketing-font-body)] text-[14.5px] leading-[1.55] text-[#8A8F98]'>
+        <p className='mx-auto mt-3 max-w-[46ch] font-[var(--marketing-font-body)] text-[14.5px] leading-[1.55] text-black/58'>
           {card.body}
         </p>
       </div>
@@ -115,16 +115,16 @@ function SmartLinkPreview() {
     <div className='absolute inset-0 flex items-center justify-center'>
       <PreviewHalo color='var(--geist-purple-solid)' />
       <div className='relative flex flex-col items-center gap-3 font-[var(--marketing-font-body)]'>
-        <div className='flex h-14 w-14 items-center justify-center rounded-2xl border border-white/15 bg-white/[0.06] text-lg font-bold text-white'>
+        <div className='flex h-14 w-14 items-center justify-center rounded-lg border border-black/10 bg-white text-lg font-bold text-black shadow-[0_12px_42px_-34px_rgba(0,0,0,0.55)]'>
           j
         </div>
-        <div className='flex gap-2 text-[10px] uppercase tracking-[0.18em] text-[#A2A7AF]'>
+        <div className='flex gap-2 text-[10px] font-medium uppercase tracking-[0.18em] text-black/45'>
           <span>Spotify</span>
-          <span aria-hidden='true' className='text-[#3a3b3d]'>
+          <span aria-hidden='true' className='text-black/18'>
             ·
           </span>
           <span>Apple</span>
-          <span aria-hidden='true' className='text-[#3a3b3d]'>
+          <span aria-hidden='true' className='text-black/18'>
             ·
           </span>
           <span>YT&nbsp;Music</span>
@@ -139,7 +139,7 @@ function CountdownPreview() {
     <div className='absolute inset-0 flex items-center justify-center'>
       <PreviewHalo color='var(--geist-blue-solid)' />
       <div
-        className='relative font-[var(--marketing-font-display)] text-[64px] font-extrabold leading-none tracking-[-0.04em] text-[#F7F8F8] tabular-nums'
+        className='relative font-[var(--marketing-font-display)] text-[64px] font-extrabold leading-none tracking-[-0.04em] text-black tabular-nums'
         style={{ fontVariantNumeric: 'tabular-nums' }}
       >
         02&nbsp;:&nbsp;14&nbsp;:&nbsp;57
@@ -161,10 +161,10 @@ function TourPreview() {
         {cities.map(c => (
           <li
             key={c.city}
-            className='flex items-center justify-between rounded-lg border border-white/[0.08] bg-white/[0.04] px-3 py-2 font-[var(--marketing-font-body)] text-[12px] text-[#F7F8F8]'
+            className='flex items-center justify-between rounded-lg border border-black/[0.08] bg-white px-3 py-2 font-[var(--marketing-font-body)] text-[12px] text-black shadow-[0_10px_32px_-28px_rgba(0,0,0,0.55)]'
           >
             <span>{c.city}</span>
-            <span className='text-[#A2A7AF]'>{c.date}</span>
+            <span className='text-black/45'>{c.date}</span>
           </li>
         ))}
       </ul>
@@ -176,7 +176,7 @@ function TipPreview() {
   return (
     <div className='absolute inset-0 flex items-center justify-center'>
       <PreviewHalo color='var(--geist-green-solid)' />
-      <div className='relative flex items-baseline gap-1 font-[var(--marketing-font-display)] text-[#F7F8F8]'>
+      <div className='relative flex items-baseline gap-1 font-[var(--marketing-font-display)] text-black'>
         <span
           className='text-[28px] font-semibold'
           style={{ color: 'var(--geist-green-solid)' }}

@@ -19,9 +19,10 @@ import { getAdminReleases } from '@/lib/admin/releases';
 import { getAdminUsers } from '@/lib/admin/users';
 import {
   getAdminWaitlistEntries,
+  getWaitlistIntegritySummary,
   getWaitlistMetrics,
 } from '@/lib/admin/waitlist';
-import { getAdminFeedbackItems } from '@/lib/feedback';
+import { getAdminFeedbackItemsResult } from '@/lib/feedback';
 import {
   type AdminCreatorsSort,
   type AdminPeopleSort,
@@ -80,11 +81,15 @@ async function renderPeopleView(
 
   switch (view) {
     case 'waitlist': {
-      const [{ entries, pageSize: resolvedPageSize, total }, metrics] =
-        await Promise.all([
-          getAdminWaitlistEntries({ page: 1, pageSize }),
-          getWaitlistMetrics(),
-        ]);
+      const [
+        { entries, pageSize: resolvedPageSize, total },
+        metrics,
+        integrity,
+      ] = await Promise.all([
+        getAdminWaitlistEntries({ page: 1, pageSize }),
+        getWaitlistMetrics(),
+        getWaitlistIntegritySummary(),
+      ]);
 
       return (
         <div className='space-y-4'>
@@ -94,6 +99,7 @@ async function renderPeopleView(
             page={1}
             pageSize={resolvedPageSize}
             total={total}
+            integrity={integrity}
           />
         </div>
       );
@@ -170,10 +176,11 @@ async function renderPeopleView(
     }
     case 'feedback':
     default: {
-      const items = await getAdminFeedbackItems(200);
+      const { items, error } = await getAdminFeedbackItemsResult(200);
 
       return (
         <AdminFeedbackTable
+          loadError={error}
           items={items.map(item => ({
             id: item.id,
             message: item.message,

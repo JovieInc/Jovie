@@ -743,11 +743,11 @@ body:has(.home-viewport)::-webkit-scrollbar {
   padding-block: clamp(5rem, 8.5vw, 7.5rem) clamp(5rem, 8.5vw, 7.5rem);
   background:
     radial-gradient(
-      62% 34% at 50% 4%,
-      rgba(45, 83, 142, 0.11) 0%,
-      rgba(5, 6, 8, 0) 72%
+      62% 34% at 50% 0%,
+      rgba(0, 112, 243, 0.055) 0%,
+      rgba(245, 245, 247, 0) 72%
     ),
-    linear-gradient(180deg, #020303 0%, #020303 100%);
+    #f5f5f7;
 }
 
 .homepage-outcome-inner {
@@ -820,9 +820,10 @@ body:has(.home-viewport)::-webkit-scrollbar {
   flex-direction: column;
   justify-content: space-between;
   overflow: hidden;
-  border: 1px solid var(--homepage-section-border);
-  border-radius: var(--homepage-radius);
-  background: var(--homepage-surface-bg);
+  border: 1px solid rgba(5, 6, 8, 0.08);
+  border-radius: 8px;
+  background: #fff;
+  box-shadow: 0 18px 70px -56px rgba(0, 0, 0, 0.45);
   padding: clamp(2.35rem, 3.45vw, 3.55rem);
   scroll-snap-align: start;
 }
@@ -834,19 +835,15 @@ body:has(.home-viewport)::-webkit-scrollbar {
   background:
     radial-gradient(
       42% 28% at 75% 14%,
-      color-mix(in srgb, var(--outcome-accent) 14%, transparent) 0%,
+      color-mix(in srgb, var(--outcome-accent) 9%, transparent) 0%,
       transparent 70%
     ),
     radial-gradient(
       52% 40% at 50% 86%,
-      rgba(0, 112, 243, 0.045) 0%,
+      rgba(0, 112, 243, 0.035) 0%,
       transparent 72%
     ),
-    linear-gradient(
-      180deg,
-      rgba(255, 255, 255, 0.045),
-      rgba(255, 255, 255, 0) 34%
-    );
+    linear-gradient(180deg, rgba(0, 0, 0, 0.025), rgba(255, 255, 255, 0) 34%);
 }
 
 .homepage-outcome-card__copy,
@@ -865,7 +862,7 @@ body:has(.home-viewport)::-webkit-scrollbar {
   font-weight: 680;
   line-height: 1.15;
   letter-spacing: -0.02em;
-  color: rgb(255 255 255 / 0.96);
+  color: rgb(5 6 8 / 0.96);
   text-wrap: balance;
 }
 
@@ -897,12 +894,10 @@ body:has(.home-viewport)::-webkit-scrollbar {
 .homepage-outcome-release-card,
 .homepage-outcome-drawer,
 .homepage-outcome-share-card {
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: calc(var(--homepage-radius) * 0.82);
-  background: rgba(255, 255, 255, 0.035);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.05),
-    0 20px 52px rgba(0, 0, 0, 0.28);
+  border: 1px solid rgba(5, 6, 8, 0.08);
+  border-radius: 8px;
+  background: #f7f7f8;
+  box-shadow: 0 14px 44px -36px rgba(0, 0, 0, 0.38);
 }
 
 .homepage-outcome-release-card {
@@ -923,13 +918,13 @@ body:has(.home-viewport)::-webkit-scrollbar {
 
 .homepage-outcome-release-card strong {
   margin-top: 0.38rem;
-  color: rgb(255 255 255 / 0.96);
+  color: rgb(5 6 8 / 0.96);
 }
 
 .homepage-outcome-release-card span:not(.homepage-outcome-proof-label) {
   margin-top: 0.2rem;
   font-size: 12px;
-  color: rgb(255 255 255 / 0.48);
+  color: rgb(5 6 8 / 0.52);
 }
 
 .homepage-outcome-proof-label,
@@ -937,7 +932,7 @@ body:has(.home-viewport)::-webkit-scrollbar {
   font-size: 12px;
   font-weight: 520;
   letter-spacing: -0.01em;
-  color: rgb(255 255 255 / 0.48);
+  color: rgb(5 6 8 / 0.52);
 }
 
 .homepage-outcome-drawer {
@@ -948,7 +943,7 @@ body:has(.home-viewport)::-webkit-scrollbar {
   font-size: 13px;
   font-weight: 620;
   letter-spacing: -0.02em;
-  color: rgb(255 255 255 / 0.94);
+  color: rgb(5 6 8 / 0.94);
 }
 
 .homepage-outcome-drawer__subtitle {
@@ -966,7 +961,7 @@ body:has(.home-viewport)::-webkit-scrollbar {
   align-items: center;
   gap: 0.75rem;
   padding-block: 0.72rem;
-  border-top: 1px solid rgba(255, 255, 255, 0.07);
+  border-top: 1px solid rgba(5, 6, 8, 0.08);
 }
 
 .homepage-outcome-tour-row:first-child {
@@ -977,12 +972,12 @@ body:has(.home-viewport)::-webkit-scrollbar {
 .homepage-outcome-tour-row span {
   min-width: 0;
   font-size: 12px;
-  color: rgb(255 255 255 / 0.52);
+  color: rgb(5 6 8 / 0.54);
 }
 
 .homepage-outcome-tour-row span > strong {
   display: block;
-  color: rgb(255 255 255 / 0.93);
+  color: rgb(5 6 8 / 0.93);
 }
 
 .homepage-outcome-tour-row small {
@@ -990,7 +985,7 @@ body:has(.home-viewport)::-webkit-scrollbar {
   overflow: hidden;
   font-size: 11px;
   line-height: 1.35;
-  color: rgb(255 255 255 / 0.46);
+  color: rgb(5 6 8 / 0.5);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -1005,27 +1000,27 @@ body:has(.home-viewport)::-webkit-scrollbar {
   align-items: center;
   justify-content: space-between;
   min-height: 2.55rem;
-  border: 1px solid rgba(255, 255, 255, 0.075);
-  border-radius: 0.86rem;
+  border: 1px solid rgba(5, 6, 8, 0.08);
+  border-radius: 8px;
   padding-inline: 0.9rem;
   font-size: 13px;
-  color: rgb(255 255 255 / 0.92);
-  background: rgba(255, 255, 255, 0.025);
+  color: rgb(5 6 8 / 0.92);
+  background: #fff;
 }
 
 .homepage-outcome-amount-row span {
   font-size: 11px;
-  color: rgb(255 255 255 / 0.48);
+  color: rgb(5 6 8 / 0.52);
 }
 
 .homepage-outcome-amount-row--featured {
-  border-color: rgba(255, 255, 255, 0.9);
-  color: #050608;
-  background: rgb(245 245 247);
+  border-color: rgba(5, 6, 8, 0.9);
+  color: #fff;
+  background: #050608;
 }
 
 .homepage-outcome-amount-row--featured span {
-  color: rgb(5 6 8 / 0.6);
+  color: rgb(255 255 255 / 0.64);
 }
 
 .homepage-outcome-pay-cta {
@@ -1039,8 +1034,8 @@ body:has(.home-viewport)::-webkit-scrollbar {
   font-size: 12px;
   font-weight: 620;
   letter-spacing: -0.01em;
-  color: #050608;
-  background: rgb(245 245 247);
+  color: #fff;
+  background: #050608;
 }
 
 .homepage-outcome-share-card {
@@ -1049,7 +1044,7 @@ body:has(.home-viewport)::-webkit-scrollbar {
   padding: 1rem;
   text-align: center;
   color: #050608;
-  background: rgb(245 245 247);
+  background: #f7f7f8;
 }
 
 .homepage-outcome-share-card p {
@@ -1080,7 +1075,7 @@ body:has(.home-viewport)::-webkit-scrollbar {
   width: 9rem;
   height: 9rem;
   margin: 0.85rem auto 0;
-  border-radius: 1rem;
+  border-radius: 8px;
   padding: 1rem;
   background: #fff;
   box-shadow: inset 0 0 0 1px rgba(5, 6, 8, 0.06);
@@ -3665,12 +3660,11 @@ body:has(.home-viewport)::-webkit-scrollbar {
   background:
     radial-gradient(
       72% 90% at 48% 0%,
-      rgba(64, 89, 154, 0.2),
-      rgba(2, 3, 3, 0) 34rem
+      rgba(0, 112, 243, 0.055),
+      rgba(245, 245, 247, 0) 34rem
     ),
-    linear-gradient(180deg, rgba(255, 255, 255, 0.035), rgba(255, 255, 255, 0)),
-    #020303;
-  color: rgba(255, 255, 255, 0.95);
+    #f5f5f7;
+  color: rgb(5 6 8 / 0.95);
 }
 
 .homepage-artist-profiles-section__inner {
@@ -3689,7 +3683,7 @@ body:has(.home-viewport)::-webkit-scrollbar {
 
 .homepage-artist-profiles-section__header p {
   margin: 0;
-  color: rgba(111, 156, 255, 0.96);
+  color: rgb(5 6 8 / 0.54);
   font-size: 0.94rem;
   font-weight: 620;
   line-height: 1.2;
@@ -3699,7 +3693,7 @@ body:has(.home-viewport)::-webkit-scrollbar {
   display: grid;
   max-width: 13.5ch;
   margin: 0;
-  color: rgba(255, 255, 255, 0.96);
+  color: rgb(5 6 8 / 0.96);
   font-size: clamp(2.7rem, 4vw, 3.85rem);
   font-weight: 680;
   line-height: 1.06;
@@ -3719,7 +3713,7 @@ body:has(.home-viewport)::-webkit-scrollbar {
 }
 
 .homepage-artist-profiles-section__meta > span {
-  color: rgba(255, 255, 255, 0.58);
+  color: rgb(5 6 8 / 0.58);
   font-size: clamp(1.05rem, 1.65vw, 1.45rem);
   font-weight: 420;
   line-height: 1.35;
@@ -3748,14 +3742,14 @@ body:has(.home-viewport)::-webkit-scrollbar {
 }
 
 .homepage-artist-profiles-section__primary {
-  background: rgba(255, 255, 255, 0.94);
-  color: #050609;
+  background: #050609;
+  color: #fff;
 }
 
 .homepage-artist-profiles-section__secondary {
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  background: rgba(255, 255, 255, 0.035);
-  color: rgba(255, 255, 255, 0.9);
+  border: 1px solid rgb(5 6 8 / 0.12);
+  background: #fff;
+  color: rgb(5 6 8 / 0.86);
 }
 
 .homepage-artist-profiles-carousel {
@@ -3785,10 +3779,10 @@ body:has(.home-viewport)::-webkit-scrollbar {
   height: 2.6rem;
   align-items: center;
   justify-content: center;
-  border: 1px solid rgba(255, 255, 255, 0.12);
+  border: 1px solid rgb(5 6 8 / 0.12);
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.045);
-  color: rgba(255, 255, 255, 0.92);
+  background: #fff;
+  color: rgb(5 6 8 / 0.88);
   cursor: pointer;
   transition:
     background-color 160ms ease,
@@ -3797,8 +3791,8 @@ body:has(.home-viewport)::-webkit-scrollbar {
 
 .homepage-artist-profiles-carousel__controls button:hover,
 .homepage-artist-profiles-carousel__controls button:focus-visible {
-  border-color: rgba(255, 255, 255, 0.22);
-  background: rgba(255, 255, 255, 0.09);
+  border-color: rgb(5 6 8 / 0.22);
+  background: rgb(5 6 8 / 0.04);
 }
 
 .homepage-artist-profiles-carousel__rail {
@@ -3812,9 +3806,9 @@ body:has(.home-viewport)::-webkit-scrollbar {
 }
 
 .homepage-artist-profiles-carousel__rail:focus-visible {
-  outline: 2px solid rgba(68, 182, 255, 0.85);
+  outline: 2px solid rgba(5, 6, 8, 0.24);
   outline-offset: 0.45rem;
-  border-radius: 1.4rem;
+  border-radius: 8px;
 }
 
 .homepage-artist-profiles-carousel__keyboard-controls {
@@ -3847,10 +3841,10 @@ body:has(.home-viewport)::-webkit-scrollbar {
   height: 2.25rem;
   align-items: center;
   justify-content: center;
-  border: 1px solid rgba(255, 255, 255, 0.18);
+  border: 1px solid rgb(5 6 8 / 0.14);
   border-radius: 999px;
-  background: rgba(9, 12, 18, 0.88);
-  color: rgba(255, 255, 255, 0.92);
+  background: #fff;
+  color: rgb(5 6 8 / 0.9);
 }
 
 .homepage-artist-profiles-carousel__rail::-webkit-scrollbar {
@@ -3873,25 +3867,19 @@ body:has(.home-viewport)::-webkit-scrollbar {
   height: clamp(43rem, 55vw, 49rem);
   scroll-snap-align: start;
   overflow: hidden;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 26px;
+  border: 1px solid rgb(5 6 8 / 0.08);
+  border-radius: 8px;
   padding: clamp(2.35rem, 3vw, 3.1rem) 1.1rem 1rem;
   background:
     radial-gradient(
       120% 62% at 50% 100%,
-      color-mix(in oklab, var(--profile-card-glow-a) 72%, transparent) 0%,
-      color-mix(in oklab, var(--profile-card-glow-b) 60%, transparent) 34%,
+      color-mix(in oklab, var(--profile-card-glow-a) 24%, transparent) 0%,
+      color-mix(in oklab, var(--profile-card-glow-b) 18%, transparent) 34%,
       transparent 68%
     ),
-    radial-gradient(
-      80% 44% at 50% 0%,
-      rgba(255, 255, 255, 0.07),
-      transparent 60%
-    ),
-    #04050a;
-  box-shadow:
-    0 28px 90px rgba(0, 0, 0, 0.42),
-    inset 0 1px 0 rgba(255, 255, 255, 0.08);
+    radial-gradient(80% 44% at 50% 0%, rgba(5, 6, 8, 0.035), transparent 60%),
+    #fff;
+  box-shadow: 0 18px 70px -56px rgba(0, 0, 0, 0.45);
 }
 
 .homepage-artist-profile-card__link {
@@ -3901,13 +3889,13 @@ body:has(.home-viewport)::-webkit-scrollbar {
   grid-template-rows: auto minmax(0, 1fr);
   justify-items: center;
   gap: 1.35rem;
-  border-radius: 20px;
+  border-radius: 8px;
   color: inherit;
   text-decoration: none;
 }
 
 .homepage-artist-profile-card__link:focus-visible {
-  outline: 2px solid rgba(255, 255, 255, 0.72);
+  outline: 2px solid rgb(5 6 8 / 0.28);
   outline-offset: 0.35rem;
 }
 
@@ -3936,7 +3924,7 @@ body:has(.home-viewport)::-webkit-scrollbar {
   z-index: 2;
   max-width: 12ch;
   margin: 0;
-  color: #fff;
+  color: #050608;
   font-size: clamp(1.85rem, 2.2vw, 2.2rem);
   font-weight: 680;
   line-height: 1.04;
