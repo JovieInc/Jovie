@@ -815,18 +815,18 @@ function assertToolUiRegistryCovered(output) {
   if (payload.target !== 'tool-inventory') {
     return fail('case did not run through the tool-inventory adapter');
   }
-  if (
-    Array.isArray(payload.missingToolUiRegistryNames) &&
-    payload.missingToolUiRegistryNames.length > 0
-  ) {
+  if (!Array.isArray(payload.missingToolUiRegistryNames)) {
+    return fail('missing tool-inventory field: missingToolUiRegistryNames');
+  }
+  if (!Array.isArray(payload.staleToolUiRegistryNames)) {
+    return fail('missing tool-inventory field: staleToolUiRegistryNames');
+  }
+  if (payload.missingToolUiRegistryNames.length > 0) {
     return fail(
       `missing tool UI registry coverage: ${payload.missingToolUiRegistryNames.join(', ')}`
     );
   }
-  if (
-    Array.isArray(payload.staleToolUiRegistryNames) &&
-    payload.staleToolUiRegistryNames.length > 0
-  ) {
+  if (payload.staleToolUiRegistryNames.length > 0) {
     return fail(
       `stale tool UI registry entries: ${payload.staleToolUiRegistryNames.join(', ')}`
     );
