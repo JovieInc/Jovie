@@ -54,7 +54,7 @@ describe('HomepageIntent', () => {
     ).toBeTruthy();
     expect(
       screen.getByText(
-        'Jovie watches your catalog, surfaces what to do next, and helps you ship the presave, fan path, or playlist pitch.'
+        'Jovie watches your catalog, surfaces what to do next, and helps you ship the presave, fan path, or pitch draft.'
       )
     ).toBeTruthy();
     expect(getInput()).toBeTruthy();
@@ -62,9 +62,7 @@ describe('HomepageIntent', () => {
     expect(
       screen.getByRole('button', { name: 'Generate album art' })
     ).toBeTruthy();
-    expect(
-      screen.getByRole('button', { name: 'Pitch playlists' })
-    ).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Generate pitch' })).toBeTruthy();
     expect(
       screen.getByRole('button', { name: 'Build artist profile' })
     ).toBeTruthy();

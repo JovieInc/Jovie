@@ -69,7 +69,7 @@ test.describe('Homepage', () => {
     ).toBeVisible();
     await expect(
       hero.getByText(
-        'Connect your catalog. Jovie turns each release into the next fan path, presave, or playlist pitch.'
+        'Connect your catalog. Jovie turns each release into the next fan path, presave, or pitch draft.'
       )
     ).toBeVisible();
     await expect(

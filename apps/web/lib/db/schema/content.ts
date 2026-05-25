@@ -67,14 +67,26 @@ export const discogReleases = pgTable(
       .default('manual')
       .notNull(),
     metadata: jsonb('metadata').$type<Record<string, unknown>>().default({}),
-    generatedPitches: jsonb('generated_pitches').$type<{
-      spotify: string;
-      amazon: string;
-      appleMusic: string;
-      generic: string;
-      generatedAt: string;
-      modelUsed: string;
-    }>(),
+    generatedPitches: jsonb('generated_pitches').$type<
+      | {
+          spotify: string;
+          amazon: string;
+          appleMusic: string;
+          generic: string;
+          generatedAt: string;
+          modelUsed: string;
+        }
+      | {
+          target: string;
+          platform: string | null;
+          destinationLabel: string;
+          audience: string;
+          subjectLine: string | null;
+          body: string;
+          generatedAt: string;
+          modelUsed: string;
+        }
+    >(),
     createdAt: timestamp('created_at').defaultNow().notNull(),
     updatedAt: timestamp('updated_at').defaultNow().notNull(),
   },

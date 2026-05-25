@@ -187,8 +187,8 @@ export function SuggestedPrompts({
             const cleanTitle = latestReleaseTitle.trim();
             return {
               ...PITCH_SUGGESTION,
-              label: `Pitches for “${cleanTitle}”`,
-              prompt: `Generate playlist pitches for ${cleanTitle}.`,
+              label: `Pitch for “${cleanTitle}”`,
+              prompt: `Generate a pitch for ${cleanTitle}.`,
             };
           }
           return PITCH_SUGGESTION;

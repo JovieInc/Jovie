@@ -7,13 +7,27 @@
 
 ## [26.5.57] - 2026-05-25
 
-> Native auth now completes through the hardened Mac OS and iOS callback paths without leaking internal runtime names into customer-facing copy.
+> Native auth now completes through the hardened Mac OS and iOS callback paths, and release pitching now starts from Jovie chat instead of a dedicated sidebar builder.
+
+### Added
+
+- **Chat-first pitch tool (JOV-2594)**: added a centralized `generateReleasePitch` tool and command that drafts one destination-aware pitch for playlists, radio, Sirius XM, installs, playback/music supervisors, editorial posts, record labels, or collaborators.
+- **Pitch action menus (JOV-2594)**: added `Generate pitch` to release action menus and pitch-related task menus, with task-derived destination context when the task title/category is clear.
+
+### Changed
+
+- **Pitch chat artifact (JOV-2594)**: renders a copy-ready pitch draft with subject/body support instead of four fixed platform tabs.
+- **Agent catalog alignment (JOV-2594)**: registered pitch generation in the shared agent tool catalog and command registry, and captured the broader UI-to-tool consolidation audit in JOV-2595.
 
 ### Fixed
 
 - **Native auth completion**: finalizes Mac OS Clerk ticket sign-in through the tested set-active path, returns iOS native exchange responses through the mobile session-token contract, and records DEBUG/TestFlight-safe diagnostics for the sheet, callback, exchange, hydration, `/me`, and route stages.
 - **Auth surfaces**: replaces the oversized unavailable state with the compact centered auth sheet and reduces the iOS splash logo footprint.
 - **Customer-facing runtime copy**: maps desktop session activity from internal runtime names to `Mac OS` and adds a deterministic guard for forbidden vendor/runtime copy.
+
+### Removed
+
+- **Dedicated pitch builder UI (JOV-2594)**: removed the release sidebar `Pitch` tab, target-playlist editor, pitch dashboard API route, and client mutation hook.
 
 ## [26.5.56] - 2026-05-25
 

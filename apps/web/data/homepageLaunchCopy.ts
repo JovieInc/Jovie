@@ -29,7 +29,7 @@ export const HOMEPAGE_LAUNCH_COPY = {
   hero: {
     headline: 'Your AI artist manager.',
     subhead:
-      'Jovie watches your catalog, surfaces what to do next, and helps you ship the presave, fan path, or playlist pitch.',
+      'Jovie watches your catalog, surfaces what to do next, and helps you ship the presave, fan path, or pitch draft.',
     primaryCta: HOMEPAGE_FRONT_DOOR_CTA.primary,
     secondaryCta: {
       label: 'See a live profile',

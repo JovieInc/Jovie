@@ -8,6 +8,7 @@ interface GetReleaseContextMenuItemsOptions {
   onDelete?: (releaseId: string) => void;
   canGenerateAlbumArt?: boolean;
   onGenerateAlbumArt?: (release: ReleaseViewModel) => void;
+  onGeneratePitch?: (release: ReleaseViewModel) => void;
   artistName?: string | null;
   isSmartLinkLocked?: (releaseId: string) => boolean;
   getSmartLinkLockReason?: (releaseId: string) => 'scheduled' | 'cap' | null;
@@ -26,6 +27,7 @@ export async function getReleaseContextMenuItems({
   onDelete,
   canGenerateAlbumArt,
   onGenerateAlbumArt,
+  onGeneratePitch,
   artistName,
   isSmartLinkLocked,
   getSmartLinkLockReason,
@@ -41,6 +43,7 @@ export async function getReleaseContextMenuItems({
     onDelete,
     canGenerateAlbumArt,
     onGenerateAlbumArt,
+    onGeneratePitch,
     artistName,
     isSmartLinkLocked,
     getSmartLinkLockReason,

@@ -1,8 +1,10 @@
 /**
  * Pitch Generation Types
  *
- * Types and constants for AI-generated playlist pitches.
+ * Types and constants for AI-generated release pitches.
  */
+
+import type { PitchDestination, PitchPlatform, PitchTarget } from './targets';
 
 /** Character limits per DSP platform */
 export const PLATFORM_LIMITS = {
@@ -20,6 +22,18 @@ export interface GeneratedPitches {
   amazon: string;
   appleMusic: string;
   generic: string;
+  generatedAt: string; // ISO 8601 UTC
+  modelUsed: string;
+}
+
+/** Chat-first pitch draft stored on the release after generation. */
+export interface GeneratedPitchDraft {
+  target: PitchTarget;
+  platform: PitchPlatform | null;
+  destinationLabel: string;
+  audience: string;
+  subjectLine: string | null;
+  body: string;
   generatedAt: string; // ISO 8601 UTC
   modelUsed: string;
 }
@@ -55,6 +69,13 @@ export interface PitchInput {
 
 export interface PitchGenerationResult {
   pitches: GeneratedPitches;
+  promptTokens: number;
+  completionTokens: number;
+}
+
+export interface PitchDraftGenerationResult {
+  pitch: GeneratedPitchDraft;
+  destination: PitchDestination;
   promptTokens: number;
   completionTokens: number;
 }

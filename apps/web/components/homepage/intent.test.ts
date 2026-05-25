@@ -27,14 +27,14 @@ describe('homepage intent constants', () => {
     expect(PILLS.map(p => p.label)).toEqual([
       'Plan a release',
       'Generate album art',
-      'Pitch playlists',
+      'Generate pitch',
       'Build artist profile',
       'Analyze momentum',
     ]);
     expect(PILLS.map(p => p.insertedPrompt)).toEqual([
       'Plan a release for ',
       'Generate album art for ',
-      'Pitch playlists for ',
+      'Generate a pitch for ',
       'Build artist profile for ',
       'Analyze momentum for ',
     ]);

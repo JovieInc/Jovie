@@ -15,6 +15,7 @@ import {
   Disc3,
   FileText,
   Plus,
+  Sparkles,
   Trash2,
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
@@ -76,6 +77,7 @@ import { useBreakpoint } from '@/hooks/useBreakpoint';
 import { useIsomorphicLayoutEffect } from '@/hooks/useIsomorphicLayoutEffect';
 import { useMediaQuery } from '@/hooks/useMediaQuery';
 import { useRegisterRightPanel } from '@/hooks/useRegisterRightPanel';
+import { openChatWithPrompt } from '@/lib/chat/open-chat-with-prompt';
 import { useAppFlag } from '@/lib/flags/client';
 import { useReleaseEntityQuery } from '@/lib/queries/useReleaseEntityQuery';
 import {
@@ -90,6 +92,10 @@ import {
   useTasksQuery,
 } from '@/lib/queries/useTasksQuery';
 import { DEFAULT_RELEASE_TASK_TEMPLATE } from '@/lib/release-tasks/default-template';
+import {
+  buildTaskPitchChatPrompt,
+  isPitchRelatedText,
+} from '@/lib/services/pitch/targets';
 import {
   compareTasksByBoardOrder,
   getVisibleTaskBoardStatuses,
@@ -1164,12 +1170,14 @@ function MobileTaskListItem({
 
 function useTaskActions({
   artistName,
+  onGeneratePitch,
   onRequestDelete,
   openReleaseSidebar,
   openTaskDocument,
   updateTask,
 }: {
   artistName: string | null | undefined;
+  onGeneratePitch: (task: TaskView) => void;
   onRequestDelete: (task: TaskView) => void;
   openReleaseSidebar: (task: TaskView) => void;
   openTaskDocument: (task: TaskView) => void;
@@ -1204,6 +1212,11 @@ function useTaskActions({
   const getTaskContextMenuItems = useCallback(
     (task: TaskView): ContextMenuItemType[] => {
       const StageIcon = getTaskStageVisual(task.status, task.agentStatus).icon;
+      const canGeneratePitch = Boolean(
+        task.releaseId &&
+          task.releaseTitle &&
+          isPitchRelatedText(`${task.title} ${task.category ?? ''}`)
+      );
       const statusIcon = (
         <StageIcon
           className={cn('h-4 w-4', task.status === 'done' && 'fill-current')}
@@ -1224,6 +1237,16 @@ function useTaskActions({
                 icon: <Disc3 className='h-4 w-4' />,
                 onClick: () => openReleaseSidebar(task),
               } satisfies ContextMenuItemType,
+              ...(canGeneratePitch
+                ? [
+                    {
+                      id: 'generate-pitch',
+                      label: 'Generate pitch',
+                      icon: <Sparkles className='h-4 w-4' />,
+                      onClick: () => onGeneratePitch(task),
+                    } satisfies ContextMenuItemType,
+                  ]
+                : []),
               { type: 'separator' } satisfies ContextMenuItemType,
             ]
           : []),
@@ -1305,6 +1328,7 @@ function useTaskActions({
     [
       artistName,
       handleDeleteTask,
+      onGeneratePitch,
       openReleaseSidebar,
       openTaskDocument,
       updateTaskField,
@@ -1646,8 +1670,28 @@ export function TasksPageClient() {
     [canShowTaskDocumentAlongsideReleaseSidebar]
   );
 
+  const handleGenerateTaskPitch = useCallback(
+    (task: TaskView) => {
+      if (!task.releaseId || !task.releaseTitle) {
+        return;
+      }
+
+      openChatWithPrompt(
+        buildTaskPitchChatPrompt({
+          releaseId: task.releaseId,
+          releaseTitle: task.releaseTitle,
+          taskTitle: task.title,
+          taskCategory: task.category,
+        }),
+        router
+      );
+    },
+    [router]
+  );
+
   const { getTaskContextMenuItems, updateTaskField } = useTaskActions({
     artistName,
+    onGeneratePitch: handleGenerateTaskPitch,
     onRequestDelete: setTaskPendingDelete,
     openReleaseSidebar,
     openTaskDocument,

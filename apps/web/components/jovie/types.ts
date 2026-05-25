@@ -268,7 +268,7 @@ export interface StarterSuggestionContext {
 /**
  * Default chat-home suggestions. Mirrors the homepage hero pills
  * (`components/homepage/intent.ts`) so the authenticated entrypoint
- * starts from the same mental model ("Plan a release", "Pitch playlists",
+ * starts from the same mental model ("Plan a release", "Generate pitch",
  * ...) instead of the old task-list-style "Preview profile" / "Change
  * photo" actions — those belong in the profile switcher, not the chat
  * home.
@@ -288,8 +288,8 @@ export const DEFAULT_SUGGESTIONS: readonly ChatSuggestion[] = [
   },
   {
     icon: 'Music',
-    label: 'Pitch playlists',
-    prompt: 'Generate playlist pitches for my latest release.',
+    label: 'Generate pitch',
+    prompt: 'Generate a pitch for my latest release.',
     accent: 'blue',
   },
   {
@@ -312,8 +312,8 @@ export const DEFAULT_SUGGESTIONS: readonly ChatSuggestion[] = [
  */
 export const PITCH_SUGGESTION: ChatSuggestion = {
   icon: 'Music',
-  label: 'Generate pitches',
-  prompt: 'Generate playlist pitches for my latest release.',
+  label: 'Generate pitch',
+  prompt: 'Generate a pitch for my latest release.',
   accent: 'blue',
 };
 
@@ -343,8 +343,8 @@ export const FIRST_SESSION_SUGGESTIONS: readonly ChatSuggestion[] = [
   },
   {
     icon: 'Music',
-    label: 'Pitch playlists',
-    prompt: 'Walk me through pitching my music to playlists.',
+    label: 'Generate pitch',
+    prompt: 'Walk me through pitching my music.',
     accent: 'blue',
   },
   {

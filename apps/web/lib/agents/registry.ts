@@ -18,6 +18,23 @@ import type { SkillDefinition, ToolDefinition } from './types';
 type RegistryDefinition = SkillDefinition | ToolDefinition;
 
 export const SKILL_REGISTRY = {
+  generateReleasePitch: {
+    id: 'generateReleasePitch',
+    name: 'Generate pitch',
+    description:
+      'Draft a destination-aware release pitch for playlists, radio, Sirius XM, installs, playback, editorial posts, record labels, or collaborators.',
+    kind: 'tool',
+    version: '1.0.0',
+    entitlement: 'aiCanUseTools',
+    model: 'anthropic/claude-haiku-4-5-20251001',
+    inputSchemaZodPath: 'apps/web/lib/chat/tool-schemas.ts',
+    outputSchemaZodPath: 'apps/web/components/jovie/tool-ui.tsx',
+    metadata: {
+      surface: 'chat',
+      action: 'generate_release_pitch',
+      connector: 'gmail_optional',
+    },
+  },
   retouch: {
     id: 'retouch',
     name: 'Retouch image',

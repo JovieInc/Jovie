@@ -74,6 +74,7 @@ export interface BuildReleaseActionsOptions {
   readonly qrCodeIcon?: ReactNode;
   readonly canGenerateAlbumArt?: boolean;
   readonly onGenerateAlbumArt?: (release: ReleaseViewModel) => void;
+  readonly onGeneratePitch?: (release: ReleaseViewModel) => void;
 }
 
 function buildPrimaryCopySmartLinkItem(
@@ -251,6 +252,7 @@ export function buildReleaseActions({
   qrCodeIcon,
   canGenerateAlbumArt,
   onGenerateAlbumArt,
+  onGeneratePitch,
 }: BuildReleaseActionsOptions): ContextMenuItemType[] {
   const locked = isSmartLinkLocked?.(release.id) ?? false;
   const lockReason = getSmartLinkLockReason?.(release.id) ?? null;
@@ -297,6 +299,16 @@ export function buildReleaseActions({
             label: 'Generate Album Art',
             icon: menuIcon('Sparkles'),
             onClick: () => onGenerateAlbumArt(release),
+          } satisfies ContextMenuItemType,
+        ]
+      : []),
+    ...(onGeneratePitch
+      ? [
+          {
+            id: 'generate-pitch',
+            label: 'Generate pitch',
+            icon: menuIcon('Sparkles'),
+            onClick: () => onGeneratePitch(release),
           } satisfies ContextMenuItemType,
         ]
       : []),

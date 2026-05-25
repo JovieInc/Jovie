@@ -389,32 +389,6 @@ vi.mock(
   })
 );
 
-vi.mock('@/components/organisms/release-sidebar/ReleasePitchSection', () => ({
-  ReleasePitchSection: ({ variant }: { variant?: 'card' | 'flat' }) => (
-    <div data-testid='pitch-section' data-variant={variant ?? 'card'}>
-      Pitch Section
-    </div>
-  ),
-}));
-
-vi.mock(
-  '@/components/organisms/release-sidebar/ReleaseTargetPlaylistsSection',
-  () => ({
-    ReleaseTargetPlaylistsSection: ({
-      variant,
-    }: {
-      variant?: 'card' | 'flat';
-    }) => (
-      <div
-        data-testid='target-playlists-section'
-        data-variant={variant ?? 'card'}
-      >
-        Target Playlists
-      </div>
-    ),
-  })
-);
-
 vi.mock('@/components/features/dashboard/release-tasks', () => ({
   ReleaseTaskChecklist: ({
     onNavigateToFullPage,
@@ -532,7 +506,7 @@ describe('ReleaseSidebar inspector cards', () => {
     );
   });
 
-  it('renders the release drawer with four primary tabs and overview content', () => {
+  it('renders the release drawer with three primary tabs and overview content', () => {
     render(<ReleaseSidebar release={mockRelease} {...defaultProps} />);
 
     expect(screen.getByTestId('release-tabbed-card')).toBeInTheDocument();
@@ -540,7 +514,6 @@ describe('ReleaseSidebar inspector cards', () => {
     expect(screen.getByTestId('drawer-tab-overview')).toBeInTheDocument();
     expect(screen.getByTestId('drawer-tab-dsps')).toBeInTheDocument();
     expect(screen.getByTestId('drawer-tab-tasks')).toBeInTheDocument();
-    expect(screen.getByTestId('drawer-tab-pitch')).toBeInTheDocument();
     expect(screen.getByTestId('release-properties-card')).toBeInTheDocument();
     expect(screen.getByTestId('metadata')).toHaveAttribute(
       'data-variant',
@@ -555,10 +528,6 @@ describe('ReleaseSidebar inspector cards', () => {
     expect(screen.getByText('Lyrics')).toBeInTheDocument();
     expect(screen.queryByTestId('lyrics')).not.toBeInTheDocument();
     expect(screen.queryByTestId('async-toggle')).not.toBeInTheDocument();
-    expect(screen.queryByTestId('pitch-section')).not.toBeInTheDocument();
-    expect(
-      screen.queryByTestId('target-playlists-section')
-    ).not.toBeInTheDocument();
     expect(screen.queryByTestId('task-checklist')).not.toBeInTheDocument();
   });
 
@@ -729,7 +698,7 @@ describe('ReleaseSidebar inspector cards', () => {
     expect(screen.getByTestId('analytics')).toBeInTheDocument();
   });
 
-  it('renders the release drawer as header, analytics, and four primary tabs', () => {
+  it('renders the release drawer as header, analytics, and three primary tabs', () => {
     render(<ReleaseSidebar release={mockRelease} {...defaultProps} />);
 
     expect(screen.getByTestId('release-header-card')).toBeInTheDocument();
@@ -739,13 +708,13 @@ describe('ReleaseSidebar inspector cards', () => {
     expect(screen.getByTestId('drawer-tabs')).toBeInTheDocument();
     expect(screen.getByTestId('release-tabbed-card')).toBeInTheDocument();
     expect(screen.getByTestId('release-lyrics-card')).toBeInTheDocument();
-    expect(screen.getAllByRole('tab')).toHaveLength(4);
+    expect(screen.getAllByRole('tab')).toHaveLength(3);
     expect(
       screen.queryByTestId('release-credits-card-stack')
     ).not.toBeInTheDocument();
   });
 
-  it('switches between Overview, Links, Tasks, and Pitch tabs', async () => {
+  it('switches between Overview, Links, and Tasks tabs', async () => {
     const user = userEvent.setup();
     render(<ReleaseSidebar release={mockRelease} {...defaultProps} />);
 
@@ -762,10 +731,6 @@ describe('ReleaseSidebar inspector cards', () => {
     await user.click(screen.getByTestId('drawer-tab-tasks'));
     expect(screen.getByTestId('release-tasks-card')).toBeInTheDocument();
     expect(screen.queryByTestId('dsp-links')).not.toBeInTheDocument();
-
-    await user.click(screen.getByTestId('drawer-tab-pitch'));
-    expect(screen.getByTestId('release-pitch-tab')).toBeInTheDocument();
-    expect(screen.queryByTestId('release-tasks-card')).not.toBeInTheDocument();
   });
 
   it('renders the Tracks collapsible only when the release has tracks', () => {

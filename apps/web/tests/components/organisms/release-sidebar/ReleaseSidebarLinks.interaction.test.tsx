@@ -355,9 +355,6 @@ vi.mock('@/components/organisms/release-sidebar/ReleaseMetadata', () => ({
 vi.mock('@/components/organisms/release-sidebar/ReleaseCreditsSection', () => ({
   ReleaseCreditsSection: () => <div>Credits</div>,
 }));
-vi.mock('@/components/organisms/release-sidebar/ReleasePitchSection', () => ({
-  ReleasePitchSection: () => <div>Pitch Section</div>,
-}));
 vi.mock('@/app/app/(shell)/dashboard/releases/actions', () => ({
   updateAllowArtworkDownloads: vi.fn().mockResolvedValue(undefined),
 }));

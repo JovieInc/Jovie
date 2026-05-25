@@ -81,7 +81,6 @@ const DEMO_RELEASE_EXPERIENCE_ADAPTER = {
   onSaveLyrics: async () => {},
   onSaveMetadata: async () => {},
   onSavePrimaryIsrc: async () => {},
-  onSaveTargetPlaylists: async () => {},
   onFormatLyrics: async (_releaseId: string, lyrics: string) => [lyrics],
   onCanvasStatusUpdate: async () => {},
   onToggleArtworkDownloads: async () => {},

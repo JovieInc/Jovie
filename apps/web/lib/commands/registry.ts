@@ -37,7 +37,6 @@ export const HIDDEN_TOOLS: Readonly<Record<string, string>> = {
     'Merch lifecycle action shown from merch cards, not the root slash menu.',
   formatLyrics: 'Pro-only; surfaced via the lyrics surface, not slash.',
   generateCanvasPlan: 'Pro-only; surfaced via the release detail surface.',
-  generateReleasePitch: 'Pro-only; surfaced via the release detail surface.',
   importBioFromUrl:
     'Triggered conversationally from an explicit URL import request before profile-edit preview.',
   markCanvasUploaded:
@@ -179,6 +178,13 @@ export const COMMANDS: readonly Command[] = [
     'Generate album art',
     'Generate three album art options for a release.',
     'Image',
+    [{ kind: 'release', required: true }]
+  ),
+  skill(
+    'generateReleasePitch',
+    'Generate pitch',
+    'Draft a destination-aware release pitch in chat.',
+    'Music',
     [{ kind: 'release', required: true }]
   ),
   skill(

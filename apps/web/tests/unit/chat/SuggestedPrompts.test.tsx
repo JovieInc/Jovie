@@ -15,7 +15,7 @@ describe('SuggestedPrompts', () => {
     const generateAlbumArt = getByText('Generate album art').closest('button');
     expect(generateAlbumArt).toBeTruthy();
     expect(generateAlbumArt).toBeDisabled();
-    expect(getByText('Pitch playlists')).toBeTruthy();
+    expect(getByText('Generate pitch')).toBeTruthy();
     expect(getByText('Build artist profile')).toBeTruthy();
     expect(getByText('Analyze momentum')).toBeTruthy();
 
@@ -86,7 +86,7 @@ describe('SuggestedPrompts', () => {
 
     expect(getByRole('button', { name: 'Plan a release' })).toBeTruthy();
     expect(getByRole('button', { name: 'Generate album art' })).toBeDisabled();
-    expect(getByRole('button', { name: 'Pitch playlists' })).toBeTruthy();
+    expect(getByRole('button', { name: 'Generate pitch' })).toBeTruthy();
     expect(getByRole('button', { name: 'Build artist profile' })).toBeTruthy();
   });
 
@@ -109,7 +109,7 @@ describe('SuggestedPrompts', () => {
 
     expect(
       getByRole('button', {
-        name: 'Pitches for “Midnight Drive”',
+        name: 'Pitch for “Midnight Drive”',
       })
     ).toBeTruthy();
     expect(getByRole('button', { name: 'Share feedback' })).toBeTruthy();

@@ -245,32 +245,6 @@ export function SettingsProfileSection({
             </span>
           </div>
         </div>
-
-        <div className={PROFILE_ROW_CLASS}>
-          <div>
-            <label
-              htmlFor='targetPlaylists'
-              className='text-app text-primary-token'
-            >
-              Default target playlists
-            </label>
-            <p className='mt-0.5 text-app text-secondary-token'>
-              Default playlists for pitch generation. Override per-release in
-              the release sidebar.
-            </p>
-          </div>
-          <Input
-            type='text'
-            name='targetPlaylists'
-            id='targetPlaylists'
-            value={formData.targetPlaylists}
-            onChange={e => handleFieldChange('targetPlaylists', e.target.value)}
-            onBlur={() => flushSave()}
-            placeholder='e.g. Pollen, Butter, Lorem'
-            maxLength={310}
-            className={`${PROFILE_FIELD_COLUMN_CLASS} ${PROFILE_INPUT_CLASS}`}
-          />
-        </div>
       </div>
     </SettingsPanel>
   );

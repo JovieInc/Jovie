@@ -7,6 +7,11 @@
  */
 
 import { z } from 'zod';
+import {
+  PITCH_PLATFORMS,
+  PITCH_TARGET_OPTIONS_TEXT,
+  PITCH_TARGETS,
+} from '@/lib/services/pitch/targets';
 import { interviewSignalSchema } from './tools/onboarding-signals';
 
 // ---------------------------------------------------------------------------
@@ -35,6 +40,19 @@ export const TOOL_SCHEMAS = {
         .optional(),
       prompt: z.string().max(500).optional(),
       createRelease: z.boolean().optional(),
+    }),
+  },
+
+  generateReleasePitch: {
+    description: `Generate one copy-paste-ready release pitch for a destination. Ask where they want to pitch it before using this tool unless the task or user message clearly maps to: ${PITCH_TARGET_OPTIONS_TEXT}.`,
+    inputSchema: z.object({
+      releaseTitle: z.string().max(200).optional(),
+      releaseId: z.string().uuid().optional(),
+      target: z.enum(PITCH_TARGETS).optional(),
+      platform: z.enum(PITCH_PLATFORMS).optional(),
+      taskTitle: z.string().max(200).optional(),
+      taskCategory: z.string().max(100).optional(),
+      instructions: z.string().max(700).optional(),
     }),
   },
 

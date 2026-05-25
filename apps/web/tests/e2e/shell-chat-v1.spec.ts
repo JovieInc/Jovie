@@ -171,7 +171,7 @@ async function mockFlyoutConversation(page: Page) {
               id: 'assistant-intro',
               role: 'assistant',
               content:
-                'Hey Tim. I can help with your profile, releases, promotion strategy, playlist pitches, and analytics.',
+                'Hey Tim. I can help with your profile, releases, promotion strategy, pitch drafts, and analytics.',
               toolCalls: null,
               clientMessageId: null,
               turnId: 'turn-intro',

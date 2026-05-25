@@ -44,7 +44,7 @@ test.describe
       await waitForHydration(page);
 
       // On free plan, the pitch suggestion should NOT be visible
-      const pitchSuggestion = page.getByText(/generate pitches/i);
+      const pitchSuggestion = page.getByText(/generate pitch/i);
       await expect(pitchSuggestion).not.toBeVisible({ timeout: 5_000 });
     });
 
@@ -69,7 +69,7 @@ test.describe
 
       // Prompt suggestion pills are not part of this shell convergence wave.
       // The paid tool remains reachable through the composer.
-      const pitchSuggestion = page.getByText(/generate pitches/i);
+      const pitchSuggestion = page.getByText(/generate pitch/i);
       const chatInput = page.getByPlaceholder(/ask jovie|chat message/i);
 
       await expect(chatInput).toBeVisible({ timeout: 15_000 });
@@ -90,7 +90,7 @@ test.describe
       // Type a pitch request in the chat input
       const chatInput = page.getByPlaceholder(/ask jovie|chat message/i);
       await expect(chatInput).toBeVisible({ timeout: 15_000 });
-      await chatInput.fill('Generate playlist pitches for my latest release.');
+      await chatInput.fill('Generate a playlist pitch for my latest release.');
 
       // Send the message
       const sendButton = page.getByRole('button', { name: /send message/i });
@@ -99,7 +99,7 @@ test.describe
 
       // Wait for the actual pitch tool UI, not just "some assistant activity".
       // The tool can surface either the loading title or the completed card.
-      const pitchToolUi = page.getByText(/Generating pitches|Pitch Builder/i);
+      const pitchToolUi = page.getByText(/Generating pitch|Generated Pitch/i);
       await expect(pitchToolUi.first()).toBeVisible({ timeout: 30_000 });
     });
 

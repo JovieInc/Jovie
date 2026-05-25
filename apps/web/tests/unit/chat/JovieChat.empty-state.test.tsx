@@ -173,7 +173,7 @@ describe('JovieChat empty state', () => {
     ).toBeNull();
     expect(queryByText('Plan a release')).toBeNull();
     expect(queryByText('Generate album art')).toBeNull();
-    expect(queryByText('Pitch playlists')).toBeNull();
+    expect(queryByText('Generate pitch')).toBeNull();
     // Old task-list-style actions should NOT appear — they belong in the profile switcher.
     expect(queryByText('Preview profile')).toBeNull();
     expect(queryByText('Change photo')).toBeNull();
