@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { env } from '@/lib/env';
 
 /**
  * GET /api/version
@@ -11,8 +12,8 @@ import { NextResponse } from 'next/server';
  */
 export function GET() {
   const buildId =
-    process.env.NEXT_PUBLIC_BUILD_SHA?.trim() ||
-    process.env.VERCEL_GIT_COMMIT_SHA?.slice(0, 7) ||
+    env.NEXT_PUBLIC_BUILD_SHA?.trim() ||
+    env.VERCEL_GIT_COMMIT_SHA?.slice(0, 7) ||
     'dev';
 
   return NextResponse.json(

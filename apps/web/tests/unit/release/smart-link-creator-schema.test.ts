@@ -1,20 +1,29 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { doesColumnExistMock, fromMock, limitMock, selectMock, whereMock } =
-  vi.hoisted(() => {
-    const limitMock = vi.fn();
-    const whereMock = vi.fn(() => ({ limit: limitMock }));
-    const fromMock = vi.fn(() => ({ where: whereMock }));
-    const selectMock = vi.fn(() => ({ from: fromMock }));
+const {
+  doesColumnExistMock,
+  fromMock,
+  limitMock,
+  selectMock,
+  withRetryMock,
+  whereMock,
+} = vi.hoisted(() => {
+  const limitMock = vi.fn();
+  const whereMock = vi.fn(() => ({ limit: limitMock }));
+  const fromMock = vi.fn(() => ({ where: whereMock }));
+  const selectMock = vi.fn(() => ({ from: fromMock }));
 
-    return {
-      doesColumnExistMock: vi.fn(),
-      fromMock,
-      limitMock,
-      selectMock,
-      whereMock,
-    };
-  });
+  return {
+    doesColumnExistMock: vi.fn(),
+    fromMock,
+    limitMock,
+    selectMock,
+    withRetryMock: vi.fn(async (operation: () => Promise<unknown>) =>
+      operation()
+    ),
+    whereMock,
+  };
+});
 
 vi.mock('react', () => ({
   cache: (fn: unknown) => fn,
@@ -29,6 +38,7 @@ vi.mock('@/lib/db', () => ({
     select: selectMock,
   },
   doesColumnExist: doesColumnExistMock,
+  withRetry: withRetryMock,
 }));
 
 describe('smart-link creator schema compatibility', () => {

@@ -3821,7 +3821,11 @@ jobs:
       cancel-in-progress: false
     uses: ./.github/workflows/canary-health-gate.yml
     with:
-      deployment_url: https://staging.jov.ie
+      # Verify the exact deployment produced by deploy-staging instead of the
+      # shared staging alias. Merge-queue traffic can retarget staging.jov.ie
+      # while this gate is still retrying, which produces false negatives even
+      # when the freshly deployed preview is healthy.
+      deployment_url: ${{ needs.deploy-staging.outputs.deploy_url }}
       commit_sha: ${{ github.sha }}
       fallback_health_url: /api/health
     secrets:
