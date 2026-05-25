@@ -2,7 +2,7 @@
 
 Runs a small Promptfoo suite against local adapters:
 
-- Deterministic contract adapters for chat and onboarding tool availability, schemas, tool UI registry coverage, model-routing scenario inventory, knowledge-topic routing, onboarding next-step state decisions, stubbed outputs, and no-spend guarantees.
+- Deterministic contract adapters for chat and onboarding tool availability, production tool-access gating, schemas, tool UI registry coverage, model-routing scenario inventory, knowledge-topic routing, onboarding next-step state decisions, stubbed outputs, and no-spend guarantees.
 - The production `executeChatTurn()` path used by `/api/chat`, with synthetic Luna Waves fixtures and eval-only tool stubs. This live path is manual-only because it calls the model provider.
 - A deterministic route-contract adapter for `POST /api/chat`, covering unauthenticated requests, branch-ordering for the chat kill switch, invalid JSON, message validation, missing profile context, client-turn preconditions, rate-limit responses, and contract-only pre-dispatch success without starting Next, Clerk, or the database.
 - A deterministic route-contract adapter for `POST /api/mobile/v1/chat/turns`, covering unauthenticated, invalid JSON, invalid-body variants, and `MOBILE_CHAT_RUNTIME_DISABLED` responses without starting Next or Clerk.
