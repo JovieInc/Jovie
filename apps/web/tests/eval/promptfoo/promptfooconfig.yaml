@@ -2516,6 +2516,70 @@ tests:
       - type: javascript
         value: file://assertions.cjs:assertOnboardingStateDecision
 
+  - description: Onboarding sequence records Spotify observation before next step
+    metadata:
+      cost: deterministic
+    vars:
+      input: "I selected Luna Waves on Spotify."
+      target: onboarding-tool-sequence-contract
+      sequenceCase: spotify-confirmation-observation-next-step
+      turnCount: 1
+    assert:
+      - type: javascript
+        value: file://assertions.cjs:assertOnboardingSequenceNoSpend
+      - type: javascript
+        value: file://assertions.cjs:assertOnboardingSequenceOrder
+      - type: javascript
+        value: file://assertions.cjs:assertOnboardingObservationAfterSpotify
+
+  - description: Onboarding sequence calls checkout only after instant access
+    metadata:
+      cost: deterministic
+    vars:
+      input: "I have a single announced and want to join now."
+      target: onboarding-tool-sequence-contract
+      sequenceCase: instant-access-next-step-before-checkout
+      turnCount: 1
+    assert:
+      - type: javascript
+        value: file://assertions.cjs:assertOnboardingSequenceNoSpend
+      - type: javascript
+        value: file://assertions.cjs:assertOnboardingSequenceOrder
+      - type: javascript
+        value: file://assertions.cjs:assertOnboardingCheckoutAfterInstantAccess
+
+  - description: Onboarding sequence never checks out waitlist outcome
+    metadata:
+      cost: deterministic
+    vars:
+      input: "I'm still early and do not have much audience yet."
+      target: onboarding-tool-sequence-contract
+      sequenceCase: waitlist-outcome-no-checkout
+      turnCount: 3
+    assert:
+      - type: javascript
+        value: file://assertions.cjs:assertOnboardingSequenceNoSpend
+      - type: javascript
+        value: file://assertions.cjs:assertOnboardingSequenceOrder
+      - type: javascript
+        value: file://assertions.cjs:assertOnboardingNoCheckoutForWaitlist
+
+  - description: Onboarding sequence blocks next step before artist identity
+    metadata:
+      cost: deterministic
+    vars:
+      input: "Can I sign up now?"
+      target: onboarding-tool-sequence-contract
+      sequenceCase: premature-next-step-blocked-before-identity
+      turnCount: 1
+    assert:
+      - type: javascript
+        value: file://assertions.cjs:assertOnboardingSequenceNoSpend
+      - type: javascript
+        value: file://assertions.cjs:assertOnboardingSequenceOrder
+      - type: javascript
+        value: file://assertions.cjs:assertOnboardingBlocksPrematureNextStep
+
   - description: Free plan blocks paid album art tool
     metadata:
       cost: deterministic
