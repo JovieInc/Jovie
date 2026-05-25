@@ -80,6 +80,9 @@ describe('DesktopTitlebar', () => {
       screen.getByRole('button', { name: 'Collapse sidebar' })
     ).toBeInTheDocument();
     expect(
+      screen.getByTestId('electron-sidebar-toggle').querySelector('svg')
+    ).toBeTruthy();
+    expect(
       screen.queryByRole('link', { name: 'New thread' })
     ).not.toBeInTheDocument();
   });

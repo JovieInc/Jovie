@@ -9,6 +9,7 @@ import {
 import type { DashboardData } from '@/app/app/(shell)/dashboard/actions/dashboard-data';
 import { DashboardDataProvider } from '@/app/app/(shell)/dashboard/DashboardDataContext';
 import type { ChatActionCard } from '@/components/jovie/types';
+import { APP_ROUTES } from '@/constants/routes';
 import { fastRender } from '@/tests/utils/fast-render';
 
 // Controllable mocks
@@ -82,6 +83,9 @@ vi.mock('@/contexts/HeaderActionsContext', () => ({
 
 // Track the onTitleChange callback from JovieChat
 let capturedOnTitleChange: ((title: string | null) => void) | undefined;
+let capturedOnConversationCreate:
+  | ((id: string, phase?: 'reserved' | 'completed') => void)
+  | undefined;
 let capturedActionCards: readonly ChatActionCard[] | undefined;
 
 vi.mock('@/components/jovie/JovieChat', () => ({
@@ -95,6 +99,7 @@ vi.mock('@/components/jovie/JovieChat', () => ({
     actionCards?: readonly ChatActionCard[];
   }) => {
     capturedOnTitleChange = props.onTitleChange;
+    capturedOnConversationCreate = props.onConversationCreate;
     capturedActionCards = props.actionCards;
     return React.createElement('div', {
       'data-testid': 'jovie-chat',
@@ -211,6 +216,7 @@ describe('ChatPageClient', () => {
     mockSetPreviewData.mockReset();
     mockPreviewPanelState.isOpen = false;
     globalThis.sessionStorage.clear();
+    capturedOnConversationCreate = undefined;
   });
 
   it('renders JovieChat with profileId from selected profile', () => {
@@ -265,6 +271,27 @@ describe('ChatPageClient', () => {
     const { getByTestId } = renderChatPage('conv-123');
     const chat = getByTestId('jovie-chat');
     expect(chat.getAttribute('data-conversation-id')).toBe('conv-123');
+  });
+
+  it('uses history.replaceState for the first conversation on the chat root', () => {
+    window.history.replaceState({}, '', APP_ROUTES.CHAT);
+    const replaceStateSpy = vi.spyOn(window.history, 'replaceState');
+
+    try {
+      renderChatPage();
+
+      expect(capturedOnConversationCreate).toBeDefined();
+      capturedOnConversationCreate?.('conv-123');
+
+      expect(replaceStateSpy).toHaveBeenCalledTimes(1);
+      expect(replaceStateSpy.mock.calls[0]?.[1]).toBe('');
+      expect(replaceStateSpy.mock.calls[0]?.[2]).toBe(
+        `${APP_ROUTES.CHAT}/conv-123`
+      );
+      expect(mockReplace).not.toHaveBeenCalled();
+    } finally {
+      replaceStateSpy.mockRestore();
+    }
   });
 
   it('marks no-conversation route as first session', () => {

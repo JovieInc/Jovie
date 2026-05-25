@@ -1,12 +1,13 @@
 'use client';
 
-import { Badge, Button } from '@jovie/ui';
+import { Button } from '@jovie/ui';
 import { AlertCircle } from 'lucide-react';
 import Link from 'next/link';
 import type { ReactNode } from 'react';
 import { SettingsPanel } from '@/components/molecules/settings/SettingsPanel';
 import { UpgradeButton } from '@/components/molecules/UpgradeButton';
 import { APP_ROUTES } from '@/constants/routes';
+import type { ChatUsageState } from '@/lib/chat-usage/copy';
 import { getChatUsageCopy } from '@/lib/chat-usage/copy';
 import { env } from '@/lib/env-client';
 import { useChatUsageQuery } from '@/lib/queries';
@@ -48,6 +49,18 @@ function formatResetAt(value: string | null | undefined): string {
     hour: 'numeric',
     minute: '2-digit',
   }).format(resetAt);
+}
+
+function getStatusToneClasses(state: ChatUsageState): string {
+  if (state === 'healthy') {
+    return 'border-[color-mix(in_oklab,var(--geist-cyan-solid)_24%,transparent)] bg-[color-mix(in_oklab,var(--geist-cyan-solid)_10%,var(--linear-app-content-surface))] text-[color:var(--geist-cyan-solid)]';
+  }
+
+  if (state === 'near_limit') {
+    return 'border-[color-mix(in_oklab,var(--geist-blue-solid)_24%,transparent)] bg-[color-mix(in_oklab,var(--geist-blue-solid)_10%,var(--linear-app-content-surface))] text-[color:var(--geist-blue-solid)]';
+  }
+
+  return 'border-[color-mix(in_oklab,var(--geist-red-solid)_24%,transparent)] bg-[color-mix(in_oklab,var(--geist-red-solid)_10%,var(--linear-app-content-surface))] text-[color:var(--geist-red-solid)]';
 }
 
 function getMonthlyUsage(data: ChatUsageData): {
@@ -108,7 +121,7 @@ function UsageMeterRow({
           aria-label={`${title} usage`}
           value={clampedUsed}
           max={progressMax}
-          className='block h-2 w-full appearance-none overflow-hidden rounded-full bg-surface-0 [&::-moz-progress-bar]:rounded-full [&::-moz-progress-bar]:bg-primary-token [&::-webkit-progress-bar]:rounded-full [&::-webkit-progress-bar]:bg-surface-0 [&::-webkit-progress-value]:rounded-full [&::-webkit-progress-value]:bg-primary-token'
+          className='block h-2 w-full appearance-none overflow-hidden rounded-full bg-[color-mix(in_oklab,var(--geist-cyan-solid)_8%,var(--linear-app-content-surface))] [&::-moz-progress-bar]:rounded-full [&::-moz-progress-bar]:bg-[color:var(--geist-cyan-solid)] [&::-webkit-progress-bar]:rounded-full [&::-webkit-progress-bar]:bg-[color-mix(in_oklab,var(--geist-cyan-solid)_8%,var(--linear-app-content-surface))] [&::-webkit-progress-value]:rounded-full [&::-webkit-progress-value]:bg-[color:var(--geist-cyan-solid)]'
         />
       </div>
       <p className='mt-2 text-2xs text-tertiary-token'>
@@ -239,13 +252,14 @@ export function SettingsUsageStatsSection() {
             <p className='text-app font-caption text-primary-token'>
               {copy.summaryTitle}
             </p>
-            <Badge
-              variant={copy.state === 'healthy' ? 'success' : 'warning'}
-              size='sm'
-              className='rounded-md px-1.5 text-3xs'
+            <span
+              className={cn(
+                'inline-flex items-center rounded-md border px-1.5 py-0.5 text-3xs font-medium tracking-[0.01em]',
+                getStatusToneClasses(copy.state)
+              )}
             >
               {copy.statusLabel}
-            </Badge>
+            </span>
           </div>
           <p className='max-w-[42rem] text-xs leading-[17px] text-secondary-token'>
             {copy.summaryDescription}

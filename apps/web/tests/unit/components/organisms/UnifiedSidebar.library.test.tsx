@@ -1,3 +1,4 @@
+import { TooltipProvider } from '@jovie/ui';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { render, screen, waitFor } from '@testing-library/react';
 import type { ReactNode } from 'react';
@@ -114,16 +115,18 @@ function renderUnifiedSidebar({
         initialFlags={{ ...APP_FLAG_DEFAULTS, DESIGN_V1: designV1 }}
       >
         <DashboardDataProvider value={dashboardData}>
-          <SidebarProvider>
-            <ShellSidebarOverrideProvider>
-              {overrideContent ? (
-                <LibrarySidebarOverride>
-                  {overrideContent}
-                </LibrarySidebarOverride>
-              ) : null}
-              <UnifiedSidebar section={section} />
-            </ShellSidebarOverrideProvider>
-          </SidebarProvider>
+          <TooltipProvider>
+            <SidebarProvider>
+              <ShellSidebarOverrideProvider>
+                {overrideContent ? (
+                  <LibrarySidebarOverride>
+                    {overrideContent}
+                  </LibrarySidebarOverride>
+                ) : null}
+                <UnifiedSidebar section={section} />
+              </ShellSidebarOverrideProvider>
+            </SidebarProvider>
+          </TooltipProvider>
         </DashboardDataProvider>
       </AppFlagProvider>
     </QueryClientProvider>
@@ -139,8 +142,11 @@ describe('UnifiedSidebar library route', () => {
   it('keeps the library route out of the default dashboard navigation', () => {
     renderUnifiedSidebar();
 
-    expect(screen.getByText('Loading Library')).toBeInTheDocument();
+    expect(screen.queryByText('Loading Library')).not.toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Back to App' })).toBeDefined();
+    expect(
+      screen.queryByRole('navigation', { name: 'Library navigation' })
+    ).not.toBeInTheDocument();
     expect(
       screen.queryByRole('link', { name: 'Releases' })
     ).not.toBeInTheDocument();
@@ -173,7 +179,7 @@ describe('UnifiedSidebar library route', () => {
     );
   });
 
-  it('omits header New thread and web dock controls in Electron dashboard mode', () => {
+  it('omits header New thread and the web collapse control in Electron dashboard mode', () => {
     renderUnifiedSidebar({
       designV1: false,
       pathname: APP_ROUTES.DASHBOARD,
@@ -185,11 +191,11 @@ describe('UnifiedSidebar library route', () => {
       screen.queryByRole('link', { name: 'New thread' })
     ).not.toBeInTheDocument();
     expect(
-      document.querySelector('[data-sidebar-dock-button="true"]')
+      screen.queryByRole('button', { name: 'Collapse sidebar' })
     ).not.toBeInTheDocument();
   });
 
-  it('uses the in-sidebar dock control as the web dashboard toggle', () => {
+  it('uses the in-sidebar collapse control as the web dashboard toggle', () => {
     electronRuntimeMock.isElectronRuntime = false;
 
     renderUnifiedSidebar({
@@ -198,7 +204,7 @@ describe('UnifiedSidebar library route', () => {
     });
 
     expect(
-      document.querySelector('[data-sidebar-dock-button="true"]')
+      screen.getByRole('button', { name: 'Collapse sidebar' })
     ).toBeInTheDocument();
     expect(
       screen.queryByRole('link', { name: 'New thread' })

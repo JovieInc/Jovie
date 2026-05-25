@@ -274,7 +274,6 @@ function RecordingChatPanel({
             isSubmitting={false}
             placeholder='Ask Jovie'
             variant='compact'
-            shellChatV1
           />
         }
       >

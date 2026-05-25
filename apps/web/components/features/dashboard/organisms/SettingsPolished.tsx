@@ -99,7 +99,7 @@ const SettingsSidebar = memo(
       <div className='max-h-[calc(100vh-4.5rem)] overflow-y-auto rounded-[14px] border border-(--linear-app-frame-seam) bg-[color-mix(in_oklab,var(--linear-app-content-surface)_97%,var(--linear-bg-surface-0))] p-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] backdrop-blur-sm'>
         {groups.map(group => (
           <div key={group.id} className='mb-2 last:mb-0'>
-            <p className='mb-1 px-2.5 text-2xs font-semibold text-tertiary-token'>
+            <p className='mb-1 px-2.5 text-[11px] font-medium tracking-[-0.01em] text-tertiary-token'>
               {group.label}
             </p>
             <nav aria-label={`${group.label} settings`}>
@@ -207,7 +207,7 @@ export function SettingsPolished({
           <h3 className='text-sm font-caption text-primary-token mb-3'>
             Account settings unavailable
           </h3>
-          <p className='text-app text-secondary'>
+          <p className='text-app text-secondary-token'>
             Clerk is not configured (missing publishable key). Set
             NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY to enable account management.
           </p>
@@ -492,9 +492,6 @@ export function SettingsPolished({
             aria-label={`${group.label} settings group`}
             className='px-0.5'
           >
-            <h3 className='mb-2 px-1 text-xs font-semibold tracking-[-0.012em] text-secondary-token'>
-              {group.label}
-            </h3>
             <div className='space-y-3'>
               {group.sections.map(section => (
                 <SettingsSection

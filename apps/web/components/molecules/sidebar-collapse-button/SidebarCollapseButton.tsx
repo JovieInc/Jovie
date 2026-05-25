@@ -1,6 +1,7 @@
 'use client';
 
 import { TooltipShortcut } from '@jovie/ui';
+import { PanelLeft } from 'lucide-react';
 import { CircleIconButton } from '@/components/atoms/CircleIconButton';
 import { useSidebar } from '@/components/organisms/Sidebar';
 import { SIDEBAR_KEYBOARD_SHORTCUT_BARE } from '@/hooks/useSidebarKeyboardShortcut';
@@ -26,11 +27,7 @@ export function SidebarCollapseButton({
         ariaLabel={label}
         className={className}
       >
-        <div className='flex flex-col items-center justify-center gap-[3px]'>
-          <span className='block h-0.5 w-3 rounded-full bg-current' />
-          <span className='block h-0.5 w-3 rounded-full bg-current' />
-          <span className='block h-0.5 w-3 rounded-full bg-current' />
-        </div>
+        <PanelLeft className='h-3.5 w-3.5' strokeWidth={2} aria-hidden='true' />
       </CircleIconButton>
     </TooltipShortcut>
   );

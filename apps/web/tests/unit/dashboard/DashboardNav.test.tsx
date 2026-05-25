@@ -94,6 +94,21 @@ describe('DashboardNav', () => {
     ).toBeNull();
   });
 
+  it('keeps New thread on the default shell tone when it is inactive', () => {
+    mockUsePathname.mockReturnValueOnce(APP_ROUTES.RELEASES);
+
+    const { getByRole } = renderDashboardNav({
+      renderFn: fastRender,
+      appFlags: { DESIGN_V1: true },
+    });
+
+    const newThreadLink = getByRole('link', { name: 'New thread' });
+    expect(newThreadLink.className).toContain('text-sidebar-muted/80');
+    expect(newThreadLink.className).not.toContain(
+      'bg-[color-mix(in_oklab,var(--linear-app-content-surface)_92%,white_8%)]'
+    );
+  });
+
   it('renders one canonical New thread nav row in Design V1', () => {
     const { getAllByRole } = renderDashboardNav({
       renderFn: fastRender,

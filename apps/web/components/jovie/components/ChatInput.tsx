@@ -81,8 +81,6 @@ export interface ChatInputProps {
    * slash picker to scope `useReleasesQuery` to the active creator.
    */
   readonly profileId?: string;
-  /** Enables the Shell + Chat V1 composer geometry behind DESIGN_V1. */
-  readonly shellChatV1?: boolean;
   /** Optional compact status content rendered inside the composer surface. */
   readonly statusBanner?: ReactNode;
 }
@@ -151,7 +149,6 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
       onAddEntity,
       onPickerOpenChange,
       profileId,
-      shellChatV1 = false,
       statusBanner,
     },
     ref
@@ -352,6 +349,12 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
       },
     });
 
+    const scheduleTextareaRefocus = useCallback(() => {
+      globalThis.setTimeout(() => {
+        internalTextareaRef.current?.focus();
+      }, 0);
+    }, []);
+
     const handleMicToggle = useCallback(() => {
       if (!isListening) {
         dictationBaselineRef.current = value;
@@ -363,13 +366,15 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
       (e: React.FormEvent) => {
         e.preventDefault();
         onSubmit(e);
+        scheduleTextareaRefocus();
       },
-      [onSubmit]
+      [onSubmit, scheduleTextareaRefocus]
     );
 
     const handleSendClick = useCallback(() => {
       onSubmit();
-    }, [onSubmit]);
+      scheduleTextareaRefocus();
+    }, [onSubmit, scheduleTextareaRefocus]);
 
     const handleKeyDown = useCallback(
       (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -379,6 +384,7 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
         if (e.key === 'Enter' && !e.shiftKey && canSend) {
           e.preventDefault();
           onSubmit();
+          scheduleTextareaRefocus();
           return;
         }
         if (
@@ -391,7 +397,15 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
           onRemoveLastChip();
         }
       },
-      [onSubmit, canSend, value, chips, onRemoveLastChip, picker.state]
+      [
+        onSubmit,
+        canSend,
+        value,
+        chips,
+        onRemoveLastChip,
+        picker.state,
+        scheduleTextareaRefocus,
+      ]
     );
 
     const handlePreserveFocus = useCallback(
@@ -402,20 +416,14 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
     );
 
     // Resolve the surface mode from textarea + picker state. Shell + Chat V1
-    // keeps focus-only empty pills calm; the legacy shell preserves the old
-    // focus-to-typing morph until the rollout flag is enabled.
+    // keeps empty focus calm so the composer doesn't reflow just because the
+    // textarea received focus.
     const hasText = Boolean(value.trim()) || hasPendingImages;
     const isExpanded = plusMenuOpen || isListening || hasText || isFocused;
     let surfaceMode: SurfaceMode = 'empty';
     if (picker.state.status === 'entity') surfaceMode = 'entity';
     else if (picker.state.status === 'root') surfaceMode = 'root';
-    else if (
-      hasText ||
-      plusMenuOpen ||
-      isListening ||
-      (!shellChatV1 && isFocused)
-    )
-      surfaceMode = 'typing';
+    else if (hasText || plusMenuOpen || isListening) surfaceMode = 'typing';
 
     const geometry = geometryFor(surfaceMode, isStacked, variant);
     const showInlinePicker = picker.state.status === 'root';
