@@ -1,32 +1,24 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mockConsoleWarn = vi.spyOn(console, 'warn').mockImplementation(() => {});
-const mutableEnv = process.env as Record<string, string | undefined>;
-let originalNodeEnv: string | undefined;
 let cwdSpy: ReturnType<typeof vi.spyOn> | undefined;
 
 describe('@critical GET /api/health/build-info', () => {
   beforeEach(() => {
-    originalNodeEnv = mutableEnv.NODE_ENV;
     vi.clearAllMocks();
     vi.resetModules();
+    vi.unstubAllEnvs();
     cwdSpy = vi.spyOn(process, 'cwd').mockReturnValue('/__missing-build-id__');
   });
 
   afterEach(() => {
     cwdSpy?.mockRestore();
     cwdSpy = undefined;
-
-    if (originalNodeEnv === undefined) {
-      delete mutableEnv.NODE_ENV;
-      return;
-    }
-
-    mutableEnv.NODE_ENV = originalNodeEnv;
+    vi.unstubAllEnvs();
   });
 
   it('logs warning and returns fallback when build info read fails in production', async () => {
-    mutableEnv.NODE_ENV = 'production';
+    vi.stubEnv('NODE_ENV', 'production');
 
     const { GET } = await import('@/app/api/health/build-info/route');
     const response = GET();
@@ -38,8 +30,21 @@ describe('@critical GET /api/health/build-info', () => {
     );
   });
 
+  it('prefers build-time commit sha when available in production', async () => {
+    vi.stubEnv('NODE_ENV', 'production');
+    vi.stubEnv('NEXT_PUBLIC_BUILD_SHA', 'abcdef1');
+    vi.stubEnv('VERCEL_GIT_COMMIT_SHA', '1234567890abcdef');
+
+    const { GET } = await import('@/app/api/health/build-info/route');
+    const response = GET();
+    expect(response.status).toBe(200);
+
+    const body = await response.json();
+    expect(body.commitSha).toBe('abcdef1');
+  });
+
   it('returns development build id without warning in development', async () => {
-    mutableEnv.NODE_ENV = 'development';
+    vi.stubEnv('NODE_ENV', 'development');
 
     const { GET } = await import('@/app/api/health/build-info/route');
     const response = GET();
