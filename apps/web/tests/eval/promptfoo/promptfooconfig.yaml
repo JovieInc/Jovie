@@ -648,6 +648,8 @@ tests:
         value: file://assertions.cjs:assertDeterministicNoSpend
       - type: javascript
         value: file://assertions.cjs:assertToolInventoryCovered
+      - type: javascript
+        value: file://assertions.cjs:assertToolUiRegistryCovered
 
   - description: Tool contract accepts free avatar upload
     metadata:

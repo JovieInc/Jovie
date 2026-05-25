@@ -7,6 +7,7 @@ import {
   ONBOARDING_TOOLS,
   TOOL_SCHEMAS,
 } from '@/lib/chat/tool-schemas';
+import { TOOL_UI_REGISTRY } from '@/lib/chat/tool-ui-registry';
 import type { ReleaseContext } from '@/lib/chat/types';
 import { getEntitlements, type PlanId } from '@/lib/entitlements/registry';
 import { NO_STORE_HEADERS } from '@/lib/http/headers';
@@ -250,6 +251,7 @@ const FREE_APP_TOOL_NAMES = [
 ] as const;
 
 const ALL_EVAL_TOOL_NAMES = Object.keys(ALL_EVAL_TOOL_SCHEMAS).sort();
+const TOOL_UI_REGISTRY_NAMES = Object.keys(TOOL_UI_REGISTRY).sort();
 
 function toObject(value: unknown): Record<string, unknown> {
   return value && typeof value === 'object' && !Array.isArray(value)
@@ -1089,6 +1091,12 @@ function evaluateToolInventory(vars: EvalVars) {
   const missingToolNames = ALL_EVAL_TOOL_NAMES.filter(
     toolName => !coveredSet.has(toolName)
   );
+  const missingToolUiRegistryNames = ALL_EVAL_TOOL_NAMES.filter(
+    toolName => !Object.hasOwn(TOOL_UI_REGISTRY, toolName)
+  );
+  const staleToolUiRegistryNames = TOOL_UI_REGISTRY_NAMES.filter(
+    toolName => !Object.hasOwn(ALL_EVAL_TOOL_SCHEMAS, toolName)
+  );
 
   return {
     target: 'tool-inventory',
@@ -1102,6 +1110,9 @@ function evaluateToolInventory(vars: EvalVars) {
     coveredToolNames: [...coveredSet].sort(),
     missingToolNames,
     unknownCoveredTools,
+    toolUiRegistryNames: TOOL_UI_REGISTRY_NAMES,
+    missingToolUiRegistryNames,
+    staleToolUiRegistryNames,
     freeAppToolNames: [...FREE_APP_TOOL_NAMES],
     onboardingToolNames: [...ONBOARDING_TOOLS],
     paidToolNames: [...PAID_TOOL_NAMES],
