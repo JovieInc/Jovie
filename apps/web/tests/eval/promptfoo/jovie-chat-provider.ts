@@ -15,6 +15,11 @@ import {
 } from '@/lib/chat/tool-schemas';
 import { TOOL_UI_REGISTRY } from '@/lib/chat/tool-ui-registry';
 import type { ReleaseContext } from '@/lib/chat/types';
+import {
+  COMMANDS,
+  commandsForSurface,
+  HIDDEN_TOOLS,
+} from '@/lib/commands/registry';
 import { getEntitlements, type PlanId } from '@/lib/entitlements/registry';
 import { NO_STORE_HEADERS } from '@/lib/http/headers';
 import {
@@ -268,6 +273,27 @@ const FREE_APP_TOOL_NAMES = [
 
 const ALL_EVAL_TOOL_NAMES = Object.keys(ALL_EVAL_TOOL_SCHEMAS).sort();
 const TOOL_UI_REGISTRY_NAMES = Object.keys(TOOL_UI_REGISTRY).sort();
+const CHAT_SLASH_SKILL_NAMES = commandsForSurface('chat-slash')
+  .filter(command => command.kind === 'skill')
+  .map(command => command.id)
+  .sort();
+const CMDK_SKILL_NAMES = commandsForSurface('cmdk')
+  .filter(command => command.kind === 'skill')
+  .map(command => command.id)
+  .sort();
+const ALL_COMMAND_SKILL_NAMES = COMMANDS.filter(
+  command => command.kind === 'skill'
+)
+  .map(command => command.id)
+  .sort();
+const HIDDEN_TOOL_NAMES = Object.keys(HIDDEN_TOOLS).sort();
+const HIDDEN_TOOL_REASONS = HIDDEN_TOOL_NAMES.reduce<Record<string, string>>(
+  (reasons, toolName) => {
+    reasons[toolName] = HIDDEN_TOOLS[toolName] ?? '';
+    return reasons;
+  },
+  {}
+);
 
 function toObject(value: unknown): Record<string, unknown> {
   return value && typeof value === 'object' && !Array.isArray(value)
@@ -1169,6 +1195,28 @@ function evaluateToolInventory(vars: EvalVars) {
   const staleToolUiRegistryNames = TOOL_UI_REGISTRY_NAMES.filter(
     toolName => !Object.hasOwn(ALL_EVAL_TOOL_SCHEMAS, toolName)
   );
+  const missingSkillCommandSchemaNames = ALL_COMMAND_SKILL_NAMES.filter(
+    toolName => !Object.hasOwn(ALL_EVAL_TOOL_SCHEMAS, toolName)
+  );
+  const missingSkillCommandCaseNames = ALL_COMMAND_SKILL_NAMES.filter(
+    toolName => !coveredSet.has(toolName)
+  );
+  const missingCmdkSkillNames = CHAT_SLASH_SKILL_NAMES.filter(
+    toolName => !CMDK_SKILL_NAMES.includes(toolName)
+  );
+  const staleHiddenToolNames = HIDDEN_TOOL_NAMES.filter(
+    toolName => !Object.hasOwn(ALL_EVAL_TOOL_SCHEMAS, toolName)
+  );
+  const hiddenToolsWithoutReason = HIDDEN_TOOL_NAMES.filter(
+    toolName => !HIDDEN_TOOL_REASONS[toolName]?.trim()
+  );
+  const visibleOrHiddenToolNames = new Set([
+    ...ALL_COMMAND_SKILL_NAMES,
+    ...HIDDEN_TOOL_NAMES,
+  ]);
+  const missingVisibilityDecisionNames = ALL_EVAL_TOOL_NAMES.filter(
+    toolName => !visibleOrHiddenToolNames.has(toolName)
+  );
 
   return {
     target: 'tool-inventory',
@@ -1188,6 +1236,17 @@ function evaluateToolInventory(vars: EvalVars) {
     freeAppToolNames: [...FREE_APP_TOOL_NAMES],
     onboardingToolNames: [...ONBOARDING_TOOLS],
     paidToolNames: [...PAID_TOOL_NAMES],
+    chatSlashSkillNames: CHAT_SLASH_SKILL_NAMES,
+    cmdkSkillNames: CMDK_SKILL_NAMES,
+    commandSkillNames: ALL_COMMAND_SKILL_NAMES,
+    hiddenToolNames: HIDDEN_TOOL_NAMES,
+    hiddenToolReasons: HIDDEN_TOOL_REASONS,
+    missingSkillCommandSchemaNames,
+    missingSkillCommandCaseNames,
+    missingCmdkSkillNames,
+    staleHiddenToolNames,
+    hiddenToolsWithoutReason,
+    missingVisibilityDecisionNames,
   };
 }
 
