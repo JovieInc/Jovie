@@ -122,6 +122,21 @@ describe('resolveChatAccountContext', () => {
     });
   });
 
+  it('keeps merch creation available for entitled accounts when rollout flag is off', async () => {
+    hoisted.getAppFlagValueMock.mockResolvedValue(false);
+    hoisted.getCurrentUserEntitlementsMock.mockResolvedValue(
+      makeEntitlements()
+    );
+
+    const context = await resolveChatAccountContext({ userId: 'user_123' });
+
+    expect(context.flags.merchMvp).toBe(false);
+    expect(context.merchAccess).toEqual({
+      available: true,
+      reason: 'available',
+    });
+  });
+
   it('explains merch denial for verified free accounts', async () => {
     hoisted.getCurrentUserEntitlementsMock.mockResolvedValue(
       makeEntitlements({

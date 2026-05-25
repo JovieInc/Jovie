@@ -11,7 +11,7 @@ import {
   useRef,
   useState,
 } from 'react';
-
+import { serializeEntity, serializeSkill } from '@/lib/chat/tokens';
 import { cn } from '@/lib/utils';
 
 import type { PendingImage } from '../hooks/useChatImageAttachments';
@@ -145,8 +145,6 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
       chips,
       onRemoveChipAt,
       onRemoveLastChip,
-      onAddSkill,
-      onAddEntity,
       onPickerOpenChange,
       profileId,
       statusBanner,
@@ -303,31 +301,55 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
       onChange(nextValue);
     }, [onChange, picker.state, value]);
 
+    const replaceSlashQueryWithToken = useCallback(
+      (token: string): number => {
+        if (picker.state.status === 'closed') return value.length;
+        const startIdx = picker.state.startIdx;
+        const el = internalTextareaRef.current;
+        const caret = el?.selectionStart ?? value.length;
+        const before = value.slice(0, startIdx);
+        const after = value.slice(caret);
+        const leadingSpace =
+          before.length > 0 && !/\s$/.test(before) ? ' ' : '';
+        const trailingSpace = after.length > 0 && !/^\s/.test(after) ? ' ' : '';
+        const replacement = `${leadingSpace}${token}${trailingSpace}`;
+        const nextValue = before + replacement + after;
+        const nextCaret = before.length + replacement.length;
+        onChange(nextValue);
+        globalThis.setTimeout(() => {
+          internalTextareaRef.current?.focus();
+          internalTextareaRef.current?.setSelectionRange(nextCaret, nextCaret);
+        }, 0);
+        return nextCaret;
+      },
+      [onChange, picker.state, value]
+    );
+
     const handleSelectSkill = useCallback(
       (skill: import('@/lib/commands/registry').SkillCommand) => {
-        onAddSkill?.(skill.id);
-        stripSlashQuery();
+        const nextCaret = replaceSlashQueryWithToken(serializeSkill(skill.id));
         const requiredSlot = skill.entitySlots.find(s => s.required);
         if (requiredSlot && picker.state.status !== 'closed') {
-          picker.openEntity(requiredSlot.kind, picker.state.startIdx, '');
+          picker.openEntity(requiredSlot.kind, nextCaret, '');
         } else {
           picker.close();
         }
       },
-      [onAddSkill, stripSlashQuery, picker]
+      [replaceSlashQueryWithToken, picker]
     );
 
     const handleSelectEntity = useCallback(
       (entity: import('@/lib/commands/entities').EntityRef) => {
-        onAddEntity?.({
-          kind: entity.kind,
-          id: entity.id,
-          label: entity.label,
-        });
-        stripSlashQuery();
+        replaceSlashQueryWithToken(
+          serializeEntity({
+            kind: entity.kind,
+            id: entity.id,
+            label: entity.label,
+          })
+        );
         picker.close();
       },
-      [onAddEntity, stripSlashQuery, picker]
+      [replaceSlashQueryWithToken, picker]
     );
 
     const handleSelectPromptAction = useCallback(

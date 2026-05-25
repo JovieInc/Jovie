@@ -1209,6 +1209,8 @@ function createMerchGenerationTool(params: {
   readonly profileId: string | null;
   readonly clerkUserId: string;
   readonly command: 'create_merch' | 'preview_merch_options';
+  readonly conversationId?: string | null;
+  readonly turnId?: string | null;
 }) {
   return tool({
     description:
@@ -1233,6 +1235,8 @@ function createMerchGenerationTool(params: {
         clerkUserId: params.clerkUserId,
         prompt: merchPrompt || 'Make premium merch for this artist.',
         command: params.command,
+        conversationId: params.conversationId ?? null,
+        turnId: params.turnId ?? null,
       });
 
       return {
@@ -1922,7 +1926,10 @@ function buildChatTools(
   canGenerateAlbumArt: boolean,
   albumArtEnabled: boolean,
   canAccessMerchCreation: boolean,
-  merchEnabled: boolean
+  reservedTurn?: {
+    readonly conversationId: string;
+    readonly turnId: string;
+  } | null
 ) {
   return {
     ...(insightsEnabled
@@ -1960,17 +1967,21 @@ function buildChatTools(
             createGenerateReleasePitchTool(resolvedProfileId),
         }
       : {}),
-    ...(merchEnabled && canAccessMerchCreation
+    ...(canAccessMerchCreation
       ? {
           createMerch: createMerchGenerationTool({
             profileId: resolvedProfileId,
             clerkUserId,
             command: 'create_merch',
+            conversationId: reservedTurn?.conversationId ?? null,
+            turnId: reservedTurn?.turnId ?? null,
           }),
           previewMerchOptions: createMerchGenerationTool({
             profileId: resolvedProfileId,
             clerkUserId,
             command: 'preview_merch_options',
+            conversationId: reservedTurn?.conversationId ?? null,
+            turnId: reservedTurn?.turnId ?? null,
           }),
           selectMerchDesign: createSelectMerchDesignTool({
             profileId: resolvedProfileId,
@@ -2589,8 +2600,6 @@ export async function POST(req: Request) {
 
   try {
     const albumArtEnabled = FEATURE_FLAGS.ALBUM_ART_GENERATION;
-    const merchEnabled = accountContext.flags.merchMvp;
-
     // Free tools (avatar upload, social links, link removal, feedback) available on ALL plans
     const freeTools = buildFreeChatTools(
       resolvedProfileId,
@@ -2609,7 +2618,7 @@ export async function POST(req: Request) {
             albumArtCapability.availability === 'available',
             albumArtEnabled,
             planLimits.booleans.canAccessMerchCreation,
-            merchEnabled
+            reservedTurn
           ),
         }
       : freeTools;

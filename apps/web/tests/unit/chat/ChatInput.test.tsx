@@ -254,6 +254,27 @@ describe('ChatInput', () => {
     );
   });
 
+  it('inserts selected slash skills at the typed slash location', () => {
+    fastRender(withProviders(<ControlledChatInputHarness />));
+
+    const textarea = screen.getByRole('textbox', {
+      name: /chat message input/i,
+    }) as HTMLTextAreaElement;
+    fireEvent.focus(textarea);
+    fireEvent.change(textarea, {
+      target: {
+        value: 'Please /feed',
+        selectionStart: 12,
+        selectionEnd: 12,
+      },
+    });
+
+    const option = screen.getByRole('option', { name: /Send feedback/u });
+    fireEvent.mouseDown(option);
+
+    expect(textarea.value).toBe('Please /skill:submitFeedback');
+  });
+
   it('renders the elevated no-shadow composer geometry', () => {
     fastRender(
       withProviders(

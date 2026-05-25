@@ -123,9 +123,6 @@ function resolveMerchAccess(params: {
   if (params.billingVerification === 'unavailable') {
     return { available: false, reason: 'billing_unavailable' };
   }
-  if (!params.merchMvp) {
-    return { available: false, reason: 'feature_flag_disabled' };
-  }
   if (!params.canAccessMerchCreation) {
     return { available: false, reason: 'plan_unavailable' };
   }

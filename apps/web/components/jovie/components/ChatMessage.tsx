@@ -75,7 +75,7 @@ export function ChatMessage({
     isUser &&
     imageChips.length === 0 &&
     !messageText.includes('\n') &&
-    messageText.length <= 72;
+    messageText.length <= 44;
 
   return (
     <motion.div

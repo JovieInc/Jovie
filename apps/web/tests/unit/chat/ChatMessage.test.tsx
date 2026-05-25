@@ -24,6 +24,12 @@ vi.mock('motion/react', () => ({
 }));
 
 vi.mock('@jovie/ui', () => ({
+  Button: ({
+    children,
+    ...props
+  }: ComponentProps<'button'> & { size?: string; variant?: string }) => (
+    <button {...props}>{children}</button>
+  ),
   Popover: ({ children }: { children: ReactNode }) => <>{children}</>,
   PopoverContent: ({
     children,
@@ -40,9 +46,10 @@ vi.mock('next/image', () => ({
   default: ({
     src,
     alt,
+    fill: _fill,
     unoptimized: _unoptimized,
     ...rest
-  }: ComponentProps<'img'> & { unoptimized?: boolean }) => (
+  }: ComponentProps<'img'> & { fill?: boolean; unoptimized?: boolean }) => (
     <img src={src as string} alt={alt ?? ''} {...rest} />
   ),
 }));
@@ -199,5 +206,99 @@ describe('ChatMessage', () => {
     );
     expect(screen.getByText("Couldn't send your feedback")).toBeInTheDocument();
     expect(screen.getByText('Feedback failed.')).toBeInTheDocument();
+  });
+
+  it('renders merch option artifacts with selectable option cards', () => {
+    const submitListener = vi.fn();
+    globalThis.addEventListener('jovie-chat-submit-prompt', submitListener);
+    const messageProps = {
+      id: 'assistant-merch-1',
+      role: 'assistant' as const,
+      parts: [
+        {
+          type: 'dynamic-tool' as const,
+          toolName: 'previewMerchOptions',
+          toolCallId: 'tool-merch-1',
+          state: 'output-available' as const,
+          output: {
+            success: true,
+            generationId: 'generation-1',
+            nextStep: 'Pick a design',
+            options: [
+              {
+                id: 'option-1',
+                option_number: 1,
+                design_name: 'Never Say A Word Hoodie',
+                product_type: 'hoodie',
+                colorway: 'black',
+                concept: 'Cover art on heavyweight black fleece.',
+                mockup_urls: ['https://cdn.example.com/hoodie.png'],
+                price_recommendation: {
+                  retail_price: '$68.00',
+                  artist_share: '$22.00',
+                },
+              },
+            ],
+          },
+        },
+      ],
+    };
+
+    try {
+      fastRender(<ChatMessage {...messageProps} />);
+
+      expect(screen.getByText('Merch Options')).toBeInTheDocument();
+      expect(screen.getByTestId('chat-merch-option-card')).toHaveTextContent(
+        'Never Say A Word Hoodie'
+      );
+      expect(screen.getByText('$68.00')).toBeInTheDocument();
+
+      screen.getByRole('button', { name: 'Save' }).click();
+
+      expect(submitListener).toHaveBeenCalledTimes(1);
+      expect(submitListener.mock.calls[0]?.[0]).toMatchObject({
+        detail: {
+          prompt: 'Select merch option 1 from generation generation-1.',
+        },
+      });
+    } finally {
+      globalThis.removeEventListener(
+        'jovie-chat-submit-prompt',
+        submitListener
+      );
+    }
+  });
+
+  it('renders merch selection artifacts with a Library destination', () => {
+    const messageProps = {
+      id: 'assistant-merch-2',
+      role: 'assistant' as const,
+      parts: [
+        {
+          type: 'dynamic-tool' as const,
+          toolName: 'selectMerchDesign',
+          toolCallId: 'tool-merch-2',
+          state: 'output-available' as const,
+          output: {
+            success: true,
+            merchCardId: 'merch-card-1',
+            selectedOptionId: 'option-1',
+            status: 'draft',
+            title: 'Never Say A Word Hoodie',
+            publicUrl: null,
+          },
+        },
+      ],
+    };
+
+    fastRender(<ChatMessage {...messageProps} />);
+
+    expect(screen.getByTestId('chat-merch-selection-card')).toHaveTextContent(
+      'Merch card created'
+    );
+    expect(screen.getByRole('link', { name: 'Open Library' })).toHaveAttribute(
+      'href',
+      '/app/library?view=merch'
+    );
   });
 });

@@ -335,7 +335,10 @@ export function useJovieChat({
             : {}),
         },
         fetch: async (input, init) => {
-          const response = await globalThis.fetch(input, init);
+          const response = await globalThis.fetch(input, {
+            ...init,
+            credentials: 'same-origin',
+          });
           const serverConversationId =
             response.headers.get('x-conversation-id');
           const serverTurnId = response.headers.get('x-chat-turn-id');

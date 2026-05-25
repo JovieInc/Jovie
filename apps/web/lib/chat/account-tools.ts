@@ -19,7 +19,7 @@ function getAccountNextAction(accountContext: ChatAccountContext): string {
   }
 
   if (accountContext.merchAccess.available) {
-    return 'Merch creation is available when the merch rollout flag is enabled.';
+    return 'Merch creation is available for this account.';
   }
 
   return 'Use billing settings to manage plan access.';
