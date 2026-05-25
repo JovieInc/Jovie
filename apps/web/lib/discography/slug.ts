@@ -6,7 +6,7 @@
  */
 
 import { and, eq, ne } from 'drizzle-orm';
-import { db } from '@/lib/db';
+import { db, withRetry } from '@/lib/db';
 import {
   contentSlugRedirects,
   discogRecordings,
@@ -14,6 +14,7 @@ import {
   discogReleaseTracks,
   discogTracks,
 } from '@/lib/db/schema/content';
+import { logger } from '@/lib/utils/logger';
 
 export type ContentType = 'release' | 'track' | 'release_track';
 
@@ -265,25 +266,43 @@ export async function findRedirectByOldSlug(
   creatorProfileId: string,
   oldSlug: string
 ): Promise<{ type: ContentType; currentSlug: string } | null> {
-  const [redirect] = await db
-    .select({
-      contentType: contentSlugRedirects.contentType,
-      releaseId: contentSlugRedirects.releaseId,
-      trackId: contentSlugRedirects.trackId,
-      releaseTrackId: contentSlugRedirects.releaseTrackId,
-    })
-    .from(contentSlugRedirects)
-    .where(
-      and(
-        eq(contentSlugRedirects.creatorProfileId, creatorProfileId),
-        eq(contentSlugRedirects.oldSlug, oldSlug)
-      )
-    )
-    .limit(1);
+  try {
+    const [redirect] = await withRetry(
+      () =>
+        db
+          .select({
+            contentType: contentSlugRedirects.contentType,
+            releaseId: contentSlugRedirects.releaseId,
+            trackId: contentSlugRedirects.trackId,
+            releaseTrackId: contentSlugRedirects.releaseTrackId,
+          })
+          .from(contentSlugRedirects)
+          .where(
+            and(
+              eq(contentSlugRedirects.creatorProfileId, creatorProfileId),
+              eq(contentSlugRedirects.oldSlug, oldSlug)
+            )
+          )
+          .limit(1),
+      `findRedirectByOldSlug(${creatorProfileId}:${oldSlug})`
+    );
 
-  if (!redirect) return null;
+    if (!redirect) return null;
 
-  return resolveRedirectSlug(redirect);
+    return await resolveRedirectSlug(redirect);
+  } catch (error) {
+    logger.error(
+      'Failed to resolve redirect for smart-link slug',
+      {
+        creatorProfileId,
+        error,
+        helper: 'findRedirectByOldSlug',
+        oldSlug,
+      },
+      'public-smart-link'
+    );
+    return null;
+  }
 }
 
 /** Resolve the current slug for a redirect entry based on its content type. */
