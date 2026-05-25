@@ -1,8 +1,17 @@
+import { randomUUID } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { resolve, sep } from 'node:path';
+import { neon } from '@neondatabase/serverless';
 import { type ToolSet, tool, type UIMessage } from 'ai';
+import { and, eq } from 'drizzle-orm';
+import { drizzle } from 'drizzle-orm/neon-http';
 import { z } from 'zod';
 import { APP_ROUTES } from '@/constants/routes';
+import {
+  TEST_AUTH_BYPASS_MODE,
+  TEST_MODE_HEADER,
+  TEST_USER_ID_HEADER,
+} from '@/lib/auth/test-mode-constants';
 import {
   canUseLightModel,
   executeChatTurn,
@@ -27,6 +36,9 @@ import {
   HIDDEN_TOOLS,
 } from '@/lib/commands/registry';
 import { CHAT_MODEL, CHAT_MODEL_LIGHT } from '@/lib/constants/ai-models';
+import { users } from '@/lib/db/schema/auth';
+import { chatMessages, chatTurns } from '@/lib/db/schema/chat';
+import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { getEntitlements, type PlanId } from '@/lib/entitlements/registry';
 import { NO_STORE_HEADERS } from '@/lib/http/headers';
 import {
@@ -44,6 +56,7 @@ type EvalTarget =
   | 'tool-event-contract'
   | 'tool-render-contract'
   | 'tool-inventory'
+  | 'web-chat-http-route'
   | 'web-chat-route';
 
 type ToolExecution = {
@@ -98,6 +111,11 @@ const MOBILE_CHAT_NDJSON_HEADERS = {
   'Content-Type': 'application/x-ndjson; charset=utf-8',
 } as const;
 const PROMPTFOO_CONFIG_PATH = 'tests/eval/promptfoo/promptfooconfig.yaml';
+const HTTP_EVAL_MAX_RESPONSE_CHARS = 4000;
+const HTTP_EVAL_TIMEOUT_MS = 15_000;
+const HTTP_EVAL_DEFAULT_PERSONA = 'creator-ready';
+
+let liveHttpEvalDb: ReturnType<typeof drizzle> | null = null;
 
 const ADVANCED_TOOL_SCHEMAS = {
   showTopInsights: {
@@ -378,6 +396,7 @@ function toTarget(value: unknown): EvalTarget {
     value === 'tool-event-contract' ||
     value === 'tool-render-contract' ||
     value === 'tool-inventory' ||
+    value === 'web-chat-http-route' ||
     value === 'web-chat-route'
   ) {
     return value;
@@ -786,6 +805,483 @@ function evaluateMobileChatRouteContract(prompt: string, vars: EvalVars) {
     events: [MOBILE_CHAT_RUNTIME_DISABLED_EVENT],
     responseText: ndjsonEvent(MOBILE_CHAT_RUNTIME_DISABLED_EVENT),
   };
+}
+
+type LiveHttpResponse = {
+  readonly status: number;
+  readonly headers: Record<string, string>;
+  readonly responseText: string;
+  readonly responseJson: unknown;
+};
+
+type LiveHttpSession = {
+  readonly persona: string;
+  readonly userId: string;
+  readonly dbUserId: string;
+  readonly profileId: string;
+  readonly profilePath: string | null;
+  readonly cookieHeader: string;
+};
+
+function parseJsonText(value: string): unknown {
+  if (value.trim().length === 0) return null;
+
+  try {
+    return JSON.parse(value) as unknown;
+  } catch {
+    return null;
+  }
+}
+
+function truncateHttpBody(value: string): string {
+  if (value.length <= HTTP_EVAL_MAX_RESPONSE_CHARS) return value;
+  return `${value.slice(0, HTTP_EVAL_MAX_RESPONSE_CHARS)}[truncated]`;
+}
+
+function responseHeadersToObject(headers: Headers): Record<string, string> {
+  const values: Record<string, string> = {};
+  headers.forEach((value, key) => {
+    values[key.toLowerCase()] = value;
+  });
+  return values;
+}
+
+function getSetCookieHeaders(headers: Headers): string[] {
+  const getSetCookie = (headers as Headers & { getSetCookie?: () => string[] })
+    .getSetCookie;
+  if (typeof getSetCookie === 'function') {
+    return getSetCookie.call(headers);
+  }
+
+  const combined = headers.get('set-cookie');
+  return combined ? combined.split(/,(?=\s*[^;,]+=)/).map(v => v.trim()) : [];
+}
+
+function cookieHeaderFromResponse(headers: Headers): string {
+  return getSetCookieHeaders(headers)
+    .map(cookie => cookie.split(';')[0]?.trim())
+    .filter((cookie): cookie is string => Boolean(cookie))
+    .join('; ');
+}
+
+function getLiveHttpEvalDb() {
+  const databaseUrl = process.env.DATABASE_URL;
+  if (!databaseUrl) {
+    throw new Error('DATABASE_URL is required for live HTTP Promptfoo evals');
+  }
+
+  liveHttpEvalDb ??= drizzle(neon(databaseUrl));
+  return liveHttpEvalDb;
+}
+
+function isLoopbackHttpEvalHost(hostname: string): boolean {
+  const normalized = hostname.toLowerCase();
+  return (
+    normalized === 'localhost' ||
+    normalized === '127.0.0.1' ||
+    normalized === '::1' ||
+    normalized === '[::1]' ||
+    normalized.endsWith('.localhost')
+  );
+}
+
+function resolveLiveHttpBaseUrl(vars: EvalVars): URL {
+  const rawBaseUrl =
+    typeof vars.baseUrl === 'string' && vars.baseUrl.trim().length > 0
+      ? vars.baseUrl.trim()
+      : (process.env.JOVIE_PROMPTFOO_BASE_URL ?? '').trim();
+
+  if (!rawBaseUrl) {
+    throw new Error(
+      'JOVIE_PROMPTFOO_BASE_URL is required for live HTTP Promptfoo evals'
+    );
+  }
+
+  const baseUrl = new URL(rawBaseUrl);
+  if (baseUrl.protocol !== 'http:' && baseUrl.protocol !== 'https:') {
+    throw new Error('JOVIE_PROMPTFOO_BASE_URL must be an HTTP(S) URL');
+  }
+  if (!isLoopbackHttpEvalHost(baseUrl.hostname)) {
+    throw new Error(
+      'Live HTTP Promptfoo evals only run against loopback hosts'
+    );
+  }
+
+  return baseUrl;
+}
+
+async function fetchWithTimeout(
+  input: string | URL,
+  init: RequestInit = {}
+): Promise<Response> {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => {
+    controller.abort();
+  }, HTTP_EVAL_TIMEOUT_MS);
+
+  try {
+    return await fetch(input, { ...init, signal: controller.signal });
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+async function readHttpResponse(response: Response): Promise<LiveHttpResponse> {
+  const responseText = truncateHttpBody(await response.text());
+  return {
+    status: response.status,
+    headers: responseHeadersToObject(response.headers),
+    responseText,
+    responseJson: parseJsonText(responseText),
+  };
+}
+
+function buildLiveHttpChatBody(input: {
+  readonly prompt: string;
+  readonly profileId?: string;
+  readonly clientTurnId?: string;
+  readonly clientMessageId?: string;
+  readonly toolIntent?: string;
+}) {
+  return {
+    profileId: input.profileId,
+    clientTurnId: input.clientTurnId,
+    clientMessageId: input.clientMessageId,
+    source: 'typed',
+    toolIntent: input.toolIntent,
+    messages: [
+      {
+        id: input.clientMessageId ?? `promptfoo-http-message-${randomUUID()}`,
+        role: 'user',
+        parts: [{ type: 'text', text: input.prompt }],
+      },
+    ],
+  };
+}
+
+async function resolveLiveHttpProfileForUser(clerkUserId: string): Promise<{
+  readonly dbUserId: string;
+  readonly profileId: string;
+  readonly profilePath: string | null;
+}> {
+  const [profile] = await getLiveHttpEvalDb()
+    .select({
+      dbUserId: users.id,
+      profileId: creatorProfiles.id,
+      username: creatorProfiles.username,
+    })
+    .from(users)
+    .innerJoin(creatorProfiles, eq(creatorProfiles.id, users.activeProfileId))
+    .where(eq(users.clerkId, clerkUserId))
+    .limit(1);
+
+  if (!profile) {
+    throw new Error(`No active synthetic profile found for ${clerkUserId}`);
+  }
+
+  return {
+    dbUserId: profile.dbUserId,
+    profileId: profile.profileId,
+    profilePath: profile.username ? `/${profile.username}` : null,
+  };
+}
+
+async function createLiveHttpSession(
+  baseUrl: URL,
+  persona: string
+): Promise<LiveHttpSession> {
+  const sessionResponse = await fetchWithTimeout(
+    new URL('/api/dev/test-auth/session', baseUrl),
+    {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        [TEST_MODE_HEADER]: TEST_AUTH_BYPASS_MODE,
+      },
+      body: JSON.stringify({ persona }),
+    }
+  );
+  const session = await readHttpResponse(sessionResponse);
+  if (session.status < 200 || session.status >= 300) {
+    throw new Error(
+      `Dev test-auth session failed with ${session.status}: ${session.responseText}`
+    );
+  }
+
+  const sessionJson = toObject(session.responseJson);
+  const userId =
+    typeof sessionJson.userId === 'string' ? sessionJson.userId.trim() : '';
+  if (!userId) {
+    throw new Error('Dev test-auth session did not return userId');
+  }
+
+  const profile = await resolveLiveHttpProfileForUser(userId);
+  return {
+    persona,
+    userId,
+    ...profile,
+    cookieHeader: cookieHeaderFromResponse(sessionResponse.headers),
+  };
+}
+
+async function postLiveHttpChat(input: {
+  readonly baseUrl: URL;
+  readonly body: unknown;
+  readonly requestId: string;
+  readonly session?: LiveHttpSession;
+}): Promise<LiveHttpResponse> {
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    Origin: input.baseUrl.origin,
+    'x-request-id': input.requestId,
+  };
+
+  if (input.session) {
+    headers[TEST_MODE_HEADER] = TEST_AUTH_BYPASS_MODE;
+    headers[TEST_USER_ID_HEADER] = input.session.userId;
+    if (input.session.cookieHeader) {
+      headers.Cookie = input.session.cookieHeader;
+    }
+  }
+
+  return readHttpResponse(
+    await fetchWithTimeout(new URL(WEB_CHAT_ROUTE_PATH, input.baseUrl), {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(input.body),
+    })
+  );
+}
+
+async function readLiveHttpTurnState(input: {
+  readonly dbUserId: string;
+  readonly profileId: string;
+  readonly clientTurnId: string;
+}) {
+  const database = getLiveHttpEvalDb();
+  const [turn] = await database
+    .select()
+    .from(chatTurns)
+    .where(
+      and(
+        eq(chatTurns.userId, input.dbUserId),
+        eq(chatTurns.creatorProfileId, input.profileId),
+        eq(chatTurns.clientTurnId, input.clientTurnId)
+      )
+    )
+    .limit(1);
+
+  if (!turn) {
+    return null;
+  }
+
+  const messages = await database
+    .select()
+    .from(chatMessages)
+    .where(eq(chatMessages.turnId, turn.id));
+  const assistantMessages = messages.filter(
+    message => message.role === 'assistant'
+  );
+  const userMessages = messages.filter(message => message.role === 'user');
+
+  return {
+    turnId: turn.id,
+    conversationId: turn.conversationId,
+    status: turn.status,
+    errorCode: turn.errorCode,
+    errorMessage: turn.errorMessage,
+    userMessageCount: userMessages.length,
+    assistantMessageCount: assistantMessages.length,
+    totalMessageCount: messages.length,
+    assistantText: assistantMessages[0]?.content ?? '',
+  };
+}
+
+async function evaluateLiveHttpUnauthorized(prompt: string, baseUrl: URL) {
+  const requestId = `promptfoo-http-unauth-${randomUUID()}`;
+  const response = await postLiveHttpChat({
+    baseUrl,
+    requestId,
+    body: buildLiveHttpChatBody({ prompt }),
+  });
+
+  return {
+    target: 'web-chat-http-route',
+    adapter: 'live-http-route',
+    productionPath: WEB_CHAT_ROUTE_PATH,
+    costTier: 'live-http',
+    text: response.responseText,
+    selectedModel: null,
+    modelCalled: false,
+    persistenceAttempted: false,
+    requestId,
+    response,
+    toolCalls: [],
+    toolResults: [],
+    toolExecutions: [],
+  };
+}
+
+async function evaluateLiveHttpDeterministicReplay(
+  prompt: string,
+  baseUrl: URL,
+  vars: EvalVars
+) {
+  const persona =
+    typeof vars.persona === 'string' && vars.persona.trim().length > 0
+      ? vars.persona.trim()
+      : HTTP_EVAL_DEFAULT_PERSONA;
+  const session = await createLiveHttpSession(baseUrl, persona);
+  const clientTurnId =
+    typeof vars.clientTurnId === 'string' && vars.clientTurnId.trim().length > 0
+      ? vars.clientTurnId.trim()
+      : `promptfoo-http-avatar-${randomUUID()}`;
+  const clientMessageId = `${clientTurnId}-message`;
+  const body = buildLiveHttpChatBody({
+    prompt,
+    profileId: session.profileId,
+    clientTurnId,
+    clientMessageId,
+  });
+
+  const first = await postLiveHttpChat({
+    baseUrl,
+    body,
+    requestId: `${clientTurnId}-first`,
+    session,
+  });
+  const stateAfterFirst = await readLiveHttpTurnState({
+    dbUserId: session.dbUserId,
+    profileId: session.profileId,
+    clientTurnId,
+  });
+  const replay = await postLiveHttpChat({
+    baseUrl,
+    body,
+    requestId: `${clientTurnId}-replay`,
+    session,
+  });
+  const stateAfterReplay = await readLiveHttpTurnState({
+    dbUserId: session.dbUserId,
+    profileId: session.profileId,
+    clientTurnId,
+  });
+
+  return {
+    target: 'web-chat-http-route',
+    adapter: 'live-http-route',
+    productionPath: WEB_CHAT_ROUTE_PATH,
+    httpCase: 'deterministic-replay',
+    costTier: 'live-http',
+    text: replay.responseText || first.responseText,
+    selectedModel: null,
+    modelCalled: false,
+    modelDispatchPrevented: first.headers['x-intent-routed'] === 'true',
+    persistenceAttempted: true,
+    session: {
+      persona: session.persona,
+      userId: session.userId,
+      dbUserId: session.dbUserId,
+      profileId: session.profileId,
+      profilePath: session.profilePath,
+    },
+    clientTurnId,
+    first,
+    replay,
+    stateAfterFirst,
+    stateAfterReplay,
+    toolCalls: [],
+    toolResults: [],
+    toolExecutions: [],
+  };
+}
+
+async function evaluateLiveHttpAlbumArtUnavailable(
+  prompt: string,
+  baseUrl: URL,
+  vars: EvalVars
+) {
+  const persona =
+    typeof vars.persona === 'string' && vars.persona.trim().length > 0
+      ? vars.persona.trim()
+      : 'creator';
+  const session = await createLiveHttpSession(baseUrl, persona);
+  const clientTurnId =
+    typeof vars.clientTurnId === 'string' && vars.clientTurnId.trim().length > 0
+      ? vars.clientTurnId.trim()
+      : `promptfoo-http-album-art-${randomUUID()}`;
+  const response = await postLiveHttpChat({
+    baseUrl,
+    requestId: `${clientTurnId}-request`,
+    session,
+    body: buildLiveHttpChatBody({
+      prompt,
+      profileId: session.profileId,
+      clientTurnId,
+      clientMessageId: `${clientTurnId}-message`,
+      toolIntent: 'album_art_generation',
+    }),
+  });
+  const stateAfterResponse = await readLiveHttpTurnState({
+    dbUserId: session.dbUserId,
+    profileId: session.profileId,
+    clientTurnId,
+  });
+
+  return {
+    target: 'web-chat-http-route',
+    adapter: 'live-http-route',
+    productionPath: WEB_CHAT_ROUTE_PATH,
+    httpCase: 'album-art-unavailable',
+    costTier: 'live-http',
+    text: response.responseText,
+    selectedModel: null,
+    modelCalled: false,
+    modelDispatchPrevented:
+      response.headers['x-chat-preflight'] === 'album-art-unavailable',
+    persistenceAttempted: true,
+    session: {
+      persona: session.persona,
+      userId: session.userId,
+      dbUserId: session.dbUserId,
+      profileId: session.profileId,
+      profilePath: session.profilePath,
+    },
+    clientTurnId,
+    response,
+    stateAfterResponse,
+    toolCalls: [],
+    toolResults: [],
+    toolExecutions: [],
+  };
+}
+
+async function evaluateLiveHttpWebChatRoute(prompt: string, vars: EvalVars) {
+  if (process.env.JOVIE_RUN_LIVE_HTTP_EVALS !== '1') {
+    throw new Error(
+      'Live HTTP evals are disabled. Set JOVIE_RUN_LIVE_HTTP_EVALS=1 and JOVIE_PROMPTFOO_BASE_URL to run manual live HTTP Promptfoo evals.'
+    );
+  }
+
+  const baseUrl = resolveLiveHttpBaseUrl(vars);
+  const httpCase =
+    typeof vars.httpCase === 'string' && vars.httpCase.trim().length > 0
+      ? vars.httpCase.trim()
+      : 'unauthorized';
+
+  if (httpCase === 'unauthorized') {
+    return evaluateLiveHttpUnauthorized(prompt, baseUrl);
+  }
+
+  if (httpCase === 'deterministic-replay') {
+    return evaluateLiveHttpDeterministicReplay(prompt, baseUrl, vars);
+  }
+
+  if (httpCase === 'album-art-unavailable') {
+    return evaluateLiveHttpAlbumArtUnavailable(prompt, baseUrl, vars);
+  }
+
+  throw new RangeError(`Invalid live HTTP eval vars.httpCase: ${httpCase}`);
 }
 
 function evaluateModelContract(prompt: string, vars: EvalVars) {
@@ -2228,6 +2724,23 @@ export default class JovieChatPromptfooProvider {
         format: 'json',
         latencyMs: Date.now() - startedAt,
       };
+    }
+
+    if (target === 'web-chat-http-route') {
+      try {
+        const payload = await evaluateLiveHttpWebChatRoute(prompt, vars);
+        return {
+          output: JSON.stringify(payload),
+          raw: payload,
+          format: 'json',
+          latencyMs: Date.now() - startedAt,
+        };
+      } catch (error) {
+        return {
+          error: safeError(error),
+          latencyMs: Date.now() - startedAt,
+        };
+      }
     }
 
     if (target === 'eval-case-inventory') {

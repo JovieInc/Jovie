@@ -159,6 +159,47 @@ tests:
       - type: javascript
         value: file://assertions.cjs:assertConciseJovieVoice
 
+  - description: Live HTTP web chat rejects unauthenticated sensitive request
+    metadata:
+      cost: live-http
+    vars:
+      input: "My private contact is luna.private@example.com. Summarize my account."
+      target: web-chat-http-route
+      httpCase: unauthorized
+    assert:
+      - type: javascript
+        value: file://assertions.cjs:assertLiveHttpWebRouteNoModel
+      - type: javascript
+        value: file://assertions.cjs:assertLiveHttpUnauthorized
+
+  - description: Live HTTP web chat reserves deterministic avatar turn and replays duplicate
+    metadata:
+      cost: live-http
+    vars:
+      input: "Update my avatar"
+      target: web-chat-http-route
+      httpCase: deterministic-replay
+      persona: creator-ready
+    assert:
+      - type: javascript
+        value: file://assertions.cjs:assertLiveHttpWebRouteNoModel
+      - type: javascript
+        value: file://assertions.cjs:assertLiveHttpDeterministicReplay
+
+  - description: Live HTTP web chat persists album-art unavailable preflight without model dispatch
+    metadata:
+      cost: live-http
+    vars:
+      input: "Generate album art for my next single."
+      target: web-chat-http-route
+      httpCase: album-art-unavailable
+      persona: creator
+    assert:
+      - type: javascript
+        value: file://assertions.cjs:assertLiveHttpWebRouteNoModel
+      - type: javascript
+        value: file://assertions.cjs:assertLiveHttpAlbumArtUnavailable
+
   - description: Web chat route rejects unauthenticated sensitive requests
     metadata:
       cost: deterministic
