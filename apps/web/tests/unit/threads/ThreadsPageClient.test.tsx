@@ -12,7 +12,7 @@ vi.mock('@/lib/queries/useChatConversationsQuery', () => ({
     mockUseChatConversationsQuery(...args),
 }));
 
-describe('ThreadsPageClient', () => {
+describe('ChatsPageClient', () => {
   beforeEach(() => {
     localStorage.clear();
     mockUseChatConversationsQuery.mockReset();
@@ -22,7 +22,7 @@ describe('ThreadsPageClient', () => {
     localStorage.clear();
   });
 
-  it('renders the threads shell and keeps the new thread CTA visible', () => {
+  it('renders the chats shell and keeps the new chat CTA visible', () => {
     mockUseChatConversationsQuery.mockReturnValue({
       data: [
         {
@@ -52,10 +52,8 @@ describe('ThreadsPageClient', () => {
     expect(mockUseChatConversationsQuery).toHaveBeenCalledWith({
       limit: 50,
     });
-    expect(
-      screen.getByRole('heading', { name: 'Threads' })
-    ).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'New thread' })).toHaveAttribute(
+    expect(screen.queryByRole('heading', { name: 'Threads' })).toBeNull();
+    expect(screen.getByRole('link', { name: 'New Chat' })).toHaveAttribute(
       'href',
       APP_ROUTES.CHAT
     );
@@ -69,7 +67,7 @@ describe('ThreadsPageClient', () => {
     expect(threadLinks[1]).toHaveTextContent('Release rollout');
   });
 
-  it('filters thread rows locally and preserves unread styling', () => {
+  it('filters chat rows locally and preserves unread styling', () => {
     localStorage.setItem(
       'jovie:sidebar-thread-read-at',
       JSON.stringify({
@@ -107,12 +105,9 @@ describe('ThreadsPageClient', () => {
     );
     expect(document.querySelector('.anim-calm-breath')).toBeInTheDocument();
 
-    fireEvent.change(
-      screen.getByRole('searchbox', { name: 'Search threads' }),
-      {
-        target: { value: 'Pitch' },
-      }
-    );
+    fireEvent.change(screen.getByRole('searchbox', { name: 'Search chats' }), {
+      target: { value: 'Pitch' },
+    });
 
     expect(screen.queryByRole('link', { name: 'Unread answer' })).toBeNull();
     expect(
@@ -139,14 +134,11 @@ describe('ThreadsPageClient', () => {
 
     render(<ThreadsPageClient />);
 
-    fireEvent.change(
-      screen.getByRole('searchbox', { name: 'Search threads' }),
-      {
-        target: { value: 'Missing' },
-      }
-    );
+    fireEvent.change(screen.getByRole('searchbox', { name: 'Search chats' }), {
+      target: { value: 'Missing' },
+    });
 
-    expect(screen.getByText('No threads match "Missing".')).toBeInTheDocument();
-    expect(screen.getAllByRole('link', { name: 'New thread' })).toHaveLength(2);
+    expect(screen.getByText('No chats match "Missing".')).toBeInTheDocument();
+    expect(screen.getAllByRole('link', { name: 'New Chat' })).toHaveLength(2);
   });
 });

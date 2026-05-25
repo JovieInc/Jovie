@@ -21,7 +21,7 @@ import {
 } from './utils/smoke-test-utils';
 
 const PALETTE_INPUT =
-  'input[placeholder="Jump to a page, skill, release, or thread…"]';
+  'input[placeholder="Jump to a page, skill, release, or chat..."]';
 
 test.describe('Command palette — Cmd+K contract', () => {
   test.beforeAll(() => {

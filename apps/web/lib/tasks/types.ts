@@ -93,6 +93,7 @@ export interface TaskStats {
   readonly done: number;
   readonly cancelled: number;
   readonly activeTodoCount: number;
+  readonly newActiveTodoCount: number;
 }
 
 export interface CreateTaskInput {

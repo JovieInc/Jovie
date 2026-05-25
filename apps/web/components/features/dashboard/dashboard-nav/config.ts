@@ -12,6 +12,7 @@ import {
   IdCard,
   Image as ImageIcon,
   LayoutDashboard,
+  Library as LibraryIcon,
   Lock,
   type LucideIcon,
   MailCheck,
@@ -44,27 +45,36 @@ export const dashboardHome: NavItem = {
   href: APP_ROUTES.CHAT,
   id: 'overview',
   icon: Home,
-  description: 'Start a new thread',
+  description: 'Start a new chat',
 };
 
 export const newThreadNavItem: NavItem = {
-  name: 'New thread',
+  name: 'New Chat',
   href: APP_ROUTES.CHAT,
   id: 'chat',
   icon: SquarePen,
-  description: 'Start a new thread',
+  description: 'Start a new chat',
 };
 
 export const profileNavItem: NavItem = {
   name: 'Profile',
-  href: APP_ROUTES.SETTINGS_ARTIST_PROFILE,
+  href: APP_ROUTES.CHAT_PROFILE_PANEL,
   id: 'profile',
   icon: UserCircle,
-  description: 'Update your profile and links',
+  description: 'Open profile preview and links',
+};
+
+export const libraryNavItem: NavItem = {
+  name: 'Library',
+  href: APP_ROUTES.LIBRARY,
+  id: 'library',
+  icon: LibraryIcon,
+  description: 'Browse releases, merch, images, videos, and audio',
 };
 
 export const primaryNavigation: NavItem[] = [
   newThreadNavItem,
+  libraryNavItem,
   profileNavItem,
   {
     name: 'Releases',
@@ -264,7 +274,7 @@ export const mobileHome: NavItem = {
   href: APP_ROUTES.CHAT,
   id: 'home',
   icon: SquarePen,
-  description: 'Start a new thread',
+  description: 'Start a new chat',
 };
 
 /** Items shown as icons in the bottom tab bar (max 3). */

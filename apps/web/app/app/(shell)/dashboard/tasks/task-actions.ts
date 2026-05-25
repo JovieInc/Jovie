@@ -6,6 +6,7 @@ import {
   count,
   sql as drizzleSql,
   eq,
+  gt,
   ilike,
   inArray,
   isNull,
@@ -129,6 +130,7 @@ function formatTaskStats(
     done,
     cancelled,
     activeTodoCount: backlog + todo + inProgress,
+    newActiveTodoCount: 0,
   };
 }
 
@@ -881,7 +883,9 @@ export async function bulkUpdateTasks(
   return { success: true };
 }
 
-export async function getTaskStats(): Promise<TaskStats> {
+export async function getTaskStats(
+  options: { readonly newerThan?: string | null } = {}
+): Promise<TaskStats> {
   await requireTasksWorkspaceAccess();
   const profileId = await requireProfileId();
 
@@ -894,5 +898,26 @@ export async function getTaskStats(): Promise<TaskStats> {
     .where(and(eq(tasks.creatorProfileId, profileId), isNull(tasks.deletedAt)))
     .groupBy(tasks.status);
 
-  return formatTaskStats(rows);
+  const stats = formatTaskStats(rows);
+  const newerThan = options.newerThan ? new Date(options.newerThan) : null;
+  if (!newerThan || Number.isNaN(newerThan.getTime())) {
+    return stats;
+  }
+
+  const [newActive] = await db
+    .select({ count: count() })
+    .from(tasks)
+    .where(
+      and(
+        eq(tasks.creatorProfileId, profileId),
+        isNull(tasks.deletedAt),
+        inArray(tasks.status, ['backlog', 'todo', 'in_progress']),
+        gt(tasks.updatedAt, newerThan)
+      )
+    );
+
+  return {
+    ...stats,
+    newActiveTodoCount: Number(newActive?.count ?? 0),
+  };
 }

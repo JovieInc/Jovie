@@ -11,6 +11,11 @@ describe('APP_ROUTES settings', () => {
   it('exposes the canonical settings usage route', () => {
     expect(APP_ROUTES.SETTINGS_USAGE).toBe('/app/settings/usage');
   });
+
+  it('exposes Chats as the canonical chat index route', () => {
+    expect(APP_ROUTES.CHATS).toBe('/app/chats');
+    expect(APP_ROUTES.THREADS).toBe('/app/threads');
+  });
 });
 
 describe('buildLyricsRoute', () => {

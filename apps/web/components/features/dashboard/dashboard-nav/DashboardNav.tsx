@@ -31,7 +31,7 @@ import { useTaskStatsQuery } from '@/lib/queries/useTasksQuery';
 import {
   adminNavigationSections,
   artistSettingsNavigation,
-  calendarNavItem,
+  libraryNavItem,
   newThreadNavItem,
   primaryNavigation,
   profileNavItem,
@@ -48,7 +48,7 @@ const searchNavItem: NavItem = {
   id: 'search',
   icon: Search,
   description:
-    'Search app content across threads, releases, artists, tasks, and more',
+    'Search app content across chats, releases, artists, tasks, and more',
 };
 
 type DashboardNavSection = {
@@ -101,11 +101,36 @@ function normalizeTrailingSlash(pathname: string): string {
   return pathname === '/' ? pathname : pathname.replace(/\/$/, '');
 }
 
+const TASKS_SEEN_STORAGE_KEY = 'jovie:tasks-seen-at';
+
+function readTasksSeenAt(): string | null {
+  try {
+    return globalThis.localStorage?.getItem(TASKS_SEEN_STORAGE_KEY) ?? null;
+  } catch {
+    return null;
+  }
+}
+
+function writeTasksSeenAt(value: string): void {
+  try {
+    globalThis.localStorage?.setItem(TASKS_SEEN_STORAGE_KEY, value);
+  } catch {
+    // Storage can be unavailable in restricted browsers; the badge still works.
+  }
+}
+
 function formatTaskBadge(
-  taskStats: { activeTodoCount: number } | undefined
+  taskStats:
+    | { activeTodoCount: number; newActiveTodoCount?: number }
+    | undefined,
+  seenAt: string | null
 ): string | number | undefined {
   if (!taskStats || taskStats.activeTodoCount <= 0) return undefined;
-  return taskStats.activeTodoCount > 99 ? '99+' : taskStats.activeTodoCount;
+  const count = seenAt
+    ? (taskStats.newActiveTodoCount ?? 0)
+    : taskStats.activeTodoCount;
+  if (count <= 0) return undefined;
+  return count > 99 ? '99+' : count;
 }
 
 export function DashboardNav(_: DashboardNavProps) {
@@ -118,6 +143,9 @@ export function DashboardNav(_: DashboardNavProps) {
   const shellChatV1Enabled = useAppFlag('DESIGN_V1');
   const [threadReadAtById, setThreadReadAtById] =
     useState<Record<string, string>>(readThreadReadState);
+  const [tasksSeenAt, setTasksSeenAt] = useState<string | null>(
+    readTasksSeenAt
+  );
   const username =
     selectedProfile?.usernameNormalized ?? selectedProfile?.username;
   const publicProfileHref = username ? `/${username}` : undefined;
@@ -138,6 +166,7 @@ export function DashboardNav(_: DashboardNavProps) {
     usePlanGate();
   const { data: taskStats } = useTaskStatsQuery(profileId, {
     enabled: !isDemo && canAccessTasksWorkspace,
+    seenAt: tasksSeenAt,
   });
   const isInSettings = pathname.startsWith(APP_ROUTES.SETTINGS);
   const threadsVisible =
@@ -172,6 +201,13 @@ export function DashboardNav(_: DashboardNavProps) {
     });
   }, [conversations]);
 
+  useEffect(() => {
+    if (normalizeTrailingSlash(pathname) !== APP_ROUTES.TASKS) return;
+    const nextSeenAt = new Date().toISOString();
+    writeTasksSeenAt(nextSeenAt);
+    setTasksSeenAt(nextSeenAt);
+  }, [pathname]);
+
   // Settings nav: "General" (user) and artist name (or "Artist") groups
   const artistSettingsLabel = artistName || 'Artist';
   const moreLabel = 'More';
@@ -187,7 +223,8 @@ export function DashboardNav(_: DashboardNavProps) {
             ...item,
             badge: (() => {
               if (isPlanGateLoading) return undefined;
-              if (canAccessTasksWorkspace) return formatTaskBadge(taskStats);
+              if (canAccessTasksWorkspace)
+                return formatTaskBadge(taskStats, tasksSeenAt);
               return (
                 <span className='rounded-full border border-[color-mix(in_oklab,var(--linear-app-frame-seam)_76%,transparent)] bg-[color-mix(in_oklab,var(--linear-app-content-surface)_90%,transparent)] px-1.5 py-0.5 text-[9px] font-semibold tracking-[0.02em] text-secondary-token'>
                   Pro
@@ -200,34 +237,35 @@ export function DashboardNav(_: DashboardNavProps) {
     const releaseItem = primaryNavigation.find(item => item.id === 'releases');
     const audienceItem = primaryNavigation.find(item => item.id === 'audience');
     const tasksItem = primaryNavigation.find(item => item.id === 'tasks');
+    const artistProfileItem: NavItem = {
+      ...profileNavItem,
+      name: artistSettingsLabel,
+    };
 
     if (shellChatV1Enabled) {
       return {
         moreSection: {
           key: 'more',
           label: moreLabel,
-          items: [profileNavItem, settingsNavItem].map(decorateItem),
+          items: [artistProfileItem, settingsNavItem].map(decorateItem),
         },
         navSections: [
           {
-            key: 'work',
-            label: 'Work',
+            key: 'top',
             items: [
               decorateItem(newThreadNavItem),
               searchNavItem,
-              ...(tasksItem ? [decorateItem(tasksItem)] : []),
-              decorateItem(calendarNavItem),
+              decorateItem(libraryNavItem),
             ],
           },
           {
-            key: 'catalog',
-            label: 'Catalog',
-            items: releaseItem ? [decorateItem(releaseItem)] : [],
-          },
-          {
-            key: 'growth',
-            label: 'Growth',
-            items: audienceItem ? [decorateItem(audienceItem)] : [],
+            key: 'artist',
+            label: artistSettingsLabel,
+            items: [
+              ...(releaseItem ? [decorateItem(releaseItem)] : []),
+              ...(audienceItem ? [decorateItem(audienceItem)] : []),
+              ...(tasksItem ? [decorateItem(tasksItem)] : []),
+            ],
           },
         ],
       };
@@ -245,9 +283,11 @@ export function DashboardNav(_: DashboardNavProps) {
   }, [
     canAccessTasksWorkspace,
     isPlanGateLoading,
+    artistSettingsLabel,
     moreLabel,
     shellChatV1Enabled,
     taskStats,
+    tasksSeenAt,
   ]);
 
   // Debounced prefetch: avoid firing on fast mouse sweeps across nav items
@@ -527,7 +567,7 @@ export function DashboardNav(_: DashboardNavProps) {
             threads={sidebarThreads}
             activeThreadId={activeThreadId}
             allThreadsActive={
-              normalizeTrailingSlash(pathname) === APP_ROUTES.THREADS
+              normalizeTrailingSlash(pathname) === APP_ROUTES.CHATS
             }
             onNewThread={() => {
               router.push(APP_ROUTES.CHAT);

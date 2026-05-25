@@ -24,7 +24,10 @@ import type {
 } from '@/lib/tasks/types';
 import { queryKeys } from './keys';
 
-type TaskStatsStatusKey = Exclude<keyof TaskStats, 'activeTodoCount'>;
+type TaskStatsStatusKey = Exclude<
+  keyof TaskStats,
+  'activeTodoCount' | 'newActiveTodoCount'
+>;
 type TaskListCacheEntry = readonly [
   readonly unknown[],
   TaskListResult | undefined,

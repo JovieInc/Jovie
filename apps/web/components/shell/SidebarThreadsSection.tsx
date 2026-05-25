@@ -15,7 +15,7 @@ import { cn } from '@/lib/utils';
 import { getSidebarNavRowClassName } from './SidebarNavItem';
 import { Tooltip } from './Tooltip';
 
-// Thread types — co-located so consumers import from one place. Production
+// Chat list types — co-located so consumers import from one place. Production
 // adapters should map real conversation records into this flat shell contract.
 
 export type ThreadStatus = 'running' | 'complete' | 'errored';
@@ -146,7 +146,7 @@ export function toSidebarThread(
   return {
     id: conversation.id,
     href: `${APP_ROUTES.CHAT}/${encodeURIComponent(conversation.id)}`,
-    title: conversation.title?.trim() || 'Untitled thread',
+    title: conversation.title?.trim() || 'Untitled chat',
     status: getSidebarThreadStatus(latestTurnStatus),
     updatedAt: conversation.updatedAt,
     unread,
@@ -268,11 +268,11 @@ const SidebarThreadRow = React.memo(function SidebarThreadRow({
         )}
       </Tooltip>
       {onThreadContextMenu ? (
-        <Tooltip label='Thread actions' side='right'>
+        <Tooltip label='Chat actions' side='right'>
           <button
             type='button'
             onClick={e => onThreadContextMenu(e, thread)}
-            aria-label={`Thread actions for ${thread.title}`}
+            aria-label={`Chat actions for ${thread.title}`}
             className={cn(
               'absolute right-1 top-1/2 grid h-5 w-5 -translate-y-1/2 place-items-center rounded-full text-quaternary-token transition-[background-color,color,opacity] duration-subtle ease-subtle hover:bg-surface-1 hover:text-primary-token focus-visible:bg-surface-1 focus-visible:text-primary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/55',
               'opacity-0 group-hover/thread:opacity-100 focus-visible:opacity-100'
@@ -325,7 +325,7 @@ export function SidebarThreadsSection({
     <div className='space-y-1.5'>
       <div className='flex items-center justify-between border-t border-[color-mix(in_oklab,var(--linear-app-frame-seam)_44%,transparent)] px-2.5 pb-0.5 pt-2'>
         <span className='text-[10.5px] font-semibold uppercase tracking-[0.08em] text-quaternary-token'>
-          Threads
+          Chats
         </span>
         {unreadCount > 0 && (
           <span className='inline-flex items-center gap-1 text-[11px] font-medium text-quaternary-token'>
@@ -359,12 +359,12 @@ export function SidebarThreadsSection({
               tight ? 'h-6 text-[12px]' : 'h-6.5 text-[12.5px]'
             )}
           >
-            <span className='min-w-0 flex-1 truncate'>Threads unavailable</span>
+            <span className='min-w-0 flex-1 truncate'>Chats unavailable</span>
             {onRetry ? (
               <button
                 type='button'
                 onClick={onRetry}
-                aria-label='Retry threads'
+                aria-label='Retry chats'
                 className='grid h-5 w-5 shrink-0 place-items-center rounded text-quaternary-token transition-[background-color] duration-subtle ease-subtle hover:bg-sidebar-accent/55 hover:text-primary-token'
               >
                 <RefreshCw
@@ -394,7 +394,7 @@ export function SidebarThreadsSection({
               strokeWidth={2.25}
             />
             <span className='min-w-0 truncate justify-self-start'>
-              New thread
+              New Chat
             </span>
           </button>
         ) : null}
@@ -417,13 +417,12 @@ export function SidebarThreadsSection({
         })}
         {hasThreads ? (
           <Link
-            href={APP_ROUTES.THREADS}
+            href={APP_ROUTES.CHATS}
             aria-current={allThreadsActive ? 'page' : undefined}
             className={cn(
               getSidebarNavRowClassName({
                 active: allThreadsActive,
                 tight,
-                tone: 'primary',
               }),
               'text-left'
             )}
@@ -434,7 +433,7 @@ export function SidebarThreadsSection({
               strokeWidth={2.25}
             />
             <span className='min-w-0 truncate justify-self-start'>
-              All threads
+              All Chats
             </span>
           </Link>
         ) : null}

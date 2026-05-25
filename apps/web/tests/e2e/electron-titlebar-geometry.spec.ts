@@ -102,11 +102,9 @@ async function assertElectronShellControls(
     page.locator('[data-testid="electron-sidebar-toggle"]')
   ).toHaveCount(1);
   await expect(page.locator('[data-sidebar="trigger"]')).toHaveCount(0);
-  await expect(page.locator('header a[aria-label="New thread"]')).toHaveCount(
-    0
-  );
+  await expect(page.locator('header a[aria-label="New Chat"]')).toHaveCount(0);
   const newChatRowCount = await page
-    .getByRole('link', { name: 'New thread' })
+    .getByRole('link', { name: 'New Chat' })
     .count();
   expect(newChatRowCount).toBeLessThanOrEqual(1);
   if (expectedNewChatRows === 1) {
@@ -193,13 +191,11 @@ test('no duplicate sidebar dock button and titlebar toggle on the same page', as
   });
 
   await expect(page.locator('[data-sidebar="trigger"]')).toHaveCount(0);
-  await expect(page.locator('header a[aria-label="New thread"]')).toHaveCount(
-    0
-  );
+  await expect(page.locator('header a[aria-label="New Chat"]')).toHaveCount(0);
   await expect(
     page.locator('[data-testid="electron-sidebar-toggle"]')
   ).toHaveCount(1);
-  await expect(page.getByRole('link', { name: 'New thread' })).toHaveCount(1);
+  await expect(page.getByRole('link', { name: 'New Chat' })).toHaveCount(1);
 
   // The titlebar sidebar toggle must be present (it is the canonical one in Electron).
   const titlebarToggle = page.locator(
