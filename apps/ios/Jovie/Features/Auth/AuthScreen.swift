@@ -58,6 +58,14 @@ struct AuthScreen: View {
     }
 
     didRequestBrowserAuth = true
+    Observability.addBreadcrumb(
+      .authStart,
+      context: ["provider": "browser", "base_url": webBaseURL]
+    )
+    Observability.addBreadcrumb(
+      .authProviderSelected,
+      context: ["provider": "browser"]
+    )
 
     authCoordinator.startSignIn(baseURL: webBaseURL) { result in
       Task { @MainActor in
@@ -67,10 +75,27 @@ struct AuthScreen: View {
         case let .success(authReturn):
           onAuthReturn(authReturn)
         case let .failure(error):
-          if error is CancellationError {
+          if isAuthSessionCancellation(error) {
+            Observability.addBreadcrumb(
+              .authSessionClosed,
+              context: ["reason": "user_cancelled"]
+            )
             return
           }
 
+          Observability.addBreadcrumb(
+            .authSessionClosed,
+            level: .warning,
+            context: ["reason": "browser_auth_failed"]
+          )
+          Observability.captureError(
+            error,
+            event: .authSessionClosed,
+            context: [
+              "stage": "browser_auth",
+              "error_type": String(describing: type(of: error)),
+            ]
+          )
           authLogger.error("Mobile browser auth failed: \(error.localizedDescription, privacy: .public)")
         }
       }
@@ -144,9 +169,19 @@ final class MobileAuthCoordinator: NSObject, ASWebAuthenticationPresentationCont
       baseURL: baseURL,
       codeChallenge: codeChallenge
     ) else {
+      Observability.addBreadcrumb(
+        .authSessionClosed,
+        level: .warning,
+        context: ["reason": "invalid_auth_url"]
+      )
       completion(.failure(MobileAuthCoordinatorError.invalidAuthURL))
       return
     }
+
+    Observability.addBreadcrumb(
+      .authSheetOpened,
+      context: ["auth_url": authURL]
+    )
 
     let session = ASWebAuthenticationSession(
       url: authURL,
@@ -156,8 +191,22 @@ final class MobileAuthCoordinator: NSObject, ASWebAuthenticationPresentationCont
         self.session = nil
 
         if let error {
+          Observability.addBreadcrumb(
+            .authSessionClosed,
+            context: [
+              "reason": "session_error",
+              "error_type": String(describing: type(of: error)),
+            ]
+          )
           completion(.failure(error))
           return
+        }
+
+        if let callbackURL {
+          Observability.addBreadcrumb(
+            .authCallbackReceived,
+            context: ["callback_url": callbackURL]
+          )
         }
 
         guard let callbackURL,
@@ -166,10 +215,19 @@ final class MobileAuthCoordinator: NSObject, ASWebAuthenticationPresentationCont
                 codeVerifier: codeVerifier
               )
         else {
+          Observability.addBreadcrumb(
+            .deepLinkParseFailed,
+            level: .warning,
+            context: ["reason": "missing_or_invalid_callback_url"]
+          )
           completion(.failure(MobileAuthCoordinatorError.missingCallbackURL))
           return
         }
 
+        Observability.addBreadcrumb(
+          .authCallbackURLParsed,
+          context: ["callback_url": callbackURL]
+        )
         completion(.success(authReturn))
       }
     }
@@ -180,6 +238,11 @@ final class MobileAuthCoordinator: NSObject, ASWebAuthenticationPresentationCont
 
     if !session.start() {
       self.session = nil
+      Observability.addBreadcrumb(
+        .authSessionClosed,
+        level: .warning,
+        context: ["reason": "session_start_failed"]
+      )
       completion(.failure(MobileAuthCoordinatorError.invalidAuthURL))
     }
   }
@@ -203,6 +266,18 @@ final class MobileAuthCoordinator: NSObject, ASWebAuthenticationPresentationCont
     let digest = SHA256.hash(data: Data(verifier.utf8))
     return Data(digest).base64URLEncodedString()
   }
+}
+
+private func isAuthSessionCancellation(_ error: Error) -> Bool {
+  if error is CancellationError {
+    return true
+  }
+
+  if let error = error as? ASWebAuthenticationSessionError {
+    return error.code == .canceledLogin
+  }
+
+  return false
 }
 
 private extension Data {

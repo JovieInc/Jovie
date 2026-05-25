@@ -5,6 +5,15 @@
      5|The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
      6|and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.5.49] - 2026-05-24
+
+> [internal] Jovie iOS now reports auth and deep-link diagnostics through provider-agnostic observability.
+
+### Added
+
+- **[internal] iOS observability adapter**: adds a Jovie Observability facade with typed events, Sentry-backed and Noop providers, Sentry Cocoa wiring, redaction hooks, and auth/deep-link/session breadcrumbs without exposing Sentry APIs outside the provider.
+- **[internal] iOS observability redaction tests**: covers auth token, cookie, contact-field, and callback URL sanitization plus provider swapping, no-op spans, and AppState user set/clear instrumentation.
+
 ## [26.5.48] - 2026-05-24
 
 > [internal] Promptfoo now checks the web chat route's pre-model auth, billing, privacy, and kill-switch contracts.
