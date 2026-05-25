@@ -5,6 +5,16 @@
      5|The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
      6|and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.5.56] - 2026-05-25
+
+> Native auth test harnesses now stay rate-limited in production even if simulator-only auth tokens are present.
+
+### Fixed
+
+- **Native auth exchange production guard**: restricted the real-browser auth harness rate-limit bypass to non-production deployments and added regression coverage for production and preview environments.
+- **Smoke auth bypass warmup**: pre-warms the dev test-auth session route and provisions the creator-ready persona through the test seeding path so parallel Turbopack smoke tests do not fall back to stale configured users.
+- **Neon CI branch cleanup**: retains recently-created ephemeral Neon branches so concurrent CI cleanup cannot delete another active run's database during auth and preview smoke tests.
+
 ## [26.5.55] - 2026-05-25
 
 > Release metadata now matches the deployed build-info response and fails CI when it drifts.
