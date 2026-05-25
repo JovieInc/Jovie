@@ -100,6 +100,8 @@ const WEB_CHAT_EVAL_EPOCH_SECONDS = 1_700_000_000;
 const MOBILE_CHAT_ROUTE_PATH = '/api/mobile/v1/chat/turns';
 const MAX_WEB_MESSAGES_PER_REQUEST = 50;
 const MAX_WEB_MESSAGE_LENGTH = 4000;
+const MAX_ONBOARDING_MESSAGES_PER_REQUEST = 50;
+const MAX_ONBOARDING_MESSAGE_LENGTH = 4000;
 const MAX_MOBILE_TEXT_LENGTH = 4000;
 const MOBILE_CHAT_RUNTIME_DISABLED_EVENT = {
   type: 'error',
@@ -559,6 +561,75 @@ function validateWebChatMessages(messages: unknown): string | null {
   return null;
 }
 
+function validateOnboardingRouteMessages(messages: unknown[]): string | null {
+  if (messages.length === 0) {
+    return 'messages array must be non-empty';
+  }
+
+  for (let index = 0; index < messages.length; index += 1) {
+    const shapeError = validateOnboardingMessageShape(messages[index], index);
+    if (shapeError) return shapeError;
+
+    const parts = (messages[index] as { parts: unknown[] }).parts;
+    const partsError = validateOnboardingTextPartLengths(parts, index);
+    if (partsError) return partsError;
+  }
+
+  return null;
+}
+
+function validateOnboardingMessageShape(
+  message: unknown,
+  index: number
+): string | null {
+  if (!message || typeof message !== 'object') {
+    return `messages[${index}] must be an object`;
+  }
+
+  const candidate = message as { role?: unknown; parts?: unknown };
+  if (
+    candidate.role !== 'user' &&
+    candidate.role !== 'assistant' &&
+    candidate.role !== 'system'
+  ) {
+    return `messages[${index}].role must be user/assistant/system`;
+  }
+  if (!Array.isArray(candidate.parts)) {
+    return `messages[${index}].parts must be an array`;
+  }
+
+  return null;
+}
+
+function validateOnboardingTextPartLengths(
+  parts: unknown[],
+  messageIndex: number
+): string | null {
+  for (const part of parts) {
+    if (!part || typeof part !== 'object') continue;
+    if ((part as { type?: unknown }).type !== 'text') continue;
+
+    const text = (part as { text?: unknown }).text;
+    if (
+      typeof text === 'string' &&
+      text.length > MAX_ONBOARDING_MESSAGE_LENGTH
+    ) {
+      return `messages[${messageIndex}] text part exceeds ${MAX_ONBOARDING_MESSAGE_LENGTH} chars`;
+    }
+  }
+
+  return null;
+}
+
+function hasOnboardingUserMessage(messages: unknown[]): boolean {
+  return messages.some(
+    message =>
+      Boolean(message) &&
+      typeof message === 'object' &&
+      (message as { role?: unknown }).role === 'user'
+  );
+}
+
 function toNullableString(value: unknown): string | null {
   return typeof value === 'string' && value.trim().length > 0
     ? value.trim()
@@ -580,6 +651,9 @@ function buildRateLimitHeaders(
 
 function evaluateWebChatRouteContract(prompt: string, vars: EvalVars) {
   const body = buildDefaultWebChatBody(prompt, toObject(vars.body));
+  if (toMode(vars.mode) === 'onboarding' && body.mode === undefined) {
+    body.mode = 'onboarding';
+  }
   if (
     typeof vars.messageCount === 'number' &&
     Number.isInteger(vars.messageCount)
@@ -612,6 +686,7 @@ function evaluateWebChatRouteContract(prompt: string, vars: EvalVars) {
     Vary: 'Origin',
   };
   const responseHeaders = { ...corsHeaders, 'x-request-id': requestId };
+  const mode = body.mode === 'onboarding' ? 'onboarding' : toMode(vars.mode);
   const basePayload = {
     target: 'web-chat-route',
     adapter: 'route-contract',
@@ -621,6 +696,7 @@ function evaluateWebChatRouteContract(prompt: string, vars: EvalVars) {
     routeImportGap:
       'Promptfoo runs outside the Next/Clerk/DB server context, so this eval mirrors checked-in /api/chat pre-model route contracts instead of importing POST directly.',
     request: {
+      mode,
       authenticated,
       body,
       billingVerification:
@@ -643,6 +719,156 @@ function evaluateWebChatRouteContract(prompt: string, vars: EvalVars) {
     persistenceAttempted: false,
     requestId,
   };
+
+  if (mode === 'onboarding') {
+    const onboardingHeaders = {
+      ...responseHeaders,
+      'x-chat-mode': 'onboarding',
+    };
+    const response = (
+      status: number,
+      responseJson: Record<string, unknown>
+    ) => ({
+      ...basePayload,
+      status,
+      headers: onboardingHeaders,
+      responseJson,
+      responseText: JSON.stringify(responseJson),
+    });
+
+    if (
+      body.mode !== 'onboarding' ||
+      (body.turnstileToken !== undefined &&
+        typeof body.turnstileToken !== 'string') ||
+      (body.messages !== undefined && !Array.isArray(body.messages)) ||
+      (Array.isArray(body.messages) &&
+        body.messages.length > MAX_ONBOARDING_MESSAGES_PER_REQUEST)
+    ) {
+      return response(400, {
+        error: 'Invalid onboarding chat request',
+        errorCode: 'INVALID_ONBOARDING_PAYLOAD',
+        requestId,
+      });
+    }
+
+    if (toBoolean(vars.chatDisabled, false)) {
+      return response(503, {
+        error: 'Onboarding chat is temporarily unavailable',
+        errorCode: 'ONBOARDING_CHAT_DISABLED',
+        requestId,
+      });
+    }
+
+    const existingSession = toBoolean(vars.existingOnboardingSession, true);
+    if (
+      !existingSession &&
+      toBoolean(vars.sessionSecretConfigured, true) === false
+    ) {
+      return response(503, {
+        error: 'Onboarding chat is temporarily unavailable',
+        errorCode: 'SESSION_SECRET_NOT_CONFIGURED',
+        requestId,
+      });
+    }
+    if (
+      !existingSession &&
+      toBoolean(vars.turnstileConfigured, true) === false
+    ) {
+      return response(503, {
+        error: 'Onboarding chat is temporarily unavailable',
+        errorCode: 'TURNSTILE_NOT_CONFIGURED',
+        requestId,
+      });
+    }
+    if (!existingSession && toBoolean(vars.turnstileVerified, true) === false) {
+      return response(403, {
+        error: 'Bot challenge failed',
+        errorCode: 'TURNSTILE_REQUIRED',
+        reason: 'invalid-input-response',
+        requestId,
+      });
+    }
+
+    if (toBoolean(vars.rateLimited, false)) {
+      const retryAfter = 60;
+      const responseJson = {
+        error: 'Rate limit exceeded',
+        message:
+          typeof vars.rateLimitReason === 'string'
+            ? vars.rateLimitReason
+            : 'Too many onboarding messages. Please retry in a few minutes.',
+        errorCode: 'RATE_LIMITED',
+        requestId,
+      };
+
+      return {
+        ...basePayload,
+        status: 429,
+        headers: {
+          ...onboardingHeaders,
+          ...buildRateLimitHeaders(retryAfter),
+        },
+        responseJson,
+        responseText: JSON.stringify(responseJson),
+      };
+    }
+
+    const rawMessages = (body.messages ?? []) as unknown[];
+    const messagesError = validateOnboardingRouteMessages(rawMessages);
+    if (messagesError) {
+      return response(400, {
+        error: messagesError,
+        errorCode: 'INVALID_MESSAGES',
+        requestId,
+      });
+    }
+
+    if (!hasOnboardingUserMessage(rawMessages)) {
+      return response(400, {
+        error: 'messages array must include a user message',
+        errorCode: 'INVALID_MESSAGES',
+        requestId,
+      });
+    }
+
+    if (vars.onboardingPersistence === 'unavailable') {
+      return {
+        ...response(503, {
+          error: 'Onboarding chat is temporarily unavailable',
+          errorCode: 'ONBOARDING_CHAT_PERSISTENCE_FAILED',
+          requestId,
+        }),
+        persistenceStubbed: true,
+        persistenceWouldBeAttempted: true,
+      };
+    }
+
+    const responseJson = {
+      message:
+        'This deterministic onboarding eval stops before model dispatch; use target=chat-turn for executeChatTurn behavior.',
+      requestId,
+    };
+
+    return {
+      ...basePayload,
+      status: 200,
+      headers: onboardingHeaders,
+      contractOnly: true,
+      productionEntrypoint: 'apps/web/lib/chat/run.ts:executeChatTurn',
+      responseJson,
+      responseText: JSON.stringify(responseJson),
+      mode: 'onboarding',
+      plan: 'free',
+      selectedModel: CHAT_MODEL_LIGHT,
+      modelBoundary: 'light',
+      forceLightModel: true,
+      availableToolNames: [...ONBOARDING_TOOLS],
+      onboardingToolNames: [...ONBOARDING_TOOLS],
+      modelDispatchPrevented: true,
+      persistenceStubbed: true,
+      persistenceWouldBeAttempted: true,
+    };
+  }
 
   if (!authenticated) {
     return {
