@@ -16,7 +16,11 @@ import { captureError } from '@/lib/error-tracking';
 import { useNotifications } from '@/lib/hooks/useNotifications';
 
 import type { ClerkSessionResource, ClerkUserResource } from './types';
-import { extractErrorMessage, formatRelativeDate } from './utils';
+import {
+  extractErrorMessage,
+  formatRelativeDate,
+  formatSessionDeviceName,
+} from './utils';
 
 export interface SessionManagementCardProps {
   readonly user: ClerkUserResource;
@@ -151,7 +155,7 @@ export function SessionManagementCard({
                   <p className='text-app font-caption text-primary-token'>
                     {isCurrent
                       ? 'This device'
-                      : activity?.browserName || 'Unknown device'}
+                      : formatSessionDeviceName(activity?.browserName)}
                   </p>
                   {isCurrent ? (
                     <Badge variant='secondary' size='sm'>

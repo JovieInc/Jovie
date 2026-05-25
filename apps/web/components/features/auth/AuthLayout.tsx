@@ -35,6 +35,7 @@ interface AuthLayoutProps {
   readonly showLogoutButton?: boolean;
   readonly logoutRedirectUrl?: string;
   readonly layoutVariant?: 'stack' | 'split';
+  readonly contentPlacement?: 'default' | 'center';
   readonly showcaseVariant?: 'page' | 'image-only';
 }
 
@@ -50,6 +51,7 @@ interface AuthLayoutInnerProps {
   readonly showFooterPrompt: boolean;
   readonly showFormTitle: boolean;
   readonly showLogo: boolean;
+  readonly contentPlacement: 'default' | 'center';
   readonly showcaseVariant: 'page' | 'image-only';
   readonly isKeyboardVisible: boolean;
   readonly formRef: React.RefObject<HTMLElement | null>;
@@ -132,6 +134,7 @@ function StackLayoutContent({
   showFooterPrompt,
   showFormTitle,
   showLogo,
+  contentPlacement,
   isKeyboardVisible,
   formRef,
 }: Omit<AuthLayoutInnerProps, 'showcaseVariant'>) {
@@ -139,7 +142,8 @@ function StackLayoutContent({
     <>
       <div
         className={cn(
-          `relative z-10 flex w-full ${AUTH_FORM_MAX_WIDTH_CLASS} flex-col items-center overflow-visible`
+          `relative z-10 flex w-full ${AUTH_FORM_MAX_WIDTH_CLASS} flex-col items-center overflow-visible`,
+          contentPlacement === 'center' && 'flex-1 justify-center'
         )}
       >
         {showFormTitle && formTitle ? (
@@ -195,6 +199,7 @@ export function AuthLayout({
   showLogoutButton = false,
   logoutRedirectUrl = '/signin',
   layoutVariant = 'stack',
+  contentPlacement = 'default',
   showcaseVariant = 'page',
 }: Readonly<AuthLayoutProps>) {
   const { isKeyboardVisible } = useMobileKeyboard();
@@ -216,6 +221,7 @@ export function AuthLayout({
     showFooterPrompt,
     showFormTitle,
     showLogo,
+    contentPlacement,
     showcaseVariant,
     isKeyboardVisible,
     formRef,

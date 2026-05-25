@@ -30,6 +30,19 @@ export function formatRelativeDate(value: Date | null | undefined): string {
   return formatter.format(days, 'day');
 }
 
+export function formatSessionDeviceName(
+  browserName: string | null | undefined
+): string {
+  const trimmedName = browserName?.trim();
+  if (!trimmedName) return 'Unknown device';
+
+  if (/electron|jovie\s*desktop|joviedesktop/i.test(trimmedName)) {
+    return 'Mac OS';
+  }
+
+  return trimmedName;
+}
+
 /**
  * Extract a user-friendly error message from various error types.
  */

@@ -789,6 +789,42 @@ describe('dev test-auth routes', () => {
     });
   });
 
+  it('allows the iOS provider-complete route on HTTPS production only with the configured test token', async () => {
+    vi.stubEnv('JOVIE_IOS_REAL_BROWSER_AUTH_TOKEN', 'test-token');
+    mockEnsureLiveDevTestAuthActor.mockResolvedValueOnce({
+      persona: 'creator-ready',
+      clerkUserId: 'user_creator_ready',
+      email: 'browse-ready+clerk_test@jov.ie',
+      username: 'browse-ready-user',
+      fullName: 'Browse Ready User',
+      isAdmin: false,
+      profilePath: '/browse-ready-user',
+    });
+
+    const { GET } = await import(
+      '@/app/api/dev/test-auth/mobile-provider-complete/route'
+    );
+    const response = await GET(
+      new NextRequest(
+        'https://jov.ie/api/dev/test-auth/mobile-provider-complete?persona=creator-ready&return_to=%2Fapp&code_challenge=challenge_123&code_challenge_method=S256&test_token=test-token'
+      )
+    );
+
+    expect(response.status).toBe(307);
+    expect(response.headers.get('location')).toMatch(
+      /^ie\.jov\.jovie:\/\/auth\/complete\?code=.+&state=.+$/
+    );
+    expect(mockCreateStoredNativeExchangeCode).toHaveBeenCalledWith(
+      expect.objectContaining({
+        client: 'ios',
+        userId: 'user_creator_ready',
+        returnTo: '/app',
+        codeChallenge: 'challenge_123',
+      })
+    );
+    expect(mockGetDevTestAuthAvailability).not.toHaveBeenCalled();
+  });
+
   it('rejects the iOS provider-complete route without PKCE', async () => {
     const { GET } = await import(
       '@/app/api/dev/test-auth/mobile-provider-complete/route'

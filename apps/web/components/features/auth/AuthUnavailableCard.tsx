@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { BrandLogo } from '@/components/atoms/BrandLogo';
 import { APP_ROUTES } from '@/constants/routes';
 
 interface AuthUnavailableCardProps {
@@ -32,32 +33,30 @@ export function AuthUnavailableCard({
       ? 'Sign up is temporarily unavailable'
       : 'Sign in is temporarily unavailable';
   const actionClassName =
-    'inline-flex min-h-[3.75rem] w-full items-center justify-center rounded-full border border-white/10 bg-white px-6 text-[15px] font-[590] tracking-[-0.02em] text-[#06070a] shadow-[0_18px_42px_rgba(0,0,0,0.28)] transition-[background-color,border-color,box-shadow] duration-subtle hover:border-white/15 hover:bg-[#f2f2f2] hover:shadow-[0_20px_46px_rgba(0,0,0,0.26)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/24';
+    'inline-flex h-(--linear-button-height-md) min-h-[40px] w-full items-center justify-center rounded-full border border-subtle bg-white px-[14px] text-(--linear-caption-size) font-(--linear-caption-weight) text-[#06070a] shadow-(--linear-shadow-button) transition-[background-color,border-color,color,box-shadow,opacity] duration-subtle ease-out hover:bg-white/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/24 disabled:cursor-not-allowed disabled:opacity-70';
 
   return (
     <section
       data-testid='auth-clerk-unavailable'
       data-auth-mode={resolvedMode}
-      className='w-full max-w-[30rem] space-y-6 text-center lg:text-left'
+      className='mx-auto flex w-full max-w-[22rem] flex-col items-center text-center'
     >
-      <div className='flex justify-center lg:justify-start'>
-        <div className='inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.04] px-3 py-1.5 text-[12px] font-medium tracking-[-0.012em] text-white/70'>
-          <span
-            aria-hidden='true'
-            className='h-1.5 w-1.5 rounded-full bg-white/55'
-          ></span>
-          Auth unavailable
-        </div>
-      </div>
+      <BrandLogo
+        size={34}
+        tone='white'
+        rounded={false}
+        aria-hidden
+        className='opacity-90'
+      />
 
-      <div className='space-y-2.5'>
-        <h1 className='max-w-[10.5ch] text-[clamp(2.9rem,6.2vw,4.45rem)] font-[590] leading-[0.92] tracking-[-0.06em] text-white text-balance lg:max-w-[11.5ch]'>
+      <div className='mt-5 space-y-2'>
+        <h1 className='text-[1.5rem] font-[650] leading-[1.16] tracking-[-0.02em] text-white text-balance'>
           {headline}
         </h1>
-        <p className='mx-auto max-w-[26rem] text-[0.96rem] leading-[1.65] tracking-[-0.014em] text-white/60 text-pretty lg:mx-0'>
+        <p className='mx-auto max-w-[20rem] text-[0.875rem] leading-[1.55] tracking-[-0.011em] text-white/60 text-pretty'>
           {showResetAction
-            ? "Something is off with this environment's auth. Try resetting your session — if it still fails, we've been notified."
-            : 'Clerk is not configured for this environment.'}
+            ? "Something is off with this environment's sign-in setup. Reset your session, then try again."
+            : 'Sign-in is not ready for this environment. Try again from the main app.'}
         </p>
       </div>
 
@@ -65,26 +64,26 @@ export function AuthUnavailableCard({
         <form
           action='/api/auth/reset'
           method='post'
-          className='pt-1 flex justify-center lg:justify-start'
+          className='mt-5 flex w-full justify-center'
         >
           <button type='submit' className={actionClassName}>
             Reset session and retry
           </button>
         </form>
       ) : (
-        <div className='flex justify-center pt-1 lg:justify-start'>
+        <div className='mt-5 flex w-full justify-center'>
           <Link href='/' className={actionClassName}>
             Go to Homepage
           </Link>
         </div>
       )}
 
-      <p className='text-[12px] leading-[1.6] tracking-[-0.01em] text-white/40'>
+      <p className='mt-3 text-[12px] leading-[1.55] tracking-[-0.01em] text-white/40'>
         If it still does not work, give it a moment and try again.
       </p>
 
       {showSignupLegal ? (
-        <p className='text-[12px] leading-[1.6] tracking-[-0.01em] text-white/50'>
+        <p className='mt-4 text-[12px] leading-[1.6] tracking-[-0.01em] text-white/50'>
           By signing up, you agree to our{' '}
           <Link
             href={APP_ROUTES.LEGAL_TERMS}

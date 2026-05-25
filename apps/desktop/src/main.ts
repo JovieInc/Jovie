@@ -740,7 +740,7 @@ function buildDesktopLoadFailureUrl(): string {
         <a class="primary" href="${retryUrl}">Retry</a>
         <a href="${appOrigin}">Open Jovie</a>
       </div>
-      <div class="meta">Desktop shell runtime: Electron</div>
+      <div class="meta">Desktop shell runtime: Mac OS</div>
     </main>
   </body>
 </html>`;

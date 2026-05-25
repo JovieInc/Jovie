@@ -10,7 +10,7 @@ struct SplashView: View {
     ZStack {
       JovieColor.backgroundBase.ignoresSafeArea()
 
-      JovieLogoMark(size: 58)
+      JovieLogoMark(size: 29)
         .opacity(logoOpacity)
         .scaleEffect(logoScale)
         .accessibilityHidden(true)
