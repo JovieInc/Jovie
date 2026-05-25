@@ -12,6 +12,7 @@ import {
 } from '@/lib/auth/test-mode';
 import { ensureClerkTestUser } from '@/lib/testing/test-user-provision.server';
 import { smokeNavigateWithRetry } from '../e2e/utils/smoke-test-utils';
+import { ensureDevTestAuthPersona } from './dev-test-auth-personas';
 import { primeVercelBypassCookie } from './vercel-preview';
 
 const AUTH_READY_ROUTE = APP_ROUTES.DASHBOARD;
@@ -143,10 +144,7 @@ async function resolveBypassUserIdFromLocalProvisioning(
   }
 
   try {
-    const { ensureDevTestAuthActor } = await import(
-      '@/lib/auth/dev-test-auth.server'
-    );
-    const actor = await ensureDevTestAuthActor(persona);
+    const actor = await ensureDevTestAuthPersona(persona);
     return actor.clerkUserId?.trim() || fallbackUserId;
   } catch (error) {
     console.warn(
@@ -180,7 +178,10 @@ async function resolveBypassUserId(
       try {
         const response = await fetch(sessionUrl, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: {
+            'Content-Type': 'application/json',
+            [TEST_MODE_HEADER]: TEST_AUTH_BYPASS_MODE,
+          },
           body: JSON.stringify({ persona }),
         });
 
