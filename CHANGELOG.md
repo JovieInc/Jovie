@@ -5,6 +5,18 @@
      5|The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
      6|and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.5.55] - 2026-05-25
+
+> Release metadata now matches the deployed build-info response and fails CI when it drifts.
+
+### Fixed
+
+- **Build-info release version (JOV-2586)**: synced `version.json`, `VERSION`, and workspace package versions so `/api/health/build-info` reports the current release version.
+
+### Changed
+
+- **Version guardrail (JOV-2586)**: runs the existing version audit in CI guardrails before deploy-related checks.
+
 ## [26.5.53] - 2026-05-25
 
 > Admin People is now stable enough to trust during waitlist review, with flatter insights, clearer chat qualification, and proof of the full waitlist path.
