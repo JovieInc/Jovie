@@ -20,6 +20,12 @@ import { ChatAnalyticsCard } from './components/ChatAnalyticsCard';
 import { ChatAvatarUploadCard } from './components/ChatAvatarUploadCard';
 import { ChatLinkConfirmationCard } from './components/ChatLinkConfirmationCard';
 import { ChatLinkRemovalCard } from './components/ChatLinkRemovalCard';
+import {
+  ChatMerchOptionsCard,
+  ChatMerchSelectionCard,
+  isChatMerchGenerationResult,
+  isChatMerchSelectionResult,
+} from './components/ChatMerchCard';
 import { ChatPitchCard } from './components/ChatPitchCard';
 import type {
   ChatInsightsToolResult,
@@ -381,6 +387,22 @@ function renderReleasePitchArtifact(event: PersistedToolEvent): ReactNode {
   );
 }
 
+function renderMerchGenerationArtifact(event: PersistedToolEvent): ReactNode {
+  if (!isChatMerchGenerationResult(event.output)) {
+    return null;
+  }
+
+  return <ChatMerchOptionsCard result={event.output} />;
+}
+
+function renderMerchSelectionArtifact(event: PersistedToolEvent): ReactNode {
+  if (!isChatMerchSelectionResult(event.output)) {
+    return null;
+  }
+
+  return <ChatMerchSelectionCard result={event.output} />;
+}
+
 const ARTIFACT_RENDERERS: Partial<Record<string, ArtifactRenderer>> = {
   proposeAvatarUpload: event => renderAvatarUploadArtifact(event),
   proposeProfileEdit: (event, profileId) =>
@@ -393,6 +415,9 @@ const ARTIFACT_RENDERERS: Partial<Record<string, ArtifactRenderer>> = {
   generateAlbumArt: (event, profileId) =>
     renderAlbumArtArtifact(event, profileId),
   generateReleasePitch: event => renderReleasePitchArtifact(event),
+  createMerch: event => renderMerchGenerationArtifact(event),
+  previewMerchOptions: event => renderMerchGenerationArtifact(event),
+  selectMerchDesign: event => renderMerchSelectionArtifact(event),
 };
 
 function renderArtifactCard(

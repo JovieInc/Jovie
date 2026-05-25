@@ -255,10 +255,6 @@ function buildMerchAccessLine(accountContext: AccountPromptContext): string {
     return 'Unavailable because billing verification is temporarily unavailable';
   }
 
-  if (!accountContext.flags.merchMvp) {
-    return 'Unavailable because the merch rollout flag is off';
-  }
-
   if (!accountContext.entitlements.canAccessMerchCreation) {
     return 'Unavailable on this plan';
   }
