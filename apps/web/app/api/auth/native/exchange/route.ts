@@ -36,8 +36,20 @@ function createCodeChallenge(verifier: string): string {
   return createHash('sha256').update(verifier).digest('base64url');
 }
 
+function isProductionRuntimeEnvironment(): boolean {
+  const vercelEnv = process.env.VERCEL_ENV?.trim();
+  if (vercelEnv) {
+    return vercelEnv === 'production';
+  }
+
+  return process.env.NODE_ENV === 'production';
+}
+
 function isRealBrowserAuthHarnessEnabled(): boolean {
-  return Boolean(process.env.JOVIE_IOS_REAL_BROWSER_AUTH_TOKEN?.trim());
+  return (
+    !isProductionRuntimeEnvironment() &&
+    Boolean(process.env.JOVIE_IOS_REAL_BROWSER_AUTH_TOKEN?.trim())
+  );
 }
 
 async function trackAuthEvent(
