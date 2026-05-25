@@ -38,6 +38,7 @@
     "evals": "PROMPTFOO_DISABLE_TELEMETRY=1 PROMPTFOO_DISABLE_UPDATE=1 PROMPTFOO_NO_TESTCASE_ASSERT_WARNING=1 promptfoo eval -c tests/eval/promptfoo/promptfooconfig.yaml --filter-metadata cost=deterministic --no-cache --no-share --no-write --no-table",
     "evals:live": "bash scripts/run-live-promptfoo-evals.sh smoke",
     "evals:live:all": "bash scripts/run-live-promptfoo-evals.sh all",
+    "evals:live:http": "bash scripts/run-live-promptfoo-http-evals.sh",
     "test": "NODE_OPTIONS=--max-old-space-size=8192 node scripts/vitest-wrapper.mjs",
     "test:ci": "NODE_OPTIONS=--max-old-space-size=8192 vitest run --pool=forks --maxWorkers=2",
     "test:coverage": "vitest run --coverage",

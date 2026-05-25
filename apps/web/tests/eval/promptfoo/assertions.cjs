@@ -669,6 +669,163 @@ function assertDeterministicNoSpend(output) {
   return pass();
 }
 
+function assertLiveHttpWebRouteNoModel(output) {
+  const payload = parseOutput(output);
+
+  if (payload.target !== 'web-chat-http-route') {
+    return fail('case did not run through the live HTTP web chat adapter');
+  }
+  if (payload.costTier !== 'live-http') {
+    return fail('case is not marked as live-http');
+  }
+  if (payload.selectedModel !== null) {
+    return fail('live HTTP no-model case selected a model');
+  }
+  if (payload.modelCalled !== false) {
+    return fail('live HTTP no-model case reported a model call');
+  }
+
+  return pass();
+}
+
+function assertLiveHttpUnauthorized(output) {
+  const payload = parseOutput(output);
+  const response = payload.response ?? {};
+  const responseText = String(response.responseText ?? payload.text ?? '');
+
+  if (payload.target !== 'web-chat-http-route') {
+    return fail('case did not run through the live HTTP web chat adapter');
+  }
+  if (response.status !== 401) {
+    return fail(`expected live HTTP 401, got ${String(response.status)}`);
+  }
+  if (response.responseJson?.error !== 'Unauthorized') {
+    return fail('missing live Unauthorized response body');
+  }
+  if (!response.headers?.['x-request-id']) {
+    return fail('missing live x-request-id header');
+  }
+  if (/luna\.private@example\.com/i.test(responseText)) {
+    return fail('live unauthorized response echoed sensitive request content');
+  }
+  if (payload.persistenceAttempted !== false) {
+    return fail('unauthorized live HTTP case attempted persistence');
+  }
+
+  return pass();
+}
+
+function assertLiveHttpDeterministicReplay(output) {
+  const payload = parseOutput(output);
+  const first = payload.first ?? {};
+  const replay = payload.replay ?? {};
+  const stateAfterFirst = payload.stateAfterFirst ?? {};
+  const stateAfterReplay = payload.stateAfterReplay ?? {};
+
+  if (payload.target !== 'web-chat-http-route') {
+    return fail('case did not run through the live HTTP web chat adapter');
+  }
+  if (first.status !== 200) {
+    return fail(
+      `expected first live HTTP turn 200, got ${String(first.status)}`
+    );
+  }
+  if (replay.status !== 200) {
+    return fail(
+      `expected replay live HTTP turn 200, got ${String(replay.status)}`
+    );
+  }
+  if (first.headers?.['x-intent-routed'] !== 'true') {
+    return fail(
+      'first live HTTP turn did not stay on deterministic intent path'
+    );
+  }
+  if (replay.headers?.['x-chat-replay'] !== 'true') {
+    return fail('duplicate live HTTP turn did not replay persisted result');
+  }
+  if (
+    !first.headers?.['x-conversation-id'] ||
+    !first.headers?.['x-chat-turn-id']
+  ) {
+    return fail('first live HTTP turn missing persistence headers');
+  }
+  if (
+    first.headers?.['x-conversation-id'] !==
+      replay.headers?.['x-conversation-id'] ||
+    first.headers?.['x-chat-turn-id'] !== replay.headers?.['x-chat-turn-id']
+  ) {
+    return fail('replay did not return the same conversation and turn ids');
+  }
+  if (stateAfterFirst.status !== 'completed') {
+    return fail(
+      `expected completed turn after first request, got ${String(stateAfterFirst.status)}`
+    );
+  }
+  if (stateAfterReplay.status !== 'completed') {
+    return fail(
+      `expected completed turn after replay, got ${String(stateAfterReplay.status)}`
+    );
+  }
+  if (stateAfterReplay.userMessageCount !== 1) {
+    return fail('duplicate replay inserted another user message');
+  }
+  if (stateAfterReplay.assistantMessageCount !== 1) {
+    return fail('duplicate replay inserted another assistant message');
+  }
+  if (payload.modelDispatchPrevented !== true) {
+    return fail(
+      'live HTTP deterministic replay did not prove model dispatch was bypassed'
+    );
+  }
+
+  return pass();
+}
+
+function assertLiveHttpAlbumArtUnavailable(output) {
+  const payload = parseOutput(output);
+  const response = payload.response ?? {};
+  const state = payload.stateAfterResponse ?? {};
+  const combinedText = `${String(response.responseText ?? '')}\n${String(state.assistantText ?? '')}`;
+
+  if (payload.target !== 'web-chat-http-route') {
+    return fail('case did not run through the live HTTP web chat adapter');
+  }
+  if (response.status !== 200) {
+    return fail(
+      `expected album-art preflight stream 200, got ${String(response.status)}`
+    );
+  }
+  if (response.headers?.['x-chat-preflight'] !== 'album-art-unavailable') {
+    return fail('missing album-art-unavailable preflight header');
+  }
+  if (state.status !== 'failed_tool_unavailable') {
+    return fail(
+      `expected failed_tool_unavailable turn, got ${String(state.status)}`
+    );
+  }
+  if (state.assistantMessageCount !== 1) {
+    return fail(
+      'album-art unavailable path did not persist one assistant message'
+    );
+  }
+  if (
+    !/album art generation|cover concept|visual direction|pro plan/i.test(
+      combinedText
+    )
+  ) {
+    return fail(
+      'album-art unavailable response did not explain the policy boundary'
+    );
+  }
+  if (payload.modelDispatchPrevented !== true) {
+    return fail(
+      'album-art unavailable case did not prove model dispatch was bypassed'
+    );
+  }
+
+  return pass();
+}
+
 function assertToolAvailable(output) {
   const payload = parseOutput(output);
 
@@ -1407,6 +1564,10 @@ module.exports = {
   assertWebRouteMessageValidation,
   assertWebRouteContractOnlySuccess,
   assertDeterministicNoSpend,
+  assertLiveHttpWebRouteNoModel,
+  assertLiveHttpUnauthorized,
+  assertLiveHttpDeterministicReplay,
+  assertLiveHttpAlbumArtUnavailable,
   assertToolAvailable,
   assertToolUnavailable,
   assertToolSchemaValid,
