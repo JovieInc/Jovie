@@ -1,5 +1,18 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+vi.mock('@/lib/env', () => ({
+  env: new Proxy(
+    {},
+    {
+      get: (_target, prop) => {
+        if (typeof prop !== 'string') return undefined;
+        if (prop === 'NODE_ENV') return process.env.NODE_ENV ?? 'development';
+        return process.env[prop];
+      },
+    }
+  ),
+}));
+
 const mockConsoleWarn = vi.spyOn(console, 'warn').mockImplementation(() => {});
 let cwdSpy: ReturnType<typeof vi.spyOn> | undefined;
 
