@@ -87,4 +87,44 @@ describe('DrawerAnalyticsSummaryCard', () => {
       'true'
     );
   });
+
+  it('reserves stable body and footer space across sparse states', () => {
+    render(
+      <DrawerAnalyticsSummaryCard
+        metrics={[]}
+        state='ready'
+        emptyMessage='No clicks yet.'
+        stableLayout
+        reserveFooterSlot
+        metricSlotCount={2}
+        testId='analytics-card'
+      />
+    );
+
+    expect(screen.getByTestId('analytics-card-body')).toHaveClass(
+      'min-h-[106px]'
+    );
+    expect(screen.getByTestId('analytics-card-footer')).toHaveClass(
+      'invisible',
+      'min-h-[40px]'
+    );
+  });
+
+  it('reserves metric hint rows in stable ready state', () => {
+    render(
+      <DrawerAnalyticsSummaryCard
+        metrics={[
+          { id: 'profile-views', label: 'Profile views', value: '120' },
+        ]}
+        state='ready'
+        stableLayout
+      />
+    );
+
+    const metric = screen.getByTestId('drawer-analytics-metric-profile-views');
+    expect(metric.querySelector('p[aria-hidden="true"]')).toHaveClass(
+      'invisible',
+      'min-h-[13px]'
+    );
+  });
 });

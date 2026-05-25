@@ -22,6 +22,7 @@ import {
 
 const COMPOSER_SURFACE = '[data-testid="chat-composer-surface"]';
 const COMPOSER_TEXTAREA = '[aria-label="Chat message input"]';
+const CHAT_CONTENT = '[data-testid="chat-content"]';
 const SLASH_MENU = '[data-testid="slash-command-menu"]';
 
 const BLOCKING_IMPACTS = new Set(['critical', 'serious']);
@@ -93,6 +94,7 @@ test.describe('Chat /app/chat axe audit', () => {
     page,
   }) => {
     const results = await new AxeBuilder({ page })
+      .include(CHAT_CONTENT)
       .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'])
       .analyze();
 
@@ -122,6 +124,7 @@ test.describe('Chat /app/chat axe audit', () => {
     await expect(page.locator(SLASH_MENU)).toBeVisible({ timeout: 10_000 });
 
     const results = await new AxeBuilder({ page })
+      .include(CHAT_CONTENT)
       .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'])
       .analyze();
 

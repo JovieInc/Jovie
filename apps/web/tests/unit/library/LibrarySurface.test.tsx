@@ -170,6 +170,8 @@ function renderLibraryWithSidebarOverride(
 }
 
 describe('LibrarySurface', () => {
+  const baseMatchMedia = window.matchMedia;
+
   beforeEach(() => {
     audioMock.playbackState = { ...audioMock.basePlaybackState };
     audioMock.toggleTrack.mockClear();
@@ -182,6 +184,7 @@ describe('LibrarySurface', () => {
 
   afterEach(() => {
     vi.unstubAllGlobals();
+    window.matchMedia = baseMatchMedia;
   });
 
   it('renders an empty read-only library state with a releases escape hatch', () => {
@@ -483,7 +486,7 @@ describe('LibrarySurface', () => {
       }),
     ]);
 
-    fireEvent.click(screen.getByRole('button', { name: 'Filters' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Show filters' }));
     fireEvent.click(screen.getByRole('button', { name: /Needs Assets/u }));
 
     expect(
@@ -503,7 +506,7 @@ describe('LibrarySurface', () => {
     ).toBeInTheDocument();
   });
 
-  it('registers the route sidebar takeover contract', async () => {
+  it('keeps Library inside the standard app shell without a route sidebar takeover', async () => {
     renderLibraryWithSidebarOverride([
       buildAsset(),
       buildAsset({
@@ -515,10 +518,46 @@ describe('LibrarySurface', () => {
 
     const contract = await screen.findByTestId('library-sidebar-override');
 
-    expect(contract).toHaveTextContent('registered');
-    expect(contract).toHaveAttribute('data-key', 'library');
-    expect(contract).toHaveAttribute('data-back-href', APP_ROUTES.CHAT);
-    expect(contract).toHaveAttribute('data-back-label', 'Back to App');
+    expect(contract).toHaveTextContent('missing');
+    expect(contract).not.toHaveAttribute('data-key');
+    expect(contract).not.toHaveAttribute('data-back-href');
+    expect(contract).not.toHaveAttribute('data-back-label');
+    fireEvent.click(screen.getByRole('button', { name: 'Show filters' }));
+    expect(
+      screen.getByRole('navigation', { name: 'Library navigation' })
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: /All Releases/u })
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: /Needs Assets/u })
+    ).toBeInTheDocument();
+  });
+
+  it('keeps library filters reachable on desktop without taking over the shell sidebar', async () => {
+    window.matchMedia = vi.fn().mockImplementation(query => ({
+      matches: query === '(min-width: 1024px)',
+      media: query,
+      onchange: null,
+      addListener: vi.fn(),
+      removeListener: vi.fn(),
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      dispatchEvent: vi.fn(),
+    }));
+
+    renderLibraryWithSidebarOverride([
+      buildAsset(),
+      buildAsset({
+        id: 'release-2',
+        title: 'Never Say A Word',
+        artist: 'Other Artist',
+      }),
+    ]);
+
+    const contract = await screen.findByTestId('library-sidebar-override');
+
+    expect(contract).toHaveTextContent('missing');
     expect(
       screen.getByRole('navigation', { name: 'Library navigation' })
     ).toBeInTheDocument();

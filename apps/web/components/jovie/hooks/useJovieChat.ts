@@ -384,10 +384,7 @@ export function useJovieChat({
       }): ChatTimelineServerMessage => ({
         id: msg.id,
         role: msg.role as 'user' | 'assistant',
-        parts: hydratePersistedMessageParts(
-          msg.content,
-          msg.toolCalls
-        ) as ChatTimelineServerMessage['parts'],
+        parts: hydratePersistedMessageParts(msg.content, msg.toolCalls),
         createdAt: new Date(msg.createdAt),
         clientMessageId: msg.clientMessageId ?? null,
         turnId: msg.turnId ?? null,
@@ -764,8 +761,8 @@ export function useJovieChat({
       try {
         const result = sendMessage(payload, sendOptions);
         setInput('');
-        void Promise.resolve(result).catch(value => {
-          handleChatFailure(toError(value), 'send', clientTurnId);
+        void Promise.resolve(result).catch(error_ => {
+          handleChatFailure(toError(error_), 'send', clientTurnId);
         });
         return true;
       } catch (error) {

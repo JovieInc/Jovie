@@ -243,7 +243,11 @@ if ! ensure_playwright_browser; then
     (
       cd "$SOURCE_GSTACK_DIR"
       # Bun's node_modules already has playwright; verify Node can require it
-      node -e "require('playwright')" 2>/dev/null || npm install --no-save playwright
+      node -e "require('playwright')" 2>/dev/null || {
+        echo "gstack setup failed: Node.js cannot load Playwright from Bun's node_modules" >&2
+        echo "  Run 'bun install --frozen-lockfile' in $SOURCE_GSTACK_DIR and retry." >&2
+        exit 1
+      }
     )
   fi
 fi

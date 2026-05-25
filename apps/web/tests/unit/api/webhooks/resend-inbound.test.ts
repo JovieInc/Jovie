@@ -20,7 +20,7 @@ const hoisted = vi.hoisted(() => {
 });
 
 const TEST_WEBHOOK_SECRET = vi.hoisted(
-  () => 'whsec_dGVzdC1zZWNyZXQtZm9yLXVuaXQtdGVzdHM='
+  () => 'dGVzdC1zZWNyZXQtZm9yLXVuaXQtdGVzdHM='
 );
 
 vi.mock('@/lib/db', () => ({

@@ -5,6 +5,7 @@ import Link from 'next/link';
 import type { ReactNode } from 'react';
 import React, { useMemo, useState } from 'react';
 import { cn } from '@/lib/utils';
+import { getSidebarNavRowClassName } from './SidebarNavItem';
 import { Tooltip } from './Tooltip';
 
 // Thread types — co-located so consumers import from one place. Production
@@ -56,11 +57,11 @@ function SidebarThreadStatusRow({
   return (
     <div
       className={cn(
-        'flex items-center gap-2 rounded-md px-3 text-tertiary-token',
+        'grid grid-cols-[22px_minmax(0,1fr)] items-center gap-2 rounded-full px-2.5 text-tertiary-token',
         tight ? 'h-6 text-[12px]' : 'h-7 text-[12.5px]'
       )}
     >
-      <span className='grid h-3.5 w-3.5 shrink-0 place-items-center text-quaternary-token'>
+      <span className='grid h-3.5 w-3.5 shrink-0 place-items-center justify-self-center text-quaternary-token'>
         {icon}
       </span>
       <span className='min-w-0 flex-1 truncate'>{children}</span>
@@ -92,11 +93,14 @@ const SidebarThreadRow = React.memo(function SidebarThreadRow({
   ) => void;
 }) {
   const rowClasses = cn(
-    'flex w-full min-w-0 items-center gap-2 rounded-md text-left transition-[background-color] duration-subtle ease-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/55',
-    tight ? 'h-6 pl-2.5' : 'h-6.5 pl-2.5',
-    hasThreadActions ? 'pr-7' : 'pr-2',
+    getSidebarNavRowClassName({
+      active,
+      tight,
+      className: hasThreadActions ? 'pr-8' : undefined,
+    }),
+    'text-left',
     active
-      ? 'bg-surface-1 text-primary-token'
+      ? undefined
       : unread
         ? 'text-primary-token hover:bg-surface-1 focus-visible:bg-surface-1'
         : 'text-secondary-token hover:bg-surface-1 hover:text-primary-token focus-visible:bg-surface-1 focus-visible:text-primary-token'
@@ -105,7 +109,7 @@ const SidebarThreadRow = React.memo(function SidebarThreadRow({
     <>
       <span
         className={cn(
-          'h-1.5 w-1.5 rounded-full shrink-0',
+          'h-1.5 w-1.5 rounded-full shrink-0 justify-self-center',
           thread.status === 'running'
             ? 'bg-cyan-300/85 anim-calm-breath'
             : thread.status === 'errored'
@@ -117,7 +121,7 @@ const SidebarThreadRow = React.memo(function SidebarThreadRow({
       />
       <span
         className={cn(
-          'flex-1 truncate',
+          'min-w-0 truncate text-left justify-self-start',
           'text-[12.5px]',
           unread && 'font-medium'
         )}
@@ -162,7 +166,7 @@ const SidebarThreadRow = React.memo(function SidebarThreadRow({
             onClick={e => onThreadContextMenu(e, thread)}
             aria-label={`Thread actions for ${thread.title}`}
             className={cn(
-              'absolute right-1 top-1/2 grid h-5 w-5 -translate-y-1/2 place-items-center rounded-md text-quaternary-token transition-[background-color,color,opacity] duration-subtle ease-subtle hover:bg-surface-1 hover:text-primary-token focus-visible:bg-surface-1 focus-visible:text-primary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/55',
+              'absolute right-1 top-1/2 grid h-5 w-5 -translate-y-1/2 place-items-center rounded-full text-quaternary-token transition-[background-color,color,opacity] duration-subtle ease-subtle hover:bg-surface-1 hover:text-primary-token focus-visible:bg-surface-1 focus-visible:text-primary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/55',
               'opacity-0 group-hover/thread:opacity-100 focus-visible:opacity-100'
             )}
           >
@@ -212,9 +216,9 @@ export function SidebarThreadsSection({
   const hasThreads = sorted.length > 0;
 
   return (
-    <div className='space-y-1'>
-      <div className='flex items-center justify-between px-2.5 pb-1 pt-1.5'>
-        <span className='text-[11px] font-medium text-quaternary-token'>
+    <div className='space-y-1.5'>
+      <div className='flex items-center justify-between border-t border-[color-mix(in_oklab,var(--linear-app-frame-seam)_44%,transparent)] px-2.5 pb-0.5 pt-2'>
+        <span className='text-[10.5px] font-semibold uppercase tracking-[0.08em] text-quaternary-token'>
           Threads
         </span>
         {unreadCount > 0 && (
@@ -250,7 +254,7 @@ export function SidebarThreadsSection({
         {state === 'error' && !hasThreads ? (
           <div
             className={cn(
-              'flex items-center gap-2 rounded-md px-3 text-tertiary-token',
+              'grid grid-cols-[minmax(0,1fr)_20px] items-center gap-2 rounded-full px-2.5 text-tertiary-token',
               tight ? 'h-6 text-[12px]' : 'h-6.5 text-[12.5px]'
             )}
           >
@@ -276,16 +280,21 @@ export function SidebarThreadsSection({
             type='button'
             onClick={onNewThread}
             className={cn(
-              'flex items-center gap-2 rounded-md px-3 text-left text-tertiary-token transition-[background-color] duration-subtle ease-subtle hover:bg-sidebar-accent/55 hover:text-primary-token',
-              tight ? 'h-6 text-[12px]' : 'h-6.5 text-[12.5px]'
+              getSidebarNavRowClassName({
+                tight,
+                tone: 'primary',
+              }),
+              'text-left'
             )}
           >
             <MessageSquarePlus
-              className='h-3.5 w-3.5 shrink-0 text-quaternary-token'
+              className='h-3.5 w-3.5 shrink-0 justify-self-center text-quaternary-token'
               aria-hidden='true'
               strokeWidth={2.25}
             />
-            <span className='min-w-0 flex-1 truncate'>New chat</span>
+            <span className='min-w-0 truncate justify-self-start'>
+              New chat
+            </span>
           </button>
         ) : null}
         {visible.map(t => {

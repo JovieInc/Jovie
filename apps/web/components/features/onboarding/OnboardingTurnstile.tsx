@@ -74,6 +74,10 @@ const DEFAULT_STATE: OnboardingTurnstileState = {
   message: 'Checking your browser before your first message.',
 };
 
+function getTurnstile() {
+  return globalThis.window.turnstile;
+}
+
 function getStateCopy(state: OnboardingTurnstileState) {
   if (state.message) return state.message;
   switch (state.status) {
@@ -138,9 +142,10 @@ export function OnboardingTurnstile({
   const resetWidget = useCallback(
     (message = 'Verification reset. Complete the check to retry.') => {
       const widgetId = widgetIdRef.current;
-      if (widgetId && window.turnstile) {
+      const turnstile = getTurnstile();
+      if (widgetId && turnstile) {
         try {
-          window.turnstile.reset(widgetId);
+          turnstile.reset(widgetId);
           commitState({ status: 'loading', message });
           return;
         } catch (err) {
@@ -155,11 +160,12 @@ export function OnboardingTurnstile({
 
   const render = useCallback(() => {
     if (shouldBypassTurnstile || !siteKey) return; // local fallback handled server-side
-    if (!containerRef.current || !window.turnstile) return;
+    const turnstile = getTurnstile();
+    if (!containerRef.current || !turnstile) return;
     if (widgetIdRef.current) return; // already rendered
     try {
       commitState(DEFAULT_STATE);
-      widgetIdRef.current = window.turnstile.render(containerRef.current, {
+      widgetIdRef.current = turnstile.render(containerRef.current, {
         sitekey: siteKey,
         appearance: 'interaction-only',
         size: 'flexible',
@@ -226,14 +232,15 @@ export function OnboardingTurnstile({
       });
       return;
     }
-    if (window.turnstile) {
+    const turnstile = getTurnstile();
+    if (turnstile) {
       render();
     }
     return () => {
       const id = widgetIdRef.current;
-      if (id && window.turnstile) {
+      if (id && turnstile) {
         try {
-          window.turnstile.remove(id);
+          turnstile.remove(id);
         } catch {
           // ignore — widget already torn down
         }

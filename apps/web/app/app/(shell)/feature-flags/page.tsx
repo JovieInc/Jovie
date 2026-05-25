@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 import { redirect } from 'next/navigation';
 import { loadAppShellRouteContext } from '@/app/app/(shell)/app-shell-route-context';
-import { AdminToolPage } from '@/components/features/admin/layout/AdminToolPage';
+import { AdminPage } from '@/components/features/admin/layout/AdminPage';
 import { APP_ROUTES } from '@/constants/routes';
 import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
 import {
@@ -57,8 +57,8 @@ export default async function FeatureFlagsPage() {
   }));
 
   return (
-    <AdminToolPage testId='feature-flags-page'>
+    <AdminPage title='' testId='feature-flags-page'>
       <FeatureFlagsTable flags={[...flags]} />
-    </AdminToolPage>
+    </AdminPage>
   );
 }

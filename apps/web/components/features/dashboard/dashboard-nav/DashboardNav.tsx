@@ -6,7 +6,6 @@ import { usePathname, useRouter } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { useDashboardData } from '@/app/app/(shell)/dashboard/DashboardDataContext';
-import { usePreviewPanelState } from '@/app/app/(shell)/dashboard/PreviewPanelContext';
 import { openCommandPalette } from '@/components/organisms/command-palette-events';
 import { usePendingShell } from '@/components/organisms/PendingShellContext';
 import {
@@ -24,7 +23,10 @@ import { APP_ROUTES, isDemoRoutePath } from '@/constants/routes';
 import { useAppFlag } from '@/lib/flags/client';
 import { NAV_SHORTCUTS } from '@/lib/keyboard-shortcuts';
 import { usePlanGate } from '@/lib/queries';
-import { useChatConversationsQuery } from '@/lib/queries/useChatConversationsQuery';
+import {
+  type ChatConversation,
+  useChatConversationsQuery,
+} from '@/lib/queries/useChatConversationsQuery';
 import { useTaskStatsQuery } from '@/lib/queries/useTasksQuery';
 import {
   adminNavigationSections,
@@ -59,6 +61,24 @@ const FAILED_CHAT_TURN_STATUSES = new Set([
   'failed_timeout',
   'failed_network',
 ]);
+
+function getSidebarThreadStatus(
+  latestTurnStatus: ChatConversation['latestTurnStatus']
+): SidebarThread['status'] {
+  if (!latestTurnStatus) {
+    return 'complete';
+  }
+
+  if (IN_PROGRESS_CHAT_TURN_STATUSES.has(latestTurnStatus)) {
+    return 'running';
+  }
+
+  if (FAILED_CHAT_TURN_STATUSES.has(latestTurnStatus)) {
+    return 'errored';
+  }
+
+  return 'complete';
+}
 
 function readThreadReadState(): Record<string, string> {
   try {
@@ -169,12 +189,6 @@ export function DashboardNav(_: DashboardNavProps) {
   const shellChatLibraryEnabled = useAppFlag('SHELL_CHAT_V1');
   const [threadReadAtById, setThreadReadAtById] =
     useState<Record<string, string>>(readThreadReadState);
-  const {
-    isOpen: isPreviewOpen,
-    open: openPreviewPanel,
-    toggle: togglePreviewPanel,
-  } = usePreviewPanelState();
-
   const username =
     selectedProfile?.usernameNormalized ?? selectedProfile?.username;
   const publicProfileHref = username ? `/${username}` : undefined;
@@ -312,18 +326,6 @@ export function DashboardNav(_: DashboardNavProps) {
     taskStats,
   ]);
 
-  // Profile nav item opens the preview drawer instead of navigating to a separate page.
-  // If already on a chat route, just opens the drawer; otherwise navigates first.
-  const handleProfileClick = useCallback(() => {
-    const isOnChat = pathname.startsWith(APP_ROUTES.CHAT);
-    if (isOnChat) {
-      togglePreviewPanel();
-    } else {
-      router.push(APP_ROUTES.CHAT);
-      queueMicrotask(() => openPreviewPanel());
-    }
-  }, [pathname, togglePreviewPanel, openPreviewPanel, router]);
-
   // Debounced prefetch: avoid firing on fast mouse sweeps across nav items
   const prefetchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const releasesPrefetchedProfileIdRef = useRef<string | null>(null);
@@ -388,7 +390,7 @@ export function DashboardNav(_: DashboardNavProps) {
     // the timer so a cleanup that fires before the timer runs (fast route
     // change) leaves the ref null and a later visit will retry.
     const handle = setTimeout(() => {
-      void warmReleasesRoute();
+      warmReleasesRoute().catch(() => {});
     }, 300);
 
     return () => clearTimeout(handle);
@@ -400,10 +402,10 @@ export function DashboardNav(_: DashboardNavProps) {
       const prefetchDelayMs = itemId === 'releases' ? 0 : 150;
       prefetchTimerRef.current = setTimeout(() => {
         if (itemId === 'releases') {
-          void warmReleasesRoute();
+          warmReleasesRoute().catch(() => {});
           return;
         }
-        void import('@/lib/queries/prefetch-dashboard')
+        import('@/lib/queries/prefetch-dashboard')
           .then(({ prefetchForRoute }) =>
             prefetchForRoute(itemId, queryClient, profileId || undefined)
           )
@@ -471,12 +473,6 @@ export function DashboardNav(_: DashboardNavProps) {
     () =>
       (conversations ?? []).map(conversation => {
         const latestTurnStatus = conversation.latestTurnStatus ?? null;
-        const isRunning = latestTurnStatus
-          ? IN_PROGRESS_CHAT_TURN_STATUSES.has(latestTurnStatus)
-          : false;
-        const isFailed = latestTurnStatus
-          ? FAILED_CHAT_TURN_STATUSES.has(latestTurnStatus)
-          : false;
         const isUnread =
           activeThreadId !== conversation.id &&
           conversation.latestMessageRole === 'assistant' &&
@@ -489,7 +485,7 @@ export function DashboardNav(_: DashboardNavProps) {
           id: conversation.id,
           href: `${APP_ROUTES.CHAT}/${encodeURIComponent(conversation.id)}`,
           title: conversation.title?.trim() || 'Untitled thread',
-          status: isRunning ? 'running' : isFailed ? 'errored' : 'complete',
+          status: getSidebarThreadStatus(latestTurnStatus),
           updatedAt: conversation.updatedAt,
           unread: isUnread,
         };
@@ -498,7 +494,7 @@ export function DashboardNav(_: DashboardNavProps) {
   );
 
   const handleRetryThreads = useCallback(() => {
-    void refetchConversations();
+    Promise.resolve(refetchConversations()).catch(() => {});
   }, [refetchConversations]);
 
   // Memoize renderNavItem to prevent creating new functions on every render
@@ -511,7 +507,7 @@ export function DashboardNav(_: DashboardNavProps) {
         item.id === 'chat' && item.href === APP_ROUTES.CHAT;
       let isActive = false;
       if (isProfileItem) {
-        isActive = isPreviewOpen && pathname.startsWith(APP_ROUTES.CHAT);
+        isActive = isItemActive(pathname, item);
       } else if (isNewThreadItem) {
         isActive = normalizeTrailingSlash(pathname) === APP_ROUTES.CHAT;
       } else if (!isSearchItem) {
@@ -521,12 +517,10 @@ export function DashboardNav(_: DashboardNavProps) {
 
       // In demo mode, only Releases has real content — intercept all other nav clicks
       const demoUnavailable = isDemo && !isReleasesItem && !isSearchItem;
-      const renderAsButton =
-        (isProfileItem && !demoUnavailable) || isSearchItem;
+      const renderAsButton = isSearchItem;
       let onClick: (() => void) | undefined;
       if (demoUnavailable) onClick = () => handleDemoNavClick(item);
       else if (isSearchItem) onClick = handleSearchClick;
-      else if (isProfileItem) onClick = handleProfileClick;
 
       return (
         <NavMenuItem
@@ -553,13 +547,11 @@ export function DashboardNav(_: DashboardNavProps) {
     [
       pathname,
       profileActions,
-      handleProfileClick,
       handleDemoNavClick,
       handlePrefetch,
       handleSearchClick,
       clearPendingReleasesShell,
       showPendingReleasesShell,
-      isPreviewOpen,
       isDemo,
       shellChatV1Enabled,
     ]

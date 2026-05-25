@@ -1,6 +1,6 @@
 import { Badge } from '@jovie/ui';
 import type { Metadata } from 'next';
-import { AdminToolPage } from '@/components/features/admin/layout/AdminToolPage';
+import { AdminPage } from '@/components/features/admin/layout/AdminPage';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { capitalizeFirst } from '@/lib/utils/string-utils';
 import { loadAdminInterviewRows } from './interviews-data';
@@ -34,7 +34,7 @@ export default async function AdminInterviewsPage() {
   const rows = await loadAdminInterviewRows();
 
   return (
-    <AdminToolPage
+    <AdminPage
       title='User Interviews'
       description='Mom Test interviews captured after onboarding.'
       testId='admin-interviews-page'
@@ -109,6 +109,6 @@ export default async function AdminInterviewsPage() {
           </div>
         )}
       </ContentSurfaceCard>
-    </AdminToolPage>
+    </AdminPage>
   );
 }

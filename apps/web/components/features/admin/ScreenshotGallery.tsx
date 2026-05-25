@@ -1,6 +1,11 @@
 'use client';
 
-import { ChevronLeft, ChevronRight, Download } from 'lucide-react';
+import {
+  ChevronLeft,
+  ChevronRight,
+  Download,
+  SlidersHorizontal,
+} from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { DrawerButton } from '@/components/molecules/drawer';
@@ -241,7 +246,7 @@ export function ScreenshotGallery({ screenshots }: ScreenshotGalleryProps) {
           <div className='flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between'>
             <div>
               <p className='text-xs font-semibold text-primary-token'>
-                Filters
+                Screenshot Set
               </p>
               <p className='text-xs text-secondary-token'>
                 Showing {filteredScreenshots.length} of {screenshots.length}{' '}
@@ -267,48 +272,63 @@ export function ScreenshotGallery({ screenshots }: ScreenshotGalleryProps) {
               ))}
             </div>
           </div>
-          <div className='space-y-2'>
-            <p className='text-xs font-semibold text-primary-token'>
-              Capture Group
-            </p>
-            <div className='flex flex-wrap gap-2'>
-              {GROUP_FILTERS.map(filter => (
-                <button
-                  key={filter.id}
-                  type='button'
-                  onClick={() => setGroupFilter(filter.id)}
-                  aria-pressed={groupFilter === filter.id}
-                  className={`rounded-full border px-3 py-1.5 text-xs ${
-                    groupFilter === filter.id
-                      ? 'border-(--linear-accent) bg-(--linear-accent)/10 text-primary-token'
-                      : 'border-subtle bg-surface-0 text-secondary-token'
-                  }`}
-                >
-                  {filter.label}
-                </button>
-              ))}
+          <details className='group rounded-md border border-subtle bg-surface-0'>
+            <summary className='flex cursor-pointer list-none items-center justify-between gap-3 px-3 py-2 text-xs font-medium text-primary-token'>
+              <span className='inline-flex items-center gap-2'>
+                <SlidersHorizontal className='size-3.5' aria-hidden />
+                More Filters
+              </span>
+              <span className='text-2xs font-normal text-tertiary-token'>
+                Group and use case
+              </span>
+            </summary>
+            <div className='space-y-3 border-t border-subtle px-3 py-3'>
+              <div className='space-y-2'>
+                <p className='text-xs font-semibold text-primary-token'>
+                  Capture Group
+                </p>
+                <div className='flex flex-wrap gap-2'>
+                  {GROUP_FILTERS.map(filter => (
+                    <button
+                      key={filter.id}
+                      type='button'
+                      onClick={() => setGroupFilter(filter.id)}
+                      aria-pressed={groupFilter === filter.id}
+                      className={`rounded-full border px-3 py-1.5 text-xs ${
+                        groupFilter === filter.id
+                          ? 'border-(--linear-accent) bg-(--linear-accent)/10 text-primary-token'
+                          : 'border-subtle bg-surface-1 text-secondary-token'
+                      }`}
+                    >
+                      {filter.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div className='space-y-2'>
+                <p className='text-xs font-semibold text-primary-token'>
+                  Use Case
+                </p>
+                <div className='flex flex-wrap gap-2'>
+                  {CONSUMER_FILTERS.map(filter => (
+                    <button
+                      key={filter.id}
+                      type='button'
+                      onClick={() => setConsumerFilter(filter.id)}
+                      aria-pressed={consumerFilter === filter.id}
+                      className={`rounded-full border px-3 py-1.5 text-xs ${
+                        consumerFilter === filter.id
+                          ? 'border-(--linear-accent) bg-(--linear-accent)/10 text-primary-token'
+                          : 'border-subtle bg-surface-1 text-secondary-token'
+                      }`}
+                    >
+                      {filter.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
             </div>
-          </div>
-          <div className='space-y-2'>
-            <p className='text-xs font-semibold text-primary-token'>Use Case</p>
-            <div className='flex flex-wrap gap-2'>
-              {CONSUMER_FILTERS.map(filter => (
-                <button
-                  key={filter.id}
-                  type='button'
-                  onClick={() => setConsumerFilter(filter.id)}
-                  aria-pressed={consumerFilter === filter.id}
-                  className={`rounded-full border px-3 py-1.5 text-xs ${
-                    consumerFilter === filter.id
-                      ? 'border-(--linear-accent) bg-(--linear-accent)/10 text-primary-token'
-                      : 'border-subtle bg-surface-0 text-secondary-token'
-                  }`}
-                >
-                  {filter.label}
-                </button>
-              ))}
-            </div>
-          </div>
+          </details>
         </ContentSurfaceCard>
 
         {canonicalSections.length > 0 ? (

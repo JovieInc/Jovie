@@ -1,5 +1,5 @@
 import { TooltipProvider } from '@jovie/ui';
-import { act, fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen, within } from '@testing-library/react';
 import React from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { APP_ROUTES } from '@/constants/routes';
@@ -1240,7 +1240,7 @@ describe('TasksPageClient', () => {
       headerActions.querySelector('[aria-label="Search tasks"]')
     ).not.toBeInTheDocument();
     expect(
-      screen.getByRole('button', { name: 'Create task' })
+      within(headerActions).getByRole('button', { name: 'Create task' })
     ).toBeInTheDocument();
     expect(
       screen.getByRole('button', { name: 'Search tasks' })
@@ -1313,7 +1313,11 @@ describe('TasksPageClient', () => {
   it('promotes the header into create mode when new task is triggered', () => {
     renderPage();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Create task' }));
+    fireEvent.click(
+      within(screen.getByTestId('header-actions-host')).getByRole('button', {
+        name: 'Create task',
+      })
+    );
 
     expect(screen.getByLabelText('New task name')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Create' })).toBeInTheDocument();
@@ -1479,6 +1483,18 @@ describe('TasksPageClient', () => {
 
     expect(screen.queryByLabelText('Task title')).not.toBeInTheDocument();
     expect(screen.getByTestId('mobile-task-list')).toBeInTheDocument();
+  });
+
+  it('keeps a create-task affordance visible below the desktop breakpoint', () => {
+    mockIsXlUp = false;
+
+    renderPage();
+
+    expect(
+      within(screen.getByTestId('header-actions-host')).getByRole('button', {
+        name: 'Create task',
+      })
+    ).toBeInTheDocument();
   });
 
   it('renders the mobile list shell without duplicate search and opens task detail on tap', () => {

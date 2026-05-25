@@ -25,6 +25,42 @@ interface ReleasePromptContext {
   readonly totalTracks: number;
 }
 
+interface AccountPromptContext {
+  readonly email: string | null;
+  readonly plan: string;
+  readonly displayPlan: string;
+  readonly isPro: boolean;
+  readonly billingVerification: 'verified' | 'missing_user' | 'unavailable';
+  readonly planMismatch: {
+    readonly rawPlan: string | null;
+    readonly normalizedPlan: string;
+    readonly reason: string;
+  } | null;
+  readonly usage: {
+    readonly dailyLimit: number;
+    readonly used: number;
+    readonly remaining: number;
+    readonly resetAt: string | null;
+    readonly monthlyLimit: number;
+    readonly monthlyUsed: number;
+    readonly monthlyRemaining: number;
+    readonly monthlyResetAt: string;
+  } | null;
+  readonly entitlements: {
+    readonly aiCanUseTools: boolean;
+    readonly canAccessMerchCreation: boolean;
+    readonly canGenerateAlbumArt: boolean;
+    readonly canAccessAdvancedAnalytics: boolean;
+  };
+  readonly flags: {
+    readonly merchMvp: boolean;
+  };
+  readonly billing: {
+    readonly hasStripeCustomer: boolean;
+    readonly hasStripeSubscription: boolean;
+  };
+}
+
 function formatReleaseLine(release: ReleasePromptContext): string {
   const releaseDate = release.releaseDate
     ? `, ${release.releaseDate.slice(0, 10)}`
@@ -57,6 +93,7 @@ export function buildSystemPrompt(
     aiDailyMessageLimit: number;
     insightsEnabled?: boolean;
     knowledgeContext?: string;
+    accountContext?: AccountPromptContext;
   }
 ): string {
   return `You are Jovie, an AI music career assistant. You help independent artists understand their data and make smart career decisions.
@@ -85,6 +122,7 @@ ${buildDiscographySection(releases)}
 - **Total Earned:** ${formatAmount(context.tippingStats.totalReceivedCents)}
 - **This Month:** ${formatAmount(context.tippingStats.monthReceivedCents)}
 ${buildKnowledgeSection(options?.knowledgeContext)}
+${buildAccountAccessSection(options?.accountContext)}
 ## Entity & Skill Tokens
 Messages may contain structured tokens the UI attached before sending:
 - \`@release:<id>[<title>]\` — reference to a specific release. Use the id directly (e.g. pass as releaseId to generateAlbumArt). Treat the [title] as display only.
@@ -161,13 +199,67 @@ ${knowledgeContext}
 function buildPlanLimitationsSection(options?: {
   aiCanUseTools: boolean;
   aiDailyMessageLimit: number;
+  accountContext?: AccountPromptContext;
 }): string {
+  if (options?.accountContext?.billingVerification === 'unavailable') {
+    return '';
+  }
   if (!options || options.aiCanUseTools) return '';
 
   return `
 
 ## Plan Limitations (Free Tier)
 This artist is on the Free plan with ${options.aiDailyMessageLimit} messages per day. You can answer questions, give advice, upload profile photos (proposeAvatarUpload), add social links (proposeSocialLink), and remove social links (proposeSocialLinkRemoval). You do NOT have access to advanced tools (profile editing, canvas planning, promo strategy, release creation, pitch generation, bio writing, or related artist suggestions). If the artist asks for something that requires an advanced tool, let them know briefly that it's available on the Pro plan.`;
+}
+
+function buildAccountAccessSection(
+  accountContext?: AccountPromptContext
+): string {
+  if (!accountContext) return '';
+
+  const merchLine = buildMerchAccessLine(accountContext);
+  const usageLine = accountContext.usage
+    ? `${accountContext.usage.used} used, ${accountContext.usage.remaining} remaining of ${accountContext.usage.dailyLimit}`
+    : 'Unavailable while billing verification is unavailable';
+  const billingLine =
+    accountContext.billingVerification === 'unavailable'
+      ? '- **Billing Verification:** Billing verification is temporarily unavailable. Do not tell the artist they are on Free; say Jovie could not verify billing right now and can retry or open billing settings.'
+      : `- **Billing Verification:** ${accountContext.billingVerification}`;
+  const mismatchLine = accountContext.planMismatch
+    ? `\n- **Billing Drift:** Billing row mismatch detected. Raw plan ${accountContext.planMismatch.rawPlan ?? 'not set'} normalized to ${accountContext.planMismatch.normalizedPlan}. Do not ask the artist to fix this manually.`
+    : '';
+
+  return `
+## Account & Access
+- **Account Email:** ${accountContext.email ?? 'Not available'}
+- **Plan:** ${accountContext.displayPlan}
+${billingLine}
+- **AI Usage Today:** ${usageLine}
+- **Merch Creation:** ${merchLine}
+- **Billing Portal:** ${accountContext.billing.hasStripeCustomer ? 'Available' : 'No Stripe billing account yet'}
+
+Safe account actions:
+- Use showAccountStatus when the artist asks what plan, billing state, or feature access they have.
+- Use showUsage when the artist asks about AI message usage or limits.
+- Use openBillingPortal for billing management handoff. Never change subscriptions, email, username, connected accounts, or OAuth providers from chat.${mismatchLine}
+
+`;
+}
+
+function buildMerchAccessLine(accountContext: AccountPromptContext): string {
+  if (accountContext.billingVerification === 'unavailable') {
+    return 'Unavailable because billing verification is temporarily unavailable';
+  }
+
+  if (!accountContext.flags.merchMvp) {
+    return 'Unavailable because the merch rollout flag is off';
+  }
+
+  if (!accountContext.entitlements.canAccessMerchCreation) {
+    return 'Unavailable on this plan';
+  }
+
+  return 'Available';
 }
 
 function buildAnalyticsSection(options?: {

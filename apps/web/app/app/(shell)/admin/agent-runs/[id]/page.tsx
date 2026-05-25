@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 import { notFound, redirect } from 'next/navigation';
 import type { ReactNode } from 'react';
-import { AdminToolPage } from '@/components/features/admin/layout/AdminToolPage';
+import { AdminPage } from '@/components/features/admin/layout/AdminPage';
 import { ContentSectionHeader } from '@/components/molecules/ContentSectionHeader';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { APP_ROUTES } from '@/constants/routes';
@@ -59,7 +59,7 @@ export default async function AgentRunDebugPage({
   const costDisplay = run.cost ? formatUsd(Number(run.cost)) : '—';
 
   return (
-    <AdminToolPage
+    <AdminPage
       title='Agent Run Debug'
       description={run.id}
       testId='admin-agent-run-detail-page'
@@ -141,7 +141,7 @@ export default async function AgentRunDebugPage({
           </pre>
         </DebugSection>
       )}
-    </AdminToolPage>
+    </AdminPage>
   );
 }
 

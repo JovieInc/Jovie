@@ -109,7 +109,7 @@ function buildDropdownItems({
         <button
           type='button'
           onClick={handleProfile}
-          className='w-full cursor-pointer rounded-md px-2 py-1.5 hover:bg-interactive-hover focus-visible:outline-none focus-visible:bg-interactive-hover text-left'
+          className='w-full cursor-pointer rounded-xl px-2.5 py-2 hover:bg-interactive-hover focus-visible:outline-none focus-visible:bg-interactive-hover text-left'
         >
           <div className='flex w-full items-center gap-2.5'>
             <Avatar
@@ -297,6 +297,7 @@ function buildDropdownItems({
   // Add feedback, version info, and sign out.
   // Version is now shown to all users (moved from admin-only sidebar footer).
   items.push(
+    { type: 'separator', id: 'sep-support' },
     {
       type: 'action',
       id: 'feedback',
@@ -309,14 +310,15 @@ function buildDropdownItems({
       type: 'custom',
       id: 'version',
       render: () => (
-        <div className='px-2.5 py-1 text-2xs text-tertiary-token select-none'>
-          v{process.env.NEXT_PUBLIC_APP_VERSION ?? '0.0.0'}
+        <div className='px-2.5 py-1.5 text-[11px] leading-4 text-tertiary-token select-none'>
+          Version {process.env.NEXT_PUBLIC_APP_VERSION ?? '0.0.0'}
           {process.env.NEXT_PUBLIC_BUILD_SHA
             ? ` (${process.env.NEXT_PUBLIC_BUILD_SHA})`
             : ''}
         </div>
       ),
     },
+    { type: 'separator', id: 'sep-signout' },
     {
       type: 'action',
       id: 'sign-out',
@@ -451,7 +453,7 @@ export function UserButton({
             open={isMenuOpen}
             onOpenChange={setIsMenuOpen}
             disabled
-            contentClassName='w-[220px]'
+            contentClassName='w-[240px]'
           />
         </div>
       );
@@ -547,7 +549,7 @@ export function UserButton({
         align={trigger ? 'start' : 'end'}
         open={isMenuOpen}
         onOpenChange={setIsMenuOpen}
-        contentClassName='w-[220px]'
+        contentClassName='w-[240px]'
       />
       <DashboardFeedbackModal
         isOpen={isFeedbackOpen}

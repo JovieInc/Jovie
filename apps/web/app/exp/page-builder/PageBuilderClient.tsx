@@ -403,6 +403,14 @@ function groupItemsByCategory(items: readonly DesignStudioItem[]) {
   );
 }
 
+function renderDesignStudio(mode: Exclude<StudioMode, 'pages'>) {
+  if (mode === 'sections') {
+    return <SectionStudio />;
+  }
+
+  return mode === 'product' ? <ProductComponentStudio /> : <ScreenshotStudio />;
+}
+
 export function DesignStudioWorkspace({
   mode,
 }: Readonly<{ mode: Exclude<StudioMode, 'pages'> }>) {
@@ -411,13 +419,7 @@ export function DesignStudioWorkspace({
       className='min-h-screen bg-surface-1 px-4 pb-12 pt-[80px] text-white sm:px-6 lg:px-8'
       data-testid={`design-studio-${mode}`}
     >
-      {mode === 'sections' ? (
-        <SectionStudio />
-      ) : mode === 'product' ? (
-        <ProductComponentStudio />
-      ) : (
-        <ScreenshotStudio />
-      )}
+      {renderDesignStudio(mode)}
     </main>
   );
 }

@@ -94,7 +94,7 @@ export function SidebarCollapsibleGroup({
             )}
             aria-expanded={open}
           >
-            <span className='truncate group-data-[collapsible=icon]:hidden text-xs font-caption tracking-normal'>
+            <span className='truncate group-data-[collapsible=icon]:hidden text-[10.5px] font-semibold uppercase tracking-[0.08em]'>
               {label}
             </span>
             {GroupIcon ? (
@@ -115,7 +115,7 @@ export function SidebarCollapsibleGroup({
       </SidebarMenu>
 
       <div
-        inert={!open ? true : undefined}
+        inert={open ? undefined : true}
         className={cn(
           'grid transition-[grid-template-rows,opacity] duration-[160ms] [transition-timing-function:cubic-bezier(0.25,0.46,0.45,0.94)]',
           open ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0'

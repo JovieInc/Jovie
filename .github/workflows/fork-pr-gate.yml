@@ -90,10 +90,7 @@ jobs:
     if: github.event_name != 'pull_request_target' && github.actor != 'copilot-swe-agent[bot]' && github.actor != 'dependabot[bot]'
     runs-on: ubuntu-latest
     timeout-minutes: 3
-    permissions:
-      contents: read
-      pull-requests: read
-      statuses: write
+    permissions: {}
     steps:
       - name: Generate Jovie Bot token
         id: app-token

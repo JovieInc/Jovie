@@ -188,9 +188,11 @@ describe('electron-bridge — defensive guards', () => {
       openDesktopAuthUrl,
     });
 
-    await __testing.openDesktopAuthUrl(
-      'https://jov.ie/auth/start?client=electron&intent=sign_in&return_to=%2Fapp&code_challenge=abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQ&code_challenge_method=S256'
-    );
+    await expect(
+      __testing.openDesktopAuthUrl(
+        'https://jov.ie/auth/start?client=electron&intent=sign_in&return_to=%2Fapp&code_challenge=abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQ&code_challenge_method=S256'
+      )
+    ).resolves.toEqual({ ok: true });
 
     expect(openDesktopAuthUrl).toHaveBeenCalledWith(
       'https://jov.ie/auth/start?client=electron&intent=sign_in&return_to=%2Fapp&code_challenge=abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQ&code_challenge_method=S256'
@@ -198,7 +200,7 @@ describe('electron-bridge — defensive guards', () => {
     expect(windowOpenSpy).not.toHaveBeenCalled();
   });
 
-  it('openDesktopAuthUrl falls back to browser open when the bridge rejects', async () => {
+  it('openDesktopAuthUrl returns the bridge failure reason when open fails', async () => {
     const openDesktopAuthUrl = vi.fn(async () => ({
       ok: false,
       reason: 'invalid-auth-url',
@@ -207,15 +209,13 @@ describe('electron-bridge — defensive guards', () => {
       openDesktopAuthUrl,
     });
 
-    await __testing.openDesktopAuthUrl(
-      'https://jov.ie/auth/start?client=electron&intent=sign_in&return_to=%2Fapp&code_challenge=abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQ&code_challenge_method=S256'
-    );
+    await expect(
+      __testing.openDesktopAuthUrl(
+        'https://jov.ie/auth/start?client=electron&intent=sign_in&return_to=%2Fapp&code_challenge=abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQ&code_challenge_method=S256'
+      )
+    ).resolves.toEqual({ ok: false, reason: 'invalid-auth-url' });
 
-    expect(windowOpenSpy).toHaveBeenCalledWith(
-      'https://jov.ie/auth/start?client=electron&intent=sign_in&return_to=%2Fapp&code_challenge=abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQ&code_challenge_method=S256',
-      '_blank',
-      'noopener,noreferrer'
-    );
+    expect(windowOpenSpy).not.toHaveBeenCalled();
   });
 
   it('startDesktopAuthHandoff uses explicit IPC when available', async () => {
@@ -224,9 +224,11 @@ describe('electron-bridge — defensive guards', () => {
       startDesktopAuthHandoff,
     });
 
-    await __testing.startDesktopAuthHandoff(
-      'https://jov.ie/auth/start?client=electron&intent=sign_up&return_to=%2Fstart&code_challenge=abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQ&code_challenge_method=S256'
-    );
+    await expect(
+      __testing.startDesktopAuthHandoff(
+        'https://jov.ie/auth/start?client=electron&intent=sign_up&return_to=%2Fstart&code_challenge=abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQ&code_challenge_method=S256'
+      )
+    ).resolves.toEqual({ ok: true });
 
     expect(startDesktopAuthHandoff).toHaveBeenCalledWith(
       'https://jov.ie/auth/start?client=electron&intent=sign_up&return_to=%2Fstart&code_challenge=abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQ&code_challenge_method=S256'
@@ -234,7 +236,7 @@ describe('electron-bridge — defensive guards', () => {
     expect(windowOpenSpy).not.toHaveBeenCalled();
   });
 
-  it('startDesktopAuthHandoff falls back to the browser when IPC rejects', async () => {
+  it('startDesktopAuthHandoff returns the bridge failure reason when IPC rejects', async () => {
     const startDesktopAuthHandoff = vi.fn(async () => ({
       ok: false,
       reason: 'invalid-auth-url',
@@ -243,18 +245,16 @@ describe('electron-bridge — defensive guards', () => {
       startDesktopAuthHandoff,
     });
 
-    await __testing.startDesktopAuthHandoff(
-      'https://jov.ie/auth/start?client=electron&intent=sign_up&return_to=%2Fstart&code_challenge=abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQ&code_challenge_method=S256'
-    );
+    await expect(
+      __testing.startDesktopAuthHandoff(
+        'https://jov.ie/auth/start?client=electron&intent=sign_up&return_to=%2Fstart&code_challenge=abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQ&code_challenge_method=S256'
+      )
+    ).resolves.toEqual({ ok: false, reason: 'invalid-auth-url' });
 
     expect(startDesktopAuthHandoff).toHaveBeenCalledWith(
       'https://jov.ie/auth/start?client=electron&intent=sign_up&return_to=%2Fstart&code_challenge=abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQ&code_challenge_method=S256'
     );
-    expect(windowOpenSpy).toHaveBeenCalledWith(
-      'https://jov.ie/auth/start?client=electron&intent=sign_up&return_to=%2Fstart&code_challenge=abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQ&code_challenge_method=S256',
-      '_blank',
-      'noopener,noreferrer'
-    );
+    expect(windowOpenSpy).not.toHaveBeenCalled();
   });
 
   it('consumeDesktopAuthCompletion returns a validated one-time completion payload', async () => {

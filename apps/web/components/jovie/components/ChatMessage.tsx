@@ -81,7 +81,10 @@ export function ChatMessage({
     <motion.div
       data-message-id={id}
       data-role={role}
-      className={cn('flex gap-3.5', isUser ? 'justify-end' : 'justify-start')}
+      className={cn(
+        'group/message flex gap-3.5',
+        isUser ? 'justify-end' : 'justify-start'
+      )}
       initial={
         skipEntrance || shouldReduceMotion ? false : { opacity: 0, y: 8 }
       }
@@ -177,7 +180,7 @@ export function ChatMessage({
           ) : null}
 
           {!isThinking && !isStreaming && messageText ? (
-            <div className='mt-1.5 flex items-center justify-start'>
+            <div className='mt-1.5 flex h-7 items-center justify-start opacity-0 transition-opacity duration-subtle ease-subtle group-hover/message:opacity-100 group-focus-within/message:opacity-100'>
               <SimpleTooltip content={isSuccess ? 'Copied!' : 'Copy response'}>
                 <button
                   type='button'

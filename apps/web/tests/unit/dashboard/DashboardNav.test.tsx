@@ -24,7 +24,9 @@ describe('DashboardNav', () => {
       renderFn: fastRender,
     });
 
-    expect(getByRole('button', { name: 'Profile' })).toBeDefined();
+    expect(getByRole('link', { name: 'Profile' }).getAttribute('href')).toBe(
+      APP_ROUTES.SETTINGS_ARTIST_PROFILE
+    );
     expect(getByRole('link', { name: 'Releases' })).toBeDefined();
     expect(getByRole('link', { name: 'Calendar' }).getAttribute('href')).toBe(
       APP_ROUTES.CALENDAR
@@ -57,7 +59,7 @@ describe('DashboardNav', () => {
     const calendarLink = getByRole('link', { name: 'Calendar' });
     expect(calendarLink.getAttribute('href')).toBe(APP_ROUTES.CALENDAR);
     expect(calendarLink.className).toContain(
-      'grid-cols-[20px_minmax(0,1fr)_40px]'
+      'grid-cols-[22px_minmax(0,1fr)_34px]'
     );
   });
 
@@ -170,15 +172,16 @@ describe('DashboardNav', () => {
   });
 
   it('handles collapsed state', () => {
-    const { container } = renderDashboardNav({
+    const { getByRole } = renderDashboardNav({
       renderFn: fastRender,
       sidebarProps: { defaultOpen: false },
       appFlags: { DESIGN_V1: true },
     });
 
-    const profileButton = container.querySelector('button[aria-pressed]');
-    expect(profileButton).toBeTruthy();
-    expect(profileButton?.className).toContain('justify-center');
+    const newChatLink = getByRole('link', { name: 'New chat' });
+    expect(newChatLink.className).toContain(
+      'group-data-[collapsible=icon]:justify-center'
+    );
     expect(mockUseChatConversationsQuery).toHaveBeenCalledWith({
       limit: 10,
       enabled: false,
@@ -362,9 +365,9 @@ describe('DashboardNav', () => {
     });
 
     const tasksLink = getByRole('link', { name: 'Tasks 7' });
-    expect(tasksLink.className).toContain('h-6.5');
+    expect(tasksLink.className).toContain('h-7');
     expect(tasksLink.className).toContain(
-      'grid-cols-[20px_minmax(0,1fr)_40px]'
+      'grid-cols-[22px_minmax(0,1fr)_34px]'
     );
     expect(tasksLink.className).toContain('text-[12.5px]');
     expect(getByText('7')).toBeDefined();

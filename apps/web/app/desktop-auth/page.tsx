@@ -1,7 +1,14 @@
 'use client';
 
 import { useSearchParams } from 'next/navigation';
-import { Suspense, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  Suspense,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import { sanitizeDesktopAuthUrl } from '@/lib/desktop/auth-return';
 import {
   closeDesktopAuthWindow,
@@ -9,40 +16,107 @@ import {
   openDesktopAuthUrl,
 } from '@/lib/desktop/electron-bridge';
 
+type BrowserOpenState = 'idle' | 'opening' | 'opened' | 'error';
+
+const BROWSER_OPEN_TIMEOUT_MS = 5000;
+
+function formatOpenError(reason?: string): string {
+  if (reason === 'blocked-url' || reason === 'invalid-auth-url') {
+    return 'Sign-in could not start. Close this window and try again from Jovie.';
+  }
+
+  return 'The browser did not open. Try again, or close this window and start sign-in again.';
+}
+
+function formatBrowserOpenStatus(
+  openState: BrowserOpenState,
+  openError: string | null
+): string | null {
+  if (openState === 'opening') {
+    return 'Opening your browser...';
+  }
+
+  if (openState === 'opened') {
+    return 'Continue sign-in in your browser.';
+  }
+
+  return openError;
+}
+
+async function openWithTimeout(authUrl: string) {
+  let timeoutId: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      openDesktopAuthUrl(authUrl),
+      new Promise<{ ok: false; reason: string }>(resolve => {
+        timeoutId = setTimeout(
+          () => resolve({ ok: false, reason: 'desktop-auth-open-timeout' }),
+          BROWSER_OPEN_TIMEOUT_MS
+        );
+      }),
+    ]);
+  } finally {
+    if (timeoutId !== undefined) {
+      clearTimeout(timeoutId);
+    }
+  }
+}
+
+function getAppOrigin(): string {
+  return globalThis.window === undefined
+    ? 'https://jov.ie'
+    : globalThis.window.location.origin;
+}
+
 function DesktopAuthContent() {
   const searchParams = useSearchParams();
-  const [isOpening, setIsOpening] = useState(false);
+  const [openState, setOpenState] = useState<BrowserOpenState>('idle');
+  const [openError, setOpenError] = useState<string | null>(null);
   const autoOpenedRef = useRef(false);
-  const appOrigin =
-    typeof window === 'undefined' ? 'https://jov.ie' : window.location.origin;
+  const appOrigin = getAppOrigin();
   const authUrl = useMemo(
     () => sanitizeDesktopAuthUrl(searchParams.get('auth_url'), appOrigin),
     [searchParams, appOrigin]
   );
   const canAutoOpen = isElectronRuntime();
 
+  const openAuthUrl = useCallback(async () => {
+    if (!authUrl || openState === 'opening') return;
+    setOpenState('opening');
+    setOpenError(null);
+    const result = await openWithTimeout(authUrl);
+    if (result.ok) {
+      setOpenState('opened');
+      return;
+    }
+    setOpenState('error');
+    setOpenError(formatOpenError(result.reason));
+  }, [authUrl, openState]);
+
   useEffect(() => {
     if (!canAutoOpen || !authUrl || autoOpenedRef.current) return;
-
     let isActive = true;
     autoOpenedRef.current = true;
-    setIsOpening(true);
-    void openDesktopAuthUrl(authUrl).finally(() => {
-      if (isActive) {
-        setIsOpening(false);
-      }
-    });
+    setOpenState('opening');
+    setOpenError(null);
+    openWithTimeout(authUrl)
+      .then(result => {
+        if (!isActive) return;
+        if (result.ok) {
+          setOpenState('opened');
+        } else {
+          setOpenState('error');
+          setOpenError(formatOpenError(result.reason));
+        }
+      })
+      .catch(() => {});
 
     return () => {
       isActive = false;
     };
   }, [authUrl, canAutoOpen]);
 
-  const handleContinue = () => {
-    if (!authUrl) return;
-    setIsOpening(true);
-    void openDesktopAuthUrl(authUrl).finally(() => setIsOpening(false));
-  };
+  const statusText = formatBrowserOpenStatus(openState, openError);
 
   return (
     <main className='grid min-h-dvh place-items-center bg-[#06070a] px-6 text-white [color-scheme:dark]'>
@@ -59,21 +133,30 @@ function DesktopAuthContent() {
           <button
             type='button'
             className='inline-flex h-10 w-full items-center justify-center rounded-full bg-white px-4 text-[13px] font-medium text-black transition-colors hover:bg-white/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/35 disabled:cursor-not-allowed disabled:opacity-55'
-            disabled={!authUrl || isOpening}
-            onClick={handleContinue}
+            disabled={!authUrl || openState === 'opening'}
+            onClick={() => {
+              openAuthUrl().catch(() => {});
+            }}
           >
-            {isOpening ? 'Opening...' : 'Continue in browser'}
+            Continue in browser
           </button>
           <button
             type='button'
             className='inline-flex h-10 w-full items-center justify-center rounded-full border border-white/10 px-4 text-[13px] font-medium text-white/72 transition-colors hover:bg-white/[0.06] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/25'
             onClick={() => {
-              void closeDesktopAuthWindow();
+              closeDesktopAuthWindow().catch(() => {});
             }}
           >
             Cancel sign-in
           </button>
         </div>
+        <p
+          aria-live='polite'
+          role='status'
+          className='mt-3 min-h-5 text-[12px] leading-5 text-white/56'
+        >
+          {statusText}
+        </p>
       </section>
     </main>
   );

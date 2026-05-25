@@ -162,7 +162,8 @@ export function EntityChipPopover({
         </button>
       </PopoverTrigger>
       <PopoverContent
-        className='w-[272px] overflow-hidden p-0'
+        className='z-[150] w-[min(272px,calc(100vw-24px))] overflow-hidden rounded-xl border border-(--linear-app-frame-seam) bg-surface-1 p-0 shadow-popover'
+        side='top'
         sideOffset={6}
         align='start'
         testId='entity-chip-popover-content'

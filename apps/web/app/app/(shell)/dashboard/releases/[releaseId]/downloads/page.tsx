@@ -270,21 +270,21 @@ export default function PromoDownloadsPage() {
               className='sr-only'
               aria-label='Upload promo download audio file'
             />
-            <div
-              className='min-h-9 border-t border-transparent px-3 py-2.5 text-xs sm:px-4'
-              role='status'
+            <output
+              className='block min-h-9 border-t border-transparent px-3 py-2.5 text-xs sm:px-4'
+              aria-live='polite'
             >
               {uploadError ? <p className='text-error'>{uploadError}</p> : null}
-            </div>
+            </output>
           </ContentSurfaceCard>
 
-          <div className='min-h-10' role='status'>
+          <output className='block min-h-10' aria-live='polite'>
             {listError || operationError ? (
               <ContentSurfaceCard className='border-error/20 bg-error-subtle px-3 py-2.5 text-xs text-error'>
                 {operationError ?? listError}
               </ContentSurfaceCard>
             ) : null}
-          </div>
+          </output>
 
           <PromoDownloadsTable
             files={files}

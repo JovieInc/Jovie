@@ -10,7 +10,6 @@ import { APP_ROUTES } from '@/constants/routes';
 import {
   consumeStoredAuthState,
   createStoredNativeExchangeCode,
-  readStoredAuthState,
 } from '@/lib/auth/routing-state.server';
 import { captureError } from '@/lib/error-tracking';
 import { NO_STORE_HEADERS } from '@/lib/http/headers';
@@ -49,7 +48,7 @@ export async function GET(request: Request) {
       return NextResponse.redirect(signInUrl, { headers: NO_STORE_HEADERS });
     }
 
-    const stateRecord = await readStoredAuthState({ state });
+    const stateRecord = await consumeStoredAuthState({ state });
     if (!stateRecord) {
       return NextResponse.json(
         { error: 'Auth state expired' },
@@ -65,24 +64,18 @@ export async function GET(request: Request) {
     });
 
     let exchangeCode: string | undefined;
-    if (stateRecord.client !== 'web') {
+    const nativeClient: NativeAuthClient | null =
+      stateRecord.client === 'web' ? null : stateRecord.client;
+    if (nativeClient) {
       exchangeCode = createExchangeCode();
       await createStoredNativeExchangeCode({
         code: exchangeCode,
-        client: stateRecord.client as NativeAuthClient,
+        client: nativeClient,
         state: stateRecord.state,
         userId,
         returnTo: stateRecord.returnTo,
         codeChallenge: stateRecord.codeChallenge,
       });
-    }
-
-    const consumedStateRecord = await consumeStoredAuthState({ state });
-    if (!consumedStateRecord) {
-      return NextResponse.json(
-        { error: 'Auth state expired' },
-        { status: 410, headers: NO_STORE_HEADERS }
-      );
     }
 
     const resolved = resolveAuthCallback({ stateRecord, exchangeCode });

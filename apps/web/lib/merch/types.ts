@@ -1,12 +1,9 @@
 import type {
   MerchArtistBrief,
   MerchCard,
-  MerchDesignOption,
-  MerchLearningSnapshot,
   MerchPricingSnapshot,
   MerchPrintfulSnapshot,
   MerchShippingAddress,
-  MerchVariantMap,
 } from '@/lib/db/schema/merch';
 
 export type MerchDesignCommand =
@@ -120,4 +117,4 @@ export type {
   MerchPrintfulSnapshot,
   MerchShippingAddress,
   MerchVariantMap,
-};
+} from '@/lib/db/schema/merch';

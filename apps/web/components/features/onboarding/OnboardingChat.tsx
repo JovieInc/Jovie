@@ -87,6 +87,10 @@ const ONBOARDING_INTRO_MESSAGE = {
   ],
 } satisfies UIMessage;
 
+const BLOCKED_TURNSTILE_TOKEN_STATUSES: ReadonlySet<
+  OnboardingTurnstileStatus | undefined
+> = new Set(['expired', 'timeout', 'error', 'unsupported', 'unconfigured']);
+
 function getMessageText(message: UIMessage): string {
   return (message.parts ?? [])
     .filter(
@@ -543,6 +547,168 @@ function OnboardingInitialIntro({
   );
 }
 
+function isTurnstileTokenUsable(
+  token: string | null,
+  status: OnboardingTurnstileStatus | undefined
+): boolean {
+  if (!token) return false;
+  return !BLOCKED_TURNSTILE_TOKEN_STATUSES.has(status);
+}
+
+function getDisplayMessages(
+  messages: readonly UIMessage[],
+  shouldShowThinking: boolean
+): readonly UIMessage[] {
+  if (!shouldShowThinking) {
+    return [ONBOARDING_INTRO_MESSAGE, ...messages];
+  }
+
+  return [
+    ONBOARDING_INTRO_MESSAGE,
+    ...messages,
+    {
+      id: THINKING_PLACEHOLDER_ID,
+      role: 'assistant',
+      parts: [],
+    },
+  ];
+}
+
+interface ChatErrorStatusBannerProps {
+  readonly chatError: ChatError | null;
+  readonly handleRetry: () => void;
+  readonly isBusy: boolean;
+  readonly isSubmitted: boolean;
+}
+
+function ChatErrorStatusBanner({
+  chatError,
+  handleRetry,
+  isBusy,
+  isSubmitted,
+}: ChatErrorStatusBannerProps) {
+  if (!chatError) return null;
+
+  const canRetry = Boolean(chatError.failedMessage) && !chatError.retryAfter;
+
+  return (
+    <div
+      role='alert'
+      aria-live='assertive'
+      aria-atomic='true'
+      className='px-3 py-2.5 text-[12.5px] leading-5'
+    >
+      <p className='font-medium text-primary-token'>Message paused</p>
+      <p className='mt-0.5 text-secondary-token'>{chatError.message}</p>
+      {canRetry ? (
+        <button
+          type='button'
+          onClick={handleRetry}
+          disabled={isBusy || isSubmitted}
+          className='mt-2 inline-flex h-7 items-center rounded-[8px] border border-subtle px-2.5 text-[11.5px] font-medium text-secondary-token transition-colors duration-fast hover:border-white/15 hover:text-primary-token focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-white/20 disabled:opacity-50'
+        >
+          Retry message
+        </button>
+      ) : null}
+    </div>
+  );
+}
+
+interface ComposerStatusBannerProps extends ChatErrorStatusBannerProps {
+  readonly shouldShowTurnstileBanner: boolean;
+  readonly turnstilePanel: ReactNode;
+}
+
+function ComposerStatusBanner({
+  chatError,
+  handleRetry,
+  isBusy,
+  isSubmitted,
+  shouldShowTurnstileBanner,
+  turnstilePanel,
+}: ComposerStatusBannerProps) {
+  if (!shouldShowTurnstileBanner && !chatError) return null;
+
+  return (
+    <div className='divide-y divide-white/[0.065]'>
+      {shouldShowTurnstileBanner ? (
+        <div data-testid='onboarding-turnstile-slot'>{turnstilePanel}</div>
+      ) : null}
+      <ChatErrorStatusBanner
+        chatError={chatError}
+        handleRetry={handleRetry}
+        isBusy={isBusy}
+        isSubmitted={isSubmitted}
+      />
+    </div>
+  );
+}
+
+interface OnboardingMessageRegionProps {
+  readonly composerPickerOpen: boolean;
+  readonly displayMessages: readonly UIMessage[];
+  readonly hasConversationStarted: boolean;
+  readonly isBusy: boolean;
+  readonly isStreaming: boolean;
+  readonly lastAssistantMessageId: string | null;
+  readonly onboardingComposerSurface: ReactNode;
+  readonly onSelectArtist: (artist: OnboardingArtistSelection) => void;
+  readonly shouldDockComposer: boolean;
+}
+
+function OnboardingMessageRegion({
+  composerPickerOpen,
+  displayMessages,
+  hasConversationStarted,
+  isBusy,
+  isStreaming,
+  lastAssistantMessageId,
+  onboardingComposerSurface,
+  onSelectArtist,
+  shouldDockComposer,
+}: OnboardingMessageRegionProps) {
+  if (shouldDockComposer) {
+    return (
+      <OnboardingMessageList
+        displayMessages={displayMessages}
+        hideIntroMessage={composerPickerOpen}
+        isStreaming={isStreaming}
+        lastAssistantMessageId={lastAssistantMessageId}
+        isBusy={isBusy}
+        onSelectArtist={onSelectArtist}
+      />
+    );
+  }
+
+  return (
+    <div className='flex w-full flex-col items-center justify-center gap-5 py-8'>
+      <div className='relative w-full'>
+        <OnboardingInitialIntro
+          hidden={hasConversationStarted || composerPickerOpen}
+          testId={
+            hasConversationStarted ? undefined : 'onboarding-intro-message'
+          }
+        />
+        {hasConversationStarted ? (
+          <div className='absolute inset-x-0 bottom-0 z-10 max-h-[min(42vh,24rem)] overflow-y-auto overscroll-contain pb-1'>
+            <OnboardingMessageList
+              displayMessages={displayMessages}
+              hideIntroMessage={composerPickerOpen}
+              isStreaming={isStreaming}
+              lastAssistantMessageId={lastAssistantMessageId}
+              isBusy={isBusy}
+              onSelectArtist={onSelectArtist}
+            />
+          </div>
+        ) : null}
+      </div>
+      <div className='w-full' data-testid='onboarding-centered-composer'>
+        {onboardingComposerSurface}
+      </div>
+    </div>
+  );
+}
+
 export function OnboardingChat({
   onConversationActivity,
   onProfileBuilderChange,
@@ -610,28 +776,13 @@ export function OnboardingChat({
   const isStreaming = status === 'streaming';
   const isBusy = isSubmitted || isStreaming;
   const requiresTurnstile = process.env.NODE_ENV !== 'development';
-  const isTurnstileTokenUsable =
-    Boolean(turnstileToken) &&
-    turnstileStatus !== 'expired' &&
-    turnstileStatus !== 'timeout' &&
-    turnstileStatus !== 'error' &&
-    turnstileStatus !== 'unsupported' &&
-    turnstileStatus !== 'unconfigured';
   const isAwaitingFirstToken =
-    requiresTurnstile && !hasSentFirst && !isTurnstileTokenUsable;
+    requiresTurnstile &&
+    !hasSentFirst &&
+    !isTurnstileTokenUsable(turnstileToken, turnstileStatus);
   const lastMessage = messages[messages.length - 1];
   const shouldShowThinking = isBusy && lastMessage?.role === 'user';
-  const displayMessages: readonly UIMessage[] = shouldShowThinking
-    ? [
-        ONBOARDING_INTRO_MESSAGE,
-        ...messages,
-        {
-          id: THINKING_PLACEHOLDER_ID,
-          role: 'assistant',
-          parts: [],
-        },
-      ]
-    : [ONBOARDING_INTRO_MESSAGE, ...messages];
+  const displayMessages = getDisplayMessages(messages, shouldShowThinking);
   const lastAssistantMessageId = findLastAssistantMessageId(displayMessages);
   const { isStuckToBottom, onScroll, totalSizeRef, scrollContainerRef } =
     useStickToBottom({ messageCount: displayMessages.length });
@@ -719,36 +870,18 @@ export function OnboardingChat({
 
   const shouldShowTurnstileBanner =
     Boolean(turnstilePanel) && isAwaitingFirstToken;
-  const chatErrorStatusBanner = chatError ? (
-    <div
-      role='alert'
-      aria-live='assertive'
-      aria-atomic='true'
-      className='px-3 py-2.5 text-[12.5px] leading-5'
-    >
-      <p className='font-medium text-primary-token'>Message paused</p>
-      <p className='mt-0.5 text-secondary-token'>{chatError.message}</p>
-      {chatError.failedMessage && !chatError.retryAfter ? (
-        <button
-          type='button'
-          onClick={handleRetry}
-          disabled={isBusy || isSubmitted}
-          className='mt-2 inline-flex h-7 items-center rounded-[8px] border border-subtle px-2.5 text-[11.5px] font-medium text-secondary-token transition-colors duration-fast hover:border-white/15 hover:text-primary-token focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-white/20 disabled:opacity-50'
-        >
-          Retry message
-        </button>
-      ) : null}
-    </div>
+  const hasComposerStatusBanner =
+    shouldShowTurnstileBanner || chatError !== null;
+  const composerStatusBanner = hasComposerStatusBanner ? (
+    <ComposerStatusBanner
+      chatError={chatError}
+      handleRetry={handleRetry}
+      isBusy={isBusy}
+      isSubmitted={isSubmitted}
+      shouldShowTurnstileBanner={shouldShowTurnstileBanner}
+      turnstilePanel={turnstilePanel}
+    />
   ) : null;
-  const composerStatusBanner =
-    shouldShowTurnstileBanner || chatErrorStatusBanner ? (
-      <div className='divide-y divide-white/[0.065]'>
-        {shouldShowTurnstileBanner ? (
-          <div data-testid='onboarding-turnstile-slot'>{turnstilePanel}</div>
-        ) : null}
-        {chatErrorStatusBanner}
-      </div>
-    ) : null;
 
   const userTurnCount = messages.filter(
     message => message.role === 'user'
@@ -804,47 +937,17 @@ export function OnboardingChat({
             !shouldDockComposer && 'justify-center'
           )}
         >
-          {shouldDockComposer ? (
-            <OnboardingMessageList
-              displayMessages={displayMessages}
-              hideIntroMessage={composerPickerOpen}
-              isStreaming={isStreaming}
-              lastAssistantMessageId={lastAssistantMessageId}
-              isBusy={isBusy}
-              onSelectArtist={handleArtistSelect}
-            />
-          ) : (
-            <div className='flex w-full flex-col items-center justify-center gap-5 py-8'>
-              <div className='relative w-full'>
-                <OnboardingInitialIntro
-                  hidden={hasConversationStarted || composerPickerOpen}
-                  testId={
-                    hasConversationStarted
-                      ? undefined
-                      : 'onboarding-intro-message'
-                  }
-                />
-                {hasConversationStarted ? (
-                  <div className='absolute inset-x-0 bottom-0 z-10 max-h-[min(42vh,24rem)] overflow-y-auto overscroll-contain pb-1'>
-                    <OnboardingMessageList
-                      displayMessages={displayMessages}
-                      hideIntroMessage={composerPickerOpen}
-                      isStreaming={isStreaming}
-                      lastAssistantMessageId={lastAssistantMessageId}
-                      isBusy={isBusy}
-                      onSelectArtist={handleArtistSelect}
-                    />
-                  </div>
-                ) : null}
-              </div>
-              <div
-                className='w-full'
-                data-testid='onboarding-centered-composer'
-              >
-                {onboardingComposerSurface}
-              </div>
-            </div>
-          )}
+          <OnboardingMessageRegion
+            composerPickerOpen={composerPickerOpen}
+            displayMessages={displayMessages}
+            hasConversationStarted={hasConversationStarted}
+            isBusy={isBusy}
+            isStreaming={isStreaming}
+            lastAssistantMessageId={lastAssistantMessageId}
+            onboardingComposerSurface={onboardingComposerSurface}
+            onSelectArtist={handleArtistSelect}
+            shouldDockComposer={shouldDockComposer}
+          />
         </div>
       </div>
 

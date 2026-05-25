@@ -1897,7 +1897,9 @@ export function TasksPageClient() {
               : 'empty'
         }
         onClose={closeReleaseSidebar}
-        onRetry={() => void selectedReleaseQuery.refetch()}
+        onRetry={() => {
+          Promise.resolve(selectedReleaseQuery.refetch()).catch(() => {});
+        }}
       />
     )
   ) : null;
@@ -1913,6 +1915,7 @@ export function TasksPageClient() {
           onClick={() => setHeaderMode('create')}
           pressed={headerMode === 'create'}
           hideLabelOnMobile
+          className='lg:hidden'
         />
       </DashboardHeaderActionGroup>
     ),
@@ -2114,6 +2117,7 @@ export function TasksPageClient() {
               onClearSearch={() => setSearch('')}
               filterCategories={taskFilterCategories}
               onClearFilters={clearFilters}
+              onCreateTask={() => setHeaderMode('create')}
               viewMode={viewMode}
               onViewModeChange={setViewMode}
               showCancelledColumn={showCancelledColumn}
@@ -2136,7 +2140,11 @@ export function TasksPageClient() {
           data-testid='tasks-content-panel'
         >
           {activeIsError ? (
-            <TaskErrorState onRetry={() => void refetchActiveTasks()} />
+            <TaskErrorState
+              onRetry={() => {
+                Promise.resolve(refetchActiveTasks()).catch(() => {});
+              }}
+            />
           ) : (
             <div className='flex min-h-0 flex-1 overflow-hidden'>
               <div

@@ -1,8 +1,10 @@
 # gstack CI eval runner — pre-baked toolchain + deps
 # Rebuild weekly via ci-image.yml, on Dockerfile changes, or on lockfile changes
-FROM ubuntu:24.04
+FROM ubuntu:24.04@sha256:c4a8d5503dfb2a3eb8ab5f807da5bc69a85730fb49b5cfca2330194ebcc41c7b
 
 ENV DEBIAN_FRONTEND=noninteractive
+
+SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 
 # System deps
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -18,19 +20,29 @@ RUN curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg \
     && rm -rf /var/lib/apt/lists/*
 
 # Node.js 22 LTS (needed for claude CLI)
-RUN curl -fsSL https://deb.nodesource.com/setup_22.x | bash - \
+RUN curl -fsSL https://deb.nodesource.com/setup_22.x -o /tmp/nodesource-setup.sh \
+    && echo "575583bbac2fccc0b5edd0dbc03e222d9f9dc8d724da996d22754d6411104fd1  /tmp/nodesource-setup.sh" | sha256sum -c - \
+    && bash /tmp/nodesource-setup.sh \
     && apt-get install -y --no-install-recommends nodejs \
-    && rm -rf /var/lib/apt/lists/*
+    && rm -rf /tmp/nodesource-setup.sh /var/lib/apt/lists/*
 
 # Bun (install to /usr/local so non-root users can access it)
 ENV BUN_INSTALL="/usr/local"
-RUN bash -o pipefail -c 'curl -fsSL https://bun.sh/install | BUN_VERSION=1.3.10 bash'
+RUN curl -fsSL https://bun.sh/install -o /tmp/bun-install.sh \
+    && echo "bab8acfb046aac8c72407bdcce903957665d655d7acaa3e11c7c4616beae68dd  /tmp/bun-install.sh" | sha256sum -c - \
+    && BUN_VERSION=1.3.10 bash /tmp/bun-install.sh \
+    && rm -f /tmp/bun-install.sh
 
 # Claude CLI
-RUN npm i -g @anthropic-ai/claude-code
+RUN curl -fsSL https://registry.npmjs.org/@anthropic-ai/claude-code/-/claude-code-2.1.150.tgz -o /tmp/claude-code.tgz \
+    && echo "9f278eca873fa661864697dfc8f535eafe5c6a6a73b64ca7c9115c34aa83ee906f23468f7e58c6562dc28b329bbbbfddc753228de13d5e2434907935b66c791a  /tmp/claude-code.tgz" | sha512sum -c - \
+    && mkdir -p /usr/local/lib/claude-code \
+    && tar -xzf /tmp/claude-code.tgz --strip-components=1 -C /usr/local/lib/claude-code \
+    && ln -sf /usr/local/lib/claude-code/bin/claude.exe /usr/local/bin/claude \
+    && rm -f /tmp/claude-code.tgz
 
 # Playwright system deps (Chromium) — needed for browse E2E tests
-RUN npx playwright install-deps chromium
+RUN npx --yes playwright@1.60.0 install-deps chromium
 
 # Pre-install dependencies (cached layer — only rebuilds when package.json changes)
 COPY package.json /workspace/
@@ -39,12 +51,12 @@ RUN bun install && rm -rf /tmp/*
 
 # Install Playwright Chromium to a shared location accessible by all users
 ENV PLAYWRIGHT_BROWSERS_PATH=/opt/playwright-browsers
-RUN npx playwright install chromium \
+RUN npx --yes playwright@1.60.0 install chromium \
     && chmod -R a+rX /opt/playwright-browsers
 
 # Verify everything works
 RUN bun --version && node --version && claude --version && jq --version && gh --version \
-    && npx playwright --version
+    && npx --yes playwright@1.60.0 --version
 
 # At runtime: checkout overwrites /workspace, but node_modules persists
 # if we move it out of the way and symlink back

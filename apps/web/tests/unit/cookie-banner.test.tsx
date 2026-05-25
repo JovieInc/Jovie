@@ -1,6 +1,7 @@
 import { render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { CookieBannerSection } from '@/components/organisms/CookieBannerSection';
+import { shouldSuppressCookieBannerForPathname } from '@/lib/cookies/banner-visibility';
 
 vi.mock('@/lib/cookies/consent', () => ({
   saveConsent: vi.fn(),
@@ -38,6 +39,19 @@ describe('CookieBannerSection', () => {
     setCookie('jv_cc_required=0');
     render(<CookieBannerSection />);
     expect(screen.queryByTestId('cookie-banner')).not.toBeInTheDocument();
+  });
+
+  it.each([
+    '/desktop-auth',
+    '/auth/native-complete',
+    '/signin',
+    '/signin/sso-callback',
+    '/signup',
+    '/sign-in',
+    '/sign-up',
+    '/sso-callback',
+  ])('suppresses auth utility route %s', pathname => {
+    expect(shouldSuppressCookieBannerForPathname(pathname)).toBe(true);
   });
 
   it('renders as floating bottom-right card (not full-width bar) with correct classes and compact actions when required', () => {

@@ -10,7 +10,7 @@ import {
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { Suspense } from 'react';
-import { AdminToolPage } from '@/components/features/admin/layout/AdminToolPage';
+import { AdminPage } from '@/components/features/admin/layout/AdminPage';
 import { ContentSectionHeader } from '@/components/molecules/ContentSectionHeader';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { UnifiedTableSkeleton } from '@/components/organisms/table';
@@ -108,7 +108,7 @@ const INVESTOR_TABLE_SKELETON_COLUMN_CONFIG = [
  */
 export default function InvestorPipelinePage() {
   return (
-    <AdminToolPage
+    <AdminPage
       title='Investors'
       description='Track investor links, view signals, and active fundraising conversations.'
       testId='admin-investors-page'
@@ -124,31 +124,10 @@ export default function InvestorPipelinePage() {
         </div>
       }
     >
-      <div
-        className='grid gap-3 sm:grid-cols-3'
-        data-testid='admin-investors-summary'
-      >
-        <SummaryCard
-          label='Pipeline View'
-          value='Investor links'
-          description='Every link is a lightweight deal room with stage tracking.'
-        />
-        <SummaryCard
-          label='Signal Capture'
-          value='View + stage history'
-          description='Keep engagement, recency, and status visible in one list.'
-        />
-        <SummaryCard
-          label='Next Action'
-          value='Create or follow up'
-          description='Use links, notes, and stage changes to keep momentum moving.'
-        />
-      </div>
-
       <Suspense fallback={<TableSkeleton />}>
         <InvestorPipelineTable />
       </Suspense>
-    </AdminToolPage>
+    </AdminPage>
   );
 }
 
@@ -322,26 +301,6 @@ function CreateLinkButton() {
         Create link
       </Link>
     </Button>
-  );
-}
-
-function SummaryCard({
-  label,
-  value,
-  description,
-}: Readonly<{
-  label: string;
-  value: string;
-  description: string;
-}>) {
-  return (
-    <ContentSurfaceCard surface='nested' className='p-3.5'>
-      <p className='text-2xs text-tertiary-token'>{label}</p>
-      <p className='mt-1 text-sm font-semibold text-primary-token'>{value}</p>
-      <p className='mt-1 text-xs leading-[18px] text-secondary-token'>
-        {description}
-      </p>
-    </ContentSurfaceCard>
   );
 }
 

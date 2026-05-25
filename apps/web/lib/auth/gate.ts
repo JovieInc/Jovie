@@ -103,6 +103,57 @@ interface ExistingUserData {
   onboardingComplete: Date | null;
 }
 
+interface AuthGateRecord {
+  id: string;
+  email: string | null;
+  userStatus: string | null;
+  isAdmin: boolean | null;
+  isPro: boolean | null;
+  deletedAt: Date | null;
+  profileId: string | null;
+  profileUsername: string | null;
+  profileUsernameNormalized: string | null;
+  profileDisplayName: string | null;
+  profileIsPublic: boolean | null;
+  profileAvatarUrl: string | null;
+  profileOnboardingCompletedAt: Date | null;
+}
+
+interface AuthGateDbUser {
+  id: string;
+  email: string | null;
+  userStatus: string | null;
+  isAdmin: boolean | null;
+  isPro: boolean | null;
+  deletedAt: Date | null;
+}
+
+interface AuthGateProfile {
+  id: string;
+  username: string | null;
+  usernameNormalized: string | null;
+  displayName: string | null;
+  avatarUrl: string | null;
+  isPublic: boolean | null;
+  onboardingCompletedAt: Date | null;
+  isClaimed: true;
+}
+
+function createUnauthenticatedAuthGateResult(): AuthGateResult {
+  return {
+    state: CanonicalUserState.UNAUTHENTICATED,
+    clerkUserId: null,
+    dbUserId: null,
+    profileId: null,
+    redirectTo: '/signin',
+    context: {
+      isAdmin: false,
+      isPro: false,
+      email: null,
+    },
+  };
+}
+
 /**
  * Determine user status based on waitlist entry and profile state.
  * Implements the state progression: waitlist_pending → waitlist_approved → active
@@ -452,6 +503,130 @@ async function handleMissingDbUser(
   return { dbUserId: newUserId };
 }
 
+async function resolveClerkIdentity(knownClerkUserId?: string): Promise<{
+  clerkUserId: string | null;
+  email: string | null;
+}> {
+  if (knownClerkUserId) {
+    return { clerkUserId: knownClerkUserId, email: null };
+  }
+
+  const [authResult, clerkUser] = await Promise.all([
+    getCachedAuth(),
+    getCachedCurrentUser(),
+  ]);
+  const clerkUserId = authResult.userId;
+  const email =
+    clerkUser?.emailAddresses?.find(e => e.verification?.status === 'verified')
+      ?.emailAddress ?? null;
+
+  return { clerkUserId, email };
+}
+
+async function loadAuthGateRecord(
+  clerkUserId: string,
+  email: string | null
+): Promise<AuthGateRecord | AuthGateResult | undefined> {
+  try {
+    const [dbResult] = await db
+      .select({
+        // User fields
+        id: users.id,
+        email: users.email,
+        userStatus: users.userStatus,
+        isAdmin: users.isAdmin,
+        isPro: users.isPro,
+        deletedAt: users.deletedAt,
+        // Profile fields (nullable from LEFT JOIN)
+        profileId: creatorProfiles.id,
+        profileUsername: creatorProfiles.username,
+        profileUsernameNormalized: creatorProfiles.usernameNormalized,
+        profileDisplayName: creatorProfiles.displayName,
+        profileIsPublic: creatorProfiles.isPublic,
+        profileAvatarUrl: creatorProfiles.avatarUrl,
+        profileOnboardingCompletedAt: creatorProfiles.onboardingCompletedAt,
+      })
+      .from(users)
+      .leftJoin(creatorProfiles, eq(creatorProfiles.id, users.activeProfileId))
+      .where(eq(users.clerkId, clerkUserId))
+      .limit(1);
+
+    return dbResult;
+  } catch (error) {
+    if (canUseE2ETestAuthFallback()) {
+      Sentry.addBreadcrumb({
+        category: 'auth-gate',
+        level: 'warning',
+        message: 'Using E2E test auth fallback after DB lookup failure',
+        data: {
+          clerkUserId,
+          error: error instanceof Error ? error.message : String(error),
+        },
+      });
+      return createE2ETestAuthGateResult(clerkUserId, email);
+    }
+    throw error;
+  }
+}
+
+function toAuthGateDbUser(
+  dbResult: AuthGateRecord | undefined
+): AuthGateDbUser | null {
+  if (!dbResult) {
+    return null;
+  }
+
+  return {
+    id: dbResult.id,
+    email: dbResult.email,
+    userStatus: dbResult.userStatus,
+    isAdmin: dbResult.isAdmin,
+    isPro: dbResult.isPro,
+    deletedAt: dbResult.deletedAt,
+  };
+}
+
+function toAuthGateProfile(
+  dbResult: AuthGateRecord | undefined
+): AuthGateProfile | null {
+  if (!dbResult?.profileId) {
+    return null;
+  }
+
+  return {
+    id: dbResult.profileId,
+    username: dbResult.profileUsername,
+    usernameNormalized: dbResult.profileUsernameNormalized,
+    displayName: dbResult.profileDisplayName,
+    avatarUrl: dbResult.profileAvatarUrl,
+    isPublic: dbResult.profileIsPublic,
+    onboardingCompletedAt: dbResult.profileOnboardingCompletedAt,
+    isClaimed: true, // joined via activeProfileId = claimed
+  };
+}
+
+async function syncVerifiedEmailIfNeeded(
+  dbUser: AuthGateDbUser | null,
+  email: string | null
+) {
+  if (!dbUser || !email || dbUser.email === email) {
+    return;
+  }
+
+  // Best-effort sync - don't block auth on sync failure
+  await syncEmailFromClerk(dbUser.id, email).catch(err => {
+    Sentry.addBreadcrumb({
+      category: 'auth-gate',
+      message: 'Email sync failed',
+      level: 'warning',
+      data: {
+        error: err instanceof Error ? err.message : String(err),
+        userId: dbUser.id,
+      },
+    });
+  });
+}
+
 /**
  * Centralized auth gate function that resolves the current user's state.
  *
@@ -484,126 +659,27 @@ export async function resolveUserState(
 ): Promise<AuthGateResult> {
   const { createDbUserIfMissing = true, knownClerkUserId } = options;
 
-  // Default empty result
-  const emptyResult: AuthGateResult = {
-    state: CanonicalUserState.UNAUTHENTICATED,
-    clerkUserId: null,
-    dbUserId: null,
-    profileId: null,
-    redirectTo: '/signin',
-    context: {
-      isAdmin: false,
-      isPro: false,
-      email: null,
-    },
-  };
-
   // 1. Resolve the Clerk user ID.
   //
   // When knownClerkUserId is provided (e.g. from a cached function), skip
   // getCachedAuth() and getCachedCurrentUser() — both access headers()
   // internally and will throw ClerkUseCacheError inside unstable_cache scopes.
-  let clerkUserId: string | null;
-  let email: string | null;
-
-  if (knownClerkUserId) {
-    clerkUserId = knownClerkUserId;
-    // Email is unavailable without getCachedCurrentUser(). User creation will
-    // fail gracefully in handleMissingDbUser if email is required.
-    email = null;
-  } else {
-    const [authResult, clerkUser] = await Promise.all([
-      getCachedAuth(),
-      getCachedCurrentUser(),
-    ]);
-
-    clerkUserId = authResult.userId;
-    if (!clerkUserId) {
-      return emptyResult;
-    }
-
-    // Get the primary verified email — verified emails are the source of truth
-    // for identity. Prefer a verified address over index [0] (may be unverified).
-    email =
-      clerkUser?.emailAddresses?.find(
-        e => e.verification?.status === 'verified'
-      )?.emailAddress ?? null;
-  }
+  const { clerkUserId, email } = await resolveClerkIdentity(knownClerkUserId);
 
   if (!clerkUserId) {
-    return emptyResult;
+    return createUnauthenticatedAuthGateResult();
   }
 
   // 2. Query DB user AND profile in a single JOIN query (performance optimization)
   // This reduces database round trips from 2 to 1
-  let dbResult:
-    | {
-        id: string;
-        email: string | null;
-        userStatus: string | null;
-        isAdmin: boolean | null;
-        isPro: boolean | null;
-        deletedAt: Date | null;
-        profileId: string | null;
-        profileUsername: string | null;
-        profileUsernameNormalized: string | null;
-        profileDisplayName: string | null;
-        profileIsPublic: boolean | null;
-        profileAvatarUrl: string | null;
-        profileOnboardingCompletedAt: Date | null;
-      }
-    | undefined;
-
-  try {
-    [dbResult] = await db
-      .select({
-        // User fields
-        id: users.id,
-        email: users.email,
-        userStatus: users.userStatus,
-        isAdmin: users.isAdmin,
-        isPro: users.isPro,
-        deletedAt: users.deletedAt,
-        // Profile fields (nullable from LEFT JOIN)
-        profileId: creatorProfiles.id,
-        profileUsername: creatorProfiles.username,
-        profileUsernameNormalized: creatorProfiles.usernameNormalized,
-        profileDisplayName: creatorProfiles.displayName,
-        profileIsPublic: creatorProfiles.isPublic,
-        profileAvatarUrl: creatorProfiles.avatarUrl,
-        profileOnboardingCompletedAt: creatorProfiles.onboardingCompletedAt,
-      })
-      .from(users)
-      .leftJoin(creatorProfiles, eq(creatorProfiles.id, users.activeProfileId))
-      .where(eq(users.clerkId, clerkUserId))
-      .limit(1);
-  } catch (error) {
-    if (canUseE2ETestAuthFallback()) {
-      Sentry.addBreadcrumb({
-        category: 'auth-gate',
-        level: 'warning',
-        message: 'Using E2E test auth fallback after DB lookup failure',
-        data: {
-          clerkUserId,
-          error: error instanceof Error ? error.message : String(error),
-        },
-      });
-      return createE2ETestAuthGateResult(clerkUserId, email);
-    }
-    throw error;
+  const lookupResult = await loadAuthGateRecord(clerkUserId, email);
+  if (lookupResult && 'state' in lookupResult) {
+    return lookupResult;
   }
 
   // Extract user data from result (may be undefined if no user exists)
-  const dbUser = dbResult
-    ? {
-        id: dbResult.id,
-        email: dbResult.email,
-        userStatus: dbResult.userStatus,
-        isAdmin: dbResult.isAdmin,
-        isPro: dbResult.isPro,
-        deletedAt: dbResult.deletedAt,
-      }
-    : null;
+  const dbResult = lookupResult;
+  const dbUser = toAuthGateDbUser(dbResult);
 
   const baseContext = {
     isAdmin: dbUser?.isAdmin ?? false,
@@ -614,20 +690,7 @@ export async function resolveUserState(
   // Sync email from Clerk if different (Clerk is source of truth for identity)
   // Only sync verified emails to prevent hijacking. `email` is already the
   // verified address resolved above, so reuse it directly.
-  if (dbUser && email && dbUser.email !== email) {
-    // Best-effort sync - don't block auth on sync failure
-    await syncEmailFromClerk(dbUser.id, email).catch(err => {
-      Sentry.addBreadcrumb({
-        category: 'auth-gate',
-        message: 'Email sync failed',
-        level: 'warning',
-        data: {
-          error: err instanceof Error ? err.message : String(err),
-          userId: dbUser.id,
-        },
-      });
-    });
-  }
+  await syncVerifiedEmailIfNeeded(dbUser, email);
 
   // Check if user is blocked (banned, suspended, or deleted)
   const statusCheck = checkUserStatus(
@@ -661,18 +724,7 @@ export async function resolveUserState(
   }
 
   // Profile from the JOIN query (only valid if dbUser exists)
-  let profile = dbResult?.profileId
-    ? {
-        id: dbResult.profileId,
-        username: dbResult.profileUsername,
-        usernameNormalized: dbResult.profileUsernameNormalized,
-        displayName: dbResult.profileDisplayName,
-        avatarUrl: dbResult.profileAvatarUrl,
-        isPublic: dbResult.profileIsPublic,
-        onboardingCompletedAt: dbResult.profileOnboardingCompletedAt,
-        isClaimed: true, // joined via activeProfileId = claimed
-      }
-    : null;
+  let profile = toAuthGateProfile(dbResult);
 
   if (!dbUserId) {
     const waitlistGateEnabled = await isWaitlistGateEnabled();

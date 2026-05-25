@@ -123,4 +123,16 @@ describe('EntityChipPopover', () => {
     const content = await screen.findByTestId('entity-chip-popover-content');
     expect(content.textContent).toContain('Sober');
   });
+
+  it('uses the chat overlay tier with an opaque bounded surface', async () => {
+    const user = userEvent.setup();
+    renderPopover();
+    await user.click(screen.getByTestId('entity-chip-popover-trigger'));
+    const content = await screen.findByTestId('entity-chip-popover-content');
+
+    expect(content.className).toContain('z-[150]');
+    expect(content.className).toContain('bg-surface-1');
+    expect(content.className).toContain('shadow-popover');
+    expect(content.className).toContain('calc(100vw-24px)');
+  });
 });

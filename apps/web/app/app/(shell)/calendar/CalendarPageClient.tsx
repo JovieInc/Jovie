@@ -23,11 +23,11 @@ import {
   rejectEvents,
   undoRejectEvent,
 } from '@/app/app/(shell)/dashboard/tour-dates/events-actions';
+import { PageContent, PageShell } from '@/components/organisms/PageShell';
 import {
-  PageContent,
-  PageHeader,
-  PageShell,
-} from '@/components/organisms/PageShell';
+  PAGE_TOOLBAR_META_TEXT_CLASS,
+  PageToolbar,
+} from '@/components/organisms/table';
 import { getEventLocalDateKey } from '@/lib/events/date';
 import { normalizeTicketUrl } from '@/lib/events/ticket-url';
 import { queryKeys } from '@/lib/queries';
@@ -413,72 +413,81 @@ export function CalendarPageClient() {
   const isLoading = isLoadingReleases || isLoadingEvents;
 
   return (
-    <PageShell>
-      <PageHeader
-        title='Calendar'
-        description='Releases and events at a glance.'
-        action={
-          <div className='flex flex-wrap items-center justify-end gap-1'>
-            <FilterPill
-              label='All'
-              active={filter === 'all'}
-              onClick={() => setFilter('all')}
-            />
-            <FilterPill
-              label='Releases'
-              active={filter === 'releases'}
-              onClick={() => setFilter('releases')}
-            />
-            <FilterPill
-              label='Events'
-              active={filter === 'events'}
-              onClick={() => setFilter('events')}
-            />
-            <FilterPill
-              label={
-                'Needs review' + (pendingCount > 0 ? ' · ' + pendingCount : '')
-              }
-              active={filter === 'needs_review'}
-              onClick={() => setFilter('needs_review')}
-              tone={pendingCount > 0 ? 'warn' : 'default'}
-            />
-          </div>
-        }
-      />
+    <PageShell
+      toolbar={
+        <PageToolbar
+          start={
+            <span className={PAGE_TOOLBAR_META_TEXT_CLASS}>
+              Releases and events at a glance.
+            </span>
+          }
+          end={
+            <div className='flex flex-wrap items-center justify-end gap-1'>
+              <FilterPill
+                label='All'
+                active={filter === 'all'}
+                onClick={() => setFilter('all')}
+              />
+              <FilterPill
+                label='Releases'
+                active={filter === 'releases'}
+                onClick={() => setFilter('releases')}
+              />
+              <FilterPill
+                label='Events'
+                active={filter === 'events'}
+                onClick={() => setFilter('events')}
+              />
+              <FilterPill
+                label={
+                  'Needs review' +
+                  (pendingCount > 0 ? ' · ' + pendingCount : '')
+                }
+                active={filter === 'needs_review'}
+                onClick={() => setFilter('needs_review')}
+                tone={pendingCount > 0 ? 'warn' : 'default'}
+              />
+            </div>
+          }
+        />
+      }
+    >
       <PageContent>
         <div className='flex h-full min-h-0 flex-col gap-4'>
-          <div className='flex flex-wrap items-center gap-3'>
-            <button
-              type='button'
-              onClick={() => {
-                const next = new Date(cursor);
-                next.setMonth(cursor.getMonth() - 1);
-                setCursor(startOfMonth(next));
-              }}
-              className='grid h-7 w-7 place-items-center rounded-md text-tertiary-token transition-colors duration-subtle ease-subtle hover:bg-surface-1 hover:text-primary-token'
-              aria-label='Previous month'
-            >
-              <ChevronLeft className='h-4 w-4' strokeWidth={2.25} />
-            </button>
-            <h2 className='text-[15px] font-medium text-primary-token tabular-nums'>
-              {MONTH_NAMES[cursor.getMonth()]} {cursor.getFullYear()}
-            </h2>
-            <button
-              type='button'
-              onClick={() => {
-                const next = new Date(cursor);
-                next.setMonth(cursor.getMonth() + 1);
-                setCursor(startOfMonth(next));
-              }}
-              className='grid h-7 w-7 place-items-center rounded-md text-tertiary-token transition-colors duration-subtle ease-subtle hover:bg-surface-1 hover:text-primary-token'
-              aria-label='Next month'
-            >
-              <ChevronRight className='h-4 w-4' strokeWidth={2.25} />
-            </button>
+          <div className='flex flex-wrap items-center justify-between gap-2'>
+            <div className='inline-flex min-w-0 items-center gap-1 rounded-full bg-surface-1 p-0.5'>
+              <button
+                type='button'
+                onClick={() => {
+                  const next = new Date(cursor);
+                  next.setMonth(cursor.getMonth() - 1);
+                  setCursor(startOfMonth(next));
+                }}
+                className='grid h-7 w-7 place-items-center rounded-full text-tertiary-token transition-colors duration-subtle ease-subtle hover:bg-surface-0 hover:text-primary-token'
+                aria-label='Previous month'
+              >
+                <ChevronLeft className='h-4 w-4' strokeWidth={2.25} />
+              </button>
+              <h2 className='min-w-[9.5rem] text-center text-[15px] font-medium text-primary-token tabular-nums'>
+                {MONTH_NAMES[cursor.getMonth()]} {cursor.getFullYear()}
+              </h2>
+              <button
+                type='button'
+                onClick={() => {
+                  const next = new Date(cursor);
+                  next.setMonth(cursor.getMonth() + 1);
+                  setCursor(startOfMonth(next));
+                }}
+                className='grid h-7 w-7 place-items-center rounded-full text-tertiary-token transition-colors duration-subtle ease-subtle hover:bg-surface-0 hover:text-primary-token'
+                aria-label='Next month'
+              >
+                <ChevronRight className='h-4 w-4' strokeWidth={2.25} />
+              </button>
+            </div>
             <button
               type='button'
               onClick={() => setCursor(startOfMonth(new Date()))}
-              className='h-7 rounded-md px-3 text-[12px] font-caption text-tertiary-token transition-colors duration-subtle ease-subtle hover:bg-surface-1 hover:text-primary-token'
+              className='h-7 rounded-full bg-surface-1 px-3 text-[12px] font-caption text-tertiary-token transition-colors duration-subtle ease-subtle hover:bg-surface-0 hover:text-primary-token'
             >
               Today
             </button>
@@ -782,7 +791,7 @@ function FilterPill(props: FilterPillProps) {
       onClick={props.onClick}
       aria-pressed={props.active}
       className={cn(
-        'h-7 rounded-md px-3 text-[11.5px] font-caption transition-colors duration-subtle ease-subtle',
+        'h-7 rounded-full px-3 text-[11.5px] font-caption transition-colors duration-subtle ease-subtle',
         props.active
           ? props.tone === 'warn'
             ? 'bg-amber-400/15 text-amber-300'

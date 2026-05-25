@@ -186,7 +186,7 @@ export function CommonDropdown(props: CommonDropdownProps) {
       <button
         type='button'
         className={cn(
-          'inline-flex h-7 w-7 items-center justify-center rounded-[8px] border border-transparent bg-transparent text-tertiary-token transition-[background-color,color,box-shadow] duration-150 hover:bg-surface-1 hover:text-primary-token focus-visible:outline-none focus-visible:bg-surface-1 focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)/50',
+          'inline-flex h-8 w-8 items-center justify-center rounded-full border border-transparent bg-transparent text-tertiary-token transition-[background-color,color,box-shadow] duration-150 hover:bg-surface-1 hover:text-primary-token focus-visible:outline-none focus-visible:bg-surface-1 focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)/50',
           triggerClassName
         )}
         aria-label={ariaLabel || 'More actions'}

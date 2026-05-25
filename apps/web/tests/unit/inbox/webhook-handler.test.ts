@@ -105,7 +105,7 @@ vi.mock('@/lib/db/schema/inbox', () => ({
 // (see "fail closed when secret is missing" cases).
 // Hoisted so it is available when the vi.mock() factory runs.
 const TEST_WEBHOOK_SECRET = vi.hoisted(
-  () => 'whsec_dGVzdC1zZWNyZXQtZm9yLXVuaXQtdGVzdHM='
+  () => 'dGVzdC1zZWNyZXQtZm9yLXVuaXQtdGVzdHM='
 );
 
 vi.mock('@/lib/env-server', () => ({

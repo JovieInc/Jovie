@@ -28,11 +28,13 @@ vi.mock('motion/react', () => ({
       children,
       initial: _initial,
       animate: _animate,
+      layoutId: _layoutId,
       transition: _transition,
       ...props
     }: ComponentProps<'div'> & {
       initial?: unknown;
       animate?: unknown;
+      layoutId?: unknown;
       transition?: unknown;
     }) => <div {...props}>{children}</div>,
     textarea: ({
@@ -256,8 +258,30 @@ describe('ChatInput', () => {
     ]) {
       expect(
         screen.getByRole('button', { name: buttonName }).className
-      ).toMatch(/h-8 w-8/);
+      ).toMatch(/h-9 w-9/);
     }
+  });
+
+  it('keeps the hero attach button ahead of the input field', () => {
+    fastRender(
+      withProviders(
+        <ChatInput
+          {...baseProps}
+          value=''
+          variant='hero'
+          onImageAttach={vi.fn()}
+        />
+      )
+    );
+
+    const attachButton = screen.getByRole('button', {
+      name: /attachment options/i,
+    });
+    const inlineField = screen.getByTestId('chat-input-inline-field');
+
+    expect(attachButton.compareDocumentPosition(inlineField)).toBe(
+      Node.DOCUMENT_POSITION_FOLLOWING
+    );
   });
 
   it('renders the larger hero composer geometry for the empty state', () => {
@@ -291,7 +315,7 @@ describe('ChatInput', () => {
     expect(textarea.className).toContain('leading-6');
   });
 
-  it('renders the larger hero pill geometry even while typing the first message in an empty chat', () => {
+  it('expands hero geometry while typing the first message in an empty chat', () => {
     fastRender(
       withProviders(
         <ChatInput
@@ -307,7 +331,10 @@ describe('ChatInput', () => {
     expect(surface.style.borderRadius).toBe('36px');
 
     expect(surface.firstElementChild?.firstElementChild?.className).toContain(
-      'min-h-[52px]'
+      'min-h-[88px]'
+    );
+    expect(surface.firstElementChild?.firstElementChild?.className).toContain(
+      'grid'
     );
   });
 
@@ -339,7 +366,7 @@ describe('ChatInput', () => {
 
     const inlineField = screen.getByTestId('chat-input-inline-field');
     const container = inlineField.parentElement;
-    expect(container?.className).toContain('min-h-[64px]');
+    expect(container?.className).toContain('min-h-[88px]');
     expect(container?.className).toContain('grid');
     expect(container?.className).not.toContain('min-h-[52px]');
   });
@@ -451,6 +478,52 @@ describe('ChatInput', () => {
       screen.getByRole('textbox', { name: /chat message input/i })
     );
     expect(screen.getByTestId('chat-input-chip-tray')).toHaveClass('contents');
+  });
+
+  it('keeps mixed skill and entity chips inline and individually removable', async () => {
+    const user = userEvent.setup();
+    const onRemoveChipAt = vi.fn();
+
+    fastRender(
+      withProviders(
+        <ChatInput
+          {...baseProps}
+          value=''
+          chips={[
+            {
+              type: 'skill',
+              id: 'generateAlbumArt',
+              uid: 'chip-skill-1',
+            },
+            {
+              type: 'entity',
+              kind: 'release',
+              id: 'rel_1',
+              label: 'Take Me Over',
+              uid: 'chip-release-1',
+            },
+          ]}
+          onRemoveChipAt={onRemoveChipAt}
+        />
+      )
+    );
+
+    const inlineField = screen.getByTestId('chat-input-inline-field');
+    expect(within(inlineField).getByTestId('skill-chip')).toHaveTextContent(
+      'Generate album art'
+    );
+    expect(within(inlineField).getByTestId('entity-chip')).toHaveTextContent(
+      'Take Me Over'
+    );
+    expect(inlineField).toContainElement(
+      screen.getByRole('textbox', { name: /chat message input/i })
+    );
+
+    await user.click(
+      screen.getByRole('button', { name: /remove take me over/i })
+    );
+
+    expect(onRemoveChipAt).toHaveBeenCalledWith(1);
   });
 
   it('lets keyboard users remove skill chips', async () => {

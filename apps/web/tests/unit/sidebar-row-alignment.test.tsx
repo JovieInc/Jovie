@@ -145,12 +145,12 @@ describe('Sidebar row alignment', () => {
     const activeRowClassName = getSidebarNavRowClassName({ active: true });
     const iconClassName = getSidebarNavIconClassName({});
 
-    expect(rowClassName).toContain('h-6.5');
+    expect(rowClassName).toContain('h-7');
     expect(rowClassName).toContain('px-2.5');
     expect(rowClassName).toContain('gap-x-2.5');
-    expect(rowClassName).toContain('grid-cols-[20px_minmax(0,1fr)_40px]');
-    expect(rowClassName).toContain('before:left-[20px]');
-    expect(rowClassName).toContain('after:left-[34px]');
+    expect(rowClassName).toContain('grid-cols-[22px_minmax(0,1fr)_34px]');
+    expect(rowClassName).toContain('before:left-[22px]');
+    expect(rowClassName).toContain('after:left-[38px]');
     expect(rowClassName).toContain('text-[12.5px]');
     expect(rowClassName).toContain('font-normal');
     expect(rowClassName).toContain('hover:bg-sidebar-accent');

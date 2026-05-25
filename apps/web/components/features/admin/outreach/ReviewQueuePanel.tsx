@@ -1,7 +1,11 @@
 'use client';
 
 import { Badge } from '@jovie/ui';
-import { type ColumnDef, createColumnHelper } from '@tanstack/react-table';
+import {
+  type CellContext,
+  type ColumnDef,
+  createColumnHelper,
+} from '@tanstack/react-table';
 import { ExternalLink } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
@@ -45,6 +49,131 @@ const SIGNAL_CONFIG: Record<
 };
 
 const reviewQueueColumnHelper = createColumnHelper<ReviewLead>();
+
+interface ReviewLeadActionsProps {
+  readonly id: string;
+  readonly isSkipping: boolean;
+  readonly onSkip: (id: string) => Promise<void>;
+}
+
+function ReviewLeadActions({ id, isSkipping, onSkip }: ReviewLeadActionsProps) {
+  return (
+    <DrawerButton
+      tone='secondary'
+      size='sm'
+      onClick={() => {
+        onSkip(id).catch(() => {});
+      }}
+      disabled={isSkipping}
+      className='h-8 px-3 text-xs'
+    >
+      {isSkipping ? (
+        <LoadingSpinner size='sm' tone='muted' className='mr-1.5' />
+      ) : null}
+      Skip
+    </DrawerButton>
+  );
+}
+
+function renderActionsCell(
+  { row }: CellContext<ReviewLead, unknown>,
+  skippingIds: Set<string>,
+  onSkip: (id: string) => Promise<void>
+) {
+  const leadId = row.original.id;
+  return (
+    <ReviewLeadActions
+      id={leadId}
+      isSkipping={skippingIds.has(leadId)}
+      onSkip={onSkip}
+    />
+  );
+}
+
+function createReviewQueueColumns(
+  handleSkip: (id: string) => Promise<void>,
+  skippingIds: Set<string>
+): ColumnDef<ReviewLead, unknown>[] {
+  return [
+    reviewQueueColumnHelper.accessor('displayName', {
+      header: 'Name',
+      cell: ({ getValue }) => (
+        <span className='font-semibold text-primary-token'>
+          {getValue() || '-'}
+        </span>
+      ),
+      size: 180,
+    }) as ColumnDef<ReviewLead, unknown>,
+    reviewQueueColumnHelper.accessor('priorityScore', {
+      header: 'Priority',
+      cell: ({ getValue }) => (
+        <span className='tabular-nums'>{getValue() ?? '-'}</span>
+      ),
+      size: 92,
+    }) as ColumnDef<ReviewLead, unknown>,
+    reviewQueueColumnHelper.accessor('fitScore', {
+      header: 'Fit score',
+      cell: ({ getValue }) => (
+        <span className='tabular-nums'>{getValue() ?? '-'}</span>
+      ),
+      size: 92,
+    }) as ColumnDef<ReviewLead, unknown>,
+    reviewQueueColumnHelper.accessor('contactEmail', {
+      header: 'Email',
+      cell: ({ getValue }) => (
+        <span className='text-secondary-token'>{getValue() || '-'}</span>
+      ),
+      size: 220,
+    }) as ColumnDef<ReviewLead, unknown>,
+    reviewQueueColumnHelper.accessor('instagramHandle', {
+      header: 'Instagram',
+      cell: ({ getValue }) => {
+        const handle = getValue();
+        return handle ? (
+          <a
+            href={`https://instagram.com/${handle}`}
+            target='_blank'
+            rel='noopener noreferrer'
+            className='flex items-center gap-1 text-secondary-token hover:text-primary-token'
+          >
+            @{handle}
+            <ExternalLink className='size-3' aria-hidden='true' />
+          </a>
+        ) : (
+          <span className='text-tertiary-token'>-</span>
+        );
+      },
+      size: 150,
+    }) as ColumnDef<ReviewLead, unknown>,
+    reviewQueueColumnHelper.accessor('signals', {
+      header: 'Signals',
+      cell: ({ getValue }) => (
+        <div className='flex flex-wrap gap-1'>
+          {Object.entries(getValue() ?? {}).map(
+            ([key, value]) =>
+              value &&
+              SIGNAL_CONFIG[key] && (
+                <Badge
+                  key={key}
+                  variant={SIGNAL_CONFIG[key].variant}
+                  className='text-2xs'
+                >
+                  {SIGNAL_CONFIG[key].label}
+                </Badge>
+              )
+          )}
+        </div>
+      ),
+      size: 220,
+    }) as ColumnDef<ReviewLead, unknown>,
+    reviewQueueColumnHelper.display({
+      id: 'actions',
+      header: 'Actions',
+      cell: context => renderActionsCell(context, skippingIds, handleSkip),
+      size: 110,
+    }) as ColumnDef<ReviewLead, unknown>,
+  ];
+}
 
 export function ReviewQueuePanel() {
   const [leads, setLeads] = useState<ReviewLead[]>([]);
@@ -113,101 +242,8 @@ export function ReviewQueuePanel() {
     [fetchQueue]
   );
 
-  const columns = useMemo<ColumnDef<ReviewLead, unknown>[]>(
-    () => [
-      reviewQueueColumnHelper.accessor('displayName', {
-        header: 'Name',
-        cell: ({ getValue }) => (
-          <span className='font-semibold text-primary-token'>
-            {getValue() || '-'}
-          </span>
-        ),
-        size: 180,
-      }) as ColumnDef<ReviewLead, unknown>,
-      reviewQueueColumnHelper.accessor('priorityScore', {
-        header: 'Priority',
-        cell: ({ getValue }) => (
-          <span className='tabular-nums'>{getValue() ?? '-'}</span>
-        ),
-        size: 92,
-      }) as ColumnDef<ReviewLead, unknown>,
-      reviewQueueColumnHelper.accessor('fitScore', {
-        header: 'Fit score',
-        cell: ({ getValue }) => (
-          <span className='tabular-nums'>{getValue() ?? '-'}</span>
-        ),
-        size: 92,
-      }) as ColumnDef<ReviewLead, unknown>,
-      reviewQueueColumnHelper.accessor('contactEmail', {
-        header: 'Email',
-        cell: ({ getValue }) => (
-          <span className='text-secondary-token'>{getValue() || '-'}</span>
-        ),
-        size: 220,
-      }) as ColumnDef<ReviewLead, unknown>,
-      reviewQueueColumnHelper.accessor('instagramHandle', {
-        header: 'Instagram',
-        cell: ({ getValue }) => {
-          const handle = getValue();
-          return handle ? (
-            <a
-              href={`https://instagram.com/${handle}`}
-              target='_blank'
-              rel='noopener noreferrer'
-              className='flex items-center gap-1 text-secondary-token hover:text-primary-token'
-            >
-              @{handle}
-              <ExternalLink className='size-3' aria-hidden='true' />
-            </a>
-          ) : (
-            <span className='text-tertiary-token'>-</span>
-          );
-        },
-        size: 150,
-      }) as ColumnDef<ReviewLead, unknown>,
-      reviewQueueColumnHelper.accessor('signals', {
-        header: 'Signals',
-        cell: ({ getValue }) => (
-          <div className='flex flex-wrap gap-1'>
-            {Object.entries(getValue() ?? {}).map(
-              ([key, value]) =>
-                value &&
-                SIGNAL_CONFIG[key] && (
-                  <Badge
-                    key={key}
-                    variant={SIGNAL_CONFIG[key].variant}
-                    className='text-2xs'
-                  >
-                    {SIGNAL_CONFIG[key].label}
-                  </Badge>
-                )
-            )}
-          </div>
-        ),
-        size: 220,
-      }) as ColumnDef<ReviewLead, unknown>,
-      reviewQueueColumnHelper.display({
-        id: 'actions',
-        header: 'Actions',
-        cell: ({ row }) => (
-          <DrawerButton
-            tone='secondary'
-            size='sm'
-            onClick={() => {
-              void handleSkip(row.original.id);
-            }}
-            disabled={skippingIds.has(row.original.id)}
-            className='h-8 px-3 text-xs'
-          >
-            {skippingIds.has(row.original.id) ? (
-              <LoadingSpinner size='sm' tone='muted' className='mr-1.5' />
-            ) : null}
-            Skip
-          </DrawerButton>
-        ),
-        size: 110,
-      }) as ColumnDef<ReviewLead, unknown>,
-    ],
+  const columns = useMemo(
+    () => createReviewQueueColumns(handleSkip, skippingIds),
     [handleSkip, skippingIds]
   );
 

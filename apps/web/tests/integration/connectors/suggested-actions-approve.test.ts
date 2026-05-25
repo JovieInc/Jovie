@@ -112,7 +112,7 @@ describe('CAS approve: approve → 200 first call, 409 second', () => {
     await db.insert(workflowRuns).values({
       kind: 'execute_approved_action',
       userId: USER_ID,
-      status: 'pending' as const,
+      status: 'queued' as const,
       currentStep: 'create_calendar_event',
       stepOutputs: { approvalId: ACTION_ID },
       runAt: new Date(),
@@ -209,7 +209,7 @@ describe('CAS concurrent approve: exactly one workflow_runs row', () => {
         await db.insert(workflowRuns).values({
           kind: 'execute_approved_action',
           userId: USER_ID,
-          status: 'pending' as const,
+          status: 'queued' as const,
           currentStep: 'create_calendar_event',
           stepOutputs: { approvalId: ACTION_ID },
           runAt: new Date(),

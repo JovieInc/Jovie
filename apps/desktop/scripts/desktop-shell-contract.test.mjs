@@ -70,8 +70,25 @@ test('desktop window fails into a branded Jovie recovery surface', async () => {
   assert.match(mainSource, /START_DESKTOP_AUTH_HANDOFF_CHANNEL/);
   assert.match(mainSource, /OPEN_DESKTOP_AUTH_URL_CHANNEL/);
   assert.match(mainSource, /CLOSE_DESKTOP_AUTH_WINDOW_CHANNEL/);
+  assert.match(mainSource, /function hideMainWindowForAuthHandoff\(\): void/);
+  assert.match(mainSource, /function restoreMainWindowAfterAuthHandoff\(\): void/);
+  assert.match(mainSource, /mainWindowHiddenForAuthHandoff/);
+  assert.match(mainSource, /win === mainWindow && isAuthHandoffOpen\(\)/);
+  assert.match(mainSource, /hideMainWindowForAuthHandoff\(\);\s*if \(authHandoffWindow\) showWindow\(authHandoffWindow\);/);
+  assert.doesNotMatch(mainSource, /parent: mainWindow/);
   assert.doesNotMatch(mainSource, /M31 10A20 20 0 0 0 11 30H31V10Z/);
   assert.doesNotMatch(mainSource, /M11 31L30 31M14 36L31 36M18 41L32 41/);
+});
+
+test('desktop production bundle declares the jovie auth protocol', async () => {
+  const builderConfig = await readFile(
+    join(desktopRoot, 'electron-builder.yml'),
+    'utf8'
+  );
+
+  assert.match(builderConfig, /CFBundleURLTypes:/);
+  assert.match(builderConfig, /CFBundleURLName: Jovie Auth/);
+  assert.match(builderConfig, /CFBundleURLSchemes:\s*\n\s*- jovie/);
 });
 
 test('desktop navigation uses explicit URL disposition allowlists', async () => {

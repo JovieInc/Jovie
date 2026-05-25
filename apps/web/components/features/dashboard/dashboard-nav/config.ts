@@ -58,13 +58,14 @@ export const newThreadNavItem: NavItem = {
 
 export const profileNavItem: NavItem = {
   name: 'Profile',
-  href: APP_ROUTES.CHAT,
+  href: APP_ROUTES.SETTINGS_ARTIST_PROFILE,
   id: 'profile',
   icon: UserCircle,
   description: 'Update your profile and links',
 };
 
 export const primaryNavigation: NavItem[] = [
+  newThreadNavItem,
   profileNavItem,
   {
     name: 'Releases',

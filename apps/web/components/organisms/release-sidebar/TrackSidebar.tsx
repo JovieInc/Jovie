@@ -326,6 +326,13 @@ export function TrackSidebar({
               <EntityHeaderCard
                 eyebrow='Track'
                 title={track.title}
+                stableLayout
+                titleLineClamp={1}
+                subtitleLineClamp={1}
+                reserveSubtitleSlot
+                reserveMetaSlot
+                reserveFooterSlot
+                metaOverflow='scroll'
                 subtitle={
                   <span className='flex items-center gap-1.5'>
                     <span className='tabular-nums'>{trackLabel}.</span>
@@ -349,7 +356,7 @@ export function TrackSidebar({
                   />
                 }
                 meta={
-                  <div className='flex flex-wrap items-center gap-2 text-[10.5px] text-tertiary-token'>
+                  <div className='flex items-center gap-2 text-[10.5px] text-tertiary-token'>
                     {track.durationMs == null ? null : (
                       <span className='tabular-nums'>
                         {formatDuration(track.durationMs)}

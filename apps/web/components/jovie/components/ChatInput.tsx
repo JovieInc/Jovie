@@ -245,6 +245,7 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
     );
     const activeEntity = activeEntityFor(picker.state, pickerItems);
     const isPickerOpen = picker.state.status !== 'closed';
+    const isRootPickerOpen = picker.state.status === 'root';
     // Treat a lone leading "/" as picker bait, not a real message — the picker
     // is open above it and Enter is committing the active row, not sending.
     const sendBlockedByPicker = isPickerOpen && value.trim() === '/';
@@ -457,13 +458,13 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
           {/* ROOT inline picker is absolutely positioned so it does not alter
               the composer surface height and cause layout shift when it opens. */}
           {showInlinePicker ? (
-            <div className='absolute bottom-full left-0 right-0 z-50 mb-4 flex justify-center'>
+            <div className='absolute bottom-full left-0 right-0 z-[80] mb-4 flex justify-center'>
               <div
                 style={{
                   width: geometry.width,
                   maxWidth: geometry.maxWidth,
                 }}
-                className='overflow-hidden rounded-[24px] border border-[color-mix(in_oklab,var(--linear-app-frame-seam)_84%,transparent)] bg-[linear-gradient(180deg,rgba(255,255,255,0.04)_0%,rgba(255,255,255,0.012)_100%),var(--linear-app-content-surface)] shadow-none'
+                className='isolate max-h-[min(340px,calc(100vh-12rem))] overflow-hidden rounded-[24px] border border-(--linear-app-frame-seam) bg-surface-1 shadow-popover'
               >
                 <SlashCommandMenu
                   profileId={pickerProfileId}
@@ -506,8 +507,13 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
             }}
             className={cn(
               'overflow-hidden border border-[color-mix(in_oklab,var(--linear-app-frame-seam)_84%,transparent)] bg-[linear-gradient(180deg,rgba(255,255,255,0.04)_0%,rgba(255,255,255,0.012)_100%),var(--linear-app-content-surface)] text-primary-token shadow-none',
+              isHero &&
+                'bg-[color-mix(in_oklab,var(--linear-app-content-surface)_88%,black_12%)] shadow-[0_18px_68px_-34px_rgba(0,0,0,0.96),inset_0_1px_0_rgba(255,255,255,0.08)]',
               isExpanded &&
                 'border-[color-mix(in_oklab,var(--linear-border-focus)_46%,var(--linear-app-frame-seam))] bg-[linear-gradient(180deg,rgba(255,255,255,0.052)_0%,rgba(255,255,255,0.016)_100%),var(--linear-app-content-surface)]',
+              isHero &&
+                isExpanded &&
+                'bg-[color-mix(in_oklab,var(--linear-app-content-surface)_82%,white_6%)]',
               'outline-none ring-0 focus-within:border-[color-mix(in_oklab,var(--linear-border-focus)_78%,transparent)] focus-within:ring-1 focus-within:ring-[color-mix(in_oklab,var(--linear-border-focus)_42%,transparent)] focus-within:outline-none',
               isOverLimit && 'border-error',
               showEntitySurface && !isStacked ? 'flex' : 'flex flex-col'
@@ -579,6 +585,7 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
                       chips={chips}
                       onRemoveChipAt={onRemoveChipAt}
                       isPickerOpen={isPickerOpen}
+                      isRootPickerOpen={isRootPickerOpen}
                       pickerListId={pickerListId}
                       pickerActiveRowId={pickerActiveRowId}
                       attachDisabledForPicker={isPickerOpen}
@@ -663,6 +670,7 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
                     showEntitySurface
                   }
                   isPickerOpen={isPickerOpen}
+                  isRootPickerOpen={isRootPickerOpen}
                   pickerListId={pickerListId}
                   pickerActiveRowId={pickerActiveRowId}
                   attachDisabledForPicker={isPickerOpen}
@@ -732,6 +740,8 @@ interface InputRowProps {
   readonly hasBorderTop?: boolean;
   /** True while slash picker is open — drives textarea combobox ARIA. */
   readonly isPickerOpen: boolean;
+  /** True while the root slash picker is floating above the composer. */
+  readonly isRootPickerOpen: boolean;
   /** id of the listbox the textarea controls (always set for stable ARIA). */
   readonly pickerListId: string;
   /** Active row id for `aria-activedescendant`; null when no row is active. */
@@ -777,12 +787,19 @@ function InputRow({
   onRemoveChipAt,
   hasBorderTop = false,
   isPickerOpen,
+  isRootPickerOpen,
   pickerListId,
   pickerActiveRowId,
   attachDisabledForPicker,
   isHero,
 }: InputRowProps) {
-  const useHeroPill = isHero && !hasPendingImages;
+  const hasInlineContent = Boolean(value.trim()) || (chips?.length ?? 0) > 0;
+  const hasOnlyRootSlashQuery =
+    isRootPickerOpen &&
+    value.trim().startsWith('/') &&
+    (chips?.length ?? 0) === 0;
+  const useHeroPill =
+    isHero && !hasPendingImages && (!hasInlineContent || hasOnlyRootSlashQuery);
 
   return (
     <div className={cn(hasBorderTop && 'border-t border-white/[0.065]')}>
@@ -804,12 +821,24 @@ function InputRow({
             : [
                 'grid gap-2',
                 isHero
-                  ? 'min-h-[64px] grid-rows-[minmax(28px,auto)_36px] px-3 py-1.5'
+                  ? 'min-h-[88px] grid-rows-[minmax(28px,auto)_36px] px-3 py-1.5'
                   : 'min-h-[56px] grid-rows-[minmax(24px,auto)_36px] px-3 py-1.5',
               ]
         )}
       >
         <div ref={hiddenDivRef} style={HIDDEN_DIV_STYLES} aria-hidden />
+        {useHeroPill && hasAttachButton && onImageAttach ? (
+          <ComposerAttachButton
+            isImageProcessing={isImageProcessing}
+            isLoading={isLoading}
+            isSubmitting={isSubmitting}
+            disabled={attachDisabledForPicker}
+            plusMenuOpen={plusMenuOpen}
+            onOpenChange={setPlusMenuOpen}
+            onMouseDown={handlePreserveFocus}
+            onImageAttach={onImageAttach}
+          />
+        ) : null}
         <div
           data-testid='chat-input-inline-field'
           className={cn(
@@ -878,12 +907,12 @@ function InputRow({
           className={cn(
             'flex items-center gap-2',
             useHeroPill
-              ? 'min-h-8 shrink-0 justify-end'
+              ? 'min-h-9 shrink-0 justify-end'
               : ['justify-between', 'min-h-9']
           )}
         >
           <div className='flex min-w-0 items-center gap-2'>
-            {hasAttachButton && onImageAttach ? (
+            {!useHeroPill && hasAttachButton && onImageAttach ? (
               <ComposerAttachButton
                 isImageProcessing={isImageProcessing}
                 isLoading={isLoading}

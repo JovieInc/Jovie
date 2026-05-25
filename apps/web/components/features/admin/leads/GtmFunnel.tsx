@@ -2,6 +2,7 @@ import { ChevronRight } from 'lucide-react';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { getLeadFunnelReport } from '@/lib/leads/reporting';
 import type { LeadFunnelCounts } from './LeadPipelineKpis';
+import { getClampedPercent } from './percentages';
 
 export type { LeadFunnelCounts } from './LeadPipelineKpis';
 
@@ -40,7 +41,7 @@ function DropOff({
   total,
 }: Readonly<{ label: string; count: number; total: number }>) {
   if (count === 0) return null;
-  const pct = total > 0 ? Math.round((count / total) * 100) : 0;
+  const pct = getClampedPercent(count, total);
   return (
     <span className='text-2xs font-book text-destructive/70'>
       {count.toLocaleString()} {label} ({pct}%)
@@ -50,7 +51,7 @@ function DropOff({
 
 function formatRate(numerator: number, denominator: number): string {
   if (denominator === 0) return '--';
-  return `${Math.round((numerator / denominator) * 100)}%`;
+  return `${getClampedPercent(numerator, denominator)}%`;
 }
 
 function EmptyFunnel() {
@@ -108,11 +109,20 @@ export async function GtmFunnel({ counts }: GtmFunnelProps) {
       className='overflow-hidden px-(--linear-app-content-padding-x) py-4'
       data-testid='gtm-pipeline-status'
     >
-      {/* Pipeline status (all time) */}
-      <p className='mb-2 text-2xs font-medium text-tertiary-token'>
-        Pipeline status
-      </p>
-      <div className='flex flex-wrap items-start gap-x-1 gap-y-3'>
+      <div className='mb-3 flex flex-wrap items-end justify-between gap-3'>
+        <div>
+          <p className='text-app font-semibold text-primary-token'>
+            Pipeline Scan
+          </p>
+          <p className='mt-0.5 text-xs text-secondary-token'>
+            All-time lead status flow from discovery through ingestion.
+          </p>
+        </div>
+        <span className='text-2xs text-tertiary-token'>
+          {total.toLocaleString()} total lead{total === 1 ? '' : 's'}
+        </span>
+      </div>
+      <div className='flex flex-wrap items-stretch gap-2'>
         <FunnelStage label='Discovered' count={discovered} />
         <FunnelStage
           label='Qualified'

@@ -72,6 +72,11 @@ export type DesktopAuthCompletionResult =
       readonly reason?: string;
     };
 
+export interface DesktopAuthActionResult {
+  readonly ok: boolean;
+  readonly reason?: string;
+}
+
 type InstallUpdateResult = Awaited<
   ReturnType<ElectronAPI['installUpdateAndRestart']>
 >;
@@ -120,9 +125,10 @@ function reportMissingBridgeMethod(method: keyof ElectronAPI): void {
 }
 
 function getRawElectronAPI(): Partial<ElectronAPI> | undefined {
-  if (typeof window === 'undefined') return undefined;
-  const raw = (window as Window & { electronAPI?: Partial<ElectronAPI> })
-    .electronAPI;
+  if (globalThis.window === undefined) return undefined;
+  const raw = (
+    globalThis.window as Window & { electronAPI?: Partial<ElectronAPI> }
+  ).electronAPI;
   if (!raw || typeof raw !== 'object') return undefined;
   return raw;
 }
@@ -184,15 +190,23 @@ function openManualDownload(): void {
   // Fallback: open the releases page in the system browser (or in-app).
   // window.open is safe in both browser and Electron contexts; Electron's
   // shell handler will route it via shell.openExternal.
-  if (typeof window !== 'undefined') {
-    window.open(RELEASE_DOWNLOAD_URL, '_blank', 'noopener,noreferrer');
+  if (globalThis.window !== undefined) {
+    globalThis.window.open(
+      RELEASE_DOWNLOAD_URL,
+      '_blank',
+      'noopener,noreferrer'
+    );
   }
 }
 
-function openBrowserFallback(url: string): void {
-  if (typeof window !== 'undefined') {
-    window.open(url, '_blank', 'noopener,noreferrer');
+function openBrowserFallback(url: string): DesktopAuthActionResult {
+  if (globalThis.window !== undefined) {
+    const opened = globalThis.window.open(url, '_blank', 'noopener,noreferrer');
+    return opened
+      ? { ok: true }
+      : { ok: false, reason: 'browser-window-open-blocked' };
   }
+  return { ok: false, reason: 'browser-window-unavailable' };
 }
 
 function reportInstallFailure(error: unknown): void {
@@ -240,9 +254,11 @@ function safeInstallUpdateAndRestart(): void {
 }
 
 export function isElectronRuntime(): boolean {
-  if (typeof window === 'undefined') return false;
+  if (globalThis.window === undefined) return false;
   if (isDesktopEnvironment()) return true;
-  return document.documentElement.dataset.desktopRuntime === 'electron';
+  return (
+    globalThis.document.documentElement.dataset.desktopRuntime === 'electron'
+  );
 }
 
 export function useIsElectronRuntime(): boolean {
@@ -299,29 +315,42 @@ export function useDesktopUpdate(): DesktopUpdateState {
   };
 }
 
-export async function startDesktopAuthHandoff(authUrl: string): Promise<void> {
+export async function startDesktopAuthHandoff(
+  authUrl: string
+): Promise<DesktopAuthActionResult> {
   const api = getRawElectronAPI();
   if (api && typeof api.startDesktopAuthHandoff === 'function') {
     const result = await api.startDesktopAuthHandoff(authUrl);
-    if (result?.ok) return;
-    openBrowserFallback(authUrl);
-    return;
+    if (result?.ok) return { ok: true };
+    if (result) {
+      return {
+        ok: false,
+        reason: result.reason ?? 'desktop-auth-handoff-failed',
+      };
+    }
+    return openBrowserFallback(authUrl);
   }
   if (api) {
     reportMissingBridgeMethod('startDesktopAuthHandoff');
   }
-  openBrowserFallback(authUrl);
+  return openBrowserFallback(authUrl);
 }
 
-export async function openDesktopAuthUrl(authUrl: string): Promise<void> {
+export async function openDesktopAuthUrl(
+  authUrl: string
+): Promise<DesktopAuthActionResult> {
   const api = getRawElectronAPI();
   if (api && typeof api.openDesktopAuthUrl === 'function') {
     const result = await api.openDesktopAuthUrl(authUrl);
-    if (result.ok) return;
+    if (result.ok) return { ok: true };
+    return {
+      ok: false,
+      reason: result.reason ?? 'desktop-auth-open-failed',
+    };
   } else if (api) {
     reportMissingBridgeMethod('openDesktopAuthUrl');
   }
-  openBrowserFallback(authUrl);
+  return openBrowserFallback(authUrl);
 }
 
 export async function closeDesktopAuthWindow(): Promise<void> {

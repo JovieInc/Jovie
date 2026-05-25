@@ -54,9 +54,9 @@ test.describe('Command palette — Cmd+K contract', () => {
     // Type a query that matches the Releases nav item.
     await paletteInput.fill('Releases');
 
-    // Verify at least one cmdk option surfaces. cmdk renders items with
-    // `cmdk-item` data attributes; prefer that to a brittle text selector.
-    const matches = page.locator('[cmdk-item]');
+    // Verify at least one cmdk option surfaces. cmdk renders rows with a
+    // stable data marker; prefer that to a brittle text selector.
+    const matches = page.locator('[data-cmdk-item]');
     await expect(matches.first()).toBeVisible({ timeout: 5_000 });
 
     // Enter commits the highlighted item — should navigate to releases.

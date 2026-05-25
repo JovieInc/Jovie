@@ -163,24 +163,24 @@ function CmdKPaletteRow({
   shortcutLabel,
 }: CmdKPaletteRowProps) {
   return (
-    <button
-      type='button'
+    <div
       role='option'
       id={rowId}
+      tabIndex={-1}
       aria-selected={isActive ? 'true' : 'false'}
       aria-current={isActive ? 'true' : undefined}
       data-selected={isActive ? 'true' : undefined}
-      cmdk-item=''
+      data-cmdk-item=''
       onMouseEnter={() => onMouseEnter(index)}
       onMouseDown={e => {
         e.preventDefault();
         onCommit(index);
       }}
       className={cn(
-        'flex min-h-12 w-full items-center gap-2 rounded-md px-2 py-1.5 text-left outline-none transition-colors duration-subtle ease-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/55 focus-visible:ring-offset-2 focus-visible:ring-offset-(--linear-bg-page)',
+        'flex min-h-14 w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left outline-none transition-colors duration-subtle ease-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/55 focus-visible:ring-offset-2 focus-visible:ring-offset-(--linear-bg-page)',
         isActive
-          ? 'bg-white/[0.075] shadow-[inset_0_0_0_1px_rgba(255,255,255,0.075)]'
-          : 'hover:bg-white/[0.035]'
+          ? 'bg-[color-mix(in_oklab,var(--linear-app-content-surface)_76%,white_14%)] text-primary-token shadow-[inset_0_0_0_1px_color-mix(in_oklab,var(--linear-border-focus)_36%,transparent),0_10px_28px_-24px_rgba(0,0,0,0.9)]'
+          : 'hover:bg-white/[0.045]'
       )}
     >
       <RowVisual item={item} />
@@ -190,7 +190,7 @@ function CmdKPaletteRow({
           {shortcutLabel}
         </span>
       ) : null}
-    </button>
+    </div>
   );
 }
 
@@ -225,11 +225,18 @@ export function PaletteList({
       {sections.map((section, sectionIdx) => {
         const start = sectionStarts[sectionIdx] ?? 0;
         return (
-          <div key={section.id}>
+          <div
+            key={section.id}
+            className={cn(
+              variant === 'cmdk' &&
+                sectionIdx > 0 &&
+                'mt-2 border-t border-[color-mix(in_oklab,var(--linear-app-frame-seam)_72%,transparent)] pt-1'
+            )}
+          >
             <div
               className={cn(
                 variant === 'cmdk'
-                  ? 'px-2 pb-1 pt-2 text-[11px] font-medium text-quaternary-token'
+                  ? 'px-3 pb-1.5 pt-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-quaternary-token'
                   : 'px-[10px] pb-[5px] pt-[11px] text-[9.5px] font-semibold uppercase tracking-[0.1em] text-quaternary-token'
               )}
             >

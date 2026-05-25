@@ -130,7 +130,9 @@ describe('PlatformConnectionsClient', () => {
       />
     );
 
-    expect(screen.getByText('Disconnected')).toBeInTheDocument();
+    expect(screen.getByText('No account linked')).toBeInTheDocument();
+    expect(screen.getByText('Action required')).toBeInTheDocument();
+    expect(screen.getByText('Configuration Not Set')).toBeInTheDocument();
     expect(
       screen.getByRole('button', { name: /Use This Account/i })
     ).toBeDisabled();
@@ -151,7 +153,7 @@ describe('PlatformConnectionsClient', () => {
       />
     );
 
-    expect(screen.getByText('Disabled')).toBeInTheDocument();
+    expect(screen.getByText('Paused')).toBeInTheDocument();
     await user.click(
       screen.getByRole('button', { name: 'Generate Test Playlist' })
     );

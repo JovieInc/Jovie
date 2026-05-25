@@ -98,7 +98,7 @@ export function ProfileSmartLinkAnalytics({
   const content = (
     <>
       {/* Analytics metrics */}
-      <div className='px-3 pb-3 pt-3'>
+      <div className='min-h-[76px] px-3 pb-3 pt-3'>
         {showSkeleton && (
           <div className='grid grid-cols-2 gap-3'>
             <div className='space-y-1'>
@@ -124,7 +124,7 @@ export function ProfileSmartLinkAnalytics({
         {!showSkeleton && !isError && (
           <div
             className={cn(
-              'space-y-3 transition-opacity duration-100',
+              'space-y-3 transition-opacity duration-subtle',
               isFetching && 'opacity-50'
             )}
           >

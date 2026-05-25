@@ -98,8 +98,8 @@ describe('release downloads shell contract', () => {
     const source = readReleaseDownloadsSource();
     const tableSource = readPromoDownloadsTableSource();
 
-    expect(source).toContain("className='min-h-9");
-    expect(source).toContain("className='min-h-10'");
+    expect(source).toContain("className='block min-h-9");
+    expect(source).toContain('min-h-10');
     expect(tableSource).toContain("className='min-h-[220px]");
   });
 });

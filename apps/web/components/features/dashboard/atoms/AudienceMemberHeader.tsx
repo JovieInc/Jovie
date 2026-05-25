@@ -30,6 +30,10 @@ export function AudienceMemberHeader({
       }
       title={title}
       subtitle={subtitle}
+      stableLayout
+      titleLineClamp={1}
+      subtitleLineClamp={1}
+      reserveSubtitleSlot
       className={className}
     />
   );

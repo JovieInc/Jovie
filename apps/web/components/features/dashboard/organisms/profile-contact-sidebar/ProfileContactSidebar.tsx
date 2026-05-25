@@ -176,6 +176,12 @@ function ProfileSidebarHeaderCard({
         <DrawerHero
           title={primaryLabel}
           subtitle={secondaryLabel}
+          stableLayout
+          titleLineClamp={1}
+          subtitleLineClamp={1}
+          reserveSubtitleSlot
+          reserveMetaSlot
+          metaOverflow='scroll'
           artwork={
             <DrawerMediaThumb
               src={previewData.avatarUrl}
@@ -190,7 +196,7 @@ function ProfileSidebarHeaderCard({
             />
           }
           meta={
-            <div className='flex flex-wrap items-center gap-2 text-2xs text-tertiary-token'>
+            <div className='flex items-center gap-2 text-2xs text-tertiary-token'>
               {detailChips.map(detail => (
                 <span key={detail}>{detail}</span>
               ))}

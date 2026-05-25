@@ -274,6 +274,12 @@ export function ReleaseFilterDropdown({
   const labelFilterCount = filters.labels.length;
   const hasAnyFilter =
     typeFilterCount > 0 || popularityFilterCount > 0 || labelFilterCount > 0;
+  const activeFilterCount =
+    typeFilterCount + popularityFilterCount + labelFilterCount;
+  const triggerLabel =
+    activeFilterCount > 0
+      ? `Filter Releases (${activeFilterCount})`
+      : 'Filter Releases';
 
   // Reset searches when dropdown closes
   const handleOpenChange = useCallback((open: boolean) => {
@@ -296,13 +302,14 @@ export function ReleaseFilterDropdown({
                 buttonClassName,
                 (isOpen || hasAnyFilter) && FILTER_TRIGGER_ACTIVE_CLASS
               )}
+              aria-label={triggerLabel}
               aria-pressed={isOpen || hasAnyFilter}
             >
               <Icon name='Filter' className='h-3.5 w-3.5' strokeWidth={2} />
               <span
                 className={cn(iconOnly ? 'sr-only' : 'sr-only md:not-sr-only')}
               >
-                Filter
+                {triggerLabel}
               </span>
             </Button>
           </DropdownMenuTrigger>

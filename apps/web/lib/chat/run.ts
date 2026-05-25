@@ -6,6 +6,7 @@ import {
   type UIMessage,
 } from 'ai';
 import { streamText } from '@/lib/ai/sdk';
+import type { ChatAccountContext } from '@/lib/chat/account-context';
 import { selectKnowledgeContext } from '@/lib/chat/knowledge/router';
 import { ONBOARDING_SYSTEM_PROMPT } from '@/lib/chat/prompts/onboarding';
 import { buildSystemPrompt } from '@/lib/chat/system-prompt';
@@ -113,6 +114,7 @@ export interface ExecuteChatTurnInput {
   userPlan: string;
   planLimits: EntitlementsForPlan;
   insightsEnabled: boolean;
+  accountContext?: ChatAccountContext;
   forceLightModel: boolean;
   /**
    * Pre-built tools for the turn. The caller composes free + paid tool sets
@@ -176,6 +178,7 @@ export async function executeChatTurn(
     userPlan,
     planLimits,
     insightsEnabled,
+    accountContext,
     forceLightModel,
     tools,
     signal,
@@ -205,6 +208,7 @@ export async function executeChatTurn(
       aiDailyMessageLimit: planLimits.limits.aiDailyMessageLimit,
       insightsEnabled,
       knowledgeContext: selectKnowledgeContextForTurn(uiMessages) || undefined,
+      accountContext,
     });
   }
 
