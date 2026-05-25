@@ -55,6 +55,7 @@ import { chatMessages, chatTurns } from '@/lib/db/schema/chat';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { getEntitlements, type PlanId } from '@/lib/entitlements/registry';
 import { NO_STORE_HEADERS } from '@/lib/http/headers';
+import { buildWelcomeMessage } from '@/lib/services/onboarding/welcome-message';
 import {
   buildTestArtistContext,
   buildTestReleases,
@@ -67,6 +68,7 @@ type EvalTarget =
   | 'knowledge-contract'
   | 'model-contract'
   | 'mobile-chat-route'
+  | 'onboarding-welcome-chat-contract'
   | 'onboarding-state-contract'
   | 'prompt-context-contract'
   | 'tool-access-contract'
@@ -116,11 +118,13 @@ const WEB_CHAT_ROUTE_PATH = '/api/chat';
 const WEB_CHAT_REQUEST_ID = 'promptfoo-web-chat-route';
 const WEB_CHAT_EVAL_EPOCH_SECONDS = 1_700_000_000;
 const MOBILE_CHAT_ROUTE_PATH = '/api/mobile/v1/chat/turns';
+const ONBOARDING_WELCOME_CHAT_ROUTE_PATH = '/api/onboarding/welcome-chat';
 const MAX_WEB_MESSAGES_PER_REQUEST = 50;
 const MAX_WEB_MESSAGE_LENGTH = 4000;
 const MAX_ONBOARDING_MESSAGES_PER_REQUEST = 50;
 const MAX_ONBOARDING_MESSAGE_LENGTH = 4000;
 const MAX_MOBILE_TEXT_LENGTH = 4000;
+const MAX_WELCOME_INITIAL_REPLY_LENGTH = 2000;
 const MOBILE_CHAT_RUNTIME_DISABLED_EVENT = {
   type: 'error',
   errorCode: 'MOBILE_CHAT_RUNTIME_DISABLED',
@@ -390,6 +394,15 @@ const REQUIRED_ONBOARDING_STATE_CASES = [
   'weak-signal-force-waitlist',
   'weak-signal-needs-more-info',
 ] as const;
+const REQUIRED_WELCOME_CHAT_CASES = [
+  'claims-current-session-orphan-before-creating-new',
+  'creates-new-welcome-chat-with-route-panel-profile-from-onboarding',
+  'does-not-claim-orphan-from-other-user-or-attached-profile',
+  'existing-conversation-retry-does-not-duplicate-initial-reply',
+  'existing-conversation-reuses-and-appends-once',
+  'initial-reply-too-long-400',
+  'missing-profile-404',
+] as const;
 const REQUIRED_KNOWLEDGE_CASES = [
   'monetization-only',
   'no-false-positive-had',
@@ -462,6 +475,7 @@ function toTarget(value: unknown): EvalTarget {
     value === 'knowledge-contract' ||
     value === 'mobile-chat-route' ||
     value === 'model-contract' ||
+    value === 'onboarding-welcome-chat-contract' ||
     value === 'onboarding-state-contract' ||
     value === 'prompt-context-contract' ||
     value === 'tool-access-contract' ||
@@ -1102,6 +1116,321 @@ function evaluateMobileChatRouteContract(prompt: string, vars: EvalVars) {
     events: [MOBILE_CHAT_RUNTIME_DISABLED_EVENT],
     responseText: ndjsonEvent(MOBILE_CHAT_RUNTIME_DISABLED_EVENT),
   };
+}
+
+type WelcomeMessage = {
+  readonly role: 'assistant' | 'user';
+  readonly content: string;
+};
+
+type WelcomeConversation = {
+  readonly id: string;
+  readonly userId: string;
+  readonly creatorProfileId: string | null;
+  readonly sessionId: string | null;
+  readonly messages: readonly WelcomeMessage[];
+};
+
+function buildWelcomeChatRoute(conversationId: string): string {
+  return `${APP_ROUTES.CHAT}/${conversationId}?panel=profile&from=onboarding`;
+}
+
+function defaultWelcomeInitialReply(welcomeCase: string): string {
+  switch (welcomeCase) {
+    case 'existing-conversation-reuses-and-appends-once':
+    case 'existing-conversation-retry-does-not-duplicate-initial-reply':
+      return 'Help me finish setting up Neon Reef.';
+    case 'initial-reply-too-long-400':
+      return 'x'.repeat(MAX_WELCOME_INITIAL_REPLY_LENGTH + 1);
+    case 'creates-new-welcome-chat-with-route-panel-profile-from-onboarding':
+      return 'I want to work on the Neon Reef release first.';
+    default:
+      return '';
+  }
+}
+
+function welcomeExistingConversationForCase(
+  welcomeCase: string,
+  initialReply: string
+): WelcomeConversation | null {
+  if (welcomeCase === 'existing-conversation-reuses-and-appends-once') {
+    return {
+      id: 'conv_existing',
+      userId: EVAL_USER_ID,
+      creatorProfileId: EVAL_PROFILE_ID,
+      sessionId: null,
+      messages: [
+        {
+          role: 'assistant',
+          content: 'Welcome to Jovie, Luna. What should we work on first?',
+        },
+      ],
+    };
+  }
+
+  if (
+    welcomeCase ===
+    'existing-conversation-retry-does-not-duplicate-initial-reply'
+  ) {
+    return {
+      id: 'conv_existing',
+      userId: EVAL_USER_ID,
+      creatorProfileId: EVAL_PROFILE_ID,
+      sessionId: null,
+      messages: [{ role: 'user', content: initialReply }],
+    };
+  }
+
+  return null;
+}
+
+function welcomeOrphanCandidatesForCase(
+  welcomeCase: string,
+  onboardingSessionId: string | null
+): WelcomeConversation[] {
+  if (welcomeCase === 'claims-current-session-orphan-before-creating-new') {
+    return [
+      {
+        id: 'conv_orphan_current',
+        userId: EVAL_USER_ID,
+        creatorProfileId: null,
+        sessionId: onboardingSessionId,
+        messages: [
+          { role: 'user', content: 'I selected Luna Waves on Spotify.' },
+        ],
+      },
+    ];
+  }
+
+  if (
+    welcomeCase === 'does-not-claim-orphan-from-other-user-or-attached-profile'
+  ) {
+    return [
+      {
+        id: 'conv_other_user',
+        userId: 'db_user_other',
+        creatorProfileId: null,
+        sessionId: onboardingSessionId,
+        messages: [{ role: 'user', content: 'Other user setup.' }],
+      },
+      {
+        id: 'conv_already_attached',
+        userId: EVAL_USER_ID,
+        creatorProfileId: 'profile_other',
+        sessionId: onboardingSessionId,
+        messages: [{ role: 'user', content: 'Already claimed setup.' }],
+      },
+    ];
+  }
+
+  return [];
+}
+
+function findEligibleWelcomeOrphan(
+  candidates: readonly WelcomeConversation[],
+  onboardingSessionId: string | null
+): WelcomeConversation | null {
+  return (
+    candidates.find(candidate => {
+      if (candidate.userId !== EVAL_USER_ID) return false;
+      if (candidate.creatorProfileId !== null) return false;
+      if (onboardingSessionId) {
+        return candidate.sessionId === onboardingSessionId;
+      }
+      return candidate.sessionId !== null;
+    }) ?? null
+  );
+}
+
+function evaluateOnboardingWelcomeChatContract(vars: EvalVars) {
+  const welcomeCase =
+    typeof vars.welcomeCase === 'string'
+      ? vars.welcomeCase
+      : 'creates-new-welcome-chat-with-route-panel-profile-from-onboarding';
+  const initialReply = (
+    typeof vars.initialReply === 'string'
+      ? vars.initialReply
+      : defaultWelcomeInitialReply(welcomeCase)
+  ).trim();
+  const includeProfile = toBoolean(vars.includeProfile, true);
+  const profileId = includeProfile ? EVAL_PROFILE_ID : null;
+  const onboardingSessionId =
+    typeof vars.onboardingSessionId === 'string'
+      ? vars.onboardingSessionId
+      : welcomeCase.includes('orphan')
+        ? 'sess_eval_current'
+        : null;
+  const basePayload = {
+    target: 'onboarding-welcome-chat-contract',
+    adapter: 'route-contract',
+    productionPath: ONBOARDING_WELCOME_CHAT_ROUTE_PATH,
+    productionHandler: 'apps/web/app/api/onboarding/welcome-chat/route.ts',
+    routeImportAvailable: false,
+    routeImportGap:
+      'Promptfoo runs outside the Next/Clerk/DB server context, so this eval mirrors checked-in /api/onboarding/welcome-chat decisions instead of importing POST directly.',
+    request: {
+      authenticated: true,
+      userId: EVAL_USER_ID,
+      profileId,
+      initialReply,
+      initialReplyLength: initialReply.length,
+      onboardingSessionId,
+    },
+    costTier: 'deterministic',
+    text: '',
+    selectedModel: null,
+    modelCalled: false,
+    persistenceAttempted: false,
+    dbAttempted: false,
+    networkAttempted: false,
+    toolCalls: [],
+    toolResults: [],
+    toolExecutions: [],
+    welcomeCase,
+    headers: NO_STORE_HEADERS,
+  };
+  const response = (
+    status: number,
+    responseJson: Record<string, unknown>,
+    extra: Record<string, unknown> = {}
+  ) => ({
+    ...basePayload,
+    status,
+    responseJson,
+    responseText: JSON.stringify(responseJson),
+    ...extra,
+  });
+
+  if (!profileId) {
+    return response(404, { error: 'Profile not found' });
+  }
+
+  if (initialReply.length > MAX_WELCOME_INITIAL_REPLY_LENGTH) {
+    return response(400, {
+      error: `Initial reply must be ${MAX_WELCOME_INITIAL_REPLY_LENGTH} characters or less.`,
+    });
+  }
+
+  const existingConversation = welcomeExistingConversationForCase(
+    welcomeCase,
+    initialReply
+  );
+  if (existingConversation) {
+    const lastMessage =
+      existingConversation.messages[existingConversation.messages.length - 1] ??
+      null;
+    const shouldAppendInitialReply = Boolean(
+      initialReply &&
+        !(lastMessage?.role === 'user' && lastMessage.content === initialReply)
+    );
+    const insertedMessages = shouldAppendInitialReply
+      ? [{ role: 'user', content: initialReply }]
+      : [];
+    const responseJson = {
+      success: true,
+      conversationId: existingConversation.id,
+      route: buildWelcomeChatRoute(existingConversation.id),
+      reused: true,
+    };
+
+    return response(200, responseJson, {
+      reused: true,
+      createdNew: false,
+      existingConversationId: existingConversation.id,
+      selectedConversationId: existingConversation.id,
+      route: responseJson.route,
+      appendedInitialReply: shouldAppendInitialReply,
+      insertedMessages,
+      updatedConversation: shouldAppendInitialReply,
+      welcomeMessageBuilt: false,
+      persistenceWouldBeAttempted: shouldAppendInitialReply,
+    });
+  }
+
+  const orphanCandidates = welcomeOrphanCandidatesForCase(
+    welcomeCase,
+    onboardingSessionId
+  );
+  const eligibleOrphan = findEligibleWelcomeOrphan(
+    orphanCandidates,
+    onboardingSessionId
+  );
+  if (eligibleOrphan) {
+    const responseJson = {
+      success: true,
+      conversationId: eligibleOrphan.id,
+      route: buildWelcomeChatRoute(eligibleOrphan.id),
+      reused: true,
+    };
+
+    return response(200, responseJson, {
+      reused: true,
+      createdNew: false,
+      selectedConversationId: eligibleOrphan.id,
+      claimedConversationId: eligibleOrphan.id,
+      route: responseJson.route,
+      orphanCandidateCount: orphanCandidates.length,
+      eligibleOrphanCandidateCount: 1,
+      unsafeOrphanCandidateCount: orphanCandidates.length - 1,
+      claimFilter: {
+        userId: EVAL_USER_ID,
+        sessionId: onboardingSessionId,
+        creatorProfileId: null,
+      },
+      insertedMessages: [],
+      updatedConversation: true,
+      welcomeMessageBuilt: false,
+      persistenceWouldBeAttempted: true,
+    });
+  }
+
+  const displayName =
+    typeof vars.displayName === 'string' ? vars.displayName : 'Luna Waves';
+  const releaseCount =
+    typeof vars.releaseCount === 'number' ? vars.releaseCount : 3;
+  const trackCount = typeof vars.trackCount === 'number' ? vars.trackCount : 12;
+  const baseDspCount = typeof vars.dspCount === 'number' ? vars.dspCount : 1;
+  const socialCount =
+    typeof vars.socialCount === 'number' ? vars.socialCount : 2;
+  const hasSpotifyIdentity = toBoolean(vars.hasSpotifyIdentity, true);
+  const welcomeMessageParams = {
+    displayName,
+    releaseCount,
+    trackCount,
+    dspCount: baseDspCount + (hasSpotifyIdentity ? 1 : 0),
+    socialCount,
+    careerHighlights:
+      typeof vars.careerHighlights === 'string' ? vars.careerHighlights : null,
+  };
+  const welcomeMessage = buildWelcomeMessage(welcomeMessageParams);
+  const conversationId = 'conv_welcome_new';
+  const insertedMessages = [
+    { role: 'assistant', content: welcomeMessage },
+    ...(initialReply ? [{ role: 'user', content: initialReply }] : []),
+  ];
+  const responseJson = {
+    success: true,
+    conversationId,
+    route: buildWelcomeChatRoute(conversationId),
+    reused: false,
+  };
+
+  return response(201, responseJson, {
+    reused: false,
+    createdNew: true,
+    selectedConversationId: conversationId,
+    claimedConversationId: null,
+    route: responseJson.route,
+    orphanCandidateCount: orphanCandidates.length,
+    eligibleOrphanCandidateCount: 0,
+    unsafeOrphanCandidateCount: orphanCandidates.length,
+    insertedMessages,
+    updatedConversation: true,
+    welcomeMessageBuilt: true,
+    welcomeMessage,
+    welcomeMessageParams,
+    persistenceWouldBeAttempted: true,
+  });
 }
 
 type LiveHttpResponse = {
@@ -3661,6 +3990,7 @@ type EvalCaseSummary = {
   readonly promptCase: string | null;
   readonly renderCase: string | null;
   readonly stateCase: string | null;
+  readonly welcomeCase: string | null;
   readonly mode: string | null;
   readonly plan: string | null;
   readonly assertions: readonly string[];
@@ -3750,6 +4080,7 @@ function parseEvalCaseSummary(block: string): EvalCaseSummary {
     promptCase: scalarValue(block, 'promptCase'),
     renderCase: scalarValue(block, 'renderCase'),
     stateCase: scalarValue(block, 'stateCase'),
+    welcomeCase: scalarValue(block, 'welcomeCase'),
     mode: scalarValue(block, 'mode') ?? 'app',
     plan: scalarValue(block, 'plan') ?? 'pro',
     assertions,
@@ -3900,6 +4231,16 @@ function evaluateEvalCaseInventory(vars: EvalVars) {
       .map(testCase => testCase.stateCase)
       .filter((stateCase): stateCase is string => typeof stateCase === 'string')
   );
+  const welcomeChatCaseNames = uniqueSorted(
+    deterministicCases
+      .filter(
+        testCase => testCase.target === 'onboarding-welcome-chat-contract'
+      )
+      .map(testCase => testCase.welcomeCase)
+      .filter(
+        (welcomeCase): welcomeCase is string => typeof welcomeCase === 'string'
+      )
+  );
   const knownToolNames = new Set(ALL_EVAL_TOOL_NAMES);
 
   return {
@@ -4009,6 +4350,12 @@ function evaluateEvalCaseInventory(vars: EvalVars) {
       REQUIRED_ONBOARDING_STATE_CASES,
       onboardingStateCaseNames
     ),
+    requiredWelcomeChatCaseNames: [...REQUIRED_WELCOME_CHAT_CASES],
+    welcomeChatCaseNames,
+    missingWelcomeChatCaseNames: missingNames(
+      REQUIRED_WELCOME_CHAT_CASES,
+      welcomeChatCaseNames
+    ),
     toolCalls: [],
     toolResults: [],
     toolExecutions: [],
@@ -4066,6 +4413,16 @@ export default class JovieChatPromptfooProvider {
 
     if (target === 'mobile-chat-route') {
       const payload = evaluateMobileChatRouteContract(prompt, vars);
+      return {
+        output: JSON.stringify(payload),
+        raw: payload,
+        format: 'json',
+        latencyMs: Date.now() - startedAt,
+      };
+    }
+
+    if (target === 'onboarding-welcome-chat-contract') {
+      const payload = evaluateOnboardingWelcomeChatContract(vars);
       return {
         output: JSON.stringify(payload),
         raw: payload,
