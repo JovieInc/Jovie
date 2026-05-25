@@ -152,6 +152,7 @@ async function globalSetup() {
     APP_ROUTES.CHAT, // auth.setup.ts navigates here — warm up to avoid cold-compile 404
     APP_ROUTES.LIBRARY,
     APP_ROUTES.RELEASES,
+    APP_ROUTES.TASKS,
     APP_ROUTES.AUDIENCE,
     APP_ROUTES.PRESENCE,
     APP_ROUTES.EARNINGS,

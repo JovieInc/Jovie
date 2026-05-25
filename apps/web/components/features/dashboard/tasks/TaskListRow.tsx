@@ -124,7 +124,7 @@ export const TaskListRow = memo(function TaskListRow({
       isSelected={isSelected}
       interaction='task-row-group'
       className={cn(
-        'group/row grid h-full grid-cols-[1.25rem_minmax(0,1fr)_auto] items-center gap-3 px-3 py-1.5 transition-[opacity] duration-subtle ease-subtle',
+        'group/row grid h-full grid-cols-[1.25rem_minmax(0,1fr)_auto] items-center gap-3 px-3 py-1 transition-[opacity] duration-subtle ease-subtle',
         isDone && !isSelected && 'opacity-75',
         isCancelled && !isSelected && 'opacity-60'
       )}
@@ -144,7 +144,7 @@ export const TaskListRow = memo(function TaskListRow({
 
         <div
           data-testid={`task-list-row-meta-${task.id}`}
-          className='mt-1 flex min-w-0 flex-wrap items-center gap-x-2.5 gap-y-1 overflow-hidden text-[10.5px] leading-none text-secondary-token'
+          className='mt-0.5 flex min-w-0 flex-wrap items-center gap-x-2.5 gap-y-1 overflow-hidden text-[10.5px] leading-none text-secondary-token'
         >
           <span className='shrink-0 truncate text-tertiary-token'>
             {stage.label}

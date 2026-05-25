@@ -245,6 +245,12 @@ function setHeaderActionsForTest(actions: React.ReactNode) {
   setHeaderActionsHost?.(actions);
 }
 
+function openTask(task: TaskView = mockTaskTwo) {
+  act(() => {
+    getLatestTableProps()?.onRowClick?.(task);
+  });
+}
+
 vi.mock('@/app/app/(shell)/dashboard/DashboardDataContext', () => ({
   DashboardDataContext: {
     Provider: ({ children }: { children: React.ReactNode }) => children,
@@ -745,6 +751,16 @@ describe('TasksPageClient', () => {
     ).not.toBeInTheDocument();
   });
 
+  it('renders an empty task document shell on desktop list mode before selection', () => {
+    renderPage();
+
+    expect(screen.getByTestId('task-document-pane')).toBeVisible();
+    expect(
+      screen.getByText('Pick a task from the list to see what it needs.')
+    ).toBeInTheDocument();
+    expect(screen.queryByLabelText('Task title')).not.toBeInTheDocument();
+  });
+
   it('submits board moves through the move mutation', () => {
     mockViewMode = 'board';
 
@@ -878,6 +894,7 @@ describe('TasksPageClient', () => {
 
   it('renders the task title editor as a textarea for wrapping document headings', () => {
     renderPage();
+    openTask();
 
     const titleEditor = screen.getByLabelText('Task title');
     expect(titleEditor.tagName).toBe('TEXTAREA');
@@ -903,6 +920,7 @@ describe('TasksPageClient', () => {
 
   it('shows the compact progress metadata for the selected task', () => {
     renderPage();
+    openTask();
 
     expect(screen.getAllByText('In Progress').length).toBeGreaterThan(0);
     expect(screen.getAllByText('Medium').length).toBeGreaterThan(0);
@@ -974,6 +992,7 @@ describe('TasksPageClient', () => {
   it('hides the task document when the right panel opens on constrained desktop widths', () => {
     mockCanShowTaskDocumentAlongsideReleaseSidebar = false;
     renderPage();
+    openTask();
 
     fireEvent.click(screen.getByRole('button', { name: 'QA Release' }));
 
@@ -987,6 +1006,7 @@ describe('TasksPageClient', () => {
 
   it('registers the release side panel from the selected task document', () => {
     renderPage();
+    openTask();
 
     fireEvent.click(screen.getByRole('button', { name: 'QA Release' }));
 
@@ -1003,6 +1023,7 @@ describe('TasksPageClient', () => {
 
   it('autosaves document edits and removes the manual save button', () => {
     renderPage();
+    openTask();
 
     expect(
       screen.queryByRole('button', { name: /save task/i })
@@ -1033,6 +1054,7 @@ describe('TasksPageClient', () => {
 
   it('does not reset unsaved title text when task metadata refreshes', () => {
     const view = renderPage();
+    openTask();
 
     const titleEditor = screen.getByLabelText('Task title');
     fireEvent.change(titleEditor, {
@@ -1081,6 +1103,7 @@ describe('TasksPageClient', () => {
     mockTasksData = [mockHelperTask, mockTask];
 
     renderPage();
+    openTask(mockHelperTask);
 
     expect(screen.getByTestId('task-description-helper')).toBeInTheDocument();
     expect(screen.getByText('Press Release')).toBeInTheDocument();
@@ -1091,6 +1114,7 @@ describe('TasksPageClient', () => {
 
   it('does not show the helper when the selected task already has a description', () => {
     renderPage();
+    openTask();
 
     expect(
       screen.queryByTestId('task-description-helper')
@@ -1101,19 +1125,19 @@ describe('TasksPageClient', () => {
   });
 
   it('does not show the helper for manual empty-description tasks', () => {
-    mockTasksData = [
-      {
-        ...mockTask,
-        id: 'manual-task',
-        description: null,
-        releaseId: null,
-        releaseTitle: null,
-        metadata: null,
-      },
-      mockTask,
-    ];
+    const manualTask = {
+      ...mockTask,
+      id: 'manual-task',
+      description: null,
+      releaseId: null,
+      releaseTitle: null,
+      metadata: null,
+    } as const;
+
+    mockTasksData = [manualTask, mockTask];
 
     renderPage();
+    openTask(manualTask);
 
     expect(
       screen.queryByTestId('task-description-helper')
@@ -1125,6 +1149,7 @@ describe('TasksPageClient', () => {
     mockTasksData = [mockHelperTask, mockTask];
 
     renderPage();
+    openTask(mockHelperTask);
 
     fireEvent.click(screen.getByTestId('task-description-helper'));
 
@@ -1146,6 +1171,7 @@ describe('TasksPageClient', () => {
     ];
 
     renderPage();
+    openTask(mockHelperTask);
 
     expect(screen.getByTestId('task-description-helper')).toBeInTheDocument();
     expect(screen.getByText('Press Release')).toBeInTheDocument();
@@ -1155,6 +1181,7 @@ describe('TasksPageClient', () => {
     mockTasksData = [mockHelperTask, mockTask];
 
     renderPage();
+    openTask(mockHelperTask);
 
     fireEvent.focus(screen.getByLabelText('Task description'));
 
@@ -1167,6 +1194,7 @@ describe('TasksPageClient', () => {
     mockTasksData = [mockHelperTask, mockTask];
 
     renderPage();
+    openTask(mockHelperTask);
 
     const editor = screen.getByLabelText('Task description');
 
@@ -1187,6 +1215,7 @@ describe('TasksPageClient', () => {
     mockTasksData = [mockHelperTask, mockTask];
 
     renderPage();
+    openTask(mockHelperTask);
 
     const editor = screen.getByLabelText('Task description');
 
@@ -1212,6 +1241,7 @@ describe('TasksPageClient', () => {
     mockTasksData = [mockHelperTask, mockTask];
 
     renderPage();
+    openTask(mockHelperTask);
 
     fireEvent.click(
       screen.getByRole('link', { name: 'UnitedMasters Promote Tab' })
@@ -1223,6 +1253,7 @@ describe('TasksPageClient', () => {
 
   it('renders previous and next task navigation controls', () => {
     renderPage();
+    openTask();
 
     expect(
       screen.getByRole('button', { name: 'Previous task' })
@@ -1257,6 +1288,7 @@ describe('TasksPageClient', () => {
 
   it('does not open or focus task search with the slash key', () => {
     renderPage();
+    openTask();
 
     const searchButton = screen.getByRole('button', { name: 'Search tasks' });
 
@@ -1426,6 +1458,11 @@ describe('TasksPageClient', () => {
   it('supports j and k keyboard navigation across visible tasks', () => {
     renderPage();
 
+    expect(
+      screen.getByText('Pick a task from the list to see what it needs.')
+    ).toBeInTheDocument();
+
+    fireEvent.keyDown(window, { key: 'j' });
     expect(screen.getByLabelText('Task title')).toHaveValue(mockTaskTwo.title);
 
     fireEvent.keyDown(window, { key: 'j' });
@@ -1467,6 +1504,7 @@ describe('TasksPageClient', () => {
 
   it('keeps task keyboard navigation out of text editors', () => {
     renderPage();
+    openTask();
 
     expect(screen.getByLabelText('Task title')).toHaveValue(mockTaskTwo.title);
 

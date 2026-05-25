@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { readFile } from 'node:fs/promises';
+import { access, readFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import assert from 'node:assert/strict';
@@ -22,6 +22,10 @@ const contactSheetPath = join(
   'brand',
   'jovie-icon-contact-sheet.png'
 );
+const productionIcnsPath = join(assetsRoot, 'icon.icns');
+const stagingIcnsPath = join(assetsRoot, 'icon-staging.icns');
+const productionIconsetPath = join(assetsRoot, 'icon.iconset');
+const stagingIconsetPath = join(assetsRoot, 'icon-staging.iconset');
 const ICON_SIZE = 512;
 
 async function pngMetadata(filePath) {
@@ -61,6 +65,12 @@ async function assertBlackCorners(filePath) {
   }
 }
 
+async function assertIcnsFile(filePath) {
+  const buffer = await readFile(filePath);
+  assert.equal(buffer.subarray(0, 4).toString('utf8'), 'icns');
+  assert.ok(buffer.length > 0);
+}
+
 test('desktop sources the canonical opaque Jovie app icon profile', async () => {
   const sourceMetadata = await pngMetadata(canonicalIconPath);
 
@@ -86,6 +96,8 @@ test('legacy icon-source.png remains for reference but is no longer the producti
 test('packaged production and staging icons are generated from the canonical profile', async () => {
   await assertOpaquePng(join(assetsRoot, 'icon.png'), ICON_SIZE);
   await assertOpaquePng(join(assetsRoot, 'icon-staging.png'), ICON_SIZE);
+  await assertIcnsFile(productionIcnsPath);
+  await assertIcnsFile(stagingIcnsPath);
   await assertBlackCorners(join(assetsRoot, 'icon.png'));
   await assertBlackCorners(join(assetsRoot, 'icon-staging.png'));
 
@@ -95,6 +107,11 @@ test('packaged production and staging icons are generated from the canonical pro
 
   assert.deepEqual(productionIcon, expectedProductionIcon);
   assert.deepEqual(stagingIcon, expectedProductionIcon);
+});
+
+test('desktop icon generation cleans up temporary iconset caches', async () => {
+  await assert.rejects(access(productionIconsetPath));
+  await assert.rejects(access(stagingIconsetPath));
 });
 
 test('generated icon contact sheet exists for visual review', async () => {
@@ -111,13 +128,13 @@ test('electron-builder packages the Jovie app icons for every desktop target', a
   ]);
 
   assert.match(productionConfig, /productName: Jovie/);
-  assert.match(productionConfig, /icon: assets\/icon\.png/);
+  assert.match(productionConfig, /icon: assets\/icon\.icns/);
   assert.match(productionConfig, /assets\/icon\.png/);
   assert.match(productionConfig, /assets\/dmg-background\.png/);
   assert.doesNotMatch(productionConfig, /Linear/);
 
   assert.match(stagingConfig, /productName: Jovie Staging/);
-  assert.match(stagingConfig, /icon: assets\/icon-staging\.png/);
+  assert.match(stagingConfig, /icon: assets\/icon-staging\.icns/);
   assert.match(stagingConfig, /assets\/icon-staging\.png/);
   assert.match(stagingConfig, /assets\/dmg-background\.png/);
   assert.doesNotMatch(stagingConfig, /Linear/);

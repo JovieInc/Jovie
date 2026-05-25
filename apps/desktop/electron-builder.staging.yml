@@ -27,7 +27,7 @@ mac:
     - target: zip
       arch:
         - universal
-  icon: assets/icon-staging.png
+  icon: assets/icon-staging.icns
 dmg:
   title: Jovie Staging
   background: assets/dmg-background.png

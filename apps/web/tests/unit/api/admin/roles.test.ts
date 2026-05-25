@@ -78,14 +78,15 @@ describe('Admin Roles API', () => {
         email: 'user@example.com',
         isAdmin: false,
       });
-      mockDbUpdate.mockReturnValue({
-        set: vi.fn().mockReturnValue({
-          where: vi.fn().mockReturnValue({
-            returning: vi
-              .fn()
-              .mockResolvedValue([{ id: 'user_1', clerkId: 'user_123' }]),
-          }),
+      const setMock = vi.fn().mockReturnValue({
+        where: vi.fn().mockReturnValue({
+          returning: vi
+            .fn()
+            .mockResolvedValue([{ id: 'user_1', clerkId: 'user_123' }]),
         }),
+      });
+      mockDbUpdate.mockReturnValue({
+        set: setMock,
       });
 
       const { POST } = await import('@/app/api/admin/roles/route');
@@ -100,6 +101,15 @@ describe('Admin Roles API', () => {
 
       expect(response.status).toBe(200);
       expect(data.success).toBe(true);
+      expect(setMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          isAdmin: true,
+          isPro: true,
+          plan: 'max',
+          billingUpdatedAt: expect.any(Date),
+          updatedAt: expect.any(Date),
+        })
+      );
     });
   });
 

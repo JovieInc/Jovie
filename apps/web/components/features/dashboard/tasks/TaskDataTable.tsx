@@ -24,7 +24,7 @@ export function TaskDataTable<TData>({
   getRowClassName,
   hideHeader = true,
   minWidth = '100%',
-  rowHeight = 64,
+  rowHeight = 56,
   skeletonRows = 8,
   ...props
 }: Readonly<TaskDataTableProps<TData>>) {

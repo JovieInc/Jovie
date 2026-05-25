@@ -61,7 +61,7 @@ describe('TaskDataTable', () => {
       'data-row-class-name',
       TASK_DATA_TABLE_ROW_CLASSNAME
     );
-    expect(table).toHaveAttribute('data-row-height', '64');
+    expect(table).toHaveAttribute('data-row-height', '56');
     expect(table).toHaveAttribute('data-skeleton-rows', '8');
     expect(table).toHaveAttribute('data-virtualized', 'false');
   });

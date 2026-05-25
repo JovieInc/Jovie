@@ -7,12 +7,20 @@ const { mockEnv, mockGetCurrentUserEntitlements } = vi.hoisted(() => ({
   mockGetCurrentUserEntitlements: vi.fn(),
 }));
 
+const { mockIsAdmin } = vi.hoisted(() => ({
+  mockIsAdmin: vi.fn(),
+}));
+
 vi.mock('@/lib/env-server', () => ({
   env: mockEnv,
 }));
 
 vi.mock('@/lib/entitlements/server', () => ({
   getCurrentUserEntitlements: mockGetCurrentUserEntitlements,
+}));
+
+vi.mock('@/lib/admin/roles', () => ({
+  isAdmin: mockIsAdmin,
 }));
 
 describe('authorizeHud', () => {
@@ -23,7 +31,9 @@ describe('authorizeHud', () => {
     mockGetCurrentUserEntitlements.mockResolvedValue({
       isAuthenticated: false,
       isAdmin: false,
+      userId: null,
     });
+    mockIsAdmin.mockResolvedValue(false);
   });
 
   it('allows a valid kiosk token without loading Clerk entitlements', async () => {
@@ -63,5 +73,22 @@ describe('authorizeHud', () => {
       ok: false,
       reason: 'unauthorized',
     });
+  });
+
+  it('allows the raw admin role even when fresh MFA is unavailable', async () => {
+    mockGetCurrentUserEntitlements.mockResolvedValue({
+      isAuthenticated: true,
+      isAdmin: false,
+      userId: 'admin_123',
+    });
+    mockIsAdmin.mockResolvedValue(true);
+
+    const { authorizeHud } = await import('@/lib/auth/hud');
+
+    await expect(authorizeHud(null)).resolves.toEqual({
+      ok: true,
+      mode: 'admin',
+    });
+    expect(mockIsAdmin).toHaveBeenCalledWith('admin_123');
   });
 });

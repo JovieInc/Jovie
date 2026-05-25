@@ -38,6 +38,20 @@ const {
   };
 });
 
+const { mockIsAdmin } = vi.hoisted(() => ({
+  mockIsAdmin: vi.fn(),
+}));
+
+const { mockCookiesGet, mockCookies } = vi.hoisted(() => {
+  const mockCookiesGet = vi.fn();
+  return {
+    mockCookiesGet,
+    mockCookies: vi.fn(async () => ({
+      get: mockCookiesGet,
+    })),
+  };
+});
+
 // Mock the Statsig Core server SDK before importing the module under test.
 vi.mock('@statsig/statsig-node-core', () => ({
   Statsig: statsigConstructorMock,
@@ -57,6 +71,14 @@ vi.mock('@/lib/env-public', () => ({
   },
 }));
 
+vi.mock('next/headers', () => ({
+  cookies: mockCookies,
+}));
+
+vi.mock('@/lib/admin/roles', () => ({
+  isAdmin: mockIsAdmin,
+}));
+
 describe('Statsig server initialization', () => {
   beforeEach(() => {
     vi.resetModules();
@@ -69,6 +91,8 @@ describe('Statsig server initialization', () => {
       getEvaluationDetails: () => ({ reason: 'Unrecognized' }),
       value: false,
     });
+    mockCookiesGet.mockReset().mockReturnValue(undefined);
+    mockIsAdmin.mockReset().mockResolvedValue(false);
     initializeMock.mockReset().mockResolvedValue({ success: true });
     shutdownMock.mockReset().mockResolvedValue({ success: true });
     statsigConstructorMock.mockClear();
@@ -204,19 +228,15 @@ describe('Statsig server initialization', () => {
   it('ignores client override cookies in production', async () => {
     process.env.NODE_ENV = 'production';
     process.env.VERCEL_ENV = 'production';
-
-    vi.doMock('next/headers', () => ({
-      cookies: async () => ({
-        get: (name: string) =>
-          name === 'jovie_app_flag_overrides'
-            ? {
-                value: encodeURIComponent(
-                  JSON.stringify({ 'code:SPOTIFY_OAUTH': true })
-                ),
-              }
-            : undefined,
-      }),
-    }));
+    mockCookiesGet.mockImplementation((name: string) =>
+      name === 'jovie_app_flag_overrides'
+        ? {
+            value: encodeURIComponent(
+              JSON.stringify({ 'code:SPOTIFY_OAUTH': true })
+            ),
+          }
+        : undefined
+    );
 
     vi.doMock('flags/next', () => ({
       dedupe: <T extends (...args: never[]) => unknown>(fn: T) => fn,
@@ -238,5 +258,33 @@ describe('Statsig server initialization', () => {
     const { getAppFlagValue } = await import('@/lib/flags/server');
     await expect(getAppFlagValue('SPOTIFY_OAUTH')).resolves.toBe(false);
     expect(run).toHaveBeenCalledTimes(1);
+  });
+
+  it('returns true for admin users before consulting the registry', async () => {
+    mockIsAdmin.mockResolvedValue(true);
+
+    vi.doMock('flags/next', () => ({
+      dedupe: <T extends (...args: never[]) => unknown>(fn: T) => fn,
+    }));
+
+    const run = vi.fn().mockResolvedValue(false);
+    vi.doMock('@/lib/flags/registry', () => ({
+      APP_FLAG_REGISTRY: {
+        SPOTIFY_OAUTH: { run },
+      },
+      SUBSCRIBE_CTA_VARIANT_FLAG: {
+        run: vi.fn().mockResolvedValue('two_step'),
+      },
+      PROFILE_ALERT_OPTIN_VARIANT_FLAG: {
+        run: vi.fn().mockResolvedValue('button'),
+      },
+    }));
+
+    const { getAppFlagValue } = await import('@/lib/flags/server');
+    await expect(
+      getAppFlagValue('SPOTIFY_OAUTH', { userId: 'admin_123' })
+    ).resolves.toBe(true);
+    expect(mockIsAdmin).toHaveBeenCalledWith('admin_123');
+    expect(run).not.toHaveBeenCalled();
   });
 });
