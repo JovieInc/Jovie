@@ -24,6 +24,7 @@ import {
   DEFAULT_TEST_AVATAR_URL,
   ensureClerkTestUser,
   ensureCreatorProfileRecord,
+  ensureLiveClerkTestUser,
   ensureSocialLinkRecord,
   ensureUserProfileClaim,
   ensureUserRecord,
@@ -445,6 +446,33 @@ export async function ensureDevTestAuthActor(
     },
   });
 
+  return ensureDevTestAuthActorForClerkUser(persona, config, clerkUserId);
+}
+
+export async function ensureLiveDevTestAuthActor(
+  persona: DevTestAuthPersona
+): Promise<DevTestAuthActor> {
+  const config = resolvePersonaSeedConfig(persona);
+  const clerkUserId = await ensureLiveClerkTestUser({
+    email: config.email,
+    username: config.username,
+    firstName: config.firstName,
+    lastName: config.lastName,
+    metadata: {
+      role: persona,
+      env: 'dev',
+      purpose: 'native-auth-bootstrap',
+    },
+  });
+
+  return ensureDevTestAuthActorForClerkUser(persona, config, clerkUserId);
+}
+
+async function ensureDevTestAuthActorForClerkUser(
+  persona: DevTestAuthPersona,
+  config: PersonaSeedConfig,
+  clerkUserId: string
+): Promise<DevTestAuthActor> {
   const { id: dbUserId, previousClerkId } = await ensureUserRecord(db, {
     clerkId: clerkUserId,
     email: config.email,

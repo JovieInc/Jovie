@@ -166,10 +166,98 @@ final class JovieUITests: XCTestCase {
     XCTFail("Live auth did not reach dashboard or onboarding.\n\(app.debugDescription)")
   }
 
+  func testRealBrowserAuthProviderCompleteReachesAuthenticatedShell() throws {
+    guard testEnvironmentValue("JOVIE_IOS_REAL_BROWSER_AUTH") == "1" else {
+      throw XCTSkip("Set JOVIE_IOS_REAL_BROWSER_AUTH=1 to run the HTTPS browser auth flow.")
+    }
+
+    let app = try makeRealBrowserAuthApp()
+    app.launch()
+
+    XCTAssertTrue(
+      app.buttons["Get started"].waitForExistence(timeout: 10),
+      "Browser auth entry button did not appear.\n\(app.debugDescription)"
+    )
+
+    app.buttons["Get started"].tap()
+    acceptSystemAuthPromptIfNeeded()
+
+    let copyURLButton = app.buttons["Copy URL"]
+    let continueOnWebButton = app.buttons["Continue on Web"]
+    let authError = app.staticTexts["Couldn't finish sign-in. Try again."]
+    let deadline = Date().addingTimeInterval(60)
+
+    while Date() < deadline {
+      acceptSystemAuthPromptIfNeeded()
+
+      if copyURLButton.exists || continueOnWebButton.exists {
+        attachScreenshot(named: "real-browser-auth", app: app)
+        return
+      }
+
+      if authError.exists {
+        XCTFail("Real browser auth rendered the generic sign-in error.\n\(app.debugDescription)")
+        return
+      }
+
+      RunLoop.current.run(until: Date().addingTimeInterval(0.5))
+    }
+
+    XCTFail("Real browser auth did not reach dashboard or onboarding.\n\(app.debugDescription)")
+  }
+
+  func testAuthCallbackDeepLinkCompletesHarness() throws {
+    let app = launchMockApp(
+      launchArgument: "-ui-testing-auth-callback",
+      expectedElementDescription: "\"Get started\""
+    ) {
+      $0.buttons["Get started"]
+    }
+
+    try openAuthCallbackURL(
+      "ie.jov.jovie://auth/complete?code=test_code&state=state_123",
+      targetApp: app
+    )
+
+    XCTAssertTrue(
+      app.buttons["Copy URL"].waitForExistence(timeout: 10),
+      "Auth callback did not route to the authenticated shell.\n\(app.debugDescription)"
+    )
+
+    try openAuthCallbackURL(
+      "ie.jov.jovie://auth/complete?code=test_code&state=state_123",
+      targetApp: app
+    )
+
+    XCTAssertTrue(
+      app.buttons["Copy URL"].waitForExistence(timeout: 3),
+      "Duplicate auth callback should leave the authenticated shell stable.\n\(app.debugDescription)"
+    )
+  }
+
+  func testAuthCallbackProviderErrorShowsAuthError() throws {
+    let app = launchMockApp(
+      launchArgument: "-ui-testing-auth-callback",
+      expectedElementDescription: "\"Get started\""
+    ) {
+      $0.buttons["Get started"]
+    }
+
+    try openAuthCallbackURL(
+      "ie.jov.jovie://auth/complete?error=access_denied&error_description=Denied&state=state_123",
+      targetApp: app
+    )
+
+    XCTAssertTrue(
+      app.staticTexts["Couldn't finish sign-in. Try again."].waitForExistence(timeout: 10),
+      "Provider error callback did not render the auth error.\n\(app.debugDescription)"
+    )
+  }
+
   private func makeLiveClerkApp(launchArgument: String) throws -> XCUIApplication {
     let publishableKey =
-      ProcessInfo.processInfo.environment["CLERK_PUBLISHABLE_KEY"] ??
-      ProcessInfo.processInfo.environment["NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY"] ??
+      testEnvironmentValue("CLERK_PUBLISHABLE_KEY") ??
+      testEnvironmentValue("NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY") ??
       ""
     let apiBaseURL = ProcessInfo.processInfo.environment["API_BASE_URL"] ?? "http://localhost:3003"
     let emailAddress = try requiredEnvironmentValue("E2E_CLERK_USER_USERNAME")
@@ -194,13 +282,84 @@ final class JovieUITests: XCTestCase {
     return app
   }
 
+  private func makeRealBrowserAuthApp() throws -> XCUIApplication {
+    let publishableKey =
+      testEnvironmentValue("CLERK_PUBLISHABLE_KEY") ??
+      testEnvironmentValue("NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY") ??
+      ""
+    let apiBaseURL = try requiredHTTPSURL("API_BASE_URL")
+    let webBaseURL = try requiredHTTPSURL("WEB_BASE_URL")
+
+    guard !publishableKey.isEmpty else {
+      throw XCTSkip("Missing CLERK_PUBLISHABLE_KEY for HTTPS browser auth testing.")
+    }
+
+    let app = XCUIApplication()
+    app.launchArguments.append("-ui-testing-real-browser-auth")
+    app.launchArguments.append("-ui-testing-allow-exit")
+    app.launchEnvironment["API_BASE_URL"] = apiBaseURL
+    app.launchEnvironment["WEB_BASE_URL"] = webBaseURL
+    app.launchEnvironment["JOVIE_IOS_REAL_BROWSER_AUTH"] = "1"
+    app.launchEnvironment["JOVIE_IOS_REAL_BROWSER_AUTH_PERSONA"] =
+      testEnvironmentValue("JOVIE_IOS_REAL_BROWSER_AUTH_PERSONA") ?? "creator-ready"
+    app.launchEnvironment["CLERK_PUBLISHABLE_KEY"] = publishableKey
+    app.launchEnvironment["NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY"] = publishableKey
+
+    if let token = testEnvironmentValue("JOVIE_IOS_REAL_BROWSER_AUTH_TOKEN"),
+       !token.isEmpty
+    {
+      app.launchEnvironment["JOVIE_IOS_REAL_BROWSER_AUTH_TOKEN"] = token
+    }
+
+    addTeardownBlock { [app] in
+      self.endUITestSession(app)
+    }
+
+    return app
+  }
+
   private func requiredEnvironmentValue(_ key: String) throws -> String {
-    let value = ProcessInfo.processInfo.environment[key] ?? ""
+    let value = testEnvironmentValue(key) ?? ""
     guard !value.isEmpty else {
       throw XCTSkip("Missing \(key) for live Clerk UI testing.")
     }
 
     return value
+  }
+
+  private func requiredHTTPSURL(_ key: String) throws -> String {
+    let value = testEnvironmentValue(key) ?? ""
+    guard let url = URL(string: value),
+          url.scheme?.lowercased() == "https",
+          url.host?.isEmpty == false
+    else {
+      throw XCTSkip("Missing HTTPS \(key) for real browser auth testing.")
+    }
+
+    return value
+  }
+
+  private func testEnvironmentValue(_ key: String) -> String? {
+    if let value = ProcessInfo.processInfo.environment[key], !value.isEmpty {
+      return value
+    }
+
+    guard
+      let contents = try? String(
+        contentsOfFile: "/tmp/jovie-ios-real-browser-auth.env",
+        encoding: .utf8
+      )
+    else {
+      return nil
+    }
+
+    for line in contents.split(separator: "\n") {
+      let parts = line.split(separator: "=", maxSplits: 1).map(String.init)
+      guard parts.count == 2, parts[0] == key else { continue }
+      return parts[1]
+    }
+
+    return nil
   }
 
   private func launchMockApp(
@@ -234,6 +393,41 @@ final class JovieUITests: XCTestCase {
       line: line
     )
     return app
+  }
+
+  private func openAuthCallbackURL(
+    _ rawURL: String,
+    targetApp app: XCUIApplication,
+    file: StaticString = #filePath,
+    line: UInt = #line
+  ) throws {
+    guard let url = URL(string: rawURL) else {
+      XCTFail("Invalid auth callback URL: \(rawURL)", file: file, line: line)
+      return
+    }
+
+    app.open(url)
+    acceptSystemOpenPromptIfNeeded()
+    app.activate()
+  }
+
+  private func acceptSystemOpenPromptIfNeeded() {
+    let springboard = XCUIApplication(bundleIdentifier: "com.apple.springboard")
+    let openButton = springboard.buttons["Open"]
+    if openButton.waitForExistence(timeout: 2) {
+      openButton.tap()
+    }
+  }
+
+  private func acceptSystemAuthPromptIfNeeded() {
+    let springboard = XCUIApplication(bundleIdentifier: "com.apple.springboard")
+    for label in ["Continue", "Open"] {
+      let button = springboard.buttons[label]
+      if button.waitForExistence(timeout: 1) {
+        button.tap()
+        return
+      }
+    }
   }
 
   private func endUITestSession(_ app: XCUIApplication) {

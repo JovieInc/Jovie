@@ -5,6 +5,21 @@
      5|The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
      6|and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.5.51] - 2026-05-25
+
+> iOS native sign-in now completes the HTTPS browser callback path, exchanges the custom-scheme return, persists the session, and lands in the authenticated shell.
+
+### Fixed
+
+- **iOS native OAuth callback completion**: fixed the native exchange path so simulator HTTPS auth stores a real Clerk test user, exchanges the callback once, clears transient auth errors, and routes to the authenticated app shell instead of showing `Couldn't finish sign-in. Try again.`
+- **Mobile session-token API auth**: updated mobile `/me` and chat routes to authenticate bearer session tokens directly from the request, so native sessions no longer depend on Clerk middleware state.
+- **iOS runtime auth configuration**: made simulator/runtime environment values override stale local plist values, keeping `WEB_BASE_URL`, `API_BASE_URL`, and Clerk keys aligned for HTTPS auth tests.
+
+### Added
+
+- **HTTPS ASWebAuthenticationSession coverage**: added `pnpm test:auth:ios` with deterministic callback parser tests, custom-scheme simulator tests, and a real-browser HTTPS mode that launches through `ASWebAuthenticationSession` and returns via `ie.jov.jovie://auth/complete`.
+- **Native auth diagnostics**: added DEBUG/TestFlight-safe stage diagnostics for auth sheet open, callback receipt/parsing, native exchange, Clerk ticket sign-in, token hydration, `/api/mobile/v1/me`, and final route transitions.
+
 ## [26.5.50] - 2026-05-24
 
 > Chat now keeps profile and entity context visible in the right rail while tool work reads like a native inline activity feed instead of boxed status cards.

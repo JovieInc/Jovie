@@ -85,6 +85,7 @@
     "ios:setup-env": "bash apps/ios/scripts/setup-env.sh",
     "ios:build": "bash apps/ios/scripts/run-xcodebuild.sh build",
     "ios:test": "bash apps/ios/scripts/run-xcodebuild.sh test",
+    "test:auth:ios": "bash apps/ios/scripts/test-auth-callback.sh",
     "ios:screenshots": "bash apps/ios/scripts/capture-screenshots.sh",
     "build": "node scripts/turbo-local.mjs build",
     "build:web": "node scripts/turbo-local.mjs build --filter=@jovie/web",

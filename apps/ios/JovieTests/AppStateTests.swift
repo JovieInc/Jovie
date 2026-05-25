@@ -233,6 +233,38 @@ struct AppStateTests {
     )
   }
 
+  @Test func mobileBrowserAuthURLCanUseRealBrowserProviderCompleteHarness() {
+    setenv("JOVIE_IOS_REAL_BROWSER_AUTH", "1", 1)
+    setenv("JOVIE_IOS_REAL_BROWSER_AUTH_TOKEN", "token_123", 1)
+    defer {
+      unsetenv("JOVIE_IOS_REAL_BROWSER_AUTH")
+      unsetenv("JOVIE_IOS_REAL_BROWSER_AUTH_TOKEN")
+    }
+
+    let url = MobileBrowserAuthURLBuilder.signInURL(
+      baseURL: URL(string: "https://preview.example")!,
+      codeChallenge: "challenge_123"
+    )
+
+    #expect(
+      url?.absoluteString == "https://preview.example/api/dev/test-auth/mobile-provider-complete?client=ios&intent=sign_in&return_to=/app&code_challenge=challenge_123&code_challenge_method=S256&persona=creator-ready&test_token=token_123"
+    )
+  }
+
+  @Test func mobileBrowserAuthURLRejectsHTTPForRealBrowserHarness() {
+    setenv("JOVIE_IOS_REAL_BROWSER_AUTH", "1", 1)
+    defer {
+      unsetenv("JOVIE_IOS_REAL_BROWSER_AUTH")
+    }
+
+    let url = MobileBrowserAuthURLBuilder.signInURL(
+      baseURL: URL(string: "http://localhost:3100")!,
+      codeChallenge: "challenge_123"
+    )
+
+    #expect(url == nil)
+  }
+
   @Test func mobileAuthReturnParserAcceptsCodeCallback() {
     let result = MobileAuthReturnParser.parse(
       URL(string: "ie.jov.jovie://auth/complete?code=code_123&state=state_123")!,
@@ -254,6 +286,63 @@ struct AppStateTests {
     )
 
     #expect(result == nil)
+  }
+
+  @Test func mobileAuthReturnParserAcceptsProviderErrorCallback() {
+    let result = MobileAuthReturnParser.parseProviderError(
+      URL(
+        string: "ie.jov.jovie://auth/complete?error=access_denied&error_description=Denied&state=state_123"
+      )!
+    )
+
+    #expect(
+      result == MobileAuthProviderError(
+        error: "access_denied",
+        errorDescription: "Denied",
+        state: "state_123"
+      )
+    )
+    #expect(result?.userMessage == "Couldn't finish sign-in. Try again.")
+  }
+
+  @Test func mobileAuthReturnParserConsumesStoredVerifierForOpenURLCallback() async {
+    let store = MobileAuthPendingStore(
+      defaults: UserDefaults(suiteName: "MobileAuthPendingStoreTests-\(UUID().uuidString)")!
+    )
+    await store.save(codeVerifier: "verifier_123")
+
+    let result = await MobileAuthReturnParser.parse(
+      URL(string: "ie.jov.jovie://auth/complete?code=code_123&state=state_123")!,
+      pendingStore: store
+    )
+
+    #expect(
+      result == MobileAuthReturn(
+        code: "code_123",
+        state: "state_123",
+        codeVerifier: "verifier_123"
+      )
+    )
+  }
+
+  @Test func mobileAuthReturnParserConsumesPendingVerifierOnlyOnce() async {
+    let store = MobileAuthPendingStore(
+      defaults: UserDefaults(suiteName: "MobileAuthDuplicateCallbackTests-\(UUID().uuidString)")!
+    )
+    let callbackURL = URL(string: "ie.jov.jovie://auth/complete?code=code_123&state=state_123")!
+    await store.save(codeVerifier: "verifier_123")
+
+    let first = await MobileAuthReturnParser.parse(
+      callbackURL,
+      pendingStore: store
+    )
+    let second = await MobileAuthReturnParser.parse(
+      callbackURL,
+      pendingStore: store
+    )
+
+    #expect(first != nil)
+    #expect(second == nil)
   }
 
   @Test func chatLaunchModeOpensChatWithoutChangingReadyState() async throws {
