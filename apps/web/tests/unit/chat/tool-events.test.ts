@@ -19,6 +19,7 @@ const CHAT_ROUTE_TOOL_NAMES = [
   'submitFeedback',
   'showTopInsights',
   'proposeProfileEdit',
+  'importBioFromUrl',
   'checkCanvasStatus',
   'suggestRelatedArtists',
   'writeWorldClassBio',
