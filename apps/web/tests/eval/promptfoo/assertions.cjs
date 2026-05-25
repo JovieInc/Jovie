@@ -45,6 +45,26 @@ function allExecutions(payload) {
   return Array.isArray(payload.toolExecutions) ? payload.toolExecutions : [];
 }
 
+function containsExpected(actual, expected, path = '') {
+  if (!expected || typeof expected !== 'object' || Array.isArray(expected)) {
+    return Object.is(actual, expected)
+      ? null
+      : `${path || 'value'} expected ${JSON.stringify(expected)}, got ${JSON.stringify(actual)}`;
+  }
+
+  if (!actual || typeof actual !== 'object' || Array.isArray(actual)) {
+    return `${path || 'value'} expected object, got ${JSON.stringify(actual)}`;
+  }
+
+  for (const [key, expectedValue] of Object.entries(expected)) {
+    const nextPath = path ? `${path}.${key}` : key;
+    const mismatch = containsExpected(actual[key], expectedValue, nextPath);
+    if (mismatch) return mismatch;
+  }
+
+  return null;
+}
+
 function toolNames(payload) {
   return allCalls(payload)
     .map(call => call.toolName)
@@ -1343,6 +1363,69 @@ function assertToolDidNotExecute(output) {
   return pass();
 }
 
+function assertOnboardingStateNoSpend(output) {
+  const payload = parseOutput(output);
+
+  if (payload.target !== 'onboarding-state-contract') {
+    return fail('case did not run through the onboarding-state adapter');
+  }
+  if (payload.costTier !== 'deterministic') {
+    return fail('onboarding state case is not marked deterministic');
+  }
+  if (payload.modelCalled !== false || payload.selectedModel !== null) {
+    return fail('onboarding state case crossed the model boundary');
+  }
+  if (payload.persistenceAttempted !== false || payload.dbAttempted !== false) {
+    return fail('onboarding state case crossed the persistence boundary');
+  }
+  if (payload.networkAttempted !== false) {
+    return fail('onboarding state case crossed the network boundary');
+  }
+
+  return pass();
+}
+
+function assertOnboardingStateDecision(output) {
+  const payload = parseOutput(output);
+
+  if (payload.target !== 'onboarding-state-contract') {
+    return fail('case did not run through the onboarding-state adapter');
+  }
+  if (Array.isArray(payload.errors) && payload.errors.length > 0) {
+    return fail(`onboarding state errors: ${payload.errors.join('; ')}`);
+  }
+
+  const decisionMismatch = containsExpected(
+    payload.nextStepDecision,
+    payload.expectedDecision ?? {},
+    'nextStepDecision'
+  );
+  if (decisionMismatch) return fail(decisionMismatch);
+
+  const signalMismatch = containsExpected(
+    payload.collapsedSignal,
+    payload.expectedCollapsedSignal ?? {},
+    'collapsedSignal'
+  );
+  if (signalMismatch) return fail(signalMismatch);
+
+  if (
+    typeof payload.expectedSignalCount === 'number' &&
+    payload.signalCount !== payload.expectedSignalCount
+  ) {
+    return fail(
+      `signalCount expected ${payload.expectedSignalCount}, got ${payload.signalCount}`
+    );
+  }
+
+  const executions = allExecutions(payload);
+  if (!executions.some(execution => execution.name === 'proposeNextStep')) {
+    return fail('onboarding state case did not evaluate proposeNextStep');
+  }
+
+  return pass();
+}
+
 function assertSafeSocialUrl(output) {
   const payload = parseOutput(output);
   const input = payload.parsedInput ?? payload.input ?? {};
@@ -1910,6 +1993,7 @@ function assertEvalCaseInventoryCovered(output) {
     'missingSemanticInvalidCaseNames',
     'missingModelRoutingScenarioNames',
     'missingModelRoutingBoundaryNames',
+    'missingOnboardingStateCaseNames',
   ]) {
     const values = payload[field];
     if (!Array.isArray(values)) {
@@ -1972,6 +2056,8 @@ module.exports = {
   assertToolSemanticInvalid,
   assertToolExecuted,
   assertToolDidNotExecute,
+  assertOnboardingStateNoSpend,
+  assertOnboardingStateDecision,
   assertSafeSocialUrl,
   assertFailedToolResultPreserved,
   assertToolInventoryCovered,
