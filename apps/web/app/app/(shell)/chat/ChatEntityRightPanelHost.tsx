@@ -455,7 +455,7 @@ function ChatReleaseEntityPanel({
             </ChatEntityPanelSection>
           ) : null}
 
-          {release && shouldShowReleaseTasksSection ? (
+          {shouldShowReleaseTasksSection ? (
             <ChatEntityPanelSection
               title='Tasks'
               icon={<CheckSquare className='h-3.5 w-3.5 text-tertiary-token' />}
