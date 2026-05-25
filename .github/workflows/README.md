@@ -58,13 +58,13 @@ Promptfoo has explicit cost lanes:
 - **Live evals** run only from `pnpm run evals:live`, which is wrapped by Doppler at the repo root and still fails unless `JOVIE_RUN_LIVE_EVALS=1` and `AI_GATEWAY_API_KEY` are present. The live Promptfoo lane is manual-only, concurrency 1, and uses `--no-share --no-write`.
 - **Live HTTP evals** run only from `pnpm run evals:live:http`, require `JOVIE_RUN_LIVE_HTTP_EVALS=1` plus a loopback `JOVIE_PROMPTFOO_BASE_URL`, and unset model keys before running Promptfoo. This lane exercises real `/api/chat` HTTP auth and persistence with deterministic no-model chat paths.
 - **Live HTTP rate-limit evals** run only from `pnpm run evals:live:http:rate-limit`, require `JOVIE_RUN_LIVE_HTTP_RATE_LIMIT_EVALS=1`, `JOVIE_PROMPTFOO_EXPECT_REDIS_DISABLED=1`, and a loopback `JOVIE_PROMPTFOO_BASE_URL`. Start the local server with `JOVIE_DISABLE_REDIS_FOR_EVALS=1` and `JOVIE_DISABLE_MODEL_KEYS_FOR_EVALS=1`; this lane is manual-only and validates fail-closed 429 headers without touching shared Redis or model providers.
-- **Promptfoo eval-infrastructure-only PRs** short-circuit to deterministic eval CI before the `testing` label can fan out into Neon, Lighthouse, mobile overflow, or Playwright jobs. Use manual `workflow_dispatch` when a full CI run is intentionally needed for eval infrastructure.
+- **Promptfoo eval-infrastructure-only PRs** short-circuit to deterministic eval CI before the `testing` label can fan out into Neon, Lighthouse, mobile overflow, Playwright, or Vercel preview deploy jobs. Use manual `workflow_dispatch` when a full CI run is intentionally needed for eval infrastructure.
 
 The legacy `evals-periodic.yml` workflow is also manual-only. It has no scheduled trigger, requires typing `RUN_LIVE_EVALS` into `confirm_live_llm_evals`, and runs at concurrency 1 if explicitly invoked.
 
 Ship now / Re-evaluate when / Then:
 
-- Ship now: deterministic PR evals stay free, Promptfoo eval-infrastructure-only PRs do not fan out into heavyweight CI even when auto-labeled `testing`, every live LLM eval surface requires manual intent and concurrency 1, live HTTP route evals stay manual plus no-model, and live rate-limit evals require Redis/model-key-disabled local server mode.
+- Ship now: deterministic PR evals stay free, Promptfoo eval-infrastructure-only PRs do not fan out into heavyweight CI or preview deploys even when auto-labeled `testing`, every live LLM eval surface requires manual intent and concurrency 1, live HTTP route evals stay manual plus no-model, and live rate-limit evals require Redis/model-key-disabled local server mode.
 - Re-evaluate when: manual live evals catch a release-blocking regression twice in 30 days or observed live eval cost stays below the agreed per-run budget for 10 consecutive runs.
 - Then: add a capped scheduled or PR-gated live subset with explicit case count, concurrency 1, and per-run cost reporting.
 
