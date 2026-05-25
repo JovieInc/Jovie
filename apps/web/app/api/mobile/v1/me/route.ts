@@ -1,6 +1,6 @@
-import { auth } from '@clerk/nextjs/server';
 import { NextResponse } from 'next/server';
 import { getAppUrl, getProfileUrl } from '@/constants/domains';
+import { getCachedSessionTokenAuth } from '@/lib/auth/cached';
 import { isProfileComplete } from '@/lib/auth/profile-completeness';
 import { getSessionContext, SESSION_ERRORS } from '@/lib/auth/session';
 import { captureError } from '@/lib/error-tracking';
@@ -40,7 +40,7 @@ function buildNeedsOnboardingResponse(): NextResponse {
 
 export async function GET() {
   try {
-    const { userId } = await auth({ acceptsToken: 'session_token' });
+    const { userId } = await getCachedSessionTokenAuth();
     if (!userId) {
       return NextResponse.json(
         { error: 'Unauthorized' },

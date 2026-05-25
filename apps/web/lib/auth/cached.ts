@@ -38,7 +38,7 @@ function isMissingAuthRequestContext(error: unknown): boolean {
   );
 }
 
-async function resolveCachedAuth() {
+async function resolveCachedAuth(options?: { acceptsSessionToken?: boolean }) {
   const bypassSession = await getCachedDevTestAuthSession();
   if (bypassSession) {
     const result = {
@@ -50,7 +50,9 @@ async function resolveCachedAuth() {
     return result;
   }
 
-  const result = await auth();
+  const result = options?.acceptsSessionToken
+    ? await auth({ acceptsToken: 'session_token' })
+    : await auth();
   await attachSentryContext(result.userId);
   return result;
 }
@@ -75,6 +77,10 @@ async function resolveCachedAuth() {
  */
 export const getCachedAuth = cache(async () => {
   return resolveCachedAuth();
+});
+
+export const getCachedSessionTokenAuth = cache(async () => {
+  return resolveCachedAuth({ acceptsSessionToken: true });
 });
 
 /**

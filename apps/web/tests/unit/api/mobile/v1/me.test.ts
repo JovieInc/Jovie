@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const hoisted = vi.hoisted(() => ({
-  authMock: vi.fn(),
+  getCachedSessionTokenAuthMock: vi.fn(),
   captureErrorMock: vi.fn(),
   getAppUrlMock: vi.fn(),
   getProfileUrlMock: vi.fn(),
@@ -10,8 +10,9 @@ const hoisted = vi.hoisted(() => ({
   isAppleWalletProfilePassAvailableMock: vi.fn(),
 }));
 
-vi.mock('@clerk/nextjs/server', () => ({
-  auth: hoisted.authMock,
+vi.mock('@/lib/auth/cached', () => ({
+  getCachedAuth: hoisted.getCachedSessionTokenAuthMock,
+  getCachedSessionTokenAuth: hoisted.getCachedSessionTokenAuthMock,
 }));
 
 vi.mock('@/constants/domains', () => ({
@@ -45,7 +46,9 @@ const routeModulePromise = import('@/app/api/mobile/v1/me/route');
 describe('GET /api/mobile/v1/me', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    hoisted.authMock.mockResolvedValue({ userId: 'user_123' });
+    hoisted.getCachedSessionTokenAuthMock.mockResolvedValue({
+      userId: 'user_123',
+    });
     hoisted.getAppUrlMock.mockReturnValue('https://jov.ie/app');
     hoisted.getProfileUrlMock.mockImplementation(
       (handle: string) => `https://jov.ie/${handle}`
@@ -55,7 +58,7 @@ describe('GET /api/mobile/v1/me', () => {
   });
 
   it('returns 401 when unauthenticated', async () => {
-    hoisted.authMock.mockResolvedValue({ userId: null });
+    hoisted.getCachedSessionTokenAuthMock.mockResolvedValue({ userId: null });
 
     const { GET } = await routeModulePromise;
     const response = await GET();

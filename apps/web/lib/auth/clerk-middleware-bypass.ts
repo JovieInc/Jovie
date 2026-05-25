@@ -43,6 +43,7 @@ const AUTHENTICATED_API_PREFIXES = [
   '/api/stripe',
   '/api/suggestions',
   '/api/waitlist',
+  '/api/wallet',
 ] as const;
 
 const PUBLIC_API_EXACT_PATHS = [
