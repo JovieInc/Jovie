@@ -24,6 +24,7 @@ export const APP_ROUTES = {
   /** Legacy library path. Keep as a redirect source only. */
   LEGACY_DASHBOARD_LIBRARY: '/app/dashboard/library',
   DASHBOARD_LIBRARY: '/app/library',
+  THREADS: '/app/threads',
   /** Legacy release workspace route. Keep for old bookmarks and nested task aliases; use RELEASES for navigation. */
   DASHBOARD_RELEASES: '/app/dashboard/releases',
   /** Legacy tasks path. Keep for old bookmarks; use TASKS for navigation. */

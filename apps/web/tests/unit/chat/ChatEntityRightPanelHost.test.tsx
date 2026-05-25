@@ -15,11 +15,13 @@ const {
   mockUseReleasesQuery,
   mockUseContactsQuery,
   mockUseEventsQuery,
+  mockUsePlanGate,
 } = vi.hoisted(() => ({
   mockUseReleaseEntityQuery: vi.fn(),
   mockUseReleasesQuery: vi.fn(),
   mockUseContactsQuery: vi.fn(),
   mockUseEventsQuery: vi.fn(),
+  mockUsePlanGate: vi.fn(),
 }));
 let mockPreviewPanelOpen = false;
 
@@ -41,6 +43,20 @@ vi.mock('@/app/app/(shell)/dashboard/PreviewPanelContext', () => ({
     toggle: vi.fn(),
   }),
 }));
+
+vi.mock('@/lib/queries', async importOriginal => {
+  const actual = await importOriginal<typeof import('@/lib/queries')>();
+
+  return {
+    ...actual,
+    usePlanGate: mockUsePlanGate,
+    useCheckoutMutation: () => ({
+      mutate: vi.fn(),
+      isPending: false,
+      error: null,
+    }),
+  };
+});
 
 vi.mock('@/hooks/useRegisterRightPanel', () => ({
   useRegisterRightPanel: mockUseRegisterRightPanel,
@@ -220,6 +236,11 @@ describe('ChatEntityRightPanelHost', () => {
     mockUseContactsQuery.mockReturnValue({ data: [], isLoading: false });
     mockUseEventsQuery.mockClear();
     mockUseEventsQuery.mockReturnValue({ data: [], isLoading: false });
+    mockUsePlanGate.mockClear();
+    mockUsePlanGate.mockReturnValue({
+      canAccessTasksWorkspace: false,
+      isLoading: false,
+    });
   });
 
   it('registers no right panel when preview is closed', () => {
@@ -301,6 +322,13 @@ describe('ChatEntityRightPanelHost', () => {
       'release-1'
     );
     expect(mockUseReleasesQuery).not.toHaveBeenCalled();
+    expect(
+      screen.getByTestId('compact-release-plan-upgrade-card')
+    ).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Maybe Later' }));
+    expect(
+      screen.queryByTestId('compact-release-plan-upgrade-card')
+    ).not.toBeInTheDocument();
   });
 
   it('registers compact profile context cards without opening the full profile preview', async () => {

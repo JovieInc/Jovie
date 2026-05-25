@@ -546,7 +546,7 @@ export function ChatPageClient({
         );
       }
 
-      // New chats reserve the final URL with history.replaceState as soon as
+      // New threads reserve the final URL with history.replaceState as soon as
       // the server acknowledges the turn. A second router.replace on stream
       // completion remounts the chat surface and can let stale refetch data
       // replace the settled local timeline.

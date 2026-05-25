@@ -9,6 +9,7 @@ import {
   isPresenceShellRoute,
   isReleasesShellRoute,
   isTasksShellRoute,
+  isThreadsShellRoute,
   resolveAppShellRequestPath,
   shouldRedirectToOnboarding,
   shouldUseEssentialShellData,
@@ -81,6 +82,10 @@ describe('isChatShellRoute', () => {
     expect(isChatShellRoute(`${APP_ROUTES.CHAT}/thread-abc`)).toBe(true);
   });
 
+  it('matches the all threads route', () => {
+    expect(isChatShellRoute(APP_ROUTES.THREADS)).toBe(true);
+  });
+
   it('returns false for null', () => {
     expect(isChatShellRoute(null)).toBe(false);
   });
@@ -108,6 +113,16 @@ describe('isLibraryShellRoute', () => {
   it('matches the legacy dashboard library redirect route', () => {
     expect(isLibraryShellRoute(APP_ROUTES.LEGACY_DASHBOARD_LIBRARY)).toBe(true);
     expect(isLibraryShellRoute(APP_ROUTES.DASHBOARD_LIBRARY)).toBe(true);
+  });
+});
+
+describe('isThreadsShellRoute', () => {
+  it('matches the canonical threads route', () => {
+    expect(isThreadsShellRoute(APP_ROUTES.THREADS)).toBe(true);
+  });
+
+  it('matches nested threads subroutes', () => {
+    expect(isThreadsShellRoute(`${APP_ROUTES.THREADS}/recent`)).toBe(true);
   });
 });
 
@@ -179,6 +194,7 @@ describe('isCalendarShellRoute', () => {
 describe('shouldUseEssentialShellData', () => {
   it('returns true for chat routes', () => {
     expect(shouldUseEssentialShellData(APP_ROUTES.CHAT)).toBe(true);
+    expect(shouldUseEssentialShellData(APP_ROUTES.THREADS)).toBe(true);
   });
 
   it('returns true for releases routes', () => {
@@ -243,6 +259,7 @@ describe('shouldUseEssentialShellData', () => {
 describe('shouldRedirectToOnboarding', () => {
   it('returns true for lightweight shell routes', () => {
     expect(shouldRedirectToOnboarding(APP_ROUTES.CHAT)).toBe(true);
+    expect(shouldRedirectToOnboarding(APP_ROUTES.THREADS)).toBe(true);
     expect(shouldRedirectToOnboarding('/app/dashboard/releases')).toBe(true);
     expect(shouldRedirectToOnboarding(APP_ROUTES.LYRICS)).toBe(true);
     expect(shouldRedirectToOnboarding(APP_ROUTES.LIBRARY)).toBe(true);
@@ -270,12 +287,13 @@ describe('shouldRedirectToOnboarding', () => {
 });
 
 describe('shell foundation Wave 3 — route persistence + request budgets (no full reload / blank frame on warm nav)', () => {
-  it('lightweight shell routes (chat, releases, library, tasks, etc.) use essential shell data for minimal request count and stable HydrateClient root', () => {
+  it('lightweight shell routes (chat, threads, releases, library, tasks, etc.) use essential shell data for minimal request count and stable HydrateClient root', () => {
     // These routes return true → getDashboardShellData only (no full dashboardData)
     // Combined with always-on HydrateClient in DashboardShellContent, guarantees
     // AppShellFrame / sidebar / audio / header chrome do not remount on client nav.
     // Sidebar collapsed state (cookie), audio playback, and focus all persist.
     expect(shouldUseEssentialShellData(APP_ROUTES.CHAT)).toBe(true);
+    expect(shouldUseEssentialShellData(APP_ROUTES.THREADS)).toBe(true);
     expect(shouldUseEssentialShellData('/app/dashboard/releases')).toBe(true);
     expect(shouldUseEssentialShellData(APP_ROUTES.LIBRARY)).toBe(true);
     expect(shouldUseEssentialShellData(APP_ROUTES.TASKS)).toBe(true);

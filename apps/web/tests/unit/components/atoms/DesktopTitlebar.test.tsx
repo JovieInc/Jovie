@@ -80,7 +80,7 @@ describe('DesktopTitlebar', () => {
       screen.getByRole('button', { name: 'Collapse sidebar' })
     ).toBeInTheDocument();
     expect(
-      screen.queryByRole('link', { name: 'New chat' })
+      screen.queryByRole('link', { name: 'New thread' })
     ).not.toBeInTheDocument();
   });
 

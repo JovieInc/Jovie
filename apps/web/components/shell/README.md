@@ -17,7 +17,7 @@ ledger and delete-later inventory.
 | `IconBtn` | Square icon button with hover/active tones (ghost/primary/danger). Wraps `Tooltip`. | Yes |
 | `StatusBadge` | Release / track status pill (`live`, `scheduled`, `draft`, `announced`, `hidden`). | Yes |
 | `SidebarNavItem` | Single sidebar nav row — icon, label, badge, active state. Server-safe. | Yes |
-| `SidebarThreadsSection` | Threads section in the sidebar — top 5 inline, "View all" expands. | Yes |
+| `SidebarThreadsSection` | Threads section in the sidebar — top 5 inline, plus an "All threads" link to the full index. | Yes |
 | `EntityPopover` | Hover-anchored entity preview (release/artist/track/event/contact/teammate). Includes `EntityHoverLink`, `lookupArtistEntity`, `lookupReleaseEntityByAlbum`. | Yes — DrawerHero, lyrics breadcrumb, etc. |
 | `ShellDropdown` | Radix-backed dropdown with compound parts: `Header`, `Label`, `Item`, `EntityItem`, `CheckboxItem`, `RadioGroup`/`RadioItem`, `Sub`/`SubTrigger`/`SubContent`, `Separator`. Optional `searchable`. | Yes — overflow menus, sort/filter, palette switcher |
 
