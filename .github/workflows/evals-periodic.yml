@@ -1,8 +1,11 @@
 name: Periodic Evals
 on:
-  schedule:
-    - cron: '0 6 * * 1'  # Monday 6 AM UTC
   workflow_dispatch:
+    inputs:
+      confirm_live_llm_evals:
+        description: "Type RUN_LIVE_EVALS to run this legacy live LLM eval workflow."
+        required: true
+        default: ""
 
 permissions:
   contents: read
@@ -15,9 +18,11 @@ env:
   IMAGE: ghcr.io/${{ github.repository }}/ci
   EVALS_TIER: periodic
   EVALS_ALL: 1  # Ignore diff — run all periodic tests
+  EVALS_CONCURRENCY: "1"
 
 jobs:
   build-image:
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.confirm_live_llm_evals == 'RUN_LIVE_EVALS' }}
     runs-on: ubicloud-standard-2
     permissions:
       contents: read
@@ -58,6 +63,7 @@ jobs:
             ${{ steps.meta.outputs.tag }}
 
   evals:
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.confirm_live_llm_evals == 'RUN_LIVE_EVALS' }}
     runs-on: ubicloud-standard-2
     needs: build-image
     container:
@@ -118,9 +124,9 @@ jobs:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-          EVALS_CONCURRENCY: "40"
+          EVALS_CONCURRENCY: "1"
           PLAYWRIGHT_BROWSERS_PATH: /opt/playwright-browsers
-        run: EVALS=1 bun test --retry 2 --concurrent --max-concurrency 40 ${{ matrix.suite.file }}
+        run: EVALS=1 bun test --retry 0 --max-concurrency 1 ${{ matrix.suite.file }}
 
       - name: Upload eval results
         if: always()
