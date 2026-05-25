@@ -529,6 +529,208 @@ function assertWebRouteBillingRateLimit(output) {
   return pass();
 }
 
+function assertDeterministicNoSpend(output) {
+  const payload = parseOutput(output);
+
+  if (payload.costTier !== 'deterministic') {
+    return fail('case is not marked as deterministic');
+  }
+  if (payload.modelCalled !== false) {
+    return fail('deterministic case attempted a model call');
+  }
+  if (payload.selectedModel !== null) {
+    return fail('deterministic case selected a model');
+  }
+  if (payload.persistenceAttempted !== false) {
+    return fail('deterministic case attempted persistence');
+  }
+
+  return pass();
+}
+
+function assertToolAvailable(output) {
+  const payload = parseOutput(output);
+
+  if (payload.target !== 'tool-contract') {
+    return fail('case did not run through the tool-contract adapter');
+  }
+  if (payload.available !== true) {
+    return fail(`${payload.toolName ?? 'tool'} was not available`);
+  }
+
+  return pass();
+}
+
+function assertToolUnavailable(output) {
+  const payload = parseOutput(output);
+
+  if (payload.target !== 'tool-contract') {
+    return fail('case did not run through the tool-contract adapter');
+  }
+  if (payload.available !== false) {
+    return fail(`${payload.toolName ?? 'tool'} was unexpectedly available`);
+  }
+  if (payload.executionAttempted !== false) {
+    return fail('unavailable tool should not execute');
+  }
+
+  return pass();
+}
+
+function assertToolSchemaValid(output) {
+  const payload = parseOutput(output);
+
+  if (payload.target !== 'tool-contract') {
+    return fail('case did not run through the tool-contract adapter');
+  }
+  if (payload.schemaValid !== true) {
+    return fail(
+      `${payload.toolName ?? 'tool'} schema should be valid: ${(
+        payload.schemaErrors ?? []
+      ).join('; ')}`
+    );
+  }
+
+  return pass();
+}
+
+function assertToolSchemaInvalid(output) {
+  const payload = parseOutput(output);
+
+  if (payload.target !== 'tool-contract') {
+    return fail('case did not run through the tool-contract adapter');
+  }
+  if (payload.schemaValid !== false) {
+    return fail(`${payload.toolName ?? 'tool'} schema should be invalid`);
+  }
+  if (
+    !Array.isArray(payload.schemaErrors) ||
+    payload.schemaErrors.length === 0
+  ) {
+    return fail('invalid schema case did not include schema errors');
+  }
+  if (payload.executionAttempted !== false) {
+    return fail('invalid tool input should not execute');
+  }
+
+  return pass();
+}
+
+function assertToolSemanticInvalid(output) {
+  const payload = parseOutput(output);
+
+  if (payload.target !== 'tool-contract') {
+    return fail('case did not run through the tool-contract adapter');
+  }
+  if (payload.schemaValid !== true) {
+    return fail('semantic invalid case should still be schema-valid');
+  }
+  if (payload.semanticValid !== false) {
+    return fail(
+      `${payload.toolName ?? 'tool'} semantic validation should fail`
+    );
+  }
+  if (
+    !Array.isArray(payload.semanticErrors) ||
+    payload.semanticErrors.length === 0
+  ) {
+    return fail('semantic invalid case did not include semantic errors');
+  }
+  if (payload.executionAttempted !== false) {
+    return fail('semantically unsafe tool input should not execute');
+  }
+
+  return pass();
+}
+
+function assertToolExecuted(output) {
+  const payload = parseOutput(output);
+  const executions = allExecutions(payload);
+
+  if (payload.target !== 'tool-contract') {
+    return fail('case did not run through the tool-contract adapter');
+  }
+  if (payload.executionAttempted !== true) {
+    return fail(`${payload.toolName ?? 'tool'} did not execute`);
+  }
+  if (executions.length !== 1) {
+    return fail(`expected one tool execution, got ${executions.length}`);
+  }
+  if (executions[0]?.name !== payload.toolName) {
+    return fail('executed tool name does not match requested tool');
+  }
+  if (!executions[0]?.output || typeof executions[0].output !== 'object') {
+    return fail('tool execution did not return a structured result');
+  }
+
+  return pass();
+}
+
+function assertToolDidNotExecute(output) {
+  const payload = parseOutput(output);
+
+  if (payload.executionAttempted !== false) {
+    return fail(`${payload.toolName ?? 'tool'} unexpectedly executed`);
+  }
+  if (allExecutions(payload).length > 0) {
+    return fail('tool execution list should be empty');
+  }
+
+  return pass();
+}
+
+function assertSafeSocialUrl(output) {
+  const payload = parseOutput(output);
+  const input = payload.parsedInput ?? payload.input ?? {};
+  const url = String(input.url ?? '');
+
+  if (!/^https:\/\/(www\.)?instagram\.com\/lunawaves\/?$/i.test(url)) {
+    return fail(`expected safe synthetic Instagram URL, got "${url}"`);
+  }
+
+  return pass();
+}
+
+function assertFailedToolResultPreserved(output) {
+  const payload = parseOutput(output);
+  const execution = allExecutions(payload)[0];
+
+  if (!execution) {
+    return fail('tool was not executed');
+  }
+  if (execution.output?.success !== false) {
+    return fail('failed fixture result was not preserved');
+  }
+
+  return pass();
+}
+
+function assertToolInventoryCovered(output) {
+  const payload = parseOutput(output);
+
+  if (payload.target !== 'tool-inventory') {
+    return fail('case did not run through the tool-inventory adapter');
+  }
+  if (
+    Array.isArray(payload.missingToolNames) &&
+    payload.missingToolNames.length > 0
+  ) {
+    return fail(
+      `missing tool coverage: ${payload.missingToolNames.join(', ')}`
+    );
+  }
+  if (
+    Array.isArray(payload.unknownCoveredTools) &&
+    payload.unknownCoveredTools.length > 0
+  ) {
+    return fail(
+      `unknown covered tools: ${payload.unknownCoveredTools.join(', ')}`
+    );
+  }
+
+  return pass();
+}
+
 module.exports = {
   assertNoPromptLeak,
   assertGroundedReleaseLeadTime,
@@ -551,4 +753,15 @@ module.exports = {
   assertWebRouteClientTurnRequiresProfile,
   assertWebRouteChatDisabled,
   assertWebRouteBillingRateLimit,
+  assertDeterministicNoSpend,
+  assertToolAvailable,
+  assertToolUnavailable,
+  assertToolSchemaValid,
+  assertToolSchemaInvalid,
+  assertToolSemanticInvalid,
+  assertToolExecuted,
+  assertToolDidNotExecute,
+  assertSafeSocialUrl,
+  assertFailedToolResultPreserved,
+  assertToolInventoryCovered,
 };
