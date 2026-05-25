@@ -61,6 +61,20 @@ describe('buildSystemPrompt', () => {
     expect(prompt).toContain("call the 'showTopInsights' tool first");
   });
 
+  it('instructs off-topic refusals to pivot into useful music-career actions', () => {
+    const prompt = buildSystemPrompt(baseContext, [], {
+      aiCanUseTools: true,
+      aiDailyMessageLimit: 10,
+      insightsEnabled: true,
+    });
+
+    expect(prompt).toContain('## Useful Pivot');
+    expect(prompt).toContain(
+      'refuse only the unsupported part and immediately pivot'
+    );
+    expect(prompt).toContain('one concrete music-career action');
+  });
+
   it('does not instruct the model to call analytics tools when insights are disabled', () => {
     const prompt = buildSystemPrompt(baseContext, [], {
       aiCanUseTools: true,

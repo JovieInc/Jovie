@@ -1,5 +1,6 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
+import { APP_ROUTES } from '@/constants/routes';
 import {
   type SidebarThread,
   SidebarThreadsSection,
@@ -78,6 +79,23 @@ describe('SidebarThreadsSection', () => {
     });
   });
 
+  it('shows an all threads link when threads are present', () => {
+    render(
+      <SidebarThreadsSection
+        threads={threads}
+        activeThreadId={null}
+        allThreadsActive
+        tight
+        collapsed={false}
+      />
+    );
+
+    const allThreadsLink = screen.getByRole('link', { name: 'All threads' });
+
+    expect(allThreadsLink).toHaveAttribute('href', APP_ROUTES.THREADS);
+    expect(allThreadsLink).toHaveAttribute('aria-current', 'page');
+  });
+
   it('renders selectable button rows when no href is provided', () => {
     const onSelect = vi.fn();
 
@@ -103,5 +121,24 @@ describe('SidebarThreadsSection', () => {
     expect(threadButton).toHaveAttribute('aria-pressed', 'true');
     fireEvent.click(threadButton);
     expect(onSelect).toHaveBeenCalledWith('draft-thread');
+  });
+
+  it('shows a new thread empty-state action when no threads are available', () => {
+    const onNewThread = vi.fn();
+
+    render(
+      <SidebarThreadsSection
+        threads={[]}
+        activeThreadId={null}
+        onNewThread={onNewThread}
+        tight
+        collapsed={false}
+      />
+    );
+
+    const newThreadButton = screen.getByRole('button', { name: 'New thread' });
+
+    fireEvent.click(newThreadButton);
+    expect(onNewThread).toHaveBeenCalledTimes(1);
   });
 });

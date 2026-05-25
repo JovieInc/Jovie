@@ -402,6 +402,55 @@ function assertNoRoutePersistence(output) {
   return pass();
 }
 
+function assertDeterministicRouteNoSideEffects(output) {
+  const spendResult = assertDeterministicNoSpend(output);
+  if (!spendResult.pass) return spendResult;
+  return assertNoRoutePersistence(output);
+}
+
+function assertModelContractNoSpend(output) {
+  const payload = parseOutput(output);
+
+  if (payload.target !== 'model-contract') {
+    return fail('case did not run through the model-contract adapter');
+  }
+  if (payload.costTier !== 'deterministic') {
+    return fail('case is not marked as deterministic');
+  }
+  if (payload.modelCalled !== false) {
+    return fail('model-contract case attempted a model call');
+  }
+  if (payload.persistenceAttempted !== false) {
+    return fail('model-contract case attempted persistence');
+  }
+  if (toolNames(payload).length > 0 || allExecutions(payload).length > 0) {
+    return fail('model-contract case should not call or execute tools');
+  }
+
+  return pass();
+}
+
+function assertModelContractExpectedModel(output) {
+  const payload = parseOutput(output);
+
+  if (payload.target !== 'model-contract') {
+    return fail('case did not run through the model-contract adapter');
+  }
+  if (typeof payload.selectedModel !== 'string') {
+    return fail('model-contract did not expose selectedModel');
+  }
+  if (typeof payload.expectedModel !== 'string') {
+    return fail('model-contract case did not include expectedModel');
+  }
+  if (payload.selectedModel !== payload.expectedModel) {
+    return fail(
+      `expected ${payload.expectedBoundary} model ${payload.expectedModel}, got ${payload.modelBoundary} model ${payload.selectedModel}`
+    );
+  }
+
+  return pass();
+}
+
 function assertWebRouteUnauthorized(output) {
   const payload = parseOutput(output);
   const responseText = String(payload.responseText ?? '');
@@ -524,6 +573,78 @@ function assertWebRouteBillingRateLimit(output) {
   }
   if (/luna\.private@example\.com/i.test(responseText)) {
     return fail('rate-limit response echoed sensitive request content');
+  }
+
+  return pass();
+}
+
+function assertWebRouteStandardRateLimit(output) {
+  const payload = parseOutput(output);
+  const responseText = String(payload.responseText ?? '');
+
+  if (payload.target !== 'web-chat-route') {
+    return fail('case did not run through the web chat route contract');
+  }
+  if (payload.status !== 429) {
+    return fail(`expected 429, got ${String(payload.status)}`);
+  }
+  if (payload.responseJson?.errorCode !== 'RATE_LIMITED') {
+    return fail('missing RATE_LIMITED error code');
+  }
+  if (!payload.headers?.['Retry-After']) {
+    return fail('missing Retry-After header');
+  }
+  if (!/chat limit|try again later/i.test(responseText)) {
+    return fail('missing standard quota rate-limit guidance');
+  }
+  if (/billing status|billing settings/i.test(responseText)) {
+    return fail('standard rate-limit path used billing-outage guidance');
+  }
+
+  return pass();
+}
+
+function assertWebRouteMessageValidation(output) {
+  const payload = parseOutput(output);
+  const expected = String(payload.request?.expectedError ?? '');
+
+  if (payload.target !== 'web-chat-route') {
+    return fail('case did not run through the web chat route contract');
+  }
+  if (payload.status !== 400) {
+    return fail(`expected 400, got ${String(payload.status)}`);
+  }
+  if (!expected) {
+    return fail('route validation case did not include expectedError');
+  }
+  if (payload.responseJson?.error !== expected) {
+    return fail(
+      `expected "${expected}", got "${String(payload.responseJson?.error ?? '')}"`
+    );
+  }
+  if (payload.modelCalled !== false) {
+    return fail('invalid message route case attempted a model call');
+  }
+
+  return pass();
+}
+
+function assertWebRouteContractOnlySuccess(output) {
+  const payload = parseOutput(output);
+
+  if (payload.target !== 'web-chat-route') {
+    return fail('case did not run through the web chat route contract');
+  }
+  if (payload.status !== 200) {
+    return fail(`expected 200, got ${String(payload.status)}`);
+  }
+  if (payload.contractOnly !== true) {
+    return fail('successful deterministic route case was not contract-only');
+  }
+  if (
+    !/stops before model dispatch/i.test(payload.responseJson?.message ?? '')
+  ) {
+    return fail('contract-only response did not document the model boundary');
   }
 
   return pass();
@@ -731,6 +852,288 @@ function assertToolInventoryCovered(output) {
   return pass();
 }
 
+function assertToolUiRegistryCovered(output) {
+  const payload = parseOutput(output);
+
+  if (payload.target !== 'tool-inventory') {
+    return fail('case did not run through the tool-inventory adapter');
+  }
+  if (!Array.isArray(payload.missingToolUiRegistryNames)) {
+    return fail('missing tool-inventory field: missingToolUiRegistryNames');
+  }
+  if (!Array.isArray(payload.staleToolUiRegistryNames)) {
+    return fail('missing tool-inventory field: staleToolUiRegistryNames');
+  }
+  if (payload.missingToolUiRegistryNames.length > 0) {
+    return fail(
+      `missing tool UI registry coverage: ${payload.missingToolUiRegistryNames.join(', ')}`
+    );
+  }
+  if (payload.staleToolUiRegistryNames.length > 0) {
+    return fail(
+      `stale tool UI registry entries: ${payload.staleToolUiRegistryNames.join(', ')}`
+    );
+  }
+
+  return pass();
+}
+
+function assertSlashSkillVisibilityCovered(output) {
+  const payload = parseOutput(output);
+
+  if (payload.target !== 'tool-inventory') {
+    return fail('case did not run through the tool-inventory adapter');
+  }
+  if (!Array.isArray(payload.chatSlashSkillNames)) {
+    return fail('missing tool-inventory field: chatSlashSkillNames');
+  }
+  if (payload.chatSlashSkillNames.length === 0) {
+    return fail('chat slash exposes no skills');
+  }
+  if (!Array.isArray(payload.cmdkSkillNames)) {
+    return fail('missing tool-inventory field: cmdkSkillNames');
+  }
+  if (payload.cmdkSkillNames.length === 0) {
+    return fail('cmd+k exposes no skills');
+  }
+  if (
+    Array.isArray(payload.missingSkillCommandSchemaNames) &&
+    payload.missingSkillCommandSchemaNames.length > 0
+  ) {
+    return fail(
+      `slash skill commands missing schemas: ${payload.missingSkillCommandSchemaNames.join(', ')}`
+    );
+  }
+  if (
+    Array.isArray(payload.missingSkillCommandCaseNames) &&
+    payload.missingSkillCommandCaseNames.length > 0
+  ) {
+    return fail(
+      `slash skill commands missing eval cases: ${payload.missingSkillCommandCaseNames.join(', ')}`
+    );
+  }
+  if (
+    Array.isArray(payload.missingCmdkSkillNames) &&
+    payload.missingCmdkSkillNames.length > 0
+  ) {
+    return fail(
+      `chat slash skills missing from cmd+k: ${payload.missingCmdkSkillNames.join(', ')}`
+    );
+  }
+  if (
+    Array.isArray(payload.staleHiddenToolNames) &&
+    payload.staleHiddenToolNames.length > 0
+  ) {
+    return fail(
+      `hidden tool decisions reference unknown tools: ${payload.staleHiddenToolNames.join(', ')}`
+    );
+  }
+  if (
+    Array.isArray(payload.hiddenToolsWithoutReason) &&
+    payload.hiddenToolsWithoutReason.length > 0
+  ) {
+    return fail(
+      `hidden tools missing rationale: ${payload.hiddenToolsWithoutReason.join(', ')}`
+    );
+  }
+  if (
+    Array.isArray(payload.missingVisibilityDecisionNames) &&
+    payload.missingVisibilityDecisionNames.length > 0
+  ) {
+    return fail(
+      `tools missing visible/hidden command decision: ${payload.missingVisibilityDecisionNames.join(', ')}`
+    );
+  }
+
+  return pass();
+}
+
+function firstEvent(payload) {
+  return Array.isArray(payload.events) ? payload.events[0] : undefined;
+}
+
+function firstMessagePart(payload) {
+  return Array.isArray(payload.messageParts)
+    ? payload.messageParts[0]
+    : undefined;
+}
+
+function assertToolEventInventoryCovered(output) {
+  const payload = parseOutput(output);
+
+  if (payload.target !== 'tool-event-contract') {
+    return fail('case did not run through the tool-event-contract adapter');
+  }
+  if (payload.source !== 'v2') {
+    return fail(`expected v2 tool events, got ${String(payload.source)}`);
+  }
+  if (payload.schemaValid !== true) {
+    return fail('tool events did not pass persisted schema validation');
+  }
+  if (
+    Array.isArray(payload.missingEventToolNames) &&
+    payload.missingEventToolNames.length > 0
+  ) {
+    return fail(
+      `missing persisted tool events: ${payload.missingEventToolNames.join(', ')}`
+    );
+  }
+  if (
+    Array.isArray(payload.missingHydratedToolNames) &&
+    payload.missingHydratedToolNames.length > 0
+  ) {
+    return fail(
+      `missing hydrated tool parts: ${payload.missingHydratedToolNames.join(', ')}`
+    );
+  }
+
+  return pass();
+}
+
+function assertToolEventHydratesSuccess(output) {
+  const payload = parseOutput(output);
+  const event = firstEvent(payload);
+  const part = firstMessagePart(payload);
+
+  if (payload.target !== 'tool-event-contract') {
+    return fail('case did not run through the tool-event-contract adapter');
+  }
+  if (payload.schemaValid !== true) {
+    return fail('tool event schema was invalid');
+  }
+  if (event?.state !== 'succeeded') {
+    return fail(`expected succeeded event, got ${String(event?.state)}`);
+  }
+  if (part?.state !== 'output-available') {
+    return fail(`expected output-available part, got ${String(part?.state)}`);
+  }
+  if (part?.toolName !== payload.toolName) {
+    return fail('hydrated part tool name did not match');
+  }
+
+  return pass();
+}
+
+function assertToolEventFailurePreserved(output) {
+  const payload = parseOutput(output);
+  const event = firstEvent(payload);
+  const part = firstMessagePart(payload);
+
+  if (payload.source !== 'legacy') {
+    return fail(`expected legacy source, got ${String(payload.source)}`);
+  }
+  if (event?.state !== 'failed') {
+    return fail(`expected failed event, got ${String(event?.state)}`);
+  }
+  if (!/provider unavailable/i.test(event?.errorMessage ?? '')) {
+    return fail('failed event did not preserve provider error text');
+  }
+  if (part?.state !== 'output-error') {
+    return fail(`expected output-error part, got ${String(part?.state)}`);
+  }
+  if (!/provider unavailable/i.test(part?.errorText ?? '')) {
+    return fail('hydrated failed part did not preserve provider error text');
+  }
+
+  return pass();
+}
+
+function assertToolEventApprovalRequested(output) {
+  const payload = parseOutput(output);
+  const event = firstEvent(payload);
+  const part = firstMessagePart(payload);
+
+  if (event?.state !== 'needs-approval') {
+    return fail(`expected needs-approval event, got ${String(event?.state)}`);
+  }
+  if (part?.state !== 'approval-requested') {
+    return fail(`expected approval-requested part, got ${String(part?.state)}`);
+  }
+  if (!part?.approval?.id) {
+    return fail('approval-requested part is missing approval id');
+  }
+
+  return pass();
+}
+
+function assertToolEventApprovalResponded(output) {
+  const payload = parseOutput(output);
+  const event = firstEvent(payload);
+  const part = firstMessagePart(payload);
+
+  if (event?.approval?.approved !== true) {
+    return fail('event did not preserve approved=true');
+  }
+  if (part?.state !== 'approval-responded') {
+    return fail(`expected approval-responded part, got ${String(part?.state)}`);
+  }
+  if (part?.approval?.approved !== true) {
+    return fail('hydrated part did not preserve approved=true');
+  }
+
+  return pass();
+}
+
+function assertToolEventDeniedHydrated(output) {
+  const payload = parseOutput(output);
+  const event = firstEvent(payload);
+  const part = firstMessagePart(payload);
+
+  if (event?.state !== 'denied') {
+    return fail(`expected denied event, got ${String(event?.state)}`);
+  }
+  if (part?.state !== 'output-denied') {
+    return fail(`expected output-denied part, got ${String(part?.state)}`);
+  }
+  if (part?.approval?.approved !== false) {
+    return fail('hydrated denied part did not preserve approved=false');
+  }
+
+  return pass();
+}
+
+function assertToolEventDedupeUsesLatest(output) {
+  const payload = parseOutput(output);
+  const event = firstEvent(payload);
+  const part = firstMessagePart(payload);
+
+  if (!Array.isArray(payload.events) || payload.events.length !== 1) {
+    return fail(`expected one deduped event, got ${payload.events?.length}`);
+  }
+  if (event?.state !== 'succeeded') {
+    return fail(`expected latest succeeded event, got ${String(event?.state)}`);
+  }
+  if (!/latest synthetic result/i.test(event?.summary ?? '')) {
+    return fail('deduped event did not keep latest summary');
+  }
+  if (part?.state !== 'output-available') {
+    return fail(`expected output-available part, got ${String(part?.state)}`);
+  }
+
+  return pass();
+}
+
+function assertToolEventInvalidRejected(output) {
+  const payload = parseOutput(output);
+
+  if (payload.source !== 'invalid') {
+    return fail(`expected invalid source, got ${String(payload.source)}`);
+  }
+  if (payload.schemaValid !== true) {
+    return fail(
+      'empty invalid decode result should still satisfy event schema'
+    );
+  }
+  if (Array.isArray(payload.events) && payload.events.length > 0) {
+    return fail('invalid payload produced persisted tool events');
+  }
+  if (Array.isArray(payload.messageParts) && payload.messageParts.length > 0) {
+    return fail('invalid payload produced hydrated message parts');
+  }
+
+  return pass();
+}
+
 module.exports = {
   assertNoPromptLeak,
   assertGroundedReleaseLeadTime,
@@ -743,16 +1146,22 @@ module.exports = {
   assertPitchingConflictReconciled,
   assertOnboardingSpotifyObservation,
   assertConciseJovieVoice,
+  assertModelContractNoSpend,
+  assertModelContractExpectedModel,
   assertMobileRouteUnauthorized,
   assertMobileRouteInvalidBody,
   assertMobileRouteRuntimeDisabled,
   assertNoRoutePersistence,
+  assertDeterministicRouteNoSideEffects,
   assertWebRouteUnauthorized,
   assertWebRouteInvalidJson,
   assertWebRouteMissingProfile,
   assertWebRouteClientTurnRequiresProfile,
   assertWebRouteChatDisabled,
   assertWebRouteBillingRateLimit,
+  assertWebRouteStandardRateLimit,
+  assertWebRouteMessageValidation,
+  assertWebRouteContractOnlySuccess,
   assertDeterministicNoSpend,
   assertToolAvailable,
   assertToolUnavailable,
@@ -764,4 +1173,14 @@ module.exports = {
   assertSafeSocialUrl,
   assertFailedToolResultPreserved,
   assertToolInventoryCovered,
+  assertToolUiRegistryCovered,
+  assertSlashSkillVisibilityCovered,
+  assertToolEventInventoryCovered,
+  assertToolEventHydratesSuccess,
+  assertToolEventFailurePreserved,
+  assertToolEventApprovalRequested,
+  assertToolEventApprovalResponded,
+  assertToolEventDeniedHydrated,
+  assertToolEventDedupeUsesLatest,
+  assertToolEventInvalidRejected,
 };

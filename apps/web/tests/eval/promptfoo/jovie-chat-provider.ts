@@ -1,13 +1,30 @@
 import { type ToolSet, tool, type UIMessage } from 'ai';
 import { z } from 'zod';
 import { APP_ROUTES } from '@/constants/routes';
-import { executeChatTurn, selectKnowledgeContextForTurn } from '@/lib/chat/run';
+import {
+  canUseLightModel,
+  executeChatTurn,
+  selectKnowledgeContextForTurn,
+} from '@/lib/chat/run';
+import {
+  decodeToolEvents,
+  type PersistedToolEvent,
+  persistedToolEventsSchema,
+  toolEventToMessagePart,
+} from '@/lib/chat/tool-events';
 import {
   FREE_TIER_TOOLS,
   ONBOARDING_TOOLS,
   TOOL_SCHEMAS,
 } from '@/lib/chat/tool-schemas';
+import { TOOL_UI_REGISTRY } from '@/lib/chat/tool-ui-registry';
 import type { ReleaseContext } from '@/lib/chat/types';
+import {
+  COMMANDS,
+  commandsForSurface,
+  HIDDEN_TOOLS,
+} from '@/lib/commands/registry';
+import { CHAT_MODEL, CHAT_MODEL_LIGHT } from '@/lib/constants/ai-models';
 import { getEntitlements, type PlanId } from '@/lib/entitlements/registry';
 import { NO_STORE_HEADERS } from '@/lib/http/headers';
 import {
@@ -18,8 +35,10 @@ import {
 type EvalVars = Record<string, unknown>;
 type EvalTarget =
   | 'chat-turn'
+  | 'model-contract'
   | 'mobile-chat-route'
   | 'tool-contract'
+  | 'tool-event-contract'
   | 'tool-inventory'
   | 'web-chat-route';
 
@@ -225,22 +244,31 @@ const MERCH_TOOL_NAMES = [
   'showArtistPayouts',
 ] as const;
 
-const PAID_TOOL_NAMES = [
-  ...FREE_TIER_TOOLS,
-  ...ACCOUNT_TOOL_NAMES,
-  'showTopInsights',
+const INSIGHT_TOOL_NAMES = ['showTopInsights'] as const;
+const ALBUM_ART_TOOL_NAMES = ['generateAlbumArt'] as const;
+const PROFILE_RELEASE_TOOL_NAMES = [
+  'createRelease',
+  'generateReleasePitch',
+] as const;
+const ALWAYS_PAID_TOOL_NAMES = [
   'proposeProfileEdit',
   'importBioFromUrl',
   'checkCanvasStatus',
   'suggestRelatedArtists',
   'writeWorldClassBio',
   'generateCanvasPlan',
-  'generateAlbumArt',
   'createPromoStrategy',
   'markCanvasUploaded',
   'formatLyrics',
-  'createRelease',
-  'generateReleasePitch',
+] as const;
+
+const PAID_TOOL_NAMES = [
+  ...FREE_TIER_TOOLS,
+  ...ACCOUNT_TOOL_NAMES,
+  ...INSIGHT_TOOL_NAMES,
+  ...ALWAYS_PAID_TOOL_NAMES,
+  ...ALBUM_ART_TOOL_NAMES,
+  ...PROFILE_RELEASE_TOOL_NAMES,
   ...MERCH_TOOL_NAMES,
 ] as const;
 
@@ -250,6 +278,28 @@ const FREE_APP_TOOL_NAMES = [
 ] as const;
 
 const ALL_EVAL_TOOL_NAMES = Object.keys(ALL_EVAL_TOOL_SCHEMAS).sort();
+const TOOL_UI_REGISTRY_NAMES = Object.keys(TOOL_UI_REGISTRY).sort();
+const CHAT_SLASH_SKILL_NAMES = commandsForSurface('chat-slash')
+  .filter(command => command.kind === 'skill')
+  .map(command => command.id)
+  .sort();
+const CMDK_SKILL_NAMES = commandsForSurface('cmdk')
+  .filter(command => command.kind === 'skill')
+  .map(command => command.id)
+  .sort();
+const ALL_COMMAND_SKILL_NAMES = COMMANDS.filter(
+  command => command.kind === 'skill'
+)
+  .map(command => command.id)
+  .sort();
+const HIDDEN_TOOL_NAMES = Object.keys(HIDDEN_TOOLS).sort();
+const HIDDEN_TOOL_REASONS = HIDDEN_TOOL_NAMES.reduce<Record<string, string>>(
+  (reasons, toolName) => {
+    reasons[toolName] = HIDDEN_TOOLS[toolName] ?? '';
+    return reasons;
+  },
+  {}
+);
 
 function toObject(value: unknown): Record<string, unknown> {
   return value && typeof value === 'object' && !Array.isArray(value)
@@ -281,7 +331,9 @@ function toMode(value: unknown): 'app' | 'onboarding' {
 function toTarget(value: unknown): EvalTarget {
   if (
     value === 'mobile-chat-route' ||
+    value === 'model-contract' ||
     value === 'tool-contract' ||
+    value === 'tool-event-contract' ||
     value === 'tool-inventory' ||
     value === 'web-chat-route'
   ) {
@@ -440,6 +492,28 @@ function buildRateLimitHeaders(
 
 function evaluateWebChatRouteContract(prompt: string, vars: EvalVars) {
   const body = buildDefaultWebChatBody(prompt, toObject(vars.body));
+  if (
+    typeof vars.messageCount === 'number' &&
+    Number.isInteger(vars.messageCount)
+  ) {
+    body.messages = Array.from({ length: vars.messageCount }, (_, index) => ({
+      id: `eval-web-route-message-${index + 1}`,
+      role: 'user',
+      parts: [{ type: 'text', text: `message ${index + 1}` }],
+    }));
+  }
+  if (
+    typeof vars.longUserMessageLength === 'number' &&
+    Number.isInteger(vars.longUserMessageLength)
+  ) {
+    body.messages = [
+      {
+        id: 'eval-web-route-long-message',
+        role: 'user',
+        parts: [{ type: 'text', text: 'x'.repeat(vars.longUserMessageLength) }],
+      },
+    ];
+  }
   const authenticated = toBoolean(vars.authenticated, false);
   const requestId =
     typeof vars.requestId === 'string' && vars.requestId.trim().length > 0
@@ -468,6 +542,8 @@ function evaluateWebChatRouteContract(prompt: string, vars: EvalVars) {
       chatDisabled: toBoolean(vars.chatDisabled, false),
       invalidJson: toBoolean(vars.invalidJson, false),
       rateLimited: toBoolean(vars.rateLimited, false),
+      expectedError:
+        typeof vars.expectedError === 'string' ? vars.expectedError : undefined,
     },
     costTier: 'deterministic',
     text: '',
@@ -608,6 +684,12 @@ function evaluateMobileChatRouteContract(prompt: string, vars: EvalVars) {
   const body = toObject(vars.body);
   const requestBody =
     typeof body.text === 'string' ? body : { ...body, text: prompt };
+  if (
+    typeof vars.longMobileTextLength === 'number' &&
+    Number.isInteger(vars.longMobileTextLength)
+  ) {
+    requestBody.text = 'x'.repeat(vars.longMobileTextLength);
+  }
   const authenticated = toBoolean(vars.authenticated, false);
   const basePayload = {
     target: 'mobile-chat-route',
@@ -620,6 +702,7 @@ function evaluateMobileChatRouteContract(prompt: string, vars: EvalVars) {
     request: {
       authenticated,
       body: requestBody,
+      invalidJson: toBoolean(vars.invalidJson, false),
     },
     costTier: 'deterministic',
     text: '',
@@ -642,7 +725,7 @@ function evaluateMobileChatRouteContract(prompt: string, vars: EvalVars) {
   }
 
   const parsed = parseMobileChatTurnRequest(requestBody);
-  if (!parsed) {
+  if (toBoolean(vars.invalidJson, false) || !parsed) {
     return {
       ...basePayload,
       status: 400,
@@ -659,6 +742,68 @@ function evaluateMobileChatRouteContract(prompt: string, vars: EvalVars) {
     headers: MOBILE_CHAT_NDJSON_HEADERS,
     events: [MOBILE_CHAT_RUNTIME_DISABLED_EVENT],
     responseText: ndjsonEvent(MOBILE_CHAT_RUNTIME_DISABLED_EVENT),
+  };
+}
+
+function evaluateModelContract(prompt: string, vars: EvalVars) {
+  const uiMessages = toUiMessages(prompt, vars);
+  const mode = toMode(vars.mode);
+  const plan = toPlanId(vars.plan);
+  const planLimits = getEntitlements(plan);
+  const aiCanUseTools = toBoolean(
+    vars.aiCanUseTools,
+    planLimits.booleans.aiCanUseTools
+  );
+  const forceLightModel = toBoolean(vars.forceLightModel, false);
+  const heuristicLightModel = canUseLightModel(uiMessages, aiCanUseTools);
+  const selectedModel =
+    forceLightModel || heuristicLightModel ? CHAT_MODEL_LIGHT : CHAT_MODEL;
+  const expectedModel =
+    vars.expectedModel === 'light'
+      ? CHAT_MODEL_LIGHT
+      : vars.expectedModel === 'primary'
+        ? CHAT_MODEL
+        : null;
+
+  return {
+    target: 'model-contract',
+    adapter: 'model-contract',
+    productionEntrypoint: 'apps/web/lib/chat/run.ts:executeChatTurn',
+    costTier: 'deterministic',
+    text: '',
+    selectedModel,
+    expectedModel,
+    modelBoundary: selectedModel === CHAT_MODEL_LIGHT ? 'light' : 'primary',
+    expectedBoundary:
+      expectedModel === CHAT_MODEL_LIGHT
+        ? 'light'
+        : expectedModel === CHAT_MODEL
+          ? 'primary'
+          : null,
+    lightModel: CHAT_MODEL_LIGHT,
+    primaryModel: CHAT_MODEL,
+    modelCalled: false,
+    persistenceAttempted: false,
+    toolCalls: [],
+    toolResults: [],
+    toolExecutions: [],
+    mode,
+    plan,
+    aiCanUseTools,
+    forceLightModel,
+    heuristicLightModel,
+    messageCount: uiMessages.length,
+    userText: uiMessages
+      .filter(message => message.role === 'user')
+      .flatMap(message =>
+        message.parts
+          .filter(
+            (part): part is { type: 'text'; text: string } =>
+              part.type === 'text' && typeof part.text === 'string'
+          )
+          .map(part => part.text)
+      )
+      .join('\n'),
   };
 }
 
@@ -711,9 +856,62 @@ function buildEvalReleases(vars: EvalVars): ReleaseContext[] {
   }));
 }
 
-function getToolNamesForTurn(mode: 'app' | 'onboarding', plan: PlanId) {
+function toBillingVerification(value: unknown) {
+  return typeof value === 'string' && value.trim().length > 0
+    ? value.trim()
+    : 'verified';
+}
+
+function resolveToolAvailabilityFlags(plan: PlanId, vars: EvalVars) {
+  const planLimits = getEntitlements(plan);
+  const billingVerification = toBillingVerification(vars.billingVerification);
+  const planAllowsPaidTools = Boolean(planLimits.booleans.aiCanUseTools);
+  const aiCanUseTools =
+    planAllowsPaidTools && toBoolean(vars.aiCanUseTools, true);
+
+  return {
+    billingVerification,
+    paidToolsEnabled:
+      plan !== 'free' && billingVerification === 'verified' && aiCanUseTools,
+    insightsEnabled: toBoolean(vars.insightsEnabled, true),
+    albumArtEnabled: toBoolean(vars.albumArtEnabled, true),
+    canGenerateAlbumArt: toBoolean(vars.canGenerateAlbumArt, true),
+    resolvedProfileIdPresent: toBoolean(vars.resolvedProfileIdPresent, true),
+    merchEnabled: toBoolean(vars.merchEnabled, true),
+    canAccessMerchCreation: toBoolean(
+      vars.canAccessMerchCreation,
+      Boolean(planLimits.booleans.canAccessMerchCreation)
+    ),
+  };
+}
+
+function getToolNamesForTurn(
+  mode: 'app' | 'onboarding',
+  plan: PlanId,
+  vars: EvalVars = {}
+) {
   if (mode === 'onboarding') return ONBOARDING_TOOLS;
-  return plan === 'free' ? FREE_APP_TOOL_NAMES : PAID_TOOL_NAMES;
+
+  const freeTools = [...FREE_APP_TOOL_NAMES];
+  const flags = resolveToolAvailabilityFlags(plan, vars);
+  if (!flags.paidToolsEnabled) return freeTools;
+
+  const toolNames: string[] = [...freeTools, ...ALWAYS_PAID_TOOL_NAMES];
+
+  if (flags.insightsEnabled) {
+    toolNames.push(...INSIGHT_TOOL_NAMES);
+  }
+  if (flags.albumArtEnabled && flags.canGenerateAlbumArt) {
+    toolNames.push(...ALBUM_ART_TOOL_NAMES);
+  }
+  if (flags.resolvedProfileIdPresent) {
+    toolNames.push(...PROFILE_RELEASE_TOOL_NAMES);
+  }
+  if (flags.merchEnabled && flags.canAccessMerchCreation) {
+    toolNames.push(...MERCH_TOOL_NAMES);
+  }
+
+  return toolNames;
 }
 
 function configuredToolResult(
@@ -997,7 +1195,8 @@ function evaluateToolContract(vars: EvalVars) {
     ALL_EVAL_TOOL_SCHEMAS[toolName as keyof typeof ALL_EVAL_TOOL_SCHEMAS];
   const input = Object.hasOwn(vars, 'toolInput') ? vars.toolInput : {};
   const schemaResult = schema.inputSchema.safeParse(input);
-  const availableToolNames = [...getToolNamesForTurn(mode, plan)];
+  const availabilityFlags = resolveToolAvailabilityFlags(plan, vars);
+  const availableToolNames = [...getToolNamesForTurn(mode, plan, vars)];
   const available = (availableToolNames as readonly string[]).includes(
     toolName
   );
@@ -1029,6 +1228,7 @@ function evaluateToolContract(vars: EvalVars) {
     toolName,
     mode,
     plan,
+    availabilityFlags,
     available,
     availableToolNames,
     schemaValid: schemaResult.success,
@@ -1058,6 +1258,34 @@ function evaluateToolInventory(vars: EvalVars) {
   const missingToolNames = ALL_EVAL_TOOL_NAMES.filter(
     toolName => !coveredSet.has(toolName)
   );
+  const missingToolUiRegistryNames = ALL_EVAL_TOOL_NAMES.filter(
+    toolName => !Object.hasOwn(TOOL_UI_REGISTRY, toolName)
+  );
+  const staleToolUiRegistryNames = TOOL_UI_REGISTRY_NAMES.filter(
+    toolName => !Object.hasOwn(ALL_EVAL_TOOL_SCHEMAS, toolName)
+  );
+  const missingSkillCommandSchemaNames = ALL_COMMAND_SKILL_NAMES.filter(
+    toolName => !Object.hasOwn(ALL_EVAL_TOOL_SCHEMAS, toolName)
+  );
+  const missingSkillCommandCaseNames = ALL_COMMAND_SKILL_NAMES.filter(
+    toolName => !coveredSet.has(toolName)
+  );
+  const missingCmdkSkillNames = CHAT_SLASH_SKILL_NAMES.filter(
+    toolName => !CMDK_SKILL_NAMES.includes(toolName)
+  );
+  const staleHiddenToolNames = HIDDEN_TOOL_NAMES.filter(
+    toolName => !Object.hasOwn(ALL_EVAL_TOOL_SCHEMAS, toolName)
+  );
+  const hiddenToolsWithoutReason = HIDDEN_TOOL_NAMES.filter(
+    toolName => !HIDDEN_TOOL_REASONS[toolName]?.trim()
+  );
+  const visibleOrHiddenToolNames = new Set([
+    ...ALL_COMMAND_SKILL_NAMES,
+    ...HIDDEN_TOOL_NAMES,
+  ]);
+  const missingVisibilityDecisionNames = ALL_EVAL_TOOL_NAMES.filter(
+    toolName => !visibleOrHiddenToolNames.has(toolName)
+  );
 
   return {
     target: 'tool-inventory',
@@ -1071,9 +1299,199 @@ function evaluateToolInventory(vars: EvalVars) {
     coveredToolNames: [...coveredSet].sort(),
     missingToolNames,
     unknownCoveredTools,
+    toolUiRegistryNames: TOOL_UI_REGISTRY_NAMES,
+    missingToolUiRegistryNames,
+    staleToolUiRegistryNames,
     freeAppToolNames: [...FREE_APP_TOOL_NAMES],
     onboardingToolNames: [...ONBOARDING_TOOLS],
     paidToolNames: [...PAID_TOOL_NAMES],
+    chatSlashSkillNames: CHAT_SLASH_SKILL_NAMES,
+    cmdkSkillNames: CMDK_SKILL_NAMES,
+    commandSkillNames: ALL_COMMAND_SKILL_NAMES,
+    hiddenToolNames: HIDDEN_TOOL_NAMES,
+    hiddenToolReasons: HIDDEN_TOOL_REASONS,
+    missingSkillCommandSchemaNames,
+    missingSkillCommandCaseNames,
+    missingCmdkSkillNames,
+    staleHiddenToolNames,
+    hiddenToolsWithoutReason,
+    missingVisibilityDecisionNames,
+  };
+}
+
+function getToolUiHint(toolName: string) {
+  return TOOL_UI_REGISTRY[toolName as keyof typeof TOOL_UI_REGISTRY]?.uiHint;
+}
+
+function toolEvent(
+  toolName: string,
+  overrides: Partial<PersistedToolEvent> = {}
+): PersistedToolEvent {
+  return {
+    schemaVersion: 2,
+    toolCallId: `${toolName}-event`,
+    toolName,
+    state: 'succeeded',
+    input: { synthetic: true },
+    output: {
+      success: true,
+      title: `${toolName} completed`,
+      summary: `${toolName} completed`,
+    },
+    summary: `${toolName} completed`,
+    uiHint: getToolUiHint(toolName) ?? 'status',
+    ...overrides,
+  };
+}
+
+function buildToolEventInput(eventCase: string, toolName: string): unknown[] {
+  switch (eventCase) {
+    case 'inventory':
+      return ALL_EVAL_TOOL_NAMES.map(name => toolEvent(name));
+    case 'legacy-success':
+      return [
+        {
+          type: 'tool-invocation',
+          toolInvocation: {
+            toolCallId: 'legacy-success-1',
+            toolName,
+            state: 'result',
+            args: { synthetic: true },
+            result: {
+              success: true,
+              title: 'Synthetic tool result',
+              summary: 'Synthetic tool result',
+            },
+          },
+        },
+      ];
+    case 'legacy-failure':
+      return [
+        {
+          type: 'tool-invocation',
+          toolInvocation: {
+            toolCallId: 'legacy-failure-1',
+            toolName,
+            state: 'result',
+            args: { synthetic: true },
+            result: {
+              success: false,
+              error: 'Synthetic provider unavailable',
+            },
+          },
+        },
+      ];
+    case 'approval-requested':
+      return [
+        toolEvent(toolName, {
+          toolCallId: 'approval-requested-1',
+          state: 'needs-approval',
+          output: undefined,
+          summary: undefined,
+          approval: { id: 'approval-requested-1-state' },
+        }),
+      ];
+    case 'approval-responded':
+      return [
+        toolEvent(toolName, {
+          toolCallId: 'approval-responded-1',
+          state: 'needs-approval',
+          output: undefined,
+          summary: undefined,
+          approval: {
+            id: 'approval-responded-1-state',
+            approved: true,
+            reason: 'Synthetic approval granted',
+          },
+        }),
+      ];
+    case 'denied':
+      return [
+        toolEvent(toolName, {
+          toolCallId: 'denied-1',
+          state: 'denied',
+          output: undefined,
+          summary: 'Synthetic approval denied',
+          errorMessage: 'Synthetic approval denied',
+          approval: {
+            id: 'denied-1-state',
+            approved: false,
+            reason: 'Synthetic approval denied',
+          },
+        }),
+      ];
+    case 'dedupe-latest':
+      return [
+        toolEvent(toolName, {
+          toolCallId: 'dedupe-1',
+          state: 'running',
+          output: undefined,
+          summary: undefined,
+        }),
+        toolEvent(toolName, {
+          toolCallId: 'dedupe-1',
+          state: 'succeeded',
+          output: {
+            success: true,
+            title: 'Latest synthetic result',
+          },
+          summary: 'Latest synthetic result',
+        }),
+      ];
+    case 'invalid':
+      return [{ type: 'not-a-tool-event', value: true }];
+    default:
+      throw new RangeError(`Invalid eval vars.eventCase: ${eventCase}`);
+  }
+}
+
+function evaluateToolEventContract(vars: EvalVars) {
+  const eventCase =
+    typeof vars.eventCase === 'string' ? vars.eventCase : 'legacy-success';
+  const toolName = toToolName(vars.toolName ?? 'showTopInsights');
+  const toolCalls = buildToolEventInput(eventCase, toolName);
+  const decoded = decodeToolEvents(toolCalls);
+  const schemaResult = persistedToolEventsSchema.safeParse(decoded.events);
+  const messageParts = schemaResult.success
+    ? schemaResult.data.map(event => toolEventToMessagePart(event))
+    : [];
+  const eventToolNames = decoded.events.map(event => event.toolName);
+  const hydratedToolNames = messageParts
+    .map(part => ('toolName' in part ? part.toolName : null))
+    .filter((name): name is string => typeof name === 'string');
+  const missingEventToolNames =
+    eventCase === 'inventory'
+      ? ALL_EVAL_TOOL_NAMES.filter(name => !eventToolNames.includes(name))
+      : [];
+  const missingHydratedToolNames =
+    eventCase === 'inventory'
+      ? ALL_EVAL_TOOL_NAMES.filter(name => !hydratedToolNames.includes(name))
+      : [];
+
+  return {
+    target: 'tool-event-contract',
+    adapter: 'tool-event-contract',
+    costTier: 'deterministic',
+    text: '',
+    selectedModel: null,
+    modelCalled: false,
+    persistenceAttempted: false,
+    toolName,
+    eventCase,
+    source: decoded.source,
+    schemaValid: schemaResult.success,
+    schemaErrors: schemaResult.success ? [] : schemaErrorMessages(schemaResult),
+    toolCalls,
+    events: decoded.events,
+    messageParts,
+    eventStates: decoded.events.map(event => event.state),
+    hydratedStates: messageParts.map(part =>
+      'state' in part ? part.state : null
+    ),
+    eventToolNames,
+    hydratedToolNames,
+    missingEventToolNames,
+    missingHydratedToolNames,
   };
 }
 
@@ -1146,8 +1564,28 @@ export default class JovieChatPromptfooProvider {
       };
     }
 
+    if (target === 'model-contract') {
+      const payload = evaluateModelContract(prompt, vars);
+      return {
+        output: JSON.stringify(payload),
+        raw: payload,
+        format: 'json',
+        latencyMs: Date.now() - startedAt,
+      };
+    }
+
     if (target === 'tool-contract') {
       const payload = evaluateToolContract(vars);
+      return {
+        output: JSON.stringify(payload),
+        raw: payload,
+        format: 'json',
+        latencyMs: Date.now() - startedAt,
+      };
+    }
+
+    if (target === 'tool-event-contract') {
+      const payload = evaluateToolEventContract(vars);
       return {
         output: JSON.stringify(payload),
         raw: payload,

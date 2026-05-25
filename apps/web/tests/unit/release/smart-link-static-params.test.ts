@@ -1,14 +1,18 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { loggerErrorMock, selectMock } = vi.hoisted(() => ({
+const { loggerErrorMock, selectMock, withRetryMock } = vi.hoisted(() => ({
   loggerErrorMock: vi.fn(),
   selectMock: vi.fn(),
+  withRetryMock: vi.fn(async (operation: () => Promise<unknown>) =>
+    operation()
+  ),
 }));
 
 vi.mock('@/lib/db', () => ({
   db: {
     select: selectMock,
   },
+  withRetry: withRetryMock,
 }));
 
 vi.mock('@/lib/utils/logger', () => ({

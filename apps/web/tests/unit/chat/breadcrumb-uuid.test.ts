@@ -3,16 +3,16 @@ import { getDemoBreadcrumbSegment } from '@/hooks/useAuthRouteConfig';
 import { getBreadcrumbLabel } from '@/lib/constants/breadcrumb-labels';
 
 describe('getBreadcrumbLabel', () => {
-  it('returns "New chat" for the chat segment', () => {
-    expect(getBreadcrumbLabel('chat')).toBe('New chat');
+  it('returns "New thread" for the chat segment', () => {
+    expect(getBreadcrumbLabel('chat')).toBe('New thread');
   });
 
   it('returns "Dashboard" for the dashboard segment', () => {
     expect(getBreadcrumbLabel('dashboard')).toBe('Dashboard');
   });
 
-  it('returns "New chat" for the app root segment', () => {
-    expect(getBreadcrumbLabel('app')).toBe('New chat');
+  it('returns "New thread" for the app root segment', () => {
+    expect(getBreadcrumbLabel('app')).toBe('New thread');
   });
 
   it('converts unknown kebab-case to sentence case', () => {

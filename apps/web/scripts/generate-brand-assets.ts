@@ -21,7 +21,8 @@
  *     Jovie-Logo-Mark-{Black,Cream}.svg.
  */
 
-import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { spawnSync } from 'node:child_process';
+import { mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import sharp from 'sharp';
@@ -45,6 +46,22 @@ const IOS_APP_ICON_DIR = resolve(IOS_ASSETS_DIR, 'AppIcon.appiconset');
 const IOS_LOGO_DIR = resolve(IOS_ASSETS_DIR, 'Jovie-logo.imageset');
 const DESKTOP_ASSETS_DIR = resolve(REPO_ROOT, 'apps/desktop/assets');
 const CONTACT_SHEET_PATH = resolve(BRAND_DIR, 'jovie-icon-contact-sheet.png');
+const STALE_DESKTOP_ICON_CACHE_DIRS = [
+  resolve(DESKTOP_ASSETS_DIR, 'icon.iconset'),
+  resolve(DESKTOP_ASSETS_DIR, 'icon-staging.iconset'),
+] as const;
+const MAC_ICONSET_ENTRIES = [
+  ['icon_16x16.png', 16],
+  ['icon_16x16@2x.png', 32],
+  ['icon_32x32.png', 32],
+  ['icon_32x32@2x.png', 64],
+  ['icon_128x128.png', 128],
+  ['icon_128x128@2x.png', 256],
+  ['icon_256x256.png', 256],
+  ['icon_256x256@2x.png', 512],
+  ['icon_512x512.png', 512],
+  ['icon_512x512@2x.png', 1024],
+] as const;
 
 const INK = '#08090a';
 const CREAM = '#F5F4F0';
@@ -206,6 +223,46 @@ async function renderTransparentMark(
   });
 }
 
+async function clearStaleDesktopIconCaches(): Promise<void> {
+  await Promise.all(
+    STALE_DESKTOP_ICON_CACHE_DIRS.map(async cacheDir => {
+      await rm(cacheDir, { recursive: true, force: true });
+    })
+  );
+}
+
+async function generateMacIcns(
+  output: string,
+  iconsetDir: string
+): Promise<void> {
+  try {
+    for (const [fileName, size] of MAC_ICONSET_ENTRIES) {
+      await renderAppIcon(resolve(iconsetDir, fileName), size);
+    }
+
+    const result = spawnSync(
+      'iconutil',
+      ['-c', 'icns', iconsetDir, '-o', output],
+      {
+        encoding: 'utf8',
+        stdio: 'pipe',
+      }
+    );
+
+    if (result.error) {
+      throw result.error;
+    }
+
+    if (result.status !== 0) {
+      throw new Error(
+        `iconutil failed for ${output}: ${result.stderr || result.stdout || `exit ${result.status}`}`
+      );
+    }
+  } finally {
+    await rm(iconsetDir, { recursive: true, force: true });
+  }
+}
+
 function parseIconPixelSize(size: string, scale: string): number {
   const logical = Number.parseFloat(size.split('x')[0] ?? '');
   const multiplier = Number.parseInt(scale.replace('x', ''), 10);
@@ -233,8 +290,17 @@ async function generateIosIcons(): Promise<void> {
 }
 
 async function generateDesktopIcons(): Promise<void> {
+  await clearStaleDesktopIconCaches();
   await renderAppIcon(resolve(DESKTOP_ASSETS_DIR, 'icon.png'), 512);
   await renderAppIcon(resolve(DESKTOP_ASSETS_DIR, 'icon-staging.png'), 512);
+  await generateMacIcns(
+    resolve(DESKTOP_ASSETS_DIR, 'icon.icns'),
+    resolve(DESKTOP_ASSETS_DIR, 'icon.iconset')
+  );
+  await generateMacIcns(
+    resolve(DESKTOP_ASSETS_DIR, 'icon-staging.icns'),
+    resolve(DESKTOP_ASSETS_DIR, 'icon-staging.iconset')
+  );
 }
 
 async function generateContactSheet(): Promise<void> {

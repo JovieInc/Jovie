@@ -20,6 +20,10 @@ inputs:
     description: 'Start cleanup when this many branches exist (should be less than limit)'
     required: false
     default: '7'
+  minimum_branch_age_minutes:
+    description: 'Do not delete ephemeral branches younger than this many minutes; protects other in-flight CI runs'
+    required: false
+    default: '120'
 
 outputs:
   branches_deleted:
@@ -53,6 +57,7 @@ runs:
         BRANCH_LIMIT: ${{ inputs.branch_limit }}
         PROTECTED_BRANCHES: ${{ inputs.protected_branches }}
         CLEANUP_THRESHOLD: ${{ inputs.cleanup_threshold }}
+        MINIMUM_BRANCH_AGE_MINUTES: ${{ inputs.minimum_branch_age_minutes }}
       run: |
         set -euo pipefail
 
@@ -82,7 +87,9 @@ runs:
         # Get branches sorted by creation time (oldest first), excluding protected ones
         DELETABLE_BRANCHES=$(echo "$BRANCHES_JSON" | jq -r '
           sort_by(.created_at) |
-          .[].name
+          .[] |
+          [.name, (.created_at // "")] |
+          @tsv
         ')
 
         DELETED_COUNT=0
@@ -92,7 +99,10 @@ runs:
           TARGET_COUNT=1
         fi
 
-        while IFS= read -r branch_name; do
+        MINIMUM_BRANCH_AGE_SECONDS=$((MINIMUM_BRANCH_AGE_MINUTES * 60))
+        NOW_SECONDS=$(date -u +%s)
+
+        while IFS=$'\t' read -r branch_name branch_created_at; do
           [ -z "$branch_name" ] && continue
 
           # Parallel CI jobs for the same workflow run may create multiple Neon
@@ -117,6 +127,17 @@ runs:
           if [ "$is_protected_branch" = true ]; then
             echo "Skipping protected branch: $branch_name"
             continue
+          fi
+
+          if [ -n "$branch_created_at" ]; then
+            branch_created_seconds=$(date -u -d "$branch_created_at" +%s 2>/dev/null || echo 0)
+            if [ "$branch_created_seconds" -gt 0 ]; then
+              branch_age_seconds=$((NOW_SECONDS - branch_created_seconds))
+              if [ "$branch_age_seconds" -lt "$MINIMUM_BRANCH_AGE_SECONDS" ]; then
+                echo "Skipping recently-created branch: $branch_name (${branch_age_seconds}s old)"
+                continue
+              fi
+            fi
           fi
 
           # SAFETY: Only delete branches that match ephemeral naming patterns.

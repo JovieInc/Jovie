@@ -6,24 +6,37 @@ import {
 import { getEntitlements } from '@/lib/entitlements/registry';
 
 const {
+  loggerErrorMock,
   selectMock,
   fromMock,
   leftJoinMock,
   whereMock,
   orderByMock,
   limitMock,
+  withRetryMock,
 } = vi.hoisted(() => ({
+  loggerErrorMock: vi.fn(),
   selectMock: vi.fn(),
   fromMock: vi.fn(),
   leftJoinMock: vi.fn(),
   whereMock: vi.fn(),
   orderByMock: vi.fn(),
   limitMock: vi.fn(),
+  withRetryMock: vi.fn(async (operation: () => Promise<unknown>) =>
+    operation()
+  ),
 }));
 
 vi.mock('@/lib/db', () => ({
   db: {
     select: selectMock,
+  },
+  withRetry: withRetryMock,
+}));
+
+vi.mock('@/lib/utils/logger', () => ({
+  logger: {
+    error: loggerErrorMock,
   },
 }));
 
@@ -112,6 +125,28 @@ describe('getCreatorEntitlements', () => {
       plan: 'pro',
       entitlements: getEntitlements('pro'),
     });
+  });
+
+  it('fails closed to free when the query errors', async () => {
+    selectMock.mockImplementation(() => {
+      throw new Error('db unavailable');
+    });
+
+    const result = await getCreatorEntitlements('profile_error');
+
+    expect(result).toEqual({
+      plan: 'free',
+      entitlements: getEntitlements('free'),
+    });
+    expect(loggerErrorMock).toHaveBeenCalledWith(
+      'Failed to load creator entitlements',
+      expect.objectContaining({
+        creatorProfileId: 'profile_error',
+        error: expect.any(Error),
+        helper: 'getCreatorEntitlements',
+      }),
+      'public-smart-link'
+    );
   });
 });
 

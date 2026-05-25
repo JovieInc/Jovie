@@ -43,11 +43,15 @@ export async function POST(request: Request) {
     }
 
     // Update user's admin status
+    const now = new Date();
     await db
       .update(users)
       .set({
         isAdmin: true,
-        updatedAt: new Date(),
+        isPro: true,
+        plan: 'max',
+        billingUpdatedAt: now,
+        updatedAt: now,
       })
       .where(eq(users.id, user.id));
 

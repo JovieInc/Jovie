@@ -73,7 +73,9 @@ export function buildFinalResponse(
   // Set CSP headers using the pre-generated nonce
   // The nonce was already set on request headers for Server Components
   if (nonce && pathInfo.needsNonce) {
-    const allowTestRuntimeRelaxations = process.env.E2E_ALLOW_DEV_CSP === '1';
+    const allowTestRuntimeRelaxations =
+      process.env.E2E_ALLOW_DEV_CSP === '1' ||
+      process.env.E2E_USE_TEST_AUTH_BYPASS === '1';
     res.headers.set(SCRIPT_NONCE_HEADER, nonce);
     res.headers.set(
       'Content-Security-Policy',

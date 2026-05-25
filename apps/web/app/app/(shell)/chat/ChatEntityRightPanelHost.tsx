@@ -3,6 +3,7 @@
 import { Button } from '@jovie/ui';
 import {
   Calendar,
+  CheckSquare,
   Disc3,
   ImageIcon,
   Link as LinkIcon,
@@ -13,11 +14,16 @@ import {
 } from 'lucide-react';
 import dynamic from 'next/dynamic';
 import Image from 'next/image';
-import { type ReactNode, useMemo } from 'react';
+import { useRouter } from 'next/navigation';
+import { type ReactNode, useEffect, useMemo, useState } from 'react';
 import { usePreviewPanelState } from '@/app/app/(shell)/dashboard/PreviewPanelContext';
+import { ReleaseTaskChecklist } from '@/components/features/dashboard/release-tasks/ReleaseTaskChecklist';
+import { CompactReleasePlanUpgradeCard } from '@/components/features/dashboard/tasks/TasksUpgradeInterstitial';
 import { ErrorBoundary } from '@/components/providers/ErrorBoundary';
+import { buildReleaseTasksRoute } from '@/constants/routes';
 import { useRegisterRightPanel } from '@/hooks/useRegisterRightPanel';
 import type { ReleaseViewModel } from '@/lib/discography/types';
+import { usePlanGate } from '@/lib/queries';
 import { useContactsQuery } from '@/lib/queries/useContactsQuery';
 import { type EventRecord, useEventsQuery } from '@/lib/queries/useEventsQuery';
 import { useReleaseEntityQuery } from '@/lib/queries/useReleaseEntityQuery';
@@ -284,12 +290,22 @@ function ChatReleaseEntityPanel({
   threadTitle?: string | null;
   onClose: () => void;
 }>) {
+  const router = useRouter();
+  const { canAccessTasksWorkspace, isLoading: isTasksWorkspaceGateLoading } =
+    usePlanGate();
+  const [showTasksUpgrade, setShowTasksUpgrade] = useState(true);
   const releaseDate = formatReleaseDate(release?.releaseDate);
   const visibleProviders = release?.providers.filter(provider => provider.url);
   const hasMedia =
     Boolean(release?.artworkUrl) ||
     Boolean(release?.previewUrl) ||
     Boolean(visibleProviders && visibleProviders.length > 0);
+  const shouldShowReleaseTasksSection =
+    isTasksWorkspaceGateLoading || canAccessTasksWorkspace || showTasksUpgrade;
+
+  useEffect(() => {
+    setShowTasksUpgrade(true);
+  }, [release?.id]);
 
   return (
     <aside
@@ -436,6 +452,42 @@ function ChatReleaseEntityPanel({
                   This release was referenced in the current chat thread.
                 </p>
               </div>
+            </ChatEntityPanelSection>
+          ) : null}
+
+          {shouldShowReleaseTasksSection ? (
+            <ChatEntityPanelSection
+              title='Tasks'
+              icon={<CheckSquare className='h-3.5 w-3.5 text-tertiary-token' />}
+            >
+              {isTasksWorkspaceGateLoading ? (
+                <div
+                  className='rounded-lg border border-subtle bg-surface-1 px-3 py-3'
+                  data-testid='chat-release-tasks-loading-state'
+                >
+                  <div
+                    className='h-4 w-28 rounded skeleton motion-reduce:animate-none'
+                    aria-hidden='true'
+                  />
+                  <div
+                    className='mt-3 h-20 rounded-md skeleton motion-reduce:animate-none'
+                    aria-hidden='true'
+                  />
+                </div>
+              ) : canAccessTasksWorkspace ? (
+                <ReleaseTaskChecklist
+                  releaseId={release.id}
+                  variant='compact'
+                  releaseDate={release.releaseDate}
+                  onNavigateToFullPage={() =>
+                    router.push(buildReleaseTasksRoute(release.id))
+                  }
+                />
+              ) : showTasksUpgrade ? (
+                <CompactReleasePlanUpgradeCard
+                  onDismiss={() => setShowTasksUpgrade(false)}
+                />
+              ) : null}
             </ChatEntityPanelSection>
           ) : null}
         </div>

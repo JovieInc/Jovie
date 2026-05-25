@@ -1,6 +1,7 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
+import { useIsomorphicLayoutEffect } from './useIsomorphicLayoutEffect';
 
 interface UseMediaQueryOptions {
   defaultValue?: boolean;
@@ -11,9 +12,18 @@ export function useMediaQuery(
   options: UseMediaQueryOptions = {}
 ): boolean {
   const { defaultValue = false } = options;
-  const [matches, setMatches] = useState<boolean>(defaultValue);
+  const [matches, setMatches] = useState<boolean>(() => {
+    if (
+      typeof globalThis !== 'undefined' &&
+      typeof globalThis.matchMedia === 'function'
+    ) {
+      return globalThis.matchMedia(query).matches;
+    }
 
-  useEffect(() => {
+    return defaultValue;
+  });
+
+  useIsomorphicLayoutEffect(() => {
     if (
       typeof window === 'undefined' ||
       typeof globalThis.matchMedia !== 'function'

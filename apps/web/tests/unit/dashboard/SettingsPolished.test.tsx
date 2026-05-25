@@ -81,7 +81,7 @@ describe('SettingsPolished', () => {
   });
 
   it('renders settings sections and sidebar navigation', () => {
-    render(
+    const { container } = render(
       <SettingsPolished
         artist={{ id: 'artist_1' } as Artist}
         onArtistUpdate={vi.fn()}
@@ -95,6 +95,11 @@ describe('SettingsPolished', () => {
     // Account section should be rendered
     const firstSection = document.getElementById('account');
     expect(firstSection).toBeTruthy();
+    expect(
+      container.querySelectorAll('section[aria-label$="settings group"] > h3')
+    ).toHaveLength(0);
+    expect(screen.queryByText('ACCOUNT')).not.toBeInTheDocument();
+    expect(screen.getByText('Account', { selector: 'p' })).toBeVisible();
   });
 
   it('keeps the full settings navigation visible when a section is focused', () => {

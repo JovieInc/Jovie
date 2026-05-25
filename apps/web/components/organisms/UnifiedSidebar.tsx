@@ -6,19 +6,14 @@ import {
   ContextMenuItem,
   ContextMenuTrigger,
 } from '@jovie/ui';
-import {
-  ArrowLeft,
-  Copy,
-  PanelLeftClose,
-  RefreshCw,
-  Settings,
-} from 'lucide-react';
+import { ArrowLeft, Copy, RefreshCw, Settings } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { useDashboardData } from '@/app/app/(shell)/dashboard/DashboardDataContext';
 import { BrandLogo } from '@/components/atoms/BrandLogo';
+import { SidebarCollapseButton } from '@/components/molecules/sidebar-collapse-button';
 import {
   Sidebar,
   SidebarContent,
@@ -28,11 +23,9 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
-  useSidebar,
 } from '@/components/organisms/Sidebar';
 import { UserButton } from '@/components/organisms/user-button';
 import { InstallBanner } from '@/components/shell/InstallBanner';
-import { Tooltip } from '@/components/shell/Tooltip';
 import { BASE_URL } from '@/constants/domains';
 import { APP_ROUTES, isDemoRoutePath } from '@/constants/routes';
 import { useShellSidebarOverride } from '@/contexts/ShellSidebarOverrideContext';
@@ -48,7 +41,6 @@ import { SidebarInstallBanner } from '@/features/feedback/SidebarInstallBanner';
 import { SidebarUpgradeBanner } from '@/features/feedback/SidebarUpgradeBanner';
 import { copyToClipboard } from '@/hooks/useClipboard';
 import { useProfileData } from '@/hooks/useProfileData';
-import { SIDEBAR_KEYBOARD_SHORTCUT_BARE } from '@/hooks/useSidebarKeyboardShortcut';
 import { useIsElectronRuntime } from '@/lib/desktop/electron-bridge';
 import { env } from '@/lib/env-client';
 import { useAppFlag } from '@/lib/flags/client';
@@ -209,41 +201,10 @@ function SettingsNavigation({
   );
 }
 
-/**
- * Visible dock/pin affordance for the New Design sidebar. Opens/closes the
- * sidebar in a way users can discover without keyboard knowledge; the same
- * state is persisted by the existing sidebar:state cookie via the SidebarContext.
- */
-function SidebarDockButton() {
-  const { toggleSidebar } = useSidebar();
-  return (
-    <Tooltip
-      label='Collapse sidebar'
-      side='bottom'
-      shortcut={{
-        keys: SIDEBAR_KEYBOARD_SHORTCUT_BARE,
-        description: 'Toggle sidebar',
-      }}
-      className='ml-auto group-data-[collapsible=icon]:hidden'
-    >
-      <button
-        type='button'
-        aria-label='Collapse sidebar'
-        data-sidebar-dock-button='true'
-        onClick={toggleSidebar}
-        className='flex size-7 shrink-0 items-center justify-center rounded-[10px] bg-transparent text-sidebar-item-icon transition-[background,color] duration-normal ease-interactive hover:bg-sidebar-accent/60 hover:text-sidebar-item-foreground focus-visible:outline-none focus-visible:bg-sidebar-accent/60 focus-visible:text-sidebar-item-foreground'
-      >
-        <PanelLeftClose className='size-3' />
-      </button>
-    </Tooltip>
-  );
-}
-
 /** Logo (clean header) or back button for settings/library */
 function SidebarHeaderNav({
   isRouteSidebar,
   isAdmin,
-  isDashboardOrAdmin,
   hasMultipleProfiles,
   isDemoRoute,
   routeBackHref = APP_ROUTES.DASHBOARD,
@@ -251,7 +212,6 @@ function SidebarHeaderNav({
 }: Readonly<{
   isRouteSidebar: boolean;
   isAdmin: boolean;
-  isDashboardOrAdmin: boolean;
   hasMultipleProfiles: boolean;
   isDemoRoute: boolean;
   routeBackHref?: string;
@@ -329,8 +289,8 @@ function SidebarHeaderNav({
         );
       })()}
 
-      {!isDesktop && !isRouteSidebar && isDashboardOrAdmin ? (
-        <SidebarDockButton />
+      {!isDesktop ? (
+        <SidebarCollapseButton className='ml-auto shrink-0' />
       ) : null}
     </div>
   );
@@ -459,7 +419,6 @@ export function UnifiedSidebar({ section }: UnifiedSidebarProps) {
         <SidebarHeaderNav
           isRouteSidebar={isRouteSidebar}
           isAdmin={isAdmin}
-          isDashboardOrAdmin={isDashboardOrAdmin}
           hasMultipleProfiles={hasMultipleProfiles}
           isDemoRoute={isDemoRoute}
           routeBackHref={sidebarOverride?.backHref}
@@ -473,11 +432,7 @@ export function UnifiedSidebar({ section }: UnifiedSidebarProps) {
             {isInSettings ? (
               <SettingsNavigation pathname={pathname} section={section} />
             ) : isInLibrary ? (
-              (sidebarOverride?.content ?? (
-                <div className='px-2.5 py-2 text-xs text-sidebar-muted'>
-                  Loading Library
-                </div>
-              ))
+              (sidebarOverride?.content ?? null)
             ) : (
               <DashboardNav />
             )}

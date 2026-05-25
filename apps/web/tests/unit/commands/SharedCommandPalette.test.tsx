@@ -129,6 +129,27 @@ describe('SharedCommandPalette (cmd+k surface)', () => {
     );
   });
 
+  it('adds Threads as a cmd+k-only nav route', () => {
+    expect(commandsForSurface('cmdk')).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          kind: 'nav',
+          id: 'go-threads',
+          label: 'Threads',
+          href: APP_ROUTES.THREADS,
+        }),
+      ])
+    );
+    expect(commandsForSurface('chat-slash')).not.toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          kind: 'nav',
+          id: 'go-threads',
+        }),
+      ])
+    );
+  });
+
   it('renders nav, skill, and release sections when open', () => {
     render(<CmdKPalette profileId='profile-1' open onOpenChange={vi.fn()} />);
     expect(screen.getByTestId('shared-command-palette')).toBeInTheDocument();

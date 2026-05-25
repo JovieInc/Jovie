@@ -15,6 +15,7 @@ export type AdminDataTableProps<TData> = UnifiedTableProps<TData>;
 export function AdminDataTable<TData>({
   className,
   enableVirtualization = true,
+  rowHeight = 40,
   minWidth = `${TABLE_MIN_WIDTHS.MEDIUM}px`,
   ...props
 }: Readonly<AdminDataTableProps<TData>>) {
@@ -23,6 +24,7 @@ export function AdminDataTable<TData>({
       {...props}
       className={cn(ADMIN_DATA_TABLE_CLASSNAME, className)}
       enableVirtualization={enableVirtualization}
+      rowHeight={rowHeight}
       minWidth={minWidth}
     />
   );

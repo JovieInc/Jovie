@@ -1,6 +1,7 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
+import { useIsomorphicLayoutEffect } from '@/hooks/useIsomorphicLayoutEffect';
 import { logger } from '@/lib/utils/logger';
 
 type ViewMode = 'list' | 'board';
@@ -58,7 +59,7 @@ export function useViewMode({
   const [isHydrated, setIsHydrated] = useState(false);
 
   // Hydrate from localStorage on mount
-  useEffect(() => {
+  useIsomorphicLayoutEffect(() => {
     const stored = localStorage.getItem(storageKey) as ViewMode | null;
 
     if (stored && availableModes.includes(stored)) {

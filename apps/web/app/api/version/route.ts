@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { env } from '@/lib/env';
 
 /**
  * GET /api/version
@@ -10,8 +11,13 @@ import { NextResponse } from 'next/server';
  * Cache-Control: no-store ensures each poll sees the live value.
  */
 export function GET() {
+  const buildId =
+    env.NEXT_PUBLIC_BUILD_SHA?.trim() ||
+    env.VERCEL_GIT_COMMIT_SHA?.slice(0, 7) ||
+    'dev';
+
   return NextResponse.json(
-    { buildId: process.env.VERCEL_GIT_COMMIT_SHA ?? 'dev' },
+    { buildId },
     { headers: { 'Cache-Control': 'no-store' } }
   );
 }

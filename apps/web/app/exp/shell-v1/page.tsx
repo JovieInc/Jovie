@@ -4109,7 +4109,6 @@ function DashboardHome() {
           isLoading={false}
           isSubmitting={false}
           placeholder='Ask Jovie'
-          shellChatV1
         />
       </div>
     </div>
@@ -4608,7 +4607,6 @@ function OnboardingCanvas({ onComplete }: { onComplete: () => void }) {
             placeholder={
               stage === 'welcome' ? 'Pick a handle…' : 'Talk to Jovie…'
             }
-            shellChatV1
           />
         </div>
       </footer>

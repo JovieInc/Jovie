@@ -63,16 +63,15 @@ export async function POST(request: NextRequest) {
     // Public rate limiting check (per-IP) - use 'visit' limiter for pixel events
     const rateLimitResult = await publicVisitLimiter.limit(clientIP);
     if (!rateLimitResult.success) {
-      return NextResponse.json(
-        { error: 'Rate limit exceeded' },
-        {
-          status: 429,
-          headers: {
-            ...NO_STORE_HEADERS,
-            ...createRateLimitHeaders(rateLimitResult),
-          },
-        }
-      );
+      // Pixel ingestion is best-effort. Return a silent success instead of a
+      // 429 so browser-based audits do not report console noise for retries.
+      return new NextResponse(null, {
+        status: 204,
+        headers: {
+          ...NO_STORE_HEADERS,
+          ...createRateLimitHeaders(rateLimitResult),
+        },
+      });
     }
 
     // Bot detection - silently skip recording for bots

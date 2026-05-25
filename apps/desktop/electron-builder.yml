@@ -31,7 +31,7 @@ mac:
     - target: zip
       arch:
         - universal
-  icon: assets/icon.png
+  icon: assets/icon.icns
 dmg:
   title: Jovie
   background: assets/dmg-background.png

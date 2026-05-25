@@ -26,6 +26,11 @@ export interface FeedbackAdminRow {
   };
 }
 
+export interface AdminFeedbackItemsResult {
+  readonly items: FeedbackAdminRow[];
+  readonly error: string | null;
+}
+
 export async function createFeedbackItem(params: {
   userId: string | null;
   message: string;
@@ -58,44 +63,56 @@ export async function createFeedbackItem(params: {
 export async function getAdminFeedbackItems(
   limit = 100
 ): Promise<FeedbackAdminRow[]> {
-  try {
-    const rows = await db
-      .select({
-        id: feedbackItems.id,
-        message: feedbackItems.message,
-        source: feedbackItems.source,
-        status: feedbackItems.status,
-        context: feedbackItems.context,
-        dismissedAt: feedbackItems.dismissedAt,
-        createdAt: feedbackItems.createdAt,
-        userId: users.id,
-        userName: users.name,
-        userEmail: users.email,
-        userClerkId: users.clerkId,
-      })
-      .from(feedbackItems)
-      .leftJoin(users, eq(feedbackItems.userId, users.id))
-      .orderBy(desc(feedbackItems.createdAt))
-      .limit(limit);
+  const rows = await db
+    .select({
+      id: feedbackItems.id,
+      message: feedbackItems.message,
+      source: feedbackItems.source,
+      status: feedbackItems.status,
+      context: feedbackItems.context,
+      dismissedAt: feedbackItems.dismissedAt,
+      createdAt: feedbackItems.createdAt,
+      userId: users.id,
+      userName: users.name,
+      userEmail: users.email,
+      userClerkId: users.clerkId,
+    })
+    .from(feedbackItems)
+    .leftJoin(users, eq(feedbackItems.userId, users.id))
+    .orderBy(desc(feedbackItems.createdAt))
+    .limit(limit);
 
-    return rows.map(row => ({
-      id: row.id,
-      message: row.message,
-      source: row.source,
-      status: row.status,
-      context: (row.context ?? {}) as Record<string, unknown>,
-      dismissedAt: row.dismissedAt,
-      createdAt: row.createdAt,
-      user: {
-        id: row.userId,
-        name: row.userName,
-        email: row.userEmail,
-        clerkId: row.userClerkId,
-      },
-    }));
+  return rows.map(row => ({
+    id: row.id,
+    message: row.message,
+    source: row.source,
+    status: row.status,
+    context: (row.context ?? {}) as Record<string, unknown>,
+    dismissedAt: row.dismissedAt,
+    createdAt: row.createdAt,
+    user: {
+      id: row.userId,
+      name: row.userName,
+      email: row.userEmail,
+      clerkId: row.userClerkId,
+    },
+  }));
+}
+
+export async function getAdminFeedbackItemsResult(
+  limit = 100
+): Promise<AdminFeedbackItemsResult> {
+  try {
+    return { items: await getAdminFeedbackItems(limit), error: null };
   } catch (error) {
     console.error('[feedback] getAdminFeedbackItems failed:', error);
-    return [];
+    return {
+      items: [],
+      error:
+        error instanceof Error
+          ? error.message
+          : 'Unable to load feedback items',
+    };
   }
 }
 

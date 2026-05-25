@@ -72,8 +72,13 @@ export function resolveAppShellRequestPath(
 export function isChatShellRoute(pathname: string | null): boolean {
   return (
     matchesExactRoute(pathname, APP_ROUTES.DASHBOARD) ||
-    matchesRoutePrefix(pathname, APP_ROUTES.CHAT)
+    matchesRoutePrefix(pathname, APP_ROUTES.CHAT) ||
+    matchesRoutePrefix(pathname, APP_ROUTES.THREADS)
   );
+}
+
+export function isThreadsShellRoute(pathname: string | null): boolean {
+  return matchesRoutePrefix(pathname, APP_ROUTES.THREADS);
 }
 
 export function isReleasesShellRoute(pathname: string | null): boolean {
@@ -136,6 +141,7 @@ function isShellOptimizedSettingsRoute(pathname: string | null): boolean {
 function isLightweightShellRoute(pathname: string | null): boolean {
   return (
     isChatShellRoute(pathname) ||
+    isThreadsShellRoute(pathname) ||
     isReleasesShellRoute(pathname) ||
     isLyricsShellRoute(pathname) ||
     isLibraryShellRoute(pathname) ||
@@ -156,6 +162,7 @@ export function shouldUseEssentialShellData(pathname: string | null): boolean {
 export function shouldRedirectToOnboarding(pathname: string | null): boolean {
   return (
     isChatShellRoute(pathname) ||
+    isThreadsShellRoute(pathname) ||
     isReleasesShellRoute(pathname) ||
     isLyricsShellRoute(pathname) ||
     isLibraryShellRoute(pathname) ||

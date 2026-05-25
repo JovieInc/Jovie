@@ -240,6 +240,15 @@ describe('dev-test-auth.server', () => {
         username: 'browse-admin-user',
       })
     );
+    expect(mockEnsureUserRecord).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        isAdmin: true,
+        plan: 'max',
+        isPro: true,
+        billingUpdatedAt: expect.any(Date),
+      })
+    );
     expect(mockEnsureCreatorProfileRecord).toHaveBeenCalledWith(
       expect.anything(),
       expect.objectContaining({

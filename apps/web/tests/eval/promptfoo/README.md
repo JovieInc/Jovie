@@ -2,10 +2,10 @@
 
 Runs a small Promptfoo suite against three local adapters:
 
-- A deterministic tool-contract adapter for chat and onboarding tool availability, schemas, stubbed outputs, and no-spend guarantees.
+- A deterministic tool-contract adapter for chat and onboarding tool availability, schemas, tool UI registry coverage, stubbed outputs, and no-spend guarantees.
 - The production `executeChatTurn()` path used by `/api/chat`, with synthetic Luna Waves fixtures and eval-only tool stubs. This live path is manual-only because it calls the model provider.
-- A deterministic route-contract adapter for `POST /api/chat`, covering unauthenticated requests, invalid JSON, missing profile context, client-turn preconditions, the chat kill switch, and billing-verification rate-limit messaging without starting Next, Clerk, or the database.
-- A deterministic route-contract adapter for `POST /api/mobile/v1/chat/turns`, covering unauthenticated, invalid-body, and `MOBILE_CHAT_RUNTIME_DISABLED` responses without starting Next or Clerk.
+- A deterministic route-contract adapter for `POST /api/chat`, covering unauthenticated requests, branch-ordering for the chat kill switch, invalid JSON, message validation, missing profile context, client-turn preconditions, rate-limit responses, and contract-only pre-dispatch success without starting Next, Clerk, or the database.
+- A deterministic route-contract adapter for `POST /api/mobile/v1/chat/turns`, covering unauthenticated, invalid JSON, invalid-body variants, and `MOBILE_CHAT_RUNTIME_DISABLED` responses without starting Next or Clerk.
 
 The default eval command is deterministic and does not call models, DB, Clerk, Spotify, Stripe, Slack, or a local Next server. The route-contract adapters mirror checked-in route behavior because direct route import in Promptfoo runs outside the Next/Clerk/DB server context.
 

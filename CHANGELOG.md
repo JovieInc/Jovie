@@ -5,6 +5,59 @@
      5|The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
      6|and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.5.56] - 2026-05-25
+
+> Native auth test harnesses now stay rate-limited in production even if simulator-only auth tokens are present.
+
+### Fixed
+
+- **Native auth exchange production guard**: restricted the real-browser auth harness rate-limit bypass to non-production deployments and added regression coverage for production and preview environments.
+- **Smoke auth bypass warmup**: pre-warms the dev test-auth session route and provisions the creator-ready persona through the test seeding path so parallel Turbopack smoke tests do not fall back to stale configured users.
+- **Neon CI branch cleanup**: retains recently-created ephemeral Neon branches so concurrent CI cleanup cannot delete another active run's database during auth and preview smoke tests.
+
+## [26.5.55] - 2026-05-25
+
+> Release metadata now matches the deployed build-info response and fails CI when it drifts.
+
+### Fixed
+
+- **Build-info release version (JOV-2586)**: synced `version.json`, `VERSION`, and workspace package versions so `/api/health/build-info` reports the current release version.
+
+### Changed
+
+- **Version guardrail (JOV-2586)**: runs the existing version audit in CI guardrails before deploy-related checks.
+
+## [26.5.53] - 2026-05-25
+
+> Admin People is now stable enough to trust during waitlist review, with flatter insights, clearer chat qualification, and proof of the full waitlist path.
+
+### Added
+
+- **Waitlist golden-path coverage (JOV-2572)**: adds local browser coverage for homepage to signup, chat qualification, waitlisting, admin approval, and app entry, with screenshots and video artifacts.
+- **Waitlist integrity signal (JOV-2572)**: Admin > People > Waitlist now surfaces missing user/waitlist links so signup drift is visible instead of looking like a clean table.
+
+### Changed
+
+- **Cleaner admin People tables**: Waitlist, Users, Releases, and Feedback use flatter shells, fixed row geometry, and compact release artwork so real data no longer blows up table rows.
+- **White homepage outcome cards**: artist-profile bento cards now use white surfaces with black text for the sharper Apple-style treatment.
+- **More useful chat qualification**: onboarding chat now pushes toward concrete artist, release, and profile context before putting qualified users on the waitlist.
+
+### Fixed
+
+- **Feedback visibility**: feedback posts now require confirmed persistence, and Admin Feedback reports load errors instead of disguising them as zero feedback.
+- **Insight card over-framing**: chat and dashboard insight cards drop the extra nested card treatment.
+
+## [26.5.52] - 2026-05-25
+
+> Shell chrome now reads calmer, with the sidebar collapse control in the header, the library route using one shell, and the chat composer/settings surfaces tightened up.
+
+### Fixed
+
+- **Shell navigation chrome**: removed the highlighted `New chat` treatment, moved the web collapse control into the header cluster, and kept the thicker collapse icon so the shell behaves the same in web and desktop contexts.
+- **Library shell cleanup**: registered the library route sidebar override, removed duplicate sidebar loading fallback behavior, and retuned the filter, release-date, and status surfaces to the shell-v1 accent palette.
+- **Chat composer stability**: tightened focus restoration after send, simplified the attachment menu copy, and gave dictation a visible active state with the updated shell button treatment.
+- **Settings hierarchy and usage meter**: flattened duplicated settings headers, normalized sidebar labels, and updated usage counters and progress fills to the Geist accent colors.
+
 ## [26.5.51] - 2026-05-25
 
 > iOS native sign-in now completes the HTTPS browser callback path, exchanges the custom-scheme return, persists the session, and lands in the authenticated shell.

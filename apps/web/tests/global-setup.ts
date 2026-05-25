@@ -2,6 +2,11 @@ import { clerkSetup } from '@clerk/testing/playwright';
 import { config } from 'dotenv';
 import path from 'path';
 import { APP_ROUTES } from '../constants/routes';
+import { TEST_AUTH_BYPASS_MODE, TEST_MODE_HEADER } from '../lib/auth/test-mode';
+import {
+  ensureDevTestAuthPersona,
+  resolveDevTestAuthPersona,
+} from './helpers/dev-test-auth-personas';
 import { seedTestData } from './seed-test-data';
 
 // Load environment variables in priority order (first-loaded wins with override: false)
@@ -131,6 +136,28 @@ async function globalSetup() {
     console.log('ℹ DATABASE_URL not set, skipping test data seeding');
   }
 
+  if (process.env.E2E_USE_TEST_AUTH_BYPASS === '1') {
+    const persona =
+      resolveDevTestAuthPersona(process.env.E2E_TEST_AUTH_PERSONA) ??
+      'creator-ready';
+
+    if (process.env.DATABASE_URL) {
+      try {
+        const actor = await ensureDevTestAuthPersona(persona);
+        console.log(
+          `✓ Dev test auth persona provisioned (${persona}: ${actor.clerkUserId})`
+        );
+      } catch (error) {
+        console.warn('⚠ Failed to provision dev test auth persona:', error);
+        if (isCI && isSmokeOnly) {
+          throw error;
+        }
+      }
+    } else {
+      console.log('ℹ DATABASE_URL not set, skipping dev auth persona seed');
+    }
+  }
+
   if (process.env.E2E_SKIP_WARMUP === '1') {
     console.log('ℹ E2E_SKIP_WARMUP=1, skipping Turbopack route warmup');
     console.log(`✅ E2E global setup complete in ${Date.now() - startTime}ms`);
@@ -152,6 +179,7 @@ async function globalSetup() {
     APP_ROUTES.CHAT, // auth.setup.ts navigates here — warm up to avoid cold-compile 404
     APP_ROUTES.LIBRARY,
     APP_ROUTES.RELEASES,
+    APP_ROUTES.TASKS,
     APP_ROUTES.AUDIENCE,
     APP_ROUTES.PRESENCE,
     APP_ROUTES.EARNINGS,
@@ -178,6 +206,23 @@ async function globalSetup() {
   }
 
   const apiWarmupRequests = [
+    ...(process.env.E2E_USE_TEST_AUTH_BYPASS === '1'
+      ? [
+          {
+            body: JSON.stringify({
+              persona:
+                resolveDevTestAuthPersona(process.env.E2E_TEST_AUTH_PERSONA) ??
+                'creator-ready',
+            }),
+            headers: {
+              'Content-Type': 'application/json',
+              [TEST_MODE_HEADER]: TEST_AUTH_BYPASS_MODE,
+            },
+            method: 'POST',
+            route: '/api/dev/test-auth/session',
+          },
+        ]
+      : []),
     {
       body: JSON.stringify({}),
       headers: { 'Content-Type': 'application/json' },

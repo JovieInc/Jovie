@@ -184,6 +184,14 @@ describe('ChatInput', () => {
 
     // Dropdown menu receives focus when opened (standard Radix behavior)
     expect(getByRole('menu')).toBeInTheDocument();
+    expect(
+      getByRole('menuitem', { name: /attach image/i })
+    ).toBeInTheDocument();
+    expect(screen.queryByText('Attachments')).not.toBeInTheDocument();
+    expect(
+      screen.queryByText('Drop images anywhere in chat.')
+    ).not.toBeInTheDocument();
+    expect(screen.queryByRole('separator')).not.toBeInTheDocument();
   });
 
   it('keeps composer controls at stable dimensions while using heavier icons', () => {
@@ -417,6 +425,10 @@ describe('ChatInput', () => {
 
     expect(MockSpeechRecognition.instances).toHaveLength(1);
     expect(MockSpeechRecognition.instances[0]?.start).toHaveBeenCalledTimes(1);
+    expect(dictationButton).toHaveAttribute('aria-pressed', 'true');
+    expect(dictationButton.className).toContain(
+      'bg-[color-mix(in_oklab,var(--geist-cyan-solid)_12%,var(--linear-app-content-surface))]'
+    );
     expect(
       screen.getByRole('button', { name: /stop dictation/i })
     ).toBeEnabled();

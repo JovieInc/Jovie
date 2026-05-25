@@ -119,8 +119,8 @@ function DesktopAuthContent() {
   const statusText = formatBrowserOpenStatus(openState, openError);
 
   return (
-    <main className='grid min-h-dvh place-items-center bg-[#06070a] px-6 text-white [color-scheme:dark]'>
-      <section className='w-full max-w-sm px-6 py-7 text-center'>
+    <main className='relative isolate grid min-h-dvh place-items-center bg-[#06070a] px-6 text-white [color-scheme:dark]'>
+      <section className='relative z-10 w-full max-w-sm px-6 py-7 text-center'>
         <h1 className='text-[22px] font-semibold leading-7'>
           Continue in browser
         </h1>

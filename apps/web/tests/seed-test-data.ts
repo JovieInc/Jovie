@@ -1172,6 +1172,9 @@ export async function seedTestData(options: SeedTestDataOptions = {}) {
               name: 'E2E Test',
               userStatus: 'active',
               isAdmin: true,
+              plan: 'max',
+              isPro: true,
+              billingUpdatedAt: new Date(),
             });
             console.log(
               `    ✓ Ensured E2E user with admin privileges (ID: ${userId})`

@@ -91,8 +91,15 @@ describe('SettingsUsageStatsSection', () => {
       screen.getByRole('progressbar', { name: 'Daily Messages usage' })
     ).toHaveAttribute('value', '4');
     expect(
+      screen.getByRole('progressbar', { name: 'Daily Messages usage' })
+        .className
+    ).toContain('bg-[color:var(--geist-cyan-solid)]');
+    expect(
       screen.getByRole('progressbar', { name: 'Monthly Capacity usage' })
     ).toHaveAttribute('value', '24');
+    expect(screen.getByText('Within Daily Limit')).toHaveClass(
+      'border-[color-mix(in_oklab,var(--geist-cyan-solid)_24%,transparent)]'
+    );
     expect(screen.getByText('6 left')).toBeInTheDocument();
     expect(screen.getByText('286 left')).toBeInTheDocument();
   });
@@ -121,6 +128,9 @@ describe('SettingsUsageStatsSection', () => {
       screen.getByText("You're almost out of messages")
     ).toBeInTheDocument();
     expect(screen.getByText('Pro')).toBeInTheDocument();
+    expect(screen.getByText('Near Daily Limit')).toHaveClass(
+      'border-[color-mix(in_oklab,var(--geist-blue-solid)_24%,transparent)]'
+    );
     expect(screen.getByRole('link', { name: /view plans/i })).toHaveAttribute(
       'href',
       '/pricing'

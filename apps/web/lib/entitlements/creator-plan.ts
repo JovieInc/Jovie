@@ -1,9 +1,10 @@
 import 'server-only';
 
 import { aliasedTable, eq, inArray } from 'drizzle-orm';
-import { db } from '@/lib/db';
+import { db, withRetry } from '@/lib/db';
 import { users } from '@/lib/db/schema/auth';
 import { creatorProfiles, userProfileClaims } from '@/lib/db/schema/profiles';
+import { logger } from '@/lib/utils/logger';
 import {
   checkBoolean,
   getEntitlements,
@@ -24,36 +25,53 @@ const legacyUsers = aliasedTable(users, 'legacy_users');
 export async function getCreatorEntitlements(
   creatorProfileId: string
 ): Promise<{ plan: PlanId; entitlements: PlanEntitlements }> {
-  const [result] = await db
-    .select({
-      claimedUserId: userProfileClaims.userId,
-      claimedPlan: claimedUsers.plan,
-      legacyUserId: creatorProfiles.userId,
-      legacyPlan: legacyUsers.plan,
-    })
-    .from(creatorProfiles)
-    .leftJoin(
-      userProfileClaims,
-      eq(userProfileClaims.creatorProfileId, creatorProfiles.id)
-    )
-    .leftJoin(claimedUsers, eq(claimedUsers.id, userProfileClaims.userId))
-    .leftJoin(legacyUsers, eq(legacyUsers.id, creatorProfiles.userId))
-    .where(eq(creatorProfiles.id, creatorProfileId))
-    .orderBy(userProfileClaims.userId)
-    .limit(1);
+  try {
+    const [result] = await withRetry(
+      () =>
+        db
+          .select({
+            claimedUserId: userProfileClaims.userId,
+            claimedPlan: claimedUsers.plan,
+            legacyUserId: creatorProfiles.userId,
+            legacyPlan: legacyUsers.plan,
+          })
+          .from(creatorProfiles)
+          .leftJoin(
+            userProfileClaims,
+            eq(userProfileClaims.creatorProfileId, creatorProfiles.id)
+          )
+          .leftJoin(claimedUsers, eq(claimedUsers.id, userProfileClaims.userId))
+          .leftJoin(legacyUsers, eq(legacyUsers.id, creatorProfiles.userId))
+          .where(eq(creatorProfiles.id, creatorProfileId))
+          .orderBy(userProfileClaims.userId)
+          .limit(1),
+      `creatorEntitlements(${creatorProfileId})`
+    );
 
-  const ownerUserId = result?.claimedUserId ?? result?.legacyUserId ?? null;
-  if (!ownerUserId) {
+    const ownerUserId = result?.claimedUserId ?? result?.legacyUserId ?? null;
+    if (!ownerUserId) {
+      return { plan: 'free', entitlements: getEntitlements('free') };
+    }
+
+    const plan =
+      ((result?.claimedUserId ? result.claimedPlan : result?.legacyPlan) as
+        | PlanId
+        | null
+        | undefined) ?? 'free';
+
+    return { plan, entitlements: getEntitlements(plan) };
+  } catch (error) {
+    logger.error(
+      'Failed to load creator entitlements',
+      {
+        creatorProfileId,
+        error,
+        helper: 'getCreatorEntitlements',
+      },
+      'public-smart-link'
+    );
     return { plan: 'free', entitlements: getEntitlements('free') };
   }
-
-  const plan =
-    ((result?.claimedUserId ? result.claimedPlan : result?.legacyPlan) as
-      | PlanId
-      | null
-      | undefined) ?? 'free';
-
-  return { plan, entitlements: getEntitlements(plan) };
 }
 
 /**

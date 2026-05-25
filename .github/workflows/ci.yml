@@ -107,11 +107,11 @@ jobs:
             exit 0
           fi
 
-          PROMPTFOO_HARNESS_FILE_PATTERN='^apps/web/tests/eval/promptfoo/'
-          PROMPTFOO_HARNESS_ALLOWED_PATTERN='^(\.github/workflows/ci\.yml|apps/web/tests/eval/promptfoo/.*|apps/web/package.*\.json|package.*\.json|pnpm-lock\.yaml)$'
-          if echo "$CHANGED_FILES" | grep -q -E "$PROMPTFOO_HARNESS_FILE_PATTERN" &&
-            ! echo "$CHANGED_FILES" | grep -v -E "$PROMPTFOO_HARNESS_ALLOWED_PATTERN" | grep -q .; then
-            echo "Promptfoo harness-only change: running deterministic eval CI and core static checks."
+          PROMPTFOO_INFRA_TRIGGER_PATTERN='^(\.github/workflows/evals-periodic\.yml|\.github/workflows/README\.md|apps/web/tests/eval/promptfoo/)'
+          PROMPTFOO_INFRA_ALLOWED_PATTERN='^(\.github/workflows/ci\.yml|\.github/workflows/evals-periodic\.yml|\.github/workflows/README\.md|apps/web/tests/eval/promptfoo/.*|apps/web/package.*\.json|package.*\.json|pnpm-lock\.yaml)$'
+          if echo "$CHANGED_FILES" | grep -q -E "$PROMPTFOO_INFRA_TRIGGER_PATTERN" &&
+            ! echo "$CHANGED_FILES" | grep -v -E "$PROMPTFOO_INFRA_ALLOWED_PATTERN" | grep -q .; then
+            echo "Promptfoo eval-infrastructure-only change: running deterministic eval CI and core static checks."
             echo "has_code_changes=true" >> "$GITHUB_OUTPUT"
             echo "run_promptfoo_evals=true" >> "$GITHUB_OUTPUT"
             for t in run_build run_test run_public_lighthouse run_dashboard_lighthouse run_onboarding_lighthouse run_admin_lighthouse run_chat_lighthouse run_e2e run_drizzle run_neon; do
@@ -202,9 +202,10 @@ jobs:
 
           # Neon ephemeral-branch gate: only spin up Neon when DB-relevant code changed.
           # Covers drizzle, lib/db, lib/queries, schema, cron routes, SQL files, and
-          # package.json changes that could affect drizzle/DB deps.
+          # lockfile changes that could affect drizzle/DB deps. Version-only package
+          # metadata changes should not spin up ephemeral Neon branches.
           # Jobs that create ephemeral Neon branches must check this flag before doing so.
-          NEON_PATTERN='^(apps/web/drizzle/|apps/web/lib/db/|apps/web/lib/queries/|apps/web/drizzle\.config\.ts|drizzle\.kit\.(m?js|ts)|.*\.sql$|apps/web/app/api/cron/|apps/web/package.*\.json|package.*\.json)'
+          NEON_PATTERN='^(apps/web/drizzle/|apps/web/lib/db/|apps/web/lib/queries/|apps/web/drizzle\.config\.ts|drizzle\.kit\.(m?js|ts)|.*\.sql$|apps/web/app/api/cron/|pnpm-lock\.yaml)'
           if echo "$CHANGED_FILES" | grep -q -E "$NEON_PATTERN"; then
             echo "run_neon=true" >> "$GITHUB_OUTPUT"
           else
@@ -271,6 +272,8 @@ jobs:
         env:
           BASE_REF: ${{ github.base_ref || 'main' }}
         run: node scripts/desktop-release-guard.mjs --base "origin/${BASE_REF}"
+      - name: Version consistency guard
+        run: node scripts/version-check.mjs
       - name: Next.js proxy guard
         # next-proxy-guard.mjs only uses Node built-ins (fs, path) — no pnpm install needed.
         # Running node directly avoids ERR_PNPM_OUTDATED_LOCKFILE on dependabot PRs that
@@ -1077,6 +1080,7 @@ jobs:
           NEXT_IGNORE_ESLINT: '1'
           NEXT_IGNORE_TYPECHECK: '1'
           NEXT_PRIVATE_SKIP_SIZE_CHECK: 'true'
+          SKIP_SKILLS_CATALOG_SYNC: '1'
 
       - name: Run Lighthouse CI (public launch thresholds)
         run: |
@@ -1215,6 +1219,7 @@ jobs:
           NEXT_IGNORE_ESLINT: '1'
           NEXT_IGNORE_TYPECHECK: '1'
           NEXT_PRIVATE_SKIP_SIZE_CHECK: 'true'
+          SKIP_SKILLS_CATALOG_SYNC: '1'
 
       - name: Run authenticated dashboard Lighthouse
         if: steps.check_changes.outputs.run_full_ci == 'true'
@@ -1359,6 +1364,7 @@ jobs:
           NEXT_IGNORE_ESLINT: '1'
           NEXT_IGNORE_TYPECHECK: '1'
           NEXT_PRIVATE_SKIP_SIZE_CHECK: 'true'
+          SKIP_SKILLS_CATALOG_SYNC: '1'
 
       - name: Run authenticated onboarding Lighthouse
         run: |
@@ -1493,6 +1499,7 @@ jobs:
           NEXT_IGNORE_ESLINT: '1'
           NEXT_IGNORE_TYPECHECK: '1'
           NEXT_PRIVATE_SKIP_SIZE_CHECK: 'true'
+          SKIP_SKILLS_CATALOG_SYNC: '1'
 
       - name: Run authenticated admin Lighthouse
         run: |
@@ -1628,6 +1635,7 @@ jobs:
           NEXT_IGNORE_ESLINT: '1'
           NEXT_IGNORE_TYPECHECK: '1'
           NEXT_PRIVATE_SKIP_SIZE_CHECK: 'true'
+          SKIP_SKILLS_CATALOG_SYNC: '1'
 
       - name: Run authenticated chat Lighthouse
         run: |
@@ -3813,7 +3821,11 @@ jobs:
       cancel-in-progress: false
     uses: ./.github/workflows/canary-health-gate.yml
     with:
-      deployment_url: https://staging.jov.ie
+      # Verify the exact deployment produced by deploy-staging instead of the
+      # shared staging alias. Merge-queue traffic can retarget staging.jov.ie
+      # while this gate is still retrying, which produces false negatives even
+      # when the freshly deployed preview is healthy.
+      deployment_url: ${{ needs.deploy-staging.outputs.deploy_url }}
       commit_sha: ${{ github.sha }}
       fallback_health_url: /api/health
     secrets:

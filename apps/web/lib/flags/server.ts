@@ -1,7 +1,9 @@
 import 'server-only';
 import { dedupe } from 'flags/next';
 import { cookies } from 'next/headers';
+import { isAdmin as checkAdminRole } from '@/lib/admin/roles';
 import {
+  APP_FLAG_DEFAULTS,
   APP_FLAG_OVERRIDE_KEYS,
   type AppFlagName,
   type AppFlagSnapshot,
@@ -20,6 +22,12 @@ import {
   PROFILE_ALERT_OPTIN_VARIANT_FLAG,
   SUBSCRIBE_CTA_VARIANT_FLAG,
 } from './registry';
+
+const ADMIN_DEFAULT_TRUE_FLAGS = new Set<AppFlagName>(
+  (Object.keys(APP_FLAG_DEFAULTS) as AppFlagName[]).filter(
+    flagName => flagName !== 'RELEASE_PLAN_DEMO'
+  )
+);
 
 function shouldHonorClientFlagOverrides(): boolean {
   return !(
@@ -50,6 +58,12 @@ export async function getAppFlagValue(
   const overrideValue = getAppFlagOverrideValue(flagName, overrides);
   if (overrideValue !== undefined) {
     return overrideValue;
+  }
+
+  if (options?.userId && ADMIN_DEFAULT_TRUE_FLAGS.has(flagName)) {
+    if (await checkAdminRole(options.userId)) {
+      return true;
+    }
   }
 
   return APP_FLAG_REGISTRY[flagName].run({

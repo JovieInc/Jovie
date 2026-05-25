@@ -479,6 +479,9 @@ async function ensureDevTestAuthActorForClerkUser(
     name: config.fullName,
     userStatus: 'active',
     isAdmin: config.isAdmin,
+    ...(persona === 'admin'
+      ? { plan: 'max' as const, isPro: true, billingUpdatedAt: new Date() }
+      : {}),
     // Ready creator is the paid dashboard QA baseline for gated surfaces.
     ...(persona === 'creator-ready'
       ? { plan: 'pro' as const, isPro: true, billingUpdatedAt: new Date() }

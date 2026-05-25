@@ -73,6 +73,7 @@ import { useViewMode } from '@/components/organisms/table/utils/useViewMode';
 import { APP_ROUTES } from '@/constants/routes';
 import { useRegisterHeaderActions } from '@/contexts/HeaderActionsContext';
 import { useBreakpoint } from '@/hooks/useBreakpoint';
+import { useIsomorphicLayoutEffect } from '@/hooks/useIsomorphicLayoutEffect';
 import { useMediaQuery } from '@/hooks/useMediaQuery';
 import { useRegisterRightPanel } from '@/hooks/useRegisterRightPanel';
 import { useAppFlag } from '@/lib/flags/client';
@@ -591,7 +592,6 @@ function TaskDocumentPanel({
   onUpdateAssignee,
   artistName,
   isDesktopLayout,
-  designV1,
 }: Readonly<{
   task: TaskView | null;
   title: string;
@@ -605,7 +605,6 @@ function TaskDocumentPanel({
   onUpdateAssignee: (taskId: string, assigneeKind: TaskAssigneeKind) => void;
   artistName?: string | null;
   isDesktopLayout: boolean;
-  designV1: boolean;
 }>) {
   const descriptionEditorRef = useRef<HTMLTextAreaElement>(null);
   const [descriptionHelperDismissed, setDescriptionHelperDismissed] =
@@ -645,31 +644,28 @@ function TaskDocumentPanel({
   }, [description, descriptionHelper]);
 
   if (!task) {
-    if (designV1) {
-      return (
-        <div className='flex min-h-0 flex-1 items-center justify-center px-8 py-8'>
-          <div className='max-w-sm text-center'>
-            <p className='text-[13px] leading-relaxed text-tertiary-token'>
-              Pick a task from the list to see what it needs.
-            </p>
-            <p className='mt-2 text-[11.5px] text-quaternary-token'>
-              Use the task list to scan the queue, then open the one that needs
-              attention.
-            </p>
-          </div>
-        </div>
-      );
-    }
-
     return (
-      <div className='flex min-h-0 flex-1 items-center justify-center px-6 py-6'>
-        <div className='max-w-[34rem] px-6 py-10 text-center'>
-          <div className='mx-auto flex h-11 w-11 items-center justify-center rounded-full bg-surface-1 text-secondary-token'>
-            <FileText className='h-5 w-5' />
+      <div className='flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden px-2 pb-2 pr-2 pt-2'>
+        <div className='flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden'>
+          <div
+            className='min-h-0 flex-1 overflow-y-auto overscroll-contain'
+            data-testid='task-document-scroll-region'
+          >
+            <div className='flex min-h-full items-center justify-center px-6 py-6'>
+              <div className='max-w-[34rem] px-6 py-10 text-center'>
+                <div className='mx-auto flex h-11 w-11 items-center justify-center rounded-full bg-surface-1 text-secondary-token'>
+                  <FileText className='h-5 w-5' />
+                </div>
+                <h2 className='mt-5 text-[21px] font-semibold tracking-[-0.03em] text-primary-token'>
+                  Pick a task from the list to see what it needs.
+                </h2>
+                <p className='mt-2 text-[13px] leading-relaxed text-tertiary-token'>
+                  Open a task to review its status, metadata, due state, and
+                  body in the detail pane.
+                </p>
+              </div>
+            </div>
           </div>
-          <h2 className='mt-5 text-[21px] font-semibold tracking-[-0.03em] text-primary-token'>
-            Select a task
-          </h2>
         </div>
       </div>
     );
@@ -1336,7 +1332,7 @@ export function TasksPageClient() {
   );
   const [assigneeFilter, setAssigneeFilter] = useState<
     TaskAssigneeKind | 'all'
-  >('all');
+  >('human');
   const [mobileScope, setMobileScope] = useState<MobileTaskScope>('all');
   const [showCancelledColumn, setShowCancelledColumn] = useState(false);
   const [draftTitle, setDraftTitle] = useState('');
@@ -1353,13 +1349,13 @@ export function TasksPageClient() {
   const deferredSearch = useDeferredValue(search);
   const { viewMode, setViewMode } = useViewMode({
     storageKey: 'jovie-dashboard-tasks-view-mode',
-    defaultMode: 'board',
+    defaultMode: 'list',
     availableModes: TASK_VIEW_MODES,
   });
   const isBoardMode = isDesktopTaskLayout && viewMode === 'board';
   const profileId = selectedProfile?.id;
 
-  useEffect(() => {
+  useIsomorphicLayoutEffect(() => {
     setHasResolvedResponsiveLayout(true);
   }, []);
 
@@ -1494,11 +1490,7 @@ export function TasksPageClient() {
         .reduce((total, column) => total + column.totalCount, 0),
     [filteredBoardData?.columns, visibleBoardStatuses]
   );
-  const effectiveSelectedTaskId =
-    selectedTaskId ??
-    (isDesktopTaskLayout && !isBoardMode && !designV1TasksEnabled
-      ? (visibleTasks[0]?.id ?? null)
-      : null);
+  const effectiveSelectedTaskId = selectedTaskId;
   const { data: selectedTaskData } = useTaskQuery(
     effectiveSelectedTaskId,
     profileId
@@ -1517,7 +1509,7 @@ export function TasksPageClient() {
     Boolean(deferredSearch.trim()) ||
     statusFilter !== 'all' ||
     priorityFilter !== 'all' ||
-    assigneeFilter !== 'all';
+    assigneeFilter !== 'human';
   const isResolvingProfile = !profileId || !hasResolvedResponsiveLayout;
   const isActiveBoardLoading = isResolvingProfile || isBoardLoading;
   const isActiveListLoading = isResolvingProfile || isLoading;
@@ -1527,14 +1519,13 @@ export function TasksPageClient() {
     !selectedTask ||
     shouldPrioritizeRightPanel;
   const showTaskDocumentPane =
-    ((isBoardMode && isDesktopTaskLayout && Boolean(selectedTask)) ||
-      (!isBoardMode && (isDesktopTaskLayout || Boolean(selectedTask)))) &&
-    !shouldPrioritizeRightPanel;
+    !shouldPrioritizeRightPanel &&
+    ((isDesktopTaskLayout && viewMode !== 'board') || Boolean(selectedTask));
   const clearFilters = useCallback(() => {
     setSearch('');
     setStatusFilter('all');
     setPriorityFilter('all');
-    setAssigneeFilter('all');
+    setAssigneeFilter('human');
     setMobileScope('all');
   }, []);
   const openReleases = useCallback(() => {
@@ -1706,24 +1697,14 @@ export function TasksPageClient() {
     const hasVisibleSelection = visibleTasks.some(
       task => task.id === selectedTaskId
     );
-    if (!hasVisibleSelection) {
-      if (!isDesktopTaskLayout && selectedTaskId === null) {
-        return;
-      }
-
-      setSelectedTaskId(
-        designV1TasksEnabled ? null : (visibleTasks[0]?.id ?? null)
-      );
+    if (selectedTaskId === null) {
+      return;
     }
-  }, [
-    designV1TasksEnabled,
-    isBoardMode,
-    isLoading,
-    isDesktopTaskLayout,
-    selectedTaskId,
-    tasks,
-    visibleTasks,
-  ]);
+
+    if (!hasVisibleSelection) {
+      setSelectedTaskId(null);
+    }
+  }, [isBoardMode, isLoading, selectedTaskId, tasks, visibleTasks]);
 
   const selectTaskByIndex = useCallback(
     (index: number) => {
@@ -2152,7 +2133,7 @@ export function TasksPageClient() {
                 className={cn(
                   'min-h-0 min-w-0',
                   TASK_WORKSPACE_PANE_CLASSNAME,
-                  selectedTask && showTaskDocumentPane && !isBoardMode
+                  viewMode !== 'board'
                     ? 'lg:flex-none lg:basis-[32rem] lg:min-w-[28rem] lg:max-w-[36rem] lg:border-r lg:border-[color-mix(in_oklab,var(--linear-app-shell-border)_74%,transparent)]'
                     : 'flex-1',
                   showTaskListPane ? 'block' : 'hidden',
@@ -2193,7 +2174,11 @@ export function TasksPageClient() {
                     ? 'lg:flex-none lg:w-[min(34rem,42vw)] lg:border-l lg:border-[color-mix(in_oklab,var(--linear-app-shell-border)_74%,transparent)]'
                     : 'flex-1',
                   TASK_WORKSPACE_PANE_CLASSNAME,
-                  showTaskDocumentPane ? 'flex' : 'hidden'
+                  showTaskDocumentPane
+                    ? isDesktopTaskLayout
+                      ? 'hidden lg:flex'
+                      : 'flex'
+                    : 'hidden'
                 )}
                 data-testid='task-document-pane'
               >
@@ -2217,7 +2202,6 @@ export function TasksPageClient() {
                     }
                     artistName={artistName}
                     isDesktopLayout={isDesktopTaskLayout}
-                    designV1={designV1TasksEnabled}
                   />
                 ) : (
                   <TaskDocumentPanel
@@ -2233,7 +2217,6 @@ export function TasksPageClient() {
                     onUpdateAssignee={NOOP_TASK_ASSIGNEE_UPDATE}
                     artistName={artistName}
                     isDesktopLayout={isDesktopTaskLayout}
-                    designV1={designV1TasksEnabled}
                   />
                 )}
               </div>

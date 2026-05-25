@@ -1,6 +1,6 @@
 'use client';
 
-import { CheckCircle, Copy, XCircle } from 'lucide-react';
+import { AlertTriangle, CheckCircle, Copy, XCircle } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import { Icon } from '@/components/atoms/Icon';
@@ -61,7 +61,7 @@ import { WaitlistKanbanCard } from './WaitlistKanbanCard';
  * - LocalStorage persistence for view and grouping preferences
  */
 export function AdminWaitlistTableWithViews(props: WaitlistTableProps) {
-  const { entries: initialEntries, pageSize, total } = props;
+  const { entries: initialEntries, pageSize, total, integrity } = props;
 
   // View mode state with localStorage persistence
   const [viewMode, setViewMode] = useState<ViewMode>(readViewModePreference);
@@ -302,6 +302,9 @@ export function AdminWaitlistTableWithViews(props: WaitlistTableProps) {
               title='Waitlist'
               subtitle='Track pipeline state and move prospects from new to claimed.'
             />
+            {integrity ? (
+              <WaitlistIntegrityStatus integrity={integrity} />
+            ) : null}
             <AdminTableSubheader
               start={
                 <div className={PAGE_TOOLBAR_META_TEXT_CLASS}>
@@ -395,5 +398,33 @@ export function AdminWaitlistTableWithViews(props: WaitlistTableProps) {
         }
       </AdminTableShell>
     </QueryErrorBoundary>
+  );
+}
+
+function WaitlistIntegrityStatus({
+  integrity,
+}: {
+  readonly integrity: NonNullable<WaitlistTableProps['integrity']>;
+}) {
+  const hasIssues = integrity.totalIssues > 0;
+
+  return (
+    <div className='flex min-h-9 items-center gap-2 border-t border-(--linear-app-frame-seam) px-4 py-2 text-2xs'>
+      {hasIssues ? (
+        <AlertTriangle className='h-3.5 w-3.5 shrink-0 text-amber-500' />
+      ) : (
+        <CheckCircle className='h-3.5 w-3.5 shrink-0 text-emerald-500' />
+      )}
+      <span className='font-medium text-primary-token'>
+        {hasIssues
+          ? `${integrity.totalIssues} waitlist integrity issue${integrity.totalIssues === 1 ? '' : 's'}`
+          : 'Waitlist links look healthy'}
+      </span>
+      <span className='truncate text-tertiary-token'>
+        Users missing entries: {integrity.usersMissingWaitlistEntry} · Entries
+        missing users: {integrity.entriesMissingUser} · Signed-up entries
+        missing users: {integrity.signedUpEntriesMissingUser}
+      </span>
+    </div>
   );
 }

@@ -21,6 +21,7 @@ test('desktop window enters the authenticated chat shell instead of the web root
     mainSource,
     /const DESKTOP_USER_AGENT_PRODUCT = `JovieDesktop\/\$\{app\.getVersion\(\)\}`;/
   );
+  assert.match(mainSource, /await shell\.openExternal\(parsed\.toString\(\)\);/);
   assert.match(
     mainSource,
     /const MACOS_TRAFFIC_LIGHT_X = 20;/

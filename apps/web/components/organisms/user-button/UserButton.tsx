@@ -25,6 +25,7 @@ import { track } from '@/lib/analytics';
 import { COOKIE_BANNER_REQUIRED_COOKIE } from '@/lib/cookies/consent-regions';
 import { useIsElectronRuntime } from '@/lib/desktop/electron-bridge';
 import { GLYPH_CMD, GLYPH_OPT, GLYPH_SHIFT } from '@/lib/keyboard-shortcuts';
+import { useFeedbackMutation } from '@/lib/queries';
 import { Icon } from '../../atoms/Icon';
 import { Avatar } from '../../molecules/Avatar/Avatar';
 import type { UserButtonProps } from './types';
@@ -343,6 +344,7 @@ export function UserButton({
 }: UserButtonProps) {
   const keyboardShortcuts = useKeyboardShortcutsSafe();
   const isElectronRuntime = useIsElectronRuntime();
+  const { mutateAsync: submitFeedback } = useFeedbackMutation();
   const [iosAlphaAccess, setIOSAlphaAccess] = useState<{
     hasAccess: boolean;
     installUrl: string | null;
@@ -350,27 +352,26 @@ export function UserButton({
     hasAccess: false,
     installUrl: null,
   });
-  const handleFeedbackSubmit = useCallback(async (feedback: string) => {
-    const trimmedFeedback = feedback.trim();
+  const handleFeedbackSubmit = useCallback(
+    async (feedback: string) => {
+      const trimmedFeedback = feedback.trim();
 
-    track('feedback_submitted', {
-      feedback: trimmedFeedback,
-      source: 'dashboard_sidebar',
-      method: 'custom_modal',
-      character_count: trimmedFeedback.length,
-    });
-
-    await fetch('/api/feedback', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
+      await submitFeedback({
         message: trimmedFeedback,
         source: 'dashboard_sidebar',
         pathname:
           globalThis.window === undefined ? null : globalThis.location.pathname,
-      }),
-    });
-  }, []);
+      });
+
+      track('feedback_submitted', {
+        feedback: trimmedFeedback,
+        source: 'dashboard_sidebar',
+        method: 'custom_modal',
+        character_count: trimmedFeedback.length,
+      });
+    },
+    [submitFeedback]
+  );
   const {
     isLoaded,
     user,

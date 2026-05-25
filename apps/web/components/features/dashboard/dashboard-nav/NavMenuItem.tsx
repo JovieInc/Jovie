@@ -29,7 +29,6 @@ import {
 } from '@/components/shell/SidebarNavItem';
 import { Tooltip } from '@/components/shell/Tooltip';
 import { BASE_URL } from '@/constants/domains';
-import { APP_ROUTES } from '@/constants/routes';
 import { copyToClipboard } from '@/hooks/useClipboard';
 import { useIsElectronRuntime } from '@/lib/desktop/electron-bridge';
 import type { KeyboardShortcut } from '@/lib/keyboard-shortcuts';
@@ -333,18 +332,15 @@ export function NavMenuItem({
     showPendingShell,
   ]);
 
-  const shellNavItem = useShellNavItem;
   const shellTooltipShortcut = shortcut
     ? {
         keys: shortcut.keys,
         description: shortcut.description ?? shortcut.label,
       }
     : undefined;
-  const isPrimaryNavAction =
-    item.id === 'chat' && item.href === APP_ROUTES.CHAT;
   const shellNavClassName = getSidebarNavRowClassName({
     active: isActive,
-    tone: isPrimaryNavAction && !isActive ? 'primary' : 'default',
+    tone: 'default',
     className:
       'group-data-[collapsible=icon]:mx-auto group-data-[collapsible=icon]:h-8 group-data-[collapsible=icon]:w-10 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0',
   });
@@ -369,8 +365,8 @@ export function NavMenuItem({
   return (
     <ContextMenu>
       <ContextMenuTrigger asChild>
-        <SidebarMenuItem className={isPrimaryNavAction ? 'mb-1.5' : undefined}>
-          {shellNavItem ? (
+        <SidebarMenuItem>
+          {useShellNavItem ? (
             <Tooltip
               label={item.name}
               shortcut={shellTooltipShortcut}
@@ -410,7 +406,7 @@ export function NavMenuItem({
               </NavMenuInteractiveElement>
             </SidebarMenuButton>
           )}
-          {!shellNavItem && item.badge != null && (
+          {!useShellNavItem && item.badge != null && (
             <SidebarMenuBadge>{item.badge}</SidebarMenuBadge>
           )}
           {actions}
