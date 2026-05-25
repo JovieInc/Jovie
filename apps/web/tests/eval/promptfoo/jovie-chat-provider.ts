@@ -113,6 +113,7 @@ const MOBILE_CHAT_NDJSON_HEADERS = {
 const PROMPTFOO_CONFIG_PATH = 'tests/eval/promptfoo/promptfooconfig.yaml';
 const HTTP_EVAL_MAX_RESPONSE_CHARS = 4000;
 const HTTP_EVAL_TIMEOUT_MS = 15_000;
+const HTTP_EVAL_PERSISTENCE_WAIT_MS = 5000;
 const HTTP_EVAL_DEFAULT_PERSONA = 'creator-ready';
 
 let liveHttpEvalDb: ReturnType<typeof drizzle> | null = null;
@@ -1098,6 +1099,36 @@ async function readLiveHttpTurnState(input: {
   };
 }
 
+function sleep(ms: number): Promise<void> {
+  return new Promise(resolve => {
+    setTimeout(resolve, ms);
+  });
+}
+
+async function readLiveHttpTurnStateEventually(input: {
+  readonly dbUserId: string;
+  readonly profileId: string;
+  readonly clientTurnId: string;
+}) {
+  const terminalStatuses = new Set([
+    'completed',
+    'failed_model_error',
+    'failed_tool_unavailable',
+    'failed_timeout',
+    'failed_network',
+    'canceled',
+  ]);
+  const deadline = Date.now() + HTTP_EVAL_PERSISTENCE_WAIT_MS;
+  let latest = await readLiveHttpTurnState(input);
+
+  while (!terminalStatuses.has(latest?.status ?? '') && Date.now() < deadline) {
+    await sleep(250);
+    latest = await readLiveHttpTurnState(input);
+  }
+
+  return latest;
+}
+
 async function evaluateLiveHttpUnauthorized(prompt: string, baseUrl: URL) {
   const requestId = `promptfoo-http-unauth-${randomUUID()}`;
   const response = await postLiveHttpChat({
@@ -1441,6 +1472,86 @@ async function evaluateLiveHttpOnboardingRateLimitUnavailable(
   };
 }
 
+async function evaluateLiveHttpModelProviderTerminalError(
+  prompt: string,
+  baseUrl: URL,
+  vars: EvalVars
+) {
+  if (process.env.JOVIE_PROMPTFOO_EXPECT_MODEL_KEYS_DISABLED !== '1') {
+    throw new Error(
+      'Set JOVIE_PROMPTFOO_EXPECT_MODEL_KEYS_DISABLED=1 and start the local server with JOVIE_DISABLE_MODEL_KEYS_FOR_EVALS=1 before running the live HTTP model-error eval.'
+    );
+  }
+
+  const persona =
+    typeof vars.persona === 'string' && vars.persona.trim().length > 0
+      ? vars.persona.trim()
+      : HTTP_EVAL_DEFAULT_PERSONA;
+  const session = await createLiveHttpSession(baseUrl, persona);
+  const clientTurnId =
+    typeof vars.clientTurnId === 'string' && vars.clientTurnId.trim().length > 0
+      ? vars.clientTurnId.trim()
+      : `promptfoo-http-model-error-${randomUUID()}`;
+  const body = buildLiveHttpChatBody({
+    prompt,
+    profileId: session.profileId,
+    clientTurnId,
+    clientMessageId: `${clientTurnId}-message`,
+  });
+
+  const first = await postLiveHttpChat({
+    baseUrl,
+    body,
+    requestId: `${clientTurnId}-first`,
+    session,
+  });
+  const stateAfterFirst = await readLiveHttpTurnStateEventually({
+    dbUserId: session.dbUserId,
+    profileId: session.profileId,
+    clientTurnId,
+  });
+  const replay = await postLiveHttpChat({
+    baseUrl,
+    body,
+    requestId: `${clientTurnId}-replay`,
+    session,
+  });
+  const stateAfterReplay = await readLiveHttpTurnStateEventually({
+    dbUserId: session.dbUserId,
+    profileId: session.profileId,
+    clientTurnId,
+  });
+
+  return {
+    target: 'web-chat-http-route',
+    adapter: 'live-http-route',
+    productionPath: WEB_CHAT_ROUTE_PATH,
+    httpCase: 'model-provider-terminal-error',
+    costTier: 'live-model-error',
+    text: first.responseText,
+    selectedModel: null,
+    modelCalled: false,
+    modelDispatchAttempted: true,
+    modelProviderKeysDisabled: true,
+    persistenceAttempted: true,
+    session: {
+      persona: session.persona,
+      userId: session.userId,
+      dbUserId: session.dbUserId,
+      profileId: session.profileId,
+      profilePath: session.profilePath,
+    },
+    clientTurnId,
+    first,
+    replay,
+    stateAfterFirst,
+    stateAfterReplay,
+    toolCalls: [],
+    toolResults: [],
+    toolExecutions: [],
+  };
+}
+
 async function evaluateLiveHttpWebChatRoute(prompt: string, vars: EvalVars) {
   if (process.env.JOVIE_RUN_LIVE_HTTP_EVALS !== '1') {
     throw new Error(
@@ -1480,6 +1591,10 @@ async function evaluateLiveHttpWebChatRoute(prompt: string, vars: EvalVars) {
 
   if (httpCase === 'anonymous-onboarding-rate-limit-unavailable') {
     return evaluateLiveHttpOnboardingRateLimitUnavailable(prompt, baseUrl);
+  }
+
+  if (httpCase === 'model-provider-terminal-error') {
+    return evaluateLiveHttpModelProviderTerminalError(prompt, baseUrl, vars);
   }
 
   throw new RangeError(`Invalid live HTTP eval vars.httpCase: ${httpCase}`);
