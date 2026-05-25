@@ -1751,6 +1751,8 @@ function assertEvalCaseInventoryCovered(output) {
     'missingFreeUnavailableCaseNames',
     'missingOnboardingUnavailableCaseNames',
     'missingSemanticInvalidCaseNames',
+    'missingModelRoutingScenarioNames',
+    'missingModelRoutingBoundaryNames',
   ]) {
     const values = payload[field];
     if (!Array.isArray(values)) {

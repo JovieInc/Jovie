@@ -339,6 +339,13 @@ const REQUIRED_SEMANTIC_INVALID_TOOL_NAMES = [
   'proposeSocialLink',
   'proposeSocialLinkRemoval',
 ] as const;
+const REQUIRED_MODEL_ROUTING_SCENARIOS = [
+  'complex-pro-strategy-primary',
+  'force-light-override',
+  'free-no-tool-light',
+  'long-pro-conversation-primary',
+  'simple-pro-tool-light',
+] as const;
 const CHAT_SLASH_SKILL_NAMES = commandsForSurface('chat-slash')
   .filter(command => command.kind === 'skill')
   .map(command => command.id)
@@ -2709,6 +2716,8 @@ type EvalCaseSummary = {
   readonly cost: string | null;
   readonly target: string | null;
   readonly toolName: string | null;
+  readonly modelScenario: string | null;
+  readonly expectedModel: string | null;
   readonly eventCase: string | null;
   readonly renderCase: string | null;
   readonly mode: string | null;
@@ -2792,6 +2801,8 @@ function parseEvalCaseSummary(block: string): EvalCaseSummary {
     cost: scalarValue(block, 'cost'),
     target: scalarValue(block, 'target') ?? 'chat-turn',
     toolName: scalarValue(block, 'toolName'),
+    modelScenario: scalarValue(block, 'modelScenario'),
+    expectedModel: scalarValue(block, 'expectedModel'),
     eventCase: scalarValue(block, 'eventCase'),
     renderCase: scalarValue(block, 'renderCase'),
     mode: scalarValue(block, 'mode') ?? 'app',
@@ -2894,6 +2905,25 @@ function evaluateEvalCaseInventory(vars: EvalVars) {
       testCase.target === 'tool-contract' &&
       caseHasAssertion(testCase, 'assertToolSemanticInvalid')
   );
+  const modelContractCases = deterministicCases.filter(
+    testCase => testCase.target === 'model-contract'
+  );
+  const modelRoutingScenarioNames = uniqueSorted(
+    modelContractCases
+      .map(testCase => testCase.modelScenario)
+      .filter(
+        (modelScenario): modelScenario is string =>
+          typeof modelScenario === 'string'
+      )
+  );
+  const modelRoutingBoundaryNames = uniqueSorted(
+    modelContractCases
+      .map(testCase => testCase.expectedModel)
+      .filter(
+        (expectedModel): expectedModel is string =>
+          expectedModel === 'light' || expectedModel === 'primary'
+      )
+  );
   const knownToolNames = new Set(ALL_EVAL_TOOL_NAMES);
 
   return {
@@ -2966,6 +2996,18 @@ function evaluateEvalCaseInventory(vars: EvalVars) {
     missingSemanticInvalidCaseNames: missingNames(
       REQUIRED_SEMANTIC_INVALID_TOOL_NAMES,
       semanticInvalidCaseNames
+    ),
+    requiredModelRoutingScenarioNames: [...REQUIRED_MODEL_ROUTING_SCENARIOS],
+    modelRoutingScenarioNames,
+    missingModelRoutingScenarioNames: missingNames(
+      REQUIRED_MODEL_ROUTING_SCENARIOS,
+      modelRoutingScenarioNames
+    ),
+    requiredModelRoutingBoundaryNames: ['light', 'primary'],
+    modelRoutingBoundaryNames,
+    missingModelRoutingBoundaryNames: missingNames(
+      ['light', 'primary'],
+      modelRoutingBoundaryNames
     ),
     toolCalls: [],
     toolResults: [],
