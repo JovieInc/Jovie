@@ -1853,6 +1853,252 @@ function assertPromptContextReleaseOverflowCap(output) {
   return pass();
 }
 
+function welcomeChatPayload(output) {
+  const payload = parseOutput(output);
+
+  if (payload.target !== 'onboarding-welcome-chat-contract') {
+    return {
+      payload,
+      error: 'case did not run through the onboarding welcome-chat adapter',
+    };
+  }
+
+  return { payload, error: null };
+}
+
+function welcomeRouteIsExpected(route, conversationId) {
+  return route === `/app/chat/${conversationId}?panel=profile&from=onboarding`;
+}
+
+function welcomeInsertedMessages(payload) {
+  return Array.isArray(payload.insertedMessages)
+    ? payload.insertedMessages
+    : [];
+}
+
+function assertWelcomeChatNoSpend(output) {
+  const { payload, error } = welcomeChatPayload(output);
+  if (error) return fail(error);
+
+  if (payload.costTier !== 'deterministic') {
+    return fail('welcome-chat case is not marked deterministic');
+  }
+  if (payload.modelCalled !== false || payload.selectedModel !== null) {
+    return fail('welcome-chat case crossed the model boundary');
+  }
+  if (payload.persistenceAttempted !== false || payload.dbAttempted !== false) {
+    return fail('welcome-chat case crossed the persistence boundary');
+  }
+  if (payload.networkAttempted !== false) {
+    return fail('welcome-chat case crossed the network boundary');
+  }
+
+  return pass();
+}
+
+function assertWelcomeChatNoModel(output) {
+  const { payload, error } = welcomeChatPayload(output);
+  if (error) return fail(error);
+
+  if (payload.modelCalled !== false || payload.selectedModel !== null) {
+    return fail('welcome-chat contract attempted model dispatch');
+  }
+  if (toolNames(payload).length > 0 || allExecutions(payload).length > 0) {
+    return fail('welcome-chat contract should not call or execute tools');
+  }
+
+  return pass();
+}
+
+function assertWelcomeChatMissingProfile(output) {
+  const { payload, error } = welcomeChatPayload(output);
+  if (error) return fail(error);
+
+  if (payload.welcomeCase !== 'missing-profile-404') {
+    return fail('welcome case is not missing-profile-404');
+  }
+  if (payload.status !== 404) {
+    return fail(`expected 404, got ${String(payload.status)}`);
+  }
+  if (payload.responseJson?.error !== 'Profile not found') {
+    return fail('missing profile response changed');
+  }
+  if (payload.persistenceWouldBeAttempted) {
+    return fail('missing profile case attempted simulated persistence');
+  }
+
+  return pass();
+}
+
+function assertWelcomeChatInitialReplyLimit(output) {
+  const { payload, error } = welcomeChatPayload(output);
+  if (error) return fail(error);
+
+  if (payload.welcomeCase !== 'initial-reply-too-long-400') {
+    return fail('welcome case is not initial-reply-too-long-400');
+  }
+  if (payload.status !== 400) {
+    return fail(`expected 400, got ${String(payload.status)}`);
+  }
+  if (!/2000 characters or less/i.test(payload.responseJson?.error ?? '')) {
+    return fail('initial reply limit response changed');
+  }
+  if ((payload.request?.initialReplyLength ?? 0) <= 2000) {
+    return fail('initial reply limit case did not exceed the limit');
+  }
+
+  return pass();
+}
+
+function assertWelcomeChatReusesExisting(output) {
+  const { payload, error } = welcomeChatPayload(output);
+  if (error) return fail(error);
+
+  if (payload.welcomeCase !== 'existing-conversation-reuses-and-appends-once') {
+    return fail(
+      'welcome case is not existing-conversation-reuses-and-appends-once'
+    );
+  }
+  if (payload.status !== 200 || payload.reused !== true) {
+    return fail('existing conversation was not reused');
+  }
+  if (
+    payload.createdNew !== false ||
+    payload.existingConversationId !== 'conv_existing'
+  ) {
+    return fail('existing conversation reuse metadata changed');
+  }
+  if (!welcomeRouteIsExpected(payload.route, 'conv_existing')) {
+    return fail('existing conversation route is incorrect');
+  }
+  if (payload.appendedInitialReply !== true) {
+    return fail('initial reply was not appended once');
+  }
+  const userMessages = welcomeInsertedMessages(payload).filter(
+    message => message.role === 'user'
+  );
+  if (userMessages.length !== 1) {
+    return fail(
+      `expected one appended user message, got ${userMessages.length}`
+    );
+  }
+  if (userMessages[0]?.content !== payload.request?.initialReply) {
+    return fail('appended user message does not match trimmed initial reply');
+  }
+
+  return pass();
+}
+
+function assertWelcomeChatIdempotentInitialReply(output) {
+  const { payload, error } = welcomeChatPayload(output);
+  if (error) return fail(error);
+
+  if (
+    payload.welcomeCase !==
+    'existing-conversation-retry-does-not-duplicate-initial-reply'
+  ) {
+    return fail(
+      'welcome case is not existing-conversation-retry-does-not-duplicate-initial-reply'
+    );
+  }
+  if (payload.status !== 200 || payload.reused !== true) {
+    return fail('idempotent retry did not reuse the existing conversation');
+  }
+  if (payload.appendedInitialReply !== false) {
+    return fail('duplicate initial reply was appended');
+  }
+  if (welcomeInsertedMessages(payload).length !== 0) {
+    return fail('idempotent retry inserted messages');
+  }
+  if (payload.updatedConversation !== false) {
+    return fail('idempotent retry updated the conversation');
+  }
+
+  return pass();
+}
+
+function assertWelcomeChatClaimsOnlySafeOrphan(output) {
+  const { payload, error } = welcomeChatPayload(output);
+  if (error) return fail(error);
+
+  if (
+    payload.welcomeCase === 'claims-current-session-orphan-before-creating-new'
+  ) {
+    if (payload.status !== 200 || payload.reused !== true) {
+      return fail('safe orphan conversation was not reused');
+    }
+    if (payload.claimedConversationId !== 'conv_orphan_current') {
+      return fail('safe orphan conversation was not claimed');
+    }
+    if (payload.createdNew !== false || payload.welcomeMessageBuilt !== false) {
+      return fail('safe orphan claim created a new welcome chat');
+    }
+    if (payload.claimFilter?.creatorProfileId !== null) {
+      return fail('safe orphan claim did not require an unattached profile');
+    }
+    return pass();
+  }
+
+  if (
+    payload.welcomeCase ===
+    'does-not-claim-orphan-from-other-user-or-attached-profile'
+  ) {
+    if (payload.claimedConversationId !== null) {
+      return fail('unsafe orphan conversation was claimed');
+    }
+    if (payload.unsafeOrphanCandidateCount < 1) {
+      return fail('unsafe orphan case did not include unsafe candidates');
+    }
+    if (payload.eligibleOrphanCandidateCount !== 0) {
+      return fail('unsafe orphan case had eligible candidates');
+    }
+    if (payload.status !== 201 || payload.createdNew !== true) {
+      return fail('unsafe orphan case did not create a new welcome chat');
+    }
+    return pass();
+  }
+
+  return fail('welcome case is not an orphan claim case');
+}
+
+function assertWelcomeChatCreatesExpectedRoute(output) {
+  const { payload, error } = welcomeChatPayload(output);
+  if (error) return fail(error);
+
+  if (
+    payload.welcomeCase !==
+      'creates-new-welcome-chat-with-route-panel-profile-from-onboarding' &&
+    payload.welcomeCase !==
+      'does-not-claim-orphan-from-other-user-or-attached-profile'
+  ) {
+    return fail('welcome case is not a new-chat creation case');
+  }
+  if (payload.status !== 201 || payload.createdNew !== true) {
+    return fail('new welcome chat was not created');
+  }
+  if (!welcomeRouteIsExpected(payload.route, 'conv_welcome_new')) {
+    return fail('new welcome chat route is incorrect');
+  }
+  if (payload.responseJson?.route !== payload.route) {
+    return fail('response route does not match contract route');
+  }
+  if (payload.welcomeMessageBuilt !== true) {
+    return fail('new welcome chat did not build the welcome message');
+  }
+  const messages = welcomeInsertedMessages(payload);
+  if (messages[0]?.role !== 'assistant') {
+    return fail('new welcome chat did not insert assistant welcome first');
+  }
+  if (!/Welcome to Jovie, Luna\./.test(messages[0]?.content ?? '')) {
+    return fail('welcome message did not greet the artist by first name');
+  }
+  if (!/panel=profile&from=onboarding$/.test(payload.route ?? '')) {
+    return fail('welcome chat route lost the onboarding profile panel hint');
+  }
+
+  return pass();
+}
+
 function assertToolAccessContractNoSpend(output) {
   const payload = parseOutput(output);
 
@@ -2499,6 +2745,7 @@ function assertEvalCaseInventoryCovered(output) {
     'missingPromptContextCaseNames',
     'missingToolAccessCaseNames',
     'missingOnboardingStateCaseNames',
+    'missingWelcomeChatCaseNames',
   ]) {
     const values = payload[field];
     if (!Array.isArray(values)) {
@@ -2578,6 +2825,14 @@ module.exports = {
   assertPromptContextPlanMismatchSafe,
   assertPromptContextKnowledgeNoUserPii,
   assertPromptContextReleaseOverflowCap,
+  assertWelcomeChatNoSpend,
+  assertWelcomeChatNoModel,
+  assertWelcomeChatMissingProfile,
+  assertWelcomeChatInitialReplyLimit,
+  assertWelcomeChatReusesExisting,
+  assertWelcomeChatIdempotentInitialReply,
+  assertWelcomeChatClaimsOnlySafeOrphan,
+  assertWelcomeChatCreatesExpectedRoute,
   assertToolAccessContractNoSpend,
   assertToolAccessMatrix,
   assertSafeSocialUrl,

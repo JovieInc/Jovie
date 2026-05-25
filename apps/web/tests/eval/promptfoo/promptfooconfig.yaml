@@ -1189,6 +1189,114 @@ tests:
       - type: javascript
         value: file://assertions.cjs:assertPromptContextReleaseOverflowCap
 
+  - description: Welcome chat route returns 404 without profile
+    metadata:
+      cost: deterministic
+    vars:
+      input: "Start my signed-in welcome chat."
+      target: onboarding-welcome-chat-contract
+      welcomeCase: missing-profile-404
+      includeProfile: false
+    assert:
+      - type: javascript
+        value: file://assertions.cjs:assertWelcomeChatNoSpend
+      - type: javascript
+        value: file://assertions.cjs:assertWelcomeChatNoModel
+      - type: javascript
+        value: file://assertions.cjs:assertWelcomeChatMissingProfile
+
+  - description: Welcome chat route rejects oversized initial reply
+    metadata:
+      cost: deterministic
+    vars:
+      input: "Start my signed-in welcome chat with a long reply."
+      target: onboarding-welcome-chat-contract
+      welcomeCase: initial-reply-too-long-400
+    assert:
+      - type: javascript
+        value: file://assertions.cjs:assertWelcomeChatNoSpend
+      - type: javascript
+        value: file://assertions.cjs:assertWelcomeChatNoModel
+      - type: javascript
+        value: file://assertions.cjs:assertWelcomeChatInitialReplyLimit
+
+  - description: Welcome chat reuses existing conversation and appends once
+    metadata:
+      cost: deterministic
+    vars:
+      input: "Help me finish setting up Neon Reef."
+      target: onboarding-welcome-chat-contract
+      welcomeCase: existing-conversation-reuses-and-appends-once
+    assert:
+      - type: javascript
+        value: file://assertions.cjs:assertWelcomeChatNoSpend
+      - type: javascript
+        value: file://assertions.cjs:assertWelcomeChatNoModel
+      - type: javascript
+        value: file://assertions.cjs:assertWelcomeChatReusesExisting
+
+  - description: Welcome chat retry does not duplicate initial reply
+    metadata:
+      cost: deterministic
+    vars:
+      input: "Help me finish setting up Neon Reef."
+      target: onboarding-welcome-chat-contract
+      welcomeCase: existing-conversation-retry-does-not-duplicate-initial-reply
+    assert:
+      - type: javascript
+        value: file://assertions.cjs:assertWelcomeChatNoSpend
+      - type: javascript
+        value: file://assertions.cjs:assertWelcomeChatNoModel
+      - type: javascript
+        value: file://assertions.cjs:assertWelcomeChatIdempotentInitialReply
+
+  - description: Welcome chat claims current-session orphan before creating
+    metadata:
+      cost: deterministic
+    vars:
+      input: "I selected Luna Waves on Spotify."
+      target: onboarding-welcome-chat-contract
+      welcomeCase: claims-current-session-orphan-before-creating-new
+    assert:
+      - type: javascript
+        value: file://assertions.cjs:assertWelcomeChatNoSpend
+      - type: javascript
+        value: file://assertions.cjs:assertWelcomeChatNoModel
+      - type: javascript
+        value: file://assertions.cjs:assertWelcomeChatClaimsOnlySafeOrphan
+
+  - description: Welcome chat ignores unsafe orphan conversations
+    metadata:
+      cost: deterministic
+    vars:
+      input: "Finish my onboarding handoff."
+      target: onboarding-welcome-chat-contract
+      welcomeCase: does-not-claim-orphan-from-other-user-or-attached-profile
+    assert:
+      - type: javascript
+        value: file://assertions.cjs:assertWelcomeChatNoSpend
+      - type: javascript
+        value: file://assertions.cjs:assertWelcomeChatNoModel
+      - type: javascript
+        value: file://assertions.cjs:assertWelcomeChatClaimsOnlySafeOrphan
+      - type: javascript
+        value: file://assertions.cjs:assertWelcomeChatCreatesExpectedRoute
+
+  - description: Welcome chat creates route with onboarding profile panel
+    metadata:
+      cost: deterministic
+    vars:
+      input: "I want to work on the Neon Reef release first."
+      target: onboarding-welcome-chat-contract
+      welcomeCase: creates-new-welcome-chat-with-route-panel-profile-from-onboarding
+    assert:
+      - type: javascript
+        value: file://assertions.cjs:assertWelcomeChatNoSpend
+      - type: javascript
+        value: file://assertions.cjs:assertWelcomeChatNoModel
+      - type: javascript
+        value: file://assertions.cjs:assertWelcomeChatCreatesExpectedRoute
+
   - description: Tool access matrix matches billing and mode gates
     metadata:
       cost: deterministic
