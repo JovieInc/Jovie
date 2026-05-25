@@ -22,8 +22,7 @@ export function FeedbackModal({ isOpen, onClose }: FeedbackModalProps) {
     await submitFeedback({
       message: trimmedFeedback,
       source: 'dashboard_sidebar',
-      pathname:
-        globalThis.window === undefined ? null : globalThis.location.pathname,
+      pathname: window.location.pathname,
     });
 
     track('feedback_submitted', {

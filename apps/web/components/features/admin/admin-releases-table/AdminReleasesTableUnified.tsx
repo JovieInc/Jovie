@@ -157,7 +157,6 @@ function createColumns(): ColumnDef<AdminReleaseRow, unknown>[] {
                   src={release.artworkUrl}
                   alt=''
                   className='block h-9 w-9 max-h-9 max-w-9 object-cover'
-                  style={{ width: 36, height: 36, objectFit: 'cover' }}
                   loading='lazy'
                 />
               ) : (
