@@ -3,6 +3,12 @@ import { z } from 'zod';
 import { APP_ROUTES } from '@/constants/routes';
 import { executeChatTurn, selectKnowledgeContextForTurn } from '@/lib/chat/run';
 import {
+  decodeToolEvents,
+  type PersistedToolEvent,
+  persistedToolEventsSchema,
+  toolEventToMessagePart,
+} from '@/lib/chat/tool-events';
+import {
   FREE_TIER_TOOLS,
   ONBOARDING_TOOLS,
   TOOL_SCHEMAS,
@@ -21,6 +27,7 @@ type EvalTarget =
   | 'chat-turn'
   | 'mobile-chat-route'
   | 'tool-contract'
+  | 'tool-event-contract'
   | 'tool-inventory'
   | 'web-chat-route';
 
@@ -293,6 +300,7 @@ function toTarget(value: unknown): EvalTarget {
   if (
     value === 'mobile-chat-route' ||
     value === 'tool-contract' ||
+    value === 'tool-event-contract' ||
     value === 'tool-inventory' ||
     value === 'web-chat-route'
   ) {
@@ -1183,6 +1191,182 @@ function evaluateToolInventory(vars: EvalVars) {
   };
 }
 
+function getToolUiHint(toolName: string) {
+  return TOOL_UI_REGISTRY[toolName as keyof typeof TOOL_UI_REGISTRY]?.uiHint;
+}
+
+function toolEvent(
+  toolName: string,
+  overrides: Partial<PersistedToolEvent> = {}
+): PersistedToolEvent {
+  return {
+    schemaVersion: 2,
+    toolCallId: `${toolName}-event`,
+    toolName,
+    state: 'succeeded',
+    input: { synthetic: true },
+    output: {
+      success: true,
+      title: `${toolName} completed`,
+      summary: `${toolName} completed`,
+    },
+    summary: `${toolName} completed`,
+    uiHint: getToolUiHint(toolName) ?? 'status',
+    ...overrides,
+  };
+}
+
+function buildToolEventInput(eventCase: string, toolName: string): unknown[] {
+  switch (eventCase) {
+    case 'inventory':
+      return ALL_EVAL_TOOL_NAMES.map(name => toolEvent(name));
+    case 'legacy-success':
+      return [
+        {
+          type: 'tool-invocation',
+          toolInvocation: {
+            toolCallId: 'legacy-success-1',
+            toolName,
+            state: 'result',
+            args: { synthetic: true },
+            result: {
+              success: true,
+              title: 'Synthetic tool result',
+              summary: 'Synthetic tool result',
+            },
+          },
+        },
+      ];
+    case 'legacy-failure':
+      return [
+        {
+          type: 'tool-invocation',
+          toolInvocation: {
+            toolCallId: 'legacy-failure-1',
+            toolName,
+            state: 'result',
+            args: { synthetic: true },
+            result: {
+              success: false,
+              error: 'Synthetic provider unavailable',
+            },
+          },
+        },
+      ];
+    case 'approval-requested':
+      return [
+        toolEvent(toolName, {
+          toolCallId: 'approval-requested-1',
+          state: 'needs-approval',
+          output: undefined,
+          summary: undefined,
+          approval: { id: 'approval-requested-1-state' },
+        }),
+      ];
+    case 'approval-responded':
+      return [
+        toolEvent(toolName, {
+          toolCallId: 'approval-responded-1',
+          state: 'needs-approval',
+          output: undefined,
+          summary: undefined,
+          approval: {
+            id: 'approval-responded-1-state',
+            approved: true,
+            reason: 'Synthetic approval granted',
+          },
+        }),
+      ];
+    case 'denied':
+      return [
+        toolEvent(toolName, {
+          toolCallId: 'denied-1',
+          state: 'denied',
+          output: undefined,
+          summary: 'Synthetic approval denied',
+          errorMessage: 'Synthetic approval denied',
+          approval: {
+            id: 'denied-1-state',
+            approved: false,
+            reason: 'Synthetic approval denied',
+          },
+        }),
+      ];
+    case 'dedupe-latest':
+      return [
+        toolEvent(toolName, {
+          toolCallId: 'dedupe-1',
+          state: 'running',
+          output: undefined,
+          summary: undefined,
+        }),
+        toolEvent(toolName, {
+          toolCallId: 'dedupe-1',
+          state: 'succeeded',
+          output: {
+            success: true,
+            title: 'Latest synthetic result',
+          },
+          summary: 'Latest synthetic result',
+        }),
+      ];
+    case 'invalid':
+      return [{ type: 'not-a-tool-event', value: true }];
+    default:
+      throw new RangeError(`Invalid eval vars.eventCase: ${eventCase}`);
+  }
+}
+
+function evaluateToolEventContract(vars: EvalVars) {
+  const eventCase =
+    typeof vars.eventCase === 'string' ? vars.eventCase : 'legacy-success';
+  const toolName = toToolName(vars.toolName ?? 'showTopInsights');
+  const toolCalls = buildToolEventInput(eventCase, toolName);
+  const decoded = decodeToolEvents(toolCalls);
+  const schemaResult = persistedToolEventsSchema.safeParse(decoded.events);
+  const messageParts = schemaResult.success
+    ? schemaResult.data.map(event => toolEventToMessagePart(event))
+    : [];
+  const eventToolNames = decoded.events.map(event => event.toolName);
+  const hydratedToolNames = messageParts
+    .map(part => ('toolName' in part ? part.toolName : null))
+    .filter((name): name is string => typeof name === 'string');
+  const missingEventToolNames =
+    eventCase === 'inventory'
+      ? ALL_EVAL_TOOL_NAMES.filter(name => !eventToolNames.includes(name))
+      : [];
+  const missingHydratedToolNames =
+    eventCase === 'inventory'
+      ? ALL_EVAL_TOOL_NAMES.filter(name => !hydratedToolNames.includes(name))
+      : [];
+
+  return {
+    target: 'tool-event-contract',
+    adapter: 'tool-event-contract',
+    costTier: 'deterministic',
+    text: '',
+    selectedModel: null,
+    modelCalled: false,
+    persistenceAttempted: false,
+    toolName,
+    eventCase,
+    source: decoded.source,
+    schemaValid: schemaResult.success,
+    schemaErrors: schemaResult.success ? [] : schemaErrorMessages(schemaResult),
+    toolCalls,
+    events: decoded.events,
+    messageParts,
+    eventStates: decoded.events.map(event => event.state),
+    hydratedStates: messageParts.map(part =>
+      'state' in part ? part.state : null
+    ),
+    eventToolNames,
+    hydratedToolNames,
+    missingEventToolNames,
+    missingHydratedToolNames,
+  };
+}
+
 function toPromptfooUsage(usage: Record<string, unknown> | null | undefined) {
   if (!usage) return undefined;
 
@@ -1254,6 +1438,16 @@ export default class JovieChatPromptfooProvider {
 
     if (target === 'tool-contract') {
       const payload = evaluateToolContract(vars);
+      return {
+        output: JSON.stringify(payload),
+        raw: payload,
+        format: 'json',
+        latencyMs: Date.now() - startedAt,
+      };
+    }
+
+    if (target === 'tool-event-contract') {
+      const payload = evaluateToolEventContract(vars);
       return {
         output: JSON.stringify(payload),
         raw: payload,
