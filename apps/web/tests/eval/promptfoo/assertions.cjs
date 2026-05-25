@@ -715,6 +715,80 @@ function assertLiveHttpUnauthorized(output) {
   return pass();
 }
 
+function assertLiveHttpInvalidJson(output) {
+  const payload = parseOutput(output);
+  const response = payload.response ?? {};
+
+  if (payload.target !== 'web-chat-http-route') {
+    return fail('case did not run through the live HTTP web chat adapter');
+  }
+  if (response.status !== 400) {
+    return fail(`expected live HTTP 400, got ${String(response.status)}`);
+  }
+  if (response.responseJson?.error !== 'Invalid JSON body') {
+    return fail('missing live Invalid JSON body response');
+  }
+  if (!response.headers?.['x-request-id']) {
+    return fail('missing live x-request-id header');
+  }
+  if (payload.persistenceAttempted !== false) {
+    return fail('invalid JSON live HTTP case attempted persistence');
+  }
+
+  return pass();
+}
+
+function assertLiveHttpMissingContext(output) {
+  const payload = parseOutput(output);
+  const response = payload.response ?? {};
+
+  if (payload.target !== 'web-chat-http-route') {
+    return fail('case did not run through the live HTTP web chat adapter');
+  }
+  if (response.status !== 400) {
+    return fail(`expected live HTTP 400, got ${String(response.status)}`);
+  }
+  if (response.responseJson?.error !== 'Missing profileId or artistContext') {
+    return fail('missing live profile-or-context validation error');
+  }
+  if (!response.headers?.['x-request-id']) {
+    return fail('missing live x-request-id header');
+  }
+  if (payload.persistenceAttempted !== false) {
+    return fail('missing-context live HTTP case attempted persistence');
+  }
+
+  return pass();
+}
+
+function assertLiveHttpClientTurnRequiresProfile(output) {
+  const payload = parseOutput(output);
+  const response = payload.response ?? {};
+
+  if (payload.target !== 'web-chat-http-route') {
+    return fail('case did not run through the live HTTP web chat adapter');
+  }
+  if (response.status !== 400) {
+    return fail(`expected live HTTP 400, got ${String(response.status)}`);
+  }
+  if (
+    response.responseJson?.error !==
+    'profileId is required when clientTurnId is provided'
+  ) {
+    return fail('missing live clientTurnId profile validation error');
+  }
+  if (!response.headers?.['x-request-id']) {
+    return fail('missing live x-request-id header');
+  }
+  if (payload.persistenceAttempted !== false) {
+    return fail(
+      'client-turn precondition live HTTP case attempted persistence'
+    );
+  }
+
+  return pass();
+}
+
 function assertLiveHttpDeterministicReplay(output) {
   const payload = parseOutput(output);
   const first = payload.first ?? {};
@@ -1566,6 +1640,9 @@ module.exports = {
   assertDeterministicNoSpend,
   assertLiveHttpWebRouteNoModel,
   assertLiveHttpUnauthorized,
+  assertLiveHttpInvalidJson,
+  assertLiveHttpMissingContext,
+  assertLiveHttpClientTurnRequiresProfile,
   assertLiveHttpDeterministicReplay,
   assertLiveHttpAlbumArtUnavailable,
   assertToolAvailable,

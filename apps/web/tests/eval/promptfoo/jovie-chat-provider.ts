@@ -1026,7 +1026,8 @@ async function createLiveHttpSession(
 
 async function postLiveHttpChat(input: {
   readonly baseUrl: URL;
-  readonly body: unknown;
+  readonly body?: unknown;
+  readonly rawBody?: string;
   readonly requestId: string;
   readonly session?: LiveHttpSession;
 }): Promise<LiveHttpResponse> {
@@ -1048,7 +1049,7 @@ async function postLiveHttpChat(input: {
     await fetchWithTimeout(new URL(WEB_CHAT_ROUTE_PATH, input.baseUrl), {
       method: 'POST',
       headers,
-      body: JSON.stringify(input.body),
+      body: input.rawBody ?? JSON.stringify(input.body),
     })
   );
 }
@@ -1114,6 +1115,145 @@ async function evaluateLiveHttpUnauthorized(prompt: string, baseUrl: URL) {
     selectedModel: null,
     modelCalled: false,
     persistenceAttempted: false,
+    requestId,
+    response,
+    toolCalls: [],
+    toolResults: [],
+    toolExecutions: [],
+  };
+}
+
+async function evaluateLiveHttpInvalidJson(baseUrl: URL, vars: EvalVars) {
+  const persona =
+    typeof vars.persona === 'string' && vars.persona.trim().length > 0
+      ? vars.persona.trim()
+      : HTTP_EVAL_DEFAULT_PERSONA;
+  const session = await createLiveHttpSession(baseUrl, persona);
+  const requestId = `promptfoo-http-invalid-json-${randomUUID()}`;
+  const response = await postLiveHttpChat({
+    baseUrl,
+    requestId,
+    session,
+    rawBody: '{"messages":',
+  });
+
+  return {
+    target: 'web-chat-http-route',
+    adapter: 'live-http-route',
+    productionPath: WEB_CHAT_ROUTE_PATH,
+    httpCase: 'invalid-json',
+    costTier: 'live-http',
+    text: response.responseText,
+    selectedModel: null,
+    modelCalled: false,
+    persistenceAttempted: false,
+    session: {
+      persona: session.persona,
+      userId: session.userId,
+      dbUserId: session.dbUserId,
+      profileId: session.profileId,
+      profilePath: session.profilePath,
+    },
+    requestId,
+    response,
+    toolCalls: [],
+    toolResults: [],
+    toolExecutions: [],
+  };
+}
+
+async function evaluateLiveHttpMissingContext(
+  prompt: string,
+  baseUrl: URL,
+  vars: EvalVars
+) {
+  const persona =
+    typeof vars.persona === 'string' && vars.persona.trim().length > 0
+      ? vars.persona.trim()
+      : HTTP_EVAL_DEFAULT_PERSONA;
+  const session = await createLiveHttpSession(baseUrl, persona);
+  const requestId = `promptfoo-http-missing-context-${randomUUID()}`;
+  const response = await postLiveHttpChat({
+    baseUrl,
+    requestId,
+    session,
+    body: {
+      messages: buildLiveHttpChatBody({ prompt }).messages,
+    },
+  });
+
+  return {
+    target: 'web-chat-http-route',
+    adapter: 'live-http-route',
+    productionPath: WEB_CHAT_ROUTE_PATH,
+    httpCase: 'missing-context',
+    costTier: 'live-http',
+    text: response.responseText,
+    selectedModel: null,
+    modelCalled: false,
+    persistenceAttempted: false,
+    session: {
+      persona: session.persona,
+      userId: session.userId,
+      dbUserId: session.dbUserId,
+      profileId: session.profileId,
+      profilePath: session.profilePath,
+    },
+    requestId,
+    response,
+    toolCalls: [],
+    toolResults: [],
+    toolExecutions: [],
+  };
+}
+
+async function evaluateLiveHttpClientTurnRequiresProfile(
+  prompt: string,
+  baseUrl: URL,
+  vars: EvalVars
+) {
+  const persona =
+    typeof vars.persona === 'string' && vars.persona.trim().length > 0
+      ? vars.persona.trim()
+      : HTTP_EVAL_DEFAULT_PERSONA;
+  const session = await createLiveHttpSession(baseUrl, persona);
+  const clientTurnId =
+    typeof vars.clientTurnId === 'string' && vars.clientTurnId.trim().length > 0
+      ? vars.clientTurnId.trim()
+      : `promptfoo-http-client-turn-${randomUUID()}`;
+  const requestId = `${clientTurnId}-request`;
+  const response = await postLiveHttpChat({
+    baseUrl,
+    requestId,
+    session,
+    body: {
+      ...buildLiveHttpChatBody({
+        prompt,
+        clientTurnId,
+        clientMessageId: `${clientTurnId}-message`,
+      }),
+      artistContext: buildTestArtistContext(),
+    },
+  });
+
+  return {
+    target: 'web-chat-http-route',
+    adapter: 'live-http-route',
+    productionPath: WEB_CHAT_ROUTE_PATH,
+    httpCase: 'client-turn-requires-profile',
+    costTier: 'live-http',
+    text: response.responseText,
+    selectedModel: null,
+    modelCalled: false,
+    persistenceAttempted: false,
+    session: {
+      persona: session.persona,
+      userId: session.userId,
+      dbUserId: session.dbUserId,
+      profileId: session.profileId,
+      profilePath: session.profilePath,
+    },
+    clientTurnId,
     requestId,
     response,
     toolCalls: [],
@@ -1271,6 +1411,18 @@ async function evaluateLiveHttpWebChatRoute(prompt: string, vars: EvalVars) {
 
   if (httpCase === 'unauthorized') {
     return evaluateLiveHttpUnauthorized(prompt, baseUrl);
+  }
+
+  if (httpCase === 'invalid-json') {
+    return evaluateLiveHttpInvalidJson(baseUrl, vars);
+  }
+
+  if (httpCase === 'missing-context') {
+    return evaluateLiveHttpMissingContext(prompt, baseUrl, vars);
+  }
+
+  if (httpCase === 'client-turn-requires-profile') {
+    return evaluateLiveHttpClientTurnRequiresProfile(prompt, baseUrl, vars);
   }
 
   if (httpCase === 'deterministic-replay') {

@@ -6,11 +6,13 @@ Runs a small Promptfoo suite against three local adapters:
 - The production `executeChatTurn()` path used by `/api/chat`, with synthetic Luna Waves fixtures and eval-only tool stubs. This live path is manual-only because it calls the model provider.
 - A deterministic route-contract adapter for `POST /api/chat`, covering unauthenticated requests, branch-ordering for the chat kill switch, invalid JSON, message validation, missing profile context, client-turn preconditions, rate-limit responses, and contract-only pre-dispatch success without starting Next, Clerk, or the database.
 - A deterministic route-contract adapter for `POST /api/mobile/v1/chat/turns`, covering unauthenticated, invalid JSON, invalid-body variants, and `MOBILE_CHAT_RUNTIME_DISABLED` responses without starting Next or Clerk.
-- A manual live HTTP adapter for `POST /api/chat`, covering loopback auth, DB-backed client-turn reservation, deterministic no-model terminal paths, duplicate replay, and no sensitive echo on unauthorized responses.
+- A manual live HTTP adapter for `POST /api/chat`, covering loopback auth, authenticated validation errors, client-turn preconditions, DB-backed client-turn reservation, deterministic no-model terminal paths, duplicate replay, and no sensitive echo on unauthorized responses.
 
 The default eval command is deterministic and does not call models, DB, Clerk, Spotify, Stripe, Slack, or a local Next server. The route-contract adapters mirror checked-in route behavior because direct route import in Promptfoo runs outside the Next/Clerk/DB server context.
 
-Remaining JOV-2573 scope is live HTTP coverage for broader billing/rate-limit headers, terminal model-error variants, and production-like Clerk sessions. The initial live HTTP lane uses loopback dev test-auth and deterministic no-model paths.
+Remaining JOV-2573 scope is live HTTP coverage for isolated rate-limit headers, terminal model-error variants, and production-like Clerk sessions. The current live HTTP lane uses loopback dev test-auth and deterministic no-model paths.
+
+Cost decision: Ship now live HTTP validation and persistence coverage that never needs model dispatch. Re-evaluate when a local eval server can reliably start with Redis disabled or namespace-isolated, so rate-limit exhaustion costs zero external quota and cannot poison shared dev state. Then add live HTTP rate-limit exhaustion cases with capped request counts and concurrency 1.
 
 Run from the repo root:
 
