@@ -812,6 +812,232 @@ tests:
       - type: javascript
         value: file://assertions.cjs:assertWebRouteAlbumArtUnavailablePreflight
 
+  - description: Chat confirm edit rejects unauthenticated request before parsing
+    metadata:
+      cost: deterministic
+    vars:
+      input: "Apply a display-name confirmation."
+      target: chat-confirm-route
+      confirmRoute: confirm-edit
+      confirmRouteCase: confirm-edit-unauthorized
+      authenticated: false
+      body:
+        profileId: 00000000-0000-4000-8000-000000002561
+        field: displayName
+        newValue: "Luna private contact luna.private@example.com"
+    assert:
+      - type: javascript
+        value: file://assertions.cjs:assertDeterministicRouteNoSideEffects
+      - type: javascript
+        value: file://assertions.cjs:assertChatConfirmRouteUnauthorized
+
+  - description: Chat confirm edit blocks profile ownership mismatch
+    metadata:
+      cost: deterministic
+    vars:
+      input: "Apply a display-name confirmation."
+      target: chat-confirm-route
+      confirmRoute: confirm-edit
+      confirmRouteCase: confirm-edit-ownership-mismatch
+      authenticated: true
+      ownerMatched: false
+      body:
+        profileId: 00000000-0000-4000-8000-000000002561
+        field: displayName
+        newValue: "Luna Waves"
+    assert:
+      - type: javascript
+        value: file://assertions.cjs:assertDeterministicRouteNoSideEffects
+      - type: javascript
+        value: file://assertions.cjs:assertChatConfirmRouteOwnershipBlocked
+
+  - description: Chat confirm edit reaches profile update and audit boundaries
+    metadata:
+      cost: deterministic
+    vars:
+      input: "Apply a display-name confirmation."
+      target: chat-confirm-route
+      confirmRoute: confirm-edit
+      confirmRouteCase: confirm-edit-success
+      authenticated: true
+      body:
+        profileId: 00000000-0000-4000-8000-000000002561
+        field: displayName
+        newValue: "Luna Waves"
+    assert:
+      - type: javascript
+        value: file://assertions.cjs:assertDeterministicRouteNoSideEffects
+      - type: javascript
+        value: file://assertions.cjs:assertConfirmEditSuccess
+
+  - description: Chat confirm link rejects unsafe synthetic URL
+    metadata:
+      cost: deterministic
+    vars:
+      input: "Apply an unsafe social link confirmation."
+      target: chat-confirm-route
+      confirmRoute: confirm-link
+      confirmRouteCase: confirm-link-rejects-unsafe-url
+      authenticated: true
+      body:
+        profileId: 00000000-0000-4000-8000-000000002561
+        platform: instagram
+        url: http://127.0.0.1/lunawaves
+        normalizedUrl: http://127.0.0.1/lunawaves
+    assert:
+      - type: javascript
+        value: file://assertions.cjs:assertDeterministicRouteNoSideEffects
+      - type: javascript
+        value: file://assertions.cjs:assertConfirmLinkRejectsUnsafeUrl
+
+  - description: Chat confirm link reaches social-link write audit and sync boundaries
+    metadata:
+      cost: deterministic
+    vars:
+      input: "Apply an Instagram link confirmation."
+      target: chat-confirm-route
+      confirmRoute: confirm-link
+      confirmRouteCase: confirm-link-success
+      authenticated: true
+      existingLink: false
+      body:
+        profileId: 00000000-0000-4000-8000-000000002561
+        platform: instagram
+        url: https://instagram.com/lunawaves
+        normalizedUrl: https://instagram.com/lunawaves
+    assert:
+      - type: javascript
+        value: file://assertions.cjs:assertDeterministicRouteNoSideEffects
+      - type: javascript
+        value: file://assertions.cjs:assertConfirmLinkSuccess
+
+  - description: Chat confirm remove link rejects invalid link id
+    metadata:
+      cost: deterministic
+    vars:
+      input: "Apply a link removal confirmation with an invalid id."
+      target: chat-confirm-route
+      confirmRoute: confirm-remove-link
+      confirmRouteCase: confirm-remove-link-invalid-request
+      authenticated: true
+      body:
+        profileId: 00000000-0000-4000-8000-000000002561
+        linkId: not-a-uuid
+    assert:
+      - type: javascript
+        value: file://assertions.cjs:assertDeterministicRouteNoSideEffects
+      - type: javascript
+        value: file://assertions.cjs:assertChatConfirmRouteInvalidRequest
+
+  - description: Chat confirm remove link reports missing link without write
+    metadata:
+      cost: deterministic
+    vars:
+      input: "Apply a link removal confirmation for a missing link."
+      target: chat-confirm-route
+      confirmRoute: confirm-remove-link
+      confirmRouteCase: confirm-remove-link-link-not-found
+      authenticated: true
+      linkLookup: missing
+      body:
+        profileId: 00000000-0000-4000-8000-000000002561
+        linkId: 00000000-0000-4000-8000-000000002574
+    assert:
+      - type: javascript
+        value: file://assertions.cjs:assertDeterministicRouteNoSideEffects
+      - type: javascript
+        value: file://assertions.cjs:assertConfirmRemoveLinkNotFound
+
+  - description: Chat confirm remove link reaches soft-delete audit and sync boundaries
+    metadata:
+      cost: deterministic
+    vars:
+      input: "Apply a link removal confirmation."
+      target: chat-confirm-route
+      confirmRoute: confirm-remove-link
+      confirmRouteCase: confirm-remove-link-success
+      authenticated: true
+      body:
+        profileId: 00000000-0000-4000-8000-000000002561
+        linkId: 00000000-0000-4000-8000-000000002574
+    assert:
+      - type: javascript
+        value: file://assertions.cjs:assertDeterministicRouteNoSideEffects
+      - type: javascript
+        value: file://assertions.cjs:assertConfirmRemoveLinkSuccess
+
+  - description: Album-art apply route blocks when generation feature is disabled
+    metadata:
+      cost: deterministic
+    vars:
+      input: "Apply a generated artwork confirmation."
+      target: chat-confirm-route
+      confirmRoute: album-art-apply
+      confirmRouteCase: album-art-apply-feature-disabled
+      authenticated: true
+      albumArtFeature: disabled
+    assert:
+      - type: javascript
+        value: file://assertions.cjs:assertDeterministicRouteNoSideEffects
+      - type: javascript
+        value: file://assertions.cjs:assertAlbumArtApplyUnavailable
+
+  - description: Album-art apply route blocks when plan is not entitled
+    metadata:
+      cost: deterministic
+    vars:
+      input: "Apply a generated artwork confirmation."
+      target: chat-confirm-route
+      confirmRoute: album-art-apply
+      confirmRouteCase: album-art-apply-plan-unavailable
+      authenticated: true
+      albumArtEntitled: false
+    assert:
+      - type: javascript
+        value: file://assertions.cjs:assertDeterministicRouteNoSideEffects
+      - type: javascript
+        value: file://assertions.cjs:assertAlbumArtApplyUnavailable
+
+  - description: Album-art apply route validates candidate identifiers
+    metadata:
+      cost: deterministic
+    vars:
+      input: "Apply a generated artwork confirmation with a bad candidate id."
+      target: chat-confirm-route
+      confirmRoute: album-art-apply
+      confirmRouteCase: album-art-apply-invalid-request
+      authenticated: true
+      body:
+        profileId: 00000000-0000-4000-8000-000000002561
+        releaseId: 00000000-0000-4000-8000-000000002571
+        generationId: 00000000-0000-4000-8000-000000002572
+        candidateId: not-a-uuid
+    assert:
+      - type: javascript
+        value: file://assertions.cjs:assertDeterministicRouteNoSideEffects
+      - type: javascript
+        value: file://assertions.cjs:assertChatConfirmRouteInvalidRequest
+
+  - description: Album-art apply route reaches apply boundary with synthetic result
+    metadata:
+      cost: deterministic
+    vars:
+      input: "Apply a generated artwork confirmation."
+      target: chat-confirm-route
+      confirmRoute: album-art-apply
+      confirmRouteCase: album-art-apply-success
+      authenticated: true
+      body:
+        profileId: 00000000-0000-4000-8000-000000002561
+        releaseId: 00000000-0000-4000-8000-000000002571
+        generationId: 00000000-0000-4000-8000-000000002572
+        candidateId: 00000000-0000-4000-8000-000000002573
+    assert:
+      - type: javascript
+        value: file://assertions.cjs:assertDeterministicRouteNoSideEffects
+      - type: javascript
+        value: file://assertions.cjs:assertAlbumArtApplySuccess
+
   - description: Anonymous onboarding route rejects invalid messages before model dispatch
     metadata:
       cost: deterministic
