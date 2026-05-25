@@ -103,6 +103,7 @@ const AUTHENTICATED_ROUTES = [
     id: 'app-releases',
     path: APP_ROUTES.RELEASES,
     readySelectors: [
+      '[data-testid="library-surface"]',
       '[data-testid="shell-releases-view"]',
       '[data-testid="releases-matrix"]',
       '[data-testid="releases-empty-state-enriching"]',
