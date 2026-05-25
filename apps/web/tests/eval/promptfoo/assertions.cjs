@@ -2895,6 +2895,130 @@ function assertToolRenderUnimplementedArtifactFallsBack(output) {
   return pass();
 }
 
+function assertToolResultShapeMatrix(output) {
+  const payload = parseOutput(output);
+
+  if (payload.target !== 'tool-result-shape-contract') {
+    return fail(
+      'case did not run through the tool-result-shape-contract adapter'
+    );
+  }
+  if (payload.resultShapeCase !== 'success-failure-matrix') {
+    return fail(
+      `expected success-failure-matrix result shape case, got ${String(payload.resultShapeCase)}`
+    );
+  }
+  if (payload.costTier !== 'deterministic') {
+    return fail(`expected deterministic cost tier, got ${payload.costTier}`);
+  }
+  for (const field of [
+    'modelCalled',
+    'persistenceAttempted',
+    'dbAttempted',
+    'networkAttempted',
+  ]) {
+    if (payload[field] !== false) {
+      return fail(`${field} should be false for tool result shape coverage`);
+    }
+  }
+
+  const requiredToolNames = sortedStringArray(payload.requiredToolNames);
+  const resultShapes = Array.isArray(payload.resultShapes)
+    ? payload.resultShapes
+    : [];
+  const resultToolNames = sortedStringArray(
+    resultShapes.map(shape => shape?.toolName)
+  );
+
+  if (requiredToolNames.length === 0) {
+    return fail('tool result shape matrix has no required tool names');
+  }
+  if (!sameStringArray(resultToolNames, requiredToolNames)) {
+    return fail(
+      `result shape tools mismatch: expected ${requiredToolNames.join(', ')}, got ${resultToolNames.join(', ')}`
+    );
+  }
+
+  for (const field of [
+    'missingResultShapeToolNames',
+    'schemaInvalidToolNames',
+    'missingUiHintToolNames',
+    'invalidSuccessShapeNames',
+    'invalidFailureShapeNames',
+    'sensitiveResultToolNames',
+  ]) {
+    const values = payload[field];
+    if (!Array.isArray(values)) {
+      return fail(`tool result shape payload missing ${field}`);
+    }
+    if (values.length > 0) {
+      return fail(`${field}: ${values.join(', ')}`);
+    }
+  }
+
+  for (const shape of resultShapes) {
+    if (!shape || typeof shape !== 'object') {
+      return fail('tool result shape entry was not an object');
+    }
+    if (shape.schemaValid !== true) {
+      return fail(`${String(shape.toolName)} did not parse synthetic input`);
+    }
+    if (shape.uiRegistryConfigured !== true) {
+      return fail(
+        `${String(shape.toolName)} is missing a tool UI registry row`
+      );
+    }
+    if (shape.uiHint !== 'artifact' && shape.uiHint !== 'status') {
+      return fail(
+        `${String(shape.toolName)} has invalid uiHint ${String(shape.uiHint)}`
+      );
+    }
+    if (shape.renderer !== 'artifact' && shape.renderer !== 'status') {
+      return fail(
+        `${String(shape.toolName)} has invalid renderer ${String(shape.renderer)}`
+      );
+    }
+    if (!shape.successOutput || typeof shape.successOutput !== 'object') {
+      return fail(`${String(shape.toolName)} success output was not an object`);
+    }
+    if (!shape.failureOutput || typeof shape.failureOutput !== 'object') {
+      return fail(`${String(shape.toolName)} failure output was not an object`);
+    }
+    if (shape.failureOutput.success !== false) {
+      return fail(
+        `${String(shape.toolName)} failure output did not set success false`
+      );
+    }
+    if (
+      typeof shape.failureOutput.error !== 'string' ||
+      shape.failureOutput.error.length === 0
+    ) {
+      return fail(`${String(shape.toolName)} failure output had no error text`);
+    }
+    const requiredKeys = Array.isArray(shape.requiredKeys)
+      ? shape.requiredKeys
+      : [];
+    const missingRequiredKeys = requiredKeys.filter(
+      key =>
+        typeof key === 'string' &&
+        !Object.prototype.hasOwnProperty.call(shape.successOutput, key)
+    );
+    if (missingRequiredKeys.length > 0) {
+      return fail(
+        `${String(shape.toolName)} success output missing required keys: ${missingRequiredKeys.join(', ')}`
+      );
+    }
+    if (shape.successShapeValid !== true) {
+      return fail(`${String(shape.toolName)} success shape was invalid`);
+    }
+    if (shape.failureShapeValid !== true) {
+      return fail(`${String(shape.toolName)} failure shape was invalid`);
+    }
+  }
+
+  return pass();
+}
+
 function assertEvalCaseInventoryCovered(output) {
   const payload = parseOutput(output);
 
@@ -2925,6 +3049,7 @@ function assertEvalCaseInventoryCovered(output) {
     'missingToolAccessCaseNames',
     'missingOnboardingStateCaseNames',
     'missingOnboardingToolSequenceCaseNames',
+    'missingToolResultShapeCaseNames',
     'missingWelcomeChatCaseNames',
   ]) {
     const values = payload[field];
@@ -3042,5 +3167,6 @@ module.exports = {
   assertToolRenderStatusSuccess,
   assertToolRenderMissingProfileFallsBack,
   assertToolRenderUnimplementedArtifactFallsBack,
+  assertToolResultShapeMatrix,
   assertEvalCaseInventoryCovered,
 };

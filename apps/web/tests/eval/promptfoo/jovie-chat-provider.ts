@@ -75,6 +75,7 @@ type EvalTarget =
   | 'tool-access-contract'
   | 'tool-contract'
   | 'tool-event-contract'
+  | 'tool-result-shape-contract'
   | 'tool-render-contract'
   | 'tool-inventory'
   | 'web-chat-http-route'
@@ -368,6 +369,7 @@ const REQUIRED_TOOL_EVENT_CASES = [
   'legacy-failure',
   'legacy-success',
 ] as const;
+const REQUIRED_TOOL_RESULT_SHAPE_CASES = ['success-failure-matrix'] as const;
 const REQUIRED_FREE_UNAVAILABLE_TOOL_NAMES = [
   'createMerch',
   'generateAlbumArt',
@@ -448,6 +450,74 @@ const HIDDEN_TOOL_REASONS = HIDDEN_TOOL_NAMES.reduce<Record<string, string>>(
   },
   {}
 );
+const TOOL_RESULT_REQUIRED_KEYS: Record<string, readonly string[]> = {
+  checkCanvasStatus: ['success', 'summary', 'releases'],
+  checkHandle: ['action', 'handle', 'available', 'summary'],
+  confirmSpotifyArtist: ['action', 'spotifyArtistId', 'artist', 'summary'],
+  createMerch: ['success', 'action', 'generationId', 'options'],
+  createPromoStrategy: [
+    'success',
+    'action',
+    'releaseTitle',
+    'strategy',
+    'summary',
+  ],
+  createRelease: ['success', 'action', 'release', 'summary'],
+  deleteOrArchiveMerchCard: ['success', 'action', 'merchCardId'],
+  formatLyrics: ['success', 'action', 'formattedLyrics', 'summary'],
+  generateAlbumArt: ['success', 'action', 'releaseTitle', 'options'],
+  generateCanvasPlan: ['success', 'action', 'releaseTitle', 'plan', 'summary'],
+  generateReleasePitch: [
+    'success',
+    'action',
+    'releaseTitle',
+    'pitch',
+    'summary',
+  ],
+  importBioFromUrl: ['ok', 'candidateBio', 'sourceUrl', 'sourceTitle'],
+  markCanvasUploaded: ['success', 'action', 'releaseTitle', 'summary'],
+  openBillingPortal: ['success', 'portalUrl', 'fallbackUrl'],
+  optimizeMerchCards: ['success', 'action', 'optimized'],
+  pauseMerchCard: ['success', 'action', 'merchCardId'],
+  previewMerchOptions: ['success', 'action', 'generationId', 'options'],
+  proposeAvatarUpload: ['success', 'action'],
+  proposeCheckout: ['action', 'plan', 'handoffUrl', 'summary'],
+  proposeNextStep: ['action', 'decision', 'summary'],
+  proposeProfileEdit: ['success', 'action', 'field', 'newValue'],
+  proposeSocialLink: [
+    'success',
+    'action',
+    'normalizedUrl',
+    'originalUrl',
+    'platform',
+    'suggestedTitle',
+  ],
+  proposeSocialLinkRemoval: ['success', 'action', 'platform', 'url'],
+  publishMerchCard: ['success', 'action', 'merchCardId'],
+  recordInterviewSignal: ['action', 'signalCount', 'summary'],
+  reorderMerchCards: ['success', 'action', 'merchCardIds'],
+  searchSpotifyArtist: ['action', 'query', 'candidates', 'summary'],
+  selectMerchDesign: ['success', 'action', 'generationId'],
+  showAccountStatus: [
+    'success',
+    'plan',
+    'billingVerified',
+    'merchAccess',
+    'nextAction',
+  ],
+  showArtistPayouts: ['success', 'pendingLiabilityCents', 'automaticPayout'],
+  showMerchSales: ['success', 'grossRevenueCents', 'orders', 'topItem'],
+  showTopInsights: ['success', 'title', 'totalActive', 'insights'],
+  showUsage: ['success', 'period', 'limit', 'used', 'remaining', 'resetsAt'],
+  submitFeedback: ['success', 'message'],
+  suggestRelatedArtists: ['success', 'action', 'artists', 'summary'],
+  unpauseMerchCard: ['success', 'action', 'merchCardId'],
+  writeWorldClassBio: ['success', 'action', 'bio', 'summary'],
+};
+const SENSITIVE_RESULT_KEY_PATTERN =
+  /(?:api[_-]?key|authorization|cookie|password|secret|session|token)/i;
+const SENSITIVE_RESULT_VALUE_PATTERN =
+  /(?:sk-[a-z0-9_-]{12,}|pk_[a-z0-9_-]{12,}|bearer\s+[a-z0-9._-]{12,})/i;
 
 function toObject(value: unknown): Record<string, unknown> {
   return value && typeof value === 'object' && !Array.isArray(value)
@@ -489,6 +559,7 @@ function toTarget(value: unknown): EvalTarget {
     value === 'tool-access-contract' ||
     value === 'tool-contract' ||
     value === 'tool-event-contract' ||
+    value === 'tool-result-shape-contract' ||
     value === 'tool-render-contract' ||
     value === 'tool-inventory' ||
     value === 'web-chat-http-route' ||
@@ -2975,6 +3046,21 @@ function defaultToolResult(toolName: string, input: unknown): unknown {
         summary: { total: 3, withCanvas: 1, withoutCanvas: 2 },
         releases: [{ title: 'Tidal Drift', hasArtwork: true }],
       };
+    case 'searchSpotifyArtist':
+      return {
+        action: 'spotify_artist_search',
+        query: typeof args.query === 'string' ? args.query : 'Luna Waves',
+        candidates: [
+          {
+            id: 'spotify-luna-123',
+            name: 'Luna Waves',
+            url: 'https://open.spotify.com/artist/spotify-luna-123',
+            imageUrl: 'https://cdn.jov.ie/eval/luna-waves.jpg',
+            followers: 12_500,
+          },
+        ],
+        summary: 'Found one Spotify artist candidate.',
+      };
     case 'confirmSpotifyArtist':
       return {
         action: 'spotify_artist_confirmed',
@@ -3018,6 +3104,57 @@ function defaultToolResult(toolName: string, input: unknown): unknown {
             ? `/onboarding/checkout?plan=${encodeURIComponent(args.plan)}`
             : '/onboarding/checkout',
         summary: 'Checkout handoff ready.',
+      };
+    case 'suggestRelatedArtists':
+      return {
+        success: true,
+        action: 'related_artists_suggested',
+        artists: [
+          {
+            name: 'Solar Tides',
+            reason: 'Similar ambient electronic audience and playlist fit.',
+          },
+        ],
+        summary: 'Related artists ready.',
+      };
+    case 'writeWorldClassBio':
+      return {
+        success: true,
+        action: 'world_class_bio_written',
+        bio: 'Luna Waves makes ambient electronic music built from field recordings, modular textures, and patient melodic loops.',
+        summary: 'Bio ready.',
+      };
+    case 'generateCanvasPlan':
+      return {
+        success: true,
+        action: 'canvas_plan_generated',
+        releaseTitle: args.releaseTitle ?? 'Neon Reef',
+        plan: {
+          motion: args.motionPreference ?? 'ambient',
+          steps: ['Loop the cover texture', 'Add slow light movement'],
+        },
+        summary: 'Canvas plan ready.',
+      };
+    case 'createPromoStrategy':
+      return {
+        success: true,
+        action: 'promo_strategy_created',
+        releaseTitle: args.releaseTitle ?? 'Neon Reef',
+        strategy: {
+          budget: args.budget ?? 'low',
+          platforms: Array.isArray(args.platforms)
+            ? args.platforms
+            : ['instagram'],
+          phases: ['announce', 'pre-save', 'release-week'],
+        },
+        summary: 'Promo strategy ready.',
+      };
+    case 'markCanvasUploaded':
+      return {
+        success: true,
+        action: 'canvas_uploaded_marked',
+        releaseTitle: args.releaseTitle ?? 'Neon Reef',
+        summary: 'Canvas marked uploaded.',
       };
     case 'generateAlbumArt':
       return {
@@ -3079,6 +3216,37 @@ function defaultToolResult(toolName: string, input: unknown): unknown {
         success: true,
         pendingLiabilityCents: 6200,
         automaticPayout: false,
+      };
+    case 'createRelease':
+      return {
+        success: true,
+        action: 'release_created',
+        release: {
+          title: args.title ?? 'Neon Reef',
+          releaseType: args.releaseType ?? 'single',
+          releaseDate: args.releaseDate ?? null,
+          label: args.label ?? null,
+        },
+        summary: 'Release created.',
+      };
+    case 'formatLyrics':
+      return {
+        success: true,
+        action: 'lyrics_formatted',
+        formattedLyrics:
+          typeof args.lyrics === 'string'
+            ? args.lyrics
+            : 'Verse one\n\nChorus one',
+        summary: 'Lyrics formatted.',
+      };
+    case 'generateReleasePitch':
+      return {
+        success: true,
+        action: 'release_pitch_generated',
+        releaseTitle: args.releaseTitle ?? 'Neon Reef',
+        pitch:
+          'Luna Waves pairs ambient textures with a concise release story for editorial pitching.',
+        summary: 'Pitch ready.',
       };
     default:
       return { success: true, action: toolName, input: args };
@@ -3515,6 +3683,269 @@ function semanticToolInputErrors(toolName: string, input: unknown): string[] {
   }
 
   return [];
+}
+
+function sampleToolInput(toolName: string): Record<string, unknown> {
+  switch (toolName) {
+    case 'proposeAvatarUpload':
+    case 'optimizeMerchCards':
+    case 'showMerchSales':
+    case 'showArtistPayouts':
+    case 'showAccountStatus':
+    case 'showUsage':
+    case 'openBillingPortal':
+    case 'showTopInsights':
+    case 'proposeNextStep':
+      return {};
+    case 'generateAlbumArt':
+      return {
+        releaseTitle: 'Neon Reef',
+        styleId: 'analog_dream',
+        prompt: 'moonlit tide pool with soft modular synth textures',
+      };
+    case 'createMerch':
+      return {
+        prompt: 'premium tee for the Neon Reef release',
+        itemType: 'tee',
+        makeLive: false,
+      };
+    case 'previewMerchOptions':
+      return {
+        prompt: 'three quiet merch concepts for Luna Waves',
+        itemType: 'hoodie',
+      };
+    case 'selectMerchDesign':
+      return {
+        generationId: '00000000-0000-4000-8000-000000000b01',
+        optionNumber: 1,
+      };
+    case 'publishMerchCard':
+    case 'pauseMerchCard':
+    case 'unpauseMerchCard':
+    case 'deleteOrArchiveMerchCard':
+      return { merchCardId: '00000000-0000-4000-8000-000000000c01' };
+    case 'reorderMerchCards':
+      return {
+        merchCardIds: [
+          '00000000-0000-4000-8000-000000000c01',
+          '00000000-0000-4000-8000-000000000c02',
+        ],
+      };
+    case 'proposeSocialLink':
+      return { url: 'https://instagram.com/lunawaves' };
+    case 'proposeSocialLinkRemoval':
+      return { platform: 'instagram' };
+    case 'submitFeedback':
+      return { message: 'Please make release planning easier to scan.' };
+    case 'searchSpotifyArtist':
+      return { query: 'Luna Waves' };
+    case 'confirmSpotifyArtist':
+      return { spotifyArtistId: 'spotify-luna-123' };
+    case 'checkHandle':
+      return { handle: 'lunawaves' };
+    case 'recordInterviewSignal':
+      return {
+        releaseStage: 'announced_unreleased',
+        audienceBand: '5k_to_50k',
+      };
+    case 'proposeCheckout':
+      return { plan: 'pro' };
+    case 'proposeProfileEdit':
+      return {
+        field: 'bio',
+        newValue:
+          'Luna Waves makes ambient electronic songs for late-night focus.',
+      };
+    case 'importBioFromUrl':
+      return { url: 'https://lunawaves.example/press-kit' };
+    case 'checkCanvasStatus':
+      return { includeAll: true };
+    case 'suggestRelatedArtists':
+      return { purpose: 'playlist_pitching', count: 5 };
+    case 'writeWorldClassBio':
+      return { goal: 'spotify', tone: 'cinematic', maxWords: 120 };
+    case 'generateCanvasPlan':
+      return { releaseTitle: 'Neon Reef', motionPreference: 'ambient' };
+    case 'createPromoStrategy':
+      return {
+        releaseTitle: 'Neon Reef',
+        budget: 'low',
+        platforms: ['instagram', 'spotify'],
+      };
+    case 'markCanvasUploaded':
+      return { releaseTitle: 'Neon Reef' };
+    case 'createRelease':
+      return {
+        title: 'Neon Reef',
+        releaseType: 'single',
+        releaseDate: '2026-06-19',
+        label: 'Luna Waves Records',
+      };
+    case 'formatLyrics':
+      return { lyrics: 'Neon reef\nSoft signal\nNeon reef\nHome' };
+    case 'generateReleasePitch':
+      return {
+        releaseTitle: 'Neon Reef',
+        target: 'playlist',
+        platform: 'spotify',
+      };
+    default:
+      return {};
+  }
+}
+
+function failureToolResult(toolName: string) {
+  return {
+    success: false,
+    error: `Synthetic ${toolName} failure.`,
+  };
+}
+
+function sensitiveResultPaths(value: unknown, path: string[] = []): string[] {
+  if (Array.isArray(value)) {
+    return value.flatMap((item, index) =>
+      sensitiveResultPaths(item, [...path, String(index)])
+    );
+  }
+
+  if (value && typeof value === 'object') {
+    return Object.entries(value).flatMap(([key, nestedValue]) => {
+      const nestedPath = [...path, key];
+      const keyPaths = SENSITIVE_RESULT_KEY_PATTERN.test(key)
+        ? [nestedPath.join('.')]
+        : [];
+
+      return [...keyPaths, ...sensitiveResultPaths(nestedValue, nestedPath)];
+    });
+  }
+
+  if (typeof value === 'string' && SENSITIVE_RESULT_VALUE_PATTERN.test(value)) {
+    return [path.join('.') || 'value'];
+  }
+
+  return [];
+}
+
+function missingRequiredResultKeys(
+  toolName: string,
+  output: unknown
+): string[] {
+  const requiredKeys = TOOL_RESULT_REQUIRED_KEYS[toolName] ?? [
+    'success',
+    'action',
+  ];
+  const result = toObject(output);
+
+  return requiredKeys.filter(key => !Object.hasOwn(result, key));
+}
+
+function resultShapeRecord(toolName: string) {
+  const schema =
+    ALL_EVAL_TOOL_SCHEMAS[toolName as keyof typeof ALL_EVAL_TOOL_SCHEMAS];
+  const input = sampleToolInput(toolName);
+  const schemaResult = schema.inputSchema.safeParse(input);
+  const successOutput = schemaResult.success
+    ? defaultToolResult(toolName, schemaResult.data)
+    : null;
+  const failureOutput = failureToolResult(toolName);
+  const uiConfig = getToolUiConfig(toolName);
+  const uiRegistryConfigured = Object.hasOwn(TOOL_UI_REGISTRY, toolName);
+  const requiredKeys = TOOL_RESULT_REQUIRED_KEYS[toolName] ?? [
+    'success',
+    'action',
+  ];
+  const missingRequiredKeys = schemaResult.success
+    ? missingRequiredResultKeys(toolName, successOutput)
+    : [...requiredKeys];
+  const successSensitivePaths = sensitiveResultPaths(successOutput);
+  const failureSensitivePaths = sensitiveResultPaths(failureOutput);
+  const failureResult = toObject(failureOutput);
+  const failureSuccessFlag = failureResult.success;
+  const failureError = failureResult.error;
+  const uiHintValid =
+    uiRegistryConfigured &&
+    (uiConfig.uiHint === 'artifact' || uiConfig.uiHint === 'status') &&
+    (uiConfig.renderer === 'artifact' || uiConfig.renderer === 'status');
+  const successShapeValid =
+    schemaResult.success &&
+    missingRequiredKeys.length === 0 &&
+    successSensitivePaths.length === 0 &&
+    uiHintValid;
+  const failureShapeValid =
+    failureSuccessFlag === false &&
+    typeof failureError === 'string' &&
+    failureError.length > 0 &&
+    failureSensitivePaths.length === 0 &&
+    uiHintValid;
+
+  return {
+    toolName,
+    input,
+    parsedInput: schemaResult.success ? schemaResult.data : null,
+    schemaValid: schemaResult.success,
+    schemaErrors: schemaResult.success ? [] : schemaErrorMessages(schemaResult),
+    uiRegistryConfigured,
+    uiHint: uiConfig.uiHint,
+    renderer: uiConfig.renderer,
+    requiredKeys,
+    successOutput,
+    failureOutput,
+    missingRequiredKeys,
+    successSensitivePaths,
+    failureSensitivePaths,
+    failureSuccessFlag,
+    failureError: typeof failureError === 'string' ? failureError : null,
+    successShapeValid,
+    failureShapeValid,
+  };
+}
+
+function evaluateToolResultShapeContract(vars: EvalVars) {
+  const resultShapeCase =
+    typeof vars.resultShapeCase === 'string'
+      ? vars.resultShapeCase
+      : 'success-failure-matrix';
+  const resultShapes = ALL_EVAL_TOOL_NAMES.map(resultShapeRecord);
+
+  return {
+    target: 'tool-result-shape-contract',
+    adapter: 'tool-result-shape-contract',
+    costTier: 'deterministic',
+    text: '',
+    selectedModel: null,
+    modelCalled: false,
+    persistenceAttempted: false,
+    dbAttempted: false,
+    networkAttempted: false,
+    resultShapeCase,
+    requiredToolNames: ALL_EVAL_TOOL_NAMES,
+    resultShapes,
+    missingResultShapeToolNames: ALL_EVAL_TOOL_NAMES.filter(
+      toolName => !resultShapes.some(shape => shape.toolName === toolName)
+    ),
+    schemaInvalidToolNames: resultShapes
+      .filter(shape => shape.schemaValid !== true)
+      .map(shape => shape.toolName),
+    missingUiHintToolNames: resultShapes
+      .filter(shape => shape.uiRegistryConfigured !== true)
+      .map(shape => shape.toolName),
+    invalidSuccessShapeNames: resultShapes
+      .filter(shape => shape.successShapeValid !== true)
+      .map(shape => shape.toolName),
+    invalidFailureShapeNames: resultShapes
+      .filter(shape => shape.failureShapeValid !== true)
+      .map(shape => shape.toolName),
+    sensitiveResultToolNames: resultShapes
+      .filter(
+        shape =>
+          shape.successSensitivePaths.length > 0 ||
+          shape.failureSensitivePaths.length > 0
+      )
+      .map(shape => shape.toolName),
+    toolCalls: [],
+    toolResults: [],
+    toolExecutions: [],
+  };
 }
 
 function evaluateToolContract(vars: EvalVars) {
@@ -4200,6 +4631,7 @@ type EvalCaseSummary = {
   readonly knowledgeCase: string | null;
   readonly promptCase: string | null;
   readonly renderCase: string | null;
+  readonly resultShapeCase: string | null;
   readonly sequenceCase: string | null;
   readonly stateCase: string | null;
   readonly welcomeCase: string | null;
@@ -4291,6 +4723,7 @@ function parseEvalCaseSummary(block: string): EvalCaseSummary {
     knowledgeCase: scalarValue(block, 'knowledgeCase'),
     promptCase: scalarValue(block, 'promptCase'),
     renderCase: scalarValue(block, 'renderCase'),
+    resultShapeCase: scalarValue(block, 'resultShapeCase'),
     sequenceCase: scalarValue(block, 'sequenceCase'),
     stateCase: scalarValue(block, 'stateCase'),
     welcomeCase: scalarValue(block, 'welcomeCase'),
@@ -4455,6 +4888,15 @@ function evaluateEvalCaseInventory(vars: EvalVars) {
           typeof sequenceCase === 'string'
       )
   );
+  const toolResultShapeCaseNames = uniqueSorted(
+    deterministicCases
+      .filter(testCase => testCase.target === 'tool-result-shape-contract')
+      .map(testCase => testCase.resultShapeCase)
+      .filter(
+        (resultShapeCase): resultShapeCase is string =>
+          typeof resultShapeCase === 'string'
+      )
+  );
   const welcomeChatCaseNames = uniqueSorted(
     deterministicCases
       .filter(
@@ -4581,6 +5023,12 @@ function evaluateEvalCaseInventory(vars: EvalVars) {
     missingOnboardingToolSequenceCaseNames: missingNames(
       REQUIRED_ONBOARDING_TOOL_SEQUENCE_CASES,
       onboardingToolSequenceCaseNames
+    ),
+    requiredToolResultShapeCaseNames: [...REQUIRED_TOOL_RESULT_SHAPE_CASES],
+    toolResultShapeCaseNames,
+    missingToolResultShapeCaseNames: missingNames(
+      REQUIRED_TOOL_RESULT_SHAPE_CASES,
+      toolResultShapeCaseNames
     ),
     requiredWelcomeChatCaseNames: [...REQUIRED_WELCOME_CHAT_CASES],
     welcomeChatCaseNames,
@@ -4772,6 +5220,16 @@ export default class JovieChatPromptfooProvider {
 
     if (target === 'tool-event-contract') {
       const payload = evaluateToolEventContract(vars);
+      return {
+        output: JSON.stringify(payload),
+        raw: payload,
+        format: 'json',
+        latencyMs: Date.now() - startedAt,
+      };
+    }
+
+    if (target === 'tool-result-shape-contract') {
+      const payload = evaluateToolResultShapeContract(vars);
       return {
         output: JSON.stringify(payload),
         raw: payload,

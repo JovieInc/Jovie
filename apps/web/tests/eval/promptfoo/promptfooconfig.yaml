@@ -946,6 +946,19 @@ tests:
       - type: javascript
         value: file://assertions.cjs:assertSlashSkillVisibilityCovered
 
+  - description: Tool result shape matrix covers success and failure outputs
+    metadata:
+      cost: deterministic
+    vars:
+      input: "Validate tool result shapes without executing live services."
+      target: tool-result-shape-contract
+      resultShapeCase: success-failure-matrix
+    assert:
+      - type: javascript
+        value: file://assertions.cjs:assertDeterministicNoSpend
+      - type: javascript
+        value: file://assertions.cjs:assertToolResultShapeMatrix
+
   - description: Eval case inventory covers every deterministic tool lane
     metadata:
       cost: deterministic
