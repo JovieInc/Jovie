@@ -720,6 +720,270 @@ function assertWebRouteContractOnlySuccess(output) {
   return pass();
 }
 
+function assertWebRouteDeterministicIntentRouted(output) {
+  const payload = parseOutput(output);
+  const expectedCategory = String(
+    payload.request?.expectedIntentCategory ?? ''
+  );
+  const expectedClientAction =
+    typeof payload.request?.expectedClientAction === 'string'
+      ? payload.request.expectedClientAction
+      : null;
+  const expectedSafeUrl =
+    typeof payload.request?.expectedSafeUrl === 'string'
+      ? payload.request.expectedSafeUrl
+      : null;
+
+  if (payload.target !== 'web-chat-route') {
+    return fail('case did not run through the web chat route contract');
+  }
+  if (payload.status !== 200) {
+    return fail(`expected 200, got ${String(payload.status)}`);
+  }
+  if (payload.headers?.['x-intent-routed'] !== 'true') {
+    return fail('missing deterministic intent route header');
+  }
+  if (!expectedCategory) {
+    return fail('deterministic intent case did not include expected category');
+  }
+  if (
+    payload.headers?.['x-intent-category'] !== expectedCategory ||
+    payload.intentCategory !== expectedCategory ||
+    payload.detectedIntent?.category !== expectedCategory
+  ) {
+    return fail(
+      `expected intent ${expectedCategory}, got ${String(payload.intentCategory)}`
+    );
+  }
+  if (
+    payload.modelCalled !== false ||
+    payload.modelDispatchPrevented !== true
+  ) {
+    return fail('deterministic intent crossed the model boundary');
+  }
+  if (payload.intentResult?.success !== true) {
+    return fail('deterministic intent did not expose a successful result');
+  }
+  if (expectedClientAction) {
+    const actualClientAction = payload.intentResult?.clientAction;
+    if (actualClientAction !== expectedClientAction) {
+      return fail(
+        `expected client action ${expectedClientAction}, got ${String(actualClientAction)}`
+      );
+    }
+  }
+  if (expectedSafeUrl) {
+    const actualUrl = payload.intentResult?.data?.url;
+    if (actualUrl !== expectedSafeUrl) {
+      return fail(
+        `expected safe URL ${expectedSafeUrl}, got ${String(actualUrl)}`
+      );
+    }
+    if (!/^https:\/\/[a-z0-9.-]+\/[a-z0-9._/-]+$/i.test(actualUrl)) {
+      return fail('deterministic link URL was not a safe synthetic https URL');
+    }
+  }
+  if (typeof textOf(payload) !== 'string' || textOf(payload).trim() === '') {
+    return fail('deterministic intent response had no assistant text');
+  }
+
+  return pass();
+}
+
+function assertWebRouteClientTurnDuplicateInProgress(output) {
+  const payload = parseOutput(output);
+
+  if (payload.target !== 'web-chat-route') {
+    return fail('case did not run through the web chat route contract');
+  }
+  if (payload.status !== 409) {
+    return fail(`expected 409, got ${String(payload.status)}`);
+  }
+  if (payload.responseJson?.errorCode !== 'TURN_IN_PROGRESS') {
+    return fail('missing TURN_IN_PROGRESS error code');
+  }
+  if (payload.reservationOutcome !== 'duplicate_in_progress') {
+    return fail(
+      'duplicate in-progress case did not expose reservation outcome'
+    );
+  }
+  if (
+    !payload.headers?.['x-conversation-id'] ||
+    !payload.headers?.['x-chat-turn-id']
+  ) {
+    return fail('duplicate in-progress response is missing turn headers');
+  }
+  if (payload.modelCalled !== false) {
+    return fail('duplicate in-progress response attempted a model call');
+  }
+
+  return pass();
+}
+
+function assertWebRouteClientTurnReplay(output) {
+  const payload = parseOutput(output);
+
+  if (payload.target !== 'web-chat-route') {
+    return fail('case did not run through the web chat route contract');
+  }
+  if (payload.status !== 200) {
+    return fail(`expected 200, got ${String(payload.status)}`);
+  }
+  if (payload.headers?.['x-chat-replay'] !== 'true') {
+    return fail('missing chat replay header');
+  }
+  if (payload.reservationOutcome !== 'duplicate_completed') {
+    return fail('duplicate replay case did not expose reservation outcome');
+  }
+  if (payload.replayed !== true) {
+    return fail('duplicate replay case did not mark the response as replayed');
+  }
+  if (textOf(payload).trim().length === 0) {
+    return fail('duplicate replay did not expose assistant replay text');
+  }
+  if (payload.modelCalled !== false) {
+    return fail('duplicate replay attempted a model call');
+  }
+
+  return pass();
+}
+
+function assertWebRouteClientTurnToolReplay(output) {
+  const payload = parseOutput(output);
+  const replayToolEvents = Array.isArray(payload.replayToolEvents)
+    ? payload.replayToolEvents
+    : [];
+  const replayMessageParts = Array.isArray(payload.replayMessageParts)
+    ? payload.replayMessageParts
+    : [];
+
+  if (payload.target !== 'web-chat-route') {
+    return fail('case did not run through the web chat route contract');
+  }
+  if (payload.status !== 200) {
+    return fail(`expected 200, got ${String(payload.status)}`);
+  }
+  if (payload.headers?.['x-chat-replay'] !== 'true') {
+    return fail('missing chat replay header');
+  }
+  if (payload.reservationOutcome !== 'duplicate_completed') {
+    return fail('tool replay case did not expose duplicate-completed outcome');
+  }
+  if (textOf(payload).length !== 0) {
+    return fail('tool replay should allow empty text when tool state exists');
+  }
+  if (replayToolEvents.length < 1) {
+    return fail('tool replay did not expose persisted tool events');
+  }
+  if (
+    !replayToolEvents.some(
+      event =>
+        event?.toolName === 'proposeSocialLink' && event?.state === 'succeeded'
+    )
+  ) {
+    return fail('tool replay did not include succeeded social-link event');
+  }
+  if (replayMessageParts.length !== replayToolEvents.length) {
+    return fail('tool replay did not hydrate tool events into message parts');
+  }
+  if (
+    !replayMessageParts.some(
+      part =>
+        part?.toolName === 'proposeSocialLink' &&
+        part?.state === 'output-available'
+    )
+  ) {
+    return fail('tool replay message parts lost the social-link tool state');
+  }
+  if (payload.modelCalled !== false) {
+    return fail('tool replay attempted a model call');
+  }
+
+  return pass();
+}
+
+function assertWebRouteReservedRateLimitTerminal(output) {
+  const payload = parseOutput(output);
+
+  if (payload.target !== 'web-chat-route') {
+    return fail('case did not run through the web chat route contract');
+  }
+  if (payload.status !== 200) {
+    return fail(
+      `expected terminal stream boundary 200, got ${String(payload.status)}`
+    );
+  }
+  if (payload.headers?.['x-chat-terminal-failure'] !== 'rate-limited') {
+    return fail('missing reserved-turn rate-limit terminal header');
+  }
+  if (!payload.headers?.['Retry-After']) {
+    return fail('missing Retry-After header on reserved-turn rate limit');
+  }
+  if (payload.responseJson?.errorCode !== 'RATE_LIMITED') {
+    return fail('missing RATE_LIMITED error code');
+  }
+  if (
+    payload.terminalPersistenceStatus !== 'failed_model_error' ||
+    payload.terminalPersistenceErrorCode !== 'RATE_LIMITED'
+  ) {
+    return fail('reserved-turn rate limit did not stub terminal persistence');
+  }
+  if (
+    payload.modelCalled !== false ||
+    payload.modelDispatchPrevented !== true
+  ) {
+    return fail('reserved-turn rate limit crossed the model boundary');
+  }
+  if (
+    payload.persistenceAttempted !== false ||
+    payload.persistenceStubbed !== true
+  ) {
+    return fail('reserved-turn rate limit attempted real persistence');
+  }
+
+  return pass();
+}
+
+function assertWebRouteAlbumArtUnavailablePreflight(output) {
+  const payload = parseOutput(output);
+
+  if (payload.target !== 'web-chat-route') {
+    return fail('case did not run through the web chat route contract');
+  }
+  if (payload.status !== 200) {
+    return fail(
+      `expected album-art preflight stream boundary 200, got ${String(payload.status)}`
+    );
+  }
+  if (payload.headers?.['x-chat-preflight'] !== 'album-art-unavailable') {
+    return fail('missing album-art unavailable preflight header');
+  }
+  if (payload.responseJson?.errorCode !== 'PROVIDER_UNAVAILABLE') {
+    return fail('missing provider-unavailable album-art error code');
+  }
+  if (
+    !/album art generation is temporarily unavailable/i.test(textOf(payload))
+  ) {
+    return fail(
+      'album-art preflight text did not reflect unavailable provider'
+    );
+  }
+  if (
+    payload.terminalPersistenceStatus !== 'failed_tool_unavailable' ||
+    payload.persistenceStubbed !== true
+  ) {
+    return fail('album-art preflight did not stub terminal tool persistence');
+  }
+  if (
+    payload.modelCalled !== false ||
+    payload.modelDispatchPrevented !== true
+  ) {
+    return fail('album-art preflight crossed the model boundary');
+  }
+
+  return pass();
+}
+
 function assertWebRouteOnboardingInvalidMessages(output) {
   const payload = parseOutput(output);
   const expected = String(payload.request?.expectedError ?? '');
@@ -3051,6 +3315,7 @@ function assertEvalCaseInventoryCovered(output) {
     'missingOnboardingToolSequenceCaseNames',
     'missingToolResultShapeCaseNames',
     'missingWelcomeChatCaseNames',
+    'missingWebChatPremodelCaseNames',
   ]) {
     const values = payload[field];
     if (!Array.isArray(values)) {
@@ -3092,6 +3357,12 @@ module.exports = {
   assertWebRouteStandardRateLimit,
   assertWebRouteMessageValidation,
   assertWebRouteContractOnlySuccess,
+  assertWebRouteDeterministicIntentRouted,
+  assertWebRouteClientTurnDuplicateInProgress,
+  assertWebRouteClientTurnReplay,
+  assertWebRouteClientTurnToolReplay,
+  assertWebRouteReservedRateLimitTerminal,
+  assertWebRouteAlbumArtUnavailablePreflight,
   assertWebRouteOnboardingInvalidMessages,
   assertWebRouteOnboardingChatDisabled,
   assertWebRouteOnboardingDispatchContract,

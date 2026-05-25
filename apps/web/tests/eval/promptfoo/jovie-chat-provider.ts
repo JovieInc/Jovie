@@ -12,6 +12,11 @@ import {
   TEST_MODE_HEADER,
   TEST_USER_ID_HEADER,
 } from '@/lib/auth/test-mode-constants';
+import {
+  type AlbumArtCapability,
+  buildAlbumArtUnavailableAssistantMessage,
+  detectAlbumArtGenerationIntent,
+} from '@/lib/chat/album-art-capability';
 import { KNOWLEDGE_TOPICS } from '@/lib/chat/knowledge/topics';
 import {
   canUseLightModel,
@@ -55,6 +60,14 @@ import { chatMessages, chatTurns } from '@/lib/db/schema/chat';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { getEntitlements, type PlanId } from '@/lib/entitlements/registry';
 import { NO_STORE_HEADERS } from '@/lib/http/headers';
+import {
+  classifyIntent,
+  isDeterministicIntent,
+} from '@/lib/intent-detection/classifier';
+import {
+  type DetectedIntent,
+  IntentCategory,
+} from '@/lib/intent-detection/types';
 import { buildWelcomeMessage } from '@/lib/services/onboarding/welcome-message';
 import {
   buildTestArtistContext,
@@ -115,6 +128,7 @@ type ProviderResponse = {
 
 const EVAL_PROFILE_ID = '00000000-0000-4000-8000-000000002561';
 const EVAL_CONVERSATION_ID = 'promptfoo-eval-conversation';
+const EVAL_TURN_ID = 'promptfoo-eval-turn';
 const EVAL_USER_ID = 'promptfoo-eval-user';
 const WEB_CHAT_ROUTE_PATH = '/api/chat';
 const WEB_CHAT_REQUEST_ID = 'promptfoo-web-chat-route';
@@ -141,6 +155,18 @@ const HTTP_EVAL_MAX_RESPONSE_CHARS = 4000;
 const HTTP_EVAL_TIMEOUT_MS = 15_000;
 const HTTP_EVAL_PERSISTENCE_WAIT_MS = 5000;
 const HTTP_EVAL_DEFAULT_PERSONA = 'creator-ready';
+const REQUIRED_WEB_CHAT_PREMODEL_CASES = [
+  'deterministic-profile-name-intent',
+  'deterministic-profile-bio-intent',
+  'deterministic-social-link-url-intent',
+  'deterministic-social-link-removal-intent',
+  'deterministic-avatar-upload-intent',
+  'client-turn-duplicate-in-progress',
+  'client-turn-duplicate-completed-replay',
+  'client-turn-duplicate-completed-tool-replay',
+  'reserved-turn-rate-limit-terminal',
+  'reserved-turn-album-art-unavailable',
+] as const;
 
 let liveHttpEvalDb: ReturnType<typeof drizzle> | null = null;
 
@@ -660,6 +686,21 @@ function extractWebMessageText(parts: unknown): string {
     .join('');
 }
 
+function extractLastWebUserText(messages: unknown): string {
+  if (!Array.isArray(messages)) return '';
+
+  const lastUserMessage = [...messages]
+    .reverse()
+    .find(
+      (message): message is { role: 'user'; parts: unknown } =>
+        Boolean(message) &&
+        typeof message === 'object' &&
+        (message as { role?: unknown }).role === 'user'
+    );
+
+  return extractWebMessageText(lastUserMessage?.parts).trim();
+}
+
 function validateWebChatMessages(messages: unknown): string | null {
   if (!Array.isArray(messages)) {
     return 'Messages must be an array';
@@ -697,6 +738,186 @@ function validateWebChatMessages(messages: unknown): string | null {
   }
 
   return null;
+}
+
+type WebChatClientTurnReservation =
+  | 'created'
+  | 'duplicate_completed'
+  | 'duplicate_in_progress';
+
+function toWebChatClientTurnReservation(
+  value: unknown
+): WebChatClientTurnReservation {
+  if (
+    value === 'created' ||
+    value === 'duplicate_completed' ||
+    value === 'duplicate_in_progress'
+  ) {
+    return value;
+  }
+
+  return 'created';
+}
+
+function buildEvalReservedTurn(body: Record<string, unknown>) {
+  return {
+    conversationId:
+      toNullableString(body.conversationId) ?? EVAL_CONVERSATION_ID,
+    turnId: EVAL_TURN_ID,
+  };
+}
+
+function buildEvalAlbumArtCapability(vars: EvalVars): AlbumArtCapability {
+  if (vars.albumArtCapability === 'available') {
+    return {
+      availability: 'available',
+      reason: null,
+      reasonCode: null,
+    };
+  }
+
+  if (vars.albumArtCapability === 'feature-disabled') {
+    return {
+      availability: 'unavailable',
+      reason: 'Album art generation is not enabled for this workspace.',
+      reasonCode: 'FEATURE_DISABLED',
+    };
+  }
+
+  if (vars.albumArtCapability === 'plan-unavailable') {
+    return {
+      availability: 'unavailable',
+      reason: 'Album art generation requires a Pro plan.',
+      reasonCode: 'PLAN_UNAVAILABLE',
+    };
+  }
+
+  return {
+    availability: 'unavailable',
+    reason: 'Album art generation is temporarily unavailable.',
+    reasonCode: 'PROVIDER_UNAVAILABLE',
+  };
+}
+
+function buildStubbedIntentResult(intent: DetectedIntent): {
+  readonly success: boolean;
+  readonly message: string;
+  readonly clientAction?: string;
+  readonly data?: Record<string, unknown>;
+  readonly persistenceWouldBeAttempted: boolean;
+} | null {
+  const { platform, url, value } = intent.extractedData;
+
+  if (intent.category === IntentCategory.PROFILE_UPDATE_NAME) {
+    if (!value) {
+      return {
+        success: false,
+        message: 'I need a name to set. What should your display name be?',
+        persistenceWouldBeAttempted: false,
+      };
+    }
+
+    return {
+      success: true,
+      message: `Done! Your display name is now "${value}".`,
+      data: { displayName: value },
+      persistenceWouldBeAttempted: true,
+    };
+  }
+
+  if (intent.category === IntentCategory.PROFILE_UPDATE_BIO) {
+    if (!value) {
+      return {
+        success: false,
+        message: 'I need the bio text. What should your bio say?',
+        persistenceWouldBeAttempted: false,
+      };
+    }
+
+    return {
+      success: true,
+      message: 'Done! Your bio has been updated.',
+      data: { bio: value },
+      persistenceWouldBeAttempted: true,
+    };
+  }
+
+  if (intent.category === IntentCategory.LINK_ADD) {
+    if (url) {
+      return {
+        success: true,
+        message: "I'll add that link for you.",
+        clientAction: 'propose_social_link',
+        data: { platform: platform || '', url },
+        persistenceWouldBeAttempted: false,
+      };
+    }
+
+    if (platform) {
+      return {
+        success: true,
+        message: `To add your ${platform} link, please paste the URL.`,
+        clientAction: 'prompt_link_url',
+        data: { platform },
+        persistenceWouldBeAttempted: false,
+      };
+    }
+
+    return {
+      success: false,
+      message:
+        'Which platform would you like to add? (e.g., Instagram, Spotify, TikTok)',
+      persistenceWouldBeAttempted: false,
+    };
+  }
+
+  if (intent.category === IntentCategory.LINK_REMOVE) {
+    if (!platform) {
+      return {
+        success: false,
+        message: 'Which link would you like to remove?',
+        persistenceWouldBeAttempted: false,
+      };
+    }
+
+    return {
+      success: true,
+      message: `I'll remove your ${platform} link.`,
+      clientAction: 'propose_social_link_removal',
+      data: { platform },
+      persistenceWouldBeAttempted: false,
+    };
+  }
+
+  if (intent.category === IntentCategory.AVATAR_UPLOAD) {
+    return {
+      success: true,
+      message: "Let's update your profile photo. Use the uploader below.",
+      clientAction: 'propose_avatar_upload',
+      persistenceWouldBeAttempted: false,
+    };
+  }
+
+  return null;
+}
+
+function buildReplayToolEvents(value: unknown): PersistedToolEvent[] {
+  if (value === 'social-link-success') {
+    return [
+      toolEvent('proposeSocialLink', {
+        toolCallId: 'replay-social-link-1',
+        input: {
+          platform: 'instagram',
+          url: 'https://instagram.com/lunawaves',
+        },
+        output: syntheticArtifactOutputFor('proposeSocialLink'),
+        summary: 'Instagram link proposal is ready.',
+        uiHint: 'artifact',
+      }),
+    ];
+  }
+
+  return [];
 }
 
 function validateOnboardingRouteMessages(messages: unknown[]): string | null {
@@ -844,6 +1065,32 @@ function evaluateWebChatRouteContract(prompt: string, vars: EvalVars) {
       chatDisabled: toBoolean(vars.chatDisabled, false),
       invalidJson: toBoolean(vars.invalidJson, false),
       rateLimited: toBoolean(vars.rateLimited, false),
+      webRouteCase:
+        typeof vars.webRouteCase === 'string' ? vars.webRouteCase : undefined,
+      clientTurnReservation:
+        typeof vars.clientTurnReservation === 'string'
+          ? vars.clientTurnReservation
+          : undefined,
+      replayToolEvents:
+        typeof vars.replayToolEvents === 'string'
+          ? vars.replayToolEvents
+          : undefined,
+      albumArtCapability:
+        typeof vars.albumArtCapability === 'string'
+          ? vars.albumArtCapability
+          : undefined,
+      expectedIntentCategory:
+        typeof vars.expectedIntentCategory === 'string'
+          ? vars.expectedIntentCategory
+          : undefined,
+      expectedClientAction:
+        typeof vars.expectedClientAction === 'string'
+          ? vars.expectedClientAction
+          : undefined,
+      expectedSafeUrl:
+        typeof vars.expectedSafeUrl === 'string'
+          ? vars.expectedSafeUrl
+          : undefined,
       expectedError:
         typeof vars.expectedError === 'string' ? vars.expectedError : undefined,
     },
@@ -1074,7 +1321,16 @@ function evaluateWebChatRouteContract(prompt: string, vars: EvalVars) {
     };
   }
 
-  if (toNullableString(body.clientTurnId) && !profileId) {
+  const clientTurnId = toNullableString(body.clientTurnId);
+  const clientMessageId = toNullableString(body.clientMessageId);
+  const userText = extractLastWebUserText(body.messages);
+  const toolIntent = toNullableString(body.toolIntent);
+  let reservedTurn: {
+    readonly conversationId: string;
+    readonly turnId: string;
+  } | null = null;
+
+  if (clientTurnId && !profileId) {
     const responseJson = {
       error: 'profileId is required when clientTurnId is provided',
       requestId,
@@ -1089,18 +1345,162 @@ function evaluateWebChatRouteContract(prompt: string, vars: EvalVars) {
     };
   }
 
+  if (clientTurnId) {
+    reservedTurn = buildEvalReservedTurn(body);
+    const reservationOutcome = toWebChatClientTurnReservation(
+      vars.clientTurnReservation
+    );
+    const reservationHeaders = {
+      ...responseHeaders,
+      'x-conversation-id': reservedTurn.conversationId,
+      'x-chat-turn-id': reservedTurn.turnId,
+    };
+
+    if (reservationOutcome === 'duplicate_in_progress') {
+      const responseJson = {
+        error: 'TURN_IN_PROGRESS',
+        message: 'This chat action is still in progress.',
+        errorCode: 'TURN_IN_PROGRESS',
+        requestId,
+        conversationId: reservedTurn.conversationId,
+        turnId: reservedTurn.turnId,
+      };
+
+      return {
+        ...basePayload,
+        status: 409,
+        headers: reservationHeaders,
+        responseJson,
+        responseText: JSON.stringify(responseJson),
+        clientTurnId,
+        clientMessageId,
+        reservationOutcome,
+        reservationStubbed: true,
+        persistenceWouldBeAttempted: true,
+      };
+    }
+
+    if (reservationOutcome === 'duplicate_completed') {
+      const replayToolEvents = buildReplayToolEvents(vars.replayToolEvents);
+      const replayMessageParts = replayToolEvents.map(event =>
+        toolEventToMessagePart(event)
+      );
+      const replayText =
+        typeof vars.replayText === 'string' && vars.replayText.length > 0
+          ? vars.replayText
+          : replayToolEvents.length > 0
+            ? ''
+            : 'This chat action already finished. Please send a new message if you need anything else.';
+      const responseJson = {
+        message: replayText,
+        requestId,
+        conversationId: reservedTurn.conversationId,
+        turnId: reservedTurn.turnId,
+        toolEventCount: replayToolEvents.length,
+      };
+
+      return {
+        ...basePayload,
+        status: 200,
+        headers: {
+          ...reservationHeaders,
+          'x-chat-replay': 'true',
+        },
+        responseJson,
+        responseText: replayText,
+        text: replayText,
+        replayToolEvents,
+        replayMessageParts,
+        clientTurnId,
+        clientMessageId,
+        reservationOutcome,
+        replayed: true,
+        reservationStubbed: true,
+        persistenceWouldBeAttempted: true,
+      };
+    }
+  }
+
+  const albumArtCapability = buildEvalAlbumArtCapability(vars);
+  if (
+    reservedTurn &&
+    albumArtCapability.availability !== 'available' &&
+    detectAlbumArtGenerationIntent({ text: userText, toolIntent })
+  ) {
+    const replyText =
+      buildAlbumArtUnavailableAssistantMessage(albumArtCapability);
+    const responseJson = {
+      message: replyText,
+      errorCode: albumArtCapability.reasonCode ?? 'TOOL_UNAVAILABLE',
+      reason: albumArtCapability.reason,
+      requestId,
+    };
+
+    return {
+      ...basePayload,
+      status: 200,
+      headers: {
+        ...responseHeaders,
+        'x-chat-preflight': 'album-art-unavailable',
+        'x-conversation-id': reservedTurn.conversationId,
+        'x-chat-turn-id': reservedTurn.turnId,
+      },
+      responseJson,
+      responseText: replyText,
+      text: replyText,
+      clientTurnId,
+      clientMessageId,
+      reservationOutcome: 'created',
+      reservationStubbed: true,
+      persistenceStubbed: true,
+      persistenceWouldBeAttempted: true,
+      terminalPersistenceStatus: 'failed_tool_unavailable',
+      terminalPersistenceErrorCode:
+        albumArtCapability.reasonCode ?? 'TOOL_UNAVAILABLE',
+      modelDispatchPrevented: true,
+      albumArtCapability,
+    };
+  }
+
   if (toBoolean(vars.rateLimited, false)) {
     const billingUnavailable = vars.billingVerification === 'unavailable';
     const retryAfter = 60;
+    const rateLimitMessage = billingUnavailable
+      ? 'Jovie could not verify your billing status right now, so chat usage is temporarily limited. Please retry in a few minutes or open billing settings.'
+      : 'You have reached your chat limit. Please try again later.';
     const responseJson = {
       error: 'Rate limit exceeded',
-      message: billingUnavailable
-        ? 'Jovie could not verify your billing status right now, so chat usage is temporarily limited. Please retry in a few minutes or open billing settings.'
-        : 'You have reached your chat limit. Please try again later.',
+      message: rateLimitMessage,
       errorCode: 'RATE_LIMITED',
       retryAfter,
       requestId,
     };
+
+    if (reservedTurn) {
+      return {
+        ...basePayload,
+        status: 200,
+        headers: {
+          ...responseHeaders,
+          ...buildRateLimitHeaders(retryAfter),
+          'x-chat-terminal-failure': 'rate-limited',
+          'x-conversation-id': reservedTurn.conversationId,
+          'x-chat-turn-id': reservedTurn.turnId,
+        },
+        responseJson,
+        responseText: rateLimitMessage,
+        text: rateLimitMessage,
+        clientTurnId,
+        clientMessageId,
+        reservationOutcome: 'created',
+        reservationStubbed: true,
+        persistenceStubbed: true,
+        persistenceWouldBeAttempted: true,
+        terminalPersistenceStatus: 'failed_model_error',
+        terminalPersistenceErrorCode: 'RATE_LIMITED',
+        modelDispatchPrevented: true,
+      };
+    }
 
     return {
       ...basePayload,
@@ -1112,6 +1512,57 @@ function evaluateWebChatRouteContract(prompt: string, vars: EvalVars) {
       responseJson,
       responseText: JSON.stringify(responseJson),
     };
+  }
+
+  const detectedIntent = classifyIntent(userText);
+  if (isDeterministicIntent(detectedIntent)) {
+    const intentResult = buildStubbedIntentResult(detectedIntent);
+
+    if (intentResult) {
+      const responseJson = {
+        message: intentResult.message,
+        requestId,
+        success: intentResult.success,
+        clientAction: intentResult.clientAction,
+        data: intentResult.data,
+      };
+      const intentPersistenceWouldBeAttempted =
+        intentResult.persistenceWouldBeAttempted || Boolean(reservedTurn);
+
+      return {
+        ...basePayload,
+        status: 200,
+        headers: {
+          ...responseHeaders,
+          'x-intent-routed': 'true',
+          'x-intent-category': detectedIntent.category,
+          ...(reservedTurn
+            ? {
+                'x-conversation-id': reservedTurn.conversationId,
+                'x-chat-turn-id': reservedTurn.turnId,
+              }
+            : {}),
+        },
+        responseJson,
+        responseText: intentResult.message,
+        text: intentResult.message,
+        clientTurnId,
+        clientMessageId,
+        detectedIntent,
+        intentResult,
+        intentCategory: detectedIntent.category,
+        modelDispatchPrevented: true,
+        reservationOutcome: reservedTurn ? 'created' : null,
+        reservationStubbed: Boolean(reservedTurn),
+        persistenceStubbed: intentPersistenceWouldBeAttempted,
+        persistenceWouldBeAttempted: intentPersistenceWouldBeAttempted,
+        terminalPersistenceStatus: reservedTurn
+          ? intentResult.success
+            ? 'completed'
+            : 'failed_model_error'
+          : null,
+      };
+    }
   }
 
   return {
@@ -4635,6 +5086,7 @@ type EvalCaseSummary = {
   readonly sequenceCase: string | null;
   readonly stateCase: string | null;
   readonly welcomeCase: string | null;
+  readonly webRouteCase: string | null;
   readonly mode: string | null;
   readonly plan: string | null;
   readonly assertions: readonly string[];
@@ -4727,6 +5179,7 @@ function parseEvalCaseSummary(block: string): EvalCaseSummary {
     sequenceCase: scalarValue(block, 'sequenceCase'),
     stateCase: scalarValue(block, 'stateCase'),
     welcomeCase: scalarValue(block, 'welcomeCase'),
+    webRouteCase: scalarValue(block, 'webRouteCase'),
     mode: scalarValue(block, 'mode') ?? 'app',
     plan: scalarValue(block, 'plan') ?? 'pro',
     assertions,
@@ -4907,6 +5360,15 @@ function evaluateEvalCaseInventory(vars: EvalVars) {
         (welcomeCase): welcomeCase is string => typeof welcomeCase === 'string'
       )
   );
+  const webChatPremodelCaseNames = uniqueSorted(
+    deterministicCases
+      .filter(testCase => testCase.target === 'web-chat-route')
+      .map(testCase => testCase.webRouteCase)
+      .filter(
+        (webRouteCase): webRouteCase is string =>
+          typeof webRouteCase === 'string'
+      )
+  );
   const knownToolNames = new Set(ALL_EVAL_TOOL_NAMES);
 
   return {
@@ -5035,6 +5497,12 @@ function evaluateEvalCaseInventory(vars: EvalVars) {
     missingWelcomeChatCaseNames: missingNames(
       REQUIRED_WELCOME_CHAT_CASES,
       welcomeChatCaseNames
+    ),
+    requiredWebChatPremodelCaseNames: [...REQUIRED_WEB_CHAT_PREMODEL_CASES],
+    webChatPremodelCaseNames,
+    missingWebChatPremodelCaseNames: missingNames(
+      REQUIRED_WEB_CHAT_PREMODEL_CASES,
+      webChatPremodelCaseNames
     ),
     toolCalls: [],
     toolResults: [],
