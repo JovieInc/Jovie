@@ -226,22 +226,31 @@ const MERCH_TOOL_NAMES = [
   'showArtistPayouts',
 ] as const;
 
-const PAID_TOOL_NAMES = [
-  ...FREE_TIER_TOOLS,
-  ...ACCOUNT_TOOL_NAMES,
-  'showTopInsights',
+const INSIGHT_TOOL_NAMES = ['showTopInsights'] as const;
+const ALBUM_ART_TOOL_NAMES = ['generateAlbumArt'] as const;
+const PROFILE_RELEASE_TOOL_NAMES = [
+  'createRelease',
+  'generateReleasePitch',
+] as const;
+const ALWAYS_PAID_TOOL_NAMES = [
   'proposeProfileEdit',
   'importBioFromUrl',
   'checkCanvasStatus',
   'suggestRelatedArtists',
   'writeWorldClassBio',
   'generateCanvasPlan',
-  'generateAlbumArt',
   'createPromoStrategy',
   'markCanvasUploaded',
   'formatLyrics',
-  'createRelease',
-  'generateReleasePitch',
+] as const;
+
+const PAID_TOOL_NAMES = [
+  ...FREE_TIER_TOOLS,
+  ...ACCOUNT_TOOL_NAMES,
+  ...INSIGHT_TOOL_NAMES,
+  ...ALWAYS_PAID_TOOL_NAMES,
+  ...ALBUM_ART_TOOL_NAMES,
+  ...PROFILE_RELEASE_TOOL_NAMES,
   ...MERCH_TOOL_NAMES,
 ] as const;
 
@@ -744,9 +753,62 @@ function buildEvalReleases(vars: EvalVars): ReleaseContext[] {
   }));
 }
 
-function getToolNamesForTurn(mode: 'app' | 'onboarding', plan: PlanId) {
+function toBillingVerification(value: unknown) {
+  return typeof value === 'string' && value.trim().length > 0
+    ? value.trim()
+    : 'verified';
+}
+
+function resolveToolAvailabilityFlags(plan: PlanId, vars: EvalVars) {
+  const planLimits = getEntitlements(plan);
+  const billingVerification = toBillingVerification(vars.billingVerification);
+  const planAllowsPaidTools = Boolean(planLimits.booleans.aiCanUseTools);
+  const aiCanUseTools =
+    planAllowsPaidTools && toBoolean(vars.aiCanUseTools, true);
+
+  return {
+    billingVerification,
+    paidToolsEnabled:
+      plan !== 'free' && billingVerification === 'verified' && aiCanUseTools,
+    insightsEnabled: toBoolean(vars.insightsEnabled, true),
+    albumArtEnabled: toBoolean(vars.albumArtEnabled, true),
+    canGenerateAlbumArt: toBoolean(vars.canGenerateAlbumArt, true),
+    resolvedProfileIdPresent: toBoolean(vars.resolvedProfileIdPresent, true),
+    merchEnabled: toBoolean(vars.merchEnabled, true),
+    canAccessMerchCreation: toBoolean(
+      vars.canAccessMerchCreation,
+      Boolean(planLimits.booleans.canAccessMerchCreation)
+    ),
+  };
+}
+
+function getToolNamesForTurn(
+  mode: 'app' | 'onboarding',
+  plan: PlanId,
+  vars: EvalVars = {}
+) {
   if (mode === 'onboarding') return ONBOARDING_TOOLS;
-  return plan === 'free' ? FREE_APP_TOOL_NAMES : PAID_TOOL_NAMES;
+
+  const freeTools = [...FREE_APP_TOOL_NAMES];
+  const flags = resolveToolAvailabilityFlags(plan, vars);
+  if (!flags.paidToolsEnabled) return freeTools;
+
+  const toolNames: string[] = [...freeTools, ...ALWAYS_PAID_TOOL_NAMES];
+
+  if (flags.insightsEnabled) {
+    toolNames.push(...INSIGHT_TOOL_NAMES);
+  }
+  if (flags.albumArtEnabled && flags.canGenerateAlbumArt) {
+    toolNames.push(...ALBUM_ART_TOOL_NAMES);
+  }
+  if (flags.resolvedProfileIdPresent) {
+    toolNames.push(...PROFILE_RELEASE_TOOL_NAMES);
+  }
+  if (flags.merchEnabled && flags.canAccessMerchCreation) {
+    toolNames.push(...MERCH_TOOL_NAMES);
+  }
+
+  return toolNames;
 }
 
 function configuredToolResult(
@@ -1030,7 +1092,8 @@ function evaluateToolContract(vars: EvalVars) {
     ALL_EVAL_TOOL_SCHEMAS[toolName as keyof typeof ALL_EVAL_TOOL_SCHEMAS];
   const input = Object.hasOwn(vars, 'toolInput') ? vars.toolInput : {};
   const schemaResult = schema.inputSchema.safeParse(input);
-  const availableToolNames = [...getToolNamesForTurn(mode, plan)];
+  const availabilityFlags = resolveToolAvailabilityFlags(plan, vars);
+  const availableToolNames = [...getToolNamesForTurn(mode, plan, vars)];
   const available = (availableToolNames as readonly string[]).includes(
     toolName
   );
@@ -1062,6 +1125,7 @@ function evaluateToolContract(vars: EvalVars) {
     toolName,
     mode,
     plan,
+    availabilityFlags,
     available,
     availableToolNames,
     schemaValid: schemaResult.success,
