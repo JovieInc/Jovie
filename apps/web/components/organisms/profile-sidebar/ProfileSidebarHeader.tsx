@@ -1,14 +1,19 @@
 'use client';
 
-import { Contact, ExternalLink, QrCode } from 'lucide-react';
-import type { ReactNode } from 'react';
+import { Contact, ExternalLink, QrCode, Wallet } from 'lucide-react';
+import { type ReactNode, useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import type { DrawerHeaderAction } from '@/components/molecules/drawer-header/DrawerHeaderActions';
 import { DrawerHeaderActions } from '@/components/molecules/drawer-header/DrawerHeaderActions';
 import { getQrCodeUrl } from '@/components/molecules/QRCode';
 import { BASE_URL } from '@/constants/domains';
 import { getProfileModePath } from '@/features/profile/registry';
+import { useAppFlag } from '@/lib/flags/client';
 import { downloadBlob } from '@/lib/utils/download';
+import {
+  isAppleWalletPassSupportedClient,
+  openAppleWalletProfilePass,
+} from '@/lib/wallet/apple/client';
 
 interface UseProfileHeaderResult {
   readonly title: ReactNode;
@@ -53,11 +58,17 @@ export function useProfileHeaderParts({
   profilePath,
   onClose,
 }: Readonly<UseProfileHeaderPartsProps>): UseProfileHeaderResult {
+  const appleWalletEnabled = useAppFlag('APPLE_WALLET_PROFILE_PASS');
+  const [supportsAppleWallet, setSupportsAppleWallet] = useState(false);
   const resolvedProfilePath =
     profilePath.trim().length > 0
       ? profilePath
       : getProfileModePath(username, 'profile');
   const profileUrl = `${BASE_URL}${resolvedProfilePath}`;
+
+  useEffect(() => {
+    setSupportsAppleWallet(isAppleWalletPassSupportedClient());
+  }, []);
 
   const handleOpenProfile = () => {
     globalThis.open(profileUrl, '_blank', 'noopener,noreferrer');
@@ -112,6 +123,15 @@ export function useProfileHeaderParts({
       },
     },
   ];
+
+  if (appleWalletEnabled && supportsAppleWallet) {
+    overflowActions.push({
+      id: 'apple-wallet-profile-pass',
+      label: 'Add to Apple Wallet',
+      icon: Wallet,
+      onClick: openAppleWalletProfilePass,
+    });
+  }
 
   let primaryLabel = 'Profile';
   if (displayName && displayName !== username) {

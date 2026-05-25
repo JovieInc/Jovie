@@ -75,6 +75,16 @@
 |-------|---------|------|-------------|
 | `/api/apple-music/search` | GET | `auth` | Search Apple Music catalog |
 
+### Apple Wallet
+
+| Route | Methods | Auth | Description |
+|-------|---------|------|-------------|
+| `/api/wallet/apple/profile-pass` | GET | `auth` | Generate and return the current user's Jovie Profile `.pkpass` |
+| `/api/wallet/apple/v1/devices/[deviceLibraryIdentifier]/registrations/[passTypeIdentifier]` | GET | Pass auth token | Return changed serial numbers for registered Wallet passes |
+| `/api/wallet/apple/v1/devices/[deviceLibraryIdentifier]/registrations/[passTypeIdentifier]/[serialNumber]` | POST, DELETE | Pass auth token | Register or unregister a device for pass updates |
+| `/api/wallet/apple/v1/passes/[passTypeIdentifier]/[serialNumber]` | GET | Pass auth token | Return the latest signed Wallet pass bundle |
+| `/api/wallet/apple/v1/log` | POST | `public` | Receive Apple Wallet client logs with public rate limiting |
+
 ### Artist
 
 | Route | Methods | Auth | Description |
