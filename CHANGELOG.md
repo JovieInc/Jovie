@@ -5,6 +5,16 @@
      5|The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
      6|and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.5.57] - 2026-05-25
+
+> Native auth now completes through the hardened Mac OS and iOS callback paths without leaking internal runtime names into customer-facing copy.
+
+### Fixed
+
+- **Native auth completion**: finalizes Mac OS Clerk ticket sign-in through the tested set-active path, returns iOS native exchange responses through the mobile session-token contract, and records DEBUG/TestFlight-safe diagnostics for the sheet, callback, exchange, hydration, `/me`, and route stages.
+- **Auth surfaces**: replaces the oversized unavailable state with the compact centered auth sheet and reduces the iOS splash logo footprint.
+- **Customer-facing runtime copy**: maps desktop session activity from internal runtime names to `Mac OS` and adds a deterministic guard for forbidden vendor/runtime copy.
+
 ## [26.5.56] - 2026-05-25
 
 > Native auth test harnesses now stay rate-limited in production even if simulator-only auth tokens are present.
