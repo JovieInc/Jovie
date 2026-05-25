@@ -54,6 +54,7 @@ const EVAL_CONVERSATION_ID = 'promptfoo-eval-conversation';
 const EVAL_USER_ID = 'promptfoo-eval-user';
 const WEB_CHAT_ROUTE_PATH = '/api/chat';
 const WEB_CHAT_REQUEST_ID = 'promptfoo-web-chat-route';
+const WEB_CHAT_EVAL_EPOCH_SECONDS = 1_700_000_000;
 const MOBILE_CHAT_ROUTE_PATH = '/api/mobile/v1/chat/turns';
 const MAX_WEB_MESSAGES_PER_REQUEST = 50;
 const MAX_WEB_MESSAGE_LENGTH = 4000;
@@ -373,8 +374,11 @@ function toNullableString(value: unknown): string | null {
     : null;
 }
 
-function buildRateLimitHeaders(retryAfterSeconds: number) {
-  const reset = Math.floor((Date.now() + retryAfterSeconds * 1000) / 1000);
+function buildRateLimitHeaders(
+  retryAfterSeconds: number,
+  nowEpochSeconds = WEB_CHAT_EVAL_EPOCH_SECONDS
+) {
+  const reset = nowEpochSeconds + retryAfterSeconds;
   return {
     'X-RateLimit-Limit': '10',
     'X-RateLimit-Remaining': '0',
