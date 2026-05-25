@@ -119,24 +119,9 @@ export function WorkspaceTabsSurface<
 
   return (
     <div className='space-y-4'>
-      <ContentSurfaceCard className='overflow-hidden'>
-        {headerless ? null : (
-          <ContentSectionHeader
-            title={title}
-            subtitle={description}
-            actions={actions}
-            className='min-h-0 px-(--linear-app-header-padding-x) py-3'
-            actionsClassName='shrink-0'
-          />
-        )}
-        {shouldShowTabControls ? (
-          <div
-            className={
-              headerless
-                ? 'px-(--linear-app-content-padding-x) py-3'
-                : 'border-t border-subtle px-(--linear-app-content-padding-x) py-3'
-            }
-          >
+      {headerless ? (
+        shouldShowTabControls ? (
+          <div className='border-b border-(--linear-app-frame-seam) pb-3'>
             <div className='flex flex-col gap-3'>
               {shouldShowPrimaryControl ? (
                 <LinkedTabBar
@@ -154,8 +139,38 @@ export function WorkspaceTabsSurface<
               {secondaryControl}
             </div>
           </div>
-        ) : null}
-      </ContentSurfaceCard>
+        ) : null
+      ) : (
+        <ContentSurfaceCard className='overflow-hidden'>
+          <ContentSectionHeader
+            title={title}
+            subtitle={description}
+            actions={actions}
+            className='min-h-0 px-(--linear-app-header-padding-x) py-3'
+            actionsClassName='shrink-0'
+          />
+          {shouldShowTabControls ? (
+            <div className='border-t border-subtle px-(--linear-app-content-padding-x) py-3'>
+              <div className='flex flex-col gap-3'>
+                {shouldShowPrimaryControl ? (
+                  <LinkedTabBar
+                    value={primaryValue}
+                    options={primaryOptions}
+                    ariaLabel={`${title} primary views`}
+                    getHref={value =>
+                      buildHrefWithParam(primaryParam, value, [
+                        ...PRIMARY_TAB_RESET_KEYS,
+                        ...clearOnPrimaryChange,
+                      ])
+                    }
+                  />
+                ) : null}
+                {secondaryControl}
+              </div>
+            </div>
+          ) : null}
+        </ContentSurfaceCard>
+      )}
       {children}
     </div>
   );

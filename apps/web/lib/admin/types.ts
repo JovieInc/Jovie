@@ -46,4 +46,8 @@ export type { AdminSentryMetrics } from './sentry-metrics';
 export type { AdminUserRow, AdminUsersSort } from './users';
 
 // waitlist
-export type { WaitlistEntryRow, WaitlistMetrics } from './waitlist';
+export type {
+  WaitlistEntryRow,
+  WaitlistIntegritySummary,
+  WaitlistMetrics,
+} from './waitlist';

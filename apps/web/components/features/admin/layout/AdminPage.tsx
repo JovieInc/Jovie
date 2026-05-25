@@ -70,8 +70,6 @@ export function AdminPage<
   children,
   className,
 }: Readonly<AdminPageProps<TPrimary, TSecondary>>) {
-  const tabsHeaderless = Boolean(tabs);
-
   return (
     <PageShell>
       <PageContent noPadding>
@@ -105,7 +103,7 @@ export function AdminPage<
               secondaryValue={tabs.secondaryValue}
               secondaryOptions={tabs.secondaryOptions}
               clearOnPrimaryChange={tabs.clearOnPrimaryChange}
-              headerless={tabsHeaderless}
+              headerless
             >
               <div className='space-y-4' data-testid={viewTestId}>
                 {children}

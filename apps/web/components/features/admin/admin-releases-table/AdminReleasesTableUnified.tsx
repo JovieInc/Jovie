@@ -149,14 +149,15 @@ function createColumns(): ColumnDef<AdminReleaseRow, unknown>[] {
       cell: ({ row }) => {
         const release = row.original;
         return (
-          <div className='flex items-center gap-3'>
-            <div className='relative size-9 shrink-0 overflow-hidden rounded-md bg-secondary-token/10'>
+          <div className='flex min-h-10 items-center gap-3'>
+            <div className='relative h-9 w-9 max-h-9 max-w-9 shrink-0 overflow-hidden rounded-md bg-secondary-token/10'>
               {release.artworkUrl ? (
                 // eslint-disable-next-line @next/next/no-img-element -- admin table thumbnail, no optimization needed
                 <img
                   src={release.artworkUrl}
                   alt=''
-                  className='size-full object-cover'
+                  className='block h-9 w-9 max-h-9 max-w-9 object-cover'
+                  style={{ width: 36, height: 36, objectFit: 'cover' }}
                   loading='lazy'
                 />
               ) : (
@@ -360,6 +361,8 @@ export function AdminReleasesTableUnified({
           getContextMenuItems={(row: AdminReleaseRow) =>
             getContextMenuItems(row)
           }
+          rowHeight={52}
+          getRowClassName={() => 'h-[52px]'}
           hasNextPage={hasNextPage ?? false}
           isFetchingNextPage={isFetchingNextPage}
           onLoadMore={fetchNextPage}

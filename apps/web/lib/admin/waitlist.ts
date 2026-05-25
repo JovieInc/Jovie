@@ -40,6 +40,39 @@ export interface WaitlistMetrics {
   emailFailures: number;
 }
 
+export interface WaitlistIntegritySummary {
+  usersMissingWaitlistEntry: number;
+  entriesMissingUser: number;
+  signedUpEntriesMissingUser: number;
+  totalIssues: number;
+}
+
+interface WaitlistIntegrityRawRow {
+  users_missing_waitlist_entry?: number | string | null;
+  entries_missing_user?: number | string | null;
+  signed_up_entries_missing_user?: number | string | null;
+}
+
+const EMPTY_WAITLIST_INTEGRITY: WaitlistIntegritySummary = {
+  usersMissingWaitlistEntry: 0,
+  entriesMissingUser: 0,
+  signedUpEntriesMissingUser: 0,
+  totalIssues: 0,
+};
+
+function getRawRows(result: unknown): Record<string, unknown>[] {
+  return (result as { rows?: Record<string, unknown>[] }).rows ?? [];
+}
+
+function toCount(value: number | string | null | undefined): number {
+  if (typeof value === 'number') return value;
+  if (typeof value === 'string') {
+    const parsed = Number.parseInt(value, 10);
+    return Number.isFinite(parsed) ? parsed : 0;
+  }
+  return 0;
+}
+
 /**
  * Fetch waitlist metrics grouped by status
  */
@@ -108,6 +141,83 @@ export async function getWaitlistMetrics(): Promise<WaitlistMetrics> {
   } catch (error) {
     throw error;
   }
+}
+
+export async function getWaitlistIntegritySummary(): Promise<WaitlistIntegritySummary> {
+  const hasWaitlistTable = await doesTableExist('waitlist_entries');
+  if (!hasWaitlistTable) {
+    return EMPTY_WAITLIST_INTEGRITY;
+  }
+
+  const result = await db.execute(drizzleSql<WaitlistIntegrityRawRow>`
+    WITH users_missing_waitlist_entry AS (
+      SELECT COUNT(*)::int AS count
+      FROM users u
+      LEFT JOIN waitlist_entries by_id
+        ON by_id.id = u.waitlist_entry_id
+      LEFT JOIN waitlist_entries by_email
+        ON by_email.canonical = true
+        AND u.email IS NOT NULL
+        AND (
+          by_email.email_normalized = lower(u.email)
+          OR lower(by_email.email) = lower(u.email)
+        )
+      WHERE u.deleted_at IS NULL
+        AND u.user_status IN ('waitlist_pending', 'waitlist_approved')
+        AND by_id.id IS NULL
+        AND by_email.id IS NULL
+    ),
+    entries_missing_user AS (
+      SELECT COUNT(*)::int AS count
+      FROM waitlist_entries w
+      LEFT JOIN users by_id
+        ON by_id.waitlist_entry_id = w.id
+        AND by_id.deleted_at IS NULL
+      LEFT JOIN users by_email
+        ON by_email.deleted_at IS NULL
+        AND by_email.email IS NOT NULL
+        AND lower(by_email.email) = w.email_normalized
+      WHERE w.canonical = true
+        AND w.status IN ('approved', 'invited', 'claimed', 'signed_up')
+        AND by_id.id IS NULL
+        AND by_email.id IS NULL
+    ),
+    signed_up_entries_missing_user AS (
+      SELECT COUNT(*)::int AS count
+      FROM waitlist_entries w
+      LEFT JOIN users by_id
+        ON by_id.waitlist_entry_id = w.id
+        AND by_id.deleted_at IS NULL
+      LEFT JOIN users by_email
+        ON by_email.deleted_at IS NULL
+        AND by_email.email IS NOT NULL
+        AND lower(by_email.email) = w.email_normalized
+      WHERE w.canonical = true
+        AND w.status = 'signed_up'
+        AND by_id.id IS NULL
+        AND by_email.id IS NULL
+    )
+    SELECT
+      (SELECT count FROM users_missing_waitlist_entry) AS users_missing_waitlist_entry,
+      (SELECT count FROM entries_missing_user) AS entries_missing_user,
+      (SELECT count FROM signed_up_entries_missing_user) AS signed_up_entries_missing_user
+  `);
+  const [raw] = getRawRows(result) as WaitlistIntegrityRawRow[];
+  const usersMissingWaitlistEntry = toCount(raw?.users_missing_waitlist_entry);
+  const entriesMissingUser = toCount(raw?.entries_missing_user);
+  const signedUpEntriesMissingUser = toCount(
+    raw?.signed_up_entries_missing_user
+  );
+
+  return {
+    usersMissingWaitlistEntry,
+    entriesMissingUser,
+    signedUpEntriesMissingUser,
+    totalIssues:
+      usersMissingWaitlistEntry +
+      entriesMissingUser +
+      signedUpEntriesMissingUser,
+  };
 }
 
 /**

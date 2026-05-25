@@ -1,7 +1,6 @@
 'use client';
 
 import { Badge } from '@jovie/ui';
-import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import type { InsightResponse } from '@/types/insights';
 import { InsightActions } from './InsightActions';
 import { InsightCategoryIcon } from './InsightCategoryIcon';
@@ -24,10 +23,8 @@ interface InsightCardProps {
 
 export function InsightCard({ insight }: InsightCardProps) {
   return (
-    <ContentSurfaceCard
-      as='article'
-      surface='details'
-      className='p-3.5 transition-[border-color,background-color,box-shadow] duration-150 hover:border-default hover:bg-surface-0'
+    <article
+      className='border-b border-(--linear-app-frame-seam) px-1 py-3.5 transition-colors duration-subtle last:border-b-0 hover:bg-surface-0/60'
       aria-label={`${PRIORITY_LABELS[insight.priority]} insight: ${insight.title}`}
     >
       <div className='flex items-start gap-3'>
@@ -52,16 +49,14 @@ export function InsightCard({ insight }: InsightCardProps) {
           </p>
 
           {insight.actionSuggestion ? (
-            <div className='mt-2 rounded-lg border border-(--linear-app-frame-seam) bg-surface-0 px-2.5 py-2'>
-              <p className='text-xs font-caption text-primary-token'>
-                {insight.actionSuggestion}
-              </p>
-            </div>
+            <p className='mt-2 text-xs font-caption leading-5 text-primary-token'>
+              {insight.actionSuggestion}
+            </p>
           ) : null}
 
           <div className='mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-(--linear-app-frame-seam) pt-3'>
             <div className='flex items-center gap-2'>
-              <span className='rounded-md border border-(--linear-app-frame-seam) bg-surface-0 px-1.5 py-0.5 text-3xs font-caption text-secondary-token capitalize'>
+              <span className='text-3xs font-caption text-secondary-token capitalize'>
                 {insight.category}
               </span>
               <span className='text-3xs text-tertiary-token tabular-nums'>
@@ -72,6 +67,6 @@ export function InsightCard({ insight }: InsightCardProps) {
           </div>
         </div>
       </div>
-    </ContentSurfaceCard>
+    </article>
   );
 }

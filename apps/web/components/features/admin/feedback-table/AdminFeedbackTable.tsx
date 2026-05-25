@@ -49,6 +49,7 @@ interface FeedbackRow {
 
 interface AdminFeedbackTableProps {
   readonly items: FeedbackRow[];
+  readonly loadError?: string | null;
 }
 
 function getFeedbackUserLabel(user: FeedbackRow['user']): string {
@@ -184,6 +185,7 @@ function formatDismissedLabel(dismissedAtIso: string | null): string {
 
 export function AdminFeedbackTable({
   items,
+  loadError = null,
 }: Readonly<AdminFeedbackTableProps>) {
   const [selectedId, setSelectedId] = useState<string | null>(
     items[0]?.id ?? null
@@ -335,8 +337,14 @@ export function AdminFeedbackTable({
                   icon={
                     <MessageSquareText className='h-5 w-5' aria-hidden='true' />
                   }
-                  title='No feedback found'
-                  description='New feedback will appear here once users submit it.'
+                  title={
+                    loadError ? 'Feedback unavailable' : 'No feedback found'
+                  }
+                  description={
+                    loadError
+                      ? 'The feedback table could not load. Check the server logs before treating this as zero feedback.'
+                      : 'New feedback will appear here once users submit it.'
+                  }
                   className='min-h-[220px] rounded-none border-x-0 border-b-0 shadow-none'
                 />
               }

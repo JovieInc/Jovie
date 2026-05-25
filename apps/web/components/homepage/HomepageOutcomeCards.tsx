@@ -39,7 +39,7 @@ export function HomepageOutcomeCards({
     <section
       data-testid='homepage-outcome-cards'
       className={cn(
-        'homepage-outcome-section relative w-full bg-black',
+        'homepage-outcome-section relative w-full bg-[#f5f5f7]',
         className
       )}
       aria-labelledby='homepage-outcome-cards-heading'
@@ -48,7 +48,7 @@ export function HomepageOutcomeCards({
         <div className='homepage-outcome-header'>
           <h2
             id='homepage-outcome-cards-heading'
-            className='homepage-outcome-heading text-white'
+            className='homepage-outcome-heading text-black'
           >
             {headline}
           </h2>
