@@ -1067,6 +1067,128 @@ tests:
       - type: javascript
         value: file://assertions.cjs:assertKnowledgeOnboardingSkipsContext
 
+  - description: Prompt context summarizes verified Pro account safely
+    metadata:
+      cost: deterministic
+    vars:
+      input: "Summarize my account."
+      target: prompt-context-contract
+      promptCase: pro-verified-account
+      plan: pro
+      billingVerification: verified
+    assert:
+      - type: javascript
+        value: file://assertions.cjs:assertPromptContextNoSpend
+      - type: javascript
+        value: file://assertions.cjs:assertPromptContextNoSensitiveData
+      - type: javascript
+        value: file://assertions.cjs:assertPromptContextAccountSummary
+
+  - description: Prompt context handles billing verification outage safely
+    metadata:
+      cost: deterministic
+    vars:
+      input: "What plan am I on?"
+      target: prompt-context-contract
+      promptCase: billing-unavailable-guard
+      plan: pro
+      billingVerification: unavailable
+    assert:
+      - type: javascript
+        value: file://assertions.cjs:assertPromptContextNoSpend
+      - type: javascript
+        value: file://assertions.cjs:assertPromptContextNoSensitiveData
+      - type: javascript
+        value: file://assertions.cjs:assertPromptContextBillingUnavailableSafe
+
+  - description: Prompt context omits account section when account context is missing
+    metadata:
+      cost: deterministic
+    vars:
+      input: "What should I do with my next release?"
+      target: prompt-context-contract
+      promptCase: no-account-context
+      plan: pro
+      includeAccountContext: false
+    assert:
+      - type: javascript
+        value: file://assertions.cjs:assertPromptContextNoSpend
+      - type: javascript
+        value: file://assertions.cjs:assertPromptContextNoSensitiveData
+      - type: javascript
+        value: file://assertions.cjs:assertPromptContextMissingAccountOmitted
+
+  - description: Prompt context explains Free plan tool limits
+    metadata:
+      cost: deterministic
+    vars:
+      input: "Can you generate album art and merch for me?"
+      target: prompt-context-contract
+      promptCase: free-plan-limitations
+      plan: free
+      billingVerification: verified
+    assert:
+      - type: javascript
+        value: file://assertions.cjs:assertPromptContextNoSpend
+      - type: javascript
+        value: file://assertions.cjs:assertPromptContextNoSensitiveData
+      - type: javascript
+        value: file://assertions.cjs:assertPromptContextFreePlanLimitations
+
+  - description: Prompt context keeps billing drift guidance safe
+    metadata:
+      cost: deterministic
+    vars:
+      input: "Why does billing look different from my plan?"
+      target: prompt-context-contract
+      promptCase: billing-drift-guidance
+      plan: pro
+      billingVerification: verified
+      planMismatch: legacy-founding
+    assert:
+      - type: javascript
+        value: file://assertions.cjs:assertPromptContextNoSpend
+      - type: javascript
+        value: file://assertions.cjs:assertPromptContextNoSensitiveData
+      - type: javascript
+        value: file://assertions.cjs:assertPromptContextPlanMismatchSafe
+
+  - description: Prompt context selects knowledge without copying user PII
+    metadata:
+      cost: deterministic
+    vars:
+      input: "My private email is private@example.test. For Neon Reef, how should I plan the release date, pre-save countdown, playlist pitching, and editorial playlist submission?"
+      target: prompt-context-contract
+      promptCase: analytics-guardrails
+      plan: pro
+      selectKnowledgeContext: true
+      insightsEnabled: true
+      disallowedPromptText:
+        - private@example.test
+    assert:
+      - type: javascript
+        value: file://assertions.cjs:assertPromptContextNoSpend
+      - type: javascript
+        value: file://assertions.cjs:assertPromptContextNoSensitiveData
+      - type: javascript
+        value: file://assertions.cjs:assertPromptContextKnowledgeNoUserPii
+
+  - description: Prompt context caps large release catalogs
+    metadata:
+      cost: deterministic
+    vars:
+      input: "Summarize my release catalog."
+      target: prompt-context-contract
+      promptCase: release-overflow-cap
+      plan: pro
+    assert:
+      - type: javascript
+        value: file://assertions.cjs:assertPromptContextNoSpend
+      - type: javascript
+        value: file://assertions.cjs:assertPromptContextNoSensitiveData
+      - type: javascript
+        value: file://assertions.cjs:assertPromptContextReleaseOverflowCap
+
   - description: Tool access matrix matches billing and mode gates
     metadata:
       cost: deterministic

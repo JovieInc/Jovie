@@ -18,6 +18,7 @@ import {
   executeChatTurn,
   selectKnowledgeContextForTurn,
 } from '@/lib/chat/run';
+import { buildSystemPrompt } from '@/lib/chat/system-prompt';
 import {
   canUsePaidChatTools,
   resolveChatTurnPlanLimits,
@@ -67,6 +68,7 @@ type EvalTarget =
   | 'model-contract'
   | 'mobile-chat-route'
   | 'onboarding-state-contract'
+  | 'prompt-context-contract'
   | 'tool-access-contract'
   | 'tool-contract'
   | 'tool-event-contract'
@@ -395,6 +397,15 @@ const REQUIRED_KNOWLEDGE_CASES = [
   'recent-user-turn-window',
   'release-playlist-topic-cap',
 ] as const;
+const REQUIRED_PROMPT_CONTEXT_CASES = [
+  'analytics-guardrails',
+  'billing-drift-guidance',
+  'billing-unavailable-guard',
+  'free-plan-limitations',
+  'no-account-context',
+  'pro-verified-account',
+  'release-overflow-cap',
+] as const;
 const REQUIRED_TOOL_ACCESS_CASES = ['billing-mode-matrix'] as const;
 const CHAT_SLASH_SKILL_NAMES = commandsForSurface('chat-slash')
   .filter(command => command.kind === 'skill')
@@ -452,6 +463,7 @@ function toTarget(value: unknown): EvalTarget {
     value === 'mobile-chat-route' ||
     value === 'model-contract' ||
     value === 'onboarding-state-contract' ||
+    value === 'prompt-context-contract' ||
     value === 'tool-access-contract' ||
     value === 'tool-contract' ||
     value === 'tool-event-contract' ||
@@ -2085,6 +2097,218 @@ function buildEvalReleases(vars: EvalVars): ReleaseContext[] {
   }));
 }
 
+type SystemPromptOptions = NonNullable<Parameters<typeof buildSystemPrompt>[2]>;
+type EvalAccountPromptContext = NonNullable<
+  SystemPromptOptions['accountContext']
+>;
+type EvalSystemPromptReleases = Parameters<typeof buildSystemPrompt>[1];
+type EvalBillingVerification = EvalAccountPromptContext['billingVerification'];
+
+const SYSTEM_PROMPT_SECRET_PATTERN =
+  /(AI_GATEWAY_API_KEY|OPENAI_API_KEY|ANTHROPIC_API_KEY|XAI_API_KEY|VERCEL_OIDC_TOKEN|DATABASE_URL|CLERK_|UPSTASH_|bearer\s+[a-z0-9._-]+|sk-[a-z0-9_-]+|postgres(?:ql)?:\/\/|stack trace|at\s+[A-Za-z0-9_.$]+\s*\()/gi;
+
+function toPromptBillingVerification(value: unknown): EvalBillingVerification {
+  if (
+    value === 'verified' ||
+    value === 'missing_user' ||
+    value === 'unavailable'
+  ) {
+    return value;
+  }
+
+  return 'verified';
+}
+
+function displayPlanForPrompt(
+  plan: PlanId,
+  billingVerification: EvalBillingVerification
+): string {
+  if (billingVerification === 'unavailable') return 'Unverified';
+  if (plan === 'trial') return 'Pro Trial';
+  if (plan === 'max') return 'Max';
+  if (plan === 'pro') return 'Pro';
+  return 'Free';
+}
+
+function buildEvalPromptAccountContext(
+  vars: EvalVars
+): EvalAccountPromptContext | undefined {
+  if (vars.includeAccountContext === false) return undefined;
+
+  const plan = toPlanId(vars.plan);
+  const planLimits = getEntitlements(plan);
+  const billingVerification = toPromptBillingVerification(
+    vars.billingVerification
+  );
+  const dailyLimit = planLimits.limits.aiDailyMessageLimit;
+  const used = typeof vars.usageUsed === 'number' ? vars.usageUsed : 7;
+  const monthlyLimit =
+    typeof vars.monthlyLimit === 'number' ? vars.monthlyLimit : dailyLimit * 30;
+  const monthlyUsed =
+    typeof vars.monthlyUsed === 'number' ? vars.monthlyUsed : used * 4;
+  const planMismatch =
+    vars.planMismatch === 'legacy-founding'
+      ? {
+          rawPlan: 'founding',
+          normalizedPlan: 'pro',
+          reason: 'legacy_alias',
+        }
+      : null;
+
+  return {
+    email:
+      typeof vars.accountEmail === 'string'
+        ? vars.accountEmail
+        : 'luna.billing@example.test',
+    plan,
+    displayPlan: displayPlanForPrompt(plan, billingVerification),
+    isPro: plan !== 'free',
+    billingVerification,
+    planMismatch,
+    usage:
+      billingVerification === 'unavailable'
+        ? null
+        : {
+            dailyLimit,
+            used,
+            remaining: Math.max(dailyLimit - used, 0),
+            resetAt: '2026-05-26T07:00:00.000Z',
+            monthlyLimit,
+            monthlyUsed,
+            monthlyRemaining: Math.max(monthlyLimit - monthlyUsed, 0),
+            monthlyResetAt: '2026-06-01T07:00:00.000Z',
+          },
+    entitlements: {
+      aiCanUseTools:
+        plan !== 'free' &&
+        billingVerification === 'verified' &&
+        toBoolean(vars.aiCanUseTools, planLimits.booleans.aiCanUseTools),
+      canAccessMerchCreation: planLimits.booleans.canAccessMerchCreation,
+      canGenerateAlbumArt: planLimits.booleans.canGenerateAlbumArt,
+      canAccessAdvancedAnalytics:
+        planLimits.booleans.canAccessAdvancedAnalytics,
+    },
+    flags: {
+      merchMvp: true,
+    },
+    billing: {
+      hasStripeCustomer: toBoolean(vars.hasStripeCustomer, plan !== 'free'),
+      hasStripeSubscription: toBoolean(
+        vars.hasStripeSubscription,
+        plan !== 'free'
+      ),
+    },
+  };
+}
+
+function buildSystemPromptContractReleases(
+  promptCase: string,
+  vars: EvalVars
+): EvalSystemPromptReleases {
+  if (promptCase !== 'release-overflow-cap') {
+    return buildEvalReleases(vars);
+  }
+
+  return Array.from({ length: 30 }, (_, index) => ({
+    title: `Overflow Release ${index + 1}`,
+    releaseType: index % 3 === 0 ? 'album' : 'single',
+    releaseDate: `2025-${String((index % 12) + 1).padStart(2, '0')}-15T00:00:00Z`,
+    totalTracks: index % 3 === 0 ? 10 : 1,
+  }));
+}
+
+function evaluateSystemPromptContract(prompt: string, vars: EvalVars) {
+  const promptCase =
+    typeof vars.promptCase === 'string' ? vars.promptCase : 'unspecified';
+  const plan = toPlanId(vars.plan);
+  const accountContext = buildEvalPromptAccountContext(vars);
+  const planLimits = getEntitlements(plan);
+  const aiCanUseTools =
+    accountContext?.entitlements.aiCanUseTools ??
+    (plan !== 'free' && planLimits.booleans.aiCanUseTools);
+  const artistContext = buildTestArtistContext(
+    toObject(vars.artistOverrides) as Parameters<
+      typeof buildTestArtistContext
+    >[0]
+  );
+  const releases = buildSystemPromptContractReleases(promptCase, vars);
+  const uiMessages = toUiMessages(prompt, vars);
+  const knowledgeContext =
+    typeof vars.knowledgeContext === 'string' &&
+    vars.knowledgeContext.trim().length > 0
+      ? vars.knowledgeContext.trim()
+      : toBoolean(vars.selectKnowledgeContext, false)
+        ? selectKnowledgeContextForTurn(uiMessages)
+        : undefined;
+  const systemPrompt = buildSystemPrompt(artistContext, releases, {
+    aiCanUseTools,
+    aiDailyMessageLimit: planLimits.limits.aiDailyMessageLimit,
+    insightsEnabled: toBoolean(vars.insightsEnabled, plan !== 'free'),
+    knowledgeContext,
+    accountContext,
+  });
+  const disallowedPromptText = stringArrayValue(vars.disallowedPromptText);
+  const releaseTitles = releases.map(release => release.title);
+
+  return {
+    target: 'prompt-context-contract',
+    adapter: 'prompt-context-contract',
+    productionEntrypoint:
+      'apps/web/lib/chat/system-prompt.ts:buildSystemPrompt',
+    costTier: 'deterministic',
+    text: '',
+    selectedModel: null,
+    modelCalled: false,
+    persistenceAttempted: false,
+    dbAttempted: false,
+    networkAttempted: false,
+    promptCase,
+    mode: 'app',
+    plan,
+    billingVerification: accountContext?.billingVerification ?? null,
+    aiCanUseTools,
+    systemPrompt,
+    systemPromptChars: systemPrompt.length,
+    knowledgeContextSelected: Boolean(knowledgeContext),
+    selectedTopicIds: selectedKnowledgeTopicIds(knowledgeContext ?? ''),
+    hasAccountAccessSection: systemPrompt.includes('## Account & Access'),
+    hasPlanLimitationsSection: systemPrompt.includes(
+      '## Plan Limitations (Free Tier)'
+    ),
+    hasAnalyticsGuardrails:
+      /Never invent downstream DSP performance or revenue figures/i.test(
+        systemPrompt
+      ) && /hidden internal scoring/i.test(systemPrompt),
+    hasBillingUnavailableGuidance:
+      /could not verify billing right now/i.test(systemPrompt) &&
+      /Do not tell the artist they are on Free/i.test(systemPrompt),
+    hasBillingDriftGuidance:
+      /Billing row mismatch detected/i.test(systemPrompt) &&
+      /Do not ask the artist to fix this manually/i.test(systemPrompt),
+    hasSafeAccountActions:
+      /Never change subscriptions, email, username, connected accounts, or OAuth providers from chat/i.test(
+        systemPrompt
+      ),
+    releaseCount: releases.length,
+    releaseTitles,
+    releaseTitlesIncluded: releaseTitles.filter(title =>
+      systemPrompt.includes(title)
+    ),
+    releaseOverflowLinePresent:
+      /\.\.\.and 5 more releases in the catalog/i.test(systemPrompt),
+    sensitiveDiagnosticMatches: [
+      ...systemPrompt.matchAll(SYSTEM_PROMPT_SECRET_PATTERN),
+    ].map(match => match[0]),
+    disallowedPromptText,
+    presentDisallowedPromptText: disallowedPromptText.filter(value =>
+      systemPrompt.includes(value)
+    ),
+    toolCalls: [],
+    toolResults: [],
+    toolExecutions: [],
+  };
+}
+
 function toBillingVerification(value: unknown) {
   return typeof value === 'string' && value.trim().length > 0
     ? value.trim()
@@ -3434,6 +3658,7 @@ type EvalCaseSummary = {
   readonly expectedModel: string | null;
   readonly eventCase: string | null;
   readonly knowledgeCase: string | null;
+  readonly promptCase: string | null;
   readonly renderCase: string | null;
   readonly stateCase: string | null;
   readonly mode: string | null;
@@ -3522,6 +3747,7 @@ function parseEvalCaseSummary(block: string): EvalCaseSummary {
     expectedModel: scalarValue(block, 'expectedModel'),
     eventCase: scalarValue(block, 'eventCase'),
     knowledgeCase: scalarValue(block, 'knowledgeCase'),
+    promptCase: scalarValue(block, 'promptCase'),
     renderCase: scalarValue(block, 'renderCase'),
     stateCase: scalarValue(block, 'stateCase'),
     mode: scalarValue(block, 'mode') ?? 'app',
@@ -3652,6 +3878,14 @@ function evaluateEvalCaseInventory(vars: EvalVars) {
           typeof knowledgeCase === 'string'
       )
   );
+  const promptContextCaseNames = uniqueSorted(
+    deterministicCases
+      .filter(testCase => testCase.target === 'prompt-context-contract')
+      .map(testCase => testCase.promptCase)
+      .filter(
+        (promptCase): promptCase is string => typeof promptCase === 'string'
+      )
+  );
   const toolAccessCaseNames = uniqueSorted(
     deterministicCases
       .filter(testCase => testCase.target === 'tool-access-contract')
@@ -3756,6 +3990,12 @@ function evaluateEvalCaseInventory(vars: EvalVars) {
     missingKnowledgeCaseNames: missingNames(
       REQUIRED_KNOWLEDGE_CASES,
       knowledgeCaseNames
+    ),
+    requiredPromptContextCaseNames: [...REQUIRED_PROMPT_CONTEXT_CASES],
+    promptContextCaseNames,
+    missingPromptContextCaseNames: missingNames(
+      REQUIRED_PROMPT_CONTEXT_CASES,
+      promptContextCaseNames
     ),
     requiredToolAccessCaseNames: [...REQUIRED_TOOL_ACCESS_CASES],
     toolAccessCaseNames,
@@ -3893,6 +4133,16 @@ export default class JovieChatPromptfooProvider {
 
     if (target === 'onboarding-state-contract') {
       const payload = evaluateOnboardingStateContract(vars);
+      return {
+        output: JSON.stringify(payload),
+        raw: payload,
+        format: 'json',
+        latencyMs: Date.now() - startedAt,
+      };
+    }
+
+    if (target === 'prompt-context-contract') {
+      const payload = evaluateSystemPromptContract(prompt, vars);
       return {
         output: JSON.stringify(payload),
         raw: payload,

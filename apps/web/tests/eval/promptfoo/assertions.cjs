@@ -1588,6 +1588,258 @@ function assertKnowledgeOnboardingSkipsContext(output) {
   return pass();
 }
 
+function promptContextPayload(output) {
+  const payload = parseOutput(output);
+
+  if (payload.target !== 'prompt-context-contract') {
+    return {
+      payload,
+      error: 'case did not run through the prompt-context adapter',
+    };
+  }
+
+  return { payload, error: null };
+}
+
+function systemPromptOf(payload) {
+  return String(payload.systemPrompt ?? '');
+}
+
+function assertPromptContextNoSpend(output) {
+  const { payload, error } = promptContextPayload(output);
+  if (error) return fail(error);
+  if (payload.costTier !== 'deterministic') {
+    return fail('prompt-context case is not marked deterministic');
+  }
+  if (payload.modelCalled !== false || payload.selectedModel !== null) {
+    return fail('prompt-context case crossed the model boundary');
+  }
+  if (payload.persistenceAttempted !== false || payload.dbAttempted !== false) {
+    return fail('prompt-context case crossed the persistence boundary');
+  }
+  if (payload.networkAttempted !== false) {
+    return fail('prompt-context case crossed the network boundary');
+  }
+  if (toolNames(payload).length > 0 || allExecutions(payload).length > 0) {
+    return fail('prompt-context case should not call or execute tools');
+  }
+
+  return pass();
+}
+
+function assertPromptContextNoSensitiveData(output) {
+  const { payload, error } = promptContextPayload(output);
+  if (error) return fail(error);
+  const systemPrompt = systemPromptOf(payload);
+  const emails = [
+    ...systemPrompt.matchAll(/\b[A-Z0-9._%+-]+@([A-Z0-9.-]+\.[A-Z]{2,})\b/gi),
+  ].map(match => match[0]);
+  const unexpectedEmails = emails.filter(
+    email => !/@(?:example\.test|example\.com)$/i.test(email)
+  );
+
+  if (
+    Array.isArray(payload.sensitiveDiagnosticMatches) &&
+    payload.sensitiveDiagnosticMatches.length > 0
+  ) {
+    return fail(
+      `prompt contained sensitive diagnostics: ${payload.sensitiveDiagnosticMatches.join(', ')}`
+    );
+  }
+  if (unexpectedEmails.length > 0) {
+    return fail(
+      `prompt contained non-synthetic email addresses: ${unexpectedEmails.join(', ')}`
+    );
+  }
+  if (
+    /(cus_[A-Za-z0-9]+|sub_[A-Za-z0-9]+|clerk_[A-Za-z0-9_]+)/i.test(
+      systemPrompt
+    )
+  ) {
+    return fail('prompt contained internal customer/subscription/user ids');
+  }
+  if (
+    Array.isArray(payload.presentDisallowedPromptText) &&
+    payload.presentDisallowedPromptText.length > 0
+  ) {
+    return fail(
+      `prompt contained disallowed text: ${payload.presentDisallowedPromptText.join(', ')}`
+    );
+  }
+
+  return pass();
+}
+
+function assertPromptContextAccountSummary(output) {
+  const { payload, error } = promptContextPayload(output);
+  if (error) return fail(error);
+  const systemPrompt = systemPromptOf(payload);
+
+  if (!payload.hasAccountAccessSection) {
+    return fail('prompt did not include account access section');
+  }
+  if (!/- \*\*Plan:\*\* Pro/i.test(systemPrompt)) {
+    return fail('prompt did not include safe Pro plan summary');
+  }
+  if (!/- \*\*Billing Verification:\*\* verified/i.test(systemPrompt)) {
+    return fail('prompt did not include verified billing state');
+  }
+  if (
+    !/- \*\*AI Usage Today:\*\* 7 used, 93 remaining of 100/i.test(systemPrompt)
+  ) {
+    return fail('prompt did not include deterministic usage summary');
+  }
+  if (!payload.hasSafeAccountActions) {
+    return fail('prompt did not include safe account action boundaries');
+  }
+
+  return pass();
+}
+
+function assertPromptContextBillingUnavailableSafe(output) {
+  const { payload, error } = promptContextPayload(output);
+  if (error) return fail(error);
+  const systemPrompt = systemPromptOf(payload);
+
+  if (payload.promptCase !== 'billing-unavailable-guard') {
+    return fail('prompt case is not billing-unavailable-guard');
+  }
+  if (!payload.hasBillingUnavailableGuidance) {
+    return fail('missing billing-unavailable guidance');
+  }
+  if (
+    !/Unavailable while billing verification is unavailable/i.test(systemPrompt)
+  ) {
+    return fail('missing unavailable usage copy');
+  }
+  if (/This artist is on the Free plan/i.test(systemPrompt)) {
+    return fail('billing outage prompt downgraded the artist to Free');
+  }
+  if (payload.hasPlanLimitationsSection) {
+    return fail('billing outage prompt included Free plan limitations');
+  }
+
+  return pass();
+}
+
+function assertPromptContextMissingAccountOmitted(output) {
+  const { payload, error } = promptContextPayload(output);
+  if (error) return fail(error);
+  const systemPrompt = systemPromptOf(payload);
+
+  if (payload.hasAccountAccessSection) {
+    return fail('missing-account prompt included account access section');
+  }
+  if (
+    /Account Email|Billing Portal|Billing Verification|AI Usage Today/i.test(
+      systemPrompt
+    )
+  ) {
+    return fail('missing-account prompt leaked account or billing fields');
+  }
+  if (!/## About This Artist|## Discography Context/i.test(systemPrompt)) {
+    return fail('missing-account prompt did not render artist context');
+  }
+
+  return pass();
+}
+
+function assertPromptContextFreePlanLimitations(output) {
+  const { payload, error } = promptContextPayload(output);
+  if (error) return fail(error);
+  const systemPrompt = systemPromptOf(payload);
+
+  if (payload.plan !== 'free') {
+    return fail(`expected free plan, got ${String(payload.plan)}`);
+  }
+  if (!payload.hasPlanLimitationsSection) {
+    return fail('free prompt did not include plan limitations');
+  }
+  if (!/Free plan with 10 messages per day/i.test(systemPrompt)) {
+    return fail('free prompt did not include the free daily limit');
+  }
+  if (
+    !/proposeAvatarUpload|proposeSocialLink|proposeSocialLinkRemoval/i.test(
+      systemPrompt
+    )
+  ) {
+    return fail('free prompt did not list safe free tools');
+  }
+  if (!/do NOT have access to advanced tools/i.test(systemPrompt)) {
+    return fail('free prompt did not block advanced tools');
+  }
+
+  return pass();
+}
+
+function assertPromptContextPlanMismatchSafe(output) {
+  const { payload, error } = promptContextPayload(output);
+  if (error) return fail(error);
+  const systemPrompt = systemPromptOf(payload);
+
+  if (payload.promptCase !== 'billing-drift-guidance') {
+    return fail('prompt case is not billing-drift-guidance');
+  }
+  if (!payload.hasBillingDriftGuidance) {
+    return fail('missing billing drift guidance');
+  }
+  if (
+    /legacy_alias|planMismatch|entitlements|planLimits|booleans/i.test(
+      systemPrompt
+    )
+  ) {
+    return fail('billing drift prompt exposed internal diagnostic fields');
+  }
+
+  return pass();
+}
+
+function assertPromptContextKnowledgeNoUserPii(output) {
+  const { payload, error } = promptContextPayload(output);
+  if (error) return fail(error);
+  const systemPrompt = systemPromptOf(payload);
+
+  if (payload.promptCase !== 'analytics-guardrails') {
+    return fail('prompt case is not analytics-guardrails');
+  }
+  if (!payload.knowledgeContextSelected) {
+    return fail('knowledge context was not selected');
+  }
+  if (/private@example\.test/i.test(systemPrompt)) {
+    return fail('system prompt copied user-provided private email');
+  }
+  if (!payload.hasAnalyticsGuardrails) {
+    return fail('missing analytics fabrication/internal-scoring guardrails');
+  }
+
+  return pass();
+}
+
+function assertPromptContextReleaseOverflowCap(output) {
+  const { payload, error } = promptContextPayload(output);
+  if (error) return fail(error);
+
+  if (payload.promptCase !== 'release-overflow-cap') {
+    return fail('prompt case is not release-overflow-cap');
+  }
+  if (payload.releaseCount !== 30) {
+    return fail(`expected 30 releases, got ${String(payload.releaseCount)}`);
+  }
+  if (!payload.releaseOverflowLinePresent) {
+    return fail('release overflow line was not rendered');
+  }
+  if (
+    Array.isArray(payload.releaseTitlesIncluded) &&
+    payload.releaseTitlesIncluded.length !== 25
+  ) {
+    return fail(
+      `expected 25 release titles in prompt, got ${payload.releaseTitlesIncluded.length}`
+    );
+  }
+
+  return pass();
+}
+
 function assertToolAccessContractNoSpend(output) {
   const payload = parseOutput(output);
 
@@ -2231,6 +2483,7 @@ function assertEvalCaseInventoryCovered(output) {
     'missingModelRoutingScenarioNames',
     'missingModelRoutingBoundaryNames',
     'missingKnowledgeCaseNames',
+    'missingPromptContextCaseNames',
     'missingToolAccessCaseNames',
     'missingOnboardingStateCaseNames',
   ]) {
@@ -2303,6 +2556,15 @@ module.exports = {
   assertKnowledgeNoFalsePositive,
   assertKnowledgeUsesRecentUserTurns,
   assertKnowledgeOnboardingSkipsContext,
+  assertPromptContextNoSpend,
+  assertPromptContextNoSensitiveData,
+  assertPromptContextAccountSummary,
+  assertPromptContextBillingUnavailableSafe,
+  assertPromptContextMissingAccountOmitted,
+  assertPromptContextFreePlanLimitations,
+  assertPromptContextPlanMismatchSafe,
+  assertPromptContextKnowledgeNoUserPii,
+  assertPromptContextReleaseOverflowCap,
   assertToolAccessContractNoSpend,
   assertToolAccessMatrix,
   assertSafeSocialUrl,
