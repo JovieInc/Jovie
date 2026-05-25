@@ -73,6 +73,18 @@ function hasEmoji(text) {
   return /[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}]/u.test(text);
 }
 
+function hasSensitiveDiagnostic(text) {
+  return /(AI_GATEWAY_API_KEY|OPENAI_API_KEY|ANTHROPIC_API_KEY|XAI_API_KEY|VERCEL_OIDC_TOKEN|DATABASE_URL|CLERK_|UPSTASH_|bearer\s+[a-z0-9._-]+|sk-[a-z0-9_-]+|stack trace|at\s+[A-Za-z0-9_.$]+\s*\()/i.test(
+    text
+  );
+}
+
+function hasSecretValue(text) {
+  return /(bearer\s+[a-z0-9._-]+|sk-[a-z0-9_-]+|postgres(?:ql)?:\/\/|https:\/\/[^/\s]*upstash[^/\s]*\/[A-Za-z0-9._-]+)/i.test(
+    text
+  );
+}
+
 function wordCount(text) {
   return text.trim().split(/\s+/).filter(Boolean).length;
 }
@@ -942,6 +954,107 @@ function assertLiveHttpAlbumArtUnavailable(output) {
   return pass();
 }
 
+function assertLiveHttpModelProviderTerminalError(output) {
+  const payload = parseOutput(output);
+  const first = payload.first ?? {};
+  const replay = payload.replay ?? {};
+  const stateAfterFirst = payload.stateAfterFirst ?? {};
+  const stateAfterReplay = payload.stateAfterReplay ?? {};
+  const firstText = String(first.responseText ?? payload.text ?? '');
+  const persistedText = String(stateAfterFirst.assistantText ?? '');
+  const replayText = String(replay.responseText ?? '');
+  const combinedPublicText = `${firstText}\n${persistedText}\n${replayText}`;
+
+  if (payload.target !== 'web-chat-http-route') {
+    return fail('case did not run through the live HTTP web chat adapter');
+  }
+  if (payload.costTier !== 'live-model-error') {
+    return fail('case is not marked as live-model-error');
+  }
+  if (payload.modelProviderKeysDisabled !== true) {
+    return fail('model-error eval did not require disabled model keys');
+  }
+  if (payload.modelDispatchAttempted !== true) {
+    return fail('model-error eval did not reach the model dispatch path');
+  }
+  if (payload.persistenceAttempted !== true) {
+    return fail('model-error eval did not attempt persistence');
+  }
+  if (first.status !== 200) {
+    return fail(
+      `expected first model-error stream 200, got ${String(first.status)}`
+    );
+  }
+  if (replay.status !== 200) {
+    return fail(
+      `expected model-error replay 200, got ${String(replay.status)}`
+    );
+  }
+  if (
+    !first.headers?.['x-request-id'] ||
+    !first.headers?.['x-conversation-id'] ||
+    !first.headers?.['x-chat-turn-id']
+  ) {
+    return fail('first model-error stream missing request or turn headers');
+  }
+  if (replay.headers?.['x-chat-replay'] !== 'true') {
+    return fail('duplicate model-error turn did not replay persisted result');
+  }
+  if (
+    first.headers?.['x-conversation-id'] !==
+      replay.headers?.['x-conversation-id'] ||
+    first.headers?.['x-chat-turn-id'] !== replay.headers?.['x-chat-turn-id']
+  ) {
+    return fail('model-error replay did not return the same turn headers');
+  }
+  if (stateAfterFirst.status !== 'failed_model_error') {
+    return fail(
+      `expected failed_model_error after first request, got ${String(stateAfterFirst.status)}`
+    );
+  }
+  if (stateAfterReplay.status !== 'failed_model_error') {
+    return fail(
+      `expected failed_model_error after replay, got ${String(stateAfterReplay.status)}`
+    );
+  }
+  if (stateAfterReplay.userMessageCount !== 1) {
+    return fail('duplicate model-error replay inserted another user message');
+  }
+  if (stateAfterReplay.assistantMessageCount !== 1) {
+    return fail(
+      'duplicate model-error replay inserted another assistant message'
+    );
+  }
+  if (stateAfterFirst.errorCode !== 'CHAT_STREAM_FAILED') {
+    return fail('missing CHAT_STREAM_FAILED persisted error code');
+  }
+  if (stateAfterReplay.errorCode !== stateAfterFirst.errorCode) {
+    return fail('model-error replay changed persisted error code');
+  }
+  if (
+    String(stateAfterReplay.errorMessage ?? '').trim() !==
+    String(stateAfterFirst.errorMessage ?? '').trim()
+  ) {
+    return fail('model-error replay changed persisted error detail');
+  }
+  if (!/temporary issue|retry|simpler next step/i.test(combinedPublicText)) {
+    return fail('model-error path did not return the generic fallback copy');
+  }
+  if (hasSensitiveDiagnostic(combinedPublicText)) {
+    return fail('model-error response leaked provider or secret diagnostics');
+  }
+  if (!String(stateAfterFirst.errorMessage ?? '').trim()) {
+    return fail('missing persisted model-error detail');
+  }
+  if (hasSecretValue(String(stateAfterFirst.errorMessage ?? ''))) {
+    return fail(
+      'persisted model-error detail appears to contain a secret value'
+    );
+  }
+
+  return pass();
+}
+
 function assertToolAvailable(output) {
   const payload = parseOutput(output);
 
@@ -1688,6 +1801,7 @@ module.exports = {
   assertLiveHttpClientTurnRequiresProfile,
   assertLiveHttpDeterministicReplay,
   assertLiveHttpAlbumArtUnavailable,
+  assertLiveHttpModelProviderTerminalError,
   assertToolAvailable,
   assertToolUnavailable,
   assertToolSchemaValid,

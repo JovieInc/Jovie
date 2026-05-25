@@ -255,6 +255,18 @@ tests:
       - type: javascript
         value: file://assertions.cjs:assertLiveHttpOnboardingRateLimitUnavailable
 
+  - description: Live HTTP web chat persists terminal model errors with replay
+    metadata:
+      cost: live-model-error
+    vars:
+      input: "Give me a 3-step release strategy for my next single without changing my profile."
+      target: web-chat-http-route
+      httpCase: model-provider-terminal-error
+      persona: creator-ready
+    assert:
+      - type: javascript
+        value: file://assertions.cjs:assertLiveHttpModelProviderTerminalError
+
   - description: Web chat route rejects unauthenticated sensitive requests
     metadata:
       cost: deterministic

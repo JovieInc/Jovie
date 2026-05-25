@@ -2686,7 +2686,7 @@ export async function POST(req: Request) {
             })
           : undefined,
       onFinish: async ({ responseMessage }) => {
-        if (!reservedTurn) return;
+        if (!reservedTurn || streamFailurePersisted) return;
 
         const assistantText = extractUIMessageText(
           responseMessage.parts as Array<{ type: string; text?: string }>

@@ -8,12 +8,13 @@ Runs a small Promptfoo suite against local adapters:
 - A deterministic route-contract adapter for `POST /api/mobile/v1/chat/turns`, covering unauthenticated, invalid JSON, invalid-body variants, and `MOBILE_CHAT_RUNTIME_DISABLED` responses without starting Next or Clerk.
 - A manual live HTTP adapter for `POST /api/chat`, covering loopback auth, authenticated validation errors, client-turn preconditions, DB-backed client-turn reservation, deterministic no-model terminal paths, duplicate replay, and no sensitive echo on unauthorized responses.
 - A separate manual live HTTP rate-limit adapter for the anonymous `/api/chat` onboarding path, covering fail-closed 429 headers when Redis is intentionally disabled on the local server.
+- A separate manual live HTTP model-error adapter for authenticated `/api/chat`, covering terminal streaming model failures, generic fallback copy, DB-backed `failed_model_error` persistence, duplicate replay, and no public provider diagnostics when model credentials are intentionally disabled on the local server.
 
 The default eval command is deterministic and does not call models, DB, Clerk, Spotify, Stripe, Slack, or a local Next server. The route-contract adapters mirror checked-in route behavior because direct route import in Promptfoo runs outside the Next/Clerk/DB server context.
 
-Remaining JOV-2573 scope is live HTTP coverage for terminal model-error variants and production-like Clerk sessions. The current live HTTP lanes use loopback dev test-auth, deterministic no-model paths, and an isolated Redis-disabled local server for rate-limit coverage.
+Remaining JOV-2573 scope is production-like Clerk sessions. The current live HTTP lanes use loopback dev test-auth, deterministic no-model paths, an isolated Redis-disabled local server for rate-limit coverage, and an isolated model-key-disabled local server for terminal model-error coverage.
 
-Cost decision: Ship now live HTTP validation, persistence, and Redis-disabled rate-limit coverage that never needs model dispatch. Re-evaluate when production-like Clerk sessions can run locally without real customer data or paid auth-provider side effects. Then add Clerk-session live HTTP cases with capped case count and concurrency 1 under JOV-2573.
+Cost decision: Ship now live HTTP validation, persistence, Redis-disabled rate-limit coverage, and model-key-disabled terminal model-error coverage with no paid model calls. Re-evaluate when production-like Clerk sessions can run locally without real customer data or paid auth-provider side effects. Then add Clerk-session live HTTP cases with capped case count and concurrency 1 under JOV-2573.
 
 Run from the repo root:
 
@@ -41,6 +42,13 @@ PORT=3101 JOVIE_DISABLE_REDIS_FOR_EVALS=1 JOVIE_DISABLE_MODEL_KEYS_FOR_EVALS=1 E
 JOVIE_RUN_LIVE_HTTP_RATE_LIMIT_EVALS=1 JOVIE_PROMPTFOO_EXPECT_REDIS_DISABLED=1 JOVIE_PROMPTFOO_BASE_URL=http://127.0.0.1:3101 pnpm run evals:live:http:rate-limit
 ```
 
+To run the isolated live HTTP model-error case, start the local server with model provider credentials disabled. Use a port that is not already owned by another worktree:
+
+```bash
+PORT=3102 JOVIE_DISABLE_MODEL_KEYS_FOR_EVALS=1 E2E_USE_TEST_AUTH_BYPASS=1 pnpm run dev:web:fast
+JOVIE_RUN_LIVE_HTTP_MODEL_ERROR_EVALS=1 JOVIE_PROMPTFOO_EXPECT_MODEL_KEYS_DISABLED=1 JOVIE_PROMPTFOO_BASE_URL=http://127.0.0.1:3102 pnpm run evals:live:http:model-error
+```
+
 Promptfoo exits non-zero when baseline assertions fail. That is expected when the live suite is capturing current product behavior that should be improved. The default deterministic suite should stay green and cheap enough for CI.
 
 Required environment for default deterministic evals:
@@ -66,3 +74,10 @@ Required environment for manual live HTTP rate-limit evals:
 - `JOVIE_PROMPTFOO_EXPECT_REDIS_DISABLED=1`.
 - `JOVIE_PROMPTFOO_BASE_URL`, restricted to loopback hosts.
 - Local web server started with `JOVIE_DISABLE_REDIS_FOR_EVALS=1` and `JOVIE_DISABLE_MODEL_KEYS_FOR_EVALS=1`.
+
+Required environment for manual live HTTP model-error evals:
+
+- `JOVIE_RUN_LIVE_HTTP_MODEL_ERROR_EVALS=1`.
+- `JOVIE_PROMPTFOO_EXPECT_MODEL_KEYS_DISABLED=1`.
+- `JOVIE_PROMPTFOO_BASE_URL`, restricted to loopback hosts.
+- Local web server started with `E2E_USE_TEST_AUTH_BYPASS=1` and `JOVIE_DISABLE_MODEL_KEYS_FOR_EVALS=1`.

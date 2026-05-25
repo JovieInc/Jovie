@@ -40,6 +40,7 @@
     "evals:live:all": "bash scripts/run-live-promptfoo-evals.sh all",
     "evals:live:http": "bash scripts/run-live-promptfoo-http-evals.sh",
     "evals:live:http:rate-limit": "bash scripts/run-live-promptfoo-http-rate-limit-evals.sh",
+    "evals:live:http:model-error": "bash scripts/run-live-promptfoo-http-model-error-evals.sh",
     "test": "NODE_OPTIONS=--max-old-space-size=8192 node scripts/vitest-wrapper.mjs",
     "test:ci": "NODE_OPTIONS=--max-old-space-size=8192 vitest run --pool=forks --maxWorkers=2",
     "test:coverage": "vitest run --coverage",
