@@ -123,6 +123,7 @@ protocol TokenProviding: Sendable {
 
 protocol APIClientProtocol: Sendable {
   func fetchMe() async throws -> MobileMeResponse
+  func fetchAppleWalletProfilePass() async throws -> Data
 }
 
 struct APIClient: APIClientProtocol, Sendable {
@@ -147,6 +148,10 @@ struct APIClient: APIClientProtocol, Sendable {
 
   func fetchMe() async throws -> MobileMeResponse {
     try await sendMeRequest(forceRefresh: false)
+  }
+
+  func fetchAppleWalletProfilePass() async throws -> Data {
+    try await sendAppleWalletProfilePassRequest(forceRefresh: false)
   }
 
   private func sendMeRequest(forceRefresh: Bool) async throws -> MobileMeResponse {
@@ -185,6 +190,40 @@ struct APIClient: APIClientProtocol, Sendable {
     } catch {
       throw APIClientError.decodingFailed
     }
+  }
+
+  private func sendAppleWalletProfilePassRequest(forceRefresh: Bool) async throws -> Data {
+    let token = try await tokenProvider.bearerToken(forceRefresh: forceRefresh)
+    var request = URLRequest(url: baseURL.appending(path: "/api/wallet/apple/profile-pass"))
+    request.httpMethod = "GET"
+    request.timeoutInterval = requestTimeout
+    request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+    request.setValue("application/vnd.apple.pkpass", forHTTPHeaderField: "Accept")
+
+    let data: Data
+    let response: URLResponse
+
+    do {
+      (data, response) = try await session.data(for: request)
+    } catch let error as URLError {
+      throw APIClientError.transportFailed(code: error.code.rawValue)
+    } catch {
+      throw APIClientError.invalidResponse
+    }
+
+    guard let httpResponse = response as? HTTPURLResponse else {
+      throw APIClientError.invalidResponse
+    }
+
+    if httpResponse.statusCode == 401, !forceRefresh {
+      return try await sendAppleWalletProfilePassRequest(forceRefresh: true)
+    }
+
+    guard (200 ... 299).contains(httpResponse.statusCode) else {
+      throw APIClientError.requestFailed(statusCode: httpResponse.statusCode)
+    }
+
+    return data
   }
 }
 

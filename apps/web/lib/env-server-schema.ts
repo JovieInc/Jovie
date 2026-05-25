@@ -74,6 +74,16 @@ export const ServerEnvSchema = z.object({
   APPLE_MUSIC_DEVELOPER_TOKEN: z.string().optional(),
   IOS_TESTFLIGHT_PUBLIC_LINK: z.string().url().optional(),
 
+  // Apple Wallet profile passes (PassKit)
+  APPLE_WALLET_PASS_TYPE_IDENTIFIER: z.string().optional(),
+  APPLE_WALLET_TEAM_IDENTIFIER: z.string().optional(),
+  APPLE_WALLET_SIGNER_CERT_PEM: z.string().optional(),
+  APPLE_WALLET_SIGNER_KEY_PEM: z.string().optional(),
+  APPLE_WALLET_SIGNER_KEY_PASSPHRASE: z.string().optional(),
+  APPLE_WALLET_WWDR_CERT_PEM: z.string().optional(),
+  APPLE_WALLET_AUTH_TOKEN_SECRET: z.string().min(32).optional(),
+  APPLE_WALLET_APNS_PRODUCTION: z.enum(['true', 'false']).optional(),
+
   // Bandsintown configuration
   BANDSINTOWN_APP_ID: z.string().optional(),
 
@@ -317,6 +327,14 @@ export const ENV_KEYS = [
   'JOVIE_SYSTEM_CLERK_USER_ID',
   'APPLE_MUSIC_DEVELOPER_TOKEN',
   'IOS_TESTFLIGHT_PUBLIC_LINK',
+  'APPLE_WALLET_PASS_TYPE_IDENTIFIER',
+  'APPLE_WALLET_TEAM_IDENTIFIER',
+  'APPLE_WALLET_SIGNER_CERT_PEM',
+  'APPLE_WALLET_SIGNER_KEY_PEM',
+  'APPLE_WALLET_SIGNER_KEY_PASSPHRASE',
+  'APPLE_WALLET_WWDR_CERT_PEM',
+  'APPLE_WALLET_AUTH_TOKEN_SECRET',
+  'APPLE_WALLET_APNS_PRODUCTION',
   'BANDSINTOWN_APP_ID',
   'BLOB_READ_WRITE_TOKEN',
   'STRIPE_SECRET_KEY',

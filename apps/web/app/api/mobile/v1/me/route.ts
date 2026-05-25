@@ -5,6 +5,7 @@ import { isProfileComplete } from '@/lib/auth/profile-completeness';
 import { getSessionContext, SESSION_ERRORS } from '@/lib/auth/session';
 import { captureError } from '@/lib/error-tracking';
 import { NO_STORE_HEADERS } from '@/lib/http/headers';
+import { isAppleWalletProfilePassAvailable } from '@/lib/wallet/apple/profile-pass';
 
 export const runtime = 'nodejs';
 
@@ -16,6 +17,7 @@ export interface MobileMeResponse {
   qrPayload: string | null;
   avatarUrl: string | null;
   continueOnWebUrl: string;
+  appleWalletProfilePassAvailable: boolean;
 }
 
 function buildNeedsOnboardingResponse(): NextResponse {
@@ -27,6 +29,7 @@ function buildNeedsOnboardingResponse(): NextResponse {
     qrPayload: null,
     avatarUrl: null,
     continueOnWebUrl: getAppUrl(),
+    appleWalletProfilePassAvailable: false,
   };
 
   return NextResponse.json(payload, {
@@ -90,6 +93,16 @@ export async function GET() {
     }
 
     const publicProfileUrl = getProfileUrl(profile.username!);
+    const appleWalletProfilePassAvailable =
+      await isAppleWalletProfilePassAvailable(userId, {
+        id: profile.id,
+        username: profile.username!,
+        usernameNormalized: profile.usernameNormalized!,
+        displayName: profile.displayName,
+        avatarUrl: profile.avatarUrl,
+        isPublic: profile.isPublic,
+        onboardingCompletedAt: profile.onboardingCompletedAt,
+      });
     const payload: MobileMeResponse = {
       state: 'ready',
       displayName: profile.displayName,
@@ -98,6 +111,7 @@ export async function GET() {
       qrPayload: publicProfileUrl,
       avatarUrl: profile.avatarUrl,
       continueOnWebUrl: getAppUrl(),
+      appleWalletProfilePassAvailable,
     };
 
     return NextResponse.json(payload, {

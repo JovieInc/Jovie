@@ -116,6 +116,43 @@ struct APIClientTests {
     #expect(await tokenProvider.recordedForceRefreshValues() == [false, true])
   }
 
+  @Test func fetchesAppleWalletPassWithFreshTokenAfterUnauthorized() async throws {
+    let tokenProvider = MockTokenProvider(tokens: ["stale-token", "fresh-token"])
+    let passData = Data([0x50, 0x4B, 0x03, 0x04])
+    var requestCount = 0
+
+    MockURLProtocol.requestHandler = { request in
+      requestCount += 1
+      #expect(request.url?.path == "/api/wallet/apple/profile-pass")
+      #expect(request.value(forHTTPHeaderField: "Accept") == "application/vnd.apple.pkpass")
+      #expect(
+        request.value(forHTTPHeaderField: "Authorization")
+          == "Bearer \(requestCount == 1 ? "stale-token" : "fresh-token")"
+      )
+
+      let statusCode = requestCount == 1 ? 401 : 200
+      let response = HTTPURLResponse(
+        url: request.url!,
+        statusCode: statusCode,
+        httpVersion: nil,
+        headerFields: ["Content-Type": "application/vnd.apple.pkpass"]
+      )!
+
+      return (response, statusCode == 401 ? Data() : passData)
+    }
+
+    let client = APIClient(
+      baseURL: URL(string: "https://jov.ie")!,
+      session: makeSession(),
+      tokenProvider: tokenProvider
+    )
+
+    let data = try await client.fetchAppleWalletProfilePass()
+
+    #expect(data == passData)
+    #expect(await tokenProvider.recordedForceRefreshValues() == [false, true])
+  }
+
   @Test func mapsInvalidJSONToDecodingFailed() async throws {
     let tokenProvider = MockTokenProvider(tokens: ["token-1"])
     MockURLProtocol.requestHandler = { request in

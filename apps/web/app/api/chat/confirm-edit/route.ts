@@ -9,6 +9,7 @@ import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { NO_CACHE_HEADERS } from '@/lib/http/headers';
 import { getClientIP } from '@/lib/rate-limit';
 import { logger } from '@/lib/utils/logger';
+import { refreshAppleWalletProfilePassForProfileId } from '@/lib/wallet/apple/profile-pass';
 
 /**
  * Schema for validating the edit request body
@@ -96,6 +97,10 @@ export async function POST(req: Request) {
         updatedAt: new Date(),
       })
       .where(eq(creatorProfiles.id, profileId));
+
+    if (field === 'displayName') {
+      await refreshAppleWalletProfilePassForProfileId(profileId);
+    }
 
     // Log to audit table with full traceability
     const ipAddress = getClientIP(req);

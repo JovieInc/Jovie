@@ -16,6 +16,7 @@ import {
 import { track } from '@/lib/analytics';
 import { matchCommand } from '@/lib/chat/command-registry';
 import { consumePendingChatPrompt } from '@/lib/chat/open-chat-with-prompt';
+import { useAppFlag } from '@/lib/flags/client';
 import { PACER_TIMING } from '@/lib/pacer/hooks/timing';
 import { queryKeys, useChatConversationQuery } from '@/lib/queries';
 import { captureException } from '@/lib/sentry/client-lite';
@@ -217,6 +218,7 @@ export function useJovieChat({
   username,
 }: UseJovieChatOptions) {
   const router = useRouter();
+  const appleWalletProfilePassEnabled = useAppFlag('APPLE_WALLET_PROFILE_PASS');
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const lastAttemptedMessageRef = useRef<string>('');
   const activeClientTurnIdRef = useRef<string | null>(null);
@@ -663,7 +665,12 @@ export function useJovieChat({
   /** Try to handle text as a deterministic command. Returns true if handled. */
   const tryHandleCommand = useCallback(
     (trimmedText: string): boolean => {
-      const commandCtx = { username, router };
+      const commandCtx = {
+        username,
+        appleWalletProfilePassAvailable:
+          appleWalletProfilePassEnabled && Boolean(username),
+        router,
+      };
       const command = matchCommand(trimmedText, commandCtx);
       if (!command) return false;
 
@@ -681,7 +688,14 @@ export function useJovieChat({
       command.execute(commandCtx);
       return true;
     },
-    [activeConversationId, dispatchTimelineEvent, username, router, setInput]
+    [
+      activeConversationId,
+      appleWalletProfilePassEnabled,
+      dispatchTimelineEvent,
+      username,
+      router,
+      setInput,
+    ]
   );
 
   // Core submit logic

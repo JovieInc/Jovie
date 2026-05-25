@@ -1,3 +1,4 @@
+import PassKit
 import SwiftUI
 import UIKit
 
@@ -42,23 +43,31 @@ struct DashboardView: View {
   let isOffline: Bool
   let brightnessManager: BrightnessControlling
   let showVenueModeOnLaunch: Bool
+  let loadAppleWalletProfilePass: @Sendable () async throws -> Data
   let onRetry: () async -> Void
 
   @State private var isShowingVenueMode = false
   @State private var didCopyURL = false
   @State private var didPresentLaunchVenueMode = false
+  @State private var isAddingAppleWalletPass = false
+  @State private var appleWalletPassSheet: AppleWalletPassSheet?
+  @State private var appleWalletErrorMessage: String?
 
   init(
     state: DashboardLoadState,
     isOffline: Bool,
     brightnessManager: BrightnessControlling,
     showVenueModeOnLaunch: Bool = false,
+    loadAppleWalletProfilePass: @escaping @Sendable () async throws -> Data = {
+      throw APIClientError.missingToken
+    },
     onRetry: @escaping () async -> Void
   ) {
     self.state = state
     self.isOffline = isOffline
     self.brightnessManager = brightnessManager
     self.showVenueModeOnLaunch = showVenueModeOnLaunch
+    self.loadAppleWalletProfilePass = loadAppleWalletProfilePass
     self.onRetry = onRetry
   }
 
@@ -80,6 +89,26 @@ struct DashboardView: View {
           onDismiss: { isShowingVenueMode = false }
         )
       }
+    }
+    .sheet(item: $appleWalletPassSheet) { sheet in
+      AppleWalletAddPassView(pass: sheet.pass)
+    }
+    .alert(
+      "Apple Wallet",
+      isPresented: Binding(
+        get: { appleWalletErrorMessage != nil },
+        set: { isPresented in
+          if !isPresented {
+            appleWalletErrorMessage = nil
+          }
+        }
+      )
+    ) {
+      Button("OK", role: .cancel) {
+        appleWalletErrorMessage = nil
+      }
+    } message: {
+      Text(appleWalletErrorMessage ?? "Couldn't add the Wallet pass.")
     }
     .task(id: showVenueModeOnLaunch) {
       guard showVenueModeOnLaunch, !didPresentLaunchVenueMode else {
@@ -216,8 +245,41 @@ struct DashboardView: View {
         }
         .buttonStyle(JoviePillButtonStyle(filled: true))
       }
+
+      if response.appleWalletProfilePassAvailable && PKAddPassesViewController.canAddPasses() {
+        ZStack(alignment: .trailing) {
+          AppleWalletAddPassButton(isEnabled: !isAddingAppleWalletPass) {
+            Task {
+              await addAppleWalletPass()
+            }
+          }
+
+          if isAddingAppleWalletPass {
+            ProgressView()
+              .tint(.white)
+              .padding(.trailing, 14)
+              .accessibilityLabel("Preparing Apple Wallet pass")
+          }
+        }
+        .frame(width: 220, height: 44)
+        .accessibilityIdentifier("apple-wallet-profile-pass-button")
+      }
     }
     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+  }
+
+  private func addAppleWalletPass() async {
+    guard !isAddingAppleWalletPass else { return }
+    isAddingAppleWalletPass = true
+    defer { isAddingAppleWalletPass = false }
+
+    do {
+      let passData = try await loadAppleWalletProfilePass()
+      let pass = try PKPass(data: passData)
+      appleWalletPassSheet = AppleWalletPassSheet(pass: pass)
+    } catch {
+      appleWalletErrorMessage = "Couldn't add the Wallet pass. Try again."
+    }
   }
 
   private func copyURL(_ value: String?) {
@@ -228,6 +290,73 @@ struct DashboardView: View {
     Task {
       try? await Task.sleep(for: .seconds(2))
       didCopyURL = false
+    }
+  }
+}
+
+private struct AppleWalletPassSheet: Identifiable {
+  let id = UUID()
+  let pass: PKPass
+}
+
+private struct AppleWalletAddPassButton: UIViewRepresentable {
+  let isEnabled: Bool
+  let action: @MainActor () -> Void
+
+  func makeCoordinator() -> Coordinator {
+    Coordinator(action: action)
+  }
+
+  func makeUIView(context: Context) -> PKAddPassButton {
+    let button = PKAddPassButton(addPassButtonStyle: .black)
+    button.addTarget(
+      context.coordinator,
+      action: #selector(Coordinator.didTap),
+      for: .touchUpInside
+    )
+    return button
+  }
+
+  func updateUIView(_ button: PKAddPassButton, context: Context) {
+    context.coordinator.action = action
+    button.isUserInteractionEnabled = isEnabled
+    button.alpha = isEnabled ? 1 : 0.6
+  }
+
+  final class Coordinator: NSObject {
+    var action: @MainActor () -> Void
+
+    init(action: @escaping @MainActor () -> Void) {
+      self.action = action
+    }
+
+    @MainActor
+    @objc func didTap() {
+      action()
+    }
+  }
+}
+
+private struct AppleWalletAddPassView: UIViewControllerRepresentable {
+  let pass: PKPass
+
+  func makeCoordinator() -> Coordinator {
+    Coordinator()
+  }
+
+  func makeUIViewController(context: Context) -> UIViewController {
+    guard let controller = PKAddPassesViewController(pass: pass) else {
+      return UIViewController()
+    }
+    controller.delegate = context.coordinator
+    return controller
+  }
+
+  func updateUIViewController(_ controller: UIViewController, context: Context) {}
+
+  final class Coordinator: NSObject, PKAddPassesViewControllerDelegate {
+    func addPassesViewControllerDidFinish(_ controller: PKAddPassesViewController) {
+      controller.dismiss(animated: true)
     }
   }
 }
