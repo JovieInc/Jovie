@@ -650,6 +650,8 @@ tests:
         value: file://assertions.cjs:assertToolInventoryCovered
       - type: javascript
         value: file://assertions.cjs:assertToolUiRegistryCovered
+      - type: javascript
+        value: file://assertions.cjs:assertSlashSkillVisibilityCovered
 
   - description: Tool event inventory hydrates every eval tool
     metadata:

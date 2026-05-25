@@ -23,22 +23,64 @@ import type { ToolSchemaKey } from '@/lib/chat/tool-schemas';
  * or here (intentionally hidden) — no orphans.
  */
 export const HIDDEN_TOOLS: Readonly<Record<string, string>> = {
-  proposeProfileEdit:
-    'Triggered conversationally; surfacing as a slash command would duplicate proposeAvatarUpload + proposeSocialLink.',
-  showTopInsights: 'Surfaced as a home-screen card, not a slash command.',
+  checkHandle:
+    'Onboarding-only follow-up after Spotify identity; not useful as a standalone slash command.',
   checkCanvasStatus:
     'Diagnostic; results surface inside writeWorldClassBio / createPromoStrategy.',
-  suggestRelatedArtists:
-    'Always part of createPromoStrategy; never a standalone user action.',
-  writeWorldClassBio:
-    'Pro-only; chat surfaces it conversationally rather than via slash.',
-  generateCanvasPlan: 'Pro-only; surfaced via the release detail surface.',
+  confirmSpotifyArtist:
+    'Onboarding-only continuation from the Spotify picker; requires a selected candidate.',
+  createMerch:
+    'Conversational merch creation is gated by plan and rollout flags before broader slash exposure.',
   createPromoStrategy: 'Pro-only; surfaced via the release detail surface.',
+  createRelease: 'Surfaced in the releases dashboard; chat tool is a fallback.',
+  deleteOrArchiveMerchCard:
+    'Merch lifecycle action shown from merch cards, not the root slash menu.',
+  formatLyrics: 'Pro-only; surfaced via the lyrics surface, not slash.',
+  generateCanvasPlan: 'Pro-only; surfaced via the release detail surface.',
+  generateReleasePitch: 'Pro-only; surfaced via the release detail surface.',
+  importBioFromUrl:
+    'Triggered conversationally from an explicit URL import request before profile-edit preview.',
   markCanvasUploaded:
     'CRUD-style follow-up; surfaced inside the checkCanvasStatus card.',
-  formatLyrics: 'Pro-only; surfaced via the lyrics surface, not slash.',
-  createRelease: 'Surfaced in the releases dashboard; chat tool is a fallback.',
-  generateReleasePitch: 'Pro-only; surfaced via the release detail surface.',
+  openBillingPortal:
+    'Account handoff exposed from billing/account surfaces rather than chat slash.',
+  optimizeMerchCards:
+    'Merch optimization is an advanced card-level action, not a root slash command.',
+  pauseMerchCard:
+    'Merch lifecycle action shown from merch cards, not the root slash menu.',
+  previewMerchOptions:
+    'Conversational merch preview is gated by plan and rollout flags before broader slash exposure.',
+  proposeCheckout:
+    'Onboarding-only output from proposeNextStep; direct slash access would skip qualification.',
+  proposeNextStep:
+    'Onboarding evaluator trigger; direct slash access would bypass required intake signal.',
+  proposeProfileEdit:
+    'Triggered conversationally; surfacing as a slash command would duplicate proposeAvatarUpload + proposeSocialLink.',
+  publishMerchCard:
+    'Merch lifecycle action shown from merch cards, not the root slash menu.',
+  recordInterviewSignal:
+    'Silent onboarding telemetry; never user-visible as a command.',
+  reorderMerchCards:
+    'Merch ordering requires concrete card IDs from the merch UI, not a root slash command.',
+  searchSpotifyArtist:
+    'Onboarding-first identity picker; the authenticated chat slash menu should not expose it.',
+  selectMerchDesign:
+    'Follow-up after generated merch options; direct slash access would lack generation context.',
+  showAccountStatus:
+    'Account summary is triggered conversationally or from settings surfaces, not slash.',
+  showArtistPayouts:
+    'Internal merch payout liability is advanced/account-adjacent and not a root slash command.',
+  showMerchSales:
+    'Merch reporting belongs with merch/account cards rather than the root slash menu.',
+  showTopInsights: 'Surfaced as a home-screen card, not a slash command.',
+  showUsage:
+    'Usage details are triggered conversationally or from settings surfaces, not slash.',
+  suggestRelatedArtists:
+    'Always part of createPromoStrategy; never a standalone user action.',
+  unpauseMerchCard:
+    'Merch lifecycle action shown from merch cards, not the root slash menu.',
+  writeWorldClassBio:
+    'Pro-only; chat surfaces it conversationally rather than via slash.',
 } as const;
 
 export type CommandSurface = 'chat-slash' | 'cmdk';

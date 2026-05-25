@@ -835,6 +835,76 @@ function assertToolUiRegistryCovered(output) {
   return pass();
 }
 
+function assertSlashSkillVisibilityCovered(output) {
+  const payload = parseOutput(output);
+
+  if (payload.target !== 'tool-inventory') {
+    return fail('case did not run through the tool-inventory adapter');
+  }
+  if (!Array.isArray(payload.chatSlashSkillNames)) {
+    return fail('missing tool-inventory field: chatSlashSkillNames');
+  }
+  if (payload.chatSlashSkillNames.length === 0) {
+    return fail('chat slash exposes no skills');
+  }
+  if (!Array.isArray(payload.cmdkSkillNames)) {
+    return fail('missing tool-inventory field: cmdkSkillNames');
+  }
+  if (payload.cmdkSkillNames.length === 0) {
+    return fail('cmd+k exposes no skills');
+  }
+  if (
+    Array.isArray(payload.missingSkillCommandSchemaNames) &&
+    payload.missingSkillCommandSchemaNames.length > 0
+  ) {
+    return fail(
+      `slash skill commands missing schemas: ${payload.missingSkillCommandSchemaNames.join(', ')}`
+    );
+  }
+  if (
+    Array.isArray(payload.missingSkillCommandCaseNames) &&
+    payload.missingSkillCommandCaseNames.length > 0
+  ) {
+    return fail(
+      `slash skill commands missing eval cases: ${payload.missingSkillCommandCaseNames.join(', ')}`
+    );
+  }
+  if (
+    Array.isArray(payload.missingCmdkSkillNames) &&
+    payload.missingCmdkSkillNames.length > 0
+  ) {
+    return fail(
+      `chat slash skills missing from cmd+k: ${payload.missingCmdkSkillNames.join(', ')}`
+    );
+  }
+  if (
+    Array.isArray(payload.staleHiddenToolNames) &&
+    payload.staleHiddenToolNames.length > 0
+  ) {
+    return fail(
+      `hidden tool decisions reference unknown tools: ${payload.staleHiddenToolNames.join(', ')}`
+    );
+  }
+  if (
+    Array.isArray(payload.hiddenToolsWithoutReason) &&
+    payload.hiddenToolsWithoutReason.length > 0
+  ) {
+    return fail(
+      `hidden tools missing rationale: ${payload.hiddenToolsWithoutReason.join(', ')}`
+    );
+  }
+  if (
+    Array.isArray(payload.missingVisibilityDecisionNames) &&
+    payload.missingVisibilityDecisionNames.length > 0
+  ) {
+    return fail(
+      `tools missing visible/hidden command decision: ${payload.missingVisibilityDecisionNames.join(', ')}`
+    );
+  }
+
+  return pass();
+}
+
 function firstEvent(payload) {
   return Array.isArray(payload.events) ? payload.events[0] : undefined;
 }
@@ -1059,6 +1129,7 @@ module.exports = {
   assertFailedToolResultPreserved,
   assertToolInventoryCovered,
   assertToolUiRegistryCovered,
+  assertSlashSkillVisibilityCovered,
   assertToolEventInventoryCovered,
   assertToolEventHydratesSuccess,
   assertToolEventFailurePreserved,
