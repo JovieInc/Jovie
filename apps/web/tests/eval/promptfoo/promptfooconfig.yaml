@@ -617,6 +617,201 @@ tests:
       - type: javascript
         value: file://assertions.cjs:assertWebRouteContractOnlySuccess
 
+  - description: Web chat route deterministic display-name intent stops before model dispatch
+    metadata:
+      cost: deterministic
+    vars:
+      input: "Change my display name to Luna Waves"
+      target: web-chat-route
+      webRouteCase: deterministic-profile-name-intent
+      authenticated: true
+      expectedIntentCategory: PROFILE_UPDATE_NAME
+      body:
+        profileId: 00000000-0000-4000-8000-000000002561
+    assert:
+      - type: javascript
+        value: file://assertions.cjs:assertDeterministicRouteNoSideEffects
+      - type: javascript
+        value: file://assertions.cjs:assertWebRouteDeterministicIntentRouted
+
+  - description: Web chat route deterministic bio intent stops before model dispatch
+    metadata:
+      cost: deterministic
+    vars:
+      input: "Update my bio to Ocean-lit synth pop from a synthetic shoreline."
+      target: web-chat-route
+      webRouteCase: deterministic-profile-bio-intent
+      authenticated: true
+      expectedIntentCategory: PROFILE_UPDATE_BIO
+      body:
+        profileId: 00000000-0000-4000-8000-000000002561
+    assert:
+      - type: javascript
+        value: file://assertions.cjs:assertDeterministicRouteNoSideEffects
+      - type: javascript
+        value: file://assertions.cjs:assertWebRouteDeterministicIntentRouted
+
+  - description: Web chat route deterministic social-link URL intent uses safe args
+    metadata:
+      cost: deterministic
+    vars:
+      input: "Add https://instagram.com/lunawaves to my profile."
+      target: web-chat-route
+      webRouteCase: deterministic-social-link-url-intent
+      authenticated: true
+      expectedIntentCategory: LINK_ADD
+      expectedClientAction: propose_social_link
+      expectedSafeUrl: https://instagram.com/lunawaves
+      body:
+        profileId: 00000000-0000-4000-8000-000000002561
+    assert:
+      - type: javascript
+        value: file://assertions.cjs:assertDeterministicRouteNoSideEffects
+      - type: javascript
+        value: file://assertions.cjs:assertWebRouteDeterministicIntentRouted
+
+  - description: Web chat route deterministic social-link removal intent stops before model dispatch
+    metadata:
+      cost: deterministic
+    vars:
+      input: "Remove my TikTok link from my profile."
+      target: web-chat-route
+      webRouteCase: deterministic-social-link-removal-intent
+      authenticated: true
+      expectedIntentCategory: LINK_REMOVE
+      expectedClientAction: propose_social_link_removal
+      body:
+        profileId: 00000000-0000-4000-8000-000000002561
+    assert:
+      - type: javascript
+        value: file://assertions.cjs:assertDeterministicRouteNoSideEffects
+      - type: javascript
+        value: file://assertions.cjs:assertWebRouteDeterministicIntentRouted
+
+  - description: Web chat route deterministic avatar upload intent stops before model dispatch
+    metadata:
+      cost: deterministic
+    vars:
+      input: "Update my photo."
+      target: web-chat-route
+      webRouteCase: deterministic-avatar-upload-intent
+      authenticated: true
+      expectedIntentCategory: AVATAR_UPLOAD
+      expectedClientAction: propose_avatar_upload
+      body:
+        profileId: 00000000-0000-4000-8000-000000002561
+    assert:
+      - type: javascript
+        value: file://assertions.cjs:assertDeterministicRouteNoSideEffects
+      - type: javascript
+        value: file://assertions.cjs:assertWebRouteDeterministicIntentRouted
+
+  - description: Web chat route duplicate client turn returns in-progress response before model dispatch
+    metadata:
+      cost: deterministic
+    vars:
+      input: "Update my photo."
+      target: web-chat-route
+      webRouteCase: client-turn-duplicate-in-progress
+      authenticated: true
+      clientTurnReservation: duplicate_in_progress
+      body:
+        profileId: 00000000-0000-4000-8000-000000002561
+        conversationId: promptfoo-eval-conversation
+        clientTurnId: web-route-duplicate-in-progress
+        clientMessageId: web-route-duplicate-in-progress-message
+    assert:
+      - type: javascript
+        value: file://assertions.cjs:assertDeterministicRouteNoSideEffects
+      - type: javascript
+        value: file://assertions.cjs:assertWebRouteClientTurnDuplicateInProgress
+
+  - description: Web chat route duplicate completed client turn replays before model dispatch
+    metadata:
+      cost: deterministic
+    vars:
+      input: "Update my photo."
+      target: web-chat-route
+      webRouteCase: client-turn-duplicate-completed-replay
+      authenticated: true
+      clientTurnReservation: duplicate_completed
+      replayText: "This synthetic avatar update already finished."
+      body:
+        profileId: 00000000-0000-4000-8000-000000002561
+        conversationId: promptfoo-eval-conversation
+        clientTurnId: web-route-duplicate-completed
+        clientMessageId: web-route-duplicate-completed-message
+    assert:
+      - type: javascript
+        value: file://assertions.cjs:assertDeterministicRouteNoSideEffects
+      - type: javascript
+        value: file://assertions.cjs:assertWebRouteClientTurnReplay
+
+  - description: Web chat route duplicate completed client turn replays tool state without text
+    metadata:
+      cost: deterministic
+    vars:
+      input: "Add https://instagram.com/lunawaves to my profile."
+      target: web-chat-route
+      webRouteCase: client-turn-duplicate-completed-tool-replay
+      authenticated: true
+      clientTurnReservation: duplicate_completed
+      replayToolEvents: social-link-success
+      body:
+        profileId: 00000000-0000-4000-8000-000000002561
+        conversationId: promptfoo-eval-conversation
+        clientTurnId: web-route-duplicate-completed-tool
+        clientMessageId: web-route-duplicate-completed-tool-message
+    assert:
+      - type: javascript
+        value: file://assertions.cjs:assertDeterministicRouteNoSideEffects
+      - type: javascript
+        value: file://assertions.cjs:assertWebRouteClientTurnToolReplay
+
+  - description: Web chat route reserved client turn persists rate-limit terminal without model dispatch
+    metadata:
+      cost: deterministic
+    vars:
+      input: "My private contact is luna.private@example.com. I need one more chat response."
+      target: web-chat-route
+      webRouteCase: reserved-turn-rate-limit-terminal
+      authenticated: true
+      clientTurnReservation: created
+      rateLimited: true
+      billingVerification: unavailable
+      body:
+        profileId: 00000000-0000-4000-8000-000000002561
+        conversationId: promptfoo-eval-conversation
+        clientTurnId: web-route-rate-limit-terminal
+        clientMessageId: web-route-rate-limit-terminal-message
+    assert:
+      - type: javascript
+        value: file://assertions.cjs:assertDeterministicRouteNoSideEffects
+      - type: javascript
+        value: file://assertions.cjs:assertWebRouteReservedRateLimitTerminal
+
+  - description: Web chat route reserved album-art preflight stops before model dispatch
+    metadata:
+      cost: deterministic
+    vars:
+      input: "Generate album art for my next single."
+      target: web-chat-route
+      webRouteCase: reserved-turn-album-art-unavailable
+      authenticated: true
+      clientTurnReservation: created
+      albumArtCapability: provider-unavailable
+      body:
+        profileId: 00000000-0000-4000-8000-000000002561
+        conversationId: promptfoo-eval-conversation
+        clientTurnId: web-route-album-art-unavailable
+        clientMessageId: web-route-album-art-unavailable-message
+        toolIntent: album_art_generation
+    assert:
+      - type: javascript
+        value: file://assertions.cjs:assertDeterministicRouteNoSideEffects
+      - type: javascript
+        value: file://assertions.cjs:assertWebRouteAlbumArtUnavailablePreflight
+
   - description: Anonymous onboarding route rejects invalid messages before model dispatch
     metadata:
       cost: deterministic
