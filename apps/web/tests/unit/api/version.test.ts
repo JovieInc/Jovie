@@ -31,4 +31,14 @@ describe('GET /api/version', () => {
 
     expect(await response.json()).toEqual({ buildId: '1234567' });
   });
+
+  it('falls back to dev when both SHAs are missing', async () => {
+    vi.stubEnv('NEXT_PUBLIC_BUILD_SHA', '');
+    vi.stubEnv('VERCEL_GIT_COMMIT_SHA', '');
+
+    const { GET } = await import('@/app/api/version/route');
+    const response = GET();
+
+    expect(await response.json()).toEqual({ buildId: 'dev' });
+  });
 });
