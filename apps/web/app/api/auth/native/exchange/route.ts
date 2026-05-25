@@ -28,6 +28,18 @@ interface NativeExchangeRequest {
   codeVerifier?: unknown;
 }
 
+type NativeExchangePayload =
+  | {
+      ticket: string;
+      expiresInSeconds: number;
+    }
+  | {
+      sessionToken: string;
+      sessionId: string;
+      userId: string;
+      expiresInSeconds: number;
+    };
+
 function isNativeClient(client: unknown): client is NativeAuthClient {
   return isAuthClient(client) && (client === 'ios' || client === 'electron');
 }
@@ -143,47 +155,10 @@ export async function POST(request: Request) {
     }
 
     const clerk = await clerkClient();
-    let exchangePayload:
-      | {
-          ticket: string;
-          expiresInSeconds: number;
-        }
-      | {
-          sessionToken: string;
-          sessionId: string;
-          userId: string;
-          expiresInSeconds: number;
-        };
-
-    try {
-      const signInToken = await clerk.signInTokens.createSignInToken({
-        userId: result.userId,
-        expiresInSeconds: SIGN_IN_TOKEN_TTL_SECONDS,
-      });
-      exchangePayload = {
-        ticket: signInToken.token,
-        expiresInSeconds: SIGN_IN_TOKEN_TTL_SECONDS,
-      };
-    } catch (error) {
-      if (!isNotFoundError(error)) {
-        throw error;
-      }
-
-      const session = await clerk.sessions.createSession({
-        userId: result.userId,
-      });
-      const token = await clerk.sessions.getToken(
-        session.id,
-        undefined,
-        SESSION_TOKEN_TTL_SECONDS
-      );
-      exchangePayload = {
-        sessionToken: token.jwt,
-        sessionId: session.id,
-        userId: session.userId,
-        expiresInSeconds: SESSION_TOKEN_TTL_SECONDS,
-      };
-    }
+    const exchangePayload =
+      client === 'ios'
+        ? await createIosNativeExchangePayload(clerk, result.userId)
+        : await createDesktopNativeExchangePayload(clerk, result.userId);
 
     void trackAuthEvent('auth_exchange_succeeded', {
       client,
@@ -208,5 +183,65 @@ export async function POST(request: Request) {
       { error: 'Native auth exchange failed' },
       { status: 500, headers: NO_STORE_HEADERS }
     );
+  }
+}
+
+async function createDesktopNativeExchangePayload(
+  clerk: Awaited<ReturnType<typeof clerkClient>>,
+  userId: string
+): Promise<NativeExchangePayload> {
+  const signInToken = await clerk.signInTokens.createSignInToken({
+    userId,
+    expiresInSeconds: SIGN_IN_TOKEN_TTL_SECONDS,
+  });
+
+  return {
+    ticket: signInToken.token,
+    expiresInSeconds: SIGN_IN_TOKEN_TTL_SECONDS,
+  };
+}
+
+async function createIosNativeExchangePayload(
+  clerk: Awaited<ReturnType<typeof clerkClient>>,
+  userId: string
+): Promise<NativeExchangePayload> {
+  try {
+    const session = await clerk.sessions.createSession({ userId });
+    const token = await clerk.sessions.getToken(
+      session.id,
+      undefined,
+      SESSION_TOKEN_TTL_SECONDS
+    );
+
+    return {
+      sessionToken: token.jwt,
+      sessionId: session.id,
+      userId: session.userId,
+      expiresInSeconds: SESSION_TOKEN_TTL_SECONDS,
+    };
+  } catch (error) {
+    if (!isNotFoundError(error)) {
+      throw error;
+    }
+
+    /*
+     * If a preview environment has not been granted Sessions API access yet,
+     * keep the iOS test harness usable by falling back to Clerk's ticket flow.
+     * Production iOS prefers the session-token path so the app can persist the
+     * native session before calling /api/mobile/v1/me.
+     */
+    if (!isProductionRuntimeEnvironment()) {
+      const signInToken = await clerk.signInTokens.createSignInToken({
+        userId,
+        expiresInSeconds: SIGN_IN_TOKEN_TTL_SECONDS,
+      });
+
+      return {
+        ticket: signInToken.token,
+        expiresInSeconds: SIGN_IN_TOKEN_TTL_SECONDS,
+      };
+    }
+
+    throw error;
   }
 }

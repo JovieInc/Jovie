@@ -1,6 +1,6 @@
 {
   "name": "jovie-monorepo",
-  "version": "26.5.56",
+  "version": "26.5.57",
   "private": true,
   "config": {
     "commitizen": {
@@ -86,6 +86,7 @@
     "ios:build": "bash apps/ios/scripts/run-xcodebuild.sh build",
     "ios:test": "bash apps/ios/scripts/run-xcodebuild.sh test",
     "test:auth:ios": "bash apps/ios/scripts/test-auth-callback.sh",
+    "test:auth:native": "pnpm --filter @jovie/web exec vitest run tests/unit/desktop/native-complete.test.ts tests/unit/dashboard/session-device-name.test.ts tests/unit/auth/AuthUnavailableCard.compact.test.tsx tests/unit/customer-facing-vendor-copy.test.ts tests/unit/api/auth/native-exchange.test.ts tests/unit/api/dev/test-auth-routes.test.ts && pnpm --filter @jovie/desktop run test && pnpm run test:auth:ios",
     "ios:screenshots": "bash apps/ios/scripts/capture-screenshots.sh",
     "build": "node scripts/turbo-local.mjs build",
     "build:web": "node scripts/turbo-local.mjs build --filter=@jovie/web",
