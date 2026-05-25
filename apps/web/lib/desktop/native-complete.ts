@@ -11,8 +11,8 @@ interface DesktopNativeExchangeResponse {
 
 interface DesktopSignInResource {
   readonly createdSessionId: string | null;
-  ticket: (params: { ticket: string }) => Promise<{ error?: unknown | null }>;
-  finalize: () => Promise<{ error?: unknown | null }>;
+  ticket: (params: { ticket: string }) => Promise<{ error?: unknown }>;
+  finalize: () => Promise<{ error?: unknown }>;
 }
 
 type DesktopSetActive = (params: { session: string }) => Promise<void>;
@@ -35,6 +35,7 @@ export type DesktopAuthDiagnosticStage =
   | 'ticket_finalize_started'
   | 'ticket_finalize_failed'
   | 'ticket_finalize_succeeded'
+  | 'session_id_missing'
   | 'set_active_started'
   | 'set_active_succeeded'
   | 'route_ready';
@@ -75,13 +76,7 @@ export function recordDesktopAuthDiagnostic(
 }
 
 function createError(code: string, cause?: unknown): Error {
-  if (cause instanceof Error) {
-    const error = new Error(code);
-    error.cause = cause;
-    return error;
-  }
-
-  if (cause) {
+  if (cause !== undefined) {
     const error = new Error(code);
     error.cause = cause;
     return error;
@@ -169,7 +164,7 @@ export async function completeDesktopNativeAuth({
 
   const sessionId = signIn.createdSessionId;
   if (!sessionId) {
-    recordDiagnostic('ticket_finalize_failed', 'missing_created_session');
+    recordDiagnostic('session_id_missing', 'missing_created_session');
     throw new Error('desktop-auth-missing-session');
   }
 

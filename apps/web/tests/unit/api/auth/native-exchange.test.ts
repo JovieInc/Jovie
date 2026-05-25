@@ -188,11 +188,7 @@ describe('POST /api/auth/native/exchange', () => {
     expect(mockSessionsCreateSession).toHaveBeenCalledWith({
       userId: 'user_native',
     });
-    expect(mockSessionsGetToken).toHaveBeenCalledWith(
-      'sess_ios',
-      undefined,
-      43_200
-    );
+    expect(mockSessionsGetToken).toHaveBeenCalledWith('sess_ios', '', 43_200);
     expect(mockSignInTokensCreateSignInToken).not.toHaveBeenCalled();
   });
 
@@ -213,5 +209,23 @@ describe('POST /api/auth/native/exchange', () => {
       codeVerifier: 'desktop_verifier',
       createCodeChallenge: expect.any(Function),
     });
+  });
+
+  it('returns a clear desktop auth error when Clerk sign-in tokens are unavailable', async () => {
+    const unavailableError = new Error('sign-in token unavailable');
+    Object.assign(unavailableError, { status: 404 });
+    mockSignInTokensCreateSignInToken.mockRejectedValue(unavailableError);
+
+    const { POST } = await import('@/app/api/auth/native/exchange/route');
+    const response = await POST(createElectronExchangeRequest());
+    const data = await response.json();
+
+    expect(response.status).toBe(503);
+    expect(data).toEqual({
+      error: 'Desktop native auth unavailable',
+      reason: 'desktop_sign_in_token_unavailable',
+    });
+    expect(mockSessionsCreateSession).not.toHaveBeenCalled();
+    expect(mockSessionsGetToken).not.toHaveBeenCalled();
   });
 });

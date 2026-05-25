@@ -20,6 +20,7 @@ export const runtime = 'nodejs';
 
 const SIGN_IN_TOKEN_TTL_SECONDS = 60;
 const SESSION_TOKEN_TTL_SECONDS = 60 * 60 * 12;
+const DEFAULT_SESSION_TOKEN_TEMPLATE = '';
 
 interface NativeExchangeRequest {
   client?: unknown;
@@ -155,10 +156,32 @@ export async function POST(request: Request) {
     }
 
     const clerk = await clerkClient();
-    const exchangePayload =
-      client === 'ios'
-        ? await createIosNativeExchangePayload(clerk, result.userId)
-        : await createDesktopNativeExchangePayload(clerk, result.userId);
+    let exchangePayload: NativeExchangePayload;
+    try {
+      exchangePayload =
+        client === 'ios'
+          ? await createIosNativeExchangePayload(clerk, result.userId)
+          : await createDesktopNativeExchangePayload(clerk, result.userId);
+    } catch (error) {
+      if (client === 'electron' && isNotFoundError(error)) {
+        void trackAuthEvent('auth_exchange_failed', {
+          client,
+          intent: 'sign_in',
+          result: 'failed',
+          reason: 'desktop_sign_in_token_unavailable',
+        });
+
+        return NextResponse.json(
+          {
+            error: 'Desktop native auth unavailable',
+            reason: 'desktop_sign_in_token_unavailable',
+          },
+          { status: 503, headers: NO_STORE_HEADERS }
+        );
+      }
+
+      throw error;
+    }
 
     void trackAuthEvent('auth_exchange_succeeded', {
       client,
@@ -209,7 +232,7 @@ async function createIosNativeExchangePayload(
     const session = await clerk.sessions.createSession({ userId });
     const token = await clerk.sessions.getToken(
       session.id,
-      undefined,
+      DEFAULT_SESSION_TOKEN_TEMPLATE,
       SESSION_TOKEN_TTL_SECONDS
     );
 
