@@ -822,7 +822,7 @@ tests:
       confirmRouteCase: confirm-edit-unauthorized
       authenticated: false
       body:
-        profileId: 00000000-0000-4000-8000-000000002561
+        profileId: not-a-uuid
         field: displayName
         newValue: "Luna private contact luna.private@example.com"
     assert:

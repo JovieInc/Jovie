@@ -996,7 +996,8 @@ function assertChatConfirmRouteUnauthorized(output) {
   if (payload.responseJson?.error !== 'Unauthorized') {
     return fail('missing Unauthorized response body');
   }
-  if (/luna\.private@example\.com/i.test(payload.responseText ?? '')) {
+  const publicResponseSurface = `${String(payload.responseText ?? '')}\n${JSON.stringify(payload.responseJson ?? {})}`;
+  if (/luna\.private@example\.com/i.test(publicResponseSurface)) {
     return fail(
       'unauthorized confirmation route echoed sensitive request data'
     );
