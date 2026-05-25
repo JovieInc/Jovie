@@ -17,7 +17,7 @@ import {
   ONBOARDING_TOOLS,
   TOOL_SCHEMAS,
 } from '@/lib/chat/tool-schemas';
-import { TOOL_UI_REGISTRY } from '@/lib/chat/tool-ui-registry';
+import { getToolUiConfig, TOOL_UI_REGISTRY } from '@/lib/chat/tool-ui-registry';
 import type { ReleaseContext } from '@/lib/chat/types';
 import {
   COMMANDS,
@@ -39,6 +39,7 @@ type EvalTarget =
   | 'mobile-chat-route'
   | 'tool-contract'
   | 'tool-event-contract'
+  | 'tool-render-contract'
   | 'tool-inventory'
   | 'web-chat-route';
 
@@ -279,6 +280,18 @@ const FREE_APP_TOOL_NAMES = [
 
 const ALL_EVAL_TOOL_NAMES = Object.keys(ALL_EVAL_TOOL_SCHEMAS).sort();
 const TOOL_UI_REGISTRY_NAMES = Object.keys(TOOL_UI_REGISTRY).sort();
+const GENERIC_ARTIFACT_RENDERER_TOOL_NAMES = [
+  'generateAlbumArt',
+  'generateReleasePitch',
+  'proposeAvatarUpload',
+  'proposeProfileEdit',
+  'proposeSocialLink',
+  'proposeSocialLinkRemoval',
+  'showTopInsights',
+] as const;
+const GENERIC_ARTIFACT_RENDERER_NAME_SET = new Set<string>(
+  GENERIC_ARTIFACT_RENDERER_TOOL_NAMES
+);
 const CHAT_SLASH_SKILL_NAMES = commandsForSurface('chat-slash')
   .filter(command => command.kind === 'skill')
   .map(command => command.id)
@@ -334,6 +347,7 @@ function toTarget(value: unknown): EvalTarget {
     value === 'model-contract' ||
     value === 'tool-contract' ||
     value === 'tool-event-contract' ||
+    value === 'tool-render-contract' ||
     value === 'tool-inventory' ||
     value === 'web-chat-route'
   ) {
@@ -1495,6 +1509,360 @@ function evaluateToolEventContract(vars: EvalVars) {
   };
 }
 
+function renderStatusTitle(event: PersistedToolEvent): string {
+  const config = getToolUiConfig(event.toolName);
+
+  switch (event.state) {
+    case 'running':
+      return config.loadingTitle ?? config.label;
+    case 'failed':
+      return config.errorTitle ?? `${config.label} Failed`;
+    case 'denied':
+      return `${config.label} denied`;
+    case 'needs-approval':
+      return `${config.label} needs your OK`;
+    case 'succeeded':
+      return config.successTitle ?? config.label;
+  }
+}
+
+function renderStatusBody(event: PersistedToolEvent): string | undefined {
+  switch (event.state) {
+    case 'running':
+      return event.summary;
+    case 'failed':
+    case 'denied':
+      return event.errorMessage ?? event.summary;
+    case 'needs-approval':
+      return event.errorMessage ?? 'Approval required before continuing.';
+    case 'succeeded':
+      return event.summary ?? 'Completed';
+  }
+}
+
+function syntheticArtifactOutputFor(toolName: string): Record<string, unknown> {
+  switch (toolName) {
+    case 'generateAlbumArt':
+      return {
+        success: true,
+        state: 'generated',
+        releaseId: '00000000-0000-4000-8000-000000000401',
+        releaseTitle: 'Tidal Drift',
+        artistName: 'Luna Waves',
+        generationId: '00000000-0000-4000-8000-000000000402',
+        hasExistingArtwork: false,
+        candidates: [
+          {
+            id: 'album-art-candidate-1',
+            styleId: 'chromatic-tide',
+            styleLabel: 'Chromatic tide',
+            previewUrl: 'https://cdn.jov.ie/eval/album-art-preview.jpg',
+            fullResUrl: 'https://cdn.jov.ie/eval/album-art-full.jpg',
+          },
+        ],
+      };
+    case 'generateReleasePitch':
+      return {
+        success: true,
+        releaseTitle: 'Tidal Drift',
+        pitches: {
+          spotify: 'Synthetic Spotify pitch for Tidal Drift.',
+          appleMusic: 'Synthetic Apple Music pitch for Tidal Drift.',
+          amazon: 'Synthetic Amazon pitch for Tidal Drift.',
+          generic: 'Synthetic generic pitch for Tidal Drift.',
+        },
+      };
+    case 'proposeAvatarUpload':
+      return { success: true };
+    case 'proposeProfileEdit':
+      return {
+        success: true,
+        preview: {
+          field: 'bio',
+          fieldLabel: 'Bio',
+          currentValue: 'Old synthetic bio.',
+          newValue: 'New synthetic bio.',
+          reason: 'Synthetic eval preview.',
+        },
+      };
+    case 'proposeSocialLink':
+      return {
+        success: true,
+        platform: {
+          id: 'instagram',
+          name: 'Instagram',
+          icon: 'instagram',
+          color: '#E1306C',
+        },
+        normalizedUrl: 'https://instagram.com/lunawaves',
+        originalUrl: 'https://instagram.com/lunawaves',
+      };
+    case 'proposeSocialLinkRemoval':
+      return {
+        success: true,
+        linkId: '00000000-0000-4000-8000-000000000301',
+        platform: 'instagram',
+        url: 'https://instagram.com/lunawaves',
+      };
+    case 'showTopInsights':
+      return {
+        success: true,
+        totalActive: 1,
+        insights: [
+          {
+            id: 'synthetic-insight',
+            title: 'Synthetic insight',
+            body: 'Synthetic audience signal.',
+            priority: 'medium',
+          },
+        ],
+      };
+    default:
+      return {
+        success: true,
+        summary: `${toolName} completed with a synthetic eval result.`,
+      };
+  }
+}
+
+function hasGeneratedAlbumArtOutput(output: Record<string, unknown>): boolean {
+  const candidates = output.candidates;
+
+  return (
+    output.success === true &&
+    output.state === 'generated' &&
+    typeof output.releaseTitle === 'string' &&
+    typeof output.artistName === 'string' &&
+    typeof output.generationId === 'string' &&
+    typeof output.hasExistingArtwork === 'boolean' &&
+    Array.isArray(candidates) &&
+    candidates.every(candidate => {
+      const candidateObject = toObject(candidate);
+      return (
+        typeof candidateObject.id === 'string' &&
+        typeof candidateObject.styleId === 'string' &&
+        typeof candidateObject.styleLabel === 'string' &&
+        typeof candidateObject.previewUrl === 'string' &&
+        typeof candidateObject.fullResUrl === 'string'
+      );
+    })
+  );
+}
+
+function hasReleasePitchOutput(output: Record<string, unknown>): boolean {
+  const pitches = toObject(output.pitches);
+
+  return (
+    output.success === true &&
+    (output.releaseTitle === undefined ||
+      typeof output.releaseTitle === 'string') &&
+    typeof pitches.spotify === 'string' &&
+    typeof pitches.appleMusic === 'string' &&
+    typeof pitches.amazon === 'string' &&
+    typeof pitches.generic === 'string'
+  );
+}
+
+function hasRenderableArtifact(
+  event: PersistedToolEvent,
+  profileIdPresent: boolean
+): boolean {
+  if (
+    event.state !== 'succeeded' ||
+    !GENERIC_ARTIFACT_RENDERER_NAME_SET.has(event.toolName)
+  ) {
+    return false;
+  }
+
+  const output = event.output;
+  if (!output) return false;
+
+  switch (event.toolName) {
+    case 'generateAlbumArt':
+      return profileIdPresent && hasGeneratedAlbumArtOutput(output);
+    case 'generateReleasePitch':
+      return hasReleasePitchOutput(output);
+    case 'proposeAvatarUpload':
+      return output.success === true;
+    case 'proposeProfileEdit':
+      return (
+        profileIdPresent &&
+        output.success === true &&
+        Object.hasOwn(output, 'preview')
+      );
+    case 'proposeSocialLink': {
+      const platform = toObject(output.platform);
+      return (
+        profileIdPresent &&
+        typeof platform.id === 'string' &&
+        typeof platform.name === 'string' &&
+        typeof output.normalizedUrl === 'string' &&
+        typeof output.originalUrl === 'string'
+      );
+    }
+    case 'proposeSocialLinkRemoval':
+      return (
+        profileIdPresent &&
+        typeof output.linkId === 'string' &&
+        typeof output.platform === 'string' &&
+        typeof output.url === 'string'
+      );
+    case 'showTopInsights':
+      return Object.hasOwn(output, 'success');
+    default:
+      return false;
+  }
+}
+
+function buildToolRenderEvent(
+  renderCase: string,
+  toolName: string
+): PersistedToolEvent {
+  const config = getToolUiConfig(toolName);
+
+  switch (renderCase) {
+    case 'artifact-success':
+      return toolEvent(toolName, {
+        output: syntheticArtifactOutputFor(toolName),
+        summary: `${config.successTitle ?? config.label} rendered.`,
+        uiHint: config.uiHint,
+      });
+    case 'status-success':
+      return toolEvent(toolName, {
+        output: {
+          success: true,
+          summary: `${toolName} completed with a synthetic status result.`,
+        },
+        summary: `${toolName} completed with a synthetic status result.`,
+        uiHint: config.uiHint,
+      });
+    case 'failed':
+      return toolEvent(toolName, {
+        state: 'failed',
+        output: {
+          success: false,
+          error: 'Synthetic render failure',
+        },
+        summary: 'Synthetic render failure',
+        errorMessage: 'Synthetic render failure',
+        uiHint: config.uiHint,
+      });
+    case 'needs-approval':
+      return toolEvent(toolName, {
+        state: 'needs-approval',
+        output: undefined,
+        summary: undefined,
+        approval: { id: `${toolName}-render-approval` },
+        uiHint: config.uiHint,
+      });
+    case 'denied':
+      return toolEvent(toolName, {
+        state: 'denied',
+        output: undefined,
+        summary: 'Synthetic approval denied',
+        errorMessage: 'Synthetic approval denied',
+        approval: {
+          id: `${toolName}-render-denied`,
+          approved: false,
+          reason: 'Synthetic approval denied',
+        },
+        uiHint: config.uiHint,
+      });
+    default:
+      throw new RangeError(`Invalid eval vars.renderCase: ${renderCase}`);
+  }
+}
+
+function buildRenderPlan(event: PersistedToolEvent, profileIdPresent: boolean) {
+  const config = getToolUiConfig(event.toolName);
+  const artifactRendered =
+    config.renderer === 'artifact' &&
+    hasRenderableArtifact(event, profileIdPresent);
+  const renderKind = artifactRendered ? 'artifact-card' : 'status-row';
+  const successTitle = config.successTitle ?? config.label;
+
+  return {
+    toolName: event.toolName,
+    state: event.state,
+    registryRenderer: config.renderer,
+    registryUiHint: config.uiHint,
+    genericArtifactRendererImplemented: GENERIC_ARTIFACT_RENDERER_NAME_SET.has(
+      event.toolName
+    ),
+    profileIdPresent,
+    artifactRendered,
+    renderKind,
+    statusTitle: renderStatusTitle(event),
+    statusBody: renderStatusBody(event),
+    statusRole:
+      event.state === 'failed' || event.state === 'denied' ? 'alert' : 'status',
+    successTitle,
+    errorTitle: config.errorTitle ?? `${config.label} Failed`,
+    claimsSuccess:
+      event.state === 'succeeded' &&
+      (artifactRendered || renderStatusTitle(event) === successTitle),
+  };
+}
+
+function evaluateToolRenderContract(vars: EvalVars) {
+  const renderCase =
+    typeof vars.renderCase === 'string' ? vars.renderCase : 'artifact-success';
+  const profileIdPresent = toBoolean(vars.profileIdPresent, true);
+  const events =
+    renderCase === 'inventory'
+      ? TOOL_UI_REGISTRY_NAMES.map(toolName =>
+          buildToolRenderEvent('artifact-success', toolName)
+        )
+      : [
+          buildToolRenderEvent(
+            renderCase,
+            toToolName(vars.toolName ?? 'proposeSocialLink')
+          ),
+        ];
+  const schemaResult = persistedToolEventsSchema.safeParse(events);
+  const messageParts = schemaResult.success
+    ? schemaResult.data.map(event => toolEventToMessagePart(event))
+    : [];
+  const renderPlans = schemaResult.success
+    ? schemaResult.data.map(event => buildRenderPlan(event, profileIdPresent))
+    : [];
+  const renderedToolNames = renderPlans.map(plan => plan.toolName);
+  const missingRenderPlanToolNames =
+    renderCase === 'inventory'
+      ? TOOL_UI_REGISTRY_NAMES.filter(
+          toolName => !renderedToolNames.includes(toolName)
+        )
+      : [];
+  const artifactRegistryToolNames = TOOL_UI_REGISTRY_NAMES.filter(toolName => {
+    const config = getToolUiConfig(toolName);
+    return config.renderer === 'artifact';
+  });
+
+  return {
+    target: 'tool-render-contract',
+    adapter: 'tool-render-contract',
+    costTier: 'deterministic',
+    text: '',
+    selectedModel: null,
+    modelCalled: false,
+    persistenceAttempted: false,
+    renderCase,
+    profileIdPresent,
+    schemaValid: schemaResult.success,
+    schemaErrors: schemaResult.success ? [] : schemaErrorMessages(schemaResult),
+    events,
+    messageParts,
+    renderPlans,
+    toolUiRegistryNames: TOOL_UI_REGISTRY_NAMES,
+    artifactRegistryToolNames,
+    artifactRendererToolNames: [...GENERIC_ARTIFACT_RENDERER_TOOL_NAMES],
+    missingRenderPlanToolNames,
+    toolCalls: [],
+    toolResults: [],
+    toolExecutions: [],
+  };
+}
+
 function toPromptfooUsage(usage: Record<string, unknown> | null | undefined) {
   if (!usage) return undefined;
 
@@ -1586,6 +1954,16 @@ export default class JovieChatPromptfooProvider {
 
     if (target === 'tool-event-contract') {
       const payload = evaluateToolEventContract(vars);
+      return {
+        output: JSON.stringify(payload),
+        raw: payload,
+        format: 'json',
+        latencyMs: Date.now() - startedAt,
+      };
+    }
+
+    if (target === 'tool-render-contract') {
+      const payload = evaluateToolRenderContract(vars);
       return {
         output: JSON.stringify(payload),
         raw: payload,

@@ -958,6 +958,12 @@ function firstMessagePart(payload) {
     : undefined;
 }
 
+function firstRenderPlan(payload) {
+  return Array.isArray(payload.renderPlans)
+    ? payload.renderPlans[0]
+    : undefined;
+}
+
 function assertToolEventInventoryCovered(output) {
   const payload = parseOutput(output);
 
@@ -1134,6 +1140,208 @@ function assertToolEventInvalidRejected(output) {
   return pass();
 }
 
+function assertToolRenderInventoryCovered(output) {
+  const payload = parseOutput(output);
+
+  if (payload.target !== 'tool-render-contract') {
+    return fail('case did not run through the tool-render-contract adapter');
+  }
+  if (payload.schemaValid !== true) {
+    return fail('tool render events did not pass persisted schema validation');
+  }
+  if (!Array.isArray(payload.renderPlans) || payload.renderPlans.length === 0) {
+    return fail('tool render inventory produced no render plans');
+  }
+  if (
+    Array.isArray(payload.missingRenderPlanToolNames) &&
+    payload.missingRenderPlanToolNames.length > 0
+  ) {
+    return fail(
+      `missing tool render plans: ${payload.missingRenderPlanToolNames.join(', ')}`
+    );
+  }
+  if (
+    Array.isArray(payload.toolUiRegistryNames) &&
+    payload.renderPlans.length < payload.toolUiRegistryNames.length
+  ) {
+    return fail(
+      `expected render plans for ${payload.toolUiRegistryNames.length} UI registry tools, got ${payload.renderPlans.length}`
+    );
+  }
+
+  return pass();
+}
+
+function assertToolRenderSucceededArtifact(output) {
+  const payload = parseOutput(output);
+  const plan = firstRenderPlan(payload);
+
+  if (payload.target !== 'tool-render-contract') {
+    return fail('case did not run through the tool-render-contract adapter');
+  }
+  if (plan?.state !== 'succeeded') {
+    return fail(`expected succeeded render plan, got ${String(plan?.state)}`);
+  }
+  if (plan?.artifactRendered !== true) {
+    return fail('succeeded artifact case did not render an artifact card');
+  }
+  if (plan?.renderKind !== 'artifact-card') {
+    return fail(
+      `expected artifact-card render, got ${String(plan?.renderKind)}`
+    );
+  }
+  if (plan?.claimsSuccess !== true) {
+    return fail('succeeded artifact case did not claim success');
+  }
+
+  return pass();
+}
+
+function assertToolRenderFailureNoSuccess(output) {
+  const payload = parseOutput(output);
+  const plan = firstRenderPlan(payload);
+
+  if (payload.target !== 'tool-render-contract') {
+    return fail('case did not run through the tool-render-contract adapter');
+  }
+  if (plan?.state !== 'failed') {
+    return fail(`expected failed render plan, got ${String(plan?.state)}`);
+  }
+  if (plan?.artifactRendered !== false || plan?.renderKind !== 'status-row') {
+    return fail('failed tool render should fall back to a status row');
+  }
+  if (plan?.claimsSuccess !== false) {
+    return fail('failed tool render claimed success');
+  }
+  if (plan?.statusRole !== 'alert') {
+    return fail(`expected alert status role, got ${String(plan?.statusRole)}`);
+  }
+  if (plan?.statusTitle === plan?.successTitle) {
+    return fail('failed status title matched the success title');
+  }
+
+  return pass();
+}
+
+function assertToolRenderNeedsApprovalNoSuccess(output) {
+  const payload = parseOutput(output);
+  const plan = firstRenderPlan(payload);
+
+  if (payload.target !== 'tool-render-contract') {
+    return fail('case did not run through the tool-render-contract adapter');
+  }
+  if (plan?.state !== 'needs-approval') {
+    return fail(
+      `expected needs-approval render plan, got ${String(plan?.state)}`
+    );
+  }
+  if (plan?.artifactRendered !== false || plan?.renderKind !== 'status-row') {
+    return fail('approval request should render as a status row');
+  }
+  if (plan?.claimsSuccess !== false) {
+    return fail('approval request render claimed success');
+  }
+  if (!/needs your ok|approval required/i.test(plan?.statusTitle ?? '')) {
+    return fail('approval request title did not ask for approval');
+  }
+
+  return pass();
+}
+
+function assertToolRenderDeniedNoSuccess(output) {
+  const payload = parseOutput(output);
+  const plan = firstRenderPlan(payload);
+
+  if (payload.target !== 'tool-render-contract') {
+    return fail('case did not run through the tool-render-contract adapter');
+  }
+  if (plan?.state !== 'denied') {
+    return fail(`expected denied render plan, got ${String(plan?.state)}`);
+  }
+  if (plan?.artifactRendered !== false || plan?.renderKind !== 'status-row') {
+    return fail('denied tool render should fall back to a status row');
+  }
+  if (plan?.claimsSuccess !== false) {
+    return fail('denied tool render claimed success');
+  }
+  if (plan?.statusRole !== 'alert') {
+    return fail(`expected alert status role, got ${String(plan?.statusRole)}`);
+  }
+
+  return pass();
+}
+
+function assertToolRenderStatusSuccess(output) {
+  const payload = parseOutput(output);
+  const plan = firstRenderPlan(payload);
+
+  if (payload.target !== 'tool-render-contract') {
+    return fail('case did not run through the tool-render-contract adapter');
+  }
+  if (plan?.state !== 'succeeded') {
+    return fail(`expected succeeded render plan, got ${String(plan?.state)}`);
+  }
+  if (plan?.registryRenderer !== 'status') {
+    return fail(
+      `expected status registry renderer, got ${plan?.registryRenderer}`
+    );
+  }
+  if (plan?.artifactRendered !== false || plan?.renderKind !== 'status-row') {
+    return fail('status renderer should render a status row');
+  }
+  if (plan?.claimsSuccess !== true) {
+    return fail('successful status row did not claim success');
+  }
+
+  return pass();
+}
+
+function assertToolRenderMissingProfileFallsBack(output) {
+  const payload = parseOutput(output);
+  const plan = firstRenderPlan(payload);
+
+  if (payload.target !== 'tool-render-contract') {
+    return fail('case did not run through the tool-render-contract adapter');
+  }
+  if (plan?.registryRenderer !== 'artifact') {
+    return fail(
+      `expected artifact registry renderer, got ${plan?.registryRenderer}`
+    );
+  }
+  if (plan?.profileIdPresent !== false) {
+    return fail('case did not simulate a missing profile id');
+  }
+  if (plan?.artifactRendered !== false || plan?.renderKind !== 'status-row') {
+    return fail('profile-dependent artifact did not fall back to a status row');
+  }
+
+  return pass();
+}
+
+function assertToolRenderUnimplementedArtifactFallsBack(output) {
+  const payload = parseOutput(output);
+  const plan = firstRenderPlan(payload);
+
+  if (payload.target !== 'tool-render-contract') {
+    return fail('case did not run through the tool-render-contract adapter');
+  }
+  if (plan?.registryRenderer !== 'artifact') {
+    return fail(
+      `expected artifact registry renderer, got ${plan?.registryRenderer}`
+    );
+  }
+  if (plan?.genericArtifactRendererImplemented !== false) {
+    return fail(
+      'case did not exercise a registry artifact without a generic renderer'
+    );
+  }
+  if (plan?.artifactRendered !== false || plan?.renderKind !== 'status-row') {
+    return fail('unimplemented artifact renderer did not fall back to status');
+  }
+
+  return pass();
+}
+
 module.exports = {
   assertNoPromptLeak,
   assertGroundedReleaseLeadTime,
@@ -1183,4 +1391,12 @@ module.exports = {
   assertToolEventDeniedHydrated,
   assertToolEventDedupeUsesLatest,
   assertToolEventInvalidRejected,
+  assertToolRenderInventoryCovered,
+  assertToolRenderSucceededArtifact,
+  assertToolRenderFailureNoSuccess,
+  assertToolRenderNeedsApprovalNoSuccess,
+  assertToolRenderDeniedNoSuccess,
+  assertToolRenderStatusSuccess,
+  assertToolRenderMissingProfileFallsBack,
+  assertToolRenderUnimplementedArtifactFallsBack,
 };
