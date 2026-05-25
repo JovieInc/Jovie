@@ -597,8 +597,8 @@ importers:
         specifier: ^6.0.2
         version: 6.0.2(@typescript-eslint/parser@8.57.2(eslint@10.2.1(jiti@2.6.1))(typescript@6.0.3))(eslint@10.2.1(jiti@2.6.1))
       fast-check:
-        specifier: ^4.6.0
-        version: 4.6.0
+        specifier: ^4.8.0
+        version: 4.8.0
       glob:
         specifier: ^13.0.6
         version: 13.0.6
@@ -10297,8 +10297,8 @@ packages:
     resolution: {integrity: sha512-GipyPsXO1anza0AOZdy69Im7hGFCNB7Y/NGjDlZGJ3GJJLtwNSb2vrzYrTYJRrRloVx7pl+bhUaTB8yiccPvFQ==}
     engines: {node: '> 0.1.90'}
 
-  fast-check@4.6.0:
-    resolution: {integrity: sha512-h7H6Dm0Fy+H4ciQYFxFjXnXkzR2kr9Fb22c0UBpHnm59K2zpr2t13aPTHlltFiNT6zuxp6HMPAVVvgur4BLdpA==}
+  fast-check@4.8.0:
+    resolution: {integrity: sha512-GOJ158CUMnN6cSahsv4+ExARvIDuzzinFjkp0E9WtiBa5zcVeLozVkWaE4IzFcc+Y48Wp1EDlUZsXRyAztQcSg==}
     engines: {node: '>=12.17.0'}
 
   fast-content-type-parse@2.0.1:
@@ -13884,8 +13884,8 @@ packages:
     resolution: {integrity: sha512-MWL3XbUCfVgGR0gRsidzT6oKJT2QydPLhMITU6HoVWiiv4gkb6gJi3pcdAa8q4HwjBTbqISOWVP4aJiiyUJvag==}
     engines: {node: '>=18'}
 
-  pure-rand@8.3.0:
-    resolution: {integrity: sha512-1ws1Ab8fnsf4bvpL+SujgBnr3KFs5abgCLVzavBp+f2n8Ld5YTOZlkv/ccYPhu3X9s+MEeqPRMqKlJz/kWDK8A==}
+  pure-rand@8.4.0:
+    resolution: {integrity: sha512-IoM8YF/jY0hiugFo/wOWqfmarlE6J0wc6fDK1PhftMk7MGhVZl88sZimmqBBFomLOCSmcCCpsfj7wXASCpvK9A==}
 
   python-shell@5.0.0:
     resolution: {integrity: sha512-RUOOOjHLhgR1MIQrCtnEqz/HJ1RMZBIN+REnpSUrfft2bXqXy69fwJASVziWExfFXsR1bCY0TznnHooNsCo0/w==}
@@ -27676,9 +27676,9 @@ snapshots:
 
   eyes@0.1.8: {}
 
-  fast-check@4.6.0:
+  fast-check@4.8.0:
     dependencies:
-      pure-rand: 8.3.0
+      pure-rand: 8.4.0
 
   fast-content-type-parse@2.0.1: {}
 
@@ -32373,7 +32373,7 @@ snapshots:
       - supports-color
       - utf-8-validate
 
-  pure-rand@8.3.0: {}
+  pure-rand@8.4.0: {}
 
   python-shell@5.0.0: {}
 
