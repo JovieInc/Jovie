@@ -2147,7 +2147,7 @@ type ToolAccessScenarioInput = {
   readonly name: string;
   readonly mode: 'app' | 'onboarding';
   readonly plan: PlanId;
-  readonly billingVerification?: 'verified' | 'unavailable';
+  readonly billingVerification?: 'verified' | 'missing_user' | 'unavailable';
   readonly aiCanUseTools?: boolean;
   readonly expectedPaidToolAccess: boolean | null;
   readonly expectedTurnAiCanUseTools: boolean | null;
@@ -2241,6 +2241,33 @@ function evaluateToolAccessContract(vars: EvalVars) {
       expectedToolNames: PAID_TOOL_NAMES,
     }),
     buildToolAccessScenario({
+      name: 'app-trial-verified',
+      mode: 'app',
+      plan: 'trial',
+      billingVerification: 'verified',
+      expectedPaidToolAccess: true,
+      expectedTurnAiCanUseTools: true,
+      expectedToolNames: PAID_TOOL_NAMES,
+    }),
+    buildToolAccessScenario({
+      name: 'app-max-verified',
+      mode: 'app',
+      plan: 'max',
+      billingVerification: 'verified',
+      expectedPaidToolAccess: true,
+      expectedTurnAiCanUseTools: true,
+      expectedToolNames: PAID_TOOL_NAMES,
+    }),
+    buildToolAccessScenario({
+      name: 'app-pro-billing-missing-user',
+      mode: 'app',
+      plan: 'pro',
+      billingVerification: 'missing_user',
+      expectedPaidToolAccess: false,
+      expectedTurnAiCanUseTools: false,
+      expectedToolNames: FREE_APP_TOOL_NAMES,
+    }),
+    buildToolAccessScenario({
       name: 'app-pro-billing-unavailable',
       mode: 'app',
       plan: 'pro',
@@ -2284,6 +2311,9 @@ function evaluateToolAccessContract(vars: EvalVars) {
     requiredScenarioNames: [
       'app-free-verified',
       'app-pro-verified',
+      'app-trial-verified',
+      'app-max-verified',
+      'app-pro-billing-missing-user',
       'app-pro-billing-unavailable',
       'app-pro-ai-tools-disabled',
       'onboarding-free',
