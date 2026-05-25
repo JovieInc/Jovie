@@ -1,5 +1,5 @@
 import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
+import { resolve, sep } from 'node:path';
 import { type ToolSet, tool, type UIMessage } from 'ai';
 import { z } from 'zod';
 import { APP_ROUTES } from '@/constants/routes';
@@ -1936,7 +1936,7 @@ function listValuesAfter(block: string, key: string): string[] {
 
 function extractPromptfooTestBlocks(configText: string): string[] {
   const testsStart = configText.match(/^tests:\s*$/m);
-  if (!testsStart?.index) return [];
+  if (testsStart?.index === undefined) return [];
 
   const lines = configText.slice(testsStart.index).split('\n');
   const blocks: string[] = [];
@@ -2025,7 +2025,12 @@ function evaluateEvalCaseInventory(vars: EvalVars) {
     typeof vars.configPath === 'string' && vars.configPath.trim().length > 0
       ? vars.configPath.trim()
       : PROMPTFOO_CONFIG_PATH;
-  const configText = readFileSync(resolve(process.cwd(), configPath), 'utf8');
+  const resolvedConfigPath = resolve(process.cwd(), configPath);
+  const allowedConfigRoot = resolve(process.cwd(), 'tests/eval/promptfoo');
+  if (!resolvedConfigPath.startsWith(`${allowedConfigRoot}${sep}`)) {
+    throw new RangeError(`Invalid eval vars.configPath: ${configPath}`);
+  }
+  const configText = readFileSync(resolvedConfigPath, 'utf8');
   const cases = parsePromptfooCaseSummaries(configText);
   const deterministicCases = cases.filter(
     testCase => testCase.cost === 'deterministic'
