@@ -662,6 +662,163 @@ function assertWebRouteContractOnlySuccess(output) {
   return pass();
 }
 
+function assertWebRouteOnboardingInvalidMessages(output) {
+  const payload = parseOutput(output);
+  const expected = String(payload.request?.expectedError ?? '');
+
+  if (payload.target !== 'web-chat-route') {
+    return fail('case did not run through the web chat route contract');
+  }
+  if (payload.request?.mode !== 'onboarding') {
+    return fail('case did not exercise onboarding mode');
+  }
+  if (payload.status !== 400) {
+    return fail(`expected 400, got ${String(payload.status)}`);
+  }
+  if (payload.responseJson?.errorCode !== 'INVALID_MESSAGES') {
+    return fail('missing INVALID_MESSAGES error code');
+  }
+  if (!expected) {
+    return fail('onboarding validation case did not include expectedError');
+  }
+  if (payload.responseJson?.error !== expected) {
+    return fail(
+      `expected "${expected}", got "${String(payload.responseJson?.error ?? '')}"`
+    );
+  }
+  if (payload.modelCalled !== false) {
+    return fail('invalid onboarding message case attempted a model call');
+  }
+  if (payload.persistenceAttempted !== false) {
+    return fail('invalid onboarding message case attempted persistence');
+  }
+
+  return pass();
+}
+
+function assertWebRouteOnboardingChatDisabled(output) {
+  const payload = parseOutput(output);
+
+  if (payload.target !== 'web-chat-route') {
+    return fail('case did not run through the web chat route contract');
+  }
+  if (payload.request?.mode !== 'onboarding') {
+    return fail('case did not exercise onboarding mode');
+  }
+  if (payload.status !== 503) {
+    return fail(`expected 503, got ${String(payload.status)}`);
+  }
+  if (payload.responseJson?.errorCode !== 'ONBOARDING_CHAT_DISABLED') {
+    return fail('missing ONBOARDING_CHAT_DISABLED error code');
+  }
+  if (!/temporarily unavailable/i.test(payload.responseJson?.error ?? '')) {
+    return fail('missing safe onboarding-disabled message');
+  }
+  if (payload.modelCalled !== false || payload.persistenceAttempted !== false) {
+    return fail('disabled onboarding route crossed a side-effect boundary');
+  }
+
+  return pass();
+}
+
+function assertWebRouteOnboardingDispatchContract(output) {
+  const payload = parseOutput(output);
+  const expectedTools = [
+    'searchSpotifyArtist',
+    'confirmSpotifyArtist',
+    'checkHandle',
+    'proposeSocialLink',
+    'recordInterviewSignal',
+    'proposeNextStep',
+    'proposeCheckout',
+  ];
+  const onboardingTools = Array.isArray(payload.onboardingToolNames)
+    ? payload.onboardingToolNames
+    : [];
+
+  if (payload.target !== 'web-chat-route') {
+    return fail('case did not run through the web chat route contract');
+  }
+  if (payload.request?.mode !== 'onboarding' || payload.mode !== 'onboarding') {
+    return fail('case did not exercise onboarding mode');
+  }
+  if (payload.status !== 200 || payload.contractOnly !== true) {
+    return fail('onboarding dispatch contract did not stop at a 200 boundary');
+  }
+  if (payload.costTier !== 'deterministic') {
+    return fail('onboarding dispatch case is not deterministic');
+  }
+  if (
+    payload.modelCalled !== false ||
+    payload.modelDispatchPrevented !== true
+  ) {
+    return fail('onboarding dispatch contract attempted model dispatch');
+  }
+  if (payload.modelBoundary !== 'light' || payload.forceLightModel !== true) {
+    return fail('onboarding dispatch contract did not force the light model');
+  }
+  if (payload.plan !== 'free') {
+    return fail(`expected free onboarding plan, got ${String(payload.plan)}`);
+  }
+  if (
+    payload.persistenceAttempted !== false ||
+    payload.persistenceStubbed !== true
+  ) {
+    return fail('onboarding dispatch contract attempted real persistence');
+  }
+  if (toolNames(payload).length > 0 || allExecutions(payload).length > 0) {
+    return fail('onboarding dispatch contract executed tools');
+  }
+  if (
+    onboardingTools.length !== expectedTools.length ||
+    expectedTools.some(tool => !onboardingTools.includes(tool))
+  ) {
+    return fail(
+      `onboarding tool palette mismatch: ${onboardingTools.join(', ')}`
+    );
+  }
+  if (
+    !/stops before model dispatch/i.test(payload.responseJson?.message ?? '')
+  ) {
+    return fail('contract-only response did not document the model boundary');
+  }
+
+  return pass();
+}
+
+function assertWebRouteOnboardingPersistenceFailed(output) {
+  const payload = parseOutput(output);
+
+  if (payload.target !== 'web-chat-route') {
+    return fail('case did not run through the web chat route contract');
+  }
+  if (payload.request?.mode !== 'onboarding') {
+    return fail('case did not exercise onboarding mode');
+  }
+  if (payload.status !== 503) {
+    return fail(`expected 503, got ${String(payload.status)}`);
+  }
+  if (
+    payload.responseJson?.errorCode !== 'ONBOARDING_CHAT_PERSISTENCE_FAILED'
+  ) {
+    return fail('missing ONBOARDING_CHAT_PERSISTENCE_FAILED error code');
+  }
+  if (payload.modelCalled !== false) {
+    return fail('persistence failure case attempted a model call');
+  }
+  if (
+    payload.persistenceAttempted !== false ||
+    payload.persistenceStubbed !== true
+  ) {
+    return fail('persistence failure case attempted real persistence');
+  }
+  if (toolNames(payload).length > 0 || allExecutions(payload).length > 0) {
+    return fail('persistence failure case executed tools');
+  }
+
+  return pass();
+}
+
 function assertDeterministicNoSpend(output) {
   const payload = parseOutput(output);
 
@@ -1794,6 +1951,10 @@ module.exports = {
   assertWebRouteStandardRateLimit,
   assertWebRouteMessageValidation,
   assertWebRouteContractOnlySuccess,
+  assertWebRouteOnboardingInvalidMessages,
+  assertWebRouteOnboardingChatDisabled,
+  assertWebRouteOnboardingDispatchContract,
+  assertWebRouteOnboardingPersistenceFailed,
   assertDeterministicNoSpend,
   assertLiveHttpWebRouteNoModel,
   assertLiveHttpOnboardingRateLimitUnavailable,
