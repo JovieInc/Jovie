@@ -50,6 +50,21 @@ The main CI workflow `ci.yml` is the gatekeeper for PRs to `main`. It includes:
 - **Smoke tests** - validates critical paths after deploy
 - **Lighthouse CI** - performance metrics on each deploy
 
+## Promptfoo Eval Cost Controls
+
+Promptfoo has two explicit cost lanes:
+
+- **Deterministic evals** run through `pnpm run evals` and the `Promptfoo Evals (deterministic)` CI job. They unset live model keys, set `JOVIE_RUN_LIVE_EVALS=0`, use `cost=deterministic`, and run with `--no-share --no-write`.
+- **Live evals** run only from `pnpm run evals:live`, which is wrapped by Doppler at the repo root and still fails unless `JOVIE_RUN_LIVE_EVALS=1` and `AI_GATEWAY_API_KEY` are present. The live Promptfoo lane is manual-only, concurrency 1, and uses `--no-share --no-write`.
+
+The legacy `evals-periodic.yml` workflow is also manual-only. It has no scheduled trigger, requires typing `RUN_LIVE_EVALS` into `confirm_live_llm_evals`, and runs at concurrency 1 if explicitly invoked.
+
+Ship now / Re-evaluate when / Then:
+
+- Ship now: deterministic PR evals stay free, while every live LLM eval surface requires manual intent and concurrency 1.
+- Re-evaluate when: manual live evals catch a release-blocking regression twice in 30 days or observed live eval cost stays below the agreed per-run budget for 10 consecutive runs.
+- Then: add a capped scheduled or PR-gated live subset with explicit case count, concurrency 1, and per-run cost reporting.
+
 ## Agent Landing Sweep
 
 The `agent-landing-sweep.yml` workflow runs every 15 minutes as a scheduled fallback for the event-driven approve job in `agent-pipeline.yml`. It sweeps open, non-draft agent PRs and enables auto-merge on any that pass all guardrails:
