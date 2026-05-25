@@ -1,7 +1,11 @@
 import { type ToolSet, tool, type UIMessage } from 'ai';
 import { z } from 'zod';
 import { APP_ROUTES } from '@/constants/routes';
-import { executeChatTurn, selectKnowledgeContextForTurn } from '@/lib/chat/run';
+import {
+  canUseLightModel,
+  executeChatTurn,
+  selectKnowledgeContextForTurn,
+} from '@/lib/chat/run';
 import {
   decodeToolEvents,
   type PersistedToolEvent,
@@ -20,6 +24,7 @@ import {
   commandsForSurface,
   HIDDEN_TOOLS,
 } from '@/lib/commands/registry';
+import { CHAT_MODEL, CHAT_MODEL_LIGHT } from '@/lib/constants/ai-models';
 import { getEntitlements, type PlanId } from '@/lib/entitlements/registry';
 import { NO_STORE_HEADERS } from '@/lib/http/headers';
 import {
@@ -30,6 +35,7 @@ import {
 type EvalVars = Record<string, unknown>;
 type EvalTarget =
   | 'chat-turn'
+  | 'model-contract'
   | 'mobile-chat-route'
   | 'tool-contract'
   | 'tool-event-contract'
@@ -325,6 +331,7 @@ function toMode(value: unknown): 'app' | 'onboarding' {
 function toTarget(value: unknown): EvalTarget {
   if (
     value === 'mobile-chat-route' ||
+    value === 'model-contract' ||
     value === 'tool-contract' ||
     value === 'tool-event-contract' ||
     value === 'tool-inventory' ||
@@ -735,6 +742,68 @@ function evaluateMobileChatRouteContract(prompt: string, vars: EvalVars) {
     headers: MOBILE_CHAT_NDJSON_HEADERS,
     events: [MOBILE_CHAT_RUNTIME_DISABLED_EVENT],
     responseText: ndjsonEvent(MOBILE_CHAT_RUNTIME_DISABLED_EVENT),
+  };
+}
+
+function evaluateModelContract(prompt: string, vars: EvalVars) {
+  const uiMessages = toUiMessages(prompt, vars);
+  const mode = toMode(vars.mode);
+  const plan = toPlanId(vars.plan);
+  const planLimits = getEntitlements(plan);
+  const aiCanUseTools = toBoolean(
+    vars.aiCanUseTools,
+    planLimits.booleans.aiCanUseTools
+  );
+  const forceLightModel = toBoolean(vars.forceLightModel, false);
+  const heuristicLightModel = canUseLightModel(uiMessages, aiCanUseTools);
+  const selectedModel =
+    forceLightModel || heuristicLightModel ? CHAT_MODEL_LIGHT : CHAT_MODEL;
+  const expectedModel =
+    vars.expectedModel === 'light'
+      ? CHAT_MODEL_LIGHT
+      : vars.expectedModel === 'primary'
+        ? CHAT_MODEL
+        : null;
+
+  return {
+    target: 'model-contract',
+    adapter: 'model-contract',
+    productionEntrypoint: 'apps/web/lib/chat/run.ts:executeChatTurn',
+    costTier: 'deterministic',
+    text: '',
+    selectedModel,
+    expectedModel,
+    modelBoundary: selectedModel === CHAT_MODEL_LIGHT ? 'light' : 'primary',
+    expectedBoundary:
+      expectedModel === CHAT_MODEL_LIGHT
+        ? 'light'
+        : expectedModel === CHAT_MODEL
+          ? 'primary'
+          : null,
+    lightModel: CHAT_MODEL_LIGHT,
+    primaryModel: CHAT_MODEL,
+    modelCalled: false,
+    persistenceAttempted: false,
+    toolCalls: [],
+    toolResults: [],
+    toolExecutions: [],
+    mode,
+    plan,
+    aiCanUseTools,
+    forceLightModel,
+    heuristicLightModel,
+    messageCount: uiMessages.length,
+    userText: uiMessages
+      .filter(message => message.role === 'user')
+      .flatMap(message =>
+        message.parts
+          .filter(
+            (part): part is { type: 'text'; text: string } =>
+              part.type === 'text' && typeof part.text === 'string'
+          )
+          .map(part => part.text)
+      )
+      .join('\n'),
   };
 }
 
@@ -1487,6 +1556,16 @@ export default class JovieChatPromptfooProvider {
 
     if (target === 'web-chat-route') {
       const payload = evaluateWebChatRouteContract(prompt, vars);
+      return {
+        output: JSON.stringify(payload),
+        raw: payload,
+        format: 'json',
+        latencyMs: Date.now() - startedAt,
+      };
+    }
+
+    if (target === 'model-contract') {
+      const payload = evaluateModelContract(prompt, vars);
       return {
         output: JSON.stringify(payload),
         raw: payload,

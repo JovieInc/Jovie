@@ -408,6 +408,49 @@ function assertDeterministicRouteNoSideEffects(output) {
   return assertNoRoutePersistence(output);
 }
 
+function assertModelContractNoSpend(output) {
+  const payload = parseOutput(output);
+
+  if (payload.target !== 'model-contract') {
+    return fail('case did not run through the model-contract adapter');
+  }
+  if (payload.costTier !== 'deterministic') {
+    return fail('case is not marked as deterministic');
+  }
+  if (payload.modelCalled !== false) {
+    return fail('model-contract case attempted a model call');
+  }
+  if (payload.persistenceAttempted !== false) {
+    return fail('model-contract case attempted persistence');
+  }
+  if (toolNames(payload).length > 0 || allExecutions(payload).length > 0) {
+    return fail('model-contract case should not call or execute tools');
+  }
+
+  return pass();
+}
+
+function assertModelContractExpectedModel(output) {
+  const payload = parseOutput(output);
+
+  if (payload.target !== 'model-contract') {
+    return fail('case did not run through the model-contract adapter');
+  }
+  if (typeof payload.selectedModel !== 'string') {
+    return fail('model-contract did not expose selectedModel');
+  }
+  if (typeof payload.expectedModel !== 'string') {
+    return fail('model-contract case did not include expectedModel');
+  }
+  if (payload.selectedModel !== payload.expectedModel) {
+    return fail(
+      `expected ${payload.expectedBoundary} model ${payload.expectedModel}, got ${payload.modelBoundary} model ${payload.selectedModel}`
+    );
+  }
+
+  return pass();
+}
+
 function assertWebRouteUnauthorized(output) {
   const payload = parseOutput(output);
   const responseText = String(payload.responseText ?? '');
@@ -1103,6 +1146,8 @@ module.exports = {
   assertPitchingConflictReconciled,
   assertOnboardingSpotifyObservation,
   assertConciseJovieVoice,
+  assertModelContractNoSpend,
+  assertModelContractExpectedModel,
   assertMobileRouteUnauthorized,
   assertMobileRouteInvalidBody,
   assertMobileRouteRuntimeDisabled,

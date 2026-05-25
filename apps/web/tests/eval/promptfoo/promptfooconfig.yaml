@@ -598,6 +598,93 @@ tests:
       - type: javascript
         value: file://assertions.cjs:assertMobileRouteInvalidBody
 
+  - description: Model routing keeps no-tool entitlement turns on the light model
+    metadata:
+      cost: deterministic
+    vars:
+      input: "How should I set up my pre-save?"
+      target: model-contract
+      plan: free
+      aiCanUseTools: false
+      expectedModel: light
+    assert:
+      - type: javascript
+        value: file://assertions.cjs:assertModelContractNoSpend
+      - type: javascript
+        value: file://assertions.cjs:assertModelContractExpectedModel
+
+  - description: Model routing sends simple pro tool intents to the light model
+    metadata:
+      cost: deterministic
+    vars:
+      input: "add my instagram https://instagram.com/lunawaves"
+      target: model-contract
+      plan: pro
+      expectedModel: light
+    assert:
+      - type: javascript
+        value: file://assertions.cjs:assertModelContractNoSpend
+      - type: javascript
+        value: file://assertions.cjs:assertModelContractExpectedModel
+
+  - description: Model routing keeps complex pro strategy on the primary model
+    metadata:
+      cost: deterministic
+    vars:
+      input: "Build a detailed six-week campaign strategy for my next release, including audience segments, content themes, playlist pitching, merch timing, and what to measure each week."
+      target: model-contract
+      plan: pro
+      expectedModel: primary
+    assert:
+      - type: javascript
+        value: file://assertions.cjs:assertModelContractNoSpend
+      - type: javascript
+        value: file://assertions.cjs:assertModelContractExpectedModel
+
+  - description: Model routing force-light override uses the light model
+    metadata:
+      cost: deterministic
+    vars:
+      input: "Build a detailed six-week campaign strategy for my next release, including audience segments, content themes, playlist pitching, merch timing, and what to measure each week."
+      target: model-contract
+      plan: pro
+      forceLightModel: true
+      expectedModel: light
+    assert:
+      - type: javascript
+        value: file://assertions.cjs:assertModelContractNoSpend
+      - type: javascript
+        value: file://assertions.cjs:assertModelContractExpectedModel
+
+  - description: Model routing long pro conversations stay on the primary model
+    metadata:
+      cost: deterministic
+    vars:
+      input: "add my instagram https://instagram.com/lunawaves"
+      target: model-contract
+      plan: pro
+      expectedModel: primary
+      messages:
+        - role: user
+          text: "I am planning a release."
+        - role: assistant
+          text: "What release are you focused on?"
+        - role: user
+          text: "Tidal Drift."
+        - role: assistant
+          text: "What date are you aiming for?"
+        - role: user
+          text: "Four weeks from Friday."
+        - role: assistant
+          text: "What do you want to handle next?"
+        - role: user
+          text: "add my instagram https://instagram.com/lunawaves"
+    assert:
+      - type: javascript
+        value: file://assertions.cjs:assertModelContractNoSpend
+      - type: javascript
+        value: file://assertions.cjs:assertModelContractExpectedModel
+
   - description: Tool inventory covers every chat and onboarding adapter
     metadata:
       cost: deterministic
