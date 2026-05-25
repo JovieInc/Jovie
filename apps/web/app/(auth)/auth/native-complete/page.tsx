@@ -1,80 +1,44 @@
 'use client';
 
-import { useSignIn } from '@clerk/nextjs';
+import { useClerk, useSignIn } from '@clerk/nextjs';
 import { useRouter } from 'next/navigation';
-import { Suspense, useEffect, useState } from 'react';
+import { Suspense, useEffect, useRef, useState } from 'react';
 import { consumeDesktopAuthCompletion } from '@/lib/desktop/electron-bridge';
+import { completeDesktopNativeAuth } from '@/lib/desktop/native-complete';
 
 type CompletionState = 'loading' | 'error';
 
-interface NativeExchangeResponse {
-  readonly ticket: string;
-  readonly returnTo: string;
-}
-
-async function exchangeDesktopCompletion(): Promise<NativeExchangeResponse> {
-  const completionResult = await consumeDesktopAuthCompletion();
-  if (!completionResult.ok) {
-    throw new Error(completionResult.reason ?? 'missing-auth-completion');
-  }
-
-  const { code, state, codeVerifier } = completionResult.completion;
-  const response = await fetch('/api/auth/native/exchange', {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({
-      client: 'electron',
-      code,
-      state,
-      codeVerifier,
-    }),
-  });
-
-  if (!response.ok) {
-    throw new Error('native-auth-exchange-failed');
-  }
-
-  const payload = (await response.json()) as Partial<NativeExchangeResponse>;
-  if (typeof payload.ticket !== 'string' || payload.ticket.length === 0) {
-    throw new Error('native-auth-exchange-missing-ticket');
-  }
-  if (
-    typeof payload.returnTo !== 'string' ||
-    !payload.returnTo.startsWith('/')
-  ) {
-    throw new Error('native-auth-exchange-missing-return');
-  }
-
-  return {
-    ticket: payload.ticket,
-    returnTo: payload.returnTo,
-  };
-}
-
 function NativeCompleteContent() {
   const router = useRouter();
+  const clerk = useClerk();
   const { signIn } = useSignIn();
   const [state, setState] = useState<CompletionState>('loading');
+  const didStartCompletionRef = useRef(false);
 
   useEffect(() => {
+    if (
+      !clerk.loaded ||
+      !signIn ||
+      !clerk.setActive ||
+      didStartCompletionRef.current
+    ) {
+      return;
+    }
+
     let isActive = true;
+    didStartCompletionRef.current = true;
+    setState('loading');
 
     async function completeAuth() {
       try {
-        const exchange = await exchangeDesktopCompletion();
-        const ticketAttempt = await signIn.ticket({
-          ticket: exchange.ticket,
+        const result = await completeDesktopNativeAuth({
+          consumeCompletion: consumeDesktopAuthCompletion,
+          signIn,
+          setActive: params => clerk.setActive(params),
         });
-        if (ticketAttempt.error) {
-          throw ticketAttempt.error;
-        }
 
-        const finalizeAttempt = await signIn.finalize();
-        if (finalizeAttempt.error) {
-          throw finalizeAttempt.error;
-        }
         if (isActive) {
-          router.replace(exchange.returnTo);
+          router.replace(result.returnTo);
         }
       } catch {
         if (isActive) {
@@ -88,7 +52,7 @@ function NativeCompleteContent() {
     return () => {
       isActive = false;
     };
-  }, [router, signIn]);
+  }, [clerk, router, signIn]);
 
   return (
     <main className='grid min-h-dvh place-items-center bg-[#06070a] px-6 text-white [color-scheme:dark]'>

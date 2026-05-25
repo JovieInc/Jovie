@@ -9,6 +9,8 @@ const {
   mockCreateRateLimitHeaders,
   mockGeneralLimiterLimit,
   mockGetClientIP,
+  mockSessionsCreateSession,
+  mockSessionsGetToken,
   mockSignInTokensCreateSignInToken,
   mockTrackServerEvent,
 } = vi.hoisted(() => ({
@@ -19,6 +21,8 @@ const {
   mockCreateRateLimitHeaders: vi.fn(),
   mockGeneralLimiterLimit: vi.fn(),
   mockGetClientIP: vi.fn(),
+  mockSessionsCreateSession: vi.fn(),
+  mockSessionsGetToken: vi.fn(),
   mockSignInTokensCreateSignInToken: vi.fn(),
   mockTrackServerEvent: vi.fn(),
 }));
@@ -65,6 +69,19 @@ function createExchangeRequest() {
   });
 }
 
+function createElectronExchangeRequest() {
+  return new NextRequest('https://jov.ie/api/auth/native/exchange', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      client: 'electron',
+      code: 'desktop_code',
+      state: 'desktop_state',
+      codeVerifier: 'desktop_verifier',
+    }),
+  });
+}
+
 describe('POST /api/auth/native/exchange', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -89,7 +106,18 @@ describe('POST /api/auth/native/exchange', () => {
     mockSignInTokensCreateSignInToken.mockResolvedValue({
       token: 'sign_in_ticket',
     });
+    mockSessionsCreateSession.mockResolvedValue({
+      id: 'sess_ios',
+      userId: 'user_native',
+    });
+    mockSessionsGetToken.mockResolvedValue({
+      jwt: 'ios_session_token',
+    });
     mockClerkClient.mockResolvedValue({
+      sessions: {
+        createSession: mockSessionsCreateSession,
+        getToken: mockSessionsGetToken,
+      },
       signInTokens: {
         createSignInToken: mockSignInTokensCreateSignInToken,
       },
@@ -136,9 +164,68 @@ describe('POST /api/auth/native/exchange', () => {
     expect(response.status).toBe(200);
     expect(data).toMatchObject({
       returnTo: '/app',
-      ticket: 'sign_in_ticket',
+      sessionToken: 'ios_session_token',
+      sessionId: 'sess_ios',
+      userId: 'user_native',
     });
     expect(mockGeneralLimiterLimit).not.toHaveBeenCalled();
     expect(mockConsumeStoredNativeExchangeCode).toHaveBeenCalledTimes(1);
+  });
+
+  it('returns a server-created session token for iOS native exchange', async () => {
+    const { POST } = await import('@/app/api/auth/native/exchange/route');
+    const response = await POST(createExchangeRequest());
+    const data = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(data).toMatchObject({
+      returnTo: '/app',
+      sessionToken: 'ios_session_token',
+      sessionId: 'sess_ios',
+      userId: 'user_native',
+      expiresInSeconds: 43_200,
+    });
+    expect(mockSessionsCreateSession).toHaveBeenCalledWith({
+      userId: 'user_native',
+    });
+    expect(mockSessionsGetToken).toHaveBeenCalledWith('sess_ios', '', 43_200);
+    expect(mockSignInTokensCreateSignInToken).not.toHaveBeenCalled();
+  });
+
+  it('accepts the Mac OS native exchange client and passes through its PKCE verifier', async () => {
+    const { POST } = await import('@/app/api/auth/native/exchange/route');
+    const response = await POST(createElectronExchangeRequest());
+    const data = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(data).toMatchObject({
+      returnTo: '/app',
+      ticket: 'sign_in_ticket',
+    });
+    expect(mockConsumeStoredNativeExchangeCode).toHaveBeenCalledWith({
+      client: 'electron',
+      code: 'desktop_code',
+      state: 'desktop_state',
+      codeVerifier: 'desktop_verifier',
+      createCodeChallenge: expect.any(Function),
+    });
+  });
+
+  it('returns a clear desktop auth error when Clerk sign-in tokens are unavailable', async () => {
+    const unavailableError = new Error('sign-in token unavailable');
+    Object.assign(unavailableError, { status: 404 });
+    mockSignInTokensCreateSignInToken.mockRejectedValue(unavailableError);
+
+    const { POST } = await import('@/app/api/auth/native/exchange/route');
+    const response = await POST(createElectronExchangeRequest());
+    const data = await response.json();
+
+    expect(response.status).toBe(503);
+    expect(data).toEqual({
+      error: 'Desktop native auth unavailable',
+      reason: 'desktop_sign_in_token_unavailable',
+    });
+    expect(mockSessionsCreateSession).not.toHaveBeenCalled();
+    expect(mockSessionsGetToken).not.toHaveBeenCalled();
   });
 });

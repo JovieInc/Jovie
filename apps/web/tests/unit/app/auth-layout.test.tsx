@@ -50,8 +50,25 @@ async function renderAuthRouteLayout({
   }));
 
   vi.doMock('@/features/auth', () => ({
-    AuthLayout: ({ children }: { children: ReactNode }) => (
-      <div data-testid='auth-layout'>{children}</div>
+    AuthLayout: ({
+      children,
+      contentPlacement,
+      layoutVariant,
+      showLogo,
+    }: {
+      children: ReactNode;
+      contentPlacement?: string;
+      layoutVariant?: string;
+      showLogo?: boolean;
+    }) => (
+      <div
+        data-content-placement={contentPlacement}
+        data-layout-variant={layoutVariant}
+        data-show-logo={String(showLogo)}
+        data-testid='auth-layout'
+      >
+        {children}
+      </div>
     ),
     AuthUnavailableCard: () => <div data-testid='auth-clerk-unavailable' />,
   }));
@@ -76,7 +93,18 @@ describe('auth route layout', () => {
   it('renders the unavailable fallback instead of auth children when Clerk is unavailable', async () => {
     await renderAuthRouteLayout({ resolvedPublishableKey: undefined });
 
-    expect(screen.getByTestId('auth-layout')).toBeInTheDocument();
+    expect(screen.getByTestId('auth-layout')).toHaveAttribute(
+      'data-content-placement',
+      'center'
+    );
+    expect(screen.getByTestId('auth-layout')).toHaveAttribute(
+      'data-layout-variant',
+      'stack'
+    );
+    expect(screen.getByTestId('auth-layout')).toHaveAttribute(
+      'data-show-logo',
+      'false'
+    );
     expect(screen.getByTestId('auth-clerk-unavailable')).toBeInTheDocument();
     expect(
       screen.queryByTestId('auth-client-providers')

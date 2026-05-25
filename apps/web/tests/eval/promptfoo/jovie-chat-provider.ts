@@ -1396,6 +1396,51 @@ async function evaluateLiveHttpAlbumArtUnavailable(
   };
 }
 
+async function evaluateLiveHttpOnboardingRateLimitUnavailable(
+  prompt: string,
+  baseUrl: URL
+) {
+  if (process.env.JOVIE_PROMPTFOO_EXPECT_REDIS_DISABLED !== '1') {
+    throw new Error(
+      'Set JOVIE_PROMPTFOO_EXPECT_REDIS_DISABLED=1 and start the local server with JOVIE_DISABLE_REDIS_FOR_EVALS=1 before running the live HTTP rate-limit eval.'
+    );
+  }
+
+  const requestId = `promptfoo-http-onboarding-rate-limit-${randomUUID()}`;
+  const response = await postLiveHttpChat({
+    baseUrl,
+    requestId,
+    body: {
+      mode: 'onboarding',
+      messages: [
+        {
+          id: `${requestId}-message`,
+          role: 'user',
+          parts: [{ type: 'text', text: prompt }],
+        },
+      ],
+    },
+  });
+
+  return {
+    target: 'web-chat-http-route',
+    adapter: 'live-http-route',
+    productionPath: WEB_CHAT_ROUTE_PATH,
+    httpCase: 'anonymous-onboarding-rate-limit-unavailable',
+    costTier: 'live-rate-limit',
+    text: response.responseText,
+    selectedModel: null,
+    modelCalled: false,
+    modelDispatchPrevented: response.status === 429,
+    persistenceAttempted: false,
+    requestId,
+    response,
+    toolCalls: [],
+    toolResults: [],
+    toolExecutions: [],
+  };
+}
+
 async function evaluateLiveHttpWebChatRoute(prompt: string, vars: EvalVars) {
   if (process.env.JOVIE_RUN_LIVE_HTTP_EVALS !== '1') {
     throw new Error(
@@ -1431,6 +1476,10 @@ async function evaluateLiveHttpWebChatRoute(prompt: string, vars: EvalVars) {
 
   if (httpCase === 'album-art-unavailable') {
     return evaluateLiveHttpAlbumArtUnavailable(prompt, baseUrl, vars);
+  }
+
+  if (httpCase === 'anonymous-onboarding-rate-limit-unavailable') {
+    return evaluateLiveHttpOnboardingRateLimitUnavailable(prompt, baseUrl);
   }
 
   throw new RangeError(`Invalid live HTTP eval vars.httpCase: ${httpCase}`);

@@ -242,6 +242,19 @@ tests:
       - type: javascript
         value: file://assertions.cjs:assertLiveHttpAlbumArtUnavailable
 
+  - description: Live HTTP onboarding chat fails closed with rate-limit headers when Redis is disabled
+    metadata:
+      cost: live-rate-limit
+    vars:
+      input: "Help me start my Jovie setup."
+      target: web-chat-http-route
+      httpCase: anonymous-onboarding-rate-limit-unavailable
+    assert:
+      - type: javascript
+        value: file://assertions.cjs:assertLiveHttpWebRouteNoModel
+      - type: javascript
+        value: file://assertions.cjs:assertLiveHttpOnboardingRateLimitUnavailable
+
   - description: Web chat route rejects unauthenticated sensitive requests
     metadata:
       cost: deterministic

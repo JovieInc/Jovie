@@ -32,17 +32,17 @@ function hasValidTunnelToken(request: NextRequest): boolean {
 }
 
 function getRequestDevTestAuthAvailability(request: NextRequest) {
-  const availability = getDevTestAuthAvailability(request.nextUrl.hostname);
-  if (availability.trustedHost || !availability.enabled) {
-    return availability;
-  }
-
   if (hasValidTunnelToken(request)) {
     return {
       enabled: true,
       trustedHost: true,
       reason: null,
     };
+  }
+
+  const availability = getDevTestAuthAvailability(request.nextUrl.hostname);
+  if (availability.trustedHost || !availability.enabled) {
+    return availability;
   }
 
   return availability;
