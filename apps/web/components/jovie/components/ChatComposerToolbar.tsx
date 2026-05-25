@@ -4,8 +4,6 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
   DropdownMenuTrigger,
   SimpleTooltip,
 } from '@jovie/ui';
@@ -138,8 +136,8 @@ export function ComposerAttachButton({
           onMouseDown={onMouseDown}
           disabled={isImageProcessing || isLoading || isSubmitting || disabled}
           className={cn(
-            'flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-tertiary-token transition-[background-color,color,box-shadow] duration-fast',
-            'hover:bg-white/[0.055] hover:text-primary-token hover:shadow-[inset_0_0_0_0.5px_rgba(255,255,255,0.055)]',
+            'flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-transparent bg-[color-mix(in_oklab,var(--linear-app-content-surface)_88%,var(--linear-bg-surface-0))] text-tertiary-token transition-[background-color,border-color,color,box-shadow] duration-fast',
+            'hover:border-(--linear-app-shell-border) hover:bg-surface-1/60 hover:text-primary-token hover:shadow-[inset_0_0_0_0.5px_rgba(255,255,255,0.055)]',
             'disabled:cursor-not-allowed disabled:opacity-50'
           )}
           aria-label='Attachment options'
@@ -157,13 +155,10 @@ export function ComposerAttachButton({
         sideOffset={8}
         alignOffset={-4}
         collisionPadding={16}
-        className='w-52 rounded-xl p-1'
+        className='w-48 rounded-xl border border-(--linear-app-shell-border) bg-(--linear-app-content-surface)/95 p-1.5 shadow-[0_12px_40px_rgba(0,0,0,0.32)] backdrop-blur-xl'
       >
-        <DropdownMenuLabel className='px-2.5 py-1.5 text-[11px] font-medium leading-4 text-tertiary-token'>
-          Attachments
-        </DropdownMenuLabel>
         <DropdownMenuItem
-          className='min-h-9 gap-2 px-2.5 py-2'
+          className='min-h-9 gap-2 rounded-lg px-2.5 py-2'
           onSelect={() => {
             onImageAttach();
           }}
@@ -171,10 +166,6 @@ export function ComposerAttachButton({
           <ImagePlus className='h-3.5 w-3.5' />
           Attach image
         </DropdownMenuItem>
-        <DropdownMenuSeparator className='my-1' />
-        <div className='px-2.5 pb-1.5 pt-0.5 text-[11px] leading-4 text-tertiary-token'>
-          Drop images anywhere in chat.
-        </div>
       </DropdownMenuContent>
     </DropdownMenu>
   );
@@ -211,12 +202,12 @@ export function ComposerMicButton({
         onClick={onToggle}
         disabled={isLoading || isSubmitting || !isSupported}
         className={cn(
-          'flex h-9 w-9 shrink-0 items-center justify-center rounded-full transition-[background-color,color,box-shadow] duration-fast',
+          'flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-transparent bg-[color-mix(in_oklab,var(--linear-app-content-surface)_88%,var(--linear-bg-surface-0))] transition-[background-color,border-color,color,box-shadow] duration-fast',
           !isSupported
             ? 'text-quaternary-token'
             : isListening
-              ? 'bg-red-500/15 text-red-400 hover:bg-red-500/20'
-              : 'text-tertiary-token hover:bg-white/[0.055] hover:text-primary-token hover:shadow-[inset_0_0_0_0.5px_rgba(255,255,255,0.055)]',
+              ? 'border border-[color-mix(in_oklab,var(--geist-cyan-solid)_24%,transparent)] bg-[color-mix(in_oklab,var(--geist-cyan-solid)_12%,var(--linear-app-content-surface))] text-[color:var(--geist-cyan-solid)] hover:bg-[color-mix(in_oklab,var(--geist-cyan-solid)_16%,var(--linear-app-content-surface))] hover:text-[color:var(--geist-cyan-solid)]'
+              : 'text-tertiary-token hover:border-(--linear-app-shell-border) hover:bg-surface-1/60 hover:text-primary-token hover:shadow-[inset_0_0_0_0.5px_rgba(255,255,255,0.055)]',
           'disabled:cursor-not-allowed disabled:opacity-50'
         )}
         aria-label={label}

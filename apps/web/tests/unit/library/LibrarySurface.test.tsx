@@ -141,18 +141,15 @@ function SidebarOverrideProbe() {
   const override = useShellSidebarOverride();
 
   return (
-    <>
-      <output
-        aria-label='Sidebar override contract'
-        data-testid='library-sidebar-override'
-        data-back-href={override?.backHref}
-        data-back-label={override?.backLabel}
-        data-key={override?.key}
-      >
-        {override?.content ? 'registered' : 'missing'}
-      </output>
-      {override?.content}
-    </>
+    <output
+      aria-label='Sidebar override contract'
+      data-testid='library-sidebar-override'
+      data-back-href={override?.backHref}
+      data-back-label={override?.backLabel}
+      data-key={override?.key}
+    >
+      {override?.content ? 'registered' : 'missing'}
+    </output>
   );
 }
 
@@ -518,10 +515,12 @@ describe('LibrarySurface', () => {
 
     const contract = await screen.findByTestId('library-sidebar-override');
 
-    expect(contract).toHaveTextContent('missing');
-    expect(contract).not.toHaveAttribute('data-key');
-    expect(contract).not.toHaveAttribute('data-back-href');
-    expect(contract).not.toHaveAttribute('data-back-label');
+    await waitFor(() => {
+      expect(contract).toHaveTextContent('registered');
+    });
+    expect(contract).toHaveAttribute('data-key', 'library');
+    expect(contract).toHaveAttribute('data-back-href', APP_ROUTES.CHAT);
+    expect(contract).toHaveAttribute('data-back-label', 'Back to App');
     fireEvent.click(screen.getByRole('button', { name: 'Show filters' }));
     expect(
       screen.getByRole('navigation', { name: 'Library navigation' })
@@ -557,15 +556,11 @@ describe('LibrarySurface', () => {
 
     const contract = await screen.findByTestId('library-sidebar-override');
 
-    expect(contract).toHaveTextContent('missing');
-    expect(
-      screen.getByRole('navigation', { name: 'Library navigation' })
-    ).toBeInTheDocument();
-    expect(
-      screen.getByRole('button', { name: /All Releases/u })
-    ).toBeInTheDocument();
-    expect(
-      screen.getByRole('button', { name: /Needs Assets/u })
-    ).toBeInTheDocument();
+    await waitFor(() => {
+      expect(contract).toHaveTextContent('registered');
+    });
+    expect(contract).toHaveAttribute('data-key', 'library');
+    expect(contract).toHaveAttribute('data-back-href', APP_ROUTES.CHAT);
+    expect(contract).toHaveAttribute('data-back-label', 'Back to App');
   });
 });

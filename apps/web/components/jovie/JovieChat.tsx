@@ -360,7 +360,6 @@ export function JovieChat({
         {...chatInputProps}
         placeholder='Ask Jovie...'
         variant={showThreadView ? 'compact' : 'hero'}
-        shellChatV1
       />
     </div>
   );

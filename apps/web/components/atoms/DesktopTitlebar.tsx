@@ -19,9 +19,8 @@ import { cn } from '@/lib/utils';
  * Renders as a zero-height invisible element in the browser; CSS on
  * [data-electron-titlebar="true"] makes it visible only inside Electron.
  *
- * The sidebar toggle here is the single canonical toggle in Electron mode —
- * the in-sidebar SidebarDockButton is not rendered in desktop runtime so
- * there is never a duplicate.
+ * The sidebar toggle here is the single canonical toggle in Electron mode,
+ * so there is never a duplicate control path in desktop runtime.
  *
  * Back/forward keyboard shortcuts (Cmd+[ / Cmd+]) remain wired via
  * useDesktopNavigation in components that need them; visible controls sit
@@ -60,8 +59,7 @@ export function DesktopTitlebar() {
               className='w-[var(--electron-traffic-light-safe-width)] shrink-0'
               aria-hidden='true'
             />
-            {/* Single canonical sidebar toggle for Electron — the in-sidebar
-                SidebarDockButton is not rendered in desktop runtime */}
+            {/* Single canonical sidebar toggle for Electron. */}
             <button
               type='button'
               onClick={toggleSidebar}

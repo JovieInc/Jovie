@@ -93,6 +93,21 @@ describe('DashboardNav', () => {
     ).toBeNull();
   });
 
+  it('keeps New chat on the default shell tone when it is inactive', () => {
+    mockUsePathname.mockReturnValueOnce(APP_ROUTES.RELEASES);
+
+    const { getByRole } = renderDashboardNav({
+      renderFn: fastRender,
+      appFlags: { DESIGN_V1: true },
+    });
+
+    const newChatLink = getByRole('link', { name: 'New chat' });
+    expect(newChatLink.className).toContain('text-sidebar-muted/80');
+    expect(newChatLink.className).not.toContain(
+      'bg-[color-mix(in_oklab,var(--linear-app-content-surface)_92%,white_8%)]'
+    );
+  });
+
   it('renders one canonical New chat nav row in Design V1', () => {
     const { getAllByRole } = renderDashboardNav({
       renderFn: fastRender,

@@ -41,6 +41,7 @@ import {
   type ReactNode,
   useCallback,
   useContext,
+  useDeferredValue,
   useEffect,
   useId,
   useMemo,
@@ -66,6 +67,7 @@ import type { FilterPill } from '@/components/shell/pill-search.types';
 import { ShellDropdown } from '@/components/shell/ShellDropdown';
 import { APP_ROUTES } from '@/constants/routes';
 import { useRegisterHeaderSearch } from '@/contexts/HeaderActionsContext';
+import { useRegisterShellSidebarOverride } from '@/contexts/ShellSidebarOverrideContext';
 import { useBreakpoint } from '@/hooks/useBreakpoint';
 import { SKELETON_ROW_COUNT } from '@/lib/constants/layout';
 import { cn } from '@/lib/utils';
@@ -232,10 +234,10 @@ function formatReleaseStatus(status: LibraryReleaseAsset['status']): string {
 
 function releaseStatusClasses(status: LibraryReleaseAsset['status']): string {
   if (status === 'released') {
-    return 'border-emerald-500/20 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300';
+    return 'border-[color-mix(in_oklab,var(--geist-cyan-solid)_24%,transparent)] bg-[color-mix(in_oklab,var(--geist-cyan-solid)_12%,var(--linear-app-content-surface))] text-[color:var(--geist-cyan-solid)]';
   }
   if (status === 'scheduled') {
-    return 'border-cyan-500/20 bg-cyan-500/10 text-cyan-700 dark:text-cyan-300';
+    return 'border-[color-mix(in_oklab,var(--geist-blue-solid)_24%,transparent)] bg-[color-mix(in_oklab,var(--geist-blue-solid)_10%,var(--linear-app-content-surface))] text-[color:var(--geist-blue-solid)]';
   }
   return 'border-subtle bg-surface-1 text-tertiary-token';
 }
@@ -243,8 +245,8 @@ function releaseStatusClasses(status: LibraryReleaseAsset['status']): string {
 function releaseStatusDotClasses(
   status: LibraryReleaseAsset['status']
 ): string {
-  if (status === 'released') return 'bg-emerald-400';
-  if (status === 'scheduled') return 'bg-cyan-300';
+  if (status === 'released') return 'bg-[color:var(--geist-cyan-solid)]';
+  if (status === 'scheduled') return 'bg-[color:var(--geist-blue-solid)]';
   return 'bg-white/35';
 }
 
@@ -642,10 +644,10 @@ function LibraryRail({
                 type='button'
                 onClick={() => onPreset(view.id)}
                 className={cn(
-                  'flex h-8 w-full items-center gap-2 rounded-md px-2 text-left text-[12.5px] transition-colors duration-subtle ease-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/55 focus-visible:ring-offset-2 focus-visible:ring-offset-(--linear-app-content-surface) outline-none',
+                  'flex h-8 w-full items-center gap-2 rounded-md border px-2 text-left text-[12.5px] transition-[background-color,border-color,color,box-shadow] duration-subtle ease-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/55 focus-visible:ring-offset-2 focus-visible:ring-offset-(--linear-app-content-surface) outline-none',
                   active
-                    ? 'bg-surface-1 text-primary-token'
-                    : 'text-secondary-token hover:bg-surface-1 hover:text-primary-token'
+                    ? 'border-[color-mix(in_oklab,var(--geist-cyan-solid)_20%,transparent)] bg-[color-mix(in_oklab,var(--geist-cyan-solid)_8%,var(--linear-app-content-surface))] text-primary-token'
+                    : 'border-transparent text-secondary-token hover:border-[color-mix(in_oklab,var(--geist-cyan-solid)_12%,transparent)] hover:bg-[color-mix(in_oklab,var(--geist-cyan-solid)_4%,var(--linear-app-content-surface))] hover:text-primary-token'
                 )}
               >
                 <span className='min-w-0 flex-1 truncate'>{view.label}</span>
@@ -665,7 +667,7 @@ function LibraryRail({
             <button
               type='button'
               onClick={onClearFilters}
-              className='rounded px-1.5 py-0.5 text-2xs text-tertiary-token transition-colors duration-subtle ease-subtle hover:bg-surface-1 hover:text-primary-token'
+              className='rounded px-1.5 py-0.5 text-2xs text-tertiary-token transition-[background-color,color] duration-subtle ease-subtle hover:bg-[color-mix(in_oklab,var(--geist-cyan-solid)_5%,var(--linear-app-content-surface))] hover:text-primary-token'
             >
               Clear Filters ({activeFilterCount})
             </button>
@@ -770,7 +772,7 @@ function FilterSection({
         aria-controls={panelId}
         aria-expanded={open}
         onClick={() => setOpen(value => !value)}
-        className='flex h-6 w-full items-center justify-between rounded-md px-1 text-[11px] font-medium text-tertiary-token transition-colors duration-subtle ease-subtle hover:bg-surface-1 hover:text-primary-token'
+        className='flex h-6 w-full items-center justify-between rounded-md px-1 text-[11px] font-medium text-tertiary-token transition-[background-color,color] duration-subtle ease-subtle hover:bg-[color-mix(in_oklab,var(--geist-cyan-solid)_4%,var(--linear-app-content-surface))] hover:text-primary-token'
       >
         <span>{label}</span>
         <ChevronDown
@@ -814,10 +816,10 @@ function FilterRow({
       type='button'
       onClick={onClick}
       className={cn(
-        'flex h-7 w-full items-center gap-2 rounded-md px-2 text-[12px] transition-colors duration-subtle ease-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/55 focus-visible:ring-offset-2 focus-visible:ring-offset-(--linear-app-content-surface) outline-none',
+        'flex h-7 w-full items-center gap-2 rounded-md border px-2 text-[12px] transition-[background-color,border-color,color,box-shadow] duration-subtle ease-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/55 focus-visible:ring-offset-2 focus-visible:ring-offset-(--linear-app-content-surface) outline-none',
         active
-          ? 'bg-surface-1 text-primary-token'
-          : 'text-secondary-token hover:bg-surface-1 hover:text-primary-token'
+          ? 'border-[color-mix(in_oklab,var(--geist-cyan-solid)_20%,transparent)] bg-[color-mix(in_oklab,var(--geist-cyan-solid)_8%,var(--linear-app-content-surface))] text-primary-token'
+          : 'border-transparent text-secondary-token hover:border-[color-mix(in_oklab,var(--geist-cyan-solid)_12%,transparent)] hover:bg-[color-mix(in_oklab,var(--geist-cyan-solid)_4%,var(--linear-app-content-surface))] hover:text-primary-token'
       )}
     >
       {Icon ? (
@@ -831,7 +833,7 @@ function FilterRow({
       <span className='min-w-0 flex-1 truncate text-left'>{label}</span>
       <span className='text-2xs tabular-nums text-tertiary-token'>{count}</span>
       {active ? (
-        <Check className='h-3 w-3 shrink-0 text-primary-token' />
+        <Check className='h-3 w-3 shrink-0 text-[color:var(--geist-cyan-solid)]' />
       ) : null}
     </button>
   );
@@ -1780,6 +1782,10 @@ export function LibrarySurface({
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
   const [pills, setPills] = useState<FilterPill[]>([]);
   const isDesktopLayout = useBreakpoint('lg');
+  const deferredFilters = useDeferredValue(filters);
+  const deferredPreset = useDeferredValue(preset);
+  const deferredPills = useDeferredValue(pills);
+  const deferredSort = useDeferredValue(sort);
 
   const effectiveAssets = useMemo<readonly LibraryReleaseAsset[]>(
     () =>
@@ -1802,14 +1808,21 @@ export function LibrarySurface({
 
   const visibleAssets = useMemo(() => {
     const presetPredicate =
-      PRESETS.find(item => item.id === preset)?.predicate ?? (() => true);
+      PRESETS.find(item => item.id === deferredPreset)?.predicate ??
+      (() => true);
 
     return effectiveAssets
       .filter(presetPredicate)
-      .filter(asset => assetMatchesFilters(asset, filters))
-      .filter(asset => assetMatchesPills(asset, pills))
-      .toSorted(compareAssets(sort));
-  }, [effectiveAssets, filters, pills, preset, sort]);
+      .filter(asset => assetMatchesFilters(asset, deferredFilters))
+      .filter(asset => assetMatchesPills(asset, deferredPills))
+      .toSorted(compareAssets(deferredSort));
+  }, [
+    deferredFilters,
+    deferredPills,
+    deferredPreset,
+    deferredSort,
+    effectiveAssets,
+  ]);
 
   const artistOptions = useMemo(
     () => uniqueSorted(effectiveAssets.map(asset => asset.artist)),
@@ -1957,6 +1970,17 @@ export function LibrarySurface({
     [effectiveAssets, filters, preset]
   );
 
+  useRegisterShellSidebarOverride(
+    effectiveAssets.length > 0
+      ? {
+          key: 'library',
+          backHref: APP_ROUTES.CHAT,
+          backLabel: 'Back to App',
+          content: libraryRail,
+        }
+      : null
+  );
+
   const handleAudioUploaded = useCallback(
     (assetId: string, previewUrl: string) => {
       setAudioOverrides(previous => ({
@@ -1970,7 +1994,7 @@ export function LibrarySurface({
 
   const drawerColumnWidth = drawerOpen ? '360px' : '0px';
   const libraryGridTemplateColumns = isDesktopLayout
-    ? `minmax(16rem,17.5rem) minmax(0,1fr) ${drawerColumnWidth}`
+    ? `minmax(0,1fr) ${drawerColumnWidth}`
     : 'minmax(0, 1fr)';
 
   if (effectiveAssets.length === 0) {
@@ -2015,12 +2039,6 @@ export function LibrarySurface({
           } as CSSProperties
         }
       >
-        {isDesktopLayout
-          ? cloneElement(libraryRail, {
-              className:
-                'hidden min-h-0 border-r border-subtle lg:flex lg:h-full',
-            })
-          : null}
         <div className='flex min-h-0 min-w-0 flex-col overflow-hidden'>
           <div className='min-h-0 flex-1 overflow-y-auto pb-20 lg:pb-0'>
             {visibleAssets.length === 0 ? (

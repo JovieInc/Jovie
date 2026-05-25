@@ -6,8 +6,8 @@
  *    sidebar toggle + update pill; main-cell is a plain drag region (no header —
  *    page headers moved into
  *    the elevated content card below).
- * 2. No duplicate sidebar toggles — Electron gets exactly one titlebar toggle,
- *    zero web dock/header triggers, and zero sidebar-header plus controls.
+ * 2. No duplicate sidebar toggles — Electron gets exactly one titlebar toggle
+ *    and zero web sidebar-header controls.
  * 3. The sidebar-cell width equals the CSS sidebar-width token, confirming rail alignment.
  *    (In a real Electron run the CSS `padding-left` rule for shellChatV1 takes effect;
  *    in the browser we verify the column structure is present and correctly attributed.)
@@ -101,9 +101,6 @@ async function assertElectronShellControls(
   await expect(
     page.locator('[data-testid="electron-sidebar-toggle"]')
   ).toHaveCount(1);
-  await expect(page.locator('[data-sidebar-dock-button="true"]')).toHaveCount(
-    0
-  );
   await expect(page.locator('[data-sidebar="trigger"]')).toHaveCount(0);
   await expect(page.locator('header a[aria-label="New chat"]')).toHaveCount(0);
   const newChatRowCount = await page
@@ -193,9 +190,6 @@ test('no duplicate sidebar dock button and titlebar toggle on the same page', as
     timeout: 30_000,
   });
 
-  await expect(page.locator('[data-sidebar-dock-button="true"]')).toHaveCount(
-    0
-  );
   await expect(page.locator('[data-sidebar="trigger"]')).toHaveCount(0);
   await expect(page.locator('header a[aria-label="New chat"]')).toHaveCount(0);
   await expect(
