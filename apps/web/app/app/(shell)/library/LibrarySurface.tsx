@@ -994,10 +994,16 @@ const AssetCard = memo(function AssetCard({
       className={cn(
         'group relative min-w-0 overflow-hidden rounded-lg border bg-surface-0 transition-[border-color,background-color] duration-subtle ease-subtle',
         selected
-          ? 'border-(--linear-border-focus) bg-surface-1'
+          ? 'border-cyan-400/50 bg-surface-1'
           : 'border-subtle hover:border-default'
       )}
     >
+      {selected ? (
+        <span
+          aria-hidden='true'
+          className='pointer-events-none absolute inset-0 rounded-lg shadow-[inset_2px_0_0_0_rgb(103_232_249),inset_0_0_0_1px_rgb(103_232_249_/_0.08)]'
+        />
+      ) : null}
       <button
         type='button'
         onClick={onSelect}
@@ -1142,6 +1148,13 @@ function LibraryDataTable({
     () => (selectedId ? { [selectedId]: true } : {}),
     [selectedId]
   );
+  const getRowClassName = useCallback(
+    (asset: LibraryReleaseAsset) =>
+      asset.id === selectedId
+        ? 'bg-cyan-400/[0.08]! text-primary-token shadow-[inset_2px_0_0_0_rgb(103_232_249)]!'
+        : '',
+    [selectedId]
+  );
 
   return (
     <LibraryPreviewContext.Provider value={previewContext}>
@@ -1152,6 +1165,7 @@ function LibraryDataTable({
         getRowId={getRowId}
         getRowTestId={getRowTestId}
         rowSelection={rowSelection}
+        getRowClassName={getRowClassName}
         enableVirtualization={assets.length >= 20}
         rowHeight={LIBRARY_TABLE_ROW_HEIGHT}
         minWidth={LIBRARY_TABLE_MIN_WIDTH}

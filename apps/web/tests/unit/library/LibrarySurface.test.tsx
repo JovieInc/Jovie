@@ -423,8 +423,10 @@ describe('LibrarySurface', () => {
       'false'
     );
     expect(row).toHaveAttribute('aria-selected', 'true');
-    expect(row.className).toContain('bg-(--linear-row-selected)');
-    expect(row.className).not.toContain('shadow-[inset_3px_0_0_0');
+    expect(row.className).toContain('bg-cyan-400/[0.08]!');
+    expect(row.className).toContain(
+      'shadow-[inset_2px_0_0_0_rgb(103_232_249)]!'
+    );
     expect(screen.getByRole('link', { name: /Open Release/u })).toHaveAttribute(
       'href',
       '/tim/take-me-over'

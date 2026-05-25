@@ -1,5 +1,6 @@
 import { type ToolSet, tool, type UIMessage } from 'ai';
 import { z } from 'zod';
+import { APP_ROUTES } from '@/constants/routes';
 import { executeChatTurn, selectKnowledgeContextForTurn } from '@/lib/chat/run';
 import {
   FREE_TIER_TOOLS,
@@ -15,7 +16,12 @@ import {
 } from '../../fixtures/chat-context';
 
 type EvalVars = Record<string, unknown>;
-type EvalTarget = 'chat-turn' | 'mobile-chat-route' | 'web-chat-route';
+type EvalTarget =
+  | 'chat-turn'
+  | 'mobile-chat-route'
+  | 'tool-contract'
+  | 'tool-inventory'
+  | 'web-chat-route';
 
 type ToolExecution = {
   readonly name: string;
@@ -199,8 +205,29 @@ const ALL_EVAL_TOOL_SCHEMAS = {
   ...ADVANCED_TOOL_SCHEMAS,
 };
 
+const ACCOUNT_TOOL_NAMES = [
+  'showAccountStatus',
+  'showUsage',
+  'openBillingPortal',
+] as const;
+
+const MERCH_TOOL_NAMES = [
+  'createMerch',
+  'previewMerchOptions',
+  'selectMerchDesign',
+  'publishMerchCard',
+  'pauseMerchCard',
+  'unpauseMerchCard',
+  'deleteOrArchiveMerchCard',
+  'reorderMerchCards',
+  'optimizeMerchCards',
+  'showMerchSales',
+  'showArtistPayouts',
+] as const;
+
 const PAID_TOOL_NAMES = [
   ...FREE_TIER_TOOLS,
+  ...ACCOUNT_TOOL_NAMES,
   'showTopInsights',
   'proposeProfileEdit',
   'importBioFromUrl',
@@ -214,7 +241,15 @@ const PAID_TOOL_NAMES = [
   'formatLyrics',
   'createRelease',
   'generateReleasePitch',
+  ...MERCH_TOOL_NAMES,
 ] as const;
+
+const FREE_APP_TOOL_NAMES = [
+  ...FREE_TIER_TOOLS,
+  ...ACCOUNT_TOOL_NAMES,
+] as const;
+
+const ALL_EVAL_TOOL_NAMES = Object.keys(ALL_EVAL_TOOL_SCHEMAS).sort();
 
 function toObject(value: unknown): Record<string, unknown> {
   return value && typeof value === 'object' && !Array.isArray(value)
@@ -244,11 +279,27 @@ function toMode(value: unknown): 'app' | 'onboarding' {
 }
 
 function toTarget(value: unknown): EvalTarget {
-  if (value === 'mobile-chat-route' || value === 'web-chat-route') {
+  if (
+    value === 'mobile-chat-route' ||
+    value === 'tool-contract' ||
+    value === 'tool-inventory' ||
+    value === 'web-chat-route'
+  ) {
     return value;
   }
 
   return 'chat-turn';
+}
+
+function toToolName(value: unknown): string {
+  if (
+    typeof value === 'string' &&
+    Object.hasOwn(ALL_EVAL_TOOL_SCHEMAS, value)
+  ) {
+    return value;
+  }
+
+  throw new RangeError(`Invalid eval vars.toolName: ${String(value)}`);
 }
 
 function toBoolean(value: unknown, fallback: boolean): boolean {
@@ -300,7 +351,7 @@ function ndjsonEvent(event: Record<string, unknown>): string {
 function buildDefaultWebChatBody(
   prompt: string,
   body: Record<string, unknown>
-) {
+): Record<string, unknown> {
   return {
     profileId: EVAL_PROFILE_ID,
     messages: [
@@ -418,7 +469,10 @@ function evaluateWebChatRouteContract(prompt: string, vars: EvalVars) {
       invalidJson: toBoolean(vars.invalidJson, false),
       rateLimited: toBoolean(vars.rateLimited, false),
     },
+    costTier: 'deterministic',
     text: '',
+    selectedModel: null,
+    modelCalled: false,
     toolCalls: [],
     toolResults: [],
     toolExecutions: [],
@@ -567,7 +621,10 @@ function evaluateMobileChatRouteContract(prompt: string, vars: EvalVars) {
       authenticated,
       body: requestBody,
     },
+    costTier: 'deterministic',
     text: '',
+    selectedModel: null,
+    modelCalled: false,
     toolCalls: [],
     toolResults: [],
     toolExecutions: [],
@@ -656,7 +713,7 @@ function buildEvalReleases(vars: EvalVars): ReleaseContext[] {
 
 function getToolNamesForTurn(mode: 'app' | 'onboarding', plan: PlanId) {
   if (mode === 'onboarding') return ONBOARDING_TOOLS;
-  return plan === 'free' ? FREE_TIER_TOOLS : PAID_TOOL_NAMES;
+  return plan === 'free' ? FREE_APP_TOOL_NAMES : PAID_TOOL_NAMES;
 }
 
 function configuredToolResult(
@@ -702,6 +759,29 @@ function defaultToolResult(toolName: string, input: unknown): unknown {
     }
     case 'submitFeedback':
       return { success: true, message: 'Feedback recorded.' };
+    case 'showAccountStatus':
+      return {
+        success: true,
+        plan: 'pro',
+        billingVerified: true,
+        merchAccess: true,
+        nextAction: 'Review usage or open billing settings.',
+      };
+    case 'showUsage':
+      return {
+        success: true,
+        period: 'daily',
+        limit: 50,
+        used: 7,
+        remaining: 43,
+        resetsAt: '2026-05-25T07:00:00.000Z',
+      };
+    case 'openBillingPortal':
+      return {
+        success: true,
+        portalUrl: 'https://billing.jov.ie/eval/session',
+        fallbackUrl: APP_ROUTES.SETTINGS_BILLING,
+      };
     case 'showTopInsights':
       return {
         success: true,
@@ -769,6 +849,67 @@ function defaultToolResult(toolName: string, input: unknown): unknown {
             : '/onboarding/checkout',
         summary: 'Checkout handoff ready.',
       };
+    case 'generateAlbumArt':
+      return {
+        success: true,
+        action: 'album_art_options_generated',
+        releaseTitle: args.releaseTitle ?? null,
+        options: [
+          { id: 'album-art-option-1', title: 'Moonlit Signal' },
+          { id: 'album-art-option-2', title: 'Neon Current' },
+          { id: 'album-art-option-3', title: 'Chrome Tide' },
+        ],
+      };
+    case 'createMerch':
+    case 'previewMerchOptions':
+      return {
+        success: true,
+        action: toolName,
+        generationId: '00000000-0000-4000-8000-000000000b01',
+        options: [
+          { optionNumber: 1, itemType: args.itemType ?? 'tee' },
+          { optionNumber: 2, itemType: args.itemType ?? 'hoodie' },
+          { optionNumber: 3, itemType: args.itemType ?? 'poster' },
+        ],
+      };
+    case 'selectMerchDesign':
+      return {
+        success: true,
+        action: 'select_merch_design',
+        generationId: args.generationId,
+        optionNumber: args.optionNumber ?? null,
+        optionId: args.optionId ?? null,
+      };
+    case 'publishMerchCard':
+    case 'pauseMerchCard':
+    case 'unpauseMerchCard':
+    case 'deleteOrArchiveMerchCard':
+      return {
+        success: true,
+        action: toolName,
+        merchCardId: args.merchCardId,
+      };
+    case 'reorderMerchCards':
+      return {
+        success: true,
+        action: 'reorder_merch_cards',
+        merchCardIds: Array.isArray(args.merchCardIds) ? args.merchCardIds : [],
+      };
+    case 'optimizeMerchCards':
+      return { success: true, action: 'optimize_merch_cards', optimized: 3 };
+    case 'showMerchSales':
+      return {
+        success: true,
+        grossRevenueCents: 12400,
+        orders: 8,
+        topItem: 'Luna Waves tee',
+      };
+    case 'showArtistPayouts':
+      return {
+        success: true,
+        pendingLiabilityCents: 6200,
+        automaticPayout: false,
+      };
     default:
       return { success: true, action: toolName, input: args };
   }
@@ -804,6 +945,136 @@ function buildEvalTools(
   }
 
   return tools;
+}
+
+function schemaErrorMessages(result: { error?: { issues?: unknown[] } }) {
+  const issues = Array.isArray(result.error?.issues) ? result.error.issues : [];
+
+  return issues.map(issue => {
+    const record = toObject(issue);
+    const path = Array.isArray(record.path)
+      ? record.path.map(String).join('.')
+      : '';
+    const message =
+      typeof record.message === 'string' ? record.message : 'Invalid input';
+    return path.length > 0 ? `${path}: ${message}` : message;
+  });
+}
+
+function semanticToolInputErrors(toolName: string, input: unknown): string[] {
+  const args = toObject(input);
+
+  if (toolName === 'proposeSocialLink') {
+    const url = typeof args.url === 'string' ? args.url.trim() : '';
+    if (url.length === 0) return ['url: Provide a full URL'];
+
+    try {
+      const parsed = new URL(url);
+      if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') {
+        return ['url: Only http and https URLs are allowed'];
+      }
+    } catch {
+      return ['url: Provide a valid full URL'];
+    }
+  }
+
+  if (toolName === 'proposeSocialLinkRemoval') {
+    const platform =
+      typeof args.platform === 'string' ? args.platform.trim() : '';
+    if (platform.length === 0) {
+      return ['platform: Provide the platform name to remove'];
+    }
+  }
+
+  return [];
+}
+
+function evaluateToolContract(vars: EvalVars) {
+  const mode = toMode(vars.mode);
+  const plan = toPlanId(vars.plan);
+  const toolName = toToolName(vars.toolName);
+  const schema =
+    ALL_EVAL_TOOL_SCHEMAS[toolName as keyof typeof ALL_EVAL_TOOL_SCHEMAS];
+  const input = Object.hasOwn(vars, 'toolInput') ? vars.toolInput : {};
+  const schemaResult = schema.inputSchema.safeParse(input);
+  const availableToolNames = [...getToolNamesForTurn(mode, plan)];
+  const available = (availableToolNames as readonly string[]).includes(
+    toolName
+  );
+  const semanticErrors = schemaResult.success
+    ? semanticToolInputErrors(toolName, schemaResult.data)
+    : [];
+  const semanticValid = semanticErrors.length === 0;
+  const executionAllowed =
+    available &&
+    schemaResult.success &&
+    semanticValid &&
+    toBoolean(vars.executeTool, true);
+  const output = executionAllowed
+    ? (configuredToolResult(vars, toolName) ??
+      defaultToolResult(toolName, schemaResult.data))
+    : null;
+  const toolExecutions = executionAllowed
+    ? [{ name: toolName, input: schemaResult.data, output }]
+    : [];
+
+  return {
+    target: 'tool-contract',
+    adapter: 'tool-contract',
+    costTier: 'deterministic',
+    text: '',
+    selectedModel: null,
+    modelCalled: false,
+    persistenceAttempted: false,
+    toolName,
+    mode,
+    plan,
+    available,
+    availableToolNames,
+    schemaValid: schemaResult.success,
+    schemaErrors: schemaResult.success ? [] : schemaErrorMessages(schemaResult),
+    semanticValid,
+    semanticErrors,
+    input,
+    parsedInput: schemaResult.success ? schemaResult.data : null,
+    executionAttempted: executionAllowed,
+    toolCalls: executionAllowed ? [{ toolName, input: schemaResult.data }] : [],
+    toolResults: executionAllowed ? [{ toolName, output }] : [],
+    toolExecutions,
+  };
+}
+
+function evaluateToolInventory(vars: EvalVars) {
+  const coverage = toObject(vars.coverage);
+  const coveredTools = Array.isArray(coverage.coveredTools)
+    ? coverage.coveredTools.filter((toolName): toolName is string => {
+        return typeof toolName === 'string';
+      })
+    : [];
+  const coveredSet = new Set(coveredTools);
+  const unknownCoveredTools = coveredTools
+    .filter(toolName => !Object.hasOwn(ALL_EVAL_TOOL_SCHEMAS, toolName))
+    .sort();
+  const missingToolNames = ALL_EVAL_TOOL_NAMES.filter(
+    toolName => !coveredSet.has(toolName)
+  );
+
+  return {
+    target: 'tool-inventory',
+    adapter: 'tool-inventory',
+    costTier: 'deterministic',
+    text: '',
+    selectedModel: null,
+    modelCalled: false,
+    persistenceAttempted: false,
+    requiredToolNames: ALL_EVAL_TOOL_NAMES,
+    coveredToolNames: [...coveredSet].sort(),
+    missingToolNames,
+    unknownCoveredTools,
+    freeAppToolNames: [...FREE_APP_TOOL_NAMES],
+    onboardingToolNames: [...ONBOARDING_TOOLS],
+    paidToolNames: [...PAID_TOOL_NAMES],
+  };
 }
 
 function toPromptfooUsage(usage: Record<string, unknown> | null | undefined) {
@@ -871,6 +1142,42 @@ export default class JovieChatPromptfooProvider {
         output: JSON.stringify(payload),
         raw: payload,
         format: 'json',
+        latencyMs: Date.now() - startedAt,
+      };
+    }
+
+    if (target === 'tool-contract') {
+      const payload = evaluateToolContract(vars);
+      return {
+        output: JSON.stringify(payload),
+        raw: payload,
+        format: 'json',
+        latencyMs: Date.now() - startedAt,
+      };
+    }
+
+    if (target === 'tool-inventory') {
+      const payload = evaluateToolInventory(vars);
+      return {
+        output: JSON.stringify(payload),
+        raw: payload,
+        format: 'json',
+        latencyMs: Date.now() - startedAt,
+      };
+    }
+
+    if (process.env.JOVIE_RUN_LIVE_EVALS !== '1') {
+      return {
+        error:
+          'Live chat-turn evals are disabled. Set JOVIE_RUN_LIVE_EVALS=1 and AI_GATEWAY_API_KEY to run manual live Promptfoo evals.',
+        latencyMs: Date.now() - startedAt,
+      };
+    }
+
+    if (!process.env.AI_GATEWAY_API_KEY) {
+      return {
+        error:
+          'AI_GATEWAY_API_KEY is required for manual live chat-turn Promptfoo evals.',
         latencyMs: Date.now() - startedAt,
       };
     }

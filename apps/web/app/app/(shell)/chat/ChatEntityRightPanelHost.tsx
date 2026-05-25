@@ -8,6 +8,7 @@ import {
   Link as LinkIcon,
   MessageSquareText,
   Music2,
+  UserRound,
   X,
 } from 'lucide-react';
 import dynamic from 'next/dynamic';
@@ -24,6 +25,8 @@ import { cn } from '@/lib/utils';
 import type { DashboardContact } from '@/types/contacts';
 import {
   type ChatEntityTarget,
+  type ChatRailContextKind,
+  type ChatRailContextTarget,
   useChatEntityPanel,
 } from './ChatEntityPanelContext';
 
@@ -39,8 +42,22 @@ interface ChatEntityRightPanelHostProps {
   readonly enablePreviewPanel: boolean;
   readonly enableChatEntityPanels?: boolean;
   readonly profileId?: string | null;
+  readonly profileContext?: ChatProfileContextSummary | null;
   readonly threadTitle?: string | null;
 }
+
+export interface ChatProfileContextSummary {
+  readonly id: string;
+  readonly displayName?: string | null;
+  readonly username?: string | null;
+  readonly avatarUrl?: string | null;
+  readonly completionPercentage?: number | null;
+  readonly hasMusicLinks?: boolean | null;
+  readonly hasSocialLinks?: boolean | null;
+}
+
+const CHAT_ENTITY_RIGHT_PANEL_SHELL_CLASSNAME =
+  'hidden h-full min-h-0 w-[320px] shrink-0 overflow-hidden bg-(--linear-app-content-surface) lg:flex xl:w-[340px]';
 
 function formatReleaseDate(value: string | undefined): string | null {
   if (!value) return null;
@@ -59,6 +76,179 @@ function releaseTypeLabel(type: ReleaseViewModel['releaseType']): string {
   return type
     .replaceAll('_', ' ')
     .replaceAll(/\b\w/g, letter => letter.toUpperCase());
+}
+
+function getProfileInitials(profile: ChatProfileContextSummary): string {
+  const label = profile.displayName ?? profile.username ?? 'Profile';
+  const words = label
+    .split(/\s+/)
+    .map(word => word.trim())
+    .filter(Boolean);
+  const initials = words
+    .slice(0, 2)
+    .map(word => word[0]?.toUpperCase())
+    .join('');
+  return initials || 'P';
+}
+
+function contextKindLabel(kind: ChatRailContextKind): string {
+  if (kind === 'tour-date') return 'Tour Date';
+  return kind
+    .replaceAll('-', ' ')
+    .replaceAll(/\b\w/g, letter => letter.toUpperCase());
+}
+
+function ChatRailContextIcon({
+  kind,
+}: Readonly<{ kind: ChatRailContextKind }>) {
+  if (kind === 'profile') return <UserRound className='h-3.5 w-3.5' />;
+  if (kind === 'release') return <Disc3 className='h-3.5 w-3.5' />;
+  if (kind === 'event' || kind === 'tour-date') {
+    return <Calendar className='h-3.5 w-3.5' />;
+  }
+  return <Music2 className='h-3.5 w-3.5' />;
+}
+
+function ChatProfileContextCard({
+  profile,
+  target,
+  onDismiss,
+}: Readonly<{
+  profile: ChatProfileContextSummary | null | undefined;
+  target: ChatRailContextTarget;
+  onDismiss: (focusKey: string) => void;
+}>) {
+  const title =
+    profile?.displayName?.trim() ||
+    profile?.username?.trim() ||
+    target.label ||
+    'Profile';
+  const completion =
+    typeof profile?.completionPercentage === 'number'
+      ? Math.round(profile.completionPercentage)
+      : null;
+  const meta =
+    completion !== null
+      ? `${completion}% Complete`
+      : profile?.hasMusicLinks
+        ? 'Music Connected'
+        : 'Profile Context';
+
+  return (
+    <div
+      data-testid='chat-rail-context-card'
+      data-context-kind='profile'
+      className='group relative flex min-w-0 items-center gap-3 rounded-lg px-3 py-2.5 text-left transition-colors hover:bg-surface-1'
+    >
+      <div className='relative h-9 w-9 shrink-0 overflow-hidden rounded-lg bg-surface-1 text-[12px] font-semibold text-secondary-token'>
+        {profile?.avatarUrl ? (
+          <Image
+            src={profile.avatarUrl}
+            alt=''
+            fill
+            sizes='36px'
+            className='object-cover'
+          />
+        ) : (
+          <div className='flex h-full w-full items-center justify-center'>
+            {profile ? getProfileInitials(profile) : 'P'}
+          </div>
+        )}
+      </div>
+      <div className='min-w-0 flex-1'>
+        <p className='truncate text-[13px] font-semibold text-primary-token'>
+          {title}
+        </p>
+        <p className='truncate text-[11.5px] text-tertiary-token'>{meta}</p>
+      </div>
+      <Button
+        type='button'
+        variant='ghost'
+        size='icon'
+        aria-label='Dismiss profile context'
+        onClick={() => onDismiss(target.focusKey)}
+        className='h-7 w-7 shrink-0 opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100'
+      >
+        <X className='h-3.5 w-3.5' />
+      </Button>
+    </div>
+  );
+}
+
+function ChatEntityContextCard({
+  target,
+  onDismiss,
+}: Readonly<{
+  target: ChatRailContextTarget;
+  onDismiss: (focusKey: string) => void;
+}>) {
+  const title = target.label?.trim() || contextKindLabel(target.kind);
+  return (
+    <div
+      data-testid='chat-rail-context-card'
+      data-context-kind={target.kind}
+      className='group relative flex min-w-0 items-center gap-3 rounded-lg px-3 py-2.5 text-left transition-colors hover:bg-surface-1'
+    >
+      <div className='flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-cyan-400/[0.08] text-cyan-300'>
+        <ChatRailContextIcon kind={target.kind} />
+      </div>
+      <div className='min-w-0 flex-1'>
+        <p className='truncate text-[13px] font-semibold text-primary-token'>
+          {title}
+        </p>
+        <p className='truncate text-[11.5px] text-tertiary-token'>
+          {contextKindLabel(target.kind)} Context
+        </p>
+      </div>
+      <Button
+        type='button'
+        variant='ghost'
+        size='icon'
+        aria-label={`Dismiss ${contextKindLabel(target.kind)} context`}
+        onClick={() => onDismiss(target.focusKey)}
+        className='h-7 w-7 shrink-0 opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100'
+      >
+        <X className='h-3.5 w-3.5' />
+      </Button>
+    </div>
+  );
+}
+
+function ChatRailContextCards({
+  targets,
+  profileContext,
+  onDismiss,
+}: Readonly<{
+  targets: readonly ChatRailContextTarget[];
+  profileContext?: ChatProfileContextSummary | null;
+  onDismiss: (focusKey: string) => void;
+}>) {
+  if (targets.length === 0) {
+    return null;
+  }
+
+  return (
+    <div className='shrink-0 px-2 py-2' data-testid='chat-rail-context-cards'>
+      <div className='space-y-1'>
+        {targets.map(target =>
+          target.kind === 'profile' ? (
+            <ChatProfileContextCard
+              key={target.focusKey}
+              profile={profileContext}
+              target={target}
+              onDismiss={onDismiss}
+            />
+          ) : (
+            <ChatEntityContextCard
+              key={target.focusKey}
+              target={target}
+              onDismiss={onDismiss}
+            />
+          )
+        )}
+      </div>
+    </div>
+  );
 }
 
 function ChatEntityPanelSection({
@@ -461,15 +651,27 @@ export function ChatEntityRightPanelHost({
   enablePreviewPanel,
   enableChatEntityPanels = false,
   profileId,
+  profileContext,
   threadTitle,
 }: Readonly<ChatEntityRightPanelHostProps>) {
   const { isOpen: isPreviewPanelOpen } = usePreviewPanelState();
-  const { target, close } = useChatEntityPanel();
+  const { target, contextTargets, close, dismissContext } =
+    useChatEntityPanel();
 
   const panel = useMemo(() => {
+    const contextCards =
+      enableChatEntityPanels && profileId && contextTargets.length > 0 ? (
+        <ChatRailContextCards
+          targets={contextTargets}
+          profileContext={profileContext}
+          onDismiss={dismissContext}
+        />
+      ) : null;
+    let entityPanel: ReactNode = null;
+
     if (enableChatEntityPanels && profileId && target) {
       if (target.kind === 'release') {
-        return (
+        entityPanel = (
           <ChatReleaseEntityPanelLoader
             target={target}
             profileId={profileId}
@@ -479,7 +681,7 @@ export function ChatEntityRightPanelHost({
         );
       }
       if (target.kind === 'contact') {
-        return (
+        entityPanel = (
           <ChatContactEntityPanelLoader
             target={target}
             profileId={profileId}
@@ -488,7 +690,7 @@ export function ChatEntityRightPanelHost({
         );
       }
       if (target.kind === 'tour-date') {
-        return (
+        entityPanel = (
           <ChatTourDateEntityPanelLoader
             target={target}
             profileId={profileId}
@@ -496,6 +698,42 @@ export function ChatEntityRightPanelHost({
           />
         );
       }
+    }
+
+    if (contextCards && entityPanel) {
+      return (
+        <aside
+          className={cn(CHAT_ENTITY_RIGHT_PANEL_SHELL_CLASSNAME, 'flex-col')}
+          data-testid='chat-rail-context-and-entity-panel'
+        >
+          <div className='shrink-0 border-b border-[color-mix(in_oklab,var(--linear-app-shell-border)_64%,transparent)]'>
+            {contextCards}
+          </div>
+          <div className='min-h-0 flex-1'>{entityPanel}</div>
+        </aside>
+      );
+    }
+
+    if (entityPanel) {
+      return (
+        <div
+          className={CHAT_ENTITY_RIGHT_PANEL_SHELL_CLASSNAME}
+          data-testid='chat-entity-panel-shell'
+        >
+          {entityPanel}
+        </div>
+      );
+    }
+
+    if (contextCards) {
+      return (
+        <aside
+          className={cn(CHAT_ENTITY_RIGHT_PANEL_SHELL_CLASSNAME, 'flex-col')}
+          data-testid='chat-rail-context-only-panel'
+        >
+          {contextCards}
+        </aside>
+      );
     }
 
     if (target) {
@@ -515,10 +753,13 @@ export function ChatEntityRightPanelHost({
     );
   }, [
     close,
+    contextTargets,
+    dismissContext,
     enableChatEntityPanels,
     enablePreviewPanel,
     isPreviewPanelOpen,
     profileId,
+    profileContext,
     target,
     threadTitle,
   ]);

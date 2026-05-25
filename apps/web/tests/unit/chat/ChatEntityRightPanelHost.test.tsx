@@ -1,5 +1,5 @@
-import { render, screen } from '@testing-library/react';
-import React, { useEffect } from 'react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import React, { useCallback, useEffect } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   ChatEntityPanelProvider,
@@ -117,6 +117,100 @@ function OpenTourDateTarget() {
   return null;
 }
 
+function UpsertProfileContext() {
+  const { upsertContext } = useChatEntityPanel();
+  useEffect(() => {
+    upsertContext({
+      kind: 'profile',
+      id: 'profile-1',
+      label: 'Tim White',
+      source: 'tool',
+      focusKey: 'tool-1:profile',
+      toolCallId: 'tool-1',
+    });
+  }, [upsertContext]);
+  return null;
+}
+
+function UpsertReleaseContext() {
+  const { upsertContext } = useChatEntityPanel();
+  useEffect(() => {
+    upsertContext({
+      kind: 'release',
+      id: 'release-1',
+      label: 'Lost In The Light',
+      source: 'message',
+      focusKey: 'message-1:release-1',
+    });
+  }, [upsertContext]);
+  return null;
+}
+
+function DismissContextHarness() {
+  const { contextTargets, dismissContext, upsertContext } =
+    useChatEntityPanel();
+
+  useEffect(() => {
+    upsertContext({
+      kind: 'profile',
+      id: 'profile-1',
+      label: 'Tim White',
+      source: 'tool',
+      focusKey: 'tool-1:profile',
+    });
+  }, [upsertContext]);
+
+  return (
+    <div>
+      <button type='button' onClick={() => dismissContext('tool-1:profile')}>
+        Dismiss Context
+      </button>
+      {contextTargets.map(target => (
+        <span key={target.focusKey}>{target.label}</span>
+      ))}
+    </div>
+  );
+}
+
+function BatchContextOrderHarness() {
+  const { contextTargets, upsertContexts } = useChatEntityPanel();
+
+  const refreshContexts = useCallback(() => {
+    upsertContexts([
+      {
+        kind: 'release',
+        id: 'release-a',
+        label: 'Release A',
+        source: 'message',
+        focusKey: 'message-1:release-a',
+      },
+      {
+        kind: 'artist',
+        id: 'artist-b',
+        label: 'Artist B',
+        source: 'tool',
+        focusKey: 'tool-1:artist-b',
+        toolCallId: 'tool-1',
+      },
+    ]);
+  }, [upsertContexts]);
+
+  useEffect(() => {
+    refreshContexts();
+  }, [refreshContexts]);
+
+  return (
+    <div>
+      <button type='button' onClick={refreshContexts}>
+        Refresh Contexts
+      </button>
+      <div data-testid='context-order'>
+        {contextTargets.map(target => target.label).join(',')}
+      </div>
+    </div>
+  );
+}
+
 describe('ChatEntityRightPanelHost', () => {
   beforeEach(() => {
     mockUseReleaseEntityQuery.mockClear();
@@ -207,6 +301,123 @@ describe('ChatEntityRightPanelHost', () => {
       'release-1'
     );
     expect(mockUseReleasesQuery).not.toHaveBeenCalled();
+  });
+
+  it('registers compact profile context cards without opening the full profile preview', async () => {
+    mockPreviewPanelOpen = false;
+    mockUseRegisterRightPanel.mockClear();
+
+    render(
+      <ChatEntityPanelProvider>
+        <UpsertProfileContext />
+        <ChatEntityRightPanelHost
+          enablePreviewPanel={false}
+          enableChatEntityPanels
+          profileId='profile-1'
+          profileContext={{
+            id: 'profile-1',
+            displayName: 'Tim White',
+            username: 'tim',
+            avatarUrl: null,
+            completionPercentage: 64,
+          }}
+        />
+      </ChatEntityPanelProvider>
+    );
+
+    await waitFor(() => {
+      expect(mockUseRegisterRightPanel.mock.calls.at(-1)?.[0]).not.toBeNull();
+    });
+
+    const registeredPanel = mockUseRegisterRightPanel.mock.calls.at(-1)?.[0];
+    render(registeredPanel as React.ReactElement);
+
+    expect(
+      screen.getByTestId('chat-rail-context-only-panel')
+    ).toBeInTheDocument();
+    expect(screen.getByText('Tim White')).toBeInTheDocument();
+    expect(screen.getByText('64% Complete')).toBeInTheDocument();
+    expect(screen.queryByTestId('profile-contact-sidebar')).toBeNull();
+  });
+
+  it('stacks compact context cards above an open child entity panel', async () => {
+    mockPreviewPanelOpen = false;
+    mockUseRegisterRightPanel.mockClear();
+    mockUseReleaseEntityQuery.mockReturnValue({
+      data: {
+        id: 'release-1',
+        title: 'Lost In The Light',
+        releaseType: 'single',
+        status: 'released',
+        slug: 'lost-in-the-light',
+        smartLinkPath: '/r/lost-in-the-light',
+        profileId: 'profile-1',
+        totalTracks: 1,
+        providers: [],
+      },
+      isLoading: false,
+    });
+
+    render(
+      <ChatEntityPanelProvider>
+        <UpsertReleaseContext />
+        <OpenReleaseTarget />
+        <ChatEntityRightPanelHost
+          enablePreviewPanel={false}
+          enableChatEntityPanels
+          profileId='profile-1'
+          threadTitle='Release plan'
+        />
+      </ChatEntityPanelProvider>
+    );
+
+    await waitFor(() => {
+      expect(mockUseRegisterRightPanel.mock.calls.at(-1)?.[0]).not.toBeNull();
+    });
+
+    const registeredPanel = mockUseRegisterRightPanel.mock.calls.at(-1)?.[0];
+    render(registeredPanel as React.ReactElement);
+
+    expect(
+      screen.getByTestId('chat-rail-context-and-entity-panel')
+    ).toBeInTheDocument();
+    expect(screen.getAllByText('Lost In The Light').length).toBeGreaterThan(1);
+    expect(screen.getByTestId('chat-release-entity-panel')).toBeInTheDocument();
+  });
+
+  it('dismisses context cards without clearing the full entity target', async () => {
+    render(
+      <ChatEntityPanelProvider>
+        <DismissContextHarness />
+      </ChatEntityPanelProvider>
+    );
+
+    expect(await screen.findByText('Tim White')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Dismiss Context' }));
+
+    await waitFor(() => {
+      expect(screen.queryByText('Tim White')).toBeNull();
+    });
+  });
+
+  it('preserves batch context order when the same contexts upsert again', async () => {
+    render(
+      <ChatEntityPanelProvider>
+        <BatchContextOrderHarness />
+      </ChatEntityPanelProvider>
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId('context-order')).toHaveTextContent(
+        'Release A,Artist B'
+      );
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Refresh Contexts' }));
+
+    expect(screen.getByTestId('context-order')).toHaveTextContent(
+      'Release A,Artist B'
+    );
   });
 
   it('registers a contact entity panel backed by useContactsQuery', () => {

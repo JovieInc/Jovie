@@ -3,11 +3,13 @@
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { ImagePlus } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useOptionalChatEntityPanel } from '@/app/app/(shell)/chat/ChatEntityPanelContext';
 import { JovieMarkElectric } from '@/components/atoms/JovieMarkElectric';
 import { useAppFlag } from '@/lib/flags/client';
 import { SUPPORTED_IMAGE_MIME_TYPES } from '@/lib/images/config';
 
+import { deriveChatRailContextTargets } from './chat-context-rail';
 import { CHAT_COMPOSER_DOCK_CLASSNAME } from './chat-layout';
 import {
   ChatInput,
@@ -49,6 +51,7 @@ export function JovieChat({
   initialQuery,
   initialSkillId,
   onTitleChange,
+  displayName,
   avatarUrl,
   username,
 }: JovieChatProps) {
@@ -58,6 +61,7 @@ export function JovieChat({
   const [composerPickerOpen, setComposerPickerOpen] = useState(false);
   // Track message IDs that were loaded from persistence to skip entrance animation
   const knownMessageIdsRef = useRef<Set<string>>(new Set());
+  const initialConversationScrollRef = useRef<string | null>(null);
   const {
     input,
     setInput,
@@ -113,6 +117,7 @@ export function JovieChat({
   // ─── Chat jank instrumentation (flag-gated) ─────────────────
   const jankMonitorEnabled = useAppFlag('CHAT_JANK_MONITOR');
   const designV1ChatEntitiesEnabled = useAppFlag('DESIGN_V1');
+  const chatEntityPanel = useOptionalChatEntityPanel();
   const { onSend: notifyJankSend } = useChatJankMonitor({
     conversationId: activeConversationId,
     messages,
@@ -205,14 +210,48 @@ export function JovieChat({
     chipTray.addSkill(initialSkillId);
   }, [initialSkillId, conversationId, isLoadingConversation, chipTray]);
 
+  const profileRailLabel = displayName ?? username ?? null;
+  const railContextTargets = useMemo(
+    () =>
+      designV1ChatEntitiesEnabled
+        ? deriveChatRailContextTargets({
+            messages,
+            profile: profileId
+              ? {
+                  id: profileId,
+                  label: profileRailLabel,
+                }
+              : null,
+          })
+        : [],
+    [designV1ChatEntitiesEnabled, messages, profileId, profileRailLabel]
+  );
+
+  useEffect(() => {
+    if (!chatEntityPanel) {
+      return;
+    }
+
+    if (railContextTargets.length === 0) {
+      chatEntityPanel.clearContexts();
+      return;
+    }
+
+    chatEntityPanel.upsertContexts(railContextTargets);
+  }, [chatEntityPanel, railContextTargets]);
+
   // Populate known message IDs from hydrated conversation to skip entrance animations
   useEffect(() => {
-    if (messages.length > 0 && knownMessageIdsRef.current.size === 0) {
+    if (
+      conversationId &&
+      messages.length > 0 &&
+      knownMessageIdsRef.current.size === 0
+    ) {
       for (const m of messages) {
         knownMessageIdsRef.current.add(m.id);
       }
     }
-  }, [messages]);
+  }, [conversationId, messages]);
 
   // Virtualizer
   const virtualizer = useVirtualizer({
@@ -224,34 +263,71 @@ export function JovieChat({
   });
   const shouldVirtualizeMessages = messages.length > VIRTUALIZATION_THRESHOLD;
 
-  const scrollToBottom = useCallback(() => {
-    if (messages.length > 0) {
-      if (shouldVirtualizeMessages) {
-        virtualizer.scrollToIndex(messages.length - 1, {
-          align: 'end',
-          behavior: 'smooth',
-        });
-      } else {
-        const scrollContainer = scrollContainerRef.current;
-        if (scrollContainer) {
-          if (typeof scrollContainer.scrollTo === 'function') {
-            scrollContainer.scrollTo({
-              top: scrollContainer.scrollHeight,
-              behavior: 'smooth',
-            });
-          } else {
-            scrollContainer.scrollTop = scrollContainer.scrollHeight;
+  const scrollToBottom = useCallback(
+    (behavior: ScrollBehavior = 'smooth') => {
+      if (messages.length > 0) {
+        if (shouldVirtualizeMessages) {
+          virtualizer.scrollToIndex(messages.length - 1, {
+            align: 'end',
+            behavior,
+          });
+          if (behavior === 'auto') {
+            const scrollContainer = scrollContainerRef.current;
+            if (scrollContainer) {
+              scrollContainer.scrollTop = scrollContainer.scrollHeight;
+            }
+          }
+        } else {
+          const scrollContainer = scrollContainerRef.current;
+          if (scrollContainer) {
+            if (typeof scrollContainer.scrollTo === 'function') {
+              scrollContainer.scrollTo({
+                top: scrollContainer.scrollHeight,
+                behavior,
+              });
+            } else {
+              scrollContainer.scrollTop = scrollContainer.scrollHeight;
+            }
           }
         }
+        setStuckToBottom(true);
       }
-      setStuckToBottom(true);
+    },
+    [
+      messages.length,
+      scrollContainerRef,
+      setStuckToBottom,
+      shouldVirtualizeMessages,
+      virtualizer,
+    ]
+  );
+
+  useEffect(() => {
+    const conversationKey = activeConversationId ?? conversationId ?? null;
+    if (
+      !conversationKey ||
+      isLoadingConversation ||
+      messages.length === 0 ||
+      initialConversationScrollRef.current === conversationKey
+    ) {
+      return;
     }
+
+    initialConversationScrollRef.current = conversationKey;
+    setStuckToBottom(true);
+    const frame = requestAnimationFrame(() => scrollToBottom('auto'));
+    const settleTimer = window.setTimeout(() => scrollToBottom('auto'), 120);
+    return () => {
+      cancelAnimationFrame(frame);
+      window.clearTimeout(settleTimer);
+    };
   }, [
+    activeConversationId,
+    conversationId,
+    isLoadingConversation,
     messages.length,
-    scrollContainerRef,
+    scrollToBottom,
     setStuckToBottom,
-    shouldVirtualizeMessages,
-    virtualizer,
   ]);
 
   const lastAssistantIndex = findLastAssistantIndex(messages);
@@ -335,20 +411,8 @@ export function JovieChat({
 
   const composerSurface = (
     <div className='mx-auto w-full max-w-[45rem]'>
-      {/* Transient alerts stack above the input. Each contributes its
-        own bottom margin only when rendered. */}
+      {/* Usage alert remains in the composer slot; message failures render in the transcript. */}
       <ChatUsageAlert />
-
-      {chatError && (
-        <div className='mb-2'>
-          <ErrorDisplay
-            chatError={chatError}
-            onRetry={handleRetry}
-            isLoading={isLoading}
-            isSubmitting={isSubmitting}
-          />
-        </div>
-      )}
 
       {isRateLimited && (
         <p className='mb-1.5 text-xs text-tertiary-token' aria-live='polite'>
@@ -363,6 +427,20 @@ export function JovieChat({
       />
     </div>
   );
+
+  const inlineChatError = chatError ? (
+    <div
+      className='mx-auto w-full max-w-[44rem] pb-4'
+      data-testid='chat-inline-error-slot'
+    >
+      <ErrorDisplay
+        chatError={chatError}
+        onRetry={handleRetry}
+        isLoading={isLoading}
+        isSubmitting={isSubmitting}
+      />
+    </div>
+  ) : null;
 
   return (
     <EntityResolutionProvider profileId={profileId}>
@@ -455,6 +533,9 @@ export function JovieChat({
                       data-testid='chat-empty-state-centered-composer'
                     >
                       {composerSurface}
+                      {inlineChatError ? (
+                        <div className='mt-3 w-full'>{inlineChatError}</div>
+                      ) : null}
                     </div>
                   </div>
                 </div>
@@ -548,10 +629,12 @@ export function JovieChat({
                     </div>
                   )}
 
+                  {inlineChatError}
+
                   {/* Scroll to bottom button */}
                   <ScrollToBottom
                     visible={!isStuckToBottom}
-                    onClick={scrollToBottom}
+                    onClick={() => scrollToBottom()}
                   />
                 </div>
               )}

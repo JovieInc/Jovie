@@ -349,6 +349,58 @@ export async function ensureClerkTestUser({
   }
 }
 
+export async function ensureLiveClerkTestUser({
+  email,
+  username,
+  firstName,
+  lastName,
+  metadata,
+}: EnsureClerkTestUserOptions): Promise<string> {
+  const normalizedEmail = normalizeEmail(email);
+  const secretKey = process.env.CLERK_SECRET_KEY;
+
+  if (!secretKey?.startsWith('sk_test_')) {
+    throw new Error(
+      'Live Clerk test user provisioning requires a test Clerk secret key.'
+    );
+  }
+
+  if (!isAllowlistedTestAccountEmail(normalizedEmail)) {
+    throw new Error(
+      `Live Clerk test user provisioning is limited to Jovie test accounts: ${normalizedEmail}`
+    );
+  }
+
+  const clerk = createClerkClient({ secretKey });
+  const existingUsers = await clerk.users.getUserList({
+    emailAddress: [normalizedEmail],
+  });
+  const existingUser = existingUsers.data[0];
+
+  if (existingUser) {
+    return existingUser.id;
+  }
+
+  try {
+    const createdUser = await clerk.users.createUser({
+      username,
+      emailAddress: [normalizedEmail],
+      firstName,
+      lastName,
+      publicMetadata: metadata,
+      skipPasswordRequirement: true,
+    });
+
+    return createdUser.id;
+  } catch (error) {
+    if (!isClerkIdentificationExistsError(error)) {
+      throw error;
+    }
+
+    return resolveRacedClerkUser(clerk, normalizedEmail, undefined, error);
+  }
+}
+
 async function resolveRacedClerkUser(
   clerk: ReturnType<typeof createClerkClient>,
   normalizedEmail: string,

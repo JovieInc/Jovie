@@ -5,6 +5,8 @@ enum LaunchMode: Equatable {
   case unitTesting
   case uiTestingAutoAuth
   case uiTestingLiveAuth
+  case uiTestingRealBrowserAuth
+  case uiTestingAuthCallback
   case uiTestingSignedOut
   case uiTestingReady
   case uiTestingChat
@@ -15,9 +17,10 @@ enum LaunchMode: Equatable {
 
   var usesLiveClerk: Bool {
     switch self {
-    case .live, .uiTestingAutoAuth, .uiTestingLiveAuth:
+    case .live, .uiTestingAutoAuth, .uiTestingLiveAuth, .uiTestingRealBrowserAuth:
       return true
     case .unitTesting,
+         .uiTestingAuthCallback,
          .uiTestingSignedOut,
          .uiTestingReady,
          .uiTestingChat,
@@ -54,6 +57,14 @@ enum LaunchMode: Equatable {
 
     if arguments.contains("-ui-testing-live-auth") {
       return .uiTestingLiveAuth
+    }
+
+    if arguments.contains("-ui-testing-real-browser-auth") {
+      return .uiTestingRealBrowserAuth
+    }
+
+    if arguments.contains("-ui-testing-auth-callback") {
+      return .uiTestingAuthCallback
     }
 
     if arguments.contains("-ui-testing-signed-out") {

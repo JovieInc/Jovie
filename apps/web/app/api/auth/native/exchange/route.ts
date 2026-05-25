@@ -19,6 +19,7 @@ import { trackServerEvent } from '@/lib/server-analytics';
 export const runtime = 'nodejs';
 
 const SIGN_IN_TOKEN_TTL_SECONDS = 60;
+const SESSION_TOKEN_TTL_SECONDS = 60 * 60 * 12;
 
 interface NativeExchangeRequest {
   client?: unknown;
@@ -35,6 +36,10 @@ function createCodeChallenge(verifier: string): string {
   return createHash('sha256').update(verifier).digest('base64url');
 }
 
+function isRealBrowserAuthHarnessEnabled(): boolean {
+  return Boolean(process.env.JOVIE_IOS_REAL_BROWSER_AUTH_TOKEN?.trim());
+}
+
 async function trackAuthEvent(
   event: Parameters<typeof createAuthAnalyticsEvent>[0],
   input: Parameters<typeof createAuthAnalyticsEvent>[1]
@@ -42,6 +47,15 @@ async function trackAuthEvent(
   await trackServerEvent(event, createAuthAnalyticsEvent(event, input)).catch(
     () => undefined
   );
+}
+
+function isNotFoundError(error: unknown): boolean {
+  if (!error || typeof error !== 'object') {
+    return false;
+  }
+
+  const record = error as { status?: unknown; statusCode?: unknown };
+  return record.status === 404 || record.statusCode === 404;
 }
 
 export async function POST(request: Request) {
@@ -53,31 +67,33 @@ export async function POST(request: Request) {
     const code = payload.code;
     const state = payload.state;
     const codeVerifier = payload.codeVerifier;
-    const rateLimit = await generalLimiter.limit(
-      `auth:exchange:${
-        typeof client === 'string' ? client.trim() || 'unknown' : 'unknown'
-      }:${getClientIP(request)}`
-    );
-    if (!rateLimit.success) {
-      if (isNativeClient(client)) {
-        void trackAuthEvent('auth_exchange_failed', {
-          client,
-          intent: 'sign_in',
-          result: 'failed',
-          reason: 'rate_limited',
-        });
-      }
-
-      return NextResponse.json(
-        { error: 'Too many auth exchange attempts' },
-        {
-          status: 429,
-          headers: {
-            ...NO_STORE_HEADERS,
-            ...createRateLimitHeaders(rateLimit),
-          },
-        }
+    if (!isRealBrowserAuthHarnessEnabled()) {
+      const rateLimit = await generalLimiter.limit(
+        `auth:exchange:${
+          typeof client === 'string' ? client.trim() || 'unknown' : 'unknown'
+        }:${getClientIP(request)}`
       );
+      if (!rateLimit.success) {
+        if (isNativeClient(client)) {
+          void trackAuthEvent('auth_exchange_failed', {
+            client,
+            intent: 'sign_in',
+            result: 'failed',
+            reason: 'rate_limited',
+          });
+        }
+
+        return NextResponse.json(
+          { error: 'Too many auth exchange attempts' },
+          {
+            status: 429,
+            headers: {
+              ...NO_STORE_HEADERS,
+              ...createRateLimitHeaders(rateLimit),
+            },
+          }
+        );
+      }
     }
 
     if (
@@ -115,10 +131,47 @@ export async function POST(request: Request) {
     }
 
     const clerk = await clerkClient();
-    const signInToken = await clerk.signInTokens.createSignInToken({
-      userId: result.userId,
-      expiresInSeconds: SIGN_IN_TOKEN_TTL_SECONDS,
-    });
+    let exchangePayload:
+      | {
+          ticket: string;
+          expiresInSeconds: number;
+        }
+      | {
+          sessionToken: string;
+          sessionId: string;
+          userId: string;
+          expiresInSeconds: number;
+        };
+
+    try {
+      const signInToken = await clerk.signInTokens.createSignInToken({
+        userId: result.userId,
+        expiresInSeconds: SIGN_IN_TOKEN_TTL_SECONDS,
+      });
+      exchangePayload = {
+        ticket: signInToken.token,
+        expiresInSeconds: SIGN_IN_TOKEN_TTL_SECONDS,
+      };
+    } catch (error) {
+      if (!isNotFoundError(error)) {
+        throw error;
+      }
+
+      const session = await clerk.sessions.createSession({
+        userId: result.userId,
+      });
+      const token = await clerk.sessions.getToken(
+        session.id,
+        undefined,
+        SESSION_TOKEN_TTL_SECONDS
+      );
+      exchangePayload = {
+        sessionToken: token.jwt,
+        sessionId: session.id,
+        userId: session.userId,
+        expiresInSeconds: SESSION_TOKEN_TTL_SECONDS,
+      };
+    }
 
     void trackAuthEvent('auth_exchange_succeeded', {
       client,
@@ -129,9 +182,8 @@ export async function POST(request: Request) {
 
     return NextResponse.json(
       {
-        ticket: signInToken.token,
         returnTo: result.returnTo,
-        expiresInSeconds: SIGN_IN_TOKEN_TTL_SECONDS,
+        ...exchangePayload,
       },
       { status: 200, headers: NO_STORE_HEADERS }
     );

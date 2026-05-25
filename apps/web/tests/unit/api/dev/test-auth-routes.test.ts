@@ -1,24 +1,44 @@
+import { createHash } from 'node:crypto';
 import { NextRequest } from 'next/server';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const {
+  mockBuildIosAuthCompleteUrl,
   mockBuildDevTestAuthCookieDescriptors,
+  mockCreateStoredNativeExchangeCode,
   mockEnsureDevTestAuthActor,
+  mockEnsureLiveDevTestAuthActor,
   mockGetCachedDevTestAuthSession,
   mockGetDevTestAuthAvailability,
   mockIsTrustedTestBypassRequest,
   mockParseDevTestAuthPersona,
   mockRevalidatePath,
+  mockSanitizeReturnTo,
   mockSanitizeDevTestAuthRedirectPath,
+  mockClerkClient,
+  mockClerkGetUser,
+  mockClerkGetUserList,
 } = vi.hoisted(() => ({
+  mockBuildIosAuthCompleteUrl: vi.fn(),
   mockBuildDevTestAuthCookieDescriptors: vi.fn(),
+  mockCreateStoredNativeExchangeCode: vi.fn(),
   mockEnsureDevTestAuthActor: vi.fn(),
+  mockEnsureLiveDevTestAuthActor: vi.fn(),
   mockGetCachedDevTestAuthSession: vi.fn(),
   mockGetDevTestAuthAvailability: vi.fn(),
   mockIsTrustedTestBypassRequest: vi.fn(),
   mockParseDevTestAuthPersona: vi.fn(),
   mockRevalidatePath: vi.fn(),
+  mockSanitizeReturnTo: vi.fn(),
   mockSanitizeDevTestAuthRedirectPath: vi.fn(),
+  mockClerkClient: vi.fn(),
+  mockClerkGetUser: vi.fn(),
+  mockClerkGetUserList: vi.fn(),
+}));
+
+vi.mock('@jovie/auth-routing', () => ({
+  buildIosAuthCompleteUrl: mockBuildIosAuthCompleteUrl,
+  sanitizeReturnTo: mockSanitizeReturnTo,
 }));
 
 vi.mock('@/lib/auth/dev-test-auth.server', () => ({
@@ -29,14 +49,23 @@ vi.mock('@/lib/auth/dev-test-auth.server', () => ({
     '__e2e_test_persona',
   ],
   ensureDevTestAuthActor: mockEnsureDevTestAuthActor,
+  ensureLiveDevTestAuthActor: mockEnsureLiveDevTestAuthActor,
   getCachedDevTestAuthSession: mockGetCachedDevTestAuthSession,
   getDevTestAuthAvailability: mockGetDevTestAuthAvailability,
   parseDevTestAuthPersona: mockParseDevTestAuthPersona,
   sanitizeDevTestAuthRedirectPath: mockSanitizeDevTestAuthRedirectPath,
 }));
 
+vi.mock('@/lib/auth/routing-state.server', () => ({
+  createStoredNativeExchangeCode: mockCreateStoredNativeExchangeCode,
+}));
+
 vi.mock('@/lib/auth/test-mode', () => ({
   isTrustedTestBypassRequest: mockIsTrustedTestBypassRequest,
+}));
+
+vi.mock('@clerk/nextjs/server', () => ({
+  clerkClient: mockClerkClient,
 }));
 
 vi.mock('next/cache', () => ({
@@ -47,6 +76,21 @@ describe('dev test-auth routes', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.resetModules();
+    vi.stubEnv('E2E_CLERK_USER_ID', '');
+    vi.stubEnv('E2E_CLERK_USER_USERNAME', '');
+    vi.stubEnv('JOVIE_IOS_LIVE_AUTH_CLERK_USER_ID', '');
+    mockClerkClient.mockResolvedValue({
+      users: {
+        getUser: mockClerkGetUser,
+        getUserList: mockClerkGetUserList,
+      },
+    });
+    mockClerkGetUser.mockImplementation((userId: string) =>
+      Promise.resolve({ id: userId })
+    );
+    mockClerkGetUserList.mockResolvedValue({
+      data: [{ id: 'user_from_email' }],
+    });
 
     mockGetDevTestAuthAvailability.mockReturnValue({
       enabled: true,
@@ -62,7 +106,28 @@ describe('dev test-auth routes', () => {
     mockSanitizeDevTestAuthRedirectPath.mockImplementation(value =>
       value?.startsWith('/') && !value.startsWith('//') ? value : null
     );
+    mockSanitizeReturnTo.mockImplementation((client, value) =>
+      client === 'ios' && typeof value === 'string' && value.startsWith('/app')
+        ? value
+        : null
+    );
+    mockBuildIosAuthCompleteUrl.mockImplementation(({ code, state }) => {
+      const url = new URL('ie.jov.jovie://auth/complete');
+      url.searchParams.set('code', code);
+      url.searchParams.set('state', state);
+      return url.toString();
+    });
+    mockCreateStoredNativeExchangeCode.mockResolvedValue({});
     mockEnsureDevTestAuthActor.mockResolvedValue({
+      persona: 'creator',
+      clerkUserId: 'user_creator',
+      email: 'browse+clerk_test@jov.ie',
+      username: 'browse-test-user',
+      fullName: 'Browse Test User',
+      isAdmin: false,
+      profilePath: '/browse-test-user',
+    });
+    mockEnsureLiveDevTestAuthActor.mockResolvedValue({
       persona: 'creator',
       clerkUserId: 'user_creator',
       email: 'browse+clerk_test@jov.ie',
@@ -503,5 +568,242 @@ describe('dev test-auth routes', () => {
       success: false,
       error: 'Not available in production',
     });
+  });
+
+  it('creates an iOS native callback for local simulator auth smoke tests', async () => {
+    mockEnsureLiveDevTestAuthActor.mockResolvedValueOnce({
+      persona: 'creator-ready',
+      clerkUserId: 'user_creator_ready',
+      email: 'browse-ready+clerk_test@jov.ie',
+      username: 'browse-ready-user',
+      fullName: 'Browse Ready User',
+      isAdmin: false,
+      profilePath: '/browse-ready-user',
+    });
+    const codeVerifier = 'test_code_verifier';
+
+    const { POST } = await import(
+      '@/app/api/dev/test-auth/mobile-callback/route'
+    );
+    const response = await POST(
+      new NextRequest(
+        'http://localhost:3000/api/dev/test-auth/mobile-callback',
+        {
+          method: 'POST',
+          body: JSON.stringify({
+            persona: 'creator-ready',
+            codeVerifier,
+            returnTo: '/app',
+          }),
+          headers: { 'Content-Type': 'application/json' },
+        }
+      )
+    );
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body).toEqual({
+      success: true,
+      client: 'ios',
+      callbackUrl: expect.stringMatching(
+        /^ie\.jov\.jovie:\/\/auth\/complete\?code=.+&state=.+$/
+      ),
+      codeVerifier,
+      state: expect.any(String),
+      returnTo: '/app',
+      persona: 'creator-ready',
+      userId: 'user_creator_ready',
+    });
+    expect(mockEnsureLiveDevTestAuthActor).toHaveBeenCalledWith(
+      'creator-ready'
+    );
+    expect(mockCreateStoredNativeExchangeCode).toHaveBeenCalledWith({
+      code: expect.any(String),
+      client: 'ios',
+      state: body.state,
+      userId: 'user_creator_ready',
+      returnTo: '/app',
+      codeChallenge: createHash('sha256')
+        .update(codeVerifier)
+        .digest('base64url'),
+    });
+  });
+
+  it('rejects the iOS native callback route when dev auth is disabled', async () => {
+    mockGetDevTestAuthAvailability.mockReturnValueOnce({
+      enabled: false,
+      trustedHost: false,
+      reason: 'Not available in production',
+    });
+
+    const { POST } = await import(
+      '@/app/api/dev/test-auth/mobile-callback/route'
+    );
+    const response = await POST(
+      new NextRequest(
+        'http://localhost:3000/api/dev/test-auth/mobile-callback',
+        {
+          method: 'POST',
+          body: JSON.stringify({ codeVerifier: 'test_code_verifier' }),
+          headers: { 'Content-Type': 'application/json' },
+        }
+      )
+    );
+
+    expect(response.status).toBe(403);
+    expect(await response.json()).toEqual({
+      success: false,
+      error: 'Not available in production',
+    });
+    expect(mockCreateStoredNativeExchangeCode).not.toHaveBeenCalled();
+  });
+
+  it('rejects unsafe return paths on the iOS native callback route', async () => {
+    const { POST } = await import(
+      '@/app/api/dev/test-auth/mobile-callback/route'
+    );
+    const response = await POST(
+      new NextRequest(
+        'http://localhost:3000/api/dev/test-auth/mobile-callback',
+        {
+          method: 'POST',
+          body: JSON.stringify({
+            codeVerifier: 'test_code_verifier',
+            returnTo: 'https://evil.example',
+          }),
+          headers: { 'Content-Type': 'application/json' },
+        }
+      )
+    );
+
+    expect(response.status).toBe(400);
+    expect(await response.json()).toEqual({
+      success: false,
+      error: 'Invalid return_to',
+    });
+    expect(mockCreateStoredNativeExchangeCode).not.toHaveBeenCalled();
+  });
+
+  it('uses configured real Clerk user id for the iOS native callback route when present', async () => {
+    vi.stubEnv('E2E_CLERK_USER_ID', 'user_live_clerk');
+
+    const { POST } = await import(
+      '@/app/api/dev/test-auth/mobile-callback/route'
+    );
+    const response = await POST(
+      new NextRequest(
+        'http://localhost:3000/api/dev/test-auth/mobile-callback',
+        {
+          method: 'POST',
+          body: JSON.stringify({ codeVerifier: 'test_code_verifier' }),
+          headers: { 'Content-Type': 'application/json' },
+        }
+      )
+    );
+
+    expect(response.status).toBe(200);
+    expect(mockClerkGetUser).toHaveBeenCalledWith('user_live_clerk');
+    expect(mockEnsureDevTestAuthActor).not.toHaveBeenCalled();
+    expect(mockEnsureLiveDevTestAuthActor).not.toHaveBeenCalled();
+    expect(mockCreateStoredNativeExchangeCode).toHaveBeenCalledWith(
+      expect.objectContaining({
+        userId: 'user_live_clerk',
+      })
+    );
+    expect(await response.json()).toEqual(
+      expect.objectContaining({
+        userId: 'user_live_clerk',
+        persona: 'creator-ready',
+      })
+    );
+  });
+
+  it('falls back to a provisioned actor when configured Clerk user id is stale', async () => {
+    vi.stubEnv('E2E_CLERK_USER_ID', 'user_stale_clerk');
+    mockClerkGetUser.mockRejectedValueOnce(new Error('Not Found'));
+    mockEnsureLiveDevTestAuthActor.mockResolvedValueOnce({
+      persona: 'creator-ready',
+      clerkUserId: 'user_creator_ready',
+      email: 'browse-ready+clerk_test@jov.ie',
+      username: 'browse-ready-user',
+      fullName: 'Browse Ready User',
+      isAdmin: false,
+      profilePath: '/browse-ready-user',
+    });
+
+    const { GET } = await import(
+      '@/app/api/dev/test-auth/mobile-provider-complete/route'
+    );
+    const response = await GET(
+      new NextRequest(
+        'http://localhost:3000/api/dev/test-auth/mobile-provider-complete?persona=creator-ready&return_to=%2Fapp&code_challenge=challenge_123&code_challenge_method=S256'
+      )
+    );
+
+    expect(response.status).toBe(307);
+    expect(mockClerkGetUser).toHaveBeenCalledWith('user_stale_clerk');
+    expect(mockEnsureLiveDevTestAuthActor).toHaveBeenCalledWith(
+      'creator-ready'
+    );
+    expect(mockCreateStoredNativeExchangeCode).toHaveBeenCalledWith(
+      expect.objectContaining({
+        userId: 'user_creator_ready',
+      })
+    );
+  });
+
+  it('redirects through the iOS custom scheme from the real browser provider-complete route', async () => {
+    mockEnsureLiveDevTestAuthActor.mockResolvedValueOnce({
+      persona: 'creator-ready',
+      clerkUserId: 'user_creator_ready',
+      email: 'browse-ready+clerk_test@jov.ie',
+      username: 'browse-ready-user',
+      fullName: 'Browse Ready User',
+      isAdmin: false,
+      profilePath: '/browse-ready-user',
+    });
+
+    const { GET } = await import(
+      '@/app/api/dev/test-auth/mobile-provider-complete/route'
+    );
+    const response = await GET(
+      new NextRequest(
+        'http://localhost:3000/api/dev/test-auth/mobile-provider-complete?persona=creator-ready&return_to=%2Fapp&code_challenge=challenge_123&code_challenge_method=S256'
+      )
+    );
+
+    expect(response.status).toBe(307);
+    expect(response.headers.get('location')).toMatch(
+      /^ie\.jov\.jovie:\/\/auth\/complete\?code=.+&state=.+$/
+    );
+    expect(mockEnsureLiveDevTestAuthActor).toHaveBeenCalledWith(
+      'creator-ready'
+    );
+    expect(mockCreateStoredNativeExchangeCode).toHaveBeenCalledWith({
+      code: expect.any(String),
+      client: 'ios',
+      state: expect.any(String),
+      userId: 'user_creator_ready',
+      returnTo: '/app',
+      codeChallenge: 'challenge_123',
+    });
+  });
+
+  it('rejects the iOS provider-complete route without PKCE', async () => {
+    const { GET } = await import(
+      '@/app/api/dev/test-auth/mobile-provider-complete/route'
+    );
+    const response = await GET(
+      new NextRequest(
+        'http://localhost:3000/api/dev/test-auth/mobile-provider-complete?persona=creator-ready'
+      )
+    );
+
+    expect(response.status).toBe(400);
+    expect(await response.json()).toEqual({
+      success: false,
+      error: 'Native auth requires PKCE',
+    });
+    expect(mockCreateStoredNativeExchangeCode).not.toHaveBeenCalled();
   });
 });

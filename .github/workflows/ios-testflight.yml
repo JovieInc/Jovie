@@ -43,6 +43,8 @@ jobs:
       CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
       CLERK_ASSOCIATED_DOMAIN: ${{ secrets.CLERK_ASSOCIATED_DOMAIN }}
       APP_STORE_COMPANY_NAME: ${{ secrets.APP_STORE_COMPANY_NAME }}
+      JOVIE_IOS_SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
+      JOVIE_IOS_OBSERVABILITY_ENVIRONMENT: production
       API_BASE_URL: https://jov.ie
       WEB_BASE_URL: https://jov.ie
       IOS_BUILD_NUMBER: ${{ github.event_name == 'workflow_dispatch' && inputs.build_number || github.run_number }}

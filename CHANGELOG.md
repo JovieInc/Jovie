@@ -5,6 +5,44 @@
      5|The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
      6|and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.5.51] - 2026-05-25
+
+> iOS native sign-in now completes the HTTPS browser callback path, exchanges the custom-scheme return, persists the session, and lands in the authenticated shell.
+
+### Fixed
+
+- **iOS native OAuth callback completion**: fixed the native exchange path so simulator HTTPS auth stores a real Clerk test user, exchanges the callback once, clears transient auth errors, and routes to the authenticated app shell instead of showing `Couldn't finish sign-in. Try again.`
+- **Mobile session-token API auth**: updated mobile `/me` and chat routes to authenticate bearer session tokens directly from the request, so native sessions no longer depend on Clerk middleware state.
+- **iOS runtime auth configuration**: made simulator/runtime environment values override stale local plist values, keeping `WEB_BASE_URL`, `API_BASE_URL`, and Clerk keys aligned for HTTPS auth tests.
+
+### Added
+
+- **HTTPS ASWebAuthenticationSession coverage**: added `pnpm test:auth:ios` with deterministic callback parser tests, custom-scheme simulator tests, and a real-browser HTTPS mode that launches through `ASWebAuthenticationSession` and returns via `ie.jov.jovie://auth/complete`.
+- **Native auth diagnostics**: added DEBUG/TestFlight-safe stage diagnostics for auth sheet open, callback receipt/parsing, native exchange, Clerk ticket sign-in, token hydration, `/api/mobile/v1/me`, and final route transitions.
+
+## [26.5.50] - 2026-05-24
+
+> Chat now keeps profile and entity context visible in the right rail while tool work reads like a native inline activity feed instead of boxed status cards.
+
+### Added
+
+- **Chat context rail cards (JOV-2567)**: structured entity tokens and profile-related tool activity now upsert compact right-rail context cards above any open release/contact/tour-date child panel, with dedupe and dismissal handled separately from the full child panel target.
+- **Inline tool activity feed**: generic tool calls now render as compact activity rows, with multi-tool responses connected by a timeline line and failed/denied calls exposed as inline alert rows.
+
+### Changed
+
+- **Chat error and artifact polish**: composer failures now render inside the transcript with retry/support-reference affordances, generation artifacts share a cyan-accent surface, and composer icons use heavier strokes without changing the current button footprint.
+- **Library selection polish**: selected library grid/list items use the cyan rail/ring treatment scoped to the library surface instead of changing global table selection tokens.
+
+## [26.5.49] - 2026-05-24
+
+> [internal] Jovie iOS now reports auth and deep-link diagnostics through provider-agnostic observability.
+
+### Added
+
+- **[internal] iOS observability adapter**: adds a Jovie Observability facade with typed events, Sentry-backed and Noop providers, Sentry Cocoa wiring, redaction hooks, and auth/deep-link/session breadcrumbs without exposing Sentry APIs outside the provider.
+- **[internal] iOS observability redaction tests**: covers auth token, cookie, contact-field, and callback URL sanitization plus provider swapping, no-op spans, and AppState user set/clear instrumentation.
+
 ## [26.5.48] - 2026-05-24
 
 > [internal] Promptfoo now checks the web chat route's pre-model auth, billing, privacy, and kill-switch contracts.

@@ -1,6 +1,6 @@
-import { auth } from '@clerk/nextjs/server';
 import { NextResponse } from 'next/server';
 import { NO_STORE_HEADERS } from '@/lib/http/headers';
+import { getMobileSessionUserId } from '@/lib/mobile/session-auth';
 
 export const runtime = 'nodejs';
 
@@ -62,7 +62,7 @@ function ndjsonEvent(event: Record<string, unknown>): string {
 }
 
 export async function POST(request: Request) {
-  const { userId } = await auth({ acceptsToken: 'session_token' });
+  const userId = await getMobileSessionUserId(request);
   if (!userId) {
     return NextResponse.json(
       { error: 'Unauthorized' },

@@ -1,16 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const hoisted = vi.hoisted(() => ({
-  authMock: vi.fn(),
   captureErrorMock: vi.fn(),
   getAppUrlMock: vi.fn(),
   getProfileUrlMock: vi.fn(),
+  getMobileSessionUserIdMock: vi.fn(),
   getSessionContextMock: vi.fn(),
   isProfileCompleteMock: vi.fn(),
-}));
-
-vi.mock('@clerk/nextjs/server', () => ({
-  auth: hoisted.authMock,
 }));
 
 vi.mock('@/constants/domains', () => ({
@@ -22,11 +18,12 @@ vi.mock('@/lib/auth/profile-completeness', () => ({
   isProfileComplete: hoisted.isProfileCompleteMock,
 }));
 
-vi.mock('@/lib/auth/session', async importOriginal => {
-  const actual = await importOriginal<typeof import('@/lib/auth/session')>();
+vi.mock('@/lib/auth/session', () => {
   return {
-    ...actual,
     getSessionContext: hoisted.getSessionContextMock,
+    SESSION_ERRORS: {
+      USER_NOT_FOUND: 'User not found',
+    },
   };
 });
 
@@ -34,12 +31,24 @@ vi.mock('@/lib/error-tracking', () => ({
   captureError: hoisted.captureErrorMock,
 }));
 
+vi.mock('@/lib/mobile/session-auth', () => ({
+  getMobileSessionUserId: hoisted.getMobileSessionUserIdMock,
+}));
+
 const routeModulePromise = import('@/app/api/mobile/v1/me/route');
+
+function makeRequest() {
+  return new Request('https://jov.ie/api/mobile/v1/me', {
+    headers: {
+      Authorization: 'Bearer session-token',
+    },
+  });
+}
 
 describe('GET /api/mobile/v1/me', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    hoisted.authMock.mockResolvedValue({ userId: 'user_123' });
+    hoisted.getMobileSessionUserIdMock.mockResolvedValue('user_123');
     hoisted.getAppUrlMock.mockReturnValue('https://jov.ie/app');
     hoisted.getProfileUrlMock.mockImplementation(
       (handle: string) => `https://jov.ie/${handle}`
@@ -48,10 +57,10 @@ describe('GET /api/mobile/v1/me', () => {
   });
 
   it('returns 401 when unauthenticated', async () => {
-    hoisted.authMock.mockResolvedValue({ userId: null });
+    hoisted.getMobileSessionUserIdMock.mockResolvedValue(null);
 
     const { GET } = await routeModulePromise;
-    const response = await GET();
+    const response = await GET(makeRequest());
 
     expect(response.status).toBe(401);
     expect(response.headers.get('Cache-Control')).toBe('no-store');
@@ -69,7 +78,7 @@ describe('GET /api/mobile/v1/me', () => {
     });
 
     const { GET } = await routeModulePromise;
-    const response = await GET();
+    const response = await GET(makeRequest());
 
     expect(response.status).toBe(403);
     expect(response.headers.get('Cache-Control')).toBe('no-store');
@@ -94,7 +103,7 @@ describe('GET /api/mobile/v1/me', () => {
     });
 
     const { GET } = await routeModulePromise;
-    const response = await GET();
+    const response = await GET(makeRequest());
     const data = await response.json();
 
     expect(response.status).toBe(200);
@@ -123,7 +132,7 @@ describe('GET /api/mobile/v1/me', () => {
     );
 
     const { GET } = await routeModulePromise;
-    const response = await GET();
+    const response = await GET(makeRequest());
 
     expect(response.status).toBe(200);
     expect(response.headers.get('Cache-Control')).toBe('no-store');
@@ -147,7 +156,7 @@ describe('GET /api/mobile/v1/me', () => {
     });
 
     const { GET } = await routeModulePromise;
-    const response = await GET();
+    const response = await GET(makeRequest());
 
     expect(response.status).toBe(200);
     expect(response.headers.get('Cache-Control')).toBe('no-store');
@@ -179,7 +188,7 @@ describe('GET /api/mobile/v1/me', () => {
     });
 
     const { GET } = await routeModulePromise;
-    const response = await GET();
+    const response = await GET(makeRequest());
 
     expect(response.status).toBe(200);
     expect(response.headers.get('Cache-Control')).toBe('no-store');
@@ -198,7 +207,7 @@ describe('GET /api/mobile/v1/me', () => {
     hoisted.getSessionContextMock.mockRejectedValue(new Error('DB blew up'));
 
     const { GET } = await routeModulePromise;
-    const response = await GET();
+    const response = await GET(makeRequest());
 
     expect(response.status).toBe(500);
     expect(response.headers.get('Cache-Control')).toBe('no-store');

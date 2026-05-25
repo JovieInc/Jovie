@@ -122,12 +122,18 @@ function isVerboseToolModeEnabled(): boolean {
   }
 }
 
-function ToolStatusRow({
+function ToolActivityRow({
   event,
   variant,
+  multiple,
+  index,
+  count,
 }: Readonly<{
   event: PersistedToolEvent;
   variant: ToolRendererVariant;
+  multiple: boolean;
+  index: number;
+  count: number;
 }>) {
   const body = getToolStatusBody(event);
   const isInline = variant === 'inline';
@@ -143,66 +149,114 @@ function ToolStatusRow({
       data-tool-state={event.state}
       role={isError ? 'alert' : 'status'}
       className={cn(
-        'w-full rounded-xl border bg-[linear-gradient(180deg,rgba(255,255,255,0.045),rgba(255,255,255,0.018)),#17181d] text-primary-token shadow-[inset_0_1px_0_rgba(255,255,255,0.045)]',
-        isInline ? 'px-3 py-2.5' : 'max-w-[420px] px-3.5 py-3',
-        isError
-          ? 'border-red-500/20 bg-[color-mix(in_oklab,var(--color-error)_8%,var(--linear-app-content-surface))]'
-          : 'border-white/[0.085]'
+        'relative flex w-full items-start gap-2.5 text-primary-token',
+        isInline ? 'py-1' : 'py-1.5'
       )}
     >
-      <div className='flex items-start gap-2.5'>
+      {multiple ? (
         <span
+          aria-hidden='true'
+          data-testid='tool-activity-timeline-line'
           className={cn(
-            'mt-0.5 flex shrink-0 items-center justify-center text-secondary-token',
-            isRunning && 'animate-spin motion-reduce:animate-none',
+            'absolute left-[7px] w-px bg-[color-mix(in_oklab,var(--linear-app-shell-border)_70%,transparent)]',
+            index === 0 ? 'top-3.5' : 'top-0',
+            index === count - 1 ? 'bottom-[calc(100%_-_14px)]' : 'bottom-0'
+          )}
+        />
+      ) : null}
+      <span
+        className={cn(
+          'relative z-10 mt-0.5 flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-full bg-(--linear-app-content-surface)',
+          isRunning && 'text-secondary-token',
+          isError && 'text-red-500',
+          !isRunning && !isError && 'text-cyan-300'
+        )}
+      >
+        <Icon
+          className={cn(
+            isInline ? 'h-3.5 w-3.5' : 'h-4 w-4',
+            isRunning && 'animate-spin motion-reduce:animate-none'
+          )}
+          strokeWidth={2.25}
+        />
+      </span>
+      <div className='min-w-0 flex-1'>
+        <div
+          title={getToolStatusTitle(event)}
+          className={cn(
+            'truncate font-semibold tracking-[-0.01em]',
             isError && 'text-red-500',
-            !isRunning && !isError && 'text-green-600'
+            isInline ? 'text-xs' : 'text-app'
           )}
         >
-          <Icon className={isInline ? 'h-3.5 w-3.5' : 'h-4 w-4'} />
-        </span>
-        <div className='min-w-0'>
+          {getToolStatusTitle(event)}
+        </div>
+        {body ? (
           <div
-            title={getToolStatusTitle(event)}
             className={cn(
-              'truncate font-semibold tracking-[-0.01em]',
-              isInline ? 'text-xs' : 'text-app'
+              'mt-0.5 text-secondary-token',
+              isInline ? 'line-clamp-2 text-2xs' : 'line-clamp-2 text-xs'
             )}
           >
-            {getToolStatusTitle(event)}
+            {body}
           </div>
-          {body ? (
-            <div
-              className={cn(
-                'mt-0.5 text-secondary-token',
-                isInline ? 'line-clamp-2 text-2xs' : 'line-clamp-2 text-xs'
-              )}
-            >
-              {body}
-            </div>
-          ) : null}
-          {showVerboseDetails ? (
-            <details
-              data-testid='chat-tool-verbose'
-              className='mt-2 rounded-lg border border-white/[0.07] bg-black/20 px-2 py-1.5 text-[10.5px] leading-4 text-tertiary-token'
-            >
-              <summary className='cursor-pointer select-none text-secondary-token'>
-                Verbose tool details
-              </summary>
-              <dl className='mt-1.5 grid grid-cols-[72px_minmax(0,1fr)] gap-x-2 gap-y-1'>
-                <dt>Tool</dt>
-                <dd className='min-w-0 truncate font-mono'>{event.toolName}</dd>
-                <dt>State</dt>
-                <dd className='font-mono'>{event.state}</dd>
-                <dt>Call</dt>
-                <dd className='min-w-0 truncate font-mono'>
-                  {event.toolCallId}
-                </dd>
-              </dl>
-            </details>
-          ) : null}
-        </div>
+        ) : null}
+        {showVerboseDetails ? (
+          <details
+            data-testid='chat-tool-verbose'
+            className='mt-1.5 text-[10.5px] leading-4 text-tertiary-token'
+          >
+            <summary className='cursor-pointer select-none text-secondary-token'>
+              Verbose tool details
+            </summary>
+            <dl className='mt-1 grid grid-cols-[72px_minmax(0,1fr)] gap-x-2 gap-y-0.5'>
+              <dt>Tool</dt>
+              <dd className='min-w-0 truncate font-mono'>{event.toolName}</dd>
+              <dt>State</dt>
+              <dd className='font-mono'>{event.state}</dd>
+              <dt>Call</dt>
+              <dd className='min-w-0 truncate font-mono'>{event.toolCallId}</dd>
+            </dl>
+          </details>
+        ) : null}
       </div>
+    </div>
+  );
+}
+
+function ToolActivityFeed({
+  events,
+  variant,
+}: Readonly<{
+  events: readonly PersistedToolEvent[];
+  variant: ToolRendererVariant;
+}>) {
+  if (events.length === 0) {
+    return null;
+  }
+
+  const multiple = events.length > 1;
+
+  return (
+    <div
+      data-testid='tool-activity-feed'
+      data-tool-count={events.length}
+      className={cn(
+        'w-full text-primary-token',
+        variant === 'inline' ? 'max-w-full' : 'max-w-[420px]',
+        multiple ? 'space-y-0.5' : 'space-y-0'
+      )}
+    >
+      {events.map((event, index) => (
+        <ToolActivityRow
+          key={event.toolCallId}
+          event={event}
+          variant={variant}
+          multiple={multiple}
+          index={index}
+          count={events.length}
+        />
+      ))}
     </div>
   );
 }
@@ -353,6 +407,65 @@ function renderArtifactCard(
   return renderer?.(event, profileId) ?? null;
 }
 
+function renderToolActivityGroups({
+  events,
+  profileId,
+  variant,
+  hasMessageText,
+}: Readonly<{
+  events: readonly PersistedToolEvent[];
+  profileId?: string;
+  variant: ToolRendererVariant;
+  hasMessageText: boolean;
+}>): ReactNode[] {
+  const elements: ReactNode[] = [];
+  let statusEvents: PersistedToolEvent[] = [];
+
+  const flushStatusEvents = () => {
+    if (statusEvents.length === 0) {
+      return;
+    }
+
+    const key = statusEvents[0]?.toolCallId ?? `status-${elements.length}`;
+    elements.push(
+      <div
+        key={`activity:${key}`}
+        className={cn(hasMessageText && variant === 'chat' && 'mt-2.5')}
+      >
+        <ToolActivityFeed events={statusEvents} variant={variant} />
+      </div>
+    );
+    statusEvents = [];
+  };
+
+  for (const event of events) {
+    const config = getToolUiConfig(event.toolName);
+    const artifactCard =
+      config.renderer === 'artifact'
+        ? renderArtifactCard(event, profileId)
+        : null;
+
+    if (!artifactCard) {
+      statusEvents.push(event);
+      continue;
+    }
+
+    flushStatusEvents();
+    elements.push(
+      <div
+        key={event.toolCallId}
+        className={cn(hasMessageText && variant === 'chat' && 'mt-3')}
+      >
+        {artifactCard}
+      </div>
+    );
+  }
+
+  flushStatusEvents();
+
+  return elements;
+}
+
 export function getRenderableToolEvents(parts: readonly MessagePart[]) {
   return encodeToolEvents(parts) ?? [];
 }
@@ -398,24 +511,11 @@ export function ToolPartsRenderer({
 
   return (
     <>
-      {events.map(event => {
-        const config = getToolUiConfig(event.toolName);
-        const artifactCard =
-          config.renderer === 'artifact'
-            ? renderArtifactCard(event, profileId)
-            : null;
-        const content = artifactCard ?? (
-          <ToolStatusRow event={event} variant={variant} />
-        );
-
-        return (
-          <div
-            key={event.toolCallId}
-            className={cn(hasMessageText && variant === 'chat' && 'mt-3')}
-          >
-            {content}
-          </div>
-        );
+      {renderToolActivityGroups({
+        events,
+        profileId,
+        variant,
+        hasMessageText,
       })}
     </>
   );
