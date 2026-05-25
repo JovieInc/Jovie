@@ -852,6 +852,120 @@ tests:
       - type: javascript
         value: file://assertions.cjs:assertToolEventInvalidRejected
 
+  - description: Tool rendering inventory covers every UI registry tool
+    metadata:
+      cost: deterministic
+    vars:
+      input: "Tool rendering inventory check"
+      target: tool-render-contract
+      renderCase: inventory
+    assert:
+      - type: javascript
+        value: file://assertions.cjs:assertDeterministicNoSpend
+      - type: javascript
+        value: file://assertions.cjs:assertToolRenderInventoryCovered
+
+  - description: Tool rendering shows succeeded social link as artifact card
+    metadata:
+      cost: deterministic
+    vars:
+      input: "Render a succeeded social link artifact."
+      target: tool-render-contract
+      toolName: proposeSocialLink
+      renderCase: artifact-success
+      profileIdPresent: true
+    assert:
+      - type: javascript
+        value: file://assertions.cjs:assertDeterministicNoSpend
+      - type: javascript
+        value: file://assertions.cjs:assertToolRenderSucceededArtifact
+
+  - description: Tool rendering failed album art falls back to alert status
+    metadata:
+      cost: deterministic
+    vars:
+      input: "Render a failed album art tool result."
+      target: tool-render-contract
+      toolName: generateAlbumArt
+      renderCase: failed
+    assert:
+      - type: javascript
+        value: file://assertions.cjs:assertDeterministicNoSpend
+      - type: javascript
+        value: file://assertions.cjs:assertToolRenderFailureNoSuccess
+
+  - description: Tool rendering approval request does not claim completion
+    metadata:
+      cost: deterministic
+    vars:
+      input: "Render a social link approval request."
+      target: tool-render-contract
+      toolName: proposeSocialLink
+      renderCase: needs-approval
+    assert:
+      - type: javascript
+        value: file://assertions.cjs:assertDeterministicNoSpend
+      - type: javascript
+        value: file://assertions.cjs:assertToolRenderNeedsApprovalNoSuccess
+
+  - description: Tool rendering denied profile edit does not claim success
+    metadata:
+      cost: deterministic
+    vars:
+      input: "Render a denied profile edit."
+      target: tool-render-contract
+      toolName: proposeProfileEdit
+      renderCase: denied
+    assert:
+      - type: javascript
+        value: file://assertions.cjs:assertDeterministicNoSpend
+      - type: javascript
+        value: file://assertions.cjs:assertToolRenderDeniedNoSuccess
+
+  - description: Tool rendering succeeded usage stays status row
+    metadata:
+      cost: deterministic
+    vars:
+      input: "Render a successful usage status."
+      target: tool-render-contract
+      toolName: showUsage
+      renderCase: status-success
+    assert:
+      - type: javascript
+        value: file://assertions.cjs:assertDeterministicNoSpend
+      - type: javascript
+        value: file://assertions.cjs:assertToolRenderStatusSuccess
+
+  - description: Tool rendering profile-dependent artifact without profile falls back
+    metadata:
+      cost: deterministic
+    vars:
+      input: "Render a profile-dependent social link without profile id."
+      target: tool-render-contract
+      toolName: proposeSocialLink
+      renderCase: artifact-success
+      profileIdPresent: false
+    assert:
+      - type: javascript
+        value: file://assertions.cjs:assertDeterministicNoSpend
+      - type: javascript
+        value: file://assertions.cjs:assertToolRenderMissingProfileFallsBack
+
+  - description: Tool rendering onboarding artifact without generic renderer falls back
+    metadata:
+      cost: deterministic
+    vars:
+      input: "Render a Spotify picker artifact without a generic renderer."
+      target: tool-render-contract
+      toolName: searchSpotifyArtist
+      renderCase: artifact-success
+      profileIdPresent: true
+    assert:
+      - type: javascript
+        value: file://assertions.cjs:assertDeterministicNoSpend
+      - type: javascript
+        value: file://assertions.cjs:assertToolRenderUnimplementedArtifactFallsBack
+
   - description: Tool contract accepts free avatar upload
     metadata:
       cost: deterministic
