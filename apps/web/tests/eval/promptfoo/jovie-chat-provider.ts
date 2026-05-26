@@ -204,6 +204,29 @@ const REQUIRED_CHAT_CONFIRM_ROUTE_CASES = [
   'confirm-remove-link-link-not-found',
   'confirm-remove-link-success',
 ] as const;
+const REQUIRED_LIVE_HTTP_CASES = [
+  'album-art-unavailable',
+  'anonymous-onboarding-rate-limit-unavailable',
+  'client-turn-requires-profile',
+  'deterministic-replay',
+  'invalid-json',
+  'missing-context',
+  'model-provider-terminal-error',
+  'unauthorized',
+] as const;
+const LIVE_MODEL_COST_TIERS = ['live'] as const;
+const LIVE_HTTP_COST_TIERS = [
+  'live-http',
+  'live-model-error',
+  'live-rate-limit',
+] as const;
+const ALLOWED_EVAL_COST_TIERS = [
+  'deterministic',
+  ...LIVE_MODEL_COST_TIERS,
+  ...LIVE_HTTP_COST_TIERS,
+] as const;
+const LIVE_MODEL_TARGETS = ['chat-turn'] as const;
+const LIVE_HTTP_TARGETS = ['web-chat-http-route'] as const;
 
 let liveHttpEvalDb: ReturnType<typeof drizzle> | null = null;
 
@@ -5525,6 +5548,7 @@ type EvalCaseSummary = {
   readonly stateCase: string | null;
   readonly welcomeCase: string | null;
   readonly webRouteCase: string | null;
+  readonly httpCase: string | null;
   readonly mode: string | null;
   readonly plan: string | null;
   readonly assertions: readonly string[];
@@ -5619,6 +5643,7 @@ function parseEvalCaseSummary(block: string): EvalCaseSummary {
     stateCase: scalarValue(block, 'stateCase'),
     welcomeCase: scalarValue(block, 'welcomeCase'),
     webRouteCase: scalarValue(block, 'webRouteCase'),
+    httpCase: scalarValue(block, 'httpCase'),
     mode: scalarValue(block, 'mode') ?? 'app',
     plan: scalarValue(block, 'plan') ?? 'pro',
     assertions,
@@ -5658,6 +5683,10 @@ function missingNames(
   return required.filter(name => !coveredSet.has(name)).sort();
 }
 
+function caseNamesForCases(cases: readonly EvalCaseSummary[]): string[] {
+  return uniqueSorted(cases.map(testCase => testCase.description));
+}
+
 function evaluateEvalCaseInventory(vars: EvalVars) {
   const configPath =
     typeof vars.configPath === 'string' && vars.configPath.trim().length > 0
@@ -5674,6 +5703,64 @@ function evaluateEvalCaseInventory(vars: EvalVars) {
     testCase => testCase.cost === 'deterministic'
   );
   const liveCases = cases.filter(testCase => testCase.cost === 'live');
+  const allowedCostTiers = new Set<string>(ALLOWED_EVAL_COST_TIERS);
+  const liveModelCostTiers = new Set<string>(LIVE_MODEL_COST_TIERS);
+  const liveHttpCostTiers = new Set<string>(LIVE_HTTP_COST_TIERS);
+  const liveModelTargets = new Set<string>(LIVE_MODEL_TARGETS);
+  const liveHttpTargets = new Set<string>(LIVE_HTTP_TARGETS);
+  const liveTargetCases = cases.filter(
+    testCase =>
+      typeof testCase.target === 'string' &&
+      (liveModelTargets.has(testCase.target) ||
+        liveHttpTargets.has(testCase.target))
+  );
+  const liveModelCases = cases.filter(
+    testCase =>
+      typeof testCase.target === 'string' &&
+      liveModelTargets.has(testCase.target)
+  );
+  const liveHttpCases = cases.filter(
+    testCase =>
+      typeof testCase.target === 'string' &&
+      liveHttpTargets.has(testCase.target)
+  );
+  const liveHttpCaseNames = uniqueSorted(
+    liveHttpCases
+      .map(testCase => testCase.httpCase)
+      .filter((httpCase): httpCase is string => typeof httpCase === 'string')
+  );
+  const missingCostTierCaseNames = caseNamesForCases(
+    cases.filter(testCase => testCase.cost === null)
+  );
+  const unknownCostTierCaseNames = caseNamesForCases(
+    cases.filter(
+      testCase =>
+        typeof testCase.cost === 'string' &&
+        !allowedCostTiers.has(testCase.cost)
+    )
+  );
+  const deterministicLiveTargetCaseNames = caseNamesForCases(
+    deterministicCases.filter(
+      testCase =>
+        typeof testCase.target === 'string' &&
+        (liveModelTargets.has(testCase.target) ||
+          liveHttpTargets.has(testCase.target))
+    )
+  );
+  const liveModelInvalidCostCaseNames = caseNamesForCases(
+    liveModelCases.filter(
+      testCase =>
+        typeof testCase.cost !== 'string' ||
+        !liveModelCostTiers.has(testCase.cost)
+    )
+  );
+  const liveHttpInvalidCostCaseNames = caseNamesForCases(
+    liveHttpCases.filter(
+      testCase =>
+        typeof testCase.cost !== 'string' ||
+        !liveHttpCostTiers.has(testCase.cost)
+    )
+  );
   const firstToolInventoryCase = deterministicCases.find(
     testCase => testCase.target === 'tool-inventory'
   );
@@ -5844,6 +5931,22 @@ function evaluateEvalCaseInventory(vars: EvalVars) {
     caseCount: cases.length,
     deterministicCaseCount: deterministicCases.length,
     liveCaseCount: liveCases.length,
+    allowedCostTiers: [...ALLOWED_EVAL_COST_TIERS],
+    liveModelCostTiers: [...LIVE_MODEL_COST_TIERS],
+    liveHttpCostTiers: [...LIVE_HTTP_COST_TIERS],
+    liveTargetCaseCount: liveTargetCases.length,
+    liveModelCaseCount: liveModelCases.length,
+    liveHttpCaseCount: liveHttpCases.length,
+    liveHttpCaseNames,
+    missingLiveHttpCaseNames: missingNames(
+      REQUIRED_LIVE_HTTP_CASES,
+      liveHttpCaseNames
+    ),
+    missingCostTierCaseNames,
+    unknownCostTierCaseNames,
+    deterministicLiveTargetCaseNames,
+    liveModelInvalidCostCaseNames,
+    liveHttpInvalidCostCaseNames,
     targetCounts: deterministicCases.reduce<Record<string, number>>(
       (counts, testCase) => {
         const target = testCase.target ?? 'chat-turn';
