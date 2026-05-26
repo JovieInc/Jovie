@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { existsSync, readFileSync } from 'node:fs';
-import { resolve, sep } from 'node:path';
+import { dirname, resolve, sep } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { neon } from '@neondatabase/serverless';
 import { type ToolSet, tool, type UIMessage } from 'ai';
 import { and, eq } from 'drizzle-orm';
@@ -164,6 +165,8 @@ const MOBILE_CHAT_NDJSON_HEADERS = {
   'Content-Type': 'application/x-ndjson; charset=utf-8',
 } as const;
 const PROMPTFOO_CONFIG_PATH = 'tests/eval/promptfoo/promptfooconfig.yaml';
+const EVAL_PROVIDER_DIR = dirname(fileURLToPath(import.meta.url));
+const REPO_ROOT = resolve(EVAL_PROVIDER_DIR, '..', '..', '..', '..', '..');
 const HTTP_EVAL_MAX_RESPONSE_CHARS = 4000;
 const HTTP_EVAL_TIMEOUT_MS = 15_000;
 const HTTP_EVAL_PERSISTENCE_WAIT_MS = 5000;
@@ -5000,7 +5003,7 @@ function evaluateToolInventory(vars: EvalVars) {
 function registryPathExists(path: string | undefined): boolean {
   if (!path?.trim()) return false;
 
-  return existsSync(resolve(process.cwd(), '..', '..', path));
+  return existsSync(resolve(REPO_ROOT, path));
 }
 
 function evaluateSkillRegistryInventory(vars: EvalVars) {
@@ -5038,12 +5041,12 @@ function evaluateSkillRegistryInventory(vars: EvalVars) {
     })
     .sort((left, right) => left.id.localeCompare(right.id));
 
-  const missingExpectedSkillIds = SKILL_REGISTRY_IDS.filter(
-    skillId => !expectedSkillIdSet.has(skillId)
-  );
-  const unknownExpectedSkillIds = expectedSkillIds
+  const missingExpectedSkillIds = expectedSkillIds
     .filter(skillId => !knownSkillIdSet.has(skillId))
     .sort();
+  const unknownExpectedSkillIds = SKILL_REGISTRY_IDS.filter(
+    skillId => !expectedSkillIdSet.has(skillId)
+  );
 
   return {
     target: 'skill-registry-inventory',
