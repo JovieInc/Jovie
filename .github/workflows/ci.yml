@@ -329,6 +329,9 @@ jobs:
     if: ${{ github.event_name == 'workflow_dispatch' || needs.ci-path-changes.outputs.run_promptfoo_evals == 'true' }}
     env:
       JOVIE_RUN_LIVE_EVALS: '0'
+      JOVIE_RUN_LIVE_HTTP_EVALS: '0'
+      JOVIE_RUN_LIVE_RATE_LIMIT_EVALS: '0'
+      JOVIE_RUN_LIVE_MODEL_ERROR_EVALS: '0'
       PROMPTFOO_DISABLE_TELEMETRY: '1'
       PROMPTFOO_DISABLE_UPDATE: '1'
       PROMPTFOO_NO_TESTCASE_ASSERT_WARNING: '1'
@@ -337,12 +340,9 @@ jobs:
         with: { fetch-depth: 1 }
       - uses: ./.github/actions/setup-node-pnpm
       - name: Validate Promptfoo config
-        run: pnpm --filter @jovie/web exec promptfoo validate -c tests/eval/promptfoo/promptfooconfig.yaml
+        run: pnpm --filter @jovie/web run evals:validate
       - name: Run deterministic Promptfoo evals
-        shell: bash
-        run: |
-          unset AI_GATEWAY_API_KEY OPENAI_API_KEY ANTHROPIC_API_KEY BRAINTRUST_API_KEY
-          pnpm run evals
+        run: pnpm run evals
 
   ci-eslint:
     name: ESLint Server Boundaries

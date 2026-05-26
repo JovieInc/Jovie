@@ -1652,6 +1652,19 @@ tests:
       - type: javascript
         value: file://assertions.cjs:assertInsightPromptContractCovered
 
+  - description: Release task classifier uses stubbed prompt and coercion path
+    metadata:
+      cost: deterministic
+    vars:
+      input: "Release task classifier contract check"
+      target: release-task-classifier-contract
+      releaseTaskClassifierCase: prompt-and-coercion
+    assert:
+      - type: javascript
+        value: file://assertions.cjs:assertDeterministicNoSpend
+      - type: javascript
+        value: file://assertions.cjs:assertReleaseTaskClassifierContractCovered
+
   - description: Tool result shape matrix covers success and failure outputs
     metadata:
       cost: deterministic
