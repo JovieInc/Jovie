@@ -123,6 +123,7 @@ import {
 
 type EvalVars = Record<string, unknown>;
 type EvalTarget =
+  | 'album-art-provider-contract'
   | 'ai-tool-prompt-contract'
   | 'chat-confirm-route'
   | 'chat-title-contract'
@@ -598,6 +599,9 @@ const REQUIRED_SKILL_COMMAND_CASES = ['command-inventory'] as const;
 const REQUIRED_SKILL_PROMPT_CASES = ['release-pitch-retouch-prompts'] as const;
 const REQUIRED_SKILL_REGISTRY_CASES = ['registry-inventory'] as const;
 const REQUIRED_AI_TOOL_PROMPT_CASES = ['album-art-canvas-bio-prompts'] as const;
+const REQUIRED_ALBUM_ART_PROVIDER_CASES = [
+  'xai-provider-source-contract',
+] as const;
 const REQUIRED_INSIGHT_PROMPT_CASES = ['analytics-grounding-prompts'] as const;
 const REQUIRED_INTERVIEW_SUMMARY_CASES = ['prompt-schema-timeout'] as const;
 const REQUIRED_PLAYLIST_GENERATION_CASES = [
@@ -748,6 +752,7 @@ function toTarget(value: unknown): EvalTarget {
   }
 
   if (
+    value === 'album-art-provider-contract' ||
     value === 'ai-tool-prompt-contract' ||
     value === 'chat-confirm-route' ||
     value === 'chat-title-contract' ||
@@ -5902,6 +5907,218 @@ function evaluateAiToolPromptContract(vars: EvalVars) {
   };
 }
 
+function sourceHasOrderedFragments(
+  source: string,
+  fragments: readonly string[]
+): boolean {
+  let previousIndex = -1;
+
+  for (const fragment of fragments) {
+    const index = source.indexOf(fragment, previousIndex + 1);
+    if (index === -1) return false;
+    previousIndex = index;
+  }
+
+  return true;
+}
+
+function evaluateAlbumArtProviderContract(vars: EvalVars) {
+  const providerCase =
+    typeof vars.albumArtProviderCase === 'string'
+      ? vars.albumArtProviderCase
+      : 'xai-provider-source-contract';
+  const providerSourcePath = 'lib/services/album-art/provider-xai.ts';
+  const chatRouteSourcePath = 'app/api/chat/route.ts';
+  const storageSourcePath = 'lib/services/album-art/storage.ts';
+  const providerSource = readFileSync(
+    resolve(process.cwd(), providerSourcePath),
+    'utf8'
+  );
+  const chatRouteSource = readFileSync(
+    resolve(process.cwd(), chatRouteSourcePath),
+    'utf8'
+  );
+  const storageSource = readFileSync(
+    resolve(process.cwd(), storageSourcePath),
+    'utf8'
+  );
+
+  const providerFacts = {
+    importsServerOnly: providerSource.includes("import 'server-only';"),
+    usesEnvServerWrapper: providerSource.includes(
+      "import { env } from '@/lib/env-server';"
+    ),
+    exposesStableMissingKeyError: textIncludesAll(providerSource, [
+      "readonly code = 'XAI_API_KEY_MISSING' as const",
+      "this.name = 'XaiApiKeyMissingError'",
+    ]),
+    trimsApiKeyForCapability: /Boolean\(env\.XAI_API_KEY\?\.trim\(\)\)/.test(
+      providerSource
+    ),
+    declaresDefaultImagineModel: providerSource.includes(
+      "const DEFAULT_MODEL = 'grok-imagine-image';"
+    ),
+    allowsEnvModelOverride: providerSource.includes(
+      'return env.ALBUM_ART_IMAGE_MODEL ?? DEFAULT_MODEL;'
+    ),
+    failsBeforeProviderCallWhenKeyMissing: sourceHasOrderedFragments(
+      providerSource,
+      [
+        'if (!isXaiConfigured())',
+        'throw new XaiApiKeyMissingError()',
+        'const result = await generateImage',
+      ]
+    ),
+    usesXaiImageModel: providerSource.includes('model: xai.image(model)'),
+    forwardsOnlyPromptText: providerSource.includes('prompt: params.prompt'),
+    requestsSquareImages: providerSource.includes("aspectRatio: '1:1'"),
+    requestsThreeImages: providerSource.includes('n: 3'),
+    acceptsUint8ArrayImages: textIncludesAll(providerSource, [
+      'readonly uint8Array?: Uint8Array',
+      'Buffer.from(candidate.uint8Array)',
+    ]),
+    acceptsBase64Images: textIncludesAll(providerSource, [
+      'readonly base64?: string',
+      "Buffer.from(candidate.base64, 'base64')",
+    ]),
+    rejectsMissingImageBytes: providerSource.includes(
+      "throw new TypeError('xAI image result did not include image bytes')"
+    ),
+    returnsModelAndBuffers: textIncludesAll(providerSource, [
+      'model,',
+      'images: (result.images as readonly unknown[]).map(bufferFromImage)',
+    ]),
+  };
+  const providerForbiddenSideEffects = [
+    '@vercel/blob',
+    '@/lib/db',
+    '@sentry/nextjs',
+    'Sentry.capture',
+    'fetch(',
+    'put(',
+    'list(',
+  ].filter(fragment => providerSource.includes(fragment));
+
+  const routeFacts = {
+    exposesGenerateAlbumArtTool: chatRouteSource.includes(
+      'generateAlbumArt: createGenerateAlbumArtTool'
+    ),
+    checksProfileBeforeGeneration: sourceHasOrderedFragments(chatRouteSource, [
+      'if (!params.profileId)',
+      'const generated = await generateAlbumArtBackgrounds',
+    ]),
+    checksPlanBeforeGeneration: sourceHasOrderedFragments(chatRouteSource, [
+      'if (!params.canGenerateAlbumArt)',
+      'const generated = await generateAlbumArtBackgrounds',
+    ]),
+    checksProviderBeforeReleaseFetchAndRateLimits: sourceHasOrderedFragments(
+      chatRouteSource,
+      [
+        'if (!isXaiConfigured())',
+        'const releases = await fetchReleasesForChat(params.profileId)',
+        'const burstLimit = await albumArtGenerationBurstLimiter.limit',
+        'const generated = await generateAlbumArtBackgrounds',
+      ]
+    ),
+    appliesBurstBeforeDailyLimit: sourceHasOrderedFragments(chatRouteSource, [
+      'const burstLimit = await albumArtGenerationBurstLimiter.limit',
+      'const dailyLimit = await albumArtGenerationLimiter.limit',
+    ]),
+    asksForReleaseTargetBeforeGeneration: sourceHasOrderedFragments(
+      chatRouteSource,
+      [
+        "target.status === 'needs_target'",
+        'const generated = await generateAlbumArtBackgrounds',
+      ]
+    ),
+    buildsProviderPromptBeforeGeneration: sourceHasOrderedFragments(
+      chatRouteSource,
+      [
+        'const providerPrompt = buildAlbumArtBackgroundPrompt',
+        'const generated = await generateAlbumArtBackgrounds',
+      ]
+    ),
+    capsToolCandidatesAtThree: chatRouteSource.includes(
+      'if (index >= 2) break;'
+    ),
+    uploadsManifestAfterCandidateUploads: sourceHasOrderedFragments(
+      chatRouteSource,
+      [
+        'const urls = await uploadAlbumArtCandidate',
+        'await uploadAlbumArtManifest',
+      ]
+    ),
+    treatsMissingKeyAsUnavailableWithoutSentry: sourceHasOrderedFragments(
+      chatRouteSource,
+      [
+        'if (error instanceof XaiApiKeyMissingError)',
+        "error: 'Album art generation is temporarily unavailable.'",
+        'Sentry.captureException(error',
+      ]
+    ),
+  };
+
+  const storageFacts = {
+    sanitizesManifestBeforeUpload: textIncludesAll(storageSource, [
+      'sanitizeManifestForUpload',
+      'prompt: null',
+      'candidates: manifest.candidates.map',
+    ]),
+    redactsCandidatePromptsFromManifest: sourceHasOrderedFragments(
+      storageSource,
+      ['candidates: manifest.candidates.map', 'prompt: null']
+    ),
+    usesPublicJpegContentTypes: textIncludesAll(storageSource, [
+      'contentType: params.contentType',
+      "contentType: 'image/jpeg'",
+    ]),
+    failsClosedForMissingProductionBlobToken: textIncludesAll(storageSource, [
+      "env.NODE_ENV === 'production'",
+      "throw new TypeError('Blob storage not configured')",
+    ]),
+  };
+
+  return {
+    target: 'album-art-provider-contract',
+    adapter: 'album-art-provider-contract',
+    costTier: 'deterministic',
+    text: '',
+    selectedModel: null,
+    modelCalled: false,
+    persistenceAttempted: false,
+    dbAttempted: false,
+    networkAttempted: false,
+    providerCase,
+    sourcePaths: {
+      provider: providerSourcePath,
+      chatRoute: chatRouteSourcePath,
+      storage: storageSourcePath,
+    },
+    provider: {
+      facts: providerFacts,
+      missingFacts: Object.entries(providerFacts)
+        .filter(([, passed]) => !passed)
+        .map(([name]) => name),
+      forbiddenSideEffects: providerForbiddenSideEffects,
+    },
+    route: {
+      facts: routeFacts,
+      missingFacts: Object.entries(routeFacts)
+        .filter(([, passed]) => !passed)
+        .map(([name]) => name),
+    },
+    storage: {
+      facts: storageFacts,
+      missingFacts: Object.entries(storageFacts)
+        .filter(([, passed]) => !passed)
+        .map(([name]) => name),
+    },
+    toolCalls: [],
+    toolResults: [],
+    toolExecutions: [],
+  };
+}
+
 function evaluateInsightPromptContract(vars: EvalVars) {
   const promptCase =
     typeof vars.insightPromptCase === 'string'
@@ -7902,6 +8119,7 @@ type EvalCaseSummary = {
   readonly modelScenario: string | null;
   readonly expectedModel: string | null;
   readonly eventCase: string | null;
+  readonly albumArtProviderCase: string | null;
   readonly aiToolPromptCase: string | null;
   readonly chatTitleCase: string | null;
   readonly insightPromptCase: string | null;
@@ -8009,6 +8227,7 @@ function parseEvalCaseSummary(block: string): EvalCaseSummary {
     modelScenario: scalarValue(block, 'modelScenario'),
     expectedModel: scalarValue(block, 'expectedModel'),
     eventCase: scalarValue(block, 'eventCase'),
+    albumArtProviderCase: scalarValue(block, 'albumArtProviderCase'),
     aiToolPromptCase: scalarValue(block, 'aiToolPromptCase'),
     chatTitleCase: scalarValue(block, 'chatTitleCase'),
     insightPromptCase: scalarValue(block, 'insightPromptCase'),
@@ -8238,6 +8457,15 @@ function evaluateEvalCaseInventory(vars: EvalVars) {
       .map(testCase => testCase.accessCase)
       .filter(
         (accessCase): accessCase is string => typeof accessCase === 'string'
+      )
+  );
+  const albumArtProviderCaseNames = uniqueSorted(
+    deterministicCases
+      .filter(testCase => testCase.target === 'album-art-provider-contract')
+      .map(testCase => testCase.albumArtProviderCase)
+      .filter(
+        (albumArtProviderCase): albumArtProviderCase is string =>
+          typeof albumArtProviderCase === 'string'
       )
   );
   const aiToolPromptCaseNames = uniqueSorted(
@@ -8537,6 +8765,12 @@ function evaluateEvalCaseInventory(vars: EvalVars) {
       REQUIRED_TOOL_ACCESS_CASES,
       toolAccessCaseNames
     ),
+    requiredAlbumArtProviderCaseNames: [...REQUIRED_ALBUM_ART_PROVIDER_CASES],
+    albumArtProviderCaseNames,
+    missingAlbumArtProviderCaseNames: missingNames(
+      REQUIRED_ALBUM_ART_PROVIDER_CASES,
+      albumArtProviderCaseNames
+    ),
     requiredAiToolPromptCaseNames: [...REQUIRED_AI_TOOL_PROMPT_CASES],
     aiToolPromptCaseNames,
     missingAiToolPromptCaseNames: missingNames(
@@ -8831,6 +9065,11 @@ export default class JovieChatPromptfooProvider {
 
     if (target === 'skill-prompt-contract') {
       const payload = evaluateSkillPromptContract(vars);
+      return jsonProviderResponse(payload, startedAt);
+    }
+
+    if (target === 'album-art-provider-contract') {
+      const payload = evaluateAlbumArtProviderContract(vars);
       return jsonProviderResponse(payload, startedAt);
     }
 
