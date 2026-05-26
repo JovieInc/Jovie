@@ -462,6 +462,12 @@ function assertMobileRouteRuntimeDisabled(output) {
 function assertNoRoutePersistence(output) {
   const payload = parseOutput(output);
 
+  if (payload.modelCalled !== false) {
+    return fail('route contract should not attempt a model call');
+  }
+  if (payload.selectedModel !== null) {
+    return fail('route contract should not select a model');
+  }
   if (payload.persistenceAttempted !== false) {
     return fail('route contract should not attempt persistence');
   }
@@ -1488,6 +1494,17 @@ function assertDeterministicNoSpend(output) {
   }
   if (payload.persistenceAttempted !== false) {
     return fail('deterministic case attempted persistence');
+  }
+  for (const field of [
+    'dbAttempted',
+    'networkAttempted',
+    'clerkAttempted',
+    'spotifyAttempted',
+    'stripeAttempted',
+  ]) {
+    if (payload[field] === true) {
+      return fail(`deterministic case attempted ${field}`);
+    }
   }
 
   return pass();
@@ -3688,6 +3705,95 @@ function assertInsightPromptContractCovered(output) {
   return pass();
 }
 
+function assertReleaseTaskClassifierContractCovered(output) {
+  const payload = parseOutput(output);
+
+  if (payload.target !== 'release-task-classifier-contract') {
+    return fail(
+      'case did not run through the release-task-classifier-contract adapter'
+    );
+  }
+  if (payload.promptCase !== 'prompt-and-coercion') {
+    return fail(
+      `expected prompt-and-coercion classifier case, got ${String(payload.promptCase)}`
+    );
+  }
+  if (payload.costTier !== 'deterministic') {
+    return fail('release task classifier case is not marked deterministic');
+  }
+  for (const field of [
+    'modelCalled',
+    'persistenceAttempted',
+    'dbAttempted',
+    'networkAttempted',
+  ]) {
+    if (payload[field] !== false) {
+      return fail(`${field} should be false for classifier coverage`);
+    }
+  }
+  if (
+    payload.productionEntrypoint !==
+    'apps/web/lib/release-tasks/classify-task-cluster.ts:classifyTaskCluster'
+  ) {
+    return fail('classifier contract did not use the production entrypoint');
+  }
+
+  const thresholds = payload.classifierThresholds ?? {};
+  if (thresholds.minConfidence !== 0.6) {
+    return fail(
+      `expected min confidence 0.6, got ${String(thresholds.minConfidence)}`
+    );
+  }
+  if (!Array.isArray(payload.clusters) || payload.clusters.length < 3) {
+    return fail('classifier contract missing synthetic clusters');
+  }
+  if (payload.scenarioCount !== 4) {
+    return fail(
+      `expected 4 classifier scenarios, got ${payload.scenarioCount}`
+    );
+  }
+
+  const results = Array.isArray(payload.results) ? payload.results : [];
+  const resultByName = new Map(results.map(result => [result.name, result]));
+  for (const name of [
+    'known-cluster-json',
+    'unknown-cluster-null',
+    'low-confidence-null',
+    'invalid-json-null',
+  ]) {
+    const result = resultByName.get(name);
+    if (!result) {
+      return fail(`missing classifier scenario ${name}`);
+    }
+    if (typeof result.promptLength !== 'number' || result.promptLength < 500) {
+      return fail(`${name} captured prompt was too short`);
+    }
+    const missingFacts = Array.isArray(result.missingPromptFacts)
+      ? result.missingPromptFacts
+      : [];
+    if (missingFacts.length > 0) {
+      return fail(`${name} prompt missing facts: ${missingFacts.join(', ')}`);
+    }
+    const leakPatterns = Array.isArray(result.promptLeakPatterns)
+      ? result.promptLeakPatterns
+      : [];
+    if (leakPatterns.length > 0) {
+      return fail(`${name} prompt leaked patterns: ${leakPatterns.join(', ')}`);
+    }
+  }
+
+  const missingResultFacts = Array.isArray(payload.missingResultFacts)
+    ? payload.missingResultFacts
+    : [];
+  if (missingResultFacts.length > 0) {
+    return fail(
+      `classifier result missing facts: ${missingResultFacts.join(', ')}`
+    );
+  }
+
+  return pass();
+}
+
 function firstEvent(payload) {
   return Array.isArray(payload.events) ? payload.events[0] : undefined;
 }
@@ -4248,6 +4354,7 @@ function assertEvalCaseInventoryCovered(output) {
     'missingToolAccessCaseNames',
     'missingAiToolPromptCaseNames',
     'missingInsightPromptCaseNames',
+    'missingReleaseTaskClassifierCaseNames',
     'missingSkillArtifactCaseNames',
     'missingSkillCatalogCaseNames',
     'missingSkillCommandCaseNames',
@@ -4384,6 +4491,7 @@ module.exports = {
   assertSkillPromptContractCovered,
   assertAiToolPromptContractCovered,
   assertInsightPromptContractCovered,
+  assertReleaseTaskClassifierContractCovered,
   assertSkillRegistryInventoryCovered,
   assertToolEventInventoryCovered,
   assertToolEventHydratesSuccess,
