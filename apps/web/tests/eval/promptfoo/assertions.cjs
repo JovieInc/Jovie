@@ -3237,6 +3237,97 @@ function assertSkillArtifactContractCovered(output) {
   return pass();
 }
 
+function assertSkillCatalogSyncContractCovered(output) {
+  const payload = parseOutput(output);
+
+  if (payload.target !== 'skill-catalog-sync-contract') {
+    return fail(
+      'case did not run through the skill-catalog-sync-contract adapter'
+    );
+  }
+  if (payload.costTier !== 'deterministic') {
+    return fail('skill catalog sync case is not marked deterministic');
+  }
+  for (const field of [
+    'modelCalled',
+    'persistenceAttempted',
+    'dbAttempted',
+    'networkAttempted',
+  ]) {
+    if (payload[field] !== false) {
+      return fail(`${field} should be false for skill catalog sync coverage`);
+    }
+  }
+  if (!Array.isArray(payload.catalogRows)) {
+    return fail('skill catalog sync contract missing catalogRows');
+  }
+  if (payload.catalogRows.length === 0) {
+    return fail('skill catalog sync contract found no deployed skills');
+  }
+
+  for (const flag of [
+    'syncScriptPathExists',
+    'syncScriptReferencesRegistry',
+    'syncScriptReferencesSkillsCatalog',
+    'syncScriptReferencesToolsCatalog',
+    'syncScriptUsesConflictUpsert',
+    'syncScriptUsesSkipFlag',
+    'postbuildRunsCatalogSync',
+  ]) {
+    if (payload[flag] !== true) {
+      return fail(`skill catalog sync contract missing ${flag}`);
+    }
+  }
+
+  for (const field of [
+    'missingExpectedSkillIds',
+    'unknownExpectedSkillIds',
+    'invalidCatalogRowSkillIds',
+    'nonSerializableMetadataSkillIds',
+    'missingRequiredSyncFieldSkillIds',
+  ]) {
+    const values = payload[field];
+    if (!Array.isArray(values)) {
+      return fail(`skill catalog sync contract missing ${field}`);
+    }
+    if (values.length > 0) {
+      return fail(`${field}: ${values.join(', ')}`);
+    }
+  }
+
+  const schemaErrorsBySkill = payload.schemaErrorsBySkill ?? {};
+  if (
+    !schemaErrorsBySkill ||
+    typeof schemaErrorsBySkill !== 'object' ||
+    Array.isArray(schemaErrorsBySkill)
+  ) {
+    return fail('skill catalog sync contract missing schema error detail map');
+  }
+  for (const [skillId, errors] of Object.entries(schemaErrorsBySkill)) {
+    if (Array.isArray(errors) && errors.length > 0) {
+      return fail(`${skillId} catalog schema errors: ${errors.join(', ')}`);
+    }
+  }
+
+  const missingFieldsBySkill = payload.missingRequiredSyncFieldsBySkill ?? {};
+  if (
+    !missingFieldsBySkill ||
+    typeof missingFieldsBySkill !== 'object' ||
+    Array.isArray(missingFieldsBySkill)
+  ) {
+    return fail(
+      'skill catalog sync contract missing required-field detail map'
+    );
+  }
+  for (const [skillId, fields] of Object.entries(missingFieldsBySkill)) {
+    if (Array.isArray(fields) && fields.length > 0) {
+      return fail(`${skillId} missing sync fields: ${fields.join(', ')}`);
+    }
+  }
+
+  return pass();
+}
+
 function assertSkillCommandContractCovered(output) {
   const payload = parseOutput(output);
 
@@ -3863,6 +3954,7 @@ function assertEvalCaseInventoryCovered(output) {
     'missingPromptContextCaseNames',
     'missingToolAccessCaseNames',
     'missingSkillArtifactCaseNames',
+    'missingSkillCatalogCaseNames',
     'missingSkillCommandCaseNames',
     'missingSkillRegistryCaseNames',
     'missingOnboardingStateCaseNames',
@@ -3991,6 +4083,7 @@ module.exports = {
   assertToolUiRegistryCovered,
   assertSlashSkillVisibilityCovered,
   assertSkillArtifactContractCovered,
+  assertSkillCatalogSyncContractCovered,
   assertSkillCommandContractCovered,
   assertSkillRegistryInventoryCovered,
   assertToolEventInventoryCovered,

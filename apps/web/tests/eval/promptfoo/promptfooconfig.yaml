@@ -1566,6 +1566,23 @@ tests:
       - type: javascript
         value: file://assertions.cjs:assertSkillArtifactContractCovered
 
+  - description: AI skill catalog sync shape maps to DB mirror rows
+    metadata:
+      cost: deterministic
+    vars:
+      input: "AI skill catalog sync contract check"
+      target: skill-catalog-sync-contract
+      skillCatalogCase: catalog-sync-shape
+      coverage:
+        expectedSkillIds:
+          - generateReleasePitch
+          - retouch
+    assert:
+      - type: javascript
+        value: file://assertions.cjs:assertDeterministicNoSpend
+      - type: javascript
+        value: file://assertions.cjs:assertSkillCatalogSyncContractCovered
+
   - description: AI skill commands round-trip through slash and cmdk surfaces
     metadata:
       cost: deterministic
