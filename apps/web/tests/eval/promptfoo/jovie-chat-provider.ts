@@ -88,6 +88,10 @@ import {
   buildVideoGenerationPrompt,
 } from '@/lib/services/canvas/prompts';
 import type { CanvasGenerationInput } from '@/lib/services/canvas/types';
+import {
+  buildSystemPrompt as buildInsightSystemPrompt,
+  buildUserPrompt as buildInsightUserPrompt,
+} from '@/lib/services/insights/prompts';
 import { buildWelcomeMessage } from '@/lib/services/onboarding/welcome-message';
 import {
   buildPitchDraftSystemPrompt,
@@ -100,6 +104,7 @@ import { type PitchInput, PLATFORM_LIMITS } from '@/lib/services/pitch/types';
 import { detectPlatform } from '@/lib/utils/platform-detection/detector';
 import { validateSocialLinkUrl } from '@/lib/utils/url-validation';
 import { httpUrlSchema } from '@/lib/validation/schemas/base';
+import type { MetricSnapshot } from '@/types/insights';
 import {
   buildTestArtistContext,
   buildTestReleases,
@@ -111,6 +116,7 @@ type EvalTarget =
   | 'chat-confirm-route'
   | 'chat-turn'
   | 'eval-case-inventory'
+  | 'insight-prompt-contract'
   | 'knowledge-contract'
   | 'model-contract'
   | 'mobile-chat-route'
@@ -565,6 +571,7 @@ const REQUIRED_SKILL_COMMAND_CASES = ['command-inventory'] as const;
 const REQUIRED_SKILL_PROMPT_CASES = ['release-pitch-retouch-prompts'] as const;
 const REQUIRED_SKILL_REGISTRY_CASES = ['registry-inventory'] as const;
 const REQUIRED_AI_TOOL_PROMPT_CASES = ['album-art-canvas-bio-prompts'] as const;
+const REQUIRED_INSIGHT_PROMPT_CASES = ['analytics-grounding-prompts'] as const;
 const AI_TOOL_PROMPT_TOOL_NAMES = [
   'generateAlbumArt',
   'generateCanvasPlan',
@@ -705,6 +712,7 @@ function toTarget(value: unknown): EvalTarget {
     value === 'ai-tool-prompt-contract' ||
     value === 'chat-confirm-route' ||
     value === 'eval-case-inventory' ||
+    value === 'insight-prompt-contract' ||
     value === 'knowledge-contract' ||
     value === 'mobile-chat-route' ||
     value === 'model-contract' ||
@@ -5294,6 +5302,148 @@ function buildEvalPitchInput(): PitchInput {
   };
 }
 
+function buildEvalInsightMetrics(): MetricSnapshot {
+  return {
+    period: {
+      start: new Date('2026-04-01T00:00:00.000Z'),
+      end: new Date('2026-04-30T00:00:00.000Z'),
+    },
+    comparisonPeriod: {
+      start: new Date('2026-03-01T00:00:00.000Z'),
+      end: new Date('2026-03-31T00:00:00.000Z'),
+    },
+    geographic: {
+      currentTopCities: [
+        { city: 'Portland', country: 'US', count: 840 },
+        { city: 'Austin', country: 'US', count: 410 },
+      ],
+      previousTopCities: [
+        { city: 'Portland', country: 'US', count: 520 },
+        { city: 'Seattle', country: 'US', count: 310 },
+      ],
+      cityGrowthRates: [
+        {
+          city: 'Portland',
+          country: 'US',
+          currentCount: 840,
+          previousCount: 520,
+          growthPct: 61.5,
+        },
+      ],
+      newCities: [{ city: 'Austin', country: 'US', count: 410 }],
+      decliningCities: [{ city: 'Seattle', country: 'US', declinePct: 28.4 }],
+    },
+    traffic: {
+      totalClicksCurrent: 2400,
+      totalClicksPrevious: 1680,
+      uniqueVisitorsCurrent: 1750,
+      uniqueVisitorsPrevious: 1210,
+      profileViewsCurrent: 3420,
+      profileViewsPrevious: 2290,
+    },
+    subscribers: {
+      newSubscribersCurrent: 184,
+      newSubscribersPrevious: 92,
+      unsubscribesCurrent: 9,
+      unsubscribesPrevious: 6,
+      totalActive: 960,
+      subscriberCities: [
+        { city: 'Portland', count: 180 },
+        { city: 'Austin', count: 74 },
+      ],
+    },
+    revenue: {
+      totalTipsCurrent: 82_500,
+      totalTipsPrevious: 46_000,
+      tipCountCurrent: 33,
+      tipCountPrevious: 18,
+      tipsByCity: [{ city: 'Portland', totalCents: 38_000, count: 14 }],
+      averageTipCurrent: 2500,
+      averageTipPrevious: 2555,
+    },
+    content: {
+      clicksByLinkType: [
+        { linkType: 'spotify', current: 920, previous: 610 },
+        { linkType: 'merch', current: 280, previous: 115 },
+      ],
+      recentReleases: [
+        {
+          id: '00000000-0000-4000-8000-00000000feed',
+          title: 'Neon Reef',
+          releaseDate: '2026-04-18',
+          clickCount: 740,
+        },
+      ],
+    },
+    tour: {
+      upcomingShows: [
+        {
+          city: 'Portland',
+          country: 'US',
+          date: '2026-05-20',
+          venueName: 'Synthetic Hall',
+        },
+      ],
+      audienceCitiesWithoutShows: [
+        { city: 'Austin', country: 'US', audienceCount: 410 },
+      ],
+    },
+    engagement: {
+      intentDistributionCurrent: [
+        { level: 'high', count: 220 },
+        { level: 'medium', count: 480 },
+      ],
+      intentDistributionPrevious: [
+        { level: 'high', count: 120 },
+        { level: 'medium', count: 360 },
+      ],
+      deviceDistribution: [
+        { deviceType: 'mobile', count: 1380 },
+        { deviceType: 'desktop', count: 370 },
+      ],
+      captureRateCurrent: 0.105,
+      captureRatePrevious: 0.076,
+    },
+    referrers: {
+      topReferrersCurrent: [
+        { referrer: 'instagram', count: 690 },
+        { referrer: 'spotify', count: 420 },
+      ],
+      topReferrersPrevious: [
+        { referrer: 'instagram', count: 390 },
+        { referrer: 'spotify', count: 310 },
+      ],
+      referrerGrowthRates: [
+        {
+          referrer: 'instagram',
+          currentCount: 690,
+          previousCount: 390,
+          growthPct: 76.9,
+        },
+      ],
+    },
+    temporal: {
+      clicksByHour: [
+        { hour: 20, count: 260 },
+        { hour: 21, count: 310 },
+      ],
+      clicksByDayOfWeek: [
+        { day: 5, count: 510 },
+        { day: 6, count: 460 },
+      ],
+    },
+    profile: {
+      displayName: 'Luna Waves',
+      genres: ['ambient electronic', 'downtempo'],
+      spotifyFollowers: 12_500,
+      spotifyPopularity: 45,
+      creatorType: 'artist',
+      totalAudienceMembers: 1840,
+      totalSubscribers: 960,
+    },
+  };
+}
+
 function textIncludesAll(text: string, needles: readonly string[]): boolean {
   const normalizedText = text.toLowerCase();
   return needles.every(needle => normalizedText.includes(needle.toLowerCase()));
@@ -5638,6 +5788,133 @@ function evaluateAiToolPromptContract(vars: EvalVars) {
         .map(([name]) => name),
       leakPatterns: promptLeakPatterns(combinedBioText),
     },
+    toolCalls: [],
+    toolResults: [],
+    toolExecutions: [],
+  };
+}
+
+function evaluateInsightPromptContract(vars: EvalVars) {
+  const promptCase =
+    typeof vars.insightPromptCase === 'string'
+      ? vars.insightPromptCase
+      : 'analytics-grounding-prompts';
+  const metrics = buildEvalInsightMetrics();
+  const existingInsightTypes = ['platform_preference', 'tour_gap'];
+  const systemPrompt = buildInsightSystemPrompt();
+  const userPrompt = buildInsightUserPrompt(metrics, existingInsightTypes);
+  const combinedPrompt = `${systemPrompt}\n${userPrompt}`;
+  const systemFacts = {
+    requiresGroundedMetrics: textIncludesAll(systemPrompt, [
+      'directly supported by the provided data',
+      'Never fabricate or estimate numbers',
+      'specific metrics',
+    ]),
+    requiresSparseDataAbstention: textIncludesAll(systemPrompt, [
+      'too sparse',
+      '10+ events',
+    ]),
+    enforcesConfidenceBounds: textIncludesAll(systemPrompt, [
+      '0.50 and 1.00',
+      '0.85+',
+      '0.50-0.70',
+    ]),
+    capsInsightCountAndExpiry: textIncludesAll(systemPrompt, [
+      'Maximum 8 insights',
+      'expiresInDays',
+      '7 for high priority',
+      '14 for medium',
+      '30 for low priority',
+    ]),
+    staysMusicianActionable: textIncludesAll(systemPrompt, [
+      'music artists',
+      'touring',
+      'promotion',
+      'fan engagement',
+      'concrete, achievable',
+    ]),
+    enumeratesAllowedInsightTypes: textIncludesAll(systemPrompt, [
+      'city_growth',
+      'subscriber_surge',
+      'release_momentum',
+      'platform_preference',
+      'tip_hotspot',
+      'capture_rate_change',
+    ]),
+  };
+  const userFacts = {
+    includesSyntheticProfileContext: textIncludesAll(userPrompt, [
+      'Luna Waves',
+      'artist',
+      'ambient electronic',
+      'downtempo',
+    ]),
+    includesAudienceAndFollowerMetrics:
+      textIncludesAll(userPrompt, [
+        'Spotify followers',
+        'Total audience members',
+        'Total subscribers',
+      ]) &&
+      textIncludesNumericValue(userPrompt, 12_500) &&
+      textIncludesNumericValue(userPrompt, 1840) &&
+      textIncludesNumericValue(userPrompt, 960),
+    includesAnalysisWindows: textIncludesAll(userPrompt, [
+      '2026-04-01 to 2026-04-30',
+      '2026-03-01 to 2026-03-31',
+    ]),
+    includesExactJsonMetrics: textIncludesAll(userPrompt, [
+      '"totalClicksCurrent": 2400',
+      '"profileViewsCurrent": 3420',
+      '"captureRateCurrent": 0.105',
+      '"growthPct": 76.9',
+      '"title": "Neon Reef"',
+    ]),
+    suppressesDuplicateInsightTypes: textIncludesAll(userPrompt, [
+      'RECENTLY GENERATED',
+      'platform_preference',
+      'tour_gap',
+    ]),
+    requestsStructuredInsights: textIncludesAll(userPrompt, [
+      'Return a JSON array of insight objects',
+    ]),
+  };
+
+  return {
+    target: 'insight-prompt-contract',
+    adapter: 'insight-prompt-contract',
+    costTier: 'deterministic',
+    text: '',
+    selectedModel: null,
+    modelCalled: false,
+    persistenceAttempted: false,
+    dbAttempted: false,
+    networkAttempted: false,
+    promptCase,
+    promptLengths: {
+      system: systemPrompt.length,
+      user: userPrompt.length,
+    },
+    existingInsightTypes,
+    metricsProfile: {
+      displayName: metrics.profile.displayName,
+      creatorType: metrics.profile.creatorType,
+      spotifyFollowers: metrics.profile.spotifyFollowers,
+      totalAudienceMembers: metrics.profile.totalAudienceMembers,
+      totalSubscribers: metrics.profile.totalSubscribers,
+    },
+    system: {
+      facts: systemFacts,
+      missingFacts: Object.entries(systemFacts)
+        .filter(([, passed]) => !passed)
+        .map(([name]) => name),
+    },
+    user: {
+      facts: userFacts,
+      missingFacts: Object.entries(userFacts)
+        .filter(([, passed]) => !passed)
+        .map(([name]) => name),
+    },
+    leakPatterns: promptLeakPatterns(combinedPrompt),
     toolCalls: [],
     toolResults: [],
     toolExecutions: [],
@@ -6489,6 +6766,7 @@ type EvalCaseSummary = {
   readonly expectedModel: string | null;
   readonly eventCase: string | null;
   readonly aiToolPromptCase: string | null;
+  readonly insightPromptCase: string | null;
   readonly knowledgeCase: string | null;
   readonly promptCase: string | null;
   readonly renderCase: string | null;
@@ -6590,6 +6868,7 @@ function parseEvalCaseSummary(block: string): EvalCaseSummary {
     expectedModel: scalarValue(block, 'expectedModel'),
     eventCase: scalarValue(block, 'eventCase'),
     aiToolPromptCase: scalarValue(block, 'aiToolPromptCase'),
+    insightPromptCase: scalarValue(block, 'insightPromptCase'),
     knowledgeCase: scalarValue(block, 'knowledgeCase'),
     promptCase: scalarValue(block, 'promptCase'),
     renderCase: scalarValue(block, 'renderCase'),
@@ -6818,6 +7097,15 @@ function evaluateEvalCaseInventory(vars: EvalVars) {
       .filter(
         (aiToolPromptCase): aiToolPromptCase is string =>
           typeof aiToolPromptCase === 'string'
+      )
+  );
+  const insightPromptCaseNames = uniqueSorted(
+    deterministicCases
+      .filter(testCase => testCase.target === 'insight-prompt-contract')
+      .map(testCase => testCase.insightPromptCase)
+      .filter(
+        (insightPromptCase): insightPromptCase is string =>
+          typeof insightPromptCase === 'string'
       )
   );
   const skillArtifactCaseNames = uniqueSorted(
@@ -7055,6 +7343,12 @@ function evaluateEvalCaseInventory(vars: EvalVars) {
     missingAiToolPromptCaseNames: missingNames(
       REQUIRED_AI_TOOL_PROMPT_CASES,
       aiToolPromptCaseNames
+    ),
+    requiredInsightPromptCaseNames: [...REQUIRED_INSIGHT_PROMPT_CASES],
+    insightPromptCaseNames,
+    missingInsightPromptCaseNames: missingNames(
+      REQUIRED_INSIGHT_PROMPT_CASES,
+      insightPromptCaseNames
     ),
     requiredSkillArtifactCaseNames: [...REQUIRED_SKILL_ARTIFACT_CASES],
     skillArtifactCaseNames,
@@ -7346,6 +7640,16 @@ export default class JovieChatPromptfooProvider {
 
     if (target === 'ai-tool-prompt-contract') {
       const payload = evaluateAiToolPromptContract(vars);
+      return {
+        output: JSON.stringify(payload),
+        raw: payload,
+        format: 'json',
+        latencyMs: Date.now() - startedAt,
+      };
+    }
+
+    if (target === 'insight-prompt-contract') {
+      const payload = evaluateInsightPromptContract(vars);
       return {
         output: JSON.stringify(payload),
         raw: payload,

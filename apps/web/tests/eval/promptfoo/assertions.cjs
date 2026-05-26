@@ -3608,6 +3608,86 @@ function assertAiToolPromptContractCovered(output) {
   return pass();
 }
 
+function assertInsightPromptContractCovered(output) {
+  const payload = parseOutput(output);
+
+  if (payload.target !== 'insight-prompt-contract') {
+    return fail('case did not run through the insight-prompt-contract adapter');
+  }
+  if (payload.promptCase !== 'analytics-grounding-prompts') {
+    return fail(
+      `expected analytics-grounding-prompts prompt case, got ${String(payload.promptCase)}`
+    );
+  }
+  if (payload.costTier !== 'deterministic') {
+    return fail('insight prompt case is not marked deterministic');
+  }
+  for (const field of [
+    'modelCalled',
+    'persistenceAttempted',
+    'dbAttempted',
+    'networkAttempted',
+  ]) {
+    if (payload[field] !== false) {
+      return fail(`${field} should be false for insight prompt coverage`);
+    }
+  }
+
+  const promptLengths = payload.promptLengths ?? {};
+  if (typeof promptLengths.system !== 'number' || promptLengths.system < 1000) {
+    return fail('insight system prompt is too short');
+  }
+  if (typeof promptLengths.user !== 'number' || promptLengths.user < 2500) {
+    return fail('insight user prompt is too short');
+  }
+
+  const profile = payload.metricsProfile ?? {};
+  if (profile.displayName !== 'Luna Waves') {
+    return fail('insight metrics profile did not use synthetic artist');
+  }
+  if (profile.spotifyFollowers !== 12500) {
+    return fail('insight metrics profile lost synthetic follower count');
+  }
+  if (profile.totalSubscribers !== 960) {
+    return fail('insight metrics profile lost subscriber count');
+  }
+
+  for (const [name, section] of Object.entries({
+    system: payload.system,
+    user: payload.user,
+  })) {
+    if (!section || typeof section !== 'object') {
+      return fail(`insight prompt missing ${name} section`);
+    }
+    const missingFacts = Array.isArray(section.missingFacts)
+      ? section.missingFacts
+      : [];
+    if (missingFacts.length > 0) {
+      return fail(
+        `insight ${name} prompt missing facts: ${missingFacts.join(', ')}`
+      );
+    }
+  }
+
+  const existingInsightTypes = Array.isArray(payload.existingInsightTypes)
+    ? payload.existingInsightTypes
+    : [];
+  for (const insightType of ['platform_preference', 'tour_gap']) {
+    if (!existingInsightTypes.includes(insightType)) {
+      return fail(`missing duplicate suppression type ${insightType}`);
+    }
+  }
+
+  const leakPatterns = Array.isArray(payload.leakPatterns)
+    ? payload.leakPatterns
+    : [];
+  if (leakPatterns.length > 0) {
+    return fail(`insight prompt leaked patterns: ${leakPatterns.join(', ')}`);
+  }
+
+  return pass();
+}
+
 function firstEvent(payload) {
   return Array.isArray(payload.events) ? payload.events[0] : undefined;
 }
@@ -4167,6 +4247,7 @@ function assertEvalCaseInventoryCovered(output) {
     'missingPromptContextCaseNames',
     'missingToolAccessCaseNames',
     'missingAiToolPromptCaseNames',
+    'missingInsightPromptCaseNames',
     'missingSkillArtifactCaseNames',
     'missingSkillCatalogCaseNames',
     'missingSkillCommandCaseNames',
@@ -4302,6 +4383,7 @@ module.exports = {
   assertSkillCommandContractCovered,
   assertSkillPromptContractCovered,
   assertAiToolPromptContractCovered,
+  assertInsightPromptContractCovered,
   assertSkillRegistryInventoryCovered,
   assertToolEventInventoryCovered,
   assertToolEventHydratesSuccess,
