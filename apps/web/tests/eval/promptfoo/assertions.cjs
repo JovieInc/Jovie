@@ -3871,6 +3871,89 @@ function assertOnboardingSystemPromptContractCovered(output) {
   return pass();
 }
 
+function assertChatTitleContractCovered(output) {
+  const payload = parseOutput(output);
+
+  if (payload.target !== 'chat-title-contract') {
+    return fail('case did not run through the chat-title-contract adapter');
+  }
+  if (payload.titleCase !== 'prompt-and-fallback') {
+    return fail(
+      `expected prompt-and-fallback title case, got ${String(payload.titleCase)}`
+    );
+  }
+  if (payload.costTier !== 'deterministic') {
+    return fail('chat title case is not marked deterministic');
+  }
+  for (const field of [
+    'modelCalled',
+    'persistenceAttempted',
+    'dbAttempted',
+    'networkAttempted',
+  ]) {
+    if (payload[field] !== false) {
+      return fail(`${field} should be false for chat title coverage`);
+    }
+  }
+  if (
+    payload.productionEntrypoint !==
+    'apps/web/app/api/chat/conversations/[id]/messages/route.ts:maybeGenerateTitle'
+  ) {
+    return fail('chat title contract did not inspect the production route');
+  }
+  if (payload.titleModel !== 'google/gemini-2.0-flash') {
+    return fail(`unexpected title model: ${String(payload.titleModel)}`);
+  }
+  if (
+    typeof payload.routeSourceLength !== 'number' ||
+    payload.routeSourceLength < 5000
+  ) {
+    return fail('chat title route source was unexpectedly short');
+  }
+  if (
+    typeof payload.systemPromptLength !== 'number' ||
+    payload.systemPromptLength < 100
+  ) {
+    return fail('chat title system prompt was unexpectedly short');
+  }
+  if (payload.guardedNullUpdateCount < 2) {
+    return fail('chat title route did not guard both title update paths');
+  }
+
+  for (const field of ['missingSourceFacts', 'missingRuntimeFacts']) {
+    const values = Array.isArray(payload[field]) ? payload[field] : null;
+    if (!values) {
+      return fail(`chat title contract missing ${field}`);
+    }
+    if (values.length > 0) {
+      return fail(`${field}: ${values.join(', ')}`);
+    }
+  }
+
+  const synthetic = payload.synthetic ?? {};
+  if (synthetic.generatedTitle !== 'Neon Reef Launch Plan') {
+    return fail('synthetic generated title was not sanitized');
+  }
+  if (
+    typeof synthetic.fallbackTitle !== 'string' ||
+    synthetic.fallbackTitle.length > 50 ||
+    !synthetic.fallbackTitle.endsWith('...')
+  ) {
+    return fail('synthetic fallback title was not truncated safely');
+  }
+
+  const leakPatterns = Array.isArray(payload.promptLeakPatterns)
+    ? payload.promptLeakPatterns
+    : [];
+  if (leakPatterns.length > 0) {
+    return fail(
+      `chat title prompt leaked patterns: ${leakPatterns.join(', ')}`
+    );
+  }
+
+  return pass();
+}
+
 function firstEvent(payload) {
   return Array.isArray(payload.events) ? payload.events[0] : undefined;
 }
@@ -4430,6 +4513,7 @@ function assertEvalCaseInventoryCovered(output) {
     'missingPromptContextCaseNames',
     'missingToolAccessCaseNames',
     'missingAiToolPromptCaseNames',
+    'missingChatTitleCaseNames',
     'missingInsightPromptCaseNames',
     'missingOnboardingSystemPromptCaseNames',
     'missingReleaseTaskClassifierCaseNames',
@@ -4568,6 +4652,7 @@ module.exports = {
   assertSkillCommandContractCovered,
   assertSkillPromptContractCovered,
   assertAiToolPromptContractCovered,
+  assertChatTitleContractCovered,
   assertInsightPromptContractCovered,
   assertOnboardingSystemPromptContractCovered,
   assertReleaseTaskClassifierContractCovered,

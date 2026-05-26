@@ -1665,6 +1665,19 @@ tests:
       - type: javascript
         value: file://assertions.cjs:assertOnboardingSystemPromptContractCovered
 
+  - description: Chat title generation preserves low-cost prompt and fallback
+    metadata:
+      cost: deterministic
+    vars:
+      input: "Chat title generation contract check"
+      target: chat-title-contract
+      chatTitleCase: prompt-and-fallback
+    assert:
+      - type: javascript
+        value: file://assertions.cjs:assertDeterministicNoSpend
+      - type: javascript
+        value: file://assertions.cjs:assertChatTitleContractCovered
+
   - description: Release task classifier uses stubbed prompt and coercion path
     metadata:
       cost: deterministic
