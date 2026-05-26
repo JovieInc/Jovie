@@ -4151,6 +4151,76 @@ function assertOnboardingSystemPromptContractCovered(output) {
   return pass();
 }
 
+function assertAlbumArtProviderContractCovered(output) {
+  const payload = parseOutput(output);
+
+  if (payload.target !== 'album-art-provider-contract') {
+    return fail(
+      'case did not run through the album-art-provider-contract adapter'
+    );
+  }
+  if (payload.providerCase !== 'xai-provider-source-contract') {
+    return fail(
+      `expected xai-provider-source-contract provider case, got ${String(payload.providerCase)}`
+    );
+  }
+  if (payload.costTier !== 'deterministic') {
+    return fail('album-art provider case is not marked deterministic');
+  }
+  for (const field of [
+    'modelCalled',
+    'persistenceAttempted',
+    'dbAttempted',
+    'networkAttempted',
+  ]) {
+    if (payload[field] !== false) {
+      return fail(`${field} should be false for album-art provider coverage`);
+    }
+  }
+
+  const sourcePaths = payload.sourcePaths ?? {};
+  for (const field of ['provider', 'chatRoute', 'storage']) {
+    if (
+      typeof sourcePaths[field] !== 'string' ||
+      sourcePaths[field].length < 1
+    ) {
+      return fail(`album-art provider contract missing source path: ${field}`);
+    }
+  }
+
+  for (const sectionName of ['provider', 'route', 'storage']) {
+    const section = payload[sectionName] ?? {};
+    if (!section || typeof section !== 'object') {
+      return fail(`album-art provider contract missing ${sectionName} section`);
+    }
+    const missingFacts = Array.isArray(section.missingFacts)
+      ? section.missingFacts
+      : null;
+    if (!missingFacts) {
+      return fail(`${sectionName} section missing missingFacts`);
+    }
+    if (missingFacts.length > 0) {
+      return fail(`${sectionName} missing facts: ${missingFacts.join(', ')}`);
+    }
+  }
+
+  const forbiddenSideEffects = Array.isArray(
+    payload.provider?.forbiddenSideEffects
+  )
+    ? payload.provider.forbiddenSideEffects
+    : null;
+  if (!forbiddenSideEffects) {
+    return fail('provider section missing forbiddenSideEffects');
+  }
+  if (forbiddenSideEffects.length > 0) {
+    return fail(
+      `provider source has forbidden side effects: ${forbiddenSideEffects.join(', ')}`
+    );
+  }
+
+  return pass();
+}
+
 function assertChatTitleContractCovered(output) {
   const payload = parseOutput(output);
 
@@ -4792,6 +4862,7 @@ function assertEvalCaseInventoryCovered(output) {
     'missingKnowledgeCaseNames',
     'missingPromptContextCaseNames',
     'missingToolAccessCaseNames',
+    'missingAlbumArtProviderCaseNames',
     'missingAiToolPromptCaseNames',
     'missingChatTitleCaseNames',
     'missingInsightPromptCaseNames',
@@ -4933,6 +5004,7 @@ module.exports = {
   assertSkillCatalogSyncContractCovered,
   assertSkillCommandContractCovered,
   assertSkillPromptContractCovered,
+  assertAlbumArtProviderContractCovered,
   assertAiToolPromptContractCovered,
   assertChatTitleContractCovered,
   assertInsightPromptContractCovered,

@@ -1639,6 +1639,19 @@ tests:
       - type: javascript
         value: file://assertions.cjs:assertAiToolPromptContractCovered
 
+  - description: Album-art image provider contract is cost-gated and source-safe
+    metadata:
+      cost: deterministic
+    vars:
+      input: "Album-art provider contract check"
+      target: album-art-provider-contract
+      albumArtProviderCase: xai-provider-source-contract
+    assert:
+      - type: javascript
+        value: file://assertions.cjs:assertDeterministicNoSpend
+      - type: javascript
+        value: file://assertions.cjs:assertAlbumArtProviderContractCovered
+
   - description: AI insight prompt builders require grounded analytics
     metadata:
       cost: deterministic
