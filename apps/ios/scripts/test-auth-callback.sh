@@ -103,6 +103,20 @@ NODE
   return 1
 }
 
+require_publishable_key() {
+  local web_base_url="$1"
+  local publishable_key
+
+  publishable_key="$(resolve_publishable_key "$web_base_url" || true)"
+  if [[ -z "$publishable_key" ]]; then
+    echo "Unable to run iOS auth smoke without a real Clerk publishable key." >&2
+    echo "Set CLERK_PUBLISHABLE_KEY/NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY, start WEB_BASE_URL, or ensure Doppler dev is available." >&2
+    return 1
+  fi
+
+  printf '%s' "$publishable_key"
+}
+
 run_real_browser_auth_simulator_test() {
   local api_base_url="${API_BASE_URL:-}"
   local web_base_url="${WEB_BASE_URL:-}"
@@ -111,7 +125,7 @@ run_real_browser_auth_simulator_test() {
   require_https_url "WEB_BASE_URL" "$web_base_url"
 
   local publishable_key
-  publishable_key="$(resolve_publishable_key "$web_base_url")"
+  publishable_key="$(require_publishable_key "$web_base_url")"
   export CLERK_PUBLISHABLE_KEY="$publishable_key"
   export NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY="$publishable_key"
   export API_BASE_URL="$api_base_url"
@@ -146,7 +160,7 @@ run_live_auth_simulator_smoke() {
   local publishable_key
   local callback_response
 
-  publishable_key="$(resolve_publishable_key "$web_base_url")"
+  publishable_key="$(require_publishable_key "$web_base_url")"
 
   echo "Creating dev native auth callback against $api_base_url..."
   callback_response="$(
