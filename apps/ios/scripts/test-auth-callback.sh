@@ -108,7 +108,7 @@ require_publishable_key() {
   local publishable_key
 
   publishable_key="$(resolve_publishable_key "$web_base_url" || true)"
-  if [[ -z "$publishable_key" ]]; then
+  if [[ -z "$publishable_key" || "$publishable_key" == "pk_test_ci_placeholder" ]]; then
     echo "Unable to run iOS auth smoke without a real Clerk publishable key." >&2
     echo "Set CLERK_PUBLISHABLE_KEY/NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY, start WEB_BASE_URL, or ensure Doppler dev is available." >&2
     return 1
