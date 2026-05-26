@@ -91,6 +91,7 @@ type EvalTarget =
   | 'onboarding-state-contract'
   | 'onboarding-tool-sequence-contract'
   | 'prompt-context-contract'
+  | 'skill-artifact-contract'
   | 'skill-registry-inventory'
   | 'tool-access-contract'
   | 'tool-contract'
@@ -528,6 +529,7 @@ const REQUIRED_PROMPT_CONTEXT_CASES = [
   'release-overflow-cap',
 ] as const;
 const REQUIRED_TOOL_ACCESS_CASES = ['billing-mode-matrix'] as const;
+const REQUIRED_SKILL_ARTIFACT_CASES = ['artifact-inventory'] as const;
 const REQUIRED_SKILL_REGISTRY_CASES = ['registry-inventory'] as const;
 const CHAT_SLASH_SKILL_NAMES = commandsForSurface('chat-slash')
   .filter(command => command.kind === 'skill')
@@ -551,6 +553,9 @@ const HIDDEN_TOOL_REASONS = HIDDEN_TOOL_NAMES.reduce<Record<string, string>>(
   {}
 );
 const SKILL_REGISTRY_IDS = Object.keys(SKILL_REGISTRY).sort();
+const ALL_EVAL_TOOL_NAME_SET = new Set<string>(ALL_EVAL_TOOL_NAMES);
+const PAID_TOOL_NAME_SET = new Set<string>(PAID_TOOL_NAMES);
+const TOOL_UI_REGISTRY_NAME_SET = new Set<string>(TOOL_UI_REGISTRY_NAMES);
 const TOOL_RESULT_REQUIRED_KEYS: Record<string, readonly string[]> = {
   checkCanvasStatus: ['success', 'summary', 'releases'],
   checkHandle: ['action', 'handle', 'available', 'summary'],
@@ -626,6 +631,12 @@ function toObject(value: unknown): Record<string, unknown> {
     : {};
 }
 
+function toStringArray(value: unknown): string[] {
+  return Array.isArray(value)
+    ? value.filter((item): item is string => typeof item === 'string')
+    : [];
+}
+
 function toPlanId(value: unknown): PlanId {
   if (value === undefined) {
     return 'pro';
@@ -658,6 +669,7 @@ function toTarget(value: unknown): EvalTarget {
     value === 'onboarding-state-contract' ||
     value === 'onboarding-tool-sequence-contract' ||
     value === 'prompt-context-contract' ||
+    value === 'skill-artifact-contract' ||
     value === 'skill-registry-inventory' ||
     value === 'tool-access-contract' ||
     value === 'tool-contract' ||
@@ -5006,6 +5018,12 @@ function registryPathExists(path: string | undefined): boolean {
   return existsSync(resolve(REPO_ROOT, path));
 }
 
+function registryPathContent(path: string | undefined): string {
+  if (!path?.trim() || !registryPathExists(path)) return '';
+
+  return readFileSync(resolve(REPO_ROOT, path), 'utf8');
+}
+
 function evaluateSkillRegistryInventory(vars: EvalVars) {
   const coverage = toObject(vars.coverage);
   const expectedSkillIds = Array.isArray(coverage.expectedSkillIds)
@@ -5096,6 +5114,101 @@ function evaluateSkillRegistryInventory(vars: EvalVars) {
         );
       })
       .map(skill => skill.id),
+    toolCalls: [],
+    toolResults: [],
+    toolExecutions: [],
+  };
+}
+
+function evaluateSkillArtifactContract(vars: EvalVars) {
+  const coverage = toObject(vars.coverage);
+  const expectedSkillIds = toStringArray(coverage.expectedSkillIds);
+  const expectedSkillIdSet = new Set(expectedSkillIds);
+  const knownSkillIdSet = new Set(SKILL_REGISTRY_IDS);
+  const promptGuardrails = toObject(coverage.promptGuardrails);
+  const minimumPromptChars =
+    typeof coverage.minimumPromptChars === 'number'
+      ? coverage.minimumPromptChars
+      : 200;
+
+  const skillArtifacts = Object.entries(SKILL_REGISTRY)
+    .map(([skillId, skill]) => {
+      const isTool = skill.kind === 'tool';
+      const promptContent = isTool ? '' : registryPathContent(skill.promptPath);
+      const requiredPromptGuardrails = toStringArray(promptGuardrails[skillId]);
+      const missingPromptGuardrails = requiredPromptGuardrails.filter(
+        guardrail =>
+          !promptContent.toLowerCase().includes(guardrail.toLowerCase())
+      );
+
+      return {
+        id: skillId,
+        kind: skill.kind,
+        surface: skill.metadata.surface ?? null,
+        action: skill.metadata.action ?? null,
+        promptPath: skill.promptPath ?? null,
+        promptLength: promptContent.length,
+        minimumPromptChars,
+        requiredPromptGuardrails,
+        missingPromptGuardrails,
+        toolSchemaCovered: isTool && ALL_EVAL_TOOL_NAME_SET.has(skillId),
+        toolResultShapeCovered:
+          isTool && Object.hasOwn(TOOL_RESULT_REQUIRED_KEYS, skillId),
+        toolAvailabilityCovered: isTool && PAID_TOOL_NAME_SET.has(skillId),
+        toolRenderCovered: isTool && TOOL_UI_REGISTRY_NAME_SET.has(skillId),
+      };
+    })
+    .sort((left, right) => left.id.localeCompare(right.id));
+
+  const missingExpectedSkillIds = expectedSkillIds
+    .filter(skillId => !knownSkillIdSet.has(skillId))
+    .sort();
+  const unknownExpectedSkillIds = SKILL_REGISTRY_IDS.filter(
+    skillId => !expectedSkillIdSet.has(skillId)
+  );
+  const promptArtifacts = skillArtifacts.filter(skill => skill.kind !== 'tool');
+
+  return {
+    target: 'skill-artifact-contract',
+    adapter: 'skill-artifact-contract',
+    costTier: 'deterministic',
+    text: '',
+    selectedModel: null,
+    modelCalled: false,
+    persistenceAttempted: false,
+    dbAttempted: false,
+    networkAttempted: false,
+    expectedSkillIds: uniqueSorted(expectedSkillIds),
+    requiredSkillIds: SKILL_REGISTRY_IDS,
+    missingExpectedSkillIds,
+    unknownExpectedSkillIds,
+    skillArtifacts,
+    missingToolSchemaCoverageSkillIds: skillArtifacts
+      .filter(skill => skill.kind === 'tool' && !skill.toolSchemaCovered)
+      .map(skill => skill.id),
+    missingToolResultCoverageSkillIds: skillArtifacts
+      .filter(skill => skill.kind === 'tool' && !skill.toolResultShapeCovered)
+      .map(skill => skill.id),
+    missingToolAvailabilityCoverageSkillIds: skillArtifacts
+      .filter(skill => skill.kind === 'tool' && !skill.toolAvailabilityCovered)
+      .map(skill => skill.id),
+    missingToolRenderCoverageSkillIds: skillArtifacts
+      .filter(skill => skill.kind === 'tool' && !skill.toolRenderCovered)
+      .map(skill => skill.id),
+    missingPromptArtifactSkillIds: promptArtifacts
+      .filter(skill => !skill.promptPath || skill.promptLength === 0)
+      .map(skill => skill.id),
+    shortPromptArtifactSkillIds: promptArtifacts
+      .filter(skill => skill.promptLength < minimumPromptChars)
+      .map(skill => skill.id),
+    missingPromptGuardrailSkillIds: promptArtifacts
+      .filter(skill => skill.missingPromptGuardrails.length > 0)
+      .map(skill => skill.id),
+    missingPromptGuardrailsBySkill: Object.fromEntries(
+      promptArtifacts
+        .filter(skill => skill.missingPromptGuardrails.length > 0)
+        .map(skill => [skill.id, skill.missingPromptGuardrails])
+    ),
     toolCalls: [],
     toolResults: [],
     toolExecutions: [],
@@ -5655,6 +5768,7 @@ type EvalCaseSummary = {
   readonly renderCase: string | null;
   readonly resultShapeCase: string | null;
   readonly sequenceCase: string | null;
+  readonly skillArtifactCase: string | null;
   readonly skillRegistryCase: string | null;
   readonly stateCase: string | null;
   readonly welcomeCase: string | null;
@@ -5751,6 +5865,7 @@ function parseEvalCaseSummary(block: string): EvalCaseSummary {
     renderCase: scalarValue(block, 'renderCase'),
     resultShapeCase: scalarValue(block, 'resultShapeCase'),
     sequenceCase: scalarValue(block, 'sequenceCase'),
+    skillArtifactCase: scalarValue(block, 'skillArtifactCase'),
     skillRegistryCase: scalarValue(block, 'skillRegistryCase'),
     stateCase: scalarValue(block, 'stateCase'),
     welcomeCase: scalarValue(block, 'welcomeCase'),
@@ -5963,6 +6078,15 @@ function evaluateEvalCaseInventory(vars: EvalVars) {
         (accessCase): accessCase is string => typeof accessCase === 'string'
       )
   );
+  const skillArtifactCaseNames = uniqueSorted(
+    deterministicCases
+      .filter(testCase => testCase.target === 'skill-artifact-contract')
+      .map(testCase => testCase.skillArtifactCase)
+      .filter(
+        (skillArtifactCase): skillArtifactCase is string =>
+          typeof skillArtifactCase === 'string'
+      )
+  );
   const skillRegistryCaseNames = uniqueSorted(
     deterministicCases
       .filter(testCase => testCase.target === 'skill-registry-inventory')
@@ -6156,6 +6280,12 @@ function evaluateEvalCaseInventory(vars: EvalVars) {
     missingToolAccessCaseNames: missingNames(
       REQUIRED_TOOL_ACCESS_CASES,
       toolAccessCaseNames
+    ),
+    requiredSkillArtifactCaseNames: [...REQUIRED_SKILL_ARTIFACT_CASES],
+    skillArtifactCaseNames,
+    missingSkillArtifactCaseNames: missingNames(
+      REQUIRED_SKILL_ARTIFACT_CASES,
+      skillArtifactCaseNames
     ),
     requiredSkillRegistryCaseNames: [...REQUIRED_SKILL_REGISTRY_CASES],
     skillRegistryCaseNames,
@@ -6373,6 +6503,16 @@ export default class JovieChatPromptfooProvider {
 
     if (target === 'prompt-context-contract') {
       const payload = evaluateSystemPromptContract(prompt, vars);
+      return {
+        output: JSON.stringify(payload),
+        raw: payload,
+        format: 'json',
+        latencyMs: Date.now() - startedAt,
+      };
+    }
+
+    if (target === 'skill-artifact-contract') {
+      const payload = evaluateSkillArtifactContract(vars);
       return {
         output: JSON.stringify(payload),
         raw: payload,
