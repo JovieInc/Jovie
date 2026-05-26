@@ -3823,6 +3823,170 @@ function assertInterviewSummaryContractCovered(output) {
   return pass();
 }
 
+function assertPlaylistGenerationContractCovered(output) {
+  const payload = parseOutput(output);
+
+  if (payload.target !== 'playlist-generation-contract') {
+    return fail(
+      'case did not run through the playlist-generation-contract adapter'
+    );
+  }
+  if (payload.playlistGenerationCase !== 'concept-and-curation-prompts') {
+    return fail(
+      `expected concept-and-curation-prompts playlist case, got ${String(payload.playlistGenerationCase)}`
+    );
+  }
+  if (payload.costTier !== 'deterministic') {
+    return fail('playlist generation case is not marked deterministic');
+  }
+  for (const field of [
+    'modelCalled',
+    'persistenceAttempted',
+    'dbAttempted',
+    'networkAttempted',
+  ]) {
+    if (payload[field] !== false) {
+      return fail(`${field} should be false for playlist generation coverage`);
+    }
+  }
+
+  const entrypoints = Array.isArray(payload.productionEntrypoints)
+    ? payload.productionEntrypoints
+    : [];
+  for (const entrypoint of [
+    'apps/web/lib/playlists/generate-concept.ts:generatePlaylistConcept',
+    'apps/web/lib/playlists/curate-tracklist.ts:curateTracklist',
+    'apps/web/lib/playlists/pipeline.ts:generatePlaylist',
+  ]) {
+    if (!entrypoints.includes(entrypoint)) {
+      return fail(`missing playlist production entrypoint ${entrypoint}`);
+    }
+  }
+
+  const modelIds = payload.modelIds ?? {};
+  if (modelIds.concept !== 'claude-haiku-4-5-20251001') {
+    return fail(
+      `unexpected playlist concept model: ${String(modelIds.concept)}`
+    );
+  }
+  if (modelIds.curation !== 'claude-sonnet-4-20250514') {
+    return fail(
+      `unexpected playlist curation model: ${String(modelIds.curation)}`
+    );
+  }
+
+  const maxTokens = payload.maxTokens ?? {};
+  if (maxTokens.concept !== 2000) {
+    return fail(
+      `expected playlist concept max tokens 2000, got ${String(maxTokens.concept)}`
+    );
+  }
+  if (maxTokens.curation !== 1500) {
+    return fail(
+      `expected playlist curation max tokens 1500, got ${String(maxTokens.curation)}`
+    );
+  }
+  if (payload.anthropicRequestTimeoutMs !== 30000) {
+    return fail(
+      `expected Anthropic timeout 30000, got ${String(payload.anthropicRequestTimeoutMs)}`
+    );
+  }
+  if (payload.wrapperTimeoutMs !== 31000) {
+    return fail(
+      `expected wrapper timeout 31000, got ${String(payload.wrapperTimeoutMs)}`
+    );
+  }
+
+  const sourceLengths = payload.sourceLengths ?? {};
+  for (const [name, minLength] of [
+    ['concept', 3000],
+    ['curation', 3500],
+    ['prompts', 2500],
+    ['pipeline', 8000],
+  ]) {
+    if (
+      typeof sourceLengths[name] !== 'number' ||
+      sourceLengths[name] < minLength
+    ) {
+      return fail(`playlist ${name} source was unexpectedly short`);
+    }
+  }
+
+  for (const field of [
+    'missingConceptPromptFacts',
+    'missingConceptRuntimeFacts',
+    'missingCurationPromptFacts',
+    'missingCurationRuntimeFacts',
+    'missingPipelineFacts',
+  ]) {
+    const values = Array.isArray(payload[field]) ? payload[field] : null;
+    if (!values) {
+      return fail(`playlist generation contract missing ${field}`);
+    }
+    if (values.length > 0) {
+      return fail(`${field}: ${values.join(', ')}`);
+    }
+  }
+
+  const promptLengths = payload.promptLengths ?? {};
+  if (
+    typeof promptLengths.concept !== 'number' ||
+    promptLengths.concept < 1500
+  ) {
+    return fail('playlist concept prompt was unexpectedly short');
+  }
+  if (
+    typeof promptLengths.curation !== 'number' ||
+    promptLengths.curation < 1200
+  ) {
+    return fail('playlist curation prompt was unexpectedly short');
+  }
+
+  const synthetic = payload.synthetic ?? {};
+  if (
+    typeof synthetic.conceptPromptPreview !== 'string' ||
+    !synthetic.conceptPromptPreview.includes('hyper-specific')
+  ) {
+    return fail('playlist concept prompt preview missing expected wording');
+  }
+  if (
+    typeof synthetic.curationPromptPreview !== 'string' ||
+    !synthetic.curationPromptPreview.includes('Rain-Soaked Arcade Dream Pop')
+  ) {
+    return fail('playlist curation prompt preview missing synthetic concept');
+  }
+  if (
+    typeof synthetic.emptyJoviePromptPreview !== 'string' ||
+    !synthetic.emptyJoviePromptPreview.includes('No Jovie artists')
+  ) {
+    return fail('playlist empty-Jovie prompt preview missing fallback copy');
+  }
+  const missingSyntheticFacts = Array.isArray(synthetic.missingFacts)
+    ? synthetic.missingFacts
+    : [];
+  if (missingSyntheticFacts.length > 0) {
+    return fail(
+      `playlist synthetic facts missing: ${missingSyntheticFacts.join(', ')}`
+    );
+  }
+
+  const leakPatterns = Array.isArray(payload.promptLeakPatterns)
+    ? payload.promptLeakPatterns
+    : [];
+  if (leakPatterns.length > 0) {
+    return fail(
+      `playlist generation contract leaked patterns: ${leakPatterns.join(', ')}`
+    );
+  }
+  if (toolNames(payload).length > 0 || allExecutions(payload).length > 0) {
+    return fail(
+      'playlist generation contract should not call or execute tools'
+    );
+  }
+
+  return pass();
+}
+
 function assertReleaseTaskClassifierContractCovered(output) {
   const payload = parseOutput(output);
 
@@ -4632,6 +4796,7 @@ function assertEvalCaseInventoryCovered(output) {
     'missingChatTitleCaseNames',
     'missingInsightPromptCaseNames',
     'missingInterviewSummaryCaseNames',
+    'missingPlaylistGenerationCaseNames',
     'missingOnboardingSystemPromptCaseNames',
     'missingReleaseTaskClassifierCaseNames',
     'missingSkillArtifactCaseNames',
@@ -4772,6 +4937,7 @@ module.exports = {
   assertChatTitleContractCovered,
   assertInsightPromptContractCovered,
   assertInterviewSummaryContractCovered,
+  assertPlaylistGenerationContractCovered,
   assertOnboardingSystemPromptContractCovered,
   assertReleaseTaskClassifierContractCovered,
   assertSkillRegistryInventoryCovered,

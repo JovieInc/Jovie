@@ -88,6 +88,10 @@ import {
   type DetectedIntent,
   IntentCategory,
 } from '@/lib/intent-detection/types';
+import {
+  buildConceptPrompt,
+  buildCurationPrompt,
+} from '@/lib/playlists/prompts';
 import { buildAlbumArtBackgroundPrompt } from '@/lib/services/album-art/prompts';
 import { ALBUM_ART_STYLES } from '@/lib/services/album-art/styles';
 import {
@@ -128,6 +132,7 @@ type EvalTarget =
   | 'interview-summary-contract'
   | 'knowledge-contract'
   | 'model-contract'
+  | 'playlist-generation-contract'
   | 'onboarding-system-prompt-contract'
   | 'mobile-chat-route'
   | 'onboarding-welcome-chat-contract'
@@ -595,6 +600,9 @@ const REQUIRED_SKILL_REGISTRY_CASES = ['registry-inventory'] as const;
 const REQUIRED_AI_TOOL_PROMPT_CASES = ['album-art-canvas-bio-prompts'] as const;
 const REQUIRED_INSIGHT_PROMPT_CASES = ['analytics-grounding-prompts'] as const;
 const REQUIRED_INTERVIEW_SUMMARY_CASES = ['prompt-schema-timeout'] as const;
+const REQUIRED_PLAYLIST_GENERATION_CASES = [
+  'concept-and-curation-prompts',
+] as const;
 const REQUIRED_ONBOARDING_SYSTEM_PROMPT_CASES = ['prompt-rules'] as const;
 const REQUIRED_RELEASE_TASK_CLASSIFIER_CASES = ['prompt-and-coercion'] as const;
 const REQUIRED_CHAT_TITLE_CASES = ['prompt-and-fallback'] as const;
@@ -750,6 +758,7 @@ function toTarget(value: unknown): EvalTarget {
     value === 'knowledge-contract' ||
     value === 'mobile-chat-route' ||
     value === 'model-contract' ||
+    value === 'playlist-generation-contract' ||
     value === 'onboarding-system-prompt-contract' ||
     value === 'onboarding-welcome-chat-contract' ||
     value === 'release-task-classifier-contract' ||
@@ -6195,6 +6204,441 @@ function evaluateInterviewSummaryContract(vars: EvalVars) {
   };
 }
 
+function evaluatePlaylistGenerationContract(vars: EvalVars) {
+  const playlistGenerationCase =
+    typeof vars.playlistGenerationCase === 'string'
+      ? vars.playlistGenerationCase
+      : 'concept-and-curation-prompts';
+  const conceptSourcePath = 'lib/playlists/generate-concept.ts';
+  const curationSourcePath = 'lib/playlists/curate-tracklist.ts';
+  const promptSourcePath = 'lib/playlists/prompts.ts';
+  const pipelineSourcePath = 'lib/playlists/pipeline.ts';
+  const conceptSource = readFileSync(
+    resolve(process.cwd(), conceptSourcePath),
+    'utf8'
+  );
+  const curationSource = readFileSync(
+    resolve(process.cwd(), curationSourcePath),
+    'utf8'
+  );
+  const promptSource = readFileSync(
+    resolve(process.cwd(), promptSourcePath),
+    'utf8'
+  );
+  const pipelineSource = readFileSync(
+    resolve(process.cwd(), pipelineSourcePath),
+    'utf8'
+  );
+  const previousTitles = [
+    'Sunday Night Synth Escapes',
+    'Rainy Windows Dream Pop',
+  ];
+  const conceptPrompt = buildConceptPrompt({
+    previousTitles,
+    genreFocus: 'ambient pop',
+    category: 'soundtrack',
+    seed: 4201,
+  });
+  const curationPrompt = buildCurationPrompt({
+    concept: {
+      title: 'Rain-Soaked Arcade Dream Pop',
+      description:
+        'A cinematic synthetic playlist for rainy late-night walks and arcade-lit memories.',
+      moodTags: ['nostalgic', 'rainy'],
+    },
+    candidateTracks: [
+      {
+        id: 'track-001',
+        name: 'Neon Arcade',
+        artist: 'Luna Waves',
+        popularity: 62,
+      },
+      {
+        id: 'track-002',
+        name: 'Rain Console',
+        artist: 'Harbor Glass',
+        popularity: 55,
+      },
+      {
+        id: 'track-003',
+        name: 'Blue Continue',
+        artist: 'Static Choir',
+        popularity: 49,
+      },
+      {
+        id: 'track-004',
+        name: 'Soft Credits',
+        artist: 'Arcade Vista',
+        popularity: 58,
+      },
+      {
+        id: 'track-005',
+        name: 'Afterimage',
+        artist: 'Signal Bay',
+        popularity: 51,
+      },
+      {
+        id: 'track-006',
+        name: 'Wet Pavement',
+        artist: 'North Terminal',
+        popularity: 44,
+      },
+      {
+        id: 'track-007',
+        name: 'Token Glow',
+        artist: 'Velvet Index',
+        popularity: 47,
+      },
+      {
+        id: 'track-008',
+        name: 'Side Quest',
+        artist: 'Glass Circuit',
+        popularity: 59,
+      },
+      {
+        id: 'track-009',
+        name: 'Low Battery',
+        artist: 'Violet Arcade',
+        popularity: 42,
+      },
+      {
+        id: 'track-010',
+        name: 'Night Cabinet',
+        artist: 'Echo Ferry',
+        popularity: 53,
+      },
+      {
+        id: 'track-011',
+        name: 'Insert Rain',
+        artist: 'Patch Memory',
+        popularity: 38,
+      },
+      {
+        id: 'track-012',
+        name: 'Final Token',
+        artist: 'Sleep Menu',
+        popularity: 41,
+      },
+    ],
+    jovieArtistTracks: [
+      {
+        spotifyTrackId: 'jovie-track-001',
+        name: 'Moonlit Tide Pool',
+        artist: 'Luna Waves',
+      },
+      {
+        spotifyTrackId: 'jovie-track-002',
+        name: 'Quiet Launch',
+        artist: 'Mira Cove',
+      },
+    ],
+    targetSize: 12,
+  });
+  const emptyJoviePrompt = buildCurationPrompt({
+    concept: {
+      title: 'Dusty Synth Bus Window',
+      description: 'Synthetic eval playlist prompt with no matching artists.',
+      moodTags: ['travel', 'synth'],
+    },
+    candidateTracks: [
+      {
+        id: 'empty-001',
+        name: 'Signal One',
+        artist: 'North Trace',
+        popularity: 50,
+      },
+      {
+        id: 'empty-002',
+        name: 'Signal Two',
+        artist: 'South Trace',
+        popularity: 49,
+      },
+    ],
+    jovieArtistTracks: [],
+    targetSize: 10,
+  });
+  const conceptPromptFacts = {
+    framesHyperSpecificSearchConcept: textIncludesAll(conceptPrompt, [
+      'hyper-specific playlist concept',
+      'long-tail search phrase',
+      'Spotify search',
+    ]),
+    rejectsGenericThemes: textIncludesAll(conceptPrompt, [
+      'Avoid generic themes',
+      'Chill Vibes',
+      'Workout Playlist',
+    ]),
+    includesGenreAndCategoryDirectives: textIncludesAll(conceptPrompt, [
+      'Genre focus for this playlist: ambient pop',
+      'movie, TV show, video game',
+      'specific and searchable',
+    ]),
+    includesPreviousTitleExclusion: textIncludesAll(conceptPrompt, [
+      'Previously generated titles',
+      'DO NOT repeat or closely resemble',
+      previousTitles[0],
+      previousTitles[1],
+    ]),
+    requestsStructuredJsonFields: textIncludesAll(conceptPrompt, [
+      '"title"',
+      '"description"',
+      '"editorialNote"',
+      '"genreTags"',
+      '"moodTags"',
+      '"trackQueries"',
+      '"unsplashQuery"',
+      '"coverTextWords"',
+    ]),
+    requestsTrackQueryMix: textIncludesAll(conceptPrompt, [
+      '30-50 specific track search queries',
+      'artist - title format',
+      'well-known tracks (60%)',
+      'deeper cuts (30%)',
+      'emerging artists (10%)',
+    ]),
+    includesVarietySeed: conceptPrompt.includes('Variety seed: 4201'),
+  };
+  const conceptRuntimeFacts = {
+    validatesConceptSchema: textIncludesAll(conceptSource, [
+      'PlaylistConceptSchema = z.object',
+      'title: z.string().min(5).max(100)',
+      'description: z.string().min(20).max(500)',
+      'editorialNote: z.string().min(100).max(2000)',
+      'trackQueries: z.array(z.string()).min(15).max(50)',
+    ]),
+    capsTagsAndCoverFields: textIncludesAll(conceptSource, [
+      'genreTags: z.array(z.string()).min(1).max(5)',
+      'moodTags: z.array(z.string()).min(1).max(5)',
+      'unsplashQuery: z.string().min(2).max(50)',
+      'coverTextWords: z.string().min(1).max(30)',
+    ]),
+    dedupesAgainstLastFiftyTitles: textIncludesAll(conceptSource, [
+      'previousTitles',
+      'orderBy(desc(joviePlaylists.createdAt))',
+      'limit(50)',
+      'Duplicate title generated',
+    ]),
+    rotatesGenreAndCategory: textIncludesAll(conceptSource, [
+      'GENRE_ROTATION',
+      'CATEGORY_ROTATION',
+      'playlistCount % GENRE_ROTATION.length',
+      'playlistCount % CATEGORY_ROTATION.length',
+    ]),
+    usesHaikuModel: textIncludesAll(conceptSource, [
+      "model: 'claude-haiku-4-5-20251001'",
+      'max_tokens: 2000',
+    ]),
+    usesBoundedAnthropicTimeout: textIncludesAll(conceptSource, [
+      'ANTHROPIC_REQUEST_TIMEOUT_MS = 30_000',
+      'withTimeout',
+      'timeoutMs: ANTHROPIC_REQUEST_TIMEOUT_MS + 1_000',
+      "context: 'Anthropic generatePlaylistConcept'",
+    ]),
+    parsesJsonThenSchema: textIncludesAll(conceptSource, [
+      'extractJsonPayload(textBlock.text)',
+      'JSON.parse(jsonStr)',
+      'PlaylistConceptSchema.parse(parsed)',
+    ]),
+    retriesAndFailsClosed: textIncludesAll(conceptSource, [
+      'for (let attempt = 0; attempt < 3; attempt++)',
+      'if (attempt === 2) throw error',
+      'Failed to generate playlist concept after 3 attempts',
+    ]),
+  };
+  const curationPromptFacts = {
+    includesTargetSizeAndConcept: textIncludesAll(curationPrompt, [
+      '12-track playlist called "Rain-Soaked Arcade Dream Pop"',
+      'Candidate tracks (select 12 from these)',
+      'Mood: nostalgic, rainy',
+    ]),
+    preservesCandidateIdsAndMetadata: textIncludesAll(curationPrompt, [
+      '[track-001] Luna Waves - Neon Arcade (pop: 62)',
+      '[track-012] Sleep Menu - Final Token (pop: 41)',
+    ]),
+    includesJovieArtistPlacement: textIncludesAll(curationPrompt, [
+      'Jovie artist tracks to include',
+      'place in positions 3-8',
+      '[jovie-track-001] Luna Waves - Moonlit Tide Pool',
+      '[jovie-track-002] Mira Cove - Quiet Launch',
+    ]),
+    handlesNoJovieArtistMatch: emptyJoviePrompt.includes(
+      'No Jovie artists match this theme.'
+    ),
+    preservesSequencingRules: textIncludesAll(curationPrompt, [
+      'Open with a track that immediately establishes the mood',
+      'Build energy gradually',
+      'Peak energy',
+      'Cool down',
+      'one more',
+    ]),
+    preventsAdjacentDuplicateArtists: curationPrompt.includes(
+      'Never place two tracks by the same artist back-to-back'
+    ),
+    requiresJsonArrayOfTrackIds: textIncludesAll(curationPrompt, [
+      'Return a JSON array of Spotify track IDs',
+      '["trackId1", "trackId2", ...]',
+    ]),
+  };
+  const curationRuntimeFacts = {
+    rejectsTooFewCandidatesBeforeModel: textIncludesAll(curationSource, [
+      'if (candidates.length < 10)',
+      'Not enough candidate tracks',
+      'Need at least 10',
+    ]),
+    validatesJsonArraySize: textIncludesAll(curationSource, [
+      'CURATED_TRACK_IDS_SCHEMA = z.array(z.string()).min(10).max(50)',
+      'CURATED_TRACK_IDS_SCHEMA.parse(parsed)',
+    ]),
+    usesSonnetModel: textIncludesAll(curationSource, [
+      "model: 'claude-sonnet-4-20250514'",
+      'max_tokens: 1500',
+    ]),
+    usesBoundedAnthropicTimeout: textIncludesAll(curationSource, [
+      'ANTHROPIC_REQUEST_TIMEOUT_MS = 30_000',
+      'withTimeout',
+      'timeoutMs: ANTHROPIC_REQUEST_TIMEOUT_MS + 1_000',
+      "context: 'Anthropic curateTracklist'",
+    ]),
+    parsesJsonPayload: textIncludesAll(curationSource, [
+      'extractJsonPayload(responseText)',
+      'JSON.parse(jsonStr)',
+    ]),
+    filtersHallucinatedIds: textIncludesAll(curationSource, [
+      'validIds = new Set',
+      'candidates.map(track => track.id)',
+      'jovieArtistTracks.map(track => track.spotifyTrackId)',
+      'trackIds.filter(id => validIds.has(id))',
+    ]),
+    dedupesAdjacentArtists: textIncludesAll(curationSource, [
+      'createArtistLookup',
+      'dedupeTrackIdsByArtist',
+      "if (artist === lastArtist && artist !== '') continue",
+    ]),
+    retriesWhenTooFewValidTracks: textIncludesAll(curationSource, [
+      'validatedIds.length < 10',
+      'deduped.length < 10',
+      'continue',
+      'Failed to curate tracklist after 3 attempts',
+    ]),
+  };
+  const pipelineFacts = {
+    runsConceptBeforeCuration: textIncludesAll(pipelineSource, [
+      'const concept = await generatePlaylistConcept()',
+      'const curated = await curateTracklist',
+    ]),
+    discoversThreeTimesTargetCandidates: pipelineSource.includes(
+      'maxCandidates: targetSize * 3'
+    ),
+    includesJovieArtistTracksBeforeCuration: textIncludesAll(pipelineSource, [
+      'findMatchingJovieArtistTracks',
+      'jovieArtistTracks',
+      'targetSize',
+    ]),
+    queuesPendingAdminReviewWithoutPublishing: textIncludesAll(pipelineSource, [
+      'Cover art is generated at approval time',
+      "${'pending'}",
+      "${'haiku+sonnet'}",
+    ]),
+    persistsLlmPromptMetadata: textIncludesAll(pipelineSource, [
+      'llmPrompt = JSON.stringify',
+      'candidateCount',
+      'jovieArtistCount',
+      'unsplashQuery',
+      'coverTextWords',
+    ]),
+  };
+  const syntheticFacts = {
+    usesSyntheticPlaylistData: textIncludesAll(
+      [conceptPrompt, curationPrompt].join('\n\n'),
+      ['Luna Waves', 'Rain-Soaked Arcade Dream Pop', 'jovie-track-001']
+    ),
+    containsNoSecretLikeValues:
+      promptLeakPatterns([conceptPrompt, curationPrompt].join('\n\n'))
+        .length === 0,
+  };
+
+  return {
+    target: 'playlist-generation-contract',
+    adapter: 'playlist-generation-contract',
+    productionEntrypoints: [
+      'apps/web/lib/playlists/generate-concept.ts:generatePlaylistConcept',
+      'apps/web/lib/playlists/curate-tracklist.ts:curateTracklist',
+      'apps/web/lib/playlists/pipeline.ts:generatePlaylist',
+    ],
+    costTier: 'deterministic',
+    text: '',
+    selectedModel: null,
+    modelCalled: false,
+    persistenceAttempted: false,
+    dbAttempted: false,
+    networkAttempted: false,
+    playlistGenerationCase,
+    sourcePaths: {
+      concept: conceptSourcePath,
+      curation: curationSourcePath,
+      prompts: promptSourcePath,
+      pipeline: pipelineSourcePath,
+    },
+    sourceLengths: {
+      concept: conceptSource.length,
+      curation: curationSource.length,
+      prompts: promptSource.length,
+      pipeline: pipelineSource.length,
+    },
+    modelIds: {
+      concept: 'claude-haiku-4-5-20251001',
+      curation: 'claude-sonnet-4-20250514',
+    },
+    maxTokens: {
+      concept: 2000,
+      curation: 1500,
+    },
+    anthropicRequestTimeoutMs: 30_000,
+    wrapperTimeoutMs: 31_000,
+    promptLengths: {
+      concept: conceptPrompt.length,
+      curation: curationPrompt.length,
+      emptyJovie: emptyJoviePrompt.length,
+      source: promptSource.length,
+    },
+    conceptPromptFacts,
+    missingConceptPromptFacts: Object.entries(conceptPromptFacts)
+      .filter(([, passed]) => !passed)
+      .map(([name]) => name),
+    conceptRuntimeFacts,
+    missingConceptRuntimeFacts: Object.entries(conceptRuntimeFacts)
+      .filter(([, passed]) => !passed)
+      .map(([name]) => name),
+    curationPromptFacts,
+    missingCurationPromptFacts: Object.entries(curationPromptFacts)
+      .filter(([, passed]) => !passed)
+      .map(([name]) => name),
+    curationRuntimeFacts,
+    missingCurationRuntimeFacts: Object.entries(curationRuntimeFacts)
+      .filter(([, passed]) => !passed)
+      .map(([name]) => name),
+    pipelineFacts,
+    missingPipelineFacts: Object.entries(pipelineFacts)
+      .filter(([, passed]) => !passed)
+      .map(([name]) => name),
+    synthetic: {
+      facts: syntheticFacts,
+      missingFacts: Object.entries(syntheticFacts)
+        .filter(([, passed]) => !passed)
+        .map(([name]) => name),
+      conceptPromptPreview: conceptPrompt.slice(0, 500),
+      curationPromptPreview: curationPrompt.slice(0, 500),
+      emptyJoviePromptPreview: emptyJoviePrompt.slice(0, 900),
+    },
+    promptLeakPatterns: promptLeakPatterns(
+      [conceptPrompt, curationPrompt, emptyJoviePrompt].join('\n\n')
+    ),
+    toolCalls: [],
+    toolResults: [],
+    toolExecutions: [],
+  };
+}
+
 function evaluateOnboardingSystemPromptContract(vars: EvalVars) {
   const promptCase =
     typeof vars.onboardingSystemPromptCase === 'string'
@@ -7449,6 +7893,7 @@ type EvalCaseSummary = {
   readonly chatTitleCase: string | null;
   readonly insightPromptCase: string | null;
   readonly interviewSummaryCase: string | null;
+  readonly playlistGenerationCase: string | null;
   readonly onboardingSystemPromptCase: string | null;
   readonly releaseTaskClassifierCase: string | null;
   readonly knowledgeCase: string | null;
@@ -7555,6 +8000,7 @@ function parseEvalCaseSummary(block: string): EvalCaseSummary {
     chatTitleCase: scalarValue(block, 'chatTitleCase'),
     insightPromptCase: scalarValue(block, 'insightPromptCase'),
     interviewSummaryCase: scalarValue(block, 'interviewSummaryCase'),
+    playlistGenerationCase: scalarValue(block, 'playlistGenerationCase'),
     onboardingSystemPromptCase: scalarValue(
       block,
       'onboardingSystemPromptCase'
@@ -7815,6 +8261,15 @@ function evaluateEvalCaseInventory(vars: EvalVars) {
       .filter(
         (interviewSummaryCase): interviewSummaryCase is string =>
           typeof interviewSummaryCase === 'string'
+      )
+  );
+  const playlistGenerationCaseNames = uniqueSorted(
+    deterministicCases
+      .filter(testCase => testCase.target === 'playlist-generation-contract')
+      .map(testCase => testCase.playlistGenerationCase)
+      .filter(
+        (playlistGenerationCase): playlistGenerationCase is string =>
+          typeof playlistGenerationCase === 'string'
       )
   );
   const onboardingSystemPromptCaseNames = uniqueSorted(
@@ -8093,6 +8548,14 @@ function evaluateEvalCaseInventory(vars: EvalVars) {
       REQUIRED_INTERVIEW_SUMMARY_CASES,
       interviewSummaryCaseNames
     ),
+    requiredPlaylistGenerationCaseNames: [
+      ...REQUIRED_PLAYLIST_GENERATION_CASES,
+    ],
+    playlistGenerationCaseNames,
+    missingPlaylistGenerationCaseNames: missingNames(
+      REQUIRED_PLAYLIST_GENERATION_CASES,
+      playlistGenerationCaseNames
+    ),
     requiredOnboardingSystemPromptCaseNames: [
       ...REQUIRED_ONBOARDING_SYSTEM_PROMPT_CASES,
     ],
@@ -8370,6 +8833,11 @@ export default class JovieChatPromptfooProvider {
 
     if (target === 'interview-summary-contract') {
       const payload = evaluateInterviewSummaryContract(vars);
+      return jsonProviderResponse(payload, startedAt);
+    }
+
+    if (target === 'playlist-generation-contract') {
+      const payload = evaluatePlaylistGenerationContract(vars);
       return jsonProviderResponse(payload, startedAt);
     }
 
