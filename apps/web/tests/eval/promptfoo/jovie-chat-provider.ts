@@ -986,7 +986,7 @@ function evaluateChatConfirmRouteContract(vars: EvalVars) {
   if (!parsed.success) {
     return response(400, {
       error: 'Invalid request',
-      details: parsed.error.flatten(),
+      details: parsed.error.flatten().fieldErrors,
     });
   }
 
