@@ -9,6 +9,7 @@ import { drizzle } from 'drizzle-orm/neon-http';
 import { z } from 'zod';
 import { APP_ROUTES } from '@/constants/routes';
 import { SKILL_REGISTRY } from '@/lib/agents/registry';
+import { buildArtistBioDraft } from '@/lib/ai/artist-bio-writer';
 import {
   TEST_AUTH_BYPASS_MODE,
   TEST_MODE_HEADER,
@@ -80,6 +81,13 @@ import {
   type DetectedIntent,
   IntentCategory,
 } from '@/lib/intent-detection/types';
+import { buildAlbumArtBackgroundPrompt } from '@/lib/services/album-art/prompts';
+import { ALBUM_ART_STYLES } from '@/lib/services/album-art/styles';
+import {
+  buildArtworkProcessingPrompt,
+  buildVideoGenerationPrompt,
+} from '@/lib/services/canvas/prompts';
+import type { CanvasGenerationInput } from '@/lib/services/canvas/types';
 import { buildWelcomeMessage } from '@/lib/services/onboarding/welcome-message';
 import {
   buildPitchDraftSystemPrompt,
@@ -99,6 +107,7 @@ import {
 
 type EvalVars = Record<string, unknown>;
 type EvalTarget =
+  | 'ai-tool-prompt-contract'
   | 'chat-confirm-route'
   | 'chat-turn'
   | 'eval-case-inventory'
@@ -555,6 +564,12 @@ const REQUIRED_SKILL_CATALOG_CASES = ['catalog-sync-shape'] as const;
 const REQUIRED_SKILL_COMMAND_CASES = ['command-inventory'] as const;
 const REQUIRED_SKILL_PROMPT_CASES = ['release-pitch-retouch-prompts'] as const;
 const REQUIRED_SKILL_REGISTRY_CASES = ['registry-inventory'] as const;
+const REQUIRED_AI_TOOL_PROMPT_CASES = ['album-art-canvas-bio-prompts'] as const;
+const AI_TOOL_PROMPT_TOOL_NAMES = [
+  'generateAlbumArt',
+  'generateCanvasPlan',
+  'writeWorldClassBio',
+] as const;
 const SKILLS_CATALOG_SYNC_SCRIPT_PATH =
   'apps/web/scripts/sync-skills-catalog.ts';
 const WEB_PACKAGE_JSON_PATH = 'apps/web/package.json';
@@ -687,6 +702,7 @@ function toMode(value: unknown): 'app' | 'onboarding' {
 
 function toTarget(value: unknown): EvalTarget {
   if (
+    value === 'ai-tool-prompt-contract' ||
     value === 'chat-confirm-route' ||
     value === 'eval-case-inventory' ||
     value === 'knowledge-contract' ||
@@ -5283,11 +5299,20 @@ function textIncludesAll(text: string, needles: readonly string[]): boolean {
   return needles.every(needle => normalizedText.includes(needle.toLowerCase()));
 }
 
+function textIncludesNumericValue(text: string, value: number): boolean {
+  return text.replace(/\D+/g, '').includes(String(value));
+}
+
 function promptLeakPatterns(text: string): string[] {
   const patterns: Array<[string, RegExp]> = [
     ['email', /[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i],
-    ['http-url', /https?:\/\//i],
+    [
+      'localhost-url',
+      /https?:\/\/(?:localhost|127\.0\.0\.1|0\.0\.0\.0|\[::1\])/i,
+    ],
+    ['internal-url', /https?:\/\/[^/\s]*(?:\.internal|\.local)(?:[/:]|\s|$)/i],
     ['secret-token', /(?:sk-|bearer\s+|password|api[_-]?key)/i],
+    ['secret-env', /(?:SECRET_|PRIVATE_|TOKEN=|KEY=)/i],
   ];
 
   return patterns
@@ -5420,6 +5445,198 @@ function evaluateSkillPromptContract(vars: EvalVars) {
       promptLength: retouchPrompt.length,
       requiredGuardrails: retouchGuardrails,
       missingGuardrails: missingRetouchGuardrails,
+    },
+    toolCalls: [],
+    toolResults: [],
+    toolExecutions: [],
+  };
+}
+
+function evaluateAiToolPromptContract(vars: EvalVars) {
+  const coverage = toObject(vars.coverage);
+  const expectedToolNames = toStringArray(coverage.expectedToolNames);
+  const requiredToolNames = [...AI_TOOL_PROMPT_TOOL_NAMES];
+  const requiredToolNameSet = new Set(requiredToolNames);
+  const promptCase =
+    typeof vars.aiToolPromptCase === 'string'
+      ? vars.aiToolPromptCase
+      : 'album-art-canvas-bio-prompts';
+
+  const albumArtStyle = ALBUM_ART_STYLES.chrome_noir;
+  const albumArtPrompt = buildAlbumArtBackgroundPrompt({
+    releaseTitle: 'Neon Reef',
+    artistName: 'Luna Waves',
+    style: albumArtStyle,
+    prompt: 'Bioluminescent reef reflections with polished chrome depth.',
+  });
+  const albumArtFacts = {
+    includesSquareBackgroundInstruction: textIncludesAll(albumArtPrompt, [
+      'square album cover background image',
+    ]),
+    includesSelectedStyle: textIncludesAll(albumArtPrompt, [
+      albumArtStyle.backgroundPrompt,
+    ]),
+    includesSyntheticReleaseContext: textIncludesAll(albumArtPrompt, [
+      'Neon Reef',
+      'Luna Waves',
+    ]),
+    includesUserDirection: textIncludesAll(albumArtPrompt, [
+      'Bioluminescent reef reflections',
+    ]),
+    blocksTextAndLogos: textIncludesAll(albumArtPrompt, [
+      'Do not render any words',
+      'typography',
+      'logos',
+      'watermarks',
+      'UI elements',
+    ]),
+    leavesOverlaySpace: textIncludesAll(albumArtPrompt, [
+      'Leave clean composition space',
+      'overlay the artist name and release title',
+    ]),
+  };
+
+  const canvasInput: CanvasGenerationInput = {
+    releaseId: '00000000-0000-4000-8000-00000000cafe',
+    artworkUrl: 'https://cdn.jov.ie/eval/neon-reef-cover.jpg',
+    releaseTitle: 'Neon Reef',
+    artistName: 'Luna Waves',
+    style: {
+      motionType: 'particles',
+    },
+  };
+  const artworkProcessingPrompt = buildArtworkProcessingPrompt(canvasInput);
+  const videoGenerationPrompt = buildVideoGenerationPrompt(canvasInput);
+  const combinedCanvasPrompt = `${artworkProcessingPrompt}\n${videoGenerationPrompt}`;
+  const canvasFacts = {
+    processingRemovesTextAndMarks: textIncludesAll(artworkProcessingPrompt, [
+      'Remove all text',
+      'logos',
+      'watermarks',
+    ]),
+    processingUsesCanvasDimensions: textIncludesAll(artworkProcessingPrompt, [
+      '1080x1920',
+      '9:16 portrait',
+    ]),
+    videoIncludesSyntheticReleaseContext: textIncludesAll(
+      videoGenerationPrompt,
+      ['Neon Reef', 'Luna Waves']
+    ),
+    videoUsesRequestedMotion: textIncludesAll(videoGenerationPrompt, [
+      'subtle floating particles',
+    ]),
+    videoPreservesLoopAndSpecs: textIncludesAll(videoGenerationPrompt, [
+      'looping video',
+      'Seamless loop',
+      '30 fps',
+      'H.264 codec',
+      'MP4 container',
+    ]),
+    videoBlocksTextAndUi: textIncludesAll(videoGenerationPrompt, [
+      'No text or UI elements',
+    ]),
+  };
+
+  const bioDraft = buildArtistBioDraft({
+    artistName: 'Luna Waves',
+    existingBio:
+      'Luna Waves builds immersive ambient-pop pieces from modular synths, oceanic field recordings, and patient vocal fragments.',
+    genres: ['ambient electronic', 'downtempo', 'left-field pop'],
+    spotifyFollowers: 12_500,
+    spotifyPopularity: 45,
+    spotifyUrl: 'https://open.spotify.com/artist/synthetic-luna-waves',
+    appleMusicUrl: 'https://music.apple.com/us/artist/synthetic-luna-waves',
+    profileViews: 3420,
+    releaseCount: 3,
+    notableReleases: ['Neon Reef', 'Midnight Current', 'Solar Drift'],
+  });
+  const combinedBioText = [
+    bioDraft.draft,
+    ...bioDraft.facts,
+    ...bioDraft.voiceDirectives,
+  ].join('\n');
+  const bioFacts = {
+    draftUsesSyntheticArtist: textIncludesAll(bioDraft.draft, ['Luna Waves']),
+    draftUsesMarketSignal:
+      textIncludesAll(bioDraft.draft, ['Spotify followers']) &&
+      textIncludesNumericValue(bioDraft.draft, 12_500),
+    draftUsesCatalogSignal:
+      textIncludesAll(bioDraft.draft, [
+        'Neon Reef',
+        'Midnight Current',
+        'releases',
+      ]) && textIncludesNumericValue(bioDraft.draft, 3),
+    draftUsesProfileSignal:
+      textIncludesAll(bioDraft.draft, ['views']) &&
+      textIncludesNumericValue(bioDraft.draft, 3420),
+    factsAvoidInventingMissingMetrics:
+      textIncludesAll(bioDraft.facts.join('\n'), [
+        'Spotify followers',
+        'Spotify popularity',
+        'Spotify profile linked',
+        'Apple Music profile linked',
+      ]) &&
+      textIncludesNumericValue(bioDraft.facts.join('\n'), 12_500) &&
+      textIncludesNumericValue(bioDraft.facts.join('\n'), 45) &&
+      textIncludesNumericValue(bioDraft.facts.join('\n'), 100),
+    directivesRequireFactualGrounding: textIncludesAll(
+      bioDraft.voiceDirectives.join('\n'),
+      ['avoid fabricated achievements', 'verifiable data points']
+    ),
+  };
+
+  return {
+    target: 'ai-tool-prompt-contract',
+    adapter: 'ai-tool-prompt-contract',
+    costTier: 'deterministic',
+    text: '',
+    selectedModel: null,
+    modelCalled: false,
+    persistenceAttempted: false,
+    dbAttempted: false,
+    networkAttempted: false,
+    promptCase,
+    expectedToolNames: uniqueSorted(expectedToolNames),
+    requiredToolNames,
+    missingExpectedToolNames: missingNames(
+      requiredToolNames,
+      expectedToolNames
+    ),
+    unknownExpectedToolNames: expectedToolNames
+      .filter(toolName => !requiredToolNameSet.has(toolName))
+      .sort(),
+    albumArt: {
+      toolName: 'generateAlbumArt',
+      styleId: albumArtStyle.id,
+      promptLength: albumArtPrompt.length,
+      facts: albumArtFacts,
+      missingFacts: Object.entries(albumArtFacts)
+        .filter(([, passed]) => !passed)
+        .map(([name]) => name),
+      leakPatterns: promptLeakPatterns(albumArtPrompt),
+    },
+    canvas: {
+      toolName: 'generateCanvasPlan',
+      promptLengths: {
+        artworkProcessing: artworkProcessingPrompt.length,
+        videoGeneration: videoGenerationPrompt.length,
+      },
+      facts: canvasFacts,
+      missingFacts: Object.entries(canvasFacts)
+        .filter(([, passed]) => !passed)
+        .map(([name]) => name),
+      leakPatterns: promptLeakPatterns(combinedCanvasPrompt),
+    },
+    bio: {
+      toolName: 'writeWorldClassBio',
+      draftLength: bioDraft.draft.length,
+      factCount: bioDraft.facts.length,
+      voiceDirectiveCount: bioDraft.voiceDirectives.length,
+      facts: bioFacts,
+      missingFacts: Object.entries(bioFacts)
+        .filter(([, passed]) => !passed)
+        .map(([name]) => name),
+      leakPatterns: promptLeakPatterns(combinedBioText),
     },
     toolCalls: [],
     toolResults: [],
@@ -6271,6 +6488,7 @@ type EvalCaseSummary = {
   readonly modelScenario: string | null;
   readonly expectedModel: string | null;
   readonly eventCase: string | null;
+  readonly aiToolPromptCase: string | null;
   readonly knowledgeCase: string | null;
   readonly promptCase: string | null;
   readonly renderCase: string | null;
@@ -6371,6 +6589,7 @@ function parseEvalCaseSummary(block: string): EvalCaseSummary {
     modelScenario: scalarValue(block, 'modelScenario'),
     expectedModel: scalarValue(block, 'expectedModel'),
     eventCase: scalarValue(block, 'eventCase'),
+    aiToolPromptCase: scalarValue(block, 'aiToolPromptCase'),
     knowledgeCase: scalarValue(block, 'knowledgeCase'),
     promptCase: scalarValue(block, 'promptCase'),
     renderCase: scalarValue(block, 'renderCase'),
@@ -6590,6 +6809,15 @@ function evaluateEvalCaseInventory(vars: EvalVars) {
       .map(testCase => testCase.accessCase)
       .filter(
         (accessCase): accessCase is string => typeof accessCase === 'string'
+      )
+  );
+  const aiToolPromptCaseNames = uniqueSorted(
+    deterministicCases
+      .filter(testCase => testCase.target === 'ai-tool-prompt-contract')
+      .map(testCase => testCase.aiToolPromptCase)
+      .filter(
+        (aiToolPromptCase): aiToolPromptCase is string =>
+          typeof aiToolPromptCase === 'string'
       )
   );
   const skillArtifactCaseNames = uniqueSorted(
@@ -6821,6 +7049,12 @@ function evaluateEvalCaseInventory(vars: EvalVars) {
     missingToolAccessCaseNames: missingNames(
       REQUIRED_TOOL_ACCESS_CASES,
       toolAccessCaseNames
+    ),
+    requiredAiToolPromptCaseNames: [...REQUIRED_AI_TOOL_PROMPT_CASES],
+    aiToolPromptCaseNames,
+    missingAiToolPromptCaseNames: missingNames(
+      REQUIRED_AI_TOOL_PROMPT_CASES,
+      aiToolPromptCaseNames
     ),
     requiredSkillArtifactCaseNames: [...REQUIRED_SKILL_ARTIFACT_CASES],
     skillArtifactCaseNames,
@@ -7102,6 +7336,16 @@ export default class JovieChatPromptfooProvider {
 
     if (target === 'skill-prompt-contract') {
       const payload = evaluateSkillPromptContract(vars);
+      return {
+        output: JSON.stringify(payload),
+        raw: payload,
+        format: 'json',
+        latencyMs: Date.now() - startedAt,
+      };
+    }
+
+    if (target === 'ai-tool-prompt-contract') {
+      const payload = evaluateAiToolPromptContract(vars);
       return {
         output: JSON.stringify(payload),
         raw: payload,
