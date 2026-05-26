@@ -3574,8 +3574,17 @@ function assertAiToolPromptContractCovered(output) {
   if (typeof bio.draftLength !== 'number' || bio.draftLength < 150) {
     return fail('bio draft is too short');
   }
+  if (typeof bio.factCount !== 'number' || !Number.isFinite(bio.factCount)) {
+    return fail('bio fact count is missing or non-numeric');
+  }
   if (bio.factCount < 5) {
     return fail('bio draft did not return expected facts');
+  }
+  if (
+    typeof bio.voiceDirectiveCount !== 'number' ||
+    !Number.isFinite(bio.voiceDirectiveCount)
+  ) {
+    return fail('bio voice directive count is missing or non-numeric');
   }
   if (bio.voiceDirectiveCount < 4) {
     return fail('bio draft did not return expected voice directives');

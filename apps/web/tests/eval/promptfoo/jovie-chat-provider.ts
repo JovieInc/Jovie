@@ -5299,11 +5299,20 @@ function textIncludesAll(text: string, needles: readonly string[]): boolean {
   return needles.every(needle => normalizedText.includes(needle.toLowerCase()));
 }
 
+function textIncludesNumericValue(text: string, value: number): boolean {
+  return text.replace(/\D+/g, '').includes(String(value));
+}
+
 function promptLeakPatterns(text: string): string[] {
   const patterns: Array<[string, RegExp]> = [
     ['email', /[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i],
-    ['http-url', /https?:\/\//i],
+    [
+      'localhost-url',
+      /https?:\/\/(?:localhost|127\.0\.0\.1|0\.0\.0\.0|\[::1\])/i,
+    ],
+    ['internal-url', /https?:\/\/[^/\s]*(?:\.internal|\.local)(?:[/:]|\s|$)/i],
     ['secret-token', /(?:sk-|bearer\s+|password|api[_-]?key)/i],
+    ['secret-env', /(?:SECRET_|PRIVATE_|TOKEN=|KEY=)/i],
   ];
 
   return patterns
@@ -5548,24 +5557,28 @@ function evaluateAiToolPromptContract(vars: EvalVars) {
   ].join('\n');
   const bioFacts = {
     draftUsesSyntheticArtist: textIncludesAll(bioDraft.draft, ['Luna Waves']),
-    draftUsesMarketSignal: textIncludesAll(bioDraft.draft, [
-      '12,500 Spotify followers',
-    ]),
-    draftUsesCatalogSignal: textIncludesAll(bioDraft.draft, [
-      'Neon Reef',
-      'Midnight Current',
-      '3 releases',
-    ]),
-    draftUsesProfileSignal: textIncludesAll(bioDraft.draft, ['3,420 views']),
-    factsAvoidInventingMissingMetrics: textIncludesAll(
-      bioDraft.facts.join('\n'),
-      [
-        'Spotify followers: 12,500',
-        'Spotify popularity: 45 / 100',
-        'Spotify profile linked: yes',
-        'Apple Music profile linked: yes',
-      ]
-    ),
+    draftUsesMarketSignal:
+      textIncludesAll(bioDraft.draft, ['Spotify followers']) &&
+      textIncludesNumericValue(bioDraft.draft, 12_500),
+    draftUsesCatalogSignal:
+      textIncludesAll(bioDraft.draft, [
+        'Neon Reef',
+        'Midnight Current',
+        'releases',
+      ]) && textIncludesNumericValue(bioDraft.draft, 3),
+    draftUsesProfileSignal:
+      textIncludesAll(bioDraft.draft, ['views']) &&
+      textIncludesNumericValue(bioDraft.draft, 3420),
+    factsAvoidInventingMissingMetrics:
+      textIncludesAll(bioDraft.facts.join('\n'), [
+        'Spotify followers',
+        'Spotify popularity',
+        'Spotify profile linked',
+        'Apple Music profile linked',
+      ]) &&
+      textIncludesNumericValue(bioDraft.facts.join('\n'), 12_500) &&
+      textIncludesNumericValue(bioDraft.facts.join('\n'), 45) &&
+      textIncludesNumericValue(bioDraft.facts.join('\n'), 100),
     directivesRequireFactualGrounding: textIncludesAll(
       bioDraft.voiceDirectives.join('\n'),
       ['avoid fabricated achievements', 'verifiable data points']
