@@ -105,6 +105,7 @@ import {
   selectMerchDesign,
   showArtistPayouts,
   showMerchSales,
+  updateMerchCardDetails,
   updateMerchCardStatus,
 } from '@/lib/merch/service';
 import {
@@ -1349,6 +1350,47 @@ function createMerchStatusTool(params: {
   });
 }
 
+function createMerchUpdateTool(params: {
+  readonly profileId: string | null;
+  readonly clerkUserId: string;
+}) {
+  return tool({
+    description:
+      'Update a merch card name, description, image URL, or retail price. If asked to make it live, run the merch safety guard before publishing.',
+    inputSchema: z.object({
+      merchCardId: z.string().uuid(),
+      title: z.string().min(1).max(120).optional(),
+      description: z.string().min(1).max(500).optional(),
+      primaryImageUrl: z.string().url().optional(),
+      retailPriceCents: z.number().int().min(100).max(50_000).optional(),
+      makeLive: z.boolean().optional(),
+    }),
+    execute: async input => {
+      if (!params.profileId) {
+        return { success: false as const, error: 'Profile ID required' };
+      }
+
+      const card = await updateMerchCardDetails({
+        cardId: input.merchCardId,
+        profileId: params.profileId,
+        clerkUserId: params.clerkUserId,
+        title: input.title,
+        description: input.description,
+        primaryImageUrl: input.primaryImageUrl,
+        retailPriceCents: input.retailPriceCents,
+        makeLive: input.makeLive,
+      });
+      return {
+        success: true as const,
+        merchCardId: card.id,
+        status: card.status,
+        title: card.title,
+        retailPrice: formatMerchMoney(card.retailPriceCents),
+      };
+    },
+  });
+}
+
 function createMerchSalesTool(profileId: string | null) {
   return tool({
     description: 'Show merch revenue and purchase counts for this artist.',
@@ -2056,6 +2098,10 @@ function buildChatTools(
             turnId: reservedTurn?.turnId ?? null,
           }),
           selectMerchDesign: createSelectMerchDesignTool({
+            profileId: resolvedProfileId,
+            clerkUserId,
+          }),
+          updateMerchCard: createMerchUpdateTool({
             profileId: resolvedProfileId,
             clerkUserId,
           }),

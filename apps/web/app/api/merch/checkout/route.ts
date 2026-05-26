@@ -63,6 +63,15 @@ export async function POST(request: Request) {
     return NextResponse.json(session, { headers: NO_STORE_HEADERS });
   } catch (error) {
     logger.error('[merch] Checkout session creation failed', { error });
+    if (
+      error instanceof Error &&
+      error.message.toLowerCase().includes('not sellable')
+    ) {
+      return NextResponse.json(
+        { error: 'This merch item is not currently sellable.' },
+        { status: 409, headers: NO_STORE_HEADERS }
+      );
+    }
     return NextResponse.json(
       { error: 'Failed to create checkout session' },
       { status: 500, headers: NO_STORE_HEADERS }

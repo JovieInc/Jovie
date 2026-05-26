@@ -27,6 +27,7 @@ import {
   estimateStripeFeeCents,
   MERCH_DEFAULT_REFUND_RESERVE_CENTS,
 } from './pricing';
+import { getMerchCardSellability, getMerchOrderSellability } from './safety';
 import { refreshMerchRank, resolveVariantId } from './service';
 import type {
   MerchCheckoutInput,
@@ -88,6 +89,31 @@ function validateShippingAddress(
       address.postalCode &&
       address.country
   );
+}
+
+function assertMerchCardCheckoutSellable(card: MerchCard): void {
+  const result = getMerchCardSellability(card);
+  if (!result.sellable) {
+    throw new Error(`Merch item is not sellable: ${result.reasons.join(' ')}`);
+  }
+}
+
+function assertMerchOrderSellable(
+  order: Pick<
+    MerchOrder,
+    | 'quantity'
+    | 'subtotalCents'
+    | 'printfulProductCostCents'
+    | 'stripeFeeEstimateCents'
+    | 'refundReserveCents'
+    | 'artistPayoutEstimateCents'
+    | 'jovieShareEstimateCents'
+  >
+): void {
+  const result = getMerchOrderSellability(order);
+  if (!result.sellable) {
+    throw new Error(`Merch order is not sellable: ${result.reasons.join(' ')}`);
+  }
 }
 
 function toPrintfulTechnique(technique: string): string {
@@ -176,6 +202,7 @@ export async function createMerchCheckoutSession(
   if (!row) {
     throw new Error('Merch item is not available');
   }
+  assertMerchCardCheckoutSellable(row.card);
 
   const variantId = resolveVariantId(
     row.card.printful.variantMap,
@@ -206,6 +233,15 @@ export async function createMerchCheckoutSession(
   );
   const jovieShareEstimateCents =
     netProfitEstimateCents - artistPayoutEstimateCents;
+  assertMerchOrderSellable({
+    quantity,
+    subtotalCents,
+    printfulProductCostCents,
+    stripeFeeEstimateCents,
+    refundReserveCents,
+    artistPayoutEstimateCents,
+    jovieShareEstimateCents,
+  });
   const printfulExternalId = `jovie_merch_${crypto.randomUUID()}`;
 
   const [order] = await db
@@ -347,6 +383,35 @@ export async function handleMerchCheckoutCompleted(
   const buyerName =
     session.customer_details?.name ?? shippingAddress?.name ?? null;
   const paidAt = new Date();
+  const cardSellability = getMerchCardSellability(existing.card);
+  const orderSellability = getMerchOrderSellability(existing.order);
+  const safetyReasons = [
+    ...cardSellability.reasons,
+    ...orderSellability.reasons,
+  ];
+
+  if (safetyReasons.length > 0) {
+    await db
+      .update(merchOrders)
+      .set({
+        status: 'paid_fulfillment_hold',
+        stripeCheckoutSessionId: session.id,
+        stripePaymentIntentId: paymentIntentId,
+        buyerEmail,
+        buyerName,
+        shippingAddress,
+        paidAt,
+        error: `Merch order safety hold: ${safetyReasons.join(' ')}`,
+        updatedAt: paidAt,
+      })
+      .where(eq(merchOrders.id, orderId));
+    logger.error('[merch] Paid order held by merch safety guard', {
+      orderId,
+      merchCardId: existing.card.id,
+      reasons: safetyReasons,
+    });
+    return;
+  }
 
   await db
     .insert(merchFulfillmentJobs)
@@ -526,6 +591,22 @@ export async function fulfillMerchOrder(orderId: string): Promise<void> {
         .where(eq(merchOrders.id, orderId));
     }
     throw new Error(`Merch order ${orderId} is not fulfillment-ready`);
+  }
+
+  try {
+    assertMerchCardCheckoutSellable(row.card);
+    assertMerchOrderSellable(row.order);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Unknown error';
+    await db
+      .update(merchOrders)
+      .set({
+        status: 'paid_fulfillment_hold',
+        error: message,
+        updatedAt: new Date(),
+      })
+      .where(eq(merchOrders.id, orderId));
+    throw error;
   }
 
   if (!isPrintfulConfigured()) {

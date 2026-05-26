@@ -113,4 +113,70 @@ describe('Printful client', () => {
     expect(body.order_items[0]?.catalog_variant_id).toBe(4012);
     expect(body.order_items[0]?.catalog_product_id).toBeUndefined();
   });
+
+  it('retrieves catalog variant prices with selling region and currency', async () => {
+    const serverFetch = vi.fn(
+      async () =>
+        new Response(
+          JSON.stringify({
+            data: {
+              currency: 'USD',
+              product: {
+                id: 71,
+                placements: [
+                  {
+                    id: 'front',
+                    technique_key: 'dtg',
+                    price: '17.50',
+                    discounted_price: '16.75',
+                  },
+                ],
+              },
+            },
+          }),
+          { status: 200 }
+        )
+    );
+    const { client } = await loadPrintfulClient({ serverFetch });
+
+    const prices = await client.getCatalogVariantPrices(4011, {
+      currency: 'USD',
+      sellingRegionName: 'north_america',
+    });
+
+    expect(prices.currency).toBe('USD');
+    expect(prices.product.placements[0]?.discounted_price).toBe('16.75');
+    expect(serverFetch).toHaveBeenCalledTimes(1);
+    const priceCall = serverFetch.mock.calls[0] as unknown as [string];
+    expect(priceCall[0]).toBe(
+      'https://printful.test/v2/catalog-variants/4011/prices?currency=USD&selling_region_name=north_america'
+    );
+  });
+
+  it('supports catalog product paging parameters', async () => {
+    const serverFetch = vi.fn(
+      async () =>
+        new Response(
+          JSON.stringify({
+            data: [{ id: 71, name: 'Unisex Premium T-Shirt' }],
+            paging: { total: 240, offset: 20, limit: 20 },
+          }),
+          { status: 200 }
+        )
+    );
+    const { client } = await loadPrintfulClient({ serverFetch });
+
+    const products = await client.listCatalogProducts({
+      sellingRegionName: 'north_america',
+      placements: ['front'],
+      limit: 20,
+      offset: 20,
+    });
+
+    expect(products).toEqual([{ id: 71, name: 'Unisex Premium T-Shirt' }]);
+    const productsCall = serverFetch.mock.calls[0] as unknown as [string];
+    expect(productsCall[0]).toBe(
+      'https://printful.test/v2/catalog-products?selling_region_name=north_america&placements=front&limit=20&offset=20'
+    );
+  });
 });

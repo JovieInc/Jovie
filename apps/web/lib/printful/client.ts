@@ -51,6 +51,32 @@ export interface PrintfulCatalogVariant {
   readonly image?: string | null;
 }
 
+export interface PrintfulCatalogVariantPrices {
+  readonly currency: string;
+  readonly product: {
+    readonly id: number;
+    readonly placements: Array<{
+      readonly id: string;
+      readonly title?: string;
+      readonly type?: string;
+      readonly technique_key?: string;
+      readonly price?: string;
+      readonly discounted_price?: string;
+      readonly placement_options?: unknown[];
+      readonly layers?: unknown[];
+    }>;
+  };
+  readonly variant?: {
+    readonly id: number;
+    readonly techniques?: Array<{
+      readonly technique_key?: string;
+      readonly technique_display_name?: string;
+      readonly price?: string;
+      readonly discounted_price?: string;
+    }>;
+  };
+}
+
 export interface PrintfulAvailability {
   readonly catalog_variant_id: number;
   readonly techniques?: Array<{
@@ -226,6 +252,7 @@ export async function listCatalogProducts(params?: {
   readonly sellingRegionName?: string;
   readonly placements?: readonly string[];
   readonly limit?: number;
+  readonly offset?: number;
 }): Promise<PrintfulCatalogProduct[]> {
   const search = new URLSearchParams();
   if (params?.sellingRegionName) {
@@ -236,6 +263,9 @@ export async function listCatalogProducts(params?: {
   }
   if (params?.limit) {
     search.set('limit', String(params.limit));
+  }
+  if (params?.offset) {
+    search.set('offset', String(params.offset));
   }
 
   const catalogProductsPath =
@@ -249,16 +279,79 @@ export async function listCatalogProducts(params?: {
   return readList(payload);
 }
 
-export async function listCatalogVariants(
+export async function getCatalogProduct(
   catalogProductId: number
+): Promise<PrintfulCatalogProduct> {
+  const payload = await requestPrintful<
+    PrintfulDataResponse<PrintfulCatalogProduct>
+  >(`/v2/catalog-products/${catalogProductId}`, {
+    method: 'GET',
+    retry: true,
+  });
+  return readData(payload);
+}
+
+export async function listCatalogVariants(
+  catalogProductId: number,
+  params?: {
+    readonly limit?: number;
+    readonly offset?: number;
+  }
 ): Promise<PrintfulCatalogVariant[]> {
+  const search = new URLSearchParams();
+  if (params?.limit) {
+    search.set('limit', String(params.limit));
+  }
+  if (params?.offset) {
+    search.set('offset', String(params.offset));
+  }
+  const path =
+    search.size > 0
+      ? `/v2/catalog-products/${catalogProductId}/catalog-variants?${search}`
+      : `/v2/catalog-products/${catalogProductId}/catalog-variants`;
   const payload = await requestPrintful<
     PrintfulListResponse<PrintfulCatalogVariant>
-  >(`/v2/catalog-products/${catalogProductId}/catalog-variants`, {
+  >(path, {
     method: 'GET',
     retry: true,
   });
   return readList(payload);
+}
+
+export async function getCatalogVariant(
+  catalogVariantId: number
+): Promise<PrintfulCatalogVariant> {
+  const payload = await requestPrintful<
+    PrintfulDataResponse<PrintfulCatalogVariant>
+  >(`/v2/catalog-variants/${catalogVariantId}`, {
+    method: 'GET',
+    retry: true,
+  });
+  return readData(payload);
+}
+
+export async function getCatalogVariantPrices(
+  catalogVariantId: number,
+  params?: {
+    readonly currency?: string;
+    readonly sellingRegionName?: string;
+  }
+): Promise<PrintfulCatalogVariantPrices> {
+  const search = new URLSearchParams();
+  if (params?.currency) {
+    search.set('currency', params.currency);
+  }
+  if (params?.sellingRegionName) {
+    search.set('selling_region_name', params.sellingRegionName);
+  }
+  const path =
+    search.size > 0
+      ? `/v2/catalog-variants/${catalogVariantId}/prices?${search}`
+      : `/v2/catalog-variants/${catalogVariantId}/prices`;
+  const payload = await requestPrintful<
+    PrintfulDataResponse<PrintfulCatalogVariantPrices>
+  >(path, { method: 'GET', retry: true });
+  return readData(payload);
 }
 
 export async function getCatalogProductAvailability(

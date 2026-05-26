@@ -251,7 +251,9 @@ describe('ChatMessage', () => {
       expect(screen.getByTestId('chat-merch-option-card')).toHaveTextContent(
         'Never Say A Word Hoodie'
       );
-      expect(screen.getByText('$68.00')).toBeInTheDocument();
+      expect(screen.getByTestId('chat-merch-option-card')).toHaveTextContent(
+        '$68.00'
+      );
 
       screen.getByRole('button', { name: 'Save' }).click();
 
