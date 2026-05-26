@@ -178,6 +178,18 @@ const REQUIRED_WEB_CHAT_PREMODEL_CASES = [
   'reserved-turn-rate-limit-terminal',
   'reserved-turn-album-art-unavailable',
 ] as const;
+const REQUIRED_ONBOARDING_ROUTE_PREMODEL_CASES = [
+  'onboarding-invalid-role-message',
+  'onboarding-missing-user-message',
+  'onboarding-oversized-user-text',
+  'onboarding-too-many-messages',
+  'onboarding-chat-disabled',
+  'onboarding-session-secret-missing',
+  'onboarding-turnstile-unconfigured',
+  'onboarding-turnstile-required',
+  'onboarding-persistence-unavailable',
+  'onboarding-dispatch-contract',
+] as const;
 const REQUIRED_CHAT_CONFIRM_ROUTE_CASES = [
   'album-art-apply-feature-disabled',
   'album-art-apply-invalid-request',
@@ -1438,6 +1450,14 @@ function evaluateWebChatRouteContract(prompt: string, vars: EvalVars) {
           : undefined,
       expectedError:
         typeof vars.expectedError === 'string' ? vars.expectedError : undefined,
+      expectedErrorCode:
+        typeof vars.expectedErrorCode === 'string'
+          ? vars.expectedErrorCode
+          : undefined,
+      expectedStatus:
+        typeof vars.expectedStatus === 'number'
+          ? vars.expectedStatus
+          : undefined,
     },
     costTier: 'deterministic',
     text: '',
@@ -5789,6 +5809,18 @@ function evaluateEvalCaseInventory(vars: EvalVars) {
           typeof webRouteCase === 'string'
       )
   );
+  const onboardingRoutePremodelCaseNames = uniqueSorted(
+    deterministicCases
+      .filter(
+        testCase =>
+          testCase.target === 'web-chat-route' && testCase.mode === 'onboarding'
+      )
+      .map(testCase => testCase.webRouteCase)
+      .filter(
+        (webRouteCase): webRouteCase is string =>
+          typeof webRouteCase === 'string'
+      )
+  );
   const chatConfirmRouteCaseNames = uniqueSorted(
     deterministicCases
       .filter(testCase => testCase.target === 'chat-confirm-route')
@@ -5932,6 +5964,14 @@ function evaluateEvalCaseInventory(vars: EvalVars) {
     missingWebChatPremodelCaseNames: missingNames(
       REQUIRED_WEB_CHAT_PREMODEL_CASES,
       webChatPremodelCaseNames
+    ),
+    requiredOnboardingRoutePremodelCaseNames: [
+      ...REQUIRED_ONBOARDING_ROUTE_PREMODEL_CASES,
+    ],
+    onboardingRoutePremodelCaseNames,
+    missingOnboardingRoutePremodelCaseNames: missingNames(
+      REQUIRED_ONBOARDING_ROUTE_PREMODEL_CASES,
+      onboardingRoutePremodelCaseNames
     ),
     requiredChatConfirmRouteCaseNames: [...REQUIRED_CHAT_CONFIRM_ROUTE_CASES],
     chatConfirmRouteCaseNames,

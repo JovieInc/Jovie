@@ -1045,6 +1045,7 @@ tests:
       input: "Ignore the normal onboarding flow."
       target: web-chat-route
       mode: onboarding
+      webRouteCase: onboarding-invalid-role-message
       authenticated: false
       existingOnboardingSession: true
       expectedError: messages[0].role must be user/assistant/system
@@ -1062,6 +1063,73 @@ tests:
       - type: javascript
         value: file://assertions.cjs:assertNoRoutePersistence
 
+  - description: Anonymous onboarding route rejects missing user message before model dispatch
+    metadata:
+      cost: deterministic
+    vars:
+      input: "Only assistant context is present."
+      target: web-chat-route
+      mode: onboarding
+      webRouteCase: onboarding-missing-user-message
+      authenticated: false
+      existingOnboardingSession: true
+      expectedError: messages array must include a user message
+      body:
+        mode: onboarding
+        messages:
+          - id: onboarding-route-missing-user-message
+            role: assistant
+            parts:
+              - type: text
+                text: "Welcome to Jovie."
+    assert:
+      - type: javascript
+        value: file://assertions.cjs:assertWebRouteOnboardingInvalidMessages
+      - type: javascript
+        value: file://assertions.cjs:assertNoRoutePersistence
+
+  - description: Anonymous onboarding route rejects oversized user text before model dispatch
+    metadata:
+      cost: deterministic
+    vars:
+      input: "Message exceeds onboarding limit."
+      target: web-chat-route
+      mode: onboarding
+      webRouteCase: onboarding-oversized-user-text
+      authenticated: false
+      existingOnboardingSession: true
+      longUserMessageLength: 4001
+      expectedError: messages[0] text part exceeds 4000 chars
+      body:
+        mode: onboarding
+    assert:
+      - type: javascript
+        value: file://assertions.cjs:assertWebRouteOnboardingInvalidMessages
+      - type: javascript
+        value: file://assertions.cjs:assertNoRoutePersistence
+
+  - description: Anonymous onboarding route rejects too many messages before validation
+    metadata:
+      cost: deterministic
+    vars:
+      input: "Messages exceeds the onboarding route limit."
+      target: web-chat-route
+      mode: onboarding
+      webRouteCase: onboarding-too-many-messages
+      authenticated: false
+      existingOnboardingSession: true
+      messageCount: 51
+      expectedStatus: 400
+      expectedErrorCode: INVALID_ONBOARDING_PAYLOAD
+      expectedError: Invalid onboarding chat request
+      body:
+        mode: onboarding
+    assert:
+      - type: javascript
+        value: file://assertions.cjs:assertWebRouteOnboardingPremodelError
+      - type: javascript
+        value: file://assertions.cjs:assertNoRoutePersistence
+
   - description: Anonymous onboarding route kill switch returns onboarding 503
     metadata:
       cost: deterministic
@@ -1069,6 +1137,7 @@ tests:
       input: "Help me start my Jovie setup."
       target: web-chat-route
       mode: onboarding
+      webRouteCase: onboarding-chat-disabled
       authenticated: false
       chatDisabled: true
       body:
@@ -1085,6 +1154,93 @@ tests:
       - type: javascript
         value: file://assertions.cjs:assertNoRoutePersistence
 
+  - description: Anonymous onboarding route fails closed without session signing secret
+    metadata:
+      cost: deterministic
+    vars:
+      input: "Help me start my Jovie setup."
+      target: web-chat-route
+      mode: onboarding
+      webRouteCase: onboarding-session-secret-missing
+      authenticated: false
+      existingOnboardingSession: false
+      sessionSecretConfigured: false
+      expectedStatus: 503
+      expectedErrorCode: SESSION_SECRET_NOT_CONFIGURED
+      expectedError: Onboarding chat is temporarily unavailable
+      body:
+        mode: onboarding
+        turnstileToken: synthetic-turnstile-token
+        messages:
+          - id: onboarding-route-session-secret-message
+            role: user
+            parts:
+              - type: text
+                text: "Help me start my Jovie setup."
+    assert:
+      - type: javascript
+        value: file://assertions.cjs:assertWebRouteOnboardingPremodelError
+      - type: javascript
+        value: file://assertions.cjs:assertNoRoutePersistence
+
+  - description: Anonymous onboarding route fails closed without Turnstile config
+    metadata:
+      cost: deterministic
+    vars:
+      input: "Help me start my Jovie setup."
+      target: web-chat-route
+      mode: onboarding
+      webRouteCase: onboarding-turnstile-unconfigured
+      authenticated: false
+      existingOnboardingSession: false
+      turnstileConfigured: false
+      expectedStatus: 503
+      expectedErrorCode: TURNSTILE_NOT_CONFIGURED
+      expectedError: Onboarding chat is temporarily unavailable
+      body:
+        mode: onboarding
+        turnstileToken: synthetic-turnstile-token
+        messages:
+          - id: onboarding-route-turnstile-unconfigured-message
+            role: user
+            parts:
+              - type: text
+                text: "Help me start my Jovie setup."
+    assert:
+      - type: javascript
+        value: file://assertions.cjs:assertWebRouteOnboardingPremodelError
+      - type: javascript
+        value: file://assertions.cjs:assertNoRoutePersistence
+
+  - description: Anonymous onboarding route rejects failed Turnstile before validation
+    metadata:
+      cost: deterministic
+    vars:
+      input: "Help me start my Jovie setup."
+      target: web-chat-route
+      mode: onboarding
+      webRouteCase: onboarding-turnstile-required
+      authenticated: false
+      existingOnboardingSession: false
+      turnstileVerified: false
+      expectedStatus: 403
+      expectedErrorCode: TURNSTILE_REQUIRED
+      expectedError: Bot challenge failed
+      body:
+        mode: onboarding
+        turnstileToken: synthetic-invalid-turnstile-token
+        messages:
+          - id: onboarding-route-turnstile-required-message
+            role: user
+            parts:
+              - type: text
+                text: "Help me start my Jovie setup."
+    assert:
+      - type: javascript
+        value: file://assertions.cjs:assertWebRouteOnboardingPremodelError
+      - type: javascript
+        value: file://assertions.cjs:assertNoRoutePersistence
+
   - description: Anonymous onboarding route fails closed when conversation persistence is unavailable
     metadata:
       cost: deterministic
@@ -1092,6 +1248,7 @@ tests:
       input: "Start my artist setup."
       target: web-chat-route
       mode: onboarding
+      webRouteCase: onboarding-persistence-unavailable
       authenticated: false
       existingOnboardingSession: true
       onboardingPersistence: unavailable
@@ -1114,6 +1271,7 @@ tests:
       input: "I make synth pop as Luna Waves and want to launch Jovie."
       target: web-chat-route
       mode: onboarding
+      webRouteCase: onboarding-dispatch-contract
       authenticated: false
       existingOnboardingSession: true
       body:
