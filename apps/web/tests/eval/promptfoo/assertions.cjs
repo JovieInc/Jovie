@@ -3660,8 +3660,20 @@ function assertEvalCaseInventoryCovered(output) {
   if (payload.liveCaseCount < 1) {
     return fail('eval case inventory found no live/manual cases');
   }
+  if (payload.liveModelCaseCount < 1) {
+    return fail('eval case inventory found no live model cases');
+  }
+  if (payload.liveHttpCaseCount < 1) {
+    return fail('eval case inventory found no live HTTP cases');
+  }
 
   for (const field of [
+    'missingCostTierCaseNames',
+    'unknownCostTierCaseNames',
+    'deterministicLiveTargetCaseNames',
+    'liveModelInvalidCostCaseNames',
+    'liveHttpInvalidCostCaseNames',
+    'missingLiveHttpCaseNames',
     'missingToolContractExecutedNames',
     'unknownToolContractExecutedNames',
     'missingInventoryCoveredToolNames',

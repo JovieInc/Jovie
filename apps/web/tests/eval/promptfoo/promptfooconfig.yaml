@@ -1538,7 +1538,7 @@ tests:
       - type: javascript
         value: file://assertions.cjs:assertToolResultShapeMatrix
 
-  - description: Eval case inventory covers every deterministic tool lane
+  - description: Eval case inventory covers deterministic lanes and no-cost gates
     metadata:
       cost: deterministic
     vars:
