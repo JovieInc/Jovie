@@ -76,6 +76,7 @@ describe('dev test-auth routes', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.resetModules();
+    vi.unstubAllEnvs();
     vi.stubEnv('E2E_CLERK_USER_ID', '');
     vi.stubEnv('E2E_CLERK_USER_USERNAME', '');
     vi.stubEnv('JOVIE_IOS_LIVE_AUTH_CLERK_USER_ID', '');
@@ -789,7 +790,7 @@ describe('dev test-auth routes', () => {
     });
   });
 
-  it('allows the iOS provider-complete route on HTTPS production only with the configured test token', async () => {
+  it('allows the iOS provider-complete route on HTTPS preview only with the configured test token', async () => {
     vi.stubEnv('JOVIE_IOS_REAL_BROWSER_AUTH_TOKEN', 'test-token');
     mockEnsureLiveDevTestAuthActor.mockResolvedValueOnce({
       persona: 'creator-ready',
@@ -806,7 +807,7 @@ describe('dev test-auth routes', () => {
     );
     const response = await GET(
       new NextRequest(
-        'https://jov.ie/api/dev/test-auth/mobile-provider-complete?persona=creator-ready&return_to=%2Fapp&code_challenge=challenge_123&code_challenge_method=S256&test_token=test-token'
+        'https://preview.jov.ie/api/dev/test-auth/mobile-provider-complete?persona=creator-ready&return_to=%2Fapp&code_challenge=challenge_123&code_challenge_method=S256&test_token=test-token'
       )
     );
 
@@ -822,6 +823,28 @@ describe('dev test-auth routes', () => {
         codeChallenge: 'challenge_123',
       })
     );
+    expect(mockGetDevTestAuthAvailability).not.toHaveBeenCalled();
+  });
+
+  it('rejects the iOS provider-complete token bypass on production deployments', async () => {
+    vi.stubEnv('JOVIE_IOS_REAL_BROWSER_AUTH_TOKEN', 'test-token');
+    vi.stubEnv('VERCEL_ENV', 'production');
+
+    const { GET } = await import(
+      '@/app/api/dev/test-auth/mobile-provider-complete/route'
+    );
+    const response = await GET(
+      new NextRequest(
+        'https://jov.ie/api/dev/test-auth/mobile-provider-complete?persona=creator-ready&return_to=%2Fapp&code_challenge=challenge_123&code_challenge_method=S256&test_token=test-token'
+      )
+    );
+
+    expect(response.status).toBe(403);
+    expect(await response.json()).toEqual({
+      success: false,
+      error: 'Not available in production',
+    });
+    expect(mockCreateStoredNativeExchangeCode).not.toHaveBeenCalled();
     expect(mockGetDevTestAuthAvailability).not.toHaveBeenCalled();
   });
 
