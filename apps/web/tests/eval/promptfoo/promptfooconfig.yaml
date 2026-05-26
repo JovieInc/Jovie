@@ -1621,6 +1621,24 @@ tests:
       - type: javascript
         value: file://assertions.cjs:assertSkillPromptContractCovered
 
+  - description: AI chat tool prompt builders preserve no-text and factual guardrails
+    metadata:
+      cost: deterministic
+    vars:
+      input: "AI chat tool prompt contract check"
+      target: ai-tool-prompt-contract
+      aiToolPromptCase: album-art-canvas-bio-prompts
+      coverage:
+        expectedToolNames:
+          - generateAlbumArt
+          - generateCanvasPlan
+          - writeWorldClassBio
+    assert:
+      - type: javascript
+        value: file://assertions.cjs:assertDeterministicNoSpend
+      - type: javascript
+        value: file://assertions.cjs:assertAiToolPromptContractCovered
+
   - description: Tool result shape matrix covers success and failure outputs
     metadata:
       cost: deterministic

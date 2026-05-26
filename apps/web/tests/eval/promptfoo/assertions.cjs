@@ -3501,6 +3501,104 @@ function assertSkillPromptContractCovered(output) {
   return pass();
 }
 
+function assertAiToolPromptContractCovered(output) {
+  const payload = parseOutput(output);
+
+  if (payload.target !== 'ai-tool-prompt-contract') {
+    return fail('case did not run through the ai-tool-prompt-contract adapter');
+  }
+  if (payload.promptCase !== 'album-art-canvas-bio-prompts') {
+    return fail(
+      `expected album-art-canvas-bio-prompts prompt case, got ${String(payload.promptCase)}`
+    );
+  }
+  if (payload.costTier !== 'deterministic') {
+    return fail('AI tool prompt case is not marked deterministic');
+  }
+  for (const field of [
+    'modelCalled',
+    'persistenceAttempted',
+    'dbAttempted',
+    'networkAttempted',
+  ]) {
+    if (payload[field] !== false) {
+      return fail(`${field} should be false for AI tool prompt coverage`);
+    }
+  }
+
+  for (const field of [
+    'missingExpectedToolNames',
+    'unknownExpectedToolNames',
+  ]) {
+    const values = payload[field];
+    if (!Array.isArray(values)) {
+      return fail(`AI tool prompt contract missing ${field}`);
+    }
+    if (values.length > 0) {
+      return fail(`${field}: ${values.join(', ')}`);
+    }
+  }
+
+  const albumArt = payload.albumArt ?? {};
+  if (albumArt.toolName !== 'generateAlbumArt') {
+    return fail('albumArt payload is not tied to generateAlbumArt');
+  }
+  if (
+    typeof albumArt.promptLength !== 'number' ||
+    albumArt.promptLength < 250
+  ) {
+    return fail('album art prompt is too short');
+  }
+  if (albumArt.styleId !== 'chrome_noir') {
+    return fail(`expected chrome_noir style, got ${String(albumArt.styleId)}`);
+  }
+
+  const canvas = payload.canvas ?? {};
+  if (canvas.toolName !== 'generateCanvasPlan') {
+    return fail('canvas payload is not tied to generateCanvasPlan');
+  }
+  const canvasPromptLengths = canvas.promptLengths ?? {};
+  for (const field of ['artworkProcessing', 'videoGeneration']) {
+    if (
+      typeof canvasPromptLengths[field] !== 'number' ||
+      canvasPromptLengths[field] < 100
+    ) {
+      return fail(`canvas prompt length ${field} was too short`);
+    }
+  }
+
+  const bio = payload.bio ?? {};
+  if (bio.toolName !== 'writeWorldClassBio') {
+    return fail('bio payload is not tied to writeWorldClassBio');
+  }
+  if (typeof bio.draftLength !== 'number' || bio.draftLength < 150) {
+    return fail('bio draft is too short');
+  }
+  if (bio.factCount < 5) {
+    return fail('bio draft did not return expected facts');
+  }
+  if (bio.voiceDirectiveCount < 4) {
+    return fail('bio draft did not return expected voice directives');
+  }
+
+  for (const [name, section] of Object.entries({ albumArt, canvas, bio })) {
+    const missingFacts = Array.isArray(section.missingFacts)
+      ? section.missingFacts
+      : [];
+    if (missingFacts.length > 0) {
+      return fail(`${name} prompt missing facts: ${missingFacts.join(', ')}`);
+    }
+    const leakPatterns = Array.isArray(section.leakPatterns)
+      ? section.leakPatterns
+      : [];
+    if (leakPatterns.length > 0) {
+      return fail(`${name} prompt leaked patterns: ${leakPatterns.join(', ')}`);
+    }
+  }
+
+  return pass();
+}
+
 function firstEvent(payload) {
   return Array.isArray(payload.events) ? payload.events[0] : undefined;
 }
@@ -4059,6 +4157,7 @@ function assertEvalCaseInventoryCovered(output) {
     'missingKnowledgeCaseNames',
     'missingPromptContextCaseNames',
     'missingToolAccessCaseNames',
+    'missingAiToolPromptCaseNames',
     'missingSkillArtifactCaseNames',
     'missingSkillCatalogCaseNames',
     'missingSkillCommandCaseNames',
@@ -4193,6 +4292,7 @@ module.exports = {
   assertSkillCatalogSyncContractCovered,
   assertSkillCommandContractCovered,
   assertSkillPromptContractCovered,
+  assertAiToolPromptContractCovered,
   assertSkillRegistryInventoryCovered,
   assertToolEventInventoryCovered,
   assertToolEventHydratesSuccess,

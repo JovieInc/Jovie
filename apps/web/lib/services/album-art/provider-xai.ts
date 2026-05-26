@@ -3,7 +3,8 @@ import 'server-only';
 import { xai } from '@ai-sdk/xai';
 import { generateImage } from 'ai';
 import { env } from '@/lib/env-server';
-import type { AlbumArtStylePreset } from './types';
+
+export { buildAlbumArtBackgroundPrompt } from './prompts';
 
 const DEFAULT_MODEL = 'grok-imagine-image';
 
@@ -26,25 +27,6 @@ export function isXaiConfigured(): boolean {
 
 function getAlbumArtModelId(): string {
   return env.ALBUM_ART_IMAGE_MODEL ?? DEFAULT_MODEL;
-}
-
-export function buildAlbumArtBackgroundPrompt(params: {
-  readonly releaseTitle: string;
-  readonly artistName: string;
-  readonly style: AlbumArtStylePreset;
-  readonly prompt?: string;
-}): string {
-  const customPrompt = params.prompt?.trim();
-  return [
-    'Create a square album cover background image.',
-    params.style.backgroundPrompt,
-    customPrompt ? `Additional direction: ${customPrompt}` : null,
-    'Do not render any words, letters, typography, logos, label names, advisory stickers, watermarks, symbols that resemble text, or UI elements.',
-    'Leave clean composition space for Jovie to overlay the artist name and release title later.',
-    `Mood should fit a release called "${params.releaseTitle}" by ${params.artistName}.`,
-  ]
-    .filter(Boolean)
-    .join(' ');
 }
 
 function bufferFromImage(image: unknown): Buffer {
