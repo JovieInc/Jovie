@@ -29,6 +29,7 @@ import {
   selectKnowledgeContextForTurn,
 } from '@/lib/chat/run';
 import { buildSystemPrompt } from '@/lib/chat/system-prompt';
+import { sanitizeConversationTitle } from '@/lib/chat/title';
 import {
   extractSkill,
   parseTokens,
@@ -65,7 +66,11 @@ import {
   commandsForSurface,
   HIDDEN_TOOLS,
 } from '@/lib/commands/registry';
-import { CHAT_MODEL, CHAT_MODEL_LIGHT } from '@/lib/constants/ai-models';
+import {
+  CHAT_MODEL,
+  CHAT_MODEL_LIGHT,
+  TITLE_MODEL,
+} from '@/lib/constants/ai-models';
 import {
   insertSkillsCatalogSchema,
   insertToolsCatalogSchema,
@@ -116,6 +121,7 @@ type EvalVars = Record<string, unknown>;
 type EvalTarget =
   | 'ai-tool-prompt-contract'
   | 'chat-confirm-route'
+  | 'chat-title-contract'
   | 'chat-turn'
   | 'eval-case-inventory'
   | 'insight-prompt-contract'
@@ -589,6 +595,7 @@ const REQUIRED_AI_TOOL_PROMPT_CASES = ['album-art-canvas-bio-prompts'] as const;
 const REQUIRED_INSIGHT_PROMPT_CASES = ['analytics-grounding-prompts'] as const;
 const REQUIRED_ONBOARDING_SYSTEM_PROMPT_CASES = ['prompt-rules'] as const;
 const REQUIRED_RELEASE_TASK_CLASSIFIER_CASES = ['prompt-and-coercion'] as const;
+const REQUIRED_CHAT_TITLE_CASES = ['prompt-and-fallback'] as const;
 let serverOnlyEvalShimRegistered = false;
 const AI_TOOL_PROMPT_TOOL_NAMES = [
   'generateAlbumArt',
@@ -733,6 +740,7 @@ function toTarget(value: unknown): EvalTarget {
   if (
     value === 'ai-tool-prompt-contract' ||
     value === 'chat-confirm-route' ||
+    value === 'chat-title-contract' ||
     value === 'chat-turn' ||
     value === 'eval-case-inventory' ||
     value === 'insight-prompt-contract' ||
@@ -6129,6 +6137,123 @@ function evaluateOnboardingSystemPromptContract(vars: EvalVars) {
   };
 }
 
+function evaluateChatTitleContract(vars: EvalVars) {
+  const titleCase =
+    typeof vars.chatTitleCase === 'string'
+      ? vars.chatTitleCase
+      : 'prompt-and-fallback';
+  const routeSourcePath = 'app/api/chat/conversations/[id]/messages/route.ts';
+  const routeSource = readFileSync(
+    resolve(process.cwd(), routeSourcePath),
+    'utf8'
+  );
+  const systemPrompt =
+    routeSource.match(/system:\s*'([^']+)'/)?.[1]?.trim() ?? '';
+  const guardedNullUpdateCount = [
+    ...routeSource.matchAll(/isNull\(chatConversations\.title\)/g),
+  ].length;
+  const sourceTitle = sanitizeConversationTitle(
+    'Help Luna Waves title a launch plan for Neon Reef, playlist pitching, and profile cleanup before release week.',
+    200
+  );
+  const fallbackTitle = sanitizeConversationTitle(sourceTitle, 50);
+  const generatedTitle = sanitizeConversationTitle('"Neon Reef Launch Plan"');
+  const sourceFacts = {
+    importsUserFacingRouteDependencies: textIncludesAll(routeSource, [
+      "import { gateway } from '@ai-sdk/gateway'",
+      "import { generateText } from '@/lib/ai/sdk'",
+      "import { TITLE_MODEL } from '@/lib/constants/ai-models'",
+    ]),
+    usesTitleModelConstant:
+      TITLE_MODEL === 'google/gemini-2.0-flash' &&
+      routeSource.includes('gateway(TITLE_MODEL)'),
+    keepsTitleOnlyPrompt: textIncludesAll(systemPrompt, [
+      'Generate a short, descriptive title',
+      '2-6 words',
+      'Return only the title text',
+      'no quotes',
+      'extra punctuation',
+    ]),
+    capsModelOutputAndDuration: textIncludesAll(routeSource, [
+      'maxOutputTokens: 30',
+      'AbortSignal.timeout(5000)',
+    ]),
+    redactsTitleTelemetryInputsAndOutputs: textIncludesAll(routeSource, [
+      'experimental_telemetry',
+      'recordInputs: false',
+      'recordOutputs: false',
+      "functionId: 'jovie-chat-title'",
+    ]),
+    sanitizesAllTitleInputsAndOutputs: textIncludesAll(routeSource, [
+      'sanitizeConversationTitle(userMessage?.content, 200)',
+      'sanitizeConversationTitle(m.content, 200)',
+      'sanitizeConversationTitle(text)',
+    ]),
+    guardsGeneratedAndFallbackUpdates: guardedNullUpdateCount >= 2,
+    fallsBackToSanitizedUserMessage: textIncludesAll(routeSource, [
+      'const fallback = sanitizeConversationTitle(titleSource, 50)',
+      'if (!fallback) return',
+    ]),
+    schedulesTitleGenerationAfterPersistence: textIncludesAll(routeSource, [
+      'const titlePending = hasUserMessage && !conversation.title',
+      'after(async () =>',
+      'await maybeGenerateTitle(conversationId, messagesToInsert)',
+    ]),
+  };
+  const runtimeFacts = {
+    syntheticGeneratedTitleSanitized:
+      generatedTitle === 'Neon Reef Launch Plan',
+    syntheticFallbackExists: typeof fallbackTitle === 'string',
+    syntheticFallbackTruncated:
+      typeof fallbackTitle === 'string' &&
+      fallbackTitle.length <= 50 &&
+      fallbackTitle.endsWith('...'),
+    syntheticSourceTitleSanitized:
+      typeof sourceTitle === 'string' &&
+      sourceTitle.includes('Luna Waves') &&
+      sourceTitle.includes('Neon Reef'),
+  };
+  const titlePromptLeakPatterns = promptLeakPatterns(systemPrompt);
+
+  return {
+    target: 'chat-title-contract',
+    adapter: 'chat-title-contract',
+    productionEntrypoint:
+      'apps/web/app/api/chat/conversations/[id]/messages/route.ts:maybeGenerateTitle',
+    costTier: 'deterministic',
+    text: '',
+    selectedModel: null,
+    modelCalled: false,
+    persistenceAttempted: false,
+    dbAttempted: false,
+    networkAttempted: false,
+    titleCase,
+    titleModel: TITLE_MODEL,
+    routeSourcePath,
+    routeSourceLength: routeSource.length,
+    systemPrompt,
+    systemPromptLength: systemPrompt.length,
+    guardedNullUpdateCount,
+    sourceFacts,
+    missingSourceFacts: Object.entries(sourceFacts)
+      .filter(([, passed]) => !passed)
+      .map(([name]) => name),
+    runtimeFacts,
+    missingRuntimeFacts: Object.entries(runtimeFacts)
+      .filter(([, passed]) => !passed)
+      .map(([name]) => name),
+    synthetic: {
+      generatedTitle,
+      sourceTitle,
+      fallbackTitle,
+    },
+    promptLeakPatterns: titlePromptLeakPatterns,
+    toolCalls: [],
+    toolResults: [],
+    toolExecutions: [],
+  };
+}
+
 async function evaluateReleaseTaskClassifierContract(vars: EvalVars) {
   const { classifyTaskCluster, CLASSIFIER_MIN_CONFIDENCE } =
     await importReleaseTaskClassifierModule();
@@ -7130,6 +7255,7 @@ type EvalCaseSummary = {
   readonly expectedModel: string | null;
   readonly eventCase: string | null;
   readonly aiToolPromptCase: string | null;
+  readonly chatTitleCase: string | null;
   readonly insightPromptCase: string | null;
   readonly onboardingSystemPromptCase: string | null;
   readonly releaseTaskClassifierCase: string | null;
@@ -7234,6 +7360,7 @@ function parseEvalCaseSummary(block: string): EvalCaseSummary {
     expectedModel: scalarValue(block, 'expectedModel'),
     eventCase: scalarValue(block, 'eventCase'),
     aiToolPromptCase: scalarValue(block, 'aiToolPromptCase'),
+    chatTitleCase: scalarValue(block, 'chatTitleCase'),
     insightPromptCase: scalarValue(block, 'insightPromptCase'),
     onboardingSystemPromptCase: scalarValue(
       block,
@@ -7468,6 +7595,15 @@ function evaluateEvalCaseInventory(vars: EvalVars) {
       .filter(
         (aiToolPromptCase): aiToolPromptCase is string =>
           typeof aiToolPromptCase === 'string'
+      )
+  );
+  const chatTitleCaseNames = uniqueSorted(
+    deterministicCases
+      .filter(testCase => testCase.target === 'chat-title-contract')
+      .map(testCase => testCase.chatTitleCase)
+      .filter(
+        (chatTitleCase): chatTitleCase is string =>
+          typeof chatTitleCase === 'string'
       )
   );
   const insightPromptCaseNames = uniqueSorted(
@@ -7736,6 +7872,12 @@ function evaluateEvalCaseInventory(vars: EvalVars) {
     missingAiToolPromptCaseNames: missingNames(
       REQUIRED_AI_TOOL_PROMPT_CASES,
       aiToolPromptCaseNames
+    ),
+    requiredChatTitleCaseNames: [...REQUIRED_CHAT_TITLE_CASES],
+    chatTitleCaseNames,
+    missingChatTitleCaseNames: missingNames(
+      REQUIRED_CHAT_TITLE_CASES,
+      chatTitleCaseNames
     ),
     requiredInsightPromptCaseNames: [...REQUIRED_INSIGHT_PROMPT_CASES],
     insightPromptCaseNames,
@@ -8020,6 +8162,11 @@ export default class JovieChatPromptfooProvider {
 
     if (target === 'onboarding-system-prompt-contract') {
       const payload = evaluateOnboardingSystemPromptContract(vars);
+      return jsonProviderResponse(payload, startedAt);
+    }
+
+    if (target === 'chat-title-contract') {
+      const payload = evaluateChatTitleContract(vars);
       return jsonProviderResponse(payload, startedAt);
     }
 
