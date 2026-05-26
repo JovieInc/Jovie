@@ -30,7 +30,9 @@ export function buildVercelBypassUrl(
   baseURL: string,
   pathname: string = '/'
 ): string | null {
-  const bypassSecret = process.env.VERCEL_AUTOMATION_BYPASS_SECRET;
+  const bypassSecret =
+    process.env.PLAYWRIGHT_VERCEL_BYPASS_SECRET ||
+    process.env.VERCEL_AUTOMATION_BYPASS_SECRET;
   if (!bypassSecret || !isSafePreviewBaseUrl(baseURL)) {
     return null;
   }

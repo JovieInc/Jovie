@@ -182,6 +182,73 @@ describe('test-user-provision.server', () => {
     ).toBe(true);
   });
 
+  it('adopts the allowlisted email row when the current Clerk id belongs to a stale test row', async () => {
+    const updateValues: Array<Record<string, unknown>> = [];
+    const selectQueue = [
+      [
+        {
+          id: 'user_clerk_match',
+          clerkId: 'user_live_e2e',
+          email: 'stale-e2e@jov.ie',
+        },
+        {
+          id: 'user_email_match',
+          clerkId: 'user_old_e2e',
+          email: 'e2e@jov.ie',
+        },
+      ],
+    ];
+    const database = {
+      select: vi.fn(() => ({
+        from: vi.fn(() => ({
+          where: vi.fn(async () => selectQueue.shift() ?? []),
+        })),
+      })),
+      update: vi.fn(() => ({
+        set: vi.fn((values: Record<string, unknown>) => {
+          updateValues.push(values);
+          return {
+            where: vi.fn(async () => undefined),
+          };
+        }),
+      })),
+      insert: vi.fn(),
+    };
+
+    const { ensureUserRecord } = await import(
+      '@/lib/testing/test-user-provision.server'
+    );
+
+    await expect(
+      ensureUserRecord(database as never, {
+        clerkId: 'user_live_e2e',
+        email: 'e2e@jov.ie',
+        name: 'E2E Test',
+        userStatus: 'active',
+        isAdmin: true,
+        plan: 'max',
+        isPro: true,
+        billingUpdatedAt: new Date('2026-01-01T00:00:00.000Z'),
+      })
+    ).resolves.toEqual({
+      id: 'user_email_match',
+      previousClerkId: 'user_old_e2e',
+    });
+
+    expect(database.insert).not.toHaveBeenCalled();
+    expect(updateValues).toHaveLength(2);
+    expect(updateValues[0]).toMatchObject({
+      clerkId: 'user_live_e2e__stale_user_clerk_match',
+    });
+    expect(updateValues[1]).toMatchObject({
+      clerkId: 'user_live_e2e',
+      email: 'e2e@jov.ie',
+      isAdmin: true,
+      plan: 'max',
+      userStatus: 'active',
+    });
+  });
+
   it('updates the existing claimed profile for the same user when one already exists', async () => {
     const updateValues: Array<Record<string, unknown>> = [];
     const selectQueue = [[{ id: 'profile_existing', userId: 'user_123' }]];
