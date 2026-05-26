@@ -207,7 +207,13 @@ const ADVANCED_TOOL_SCHEMAS = {
     inputSchema: z.object({
       field: z.enum(['displayName', 'bio']),
       newValue: z.string().min(1).max(500),
-      sourceUrl: z.string().url().optional(),
+      sourceUrl: z
+        .string()
+        .url()
+        .refine(value => value.startsWith('https://'), {
+          message: 'sourceUrl must be https',
+        })
+        .optional(),
       sourceTitle: z.string().max(200).optional(),
     }),
   },
@@ -432,6 +438,7 @@ const REQUIRED_ONBOARDING_UNAVAILABLE_TOOL_NAMES = [
   'submitFeedback',
 ] as const;
 const REQUIRED_SEMANTIC_INVALID_TOOL_NAMES = [
+  'importBioFromUrl',
   'proposeSocialLink',
   'proposeSocialLinkRemoval',
 ] as const;
@@ -4445,6 +4452,38 @@ function schemaErrorMessages(result: { error?: { issues?: unknown[] } }) {
   });
 }
 
+function isBlockedBioImportHostname(hostname: string): boolean {
+  const normalized = hostname.toLowerCase();
+  if (
+    normalized === 'localhost' ||
+    normalized === '0.0.0.0' ||
+    normalized === '::1' ||
+    normalized === '[::1]' ||
+    normalized.endsWith('.local')
+  ) {
+    return true;
+  }
+
+  const ipv4Match = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/.exec(
+    normalized
+  );
+  if (!ipv4Match) return false;
+
+  const octets = ipv4Match.slice(1).map(Number);
+  if (octets.some(octet => !Number.isInteger(octet) || octet > 255)) {
+    return true;
+  }
+
+  const [first = 0, second = 0] = octets;
+  return (
+    first === 10 ||
+    first === 127 ||
+    (first === 169 && second === 254) ||
+    (first === 172 && second >= 16 && second <= 31) ||
+    (first === 192 && second === 168)
+  );
+}
+
 function semanticToolInputErrors(toolName: string, input: unknown): string[] {
   const args = toObject(input);
 
@@ -4459,6 +4498,27 @@ function semanticToolInputErrors(toolName: string, input: unknown): string[] {
       }
     } catch {
       return ['url: Provide a valid full URL'];
+    }
+  }
+
+  if (toolName === 'importBioFromUrl') {
+    const url = typeof args.url === 'string' ? args.url.trim() : '';
+    try {
+      const parsed = new URL(url);
+      if (parsed.protocol !== 'https:') {
+        return ['url: Provide a public https URL'];
+      }
+      if (parsed.username || parsed.password) {
+        return ['url: Userinfo is not allowed in bio import URLs'];
+      }
+      if (
+        parsed.hostname.endsWith('.') ||
+        isBlockedBioImportHostname(parsed.hostname)
+      ) {
+        return ['url: Provide a public https URL'];
+      }
+    } catch {
+      return ['url: Provide a valid public https URL'];
     }
   }
 

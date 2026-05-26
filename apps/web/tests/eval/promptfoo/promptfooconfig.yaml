@@ -3469,6 +3469,74 @@ tests:
       - type: javascript
         value: file://assertions.cjs:assertToolSchemaInvalid
 
+  - description: Non-HTTPS profile edit provenance URL does not execute
+    metadata:
+      cost: deterministic
+    vars:
+      input: "Preview this imported bio with provenance."
+      target: tool-contract
+      toolName: proposeProfileEdit
+      mode: app
+      plan: pro
+      toolInput:
+        field: bio
+        newValue: "Luna Waves makes ambient electronic songs for late-night drives."
+        sourceUrl: http://lunawaves.example/press
+        sourceTitle: "Luna Waves press kit"
+    assert:
+      - type: javascript
+        value: file://assertions.cjs:assertDeterministicNoSpend
+      - type: javascript
+        value: file://assertions.cjs:assertToolAvailable
+      - type: javascript
+        value: file://assertions.cjs:assertToolSchemaInvalid
+
+  - description: Non-HTTPS bio import URL does not execute
+    metadata:
+      cost: deterministic
+    vars:
+      input: "Import my bio from this press kit."
+      target: tool-contract
+      toolName: importBioFromUrl
+      mode: app
+      plan: pro
+      toolInput:
+        url: http://lunawaves.example/press
+    assert:
+      - type: javascript
+        value: file://assertions.cjs:assertDeterministicNoSpend
+      - type: javascript
+        value: file://assertions.cjs:assertToolAvailable
+      - type: javascript
+        value: file://assertions.cjs:assertToolSchemaValid
+      - type: javascript
+        value: file://assertions.cjs:assertToolSemanticInvalid
+      - type: javascript
+        value: file://assertions.cjs:assertToolDidNotExecute
+
+  - description: Internal bio import URL does not execute
+    metadata:
+      cost: deterministic
+    vars:
+      input: "Import my bio from this local press kit."
+      target: tool-contract
+      toolName: importBioFromUrl
+      mode: app
+      plan: pro
+      toolInput:
+        url: https://localhost/press
+    assert:
+      - type: javascript
+        value: file://assertions.cjs:assertDeterministicNoSpend
+      - type: javascript
+        value: file://assertions.cjs:assertToolAvailable
+      - type: javascript
+        value: file://assertions.cjs:assertToolSchemaValid
+      - type: javascript
+        value: file://assertions.cjs:assertToolSemanticInvalid
+      - type: javascript
+        value: file://assertions.cjs:assertToolDidNotExecute
+
   - description: Unsafe social link argument does not execute
     metadata:
       cost: deterministic
