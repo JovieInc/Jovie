@@ -3130,6 +3130,46 @@ function assertSlashSkillVisibilityCovered(output) {
   return pass();
 }
 
+function assertSkillRegistryInventoryCovered(output) {
+  const payload = parseOutput(output);
+
+  if (payload.target !== 'skill-registry-inventory') {
+    return fail(
+      'case did not run through the skill-registry-inventory adapter'
+    );
+  }
+  if (!Array.isArray(payload.skillSummaries)) {
+    return fail('skill registry inventory missing skillSummaries');
+  }
+  if (payload.skillSummaries.length === 0) {
+    return fail('skill registry inventory found no deployed skills');
+  }
+
+  for (const field of [
+    'missingExpectedSkillIds',
+    'unknownExpectedSkillIds',
+    'missingEntitlementSkillIds',
+    'missingModelSkillIds',
+    'missingVersionSkillIds',
+    'missingMetadataSurfaceSkillIds',
+    'missingMetadataActionSkillIds',
+    'missingPromptPathSkillIds',
+    'missingInputSchemaPathToolIds',
+    'missingOutputSchemaPathToolIds',
+    'missingPathFileSkillIds',
+  ]) {
+    const values = payload[field];
+    if (!Array.isArray(values)) {
+      return fail(`skill registry inventory missing ${field}`);
+    }
+    if (values.length > 0) {
+      return fail(`${field}: ${values.join(', ')}`);
+    }
+  }
+
+  return pass();
+}
+
 function firstEvent(payload) {
   return Array.isArray(payload.events) ? payload.events[0] : undefined;
 }
@@ -3688,6 +3728,7 @@ function assertEvalCaseInventoryCovered(output) {
     'missingKnowledgeCaseNames',
     'missingPromptContextCaseNames',
     'missingToolAccessCaseNames',
+    'missingSkillRegistryCaseNames',
     'missingOnboardingStateCaseNames',
     'missingOnboardingToolSequenceCaseNames',
     'missingToolResultShapeCaseNames',
@@ -3813,6 +3854,7 @@ module.exports = {
   assertToolInventoryCovered,
   assertToolUiRegistryCovered,
   assertSlashSkillVisibilityCovered,
+  assertSkillRegistryInventoryCovered,
   assertToolEventInventoryCovered,
   assertToolEventHydratesSuccess,
   assertToolEventFailurePreserved,

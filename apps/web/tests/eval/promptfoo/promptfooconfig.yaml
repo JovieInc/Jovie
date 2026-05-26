@@ -1525,6 +1525,23 @@ tests:
       - type: javascript
         value: file://assertions.cjs:assertSlashSkillVisibilityCovered
 
+  - description: AI skill registry inventory covers deployed skills
+    metadata:
+      cost: deterministic
+    vars:
+      input: "AI skill registry inventory check"
+      target: skill-registry-inventory
+      skillRegistryCase: registry-inventory
+      coverage:
+        expectedSkillIds:
+          - generateReleasePitch
+          - retouch
+    assert:
+      - type: javascript
+        value: file://assertions.cjs:assertDeterministicNoSpend
+      - type: javascript
+        value: file://assertions.cjs:assertSkillRegistryInventoryCovered
+
   - description: Tool result shape matrix covers success and failure outputs
     metadata:
       cost: deterministic
