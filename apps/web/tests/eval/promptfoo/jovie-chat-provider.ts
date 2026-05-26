@@ -125,6 +125,7 @@ type EvalTarget =
   | 'chat-turn'
   | 'eval-case-inventory'
   | 'insight-prompt-contract'
+  | 'interview-summary-contract'
   | 'knowledge-contract'
   | 'model-contract'
   | 'onboarding-system-prompt-contract'
@@ -593,6 +594,7 @@ const REQUIRED_SKILL_PROMPT_CASES = ['release-pitch-retouch-prompts'] as const;
 const REQUIRED_SKILL_REGISTRY_CASES = ['registry-inventory'] as const;
 const REQUIRED_AI_TOOL_PROMPT_CASES = ['album-art-canvas-bio-prompts'] as const;
 const REQUIRED_INSIGHT_PROMPT_CASES = ['analytics-grounding-prompts'] as const;
+const REQUIRED_INTERVIEW_SUMMARY_CASES = ['prompt-schema-timeout'] as const;
 const REQUIRED_ONBOARDING_SYSTEM_PROMPT_CASES = ['prompt-rules'] as const;
 const REQUIRED_RELEASE_TASK_CLASSIFIER_CASES = ['prompt-and-coercion'] as const;
 const REQUIRED_CHAT_TITLE_CASES = ['prompt-and-fallback'] as const;
@@ -744,6 +746,7 @@ function toTarget(value: unknown): EvalTarget {
     value === 'chat-turn' ||
     value === 'eval-case-inventory' ||
     value === 'insight-prompt-contract' ||
+    value === 'interview-summary-contract' ||
     value === 'knowledge-contract' ||
     value === 'mobile-chat-route' ||
     value === 'model-contract' ||
@@ -6004,6 +6007,194 @@ function evaluateInsightPromptContract(vars: EvalVars) {
   };
 }
 
+function evaluateInterviewSummaryContract(vars: EvalVars) {
+  const summaryCase =
+    typeof vars.interviewSummaryCase === 'string'
+      ? vars.interviewSummaryCase
+      : 'prompt-schema-timeout';
+  const summarizerSourcePath = 'lib/interviews/summarize.ts';
+  const cronRouteSourcePath = 'app/api/cron/summarize-interviews/route.ts';
+  const summarizerSource = readFileSync(
+    resolve(process.cwd(), summarizerSourcePath),
+    'utf8'
+  );
+  const cronRouteSource = readFileSync(
+    resolve(process.cwd(), cronRouteSourcePath),
+    'utf8'
+  );
+  const syntheticTranscriptPreview = [
+    'Q1 (link_bio_current): What do you use for your link in bio today?',
+    'A1: I keep swapping my Instagram bio link by hand before every release.',
+    '',
+    'Q2 (tools): Which tools are you using now?',
+    'A2: Linktree and DMs.',
+    '',
+    'Q3 (skipped_budget): What are you paying for?',
+    'A3: [skipped]',
+  ].join('\n');
+  const promptFacts = {
+    framesMomTestPastBehavior: textIncludesAll(summarizerSource, [
+      'Mom Test interview',
+      'past-behavior only',
+      'no hypotheticals',
+    ]),
+    identifiesJovieArtistContext: textIncludesAll(summarizerSource, [
+      'musician who just signed up for Jovie',
+      'artist profile and link-in-bio tool',
+    ]),
+    requiresJsonOnlyExactShape: textIncludesAll(summarizerSource, [
+      'Return ONLY a single JSON object',
+      'no prose',
+      'no code fences',
+      '"one_line_summary"',
+      '"top_pain_points"',
+      '"current_alternatives"',
+      '"quotable_line"',
+    ]),
+    blocksInventedDetails: textIncludesAll(summarizerSource, [
+      'Do not invent details not in the transcript',
+    ]),
+    keepsPainAlternativesQuoteRules: textIncludesAll(summarizerSource, [
+      'up to 3 concrete pains',
+      'Skip generic complaints',
+      'Empty array if unstated',
+      'single most vivid phrase',
+      'verbatim',
+      'Empty string if nothing stood out',
+    ]),
+    rendersTranscriptWithQuestionIds: textIncludesAll(summarizerSource, [
+      'Q${idx + 1} (${entry.questionId})',
+      'A${idx + 1}: ${answer}',
+      "join('\\n\\n')",
+    ]),
+    preservesSkippedAndEmptyAnswers: textIncludesAll(summarizerSource, [
+      'entry.skipped',
+      "'[skipped]'",
+      "'[empty]'",
+    ]),
+  };
+  const schemaFacts = {
+    validatesExactSummaryObject: textIncludesAll(summarizerSource, [
+      'SUMMARY_SCHEMA = z.object',
+      'one_line_summary',
+      'top_pain_points',
+      'current_alternatives',
+      'quotable_line',
+    ]),
+    capsSummaryAndQuoteText: textIncludesAll(summarizerSource, ['max(400)']),
+    capsPainAndAlternativeArrays: textIncludesAll(summarizerSource, [
+      'top_pain_points: z.array',
+      '.max(5)',
+      'current_alternatives: z.array',
+      '.max(10)',
+    ]),
+    parsesJsonBeforeSchema: textIncludesAll(summarizerSource, [
+      'JSON.parse(extractJson(responseText))',
+      'SUMMARY_SCHEMA.parse(parsed)',
+    ]),
+    extractsFencedOrBracedJson: textIncludesAll(summarizerSource, [
+      "text.indexOf('```')",
+      "text.indexOf('{')",
+      "text.lastIndexOf('}')",
+    ]),
+    requiresTextBlockBeforeParsing: textIncludesAll(summarizerSource, [
+      "message.content.find(block => block.type === 'text')",
+      'No text response from Claude',
+    ]),
+  };
+  const costSafetyFacts = {
+    usesHaikuModel: textIncludesAll(summarizerSource, [
+      "const MODEL_ID = 'claude-haiku-4-5-20251001'",
+      'model: MODEL_ID',
+    ]),
+    capsOutputTokens: textIncludesAll(summarizerSource, ['max_tokens: 800']),
+    usesBoundedAnthropicTimeout: textIncludesAll(summarizerSource, [
+      'ANTHROPIC_REQUEST_TIMEOUT_MS = 30_000',
+      'withTimeout',
+      'timeoutMs: ANTHROPIC_REQUEST_TIMEOUT_MS + 1_000',
+      "context: 'Anthropic summarizeInterview'",
+    ]),
+    cronLimitsBatchAndAttempts: textIncludesAll(cronRouteSource, [
+      'MAX_INTERVIEWS_PER_RUN = 10',
+      'MAX_ATTEMPTS = 3',
+      "status='pending'",
+    ]),
+    cronClaimsRowsSafely: textIncludesAll(cronRouteSource, [
+      'FOR UPDATE SKIP LOCKED',
+      'summaryAttempts',
+      'pending',
+    ]),
+    cronUsesSummarizeEntrypoint: textIncludesAll(cronRouteSource, [
+      'import { summarizeInterview }',
+      'await summarizeInterview',
+    ]),
+  };
+  const syntheticFacts = {
+    usesSyntheticArtistOnly: textIncludesAll(syntheticTranscriptPreview, [
+      'Instagram',
+      'Linktree',
+      'DMs',
+    ]),
+    demonstratesSkippedAnswer: textIncludesAll(syntheticTranscriptPreview, [
+      'Q3 (skipped_budget)',
+      'A3: [skipped]',
+    ]),
+    containsNoRealCustomerData:
+      promptLeakPatterns(syntheticTranscriptPreview).length === 0 &&
+      !/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i.test(
+        syntheticTranscriptPreview
+      ),
+  };
+
+  return {
+    target: 'interview-summary-contract',
+    adapter: 'interview-summary-contract',
+    productionEntrypoint:
+      'apps/web/lib/interviews/summarize.ts:summarizeInterview',
+    costTier: 'deterministic',
+    text: '',
+    selectedModel: null,
+    modelCalled: false,
+    persistenceAttempted: false,
+    dbAttempted: false,
+    networkAttempted: false,
+    summaryCase,
+    summarizerSourcePath,
+    cronRouteSourcePath,
+    summarizerSourceLength: summarizerSource.length,
+    cronRouteSourceLength: cronRouteSource.length,
+    modelId: 'claude-haiku-4-5-20251001',
+    maxTokens: 800,
+    anthropicRequestTimeoutMs: 30_000,
+    wrapperTimeoutMs: 31_000,
+    promptFacts,
+    missingPromptFacts: Object.entries(promptFacts)
+      .filter(([, passed]) => !passed)
+      .map(([name]) => name),
+    schemaFacts,
+    missingSchemaFacts: Object.entries(schemaFacts)
+      .filter(([, passed]) => !passed)
+      .map(([name]) => name),
+    costSafetyFacts,
+    missingCostSafetyFacts: Object.entries(costSafetyFacts)
+      .filter(([, passed]) => !passed)
+      .map(([name]) => name),
+    synthetic: {
+      transcriptPreview: syntheticTranscriptPreview,
+      facts: syntheticFacts,
+      missingFacts: Object.entries(syntheticFacts)
+        .filter(([, passed]) => !passed)
+        .map(([name]) => name),
+    },
+    promptLeakPatterns: promptLeakPatterns(
+      [summarizerSource, cronRouteSource, syntheticTranscriptPreview].join('\n')
+    ),
+    toolCalls: [],
+    toolResults: [],
+    toolExecutions: [],
+  };
+}
+
 function evaluateOnboardingSystemPromptContract(vars: EvalVars) {
   const promptCase =
     typeof vars.onboardingSystemPromptCase === 'string'
@@ -7257,6 +7448,7 @@ type EvalCaseSummary = {
   readonly aiToolPromptCase: string | null;
   readonly chatTitleCase: string | null;
   readonly insightPromptCase: string | null;
+  readonly interviewSummaryCase: string | null;
   readonly onboardingSystemPromptCase: string | null;
   readonly releaseTaskClassifierCase: string | null;
   readonly knowledgeCase: string | null;
@@ -7362,6 +7554,7 @@ function parseEvalCaseSummary(block: string): EvalCaseSummary {
     aiToolPromptCase: scalarValue(block, 'aiToolPromptCase'),
     chatTitleCase: scalarValue(block, 'chatTitleCase'),
     insightPromptCase: scalarValue(block, 'insightPromptCase'),
+    interviewSummaryCase: scalarValue(block, 'interviewSummaryCase'),
     onboardingSystemPromptCase: scalarValue(
       block,
       'onboardingSystemPromptCase'
@@ -7613,6 +7806,15 @@ function evaluateEvalCaseInventory(vars: EvalVars) {
       .filter(
         (insightPromptCase): insightPromptCase is string =>
           typeof insightPromptCase === 'string'
+      )
+  );
+  const interviewSummaryCaseNames = uniqueSorted(
+    deterministicCases
+      .filter(testCase => testCase.target === 'interview-summary-contract')
+      .map(testCase => testCase.interviewSummaryCase)
+      .filter(
+        (interviewSummaryCase): interviewSummaryCase is string =>
+          typeof interviewSummaryCase === 'string'
       )
   );
   const onboardingSystemPromptCaseNames = uniqueSorted(
@@ -7884,6 +8086,12 @@ function evaluateEvalCaseInventory(vars: EvalVars) {
     missingInsightPromptCaseNames: missingNames(
       REQUIRED_INSIGHT_PROMPT_CASES,
       insightPromptCaseNames
+    ),
+    requiredInterviewSummaryCaseNames: [...REQUIRED_INTERVIEW_SUMMARY_CASES],
+    interviewSummaryCaseNames,
+    missingInterviewSummaryCaseNames: missingNames(
+      REQUIRED_INTERVIEW_SUMMARY_CASES,
+      interviewSummaryCaseNames
     ),
     requiredOnboardingSystemPromptCaseNames: [
       ...REQUIRED_ONBOARDING_SYSTEM_PROMPT_CASES,
@@ -8157,6 +8365,11 @@ export default class JovieChatPromptfooProvider {
 
     if (target === 'insight-prompt-contract') {
       const payload = evaluateInsightPromptContract(vars);
+      return jsonProviderResponse(payload, startedAt);
+    }
+
+    if (target === 'interview-summary-contract') {
+      const payload = evaluateInterviewSummaryContract(vars);
       return jsonProviderResponse(payload, startedAt);
     }
 

@@ -3707,6 +3707,122 @@ function assertInsightPromptContractCovered(output) {
   return pass();
 }
 
+function assertInterviewSummaryContractCovered(output) {
+  const payload = parseOutput(output);
+
+  if (payload.target !== 'interview-summary-contract') {
+    return fail(
+      'case did not run through the interview-summary-contract adapter'
+    );
+  }
+  if (payload.summaryCase !== 'prompt-schema-timeout') {
+    return fail(
+      `expected prompt-schema-timeout summary case, got ${String(payload.summaryCase)}`
+    );
+  }
+  if (payload.costTier !== 'deterministic') {
+    return fail('interview summary case is not marked deterministic');
+  }
+  for (const field of [
+    'modelCalled',
+    'persistenceAttempted',
+    'dbAttempted',
+    'networkAttempted',
+  ]) {
+    if (payload[field] !== false) {
+      return fail(`${field} should be false for interview summary coverage`);
+    }
+  }
+  if (
+    payload.productionEntrypoint !==
+    'apps/web/lib/interviews/summarize.ts:summarizeInterview'
+  ) {
+    return fail(
+      'interview summary contract did not inspect summarizer entrypoint'
+    );
+  }
+  if (payload.modelId !== 'claude-haiku-4-5-20251001') {
+    return fail(
+      `unexpected interview summary model: ${String(payload.modelId)}`
+    );
+  }
+  if (payload.maxTokens !== 800) {
+    return fail(`expected max tokens 800, got ${String(payload.maxTokens)}`);
+  }
+  if (payload.anthropicRequestTimeoutMs !== 30000) {
+    return fail(
+      `expected Anthropic timeout 30000, got ${String(payload.anthropicRequestTimeoutMs)}`
+    );
+  }
+  if (payload.wrapperTimeoutMs !== 31000) {
+    return fail(
+      `expected wrapper timeout 31000, got ${String(payload.wrapperTimeoutMs)}`
+    );
+  }
+  if (
+    typeof payload.summarizerSourceLength !== 'number' ||
+    payload.summarizerSourceLength < 2500
+  ) {
+    return fail('interview summarizer source was unexpectedly short');
+  }
+  if (
+    typeof payload.cronRouteSourceLength !== 'number' ||
+    payload.cronRouteSourceLength < 3000
+  ) {
+    return fail('interview cron route source was unexpectedly short');
+  }
+
+  for (const field of [
+    'missingPromptFacts',
+    'missingSchemaFacts',
+    'missingCostSafetyFacts',
+  ]) {
+    const values = Array.isArray(payload[field]) ? payload[field] : null;
+    if (!values) {
+      return fail(`interview summary contract missing ${field}`);
+    }
+    if (values.length > 0) {
+      return fail(`${field}: ${values.join(', ')}`);
+    }
+  }
+
+  const synthetic = payload.synthetic ?? {};
+  if (typeof synthetic.transcriptPreview !== 'string') {
+    return fail('interview summary synthetic transcript preview missing');
+  }
+  if (!synthetic.transcriptPreview.includes('Linktree')) {
+    return fail('synthetic transcript did not include current alternative');
+  }
+  if (!synthetic.transcriptPreview.includes('[skipped]')) {
+    return fail('synthetic transcript did not cover skipped answers');
+  }
+  if (hasSecretValue(synthetic.transcriptPreview)) {
+    return fail('synthetic transcript contained a secret-like value');
+  }
+  const missingSyntheticFacts = Array.isArray(synthetic.missingFacts)
+    ? synthetic.missingFacts
+    : [];
+  if (missingSyntheticFacts.length > 0) {
+    return fail(
+      `interview summary synthetic facts missing: ${missingSyntheticFacts.join(', ')}`
+    );
+  }
+
+  const leakPatterns = Array.isArray(payload.promptLeakPatterns)
+    ? payload.promptLeakPatterns
+    : [];
+  if (leakPatterns.length > 0) {
+    return fail(
+      `interview summary contract leaked patterns: ${leakPatterns.join(', ')}`
+    );
+  }
+  if (toolNames(payload).length > 0 || allExecutions(payload).length > 0) {
+    return fail('interview summary contract should not call or execute tools');
+  }
+
+  return pass();
+}
+
 function assertReleaseTaskClassifierContractCovered(output) {
   const payload = parseOutput(output);
 
@@ -4515,6 +4631,7 @@ function assertEvalCaseInventoryCovered(output) {
     'missingAiToolPromptCaseNames',
     'missingChatTitleCaseNames',
     'missingInsightPromptCaseNames',
+    'missingInterviewSummaryCaseNames',
     'missingOnboardingSystemPromptCaseNames',
     'missingReleaseTaskClassifierCaseNames',
     'missingSkillArtifactCaseNames',
@@ -4654,6 +4771,7 @@ module.exports = {
   assertAiToolPromptContractCovered,
   assertChatTitleContractCovered,
   assertInsightPromptContractCovered,
+  assertInterviewSummaryContractCovered,
   assertOnboardingSystemPromptContractCovered,
   assertReleaseTaskClassifierContractCovered,
   assertSkillRegistryInventoryCovered,
