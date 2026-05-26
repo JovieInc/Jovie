@@ -1665,6 +1665,19 @@ tests:
       - type: javascript
         value: file://assertions.cjs:assertInterviewSummaryContractCovered
 
+  - description: Playlist generation prompts preserve concept and curation guardrails
+    metadata:
+      cost: deterministic
+    vars:
+      input: "Playlist generation prompt contract check"
+      target: playlist-generation-contract
+      playlistGenerationCase: concept-and-curation-prompts
+    assert:
+      - type: javascript
+        value: file://assertions.cjs:assertDeterministicNoSpend
+      - type: javascript
+        value: file://assertions.cjs:assertPlaylistGenerationContractCovered
+
   - description: Onboarding system prompt preserves intake and access rules
     metadata:
       cost: deterministic
