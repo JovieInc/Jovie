@@ -81,6 +81,14 @@ import {
   IntentCategory,
 } from '@/lib/intent-detection/types';
 import { buildWelcomeMessage } from '@/lib/services/onboarding/welcome-message';
+import {
+  buildPitchDraftSystemPrompt,
+  buildPitchDraftUserPrompt,
+  buildSystemPrompt as buildPlaylistPitchSystemPrompt,
+  buildUserPrompt as buildPlaylistPitchUserPrompt,
+} from '@/lib/services/pitch/prompts';
+import { resolvePitchDestination } from '@/lib/services/pitch/targets';
+import { type PitchInput, PLATFORM_LIMITS } from '@/lib/services/pitch/types';
 import { detectPlatform } from '@/lib/utils/platform-detection/detector';
 import { validateSocialLinkUrl } from '@/lib/utils/url-validation';
 import { httpUrlSchema } from '@/lib/validation/schemas/base';
@@ -104,6 +112,7 @@ type EvalTarget =
   | 'skill-artifact-contract'
   | 'skill-catalog-sync-contract'
   | 'skill-command-contract'
+  | 'skill-prompt-contract'
   | 'skill-registry-inventory'
   | 'tool-access-contract'
   | 'tool-contract'
@@ -544,6 +553,7 @@ const REQUIRED_TOOL_ACCESS_CASES = ['billing-mode-matrix'] as const;
 const REQUIRED_SKILL_ARTIFACT_CASES = ['artifact-inventory'] as const;
 const REQUIRED_SKILL_CATALOG_CASES = ['catalog-sync-shape'] as const;
 const REQUIRED_SKILL_COMMAND_CASES = ['command-inventory'] as const;
+const REQUIRED_SKILL_PROMPT_CASES = ['release-pitch-retouch-prompts'] as const;
 const REQUIRED_SKILL_REGISTRY_CASES = ['registry-inventory'] as const;
 const SKILLS_CATALOG_SYNC_SCRIPT_PATH =
   'apps/web/scripts/sync-skills-catalog.ts';
@@ -689,6 +699,7 @@ function toTarget(value: unknown): EvalTarget {
     value === 'skill-artifact-contract' ||
     value === 'skill-catalog-sync-contract' ||
     value === 'skill-command-contract' ||
+    value === 'skill-prompt-contract' ||
     value === 'skill-registry-inventory' ||
     value === 'tool-access-contract' ||
     value === 'tool-contract' ||
@@ -5234,6 +5245,188 @@ function evaluateSkillArtifactContract(vars: EvalVars) {
   };
 }
 
+function buildEvalPitchInput(): PitchInput {
+  return {
+    artist: {
+      displayName: 'Luna Waves',
+      bio: 'Luna Waves builds ambient electronic songs around field recordings, soft modular textures, and patient melodies.',
+      genres: ['ambient', 'electronic', 'downtempo'],
+      location: 'Portland, OR',
+      activeSinceYear: 2021,
+      spotifyFollowers: 12_500,
+      spotifyPopularity: 45,
+      careerHighlights:
+        'Sold out a 220-cap hometown release show and supported a regional ambient showcase.',
+      targetPlaylists: ['Pollen', 'Electronic Rising'],
+    },
+    release: {
+      title: 'Neon Reef',
+      releaseDate: new Date('2026-06-19T00:00:00.000Z'),
+      releaseType: 'single',
+      genres: ['ambient electronic', 'downtempo'],
+      totalTracks: 1,
+      label: 'Luna Waves Records',
+      distributor: 'DistroKid',
+    },
+    tracks: [
+      {
+        title: 'Neon Reef',
+        durationMs: 205_000,
+        creditNames: ['Luna Waves'],
+      },
+    ],
+  };
+}
+
+function textIncludesAll(text: string, needles: readonly string[]): boolean {
+  const normalizedText = text.toLowerCase();
+  return needles.every(needle => normalizedText.includes(needle.toLowerCase()));
+}
+
+function promptLeakPatterns(text: string): string[] {
+  const patterns: Array<[string, RegExp]> = [
+    ['email', /[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i],
+    ['http-url', /https?:\/\//i],
+    ['secret-token', /(?:sk-|bearer\s+|password|api[_-]?key)/i],
+  ];
+
+  return patterns
+    .filter(([, pattern]) => pattern.test(text))
+    .map(([name]) => name);
+}
+
+function evaluateSkillPromptContract(vars: EvalVars) {
+  const coverage = toObject(vars.coverage);
+  const expectedSkillIds = toStringArray(coverage.expectedSkillIds);
+  const expectedSkillIdSet = new Set(expectedSkillIds);
+  const knownSkillIdSet = new Set(SKILL_REGISTRY_IDS);
+  const promptCase =
+    typeof vars.skillPromptCase === 'string'
+      ? vars.skillPromptCase
+      : 'release-pitch-retouch-prompts';
+  const pitchInput = buildEvalPitchInput();
+  const destination = resolvePitchDestination({
+    target: 'playlist',
+    platform: 'spotify',
+  });
+  const playlistSystemPrompt = buildPlaylistPitchSystemPrompt();
+  const playlistUserPrompt = buildPlaylistPitchUserPrompt(
+    pitchInput,
+    'Pitch this for late-night focus and ambient editorial playlists.'
+  );
+  const draftSystemPrompt = buildPitchDraftSystemPrompt();
+  const draftUserPrompt = destination
+    ? buildPitchDraftUserPrompt({
+        input: pitchInput,
+        destination,
+        instructions: 'Keep the ask useful for a Spotify playlist curator.',
+      })
+    : '';
+  const retouchPrompt = registryPathContent(SKILL_REGISTRY.retouch.promptPath);
+  const combinedPitchPrompt = [
+    playlistSystemPrompt,
+    playlistUserPrompt,
+    draftSystemPrompt,
+    draftUserPrompt,
+  ].join('\n\n');
+  const releasePitchPromptFacts = {
+    systemBlocksFabrication: textIncludesAll(
+      `${playlistSystemPrompt}\n${draftSystemPrompt}`,
+      ['NEVER fabricate', 'Never fabricate']
+    ),
+    systemBlocksLinksAndHandles: textIncludesAll(
+      `${playlistSystemPrompt}\n${draftSystemPrompt}`,
+      ['NEVER include links, @handles', 'Do not include links, @handles']
+    ),
+    systemUsesArtistVoice: textIncludesAll(
+      `${playlistSystemPrompt}\n${draftSystemPrompt}`,
+      ['FIRST PERSON', 'first person as the artist']
+    ),
+    playlistSystemIncludesPlatformLimits: Object.values(PLATFORM_LIMITS).every(
+      limit => playlistSystemPrompt.includes(String(limit))
+    ),
+    userPromptIncludesSyntheticArtist: textIncludesAll(playlistUserPrompt, [
+      'Luna Waves',
+      'Neon Reef',
+      'Pollen',
+      '2026-06-19',
+    ]),
+    draftPromptIncludesDestination: textIncludesAll(draftUserPrompt, [
+      'Spotify playlist',
+      'streaming editorial or independent playlist curator',
+      'Character limit: 500',
+    ]),
+    promptAvoidsPrivateContactLeak:
+      promptLeakPatterns(combinedPitchPrompt).length === 0,
+  };
+  const retouchGuardrails = [
+    "Preserve the person's identity",
+    'Do not change protected or sensitive attributes',
+    'return a safe refusal',
+    'same person',
+  ];
+  const missingRetouchGuardrails = retouchGuardrails.filter(
+    guardrail => !retouchPrompt.toLowerCase().includes(guardrail.toLowerCase())
+  );
+  const missingReleasePitchPromptFacts = Object.entries(releasePitchPromptFacts)
+    .filter(([, passed]) => !passed)
+    .map(([name]) => name);
+  const missingExpectedSkillIds = expectedSkillIds
+    .filter(skillId => !knownSkillIdSet.has(skillId))
+    .sort();
+  const unknownExpectedSkillIds = SKILL_REGISTRY_IDS.filter(
+    skillId => !expectedSkillIdSet.has(skillId)
+  );
+
+  return {
+    target: 'skill-prompt-contract',
+    adapter: 'skill-prompt-contract',
+    costTier: 'deterministic',
+    text: '',
+    selectedModel: null,
+    modelCalled: false,
+    persistenceAttempted: false,
+    dbAttempted: false,
+    networkAttempted: false,
+    promptCase,
+    expectedSkillIds: uniqueSorted(expectedSkillIds),
+    requiredSkillIds: SKILL_REGISTRY_IDS,
+    missingExpectedSkillIds,
+    unknownExpectedSkillIds,
+    releasePitch: {
+      skillId: 'generateReleasePitch',
+      promptLengths: {
+        playlistSystem: playlistSystemPrompt.length,
+        playlistUser: playlistUserPrompt.length,
+        draftSystem: draftSystemPrompt.length,
+        draftUser: draftUserPrompt.length,
+      },
+      destination: destination
+        ? {
+            target: destination.target,
+            platform: destination.platform,
+            label: destination.label,
+            characterLimit: destination.characterLimit,
+          }
+        : null,
+      platformLimits: PLATFORM_LIMITS,
+      facts: releasePitchPromptFacts,
+      missingFacts: missingReleasePitchPromptFacts,
+      leakPatterns: promptLeakPatterns(combinedPitchPrompt),
+    },
+    retouch: {
+      skillId: 'retouch',
+      promptPath: SKILL_REGISTRY.retouch.promptPath,
+      promptLength: retouchPrompt.length,
+      requiredGuardrails: retouchGuardrails,
+      missingGuardrails: missingRetouchGuardrails,
+    },
+    toolCalls: [],
+    toolResults: [],
+    toolExecutions: [],
+  };
+}
+
 function isJsonSerializable(value: unknown): boolean {
   try {
     JSON.parse(JSON.stringify(value));
@@ -6086,6 +6279,7 @@ type EvalCaseSummary = {
   readonly skillArtifactCase: string | null;
   readonly skillCatalogCase: string | null;
   readonly skillCommandCase: string | null;
+  readonly skillPromptCase: string | null;
   readonly skillRegistryCase: string | null;
   readonly stateCase: string | null;
   readonly welcomeCase: string | null;
@@ -6185,6 +6379,7 @@ function parseEvalCaseSummary(block: string): EvalCaseSummary {
     skillArtifactCase: scalarValue(block, 'skillArtifactCase'),
     skillCatalogCase: scalarValue(block, 'skillCatalogCase'),
     skillCommandCase: scalarValue(block, 'skillCommandCase'),
+    skillPromptCase: scalarValue(block, 'skillPromptCase'),
     skillRegistryCase: scalarValue(block, 'skillRegistryCase'),
     stateCase: scalarValue(block, 'stateCase'),
     welcomeCase: scalarValue(block, 'welcomeCase'),
@@ -6424,6 +6619,15 @@ function evaluateEvalCaseInventory(vars: EvalVars) {
           typeof skillCommandCase === 'string'
       )
   );
+  const skillPromptCaseNames = uniqueSorted(
+    deterministicCases
+      .filter(testCase => testCase.target === 'skill-prompt-contract')
+      .map(testCase => testCase.skillPromptCase)
+      .filter(
+        (skillPromptCase): skillPromptCase is string =>
+          typeof skillPromptCase === 'string'
+      )
+  );
   const skillRegistryCaseNames = uniqueSorted(
     deterministicCases
       .filter(testCase => testCase.target === 'skill-registry-inventory')
@@ -6635,6 +6839,12 @@ function evaluateEvalCaseInventory(vars: EvalVars) {
     missingSkillCommandCaseNames: missingNames(
       REQUIRED_SKILL_COMMAND_CASES,
       skillCommandCaseNames
+    ),
+    requiredSkillPromptCaseNames: [...REQUIRED_SKILL_PROMPT_CASES],
+    skillPromptCaseNames,
+    missingSkillPromptCaseNames: missingNames(
+      REQUIRED_SKILL_PROMPT_CASES,
+      skillPromptCaseNames
     ),
     requiredSkillRegistryCaseNames: [...REQUIRED_SKILL_REGISTRY_CASES],
     skillRegistryCaseNames,
@@ -6882,6 +7092,16 @@ export default class JovieChatPromptfooProvider {
 
     if (target === 'skill-command-contract') {
       const payload = evaluateSkillCommandContract(vars);
+      return {
+        output: JSON.stringify(payload),
+        raw: payload,
+        format: 'json',
+        latencyMs: Date.now() - startedAt,
+      };
+    }
+
+    if (target === 'skill-prompt-contract') {
+      const payload = evaluateSkillPromptContract(vars);
       return {
         output: JSON.stringify(payload),
         raw: payload,

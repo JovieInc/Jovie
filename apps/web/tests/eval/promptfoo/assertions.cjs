@@ -3395,6 +3395,112 @@ function assertSkillCommandContractCovered(output) {
   return pass();
 }
 
+function assertSkillPromptContractCovered(output) {
+  const payload = parseOutput(output);
+
+  if (payload.target !== 'skill-prompt-contract') {
+    return fail('case did not run through the skill-prompt-contract adapter');
+  }
+  if (payload.promptCase !== 'release-pitch-retouch-prompts') {
+    return fail(
+      `expected release-pitch-retouch-prompts prompt case, got ${String(payload.promptCase)}`
+    );
+  }
+  if (payload.costTier !== 'deterministic') {
+    return fail('skill prompt case is not marked deterministic');
+  }
+  for (const field of [
+    'modelCalled',
+    'persistenceAttempted',
+    'dbAttempted',
+    'networkAttempted',
+  ]) {
+    if (payload[field] !== false) {
+      return fail(`${field} should be false for skill prompt coverage`);
+    }
+  }
+
+  for (const field of ['missingExpectedSkillIds', 'unknownExpectedSkillIds']) {
+    const values = payload[field];
+    if (!Array.isArray(values)) {
+      return fail(`skill prompt contract missing ${field}`);
+    }
+    if (values.length > 0) {
+      return fail(`${field}: ${values.join(', ')}`);
+    }
+  }
+
+  const releasePitch = payload.releasePitch ?? {};
+  if (!releasePitch || typeof releasePitch !== 'object') {
+    return fail('skill prompt contract missing releasePitch payload');
+  }
+  if (releasePitch.skillId !== 'generateReleasePitch') {
+    return fail('releasePitch payload is not tied to generateReleasePitch');
+  }
+  const missingFacts = Array.isArray(releasePitch.missingFacts)
+    ? releasePitch.missingFacts
+    : [];
+  if (missingFacts.length > 0) {
+    return fail(
+      `release pitch prompt missing facts: ${missingFacts.join(', ')}`
+    );
+  }
+  const leakPatterns = Array.isArray(releasePitch.leakPatterns)
+    ? releasePitch.leakPatterns
+    : [];
+  if (leakPatterns.length > 0) {
+    return fail(
+      `release pitch prompt leaked patterns: ${leakPatterns.join(', ')}`
+    );
+  }
+  const destination = releasePitch.destination ?? {};
+  if (destination.label !== 'Spotify playlist') {
+    return fail(
+      `expected Spotify playlist destination, got ${String(destination.label)}`
+    );
+  }
+  if (destination.characterLimit !== 500) {
+    return fail(
+      `expected Spotify playlist character limit 500, got ${String(destination.characterLimit)}`
+    );
+  }
+  const promptLengths = releasePitch.promptLengths ?? {};
+  for (const field of [
+    'playlistSystem',
+    'playlistUser',
+    'draftSystem',
+    'draftUser',
+  ]) {
+    if (
+      typeof promptLengths[field] !== 'number' ||
+      promptLengths[field] < 100
+    ) {
+      return fail(`release pitch prompt length ${field} was too short`);
+    }
+  }
+
+  const retouch = payload.retouch ?? {};
+  if (!retouch || typeof retouch !== 'object') {
+    return fail('skill prompt contract missing retouch payload');
+  }
+  if (retouch.skillId !== 'retouch') {
+    return fail('retouch payload is not tied to retouch skill');
+  }
+  if (typeof retouch.promptLength !== 'number' || retouch.promptLength < 300) {
+    return fail('retouch prompt artifact is too short');
+  }
+  const missingGuardrails = Array.isArray(retouch.missingGuardrails)
+    ? retouch.missingGuardrails
+    : [];
+  if (missingGuardrails.length > 0) {
+    return fail(
+      `retouch prompt missing guardrails: ${missingGuardrails.join(', ')}`
+    );
+  }
+
+  return pass();
+}
+
 function firstEvent(payload) {
   return Array.isArray(payload.events) ? payload.events[0] : undefined;
 }
@@ -3956,6 +4062,7 @@ function assertEvalCaseInventoryCovered(output) {
     'missingSkillArtifactCaseNames',
     'missingSkillCatalogCaseNames',
     'missingSkillCommandCaseNames',
+    'missingSkillPromptCaseNames',
     'missingSkillRegistryCaseNames',
     'missingOnboardingStateCaseNames',
     'missingOnboardingToolSequenceCaseNames',
@@ -4085,6 +4192,7 @@ module.exports = {
   assertSkillArtifactContractCovered,
   assertSkillCatalogSyncContractCovered,
   assertSkillCommandContractCovered,
+  assertSkillPromptContractCovered,
   assertSkillRegistryInventoryCovered,
   assertToolEventInventoryCovered,
   assertToolEventHydratesSuccess,
