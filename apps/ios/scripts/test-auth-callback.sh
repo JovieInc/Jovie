@@ -65,7 +65,7 @@ resolve_publishable_key() {
   local web_base_url="$1"
   local existing_key="${CLERK_PUBLISHABLE_KEY:-${NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY:-}}"
 
-  if [[ -n "$existing_key" ]]; then
+  if [[ -n "$existing_key" && "$existing_key" != "pk_test_ci_placeholder" ]]; then
     printf '%s' "$existing_key"
     return 0
   fi
@@ -143,7 +143,10 @@ run_live_auth_simulator_smoke() {
   local api_base_url="${API_BASE_URL:-http://localhost:3100}"
   local web_base_url="${WEB_BASE_URL:-$api_base_url}"
   local persona="${JOVIE_IOS_LIVE_AUTH_PERSONA:-creator-ready}"
+  local publishable_key
   local callback_response
+
+  publishable_key="$(resolve_publishable_key "$web_base_url")"
 
   echo "Creating dev native auth callback against $api_base_url..."
   callback_response="$(
@@ -210,7 +213,6 @@ NODE
     /usr/libexec/PlistBuddy -c "Delete :liveAuthUITestUserID" "$existing_prefs_file" >/dev/null 2>&1 || true
   fi
 
-  local publishable_key="${CLERK_PUBLISHABLE_KEY:-${NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY:-}}"
   local launch_env=(
     "SIMCTL_CHILD_API_BASE_URL=$api_base_url"
     "SIMCTL_CHILD_WEB_BASE_URL=$web_base_url"

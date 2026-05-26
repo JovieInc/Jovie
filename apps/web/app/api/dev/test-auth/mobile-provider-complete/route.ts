@@ -22,7 +22,15 @@ function readTrimmedEnv(name: string): string | null {
   return value ? value : null;
 }
 
+function isProductionDeployment(): boolean {
+  return process.env.VERCEL_ENV === 'production';
+}
+
 function hasValidTunnelToken(request: NextRequest): boolean {
+  if (isProductionDeployment()) {
+    return false;
+  }
+
   const expectedToken = readTrimmedEnv('JOVIE_IOS_REAL_BROWSER_AUTH_TOKEN');
   if (!expectedToken) {
     return false;
@@ -32,6 +40,14 @@ function hasValidTunnelToken(request: NextRequest): boolean {
 }
 
 function getRequestDevTestAuthAvailability(request: NextRequest) {
+  if (isProductionDeployment()) {
+    return {
+      enabled: false,
+      trustedHost: false,
+      reason: 'Not available in production',
+    };
+  }
+
   if (hasValidTunnelToken(request)) {
     return {
       enabled: true,
