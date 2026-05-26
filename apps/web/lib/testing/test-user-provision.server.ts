@@ -69,6 +69,11 @@ interface MatchedSeedUser {
   readonly email: string | null;
 }
 
+interface ResolvedSeedUserMatch {
+  readonly user: MatchedSeedUser | undefined;
+  readonly staleClerkIdUsers: readonly MatchedSeedUser[];
+}
+
 interface EnsureClerkTestUserOptions {
   readonly email: string;
   readonly username: string;
@@ -193,7 +198,7 @@ function shouldUseDeterministicClerkTestUser(): boolean {
 function resolveMatchedSeedUser(
   matchedUsers: readonly MatchedSeedUser[],
   values: SeededUserValues
-): MatchedSeedUser | undefined {
+): ResolvedSeedUserMatch {
   const normalizedEmail = values.email ? normalizeEmail(values.email) : null;
   const clerkIdMatches = matchedUsers.filter(
     matchedUser => matchedUser.clerkId === values.clerkId
@@ -212,12 +217,22 @@ function resolveMatchedSeedUser(
   const emailMatch = emailMatches[0];
 
   if (clerkIdMatch && emailMatch && clerkIdMatch.id !== emailMatch.id) {
+    if (isAllowlistedTestAccountEmail(normalizedEmail)) {
+      return {
+        user: emailMatch,
+        staleClerkIdUsers: [clerkIdMatch],
+      };
+    }
+
     throw new Error(
       `Conflicting test user matches for ${values.email ?? 'unknown email'}`
     );
   }
 
-  return clerkIdMatch ?? emailMatch ?? matchedUsers[0];
+  return {
+    user: clerkIdMatch ?? emailMatch ?? matchedUsers[0],
+    staleClerkIdUsers: [],
+  };
 }
 
 function buildSeedUserLookupCondition(values: SeededUserValues) {
@@ -234,6 +249,28 @@ function buildSeedUserLookupCondition(values: SeededUserValues) {
     normalizedEmail,
     userLookupCondition,
   };
+}
+
+function getRetiredTestClerkId(matchedUser: MatchedSeedUser): string {
+  const stableSuffix =
+    matchedUser.id.replaceAll(/[^a-z0-9]+/gi, '_').slice(0, 24) || 'row';
+
+  return `${matchedUser.clerkId ?? 'user_dev_test'}__stale_${stableSuffix}`;
+}
+
+async function retireStaleSeedUserClerkIds(
+  database: DbOrTransaction,
+  matchedUsers: readonly MatchedSeedUser[]
+) {
+  for (const matchedUser of matchedUsers) {
+    await database
+      .update(users)
+      .set({
+        clerkId: getRetiredTestClerkId(matchedUser),
+        updatedAt: new Date(),
+      })
+      .where(eq(users.id, matchedUser.id));
+  }
 }
 
 export async function resolveClerkTestUserId(
@@ -438,7 +475,8 @@ export async function ensureUserRecord(
     .select({ id: users.id, clerkId: users.clerkId, email: users.email })
     .from(users)
     .where(userLookupCondition);
-  const existingUser = resolveMatchedSeedUser(matchedUsers, values);
+  const existingMatch = resolveMatchedSeedUser(matchedUsers, values);
+  const existingUser = existingMatch.user;
 
   const normalizedValues = {
     ...values,
@@ -446,6 +484,11 @@ export async function ensureUserRecord(
   };
 
   if (existingUser) {
+    await retireStaleSeedUserClerkIds(
+      database,
+      existingMatch.staleClerkIdUsers
+    );
+
     await database
       .update(users)
       .set({ ...normalizedValues, updatedAt: new Date() })
@@ -479,11 +522,14 @@ export async function ensureUserRecord(
       .select({ id: users.id, clerkId: users.clerkId, email: users.email })
       .from(users)
       .where(userLookupCondition);
-    const racedUser = resolveMatchedSeedUser(racedUsers, normalizedValues);
+    const racedMatch = resolveMatchedSeedUser(racedUsers, normalizedValues);
+    const racedUser = racedMatch.user;
 
     if (!racedUser) {
       throw error;
     }
+
+    await retireStaleSeedUserClerkIds(database, racedMatch.staleClerkIdUsers);
 
     await database
       .update(users)

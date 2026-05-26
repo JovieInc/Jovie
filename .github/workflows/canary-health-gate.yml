@@ -565,9 +565,9 @@ jobs:
           auth_smoke_attempt=1
           auth_smoke_max_attempts=3
 
-          # The HTTP canary uses Vercel bypass headers above, but this browser
-          # smoke must match real public user traffic. Passing bypass headers into
-          # Playwright keeps Clerk from reaching an interactive ready state.
+          # The HTTP canary uses Vercel bypass headers above. This browser smoke
+          # primes Vercel's bypass cookie by URL query instead of headers so
+          # Clerk still reaches its normal interactive ready state.
           until CI=true SMOKE_ONLY=1 BASE_URL="${DEPLOYMENT_URL}" pnpm exec playwright test tests/e2e/auth-public-ready.spec.ts --project=chromium --reporter=line; do
             if [ "$auth_smoke_attempt" -ge "$auth_smoke_max_attempts" ]; then
               echo "❌ Public auth controls failed after ${auth_smoke_max_attempts} attempts."
@@ -581,6 +581,7 @@ jobs:
           done
         env:
           DEPLOYMENT_URL: ${{ steps.canary-check.outputs.verified_deployment_url || inputs.deployment_url }}
+          PLAYWRIGHT_VERCEL_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
 
       - name: Mark canary verified
         id: canary-status

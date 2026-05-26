@@ -318,9 +318,14 @@ describe('canary health gate workflow', () => {
     expect(authSmokeStep).toContain(
       'DEPLOYMENT_URL: ${{ steps.canary-check.outputs.verified_deployment_url || inputs.deployment_url }}'
     );
-    expect(authSmokeStep).not.toContain('VERCEL_AUTOMATION_BYPASS_SECRET');
     expect(authSmokeStep).toContain(
-      'this browser\n          # smoke must match real public user traffic'
+      'PLAYWRIGHT_VERCEL_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}'
+    );
+    expect(authSmokeStep).not.toContain(
+      'VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}'
+    );
+    expect(authSmokeStep).toContain(
+      "primes Vercel's bypass cookie by URL query instead of headers"
     );
     expect(authSmokeStep).toContain('auth_smoke_attempt=1');
     expect(authSmokeStep).toContain('auth_smoke_max_attempts=3');

@@ -1,5 +1,6 @@
 import { expect, type Page, test } from '@playwright/test';
 import { APP_ROUTES } from '@/constants/routes';
+import { primeVercelBypassCookie } from '../helpers/vercel-preview';
 import { SMOKE_TIMEOUTS } from './utils/smoke-test-utils';
 
 test.use({ storageState: { cookies: [], origins: [] } });
@@ -17,6 +18,8 @@ test.beforeEach(() => {
 
 function expectPublicAuthReady(pathname: string) {
   return async ({ page }: { page: Page }) => {
+    await primeVercelBypassCookie(page, process.env.BASE_URL, pathname);
+
     await page.goto(pathname, {
       waitUntil: 'domcontentloaded',
       timeout: SMOKE_TIMEOUTS.NAVIGATION,
