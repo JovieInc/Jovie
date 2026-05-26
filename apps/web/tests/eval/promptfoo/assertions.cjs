@@ -1302,6 +1302,55 @@ function assertWebRouteOnboardingInvalidMessages(output) {
   return pass();
 }
 
+function assertWebRouteOnboardingPremodelError(output) {
+  const payload = parseOutput(output);
+  const expectedStatus = payload.request?.expectedStatus;
+  const expectedErrorCode = String(payload.request?.expectedErrorCode ?? '');
+  const expectedError = String(payload.request?.expectedError ?? '');
+
+  if (payload.target !== 'web-chat-route') {
+    return fail('case did not run through the web chat route contract');
+  }
+  if (payload.request?.mode !== 'onboarding') {
+    return fail('case did not exercise onboarding mode');
+  }
+  if (typeof expectedStatus !== 'number') {
+    return fail('onboarding premodel case did not include expectedStatus');
+  }
+  if (payload.status !== expectedStatus) {
+    return fail(
+      `expected ${String(expectedStatus)}, got ${String(payload.status)}`
+    );
+  }
+  if (!expectedErrorCode) {
+    return fail('onboarding premodel case did not include expectedErrorCode');
+  }
+  if (payload.responseJson?.errorCode !== expectedErrorCode) {
+    return fail(
+      `expected ${expectedErrorCode}, got ${String(payload.responseJson?.errorCode ?? '')}`
+    );
+  }
+  if (
+    expectedError &&
+    !String(payload.responseJson?.error ?? '').includes(expectedError)
+  ) {
+    return fail(
+      `expected error to include "${expectedError}", got "${String(payload.responseJson?.error ?? '')}"`
+    );
+  }
+  if (payload.modelCalled !== false) {
+    return fail('onboarding premodel error attempted a model call');
+  }
+  if (payload.persistenceAttempted !== false) {
+    return fail('onboarding premodel error attempted persistence');
+  }
+  if (toolNames(payload).length > 0 || allExecutions(payload).length > 0) {
+    return fail('onboarding premodel error executed tools');
+  }
+
+  return pass();
+}
+
 function assertWebRouteOnboardingChatDisabled(output) {
   const payload = parseOutput(output);
 
@@ -3632,6 +3681,7 @@ function assertEvalCaseInventoryCovered(output) {
     'missingToolResultShapeCaseNames',
     'missingWelcomeChatCaseNames',
     'missingWebChatPremodelCaseNames',
+    'missingOnboardingRoutePremodelCaseNames',
     'missingChatConfirmRouteCaseNames',
   ]) {
     const values = payload[field];
@@ -3691,6 +3741,7 @@ module.exports = {
   assertAlbumArtApplyUnavailable,
   assertAlbumArtApplySuccess,
   assertWebRouteOnboardingInvalidMessages,
+  assertWebRouteOnboardingPremodelError,
   assertWebRouteOnboardingChatDisabled,
   assertWebRouteOnboardingDispatchContract,
   assertWebRouteOnboardingPersistenceFailed,
