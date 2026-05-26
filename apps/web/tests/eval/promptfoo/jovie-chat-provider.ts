@@ -3221,6 +3221,12 @@ async function evaluateLiveHttpWebChatRoute(prompt: string, vars: EvalVars) {
     );
   }
 
+  if (process.env.JOVIE_PROMPTFOO_EXPECT_MODEL_KEYS_DISABLED !== '1') {
+    throw new Error(
+      'Set JOVIE_PROMPTFOO_EXPECT_MODEL_KEYS_DISABLED=1 and start the local server with JOVIE_DISABLE_MODEL_KEYS_FOR_EVALS=1 before running live HTTP Promptfoo evals.'
+    );
+  }
+
   const baseUrl = resolveLiveHttpBaseUrl(vars);
   const httpCase =
     typeof vars.httpCase === 'string' && vars.httpCase.trim().length > 0

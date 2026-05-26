@@ -11,6 +11,11 @@ if [ -z "${JOVIE_PROMPTFOO_BASE_URL:-}" ]; then
   exit 1
 fi
 
+if [ "${JOVIE_PROMPTFOO_EXPECT_MODEL_KEYS_DISABLED:-}" != "1" ]; then
+  echo "Set JOVIE_PROMPTFOO_EXPECT_MODEL_KEYS_DISABLED=1 after starting the local server with JOVIE_DISABLE_MODEL_KEYS_FOR_EVALS=1" >&2
+  exit 1
+fi
+
 case "${JOVIE_PROMPTFOO_BASE_URL}" in
   http://localhost:* | http://127.0.0.1:* | http://[[]::1[]]:* | http://*.localhost:* | https://localhost:* | https://127.0.0.1:* | https://[[]::1[]]:* | https://*.localhost:*)
     ;;

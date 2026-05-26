@@ -11,6 +11,11 @@ if [ "${JOVIE_PROMPTFOO_EXPECT_REDIS_DISABLED:-}" != "1" ]; then
   exit 1
 fi
 
+if [ "${JOVIE_PROMPTFOO_EXPECT_MODEL_KEYS_DISABLED:-}" != "1" ]; then
+  echo "Set JOVIE_PROMPTFOO_EXPECT_MODEL_KEYS_DISABLED=1 after starting the local server with JOVIE_DISABLE_MODEL_KEYS_FOR_EVALS=1" >&2
+  exit 1
+fi
+
 if [ -z "${JOVIE_PROMPTFOO_BASE_URL:-}" ]; then
   echo "JOVIE_PROMPTFOO_BASE_URL is required for live HTTP rate-limit Promptfoo evals" >&2
   exit 1
