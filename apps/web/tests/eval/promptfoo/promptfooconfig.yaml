@@ -1604,6 +1604,23 @@ tests:
       - type: javascript
         value: file://assertions.cjs:assertSkillCommandContractCovered
 
+  - description: AI skill prompt builders preserve release-pitch and retouch guardrails
+    metadata:
+      cost: deterministic
+    vars:
+      input: "AI skill prompt contract check"
+      target: skill-prompt-contract
+      skillPromptCase: release-pitch-retouch-prompts
+      coverage:
+        expectedSkillIds:
+          - generateReleasePitch
+          - retouch
+    assert:
+      - type: javascript
+        value: file://assertions.cjs:assertDeterministicNoSpend
+      - type: javascript
+        value: file://assertions.cjs:assertSkillPromptContractCovered
+
   - description: Tool result shape matrix covers success and failure outputs
     metadata:
       cost: deterministic
