@@ -1566,6 +1566,27 @@ tests:
       - type: javascript
         value: file://assertions.cjs:assertSkillArtifactContractCovered
 
+  - description: AI skill commands round-trip through slash and cmdk surfaces
+    metadata:
+      cost: deterministic
+    vars:
+      input: "AI skill command contract check"
+      target: skill-command-contract
+      skillCommandCase: command-inventory
+      coverage:
+        expectedVisibleSkillIds:
+          - generateAlbumArt
+          - generateReleasePitch
+          - proposeAvatarUpload
+          - proposeSocialLink
+          - proposeSocialLinkRemoval
+          - submitFeedback
+    assert:
+      - type: javascript
+        value: file://assertions.cjs:assertDeterministicNoSpend
+      - type: javascript
+        value: file://assertions.cjs:assertSkillCommandContractCovered
+
   - description: Tool result shape matrix covers success and failure outputs
     metadata:
       cost: deterministic

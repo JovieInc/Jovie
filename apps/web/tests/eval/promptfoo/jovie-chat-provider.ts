@@ -27,6 +27,12 @@ import {
 } from '@/lib/chat/run';
 import { buildSystemPrompt } from '@/lib/chat/system-prompt';
 import {
+  extractSkill,
+  parseTokens,
+  serializeSkill,
+  serializeTokens,
+} from '@/lib/chat/tokens';
+import {
   canUsePaidChatTools,
   resolveChatTurnPlanLimits,
 } from '@/lib/chat/tool-access';
@@ -92,6 +98,7 @@ type EvalTarget =
   | 'onboarding-tool-sequence-contract'
   | 'prompt-context-contract'
   | 'skill-artifact-contract'
+  | 'skill-command-contract'
   | 'skill-registry-inventory'
   | 'tool-access-contract'
   | 'tool-contract'
@@ -530,6 +537,7 @@ const REQUIRED_PROMPT_CONTEXT_CASES = [
 ] as const;
 const REQUIRED_TOOL_ACCESS_CASES = ['billing-mode-matrix'] as const;
 const REQUIRED_SKILL_ARTIFACT_CASES = ['artifact-inventory'] as const;
+const REQUIRED_SKILL_COMMAND_CASES = ['command-inventory'] as const;
 const REQUIRED_SKILL_REGISTRY_CASES = ['registry-inventory'] as const;
 const CHAT_SLASH_SKILL_NAMES = commandsForSurface('chat-slash')
   .filter(command => command.kind === 'skill')
@@ -670,6 +678,7 @@ function toTarget(value: unknown): EvalTarget {
     value === 'onboarding-tool-sequence-contract' ||
     value === 'prompt-context-contract' ||
     value === 'skill-artifact-contract' ||
+    value === 'skill-command-contract' ||
     value === 'skill-registry-inventory' ||
     value === 'tool-access-contract' ||
     value === 'tool-contract' ||
@@ -5215,6 +5224,135 @@ function evaluateSkillArtifactContract(vars: EvalVars) {
   };
 }
 
+function evaluateSkillCommandContract(vars: EvalVars) {
+  const coverage = toObject(vars.coverage);
+  const expectedVisibleSkillIds = toStringArray(
+    coverage.expectedVisibleSkillIds
+  );
+  const expectedVisibleSkillIdSet = new Set(expectedVisibleSkillIds);
+  const knownVisibleSkillIdSet = new Set(ALL_COMMAND_SKILL_NAMES);
+  const commandIds = COMMANDS.map(command => command.id);
+  const duplicateCommandIds = commandIds
+    .filter((commandId, index) => commandIds.indexOf(commandId) !== index)
+    .sort();
+  const releaseId = '00000000-0000-4000-8000-000000009001';
+
+  const commandSkills = COMMANDS.filter(command => command.kind === 'skill')
+    .map(command => {
+      const token = serializeSkill(command.id);
+      const parsedTokens = parseTokens(`please ${token} now`);
+      const parsedSkillIds = parsedTokens
+        .filter(tokenPart => tokenPart.type === 'skill')
+        .map(tokenPart => tokenPart.id);
+      const extractedSkill = extractSkill(`please ${token} now`);
+      const roundTrip = serializeTokens(parseTokens(token));
+      const schema =
+        ALL_EVAL_TOOL_SCHEMAS[command.id as keyof typeof ALL_EVAL_TOOL_SCHEMAS];
+      const requiresRelease = command.entitySlots.some(
+        slot => slot.kind === 'release' && slot.required
+      );
+      const releaseSchemaSupportsEntity =
+        !requiresRelease ||
+        schema?.inputSchema.safeParse({ releaseId }).success === true ||
+        schema?.inputSchema.safeParse({ releaseTitle: 'Neon Reef' }).success ===
+          true;
+
+      return {
+        id: command.id,
+        label: command.label,
+        description: command.description,
+        iconName: command.iconName,
+        surfaces: [...command.surfaces],
+        entitySlots: command.entitySlots.map(slot => ({
+          kind: slot.kind,
+          required: slot.required,
+        })),
+        schemaExists: Boolean(schema),
+        inChatSlash: CHAT_SLASH_SKILL_NAMES.includes(command.id),
+        inCmdk: CMDK_SKILL_NAMES.includes(command.id),
+        token,
+        parsedSkillIds,
+        extractedSkillId: extractedSkill?.id ?? null,
+        roundTrip,
+        tokenRoundTripValid: roundTrip === token,
+        tokenParsedValid:
+          parsedSkillIds.length === 1 && parsedSkillIds[0] === command.id,
+        tokenExtractValid: extractedSkill?.id === command.id,
+        requiresRelease,
+        releaseSchemaSupportsEntity,
+      };
+    })
+    .sort((left, right) => left.id.localeCompare(right.id));
+
+  const hiddenCommandCollisions = ALL_COMMAND_SKILL_NAMES.filter(toolName =>
+    HIDDEN_TOOL_NAMES.includes(toolName)
+  );
+
+  return {
+    target: 'skill-command-contract',
+    adapter: 'skill-command-contract',
+    costTier: 'deterministic',
+    text: '',
+    selectedModel: null,
+    modelCalled: false,
+    persistenceAttempted: false,
+    dbAttempted: false,
+    networkAttempted: false,
+    expectedVisibleSkillIds: uniqueSorted(expectedVisibleSkillIds),
+    commandSkillNames: ALL_COMMAND_SKILL_NAMES,
+    chatSlashSkillNames: CHAT_SLASH_SKILL_NAMES,
+    cmdkSkillNames: CMDK_SKILL_NAMES,
+    hiddenToolNames: HIDDEN_TOOL_NAMES,
+    commandSkills,
+    missingExpectedVisibleSkillIds: expectedVisibleSkillIds
+      .filter(skillId => !knownVisibleSkillIdSet.has(skillId))
+      .sort(),
+    unknownExpectedVisibleSkillIds: ALL_COMMAND_SKILL_NAMES.filter(
+      skillId => !expectedVisibleSkillIdSet.has(skillId)
+    ),
+    duplicateCommandIds: uniqueSorted(duplicateCommandIds),
+    commandSkillSchemaMissingIds: commandSkills
+      .filter(command => !command.schemaExists)
+      .map(command => command.id),
+    commandSkillMissingLabelIds: commandSkills
+      .filter(
+        command =>
+          !command.label.trim() ||
+          !command.description.trim() ||
+          !command.iconName.trim()
+      )
+      .map(command => command.id),
+    commandSkillInvalidIconIds: commandSkills
+      .filter(command => !/^[A-Z][A-Za-z0-9]*$/.test(command.iconName))
+      .map(command => command.id),
+    commandSkillMissingChatSlashIds: commandSkills
+      .filter(command => !command.inChatSlash)
+      .map(command => command.id),
+    commandSkillMissingCmdkIds: commandSkills
+      .filter(command => !command.inCmdk)
+      .map(command => command.id),
+    commandSkillTokenRoundTripFailureIds: commandSkills
+      .filter(command => !command.tokenRoundTripValid)
+      .map(command => command.id),
+    commandSkillTokenParseFailureIds: commandSkills
+      .filter(command => !command.tokenParsedValid)
+      .map(command => command.id),
+    commandSkillTokenExtractFailureIds: commandSkills
+      .filter(command => !command.tokenExtractValid)
+      .map(command => command.id),
+    commandSkillReleaseEntitySchemaMissingIds: commandSkills
+      .filter(
+        command =>
+          command.requiresRelease && !command.releaseSchemaSupportsEntity
+      )
+      .map(command => command.id),
+    hiddenCommandCollisions,
+    toolCalls: [],
+    toolResults: [],
+    toolExecutions: [],
+  };
+}
+
 function getToolUiHint(toolName: string) {
   return TOOL_UI_REGISTRY[toolName as keyof typeof TOOL_UI_REGISTRY]?.uiHint;
 }
@@ -5769,6 +5907,7 @@ type EvalCaseSummary = {
   readonly resultShapeCase: string | null;
   readonly sequenceCase: string | null;
   readonly skillArtifactCase: string | null;
+  readonly skillCommandCase: string | null;
   readonly skillRegistryCase: string | null;
   readonly stateCase: string | null;
   readonly welcomeCase: string | null;
@@ -5866,6 +6005,7 @@ function parseEvalCaseSummary(block: string): EvalCaseSummary {
     resultShapeCase: scalarValue(block, 'resultShapeCase'),
     sequenceCase: scalarValue(block, 'sequenceCase'),
     skillArtifactCase: scalarValue(block, 'skillArtifactCase'),
+    skillCommandCase: scalarValue(block, 'skillCommandCase'),
     skillRegistryCase: scalarValue(block, 'skillRegistryCase'),
     stateCase: scalarValue(block, 'stateCase'),
     welcomeCase: scalarValue(block, 'welcomeCase'),
@@ -6087,6 +6227,15 @@ function evaluateEvalCaseInventory(vars: EvalVars) {
           typeof skillArtifactCase === 'string'
       )
   );
+  const skillCommandCaseNames = uniqueSorted(
+    deterministicCases
+      .filter(testCase => testCase.target === 'skill-command-contract')
+      .map(testCase => testCase.skillCommandCase)
+      .filter(
+        (skillCommandCase): skillCommandCase is string =>
+          typeof skillCommandCase === 'string'
+      )
+  );
   const skillRegistryCaseNames = uniqueSorted(
     deterministicCases
       .filter(testCase => testCase.target === 'skill-registry-inventory')
@@ -6286,6 +6435,12 @@ function evaluateEvalCaseInventory(vars: EvalVars) {
     missingSkillArtifactCaseNames: missingNames(
       REQUIRED_SKILL_ARTIFACT_CASES,
       skillArtifactCaseNames
+    ),
+    requiredSkillCommandCaseNames: [...REQUIRED_SKILL_COMMAND_CASES],
+    skillCommandCaseNames,
+    missingSkillCommandCaseNames: missingNames(
+      REQUIRED_SKILL_COMMAND_CASES,
+      skillCommandCaseNames
     ),
     requiredSkillRegistryCaseNames: [...REQUIRED_SKILL_REGISTRY_CASES],
     skillRegistryCaseNames,
@@ -6513,6 +6668,16 @@ export default class JovieChatPromptfooProvider {
 
     if (target === 'skill-artifact-contract') {
       const payload = evaluateSkillArtifactContract(vars);
+      return {
+        output: JSON.stringify(payload),
+        raw: payload,
+        format: 'json',
+        latencyMs: Date.now() - startedAt,
+      };
+    }
+
+    if (target === 'skill-command-contract') {
+      const payload = evaluateSkillCommandContract(vars);
       return {
         output: JSON.stringify(payload),
         raw: payload,

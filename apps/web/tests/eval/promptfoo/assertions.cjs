@@ -3237,6 +3237,73 @@ function assertSkillArtifactContractCovered(output) {
   return pass();
 }
 
+function assertSkillCommandContractCovered(output) {
+  const payload = parseOutput(output);
+
+  if (payload.target !== 'skill-command-contract') {
+    return fail('case did not run through the skill-command-contract adapter');
+  }
+  if (payload.costTier !== 'deterministic') {
+    return fail('skill command case is not marked deterministic');
+  }
+  for (const field of [
+    'modelCalled',
+    'persistenceAttempted',
+    'dbAttempted',
+    'networkAttempted',
+  ]) {
+    if (payload[field] !== false) {
+      return fail(`${field} should be false for skill command coverage`);
+    }
+  }
+  if (!Array.isArray(payload.commandSkills)) {
+    return fail('skill command contract missing commandSkills');
+  }
+  if (payload.commandSkills.length === 0) {
+    return fail('skill command contract found no visible skill commands');
+  }
+
+  for (const field of [
+    'missingExpectedVisibleSkillIds',
+    'unknownExpectedVisibleSkillIds',
+    'duplicateCommandIds',
+    'commandSkillSchemaMissingIds',
+    'commandSkillMissingLabelIds',
+    'commandSkillInvalidIconIds',
+    'commandSkillMissingChatSlashIds',
+    'commandSkillMissingCmdkIds',
+    'commandSkillTokenRoundTripFailureIds',
+    'commandSkillTokenParseFailureIds',
+    'commandSkillTokenExtractFailureIds',
+    'commandSkillReleaseEntitySchemaMissingIds',
+    'hiddenCommandCollisions',
+  ]) {
+    const values = payload[field];
+    if (!Array.isArray(values)) {
+      return fail(`skill command contract missing ${field}`);
+    }
+    if (values.length > 0) {
+      return fail(`${field}: ${values.join(', ')}`);
+    }
+  }
+
+  for (const command of payload.commandSkills) {
+    if (!command || typeof command !== 'object') {
+      return fail('skill command entry is not an object');
+    }
+    if (command.token !== `/skill:${command.id}`) {
+      return fail(
+        `${String(command.id)} serialized to ${String(command.token)}`
+      );
+    }
+    if (!Array.isArray(command.surfaces) || command.surfaces.length === 0) {
+      return fail(`${String(command.id)} has no command surfaces`);
+    }
+  }
+
+  return pass();
+}
+
 function firstEvent(payload) {
   return Array.isArray(payload.events) ? payload.events[0] : undefined;
 }
@@ -3796,6 +3863,7 @@ function assertEvalCaseInventoryCovered(output) {
     'missingPromptContextCaseNames',
     'missingToolAccessCaseNames',
     'missingSkillArtifactCaseNames',
+    'missingSkillCommandCaseNames',
     'missingSkillRegistryCaseNames',
     'missingOnboardingStateCaseNames',
     'missingOnboardingToolSequenceCaseNames',
@@ -3923,6 +3991,7 @@ module.exports = {
   assertToolUiRegistryCovered,
   assertSlashSkillVisibilityCovered,
   assertSkillArtifactContractCovered,
+  assertSkillCommandContractCovered,
   assertSkillRegistryInventoryCovered,
   assertToolEventInventoryCovered,
   assertToolEventHydratesSuccess,
