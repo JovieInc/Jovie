@@ -22,6 +22,7 @@ import {
   detectAlbumArtGenerationIntent,
 } from '@/lib/chat/album-art-capability';
 import { KNOWLEDGE_TOPICS } from '@/lib/chat/knowledge/topics';
+import { ONBOARDING_SYSTEM_PROMPT } from '@/lib/chat/prompts/onboarding';
 import {
   canUseLightModel,
   executeChatTurn,
@@ -120,6 +121,7 @@ type EvalTarget =
   | 'insight-prompt-contract'
   | 'knowledge-contract'
   | 'model-contract'
+  | 'onboarding-system-prompt-contract'
   | 'mobile-chat-route'
   | 'onboarding-welcome-chat-contract'
   | 'release-task-classifier-contract'
@@ -585,6 +587,7 @@ const REQUIRED_SKILL_PROMPT_CASES = ['release-pitch-retouch-prompts'] as const;
 const REQUIRED_SKILL_REGISTRY_CASES = ['registry-inventory'] as const;
 const REQUIRED_AI_TOOL_PROMPT_CASES = ['album-art-canvas-bio-prompts'] as const;
 const REQUIRED_INSIGHT_PROMPT_CASES = ['analytics-grounding-prompts'] as const;
+const REQUIRED_ONBOARDING_SYSTEM_PROMPT_CASES = ['prompt-rules'] as const;
 const REQUIRED_RELEASE_TASK_CLASSIFIER_CASES = ['prompt-and-coercion'] as const;
 let serverOnlyEvalShimRegistered = false;
 const AI_TOOL_PROMPT_TOOL_NAMES = [
@@ -736,6 +739,7 @@ function toTarget(value: unknown): EvalTarget {
     value === 'knowledge-contract' ||
     value === 'mobile-chat-route' ||
     value === 'model-contract' ||
+    value === 'onboarding-system-prompt-contract' ||
     value === 'onboarding-welcome-chat-contract' ||
     value === 'release-task-classifier-contract' ||
     value === 'onboarding-state-contract' ||
@@ -5992,6 +5996,139 @@ function evaluateInsightPromptContract(vars: EvalVars) {
   };
 }
 
+function evaluateOnboardingSystemPromptContract(vars: EvalVars) {
+  const promptCase =
+    typeof vars.onboardingSystemPromptCase === 'string'
+      ? vars.onboardingSystemPromptCase
+      : 'prompt-rules';
+  const prompt = ONBOARDING_SYSTEM_PROMPT;
+  const toolOrderNames = [
+    'searchSpotifyArtist',
+    'confirmSpotifyArtist',
+    'checkHandle',
+    'proposeSocialLink',
+    'recordInterviewSignal',
+    'proposeNextStep',
+    'proposeCheckout',
+  ] as const;
+  const toolOrder = toolOrderNames.map(name => {
+    const quotedIndex = prompt.indexOf(`\`${name}\``);
+    return {
+      name,
+      index: quotedIndex >= 0 ? quotedIndex : prompt.indexOf(name),
+    };
+  });
+  const toolOrderValid = toolOrder.every((item, index) => {
+    if (item.index < 0) return false;
+    const previous = toolOrder[index - 1];
+    return !previous || previous.index < item.index;
+  });
+  const promptFacts = {
+    identifiesUnauthenticatedVisitor: textIncludesAll(prompt, [
+      'musician just landed',
+      'visitor is unauthenticated',
+      'no account yet',
+    ]),
+    preservesFirstBubblePrivacyDisclosure: textIncludesAll(prompt, [
+      'FIRST chat bubble',
+      'conversation is remembered',
+      'help personalize',
+    ]),
+    keepsOnboardingVoiceConstraints: textIncludesAll(prompt, [
+      'Sharp friend over iMessage',
+      'lowercase by default',
+      'NO emoji',
+      'NO customer-service polite',
+    ]),
+    requiresShortConcreteReplies: textIncludesAll(prompt, [
+      'Short messages',
+      'No bullet lists',
+      'no markdown',
+      'concrete numbered plan',
+    ]),
+    enforcesOneQuestionPerTurn: textIncludesAll(prompt, [
+      'One question per turn',
+      'Never two',
+      'Never "first, then, then"',
+    ]),
+    requiresSpotifyIdentityBeforeSetup: textIncludesAll(prompt, [
+      'Get their Spotify identity',
+      'searchSpotifyArtist',
+      'confirmSpotifyArtist',
+    ]),
+    requiresDataObservationAfterSpotifyConfirmation: textIncludesAll(prompt, [
+      'confirmSpotifyArtist',
+      'MUST make an observation',
+      'BEFORE asking the next question',
+      'wow moment',
+    ]),
+    gatesAccessThroughNextStepDecision: textIncludesAll(prompt, [
+      'proposeNextStep',
+      'instant_access',
+      'waitlist',
+      'needs_more_info',
+    ]),
+    blocksCheckoutUntilInstantAccess: textIncludesAll(prompt, [
+      'If instant_access',
+      'proposeCheckout',
+      'Never promise instant access',
+    ]),
+    keepsPricingLate: textIncludesAll(prompt, [
+      'Pricing',
+      'reveal LATE',
+      'Do NOT lead with pricing',
+      'Pro is $39/mo',
+      'Max is $149/mo',
+      '14-day reverse trial',
+    ]),
+    forbidsInventedStatsAndPrematureLiveClaims: textIncludesAll(prompt, [
+      'Never invent stats',
+      'customer counts',
+      'testimonials',
+      'Never claim a profile is "live"',
+    ]),
+    recordsSignalsSilently: textIncludesAll(prompt, [
+      'recordInterviewSignal',
+      'every signal',
+      'Silent, no UI',
+      'objection',
+    ]),
+    redirectsGeneralSupportIntoIntake: textIncludesAll(prompt, [
+      'access-intake flow',
+      'redirect to the intake',
+      'By your second assistant reply',
+      'searchSpotifyArtist',
+    ]),
+    preservesToolSequence: toolOrderValid,
+  };
+
+  return {
+    target: 'onboarding-system-prompt-contract',
+    adapter: 'onboarding-system-prompt-contract',
+    productionEntrypoint:
+      'apps/web/lib/chat/prompts/onboarding.ts:ONBOARDING_SYSTEM_PROMPT',
+    costTier: 'deterministic',
+    text: '',
+    selectedModel: null,
+    modelCalled: false,
+    persistenceAttempted: false,
+    dbAttempted: false,
+    networkAttempted: false,
+    promptCase,
+    promptLength: prompt.length,
+    promptFacts,
+    missingPromptFacts: Object.entries(promptFacts)
+      .filter(([, passed]) => !passed)
+      .map(([name]) => name),
+    toolOrder,
+    toolOrderValid,
+    promptLeakPatterns: promptLeakPatterns(prompt),
+    toolCalls: [],
+    toolResults: [],
+    toolExecutions: [],
+  };
+}
+
 async function evaluateReleaseTaskClassifierContract(vars: EvalVars) {
   const { classifyTaskCluster, CLASSIFIER_MIN_CONFIDENCE } =
     await importReleaseTaskClassifierModule();
@@ -6994,6 +7131,7 @@ type EvalCaseSummary = {
   readonly eventCase: string | null;
   readonly aiToolPromptCase: string | null;
   readonly insightPromptCase: string | null;
+  readonly onboardingSystemPromptCase: string | null;
   readonly releaseTaskClassifierCase: string | null;
   readonly knowledgeCase: string | null;
   readonly promptCase: string | null;
@@ -7097,6 +7235,10 @@ function parseEvalCaseSummary(block: string): EvalCaseSummary {
     eventCase: scalarValue(block, 'eventCase'),
     aiToolPromptCase: scalarValue(block, 'aiToolPromptCase'),
     insightPromptCase: scalarValue(block, 'insightPromptCase'),
+    onboardingSystemPromptCase: scalarValue(
+      block,
+      'onboardingSystemPromptCase'
+    ),
     releaseTaskClassifierCase: scalarValue(block, 'releaseTaskClassifierCase'),
     knowledgeCase: scalarValue(block, 'knowledgeCase'),
     promptCase: scalarValue(block, 'promptCase'),
@@ -7335,6 +7477,17 @@ function evaluateEvalCaseInventory(vars: EvalVars) {
       .filter(
         (insightPromptCase): insightPromptCase is string =>
           typeof insightPromptCase === 'string'
+      )
+  );
+  const onboardingSystemPromptCaseNames = uniqueSorted(
+    deterministicCases
+      .filter(
+        testCase => testCase.target === 'onboarding-system-prompt-contract'
+      )
+      .map(testCase => testCase.onboardingSystemPromptCase)
+      .filter(
+        (onboardingSystemPromptCase): onboardingSystemPromptCase is string =>
+          typeof onboardingSystemPromptCase === 'string'
       )
   );
   const releaseTaskClassifierCaseNames = uniqueSorted(
@@ -7589,6 +7742,14 @@ function evaluateEvalCaseInventory(vars: EvalVars) {
     missingInsightPromptCaseNames: missingNames(
       REQUIRED_INSIGHT_PROMPT_CASES,
       insightPromptCaseNames
+    ),
+    requiredOnboardingSystemPromptCaseNames: [
+      ...REQUIRED_ONBOARDING_SYSTEM_PROMPT_CASES,
+    ],
+    onboardingSystemPromptCaseNames,
+    missingOnboardingSystemPromptCaseNames: missingNames(
+      REQUIRED_ONBOARDING_SYSTEM_PROMPT_CASES,
+      onboardingSystemPromptCaseNames
     ),
     requiredReleaseTaskClassifierCaseNames: [
       ...REQUIRED_RELEASE_TASK_CLASSIFIER_CASES,
@@ -7854,6 +8015,11 @@ export default class JovieChatPromptfooProvider {
 
     if (target === 'insight-prompt-contract') {
       const payload = evaluateInsightPromptContract(vars);
+      return jsonProviderResponse(payload, startedAt);
+    }
+
+    if (target === 'onboarding-system-prompt-contract') {
+      const payload = evaluateOnboardingSystemPromptContract(vars);
       return jsonProviderResponse(payload, startedAt);
     }
 
