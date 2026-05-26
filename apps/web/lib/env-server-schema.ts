@@ -235,6 +235,7 @@ export const ServerEnvSchema = z.object({
 
   // Development tools
   JOVIE_DEV_MEMORY_MONITOR: z.string().optional(),
+  JOVIE_PROMPTFOO_EXPECT_MODEL_KEYS_DISABLED: z.string().optional(),
 
   // Instantly (outreach email campaigns)
   INSTANTLY_API_KEY: z.string().optional(),
@@ -408,6 +409,7 @@ export const ENV_KEYS = [
   'ALBUM_ART_GENERATION_DAILY_LIMIT',
   'ALBUM_ART_GENERATION_BURST_LIMIT',
   'JOVIE_DEV_MEMORY_MONITOR',
+  'JOVIE_PROMPTFOO_EXPECT_MODEL_KEYS_DISABLED',
   'INSTANTLY_API_KEY',
   'INSTANTLY_CAMPAIGN_ID',
   'SERPAPI_API_KEY',

@@ -7,8 +7,8 @@ config_path="tests/eval/promptfoo/promptfooconfig.yaml"
 for flag in \
   JOVIE_RUN_LIVE_EVALS \
   JOVIE_RUN_LIVE_HTTP_EVALS \
-  JOVIE_RUN_LIVE_RATE_LIMIT_EVALS \
-  JOVIE_RUN_LIVE_MODEL_ERROR_EVALS
+  JOVIE_RUN_LIVE_HTTP_RATE_LIMIT_EVALS \
+  JOVIE_RUN_LIVE_HTTP_MODEL_ERROR_EVALS
 do
   if [ "${!flag:-0}" = "1" ]; then
     echo "Refusing to run deterministic Promptfoo evals with ${flag}=1" >&2

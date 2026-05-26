@@ -38,18 +38,18 @@ To run the live `executeChatTurn()` answer-quality cases manually:
 JOVIE_RUN_LIVE_EVALS=1 pnpm run evals:live
 ```
 
-To run the live HTTP `/api/chat` route cases manually, start the web app with dev test-auth enabled, then run the HTTP lane:
+To run the live HTTP `/api/chat` route cases manually, start the web app with dev test-auth and model provider keys disabled, then run the HTTP lane:
 
 ```bash
-E2E_USE_TEST_AUTH_BYPASS=1 pnpm run dev:web:fast
-JOVIE_RUN_LIVE_HTTP_EVALS=1 JOVIE_PROMPTFOO_BASE_URL=http://127.0.0.1:3000 pnpm run evals:live:http
+E2E_USE_TEST_AUTH_BYPASS=1 JOVIE_DISABLE_MODEL_KEYS_FOR_EVALS=1 pnpm run dev:web:fast
+JOVIE_RUN_LIVE_HTTP_EVALS=1 JOVIE_PROMPTFOO_EXPECT_MODEL_KEYS_DISABLED=1 JOVIE_PROMPTFOO_BASE_URL=http://127.0.0.1:3000 pnpm run evals:live:http
 ```
 
 To run the isolated live HTTP rate-limit case, start the local server with Redis and model provider keys disabled. Use a port that is not already owned by another worktree:
 
 ```bash
 PORT=3101 JOVIE_DISABLE_REDIS_FOR_EVALS=1 JOVIE_DISABLE_MODEL_KEYS_FOR_EVALS=1 E2E_USE_TEST_AUTH_BYPASS=1 pnpm run dev:web:fast
-JOVIE_RUN_LIVE_HTTP_RATE_LIMIT_EVALS=1 JOVIE_PROMPTFOO_EXPECT_REDIS_DISABLED=1 JOVIE_PROMPTFOO_BASE_URL=http://127.0.0.1:3101 pnpm run evals:live:http:rate-limit
+JOVIE_RUN_LIVE_HTTP_RATE_LIMIT_EVALS=1 JOVIE_PROMPTFOO_EXPECT_REDIS_DISABLED=1 JOVIE_PROMPTFOO_EXPECT_MODEL_KEYS_DISABLED=1 JOVIE_PROMPTFOO_BASE_URL=http://127.0.0.1:3101 pnpm run evals:live:http:rate-limit
 ```
 
 To run the isolated live HTTP model-error case, start the local server with model provider credentials disabled. Use a port that is not already owned by another worktree:
@@ -74,14 +74,16 @@ Required environment for manual live evals:
 Required environment for manual live HTTP evals:
 
 - `JOVIE_RUN_LIVE_HTTP_EVALS=1`.
+- `JOVIE_PROMPTFOO_EXPECT_MODEL_KEYS_DISABLED=1`.
 - `JOVIE_PROMPTFOO_BASE_URL`, restricted to loopback hosts.
-- Local web server started with `E2E_USE_TEST_AUTH_BYPASS=1`.
+- Local web server started with `E2E_USE_TEST_AUTH_BYPASS=1` and `JOVIE_DISABLE_MODEL_KEYS_FOR_EVALS=1`.
 - Local/Doppler DB and Clerk test-user setup required by `/api/dev/test-auth/session`.
 
 Required environment for manual live HTTP rate-limit evals:
 
 - `JOVIE_RUN_LIVE_HTTP_RATE_LIMIT_EVALS=1`.
 - `JOVIE_PROMPTFOO_EXPECT_REDIS_DISABLED=1`.
+- `JOVIE_PROMPTFOO_EXPECT_MODEL_KEYS_DISABLED=1`.
 - `JOVIE_PROMPTFOO_BASE_URL`, restricted to loopback hosts.
 - Local web server started with `JOVIE_DISABLE_REDIS_FOR_EVALS=1` and `JOVIE_DISABLE_MODEL_KEYS_FOR_EVALS=1`.
 
