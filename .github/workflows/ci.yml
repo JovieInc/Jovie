@@ -2267,8 +2267,21 @@ jobs:
         if: steps.check_changes.outputs.run_full_ci == 'true'
         run: pnpm turbo test --filter=@jovie/ui
 
-      - name: Upload coverage to Codecov
+      - name: Detect coverage reports
         if: steps.check_changes.outputs.run_full_ci == 'true' && github.ref == 'refs/heads/main'
+        id: coverage_reports
+        shell: bash
+        run: |
+          if find apps/web/coverage -type f \( -name '*.json' -o -name '*.xml' -o -name '*.info' -o -name '*.lcov' \) -print -quit 2>/dev/null | grep -q .; then
+            echo "has_coverage=true" >> "$GITHUB_OUTPUT"
+            echo "Coverage reports found for this shard."
+          else
+            echo "has_coverage=false" >> "$GITHUB_OUTPUT"
+            echo "No coverage reports produced for this shard; skipping Codecov coverage upload."
+          fi
+
+      - name: Upload coverage to Codecov
+        if: steps.check_changes.outputs.run_full_ci == 'true' && github.ref == 'refs/heads/main' && steps.coverage_reports.outputs.has_coverage == 'true'
         uses: codecov/codecov-action@e79a6962e0d4c0c17b229090214935d2e33f8354 # v5
         with:
           directory: apps/web/coverage
