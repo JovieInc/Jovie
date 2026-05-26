@@ -63,6 +63,10 @@ import {
   HIDDEN_TOOLS,
 } from '@/lib/commands/registry';
 import { CHAT_MODEL, CHAT_MODEL_LIGHT } from '@/lib/constants/ai-models';
+import {
+  insertSkillsCatalogSchema,
+  insertToolsCatalogSchema,
+} from '@/lib/db/schema/agents';
 import { users } from '@/lib/db/schema/auth';
 import { chatMessages, chatTurns } from '@/lib/db/schema/chat';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
@@ -98,6 +102,7 @@ type EvalTarget =
   | 'onboarding-tool-sequence-contract'
   | 'prompt-context-contract'
   | 'skill-artifact-contract'
+  | 'skill-catalog-sync-contract'
   | 'skill-command-contract'
   | 'skill-registry-inventory'
   | 'tool-access-contract'
@@ -537,8 +542,12 @@ const REQUIRED_PROMPT_CONTEXT_CASES = [
 ] as const;
 const REQUIRED_TOOL_ACCESS_CASES = ['billing-mode-matrix'] as const;
 const REQUIRED_SKILL_ARTIFACT_CASES = ['artifact-inventory'] as const;
+const REQUIRED_SKILL_CATALOG_CASES = ['catalog-sync-shape'] as const;
 const REQUIRED_SKILL_COMMAND_CASES = ['command-inventory'] as const;
 const REQUIRED_SKILL_REGISTRY_CASES = ['registry-inventory'] as const;
+const SKILLS_CATALOG_SYNC_SCRIPT_PATH =
+  'apps/web/scripts/sync-skills-catalog.ts';
+const WEB_PACKAGE_JSON_PATH = 'apps/web/package.json';
 const CHAT_SLASH_SKILL_NAMES = commandsForSurface('chat-slash')
   .filter(command => command.kind === 'skill')
   .map(command => command.id)
@@ -678,6 +687,7 @@ function toTarget(value: unknown): EvalTarget {
     value === 'onboarding-tool-sequence-contract' ||
     value === 'prompt-context-contract' ||
     value === 'skill-artifact-contract' ||
+    value === 'skill-catalog-sync-contract' ||
     value === 'skill-command-contract' ||
     value === 'skill-registry-inventory' ||
     value === 'tool-access-contract' ||
@@ -5224,6 +5234,173 @@ function evaluateSkillArtifactContract(vars: EvalVars) {
   };
 }
 
+function isJsonSerializable(value: unknown): boolean {
+  try {
+    JSON.parse(JSON.stringify(value));
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function evaluateSkillCatalogSyncContract(vars: EvalVars) {
+  const coverage = toObject(vars.coverage);
+  const expectedSkillIds = toStringArray(coverage.expectedSkillIds);
+  const expectedSkillIdSet = new Set(expectedSkillIds);
+  const knownSkillIdSet = new Set(SKILL_REGISTRY_IDS);
+  const syncScriptContent = registryPathContent(
+    SKILLS_CATALOG_SYNC_SCRIPT_PATH
+  );
+  const webPackageJsonContent = registryPathContent(WEB_PACKAGE_JSON_PATH);
+  const updatedAt = new Date('2026-01-01T00:00:00.000Z');
+
+  const catalogRows = Object.entries(SKILL_REGISTRY)
+    .map(([skillId, skill]) => {
+      const isTool = skill.kind === 'tool';
+      const row = isTool
+        ? {
+            id: skill.id,
+            name: skill.name,
+            description: skill.description ?? null,
+            kind: 'tool' as const,
+            version: skill.version,
+            entitlementRequired: skill.entitlement ?? null,
+            model: skill.model ?? null,
+            promptPath: skill.promptPath ?? null,
+            inputSchemaZodPath: skill.inputSchemaZodPath ?? null,
+            outputSchemaZodPath: skill.outputSchemaZodPath ?? null,
+            metadata: skill.metadata,
+            updatedAt,
+          }
+        : {
+            id: skill.id,
+            name: skill.name,
+            description: skill.description ?? null,
+            kind: skill.kind,
+            version: skill.version,
+            entitlementRequired: skill.entitlement ?? null,
+            model: skill.model ?? null,
+            promptPath: skill.promptPath ?? null,
+            metadata: skill.metadata,
+            updatedAt,
+          };
+      const requiredFields = isTool
+        ? [
+            'id',
+            'name',
+            'kind',
+            'version',
+            'entitlementRequired',
+            'model',
+            'inputSchemaZodPath',
+            'outputSchemaZodPath',
+            'metadata',
+          ]
+        : [
+            'id',
+            'name',
+            'kind',
+            'version',
+            'entitlementRequired',
+            'model',
+            'promptPath',
+            'metadata',
+          ];
+      const missingRequiredFields = requiredFields.filter(field => {
+        const value = (row as Record<string, unknown>)[field];
+        return value === null || value === undefined || value === '';
+      });
+      const schemaResult = isTool
+        ? insertToolsCatalogSchema.safeParse(row)
+        : insertSkillsCatalogSchema.safeParse(row);
+      const targetTable = isTool ? 'tools_catalog' : 'skills_catalog';
+
+      return {
+        id: skillId,
+        kind: skill.kind,
+        targetTable,
+        schemaValid: schemaResult.success,
+        schemaErrors: schemaResult.success
+          ? []
+          : schemaErrorMessages(schemaResult),
+        metadataSerializable: isJsonSerializable(skill.metadata),
+        missingRequiredFields,
+        syncRowKeys: Object.keys(row).sort(),
+      };
+    })
+    .sort((left, right) => left.id.localeCompare(right.id));
+
+  const missingExpectedSkillIds = expectedSkillIds
+    .filter(skillId => !knownSkillIdSet.has(skillId))
+    .sort();
+  const unknownExpectedSkillIds = SKILL_REGISTRY_IDS.filter(
+    skillId => !expectedSkillIdSet.has(skillId)
+  );
+  const invalidCatalogRowSkillIds = catalogRows
+    .filter(row => !row.schemaValid)
+    .map(row => row.id);
+  const schemaErrorsBySkill = Object.fromEntries(
+    catalogRows
+      .filter(row => row.schemaErrors.length > 0)
+      .map(row => [row.id, row.schemaErrors])
+  );
+
+  return {
+    target: 'skill-catalog-sync-contract',
+    adapter: 'skill-catalog-sync-contract',
+    costTier: 'deterministic',
+    text: '',
+    selectedModel: null,
+    modelCalled: false,
+    persistenceAttempted: false,
+    dbAttempted: false,
+    networkAttempted: false,
+    syncScriptPath: SKILLS_CATALOG_SYNC_SCRIPT_PATH,
+    syncScriptPathExists: registryPathExists(SKILLS_CATALOG_SYNC_SCRIPT_PATH),
+    syncScriptReferencesRegistry: syncScriptContent.includes('SKILL_REGISTRY'),
+    syncScriptReferencesSkillsCatalog:
+      syncScriptContent.includes('skillsCatalog'),
+    syncScriptReferencesToolsCatalog:
+      syncScriptContent.includes('toolsCatalog'),
+    syncScriptUsesConflictUpsert:
+      syncScriptContent.includes('onConflictDoUpdate'),
+    syncScriptUsesSkipFlag: syncScriptContent.includes(
+      'SKIP_SKILLS_CATALOG_SYNC'
+    ),
+    postbuildRunsCatalogSync:
+      webPackageJsonContent.includes('"postbuild"') &&
+      webPackageJsonContent.includes('scripts/sync-skills-catalog.ts'),
+    expectedSkillIds: uniqueSorted(expectedSkillIds),
+    requiredSkillIds: SKILL_REGISTRY_IDS,
+    missingExpectedSkillIds,
+    unknownExpectedSkillIds,
+    catalogRows,
+    catalogTableCounts: catalogRows.reduce<Record<string, number>>(
+      (counts, row) => {
+        counts[row.targetTable] = (counts[row.targetTable] ?? 0) + 1;
+        return counts;
+      },
+      {}
+    ),
+    invalidCatalogRowSkillIds,
+    schemaErrorsBySkill,
+    nonSerializableMetadataSkillIds: catalogRows
+      .filter(row => !row.metadataSerializable)
+      .map(row => row.id),
+    missingRequiredSyncFieldSkillIds: catalogRows
+      .filter(row => row.missingRequiredFields.length > 0)
+      .map(row => row.id),
+    missingRequiredSyncFieldsBySkill: Object.fromEntries(
+      catalogRows
+        .filter(row => row.missingRequiredFields.length > 0)
+        .map(row => [row.id, row.missingRequiredFields])
+    ),
+    toolCalls: [],
+    toolResults: [],
+    toolExecutions: [],
+  };
+}
+
 function evaluateSkillCommandContract(vars: EvalVars) {
   const coverage = toObject(vars.coverage);
   const expectedVisibleSkillIds = toStringArray(
@@ -5907,6 +6084,7 @@ type EvalCaseSummary = {
   readonly resultShapeCase: string | null;
   readonly sequenceCase: string | null;
   readonly skillArtifactCase: string | null;
+  readonly skillCatalogCase: string | null;
   readonly skillCommandCase: string | null;
   readonly skillRegistryCase: string | null;
   readonly stateCase: string | null;
@@ -6005,6 +6183,7 @@ function parseEvalCaseSummary(block: string): EvalCaseSummary {
     resultShapeCase: scalarValue(block, 'resultShapeCase'),
     sequenceCase: scalarValue(block, 'sequenceCase'),
     skillArtifactCase: scalarValue(block, 'skillArtifactCase'),
+    skillCatalogCase: scalarValue(block, 'skillCatalogCase'),
     skillCommandCase: scalarValue(block, 'skillCommandCase'),
     skillRegistryCase: scalarValue(block, 'skillRegistryCase'),
     stateCase: scalarValue(block, 'stateCase'),
@@ -6227,6 +6406,15 @@ function evaluateEvalCaseInventory(vars: EvalVars) {
           typeof skillArtifactCase === 'string'
       )
   );
+  const skillCatalogCaseNames = uniqueSorted(
+    deterministicCases
+      .filter(testCase => testCase.target === 'skill-catalog-sync-contract')
+      .map(testCase => testCase.skillCatalogCase)
+      .filter(
+        (skillCatalogCase): skillCatalogCase is string =>
+          typeof skillCatalogCase === 'string'
+      )
+  );
   const skillCommandCaseNames = uniqueSorted(
     deterministicCases
       .filter(testCase => testCase.target === 'skill-command-contract')
@@ -6435,6 +6623,12 @@ function evaluateEvalCaseInventory(vars: EvalVars) {
     missingSkillArtifactCaseNames: missingNames(
       REQUIRED_SKILL_ARTIFACT_CASES,
       skillArtifactCaseNames
+    ),
+    requiredSkillCatalogCaseNames: [...REQUIRED_SKILL_CATALOG_CASES],
+    skillCatalogCaseNames,
+    missingSkillCatalogCaseNames: missingNames(
+      REQUIRED_SKILL_CATALOG_CASES,
+      skillCatalogCaseNames
     ),
     requiredSkillCommandCaseNames: [...REQUIRED_SKILL_COMMAND_CASES],
     skillCommandCaseNames,
@@ -6668,6 +6862,16 @@ export default class JovieChatPromptfooProvider {
 
     if (target === 'skill-artifact-contract') {
       const payload = evaluateSkillArtifactContract(vars);
+      return {
+        output: JSON.stringify(payload),
+        raw: payload,
+        format: 'json',
+        latencyMs: Date.now() - startedAt,
+      };
+    }
+
+    if (target === 'skill-catalog-sync-contract') {
+      const payload = evaluateSkillCatalogSyncContract(vars);
       return {
         output: JSON.stringify(payload),
         raw: payload,
