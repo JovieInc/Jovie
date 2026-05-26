@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { resolve, sep } from 'node:path';
 import { neon } from '@neondatabase/serverless';
 import { type ToolSet, tool, type UIMessage } from 'ai';
@@ -7,6 +7,7 @@ import { and, eq } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/neon-http';
 import { z } from 'zod';
 import { APP_ROUTES } from '@/constants/routes';
+import { SKILL_REGISTRY } from '@/lib/agents/registry';
 import {
   TEST_AUTH_BYPASS_MODE,
   TEST_MODE_HEADER,
@@ -89,6 +90,7 @@ type EvalTarget =
   | 'onboarding-state-contract'
   | 'onboarding-tool-sequence-contract'
   | 'prompt-context-contract'
+  | 'skill-registry-inventory'
   | 'tool-access-contract'
   | 'tool-contract'
   | 'tool-event-contract'
@@ -523,6 +525,7 @@ const REQUIRED_PROMPT_CONTEXT_CASES = [
   'release-overflow-cap',
 ] as const;
 const REQUIRED_TOOL_ACCESS_CASES = ['billing-mode-matrix'] as const;
+const REQUIRED_SKILL_REGISTRY_CASES = ['registry-inventory'] as const;
 const CHAT_SLASH_SKILL_NAMES = commandsForSurface('chat-slash')
   .filter(command => command.kind === 'skill')
   .map(command => command.id)
@@ -544,6 +547,7 @@ const HIDDEN_TOOL_REASONS = HIDDEN_TOOL_NAMES.reduce<Record<string, string>>(
   },
   {}
 );
+const SKILL_REGISTRY_IDS = Object.keys(SKILL_REGISTRY).sort();
 const TOOL_RESULT_REQUIRED_KEYS: Record<string, readonly string[]> = {
   checkCanvasStatus: ['success', 'summary', 'releases'],
   checkHandle: ['action', 'handle', 'available', 'summary'],
@@ -651,6 +655,7 @@ function toTarget(value: unknown): EvalTarget {
     value === 'onboarding-state-contract' ||
     value === 'onboarding-tool-sequence-contract' ||
     value === 'prompt-context-contract' ||
+    value === 'skill-registry-inventory' ||
     value === 'tool-access-contract' ||
     value === 'tool-contract' ||
     value === 'tool-event-contract' ||
@@ -4992,6 +4997,108 @@ function evaluateToolInventory(vars: EvalVars) {
   };
 }
 
+function registryPathExists(path: string | undefined): boolean {
+  if (!path?.trim()) return false;
+
+  return existsSync(resolve(process.cwd(), '..', '..', path));
+}
+
+function evaluateSkillRegistryInventory(vars: EvalVars) {
+  const coverage = toObject(vars.coverage);
+  const expectedSkillIds = Array.isArray(coverage.expectedSkillIds)
+    ? coverage.expectedSkillIds.filter(
+        (skillId): skillId is string => typeof skillId === 'string'
+      )
+    : [];
+  const expectedSkillIdSet = new Set(expectedSkillIds);
+  const knownSkillIdSet = new Set(SKILL_REGISTRY_IDS);
+
+  const skillSummaries = Object.entries(SKILL_REGISTRY)
+    .map(([skillId, skill]) => {
+      const inputSchemaZodPath =
+        'inputSchemaZodPath' in skill ? skill.inputSchemaZodPath : undefined;
+      const outputSchemaZodPath =
+        'outputSchemaZodPath' in skill ? skill.outputSchemaZodPath : undefined;
+
+      return {
+        id: skillId,
+        kind: skill.kind,
+        entitlement: skill.entitlement,
+        model: skill.model,
+        version: skill.version,
+        metadataSurface: skill.metadata.surface ?? null,
+        metadataAction: skill.metadata.action ?? null,
+        promptPath: skill.promptPath ?? null,
+        promptPathExists: registryPathExists(skill.promptPath),
+        inputSchemaZodPath: inputSchemaZodPath ?? null,
+        inputSchemaZodPathExists: registryPathExists(inputSchemaZodPath),
+        outputSchemaZodPath: outputSchemaZodPath ?? null,
+        outputSchemaZodPathExists: registryPathExists(outputSchemaZodPath),
+      };
+    })
+    .sort((left, right) => left.id.localeCompare(right.id));
+
+  const missingExpectedSkillIds = SKILL_REGISTRY_IDS.filter(
+    skillId => !expectedSkillIdSet.has(skillId)
+  );
+  const unknownExpectedSkillIds = expectedSkillIds
+    .filter(skillId => !knownSkillIdSet.has(skillId))
+    .sort();
+
+  return {
+    target: 'skill-registry-inventory',
+    adapter: 'skill-registry-inventory',
+    costTier: 'deterministic',
+    text: '',
+    selectedModel: null,
+    modelCalled: false,
+    persistenceAttempted: false,
+    requiredSkillIds: SKILL_REGISTRY_IDS,
+    expectedSkillIds: uniqueSorted(expectedSkillIds),
+    missingExpectedSkillIds,
+    unknownExpectedSkillIds,
+    skillSummaries,
+    missingEntitlementSkillIds: skillSummaries
+      .filter(skill => !skill.entitlement.trim())
+      .map(skill => skill.id),
+    missingModelSkillIds: skillSummaries
+      .filter(skill => !skill.model.trim())
+      .map(skill => skill.id),
+    missingVersionSkillIds: skillSummaries
+      .filter(skill => !skill.version.trim())
+      .map(skill => skill.id),
+    missingMetadataSurfaceSkillIds: skillSummaries
+      .filter(skill => !skill.metadataSurface)
+      .map(skill => skill.id),
+    missingMetadataActionSkillIds: skillSummaries
+      .filter(skill => !skill.metadataAction)
+      .map(skill => skill.id),
+    missingPromptPathSkillIds: skillSummaries
+      .filter(skill => skill.kind !== 'tool' && !skill.promptPath)
+      .map(skill => skill.id),
+    missingInputSchemaPathToolIds: skillSummaries
+      .filter(skill => skill.kind === 'tool' && !skill.inputSchemaZodPath)
+      .map(skill => skill.id),
+    missingOutputSchemaPathToolIds: skillSummaries
+      .filter(skill => skill.kind === 'tool' && !skill.outputSchemaZodPath)
+      .map(skill => skill.id),
+    missingPathFileSkillIds: skillSummaries
+      .filter(skill => {
+        if (skill.kind !== 'tool') {
+          return !skill.promptPathExists;
+        }
+
+        return !(
+          skill.inputSchemaZodPathExists && skill.outputSchemaZodPathExists
+        );
+      })
+      .map(skill => skill.id),
+    toolCalls: [],
+    toolResults: [],
+    toolExecutions: [],
+  };
+}
+
 function getToolUiHint(toolName: string) {
   return TOOL_UI_REGISTRY[toolName as keyof typeof TOOL_UI_REGISTRY]?.uiHint;
 }
@@ -5545,6 +5652,7 @@ type EvalCaseSummary = {
   readonly renderCase: string | null;
   readonly resultShapeCase: string | null;
   readonly sequenceCase: string | null;
+  readonly skillRegistryCase: string | null;
   readonly stateCase: string | null;
   readonly welcomeCase: string | null;
   readonly webRouteCase: string | null;
@@ -5640,6 +5748,7 @@ function parseEvalCaseSummary(block: string): EvalCaseSummary {
     renderCase: scalarValue(block, 'renderCase'),
     resultShapeCase: scalarValue(block, 'resultShapeCase'),
     sequenceCase: scalarValue(block, 'sequenceCase'),
+    skillRegistryCase: scalarValue(block, 'skillRegistryCase'),
     stateCase: scalarValue(block, 'stateCase'),
     welcomeCase: scalarValue(block, 'welcomeCase'),
     webRouteCase: scalarValue(block, 'webRouteCase'),
@@ -5851,6 +5960,15 @@ function evaluateEvalCaseInventory(vars: EvalVars) {
         (accessCase): accessCase is string => typeof accessCase === 'string'
       )
   );
+  const skillRegistryCaseNames = uniqueSorted(
+    deterministicCases
+      .filter(testCase => testCase.target === 'skill-registry-inventory')
+      .map(testCase => testCase.skillRegistryCase)
+      .filter(
+        (skillRegistryCase): skillRegistryCase is string =>
+          typeof skillRegistryCase === 'string'
+      )
+  );
   const onboardingStateCaseNames = uniqueSorted(
     deterministicCases
       .filter(testCase => testCase.target === 'onboarding-state-contract')
@@ -6035,6 +6153,12 @@ function evaluateEvalCaseInventory(vars: EvalVars) {
     missingToolAccessCaseNames: missingNames(
       REQUIRED_TOOL_ACCESS_CASES,
       toolAccessCaseNames
+    ),
+    requiredSkillRegistryCaseNames: [...REQUIRED_SKILL_REGISTRY_CASES],
+    skillRegistryCaseNames,
+    missingSkillRegistryCaseNames: missingNames(
+      REQUIRED_SKILL_REGISTRY_CASES,
+      skillRegistryCaseNames
     ),
     requiredOnboardingStateCaseNames: [...REQUIRED_ONBOARDING_STATE_CASES],
     onboardingStateCaseNames,
@@ -6246,6 +6370,16 @@ export default class JovieChatPromptfooProvider {
 
     if (target === 'prompt-context-contract') {
       const payload = evaluateSystemPromptContract(prompt, vars);
+      return {
+        output: JSON.stringify(payload),
+        raw: payload,
+        format: 'json',
+        latencyMs: Date.now() - startedAt,
+      };
+    }
+
+    if (target === 'skill-registry-inventory') {
+      const payload = evaluateSkillRegistryInventory(vars);
       return {
         output: JSON.stringify(payload),
         raw: payload,
