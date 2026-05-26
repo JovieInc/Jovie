@@ -456,6 +456,7 @@ const REQUIRED_ONBOARDING_STATE_CASES = [
   'weak-signal-needs-more-info',
 ] as const;
 const REQUIRED_ONBOARDING_TOOL_SEQUENCE_CASES = [
+  'checkout-blocked-before-instant-access',
   'instant-access-next-step-before-checkout',
   'premature-next-step-blocked-before-identity',
   'spotify-confirmation-observation-next-step',
@@ -4329,6 +4330,26 @@ function evaluateOnboardingToolSequenceContract(vars: EvalVars) {
       name: 'searchSpotifyArtist',
       input: { query: 'Luna Waves' },
       output: defaultToolResult('searchSpotifyArtist', { query: 'Luna Waves' }),
+    });
+  } else if (sequenceCase === 'checkout-blocked-before-instant-access') {
+    state.spotifyArtistId = 'spotify-luna-early';
+    state.spotifyArtistName = 'Luna Waves';
+    toolExecutions.push(
+      executeSequenceSignal(state, {
+        audienceBand: 'under_500',
+        objection: {
+          category: 'effort_to_set_up',
+          text: 'not ready to commit yet',
+        },
+      })
+    );
+    const nextStep = executeSequenceNextStep(state);
+    collapsedSignal = nextStep.collapsedSignal;
+    nextStepDecision = nextStep.nextStepDecision;
+    toolExecutions.push(nextStep.execution);
+    blockedSteps.push({
+      toolName: 'proposeCheckout',
+      reason: `next_step_${nextStepDecision.kind}`,
     });
   } else if (sequenceCase === 'waitlist-outcome-no-checkout') {
     state.turnCount = MAX_INTERVIEW_TURNS_BEFORE_FORCE;

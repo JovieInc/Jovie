@@ -2998,6 +2998,22 @@ tests:
       - type: javascript
         value: file://assertions.cjs:assertOnboardingNoCheckoutForWaitlist
 
+  - description: Onboarding sequence blocks checkout before instant access
+    metadata:
+      cost: deterministic
+    vars:
+      input: "I want checkout now, but I have under 500 fans."
+      target: onboarding-tool-sequence-contract
+      sequenceCase: checkout-blocked-before-instant-access
+      turnCount: 1
+    assert:
+      - type: javascript
+        value: file://assertions.cjs:assertOnboardingSequenceNoSpend
+      - type: javascript
+        value: file://assertions.cjs:assertOnboardingSequenceOrder
+      - type: javascript
+        value: file://assertions.cjs:assertOnboardingBlocksCheckoutBeforeInstantAccess
+
   - description: Onboarding sequence blocks next step before artist identity
     metadata:
       cost: deterministic

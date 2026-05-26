@@ -2160,6 +2160,38 @@ function assertOnboardingNoCheckoutForWaitlist(output) {
   return pass();
 }
 
+function assertOnboardingBlocksCheckoutBeforeInstantAccess(output) {
+  const { payload, error } = onboardingSequencePayload(output);
+  if (error) return fail(error);
+
+  if (payload.sequenceCase !== 'checkout-blocked-before-instant-access') {
+    return fail('sequence case is not checkout-blocked-before-instant-access');
+  }
+  if (payload.nextStepDecision?.kind === 'instant_access') {
+    return fail('early-checkout case unexpectedly reached instant access');
+  }
+  if (payload.checkoutCalled !== false) {
+    return fail('early-checkout sequence executed checkout');
+  }
+  if (sequenceToolOrder(payload).includes('proposeCheckout')) {
+    return fail('blocked early-checkout sequence included proposeCheckout');
+  }
+  const blocked = Array.isArray(payload.blockedSteps)
+    ? payload.blockedSteps
+    : [];
+  if (
+    !blocked.some(
+      step =>
+        step.toolName === 'proposeCheckout' &&
+        /^next_step_(needs_more_info|waitlist)$/.test(String(step.reason ?? ''))
+    )
+  ) {
+    return fail('early checkout was not blocked by the next-step decision');
+  }
+
+  return pass();
+}
+
 function assertOnboardingBlocksPrematureNextStep(output) {
   const { payload, error } = onboardingSequencePayload(output);
   if (error) return fail(error);
@@ -3686,6 +3718,7 @@ module.exports = {
   assertOnboardingObservationAfterSpotify,
   assertOnboardingCheckoutAfterInstantAccess,
   assertOnboardingNoCheckoutForWaitlist,
+  assertOnboardingBlocksCheckoutBeforeInstantAccess,
   assertOnboardingBlocksPrematureNextStep,
   assertKnowledgeContractNoSpend,
   assertKnowledgeTopicsSelected,
