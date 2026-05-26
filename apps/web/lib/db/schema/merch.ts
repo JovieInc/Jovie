@@ -51,6 +51,10 @@ export interface MerchPricingSnapshot {
   artistRoyaltyRateBps: number;
   artistPayoutPerUnitEstimateCents: number;
   jovieMarginPerUnitEstimateCents: number;
+  printfulCostSource?: 'printful' | 'jovie_default' | 'manual' | null;
+  printfulCostUpdatedAt?: string | null;
+  minimumJovieMarginCents?: number;
+  targetJovieMarginCents?: number;
 }
 
 export interface MerchPrintfulSnapshot {
@@ -64,6 +68,11 @@ export interface MerchPrintfulSnapshot {
   printFileUrls: string[];
   availabilityRegion: string;
   shippingProfile: string;
+  catalogCostSource?: 'printful' | 'jovie_default' | 'manual' | null;
+  catalogCostUpdatedAt?: string | null;
+  catalogProductName?: string | null;
+  providerWarnings?: string[];
+  mockupTaskIds?: Array<number | string>;
 }
 
 export interface MerchLearningSnapshot {

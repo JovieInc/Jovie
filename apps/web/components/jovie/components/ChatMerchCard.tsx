@@ -1,7 +1,7 @@
 'use client';
 
 import { Button } from '@jovie/ui';
-import { CheckCircle2, ExternalLink, Shirt } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, ExternalLink, Shirt } from 'lucide-react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { useCallback } from 'react';
@@ -20,6 +20,13 @@ interface MerchGenerationOption {
     readonly retail_price?: string;
     readonly estimated_gross_margin?: string;
     readonly artist_share?: string;
+    readonly jovie_share?: string;
+    readonly minimum_jovie_margin?: string;
+    readonly target_jovie_margin?: string;
+  };
+  readonly sellability?: {
+    readonly sellable: boolean;
+    readonly reasons: readonly string[];
   };
   readonly concept: string;
   readonly why_it_fits?: string;
@@ -42,6 +49,7 @@ export interface ChatMerchSelectionResult {
   readonly selectedOptionId: string;
   readonly title: string;
   readonly publicUrl: string | null;
+  readonly publishBlockedReasons?: readonly string[];
 }
 
 export function isChatMerchGenerationResult(
@@ -108,11 +116,13 @@ export function ChatMerchOptionsCard({
       <div className='grid gap-2.5 md:grid-cols-3'>
         {result.options.map(option => {
           const imageUrl = option.mockup_urls?.[0] ?? null;
+          const sellable = option.sellability?.sellable ?? true;
+          const blockedReasons = option.sellability?.reasons ?? [];
           return (
             <article
               key={option.id}
               data-testid='chat-merch-option-card'
-              className='min-w-0 overflow-hidden rounded-lg border border-subtle bg-surface-0'
+              className='min-w-0 overflow-hidden rounded-lg border border-subtle bg-surface-0 shadow-sm'
             >
               <div className='relative aspect-square bg-surface-1'>
                 {imageUrl ? (
@@ -129,9 +139,14 @@ export function ChatMerchOptionsCard({
                     <Shirt className='h-9 w-9' strokeWidth={1.8} />
                   </div>
                 )}
-                <span className='absolute left-2 top-2 rounded-md border border-white/15 bg-black/55 px-1.5 py-0.5 text-[10.5px] font-medium text-white backdrop-blur'>
-                  Option {option.option_number}
-                </span>
+                <div className='absolute left-2 right-2 top-2 flex items-center justify-between gap-2'>
+                  <span className='rounded-md border border-white/15 bg-black/55 px-1.5 py-0.5 text-[10.5px] font-medium text-white backdrop-blur'>
+                    Option {option.option_number}
+                  </span>
+                  <span className='rounded-md border border-white/15 bg-black/55 px-1.5 py-0.5 text-[10.5px] font-medium text-white backdrop-blur'>
+                    {sellable ? 'Ready' : 'Draft'}
+                  </span>
+                </div>
               </div>
               <div className='space-y-2 p-2.5'>
                 <div className='min-w-0'>
@@ -146,15 +161,25 @@ export function ChatMerchOptionsCard({
                 <p className='line-clamp-3 min-h-[54px] text-[11.5px] leading-[18px] text-secondary-token'>
                   {option.concept}
                 </p>
-                <div className='flex flex-wrap gap-1'>
+                <div className='grid min-h-[58px] grid-cols-2 gap-1'>
                   {option.price_recommendation?.retail_price ? (
                     <span className='rounded-md bg-surface-1 px-1.5 py-1 text-[10.5px] text-secondary-token'>
-                      {option.price_recommendation.retail_price}
+                      Price {option.price_recommendation.retail_price}
                     </span>
                   ) : null}
                   {option.price_recommendation?.artist_share ? (
                     <span className='rounded-md bg-surface-1 px-1.5 py-1 text-[10.5px] text-secondary-token'>
                       Artist {option.price_recommendation.artist_share}
+                    </span>
+                  ) : null}
+                  {option.price_recommendation?.jovie_share ? (
+                    <span className='rounded-md bg-surface-1 px-1.5 py-1 text-[10.5px] text-secondary-token'>
+                      Jovie {option.price_recommendation.jovie_share}
+                    </span>
+                  ) : null}
+                  {option.price_recommendation?.minimum_jovie_margin ? (
+                    <span className='rounded-md bg-surface-1 px-1.5 py-1 text-[10.5px] text-secondary-token'>
+                      Floor {option.price_recommendation.minimum_jovie_margin}
                     </span>
                   ) : null}
                 </div>
@@ -170,14 +195,23 @@ export function ChatMerchOptionsCard({
                     type='button'
                     size='sm'
                     variant='secondary'
+                    disabled={!sellable}
                     onClick={() => handleSelect(option, true)}
                   >
                     Publish
                   </Button>
                 </div>
-                {option.production_warnings?.length ? (
-                  <p className='text-[10.5px] leading-4 text-tertiary-token'>
-                    {option.production_warnings.join(', ')}
+                {blockedReasons.length || option.production_warnings?.length ? (
+                  <p className='flex min-h-8 items-start gap-1.5 text-[10.5px] leading-4 text-tertiary-token'>
+                    <AlertTriangle className='mt-0.5 h-3 w-3 shrink-0' />
+                    <span className='line-clamp-2'>
+                      {[
+                        ...blockedReasons,
+                        ...(option.production_warnings ?? []),
+                      ]
+                        .filter(Boolean)
+                        .join(' ')}
+                    </span>
                   </p>
                 ) : null}
               </div>
@@ -196,6 +230,7 @@ export function ChatMerchSelectionCard({
 }) {
   const statusLabel =
     result.status.slice(0, 1).toUpperCase() + result.status.slice(1);
+  const blockedReasons = result.publishBlockedReasons ?? [];
 
   return (
     <ChatGenerationArtifactSurface
@@ -214,8 +249,15 @@ export function ChatMerchSelectionCard({
             Merch card created
           </p>
           <p className='mt-0.5 text-[12px] leading-5 text-secondary-token'>
-            {statusLabel} card is now available in Library.
+            {blockedReasons.length
+              ? `${statusLabel} card is in Library as a draft until Printful and pricing checks pass.`
+              : `${statusLabel} card is now available in Library.`}
           </p>
+          {blockedReasons.length ? (
+            <p className='mt-1.5 line-clamp-2 text-[11px] leading-4 text-tertiary-token'>
+              {blockedReasons.join(' ')}
+            </p>
+          ) : null}
           <div className='mt-2 flex flex-wrap gap-1.5'>
             <Link
               href='/app/library?view=merch'

@@ -50,6 +50,12 @@ export interface MerchGenerationOptionView {
     readonly estimated_gross_margin: string;
     readonly artist_share: string;
     readonly jovie_share: string;
+    readonly minimum_jovie_margin?: string;
+    readonly target_jovie_margin?: string;
+  };
+  readonly sellability?: {
+    readonly sellable: boolean;
+    readonly reasons: readonly string[];
   };
   readonly concept: string;
   readonly why_it_fits: string;
@@ -72,6 +78,7 @@ export interface MerchSelectionResult {
   readonly selectedOptionId: string;
   readonly title: string;
   readonly publicUrl: string | null;
+  readonly publishBlockedReasons?: readonly string[];
 }
 
 export interface PublicMerchCard {
@@ -102,6 +109,8 @@ export interface LibraryMerchCard {
   readonly retailPriceCents: number;
   readonly artistPayoutPerUnitEstimateCents: number;
   readonly jovieMarginPerUnitEstimateCents: number;
+  readonly sellable: boolean;
+  readonly sellabilityReasons: readonly string[];
   readonly rankScore: number;
   readonly position: number | null;
   readonly pinned: boolean;

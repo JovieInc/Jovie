@@ -57,6 +57,7 @@ export interface LibraryReleaseAsset {
   readonly retailPriceLabel?: string;
   readonly artistPayoutLabel?: string;
   readonly jovieMarginLabel?: string;
+  readonly sellabilityLabel?: string;
   readonly description?: string;
   readonly createdAt?: string;
   readonly updatedAt?: string;
@@ -192,6 +193,9 @@ export function buildLibraryMerchAssets(
         card.artistPayoutPerUnitEstimateCents
       ),
       jovieMarginLabel: formatMerchCents(card.jovieMarginPerUnitEstimateCents),
+      sellabilityLabel: card.sellable
+        ? 'Ready To Sell'
+        : (card.sellabilityReasons?.[0] ?? 'Blocked'),
       description: card.description,
       createdAt: card.createdAt,
       updatedAt: card.updatedAt,

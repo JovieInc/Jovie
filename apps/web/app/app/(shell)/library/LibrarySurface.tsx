@@ -1761,6 +1761,10 @@ function AssetDrawer({
                       label='Jovie Margin'
                       value={current.jovieMarginLabel ?? 'No Estimate'}
                     />
+                    <MetadataRow
+                      label='Sellability'
+                      value={current.sellabilityLabel ?? 'Not Checked'}
+                    />
                   </>
                 ) : (
                   <>
