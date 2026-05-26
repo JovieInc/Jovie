@@ -1,8 +1,8 @@
 import { randomUUID } from 'node:crypto';
 import { existsSync, readFileSync } from 'node:fs';
-import { Module } from 'node:module';
+import { registerHooks } from 'node:module';
 import { dirname, resolve, sep } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { neon } from '@neondatabase/serverless';
 import { type ToolSet, tool, type UIMessage } from 'ai';
 import { and, eq } from 'drizzle-orm';
@@ -174,11 +174,9 @@ type ProviderResponse = {
 
 type ReleaseTaskClassifierModule =
   typeof import('@/lib/release-tasks/classify-task-cluster');
-type NodeModuleLoader = (
-  request: string,
-  parent: unknown,
-  isMain: boolean
-) => unknown;
+type ReleaseTaskClassifierImport = ReleaseTaskClassifierModule & {
+  default?: ReleaseTaskClassifierModule;
+};
 
 const EVAL_PROFILE_ID = '00000000-0000-4000-8000-000000002561';
 const EVAL_CONVERSATION_ID = 'promptfoo-eval-conversation';
@@ -216,6 +214,9 @@ let releaseTaskClassifierModulePromise: Promise<ReleaseTaskClassifierModule> | n
 const PROMPTFOO_CONFIG_PATH = 'tests/eval/promptfoo/promptfooconfig.yaml';
 const EVAL_PROVIDER_DIR = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = resolve(EVAL_PROVIDER_DIR, '..', '..', '..', '..', '..');
+const SERVER_ONLY_EVAL_SHIM_URL = pathToFileURL(
+  resolve(EVAL_PROVIDER_DIR, 'server-only-shim.mjs')
+).href;
 const HTTP_EVAL_MAX_RESPONSE_CHARS = 4000;
 const HTTP_EVAL_TIMEOUT_MS = 15_000;
 const HTTP_EVAL_PERSISTENCE_WAIT_MS = 5000;
@@ -585,6 +586,7 @@ const REQUIRED_SKILL_REGISTRY_CASES = ['registry-inventory'] as const;
 const REQUIRED_AI_TOOL_PROMPT_CASES = ['album-art-canvas-bio-prompts'] as const;
 const REQUIRED_INSIGHT_PROMPT_CASES = ['analytics-grounding-prompts'] as const;
 const REQUIRED_RELEASE_TASK_CLASSIFIER_CASES = ['prompt-and-coercion'] as const;
+let serverOnlyEvalShimRegistered = false;
 const AI_TOOL_PROMPT_TOOL_NAMES = [
   'generateAlbumArt',
   'generateCanvasPlan',
@@ -728,6 +730,7 @@ function toTarget(value: unknown): EvalTarget {
   if (
     value === 'ai-tool-prompt-contract' ||
     value === 'chat-confirm-route' ||
+    value === 'chat-turn' ||
     value === 'eval-case-inventory' ||
     value === 'insight-prompt-contract' ||
     value === 'knowledge-contract' ||
@@ -5488,35 +5491,54 @@ function promptLeakPatterns(text: string): string[] {
     .map(([name]) => name);
 }
 
-async function importReleaseTaskClassifierModule(): Promise<ReleaseTaskClassifierModule> {
-  const moduleWithLoader = Module as unknown as {
-    _load: NodeModuleLoader;
-  };
-  const originalLoad = moduleWithLoader._load;
-  moduleWithLoader._load = ((
-    request: string,
-    parent: unknown,
-    isMain: boolean
-  ) => {
-    if (request === 'server-only') {
-      return {};
-    }
-
-    return Reflect.apply(originalLoad, moduleWithLoader, [
-      request,
-      parent,
-      isMain,
-    ]);
-  }) as NodeModuleLoader;
-
-  try {
-    releaseTaskClassifierModulePromise ??= import(
-      '@/lib/release-tasks/classify-task-cluster'
-    );
-    return await releaseTaskClassifierModulePromise;
-  } finally {
-    moduleWithLoader._load = originalLoad;
+function registerServerOnlyEvalShim(): void {
+  if (serverOnlyEvalShimRegistered) {
+    return;
   }
+
+  registerHooks({
+    resolve(specifier, context, nextResolve) {
+      if (specifier === 'server-only') {
+        return { url: SERVER_ONLY_EVAL_SHIM_URL, shortCircuit: true };
+      }
+
+      return nextResolve(specifier, context);
+    },
+  });
+  serverOnlyEvalShimRegistered = true;
+}
+
+function normalizeReleaseTaskClassifierModule(
+  importedModule: ReleaseTaskClassifierImport
+): ReleaseTaskClassifierModule {
+  if (typeof importedModule.classifyTaskCluster === 'function') {
+    return importedModule;
+  }
+
+  if (typeof importedModule.default?.classifyTaskCluster === 'function') {
+    return importedModule.default;
+  }
+
+  throw new TypeError('Release task classifier module did not load correctly');
+}
+
+async function importReleaseTaskClassifierModule(): Promise<ReleaseTaskClassifierModule> {
+  registerServerOnlyEvalShim();
+
+  releaseTaskClassifierModulePromise ??= import(
+    '@/lib/release-tasks/classify-task-cluster'
+  )
+    .then(module =>
+      normalizeReleaseTaskClassifierModule(
+        module as ReleaseTaskClassifierImport
+      )
+    )
+    .catch(error => {
+      releaseTaskClassifierModulePromise = null;
+      throw error;
+    });
+
+  return await releaseTaskClassifierModulePromise;
 }
 
 function evaluateSkillPromptContract(vars: EvalVars) {
@@ -7687,6 +7709,42 @@ function safeError(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
 
+function withDeterministicNoSpendFields<T>(payload: T): T {
+  if (!payload || typeof payload !== 'object') {
+    return payload;
+  }
+
+  const record = payload as Record<string, unknown>;
+  if (record.costTier !== 'deterministic') {
+    return payload;
+  }
+
+  return {
+    selectedModel: null,
+    modelCalled: false,
+    persistenceAttempted: false,
+    dbAttempted: false,
+    networkAttempted: false,
+    clerkAttempted: false,
+    spotifyAttempted: false,
+    stripeAttempted: false,
+    ...record,
+  } as T;
+}
+
+function jsonProviderResponse<T>(
+  payload: T,
+  startedAt: number
+): ProviderResponse {
+  const normalizedPayload = withDeterministicNoSpendFields(payload);
+  return {
+    output: JSON.stringify(normalizedPayload),
+    raw: normalizedPayload,
+    format: 'json',
+    latencyMs: Date.now() - startedAt,
+  };
+}
+
 export default class JovieChatPromptfooProvider {
   private readonly providerId: string;
 
@@ -7709,53 +7767,28 @@ export default class JovieChatPromptfooProvider {
 
     if (target === 'chat-confirm-route') {
       const payload = evaluateChatConfirmRouteContract(vars);
-      return {
-        output: JSON.stringify(payload),
-        raw: payload,
-        format: 'json',
-        latencyMs: Date.now() - startedAt,
-      };
+      return jsonProviderResponse(payload, startedAt);
     }
 
     if (target === 'mobile-chat-route') {
       const payload = evaluateMobileChatRouteContract(prompt, vars);
-      return {
-        output: JSON.stringify(payload),
-        raw: payload,
-        format: 'json',
-        latencyMs: Date.now() - startedAt,
-      };
+      return jsonProviderResponse(payload, startedAt);
     }
 
     if (target === 'onboarding-welcome-chat-contract') {
       const payload = evaluateOnboardingWelcomeChatContract(vars);
-      return {
-        output: JSON.stringify(payload),
-        raw: payload,
-        format: 'json',
-        latencyMs: Date.now() - startedAt,
-      };
+      return jsonProviderResponse(payload, startedAt);
     }
 
     if (target === 'web-chat-route') {
       const payload = evaluateWebChatRouteContract(prompt, vars);
-      return {
-        output: JSON.stringify(payload),
-        raw: payload,
-        format: 'json',
-        latencyMs: Date.now() - startedAt,
-      };
+      return jsonProviderResponse(payload, startedAt);
     }
 
     if (target === 'web-chat-http-route') {
       try {
         const payload = await evaluateLiveHttpWebChatRoute(prompt, vars);
-        return {
-          output: JSON.stringify(payload),
-          raw: payload,
-          format: 'json',
-          latencyMs: Date.now() - startedAt,
-        };
+        return jsonProviderResponse(payload, startedAt);
       } catch (error) {
         return {
           error: safeError(error),
@@ -7766,202 +7799,102 @@ export default class JovieChatPromptfooProvider {
 
     if (target === 'eval-case-inventory') {
       const payload = evaluateEvalCaseInventory(vars);
-      return {
-        output: JSON.stringify(payload),
-        raw: payload,
-        format: 'json',
-        latencyMs: Date.now() - startedAt,
-      };
+      return jsonProviderResponse(payload, startedAt);
     }
 
     if (target === 'model-contract') {
       const payload = evaluateModelContract(prompt, vars);
-      return {
-        output: JSON.stringify(payload),
-        raw: payload,
-        format: 'json',
-        latencyMs: Date.now() - startedAt,
-      };
+      return jsonProviderResponse(payload, startedAt);
     }
 
     if (target === 'knowledge-contract') {
       const payload = evaluateKnowledgeContract(prompt, vars);
-      return {
-        output: JSON.stringify(payload),
-        raw: payload,
-        format: 'json',
-        latencyMs: Date.now() - startedAt,
-      };
+      return jsonProviderResponse(payload, startedAt);
     }
 
     if (target === 'onboarding-state-contract') {
       const payload = evaluateOnboardingStateContract(vars);
-      return {
-        output: JSON.stringify(payload),
-        raw: payload,
-        format: 'json',
-        latencyMs: Date.now() - startedAt,
-      };
+      return jsonProviderResponse(payload, startedAt);
     }
 
     if (target === 'onboarding-tool-sequence-contract') {
       const payload = evaluateOnboardingToolSequenceContract(vars);
-      return {
-        output: JSON.stringify(payload),
-        raw: payload,
-        format: 'json',
-        latencyMs: Date.now() - startedAt,
-      };
+      return jsonProviderResponse(payload, startedAt);
     }
 
     if (target === 'prompt-context-contract') {
       const payload = evaluateSystemPromptContract(prompt, vars);
-      return {
-        output: JSON.stringify(payload),
-        raw: payload,
-        format: 'json',
-        latencyMs: Date.now() - startedAt,
-      };
+      return jsonProviderResponse(payload, startedAt);
     }
 
     if (target === 'skill-artifact-contract') {
       const payload = evaluateSkillArtifactContract(vars);
-      return {
-        output: JSON.stringify(payload),
-        raw: payload,
-        format: 'json',
-        latencyMs: Date.now() - startedAt,
-      };
+      return jsonProviderResponse(payload, startedAt);
     }
 
     if (target === 'skill-catalog-sync-contract') {
       const payload = evaluateSkillCatalogSyncContract(vars);
-      return {
-        output: JSON.stringify(payload),
-        raw: payload,
-        format: 'json',
-        latencyMs: Date.now() - startedAt,
-      };
+      return jsonProviderResponse(payload, startedAt);
     }
 
     if (target === 'skill-command-contract') {
       const payload = evaluateSkillCommandContract(vars);
-      return {
-        output: JSON.stringify(payload),
-        raw: payload,
-        format: 'json',
-        latencyMs: Date.now() - startedAt,
-      };
+      return jsonProviderResponse(payload, startedAt);
     }
 
     if (target === 'skill-prompt-contract') {
       const payload = evaluateSkillPromptContract(vars);
-      return {
-        output: JSON.stringify(payload),
-        raw: payload,
-        format: 'json',
-        latencyMs: Date.now() - startedAt,
-      };
+      return jsonProviderResponse(payload, startedAt);
     }
 
     if (target === 'ai-tool-prompt-contract') {
       const payload = evaluateAiToolPromptContract(vars);
-      return {
-        output: JSON.stringify(payload),
-        raw: payload,
-        format: 'json',
-        latencyMs: Date.now() - startedAt,
-      };
+      return jsonProviderResponse(payload, startedAt);
     }
 
     if (target === 'insight-prompt-contract') {
       const payload = evaluateInsightPromptContract(vars);
-      return {
-        output: JSON.stringify(payload),
-        raw: payload,
-        format: 'json',
-        latencyMs: Date.now() - startedAt,
-      };
+      return jsonProviderResponse(payload, startedAt);
     }
 
     if (target === 'release-task-classifier-contract') {
       const payload = await evaluateReleaseTaskClassifierContract(vars);
-      return {
-        output: JSON.stringify(payload),
-        raw: payload,
-        format: 'json',
-        latencyMs: Date.now() - startedAt,
-      };
+      return jsonProviderResponse(payload, startedAt);
     }
 
     if (target === 'skill-registry-inventory') {
       const payload = evaluateSkillRegistryInventory(vars);
-      return {
-        output: JSON.stringify(payload),
-        raw: payload,
-        format: 'json',
-        latencyMs: Date.now() - startedAt,
-      };
+      return jsonProviderResponse(payload, startedAt);
     }
 
     if (target === 'tool-access-contract') {
       const payload = evaluateToolAccessContract(vars);
-      return {
-        output: JSON.stringify(payload),
-        raw: payload,
-        format: 'json',
-        latencyMs: Date.now() - startedAt,
-      };
+      return jsonProviderResponse(payload, startedAt);
     }
 
     if (target === 'tool-contract') {
       const payload = evaluateToolContract(vars);
-      return {
-        output: JSON.stringify(payload),
-        raw: payload,
-        format: 'json',
-        latencyMs: Date.now() - startedAt,
-      };
+      return jsonProviderResponse(payload, startedAt);
     }
 
     if (target === 'tool-event-contract') {
       const payload = evaluateToolEventContract(vars);
-      return {
-        output: JSON.stringify(payload),
-        raw: payload,
-        format: 'json',
-        latencyMs: Date.now() - startedAt,
-      };
+      return jsonProviderResponse(payload, startedAt);
     }
 
     if (target === 'tool-result-shape-contract') {
       const payload = evaluateToolResultShapeContract(vars);
-      return {
-        output: JSON.stringify(payload),
-        raw: payload,
-        format: 'json',
-        latencyMs: Date.now() - startedAt,
-      };
+      return jsonProviderResponse(payload, startedAt);
     }
 
     if (target === 'tool-render-contract') {
       const payload = evaluateToolRenderContract(vars);
-      return {
-        output: JSON.stringify(payload),
-        raw: payload,
-        format: 'json',
-        latencyMs: Date.now() - startedAt,
-      };
+      return jsonProviderResponse(payload, startedAt);
     }
 
     if (target === 'tool-inventory') {
       const payload = evaluateToolInventory(vars);
-      return {
-        output: JSON.stringify(payload),
-        raw: payload,
-        format: 'json',
-        latencyMs: Date.now() - startedAt,
-      };
+      return jsonProviderResponse(payload, startedAt);
     }
 
     if (process.env.JOVIE_RUN_LIVE_EVALS !== '1') {

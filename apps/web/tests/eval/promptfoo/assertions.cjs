@@ -1502,8 +1502,10 @@ function assertDeterministicNoSpend(output) {
     'spotifyAttempted',
     'stripeAttempted',
   ]) {
-    if (payload[field] === true) {
-      return fail(`deterministic case attempted ${field}`);
+    if (payload[field] !== false) {
+      return fail(
+        `deterministic case must set ${field}=false, got ${String(payload[field])}`
+      );
     }
   }
 
