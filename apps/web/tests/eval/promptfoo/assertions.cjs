@@ -3170,6 +3170,73 @@ function assertSkillRegistryInventoryCovered(output) {
   return pass();
 }
 
+function assertSkillArtifactContractCovered(output) {
+  const payload = parseOutput(output);
+
+  if (payload.target !== 'skill-artifact-contract') {
+    return fail('case did not run through the skill-artifact-contract adapter');
+  }
+  if (payload.costTier !== 'deterministic') {
+    return fail('skill artifact case is not marked deterministic');
+  }
+  for (const field of [
+    'modelCalled',
+    'persistenceAttempted',
+    'dbAttempted',
+    'networkAttempted',
+  ]) {
+    if (payload[field] !== false) {
+      return fail(`${field} should be false for skill artifact coverage`);
+    }
+  }
+  if (!Array.isArray(payload.skillArtifacts)) {
+    return fail('skill artifact contract missing skillArtifacts');
+  }
+  if (payload.skillArtifacts.length === 0) {
+    return fail('skill artifact contract found no deployed skills');
+  }
+
+  for (const field of [
+    'missingExpectedSkillIds',
+    'unknownExpectedSkillIds',
+    'missingToolSchemaCoverageSkillIds',
+    'missingToolResultCoverageSkillIds',
+    'missingToolAvailabilityCoverageSkillIds',
+    'missingToolRenderCoverageSkillIds',
+    'missingPromptArtifactSkillIds',
+    'shortPromptArtifactSkillIds',
+    'missingPromptGuardrailSkillIds',
+  ]) {
+    const values = payload[field];
+    if (!Array.isArray(values)) {
+      return fail(`skill artifact contract missing ${field}`);
+    }
+    if (values.length > 0) {
+      return fail(`${field}: ${values.join(', ')}`);
+    }
+  }
+
+  const guardrailsBySkill = payload.missingPromptGuardrailsBySkill ?? {};
+  if (
+    !guardrailsBySkill ||
+    typeof guardrailsBySkill !== 'object' ||
+    Array.isArray(guardrailsBySkill)
+  ) {
+    return fail('skill artifact contract missing guardrail detail map');
+  }
+  for (const [skillId, missingGuardrails] of Object.entries(
+    guardrailsBySkill
+  )) {
+    if (Array.isArray(missingGuardrails) && missingGuardrails.length > 0) {
+      return fail(
+        `${skillId} missing prompt guardrails: ${missingGuardrails.join(', ')}`
+      );
+    }
+  }
+
+  return pass();
+}
+
 function firstEvent(payload) {
   return Array.isArray(payload.events) ? payload.events[0] : undefined;
 }
@@ -3728,6 +3795,7 @@ function assertEvalCaseInventoryCovered(output) {
     'missingKnowledgeCaseNames',
     'missingPromptContextCaseNames',
     'missingToolAccessCaseNames',
+    'missingSkillArtifactCaseNames',
     'missingSkillRegistryCaseNames',
     'missingOnboardingStateCaseNames',
     'missingOnboardingToolSequenceCaseNames',
@@ -3854,6 +3922,7 @@ module.exports = {
   assertToolInventoryCovered,
   assertToolUiRegistryCovered,
   assertSlashSkillVisibilityCovered,
+  assertSkillArtifactContractCovered,
   assertSkillRegistryInventoryCovered,
   assertToolEventInventoryCovered,
   assertToolEventHydratesSuccess,

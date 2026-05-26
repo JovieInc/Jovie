@@ -1542,6 +1542,30 @@ tests:
       - type: javascript
         value: file://assertions.cjs:assertSkillRegistryInventoryCovered
 
+  - description: AI skill artifacts map to deterministic coverage and guardrails
+    metadata:
+      cost: deterministic
+    vars:
+      input: "AI skill artifact contract check"
+      target: skill-artifact-contract
+      skillArtifactCase: artifact-inventory
+      coverage:
+        expectedSkillIds:
+          - generateReleasePitch
+          - retouch
+        minimumPromptChars: 300
+        promptGuardrails:
+          retouch:
+            - "Preserve the person's identity"
+            - "Do not change protected or sensitive attributes"
+            - "return a safe refusal"
+            - "same person"
+    assert:
+      - type: javascript
+        value: file://assertions.cjs:assertDeterministicNoSpend
+      - type: javascript
+        value: file://assertions.cjs:assertSkillArtifactContractCovered
+
   - description: Tool result shape matrix covers success and failure outputs
     metadata:
       cost: deterministic
