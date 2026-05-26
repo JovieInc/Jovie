@@ -1652,6 +1652,19 @@ tests:
       - type: javascript
         value: file://assertions.cjs:assertInsightPromptContractCovered
 
+  - description: Interview summarization prompt preserves Mom Test JSON guardrails
+    metadata:
+      cost: deterministic
+    vars:
+      input: "Interview summary prompt contract check"
+      target: interview-summary-contract
+      interviewSummaryCase: prompt-schema-timeout
+    assert:
+      - type: javascript
+        value: file://assertions.cjs:assertDeterministicNoSpend
+      - type: javascript
+        value: file://assertions.cjs:assertInterviewSummaryContractCovered
+
   - description: Onboarding system prompt preserves intake and access rules
     metadata:
       cost: deterministic
