@@ -1652,6 +1652,19 @@ tests:
       - type: javascript
         value: file://assertions.cjs:assertInsightPromptContractCovered
 
+  - description: Onboarding system prompt preserves intake and access rules
+    metadata:
+      cost: deterministic
+    vars:
+      input: "Onboarding system prompt contract check"
+      target: onboarding-system-prompt-contract
+      onboardingSystemPromptCase: prompt-rules
+    assert:
+      - type: javascript
+        value: file://assertions.cjs:assertDeterministicNoSpend
+      - type: javascript
+        value: file://assertions.cjs:assertOnboardingSystemPromptContractCovered
+
   - description: Release task classifier uses stubbed prompt and coercion path
     metadata:
       cost: deterministic

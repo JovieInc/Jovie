@@ -3796,6 +3796,81 @@ function assertReleaseTaskClassifierContractCovered(output) {
   return pass();
 }
 
+function assertOnboardingSystemPromptContractCovered(output) {
+  const payload = parseOutput(output);
+
+  if (payload.target !== 'onboarding-system-prompt-contract') {
+    return fail(
+      'case did not run through the onboarding-system-prompt-contract adapter'
+    );
+  }
+  if (payload.promptCase !== 'prompt-rules') {
+    return fail(
+      `expected prompt-rules onboarding prompt case, got ${String(payload.promptCase)}`
+    );
+  }
+  if (payload.costTier !== 'deterministic') {
+    return fail('onboarding system prompt case is not marked deterministic');
+  }
+  for (const field of [
+    'modelCalled',
+    'persistenceAttempted',
+    'dbAttempted',
+    'networkAttempted',
+  ]) {
+    if (payload[field] !== false) {
+      return fail(`${field} should be false for onboarding prompt coverage`);
+    }
+  }
+  if (
+    payload.productionEntrypoint !==
+    'apps/web/lib/chat/prompts/onboarding.ts:ONBOARDING_SYSTEM_PROMPT'
+  ) {
+    return fail('onboarding prompt contract did not use the production prompt');
+  }
+  if (typeof payload.promptLength !== 'number' || payload.promptLength < 5000) {
+    return fail('onboarding system prompt was unexpectedly short');
+  }
+
+  const missingPromptFacts = Array.isArray(payload.missingPromptFacts)
+    ? payload.missingPromptFacts
+    : [];
+  if (missingPromptFacts.length > 0) {
+    return fail(
+      `onboarding system prompt missing facts: ${missingPromptFacts.join(', ')}`
+    );
+  }
+  if (payload.toolOrderValid !== true) {
+    return fail('onboarding system prompt tool order is invalid');
+  }
+  const toolOrder = Array.isArray(payload.toolOrder) ? payload.toolOrder : [];
+  for (const name of [
+    'searchSpotifyArtist',
+    'confirmSpotifyArtist',
+    'checkHandle',
+    'proposeSocialLink',
+    'recordInterviewSignal',
+    'proposeNextStep',
+    'proposeCheckout',
+  ]) {
+    const item = toolOrder.find(entry => entry.name === name);
+    if (!item || typeof item.index !== 'number' || item.index < 0) {
+      return fail(`onboarding system prompt missing tool ${name}`);
+    }
+  }
+
+  const leakPatterns = Array.isArray(payload.promptLeakPatterns)
+    ? payload.promptLeakPatterns
+    : [];
+  if (leakPatterns.length > 0) {
+    return fail(
+      `onboarding system prompt leaked patterns: ${leakPatterns.join(', ')}`
+    );
+  }
+
+  return pass();
+}
+
 function firstEvent(payload) {
   return Array.isArray(payload.events) ? payload.events[0] : undefined;
 }
@@ -4356,6 +4431,7 @@ function assertEvalCaseInventoryCovered(output) {
     'missingToolAccessCaseNames',
     'missingAiToolPromptCaseNames',
     'missingInsightPromptCaseNames',
+    'missingOnboardingSystemPromptCaseNames',
     'missingReleaseTaskClassifierCaseNames',
     'missingSkillArtifactCaseNames',
     'missingSkillCatalogCaseNames',
@@ -4493,6 +4569,7 @@ module.exports = {
   assertSkillPromptContractCovered,
   assertAiToolPromptContractCovered,
   assertInsightPromptContractCovered,
+  assertOnboardingSystemPromptContractCovered,
   assertReleaseTaskClassifierContractCovered,
   assertSkillRegistryInventoryCovered,
   assertToolEventInventoryCovered,
