@@ -1639,6 +1639,19 @@ tests:
       - type: javascript
         value: file://assertions.cjs:assertAiToolPromptContractCovered
 
+  - description: AI insight prompt builders require grounded analytics
+    metadata:
+      cost: deterministic
+    vars:
+      input: "AI insight prompt contract check"
+      target: insight-prompt-contract
+      insightPromptCase: analytics-grounding-prompts
+    assert:
+      - type: javascript
+        value: file://assertions.cjs:assertDeterministicNoSpend
+      - type: javascript
+        value: file://assertions.cjs:assertInsightPromptContractCovered
+
   - description: Tool result shape matrix covers success and failure outputs
     metadata:
       cost: deterministic
