@@ -3139,7 +3139,7 @@ async function evaluateLiveHttpModelProviderTerminalError(
   baseUrl: URL,
   vars: EvalVars
 ) {
-  if (process.env.JOVIE_PROMPTFOO_EXPECT_MODEL_KEYS_DISABLED !== '1') {
+  if ((await getPromptfooExpectModelKeysDisabled()) !== '1') {
     throw new Error(
       'Set JOVIE_PROMPTFOO_EXPECT_MODEL_KEYS_DISABLED=1 and start the local server with JOVIE_DISABLE_MODEL_KEYS_FOR_EVALS=1 before running the live HTTP model-error eval.'
     );
@@ -3221,7 +3221,7 @@ async function evaluateLiveHttpWebChatRoute(prompt: string, vars: EvalVars) {
     );
   }
 
-  if (process.env.JOVIE_PROMPTFOO_EXPECT_MODEL_KEYS_DISABLED !== '1') {
+  if ((await getPromptfooExpectModelKeysDisabled()) !== '1') {
     throw new Error(
       'Set JOVIE_PROMPTFOO_EXPECT_MODEL_KEYS_DISABLED=1 and start the local server with JOVIE_DISABLE_MODEL_KEYS_FOR_EVALS=1 before running live HTTP Promptfoo evals.'
     );
@@ -5536,6 +5536,13 @@ function registerServerOnlyEvalShim(): void {
     },
   });
   serverOnlyEvalShimRegistered = true;
+}
+
+async function getPromptfooExpectModelKeysDisabled() {
+  registerServerOnlyEvalShim();
+  const { env } = await import('@/lib/env');
+
+  return env.JOVIE_PROMPTFOO_EXPECT_MODEL_KEYS_DISABLED;
 }
 
 function normalizeReleaseTaskClassifierModule(
