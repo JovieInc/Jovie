@@ -82,7 +82,7 @@ These routes exist in the codebase but have **no entry in `vercel.json`**. They 
 | **Agent PR Verify Ready** | `agent-pr-verify-ready.yml` | `pull_request` (opened/synchronized/reopened) | Unprivileged verification gate for agent draft PRs | Per-PR | **Keep** |
 | **Neon Scheduled Cleanup** | `neon-scheduled-cleanup.yml` | Scheduled every 4 hours | Cleans up orphaned Neon ephemeral branches from E2E / nightly runs | Every 4h | **Keep** — prevents Neon branch accumulation |
 | **Neon Ephemeral Branch Cleanup** | `neon-ephemeral-branch-cleanup.yml` | Event-driven (PR close) | Deletes Neon branch created for a PR when PR closes | Per-PR close | **Keep** |
-| **Periodic Evals** | `evals-periodic.yml` | Scheduled `0 6 * * 1` (Mondays 06:00 UTC) | Runs all periodic eval tests; builds Docker image | Weekly | **Keep — verify eval coverage** — if evals don't cover current product surfaces, update them |
+| **Periodic Evals** | `evals-periodic.yml` | `workflow_dispatch` with typed `RUN_LIVE_EVALS` confirmation | Runs legacy live LLM eval tests; builds Docker image | Manual-only, concurrency 1 | **Keep manual-only** — no scheduled live-eval spend; verify coverage before any scheduled trigger returns |
 | **CI** | `ci.yml` | `push`/`pull_request` + merge queue | Main CI pipeline: build, typecheck, lint, tests, deploy staging, canary health gate, promote production | Per-PR and per-push | **Keep** |
 | **Sentry Error Gate** | `sentry-error-gate.yml` | `workflow_run` (CI deploy completes) | 5-minute soak watching Sentry for error spikes post-deploy; triggers rollback if spike detected | Per-deploy | **Keep** |
 | **Canary Health Gate** | `canary-health-gate.yml` | Called by CI | Verifies staging health before production promotion | Per-deploy | **Keep** |
@@ -117,7 +117,7 @@ Founder priorities (current cycle): **product stability → design system transf
 
 | Automation | Current Status | Pause Risk |
 |------------|---------------|------------|
-| `Periodic Evals` (`evals-periodic.yml`) | Runs weekly on Mondays | Low — if evals are stale or don't cover current surfaces, they produce noise not signal. Audit eval coverage before relying on results. |
+| `Periodic Evals` (`evals-periodic.yml`) | Manual-only with `RUN_LIVE_EVALS` confirmation | Low — no scheduled spend. If this returns to a schedule, add measured per-run cost and current product-surface coverage before relying on results. |
 | `generate-playlist` cron route | Missing from `vercel.json` (runs never) | None — it's already not running. Decide if AI playlist feature is active before adding schedule. |
 | `monitor-metadata-submissions` cron route | Missing from `vercel.json` (runs never) | None — not running. Add schedule only if metadata-submission feature is user-facing. |
 
