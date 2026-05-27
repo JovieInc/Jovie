@@ -1,38 +1,31 @@
 'use client';
 
 import { ChevronLeft, ChevronRight, PanelLeft } from 'lucide-react';
-import { useRouter } from 'next/navigation';
 import type { CSSProperties } from 'react';
 import { useContext } from 'react';
 import { UpdateAvailablePill } from '@/components/atoms/UpdateAvailablePill';
 import { SidebarContext } from '@/components/organisms/sidebar/context';
-import { useIsElectronRuntime } from '@/lib/desktop/electron-bridge';
+import { useBackNavigation } from '@/contexts/BackNavigationContext';
+import {
+  useDesktopNavigation,
+  useIsElectronRuntime,
+} from '@/lib/desktop/electron-bridge';
 import { cn } from '@/lib/utils';
 
 /**
  * DesktopTitlebar — Electron-only titlebar drag region.
  *
  * Layout:
- *   [sidebar-width: traffic-light spacer, back/forward, sidebar toggle, update pill]
- *   [main: drag region only]
+ *   [sidebar-width: traffic-light spacer, back button, update pill]
+ *   [main: forward nav, drag region]
  *
  * Renders as a zero-height invisible element in the browser; CSS on
  * [data-electron-titlebar="true"] makes it visible only inside Electron.
- *
- * The sidebar toggle here is the single canonical toggle in Electron mode,
- * so there is never a duplicate control path in desktop runtime.
- *
- * Back/forward keyboard shortcuts (Cmd+[ / Cmd+]) remain wired via
- * useDesktopNavigation in components that need them; visible controls sit
- * beside the traffic-light rail for native desktop discoverability.
- *
- * The page header is no longer rendered in the titlebar — it lives at the
- * top of the elevated content card below so the card (header included)
- * collapses/expands with the sidebar.
  */
 export function DesktopTitlebar() {
-  const router = useRouter();
   const isDesktop = useIsElectronRuntime();
+  const { canGoForward, goForward } = useDesktopNavigation();
+  const { canGoBack, goBack } = useBackNavigation();
   // useContext (not useSidebar) so this is safe outside SidebarProvider (e.g. demo shell)
   const sidebarCtx = useContext(SidebarContext);
   const sidebarOpen = sidebarCtx?.state === 'open';
@@ -84,7 +77,8 @@ export function DesktopTitlebar() {
             >
               <button
                 type='button'
-                onClick={() => router.back()}
+                onClick={goBack}
+                disabled={!canGoBack}
                 aria-label='Go back'
                 data-testid='electron-nav-back'
                 className={cn(
@@ -98,7 +92,8 @@ export function DesktopTitlebar() {
               </button>
               <button
                 type='button'
-                onClick={() => router.forward()}
+                onClick={goForward}
+                disabled={!canGoForward}
                 aria-label='Go forward'
                 data-testid='electron-nav-forward'
                 className={cn(

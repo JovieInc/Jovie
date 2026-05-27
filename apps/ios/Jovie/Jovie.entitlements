@@ -5,6 +5,7 @@
   <key>com.apple.developer.associated-domains</key>
   <array>
     <string>webcredentials:$(CLERK_ASSOCIATED_DOMAIN)</string>
+    <string>applinks:jov.ie</string>
   </array>
 </dict>
 </plist>
