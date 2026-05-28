@@ -16,6 +16,7 @@ import { StaticArtistPage } from '@/components/profile/StaticArtistPage';
 import { JoviePixel } from '@/components/tracking';
 import { BASE_URL } from '@/constants/app';
 import { getClientTrackingToken } from '@/lib/analytics/tracking-token';
+import { sanitizeCacheTags } from '@/lib/cache/tags';
 import { toPublicContacts } from '@/lib/contacts/mapper';
 // eslint-disable-next-line no-restricted-imports -- Schema barrel import needed for types
 import type {
@@ -349,7 +350,7 @@ const getCachedProfileAndLinks = async (username: string) => {
       },
       [`public-profile-${username}`],
       {
-        tags: ['profiles-all', `profile:${username}`],
+        tags: sanitizeCacheTags(['profiles-all', `profile:${username}`]),
         revalidate: PROFILE_SUCCESS_CACHE_TTL_SECONDS,
       }
     );

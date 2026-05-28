@@ -93,6 +93,40 @@ export function createSmartLinkContentTag(profileId: string): string {
 }
 
 /**
+ * Characters invalid in HTTP header field values (RFC 7230 §3.2.6).
+ * Strips control characters except tab (0x09) that would crash response headers.
+ * Cache tags with user-provided input (usernames, slugs) must be sanitized.
+ */
+const INVALID_HEADER_CHARS = /[\x00-\x08\x0A-\x1F\x7F]/g;
+
+/**
+ * Sanitize a cache tag value by removing characters invalid in HTTP headers.
+ * Control characters like \n, \r, and \0 crash response header serialization.
+ *
+ * @param tag - The cache tag value to sanitize
+ * @returns Sanitized tag safe for HTTP headers
+ */
+export function sanitizeCacheTag(tag: string): string {
+  return tag.replace(INVALID_HEADER_CHARS, '');
+}
+
+/**
+ * Sanitize all tags in an array, returning only unique values.
+ */
+export function sanitizeCacheTags(tags: string[]): string[] {
+  const seen = new Set<string>();
+  const result: string[] = [];
+  for (const tag of tags) {
+    const sanitized = sanitizeCacheTag(tag);
+    if (sanitized && !seen.has(sanitized)) {
+      seen.add(sanitized);
+      result.push(sanitized);
+    }
+  }
+  return result;
+}
+
+/**
  * Cache TTL presets in seconds.
  * Use these for consistent cache durations across the app.
  */
