@@ -2,6 +2,7 @@ import ClerkKit
 import Darwin
 import Observation
 import SwiftUI
+import UIKit
 
 private enum LiveAuthBootstrapError: LocalizedError {
   case bootstrapFailed(stage: String, message: String)
@@ -264,6 +265,10 @@ private struct MobileChatHomeView: View {
 private struct ChatComposerPreview: View {
   @Binding var draft: String
 
+  private var cornerRadius: CGFloat {
+    draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? 28 : JovieRadius.xLarge
+  }
+
   var body: some View {
     let trimmedDraft = draft.trimmingCharacters(in: .whitespacesAndNewlines)
 
@@ -293,11 +298,12 @@ private struct ChatComposerPreview: View {
     }
     .padding(.horizontal, JovieSpacing.large)
     .frame(height: 64)
-    .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 28, style: .continuous))
+    .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
     .overlay {
-      RoundedRectangle(cornerRadius: 28, style: .continuous)
+      RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
         .stroke(JovieColor.borderDefault, lineWidth: 1)
     }
+    .animation(.easeOut(duration: 0.2), value: trimmedDraft.isEmpty)
     .accessibilityIdentifier("chat-composer")
   }
 }
