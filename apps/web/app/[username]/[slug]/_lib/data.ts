@@ -101,7 +101,7 @@ export const getCreatorByUsername = cache(
       () => fetchCreatorByUsername(usernameNormalized),
       [`smartlink-creator-${usernameNormalized}`],
       {
-        tags: sanitizeCacheTags([
+        tags: await sanitizeCacheTags([
           'smartlink-creator',
           `smartlink-creator:${usernameNormalized}`,
           `profile:${usernameNormalized}`,
@@ -264,7 +264,7 @@ export const getContentBySlug = cache(
       () => fetchContentBySlug(creatorProfileId, slug),
       [`smartlink-content-${creatorProfileId}-${slug}`],
       {
-        tags: sanitizeCacheTags([
+        tags: await sanitizeCacheTags([
           'smartlink-content',
           `smartlink-content:${creatorProfileId}`,
           `smartlink-content:${creatorProfileId}:${slug}`,

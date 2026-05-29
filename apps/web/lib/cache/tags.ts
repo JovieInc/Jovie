@@ -26,6 +26,8 @@
  * 3. Update CACHING_DECISIONS.md with the new tag's scope and usage
  */
 
+import { cacheLogger } from './log';
+
 /**
  * All cache tag constants used in the application.
  * These are used with Next.js `revalidateTag()` and `unstable_cache`.
@@ -106,18 +108,37 @@ const INVALID_HEADER_CHARS = /[\x00-\x08\x0A-\x1F\x7F]/g;
  * @param tag - The cache tag value to sanitize
  * @returns Sanitized tag safe for HTTP headers
  */
-export function sanitizeCacheTag(tag: string): string {
-  return tag.replace(INVALID_HEADER_CHARS, '');
+export async function sanitizeCacheTag(tag: string): Promise<string> {
+  const MAX_RETRIES = 3;
+  const BASE_DELAY_MS = 100;
+  let lastError: Error | undefined;
+  for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+    try {
+      return tag.replace(INVALID_HEADER_CHARS, '');
+    } catch (err) {
+      lastError = err instanceof Error ? err : new Error(String(err));
+      cacheLogger.warn(
+        `sanitizeCacheTag attempt ${attempt}/${MAX_RETRIES} failed: ${lastError.message}`,
+        { tag, attempt }
+      );
+      if (attempt < MAX_RETRIES) {
+        await new Promise(r => setTimeout(r, BASE_DELAY_MS * (attempt - 1)));
+      }
+    }
+  }
+  throw new Error(
+    `sanitizeCacheTag failed after ${MAX_RETRIES} attempts for tag: "${tag}". Last error: ${lastError?.message ?? 'unknown'}`
+  );
 }
 
 /**
  * Sanitize all tags in an array, returning only unique values.
  */
-export function sanitizeCacheTags(tags: string[]): string[] {
+export async function sanitizeCacheTags(tags: string[]): Promise<string[]> {
   const seen = new Set<string>();
   const result: string[] = [];
   for (const tag of tags) {
-    const sanitized = sanitizeCacheTag(tag);
+    const sanitized = await sanitizeCacheTag(tag);
     if (sanitized && !seen.has(sanitized)) {
       seen.add(sanitized);
       result.push(sanitized);

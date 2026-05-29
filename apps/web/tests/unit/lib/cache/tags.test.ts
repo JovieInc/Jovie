@@ -13,6 +13,8 @@ import {
   createAvatarTag,
   createProfileTag,
   createSocialLinksTag,
+  sanitizeCacheTag,
+  sanitizeCacheTags,
 } from '@/lib/cache/tags';
 
 describe('Cache Tags', () => {
@@ -202,4 +204,86 @@ describe('Cache Tags', () => {
       expect(createAvatarTag('x')).toMatch(/^avatar:/);
     });
   });
+
+describe('sanitizeCacheTag retry logic', () => {
+  it('should return sanitized tag on first try for clean input', async () => {
+    const result = await sanitizeCacheTag('normal-tag-value');
+    expect(result).toBe('normal-tag-value');
+  });
+
+  it('should return sanitized tag on first try for input with control chars', async () => {
+    const result = await sanitizeCacheTag('tag\x00\x08value');
+    expect(result).toBe('tagvalue');
+  });
+
+  it('should succeed after a transient failure on retry', async () => {
+    const original = String.prototype.replace;
+    let callCount = 0;
+    String.prototype.replace = function (...args: unknown[]) {
+      callCount++;
+      if (callCount === 1) {
+        throw new Error('transient header validation failure');
+      }
+      return original.apply(this, args);
+    };
+    try {
+      const result = await sanitizeCacheTag('test-tag');
+      expect(result).toBe('test-tag');
+      expect(callCount).toBe(2);
+    } finally {
+      String.prototype.replace = original;
+    }
+  });
+
+  it('should throw descriptive error after all retries exhausted', async () => {
+    const original = String.prototype.replace;
+    String.prototype.replace = () => {
+      throw new Error('persistent failure');
+    };
+    try {
+      await expect(sanitizeCacheTag('failing-tag')).rejects.toThrow(
+        'sanitizeCacheTag failed after 3 attempts for tag: "failing-tag". Last error: persistent failure'
+      );
+    } finally {
+      String.prototype.replace = original;
+    }
+  });
+
+  it('should throw descriptive error including the original tag value', async () => {
+    const original = String.prototype.replace;
+    String.prototype.replace = () => {
+      throw new Error('always fails');
+    };
+    try {
+      await expect(sanitizeCacheTag('my-special-tag-123')).rejects.toThrow('my-special-tag-123');
+    } finally {
+      String.prototype.replace = original;
+    }
+  });
+});
+
+describe('sanitizeCacheTags retry logic', () => {
+  it('should deduplicate tags after sanitization', async () => {
+    const result = await sanitizeCacheTags(['tag-a', 'tag-a', 'tag-b']);
+    expect(result).toEqual(['tag-a', 'tag-b']);
+  });
+
+  it('should return empty array for all-invalid tags', async () => {
+    const result = await sanitizeCacheTags(['\x00', '\x08']);
+    expect(result).toEqual([]);
+  });
+
+  it('should propagate retry failures', async () => {
+    const original = String.prototype.replace;
+    String.prototype.replace = () => {
+      throw new Error('always fails');
+    };
+    try {
+      await expect(sanitizeCacheTags(['tag1'])).rejects.toThrow('sanitizeCacheTag failed after 3 attempts');
+    } finally {
+      String.prototype.replace = original;
+    }
+  });
+});
+
 });
