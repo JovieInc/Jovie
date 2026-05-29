@@ -22,9 +22,10 @@ coverage:
         # Only measure files changed in the PR
         only_pulls: true
     # Patch coverage: coverage of new/modified lines
+    # Humans must review and approve PR if patch coverage < 80%
     patch:
       default:
-        target: 60%
+        target: 80%
         threshold: 5%
         # Block PRs with insufficient coverage on new/modified lines
         informational: false
