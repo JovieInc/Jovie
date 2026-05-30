@@ -66,6 +66,11 @@ import {
   type PersistedToolEvent,
 } from '@/lib/chat/tool-events';
 import {
+  createMerchGenerateTool,
+  createMerchPreviewTool,
+  createMerchSelectTool,
+} from '@/lib/chat/tools/merch-tools';
+import {
   type ChatTurnSource,
   markChatTurnStreaming,
   persistTerminalAssistantMessage,
@@ -108,11 +113,6 @@ import {
   updateMerchCardDetails,
   updateMerchCardStatus,
 } from '@/lib/merch/service';
-import {
-  createMerchGenerateTool,
-  createMerchPreviewTool,
-  createMerchSelectTool,
-} from '@/lib/chat/tools/merch-tools';
 import {
   albumArtGenerationBurstLimiter,
   albumArtGenerationLimiter,
@@ -1218,7 +1218,7 @@ function createGenerateAlbumArtTool(params: {
   });
 }
 
-function createMerchGenerationTool(params: {
+function _createMerchGenerationTool(params: {
   readonly profileId: string | null;
   readonly clerkUserId: string;
   readonly command: 'create_merch' | 'preview_merch_options';
@@ -1260,7 +1260,7 @@ function createMerchGenerationTool(params: {
   });
 }
 
-function createSelectMerchDesignTool(params: {
+function _createSelectMerchDesignTool(params: {
   readonly profileId: string | null;
   readonly clerkUserId: string;
 }) {

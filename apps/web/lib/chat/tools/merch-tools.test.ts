@@ -1,5 +1,4 @@
-import { describe, it, expect, vi } from 'vitest';
-import { z } from 'zod';
+import { describe, expect, it } from 'vitest';
 import { TOOL_SCHEMAS } from '@/lib/chat/tool-schemas';
 
 describe('merch tool schemas', () => {
@@ -74,12 +73,16 @@ describe('TOOL_SCHEMAS descriptions', () => {
   });
 
   it('previewMerchOptions has a useful description', () => {
-    expect(TOOL_SCHEMAS.previewMerchOptions.description.length).toBeGreaterThan(10);
+    expect(TOOL_SCHEMAS.previewMerchOptions.description.length).toBeGreaterThan(
+      10
+    );
     expect(TOOL_SCHEMAS.previewMerchOptions.description).toContain('merch');
   });
 
   it('selectMerchDesign has a useful description', () => {
-    expect(TOOL_SCHEMAS.selectMerchDesign.description.length).toBeGreaterThan(10);
+    expect(TOOL_SCHEMAS.selectMerchDesign.description.length).toBeGreaterThan(
+      10
+    );
     expect(TOOL_SCHEMAS.selectMerchDesign.description).toContain('option');
   });
 });

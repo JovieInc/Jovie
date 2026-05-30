@@ -19,7 +19,6 @@ import 'server-only';
  */
 
 import { tool } from 'ai';
-import { z } from 'zod';
 import { TOOL_SCHEMAS } from '@/lib/chat/tool-schemas';
 import {
   generateMerchFromConcept,
