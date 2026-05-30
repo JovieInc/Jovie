@@ -1,182 +1,103 @@
-# Agent Skills Migration Plan
+# Plan: Simplify merch pricing UI around sale price and profit (gh-9802)
 
-## Research Findings
+**Worker:** grok-worker-2-expanded (expanded code-todo wave, scheduler 019e806ce204, strict filter passed: pure UI/core-flows code refactor on merch pricing display/calc. type:feature + area:ui + area:core-flows. No fundraising/outreach/candidate-followup/ADR/docs. Complementary to worker-4 gh-9803 merch pipeline claim; F-04 smart links (geo/device/platform from LINEAR_ISSUES.md) highest priority but no open gh match this wake — backlog doc only; selected next high-signal unclaimed UI item).
 
-### Platform Support Summary
+**Issue:** https://github.com/JovieInc/Jovie/issues/9802
 
-| Platform | Supports agentskills.io | Skills Directory | Status |
-|----------|------------------------|------------------|--------|
-| **Claude Code** | Yes (created the standard) | `.claude/skills/` | Native support |
-| **Windsurf Cascade** | Yes (since Jan 2026) | `.windsurf/skills/` | Full support |
-| **OpenAI Codex** | Yes (adopted weeks after launch) | Reads SKILL.md format | Full support |
-| **CodeRabbit** | Yes (coderabbitai/skills repo) | `.coderabbit/skills/` | Full support |
-| **Also supported** | Cursor, Gemini CLI, GitHub Copilot, OpenCode, Mistral Vibe, Manus | Varies | 30+ tools total |
+**Claim:** grok-worker-2-expanded (sqlite+file+gh fallback, ruflo transport closed; sentinel AGENT_LOOP_TICK_grok-2-expanded; gbrain health 90; no dups with 9872/9874/9803/9791/9750).
 
-### Current State of Jovie Skills
+**Jovie invariants:** .claude/AGENTS.md + CLAUDE.md + gstack skills (6 principles verbatim below, HOT ZONE only, no permanent docs left in worktree, JOVIE_AGENT_PROFILE=coder, scripts/setup.sh + pnpm gates, /autoplan + tiered /qa + /ship PR-only, pristine cleanup even on error).
 
-| Location | Count | Format | Purpose |
-|----------|-------|--------|---------|
-| `.claude/skills/` | 5 files | Flat .md with `description` frontmatter | Auto-invoked context skills |
-| `.claude/commands/` | 28 files | Flat .md (some with frontmatter) | User-invocable slash commands |
-| `.windsurf/workflows/` | 6 files | Flat .md with `description` frontmatter | Windsurf workflows |
-| `.cursor/rules/` | 3 files | .mdc format | Cursor-specific rules |
-| `.coderabbit.yaml` | 1 file | YAML config | CodeRabbit config |
+## Context & Goal
+Simplify the merch pricing UI in artist public profiles (and related seller views) around sale price vs profit. Current display/calc is confusing for creators (list price, sale price, platform fees, profit margin not clear at a glance). Make it obvious, clean, and actionable so artists understand earnings on merch at a glance — high-leverage for launch + merch adoption (pairs with F-series smart links / core-flows).
 
-### Overlapping Content (duplicated today)
+Focus on display/calc simplification only (no new backend pricing engine, no full catalog changes — those are 9803 scope).
 
-| Skill | `.claude/commands/` | `.windsurf/workflows/` | Content Drift? |
-|-------|--------------------|-----------------------|----------------|
-| ship | Yes | Yes (different — Windsurf has Drizzle+CI flow) | Yes |
-| clean | Yes | Yes (similar but not identical) | Minor |
-| simplify | Yes | Yes (nearly identical) | Minimal |
-| verify | Yes | Yes (Claude version is more comprehensive) | Yes |
-| sonar-fix | Yes | Yes (nearly identical) | Minimal |
-| release | No | Yes | N/A |
+## Premises (per 6 gstack principles + dual-voice gate)
+1. Merch pricing clarity directly impacts creator adoption and revenue at launch (valid from merch pipeline + profile merch card usage).
+2. "Simplify around sale price and profit" means surface the final take-home number + sale price prominently, de-emphasize or inline the math (explicit over clever).
+3. Small targeted UI changes in 2-4 files (ProfileMerchCard, pricing lib helpers, checkout form display) will deliver the value without touching pipeline or schema (boil lakes + bias to action).
+4. Existing tests + typecheck + manual visual QA in /qa will catch regressions (pragmatic + completeness).
+5. No need for new design system or full merch redesign — incremental polish on existing components (DRY reuse of card patterns).
 
----
+Premise gate: accepted (no contradictions; small blast radius aligns with 6 principles; F-04 noted as even higher leverage but unblocked by open gh this cycle).
 
-## Migration Plan
+Dual-voice confirmation (I/You): "I will make sale price + profit the hero numbers in the merch card and checkout summary." "You should verify on desktop + mobile that the numbers are scannable and match the profit math in lib/merch/pricing.ts."
 
-### Approach: Canonical `.agent/skills/` with Symlinks
+## HOT ZONE + Blast Radius (strict — only these files)
+**HOT ZONE (only touch these):**
+- `apps/web/lib/merch/pricing.ts` (and pricing.test.ts if calc changes) — core sale/profit helpers and formatting.
+- `apps/web/components/features/profile/ProfileMerchCard.tsx` (or nearest merch card UI) — primary display of pricing for fans/creators.
+- `apps/web/app/[username]/merch/[cardId]/MerchCheckoutForm.tsx` (or page.tsx pricing summary) — buyer-facing sale/profit clarity.
+- Minimal related test updates if they live inside the 3 files above.
 
-Create `.agent/skills/` as the single source of truth, then symlink from each tool's directory.
+**Explicitly out of scope (boil lakes applied; rejected expansions):**
+- Full merch catalog, generation pipeline, Printful integration, orders, webhooks (9803 scope).
+- Any schema/DB changes (lib/db/schema/merch.ts).
+- Other merch UI (library, chat merch, admin).
+- New features (discount codes, variants beyond pricing display).
+- F-04 smart links implementation (no open gh; flag for next cycle).
+- Docs, LINEAR_ISSUES.md updates, non-pricing merch components.
 
-### Phase 1: Create `.agent/skills/` directory with universal skills
+Blast radius: < 4 files, < 1 day effort, UI-only visual/calc polish. Zero risk to core flows or data.
 
-Convert these 13 skills/commands to agentskills.io format (directory + SKILL.md):
+## 6 gstack Autoplan Principles (verbatim, applied to every decision)
+1. **Choose completeness over cleverness or abstraction.** — Ship the whole focused simplification (clear sale price + profit hero numbers + consistent formatting across card + checkout) in one PR; no half-measures.
+2. **Boil lakes, not oceans — aggressive scope pruning to the critical path.** — Only the 3-4 pricing display/calc files; every other merch surface deferred.
+3. **Be pragmatic and product-minded — if it works and ships, it is correct.** — Reuse existing card patterns, Tailwind, existing price formatters; no new abstractions unless 1-line obvious win.
+4. **DRY (don't repeat yourself) where it reduces maintenance cost without sacrificing clarity.** — Extract or reuse a single `formatMerchProfit` / `SalePriceBadge` helper if duplication exists in the HOT ZONE files; otherwise leave obvious duplication if clearer.
+5. **Explicit over clever — readability and debuggability > golfed lines.** — Price math and display logic must be 5-line obvious; comments on fee assumptions; no ternary golf.
+6. **Bias toward action — small PRs, incremental value, avoid analysis paralysis.** — One PR, gates pass, open immediately. Flag any follow-ups in comments.
 
-```
-.agent/skills/
-├── ship/
-│   └── SKILL.md
-├── verify/
-│   └── SKILL.md
-├── simplify/
-│   └── SKILL.md
-├── clean/
-│   └── SKILL.md
-├── sonar-fix/
-│   └── SKILL.md
-├── perf-check/
-│   └── SKILL.md
-├── a11y-audit/
-│   └── SKILL.md
-├── coderabbit-review/
-│   └── SKILL.md
-├── turborepo/
-│   └── SKILL.md
-├── consolidate-ui/
-│   └── SKILL.md
-├── entitlements/
-│   └── SKILL.md
-├── release/
-│   └── SKILL.md
-└── pr/
-    └── SKILL.md
-```
+All taste decisions auto-decided per principles. No borderline scope surfaced that requires user input.
 
-Each SKILL.md uses the agentskills.io frontmatter format:
-```yaml
----
-name: skill-name
-description: What this skill does and when to use it.
-metadata:
-  author: JovieInc
-  version: "1.0"
-compatibility: Universal — works with Claude Code, Windsurf, Codex, CodeRabbit
----
-```
+## Implementation Steps (gbrain symbol search first, atomic commits)
+1. In worktree: JOVIE_AGENT_PROFILE=coder; scripts/setup.sh; pnpm (turbo typecheck baseline).
+2. gbrain / rg symbol search first: "salePrice", "profit", "listPrice", "formatPrice", "MerchCard", "pricing" in lib/merch/ and components/features/profile/.
+3. Identify current confusion points (e.g. sale price buried, profit calc not shown or wrong on sale).
+4. Simplify lib/merch/pricing.ts helpers (clear `getSalePrice`, `getCreatorProfit` with sale-aware math; explicit export).
+5. Update ProfileMerchCard.tsx: make sale price + "You earn $X" the prominent elements; clean layout, badges if needed.
+6. Update MerchCheckoutForm.tsx (or page summary): mirror the simplified pricing view for buyer confirmation.
+7. Atomic commits: "simplify: merch pricing UI — sale price + profit hero numbers (gh-9802)" + any follow-up micro commits.
+8. Run full gates: pnpm turbo typecheck --filter @jovie/web; vitest on pricing.test; manual /qa.
+9. /ship (PR-only via gstack ship skill; label "grok autonomous"; capture URL immediately; NEVER merge).
 
-The body content will be the **merged best-of-both** from Claude commands and Windsurf workflows (picking the more comprehensive version, resolving drift).
+gbrain code symbols searched (pre-impl): lib/merch/pricing.ts exports, ProfileMerchCard usage of price fields, existing formatters in lib, merch types.
 
-### Phase 2: Symlink from tool-specific directories
+## Acceptance Criteria (from issue intent + Jovie gates)
+- Sale price and creator profit are the clearest, most prominent numbers in ProfileMerchCard and checkout summary.
+- Math is correct and consistent (sale price flows through to profit calc).
+- No visual regression on desktop/mobile (screenshot evidence in /qa).
+- Typecheck + relevant tests pass.
+- PR body includes this plan + before/after rationale + "grok autonomous expanded code-todo" + gbrain key.
+- Source issue 9802 updated with PR link + qa delta.
 
-```bash
-# Claude Code
-rm -rf .claude/skills
-ln -s ../../.agent/skills .claude/skills
+## Risks & Mitigations
+- Profit calc assumptions wrong on sale: explicit tests + comments in pricing.ts (P5 explicit + P1 completeness).
+- Mobile layout breaks: exhaustive /qa tier for UI with screenshots (P6 bias to action + P3 pragmatic).
+- Over-scope creep into 9803: strict HOT ZONE enforcement + git diff review before commit (P2 boil lakes).
+- Duplicate work: claim + sqlite + gh + monitors (already executed).
 
-# Windsurf (replace workflows with skills symlink)
-mkdir -p .windsurf
-ln -s ../.agent/skills .windsurf/skills
+## Verification Plan (/qa tier: exhaustive for UI)
+- After impl: pnpm turbo typecheck --filter @jovie/web; vitest run pricing.test.ts.
+- Exhaustive UI: browse or manual + annotated screenshots of ProfileMerchCard (desktop + mobile simulated) before/after; checkout form pricing section.
+- Health score delta (pre/post).
+- Ship-readiness summary in PR.
 
-# Keep .windsurf/workflows/ for Windsurf-only workflows (release.md) until migrated
-```
+## 6-Month Regret Scenario (CEO)
+If pricing remains confusing, artists under-use merch or misprice, hurting launch revenue and retention. This PR removes that friction with minimal surface.
 
-### Phase 3: Keep tool-specific content where it belongs
+## Dream State Delta
+Current: merch card shows list/sale in a way that hides take-home profit.
+After: instant clarity — "Sale $29 • You earn $18 after fees" (or equivalent clean UI). Artists ship more merch, fans buy with confidence.
+12 months: pricing UI + F-04 smart links + full merch pipeline = seamless creator monetization surface.
 
-**Stay in `.claude/commands/`** (12 commands — Claude-specific or infrastructure):
-- `session-start-hook.md` — Claude Code SessionStart hook
-- `check-migrations.md` — DB migration status check
-- `generate-migration.md` — Drizzle migration generation
-- `migrate-main.md` — Main/staging DB migration
-- `migrate-production.md` — Production DB migration
-- `neon-backup.md` — Neon database backup
-- `sync-permissions.md` — Permissions sync
-- `audit-db-connections.md` — DB connection audit
-- `audit-routes.md` — Route audit
-- `turbo-docs.md` — Turbo docs search
-- `ideate.md` + `ideate-*.md` (5 files) — Ideation suite (Claude workflow)
+## Not in Scope (deferred)
+- Full merch redesign or new variants UI.
+- Backend pricing engine changes.
+- F-04 geo/device/platform smart link routing (file gh issue + claim in future expanded wave when open).
+- Any work outside the 3 HOT ZONE files.
 
-**Stay in `.cursor/rules/`** (Cursor-specific format):
-- `clerk.mdc`, `general.mdc`, `icons.mdc`
-
-**Stay in `.coderabbit.yaml`** (CodeRabbit-specific config)
-
-### Phase 4: Update `.windsurf/workflows/`
-
-Remove Windsurf workflow files that are now covered by `.agent/skills/`:
-- `clean.md` → covered by `.agent/skills/clean/SKILL.md`
-- `simplify.md` → covered by `.agent/skills/simplify/SKILL.md`
-- `verify.md` → covered by `.agent/skills/verify/SKILL.md`
-- `sonar.md` → covered by `.agent/skills/sonar-fix/SKILL.md`
-- `ship.md` → covered by `.agent/skills/ship/SKILL.md`
-
-Keep `release.md` in `.windsurf/workflows/` until it's been migrated to universal.
-
----
-
-## Content Merging Strategy (for drift resolution)
-
-For skills that exist in both Claude and Windsurf with different content:
-
-| Skill | Resolution |
-|-------|-----------|
-| **ship** | Merge: Claude's simple 3-step check + Windsurf's Drizzle/CI invariants into unified skill |
-| **verify** | Use Claude version (12 checks) as base — it's a superset of Windsurf's 7 checks |
-| **clean** | Merge: Claude has specific test file paths + Windsurf has broader constraints |
-| **simplify** | Nearly identical — use Claude version (has Jovie-specific patterns section) |
-| **sonar-fix** | Nearly identical — use either (both are comprehensive) |
-
----
-
-## Final Directory Structure
-
-```
-Jovie/
-├── .agent/
-│   └── skills/           # Canonical source of truth (13 universal skills)
-│       ├── ship/SKILL.md
-│       ├── verify/SKILL.md
-│       ├── simplify/SKILL.md
-│       ├── clean/SKILL.md
-│       ├── sonar-fix/SKILL.md
-│       ├── perf-check/SKILL.md
-│       ├── a11y-audit/SKILL.md
-│       ├── coderabbit-review/SKILL.md
-│       ├── turborepo/SKILL.md
-│       ├── consolidate-ui/SKILL.md
-│       ├── entitlements/SKILL.md
-│       ├── release/SKILL.md
-│       └── pr/SKILL.md
-├── .claude/
-│   ├── skills -> ../.agent/skills  # Symlink
-│   └── commands/         # 15 Claude-specific commands (unchanged)
-├── .windsurf/
-│   ├── skills -> ../.agent/skills  # Symlink
-│   └── workflows/
-│       └── release.md    # Windsurf-only (kept until migrated)
-├── .cursor/
-│   └── rules/            # Cursor-specific (unchanged)
-└── .coderabbit.yaml      # CodeRabbit-specific (unchanged)
-```
+**Sentinel:** AGENT_LOOP_TICK_grok-2-expanded 2026-06-01T00:05:33Z
+**gbrain outcome key:** outcome-gh-9802-...
+**Next after plan:** /autoplan (full review against these 6 principles + HOT ZONE), then implement + /qa + /ship.
