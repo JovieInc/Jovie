@@ -61,6 +61,14 @@ const SAME_ORIGIN_EXTERNAL_ROUTE_PREFIXES = [
   '/renders',
   '/support',
   '/auth/start',
+  '/auth/native-complete',
+  '/signin',
+  '/signup',
+  '/sign-in',
+  '/sign-up',
+  '/sso-callback',
+  '/auth/callback',
+  '/app/auth/callback',
 ] as const;
 
 const PUBLIC_PROFILE_RESERVED_ROOT_SEGMENTS = new Set([
