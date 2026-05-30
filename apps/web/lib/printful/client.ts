@@ -448,3 +448,34 @@ export function verifyPrintfulWebhookSignature(params: {
     crypto.timingSafeEqual(expectedBuffer, receivedBuffer)
   );
 }
+
+export interface PrintfulFile {
+  readonly id: number;
+  readonly type: string;
+  readonly filename: string;
+  readonly url: string;
+  readonly width?: number;
+  readonly height?: number;
+  readonly dpi?: number;
+  readonly status?: string;
+}
+
+export async function createPrintfulFile(input: {
+  readonly url: string;
+  readonly filename: string;
+  readonly type?: string;
+}): Promise<PrintfulFile> {
+  const payload = await requestPrintful<PrintfulDataResponse<PrintfulFile>>(
+    '/v2/files',
+    {
+      method: 'POST',
+      body: JSON.stringify({
+        url: input.url,
+        filename: input.filename,
+        type: input.type ?? 'printfile',
+      }),
+      retry: true,
+    }
+  );
+  return readData(payload);
+}
