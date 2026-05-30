@@ -23,14 +23,12 @@ import 'server-only';
  */
 
 import type {
-  PrintfulCatalogProduct as RawPrintfulProduct,
-  PrintfulCatalogVariant as RawPrintfulVariant,
   PrintfulCatalogVariantPrices,
+  PrintfulCatalogProduct as RawPrintfulProduct,
 } from '@/lib/printful/client';
 import {
   getCatalogProduct,
   getCatalogVariantPrices,
-  getCatalogProductAvailability,
   isPrintfulConfigured,
   listCatalogProducts,
   listCatalogVariants,
@@ -146,20 +144,106 @@ export const MOCK_CATALOG_PRODUCTS: SyncCatalogProduct[] = [
     image: null,
     isDiscontinued: false,
     variants: [
-      { catalogVariantId: 4009, catalogProductId: 71, name: 'S / Black', size: 'S', color: 'Black', colorCode: '000000', image: null, cost: null },
-      { catalogVariantId: 4010, catalogProductId: 71, name: 'M / Black', size: 'M', color: 'Black', colorCode: '000000', image: null, cost: null },
-      { catalogVariantId: 4011, catalogProductId: 71, name: 'L / Black', size: 'L', color: 'Black', colorCode: '000000', image: null, cost: null },
-      { catalogVariantId: 4012, catalogProductId: 71, name: 'XL / Black', size: 'XL', color: 'Black', colorCode: '000000', image: null, cost: null },
-      { catalogVariantId: 4013, catalogProductId: 71, name: 'S / White', size: 'S', color: 'White', colorCode: 'FFFFFF', image: null, cost: null },
-      { catalogVariantId: 4014, catalogProductId: 71, name: 'M / White', size: 'M', color: 'White', colorCode: 'FFFFFF', image: null, cost: null },
-      { catalogVariantId: 4015, catalogProductId: 71, name: 'L / White', size: 'L', color: 'White', colorCode: 'FFFFFF', image: null, cost: null },
-      { catalogVariantId: 4016, catalogProductId: 71, name: 'XL / White', size: 'XL', color: 'White', colorCode: 'FFFFFF', image: null, cost: null },
+      {
+        catalogVariantId: 4009,
+        catalogProductId: 71,
+        name: 'S / Black',
+        size: 'S',
+        color: 'Black',
+        colorCode: '000000',
+        image: null,
+        cost: null,
+      },
+      {
+        catalogVariantId: 4010,
+        catalogProductId: 71,
+        name: 'M / Black',
+        size: 'M',
+        color: 'Black',
+        colorCode: '000000',
+        image: null,
+        cost: null,
+      },
+      {
+        catalogVariantId: 4011,
+        catalogProductId: 71,
+        name: 'L / Black',
+        size: 'L',
+        color: 'Black',
+        colorCode: '000000',
+        image: null,
+        cost: null,
+      },
+      {
+        catalogVariantId: 4012,
+        catalogProductId: 71,
+        name: 'XL / Black',
+        size: 'XL',
+        color: 'Black',
+        colorCode: '000000',
+        image: null,
+        cost: null,
+      },
+      {
+        catalogVariantId: 4013,
+        catalogProductId: 71,
+        name: 'S / White',
+        size: 'S',
+        color: 'White',
+        colorCode: 'FFFFFF',
+        image: null,
+        cost: null,
+      },
+      {
+        catalogVariantId: 4014,
+        catalogProductId: 71,
+        name: 'M / White',
+        size: 'M',
+        color: 'White',
+        colorCode: 'FFFFFF',
+        image: null,
+        cost: null,
+      },
+      {
+        catalogVariantId: 4015,
+        catalogProductId: 71,
+        name: 'L / White',
+        size: 'L',
+        color: 'White',
+        colorCode: 'FFFFFF',
+        image: null,
+        cost: null,
+      },
+      {
+        catalogVariantId: 4016,
+        catalogProductId: 71,
+        name: 'XL / White',
+        size: 'XL',
+        color: 'White',
+        colorCode: 'FFFFFF',
+        image: null,
+        cost: null,
+      },
     ],
     cost: {
       currency: 'USD',
       placements: [
-        { placementId: 'front', title: 'Front Print', type: 'print_area', priceCents: 1750, discountedPriceCents: 1675, techniqueKey: 'dtg' },
-        { placementId: 'back', title: 'Back Print', type: 'print_area', priceCents: 1950, discountedPriceCents: 1850, techniqueKey: 'dtg' },
+        {
+          placementId: 'front',
+          title: 'Front Print',
+          type: 'print_area',
+          priceCents: 1750,
+          discountedPriceCents: 1675,
+          techniqueKey: 'dtg',
+        },
+        {
+          placementId: 'back',
+          title: 'Back Print',
+          type: 'print_area',
+          priceCents: 1950,
+          discountedPriceCents: 1850,
+          techniqueKey: 'dtg',
+        },
       ],
       minProductCostCents: 1675,
       maxProductCostCents: 1950,
@@ -177,16 +261,66 @@ export const MOCK_CATALOG_PRODUCTS: SyncCatalogProduct[] = [
     image: null,
     isDiscontinued: false,
     variants: [
-      { catalogVariantId: 4001, catalogProductId: 91, name: 'S / Black', size: 'S', color: 'Black', colorCode: '000000', image: null, cost: null },
-      { catalogVariantId: 4002, catalogProductId: 91, name: 'M / Black', size: 'M', color: 'Black', colorCode: '000000', image: null, cost: null },
-      { catalogVariantId: 4003, catalogProductId: 91, name: 'L / Black', size: 'L', color: 'Black', colorCode: '000000', image: null, cost: null },
-      { catalogVariantId: 4004, catalogProductId: 91, name: 'XL / Black', size: 'XL', color: 'Black', colorCode: '000000', image: null, cost: null },
+      {
+        catalogVariantId: 4001,
+        catalogProductId: 91,
+        name: 'S / Black',
+        size: 'S',
+        color: 'Black',
+        colorCode: '000000',
+        image: null,
+        cost: null,
+      },
+      {
+        catalogVariantId: 4002,
+        catalogProductId: 91,
+        name: 'M / Black',
+        size: 'M',
+        color: 'Black',
+        colorCode: '000000',
+        image: null,
+        cost: null,
+      },
+      {
+        catalogVariantId: 4003,
+        catalogProductId: 91,
+        name: 'L / Black',
+        size: 'L',
+        color: 'Black',
+        colorCode: '000000',
+        image: null,
+        cost: null,
+      },
+      {
+        catalogVariantId: 4004,
+        catalogProductId: 91,
+        name: 'XL / Black',
+        size: 'XL',
+        color: 'Black',
+        colorCode: '000000',
+        image: null,
+        cost: null,
+      },
     ],
     cost: {
       currency: 'USD',
       placements: [
-        { placementId: 'front', title: 'Front Print', type: 'print_area', priceCents: 2250, discountedPriceCents: 2125, techniqueKey: 'dtg' },
-        { placementId: 'back', title: 'Back Print', type: 'print_area', priceCents: 2650, discountedPriceCents: 2500, techniqueKey: 'dtg' },
+        {
+          placementId: 'front',
+          title: 'Front Print',
+          type: 'print_area',
+          priceCents: 2250,
+          discountedPriceCents: 2125,
+          techniqueKey: 'dtg',
+        },
+        {
+          placementId: 'back',
+          title: 'Back Print',
+          type: 'print_area',
+          priceCents: 2650,
+          discountedPriceCents: 2500,
+          techniqueKey: 'dtg',
+        },
       ],
       minProductCostCents: 2125,
       maxProductCostCents: 2650,
@@ -204,15 +338,58 @@ export const MOCK_CATALOG_PRODUCTS: SyncCatalogProduct[] = [
     image: null,
     isDiscontinued: false,
     variants: [
-      { catalogVariantId: 4017, catalogProductId: 72, name: 'S / Black', size: 'S', color: 'Black', colorCode: '000000', image: null, cost: null },
-      { catalogVariantId: 4018, catalogProductId: 72, name: 'M / Black', size: 'M', color: 'Black', colorCode: '000000', image: null, cost: null },
-      { catalogVariantId: 4019, catalogProductId: 72, name: 'L / Black', size: 'L', color: 'Black', colorCode: '000000', image: null, cost: null },
-      { catalogVariantId: 4020, catalogProductId: 72, name: 'XL / Black', size: 'XL', color: 'Black', colorCode: '000000', image: null, cost: null },
+      {
+        catalogVariantId: 4017,
+        catalogProductId: 72,
+        name: 'S / Black',
+        size: 'S',
+        color: 'Black',
+        colorCode: '000000',
+        image: null,
+        cost: null,
+      },
+      {
+        catalogVariantId: 4018,
+        catalogProductId: 72,
+        name: 'M / Black',
+        size: 'M',
+        color: 'Black',
+        colorCode: '000000',
+        image: null,
+        cost: null,
+      },
+      {
+        catalogVariantId: 4019,
+        catalogProductId: 72,
+        name: 'L / Black',
+        size: 'L',
+        color: 'Black',
+        colorCode: '000000',
+        image: null,
+        cost: null,
+      },
+      {
+        catalogVariantId: 4020,
+        catalogProductId: 72,
+        name: 'XL / Black',
+        size: 'XL',
+        color: 'Black',
+        colorCode: '000000',
+        image: null,
+        cost: null,
+      },
     ],
     cost: {
       currency: 'USD',
       placements: [
-        { placementId: 'front', title: 'Front Print', type: 'print_area', priceCents: 1950, discountedPriceCents: 1875, techniqueKey: 'dtg' },
+        {
+          placementId: 'front',
+          title: 'Front Print',
+          type: 'print_area',
+          priceCents: 1950,
+          discountedPriceCents: 1875,
+          techniqueKey: 'dtg',
+        },
       ],
       minProductCostCents: 1875,
       maxProductCostCents: 1875,
@@ -230,16 +407,66 @@ export const MOCK_CATALOG_PRODUCTS: SyncCatalogProduct[] = [
     image: null,
     isDiscontinued: false,
     variants: [
-      { catalogVariantId: 4101, catalogProductId: 67, name: 'S / Black', size: 'S', color: 'Black', colorCode: '000000', image: null, cost: null },
-      { catalogVariantId: 4102, catalogProductId: 67, name: 'M / Black', size: 'M', color: 'Black', colorCode: '000000', image: null, cost: null },
-      { catalogVariantId: 4103, catalogProductId: 67, name: 'L / Black', size: 'L', color: 'Black', colorCode: '000000', image: null, cost: null },
-      { catalogVariantId: 4104, catalogProductId: 67, name: 'XL / Black', size: 'XL', color: 'Black', colorCode: '000000', image: null, cost: null },
+      {
+        catalogVariantId: 4101,
+        catalogProductId: 67,
+        name: 'S / Black',
+        size: 'S',
+        color: 'Black',
+        colorCode: '000000',
+        image: null,
+        cost: null,
+      },
+      {
+        catalogVariantId: 4102,
+        catalogProductId: 67,
+        name: 'M / Black',
+        size: 'M',
+        color: 'Black',
+        colorCode: '000000',
+        image: null,
+        cost: null,
+      },
+      {
+        catalogVariantId: 4103,
+        catalogProductId: 67,
+        name: 'L / Black',
+        size: 'L',
+        color: 'Black',
+        colorCode: '000000',
+        image: null,
+        cost: null,
+      },
+      {
+        catalogVariantId: 4104,
+        catalogProductId: 67,
+        name: 'XL / Black',
+        size: 'XL',
+        color: 'Black',
+        colorCode: '000000',
+        image: null,
+        cost: null,
+      },
     ],
     cost: {
       currency: 'USD',
       placements: [
-        { placementId: 'front', title: 'Front Print', type: 'print_area', priceCents: 2100, discountedPriceCents: 1995, techniqueKey: 'dtg' },
-        { placementId: 'back', title: 'Back Print', type: 'print_area', priceCents: 2500, discountedPriceCents: 2375, techniqueKey: 'dtg' },
+        {
+          placementId: 'front',
+          title: 'Front Print',
+          type: 'print_area',
+          priceCents: 2100,
+          discountedPriceCents: 1995,
+          techniqueKey: 'dtg',
+        },
+        {
+          placementId: 'back',
+          title: 'Back Print',
+          type: 'print_area',
+          priceCents: 2500,
+          discountedPriceCents: 2375,
+          techniqueKey: 'dtg',
+        },
       ],
       minProductCostCents: 1995,
       maxProductCostCents: 2500,
@@ -257,13 +484,38 @@ export const MOCK_CATALOG_PRODUCTS: SyncCatalogProduct[] = [
     image: null,
     isDiscontinued: false,
     variants: [
-      { catalogVariantId: 4201, catalogProductId: 47, name: 'OSFA / Black', size: 'OSFA', color: 'Black', colorCode: '000000', image: null, cost: null },
-      { catalogVariantId: 4202, catalogProductId: 47, name: 'OSFA / White', size: 'OSFA', color: 'White', colorCode: 'FFFFFF', image: null, cost: null },
+      {
+        catalogVariantId: 4201,
+        catalogProductId: 47,
+        name: 'OSFA / Black',
+        size: 'OSFA',
+        color: 'Black',
+        colorCode: '000000',
+        image: null,
+        cost: null,
+      },
+      {
+        catalogVariantId: 4202,
+        catalogProductId: 47,
+        name: 'OSFA / White',
+        size: 'OSFA',
+        color: 'White',
+        colorCode: 'FFFFFF',
+        image: null,
+        cost: null,
+      },
     ],
     cost: {
       currency: 'USD',
       placements: [
-        { placementId: 'front', title: 'Front Embroidery', type: 'embroidery_area', priceCents: 850, discountedPriceCents: 799, techniqueKey: 'embroidery' },
+        {
+          placementId: 'front',
+          title: 'Front Embroidery',
+          type: 'embroidery_area',
+          priceCents: 850,
+          discountedPriceCents: 799,
+          techniqueKey: 'embroidery',
+        },
       ],
       minProductCostCents: 799,
       maxProductCostCents: 799,
@@ -281,15 +533,58 @@ export const MOCK_CATALOG_PRODUCTS: SyncCatalogProduct[] = [
     image: null,
     isDiscontinued: false,
     variants: [
-      { catalogVariantId: 4301, catalogProductId: 55, name: 'S / Black', size: 'S', color: 'Black', colorCode: '000000', image: null, cost: null },
-      { catalogVariantId: 4302, catalogProductId: 55, name: 'M / Black', size: 'M', color: 'Black', colorCode: '000000', image: null, cost: null },
-      { catalogVariantId: 4303, catalogProductId: 55, name: 'L / Black', size: 'L', color: 'Black', colorCode: '000000', image: null, cost: null },
-      { catalogVariantId: 4304, catalogProductId: 55, name: 'XL / Black', size: 'XL', color: 'Black', colorCode: '000000', image: null, cost: null },
+      {
+        catalogVariantId: 4301,
+        catalogProductId: 55,
+        name: 'S / Black',
+        size: 'S',
+        color: 'Black',
+        colorCode: '000000',
+        image: null,
+        cost: null,
+      },
+      {
+        catalogVariantId: 4302,
+        catalogProductId: 55,
+        name: 'M / Black',
+        size: 'M',
+        color: 'Black',
+        colorCode: '000000',
+        image: null,
+        cost: null,
+      },
+      {
+        catalogVariantId: 4303,
+        catalogProductId: 55,
+        name: 'L / Black',
+        size: 'L',
+        color: 'Black',
+        colorCode: '000000',
+        image: null,
+        cost: null,
+      },
+      {
+        catalogVariantId: 4304,
+        catalogProductId: 55,
+        name: 'XL / Black',
+        size: 'XL',
+        color: 'Black',
+        colorCode: '000000',
+        image: null,
+        cost: null,
+      },
     ],
     cost: {
       currency: 'USD',
       placements: [
-        { placementId: 'front', title: 'Front Print', type: 'print_area', priceCents: 1400, discountedPriceCents: 1325, techniqueKey: 'dtg' },
+        {
+          placementId: 'front',
+          title: 'Front Print',
+          type: 'print_area',
+          priceCents: 1400,
+          discountedPriceCents: 1325,
+          techniqueKey: 'dtg',
+        },
       ],
       minProductCostCents: 1325,
       maxProductCostCents: 1325,
@@ -332,7 +627,8 @@ export async function getPrintfulCatalog(
       durationMs: Date.now() - startedAt,
       totalProducts: MOCK_CATALOG_PRODUCTS.length,
       totalVariants: MOCK_CATALOG_PRODUCTS.reduce(
-        (sum, p) => sum + p.variants.length, 0
+        (sum, p) => sum + p.variants.length,
+        0
       ),
       errors: [],
       source: 'mock',
@@ -376,24 +672,29 @@ export async function syncPrintfulCatalog(
         syncProducts.push(syncProduct);
       } catch (err) {
         errors.push(
-          'Failed to sync product ' + rawProduct.id + ' (' + rawProduct.name + '): ' +
-          (err instanceof Error ? err.message : 'Unknown error')
+          'Failed to sync product ' +
+            rawProduct.id +
+            ' (' +
+            rawProduct.name +
+            '): ' +
+            (err instanceof Error ? err.message : 'Unknown error')
         );
       }
     }
   } catch (err) {
     errors.push(
       'Catalog fetch failed: ' +
-      (err instanceof Error ? err.message : 'Unknown error')
+        (err instanceof Error ? err.message : 'Unknown error')
     );
   }
 
   const totalVariants = syncProducts.reduce(
-    (sum, p) => sum + p.variants.length, 0
+    (sum, p) => sum + p.variants.length,
+    0
   );
 
   return {
-    success: errors.length === 0,
+    success: !errors.some(e => e.includes('Catalog fetch failed')),
     products: syncProducts,
     syncedAt: now,
     durationMs: Date.now() - startedAt,
@@ -484,8 +785,10 @@ export function normalizeProductCost(
   return {
     currency: prices.currency,
     placements,
-    minProductCostCents: allPriceCents.length > 0 ? Math.min(...allPriceCents) : 0,
-    maxProductCostCents: allPriceCents.length > 0 ? Math.max(...allPriceCents) : 0,
+    minProductCostCents:
+      allPriceCents.length > 0 ? Math.min(...allPriceCents) : 0,
+    maxProductCostCents:
+      allPriceCents.length > 0 ? Math.max(...allPriceCents) : 0,
     costSource: 'printful',
     fetchedAt: now,
   };
@@ -541,14 +844,18 @@ export async function findCatalogProduct(
   productId: number
 ): Promise<SyncCatalogProduct | null> {
   if (!isPrintfulConfigured()) {
-    return MOCK_CATALOG_PRODUCTS.find(p => p.catalogProductId === productId) ?? null;
+    return (
+      MOCK_CATALOG_PRODUCTS.find(p => p.catalogProductId === productId) ?? null
+    );
   }
 
   try {
     const rawProduct = await getCatalogProduct(productId);
     return normalizeCatalogProduct(rawProduct);
   } catch {
-    return MOCK_CATALOG_PRODUCTS.find(p => p.catalogProductId === productId) ?? null;
+    return (
+      MOCK_CATALOG_PRODUCTS.find(p => p.catalogProductId === productId) ?? null
+    );
   }
 }
 

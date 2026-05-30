@@ -1,9 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import type {
-  SyncCatalogProduct,
-  SyncProductCost,
-  CatalogSyncResult,
-} from './printful-catalog';
+import type { SyncProductCost } from './printful-catalog';
 
 // Mock the Printful client since it requires server environment
 vi.mock('@/lib/printful/client', () => ({
@@ -15,9 +11,7 @@ vi.mock('@/lib/printful/client', () => ({
   listCatalogVariants: vi.fn(),
 }));
 
-const printful = vi.mocked(
-  await import('@/lib/printful/client')
-);
+const printful = vi.mocked(await import('@/lib/printful/client'));
 
 async function loadModule() {
   vi.resetModules();
@@ -57,13 +51,21 @@ describe('Printful catalog service', () => {
         { id: 71, name: 'Unisex Premium T-Shirt', is_discontinued: false },
       ]);
       printful.listCatalogVariants.mockResolvedValue([
-        { id: 4011, catalog_product_id: 71, name: 'L / Black', size: 'L', color: 'Black' },
+        {
+          id: 4011,
+          catalog_product_id: 71,
+          name: 'L / Black',
+          size: 'L',
+          color: 'Black',
+        },
       ]);
       printful.getCatalogVariantPrices.mockResolvedValue({
         currency: 'USD',
         product: {
           id: 71,
-          placements: [{ id: 'front', price: '17.50', discounted_price: '16.75' }],
+          placements: [
+            { id: 'front', price: '17.50', discounted_price: '16.75' },
+          ],
         },
       });
 
@@ -81,29 +83,56 @@ describe('Printful catalog service', () => {
     it('fetches and normalizes products with variants and cost data', async () => {
       printful.isPrintfulConfigured.mockReturnValue(true);
       printful.listCatalogProducts.mockResolvedValue([
-        { id: 71, name: 'Unisex Premium T-Shirt', type: 'T-Shirt', brand: 'Bella+Canvas', is_discontinued: false },
-        { id: 91, name: 'Unisex Heavy Hoodie', type: 'Hoodie', is_discontinued: false },
+        {
+          id: 71,
+          name: 'Unisex Premium T-Shirt',
+          type: 'T-Shirt',
+          brand: 'Bella+Canvas',
+          is_discontinued: false,
+        },
+        {
+          id: 91,
+          name: 'Unisex Heavy Hoodie',
+          type: 'Hoodie',
+          is_discontinued: false,
+        },
       ]);
       printful.listCatalogVariants
         .mockResolvedValueOnce([
-          { id: 4011, catalog_product_id: 71, name: 'L / Black', size: 'L', color: 'Black' },
+          {
+            id: 4011,
+            catalog_product_id: 71,
+            name: 'L / Black',
+            size: 'L',
+            color: 'Black',
+          },
         ])
         .mockResolvedValueOnce([
-          { id: 4003, catalog_product_id: 91, name: 'L / Black', size: 'L', color: 'Black' },
+          {
+            id: 4003,
+            catalog_product_id: 91,
+            name: 'L / Black',
+            size: 'L',
+            color: 'Black',
+          },
         ]);
       printful.getCatalogVariantPrices
         .mockResolvedValueOnce({
           currency: 'USD',
           product: {
             id: 71,
-            placements: [{ id: 'front', price: '17.50', discounted_price: '16.75' }],
+            placements: [
+              { id: 'front', price: '17.50', discounted_price: '16.75' },
+            ],
           },
         })
         .mockResolvedValueOnce({
           currency: 'USD',
           product: {
             id: 91,
-            placements: [{ id: 'front', price: '22.50', discounted_price: '21.25' }],
+            placements: [
+              { id: 'front', price: '22.50', discounted_price: '21.25' },
+            ],
           },
         });
 
@@ -128,7 +157,9 @@ describe('Printful catalog service', () => {
       printful.listCatalogProducts.mockResolvedValue([
         { id: 71, name: 'Unisex Premium T-Shirt', is_discontinued: false },
       ]);
-      printful.listCatalogVariants.mockRejectedValue(new Error('variant fetch failed'));
+      printful.listCatalogVariants.mockRejectedValue(
+        new Error('variant fetch failed')
+      );
 
       const { syncPrintfulCatalog } = await loadModule();
       const result = await syncPrintfulCatalog();
@@ -145,7 +176,9 @@ describe('Printful catalog service', () => {
         { id: 2, name: 'Discontinued Product', is_discontinued: true },
       ]);
       printful.listCatalogVariants.mockResolvedValue([]);
-      printful.getCatalogVariantPrices.mockRejectedValue(new Error('no variants'));
+      printful.getCatalogVariantPrices.mockRejectedValue(
+        new Error('no variants')
+      );
 
       const { syncPrintfulCatalog } = await loadModule();
       const result = await syncPrintfulCatalog();
@@ -170,9 +203,19 @@ describe('Printful catalog service', () => {
 
     it('fetches from live API when configured', async () => {
       printful.isPrintfulConfigured.mockReturnValue(true);
-      printful.getCatalogProduct.mockResolvedValue({ id: 71, name: 'Unisex Premium T-Shirt', is_discontinued: false });
+      printful.getCatalogProduct.mockResolvedValue({
+        id: 71,
+        name: 'Unisex Premium T-Shirt',
+        is_discontinued: false,
+      });
       printful.listCatalogVariants.mockResolvedValue([
-        { id: 4011, catalog_product_id: 71, name: 'L / Black', size: 'L', color: 'Black' },
+        {
+          id: 4011,
+          catalog_product_id: 71,
+          name: 'L / Black',
+          size: 'L',
+          color: 'Black',
+        },
       ]);
       printful.getCatalogVariantPrices.mockResolvedValue({
         currency: 'USD',
@@ -204,7 +247,11 @@ describe('Printful catalog service', () => {
 
     it('returns null for product with no variants', async () => {
       printful.isPrintfulConfigured.mockReturnValue(true);
-      printful.getCatalogProduct.mockResolvedValue({ id: 1, name: 'Empty Product', is_discontinued: false });
+      printful.getCatalogProduct.mockResolvedValue({
+        id: 1,
+        name: 'Empty Product',
+        is_discontinued: false,
+      });
       printful.listCatalogVariants.mockResolvedValue([]);
 
       const { refreshProductCosts } = await loadModule();
@@ -237,7 +284,9 @@ describe('Printful catalog service', () => {
 
     it('returns false for stale cost data', async () => {
       const { isCostDataFresh } = await loadModule();
-      const staleDate = new Date(Date.now() - 25 * 60 * 60 * 1000).toISOString();
+      const staleDate = new Date(
+        Date.now() - 25 * 60 * 60 * 1000
+      ).toISOString();
       const staleCost: SyncProductCost = {
         currency: 'USD',
         placements: [],
@@ -262,8 +311,22 @@ describe('Printful catalog service', () => {
       const cost: SyncProductCost = {
         currency: 'USD',
         placements: [
-          { placementId: 'front', title: null, type: null, priceCents: 1750, discountedPriceCents: 1675, techniqueKey: 'dtg' },
-          { placementId: 'back', title: null, type: null, priceCents: 1950, discountedPriceCents: 1850, techniqueKey: 'dtg' },
+          {
+            placementId: 'front',
+            title: null,
+            type: null,
+            priceCents: 1750,
+            discountedPriceCents: 1675,
+            techniqueKey: 'dtg',
+          },
+          {
+            placementId: 'back',
+            title: null,
+            type: null,
+            priceCents: 1950,
+            discountedPriceCents: 1850,
+            techniqueKey: 'dtg',
+          },
         ],
         minProductCostCents: 1675,
         maxProductCostCents: 1950,
@@ -279,7 +342,14 @@ describe('Printful catalog service', () => {
       const cost: SyncProductCost = {
         currency: 'USD',
         placements: [
-          { placementId: 'front', title: null, type: null, priceCents: 1750, discountedPriceCents: null, techniqueKey: 'dtg' },
+          {
+            placementId: 'front',
+            title: null,
+            type: null,
+            priceCents: 1750,
+            discountedPriceCents: null,
+            techniqueKey: 'dtg',
+          },
         ],
         minProductCostCents: 1750,
         maxProductCostCents: 1750,
