@@ -76,20 +76,30 @@ test('public profile renders core elements within budget', async ({ page }) => {
     'No release or listen affordance visible on public profile'
   ).toBeVisible({ timeout: 5_000 });
 
+  // System B redesign uses a bottom tab bar (Profile / Music / Events / Alerts)
+  // and an inline alerts link (?mode=subscribe). Legacy affordance selectors are
+  // kept for backward compat but most now render as <a> or aria-label buttons.
   const actionAffordances = page
     .locator(
       [
+        'a[href*="mode=subscribe"]',
         'a[href*="/tip"]',
         'a[href*="/subscribe"]',
         'a[href*="/tour"]',
         'a[href*="/contact"]',
+        'a[href*="/listen"]',
         'button:has-text("Tip")',
         'button:has-text("Follow")',
         'button:has-text("Subscribe")',
-        'button:has-text("Listen")',
         'button:has-text("Support")',
         'button:has-text("Open support")',
+        'button[aria-label="Profile"]',
+        'button[aria-label="Music"]',
+        'button[aria-label="Events"]',
+        'button[aria-label="Alerts"]',
         '[data-mode]',
+        '[data-testid="profile-home-alerts-row"]',
+        '[data-testid="profile-tab-bar"]',
       ].join(', ')
     )
     .filter({ visible: true });
