@@ -109,6 +109,11 @@ import {
   updateMerchCardStatus,
 } from '@/lib/merch/service';
 import {
+  createMerchGenerateTool,
+  createMerchPreviewTool,
+  createMerchSelectTool,
+} from '@/lib/chat/tools/merch-tools';
+import {
   albumArtGenerationBurstLimiter,
   albumArtGenerationLimiter,
   checkAiChatRateLimitForPlan,
@@ -2083,21 +2088,19 @@ function buildChatTools(
       : {}),
     ...(canAccessMerchCreation
       ? {
-          createMerch: createMerchGenerationTool({
+          createMerch: createMerchGenerateTool({
             profileId: resolvedProfileId,
             clerkUserId,
-            command: 'create_merch',
             conversationId: reservedTurn?.conversationId ?? null,
             turnId: reservedTurn?.turnId ?? null,
           }),
-          previewMerchOptions: createMerchGenerationTool({
+          previewMerchOptions: createMerchPreviewTool({
             profileId: resolvedProfileId,
             clerkUserId,
-            command: 'preview_merch_options',
             conversationId: reservedTurn?.conversationId ?? null,
             turnId: reservedTurn?.turnId ?? null,
           }),
-          selectMerchDesign: createSelectMerchDesignTool({
+          selectMerchDesign: createMerchSelectTool({
             profileId: resolvedProfileId,
             clerkUserId,
           }),
