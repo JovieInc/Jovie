@@ -1,15 +1,7 @@
 'use client';
 
-import { useQuery } from '@tanstack/react-query';
 import { useEffect, useRef, useState } from 'react';
-import { isElectronRuntime } from '@/lib/desktop/electron-bridge';
-import { STABLE_CACHE } from '@/lib/queries/cache-strategies';
-
-const POLL_INTERVAL_MS = 5 * 60 * 1000; // 5 minutes — per spec, do not poll more often
-
-interface VersionResponse {
-  buildId: string;
-}
+import { useBuildInfoQuery } from '@/lib/queries';
 
 export interface WebUpdateState {
   /** True when the server's build hash has drifted from the initial value. */
@@ -19,63 +11,41 @@ export interface WebUpdateState {
 }
 
 /**
- * useWebUpdate — polls /api/version every 5 minutes via TanStack Query.
+ * useWebUpdate — polls /api/version every 5 minutes.
  *
- * Unified behind stable query key + cache preset (refetchOnMount:false for
- * shell chrome) so concurrent/remounting consumers (titlebar, header, nav
- * during route transitions) dedupe to a single network request.
+ * On first mount it captures the initial buildId. Subsequent polls compare
+ * against that baseline; if they diverge, `available` flips to true.
  *
- * On first data it captures the initial buildId. Subsequent data compares
- * against baseline; if they diverge, `available` flips to true.
- * Hook is a no-op when running inside Electron.
+ * Polling stops once an update is detected (no need to keep polling).
+ * Hook is a no-op when running inside Electron (window.electronAPI exists),
+ * since the desktop update path is handled by electron-updater.
  */
 export function useWebUpdate(): WebUpdateState {
   const [available, setAvailable] = useState(false);
   const initialBuildId = useRef<string | null>(null);
-  const isElectron = isElectronRuntime();
 
-  const { data: buildId } = useQuery({
-    queryKey: ['web-version', 'buildId'] as const,
-    queryFn: async ({ signal }): Promise<string | null> => {
-      try {
-        const res = await fetch('/api/version', {
-          cache: 'no-store',
-          signal,
-        });
-        if (!res.ok) return null;
-        const data = (await res.json()) as VersionResponse;
-        return data.buildId ?? null;
-      } catch {
-        return null;
-      }
-    },
-    enabled: !isElectron,
-    // Use STABLE_CACHE base (refetchOnMount:false, no focus) + polling override.
-    // This prevents duplicate /api/version fetches from shell chrome remounts
-    // across dashboard inner route transitions (JOV-2201).
-    ...STABLE_CACHE,
-    staleTime: POLL_INTERVAL_MS,
-    gcTime: POLL_INTERVAL_MS * 2,
-    // Once drift is detected and the pill is shown, stop recurring polls.
-    refetchInterval: available ? false : POLL_INTERVAL_MS,
-    refetchIntervalInBackground: false,
-    refetchOnMount: false,
-    refetchOnWindowFocus: false,
-  });
+  // In Electron, skip web polling — desktop path handles updates
+  const isElectron =
+    typeof window !== 'undefined' &&
+    'electronAPI' in window &&
+    window.electronAPI != null;
+
+  const { data: buildInfo } = useBuildInfoQuery({ enabled: !isElectron });
 
   useEffect(() => {
-    if (!buildId) return;
-
-    if (initialBuildId.current === null) {
-      // First data — capture baseline
-      initialBuildId.current = buildId;
+    if (isElectron || !buildInfo?.buildId) {
       return;
     }
 
-    if (buildId !== initialBuildId.current) {
+    if (initialBuildId.current === null) {
+      initialBuildId.current = buildInfo.buildId;
+      return;
+    }
+
+    if (buildInfo.buildId !== initialBuildId.current) {
       setAvailable(true);
     }
-  }, [buildId]);
+  }, [buildInfo, isElectron]);
 
   const reload = () => {
     if (typeof window !== 'undefined') {
