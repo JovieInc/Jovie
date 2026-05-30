@@ -1203,6 +1203,70 @@ jobs:
           fail_ci_if_error: false
           verbose: true
 
+  ci-coverage-gate:
+    name: Coverage Gate
+    # Ensures PRs meet 80% patch coverage threshold
+    needs: [ci-unit-tests, ci-path-changes]
+    if: ${{ github.event_name == 'pull_request' && needs.ci-path-changes.outputs.run_test == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with: { fetch-depth: 0 }
+
+      - name: Setup Node.js and pnpm
+        uses: ./.github/actions/setup-node-pnpm
+
+      - name: Run coverage on changed files
+        run: |
+          export NODE_OPTIONS="--max-old-space-size=4096"
+          # Run vitest with coverage, only on files changed in this PR
+          git fetch origin "${{ github.base_ref }}" --depth=1
+          pnpm turbo test --affected -- run --config=vitest.config.mts --pool=forks --maxWorkers=2 --coverage --changed=origin/${{ github.base_ref }}
+
+      - name: Upload PR coverage to Codecov
+        uses: codecov/codecov-action@671740ac38dd9b0130fbe1cec585b89eea48d3de # v5
+        with:
+          directory: apps/web/coverage
+          flags: pr-coverage
+          fail_ci_if_error: true
+          verbose: true
+
+      - name: Verify patch coverage meets threshold
+        id: coverage_check
+        run: |
+          # Extract patch coverage percentage from coverage summary
+          REPORT="apps/web/coverage/coverage-summary.json"
+          if [ ! -f "$REPORT" ]; then
+            echo "❌ Coverage report not found. Tests may have failed to produce coverage."
+            exit 1
+          fi
+
+          # Get the lines coverage percentage from the summary
+          LINES_PCT=$(python3 -c "
+          import json, sys
+          with open('$REPORT') as f:
+              data = json.load(f)
+          total = data.get('total', {})
+          lines = total.get('lines', {})
+          pct = lines.get('pct', 0)
+          print(f'{pct:.1f}')
+          ")
+
+          echo "Patch coverage: ${LINES_PCT}%"
+          echo "patch_coverage=$LINES_PCT" >> $GITHUB_OUTPUT
+
+          # Compare against 80% threshold (with 5% tolerance = 75%)
+          THRESHOLD=75.0
+          MEETS=$(python3 -c "print(1 if float('$LINES_PCT') >= $THRESHOLD else 0)")
+          if [ "$MEETS" != "1" ]; then
+            echo "❌ Patch coverage ${LINES_PCT}% is below the required ${THRESHOLD}% threshold"
+            echo "   Add tests for changed files or request a human review with justification"
+            exit 1
+          else
+            echo "✅ Patch coverage ${LINES_PCT}% meets the ${THRESHOLD}% threshold"
+          fi
+
   ci-a11y:
     name: A11y (axe)
     # Runs axe-core WCAG 2.1 AA audit on public routes — uses shared build artifact.
