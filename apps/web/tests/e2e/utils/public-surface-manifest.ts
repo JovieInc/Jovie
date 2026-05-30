@@ -976,6 +976,7 @@ const EDGE_CASE_SURFACES = [
     id: 'root-not-found',
     family: 'not-found',
     expectedState: 'not-found',
+    allowedFinalDocumentStatuses: [404],
     path: '/dev/root-not-found-probe',
     resolvePath: () => '/dev/root-not-found-probe',
     readySelectors: ['[data-testid="not-found"]'],

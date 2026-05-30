@@ -10,6 +10,12 @@ export interface UrlDispositionOptions {
 
 const DEFAULT_DOCS_URL = 'https://docs.jov.ie';
 
+/** External auth provider origins that may be opened in the system browser. */
+const AUTH_PROVIDER_ORIGINS = [
+  'https://accounts.jov.ie',
+  'https://*.clerk.accounts.dev',
+] as const;
+
 const IN_APP_ROUTE_PREFIXES = [
   '/account',
   '/app',
@@ -206,11 +212,21 @@ export function isAllowedExternalUrl(
 ): boolean {
   if (parsed.protocol === 'mailto:') return true;
   if (isAllowedDocsUrl(parsed, options)) return true;
+  if (isAllowedAuthProviderUrl(parsed)) return true;
 
   return (
     isAppOriginUrl(parsed, options) &&
     isAllowedSameOriginExternalPath(parsed.pathname)
   );
+}
+
+function isAllowedAuthProviderUrl(parsed: URL): boolean {
+  return AUTH_PROVIDER_ORIGINS.some(origin => {
+    if (!origin.includes('*')) return parsed.origin === origin;
+    // Wildcard matching: https://*.clerk.accounts.dev
+    const base = origin.replace('*.', '.');
+    return parsed.origin.endsWith(base) && parsed.protocol === 'https:';
+  });
 }
 
 export function getUrlDisposition(
