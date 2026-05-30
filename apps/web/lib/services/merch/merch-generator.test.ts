@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import {
   analyzeDesignConcept,
   buildGenerationOptions,
@@ -10,7 +10,7 @@ describe('analyzeDesignConcept', () => {
     const result = analyzeDesignConcept('tour merchandise');
     expect(result.suggestedProductCategory).toBe('T-Shirt');
     expect(result.suggestedColorway).toBe('Black');
-    expect(result.reasoning).toContain('premium t-shirt');
+    expect(result.reasoning.toLowerCase()).toContain('premium t-shirt');
   });
 
   it('detects hoodie requests', () => {

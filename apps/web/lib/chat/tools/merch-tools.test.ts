@@ -51,7 +51,7 @@ describe('merch tool schemas', () => {
     // With optionId
     const validById = schema.safeParse({
       generationId: '00000000-0000-0000-0000-000000000000',
-      optionId: '00000000-0000-0000-0000-000000000001',
+      optionId: 'ffffffff-ffff-ffff-ffff-ffffffffffff',
     });
     expect(validById.success).toBe(true);
   });
