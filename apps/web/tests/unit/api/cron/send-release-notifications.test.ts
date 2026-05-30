@@ -69,6 +69,7 @@ vi.mock('@/lib/db/schema/dsp-enrichment', () => ({
     id: 'fanReleaseNotifications.id',
     creatorProfileId: 'fanReleaseNotifications.creatorProfileId',
     releaseId: 'fanReleaseNotifications.releaseId',
+    campaignId: 'fanReleaseNotifications.campaignId', // JOV-2211
     notificationSubscriptionId:
       'fanReleaseNotifications.notificationSubscriptionId',
     notificationType: 'fanReleaseNotifications.notificationType',

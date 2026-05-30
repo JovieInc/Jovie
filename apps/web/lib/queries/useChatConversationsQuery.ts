@@ -58,8 +58,15 @@ export function useChatConversationsQuery({
   enabled = true,
 }: ConversationsOptions = {}) {
   return useQuery({
-    queryKey: queryKeys.chat.conversations(limit),
-    queryFn: ({ signal }) => fetchConversations(limit, signal),
+    // Stable key (limit omitted from key) unifies shell chrome callers
+    // (nav=10, palette=10, threads=50) behind one cache entry + preset
+    // (FREQUENT_BACKGROUND_CACHE has refetchOnMount:false to prevent
+    // duplicate /api/chat/conversations on inner dashboard route transitions).
+    queryKey: queryKeys.chat.conversations(),
+    // Always fetch a canonical high limit (50) under the stable key so every
+    // shell consumer (regardless of requested limit) gets the full recent set
+    // from one network call; small-limit UIs just render a prefix.
+    queryFn: ({ signal }) => fetchConversations(Math.max(50, limit), signal),
     enabled,
     ...FREQUENT_BACKGROUND_CACHE,
   });

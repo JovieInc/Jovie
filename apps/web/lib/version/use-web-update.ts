@@ -11,14 +11,15 @@ export interface WebUpdateState {
 }
 
 /**
- * useWebUpdate — polls /api/version every 5 minutes.
+ * useWebUpdate — uses the shared build-info query (via TanStack, 5min poll)
+ * to detect web deployments without causing duplicate /api/version or
+ * /api/health/build-info calls on shell chrome remounts.
  *
- * On first mount it captures the initial buildId. Subsequent polls compare
- * against that baseline; if they diverge, `available` flips to true.
+ * Delegates to the stable-key useBuildInfoQuery (STATIC_CACHE semantics
+ * via its internals + shell persistence keeps the query mounted).
+ * On first mount captures baseline; drift sets available.
  *
- * Polling stops once an update is detected (no need to keep polling).
- * Hook is a no-op when running inside Electron (window.electronAPI exists),
- * since the desktop update path is handled by electron-updater.
+ * No-op in Electron.
  */
 export function useWebUpdate(): WebUpdateState {
   const [available, setAvailable] = useState(false);

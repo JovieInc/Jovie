@@ -40,6 +40,7 @@ interface PendingNotification {
   id: string;
   creatorProfileId: string;
   releaseId: string;
+  campaignId?: string | null; // JOV-2211
   notificationSubscriptionId: string;
   notificationType: string;
   metadata: unknown;
@@ -139,6 +140,7 @@ async function fetchPendingNotifications(
       id: fanReleaseNotifications.id,
       creatorProfileId: fanReleaseNotifications.creatorProfileId,
       releaseId: fanReleaseNotifications.releaseId,
+      campaignId: fanReleaseNotifications.campaignId, // JOV-2211
       notificationSubscriptionId:
         fanReleaseNotifications.notificationSubscriptionId,
       notificationType: fanReleaseNotifications.notificationType,
