@@ -109,22 +109,28 @@ export const sellableVariantSchema = z.object({
 // ---------------------------------------------------------------------------
 
 export const DEFAULT_SIZE_MATRIX: readonly string[] = [
-  'XS', 'S', 'M', 'L', 'XL', '2XL', '3XL',
+  'XS',
+  'S',
+  'M',
+  'L',
+  'XL',
+  '2XL',
+  '3XL',
 ];
 
 export const DEFAULT_COLOR_MATRIX: readonly string[] = [
-  'Black', 'White', 'Navy', 'Gray', 'Heather',
+  'Black',
+  'White',
+  'Navy',
+  'Gray',
+  'Heather',
 ];
 
 // ---------------------------------------------------------------------------
 // Variant generation
 // ---------------------------------------------------------------------------
 
-function generateSku(
-  productId: number,
-  size: string,
-  color: string
-): string {
+function generateSku(productId: number, size: string, color: string): string {
   const sizeCode = size.replace(/[^A-Za-z0-9]/g, '').toUpperCase();
   const colorCode = color.replace(/[^A-Za-z0-9]/g, '').toUpperCase();
   return `MRCH-${productId}-${sizeCode}-${colorCode}`;
@@ -147,9 +153,7 @@ export function expandVariants(
   input: VariantPipelineInput
 ): VariantPipelineOutput {
   const sizes = input.sizes.length > 0 ? input.sizes : DEFAULT_SIZE_MATRIX;
-  const colors = input.colors.length > 0
-    ? input.colors
-    : DEFAULT_COLOR_MATRIX;
+  const colors = input.colors.length > 0 ? input.colors : DEFAULT_COLOR_MATRIX;
   const variants: VariantDefinition[] = [];
   let unavailableCount = 0;
 
@@ -173,7 +177,10 @@ export function expandVariants(
         sku: generateSku(input.productId, size, color),
         baseCostCents: input.baseCostCents,
         retailPriceCents,
-        profitCents: calculateProfitCents(retailPriceCents, input.baseCostCents),
+        profitCents: calculateProfitCents(
+          retailPriceCents,
+          input.baseCostCents
+        ),
         isAvailable,
       });
     }
@@ -187,10 +194,7 @@ export function expandVariants(
     (sum, v) => sum + v.retailPriceCents,
     0
   );
-  const totalProfitCents = variants.reduce(
-    (sum, v) => sum + v.profitCents,
-    0
-  );
+  const totalProfitCents = variants.reduce((sum, v) => sum + v.profitCents, 0);
 
   return {
     variants,
@@ -236,9 +240,7 @@ export function createSellableVariants(
 /**
  * Build a pricing summary for display in the merch UI.
  */
-export function buildPricingSummary(
-  variants: readonly SellableVariant[]
-): {
+export function buildPricingSummary(variants: readonly SellableVariant[]): {
   readonly minPriceCents: number;
   readonly maxPriceCents: number;
   readonly avgPriceCents: number;

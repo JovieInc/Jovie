@@ -187,9 +187,10 @@ export async function generateMockups(
             variantId,
             placement: 'front',
             printFileUrl,
-            status: mockupUrls.length > 0
-              ? MockupTaskStatus.COMPLETED
-              : MockupTaskStatus.PENDING,
+            status:
+              mockupUrls.length > 0
+                ? MockupTaskStatus.COMPLETED
+                : MockupTaskStatus.PENDING,
             mockupUrls,
           });
         }
@@ -213,9 +214,8 @@ export async function generateMockups(
   return {
     tasks,
     failedCount,
-    completedCount: tasks.filter(
-      t => t.status === MockupTaskStatus.COMPLETED
-    ).length,
+    completedCount: tasks.filter(t => t.status === MockupTaskStatus.COMPLETED)
+      .length,
   };
 }
 

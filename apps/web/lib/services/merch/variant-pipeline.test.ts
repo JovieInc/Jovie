@@ -1,14 +1,16 @@
-import { describe, it, expect } from 'vitest';
+import { describe, expect, it } from 'vitest';
+import type { VariantPipelineInput } from './variant-pipeline';
 import {
-  expandVariants,
-  createSellableVariants,
   buildPricingSummary,
-  DEFAULT_SIZE_MATRIX,
+  createSellableVariants,
   DEFAULT_COLOR_MATRIX,
+  DEFAULT_SIZE_MATRIX,
+  expandVariants,
 } from './variant-pipeline';
-import type { VariantPipelineInput, VariantPipelineOutput } from './variant-pipeline';
 
-function makeInput(overrides?: Partial<VariantPipelineInput>): VariantPipelineInput {
+function makeInput(
+  overrides?: Partial<VariantPipelineInput>
+): VariantPipelineInput {
   return {
     designOptionId: 'design-1',
     productId: 71,
@@ -108,7 +110,7 @@ describe('buildPricingSummary', () => {
       { priceCents: 1000, profitCents: 300 },
       { priceCents: 2000, profitCents: 500 },
       { priceCents: 3000, profitCents: 700 },
-    ] as Parameters<typeof buildPricingSummary>[0];
+    ] as unknown as Parameters<typeof buildPricingSummary>[0];
 
     const summary = buildPricingSummary(variants);
     expect(summary.minPriceCents).toBe(1000);

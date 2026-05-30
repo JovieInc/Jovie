@@ -1,8 +1,8 @@
-import { describe, it, expect } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import {
   generateMockups,
-  pollMockupTaskStatus,
   MockupTaskStatus,
+  pollMockupTaskStatus,
 } from './mockup-generator';
 
 describe('generateMockups', () => {
@@ -16,6 +16,7 @@ describe('generateMockups', () => {
 
   const products = [
     {
+      id: 'prod-1',
       productId: 71,
       name: 'Premium T-Shirt',
       variantIds: [4009, 4010],
@@ -25,8 +26,7 @@ describe('generateMockups', () => {
 
   it('generates placeholder mockups by default', async () => {
     const result = await generateMockups(designOption, products);
-
-    expect(result.tasks).toHaveLength(2); // 2 variants
+    expect(result.tasks).toHaveLength(2);
     expect(result.completedCount).toBe(2);
     expect(result.failedCount).toBe(0);
     expect(result.tasks[0].status).toBe(MockupTaskStatus.COMPLETED);
@@ -35,7 +35,6 @@ describe('generateMockups', () => {
   it('returns mockups with placeholder URLs', async () => {
     const result = await generateMockups(designOption, products);
     const task = result.tasks[0];
-
     expect(task.mockupUrls).toHaveLength(1);
     expect(task.mockupUrls[0]).toContain('/api/merch/mockup/placeholder');
     expect(task.mockupUrls[0]).toContain('productId=71');
@@ -43,7 +42,6 @@ describe('generateMockups', () => {
 
   it('sets correct metadata on each task', async () => {
     const result = await generateMockups(designOption, products);
-
     expect(result.tasks[0].designOptionId).toBe('design-1');
     expect(result.tasks[0].productId).toBe(71);
     expect(result.tasks[0].variantId).toBe(4009);
@@ -55,9 +53,7 @@ describe('generateMockups', () => {
     const before = Date.now();
     const result = await generateMockups(designOption, products);
     const after = Date.now();
-
     for (const task of result.tasks) {
-      // task.id is formatted as mockup-{designOptionId}-{productId}-{variantId}-{timestamp}
       const parts = task.id.split('-');
       const timestamp = Number(parts[parts.length - 1]);
       expect(timestamp).toBeGreaterThanOrEqual(before - 1000);
@@ -85,7 +81,7 @@ describe('pollMockupTaskStatus', () => {
     expect(result[0].status).toBe(MockupTaskStatus.COMPLETED);
   });
 
-  it('returns tasks unchanged when processing tasks exist (no-op until API integration)', async () => {
+  it('returns tasks unchanged when processing tasks exist', async () => {
     const tasks = [
       {
         id: 'task-2',
