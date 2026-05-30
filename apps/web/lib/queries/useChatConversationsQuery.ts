@@ -1,6 +1,7 @@
 'use client';
 
 import { useQuery } from '@tanstack/react-query';
+import { FREQUENT_BACKGROUND_CACHE } from './cache-strategies';
 import { fetchWithTimeout } from './fetch';
 import { queryKeys } from './keys';
 
@@ -60,7 +61,6 @@ export function useChatConversationsQuery({
     queryKey: queryKeys.chat.conversations(limit),
     queryFn: ({ signal }) => fetchConversations(limit, signal),
     enabled,
-    staleTime: 30_000, // 30 seconds
-    gcTime: 5 * 60 * 1000, // 5 minutes
+    ...FREQUENT_BACKGROUND_CACHE,
   });
 }

@@ -116,7 +116,8 @@ async function scheduleNotificationsForRelease(
     title: string | null;
     releaseDate: Date;
   },
-  now: Date
+  now: Date,
+  options?: { campaignId?: string | null; segment?: string | null }
 ): Promise<number> {
   let lastId = '';
   let pendingBatch: NotificationInsertValue[] = [];
@@ -157,17 +158,25 @@ async function scheduleNotificationsForRelease(
       .limit(SUBSCRIBER_PAGE_SIZE);
 
     for (const subscriber of page) {
+      const campaignId = options?.campaignId ?? null;
+      const segment = options?.segment ?? null;
+      const dedupKey = campaignId
+        ? `campaign:${campaignId}:${subscriber.id}`
+        : `release_day:${release.id}:${subscriber.id}`;
       pendingBatch.push({
         creatorProfileId: release.creatorProfileId,
         releaseId: release.id,
+        campaignId,
         notificationSubscriptionId: subscriber.id,
         notificationType: 'release_day',
         scheduledFor: release.releaseDate,
         status: 'pending',
-        dedupKey: `release_day:${release.id}:${subscriber.id}`,
+        dedupKey,
         metadata: {
           releaseTitle: release.title,
           channel: subscriber.channel,
+          ...(segment && { segment }),
+          ...(campaignId && { campaignId }),
         },
       });
 

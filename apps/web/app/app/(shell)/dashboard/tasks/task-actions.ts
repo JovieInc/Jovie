@@ -1,5 +1,11 @@
 'use server';
 
+/**
+ * Task server actions for dashboard/tasks surface.
+ * Shell persistence (JOV-2201) relies on stable query keys + refetchOnMount:false
+ * in chrome hooks so inner nav (tasks <-> releases) does not retrigger /api/version etc.
+ */
+
 import {
   and,
   asc,

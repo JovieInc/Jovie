@@ -1,7 +1,7 @@
 'use client';
 
 import { useQuery } from '@tanstack/react-query';
-import { FREQUENT_CACHE } from './cache-strategies';
+import { FREQUENT_BACKGROUND_CACHE } from './cache-strategies';
 import { createQueryFn, FetchError } from './fetch';
 import { queryKeys } from './keys';
 
@@ -60,8 +60,10 @@ async function fetchBillingStatus({
 export const billingStatusQueryOptions = {
   queryKey: queryKeys.billing.status(),
   queryFn: fetchBillingStatus,
-  // FREQUENT_CACHE: 1 min stale, 10 min gc - appropriate for billing data
-  ...FREQUENT_CACHE,
+  // FREQUENT_BACKGROUND_CACHE (refetchOnMount:false + no focus) for shell chrome.
+  // Prevents duplicate /api/billing/status calls on dashboard route transitions
+  // while keeping 1m stale for freshness (JOV-2201).
+  ...FREQUENT_BACKGROUND_CACHE,
   // Billing endpoint can return 503 when billing systems are transiently down.
   // Allow 1 retry with backoff for transient failures (5xx/429/408).
   // Don't retry 4xx client errors — they won't self-heal.
@@ -72,16 +74,14 @@ export const billingStatusQueryOptions = {
     return failureCount < 1;
   },
   retryDelay: (attempt: number) => Math.min(1000 * 2 ** attempt, 10000),
-  // Mutations already invalidate this query, so focus-based refetching is noise.
-  refetchOnWindowFocus: false,
 } as const;
 
 /**
  * Query hook for fetching user billing status.
  *
  * Replaces the manual useBillingStatus hook with TanStack Query benefits:
- * - Automatic caching (1 min stale time via FREQUENT_CACHE)
- * - Background refetching
+ * - Automatic caching (1 min stale via FREQUENT_BACKGROUND_CACHE for shell)
+ * - Background refetching (no mount/focus spam on route transitions)
  * - Deduplication of concurrent requests
  * - Optimistic UI support via queryClient
  *
