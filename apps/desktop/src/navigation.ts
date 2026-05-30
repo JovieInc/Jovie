@@ -60,6 +60,7 @@ const SAME_ORIGIN_EXTERNAL_ROUTE_PREFIXES = [
   '/pricing',
   '/renders',
   '/support',
+  '/auth/start',
 ] as const;
 
 const PUBLIC_PROFILE_RESERVED_ROOT_SEGMENTS = new Set([
