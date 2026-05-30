@@ -1,37 +1,43 @@
 <?xml version="1.0" encoding="UTF-8" ?>
-<testsuites name="vitest tests" tests="9" failures="0" errors="0" time="0.19153963">
-    <testsuite name="tests/unit/organisms/TipSection.test.tsx" timestamp="2026-02-23T05:58:00.278Z" hostname="runnervmwffz4" tests="7" failures="0" errors="0" skipped="0" time="0.185314512">
-        <testcase classname="tests/unit/organisms/TipSection.test.tsx" name="TipSection &gt; shows success toast when Stripe payment succeeds" time="0.055391505">
+<testsuites name="vitest tests" tests="18" failures="0" errors="0" time="0.216230916">
+    <testsuite name="tests/unit/chat/confirm-edit-route.test.ts" timestamp="2026-05-30T21:01:31.177Z" hostname="mac.lan" tests="11" failures="0" errors="0" skipped="0" time="0.008111708">
+        <testcase classname="tests/unit/chat/confirm-edit-route.test.ts" name="POST /api/chat/confirm-edit &gt; returns 401 when not authenticated" time="0.002474667">
         </testcase>
-        <testcase classname="tests/unit/organisms/TipSection.test.tsx" name="TipSection &gt; shows error toast when Stripe payment fails" time="0.011712775">
-            <system-err>
-[ERROR] Tip payment failed {
-  &quot;message&quot;: &quot;Payment failed&quot;,
-  &quot;stack&quot;: &quot;Error: Payment failed\n    at /home/runner/work/Jovie/Jovie/apps/web/tests/unit/organisms/TipSection.test.tsx:61:47\n    at file:///home/runner/work/Jovie/Jovie/node_modules/.pnpm/@vitest+runner@4.0.18/node_modules/@vitest/runner/dist/index.js:145:11\n    at file:///home/runner/work/Jovie/Jovie/node_modules/.pnpm/@vitest+runner@4.0.18/node_modules/@vitest/runner/dist/index.js:915:26\n    at file:///home/runner/work/Jovie/Jovie/node_modules/.pnpm/@vitest+runner@4.0.18/node_modules/@vitest/runner/dist/index.js:1243:20\n    at new Promise (&lt;anonymous&gt;)\n    at runWithTimeout (file:///home/runner/work/Jovie/Jovie/node_modules/.pnpm/@vitest+runner@4.0.18/node_modules/@vitest/runner/dist/index.js:1209:10)\n    at file:///home/runner/work/Jovie/Jovie/node_modules/.pnpm/@vitest+runner@4.0.18/node_modules/@vitest/runner/dist/index.js:1653:37\n    at Traces.$ (file:///home/runner/work/Jovie/Jovie/node_modules/.pnpm/vitest@4.0.18_@opentelemetry+api@1.9.0_@types+node@25.0.3_@vitest+browser-playwright@4.0.18_j_fxxl7ayq2proqgahacydracwhm/node_modules/vitest/dist/chunks/traces.CCmnQaNT.js:142:27)\n    at trace (file:///home/runner/work/Jovie/Jovie/node_modules/.pnpm/vitest@4.0.18_@opentelemetry+api@1.9.0_@types+node@25.0.3_@vitest+browser-playwright@4.0.18_j_fxxl7ayq2proqgahacydracwhm/node_modules/vitest/dist/chunks/test.B8ej_ZHS.js:239:21)\n    at runTest (file:///home/runner/work/Jovie/Jovie/node_modules/.pnpm/@vitest+runner@4.0.18/node_modules/@vitest/runner/dist/index.js:1653:12)&quot;,
-  &quot;type&quot;: &quot;Error&quot;,
-  &quot;handle&quot;: &quot;artist123&quot;,
-  &quot;amount&quot;: 2,
-  &quot;paymentMethod&quot;: &quot;stripe&quot;,
-  &quot;sentryMode&quot;: &quot;none&quot;
-}
-
-            </system-err>
+        <testcase classname="tests/unit/chat/confirm-edit-route.test.ts" name="POST /api/chat/confirm-edit &gt; returns 400 for invalid JSON body" time="0.000568833">
         </testcase>
-        <testcase classname="tests/unit/organisms/TipSection.test.tsx" name="TipSection &gt; renders payment method selection when both Stripe and Venmo are available" time="0.046648014">
+        <testcase classname="tests/unit/chat/confirm-edit-route.test.ts" name="POST /api/chat/confirm-edit &gt; returns 400 for missing required fields" time="0.000991959">
         </testcase>
-        <testcase classname="tests/unit/organisms/TipSection.test.tsx" name="TipSection &gt; calls onVenmoPayment with a properly constructed URL when Venmo is used" time="0.033678443">
+        <testcase classname="tests/unit/chat/confirm-edit-route.test.ts" name="POST /api/chat/confirm-edit &gt; returns 400 for invalid field name" time="0.000361625">
         </testcase>
-        <testcase classname="tests/unit/organisms/TipSection.test.tsx" name="TipSection &gt; renders QR code fallback when no Stripe or Venmo payment methods are available" time="0.007790569">
+        <testcase classname="tests/unit/chat/confirm-edit-route.test.ts" name="POST /api/chat/confirm-edit &gt; returns 400 for non-UUID profileId" time="0.000440292">
         </testcase>
-        <testcase classname="tests/unit/organisms/TipSection.test.tsx" name="TipSection &gt; returns to payment method selection when back button is clicked after choosing a payment method" time="0.020595402">
+        <testcase classname="tests/unit/chat/confirm-edit-route.test.ts" name="POST /api/chat/confirm-edit &gt; returns 404 when profile is not found" time="0.000425042">
         </testcase>
-        <testcase classname="tests/unit/organisms/TipSection.test.tsx" name="TipSection &gt; renders Venmo payment flow directly when only Venmo is available" time="0.007841326">
+        <testcase classname="tests/unit/chat/confirm-edit-route.test.ts" name="POST /api/chat/confirm-edit &gt; returns 403 when profile belongs to a different user" time="0.000250542">
+        </testcase>
+        <testcase classname="tests/unit/chat/confirm-edit-route.test.ts" name="POST /api/chat/confirm-edit &gt; returns 200 and updates displayName in database" time="0.000400959">
+        </testcase>
+        <testcase classname="tests/unit/chat/confirm-edit-route.test.ts" name="POST /api/chat/confirm-edit &gt; returns 200 and updates bio in database" time="0.000550959">
+        </testcase>
+        <testcase classname="tests/unit/chat/confirm-edit-route.test.ts" name="POST /api/chat/confirm-edit &gt; creates an audit log entry" time="0.000783541">
+        </testcase>
+        <testcase classname="tests/unit/chat/confirm-edit-route.test.ts" name="POST /api/chat/confirm-edit &gt; returns 500 when database operation fails" time="0.000307458">
         </testcase>
     </testsuite>
-    <testsuite name="tests/unit/lib/db/client/retry.test.ts" timestamp="2026-02-23T05:58:00.280Z" hostname="runnervmwffz4" tests="2" failures="0" errors="0" skipped="0" time="0.006225118">
-        <testcase classname="tests/unit/lib/db/client/retry.test.ts" name="withRetry circuit breaker &gt; fails fast with DbCircuitOpenError when circuit is open" time="0.003738909">
+    <testsuite name="tests/unit/api/chat/confirm-edit.test.ts" timestamp="2026-05-30T21:01:31.178Z" hostname="mac.lan" tests="7" failures="0" errors="0" skipped="0" time="0.208119208">
+        <testcase classname="tests/unit/api/chat/confirm-edit.test.ts" name="POST /api/chat/confirm-edit &gt; returns 401 when unauthenticated" time="0.204414166">
         </testcase>
-        <testcase classname="tests/unit/lib/db/client/retry.test.ts" name="withRetry circuit breaker &gt; exposes status and retryAfterSeconds on circuit open error" time="0.001288974">
+        <testcase classname="tests/unit/api/chat/confirm-edit.test.ts" name="POST /api/chat/confirm-edit &gt; returns 400 for invalid JSON body" time="0.000848166">
+        </testcase>
+        <testcase classname="tests/unit/api/chat/confirm-edit.test.ts" name="POST /api/chat/confirm-edit &gt; returns 400 for invalid schema" time="0.000869291">
+        </testcase>
+        <testcase classname="tests/unit/api/chat/confirm-edit.test.ts" name="POST /api/chat/confirm-edit &gt; returns 404 when profile not found" time="0.000348458">
+        </testcase>
+        <testcase classname="tests/unit/api/chat/confirm-edit.test.ts" name="POST /api/chat/confirm-edit &gt; returns 403 when profile belongs to another user" time="0.000440416">
+        </testcase>
+        <testcase classname="tests/unit/api/chat/confirm-edit.test.ts" name="POST /api/chat/confirm-edit &gt; successfully applies edit and returns success" time="0.000367792">
+        </testcase>
+        <testcase classname="tests/unit/api/chat/confirm-edit.test.ts" name="POST /api/chat/confirm-edit &gt; returns 500 on DB error and reports to Sentry" time="0.000254125">
         </testcase>
     </testsuite>
 </testsuites>

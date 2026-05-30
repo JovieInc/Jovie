@@ -25,6 +25,9 @@ export interface ReleaseDayNotificationData {
   streamingLinks: Array<{ providerId: string; url: string }>;
   /** Subscriber's name for personalized greeting */
   subscriberName?: string | null;
+  /** Optional campaign context for campaign-aware fan notifications (JOV-2211) */
+  campaignId?: string | null;
+  campaignName?: string | null;
 }
 
 /**
@@ -55,6 +58,9 @@ function getProviderLabel(providerId: string): string {
 export function getReleaseDayNotificationSubject(
   data: ReleaseDayNotificationData
 ): string {
+  if (data.campaignName) {
+    return `${data.artistName} — ${data.campaignName}`;
+  }
   return `${data.artistName} just dropped new music`;
 }
 
@@ -81,11 +87,13 @@ export function getReleaseDayNotificationText(
     .map(link => `- ${getProviderLabel(link.providerId)}: ${link.url}`)
     .join('\n');
 
+  const campaignLine = data.campaignName
+    ? `Part of: ${data.campaignName}\n\n`
+    : '';
   return `${greeting}${artistName} just dropped new music
 
 "${releaseTitle}" is out now.
-
-Listen here:
+${campaignLine}Listen here:
 ${linksList}
 
 Or view all platforms: ${releaseUrl}
@@ -265,5 +273,21 @@ export function getReleaseDayNotificationEmail(
     text: getReleaseDayNotificationText(data),
     html: getReleaseDayNotificationHtml(data),
     headers: getReleaseDayUnsubscribeHeaders(data.username),
+  };
+}
+
+/**
+ * Build a preview for campaign-aware fan notification (draft -> preview step in JOV-2211).
+ * Renders the template with campaign + fan context for the demo scheduling flow.
+ */
+export function buildFanNotificationPreview(data: ReleaseDayNotificationData): {
+  subject: string;
+  text: string;
+  html: string;
+} {
+  return {
+    subject: getReleaseDayNotificationSubject(data),
+    text: getReleaseDayNotificationText(data),
+    html: getReleaseDayNotificationHtml(data),
   };
 }

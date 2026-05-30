@@ -1,6 +1,8 @@
 'use client';
 
+import { useQuery } from '@tanstack/react-query';
 import { useEffect, useRef, useState } from 'react';
+import { STABLE_CACHE } from '@/lib/queries/cache-strategies';
 
 const POLL_INTERVAL_MS = 5 * 60 * 1000; // 5 minutes — per spec, do not poll more often
 
@@ -16,78 +18,66 @@ export interface WebUpdateState {
 }
 
 /**
- * useWebUpdate — polls /api/version every 5 minutes.
+ * useWebUpdate — polls /api/version every 5 minutes via TanStack Query.
  *
- * On first mount it captures the initial buildId. Subsequent polls compare
- * against that baseline; if they diverge, `available` flips to true.
+ * Unified behind stable query key + cache preset (refetchOnMount:false for
+ * shell chrome) so concurrent/remounting consumers (titlebar, header, nav
+ * during route transitions) dedupe to a single network request.
  *
- * Polling stops once an update is detected (no need to keep polling).
- * Hook is a no-op when running inside Electron (window.electronAPI exists),
- * since the desktop update path is handled by electron-updater.
+ * On first data it captures the initial buildId. Subsequent data compares
+ * against baseline; if they diverge, `available` flips to true.
+ * Hook is a no-op when running inside Electron (window.electronAPI exists).
  */
 export function useWebUpdate(): WebUpdateState {
   const [available, setAvailable] = useState(false);
   const initialBuildId = useRef<string | null>(null);
-  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  useEffect(() => {
-    // In Electron, skip web polling — desktop path handles updates
-    if (
-      typeof window !== 'undefined' &&
-      'electronAPI' in window &&
-      window.electronAPI != null
-    ) {
-      return;
-    }
+  const isElectron =
+    typeof window !== 'undefined' &&
+    'electronAPI' in window &&
+    window.electronAPI != null;
 
-    let cancelled = false;
-
-    async function fetchBuildId(): Promise<string | null> {
+  const { data: buildId } = useQuery({
+    queryKey: ['web-version', 'buildId'] as const,
+    queryFn: async ({ signal }): Promise<string | null> => {
       try {
-        const res = await fetch('/api/version', { cache: 'no-store' });
+        const res = await fetch('/api/version', {
+          cache: 'no-store',
+          signal,
+        });
         if (!res.ok) return null;
         const data = (await res.json()) as VersionResponse;
         return data.buildId ?? null;
       } catch {
         return null;
       }
+    },
+    enabled: !isElectron,
+    // Use STABLE_CACHE base (refetchOnMount:false, no focus) + polling override.
+    // This prevents duplicate /api/version fetches from shell chrome remounts
+    // across dashboard inner route transitions (JOV-2201).
+    ...STABLE_CACHE,
+    staleTime: POLL_INTERVAL_MS,
+    gcTime: POLL_INTERVAL_MS * 2,
+    refetchInterval: POLL_INTERVAL_MS,
+    refetchIntervalInBackground: false,
+    refetchOnMount: false,
+    refetchOnWindowFocus: false,
+  });
+
+  useEffect(() => {
+    if (!buildId) return;
+
+    if (initialBuildId.current === null) {
+      // First data — capture baseline
+      initialBuildId.current = buildId;
+      return;
     }
 
-    async function poll() {
-      if (cancelled) return;
-      const buildId = await fetchBuildId();
-      if (cancelled || buildId == null) return;
-
-      if (initialBuildId.current === null) {
-        // First poll — capture baseline
-        initialBuildId.current = buildId;
-        return;
-      }
-
-      if (buildId !== initialBuildId.current) {
-        setAvailable(true);
-        // Stop polling once we've detected drift
-        if (intervalRef.current !== null) {
-          clearInterval(intervalRef.current);
-          intervalRef.current = null;
-        }
-      }
+    if (buildId !== initialBuildId.current) {
+      setAvailable(true);
     }
-
-    // Kick off initial capture, then schedule recurring polls
-    void poll();
-    intervalRef.current = setInterval(() => {
-      void poll();
-    }, POLL_INTERVAL_MS);
-
-    return () => {
-      cancelled = true;
-      if (intervalRef.current !== null) {
-        clearInterval(intervalRef.current);
-        intervalRef.current = null;
-      }
-    };
-  }, []);
+  }, [buildId]);
 
   const reload = () => {
     if (typeof window !== 'undefined') {
