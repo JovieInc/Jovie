@@ -282,6 +282,29 @@ describe('OnboardingChat Turnstile gating', () => {
 
     expect(analyticsMocks.track).toHaveBeenCalledTimes(1);
     expect(onConversationActivity).toHaveBeenCalledTimes(2);
+
+    chatMocks.messages = [];
+    rerender(
+      <TurnstileHarness onConversationActivity={onConversationActivity} />
+    );
+    chatMocks.messages = [
+      {
+        id: 'message-5',
+        role: 'user',
+        parts: [{ type: 'text', text: 'new chat' }],
+      },
+      {
+        id: 'message-6',
+        role: 'assistant',
+        parts: [{ type: 'text', text: 'new chat ready' }],
+      },
+    ];
+    rerender(
+      <TurnstileHarness onConversationActivity={onConversationActivity} />
+    );
+
+    expect(analyticsMocks.track).toHaveBeenCalledTimes(2);
+    expect(onConversationActivity).toHaveBeenCalledTimes(3);
   });
 
   it('resets rejected Turnstile tokens, preserves the failed message, and blocks retry until fresh verification', () => {

@@ -868,6 +868,12 @@ export function OnboardingChat({
   }, [onProfileBuilderChange, profileBuilderState]);
 
   useEffect(() => {
+    if (messages.length > 0) return;
+    completedUserTurnsRef.current = 0;
+    hasTrackedChatCompletedRef.current = false;
+  }, [messages.length]);
+
+  useEffect(() => {
     if (status !== 'ready') return;
     const completedUserTurns = messages.filter(
       message => message.role === 'user'

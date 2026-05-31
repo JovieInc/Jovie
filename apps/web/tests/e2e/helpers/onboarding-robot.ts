@@ -11,6 +11,10 @@ import {
   waitForClerkSignInApi,
 } from '@/tests/helpers/clerk-auth';
 import {
+  type OnboardingRobotEnv,
+  onboardingRobotEnv,
+} from '../utils/onboarding-robot-env';
+import {
   buildProductionSignupEmail,
   isProductionSyntheticSignupEmail,
 } from '../utils/production-signup-canary';
@@ -40,11 +44,17 @@ type CleanupTarget = Pick<
   'clerkUserId' | 'email' | 'handle' | 'runId'
 >;
 
-type CleanupEnv = Record<string, string | undefined> & {
-  readonly CLERK_SECRET_KEY?: string;
-  readonly DATABASE_URL?: string;
-  readonly E2E_PROD_SIGNUP_EMAIL_BASE?: string;
-};
+type CleanupEnv = Pick<OnboardingRobotEnv, 'E2E_PROD_SIGNUP_EMAIL_BASE'>;
+
+type RobotRuntimeEnv = Pick<
+  OnboardingRobotEnv,
+  | 'CLERK_SECRET_KEY'
+  | 'DATABASE_URL'
+  | 'E2E_PROD_SIGNUP_EMAIL_BASE'
+  | 'E2E_SYNTHETIC_MODE'
+>;
+
+const runtimeEnv: RobotRuntimeEnv = onboardingRobotEnv;
 
 const LOCAL_ROBOT_EMAIL_REGEX =
   /^gp-or-[a-z0-9-]+\+clerk_test@test\.jovie\.com$/;
@@ -97,7 +107,7 @@ export function isProductionOnboardingRobotEmail(
 
 export function assertOnboardingRobotCleanupTarget(
   target: CleanupTarget,
-  env: CleanupEnv = process.env
+  env: CleanupEnv = runtimeEnv
 ): void {
   const emailIsScoped =
     isLocalOnboardingRobotEmail(target.email) ||
@@ -131,13 +141,13 @@ export function assertOnboardingRobotCleanupTarget(
 
 export function shouldUseProductionRobotAuth(): boolean {
   return (
-    process.env.E2E_SYNTHETIC_MODE === 'true' &&
-    Boolean(process.env.E2E_PROD_SIGNUP_EMAIL_BASE?.trim())
+    runtimeEnv.E2E_SYNTHETIC_MODE === 'true' &&
+    Boolean(runtimeEnv.E2E_PROD_SIGNUP_EMAIL_BASE?.trim())
   );
 }
 
 function requireClerkSecret(): string {
-  const secretKey = process.env.CLERK_SECRET_KEY?.trim();
+  const secretKey = runtimeEnv.CLERK_SECRET_KEY?.trim();
   if (!secretKey) {
     throw new Error('CLERK_SECRET_KEY required for onboarding robot user');
   }
@@ -147,7 +157,7 @@ function requireClerkSecret(): string {
 async function createProductionOnboardingRobotUser(
   runId: string
 ): Promise<OnboardingRobotUser> {
-  const baseEmail = process.env.E2E_PROD_SIGNUP_EMAIL_BASE?.trim();
+  const baseEmail = runtimeEnv.E2E_PROD_SIGNUP_EMAIL_BASE?.trim();
   if (!baseEmail) {
     throw new Error(
       'E2E_PROD_SIGNUP_EMAIL_BASE required for production onboarding robot'
@@ -324,7 +334,7 @@ export async function cleanupOnboardingRobotUser(
 ): Promise<void> {
   assertOnboardingRobotCleanupTarget(user);
 
-  const dbUrl = process.env.DATABASE_URL?.trim();
+  const dbUrl = runtimeEnv.DATABASE_URL?.trim();
   if (dbUrl) {
     const sql = neon(dbUrl);
     const targetUsers = await sql`
@@ -371,7 +381,7 @@ export async function cleanupOnboardingRobotUser(
     }
   }
 
-  const secretKey = process.env.CLERK_SECRET_KEY?.trim();
+  const secretKey = runtimeEnv.CLERK_SECRET_KEY?.trim();
   if (
     secretKey &&
     !secretKey.toLowerCase().includes('mock') &&
