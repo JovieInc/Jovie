@@ -5,6 +5,7 @@ import type { CSSProperties } from 'react';
 import { useContext } from 'react';
 import { UpdateAvailablePill } from '@/components/atoms/UpdateAvailablePill';
 import { SidebarContext } from '@/components/organisms/sidebar/context';
+import { useBackNavigation } from '@/contexts/BackNavigationContext';
 import {
   useDesktopNavigation,
   useIsElectronRuntime,
@@ -23,7 +24,8 @@ import { cn } from '@/lib/utils';
  */
 export function DesktopTitlebar() {
   const isDesktop = useIsElectronRuntime();
-  const { canGoBack, canGoForward, goBack, goForward } = useDesktopNavigation();
+  const { canGoForward, goForward } = useDesktopNavigation();
+  const { canGoBack, goBack } = useBackNavigation();
   // useContext (not useSidebar) so this is safe outside SidebarProvider (e.g. demo shell)
   const sidebarCtx = useContext(SidebarContext);
   const sidebarOpen = sidebarCtx?.state === 'open';
