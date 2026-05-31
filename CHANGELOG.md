@@ -5,7 +5,7 @@
      5|The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
      6|and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
-## [26.5.57] - 2026-05-25
+## [26.5.58] - 2026-05-25
 
 > Native auth now completes through the hardened Mac OS and iOS callback paths, and release pitching now starts from Jovie chat instead of a dedicated sidebar builder.
 
