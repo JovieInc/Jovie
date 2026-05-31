@@ -2,6 +2,7 @@ import 'server-only';
 
 import { unstable_cache } from 'next/cache';
 import { cache } from 'react';
+import { sanitizeCacheTags } from '@/lib/cache/tags';
 // eslint-disable-next-line no-restricted-imports -- Schema barrel import needed for the contact type alias
 import type { CreatorContact as DbCreatorContact } from '@/lib/db/schema';
 import type { DiscogRelease } from '@/lib/db/schema/content';
@@ -229,7 +230,7 @@ const getCachedProfileAndLinks = async (
       },
       [`public-profile-${username}`],
       {
-        tags: ['profiles-all', `profile:${username}`],
+        tags: sanitizeCacheTags(['profiles-all', `profile:${username}`]),
         revalidate: PROFILE_SUCCESS_CACHE_TTL_SECONDS,
       }
     );

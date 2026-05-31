@@ -8,6 +8,7 @@
 import { and, sql as drizzleSql, eq, isNotNull } from 'drizzle-orm';
 import { unstable_cache } from 'next/cache';
 import { cache } from 'react';
+import { sanitizeCacheTags } from '@/lib/cache/tags';
 import { db, doesColumnExist, withRetry } from '@/lib/db';
 import {
   type ArtistRole,
@@ -329,11 +330,11 @@ export const getCreatorByUsername = cache(
         () => fetchCreatorByUsername(usernameNormalized),
         [`smartlink-creator-${usernameNormalized}`],
         {
-          tags: [
+          tags: sanitizeCacheTags([
             'smartlink-creator',
             `smartlink-creator:${usernameNormalized}`,
             `profile:${usernameNormalized}`,
-          ],
+          ]),
           revalidate: 3600,
         }
       )();
@@ -685,11 +686,11 @@ export const getContentBySlug = cache(
         () => fetchContentBySlug(creatorProfileId, slug),
         [`smartlink-content-${creatorProfileId}-${slug}`],
         {
-          tags: [
+          tags: sanitizeCacheTags([
             'smartlink-content',
             `smartlink-content:${creatorProfileId}`,
             `smartlink-content:${creatorProfileId}:${slug}`,
-          ],
+          ]),
           revalidate: 300,
         }
       )();
