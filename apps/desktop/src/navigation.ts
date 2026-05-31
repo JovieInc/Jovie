@@ -232,9 +232,10 @@ export function isAllowedExternalUrl(
 function isAllowedAuthProviderUrl(parsed: URL): boolean {
   return AUTH_PROVIDER_ORIGINS.some(origin => {
     if (!origin.includes('*')) return parsed.origin === origin;
-    // Wildcard matching: https://*.clerk.accounts.dev
-    const base = origin.replace('*.', '.');
-    return parsed.origin.endsWith(base) && parsed.protocol === 'https:';
+    // Wildcard matching for Clerk (and future providers): e.g. https://*.clerk.accounts.dev
+    // Per CR + G_BRAIN precedent: strip to host suffix only; match hostname (not origin) + https:
+    const base = origin.replace(/^https?:\/\/\*\./, '');
+    return parsed.protocol === 'https:' && (parsed.hostname === base || parsed.hostname.endsWith('.' + base));
   });
 }
 

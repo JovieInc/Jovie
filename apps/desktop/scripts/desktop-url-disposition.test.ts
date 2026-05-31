@@ -102,3 +102,20 @@ test('desktop disposition allows local app origin only when running locally', ()
     'https://127.0.0.1:3112/app',
   ]);
 });
+
+test('desktop disposition allows Clerk auth provider origins externally (https wildcard) and blocks unsafe variants', () => {
+  // Valid Clerk handoff URLs (from "Open in Browser" flows) must be external
+  assertDisposition(productionPolicy, 'external', [
+    'https://foo-bar.clerk.accounts.dev/sign-in?__clerk_session_id=...',
+    'https://distinct-giraffe-5.clerk.accounts.dev/v1/client?__clerk_api_version=...',
+    'https://clerk.accounts.dev/sign-up?redirect_url=...',
+  ]);
+  // Unsafe variants (wrong protocol, evil host, path tricks) remain blocked
+  assertDisposition(productionPolicy, 'blocked', [
+    'http://foo.clerk.accounts.dev/sign-in',
+    'https://evil.com.clerk.accounts.dev/sign-in',
+    'https://evilclerk.accounts.dev/sign-in',
+    'https://clerk.accounts.dev.evil.com/sign-in',
+    'https://jov.ie.evil.com/clerk.accounts.dev',
+  ]);
+});
