@@ -1,5 +1,12 @@
 import 'server-only';
 
+/**
+ * Merch generator wrappers for chat tool execution.
+ *
+ * Keeps chat-layer plumbing thin by delegating all generation/selection logic
+ * to the canonical merch service.
+ */
+
 import { createMerchGeneration, selectMerchDesign } from '@/lib/merch/service';
 import type {
   MerchGenerationOptionView,
@@ -62,6 +69,9 @@ export interface ChatMerchGenerationInput {
   readonly turnId?: string | null;
 }
 
+// ---------------------------------------------------------------------------
+// Main generation function
+// ---------------------------------------------------------------------------
 /**
  * Generate merch card options from a design concept.
  *
