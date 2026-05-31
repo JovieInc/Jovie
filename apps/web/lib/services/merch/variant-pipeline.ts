@@ -247,6 +247,16 @@ export function buildPricingSummary(variants: readonly SellableVariant[]): {
   readonly minProfitCents: number;
   readonly maxProfitCents: number;
 } {
+  if (variants.length === 0) {
+    return {
+      minPriceCents: 0,
+      maxPriceCents: 0,
+      avgPriceCents: 0,
+      minProfitCents: 0,
+      maxProfitCents: 0,
+    };
+  }
+
   const prices = variants.map(v => v.priceCents);
   const profits = variants.map(v => v.profitCents);
 

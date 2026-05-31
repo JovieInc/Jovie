@@ -105,6 +105,17 @@ describe('createSellableVariants', () => {
 });
 
 describe('buildPricingSummary', () => {
+  it('returns zeros for empty variant input', () => {
+    const summary = buildPricingSummary([]);
+    expect(summary).toEqual({
+      minPriceCents: 0,
+      maxPriceCents: 0,
+      avgPriceCents: 0,
+      minProfitCents: 0,
+      maxProfitCents: 0,
+    });
+  });
+
   it('calculates min/max/avg from variant prices', () => {
     const variants = [
       { priceCents: 1000, profitCents: 300 },
