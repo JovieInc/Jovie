@@ -728,6 +728,7 @@ export function OnboardingChat({
     useState<OnboardingArtistSelection | null>(null);
   const chipTray = useChipTray();
   const completedUserTurnsRef = useRef(0);
+  const hasTrackedChatCompletedRef = useRef(false);
   const lastAttemptedMessageRef = useRef<string | null>(null);
   const formatArtistSelectionMessage = useArtistSelectionMessage();
 
@@ -873,9 +874,12 @@ export function OnboardingChat({
     ).length;
     if (completedUserTurns <= completedUserTurnsRef.current) return;
     completedUserTurnsRef.current = completedUserTurns;
-    track(ONBOARDING_FUNNEL_EVENTS.CHAT_COMPLETED, {
-      surface: 'start_chat',
-    });
+    if (!hasTrackedChatCompletedRef.current) {
+      hasTrackedChatCompletedRef.current = true;
+      track(ONBOARDING_FUNNEL_EVENTS.CHAT_COMPLETED, {
+        surface: 'start_chat',
+      });
+    }
     onConversationActivity?.();
   }, [messages, onConversationActivity, status]);
 
