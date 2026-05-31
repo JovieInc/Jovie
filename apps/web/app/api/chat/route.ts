@@ -66,6 +66,11 @@ import {
   type PersistedToolEvent,
 } from '@/lib/chat/tool-events';
 import {
+  createMerchGenerateTool,
+  createMerchPreviewTool,
+  createMerchSelectTool,
+} from '@/lib/chat/tools/merch-tools';
+import {
   type ChatTurnSource,
   markChatTurnStreaming,
   persistTerminalAssistantMessage,
@@ -1213,7 +1218,7 @@ function createGenerateAlbumArtTool(params: {
   });
 }
 
-function createMerchGenerationTool(params: {
+function _createMerchGenerationTool(params: {
   readonly profileId: string | null;
   readonly clerkUserId: string;
   readonly command: 'create_merch' | 'preview_merch_options';
@@ -1255,7 +1260,7 @@ function createMerchGenerationTool(params: {
   });
 }
 
-function createSelectMerchDesignTool(params: {
+function _createSelectMerchDesignTool(params: {
   readonly profileId: string | null;
   readonly clerkUserId: string;
 }) {
@@ -2083,21 +2088,19 @@ function buildChatTools(
       : {}),
     ...(canAccessMerchCreation
       ? {
-          createMerch: createMerchGenerationTool({
+          createMerch: createMerchGenerateTool({
             profileId: resolvedProfileId,
             clerkUserId,
-            command: 'create_merch',
             conversationId: reservedTurn?.conversationId ?? null,
             turnId: reservedTurn?.turnId ?? null,
           }),
-          previewMerchOptions: createMerchGenerationTool({
+          previewMerchOptions: createMerchPreviewTool({
             profileId: resolvedProfileId,
             clerkUserId,
-            command: 'preview_merch_options',
             conversationId: reservedTurn?.conversationId ?? null,
             turnId: reservedTurn?.turnId ?? null,
           }),
-          selectMerchDesign: createSelectMerchDesignTool({
+          selectMerchDesign: createMerchSelectTool({
             profileId: resolvedProfileId,
             clerkUserId,
           }),
