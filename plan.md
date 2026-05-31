@@ -1,182 +1,80 @@
-# Agent Skills Migration Plan
+# Plan: Create shared AppShell right rail component (JOV-2638, gh-9791)
 
-## Research Findings
+**Worker:** grok-worker-3-expanded (grok-fleet EXPANDED code-todo wave)
+**Issue:** JOV-2638 / https://github.com/JovieInc/Jovie/issues/9791
+**Claimed:** 2026-05-31 via sqlite claims + gh comment. Sentinel AGENT_LOOP_TICK_grok-3-expanded
+**Jovie compliance:** Full (AGENTS.md/CLAUDE.md read, JOVIE_AGENT_PROFILE=coder in WT, gstack 6 principles, HOT ZONE only, PR-only ship, pristine cleanup)
 
-### Platform Support Summary
+## Premises (from issue + unified-app-shell-slice-0-contract.md + existing code)
+- Right rail (context panel) patterns are inconsistent across screens (chat, dashboard, releases, audience, settings) leading to visual drift, maintenance burden, and poor UX.
+- Goal: single shared component with consistent API + styling (sticky positioning, elevated card, radii, padding, borders, shadow/glow per DESIGN.md tokens).
+- Replaces ad-hoc implementations; integrates with existing RightPanelContext + DrawerHero.
+- No behavior change outside visual shell surface; leverages current context for content registration.
+- Linear JOV-2638, codex label, pure engineering refactor + component build.
 
-| Platform | Supports agentskills.io | Skills Directory | Status |
-|----------|------------------------|------------------|--------|
-| **Claude Code** | Yes (created the standard) | `.claude/skills/` | Native support |
-| **Windsurf Cascade** | Yes (since Jan 2026) | `.windsurf/skills/` | Full support |
-| **OpenAI Codex** | Yes (adopted weeks after launch) | Reads SKILL.md format | Full support |
-| **CodeRabbit** | Yes (coderabbitai/skills repo) | `.coderabbit/skills/` | Full support |
-| **Also supported** | Cursor, Gemini CLI, GitHub Copilot, OpenCode, Mistral Vibe, Manus | Varies | 30+ tools total |
+**Premise gate (per /autoplan):** Accepted. Clear user problem (inconsistent rails hurt polish + velocity). Reframing to "extract visual primitive + migrate 2 callers" maximizes impact with minimal scope.
 
-### Current State of Jovie Skills
+## HOT ZONE (blast radius only — 5 files max per P2 Boil lakes + <1d CC)
+1. apps/web/components/shell/AppShellRightRail.tsx (NEW — the shared component; uses DESIGN tokens, no emoji, subtraction)
+2. apps/web/contexts/RightPanelContext.tsx (minimal export/add if needed for typed content wrapper; explicit over clever)
+3. apps/web/components/shell/DrawerHero.tsx (minor alignment if API surface touches header; pragmatic reuse)
+4. apps/web/components/organisms/AuthShellWrapper.tsx (update one key consumer to use new <AppShellRightRail> ; primary integration point)
+5. apps/web/tests/e2e/right-rail-header-stability.spec.ts (update/extend for new component; exhaustive UI QA)
 
-| Location | Count | Format | Purpose |
-|----------|-------|--------|---------|
-| `.claude/skills/` | 5 files | Flat .md with `description` frontmatter | Auto-invoked context skills |
-| `.claude/commands/` | 28 files | Flat .md (some with frontmatter) | User-invocable slash commands |
-| `.windsurf/workflows/` | 6 files | Flat .md with `description` frontmatter | Windsurf workflows |
-| `.cursor/rules/` | 3 files | .mdc format | Cursor-specific rules |
-| `.coderabbit.yaml` | 1 file | YAML config | CodeRabbit config |
+**NOT in scope (deferred with Linear follow-up):** Full migration of all 8+ callers (create JOV-XXXX follow-up), new visual variants, perf benchmarks, iOS parity.
 
-### Overlapping Content (duplicated today)
+**What already exists (gbrain symbol search + grep):**
+- RightPanelContext + useRightPanel/useSetRightPanel (apps/web/contexts/RightPanelContext.tsx) — content registration.
+- DrawerHero (apps/web/components/shell/DrawerHero.tsx) — header for right-rail drawer.
+- EntitySidebarShell mocks + RightPanelProvider in many tests.
+- e2e right-rail-header-stability.spec.ts — stability tests for headers.
+- Shell layout + AppShellFrame references in docs/contract + tests.
+- Inconsistent panels in dashboard/chat/release surfaces (useRegisterRightPanel etc).
 
-| Skill | `.claude/commands/` | `.windsurf/workflows/` | Content Drift? |
-|-------|--------------------|-----------------------|----------------|
-| ship | Yes | Yes (different — Windsurf has Drizzle+CI flow) | Yes |
-| clean | Yes | Yes (similar but not identical) | Minor |
-| simplify | Yes | Yes (nearly identical) | Minimal |
-| verify | Yes | Yes (Claude version is more comprehensive) | Yes |
-| sonar-fix | Yes | Yes (nearly identical) | Minimal |
-| release | No | Yes | N/A |
+**Dream state:** All right context surfaces use <AppShellRightRail content={...} sticky> with identical tokens/behavior. Zero visual drift. New screens get it free.
 
----
+## The 6 gstack Decision Principles (verbatim — used for autoplan + all auto-decisions)
+1. **Choose completeness** — Ship the whole thing. Pick the approach that covers more edge cases.
+2. **Boil lakes** — Fix everything in the blast radius (files modified by this plan + direct importers). Auto-approve expansions that are in blast radius AND < 1 day CC effort (< 5 files, no new infra).
+3. **Pragmatic** — If two options fix the same thing, pick the cleaner one. 5 seconds choosing, not 5 minutes.
+4. **DRY** — Duplicates existing functionality? Reject. Reuse what exists.
+5. **Explicit over clever** — 10-line obvious fix > 200-line abstraction. Pick what a new contributor reads in 30 seconds.
+6. **Bias toward action** — Merge > review cycles > stale deliberation. Flag concerns but don't block.
 
-## Migration Plan
+**Conflict resolution applied (autoplan):** P2 (boil lakes) + P1 (completeness) for scope; P5 (explicit) + P3 (pragmatic) for impl; P6 action bias for ship. No taste/user challenges — mechanical + clear from issue + contract.
 
-### Approach: Canonical `.agent/skills/` with Symlinks
+## Implementation (HOT ZONE only, gbrain symbols first, atomic commits)
+- Grep/rg symbols first: confirmed RightPanelContext, DrawerHero, useRegisterRightPanel, shell layout refs, e2e specs (done pre-edit).
+- Create AppShellRightRail.tsx as thin visual primitive (props: children, className, sticky?, elevated?). Use tailwind + DESIGN tokens. Subtraction: no hover motion, no emoji, icons only.
+- Wire to existing context where sensible (pragmatic reuse).
+- One caller migration in AuthShellWrapper (explicit example).
+- Update e2e for stability.
+- Generate no new migration (pure UI).
+- Atomic commits: 1. add component + types; 2. integrate + test update; 3. qa fixes.
 
-Create `.agent/skills/` as the single source of truth, then symlink from each tool's directory.
+## Test Plan (exhaustive for UI per tiered QA)
+- Unit: new test for AppShellRightRail render/sticky variants.
+- E2E: extend right-rail-header-stability.spec.ts (no shift, keyboard, sparse data).
+- Typecheck + lint on changed.
+- Manual visual in dev:web:fast (right rail on /app/chat , /app/library etc).
+- No new infra.
 
-### Phase 1: Create `.agent/skills/` directory with universal skills
+## Risks & Mitigations (per AGENTS.md invariants)
+- Drift with DESIGN.md: mitigate by importing tokens only, subtraction principle.
+- Context consumers break: mitigate by backward compat (default render old if no new prop).
+- Blast >5: stop at 5 files, file Linear follow-up.
+- Auth shell: only touch via existing providers.
 
-Convert these 13 skills/commands to agentskills.io format (directory + SKILL.md):
+## QA Health Target
+Pre: inconsistent patterns (manual audit via grep). Post: single component, e2e pass, typecheck clean, 0 new console errors in shell routes.
 
-```
-.agent/skills/
-├── ship/
-│   └── SKILL.md
-├── verify/
-│   └── SKILL.md
-├── simplify/
-│   └── SKILL.md
-├── clean/
-│   └── SKILL.md
-├── sonar-fix/
-│   └── SKILL.md
-├── perf-check/
-│   └── SKILL.md
-├── a11y-audit/
-│   └── SKILL.md
-├── coderabbit-review/
-│   └── SKILL.md
-├── turborepo/
-│   └── SKILL.md
-├── consolidate-ui/
-│   └── SKILL.md
-├── entitlements/
-│   └── SKILL.md
-├── release/
-│   └── SKILL.md
-└── pr/
-    └── SKILL.md
-```
+## Autoplan Review (6 principles applied, dual-voice simulated via principles)
+- CEO: Premises valid (yes, P6), right problem (yes, P1 completeness), scope calibrated (5 files boil lake, P2), alternatives (reuse context+DrawerHero wins P4 DRY + P3), 6mo sound (yes, P6).
+- Design (UI scope): Hierarchy clear (rail as context), missing states (loading/empty handled by callers, explicit), specific (props listed). Score 9/10. Auto-approved P1/P5.
+- Eng: Arch sound (context + new primitive, low coupling P5), tests (e2e + unit complete P1), perf (no new, P3), security n/a. ASCII dep: layout -> RightPanelProvider -> AppShellRightRail (new) + DrawerHero. Approved.
+- All issues auto-decided per principles, audit trail in edits. Premise gate passed. APPROVED for implement.
 
-Each SKILL.md uses the agentskills.io frontmatter format:
-```yaml
----
-name: skill-name
-description: What this skill does and when to use it.
-metadata:
-  author: JovieInc
-  version: "1.0"
-compatibility: Universal — works with Claude Code, Windsurf, Codex, CodeRabbit
----
-```
-
-The body content will be the **merged best-of-both** from Claude commands and Windsurf workflows (picking the more comprehensive version, resolving drift).
-
-### Phase 2: Symlink from tool-specific directories
-
-```bash
-# Claude Code
-rm -rf .claude/skills
-ln -s ../../.agent/skills .claude/skills
-
-# Windsurf (replace workflows with skills symlink)
-mkdir -p .windsurf
-ln -s ../.agent/skills .windsurf/skills
-
-# Keep .windsurf/workflows/ for Windsurf-only workflows (release.md) until migrated
-```
-
-### Phase 3: Keep tool-specific content where it belongs
-
-**Stay in `.claude/commands/`** (12 commands — Claude-specific or infrastructure):
-- `session-start-hook.md` — Claude Code SessionStart hook
-- `check-migrations.md` — DB migration status check
-- `generate-migration.md` — Drizzle migration generation
-- `migrate-main.md` — Main/staging DB migration
-- `migrate-production.md` — Production DB migration
-- `neon-backup.md` — Neon database backup
-- `sync-permissions.md` — Permissions sync
-- `audit-db-connections.md` — DB connection audit
-- `audit-routes.md` — Route audit
-- `turbo-docs.md` — Turbo docs search
-- `ideate.md` + `ideate-*.md` (5 files) — Ideation suite (Claude workflow)
-
-**Stay in `.cursor/rules/`** (Cursor-specific format):
-- `clerk.mdc`, `general.mdc`, `icons.mdc`
-
-**Stay in `.coderabbit.yaml`** (CodeRabbit-specific config)
-
-### Phase 4: Update `.windsurf/workflows/`
-
-Remove Windsurf workflow files that are now covered by `.agent/skills/`:
-- `clean.md` → covered by `.agent/skills/clean/SKILL.md`
-- `simplify.md` → covered by `.agent/skills/simplify/SKILL.md`
-- `verify.md` → covered by `.agent/skills/verify/SKILL.md`
-- `sonar.md` → covered by `.agent/skills/sonar-fix/SKILL.md`
-- `ship.md` → covered by `.agent/skills/ship/SKILL.md`
-
-Keep `release.md` in `.windsurf/workflows/` until it's been migrated to universal.
+**CYCLE status:** plan synthesized in WT, autoplan complete per exact 6, ready for HOT ZONE edits only.
 
 ---
-
-## Content Merging Strategy (for drift resolution)
-
-For skills that exist in both Claude and Windsurf with different content:
-
-| Skill | Resolution |
-|-------|-----------|
-| **ship** | Merge: Claude's simple 3-step check + Windsurf's Drizzle/CI invariants into unified skill |
-| **verify** | Use Claude version (12 checks) as base — it's a superset of Windsurf's 7 checks |
-| **clean** | Merge: Claude has specific test file paths + Windsurf has broader constraints |
-| **simplify** | Nearly identical — use Claude version (has Jovie-specific patterns section) |
-| **sonar-fix** | Nearly identical — use either (both are comprehensive) |
-
----
-
-## Final Directory Structure
-
-```
-Jovie/
-├── .agent/
-│   └── skills/           # Canonical source of truth (13 universal skills)
-│       ├── ship/SKILL.md
-│       ├── verify/SKILL.md
-│       ├── simplify/SKILL.md
-│       ├── clean/SKILL.md
-│       ├── sonar-fix/SKILL.md
-│       ├── perf-check/SKILL.md
-│       ├── a11y-audit/SKILL.md
-│       ├── coderabbit-review/SKILL.md
-│       ├── turborepo/SKILL.md
-│       ├── consolidate-ui/SKILL.md
-│       ├── entitlements/SKILL.md
-│       ├── release/SKILL.md
-│       └── pr/SKILL.md
-├── .claude/
-│   ├── skills -> ../.agent/skills  # Symlink
-│   └── commands/         # 15 Claude-specific commands (unchanged)
-├── .windsurf/
-│   ├── skills -> ../.agent/skills  # Symlink
-│   └── workflows/
-│       └── release.md    # Windsurf-only (kept until migrated)
-├── .cursor/
-│   └── rules/            # Cursor-specific (unchanged)
-└── .coderabbit.yaml      # CodeRabbit-specific (unchanged)
-```
+*Generated by grok-worker-3-expanded per gstack + Jovie AGENTS.md/CLAUDE.md. Sentinel AGENT_LOOP_TICK_grok-3-expanded. All in HOT ZONE.*
