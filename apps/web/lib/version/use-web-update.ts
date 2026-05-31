@@ -2,6 +2,7 @@
 
 import { useQuery } from '@tanstack/react-query';
 import { useEffect, useRef, useState } from 'react';
+import { isElectronRuntime } from '@/lib/desktop/electron-bridge';
 import { STABLE_CACHE } from '@/lib/queries/cache-strategies';
 
 const POLL_INTERVAL_MS = 5 * 60 * 1000; // 5 minutes — per spec, do not poll more often
@@ -26,16 +27,12 @@ export interface WebUpdateState {
  *
  * On first data it captures the initial buildId. Subsequent data compares
  * against baseline; if they diverge, `available` flips to true.
- * Hook is a no-op when running inside Electron (window.electronAPI exists).
+ * Hook is a no-op when running inside Electron.
  */
 export function useWebUpdate(): WebUpdateState {
   const [available, setAvailable] = useState(false);
   const initialBuildId = useRef<string | null>(null);
-
-  const isElectron =
-    typeof window !== 'undefined' &&
-    'electronAPI' in window &&
-    window.electronAPI != null;
+  const isElectron = isElectronRuntime();
 
   const { data: buildId } = useQuery({
     queryKey: ['web-version', 'buildId'] as const,
@@ -59,7 +56,8 @@ export function useWebUpdate(): WebUpdateState {
     ...STABLE_CACHE,
     staleTime: POLL_INTERVAL_MS,
     gcTime: POLL_INTERVAL_MS * 2,
-    refetchInterval: POLL_INTERVAL_MS,
+    // Once drift is detected and the pill is shown, stop recurring polls.
+    refetchInterval: available ? false : POLL_INTERVAL_MS,
     refetchIntervalInBackground: false,
     refetchOnMount: false,
     refetchOnWindowFocus: false,
