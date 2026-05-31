@@ -7,9 +7,19 @@ const electronRuntimeMock = vi.hoisted(() => ({
   isElectronRuntime: true,
 }));
 
-vi.mock('@/lib/desktop/electron-bridge', () => ({
-  useIsElectronRuntime: () => electronRuntimeMock.isElectronRuntime,
-}));
+vi.mock('@/lib/desktop/electron-bridge', async (importOriginal) => {
+  const actual = await importOriginal();
+  return {
+    ...actual,
+    useIsElectronRuntime: () => electronRuntimeMock.isElectronRuntime,
+    useDesktopNavigation: () => ({
+      canGoBack: true,
+      canGoForward: true,
+      goBack: vi.fn(),
+      goForward: vi.fn(),
+    }),
+  };
+});
 
 vi.mock('next/navigation', () => ({
   useRouter: () => ({
