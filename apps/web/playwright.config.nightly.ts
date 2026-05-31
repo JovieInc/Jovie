@@ -33,6 +33,7 @@ export default defineConfig({
     '**/nightly/**/*.spec.ts',
     '**/dashboard-pages-health.spec.ts',
     '**/onboarding-completion.spec.ts',
+    '**/onboarding-robot.full.spec.ts',
   ],
   fullyParallel: true,
   forbidOnly: isCI,

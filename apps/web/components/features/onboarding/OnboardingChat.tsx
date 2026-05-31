@@ -17,7 +17,9 @@ import {
   getErrorType,
   getPreferredErrorMessage,
 } from '@/components/jovie/utils';
+import { track } from '@/lib/analytics';
 import { useAppFlag } from '@/lib/flags/client';
+import { ONBOARDING_FUNNEL_EVENTS } from '@/lib/onboarding/funnel-events';
 import { cn } from '@/lib/utils';
 import {
   ChatProposeCheckoutCard,
@@ -726,6 +728,8 @@ export function OnboardingChat({
     useState<OnboardingArtistSelection | null>(null);
   const chipTray = useChipTray();
   const completedUserTurnsRef = useRef(0);
+  const hasTrackedChatStartedRef = useRef(false);
+  const hasTrackedChatCompletedRef = useRef(false);
   const lastAttemptedMessageRef = useRef<string | null>(null);
   const formatArtistSelectionMessage = useArtistSelectionMessage();
 
@@ -808,6 +812,12 @@ export function OnboardingChat({
       lastAttemptedMessageRef.current = text;
       setChatError(null);
       notifyJankSend();
+      if (!hasTrackedChatStartedRef.current) {
+        hasTrackedChatStartedRef.current = true;
+        track(ONBOARDING_FUNNEL_EVENTS.CHAT_STARTED, {
+          surface: 'start_chat',
+        });
+      }
       sendMessage({ text });
       chipTray.clear();
       setHasSentFirst(true);
@@ -859,12 +869,24 @@ export function OnboardingChat({
   }, [onProfileBuilderChange, profileBuilderState]);
 
   useEffect(() => {
+    if (messages.length > 0) return;
+    completedUserTurnsRef.current = 0;
+    hasTrackedChatCompletedRef.current = false;
+  }, [messages.length]);
+
+  useEffect(() => {
     if (status !== 'ready') return;
     const completedUserTurns = messages.filter(
       message => message.role === 'user'
     ).length;
     if (completedUserTurns <= completedUserTurnsRef.current) return;
     completedUserTurnsRef.current = completedUserTurns;
+    if (!hasTrackedChatCompletedRef.current) {
+      hasTrackedChatCompletedRef.current = true;
+      track(ONBOARDING_FUNNEL_EVENTS.CHAT_COMPLETED, {
+        surface: 'start_chat',
+      });
+    }
     onConversationActivity?.();
   }, [messages, onConversationActivity, status]);
 

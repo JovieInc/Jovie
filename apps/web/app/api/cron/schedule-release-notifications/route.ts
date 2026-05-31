@@ -54,7 +54,6 @@ type SubscriberRow = {
 type NotificationInsertValue = {
   creatorProfileId: string;
   releaseId: string;
-  campaignId: string | null;
   notificationSubscriptionId: string;
   notificationType: 'release_day';
   scheduledFor: Date;
@@ -172,7 +171,6 @@ async function scheduleNotificationsForRelease(
       pendingBatch.push({
         creatorProfileId: release.creatorProfileId,
         releaseId: release.id,
-        campaignId,
         notificationSubscriptionId: subscriber.id,
         notificationType: 'release_day',
         scheduledFor: release.releaseDate,

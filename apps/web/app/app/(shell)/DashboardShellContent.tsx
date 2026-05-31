@@ -11,6 +11,7 @@ import { APP_FLAG_DEFAULTS, type AppFlagSnapshot } from '@/lib/flags/contracts';
 import { getAppFlagsSnapshot, getAppFlagValue } from '@/lib/flags/server';
 import { HydrateClient } from '@/lib/queries';
 import { getDehydratedState } from '@/lib/queries/server';
+import { DashboardLoadTracker } from './DashboardLoadTracker';
 import {
   getDashboardData,
   getDashboardShellData,
@@ -106,6 +107,7 @@ export async function DashboardShellContent({
       <OperatorBanner isAdmin={dashboardData.isAdmin} />
       <ImpersonationBannerWrapper />
       <DashboardDataProvider value={dashboardData}>
+        <DashboardLoadTracker pathname={pathname} userId={userId} />
         <ProfileCompletionRedirect />
         <AuthShellWrapper
           persistSidebarCollapsed={setSidebarCollapsed}

@@ -16,6 +16,7 @@ export default defineConfig({
     '**/synthetic-auth-ui.spec.ts',
     '**/synthetic-golden-path.spec.ts',
     '**/synthetic-legacy-otp.spec.ts',
+    '**/onboarding-robot.full.spec.ts',
     '**/public-profile-smoke.spec.ts',
   ],
   fullyParallel: false, // Sequential for stability in prod
