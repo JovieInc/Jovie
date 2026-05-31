@@ -166,7 +166,6 @@ async function scheduleNotificationsForRelease(
       pendingBatch.push({
         creatorProfileId: release.creatorProfileId,
         releaseId: release.id,
-        campaignId,
         notificationSubscriptionId: subscriber.id,
         notificationType: 'release_day',
         scheduledFor: release.releaseDate,
