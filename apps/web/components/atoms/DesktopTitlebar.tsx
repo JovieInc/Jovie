@@ -83,8 +83,7 @@ export function DesktopTitlebar() {
                   'flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-secondary-token',
                   'transition-colors duration-subtle',
                   'hover:bg-white/[0.06] hover:text-primary-token',
-                  'focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-white/30',
-                  'disabled:pointer-events-none disabled:opacity-30'
+                  'focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-white/30', 'disabled:pointer-events-none disabled:opacity-30'
                 )}
               >
                 <ChevronLeft className='h-3.5 w-3.5' strokeWidth={2} />
@@ -99,8 +98,7 @@ export function DesktopTitlebar() {
                   'flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-secondary-token',
                   'transition-colors duration-subtle',
                   'hover:bg-white/[0.06] hover:text-primary-token',
-                  'focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-white/30',
-                  'disabled:pointer-events-none disabled:opacity-30'
+                  'focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-white/30', 'disabled:pointer-events-none disabled:opacity-30'
                 )}
               >
                 <ChevronRight className='h-3.5 w-3.5' strokeWidth={2} />
