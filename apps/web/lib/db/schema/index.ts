@@ -546,6 +546,30 @@ export {
   type WrappedLink,
   wrappedLinks,
 } from './links';
+// Memory Core v0 (evidence-backed entity graph) — gh-9872 / JOV-2706
+export {
+  insertMemorySourceRecordSchema,
+  type MemorySourceRecord,
+  memoryAssetEntityMentions,
+  memoryAssets,
+  memoryEnrichmentJobs,
+  memoryEntities,
+  memoryEntityAliases,
+  memoryEntityEdges,
+  memoryEntityIdentities,
+  memoryEntityStatusEnum,
+  memoryEntityTypeEnum,
+  memoryEventParticipants,
+  memoryEvents,
+  memoryObservationStatusEnum,
+  memoryObservations,
+  memoryOpportunities,
+  memoryOpportunityStatusEnum,
+  memorySourceRecords,
+  memorySourceTypeEnum,
+  type NewMemorySourceRecord,
+  selectMemorySourceRecordSchema,
+} from './memory';
 // Merch (Jovie-owned storefront products, orders, fulfillment, payout ledger)
 export {
   insertMerchCardSchema,
@@ -883,7 +907,6 @@ export {
   userInterviewStatusEnumValues,
   userInterviews,
 } from './user-interviews';
-
 // Waitlist
 export {
   insertWaitlistAuditLogSchema,
