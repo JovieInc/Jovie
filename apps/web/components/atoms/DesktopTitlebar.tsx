@@ -5,7 +5,6 @@ import type { CSSProperties } from 'react';
 import { useContext } from 'react';
 import { UpdateAvailablePill } from '@/components/atoms/UpdateAvailablePill';
 import { SidebarContext } from '@/components/organisms/sidebar/context';
-import { useBackNavigation } from '@/contexts/BackNavigationContext';
 import {
   useDesktopNavigation,
   useIsElectronRuntime,
@@ -24,8 +23,7 @@ import { cn } from '@/lib/utils';
  */
 export function DesktopTitlebar() {
   const isDesktop = useIsElectronRuntime();
-  const { canGoForward, goForward } = useDesktopNavigation();
-  const { canGoBack, goBack } = useBackNavigation();
+  const { canGoBack, canGoForward, goBack, goForward } = useDesktopNavigation();
   // useContext (not useSidebar) so this is safe outside SidebarProvider (e.g. demo shell)
   const sidebarCtx = useContext(SidebarContext);
   const sidebarOpen = sidebarCtx?.state === 'open';
@@ -85,7 +83,8 @@ export function DesktopTitlebar() {
                   'flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-secondary-token',
                   'transition-colors duration-subtle',
                   'hover:bg-white/[0.06] hover:text-primary-token',
-                  'focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-white/30'
+                  'focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-white/30',
+                  'disabled:pointer-events-none disabled:opacity-30'
                 )}
               >
                 <ChevronLeft className='h-3.5 w-3.5' strokeWidth={2} />
@@ -100,7 +99,8 @@ export function DesktopTitlebar() {
                   'flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-secondary-token',
                   'transition-colors duration-subtle',
                   'hover:bg-white/[0.06] hover:text-primary-token',
-                  'focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-white/30'
+                  'focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-white/30',
+                  'disabled:pointer-events-none disabled:opacity-30'
                 )}
               >
                 <ChevronRight className='h-3.5 w-3.5' strokeWidth={2} />
