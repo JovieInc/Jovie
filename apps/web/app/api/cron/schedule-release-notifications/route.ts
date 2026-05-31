@@ -54,7 +54,6 @@ type SubscriberRow = {
 type NotificationInsertValue = {
   creatorProfileId: string;
   releaseId: string;
-  campaignId: string | null;
   notificationSubscriptionId: string;
   notificationType: 'release_day';
   scheduledFor: Date;
