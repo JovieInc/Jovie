@@ -21,13 +21,6 @@ vi.mock('@/lib/desktop/electron-bridge', async importOriginal => {
   };
 });
 
-vi.mock('next/navigation', () => ({
-  useRouter: () => ({
-    back: vi.fn(),
-    forward: vi.fn(),
-  }),
-}));
-
 vi.mock('@/components/atoms/UpdateAvailablePill', () => ({
   UpdateAvailablePill: () => (
     <button type='button' data-testid='update-available-pill'>

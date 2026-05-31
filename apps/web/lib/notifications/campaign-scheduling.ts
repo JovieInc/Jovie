@@ -62,10 +62,10 @@ async function insertCampaignBatch(
     metadata: Record<string, unknown>;
   }>,
   now: Date
-): Promise<number> {
-  if (batch.length === 0) return 0;
+): Promise<{ inserted: number; deduped: number }> {
+  if (batch.length === 0) return { inserted: 0, deduped: 0 };
   try {
-    const inserted = await db
+    const upserted = await db
       .insert(fanReleaseNotifications)
       .values(batch)
       .onConflictDoUpdate({
@@ -83,11 +83,25 @@ async function insertCampaignBatch(
           'pending',
         ]),
       })
-      .returning({ id: fanReleaseNotifications.id });
-    return inserted.length;
+      .returning({
+        inserted: drizzleSql<boolean>`xmax = 0`,
+      });
+
+    let insertedCount = 0;
+    let dedupedCount = 0;
+
+    for (const row of upserted) {
+      if (row.inserted) {
+        insertedCount += 1;
+      } else {
+        dedupedCount += 1;
+      }
+    }
+
+    return { inserted: insertedCount, deduped: dedupedCount };
   } catch (err) {
     logger.error('[campaign-scheduling] Batch insert failed, continuing:', err);
-    return 0;
+    return { inserted: 0, deduped: 0 };
   }
 }
 
@@ -132,9 +146,9 @@ export async function scheduleCampaignFanNotifications(
         if (pendingBatch.length === 0) return;
         const toInsert = pendingBatch;
         pendingBatch = [];
-        const count = await insertCampaignBatch(toInsert, now);
-        totalScheduled += count;
-        totalDeduped += toInsert.length - count;
+        const { inserted, deduped } = await insertCampaignBatch(toInsert, now);
+        totalScheduled += inserted;
+        totalDeduped += deduped;
       };
 
       while (true) {

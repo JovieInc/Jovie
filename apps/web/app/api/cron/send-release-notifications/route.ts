@@ -150,7 +150,10 @@ async function fetchPendingNotifications(
     .where(
       and(
         eq(fanReleaseNotifications.status, 'pending'),
-        eq(fanReleaseNotifications.notificationType, 'release_day'),
+        inArray(fanReleaseNotifications.notificationType, [
+          'release_day',
+          'preview',
+        ]),
         lte(fanReleaseNotifications.scheduledFor, now)
       )
     )
