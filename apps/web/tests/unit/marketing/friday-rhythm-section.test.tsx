@@ -44,9 +44,11 @@ describe('FridayRhythmSection', () => {
         name: /Jovie rhythm model showing 3 of 52 Fridays active/i,
       })
     ).not.toHaveLength(0);
-    expect(
-      screen.getAllByRole('link', { name: 'Build Your Release Rhythm' }).at(0)
-    ).toHaveAttribute('href', '/signup');
+    const [rhythmCta] = screen.getAllByRole('link', {
+      name: 'Build Your Release Rhythm',
+    });
+    expect(rhythmCta).toHaveAttribute('href');
+    expect(rhythmCta.getAttribute('href')).toContain('/start?starter_prompt=');
     expect(screen.queryByText('Less')).not.toBeInTheDocument();
     expect(screen.queryByText('More')).not.toBeInTheDocument();
   });

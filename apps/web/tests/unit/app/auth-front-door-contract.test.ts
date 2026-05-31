@@ -9,7 +9,7 @@ describe('auth front-door contract', () => {
 
     expect(contract.primary).toEqual({
       label: 'Request access',
-      href: APP_ROUTES.SIGNUP,
+      href: `${APP_ROUTES.START}?starter_prompt=I+want+request+access+to+Jovie.+I%27m+an+artist+or+work+with+one.`,
     });
     expect(contract.secondary).toBeNull();
     expect(contract.fallbackSupport).toBe(
@@ -22,7 +22,7 @@ describe('auth front-door contract', () => {
 
     expect(contract.primary).toEqual({
       label: 'Claim your free profile',
-      href: APP_ROUTES.SIGNUP,
+      href: APP_ROUTES.START,
     });
     expect(contract.secondary).toEqual({
       label: 'See a live profile',

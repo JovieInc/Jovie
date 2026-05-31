@@ -91,12 +91,12 @@ test.describe('/new landing page', () => {
     );
   });
 
-  test('navigates hero CTA to signup', async ({ page }) => {
+  test('navigates hero CTA to start', async ({ page }) => {
     await gotoLanding(page);
 
     await expect(
       page.getByTestId('homepage-v2-hero-primary-cta')
-    ).toHaveAttribute('href', APP_ROUTES.SIGNUP);
+    ).toHaveAttribute('href', /\/start\?starter_prompt=/);
   });
 
   test('routes deep links to artist profiles anchors', async ({ page }) => {

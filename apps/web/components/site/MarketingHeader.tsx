@@ -7,7 +7,10 @@ import {
   HeaderNav,
 } from '@/components/organisms/HeaderNav';
 import { APP_ROUTES } from '@/constants/routes';
-import { FRONT_DOOR_CTA_LABEL } from '@/data/homepageLaunchCopy';
+import {
+  FRONT_DOOR_CTA_LABEL,
+  HOMEPAGE_FRONT_DOOR_CTA,
+} from '@/data/homepageLaunchCopy';
 import { MARKETING_NAV_LINKS } from '@/data/marketingNavigation';
 import { FEATURE_FLAGS } from '@/lib/flags/marketing-static';
 
@@ -192,7 +195,9 @@ export function MarketingHeader({
       containerSize='homepage'
       presentation={presentation}
       flyoutMenus={navConfig.flyoutMenus}
-      mobilePublicCtaHref={isHomepage ? APP_ROUTES.SIGNUP : undefined}
+      mobilePublicCtaHref={
+        isHomepage ? HOMEPAGE_FRONT_DOOR_CTA.primary.href : undefined
+      }
       mobilePublicCtaLabel={isHomepage ? HOMEPAGE_PUBLIC_CTA_LABEL : undefined}
       mobileNavLinks={navConfig.mobileNavLinks}
       navLinks={navConfig.desktopNavLinks}

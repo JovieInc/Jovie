@@ -1,5 +1,5 @@
 import 'server-only';
-import { type ToolSet, tool } from 'ai';
+import { type ToolSet, tool, type UIMessage } from 'ai';
 import { z } from 'zod';
 import { TOOL_SCHEMAS } from '@/lib/chat/tool-schemas';
 import {
@@ -66,11 +66,83 @@ export interface OnboardingTurnState {
   turnCount: number;
 }
 
+type OnboardingToolPart = UIMessage['parts'][number] & {
+  readonly toolName?: string;
+  readonly input?: unknown;
+  readonly output?: unknown;
+};
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function getToolName(part: OnboardingToolPart): string | null {
+  if (typeof part.toolName === 'string') return part.toolName;
+  return typeof part.type === 'string' && part.type.startsWith('tool-')
+    ? part.type.slice('tool-'.length)
+    : null;
+}
+
+function getToolParts(message: UIMessage): readonly OnboardingToolPart[] {
+  return (message.parts ?? []).filter((part): part is OnboardingToolPart => {
+    const toolName = getToolName(part as OnboardingToolPart);
+    return Boolean(toolName);
+  });
+}
+
+function restoreArtistFromOutput(
+  state: OnboardingTurnState,
+  output: Record<string, unknown>
+): void {
+  if (output.action !== 'spotify_artist_confirmed') return;
+  const artist = isRecord(output.artist) ? output.artist : null;
+  state.spotifyArtistId =
+    typeof output.spotifyArtistId === 'string'
+      ? output.spotifyArtistId
+      : typeof artist?.id === 'string'
+        ? artist.id
+        : state.spotifyArtistId;
+  state.spotifyArtistName =
+    typeof artist?.name === 'string' ? artist.name : state.spotifyArtistName;
+  state.spotifyImageUrl =
+    typeof artist?.imageUrl === 'string'
+      ? artist.imageUrl
+      : state.spotifyImageUrl;
+  state.spotifyFollowers =
+    typeof artist?.followers === 'number' && Number.isFinite(artist.followers)
+      ? artist.followers
+      : state.spotifyFollowers;
+  state.spotifyPopularity =
+    typeof artist?.popularity === 'number' && Number.isFinite(artist.popularity)
+      ? artist.popularity
+      : state.spotifyPopularity;
+  state.spotifyGenres = Array.isArray(artist?.genres)
+    ? artist.genres.filter(
+        (genre): genre is string =>
+          typeof genre === 'string' && genre.trim().length > 0
+      )
+    : state.spotifyGenres;
+}
+
+function restoreInterviewSignal(
+  state: OnboardingTurnState,
+  part: OnboardingToolPart
+): void {
+  if (getToolName(part) !== 'recordInterviewSignal') return;
+  const output = isRecord(part.output) ? part.output : null;
+  const rawSignal = output?.signal ?? part.input;
+  const parsed = interviewSignalSchema.safeParse(rawSignal);
+  if (parsed.success) {
+    state.signals.push(parsed.data);
+  }
+}
+
 export function createOnboardingTurnState(input: {
   sessionId: string;
   turnCount: number;
+  messages?: readonly UIMessage[];
 }): OnboardingTurnState {
-  return {
+  const state: OnboardingTurnState = {
     sessionId: input.sessionId,
     spotifyArtistId: null,
     spotifyArtistName: null,
@@ -81,6 +153,28 @@ export function createOnboardingTurnState(input: {
     signals: [],
     turnCount: input.turnCount,
   };
+
+  if (input.messages) {
+    deriveOnboardingTurnStateFromMessages(state, input.messages);
+  }
+
+  return state;
+}
+
+export function deriveOnboardingTurnStateFromMessages(
+  state: OnboardingTurnState,
+  messages: readonly UIMessage[]
+): OnboardingTurnState {
+  for (const message of messages) {
+    for (const part of getToolParts(message)) {
+      if (isRecord(part.output)) {
+        restoreArtistFromOutput(state, part.output);
+      }
+      restoreInterviewSignal(state, part);
+    }
+  }
+
+  return state;
 }
 
 export interface NextStepCardPayload {
@@ -201,10 +295,13 @@ export function buildOnboardingTools(state: OnboardingTurnState): ToolSet {
       inputSchema: TOOL_SCHEMAS.recordInterviewSignal.inputSchema,
       execute: async (signal: z.infer<typeof interviewSignalSchema>) => {
         state.signals.push(signal);
+        const recordedAt = new Date().toISOString();
         // Keep this silent in the UI; the accumulator feeds proposeNextStep
         // within the same turn.
         return {
           action: 'signal_recorded' as const,
+          signal,
+          recordedAt,
           signalCount: state.signals.length,
           summary: 'Signal noted.',
         };

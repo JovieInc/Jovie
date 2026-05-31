@@ -43,7 +43,7 @@ function isSpotifyUrl(value: string): boolean {
  * HeroSpotifySearch - Spotify artist search for the homepage hero.
  *
  * Adapts patterns from WaitlistSpotifySearch for the homepage context.
- * On artist selection, redirects to /signup with spotify_url and artist_name params.
+ * On artist selection, routes into /start with a Spotify-first starter prompt.
  */
 export function HeroSpotifySearch() {
   const router = useRouter();
@@ -79,7 +79,7 @@ export function HeroSpotifySearch() {
     }
   }, [activeIndex, results.length]);
 
-  const handleNavigateToSignup = useCallback(
+  const handleNavigateToStart = useCallback(
     (spotifyUrl: string, artistName?: string) => {
       if (isNavigating) return;
       setIsNavigating(true);
@@ -88,7 +88,13 @@ export function HeroSpotifySearch() {
       if (artistName) {
         params.set('artist_name', artistName);
       }
-      router.push(`${APP_ROUTES.SIGNUP}?${params.toString()}`);
+      params.set(
+        'starter_prompt',
+        artistName
+          ? `hey, I'm ${artistName}. show me my Spotify.`
+          : `show me this Spotify artist: ${spotifyUrl}`
+      );
+      router.push(`${APP_ROUTES.START}?${params.toString()}`);
     },
     [router, isNavigating]
   );
@@ -114,9 +120,9 @@ export function HeroSpotifySearch() {
 
   const handleArtistSelect = useCallback(
     (artist: SpotifyArtistResult) => {
-      handleNavigateToSignup(artist.url, artist.name);
+      handleNavigateToStart(artist.url, artist.name);
     },
-    [handleNavigateToSignup]
+    [handleNavigateToStart]
   );
 
   const handleClaimArtist = useCallback(() => {
@@ -125,7 +131,7 @@ export function HeroSpotifySearch() {
     if (!query) return;
 
     if (isSpotifyUrl(query)) {
-      handleNavigateToSignup(query);
+      handleNavigateToStart(query);
       return;
     }
 
@@ -148,7 +154,7 @@ export function HeroSpotifySearch() {
     activeIndex,
     results,
     isNavigating,
-    handleNavigateToSignup,
+    handleNavigateToStart,
     handleArtistSelect,
   ]);
 
@@ -252,7 +258,7 @@ export function HeroSpotifySearch() {
         <div
           className={cn(
             'relative w-full flex items-center gap-3 rounded-xl border px-4 py-3 min-h-12 bg-surface-0',
-            'transition-all duration-200',
+            'transition-colors duration-subtle ease-subtle',
             shouldShowDropdown
               ? 'border-focus ring-2 ring-focus/20'
               : 'border-strong hover:border-focus'

@@ -74,7 +74,7 @@ test.describe('Homepage', () => {
     ).toBeVisible();
     await expect(
       hero.getByRole('link', { name: 'Request access', exact: true })
-    ).toHaveAttribute('href', '/signup');
+    ).toHaveAttribute('href', /\/start\?starter_prompt=/);
     // Secondary CTA hidden while WAITLIST_ENABLED is on.
     await expect(
       hero.getByRole('link', { name: 'See a live profile', exact: true })
@@ -104,7 +104,7 @@ test.describe('Homepage', () => {
     await expect(header.getByRole('link', { name: 'Sign in' })).toHaveCount(1);
     await expect(
       header.getByRole('link', { name: 'Request access' })
-    ).toHaveAttribute('href', '/signup');
+    ).toHaveAttribute('href', /\/start\?starter_prompt=/);
   });
 
   test('header flyouts are not mounted by default', async ({ page }) => {
@@ -295,7 +295,7 @@ test.describe('Homepage', () => {
     ).toBeVisible();
     await expect(
       artistProfiles.getByRole('link', { name: 'Request access' })
-    ).toHaveAttribute('href', '/signup');
+    ).toHaveAttribute('href', /\/start\?starter_prompt=/);
     await expect(
       artistProfiles.getByRole('link', { name: 'View example' })
     ).toHaveAttribute('href', '/artist-profiles');
@@ -363,7 +363,7 @@ test.describe('Homepage', () => {
     );
     await expect(
       page.getByTestId('homepage-v2-final-cta-primary')
-    ).toHaveAttribute('href', '/signup');
+    ).toHaveAttribute('href', /\/start\?starter_prompt=/);
     const footer = page.getByTestId('marketing-footer');
     await expect(footer).toBeVisible();
     await expect(footer.getByRole('link', { name: 'Privacy' })).toHaveAttribute(
@@ -417,7 +417,7 @@ test.describe('Homepage', () => {
     );
     await expect(
       header.getByRole('link', { name: 'Request access', exact: true })
-    ).toHaveAttribute('href', '/signup');
+    ).toHaveAttribute('href', /\/start\?starter_prompt=/);
     await expect(
       header.getByRole('link', { name: 'Sign in', exact: true })
     ).toHaveAttribute('href', '/signin');
@@ -475,13 +475,13 @@ test.describe('Homepage', () => {
   });
 
   /**
-   * JOV-2065: Public CTAs with data-cta-sign-up="true" must route to /signup.
+   * JOV-2065: Public CTAs with data-cta-sign-up="true" route through the
+   * canonical /start product entry before authenticated signup.
    *
    * Finds every element marked with data-cta-sign-up="true" and verifies it
-   * has an href starting with /signup, or opens a dialog with
-   * data-auth-mode="sign-up".
+   * has an href starting with /start.
    */
-  test('all data-cta-sign-up elements navigate to /signup (JOV-2065)', async ({
+  test('all data-cta-sign-up elements navigate to /start (JOV-2065)', async ({
     page,
   }) => {
     await gotoHomepage(page);
@@ -495,17 +495,17 @@ test.describe('Homepage', () => {
       'Homepage must have at least one data-cta-sign-up CTA'
     ).toBeGreaterThan(0);
 
-    // Every anchor CTA must point to /signup (or /signup?...)
+    // Every anchor CTA must point to /start (or /start?...)
     for (let i = 0; i < count; i += 1) {
       const cta = ctaLinks.nth(i);
       const tagName = await cta.evaluate(el => el.tagName.toLowerCase());
 
       if (tagName === 'a') {
         const href = await cta.getAttribute('href');
-        const isSignupRoute = href?.startsWith('/signup') ?? false;
+        const isStartRoute = href?.startsWith('/start') ?? false;
         expect(
-          isSignupRoute,
-          `CTA at index ${i} (href="${href}") must route to /signup`
+          isStartRoute,
+          `CTA at index ${i} (href="${href}") must route to /start`
         ).toBe(true);
       }
     }

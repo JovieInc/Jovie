@@ -1,5 +1,14 @@
 import { APP_ROUTES } from '@/constants/routes';
 
+export const HOMEPAGE_REQUEST_ACCESS_STARTER_PROMPT =
+  "I want request access to Jovie. I'm an artist or work with one.";
+
+export function buildHomepageStartHref(starterPrompt?: string): string {
+  if (!starterPrompt) return APP_ROUTES.START;
+  const params = new URLSearchParams({ starter_prompt: starterPrompt });
+  return `${APP_ROUTES.START}?${params.toString()}`;
+}
+
 export interface HomepageFrontDoorCtaContract {
   readonly primary: {
     readonly label: string;
@@ -19,7 +28,7 @@ export function getHomepageFrontDoorCtaContract(
     return {
       primary: {
         label: 'Request access',
-        href: APP_ROUTES.SIGNUP,
+        href: buildHomepageStartHref(HOMEPAGE_REQUEST_ACCESS_STARTER_PROMPT),
       },
       secondary: null,
       fallbackSupport:
@@ -30,7 +39,7 @@ export function getHomepageFrontDoorCtaContract(
   return {
     primary: {
       label: 'Claim your free profile',
-      href: APP_ROUTES.SIGNUP,
+      href: buildHomepageStartHref(),
     },
     secondary: {
       label: 'See a live profile',

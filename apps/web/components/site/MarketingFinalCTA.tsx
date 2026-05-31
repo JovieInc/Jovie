@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { APP_ROUTES } from '@/constants/routes';
+import { HOMEPAGE_FRONT_DOOR_CTA } from '@/data/homepageLaunchCopy';
 import { cn } from '@/lib/utils';
 
 export interface MarketingFinalCTAProps {
@@ -20,7 +20,7 @@ export interface MarketingFinalCTAProps {
 
 const DEFAULT_TITLE = 'Request private launch access.';
 const DEFAULT_CTA_LABEL = 'Request Access';
-const DEFAULT_CTA_HREF = APP_ROUTES.SIGNUP;
+const DEFAULT_CTA_HREF = HOMEPAGE_FRONT_DOOR_CTA.primary.href;
 
 export function MarketingFinalCTA({
   title = DEFAULT_TITLE,
@@ -53,7 +53,7 @@ export function MarketingFinalCTA({
           <Link
             href={ctaHref}
             prefetch={false}
-            className='inline-flex h-10 items-center rounded-full bg-[rgb(252,252,252)] px-6 text-[14px] font-semibold tracking-[0.01em] text-black transition-opacity duration-150 hover:opacity-92 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40 focus-visible:ring-offset-2 focus-visible:ring-offset-black'
+            className='inline-flex h-10 items-center rounded-full bg-[rgb(252,252,252)] px-6 text-[14px] font-semibold tracking-[0.01em] text-black transition-opacity duration-subtle ease-subtle hover:opacity-92 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40 focus-visible:ring-offset-2 focus-visible:ring-offset-black'
           >
             {ctaLabel}
           </Link>
@@ -61,7 +61,7 @@ export function MarketingFinalCTA({
             <Link
               href={secondaryHref}
               prefetch={false}
-              className='inline-flex h-10 items-center gap-1 rounded-full px-6 text-[14px] font-semibold tracking-[0.01em] text-white/92 transition-colors duration-150 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40 focus-visible:ring-offset-2 focus-visible:ring-offset-black'
+              className='inline-flex h-10 items-center gap-1 rounded-full px-6 text-[14px] font-semibold tracking-[0.01em] text-white/92 transition-colors duration-subtle ease-subtle hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40 focus-visible:ring-offset-2 focus-visible:ring-offset-black'
             >
               {secondaryLabel}
               <span aria-hidden='true'>→</span>

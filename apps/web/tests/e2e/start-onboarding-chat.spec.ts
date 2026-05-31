@@ -478,10 +478,12 @@ test.describe('canonical /start onboarding chat', () => {
         .getByTestId('onboarding-artist-confirmed')
         .getByText('Progressive House', { exact: true })
     ).toBeVisible();
-    await expect(page.getByTestId('onboarding-profile-rail')).toHaveCount(0);
+    const sideRail = page.getByTestId('onboarding-profile-rail');
+    await expect(sideRail).toBeVisible();
     await expect(
-      page.getByTestId('onboarding-profile-rail-inline')
-    ).toHaveCount(0);
+      sideRail.getByTestId('onboarding-phone-preview')
+    ).toBeVisible();
+    await expect(sideRail.getByText('Building Test Artist')).toBeVisible();
     await expect(
       page.getByText('find the exact Spotify profile')
     ).toBeVisible();

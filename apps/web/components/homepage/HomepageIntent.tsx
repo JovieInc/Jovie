@@ -4,7 +4,6 @@ import { ArrowUp, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { APP_ROUTES } from '@/constants/routes';
-import { buildAuthRouteUrl } from '@/lib/auth/build-auth-route-url';
 import { trackHomepageEvent } from './homepage-analytics';
 import {
   HERO_COPY,
@@ -41,12 +40,8 @@ function isDesktopViewport(): boolean {
     .matches;
 }
 
-function buildAuthUrl(intentId: string): string {
-  const destination = `${APP_ROUTES.START}?intent_id=${encodeURIComponent(intentId)}`;
-  return buildAuthRouteUrl(
-    APP_ROUTES.SIGNUP,
-    new URLSearchParams({ redirect_url: destination })
-  );
+function buildStartUrl(intentId: string): string {
+  return `${APP_ROUTES.START}?intent_id=${encodeURIComponent(intentId)}`;
 }
 
 export function HomepageIntent({
@@ -75,7 +70,7 @@ export function HomepageIntent({
     }, HOMEPAGE_VIEWED_DELAY_MS);
 
     // Rehydrate any in-progress draft from a previous visit so the fan picks
-    // up where they left off. Cleared on submit and on successful signup
+    // up where they left off. Cleared on submit and when /start restores it
     // (via consumeHomepageIntent at the end of onboarding).
     const draft = readHomepageDraft();
     if (draft) {
@@ -206,15 +201,13 @@ export function HomepageIntent({
     // superseded and should not resurface if the fan navigates back here.
     clearHomepageDraft();
 
-    const authUrl = buildAuthUrl(intent.id);
+    const startUrl = buildStartUrl(intent.id);
     if (desktop) {
-      // Soft nav: the @auth parallel slot's intercepting route renders the
-      // modal over the homepage. Browser-back closes it.
-      router.push(authUrl);
+      // Soft nav keeps browser-back returning to the edited prompt.
+      router.push(startUrl);
     } else {
-      // Hard nav: skips the intercept entirely and loads the full-page
-      // /signup route. iOS Safari + modal + OAuth popup is a known jank.
-      globalThis.window.location.assign(authUrl);
+      // Hard nav avoids mobile modal jank while preserving the prompt intent.
+      globalThis.window.location.assign(startUrl);
     }
   }, [value, activePill, router]);
 

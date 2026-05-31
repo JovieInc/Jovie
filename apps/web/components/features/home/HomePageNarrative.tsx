@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import type { ReactNode } from 'react';
 import { Container } from '@/components/site/Container';
-import { APP_ROUTES } from '@/constants/routes';
+import { HOMEPAGE_FRONT_DOOR_CTA } from '@/data/homepageLaunchCopy';
 import { FEATURE_FLAGS } from '@/lib/feature-flags/shared';
 import type { FeaturedCreator } from '@/lib/featured-creators';
 import { fillToMinimum } from './featured-creators-fallback';
@@ -47,7 +47,7 @@ export function FinalCallToAction({
           <p className='homepage-final-cta-body'>{content.body}</p>
           <div className='mt-8 flex flex-wrap items-center justify-center gap-3'>
             <Link
-              href={APP_ROUTES.SIGNUP}
+              href={HOMEPAGE_FRONT_DOOR_CTA.primary.href}
               data-testid='final-cta-action'
               data-cta-sign-up='true'
               className='homepage-pill-primary focus-ring-themed'

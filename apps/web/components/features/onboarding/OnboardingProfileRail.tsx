@@ -5,6 +5,7 @@ import {
   CircleCheckBig,
   Gauge,
   Music2,
+  Smartphone,
   UserRound,
   Users,
 } from 'lucide-react';
@@ -200,6 +201,63 @@ function TimelineItem({
   );
 }
 
+function RailPhonePreview({
+  artist,
+  handle,
+  socialLink,
+}: {
+  readonly artist: OnboardingProfileArtist;
+  readonly handle: string | null;
+  readonly socialLink: string | null;
+}) {
+  const socialHost = socialLink ? hostnameFor(socialLink) : null;
+  const profilePath = handle ? `/${handle}` : '/your-handle';
+
+  return (
+    <div
+      className='rounded-xl border border-subtle bg-surface-1 p-3'
+      data-testid='onboarding-phone-preview'
+    >
+      <div className='mb-2 flex items-center gap-1.5 text-[11.5px] font-medium leading-4 text-secondary-token'>
+        <Smartphone className='h-3.5 w-3.5' aria-hidden />
+        <span>Profile preview</span>
+      </div>
+      <div className='mx-auto h-[238px] w-[138px] overflow-hidden rounded-[20px] border border-white/[0.09] bg-surface-0 shadow-[0_14px_34px_rgba(0,0,0,0.28)]'>
+        <div className='h-11 bg-surface-2' />
+        <div className='px-3 pb-3'>
+          <div className='-mt-5 mb-2 flex justify-center'>
+            <RailAvatar artist={artist} />
+          </div>
+          <p className='truncate text-center text-[13px] font-semibold leading-5 text-primary-token'>
+            {artist.name}
+          </p>
+          <p className='truncate text-center text-[11px] leading-4 text-tertiary-token'>
+            {profilePath}
+          </p>
+          <div className='mt-3 space-y-1.5'>
+            <span className='flex h-7 items-center justify-center gap-1 rounded-full border border-green-500/20 bg-surface-1 px-2 text-[10.5px] font-medium text-green-500'>
+              <SocialIcon platform='spotify' className='h-3 w-3' aria-hidden />
+              Spotify
+            </span>
+            {socialHost ? (
+              <span className='flex h-7 items-center justify-center rounded-full border border-subtle bg-surface-1 px-2 text-[10.5px] font-medium text-secondary-token'>
+                {socialHost}
+              </span>
+            ) : (
+              <span className='flex h-7 items-center justify-center rounded-full border border-dashed border-subtle px-2 text-[10.5px] font-medium text-tertiary-token'>
+                Social link
+              </span>
+            )}
+            <span className='flex h-7 items-center justify-center rounded-full border border-dashed border-subtle px-2 text-[10.5px] font-medium text-tertiary-token'>
+              Release page
+            </span>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function OnboardingProfileRail({
   placement = 'side',
   state,
@@ -216,12 +274,14 @@ export function OnboardingProfileRail({
   const safeArtistUrl = getSafeSpotifyArtistUrl(artist?.url);
   const isInline = placement === 'inline';
 
+  if (!visible) return null;
+
   return (
     <aside
       className={cn(
         'overflow-hidden bg-(--linear-app-content-surface) text-primary-token transition-[opacity,transform,width,border-color] duration-cinematic ease-out',
         isInline
-          ? 'relative z-0 w-full rounded-2xl border border-(--linear-app-shell-border)'
+          ? 'relative z-0 w-full rounded-2xl border border-(--linear-app-shell-border) lg:hidden'
           : 'z-30 max-lg:hidden lg:relative lg:h-full lg:border-l lg:border-(--linear-app-shell-border)',
         visible
           ? cn(
@@ -298,6 +358,12 @@ export function OnboardingProfileRail({
                 ))}
               </div>
             </div>
+
+            <RailPhonePreview
+              artist={artist}
+              handle={state.handle}
+              socialLink={firstSocialLink}
+            />
 
             <ol
               className='relative space-y-3 before:absolute before:bottom-2 before:left-[8.5px] before:top-2 before:w-px before:bg-(--linear-app-shell-border) max-lg:space-y-2.5'

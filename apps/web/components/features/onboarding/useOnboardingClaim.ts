@@ -4,6 +4,8 @@ import { useRouter } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 import { APP_ROUTES } from '@/constants/routes';
 import { useAuthSafe } from '@/hooks/useClerkSafe';
+import { track } from '@/lib/analytics';
+import { ONBOARDING_FUNNEL_EVENTS } from '@/lib/onboarding/funnel-events';
 
 /**
  * Auto-claim the anonymous onboarding conversation when the visitor
@@ -47,6 +49,11 @@ interface ClaimResponse {
   readonly retryAfterWebhook?: boolean;
   readonly alreadyClaimed?: boolean;
   readonly errorCode?: string;
+  readonly profile?: {
+    readonly profileId: string | null;
+    readonly handle: string | null;
+    readonly status: 'created' | 'updated' | 'skipped';
+  } | null;
 }
 
 const MAX_RETRIES = 3;
@@ -126,6 +133,17 @@ export function useOnboardingClaim(claimTrigger = 0): ClaimStatus {
         markTriggerCompleted();
         claimedRef.current = true;
         setStatus('claimed');
+        track(ONBOARDING_FUNNEL_EVENTS.AUTH_COMPLETED, {
+          surface: 'start_chat',
+        });
+        if (body.profile?.profileId) {
+          track(ONBOARDING_FUNNEL_EVENTS.PROFILE_CREATED, {
+            profile_id: body.profile.profileId,
+            handle: body.profile.handle ?? undefined,
+            method: 'chat_claim',
+            status: body.profile.status,
+          });
+        }
         // Hand off to the existing /onboarding/checkout flow.
         router.replace(APP_ROUTES.ONBOARDING_CHECKOUT);
         return;
@@ -136,6 +154,17 @@ export function useOnboardingClaim(claimTrigger = 0): ClaimStatus {
         markTriggerCompleted();
         claimedRef.current = true;
         setStatus('claimed');
+        track(ONBOARDING_FUNNEL_EVENTS.AUTH_COMPLETED, {
+          surface: 'start_chat',
+        });
+        if (body.profile?.profileId) {
+          track(ONBOARDING_FUNNEL_EVENTS.PROFILE_CREATED, {
+            profile_id: body.profile.profileId,
+            handle: body.profile.handle ?? undefined,
+            method: 'chat_claim',
+            status: body.profile.status,
+          });
+        }
         router.replace(APP_ROUTES.ONBOARDING_CHECKOUT);
         return;
       }
