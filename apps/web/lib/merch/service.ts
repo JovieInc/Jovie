@@ -220,7 +220,7 @@ function productSuffixFromProductType(productType: string): string {
     return 'Tank Top';
   }
 
-  return productType.trim() || 'Tee';
+  return 'Tee';
 }
 
 function buildOptionSpecs(
