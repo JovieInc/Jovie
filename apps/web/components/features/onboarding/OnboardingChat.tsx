@@ -728,6 +728,7 @@ export function OnboardingChat({
     useState<OnboardingArtistSelection | null>(null);
   const chipTray = useChipTray();
   const completedUserTurnsRef = useRef(0);
+  const hasTrackedChatStartedRef = useRef(false);
   const hasTrackedChatCompletedRef = useRef(false);
   const lastAttemptedMessageRef = useRef<string | null>(null);
   const formatArtistSelectionMessage = useArtistSelectionMessage();
@@ -811,7 +812,8 @@ export function OnboardingChat({
       lastAttemptedMessageRef.current = text;
       setChatError(null);
       notifyJankSend();
-      if (!hasSentFirst) {
+      if (!hasTrackedChatStartedRef.current) {
+        hasTrackedChatStartedRef.current = true;
         track(ONBOARDING_FUNNEL_EVENTS.CHAT_STARTED, {
           surface: 'start_chat',
         });
@@ -823,7 +825,6 @@ export function OnboardingChat({
     },
     [
       chipTray,
-      hasSentFirst,
       isAwaitingFirstToken,
       isBusy,
       notifyJankSend,
