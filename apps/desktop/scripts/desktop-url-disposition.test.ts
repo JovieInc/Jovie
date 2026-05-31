@@ -114,6 +114,7 @@ test('desktop disposition allows Clerk auth provider origins externally (https w
   assertDisposition(productionPolicy, 'blocked', [
     'http://foo.clerk.accounts.dev/sign-in',
     'https://evil.com.clerk.accounts.dev/sign-in',
+    'https://evilclerk.accounts.dev/sign-in',
     'https://clerk.accounts.dev.evil.com/sign-in',
     'https://jov.ie.evil.com/clerk.accounts.dev',
   ]);

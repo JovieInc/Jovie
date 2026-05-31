@@ -226,7 +226,7 @@ function isAllowedAuthProviderUrl(parsed: URL): boolean {
     // Wildcard matching for Clerk (and future providers): e.g. https://*.clerk.accounts.dev
     // Per CR + G_BRAIN precedent: strip to host suffix only; match hostname (not origin) + https:
     const base = origin.replace(/^https?:\/\/\*\./, '');
-    return parsed.protocol === 'https:' && parsed.hostname.endsWith(base);
+    return parsed.protocol === 'https:' && (parsed.hostname === base || parsed.hostname.endsWith('.' + base));
   });
 }
 

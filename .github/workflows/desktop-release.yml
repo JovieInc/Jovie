@@ -25,7 +25,7 @@ on:
     branches: [main]
     paths:
       - "VERSION"
-      - ".github/workflows/desktop-release.yml"
+      - ".github/workflows/desktop-release.yml"  # explicit handling for desktop auth allowlist fixes (e.g. 9870/9812 Clerk wildcard)
   workflow_dispatch:
     inputs:
       environment:
