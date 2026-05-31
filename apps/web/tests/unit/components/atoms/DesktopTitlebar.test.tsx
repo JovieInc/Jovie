@@ -7,7 +7,7 @@ const electronRuntimeMock = vi.hoisted(() => ({
   isElectronRuntime: true,
 }));
 
-vi.mock('@/lib/desktop/electron-bridge', async (importOriginal) => {
+vi.mock('@/lib/desktop/electron-bridge', async importOriginal => {
   const actual = await importOriginal();
   return {
     ...actual,
@@ -20,13 +20,6 @@ vi.mock('@/lib/desktop/electron-bridge', async (importOriginal) => {
     }),
   };
 });
-
-vi.mock('next/navigation', () => ({
-  useRouter: () => ({
-    back: vi.fn(),
-    forward: vi.fn(),
-  }),
-}));
 
 vi.mock('@/components/atoms/UpdateAvailablePill', () => ({
   UpdateAvailablePill: () => (

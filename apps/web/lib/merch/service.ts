@@ -197,15 +197,46 @@ function buildArtistBrief(
   };
 }
 
-function buildOptionSpecs(profile: CreatorProfileForMerch): MerchOptionSpec[] {
+function productSuffixFromProductType(productType: string): string {
+  const normalized = productType.trim().toLowerCase();
+  if (
+    normalized.includes('shirt') ||
+    normalized.includes('tee') ||
+    normalized.includes('t-shirt')
+  ) {
+    return 'Tee';
+  }
+  if (normalized.includes('hoodie') || normalized.includes('sweatshirt')) {
+    return 'Hoodie';
+  }
+  if (
+    normalized.includes('hat') ||
+    normalized.includes('cap') ||
+    normalized.includes('beanie')
+  ) {
+    return 'Hat';
+  }
+  if (normalized.includes('tank')) {
+    return 'Tank Top';
+  }
+
+  return 'Tee';
+}
+
+function buildOptionSpecs(
+  profile: CreatorProfileForMerch,
+  productType: string
+): MerchOptionSpec[] {
   const name = artistName(profile);
   const genre = profile.genres?.[0] ?? 'independent';
   const city = profile.location ?? 'the scene';
+  const productSuffix = productSuffixFromProductType(productType);
+  const productLabel = productSuffix.toLowerCase();
 
   return [
     {
       lane: 'band_tour_uniform',
-      designName: `${name} Signal Tee`,
+      designName: `${name} Signal ${productSuffix}`,
       concept: `A real-show uniform built around ${name} with heavyweight front typography and no fake dates.`,
       whyItFits: `It gives ${name} a clear merch-table object without inventing tour claims.`,
       typographyStyle: 'stacked venue typography',
@@ -214,9 +245,8 @@ function buildOptionSpecs(profile: CreatorProfileForMerch): MerchOptionSpec[] {
     },
     {
       lane: 'fashion_graphic_item',
-      designName: `${name} Object Tee`,
-      concept:
-        'A restrained fashion graphic item that reads as a premium tee first and artist merch second.',
+      designName: `${name} Object ${productSuffix}`,
+      concept: `A restrained fashion graphic item that reads as a premium ${productLabel} first and artist merch second.`,
       whyItFits:
         'It is wearable for fans who want taste and context without a loud logo.',
       typographyStyle: 'quiet capsule typography',
@@ -225,7 +255,7 @@ function buildOptionSpecs(profile: CreatorProfileForMerch): MerchOptionSpec[] {
     },
     {
       lane: 'artist_world_artifact',
-      designName: `${name} Archive Tee`,
+      designName: `${name} Archive ${productSuffix}`,
       concept:
         'A collectible artifact from the artist world, using coded language and a structured print layout.',
       whyItFits:
@@ -474,7 +504,7 @@ export async function createMerchGeneration(params: {
   try {
     const catalog = await resolveMerchCatalogSelection(params.prompt);
     const { pricing, providerWarnings } = catalog;
-    const specs = buildOptionSpecs(profile);
+    const specs = buildOptionSpecs(profile, catalog.productType);
     const insertedOptions: MerchDesignOption[] = [];
 
     for (const [index, spec] of specs.entries()) {
