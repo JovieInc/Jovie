@@ -83,6 +83,19 @@ jobs:
           doppler run -- pnpm --filter=@jovie/web exec playwright test tests/e2e/synthetic-golden-path.spec.ts --config=playwright.synthetic.config.ts --project=chromium-synthetic --output=test-results/synthetic-golden-path
         continue-on-error: true
 
+      - name: Run Onboarding Robot Full Synthetic (JOV-2681)
+        env:
+          DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN_PRD }}
+          BASE_URL: https://jov.ie
+          PLAYWRIGHT_TEST_BASE_URL: https://jov.ie
+          E2E_SKIP_WEB_SERVER: '1'
+          E2E_SYNTHETIC_MODE: 'true'
+          E2E_ENVIRONMENT: production
+          SYNTHETIC_PLAYWRIGHT_JSON_OUTPUT_FILE: test-results/onboarding-robot-full-results.json
+        run: |
+          doppler run -- pnpm --filter=@jovie/web exec playwright test tests/e2e/onboarding-robot.full.spec.ts --config=playwright.synthetic.config.ts --project=chromium-synthetic --output=test-results/onboarding-robot-full
+        continue-on-error: true
+
       - name: Run Legacy OTP Signup Canary (gated, JOV-2446 cutover)
         # Skip this step entirely once Layer A is proven green and the Clerk
         # dashboard has flipped to SSO-only — set repo variable
@@ -127,7 +140,8 @@ jobs:
       - name: Confirm scoped synthetic cleanup
         if: always()
         run: |
-          echo "Production signup canary cleanup is scoped inside synthetic-golden-path.spec.ts by exact plus-addressed email."
+          echo "Production signup canary cleanup is scoped by exact plus-addressed email."
+          echo "Onboarding robot cleanup is scoped by exact robot email, Clerk user id, run id, and generated handle."
           echo "No broad production Clerk cleanup script is run from this workflow."
 
       - name: Parse test results
@@ -148,6 +162,11 @@ jobs:
             {
               name: 'synthetic-golden-path',
               path: 'apps/web/test-results/synthetic-golden-path-results.json',
+              required: true,
+            },
+            {
+              name: 'onboarding-robot-full',
+              path: 'apps/web/test-results/onboarding-robot-full-results.json',
               required: true,
             },
             {
@@ -318,6 +337,11 @@ jobs:
                       "short": false
                     },
                     {
+                      "title": "Artifacts",
+                      "value": "Trace, video, screenshots, and JSON results are attached to this workflow run under synthetic-test-results.",
+                      "short": false
+                    },
+                    {
                       "title": "Action",
                       "value": "<${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View Details>",
                       "short": false
@@ -350,7 +374,7 @@ jobs:
                     },
                     {
                       "title": "Status",
-                      "value": "Production signup and public-profile synthetic checks passing",
+                      "value": "Production auth UI, onboarding robot, signup health, and public-profile synthetic checks passing",
                       "short": false
                     },
                     {

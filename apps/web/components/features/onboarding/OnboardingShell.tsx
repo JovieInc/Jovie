@@ -1,9 +1,11 @@
 'use client';
 
 import { Skeleton } from '@jovie/ui';
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { AppShellFrame } from '@/components/organisms/AppShellFrame';
 import { SidebarProvider } from '@/components/organisms/Sidebar';
+import { track } from '@/lib/analytics';
+import { ONBOARDING_FUNNEL_EVENTS } from '@/lib/onboarding/funnel-events';
 import { cn } from '@/lib/utils';
 import { OnboardingChat } from './OnboardingChat';
 import {
@@ -35,6 +37,12 @@ export function OnboardingShell({ sessionLabel }: OnboardingShellProps) {
   const [turnstileFocusSignal, setTurnstileFocusSignal] = useState(0);
   const [turnstileResetSignal, setTurnstileResetSignal] = useState(0);
   const [claimTrigger, setClaimTrigger] = useState(0);
+
+  useEffect(() => {
+    track(ONBOARDING_FUNNEL_EVENTS.ONBOARDING_STARTED, {
+      surface: 'start_chat',
+    });
+  }, []);
 
   const handleConversationActivity = useCallback(() => {
     setClaimTrigger(current => current + 1);

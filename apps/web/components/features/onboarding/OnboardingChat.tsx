@@ -17,7 +17,9 @@ import {
   getErrorType,
   getPreferredErrorMessage,
 } from '@/components/jovie/utils';
+import { track } from '@/lib/analytics';
 import { useAppFlag } from '@/lib/flags/client';
+import { ONBOARDING_FUNNEL_EVENTS } from '@/lib/onboarding/funnel-events';
 import { cn } from '@/lib/utils';
 import {
   ChatProposeCheckoutCard,
@@ -808,6 +810,11 @@ export function OnboardingChat({
       lastAttemptedMessageRef.current = text;
       setChatError(null);
       notifyJankSend();
+      if (!hasSentFirst) {
+        track(ONBOARDING_FUNNEL_EVENTS.CHAT_STARTED, {
+          surface: 'start_chat',
+        });
+      }
       sendMessage({ text });
       chipTray.clear();
       setHasSentFirst(true);
@@ -815,6 +822,7 @@ export function OnboardingChat({
     },
     [
       chipTray,
+      hasSentFirst,
       isAwaitingFirstToken,
       isBusy,
       notifyJankSend,
@@ -865,6 +873,9 @@ export function OnboardingChat({
     ).length;
     if (completedUserTurns <= completedUserTurnsRef.current) return;
     completedUserTurnsRef.current = completedUserTurns;
+    track(ONBOARDING_FUNNEL_EVENTS.CHAT_COMPLETED, {
+      surface: 'start_chat',
+    });
     onConversationActivity?.();
   }, [messages, onConversationActivity, status]);
 

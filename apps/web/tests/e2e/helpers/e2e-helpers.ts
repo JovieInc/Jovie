@@ -44,6 +44,11 @@ export interface EnsuredUserRow {
   id: string;
 }
 
+interface EnsureDbUserOptions {
+  readonly knownSpotifyArtistIds?: string[];
+  readonly clearRateLimits?: boolean;
+}
+
 export interface SpotifyImportStateRow {
   id: string;
   spotify_url: string | null;
@@ -955,19 +960,27 @@ interface SeededCreatorProfileRow {
  * Also releases the test Spotify artist ID from any previous test profiles
  * to avoid unique constraint violations on repeated runs.
  *
- * @param knownSpotifyArtistIds - Additional Spotify IDs to release from
- *   previous test profiles (beyond the standard test user email match).
+ * @param knownSpotifyArtistIdsOrOptions - Additional Spotify IDs to release
+ *   from previous test profiles, or options for production-safe synthetic runs.
  */
 export async function ensureDbUser(
   clerkUserId: string,
   email: string,
-  knownSpotifyArtistIds: string[] = []
+  knownSpotifyArtistIdsOrOptions: string[] | EnsureDbUserOptions = []
 ) {
+  const knownSpotifyArtistIds = Array.isArray(knownSpotifyArtistIdsOrOptions)
+    ? knownSpotifyArtistIdsOrOptions
+    : (knownSpotifyArtistIdsOrOptions.knownSpotifyArtistIds ?? []);
+  const shouldClearRateLimits = Array.isArray(knownSpotifyArtistIdsOrOptions)
+    ? true
+    : (knownSpotifyArtistIdsOrOptions.clearRateLimits ?? true);
   const dbUrl = process.env.DATABASE_URL;
   if (!dbUrl) throw new Error('DATABASE_URL required for DB user creation');
 
   const sql = neon(dbUrl);
-  await clearOnboardingRateLimits();
+  if (shouldClearRateLimits) {
+    await clearOnboardingRateLimits();
+  }
 
   // Release ALL test-linked Spotify artist IDs from previous test profiles.
   await sql`

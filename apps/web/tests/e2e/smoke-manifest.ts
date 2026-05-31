@@ -18,6 +18,7 @@
 export const DESKTOP_SMOKE_SPECS = [
   'smoke-public.spec.ts',
   'golden-path.spec.ts',
+  'onboarding-robot.smoke.spec.ts',
   'signup-funnel.smoke.spec.ts',
   'smoke-auth.spec.ts',
   'shell-chat-v1.spec.ts',
