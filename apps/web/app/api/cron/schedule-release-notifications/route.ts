@@ -54,12 +54,18 @@ type SubscriberRow = {
 type NotificationInsertValue = {
   creatorProfileId: string;
   releaseId: string;
+  campaignId?: string | null;
   notificationSubscriptionId: string;
   notificationType: 'release_day';
   scheduledFor: Date;
   status: 'pending';
   dedupKey: string;
-  metadata: { releaseTitle: string | null; channel: string };
+  metadata: {
+    releaseTitle: string | null;
+    channel: string;
+    campaignId?: string;
+    segment?: string;
+  };
 };
 
 const SUBSCRIBER_PAGE_SIZE = 500;
