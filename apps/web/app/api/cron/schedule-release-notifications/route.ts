@@ -54,7 +54,7 @@ type SubscriberRow = {
 type NotificationInsertValue = {
   creatorProfileId: string;
   releaseId: string;
-  campaignId?: string | null;
+  campaignId: string | null;
   notificationSubscriptionId: string;
   notificationType: 'release_day';
   scheduledFor: Date;
@@ -63,8 +63,8 @@ type NotificationInsertValue = {
   metadata: {
     releaseTitle: string | null;
     channel: string;
-    campaignId?: string;
     segment?: string;
+    campaignId?: string;
   };
 };
 
@@ -172,6 +172,7 @@ async function scheduleNotificationsForRelease(
       pendingBatch.push({
         creatorProfileId: release.creatorProfileId,
         releaseId: release.id,
+        campaignId,
         notificationSubscriptionId: subscriber.id,
         notificationType: 'release_day',
         scheduledFor: release.releaseDate,

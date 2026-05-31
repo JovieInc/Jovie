@@ -40,6 +40,7 @@ vi.mock('@/lib/db/schema/dsp-enrichment', () => ({
     dedupKey: 'fanReleaseNotifications.dedupKey',
     status: 'fanReleaseNotifications.status',
     id: 'fanReleaseNotifications.id',
+    campaignId: 'fanReleaseNotifications.campaignId', // JOV-2211
   },
 }));
 
