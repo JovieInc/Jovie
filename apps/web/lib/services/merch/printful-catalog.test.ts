@@ -5,7 +5,6 @@ import type { SyncProductCost } from './printful-catalog';
 vi.mock('@/lib/printful/client', () => ({
   getCatalogProduct: vi.fn(),
   getCatalogVariantPrices: vi.fn(),
-  getCatalogProductAvailability: vi.fn(),
   isPrintfulConfigured: vi.fn(),
   listCatalogProducts: vi.fn(),
   listCatalogVariants: vi.fn(),
