@@ -99,9 +99,11 @@ export async function generateMerchFromConcept(
 }
 
 /**
- * Generate preview merch options without persisting a full batch.
- * Follows the same flow as generateMerchFromConcept but uses
- * the preview_merch_options command flag.
+ * Generate preview merch options using the preview command tag.
+ *
+ * This currently follows the same persisted generation flow as
+ * generateMerchFromConcept, but marks the batch/turn as
+ * preview_merch_options for downstream handling.
  */
 export async function previewMerchFromConcept(
   input: ChatMerchGenerationInput
