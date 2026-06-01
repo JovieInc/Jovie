@@ -2,7 +2,6 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { SharedMarketingHero } from '@/components/features/landing/SharedMarketingHero';
 import { VoiceDemoVisual } from '@/components/features/landing/VoiceDemoVisual';
-import { Container } from '@/components/site/Container';
 import { APP_NAME, BASE_URL } from '@/constants/app';
 import { APP_ROUTES } from '@/constants/routes';
 import { NOINDEX_ROBOTS } from '@/lib/seo/noindex-metadata';
@@ -44,6 +43,8 @@ export const metadata: Metadata = {
 };
 
 export default function VoiceLandingPage() {
+  const sectionWrapClassName = 'mx-auto w-full max-w-5xl px-6 sm:px-8 lg:px-12';
+
   return (
     <main className='bg-base text-primary-token'>
       <SharedMarketingHero
@@ -82,7 +83,7 @@ export default function VoiceLandingPage() {
 
       {/* How it works — explicit 4 steps from voice skill */}
       <section className='border-t border-subtle bg-panel py-16 sm:py-20'>
-        <Container size='homepage'>
+        <div className={sectionWrapClassName}>
           <div className='mx-auto max-w-3xl text-center'>
             <p className='homepage-section-eyebrow'>Four steps</p>
             <h2 className='marketing-h2-linear mt-3 text-primary-token'>
@@ -133,12 +134,12 @@ export default function VoiceLandingPage() {
               </article>
             ))}
           </div>
-        </Container>
+        </div>
       </section>
 
       {/* Trust & product signals */}
       <section className='py-16 sm:py-20'>
-        <Container size='homepage'>
+        <div className={sectionWrapClassName}>
           <div className='mx-auto max-w-3xl'>
             <div className='rounded-3xl border border-subtle bg-panel px-8 py-10'>
               <h3 className='text-xl font-semibold'>
@@ -177,12 +178,12 @@ export default function VoiceLandingPage() {
               </p>
             </div>
           </div>
-        </Container>
+        </div>
       </section>
 
       {/* Final CTA band */}
       <section className='border-t border-subtle bg-black py-14 text-white'>
-        <Container size='homepage'>
+        <div className={sectionWrapClassName}>
           <div className='mx-auto flex max-w-2xl flex-col items-center gap-4 text-center'>
             <h2 className='text-3xl font-semibold tracking-tight'>
               Ready to sound like you — everywhere?
@@ -201,7 +202,7 @@ export default function VoiceLandingPage() {
               Free tier • Cancel anytime • No card required
             </span>
           </div>
-        </Container>
+        </div>
       </section>
     </main>
   );
