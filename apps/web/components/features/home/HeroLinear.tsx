@@ -1,6 +1,6 @@
 import Image from 'next/image';
 import Link from 'next/link';
-import { APP_ROUTES } from '@/constants/routes';
+import { HOMEPAGE_FRONT_DOOR_CTA } from '@/data/homepageLaunchCopy';
 import { getMarketingExportImage } from '@/lib/screenshots/registry';
 
 const HERO_LINEAR_IMAGE = getMarketingExportImage(
@@ -51,7 +51,7 @@ export function HeroLinear({ fullScreen = false }: Readonly<HeroLinearProps>) {
             </p>
             <div className='mt-6'>
               <Link
-                href={APP_ROUTES.SIGNUP}
+                href={HOMEPAGE_FRONT_DOOR_CTA.primary.href}
                 className='public-action-primary focus-ring-themed'
               >
                 Request Access

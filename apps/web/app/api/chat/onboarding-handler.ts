@@ -327,7 +327,11 @@ export async function tryHandleAnonymousOnboardingChat(
   }
 
   // --- Build the per-turn state accumulator and the onboarding tool palette ---
-  const onboardingState = createOnboardingTurnState({ sessionId, turnCount });
+  const onboardingState = createOnboardingTurnState({
+    sessionId,
+    turnCount,
+    messages: uiMessages,
+  });
   const tools = buildOnboardingTools(onboardingState);
 
   // --- Telemetry hooks (mirror authenticated chat) ---

@@ -3,7 +3,7 @@ import { getHomepageFrontDoorCtaContract } from '@/data/homepageFrontDoorCta';
 import { FEATURE_FLAGS } from '@/lib/flags/marketing-static';
 
 // Prelaunch front-door label. Server-side waitlist gate handles the
-// post-/signup routing; this controls only the marketing copy.
+// post-/start routing; this controls only the marketing copy.
 export const HOMEPAGE_FRONT_DOOR_CTA = getHomepageFrontDoorCtaContract(
   FEATURE_FLAGS.WAITLIST_ENABLED
 );
@@ -38,7 +38,7 @@ export const HOMEPAGE_LAUNCH_COPY = {
   },
   fallbackCta: {
     label: FRONT_DOOR_CTA_LABEL,
-    href: APP_ROUTES.SIGNUP,
+    href: HOMEPAGE_FRONT_DOOR_CTA.primary.href,
     support: FALLBACK_CTA_SUPPORT,
   },
   workspace: {
@@ -145,7 +145,7 @@ export const HOMEPAGE_LAUNCH_COPY = {
     ],
     primaryCta: {
       label: FRONT_DOOR_CTA_LABEL,
-      href: APP_ROUTES.SIGNUP,
+      href: HOMEPAGE_FRONT_DOOR_CTA.primary.href,
     },
     secondaryCta: {
       label: 'View example',

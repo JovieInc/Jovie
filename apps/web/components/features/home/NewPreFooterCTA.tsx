@@ -3,7 +3,7 @@
 import { Button } from '@jovie/ui';
 import Link from 'next/link';
 import { Container } from '@/components/site/Container';
-import { APP_ROUTES } from '@/constants/routes';
+import { HOMEPAGE_FRONT_DOOR_CTA } from '@/data/homepageLaunchCopy';
 
 export function NewPreFooterCTA() {
   return (
@@ -27,7 +27,10 @@ export function NewPreFooterCTA() {
 
             <div className='mt-8 flex flex-col sm:flex-row items-center justify-center gap-3'>
               <Button asChild size='lg' variant='primary'>
-                <Link href={APP_ROUTES.SIGNUP} data-cta-sign-up='true'>
+                <Link
+                  href={HOMEPAGE_FRONT_DOOR_CTA.primary.href}
+                  data-cta-sign-up='true'
+                >
                   Request Access
                 </Link>
               </Button>

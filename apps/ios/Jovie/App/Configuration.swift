@@ -106,4 +106,10 @@ struct AppConfiguration: Sendable {
       observabilityEnvironment: observabilityEnvironment
     )
   }
+
+  static func loadForLiveLaunch() throws -> AppConfiguration {
+    let configuration = load()
+    try ClerkPublishableKeyValidator.validateForDistribution(configuration.clerkPublishableKey)
+    return configuration
+  }
 }

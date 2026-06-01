@@ -258,6 +258,7 @@ export const ServerEnvSchema = z.object({
   E2E_USE_TEST_AUTH_BYPASS: z.string().optional(),
   E2E_CLERK_USER_ID: z.string().optional(),
   E2E_CLERK_USER_USERNAME: z.string().optional(),
+  E2E_SYNTHETIC_MODE: z.string().optional(),
   E2E_PROD_SIGNUP_EMAIL_BASE: z.string().email().optional(),
   E2E_PROD_SIGNUP_PASSWORD: z.string().optional(),
   E2E_PROD_MAILBOX_PROVIDER: z
@@ -376,6 +377,7 @@ export const ENV_KEYS = [
   'UPSTASH_REDIS_REST_TOKEN',
   'SESSION_SECRET',
   'TURNSTILE_SECRET_KEY',
+  'E2E_SYNTHETIC_MODE',
   'E2E_PROD_SIGNUP_EMAIL_BASE',
   'E2E_PROD_SIGNUP_PASSWORD',
   'E2E_PROD_MAILBOX_PROVIDER',

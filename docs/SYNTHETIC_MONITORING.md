@@ -6,6 +6,13 @@ This document describes the synthetic monitoring setup for Jovie's production fr
 
 Synthetic monitoring runs automated tests against production to make sure a real new visitor can enter the product. The scheduled workflow uses Doppler `prd` secrets, runs Playwright against `https://jov.ie`, and alerts Slack when any blocking check fails.
 
+The production suite is split by responsibility:
+
+- `synthetic-auth-ui.spec.ts` validates that Google/Apple auth surfaces and provider handoff initiation are healthy.
+- `synthetic-golden-path.spec.ts` validates the public front-door signup journey.
+- `onboarding-robot.full.spec.ts` validates app behavior after Clerk authentication: profile creation, dashboard load, public profile load, welcome-chat continuity, and exact cleanup.
+- `public-profile-smoke.spec.ts` validates the public profile rendering baseline.
+
 ## Test Coverage
 
 ### Golden Path Test
@@ -18,6 +25,24 @@ The primary test covers the complete front-door journey:
 4. **Mailbox OTP** - reads the Clerk code from a dedicated mailbox provider and completes verification.
 5. **Post-signup app state** - confirms the signed-in user can reach a non-empty usable app/onboarding surface.
 6. **Scoped cleanup** - deletes only the exact plus-addressed synthetic Clerk user created by that run.
+
+### Onboarding Robot
+
+The onboarding robot is a QA sentinel for the shipped onboarding path, not an activation optimizer. It does not automate Google or Apple provider UI. Production runs create a scoped synthetic Clerk user, authenticate with a Clerk sign-in token, complete `/onboarding`, and clean up only the exact robot user from that run.
+
+Production robot runs do not clear broad onboarding rate-limit keys. Rate-limit clearing remains limited to non-production/local recovery paths.
+
+Coverage:
+
+1. **Synthetic user creation** - creates or reuses a plus-addressed robot email derived from `E2E_PROD_SIGNUP_EMAIL_BASE`.
+2. **Clerk token auth** - signs in through Clerk using a short-lived sign-in token.
+3. **Profile creation** - completes `/onboarding` with a generated robot handle.
+4. **Dashboard load** - verifies `/app` loads and emits `dashboard_loaded`.
+5. **Public profile load** - verifies `/<handle>` returns a successful response and no not-found/error copy.
+6. **Welcome-chat continuity** - verifies `/api/onboarding/welcome-chat` returns an app chat route.
+7. **Scoped cleanup** - removes only the exact robot user, generated handle/profile, and matching Clerk user id.
+
+The fast PR smoke, `onboarding-robot.smoke.spec.ts`, runs separately through the desktop smoke manifest and only verifies anonymous `/start` chat health plus event emission.
 
 ### Health Checks
 
@@ -69,6 +94,22 @@ doppler run --project jovie-web --config prd -- \
   pnpm --filter=@jovie/web run test:e2e:synthetic
 ```
 
+### Onboarding Robot
+
+```bash
+# Fast anonymous /start smoke
+pnpm --filter=@jovie/web exec playwright test tests/e2e/onboarding-robot.smoke.spec.ts
+
+# Full production synthetic robot
+doppler run --project jovie-web --config prd -- \
+  E2E_SYNTHETIC_MODE=true \
+  E2E_ENVIRONMENT=production \
+  E2E_SKIP_WEB_SERVER=1 \
+  BASE_URL=https://jov.ie \
+  PLAYWRIGHT_TEST_BASE_URL=https://jov.ie \
+  pnpm --filter=@jovie/web exec playwright test tests/e2e/onboarding-robot.full.spec.ts --config=playwright.synthetic.config.ts --project=chromium-synthetic
+```
+
 ### Readiness Preflight
 
 ```bash
@@ -98,6 +139,8 @@ E2E_PROD_MAILBOX_CLIENT_ID=...
 E2E_PROD_MAILBOX_CLIENT_SECRET=...
 E2E_PROD_MAILBOX_REFRESH_TOKEN=...
 ```
+
+The onboarding robot additionally requires `E2E_PROD_SIGNUP_EMAIL_BASE`, `CLERK_SECRET_KEY`, and `DATABASE_URL`. It does not require mailbox OTP settings because it signs in with a Clerk sign-in token instead of driving provider UI.
 
 Preferred no-inbox provider:
 
@@ -158,12 +201,15 @@ The synthetic monitoring runs automatically via GitHub Actions:
 - Email format: `<E2E_PROD_SIGNUP_EMAIL_BASE local>+<run-id>@<domain>`
 - Accounts are tagged with Clerk public metadata `role=synthetic_production_canary`
 - The test deletes only the exact plus-addressed email created in that run
+- Onboarding robot accounts use the `+onboarding-robot-<run-id>` suffix and Clerk public metadata `role=synthetic_onboarding_robot`
+- Onboarding robot cleanup requires an exact robot email, Clerk `user_` id, `or-` run id, and generated `jor...` handle before touching the database or Clerk
 
 ### Production Considerations
 
 - Synthetic account cleanup must stay scoped to the configured plus-addressed mailbox
 - Monitor synthetic account creation rate to avoid hitting limits
 - Do not run broad `cleanup-e2e-users.ts` against production Clerk
+- Do not add a production cleanup endpoint for onboarding robot runs
 
 ## Alerting
 
@@ -180,6 +226,7 @@ Each alert includes:
 - Environment affected (production/preview)
 - Specific test failures
 - Direct link to GitHub Actions run
+- Playwright trace, video, screenshot, and JSON artifacts under `synthetic-test-results`
 - Timestamp and context
 
 ### Escalation

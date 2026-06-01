@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation';
 import { type FormEvent, useState } from 'react';
 import { shellCtaClassName } from '@/components/marketing/artist-profile/ShellCtaButton';
 import { APP_ROUTES } from '@/constants/routes';
+import { HOMEPAGE_REQUEST_ACCESS_STARTER_PROMPT } from '@/data/homepageFrontDoorCta';
 import { track } from '@/lib/analytics';
 
 export function HomeHeroCTA() {
@@ -17,8 +18,13 @@ export function HomeHeroCTA() {
       section: 'hero',
       handle: trimmed || undefined,
     });
-    const params = trimmed ? `?handle=${encodeURIComponent(trimmed)}` : '';
-    router.push(`${APP_ROUTES.SIGNUP}${params}`);
+    const params = new URLSearchParams({
+      starter_prompt: trimmed
+        ? `I want to claim jov.ie/${trimmed}.`
+        : HOMEPAGE_REQUEST_ACCESS_STARTER_PROMPT,
+    });
+    if (trimmed) params.set('handle', trimmed);
+    router.push(`${APP_ROUTES.START}?${params.toString()}`);
   }
 
   return (

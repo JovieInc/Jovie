@@ -31,6 +31,7 @@ import {
   SIGNUP_SPOTIFY_URL_KEY,
 } from '@/lib/auth/signup-claim-storage';
 import { captureError } from '@/lib/error-tracking';
+import { ONBOARDING_FUNNEL_EVENTS } from '@/lib/onboarding/funnel-events';
 import {
   extractErrorCode,
   getErrorMessage,
@@ -479,6 +480,11 @@ export function useOnboardingSubmit({
           handle: resolvedHandle,
           completion_time: new Date().toISOString(),
           totalDuration: toDurationMs(onboardingStartedAtMs),
+          method: getOnboardingCompletionMethod(shouldAutoSubmitHandle),
+        });
+        track(ONBOARDING_FUNNEL_EVENTS.PROFILE_CREATED, {
+          user_id: userId,
+          handle: resolvedHandle,
           method: getOnboardingCompletionMethod(shouldAutoSubmitHandle),
         });
 

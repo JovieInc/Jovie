@@ -2,6 +2,7 @@ import { act, fireEvent, render, screen } from '@testing-library/react';
 import { type FormEvent, type ReactNode, useState } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { OnboardingChat } from '@/components/features/onboarding/OnboardingChat';
+import { ONBOARDING_FUNNEL_EVENTS } from '@/lib/onboarding/funnel-events';
 
 const chatMocks = vi.hoisted(() => ({
   messages: [] as Array<{
@@ -24,10 +25,19 @@ const errorMocks = vi.hoisted(() => ({
   },
 }));
 
+const analyticsMocks = vi.hoisted(() => ({
+  track: vi.fn(),
+}));
+
+vi.mock('@/lib/analytics', () => ({
+  track: analyticsMocks.track,
+}));
+
 vi.mock('ai', () => ({
   DefaultChatTransport: class DefaultChatTransport {
     constructor(readonly options: unknown) {}
   },
+  gateway: vi.fn((model: string) => model),
 }));
 
 vi.mock('@ai-sdk/react', () => ({
@@ -113,6 +123,12 @@ vi.mock('@/lib/flags/client', () => ({
 }));
 
 vi.mock('@/components/features/onboarding/OnboardingToolArtifacts', () => ({
+  formatCompactCount: (value: number | null | undefined) =>
+    typeof value === 'number' ? String(value) : null,
+  formatExactCount: (value: number | null | undefined) =>
+    typeof value === 'number' ? String(value) : null,
+  formatGenreLabel: (value: string) => value,
+  getSafeSpotifyArtistUrl: (value: string | null | undefined) => value ?? null,
   OnboardingArtistConfirmedCard: () => null,
   OnboardingHandleCheckCard: () => null,
   OnboardingSocialLinkCard: () => null,
@@ -122,10 +138,14 @@ vi.mock('@/components/features/onboarding/OnboardingToolArtifacts', () => ({
 
 function TurnstileHarness({
   initialToken = null,
+  onConversationActivity,
+  resetTokenOnRejected = true,
   onTurnstileRejected = vi.fn(),
   onTurnstileRequired = vi.fn(),
 }: Readonly<{
   initialToken?: string | null;
+  onConversationActivity?: () => void;
+  resetTokenOnRejected?: boolean;
   onTurnstileRejected?: () => void;
   onTurnstileRequired?: (message?: string) => void;
 }>) {
@@ -147,9 +167,12 @@ function TurnstileHarness({
       }}
       onTurnstileRejected={() => {
         onTurnstileRejected();
-        setTurnstileToken(null);
+        if (resetTokenOnRejected) {
+          setTurnstileToken(null);
+        }
         setInstruction('Verify you are human to send');
       }}
+      onConversationActivity={onConversationActivity}
     />
   );
 }
@@ -163,6 +186,7 @@ describe('OnboardingChat Turnstile gating', () => {
     chatMocks.sendMessage.mockReset();
     chatMocks.status = 'ready';
     chatMocks.stop.mockReset();
+    analyticsMocks.track.mockReset();
     errorMocks.metadata = {};
   });
 
@@ -217,6 +241,117 @@ describe('OnboardingChat Turnstile gating', () => {
       'Verify you are human to send'
     );
     expect(screen.getByText('Verify you are human to send')).toBeVisible();
+  });
+
+  it('tracks chat completion once while reporting each completed user turn', () => {
+    const onConversationActivity = vi.fn();
+    const { rerender } = render(
+      <TurnstileHarness onConversationActivity={onConversationActivity} />
+    );
+
+    expect(analyticsMocks.track).not.toHaveBeenCalled();
+
+    chatMocks.messages = [
+      {
+        id: 'message-1',
+        role: 'user',
+        parts: [{ type: 'text', text: 'help me launch' }],
+      },
+      {
+        id: 'message-2',
+        role: 'assistant',
+        parts: [{ type: 'text', text: 'got it' }],
+      },
+    ];
+    rerender(
+      <TurnstileHarness onConversationActivity={onConversationActivity} />
+    );
+
+    expect(analyticsMocks.track).toHaveBeenCalledTimes(1);
+    expect(analyticsMocks.track).toHaveBeenCalledWith(
+      ONBOARDING_FUNNEL_EVENTS.CHAT_COMPLETED,
+      { surface: 'start_chat' }
+    );
+    expect(onConversationActivity).toHaveBeenCalledTimes(1);
+
+    chatMocks.messages = [
+      ...chatMocks.messages,
+      {
+        id: 'message-3',
+        role: 'user',
+        parts: [{ type: 'text', text: 'artist selected' }],
+      },
+      {
+        id: 'message-4',
+        role: 'assistant',
+        parts: [{ type: 'text', text: 'artist confirmed' }],
+      },
+    ];
+    rerender(
+      <TurnstileHarness onConversationActivity={onConversationActivity} />
+    );
+
+    expect(analyticsMocks.track).toHaveBeenCalledTimes(1);
+    expect(onConversationActivity).toHaveBeenCalledTimes(2);
+
+    chatMocks.messages = [];
+    rerender(
+      <TurnstileHarness onConversationActivity={onConversationActivity} />
+    );
+    chatMocks.messages = [
+      {
+        id: 'message-5',
+        role: 'user',
+        parts: [{ type: 'text', text: 'new chat' }],
+      },
+      {
+        id: 'message-6',
+        role: 'assistant',
+        parts: [{ type: 'text', text: 'new chat ready' }],
+      },
+    ];
+    rerender(
+      <TurnstileHarness onConversationActivity={onConversationActivity} />
+    );
+
+    expect(analyticsMocks.track).toHaveBeenCalledTimes(2);
+    expect(onConversationActivity).toHaveBeenCalledTimes(3);
+  });
+
+  it('tracks chat start once when a rejected first turn is retried', () => {
+    render(
+      <TurnstileHarness initialToken='token-1' resetTokenOnRejected={false} />
+    );
+
+    const input = screen.getByLabelText('Chat message input');
+    fireEvent.change(input, { target: { value: 'I am Test Artist' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Send message' }));
+
+    expect(chatMocks.sendMessage).toHaveBeenCalledWith({
+      text: 'I am Test Artist',
+    });
+    expect(analyticsMocks.track).toHaveBeenCalledTimes(1);
+    expect(analyticsMocks.track).toHaveBeenCalledWith(
+      ONBOARDING_FUNNEL_EVENTS.CHAT_STARTED,
+      { surface: 'start_chat' }
+    );
+
+    errorMocks.metadata = {
+      errorCode: 'TURNSTILE_REQUIRED',
+      message: 'Bot challenge failed',
+      requestId: 'req-1',
+    };
+    act(() => {
+      chatMocks.onError?.(new Error('Bot challenge failed'));
+    });
+
+    chatMocks.sendMessage.mockClear();
+    fireEvent.click(screen.getByRole('button', { name: 'Retry message' }));
+
+    expect(chatMocks.sendMessage).toHaveBeenCalledWith({
+      text: 'I am Test Artist',
+    });
+    expect(analyticsMocks.track).toHaveBeenCalledTimes(1);
   });
 
   it('resets rejected Turnstile tokens, preserves the failed message, and blocks retry until fresh verification', () => {

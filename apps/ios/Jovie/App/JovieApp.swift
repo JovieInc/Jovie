@@ -277,7 +277,18 @@ struct JovieApp: App {
 
   init() {
     let launchMode = LaunchMode.current()
-    let configuration = launchMode.usesLiveClerk ? AppConfiguration.load() : .mock
+    let configuration: AppConfiguration
+    if launchMode.usesLiveClerk {
+      do {
+        configuration = try AppConfiguration.loadForLiveLaunch()
+      } catch {
+        fatalError(
+          "Invalid Clerk publishable key configuration for live launch: \(error.localizedDescription)"
+        )
+      }
+    } else {
+      configuration = .mock
+    }
 
     Observability.configure(
       environment: configuration.observabilityEnvironment,

@@ -59,7 +59,12 @@ type NotificationInsertValue = {
   scheduledFor: Date;
   status: 'pending';
   dedupKey: string;
-  metadata: { releaseTitle: string | null; channel: string };
+  metadata: {
+    releaseTitle: string | null;
+    channel: string;
+    segment?: string;
+    campaignId?: string;
+  };
 };
 
 const SUBSCRIBER_PAGE_SIZE = 500;

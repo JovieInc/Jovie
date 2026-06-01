@@ -4,6 +4,11 @@ import { useChat } from '@ai-sdk/react';
 import { DefaultChatTransport, type UIMessage } from 'ai';
 import type { ReactNode } from 'react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  consumeHomepageIntent,
+  readHomepageIntent,
+  sanitizeHomepagePrompt,
+} from '@/components/homepage/intent-store';
 import { ChatInput, ChatMessage } from '@/components/jovie/components';
 import { useChatJankMonitor, useStickToBottom } from '@/components/jovie/hooks';
 import {
@@ -17,7 +22,9 @@ import {
   getErrorType,
   getPreferredErrorMessage,
 } from '@/components/jovie/utils';
+import { track } from '@/lib/analytics';
 import { useAppFlag } from '@/lib/flags/client';
+import { ONBOARDING_FUNNEL_EVENTS } from '@/lib/onboarding/funnel-events';
 import { cn } from '@/lib/utils';
 import {
   ChatProposeCheckoutCard,
@@ -31,6 +38,7 @@ import type {
   OnboardingProfileArtist,
   OnboardingProfileBuilderState,
 } from './OnboardingProfileRail';
+import { OnboardingProfileRail } from './OnboardingProfileRail';
 import {
   type ArtistConfirmedOutput,
   type ArtistPickerOutput,
@@ -55,6 +63,8 @@ import type { OnboardingTurnstileStatus } from './OnboardingTurnstile';
  */
 
 interface OnboardingChatProps {
+  /** ID for a homepage-captured starter prompt stored in localStorage. */
+  readonly intentId?: string;
   /** Turnstile token from the widget. Required on first message. */
   readonly turnstileToken: string | null;
   /** Current Turnstile widget state for first-message gating. */
@@ -71,6 +81,8 @@ interface OnboardingChatProps {
   readonly onProfileBuilderChange?: (
     state: OnboardingProfileBuilderState
   ) => void;
+  /** URL-provided starter prompt for demo and deep-link flows. */
+  readonly starterPrompt?: string;
 }
 
 /** Pull the user-visible text out of a UIMessage's parts. */
@@ -82,7 +94,7 @@ const ONBOARDING_INTRO_MESSAGE = {
   parts: [
     {
       type: 'text',
-      text: "Hey, I'm Jovie. I'll remember this chat so we can pick up where we left off if you sign up. What artist or release are you working on?",
+      text: "hey, I'm Jovie. heads up, I'll remember this chat so we can pick up where we left off if you sign up. are you the Spotify artist, or are you working with one?",
     },
   ],
 } satisfies UIMessage;
@@ -541,7 +553,8 @@ function OnboardingInitialIntro({
         Hey, I&apos;m Jovie.
       </p>
       <p className='mt-2 max-w-[24rem] text-[15px] leading-6 text-secondary-token'>
-        Tell me the artist or release. I&apos;ll remember this if you sign up.
+        Start with the Spotify artist. I&apos;ll match the profile, make one
+        useful call, then decide access.
       </p>
     </div>
   );
@@ -653,6 +666,7 @@ interface OnboardingMessageRegionProps {
   readonly lastAssistantMessageId: string | null;
   readonly onboardingComposerSurface: ReactNode;
   readonly onSelectArtist: (artist: OnboardingArtistSelection) => void;
+  readonly profileBuilderState: OnboardingProfileBuilderState;
   readonly shouldDockComposer: boolean;
 }
 
@@ -665,18 +679,22 @@ function OnboardingMessageRegion({
   lastAssistantMessageId,
   onboardingComposerSurface,
   onSelectArtist,
+  profileBuilderState,
   shouldDockComposer,
 }: OnboardingMessageRegionProps) {
   if (shouldDockComposer) {
     return (
-      <OnboardingMessageList
-        displayMessages={displayMessages}
-        hideIntroMessage={composerPickerOpen}
-        isStreaming={isStreaming}
-        lastAssistantMessageId={lastAssistantMessageId}
-        isBusy={isBusy}
-        onSelectArtist={onSelectArtist}
-      />
+      <div className='flex flex-col gap-4'>
+        <OnboardingProfileRail placement='inline' state={profileBuilderState} />
+        <OnboardingMessageList
+          displayMessages={displayMessages}
+          hideIntroMessage={composerPickerOpen}
+          isStreaming={isStreaming}
+          lastAssistantMessageId={lastAssistantMessageId}
+          isBusy={isBusy}
+          onSelectArtist={onSelectArtist}
+        />
+      </div>
     );
   }
 
@@ -691,14 +709,20 @@ function OnboardingMessageRegion({
         />
         {hasConversationStarted ? (
           <div className='absolute inset-x-0 bottom-0 z-10 max-h-[min(42vh,24rem)] overflow-y-auto overscroll-contain pb-1'>
-            <OnboardingMessageList
-              displayMessages={displayMessages}
-              hideIntroMessage={composerPickerOpen}
-              isStreaming={isStreaming}
-              lastAssistantMessageId={lastAssistantMessageId}
-              isBusy={isBusy}
-              onSelectArtist={onSelectArtist}
-            />
+            <div className='flex flex-col gap-4'>
+              <OnboardingProfileRail
+                placement='inline'
+                state={profileBuilderState}
+              />
+              <OnboardingMessageList
+                displayMessages={displayMessages}
+                hideIntroMessage={composerPickerOpen}
+                isStreaming={isStreaming}
+                lastAssistantMessageId={lastAssistantMessageId}
+                isBusy={isBusy}
+                onSelectArtist={onSelectArtist}
+              />
+            </div>
           </div>
         ) : null}
       </div>
@@ -710,10 +734,12 @@ function OnboardingMessageRegion({
 }
 
 export function OnboardingChat({
+  intentId,
   onConversationActivity,
   onProfileBuilderChange,
   onTurnstileRejected,
   onTurnstileRequired,
+  starterPrompt,
   turnstilePanel,
   turnstileStatus,
   turnstileToken,
@@ -726,7 +752,10 @@ export function OnboardingChat({
     useState<OnboardingArtistSelection | null>(null);
   const chipTray = useChipTray();
   const completedUserTurnsRef = useRef(0);
+  const hasTrackedChatStartedRef = useRef(false);
+  const hasTrackedChatCompletedRef = useRef(false);
   const lastAttemptedMessageRef = useRef<string | null>(null);
+  const hasInjectedStarterPromptRef = useRef(false);
   const formatArtistSelectionMessage = useArtistSelectionMessage();
 
   const transport = useMemo(
@@ -808,6 +837,12 @@ export function OnboardingChat({
       lastAttemptedMessageRef.current = text;
       setChatError(null);
       notifyJankSend();
+      if (!hasTrackedChatStartedRef.current) {
+        hasTrackedChatStartedRef.current = true;
+        track(ONBOARDING_FUNNEL_EVENTS.CHAT_STARTED, {
+          surface: 'start_chat',
+        });
+      }
       sendMessage({ text });
       chipTray.clear();
       setHasSentFirst(true);
@@ -846,17 +881,41 @@ export function OnboardingChat({
   );
 
   const profileBuilderState = useMemo(
-    () =>
-      onProfileBuilderChange
-        ? deriveProfileBuilderState({ messages, selectedArtist })
-        : null,
-    [messages, onProfileBuilderChange, selectedArtist]
+    () => deriveProfileBuilderState({ messages, selectedArtist }),
+    [messages, selectedArtist]
   );
 
   useEffect(() => {
-    if (!profileBuilderState) return;
     onProfileBuilderChange?.(profileBuilderState);
   }, [onProfileBuilderChange, profileBuilderState]);
+
+  useEffect(() => {
+    if (hasInjectedStarterPromptRef.current) return;
+    let nextPrompt: string | null = null;
+
+    if (intentId) {
+      const intent = readHomepageIntent(intentId);
+      if (intent) {
+        nextPrompt = sanitizeHomepagePrompt(intent.finalPrompt);
+      }
+      consumeHomepageIntent(intentId);
+    }
+
+    if (!nextPrompt && starterPrompt) {
+      nextPrompt = sanitizeHomepagePrompt(starterPrompt);
+    }
+
+    if (nextPrompt) {
+      setInput(nextPrompt);
+      hasInjectedStarterPromptRef.current = true;
+    }
+  }, [intentId, starterPrompt]);
+
+  useEffect(() => {
+    if (messages.length > 0) return;
+    completedUserTurnsRef.current = 0;
+    hasTrackedChatCompletedRef.current = false;
+  }, [messages.length]);
 
   useEffect(() => {
     if (status !== 'ready') return;
@@ -865,6 +924,12 @@ export function OnboardingChat({
     ).length;
     if (completedUserTurns <= completedUserTurnsRef.current) return;
     completedUserTurnsRef.current = completedUserTurns;
+    if (!hasTrackedChatCompletedRef.current) {
+      hasTrackedChatCompletedRef.current = true;
+      track(ONBOARDING_FUNNEL_EVENTS.CHAT_COMPLETED, {
+        surface: 'start_chat',
+      });
+    }
     onConversationActivity?.();
   }, [messages, onConversationActivity, status]);
 
@@ -946,6 +1011,7 @@ export function OnboardingChat({
             lastAssistantMessageId={lastAssistantMessageId}
             onboardingComposerSurface={onboardingComposerSurface}
             onSelectArtist={handleArtistSelect}
+            profileBuilderState={profileBuilderState}
             shouldDockComposer={shouldDockComposer}
           />
         </div>

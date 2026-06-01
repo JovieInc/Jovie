@@ -36,8 +36,8 @@ async function openHomepageIntentInput(page: Page) {
   return input;
 }
 
-test.describe('Homepage chat intake — ID-keyed intent store + viewport-split auth', () => {
-  test('desktop: pill + Enter persists intent and redirects to /signup with intent_id inside redirect_url', async ({
+test.describe('Homepage chat intake — ID-keyed intent store + /start handoff', () => {
+  test('desktop: pill + Enter persists intent and redirects to /start with intent_id', async ({
     page,
   }) => {
     const input = await openHomepageIntentInput(page);
@@ -48,17 +48,10 @@ test.describe('Homepage chat intake — ID-keyed intent store + viewport-split a
     await input.pressSequentially('my new EP');
     await input.press('Enter');
 
-    await page.waitForURL(/\/signup/);
+    await page.waitForURL(/\/start/);
     const url = new URL(page.url());
-    expect(url.pathname).toBe('/signup');
-
-    // intent_id must be encoded INSIDE redirect_url, not as a sibling query.
-    // This ensures Clerk preserves it through the OAuth round-trip.
-    const redirectUrlRaw = url.searchParams.get('redirect_url');
-    expect(redirectUrlRaw).toBeTruthy();
-    const redirectUrl = new URL(redirectUrlRaw as string, url.origin);
-    expect(redirectUrl.pathname).toBe('/onboarding');
-    const intentId = redirectUrl.searchParams.get('intent_id');
+    expect(url.pathname).toBe('/start');
+    const intentId = url.searchParams.get('intent_id');
     expect(intentId).toMatch(
       /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
     );
@@ -88,7 +81,7 @@ test.describe('Homepage chat intake — ID-keyed intent store + viewport-split a
     await input.pressSequentially('something completely custom');
     await input.press('Enter');
 
-    await page.waitForURL(/\/signup/);
+    await page.waitForURL(/\/start/);
 
     const stored = await page.evaluate(key => {
       const raw = window.localStorage.getItem(key);
@@ -112,25 +105,17 @@ test.describe('Homepage chat intake — ID-keyed intent store + viewport-split a
       .getByPlaceholder('Ask Jovie...')
       .pressSequentially('release page');
     await page.getByPlaceholder('Ask Jovie...').press('Enter');
-    await page.waitForURL(/\/signup/);
+    await page.waitForURL(/\/start/);
     const tabAUrl = new URL(page.url());
-    const tabARedirect = new URL(
-      tabAUrl.searchParams.get('redirect_url') as string,
-      tabAUrl.origin
-    );
-    const tabAId = tabARedirect.searchParams.get('intent_id') as string;
+    const tabAId = tabAUrl.searchParams.get('intent_id') as string;
 
     // Go back to home and submit a second, different prompt.
     await openHomepageIntentInput(page);
     await page.getByPlaceholder('Ask Jovie...').pressSequentially('album art');
     await page.getByPlaceholder('Ask Jovie...').press('Enter');
-    await page.waitForURL(/\/signup/);
+    await page.waitForURL(/\/start/);
     const tabBUrl = new URL(page.url());
-    const tabBRedirect = new URL(
-      tabBUrl.searchParams.get('redirect_url') as string,
-      tabBUrl.origin
-    );
-    const tabBId = tabBRedirect.searchParams.get('intent_id') as string;
+    const tabBId = tabBUrl.searchParams.get('intent_id') as string;
 
     expect(tabAId).not.toBe(tabBId);
 
@@ -148,7 +133,7 @@ test.describe('Homepage chat intake — ID-keyed intent store + viewport-split a
     const longPrompt = 'a'.repeat(300);
     await page.getByPlaceholder('Ask Jovie...').pressSequentially(longPrompt);
     await page.getByPlaceholder('Ask Jovie...').press('Enter');
-    await page.waitForURL(/\/signup/);
+    await page.waitForURL(/\/start/);
 
     const stored = await page.evaluate(key => {
       const raw = window.localStorage.getItem(key);
@@ -167,7 +152,7 @@ test.describe('Homepage chat intake — ID-keyed intent store + viewport-split a
     await setupClerkTokenIfAvailable(page);
     await page.goto('/');
     // Seed an intent with an HTML-looking prompt via localStorage so we can
-    // test the RENDER path on /onboarding without needing real auth.
+    // test the RENDER path on /start without needing real auth.
     await page.evaluate(key => {
       const id = '11111111-1111-4111-8111-111111111111';
       const intent = {
@@ -185,10 +170,14 @@ test.describe('Homepage chat intake — ID-keyed intent store + viewport-split a
       window.localStorage.setItem(key, JSON.stringify({ [id]: intent }));
     }, INTENTS_KEY);
 
-    // No real auth — we are only checking React's escaping. The body
-    // should contain the literal text, never a live <script>.
-    const body = await page.content();
-    expect(body).not.toContain('<script>alert("xss")</script>');
+    await page.goto('/start?intent_id=11111111-1111-4111-8111-111111111111');
+
+    // No real auth — we are only checking React's escaping and prompt restore.
+    await expect(page.getByLabel('Chat message input')).toHaveValue(
+      '<script>alert("xss")</script>'
+    );
+    const scriptCount = await page.locator('script:has-text("xss")').count();
+    expect(scriptCount).toBe(0);
   });
 
   test('onboarding: missing intent_id does not crash and renders default', async ({

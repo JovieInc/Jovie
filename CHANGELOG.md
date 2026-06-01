@@ -5,7 +5,25 @@
      5|The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
      6|and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
-## [26.5.57] - 2026-05-25
+## [26.6.0] - 2026-06-01
+
+> Jovie now has an onboarding robot that validates the shipped QA path instead of relying on manual incognito-window checks.
+
+### Added
+
+- **Onboarding robot smoke (JOV-2681)**: adds a fast Playwright `/start` smoke that verifies anonymous chat load, first-turn completion, onboarding session continuity, and funnel event emission.
+- **Onboarding robot synthetic (JOV-2681)**: adds the full Clerk-token synthetic path for creating a scoped robot user, completing `/onboarding`, verifying dashboard/public profile/welcome-chat continuity, and cleaning up only the exact robot account.
+- **Onboarding funnel event contract (JOV-2681)**: adds typed internal event constants for `onboarding_started`, `auth_completed`, `chat_started`, `chat_completed`, `qualified`, `waitlisted`, `profile_created`, and `dashboard_loaded`.
+
+### Changed
+
+- **Production synthetic monitoring (JOV-2681)**: wires the full onboarding robot into synthetic monitoring, Slack failure metadata, and retained Playwright trace/video/screenshot artifacts.
+
+### Fixed
+
+- **Release notification scheduling**: stops inserting `campaignId` as a top-level fan-notification field; campaign context remains in the dedup key and metadata, matching the schema.
+
+## [26.5.58] - 2026-05-25
 
 > Native auth now completes through the hardened Mac OS and iOS callback paths, and release pitching now starts from Jovie chat instead of a dedicated sidebar builder.
 

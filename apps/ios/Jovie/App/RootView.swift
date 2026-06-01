@@ -802,10 +802,6 @@ struct LiveRootContainer: View {
           .clerkSessionExchangeStarted,
           context: ["stage": "native_auth_return"]
         )
-        try await runMobileAuthFinalizationStage("waitForClerkStartup") {
-          try await waitForClerkLoaded(clerk)
-        }
-
         let exchangeResponse = try await runMobileAuthFinalizationStage("exchange") {
           try await NativeAuthExchangeClient(
             baseURL: appState.configuration.webBaseURL
@@ -816,17 +812,16 @@ struct LiveRootContainer: View {
           context: ["stage": "native_auth_exchange"]
         )
 
-        if let sessionToken = exchangeResponse.sessionToken,
-           let userID = exchangeResponse.userId,
-           sessionToken.isEmpty == false,
-           userID.isEmpty == false
-        {
+        guard let finalizationPlan = MobileAuthFinalizationPlanner.plan(for: exchangeResponse) else {
+          throw MobileAuthReturnError.missingExchangeCredential
+        }
+
+        switch finalizationPlan {
+        case let .completeWithNativeSession(sessionToken, userID, expiresInSeconds):
           NativeSessionTokenStore.save(
             token: sessionToken,
             userID: userID,
-            expiresAt: Date().addingTimeInterval(
-              TimeInterval(exchangeResponse.expiresInSeconds)
-            )
+            expiresAt: Date().addingTimeInterval(TimeInterval(expiresInSeconds))
           )
           MobileAuthDiagnostics.record("native_exchange_session_token_received")
           Observability.addBreadcrumb(
@@ -839,6 +834,13 @@ struct LiveRootContainer: View {
           LiveAuthUITestStatus.setRouteStatus(appState.route, userID: userID)
 #endif
           return
+
+        case .requiresClerkTicketFlow:
+          break
+        }
+
+        try await runMobileAuthFinalizationStage("waitForClerkStartup") {
+          try await waitForClerkLoaded(clerk)
         }
 
         guard let ticket = exchangeResponse.ticket, ticket.isEmpty == false else {

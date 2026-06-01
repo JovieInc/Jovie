@@ -21,7 +21,7 @@ function isDesktopReleaseImpactingFile(file) {
     return false;
   }
 
-  return !/^apps\/desktop\/scripts\/.+\.test\.mjs$/.test(file);
+  return !/^apps\/desktop\/scripts\/.+\.test\.(mjs|ts|js)$/.test(file);
 }
 
 export function evaluateDesktopReleaseGuard(changedFiles) {

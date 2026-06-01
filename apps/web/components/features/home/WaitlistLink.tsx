@@ -2,14 +2,14 @@
 
 import { Button } from '@jovie/ui';
 import Link from 'next/link';
-import { APP_ROUTES } from '@/constants/routes';
+import { HOMEPAGE_FRONT_DOOR_CTA } from '@/data/homepageLaunchCopy';
 
 export function WaitlistLink() {
   return (
     <div className='w-full space-y-6'>
       {/* Waitlist Call to Action */}
       <div className='relative'>
-        <div className='flex items-center justify-center rounded-xl border border-white/20 bg-white/5 backdrop-blur-xs ring-1 ring-white/10 p-8 transition-all duration-slow'>
+        <div className='flex items-center justify-center rounded-xl border border-white/20 bg-white/5 backdrop-blur-xs ring-1 ring-white/10 p-8 transition-colors duration-slow ease-subtle'>
           <div className='text-center space-y-4'>
             <h3 className='text-2xl font-bold text-white'>Coming Soon</h3>
             <p className='text-white/80 max-w-md'>
@@ -20,9 +20,9 @@ export function WaitlistLink() {
               asChild
               variant='primary'
               size='lg'
-              className='rounded-md bg-linear-to-r from-purple-600 to-pink-600 text-white hover:from-purple-700 hover:to-pink-700 transition-all duration-slow'
+              className='rounded-md bg-linear-to-r from-purple-600 to-pink-600 text-white hover:from-purple-700 hover:to-pink-700 transition-colors duration-slow ease-subtle'
             >
-              <Link href={APP_ROUTES.SIGNUP}>Sign Up</Link>
+              <Link href={HOMEPAGE_FRONT_DOOR_CTA.primary.href}>Sign Up</Link>
             </Button>
           </div>
         </div>

@@ -3,6 +3,10 @@
 <plist version="1.0">
 <dict>
   <key>com.apple.developer.associated-domains</key>
+  <!--
+    Clerk webcredentials for iOS password/passkey autofill.
+    Keep MVP auth callback routing on the custom URL scheme.
+  -->
   <array>
     <string>webcredentials:$(CLERK_ASSOCIATED_DOMAIN)</string>
   </array>

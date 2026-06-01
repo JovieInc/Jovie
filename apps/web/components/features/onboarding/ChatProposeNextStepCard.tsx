@@ -1,9 +1,11 @@
 'use client';
 
 import { SignUp } from '@clerk/nextjs';
-import { useMemo } from 'react';
+import { useEffect, useMemo } from 'react';
 import { APP_ROUTES } from '@/constants/routes';
 import { useAuthSafe, useCanRenderClerkUi } from '@/hooks/useClerkSafe';
+import { track } from '@/lib/analytics';
+import { ONBOARDING_FUNNEL_EVENTS } from '@/lib/onboarding/funnel-events';
 
 /**
  * Renders the `proposeNextStep` tool result inside the onboarding chat
@@ -43,6 +45,22 @@ export function ChatProposeNextStepCard({
   const { isSignedIn } = useAuthSafe();
   const canRenderClerkUi = useCanRenderClerkUi();
   const kind = payload.decision.kind;
+
+  useEffect(() => {
+    if (kind === 'instant_access') {
+      track(ONBOARDING_FUNNEL_EVENTS.QUALIFIED, {
+        score: payload.decision.score,
+        surface: 'start_chat',
+      });
+    }
+
+    if (kind === 'waitlist') {
+      track(ONBOARDING_FUNNEL_EVENTS.WAITLISTED, {
+        score: payload.decision.score,
+        surface: 'start_chat',
+      });
+    }
+  }, [kind, payload.decision.score]);
 
   // Memoise the Clerk appearance so the inline form looks at home on the
   // dark onboarding canvas without re-creating the object on every render.

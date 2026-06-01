@@ -139,7 +139,10 @@ export const dspArtistMatches = pgTable(
 );
 
 // ============================================================================
-// Fan Release Notifications - Queue for fan emails about new releases
+// Fan Release Notifications - Queue for fan emails (release-tied or campaign-driven)
+// JOV-2211: Added campaignId for campaign-aware scheduling (demo-critical path:
+// draft -> segment -> schedule -> preview -> send). Nullable; no FK yet (target
+// table lands in follow-up). Existing release_day rows use null.
 // ============================================================================
 
 export const fanReleaseNotifications = pgTable(
@@ -152,6 +155,9 @@ export const fanReleaseNotifications = pgTable(
     releaseId: uuid('release_id')
       .notNull()
       .references(() => discogReleases.id, { onDelete: 'cascade' }),
+    // JOV-2211: campaign linkage for manual/ad-hoc fan notifications (e.g. merch
+    // drops, surprise releases). Paired with segment targeting in scheduler.
+    campaignId: uuid('campaign_id'),
     notificationSubscriptionId: uuid('notification_subscription_id')
       .notNull()
       .references(() => notificationSubscriptions.id, { onDelete: 'cascade' }),
@@ -184,6 +190,10 @@ export const fanReleaseNotifications = pgTable(
     // Index for finding notifications by creator
     creatorIdx: index('fan_release_notifications_creator_idx').on(
       table.creatorProfileId
+    ),
+    // JOV-2211: support efficient lookups by campaign for dashboard/monitoring
+    campaignIdx: index('fan_release_notifications_campaign_idx').on(
+      table.campaignId
     ),
   })
 );
