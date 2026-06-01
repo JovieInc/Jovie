@@ -156,6 +156,28 @@ const defaultProps = {
   hasTip: false,
   hasContacts: false,
   hasReleases: true,
+  shareContext: {
+    surfaceType: 'profile' as const,
+    title: 'Test Artist',
+    canonicalUrl: 'https://example.com/testartist',
+    displayUrl: 'example.com/testartist',
+    imageUrl: null,
+    preparedText: 'Check out Test Artist',
+    emailSubject: 'Test Artist on Jovie',
+    emailBody: 'Link inside',
+    asset: {
+      kind: 'story' as const,
+      url: 'https://example.com/art.png',
+      fileName: 'art.png',
+      mimeType: 'image/png' as const,
+      width: 1080,
+      height: 1920,
+    },
+    utmContext: {
+      baseUrl: 'https://example.com/testartist',
+      releaseSlug: 'test-typecheck-fix',
+    },
+  },
   releases: [
     makeRelease({ id: 'r1', title: 'First Song', slug: 'first-song' }),
     makeRelease({ id: 'r2', title: 'Second Song', slug: 'second-song' }),
