@@ -197,6 +197,9 @@ export const ServerEnvSchema = z.object({
   // Linear API key for HUD queries (tim-action-required issues)
   LINEAR_API_KEY: z.string().optional(),
 
+  // Voice pipeline (ElevenLabs async webhooks + cron processor) (gh-9810)
+  ELEVENLABS_WEBHOOK_SECRET: z.string().optional(),
+
   // GitHub dispatch (Sentry autofix pipeline)
   GH_DISPATCH_TOKEN: z.string().optional(),
   // Vercel-injected Git metadata (used to target the dispatch repo)
@@ -399,6 +402,7 @@ export const ENV_KEYS = [
   'SENTRY_ORG_SLUG',
   'LINEAR_WEBHOOK_SECRET',
   'LINEAR_API_KEY',
+  'ELEVENLABS_WEBHOOK_SECRET',
   'GH_DISPATCH_TOKEN',
   'VERCEL_GIT_REPO_OWNER',
   'VERCEL_GIT_REPO_SLUG',
