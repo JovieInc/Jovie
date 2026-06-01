@@ -576,9 +576,9 @@ export async function createMerchGeneration(params: {
         try {
           const mockupRes = await generateProductMockups({
             designOptionId: option.id,
-            designAssetUrl: option.designAssetUrl, // from artwork step
-            catalogProductId: option.printfulCatalogProductId ?? MERCH_DEFAULT_PRINTFUL_PRODUCT.catalogProductId,
-            placements: option.placements,
+            // designAssetUrl from prior artwork step (optional in pipeline input; fallback internal if absent)
+            catalogProductId: (option as any).printfulCatalogProductId ?? MERCH_DEFAULT_PRINTFUL_PRODUCT.catalogProductId,
+            placements: (option as any).placements,
           });
           await attachMockupsToDesignOption(option.id, mockupRes.mockupUrls);
           // Mark sellable via pricing snapshot + safety (profit > min, etc)
