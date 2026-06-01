@@ -88,3 +88,44 @@ Only use `clerk users delete` directly when you need to remove a specific user t
 - Full auth architecture: `.claude/rules/auth.md`
 - E2E testing patterns: `docs/testing-clerk.md`
 - Clerk SDK integration: `apps/web/lib/auth/`
+
+## Automated Config Access (gh-9805)
+
+For agent/automation use (iOS auth redirects, OAuth provider settings, allowed origins, native apps, webhooks, JWT templates, etc.), use the dedicated wrapper:
+
+```bash
+# Always via Doppler for the correct Clerk instance keys + env
+doppler run --project jovie-web --config dev -- \
+  pnpm tsx scripts/clerk-config.ts pull --instance dev --output /tmp/clerk-dev.json
+
+# Quick auth-relevant inspection (redirects, oauth, native, etc.)
+doppler run --project jovie-web --config dev -- \
+  pnpm tsx scripts/clerk-config.ts check-redirects --pattern "jov.ie|myapp://|universal"
+
+# Safe preview of a change (dry-run is default/enforced for mutations)
+doppler run --project jovie-web --config dev -- \
+  pnpm tsx scripts/clerk-config.ts patch --dry-run --json '{"auth":{"redirect_urls":["..."]}}'
+
+# Full schema for known keys
+doppler run --project jovie-web --config dev -- \
+  pnpm tsx scripts/clerk-config.ts schema --instance dev
+```
+
+**Safety (baked in, explicit):**
+- `clerk whoami` + instance verification always first (audit logged to stderr).
+- Mutations require `--dry-run` (or explicit `--yes --allow-prod` for prod).
+- Production refused by default (sk_live_ guard).
+- Reuses exact patterns from `cleanup-e2e-users.ts` / `sync-dev-clerk-ids.ts` (Doppler, sk_test_ preference, batch/confirm style).
+- Also works with `clerk api --dry-run --platform` and the bundled `clerk skill` (MCP/agent integration point).
+
+**Common iOS / redirect auth fix flow (per gh-9805 + gh-9806 context):**
+1. `pull` or `check-redirects --pattern "custom-scheme://"` to diagnose missing native redirect.
+2. Edit the JSON (or construct patch).
+3. `patch --dry-run` (review output).
+4. Re-run with `--yes` only after human or codex review for prod.
+
+See `scripts/clerk-config.ts --help` (or --self-test) and the script source for the full Jovie Doppler mapping + pure helper exports (`extractAuthRelevantConfigKeys`, `hasMatchingRedirect` — unit-testable).
+
+All operations are auditable via the `[clerk-config-audit ...]` lines. This delivers the self-serve path for auth config without manual Clerk dashboard access.
+
+**gstack principles applied (gh-9805):** completeness (inspect + safe mutate), boil lakes (HOT ZONE: this + CLI only), pragmatic (immediate iOS pain), DRY (existing scripts), explicit (guards + docs), bias to action (ship small, iterate).
