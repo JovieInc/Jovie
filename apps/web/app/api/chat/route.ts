@@ -46,6 +46,7 @@ import { tryHandleAnonymousOnboardingChat } from '@/app/api/chat/onboarding-hand
 import { buildArtistBioDraft } from '@/lib/ai/artist-bio-writer';
 import { createImportBioFromUrlTool } from '@/lib/ai/tools/import-bio-from-url';
 import { createProfileEditTool } from '@/lib/ai/tools/profile-edit';
+import { createVoicePromoTool } from '@/lib/ai/tools/voice-promo';
 import { getOptionalAuth } from '@/lib/auth/cached';
 import { getSessionContext } from '@/lib/auth/session';
 import { resolveChatAccountContext } from '@/lib/chat/account-context';
@@ -2077,6 +2078,12 @@ function buildChatTools(
       artistContext,
       resolvedProfileId
     ),
+    // gh-9808 HOT ZONE: voice promo audio generation from cloned voice (premium, 11Labs)
+    // "clone my voice" / "voice promo" / "radio drop" intent loads via system prompt
+    voicePromo: createVoicePromoTool({
+      profileId: resolvedProfileId ?? '',
+      artistName: artistContext.displayName,
+    }),
     markCanvasUploaded: createMarkCanvasUploadedTool(resolvedProfileId),
     formatLyrics: createLyricsFormatTool(),
     ...(resolvedProfileId
