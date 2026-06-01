@@ -25,6 +25,26 @@ export const metadata: Metadata = {
   robots: { index: false, follow: false },
 };
 
-export default async function StartPage() {
-  return <OnboardingShell sessionLabel='pending' />;
+export default async function StartPage(
+  {
+    searchParams,
+  }: Readonly<{
+    searchParams: Promise<Record<string, string | string[] | undefined>>;
+  }> = { searchParams: Promise.resolve({}) }
+) {
+  const params = await searchParams;
+  const intentId =
+    typeof params.intent_id === 'string' ? params.intent_id : undefined;
+  const starterPrompt =
+    typeof params.starter_prompt === 'string'
+      ? params.starter_prompt
+      : undefined;
+
+  return (
+    <OnboardingShell
+      intentId={intentId}
+      sessionLabel='pending'
+      starterPrompt={starterPrompt}
+    />
+  );
 }

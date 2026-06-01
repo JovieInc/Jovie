@@ -9,6 +9,10 @@ import {
   TheOrchardLogo,
 } from '@/components/features/home/label-logos';
 import { APP_ROUTES } from '@/constants/routes';
+import {
+  buildHomepageStartHref,
+  HOMEPAGE_REQUEST_ACCESS_STARTER_PROMPT,
+} from '@/data/homepageFrontDoorCta';
 import { TIM_WHITE_PROFILE } from '@/lib/tim-white';
 
 const SUGGESTIONS = [
@@ -59,7 +63,9 @@ export function HomeV1Design() {
                 Sign In
               </Link>
               <Link
-                href={APP_ROUTES.SIGNUP}
+                href={buildHomepageStartHref(
+                  HOMEPAGE_REQUEST_ACCESS_STARTER_PROMPT
+                )}
                 className='inline-flex h-9 items-center gap-1.5 rounded-full bg-white px-4 text-[13px] font-semibold text-black transition-colors hover:bg-white/90'
               >
                 Request Access
@@ -115,7 +121,9 @@ export function HomeV1Design() {
                   Tell Jovie what you are releasing next
                 </div>
                 <Link
-                  href={APP_ROUTES.SIGNUP}
+                  href={buildHomepageStartHref(
+                    HOMEPAGE_REQUEST_ACCESS_STARTER_PROMPT
+                  )}
                   className='inline-flex h-12 shrink-0 items-center justify-center gap-2 rounded-full bg-white px-5 text-[14px] font-semibold text-black transition-colors hover:bg-white/90'
                 >
                   Request Access
@@ -127,7 +135,7 @@ export function HomeV1Design() {
                 {SUGGESTIONS.map(suggestion => (
                   <Link
                     key={suggestion}
-                    href={APP_ROUTES.SIGNUP}
+                    href={buildHomepageStartHref(suggestion)}
                     className='rounded-full border border-white/[0.08] px-3 py-1.5 text-[12px] font-medium text-white/56 transition-colors hover:border-white/16 hover:text-white'
                   >
                     {suggestion}

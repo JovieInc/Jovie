@@ -37,6 +37,7 @@ vi.mock('ai', () => ({
   DefaultChatTransport: class DefaultChatTransport {
     constructor(readonly options: unknown) {}
   },
+  gateway: vi.fn((model: string) => model),
 }));
 
 vi.mock('@ai-sdk/react', () => ({
@@ -122,6 +123,12 @@ vi.mock('@/lib/flags/client', () => ({
 }));
 
 vi.mock('@/components/features/onboarding/OnboardingToolArtifacts', () => ({
+  formatCompactCount: (value: number | null | undefined) =>
+    typeof value === 'number' ? String(value) : null,
+  formatExactCount: (value: number | null | undefined) =>
+    typeof value === 'number' ? String(value) : null,
+  formatGenreLabel: (value: string) => value,
+  getSafeSpotifyArtistUrl: (value: string | null | undefined) => value ?? null,
   OnboardingArtistConfirmedCard: () => null,
   OnboardingHandleCheckCard: () => null,
   OnboardingSocialLinkCard: () => null,

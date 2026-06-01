@@ -23,6 +23,7 @@ import {
 import { APP_ROUTES } from '@/constants/routes';
 import { ARTIST_NOTIFICATIONS_COPY } from '@/data/artistNotificationsCopy';
 import { ARTIST_PROFILE_COPY } from '@/data/artistProfileCopy';
+import { HOMEPAGE_FRONT_DOOR_CTA } from '@/data/homepageLaunchCopy';
 import {
   HOMEPAGE_V2_COPY,
   HOMEPAGE_V2_POWER_TILES,
@@ -107,7 +108,7 @@ function HomepageV2Hero() {
 
             <div className='mt-7 flex flex-wrap items-center gap-3'>
               <Link
-                href={APP_ROUTES.SIGNUP}
+                href={HOMEPAGE_FRONT_DOOR_CTA.primary.href}
                 data-testid='homepage-v2-hero-primary-cta'
                 className='public-action-primary'
               >

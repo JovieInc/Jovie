@@ -5,6 +5,7 @@ import { db } from '@/lib/db';
 import { users } from '@/lib/db/schema/auth';
 import { chatAuditLog, chatConversations } from '@/lib/db/schema/chat';
 import { captureError } from '@/lib/error-tracking';
+import { materializeClaimedOnboardingProfile } from '@/lib/onboarding/claim-profile';
 import {
   clearOnboardingSessionCookie,
   getCurrentOnboardingSessionId,
@@ -13,6 +14,16 @@ import { extractClientIPFromRequest } from '@/lib/utils/ip-extraction';
 import { logger } from '@/lib/utils/logger';
 
 export const runtime = 'nodejs';
+
+type ClaimedProfilePayload = Awaited<
+  ReturnType<typeof materializeClaimedOnboardingProfile>
+>;
+
+function profilePayload(
+  profile: ClaimedProfilePayload | null
+): { profile: ClaimedProfilePayload } | Record<string, never> {
+  return profile?.profileId ? { profile } : {};
+}
 
 /**
  * POST /api/onboarding/claim (JOV-2132).
@@ -33,7 +44,7 @@ export const runtime = 'nodejs';
  * sessionId from being claimed twice onto different users (constraint
  * violation surfaces as a friendly 409).
  *
- * Returns: `{ claimed: number, conversationId?: string }`.
+ * Returns: `{ claimed: number, conversationId?: string, profile?: ... }`.
  */
 export async function POST(req: Request) {
   try {
@@ -128,6 +139,13 @@ export async function POST(req: Request) {
         });
       }
 
+      const profile = await materializeClaimedOnboardingProfile({
+        userId: userRow.id,
+        conversationId: primary.id,
+        ipAddress,
+        userAgent,
+      });
+
       // Audit row records the claim event. Failure here is acceptable —
       // primary is already claimed, audit gap is a forensic loss but not a
       // user-visible failure.
@@ -174,6 +192,7 @@ export async function POST(req: Request) {
       return NextResponse.json({
         claimed: candidates.length,
         conversationId: primary.id,
+        ...profilePayload(profile),
       });
     } catch (error) {
       // Unique-constraint violation on the partial index = this sessionId was

@@ -13,6 +13,7 @@ const {
   mockLoggerWarn,
   mockLoggerError,
   mockCaptureError,
+  mockMaterializeClaimedOnboardingProfile,
 } = vi.hoisted(() => ({
   mockGetCachedAuth: vi.fn(),
   mockGetCurrentOnboardingSessionId: vi.fn(),
@@ -24,6 +25,7 @@ const {
   mockLoggerWarn: vi.fn(),
   mockLoggerError: vi.fn(),
   mockCaptureError: vi.fn().mockResolvedValue(undefined),
+  mockMaterializeClaimedOnboardingProfile: vi.fn(),
 }));
 
 vi.mock('@/lib/auth/cached', () => ({
@@ -33,6 +35,10 @@ vi.mock('@/lib/auth/cached', () => ({
 vi.mock('@/lib/onboarding/session', () => ({
   getCurrentOnboardingSessionId: mockGetCurrentOnboardingSessionId,
   clearOnboardingSessionCookie: mockClearOnboardingSessionCookie,
+}));
+
+vi.mock('@/lib/onboarding/claim-profile', () => ({
+  materializeClaimedOnboardingProfile: mockMaterializeClaimedOnboardingProfile,
 }));
 
 vi.mock('@/lib/db', () => ({
@@ -170,6 +176,11 @@ describe('POST /api/onboarding/claim — race, idempotency, failure paths', () =
     mockGetCachedAuth.mockResolvedValue({ userId: 'clerk_user_123' });
     mockGetCurrentOnboardingSessionId.mockResolvedValue('sess_abc123');
     mockExtractClientIP.mockReturnValue('10.0.0.1');
+    mockMaterializeClaimedOnboardingProfile.mockResolvedValue({
+      profileId: null,
+      handle: null,
+      status: 'skipped',
+    });
   });
 
   it('returns 401 when unauthenticated', async () => {

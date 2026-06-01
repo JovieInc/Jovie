@@ -9,6 +9,11 @@ import { ONBOARDING_FUNNEL_EVENTS } from '@/lib/onboarding/funnel-events';
 import { cn } from '@/lib/utils';
 import { OnboardingChat } from './OnboardingChat';
 import {
+  EMPTY_ONBOARDING_PROFILE_BUILDER_STATE,
+  type OnboardingProfileBuilderState,
+  OnboardingProfileRail,
+} from './OnboardingProfileRail';
+import {
   OnboardingTurnstile,
   type OnboardingTurnstileState,
 } from './OnboardingTurnstile';
@@ -22,10 +27,22 @@ import { useOnboardingClaim } from './useOnboardingClaim';
 interface OnboardingShellProps {
   /** First 8 chars of the session id. Debug breadcrumb only — not sensitive. */
   readonly sessionLabel: string;
+  /** ID for a homepage-captured starter prompt stored in localStorage. */
+  readonly intentId?: string;
+  /** Optional URL-provided starter prompt for deterministic demo runs. */
+  readonly starterPrompt?: string;
 }
 
-export function OnboardingShell({ sessionLabel }: OnboardingShellProps) {
+export function OnboardingShell({
+  intentId,
+  sessionLabel,
+  starterPrompt,
+}: OnboardingShellProps) {
   const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
+  const [profileBuilderState, setProfileBuilderState] =
+    useState<OnboardingProfileBuilderState>(
+      EMPTY_ONBOARDING_PROFILE_BUILDER_STATE
+    );
   const [turnstileState, setTurnstileState] =
     useState<OnboardingTurnstileState>({
       status: 'loading',
@@ -135,7 +152,10 @@ export function OnboardingShell({ sessionLabel }: OnboardingShellProps) {
             data-onboarding-session={sessionLabel}
           >
             <OnboardingChat
+              intentId={intentId}
               onConversationActivity={handleConversationActivity}
+              onProfileBuilderChange={setProfileBuilderState}
+              starterPrompt={starterPrompt}
               turnstileToken={turnstileToken}
               turnstileStatus={turnstileState.status}
               turnstilePanel={turnstilePanel}
@@ -155,7 +175,7 @@ export function OnboardingShell({ sessionLabel }: OnboardingShellProps) {
             />
           </div>
         }
-        rightPanel={null}
+        rightPanel={<OnboardingProfileRail state={profileBuilderState} />}
       />
     </SidebarProvider>
   );

@@ -40,7 +40,8 @@ describe('OnboardingProfileRail', () => {
     expect(screen.getByText('Genre: Progressive House')).toBeDefined();
     expect(screen.getByText('Progressive House')).toBeDefined();
     expect(screen.getByText('jov.ie/testartist')).toBeDefined();
-    expect(screen.getByText('instagram.com')).toBeDefined();
+    expect(screen.getByTestId('onboarding-phone-preview')).toBeDefined();
+    expect(screen.getAllByText('instagram.com').length).toBeGreaterThan(0);
   });
 
   it('omits unsafe artist profile links', () => {

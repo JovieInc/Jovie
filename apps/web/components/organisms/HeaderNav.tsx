@@ -55,12 +55,14 @@ export interface HeaderFlyoutMenu {
 type PublicAuthActionsProps = Readonly<{
   readonly minimal?: boolean;
   readonly minimalVariant?: 'link' | 'pill';
+  readonly publicCtaHref?: string;
   readonly publicCtaLabel?: string;
 }>;
 
 function PublicAuthActions({
   minimal = false,
   minimalVariant = 'link',
+  publicCtaHref = APP_ROUTES.SIGNUP,
   publicCtaLabel = 'Request Access',
 }: PublicAuthActionsProps = {}) {
   if (minimal) {
@@ -87,7 +89,7 @@ function PublicAuthActions({
         Log in
       </Link>
       <Link
-        href={APP_ROUTES.SIGNUP}
+        href={publicCtaHref}
         className={getLinearPillClassName({
           className: 'focus-ring-themed shrink-0 whitespace-nowrap',
         })}
@@ -99,9 +101,14 @@ function PublicAuthActions({
 }
 
 function GlassAuthActions({
+  publicCtaHref = APP_ROUTES.SIGNUP,
   publicCtaLabel = 'Start Free Trial',
   showContactLink = true,
-}: Readonly<{ publicCtaLabel?: string; showContactLink?: boolean }>) {
+}: Readonly<{
+  publicCtaHref?: string;
+  publicCtaLabel?: string;
+  showContactLink?: boolean;
+}>) {
   return (
     <div className='flex items-center gap-1'>
       {showContactLink ? (
@@ -119,7 +126,7 @@ function GlassAuthActions({
         Sign in
       </Link>
       <Link
-        href={APP_ROUTES.SIGNUP}
+        href={publicCtaHref}
         className='marketing-glass-header__cta focus-ring-themed'
       >
         {publicCtaLabel}
@@ -570,6 +577,7 @@ export function HeaderNav({
           >
             {authMode === 'public-static' && isMarketingGlass ? (
               <GlassAuthActions
+                publicCtaHref={mobilePublicCtaHref}
                 publicCtaLabel={publicCtaLabel}
                 showContactLink={showContactLink}
               />
@@ -577,6 +585,7 @@ export function HeaderNav({
               <PublicAuthActions
                 minimal={minimalAuth}
                 minimalVariant={minimalAuthVariant}
+                publicCtaHref={mobilePublicCtaHref}
                 publicCtaLabel={publicCtaLabel}
               />
             ) : (

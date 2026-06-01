@@ -5,7 +5,7 @@
      5|The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
      6|and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
-## [26.5.59] - 2026-05-31
+## [26.6.0] - 2026-06-01
 
 > Jovie now has an onboarding robot that validates the shipped QA path instead of relying on manual incognito-window checks.
 

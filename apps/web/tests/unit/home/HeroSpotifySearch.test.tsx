@@ -209,9 +209,7 @@ describe('HeroSpotifySearch', () => {
       await user.type(getInput(), 'Taylor');
       await user.keyboard('{ArrowDown}');
       await user.keyboard('{Enter}');
-      expect(mockPush).toHaveBeenCalledWith(
-        expect.stringContaining('/signup?')
-      );
+      expect(mockPush).toHaveBeenCalledWith(expect.stringContaining('/start?'));
       expect(mockPush).toHaveBeenCalledWith(
         expect.stringContaining('spotify_url=')
       );
@@ -255,16 +253,17 @@ describe('HeroSpotifySearch', () => {
       mockHookReturn.state = 'success';
     });
 
-    it('click navigates to signup with spotify_url and artist_name params', async () => {
+    it('click navigates to /start with spotify_url, artist_name, and starter prompt', async () => {
       renderComponent();
       const user = userEvent.setup();
       await user.type(getInput(), 'Taylor');
       await user.click(screen.getByText('Taylor Swift'));
       expect(mockPush).toHaveBeenCalledTimes(1);
       const url = mockPush.mock.calls[0][0] as string;
-      expect(url).toContain('/signup?');
+      expect(url).toContain('/start?');
       expect(url).toContain('spotify_url=');
       expect(url).toContain('artist_name=Taylor+Swift');
+      expect(url).toContain('starter_prompt=');
     });
 
     it('verified badge shown for verified artists', async () => {
@@ -301,7 +300,7 @@ describe('HeroSpotifySearch', () => {
       });
       await user.click(claimButton);
       expect(mockPush).toHaveBeenCalledWith(
-        expect.stringContaining('/signup?spotify_url=')
+        expect.stringContaining('/start?spotify_url=')
       );
     });
 

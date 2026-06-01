@@ -7,7 +7,7 @@ import {
 import Link from 'next/link';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { ContributionGraph } from '@/components/ui/contribution-graph';
-import { APP_ROUTES } from '@/constants/routes';
+import { HOMEPAGE_FRONT_DOOR_CTA } from '@/data/homepageLaunchCopy';
 import { cn } from '@/lib/utils';
 import {
   countFridaysInYear,
@@ -313,7 +313,7 @@ function FridayRhythmContent({
         </p>
         <Link
           className='public-action-secondary focus-ring-themed'
-          href={APP_ROUTES.SIGNUP}
+          href={HOMEPAGE_FRONT_DOOR_CTA.primary.href}
         >
           Build Your Release Rhythm
         </Link>

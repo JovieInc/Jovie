@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { MarketingPricingPlans } from '@/components/features/pricing/MarketingPricingPlans';
 import { MarketingContainer } from '@/components/marketing';
-import { APP_ROUTES } from '@/constants/routes';
+import { HOMEPAGE_FRONT_DOOR_CTA } from '@/data/homepageLaunchCopy';
 import { HOMEPAGE_V2_COPY } from '@/data/homepageV2Copy';
 import { cn } from '@/lib/utils';
 
@@ -162,7 +162,7 @@ export function HomepageV2FinalCta() {
             {HOMEPAGE_V2_COPY.finalCta.headline}
           </h2>
           <Link
-            href={APP_ROUTES.SIGNUP}
+            href={HOMEPAGE_FRONT_DOOR_CTA.primary.href}
             className='homepage-final-cta-action public-action-primary focus-ring-themed'
             data-testid='homepage-v2-final-cta-primary'
             data-cta-sign-up='true'
