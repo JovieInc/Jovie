@@ -50,7 +50,7 @@ vi.mock('@/lib/agents/agent-harness', async importOriginal => {
         },
         provenance: {
           triggeredAt: '2026-06-01T00:00:00Z',
-          sources: ['cf1'],
+          sources: ['cf_abc'],
           flag: 'MEMORY_STUDIO_SESSION_V0',
         },
       }),
