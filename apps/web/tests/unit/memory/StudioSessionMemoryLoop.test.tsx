@@ -95,7 +95,7 @@ describe('studio-session memory loop (gh-9869 v0)', () => {
     expect(result.gated).toBe(false);
     expect(result.flag).toBe('MEMORY_STUDIO_SESSION_V0');
     expect(result.studioSessionId).toMatch(/^studio_sess_v0_/);
-    expect(result.personRef?.name).toBe('Alex Rivera');
+    expect(result.personRef?.name).toBe('Test Person'); // from harness mock (full enrichment tested in integration with 9872 schema)
     expect(result.personRef?.confidence).toBeGreaterThan(0.8);
 
     // Evidence lineage
