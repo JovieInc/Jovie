@@ -269,7 +269,17 @@ async function cmdPull(options: ClerkConfigOptions): Promise<void> {
   }
 
   // Also surface extracted auth keys for quick agent inspection
-  const extracted = extractAuthRelevantConfigKeys(out);
+  const configForExtraction =
+    options.output && existsSync(options.output)
+      ? readFileSync(options.output, 'utf8')
+      : out;
+  const extracted = extractAuthRelevantConfigKeys(configForExtraction);
+  if ('parse_error' in extracted) {
+    console.error(
+      '[warn] Could not parse Clerk config JSON for extracted auth keys preview.'
+    );
+    return;
+  }
   if (Object.keys(extracted).length > 0) {
     console.error('\n[extracted-auth-keys for quick inspection]');
     console.error(JSON.stringify(extracted, null, 2));
