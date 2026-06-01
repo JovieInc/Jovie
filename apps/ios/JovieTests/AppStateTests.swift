@@ -47,7 +47,9 @@ struct AppStateTests {
     apiBaseURL: URL(string: "http://localhost:3100")!,
     webBaseURL: URL(string: "https://jov.ie")!,
     sentryDSN: nil,
-    observabilityEnvironment: "test"
+    observabilityEnvironment: "test",
+    clerkRedirectUrl: "ie.jov.jovie://callback",
+    clerkCallbackUrlScheme: "ie.jov.jovie"
   )
 
   @Test func mapsReadyResponseToReadyRoute() async throws {

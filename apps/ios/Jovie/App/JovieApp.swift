@@ -252,16 +252,21 @@ enum NativeTicketSignInDiagnostics {
 }
 #endif
 
-func makeJovieClerkOptions() -> Clerk.Options {
+func makeJovieClerkOptions(redirectUrl: String, callbackUrlScheme: String) -> Clerk.Options {
   let responseMiddleware: [any ClerkResponseMiddleware] = [
     NativeTicketSignInResponseMiddleware(),
   ]
 
   return Clerk.Options(
     keychainConfig: .init(service: "ie.jov.Jovie"),
+    // Uses env-driven values from AppConfiguration (gh-9806/JOV-2652).
+    // These MUST be registered as allowed redirect URLs in the Clerk dashboard
+    // for the matching publishable key (native/iOS app section). Explicit config
+    // per 6 gstack principles (explicit over clever, pragmatic, completeness for
+    // end-to-end iOS Clerk auth with prior #8635/#9573 patterns).
     redirectConfig: .init(
-      redirectUrl: "ie.jov.jovie://callback",
-      callbackUrlScheme: "ie.jov.jovie"
+      redirectUrl: redirectUrl,
+      callbackUrlScheme: callbackUrlScheme
     ),
     middleware: .init(
       request: [NativeTicketSignInRequestMiddleware()],
@@ -304,7 +309,10 @@ struct JovieApp: App {
     if launchMode.usesLiveClerk {
       Clerk.configure(
         publishableKey: configuration.clerkPublishableKey,
-        options: makeJovieClerkOptions()
+        options: makeJovieClerkOptions(
+          redirectUrl: configuration.clerkRedirectUrl,
+          callbackUrlScheme: configuration.clerkCallbackUrlScheme
+        )
       )
     }
 
@@ -363,6 +371,11 @@ struct JovieApp: App {
       }
       .preferredColorScheme(.dark)
       .onOpenURL { url in
+        // Jovie native auth callbacks + Clerk SDK redirects (configured via
+        // AppConfiguration.clerkRedirectUrl from env/plist, gh-9806/JOV-2652).
+        // Clerk dashboard must whitelist the exact redirectUrl for the key.
+        // If ClerkKit exposes handle (e.g. Clerk.shared.handle(url:)), forward
+        // matching Clerk callbacks here for full SDK redirect support.
         MobileAuthCallbackURLInbox.shared.enqueue(url)
       }
       .task {
@@ -379,6 +392,8 @@ final class JovieAppDelegate: NSObject, UIApplicationDelegate {
     options: [UIApplication.OpenURLOptionsKey: Any] = [:]
   ) -> Bool {
     Task { @MainActor in
+      // Mirror of onOpenURL for universal links / external launches.
+      // See above for Clerk iOS auth config notes (HOT ZONE).
       MobileAuthCallbackURLInbox.shared.enqueue(url)
     }
     return true

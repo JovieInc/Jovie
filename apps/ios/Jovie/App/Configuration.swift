@@ -6,13 +6,20 @@ struct AppConfiguration: Sendable {
   let webBaseURL: URL
   let sentryDSN: String?
   let observabilityEnvironment: String
+  // Clerk redirect config for iOS native SDK (gh-9806 / JOV-2652).
+  // Must match allowed redirect URLs registered in Clerk dashboard for the
+  // publishable key's native/iOS application (explicit per-env via plist/env).
+  let clerkRedirectUrl: String
+  let clerkCallbackUrlScheme: String
 
   static let mock = AppConfiguration(
     clerkPublishableKey: "pk_test_mock",
     apiBaseURL: URL(string: "http://localhost:3100")!,
     webBaseURL: URL(string: "https://jov.ie")!,
     sentryDSN: nil,
-    observabilityEnvironment: "test"
+    observabilityEnvironment: "test",
+    clerkRedirectUrl: "ie.jov.jovie://callback",
+    clerkCallbackUrlScheme: "ie.jov.jovie"
   )
 
   static func load(bundle: Bundle = .main) -> AppConfiguration {
@@ -98,12 +105,28 @@ struct AppConfiguration: Sendable {
       ]
     ) ?? "development"
 
+    // Clerk iOS redirect config (HOT ZONE gh-9806/JOV-2652): explicit, env-driven
+    // so each Clerk instance (dev/staging/prod) can have its matching allowed
+    // redirect URLs registered in the Clerk dashboard. Falls back to current
+    // values for backward compat. 6 principles: explicit > clever, pragmatic.
+    let clerkRedirectUrl = optionalStringValue(
+      key: "ClerkRedirectUrl",
+      envKeys: ["CLERK_REDIRECT_URL", "JOVIE_IOS_CLERK_REDIRECT_URL"]
+    ) ?? "ie.jov.jovie://callback"
+
+    let clerkCallbackUrlScheme = optionalStringValue(
+      key: "ClerkCallbackUrlScheme",
+      envKeys: ["CLERK_CALLBACK_URL_SCHEME", "JOVIE_IOS_CLERK_CALLBACK_URL_SCHEME"]
+    ) ?? "ie.jov.jovie"
+
     return AppConfiguration(
       clerkPublishableKey: publishableKey,
       apiBaseURL: apiBaseURL,
       webBaseURL: webBaseURL,
       sentryDSN: sentryDSN,
-      observabilityEnvironment: observabilityEnvironment
+      observabilityEnvironment: observabilityEnvironment,
+      clerkRedirectUrl: clerkRedirectUrl,
+      clerkCallbackUrlScheme: clerkCallbackUrlScheme
     )
   }
 

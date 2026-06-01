@@ -10,6 +10,11 @@ API_BASE_URL="${API_BASE_URL:-http://localhost:3100}"
 WEB_BASE_URL="${WEB_BASE_URL:-$API_BASE_URL}"
 SENTRY_DSN="${JOVIE_IOS_SENTRY_DSN:-${NEXT_PUBLIC_SENTRY_DSN_DEV:-${NEXT_PUBLIC_SENTRY_DSN:-${SENTRY_DSN_DEV:-${SENTRY_DSN:-}}}}}"
 OBSERVABILITY_ENVIRONMENT="${JOVIE_IOS_OBSERVABILITY_ENVIRONMENT:-${OBSERVABILITY_ENVIRONMENT:-${SENTRY_ENVIRONMENT:-development}}}"
+# Clerk iOS redirect config (gh-9806 JOV-2652): drive from env/Doppler so it
+# matches the allowed redirect URLs configured in the Clerk dashboard for
+# this publishable key + native app. Same scheme across envs; explicit.
+CLERK_REDIRECT_URL="${CLERK_REDIRECT_URL:-${JOVIE_IOS_CLERK_REDIRECT_URL:-ie.jov.jovie://callback}}"
+CLERK_CALLBACK_URL_SCHEME="${CLERK_CALLBACK_URL_SCHEME:-${JOVIE_IOS_CLERK_CALLBACK_URL_SCHEME:-ie.jov.jovie}}"
 
 python3 - <<PY
 import plistlib
@@ -24,6 +29,8 @@ payload = {
     "WebBaseUrl": r"$WEB_BASE_URL",
     "SentryDsn": r"$SENTRY_DSN",
     "ObservabilityEnvironment": r"$OBSERVABILITY_ENVIRONMENT",
+    "ClerkRedirectUrl": r"$CLERK_REDIRECT_URL",
+    "ClerkCallbackUrlScheme": r"$CLERK_CALLBACK_URL_SCHEME",
 }
 
 with target.open("wb") as file_handle:
