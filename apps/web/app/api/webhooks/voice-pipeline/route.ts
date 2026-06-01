@@ -44,6 +44,7 @@ export const runtime = 'nodejs';
 
 const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
 const DEDUPE_TTL_SECONDS = 60;
+const HEX_SIGNATURE_PATTERN = /^[0-9a-f]+$/i;
 
 interface VoicePipelineWebhookPayload {
   id?: string; // event or job id for dedupe
@@ -53,22 +54,50 @@ interface VoicePipelineWebhookPayload {
   [key: string]: unknown;
 }
 
+function normalizeSignature(signature: string): string | null {
+  const normalized = signature
+    .trim()
+    .replace(/^sha256=/i, '')
+    .toLowerCase();
+  if (!HEX_SIGNATURE_PATTERN.test(normalized)) {
+    return null;
+  }
+  return normalized;
+}
+
 function verifySignature(
   body: string,
   signature: string,
   secret: string
 ): boolean {
+  const normalizedSignature = normalizeSignature(signature);
+  if (!normalizedSignature) {
+    return false;
+  }
+
   try {
-    const expected = createHmac('sha256', secret).update(body).digest('hex');
-    const sigBuffer = Buffer.from(signature, 'hex');
-    const expectedBuffer = Buffer.from(expected, 'hex');
-    return (
-      sigBuffer.length === expectedBuffer.length &&
-      timingSafeEqual(sigBuffer, expectedBuffer)
-    );
+    const expectedBuffer = createHmac('sha256', secret).update(body).digest();
+    const providedBuffer = Buffer.from(normalizedSignature, 'hex');
+    if (providedBuffer.length !== expectedBuffer.length) {
+      return false;
+    }
+
+    return timingSafeEqual(providedBuffer, expectedBuffer);
   } catch {
     return false;
   }
+}
+
+function getEventId(payload: VoicePipelineWebhookPayload): string {
+  if (typeof payload.id === 'string' && payload.id.length > 0) {
+    return payload.id;
+  }
+
+  if (payload.data && typeof payload.data.id === 'string') {
+    return payload.data.id;
+  }
+
+  return `evt_${Date.now()}`;
 }
 
 export async function POST(request: NextRequest) {
@@ -123,12 +152,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const eventId =
-      (payload.id as string | undefined) ||
-      (payload.data && typeof payload.data === 'object' && 'id' in payload.data
-        ? String((payload.data as Record<string, unknown>).id)
-        : undefined) ||
-      `evt_${Date.now()}`;
+    const eventId = getEventId(payload);
 
     dedupeKey = eventId;
 
@@ -164,10 +188,6 @@ export async function POST(request: NextRequest) {
       type: payload.type,
       status: payload.status,
     });
-
-    // TODO (follow-up 9807+): persist to voice_jobs table or enqueue via
-    // existing job processor. For now, the event is durably received and
-    // deduped. The paired cron can sweep any side effects.
 
     // Clear dedupe lock on success path (failure paths leave it to expire)
     await clearRecentDispatch('voice-pipeline', eventId).catch(() => {
