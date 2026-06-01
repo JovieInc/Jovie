@@ -25,11 +25,13 @@ export const metadata: Metadata = {
   robots: { index: false, follow: false },
 };
 
-export default async function StartPage({
-  searchParams,
-}: Readonly<{
-  searchParams: Promise<Record<string, string | string[] | undefined>>;
-}>) {
+export default async function StartPage(
+  {
+    searchParams,
+  }: Readonly<{
+    searchParams: Promise<Record<string, string | string[] | undefined>>;
+  }> = { searchParams: Promise.resolve({}) }
+) {
   const params = await searchParams;
   const intentId =
     typeof params.intent_id === 'string' ? params.intent_id : undefined;

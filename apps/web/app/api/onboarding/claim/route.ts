@@ -15,6 +15,16 @@ import { logger } from '@/lib/utils/logger';
 
 export const runtime = 'nodejs';
 
+type ClaimedProfilePayload = Awaited<
+  ReturnType<typeof materializeClaimedOnboardingProfile>
+>;
+
+function profilePayload(
+  profile: ClaimedProfilePayload | null
+): { profile: ClaimedProfilePayload } | Record<string, never> {
+  return profile?.profileId ? { profile } : {};
+}
+
 /**
  * POST /api/onboarding/claim (JOV-2132).
  *
@@ -117,33 +127,6 @@ export async function POST(req: Request) {
         .returning({ id: chatConversations.id });
 
       if (claimedPrimary.length === 0) {
-        const [currentPrimary] = await db
-          .select({
-            userId: chatConversations.userId,
-            creatorProfileId: chatConversations.creatorProfileId,
-          })
-          .from(chatConversations)
-          .where(eq(chatConversations.id, primary.id))
-          .limit(1);
-
-        let profile: Awaited<
-          ReturnType<typeof materializeClaimedOnboardingProfile>
-        > | null = null;
-        if (currentPrimary?.userId === userRow.id) {
-          profile = currentPrimary.creatorProfileId
-            ? {
-                profileId: currentPrimary.creatorProfileId,
-                handle: null,
-                status: 'updated',
-              }
-            : await materializeClaimedOnboardingProfile({
-                userId: userRow.id,
-                conversationId: primary.id,
-                ipAddress,
-                userAgent,
-              });
-        }
-
         // Concurrent claim won — primary already has a userId set (likely
         // a duplicate request from the same user retrying after a network
         // blip). Treat as a soft success rather than a 409 because the same
@@ -153,7 +136,6 @@ export async function POST(req: Request) {
           claimed: 0,
           conversationId: primary.id,
           alreadyClaimed: true,
-          profile,
         });
       }
 
@@ -210,7 +192,7 @@ export async function POST(req: Request) {
       return NextResponse.json({
         claimed: candidates.length,
         conversationId: primary.id,
-        profile,
+        ...profilePayload(profile),
       });
     } catch (error) {
       // Unique-constraint violation on the partial index = this sessionId was
