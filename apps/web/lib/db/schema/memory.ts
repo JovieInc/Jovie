@@ -40,6 +40,21 @@ export const memoryEntityTypeEnum = pgEnum('memory_entity_type', [
   'release',
   'recording',
 ]);
+export const memoryEntityTypeEnumValues = [
+  'person',
+  'artist',
+  'song',
+  'location',
+  'studio',
+  'company',
+  'event',
+  'project',
+  'asset',
+  'file',
+  'release',
+  'recording',
+] as const;
+export type MemoryEntityType = (typeof memoryEntityTypeEnumValues)[number];
 
 export const memoryEntityStatusEnum = pgEnum('memory_entity_status', [
   'candidate',
@@ -47,6 +62,13 @@ export const memoryEntityStatusEnum = pgEnum('memory_entity_status', [
   'rejected',
   'merged',
 ]);
+export const memoryEntityStatusEnumValues = [
+  'candidate',
+  'confirmed',
+  'rejected',
+  'merged',
+] as const;
+export type MemoryEntityStatus = (typeof memoryEntityStatusEnumValues)[number];
 
 export const memorySourceTypeEnum = pgEnum('memory_source_type', [
   'chat_message',
@@ -59,12 +81,31 @@ export const memorySourceTypeEnum = pgEnum('memory_source_type', [
   'manual',
   'dev_fixture',
 ]);
+export const memorySourceTypeEnumValues = [
+  'chat_message',
+  'profile_photo',
+  'uploaded_asset',
+  'gmail_message',
+  'calendar_event',
+  'file',
+  'web',
+  'manual',
+  'dev_fixture',
+] as const;
+export type MemorySourceType = (typeof memorySourceTypeEnumValues)[number];
 
 export const memoryObservationStatusEnum = pgEnum('memory_observation_status', [
   'proposed',
   'accepted',
   'rejected',
 ]);
+export const memoryObservationStatusEnumValues = [
+  'proposed',
+  'accepted',
+  'rejected',
+] as const;
+export type MemoryObservationStatus =
+  (typeof memoryObservationStatusEnumValues)[number];
 
 export const memoryOpportunityStatusEnum = pgEnum('memory_opportunity_status', [
   'pending',
@@ -73,6 +114,15 @@ export const memoryOpportunityStatusEnum = pgEnum('memory_opportunity_status', [
   'completed',
   'failed',
 ]);
+export const memoryOpportunityStatusEnumValues = [
+  'pending',
+  'approved',
+  'dismissed',
+  'completed',
+  'failed',
+] as const;
+export type MemoryOpportunityStatus =
+  (typeof memoryOpportunityStatusEnumValues)[number];
 
 // 12 core tables (minimum per spec)
 
@@ -386,13 +436,105 @@ export const memoryOpportunities = pgTable(
   })
 );
 
-// Zod + types (exhaustive for testability per acceptance)
+// Schema validations (drizzle-zod for all 12 tables — exhaustive per plan + 6 principles: completeness, explicit)
 export const insertMemorySourceRecordSchema =
   createInsertSchema(memorySourceRecords);
 export const selectMemorySourceRecordSchema =
   createSelectSchema(memorySourceRecords);
+
+export const insertMemoryAssetSchema = createInsertSchema(memoryAssets);
+export const selectMemoryAssetSchema = createSelectSchema(memoryAssets);
+
+export const insertMemoryEntitySchema = createInsertSchema(memoryEntities);
+export const selectMemoryEntitySchema = createSelectSchema(memoryEntities);
+
+export const insertMemoryEntityIdentitySchema = createInsertSchema(
+  memoryEntityIdentities
+);
+export const selectMemoryEntityIdentitySchema = createSelectSchema(
+  memoryEntityIdentities
+);
+
+export const insertMemoryEntityAliasSchema =
+  createInsertSchema(memoryEntityAliases);
+export const selectMemoryEntityAliasSchema =
+  createSelectSchema(memoryEntityAliases);
+
+export const insertMemoryObservationSchema =
+  createInsertSchema(memoryObservations);
+export const selectMemoryObservationSchema =
+  createSelectSchema(memoryObservations);
+
+export const insertMemoryEntityEdgeSchema =
+  createInsertSchema(memoryEntityEdges);
+export const selectMemoryEntityEdgeSchema =
+  createSelectSchema(memoryEntityEdges);
+
+export const insertMemoryAssetEntityMentionSchema = createInsertSchema(
+  memoryAssetEntityMentions
+);
+export const selectMemoryAssetEntityMentionSchema = createSelectSchema(
+  memoryAssetEntityMentions
+);
+
+export const insertMemoryEventSchema = createInsertSchema(memoryEvents);
+export const selectMemoryEventSchema = createSelectSchema(memoryEvents);
+
+export const insertMemoryEventParticipantSchema = createInsertSchema(
+  memoryEventParticipants
+);
+export const selectMemoryEventParticipantSchema = createSelectSchema(
+  memoryEventParticipants
+);
+
+export const insertMemoryEnrichmentJobSchema =
+  createInsertSchema(memoryEnrichmentJobs);
+export const selectMemoryEnrichmentJobSchema =
+  createSelectSchema(memoryEnrichmentJobs);
+
+export const insertMemoryOpportunitySchema =
+  createInsertSchema(memoryOpportunities);
+export const selectMemoryOpportunitySchema =
+  createSelectSchema(memoryOpportunities);
+
+// Types (inferred for all 12 tables + enum value types)
 export type MemorySourceRecord = typeof memorySourceRecords.$inferSelect;
 export type NewMemorySourceRecord = typeof memorySourceRecords.$inferInsert;
 
-// Enums are already exported by the pgEnum declarations above.
-// (pattern repeated for brevity in this cycle; full PR version has the 4-line zod+type block for every table)
+export type MemoryAsset = typeof memoryAssets.$inferSelect;
+export type NewMemoryAsset = typeof memoryAssets.$inferInsert;
+
+export type MemoryEntity = typeof memoryEntities.$inferSelect;
+export type NewMemoryEntity = typeof memoryEntities.$inferInsert;
+
+export type MemoryEntityIdentity = typeof memoryEntityIdentities.$inferSelect;
+export type NewMemoryEntityIdentity =
+  typeof memoryEntityIdentities.$inferInsert;
+
+export type MemoryEntityAlias = typeof memoryEntityAliases.$inferSelect;
+export type NewMemoryEntityAlias = typeof memoryEntityAliases.$inferInsert;
+
+export type MemoryObservation = typeof memoryObservations.$inferSelect;
+export type NewMemoryObservation = typeof memoryObservations.$inferInsert;
+
+export type MemoryEntityEdge = typeof memoryEntityEdges.$inferSelect;
+export type NewMemoryEntityEdge = typeof memoryEntityEdges.$inferInsert;
+
+export type MemoryAssetEntityMention =
+  typeof memoryAssetEntityMentions.$inferSelect;
+export type NewMemoryAssetEntityMention =
+  typeof memoryAssetEntityMentions.$inferInsert;
+
+export type MemoryEvent = typeof memoryEvents.$inferSelect;
+export type NewMemoryEvent = typeof memoryEvents.$inferInsert;
+
+export type MemoryEventParticipant =
+  typeof memoryEventParticipants.$inferSelect;
+export type NewMemoryEventParticipant =
+  typeof memoryEventParticipants.$inferInsert;
+
+export type MemoryEnrichmentJob = typeof memoryEnrichmentJobs.$inferSelect;
+export type NewMemoryEnrichmentJob = typeof memoryEnrichmentJobs.$inferInsert;
+
+export type MemoryOpportunity = typeof memoryOpportunities.$inferSelect;
+export type NewMemoryOpportunity = typeof memoryOpportunities.$inferInsert;
