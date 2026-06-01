@@ -174,10 +174,9 @@ const defaultProps = {
       height: 1920,
     },
     utmContext: {
-      source: 'test',
-      medium: 'test',
-      campaign: 'test-typecheck-fix',
-    } as any,
+      baseUrl: 'https://example.com/testartist',
+      releaseSlug: 'test-typecheck-fix',
+    },
   },
   releases: [
     makeRelease({ id: 'r1', title: 'First Song', slug: 'first-song' }),
