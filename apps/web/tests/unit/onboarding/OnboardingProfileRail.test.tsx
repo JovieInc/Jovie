@@ -84,4 +84,40 @@ describe('OnboardingProfileRail', () => {
         .some(link => link.getAttribute('href') === 'javascript:alert(1)')
     ).toBe(false);
   });
+
+  it('omits DSP matches whose urls do not belong to the claimed platform', () => {
+    fastRender(
+      <OnboardingProfileRail
+        state={{
+          artist: {
+            id: 'artist-1',
+            name: 'Test Artist',
+            url: 'https://open.spotify.com/artist/artist-1',
+            followers: 12_300,
+            popularity: 48,
+            genres: ['progressive house'],
+            dspMatches: [
+              {
+                id: 'apple-music',
+                label: 'Apple Music',
+                platform: 'applemusic',
+                url: 'https://example.com/music.apple.com/fake',
+              },
+            ],
+          },
+          artistConfirmed: true,
+          handle: 'testartist',
+          socialLinks: ['https://evil.test/instagram.com/testartist'],
+        }}
+      />
+    );
+
+    expect(screen.getAllByTitle('Spotify').length).toBeGreaterThan(0);
+    expect(screen.queryByTitle('Apple Music')).toBeNull();
+    expect(
+      screen
+        .queryAllByRole('link')
+        .some(link => link.getAttribute('href')?.includes('evil.test'))
+    ).toBe(false);
+  });
 });

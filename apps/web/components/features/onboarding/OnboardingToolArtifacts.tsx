@@ -535,7 +535,7 @@ export function OnboardingHandleCheckCard({
   }, [handle]);
 
   useEffect(() => {
-    onHandleCandidateChange?.(normalizedDraft || null);
+    onHandleCandidateChange?.(normalizedDraft);
   }, [normalizedDraft, onHandleCandidateChange]);
 
   if (isFailed(state)) {

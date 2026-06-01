@@ -32,6 +32,13 @@ const DAVID_GUETTA_ARTIST = {
 } as const;
 
 const COMPOSER_TEXTAREA = '[aria-label="Chat message input"]';
+const FALLBACK_ARTIST_IMAGE_PNG_BASE64 =
+  'iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAIAAAAlC+aJAAAAeElEQVR4nO3PQQ3AIADAQMD+/5w9QnJ4QKZsZu2cJwAAAAAAAAAAAAAAANxq7g7wG7iBHYgb2IG4gR2IG9iBuIEdiBvYgbiBHYgb2IG4gR2IG9iBuIEdiBvYgbiBHYgb2IG4gR2IG9iBuIEdiBvYgbiBHYgb2IG4gR2IG9gB9bYCfQMD+LwAAAAASUVORK5CYII=';
+
+interface ArtistImageFixture {
+  readonly body: Buffer;
+  readonly contentType: string;
+}
 
 function uiStreamBody(chunks: readonly StreamChunk[]) {
   return `${chunks.map(chunk => `data: ${JSON.stringify(chunk)}\n\n`).join('')}data: [DONE]\n\n`;
@@ -173,7 +180,10 @@ function trimVideoStart(path: string, startSeconds: number): void {
 
 function trimLeadingWhiteFrames(path: string): void {
   if (!commandExists('ffmpeg')) {
-    throw new Error('ffmpeg is required to guard the onboarding demo video');
+    console.warn(
+      '[onboarding-demo] ffmpeg unavailable; attaching raw demo video'
+    );
+    return;
   }
 
   let firstProductFrameAt = 0;
@@ -195,6 +205,8 @@ function trimLeadingWhiteFrames(path: string): void {
 }
 
 function trimLeadingIdleFrames(path: string): void {
+  if (!commandExists('ffmpeg')) return;
+
   const referenceFrame = videoRgbFrameAt(path, 0);
   if (referenceFrame.length === 0) return;
 
@@ -228,15 +240,18 @@ async function attachDemoScreenshot(
   });
 }
 
-async function mockDavidGuettaOnboarding(page: Page, artistImageBody?: Buffer) {
+async function mockDavidGuettaOnboarding(
+  page: Page,
+  artistImage?: ArtistImageFixture
+) {
   let chatRequestCount = 0;
 
-  if (artistImageBody && artistImageBody.length > 0) {
+  if (artistImage && artistImage.body.length > 0) {
     await page.route('https://i.scdn.co/**', route =>
       route.fulfill({
         status: 200,
-        contentType: 'image/jpeg',
-        body: artistImageBody,
+        contentType: artistImage.contentType,
+        body: artistImage.body,
       })
     );
     await page.route('**/_next/image?**', route => {
@@ -244,8 +259,8 @@ async function mockDavidGuettaOnboarding(page: Page, artistImageBody?: Buffer) {
       if (sourceUrl?.startsWith('https://i.scdn.co/')) {
         return route.fulfill({
           status: 200,
-          contentType: 'image/jpeg',
-          body: artistImageBody,
+          contentType: artistImage.contentType,
+          body: artistImage.body,
         });
       }
       return route.continue();
@@ -423,14 +438,23 @@ test('records David Guetta Spotify-first onboarding demo', async ({
   );
   expect(warmupResponse.status()).toBeLessThan(500);
 
-  let artistImageBody: Buffer | undefined;
+  let artistImage: ArtistImageFixture = {
+    body: Buffer.from(FALLBACK_ARTIST_IMAGE_PNG_BASE64, 'base64'),
+    contentType: 'image/png',
+  };
   try {
     const artistImageResponse = await request.get(DAVID_GUETTA_ARTIST.imageUrl);
-    artistImageBody = artistImageResponse.ok()
-      ? await artistImageResponse.body()
-      : undefined;
+    if (artistImageResponse.ok()) {
+      artistImage = {
+        body: await artistImageResponse.body(),
+        contentType:
+          artistImageResponse.headers()['content-type'] ?? 'image/jpeg',
+      };
+    }
   } catch {
-    artistImageBody = undefined;
+    console.warn(
+      '[onboarding-demo] Spotify CDN image unavailable; using local fixture'
+    );
   }
 
   const context = await browser.newContext({
@@ -443,7 +467,7 @@ test('records David Guetta Spotify-first onboarding demo', async ({
   });
   const page = await context.newPage();
   await suppressDevToolbar(page);
-  await mockDavidGuettaOnboarding(page, artistImageBody);
+  await mockDavidGuettaOnboarding(page, artistImage);
 
   await page.goto(`/start?starter_prompt=${encodeURIComponent(prompt)}`, {
     waitUntil: 'domcontentloaded',

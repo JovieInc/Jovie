@@ -49,6 +49,49 @@ function readSafeHttpsUrl(url: string | null | undefined): string | null {
   }
 }
 
+const PLATFORM_HOST_ALLOWLIST: Record<string, readonly string[]> = {
+  apple_music: ['music.apple.com'],
+  deezer: ['deezer.com'],
+  instagram: ['instagram.com'],
+  soundcloud: ['soundcloud.com'],
+  spotify: ['open.spotify.com', 'spotify.com'],
+  tidal: ['tidal.com'],
+  tiktok: ['tiktok.com'],
+  youtube: ['youtube.com', 'youtu.be'],
+  youtube_music: ['music.youtube.com'],
+};
+
+function isAllowedHostname(
+  hostname: string,
+  allowedHostnames: readonly string[]
+): boolean {
+  const normalizedHostname = hostname.replace(/^www\./, '').toLowerCase();
+  return allowedHostnames.some(allowed => {
+    const normalizedAllowed = allowed.toLowerCase();
+    return (
+      normalizedHostname === normalizedAllowed ||
+      normalizedHostname.endsWith(`.${normalizedAllowed}`)
+    );
+  });
+}
+
+function readSafePlatformUrl(
+  url: string | null | undefined,
+  platform?: string
+): string | null {
+  const safeUrl = readSafeHttpsUrl(url);
+  if (!safeUrl) return null;
+
+  const platformKey = platform ? platformToProfileKey(platform) : null;
+  const allowedHostnames = platformKey
+    ? PLATFORM_HOST_ALLOWLIST[platformKey]
+    : undefined;
+  if (!allowedHostnames) return safeUrl;
+
+  const hostname = new URL(safeUrl).hostname;
+  return isAllowedHostname(hostname, allowedHostnames) ? safeUrl : null;
+}
+
 function platformToProfileKey(platform: string): string {
   const normalized = platform.toLowerCase().replaceAll(/[^a-z0-9]/g, '');
 
@@ -98,7 +141,7 @@ function uniqueDspMatches(
   const seen = new Set(base.map(match => match.id));
   const extras = (artist.dspMatches ?? []).filter(match => {
     if (!match.id || seen.has(match.id)) return false;
-    if (!readSafeHttpsUrl(match.url ?? null)) return false;
+    if (!readSafePlatformUrl(match.url ?? null, match.platform)) return false;
     seen.add(match.id);
     return true;
   });
@@ -115,7 +158,7 @@ function buildPreviewArtist(
   const dspUrls = new Map<string, string>();
 
   for (const match of dspMatches) {
-    const safeUrl = readSafeHttpsUrl(match.url ?? null);
+    const safeUrl = readSafePlatformUrl(match.url ?? null, match.platform);
     if (!safeUrl) continue;
     dspUrls.set(platformToProfileKey(match.platform), safeUrl);
   }
@@ -173,7 +216,7 @@ function buildPreviewLinks({
   const seen = new Set<string>();
 
   const addLink = (platform: string, url: string | null | undefined) => {
-    const safeUrl = readSafeHttpsUrl(url);
+    const safeUrl = readSafePlatformUrl(url, platform);
     if (!safeUrl || seen.has(safeUrl)) return;
     seen.add(safeUrl);
     links.push({

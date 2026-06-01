@@ -85,12 +85,16 @@ export async function generateProductMockups(
       if (mockupResponse) {
         // Extract urls from response shape (PrintfulMockupTask has catalog_variant_mockups in type)
         const urls = readMockupUrls(mockupResponse);
-        return {
-          mockupUrls: urls.length
-            ? urls
-            : [`https://printful-mockups/${designOptionId}.jpg`],
-          provider: 'printful',
-        };
+        if (urls.length > 0) {
+          return {
+            mockupUrls: urls,
+            provider: 'printful',
+          };
+        }
+        logger.warn(
+          '[merch-mockups] Printful mockup task returned no urls, falling back internal',
+          { designOptionId }
+        );
       }
     }
   } catch (err) {
@@ -101,7 +105,6 @@ export async function generateProductMockups(
 
   // Internal templating fallback (explicit reuse of artwork.ts sharp/SVG + blob)
   // Completeness: covers happy + error (bad asset -> fallback url or reject)
-  const internalUrls: string[] = [];
   try {
     // Reuse artwork prep (sizing 1800x2200 mockup etc)
     const artworkRes = await createMerchArtwork({
@@ -113,30 +116,24 @@ export async function generateProductMockups(
       lane: 'artist_world_artifact',
       concept: 'Merch generation pipeline design asset',
       // internal path uses defaults + design overlay
-    }).catch(() => null);
+    });
 
-    if (artworkRes?.mockupUrl) {
-      internalUrls.push(artworkRes.mockupUrl);
-    } else {
-      // Explicit simple internal SVG fallback (no clever abstraction)
-      internalUrls.push(
-        `https://blob.vercel-storage.com/mockups/${designOptionId}-internal.png`
-      );
+    if (!artworkRes.mockupUrl) {
+      throw new TypeError('Internal merch artwork returned no mockup URL');
     }
+
+    return {
+      mockupUrls: [artworkRes.mockupUrl],
+      provider: 'internal',
+      warnings: ['Printful unavailable; used internal templating'],
+    };
   } catch (e) {
     logger.error('[merch-mockups] internal fallback failed', {
+      designOptionId,
       err: String(e),
     });
-    internalUrls.push(
-      `https://blob.vercel-storage.com/mockups/${designOptionId}-fallback.png`
-    );
+    throw e;
   }
-
-  return {
-    mockupUrls: internalUrls,
-    provider: 'internal',
-    warnings: ['Printful unavailable; used internal templating'],
-  };
 }
 
 export async function attachMockupsToDesignOption(

@@ -191,6 +191,25 @@ function TurnstileHarness({
   );
 }
 
+function ControlledStarterHarness({
+  onTurnstileRequired = vi.fn(),
+  starterPrompt,
+  turnstileToken,
+}: Readonly<{
+  onTurnstileRequired?: (message?: string) => void;
+  starterPrompt: string;
+  turnstileToken: string | null;
+}>) {
+  return (
+    <OnboardingChat
+      turnstileToken={turnstileToken}
+      turnstileStatus={turnstileToken ? 'verified' : 'interactive'}
+      onTurnstileRequired={onTurnstileRequired}
+      starterPrompt={starterPrompt}
+    />
+  );
+}
+
 describe('OnboardingChat Turnstile gating', () => {
   beforeEach(() => {
     vi.unstubAllEnvs();
@@ -270,6 +289,41 @@ describe('OnboardingChat Turnstile gating', () => {
       text: 'Hey, I want to get access to Jovie.',
     });
     expect(screen.getByLabelText('Chat message input')).toHaveValue('');
+  });
+
+  it('auto-submits the edited starter prompt after verification', async () => {
+    const onTurnstileRequired = vi.fn();
+    const starterPrompt = 'Hey, I want to get access to Jovie.';
+    const { rerender } = render(
+      <ControlledStarterHarness
+        onTurnstileRequired={onTurnstileRequired}
+        starterPrompt={starterPrompt}
+        turnstileToken={null}
+      />
+    );
+
+    await waitFor(() => {
+      expect(onTurnstileRequired).toHaveBeenCalledWith(
+        'Verify you are human to send'
+      );
+    });
+
+    const input = screen.getByLabelText('Chat message input');
+    fireEvent.change(input, { target: { value: 'Edited access request' } });
+
+    rerender(
+      <ControlledStarterHarness
+        onTurnstileRequired={onTurnstileRequired}
+        starterPrompt={starterPrompt}
+        turnstileToken='token-1'
+      />
+    );
+
+    await waitFor(() => {
+      expect(chatMocks.sendMessage).toHaveBeenCalledWith({
+        text: 'Edited access request',
+      });
+    });
   });
 
   it('tracks chat completion once while reporting each completed user turn', () => {

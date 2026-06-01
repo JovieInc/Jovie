@@ -313,7 +313,7 @@ function deriveProfileBuilderState({
   return {
     artist,
     artistConfirmed,
-    handle: handleDraft ?? handle,
+    handle: handleDraft !== null ? cleanHandle(handleDraft) : handle,
     socialLinks,
   };
 }
@@ -865,6 +865,21 @@ export function OnboardingChat({
     [input, submitText]
   );
 
+  const handleInputChange = useCallback(
+    (nextInput: string) => {
+      setInput(nextInput);
+
+      if (
+        hasInjectedStarterPromptRef.current &&
+        !hasAutoSubmittedStarterPromptRef.current &&
+        messages.length === 0
+      ) {
+        pendingStarterPromptRef.current = nextInput.trim() ? nextInput : null;
+      }
+    },
+    [messages.length]
+  );
+
   const handleRetry = useCallback(() => {
     const failedMessage = chatError?.failedMessage;
     if (!failedMessage) return;
@@ -998,7 +1013,7 @@ export function OnboardingChat({
 
   const onboardingChatInputProps = {
     value: input,
-    onChange: setInput,
+    onChange: handleInputChange,
     onSubmit: handleSubmit,
     isLoading: isBusy,
     isSubmitting: isSubmitted,

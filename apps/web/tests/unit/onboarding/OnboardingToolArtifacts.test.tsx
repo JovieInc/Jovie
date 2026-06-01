@@ -258,6 +258,12 @@ describe('onboarding tool artifacts', () => {
     });
 
     expect(onHandleCandidateChange).toHaveBeenLastCalledWith('test');
+
+    fireEvent.change(screen.getByLabelText('Edit proposed handle'), {
+      target: { value: '' },
+    });
+
+    expect(onHandleCandidateChange).toHaveBeenLastCalledWith('');
   });
 
   it('renders proposed social links as reviewable artifacts', () => {
