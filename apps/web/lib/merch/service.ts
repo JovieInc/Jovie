@@ -35,7 +35,7 @@ import { logger } from '@/lib/utils/logger';
 import { createMerchArtwork } from './artwork';
 import { resolveMerchCatalogSelection } from './catalog';
 import { MERCH_DEFAULT_PRINTFUL_PRODUCT } from './default-catalog';
-import { generateProductMockups, attachMockupsToDesignOption } from './mockups'; // HOT ZONE pipeline (gh-9803)
+import { attachMockupsToDesignOption, generateProductMockups } from './mockups'; // HOT ZONE pipeline (gh-9803)
 import {
   buildMerchPricingSnapshot,
   formatMerchMoney,
@@ -572,13 +572,15 @@ export async function createMerchGeneration(params: {
     // Merch generation pipeline (gh-9803 / JOV-2650): image assets -> mockups (Printful or internal) -> sellable variants + profit.
     // Fire async (non-block per existing patterns); explicit, complete edges, reuse pricing/artwork (6 principles).
     void Promise.allSettled(
-      insertedOptions.map(async (option) => {
+      insertedOptions.map(async option => {
         try {
           const mockupRes = await generateProductMockups({
             designOptionId: option.id,
             // designAssetUrl from prior artwork step (optional in pipeline input; fallback internal if absent)
-            catalogProductId: (option as any).printfulCatalogProductId ?? MERCH_DEFAULT_PRINTFUL_PRODUCT.catalogProductId,
-            placements: (option as any).placements,
+            catalogProductId:
+              option.printfulCatalogProductId ??
+              MERCH_DEFAULT_PRINTFUL_PRODUCT.catalogProductId,
+            placements: option.placements,
           });
           await attachMockupsToDesignOption(option.id, mockupRes.mockupUrls);
           // Mark sellable via pricing snapshot + safety (profit > min, etc)
@@ -587,9 +589,15 @@ export async function createMerchGeneration(params: {
             retailPriceCents: option.retailPriceCents,
             printfulProductCostCents: option.estimatedPrintfulProductCostCents,
           });
-          logger.info('[merch-pipeline] mockups attached + priced', { optionId: option.id, provider: mockupRes.provider });
+          logger.info('[merch-pipeline] mockups attached + priced', {
+            optionId: option.id,
+            provider: mockupRes.provider,
+          });
         } catch (e) {
-          logger.warn('[merch-pipeline] mockup step failed (non-fatal for batch)', { optionId: option.id, err: String(e) });
+          logger.warn(
+            '[merch-pipeline] mockup step failed (non-fatal for batch)',
+            { optionId: option.id, err: String(e) }
+          );
         }
       })
     );

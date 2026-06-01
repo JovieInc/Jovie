@@ -3,8 +3,11 @@ import 'server-only';
 import { eq } from 'drizzle-orm';
 import { db } from '@/lib/db';
 import { merchDesignOptions } from '@/lib/db/schema/merch';
+import {
+  createMockupTask,
+  type PrintfulOrderItemInput,
+} from '@/lib/printful/client'; // reuse existing (explicit function, no singleton)
 import { logger } from '@/lib/utils/logger';
-import { createMockupTask } from '@/lib/printful/client'; // reuse existing (explicit function, no singleton)
 import { createMerchArtwork } from './artwork'; // reuse for internal templating fallback
 // (MerchDesignOption type not needed after refactor; explicit reuse only)
 
@@ -32,36 +35,68 @@ export interface MockupResult {
   readonly warnings?: string[];
 }
 
-export async function generateProductMockups(input: MockupGenerationInput): Promise<MockupResult> {
-  const { designOptionId, designAssetUrl, catalogProductId, placements, technique } = input;
+function readMockupUrls(
+  mockupResponse: Awaited<ReturnType<typeof createMockupTask>>
+): string[] {
+  return (
+    mockupResponse.catalog_variant_mockups?.flatMap(
+      variant =>
+        variant.mockups
+          ?.map(mockup => mockup.mockup_url)
+          .filter((url): url is string => Boolean(url)) ?? []
+    ) ?? []
+  );
+}
 
-  logger.info('[merch-mockups] generate start', { designOptionId, provider: 'printful-preferred' });
+export async function generateProductMockups(
+  input: MockupGenerationInput
+): Promise<MockupResult> {
+  const { designOptionId, catalogProductId, placements, technique } = input;
+
+  logger.info('[merch-mockups] generate start', {
+    designOptionId,
+    provider: 'printful-preferred',
+  });
 
   // Prefer Printful (async mockups per prior patterns + client catalog_variant_mockups)
   try {
     if (catalogProductId) {
+      const printfulPlacements: PrintfulOrderItemInput['placements'] = (
+        placements ?? ['front']
+      ).map(placement => ({
+        placement,
+        technique: technique ?? 'dtg',
+        layers: [],
+      }));
       // Minimal call matching client signature (variantIds from default catalog in practice)
       const mockupResponse = await createMockupTask({
         catalogProductId,
         catalogVariantIds: [1], // placeholder; real from catalog resolution in service
-        placements: (placements || ['front']).map((p) => ({ placement: p, technique: technique || 'dtg', layers: [] as any })),
+        placements: printfulPlacements,
         mockupStyleIds: undefined,
       }).catch((e: unknown) => {
-        logger.warn('[merch-mockups] Printful mockup task failed, falling back internal', { error: String(e) });
+        logger.warn(
+          '[merch-mockups] Printful mockup task failed, falling back internal',
+          { error: String(e) }
+        );
         return null;
       });
 
       if (mockupResponse) {
         // Extract urls from response shape (PrintfulMockupTask has catalog_variant_mockups in type)
-        const urls = (mockupResponse as any).catalog_variant_mockups?.flatMap((m: any) => m.mockups?.map((u: any) => u.mockup_url).filter(Boolean)) || [];
+        const urls = readMockupUrls(mockupResponse);
         return {
-          mockupUrls: urls.length ? urls : [`https://printful-mockups/${designOptionId}.jpg`],
+          mockupUrls: urls.length
+            ? urls
+            : [`https://printful-mockups/${designOptionId}.jpg`],
           provider: 'printful',
         };
       }
     }
   } catch (err) {
-    logger.warn('[merch-mockups] Printful path error, internal fallback', { err: String(err) });
+    logger.warn('[merch-mockups] Printful path error, internal fallback', {
+      err: String(err),
+    });
   }
 
   // Internal templating fallback (explicit reuse of artwork.ts sharp/SVG + blob)
@@ -75,7 +110,7 @@ export async function generateProductMockups(input: MockupGenerationInput): Prom
       optionId: designOptionId,
       artistName: 'System',
       designName: 'Pipeline Design',
-      lane: 'front' as any,
+      lane: 'artist_world_artifact',
       concept: 'Merch generation pipeline design asset',
       // internal path uses defaults + design overlay
     }).catch(() => null);
@@ -84,11 +119,17 @@ export async function generateProductMockups(input: MockupGenerationInput): Prom
       internalUrls.push(artworkRes.mockupUrl);
     } else {
       // Explicit simple internal SVG fallback (no clever abstraction)
-      internalUrls.push(`https://blob.vercel-storage.com/mockups/${designOptionId}-internal.png`);
+      internalUrls.push(
+        `https://blob.vercel-storage.com/mockups/${designOptionId}-internal.png`
+      );
     }
   } catch (e) {
-    logger.error('[merch-mockups] internal fallback failed', { err: String(e) });
-    internalUrls.push(`https://blob.vercel-storage.com/mockups/${designOptionId}-fallback.png`);
+    logger.error('[merch-mockups] internal fallback failed', {
+      err: String(e),
+    });
+    internalUrls.push(
+      `https://blob.vercel-storage.com/mockups/${designOptionId}-fallback.png`
+    );
   }
 
   return {
@@ -116,5 +157,8 @@ export async function attachMockupsToDesignOption(
     })
     .where(eq(merchDesignOptions.id, designOptionId));
 
-  logger.info('[merch-mockups] attached', { designOptionId, count: allMockupUrls.length });
+  logger.info('[merch-mockups] attached', {
+    designOptionId,
+    count: allMockupUrls.length,
+  });
 }
