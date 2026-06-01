@@ -1,5 +1,3 @@
-import 'server-only';
-
 import type { MerchPricingSnapshot } from '@/lib/db/schema/merch';
 
 export const MERCH_DEFAULT_CURRENCY = 'USD' as const;
@@ -45,6 +43,37 @@ export function formatMerchMoney(cents: number): string {
     style: 'currency',
     currency: MERCH_DEFAULT_CURRENCY,
   }).format(cents / 100);
+}
+
+/**
+ * Simplified merch price display info for UI cards and forms.
+ * Prioritizes sale price clarity + creator profit visibility (gh-9802).
+ * Explicit, small helper per 6 gstack principles (no clever golf).
+ */
+export interface MerchPriceDisplay {
+  readonly displayPrice: string;
+  readonly isOnSale: boolean;
+  readonly originalPrice?: string;
+  readonly creatorProfit?: string; // approx take-home for artist (sale-aware)
+}
+
+export function getMerchPriceDisplay(
+  retailPriceCents: number,
+  salePriceCents?: number | null,
+  creatorPayoutCents?: number | null
+): MerchPriceDisplay {
+  const onSale =
+    !!salePriceCents && salePriceCents > 0 && salePriceCents < retailPriceCents;
+  const priceCents = onSale ? salePriceCents : retailPriceCents;
+  return {
+    displayPrice: formatMerchMoney(priceCents),
+    isOnSale: onSale,
+    originalPrice: onSale ? formatMerchMoney(retailPriceCents) : undefined,
+    creatorProfit:
+      creatorPayoutCents != null
+        ? formatMerchMoney(creatorPayoutCents)
+        : undefined,
+  };
 }
 
 export function estimateStripeFeeCents(amountCents: number): number {
