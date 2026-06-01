@@ -19,6 +19,45 @@ vi.mock('@/lib/feature-flags', async importOriginal => {
 
 const mockIsEnabled = vi.mocked(isEnabled);
 
+// Mock the harness to avoid real DB inserts (harness does db ops)
+vi.mock('@/lib/agents/agent-harness', async importOriginal => {
+  const actual =
+    await importOriginal<typeof import('@/lib/agents/agent-harness')>();
+  return {
+    ...actual,
+    defaultAgentHarness: {
+      runStudioSessionMemoryLoop: vi.fn().mockResolvedValue({
+        studioSessionId: 'studio_sess_v0_test123',
+        personRef: { id: 'p_test', name: 'Test Person', confidence: 0.9 },
+        evidence: [
+          {
+            kind: 'studio_session_trigger',
+            sourceRefs: ['photo:1'],
+            confidence: 0.95,
+            data: {},
+          },
+          {
+            kind: 'person_enrichment',
+            sourceRefs: ['photo:1'],
+            confidence: 0.82,
+            data: {},
+          },
+        ],
+        opportunityRef: {
+          id: 'opp_test',
+          kind: 'content_opportunity',
+          approvalGated: true,
+        },
+        provenance: {
+          triggeredAt: '2026-06-01T00:00:00Z',
+          sources: ['cf1'],
+          flag: 'MEMORY_STUDIO_SESSION_V0',
+        },
+      }),
+    },
+  };
+});
+
 describe('studio-session memory loop (gh-9869 v0)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
