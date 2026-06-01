@@ -1,11 +1,4 @@
 import { contextBridge, ipcRenderer } from 'electron';
-import { APP_URL } from './env';
-
-const TRUSTED_APP_ORIGINS = new Set([
-  new URL(APP_URL).origin,
-  'https://jov.ie',
-  'https://staging.app.jov.ie',
-]);
 const UPDATE_AVAILABLE_CHANNEL = 'update-available';
 const UPDATE_DOWNLOADED_CHANNEL = 'update-downloaded';
 const QUIT_AND_INSTALL_CHANNEL = 'quit-and-install';
@@ -28,20 +21,6 @@ interface MinimalDocument {
     listener: () => void,
     options?: { once: boolean }
   ) => void;
-}
-
-interface MinimalLocation {
-  readonly origin?: unknown;
-}
-
-function getCurrentOrigin(): string | null {
-  const maybeLocation = (globalThis as { location?: MinimalLocation }).location;
-  const origin = maybeLocation?.origin;
-  return typeof origin === 'string' ? origin : null;
-}
-
-function isTrustedAppOrigin(): boolean {
-  return TRUSTED_APP_ORIGINS.has(getCurrentOrigin() ?? '');
 }
 
 function markElectronRuntime(): boolean {
@@ -75,12 +54,11 @@ function onUpdateChannel(channel: UpdateChannel, cb: () => void): () => void {
   return () => ipcRenderer.removeListener(channel, listener);
 }
 
-if (isTrustedAppOrigin()) {
-  installElectronRuntimeMarker();
+installElectronRuntimeMarker();
 
-  contextBridge.exposeInMainWorld('electronAPI', {
-    platform: process.platform,
-    electronVersion: process.versions.electron,
+contextBridge.exposeInMainWorld('electronAPI', {
+  platform: process.platform,
+  electronVersion: process.versions.electron,
 
     /** Fires when electron-updater detects a new version is available for download. */
     onUpdateAvailable: (cb: () => void) => {
@@ -170,5 +148,4 @@ if (isTrustedAppOrigin()) {
     getDictationStatus: () => {
       return ipcRenderer.invoke(DICTATION_STATUS_CHANNEL);
     },
-  });
-}
+});

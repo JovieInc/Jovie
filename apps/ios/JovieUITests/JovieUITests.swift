@@ -16,11 +16,11 @@ final class JovieUITests: XCTestCase {
   }
 
   func testSignedOutLaunchShowsAuthScreen() {
-    let app = launchMockApp(launchArgument: "-ui-testing-signed-out", expectedElementDescription: "\"Sign in to Jovie\"") {
-      $0.staticTexts["Sign in to Jovie"]
+    let app = launchMockApp(launchArgument: "-ui-testing-signed-out", expectedElementDescription: "\"Continue in Browser\"") {
+      $0.buttons["Continue in Browser"]
     }
 
-    XCTAssertTrue(app.buttons["Get started"].exists)
+    XCTAssertTrue(app.buttons["Continue in Browser"].exists)
     XCTAssertFalse(app.buttons["Continue with Google"].exists)
     XCTAssertFalse(app.buttons["Continue with Apple"].exists)
     XCTAssertFalse(app.staticTexts["Email"].exists)
@@ -60,7 +60,7 @@ final class JovieUITests: XCTestCase {
     app.buttons["Log Out"].tap()
 
     XCTAssertTrue(
-      app.staticTexts["Sign in to Jovie"].waitForExistence(timeout: 5),
+      app.buttons["Continue in Browser"].waitForExistence(timeout: 5),
       "Logout did not return to signed-out state.\n\(app.debugDescription)"
     )
   }
@@ -134,11 +134,7 @@ final class JovieUITests: XCTestCase {
     app.launch()
 
     XCTAssertTrue(
-      app.staticTexts["Sign in to Jovie"].waitForExistence(timeout: 10),
-      "Native auth heading did not appear.\n\(app.debugDescription)"
-    )
-    XCTAssertTrue(
-      app.buttons["Get started"].waitForExistence(timeout: 10),
+      app.buttons["Continue in Browser"].waitForExistence(timeout: 10),
       "Browser auth entry button did not appear.\n\(app.debugDescription)"
     )
   }
@@ -175,11 +171,11 @@ final class JovieUITests: XCTestCase {
     app.launch()
 
     XCTAssertTrue(
-      app.buttons["Get started"].waitForExistence(timeout: 10),
+      app.buttons["Continue in Browser"].waitForExistence(timeout: 10),
       "Browser auth entry button did not appear.\n\(app.debugDescription)"
     )
 
-    app.buttons["Get started"].tap()
+    app.buttons["Continue in Browser"].tap()
     acceptSystemAuthPromptIfNeeded()
 
     let copyURLButton = app.buttons["Copy URL"]
@@ -209,9 +205,9 @@ final class JovieUITests: XCTestCase {
   func testAuthCallbackDeepLinkCompletesHarness() throws {
     let app = launchMockApp(
       launchArgument: "-ui-testing-auth-callback",
-      expectedElementDescription: "\"Get started\""
+      expectedElementDescription: "\"Continue in Browser\""
     ) {
-      $0.buttons["Get started"]
+      $0.buttons["Continue in Browser"]
     }
 
     try openAuthCallbackURL(
@@ -238,9 +234,9 @@ final class JovieUITests: XCTestCase {
   func testAuthCallbackProviderErrorShowsAuthError() throws {
     let app = launchMockApp(
       launchArgument: "-ui-testing-auth-callback",
-      expectedElementDescription: "\"Get started\""
+      expectedElementDescription: "\"Continue in Browser\""
     ) {
-      $0.buttons["Get started"]
+      $0.buttons["Continue in Browser"]
     }
 
     try openAuthCallbackURL(

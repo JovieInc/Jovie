@@ -27,26 +27,20 @@ struct AuthScreen: View {
       VStack(spacing: 0) {
         Spacer(minLength: 96)
 
-        VStack(spacing: JovieSpacing.xLarge) {
-          JovieLogoMark(size: 92)
+        VStack(spacing: JovieSpacing.xxLarge) {
+          JovieLogoMark(size: 76)
             .accessibilityIdentifier("auth-jovie-logo")
 
-          Text("Sign in to Jovie")
-            .font(JovieFont.display(size: 29, weight: .semibold))
-            .foregroundStyle(JovieColor.textPrimary)
-            .multilineTextAlignment(.center)
-            .minimumScaleFactor(0.86)
+          BrowserAuthActions(
+            isOpening: didRequestBrowserAuth,
+            errorMessage: errorMessage,
+            action: startBrowserAuth
+          )
         }
-        .frame(maxWidth: 360)
+        .frame(maxWidth: 430)
         .padding(.horizontal, JovieSpacing.xLarge)
 
-        Spacer(minLength: 72)
-
-        BrowserAuthActions(
-          isOpening: didRequestBrowserAuth,
-          errorMessage: errorMessage,
-          action: startBrowserAuth
-        )
+        Spacer(minLength: 96)
       }
       .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
@@ -394,17 +388,15 @@ private struct BrowserAuthActions: View {
 
   var body: some View {
     VStack(spacing: JovieSpacing.large) {
-      GetStartedButton(isOpening: isOpening, action: action)
+      ContinueInBrowserButton(isOpening: isOpening, action: action)
 
       AuthErrorText(message: errorMessage)
     }
-    .frame(maxWidth: 430)
-    .padding(.horizontal, JovieSpacing.xLarge)
-    .padding(.bottom, JovieSpacing.xxLarge)
+    .frame(maxWidth: .infinity)
   }
 }
 
-private struct GetStartedButton: View {
+private struct ContinueInBrowserButton: View {
   let isOpening: Bool
   let action: () -> Void
 
@@ -417,7 +409,7 @@ private struct GetStartedButton: View {
             .tint(JovieColor.backgroundBase)
         }
 
-        Text(isOpening ? "Opening..." : "Get started")
+        Text(isOpening ? "Opening Browser..." : "Continue in Browser")
           .lineLimit(1)
           .minimumScaleFactor(0.82)
       }
@@ -432,7 +424,7 @@ private struct GetStartedButton: View {
       Capsule(style: .continuous)
         .fill(Color.white)
     )
-    .accessibilityIdentifier("auth-get-started-button")
+    .accessibilityIdentifier("auth-continue-browser-button")
   }
 }
 

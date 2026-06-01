@@ -168,7 +168,11 @@ function isTrustedDesktopAuthSender(event: IpcMainInvokeEvent): boolean {
   const parsed = parseUrl(getIpcSenderUrl(event));
   return (
     parsed?.origin === APP_ORIGIN &&
-    parsed.pathname === DESKTOP_AUTH_HANDOFF_PATH
+    (parsed.pathname === DESKTOP_AUTH_HANDOFF_PATH ||
+      parsed.pathname === '/signin' ||
+      parsed.pathname === '/signup' ||
+      parsed.pathname === '/sign-in' ||
+      parsed.pathname === '/sign-up')
   );
 }
 
@@ -680,6 +684,7 @@ function showDesktopAuthHandoff(authUrl: string): void {
   });
 
   void authHandoffWindow.loadURL(handoffUrl);
+  showWindow(authHandoffWindow);
 }
 
 function maybeShowDesktopAuthHandoff(urlString: string): boolean {
@@ -797,13 +802,12 @@ function createWindow(initialUrl = APP_ENTRY_URL): BrowserWindow {
     `${win.webContents.getUserAgent()} ${DESKTOP_USER_AGENT_PRODUCT}`
   );
 
-  const initialAuthUrl = buildDesktopBrowserAuthUrl(initialUrl);
-  if (initialAuthUrl) {
-    showDesktopAuthHandoff(initialAuthUrl);
-    void win.loadURL(APP_ENTRY_URL);
-  } else {
-    void win.loadURL(initialUrl);
-  }
+  win.webContents.on('preload-error', (_event, preloadPath, error) => {
+    console.error('[Jovie Desktop] Preload failed', {
+      preloadPath,
+      reason: error instanceof Error ? error.message : String(error),
+    });
+  });
 
   win.webContents.on(
     'did-fail-load',
@@ -923,6 +927,14 @@ function createWindow(initialUrl = APP_ENTRY_URL): BrowserWindow {
 
   win.webContents.on('did-navigate-in-page', sendNavState);
   win.webContents.on('did-navigate', sendNavState);
+
+  const initialAuthUrl = buildDesktopBrowserAuthUrl(initialUrl);
+  if (initialAuthUrl) {
+    showDesktopAuthHandoff(initialAuthUrl);
+    void win.loadURL('about:blank');
+  } else {
+    void win.loadURL(initialUrl);
+  }
 
   return win;
 }

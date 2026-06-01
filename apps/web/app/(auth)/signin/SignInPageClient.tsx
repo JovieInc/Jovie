@@ -18,6 +18,10 @@ import {
   buildMobileAuthReturnPath,
   sanitizeMobileReturnRoute,
 } from '@/lib/mobile/auth-return';
+import {
+  DesktopAuthRouteHandoff,
+  useShouldRenderDesktopAuthHandoff,
+} from '../DesktopAuthRouteHandoff';
 
 /**
  * Shows a banner when the OAuth provider returned an error code.
@@ -154,6 +158,8 @@ export function SignInPageClient() {
     searchParams,
     authReturnRoutes
   );
+  const shouldRenderDesktopHandoff =
+    useShouldRenderDesktopAuthHandoff(searchParams);
   const initialValues = useMemo(
     () => (isValidEmail(email) ? { emailAddress: email } : undefined),
     [email]
@@ -166,6 +172,10 @@ export function SignInPageClient() {
       });
     }
   }, [resetConfirmed]);
+
+  if (shouldRenderDesktopHandoff) {
+    return <DesktopAuthRouteHandoff />;
+  }
 
   return (
     <AuthLayout

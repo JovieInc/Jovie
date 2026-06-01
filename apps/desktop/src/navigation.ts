@@ -233,9 +233,16 @@ function isAllowedAuthProviderUrl(parsed: URL): boolean {
   return AUTH_PROVIDER_ORIGINS.some(origin => {
     if (!origin.includes('*')) return parsed.origin === origin;
     // Wildcard matching for Clerk (and future providers): e.g. https://*.clerk.accounts.dev
-    // Per CR + G_BRAIN precedent: strip to host suffix only; match hostname (not origin) + https:
+    // Match one tenant label only so evil.com.clerk.accounts.dev stays blocked.
     const base = origin.replace(/^https?:\/\/\*\./, '');
-    return parsed.protocol === 'https:' && (parsed.hostname === base || parsed.hostname.endsWith('.' + base));
+    if (parsed.protocol !== 'https:') {
+      return false;
+    }
+    if (parsed.hostname === base) return true;
+    if (!parsed.hostname.endsWith(`.${base}`)) return false;
+
+    const tenantLabel = parsed.hostname.slice(0, -(base.length + 1));
+    return tenantLabel.length > 0 && !tenantLabel.includes('.');
   });
 }
 

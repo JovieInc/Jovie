@@ -151,7 +151,8 @@ test('preload marks the hosted app as Electron after the document root is ready'
   );
 
   assert.match(preloadSource, /function installElectronRuntimeMarker\(\)/);
-  assert.match(preloadSource, /new URL\(APP_URL\)\.origin/);
+  assert.match(preloadSource, /installElectronRuntimeMarker\(\);/);
+  assert.match(preloadSource, /contextBridge\.exposeInMainWorld/);
   assert.match(preloadSource, /markElectronRuntime\(\)/);
   assert.match(preloadSource, /DOMContentLoaded/);
   assert.match(preloadSource, /dataset\.desktopRuntime = 'electron'/);
