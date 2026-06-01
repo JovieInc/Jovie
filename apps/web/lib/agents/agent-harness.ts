@@ -14,6 +14,7 @@ import type { NewContextFact } from '@/lib/db/schema/connectors';
 import { contextFacts } from '@/lib/db/schema/connectors';
 import { captureError } from '@/lib/error-tracking';
 import { logger } from '@/lib/utils/logger';
+import { randomUUID } from 'node:crypto';
 
 export interface StudioSessionInput {
   userId: string;
@@ -116,7 +117,7 @@ export class OpenAIAgentsAdapter implements AgentHarness {
         (triggerContext.taggedName as string) ||
         'Unknown Person';
       const personRef = {
-        id: 'person_v0_' + Math.random().toString(36).slice(2, 10),
+        id: `person_v0_${randomUUID()}`,
         name: personName,
         confidence: 0.82,
       };
@@ -177,7 +178,7 @@ export class OpenAIAgentsAdapter implements AgentHarness {
 
       // 4. Create synthetic studio-session + propose approval-gated opportunity
       const studioSessionId = 'studio_sess_v0_' + Date.now().toString(36);
-      const opportunityId = 'opp_v0_' + Math.random().toString(36).slice(2, 10);
+      const opportunityId = `opp_v0_${randomUUID()}`;
 
       // In real 9872: insert studio_sessions row + content_opportunities row (approval_status='pending')
       // v0: use context_fact + suggestedActions pattern (existing, approval gated)
