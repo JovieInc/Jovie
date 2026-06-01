@@ -313,7 +313,7 @@ function deriveProfileBuilderState({
   return {
     artist,
     artistConfirmed,
-    handle: handleDraft !== null ? cleanHandle(handleDraft) : handle,
+    handle: handleDraft == null ? handle : cleanHandle(handleDraft),
     socialLinks,
   };
 }
