@@ -46,6 +46,14 @@ Branch: codex/jov-2710-native-browser-auth
   - Passed: desktop release is handled by `VERSION`.
 - `JOVIE_AGENT_PROFILE=coder node scripts/next-proxy-guard.mjs` from `apps/web`
   - Passed.
+- `JOVIE_AGENT_PROFILE=coder pnpm --filter @jovie/desktop exec vitest run scripts/desktop-url-disposition.test.ts`
+  - Passed: 1 test file, 6 tests.
+- `JOVIE_AGENT_PROFILE=coder pnpm --filter @jovie/web exec vitest run tests/unit/app/desktop-auth-page.test.tsx`
+  - Passed: 1 test file, 7 tests.
+- `JOVIE_AGENT_PROFILE=coder pnpm --filter @jovie/desktop run typecheck`
+  - Passed after CodeRabbit fixes.
+- `JOVIE_AGENT_PROFILE=coder pnpm --filter @jovie/web run typecheck -- --pretty false`
+  - Passed after CodeRabbit fixes.
 - `JOVIE_AGENT_PROFILE=coder BASE_URL=http://localhost:3112 ELECTRON_CDP_URL=http://127.0.0.1:9223 JOVIE_PROTOCOL_OPEN_BUNDLE_ID=com.github.Electron doppler run --project jovie-web --config dev -- node apps/desktop/scripts/smoke-native-auth.mjs`
   - Failed: Playwright `connectOverCDP` timed out while trying to attach to Electron, despite raw CDP being reachable.
 
@@ -56,6 +64,7 @@ Branch: codex/jov-2710-native-browser-auth
 - The first route-level handoff heuristic treated `desktop_return` alone as a native runtime hint, which broke normal browser sign-in/sign-up fallback tests. The heuristic was narrowed so normal browser fallback keeps Clerk UI.
 - The root test suite initially exited nonzero because `useSegmentedInput()` left a delayed blur timer alive after jsdom teardown. Cleanup was added.
 - CI `Guardrails (proxy)` initially failed at `scripts/version-check.mjs` because the desktop release-triggering version bump was not propagated to `version.json`, workspace package versions, and `CHANGELOG.md`.
+- CodeRabbit flagged rejected browser-open promises that could leave the desktop auth handoff stuck in `opening`, and non-default Clerk wildcard ports that were not explicitly blocked.
 - Computer Use verified the real Electron UI handoff, but Chrome opened into the profile picker and restored an unrelated previous tab after selecting a profile. Because of that, fresh/existing browser sign-in, session persistence, authenticated Electron API calls, and sign-out clearing were not proven end-to-end in the live UI.
 
 ## Fixes Made
@@ -70,6 +79,8 @@ Branch: codex/jov-2710-native-browser-auth
 - Desktop/iOS/web tests were updated to assert the new handoff copy and behavior.
 - `useSegmentedInput()` now clears its deferred blur timer and guards `document` access after teardown.
 - Release metadata now aligns on `26.6.1` across `VERSION`, `version.json`, workspace packages, desktop package metadata, and `CHANGELOG.md`.
+- Browser-open callbacks now catch rejected launch promises and restore the retryable error state instead of leaving the handoff disabled.
+- Clerk auth-provider wildcard matching now rejects non-default HTTPS ports, with URL disposition regression coverage.
 
 ## Final Passing Evidence
 

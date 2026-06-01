@@ -113,6 +113,7 @@ test('desktop disposition allows Clerk auth provider origins externally (https w
   // Unsafe variants (wrong protocol, evil host, path tricks) remain blocked
   assertDisposition(productionPolicy, 'blocked', [
     'http://foo.clerk.accounts.dev/sign-in',
+    'https://foo.clerk.accounts.dev:8443/sign-in',
     'https://evil.com.clerk.accounts.dev/sign-in',
     'https://evilclerk.accounts.dev/sign-in',
     'https://clerk.accounts.dev.evil.com/sign-in',

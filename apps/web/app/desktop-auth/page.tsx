@@ -75,13 +75,18 @@ function DesktopAuthContent() {
     if (!authUrl || openState === 'opening') return;
     setOpenState('opening');
     setOpenError(null);
-    const result = await openWithTimeout(authUrl);
-    if (result.ok) {
-      setOpenState('opened');
-      return;
+    try {
+      const result = await openWithTimeout(authUrl);
+      if (result.ok) {
+        setOpenState('opened');
+        return;
+      }
+      setOpenState('error');
+      setOpenError(formatOpenError(result.reason));
+    } catch {
+      setOpenState('error');
+      setOpenError(formatOpenError());
     }
-    setOpenState('error');
-    setOpenError(formatOpenError(result.reason));
   }, [authUrl, openState]);
 
   const statusText = formatBrowserOpenStatus(openState, openError);
@@ -107,7 +112,7 @@ function DesktopAuthContent() {
               className='inline-flex h-10 w-full items-center justify-center rounded-full bg-white px-4 text-[13px] font-medium text-black transition-colors hover:bg-white/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/35 disabled:cursor-not-allowed disabled:opacity-55'
               disabled={!authUrl || openState === 'opening'}
               onClick={() => {
-                openAuthUrl().catch(() => {});
+                void openAuthUrl();
               }}
             >
               {openState === 'opening'

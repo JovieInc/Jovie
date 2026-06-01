@@ -238,6 +238,9 @@ function isAllowedAuthProviderUrl(parsed: URL): boolean {
     if (parsed.protocol !== 'https:') {
       return false;
     }
+    if (parsed.port && parsed.port !== '443') {
+      return false;
+    }
     if (parsed.hostname === base) return true;
     if (!parsed.hostname.endsWith(`.${base}`)) return false;
 

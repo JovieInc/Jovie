@@ -56,14 +56,19 @@ export function DesktopAuthRouteHandoff() {
 
     setOpenState('opening');
     setOpenError(null);
-    const result = await openDesktopAuthUrl(globalThis.location.href);
-    if (result.ok) {
-      setOpenState('opened');
-      return;
-    }
+    try {
+      const result = await openDesktopAuthUrl(globalThis.location.href);
+      if (result.ok) {
+        setOpenState('opened');
+        return;
+      }
 
-    setOpenState('error');
-    setOpenError(formatOpenError(result.reason));
+      setOpenState('error');
+      setOpenError(formatOpenError(result.reason));
+    } catch {
+      setOpenState('error');
+      setOpenError(formatOpenError());
+    }
   }, [openState]);
 
   const isWaitingInBrowser = openState === 'opened';
@@ -93,7 +98,7 @@ export function DesktopAuthRouteHandoff() {
             className='mt-6 inline-flex h-10 w-full items-center justify-center rounded-full bg-white px-4 text-[13px] font-medium text-black transition-colors hover:bg-white/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/35 disabled:cursor-not-allowed disabled:opacity-55'
             disabled={openState === 'opening'}
             onClick={() => {
-              openAuthUrl().catch(() => {});
+              void openAuthUrl();
             }}
           >
             {openState === 'opening'
