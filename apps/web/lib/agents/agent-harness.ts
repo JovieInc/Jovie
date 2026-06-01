@@ -9,12 +9,12 @@
  * Every output carries evidence links + confidence + user scoping.
  */
 
+import { randomUUID } from 'node:crypto';
 import { db } from '@/lib/db';
 import type { NewContextFact } from '@/lib/db/schema/connectors';
 import { contextFacts } from '@/lib/db/schema/connectors';
 import { captureError } from '@/lib/error-tracking';
 import { logger } from '@/lib/utils/logger';
-import { randomUUID } from 'node:crypto';
 
 export interface StudioSessionInput {
   userId: string;
