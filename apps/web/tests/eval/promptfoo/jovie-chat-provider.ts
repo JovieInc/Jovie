@@ -6909,7 +6909,8 @@ function evaluateOnboardingSystemPromptContract(vars: EvalVars) {
     ]),
     keepsOnboardingVoiceConstraints: textIncludesAll(prompt, [
       'Sharp friend over iMessage',
-      'lowercase by default',
+      'Use normal sentence case',
+      'capitalize proper nouns',
       'NO emoji',
       'NO customer-service polite',
     ]),

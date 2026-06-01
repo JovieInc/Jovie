@@ -1,4 +1,5 @@
 export { ChatAvatarUploadCard } from './ChatAvatarUploadCard';
+export { ChatEmptyStateComposerRegion } from './ChatEmptyStateComposerRegion';
 export { ChatInput } from './ChatInput';
 export { ChatLinkConfirmationCard } from './ChatLinkConfirmationCard';
 export { ChatMarkdown } from './ChatMarkdown';

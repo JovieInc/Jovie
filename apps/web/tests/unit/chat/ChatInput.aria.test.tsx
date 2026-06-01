@@ -213,7 +213,7 @@ describe('ChatInput combobox ARIA wiring', () => {
     expect(sendButton).toBeDisabled();
   });
 
-  it('commits the Feedback slash command into a sendable inline token', () => {
+  it('commits the Feedback slash command into a sendable skill chip', () => {
     const onSubmit = vi.fn();
     render(withProviders(<Harness onSubmit={onSubmit} />));
     const textarea = getTextarea();
@@ -226,7 +226,8 @@ describe('ChatInput combobox ARIA wiring', () => {
 
     fireEvent.keyDown(window, { key: 'Enter' });
 
-    expect(textarea).toHaveValue('/skill:submitFeedback');
+    expect(textarea).toHaveValue('');
+    expect(screen.getByTestId('skill-chip')).toHaveTextContent('Send feedback');
 
     const sendButton = screen.getByRole('button', { name: /send message/i });
     expect(sendButton).toBeEnabled();

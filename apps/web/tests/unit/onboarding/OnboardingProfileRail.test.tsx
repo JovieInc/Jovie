@@ -1,10 +1,10 @@
-import { screen } from '@testing-library/react';
+import { screen, within } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import { OnboardingProfileRail } from '@/components/features/onboarding/OnboardingProfileRail';
 import { fastRender } from '@/tests/utils/fast-render';
 
 describe('OnboardingProfileRail', () => {
-  it('renders a progressive profile timeline from onboarding state', () => {
+  it('renders the actual profile surface inside the shared phone frame', () => {
     fastRender(
       <OnboardingProfileRail
         state={{
@@ -12,9 +12,18 @@ describe('OnboardingProfileRail', () => {
             id: 'artist-1',
             name: 'Test Artist',
             url: 'https://open.spotify.com/artist/artist-1',
+            imageUrl: 'https://i.scdn.co/image/test',
             followers: 12_300,
             popularity: 48,
             genres: ['progressive house'],
+            dspMatches: [
+              {
+                id: 'apple-music',
+                label: 'Apple Music',
+                platform: 'applemusic',
+                url: 'https://music.apple.com/us/artist/test-artist',
+              },
+            ],
           },
           artistConfirmed: true,
           handle: 'testartist',
@@ -27,21 +36,26 @@ describe('OnboardingProfileRail', () => {
       'data-visible',
       'true'
     );
-    expect(screen.getByText('Building Test Artist')).toBeDefined();
-    expect(screen.getByText('Matched')).toBeDefined();
-    expect(
-      screen.getByRole('link', { name: 'Open Test Artist on Spotify' })
-    ).toHaveAttribute('href', 'https://open.spotify.com/artist/artist-1');
-    expect(screen.queryByText('open.spotify.com')).toBeNull();
-    expect(screen.getByTitle('12,300 Spotify followers')).toBeDefined();
-    expect(screen.getByText('12,300 Spotify followers')).toBeDefined();
-    expect(screen.getByTitle('Popularity score: 48 out of 100')).toBeDefined();
-    expect(screen.getByText('Popularity score: 48 out of 100')).toBeDefined();
-    expect(screen.getByText('Genre: Progressive House')).toBeDefined();
-    expect(screen.getByText('Progressive House')).toBeDefined();
-    expect(screen.getByText('jov.ie/testartist')).toBeDefined();
+    expect(screen.getByTestId('onboarding-profile-bento')).toBeDefined();
     expect(screen.getByTestId('onboarding-phone-preview')).toBeDefined();
-    expect(screen.getAllByText('instagram.com').length).toBeGreaterThan(0);
+    expect(
+      screen.getByTestId('onboarding-profile-compact-surface')
+    ).toBeDefined();
+    expect(screen.getByTestId('profile-compact-surface')).toBeDefined();
+    expect(screen.getAllByText('Test Artist')).toHaveLength(1);
+    expect(
+      within(screen.getByTestId('onboarding-phone-preview')).getByText(
+        'Test Artist'
+      )
+    ).toBeDefined();
+    expect(screen.getAllByTitle('Spotify').length).toBeGreaterThan(0);
+    expect(screen.getAllByTitle('Apple Music').length).toBeGreaterThan(0);
+    expect(screen.queryByText('open.spotify.com')).toBeNull();
+    expect(screen.getByText('12.3K Spotify followers')).toBeDefined();
+    expect(screen.queryByTestId('onboarding-rail-progress')).toBeNull();
+    expect(screen.queryByText('Artist Profile')).toBeNull();
+    expect(screen.queryByText('Building profile')).toBeNull();
+    expect(screen.queryByText('Building Test Artist')).toBeNull();
   });
 
   it('omits unsafe artist profile links', () => {
@@ -63,6 +77,47 @@ describe('OnboardingProfileRail', () => {
       />
     );
 
-    expect(screen.queryByRole('link')).toBeNull();
+    expect(screen.queryByTestId('onboarding-dsp-match-strip')).toBeNull();
+    expect(
+      screen
+        .queryAllByRole('link')
+        .some(link => link.getAttribute('href') === 'javascript:alert(1)')
+    ).toBe(false);
+  });
+
+  it('omits DSP matches whose urls do not belong to the claimed platform', () => {
+    fastRender(
+      <OnboardingProfileRail
+        state={{
+          artist: {
+            id: 'artist-1',
+            name: 'Test Artist',
+            url: 'https://open.spotify.com/artist/artist-1',
+            followers: 12_300,
+            popularity: 48,
+            genres: ['progressive house'],
+            dspMatches: [
+              {
+                id: 'apple-music',
+                label: 'Apple Music',
+                platform: 'applemusic',
+                url: 'https://example.com/music.apple.com/fake',
+              },
+            ],
+          },
+          artistConfirmed: true,
+          handle: 'testartist',
+          socialLinks: ['https://evil.test/instagram.com/testartist'],
+        }}
+      />
+    );
+
+    expect(screen.getAllByTitle('Spotify').length).toBeGreaterThan(0);
+    expect(screen.queryByTitle('Apple Music')).toBeNull();
+    expect(
+      screen
+        .queryAllByRole('link')
+        .some(link => link.getAttribute('href')?.includes('evil.test'))
+    ).toBe(false);
   });
 });

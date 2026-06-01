@@ -119,7 +119,7 @@ describe('onboarding tool artifacts', () => {
     );
   });
 
-  it('renders confirmed Spotify data as a compact artifact', () => {
+  it('does not render a duplicate confirmed artist card after selection', () => {
     fastRender(
       <OnboardingArtistConfirmedCard
         state='output-available'
@@ -138,17 +138,32 @@ describe('onboarding tool artifacts', () => {
       />
     );
 
-    expect(screen.getByTestId('onboarding-artist-confirmed')).toBeDefined();
-    expect(screen.getByText('Test Artist')).toBeDefined();
-    expect(screen.getByTitle('1,234 Spotify followers')).toBeDefined();
-    expect(screen.getByText('1,234 Spotify followers')).toBeDefined();
-    expect(screen.getByText('1.2K')).toBeDefined();
-    expect(screen.getByTitle('Popularity score: 42 out of 100')).toBeDefined();
-    expect(screen.getByText('Popularity score: 42 out of 100')).toBeDefined();
-    expect(screen.getByText('42')).toBeDefined();
-    expect(screen.getByText('Genre: Indie Pop')).toBeDefined();
-    expect(screen.getByText('Indie Pop')).toBeDefined();
+    expect(screen.getByTestId('test-wrapper')).toBeEmptyDOMElement();
+    expect(screen.queryByTestId('onboarding-artist-confirmed')).toBeNull();
+    expect(screen.queryByText('Test Artist')).toBeNull();
     expect(screen.queryByText('confirmSpotifyArtist')).toBeNull();
+  });
+
+  it('does not render unsafe Spotify profile links from confirmed artist tools', () => {
+    fastRender(
+      <OnboardingArtistConfirmedCard
+        state='output-available'
+        output={{
+          action: 'spotify_artist_confirmed',
+          spotifyArtistId: 'artist-1',
+          artist: {
+            id: 'artist-1',
+            name: 'Test Artist',
+            url: 'https://open.spotify.com/artist/artist-1',
+            followers: 1_234,
+            popularity: 42,
+            genres: ['indie pop', 'alt'],
+          },
+        }}
+      />
+    );
+
+    expect(screen.queryByLabelText('Open Test Artist on Spotify')).toBeNull();
   });
 
   it('formats genre labels without shouting', () => {
@@ -156,7 +171,47 @@ describe('onboarding tool artifacts', () => {
     expect(formatGenreLabel('alt-pop')).toBe('Alt-Pop');
   });
 
-  it('does not render unsafe Spotify profile links', () => {
+  it('renders picker and handle tools without card chrome', () => {
+    mocks.artistSearch.results = [
+      {
+        id: 'artist-1',
+        name: 'Test Artist',
+        url: 'https://open.spotify.com/artist/artist-1',
+        followers: 12_300,
+        popularity: 48,
+      },
+    ];
+    mocks.handleAvailability.data = { available: true };
+
+    fastRender(
+      <>
+        <OnboardingSpotifyArtistPickerCard
+          state='output-available'
+          output={{ action: 'open_artist_picker', query: 'Test Artist' }}
+          onSelectArtist={vi.fn()}
+        />
+        <OnboardingHandleCheckCard
+          state='output-available'
+          output={{ action: 'check_handle', handle: 'testartist' }}
+        />
+      </>
+    );
+
+    expect(screen.getByTestId('onboarding-artist-picker')).not.toHaveClass(
+      'rounded-xl'
+    );
+    expect(screen.getByTestId('onboarding-artist-picker')).not.toHaveClass(
+      'bg-surface-1'
+    );
+    expect(screen.getByTestId('onboarding-handle-check')).not.toHaveClass(
+      'rounded-xl'
+    );
+    expect(screen.getByTestId('onboarding-handle-check')).not.toHaveClass(
+      'bg-surface-1'
+    );
+  });
+
+  it('does not render confirmed artist fallback cards for unsafe links', () => {
     fastRender(
       <OnboardingArtistConfirmedCard
         state='output-available'
@@ -178,19 +233,37 @@ describe('onboarding tool artifacts', () => {
     expect(screen.queryByLabelText('Open Test Artist on Spotify')).toBeNull();
   });
 
-  it('renders handle availability without leaking the tool name', () => {
+  it('renders editable handle availability without leaking the tool name', () => {
     mocks.handleAvailability.data = { available: true };
+    const onHandleCandidateChange = vi.fn();
 
     fastRender(
       <OnboardingHandleCheckCard
         state='output-available'
         output={{ action: 'check_handle', handle: 'testartist' }}
+        onHandleCandidateChange={onHandleCandidateChange}
       />
     );
 
-    expect(screen.getByText('@testartist is available')).toBeDefined();
+    expect(screen.getByText('@testartist')).toBeDefined();
+    expect(screen.getByText('is available')).toBeDefined();
+    expect(screen.getByLabelText('Edit proposed handle')).toHaveValue(
+      'testartist'
+    );
     expect(screen.getByText('jov.ie/testartist')).toBeDefined();
     expect(screen.queryByText('checkHandle')).toBeNull();
+
+    fireEvent.change(screen.getByLabelText('Edit proposed handle'), {
+      target: { value: 'test' },
+    });
+
+    expect(onHandleCandidateChange).toHaveBeenLastCalledWith('test');
+
+    fireEvent.change(screen.getByLabelText('Edit proposed handle'), {
+      target: { value: '' },
+    });
+
+    expect(onHandleCandidateChange).toHaveBeenLastCalledWith('');
   });
 
   it('renders proposed social links as reviewable artifacts', () => {

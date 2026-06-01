@@ -1,4 +1,10 @@
-import { act, fireEvent, render, screen } from '@testing-library/react';
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from '@testing-library/react';
 import { type FormEvent, type ReactNode, useState } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { OnboardingChat } from '@/components/features/onboarding/OnboardingChat';
@@ -53,6 +59,11 @@ vi.mock('@ai-sdk/react', () => ({
 }));
 
 vi.mock('@/components/jovie/components', () => ({
+  ChatEmptyStateComposerRegion: ({
+    children,
+  }: {
+    readonly children: ReactNode;
+  }) => <div data-testid='chat-empty-state-composer-region'>{children}</div>,
   ChatInput: ({
     isSubmitting,
     onChange,
@@ -142,12 +153,14 @@ function TurnstileHarness({
   resetTokenOnRejected = true,
   onTurnstileRejected = vi.fn(),
   onTurnstileRequired = vi.fn(),
+  starterPrompt,
 }: Readonly<{
   initialToken?: string | null;
   onConversationActivity?: () => void;
   resetTokenOnRejected?: boolean;
   onTurnstileRejected?: () => void;
   onTurnstileRequired?: (message?: string) => void;
+  starterPrompt?: string;
 }>) {
   const [turnstileToken, setTurnstileToken] = useState(initialToken);
   const [instruction, setInstruction] = useState<string | null>(null);
@@ -173,6 +186,26 @@ function TurnstileHarness({
         setInstruction('Verify you are human to send');
       }}
       onConversationActivity={onConversationActivity}
+      starterPrompt={starterPrompt}
+    />
+  );
+}
+
+function ControlledStarterHarness({
+  onTurnstileRequired = vi.fn(),
+  starterPrompt,
+  turnstileToken,
+}: Readonly<{
+  onTurnstileRequired?: (message?: string) => void;
+  starterPrompt: string;
+  turnstileToken: string | null;
+}>) {
+  return (
+    <OnboardingChat
+      turnstileToken={turnstileToken}
+      turnstileStatus={turnstileToken ? 'verified' : 'interactive'}
+      onTurnstileRequired={onTurnstileRequired}
+      starterPrompt={starterPrompt}
     />
   );
 }
@@ -241,6 +274,56 @@ describe('OnboardingChat Turnstile gating', () => {
       'Verify you are human to send'
     );
     expect(screen.getByText('Verify you are human to send')).toBeVisible();
+  });
+
+  it('auto-submits a starter prompt once when verification is ready', async () => {
+    render(
+      <TurnstileHarness
+        initialToken='token-1'
+        starterPrompt='Hey, I want to get access to Jovie.'
+      />
+    );
+
+    await waitFor(() => expect(chatMocks.sendMessage).toHaveBeenCalledTimes(1));
+    expect(chatMocks.sendMessage).toHaveBeenCalledWith({
+      text: 'Hey, I want to get access to Jovie.',
+    });
+    expect(screen.getByLabelText('Chat message input')).toHaveValue('');
+  });
+
+  it('auto-submits the edited starter prompt after verification', async () => {
+    const onTurnstileRequired = vi.fn();
+    const starterPrompt = 'Hey, I want to get access to Jovie.';
+    const { rerender } = render(
+      <ControlledStarterHarness
+        onTurnstileRequired={onTurnstileRequired}
+        starterPrompt={starterPrompt}
+        turnstileToken={null}
+      />
+    );
+
+    await waitFor(() => {
+      expect(onTurnstileRequired).toHaveBeenCalledWith(
+        'Verify you are human to send'
+      );
+    });
+
+    const input = screen.getByLabelText('Chat message input');
+    fireEvent.change(input, { target: { value: 'Edited access request' } });
+
+    rerender(
+      <ControlledStarterHarness
+        onTurnstileRequired={onTurnstileRequired}
+        starterPrompt={starterPrompt}
+        turnstileToken='token-1'
+      />
+    );
+
+    await waitFor(() => {
+      expect(chatMocks.sendMessage).toHaveBeenCalledWith({
+        text: 'Edited access request',
+      });
+    });
   });
 
   it('tracks chat completion once while reporting each completed user turn', () => {

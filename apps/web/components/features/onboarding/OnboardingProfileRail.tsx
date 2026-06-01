@@ -1,23 +1,15 @@
 'use client';
 
-import {
-  Circle,
-  CircleCheckBig,
-  Gauge,
-  Music2,
-  Smartphone,
-  UserRound,
-  Users,
-} from 'lucide-react';
-import Image from 'next/image';
-import type { ReactNode } from 'react';
 import { SocialIcon } from '@/components/atoms/SocialIcon';
+import { PhoneFrame } from '@/components/molecules/PhoneFrame';
+import { ProfileCompactSurface } from '@/features/profile/templates/ProfileCompactSurface';
 import { cn } from '@/lib/utils';
+import type { Artist, LegacySocialLink } from '@/types/db';
 import {
   formatCompactCount,
-  formatExactCount,
   formatGenreLabel,
   getSafeSpotifyArtistUrl,
+  type OnboardingDspMatch,
 } from './OnboardingToolArtifacts';
 
 export interface OnboardingProfileArtist {
@@ -28,6 +20,7 @@ export interface OnboardingProfileArtist {
   readonly followers?: number | null;
   readonly popularity?: number | null;
   readonly genres?: readonly string[];
+  readonly dspMatches?: readonly OnboardingDspMatch[];
 }
 
 export interface OnboardingProfileBuilderState {
@@ -45,216 +38,245 @@ export const EMPTY_ONBOARDING_PROFILE_BUILDER_STATE: OnboardingProfileBuilderSta
     socialLinks: [],
   };
 
-function getInitials(name: string): string {
-  return name
-    .split(/\s+/)
-    .slice(0, 2)
-    .map(part => part.charAt(0))
-    .join('')
-    .toUpperCase();
-}
+function readSafeHttpsUrl(url: string | null | undefined): string | null {
+  if (!url) return null;
 
-function hostnameFor(url: string): string {
   try {
-    return new URL(url).hostname.replace(/^www\./, '');
+    const parsed = new URL(url);
+    return parsed.protocol === 'https:' ? parsed.toString() : null;
   } catch {
-    return url;
+    return null;
   }
 }
 
-function RailAvatar({ artist }: { readonly artist: OnboardingProfileArtist }) {
-  if (artist.imageUrl) {
+const PLATFORM_HOST_ALLOWLIST: Record<string, readonly string[]> = {
+  apple_music: ['music.apple.com'],
+  deezer: ['deezer.com'],
+  instagram: ['instagram.com'],
+  soundcloud: ['soundcloud.com'],
+  spotify: ['open.spotify.com', 'spotify.com'],
+  tidal: ['tidal.com'],
+  tiktok: ['tiktok.com'],
+  youtube: ['youtube.com', 'youtu.be'],
+  youtube_music: ['music.youtube.com'],
+};
+
+function isAllowedHostname(
+  hostname: string,
+  allowedHostnames: readonly string[]
+): boolean {
+  const normalizedHostname = hostname.replace(/^www\./, '').toLowerCase();
+  return allowedHostnames.some(allowed => {
+    const normalizedAllowed = allowed.toLowerCase();
     return (
-      <div className='relative h-10 w-10 shrink-0 overflow-hidden rounded-full border border-white/[0.08] bg-surface-0'>
-        <Image
-          src={artist.imageUrl}
-          alt=''
-          width={40}
-          height={40}
-          className='h-full w-full object-cover'
-          unoptimized
-        />
-      </div>
+      normalizedHostname === normalizedAllowed ||
+      normalizedHostname.endsWith(`.${normalizedAllowed}`)
     );
+  });
+}
+
+function readSafePlatformUrl(
+  url: string | null | undefined,
+  platform?: string
+): string | null {
+  const safeUrl = readSafeHttpsUrl(url);
+  if (!safeUrl) return null;
+
+  const platformKey = platform ? platformToProfileKey(platform) : null;
+  const allowedHostnames = platformKey
+    ? PLATFORM_HOST_ALLOWLIST[platformKey]
+    : undefined;
+  if (!allowedHostnames) return safeUrl;
+
+  const hostname = new URL(safeUrl).hostname;
+  return isAllowedHostname(hostname, allowedHostnames) ? safeUrl : null;
+}
+
+function platformToProfileKey(platform: string): string {
+  const normalized = platform.toLowerCase().replaceAll(/[^a-z0-9]/g, '');
+
+  if (normalized.includes('applemusic') || normalized === 'itunes') {
+    return 'apple_music';
+  }
+  if (normalized.includes('youtubemusic')) return 'youtube_music';
+  if (normalized.includes('youtube')) return 'youtube';
+  if (normalized.includes('soundcloud')) return 'soundcloud';
+  if (normalized.includes('deezer')) return 'deezer';
+  if (normalized.includes('tidal')) return 'tidal';
+  if (normalized.includes('spotify')) return 'spotify';
+
+  return normalized || platform;
+}
+
+function inferPlatformFromUrl(url: string): string {
+  try {
+    const host = new URL(url).hostname.replace(/^www\./, '').toLowerCase();
+    if (host.includes('instagram')) return 'instagram';
+    if (host.includes('tiktok')) return 'tiktok';
+    if (host.includes('youtube')) return 'youtube';
+    if (host.includes('soundcloud')) return 'soundcloud';
+    if (host.includes('spotify')) return 'spotify';
+    if (host.includes('music.apple')) return 'apple_music';
+  } catch {
+    return 'website';
   }
 
-  return (
-    <div
-      className='flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-subtle bg-surface-0 text-[11px] font-semibold text-secondary-token'
-      aria-hidden
-    >
-      {getInitials(artist.name) || <UserRound className='h-4 w-4' />}
-    </div>
-  );
+  return 'website';
 }
 
-function RailMatchBadge({
-  artistName,
-  href,
-  label,
-  tone,
-}: {
-  readonly artistName: string;
-  readonly href: string | null;
-  readonly label: string;
-  readonly tone: 'matched' | 'selected';
-}) {
-  const className = cn(
-    'inline-flex h-5 shrink-0 items-center gap-1 rounded-full border px-1.5 text-[10.5px] font-medium leading-5 transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-white/20',
-    tone === 'matched'
-      ? 'border-green-500/20 text-green-500'
-      : 'border-cyan-400/20 text-cyan-300',
-    href && 'hover:bg-surface-2'
-  );
-  const content = (
-    <>
-      <SocialIcon platform='spotify' className='h-3 w-3' aria-hidden />
-      <span>{label}</span>
-    </>
-  );
+function uniqueDspMatches(
+  artist: OnboardingProfileArtist
+): readonly OnboardingDspMatch[] {
+  const safeSpotifyUrl = getSafeSpotifyArtistUrl(artist.url);
+  const base: OnboardingDspMatch[] = safeSpotifyUrl
+    ? [
+        {
+          id: 'spotify',
+          label: 'Spotify',
+          platform: 'spotify',
+          url: safeSpotifyUrl,
+        },
+      ]
+    : [];
+  const seen = new Set(base.map(match => match.id));
+  const extras = (artist.dspMatches ?? []).filter(match => {
+    if (!match.id || seen.has(match.id)) return false;
+    if (!readSafePlatformUrl(match.url ?? null, match.platform)) return false;
+    seen.add(match.id);
+    return true;
+  });
 
-  if (href) {
-    return (
-      <a
-        href={href}
-        target='_blank'
-        rel='noreferrer'
-        className={className}
-        aria-label={`Open ${artistName} on Spotify`}
-      >
-        {content}
-      </a>
-    );
+  return [...base, ...extras];
+}
+
+function buildPreviewArtist(
+  artist: OnboardingProfileArtist,
+  handle: string | null,
+  dspMatches: readonly OnboardingDspMatch[]
+): Artist {
+  const spotifyUrl = getSafeSpotifyArtistUrl(artist.url) ?? undefined;
+  const dspUrls = new Map<string, string>();
+
+  for (const match of dspMatches) {
+    const safeUrl = readSafePlatformUrl(match.url ?? null, match.platform);
+    if (!safeUrl) continue;
+    dspUrls.set(platformToProfileKey(match.platform), safeUrl);
   }
 
-  return <span className={className}>{content}</span>;
+  const firstGenre = artist.genres?.[0]
+    ? formatGenreLabel(artist.genres[0])
+    : null;
+  const followerLabel = formatCompactCount(artist.followers);
+
+  return {
+    id: `onboarding-preview-${artist.id}`,
+    owner_user_id: 'onboarding-preview',
+    handle: handle ?? 'your-handle',
+    spotify_id: artist.id,
+    name: artist.name,
+    image_url: artist.imageUrl ?? undefined,
+    tagline: followerLabel
+      ? `${followerLabel} Spotify followers`
+      : (firstGenre ?? undefined),
+    theme: undefined,
+    settings: undefined,
+    spotify_url: spotifyUrl,
+    apple_music_url: dspUrls.get('apple_music'),
+    youtube_url: dspUrls.get('youtube'),
+    apple_music_id: undefined,
+    youtube_music_id: undefined,
+    deezer_id: undefined,
+    tidal_id: undefined,
+    soundcloud_id: undefined,
+    venmo_handle: undefined,
+    location: null,
+    hometown: null,
+    active_since_year: null,
+    genres: artist.genres ? [...artist.genres] : null,
+    career_highlights: null,
+    target_playlists: null,
+    published: true,
+    is_verified: false,
+    is_featured: false,
+    marketing_opt_out: false,
+    created_at: '2026-01-01T00:00:00.000Z',
+  };
 }
 
-function RailMetric({
-  children,
-  icon,
-  title,
-}: {
-  readonly children: ReactNode;
-  readonly icon: ReactNode;
-  readonly title: string;
-}) {
-  return (
-    <span
-      className='inline-flex h-6 items-center gap-1 rounded-full border border-subtle bg-surface-0 px-2 text-[11.5px] leading-none text-secondary-token'
-      title={title}
-    >
-      <span className='text-tertiary-token' aria-hidden>
-        {icon}
-      </span>
-      <span className='sr-only'>{title}</span>
-      <span aria-hidden>{children}</span>
-    </span>
-  );
-}
-
-function TimelineItem({
-  body,
-  state,
-  title,
-}: {
-  readonly body: string;
-  readonly state: 'done' | 'active' | 'pending';
-  readonly title: string;
-}) {
-  return (
-    <li className='relative z-10 grid grid-cols-[18px_minmax(0,1fr)] gap-2.5 max-lg:gap-2'>
-      <span
-        className={cn(
-          'mt-0.5 flex h-[18px] w-[18px] items-center justify-center',
-          state === 'done'
-            ? 'text-green-500'
-            : state === 'active'
-              ? 'text-cyan-300'
-              : 'text-tertiary-token'
-        )}
-        aria-hidden
-      >
-        {state === 'done' ? (
-          <CircleCheckBig className='h-[18px] w-[18px]' strokeWidth={2.65} />
-        ) : (
-          <Circle
-            className={cn('h-2.5 w-2.5', state === 'active' && 'fill-current')}
-            strokeWidth={2.4}
-          />
-        )}
-      </span>
-      <span className='min-w-0'>
-        <span className='block text-[12.5px] font-medium leading-5 text-primary-token'>
-          {title}
-        </span>
-        <span
-          className={cn(
-            'block text-[12px] leading-5 text-tertiary-token max-lg:text-[11.5px] max-lg:leading-4',
-            state === 'pending' && 'max-lg:hidden'
-          )}
-        >
-          {body}
-        </span>
-      </span>
-    </li>
-  );
-}
-
-function RailPhonePreview({
+function buildPreviewLinks({
   artist,
-  handle,
-  socialLink,
+  dspMatches,
+  socialLinks,
 }: {
   readonly artist: OnboardingProfileArtist;
-  readonly handle: string | null;
-  readonly socialLink: string | null;
+  readonly dspMatches: readonly OnboardingDspMatch[];
+  readonly socialLinks: readonly string[];
+}): LegacySocialLink[] {
+  const links: LegacySocialLink[] = [];
+  const seen = new Set<string>();
+
+  const addLink = (platform: string, url: string | null | undefined) => {
+    const safeUrl = readSafePlatformUrl(url, platform);
+    if (!safeUrl || seen.has(safeUrl)) return;
+    seen.add(safeUrl);
+    links.push({
+      id: `onboarding-link-${links.length + 1}`,
+      artist_id: artist.id,
+      platform,
+      url: safeUrl,
+      clicks: 0,
+      created_at: '2026-01-01T00:00:00.000Z',
+      is_visible: true,
+    });
+  };
+
+  for (const match of dspMatches) {
+    addLink(platformToProfileKey(match.platform), match.url ?? null);
+  }
+
+  for (const url of socialLinks) {
+    addLink(inferPlatformFromUrl(url), url);
+  }
+
+  return links;
+}
+
+function DspMatchStrip({
+  matches,
+}: {
+  readonly matches: readonly OnboardingDspMatch[];
 }) {
-  const socialHost = socialLink ? hostnameFor(socialLink) : null;
-  const profilePath = handle ? `/${handle}` : '/your-handle';
+  if (matches.length === 0) return null;
+
+  const visible = matches.slice(0, 4);
+  const overflow = Math.max(0, matches.length - visible.length);
 
   return (
-    <div
-      className='rounded-xl border border-subtle bg-surface-1 p-3'
-      data-testid='onboarding-phone-preview'
+    <fieldset
+      className='absolute bottom-4 left-1/2 z-20 flex -translate-x-1/2 items-center gap-1.5 rounded-full border border-white/15 bg-black/28 px-2 py-1.5 text-white shadow-[0_14px_30px_rgba(0,0,0,0.22)] backdrop-blur-xl'
+      data-testid='onboarding-dsp-match-strip'
+      aria-label='Matched music services'
     >
-      <div className='mb-2 flex items-center gap-1.5 text-[11.5px] font-medium leading-4 text-secondary-token'>
-        <Smartphone className='h-3.5 w-3.5' aria-hidden />
-        <span>Profile preview</span>
-      </div>
-      <div className='mx-auto h-[238px] w-[138px] overflow-hidden rounded-[20px] border border-white/[0.09] bg-surface-0 shadow-[0_14px_34px_rgba(0,0,0,0.28)]'>
-        <div className='h-11 bg-surface-2' />
-        <div className='px-3 pb-3'>
-          <div className='-mt-5 mb-2 flex justify-center'>
-            <RailAvatar artist={artist} />
-          </div>
-          <p className='truncate text-center text-[13px] font-semibold leading-5 text-primary-token'>
-            {artist.name}
-          </p>
-          <p className='truncate text-center text-[11px] leading-4 text-tertiary-token'>
-            {profilePath}
-          </p>
-          <div className='mt-3 space-y-1.5'>
-            <span className='flex h-7 items-center justify-center gap-1 rounded-full border border-green-500/20 bg-surface-1 px-2 text-[10.5px] font-medium text-green-500'>
-              <SocialIcon platform='spotify' className='h-3 w-3' aria-hidden />
-              Spotify
-            </span>
-            {socialHost ? (
-              <span className='flex h-7 items-center justify-center rounded-full border border-subtle bg-surface-1 px-2 text-[10.5px] font-medium text-secondary-token'>
-                {socialHost}
-              </span>
-            ) : (
-              <span className='flex h-7 items-center justify-center rounded-full border border-dashed border-subtle px-2 text-[10.5px] font-medium text-tertiary-token'>
-                Social link
-              </span>
-            )}
-            <span className='flex h-7 items-center justify-center rounded-full border border-dashed border-subtle px-2 text-[10.5px] font-medium text-tertiary-token'>
-              Release page
-            </span>
-          </div>
-        </div>
-      </div>
-    </div>
+      {visible.map(match => (
+        <span
+          key={match.id}
+          className='inline-flex h-7 w-7 items-center justify-center rounded-full bg-white text-black shadow-[0_6px_16px_rgba(0,0,0,0.18)]'
+          title={match.label}
+        >
+          <SocialIcon
+            platform={match.platform}
+            className='h-3.5 w-3.5'
+            aria-hidden
+          />
+          <span className='sr-only'>{match.label}</span>
+        </span>
+      ))}
+      {overflow > 0 ? (
+        <span className='inline-flex h-7 items-center rounded-full bg-white px-2 text-[11.5px] font-semibold text-black'>
+          +{overflow} others
+        </span>
+      ) : null}
+    </fieldset>
   );
 }
 
@@ -266,148 +288,94 @@ export function OnboardingProfileRail({
   readonly state: OnboardingProfileBuilderState;
 }) {
   const artist = state.artist;
-  const visible = Boolean(artist);
-  const followers = formatCompactCount(artist?.followers);
-  const exactFollowers = formatExactCount(artist?.followers);
-  const genres = artist?.genres?.slice(0, 2).map(formatGenreLabel) ?? [];
-  const firstSocialLink = state.socialLinks[0] ?? null;
-  const safeArtistUrl = getSafeSpotifyArtistUrl(artist?.url);
   const isInline = placement === 'inline';
 
-  if (!visible) return null;
+  if (!artist) return null;
+
+  const dspMatches = uniqueDspMatches(artist);
+  const previewArtist = buildPreviewArtist(artist, state.handle, dspMatches);
+  const previewLinks = buildPreviewLinks({
+    artist,
+    dspMatches,
+    socialLinks: state.socialLinks,
+  });
+  const profileHref = `/${previewArtist.handle}`;
 
   return (
     <aside
       className={cn(
         'overflow-hidden bg-(--linear-app-content-surface) text-primary-token transition-[opacity,transform,width,border-color] duration-cinematic ease-out',
         isInline
-          ? 'relative z-0 w-full rounded-2xl border border-(--linear-app-shell-border) lg:hidden'
-          : 'z-30 max-lg:hidden lg:relative lg:h-full lg:border-l lg:border-(--linear-app-shell-border)',
-        visible
-          ? cn(
-              'pointer-events-auto opacity-100',
-              isInline ? 'translate-y-0' : 'lg:w-[322px] lg:translate-x-0'
-            )
-          : cn(
-              'pointer-events-none opacity-0',
-              isInline ? 'hidden' : 'lg:w-0 lg:translate-x-3'
-            )
+          ? 'relative z-0 w-full rounded-[22px] lg:hidden'
+          : 'z-30 max-lg:hidden lg:relative lg:h-full lg:w-[380px] lg:border-l lg:border-(--linear-app-shell-border)'
       )}
-      aria-hidden={!visible}
       data-testid={
         isInline ? 'onboarding-profile-rail-inline' : 'onboarding-profile-rail'
       }
-      data-visible={visible ? 'true' : 'false'}
+      data-visible='true'
       data-placement={placement}
     >
-      <div className={cn(!isInline && 'lg:w-[322px]')}>
-        <div className='border-b border-(--linear-app-shell-border) px-4 py-3.5 max-lg:px-3.5 max-lg:py-3'>
-          <p className='text-[12px] font-medium leading-5 text-secondary-token'>
-            Artist Profile
-          </p>
-          <p className='text-[13px] font-semibold leading-5 text-primary-token'>
-            {artist ? `Building ${artist.name}` : 'Building profile'}
-          </p>
-        </div>
-
-        {artist ? (
-          <div className='space-y-4 px-4 py-4 max-lg:space-y-3 max-lg:px-3.5 max-lg:py-3'>
-            <div className='rounded-xl border border-subtle bg-surface-1 p-3 max-lg:p-2.5'>
-              <div className='flex items-start gap-3'>
-                <RailAvatar artist={artist} />
-                <div className='min-w-0 flex-1'>
-                  <div className='flex min-w-0 items-center gap-2'>
-                    <p className='truncate text-[13.5px] font-semibold leading-5 text-primary-token'>
-                      {artist.name}
-                    </p>
-                    <RailMatchBadge
-                      artistName={artist.name}
-                      href={safeArtistUrl}
-                      label={state.artistConfirmed ? 'Matched' : 'Selected'}
-                      tone={state.artistConfirmed ? 'matched' : 'selected'}
-                    />
-                  </div>
-                </div>
-              </div>
-
-              <div className='mt-3 flex flex-wrap gap-1.5'>
-                {followers ? (
-                  <RailMetric
-                    icon={<Users className='h-3 w-3' />}
-                    title={`${exactFollowers ?? followers} Spotify followers`}
-                  >
-                    {followers}
-                  </RailMetric>
-                ) : null}
-                {typeof artist.popularity === 'number' ? (
-                  <RailMetric
-                    icon={<Gauge className='h-3 w-3' />}
-                    title={`Popularity score: ${artist.popularity} out of 100`}
-                  >
-                    {artist.popularity}
-                  </RailMetric>
-                ) : null}
-                {genres.map(genre => (
-                  <RailMetric
-                    key={genre}
-                    icon={<Music2 className='h-3 w-3' />}
-                    title={`Genre: ${genre}`}
-                  >
-                    {genre}
-                  </RailMetric>
-                ))}
-              </div>
-            </div>
-
-            <RailPhonePreview
-              artist={artist}
-              handle={state.handle}
-              socialLink={firstSocialLink}
-            />
-
-            <ol
-              className='relative space-y-3 before:absolute before:bottom-2 before:left-[8.5px] before:top-2 before:w-px before:bg-(--linear-app-shell-border) max-lg:space-y-2.5'
-              aria-label='Profile build progress'
+      <div
+        className={cn(
+          'flex h-full min-h-0 items-center justify-center',
+          isInline ? 'px-0 py-2' : 'lg:w-[380px] lg:px-4 lg:py-4'
+        )}
+      >
+        <div
+          className={cn(
+            'relative flex w-full items-center justify-center overflow-hidden rounded-[28px] bg-[linear-gradient(145deg,#0A2A88_0%,#0B6CFF_52%,#7AC7FF_100%)] shadow-[inset_0_1px_0_rgba(255,255,255,0.26),0_30px_80px_rgba(0,48,160,0.34)]',
+            isInline
+              ? 'min-h-[456px] max-w-[342px] p-4'
+              : 'h-full min-h-[620px] max-h-[680px] max-w-[348px] p-5'
+          )}
+          data-testid='onboarding-profile-bento'
+        >
+          <div className='pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,rgba(255,255,255,0.20)_0%,rgba(255,255,255,0.04)_42%,rgba(0,0,0,0.20)_100%)]' />
+          <PhoneFrame
+            className={cn(
+              'relative z-10',
+              isInline
+                ? 'h-[420px] w-[200px] sm:h-[480px] sm:w-[228px]'
+                : 'h-[592px] w-[282px]'
+            )}
+          >
+            <div
+              className='h-full w-full [--cover-height:45%] [--page-pad:18px]'
+              data-testid='onboarding-phone-preview'
             >
-              <TimelineItem
-                title='Spotify artist'
-                body={
-                  state.artistConfirmed
-                    ? 'Profile matched and ready to build from.'
-                    : 'Selected. Jovie is matching the Spotify profile.'
-                }
-                state={state.artistConfirmed ? 'done' : 'active'}
+              <ProfileCompactSurface
+                renderMode='preview'
+                presentation='embedded'
+                artist={previewArtist}
+                socialLinks={previewLinks}
+                contacts={[]}
+                showPayButton={false}
+                genres={previewArtist.genres}
+                drawerOpen={false}
+                drawerView='menu'
+                activeMode='profile'
+                onDrawerOpenChange={() => {}}
+                onDrawerViewChange={() => {}}
+                onBack={() => {}}
+                onOpenMenu={() => {}}
+                onPlayClick={() => {}}
+                onShare={() => {}}
+                onModeSelect={() => {}}
+                profileHref={profileHref}
+                dataTestId='onboarding-profile-compact-surface'
+                isSubscribed
+                hideBackButton
+                hideJovieBranding
+                hideMoreMenu
+                renderInteractiveOverlays={false}
+                renderSemanticHeading={false}
+                headerSocialLinksOverride={[]}
+                resolveNearbyTour={false}
               />
-              <TimelineItem
-                title='Profile context'
-                body={
-                  state.artistConfirmed
-                    ? 'Next question: why this needs fixing now.'
-                    : 'Waiting for the Spotify match.'
-                }
-                state={state.artistConfirmed ? 'active' : 'pending'}
-              />
-              <TimelineItem
-                title='Social links'
-                body={
-                  firstSocialLink
-                    ? hostnameFor(firstSocialLink)
-                    : 'Instagram, TikTok, store, and other public links.'
-                }
-                state={firstSocialLink ? 'done' : 'pending'}
-              />
-              <TimelineItem
-                title='Public profile'
-                body={
-                  state.handle
-                    ? `jov.ie/${state.handle}`
-                    : 'Profile preview appears after handle and links.'
-                }
-                state={state.handle ? 'active' : 'pending'}
-              />
-            </ol>
-          </div>
-        ) : null}
+            </div>
+          </PhoneFrame>
+          <DspMatchStrip matches={dspMatches} />
+        </div>
       </div>
     </aside>
   );

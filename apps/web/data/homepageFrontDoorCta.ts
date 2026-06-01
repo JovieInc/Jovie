@@ -1,7 +1,7 @@
 import { APP_ROUTES } from '@/constants/routes';
 
 export const HOMEPAGE_REQUEST_ACCESS_STARTER_PROMPT =
-  "I want request access to Jovie. I'm an artist or work with one.";
+  'Hey, I want to get access to Jovie.';
 
 export function buildHomepageStartHref(starterPrompt?: string): string {
   if (!starterPrompt) return APP_ROUTES.START;

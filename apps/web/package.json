@@ -80,6 +80,7 @@
     "admin:green:record": "tsx scripts/admin-green-loop.ts record",
     "admin:green:watch": "tsx scripts/admin-green-loop.ts watch",
     "demo:record": "bash scripts/record-yc-demo.sh",
+    "demo:record:onboarding": "playwright test tests/e2e/onboarding-david-guetta-demo.spec.ts --project=chromium --reporter=line",
     "test:e2e:sentry:red": "node scripts/run-sentry-red-lane.mjs",
     "e2e:smoke": "SMOKE_ONLY=1 playwright test --config=playwright.config.smoke.ts",
     "e2e:smoke:mobile": "SMOKE_ONLY=1 playwright test --config=playwright.config.smoke.mobile.ts",
