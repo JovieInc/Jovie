@@ -1,5 +1,3 @@
-import 'server-only';
-
 import type { MerchPricingSnapshot } from '@/lib/db/schema/merch';
 
 export const MERCH_DEFAULT_CURRENCY = 'USD' as const;
