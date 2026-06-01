@@ -9,7 +9,11 @@ import {
   readHomepageIntent,
   sanitizeHomepagePrompt,
 } from '@/components/homepage/intent-store';
-import { ChatInput, ChatMessage } from '@/components/jovie/components';
+import {
+  ChatEmptyStateComposerRegion,
+  ChatInput,
+  ChatMessage,
+} from '@/components/jovie/components';
 import { useChatJankMonitor, useStickToBottom } from '@/components/jovie/hooks';
 import {
   composeMessage,
@@ -87,18 +91,6 @@ interface OnboardingChatProps {
 
 /** Pull the user-visible text out of a UIMessage's parts. */
 const THINKING_PLACEHOLDER_ID = 'thinking-placeholder';
-const ONBOARDING_INTRO_MESSAGE_ID = 'onboarding-intro';
-const ONBOARDING_INTRO_MESSAGE = {
-  id: ONBOARDING_INTRO_MESSAGE_ID,
-  role: 'assistant',
-  parts: [
-    {
-      type: 'text',
-      text: "hey, I'm Jovie. heads up, I'll remember this chat so we can pick up where we left off if you sign up. are you the Spotify artist, or are you working with one?",
-    },
-  ],
-} satisfies UIMessage;
-
 const BLOCKED_TURNSTILE_TOKEN_STATUSES: ReadonlySet<
   OnboardingTurnstileStatus | undefined
 > = new Set(['expired', 'timeout', 'error', 'unsupported', 'unconfigured']);
@@ -126,7 +118,9 @@ type OnboardingToolRendererArgs = {
   readonly part: ToolPart;
   readonly key: string;
   readonly isBusy: boolean;
+  readonly onHandleCandidateChange: (handle: string | null) => void;
   readonly onSelectArtist: (artist: OnboardingArtistSelection) => void;
+  readonly selectedArtistId: string | null;
 };
 
 type OnboardingToolRenderer = (
@@ -213,7 +207,6 @@ function findLastAssistantMessageId(messages: readonly UIMessage[]) {
     const message = messages[i];
     if (
       message.role === 'assistant' &&
-      message.id !== ONBOARDING_INTRO_MESSAGE_ID &&
       message.id !== THINKING_PLACEHOLDER_ID
     ) {
       return message.id;
@@ -241,6 +234,14 @@ function artistFromSelection(
     followers: artist.followers ?? null,
     popularity: artist.popularity ?? null,
     genres: [],
+    dspMatches: [
+      {
+        id: 'spotify',
+        label: 'Spotify',
+        platform: 'spotify',
+        url: artist.url,
+      },
+    ],
   };
 }
 
@@ -257,6 +258,15 @@ function artistFromConfirmedOutput(
     followers: artist.followers ?? null,
     popularity: artist.popularity ?? null,
     genres: artist.genres ?? [],
+    dspMatches: [
+      {
+        id: 'spotify',
+        label: 'Spotify',
+        platform: 'spotify',
+        url: artist.url,
+      },
+      ...(artist.dspMatches ?? []),
+    ],
   };
 }
 
@@ -266,9 +276,11 @@ function cleanHandle(handle: string | undefined): string | null {
 }
 
 function deriveProfileBuilderState({
+  handleDraft,
   messages,
   selectedArtist,
 }: {
+  readonly handleDraft: string | null;
   readonly messages: readonly UIMessage[];
   readonly selectedArtist: OnboardingArtistSelection | null;
 }): OnboardingProfileBuilderState {
@@ -301,7 +313,7 @@ function deriveProfileBuilderState({
   return {
     artist,
     artistConfirmed,
-    handle,
+    handle: handleDraft ?? handle,
     socialLinks,
   };
 }
@@ -311,7 +323,10 @@ const renderSearchSpotifyArtist: OnboardingToolRenderer = ({
   key,
   isBusy,
   onSelectArtist,
+  selectedArtistId,
 }) => {
+  if (selectedArtistId) return null;
+
   const output = part.output;
   if (!(isArtistPickerOutput(output) || output === undefined)) {
     return null;
@@ -344,7 +359,11 @@ const renderConfirmSpotifyArtist: OnboardingToolRenderer = ({ part, key }) => {
   );
 };
 
-const renderCheckHandle: OnboardingToolRenderer = ({ part, key }) => {
+const renderCheckHandle: OnboardingToolRenderer = ({
+  onHandleCandidateChange,
+  part,
+  key,
+}) => {
   const output = part.output;
   if (!(isHandleCheckOutput(output) || output === undefined)) {
     return null;
@@ -355,6 +374,7 @@ const renderCheckHandle: OnboardingToolRenderer = ({ part, key }) => {
       key={key}
       state={part.state}
       output={isHandleCheckOutput(output) ? output : null}
+      onHandleCandidateChange={onHandleCandidateChange}
     />
   );
 };
@@ -414,13 +434,17 @@ function renderOnboardingTools({
   toolParts,
   hasMessageText,
   isBusy,
+  onHandleCandidateChange,
   onSelectArtist,
+  selectedArtistId,
 }: {
   readonly messageId: string;
   readonly toolParts: readonly ToolPart[];
   readonly hasMessageText: boolean;
   readonly isBusy: boolean;
+  readonly onHandleCandidateChange: (handle: string | null) => void;
   readonly onSelectArtist: (artist: OnboardingArtistSelection) => void;
+  readonly selectedArtistId: string | null;
 }) {
   const genericParts: ToolPart[] = [];
   const cards: ReactNode[] = [];
@@ -433,14 +457,23 @@ function renderOnboardingTools({
       return;
     }
 
-    const card = onboardingToolRenderers[toolName]?.({
-      part,
-      key,
-      isBusy,
-      onSelectArtist,
-    });
-    if (card) {
-      cards.push(card);
+    if (toolName === 'searchSpotifyArtist' && selectedArtistId) {
+      return;
+    }
+
+    const renderer = onboardingToolRenderers[toolName];
+    if (renderer) {
+      const card = renderer({
+        part,
+        key,
+        isBusy,
+        onHandleCandidateChange,
+        onSelectArtist,
+        selectedArtistId,
+      });
+      if (card) {
+        cards.push(card);
+      }
       return;
     }
 
@@ -467,18 +500,20 @@ function renderOnboardingTools({
 
 function OnboardingMessageList({
   displayMessages,
-  hideIntroMessage,
   isStreaming,
   lastAssistantMessageId,
+  onHandleCandidateChange,
   isBusy,
   onSelectArtist,
+  selectedArtistId,
 }: {
   readonly displayMessages: readonly UIMessage[];
-  readonly hideIntroMessage: boolean;
   readonly isStreaming: boolean;
   readonly lastAssistantMessageId: string | null;
+  readonly onHandleCandidateChange: (handle: string | null) => void;
   readonly isBusy: boolean;
   readonly onSelectArtist: (artist: OnboardingArtistSelection) => void;
+  readonly selectedArtistId: string | null;
 }) {
   return (
     <div className='flex flex-col pb-4'>
@@ -486,24 +521,13 @@ function OnboardingMessageList({
         const text = getMessageText(message);
         const toolParts = getToolParts(message);
         const isThinking = message.id === THINKING_PLACEHOLDER_ID;
-        const isIntroHidden =
-          hideIntroMessage && message.id === ONBOARDING_INTRO_MESSAGE_ID;
         const shouldRenderMessage =
           isThinking || Boolean(text) || toolParts.length === 0;
 
         return (
           <div
             key={message.id}
-            className={cn(
-              'pb-5 transition-opacity duration-fast',
-              isIntroHidden && 'pointer-events-none opacity-0'
-            )}
-            aria-hidden={isIntroHidden ? 'true' : undefined}
-            data-testid={
-              message.id === ONBOARDING_INTRO_MESSAGE_ID
-                ? 'onboarding-intro-message'
-                : undefined
-            }
+            className='pb-5 transition-opacity duration-fast'
           >
             {shouldRenderMessage ? (
               <ChatMessage
@@ -523,39 +547,14 @@ function OnboardingMessageList({
                   toolParts,
                   hasMessageText: Boolean(text),
                   isBusy,
+                  onHandleCandidateChange,
                   onSelectArtist,
+                  selectedArtistId,
                 })
               : null}
           </div>
         );
       })}
-    </div>
-  );
-}
-
-function OnboardingInitialIntro({
-  hidden,
-  testId = 'onboarding-intro-message',
-}: {
-  readonly hidden: boolean;
-  readonly testId?: string;
-}) {
-  return (
-    <div
-      className={cn(
-        'mx-auto flex w-full max-w-[34rem] flex-col items-center pb-1 text-center transition-opacity duration-fast',
-        hidden && 'pointer-events-none opacity-0'
-      )}
-      aria-hidden={hidden ? 'true' : undefined}
-      data-testid={testId}
-    >
-      <p className='text-[2rem] font-semibold leading-[1.08] tracking-[-0.035em] text-primary-token sm:text-[2.4rem]'>
-        Hey, I&apos;m Jovie.
-      </p>
-      <p className='mt-2 max-w-[24rem] text-[15px] leading-6 text-secondary-token'>
-        Start with the Spotify artist. I&apos;ll match the profile, make one
-        useful call, then decide access.
-      </p>
     </div>
   );
 }
@@ -573,11 +572,10 @@ function getDisplayMessages(
   shouldShowThinking: boolean
 ): readonly UIMessage[] {
   if (!shouldShowThinking) {
-    return [ONBOARDING_INTRO_MESSAGE, ...messages];
+    return messages;
   }
 
   return [
-    ONBOARDING_INTRO_MESSAGE,
     ...messages,
     {
       id: THINKING_PLACEHOLDER_ID,
@@ -605,24 +603,21 @@ function ChatErrorStatusBanner({
   const canRetry = Boolean(chatError.failedMessage) && !chatError.retryAfter;
 
   return (
-    <div
-      role='alert'
-      aria-live='assertive'
-      aria-atomic='true'
-      className='px-3 py-2.5 text-[12.5px] leading-5'
-    >
-      <p className='font-medium text-primary-token'>Message paused</p>
-      <p className='mt-0.5 text-secondary-token'>{chatError.message}</p>
-      {canRetry ? (
-        <button
-          type='button'
-          onClick={handleRetry}
-          disabled={isBusy || isSubmitted}
-          className='mt-2 inline-flex h-7 items-center rounded-[8px] border border-subtle px-2.5 text-[11.5px] font-medium text-secondary-token transition-colors duration-fast hover:border-white/15 hover:text-primary-token focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-white/20 disabled:opacity-50'
-        >
-          Retry message
-        </button>
-      ) : null}
+    <div className='px-3 py-2.5 text-[12.5px] leading-5'>
+      <div role='alert' aria-live='assertive' aria-atomic='true'>
+        <p className='font-medium text-primary-token'>Message paused</p>
+        <p className='mt-0.5 text-secondary-token'>{chatError.message}</p>
+        {canRetry ? (
+          <button
+            type='button'
+            onClick={handleRetry}
+            disabled={isBusy || isSubmitted}
+            className='mt-2 inline-flex h-7 items-center rounded-[8px] border border-subtle px-2.5 text-[11.5px] font-medium text-secondary-token transition-colors duration-fast hover:border-white/15 hover:text-primary-token focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-white/20 disabled:opacity-50'
+          >
+            Retry message
+          </button>
+        ) : null}
+      </div>
     </div>
   );
 }
@@ -658,26 +653,26 @@ function ComposerStatusBanner({
 }
 
 interface OnboardingMessageRegionProps {
-  readonly composerPickerOpen: boolean;
   readonly displayMessages: readonly UIMessage[];
   readonly hasConversationStarted: boolean;
   readonly isBusy: boolean;
   readonly isStreaming: boolean;
   readonly lastAssistantMessageId: string | null;
   readonly onboardingComposerSurface: ReactNode;
+  readonly onHandleCandidateChange: (handle: string | null) => void;
   readonly onSelectArtist: (artist: OnboardingArtistSelection) => void;
   readonly profileBuilderState: OnboardingProfileBuilderState;
   readonly shouldDockComposer: boolean;
 }
 
 function OnboardingMessageRegion({
-  composerPickerOpen,
   displayMessages,
   hasConversationStarted,
   isBusy,
   isStreaming,
   lastAssistantMessageId,
   onboardingComposerSurface,
+  onHandleCandidateChange,
   onSelectArtist,
   profileBuilderState,
   shouldDockComposer,
@@ -685,51 +680,51 @@ function OnboardingMessageRegion({
   if (shouldDockComposer) {
     return (
       <div className='flex flex-col gap-4'>
-        <OnboardingProfileRail placement='inline' state={profileBuilderState} />
         <OnboardingMessageList
           displayMessages={displayMessages}
-          hideIntroMessage={composerPickerOpen}
           isStreaming={isStreaming}
           lastAssistantMessageId={lastAssistantMessageId}
           isBusy={isBusy}
+          onHandleCandidateChange={onHandleCandidateChange}
           onSelectArtist={onSelectArtist}
+          selectedArtistId={profileBuilderState.artist?.id ?? null}
         />
+        <OnboardingProfileRail placement='inline' state={profileBuilderState} />
       </div>
     );
   }
 
+  if (!hasConversationStarted) {
+    return (
+      <ChatEmptyStateComposerRegion>
+        <div className='w-full' data-testid='onboarding-centered-composer'>
+          {onboardingComposerSurface}
+        </div>
+      </ChatEmptyStateComposerRegion>
+    );
+  }
+
+  const conversationAboveComposer = (
+    <div className='mx-auto flex w-full max-w-[44rem] flex-col gap-4'>
+      <OnboardingMessageList
+        displayMessages={displayMessages}
+        isStreaming={isStreaming}
+        lastAssistantMessageId={lastAssistantMessageId}
+        isBusy={isBusy}
+        onHandleCandidateChange={onHandleCandidateChange}
+        onSelectArtist={onSelectArtist}
+        selectedArtistId={profileBuilderState.artist?.id ?? null}
+      />
+      <OnboardingProfileRail placement='inline' state={profileBuilderState} />
+    </div>
+  );
+
   return (
-    <div className='flex w-full flex-col items-center justify-center gap-5 py-8'>
-      <div className='relative w-full'>
-        <OnboardingInitialIntro
-          hidden={hasConversationStarted || composerPickerOpen}
-          testId={
-            hasConversationStarted ? undefined : 'onboarding-intro-message'
-          }
-        />
-        {hasConversationStarted ? (
-          <div className='absolute inset-x-0 bottom-0 z-10 max-h-[min(42vh,24rem)] overflow-y-auto overscroll-contain pb-1'>
-            <div className='flex flex-col gap-4'>
-              <OnboardingProfileRail
-                placement='inline'
-                state={profileBuilderState}
-              />
-              <OnboardingMessageList
-                displayMessages={displayMessages}
-                hideIntroMessage={composerPickerOpen}
-                isStreaming={isStreaming}
-                lastAssistantMessageId={lastAssistantMessageId}
-                isBusy={isBusy}
-                onSelectArtist={onSelectArtist}
-              />
-            </div>
-          </div>
-        ) : null}
-      </div>
+    <ChatEmptyStateComposerRegion above={conversationAboveComposer}>
       <div className='w-full' data-testid='onboarding-centered-composer'>
         {onboardingComposerSurface}
       </div>
-    </div>
+    </ChatEmptyStateComposerRegion>
   );
 }
 
@@ -748,6 +743,7 @@ export function OnboardingChat({
   const [hasSentFirst, setHasSentFirst] = useState(false);
   const [chatError, setChatError] = useState<ChatError | null>(null);
   const [composerPickerOpen, setComposerPickerOpen] = useState(false);
+  const [handleDraft, setHandleDraft] = useState<string | null>(null);
   const [selectedArtist, setSelectedArtist] =
     useState<OnboardingArtistSelection | null>(null);
   const chipTray = useChipTray();
@@ -756,6 +752,9 @@ export function OnboardingChat({
   const hasTrackedChatCompletedRef = useRef(false);
   const lastAttemptedMessageRef = useRef<string | null>(null);
   const hasInjectedStarterPromptRef = useRef(false);
+  const hasAutoSubmittedStarterPromptRef = useRef(false);
+  const hasRequestedStarterVerificationRef = useRef(false);
+  const pendingStarterPromptRef = useRef<string | null>(null);
   const formatArtistSelectionMessage = useArtistSelectionMessage();
 
   const transport = useMemo(
@@ -881,8 +880,8 @@ export function OnboardingChat({
   );
 
   const profileBuilderState = useMemo(
-    () => deriveProfileBuilderState({ messages, selectedArtist }),
-    [messages, selectedArtist]
+    () => deriveProfileBuilderState({ handleDraft, messages, selectedArtist }),
+    [handleDraft, messages, selectedArtist]
   );
 
   useEffect(() => {
@@ -907,9 +906,40 @@ export function OnboardingChat({
 
     if (nextPrompt) {
       setInput(nextPrompt);
+      pendingStarterPromptRef.current = nextPrompt;
       hasInjectedStarterPromptRef.current = true;
     }
   }, [intentId, starterPrompt]);
+
+  useEffect(() => {
+    const prompt = pendingStarterPromptRef.current;
+    if (
+      !prompt ||
+      hasAutoSubmittedStarterPromptRef.current ||
+      messages.length > 0 ||
+      isBusy
+    ) {
+      return;
+    }
+
+    if (isAwaitingFirstToken) {
+      if (!hasRequestedStarterVerificationRef.current) {
+        hasRequestedStarterVerificationRef.current = true;
+        onTurnstileRequired?.('Verify you are human to send');
+      }
+      return;
+    }
+
+    hasAutoSubmittedStarterPromptRef.current = true;
+    pendingStarterPromptRef.current = null;
+    submitText(prompt);
+  }, [
+    isAwaitingFirstToken,
+    isBusy,
+    messages.length,
+    onTurnstileRequired,
+    submitText,
+  ]);
 
   useEffect(() => {
     if (messages.length > 0) return;
@@ -955,6 +985,17 @@ export function OnboardingChat({
   const shouldDockComposer =
     chatError !== null || userTurnCount > 1 || selectedArtist !== null;
 
+  useEffect(() => {
+    if (shouldDockComposer) return;
+    const scrollContainer = scrollContainerRef.current;
+    if (!scrollContainer) return;
+    if (typeof scrollContainer.scrollTo === 'function') {
+      scrollContainer.scrollTo({ top: 0, behavior: 'auto' });
+      return;
+    }
+    scrollContainer.scrollTop = 0;
+  }, [displayMessages.length, scrollContainerRef, shouldDockComposer, status]);
+
   const onboardingChatInputProps = {
     value: input,
     onChange: setInput,
@@ -996,20 +1037,23 @@ export function OnboardingChat({
         aria-live='polite'
       >
         <div
-          ref={totalSizeRef}
+          ref={shouldDockComposer ? totalSizeRef : undefined}
           className={cn(
-            'mx-auto flex min-h-full w-full max-w-[44rem] flex-col',
+            'mx-auto flex min-h-full w-full flex-col',
+            hasConversationStarted || shouldDockComposer
+              ? 'max-w-[44rem]'
+              : 'max-w-[52rem]',
             !shouldDockComposer && 'justify-center'
           )}
         >
           <OnboardingMessageRegion
-            composerPickerOpen={composerPickerOpen}
             displayMessages={displayMessages}
             hasConversationStarted={hasConversationStarted}
             isBusy={isBusy}
             isStreaming={isStreaming}
             lastAssistantMessageId={lastAssistantMessageId}
             onboardingComposerSurface={onboardingComposerSurface}
+            onHandleCandidateChange={setHandleDraft}
             onSelectArtist={handleArtistSelect}
             profileBuilderState={profileBuilderState}
             shouldDockComposer={shouldDockComposer}

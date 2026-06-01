@@ -113,18 +113,18 @@ describe('Onboarding transcript quality eval', () => {
     const result = evaluateTranscript([
       {
         role: 'assistant',
-        text: "hey, I'm Jovie. heads up, I'll remember this chat so we can pick up where we left off if you sign up. what are you working on?",
+        text: "Hey, I'm Jovie. Heads up, I'll remember this chat so we can pick up where we left off if you sign up. What are you working on?",
       },
       { role: 'user', text: 'I am Test Artist and I have a single coming.' },
       {
         role: 'assistant',
         afterTool: 'confirmSpotifyArtist',
-        text: 'pulled you up. 12.3K Spotify followers and indie pop is the right lane, but the release layer is still manual. what is making you fix this now?',
+        text: 'Pulled you up. 12.3K Spotify followers and indie pop is the right lane, but the release layer is still manual. What is making you fix this now?',
       },
       {
         role: 'assistant',
         afterTool: 'proposeCheckout',
-        text: 'that is the move. Pro is $39/mo, free tier exists if you want to start lighter.',
+        text: 'That is the move. Pro is $39/mo, free tier exists if you want to start lighter.',
       },
     ]);
 

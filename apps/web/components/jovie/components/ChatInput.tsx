@@ -145,6 +145,8 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
       chips,
       onRemoveChipAt,
       onRemoveLastChip,
+      onAddSkill,
+      onAddEntity,
       onPickerOpenChange,
       profileId,
       statusBanner,
@@ -292,13 +294,14 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
       [onChange, picker]
     );
 
-    const stripSlashQuery = useCallback(() => {
-      if (picker.state.status === 'closed') return;
+    const stripSlashQuery = useCallback((): number => {
+      if (picker.state.status === 'closed') return value.length;
       const startIdx = picker.state.startIdx;
       const el = internalTextareaRef.current;
       const caret = el?.selectionStart ?? value.length;
       const nextValue = value.slice(0, startIdx) + value.slice(caret);
       onChange(nextValue);
+      return startIdx;
     }, [onChange, picker.state, value]);
 
     const replaceSlashQueryWithToken = useCallback(
@@ -327,6 +330,18 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
 
     const handleSelectSkill = useCallback(
       (skill: import('@/lib/commands/registry').SkillCommand) => {
+        if (onAddSkill) {
+          const nextCaret = stripSlashQuery();
+          onAddSkill(skill.id);
+          const requiredSlot = skill.entitySlots.find(s => s.required);
+          if (requiredSlot && picker.state.status !== 'closed') {
+            picker.openEntity(requiredSlot.kind, nextCaret, '');
+          } else {
+            picker.close();
+          }
+          return;
+        }
+
         const nextCaret = replaceSlashQueryWithToken(serializeSkill(skill.id));
         const requiredSlot = skill.entitySlots.find(s => s.required);
         if (requiredSlot && picker.state.status !== 'closed') {
@@ -335,11 +350,22 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
           picker.close();
         }
       },
-      [replaceSlashQueryWithToken, picker]
+      [onAddSkill, picker, replaceSlashQueryWithToken, stripSlashQuery]
     );
 
     const handleSelectEntity = useCallback(
       (entity: import('@/lib/commands/entities').EntityRef) => {
+        if (onAddEntity) {
+          stripSlashQuery();
+          onAddEntity({
+            kind: entity.kind,
+            id: entity.id,
+            label: entity.label,
+          });
+          picker.close();
+          return;
+        }
+
         replaceSlashQueryWithToken(
           serializeEntity({
             kind: entity.kind,
@@ -349,7 +375,7 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
         );
         picker.close();
       },
-      [replaceSlashQueryWithToken, picker]
+      [onAddEntity, picker, replaceSlashQueryWithToken, stripSlashQuery]
     );
 
     const handleSelectPromptAction = useCallback(
@@ -488,7 +514,12 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
           {/* ROOT inline picker is absolutely positioned so it does not alter
               the composer surface height and cause layout shift when it opens. */}
           {showInlinePicker ? (
-            <div className='absolute bottom-full left-0 right-0 z-[80] mb-4 flex justify-center'>
+            <div
+              className={cn(
+                'absolute bottom-full left-0 right-0 z-[80] flex justify-center',
+                statusBanner ? 'mb-[34px]' : 'mb-4'
+              )}
+            >
               <div
                 style={{
                   width: geometry.width,

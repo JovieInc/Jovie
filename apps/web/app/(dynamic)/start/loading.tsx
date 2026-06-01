@@ -1,15 +1,6 @@
 import { Skeleton } from '@jovie/ui';
+import { JovieMarkElectric } from '@/components/atoms/JovieMarkElectric';
 
-/**
- * Route-level loading skeleton for /start (unauth onboarding chat entry).
- *
- * Mirrors the empty-state layout of OnboardingChat + OnboardingInitialIntro:
- * centered intro heading + the composer surface region. This provides
- * instant visual stability during RSC streaming / hydration and eliminates
- * raw layout shift or "Securing chat..." jank on the unauth first-turn handoff.
- *
- * Matches the post-homepage-polish contract for the 4-stage perceived-jank path.
- */
 export default function StartLoading() {
   return (
     <div
@@ -18,46 +9,33 @@ export default function StartLoading() {
       aria-live='polite'
       data-testid='start-loading-skeleton'
     >
-      {/* Match the OnboardingChat scroll + centered empty region */}
       <div className='relative flex-1 overflow-y-auto px-4 py-5 sm:px-6 lg:px-8'>
-        <div className='mx-auto flex min-h-full w-full max-w-[44rem] flex-col items-center justify-center gap-6 pb-8 text-center'>
-          {/* Intro heading skeleton (matches OnboardingInitialIntro) */}
-          <div className='mx-auto flex w-full max-w-[34rem] flex-col items-center'>
-            <Skeleton
-              className='h-9 w-[18rem] sm:h-10 sm:w-[22rem]'
-              rounded='lg'
-            />
-            <Skeleton
-              className='mt-3 h-5 w-[16rem] sm:h-6 sm:w-[20rem]'
-              rounded='lg'
-            />
+        <div className='mx-auto flex min-h-full w-full max-w-[52rem] flex-col items-center justify-center px-1 py-8'>
+          <div
+            className='pointer-events-none absolute left-1/2 top-1/2 h-[min(46vw,28rem)] w-[min(46vw,28rem)] -translate-x-1/2 -translate-y-[60%] opacity-85 drop-shadow-[0_0_34px_rgba(68,188,255,0.18)] max-sm:h-[min(72vw,18rem)] max-sm:w-[min(72vw,18rem)]'
+            style={{
+              maskImage:
+                'radial-gradient(ellipse at center, black 54%, rgba(0,0,0,0.72) 68%, transparent 88%)',
+              WebkitMaskImage:
+                'radial-gradient(ellipse at center, black 54%, rgba(0,0,0,0.72) 68%, transparent 88%)',
+            }}
+            data-testid='chat-empty-state-logo'
+          >
+            <JovieMarkElectric className='h-full w-full' />
           </div>
 
-          {/* Composer surface skeleton (hero-style empty state) */}
-          <div className='mx-auto w-full max-w-[45rem]'>
+          <div className='relative z-10 mx-auto w-full max-w-[45rem]'>
             <div
-              className='overflow-hidden rounded-[32px] border border-[color-mix(in_oklab,var(--linear-app-frame-seam)_84%,transparent)] bg-[linear-gradient(180deg,rgba(255,255,255,0.04)_0%,rgba(255,255,255,0.012)_100%),var(--linear-app-content-surface)] shadow-[0_18px_56px_-30px_rgba(0,0,0,0.86)]'
+              className='overflow-hidden rounded-[36px] border border-[color-mix(in_oklab,var(--linear-app-frame-seam)_84%,transparent)] bg-[color-mix(in_oklab,var(--linear-app-content-surface)_88%,black_12%)] shadow-[0_18px_68px_-34px_rgba(0,0,0,0.96),inset_0_1px_0_rgba(255,255,255,0.08)]'
               aria-hidden='true'
             >
-              <div className='relative flex items-end gap-2 px-4 py-3 sm:px-5 sm:py-3.5'>
-                {/* Attach / plus button placeholder */}
-                <div className='flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-(--linear-app-frame-seam) bg-surface-0 opacity-60'>
-                  <Skeleton className='h-4 w-4' rounded='full' />
+              <div className='flex min-h-[56px] items-center gap-1.5 px-3 py-1.5 sm:min-h-[56px] sm:px-3'>
+                <div className='min-w-0 flex-1 px-3'>
+                  <Skeleton className='h-5 w-[58%]' rounded='full' />
                 </div>
-
-                {/* Textarea placeholder line */}
-                <div className='min-w-0 flex-1 py-1.5'>
-                  <Skeleton className='h-5 w-[65%] sm:w-[55%]' rounded='full' />
-                </div>
-
-                {/* Mic + Send button placeholders */}
-                <div className='flex items-center gap-2'>
-                  <div className='flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-(--linear-app-frame-seam) bg-surface-0 opacity-60'>
-                    <Skeleton className='h-4 w-4' rounded='full' />
-                  </div>
-                  <div className='flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-(--linear-app-frame-seam) bg-surface-0 opacity-60'>
-                    <Skeleton className='h-4 w-4' rounded='full' />
-                  </div>
+                <div className='flex shrink-0 items-center gap-2'>
+                  <Skeleton className='h-9 w-9' rounded='full' />
+                  <Skeleton className='h-9 w-9' rounded='full' />
                 </div>
               </div>
             </div>

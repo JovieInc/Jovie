@@ -9,6 +9,8 @@ type StreamChunk = Record<string, unknown>;
 const CHAT_PANEL = '[data-testid="onboarding-chat"]';
 const COMPOSER_SURFACE = '[data-testid="chat-composer-surface"]';
 const COMPOSER_TEXTAREA = '[aria-label="Chat message input"]';
+const TEST_AVATAR_PNG_BASE64 =
+  'iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAIAAAAlC+aJAAAAeElEQVR4nO3PQQ3AIADAQMD+/5w9QnJ4QKZsZu2cJwAAAAAAAAAAAAAAANxq7g7wG7iBHYgb2IG4gR2IG9iBuIEdiBvYgbiBHYgb2IG4gR2IG9iBuIEdiBvYgbiBHYgb2IG4gR2IG9iBuIEdiBvYgbiBHYgb2IG4gR2IG9gB9bYCfQMD+LwAAAAASUVORK5CYII=';
 const IGNORABLE_CONSOLE_ERRORS = [
   /favicon/i,
   /ResizeObserver loop/i,
@@ -50,7 +52,10 @@ async function readLayoutShift(page: Page): Promise<number> {
 function collectConsoleFailures(page: Page) {
   const failures: string[] = [];
   page.on('console', msg => {
-    if (msg.type() === 'error') failures.push(msg.text());
+    if (msg.type() === 'error') {
+      const location = msg.location().url;
+      failures.push(location ? `${msg.text()} (${location})` : msg.text());
+    }
   });
   page.on('pageerror', error => {
     failures.push(error.message);
@@ -154,12 +159,31 @@ async function mockOnboardingChat(page: import('@playwright/test').Page) {
           id: 'artist-1',
           name: 'Test Artist',
           url: 'https://open.spotify.com/artist/artist-1',
-          imageUrl: null,
+          imageUrl: 'https://i.scdn.co/image/test-artist',
           followers: 12_300,
           popularity: 48,
         },
       ]),
     });
+  });
+  await page.route('https://i.scdn.co/**', async route => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'image/png',
+      body: Buffer.from(TEST_AVATAR_PNG_BASE64, 'base64'),
+    });
+  });
+  await page.route('**/_next/image?**', async route => {
+    const sourceUrl = new URL(route.request().url()).searchParams.get('url');
+    if (sourceUrl?.startsWith('https://i.scdn.co/')) {
+      await route.fulfill({
+        status: 200,
+        contentType: 'image/png',
+        body: Buffer.from(TEST_AVATAR_PNG_BASE64, 'base64'),
+      });
+      return;
+    }
+    await route.continue();
   });
 
   await page.route('**/api/chat', async route => {
@@ -175,19 +199,19 @@ async function mockOnboardingChat(page: import('@playwright/test').Page) {
       chatRequestCount === 1
         ? textAndToolStream({
             messageId: 'assistant-search',
-            text: "heads up, I'll remember this so we can pick up where we left off when you sign up. let's find the exact Spotify profile.",
+            text: "Awesome, let's do it. Pick the exact Spotify artist.",
             toolName: 'searchSpotifyArtist',
             toolCallId: 'tool-search',
             input: { query: 'Test Artist' },
             output: {
               action: 'open_artist_picker',
               query: 'Test Artist',
-              summary: 'Pick the matching Spotify artist.',
+              summary: 'Pick the exact Spotify artist.',
             },
           })
         : textAndToolStream({
             messageId: 'assistant-confirm',
-            text: 'pulled you up. 12.3K Spotify followers and enough signal to treat the release setup seriously. the gap is the downstream layer, not the songs.',
+            text: 'Pulled you up. 12.3K Spotify followers and enough signal to treat the release setup seriously. The gap is the downstream layer, not the songs.',
             toolName: 'confirmSpotifyArtist',
             toolCallId: 'tool-confirm',
             input: { spotifyArtistId: 'artist-1' },
@@ -198,10 +222,18 @@ async function mockOnboardingChat(page: import('@playwright/test').Page) {
                 id: 'artist-1',
                 name: 'Test Artist',
                 url: 'https://open.spotify.com/artist/artist-1',
-                imageUrl: null,
+                imageUrl: 'https://i.scdn.co/image/test-artist',
                 followers: 12_300,
                 popularity: 48,
                 genres: ['progressive house'],
+                dspMatches: [
+                  {
+                    id: 'apple-music',
+                    label: 'Apple Music',
+                    platform: 'applemusic',
+                    url: 'https://music.apple.com/us/artist/test-artist',
+                  },
+                ],
               },
               summary: 'Test Artist matched on Spotify.',
             },
@@ -270,7 +302,11 @@ test.describe('canonical /start onboarding chat', () => {
       )
     ).toBeVisible();
     await expect(page.locator(CHAT_PANEL)).toBeVisible();
-    await expect(page.getByText("Hey, I'm Jovie.")).toBeVisible();
+    await expect(page.getByTestId('chat-empty-state-logo')).toBeVisible();
+    await expect(
+      page.getByTestId('chat-empty-state-centered-composer')
+    ).toBeVisible();
+    await expect(page.getByText("Hey, I'm Jovie.")).toHaveCount(0);
     const mainBox = await page.locator('#main-content').boundingBox();
     const chatBox = await page.locator(CHAT_PANEL).boundingBox();
     expect(mainBox).not.toBeNull();
@@ -311,23 +347,19 @@ test.describe('canonical /start onboarding chat', () => {
     ).toEqual([]);
   });
 
-  test('narrow screen keeps the intro and feedback slash command usable', async ({
+  test('narrow screen keeps the empty chat and feedback slash command usable', async ({
     page,
   }) => {
     await page.setViewportSize({ width: 615, height: 407 });
     await page.goto('/start', { waitUntil: 'domcontentloaded' });
     await waitForHydration(page);
-    await expect(page.getByText("Hey, I'm Jovie.")).toBeVisible();
+    await expect(page.getByTestId('chat-empty-state-logo')).toBeVisible();
 
     const textarea = page.locator(COMPOSER_TEXTAREA);
     await textarea.fill('/feed');
     await expect(
       page.locator('[data-testid="slash-command-menu"]')
     ).toBeVisible();
-    await expect(page.getByTestId('onboarding-intro-message')).toHaveCSS(
-      'opacity',
-      '0'
-    );
     await expect(
       page.getByRole('option', { name: /send feedback/i })
     ).toBeVisible();
@@ -343,6 +375,26 @@ test.describe('canonical /start onboarding chat', () => {
     await expect(
       page.getByRole('button', { name: 'Send message' })
     ).toBeEnabled();
+  });
+
+  test('homepage starter prompt auto-submits into a conversation', async ({
+    page,
+  }) => {
+    const getChatRequestCount = await mockOnboardingChat(page);
+    const prompt = 'Hey, I want to get access to Jovie.';
+
+    await page.goto(`/start?starter_prompt=${encodeURIComponent(prompt)}`, {
+      waitUntil: 'domcontentloaded',
+    });
+    await waitForHydration(page);
+
+    await expect(page.getByText(prompt)).toBeVisible();
+    await expect(
+      page.getByText('Pick the exact Spotify artist').first()
+    ).toBeVisible();
+    await expect(page.getByTestId('onboarding-artist-picker')).toBeVisible();
+    await expect(page.locator(COMPOSER_TEXTAREA)).toHaveValue('');
+    expect(getChatRequestCount()).toBe(1);
   });
 
   test('submitted user turn stays compact and clear of the composer on mobile', async ({
@@ -378,10 +430,54 @@ test.describe('canonical /start onboarding chat', () => {
         document.documentElement.clientWidth
     );
     expect(overflow).toBeLessThanOrEqual(0);
-    await expect(page.getByTestId('onboarding-profile-rail')).toHaveCount(0);
+    await expect(page.getByTestId('onboarding-profile-rail')).toBeHidden();
     await expect(
       page.getByTestId('onboarding-profile-rail-inline')
     ).toHaveCount(0);
+  });
+
+  test('selected artist preview stays inline on mobile without overflow', async ({
+    page,
+  }, testInfo) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await mockOnboardingChat(page);
+    await page.goto('/start', { waitUntil: 'domcontentloaded' });
+    await waitForHydration(page);
+
+    const textarea = page.locator(COMPOSER_TEXTAREA);
+    await textarea.fill('I am Test Artist');
+    await page.getByRole('button', { name: 'Send message' }).click();
+
+    await expect(page.getByTestId('onboarding-artist-picker')).toBeVisible();
+    await page.getByTestId('onboarding-artist-picker').getByText('Use').click();
+
+    await expect(page.getByTestId('onboarding-profile-rail')).toBeHidden();
+    const inlineRail = page.getByTestId('onboarding-profile-rail-inline');
+    await expect(inlineRail).toBeVisible();
+    await expect(
+      inlineRail.getByTestId('onboarding-profile-bento')
+    ).toBeVisible();
+    await expect(
+      inlineRail.getByTestId('onboarding-phone-preview')
+    ).toBeVisible();
+    await expect(
+      inlineRail.getByTestId('onboarding-profile-compact-surface')
+    ).toBeVisible();
+
+    const overflow = await page.evaluate(
+      () =>
+        document.documentElement.scrollWidth -
+        document.documentElement.clientWidth
+    );
+    expect(overflow).toBeLessThanOrEqual(0);
+
+    const screenshotPath =
+      'test-results/onboarding-demo-mobile-rail-layout.png';
+    await page.screenshot({ path: screenshotPath, fullPage: true });
+    await testInfo.attach('onboarding-demo-mobile-rail-layout', {
+      path: screenshotPath,
+      contentType: 'image/png',
+    });
   });
 
   test('auth error and slash picker do not collide at narrow desktop size', async ({
@@ -407,18 +503,19 @@ test.describe('canonical /start onboarding chat', () => {
     await expect(slashMenu).toBeVisible();
     await expect(alert).toBeVisible();
 
-    const alertBox = await alert.boundingBox();
-    const slashMenuBox = await slashMenu.boundingBox();
-    expect(alertBox).not.toBeNull();
-    expect(slashMenuBox).not.toBeNull();
-    if (alertBox && slashMenuBox) {
-      const overlaps =
-        alertBox.x < slashMenuBox.x + slashMenuBox.width &&
-        alertBox.x + alertBox.width > slashMenuBox.x &&
-        alertBox.y < slashMenuBox.y + slashMenuBox.height &&
-        alertBox.y + alertBox.height > slashMenuBox.y;
-      expect(overlaps).toBe(false);
-    }
+    await expect
+      .poll(async () => {
+        const alertBox = await alert.boundingBox();
+        const slashMenuBox = await slashMenu.boundingBox();
+        if (!(alertBox && slashMenuBox)) return true;
+        return (
+          alertBox.x < slashMenuBox.x + slashMenuBox.width &&
+          alertBox.x + alertBox.width > slashMenuBox.x &&
+          alertBox.y < slashMenuBox.y + slashMenuBox.height &&
+          alertBox.y + alertBox.height > slashMenuBox.y
+        );
+      })
+      .toBe(false);
 
     await expect(page).toHaveScreenshot('start-error-picker.png', {
       maxDiffPixelRatio: 0.04,
@@ -449,7 +546,7 @@ test.describe('canonical /start onboarding chat', () => {
     expect(Math.abs(yAfter - yBefore)).toBeLessThanOrEqual(5); // Addresses journey jank audit 20260519 + testing.md explicit CLS requirement for conditional UI (composer morph, row replace, cinematic fallback)
 
     await expect(
-      page.getByText('find the exact Spotify profile')
+      page.getByText('Pick the exact Spotify artist').first()
     ).toBeVisible();
     await expect(page.getByTestId('onboarding-artist-picker')).toBeVisible();
     await expect(page.getByTestId('onboarding-artist-picker')).toHaveScreenshot(
@@ -459,36 +556,27 @@ test.describe('canonical /start onboarding chat', () => {
 
     await page.getByTestId('onboarding-artist-picker').getByText('Use').click();
 
-    await expect(page.getByTestId('onboarding-artist-confirmed')).toBeVisible();
-    await expect(
-      page.getByTestId('onboarding-artist-confirmed').getByText('Test Artist')
-    ).toBeVisible();
-    await expect(
-      page
-        .getByTestId('onboarding-artist-confirmed')
-        .getByTitle('12,300 Spotify followers')
-    ).toBeVisible();
-    await expect(
-      page
-        .getByTestId('onboarding-artist-confirmed')
-        .getByTitle('Popularity score: 48 out of 100')
-    ).toBeVisible();
-    await expect(
-      page
-        .getByTestId('onboarding-artist-confirmed')
-        .getByText('Progressive House', { exact: true })
-    ).toBeVisible();
+    await expect(page.getByTestId('onboarding-artist-confirmed')).toHaveCount(
+      0
+    );
     const sideRail = page.getByTestId('onboarding-profile-rail');
     await expect(sideRail).toBeVisible();
     await expect(
+      sideRail.getByTestId('onboarding-profile-bento')
+    ).toBeVisible();
+    await expect(
+      sideRail.getByTestId('onboarding-profile-compact-surface')
+    ).toBeVisible();
+    await expect(
       sideRail.getByTestId('onboarding-phone-preview')
     ).toBeVisible();
-    await expect(sideRail.getByText('Building Test Artist')).toBeVisible();
+    await expect(sideRail.getByText('Test Artist')).toHaveCount(1);
+    await expect(sideRail.getByTitle('Apple Music').first()).toBeVisible();
     await expect(
-      page.getByText('find the exact Spotify profile')
+      sideRail.getByText('12.3K Spotify followers').first()
     ).toBeVisible();
     await expect(
-      page.getByText('pulled you up. 12.3K Spotify followers')
+      page.getByText('Pulled you up. 12.3K Spotify followers')
     ).toBeVisible();
 
     const bodyText = await page.locator('body').innerText();

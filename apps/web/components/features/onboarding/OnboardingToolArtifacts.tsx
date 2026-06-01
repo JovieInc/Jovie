@@ -4,17 +4,13 @@ import {
   AlertCircle,
   AtSign,
   Check,
-  ExternalLink,
-  Gauge,
   Link2,
   Loader2,
   Search,
-  Users,
 } from 'lucide-react';
 import Image from 'next/image';
 import type { ReactNode } from 'react';
 import { useEffect, useMemo, useState } from 'react';
-import { SocialIcon } from '@/components/atoms/SocialIcon';
 import type { SpotifyArtistResult } from '@/lib/contracts/api';
 import { useArtistSearchQuery } from '@/lib/queries/useArtistSearchQuery';
 import { useHandleAvailabilityQuery } from '@/lib/queries/useHandleAvailabilityQuery';
@@ -51,6 +47,7 @@ export interface ArtistConfirmedOutput {
     readonly followers?: number | null;
     readonly popularity?: number | null;
     readonly genres?: readonly string[];
+    readonly dspMatches?: readonly OnboardingDspMatch[];
   } | null;
 }
 
@@ -71,6 +68,13 @@ export interface OnboardingArtistSelection {
   readonly imageUrl?: string;
   readonly followers?: number;
   readonly popularity?: number;
+}
+
+export interface OnboardingDspMatch {
+  readonly id: string;
+  readonly label: string;
+  readonly platform: string;
+  readonly url?: string | null;
 }
 
 function isRunning(state: ToolState): boolean {
@@ -188,19 +192,15 @@ function StatusShell({
   return (
     <div
       className={cn(
-        'w-full max-w-[440px] rounded-xl border bg-surface-1 px-4 py-3 text-primary-token shadow-[inset_0_1px_0_rgba(255,255,255,0.035)]',
-        tone === 'error'
-          ? 'border-red-500/20'
-          : tone === 'success'
-            ? 'border-green-500/20'
-            : 'border-subtle'
+        'w-full max-w-[440px] px-1 py-2 text-primary-token',
+        tone === 'error' && 'text-error'
       )}
       role={tone === 'error' ? 'alert' : 'status'}
     >
       <div className='flex items-start gap-3'>
         <span
           className={cn(
-            'mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center text-secondary-token',
+            'mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center text-secondary-token',
             tone === 'error' && 'text-red-400',
             tone === 'success' && 'text-green-500'
           )}
@@ -272,40 +272,6 @@ function ArtistAvatar({
   );
 }
 
-function MetadataChip({
-  children,
-  icon,
-  title,
-}: {
-  readonly children: ReactNode;
-  readonly icon?: ReactNode;
-  readonly title: string;
-}) {
-  return (
-    <span
-      title={title}
-      className='inline-flex h-6 items-center gap-1 rounded-full border border-subtle bg-surface-0 px-2 text-[11.5px] leading-none text-secondary-token'
-    >
-      {icon ? (
-        <span className='shrink-0 text-tertiary-token' aria-hidden>
-          {icon}
-        </span>
-      ) : null}
-      <span className='sr-only'>{title}</span>
-      <span aria-hidden>{children}</span>
-    </span>
-  );
-}
-
-function SpotifyMatchBadge({ label }: { readonly label: string }) {
-  return (
-    <span className='inline-flex h-5 shrink-0 items-center gap-1 rounded-full border border-green-500/20 px-1.5 text-[10.5px] font-medium text-green-500'>
-      <SocialIcon platform='spotify' className='h-3 w-3' aria-hidden />
-      <span>{label}</span>
-    </span>
-  );
-}
-
 export function OnboardingSpotifyArtistPickerCard({
   state,
   output,
@@ -360,28 +326,23 @@ export function OnboardingSpotifyArtistPickerCard({
     );
   }
 
+  if (selectedId !== null) return null;
+
   const results = artistSearch.results;
   const hasQuery = query.trim().length > 0;
   const isSearching =
-    artistSearch.state === 'loading' || artistSearch.isPending;
+    selectedId === null &&
+    (artistSearch.state === 'loading' || artistSearch.isPending);
 
   return (
     <div
-      className='min-h-[192px] w-full max-w-[440px] rounded-xl border border-subtle bg-surface-1 p-3.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.035)]'
+      className='h-[168px] w-full max-w-[440px] px-1 py-1'
       data-testid='onboarding-artist-picker'
     >
-      <div className='flex items-start gap-3 px-0.5'>
-        <span className='mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-subtle bg-surface-0 text-secondary-token'>
-          <Search className='h-3.5 w-3.5' />
-        </span>
-        <div className='min-w-0'>
-          <p className='text-[14px] font-semibold leading-5 tracking-[-0.01em] text-primary-token'>
-            Pick the exact Spotify artist
-          </p>
-          <p className='mt-1 text-[12.5px] leading-5 text-secondary-token'>
-            This keeps the rest of the setup grounded in the right profile.
-          </p>
-        </div>
+      <div className='min-w-0 px-0.5'>
+        <p className='text-[14px] font-semibold leading-5 tracking-[-0.01em] text-primary-token'>
+          Pick the exact Spotify artist
+        </p>
       </div>
 
       <label className='mt-3 flex items-center gap-2 rounded-lg border border-subtle bg-surface-0 px-3 py-2 focus-within:border-white/[0.16] focus-within:shadow-[0_0_0_3px_rgba(255,255,255,0.035)]'>
@@ -406,7 +367,7 @@ export function OnboardingSpotifyArtistPickerCard({
 
         {!isSearching && artistSearch.error ? (
           <div
-            className='flex items-start gap-2 rounded-lg border border-subtle bg-surface-0/70 px-2.5 py-2.5 text-[12.5px] leading-5 text-secondary-token'
+            className='flex items-start gap-2 rounded-lg bg-surface-0 px-2.5 py-2.5 text-[12.5px] leading-5 text-secondary-token'
             role='alert'
           >
             <AlertCircle className='mt-0.5 h-3.5 w-3.5 shrink-0 text-warning' />
@@ -550,97 +511,32 @@ export function OnboardingArtistConfirmedCard({
     );
   }
 
-  const artist = output?.artist;
-  if (!artist) {
-    return (
-      <StatusShell
-        icon={<Check className='h-3.5 w-3.5' />}
-        title='Spotify artist selected'
-        body='Selection saved. I can keep going from here.'
-        tone='success'
-      />
-    );
-  }
-
-  const followers = formatCompactCount(artist.followers);
-  const exactFollowers = formatExactCount(artist.followers);
-  const genres = artist.genres?.slice(0, 2) ?? [];
-  const safeArtistUrl = getSafeSpotifyArtistUrl(artist.url);
-  const hasMetadata =
-    Boolean(followers) ||
-    typeof artist.popularity === 'number' ||
-    genres.length > 0;
-
-  return (
-    <div
-      className='w-full max-w-[440px] rounded-xl border border-green-500/20 bg-surface-1 p-3.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.035)]'
-      data-testid='onboarding-artist-confirmed'
-    >
-      <div className='flex items-start gap-3'>
-        <ArtistAvatar imageUrl={artist.imageUrl} name={artist.name} />
-        <div className='min-w-0 flex-1'>
-          <div className='flex min-w-0 items-center gap-2'>
-            <p className='truncate text-[14.5px] font-semibold leading-5 tracking-[-0.01em] text-primary-token'>
-              {artist.name}
-            </p>
-            <SpotifyMatchBadge label='Matched' />
-          </div>
-          {hasMetadata ? (
-            <div className='mt-2 flex flex-wrap gap-1.5'>
-              {followers ? (
-                <MetadataChip
-                  title={`${exactFollowers ?? followers} Spotify followers`}
-                  icon={<Users className='h-3 w-3' />}
-                >
-                  {followers}
-                </MetadataChip>
-              ) : null}
-              {typeof artist.popularity === 'number' ? (
-                <MetadataChip
-                  title={`Popularity score: ${artist.popularity} out of 100`}
-                  icon={<Gauge className='h-3 w-3' />}
-                >
-                  {artist.popularity}
-                </MetadataChip>
-              ) : null}
-              {genres.map(genre => {
-                const label = formatGenreLabel(genre);
-                return (
-                  <MetadataChip key={genre} title={`Genre: ${label}`}>
-                    {label}
-                  </MetadataChip>
-                );
-              })}
-            </div>
-          ) : null}
-        </div>
-        {safeArtistUrl ? (
-          <a
-            href={safeArtistUrl}
-            target='_blank'
-            rel='noreferrer'
-            className='inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-subtle text-secondary-token transition-colors duration-fast hover:bg-surface-2 hover:text-primary-token focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-white/20'
-            aria-label={`Open ${artist.name} on Spotify`}
-          >
-            <ExternalLink className='h-3.5 w-3.5' />
-          </a>
-        ) : null}
-      </div>
-    </div>
-  );
+  return null;
 }
 
 export function OnboardingHandleCheckCard({
+  onHandleCandidateChange,
   state,
   output,
 }: ToolArtifactProps & {
+  readonly onHandleCandidateChange?: (handle: string | null) => void;
   readonly output?: HandleCheckOutput | null;
 }) {
   const handle = output?.handle?.replace(/^@/, '').toLowerCase() ?? null;
+  const [draftHandle, setDraftHandle] = useState(handle ?? '');
+  const normalizedDraft = draftHandle.replace(/^@/, '').trim().toLowerCase();
   const availability = useHandleAvailabilityQuery({
-    handle,
-    enabled: Boolean(handle) && !isRunning(state) && !isFailed(state),
+    handle: normalizedDraft || null,
+    enabled: Boolean(normalizedDraft) && !isRunning(state) && !isFailed(state),
   });
+
+  useEffect(() => {
+    setDraftHandle(handle ?? '');
+  }, [handle]);
+
+  useEffect(() => {
+    onHandleCandidateChange?.(normalizedDraft || null);
+  }, [normalizedDraft, onHandleCandidateChange]);
 
   if (isFailed(state)) {
     return (
@@ -668,35 +564,72 @@ export function OnboardingHandleCheckCard({
   const loading = availability.isLoading || availability.isFetching;
   const available = availability.data?.available;
   const error = availability.data?.error;
+  const profilePath = normalizedDraft ? `jov.ie/${normalizedDraft}` : null;
 
   return (
-    <StatusShell
-      icon={
-        loading ? (
-          <Loader2 className='h-3.5 w-3.5 animate-spin motion-reduce:animate-none' />
-        ) : available ? (
-          <Check className='h-3.5 w-3.5' />
-        ) : (
-          <AlertCircle className='h-3.5 w-3.5' />
-        )
-      }
-      title={
-        loading || available === undefined
-          ? `Checking @${handle}`
-          : available
-            ? `@${handle} is available`
-            : `@${handle} is not available`
-      }
-      body={
-        error ??
-        (available === undefined
-          ? 'Checking availability.'
-          : available
-            ? `jov.ie/${handle}`
-            : 'Try a sharper variant.')
-      }
-      tone={available ? 'success' : available === false ? 'error' : 'neutral'}
-    />
+    <div
+      className={cn(
+        'w-full max-w-[440px] px-1 py-2 text-primary-token',
+        available === false && 'text-error'
+      )}
+      data-testid='onboarding-handle-check'
+      role={available === false ? 'alert' : 'status'}
+    >
+      <div className='flex items-start gap-3'>
+        <span
+          className={cn(
+            'mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center text-secondary-token',
+            available && 'text-green-500',
+            available === false && 'text-red-400'
+          )}
+          aria-hidden
+        >
+          {loading ? (
+            <Loader2 className='h-3.5 w-3.5 animate-spin motion-reduce:animate-none' />
+          ) : available ? (
+            <Check className='h-3.5 w-3.5' />
+          ) : (
+            <AlertCircle className='h-3.5 w-3.5' />
+          )}
+        </span>
+        <div className='min-w-0 flex-1'>
+          <div className='flex flex-wrap items-baseline gap-x-1.5 gap-y-1 text-[14px] leading-5 tracking-[-0.01em]'>
+            <strong className='font-semibold text-primary-token'>
+              @{normalizedDraft || handle}
+            </strong>
+            <span className='text-secondary-token'>
+              {loading || available === undefined
+                ? 'is being checked'
+                : available
+                  ? 'is available'
+                  : 'is not available'}
+            </span>
+          </div>
+          <label className='mt-2 flex h-9 items-center rounded-lg border border-subtle bg-surface-0 px-2.5 focus-within:border-white/[0.16] focus-within:shadow-[0_0_0_3px_rgba(255,255,255,0.035)]'>
+            <span className='text-[13px] text-tertiary-token' aria-hidden>
+              @
+            </span>
+            <span className='sr-only'>Edit proposed handle</span>
+            <input
+              aria-label='Edit proposed handle'
+              value={draftHandle}
+              onChange={event => setDraftHandle(event.target.value)}
+              className='min-w-0 flex-1 bg-transparent px-0.5 text-[13.5px] leading-5 text-primary-token placeholder:text-quaternary-token focus:outline-none'
+              placeholder='handle'
+              inputMode='text'
+              autoCapitalize='none'
+              spellCheck={false}
+            />
+          </label>
+          <p className='mt-1.5 text-[12.5px] leading-5 text-secondary-token'>
+            {error ??
+              (available === false
+                ? 'Try a sharper variant.'
+                : (profilePath ?? 'Edit the handle before it is claimed.'))}
+          </p>
+        </div>
+      </div>
+    </div>
   );
 }
 

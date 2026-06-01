@@ -10,7 +10,7 @@ vi.mock('@/components/marketing/homepage-v2/HomepageV2Route', () => ({
       <h1>Make every release feel bigger.</h1>
       <Link
         data-testid='homepage-v2-hero-primary-cta'
-        href='/start?starter_prompt=I+want+request+access+to+Jovie.'
+        href='/start?starter_prompt=Hey%2C+I+want+to+get+access+to+Jovie.'
       >
         Request Access
       </Link>
@@ -67,7 +67,7 @@ describe('NewLandingPage', () => {
     ).toBeInTheDocument();
     expect(screen.getByTestId('homepage-v2-hero-primary-cta')).toHaveAttribute(
       'href',
-      '/start?starter_prompt=I+want+request+access+to+Jovie.'
+      '/start?starter_prompt=Hey%2C+I+want+to+get+access+to+Jovie.'
     );
     expect(
       screen.getByRole('link', { name: 'Explore artist profiles' })

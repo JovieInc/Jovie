@@ -182,6 +182,7 @@ interface ProfileCompactSurfaceProps {
   readonly previewNotificationsState?: ProfilePreviewNotificationsState;
   readonly previewReleaseActionLabel?: string;
   readonly dataTestId?: string;
+  readonly hideBackButton?: boolean;
   readonly hideJovieBranding?: boolean;
   readonly hideMoreMenu?: boolean;
   readonly headerSocialLinksOverride?: readonly LegacySocialLink[];
@@ -274,6 +275,7 @@ export function ProfileCompactSurface({
     label: 'Get alerts',
   },
   dataTestId,
+  hideBackButton = false,
   hideMoreMenu = false,
   hideJovieBranding = false,
   headerSocialLinksOverride,
@@ -557,15 +559,19 @@ export function ProfileCompactSurface({
               className='flex w-full items-start justify-between'
               data-testid='profile-top-chrome'
             >
-              <CircleIconButton
-                onClick={onBack}
-                size='lg'
-                variant='pearl'
-                className={topChromeButtonClassName}
-                ariaLabel='Back'
-              >
-                <ChevronLeft className='h-[18px] w-[18px]' />
-              </CircleIconButton>
+              {hideBackButton ? (
+                <div className='h-11 w-11 shrink-0' aria-hidden='true' />
+              ) : (
+                <CircleIconButton
+                  onClick={onBack}
+                  size='lg'
+                  variant='pearl'
+                  className={topChromeButtonClassName}
+                  ariaLabel='Back'
+                >
+                  <ChevronLeft className='h-[18px] w-[18px]' />
+                </CircleIconButton>
+              )}
 
               {!isHomeMode ? (
                 <p

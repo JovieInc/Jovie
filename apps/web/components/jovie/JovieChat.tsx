@@ -5,13 +5,13 @@ import { ImagePlus } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useOptionalChatEntityPanel } from '@/app/app/(shell)/chat/ChatEntityPanelContext';
-import { JovieMarkElectric } from '@/components/atoms/JovieMarkElectric';
 import { useAppFlag } from '@/lib/flags/client';
 import { SUPPORTED_IMAGE_MIME_TYPES } from '@/lib/images/config';
 
 import { deriveChatRailContextTargets } from './chat-context-rail';
 import { CHAT_COMPOSER_DOCK_CLASSNAME } from './chat-layout';
 import {
+  ChatEmptyStateComposerRegion,
   ChatInput,
   ChatMessage,
   ChatMessageSkeleton,
@@ -512,32 +512,12 @@ export function JovieChat({
                   key='joviechat-empty-upper'
                   className='relative min-h-full'
                 >
-                  <div
-                    className='relative mx-auto flex min-h-full w-full max-w-[52rem] flex-col items-center justify-center px-1 py-8'
-                    data-testid='chat-empty-state-composer-region'
-                  >
-                    <div
-                      className='pointer-events-none absolute left-1/2 top-1/2 h-[min(46vw,28rem)] w-[min(46vw,28rem)] -translate-x-1/2 -translate-y-[60%] opacity-85 drop-shadow-[0_0_34px_rgba(68,188,255,0.18)] max-sm:h-[min(72vw,18rem)] max-sm:w-[min(72vw,18rem)]'
-                      style={{
-                        maskImage:
-                          'radial-gradient(ellipse at center, black 54%, rgba(0,0,0,0.72) 68%, transparent 88%)',
-                        WebkitMaskImage:
-                          'radial-gradient(ellipse at center, black 54%, rgba(0,0,0,0.72) 68%, transparent 88%)',
-                      }}
-                      data-testid='chat-empty-state-logo'
-                    >
-                      <JovieMarkElectric className='h-full w-full' />
-                    </div>
-                    <div
-                      className='relative z-10 w-full'
-                      data-testid='chat-empty-state-centered-composer'
-                    >
-                      {composerSurface}
-                      {inlineChatError ? (
-                        <div className='mt-3 w-full'>{inlineChatError}</div>
-                      ) : null}
-                    </div>
-                  </div>
+                  <ChatEmptyStateComposerRegion>
+                    {composerSurface}
+                    {inlineChatError ? (
+                      <div className='mt-3 w-full'>{inlineChatError}</div>
+                    ) : null}
+                  </ChatEmptyStateComposerRegion>
                 </div>
               ) : (
                 <div key='joviechat-messages'>

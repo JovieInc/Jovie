@@ -102,9 +102,9 @@ export function ChatProposeNextStepCard({
 
   if (kind === 'waitlist') {
     return (
-      <div className='rounded-xl border border-subtle bg-surface-1 px-4 py-3'>
+      <div className='px-1 py-1'>
         <p className='text-[15px] leading-7 text-primary-token'>
-          {`You're on the list. I'll email you when you're up — we can pick up right here.`}
+          {`You're on the list. I'll email you when you're up. We can pick up right here.`}
         </p>
       </div>
     );
@@ -116,9 +116,9 @@ export function ChatProposeNextStepCard({
     // had a Clerk session already). Skip the form; the claim hook on the
     // shell will fire and bounce them to checkout.
     return (
-      <div className='rounded-xl border border-subtle bg-surface-1 px-4 py-3'>
+      <div className='px-1 py-1'>
         <p className='text-[15px] leading-7 text-primary-token'>
-          {`You're already signed in. Linking this conversation to your account…`}
+          {`You're already signed in. Linking this conversation to your account.`}
         </p>
       </div>
     );
@@ -126,18 +126,18 @@ export function ChatProposeNextStepCard({
 
   if (!canRenderClerkUi) {
     return (
-      <div className='rounded-xl border border-subtle bg-surface-1 px-4 py-3'>
+      <div className='px-1 py-1'>
         <p className='text-[15px] leading-7 text-primary-token'>
-          {`You're in. Use the dev toolbar to continue as a local test user — I'll keep this conversation ready to link.`}
+          {`You're in. Create your account to keep this conversation and finish your profile.`}
         </p>
       </div>
     );
   }
 
   return (
-    <div className='rounded-xl border border-subtle bg-surface-1 px-4 py-4'>
+    <div className='space-y-3 px-1 py-1'>
       <p className='mb-3 text-[15px] leading-7 text-primary-token'>
-        {`You're in. Add an email to keep going — I'll save this conversation to your account so we don't lose it.`}
+        {`You're in. Add an email to keep going. I'll save this conversation to your account so we don't lose it.`}
       </p>
       <SignUp
         routing='hash'
