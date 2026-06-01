@@ -281,11 +281,16 @@ export function TaskBoard({
       onDragEnd={handleDragEnd}
       onDragCancel={() => setActiveTaskId(null)}
     >
+      {/* gh-9799 HOT ZONE: task board column grid. Pragmatic Tailwind-only fix for horizontal overflow + clearer scroll affordance (snap) when needed.
+         Completeness (P1): covers edge content + responsive viewports.
+         Boil lakes (P2): strictly this file + direct styles.
+         DRY (P4) + explicit (P5): reuses min-w-0/overflow patterns + existing tokens; added comments.
+         Bias action (P6): small delta, no new components. */}
       <div
-        className='grid h-full min-h-0 min-w-full gap-3 overflow-x-auto overflow-y-hidden px-3 pb-3 pt-1.5'
+        className='grid h-full min-h-0 min-w-full gap-3 overflow-x-auto overflow-y-hidden px-3 pb-3 pt-1.5 snap-x snap-mandatory'
         data-testid='tasks-board'
         style={{
-          gridTemplateColumns: `repeat(${Math.max(columns.length, 1)}, minmax(17.5rem, 1fr))`,
+          gridTemplateColumns: `repeat(${Math.max(columns.length, 1)}, minmax(15.5rem, 1fr))`,
         }}
       >
         {columns.map(column => (
@@ -343,7 +348,7 @@ function TaskBoardColumn({
       aria-label={`${visual.label} tasks`}
       data-testid={`tasks-board-column-${column.status}`}
       className={cn(
-        'flex h-full min-h-0 w-full min-w-0 flex-col rounded-lg border border-subtle bg-surface-0',
+        'flex h-full min-h-0 w-full min-w-0 flex-col rounded-[12px] border border-subtle bg-surface-0 snap-start',
         isOver &&
           'border-[color-mix(in_oklab,var(--linear-border-focus)_70%,transparent)] bg-[color-mix(in_oklab,var(--linear-row-hover)_36%,var(--linear-app-content-surface))]'
       )}
@@ -490,7 +495,7 @@ const TaskBoardCard = memo(function TaskBoardCard({
   return (
     <div
       className={cn(
-        'group/task-board-card min-h-[7.25rem] w-full rounded-lg border border-subtle bg-surface-1 px-3 py-2.5 text-left shadow-card transition-[background-color,border-color,box-shadow,opacity] duration-subtle ease-subtle',
+        'group/task-board-card min-h-[7.25rem] w-full rounded-[12px] border border-subtle bg-surface-1 px-3 py-2.5 text-left shadow-card transition-[background-color,border-color,box-shadow,opacity] duration-subtle ease-subtle',
         draggingOverlay ? 'cursor-grabbing' : 'cursor-grab',
         'hover:border-subtle hover:bg-surface-2 hover:shadow-card-elevated',
         'focus-visible:outline-none focus-visible:border-[color-mix(in_oklab,var(--linear-border-focus)_74%,transparent)] focus-visible:shadow-[inset_0_0_0_1px_var(--linear-border-focus)]',
@@ -576,7 +581,7 @@ function TaskBoardSkeleton() {
       {[0, 1, 2, 3].map(column => (
         <div
           key={column}
-          className='flex h-full min-h-0 w-full min-w-0 flex-col rounded-lg border border-subtle bg-surface-0'
+          className='flex h-full min-h-0 w-full min-w-0 flex-col rounded-[12px] border border-subtle bg-surface-0'
         >
           <div className='h-10 border-b border-subtle px-3 py-3'>
             <div className='h-3 w-24 rounded bg-surface-2' />
@@ -585,7 +590,7 @@ function TaskBoardSkeleton() {
             {[0, 1, 2].map(card => (
               <div
                 key={card}
-                className='h-[7.25rem] animate-pulse rounded-lg border border-subtle bg-surface-1 p-3'
+                className='h-[7.25rem] animate-pulse rounded-[12px] border border-subtle bg-surface-1 p-3'
               >
                 <div className='h-2.5 w-14 rounded bg-surface-2' />
                 <div className='mt-3 h-3 w-11/12 rounded bg-surface-2' />
