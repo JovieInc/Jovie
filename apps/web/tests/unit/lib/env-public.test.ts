@@ -4,6 +4,7 @@ describe('env-public', () => {
   afterEach(() => {
     delete document.documentElement.dataset.clerkMock;
     delete document.documentElement.dataset.clerkProxyDisabled;
+    delete document.documentElement.dataset.e2eMode;
     vi.unstubAllEnvs();
     vi.resetModules();
   });
@@ -22,5 +23,13 @@ describe('env-public', () => {
     const { publicEnv } = await import('@/lib/env-public');
 
     expect(publicEnv.NEXT_PUBLIC_CLERK_PROXY_DISABLED).toBe('1');
+  });
+
+  it('reads E2E mode from the runtime html dataset', async () => {
+    document.documentElement.dataset.e2eMode = '1';
+
+    const { publicEnv } = await import('@/lib/env-public');
+
+    expect(publicEnv.NEXT_PUBLIC_E2E_MODE).toBe('1');
   });
 });

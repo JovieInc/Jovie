@@ -1,5 +1,5 @@
 function getRuntimeHtmlDatasetValue(
-  key: 'clerkMock' | 'clerkProxyDisabled'
+  key: 'clerkMock' | 'clerkProxyDisabled' | 'e2eMode'
 ): string | undefined {
   if (typeof document === 'undefined') {
     return undefined;
@@ -79,7 +79,9 @@ export const publicEnv = {
     return process.env.NEXT_PUBLIC_FEATURE_MAX_PLAN || undefined;
   },
   get NEXT_PUBLIC_E2E_MODE() {
-    return process.env.NEXT_PUBLIC_E2E_MODE || undefined;
+    return (
+      process.env.NEXT_PUBLIC_E2E_MODE || getRuntimeHtmlDatasetValue('e2eMode')
+    );
   },
   get NEXT_PUBLIC_DEMO_RECORDING() {
     return process.env.NEXT_PUBLIC_DEMO_RECORDING || undefined;
