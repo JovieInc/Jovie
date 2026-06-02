@@ -138,13 +138,13 @@ final class JovieUITests: XCTestCase {
     measure(metrics: shellRuntimeMetrics(for: app)) {
       profileTab.tap()
       XCTAssertTrue(
-        profileReady.waitForExistence(timeout: timeoutSeconds),
+        waitForHittable(profileReady, timeout: timeoutSeconds),
         "Measured transition to Profile did not finish within \(timeoutSeconds) seconds.\n\(app.debugDescription)"
       )
 
       chatTab.tap()
       XCTAssertTrue(
-        chatReady.waitForExistence(timeout: timeoutSeconds),
+        waitForHittable(chatReady, timeout: timeoutSeconds),
         "Measured transition to Chat did not finish within \(timeoutSeconds) seconds.\n\(app.debugDescription)"
       )
     }
@@ -469,6 +469,20 @@ final class JovieUITests: XCTestCase {
       XCTCPUMetric(application: app),
       XCTMemoryMetric(application: app),
     ]
+  }
+
+  private func waitForHittable(_ element: XCUIElement, timeout: TimeInterval) -> Bool {
+    let deadline = Date().addingTimeInterval(timeout)
+
+    while Date() < deadline {
+      if element.exists && element.isHittable {
+        return true
+      }
+
+      RunLoop.current.run(until: Date().addingTimeInterval(0.05))
+    }
+
+    return element.exists && element.isHittable
   }
 
   private func openAuthCallbackURL(
