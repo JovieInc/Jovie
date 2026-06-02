@@ -201,6 +201,7 @@ describe('POST /api/auth/native/exchange', () => {
     expect(data).toMatchObject({
       returnTo: '/app',
       ticket: 'sign_in_ticket',
+      userId: 'user_native',
     });
     expect(mockConsumeStoredNativeExchangeCode).toHaveBeenCalledWith({
       client: 'electron',

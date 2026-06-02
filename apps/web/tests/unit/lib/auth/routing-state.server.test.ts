@@ -131,7 +131,7 @@ describe('auth routing state store', () => {
     expect(hoisted.redisSetMock).toHaveBeenCalledWith(
       'auth:exchange:code_123',
       expect.not.stringContaining('ticket'),
-      { ex: 60 }
+      { ex: 300 }
     );
   });
 

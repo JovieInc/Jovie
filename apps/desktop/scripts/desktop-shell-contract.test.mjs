@@ -38,6 +38,8 @@ test('desktop window enters the authenticated chat shell instead of the web root
     mainSource,
     /app\.setName\(APP_ENV === 'staging' \? 'Jovie Staging' : 'Jovie'\);/
   );
+  assert.match(mainSource, /APP_ENV === 'local'/);
+  assert.match(mainSource, /Jovie-Local/);
   assert.match(mainSource, /win\.webContents\.setUserAgent\(/);
   assert.match(
     mainSource,
@@ -66,6 +68,10 @@ test('desktop window fails into a branded Jovie recovery surface', async () => {
   assert.doesNotMatch(mainSource, /onclick="window\.location\.href/);
   assert.match(mainSource, /did-fail-load/);
   assert.match(mainSource, /NAVIGATION_ABORTED_ERROR_CODE/);
+  assert.match(
+    mainSource,
+    /maybeShowDesktopAuthHandoff\(resolveNavigationUrl\(validatedURL\)\)/
+  );
   assert.match(mainSource, /showDesktopLoadFailure\(win\)/);
   assert.match(mainSource, /viewBox="0 0 353\.68 347\.97"/);
   assert.match(mainSource, /START_DESKTOP_AUTH_HANDOFF_CHANNEL/);
@@ -107,6 +113,11 @@ test('desktop navigation uses explicit URL disposition allowlists', async () => 
   assert.match(
     mainSource,
     /const URL_DISPOSITION_OPTIONS = \{ appUrl: APP_URL, appEnv: APP_ENV \} as const;/
+  );
+  assert.match(mainSource, /function resolveNavigationUrl\(urlString: string\): string/);
+  assert.match(
+    mainSource,
+    /return new URL\(urlString, APP_URL\)\.toString\(\);/
   );
   assert.match(
     mainSource,

@@ -21,9 +21,12 @@ import {
   type UrlDisposition,
 } from './navigation';
 
-// Separate userData for staging so staging and production apps coexist
+// Separate userData for non-production shells so local, staging, and production
+// sessions coexist without sharing cookies or corrupted renderer state.
 if (APP_ENV === 'staging') {
   app.setPath('userData', path.join(app.getPath('appData'), 'Jovie-Staging'));
+} else if (APP_ENV === 'local') {
+  app.setPath('userData', path.join(app.getPath('appData'), 'Jovie-Local'));
 }
 
 const APP_ORIGIN = new URL(APP_URL).origin;
@@ -100,17 +103,24 @@ interface PendingDesktopAuthPkce {
   readonly createdAt: number;
 }
 
+interface RecentDesktopAuthCompletion {
+  readonly completion: DesktopAuthCompletion;
+  readonly expiresAt: number;
+}
+
 const AUTH_HANDOFF_WINDOW_BOUNDS = {
   width: 420,
   height: 360,
   minWidth: 360,
   minHeight: 320,
 } as const;
+const AUTH_COMPLETION_REPLAY_TTL_MS = 60_000;
 
 let updateReadyToInstall = false;
 let mainWindow: BrowserWindow | null = null;
 let authHandoffWindow: BrowserWindow | null = null;
 let pendingAuthCompletion: DesktopAuthCompletion | null = null;
+let recentAuthCompletion: RecentDesktopAuthCompletion | null = null;
 let pendingLegacyAuthReturnRoute: string | null = null;
 let pendingDesktopAuthPkce: PendingDesktopAuthPkce | null = null;
 let mainWindowHiddenForAuthHandoff = false;
@@ -135,6 +145,14 @@ function isAllowedExternalUrl(parsed: URL): boolean {
 
 function getUrlDisposition(urlString: string): UrlDisposition {
   return getDesktopUrlDisposition(urlString, URL_DISPOSITION_OPTIONS);
+}
+
+function resolveNavigationUrl(urlString: string): string {
+  if (urlString.startsWith('/') && !urlString.startsWith('//')) {
+    return new URL(urlString, APP_URL).toString();
+  }
+
+  return urlString;
 }
 
 async function openExternalUrl(urlString: string): Promise<DesktopAuthOpenResult> {
@@ -286,6 +304,7 @@ function createDesktopAuthPkce(): PendingDesktopAuthPkce {
 
 function rememberDesktopAuthPkce(pkce: PendingDesktopAuthPkce): void {
   pendingDesktopAuthPkce = pkce;
+  recentAuthCompletion = null;
 }
 
 function consumePendingDesktopAuthPkce(): PendingDesktopAuthPkce | null {
@@ -307,7 +326,7 @@ function buildCentralDesktopAuthUrl(
   authUrl.searchParams.set('return_to', returnTo);
   authUrl.searchParams.set('code_challenge', pkce.codeChallenge);
   authUrl.searchParams.set('code_challenge_method', 'S256');
-  return authUrl.toString();
+  return `${authUrl.pathname}${authUrl.search}`;
 }
 
 function isCentralDesktopAuthStartUrl(parsed: URL): boolean {
@@ -324,7 +343,7 @@ function isCentralDesktopAuthStartUrl(parsed: URL): boolean {
 function buildDesktopBrowserAuthUrl(urlString: string): string | null {
   const parsed = parseUrl(urlString);
   if (parsed && isCentralDesktopAuthStartUrl(parsed)) {
-    return parsed.toString();
+    return `${parsed.pathname}${parsed.search}`;
   }
 
   if (
@@ -549,6 +568,7 @@ function restoreMainWindowAfterAuthHandoff(): void {
 
 function loadAuthCompletion(completion: DesktopAuthCompletion): void {
   pendingAuthCompletion = completion;
+  recentAuthCompletion = null;
 
   const targetUrl = new URL(DESKTOP_AUTH_NATIVE_COMPLETE_PATH, APP_URL);
   targetUrl.searchParams.set('client', 'electron');
@@ -615,6 +635,26 @@ function handleLegacyAuthReturnRoute(route: string): void {
   }
 
   pendingLegacyAuthReturnRoute = route;
+}
+
+function getDesktopAuthCompleteSenderState(
+  event: IpcMainInvokeEvent
+): string | null {
+  const parsed = parseUrl(getIpcSenderUrl(event));
+  return parsed?.searchParams.get('state') ?? null;
+}
+
+function getRecentAuthCompletionForState(
+  state: string | null
+): DesktopAuthCompletion | null {
+  if (!recentAuthCompletion) return null;
+  if (Date.now() > recentAuthCompletion.expiresAt) {
+    recentAuthCompletion = null;
+    return null;
+  }
+
+  if (state !== recentAuthCompletion.completion.state) return null;
+  return recentAuthCompletion.completion;
 }
 
 function showDesktopAuthHandoff(authUrl: string): void {
@@ -692,6 +732,19 @@ function maybeShowDesktopAuthHandoff(urlString: string): boolean {
   if (!authUrl) return false;
 
   showDesktopAuthHandoff(authUrl);
+  return true;
+}
+
+function shouldLoadDesktopAuthRouteInApp(urlString: string): boolean {
+  const parsed = parseUrl(urlString);
+  if (
+    !parsed ||
+    parsed.origin !== APP_ORIGIN ||
+    !isDesktopAuthPath(parsed.pathname)
+  ) {
+    return false;
+  }
+
   return true;
 }
 
@@ -812,7 +865,27 @@ function createWindow(initialUrl = APP_ENTRY_URL): BrowserWindow {
   win.webContents.on(
     'did-fail-load',
     (_event, errorCode, errorDescription, validatedURL, isMainFrame) => {
-      if (!isMainFrame || errorCode === NAVIGATION_ABORTED_ERROR_CODE) {
+      if (!isMainFrame) {
+        return;
+      }
+
+      if (errorCode === NAVIGATION_ABORTED_ERROR_CODE) {
+        if (APP_ENV !== 'production') {
+          console.warn('[Jovie Desktop] Main-frame load aborted', {
+            validatedURL:
+              typeof validatedURL === 'string'
+                ? validatedURL.split('?')[0]
+                : validatedURL,
+          });
+        }
+
+        if (
+          typeof validatedURL === 'string' &&
+          maybeShowDesktopAuthHandoff(resolveNavigationUrl(validatedURL))
+        ) {
+          return;
+        }
+
         return;
       }
 
@@ -854,17 +927,22 @@ function createWindow(initialUrl = APP_ENTRY_URL): BrowserWindow {
   // Navigation guard: app-host routes stay in-window; auth routes get the
   // dedicated handoff; all other safe URLs open in the system browser.
   win.webContents.on('will-navigate', event => {
-    if (maybeShowDesktopAuthHandoff(event.url)) {
+    const navigationUrl = resolveNavigationUrl(event.url);
+    if (maybeShowDesktopAuthHandoff(navigationUrl)) {
       event.preventDefault();
       return;
     }
 
-    const disposition = getUrlDisposition(event.url);
+    if (shouldLoadDesktopAuthRouteInApp(navigationUrl)) {
+      return;
+    }
+
+    const disposition = getUrlDisposition(navigationUrl);
     if (disposition === 'in-app') return;
 
     event.preventDefault();
     if (disposition === 'external') {
-      void openExternalUrl(event.url);
+      void openExternalUrl(navigationUrl);
     }
   });
 
@@ -874,17 +952,22 @@ function createWindow(initialUrl = APP_ENTRY_URL): BrowserWindow {
   });
 
   win.webContents.on('will-redirect', event => {
-    if (maybeShowDesktopAuthHandoff(event.url)) {
+    const navigationUrl = resolveNavigationUrl(event.url);
+    if (maybeShowDesktopAuthHandoff(navigationUrl)) {
       event.preventDefault();
       return;
     }
 
-    const disposition = getUrlDisposition(event.url);
+    if (shouldLoadDesktopAuthRouteInApp(navigationUrl)) {
+      return;
+    }
+
+    const disposition = getUrlDisposition(navigationUrl);
     if (disposition === 'in-app') return;
 
     event.preventDefault();
     if (event.isMainFrame && disposition === 'external') {
-      void openExternalUrl(event.url);
+      void openExternalUrl(navigationUrl);
     }
   });
 
@@ -1150,7 +1233,7 @@ ipcMain.handle(
       return { ok: false, reason: 'invalid-auth-url' };
     }
 
-    return openExternalUrl(browserAuthUrl);
+    return openExternalUrl(new URL(browserAuthUrl, APP_URL).toString());
   }
 );
 
@@ -1178,11 +1261,21 @@ ipcMain.handle(
     }
 
     if (!pendingAuthCompletion) {
+      const replayCompletion = getRecentAuthCompletionForState(
+        getDesktopAuthCompleteSenderState(event)
+      );
+      if (replayCompletion) {
+        return { ok: true, completion: replayCompletion };
+      }
       return { ok: false, reason: 'missing-auth-completion' };
     }
 
     const completion = pendingAuthCompletion;
     pendingAuthCompletion = null;
+    recentAuthCompletion = {
+      completion,
+      expiresAt: Date.now() + AUTH_COMPLETION_REPLAY_TTL_MS,
+    };
     return { ok: true, completion };
   }
 );

@@ -16,7 +16,7 @@ import {
 import { getRedis } from '@/lib/redis';
 
 const AUTH_STATE_TTL_SECONDS = 10 * 60;
-const NATIVE_EXCHANGE_TTL_SECONDS = 60;
+const NATIVE_EXCHANGE_TTL_SECONDS = 5 * 60;
 const AUTH_STATE_PREFIX = 'auth:state';
 const NATIVE_EXCHANGE_PREFIX = 'auth:exchange';
 

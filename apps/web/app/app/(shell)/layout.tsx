@@ -27,6 +27,22 @@ import {
 
 export const runtime = 'nodejs';
 
+function resolveRequestOrigin(headerStore: Headers): string | null {
+  const host =
+    headerStore.get('x-forwarded-host')?.trim() ??
+    headerStore.get('host')?.trim();
+  if (!host) return null;
+
+  const forwardedProto = headerStore.get('x-forwarded-proto')?.trim();
+  const protocol =
+    forwardedProto ??
+    (host.startsWith('localhost') || host.startsWith('127.')
+      ? 'http'
+      : 'https');
+
+  return `${protocol}://${host}`;
+}
+
 export default async function AppShellLayout({
   children,
 }: {
@@ -48,7 +64,11 @@ export default async function AppShellLayout({
     );
 
     if (!auth.userId) {
-      redirect(buildAppShellSignInUrl(nextUrlHeader));
+      redirect(
+        buildAppShellSignInUrl(nextUrlHeader, {
+          origin: resolveRequestOrigin(headerStore),
+        })
+      );
     }
 
     // Resolve the shell variant up front so the Suspense fallback skeleton
