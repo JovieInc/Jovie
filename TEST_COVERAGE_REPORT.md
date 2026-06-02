@@ -24,7 +24,7 @@ Tracking issue: [JOV-2712](https://linear.app/jovie/issue/JOV-2712/track-platfor
 
 | Artifact | Path |
 | --- | --- |
-| iOS auth callback test result | `/Users/timwhite/Library/Developer/Xcode/DerivedData/Jovie-hiiryvawzddnbedsbmbafcsminho/Logs/Test/Test-Jovie-2026.06.02_05-12-56--0700.xcresult` |
-| iOS app state test result | `/Users/timwhite/Library/Developer/Xcode/DerivedData/Jovie-hiiryvawzddnbedsbmbafcsminho/Logs/Test/Test-Jovie-2026.06.02_05-12-21--0700.xcresult` |
-| iOS real-browser auth test result | `/Users/timwhite/Library/Developer/Xcode/DerivedData/Jovie-hiiryvawzddnbedsbmbafcsminho/Logs/Test/Test-Jovie-2026.06.02_05-30-14--0700.xcresult` |
+| iOS auth callback test result | `artifacts/ios-test-results/auth-callback/Test-Jovie-2026.06.02_05-12-56--0700.xcresult` |
+| iOS app state test result | `artifacts/ios-test-results/app-state/Test-Jovie-2026.06.02_05-12-21--0700.xcresult` |
+| iOS real-browser auth test result | `artifacts/ios-test-results/real-browser-auth/Test-Jovie-2026.06.02_05-30-14--0700.xcresult` |
 | iOS screenshots | `artifacts/ios-screenshots` |
