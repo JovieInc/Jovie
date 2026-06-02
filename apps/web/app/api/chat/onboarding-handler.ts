@@ -116,6 +116,16 @@ function extractAsn(req: Request): string | null {
   );
 }
 
+function shouldBypassTurnstileForLocalRuntime(): boolean {
+  if (isSecureEnv()) return false;
+
+  return (
+    env.NODE_ENV === 'development' ||
+    process.env.NEXT_PUBLIC_E2E_MODE === '1' ||
+    process.env.NEXT_PUBLIC_CLERK_MOCK === '1'
+  );
+}
+
 /**
  * Return a Response if this request should be handled as anonymous onboarding,
  * or `null` if the caller should fall through to the authenticated flow.
@@ -152,10 +162,10 @@ export async function tryHandleAnonymousOnboardingChat(
   // Anonymous onboarding is a live route, not a default-off rollout. Reuse the
   // existing chat kill switch so unconfigured Statsig cannot disable /start.
   // Anonymous → pass `null` userId; Statsig falls back to public conditions.
-  const chatDisabled =
-    env.NODE_ENV === 'development'
-      ? false
-      : await checkGateForUser(null, CHAT_DISABLED_GATE, false);
+  const shouldBypassTurnstile = shouldBypassTurnstileForLocalRuntime();
+  const chatDisabled = shouldBypassTurnstile
+    ? false
+    : await checkGateForUser(null, CHAT_DISABLED_GATE, false);
   if (chatDisabled) {
     return NextResponse.json(
       {
@@ -208,7 +218,7 @@ export async function tryHandleAnonymousOnboardingChat(
 
   // --- Turnstile gate: required for the first message of a fresh session ---
   if (!existingSessionId) {
-    if (env.NODE_ENV !== 'development' && !isTurnstileConfigured()) {
+    if (!shouldBypassTurnstile && !isTurnstileConfigured()) {
       // Fail-closed in production/preview: if Turnstile keys aren't configured
       // we must NOT silently let bot traffic through. A missing secret is an
       // ops gap, not a feature flag — surface as 503 so it pages and gets
@@ -232,7 +242,7 @@ export async function tryHandleAnonymousOnboardingChat(
       );
     }
 
-    if (env.NODE_ENV !== 'development') {
+    if (!shouldBypassTurnstile) {
       const verify = await verifyTurnstileToken(parsed.data.turnstileToken, ip);
       if (!verify.success) {
         return NextResponse.json(
