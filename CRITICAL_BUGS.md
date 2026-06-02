@@ -18,6 +18,7 @@ Tracking issue: [JOV-2712](https://linear.app/jovie/issue/JOV-2712/track-platfor
 | JOV-2712-WEB-AUDIT | Web auth, chat, performance, reliability, parity | Required hardening evidence has no current report entry beyond this baseline. | Evidence required under JOV-2712 |
 | JOV-2712-ELECTRON-AUDIT | Electron auth, redirects, startup, reliability, parity | Required hardening evidence has no current report entry beyond this baseline. | Evidence required under JOV-2712 |
 | JOV-2712-EXTENSION-AUDIT | Chrome Extension auth, messaging, popup/background performance, reliability, parity | Required hardening evidence has no current report entry beyond this baseline. | Evidence required under JOV-2712 |
+| JOV-2713 | iOS TestFlight live sign-in config | Build `1.0 (42)` no longer crashes on launch, but still embeds a `pk_test` Clerk publishable key and shows `Sign-in Unavailable`. | Open in JOV-2713 |
 
 ## Current iOS Result
 
@@ -58,3 +59,13 @@ recoverable dashboard error, then clears offline after retry returns fresh data
 in `coldOfflineProfileLoadShowsOfflineStateAndRetryClearsIt`, so no iOS
 cold-offline dead-end critical bug is currently reproduced for that covered
 retry path.
+The installed TestFlight iOS app crash on launch was reproduced from local
+build `1.0 (40)` crash reports (`EXC_BREAKPOINT` and Swift
+`_assertionFailure` after Release config rejected a `pk_test` Clerk key), fixed
+by PR #9918 with a fail-closed launch path, and kept compatible with mock UI
+tests by PR #9920. Main iOS CI passed on `8e333b2e97`; main TestFlight run
+`26841365624` distributed internal build `1.0 (42)`; the local TestFlight app
+was updated to build `42`, launched, remained running, and produced no fresh
+`Jovie*.ips` diagnostic report after launch. The remaining live sign-in
+configuration problem is tracked separately by JOV-2713 rather than hidden in
+this crash closeout.
