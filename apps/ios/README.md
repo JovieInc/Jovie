@@ -72,6 +72,18 @@ Native iOS foundation for Jovie. The app is dark-only, simulator-tested, and wir
    pnpm run ios:screenshots
    ```
 
+7. Capture launch-performance evidence:
+
+   ```bash
+   pnpm run ios:performance
+   ```
+
+   This opt-in run measures the signed-out launch shell with
+   `XCTApplicationLaunchMetric` and stores the log/result bundle under
+   `artifacts/ios-test-results/launch-performance`. Override
+   `JOVIE_IOS_LAUNCH_TIMEOUT_SECONDS` only when recording an explicit readiness
+   timeout.
+
 ## Release
 
 Fastlane lives at the repo root.

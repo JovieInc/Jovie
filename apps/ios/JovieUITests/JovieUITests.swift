@@ -28,6 +28,30 @@ final class JovieUITests: XCTestCase {
     attachScreenshot(named: "signed-out", app: app)
   }
 
+  func testSignedOutLaunchPerformance() throws {
+    guard testEnvironmentValue("JOVIE_IOS_LAUNCH_PERFORMANCE") == "1" else {
+      throw XCTSkip("Set JOVIE_IOS_LAUNCH_PERFORMANCE=1 to run launch performance evidence.")
+    }
+
+    let timeoutSeconds =
+      Double(testEnvironmentValue("JOVIE_IOS_LAUNCH_TIMEOUT_SECONDS") ?? "") ?? 4
+    let app = XCUIApplication()
+    app.launchArguments.append("-ui-testing-signed-out")
+    app.launchArguments.append("-ui-testing-allow-exit")
+    addTeardownBlock { [app] in
+      self.endUITestSession(app)
+    }
+
+    measure(metrics: [XCTApplicationLaunchMetric(waitUntilResponsive: true)]) {
+      app.launch()
+      XCTAssertTrue(
+        app.buttons["Continue in Browser"].waitForExistence(timeout: timeoutSeconds),
+        "Signed-out shell did not become responsive within \(timeoutSeconds) seconds.\n\(app.debugDescription)"
+      )
+      app.terminate()
+    }
+  }
+
   func testReadyLaunchShowsProfileTab() {
     let app = launchMockApp(launchArgument: "-ui-testing-ready", expectedElementDescription: "\"Copy URL\"") {
       $0.buttons["Copy URL"]

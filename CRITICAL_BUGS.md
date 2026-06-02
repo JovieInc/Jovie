@@ -24,4 +24,7 @@ Tracking issue: [JOV-2712](https://linear.app/jovie/issue/JOV-2712/track-platfor
 No critical iOS auth callback failure was reproduced by `pnpm test:auth:ios` on
 `origin/main` `9e9200348e`. The deterministic callback suite, real-browser auth
 suite, and app-state suite passed, and the known live Clerk auth hardening PR
-merged as #9907.
+merged as #9907. The iOS launch-performance baseline passed as an opt-in
+XCUITest on `origin/main` `546e2af1f4`; it averaged `3.01s` to the signed-out
+shell under UI-test automation, so the 2s target remains tracked by JOV-2712
+and is not classified as a critical bug in this ledger.
