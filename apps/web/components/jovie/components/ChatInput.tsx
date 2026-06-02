@@ -8,6 +8,7 @@ import {
   useEffect,
   useId,
   useImperativeHandle,
+  useLayoutEffect,
   useRef,
   useState,
 } from 'react';
@@ -254,6 +255,11 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
       !isImageProcessing &&
       !sendBlockedByPicker;
 
+    const handlePickerClose = useCallback(() => {
+      onPickerOpenChange?.(false);
+      picker.close();
+    }, [onPickerOpenChange, picker]);
+
     // Slash trigger detection: open root picker when `/` follows a word
     // boundary; switch to entity picker when a skill commit demands it; or
     // jump straight to a kind-locked entity picker when the user typed a
@@ -271,6 +277,7 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
             // or converted an existing `/foo` into `/release foo` while in
             // root mode. The picker reducer accepts open-entity from any
             // state.
+            onPickerOpenChange?.(true);
             picker.openEntity(
               trigger.directKind,
               trigger.startIdx,
@@ -282,16 +289,17 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
             picker.state.status === 'closed' ||
             picker.state.status === 'root'
           ) {
+            onPickerOpenChange?.(true);
             picker.openRoot(trigger.startIdx, trigger.query);
           } else {
             // entity mode: only update query (kind stays locked)
             picker.setQuery(trigger.query);
           }
         } else if (picker.state.status === 'root') {
-          picker.close();
+          handlePickerClose();
         }
       },
-      [onChange, picker]
+      [handlePickerClose, onChange, onPickerOpenChange, picker]
     );
 
     const stripSlashQuery = useCallback((): number => {
@@ -335,9 +343,10 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
           onAddSkill(skill.id);
           const requiredSlot = skill.entitySlots.find(s => s.required);
           if (requiredSlot && picker.state.status !== 'closed') {
+            onPickerOpenChange?.(true);
             picker.openEntity(requiredSlot.kind, nextCaret, '');
           } else {
-            picker.close();
+            handlePickerClose();
           }
           return;
         }
@@ -345,12 +354,20 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
         const nextCaret = replaceSlashQueryWithToken(serializeSkill(skill.id));
         const requiredSlot = skill.entitySlots.find(s => s.required);
         if (requiredSlot && picker.state.status !== 'closed') {
+          onPickerOpenChange?.(true);
           picker.openEntity(requiredSlot.kind, nextCaret, '');
         } else {
-          picker.close();
+          handlePickerClose();
         }
       },
-      [onAddSkill, picker, replaceSlashQueryWithToken, stripSlashQuery]
+      [
+        handlePickerClose,
+        onAddSkill,
+        onPickerOpenChange,
+        picker,
+        replaceSlashQueryWithToken,
+        stripSlashQuery,
+      ]
     );
 
     const handleSelectEntity = useCallback(
@@ -362,7 +379,7 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
             id: entity.id,
             label: entity.label,
           });
-          picker.close();
+          handlePickerClose();
           return;
         }
 
@@ -373,18 +390,23 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
             label: entity.label,
           })
         );
-        picker.close();
+        handlePickerClose();
       },
-      [onAddEntity, picker, replaceSlashQueryWithToken, stripSlashQuery]
+      [
+        handlePickerClose,
+        onAddEntity,
+        replaceSlashQueryWithToken,
+        stripSlashQuery,
+      ]
     );
 
     const handleSelectPromptAction = useCallback(
       (prompt: string) => {
         stripSlashQuery();
-        picker.close();
+        handlePickerClose();
         onQuickActionSelect?.(prompt);
       },
-      [onQuickActionSelect, picker, stripSlashQuery]
+      [handlePickerClose, onQuickActionSelect, stripSlashQuery]
     );
 
     const {
@@ -476,8 +498,11 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
     const geometry = geometryFor(surfaceMode, isStacked, variant);
     const showInlinePicker = picker.state.status === 'root';
     const showEntitySurface = picker.state.status === 'entity';
-    const dockClass =
-      surfaceMode === 'entity' && !isStacked
+    const reserveInlinePickerSpace =
+      showInlinePicker && variant === 'compact' && !onPickerOpenChange;
+    const dockClass = reserveInlinePickerSpace
+      ? 'relative flex flex-col items-center'
+      : surfaceMode === 'entity' && !isStacked
         ? 'relative flex justify-end'
         : 'relative flex justify-center';
     // Container the slash key listener cares about when the picker is closed.
@@ -500,7 +525,7 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
       }
     }, [isPickerOpen, isFocused]);
 
-    useEffect(() => {
+    useLayoutEffect(() => {
       onPickerOpenChange?.(picker.state.status !== 'closed');
     }, [picker.state.status, onPickerOpenChange]);
 
@@ -516,7 +541,9 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
           {showInlinePicker ? (
             <div
               className={cn(
-                'absolute bottom-full left-0 right-0 z-[80] flex justify-center',
+                reserveInlinePickerSpace
+                  ? 'relative z-[80] flex w-full justify-center'
+                  : 'absolute bottom-full left-0 right-0 z-[80] flex justify-center',
                 statusBanner ? 'mb-[34px]' : 'mb-4'
               )}
             >
@@ -534,7 +561,7 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
                   onSelectEntity={handleSelectEntity}
                   onSetSelected={picker.setSelected}
                   onMoveSelected={picker.moveSelected}
-                  onClose={picker.close}
+                  onClose={handlePickerClose}
                   variant='inline'
                   listIdProp={pickerListId}
                   onActiveRowChange={setPickerActiveRowId}
@@ -590,7 +617,7 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
                     onSelectEntity={handleSelectEntity}
                     onSetSelected={picker.setSelected}
                     onMoveSelected={picker.moveSelected}
-                    onClose={picker.close}
+                    onClose={handlePickerClose}
                     variant='rail'
                     listIdProp={pickerListId}
                     onActiveRowChange={setPickerActiveRowId}
@@ -668,7 +695,7 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
                         onSelectEntity={handleSelectEntity}
                         onSetSelected={picker.setSelected}
                         onMoveSelected={picker.moveSelected}
-                        onClose={picker.close}
+                        onClose={handlePickerClose}
                         variant='rail'
                         listIdProp={pickerListId}
                         onActiveRowChange={setPickerActiveRowId}

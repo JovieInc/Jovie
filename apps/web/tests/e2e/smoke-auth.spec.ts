@@ -93,6 +93,7 @@ async function assertDashboardRouteLoaded(
     const releasesSurface = page
       .getByTestId('releases-matrix')
       .or(page.getByTestId('shell-releases-view'))
+      .or(page.getByTestId('library-surface'))
       .first();
 
     await expect(

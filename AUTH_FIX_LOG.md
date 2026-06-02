@@ -376,3 +376,44 @@ Clerk dashboard/config changes:
 
 - No production Clerk settings changed.
 - No Clerk dashboard changes made for this PR smoke closeout.
+
+## PR Smoke Rerun Closeout - 2026-06-01
+
+Failing CI evidence inspected:
+
+- PR #9891 check `E2E Smoke (PR Fast Feedback)` failed on run `26801322456`, job `79009234276`.
+- `shell-chat-v1.spec.ts` timed out at the Shell V1 composer assertion because the test scoped the composer under `chat-content`, while the current shell can render the composer elsewhere inside the same Shell V1 frame.
+- `smoke-auth.spec.ts` failed the releases route assertion after `/app/releases` loaded `/app/library?view=releases`; the route rendered the current library surface rather than the legacy releases matrix marker.
+- The first local rerun then exposed the underlying Shell V1 layout bug: the slash picker could overlap populated transcript content after opening from the bottom composer.
+
+Fixes made:
+
+- Updated the Shell V1 smoke locator to keep the shell-frame requirement while finding the composer anywhere inside that frame.
+- Updated the authenticated releases smoke assertion to accept the current `library-surface` marker in addition to the releases matrix markers.
+- Updated the thread-view picker clearance behavior so opening the picker scrolls the transcript clear of the absolute picker while preserving composer dimensions.
+
+Commands run:
+
+```bash
+gh api repos/JovieInc/Jovie/actions/jobs/79009234276/logs
+JOVIE_AGENT_PROFILE=coder CI=true SMOKE_ONLY=1 SENTRY_E2E_REPORTING=0 E2E_USE_TEST_AUTH_BYPASS=1 E2E_TEST_AUTH_PERSONA=creator-ready NEXT_PUBLIC_CLERK_MOCK=1 NEXT_PUBLIC_CLERK_PROXY_DISABLED=1 E2E_CLERK_USER_ID=user_test_browse_ready E2E_CLERK_USER_USERNAME=browse-ready-user pnpm --filter=@jovie/web exec playwright test --config=playwright.config.smoke.ts --project=chromium --reporter=line tests/e2e/shell-chat-v1.spec.ts tests/e2e/smoke-auth.spec.ts
+JOVIE_AGENT_PROFILE=coder CI=true SMOKE_ONLY=1 SENTRY_E2E_REPORTING=0 E2E_USE_TEST_AUTH_BYPASS=1 E2E_TEST_AUTH_PERSONA=creator-ready NEXT_PUBLIC_CLERK_MOCK=1 NEXT_PUBLIC_CLERK_PROXY_DISABLED=1 E2E_CLERK_USER_ID=user_test_browse_ready E2E_CLERK_USER_USERNAME=browse-ready-user pnpm --filter=@jovie/web exec playwright test --config=playwright.config.smoke.ts --project=chromium --reporter=line
+JOVIE_AGENT_PROFILE=coder pnpm biome check --write apps/web/components/jovie/JovieChat.tsx apps/web/components/jovie/components/ChatInput.tsx apps/web/tests/e2e/shell-chat-v1.spec.ts apps/web/tests/e2e/smoke-auth.spec.ts AUTH_FIX_LOG.md
+JOVIE_AGENT_PROFILE=coder pnpm --filter @jovie/web run typecheck -- --pretty false
+JOVIE_AGENT_PROFILE=coder pnpm biome check .
+JOVIE_AGENT_PROFILE=coder pnpm --filter @jovie/web run lint
+```
+
+Final passing evidence:
+
+- Focused Shell V1 + auth smoke rerun: 8 passed in 1.0m.
+- Full local PR smoke config: 18 passed, 2 skipped, in 1.4m.
+- Focused Biome write check: checked 4 files, fixed 1 file.
+- Web typecheck: passed.
+- Root Biome check: 6069 files checked, no fixes applied.
+- Web lint: 5858 files checked, no fixes applied.
+
+Clerk dashboard/config changes:
+
+- No production Clerk settings changed.
+- No Clerk dashboard changes made for this PR smoke rerun closeout.

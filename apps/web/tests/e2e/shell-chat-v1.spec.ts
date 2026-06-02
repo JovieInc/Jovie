@@ -235,7 +235,7 @@ function shellChatFrameLocators(page: Page): ShellChatLocators {
   );
   const shellScroll = shellFrame.locator('[data-testid="app-shell-scroll"]');
   const chatContent = shellScroll.locator('[data-testid="chat-content"]');
-  const composer = chatContent.locator('[data-testid="chat-composer-surface"]');
+  const composer = shellFrame.locator('[data-testid="chat-composer-surface"]');
   const input = composer.locator('[aria-label="Chat message input"]');
 
   return { chatContent, composer, input, shellFrame, shellScroll };
@@ -273,23 +273,40 @@ async function assertSlashMenuClearsThreadContent(page: Page) {
   if (!menuBox) return;
 
   const protectedTargets = [
-    page.getByTestId('chat-message-reply').filter({
-      hasText: 'Your bio is currently not set',
-    }),
-    page.getByTestId('tool-status-row').filter({
-      hasText: 'Bio ready',
-    }),
-    page.getByTestId('chat-user-bubble').filter({
-      hasText: 'whats my bio',
-    }),
+    {
+      label: 'latest assistant reply',
+      locator: page.getByTestId('chat-message-reply').filter({
+        hasText: 'Your bio is currently not set',
+      }),
+    },
+    {
+      label: 'bio tool status row',
+      locator: page.getByTestId('tool-status-row').filter({
+        hasText: 'Bio ready',
+      }),
+    },
+    {
+      label: 'latest user bubble',
+      locator: page.getByTestId('chat-user-bubble').filter({
+        hasText: 'whats my bio',
+      }),
+    },
   ];
 
-  for (const target of protectedTargets) {
-    const targetBox = await target.boundingBox();
-    expect(targetBox).not.toBeNull();
-    if (targetBox) {
-      expect(boxesOverlap(menuBox, targetBox, 4)).toBe(false);
-    }
+  for (const { label, locator } of protectedTargets) {
+    const targetBox = await locator.boundingBox();
+    expect(targetBox, `${label} box`).not.toBeNull();
+    await expect
+      .poll(
+        async () => {
+          const currentMenuBox = await slashMenu.boundingBox();
+          const currentTargetBox = await locator.boundingBox();
+          if (!currentMenuBox || !currentTargetBox) return false;
+          return !boxesOverlap(currentMenuBox, currentTargetBox, 4);
+        },
+        { message: `${label} clears slash menu`, timeout: 10_000 }
+      )
+      .toBe(true);
   }
 }
 
