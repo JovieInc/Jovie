@@ -91,9 +91,12 @@ Native iOS foundation for Jovie. The app is dark-only, simulator-tested, and wir
    ```
 
    This opt-in run measures the deterministic Chat to Profile to Chat shell
-   transition with clock, CPU, and memory metrics. Logs, result bundles, and run
-   summaries are stored under
+   transition with clock, CPU, and memory metrics, and requests
+   `XCTHitchMetric(application:)` on iOS 26+ simulator runtimes. Logs, result
+   bundles, and run summaries are stored under
    `artifacts/ios-test-results/runtime-performance`.
+   Each summary reports whether measured hitch or frame metric lines were
+   emitted by xcodebuild.
 
 9. Capture memory/leak baseline evidence:
 

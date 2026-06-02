@@ -42,7 +42,7 @@ fi
   echo "- Status: $STATUS_DESCRIPTION"
   echo "- Flow: deterministic \`-ui-testing-chat\` shell, Chat to Profile to Chat bottom navigation transition."
   echo "- Timeout: ${JOVIE_IOS_RUNTIME_TIMEOUT_SECONDS}s per measured transition."
-  echo "- Requested metrics: \`XCTClockMetric\`, \`XCTCPUMetric(application:)\`, and \`XCTMemoryMetric(application:)\`."
+  echo "- Requested metrics: \`XCTClockMetric\`, \`XCTCPUMetric(application:)\`, \`XCTMemoryMetric(application:)\`, and \`XCTHitchMetric(application:)\` on iOS 26+ simulator runtimes."
   echo "- Emitted metrics:"
   if grep -F " measured [" "$LOG_PATH" >/dev/null 2>&1; then
     grep -F " measured [" "$LOG_PATH" | while IFS= read -r line; do
@@ -54,6 +54,11 @@ fi
     done
   else
     echo "  - No XCTest metric lines found in the log."
+  fi
+  if grep -F " measured [" "$LOG_PATH" | grep -Eiq "hitch|frame"; then
+    echo "- Hitch metrics emitted: yes."
+  else
+    echo "- Hitch metrics emitted: no measured hitch or frame metric lines found in the xcodebuild log."
   fi
   echo "- Result bundle: \`$RESULT_BUNDLE\`"
   echo "- Log: \`$LOG_PATH\`"

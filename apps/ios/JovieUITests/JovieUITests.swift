@@ -464,11 +464,17 @@ final class JovieUITests: XCTestCase {
   }
 
   private func shellRuntimeMetrics(for app: XCUIApplication) -> [any XCTMetric] {
-    [
+    var metrics: [any XCTMetric] = [
       XCTClockMetric(),
       XCTCPUMetric(application: app),
       XCTMemoryMetric(application: app),
     ]
+
+    if #available(iOS 26.0, *) {
+      metrics.append(XCTHitchMetric(application: app))
+    }
+
+    return metrics
   }
 
   private func waitForHittable(_ element: XCUIElement, timeout: TimeInterval) -> Bool {
