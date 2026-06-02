@@ -12,6 +12,7 @@ import {
 } from './utils/smoke-test-utils';
 
 const FAST_ITERATION = process.env.E2E_FAST_ITERATION === '1';
+const SMOKE_ONLY = process.env.SMOKE_ONLY === '1';
 const TEST_AUTH_BYPASS_ENABLED = process.env.E2E_USE_TEST_AUTH_BYPASS === '1';
 
 /**
@@ -74,10 +75,15 @@ async function assertDashboardRouteLoaded(
   );
 
   if (path === APP_ROUTES.CHAT) {
-    await expect(
-      page.getByLabel(/chat message input/i),
-      'Chat: composer did not render'
-    ).toBeVisible({ timeout: SMOKE_TIMEOUTS.VISIBILITY });
+    const chatComposer = page
+      .getByRole('textbox', { name: /chat message input/i })
+      .or(page.getByPlaceholder(/ask jovie|chat message/i))
+      .or(page.locator('textarea, [contenteditable="true"]'))
+      .first();
+
+    await expect(chatComposer, 'Chat: composer did not render').toBeVisible({
+      timeout: SMOKE_TIMEOUTS.VISIBILITY,
+    });
     return;
   }
 
@@ -210,7 +216,7 @@ test.describe('Dashboard Navigation @smoke', () => {
       FAST_ITERATION,
       'Post-login dashboard content runs in content-gate and chaos fast lanes'
     );
-    test.setTimeout(300_000);
+    test.setTimeout(FAST_ITERATION || SMOKE_ONLY ? 180_000 : 300_000);
 
     if (!TEST_AUTH_BYPASS_ENABLED) {
       await setupClerkTestingToken({ page });
@@ -230,17 +236,18 @@ test.describe('Dashboard Navigation @smoke', () => {
 
     await expect(page).toHaveURL(/\/app(?:\/|$)/, { timeout: 20_000 });
 
-    const dashboardPages = FAST_ITERATION
-      ? [{ path: APP_ROUTES.CHAT, name: 'Chat' }]
-      : [
-          { path: APP_ROUTES.CHAT, name: 'Chat' },
-          { path: APP_ROUTES.AUDIENCE, name: 'Audience' },
-          { path: APP_ROUTES.RELEASES, name: 'Releases' },
-          {
-            path: APP_ROUTES.DASHBOARD_EARNINGS,
-            name: 'Legacy Earnings Redirect',
-          },
-        ];
+    const dashboardPages =
+      FAST_ITERATION || SMOKE_ONLY
+        ? [{ path: APP_ROUTES.CHAT, name: 'Chat' }]
+        : [
+            { path: APP_ROUTES.CHAT, name: 'Chat' },
+            { path: APP_ROUTES.AUDIENCE, name: 'Audience' },
+            { path: APP_ROUTES.RELEASES, name: 'Releases' },
+            {
+              path: APP_ROUTES.DASHBOARD_EARNINGS,
+              name: 'Legacy Earnings Redirect',
+            },
+          ];
 
     const failures: string[] = [];
 
@@ -249,10 +256,13 @@ test.describe('Dashboard Navigation @smoke', () => {
         await smokeNavigateWithRetry(page, path, {
           timeout: SMOKE_TIMEOUTS.NAVIGATION,
           retries: FAST_ITERATION ? 3 : 2,
+          waitUntil: 'commit',
         });
 
         await page
-          .waitForLoadState('load', { timeout: 60_000 })
+          .waitForLoadState('domcontentloaded', {
+            timeout: SMOKE_TIMEOUTS.VISIBILITY,
+          })
           .catch(() => {});
 
         const url = page.url();

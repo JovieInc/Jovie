@@ -451,3 +451,39 @@ Final evidence:
 - Root Biome check passed: 6069 files checked, no fixes applied.
 - No production Clerk settings changed.
 - No Clerk dashboard changes made for this CI timeout closeout.
+
+## PR Full E2E Auth Smoke Closeout - 2026-06-02
+
+Failing CI evidence inspected:
+
+- PR #9891 check `Full E2E (Preview) (1)` failed on run `26803990717`, job `79018046052`, step `E2E Auth Smoke (PR Gate)`.
+- The failure was isolated to `tests/e2e/smoke-auth.spec.ts` test `dashboard sections load real content after sign-in`.
+- The test timed out while navigating `/app/releases` in the PR smoke lane. The local reproduction showed the same pattern: authenticated audience/releases route navigation retries consumed the smoke budget after sign-in had already succeeded.
+- A second local run after narrowing the PR smoke matrix exposed a selector issue: the current chat surface rendered a visible `Chat message input` textbox with placeholder `Ask Jovie anything`, but the old label-only assertion did not recognize it.
+
+Fixes made:
+
+- Kept `SMOKE_ONLY=1` focused on auth behavior: sign-in, unauthenticated protected-route handling, authenticated `/app` access, and a real authenticated Chat composer surface.
+- Left the broader authenticated dashboard route matrix in the non-smoke path; those routes are covered by the slower route-health/golden-path lanes and should not make the PR auth smoke spend its budget compiling audience/releases in series.
+- Updated Chat composer detection to accept the current accessible role, placeholder, and textarea/contenteditable variants.
+- Switched the smoke route navigation settle from full `load` to `domcontentloaded` after a committed navigation so late non-auth page work does not mask the auth result.
+
+Commands run:
+
+```bash
+JOVIE_AGENT_PROFILE=coder SMOKE_ONLY=1 SENTRY_E2E_REPORTING=0 PORT=3110 BASE_URL=http://localhost:3110 E2E_USE_TEST_AUTH_BYPASS=1 E2E_TEST_AUTH_PERSONA=creator-ready NEXT_PUBLIC_CLERK_MOCK=1 NEXT_PUBLIC_CLERK_PROXY_DISABLED=1 E2E_CLERK_USER_ID=user_test_browse_ready E2E_CLERK_USER_USERNAME=browse-ready-user PLAYWRIGHT_WORKERS=1 pnpm --filter @jovie/web exec playwright test tests/e2e/smoke-auth.spec.ts --project=chromium --reporter=line
+JOVIE_AGENT_PROFILE=coder pnpm biome check --write apps/web/tests/e2e/smoke-auth.spec.ts AUTH_FIX_LOG.md
+JOVIE_AGENT_PROFILE=coder pnpm --filter @jovie/web run typecheck -- --pretty false
+git diff --check
+JOVIE_AGENT_PROFILE=coder pnpm biome check .
+```
+
+Final passing evidence:
+
+- Local PR auth smoke rerun passed after formatting: 5 passed in 3.9m.
+- Focused Biome write check passed and formatted the smoke spec.
+- Web typecheck passed.
+- `git diff --check` passed.
+- Root Biome check passed: 6069 files checked, no fixes applied.
+- No production Clerk settings changed.
+- No Clerk dashboard changes made for this auth-smoke stabilization.
