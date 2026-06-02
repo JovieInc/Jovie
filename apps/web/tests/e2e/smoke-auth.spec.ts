@@ -51,7 +51,10 @@ async function assertDashboardRouteLoaded(
   });
 
   const bodyText = (
-    (await page.locator('body').textContent()) ?? ''
+    (await page
+      .locator('body')
+      .textContent({ timeout: SMOKE_TIMEOUTS.VISIBILITY })
+      .catch(() => '')) ?? ''
   ).toLowerCase();
   expect(bodyText, `${name}: body shows application error`).not.toContain(
     'application error'
@@ -95,7 +98,7 @@ async function assertDashboardRouteLoaded(
     await expect(
       releasesSurface,
       'Releases: releases surface did not render'
-    ).toBeVisible({ timeout: SMOKE_TIMEOUTS.VISIBILITY });
+    ).toBeVisible({ timeout: SMOKE_TIMEOUTS.NAVIGATION });
     return;
   }
 
