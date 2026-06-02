@@ -63,7 +63,11 @@ wait_for_boot() {
     elapsed=$((elapsed + 1))
   done
 
-  wait "$boot_pid"
+  if ! wait "$boot_pid"; then
+    cat "$boot_log"
+    echo "Simulator $udid bootstatus failed." >&2
+    return 1
+  fi
 }
 
 list_devices() {
@@ -274,7 +278,10 @@ fi
 
 echo "Preparing simulator $IPHONE_UDID"
 run_with_timeout "${JOVIE_IOS_MEMORY_BOOT_COMMAND_TIMEOUT:-120}" xcrun simctl boot "$IPHONE_UDID" >/dev/null 2>&1 || true
-wait_for_boot "$IPHONE_UDID"
+if ! wait_for_boot "$IPHONE_UDID"; then
+  echo "Failed to boot simulator $IPHONE_UDID." >&2
+  exit 1
+fi
 run_with_timeout "${JOVIE_IOS_MEMORY_UI_TIMEOUT:-10}" xcrun simctl ui "$IPHONE_UDID" appearance dark >/dev/null 2>&1 || true
 run_with_timeout "${JOVIE_IOS_MEMORY_UNINSTALL_TIMEOUT:-30}" xcrun simctl uninstall "$IPHONE_UDID" "$BUNDLE_ID" >/dev/null 2>&1 || true
 run_with_timeout "${JOVIE_IOS_MEMORY_INSTALL_TIMEOUT:-60}" xcrun simctl install "$IPHONE_UDID" "$APP_PATH"
