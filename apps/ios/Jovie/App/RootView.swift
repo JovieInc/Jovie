@@ -192,8 +192,8 @@ private struct AppContentView: View {
           onLogout: onLogout
         ) {
           NeedsOnboardingView(continueURL: appState.continueOnWebURL)
-        } chatContent: {
-          MobileChatHomeView(isOffline: false)
+        } chatContent: { draft in
+          MobileChatHomeView(isOffline: false, draft: draft)
         }
       case .ready:
         AppShellView(
@@ -211,8 +211,8 @@ private struct AppContentView: View {
             showVenueModeOnLaunch: appState.launchMode.opensVenueModeOnLaunch,
             onRetry: { await appState.retry() }
           )
-        } chatContent: {
-          MobileChatHomeView(isOffline: appState.isOffline)
+        } chatContent: { draft in
+          MobileChatHomeView(isOffline: appState.isOffline, draft: draft)
         }
       }
     }
@@ -221,8 +221,7 @@ private struct AppContentView: View {
 
 private struct MobileChatHomeView: View {
   let isOffline: Bool
-
-  @State private var draft = ""
+  @Binding var draft: String
 
   var body: some View {
     ZStack {

@@ -15,6 +15,7 @@ staging, or production as appropriate.
 | iOS custom-scheme auth callback | `pnpm test:auth:ios` passed on `origin/main` `9e9200348e`: 18 `AppStateTests` and 2 deterministic XCUITests passed. | Verified locally |
 | iOS real-browser auth callback | `JOVIE_IOS_REAL_BROWSER_AUTH=1 pnpm test:auth:ios` passed through Doppler dev config against a temporary Cloudflare tunnel to local dev. | Verified locally |
 | iOS core screenshots | `pnpm run ios:screenshots` passed on `origin/main` `9e9200348e`, producing loading, signed-out, profile, fullscreen QR, settings, needs-onboarding, chat, and iPad shell screenshots. | Verified locally |
+| iOS chat draft stability | `bash apps/ios/scripts/run-xcodebuild.sh test -only-testing:JovieUITests/JovieUITests/testChatComposerPreservesDraftAcrossShellNavigation` passed on `codex/ios-chat-draft-hardening` after `86ba0c65f9`. | Verified locally |
 
 ## Deliverables
 
