@@ -243,3 +243,67 @@ Clerk dashboard/config changes:
 - No production Clerk settings changed.
 - No Clerk dashboard changes made for this design cleanup.
 - Local no-secret UI verification intentionally showed the server-side missing-Clerk failure in logs when the opened browser hit `/auth/start`; the prior live Doppler/Clerk smoke remains the auth end-to-end evidence for the full local flow.
+
+## Code Review Follow-Up - 2026-06-01
+
+Review findings addressed:
+
+- Removed redundant `void openAuthUrl()` wrappers from the Electron auth handoff button handlers.
+- Added a 30s timeout to the Clerk testing-token `fetch()` in `apps/desktop/scripts/smoke-native-auth.mjs`; the existing bounded `curl` fallback remains.
+- Restricted `/auth/native-complete` signed-in fallback redirects to recoverable one-time completion replay errors only. Hard native exchange failures now stay on the retry/error screen.
+- Polled Clerk hydration in the no-created-session native ticket path before failing the Electron completion route.
+- Normalized comma-delimited forwarded host/proto headers before building same-origin Electron signin redirects.
+- Switched `/auth/start` local Redis-unavailable fallback from matching a diagnostic reason string to a structured `rateLimit.unavailable === true` flag.
+
+Commands run:
+
+```bash
+clerk whoami --mode agent
+clerk doctor --mode agent
+node --check apps/desktop/scripts/smoke-native-auth.mjs
+JOVIE_AGENT_PROFILE=coder pnpm --filter @jovie/web exec vitest run app/auth/start/route.test.ts tests/unit/desktop/native-complete.test.ts tests/unit/app/native-complete-page.test.tsx
+JOVIE_AGENT_PROFILE=coder pnpm biome check --write apps/web/app/auth/start/route.ts apps/web/app/auth/start/route.test.ts apps/web/app/app/\\(shell\\)/layout.tsx apps/web/lib/rate-limit/types.ts apps/web/lib/rate-limit/rate-limiter.ts apps/web/lib/desktop/native-complete.ts apps/web/app/\\(auth\\)/auth/native-complete/page.tsx apps/web/tests/unit/app/native-complete-page.test.tsx apps/web/app/\\(auth\\)/DesktopAuthRouteHandoff.tsx apps/web/app/desktop-auth/page.tsx apps/desktop/scripts/smoke-native-auth.mjs
+JOVIE_AGENT_PROFILE=coder pnpm --filter @jovie/web run typecheck -- --pretty false
+JOVIE_AGENT_PROFILE=coder pnpm --filter @jovie/desktop run typecheck
+JOVIE_AGENT_PROFILE=coder pnpm --filter @jovie/web exec vitest run app/auth/start/route.test.ts tests/unit/desktop/native-complete.test.ts tests/unit/app/native-complete-page.test.tsx tests/unit/app/desktop-auth-page.test.tsx tests/unit/auth/AuthUnavailableCard.compact.test.tsx tests/unit/middleware/proxy-auth-degraded-html.test.ts
+JOVIE_AGENT_PROFILE=coder pnpm --filter @jovie/desktop run test
+JOVIE_AGENT_PROFILE=coder pnpm biome check .
+JOVIE_AGENT_PROFILE=coder pnpm --filter @jovie/web run lint
+JOVIE_AGENT_PROFILE=coder pnpm --filter @jovie/web run build
+JOVIE_AGENT_PROFILE=coder pnpm biome check --write AUTH_FIX_LOG.md
+```
+
+Failed command evidence:
+
+```bash
+clerk doctor --mode agent
+JOVIE_AGENT_PROFILE=coder pnpm biome check --write AUTH_FIX_LOG.md
+```
+
+Failed because this clean worktree is not linked to a Clerk application and has no local `.env.local` or `.env`:
+
+- `Not linked to a Clerk application`
+- `No .env.local or .env file found`
+
+The Biome doc-only command failed because `AUTH_FIX_LOG.md` is ignored by the repo Biome config: `No files were processed in the specified paths.`
+
+Neither failure required changing any Clerk dashboard settings or exposing secrets.
+
+Final passing evidence:
+
+- `clerk whoami --mode agent`: authenticated as the local operator account; project link is `null`.
+- `node --check apps/desktop/scripts/smoke-native-auth.mjs`: passed.
+- Focused review tests: 3 files passed, 11 tests passed.
+- Expanded auth/design tests: 6 files passed, 33 tests passed.
+- Full desktop test suite: passed.
+- Desktop typecheck: passed.
+- Web typecheck: passed.
+- Root Biome check: 6069 files checked, no fixes applied.
+- Web lint: 5858 files checked, no fixes applied.
+- Web production build: passed, including static generation for 412 app routes and postbuild asset sync.
+
+Clerk dashboard/config changes:
+
+- No production Clerk settings changed.
+- No Clerk dashboard changes made for this review follow-up.
+- The minimal staging path remains: link/check the intended non-production Clerk app, pull non-production env only, verify allowed origins/callback routes, then rerun the native auth smoke against staging before removing human-review gating.

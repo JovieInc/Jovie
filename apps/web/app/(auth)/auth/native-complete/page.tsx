@@ -49,6 +49,14 @@ function getStoredDesktopAuthReturnTo(): string {
   return '/app/chat?runtime=electron';
 }
 
+function isRecoverableCompletionReplayError(error: unknown): boolean {
+  return (
+    error instanceof Error &&
+    (error.message === 'missing-auth-completion' ||
+      error.message === 'missing-completion')
+  );
+}
+
 function NativeCompleteContent() {
   const router = useRouter();
   const clerk = useClerk();
@@ -89,9 +97,9 @@ function NativeCompleteContent() {
             }
           }, 500);
         }
-      } catch {
+      } catch (error) {
         if (isActive) {
-          if (clerk.session) {
+          if (clerk.session && isRecoverableCompletionReplayError(error)) {
             const returnTo = getStoredDesktopAuthReturnTo();
             router.replace(returnTo);
             globalThis.setTimeout(() => {

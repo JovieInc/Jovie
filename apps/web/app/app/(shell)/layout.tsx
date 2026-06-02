@@ -27,18 +27,26 @@ import {
 
 export const runtime = 'nodejs';
 
+function getFirstForwardedHeader(value: string | null): string | null {
+  const firstValue = value?.split(',')[0]?.trim();
+  return firstValue || null;
+}
+
 function resolveRequestOrigin(headerStore: Headers): string | null {
   const host =
-    headerStore.get('x-forwarded-host')?.trim() ??
-    headerStore.get('host')?.trim();
+    getFirstForwardedHeader(headerStore.get('x-forwarded-host')) ??
+    getFirstForwardedHeader(headerStore.get('host'));
   if (!host) return null;
 
-  const forwardedProto = headerStore.get('x-forwarded-proto')?.trim();
+  const forwardedProto = getFirstForwardedHeader(
+    headerStore.get('x-forwarded-proto')
+  )?.toLowerCase();
   const protocol =
-    forwardedProto ??
-    (host.startsWith('localhost') || host.startsWith('127.')
-      ? 'http'
-      : 'https');
+    forwardedProto === 'http' || forwardedProto === 'https'
+      ? forwardedProto
+      : host.startsWith('localhost') || host.startsWith('127.')
+        ? 'http'
+        : 'https';
 
   return `${protocol}://${host}`;
 }

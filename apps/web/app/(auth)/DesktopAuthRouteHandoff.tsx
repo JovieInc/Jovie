@@ -88,9 +88,7 @@ export function DesktopAuthRouteHandoff() {
             type='button'
             className='mt-8 inline-flex h-11 w-full items-center justify-center rounded-full bg-white px-4 text-[13px] font-medium text-black transition-colors hover:bg-white/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/35 disabled:cursor-not-allowed disabled:opacity-55'
             disabled={openState === 'opening'}
-            onClick={() => {
-              void openAuthUrl();
-            }}
+            onClick={openAuthUrl}
           >
             {openState === 'opening'
               ? 'Opening Browser...'

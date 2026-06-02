@@ -257,14 +257,17 @@ export async function completeDesktopNativeAuth({
     ticketAttempt.createdSessionId ?? signIn.createdSessionId ?? null;
   if (!sessionId) {
     recordDiagnostic('ticket_finalize_started', 'hydrate_active_session');
-    await reloadClerk?.();
+    const hydrationStatus = getActiveSessionId
+      ? await waitForActivatedSession({
+          expectedUserId: exchange.userId,
+          reloadClerk,
+          getActiveSessionId,
+          getActiveUserId,
+        })
+      : 'missing';
 
-    const activeSessionId = getActiveSessionId?.() ?? null;
-    const activeUserId = getActiveUserId?.() ?? null;
-    if (
-      activeSessionId &&
-      (!exchange.userId || activeUserId === exchange.userId)
-    ) {
+    if (hydrationStatus === 'active') {
+      const activeSessionId = getActiveSessionId?.() ?? 'hydrated_session';
       recordDiagnostic('ticket_finalize_succeeded', activeSessionId);
       recordDiagnostic('route_ready', exchange.returnTo);
       return { returnTo: exchange.returnTo };
@@ -272,7 +275,7 @@ export async function completeDesktopNativeAuth({
 
     recordDiagnostic(
       'session_id_missing',
-      activeUserId && exchange.userId && activeUserId !== exchange.userId
+      hydrationStatus === 'user_mismatch'
         ? 'active_user_mismatch'
         : 'missing_created_session'
     );

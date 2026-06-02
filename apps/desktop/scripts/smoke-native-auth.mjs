@@ -58,6 +58,7 @@ async function requestTestingToken(secretKey) {
     const response = await fetch('https://api.clerk.com/v1/testing_tokens', {
       method: 'POST',
       headers: { Authorization: `Bearer ${secretKey}` },
+      signal: AbortSignal.timeout(30_000),
     });
     if (!response.ok) {
       throw new Error(`Testing token request failed: ${response.status}`);

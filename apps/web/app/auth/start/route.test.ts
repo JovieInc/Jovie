@@ -92,6 +92,7 @@ describe('GET /auth/start', () => {
     hoisted.generalLimiter.limit.mockResolvedValueOnce({
       success: false,
       reason: 'General rate limiter is temporarily unavailable',
+      unavailable: true,
     });
     hoisted.localLimiter.limit.mockResolvedValueOnce({
       success: true,
@@ -112,11 +113,31 @@ describe('GET /auth/start', () => {
     );
   });
 
+  it('does not fall back based on a diagnostic reason string alone', async () => {
+    hoisted.generalLimiter.limit.mockResolvedValueOnce({
+      success: false,
+      reason: 'General rate limiter is temporarily unavailable',
+      limit: 60,
+      remaining: 0,
+      reset: new Date(Date.now() + 60_000),
+    });
+
+    const response = await GET(
+      new Request(
+        'http://localhost:3112/auth/start?client=electron&intent=sign_in&return_to=%2Fapp%2Fchat%3Fruntime%3Delectron&code_challenge=abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQ&code_challenge_method=S256'
+      )
+    );
+
+    expect(response.status).toBe(429);
+    expect(hoisted.localLimiter.limit).not.toHaveBeenCalled();
+  });
+
   it('keeps Redis-required rate limiting fail-closed in production', async () => {
     vi.stubEnv('NODE_ENV', 'production');
     hoisted.generalLimiter.limit.mockResolvedValueOnce({
       success: false,
       reason: 'General rate limiter is temporarily unavailable',
+      unavailable: true,
       limit: 60,
       remaining: 0,
       reset: new Date(Date.now() + 60_000),

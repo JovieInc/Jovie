@@ -11,6 +11,7 @@ import {
 import { NextResponse } from 'next/server';
 import { APP_ROUTES } from '@/constants/routes';
 import { createStoredAuthState } from '@/lib/auth/routing-state.server';
+import { env } from '@/lib/env';
 import { captureError } from '@/lib/error-tracking';
 import { NO_STORE_HEADERS } from '@/lib/http/headers';
 import {
@@ -34,7 +35,7 @@ function createState(): string {
 }
 
 function isLocalRuntime(): boolean {
-  return process.env.NODE_ENV !== 'production';
+  return env.NODE_ENV !== 'production';
 }
 
 async function limitAuthStart(key: string) {
@@ -42,7 +43,7 @@ async function limitAuthStart(key: string) {
   if (
     rateLimit.success ||
     !isLocalRuntime() ||
-    rateLimit.reason !== 'General rate limiter is temporarily unavailable'
+    rateLimit.unavailable !== true
   ) {
     return rateLimit;
   }

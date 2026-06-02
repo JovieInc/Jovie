@@ -1,4 +1,4 @@
-import { render, waitFor } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const completeDesktopNativeAuthMock = vi.fn();
@@ -96,7 +96,7 @@ describe('NativeCompletePage', () => {
       '/app/settings?runtime=electron'
     );
     completeDesktopNativeAuthMock.mockRejectedValue(
-      new Error('native-auth-exchange-failed')
+      new Error('missing-auth-completion')
     );
 
     const { default: NativeCompletePage } = await import(
@@ -110,5 +110,22 @@ describe('NativeCompletePage', () => {
         '/app/settings?runtime=electron'
       );
     });
+  });
+
+  it('keeps hard native completion failures on the retry screen even when Clerk is already signed in', async () => {
+    clerkSession = { id: 'sess_123' };
+    clerkUser = { id: 'user_123' };
+    completeDesktopNativeAuthMock.mockRejectedValue(
+      new Error('native-auth-exchange-failed')
+    );
+
+    const { default: NativeCompletePage } = await import(
+      '../../../app/(auth)/auth/native-complete/page'
+    );
+
+    render(<NativeCompletePage />);
+
+    await screen.findByText('Sign-in did not complete');
+    expect(routerReplaceMock).not.toHaveBeenCalled();
   });
 });

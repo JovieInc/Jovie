@@ -121,6 +121,7 @@ export class RateLimiter {
         remaining: 0,
         reset: new Date(Date.now() + parseWindowToMs(this.config.window)),
         reason: `${this.config.name} rate limiter is temporarily unavailable`,
+        unavailable: true,
       };
     }
 
