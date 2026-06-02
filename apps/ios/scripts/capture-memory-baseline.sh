@@ -117,7 +117,17 @@ list_devices() {
 }
 
 pick_device() {
-  list_devices "$1" | head -n 1
+  local devices=""
+
+  if ! devices="$(list_devices "$1")"; then
+    return 1
+  fi
+
+  if [[ -z "$devices" ]]; then
+    return 1
+  fi
+
+  printf '%s\n' "${devices%%$'\n'*}"
 }
 
 write_metadata() {
