@@ -126,7 +126,7 @@ final class JovieUITests: XCTestCase {
   }
 
   func testLiveAuthViewRenders() throws {
-    guard ProcessInfo.processInfo.environment["JOVIE_IOS_LIVE_AUTH_UI"] == "1" else {
+    guard testEnvironmentValue("JOVIE_IOS_LIVE_AUTH_UI") == "1" else {
       throw XCTSkip("Set JOVIE_IOS_LIVE_AUTH_UI=1 to run the live Clerk UI spike.")
     }
 
@@ -140,7 +140,7 @@ final class JovieUITests: XCTestCase {
   }
 
   func testLiveNativeSessionCanReachAnAuthenticatedMobileState() throws {
-    guard ProcessInfo.processInfo.environment["JOVIE_IOS_LIVE_AUTH_UI"] == "1" else {
+    guard testEnvironmentValue("JOVIE_IOS_LIVE_AUTH_UI") == "1" else {
       throw XCTSkip("Set JOVIE_IOS_LIVE_AUTH_UI=1 to run the live Clerk UI spike.")
     }
 
@@ -255,9 +255,12 @@ final class JovieUITests: XCTestCase {
       testEnvironmentValue("CLERK_PUBLISHABLE_KEY") ??
       testEnvironmentValue("NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY") ??
       ""
-    let apiBaseURL = ProcessInfo.processInfo.environment["API_BASE_URL"] ?? "http://localhost:3003"
+    let apiBaseURL =
+      testEnvironmentValue("JOVIE_IOS_API_BASE_URL") ??
+      testEnvironmentValue("API_BASE_URL") ??
+      "http://localhost:3003"
     let emailAddress = try requiredEnvironmentValue("E2E_CLERK_USER_USERNAME")
-    let verificationCode = ProcessInfo.processInfo.environment["JOVIE_IOS_LIVE_AUTH_CODE"] ?? "424242"
+    let verificationCode = testEnvironmentValue("JOVIE_IOS_LIVE_AUTH_CODE") ?? "424242"
 
     let app = XCUIApplication()
     app.launchArguments.append(launchArgument)
@@ -317,7 +320,7 @@ final class JovieUITests: XCTestCase {
   private func requiredEnvironmentValue(_ key: String) throws -> String {
     let value = testEnvironmentValue(key) ?? ""
     guard !value.isEmpty else {
-      throw XCTSkip("Missing \(key) for live Clerk UI testing.")
+      throw XCTSkip("Missing \(key) or TEST_RUNNER_\(key) for live Clerk UI testing.")
     }
 
     return value
@@ -336,7 +339,13 @@ final class JovieUITests: XCTestCase {
   }
 
   private func testEnvironmentValue(_ key: String) -> String? {
-    if let value = ProcessInfo.processInfo.environment[key], !value.isEmpty {
+    let environment = ProcessInfo.processInfo.environment
+
+    if let value = environment[key], !value.isEmpty {
+      return value
+    }
+
+    if let value = environment["TEST_RUNNER_\(key)"], !value.isEmpty {
       return value
     }
 
@@ -351,7 +360,9 @@ final class JovieUITests: XCTestCase {
 
     for line in contents.split(separator: "\n") {
       let parts = line.split(separator: "=", maxSplits: 1).map(String.init)
-      guard parts.count == 2, parts[0] == key else { continue }
+      guard parts.count == 2, parts[0] == key || parts[0] == "TEST_RUNNER_\(key)" else {
+        continue
+      }
       return parts[1]
     }
 

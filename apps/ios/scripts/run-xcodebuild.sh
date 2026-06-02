@@ -5,6 +5,7 @@ ACTION="${1:-test}"
 if [[ $# -gt 0 ]]; then
   shift
 fi
+CODE_SIGNING_ALLOWED_VALUE="${CODE_SIGNING_ALLOWED:-NO}"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 IOS_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 PROJECT_PATH="$IOS_DIR/Jovie.xcodeproj"
@@ -248,6 +249,36 @@ if [[ "$ACTION" == "destination" ]]; then
 fi
 
 echo "Using destination: $DESTINATION"
+echo "Using CODE_SIGNING_ALLOWED=$CODE_SIGNING_ALLOWED_VALUE"
+
+FORWARDED_TEST_RUNNER_ENV=0
+
+forward_test_runner_env() {
+  local source_key="$1"
+  local value="${!source_key:-}"
+
+  if [[ -n "$value" ]]; then
+    export "TEST_RUNNER_${source_key}=$value"
+    FORWARDED_TEST_RUNNER_ENV=1
+  fi
+}
+
+for source_key in \
+  API_BASE_URL \
+  CLERK_PUBLISHABLE_KEY \
+  E2E_CLERK_USER_USERNAME \
+  JOVIE_IOS_API_BASE_URL \
+  JOVIE_IOS_LIVE_AUTH \
+  JOVIE_IOS_LIVE_AUTH_CODE \
+  JOVIE_IOS_LIVE_AUTH_UI \
+  NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY
+do
+  forward_test_runner_env "$source_key"
+done
+
+if [[ "$FORWARDED_TEST_RUNNER_ENV" -eq 1 ]]; then
+  echo "Forwarding XCTest environment via TEST_RUNNER_*"
+fi
 
 DESTINATION_ID="${DESTINATION#*id=}"
 DESTINATION_ID="${DESTINATION_ID%%,*}"
@@ -264,4 +295,4 @@ xcodebuild "$ACTION" \
   -scheme "$SCHEME" \
   -destination "$DESTINATION" \
   "$@" \
-  CODE_SIGNING_ALLOWED=NO
+  CODE_SIGNING_ALLOWED="$CODE_SIGNING_ALLOWED_VALUE"

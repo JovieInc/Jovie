@@ -42,6 +42,20 @@ Native iOS foundation for Jovie. The app is dark-only, simulator-tested, and wir
    pnpm run ios:test
    ```
 
+   Live Clerk auth tests are skipped by default. To run them locally, use the
+   dev Doppler config and allow simulator code signing so Clerk can use the
+   keychain. The test wrapper forwards the live-auth environment into XCTest via
+   `TEST_RUNNER_*` so the UI test process can read it:
+
+   ```bash
+   doppler run --project jovie-web --config dev -- env \
+     CODE_SIGNING_ALLOWED=YES \
+     JOVIE_IOS_LIVE_AUTH=1 \
+     JOVIE_IOS_LIVE_AUTH_UI=1 \
+     API_BASE_URL=http://localhost:3100 \
+     pnpm run ios:test
+   ```
+
 5. Run the iOS auth callback close-loop test:
 
    ```bash
@@ -72,7 +86,6 @@ bundle exec fastlane ios beta
 Release CI uses these GitHub secrets: `APPLE_API_KEY`, `APPLE_API_KEY_ID`, `APPLE_API_ISSUER`, `APPLE_TEAM_ID`, `MATCH_GIT_URL`, `MATCH_PASSWORD`, one of `MATCH_GIT_PRIVATE_KEY` or `MATCH_GIT_BASIC_AUTHORIZATION`, `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`, and `CLERK_ASSOCIATED_DOMAIN`.
 
 `bootstrap_signing` is intentionally manual. It creates or verifies the Apple bundle identifier, enables Associated Domains, creates or verifies the App Store Connect app record, and writes App Store distribution assets into match storage. Normal TestFlight uploads use readonly match in CI.
-
 ## Notes
 
 - `apps/ios/Jovie/Configuration.local.plist` is generated and gitignored.
