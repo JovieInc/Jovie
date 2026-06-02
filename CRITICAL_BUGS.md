@@ -44,3 +44,8 @@ The iOS chat shell now preserves a typed composer draft across Chat to Profile
 to Chat navigation in the focused XCUITest
 `testChatComposerPreservesDraftAcrossShellNavigation`, so no iOS draft-loss
 critical bug is currently reproduced for that shell-navigation case.
+The iOS profile shell now shows a recoverable dashboard error for a profile API
+transport failure and restores `.previewReady` after retry in the focused
+`AppStateTests` case `profileLoadFailureShowsRecoveryStateAndRetryRestoresDashboard`,
+so no iOS profile-load dead-end critical bug is currently reproduced for that
+covered API failure and retry path.
