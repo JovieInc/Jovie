@@ -75,8 +75,8 @@ export default defineConfig({
           // scope happens to be active in the parent shell.
           // See .claude/rules/environment.md.
           command: process.env.DATABASE_URL
-            ? 'pnpm run dev:local'
-            : 'doppler run --project jovie-web --config dev -- pnpm run dev:local',
+            ? 'pnpm run dev:local:playwright'
+            : 'doppler run --project jovie-web --config dev -- pnpm run dev:local:playwright',
           env: {
             ...process.env,
             NODE_ENV: 'test',
