@@ -64,7 +64,7 @@ jobs:
 
       - name: Validate TestFlight secrets
         shell: bash
-        run: apps/ios/scripts/validate-testflight-env.sh
+        run: bash apps/ios/scripts/validate-testflight-env.sh
 
       - name: Run iOS tests
         run: bundle exec fastlane ios ios_tests
