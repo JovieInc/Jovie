@@ -54,9 +54,7 @@ export function AuthUnavailableCard({
           {headline}
         </h1>
         <p className='mx-auto max-w-[20rem] text-[0.875rem] leading-[1.55] tracking-[-0.011em] text-white/60 text-pretty'>
-          {showResetAction
-            ? "Something is off with this environment's sign-in setup. Reset your session, then try again."
-            : 'Sign-in is not ready for this environment. Try again from the main app.'}
+          This environment&apos;s sign-in setup is not ready.
         </p>
       </div>
 
@@ -77,10 +75,6 @@ export function AuthUnavailableCard({
           </Link>
         </div>
       )}
-
-      <p className='mt-3 text-[12px] leading-[1.55] tracking-[-0.01em] text-white/40'>
-        If it still does not work, give it a moment and try again.
-      </p>
 
       {showSignupLegal ? (
         <p className='mt-4 text-[12px] leading-[1.6] tracking-[-0.01em] text-white/50'>

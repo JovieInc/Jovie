@@ -141,13 +141,10 @@ async function waitForAnySelector(
   try {
     await Promise.any(
       selectors.map(selector =>
-        page
-          .locator(selector)
-          .first()
-          .waitFor({
-            state: 'visible',
-            timeout: Math.min(timeout, 12_000),
-          })
+        page.locator(selector).first().waitFor({
+          state: 'visible',
+          timeout,
+        })
       )
     );
     return;

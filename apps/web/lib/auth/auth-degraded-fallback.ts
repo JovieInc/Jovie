@@ -38,27 +38,6 @@ const DEGRADED_HTML = `<!DOCTYPE html>
         max-width: 30rem;
         text-align: center;
       }
-      .badge {
-        display: inline-flex;
-        align-items: center;
-        gap: 0.5rem;
-        border: 1px solid rgba(255,255,255,0.1);
-        background: rgba(255,255,255,0.04);
-        border-radius: 9999px;
-        padding: 0.375rem 0.75rem;
-        font-size: 0.75rem;
-        font-weight: 500;
-        letter-spacing: -0.012em;
-        color: rgba(255,255,255,0.7);
-        margin-bottom: 1.5rem;
-      }
-      .badge-dot {
-        width: 0.375rem;
-        height: 0.375rem;
-        border-radius: 50%;
-        background: rgba(255,255,255,0.55);
-        flex-shrink: 0;
-      }
       h1 {
         font-size: clamp(2.2rem, 5.5vw, 3.5rem);
         font-weight: 590;
@@ -74,13 +53,6 @@ const DEGRADED_HTML = `<!DOCTYPE html>
         color: rgba(255,255,255,0.6);
         max-width: 26rem;
         margin: 0 auto 0.5rem;
-      }
-      .footer-note {
-        margin-top: 1.5rem;
-        font-size: 0.75rem;
-        line-height: 1.6;
-        letter-spacing: -0.01em;
-        color: rgba(255,255,255,0.4);
       }
       .btn {
         display: inline-flex;
@@ -102,13 +74,8 @@ const DEGRADED_HTML = `<!DOCTYPE html>
   </head>
   <body>
     <div class="card">
-      <div class="badge">
-        <span class="badge-dot" aria-hidden="true"></span>
-        Auth unavailable
-      </div>
       <h1>Sign in is temporarily unavailable</h1>
-      <p>This is usually brief — please try again in a moment.</p>
-      <p class="footer-note">If it still does not work, give it a moment and try again.</p>
+      <p>This environment's sign-in setup is not ready.</p>
       <a href="/" class="btn">Go to Homepage</a>
     </div>
   </body>

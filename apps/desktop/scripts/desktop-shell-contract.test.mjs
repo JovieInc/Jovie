@@ -38,6 +38,8 @@ test('desktop window enters the authenticated chat shell instead of the web root
     mainSource,
     /app\.setName\(APP_ENV === 'staging' \? 'Jovie Staging' : 'Jovie'\);/
   );
+  assert.match(mainSource, /APP_ENV === 'local'/);
+  assert.match(mainSource, /Jovie-Local/);
   assert.match(mainSource, /win\.webContents\.setUserAgent\(/);
   assert.match(
     mainSource,
@@ -66,6 +68,10 @@ test('desktop window fails into a branded Jovie recovery surface', async () => {
   assert.doesNotMatch(mainSource, /onclick="window\.location\.href/);
   assert.match(mainSource, /did-fail-load/);
   assert.match(mainSource, /NAVIGATION_ABORTED_ERROR_CODE/);
+  assert.match(
+    mainSource,
+    /maybeShowDesktopAuthHandoff\(resolveNavigationUrl\(validatedURL\)\)/
+  );
   assert.match(mainSource, /showDesktopLoadFailure\(win\)/);
   assert.match(mainSource, /viewBox="0 0 353\.68 347\.97"/);
   assert.match(mainSource, /START_DESKTOP_AUTH_HANDOFF_CHANNEL/);
@@ -76,6 +82,11 @@ test('desktop window fails into a branded Jovie recovery surface', async () => {
   assert.match(mainSource, /mainWindowHiddenForAuthHandoff/);
   assert.match(mainSource, /win === mainWindow && isAuthHandoffOpen\(\)/);
   assert.match(mainSource, /hideMainWindowForAuthHandoff\(\);\s*if \(authHandoffWindow\) showWindow\(authHandoffWindow\);/);
+  assert.match(
+    mainSource,
+    /void win\.loadURL\(buildDesktopAuthHandoffUrl\(initialAuthUrl\)\);/
+  );
+  assert.doesNotMatch(mainSource, /win\.loadURL\('about:blank'\)/);
   assert.doesNotMatch(mainSource, /parent: mainWindow/);
   assert.doesNotMatch(mainSource, /M31 10A20 20 0 0 0 11 30H31V10Z/);
   assert.doesNotMatch(mainSource, /M11 31L30 31M14 36L31 36M18 41L32 41/);
@@ -107,6 +118,11 @@ test('desktop navigation uses explicit URL disposition allowlists', async () => 
   assert.match(
     mainSource,
     /const URL_DISPOSITION_OPTIONS = \{ appUrl: APP_URL, appEnv: APP_ENV \} as const;/
+  );
+  assert.match(mainSource, /function resolveNavigationUrl\(urlString: string\): string/);
+  assert.match(
+    mainSource,
+    /return new URL\(urlString, APP_URL\)\.toString\(\);/
   );
   assert.match(
     mainSource,
@@ -151,7 +167,8 @@ test('preload marks the hosted app as Electron after the document root is ready'
   );
 
   assert.match(preloadSource, /function installElectronRuntimeMarker\(\)/);
-  assert.match(preloadSource, /new URL\(APP_URL\)\.origin/);
+  assert.match(preloadSource, /installElectronRuntimeMarker\(\);/);
+  assert.match(preloadSource, /contextBridge\.exposeInMainWorld/);
   assert.match(preloadSource, /markElectronRuntime\(\)/);
   assert.match(preloadSource, /DOMContentLoaded/);
   assert.match(preloadSource, /dataset\.desktopRuntime = 'electron'/);

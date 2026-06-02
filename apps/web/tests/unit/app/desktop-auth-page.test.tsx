@@ -29,7 +29,7 @@ describe('DesktopAuthPage', () => {
       'auth_url=%2Fauth%2Fstart%3Fclient%3Delectron%26intent%3Dsign_in%26return_to%3D%252Fapp%252Fsettings%26code_challenge%3DabcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQ%26code_challenge_method%3DS256';
   });
 
-  it('auto-opens the browser auth URL and keeps retry/cancel actions available', async () => {
+  it('waits for an explicit continue click before opening browser auth', async () => {
     const { default: DesktopAuthPage } = await import(
       '../../../app/desktop-auth/page'
     );
@@ -41,23 +41,23 @@ describe('DesktopAuthPage', () => {
       window.location.origin
     ).toString();
 
+    expect(openDesktopAuthUrlMock).not.toHaveBeenCalled();
+    expect(screen.getAllByText('Continue in Browser')).toHaveLength(1);
+
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Continue in Browser' })
+    );
+
     await waitFor(() => {
       expect(openDesktopAuthUrlMock).toHaveBeenCalledTimes(1);
       expect(openDesktopAuthUrlMock).toHaveBeenCalledWith(expectedAuthUrl);
     });
+    expect(await screen.findByText('Check your browser.')).toBeInTheDocument();
     expect(
-      await screen.findByText('Continue sign-in in your browser.')
-    ).toBeInTheDocument();
+      screen.queryByText('Continue signing in with your browser')
+    ).not.toBeInTheDocument();
 
-    fireEvent.click(
-      screen.getByRole('button', { name: 'Continue in browser' })
-    );
-
-    await waitFor(() => {
-      expect(openDesktopAuthUrlMock).toHaveBeenCalledTimes(2);
-    });
-
-    fireEvent.click(screen.getByRole('button', { name: 'Cancel sign-in' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel Sign-In' }));
 
     expect(closeDesktopAuthWindowMock).toHaveBeenCalledTimes(1);
   });
@@ -74,8 +74,11 @@ describe('DesktopAuthPage', () => {
     render(<DesktopAuthPage />);
 
     const continueButton = screen.getByRole('button', {
-      name: 'Continue in browser',
+      name: 'Continue in Browser',
     });
+
+    expect(openDesktopAuthUrlMock).not.toHaveBeenCalled();
+    fireEvent.click(continueButton);
 
     await waitFor(() => {
       expect(openDesktopAuthUrlMock).toHaveBeenCalledTimes(1);
@@ -91,9 +94,46 @@ describe('DesktopAuthPage', () => {
     await waitFor(() => {
       expect(openDesktopAuthUrlMock).toHaveBeenCalledTimes(2);
     });
+    expect(await screen.findByText('Check your browser.')).toBeInTheDocument();
     expect(
-      await screen.findByText('Continue sign-in in your browser.')
-    ).toBeInTheDocument();
+      screen.queryByText('Continue signing in with your browser')
+    ).not.toBeInTheDocument();
+  });
+
+  it('recovers when browser launch rejects', async () => {
+    openDesktopAuthUrlMock.mockRejectedValueOnce(
+      new Error('browser open rejected')
+    );
+    const { default: DesktopAuthPage } = await import(
+      '../../../app/desktop-auth/page'
+    );
+
+    render(<DesktopAuthPage />);
+
+    const continueButton = screen.getByRole('button', {
+      name: 'Continue in Browser',
+    });
+
+    fireEvent.click(continueButton);
+
+    await waitFor(() => {
+      expect(openDesktopAuthUrlMock).toHaveBeenCalledTimes(1);
+      expect(continueButton).toBeEnabled();
+    });
+    expect(screen.getByRole('status')).toHaveTextContent(
+      /The browser did not open/i
+    );
+
+    openDesktopAuthUrlMock.mockResolvedValueOnce({ ok: true });
+    fireEvent.click(continueButton);
+
+    await waitFor(() => {
+      expect(openDesktopAuthUrlMock).toHaveBeenCalledTimes(2);
+    });
+    expect(await screen.findByText('Check your browser.')).toBeInTheDocument();
+    expect(
+      screen.queryByText('Continue signing in with your browser')
+    ).not.toBeInTheDocument();
   });
 
   it('disables continue only while a browser launch is pending', async () => {
@@ -110,8 +150,10 @@ describe('DesktopAuthPage', () => {
     render(<DesktopAuthPage />);
 
     const continueButton = screen.getByRole('button', {
-      name: 'Continue in browser',
+      name: 'Continue in Browser',
     });
+
+    fireEvent.click(continueButton);
 
     await waitFor(() => {
       expect(continueButton).toBeDisabled();
@@ -129,5 +171,85 @@ describe('DesktopAuthPage', () => {
     expect(screen.getByRole('status')).toHaveTextContent(
       /The browser did not open/i
     );
+  });
+});
+
+describe('DesktopAuthRouteHandoff', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    window.history.pushState(
+      {},
+      '',
+      '/signin?redirect_url=%2Fapp%2Fchat%3Fruntime%3Delectron'
+    );
+  });
+
+  it('renders a single continue button for Electron auth routes', async () => {
+    const { DesktopAuthRouteHandoff } = await import(
+      '../../../app/(auth)/DesktopAuthRouteHandoff'
+    );
+
+    render(<DesktopAuthRouteHandoff />);
+
+    expect(
+      screen.getByTestId('desktop-auth-route-handoff')
+    ).toBeInTheDocument();
+    expect(openDesktopAuthUrlMock).not.toHaveBeenCalled();
+    expect(screen.getAllByText('Continue in Browser')).toHaveLength(1);
+
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Continue in Browser' })
+    );
+
+    await waitFor(() => {
+      expect(openDesktopAuthUrlMock).toHaveBeenCalledTimes(1);
+      expect(openDesktopAuthUrlMock).toHaveBeenCalledWith(window.location.href);
+    });
+    expect(await screen.findByText('Check your browser.')).toBeInTheDocument();
+    expect(
+      screen.queryByText('Continue signing in with your browser')
+    ).not.toBeInTheDocument();
+  });
+
+  it('recovers when route handoff browser launch rejects', async () => {
+    openDesktopAuthUrlMock.mockRejectedValueOnce(
+      new Error('browser open rejected')
+    );
+    const { DesktopAuthRouteHandoff } = await import(
+      '../../../app/(auth)/DesktopAuthRouteHandoff'
+    );
+
+    render(<DesktopAuthRouteHandoff />);
+
+    const continueButton = screen.getByRole('button', {
+      name: 'Continue in Browser',
+    });
+
+    fireEvent.click(continueButton);
+
+    await waitFor(() => {
+      expect(openDesktopAuthUrlMock).toHaveBeenCalledTimes(1);
+      expect(continueButton).toBeEnabled();
+    });
+    expect(screen.getByRole('status')).toHaveTextContent(
+      /The browser did not open/i
+    );
+  });
+
+  it('detects Electron runtime hints before rendering Clerk auth UI', async () => {
+    const { useShouldRenderDesktopAuthHandoff } = await import(
+      '../../../app/(auth)/DesktopAuthRouteHandoff'
+    );
+
+    function Probe() {
+      const shouldRender = useShouldRenderDesktopAuthHandoff(
+        new URLSearchParams('redirect_url=%2Fapp%2Fchat%3Fruntime%3Delectron')
+      );
+      return <span>{String(shouldRender)}</span>;
+    }
+
+    render(<Probe />);
+
+    expect(screen.getByText('true')).toBeInTheDocument();
   });
 });

@@ -5,10 +5,19 @@ const require = createRequire(import.meta.url);
 const nextBin = require.resolve('next/dist/bin/next');
 const port = process.env.PORT || '3100';
 const heapFlag = '--max-old-space-size=8192';
+const networkFamilyFlag = '--no-network-family-autoselection';
 const existingNodeOptions = process.env.NODE_OPTIONS || '';
-const nodeOptions = existingNodeOptions.includes('--max-old-space-size=')
-  ? existingNodeOptions
-  : [heapFlag, existingNodeOptions].filter(Boolean).join(' ');
+const nodeOptionParts = [existingNodeOptions];
+
+if (!existingNodeOptions.includes('--max-old-space-size=')) {
+  nodeOptionParts.unshift(heapFlag);
+}
+
+if (!existingNodeOptions.includes(networkFamilyFlag)) {
+  nodeOptionParts.push(networkFamilyFlag);
+}
+
+const nodeOptions = nodeOptionParts.filter(Boolean).join(' ');
 
 const nextDev = spawn(process.execPath, [nextBin, 'dev', '-p', port], {
   env: {

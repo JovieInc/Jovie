@@ -7,6 +7,55 @@ import { consumeDesktopAuthCompletion } from '@/lib/desktop/electron-bridge';
 import { completeDesktopNativeAuth } from '@/lib/desktop/native-complete';
 
 type CompletionState = 'loading' | 'error';
+type ClerkBrowserGlobal = {
+  readonly Clerk?: {
+    readonly load?: () => Promise<void> | void;
+  };
+};
+
+let completionKey: string | null = null;
+let completionPromise: ReturnType<typeof completeDesktopNativeAuth> | null =
+  null;
+
+function getCompletionPromise(
+  key: string,
+  input: Parameters<typeof completeDesktopNativeAuth>[0]
+) {
+  if (completionKey !== key) {
+    completionKey = key;
+    completionPromise = null;
+  }
+
+  completionPromise ??= completeDesktopNativeAuth(input);
+  return completionPromise;
+}
+
+async function reloadBrowserClerk() {
+  await (globalThis as ClerkBrowserGlobal).Clerk?.load?.();
+}
+
+function getStoredDesktopAuthReturnTo(): string {
+  try {
+    const returnTo = globalThis.localStorage.getItem(
+      'jovie.desktopAuth.returnTo'
+    );
+    if (returnTo?.startsWith('/') && !returnTo.startsWith('//')) {
+      return returnTo;
+    }
+  } catch {
+    // Missing storage should fall back to the app shell.
+  }
+
+  return '/app/chat?runtime=electron';
+}
+
+function isRecoverableCompletionReplayError(error: unknown): boolean {
+  return (
+    error instanceof Error &&
+    (error.message === 'missing-auth-completion' ||
+      error.message === 'missing-completion')
+  );
+}
 
 function NativeCompleteContent() {
   const router = useRouter();
@@ -31,17 +80,36 @@ function NativeCompleteContent() {
 
     async function completeAuth() {
       try {
-        const result = await completeDesktopNativeAuth({
+        const result = await getCompletionPromise(globalThis.location.href, {
           consumeCompletion: consumeDesktopAuthCompletion,
           signIn,
           setActive: params => clerk.setActive(params),
+          reloadClerk: reloadBrowserClerk,
+          getActiveSessionId: () => clerk.session?.id ?? null,
+          getActiveUserId: () => clerk.user?.id ?? null,
         });
 
         if (isActive) {
           router.replace(result.returnTo);
+          globalThis.setTimeout(() => {
+            if (globalThis.location.pathname === '/auth/native-complete') {
+              globalThis.location.assign(result.returnTo);
+            }
+          }, 500);
         }
-      } catch {
+      } catch (error) {
         if (isActive) {
+          if (clerk.session && isRecoverableCompletionReplayError(error)) {
+            const returnTo = getStoredDesktopAuthReturnTo();
+            router.replace(returnTo);
+            globalThis.setTimeout(() => {
+              if (globalThis.location.pathname === '/auth/native-complete') {
+                globalThis.location.assign(returnTo);
+              }
+            }, 500);
+            return;
+          }
+
           setState('error');
         }
       }

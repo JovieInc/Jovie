@@ -32,6 +32,7 @@ interface NativeExchangeRequest {
 type NativeExchangePayload =
   | {
       ticket: string;
+      userId: string;
       expiresInSeconds: number;
     }
   | {
@@ -220,6 +221,7 @@ async function createDesktopNativeExchangePayload(
 
   return {
     ticket: signInToken.token,
+    userId,
     expiresInSeconds: SIGN_IN_TOKEN_TTL_SECONDS,
   };
 }
@@ -261,6 +263,7 @@ async function createIosNativeExchangePayload(
 
       return {
         ticket: signInToken.token,
+        userId,
         expiresInSeconds: SIGN_IN_TOKEN_TTL_SECONDS,
       };
     }

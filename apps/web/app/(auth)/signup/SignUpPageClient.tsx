@@ -27,6 +27,10 @@ import {
   buildMobileAuthReturnPath,
   sanitizeMobileReturnRoute,
 } from '@/lib/mobile/auth-return';
+import {
+  DesktopAuthRouteHandoff,
+  useShouldRenderDesktopAuthHandoff,
+} from '../DesktopAuthRouteHandoff';
 
 /**
  * Persist pre-signup claim data from the homepage hero into sessionStorage,
@@ -257,6 +261,12 @@ export function SignUpPageClient() {
     searchParams,
     authReturnRoutes
   );
+  const shouldRenderDesktopHandoff =
+    useShouldRenderDesktopAuthHandoff(searchParams);
+
+  if (shouldRenderDesktopHandoff) {
+    return <DesktopAuthRouteHandoff />;
+  }
 
   return (
     <AuthLayout

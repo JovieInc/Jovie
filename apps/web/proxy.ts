@@ -79,6 +79,43 @@ function isWaitlistInviteRedirect(redirectUrl: string | null): boolean {
   );
 }
 
+function hasClerkSessionCookie(req: NextRequest): boolean {
+  return req.cookies
+    .getAll()
+    .some(
+      cookie =>
+        cookie.name.startsWith('__session') ||
+        cookie.name.startsWith('__client') ||
+        cookie.name.startsWith('__clerk')
+    );
+}
+
+function isElectronAppShellNavigation(
+  req: NextRequest,
+  isNavigationMethod: boolean
+): boolean {
+  return (
+    isNavigationMethod &&
+    (req.nextUrl.pathname === APP_ROUTES.DASHBOARD ||
+      req.nextUrl.pathname.startsWith('/app/')) &&
+    req.nextUrl.searchParams.get('runtime') === 'electron'
+  );
+}
+
+function redirectSignedOutElectronAppShell(req: NextRequest): NextResponse {
+  const targetUrl = new URL(
+    buildProtectedAuthRedirectUrl(
+      APP_ROUTES.SIGNIN,
+      req.nextUrl.pathname,
+      req.nextUrl.search
+    ),
+    req.url
+  );
+  const response = NextResponse.redirect(targetUrl);
+  response.headers.set('Location', targetUrl.toString());
+  return response;
+}
+
 /** Max consecutive state-based rewrites before the circuit breaker fires. */
 const PROXY_REWRITE_CIRCUIT_BREAKER_THRESHOLD = 3;
 const PROXY_REWRITE_COUNT_COOKIE = 'jovie_redirect_count';
@@ -348,7 +385,10 @@ async function handleRequest(req: NextRequest, userId: string | null) {
 
     // Auth callback routes must pass through untouched so Clerk can
     // complete the handshake and exchange tokens successfully.
-    if (pathInfo.isAuthCallbackPath) {
+    // Native auth start must also reach its route handler for authenticated
+    // users so it can issue the central callback instead of being redirected
+    // by waitlist/onboarding middleware state.
+    if (pathInfo.isAuthCallbackPath || pathname === '/auth/start') {
       return buildFinalResponse(
         req,
         NextResponse.next({ request: { headers: requestHeaders } }),
@@ -677,6 +717,14 @@ export default async function middleware(
 
   const pathInfo = categorizePath(pathname);
   const isNavigationMethod = req.method === 'GET' || req.method === 'HEAD';
+
+  if (
+    isElectronAppShellNavigation(req, isNavigationMethod) &&
+    !hasClerkSessionCookie(req)
+  ) {
+    return redirectSignedOutElectronAppShell(req);
+  }
+
   const canProceedWithoutClerk =
     pathInfo.isAuthPath ||
     (!pathInfo.isProtectedPath && !isClerkRequiredPath(pathname, pathInfo)) ||

@@ -458,6 +458,22 @@ describe('proxy.ts middleware', () => {
       expect(isRedirectTo(res, '/signin')).toBe(true);
     });
 
+    it('redirects signed-out Electron app shell requests with an absolute signin location before Clerk dev-browser handling', async () => {
+      const req = createUnauthenticatedRequest({
+        hostname: 'localhost:3112',
+        pathname: '/app/chat',
+        searchParams: { runtime: 'electron' },
+      });
+      const res = await callMiddleware(req);
+
+      expect(res.status).toBeGreaterThanOrEqual(300);
+      expect(res.status).toBeLessThan(400);
+      expect(res.headers.get('location')).toBe(
+        'https://localhost:3112/signin?redirect_url=%2Fapp%2Fchat%3Fruntime%3Delectron'
+      );
+      expect(mocks.clerkMiddleware).not.toHaveBeenCalled();
+    });
+
     it('redirects unauthenticated GET /app/dashboard to /signin', async () => {
       const req = createUnauthenticatedRequest({
         pathname: '/app/dashboard',
@@ -796,6 +812,23 @@ describe('proxy.ts middleware', () => {
   });
 
   describe('auth redirects for authenticated users', () => {
+    it.each([
+      '/auth/start',
+      '/auth/callback',
+      '/app/auth/callback',
+    ])('lets authenticated central auth route %s reach its handler without user-state redirects', async pathname => {
+      mocks.getUserState.mockResolvedValue(USER_STATES.needsWaitlist);
+
+      const req = createAuthenticatedRequest('clerk_user_1', {
+        pathname,
+        searchParams: { state: 'state_123' },
+      });
+      const res = await callMiddleware(req);
+
+      expect(res.status).toBeLessThan(300);
+      expect(mocks.getUserState).not.toHaveBeenCalled();
+    });
+
     it('redirects authenticated user on /signin to /app', async () => {
       mocks.getUserState.mockResolvedValue(USER_STATES.active);
 

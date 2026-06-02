@@ -20,6 +20,8 @@ export interface RateLimitResult {
   reset: Date;
   /** Optional reason for rate limit failure */
   reason?: string;
+  /** Whether the backing limiter is unavailable rather than exhausted */
+  unavailable?: boolean;
 }
 
 /**

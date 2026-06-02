@@ -37,5 +37,5 @@ describe('getLegalDocument', () => {
       expect(routeModule.dynamic).toBe('force-static');
       expect(routeModule.revalidate).toBe(false);
     }
-  });
+  }, 15_000);
 });

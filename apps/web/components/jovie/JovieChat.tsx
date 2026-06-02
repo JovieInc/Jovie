@@ -3,7 +3,14 @@
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { ImagePlus } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import { useOptionalChatEntityPanel } from '@/app/app/(shell)/chat/ChatEntityPanelContext';
 import { useAppFlag } from '@/lib/flags/client';
 import { SUPPORTED_IMAGE_MIME_TYPES } from '@/lib/images/config';
@@ -347,15 +354,12 @@ export function JovieChat({
     ? `calc(${virtualizedMessageViewportBaseHeight}px + ${messageViewportPaddingBottom})`
     : virtualizedMessageViewportBaseHeight;
 
-  useEffect(() => {
-    if (!shouldReservePickerClearance || !isStuckToBottom) return;
-    const frame = requestAnimationFrame(() => {
-      const scrollContainer = scrollContainerRef.current;
-      if (!scrollContainer) return;
-      scrollContainer.scrollTop = scrollContainer.scrollHeight;
-    });
-    return () => cancelAnimationFrame(frame);
-  }, [isStuckToBottom, scrollContainerRef, shouldReservePickerClearance]);
+  useLayoutEffect(() => {
+    if (!shouldReservePickerClearance) return;
+    const scrollContainer = scrollContainerRef.current;
+    if (!scrollContainer) return;
+    scrollContainer.scrollTop = scrollContainer.scrollHeight;
+  }, [scrollContainerRef, shouldReservePickerClearance]);
 
   // Show skeleton while fetching existing conversation
   if (isLoadingConversation) {

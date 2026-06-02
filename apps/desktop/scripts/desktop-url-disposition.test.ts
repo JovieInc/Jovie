@@ -40,8 +40,8 @@ test('desktop disposition keeps authenticated app and auth callback routes in-ap
   ]);
 });
 
-test('desktop disposition does not load auth start routes directly in-app', () => {
-  assertDisposition(productionPolicy, 'blocked', [
+test('desktop disposition opens auth routes externally instead of in-app', () => {
+  assertDisposition(productionPolicy, 'external', [
     'https://jov.ie/signin',
     'https://jov.ie/auth/start?client=electron&intent=sign_in&return_to=%2Fapp',
     'https://jov.ie/signup?desktop_return=%2Fapp',
@@ -113,6 +113,7 @@ test('desktop disposition allows Clerk auth provider origins externally (https w
   // Unsafe variants (wrong protocol, evil host, path tricks) remain blocked
   assertDisposition(productionPolicy, 'blocked', [
     'http://foo.clerk.accounts.dev/sign-in',
+    'https://foo.clerk.accounts.dev:8443/sign-in',
     'https://evil.com.clerk.accounts.dev/sign-in',
     'https://evilclerk.accounts.dev/sign-in',
     'https://clerk.accounts.dev.evil.com/sign-in',

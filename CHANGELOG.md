@@ -5,6 +5,20 @@
      5|The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
      6|and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.6.1] - 2026-06-01
+
+> Native auth now starts in the system browser while desktop and iOS keep only the app handoff surface.
+
+### Changed
+
+- **Native auth handoff**: replaces in-app desktop and iOS auth forms with a centered `Continue in Browser` handoff before opening the browser-owned Clerk flow.
+- **Desktop auth routing**: allows `/auth/start` to leave the Electron shell, keeps Clerk UI out of desktop auth routes, and tightens Clerk host matching for auth provider navigation.
+
+### Fixed
+
+- **Electron auth bridge**: installs the runtime marker and bridge before auth handoff actions so the desktop shell can open the browser reliably.
+- **Segmented input cleanup**: clears the deferred blur timer after teardown so jsdom test runs do not report late `document` access.
+
 ## [26.6.0] - 2026-06-01
 
 > Jovie now has an onboarding robot that validates the shipped QA path instead of relying on manual incognito-window checks.
