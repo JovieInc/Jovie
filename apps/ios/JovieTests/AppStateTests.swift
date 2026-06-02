@@ -218,7 +218,7 @@ struct AppStateTests {
 
   @Test func profileLoadFailureShowsRecoveryStateAndRetryRestoresDashboard() async throws {
     let repository = MockRepository(
-      nextResult: .failure(APIClientError.transportFailed(code: URLError.notConnectedToInternet.rawValue))
+      nextResult: .failure(APIClientError.requestFailed(statusCode: 500))
     )
     let appState = AppState(
       configuration: configuration,
@@ -234,6 +234,39 @@ struct AppStateTests {
     #expect(appState.route == .ready)
     #expect(appState.dashboardState == .error("Couldn't load your profile."))
     #expect(appState.isOffline == false)
+
+    await repository.updateResult(
+      .success(
+        MeRepositoryResult(response: .previewReady, isStale: false)
+      )
+    )
+    await appState.retry()
+
+    #expect(appState.activeUserID == "user_123")
+    #expect(appState.route == .ready)
+    #expect(appState.dashboardState == .loaded(.previewReady))
+    #expect(appState.isOffline == false)
+    #expect(await repository.loadCount() == 2)
+  }
+
+  @Test func coldOfflineProfileLoadShowsOfflineStateAndRetryClearsIt() async throws {
+    let repository = MockRepository(
+      nextResult: .failure(APIClientError.transportFailed(code: URLError.notConnectedToInternet.rawValue))
+    )
+    let appState = AppState(
+      configuration: configuration,
+      launchMode: .live,
+      repository: repository,
+      brightnessManager: MockBrightnessController()
+    )
+    appState.didLoadClerk = true
+
+    await appState.handleSignedInUserChange("user_123")
+
+    #expect(appState.activeUserID == "user_123")
+    #expect(appState.route == .ready)
+    #expect(appState.dashboardState == .error("Couldn't load your profile."))
+    #expect(appState.isOffline == true)
 
     await repository.updateResult(
       .success(
