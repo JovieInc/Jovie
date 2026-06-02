@@ -84,6 +84,21 @@ Native iOS foundation for Jovie. The app is dark-only, simulator-tested, and wir
    `JOVIE_IOS_LAUNCH_TIMEOUT_SECONDS` only when recording an explicit readiness
    timeout.
 
+8. Capture memory/leak baseline evidence:
+
+   ```bash
+   pnpm run ios:memory
+   ```
+
+   This builds the debug simulator app, launches the deterministic profile shell,
+   attempts to capture a `.memgraph` with Apple's `leaks` tool, and writes
+   metadata plus a markdown summary under
+   `artifacts/ios-test-results/memory-baseline`. The default run records a
+   `sample` footprint even when local Developer Tools settings block memgraph
+   capture. Set `JOVIE_IOS_MEMORY_REQUIRE_MEMGRAPH=1` for strict leak-gate runs,
+   and override `JOVIE_IOS_MEMORY_LAUNCH_ARGUMENTS` only when recording a
+   specific UI-test flow such as `-ui-testing-chat`.
+
 ## Release
 
 Fastlane lives at the repo root.
