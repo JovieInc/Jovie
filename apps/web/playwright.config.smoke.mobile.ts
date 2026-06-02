@@ -29,15 +29,31 @@ if (!managedWebServerUrl.port) {
 }
 const managedWebServerPort = managedWebServerUrl.port;
 const useTestAuthBypass = process.env.E2E_USE_TEST_AUTH_BYPASS === '1';
+const isCI = !!process.env.CI;
+const usesManagedLocalWebServer = !process.env.BASE_URL;
+const shouldThrottleManagedTestAuthRun =
+  isCI && usesManagedLocalWebServer && useTestAuthBypass;
+
+function getWorkers(defaultWorkers: number): number {
+  const explicitWorkers = process.env.PLAYWRIGHT_WORKERS;
+  if (explicitWorkers) {
+    const parsedWorkers = Number.parseInt(explicitWorkers, 10);
+    if (Number.isFinite(parsedWorkers) && parsedWorkers > 0) {
+      return parsedWorkers;
+    }
+  }
+
+  return shouldThrottleManagedTestAuthRun ? 1 : defaultWorkers;
+}
 
 export default defineConfig({
   testDir: './tests/e2e',
   // Source of truth: tests/e2e/smoke-manifest.ts → MOBILE_SMOKE_SPECS.
   testMatch: [...MOBILE_SMOKE_SPECS],
-  fullyParallel: true,
+  fullyParallel: !shouldThrottleManagedTestAuthRun,
   forbidOnly: true,
   retries: 2,
-  workers: 4,
+  workers: getWorkers(4),
   reporter: [
     ['line'],
     ['html', { open: 'never' }],
