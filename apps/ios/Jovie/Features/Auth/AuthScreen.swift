@@ -33,6 +33,7 @@ struct AuthScreen: View {
 
           BrowserAuthActions(
             isOpening: didRequestBrowserAuth,
+            isDisabled: isMock,
             errorMessage: errorMessage,
             action: startBrowserAuth
           )
@@ -383,12 +384,13 @@ private extension Data {
 
 private struct BrowserAuthActions: View {
   let isOpening: Bool
+  let isDisabled: Bool
   let errorMessage: String?
   let action: () -> Void
 
   var body: some View {
     VStack(spacing: JovieSpacing.large) {
-      ContinueInBrowserButton(isOpening: isOpening, action: action)
+      ContinueInBrowserButton(isOpening: isOpening, isDisabled: isDisabled, action: action)
 
       AuthErrorText(message: errorMessage)
     }
@@ -398,33 +400,43 @@ private struct BrowserAuthActions: View {
 
 private struct ContinueInBrowserButton: View {
   let isOpening: Bool
+  let isDisabled: Bool
   let action: () -> Void
 
   var body: some View {
     Button(action: action) {
       HStack(spacing: JovieSpacing.small) {
-        if isOpening {
+        if isOpening, !isDisabled {
           ProgressView()
             .controlSize(.small)
             .tint(JovieColor.backgroundBase)
         }
 
-        Text(isOpening ? "Opening Browser..." : "Continue in Browser")
+        Text(buttonTitle)
           .lineLimit(1)
           .minimumScaleFactor(0.82)
       }
       .font(JovieFont.body(size: 16, weight: .semibold))
-      .foregroundStyle(JovieColor.backgroundBase)
+      .foregroundStyle(isDisabled ? JovieColor.textSecondary : JovieColor.backgroundBase)
       .frame(maxWidth: .infinity)
       .frame(height: 56)
       .contentShape(Rectangle())
     }
+    .disabled(isDisabled)
     .buttonStyle(.plain)
     .background(
       Capsule(style: .continuous)
-        .fill(Color.white)
+        .fill(isDisabled ? JovieColor.surface2 : Color.white)
     )
     .accessibilityIdentifier("auth-continue-browser-button")
+  }
+
+  private var buttonTitle: String {
+    if isDisabled {
+      return "Sign-in Unavailable"
+    }
+
+    return isOpening ? "Opening Browser..." : "Continue in Browser"
   }
 }
 
