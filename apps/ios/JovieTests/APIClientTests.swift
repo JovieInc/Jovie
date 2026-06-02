@@ -196,20 +196,15 @@ struct ClerkLiveAuthIntegrationTests {
   }
 
   private func liveAuthConfig() throws -> LiveAuthConfig? {
-    let environment = ProcessInfo.processInfo.environment
-    guard environment["JOVIE_IOS_LIVE_AUTH"] == "1" else {
+    guard Self.forwardedEnvironmentValue("JOVIE_IOS_LIVE_AUTH") == "1" else {
       return nil
     }
 
     let publishableKey =
-      environment["CLERK_PUBLISHABLE_KEY"] ??
-      environment["NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY"] ??
-      ""
-    let emailAddress = environment["E2E_CLERK_USER_USERNAME"] ?? ""
-    let apiBaseURLString =
-      environment["JOVIE_IOS_API_BASE_URL"] ??
-      environment["API_BASE_URL"] ??
-      "http://localhost:3100"
+      Self.forwardedEnvironmentValue("CLERK_PUBLISHABLE_KEY", "NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY")
+    let emailAddress = Self.forwardedEnvironmentValue("E2E_CLERK_USER_USERNAME")
+    let configuredAPIBaseURL = Self.forwardedEnvironmentValue("JOVIE_IOS_API_BASE_URL", "API_BASE_URL")
+    let apiBaseURLString = configuredAPIBaseURL.isEmpty ? "http://localhost:3100" : configuredAPIBaseURL
 
     guard !publishableKey.isEmpty else {
       throw LiveAuthConfigurationError.missingPublishableKey
@@ -228,6 +223,22 @@ struct ClerkLiveAuthIntegrationTests {
       apiBaseURL: apiBaseURL,
       emailAddress: emailAddress
     )
+  }
+
+  private static func forwardedEnvironmentValue(_ keys: String...) -> String {
+    let environment = ProcessInfo.processInfo.environment
+
+    for key in keys {
+      if let value = environment[key], !value.isEmpty {
+        return value
+      }
+
+      if let value = environment["TEST_RUNNER_\(key)"], !value.isEmpty {
+        return value
+      }
+    }
+
+    return ""
   }
 
   private func configureClerk(with config: LiveAuthConfig) async throws {

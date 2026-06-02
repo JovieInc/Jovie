@@ -252,13 +252,17 @@ enum NativeTicketSignInDiagnostics {
 }
 #endif
 
-func makeJovieClerkOptions(redirectUrl: String, callbackUrlScheme: String) -> Clerk.Options {
+func makeJovieClerkOptions(
+  redirectUrl: String,
+  callbackUrlScheme: String,
+  keychainService: String = "ie.jov.Jovie"
+) -> Clerk.Options {
   let responseMiddleware: [any ClerkResponseMiddleware] = [
     NativeTicketSignInResponseMiddleware(),
   ]
 
   return Clerk.Options(
-    keychainConfig: .init(service: "ie.jov.Jovie"),
+    keychainConfig: .init(service: keychainService),
     // Uses env-driven values from AppConfiguration (gh-9806/JOV-2652).
     // These MUST be registered as allowed redirect URLs in the Clerk dashboard
     // for the matching publishable key (native/iOS app section). Explicit config
@@ -311,9 +315,14 @@ struct JovieApp: App {
         publishableKey: configuration.clerkPublishableKey,
         options: makeJovieClerkOptions(
           redirectUrl: configuration.clerkRedirectUrl,
-          callbackUrlScheme: configuration.clerkCallbackUrlScheme
+          callbackUrlScheme: configuration.clerkCallbackUrlScheme,
+          keychainService: launchMode.clerkKeychainService
         )
       )
+
+      if launchMode.clearsStoredClerkSession {
+        Clerk.clearAllKeychainItems()
+      }
     }
 
     let repository = MeRepository(
