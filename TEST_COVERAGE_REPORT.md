@@ -17,13 +17,18 @@ Tracking issue: [JOV-2712](https://linear.app/jovie/issue/JOV-2712/track-platfor
 | `pnpm run ios:runtime-performance` | Passed locally on `codex/ios-frame-hitch-evidence` after `c9be9b797a`. Ran opt-in `testShellNavigationRuntimePerformance()` for the deterministic Chat to Profile to Chat bottom-navigation transition with clock, CPU, memory, and iOS 26+ hitch metric requests; the xcodebuild log emitted no measured hitch or frame metric lines. | Passed |
 | `pnpm run ios:memory` | Passed locally after `318557208f`. Captured a `sample` footprint for the `-ui-testing-ready` shell and recorded the local `leaks --outputGraph` blocker in the run summary. Strict mode `JOVIE_IOS_MEMORY_REQUIRE_MEMGRAPH=1` exits nonzero when memgraph capture is blocked. | Evidence captured; memgraph blocked locally |
 | PR #9907 iOS CI `Build And Test` | Passed before merge of `9e9200348e`. | Passed |
+| PR #9918/#9920 focused crash hardening | XcodeBuildMCP `test_sim -only-testing:JovieTests/MobileAuthFinalizationTests` passed with 7 tests; focused XCUITests for signed-out launch, settings logout, auth callback success, and provider-error paths passed 4/4. | Passed |
+| PR #9920 iOS CI `Build And Test` | Pull-request iOS CI run `26840623483` passed in 22m47s. | Passed |
+| Main iOS CI `Build And Test` | Push iOS CI run `26841366664` passed for merge commit `8e333b2e970e4d9d8d42c658e8c0c4e73d9e70c8`. | Passed |
+| Main iOS TestFlight upload | Push TestFlight run `26841365624` uploaded, processed, and distributed internal build `1.0 (42)` to testers. | Passed |
+| Local TestFlight launch smoke | Local TestFlight updated Jovie for iOS to build `42`; launching the updated app left the `Jovie` process running and no `Jovie*.ips` diagnostic report was created after launch. | Passed |
 
 ## Platform Coverage Matrix
 
 | Platform | Required coverage | Current status |
 | --- | --- | --- |
 | Web | Playwright, unit tests, integration tests. | Evidence required under JOV-2712 |
-| iOS | XCTest and XCUITest. | Current auth callback, real-browser auth, screenshot smoke, chat draft stability, profile API retry, stale-cache offline, and cold-offline retry evidence recorded |
+| iOS | XCTest and XCUITest. | Current auth callback, real-browser auth, screenshot smoke, chat draft stability, profile API retry, stale-cache offline, cold-offline retry, TestFlight no-crash launch, and TestFlight upload evidence recorded |
 | Electron | End-to-end tests, auth flow tests, deep link tests. | Evidence required under JOV-2712 |
 | Chrome Extension | Popup tests, background script tests, authentication tests, messaging tests. | Evidence required under JOV-2712 |
 

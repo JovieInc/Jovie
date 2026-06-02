@@ -19,6 +19,8 @@ staging, or production as appropriate.
 | iOS profile API retry | XcodeBuildMCP `test_sim -only-testing:JovieTests/AppStateTests` passed on `codex/ios-profile-retry-hardening` with 19 `AppStateTests`, including the profile API server failure and retry recovery case. | Verified locally |
 | iOS stale profile cache recovery | XcodeBuildMCP `test_sim -only-testing:JovieTests/AppStateTests` passed on `codex/ios-offline-stale-cache` with 20 `AppStateTests`, including stale profile offline state and retry-clear coverage. | Verified locally |
 | iOS cold offline profile recovery | XcodeBuildMCP `test_sim -only-testing:JovieTests/AppStateTests` passed on `codex/ios-cold-offline-recovery` with 21 `AppStateTests`, including cold transport-failure offline state and retry-clear coverage. | Verified locally |
+| iOS TestFlight launch crash hardening | PR [#9918](https://github.com/JovieInc/Jovie/pull/9918) merged as `9e2030c0ee`; PR [#9920](https://github.com/JovieInc/Jovie/pull/9920) merged as `8e333b2e97`; main `iOS CI` run `26841366664` passed; main `iOS TestFlight` run `26841365624` uploaded, processed, and distributed internal build `1.0 (42)`; local TestFlight build 42 launched and stayed running with no fresh `Jovie*.ips` crash report after launch. | Verified locally and in TestFlight |
+| iOS TestFlight Clerk production key | Build `1.0 (42)` still embeds a `pk_test` Clerk publishable key, so the fail-closed screen is shown instead of live sign-in. Credential/config remediation is tracked by [JOV-2713](https://linear.app/jovie/issue/JOV-2713/provision-production-clerk-key-for-ios-testflight-sign-in). | Open |
 
 ## Deliverables
 
