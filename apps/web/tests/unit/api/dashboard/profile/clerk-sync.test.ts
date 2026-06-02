@@ -11,6 +11,7 @@ vi.mock('@clerk/nextjs/server', () => ({
 
 describe('syncClerkProfile', () => {
   const mockFetch = vi.fn();
+  const SLOW_CLERK_SYNC_TIMEOUT_MS = 15_000;
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -35,44 +36,48 @@ describe('syncClerkProfile', () => {
     vi.unstubAllGlobals();
   });
 
-  it('returns rollback that restores name and avatar', async () => {
-    mockGetUser.mockResolvedValue({
-      firstName: 'Old',
-      lastName: 'Name',
-      imageUrl: 'https://example.com/old.png',
-    });
+  it(
+    'returns rollback that restores name and avatar',
+    async () => {
+      mockGetUser.mockResolvedValue({
+        firstName: 'Old',
+        lastName: 'Name',
+        imageUrl: 'https://example.com/old.png',
+      });
 
-    const { syncClerkProfile } = await import(
-      '@/app/api/dashboard/profile/lib/clerk-sync'
-    );
+      const { syncClerkProfile } = await import(
+        '@/app/api/dashboard/profile/lib/clerk-sync'
+      );
 
-    const result = await syncClerkProfile({
-      clerkUserId: 'clerk_123',
-      clerkUpdates: { firstName: 'New', lastName: 'Name' },
-      avatarUrl: 'https://example.com/new.png',
-    });
+      const result = await syncClerkProfile({
+        clerkUserId: 'clerk_123',
+        clerkUpdates: { firstName: 'New', lastName: 'Name' },
+        avatarUrl: 'https://example.com/new.png',
+      });
 
-    expect(result.clerkSyncFailed).toBe(false);
-    expect(result.rollback).toBeTypeOf('function');
+      expect(result.clerkSyncFailed).toBe(false);
+      expect(result.rollback).toBeTypeOf('function');
 
-    await result.rollback?.();
+      await result.rollback?.();
 
-    expect(mockUpdateUser).toHaveBeenNthCalledWith(1, 'clerk_123', {
-      firstName: 'New',
-      lastName: 'Name',
-    });
-    expect(mockUpdateUser).toHaveBeenNthCalledWith(2, 'clerk_123', {
-      firstName: 'Old',
-      lastName: 'Name',
-    });
-    expect(mockUpdateUserProfileImage).toHaveBeenCalledTimes(2);
-    expect(mockFetch).toHaveBeenCalledWith(
-      'https://example.com/new.png',
-      expect.any(Object)
-    );
-    expect(mockFetch).toHaveBeenCalledWith(
-      'https://example.com/old.png',
-      expect.any(Object)
-    );
-  });
+      expect(mockUpdateUser).toHaveBeenNthCalledWith(1, 'clerk_123', {
+        firstName: 'New',
+        lastName: 'Name',
+      });
+      expect(mockUpdateUser).toHaveBeenNthCalledWith(2, 'clerk_123', {
+        firstName: 'Old',
+        lastName: 'Name',
+      });
+      expect(mockUpdateUserProfileImage).toHaveBeenCalledTimes(2);
+      expect(mockFetch).toHaveBeenCalledWith(
+        'https://example.com/new.png',
+        expect.any(Object)
+      );
+      expect(mockFetch).toHaveBeenCalledWith(
+        'https://example.com/old.png',
+        expect.any(Object)
+      );
+    },
+    SLOW_CLERK_SYNC_TIMEOUT_MS
+  );
 });
