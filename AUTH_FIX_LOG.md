@@ -487,3 +487,53 @@ Final passing evidence:
 - Root Biome check passed: 6069 files checked, no fixes applied.
 - No production Clerk settings changed.
 - No Clerk dashboard changes made for this auth-smoke stabilization.
+
+## Post-Merge Required Smoke and Mobile Guard Closeout - 2026-06-02
+
+Failing CI evidence inspected:
+
+- Merged PR #9891 run `26806980813` completed with non-auth follow-up failures after the auth PR had already landed.
+- `Extended Smoke (Preview)` failed in job `79030927295`, step `Run Required Smoke Tests`.
+- The failing test was `tests/e2e/onboarding-robot.smoke.spec.ts`. The `/start` surface rendered `Verification Unavailable`, `Verify you are human to send`, and alert text `Turnstile is not configured.`
+- Root cause: the standalone smoke server ran outside local dev with no Turnstile test keys. The app correctly failed closed, but CI had not provided Cloudflare's CI-only dummy Turnstile keys for this smoke lane.
+- `Mobile Overflow Guard (320px)` failed in job `79027919536` on `authenticated app-releases has no horizontal overflow @ 320px`.
+- The test navigates `/app/releases`, which can settle through `/app/library?view=releases`; the helper was passed a 60s authenticated-route timeout but silently capped selector readiness at 12s.
+- `Mobile Overflow Guard (430px)` job `79027919553` was cancelled after the job-level 30m timeout while the matrix was still spending time on retries after the 320px failure.
+
+Fixes made:
+
+- Added Cloudflare's CI-only always-pass Turnstile site key and secret key to the extended-smoke build, rebuild fallback, and runtime env. Production Turnstile and Clerk settings were not changed.
+- Increased `ci-mobile-overflow` timeout from 30m to 45m so the 320/390/430 matrix has enough room for authenticated route compile/retry behavior.
+- Updated `waitForAnySelector` in `mobile-overflow.spec.ts` to honor the caller-provided timeout instead of capping readiness at 12s.
+
+Commands run:
+
+```bash
+gh run view 26806980813 --json status,conclusion,jobs
+gh api repos/JovieInc/Jovie/actions/jobs/79030927295/logs
+gh api repos/JovieInc/Jovie/actions/jobs/79027919536/logs
+JOVIE_AGENT_PROFILE=coder pnpm exec actionlint -shellcheck= .github/workflows/ci.yml
+JOVIE_AGENT_PROFILE=coder pnpm --filter @jovie/web exec vitest run tests/unit/ci/deploy-workflow.test.ts
+JOVIE_AGENT_PROFILE=coder CI=1 E2E_USE_TEST_AUTH_BYPASS=1 NEXT_PUBLIC_CLERK_MOCK=1 NEXT_PUBLIC_CLERK_PROXY_DISABLED=1 NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_test_dummy CLERK_SECRET_KEY=sk_test_dummy FLAGS_SECRET=mobile-overflow-ci URL_ENCRYPTION_KEY=mobile-overflow-ci-url-encryption-key AI_GATEWAY_API_KEY=mobile-overflow-ci MOBILE_OVERFLOW_WIDTHS=320 MOBILE_OVERFLOW_FOCUS_LIMIT=8 PLAYWRIGHT_WORKERS=1 pnpm --filter=@jovie/web exec playwright test tests/e2e/mobile-overflow.spec.ts --project=chromium --reporter=line --grep "authenticated app-releases has no horizontal overflow @ 320px"
+JOVIE_AGENT_PROFILE=coder E2E_USE_TEST_AUTH_BYPASS=1 E2E_TEST_AUTH_PERSONA=creator-ready NEXT_PUBLIC_CLERK_MOCK=1 NEXT_PUBLIC_CLERK_PROXY_DISABLED=1 NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_test_dummy CLERK_SECRET_KEY=sk_test_dummy FLAGS_SECRET=mobile-overflow-ci URL_ENCRYPTION_KEY=mobile-overflow-ci-url-encryption-key AI_GATEWAY_API_KEY=mobile-overflow-ci MOBILE_OVERFLOW_WIDTHS=320 MOBILE_OVERFLOW_FOCUS_LIMIT=8 PLAYWRIGHT_WORKERS=1 pnpm --filter=@jovie/web exec playwright test tests/e2e/mobile-overflow.spec.ts --project=chromium --reporter=line --grep "authenticated app-releases has no horizontal overflow @ 320px"
+JOVIE_AGENT_PROFILE=coder NEXT_PUBLIC_TURNSTILE_SITE_KEY=1x00000000000000000000AA TURNSTILE_SECRET_KEY=1x0000000000000000000000000000000AA E2E_USE_TEST_AUTH_BYPASS=1 E2E_TEST_AUTH_PERSONA=creator-ready NEXT_PUBLIC_CLERK_MOCK=1 NEXT_PUBLIC_CLERK_PROXY_DISABLED=1 NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_test_dummy CLERK_SECRET_KEY=sk_test_dummy FLAGS_SECRET=smoke-preview-flags URL_ENCRYPTION_KEY=smoke-preview-url-encryption-key AI_GATEWAY_API_KEY=smoke-preview-ai-gateway-key PLAYWRIGHT_WORKERS=1 pnpm --filter=@jovie/web exec playwright test tests/e2e/onboarding-robot.smoke.spec.ts --project=chromium --reporter=line
+JOVIE_AGENT_PROFILE=coder pnpm biome check --write apps/web/tests/e2e/mobile-overflow.spec.ts AUTH_FIX_LOG.md
+JOVIE_AGENT_PROFILE=coder pnpm biome check --write AUTH_FIX_LOG.md
+git diff --check
+JOVIE_AGENT_PROFILE=coder pnpm --filter @jovie/web run typecheck -- --pretty false
+JOVIE_AGENT_PROFILE=coder pnpm biome check .
+```
+
+Final passing evidence:
+
+- CI workflow syntax passed under `actionlint -shellcheck=`.
+- CI workflow unit test passed: 1 file, 10 tests.
+- Initial mobile 320px reproduction showed the original failure on the first attempt and passed on retry, confirming the flake shape.
+- Mobile 320px focused rerun passed after the timeout fix with no retry: 2 passed in 3.8m.
+- Onboarding robot focused smoke passed with CI dummy Turnstile keys: 2 passed in 2.8m.
+- Focused Biome write check passed for the touched E2E spec. A later log-only Biome command processed zero files because `AUTH_FIX_LOG.md` is ignored by the repo Biome config.
+- `git diff --check` passed.
+- Web typecheck passed.
+- Root Biome check passed: 6069 files checked, no fixes applied.
+- No production Clerk settings changed.
+- No Clerk dashboard changes made for this post-merge closeout.
