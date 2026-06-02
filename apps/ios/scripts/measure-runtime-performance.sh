@@ -23,13 +23,23 @@ set +e
 "$SCRIPT_DIR/run-xcodebuild.sh" test \
   -only-testing:JovieUITests/JovieUITests/testShellNavigationRuntimePerformance \
   -resultBundlePath "$RESULT_BUNDLE" | tee "$LOG_PATH"
-XCODEBUILD_STATUS="${PIPESTATUS[0]}"
+PIPE_STATUSES=("${PIPESTATUS[@]}")
+XCODEBUILD_STATUS="${PIPE_STATUSES[0]}"
+TEE_STATUS="${PIPE_STATUSES[1]}"
 set -e
+
+if [[ "$XCODEBUILD_STATUS" -eq 0 && "$TEE_STATUS" -eq 0 ]]; then
+  STATUS_DESCRIPTION="passed"
+elif [[ "$XCODEBUILD_STATUS" -ne 0 ]]; then
+  STATUS_DESCRIPTION="failed with xcodebuild status $XCODEBUILD_STATUS"
+else
+  STATUS_DESCRIPTION="failed with tee status $TEE_STATUS"
+fi
 
 {
   echo "# iOS Runtime Performance Baseline"
   echo
-  echo "- Status: $([[ "$XCODEBUILD_STATUS" -eq 0 ]] && echo "passed" || echo "failed with status $XCODEBUILD_STATUS")"
+  echo "- Status: $STATUS_DESCRIPTION"
   echo "- Flow: deterministic \`-ui-testing-chat\` shell, Chat to Profile to Chat bottom navigation transition."
   echo "- Timeout: ${JOVIE_IOS_RUNTIME_TIMEOUT_SECONDS}s per measured transition."
   echo "- Requested metrics: \`XCTClockMetric\`, \`XCTCPUMetric(application:)\`, and \`XCTMemoryMetric(application:)\`."
@@ -49,4 +59,8 @@ set -e
   echo "- Log: \`$LOG_PATH\`"
 } > "$SUMMARY_PATH"
 
-exit "$XCODEBUILD_STATUS"
+if [[ "$XCODEBUILD_STATUS" -ne 0 ]]; then
+  exit "$XCODEBUILD_STATUS"
+fi
+
+exit "$TEE_STATUS"
