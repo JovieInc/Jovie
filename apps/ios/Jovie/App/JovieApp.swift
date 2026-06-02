@@ -395,6 +395,7 @@ struct JovieApp: App {
           RootView(
             appState: appState,
             isAuthAvailable: isLiveAuthAvailable,
+            isSignInUnavailable: launchAuthErrorMessage != nil,
             liveUserID: nil,
             authErrorMessage: launchAuthErrorMessage,
             onLogout: { await appState.signOut() },
@@ -410,6 +411,7 @@ struct JovieApp: App {
           RootView(
             appState: appState,
             isAuthAvailable: isLiveAuthAvailable,
+            isSignInUnavailable: launchAuthErrorMessage != nil,
             liveUserID: nil,
             authErrorMessage: launchAuthErrorMessage,
             onLogout: { await appState.signOut() },
