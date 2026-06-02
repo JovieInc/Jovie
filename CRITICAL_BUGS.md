@@ -49,3 +49,7 @@ transport failure and restores `.previewReady` after retry in the focused
 `AppStateTests` case `profileLoadFailureShowsRecoveryStateAndRetryRestoresDashboard`,
 so no iOS profile-load dead-end critical bug is currently reproduced for that
 covered API failure and retry path.
+The iOS profile shell now keeps stale cached profile data loaded while setting
+the offline state, then clears offline after retry returns fresh data in
+`staleProfileSnapshotShowsOfflineStateAndRetryClearsIt`, so no iOS blank-profile
+critical bug is currently reproduced for that covered stale-cache path.
