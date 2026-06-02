@@ -100,8 +100,8 @@ list_devices() {
     ranked = candidates.sort_by do |device|
       name = device.fetch("name")
       [
-        device.fetch("state") == "Booted" ? 0 : 1,
         name == "iPhone 17" ? 0 : 1,
+        device.fetch("state") == "Booted" ? 0 : 1,
         name
       ]
     end
@@ -130,6 +130,7 @@ write_metadata() {
     echo "require_memgraph: $REQUIRE_MEMGRAPH"
     echo "devtools_security_status: $DEVTOOLS_SECURITY_STATUS"
     echo "pid: $PID"
+    echo "pid_source: $PID_SOURCE"
     echo "process_label: $PROCESS_LABEL"
     echo "memgraph: $MEMGRAPH_PATH"
     echo "memgraph_created: $MEMGRAPH_CREATED"
@@ -167,6 +168,7 @@ render_summary() {
     echo "- Require memgraph: $REQUIRE_MEMGRAPH"
     echo "- Developer Tools security: $DEVTOOLS_SECURITY_STATUS"
     echo "- PID: $PID"
+    echo "- PID source: $PID_SOURCE"
     echo "- Memgraph created: $MEMGRAPH_CREATED"
     echo "- Memgraph: \`$MEMGRAPH_PATH\`"
     echo "- Raw leaks output: \`$LEAKS_OUTPUT\`"
@@ -233,8 +235,13 @@ mkdir -p "$RUN_DIR"
 
 "$SCRIPT_DIR/ensure-configuration.sh"
 
+CURRENT_GIT_HEAD="$(git -C "$REPO_ROOT" rev-parse HEAD)"
+BUILD_STAMP_PATH="$DERIVED_DATA_PATH/.memory-baseline-build-stamp"
 APP_PATH="$DERIVED_DATA_PATH/Build/Products/Debug-iphonesimulator/Jovie.app"
-if [[ -d "$APP_PATH" && "${JOVIE_IOS_MEMORY_REUSE_BUILD:-0}" == "1" ]]; then
+if [[ -d "$APP_PATH" &&
+  "${JOVIE_IOS_MEMORY_REUSE_BUILD:-0}" == "1" &&
+  -f "$BUILD_STAMP_PATH" &&
+  "$(cat "$BUILD_STAMP_PATH")" == "$CURRENT_GIT_HEAD" ]]; then
   echo "Using existing built app at $APP_PATH"
 else
   rm -rf "$DERIVED_DATA_PATH"
@@ -250,6 +257,7 @@ else
     exit 1
   fi
   echo "Build log: $RUN_DIR/build.log"
+  printf "%s\n" "$CURRENT_GIT_HEAD" >"$BUILD_STAMP_PATH"
 fi
 
 if [[ ! -d "$APP_PATH" ]]; then
@@ -275,13 +283,25 @@ run_with_timeout "${JOVIE_IOS_MEMORY_TERMINATE_TIMEOUT:-15}" xcrun simctl termin
 read -r -a LAUNCH_ARGS <<<"$LAUNCH_ARGUMENTS"
 
 echo "Launching $BUNDLE_ID with arguments: $LAUNCH_ARGUMENTS"
-if ! run_with_timeout "${JOVIE_IOS_MEMORY_LAUNCH_TIMEOUT:-30}" xcrun simctl launch "$IPHONE_UDID" "$BUNDLE_ID" "${LAUNCH_ARGS[@]}" >"$RUN_DIR/launch.txt" 2>&1; then
-  cat "$RUN_DIR/launch.txt"
+LAUNCH_OUTPUT="$RUN_DIR/launch.txt"
+if ! run_with_timeout "${JOVIE_IOS_MEMORY_LAUNCH_TIMEOUT:-30}" xcrun simctl launch "$IPHONE_UDID" "$BUNDLE_ID" "${LAUNCH_ARGS[@]}" >"$LAUNCH_OUTPUT" 2>&1; then
+  cat "$LAUNCH_OUTPUT"
   echo "Failed to launch $BUNDLE_ID on $IPHONE_UDID"
   exit 1
 fi
 
 sleep "$SETTLE_SECONDS"
+
+SIMCTL_LAUNCH_PID="$(
+  awk -F": " -v bundle_id="$BUNDLE_ID" '
+    $1 == bundle_id && $2 ~ /^[0-9]+$/ {
+      pid = $2
+    }
+    END {
+      print pid
+    }
+  ' "$LAUNCH_OUTPUT"
+)"
 
 LAUNCHCTL_LIST="$RUN_DIR/launchctl-list.txt"
 if ! run_with_timeout "${JOVIE_IOS_MEMORY_PROCESS_TIMEOUT:-30}" xcrun simctl spawn "$IPHONE_UDID" launchctl list >"$LAUNCHCTL_LIST"; then
@@ -304,19 +324,31 @@ MATCHING_PROCESSES="$(
   ' "$LAUNCHCTL_LIST"
 )"
 
-if [[ -z "$MATCHING_PROCESSES" ]]; then
+if [[ -n "$SIMCTL_LAUNCH_PID" ]]; then
+  PID="$SIMCTL_LAUNCH_PID"
+  PID_SOURCE="simctl launch"
+  PROCESS_LABEL="$(
+    awk -v pid="$PID" '
+      $1 == pid {
+        print $3
+        exit
+      }
+    ' "$LAUNCHCTL_LIST"
+  )"
+  PROCESS_LABEL="${PROCESS_LABEL:-$BUNDLE_ID}"
+elif [[ -z "$MATCHING_PROCESSES" ]]; then
   echo "Could not find a running PID for $BUNDLE_ID on $IPHONE_UDID."
   exit 1
-fi
-
-if [[ "$(printf "%s\n" "$MATCHING_PROCESSES" | wc -l | tr -d " ")" -ne 1 ]]; then
+elif [[ "$(printf "%s\n" "$MATCHING_PROCESSES" | wc -l | tr -d " ")" -ne 1 ]]; then
   echo "Found multiple running PIDs for $BUNDLE_ID on $IPHONE_UDID:"
   printf "%s\n" "$MATCHING_PROCESSES"
   exit 1
+else
+  PID="$(printf "%s\n" "$MATCHING_PROCESSES" | awk "{ print \$1 }")"
+  PID_SOURCE="launchctl list"
+  PROCESS_LABEL="$(printf "%s\n" "$MATCHING_PROCESSES" | cut -f2-)"
 fi
 
-PID="$(printf "%s\n" "$MATCHING_PROCESSES" | awk "{ print \$1 }")"
-PROCESS_LABEL="$(printf "%s\n" "$MATCHING_PROCESSES" | cut -f2-)"
 SAFE_BUNDLE="$(printf "%s" "$BUNDLE_ID" | tr -c "A-Za-z0-9_.-" "_")"
 MEMGRAPH_PATH="$RUN_DIR/$SAFE_BUNDLE-$PID-$TIMESTAMP.memgraph"
 LEAKS_OUTPUT="$RUN_DIR/$SAFE_BUNDLE-$PID-$TIMESTAMP.leaks.txt"
