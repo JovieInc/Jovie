@@ -7,12 +7,19 @@ export interface DesktopNativeAuthResult {
 interface DesktopNativeExchangeResponse {
   readonly ticket?: unknown;
   readonly returnTo?: unknown;
+  readonly userId?: unknown;
 }
 
 interface DesktopSignInResource {
-  readonly createdSessionId: string | null;
-  ticket: (params: { ticket: string }) => Promise<{ error?: unknown }>;
-  finalize: () => Promise<{ error?: unknown }>;
+  readonly status?: string | null;
+  readonly createdSessionId?: string | null;
+  create: (params: { strategy: 'ticket'; ticket: string }) => Promise<{
+    status?: string;
+    createdSessionId?: string | null;
+    error?: unknown;
+    errors?: Array<{ code?: unknown }>;
+    clerkError?: boolean;
+  }>;
 }
 
 type DesktopSetActive = (params: { session: string }) => Promise<void>;
@@ -45,6 +52,9 @@ export interface CompleteDesktopNativeAuthInput {
   readonly fetchNativeExchange?: DesktopNativeExchangeFetch;
   readonly signIn: DesktopSignInResource;
   readonly setActive: DesktopSetActive;
+  readonly reloadClerk?: () => Promise<void>;
+  readonly getActiveSessionId?: () => string | null;
+  readonly getActiveUserId?: () => string | null;
   readonly recordDiagnostic?: (
     stage: DesktopAuthDiagnosticStage,
     detail?: string
@@ -75,6 +85,34 @@ export function recordDesktopAuthDiagnostic(
   }
 }
 
+function recordDesktopAuthReturnTo(returnTo: string) {
+  if (globalThis.window === undefined) return;
+
+  try {
+    globalThis.window.localStorage.setItem(
+      'jovie.desktopAuth.returnTo',
+      returnTo
+    );
+  } catch {
+    // The return route is only a replay fallback; storage failure is non-fatal.
+  }
+}
+
+async function getNativeExchangeFailureDetail(
+  response: Pick<Response, 'status' | 'json'>
+): Promise<string> {
+  try {
+    const payload = (await response.json()) as { readonly reason?: unknown };
+    if (typeof payload.reason === 'string' && payload.reason.length > 0) {
+      return `status=${response.status} reason=${payload.reason}`;
+    }
+  } catch {
+    // Error bodies are diagnostic-only; keep the auth failure path stable.
+  }
+
+  return `status=${response.status}`;
+}
+
 function createError(code: string, cause?: unknown): Error {
   if (cause !== undefined) {
     const error = new Error(code);
@@ -88,6 +126,7 @@ function createError(code: string, cause?: unknown): Error {
 function parseNativeExchangePayload(payload: DesktopNativeExchangeResponse): {
   ticket: string;
   returnTo: string;
+  userId: string | null;
 } {
   if (typeof payload.ticket !== 'string' || payload.ticket.length === 0) {
     throw new Error('native-auth-exchange-missing-ticket');
@@ -95,7 +134,8 @@ function parseNativeExchangePayload(payload: DesktopNativeExchangeResponse): {
 
   if (
     typeof payload.returnTo !== 'string' ||
-    !payload.returnTo.startsWith('/')
+    !payload.returnTo.startsWith('/') ||
+    payload.returnTo.startsWith('//')
   ) {
     throw new Error('native-auth-exchange-missing-return');
   }
@@ -103,7 +143,51 @@ function parseNativeExchangePayload(payload: DesktopNativeExchangeResponse): {
   return {
     ticket: payload.ticket,
     returnTo: payload.returnTo,
+    userId: typeof payload.userId === 'string' ? payload.userId : null,
   };
+}
+
+async function waitForActivatedSession(input: {
+  readonly expectedUserId: string | null;
+  readonly reloadClerk?: () => Promise<void>;
+  readonly getActiveSessionId?: () => string | null;
+  readonly getActiveUserId?: () => string | null;
+}): Promise<'active' | 'missing' | 'user_mismatch'> {
+  if (!input.getActiveSessionId) return 'active';
+
+  for (let attempt = 0; attempt < 20; attempt += 1) {
+    await input.reloadClerk?.();
+
+    const activeSessionId = input.getActiveSessionId();
+    const activeUserId = input.getActiveUserId?.() ?? null;
+    if (activeSessionId) {
+      if (
+        input.expectedUserId &&
+        activeUserId &&
+        activeUserId !== input.expectedUserId
+      ) {
+        return 'user_mismatch';
+      }
+
+      return 'active';
+    }
+
+    await new Promise(resolve => setTimeout(resolve, 250));
+  }
+
+  return 'missing';
+}
+
+function getClerkErrorCode(value: unknown): string | null {
+  if (!value || typeof value !== 'object') {
+    return null;
+  }
+
+  const record = value as {
+    readonly errors?: ReadonlyArray<{ readonly code?: unknown }>;
+  };
+  const code = record.errors?.[0]?.code;
+  return typeof code === 'string' ? code : null;
 }
 
 export async function completeDesktopNativeAuth({
@@ -111,6 +195,9 @@ export async function completeDesktopNativeAuth({
   fetchNativeExchange = fetch,
   signIn,
   setActive,
+  reloadClerk,
+  getActiveSessionId,
+  getActiveUserId,
   recordDiagnostic = recordDesktopAuthDiagnostic,
 }: CompleteDesktopNativeAuthInput): Promise<DesktopNativeAuthResult> {
   recordDiagnostic('completion_consume_started');
@@ -137,40 +224,83 @@ export async function completeDesktopNativeAuth({
   });
 
   if (!response.ok) {
-    recordDiagnostic('native_exchange_failed', `status=${response.status}`);
+    recordDiagnostic(
+      'native_exchange_failed',
+      await getNativeExchangeFailureDetail(response)
+    );
     throw new Error('native-auth-exchange-failed');
   }
 
   const exchange = parseNativeExchangePayload(
     (await response.json()) as DesktopNativeExchangeResponse
   );
+  recordDesktopAuthReturnTo(exchange.returnTo);
   recordDiagnostic('native_exchange_succeeded');
 
   recordDiagnostic('ticket_sign_in_started');
-  const ticketAttempt = await signIn.ticket({ ticket: exchange.ticket });
-  if (ticketAttempt.error) {
+  const ticketAttempt = await signIn.create({
+    strategy: 'ticket',
+    ticket: exchange.ticket,
+  });
+  const ticketErrorCode =
+    getClerkErrorCode(ticketAttempt.error) ?? getClerkErrorCode(ticketAttempt);
+  if (ticketAttempt.error && ticketErrorCode !== 'session_exists') {
     recordDiagnostic('ticket_sign_in_failed');
     throw createError('desktop-auth-ticket-failed', ticketAttempt.error);
   }
-  recordDiagnostic('ticket_sign_in_succeeded');
-
-  recordDiagnostic('ticket_finalize_started');
-  const finalizeAttempt = await signIn.finalize();
-  if (finalizeAttempt.error) {
-    recordDiagnostic('ticket_finalize_failed');
-    throw createError('desktop-auth-finalize-failed', finalizeAttempt.error);
+  const ticketStatus = ticketAttempt.status ?? signIn.status ?? null;
+  if (ticketStatus && ticketStatus !== 'complete') {
+    recordDiagnostic('ticket_sign_in_failed', `status=${ticketStatus}`);
+    throw new Error('desktop-auth-ticket-incomplete');
   }
-  recordDiagnostic('ticket_finalize_succeeded');
 
-  const sessionId = signIn.createdSessionId;
+  const sessionId =
+    ticketAttempt.createdSessionId ?? signIn.createdSessionId ?? null;
   if (!sessionId) {
-    recordDiagnostic('session_id_missing', 'missing_created_session');
+    recordDiagnostic('ticket_finalize_started', 'hydrate_active_session');
+    const hydrationStatus = getActiveSessionId
+      ? await waitForActivatedSession({
+          expectedUserId: exchange.userId,
+          reloadClerk,
+          getActiveSessionId,
+          getActiveUserId,
+        })
+      : 'missing';
+
+    if (hydrationStatus === 'active') {
+      const activeSessionId = getActiveSessionId?.() ?? 'hydrated_session';
+      recordDiagnostic('ticket_finalize_succeeded', activeSessionId);
+      recordDiagnostic('route_ready', exchange.returnTo);
+      return { returnTo: exchange.returnTo };
+    }
+
+    recordDiagnostic(
+      'session_id_missing',
+      hydrationStatus === 'user_mismatch'
+        ? 'active_user_mismatch'
+        : 'missing_created_session'
+    );
     throw new Error('desktop-auth-missing-session');
   }
+  recordDiagnostic('ticket_sign_in_succeeded');
 
   recordDiagnostic('set_active_started', sessionId);
   await setActive({ session: sessionId });
   recordDiagnostic('set_active_succeeded', sessionId);
+
+  recordDiagnostic('ticket_finalize_started', 'verify_active_session');
+  const activationStatus = await waitForActivatedSession({
+    expectedUserId: exchange.userId,
+    reloadClerk,
+    getActiveSessionId,
+    getActiveUserId,
+  });
+  if (activationStatus !== 'active') {
+    recordDiagnostic('ticket_finalize_failed', activationStatus);
+    throw new Error('desktop-auth-session-not-active');
+  }
+
+  recordDiagnostic('ticket_finalize_succeeded', sessionId);
   recordDiagnostic('route_ready', exchange.returnTo);
 
   return { returnTo: exchange.returnTo };

@@ -71,6 +71,15 @@ export function useSegmentedInput({
   const haptic = useHapticFeedback();
   const lastLengthRef = useRef(0);
   const lastCompletedValueRef = useRef<string | null>(null);
+  const blurTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (blurTimeoutRef.current) {
+        clearTimeout(blurTimeoutRef.current);
+      }
+    };
+  }, []);
 
   useEffect(() => {
     if (autoFocus && inputRefs.current[0]) {
@@ -118,7 +127,14 @@ export function useSegmentedInput({
         lastCompletedValueRef.current = sanitized;
         onComplete?.(sanitized);
         if (shouldBlurOnComplete) {
-          setTimeout(() => {
+          if (blurTimeoutRef.current) {
+            clearTimeout(blurTimeoutRef.current);
+          }
+          blurTimeoutRef.current = setTimeout(() => {
+            blurTimeoutRef.current = null;
+            if (typeof document === 'undefined') {
+              return;
+            }
             (document.activeElement as HTMLElement)?.blur?.();
           }, 50);
         }

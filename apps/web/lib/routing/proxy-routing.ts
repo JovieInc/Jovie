@@ -151,6 +151,8 @@ export function categorizePath(pathname: string): PathCategory {
     pathname === '/sign-up';
 
   const isAuthCallbackPath =
+    pathname === '/auth/callback' ||
+    pathname === '/app/auth/callback' ||
     pathname === '/sso-callback' ||
     pathname === '/signup/sso-callback' ||
     pathname === '/signin/sso-callback' ||

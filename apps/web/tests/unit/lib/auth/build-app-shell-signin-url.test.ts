@@ -31,4 +31,24 @@ describe('buildAppShellSignInUrl', () => {
 
     expect(url).toBe('/signin?redirect_url=%2Fapp');
   });
+
+  it('keeps normal web app shell redirects relative even when an origin is available', () => {
+    const url = buildAppShellSignInUrl('/app/settings/account?tab=billing', {
+      origin: 'http://localhost:3112',
+    });
+
+    expect(url).toBe(
+      '/signin?redirect_url=%2Fapp%2Fsettings%2Faccount%3Ftab%3Dbilling'
+    );
+  });
+
+  it('uses an absolute same-origin redirect for Electron app shell requests', () => {
+    const url = buildAppShellSignInUrl('/app/chat?runtime=electron', {
+      origin: 'http://localhost:3112',
+    });
+
+    expect(url).toBe(
+      'http://localhost:3112/signin?redirect_url=%2Fapp%2Fchat%3Fruntime%3Delectron'
+    );
+  });
 });

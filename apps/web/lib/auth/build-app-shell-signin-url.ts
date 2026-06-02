@@ -28,7 +28,24 @@ function resolveRequestedAppPath(nextUrlHeader: string | null): string | null {
   }
 }
 
-export function buildAppShellSignInUrl(nextUrlHeader: string | null): string {
+function isElectronAppShellRequest(nextUrlHeader: string | null): boolean {
+  const requestedPath = resolveRequestedAppPath(nextUrlHeader);
+  if (!requestedPath) return false;
+
+  try {
+    return (
+      new URL(requestedPath, 'https://n').searchParams.get('runtime') ===
+      'electron'
+    );
+  } catch {
+    return false;
+  }
+}
+
+export function buildAppShellSignInUrl(
+  nextUrlHeader: string | null,
+  options: { readonly origin?: string | null } = {}
+): string {
   const redirectTarget =
     resolveRequestedAppPath(nextUrlHeader) ?? APP_ROUTES.DASHBOARD;
 
@@ -36,5 +53,10 @@ export function buildAppShellSignInUrl(nextUrlHeader: string | null): string {
     redirect_url: redirectTarget,
   });
 
-  return `${APP_ROUTES.SIGNIN}?${signInParams.toString()}`;
+  const signInPath = `${APP_ROUTES.SIGNIN}?${signInParams.toString()}`;
+  if (!options.origin || !isElectronAppShellRequest(nextUrlHeader)) {
+    return signInPath;
+  }
+
+  return new URL(signInPath, options.origin).toString();
 }

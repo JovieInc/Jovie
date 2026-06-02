@@ -265,6 +265,9 @@ describe('proxy.ts 503 paths: clerkConfigMissing for protected routes (Site 2)',
     const body = await res.text();
     expect(body).toContain('<h1>');
     expect(body).toContain('temporarily unavailable');
+    expect(body).toContain("This environment's sign-in setup is not ready.");
+    expect(body).not.toContain('Auth unavailable');
+    expect(body).not.toContain('If it still does not work');
     expect(body).toContain('<html');
   });
 
