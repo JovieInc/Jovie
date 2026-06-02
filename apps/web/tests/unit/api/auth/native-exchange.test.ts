@@ -192,6 +192,31 @@ describe('POST /api/auth/native/exchange', () => {
     expect(mockSignInTokensCreateSignInToken).not.toHaveBeenCalled();
   });
 
+  it('falls back to a sign-in ticket for iOS preview exchange when Sessions API is unavailable', async () => {
+    vi.stubEnv('NODE_ENV', 'production');
+    vi.stubEnv('VERCEL_ENV', 'preview');
+    const unavailableError = new Error('session unavailable');
+    Object.assign(unavailableError, { status: 404 });
+    mockSessionsCreateSession.mockRejectedValue(unavailableError);
+
+    const { POST } = await import('@/app/api/auth/native/exchange/route');
+    const response = await POST(createExchangeRequest());
+    const data = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(data).toMatchObject({
+      returnTo: '/app',
+      ticket: 'sign_in_ticket',
+      userId: 'user_native',
+      expiresInSeconds: 60,
+    });
+    expect(mockSignInTokensCreateSignInToken).toHaveBeenCalledWith({
+      userId: 'user_native',
+      expiresInSeconds: 60,
+    });
+    expect(mockSessionsGetToken).not.toHaveBeenCalled();
+  });
+
   it('accepts the Mac OS native exchange client and passes through its PKCE verifier', async () => {
     const { POST } = await import('@/app/api/auth/native/exchange/route');
     const response = await POST(createElectronExchangeRequest());

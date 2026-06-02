@@ -307,3 +307,35 @@ Clerk dashboard/config changes:
 - No production Clerk settings changed.
 - No Clerk dashboard changes made for this review follow-up.
 - The minimal staging path remains: link/check the intended non-production Clerk app, pull non-production env only, verify allowed origins/callback routes, then rerun the native auth smoke against staging before removing human-review gating.
+
+## Bot Review Closeout - 2026-06-01
+
+Additional CodeRabbit findings addressed after re-auditing bot comments:
+
+- Rejected protocol-relative native exchange `returnTo` values, for example `//evil.example`, before persisting or navigating.
+- Kept the hidden main Electron window on a recoverable `/desktop-auth` route during initial auth-first launch instead of loading `about:blank`, so cancelling the popup cannot reveal a blank renderer.
+- Added coverage for the iOS preview fallback path when Clerk Sessions API returns 404/session-unavailable.
+
+Commands run:
+
+```bash
+JOVIE_AGENT_PROFILE=coder pnpm --filter @jovie/web exec vitest run tests/unit/desktop/native-complete.test.ts tests/unit/api/auth/native-exchange.test.ts
+JOVIE_AGENT_PROFILE=coder pnpm --filter @jovie/desktop run test
+JOVIE_AGENT_PROFILE=coder pnpm biome check --write apps/desktop/src/main.ts apps/desktop/scripts/desktop-shell-contract.test.mjs apps/web/lib/desktop/native-complete.ts apps/web/tests/unit/desktop/native-complete.test.ts apps/web/tests/unit/api/auth/native-exchange.test.ts
+JOVIE_AGENT_PROFILE=coder pnpm --filter @jovie/web run typecheck -- --pretty false
+JOVIE_AGENT_PROFILE=coder pnpm --filter @jovie/desktop run typecheck
+JOVIE_AGENT_PROFILE=coder pnpm biome check .
+```
+
+Final passing evidence:
+
+- Native complete/native exchange tests: 2 files passed, 11 tests passed.
+- Full desktop test suite: passed.
+- Web typecheck: passed.
+- Desktop typecheck: passed.
+- Root Biome check: 6069 files checked, no fixes applied.
+
+Clerk dashboard/config changes:
+
+- No production Clerk settings changed.
+- No Clerk dashboard changes made for this bot review closeout.

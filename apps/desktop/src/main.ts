@@ -1014,7 +1014,7 @@ function createWindow(initialUrl = APP_ENTRY_URL): BrowserWindow {
   const initialAuthUrl = buildDesktopBrowserAuthUrl(initialUrl);
   if (initialAuthUrl) {
     showDesktopAuthHandoff(initialAuthUrl);
-    void win.loadURL('about:blank');
+    void win.loadURL(buildDesktopAuthHandoffUrl(initialAuthUrl));
   } else {
     void win.loadURL(initialUrl);
   }

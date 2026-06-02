@@ -82,6 +82,11 @@ test('desktop window fails into a branded Jovie recovery surface', async () => {
   assert.match(mainSource, /mainWindowHiddenForAuthHandoff/);
   assert.match(mainSource, /win === mainWindow && isAuthHandoffOpen\(\)/);
   assert.match(mainSource, /hideMainWindowForAuthHandoff\(\);\s*if \(authHandoffWindow\) showWindow\(authHandoffWindow\);/);
+  assert.match(
+    mainSource,
+    /void win\.loadURL\(buildDesktopAuthHandoffUrl\(initialAuthUrl\)\);/
+  );
+  assert.doesNotMatch(mainSource, /win\.loadURL\('about:blank'\)/);
   assert.doesNotMatch(mainSource, /parent: mainWindow/);
   assert.doesNotMatch(mainSource, /M31 10A20 20 0 0 0 11 30H31V10Z/);
   assert.doesNotMatch(mainSource, /M11 31L30 31M14 36L31 36M18 41L32 41/);

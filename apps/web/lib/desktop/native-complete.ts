@@ -134,7 +134,8 @@ function parseNativeExchangePayload(payload: DesktopNativeExchangeResponse): {
 
   if (
     typeof payload.returnTo !== 'string' ||
-    !payload.returnTo.startsWith('/')
+    !payload.returnTo.startsWith('/') ||
+    payload.returnTo.startsWith('//')
   ) {
     throw new Error('native-auth-exchange-missing-return');
   }
