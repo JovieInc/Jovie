@@ -65,12 +65,13 @@ struct AppShellView<ProfileContent: View, ChatContent: View>: View {
   let billingURL: URL
   let onLogout: @MainActor () async -> Void
   @ViewBuilder let profileContent: ProfileContent
-  @ViewBuilder let chatContent: ChatContent
+  let chatContent: (Binding<String>) -> ChatContent
 
   @State private var selectedTab: AppShellTab
   @State private var navigationPath: [AppShellRoute] = []
   @State private var isShowingMenu = false
   @State private var didOpenLaunchSettings = false
+  @State private var chatDraft = ""
 
   init(
     profile: AppShellProfile,
@@ -80,7 +81,7 @@ struct AppShellView<ProfileContent: View, ChatContent: View>: View {
     billingURL: URL,
     onLogout: @escaping @MainActor () async -> Void,
     @ViewBuilder profileContent: () -> ProfileContent,
-    @ViewBuilder chatContent: () -> ChatContent
+    @ViewBuilder chatContent: @escaping (Binding<String>) -> ChatContent
   ) {
     self.profile = profile
     self.isOffline = isOffline
@@ -88,7 +89,7 @@ struct AppShellView<ProfileContent: View, ChatContent: View>: View {
     self.billingURL = billingURL
     self.onLogout = onLogout
     self.profileContent = profileContent()
-    self.chatContent = chatContent()
+    self.chatContent = chatContent
     _selectedTab = State(initialValue: initialTab)
   }
 
@@ -150,7 +151,7 @@ struct AppShellView<ProfileContent: View, ChatContent: View>: View {
   private var activeContent: some View {
     switch selectedTab {
     case .chat:
-      chatContent
+      chatContent($chatDraft)
     case .profile:
       profileContent
     }

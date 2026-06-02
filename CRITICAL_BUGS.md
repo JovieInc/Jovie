@@ -40,3 +40,7 @@ memory command captured the deterministic
 profile shell at `36.6M` physical footprint and recorded the local
 `leaks --outputGraph` blocker; memgraph-backed leak proof is tracked by JOV-2712
 rather than classified as a reproduced critical bug here.
+The iOS chat shell now preserves a typed composer draft across Chat to Profile
+to Chat navigation in the focused XCUITest
+`testChatComposerPreservesDraftAcrossShellNavigation`, so no iOS draft-loss
+critical bug is currently reproduced for that shell-navigation case.

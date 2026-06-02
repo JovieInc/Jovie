@@ -110,7 +110,43 @@ final class JovieUITests: XCTestCase {
       app.buttons["Copy URL"].waitForExistence(timeout: 3),
       "Bottom nav did not switch to Profile.\n\(app.debugDescription)"
     )
+  }
 
+  func testChatComposerPreservesDraftAcrossShellNavigation() {
+    let app = launchMockApp(launchArgument: "-ui-testing-chat", expectedElementDescription: "\"Ask Jovie\"") {
+      $0.textFields["Ask Jovie"]
+    }
+
+    let draft = "Draft the launch follow-up"
+    let input = app.textFields["Ask Jovie"]
+    XCTAssertTrue(
+      waitForHittable(input, timeout: 3),
+      "Chat composer input did not become hittable.\n\(app.debugDescription)"
+    )
+
+    XCTAssertEqual(app.textFields.count, 1)
+    input.tap()
+    input.typeText(draft)
+    XCTAssertEqual(input.value as? String, draft)
+
+    app.buttons["Open Profile"].tap()
+    XCTAssertTrue(
+      app.buttons["Copy URL"].waitForExistence(timeout: 3),
+      "Shell navigation did not switch to Profile.\n\(app.debugDescription)"
+    )
+
+    app.buttons["shell-tab-chat"].tap()
+    let restoredInput = app.textFields["Ask Jovie"]
+    XCTAssertTrue(
+      waitForHittable(restoredInput, timeout: 3),
+      "Shell navigation did not return to the chat composer.\n\(app.debugDescription)"
+    )
+    XCTAssertEqual(app.textFields.count, 1)
+    XCTAssertEqual(
+      restoredInput.value as? String,
+      draft,
+      "Chat draft was lost or duplicated after shell navigation.\n\(app.debugDescription)"
+    )
   }
 
   func testShellNavigationRuntimePerformance() throws {
