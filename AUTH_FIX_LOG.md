@@ -417,3 +417,37 @@ Clerk dashboard/config changes:
 
 - No production Clerk settings changed.
 - No Clerk dashboard changes made for this PR smoke rerun closeout.
+
+## PR Lighthouse CI Timeout Closeout - 2026-06-02
+
+Failing CI evidence inspected:
+
+- PR #9891 check `Lighthouse (chat PR)` failed on run `26803029461`, job `79014242037`.
+- The job used `timeout-minutes: 15`.
+- `Run migrations (ephemeral Neon)` retried six transient Neon endpoint connection failures, then connected and completed migrations in 0.48s.
+- The job reached `Build app for chat Lighthouse` with roughly four seconds left and GitHub cancelled the operation before Lighthouse could start.
+
+Fixes made:
+
+- Increased the authenticated PR Lighthouse job timeout budget from 15 minutes to 30 minutes for dashboard, onboarding, admin, and chat surfaces. These jobs all create ephemeral Neon branches and can hit the same transient endpoint retry path before build/Lighthouse begins.
+
+Commands run:
+
+```bash
+gh api repos/JovieInc/Jovie/actions/jobs/79014242037/logs
+gh api repos/JovieInc/Jovie/actions/jobs/79014242037 --jq '{id, name, status, conclusion, started_at, completed_at, html_url, steps: [.steps[] | {name,status,conclusion,number,started_at,completed_at}]}'
+pnpm exec actionlint -shellcheck= .github/workflows/ci.yml
+JOVIE_AGENT_PROFILE=coder pnpm --filter @jovie/web exec vitest run tests/unit/ci/deploy-workflow.test.ts
+git diff --check
+JOVIE_AGENT_PROFILE=coder pnpm biome check .
+```
+
+Final evidence:
+
+- Root cause confirmed as workflow timeout exhaustion after transient Neon endpoint retries, not a Lighthouse assertion failure.
+- Workflow syntax check passed with ShellCheck disabled; the default local ShellCheck pass reports existing warnings elsewhere in the large workflow file.
+- CI workflow unit test passed: 1 file, 10 tests.
+- `git diff --check` passed.
+- Root Biome check passed: 6069 files checked, no fixes applied.
+- No production Clerk settings changed.
+- No Clerk dashboard changes made for this CI timeout closeout.
