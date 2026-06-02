@@ -287,11 +287,24 @@ run_with_timeout "${JOVIE_IOS_MEMORY_UNINSTALL_TIMEOUT:-30}" xcrun simctl uninst
 run_with_timeout "${JOVIE_IOS_MEMORY_INSTALL_TIMEOUT:-60}" xcrun simctl install "$IPHONE_UDID" "$APP_PATH"
 run_with_timeout "${JOVIE_IOS_MEMORY_TERMINATE_TIMEOUT:-15}" xcrun simctl terminate "$IPHONE_UDID" "$BUNDLE_ID" >/dev/null 2>&1 || true
 
-read -r -a LAUNCH_ARGS <<<"$LAUNCH_ARGUMENTS"
+LAUNCH_ARGS=()
+if [[ "$LAUNCH_ARGUMENTS" =~ [^[:space:]] ]]; then
+  read -r -a LAUNCH_ARGS <<<"$LAUNCH_ARGUMENTS"
+fi
 
 echo "Launching $BUNDLE_ID with arguments: $LAUNCH_ARGUMENTS"
 LAUNCH_OUTPUT="$RUN_DIR/launch.txt"
-if ! run_with_timeout "${JOVIE_IOS_MEMORY_LAUNCH_TIMEOUT:-30}" xcrun simctl launch "$IPHONE_UDID" "$BUNDLE_ID" "${LAUNCH_ARGS[@]}" >"$LAUNCH_OUTPUT" 2>&1; then
+set +e
+if [[ "${#LAUNCH_ARGS[@]}" -gt 0 ]]; then
+  run_with_timeout "${JOVIE_IOS_MEMORY_LAUNCH_TIMEOUT:-30}" xcrun simctl launch "$IPHONE_UDID" "$BUNDLE_ID" "${LAUNCH_ARGS[@]}" >"$LAUNCH_OUTPUT" 2>&1
+  LAUNCH_STATUS=$?
+else
+  run_with_timeout "${JOVIE_IOS_MEMORY_LAUNCH_TIMEOUT:-30}" xcrun simctl launch "$IPHONE_UDID" "$BUNDLE_ID" >"$LAUNCH_OUTPUT" 2>&1
+  LAUNCH_STATUS=$?
+fi
+set -e
+
+if [[ "$LAUNCH_STATUS" -ne 0 ]]; then
   cat "$LAUNCH_OUTPUT"
   echo "Failed to launch $BUNDLE_ID on $IPHONE_UDID"
   exit 1
