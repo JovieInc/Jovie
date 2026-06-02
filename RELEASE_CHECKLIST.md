@@ -20,5 +20,6 @@ Tracking issue: [JOV-2712](https://linear.app/jovie/issue/JOV-2712/track-platfor
 | Check | Evidence | Result |
 | --- | --- | --- |
 | Auth callback suite | `pnpm test:auth:ios` passed on `origin/main` `9e9200348e`. | Passed |
+| Real-browser auth suite | `JOVIE_IOS_REAL_BROWSER_AUTH=1 pnpm test:auth:ios` passed against a temporary HTTPS tunnel to local dev. | Passed |
 | Screenshot smoke | `pnpm run ios:screenshots` passed on `origin/main` `9e9200348e`. | Passed |
 | Live Clerk auth PR | PR #9907 merged as `9e9200348e` after local and CI verification. | Passed |

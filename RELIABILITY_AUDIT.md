@@ -14,6 +14,7 @@ interruptions, browser refreshes, app restarts, and extension reloads.
 | --- | --- | --- |
 | iOS auth callback success | `pnpm test:auth:ios` passed `testAuthCallbackDeepLinkCompletesHarness` on `origin/main` `9e9200348e`. | Passed |
 | iOS auth callback provider error | `pnpm test:auth:ios` passed `testAuthCallbackProviderErrorShowsAuthError` on `origin/main` `9e9200348e`. | Passed |
+| iOS real-browser auth callback | `JOVIE_IOS_REAL_BROWSER_AUTH=1 pnpm test:auth:ios` passed `testRealBrowserAuthProviderCompleteReachesAuthenticatedShell` against a temporary HTTPS tunnel to local dev. | Passed |
 | iOS app state transitions | `pnpm test:auth:ios` passed 18 `AppStateTests` on `origin/main` `9e9200348e`. | Passed |
 | Slow internet and offline behavior | Evidence required under JOV-2712. | Open |
 | API, database, and rate-limit failures | Evidence required under JOV-2712. | Open |

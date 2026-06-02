@@ -15,7 +15,6 @@ Tracking issue: [JOV-2712](https://linear.app/jovie/issue/JOV-2712/track-platfor
 
 | ID | Area | Evidence | Status |
 | --- | --- | --- | --- |
-| JOV-2712-AUTH-REAL-BROWSER | iOS real browser auth mode | `pnpm test:auth:ios` keeps real browser auth gated unless `JOVIE_IOS_REAL_BROWSER_AUTH=1` is set. | Evidence required under JOV-2712 |
 | JOV-2712-WEB-AUDIT | Web auth, chat, performance, reliability, parity | Required hardening evidence has no current report entry beyond this baseline. | Evidence required under JOV-2712 |
 | JOV-2712-ELECTRON-AUDIT | Electron auth, redirects, startup, reliability, parity | Required hardening evidence has no current report entry beyond this baseline. | Evidence required under JOV-2712 |
 | JOV-2712-EXTENSION-AUDIT | Chrome Extension auth, messaging, popup/background performance, reliability, parity | Required hardening evidence has no current report entry beyond this baseline. | Evidence required under JOV-2712 |
@@ -23,5 +22,6 @@ Tracking issue: [JOV-2712](https://linear.app/jovie/issue/JOV-2712/track-platfor
 ## Current iOS Result
 
 No critical iOS auth callback failure was reproduced by `pnpm test:auth:ios` on
-`origin/main` `9e9200348e`. The deterministic callback suite and app-state suite
-passed, and the known live Clerk auth hardening PR merged as #9907.
+`origin/main` `9e9200348e`. The deterministic callback suite, real-browser auth
+suite, and app-state suite passed, and the known live Clerk auth hardening PR
+merged as #9907.

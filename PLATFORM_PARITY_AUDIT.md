@@ -13,7 +13,7 @@ constraints.
 
 | Capability | Web | iOS | Electron | Chrome Extension |
 | --- | --- | --- | --- | --- |
-| Sign in and sign out | Evidence required under JOV-2712 | Deterministic callback and live-auth evidence current for `9e9200348e` | Evidence required under JOV-2712 | Evidence required under JOV-2712 |
+| Sign in and sign out | Evidence required under JOV-2712 | Deterministic callback, real-browser callback, and live-auth evidence current for `9e9200348e` | Evidence required under JOV-2712 | Evidence required under JOV-2712 |
 | Account creation and onboarding | Evidence required under JOV-2712 | Screenshot smoke includes needs-onboarding state | Evidence required under JOV-2712 | Evidence required under JOV-2712 |
 | Profile rendering | Evidence required under JOV-2712 | Screenshot smoke includes profile state | Evidence required under JOV-2712 | Evidence required under JOV-2712 |
 | Chat shell | Evidence required under JOV-2712 | Screenshot smoke includes chat state | Evidence required under JOV-2712 | Evidence required under JOV-2712 |
