@@ -249,6 +249,41 @@ struct AppStateTests {
     #expect(await repository.loadCount() == 2)
   }
 
+  @Test func staleProfileSnapshotShowsOfflineStateAndRetryClearsIt() async throws {
+    let repository = MockRepository(
+      nextResult: .success(
+        MeRepositoryResult(response: .previewReady, isStale: true)
+      )
+    )
+    let appState = AppState(
+      configuration: configuration,
+      launchMode: .live,
+      repository: repository,
+      brightnessManager: MockBrightnessController()
+    )
+    appState.didLoadClerk = true
+
+    await appState.handleSignedInUserChange("user_123")
+
+    #expect(appState.activeUserID == "user_123")
+    #expect(appState.route == .ready)
+    #expect(appState.dashboardState == .loaded(.previewReady))
+    #expect(appState.isOffline == true)
+
+    await repository.updateResult(
+      .success(
+        MeRepositoryResult(response: .previewReady, isStale: false)
+      )
+    )
+    await appState.retry()
+
+    #expect(appState.activeUserID == "user_123")
+    #expect(appState.route == .ready)
+    #expect(appState.dashboardState == .loaded(.previewReady))
+    #expect(appState.isOffline == false)
+    #expect(await repository.loadCount() == 2)
+  }
+
   @Test func mobileBrowserAuthURLUsesCentralAuthStartWithPKCE() {
     let url = MobileBrowserAuthURLBuilder.signInURL(
       baseURL: URL(string: "https://jov.ie")!,

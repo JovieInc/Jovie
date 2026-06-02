@@ -17,6 +17,7 @@ staging, or production as appropriate.
 | iOS core screenshots | `pnpm run ios:screenshots` passed on `origin/main` `9e9200348e`, producing loading, signed-out, profile, fullscreen QR, settings, needs-onboarding, chat, and iPad shell screenshots. | Verified locally |
 | iOS chat draft stability | `bash apps/ios/scripts/run-xcodebuild.sh test -only-testing:JovieUITests/JovieUITests/testChatComposerPreservesDraftAcrossShellNavigation` passed on `codex/ios-chat-draft-hardening` after `86ba0c65f9`. | Verified locally |
 | iOS profile API retry | XcodeBuildMCP `test_sim -only-testing:JovieTests/AppStateTests` passed on `codex/ios-profile-retry-hardening` with 19 `AppStateTests`, including the profile failure and retry recovery case. | Verified locally |
+| iOS stale profile cache recovery | XcodeBuildMCP `test_sim -only-testing:JovieTests/AppStateTests` passed on `codex/ios-offline-stale-cache` with 20 `AppStateTests`, including stale profile offline state and retry-clear coverage. | Verified locally |
 
 ## Deliverables
 
