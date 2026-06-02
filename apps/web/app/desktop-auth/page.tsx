@@ -25,12 +25,8 @@ function formatBrowserOpenStatus(
   openState: BrowserOpenState,
   openError: string | null
 ): string | null {
-  if (openState === 'opening') {
-    return 'Opening browser...';
-  }
-
   if (openState === 'opened') {
-    return 'Continue signing in with your browser.';
+    return 'Check your browser.';
   }
 
   return openError;
@@ -98,18 +94,14 @@ function DesktopAuthContent() {
       data-desktop-auth-state={openState}
       data-testid='desktop-auth-handoff'
     >
-      <section className='relative z-10 flex w-full max-w-[320px] flex-col items-center px-4 py-7 text-center'>
-        <BrandLogo aria-hidden size={44} tone='white' />
-        <h1 className='mt-5 text-[17px] font-medium leading-6'>
-          {isWaitingInBrowser
-            ? 'Continue signing in with your browser'
-            : 'Continue in Browser'}
-        </h1>
-        <div className='mt-6 flex min-h-10 w-full flex-col items-center justify-center gap-2'>
+      <section className='relative z-10 flex w-full max-w-[360px] flex-col items-center px-6 py-16 text-center'>
+        <BrandLogo aria-hidden size={60} tone='white' />
+        <h1 className='sr-only'>Sign in to Jovie</h1>
+        <div className='mt-8 flex min-h-11 w-full flex-col items-center justify-center gap-2'>
           {isWaitingInBrowser ? null : (
             <button
               type='button'
-              className='inline-flex h-10 w-full items-center justify-center rounded-full bg-white px-4 text-[13px] font-medium text-black transition-colors hover:bg-white/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/35 disabled:cursor-not-allowed disabled:opacity-55'
+              className='inline-flex h-11 w-full items-center justify-center rounded-full bg-white px-4 text-[13px] font-medium text-black transition-colors hover:bg-white/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/35 disabled:cursor-not-allowed disabled:opacity-55'
               disabled={!authUrl || openState === 'opening'}
               onClick={() => {
                 void openAuthUrl();
@@ -123,7 +115,7 @@ function DesktopAuthContent() {
           {isWaitingInBrowser || !authUrl ? (
             <button
               type='button'
-              className='inline-flex h-10 w-full items-center justify-center rounded-full border border-white/10 px-4 text-[13px] font-medium text-white/72 transition-colors hover:bg-white/[0.06] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/25'
+              className='inline-flex h-11 w-full items-center justify-center rounded-full border border-white/10 px-4 text-[13px] font-medium text-white/72 transition-colors hover:bg-white/[0.06] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/25'
               onClick={() => {
                 closeDesktopAuthWindow().catch(() => {});
               }}
@@ -137,9 +129,7 @@ function DesktopAuthContent() {
           role='status'
           className='mt-3 min-h-5 text-[12px] leading-5 text-white/56'
         >
-          {authUrl
-            ? statusText
-            : 'Close this window and start sign-in again from Jovie.'}
+          {authUrl ? statusText : 'Start sign-in again from Jovie.'}
         </p>
       </section>
     </main>

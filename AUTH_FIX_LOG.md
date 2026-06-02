@@ -53,7 +53,7 @@ Branch: codex/jov-2710-native-browser-auth
   - Passed after restarting Electron without rotating `Jovie-Local` userData. Clerk user and session were still active and `/api/me` returned 200.
 - Computer Use UI verification.
   - Verified the actual Electron window showed `Continue in Browser` with a single centered button and no embedded Clerk auth screen.
-  - Clicked the button and verified Electron moved to `Continue signing in with your browser` plus `Cancel Sign-In`.
+  - Clicked the button and verified Electron moved to `Cancel Sign-In` plus the distinct status `Check your browser.`
 
 ## Failing Evidence
 
@@ -136,7 +136,7 @@ Computer Use verified the actual Electron UI:
 
 - Signed-out Electron showed only the centered native handoff with `Continue in Browser`.
 - No Clerk form rendered inside Electron.
-- Clicking `Continue in Browser` moved Electron to the waiting state: `Continue signing in with your browser` and `Cancel Sign-In`.
+- Clicking `Continue in Browser` moved Electron to the waiting state: `Cancel Sign-In` and `Check your browser.`
 - Server logs showed `/auth/start` was reached after the click.
 
 Success criteria status:
@@ -172,3 +172,74 @@ Minimal safe staging path:
   - the configured iOS native/universal callback route for the staging app.
 - Verify staging Electron runs with `ELECTRON_ENV=staging`, staging `APP_URL`, and `Jovie-Staging` userData.
 - Repeat the native auth smoke against staging before removing human-review gating.
+
+## Design Cleanup Follow-Up - 2026-06-01
+
+Failing evidence:
+
+- User screenshot showed the Electron auth handoff repeating the same browser instruction in the heading, button, and footer/status text.
+- Computer Use against the installed `/Applications/Jovie.app` reproduced the stale duplicate-copy state, confirming the screenshot was a real installed-app issue and not just test drift.
+- Desktop icon metadata showed Electron runtime icons were opaque square PNGs:
+  - `apps/desktop/assets/icon.png` had `hasAlpha=false` and opaque black corners.
+  - `apps/desktop/assets/icon-staging.png` had `hasAlpha=false` and opaque black corners.
+
+Fixes made:
+
+- Removed the visible Electron handoff heading and made the a11y heading screen-reader-only.
+- Kept the idle Electron handoff to one visible action: `Continue in Browser`.
+- Replaced the post-click repeated browser sentence with the distinct status `Check your browser.`
+- Enlarged the Electron auth handoff window from `420x360` to `820x520` with generous centered spacing.
+- Simplified `AuthUnavailableCard` and the static auth-degraded HTML fallback by removing repeated retry/footer/badge copy.
+- Added a desktop-specific rounded transparent icon profile for Electron PNG/ICNS generation while keeping the existing opaque iOS/web app icon profile.
+
+Commands run:
+
+```bash
+node --version
+pnpm --version
+gh pr view 9891 --json url,labels,mergeStateStatus,statusCheckRollup --jq '{url,labels:[.labels[].name],mergeStateStatus,checks:[.statusCheckRollup[] | {name,status,conclusion}]}'
+JOVIE_AGENT_PROFILE=coder pnpm exec tsx apps/web/scripts/generate-brand-assets.ts
+JOVIE_AGENT_PROFILE=coder pnpm --filter @jovie/web exec vitest run tests/unit/app/desktop-auth-page.test.tsx tests/unit/auth/AuthUnavailableCard.compact.test.tsx tests/unit/middleware/proxy-auth-degraded-html.test.ts
+JOVIE_AGENT_PROFILE=coder pnpm --filter desktop run test:desktop-icon
+JOVIE_AGENT_PROFILE=coder pnpm biome check --write apps/web apps/desktop/src/main.ts apps/desktop/scripts/desktop-icon-contract.test.mjs
+JOVIE_AGENT_PROFILE=coder pnpm --filter @jovie/web run typecheck -- --pretty false
+JOVIE_AGENT_PROFILE=coder pnpm --filter @jovie/desktop run typecheck
+JOVIE_AGENT_PROFILE=coder pnpm --filter @jovie/desktop run test
+JOVIE_AGENT_PROFILE=coder pnpm biome check .
+JOVIE_AGENT_PROFILE=coder E2E_USE_TEST_AUTH_BYPASS=1 NEXT_PUBLIC_CLERK_MOCK=1 NEXT_PUBLIC_CLERK_PROXY_DISABLED=1 NODE_OPTIONS=--no-network-family-autoselection pnpm --filter @jovie/web exec next dev -H 127.0.0.1 -p 3112
+JOVIE_AGENT_PROFILE=coder ELECTRON_ENV=local ELECTRON_APP_URL=http://127.0.0.1:3112 node scripts/write-env.mjs
+JOVIE_AGENT_PROFILE=coder pnpm exec tsc
+JOVIE_AGENT_PROFILE=coder ELECTRON_ENV=local ELECTRON_APP_URL=http://127.0.0.1:3112 pnpm exec electron --remote-debugging-port=9223 .
+JOVIE_AGENT_PROFILE=coder pnpm --filter @jovie/web run build
+```
+
+Failed command evidence:
+
+```bash
+JOVIE_AGENT_PROFILE=coder pnpm --filter @jovie/web exec tsx apps/web/scripts/generate-brand-assets.ts
+```
+
+Failed because `pnpm --filter @jovie/web exec` changed the CWD to `apps/web`, doubling the path to `apps/web/apps/web/scripts/generate-brand-assets.ts`. Re-running from the repo root with `pnpm exec tsx apps/web/scripts/generate-brand-assets.ts` passed.
+
+Final passing evidence:
+
+- Focused web auth tests: 3 files passed, 22 tests passed.
+- Desktop icon contract: 6 tests passed.
+- Desktop typecheck: passed.
+- Full desktop tests: passed icon, URL disposition, shell contract, DMG background, and release guard.
+- Web typecheck: passed.
+- Biome write pass: fixed 2 formatting issues, then root `pnpm biome check .` passed with no fixes.
+- Web production build: passed, including static generation for 412 app routes.
+- Icon metadata after regeneration:
+  - `apps/desktop/assets/icon.png` has `hasAlpha=true` and transparent corners.
+  - `apps/desktop/assets/icon-staging.png` has `hasAlpha=true` and transparent corners.
+- Computer Use verified the actual worktree Electron UI:
+  - Initial handoff: wide `820x520` window, logo, and a single `Continue in Browser` button.
+  - No visible duplicate heading/footer copy.
+  - Single click on the accessibility button reached the waiting state with `Cancel Sign-In` and `Check your browser.`
+
+Clerk dashboard/config changes:
+
+- No production Clerk settings changed.
+- No Clerk dashboard changes made for this design cleanup.
+- Local no-secret UI verification intentionally showed the server-side missing-Clerk failure in logs when the opened browser hit `/auth/start`; the prior live Doppler/Clerk smoke remains the auth end-to-end evidence for the full local flow.

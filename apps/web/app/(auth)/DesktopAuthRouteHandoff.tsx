@@ -72,12 +72,7 @@ export function DesktopAuthRouteHandoff() {
   }, [openState]);
 
   const isWaitingInBrowser = openState === 'opened';
-  const statusText =
-    openState === 'opening'
-      ? 'Opening browser...'
-      : isWaitingInBrowser
-        ? 'Continue signing in with your browser.'
-        : openError;
+  const statusText = openState === 'opened' ? 'Check your browser.' : openError;
 
   return (
     <main
@@ -85,17 +80,13 @@ export function DesktopAuthRouteHandoff() {
       data-desktop-auth-state={openState}
       data-testid='desktop-auth-route-handoff'
     >
-      <section className='relative z-10 flex w-full max-w-[320px] flex-col items-center px-4 py-7 text-center'>
-        <BrandLogo aria-hidden size={44} tone='white' />
-        <h1 className='mt-5 text-[17px] font-medium leading-6'>
-          {isWaitingInBrowser
-            ? 'Continue signing in with your browser'
-            : 'Continue in Browser'}
-        </h1>
+      <section className='relative z-10 flex w-full max-w-[360px] flex-col items-center px-6 py-16 text-center'>
+        <BrandLogo aria-hidden size={60} tone='white' />
+        <h1 className='sr-only'>Sign in to Jovie</h1>
         {isWaitingInBrowser ? null : (
           <button
             type='button'
-            className='mt-6 inline-flex h-10 w-full items-center justify-center rounded-full bg-white px-4 text-[13px] font-medium text-black transition-colors hover:bg-white/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/35 disabled:cursor-not-allowed disabled:opacity-55'
+            className='mt-8 inline-flex h-11 w-full items-center justify-center rounded-full bg-white px-4 text-[13px] font-medium text-black transition-colors hover:bg-white/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/35 disabled:cursor-not-allowed disabled:opacity-55'
             disabled={openState === 'opening'}
             onClick={() => {
               void openAuthUrl();

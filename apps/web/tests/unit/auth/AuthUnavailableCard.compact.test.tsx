@@ -24,5 +24,11 @@ describe('AuthUnavailableCard', () => {
       name: 'Sign in is temporarily unavailable',
     });
     expect(heading.className).not.toContain('clamp(2.9rem');
+    expect(
+      screen.getByText("This environment's sign-in setup is not ready.")
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByText(/If it still does not work/i)
+    ).not.toBeInTheDocument();
   });
 });

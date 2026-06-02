@@ -42,6 +42,7 @@ describe('DesktopAuthPage', () => {
     ).toString();
 
     expect(openDesktopAuthUrlMock).not.toHaveBeenCalled();
+    expect(screen.getAllByText('Continue in Browser')).toHaveLength(1);
 
     fireEvent.click(
       screen.getByRole('button', { name: 'Continue in Browser' })
@@ -51,9 +52,10 @@ describe('DesktopAuthPage', () => {
       expect(openDesktopAuthUrlMock).toHaveBeenCalledTimes(1);
       expect(openDesktopAuthUrlMock).toHaveBeenCalledWith(expectedAuthUrl);
     });
+    expect(await screen.findByText('Check your browser.')).toBeInTheDocument();
     expect(
-      await screen.findByText('Continue signing in with your browser')
-    ).toBeInTheDocument();
+      screen.queryByText('Continue signing in with your browser')
+    ).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: 'Cancel Sign-In' }));
 
@@ -92,9 +94,10 @@ describe('DesktopAuthPage', () => {
     await waitFor(() => {
       expect(openDesktopAuthUrlMock).toHaveBeenCalledTimes(2);
     });
+    expect(await screen.findByText('Check your browser.')).toBeInTheDocument();
     expect(
-      await screen.findByText('Continue signing in with your browser')
-    ).toBeInTheDocument();
+      screen.queryByText('Continue signing in with your browser')
+    ).not.toBeInTheDocument();
   });
 
   it('recovers when browser launch rejects', async () => {
@@ -127,9 +130,10 @@ describe('DesktopAuthPage', () => {
     await waitFor(() => {
       expect(openDesktopAuthUrlMock).toHaveBeenCalledTimes(2);
     });
+    expect(await screen.findByText('Check your browser.')).toBeInTheDocument();
     expect(
-      await screen.findByText('Continue signing in with your browser')
-    ).toBeInTheDocument();
+      screen.queryByText('Continue signing in with your browser')
+    ).not.toBeInTheDocument();
   });
 
   it('disables continue only while a browser launch is pending', async () => {
@@ -191,6 +195,7 @@ describe('DesktopAuthRouteHandoff', () => {
       screen.getByTestId('desktop-auth-route-handoff')
     ).toBeInTheDocument();
     expect(openDesktopAuthUrlMock).not.toHaveBeenCalled();
+    expect(screen.getAllByText('Continue in Browser')).toHaveLength(1);
 
     fireEvent.click(
       screen.getByRole('button', { name: 'Continue in Browser' })
@@ -200,9 +205,10 @@ describe('DesktopAuthRouteHandoff', () => {
       expect(openDesktopAuthUrlMock).toHaveBeenCalledTimes(1);
       expect(openDesktopAuthUrlMock).toHaveBeenCalledWith(window.location.href);
     });
+    expect(await screen.findByText('Check your browser.')).toBeInTheDocument();
     expect(
-      await screen.findByText('Continue signing in with your browser')
-    ).toBeInTheDocument();
+      screen.queryByText('Continue signing in with your browser')
+    ).not.toBeInTheDocument();
   });
 
   it('recovers when route handoff browser launch rejects', async () => {

@@ -109,10 +109,10 @@ interface RecentDesktopAuthCompletion {
 }
 
 const AUTH_HANDOFF_WINDOW_BOUNDS = {
-  width: 420,
-  height: 360,
-  minWidth: 360,
-  minHeight: 320,
+  width: 820,
+  height: 520,
+  minWidth: 680,
+  minHeight: 460,
 } as const;
 const AUTH_COMPLETION_REPLAY_TTL_MS = 60_000;
 

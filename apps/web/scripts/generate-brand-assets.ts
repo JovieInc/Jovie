@@ -66,6 +66,8 @@ const MAC_ICONSET_ENTRIES = [
 const INK = '#08090a';
 const CREAM = '#F5F4F0';
 const APP_ICON_PADDING = 0.14;
+const DESKTOP_APP_ICON_PADDING = 0.2;
+const DESKTOP_APP_ICON_RADIUS = 0.22;
 const MARK_PADDING = 0;
 
 function markSvg(color: string): string {
@@ -161,13 +163,17 @@ async function writeSvg(file: string, content: string): Promise<void> {
   console.log(`wrote ${file}`);
 }
 
-async function renderPng(
+type RenderPngOptions = {
+  readonly background?: string;
+  readonly padding?: number;
+  readonly opaque?: boolean;
+};
+
+async function renderPngBuffer(
   svg: string,
-  output: string,
   size: number,
-  options?: { background?: string; padding?: number; opaque?: boolean }
-): Promise<void> {
-  await mkdir(dirname(output), { recursive: true });
+  options?: RenderPngOptions
+): Promise<Buffer> {
   const innerSize = options?.padding
     ? Math.round(size * (1 - options.padding * 2))
     : size;
@@ -202,7 +208,17 @@ async function renderPng(
       .flatten({ background: options.background ?? INK })
       .removeAlpha();
   }
-  await pipeline.png({ compressionLevel: 9 }).toFile(output);
+  return pipeline.png({ compressionLevel: 9 }).toBuffer();
+}
+
+async function renderPng(
+  svg: string,
+  output: string,
+  size: number,
+  options?: RenderPngOptions
+): Promise<void> {
+  await mkdir(dirname(output), { recursive: true });
+  await writeFile(output, await renderPngBuffer(svg, size, options));
   console.log(`wrote ${output} (${size}×${size})`);
 }
 
@@ -212,6 +228,31 @@ async function renderAppIcon(output: string, size: number): Promise<void> {
     padding: APP_ICON_PADDING,
     opaque: true,
   });
+}
+
+async function renderDesktopAppIcon(
+  output: string,
+  size: number
+): Promise<void> {
+  await mkdir(dirname(output), { recursive: true });
+  const radius = Math.round(size * DESKTOP_APP_ICON_RADIUS);
+  const backgroundSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 ${size} ${size}"><rect width="${size}" height="${size}" rx="${radius}" fill="${INK}"/></svg>`;
+  const mark = await renderPngBuffer(markSvg(CREAM), size, {
+    padding: DESKTOP_APP_ICON_PADDING,
+  });
+
+  await sharp({
+    create: {
+      width: size,
+      height: size,
+      channels: 4,
+      background: { r: 0, g: 0, b: 0, alpha: 0 },
+    },
+  })
+    .composite([{ input: Buffer.from(backgroundSvg) }, { input: mark }])
+    .png({ compressionLevel: 9 })
+    .toFile(output);
+  console.log(`wrote ${output} (${size}×${size})`);
 }
 
 async function renderTransparentMark(
@@ -231,13 +272,16 @@ async function clearStaleDesktopIconCaches(): Promise<void> {
   );
 }
 
+type IconRenderer = (output: string, size: number) => Promise<void>;
+
 async function generateMacIcns(
   output: string,
-  iconsetDir: string
+  iconsetDir: string,
+  renderIcon: IconRenderer = renderAppIcon
 ): Promise<void> {
   try {
     for (const [fileName, size] of MAC_ICONSET_ENTRIES) {
-      await renderAppIcon(resolve(iconsetDir, fileName), size);
+      await renderIcon(resolve(iconsetDir, fileName), size);
     }
 
     const result = spawnSync(
@@ -291,15 +335,20 @@ async function generateIosIcons(): Promise<void> {
 
 async function generateDesktopIcons(): Promise<void> {
   await clearStaleDesktopIconCaches();
-  await renderAppIcon(resolve(DESKTOP_ASSETS_DIR, 'icon.png'), 512);
-  await renderAppIcon(resolve(DESKTOP_ASSETS_DIR, 'icon-staging.png'), 512);
+  await renderDesktopAppIcon(resolve(DESKTOP_ASSETS_DIR, 'icon.png'), 512);
+  await renderDesktopAppIcon(
+    resolve(DESKTOP_ASSETS_DIR, 'icon-staging.png'),
+    512
+  );
   await generateMacIcns(
     resolve(DESKTOP_ASSETS_DIR, 'icon.icns'),
-    resolve(DESKTOP_ASSETS_DIR, 'icon.iconset')
+    resolve(DESKTOP_ASSETS_DIR, 'icon.iconset'),
+    renderDesktopAppIcon
   );
   await generateMacIcns(
     resolve(DESKTOP_ASSETS_DIR, 'icon-staging.icns'),
-    resolve(DESKTOP_ASSETS_DIR, 'icon-staging.iconset')
+    resolve(DESKTOP_ASSETS_DIR, 'icon-staging.iconset'),
+    renderDesktopAppIcon
   );
 }
 
@@ -307,7 +356,11 @@ async function generateContactSheet(): Promise<void> {
   await mkdir(dirname(CONTACT_SHEET_PATH), { recursive: true });
   const samples = [
     { label: 'iOS', file: resolve(IOS_APP_ICON_DIR, 'AppIcon-1024@1x.png') },
-    { label: 'Electron', file: resolve(DESKTOP_ASSETS_DIR, 'icon.png') },
+    {
+      label: 'Electron',
+      file: resolve(DESKTOP_ASSETS_DIR, 'icon.png'),
+      previewBackground: CREAM,
+    },
     { label: 'Apple Touch', file: resolve(PUBLIC, 'apple-touch-icon.png') },
     { label: 'PWA 192', file: resolve(PUBLIC, 'web-app-manifest-192x192.png') },
     { label: 'PWA 512', file: resolve(PUBLIC, 'web-app-manifest-512x512.png') },
@@ -432,7 +485,9 @@ export async function generateBrandAssets(): Promise<void> {
   // 9. Transparent in-app mark. App icons do not consume this file.
   await renderTransparentMark(resolve(PUBLIC, 'Jovie-logo.png'), 1024);
 
-  // 10. Native app icons from the same app-icon profile.
+  // 10. Native app icons. iOS keeps the opaque app-icon profile; Electron uses
+  //     transparent rounded corners so Dock and app-switcher previews do not
+  //     render as a raw square.
   await generateIosIcons();
   await generateDesktopIcons();
   await generateContactSheet();
