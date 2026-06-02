@@ -27,7 +27,13 @@ suite, and app-state suite passed, and the known live Clerk auth hardening PR
 merged as #9907. The iOS launch-performance baseline passed as an opt-in
 XCUITest on `origin/main` `546e2af1f4`; it averaged `3.01s` to the signed-out
 shell under UI-test automation, so the 2s target remains tracked by JOV-2712
-and is not classified as a critical bug in this ledger. The iOS memory command
-captured the deterministic profile shell at `36.6M` physical footprint and
-recorded the local `leaks --outputGraph` blocker; memgraph-backed leak proof is
-tracked by JOV-2712 rather than classified as a reproduced critical bug here.
+and is not classified as a critical bug in this ledger. The runtime-performance
+command now captures the deterministic Chat to Profile to Chat shell transition
+with clock, CPU, and memory metrics; the local baseline averaged `2.725s`
+monotonic time and `59695.770 kB` peak physical memory across 5 measured
+iterations. Local simulator graphics probes could not capture frame/hitch data,
+so frame-drop proof remains tracked by JOV-2712 rather than classified as a
+reproduced critical bug here. The iOS memory command captured the deterministic
+profile shell at `36.6M` physical footprint and recorded the local
+`leaks --outputGraph` blocker; memgraph-backed leak proof is tracked by JOV-2712
+rather than classified as a reproduced critical bug here.

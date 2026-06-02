@@ -84,7 +84,18 @@ Native iOS foundation for Jovie. The app is dark-only, simulator-tested, and wir
    `JOVIE_IOS_LAUNCH_TIMEOUT_SECONDS` only when recording an explicit readiness
    timeout.
 
-8. Capture memory/leak baseline evidence:
+8. Capture runtime-performance evidence:
+
+   ```bash
+   pnpm run ios:runtime-performance
+   ```
+
+   This opt-in run measures the deterministic Chat to Profile to Chat shell
+   transition with clock, CPU, and memory metrics. Logs, result bundles, and run
+   summaries are stored under
+   `artifacts/ios-test-results/runtime-performance`.
+
+9. Capture memory/leak baseline evidence:
 
    ```bash
    pnpm run ios:memory

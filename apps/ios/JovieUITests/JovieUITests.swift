@@ -113,6 +113,43 @@ final class JovieUITests: XCTestCase {
 
   }
 
+  func testShellNavigationRuntimePerformance() throws {
+    guard testEnvironmentValue("JOVIE_IOS_RUNTIME_PERFORMANCE") == "1" else {
+      throw XCTSkip("Set JOVIE_IOS_RUNTIME_PERFORMANCE=1 to run shell runtime performance evidence.")
+    }
+
+    let timeoutSeconds =
+      Double(testEnvironmentValue("JOVIE_IOS_RUNTIME_TIMEOUT_SECONDS") ?? "") ?? 3
+    let app = launchMockApp(launchArgument: "-ui-testing-chat", expectedElementDescription: "\"Ask Jovie\"") {
+      $0.textFields["Ask Jovie"]
+    }
+
+    let profileTab = app.buttons["shell-tab-profile"]
+    let chatTab = app.buttons["shell-tab-chat"]
+    let profileReady = app.buttons["Copy URL"]
+    let chatReady = app.textFields["Ask Jovie"]
+
+    XCTAssertTrue(
+      profileTab.waitForExistence(timeout: timeoutSeconds),
+      "Bottom navigation did not appear before runtime measurement.\n\(app.debugDescription)"
+    )
+    XCTAssertTrue(chatTab.exists)
+
+    measure(metrics: shellRuntimeMetrics(for: app)) {
+      profileTab.tap()
+      XCTAssertTrue(
+        waitForHittable(profileReady, timeout: timeoutSeconds),
+        "Measured transition to Profile did not finish within \(timeoutSeconds) seconds.\n\(app.debugDescription)"
+      )
+
+      chatTab.tap()
+      XCTAssertTrue(
+        waitForHittable(chatReady, timeout: timeoutSeconds),
+        "Measured transition to Chat did not finish within \(timeoutSeconds) seconds.\n\(app.debugDescription)"
+      )
+    }
+  }
+
   func testShellMenuAndSettingsNavigationAreFullScreen() {
     let app = launchMockApp(launchArgument: "-ui-testing-ready", expectedElementDescription: "\"Copy URL\"") {
       $0.buttons["Copy URL"]
@@ -424,6 +461,28 @@ final class JovieUITests: XCTestCase {
       line: line
     )
     return app
+  }
+
+  private func shellRuntimeMetrics(for app: XCUIApplication) -> [any XCTMetric] {
+    [
+      XCTClockMetric(),
+      XCTCPUMetric(application: app),
+      XCTMemoryMetric(application: app),
+    ]
+  }
+
+  private func waitForHittable(_ element: XCUIElement, timeout: TimeInterval) -> Bool {
+    let deadline = Date().addingTimeInterval(timeout)
+
+    while Date() < deadline {
+      if element.exists && element.isHittable {
+        return true
+      }
+
+      RunLoop.current.run(until: Date().addingTimeInterval(0.05))
+    }
+
+    return element.exists && element.isHittable
   }
 
   private func openAuthCallbackURL(
