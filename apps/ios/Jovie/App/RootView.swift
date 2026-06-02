@@ -165,6 +165,7 @@ private enum LiveAuthBootstrapper {
 private struct AppContentView: View {
   @Bindable var appState: AppState
   let isAuthAvailable: Bool
+  let isSignInUnavailable: Bool
   let authErrorMessage: String?
   let onLogout: @MainActor () async -> Void
   let onAuthReturn: @MainActor (MobileAuthReturn) -> Void
@@ -178,6 +179,7 @@ private struct AppContentView: View {
       case .signedOut:
         AuthScreen(
           isMock: !isAuthAvailable,
+          isSignInUnavailable: isSignInUnavailable,
           webBaseURL: appState.configuration.webBaseURL,
           errorMessage: authErrorMessage,
           onAuthReturn: onAuthReturn,
@@ -305,6 +307,7 @@ private struct ChatComposerPreview: View {
 struct RootView: View {
   @Bindable var appState: AppState
   let isAuthAvailable: Bool
+  let isSignInUnavailable: Bool
   let liveUserID: String?
   let authErrorMessage: String?
   let onLogout: @MainActor () async -> Void
@@ -316,6 +319,7 @@ struct RootView: View {
       AppContentView(
         appState: appState,
         isAuthAvailable: isAuthAvailable,
+        isSignInUnavailable: isSignInUnavailable,
         authErrorMessage: authErrorMessage,
         onLogout: onLogout,
         onAuthReturn: onAuthReturn,
@@ -460,6 +464,7 @@ struct UITestingAuthCallbackRoot: View {
     RootView(
       appState: appState,
       isAuthAvailable: false,
+      isSignInUnavailable: false,
       liveUserID: liveUserID,
       authErrorMessage: authErrorMessage,
       onLogout: { await appState.signOut() },
@@ -565,6 +570,7 @@ struct LiveRootContainer: View {
     RootView(
       appState: appState,
       isAuthAvailable: true,
+      isSignInUnavailable: false,
       liveUserID: clerk.user?.id,
       authErrorMessage: authErrorMessage,
       onLogout: {

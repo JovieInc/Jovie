@@ -12,6 +12,7 @@ private let authLogger = Logger(
 
 struct AuthScreen: View {
   let isMock: Bool
+  let isSignInUnavailable: Bool
   let webBaseURL: URL
   let errorMessage: String?
   let onAuthReturn: @MainActor (MobileAuthReturn) -> Void
@@ -33,7 +34,7 @@ struct AuthScreen: View {
 
           BrowserAuthActions(
             isOpening: didRequestBrowserAuth,
-            isDisabled: isMock,
+            isDisabled: isSignInUnavailable,
             errorMessage: errorMessage,
             action: startBrowserAuth
           )
