@@ -344,18 +344,25 @@ MATCHING_PROCESSES="$(
   ' "$LAUNCHCTL_LIST"
 )"
 
+SIMCTL_PROCESS_LINE=""
 if [[ -n "$SIMCTL_LAUNCH_PID" ]]; then
-  PID="$SIMCTL_LAUNCH_PID"
-  PID_SOURCE="simctl launch"
-  PROCESS_LABEL="$(
-    awk -v pid="$PID" '
+  SIMCTL_PROCESS_LINE="$(
+    printf "%s\n" "$MATCHING_PROCESSES" | awk -v pid="$SIMCTL_LAUNCH_PID" '
       $1 == pid {
-        print $3
+        print
         exit
       }
-    ' "$LAUNCHCTL_LIST"
+    '
   )"
-  PROCESS_LABEL="${PROCESS_LABEL:-$BUNDLE_ID}"
+fi
+
+if [[ -n "$SIMCTL_PROCESS_LINE" ]]; then
+  PID="$SIMCTL_LAUNCH_PID"
+  PID_SOURCE="simctl launch"
+  PROCESS_LABEL="$(printf "%s\n" "$SIMCTL_PROCESS_LINE" | cut -f2-)"
+elif [[ -n "$SIMCTL_LAUNCH_PID" && -z "$MATCHING_PROCESSES" ]]; then
+  echo "Launch reported PID $SIMCTL_LAUNCH_PID, but $BUNDLE_ID is no longer running on $IPHONE_UDID." >&2
+  exit 1
 elif [[ -z "$MATCHING_PROCESSES" ]]; then
   echo "Could not find a running PID for $BUNDLE_ID on $IPHONE_UDID."
   exit 1
