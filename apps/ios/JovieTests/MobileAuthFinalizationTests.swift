@@ -40,6 +40,59 @@ struct MobileAuthFinalizationTests {
     #expect(plan == .requiresClerkTicketFlow(ticket: "ticket_only"))
   }
 
+  @Test func liveLaunchConfigurationUsesMockForNonLiveModes() {
+    let result = LiveLaunchConfigurationResolver.resolve(
+      launchMode: .uiTestingSignedOut,
+      loadLiveConfiguration: {
+        throw ClerkPublishableKeyValidationError.developmentKeyInDistribution
+      },
+      loadUnvalidatedConfiguration: {
+        testConfiguration(clerkPublishableKey: "pk_test_fallback")
+      }
+    )
+
+    #expect(result.configuration.clerkPublishableKey == AppConfiguration.mock.clerkPublishableKey)
+    #expect(result.shouldConfigureClerk == false)
+    #expect(result.authErrorMessage == nil)
+  }
+
+  @Test func liveLaunchConfigurationEnablesClerkForValidLiveConfig() {
+    let configuration = testConfiguration(clerkPublishableKey: "pk_live_prod")
+
+    let result = LiveLaunchConfigurationResolver.resolve(
+      launchMode: .live,
+      loadLiveConfiguration: { configuration },
+      loadUnvalidatedConfiguration: {
+        testConfiguration(clerkPublishableKey: "pk_test_fallback")
+      }
+    )
+
+    #expect(result.configuration.clerkPublishableKey == "pk_live_prod")
+    #expect(result.shouldConfigureClerk == true)
+    #expect(result.authErrorMessage == nil)
+  }
+
+  @Test func liveLaunchConfigurationFailsClosedForInvalidDistributionConfig() {
+    let fallbackConfiguration = testConfiguration(
+      clerkPublishableKey: "pk_test_bW9zdC1rb2FsYS04NC5jbGVyay5hY2NvdW50cy5kZXYk"
+    )
+
+    let result = LiveLaunchConfigurationResolver.resolve(
+      launchMode: .live,
+      loadLiveConfiguration: {
+        throw ClerkPublishableKeyValidationError.developmentKeyInDistribution
+      },
+      loadUnvalidatedConfiguration: { fallbackConfiguration }
+    )
+
+    #expect(result.configuration.clerkPublishableKey == fallbackConfiguration.clerkPublishableKey)
+    #expect(result.shouldConfigureClerk == false)
+    #expect(
+      result.authErrorMessage ==
+        "Sign-in is unavailable in this build. Install the latest TestFlight build or try again later."
+    )
+  }
+
   @Test func rejectsPlaceholderClerkKeyInDistributionBuilds() {
 #if DEBUG
     // Development builds may use pk_test keys locally.
@@ -70,5 +123,17 @@ struct MobileAuthFinalizationTests {
       "pk_live_production_instance.clerk.accounts.dev"
     )
 #endif
+  }
+
+  private func testConfiguration(clerkPublishableKey: String) -> AppConfiguration {
+    AppConfiguration(
+      clerkPublishableKey: clerkPublishableKey,
+      apiBaseURL: URL(string: "https://jov.ie")!,
+      webBaseURL: URL(string: "https://jov.ie")!,
+      sentryDSN: nil,
+      observabilityEnvironment: "test",
+      clerkRedirectUrl: "ie.jov.jovie://callback",
+      clerkCallbackUrlScheme: "ie.jov.jovie"
+    )
   }
 }
