@@ -135,43 +135,30 @@
 
 .marketing-glass-header__cta {
   display: inline-flex;
-  min-height: var(--space-8);
+  min-height: 2rem;
   align-items: center;
   justify-content: center;
-  padding-inline: var(--space-4);
-  border: 1px solid
-    color-mix(in oklab, var(--color-text-primary-token) 16%, transparent);
-  border-radius: var(--system-b-radius-pill);
-  background: color-mix(
-    in oklab,
-    var(--color-text-primary-token) 6%,
-    transparent
-  );
-  color: var(--color-text-primary-token);
+  padding-inline: 0.94rem;
+  border: 1px solid rgba(255, 255, 255, 0.92);
+  border-radius: 999px;
+  background: #ffffff;
+  color: #050506;
   font-family: var(--marketing-font-body);
-  font-size: var(--text-app);
-  font-weight: var(--font-weight-semibold);
+  font-size: 0.79rem;
+  font-weight: 600;
   letter-spacing: 0;
   line-height: 1;
   text-decoration: none;
-  box-shadow: none;
+  box-shadow: 0 8px 24px rgba(255, 255, 255, 0.1);
   transition:
-    background-color var(--system-b-duration-fast) var(--system-b-ease),
-    border-color var(--system-b-duration-fast) var(--system-b-ease);
+    background-color 140ms ease,
+    border-color 140ms ease;
 }
 
 .marketing-glass-header__cta:hover,
 .marketing-glass-header__cta:focus-visible {
-  border-color: color-mix(
-    in oklab,
-    var(--color-text-primary-token) 24%,
-    transparent
-  );
-  background: color-mix(
-    in oklab,
-    var(--color-text-primary-token) 10%,
-    transparent
-  );
+  border-color: #ffffff;
+  background: rgba(255, 255, 255, 0.9);
 }
 
 .marketing-glass-header__flyout {
