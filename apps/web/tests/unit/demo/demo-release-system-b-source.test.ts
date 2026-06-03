@@ -1,5 +1,6 @@
 import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
+import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 
 const demoReleaseSources = [
@@ -15,10 +16,12 @@ const duplicatedProviderAccentPatterns = [
   /#[0-9a-fA-F]{3,8}/,
 ] as const;
 
+const webRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../../..');
+
 describe('demo release System B source contract', () => {
   it('keeps demo release provider accents on the canonical provider config', () => {
     for (const sourcePath of demoReleaseSources) {
-      const source = readFileSync(resolve(process.cwd(), sourcePath), 'utf8');
+      const source = readFileSync(resolve(webRoot, sourcePath), 'utf8');
 
       for (const pattern of duplicatedProviderAccentPatterns) {
         expect(source, `${sourcePath} matched ${pattern}`).not.toMatch(pattern);
