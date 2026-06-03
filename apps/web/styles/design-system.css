@@ -2651,7 +2651,7 @@ body:has(.system-b-download-page) .marketing-glass-header__cta:focus-visible {
   color: var(--color-text-secondary-token);
   text-align: left;
   box-shadow: 0 1px 2px
-    color-mix(in oklab, var(--system-b-accent-blue) 4%, transparent);
+    color-mix(in oklab, var(--system-b-accent-cyan) 4%, transparent);
   transition:
     background-color var(--duration-fast) var(--ease-subtle),
     border-color var(--duration-fast) var(--ease-subtle),

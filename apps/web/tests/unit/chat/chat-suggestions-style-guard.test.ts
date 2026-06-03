@@ -1,6 +1,9 @@
 import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
+import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
+
+const appRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../../..');
 
 const guardedSources = [
   'components/jovie/components/SuggestedProfilesCarousel.tsx',
@@ -22,7 +25,7 @@ const forbiddenVisualPatterns = [
 describe('chat suggestions and slash picker System B source contract', () => {
   it('keeps prompts, slash headers, suggestion cards, and transcript chips on named primitives', () => {
     for (const sourcePath of guardedSources) {
-      const source = readFileSync(resolve(process.cwd(), sourcePath), 'utf8');
+      const source = readFileSync(resolve(appRoot, sourcePath), 'utf8');
 
       for (const pattern of forbiddenVisualPatterns) {
         expect(source, `${sourcePath} matched ${pattern}`).not.toMatch(pattern);
@@ -32,7 +35,7 @@ describe('chat suggestions and slash picker System B source contract', () => {
 
   it('keeps suggested profile cards on the System B card depth token', () => {
     const styles = readFileSync(
-      resolve(process.cwd(), 'styles/design-system.css'),
+      resolve(appRoot, 'styles/design-system.css'),
       'utf8'
     );
 

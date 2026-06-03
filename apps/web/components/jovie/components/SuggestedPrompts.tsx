@@ -285,7 +285,7 @@ export function SuggestedPrompts({
               disabled={
                 suggestion.label === 'Generate album art' && albumArtDisabled
               }
-              className='system-b-chat-suggested-prompts-flat-button'
+              className='group system-b-chat-suggested-prompts-flat-button'
               aria-label={suggestion.label}
               title={
                 suggestion.label === 'Generate album art'
