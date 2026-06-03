@@ -152,12 +152,12 @@ export default async function DownloadPage() {
       <script type='application/ld+json'>{FAQ_SCHEMA}</script>
       <script type='application/ld+json'>{BREADCRUMB_SCHEMA}</script>
 
-      <main className='overflow-x-clip bg-black text-white'>
+      <main className='system-b-download-page'>
         <section
           className='homepage-hero-stage relative'
           aria-labelledby='download-hero-heading'
         >
-          <div className='homepage-hero-shell relative flex min-h-[100svh] flex-col overflow-hidden pt-[calc(var(--linear-header-height)+clamp(4.5rem,8vw,7rem))]'>
+          <div className='homepage-hero-shell system-b-download-hero-shell'>
             <div
               aria-hidden='true'
               className='homepage-hero-shell__layer homepage-hero-shell__beam'
@@ -168,20 +168,20 @@ export default async function DownloadPage() {
 
             <MarketingContainer
               width='page'
-              className='relative z-[3] flex flex-1 flex-col'
+              className='system-b-download-hero-container'
             >
-              <div className='grid min-h-0 flex-1 items-center gap-12 pb-[clamp(3.5rem,7vw,6rem)] lg:grid-cols-[minmax(0,0.78fr)_minmax(0,1fr)] lg:gap-16'>
-                <div className='max-w-[45rem]'>
+              <div className='system-b-download-hero-grid'>
+                <div className='system-b-download-hero-copy'>
                   <p className='homepage-section-eyebrow'>
                     Mac app available now / iPhone alpha in TestFlight
                   </p>
                   <h1
                     id='download-hero-heading'
-                    className='mt-5 text-balance text-[clamp(3.3rem,7vw,7.5rem)] font-[680] leading-[0.92] tracking-[-0.055em] text-white'
+                    className='system-b-download-hero-title'
                   >
                     Jovie, installed where you work.
                   </h1>
-                  <p className='mt-6 max-w-[40rem] text-balance text-[clamp(1.08rem,1.55vw,1.35rem)] leading-[1.45] tracking-[-0.015em] text-white/66'>
+                  <p className='system-b-download-hero-lead'>
                     Run the native Mac workspace today. Keep the iPhone build
                     internal while we harden auth, Profile QR, and TestFlight.
                   </p>
@@ -189,7 +189,7 @@ export default async function DownloadPage() {
                     <Button
                       asChild
                       variant='whitePill'
-                      className='h-11 gap-2 px-6 text-[15px] font-semibold'
+                      className='system-b-download-hero-button'
                     >
                       <a
                         href={DOWNLOAD_URL}
@@ -205,20 +205,20 @@ export default async function DownloadPage() {
                     </Button>
                     <Link
                       href='#ios-alpha'
-                      className='inline-flex h-11 items-center rounded-full px-4 text-[15px] font-semibold text-white/72 transition-colors duration-subtle hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/35 focus-visible:ring-offset-2 focus-visible:ring-offset-black'
+                      className='system-b-download-secondary-link'
                     >
                       iPhone status
                     </Link>
                   </div>
-                  <div className='mt-6 flex flex-wrap gap-x-5 gap-y-2 text-[13px] leading-5 text-white/48'>
+                  <div className='system-b-download-meta'>
                     <span>Developer ID signed</span>
                     <span>Apple notarized</span>
                     {meta ? <span>{meta}</span> : null}
                   </div>
                 </div>
 
-                <div className='relative min-h-[24rem] lg:min-h-[36rem]'>
-                  <div className='absolute inset-x-0 bottom-0 top-[8%] overflow-hidden rounded-[10px] border border-white/[0.08] bg-white/[0.035] shadow-[0_44px_140px_rgba(0,0,0,0.52)]'>
+                <div className='system-b-download-media-stage'>
+                  <div className='system-b-download-desktop-frame'>
                     <Image
                       src={DESKTOP_IMAGE.publicUrl}
                       alt='Jovie native desktop workspace showing releases and release planning'
@@ -227,10 +227,10 @@ export default async function DownloadPage() {
                       priority
                       sizes='(min-width: 1024px) 54vw, 92vw'
                       quality={85}
-                      className='h-full w-full object-cover object-left-top opacity-92'
+                      className='system-b-download-desktop-image'
                     />
                   </div>
-                  <div className='absolute right-0 top-0 w-[min(34vw,13rem)] overflow-hidden rounded-[28px] border border-white/[0.1] bg-black shadow-[0_28px_90px_rgba(0,0,0,0.65)] max-sm:hidden'>
+                  <div className='system-b-download-phone-frame max-sm:hidden'>
                     <Image
                       src={PROFILE_IMAGE.publicUrl}
                       alt='Jovie iPhone alpha profile QR and public profile surface'
@@ -248,9 +248,9 @@ export default async function DownloadPage() {
           </div>
         </section>
 
-        <section className='border-y border-white/[0.08] bg-black'>
+        <section className='system-b-download-platform-section'>
           <MarketingContainer width='page'>
-            <div className='grid divide-y divide-white/[0.08] lg:grid-cols-2 lg:divide-x lg:divide-y-0'>
+            <div className='system-b-download-platform-grid'>
               {PLATFORM_ROWS.map(platform => {
                 const Icon = platform.icon;
                 const isMac = platform.label === 'Mac';
@@ -258,24 +258,22 @@ export default async function DownloadPage() {
                   <div
                     key={platform.label}
                     id={isMac ? undefined : 'ios-alpha'}
-                    className='py-[clamp(2.5rem,5vw,4.5rem)] lg:px-[clamp(2rem,4vw,4rem)] first:lg:pl-0 last:lg:pr-0'
+                    className='system-b-download-platform-card'
                   >
-                    <div className='flex items-center gap-3 text-white/46'>
+                    <div className='system-b-download-platform-kicker'>
                       <Icon className='size-4' aria-hidden='true' />
-                      <span className='text-[12px] font-semibold uppercase tracking-[0.18em]'>
-                        {platform.label}
-                      </span>
+                      <span>{platform.label}</span>
                     </div>
-                    <h2 className='mt-5 max-w-[16ch] text-balance text-[clamp(2rem,3.2vw,3.2rem)] font-[650] leading-[1.02] tracking-[-0.04em] text-white'>
+                    <h2 className='system-b-download-platform-title'>
                       {platform.title}
                     </h2>
-                    <p className='mt-4 max-w-[34rem] text-[16px] leading-7 text-white/58'>
+                    <p className='system-b-download-platform-body'>
                       {platform.body}
                     </p>
                     {isMac ? (
                       <a
                         href={platform.href}
-                        className='mt-7 inline-flex h-10 items-center gap-2 rounded-full bg-white px-5 text-[14px] font-semibold text-black transition-opacity duration-subtle hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40 focus-visible:ring-offset-2 focus-visible:ring-offset-black'
+                        className='system-b-download-platform-action'
                         data-analytics-event='download_mac_dmg'
                         data-analytics-source='download_page_platform'
                       >
@@ -286,7 +284,7 @@ export default async function DownloadPage() {
                         {platform.action}
                       </a>
                     ) : (
-                      <div className='mt-7 inline-flex h-10 items-center rounded-full border border-white/[0.14] px-5 text-[14px] font-semibold text-white/48'>
+                      <div className='system-b-download-platform-inactive'>
                         {platform.action}
                       </div>
                     )}
@@ -297,83 +295,75 @@ export default async function DownloadPage() {
           </MarketingContainer>
         </section>
 
-        <MarketingContainer width='page' className='py-[clamp(5rem,9vw,8rem)]'>
-          <div className='grid gap-14 lg:grid-cols-[0.72fr_1fr] lg:gap-20'>
+        <MarketingContainer width='page' className='system-b-download-workflow'>
+          <div className='system-b-download-workflow-grid'>
             <div>
               <p className='homepage-section-eyebrow'>Release workflow</p>
-              <h2 className='mt-4 max-w-[13ch] text-balance text-[clamp(2.5rem,4.6vw,4.8rem)] font-[650] leading-[0.98] tracking-[-0.05em] text-white'>
+              <h2 className='system-b-download-section-title'>
                 Everything in Jovie, closer.
               </h2>
             </div>
             <div className='grid gap-x-10 gap-y-10 sm:grid-cols-2'>
               {FEATURE_ROWS.map(row => (
                 <section key={row.title}>
-                  <div className='mb-4 flex size-8 items-center justify-center rounded-full bg-white/[0.08] text-white/82'>
+                  <div className='system-b-download-feature-icon'>
                     <Check className='size-4' aria-hidden='true' />
                   </div>
-                  <h3 className='text-[1.35rem] font-semibold tracking-[-0.03em] text-white'>
+                  <h3 className='system-b-download-feature-title'>
                     {row.title}
                   </h3>
-                  <p className='mt-3 text-[15px] leading-7 text-white/55'>
-                    {row.body}
-                  </p>
+                  <p className='system-b-download-feature-body'>{row.body}</p>
                 </section>
               ))}
             </div>
           </div>
         </MarketingContainer>
 
-        <section className='border-y border-white/[0.08] bg-[#050506]'>
+        <section className='system-b-download-details-section'>
           <MarketingContainer
             width='page'
-            className='py-[clamp(4rem,7vw,6rem)]'
+            className='system-b-download-details-container'
           >
-            <div className='grid gap-12 lg:grid-cols-[0.78fr_1fr] lg:items-start'>
+            <div className='system-b-download-details-grid'>
               <div>
                 <p className='homepage-section-eyebrow'>Install details</p>
-                <h2 className='mt-4 max-w-[13ch] text-balance text-[clamp(2.25rem,3.8vw,4rem)] font-[650] leading-[1] tracking-[-0.045em] text-white'>
+                <h2 className='system-b-download-details-title'>
                   Built to stay out of the way.
                 </h2>
               </div>
               <div className='grid gap-8 sm:grid-cols-3'>
                 <div>
-                  <ShieldCheck className='mb-4 size-5 text-white/72' />
-                  <h3 className='text-[17px] font-semibold text-white'>
-                    Signed
-                  </h3>
-                  <p className='mt-2 text-sm leading-6 text-white/52'>
+                  <ShieldCheck className='system-b-download-detail-icon' />
+                  <h3 className='system-b-download-detail-title'>Signed</h3>
+                  <p className='system-b-download-detail-body'>
                     Developer ID signed and notarized before release.
                   </p>
                 </div>
                 <div>
-                  <Sparkles className='mb-4 size-5 text-white/72' />
-                  <h3 className='text-[17px] font-semibold text-white'>
-                    Updating
-                  </h3>
-                  <p className='mt-2 text-sm leading-6 text-white/52'>
+                  <Sparkles className='system-b-download-detail-icon' />
+                  <h3 className='system-b-download-detail-title'>Updating</h3>
+                  <p className='system-b-download-detail-body'>
                     New builds install automatically after you quit.
                   </p>
                 </div>
                 <div>
-                  <QrCode className='mb-4 size-5 text-white/72' />
-                  <h3 className='text-[17px] font-semibold text-white'>
-                    Connected
-                  </h3>
-                  <p className='mt-2 text-sm leading-6 text-white/52'>
+                  <QrCode className='system-b-download-detail-icon' />
+                  <h3 className='system-b-download-detail-title'>Connected</h3>
+                  <p className='system-b-download-detail-body'>
                     Same account, profile, QR, and workspace data.
                   </p>
                 </div>
               </div>
             </div>
 
-            <dl className='mt-14 grid border-t border-white/[0.08] text-[15px]'>
+            <dl className='system-b-download-requirements'>
               {REQUIREMENTS.map(row => (
                 <div
                   key={row.label}
-                  className='grid gap-2 border-b border-white/[0.08] py-4 sm:grid-cols-[minmax(9rem,0.35fr)_1fr]'
+                  className='system-b-download-requirement-row'
                 >
-                  <dt className='text-white/42'>{row.label}</dt>
-                  <dd className='text-white/82'>{row.value}</dd>
+                  <dt>{row.label}</dt>
+                  <dd>{row.value}</dd>
                 </div>
               ))}
             </dl>
@@ -383,8 +373,8 @@ export default async function DownloadPage() {
         <FaqSection
           items={FAQ_ITEMS}
           heading='Questions'
-          headingClassName='homepage-story-heading text-white'
-          className='mx-auto w-full max-w-[760px] px-[var(--homepage-page-gutter)] py-[var(--homepage-section-space)]'
+          headingClassName='system-b-download-faq-heading'
+          className='system-b-download-faq'
           analyticsEventName='download_faq_opened'
           analyticsProperties={{ source: 'download' }}
         />
@@ -399,27 +389,27 @@ export default async function DownloadPage() {
         />
 
         <MarketingContainer width='page' className='py-8'>
-          <p className='text-[12px] leading-5 text-white/42'>
+          <p className='system-b-download-legal'>
             Releases are hosted on{' '}
             <a
               href={DESKTOP_RELEASES_HTML_URL}
               target='_blank'
               rel='noopener noreferrer'
-              className='underline decoration-white/30 underline-offset-4 transition-colors hover:text-white/70'
+              className='system-b-download-legal-link'
             >
               GitHub
             </a>
             . By downloading the app you agree to the {APP_NAME}{' '}
             <Link
               href={APP_ROUTES.LEGAL_TERMS}
-              className='underline decoration-white/30 underline-offset-4 transition-colors hover:text-white/70'
+              className='system-b-download-legal-link'
             >
               Terms of Service
             </Link>{' '}
             and{' '}
             <Link
               href={APP_ROUTES.LEGAL_PRIVACY}
-              className='underline decoration-white/30 underline-offset-4 transition-colors hover:text-white/70'
+              className='system-b-download-legal-link'
             >
               Privacy Policy
             </Link>
