@@ -16,6 +16,11 @@ describe('ChatGenerationArtifactSurface', () => {
     expect(screen.getByTestId('chat-generation-artifact-surface')).toHaveClass(
       'system-b-chat-generation-artifact-surface'
     );
+    expect(
+      screen
+        .getByText('Merch Options')
+        .closest('.system-b-chat-generation-artifact-header')
+    ).toHaveClass('system-b-chat-generation-artifact-header');
     expect(screen.getByText('Merch Options')).toHaveClass(
       'system-b-chat-generation-artifact-title'
     );
@@ -46,7 +51,7 @@ describe('ChatGenerationArtifactSurface', () => {
       expect(source).not.toMatch(/\brgba?\([^)]+\)/);
       expect(source).not.toMatch(/\b(?:linear|radial)-gradient\([^)]+\)/);
       expect(source).not.toMatch(
-        /\b(?:bg|text|border|shadow|rounded|p|px|py|pt|pb|pl|pr|m|mx|my|mt|mb|ml|mr|gap|space-x|space-y|w|h|min-w|min-h|max-w|max-h|leading|tracking|top|bottom|left|right|inset|translate|scale)-\[[^\]]+\]/
+        /\b(?:bg|text|border|shadow|rounded|p|px|py|pt|pb|pl|pr|m|mx|my|mt|mb|ml|mr|gap|space-x|space-y|w|h|min-w|min-h|max-w|max-h|leading|tracking|top|bottom|left|right|inset|translate|scale)-(?:\[[^\]]+\]|\(--[^)]+\))/
       );
       expect(source).not.toMatch(/\btext-red-\d{2,3}\b/);
     }

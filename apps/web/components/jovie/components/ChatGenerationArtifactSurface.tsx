@@ -22,7 +22,7 @@ export function ChatGenerationArtifactSurface({
       data-testid='chat-generation-artifact-surface'
       className={cn('system-b-chat-generation-artifact-surface', className)}
     >
-      <div className='flex h-9 items-center gap-2 border-b border-(--system-b-app-shell-border)/60 px-3'>
+      <div className='system-b-chat-generation-artifact-header flex h-9 items-center gap-2 px-3'>
         <Sparkles
           className='system-b-chat-generation-artifact-icon h-3.5 w-3.5'
           strokeWidth={2.25}

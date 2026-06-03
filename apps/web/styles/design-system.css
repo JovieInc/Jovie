@@ -2330,6 +2330,11 @@ body:has(.system-b-download-page) .marketing-glass-header__cta:focus-visible {
   );
 }
 
+:where(.system-b-chat-generation-artifact-header) {
+  border-bottom: 1px solid
+    color-mix(in oklab, var(--system-b-app-shell-border) 60%, transparent);
+}
+
 :where(.system-b-chat-generation-artifact-icon) {
   color: color-mix(in oklab, var(--system-b-accent-cyan) 80%, transparent);
 }
@@ -2362,6 +2367,12 @@ body:has(.system-b-download-page) .marketing-glass-header__cta:focus-visible {
   );
   background-size: 200% 100%;
   animation: shimmer 2.4s var(--ease-in-out) infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :where(.system-b-chat-generation-shimmer) {
+    animation: none;
+  }
 }
 
 :where(.system-b-chat-pitch-count) {
