@@ -94,7 +94,7 @@ export function ChatAvatarUploadCard() {
 
   if (state === 'success') {
     return (
-      <ContentSurfaceCard className='border-success/20 bg-[color-mix(in_oklab,var(--color-success)_8%,var(--linear-app-content-surface))] p-4'>
+      <ContentSurfaceCard className='system-b-chat-avatar-upload-state-card system-b-chat-avatar-upload-state-card-success'>
         <div className='flex items-center gap-2 text-success'>
           <Check className='h-4 w-4' />
           <span className='text-sm font-medium'>Profile photo updated</span>
@@ -105,7 +105,7 @@ export function ChatAvatarUploadCard() {
 
   if (state === 'error') {
     return (
-      <ContentSurfaceCard className='border-error/20 bg-[color-mix(in_oklab,var(--color-error)_8%,var(--linear-app-content-surface))] p-4'>
+      <ContentSurfaceCard className='system-b-chat-avatar-upload-state-card system-b-chat-avatar-upload-state-card-error'>
         <div className='flex items-center justify-between'>
           <div className='flex items-center gap-2 text-error'>
             <X className='h-4 w-4' />
@@ -134,7 +134,7 @@ export function ChatAvatarUploadCard() {
         className='hidden'
         tabIndex={-1}
       />
-      <ContentSurfaceCard className='border-(--linear-app-frame-seam) bg-(--linear-app-content-surface) p-3'>
+      <ContentSurfaceCard className='system-b-chat-avatar-upload-card'>
         <button
           type='button'
           onClick={handleClick}
@@ -143,10 +143,8 @@ export function ChatAvatarUploadCard() {
           onDrop={handleDrop}
           disabled={state === 'uploading'}
           className={cn(
-            'w-full rounded-[8px] border border-dashed p-8 text-center transition-colors',
-            isDragOver
-              ? 'border-accent bg-accent/10'
-              : 'border-(--linear-app-frame-seam) bg-surface-0 hover:border-accent/50 hover:bg-surface-1',
+            'system-b-chat-avatar-upload-dropzone',
+            isDragOver && 'system-b-chat-avatar-upload-dropzone-active',
             state === 'uploading' && 'pointer-events-none opacity-60'
           )}
         >
@@ -160,7 +158,7 @@ export function ChatAvatarUploadCard() {
               </>
             ) : (
               <>
-                <span className='flex h-10 w-10 items-center justify-center rounded-[8px] border border-subtle bg-surface-1'>
+                <span className='system-b-chat-avatar-upload-icon-shell'>
                   <ImagePlus
                     className={cn(
                       'h-5 w-5',

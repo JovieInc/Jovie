@@ -87,10 +87,10 @@ export function ImageAttachmentChip({
   const label = name && name.trim().length > 0 ? name : 'Image';
 
   const chipClass = cn(
-    'inline-flex items-center gap-1.5 align-baseline rounded-md border px-1.5 py-0.5 leading-5 select-none',
+    'system-b-image-attachment-chip',
     tone === 'onLight'
-      ? 'border-black/10 bg-black/[0.04] text-[#111216]'
-      : 'border-white/10 bg-white/[0.04] text-primary-token'
+      ? 'system-b-image-attachment-chip-light'
+      : 'system-b-image-attachment-chip-dark'
   );
 
   return (
@@ -103,10 +103,7 @@ export function ImageAttachmentChip({
           aria-label={`Image attachment: ${label}`}
           onPointerEnter={handlePointerEnter}
           onPointerLeave={handlePointerLeave}
-          className={cn(
-            'inline-flex items-baseline align-baseline appearance-none p-0 m-0 bg-transparent border-0 cursor-pointer',
-            'focus:outline-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color-mix(in_oklab,var(--linear-border-focus)_72%,transparent)] focus-visible:rounded-md'
-          )}
+          className='system-b-image-attachment-trigger'
           data-testid='image-attachment-chip-trigger'
         >
           <span className={chipClass} data-testid='image-attachment-chip'>
@@ -115,18 +112,16 @@ export function ImageAttachmentChip({
               alt=''
               width={16}
               height={16}
-              className='h-4 w-4 rounded-sm object-cover shrink-0'
+              className='system-b-image-attachment-thumb'
               unoptimized
               aria-hidden
             />
-            <span className='min-w-0 max-w-[180px] truncate text-[13px] leading-5'>
-              {label}
-            </span>
+            <span className='system-b-image-attachment-label'>{label}</span>
           </span>
         </button>
       </PopoverTrigger>
       <PopoverContent
-        className='z-[150] max-h-[var(--radix-popover-content-available-height)] w-auto max-w-[min(520px,calc(100vw-24px))] overflow-hidden rounded-xl border border-(--linear-app-frame-seam) bg-surface-1 p-0 shadow-popover'
+        className='system-b-image-attachment-popover'
         sideOffset={6}
         align='start'
         testId='image-attachment-popover-content'
@@ -146,7 +141,7 @@ export function ImageAttachmentChip({
               alt={label}
               width={480}
               height={480}
-              className='h-auto max-h-[min(480px,calc(var(--radix-popover-content-available-height,520px)-44px),calc(100vh-12rem))] w-auto max-w-[min(480px,calc(100vw-24px))] object-contain'
+              className='system-b-image-attachment-preview'
               unoptimized
             />
           </div>

@@ -56,7 +56,7 @@ describe('ImageAttachmentChip', () => {
     expect(screen.getByTestId('image-attachment-popover-content')).toBeTruthy();
   });
 
-  it('uses the chat overlay tier with an opaque viewport-bounded surface', async () => {
+  it('uses the chat overlay tier with a System B popover surface', async () => {
     const user = userEvent.setup();
     renderChip();
 
@@ -66,13 +66,7 @@ describe('ImageAttachmentChip', () => {
       'image-attachment-popover-content'
     );
 
-    expect(content.className).toContain('z-[150]');
-    expect(content.className).toContain('bg-surface-1');
-    expect(content.className).toContain('shadow-popover');
-    expect(content.className).toContain('calc(100vw-24px)');
-    expect(content.className).toContain(
-      '--radix-popover-content-available-height'
-    );
+    expect(content.className).toContain('system-b-image-attachment-popover');
   });
 
   it('opens on keyboard Enter and closes on Escape', async () => {
