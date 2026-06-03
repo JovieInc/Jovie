@@ -118,7 +118,7 @@ export const TabletPlayerCard = React.memo(function TabletPlayerCard({
             <button
               type='button'
               onClick={onPlay}
-              className='h-9 w-9 rounded-full grid place-items-center bg-primary text-on-primary transition-transform duration-subtle ease-subtle active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/55 focus-visible:ring-offset-2 focus-visible:ring-offset-(--linear-bg-page) outline-none'
+              className='h-9 w-9 rounded-full grid place-items-center bg-primary text-on-primary transition-colors duration-subtle ease-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/55 focus-visible:ring-offset-2 focus-visible:ring-offset-(--linear-bg-page) outline-none'
               aria-label={isPlaying ? 'Pause' : 'Play'}
             >
               {isPlaying ? (
