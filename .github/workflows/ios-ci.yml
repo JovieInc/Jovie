@@ -56,6 +56,8 @@ jobs:
         timeout-minutes: 15
         env:
           IOS_SCREENSHOT_DERIVED_DATA: .build/ios-ci
+          IOS_SCREENSHOT_REUSE_BUILD: "1"
+          IOS_SCREENSHOT_CAPTURE_IPAD: "0"
           IOS_SCREENSHOT_REQUIRE_IPAD: "0"
         run: bash apps/ios/scripts/capture-screenshots.sh
 

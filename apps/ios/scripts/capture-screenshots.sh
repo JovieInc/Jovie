@@ -70,7 +70,7 @@ list_devices() {
     return 1
   fi
 
-  RUBYOPT= ruby -rjson -e '
+  RUBYOPT='' ruby -rjson -e '
     pattern = Regexp.new(ARGV.fetch(0))
     input = STDIN.read
     devices_by_runtime = JSON.parse(input).fetch("devices", {})
@@ -126,10 +126,10 @@ prepare_device() {
 
   echo "Preparing simulator $udid"
   run_with_timeout "${IOS_SCREENSHOT_BOOT_COMMAND_TIMEOUT:-120}" xcrun simctl boot "$udid" >/dev/null 2>&1 || true
-  wait_for_boot "$udid"
+  wait_for_boot "$udid" || return 1
   run_with_timeout "${IOS_SCREENSHOT_UI_TIMEOUT:-10}" xcrun simctl ui "$udid" appearance dark >/dev/null 2>&1 || true
   run_with_timeout "${IOS_SCREENSHOT_UNINSTALL_TIMEOUT:-30}" xcrun simctl uninstall "$udid" "$BUNDLE_ID" >/dev/null 2>&1 || true
-  run_with_timeout "${IOS_SCREENSHOT_INSTALL_TIMEOUT:-60}" xcrun simctl install "$udid" "$APP_PATH"
+  run_with_timeout "${IOS_SCREENSHOT_INSTALL_TIMEOUT:-60}" xcrun simctl install "$udid" "$APP_PATH" || return 1
 }
 
 wait_for_boot() {
@@ -174,13 +174,26 @@ capture() {
   shift 2
 
   run_with_timeout "${IOS_SCREENSHOT_TERMINATE_TIMEOUT:-15}" xcrun simctl terminate "$udid" "$BUNDLE_ID" >/dev/null 2>&1 || true
-  run_with_timeout "${IOS_SCREENSHOT_LAUNCH_TIMEOUT:-20}" xcrun simctl launch "$udid" "$BUNDLE_ID" "$@"
+  if ! run_with_timeout "${IOS_SCREENSHOT_LAUNCH_TIMEOUT:-20}" xcrun simctl launch "$udid" "$BUNDLE_ID" "$@"; then
+    echo "Unable to launch $BUNDLE_ID on $udid for $name."
+    return 1
+  fi
+
   sleep 2
   if ! run_with_timeout "${IOS_SCREENSHOT_CAPTURE_TIMEOUT:-45}" xcrun simctl io "$udid" screenshot "$OUTPUT_DIR/$name.png"; then
     echo "Retrying screenshot capture for $name after simulator settle."
     sleep 5
-    run_with_timeout "${IOS_SCREENSHOT_CAPTURE_TIMEOUT:-45}" xcrun simctl io "$udid" screenshot "$OUTPUT_DIR/$name.png"
+    if ! run_with_timeout "${IOS_SCREENSHOT_CAPTURE_TIMEOUT:-45}" xcrun simctl io "$udid" screenshot "$OUTPUT_DIR/$name.png"; then
+      echo "Unable to capture screenshot $name from simulator $udid."
+      return 1
+    fi
   fi
+
+  if [[ ! -s "$OUTPUT_DIR/$name.png" ]]; then
+    echo "Screenshot $OUTPUT_DIR/$name.png was not created."
+    return 1
+  fi
+
   echo "Captured $OUTPUT_DIR/$name.png"
 }
 
@@ -200,8 +213,9 @@ capture "$IPHONE_UDID" "04-settings" "-ui-testing-settings"
 capture "$IPHONE_UDID" "05-needs-onboarding" "-ui-testing-needs-onboarding"
 capture "$IPHONE_UDID" "06-chat" "-ui-testing-chat"
 
-IPAD_UDID="$(pick_device "^iPad")"
-if [[ -n "$IPAD_UDID" ]]; then
+if [[ "${IOS_SCREENSHOT_CAPTURE_IPAD:-1}" != "1" ]]; then
+  echo "Skipped iPad shell screenshot because IOS_SCREENSHOT_CAPTURE_IPAD=${IOS_SCREENSHOT_CAPTURE_IPAD:-0}."
+elif IPAD_UDID="$(pick_device "^iPad")" && [[ -n "$IPAD_UDID" ]]; then
   captured_ipad=false
   while IFS= read -r candidate_udid; do
     [[ -z "$candidate_udid" ]] && continue
