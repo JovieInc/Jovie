@@ -82,12 +82,8 @@ function CarouselDots({
           <div
             key={index}
             aria-hidden
-            className={cn(
-              'h-1.5 rounded-full transition-[width,background-color] duration-subtle',
-              index === current
-                ? 'w-4 bg-primary-token'
-                : 'w-1.5 bg-tertiary-token/30'
-            )}
+            className='system-b-suggested-profile-dot'
+            data-active={index === current ? 'true' : undefined}
           />
         );
       })}
@@ -111,7 +107,7 @@ function CarouselCardHeader({
   readonly isActioning: boolean;
 }) {
   return (
-    <div className='flex items-center justify-between border-b border-(--linear-app-frame-seam) px-3.5 py-2.5'>
+    <div className='flex items-center justify-between border-b border-(--system-b-app-frame-seam) px-3.5 py-2.5'>
       <div>
         <p className='text-2xs font-semibold tracking-normal text-tertiary-token'>
           Suggested identity
@@ -191,9 +187,7 @@ function ProfileReadyCard({
   return (
     <div
       className={cn(
-        'chat-card overflow-hidden rounded-[14px] border border-(--linear-app-frame-seam)',
-        'bg-(--linear-app-content-surface)',
-        'transition-[opacity,transform] duration-cinematic ease-out',
+        'system-b-suggested-profile-card',
         direction === 'left' && 'animate-slide-out-left',
         direction === 'right' && 'animate-slide-out-right'
       )}
@@ -263,12 +257,7 @@ function ProfileReadyCard({
           href={username ? `/${username}` : '/'}
           target='_blank'
           rel='noopener noreferrer'
-          className={cn(
-            'flex w-full items-center justify-center gap-1.5 rounded-[12px]',
-            'bg-btn-primary px-3 py-2.5 text-app font-medium text-btn-primary-foreground',
-            'transition-colors hover:bg-btn-primary/90',
-            'focus:outline-none'
-          )}
+          className='system-b-suggested-profile-primary-link'
         >
           View your profile
           <ExternalLink className='h-3.5 w-3.5' />
@@ -309,9 +298,7 @@ function SuggestionCard({
   return (
     <div
       className={cn(
-        'chat-card overflow-hidden rounded-[14px] border border-(--linear-app-frame-seam)',
-        'bg-(--linear-app-content-surface)',
-        'transition-[opacity,transform] duration-cinematic ease-out',
+        'system-b-suggested-profile-card',
         direction === 'left' && 'animate-slide-out-left',
         direction === 'right' && 'animate-slide-out-right'
       )}
@@ -327,7 +314,7 @@ function SuggestionCard({
       <div className='p-4'>
         {/* Header with platform icon */}
         <div className='flex items-center gap-2.5 mb-3'>
-          <div className='flex h-8 w-8 items-center justify-center rounded-[10px] border border-(--linear-app-frame-seam) bg-surface-0'>
+          <div className='system-b-suggested-profile-icon-shell'>
             {isAvatar ? (
               <Camera className='h-4 w-4 text-secondary-token' />
             ) : (
@@ -363,10 +350,10 @@ function SuggestionCard({
         {suggestion.imageUrl && (
           <div
             className={cn(
-              'relative mb-3 overflow-hidden rounded-lg bg-surface-2',
+              'system-b-suggested-profile-image',
               isAvatar
-                ? 'mx-auto h-24 w-24 rounded-full'
-                : 'aspect-[3/1] w-full'
+                ? 'system-b-suggested-profile-image-avatar'
+                : 'system-b-suggested-profile-image-wide'
             )}
           >
             <Image
@@ -401,11 +388,7 @@ function SuggestionCard({
             onClick={onReject}
             disabled={isActioning}
             className={cn(
-              'flex flex-1 items-center justify-center gap-1.5 rounded-[12px]',
-              'border border-subtle px-3 py-3 text-app font-medium sm:py-2',
-              'text-secondary-token transition-colors',
-              'hover:bg-surface-2 hover:text-primary-token',
-              'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-btn-primary/20',
+              'system-b-suggested-profile-action system-b-suggested-profile-action-secondary',
               'disabled:opacity-50 disabled:cursor-not-allowed'
             )}
           >
@@ -421,10 +404,7 @@ function SuggestionCard({
             onClick={onConfirm}
             disabled={isActioning}
             className={cn(
-              'flex flex-1 items-center justify-center gap-1.5 rounded-[12px]',
-              'bg-btn-primary px-3 py-3 text-app font-medium text-btn-primary-foreground sm:py-2',
-              'transition-colors hover:bg-btn-primary/90',
-              'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-btn-primary/20',
+              'system-b-suggested-profile-action system-b-suggested-profile-action-primary',
               'disabled:opacity-50 disabled:cursor-not-allowed'
             )}
           >
