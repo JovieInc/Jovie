@@ -119,6 +119,33 @@ describe('CircleIconButton', () => {
     expect(button).toHaveClass('my-custom-class');
   });
 
+  it('keeps shared press feedback free of decorative transforms', () => {
+    const variants = [
+      'surface',
+      'frosted',
+      'ghost',
+      'secondary',
+      'outline',
+      'pearl',
+      'pearlQuiet',
+    ] as const;
+
+    for (const variant of variants) {
+      const { unmount } = render(
+        <CircleIconButton ariaLabel={`${variant} action`} variant={variant}>
+          <svg aria-hidden='true' />
+        </CircleIconButton>
+      );
+      const button = screen.getByRole('button', {
+        name: `${variant} action`,
+      });
+      expect(button.className).not.toMatch(
+        /\b(?:transition-all|duration-\d+|active:scale|active:translate|transform|motion-reduce:transform-none)\b/
+      );
+      unmount();
+    }
+  });
+
   it('has type="button" by default', () => {
     render(
       <CircleIconButton ariaLabel='Action'>

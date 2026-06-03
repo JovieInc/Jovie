@@ -149,9 +149,7 @@ const baseStyles = cn(
   // Shape and layout
   'inline-flex items-center justify-center rounded-full',
   // Transitions
-  'transition-all duration-150 ease-out',
-  // Active state
-  'active:scale-95',
+  'transition-colors duration-subtle ease-out',
   // Required for soft material treatments on profile chrome
   'relative isolate overflow-hidden',
   // Touch optimizations
