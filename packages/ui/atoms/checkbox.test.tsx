@@ -216,6 +216,14 @@ describe('Checkbox', () => {
       );
     });
 
+    it('keeps press feedback free of transform motion', () => {
+      render(<Checkbox aria-label='Test' data-testid='checkbox' />);
+      const checkbox = screen.getByTestId('checkbox');
+      expect(checkbox.className).not.toMatch(
+        /\b(?:transition-all|transition-transform|active:scale|active:translate|hover:-translate)\b/
+      );
+    });
+
     it('merges custom className', () => {
       render(
         <Checkbox
