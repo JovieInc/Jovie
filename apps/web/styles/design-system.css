@@ -77,9 +77,17 @@
      on these names instead of route-local Tailwind literals. */
   --system-b-cinematic-black: #06070a;
   --system-b-text-primary: var(--color-text-primary-token);
+  --system-b-bg-page: var(--color-bg-base);
+  --system-b-bg-surface-0: var(--color-bg-surface-0);
+  --system-b-bg-surface-1: var(--color-bg-surface-1);
+  --system-b-bg-surface-2: var(--color-bg-surface-2);
   --system-b-primary-bg: var(--linear-btn-primary-bg);
   --system-b-primary-fg: var(--linear-btn-primary-fg);
   --system-b-header-height: var(--linear-header-height);
+  --system-b-app-shell-border: var(--app-shell-border);
+  --system-b-app-frame-seam: var(--app-shell-frame-seam);
+  --system-b-app-content-surface: var(--app-shell-content-surface);
+  --system-b-accent-cyan: var(--geist-cyan-solid);
   --system-b-duration-fast: var(--ds-motion-subtle-duration);
   --system-b-ease: var(--ds-motion-subtle-easing);
   --system-b-radius-pill: var(--radius-full);
@@ -2123,6 +2131,258 @@ body:has(.system-b-download-page) .marketing-glass-header__cta:focus-visible {
 
 :where(.system-b-download-legal-link:hover) {
   color: color-mix(in oklab, var(--system-b-text-primary) 70%, transparent);
+}
+
+/* ============================================
+   SYSTEM B CHAT ENTITY PREVIEW PRIMITIVES
+   ============================================ */
+
+:where(.system-b-entity-chip-popover-content) {
+  z-index: 150;
+  width: min(272px, calc(100vw - var(--space-6)));
+  overflow: hidden;
+  border: 1px solid var(--system-b-app-frame-seam);
+  border-radius: var(--radius-xl);
+  background: var(--system-b-bg-surface-1);
+  padding: 0;
+  box-shadow: var(--shadow-popover);
+}
+
+:where(.system-b-entity-preview-stat-pair) {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+:where(.system-b-entity-preview-stat-strong) {
+  color: var(--color-text-primary-token);
+  font-weight: var(--font-weight-semibold);
+  font-variant-numeric: tabular-nums;
+}
+
+:where(.system-b-entity-preview-artwork) {
+  position: relative;
+  width: 72px;
+  height: 72px;
+  flex-shrink: 0;
+  overflow: hidden;
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-button-inset);
+}
+
+:where(.system-b-entity-preview-event-art) {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(
+    180deg,
+    var(--system-b-bg-surface-2),
+    var(--system-b-bg-page)
+  );
+}
+
+:where(.system-b-entity-preview-event-month) {
+  color: var(--color-text-tertiary-token);
+  font-family: var(--font-display);
+  font-size: var(--text-3xs);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: var(--tracking-normal);
+  text-transform: uppercase;
+}
+
+:where(.system-b-entity-preview-event-day) {
+  color: var(--color-text-primary-token);
+  font-family: var(--font-display);
+  font-size: var(--text-2xl);
+  font-weight: var(--font-weight-bold);
+  letter-spacing: var(--tracking-normal);
+  line-height: var(--leading-none);
+}
+
+:where(.system-b-entity-preview-media-art img) {
+  object-fit: cover;
+}
+
+:where(.system-b-entity-preview-placeholder-art) {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: color-mix(
+    in oklab,
+    var(--system-b-bg-surface-2) 82%,
+    var(--system-b-bg-page)
+  );
+  color: var(--color-text-primary-token);
+  font-size: var(--text-xl);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: var(--tracking-normal);
+}
+
+:where(.system-b-entity-preview-pane) {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  background: linear-gradient(
+    180deg,
+    color-mix(in oklab, var(--color-text-primary-token) 2%, transparent),
+    transparent
+  );
+  padding: calc(var(--space-5) + var(--space-0-5)) var(--space-6);
+}
+
+:where(.system-b-entity-preview-layout) {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-4);
+}
+
+:where(.system-b-entity-preview-content) {
+  min-width: 0;
+  flex: 1;
+  padding-top: var(--space-px);
+}
+
+:where(.system-b-entity-preview-eyebrow) {
+  margin-bottom: var(--space-2);
+  color: var(--color-text-quaternary-token);
+  font-family: var(--font-display);
+  font-size: var(--text-3xs);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: var(--tracking-normal);
+  text-transform: uppercase;
+}
+
+:where(.system-b-entity-preview-title) {
+  margin: 0 0 calc(var(--space-3) + var(--space-0-5));
+  color: var(--color-text-primary-token);
+  font-family: var(--font-display);
+  font-size: var(--text-lg);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: var(--tracking-normal);
+  line-height: var(--leading-tight);
+}
+
+:where(.system-b-entity-preview-stats) {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  color: var(--color-text-tertiary-token);
+  font-size: var(--text-xs);
+  letter-spacing: var(--tracking-normal);
+  line-height: var(--leading-normal);
+}
+
+:where(.system-b-entity-preview-stat) {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  white-space: nowrap;
+}
+
+:where(.system-b-entity-preview-stat-muted) {
+  padding-inline: var(--space-2-5);
+}
+
+:where(.system-b-entity-preview-stat-first) {
+  padding-left: 0;
+}
+
+:where(.system-b-entity-preview-stat-separated)::before {
+  position: absolute;
+  top: 50%;
+  left: 0;
+  width: var(--space-0-5);
+  height: var(--space-0-5);
+  border-radius: var(--radius-full);
+  background: var(--color-text-quaternary-token);
+  content: "";
+  transform: translateY(-50%);
+}
+
+:where(.system-b-entity-preview-stat-solid) {
+  margin-left: var(--space-2);
+  border-radius: var(--radius-full);
+  background: color-mix(
+    in oklab,
+    var(--color-text-primary-token) 10%,
+    transparent
+  );
+  padding: var(--space-0-5) var(--space-2);
+  color: var(--color-text-primary-token);
+  font-family: var(--font-display);
+  font-size: var(--text-3xs);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: var(--tracking-normal);
+  text-transform: uppercase;
+}
+
+:where(.system-b-chat-generation-artifact-surface) {
+  width: 100%;
+  max-width: 520px;
+  overflow: hidden;
+  border: 1px solid var(--system-b-app-shell-border);
+  border-radius: var(--radius-xl);
+  background: color-mix(
+    in oklab,
+    var(--system-b-bg-surface-0) 40%,
+    transparent
+  );
+}
+
+:where(.system-b-chat-generation-artifact-header) {
+  border-bottom: 1px solid
+    color-mix(in oklab, var(--system-b-app-shell-border) 60%, transparent);
+}
+
+:where(.system-b-chat-generation-artifact-icon) {
+  color: color-mix(in oklab, var(--system-b-accent-cyan) 80%, transparent);
+}
+
+:where(.system-b-chat-generation-artifact-title) {
+  overflow: hidden;
+  color: var(--color-text-secondary-token);
+  font-size: var(--text-xs);
+  font-weight: var(--font-weight-medium);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+:where(.system-b-chat-generation-artifact-subtitle) {
+  overflow: hidden;
+  color: var(--color-text-tertiary-token);
+  font-size: var(--text-2xs);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+:where(.system-b-chat-generation-shimmer) {
+  background-image: linear-gradient(
+    110deg,
+    transparent 0%,
+    color-mix(in oklab, var(--color-text-primary-token) 4%, transparent) 35%,
+    color-mix(in oklab, var(--system-b-accent-cyan) 6%, transparent) 50%,
+    color-mix(in oklab, var(--color-text-primary-token) 4%, transparent) 65%,
+    transparent 100%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 2.4s var(--ease-in-out) infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :where(.system-b-chat-generation-shimmer) {
+    animation: none;
+  }
+}
+
+:where(.system-b-chat-pitch-count) {
+  color: var(--color-text-tertiary-token);
+  font-size: var(--text-3xs);
+  font-variant-numeric: tabular-nums;
+}
+
+:where(.system-b-chat-pitch-count[data-over-limit="true"]) {
+  color: var(--color-error);
 }
 
 /* ============================================

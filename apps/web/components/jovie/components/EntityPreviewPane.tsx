@@ -80,8 +80,8 @@ function buildReleaseStats(
     out.push({
       key: 'tracks',
       label: (
-        <span className='inline-flex items-center gap-[3px]'>
-          <strong className='font-semibold tabular-nums text-primary-token'>
+        <span className='system-b-entity-preview-stat-pair'>
+          <strong className='system-b-entity-preview-stat-strong'>
             {meta.totalTracks}
           </strong>
           tracks
@@ -100,9 +100,9 @@ function buildReleaseStats(
     out.push({
       key: 'spotify',
       label: (
-        <span className='inline-flex items-center gap-[3px]'>
+        <span className='system-b-entity-preview-stat-pair'>
           Spotify
-          <strong className='font-semibold tabular-nums text-primary-token'>
+          <strong className='system-b-entity-preview-stat-strong'>
             {meta.spotifyPopularity}
           </strong>
         </span>
@@ -123,8 +123,8 @@ function buildArtistStats(
     out.push({
       key: 'followers',
       label: (
-        <span className='inline-flex items-center gap-[3px]'>
-          <strong className='font-semibold tabular-nums text-primary-token'>
+        <span className='system-b-entity-preview-stat-pair'>
+          <strong className='system-b-entity-preview-stat-strong'>
             {followers}
           </strong>
           followers
@@ -140,9 +140,9 @@ function buildArtistStats(
     out.push({
       key: 'popularity',
       label: (
-        <span className='inline-flex items-center gap-[3px]'>
+        <span className='system-b-entity-preview-stat-pair'>
           Spotify
-          <strong className='font-semibold tabular-nums text-primary-token'>
+          <strong className='system-b-entity-preview-stat-strong'>
             {meta.popularity}
           </strong>
         </span>
@@ -197,9 +197,9 @@ function buildEventStats(
     out.push({
       key: 'doors',
       label: (
-        <span className='inline-flex items-center gap-[3px]'>
+        <span className='system-b-entity-preview-stat-pair'>
           Doors
-          <strong className='font-semibold tabular-nums text-primary-token'>
+          <strong className='system-b-entity-preview-stat-strong'>
             {doors}
           </strong>
         </span>
@@ -209,9 +209,9 @@ function buildEventStats(
     out.push({
       key: 'capacity',
       label: (
-        <span className='inline-flex items-center gap-[3px]'>
+        <span className='system-b-entity-preview-stat-pair'>
           Capacity
-          <strong className='font-semibold tabular-nums text-primary-token'>
+          <strong className='system-b-entity-preview-stat-strong'>
             {meta.capacity.toLocaleString()}
           </strong>
         </span>
@@ -255,16 +255,11 @@ function dateStampParts(iso: string | undefined): DateStampParts | null {
 function EventDateArtwork({ stamp }: { readonly stamp: DateStampParts }) {
   return (
     <div
-      className='flex h-[72px] w-[72px] shrink-0 flex-col items-center justify-center rounded-[10px] shadow-[0_0_0_0.5px_rgba(255,255,255,0.06),inset_0_0.5px_0_rgba(255,255,255,0.08),0_12px_24px_-8px_rgba(0,0,0,0.55)]'
-      style={{ background: 'linear-gradient(180deg,#1a1a1f,#0a0a0c)' }}
+      className='system-b-entity-preview-artwork system-b-entity-preview-event-art'
       data-testid='entity-preview-event-art'
     >
-      <span className='font-display text-[10px] font-semibold uppercase tracking-[0.12em] text-tertiary-token'>
-        {stamp.month}
-      </span>
-      <span className='font-display text-[28px] font-bold leading-none tracking-[-0.02em] text-primary-token'>
-        {stamp.day}
-      </span>
+      <span className='system-b-entity-preview-event-month'>{stamp.month}</span>
+      <span className='system-b-entity-preview-event-day'>{stamp.day}</span>
     </div>
   );
 }
@@ -280,7 +275,7 @@ function PreviewArtwork({ entity }: { readonly entity: EntityRef }) {
   }
   if (entity.thumbnail) {
     return (
-      <div className='relative h-[72px] w-[72px] shrink-0 overflow-hidden rounded-[10px] shadow-[0_0_0_0.5px_rgba(255,255,255,0.06),inset_0_0.5px_0_rgba(255,255,255,0.08),0_12px_24px_-8px_rgba(0,0,0,0.55)]'>
+      <div className='system-b-entity-preview-artwork system-b-entity-preview-media-art'>
         <Image
           src={entity.thumbnail}
           alt=''
@@ -299,7 +294,7 @@ function PreviewArtwork({ entity }: { readonly entity: EntityRef }) {
     .join('')
     .toUpperCase();
   return (
-    <div className='flex h-[72px] w-[72px] shrink-0 items-center justify-center rounded-[10px] bg-gradient-to-br from-[#2a2a2f] to-[#16161a] text-[22px] font-semibold tracking-[-0.02em] text-primary-token shadow-[0_0_0_0.5px_rgba(255,255,255,0.06),inset_0_0.5px_0_rgba(255,255,255,0.08),0_12px_24px_-8px_rgba(0,0,0,0.55)]'>
+    <div className='system-b-entity-preview-artwork system-b-entity-preview-placeholder-art'>
       {initials || '·'}
     </div>
   );
@@ -314,39 +309,36 @@ export function EntityPreviewPane({
   return (
     <section
       aria-label='Selected entity preview'
-      className={cn(
-        'flex flex-1 flex-col bg-gradient-to-b from-white/[0.022] to-transparent px-6 py-[22px]',
-        className
-      )}
+      className={cn('system-b-entity-preview-pane', className)}
       data-testid='entity-preview-pane'
     >
-      <div className='flex items-start gap-4'>
+      <div className='system-b-entity-preview-layout'>
         <PreviewArtwork entity={entity} />
-        <div className='min-w-0 flex-1 pt-px'>
-          <div className='mb-2 font-display text-[9.5px] font-semibold uppercase tracking-[0.12em] text-quaternary-token'>
-            {eyebrow}
-          </div>
+        <div className='system-b-entity-preview-content'>
+          <div className='system-b-entity-preview-eyebrow'>{eyebrow}</div>
           <h3
             aria-live='polite'
             aria-atomic='true'
-            className='m-0 mb-3.5 font-display text-[19px] font-semibold leading-[1.15] tracking-[-0.022em] text-primary-token'
+            className='system-b-entity-preview-title'
           >
             {entity.label}
           </h3>
           {stats.length > 0 ? (
-            <div className='flex flex-wrap items-center text-[12px] leading-[1.5] tracking-[-0.002em] text-tertiary-token'>
+            <div className='system-b-entity-preview-stats'>
               {stats.map((stat, i) => (
                 <span
                   key={stat.key}
                   className={cn(
-                    'relative inline-flex items-center whitespace-nowrap',
+                    'system-b-entity-preview-stat',
                     stat.emphasis === 'solid'
-                      ? 'ml-2 rounded-[3px] bg-white/10 px-[7px] py-px font-display text-[9.5px] font-semibold uppercase tracking-[0.1em] text-primary-token'
-                      : 'px-[10px]',
-                    i === 0 && stat.emphasis !== 'solid' && 'pl-0',
+                      ? 'system-b-entity-preview-stat-solid'
+                      : 'system-b-entity-preview-stat-muted',
+                    i === 0 &&
+                      stat.emphasis !== 'solid' &&
+                      'system-b-entity-preview-stat-first',
                     i > 0 &&
                       stat.emphasis !== 'solid' &&
-                      "before:absolute before:left-0 before:top-1/2 before:h-[2px] before:w-[2px] before:-translate-y-1/2 before:rounded-full before:bg-quaternary-token before:content-['']"
+                      'system-b-entity-preview-stat-separated'
                   )}
                 >
                   {stat.label}
