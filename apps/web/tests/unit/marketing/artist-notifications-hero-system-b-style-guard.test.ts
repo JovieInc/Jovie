@@ -1,9 +1,11 @@
 import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
+import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 
 const sourcePath =
   'components/marketing/artist-notifications/ArtistNotificationsHero.tsx';
+const appRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../../..');
 
 const gradientPattern = ['linear', 'gradient|radial', 'gradient'].join('-');
 
@@ -18,7 +20,7 @@ const forbiddenVisualPatterns = [
 
 describe('artist notifications hero System B source contract', () => {
   it('keeps fixed hero visuals on named System B primitives', () => {
-    const source = readFileSync(resolve(process.cwd(), sourcePath), 'utf8');
+    const source = readFileSync(resolve(appRoot, sourcePath), 'utf8');
 
     for (const pattern of forbiddenVisualPatterns) {
       expect(source, `${sourcePath} matched ${pattern}`).not.toMatch(pattern);
