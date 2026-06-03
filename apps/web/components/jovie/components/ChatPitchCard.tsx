@@ -5,10 +5,7 @@ import { toast } from 'sonner';
 import { CopyToggleIcon } from '@/components/atoms/CopyToggleIcon';
 import { PLATFORM_LIMITS } from '@/lib/services/pitch/types';
 import { cn } from '@/lib/utils';
-import {
-  CHAT_GENERATION_SHIMMER_BG,
-  ChatGenerationArtifactSurface,
-} from './ChatGenerationArtifactSurface';
+import { ChatGenerationArtifactSurface } from './ChatGenerationArtifactSurface';
 
 const PLATFORM_CONFIG = [
   { key: 'spotify' as const, label: 'Spotify', limit: PLATFORM_LIMITS.spotify },
@@ -103,10 +100,8 @@ function PitchBlock({
         <div className='flex items-center gap-1.5'>
           {limit ? (
             <span
-              className={cn(
-                'text-[10px] tabular-nums',
-                text.length > limit ? 'text-red-500' : 'text-tertiary-token'
-              )}
+              className='system-b-chat-pitch-count'
+              data-over-limit={text.length > limit ? 'true' : undefined}
             >
               {text.length}/{limit}
             </span>
@@ -148,12 +143,7 @@ export function ChatPitchCard({
         <div className='relative overflow-hidden rounded-lg bg-surface-0 p-2'>
           <div
             aria-hidden='true'
-            className='absolute inset-0'
-            style={{
-              backgroundImage: CHAT_GENERATION_SHIMMER_BG,
-              backgroundSize: '200% 100%',
-              animation: 'shimmer 2.4s ease-in-out infinite',
-            }}
+            className='system-b-chat-generation-shimmer absolute inset-0'
           />
           <div className='relative space-y-2'>
             {[1, 2, 3, 4].map(i => (
@@ -177,7 +167,7 @@ export function ChatPitchCard({
   if (state === 'error') {
     return (
       <output className='block text-app text-primary-token'>
-        <span className='block font-medium text-red-500'>
+        <span className='block font-medium text-error'>
           Pitch Generation Failed
         </span>
         {error && (
