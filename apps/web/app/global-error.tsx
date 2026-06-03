@@ -40,6 +40,16 @@ export default function GlobalError({
           // biome-ignore lint/security/noDangerouslySetInnerHtml: Required for dynamic CSS injection
           dangerouslySetInnerHTML={{
             __html: `
+              :root {
+                --global-error-bg: black;
+                --global-error-fg: white;
+                --global-error-muted: color-mix(in oklab, currentColor 58%, transparent);
+                --global-error-subtle: color-mix(in oklab, currentColor 38%, transparent);
+                --global-error-border: color-mix(in oklab, currentColor 12%, transparent);
+                --global-error-border-hover: color-mix(in oklab, currentColor 18%, transparent);
+                --global-error-control-hover: color-mix(in oklab, currentColor 8%, transparent);
+              }
+
               *, *::before, *::after {
                 box-sizing: border-box;
                 margin: 0;
@@ -49,8 +59,8 @@ export default function GlobalError({
               body {
                 font-family: Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
                 font-feature-settings: "cv01", "ss03";
-                background-color: #06070a;
-                color: #ffffff;
+                background-color: var(--global-error-bg);
+                color: var(--global-error-fg);
                 min-height: 100dvh;
                 display: flex;
                 align-items: center;
@@ -93,7 +103,7 @@ export default function GlobalError({
                 margin-top: 8px;
                 font-size: 14px;
                 line-height: 1.5;
-                color: #969799;
+                color: var(--global-error-muted);
               }
 
               .actions {
@@ -123,7 +133,7 @@ export default function GlobalError({
               }
 
               .btn:focus-visible {
-                outline: 2px solid #7170ff;
+                outline: 2px solid currentColor;
                 outline-offset: 2px;
               }
 
@@ -132,29 +142,29 @@ export default function GlobalError({
               }
 
               .btn-primary {
-                background: #e6e6e6;
-                color: #06070a;
+                background: var(--global-error-fg);
+                color: var(--global-error-bg);
               }
 
               .btn-primary:hover {
-                background: #ffffff;
+                background: var(--global-error-fg);
               }
 
               .btn-secondary {
                 background: transparent;
-                color: #969799;
-                border: 1px solid rgba(255, 255, 255, 0.08);
+                color: var(--global-error-muted);
+                border: 1px solid var(--global-error-border);
               }
 
               .btn-secondary:hover {
-                background: rgba(255, 255, 255, 0.04);
-                border-color: rgba(255, 255, 255, 0.12);
+                background: var(--global-error-control-hover);
+                border-color: var(--global-error-border-hover);
               }
 
               .error-id {
                 margin-top: 20px;
                 font-size: 12px;
-                color: #62666d;
+                color: var(--global-error-subtle);
               }
             `,
           }}
@@ -165,14 +175,11 @@ export default function GlobalError({
           <div className='logo'>
             <svg
               viewBox='0 0 353.68 347.97'
-              fill='none'
+              fill='currentColor'
               xmlns='http://www.w3.org/2000/svg'
               aria-hidden='true'
             >
-              <path
-                fill='#ffffff'
-                d='m176.84,0l3.08.05c8.92,1.73,16.9,6.45,23.05,13.18,7.95,8.7,12.87,20.77,12.87,34.14s-4.92,25.44-12.87,34.14c-6.7,7.34-15.59,12.28-25.49,13.57h-.64s0,.01,0,.01h0c-22.2,0-42.3,8.84-56.83,23.13-14.5,14.27-23.49,33.99-23.49,55.77h0v.02c0,21.78,8.98,41.5,23.49,55.77,14.54,14.3,34.64,23.15,56.83,23.15v-.02h.01c22.2,0,42.3-8.84,56.83-23.13,14.51-14.27,23.49-33.99,23.49-55.77h0c0-17.55-5.81-33.75-15.63-46.82-10.08-13.43-24.42-23.61-41.05-28.62l-2.11-.64c4.36-2.65,8.34-5.96,11.84-9.78,9.57-10.47,15.5-24.89,15.5-40.77s-5.93-30.3-15.5-40.77c-1.44-1.57-2.95-3.06-4.55-4.44l7.67,1.58c40.44,8.35,75.81,30.3,100.91,60.75,24.66,29.91,39.44,68.02,39.44,109.5h0c0,48.05-19.81,91.55-51.83,123.05-31.99,31.46-76.19,50.92-125,50.92v.02h-.01c-48.79,0-93-19.47-125-50.94C19.81,265.54,0,222.04,0,173.99h0c0-48.05,19.81-91.56,51.83-123.05C83.84,19.47,128.04,0,176.84,0Z'
-              />
+              <path d='m176.84,0l3.08.05c8.92,1.73,16.9,6.45,23.05,13.18,7.95,8.7,12.87,20.77,12.87,34.14s-4.92,25.44-12.87,34.14c-6.7,7.34-15.59,12.28-25.49,13.57h-.64s0,.01,0,.01h0c-22.2,0-42.3,8.84-56.83,23.13-14.5,14.27-23.49,33.99-23.49,55.77h0v.02c0,21.78,8.98,41.5,23.49,55.77,14.54,14.3,34.64,23.15,56.83,23.15v-.02h.01c22.2,0,42.3-8.84,56.83-23.13,14.51-14.27,23.49-33.99,23.49-55.77h0c0-17.55-5.81-33.75-15.63-46.82-10.08-13.43-24.42-23.61-41.05-28.62l-2.11-.64c4.36-2.65,8.34-5.96,11.84-9.78,9.57-10.47,15.5-24.89,15.5-40.77s-5.93-30.3-15.5-40.77c-1.44-1.57-2.95-3.06-4.55-4.44l7.67,1.58c40.44,8.35,75.81,30.3,100.91,60.75,24.66,29.91,39.44,68.02,39.44,109.5h0c0,48.05-19.81,91.55-51.83,123.05-31.99,31.46-76.19,50.92-125,50.92v.02h-.01c-48.79,0-93-19.47-125-50.94C19.81,265.54,0,222.04,0,173.99h0c0-48.05,19.81-91.56,51.83-123.05C83.84,19.47,128.04,0,176.84,0Z' />
             </svg>
           </div>
 
