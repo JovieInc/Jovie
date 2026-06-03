@@ -11,7 +11,7 @@ export default function BrandLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <div className='linear-marketing dark flex min-h-[100svh] flex-col overflow-x-clip bg-black text-primary-token'>
+    <div className='linear-marketing dark system-b-brand-layout'>
       <SkipToContent />
       <MarketingHeader
         logoSize='sm'
@@ -19,7 +19,7 @@ export default function BrandLayout({
         showHomepageCenterNav={FEATURE_FLAGS.SHOW_HOMEPAGE_CENTER_NAV}
         variant='homepage'
       />
-      <main id='main-content' className='flex min-h-[100svh] flex-1 flex-col'>
+      <main id='main-content' className='system-b-brand-main'>
         {children}
       </main>
       <HomeLegalFooter />
