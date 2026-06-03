@@ -267,7 +267,7 @@ func makeJovieClerkOptions(
     // These MUST be registered as allowed redirect URLs in the Clerk dashboard
     // for the matching publishable key (native/iOS app section). Explicit config
     // per 6 gstack principles (explicit over clever, pragmatic, completeness for
-    // end-to-end iOS Clerk auth with prior #8635/#9573 patterns).
+    // end-to-end iOS Clerk auth with prior PR 8635/9573 patterns).
     redirectConfig: .init(
       redirectUrl: redirectUrl,
       callbackUrlScheme: callbackUrlScheme

@@ -4,7 +4,6 @@ struct SplashView: View {
   @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
   @State private var logoOpacity = 0.0
-  @State private var logoScale: CGFloat = 0.94
 
   var body: some View {
     ZStack {
@@ -12,7 +11,6 @@ struct SplashView: View {
 
       JovieLogoMark(size: 29)
         .opacity(logoOpacity)
-        .scaleEffect(logoScale)
         .accessibilityHidden(true)
         .accessibilityIdentifier("cinematic-loading-logo")
     }
@@ -28,27 +26,23 @@ struct SplashView: View {
   private func runLogoAnimation(reduceMotion: Bool) async {
     if reduceMotion {
       logoOpacity = 0.92
-      logoScale = 1
       return
     }
 
     logoOpacity = 0
-    logoScale = 0.94
 
     try? await Task.sleep(for: .milliseconds(180))
     guard !Task.isCancelled else { return }
 
     withAnimation(.easeOut(duration: 0.26)) {
       logoOpacity = 0.72
-      logoScale = 1.015
     }
 
     try? await Task.sleep(for: .milliseconds(180))
     guard !Task.isCancelled else { return }
 
-    withAnimation(.spring(response: 0.48, dampingFraction: 0.86, blendDuration: 0.08)) {
+    withAnimation(.easeOut(duration: 0.22)) {
       logoOpacity = 0.92
-      logoScale = 1
     }
   }
 }
