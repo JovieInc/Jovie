@@ -12,28 +12,16 @@ import { X } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { cn } from '@/lib/utils';
 import { TableCountBadge } from '../atoms/TableCountBadge';
-import { PAGE_TOOLBAR_ACTION_BUTTON_CLASS } from './PageToolbar';
-
-const TABLE_STANDARD_TOOLBAR_CLASS =
-  'flex min-h-[44px] min-w-0 items-center gap-2 overflow-x-auto overflow-y-hidden border-b border-(--linear-app-frame-seam) bg-(--linear-app-content-surface) px-3.5 py-2 scroll-smooth [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden';
-
-const TABLE_STANDARD_TOOLBAR_LEFT_CLASS = 'flex shrink-0 items-center gap-2';
-
-const TABLE_STANDARD_TOOLBAR_RIGHT_CLASS =
-  'ml-auto flex shrink-0 items-center gap-2';
-
-const TABLE_STANDARD_TOOLBAR_MENU_BUTTON_CLASS = cn(
+import {
   PAGE_TOOLBAR_ACTION_BUTTON_CLASS,
-  'min-w-[88px] justify-center text-secondary-token'
-);
+  TABLE_TOOLBAR_LEFT_CLASS,
+  TABLE_TOOLBAR_MENU_BUTTON_CLASS,
+  TABLE_TOOLBAR_RIGHT_CLASS,
+  TABLE_TOOLBAR_SHELL_CLASS,
+  type TableToolbarBulkAction,
+} from './PageToolbar';
 
-export interface BulkAction {
-  readonly label: string;
-  readonly icon?: ReactNode;
-  readonly onClick: () => void;
-  readonly disabled?: boolean;
-  readonly variant?: 'default' | 'destructive';
-}
+export type BulkAction = TableToolbarBulkAction;
 
 export interface TableStandardToolbarProps {
   /** Number of selected items */
@@ -96,9 +84,9 @@ export function TableStandardToolbar({
   const hasSelection = selectedCount > 0;
 
   return (
-    <div className={cn(TABLE_STANDARD_TOOLBAR_CLASS, className)}>
+    <div className={cn(TABLE_TOOLBAR_SHELL_CLASS, className)}>
       {/* Left section: Checkbox + count badge + bulk actions */}
-      <div className={TABLE_STANDARD_TOOLBAR_LEFT_CLASS}>
+      <div className={TABLE_TOOLBAR_LEFT_CLASS}>
         {onToggleSelectAll && (
           <Checkbox
             checked={headerCheckboxState}
@@ -119,7 +107,7 @@ export function TableStandardToolbar({
               <Button
                 variant='ghost'
                 size='sm'
-                className={TABLE_STANDARD_TOOLBAR_MENU_BUTTON_CLASS}
+                className={TABLE_TOOLBAR_MENU_BUTTON_CLASS}
               >
                 Actions
               </Button>
@@ -144,7 +132,7 @@ export function TableStandardToolbar({
       </div>
 
       {/* Right section: Search, export, primary actions, clear */}
-      <div className={TABLE_STANDARD_TOOLBAR_RIGHT_CLASS}>
+      <div className={TABLE_TOOLBAR_RIGHT_CLASS}>
         {/* Search - shown when no selection */}
         {!hasSelection && searchComponent}
 

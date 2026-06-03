@@ -74,9 +74,14 @@ describe('shared table motion tokens', () => {
       join(TABLE_ROOTS[0], 'molecules/TableBulkActionsToolbar.tsx'),
       'utf8'
     );
+    const pageToolbarSource = readFileSync(
+      join(TABLE_ROOTS[0], 'molecules/PageToolbar.tsx'),
+      'utf8'
+    );
 
     expect(toolbarSource).toContain('data-state');
-    expect(toolbarSource).toContain('min-h-[44px]');
+    expect(toolbarSource).toContain('TABLE_TOOLBAR_OVERLAY_CLASS');
+    expect(pageToolbarSource).toContain('min-h-[44px]');
     expect(toolbarSource).not.toMatch(
       /selectedCount\s*===\s*0\)\s*return null/
     );
