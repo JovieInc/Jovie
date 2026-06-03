@@ -156,17 +156,17 @@ struct DashboardView: View {
 
   private var skeleton: some View {
     VStack(spacing: JovieSpacing.large) {
-      RoundedRectangle(cornerRadius: 28, style: .continuous)
+      RoundedRectangle(cornerRadius: JovieRadius.large, style: .continuous)
         .fill(JovieColor.surface1)
         .frame(width: 280, height: 280)
-      RoundedRectangle(cornerRadius: 8, style: .continuous)
+      RoundedRectangle(cornerRadius: JovieRadius.small, style: .continuous)
         .fill(JovieColor.surface1)
         .frame(width: 180, height: 18)
       HStack(spacing: JovieSpacing.medium) {
-        RoundedRectangle(cornerRadius: 999, style: .continuous)
+        RoundedRectangle(cornerRadius: JovieRadius.pill, style: .continuous)
           .fill(JovieColor.surface1)
           .frame(height: 48)
-        RoundedRectangle(cornerRadius: 999, style: .continuous)
+        RoundedRectangle(cornerRadius: JovieRadius.pill, style: .continuous)
           .fill(JovieColor.surface1)
           .frame(height: 48)
       }
@@ -186,14 +186,20 @@ struct DashboardView: View {
             .resizable()
             .scaledToFit()
             .padding(24)
-            .background(Color.white, in: RoundedRectangle(cornerRadius: 28, style: .continuous))
+            .background(
+              JovieColor.qrSurface,
+              in: RoundedRectangle(cornerRadius: JovieRadius.large, style: .continuous)
+            )
             .accessibilityLabel("Profile QR Code")
         } else {
           Text("QR unavailable")
             .font(JovieFont.body(size: 15, weight: .medium))
             .foregroundStyle(JovieColor.textTertiary)
             .frame(width: 280, height: 280)
-            .background(JovieColor.surface1, in: RoundedRectangle(cornerRadius: 28, style: .continuous))
+            .background(
+              JovieColor.surface1,
+              in: RoundedRectangle(cornerRadius: JovieRadius.large, style: .continuous)
+            )
         }
       }
       .buttonStyle(.plain)

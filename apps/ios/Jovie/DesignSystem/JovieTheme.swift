@@ -2,19 +2,24 @@ import SwiftUI
 import UIKit
 
 enum JovieColor {
-  static let backgroundBase = Color(hex: 0x08090A)
-  static let surface0 = Color(hex: 0x0F1011)
-  static let surface1 = Color(hex: 0x17171A)
-  static let surface2 = Color(hex: 0x23252A)
-  static let surface3 = Color(hex: 0x2A2C32)
+  static let backgroundBase = Color(hex: 0x06070A)
+  static let surface0 = Color(hex: 0x0A0B0E)
+  static let surface1 = Color(hex: 0x101216)
+  static let surface2 = Color(hex: 0x161A20)
+  static let surface3 = Color(hex: 0x1F2430)
   static let textPrimary = Color(hex: 0xFFFFFF)
   static let textSecondary = Color(hex: 0xE3E4E6)
   static let textTertiary = Color(hex: 0x969799)
   static let borderSubtle = Color.white.opacity(0.05)
   static let borderDefault = Color.white.opacity(0.08)
   static let borderStrong = Color.white.opacity(0.10)
-  static let accent = Color(hex: 0x7170FF)
+  static let accentBlue = Color(hex: 0x0070F3)
+  static let accentPurple = Color(hex: 0x8B5CF6)
+  static let accentPink = Color(hex: 0xFF0080)
+  static let accent = accentBlue
+  static let progressTrack = accentBlue.opacity(0.08)
   static let errorText = Color(hex: 0xFF7A73)
+  static let qrSurface = Color.white
 }
 
 enum JovieFont {
@@ -53,6 +58,7 @@ enum JovieRadius {
   static let medium: CGFloat = 8
   static let large: CGFloat = 12
   static let xLarge: CGFloat = 16
+  static let pill: CGFloat = 999
 }
 
 private struct JovieSurfaceModifier: ViewModifier {
@@ -102,11 +108,11 @@ struct JoviePillButtonStyle: ButtonStyle {
       .frame(maxWidth: .infinity)
       .padding(.vertical, 14)
       .background(
-        RoundedRectangle(cornerRadius: 999, style: .continuous)
+        RoundedRectangle(cornerRadius: JovieRadius.pill, style: .continuous)
           .fill(filled ? Color.white : JovieColor.surface1)
       )
       .overlay {
-        RoundedRectangle(cornerRadius: 999, style: .continuous)
+        RoundedRectangle(cornerRadius: JovieRadius.pill, style: .continuous)
           .stroke(
             filled ? Color.clear : JovieColor.borderDefault,
             lineWidth: 1
