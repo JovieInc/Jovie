@@ -20,14 +20,6 @@ interface DemoReleaseDetailProps {
   readonly onClose: () => void;
 }
 
-const PROVIDER_COLORS: Record<string, string> = {
-  Spotify: '#1DB954',
-  'Apple Music': '#FA2D48',
-  'YouTube Music': '#FF0000',
-  'Amazon Music': '#00A8E1',
-  SoundCloud: '#FF5500',
-};
-
 const STATUS_DOT: Record<string, string> = {
   connected: 'var(--color-success)',
   missing: 'var(--linear-text-tertiary)',
@@ -117,14 +109,7 @@ export function DemoReleaseDetail({
                     className='size-1.5 shrink-0 rounded-full'
                     style={{ backgroundColor: STATUS_DOT[link.status] }}
                   />
-                  <span
-                    className='flex-1 font-medium'
-                    style={{
-                      color:
-                        PROVIDER_COLORS[link.provider] ??
-                        'var(--linear-text-primary)',
-                    }}
-                  >
+                  <span className='flex-1 font-medium text-primary-token'>
                     {link.provider}
                   </span>
                   <span className='capitalize text-tertiary-token'>
