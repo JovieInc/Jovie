@@ -42,6 +42,6 @@ describe('TokenizedText', () => {
     const chip = screen.getByTestId('entity-chip');
     expect(chip).toHaveAttribute('data-entity-kind', 'artist');
     expect(chip).toHaveAttribute('data-entity-tone', 'onLight');
-    expect(chip.className).toContain('#111216');
+    expect(chip).toHaveClass('system-b-entity-chip');
   });
 });
