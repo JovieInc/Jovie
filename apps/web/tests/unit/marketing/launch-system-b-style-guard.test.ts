@@ -33,6 +33,7 @@ const forbiddenLaunchCssPatterns = [
 function extractLaunchCss(source: string): string {
   const start = source.indexOf(':where(.system-b-launch-page)');
   const nextSectionMarkers = [
+    '/* ============================================\n   SYSTEM B PRICING PAGE',
     '/* ============================================\n   SYSTEM B CHAT ENTITY PREVIEW PRIMITIVES',
     '/* ============================================\n   GEIST ACCENT PALETTE',
   ];
