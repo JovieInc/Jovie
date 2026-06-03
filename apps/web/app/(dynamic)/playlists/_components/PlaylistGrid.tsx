@@ -10,7 +10,7 @@ export interface PlaylistCardData {
 
 /**
  * Shared playlist grid used by the index, genre hub, and mood hub pages.
- * Cover-art-dominant cards: 80% art, small title, hover scale-up, no chrome.
+ * Cover-art-dominant cards: 80% art, small title, static cover, no chrome.
  */
 export function PlaylistGrid({
   playlists,
@@ -40,7 +40,7 @@ export function PlaylistGrid({
               <Image
                 src={playlist.coverImageUrl}
                 alt={playlist.title}
-                className='h-full w-full object-cover transition-transform duration-200 group-hover:scale-105'
+                className='h-full w-full object-cover'
                 width={400}
                 height={400}
                 unoptimized
