@@ -61,6 +61,20 @@ describe('DspAvatarStack', () => {
     );
   });
 
+  it('exposes the popover to keyboard focus without changing layout', () => {
+    render(<DspAvatarStack dsps={ITEMS} />);
+
+    const trigger = screen.getByLabelText('View DSP distribution details');
+    const popover = screen.getByRole('tooltip');
+
+    expect(trigger.tagName).toBe('BUTTON');
+    expect(trigger).toHaveAttribute('aria-describedby', popover.id);
+    expect(popover).toHaveClass('absolute');
+    expect(popover).toHaveClass('opacity-0');
+    expect(popover).toHaveClass('group-focus-within/dsps:opacity-100');
+    expect(popover).toHaveClass('group-focus-within/dsps:pointer-events-auto');
+  });
+
   it('uses canonical DSP brand colors instead of Tailwind color classes', () => {
     render(<DspAvatarStack dsps={ITEMS} />);
 

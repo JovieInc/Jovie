@@ -1,6 +1,6 @@
 'use client';
 
-import type { CSSProperties } from 'react';
+import { type CSSProperties, useId } from 'react';
 import { cn } from '@/lib/utils';
 
 /**
@@ -78,6 +78,8 @@ export function DspAvatarStack({
   readonly dsps: readonly DspAvatarItem[];
   readonly className?: string;
 }) {
+  const popoverId = useId();
+
   if (dsps.length === 0) return null;
 
   const ordered = [...dsps].sort(
@@ -97,42 +99,50 @@ export function DspAvatarStack({
         className
       )}
     >
-      <span
-        className={cn(
-          'relative grid h-5 w-5 shrink-0 place-items-center rounded-full bg-(--system-b-dsp-avatar-color) text-3xs font-semibold text-white',
-          'ring-2 ring-(--system-b-bg-page)',
-          primary.status === 'missing'
-            ? 'opacity-40'
-            : 'opacity-75 transition-opacity duration-fast ease-subtle group-hover/dsps:opacity-95'
-        )}
-        style={primaryAvatarStyle}
+      <button
+        aria-describedby={popoverId}
+        aria-label='View DSP distribution details'
+        className='inline-flex items-center gap-1.5 rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-(--system-b-bg-page)'
+        type='button'
       >
-        {primary.glyph}
-        {primary.status === 'pending' && (
-          <span
-            aria-hidden='true'
-            className='system-b-dsp-status-dot system-b-dsp-status-dot-pending absolute -top-0.5 -right-0.5 h-1.5 w-1.5 rounded-full ring-1 ring-(--system-b-bg-page)'
-          />
-        )}
-        {primary.status === 'error' && (
-          <span
-            aria-hidden='true'
-            className='system-b-dsp-status-dot system-b-dsp-status-dot-error absolute -top-0.5 -right-0.5 h-1.5 w-1.5 rounded-full ring-1 ring-(--system-b-bg-page)'
-          />
-        )}
-      </span>
-      {others > 0 && (
-        <span className='inline-flex h-5 items-center rounded-full border border-(--system-b-app-shell-border) bg-surface-1 px-1.5 text-3xs font-caption tabular-nums text-tertiary-token'>
-          +{others}
+        <span
+          className={cn(
+            'relative grid h-5 w-5 shrink-0 place-items-center rounded-full bg-(--system-b-dsp-avatar-color) text-3xs font-semibold text-white',
+            'ring-2 ring-(--system-b-bg-page)',
+            primary.status === 'missing'
+              ? 'opacity-40'
+              : 'opacity-75 transition-opacity duration-fast ease-subtle group-hover/dsps:opacity-95 group-focus-within/dsps:opacity-95'
+          )}
+          style={primaryAvatarStyle}
+        >
+          {primary.glyph}
+          {primary.status === 'pending' && (
+            <span
+              aria-hidden='true'
+              className='system-b-dsp-status-dot system-b-dsp-status-dot-pending absolute -top-0.5 -right-0.5 h-1.5 w-1.5 rounded-full ring-1 ring-(--system-b-bg-page)'
+            />
+          )}
+          {primary.status === 'error' && (
+            <span
+              aria-hidden='true'
+              className='system-b-dsp-status-dot system-b-dsp-status-dot-error absolute -top-0.5 -right-0.5 h-1.5 w-1.5 rounded-full ring-1 ring-(--system-b-bg-page)'
+            />
+          )}
         </span>
-      )}
+        {others > 0 && (
+          <span className='inline-flex h-5 items-center rounded-full border border-(--system-b-app-shell-border) bg-surface-1 px-1.5 text-3xs font-caption tabular-nums text-tertiary-token'>
+            +{others}
+          </span>
+        )}
+      </button>
 
       <div
+        id={popoverId}
         role='tooltip'
         className={cn(
           'system-b-dsp-avatar-stack-popover pointer-events-none absolute right-0 top-full mt-1.5 w-56',
-          'opacity-0 group-hover/dsps:opacity-100 group-hover/dsps:pointer-events-auto',
-          'transition-[opacity] duration-fast ease-subtle delay-[400ms] group-hover/dsps:delay-[400ms]'
+          'opacity-0 group-hover/dsps:opacity-100 group-hover/dsps:pointer-events-auto group-focus-within/dsps:opacity-100 group-focus-within/dsps:pointer-events-auto',
+          'transition-[opacity] duration-fast ease-subtle delay-[400ms] group-hover/dsps:delay-[400ms] group-focus-within/dsps:delay-0'
         )}
       >
         <div className='overflow-hidden rounded-xl border border-(--system-b-app-shell-border) bg-(--system-b-app-content-surface) shadow-popover backdrop-blur-xl'>
