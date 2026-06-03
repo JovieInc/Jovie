@@ -157,7 +157,7 @@ export function LinkPill({
                   }}
                   className={cn(
                     MENU_ITEM_BASE,
-                    'w-full text-left active:scale-[0.98]',
+                    'w-full text-left',
                     item.variant === 'destructive' && MENU_ITEM_DESTRUCTIVE
                   )}
                   {...getItemProps()}
