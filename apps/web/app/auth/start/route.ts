@@ -11,20 +11,44 @@ import {
 import { NextResponse } from 'next/server';
 import { APP_ROUTES } from '@/constants/routes';
 import { createStoredAuthState } from '@/lib/auth/routing-state.server';
-import { publicEnv } from '@/lib/env-public';
+import { env } from '@/lib/env';
 import { captureError } from '@/lib/error-tracking';
 import { NO_STORE_HEADERS } from '@/lib/http/headers';
 import {
+  createRateLimiter,
   createRateLimitHeaders,
   generalLimiter,
   getClientIP,
+  RATE_LIMITERS,
 } from '@/lib/rate-limit';
 import { trackServerEvent } from '@/lib/server-analytics';
 
 export const runtime = 'nodejs';
 
+const LOCAL_AUTH_START_LIMITER = createRateLimiter(RATE_LIMITERS.general, {
+  preferRedis: false,
+  warnOnFallback: false,
+});
+
 function createState(): string {
   return crypto.randomUUID().replaceAll('-', '');
+}
+
+function isLocalRuntime(): boolean {
+  return env.NODE_ENV !== 'production';
+}
+
+async function limitAuthStart(key: string) {
+  const rateLimit = await generalLimiter.limit(key);
+  if (
+    rateLimit.success ||
+    !isLocalRuntime() ||
+    rateLimit.unavailable !== true
+  ) {
+    return rateLimit;
+  }
+
+  return LOCAL_AUTH_START_LIMITER.limit(key);
 }
 
 function getAuthPageForIntent(intent: AuthIntent): string {
@@ -55,7 +79,7 @@ export async function GET(request: Request) {
   const url = new URL(request.url);
   const rawClient = getStringParam(url, 'client');
   const rawIntent = getStringParam(url, 'intent');
-  const rateLimit = await generalLimiter.limit(
+  const rateLimit = await limitAuthStart(
     `auth:start:${rawClient ?? 'unknown'}:${getClientIP(request)}`
   );
   if (!rateLimit.success) {
@@ -134,10 +158,7 @@ export async function GET(request: Request) {
     const { userId } = await auth();
     if (userId) {
       return NextResponse.redirect(
-        new URL(
-          buildAuthCallbackPath(record.state),
-          publicEnv.NEXT_PUBLIC_APP_URL
-        ),
+        new URL(buildAuthCallbackPath(record.state), request.url),
         { headers: NO_STORE_HEADERS }
       );
     }

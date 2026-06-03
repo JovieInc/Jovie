@@ -164,6 +164,8 @@ private enum LiveAuthBootstrapper {
 
 private struct AppContentView: View {
   @Bindable var appState: AppState
+  let isAuthAvailable: Bool
+  let isSignInUnavailable: Bool
   let authErrorMessage: String?
   let onLogout: @MainActor () async -> Void
   let onAuthReturn: @MainActor (MobileAuthReturn) -> Void
@@ -176,7 +178,8 @@ private struct AppContentView: View {
         SplashView()
       case .signedOut:
         AuthScreen(
-          isMock: !appState.launchMode.usesLiveClerk,
+          isMock: !isAuthAvailable,
+          isSignInUnavailable: isSignInUnavailable,
           webBaseURL: appState.configuration.webBaseURL,
           errorMessage: authErrorMessage,
           onAuthReturn: onAuthReturn,
@@ -192,8 +195,8 @@ private struct AppContentView: View {
           onLogout: onLogout
         ) {
           NeedsOnboardingView(continueURL: appState.continueOnWebURL)
-        } chatContent: {
-          MobileChatHomeView(isOffline: false)
+        } chatContent: { draft in
+          MobileChatHomeView(isOffline: false, draft: draft)
         }
       case .ready:
         AppShellView(
@@ -211,8 +214,8 @@ private struct AppContentView: View {
             showVenueModeOnLaunch: appState.launchMode.opensVenueModeOnLaunch,
             onRetry: { await appState.retry() }
           )
-        } chatContent: {
-          MobileChatHomeView(isOffline: appState.isOffline)
+        } chatContent: { draft in
+          MobileChatHomeView(isOffline: appState.isOffline, draft: draft)
         }
       }
     }
@@ -221,8 +224,7 @@ private struct AppContentView: View {
 
 private struct MobileChatHomeView: View {
   let isOffline: Bool
-
-  @State private var draft = ""
+  @Binding var draft: String
 
   var body: some View {
     ZStack {
@@ -304,6 +306,8 @@ private struct ChatComposerPreview: View {
 
 struct RootView: View {
   @Bindable var appState: AppState
+  let isAuthAvailable: Bool
+  let isSignInUnavailable: Bool
   let liveUserID: String?
   let authErrorMessage: String?
   let onLogout: @MainActor () async -> Void
@@ -314,6 +318,8 @@ struct RootView: View {
     ZStack {
       AppContentView(
         appState: appState,
+        isAuthAvailable: isAuthAvailable,
+        isSignInUnavailable: isSignInUnavailable,
         authErrorMessage: authErrorMessage,
         onLogout: onLogout,
         onAuthReturn: onAuthReturn,
@@ -457,6 +463,8 @@ struct UITestingAuthCallbackRoot: View {
   var body: some View {
     RootView(
       appState: appState,
+      isAuthAvailable: false,
+      isSignInUnavailable: false,
       liveUserID: liveUserID,
       authErrorMessage: authErrorMessage,
       onLogout: { await appState.signOut() },
@@ -561,6 +569,8 @@ struct LiveRootContainer: View {
   var body: some View {
     RootView(
       appState: appState,
+      isAuthAvailable: true,
+      isSignInUnavailable: false,
       liveUserID: clerk.user?.id,
       authErrorMessage: authErrorMessage,
       onLogout: {

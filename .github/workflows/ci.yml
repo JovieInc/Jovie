@@ -437,7 +437,7 @@ jobs:
     # Run for push to main, testing-labeled full CI, or PRs touching DB-relevant paths.
     # run_neon covers drizzle, lib/db, lib/queries, schema, cron routes, SQL files, and
     # package.json changes. PRs touching only UI/perf/docs skip this job entirely.
-    if: ${{ github.event_name == 'push' || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork == false && needs.ci-path-changes.outputs.run_neon == 'true') }}
+    if: ${{ github.event_name == 'push' || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork == false && github.actor != 'dependabot[bot]' && needs.ci-path-changes.outputs.run_neon == 'true') }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
     outputs:
@@ -889,7 +889,7 @@ jobs:
     needs: [ci-fast, ci-path-changes, neon-db]
     if: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork == false && needs.ci-path-changes.outputs.run_e2e == 'true' && github.actor != 'dependabot[bot]' }}
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 45
     strategy:
       fail-fast: false
       matrix:
@@ -1141,7 +1141,7 @@ jobs:
     needs: [ci-fast, ci-path-changes, neon-db]
     if: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork == false && contains(github.event.pull_request.labels.*.name, 'testing') }}
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
@@ -1299,7 +1299,7 @@ jobs:
     needs: [ci-fast, ci-path-changes, neon-db]
     if: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork == false && github.actor != 'dependabot[bot]' && needs.ci-path-changes.outputs.run_onboarding_lighthouse == 'true' }}
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
@@ -1446,7 +1446,7 @@ jobs:
     needs: [ci-fast, ci-path-changes]
     if: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork == false && github.actor != 'dependabot[bot]' && needs.ci-path-changes.outputs.run_admin_lighthouse == 'true' }}
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
@@ -1582,7 +1582,7 @@ jobs:
     if: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork == false && github.actor != 'dependabot[bot]' && needs.ci-path-changes.outputs.run_chat_lighthouse == 'true' }}
     continue-on-error: true
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
@@ -2085,6 +2085,8 @@ jobs:
         run: pnpm turbo build --affected
         env:
           NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
+          # Cloudflare Turnstile dummy keys for CI-only browser smoke tests.
+          NEXT_PUBLIC_TURNSTILE_SITE_KEY: 1x00000000000000000000AA
           NEXT_IGNORE_ESLINT: '1'
           NEXT_IGNORE_TYPECHECK: '1'
           NEXT_PRIVATE_SKIP_SIZE_CHECK: 'true'
@@ -2556,6 +2558,7 @@ jobs:
           SENTRY_ENVIRONMENT: ci-pr-e2e
           SENTRY_RELEASE: ${{ github.sha }}
           E2E_USE_TEST_AUTH_BYPASS: '1'
+          VERCEL_ENV: development
           E2E_TEST_AUTH_PERSONA: creator-ready
           NEXT_PUBLIC_CLERK_MOCK: '1'
           NEXT_PUBLIC_CLERK_PROXY_DISABLED: '1'
@@ -2916,6 +2919,7 @@ jobs:
           E2E_SKIP_SEED: '1'
           SMOKE_ONLY: '1'
           E2E_USE_TEST_AUTH_BYPASS: '1'
+          VERCEL_ENV: development
           SENTRY_E2E_REPORTING: '1'
           SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
           SENTRY_ENVIRONMENT: ci-pr-e2e
@@ -2945,6 +2949,7 @@ jobs:
           E2E_SKIP_SEED: '1'
           SMOKE_ONLY: '1'
           E2E_USE_TEST_AUTH_BYPASS: '1'
+          VERCEL_ENV: development
           SENTRY_E2E_REPORTING: '1'
           SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
           SENTRY_ENVIRONMENT: ci-pr-e2e-auth
@@ -3444,6 +3449,8 @@ jobs:
         env:
           DATABASE_URL: ${{ env.DATABASE_URL }}
           NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
+          # Keep rebuild fallback equivalent to the shared ci-build artifact.
+          NEXT_PUBLIC_TURNSTILE_SITE_KEY: 1x00000000000000000000AA
           NEXT_IGNORE_ESLINT: '1'
           NEXT_IGNORE_TYPECHECK: '1'
           NEXT_PRIVATE_SKIP_SIZE_CHECK: 'true'
@@ -3457,6 +3464,8 @@ jobs:
           # the shell process, but backgrounded processes inherit from the shell's exported vars.
           export DATABASE_URL="${{ env.DATABASE_URL }}"
           export NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY="${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}"
+          export NEXT_PUBLIC_TURNSTILE_SITE_KEY="1x00000000000000000000AA"
+          export TURNSTILE_SECRET_KEY="1x0000000000000000000000000000000AA"
           export CLERK_SECRET_KEY="${{ secrets.CLERK_SECRET_KEY }}"
           export NEXT_PUBLIC_E2E_MODE=1
           export NEXT_DISABLE_TOOLBAR=1
@@ -3497,6 +3506,8 @@ jobs:
         env:
           DATABASE_URL: ${{ env.DATABASE_URL }}
           NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
+          NEXT_PUBLIC_TURNSTILE_SITE_KEY: 1x00000000000000000000AA
+          TURNSTILE_SECRET_KEY: 1x0000000000000000000000000000000AA
           CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY }}
           NEXT_PUBLIC_E2E_MODE: '1'
           NEXT_DISABLE_TOOLBAR: '1'

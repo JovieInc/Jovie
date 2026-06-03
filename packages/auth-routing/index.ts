@@ -76,7 +76,7 @@ export interface AuthAnalyticsEventPayload {
 }
 
 const AUTH_STATE_TTL_MS = 10 * 60 * 1000;
-const NATIVE_EXCHANGE_TTL_MS = 60 * 1000;
+const NATIVE_EXCHANGE_TTL_MS = 5 * 60 * 1000;
 const IOS_AUTH_COMPLETE_URL = 'ie.jov.jovie://auth/complete';
 const ELECTRON_AUTH_COMPLETE_URL = 'jovie://auth/complete';
 const IOS_UNIVERSAL_AUTH_COMPLETE_PATH = '/auth/ios/complete';

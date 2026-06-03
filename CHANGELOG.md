@@ -5,6 +5,35 @@
      5|The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
      6|and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.6.2] - 2026-06-02
+
+> Memory Core v0 now has fixture-backed loops for ingest, identity, enrichment, matching, graph reads, and review-gated opportunities.
+
+### Added
+
+- **Memory Core loop services**: adds the thin ingest harness plus thick memory workers for entity resolution, enrichment, graph querying, review actions, calendar/photo matching, catalog/voice-memo matching, and pending opportunity generation.
+- **Memory dev fixtures**: adds deterministic chat, photo, calendar, catalog song, release, voice memo, Wikipedia, Wikidata, and MusicBrainz fixtures for provider-free tests.
+- **Memory graph API**: adds a scoped `/api/memory/graph` read endpoint backed by the existing Memory Core v0 schema.
+
+### Fixed
+
+- **Memory evidence and scope guards**: requires source evidence for facts, sanitizes Gmail raw-body metadata at the store boundary, and rejects cross-profile source/observation writes.
+- **QA gate stability**: removes dynamic server-only imports from the Gmail no-send guard and gives slow screenshot/Clerk tests explicit timeouts.
+
+## [26.6.1] - 2026-06-01
+
+> Native auth now starts in the system browser while desktop and iOS keep only the app handoff surface.
+
+### Changed
+
+- **Native auth handoff**: replaces in-app desktop and iOS auth forms with a centered `Continue in Browser` handoff before opening the browser-owned Clerk flow.
+- **Desktop auth routing**: allows `/auth/start` to leave the Electron shell, keeps Clerk UI out of desktop auth routes, and tightens Clerk host matching for auth provider navigation.
+
+### Fixed
+
+- **Electron auth bridge**: installs the runtime marker and bridge before auth handoff actions so the desktop shell can open the browser reliably.
+- **Segmented input cleanup**: clears the deferred blur timer after teardown so jsdom test runs do not report late `document` access.
+
 ## [26.6.0] - 2026-06-01
 
 > Jovie now has an onboarding robot that validates the shipped QA path instead of relying on manual incognito-window checks.

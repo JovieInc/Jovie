@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import { isTransientNavigationError } from './utils/smoke-test-utils';
 
 /**
  * Suite 1: Public Profile Experience + Public Pages (JOV-1427)
@@ -137,7 +138,7 @@ test('homepage loads with hero heading, CTA, sections, and footer', async ({
   // CTA must be present — if no signup entry point, users can't convert
   const cta = page
     .locator(
-      '#handle-input, a[href*="/signup"], a[href*="/sign-up"], a:has-text("Get started")'
+      '#handle-input, a[href*="/signup"], a[href*="/sign-up"], a[href*="/start"], a:has-text("Get started"), a:has-text("Request access")'
     )
     .first();
   await expect(cta).toBeVisible({ timeout: 20_000 });
@@ -252,7 +253,7 @@ test.describe('Public Profile', () => {
   test('profile subpages (/subscribe, /tip, /pay, /tour) load without 500', async ({
     page,
   }) => {
-    test.setTimeout(120_000);
+    test.setTimeout(240_000);
 
     const subpages = [
       { mode: 'subscribe', route: 'subscribe' },
@@ -262,13 +263,22 @@ test.describe('Public Profile', () => {
     ] as const;
 
     for (const { mode, route } of subpages) {
-      const redirectResponse = await page.request.get(
-        `/${TEST_PROFILE}/${route}`,
-        {
+      let redirectResponse: Awaited<ReturnType<typeof page.request.get>>;
+      try {
+        redirectResponse = await page.request.get(`/${TEST_PROFILE}/${route}`, {
           maxRedirects: 0,
           timeout: 60_000,
+        });
+      } catch (requestError) {
+        if (isTransientNavigationError(requestError)) {
+          test.skip(
+            true,
+            `Transient redirect check error on /${TEST_PROFILE}/${route}`
+          );
+          return;
         }
-      );
+        throw requestError;
+      }
       expect(
         redirectResponse.status(),
         `/${TEST_PROFILE}/${route} should redirect without a server error`

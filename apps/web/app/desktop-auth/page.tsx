@@ -1,18 +1,11 @@
 'use client';
 
 import { useSearchParams } from 'next/navigation';
-import {
-  Suspense,
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from 'react';
+import { Suspense, useCallback, useMemo, useState } from 'react';
+import { BrandLogo } from '@/components/atoms/BrandLogo';
 import { sanitizeDesktopAuthUrl } from '@/lib/desktop/auth-return';
 import {
   closeDesktopAuthWindow,
-  isElectronRuntime,
   openDesktopAuthUrl,
 } from '@/lib/desktop/electron-bridge';
 
@@ -32,12 +25,8 @@ function formatBrowserOpenStatus(
   openState: BrowserOpenState,
   openError: string | null
 ): string | null {
-  if (openState === 'opening') {
-    return 'Opening your browser...';
-  }
-
   if (openState === 'opened') {
-    return 'Continue sign-in in your browser.';
+    return 'Check your browser.';
   }
 
   return openError;
@@ -72,90 +61,73 @@ function DesktopAuthContent() {
   const searchParams = useSearchParams();
   const [openState, setOpenState] = useState<BrowserOpenState>('idle');
   const [openError, setOpenError] = useState<string | null>(null);
-  const autoOpenedRef = useRef(false);
   const appOrigin = getAppOrigin();
   const authUrl = useMemo(
     () => sanitizeDesktopAuthUrl(searchParams.get('auth_url'), appOrigin),
     [searchParams, appOrigin]
   );
-  const canAutoOpen = isElectronRuntime();
 
   const openAuthUrl = useCallback(async () => {
     if (!authUrl || openState === 'opening') return;
     setOpenState('opening');
     setOpenError(null);
-    const result = await openWithTimeout(authUrl);
-    if (result.ok) {
-      setOpenState('opened');
-      return;
+    try {
+      const result = await openWithTimeout(authUrl);
+      if (result.ok) {
+        setOpenState('opened');
+        return;
+      }
+      setOpenState('error');
+      setOpenError(formatOpenError(result.reason));
+    } catch {
+      setOpenState('error');
+      setOpenError(formatOpenError());
     }
-    setOpenState('error');
-    setOpenError(formatOpenError(result.reason));
   }, [authUrl, openState]);
 
-  useEffect(() => {
-    if (!canAutoOpen || !authUrl || autoOpenedRef.current) return;
-    let isActive = true;
-    autoOpenedRef.current = true;
-    setOpenState('opening');
-    setOpenError(null);
-    openWithTimeout(authUrl)
-      .then(result => {
-        if (!isActive) return;
-        if (result.ok) {
-          setOpenState('opened');
-        } else {
-          setOpenState('error');
-          setOpenError(formatOpenError(result.reason));
-        }
-      })
-      .catch(() => {});
-
-    return () => {
-      isActive = false;
-    };
-  }, [authUrl, canAutoOpen]);
-
   const statusText = formatBrowserOpenStatus(openState, openError);
+  const isWaitingInBrowser = openState === 'opened';
 
   return (
-    <main className='relative isolate grid min-h-dvh place-items-center bg-[#06070a] px-6 text-white [color-scheme:dark]'>
-      <section className='relative z-10 w-full max-w-sm px-6 py-7 text-center'>
-        <h1 className='text-[22px] font-semibold leading-7'>
-          Continue in browser
-        </h1>
-        <p className='mt-3 text-[14px] leading-5 text-white/64'>
-          {authUrl
-            ? 'Jovie will return here when sign-in is complete.'
-            : 'Close this window and start sign-in again from Jovie.'}
-        </p>
-        <div className='mt-6 flex flex-col gap-2'>
-          <button
-            type='button'
-            className='inline-flex h-10 w-full items-center justify-center rounded-full bg-white px-4 text-[13px] font-medium text-black transition-colors hover:bg-white/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/35 disabled:cursor-not-allowed disabled:opacity-55'
-            disabled={!authUrl || openState === 'opening'}
-            onClick={() => {
-              openAuthUrl().catch(() => {});
-            }}
-          >
-            Continue in browser
-          </button>
-          <button
-            type='button'
-            className='inline-flex h-10 w-full items-center justify-center rounded-full border border-white/10 px-4 text-[13px] font-medium text-white/72 transition-colors hover:bg-white/[0.06] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/25'
-            onClick={() => {
-              closeDesktopAuthWindow().catch(() => {});
-            }}
-          >
-            Cancel sign-in
-          </button>
+    <main
+      className='relative isolate grid min-h-dvh place-items-center bg-[#06070a] px-6 text-white [color-scheme:dark]'
+      data-desktop-auth-state={openState}
+      data-testid='desktop-auth-handoff'
+    >
+      <section className='relative z-10 flex w-full max-w-[360px] flex-col items-center px-6 py-16 text-center'>
+        <BrandLogo aria-hidden size={60} tone='white' />
+        <h1 className='sr-only'>Sign in to Jovie</h1>
+        <div className='mt-8 flex min-h-11 w-full flex-col items-center justify-center gap-2'>
+          {isWaitingInBrowser ? null : (
+            <button
+              type='button'
+              className='inline-flex h-11 w-full items-center justify-center rounded-full bg-white px-4 text-[13px] font-medium text-black transition-colors hover:bg-white/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/35 disabled:cursor-not-allowed disabled:opacity-55'
+              disabled={!authUrl || openState === 'opening'}
+              onClick={openAuthUrl}
+            >
+              {openState === 'opening'
+                ? 'Opening Browser...'
+                : 'Continue in Browser'}
+            </button>
+          )}
+          {isWaitingInBrowser || !authUrl ? (
+            <button
+              type='button'
+              className='inline-flex h-11 w-full items-center justify-center rounded-full border border-white/10 px-4 text-[13px] font-medium text-white/72 transition-colors hover:bg-white/[0.06] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/25'
+              onClick={() => {
+                closeDesktopAuthWindow().catch(() => {});
+              }}
+            >
+              Cancel Sign-In
+            </button>
+          ) : null}
         </div>
         <p
           aria-live='polite'
           role='status'
           className='mt-3 min-h-5 text-[12px] leading-5 text-white/56'
         >
-          {statusText}
+          {authUrl ? statusText : 'Start sign-in again from Jovie.'}
         </p>
       </section>
     </main>

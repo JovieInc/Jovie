@@ -24,6 +24,8 @@ const contactSheetPath = join(
 );
 const productionIcnsPath = join(assetsRoot, 'icon.icns');
 const stagingIcnsPath = join(assetsRoot, 'icon-staging.icns');
+const productionPngPath = join(assetsRoot, 'icon.png');
+const stagingPngPath = join(assetsRoot, 'icon-staging.png');
 const productionIconsetPath = join(assetsRoot, 'icon.iconset');
 const stagingIconsetPath = join(assetsRoot, 'icon-staging.iconset');
 const ICON_SIZE = 512;
@@ -48,6 +50,7 @@ async function assertOpaquePng(filePath, size) {
 
 async function assertBlackCorners(filePath) {
   const pixels = await sharp(filePath)
+    .ensureAlpha()
     .raw()
     .toBuffer({ resolveWithObject: true });
   const { data, info } = pixels;
@@ -63,6 +66,35 @@ async function assertBlackCorners(filePath) {
   ]) {
     assert.ok(r <= 10 && g <= 11 && b <= 12);
   }
+}
+
+async function assertTransparentCorners(filePath) {
+  const pixels = await sharp(filePath)
+    .ensureAlpha()
+    .raw()
+    .toBuffer({ resolveWithObject: true });
+  const { data, info } = pixels;
+  const sampleAlpha = (x, y) => {
+    const index = (y * info.width + x) * info.channels;
+    return data[index + 3];
+  };
+  for (const alpha of [
+    sampleAlpha(0, 0),
+    sampleAlpha(info.width - 1, 0),
+    sampleAlpha(0, info.height - 1),
+    sampleAlpha(info.width - 1, info.height - 1),
+  ]) {
+    assert.ok(alpha <= 5);
+  }
+}
+
+async function assertRoundedTransparentPng(filePath, size) {
+  const metadata = await pngMetadata(filePath);
+  assert.equal(metadata.format, 'png');
+  assert.equal(metadata.width, size);
+  assert.equal(metadata.height, size);
+  assert.equal(metadata.hasAlpha, true);
+  await assertTransparentCorners(filePath);
 }
 
 async function assertIcnsFile(filePath) {
@@ -93,20 +125,18 @@ test('legacy icon-source.png remains for reference but is no longer the producti
   assert.notEqual(currentLegacySha, ''); // just ensure readable
 });
 
-test('packaged production and staging icons are generated from the canonical profile', async () => {
-  await assertOpaquePng(join(assetsRoot, 'icon.png'), ICON_SIZE);
-  await assertOpaquePng(join(assetsRoot, 'icon-staging.png'), ICON_SIZE);
+test('packaged production and staging icons use the rounded desktop profile', async () => {
+  await assertRoundedTransparentPng(productionPngPath, ICON_SIZE);
+  await assertRoundedTransparentPng(stagingPngPath, ICON_SIZE);
   await assertIcnsFile(productionIcnsPath);
   await assertIcnsFile(stagingIcnsPath);
-  await assertBlackCorners(join(assetsRoot, 'icon.png'));
-  await assertBlackCorners(join(assetsRoot, 'icon-staging.png'));
 
   const expectedProductionIcon = await readFile(canonicalIconPath);
-  const productionIcon = await readFile(join(assetsRoot, 'icon.png'));
-  const stagingIcon = await readFile(join(assetsRoot, 'icon-staging.png'));
+  const productionIcon = await readFile(productionPngPath);
+  const stagingIcon = await readFile(stagingPngPath);
 
-  assert.deepEqual(productionIcon, expectedProductionIcon);
-  assert.deepEqual(stagingIcon, expectedProductionIcon);
+  assert.notDeepEqual(productionIcon, expectedProductionIcon);
+  assert.deepEqual(stagingIcon, productionIcon);
 });
 
 test('desktop icon generation cleans up temporary iconset caches', async () => {

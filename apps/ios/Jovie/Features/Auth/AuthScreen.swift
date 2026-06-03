@@ -12,6 +12,7 @@ private let authLogger = Logger(
 
 struct AuthScreen: View {
   let isMock: Bool
+  let isSignInUnavailable: Bool
   let webBaseURL: URL
   let errorMessage: String?
   let onAuthReturn: @MainActor (MobileAuthReturn) -> Void
@@ -27,26 +28,21 @@ struct AuthScreen: View {
       VStack(spacing: 0) {
         Spacer(minLength: 96)
 
-        VStack(spacing: JovieSpacing.xLarge) {
-          JovieLogoMark(size: 92)
+        VStack(spacing: JovieSpacing.xxLarge) {
+          JovieLogoMark(size: 76)
             .accessibilityIdentifier("auth-jovie-logo")
 
-          Text("Sign in to Jovie")
-            .font(JovieFont.display(size: 29, weight: .semibold))
-            .foregroundStyle(JovieColor.textPrimary)
-            .multilineTextAlignment(.center)
-            .minimumScaleFactor(0.86)
+          BrowserAuthActions(
+            isOpening: didRequestBrowserAuth,
+            isDisabled: isSignInUnavailable,
+            errorMessage: errorMessage,
+            action: startBrowserAuth
+          )
         }
-        .frame(maxWidth: 360)
+        .frame(maxWidth: 430)
         .padding(.horizontal, JovieSpacing.xLarge)
 
-        Spacer(minLength: 72)
-
-        BrowserAuthActions(
-          isOpening: didRequestBrowserAuth,
-          errorMessage: errorMessage,
-          action: startBrowserAuth
-        )
+        Spacer(minLength: 96)
       }
       .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
@@ -389,50 +385,59 @@ private extension Data {
 
 private struct BrowserAuthActions: View {
   let isOpening: Bool
+  let isDisabled: Bool
   let errorMessage: String?
   let action: () -> Void
 
   var body: some View {
     VStack(spacing: JovieSpacing.large) {
-      GetStartedButton(isOpening: isOpening, action: action)
+      ContinueInBrowserButton(isOpening: isOpening, isDisabled: isDisabled, action: action)
 
       AuthErrorText(message: errorMessage)
     }
-    .frame(maxWidth: 430)
-    .padding(.horizontal, JovieSpacing.xLarge)
-    .padding(.bottom, JovieSpacing.xxLarge)
+    .frame(maxWidth: .infinity)
   }
 }
 
-private struct GetStartedButton: View {
+private struct ContinueInBrowserButton: View {
   let isOpening: Bool
+  let isDisabled: Bool
   let action: () -> Void
 
   var body: some View {
     Button(action: action) {
       HStack(spacing: JovieSpacing.small) {
-        if isOpening {
+        if isOpening, !isDisabled {
           ProgressView()
             .controlSize(.small)
             .tint(JovieColor.backgroundBase)
         }
 
-        Text(isOpening ? "Opening..." : "Get started")
+        Text(buttonTitle)
           .lineLimit(1)
           .minimumScaleFactor(0.82)
       }
       .font(JovieFont.body(size: 16, weight: .semibold))
-      .foregroundStyle(JovieColor.backgroundBase)
+      .foregroundStyle(isDisabled ? JovieColor.textSecondary : JovieColor.backgroundBase)
       .frame(maxWidth: .infinity)
       .frame(height: 56)
       .contentShape(Rectangle())
     }
+    .disabled(isDisabled)
     .buttonStyle(.plain)
     .background(
       Capsule(style: .continuous)
-        .fill(Color.white)
+        .fill(isDisabled ? JovieColor.surface2 : Color.white)
     )
-    .accessibilityIdentifier("auth-get-started-button")
+    .accessibilityIdentifier("auth-continue-browser-button")
+  }
+
+  private var buttonTitle: String {
+    if isDisabled {
+      return "Sign-in Unavailable"
+    }
+
+    return isOpening ? "Opening Browser..." : "Continue in Browser"
   }
 }
 

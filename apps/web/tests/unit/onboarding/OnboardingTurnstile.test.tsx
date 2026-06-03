@@ -22,6 +22,7 @@ vi.mock('next/script', () => ({
 describe('OnboardingTurnstile', () => {
   beforeEach(() => {
     vi.unstubAllEnvs();
+    delete document.documentElement.dataset.e2eMode;
     delete window.turnstile;
   });
 
@@ -83,6 +84,28 @@ describe('OnboardingTurnstile', () => {
       expect.objectContaining({ status: 'verified' })
     );
     expect(screen.getByTestId('onboarding-turnstile-panel')).not.toBeVisible();
+  });
+
+  it('bypasses verification in runtime E2E mode', async () => {
+    vi.stubEnv('NODE_ENV', 'test');
+    vi.stubEnv('NEXT_PUBLIC_TURNSTILE_SITE_KEY', '');
+    document.documentElement.dataset.e2eMode = '1';
+    const onToken = vi.fn();
+    const onStateChange = vi.fn();
+
+    render(
+      <OnboardingTurnstile onToken={onToken} onStateChange={onStateChange} />
+    );
+
+    await waitFor(() => {
+      expect(onToken).toHaveBeenCalledWith('local-dev-turnstile-bypass');
+    });
+    expect(onStateChange).toHaveBeenCalledWith(
+      expect.objectContaining({ status: 'bypassed' })
+    );
+    expect(
+      screen.queryByTestId('onboarding-turnstile-panel')
+    ).not.toBeInTheDocument();
   });
 
   it('reports interactive, error, timeout, and unsupported callback states', async () => {

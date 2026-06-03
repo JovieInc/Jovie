@@ -267,8 +267,178 @@ jobs:
           ls -la /tmp/autofix-context/
           wc -l /tmp/autofix-context/*.txt /tmp/autofix-context/*.patch 2>/dev/null || true
 
-      - name: Run Claude Code to fix CI failure
+      - name: OpenRouter fix attempt (cheap first, stronger fallback)
         if: steps.drift.outputs.drifted != 'true' && steps.dedup.outputs.skip_reason == ''
+        id: openrouter
+        env:
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          GH_REPO: ${{ github.repository }}
+          FAILING_SHA: ${{ needs.evaluate.outputs.failing_sha }}
+          FAILING_RUN_ID: ${{ needs.evaluate.outputs.failing_run_id }}
+          LAST_GREEN_SHA: ${{ needs.evaluate.outputs.last_green_sha }}
+          FAILED_JOB_NAMES: ${{ needs.evaluate.outputs.failed_job_names }}
+        run: |
+          set -euo pipefail
+
+          echo "did_fix=false" >> "$GITHUB_OUTPUT"
+          echo "fallback=true" >> "$GITHUB_OUTPUT"
+          echo "reason=" >> "$GITHUB_OUTPUT"
+          echo "model_used=" >> "$GITHUB_OUTPUT"
+          echo "status=" >> "$GITHUB_OUTPUT"
+
+          if [ -z "${OPENROUTER_API_KEY:-}" ]; then
+            echo "reason=no_openrouter_key" >> "$GITHUB_OUTPUT"
+            echo "status=skipped" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          if [ ! -f /tmp/autofix-context/failed-logs.txt ]; then
+            echo "reason=missing_context_bundle" >> "$GITHUB_OUTPUT"
+            echo "status=failed" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          run_model() {
+            local model="$1"
+
+            LOG_PREVIEW=$(head -n 180 /tmp/autofix-context/failed-logs.txt)
+            SUSPECT_FILES=$(cat /tmp/autofix-context/suspect-files.txt)
+            COMMITS_RANGE=$(cat /tmp/autofix-context/commits-since-green.txt 2>/dev/null | tr '\n' ' ' | tr -s ' ')
+
+            SYSTEM_PROMPT=$(
+              cat <<'SYSTEMEOF'
+          You are a concise AI code-fixer for workflow and CI reliability.
+          Return exactly one JSON object and nothing else.
+          If the failure is clearly due to secrets/missing credentials, set status to "abort" and include a short reason.
+          If a fix is possible, return status "fix" and provide a git-compatible unified diff in the "patch" field.
+          If no fix is needed or not possible, return status "skip" and include a short reason.
+          Schema:
+          {"status":"fix|skip|abort","summary":"...", "patch":"...","reason":"..."}
+          Apply minimal edits only. Prefer edits only in workflow files and the files listed in suspect files.
+          SYSTEMEOF
+            )
+
+            USER_PROMPT=$(
+              cat <<EOF
+          Main branch failure details:
+          - Failing SHA: ${FAILING_SHA}
+          - Last green SHA: ${LAST_GREEN_SHA}
+          - Failed run: https://github.com/${GH_REPO}/actions/runs/${FAILING_RUN_ID}
+          - Failed jobs: ${FAILED_JOB_NAMES}
+          - Commits since green: ${COMMITS_RANGE}
+
+          Recent failed log excerpt:
+          ${LOG_PREVIEW}
+
+          Suspect files:
+          ${SUSPECT_FILES}
+
+          Edit the repo directly (apply minimal patch). Keep diffs compact.
+          EOF
+            )
+
+            REQUEST_BODY=$(jq -n \
+              --arg model "$model" \
+              --arg system "$SYSTEM_PROMPT" \
+              --arg user "$USER_PROMPT" \
+              '{model: $model, messages: [{role: "system", content: $system}, {role: "user", content: $user}], temperature: 0.2, max_tokens: 6000}'
+            )
+
+            RESPONSE=$(curl -sS --max-time 90 --retry 2 --retry-delay 1 \
+              --retry-connrefused --retry-all-errors \
+              https://openrouter.ai/api/v1/chat/completions \
+              -H "Authorization: Bearer ${OPENROUTER_API_KEY}" \
+              -H "Content-Type: application/json" \
+              -H "HTTP-Referer: https://github.com/${GH_REPO}" \
+              -H "X-Title: jovie-main-autofix" \
+              -d "$REQUEST_BODY")
+
+            ERROR_MSG=$(echo "$RESPONSE" | jq -r '.error.message // empty')
+            if [ -n "$ERROR_MSG" ]; then
+              echo "Model $model returned error: $ERROR_MSG"
+              return 1
+            fi
+
+            CONTENT=$(echo "$RESPONSE" | jq -r '.choices[0].message.content // ""')
+            if [ -z "$CONTENT" ]; then
+              echo "Model $model returned empty content."
+              return 1
+            fi
+
+            if ! echo "$CONTENT" | jq -e . > /dev/null 2>&1; then
+              echo "Model $model output was not strict JSON."
+              return 1
+            fi
+
+            STATUS=$(echo "$CONTENT" | jq -r '.status // ""')
+            SUMMARY=$(echo "$CONTENT" | jq -r '.summary // ""')
+            PATCH=$(echo "$CONTENT" | jq -r '.patch // ""')
+            REASON=$(echo "$CONTENT" | jq -r '.reason // ""')
+
+            echo "status=$STATUS" >> "$GITHUB_OUTPUT"
+            echo "reason=$REASON" >> "$GITHUB_OUTPUT"
+            echo "model_used=$model" >> "$GITHUB_OUTPUT"
+            echo "summary=$SUMMARY" >> "$GITHUB_OUTPUT"
+
+            if [ "$STATUS" = "abort" ]; then
+              echo "OpenRouter says this is not an autofixable code issue." > /tmp/autofix-context/ABORT.txt
+              echo "$REASON" >> /tmp/autofix-context/ABORT.txt
+              echo "did_fix=false" >> "$GITHUB_OUTPUT"
+              echo "fallback=false" >> "$GITHUB_OUTPUT"
+              return 0
+            fi
+
+            if [ "$STATUS" = "skip" ]; then
+              echo "OpenRouter skipped fix: $REASON"
+              echo "did_fix=false" >> "$GITHUB_OUTPUT"
+              echo "fallback=false" >> "$GITHUB_OUTPUT"
+              return 0
+            fi
+
+            if [ "$STATUS" != "fix" ]; then
+              echo "Model $model returned unexpected status '$STATUS'."
+              return 1
+            fi
+
+            if [ -z "$PATCH" ] || [ "$PATCH" = "null" ]; then
+              echo "Model $model requested fix but returned no patch."
+              return 1
+            fi
+
+            PATCH_FILE="/tmp/openrouter-autofix.patch"
+            printf '%s\n' "$PATCH" > "$PATCH_FILE"
+
+            if ! git apply --check "$PATCH_FILE"; then
+              echo "Patch from $model does not apply cleanly."
+              return 1
+            fi
+
+            git apply "$PATCH_FILE"
+            if git diff --quiet; then
+              echo "Patch from $model made no changes."
+              return 1
+            fi
+
+            echo "did_fix=true" >> "$GITHUB_OUTPUT"
+            echo "fallback=false" >> "$GITHUB_OUTPUT"
+            return 0
+          }
+
+          PRIMARY_MODEL="google/gemini-flash-1.5:free"
+          FALLBACK_MODEL="openai/gpt-4o-mini"
+
+          if ! run_model "$PRIMARY_MODEL"; then
+            if ! run_model "$FALLBACK_MODEL"; then
+              echo "status=failed" >> "$GITHUB_OUTPUT"
+              echo "reason=openrouter_all_models_failed" >> "$GITHUB_OUTPUT"
+              echo "model_used=${PRIMARY_MODEL},${FALLBACK_MODEL}" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+          fi
+
+      - name: Run Claude Code fallback
+        if: steps.drift.outputs.drifted != 'true' && steps.dedup.outputs.skip_reason == '' && steps.openrouter.outputs.fallback == 'true'
         id: claude
         uses: anthropics/claude-code-action@787c5a0ce96a9a6cfb050ea0c8f4c05f2447c251 # v1
         with:

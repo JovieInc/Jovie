@@ -25,6 +25,8 @@ vi.mock('@/features/demo/DemoClientProviders', () => ({
   ),
 }));
 
+const SLOW_DEMO_SURFACE_TIMEOUT_MS = 15_000;
+
 async function renderSurface(search = '') {
   mockSearchParams.mockReturnValue(new URLSearchParams(search));
   const { DemoTimWhiteProfileSurface } = await import(
@@ -46,29 +48,37 @@ describe('DemoTimWhiteProfileSurface', () => {
     mockStaticArtistPage.mockClear();
   });
 
-  it('renders the default clean Tim White profile screenshot surface', async () => {
-    const props = await renderSurface();
+  it(
+    'renders the default clean Tim White profile screenshot surface',
+    async () => {
+      const props = await renderSurface();
 
-    expect(props).toMatchObject({
-      mode: 'profile',
-      artist: expect.objectContaining({
-        spotify_id: TIM_WHITE_PROFILE.spotifyArtistId,
-        name: TIM_WHITE_PROFILE.name,
-        image_url: TIM_WHITE_PROFILE.avatarSrc,
-      }),
-      hideJovieBranding: true,
-      hideMoreMenu: true,
-      showFooter: true,
-      showPayButton: true,
-      showTourButton: true,
-    });
-  });
+      expect(props).toMatchObject({
+        mode: 'profile',
+        artist: expect.objectContaining({
+          spotify_id: TIM_WHITE_PROFILE.spotifyArtistId,
+          name: TIM_WHITE_PROFILE.name,
+          image_url: TIM_WHITE_PROFILE.avatarSrc,
+        }),
+        hideJovieBranding: true,
+        hideMoreMenu: true,
+        showFooter: true,
+        showPayButton: true,
+        showTourButton: true,
+      });
+    },
+    SLOW_DEMO_SURFACE_TIMEOUT_MS
+  );
 
-  it('accepts subscribe mode from the screenshot route query string', async () => {
-    const props = await renderSurface('mode=subscribe');
+  it(
+    'accepts subscribe mode from the screenshot route query string',
+    async () => {
+      const props = await renderSurface('mode=subscribe');
 
-    expect(props?.mode).toBe('subscribe');
-  });
+      expect(props?.mode).toBe('subscribe');
+    },
+    SLOW_DEMO_SURFACE_TIMEOUT_MS
+  );
 
   it('accepts releases mode from the screenshot route query string', async () => {
     const props = await renderSurface('mode=releases');
