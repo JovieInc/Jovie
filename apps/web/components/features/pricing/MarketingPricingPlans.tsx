@@ -10,11 +10,14 @@ import {
 import { cn } from '@/lib/utils';
 
 type MarketingPricingMode = 'compact' | 'expanded';
+type MarketingPricingCtaVariant = 'primary' | 'secondary';
 
 function MarketingPricingPlanCard({
+  ctaVariant,
   mode,
   plan,
 }: Readonly<{
+  ctaVariant: MarketingPricingCtaVariant;
   mode: MarketingPricingMode;
   plan: MarketingPricingPlan;
 }>) {
@@ -50,7 +53,12 @@ function MarketingPricingPlanCard({
       <Link
         href={getMarketingPlanHref(plan.id)}
         prefetch={false}
-        className='marketing-pricing-plan-card__cta public-action-primary focus-ring-themed'
+        className={cn(
+          'marketing-pricing-plan-card__cta focus-ring-themed',
+          ctaVariant === 'primary'
+            ? 'public-action-primary'
+            : 'public-action-secondary'
+        )}
       >
         {getMarketingPlanCtaLabel(plan)}
       </Link>
@@ -68,9 +76,11 @@ function MarketingPricingPlanCard({
 }
 
 export function MarketingPricingPlans({
+  ctaVariant = 'primary',
   mode = 'compact',
   className,
 }: Readonly<{
+  ctaVariant?: MarketingPricingCtaVariant;
   mode?: MarketingPricingMode;
   className?: string;
 }>) {
@@ -85,7 +95,12 @@ export function MarketingPricingPlans({
       )}
     >
       {visiblePlans.map(plan => (
-        <MarketingPricingPlanCard key={plan.id} mode={mode} plan={plan} />
+        <MarketingPricingPlanCard
+          ctaVariant={ctaVariant}
+          key={plan.id}
+          mode={mode}
+          plan={plan}
+        />
       ))}
     </div>
   );

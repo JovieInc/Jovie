@@ -124,64 +124,54 @@ function PricingStoryCard({
   body: string;
 }>) {
   return (
-    <article className='rounded-[1.25rem] border border-white/10 bg-white/[0.03] p-5 sm:p-6'>
-      <p className='text-[12px] font-semibold tracking-[0.08em] text-tertiary-token'>
-        {label}
-      </p>
-      <h2 className='mt-3 text-[1.35rem] font-semibold tracking-[-0.035em] text-primary-token'>
-        {headline}
-      </h2>
-      <p className='mt-3 text-[14px] leading-[1.65] text-secondary-token'>
-        {body}
-      </p>
+    <article className='system-b-pricing-story-card'>
+      <p className='system-b-pricing-story-label'>{label}</p>
+      <h2 className='system-b-pricing-story-title'>{headline}</h2>
+      <p className='system-b-pricing-story-body'>{body}</p>
     </article>
   );
 }
 
 export default function PricingPage() {
   return (
-    <MarketingPageShell>
+    <MarketingPageShell className='system-b-pricing-page'>
       <script type='application/ld+json'>
         {safeJsonLdStringify(PRICING_SCHEMA)}
       </script>
 
       <section
         aria-labelledby='pricing-hero-heading'
-        className='pb-16 pt-[5.9rem] sm:pb-20 sm:pt-[6.4rem] lg:pb-24'
+        className='system-b-pricing-hero'
       >
         <MarketingContainer width='page'>
-          <div className='grid gap-10 lg:grid-cols-[minmax(0,0.82fr)_minmax(0,1.18fr)] lg:items-start'>
-            <div className='max-w-[33rem]'>
-              <h1
-                id='pricing-hero-heading'
-                className='marketing-h1-linear text-primary-token'
-              >
+          <div className='system-b-pricing-hero-grid'>
+            <div className='system-b-pricing-hero-copy'>
+              <h1 id='pricing-hero-heading' className='system-b-pricing-title'>
                 Pricing
               </h1>
-              <p className='marketing-lead-linear mt-5 max-w-[30rem] text-secondary-token'>
+              <p className='system-b-pricing-lead'>
                 Artist profiles are free forever. Pro adds the release tools
                 when you need them.
               </p>
-              <p className='mt-6 text-[13px] font-medium tracking-[-0.01em] text-tertiary-token'>
-                {accessCopy}
-              </p>
-              <div className='mt-7 flex flex-wrap items-center gap-3'>
+              <p className='system-b-pricing-note'>{accessCopy}</p>
+              <div className='system-b-pricing-actions'>
                 <Link
                   href={`${APP_ROUTES.SIGNUP}?plan=free`}
-                  className='public-action-primary'
+                  className='system-b-pricing-primary-link'
+                  data-primary-action='true'
                 >
                   Claim your profile
                 </Link>
                 <Link
                   href={APP_ROUTES.ARTIST_PROFILES}
-                  className='public-action-secondary'
+                  className='system-b-pricing-secondary-link'
                 >
                   Explore Artist Profiles
                 </Link>
               </div>
             </div>
 
-            <div className='grid gap-4 md:grid-cols-2'>
+            <div className='system-b-pricing-story-grid'>
               {STORY_CARDS.map(card => (
                 <PricingStoryCard
                   key={card.label}
@@ -193,31 +183,31 @@ export default function PricingPage() {
             </div>
           </div>
 
-          <div className='mt-12'>
-            <MarketingPricingPlans mode='expanded' />
+          <div className='system-b-pricing-plans'>
+            <MarketingPricingPlans ctaVariant='secondary' mode='expanded' />
           </div>
         </MarketingContainer>
       </section>
 
       <section
         aria-labelledby='pricing-compare-heading'
-        className='border-t border-subtle py-20 md:py-24'
+        className='system-b-pricing-section'
       >
         <MarketingContainer width='page'>
-          <div className='mx-auto max-w-[58rem]'>
-            <div className='max-w-[30rem]'>
+          <div className='system-b-pricing-section-inner'>
+            <div className='system-b-pricing-section-copy'>
               <h2
                 id='pricing-compare-heading'
-                className='text-[clamp(2.15rem,3.6vw,3.25rem)] font-semibold tracking-[-0.04em] text-primary-token'
+                className='system-b-pricing-section-title'
               >
                 Compare all features
               </h2>
-              <p className='mt-4 text-[15px] leading-[1.7] text-secondary-token'>
+              <p className='system-b-pricing-section-body'>
                 See the plan matrix for notifications, analytics, contacts,
                 smart links, and release workspace capabilities.
               </p>
             </div>
-            <div className='mt-10'>
+            <div className='system-b-pricing-chart-wrap'>
               <PricingComparisonChart />
             </div>
           </div>
@@ -226,31 +216,29 @@ export default function PricingPage() {
 
       <section
         aria-labelledby='pricing-get-started-heading'
-        className='border-t border-subtle py-20 md:py-28'
+        className='system-b-pricing-final'
       >
         <MarketingContainer width='page'>
-          <div className='text-center'>
+          <div>
             <h2
               id='pricing-get-started-heading'
-              className='text-[clamp(2.1rem,3.6vw,3.25rem)] font-semibold tracking-[-0.04em] text-primary-token'
+              className='system-b-pricing-section-title'
             >
               Get Started
             </h2>
-            <p className='mx-auto mt-4 max-w-[30rem] text-[15px] leading-[1.7] text-secondary-token'>
-              {requestAccessCopy}
-            </p>
-            <div className='mt-8 flex flex-wrap items-center justify-center gap-3'>
+            <p className='system-b-pricing-final-copy'>{requestAccessCopy}</p>
+            <div className='system-b-pricing-actions system-b-pricing-actions--center'>
               <Link
                 href={`${APP_ROUTES.SIGNUP}?plan=free`}
                 prefetch={false}
-                className='public-action-primary'
+                className='system-b-pricing-secondary-link'
               >
                 Claim your profile
               </Link>
               <Link
                 href={`${APP_ROUTES.SIGNUP}?plan=pro`}
                 prefetch={false}
-                className='public-action-secondary'
+                className='system-b-pricing-secondary-link'
               >
                 Start Pro trial
               </Link>

@@ -22,65 +22,30 @@ function CellValue({
 }) {
   if (typeof value === 'string') {
     return (
-      <span
-        className='text-[13px]'
-        style={{ color: 'var(--linear-text-secondary)' }}
-      >
+      <span className='system-b-pricing-chart-value'>
         {value}
-        {comingSoon && (
-          <span
-            role='img'
-            aria-label='Coming soon'
-            className='ml-1.5 inline-block rounded-full px-1.5 py-px text-[10px] font-medium'
-            style={{
-              backgroundColor: 'var(--linear-warning-subtle)',
-              color: 'var(--linear-warning)',
-            }}
-          >
-            Soon
-          </span>
-        )}
+        {comingSoon ? (
+          <span className='system-b-pricing-chart-badge'>Soon</span>
+        ) : null}
       </span>
     );
   }
+
   if (value === true) {
     return (
       <Check
         aria-label='Included'
-        className='mx-auto'
-        style={{
-          width: '16px',
-          height: '16px',
-          color: 'var(--linear-text-secondary)',
-        }}
+        className='system-b-pricing-inclusion-icon'
       />
     );
   }
+
   if (comingSoon) {
-    return (
-      <span
-        role='img'
-        aria-label='Coming soon'
-        className='inline-block rounded-full px-1.5 py-px text-[10px] font-medium'
-        style={{
-          backgroundColor: 'var(--linear-warning-subtle)',
-          color: 'var(--linear-warning)',
-        }}
-      >
-        Soon
-      </span>
-    );
+    return <span className='system-b-pricing-chart-badge'>Soon</span>;
   }
+
   return (
-    <Minus
-      aria-label='Not included'
-      className='mx-auto'
-      style={{
-        width: '14px',
-        height: '14px',
-        color: 'var(--linear-text-quaternary)',
-      }}
-    />
+    <Minus aria-label='Not included' className='system-b-pricing-minus-icon' />
   );
 }
 
@@ -92,24 +57,16 @@ function MobileFeatureRow({
   readonly selectedPlan: PlanColumn;
 }) {
   return (
-    <tr
-      className='border-b'
-      style={{ borderColor: 'var(--linear-border-subtle)' }}
-    >
+    <tr className='system-b-pricing-chart-row'>
       <th
         scope='row'
-        className='px-5 py-3.5 pr-4 text-[13px]'
-        style={{ color: 'var(--linear-text-secondary)' }}
+        className='system-b-pricing-chart-cell system-b-pricing-chart-cell--feature'
       >
         {feature.name}
       </th>
       <td
-        className='px-5 py-3.5 text-center'
-        style={
-          selectedPlan === 'pro'
-            ? { backgroundColor: 'var(--linear-bg-surface-1)' }
-            : undefined
-        }
+        className='system-b-pricing-chart-cell system-b-pricing-chart-cell--value'
+        data-selected={selectedPlan === 'pro' ? 'true' : undefined}
       >
         <CellValue
           value={feature[selectedPlan]}
@@ -126,37 +83,33 @@ function DesktopFeatureRow({
   readonly feature: ComparisonFeature;
 }) {
   return (
-    <tr
-      className='border-b'
-      style={{ borderColor: 'var(--linear-border-subtle)' }}
-    >
+    <tr className='system-b-pricing-chart-row'>
       <th
         scope='row'
-        className='px-5 py-3.5 pr-4 text-[13px]'
-        style={{ color: 'var(--linear-text-secondary)' }}
+        className='system-b-pricing-chart-cell system-b-pricing-chart-cell--feature'
       >
         {feature.name}
       </th>
-      <td className='px-5 py-3.5 text-center'>
+      <td className='system-b-pricing-chart-cell system-b-pricing-chart-cell--value'>
         <CellValue
           value={feature.free}
           comingSoon={feature.comingSoon && feature.free !== false}
         />
       </td>
       <td
-        className='px-5 py-3.5 text-center'
-        style={{ backgroundColor: 'var(--linear-bg-surface-1)' }}
+        className='system-b-pricing-chart-cell system-b-pricing-chart-cell--value'
+        data-selected='true'
       >
         <CellValue
           value={feature.pro}
           comingSoon={feature.comingSoon && feature.pro !== false}
         />
       </td>
-      {maxPlanEnabled && (
-        <td className='px-5 py-3.5 text-center'>
+      {maxPlanEnabled ? (
+        <td className='system-b-pricing-chart-cell system-b-pricing-chart-cell--value'>
           <CellValue value={feature.max} comingSoon={feature.comingSoon} />
         </td>
-      )}
+      ) : null}
     </tr>
   );
 }
@@ -192,18 +145,15 @@ export function PricingComparisonChart() {
         ]
       : []),
   ];
+  const selectedPlanOption =
+    planOptions.find(option => option.id === selectedPlan) ?? planOptions[0];
 
   return (
-    <div className='mx-auto max-w-5xl'>
-      {/* Billing toggle */}
-      <div className='flex items-center justify-center gap-3 mb-8'>
+    <div className='system-b-pricing-chart'>
+      <div className='system-b-pricing-billing'>
         <span
-          className='text-[13px] font-medium'
-          style={{
-            color: isAnnual
-              ? 'var(--linear-text-tertiary)'
-              : 'var(--linear-text-primary)',
-          }}
+          className='system-b-pricing-billing-label'
+          data-active={isAnnual ? undefined : 'true'}
         >
           Monthly
         </span>
@@ -212,186 +162,110 @@ export function PricingComparisonChart() {
           role='switch'
           aria-checked={isAnnual}
           aria-label='Toggle annual billing'
-          onClick={() => setIsAnnual(v => !v)}
-          className='relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full transition-colors duration-200'
-          style={{
-            backgroundColor: isAnnual
-              ? 'var(--linear-btn-primary-bg)'
-              : 'var(--linear-bg-surface-2)',
-          }}
+          onClick={() => setIsAnnual(value => !value)}
+          className='system-b-pricing-switch'
+          data-state={isAnnual ? 'annual' : 'monthly'}
         >
-          <span
-            className='pointer-events-none inline-block h-5 w-5 transform rounded-full shadow-sm transition-transform duration-200'
-            style={{
-              backgroundColor: 'var(--linear-text-primary)',
-              transform: isAnnual
-                ? 'translate(22px, 2px)'
-                : 'translate(2px, 2px)',
-            }}
-          />
+          <span className='system-b-pricing-switch-thumb' />
         </button>
         <span
-          className='text-[13px] font-medium'
-          style={{
-            color: isAnnual
-              ? 'var(--linear-text-primary)'
-              : 'var(--linear-text-tertiary)',
-          }}
+          className='system-b-pricing-billing-label'
+          data-active={isAnnual ? 'true' : undefined}
         >
-          {'Annual'}
-          <span
-            className='ml-1.5 inline-block rounded-full px-1.5 py-px text-[10px] font-medium'
-            style={{
-              backgroundColor: 'var(--linear-success-subtle)',
-              color: 'var(--linear-success)',
-            }}
-          >
+          Annual
+          <span className='system-b-pricing-chart-badge' data-tone='success'>
             Save ~20%
           </span>
         </span>
       </div>
 
-      {/* Mobile plan selector */}
-      <div className='mb-4 md:hidden'>
+      <div className='system-b-pricing-mobile-selector'>
         <select
           aria-label='Select plan to compare'
           value={selectedPlan}
-          onChange={e => {
-            const val = e.target.value;
-            if (planOptions.some(o => o.id === val)) {
-              setSelectedPlan(val as PlanColumn);
+          onChange={event => {
+            const value = event.target.value;
+            if (planOptions.some(option => option.id === value)) {
+              setSelectedPlan(value as PlanColumn);
             }
           }}
-          className='w-full rounded-lg px-4 py-2.5 text-[14px] font-medium appearance-none cursor-pointer'
-          style={{
-            backgroundColor: 'var(--linear-bg-surface-1)',
-            border: '1px solid var(--linear-border-default)',
-            color: 'var(--linear-text-primary)',
-          }}
+          className='system-b-pricing-select'
         >
-          {planOptions.map(opt => (
-            <option key={opt.id} value={opt.id}>
-              {opt.name} — {opt.price}
+          {planOptions.map(option => (
+            <option key={option.id} value={option.id}>
+              {option.name} - {option.price}
             </option>
           ))}
         </select>
       </div>
 
-      {/* Desktop comparison table */}
-      <div
-        className='hidden overflow-x-auto rounded-[1.5rem] border p-3 md:block'
-        style={{
-          backgroundColor: 'var(--linear-bg-surface-0)',
-          borderColor: 'var(--linear-border-default)',
-        }}
-      >
-        <table className='w-full border-separate border-spacing-0'>
+      <div className='system-b-pricing-table-shell' data-variant='desktop'>
+        <table className='system-b-pricing-table'>
           <thead>
-            <tr
-              className='border-b'
-              style={{ borderColor: 'var(--linear-border-default)' }}
-            >
-              <th className='w-[40%] px-5 py-5 text-left' />
-              {/* Free */}
-              <th className='min-w-[120px] px-5 py-5 text-center'>
-                <div
-                  className='text-[13px] font-medium'
-                  style={{ color: 'var(--linear-text-tertiary)' }}
-                >
+            <tr className='system-b-pricing-chart-row'>
+              <th className='system-b-pricing-chart-cell system-b-pricing-chart-cell--feature-heading' />
+              <th className='system-b-pricing-chart-cell system-b-pricing-chart-cell--plan'>
+                <div className='system-b-pricing-plan-name'>
                   {free.marketing.displayName}
                 </div>
-                <div
-                  className='mt-1 text-2xl font-semibold'
-                  style={{ color: 'var(--linear-text-primary)' }}
-                >
-                  $0
-                </div>
+                <div className='system-b-pricing-plan-price'>$0</div>
               </th>
-              {/* Pro */}
               <th
-                className='min-w-[160px] px-5 py-5 text-center'
-                style={{ backgroundColor: 'var(--linear-bg-surface-1)' }}
+                className='system-b-pricing-chart-cell system-b-pricing-chart-cell--plan'
+                data-selected='true'
               >
-                <div
-                  className='text-[13px] font-medium'
-                  style={{ color: 'var(--linear-text-tertiary)' }}
-                >
+                <div className='system-b-pricing-plan-name'>
                   {pro.marketing.displayName}
                 </div>
-                <div
-                  className='mt-1 text-2xl font-semibold'
-                  style={{ color: 'var(--linear-text-primary)' }}
-                >
+                <div className='system-b-pricing-plan-price'>
                   ${proPrice}
-                  <span
-                    className='text-[13px] font-normal'
-                    style={{ color: 'var(--linear-text-tertiary)' }}
-                  >
-                    /mo
-                  </span>
+                  <span>/mo</span>
                 </div>
-                {isAnnual && pro.marketing.price?.yearly && (
-                  <div
-                    className='mt-0.5 text-[11px]'
-                    style={{ color: 'var(--linear-text-tertiary)' }}
-                  >
-                    ${pro.marketing.price.yearly}/yr
-                  </div>
-                )}
+                <div
+                  aria-hidden={isAnnual ? undefined : true}
+                  className='system-b-pricing-plan-annual'
+                  data-visible={isAnnual ? 'true' : undefined}
+                >
+                  {pro.marketing.price?.yearly
+                    ? `$${pro.marketing.price.yearly}/yr`
+                    : null}
+                </div>
               </th>
-              {/* Max */}
-              {maxPlanEnabled && (
-                <th className='min-w-[140px] px-5 py-5 text-center'>
-                  <div className='flex items-center justify-center gap-1.5'>
-                    <span
-                      className='text-[13px] font-medium'
-                      style={{ color: 'var(--linear-text-tertiary)' }}
-                    >
+              {maxPlanEnabled ? (
+                <th className='system-b-pricing-chart-cell system-b-pricing-chart-cell--plan'>
+                  <div className='system-b-pricing-plan-label'>
+                    <span className='system-b-pricing-plan-name'>
                       {max.marketing.displayName}
                     </span>
-                    <span
-                      className='rounded-full px-1.5 py-px text-[10px] font-medium'
-                      style={{
-                        backgroundColor: 'var(--linear-warning-subtle)',
-                        color: 'var(--linear-warning)',
-                      }}
-                    >
+                    <span className='system-b-pricing-chart-badge'>
                       Early Access
                     </span>
                   </div>
-                  <div
-                    className='mt-1 text-2xl font-semibold'
-                    style={{ color: 'var(--linear-text-primary)' }}
-                  >
+                  <div className='system-b-pricing-plan-price'>
                     ${maxPrice}
-                    <span
-                      className='text-[13px] font-normal'
-                      style={{ color: 'var(--linear-text-tertiary)' }}
-                    >
-                      /mo
-                    </span>
+                    <span>/mo</span>
                   </div>
-                  {isAnnual && max.marketing.price?.yearly && (
-                    <div
-                      className='mt-0.5 text-[11px]'
-                      style={{ color: 'var(--linear-text-tertiary)' }}
-                    >
-                      ${max.marketing.price.yearly}/yr
-                    </div>
-                  )}
+                  <div
+                    aria-hidden={isAnnual ? undefined : true}
+                    className='system-b-pricing-plan-annual'
+                    data-visible={isAnnual ? 'true' : undefined}
+                  >
+                    {max.marketing.price?.yearly
+                      ? `$${max.marketing.price.yearly}/yr`
+                      : null}
+                  </div>
                 </th>
-              )}
+              ) : null}
             </tr>
           </thead>
 
           <tbody>
             {PRICING_COMPARISON.map(category => (
               <Fragment key={`cat-${category.category}`}>
-                <tr style={{ backgroundColor: 'var(--linear-bg-page)' }}>
+                <tr className='system-b-pricing-category-row'>
                   <td
                     colSpan={maxPlanEnabled ? 4 : 3}
-                    className='px-5 py-3 text-[12px] font-semibold tracking-[0.04em]'
-                    style={{ color: 'var(--linear-text-tertiary)' }}
+                    className='system-b-pricing-category-cell'
                   >
                     {category.category}
                   </td>
@@ -408,40 +282,20 @@ export function PricingComparisonChart() {
         </table>
       </div>
 
-      {/* Mobile comparison table */}
-      <div
-        className='overflow-x-auto rounded-[1.5rem] border p-3 md:hidden'
-        style={{
-          backgroundColor: 'var(--linear-bg-surface-0)',
-          borderColor: 'var(--linear-border-default)',
-        }}
-      >
-        <table className='w-full border-separate border-spacing-0'>
+      <div className='system-b-pricing-table-shell' data-variant='mobile'>
+        <table className='system-b-pricing-table'>
           <thead>
-            <tr
-              className='border-b'
-              style={{ borderColor: 'var(--linear-border-default)' }}
-            >
-              <th className='w-[60%] px-5 py-5 text-left' />
+            <tr className='system-b-pricing-chart-row'>
+              <th className='system-b-pricing-chart-cell system-b-pricing-chart-cell--feature-heading' />
               <th
-                className='px-5 py-5 text-center'
-                style={
-                  selectedPlan === 'pro'
-                    ? { backgroundColor: 'var(--linear-bg-surface-1)' }
-                    : undefined
-                }
+                className='system-b-pricing-chart-cell system-b-pricing-chart-cell--plan'
+                data-selected={selectedPlan === 'pro' ? 'true' : undefined}
               >
-                <div
-                  className='text-[13px] font-medium'
-                  style={{ color: 'var(--linear-text-tertiary)' }}
-                >
-                  {planOptions.find(o => o.id === selectedPlan)?.name}
+                <div className='system-b-pricing-plan-name'>
+                  {selectedPlanOption.name}
                 </div>
-                <div
-                  className='mt-1 text-xl font-semibold'
-                  style={{ color: 'var(--linear-text-primary)' }}
-                >
-                  {planOptions.find(o => o.id === selectedPlan)?.price}
+                <div className='system-b-pricing-plan-price'>
+                  {selectedPlanOption.price}
                 </div>
               </th>
             </tr>
@@ -450,12 +304,8 @@ export function PricingComparisonChart() {
           <tbody>
             {PRICING_COMPARISON.map(category => (
               <Fragment key={`mcat-${category.category}`}>
-                <tr style={{ backgroundColor: 'var(--linear-bg-page)' }}>
-                  <td
-                    colSpan={2}
-                    className='px-5 py-3 text-[12px] font-semibold tracking-[0.04em]'
-                    style={{ color: 'var(--linear-text-tertiary)' }}
-                  >
+                <tr className='system-b-pricing-category-row'>
+                  <td colSpan={2} className='system-b-pricing-category-cell'>
                     {category.category}
                   </td>
                 </tr>
@@ -472,13 +322,7 @@ export function PricingComparisonChart() {
         </table>
       </div>
 
-      <p
-        className='mt-4 text-center'
-        style={{
-          fontSize: 'var(--linear-label-size)',
-          color: 'var(--linear-text-tertiary)',
-        }}
-      >
+      <p className='system-b-pricing-footnote'>
         All limits subject to fair-use guardrails.
       </p>
     </div>
