@@ -17,6 +17,9 @@ describe('app/brand/page', () => {
     expect(
       screen.getByRole('link', { name: /View guidelines/ })
     ).toHaveAttribute('href', '#mark');
+    expect(screen.getByRole('link', { name: /View guidelines/ })).toHaveClass(
+      'system-b-brand-text-link'
+    );
   });
 
   it('renders all anchored sections in order', () => {
@@ -43,6 +46,7 @@ describe('app/brand/page', () => {
     render(<BrandPage />);
     const mailto = screen.getByRole('link', { name: 'brand@jov.ie' });
     expect(mailto).toHaveAttribute('href', 'mailto:brand@jov.ie');
+    expect(mailto).toHaveClass('system-b-brand-contact-link');
   });
 
   it('renders downloadable static asset links (no client-side PNG generation)', () => {

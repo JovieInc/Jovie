@@ -54,16 +54,13 @@ const BRAND_SCHEMA = {
   isPartOf: { '@type': 'WebSite', name: APP_NAME, url: BASE_URL },
 };
 
-const sectionShell =
-  'mx-auto grid w-full max-w-[1180px] grid-cols-1 gap-12 px-6 py-20 md:grid-cols-[minmax(0,0.82fr)_minmax(0,1fr)] md:gap-16 md:px-8 md:py-28 lg:py-32';
+const sectionShell = 'system-b-brand-section';
 const firstSectionShell =
-  'mx-auto grid w-full max-w-[1180px] grid-cols-1 gap-12 px-6 pt-14 pb-20 md:grid-cols-[minmax(0,0.82fr)_minmax(0,1fr)] md:gap-16 md:px-8 md:pt-16 md:pb-28 lg:pb-32';
-const sectionHeading =
-  'font-display text-3xl font-bold leading-[1.05] text-[#F5F4F0] md:text-5xl';
-const prose =
-  'font-body text-[16px] leading-[1.72] text-white/64 md:text-[17px]';
-const proseStrong = 'font-body text-[17px] leading-[1.68] text-white/82';
-const smallText = 'font-body text-[14px] leading-[1.62] text-white/52';
+  'system-b-brand-section system-b-brand-section--first';
+const sectionHeading = 'system-b-brand-section-title';
+const prose = 'system-b-brand-copy';
+const proseStrong = 'system-b-brand-copy system-b-brand-copy--strong';
+const smallText = 'system-b-brand-small';
 
 const DOWNLOADS = [
   {
@@ -116,7 +113,7 @@ const TYPE_SAMPLES = [
 
 export default function BrandPage() {
   return (
-    <div className='bg-black text-[#F5F4F0]'>
+    <div className='system-b-brand-page'>
       <script type='application/ld+json'>
         {safeJsonLdStringify(BRAND_SCHEMA)}
       </script>
@@ -137,13 +134,11 @@ export default function BrandPage() {
 
 function HeroSection() {
   return (
-    <section id='hero' className='px-6 pt-24 pb-8 md:px-8 md:pt-28 md:pb-10'>
-      <div className='mx-auto grid min-h-[62svh] w-full max-w-[1180px] grid-cols-1 content-center gap-12 md:grid-cols-[minmax(0,1fr)_280px] md:gap-16'>
-        <div className='max-w-[760px]'>
-          <h1 className='max-w-[720px] text-balance font-sans text-5xl font-bold leading-[0.96] text-[#F5F4F0] md:text-7xl lg:text-8xl'>
-            One loop. Every release.
-          </h1>
-          <div className='mt-8 max-w-[620px] space-y-4'>
+    <section id='hero' className='system-b-brand-hero'>
+      <div className='system-b-brand-hero-grid'>
+        <div className='system-b-brand-hero-copy'>
+          <h1 className='system-b-brand-title'>One loop. Every release.</h1>
+          <div className='system-b-brand-hero-body'>
             <p className={proseStrong}>
               Jovie is becoming the closed-loop operating system for music
               artists.
@@ -158,22 +153,20 @@ function HeroSection() {
             </p>
             <p className={prose}>That is the loop.</p>
           </div>
-          <div className='mt-10 flex flex-wrap items-center gap-4'>
+          <div className='system-b-brand-actions'>
             <Link
               href='#downloads'
-              className='inline-flex min-h-11 items-center rounded-full bg-[#F5F4F0] px-5 font-display text-[14px] font-semibold text-[#08090a] transition-colors hover:bg-white focus-visible:ring-2 focus-visible:ring-white/30'
+              className='system-b-brand-primary-link'
+              data-primary-action='true'
             >
               Download brand kit
             </Link>
-            <Link
-              href='#mark'
-              className='inline-flex min-h-11 items-center rounded-full px-1 font-display text-[14px] font-semibold text-[#F5F4F0] transition-colors hover:text-white focus-visible:ring-2 focus-visible:ring-white/30'
-            >
+            <Link href='#mark' className='system-b-brand-text-link'>
               View guidelines
             </Link>
           </div>
         </div>
-        <div className='flex items-center justify-start text-[#F5F4F0] md:justify-end'>
+        <div className='system-b-brand-hero-mark'>
           <Mark size={240} title='Jovie mark' />
         </div>
       </div>
@@ -187,7 +180,7 @@ function ThesisSection() {
       <div>
         <h2 className={sectionHeading}>The artist is the company.</h2>
       </div>
-      <div className='space-y-5'>
+      <div className='system-b-brand-copy-stack'>
         <p className={proseStrong}>
           Music has always moved in loops. Write. Release. Reach. Learn. Return.
         </p>
@@ -214,11 +207,11 @@ function ThesisSection() {
         <p className={proseStrong}>
           A closed loop is more than automation. It is memory with motion.
         </p>
-        <div className='pt-8'>
+        <div className='system-b-brand-copy-callout'>
           <p className={proseStrong}>
             Jovie is building the vertical operating system for music artists.
           </p>
-          <p className={`${prose} mt-4`}>
+          <p className={prose}>
             The wedge is the artist profile: a high-conversion surface for
             links, releases, fan capture, payments, and calls to action. The
             expansion is the release system: presaves, notifications, launch
@@ -226,11 +219,11 @@ function ThesisSection() {
             the closed loop: every release teaches the system how to route the
             next one.
           </p>
-          <p className={`${prose} mt-4`}>
+          <p className={prose}>
             This is not another creator tool. It is infrastructure for the
             artist-as-company.
           </p>
-          <p className={`${proseStrong} mt-4`}>
+          <p className={proseStrong}>
             One artist. One system. A career that compounds.
           </p>
         </div>
@@ -244,11 +237,11 @@ function MarkSection() {
     <section id='mark' className={sectionShell}>
       <div>
         <h2 className={sectionHeading}>A loop with a dot.</h2>
-        <div className='mt-10 text-[#F5F4F0]'>
+        <div className='system-b-brand-mark-stage'>
           <Mark size={180} title='Jovie loop mark' />
         </div>
       </div>
-      <div className='space-y-5'>
+      <div className='system-b-brand-copy-stack'>
         <p className={proseStrong}>The mark is the company, reduced.</p>
         <p className={prose}>
           The loop is the system. The dot is the artist. Small in the geometry.
@@ -287,11 +280,11 @@ function WordmarkSection() {
     <section id='wordmark' className={sectionShell}>
       <div>
         <h2 className={sectionHeading}>JOVIE.</h2>
-        <div className='mt-10 overflow-hidden text-[#F5F4F0]'>
+        <div className='system-b-brand-wordmark-stage'>
           <Wordmark height={72} title='Jovie wordmark' />
         </div>
       </div>
-      <div className='space-y-5'>
+      <div className='system-b-brand-copy-stack'>
         <p className={proseStrong}>Drawn, not typed.</p>
         <p className={prose}>
           The wordmark is built to feel inevitable: five letters, one system, no
@@ -329,7 +322,7 @@ function LockupsSection() {
       <div>
         <h2 className={sectionHeading}>One system. Many surfaces.</h2>
       </div>
-      <div className='space-y-5'>
+      <div className='system-b-brand-copy-stack'>
         <p className={prose}>
           Jovie should feel native everywhere: a release page, an artist
           profile, a mobile icon, a deck, a festival screen, a label dashboard,
@@ -344,7 +337,7 @@ function LockupsSection() {
           The integrated lockup is reserved for moments where the wordmark can
           carry the full brand by itself.
         </p>
-        <div className='space-y-9 pt-7 text-[#F5F4F0]'>
+        <div className='system-b-brand-lockups'>
           <Wordmark height={54} title='Jovie wordmark lockup' />
           <Wordmark height={54} markAsO title='Jovie integrated lockup' />
           <Mark size={88} title='Jovie mark-only lockup' />
@@ -360,7 +353,7 @@ function UsageSection() {
       <div>
         <h2 className={sectionHeading}>Quiet system. Loud artist.</h2>
       </div>
-      <div className='space-y-5'>
+      <div className='system-b-brand-copy-stack'>
         <p className={prose}>
           Jovie does not compete with the artist. The mark is always one color.
           The contrast is always clear. The surface can move. The symbol stays
@@ -392,7 +385,7 @@ function ColorSection() {
       <div>
         <h2 className={sectionHeading}>No brand color.</h2>
       </div>
-      <div className='space-y-5'>
+      <div className='system-b-brand-copy-stack'>
         <p className={proseStrong}>Jovie is not the headline. The artist is.</p>
         <p className={prose}>
           Cream and ink do the structural work. Feature hues carry hierarchy
@@ -403,7 +396,7 @@ function ColorSection() {
           Color should clarify state, signal movement, and create rhythm. It
           should never become the brand itself.
         </p>
-        <div className='grid gap-7 pt-7 md:grid-cols-2'>
+        <div className='system-b-brand-color-grid'>
           <ColorList
             title='Surface ladder'
             items={PALETTE.surface.map(color => `${color.name} ${color.hex}`)}
@@ -429,7 +422,7 @@ function TypeSection() {
       <div>
         <h2 className={sectionHeading}>Type as interface.</h2>
       </div>
-      <div className='space-y-5'>
+      <div className='system-b-brand-copy-stack'>
         <p className={prose}>
           Jovie&apos;s typography should feel like a product edited down to its
           necessary parts.
@@ -442,12 +435,9 @@ function TypeSection() {
           Satoshi for display. DM Sans for body. Inter for product UI. Three
           voices. One system.
         </p>
-        <div className='space-y-6 pt-7'>
+        <div className='system-b-brand-type-stack'>
           {TYPE_SAMPLES.map(sample => (
-            <p
-              key={sample}
-              className='text-balance font-display text-3xl font-bold leading-[1.08] text-[#F5F4F0] md:text-5xl'
-            >
+            <p key={sample} className='system-b-brand-type-sample'>
               {sample}
             </p>
           ))}
@@ -468,7 +458,7 @@ function IconPackSection() {
       <div>
         <h2 className={sectionHeading}>The loop travels.</h2>
       </div>
-      <div className='space-y-5'>
+      <div className='system-b-brand-copy-stack'>
         <p className={prose}>
           The mark is built for every container the operating system can throw
           at it: favicons, PWA icons, app icons, social avatars, decks,
@@ -478,7 +468,7 @@ function IconPackSection() {
           Render once. Deploy everywhere. The same path. The same proportion.
           The same loop.
         </p>
-        <div className='flex flex-wrap items-end gap-7 pt-7 text-[#F5F4F0]'>
+        <div className='system-b-brand-icon-row'>
           {[28, 40, 56, 72, 96].map(size => (
             <Mark key={size} size={size} title={`Jovie icon ${size}`} />
           ))}
@@ -494,7 +484,7 @@ function DownloadsSection() {
       <div>
         <h2 className={sectionHeading}>Take the system.</h2>
       </div>
-      <div className='space-y-5'>
+      <div className='system-b-brand-copy-stack'>
         <p className={prose}>
           Every asset is rendered from the same source path. Vector and raster.
           Ink and cream. Small and large. Static and product-native.
@@ -502,13 +492,13 @@ function DownloadsSection() {
         <p className={proseStrong}>
           Use the files as shipped. Protect the geometry. Keep the loop closed.
         </p>
-        <ul className='grid list-none gap-3 p-0 pt-7 sm:grid-cols-2'>
+        <ul className='system-b-brand-downloads-list'>
           {DOWNLOADS.map(asset => (
             <li key={asset.href}>
               <Link
                 href={asset.href}
                 download={asset.file}
-                className='inline-flex min-h-10 items-center font-display text-[14px] font-semibold text-[#F5F4F0] transition-colors hover:text-white focus-visible:ring-2 focus-visible:ring-white/30'
+                className='system-b-brand-download-link'
               >
                 {asset.label}
               </Link>
@@ -517,7 +507,9 @@ function DownloadsSection() {
         </ul>
         <p className={smallText}>
           Press or usage questions:{' '}
-          <a href='mailto:brand@jov.ie'>brand@jov.ie</a>
+          <a className='system-b-brand-contact-link' href='mailto:brand@jov.ie'>
+            brand@jov.ie
+          </a>
         </p>
       </div>
     </section>
@@ -526,18 +518,18 @@ function DownloadsSection() {
 
 function FinalCta() {
   return (
-    <section className='px-6 py-20 md:px-8 md:py-28'>
-      <div className='mx-auto max-w-[1180px]'>
-        <h2 className='max-w-[720px] text-balance font-display text-4xl font-bold leading-[1.04] text-[#F5F4F0] md:text-6xl'>
+    <section className='system-b-brand-final'>
+      <div className='system-b-brand-final-inner'>
+        <h2 className='system-b-brand-final-title'>
           Build the loop your career runs on.
         </h2>
-        <p className={`${prose} mt-6 max-w-[620px]`}>
+        <p className='system-b-brand-final-copy'>
           Jovie turns releases into fan paths, fan paths into signal, and signal
           into the next step up.
         </p>
         <Link
           href={APP_ROUTES.SIGNUP}
-          className='mt-9 inline-flex min-h-11 items-center rounded-full bg-[#F5F4F0] px-5 font-display text-[14px] font-semibold text-[#08090a] transition-colors hover:bg-white focus-visible:ring-2 focus-visible:ring-white/30'
+          className='system-b-brand-secondary-link system-b-brand-final-link'
         >
           Start Free Trial
         </Link>
@@ -554,11 +546,9 @@ function Guideline({
   children: ReactNode;
 }>) {
   return (
-    <div className='pt-7'>
-      <h3 className='font-display text-[20px] font-bold leading-[1.2] text-[#F5F4F0]'>
-        {title}
-      </h3>
-      <p className={`${prose} mt-3`}>{children}</p>
+    <div className='system-b-brand-guideline'>
+      <h3 className='system-b-brand-subtitle'>{title}</h3>
+      <p className='system-b-brand-guideline-copy'>{children}</p>
     </div>
   );
 }
@@ -572,10 +562,8 @@ function ColorList({
 }>) {
   return (
     <div>
-      <h3 className='font-display text-[20px] font-bold leading-[1.2] text-[#F5F4F0]'>
-        {title}
-      </h3>
-      <ul className='mt-4 list-none space-y-2 p-0'>
+      <h3 className='system-b-brand-subtitle'>{title}</h3>
+      <ul className='system-b-brand-color-list'>
         {items.map(item => (
           <li key={item} className={smallText}>
             {item}
