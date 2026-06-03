@@ -437,7 +437,7 @@ jobs:
     # Run for push to main, testing-labeled full CI, or PRs touching DB-relevant paths.
     # run_neon covers drizzle, lib/db, lib/queries, schema, cron routes, SQL files, and
     # package.json changes. PRs touching only UI/perf/docs skip this job entirely.
-    if: ${{ github.event_name == 'push' || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork == false && github.event.pull_request.user.login != 'dependabot[bot]' && needs.ci-path-changes.outputs.run_neon == 'true') }}
+    if: ${{ github.event_name == 'push' || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork == false && github.event.pull_request.user.login && github.event.pull_request.user.login != 'dependabot[bot]' && needs.ci-path-changes.outputs.run_neon == 'true') }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
     outputs:
@@ -887,7 +887,7 @@ jobs:
   ci-mobile-overflow:
     name: Mobile Overflow Guard (${{ matrix.width }}px)
     needs: [ci-fast, ci-path-changes, neon-db]
-    if: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork == false && needs.ci-path-changes.outputs.run_e2e == 'true' && github.event.pull_request.user.login != 'dependabot[bot]' }}
+    if: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork == false && needs.ci-path-changes.outputs.run_e2e == 'true' && github.event.pull_request.user.login && github.event.pull_request.user.login != 'dependabot[bot]' }}
     runs-on: ubuntu-latest
     timeout-minutes: 45
     strategy:
@@ -1008,7 +1008,7 @@ jobs:
     needs: [ci-build-public, ci-path-changes, neon-db]
     # Runs Lighthouse CI against the public-route build artifact on PRs.
     # Blocks PRs when triggered (path-gated to public-route changes).
-    if: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork == false && github.event.pull_request.user.login != 'dependabot[bot]' && needs.ci-build-public.outputs.has_artifact == 'true' && needs.ci-path-changes.outputs.run_public_lighthouse == 'true' }}
+    if: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork == false && github.event.pull_request.user.login && github.event.pull_request.user.login != 'dependabot[bot]' && needs.ci-build-public.outputs.has_artifact == 'true' && needs.ci-path-changes.outputs.run_public_lighthouse == 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -1297,7 +1297,7 @@ jobs:
   ci-lighthouse-onboarding-pr:
     name: Lighthouse (onboarding PR)
     needs: [ci-fast, ci-path-changes, neon-db]
-    if: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork == false && github.event.pull_request.user.login != 'dependabot[bot]' && needs.ci-path-changes.outputs.run_onboarding_lighthouse == 'true' }}
+    if: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork == false && github.event.pull_request.user.login && github.event.pull_request.user.login != 'dependabot[bot]' && needs.ci-path-changes.outputs.run_onboarding_lighthouse == 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -1444,7 +1444,7 @@ jobs:
     # so dependent jobs would silently skip on admin-UI-only PRs. This job creates
     # its own ephemeral branch below and does not reuse the shared neon-db branch.
     needs: [ci-fast, ci-path-changes]
-    if: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork == false && github.event.pull_request.user.login != 'dependabot[bot]' && needs.ci-path-changes.outputs.run_admin_lighthouse == 'true' }}
+    if: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork == false && github.event.pull_request.user.login && github.event.pull_request.user.login != 'dependabot[bot]' && needs.ci-path-changes.outputs.run_admin_lighthouse == 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -1579,7 +1579,7 @@ jobs:
     # baselines stabilize this can be promoted to a hard gate by removing
     # `continue-on-error` and adding the job to ci-pr-ready.needs.
     needs: [ci-fast, ci-path-changes, neon-db]
-    if: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork == false && github.event.pull_request.user.login != 'dependabot[bot]' && needs.ci-path-changes.outputs.run_chat_lighthouse == 'true' }}
+    if: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork == false && github.event.pull_request.user.login && github.event.pull_request.user.login != 'dependabot[bot]' && needs.ci-path-changes.outputs.run_chat_lighthouse == 'true' }}
     continue-on-error: true
     runs-on: ubuntu-latest
     timeout-minutes: 30
@@ -2305,7 +2305,7 @@ jobs:
     name: A11y (axe)
     # Runs axe-core WCAG 2.1 AA audit on public routes — uses shared build artifact.
     needs: [ci-build-public, ci-path-changes, neon-db]
-    if: ${{ ((github.event_name == 'push' && github.ref == 'refs/heads/main') || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork == false) || github.event_name == 'workflow_dispatch') && needs.ci-build-public.outputs.has_artifact == 'true' && (github.event_name != 'pull_request' || github.event.pull_request.user.login != 'dependabot[bot]') }}
+    if: ${{ ((github.event_name == 'push' && github.ref == 'refs/heads/main') || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork == false && github.event.pull_request.user.login && github.event.pull_request.user.login != 'dependabot[bot]') || github.event_name == 'workflow_dispatch') && needs.ci-build-public.outputs.has_artifact == 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -3066,7 +3066,7 @@ jobs:
     # Preview deploys are the default QA surface for internal PRs.
     # Keep this independent from the main deploy gate so review happens before merge.
     needs: [ci-fast, ci-path-changes]
-    if: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'main' && github.event.pull_request.head.repo.fork == false && github.event.pull_request.user.login != 'dependabot[bot]' && needs.ci-path-changes.outputs.run_build == 'true' }}
+    if: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'main' && github.event.pull_request.head.repo.fork == false && github.event.pull_request.user.login && github.event.pull_request.user.login != 'dependabot[bot]' && needs.ci-path-changes.outputs.run_build == 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
     concurrency:
