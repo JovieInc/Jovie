@@ -129,7 +129,10 @@ export function OnboardingTurnstile({
   const headingId = useId();
   const [state, setState] = useState<OnboardingTurnstileState>(DEFAULT_STATE);
   const siteKey = publicEnv.NEXT_PUBLIC_TURNSTILE_SITE_KEY;
-  const shouldBypassTurnstile = process.env.NODE_ENV === 'development';
+  const shouldBypassTurnstile =
+    process.env.NODE_ENV === 'development' ||
+    publicEnv.NEXT_PUBLIC_E2E_MODE === '1' ||
+    publicEnv.NEXT_PUBLIC_CLERK_MOCK === '1';
 
   const commitState = useCallback(
     (nextState: OnboardingTurnstileState) => {
