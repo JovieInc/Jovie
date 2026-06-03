@@ -875,6 +875,36 @@
   --color-brand-amazon-hover: oklch(70% 0.17 70);
   --color-brand-amazon-subtle: oklch(95% 0.05 70);
 
+  /* Bandcamp */
+  --color-brand-bandcamp: oklch(65% 0.059 204.4);
+
+  /* QQ Music */
+  --color-brand-qq-music: oklch(72.3% 0.158 156.9);
+
+  /* NetEase Music */
+  --color-brand-netease: oklch(51.5% 0.206 28.7);
+
+  /* Beatport */
+  --color-brand-beatport: oklch(84.4% 0.213 128);
+
+  /* Napster */
+  --color-brand-napster: oklch(54.5% 0.252 264.6);
+
+  /* Qobuz */
+  --color-brand-qobuz: oklch(57% 0.21 257.8);
+
+  /* Anghami */
+  --color-brand-anghami: oklch(68% 0.315 327);
+
+  /* Boomplay */
+  --color-brand-boomplay: oklch(52.8% 0.263 262.9);
+
+  /* iHeartRadio */
+  --color-brand-iheartradio: oklch(52.2% 0.21 22.1);
+
+  /* Instagram */
+  --color-brand-instagram: oklch(61.9% 0.2 14.6);
+
   /* Deezer */
   --color-brand-deezer: oklch(78% 0.15 75);
   --color-brand-deezer-hover: oklch(73% 0.15 75);
@@ -915,6 +945,36 @@
   /* Amazon Music */
   --color-brand-amazon: oklch(80% 0.17 70);
   --color-brand-amazon-subtle: oklch(20% 0.08 70);
+
+  /* Bandcamp */
+  --color-brand-bandcamp: oklch(70% 0.059 204.4);
+
+  /* QQ Music */
+  --color-brand-qq-music: oklch(76% 0.158 156.9);
+
+  /* NetEase Music */
+  --color-brand-netease: oklch(66% 0.206 28.7);
+
+  /* Beatport */
+  --color-brand-beatport: oklch(86% 0.213 128);
+
+  /* Napster */
+  --color-brand-napster: oklch(68% 0.252 264.6);
+
+  /* Qobuz */
+  --color-brand-qobuz: oklch(68% 0.21 257.8);
+
+  /* Anghami */
+  --color-brand-anghami: oklch(73% 0.315 327);
+
+  /* Boomplay */
+  --color-brand-boomplay: oklch(68% 0.263 262.9);
+
+  /* iHeartRadio */
+  --color-brand-iheartradio: oklch(66% 0.21 22.1);
+
+  /* Instagram */
+  --color-brand-instagram: oklch(70% 0.2 14.6);
 
   /* Deezer */
   --color-brand-deezer: oklch(82% 0.15 75);
@@ -2439,6 +2499,37 @@ body:has(.system-b-download-page) .marketing-glass-header__cta:focus-visible {
     var(--color-text-quaternary-token) 36%,
     transparent
   );
+}
+
+.system-b-dsp-logo {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1-5);
+  color: color-mix(
+    in oklab,
+    var(--system-b-dsp-logo-brand-color) 68%,
+    var(--color-text-primary-token)
+  );
+  transition: color var(--duration-fast) var(--ease-subtle);
+}
+
+.system-b-dsp-logo:hover,
+.system-b-dsp-logo:focus-visible {
+  color: var(--system-b-dsp-logo-brand-color);
+}
+
+.system-b-dsp-logo-icon {
+  width: var(--system-b-dsp-logo-icon-size);
+  height: var(--system-b-dsp-logo-icon-size);
+  flex-shrink: 0;
+}
+
+.system-b-dsp-logo-label {
+  color: currentColor;
+  font-size: var(--system-b-dsp-logo-label-size);
+  font-weight: var(--font-weight-semibold);
+  line-height: 1;
+  white-space: nowrap;
 }
 
 .system-b-dsp-avatar-stack-popover {
