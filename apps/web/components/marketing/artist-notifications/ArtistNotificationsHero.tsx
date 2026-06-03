@@ -12,15 +12,11 @@ const CARD_POSITIONS: Record<
   ArtistNotificationsLandingCopy['hero']['floatingCards'][number]['kind'],
   string
 > = {
-  capture:
-    'lg:absolute lg:left-[2%] lg:top-[2%] lg:w-[17rem] lg:-rotate-[2deg]',
-  subscribe:
-    'lg:absolute lg:right-[4%] lg:top-[18%] lg:w-[16rem] lg:rotate-[1.5deg]',
-  email: 'lg:absolute lg:left-[8%] lg:top-[40%] lg:w-[18rem] lg:rotate-[1deg]',
-  click:
-    'lg:absolute lg:right-[6%] lg:top-[58%] lg:w-[16rem] lg:-rotate-[1.5deg]',
-  outcome:
-    'lg:absolute lg:left-[14%] lg:bottom-[2%] lg:w-[17rem] lg:rotate-[2deg]',
+  capture: 'system-b-artist-notifications-card-capture',
+  subscribe: 'system-b-artist-notifications-card-subscribe',
+  email: 'system-b-artist-notifications-card-email',
+  click: 'system-b-artist-notifications-card-click',
+  outcome: 'system-b-artist-notifications-card-outcome',
 };
 
 export function ArtistNotificationsHero({
@@ -30,16 +26,19 @@ export function ArtistNotificationsHero({
     <section className='relative overflow-hidden pb-20 pt-14 sm:pb-24 sm:pt-20 lg:pb-28 lg:pt-24'>
       <div
         aria-hidden='true'
-        className='absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(255,255,255,0.14),transparent_42%),radial-gradient(circle_at_80%_18%,rgba(86,182,255,0.16),transparent_24%),linear-gradient(180deg,rgba(255,255,255,0.02),transparent_48%)]'
+        className='system-b-artist-notifications-hero-backdrop'
       />
       <MarketingContainer width='landing' className='relative'>
-        <div className='grid min-w-0 gap-12 lg:grid-cols-[minmax(0,0.92fr)_minmax(0,1.08fr)] lg:items-center'>
-          <div className='w-full min-w-0 max-w-[38rem]'>
-            <h1 className='max-w-full text-[clamp(3rem,15vw,3.6rem)] font-semibold leading-[0.92] tracking-[-0.045em] text-primary-token sm:max-w-[10ch] sm:text-[clamp(3.6rem,8.4vw,7.2rem)] sm:leading-[0.88] sm:tracking-[-0.085em]'>
+        <div className='system-b-artist-notifications-hero-grid'>
+          <div className='system-b-artist-notifications-hero-copy'>
+            <h1 className='system-b-artist-notifications-hero-title'>
               {hero.headlineLines?.length
                 ? hero.headlineLines.map(line =>
                     line ? (
-                      <span key={line} className='block max-w-full break-words'>
+                      <span
+                        key={line}
+                        className='system-b-artist-notifications-hero-title-line'
+                      >
                         {line}
                       </span>
                     ) : null
@@ -47,7 +46,7 @@ export function ArtistNotificationsHero({
                 : hero.headline}
             </h1>
             {hero.subhead ? (
-              <p className='mt-6 max-w-[36rem] text-[clamp(1.05rem,1.9vw,1.5rem)] leading-[1.3] tracking-[-0.03em] text-secondary-token'>
+              <p className='system-b-artist-notifications-hero-subhead'>
                 {hero.subhead}
               </p>
             ) : null}
@@ -56,18 +55,18 @@ export function ArtistNotificationsHero({
               <Button
                 asChild
                 variant='whitePill'
-                className='h-11 px-5 sm:text-[14px]'
+                className='system-b-artist-notifications-hero-cta'
               >
                 <Link href={hero.primaryCtaHref}>{hero.primaryCtaLabel}</Link>
               </Button>
             </div>
           </div>
 
-          <div className='relative flex min-w-0 flex-col gap-3 lg:block lg:h-[32rem]'>
+          <div className='system-b-artist-notifications-card-stage'>
             {hero.floatingCards.map(card => (
               <div
                 key={card.id}
-                className={`${CARD_POSITIONS[card.kind]} w-full min-w-0`}
+                className={`system-b-artist-notifications-card-position ${CARD_POSITIONS[card.kind]}`}
               >
                 <ArtistNotificationFloatingCardView card={card} />
               </div>
