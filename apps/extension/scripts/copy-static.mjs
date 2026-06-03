@@ -11,6 +11,7 @@ mkdirSync(distDir, { recursive: true });
 const copies = [
   ['public/manifest.json', 'manifest.json'],
   ['public/sidepanel.html', 'sidepanel.html'],
+  ['src/system-b-tokens.css', 'system-b-tokens.css'],
   ['src/styles.css', 'styles.css'],
 ];
 
