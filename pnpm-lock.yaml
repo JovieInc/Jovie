@@ -102,8 +102,8 @@ importers:
         specifier: ^6.0.4
         version: 6.0.4
       lint-staged:
-        specifier: ^17.0.4
-        version: 17.0.4
+        specifier: ^17.0.7
+        version: 17.0.7
       playwright:
         specifier: 1.60.0
         version: 1.60.0
@@ -9784,8 +9784,8 @@ packages:
   electron-to-chromium@1.5.321:
     resolution: {integrity: sha512-L2C7Q279W2D/J4PLZLk7sebOILDSWos7bMsMNN06rK482umHUrh/3lM8G7IlHFOYip2oAg5nha1rCMxr/rs6ZQ==}
 
-  electron-to-chromium@1.5.364:
-    resolution: {integrity: sha512-G/dYE3+AYhyHwzTwg8UbnXf7zqMERYh7l2jJ3QujhFsH8agSYwtnGAR2aZ7f0AakIKJXd5En/Hre4igIUrdlYw==}
+  electron-to-chromium@1.5.366:
+    resolution: {integrity: sha512-OlRuhb688YTCzzU3gXPLn6nGyd+F+53INE1qaKKlu6kETErE8FYsyDh0XqXEU+uBRn0MpCzz2vfNwORhkap8qg==}
 
   electron-updater@6.8.3:
     resolution: {integrity: sha512-Z6sgw3jgbikWKXei1ENdqFOxBP0WlXg3TtKfz0rgw2vIZFJUyI4pD7ZN7jrkm7EoMK+tcm/qTnPUdqfZukBlBQ==}
@@ -12017,8 +12017,8 @@ packages:
   lines-and-columns@1.2.4:
     resolution: {integrity: sha512-7ylylesZQ/PV29jhEDl3Ufjo6ZX7gCqJr5F7PKrqc93v7fzSymt1BpwEU8nAUXs8qzzvqhbjhK5QZg6Mt/HkBg==}
 
-  lint-staged@17.0.4:
-    resolution: {integrity: sha512-+rU9lSUyVOZ/hDUmRLVGzyS2v73cDdQjX+XQz1AaOdIE4RysLq0HoPW2HrrgeNCLklkhi904VBU1bmgWLHVnkA==}
+  lint-staged@17.0.7:
+    resolution: {integrity: sha512-JrSobt+tW3rH8IOMi8tDZd3foorM5yPEkLD/V2NxobgHrFfHWGee4MOLVuZeScgxftEwbHrPHIFA/ZL+nUJeuA==}
     engines: {node: '>=22.22.1'}
     hasBin: true
 
@@ -13050,8 +13050,8 @@ packages:
   node-releases@2.0.36:
     resolution: {integrity: sha512-TdC8FSgHz8Mwtw9g5L4gR/Sh9XhSP/0DEkQxfEFXOpiul5IiHgHan2VhYYb6agDSfp4KuvltmGApc8HMgUrIkA==}
 
-  node-releases@2.0.46:
-    resolution: {integrity: sha512-GYVXHE2KnrzAfsAjl4uP++evGFCrAU1jta4ubEjIG7YWt/64Gqv66a30yKwWczVjA6j3bM4nBwH7Pk1JmDHaxQ==}
+  node-releases@2.0.47:
+    resolution: {integrity: sha512-Uzmd6LXpouKo8EUK68IjH4+E01w/hXyV3R3g/geCJo+rXLNfh1xucB+LOzYEOQPSiUK3h/xZf0cQGcSsmyL2Og==}
     engines: {node: '>=18'}
 
   node-rsa@1.1.1:
@@ -15292,6 +15292,10 @@ packages:
     resolution: {integrity: sha512-dAqSqE/RabpBKI8+h26GfLq6Vb3JVXs30XYQjdMjaj/c2tS8IYYMbIzP599KtRj7c57/wYApb3QjgRgXmrCukA==}
     engines: {node: '>=18'}
 
+  tinyexec@1.2.4:
+    resolution: {integrity: sha512-SHf/r48b7vOrjve9PxJo3MN5v5yuyjHvdUcrQffT3WXMUfnGmHDVbC4k3sHJaJTgZCwpUplIaAo5ANtMyp3YHg==}
+    engines: {node: '>=18'}
+
   tinyglobby@0.2.15:
     resolution: {integrity: sha512-j2Zq4NyQYG5XMST4cbs02Ak8iJUdxRM0XI5QyxXuZOzKOINmWurp3smXu3y5wDcJrptwpSjgXHzIQxR0omXljQ==}
     engines: {node: '>=12.0.0'}
@@ -16470,7 +16474,7 @@ snapshots:
   '@antfu/install-pkg@1.1.0':
     dependencies:
       package-manager-detector: 1.6.0
-      tinyexec: 1.1.2
+      tinyexec: 1.2.4
 
   '@anthropic-ai/claude-agent-sdk-darwin-arm64@0.2.141':
     optional: true
@@ -25476,8 +25480,8 @@ snapshots:
     dependencies:
       baseline-browser-mapping: 2.10.33
       caniuse-lite: 1.0.30001793
-      electron-to-chromium: 1.5.364
-      node-releases: 2.0.46
+      electron-to-chromium: 1.5.366
+      node-releases: 2.0.47
       update-browserslist-db: 1.2.3(browserslist@4.28.2)
 
   bs58@4.0.1:
@@ -26847,7 +26851,7 @@ snapshots:
 
   electron-to-chromium@1.5.321: {}
 
-  electron-to-chromium@1.5.364: {}
+  electron-to-chromium@1.5.366: {}
 
   electron-updater@6.8.3:
     dependencies:
@@ -29731,12 +29735,12 @@ snapshots:
 
   lines-and-columns@1.2.4: {}
 
-  lint-staged@17.0.4:
+  lint-staged@17.0.7:
     dependencies:
       listr2: 10.2.1
       picomatch: 4.0.4
       string-argv: 0.3.2
-      tinyexec: 1.1.2
+      tinyexec: 1.2.4
     optionalDependencies:
       yaml: 2.9.0
 
@@ -31232,7 +31236,7 @@ snapshots:
 
   node-releases@2.0.36: {}
 
-  node-releases@2.0.46: {}
+  node-releases@2.0.47: {}
 
   node-rsa@1.1.1:
     dependencies:
@@ -34206,6 +34210,8 @@ snapshots:
   tinyexec@1.0.4: {}
 
   tinyexec@1.1.2: {}
+
+  tinyexec@1.2.4: {}
 
   tinyglobby@0.2.15:
     dependencies:
