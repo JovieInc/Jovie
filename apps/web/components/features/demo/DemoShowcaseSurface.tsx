@@ -29,6 +29,7 @@ import { DemoReleaseTasksSurface } from './DemoReleaseTasksSurface';
 import { DemoReleaseTrackedLinksSurface } from './DemoReleaseTrackedLinksSurface';
 import { DemoSettingsPanel } from './DemoSettingsPanel';
 import { DemoTimWhiteProfileSurface } from './DemoTimWhiteProfileSurface';
+import { createDemoReleaseExperienceAdapter } from './demo-release-experience-adapter';
 import {
   DEMO_EARNINGS_RESPONSE,
   DEMO_ENRICHED_PROFILE,
@@ -60,32 +61,6 @@ type ReleaseShowcaseState = (typeof RELEASE_SHOWCASE_STATES)[number];
 interface DemoShowcaseSurfaceProps {
   readonly surface: DemoRenderableSurfaceId;
 }
-
-const DEMO_RELEASE_EXPERIENCE_ADAPTER = {
-  mode: 'demo',
-  entitlements: {
-    isPro: true,
-    canCreateManualReleases: true,
-    canEditSmartLinks: true,
-    canAccessFutureReleases: true,
-    smartLinksLimit: null,
-  },
-  onCopy: async (path: string) => path,
-  onCreateRelease: () => {},
-  onSync: () => {},
-  onRefreshRelease: () => {},
-  onArtworkUpload: async () => '',
-  onArtworkRevert: async () => '',
-  onAddDspLink: async () => {},
-  onRescanIsrc: () => {},
-  onSaveLyrics: async () => {},
-  onSaveMetadata: async () => {},
-  onSavePrimaryIsrc: async () => {},
-  onFormatLyrics: async (_releaseId: string, lyrics: string) => [lyrics],
-  onCanvasStatusUpdate: async () => {},
-  onToggleArtworkDownloads: async () => {},
-  sidebarDataByReleaseId: DEMO_RELEASE_SIDEBAR_FIXTURES,
-} as const;
 
 function DemoShowcasePanel({
   testId,
@@ -175,7 +150,10 @@ function DemoReleasesShowcaseState({
         allowArtworkDownloads
         initialImporting={state === 'importing'}
         initialTotalCount={state === 'importing' ? 12 : 0}
-        experienceAdapter={DEMO_RELEASE_EXPERIENCE_ADAPTER}
+        experienceAdapter={createDemoReleaseExperienceAdapter({
+          releases: DEMO_RELEASE_VIEW_MODELS,
+          sidebarDataByReleaseId: DEMO_RELEASE_SIDEBAR_FIXTURES,
+        })}
       />
     </DemoAuthShell>
   );
