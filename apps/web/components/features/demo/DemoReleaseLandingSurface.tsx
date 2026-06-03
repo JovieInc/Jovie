@@ -2,6 +2,7 @@
 
 import { useSearchParams } from 'next/navigation';
 import type { SmartLinkCreditGroup } from '@/app/[username]/[slug]/_lib/data';
+import { providerConfig } from '@/app/app/(shell)/dashboard/releases/config';
 import { ReleaseLandingPage } from '@/app/r/[slug]/ReleaseLandingPage';
 import { INTERNAL_DJ_DEMO_PERSONA } from '@/lib/demo-personas';
 import { DemoClientProviders } from './DemoClientProviders';
@@ -9,13 +10,6 @@ import { DEMO_RELEASE_VIEW_MODELS } from './mock-release-data';
 
 const RELEASE = DEMO_RELEASE_VIEW_MODELS[0];
 const ARTIST = INTERNAL_DJ_DEMO_PERSONA.profile;
-const PROVIDER_ACCENTS: Record<string, string> = {
-  spotify: '#1DB954',
-  apple_music: '#FA2D48',
-  youtube: '#FF0000',
-  amazon_music: '#00A8E1',
-};
-const DEFAULT_PROVIDER_ACCENT = '#5E6AD2';
 const DEMO_CREDITS: readonly SmartLinkCreditGroup[] = [
   {
     role: 'producer',
@@ -91,7 +85,7 @@ export function DemoReleaseLandingSurface() {
           providers={RELEASE.providers.map(provider => ({
             key: provider.key,
             label: provider.label,
-            accent: PROVIDER_ACCENTS[provider.key] ?? DEFAULT_PROVIDER_ACCENT,
+            accent: providerConfig[provider.key]?.accent,
             url: provider.url,
           }))}
           credits={[...DEMO_CREDITS]}

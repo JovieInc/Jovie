@@ -16,6 +16,7 @@ import {
   FOUNDER_DEMO_PERSONA,
   INTERNAL_DJ_DEMO_PERSONA,
 } from '@/lib/demo-personas';
+import { PROVIDER_CONFIG } from '@/lib/discography/config';
 import type { ProviderKey, ReleaseViewModel } from '@/lib/discography/types';
 import type { AudienceMember } from '@/types';
 
@@ -24,26 +25,7 @@ import type { AudienceMember } from '@/types';
 export const DEMO_PROVIDER_CONFIG: Record<
   string,
   { label: string; accent: string }
-> = {
-  spotify: { label: 'Spotify', accent: '#1DB954' },
-  apple_music: { label: 'Apple Music', accent: '#FA2D48' },
-  youtube: { label: 'YouTube', accent: '#FF0000' },
-  youtube_music: { label: 'YouTube Music', accent: '#FF0000' },
-  soundcloud: { label: 'SoundCloud', accent: '#FF5500' },
-  deezer: { label: 'Deezer', accent: '#A238FF' },
-  tidal: { label: 'Tidal', accent: '#000000' },
-  amazon_music: { label: 'Amazon Music', accent: '#00A8E1' },
-  bandcamp: { label: 'Bandcamp', accent: '#1DA0C3' },
-  beatport: { label: 'Beatport', accent: '#94D500' },
-  pandora: { label: 'Pandora', accent: '#224099' },
-  napster: { label: 'Napster', accent: '#000000' },
-  audiomack: { label: 'Audiomack', accent: '#FFA200' },
-  qobuz: { label: 'Qobuz', accent: '#2C8CBA' },
-  anghami: { label: 'Anghami', accent: '#D60062' },
-  boomplay: { label: 'Boomplay', accent: '#FF6600' },
-  iheartradio: { label: 'iHeartRadio', accent: '#C6002B' },
-  tiktok: { label: 'TikTok', accent: '#010101' },
-};
+> = PROVIDER_CONFIG;
 
 // Helper to create provider links
 function makeProviders(

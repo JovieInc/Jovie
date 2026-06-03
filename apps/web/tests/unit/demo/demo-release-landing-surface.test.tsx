@@ -17,6 +17,12 @@ interface CapturedReleaseLandingProps {
     readonly avatarUrl: string | null;
   };
   readonly credits?: readonly CapturedCreditGroup[];
+  readonly providers?: readonly {
+    readonly key: string;
+    readonly label: string;
+    readonly accent: string;
+    readonly url: string | null;
+  }[];
   readonly release: {
     readonly title: string;
   };
@@ -51,6 +57,9 @@ vi.mock('@/app/r/[slug]/ReleaseLandingPage', () => ({
 const { DemoReleaseLandingSurface } = await import(
   '@/features/demo/DemoReleaseLandingSurface'
 );
+const { providerConfig } = await import(
+  '@/app/app/(shell)/dashboard/releases/config'
+);
 
 describe('DemoReleaseLandingSurface', () => {
   beforeEach(() => {
@@ -75,5 +84,18 @@ describe('DemoReleaseLandingSurface', () => {
     expect(renderedPayload).not.toContain('Tim White');
     expect(renderedPayload).not.toContain('Blessings');
     expect(renderedPayload).not.toContain('Clementine Douglas');
+  });
+
+  it('uses the canonical release provider color config', () => {
+    render(<DemoReleaseLandingSurface />);
+
+    const provider = capturedProps?.providers?.find(
+      item => item.key === 'spotify'
+    );
+
+    expect(provider).toMatchObject({
+      label: providerConfig.spotify.label,
+      accent: providerConfig.spotify.accent,
+    });
   });
 });
