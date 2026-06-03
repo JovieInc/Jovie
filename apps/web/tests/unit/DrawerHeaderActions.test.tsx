@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { render, screen } from '@testing-library/react';
 import { Copy } from 'lucide-react';
 import type { ComponentProps, ReactNode } from 'react';
@@ -101,6 +103,19 @@ describe('DrawerHeaderActions', () => {
     expect(trigger.className).toContain('border-transparent');
     expect(trigger.className).not.toContain('border-(--linear-app-frame-seam)');
     expect(trigger.className).not.toContain('border-subtle');
+  });
+
+  it('keeps copy-state icon swaps free of scale motion', () => {
+    const source = readFileSync(
+      resolve(
+        process.cwd(),
+        'components/molecules/drawer-header/DrawerHeaderActions.tsx'
+      ),
+      'utf8'
+    );
+
+    expect(source).not.toMatch(/\b(?:transition-all|scale-50|scale-100)\b/);
+    expect(source).toContain('transition-opacity');
   });
 
   it('reuses shared dropdown menu items when menuItems is provided', () => {

@@ -120,20 +120,16 @@ export function DrawerHeaderActions({
             <span className='relative flex h-3.5 w-3.5 items-center justify-center'>
               <DefaultIcon
                 className={cn(
-                  'absolute h-3.5 w-3.5 transition-all duration-150',
-                  action.isActive
-                    ? 'scale-50 opacity-0'
-                    : 'scale-100 opacity-100'
+                  'absolute h-3.5 w-3.5 transition-opacity duration-subtle',
+                  action.isActive ? 'opacity-0' : 'opacity-100'
                 )}
                 aria-hidden='true'
               />
               {ActiveIcon && (
                 <ActiveIcon
                   className={cn(
-                    'absolute h-3.5 w-3.5 transition-all duration-150',
-                    action.isActive
-                      ? 'scale-100 opacity-100'
-                      : 'scale-50 opacity-0'
+                    'absolute h-3.5 w-3.5 transition-opacity duration-subtle',
+                    action.isActive ? 'opacity-100' : 'opacity-0'
                   )}
                   aria-hidden='true'
                 />
