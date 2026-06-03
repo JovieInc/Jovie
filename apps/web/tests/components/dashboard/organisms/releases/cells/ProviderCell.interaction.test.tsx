@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { TooltipProvider } from '@jovie/ui';
 import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
@@ -70,5 +72,20 @@ describe('ProviderCell actions', () => {
     expect(onCopy).toHaveBeenCalledTimes(1);
 
     openSpy.mockRestore();
+  });
+
+  it('keeps provider copy icon swaps opacity-only', () => {
+    const sourceFiles = [
+      'components/features/dashboard/organisms/releases/cells/ProviderCell.tsx',
+      'components/features/dashboard/organisms/releases/components/ProviderCopyButton.tsx',
+    ];
+
+    for (const sourceFile of sourceFiles) {
+      const source = readFileSync(resolve(process.cwd(), sourceFile), 'utf8');
+
+      expect(source).not.toMatch(/\btransition-all\b/);
+      expect(source).not.toMatch(/\bscale-(?:50|95|100|105|110|125)\b/);
+      expect(source).toContain('transition-opacity');
+    }
   });
 });
