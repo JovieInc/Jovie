@@ -19,7 +19,7 @@ export default function RootError({ error, reset }: ErrorProps) {
           <path fill='currentColor' d={ICON_PATH} />
         </svg>
 
-        <h1 className='mt-5 text-lg font-semibold leading-snug tracking-tight'>
+        <h1 className='mt-5 text-lg font-semibold leading-snug tracking-normal'>
           Something Went Wrong
         </h1>
         <p className='mt-2 text-sm leading-normal text-tertiary-token'>
