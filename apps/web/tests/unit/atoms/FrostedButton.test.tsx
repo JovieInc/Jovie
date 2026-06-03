@@ -72,6 +72,14 @@ describe('FrostedButton', () => {
     expect(button).toBeDisabled();
   });
 
+  it('keeps shared press feedback free of decorative transforms', () => {
+    render(<FrostedButton>Motion safe</FrostedButton>);
+    const button = screen.getByRole('button', { name: 'Motion safe' });
+    expect(button.className).not.toMatch(
+      /\b(?:transition-all|duration-\d+|active:scale|active:translate|transform|motion-reduce:transform-none)\b/
+    );
+  });
+
   it('has no accessibility violations', async () => {
     const { container } = render(<FrostedButton>Accessible</FrostedButton>);
     await expectNoA11yViolations(container);
