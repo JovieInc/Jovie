@@ -28,10 +28,14 @@ const forbiddenDownloadCssPatterns = [
 
 function extractDownloadCss(source: string): string {
   const start = source.indexOf(':where(.system-b-download-page)');
-  const end = source.indexOf(
+  const nextSectionMarkers = [
+    '/* ============================================\n   SYSTEM B CHAT ENTITY PREVIEW PRIMITIVES',
     '/* ============================================\n   GEIST ACCENT PALETTE',
-    start
-  );
+  ];
+  const end = nextSectionMarkers
+    .map(marker => source.indexOf(marker, start))
+    .filter(index => index > start)
+    .sort((a, b) => a - b)[0];
 
   expect(start, 'download CSS block exists').toBeGreaterThanOrEqual(0);
   expect(
