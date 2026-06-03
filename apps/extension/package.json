@@ -3,7 +3,7 @@
   "version": "26.6.2",
   "private": true,
   "scripts": {
-    "build": "rm -rf dist && tsc -p tsconfig.build.json && node scripts/copy-static.mjs",
+    "build": "rm -rf dist .cache/tsbuildinfo && tsc -p tsconfig.build.json && node scripts/copy-static.mjs",
     "dev": "tsc -p tsconfig.build.json --watch",
     "test": "node scripts/vitest-wrapper.mjs",
     "typecheck": "tsc -p tsconfig.json --noEmit"
