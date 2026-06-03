@@ -252,13 +252,17 @@ enum NativeTicketSignInDiagnostics {
 }
 #endif
 
-func makeJovieClerkOptions(redirectUrl: String, callbackUrlScheme: String) -> Clerk.Options {
+func makeJovieClerkOptions(
+  redirectUrl: String,
+  callbackUrlScheme: String,
+  keychainService: String = "ie.jov.Jovie"
+) -> Clerk.Options {
   let responseMiddleware: [any ClerkResponseMiddleware] = [
     NativeTicketSignInResponseMiddleware(),
   ]
 
   return Clerk.Options(
-    keychainConfig: .init(service: "ie.jov.Jovie"),
+    keychainConfig: .init(service: keychainService),
     // Uses env-driven values from AppConfiguration (gh-9806/JOV-2652).
     // These MUST be registered as allowed redirect URLs in the Clerk dashboard
     // for the matching publishable key (native/iOS app section). Explicit config
@@ -275,25 +279,64 @@ func makeJovieClerkOptions(redirectUrl: String, callbackUrlScheme: String) -> Cl
   )
 }
 
+struct LiveLaunchConfiguration: Sendable {
+  let configuration: AppConfiguration
+  let shouldConfigureClerk: Bool
+  let authErrorMessage: String?
+}
+
+enum LiveLaunchConfigurationResolver {
+  private static let unavailableMessage =
+    "Sign-in is unavailable in this build. Install the latest TestFlight build or try again later."
+
+  static func resolve(
+    launchMode: LaunchMode,
+    loadLiveConfiguration: () throws -> AppConfiguration = {
+      try AppConfiguration.loadForLiveLaunch()
+    },
+    loadUnvalidatedConfiguration: () -> AppConfiguration = {
+      AppConfiguration.load()
+    }
+  ) -> LiveLaunchConfiguration {
+    guard launchMode.usesLiveClerk else {
+      return LiveLaunchConfiguration(
+        configuration: .mock,
+        shouldConfigureClerk: false,
+        authErrorMessage: nil
+      )
+    }
+
+    do {
+      return LiveLaunchConfiguration(
+        configuration: try loadLiveConfiguration(),
+        shouldConfigureClerk: true,
+        authErrorMessage: nil
+      )
+    } catch {
+      return LiveLaunchConfiguration(
+        configuration: loadUnvalidatedConfiguration(),
+        shouldConfigureClerk: false,
+        authErrorMessage: unavailableMessage
+      )
+    }
+  }
+}
+
 @main
 struct JovieApp: App {
   @UIApplicationDelegateAdaptor(JovieAppDelegate.self) private var appDelegate
   @State private var appState: AppState
+  private let isLiveAuthAvailable: Bool
+  private let launchAuthErrorMessage: String?
 
   init() {
     let launchMode = LaunchMode.current()
-    let configuration: AppConfiguration
-    if launchMode.usesLiveClerk {
-      do {
-        configuration = try AppConfiguration.loadForLiveLaunch()
-      } catch {
-        fatalError(
-          "Invalid Clerk publishable key configuration for live launch: \(error.localizedDescription)"
-        )
-      }
-    } else {
-      configuration = .mock
-    }
+    let launchConfiguration = LiveLaunchConfigurationResolver.resolve(
+      launchMode: launchMode
+    )
+    let configuration = launchConfiguration.configuration
+    isLiveAuthAvailable = launchConfiguration.shouldConfigureClerk
+    launchAuthErrorMessage = launchConfiguration.authErrorMessage
 
     Observability.configure(
       environment: configuration.observabilityEnvironment,
@@ -306,14 +349,19 @@ struct JovieApp: App {
       value: String(describing: launchMode)
     )
 
-    if launchMode.usesLiveClerk {
+    if launchConfiguration.shouldConfigureClerk {
       Clerk.configure(
         publishableKey: configuration.clerkPublishableKey,
         options: makeJovieClerkOptions(
           redirectUrl: configuration.clerkRedirectUrl,
-          callbackUrlScheme: configuration.clerkCallbackUrlScheme
+          callbackUrlScheme: configuration.clerkCallbackUrlScheme,
+          keychainService: launchMode.clerkKeychainService
         )
       )
+
+      if launchMode.clearsStoredClerkSession {
+        Clerk.clearAllKeychainItems()
+      }
     }
 
     let repository = MeRepository(
@@ -340,28 +388,32 @@ struct JovieApp: App {
 #if DEBUG
         if appState.launchMode == .uiTestingAuthCallback {
           UITestingAuthCallbackRoot(appState: appState)
-        } else if appState.launchMode.usesLiveClerk {
+        } else if appState.launchMode.usesLiveClerk, isLiveAuthAvailable {
           LiveRootContainer(appState: appState)
             .environment(Clerk.shared)
         } else {
           RootView(
             appState: appState,
+            isAuthAvailable: isLiveAuthAvailable,
+            isSignInUnavailable: launchAuthErrorMessage != nil,
             liveUserID: nil,
-            authErrorMessage: nil,
+            authErrorMessage: launchAuthErrorMessage,
             onLogout: { await appState.signOut() },
             onAuthReturn: { _ in },
             onAuthError: { _ in }
           )
         }
 #else
-        if appState.launchMode.usesLiveClerk {
+        if appState.launchMode.usesLiveClerk, isLiveAuthAvailable {
           LiveRootContainer(appState: appState)
             .environment(Clerk.shared)
         } else {
           RootView(
             appState: appState,
+            isAuthAvailable: isLiveAuthAvailable,
+            isSignInUnavailable: launchAuthErrorMessage != nil,
             liveUserID: nil,
-            authErrorMessage: nil,
+            authErrorMessage: launchAuthErrorMessage,
             onLogout: { await appState.signOut() },
             onAuthReturn: { _ in },
             onAuthError: { _ in }

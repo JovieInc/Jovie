@@ -142,6 +142,8 @@ final class AppState {
     } catch {
       guard activeUserID == userID, loadingUserID == userID else { return }
 
+      var didTransportFail = false
+
       if let error = error as? APIClientError {
         switch error {
         case .missingToken, .requestFailed(statusCode: 401):
@@ -151,14 +153,16 @@ final class AppState {
           isOffline = false
           MobileAuthDiagnostics.record("route_signed_out", detail: error.localizedDescription)
           return
-        case .decodingFailed, .invalidResponse, .transportFailed, .requestFailed:
+        case .transportFailed:
+          didTransportFail = true
+        case .decodingFailed, .invalidResponse, .requestFailed:
           break
         }
       }
 
       route = .ready
       dashboardState = .error("Couldn't load your profile.")
-      isOffline = false
+      isOffline = didTransportFail
       MobileAuthDiagnostics.record("mobile_me_error", detail: error.localizedDescription)
     }
   }

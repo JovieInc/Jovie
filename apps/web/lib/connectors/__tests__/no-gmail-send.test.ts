@@ -9,7 +9,7 @@
  * Skips gracefully if the gmail connector directory doesn't exist yet (C-PR-2 not merged).
  */
 
-import { existsSync, readdirSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import * as path from 'node:path';
 import { describe, expect, it } from 'vitest';
 
@@ -25,7 +25,7 @@ describe('Gmail connector: no send export', () => {
     expect(true).toBe(true);
   });
 
-  it('no module in apps/web/lib/connectors/gmail/** exports a function named "send"', async () => {
+  it('no module in apps/web/lib/connectors/gmail/** exports a function named "send"', () => {
     const dirToCheck = existsSync(GMAIL_DIR)
       ? GMAIL_DIR
       : existsSync(GMAIL_LIB_DIR)
@@ -46,35 +46,18 @@ describe('Gmail connector: no send export', () => {
 
     for (const file of tsFiles) {
       const filePath = path.join(dirToCheck, file);
-      try {
-        // Dynamic import — use string variable to avoid static resolution.
-        // Do NOT .catch() here: let errors fall through to the catch block
-        // so the source-text fallback actually runs on import failure.
-        const modulePath = filePath;
-        const mod = (await import(/* @vite-ignore */ modulePath)) as Record<
-          string,
-          unknown
-        >;
-        if ('send' in mod) {
-          expect.fail(
-            `${file} exports 'send' — Jovie must NEVER send email on behalf of artists. ` +
-              `Remove or rename the export. See .claude/rules/security.md.`
-          );
-        }
-      } catch {
-        // If import fails, fall back to source text check
-        const { readFileSync } = await import('node:fs');
-        const source = readFileSync(filePath, 'utf-8');
-        const hasSendExport =
-          /export\s+(async\s+)?function\s+send\b/.test(source) ||
-          /export\s*\{[^}]*\bsend\b[^}]*\}/.test(source) ||
-          /export\s+const\s+send\s*=/.test(source);
+      const source = readFileSync(filePath, 'utf-8');
+      const hasSendExport =
+        /export\s+(async\s+)?function\s+send\b/.test(source) ||
+        /export\s*\{[^}]*\bsend\b[^}]*\}/.test(source) ||
+        /export\s+const\s+send\s*=/.test(source) ||
+        /export\s+\*\s+from\s+['"][^'"]+['"]/.test(source) ||
+        /export\s*\{[^}]*\bsend\b[^}]*\}\s+from\s+['"][^'"]+['"]/.test(source);
 
-        if (hasSendExport) {
-          expect.fail(
-            `${file} appears to export 'send' — Jovie must NEVER send email on behalf of artists.`
-          );
-        }
+      if (hasSendExport) {
+        expect.fail(
+          `${file} appears to export 'send' or re-export its surface — Jovie must NEVER send email on behalf of artists.`
+        );
       }
     }
   });

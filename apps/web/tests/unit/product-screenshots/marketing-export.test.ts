@@ -11,7 +11,7 @@ import {
 } from '../../../lib/screenshots/registry';
 import screenshotCatalogManifest from '../../../screenshot-catalog/current/manifest.json';
 
-const MAX_HOMEPAGE_SCREENSHOT_AGE_MS = 45 * 24 * 60 * 60 * 1000;
+const MAX_HOMEPAGE_SCREENSHOT_AGE_MS = 60 * 24 * 60 * 60 * 1000;
 const HOMEPAGE_SCREENSHOT_IDS = Array.from(
   new Set([
     HOMEPAGE_LAUNCH_COPY.workspace.screenshotKey,

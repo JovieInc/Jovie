@@ -48,6 +48,31 @@ enum LaunchMode: Equatable {
     self == .uiTestingVenueMode
   }
 
+  var clearsStoredClerkSession: Bool {
+    self == .uiTestingLiveAuth
+  }
+
+  var clerkKeychainService: String {
+    switch self {
+    case .uiTestingAutoAuth:
+      return "ie.jov.Jovie.ui-testing-auto-auth"
+    case .uiTestingLiveAuth:
+      return "ie.jov.Jovie.ui-testing-live-auth"
+    case .live,
+         .unitTesting,
+         .uiTestingRealBrowserAuth,
+         .uiTestingAuthCallback,
+         .uiTestingSignedOut,
+         .uiTestingReady,
+         .uiTestingChat,
+         .uiTestingSettings,
+         .uiTestingVenueMode,
+         .uiTestingNeedsOnboarding,
+         .uiTestingSplash:
+      return "ie.jov.Jovie"
+    }
+  }
+
   static func current(processInfo: ProcessInfo = .processInfo) -> LaunchMode {
     let arguments = processInfo.arguments
 
