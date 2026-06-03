@@ -2137,7 +2137,7 @@ body:has(.system-b-download-page) .marketing-glass-header__cta:focus-visible {
    SYSTEM B CHAT ENTITY PREVIEW PRIMITIVES
    ============================================ */
 
-:where(.system-b-entity-chip-popover-content) {
+.system-b-entity-chip-popover-content {
   z-index: 150;
   width: min(272px, calc(100vw - var(--space-6)));
   overflow: hidden;
