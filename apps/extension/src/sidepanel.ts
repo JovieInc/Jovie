@@ -397,6 +397,12 @@ function renderShell(children: HTMLElement[]) {
 
   const shell = document.createElement('div');
   shell.className = 'shell';
+  const isDockChild = (child: HTMLElement) =>
+    child.classList.contains('action-tray') ||
+    child.classList.contains('signed-out-actions');
+  const contentChildren = children.filter(child => !isDockChild(child));
+  const dockChildren = children.filter(isDockChild);
+  const hasActionDock = dockChildren.length > 0;
 
   const header = document.createElement('header');
   header.className = 'top-rail';
@@ -421,14 +427,20 @@ function renderShell(children: HTMLElement[]) {
 
   const main = document.createElement('main');
   main.className = 'panel-scroll';
-  for (const child of children) {
+  for (const child of contentChildren) {
     main.appendChild(child);
   }
 
   shell.appendChild(main);
-  const promptDock = renderPromptDock();
+  const promptDock = renderPromptDock({ hasActionDock });
   if (promptDock) {
+    if (hasActionDock) {
+      promptDock.classList.add('prompt-dock-stacked');
+    }
     shell.appendChild(promptDock);
+  }
+  for (const child of dockChildren) {
+    shell.appendChild(child);
   }
   root.appendChild(shell);
 }
@@ -507,7 +519,7 @@ function renderSummaryCard(summary: ExtensionSummaryResponse) {
 
   const eyebrow = document.createElement('p');
   eyebrow.className = 'eyebrow';
-  eyebrow.textContent = 'Suggested For This Page';
+  eyebrow.textContent = 'Page Context';
 
   const title = document.createElement('h2');
   title.className = 'section-title';
@@ -739,7 +751,7 @@ function renderPermissionCard(host: string) {
 
   const eyebrow = document.createElement('p');
   eyebrow.className = 'eyebrow';
-  eyebrow.textContent = 'Enable This Domain';
+  eyebrow.textContent = 'Domain Access';
 
   const title = document.createElement('h3');
   title.className = 'section-title';
@@ -768,8 +780,16 @@ function renderPermissionCard(host: string) {
   return card;
 }
 
-function renderPromptDock() {
+function renderPromptDock({
+  hasActionDock,
+}: {
+  readonly hasActionDock: boolean;
+}) {
   if (!state.statusMessage && !state.flags?.chatPromptEnabled) {
+    return null;
+  }
+
+  if (hasActionDock && !state.statusMessage) {
     return null;
   }
 
@@ -783,7 +803,7 @@ function renderPromptDock() {
     dock.appendChild(status);
   }
 
-  if (state.flags?.chatPromptEnabled) {
+  if (state.flags?.chatPromptEnabled && !hasActionDock) {
     const prompt = document.createElement('button');
     prompt.type = 'button';
     prompt.className = 'prompt-button';
