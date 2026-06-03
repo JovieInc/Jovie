@@ -2805,6 +2805,7 @@ body:has(.system-b-download-page) .marketing-glass-header__cta:focus-visible {
   border: 1px solid var(--system-b-app-frame-seam);
   border-radius: var(--radius-2xl);
   background: var(--system-b-app-content-surface);
+  box-shadow: var(--shadow-card-elevated);
   transition:
     opacity var(--duration-cinematic) var(--ease-out),
     transform var(--duration-cinematic) var(--ease-out);

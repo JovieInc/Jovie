@@ -29,4 +29,15 @@ describe('chat suggestions and slash picker System B source contract', () => {
       }
     }
   });
+
+  it('keeps suggested profile cards on the System B card depth token', () => {
+    const styles = readFileSync(
+      resolve(process.cwd(), 'styles/design-system.css'),
+      'utf8'
+    );
+
+    expect(styles).toMatch(
+      /:where\(\.system-b-suggested-profile-card\)\s*{[^}]*box-shadow:\s*var\(--shadow-card-elevated\);/
+    );
+  });
 });
