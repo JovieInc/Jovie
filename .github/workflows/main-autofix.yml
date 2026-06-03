@@ -308,34 +308,34 @@ jobs:
 
             SYSTEM_PROMPT=$(
               cat <<'SYSTEMEOF'
-You are a concise AI code-fixer for workflow and CI reliability.
-Return exactly one JSON object and nothing else.
-If the failure is clearly due to secrets/missing credentials, set status to "abort" and include a short reason.
-If a fix is possible, return status "fix" and provide a git-compatible unified diff in the "patch" field.
-If no fix is needed or not possible, return status "skip" and include a short reason.
-Schema:
-{"status":"fix|skip|abort","summary":"...", "patch":"...","reason":"..."}
-Apply minimal edits only. Prefer edits only in workflow files and the files listed in suspect files.
-SYSTEMEOF
+          You are a concise AI code-fixer for workflow and CI reliability.
+          Return exactly one JSON object and nothing else.
+          If the failure is clearly due to secrets/missing credentials, set status to "abort" and include a short reason.
+          If a fix is possible, return status "fix" and provide a git-compatible unified diff in the "patch" field.
+          If no fix is needed or not possible, return status "skip" and include a short reason.
+          Schema:
+          {"status":"fix|skip|abort","summary":"...", "patch":"...","reason":"..."}
+          Apply minimal edits only. Prefer edits only in workflow files and the files listed in suspect files.
+          SYSTEMEOF
             )
 
             USER_PROMPT=$(
               cat <<EOF
-Main branch failure details:
-- Failing SHA: ${FAILING_SHA}
-- Last green SHA: ${LAST_GREEN_SHA}
-- Failed run: https://github.com/${GH_REPO}/actions/runs/${FAILING_RUN_ID}
-- Failed jobs: ${FAILED_JOB_NAMES}
-- Commits since green: ${COMMITS_RANGE}
+          Main branch failure details:
+          - Failing SHA: ${FAILING_SHA}
+          - Last green SHA: ${LAST_GREEN_SHA}
+          - Failed run: https://github.com/${GH_REPO}/actions/runs/${FAILING_RUN_ID}
+          - Failed jobs: ${FAILED_JOB_NAMES}
+          - Commits since green: ${COMMITS_RANGE}
 
-Recent failed log excerpt:
-${LOG_PREVIEW}
+          Recent failed log excerpt:
+          ${LOG_PREVIEW}
 
-Suspect files:
-${SUSPECT_FILES}
+          Suspect files:
+          ${SUSPECT_FILES}
 
-Edit the repo directly (apply minimal patch). Keep diffs compact.
-EOF
+          Edit the repo directly (apply minimal patch). Keep diffs compact.
+          EOF
             )
 
             REQUEST_BODY=$(jq -n \
