@@ -106,7 +106,7 @@ describe('Switch', () => {
       render(<Switch aria-label='Toggle' data-testid='switch' />);
       const switchElement = screen.getByTestId('switch');
       expect(switchElement.className).toContain(
-        'data-[state=unchecked]:bg-white/[0.08]'
+        'data-[state=unchecked]:bg-surface-2'
       );
     });
 
@@ -114,7 +114,7 @@ describe('Switch', () => {
       render(<Switch aria-label='Toggle' data-testid='switch' />);
       const switchElement = screen.getByTestId('switch');
       expect(switchElement.className).toContain(
-        'data-[state=unchecked]:hover:bg-white/[0.12]'
+        'data-[state=unchecked]:hover:bg-surface-3'
       );
     });
 
@@ -122,7 +122,7 @@ describe('Switch', () => {
       render(<Switch aria-label='Toggle' data-testid='switch' />);
       const switchElement = screen.getByTestId('switch');
       expect(switchElement.className).toContain(
-        'data-[state=checked]:hover:bg-[var(--color-accent-hover)]'
+        'data-[state=checked]:hover:bg-btn-primary-hover'
       );
     });
 
@@ -132,7 +132,7 @@ describe('Switch', () => {
       );
       const switchElement = screen.getByTestId('switch');
       expect(switchElement.className).toContain(
-        'data-[state=checked]:bg-[var(--color-accent)]'
+        'data-[state=checked]:bg-btn-primary'
       );
     });
 
@@ -140,9 +140,7 @@ describe('Switch', () => {
       render(<Switch aria-label='Toggle' data-testid='switch' />);
       const switchElement = screen.getByTestId('switch');
       expect(switchElement.className).toContain('focus-visible:ring-2');
-      expect(switchElement.className).toContain(
-        'focus-visible:ring-(--color-accent)'
-      );
+      expect(switchElement.className).toContain('focus-visible:ring-focus');
     });
 
     it('applies disabled styling', () => {
@@ -174,12 +172,34 @@ describe('Switch', () => {
       expect(thumb).toBeInTheDocument();
     });
 
-    it('thumb translates when checked', () => {
+    it('thumb uses tokenized margin state when checked', () => {
       render(<Switch defaultChecked aria-label='Toggle' />);
       const switchElement = screen.getByRole('switch');
-      // The thumb child has translate classes
       const thumb = switchElement.firstChild;
-      expect(thumb?.className || '').toContain('translate');
+      expect(thumb?.className || '').toContain('data-[state=checked]:ml-3');
+      expect(thumb?.className || '').not.toContain('translate');
+    });
+
+    it('keeps fixed track and thumb dimensions across state changes', () => {
+      const { rerender } = render(
+        <Switch aria-label='Toggle' data-testid='switch' />
+      );
+      const switchElement = screen.getByTestId('switch');
+      const thumb = switchElement.firstChild;
+
+      expect(switchElement.className).toContain('h-4');
+      expect(switchElement.className).toContain('w-7');
+      expect(thumb?.className || '').toContain('h-3');
+      expect(thumb?.className || '').toContain('w-3');
+
+      rerender(
+        <Switch defaultChecked aria-label='Toggle' data-testid='switch' />
+      );
+
+      expect(switchElement.className).toContain('h-4');
+      expect(switchElement.className).toContain('w-7');
+      expect(thumb?.className || '').toContain('h-3');
+      expect(thumb?.className || '').toContain('w-3');
     });
   });
 
@@ -274,13 +294,11 @@ describe('Switch', () => {
       const switchElement = screen.getByTestId('switch');
       const classes = switchElement.className;
 
-      // Unchecked track must use a visible background
-      expect(classes).toContain('data-[state=unchecked]:bg-white/[0.08]');
+      // Unchecked track must use a visible tokenized background
+      expect(classes).toContain('data-[state=unchecked]:bg-surface-2');
 
-      // Checked track must use the System B accent token
-      expect(classes).toContain(
-        'data-[state=checked]:bg-[var(--color-accent)]'
-      );
+      // Checked track must use the primary button token
+      expect(classes).toContain('data-[state=checked]:bg-btn-primary');
     });
 
     it('checked and unchecked use different background colors', () => {
@@ -288,10 +306,13 @@ describe('Switch', () => {
       const classes = screen.getByTestId('switch').className;
 
       // Extract the unchecked and checked bg classes to verify they differ
-      const uncheckedBg = classes.match(
-        /data-\[state=unchecked\]:bg-[^\s]+/
-      )?.[0];
-      const checkedBg = classes.match(/data-\[state=checked\]:bg-[^\s]+/)?.[0];
+      const classList = classes.split(/\s+/);
+      const uncheckedBg = classList.find(token =>
+        token.startsWith('data-[state=unchecked]:bg-')
+      );
+      const checkedBg = classList.find(token =>
+        token.startsWith('data-[state=checked]:bg-')
+      );
 
       expect(uncheckedBg).toBeDefined();
       expect(checkedBg).toBeDefined();

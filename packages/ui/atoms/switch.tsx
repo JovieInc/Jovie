@@ -6,8 +6,8 @@ import * as React from 'react';
 import { cn } from '../lib/utils';
 
 /**
- * Switch component matching Linear.app toggle design.
- * 28×16px track, 12×12px thumb, System B motion and accent tokens.
+ * System B switch component.
+ * 28×16px track, 12×12px thumb, tokenized 150ms state transition.
  * Supports keyboard navigation, disabled state, and focus ring.
  */
 const Switch = React.forwardRef<
@@ -17,11 +17,11 @@ const Switch = React.forwardRef<
   <SwitchPrimitives.Root
     className={cn(
       'peer inline-flex h-4 w-7 shrink-0 cursor-pointer items-center rounded-full px-0.5',
-      'transition-colors duration-subtle ease-[var(--ds-motion-subtle-easing)]',
-      'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--color-accent) focus-visible:ring-offset-2',
+      'transition-colors duration-fast ease-interactive',
+      'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 focus-visible:ring-offset-surface-page',
       'disabled:cursor-not-allowed disabled:opacity-50',
-      'data-[state=unchecked]:bg-white/[0.08] data-[state=unchecked]:hover:bg-white/[0.12] disabled:data-[state=unchecked]:hover:bg-white/[0.08]',
-      'data-[state=checked]:bg-[var(--color-accent)] data-[state=checked]:hover:bg-[var(--color-accent-hover)] disabled:data-[state=checked]:hover:bg-[var(--color-accent)]',
+      'data-[state=unchecked]:bg-surface-2 data-[state=unchecked]:hover:bg-surface-3 disabled:data-[state=unchecked]:hover:bg-surface-2',
+      'data-[state=checked]:bg-btn-primary data-[state=checked]:hover:bg-btn-primary-hover disabled:data-[state=checked]:hover:bg-btn-primary',
       className
     )}
     {...props}
@@ -29,10 +29,9 @@ const Switch = React.forwardRef<
   >
     <SwitchPrimitives.Thumb
       className={cn(
-        'pointer-events-none block h-3 w-3 rounded-full bg-white shadow-sm ring-0',
-        'transition-transform duration-subtle ease-[var(--ds-motion-subtle-easing)]',
-        'data-[state=unchecked]:translate-x-0',
-        'data-[state=checked]:translate-x-3'
+        'pointer-events-none block h-3 w-3 rounded-full bg-btn-primary-foreground shadow-sm ring-0',
+        'transition-[margin] duration-fast ease-interactive',
+        'data-[state=checked]:ml-3'
       )}
     />
   </SwitchPrimitives.Root>
