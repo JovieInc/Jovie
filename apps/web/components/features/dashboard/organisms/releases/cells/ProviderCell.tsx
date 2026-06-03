@@ -65,15 +65,15 @@ function ProviderActionButtons({
         <span className='relative flex h-3.5 w-3.5 items-center justify-center'>
           <Icon
             name='Copy'
-            className={`absolute h-3.5 w-3.5 transition-all duration-150 ${
-              isCopied ? 'scale-50 opacity-0' : 'scale-100 opacity-100'
+            className={`absolute h-3.5 w-3.5 transition-opacity duration-subtle ${
+              isCopied ? 'opacity-0' : 'opacity-100'
             }`}
             aria-hidden='true'
           />
           <Icon
             name='Check'
-            className={`absolute h-3.5 w-3.5 transition-all duration-150 ${
-              isCopied ? 'scale-100 opacity-100' : 'scale-50 opacity-0'
+            className={`absolute h-3.5 w-3.5 transition-opacity duration-subtle ${
+              isCopied ? 'opacity-100' : 'opacity-0'
             }`}
             aria-hidden='true'
           />
