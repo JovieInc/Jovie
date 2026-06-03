@@ -1,0 +1,141 @@
+#!/bin/bash
+# Kanban auto-dispatch script for Jovie Product
+# Reads ~/.hermes/boards/jovie-product.json, picks "ready" unblocked tasks,
+# dispatches to appropriate Hermes profile (jovie-orchestrator, jovie-reviewer, jovie-merger, jovie-implementer),
+# updates board + Linear.
+#
+# Usage: ./scripts/dispatch-kanban.sh [--dry-run]
+# Cron:  */30 * * * * /Users/timwhite/conductor/repos/jovie-v1/scripts/dispatch-kanban.sh
+set -euo pipefail
+
+BOARD="${HOME}/.hermes/boards/jovie-product.json"
+REPO="/Users/timwhite/conductor/repos/jovie-v1"
+LOG="${HOME}/.hermes/logs/dispatch-kanban.log"
+mkdir -p "$(dirname "$LOG")"
+
+log()  { echo "[$(date '+%H:%M:%S')] $*" >> "$LOG"; echo "  $*"; }
+err()  { echo "[ERR] $*" >&2; log "ERR: $*"; }
+
+# --- helpers ---
+
+get_secret() {
+  cd "$REPO" && doppler run --project jovie-web --config dev -- printenv "$1" 2>/dev/null || echo ""
+}
+
+update_board() {
+  local task_id="$1" new_status="$2"
+  python3 -c "
+import json
+p = '$BOARD'
+with open(p) as f: b = json.load(f)
+for t in b['tasks']:
+    if t['id'] == '$task_id':
+        t['status'] = '$new_status'
+        break
+with open(p, 'w') as f: json.dump(b, f, indent=2)
+" 2>/dev/null && log "board: $task_id -> $new_status" || err "board update failed for $task_id"
+}
+
+mark_linear() {
+  local linear_id="$1"
+  local key="${LINEAR_API_KEY:-$(get_secret LINEAR_API_KEY)}"
+  [ -z "$key" ] && return 0
+  local sid="721e032a-fe72-4374-9a61-d9976d079e1e"
+  local iid
+  iid=$(curl -s -X POST https://api.linear.app/graphql \
+    -H "Content-Type: application/json" \
+    -H "Authorization: $key" \
+    -d "{\"query\":\"{ issueSearch(term:\\\"$linear_id\\\") { nodes { id identifier } } }\"}" \
+    | python3 -c "import sys,json;d=json.load(sys.stdin);print([n['id'] for n in d['data']['issueSearch']['nodes'] if n['identifier']=='$linear_id'][0] if any(n['identifier']=='$linear_id' for n in d['data']['issueSearch']['nodes']) else '')" 2>/dev/null) || true
+  if [ -n "$iid" ]; then
+    curl -s -X POST https://api.linear.app/graphql \
+      -H "Content-Type: application/json" \
+      -H "Authorization: $key" \
+      -d "{\"query\":\"mutation { issueUpdate(id:\\\"$iid\\\", input: { stateId: \\\"$sid\\\" }) { success } }\"}" > /dev/null
+    log "linear: $linear_id -> In Progress"
+  fi
+}
+
+dispatch_hermes() {
+  local id="$1" linear_id="$2" prompt="$3" turns="${4:-40}" profile="$5"
+
+  log "dispatch: $id ($linear_id) max_turns=$turns profile=$profile"
+  if [ "${1:-}" = "--dry-run" ]; then
+    echo "    DRY RUN"
+    return 0
+  fi
+
+  mark_linear "$linear_id" || true
+  update_board "$id" "in-progress"
+
+  set +e
+  # Change to repo directory and run the Hermes profile one-shot
+  cd "$REPO"
+  OUTPUT=$(hermes -p "$profile" -z "$prompt" chat --max-turns "$turns" 2>&1)
+  EXIT=$?
+  set -e
+
+  echo "$OUTPUT" >> "$LOG"
+
+  if [ $EXIT -eq 0 ]; then
+    if echo "$OUTPUT" | grep -qiE "(PR created|branch.*pushed|committed|Merge|merge|https://github.com.*/pull/)"; then
+      update_board "$id" "review"
+      echo "    OK: PR created"
+    else
+      update_board "$id" "done"
+      echo "    OK: completed (exit 0)"
+    fi
+  else
+    echo "    FAIL: exit $EXIT (log: $LOG)"
+    update_board "$id" "ready"
+  fi
+}
+
+# === MAIN ===
+
+cd "$REPO"
+git fetch origin main 2>/dev/null || true
+
+python3 -c "
+import json
+with open('$BOARD') as f: b = json.load(f)
+ready = [t for t in b['tasks'] if t['status'] == 'ready']
+unblocked = [t for t in ready if not t.get('blockers')]
+blocked = [t for t in ready if t.get('blockers')]
+print(f'Board: {len(b[\"tasks\"])} total, {len(ready)} ready, {len(unblocked)} unblocked, {len(blocked)} blocked')
+"
+
+# Check what's pending and dispatch
+# Dispatch all ready/unblocked tasks
+while IFS='|' read -r task_id linear_id context task_profile; do
+    # Map profile
+    case "$task_profile" in
+        coder) hermes_profile="jovie-implementer" ;;
+        founder-os) hermes_profile="jovie-orchestrator" ;;
+        ops) hermes_profile="jovie-reviewer" ;;
+        code-orchestrator) hermes_profile="jovie-merger" ;;
+        *) hermes_profile="jovie-implementer" ;;
+    esac
+
+    # Build prompt: we already have context, but we need to add the working directory note.
+    prompt="Working directory: /Users/timwhite/conductor/repos/jovie-v1. $context"
+
+    # Call dispatch_hermes
+    dispatch_hermes "$task_id" "$linear_id" "$prompt" 40 "$hermes_profile"
+done < <(python3 -c "
+import json
+import os
+BOARD = os.path.expanduser('~/.hermes/boards/jovie-product.json')
+with open(BOARD) as f:
+    b = json.load(f)
+for t in b['tasks']:
+    if t.get('status') == 'ready' and not t.get('blockers'):
+        task_id = t['id']
+        linear_id = t.get('linear_id', '')
+        context = t.get('context', '').replace('|', '\\\\|').replace('\"', '\\\\\"')
+        task_profile = t.get('profile', 'coder')
+        print(f\"{task_id}|{linear_id}|{context}|{task_profile}\")
+")
+
+echo "---"
+echo "Done. Check $LOG for details."
