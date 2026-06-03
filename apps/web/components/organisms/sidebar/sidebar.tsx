@@ -68,50 +68,48 @@ export const Sidebar = React.forwardRef<
           </SheetContent>
         </Sheet>
 
-        {/* Desktop Sidebar - hidden on mobile via CSS class */}
-        {!isMobile && (
+        {/* Desktop Sidebar - always in tree so SSR and first client render match. */}
+        <div
+          ref={ref}
+          className='group peer max-lg:hidden shrink-0 overflow-visible text-sidebar-foreground lg:sticky lg:top-0 lg:z-10'
+          data-state={state}
+          data-collapsible={state === 'closed' ? collapsible : ''}
+          data-variant={variant}
+          data-side={side}
+        >
           <div
-            ref={ref}
-            className='group peer max-lg:hidden shrink-0 overflow-visible text-sidebar-foreground lg:sticky lg:top-0 lg:z-10'
-            data-state={state}
-            data-collapsible={state === 'closed' ? collapsible : ''}
-            data-variant={variant}
-            data-side={side}
+            className={cn(
+              'duration-cinematic relative h-full w-(--sidebar-width) overflow-hidden transition-[width,transform,opacity] ease-cinematic motion-reduce:transition-none',
+              'group-data-[collapsible=offcanvas]:w-0',
+              state === 'closed' &&
+                collapsible === 'offcanvas' &&
+                side === 'left' &&
+                '-translate-x-[calc(100%+0.5rem)] opacity-0',
+              state === 'closed' &&
+                collapsible === 'offcanvas' &&
+                side === 'right' &&
+                'translate-x-[calc(100%+0.5rem)] opacity-0',
+              'group-data-[side=right]:rotate-180',
+              // Prevent pointer events from leaking into content area during width transition
+              'group-data-[collapsible=icon]:pointer-events-none',
+              variant === 'floating' &&
+                'px-2 py-2 group-data-[collapsible=icon]:w-[calc(var(--sidebar-width-icon)+1rem+2px)]',
+              variant === 'inset' &&
+                'px-2 py-0 group-data-[collapsible=icon]:w-[calc(var(--sidebar-width-icon)+1rem+2px)]',
+              variant === 'sidebar' &&
+                'group-data-[collapsible=icon]:w-(--sidebar-width-icon)',
+              className
+            )}
+            {...props}
           >
             <div
-              className={cn(
-                'duration-cinematic relative h-full w-(--sidebar-width) overflow-hidden transition-[width,transform,opacity] ease-cinematic motion-reduce:transition-none',
-                'group-data-[collapsible=offcanvas]:w-0',
-                state === 'closed' &&
-                  collapsible === 'offcanvas' &&
-                  side === 'left' &&
-                  '-translate-x-[calc(100%+0.5rem)] opacity-0',
-                state === 'closed' &&
-                  collapsible === 'offcanvas' &&
-                  side === 'right' &&
-                  'translate-x-[calc(100%+0.5rem)] opacity-0',
-                'group-data-[side=right]:rotate-180',
-                // Prevent pointer events from leaking into content area during width transition
-                'group-data-[collapsible=icon]:pointer-events-none',
-                variant === 'floating' &&
-                  'px-2 py-2 group-data-[collapsible=icon]:w-[calc(var(--sidebar-width-icon)+1rem+2px)]',
-                variant === 'inset' &&
-                  'px-2 py-0 group-data-[collapsible=icon]:w-[calc(var(--sidebar-width-icon)+1rem+2px)]',
-                variant === 'sidebar' &&
-                  'group-data-[collapsible=icon]:w-(--sidebar-width-icon)',
-                className
-              )}
-              {...props}
+              data-sidebar='sidebar'
+              className='pointer-events-auto flex h-full w-full flex-col overflow-clip bg-sidebar transition-[background-color] duration-normal ease-interactive lg:rounded-[var(--linear-app-shell-radius)] lg:shadow-[var(--linear-app-sidebar-shadow)] group-data-[variant=floating]:rounded-[14px] group-data-[variant=floating]:border group-data-[variant=floating]:border-sidebar-border group-data-[variant=floating]:shadow group-data-[variant=inset]:border-r group-data-[variant=inset]:border-sidebar-border'
             >
-              <div
-                data-sidebar='sidebar'
-                className='pointer-events-auto flex h-full w-full flex-col overflow-clip bg-sidebar transition-[background-color] duration-normal ease-interactive lg:rounded-[var(--linear-app-shell-radius)] lg:shadow-[var(--linear-app-sidebar-shadow)] group-data-[variant=floating]:rounded-[14px] group-data-[variant=floating]:border group-data-[variant=floating]:border-sidebar-border group-data-[variant=floating]:shadow group-data-[variant=inset]:border-r group-data-[variant=inset]:border-sidebar-border'
-              >
-                {children}
-              </div>
+              {children}
             </div>
           </div>
-        )}
+        </div>
       </>
     );
   }
