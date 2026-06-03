@@ -437,7 +437,7 @@ jobs:
     # Run for push to main, testing-labeled full CI, or PRs touching DB-relevant paths.
     # run_neon covers drizzle, lib/db, lib/queries, schema, cron routes, SQL files, and
     # package.json changes. PRs touching only UI/perf/docs skip this job entirely.
-    if: ${{ github.event_name == 'push' || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork == false && needs.ci-path-changes.outputs.run_neon == 'true') }}
+    if: ${{ github.event_name == 'push' || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork == false && github.actor != 'dependabot[bot]' && needs.ci-path-changes.outputs.run_neon == 'true') }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
     outputs:
