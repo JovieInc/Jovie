@@ -130,7 +130,7 @@ export function ChatLinkConfirmationCard({
 
   if (state === 'dismissed') {
     return (
-      <ContentSurfaceCard className='border-(--linear-app-frame-seam) bg-(--linear-app-content-surface) p-4 opacity-60'>
+      <ContentSurfaceCard className='border-(--system-b-app-frame-seam) bg-(--system-b-app-content-surface) p-4 opacity-60'>
         <div className='flex items-center gap-2 text-secondary-token'>
           <X className='h-4 w-4' />
           <span className='text-sm'>Link dismissed</span>
@@ -140,9 +140,9 @@ export function ChatLinkConfirmationCard({
   }
 
   return (
-    <ContentSurfaceCard className='border-accent/20 bg-[color-mix(in_oklab,var(--linear-accent)_8%,var(--linear-app-content-surface))] p-4'>
+    <ContentSurfaceCard className='system-b-chat-link-card system-b-chat-link-card-add'>
       <div className='flex items-center gap-3'>
-        <span className='flex h-9 w-9 shrink-0 items-center justify-center rounded-[8px] border border-accent/20 bg-[color-mix(in_oklab,var(--linear-accent)_10%,var(--linear-app-content-surface))]'>
+        <span className='system-b-chat-link-card-icon system-b-chat-link-card-icon-add'>
           <SocialIcon
             platform={normalizeSocialPlatform(platform.icon)}
             className='h-5 w-5 shrink-0'
@@ -168,7 +168,7 @@ export function ChatLinkConfirmationCard({
             onClick={handleAdd}
             disabled={state === 'adding'}
             className={cn(
-              'inline-flex items-center gap-1 rounded-[8px] px-2.5 py-1.5 text-xs font-medium',
+              'system-b-chat-link-primary-action',
               'bg-accent text-accent-foreground hover:bg-accent/90',
               'disabled:opacity-50 transition-colors'
             )}
@@ -185,7 +185,7 @@ export function ChatLinkConfirmationCard({
             onClick={handleDismiss}
             disabled={state === 'adding'}
             className={cn(
-              'inline-flex items-center gap-1 rounded-[8px] border border-transparent p-1.5 text-xs',
+              'system-b-chat-link-dismiss-action',
               'text-secondary-token hover:bg-surface-0 hover:text-primary-token',
               'disabled:opacity-50 transition-colors'
             )}
