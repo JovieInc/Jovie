@@ -20,6 +20,7 @@ import {
   parseUrl,
   type UrlDisposition,
 } from './navigation';
+import { SYSTEM_B_DESKTOP_TOKENS } from './system-b-tokens';
 
 // Separate userData for non-production shells so local, staging, and production
 // sessions coexist without sharing cookies or corrupted renderer state.
@@ -33,7 +34,7 @@ const APP_ORIGIN = new URL(APP_URL).origin;
 const URL_DISPOSITION_OPTIONS = { appUrl: APP_URL, appEnv: APP_ENV } as const;
 const APP_ENTRY_URL = buildAppUrl('/app/chat');
 const SETTINGS_URL = buildAppUrl('/app/settings');
-const APP_BACKGROUND_COLOR = '#08090a';
+const APP_BACKGROUND_COLOR = SYSTEM_B_DESKTOP_TOKENS.backgroundColor;
 const NAVIGATION_ABORTED_ERROR_CODE = -3;
 const APP_ICON_FILENAME =
   APP_ENV === 'staging' ? 'icon-staging.png' : 'icon.png';
@@ -762,19 +763,19 @@ function buildDesktopLoadFailureUrl(): string {
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Jovie Desktop</title>
     <style>
-      :root { color-scheme: dark; }
-      html, body { margin: 0; min-height: 100%; background: #08090a; color: #f4f6fa; font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", Inter, sans-serif; }
+      :root { color-scheme: dark; --system-b-bg-base: ${SYSTEM_B_DESKTOP_TOKENS.backgroundColor}; --system-b-surface-1: ${SYSTEM_B_DESKTOP_TOKENS.surfaceColor}; --system-b-text-primary: ${SYSTEM_B_DESKTOP_TOKENS.textPrimary}; --system-b-text-secondary: ${SYSTEM_B_DESKTOP_TOKENS.textSecondary}; --system-b-border-subtle: ${SYSTEM_B_DESKTOP_TOKENS.borderSubtle}; --system-b-primary-bg: ${SYSTEM_B_DESKTOP_TOKENS.primaryBackground}; --system-b-primary-fg: ${SYSTEM_B_DESKTOP_TOKENS.primaryForeground}; --system-b-radius-shell: ${SYSTEM_B_DESKTOP_TOKENS.radiusShell}; --system-b-radius-pill: ${SYSTEM_B_DESKTOP_TOKENS.radiusPill}; --system-b-shadow-popover: ${SYSTEM_B_DESKTOP_TOKENS.shadowPopover}; }
+      html, body { margin: 0; min-height: 100vh; background: var(--system-b-bg-base); color: var(--system-b-text-primary); font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", Inter, sans-serif; }
       body { display: grid; place-items: center; overflow: hidden; }
-      .shell { position: relative; display: grid; width: min(520px, calc(100vw - 48px)); gap: 22px; padding: 40px; border: 1px solid rgba(255,255,255,0.08); border-radius: 28px; background: linear-gradient(145deg, rgba(15,16,17,0.94), rgba(8,9,10,0.98)); box-shadow: 0 30px 120px rgba(0,0,0,0.42); }
+      .shell { position: relative; display: grid; width: min(520px, calc(100vw - 48px)); gap: 22px; padding: 40px; border: 1px solid var(--system-b-border-subtle); border-radius: var(--system-b-radius-shell); background: var(--system-b-surface-1); box-shadow: var(--system-b-shadow-popover); }
       .mark { position: absolute; right: -52px; top: -46px; width: 220px; height: 220px; opacity: 0.055; }
       .brand { display: flex; align-items: center; gap: 14px; }
-      .icon { display: grid; width: 42px; height: 42px; place-items: center; border-radius: 14px; background: #f4f6fa; color: #080a0d; }
+      .icon { display: grid; width: 42px; height: 42px; place-items: center; border-radius: var(--system-b-radius-shell); background: var(--system-b-primary-bg); color: var(--system-b-primary-fg); }
       h1 { margin: 0; font-size: 17px; font-weight: 650; letter-spacing: 0; }
-      p { margin: 0; max-width: 38ch; color: #a8b0bd; font-size: 13px; line-height: 1.55; }
+      p { margin: 0; max-width: 38ch; color: var(--system-b-text-secondary); font-size: 13px; line-height: 1.55; }
       .actions { display: flex; flex-wrap: wrap; gap: 10px; }
-      a { display: inline-flex; height: 34px; align-items: center; justify-content: center; border-radius: 10px; padding: 0 13px; border: 1px solid rgba(255,255,255,0.1); background: transparent; color: #d9dee7; font-size: 12px; font-weight: 590; text-decoration: none; }
-      .primary { background: #f4f6fa; color: #080a0d; }
-      .meta { color: #737d8c; font-size: 11px; }
+      a { display: inline-flex; height: 34px; align-items: center; justify-content: center; border-radius: var(--system-b-radius-pill); padding: 0 13px; border: 1px solid var(--system-b-border-subtle); background: transparent; color: var(--system-b-text-primary); font-size: 12px; font-weight: 590; text-decoration: none; }
+      .primary { background: var(--system-b-primary-bg); color: var(--system-b-primary-fg); }
+      .meta { color: var(--system-b-text-secondary); font-size: 11px; }
     </style>
   </head>
   <body>

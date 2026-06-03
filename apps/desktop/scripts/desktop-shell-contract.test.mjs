@@ -57,7 +57,19 @@ test('desktop window enters the authenticated chat shell instead of the web root
 
 test('desktop window fails into a branded Jovie recovery surface', async () => {
   const mainSource = await readFile(join(desktopRoot, 'src/main.ts'), 'utf8');
+  const tokenSource = await readFile(
+    join(desktopRoot, 'src/system-b-tokens.ts'),
+    'utf8'
+  );
 
+  assert.match(
+    mainSource,
+    /import \{ SYSTEM_B_DESKTOP_TOKENS \} from '\.\/system-b-tokens';/
+  );
+  assert.match(
+    mainSource,
+    /const APP_BACKGROUND_COLOR = SYSTEM_B_DESKTOP_TOKENS\.backgroundColor;/
+  );
   assert.match(mainSource, /function buildDesktopLoadFailureUrl\(\): string/);
   assert.match(mainSource, /Jovie Desktop/);
   assert.match(mainSource, /Built for artists/);
@@ -90,6 +102,21 @@ test('desktop window fails into a branded Jovie recovery surface', async () => {
   assert.doesNotMatch(mainSource, /parent: mainWindow/);
   assert.doesNotMatch(mainSource, /M31 10A20 20 0 0 0 11 30H31V10Z/);
   assert.doesNotMatch(mainSource, /M11 31L30 31M14 36L31 36M18 41L32 41/);
+  assert.match(mainSource, /--system-b-bg-base:/);
+  assert.match(mainSource, /--system-b-shadow-popover:/);
+  assert.match(mainSource, /min-height: 100vh/);
+  assert.match(mainSource, /background: var\(--system-b-bg-base\)/);
+  assert.match(mainSource, /background: var\(--system-b-surface-1\)/);
+  assert.match(mainSource, /border-radius: var\(--system-b-radius-pill\)/);
+  assert.doesNotMatch(
+    mainSource,
+    /background: linear-gradient\(145deg, rgba\(15,16,17,0\.94\), rgba\(8,9,10,0\.98\)\)/
+  );
+  assert.doesNotMatch(mainSource, /const APP_BACKGROUND_COLOR = '#08090a';/);
+  assert.doesNotMatch(mainSource, /background: #08090a/);
+  assert.match(tokenSource, /SYSTEM_B_DESKTOP_TOKENS/);
+  assert.match(tokenSource, /backgroundColor: '#06070a'/);
+  assert.match(tokenSource, /radiusPill: '999px'/);
 });
 
 test('desktop production bundle declares the jovie auth protocol', async () => {

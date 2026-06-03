@@ -5,6 +5,14 @@
      5|The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
      6|and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.6.3] - 2026-06-03
+
+> Electron now ships the System B desktop recovery shell through the desktop auto-update path.
+
+### Fixed
+
+- **Electron recovery shell**: moves the native BrowserWindow background and load-failure recovery surface onto tracked System B desktop tokens, removes the legacy gradient/raw-color fallback styling, and keeps the recovery card centered in the native window.
+
 ## [26.6.2] - 2026-06-02
 
 > Memory Core v0 now has fixture-backed loops for ingest, identity, enrichment, matching, graph reads, and review-gated opportunities.

@@ -139,5 +139,10 @@ apps/web/exp/
 apps/web/.final-shots/
 apps/web/.tmp-polish-baseline/
 apps/desktop/
+!apps/desktop/
+apps/desktop/*
+!apps/desktop/src/
+apps/desktop/src/*
+!apps/desktop/src/system-b-tokens.ts
 apps/extension/
 .agents/
