@@ -392,11 +392,22 @@ function createCardImage(imageUrl: string | null, title: string) {
   return image;
 }
 
-function renderShell(children: HTMLElement[]) {
+function renderShell(
+  children: HTMLElement[],
+  options: {
+    readonly showPromptDock?: boolean;
+    readonly showTopRail?: boolean;
+  } = {}
+) {
   root.innerHTML = '';
 
   const shell = document.createElement('div');
   shell.className = 'shell';
+  const showPromptDock = options.showPromptDock ?? true;
+  const showTopRail = options.showTopRail ?? true;
+  if (!showTopRail) {
+    shell.dataset.hasTopRail = 'false';
+  }
   const isDockChild = (child: HTMLElement) =>
     child.classList.contains('action-tray') ||
     child.classList.contains('signed-out-actions');
@@ -404,26 +415,26 @@ function renderShell(children: HTMLElement[]) {
   const dockChildren = children.filter(isDockChild);
   const hasActionDock = dockChildren.length > 0;
 
-  const header = document.createElement('header');
-  header.className = 'top-rail';
-  header.appendChild(createLogoMark());
+  if (showTopRail) {
+    const header = document.createElement('header');
+    header.className = 'top-rail';
+    header.appendChild(createLogoMark());
 
-  const railCopy = document.createElement('div');
-  railCopy.className = 'top-rail-copy';
+    const railCopy = document.createElement('div');
+    railCopy.className = 'top-rail-copy';
 
-  const heading = document.createElement('p');
-  heading.className = 'eyebrow';
-  heading.textContent = 'Jovie';
+    const heading = document.createElement('p');
+    heading.className = 'eyebrow';
+    heading.textContent = 'Jovie';
 
-  const status = document.createElement('h1');
-  status.className = 'rail-title';
-  status.textContent =
-    state.summary?.context.statusLabel ??
-    (state.flags?.signedIn ? 'Extension' : 'Sign In Required');
+    const status = document.createElement('h1');
+    status.className = 'rail-title';
+    status.textContent = state.summary?.context.statusLabel ?? 'Jovie';
 
-  railCopy.append(heading, status);
-  header.appendChild(railCopy);
-  shell.appendChild(header);
+    railCopy.append(heading, status);
+    header.appendChild(railCopy);
+    shell.appendChild(header);
+  }
 
   const main = document.createElement('main');
   main.className = 'panel-scroll';
@@ -432,7 +443,7 @@ function renderShell(children: HTMLElement[]) {
   }
 
   shell.appendChild(main);
-  const promptDock = renderPromptDock({ hasActionDock });
+  const promptDock = showPromptDock ? renderPromptDock({ hasActionDock }) : null;
   if (promptDock) {
     if (hasActionDock) {
       promptDock.classList.add('prompt-dock-stacked');
@@ -468,12 +479,12 @@ function renderSignedOut() {
 
   const title = document.createElement('h2');
   title.className = 'empty-title';
-  title.textContent = 'Bring Jovie Into This Page';
+  title.textContent = 'Sign In To Continue';
 
   const body = document.createElement('p');
   body.className = 'empty-body';
   body.textContent =
-    'Sign in to load your artist context, releases, and one-click insert actions.';
+    'Load artist context and fill supported fields from the active page.';
 
   center.append(title, body);
   section.appendChild(center);
@@ -481,15 +492,12 @@ function renderSignedOut() {
   const footer = document.createElement('div');
   footer.className = 'signed-out-actions';
   footer.append(
-    createButton('Sign Up', 'secondary', () => {
-      window.open('https://app.jov.ie/sign-up', '_blank');
-    }),
-    createButton('Log In', 'primary', () => {
+    createButton('Sign In', 'primary', () => {
       window.open('https://app.jov.ie/sign-in', '_blank');
     })
   );
 
-  renderShell([section, footer]);
+  renderShell([section, footer], { showPromptDock: false, showTopRail: false });
 }
 
 function renderEmptyState(titleText: string, bodyText: string) {
@@ -1185,7 +1193,9 @@ function renderReady(
       );
     }
 
-    children.push(actionTray);
+    if (actionTray.childElementCount > 0) {
+      children.push(actionTray);
+    }
   }
 
   renderShell(children);
