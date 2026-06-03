@@ -8,21 +8,21 @@ const ITEMS: DspAvatarItem[] = [
     status: 'pending',
     label: 'Apple Music',
     glyph: 'A',
-    colorClass: 'bg-rose-500',
+    color: '#FA243C',
   },
   {
     id: 'spotify',
     status: 'live',
     label: 'Spotify',
     glyph: 'S',
-    colorClass: 'bg-emerald-500',
+    color: '#1DB954',
   },
   {
     id: 'youtube',
     status: 'missing',
     label: 'YouTube',
     glyph: 'Y',
-    colorClass: 'bg-red-500',
+    color: '#FF0000',
   },
 ];
 
@@ -56,6 +56,22 @@ describe('DspAvatarStack', () => {
 
   it('keeps the popover above shell chrome', () => {
     render(<DspAvatarStack dsps={ITEMS} />);
-    expect(screen.getByRole('tooltip').className).toContain('z-[150]');
+    expect(screen.getByRole('tooltip')).toHaveClass(
+      'system-b-dsp-avatar-stack-popover'
+    );
+  });
+
+  it('uses canonical DSP brand colors instead of Tailwind color classes', () => {
+    render(<DspAvatarStack dsps={ITEMS} />);
+
+    const primary = screen.getAllByText('S')[0];
+    const missing = screen.getAllByText('Y')[0];
+    const liveDot = document.querySelector('.system-b-dsp-status-dot-live');
+
+    expect(primary).toHaveStyle({ '--system-b-dsp-avatar-color': '#1DB954' });
+    expect(primary.className).not.toContain('bg-emerald');
+    expect(missing).toHaveStyle({ '--system-b-dsp-avatar-color': '#FF0000' });
+    expect(missing.className).toContain('opacity-45');
+    expect(liveDot?.className).not.toContain('bg-emerald');
   });
 });

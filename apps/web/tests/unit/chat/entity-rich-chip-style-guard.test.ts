@@ -7,8 +7,10 @@ const webRoot = path.resolve(__dirname, '../../..');
 const guardedFiles = [
   'components/jovie/components/ChatGenerationArtifactSurface.tsx',
   'components/jovie/components/ChatPitchCard.tsx',
+  'components/jovie/components/EntityChip.tsx',
   'components/jovie/components/EntityChipPopover.tsx',
   'components/jovie/components/EntityPreviewPane.tsx',
+  'components/shell/DspAvatarStack.tsx',
 ];
 
 const rawVisualPatterns = [
@@ -22,7 +24,7 @@ const rawVisualPatterns = [
 ];
 
 describe('entity rich chip System B style guard', () => {
-  it('keeps touched chip, preview, and artifact visuals on named primitives', () => {
+  it('keeps touched chip, preview, DSP, and artifact visuals on named primitives', () => {
     for (const file of guardedFiles) {
       const source = readFileSync(path.join(webRoot, file), 'utf8');
       const offenders = rawVisualPatterns

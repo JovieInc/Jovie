@@ -4,50 +4,50 @@ import type {
 } from '@/components/shell/DspAvatarStack';
 import type { ReleaseStatus } from '@/components/shell/StatusBadge';
 import type { ReleaseViewModel } from '@/lib/discography/types';
+import { DSP_CONFIGS } from '@/lib/dsp-registry';
 
 /**
  * Major DSPs surfaced in the shell-v1 release row's stacked avatars. Order
  * matches the visual sort: live providers come first regardless, but among
  * equal-status providers this is the tiebreaker.
  *
- * Glyph + colorClass per DSP — kept short (1 letter) so the 20px avatar
- * stays legible. Brand colors are ~70% saturation tokens shipped with
- * Tailwind so they harmonize with the dark surface.
+ * Glyph + brand color per DSP — kept short (1 letter) so the 20px avatar
+ * stays legible. Colors come from the canonical DSP registry.
  */
 const SHELL_DSP_META: ReadonlyArray<{
   readonly id: string;
   readonly providerKey: 'spotify' | 'apple_music' | 'youtube_music' | 'tidal';
   readonly label: string;
   readonly glyph: string;
-  readonly colorClass: string;
+  readonly color: string;
 }> = [
   {
     id: 'spotify',
     providerKey: 'spotify',
     label: 'Spotify',
     glyph: 'S',
-    colorClass: 'bg-emerald-500/90',
+    color: DSP_CONFIGS.spotify.color,
   },
   {
     id: 'apple_music',
     providerKey: 'apple_music',
     label: 'Apple Music',
     glyph: 'A',
-    colorClass: 'bg-rose-400/90',
+    color: DSP_CONFIGS.apple_music.color,
   },
   {
     id: 'youtube_music',
     providerKey: 'youtube_music',
     label: 'YouTube Music',
     glyph: 'Y',
-    colorClass: 'bg-red-500/90',
+    color: DSP_CONFIGS.youtube_music.color,
   },
   {
     id: 'tidal',
     providerKey: 'tidal',
     label: 'TIDAL',
     glyph: 'T',
-    colorClass: 'bg-sky-400/90',
+    color: DSP_CONFIGS.tidal.color,
   },
 ];
 
@@ -72,13 +72,13 @@ export function releaseToDspItems(release: ReleaseViewModel): DspAvatarItem[] {
         id: meta.id,
         label: meta.label,
         glyph: meta.glyph,
-        colorClass: meta.colorClass,
+        color: meta.color,
         status: providersByKey.has(meta.providerKey) ? 'live' : 'missing',
       }) satisfies {
         id: string;
         label: string;
         glyph: string;
-        colorClass: string;
+        color: string;
         status: DspStatus;
       }
   );

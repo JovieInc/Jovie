@@ -92,39 +92,7 @@ const RELEASE_TYPE_LABELS: Record<string, string> = {
   other: 'Other',
 };
 
-const PROVIDER_COLOR_CLASS: Partial<Record<ProviderKey, string>> = {
-  spotify: 'bg-emerald-500/90',
-  apple_music: 'bg-rose-400/90',
-  youtube: 'bg-red-500/90',
-  youtube_music: 'bg-red-500/90',
-  soundcloud: 'bg-orange-400/90',
-  deezer: 'bg-violet-400/90',
-  tidal: 'bg-sky-400/90',
-  amazon_music: 'bg-blue-400/90',
-  bandcamp: 'bg-cyan-500/90',
-  beatport: 'bg-lime-400/90',
-  pandora: 'bg-blue-500/90',
-  napster: 'bg-indigo-400/90',
-  audiomack: 'bg-amber-400/90',
-  qobuz: 'bg-yellow-500/90',
-  anghami: 'bg-purple-400/90',
-  boomplay: 'bg-teal-500/90',
-  iheartradio: 'bg-red-600/90',
-  tiktok: 'bg-fuchsia-400/90',
-  amazon: 'bg-blue-400/90',
-  awa: 'bg-pink-400/90',
-  audius: 'bg-orange-500/90',
-  flo: 'bg-cyan-400/90',
-  gaana: 'bg-pink-500/90',
-  jio_saavn: 'bg-green-500/90',
-  joox: 'bg-emerald-400/90',
-  kkbox: 'bg-blue-600/90',
-  line_music: 'bg-green-400/90',
-  netease: 'bg-red-400/90',
-  qq_music: 'bg-green-600/90',
-  trebel: 'bg-amber-500/90',
-  yandex: 'bg-yellow-400/90',
-};
+const DEFAULT_DSP_COLOR = 'var(--color-text-quaternary-token)';
 
 function formatCooldown(remainingMs: number): string {
   if (remainingMs <= 0) return '';
@@ -277,7 +245,7 @@ function getDspAvatarItems(
       }),
       label,
       glyph: getProviderGlyph(label, provider.key),
-      colorClass: PROVIDER_COLOR_CLASS[provider.key] ?? 'bg-surface-2',
+      color: providerConfig[provider.key]?.accent ?? DEFAULT_DSP_COLOR,
     };
   });
 
@@ -290,7 +258,7 @@ function getDspAvatarItems(
         status: 'missing' as const,
         label,
         glyph: getProviderGlyph(label, key),
-        colorClass: PROVIDER_COLOR_CLASS[key] ?? 'bg-surface-2',
+        color: providerConfig[key]?.accent ?? DEFAULT_DSP_COLOR,
       };
     });
 

@@ -154,7 +154,7 @@ export function EntityChipPopover({
           onKeyDown={handleKeyDown}
           className={cn(
             'm-0 inline-flex cursor-pointer appearance-none items-baseline align-baseline border-0 bg-transparent p-0',
-            'rounded-md focus:outline-none focus-visible:outline-none focus-ring'
+            'rounded-full focus:outline-none focus-visible:outline-none focus-ring'
           )}
           data-testid='entity-chip-popover-trigger'
         >
@@ -219,13 +219,13 @@ function EntityChipPopoverBody({
             alt=''
             width={48}
             height={48}
-            className='h-12 w-12 rounded-md border border-subtle object-cover shadow-app-control'
+            className='h-12 w-12 rounded-xl border border-subtle object-cover shadow-app-control'
             aria-hidden
           />
         ) : (
           <div
             aria-hidden
-            className='flex h-12 w-12 items-center justify-center rounded-md border border-subtle bg-surface-1 text-app font-caption text-primary-token shadow-app-control'
+            className='flex h-12 w-12 items-center justify-center rounded-xl border border-subtle bg-surface-1 text-app font-caption text-primary-token shadow-app-control'
           >
             {getInitials(label) || '·'}
           </div>
@@ -250,7 +250,7 @@ function EntityChipPopoverBody({
           <button
             type='button'
             onClick={onOpenEntity}
-            className='mt-2 inline-flex items-center gap-1 rounded-md px-1 py-0.5 text-2xs font-caption text-secondary-token transition-colors duration-subtle ease-subtle hover:bg-surface-1 hover:text-primary-token focus:outline-none focus-visible:outline-none focus-ring'
+            className='mt-2 inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-2xs font-caption text-secondary-token transition-colors duration-fast ease-subtle hover:bg-surface-1 hover:text-primary-token focus:outline-none focus-visible:outline-none focus-ring'
           >
             Open {KIND_PREFIX[kind].toLowerCase()}
             <ArrowUpRight className='h-3 w-3' />
