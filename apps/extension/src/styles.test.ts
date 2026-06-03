@@ -7,7 +7,12 @@ const stylesPath = resolve(
   dirname(fileURLToPath(import.meta.url)),
   'styles.css'
 );
+const sidepanelPath = resolve(
+  dirname(fileURLToPath(import.meta.url)),
+  'sidepanel.ts'
+);
 const styles = readFileSync(stylesPath, 'utf8');
+const sidepanel = readFileSync(sidepanelPath, 'utf8');
 const stylesWithoutComments = styles.replace(/\/\*[\s\S]*?\*\//g, '');
 const rootBlockMatch = stylesWithoutComments.match(/:root\s*{[\s\S]*?\n}/);
 const stylesOutsideRoot = stylesWithoutComments.replace(
@@ -17,12 +22,16 @@ const stylesOutsideRoot = stylesWithoutComments.replace(
 
 describe('extension sidepanel System B styles', () => {
   it('declares a local System B bridge token block', () => {
+    expect(rootBlockMatch?.[0]).toContain('color-scheme: dark');
     expect(rootBlockMatch?.[0]).toContain('--extension-system-b-bg-base');
     expect(rootBlockMatch?.[0]).toContain('--extension-system-b-bg-surface-1');
     expect(rootBlockMatch?.[0]).toContain('--extension-system-b-text-primary');
     expect(rootBlockMatch?.[0]).toContain('--extension-system-b-border-subtle');
     expect(rootBlockMatch?.[0]).toContain('--extension-system-b-radius-lg');
     expect(rootBlockMatch?.[0]).toContain('--extension-system-b-dock-min-height');
+    expect(rootBlockMatch?.[0]).toContain(
+      '--extension-system-b-text-primary: #f7f8f8'
+    );
   });
 
   it('keeps raw color literals inside the token bridge only', () => {
@@ -34,6 +43,7 @@ describe('extension sidepanel System B styles', () => {
     expect(stylesOutsideRoot).not.toMatch(/\b(?:linear|radial)-gradient\(/);
     expect(stylesOutsideRoot).not.toMatch(/text-transform:\s*uppercase/);
     expect(stylesOutsideRoot).not.toMatch(/letter-spacing:(?!\s*0\b)/);
+    expect(stylesOutsideRoot).not.toMatch(/[{;]\s*transform:/);
   });
 
   it('uses tokens for radius and shadow recipes outside the token bridge', () => {
@@ -48,5 +58,16 @@ describe('extension sidepanel System B styles', () => {
     );
     expect(styles).toContain('.prompt-dock-stacked');
     expect(stylesOutsideRoot).not.toMatch(/position:\s*fixed/);
+  });
+
+  it('keeps the signed-out sidepanel to one System B sign-in action', () => {
+    expect(sidepanel).toContain("title.textContent = 'Sign In To Continue'");
+    expect(sidepanel).toContain("createButton('Sign In', 'primary'");
+    expect(sidepanel).toContain("window.open('https://app.jov.ie/sign-in'");
+    expect(sidepanel).toContain('showTopRail: false');
+    expect(sidepanel).toContain('showPromptDock: false');
+    expect(sidepanel).not.toContain('https://app.jov.ie/sign-up');
+    expect(sidepanel).not.toContain("'Log In'");
+    expect(sidepanel).not.toContain('Bring Jovie Into This Page');
   });
 });

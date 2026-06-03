@@ -1,24 +1,24 @@
 :root {
-  color-scheme: light;
+  color-scheme: dark;
   font-family:
     Inter, "SF Pro Text", "SF Pro Display", -apple-system, BlinkMacSystemFont,
     "Segoe UI", sans-serif;
 
   /* Local System B bridge tokens for the Chrome extension runtime. */
-  --extension-system-b-bg-base: #f5f5f5;
-  --extension-system-b-bg-surface-0: #f2f3f5;
-  --extension-system-b-bg-surface-1: #ffffff;
-  --extension-system-b-bg-surface-2: #ebecef;
-  --extension-system-b-text-primary: #0c0c0c;
-  --extension-system-b-text-secondary: #2e2f31;
-  --extension-system-b-text-tertiary: #5a5b5d;
-  --extension-system-b-text-quaternary: #8b8d92;
-  --extension-system-b-border-subtle: rgb(12 12 12 / 0.08);
-  --extension-system-b-border-default: rgb(12 12 12 / 0.12);
-  --extension-system-b-border-strong: rgb(12 12 12 / 0.18);
-  --extension-system-b-focus: #7170ff;
-  --extension-system-b-shadow-card: 0 1px 2px rgb(12 12 12 / 0.04);
-  --extension-system-b-shadow-dock: 0 8px 24px rgb(12 12 12 / 0.08);
+  --extension-system-b-bg-base: #06070a;
+  --extension-system-b-bg-surface-0: #0a0b0e;
+  --extension-system-b-bg-surface-1: #101216;
+  --extension-system-b-bg-surface-2: #171a20;
+  --extension-system-b-text-primary: #f7f8f8;
+  --extension-system-b-text-secondary: #d8dadd;
+  --extension-system-b-text-tertiary: #969799;
+  --extension-system-b-text-quaternary: #6f7277;
+  --extension-system-b-border-subtle: rgb(255 255 255 / 0.07);
+  --extension-system-b-border-default: rgb(255 255 255 / 0.12);
+  --extension-system-b-border-strong: rgb(255 255 255 / 0.18);
+  --extension-system-b-focus: #0070f3;
+  --extension-system-b-shadow-card: 0 1px 2px rgb(0 0 0 / 0.24);
+  --extension-system-b-shadow-dock: 0 12px 28px rgb(0 0 0 / 0.36);
   --extension-system-b-radius-xs: 6px;
   --extension-system-b-radius-sm: 8px;
   --extension-system-b-radius-md: 10px;
@@ -83,6 +83,10 @@ button {
   background: var(--extension-system-b-bg-base);
 }
 
+.shell[data-has-top-rail="false"] {
+  justify-content: space-between;
+}
+
 .top-rail {
   display: flex;
   min-height: var(--extension-system-b-header-height);
@@ -95,7 +99,7 @@ button {
 
 .logo-mark {
   display: inline-flex;
-  color: var(--extension-system-b-text-secondary);
+  color: var(--extension-system-b-text-primary);
 }
 
 .top-rail-copy {
@@ -354,7 +358,7 @@ button {
 
 .button-primary {
   background: var(--extension-system-b-text-primary);
-  color: var(--extension-system-b-bg-surface-1);
+  color: var(--extension-system-b-bg-base);
 }
 
 .button-primary:hover {
@@ -459,7 +463,7 @@ button {
 }
 
 .empty-hero .logo-mark {
-  color: var(--extension-system-b-text-quaternary);
+  color: var(--extension-system-b-text-primary);
 }
 
 .discovery-card {
