@@ -12,14 +12,16 @@ import { X } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { cn } from '@/lib/utils';
 import { TableCountBadge } from '../atoms/TableCountBadge';
+import {
+  PAGE_TOOLBAR_ACTION_BUTTON_CLASS,
+  TABLE_TOOLBAR_LEFT_CLASS,
+  TABLE_TOOLBAR_MENU_BUTTON_CLASS,
+  TABLE_TOOLBAR_RIGHT_CLASS,
+  TABLE_TOOLBAR_SHELL_CLASS,
+  type TableToolbarBulkAction,
+} from './PageToolbar';
 
-export interface BulkAction {
-  readonly label: string;
-  readonly icon?: ReactNode;
-  readonly onClick: () => void;
-  readonly disabled?: boolean;
-  readonly variant?: 'default' | 'destructive';
-}
+export type BulkAction = TableToolbarBulkAction;
 
 export interface TableStandardToolbarProps {
   /** Number of selected items */
@@ -82,14 +84,9 @@ export function TableStandardToolbar({
   const hasSelection = selectedCount > 0;
 
   return (
-    <div
-      className={cn(
-        'flex min-w-0 items-center gap-3 overflow-x-auto overflow-y-hidden border-b border-[color-mix(in_oklab,var(--linear-app-shell-border)_72%,transparent)] bg-transparent px-3.5 py-2 scroll-smooth [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden',
-        className
-      )}
-    >
+    <div className={cn(TABLE_TOOLBAR_SHELL_CLASS, className)}>
       {/* Left section: Checkbox + count badge + bulk actions */}
-      <div className='flex shrink-0 items-center gap-3'>
+      <div className={TABLE_TOOLBAR_LEFT_CLASS}>
         {onToggleSelectAll && (
           <Checkbox
             checked={headerCheckboxState}
@@ -107,7 +104,11 @@ export function TableStandardToolbar({
         {hasSelection && bulkActions.length > 0 && (
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant='secondary' size='sm'>
+              <Button
+                variant='ghost'
+                size='sm'
+                className={TABLE_TOOLBAR_MENU_BUTTON_CLASS}
+              >
                 Actions
               </Button>
             </DropdownMenuTrigger>
@@ -131,7 +132,7 @@ export function TableStandardToolbar({
       </div>
 
       {/* Right section: Search, export, primary actions, clear */}
-      <div className='ml-auto flex shrink-0 items-center gap-3'>
+      <div className={TABLE_TOOLBAR_RIGHT_CLASS}>
         {/* Search - shown when no selection */}
         {!hasSelection && searchComponent}
 
@@ -147,9 +148,9 @@ export function TableStandardToolbar({
             variant='ghost'
             size='sm'
             onClick={onClearSelection}
-            className='h-7 gap-1 rounded-full border border-transparent px-2 text-secondary-token transition-[background-color,border-color,color] duration-subtle hover:border-subtle hover:bg-surface-0 hover:text-primary-token'
+            className={PAGE_TOOLBAR_ACTION_BUTTON_CLASS}
           >
-            <X className='h-4 w-4' />
+            <X className='h-3.5 w-3.5' />
             Clear
           </Button>
         )}

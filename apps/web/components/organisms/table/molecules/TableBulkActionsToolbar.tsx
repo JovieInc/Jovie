@@ -10,13 +10,14 @@ import {
 import { X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { TableCountBadge } from '../atoms/TableCountBadge';
+import {
+  PAGE_TOOLBAR_ACTION_BUTTON_CLASS,
+  TABLE_TOOLBAR_MENU_BUTTON_CLASS,
+  TABLE_TOOLBAR_OVERLAY_CLASS,
+  type TableToolbarBulkAction,
+} from './PageToolbar';
 
-export interface BulkAction {
-  label: string;
-  icon?: React.ReactNode;
-  onClick: () => void;
-  variant?: 'default' | 'destructive';
-}
+export type BulkAction = TableToolbarBulkAction;
 
 export interface TableBulkActionsToolbarProps {
   readonly selectedCount: number;
@@ -31,14 +32,29 @@ export function TableBulkActionsToolbar({
   actions,
   className,
 }: TableBulkActionsToolbarProps) {
-  if (selectedCount === 0) return null;
+  const hasSelection = selectedCount > 0;
+
+  if (!hasSelection) {
+    return (
+      <div
+        aria-hidden='true'
+        data-state='hidden'
+        className={cn(
+          TABLE_TOOLBAR_OVERLAY_CLASS,
+          'pointer-events-none opacity-0',
+          className
+        )}
+      >
+        <span className='h-7 w-px' />
+      </div>
+    );
+  }
 
   return (
     <div
-      className={cn(
-        'flex flex-wrap items-center gap-2 bg-surface-1 px-3 py-2.5 sm:gap-3 sm:px-4 sm:py-3',
-        className
-      )}
+      aria-hidden='false'
+      data-state='visible'
+      className={cn(TABLE_TOOLBAR_OVERLAY_CLASS, 'opacity-100', className)}
     >
       {/* Selected count - totalCount is unused since this toolbar only renders when selectedCount > 0 */}
       <TableCountBadge
@@ -51,7 +67,11 @@ export function TableBulkActionsToolbar({
       {actions.length > 0 && (
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant='secondary' size='sm'>
+            <Button
+              variant='ghost'
+              size='sm'
+              className={TABLE_TOOLBAR_MENU_BUTTON_CLASS}
+            >
               Actions
             </Button>
           </DropdownMenuTrigger>
@@ -60,6 +80,7 @@ export function TableBulkActionsToolbar({
               <DropdownMenuItem
                 key={action.label}
                 onClick={action.onClick}
+                disabled={action.disabled}
                 className={
                   action.variant === 'destructive'
                     ? 'text-destructive focus:text-destructive'
@@ -67,7 +88,7 @@ export function TableBulkActionsToolbar({
                 }
               >
                 {action.icon && (
-                  <span className='h-4 w-4 flex items-center justify-center [&>svg]:h-4 [&>svg]:w-4'>
+                  <span className='flex h-3.5 w-3.5 items-center justify-center [&>svg]:h-3.5 [&>svg]:w-3.5'>
                     {action.icon}
                   </span>
                 )}
@@ -83,9 +104,9 @@ export function TableBulkActionsToolbar({
         variant='ghost'
         size='sm'
         onClick={onClearSelection}
-        className='ml-auto h-7 rounded-full border border-transparent px-2 text-secondary-token transition-[background-color,border-color,color] duration-subtle hover:border-subtle hover:bg-surface-0 hover:text-primary-token'
+        className={cn(PAGE_TOOLBAR_ACTION_BUTTON_CLASS, 'ml-auto')}
       >
-        <X className='h-4 w-4 mr-1' />
+        <X className='h-3.5 w-3.5' />
         Clear
       </Button>
     </div>

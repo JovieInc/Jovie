@@ -138,6 +138,7 @@ export type {
 } from './molecules/HeaderBulkActions';
 export { HeaderBulkActions } from './molecules/HeaderBulkActions';
 export { LoadingTableBody } from './molecules/LoadingTableBody';
+export type { TableToolbarBulkAction } from './molecules/PageToolbar';
 export {
   PAGE_TOOLBAR_ACTION_ACTIVE_CLASS,
   PAGE_TOOLBAR_ACTION_BUTTON_CLASS,
@@ -155,6 +156,11 @@ export {
   PageToolbar,
   PageToolbarActionButton,
   PageToolbarTabButton,
+  TABLE_TOOLBAR_LEFT_CLASS,
+  TABLE_TOOLBAR_MENU_BUTTON_CLASS,
+  TABLE_TOOLBAR_OVERLAY_CLASS,
+  TABLE_TOOLBAR_RIGHT_CLASS,
+  TABLE_TOOLBAR_SHELL_CLASS,
 } from './molecules/PageToolbar';
 export type { PageToolbarSearchFormProps } from './molecules/PageToolbarSearchForm';
 export { PageToolbarSearchForm } from './molecules/PageToolbarSearchForm';
