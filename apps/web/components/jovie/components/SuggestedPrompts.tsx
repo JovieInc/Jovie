@@ -21,7 +21,6 @@ import {
 } from '../types';
 import {
   CHAT_PROMPT_RAIL_CLASS,
-  CHAT_PROMPT_RAIL_MASK_STYLE,
   CHAT_PROMPT_RAIL_SCROLL_CLASS,
   getChatPromptPillClass,
 } from './chat-prompt-styles';
@@ -91,7 +90,7 @@ function SuggestionPill({
       aria-disabled={disabled}
       title={disabledReason ?? undefined}
     >
-      <span className='flex h-4 w-4 shrink-0 items-center justify-center text-tertiary-token transition-colors duration-subtle group-hover:text-primary-token'>
+      <span className='flex h-4 w-4 shrink-0 items-center justify-center text-tertiary-token transition-colors duration-fast group-hover:text-primary-token'>
         {IconComponent && <IconComponent className='h-3.5 w-3.5 shrink-0' />}
       </span>
       <span className='min-w-0 flex-1 truncate leading-none'>
@@ -205,8 +204,8 @@ export function SuggestedPrompts({
   // so dimmed chips can't be reached by Tab/Shift+Tab while the slash picker
   // is open. `aria-hidden` on the wrapper hides them from SR.
   const dimClass = dimmed
-    ? 'opacity-0 transition-opacity duration-subtle ease-out'
-    : 'opacity-100 transition-opacity duration-subtle ease-out';
+    ? 'opacity-0 transition-opacity duration-fast ease-out'
+    : 'opacity-100 transition-opacity duration-fast ease-out';
 
   if (layout === 'grid') {
     const primarySuggestions = promptSuggestionsWithCapabilities.slice(0, 3);
@@ -217,12 +216,12 @@ export function SuggestedPrompts({
 
     return (
       <div
-        className={cn('mx-auto w-full max-w-[35rem]', dimClass)}
+        className={cn('system-b-chat-suggested-prompts-grid', dimClass)}
         aria-hidden={dimmed}
         inert={dimmed}
         data-testid='suggested-prompts-grid'
       >
-        <div className='grid grid-cols-[repeat(auto-fit,minmax(10.75rem,1fr))] gap-2'>
+        <div className='system-b-chat-suggested-prompts-primary-grid'>
           {primarySuggestions.map(suggestion => (
             <SuggestionPill
               key={suggestion.label}
@@ -261,10 +260,7 @@ export function SuggestedPrompts({
   if (layout === 'flat') {
     return (
       <div
-        className={cn(
-          'mx-auto flex w-full max-w-[35rem] flex-col gap-1.5',
-          dimClass
-        )}
+        className={cn('system-b-chat-suggested-prompts-flat', dimClass)}
         aria-hidden={dimmed}
         inert={dimmed}
         data-testid='suggested-prompts-flat'
@@ -289,7 +285,7 @@ export function SuggestedPrompts({
               disabled={
                 suggestion.label === 'Generate album art' && albumArtDisabled
               }
-              className='group flex w-full items-center gap-2 rounded-full bg-transparent px-3 py-2 text-left text-[12.5px] text-secondary-token transition-[background-color,color] duration-subtle enabled:hover:bg-surface-0 enabled:hover:text-primary-token disabled:cursor-not-allowed disabled:opacity-55 focus-visible:outline-none focus-visible:border-(--linear-border-focus) focus-visible:bg-surface-0 focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/12'
+              className='group system-b-chat-suggested-prompts-flat-button'
               aria-label={suggestion.label}
               title={
                 suggestion.label === 'Generate album art'
@@ -297,7 +293,7 @@ export function SuggestedPrompts({
                   : undefined
               }
             >
-              <span className='flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-tertiary-token transition-colors duration-subtle group-hover:text-primary-token'>
+              <span className='flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-tertiary-token transition-colors duration-fast group-hover:text-primary-token'>
                 {IconComponent ? (
                   <IconComponent className='h-3.5 w-3.5 shrink-0' />
                 ) : null}
@@ -312,7 +308,7 @@ export function SuggestedPrompts({
 
   return (
     <div
-      className={cn('w-full max-w-[46rem]', dimClass)}
+      className={cn('system-b-chat-suggested-prompts-rail-wrapper', dimClass)}
       aria-hidden={dimmed}
       inert={dimmed}
     >
@@ -321,7 +317,6 @@ export function SuggestedPrompts({
           CHAT_PROMPT_RAIL_SCROLL_CLASS,
           'overscroll-x-contain px-1 sm:px-0'
         )}
-        style={CHAT_PROMPT_RAIL_MASK_STYLE}
         data-testid='suggested-prompts-rail'
       >
         <div

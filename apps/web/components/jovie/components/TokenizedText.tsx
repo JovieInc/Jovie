@@ -92,10 +92,10 @@ function TranscriptSkillChip({ id, tone }: TranscriptSkillChipProps) {
   return (
     <span
       className={cn(
-        'mx-0.5 inline-flex h-6 max-w-[220px] items-center gap-1.5 rounded-[8px] border px-2 align-[-0.2em] text-[12px] font-medium leading-none shadow-none',
+        'system-b-transcript-skill-chip',
         tone === 'onLight'
-          ? 'border-black/10 bg-black/[0.055] text-[#111216]'
-          : 'border-white/[0.085] bg-white/[0.035] text-primary-token'
+          ? 'system-b-transcript-skill-chip-light'
+          : 'system-b-transcript-skill-chip-dark'
       )}
       title={label}
       data-testid='transcript-skill-chip'
@@ -103,8 +103,10 @@ function TranscriptSkillChip({ id, tone }: TranscriptSkillChipProps) {
       <span
         aria-hidden
         className={cn(
-          'h-1.5 w-1.5 shrink-0 rounded-full',
-          tone === 'onLight' ? 'bg-black/45' : 'bg-tertiary-token'
+          'system-b-transcript-skill-chip-dot',
+          tone === 'onLight'
+            ? 'system-b-transcript-skill-chip-dot-light'
+            : 'system-b-transcript-skill-chip-dot-dark'
         )}
       />
       <span className='min-w-0 truncate'>{label}</span>

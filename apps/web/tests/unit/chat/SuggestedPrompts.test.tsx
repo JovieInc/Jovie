@@ -32,12 +32,12 @@ describe('SuggestedPrompts', () => {
     );
 
     const rail = getByTestId('suggested-prompts-rail');
-    expect(rail.className).toContain('overflow-x-auto');
+    expect(rail.className).toContain('system-b-chat-prompt-rail-scroll');
     expect(rail.className).not.toContain('scroll-smooth');
     expect(rail.className).not.toContain('md:overflow-visible');
     const row = rail.firstElementChild;
+    expect(row?.className).toContain('system-b-chat-prompt-rail');
     expect(row?.className).toContain('snap-x');
-    expect(row?.className).toContain('flex-nowrap');
     expect(row?.className).not.toContain('flex-wrap');
     expect(row?.className).toContain('whitespace-nowrap');
   });
