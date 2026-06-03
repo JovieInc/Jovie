@@ -1,6 +1,4 @@
-import { Button } from '@jovie/ui';
 import {
-  ArrowRight,
   Mail,
   MapPin,
   Mic,
@@ -11,9 +9,11 @@ import {
   Store,
   Users,
 } from 'lucide-react';
-import Link from 'next/link';
-import { MarketingContainer, MarketingHero } from '@/components/marketing';
-import { APP_ROUTES } from '@/constants/routes';
+import {
+  MarketingContainer,
+  MarketingHero,
+  MarketingPageShell,
+} from '@/components/marketing';
 import { ClaimHandleForm } from '@/features/home/claim-handle';
 
 /* -------------------------------------------------------------------------- */
@@ -74,14 +74,7 @@ const STEPS = [
 
 function HowItWorksSection() {
   return (
-    <section
-      className='relative z-10'
-      style={{
-        paddingTop: 'var(--linear-section-pt-lg)',
-        paddingBottom: 'var(--linear-section-pb-md)',
-        backgroundColor: 'var(--linear-bg-page)',
-      }}
-    >
+    <section className='relative z-10 bg-surface-page pt-(--linear-section-pt-lg) pb-(--linear-section-pb-md)'>
       <MarketingContainer width='landing'>
         <div className='mx-auto max-w-[1200px]'>
           <div className='homepage-section-intro'>
@@ -154,14 +147,7 @@ const BENEFITS = [
 
 function BenefitsSection() {
   return (
-    <section
-      className='relative z-10'
-      style={{
-        paddingTop: 'var(--linear-section-pt-md)',
-        paddingBottom: 'var(--linear-section-pb-md)',
-        backgroundColor: 'var(--linear-bg-footer)',
-      }}
-    >
+    <section className='relative z-10 bg-base pt-(--linear-section-pt-md) pb-(--linear-section-pb-md)'>
       <MarketingContainer width='landing'>
         <div className='mx-auto max-w-[1200px]'>
           <div className='marketing-divider mb-14' />
@@ -218,14 +204,7 @@ const USE_CASES = [
 
 function SocialProofSection() {
   return (
-    <section
-      className='relative z-10'
-      style={{
-        paddingTop: 'var(--linear-section-pt-md)',
-        paddingBottom: 'var(--linear-section-pb-md)',
-        backgroundColor: 'var(--linear-bg-page)',
-      }}
-    >
+    <section className='relative z-10 bg-surface-page pt-(--linear-section-pt-md) pb-(--linear-section-pb-md)'>
       <MarketingContainer width='landing'>
         <div className='mx-auto max-w-[1200px]'>
           <div className='homepage-section-intro'>
@@ -270,14 +249,7 @@ function SocialProofSection() {
 
 function TipsFinalCTA() {
   return (
-    <section
-      className='relative z-10'
-      style={{
-        paddingTop: 'var(--linear-section-pt-lg)',
-        paddingBottom: '140px',
-        backgroundColor: 'var(--linear-bg-page)',
-      }}
-    >
+    <section className='relative z-10 bg-surface-page pt-(--linear-section-pt-lg) pb-(--linear-section-pb-lg)'>
       <MarketingContainer width='landing'>
         <div className='marketing-divider mb-12' />
 
@@ -291,14 +263,6 @@ function TipsFinalCTA() {
               Keep the QR code simple, the follow-up automatic, and the listener
               path clean.
             </p>
-            <div className='mt-6'>
-              <Button size='lg' className='public-action-primary' asChild>
-                <Link href={APP_ROUTES.SIGNUP}>
-                  Claim Your Handle
-                  <ArrowRight className='ml-2 h-4 w-4' />
-                </Link>
-              </Button>
-            </div>
           </div>
 
           <div className='homepage-surface-card rounded-[1rem] p-2'>
@@ -316,18 +280,12 @@ function TipsFinalCTA() {
 
 export function PayLanding() {
   return (
-    <div
-      className='relative min-h-screen'
-      style={{
-        backgroundColor: 'var(--linear-bg-footer)',
-        color: 'var(--linear-text-primary)',
-      }}
-    >
+    <MarketingPageShell className='bg-base text-primary-token'>
       <TipsHero />
       <HowItWorksSection />
       <BenefitsSection />
       <SocialProofSection />
       <TipsFinalCTA />
-    </div>
+    </MarketingPageShell>
   );
 }
