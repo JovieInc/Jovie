@@ -175,6 +175,7 @@ import { ThreadVideoCard } from '@/components/shell/ThreadVideoCard';
 import { ThreadView as ShellThreadView } from '@/components/shell/ThreadView';
 import { Tooltip } from '@/components/shell/Tooltip';
 import { TypeBadge } from '@/components/shell/TypeBadge';
+import { DSP_CONFIGS } from '@/lib/dsp-registry';
 import { dropDateMeta } from '@/lib/format-drop-date';
 import { relativeDate as formatRelativeDate } from '@/lib/format-relative-date';
 // ---------------------------------------------------------------------------
@@ -853,10 +854,10 @@ const DSP_GLYPH: Record<DspKey, string> = {
   tidal: 'T',
 };
 const DSP_COLOR: Record<DspKey, string> = {
-  spotify: 'bg-emerald-500/90',
-  apple: 'bg-rose-400/90',
-  youtube: 'bg-red-500/90',
-  tidal: 'bg-sky-400/90',
+  spotify: DSP_CONFIGS.spotify.color,
+  apple: DSP_CONFIGS.apple_music.color,
+  youtube: DSP_CONFIGS.youtube_music.color,
+  tidal: DSP_CONFIGS.tidal.color,
 };
 // Calm DSP status dots — live is the default state and stays neutral.
 // Errors retain a clear rose so they read as needing attention.
@@ -873,7 +874,7 @@ function releaseDspItems(release: Release): DspAvatarItem[] {
     status: release.dsps[dsp],
     label: DSP_LABEL[dsp],
     glyph: DSP_GLYPH[dsp],
-    colorClass: DSP_COLOR[dsp],
+    color: DSP_COLOR[dsp],
   }));
 }
 

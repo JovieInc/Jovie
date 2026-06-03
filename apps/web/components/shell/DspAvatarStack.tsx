@@ -1,5 +1,6 @@
 'use client';
 
+import { type CSSProperties, useId } from 'react';
 import { cn } from '@/lib/utils';
 
 /**
@@ -14,7 +15,7 @@ export type DspStatus = 'live' | 'pending' | 'error' | 'missing';
 
 /**
  * One DSP entry passed to `DspAvatarStack`. Caller owns the brand metadata
- * (color class, single-letter glyph, full label) so the component stays
+ * (brand color, single-letter glyph, full label) so the component stays
  * generic — it has no opinion about which DSPs exist or what their brand
  * tokens are.
  */
@@ -23,15 +24,15 @@ export interface DspAvatarItem {
   readonly status: DspStatus;
   readonly label: string;
   readonly glyph: string;
-  /** Tailwind `bg-*` class used for the avatar fill at non-`missing` states. */
-  readonly colorClass: string;
+  /** Canonical DSP brand color. Missing states render this muted. */
+  readonly color: string;
 }
 
 const STATUS_DOT: Record<DspStatus, string> = {
-  live: 'bg-emerald-400',
-  pending: 'bg-amber-400',
-  error: 'bg-rose-500',
-  missing: 'bg-quaternary-token/60',
+  live: 'system-b-dsp-status-dot-live',
+  pending: 'system-b-dsp-status-dot-pending',
+  error: 'system-b-dsp-status-dot-error',
+  missing: 'system-b-dsp-status-dot-missing',
 };
 
 const STATUS_RANK: Record<DspStatus, number> = {
@@ -57,15 +58,15 @@ const STATUS_LABEL: Record<DspStatus, string> = {
  * preserves the input order's stability across renders.
  *
  * Pure presentational. The caller is expected to pre-define brand metadata
- * (`colorClass`, `glyph`, `label`) per DSP so the component has no built-in
+ * (`color`, `glyph`, `label`) per DSP so the component has no built-in
  * knowledge of specific DSPs.
  *
  * @example
  * ```tsx
  * <DspAvatarStack
  *   dsps={[
- *     { id: 'spotify', status: 'live', label: 'Spotify', glyph: 'S', colorClass: 'bg-emerald-500' },
- *     { id: 'apple', status: 'pending', label: 'Apple Music', glyph: 'A', colorClass: 'bg-rose-500' },
+ *     { id: 'spotify', status: 'live', label: 'Spotify', glyph: 'S', color: DSP_CONFIGS.spotify.color },
+ *     { id: 'apple', status: 'pending', label: 'Apple Music', glyph: 'A', color: DSP_CONFIGS.apple_music.color },
  *   ]}
  * />
  * ```
@@ -77,6 +78,8 @@ export function DspAvatarStack({
   readonly dsps: readonly DspAvatarItem[];
   readonly className?: string;
 }) {
+  const popoverId = useId();
+
   if (dsps.length === 0) return null;
 
   const ordered = [...dsps].sort(
@@ -85,6 +88,9 @@ export function DspAvatarStack({
   const primary = ordered[0];
   const liveCount = ordered.filter(d => d.status === 'live').length;
   const others = Math.max(0, ordered.length - 1);
+  const primaryAvatarStyle = {
+    '--system-b-dsp-avatar-color': primary.color,
+  } as CSSProperties;
 
   return (
     <div
@@ -93,79 +99,91 @@ export function DspAvatarStack({
         className
       )}
     >
-      <span
-        className={cn(
-          'relative h-[20px] w-[20px] rounded-full grid place-items-center text-[9px] font-semibold text-white shrink-0',
-          'ring-2 ring-(--linear-bg-page)',
-          primary.status === 'missing'
-            ? 'bg-quaternary-token/40 opacity-50'
-            : primary.colorClass
-        )}
+      <button
+        aria-describedby={popoverId}
+        aria-label='View DSP distribution details'
+        className='inline-flex items-center gap-1.5 rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-(--system-b-bg-page)'
+        type='button'
       >
-        {primary.glyph}
-        {primary.status === 'pending' && (
-          <span
-            aria-hidden='true'
-            className='absolute -top-0.5 -right-0.5 h-1.5 w-1.5 rounded-full bg-amber-400 ring-1 ring-(--linear-bg-page)'
-          />
-        )}
-        {primary.status === 'error' && (
-          <span
-            aria-hidden='true'
-            className='absolute -top-0.5 -right-0.5 h-1.5 w-1.5 rounded-full bg-rose-500 ring-1 ring-(--linear-bg-page)'
-          />
-        )}
-      </span>
-      {others > 0 && (
-        <span className='inline-flex items-center h-5 px-1.5 rounded text-[10.5px] font-caption tabular-nums text-tertiary-token bg-(--surface-1)/70 border border-(--linear-app-shell-border)'>
-          +{others}
+        <span
+          className={cn(
+            'relative grid h-5 w-5 shrink-0 place-items-center rounded-full bg-(--system-b-dsp-avatar-color) text-3xs font-semibold text-white',
+            'ring-2 ring-(--system-b-bg-page)',
+            primary.status === 'missing'
+              ? 'opacity-40'
+              : 'opacity-75 transition-opacity duration-fast ease-subtle group-hover/dsps:opacity-95 group-focus-within/dsps:opacity-95'
+          )}
+          style={primaryAvatarStyle}
+        >
+          {primary.glyph}
+          {primary.status === 'pending' && (
+            <span
+              aria-hidden='true'
+              className='system-b-dsp-status-dot system-b-dsp-status-dot-pending absolute -top-0.5 -right-0.5 h-1.5 w-1.5 rounded-full ring-1 ring-(--system-b-bg-page)'
+            />
+          )}
+          {primary.status === 'error' && (
+            <span
+              aria-hidden='true'
+              className='system-b-dsp-status-dot system-b-dsp-status-dot-error absolute -top-0.5 -right-0.5 h-1.5 w-1.5 rounded-full ring-1 ring-(--system-b-bg-page)'
+            />
+          )}
         </span>
-      )}
+        {others > 0 && (
+          <span className='inline-flex h-5 items-center rounded-full border border-(--system-b-app-shell-border) bg-surface-1 px-1.5 text-3xs font-caption tabular-nums text-tertiary-token'>
+            +{others}
+          </span>
+        )}
+      </button>
 
       <div
+        id={popoverId}
         role='tooltip'
         className={cn(
-          'pointer-events-none absolute right-0 top-full mt-1.5 z-[150] w-[220px]',
-          'opacity-0 group-hover/dsps:opacity-100 group-hover/dsps:pointer-events-auto',
-          'transition-[opacity] duration-subtle ease-subtle delay-[400ms] group-hover/dsps:delay-[400ms]'
+          'system-b-dsp-avatar-stack-popover pointer-events-none absolute right-0 top-full mt-1.5 w-56',
+          'opacity-0 group-hover/dsps:opacity-100 group-hover/dsps:pointer-events-auto group-focus-within/dsps:opacity-100 group-focus-within/dsps:pointer-events-auto',
+          'transition-[opacity] duration-fast ease-subtle delay-[400ms] group-hover/dsps:delay-[400ms] group-focus-within/dsps:delay-0'
         )}
       >
-        <div className='rounded-md border border-(--linear-app-shell-border) bg-(--linear-app-content-surface)/95 backdrop-blur-xl shadow-[0_8px_28px_rgba(0,0,0,0.32)] overflow-hidden'>
-          <div className='flex items-center justify-between px-2.5 h-7 border-b border-(--linear-app-shell-border)/60'>
-            <span className='text-[10px] uppercase tracking-[0.08em] text-quaternary-token font-semibold'>
+        <div className='overflow-hidden rounded-xl border border-(--system-b-app-shell-border) bg-(--system-b-app-content-surface) shadow-popover backdrop-blur-xl'>
+          <div className='flex h-7 items-center justify-between border-b border-(--system-b-app-shell-border) px-2.5'>
+            <span className='text-3xs font-semibold text-quaternary-token'>
               Distribution
             </span>
-            <span className='text-[10.5px] tabular-nums text-tertiary-token'>
+            <span className='text-3xs tabular-nums text-tertiary-token'>
               {liveCount}/{ordered.length} Live
             </span>
           </div>
-          <div className='max-h-[180px] overflow-y-auto'>
+          <div className='max-h-44 overflow-y-auto'>
             {ordered.map(dsp => (
               <div
                 key={dsp.id}
-                className='flex items-center gap-2 h-7 px-2.5 hover:bg-surface-1/40'
+                className='flex h-7 items-center gap-2 px-2.5 hover:bg-surface-1'
               >
                 <span
                   className={cn(
-                    'h-[14px] w-[14px] rounded-full grid place-items-center text-[8px] font-semibold text-white shrink-0',
-                    dsp.status === 'missing'
-                      ? 'bg-quaternary-token/40 opacity-60'
-                      : dsp.colorClass
+                    'grid h-3.5 w-3.5 shrink-0 place-items-center rounded-full bg-(--system-b-dsp-avatar-color) text-3xs font-semibold text-white',
+                    dsp.status === 'missing' ? 'opacity-45' : 'opacity-90'
                   )}
+                  style={
+                    {
+                      '--system-b-dsp-avatar-color': dsp.color,
+                    } as CSSProperties
+                  }
                 >
                   {dsp.glyph}
                 </span>
-                <span className='flex-1 text-[12px] text-secondary-token truncate'>
+                <span className='min-w-0 flex-1 truncate text-xs text-secondary-token'>
                   {dsp.label}
                 </span>
                 <span className='inline-flex items-center gap-1.5'>
                   <span
                     className={cn(
-                      'h-1.5 w-1.5 rounded-full',
+                      'system-b-dsp-status-dot h-1.5 w-1.5 rounded-full',
                       STATUS_DOT[dsp.status]
                     )}
                   />
-                  <span className='text-[10.5px] uppercase tracking-[0.06em] text-quaternary-token'>
+                  <span className='text-3xs text-quaternary-token'>
                     {STATUS_LABEL[dsp.status]}
                   </span>
                 </span>

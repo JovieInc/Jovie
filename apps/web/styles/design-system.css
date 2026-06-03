@@ -2137,6 +2137,110 @@ body:has(.system-b-download-page) .marketing-glass-header__cta:focus-visible {
    SYSTEM B CHAT ENTITY PREVIEW PRIMITIVES
    ============================================ */
 
+.system-b-entity-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1-5);
+  border-radius: var(--radius-full);
+  user-select: none;
+  vertical-align: baseline;
+}
+
+.system-b-entity-chip[data-entity-variant="input"] {
+  flex-shrink: 0;
+  max-width: 220px;
+  height: 1.75rem;
+  cursor: default;
+  border: 1px solid
+    color-mix(in srgb, var(--jovie-entity-accent) 30%, transparent);
+  background: color-mix(in srgb, var(--jovie-entity-accent) 13%, transparent);
+  padding-inline: var(--space-2);
+  color: color-mix(in srgb, var(--jovie-entity-accent) 72%, white 28%);
+  font-size: var(--text-app);
+  font-weight: var(--font-weight-medium);
+  line-height: 1;
+}
+
+.system-b-entity-chip[data-entity-variant="transcript"] {
+  border: 1px solid
+    color-mix(in srgb, var(--jovie-entity-accent) 22%, transparent);
+  background: color-mix(in srgb, var(--jovie-entity-accent) 11%, transparent);
+  padding: var(--space-0-5) var(--space-1-5);
+  color: color-mix(in srgb, var(--jovie-entity-accent) 70%, white 30%);
+  line-height: 1.25rem;
+}
+
+.system-b-entity-chip[data-entity-variant="transcript"][data-entity-tone="onLight"] {
+  border-color: color-mix(in srgb, var(--jovie-entity-accent) 30%, white);
+  background: color-mix(in srgb, var(--jovie-entity-accent) 8%, white);
+  color: var(--system-b-entity-chip-on-light-text, #111216);
+}
+
+.system-b-entity-chip-thumbnail {
+  flex-shrink: 0;
+  border-radius: var(--radius-full);
+  object-fit: cover;
+}
+
+.system-b-entity-chip[data-entity-variant="input"]
+  .system-b-entity-chip-thumbnail {
+  width: 0.875rem;
+  height: 0.875rem;
+}
+
+.system-b-entity-chip[data-entity-variant="transcript"]
+  .system-b-entity-chip-thumbnail {
+  width: var(--space-4);
+  height: var(--space-4);
+}
+
+.system-b-entity-chip-dot {
+  display: inline-block;
+  flex-shrink: 0;
+  border-radius: var(--radius-full);
+  background: var(--jovie-entity-accent);
+}
+
+.system-b-entity-chip[data-entity-variant="input"] .system-b-entity-chip-dot {
+  width: var(--space-1-5);
+  height: var(--space-1-5);
+}
+
+.system-b-entity-chip[data-entity-variant="transcript"]
+  .system-b-entity-chip-dot {
+  width: var(--space-2);
+  height: var(--space-2);
+}
+
+.system-b-entity-chip-remove {
+  display: inline-flex;
+  width: var(--space-4);
+  height: var(--space-4);
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  margin-right: calc(var(--space-0-5) * -1);
+  border-radius: var(--radius-full);
+  color: var(--color-text-tertiary-token);
+  transition:
+    background-color var(--system-b-duration-fast) var(--system-b-ease),
+    color var(--system-b-duration-fast) var(--system-b-ease);
+}
+
+.system-b-entity-chip-remove:hover {
+  background: color-mix(in oklab, white 7%, transparent);
+  color: var(--color-text-primary-token);
+}
+
+.system-b-entity-chip-remove:focus,
+.system-b-entity-chip-remove:focus-visible {
+  outline: none;
+}
+
+.system-b-entity-chip-remove:focus-visible {
+  box-shadow: 0 0 0 1px color-mix(in oklab, white 30%, transparent);
+}
+
 .system-b-entity-chip-popover-content {
   z-index: 150;
   width: min(272px, calc(100vw - var(--space-6)));
@@ -2315,6 +2419,30 @@ body:has(.system-b-download-page) .marketing-glass-header__cta:focus-visible {
   font-weight: var(--font-weight-semibold);
   letter-spacing: var(--tracking-normal);
   text-transform: uppercase;
+}
+
+.system-b-dsp-status-dot-live {
+  background: color-mix(in oklab, var(--color-success) 72%, transparent);
+}
+
+.system-b-dsp-status-dot-pending {
+  background: color-mix(in oklab, var(--color-warning) 78%, transparent);
+}
+
+.system-b-dsp-status-dot-error {
+  background: color-mix(in oklab, var(--color-error) 82%, transparent);
+}
+
+.system-b-dsp-status-dot-missing {
+  background: color-mix(
+    in oklab,
+    var(--color-text-quaternary-token) 36%,
+    transparent
+  );
+}
+
+.system-b-dsp-avatar-stack-popover {
+  z-index: 150;
 }
 
 :where(.system-b-chat-generation-artifact-surface) {

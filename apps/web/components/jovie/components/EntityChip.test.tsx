@@ -98,8 +98,7 @@ describe('EntityChip', () => {
     );
     const chip = screen.getByTestId('entity-chip');
     expect(chip.getAttribute('data-entity-tone')).toBe('onLight');
-    // onLight uses #111216 (neutral) text — Option B from the plan gate.
-    expect(chip.className).toContain('#111216');
+    expect(chip).toHaveClass('system-b-entity-chip');
   });
 
   it('applies onDark tone classes by default', () => {
