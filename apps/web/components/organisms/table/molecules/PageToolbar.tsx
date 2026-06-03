@@ -7,7 +7,7 @@ import { cn } from '@/lib/utils';
 import { ACTION_BAR_BUTTON_CLASS, ActionBar } from './ActionBar';
 
 export const PAGE_TOOLBAR_CONTAINER_CLASS =
-  'flex min-w-0 items-center gap-1.5 bg-transparent px-app-header py-1.5 md:min-h-[40px]';
+  'flex min-h-[40px] min-w-0 items-center gap-1.5 bg-transparent px-app-header py-1.5';
 
 export const PAGE_TOOLBAR_START_CLASS =
   'flex min-w-0 flex-1 items-center gap-1 overflow-x-auto overflow-y-hidden scroll-smooth [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden';
@@ -23,15 +23,15 @@ export const PAGE_TOOLBAR_META_TEXT_CLASS =
 
 export const PAGE_TOOLBAR_TAB_BUTTON_CLASS = cn(
   APP_CONTROL_BUTTON_CLASS,
-  'h-7.5 rounded-[10px] px-2.5 text-[11.5px] font-[540] text-secondary-token [&_svg]:h-3.5 [&_svg]:w-3.5'
+  'h-7.5 rounded-pill px-2.5 text-[11.5px] font-[540] text-secondary-token [&_svg]:h-3.5 [&_svg]:w-3.5'
 );
 
 export const PAGE_TOOLBAR_TAB_ACTIVE_CLASS =
-  'border-default bg-[color-mix(in_oklab,var(--linear-app-content-surface)_96%,white_4%)] text-primary-token shadow-[0_1px_1px_rgba(0,0,0,0.04),0_6px_12px_-10px_rgba(0,0,0,0.14),inset_0_1px_0_rgba(255,255,255,0.03)]';
+  'border-default bg-surface-0 text-primary-token shadow-[inset_0_0_0_1px_color-mix(in_oklab,var(--linear-app-shell-border)_68%,transparent)]';
 
 export const PAGE_TOOLBAR_ACTION_BUTTON_CLASS = cn(
   ACTION_BAR_BUTTON_CLASS,
-  'h-7 rounded-full border-0 bg-transparent px-2 text-[11.5px] font-[540] text-tertiary-token shadow-none hover:border-0 hover:bg-[color-mix(in_oklab,var(--linear-row-hover)_56%,transparent)] hover:text-primary-token hover:shadow-none focus-visible:border-0 focus-visible:bg-[color-mix(in_oklab,var(--linear-row-hover)_62%,transparent)] focus-visible:text-primary-token focus-visible:outline-none focus-visible:ring-0 active:border-0 active:bg-[color-mix(in_oklab,var(--linear-row-hover)_68%,transparent)] active:text-primary-token active:shadow-none disabled:pointer-events-none disabled:opacity-35 disabled:bg-transparent [&_svg]:h-3.5 [&_svg]:w-3.5'
+  'h-7 rounded-full border-0 bg-transparent px-2 text-[11.5px] font-[540] text-tertiary-token shadow-none hover:border-0 hover:bg-(--linear-row-hover) hover:text-primary-token hover:shadow-none focus-visible:border-0 focus-visible:bg-(--linear-row-hover) focus-visible:text-primary-token focus-visible:outline-none focus-visible:ring-0 active:border-0 active:bg-(--linear-row-hover) active:text-primary-token active:shadow-none disabled:pointer-events-none disabled:bg-transparent disabled:opacity-35 [&_svg]:h-3.5 [&_svg]:w-3.5'
 );
 
 export const PAGE_TOOLBAR_ACTION_ICON_ONLY_BUTTON_CLASS =

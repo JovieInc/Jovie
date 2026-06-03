@@ -53,4 +53,32 @@ describe('shared table motion tokens', () => {
 
     expect(offenders).toEqual([]);
   });
+
+  it('keeps table primitives on semantic System B color tokens', () => {
+    const offenders = TABLE_ROOTS.flatMap(root =>
+      listSourceFiles(root).flatMap(file => {
+        const source = readFileSync(file, 'utf8');
+        return /color-mix\(in_oklab,[^\]\n]*(?:\bwhite\b|\bblack\b)/.test(
+          source
+        )
+          ? [file.replace(process.cwd(), '')]
+          : [];
+      })
+    );
+
+    expect(offenders).toEqual([]);
+  });
+
+  it('keeps the bulk action toolbar mounted for stable selection transitions', () => {
+    const toolbarSource = readFileSync(
+      join(TABLE_ROOTS[0], 'molecules/TableBulkActionsToolbar.tsx'),
+      'utf8'
+    );
+
+    expect(toolbarSource).toContain('data-state');
+    expect(toolbarSource).toContain('min-h-[44px]');
+    expect(toolbarSource).not.toMatch(
+      /selectedCount\s*===\s*0\)\s*return null/
+    );
+  });
 });
