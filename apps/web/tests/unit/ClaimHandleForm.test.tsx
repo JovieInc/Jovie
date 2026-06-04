@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, test, vi } from 'vitest';
 
 // Use hoisted mocks for shared state
@@ -122,6 +122,28 @@ describe('ClaimHandleForm', () => {
     // Only check for component-specific animation keyframes (not third-party CSS like Sonner)
     expect(styleContents).not.toContain('jv-shake');
     expect(styleContents).not.toContain('jv-available');
+  });
+
+  test('does not animate the available-state chevron with positional hover motion', async () => {
+    render(<ClaimHandleForm />);
+
+    fireEvent.change(
+      screen.getByRole('textbox', { name: /choose your handle/i }),
+      {
+        target: { value: 'motionguard' },
+      }
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText('Claim @motionguard')).toBeInTheDocument();
+    });
+
+    const button = screen.getByRole('button', { name: /claim @motionguard/i });
+    const chevron = button.querySelector('svg');
+
+    expect(chevron).toBeInTheDocument();
+    expect(chevron).not.toHaveClass('transition-transform');
+    expect(chevron).not.toHaveClass('group-hover:translate-x-0.5');
   });
 
   test('tracks landing claim submits when tracking is configured', () => {

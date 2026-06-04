@@ -268,10 +268,7 @@ export function ClaimHandleForm({
       return (
         <>
           <span>Claim @{handle}</span>
-          <ChevronRight
-            className='h-3.5 w-3.5 transition-transform duration-slow group-hover:translate-x-0.5'
-            aria-hidden='true'
-          />
+          <ChevronRight className='h-3.5 w-3.5' aria-hidden='true' />
         </>
       );
     }
