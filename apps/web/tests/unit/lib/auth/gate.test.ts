@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
 // Hoist mocks before module resolution
 const {
@@ -9,6 +9,8 @@ const {
   mockEq,
   mockSql,
   mockIsWaitlistGateEnabled,
+  mockCreateClerkClient,
+  mockClerkGetUser,
 } = vi.hoisted(() => ({
   mockCachedAuth: vi.fn(),
   mockCachedCurrentUser: vi.fn(),
@@ -17,6 +19,8 @@ const {
   mockEq: vi.fn(),
   mockSql: vi.fn(),
   mockIsWaitlistGateEnabled: vi.fn().mockResolvedValue(true),
+  mockCreateClerkClient: vi.fn(),
+  mockClerkGetUser: vi.fn(),
 }));
 
 vi.mock('drizzle-orm', async importOriginal => {
@@ -57,6 +61,10 @@ vi.mock('@/lib/waitlist/settings', () => ({
   isWaitlistGateEnabled: mockIsWaitlistGateEnabled,
 }));
 
+vi.mock('@clerk/backend', () => ({
+  createClerkClient: mockCreateClerkClient,
+}));
+
 // Mock schema (just provide empty objects for the table references)
 vi.mock('@/lib/db/schema', () => ({
   users: {},
@@ -74,6 +82,8 @@ import {
   requiresRedirect,
   resolveUserState,
 } from '@/lib/auth/gate';
+
+const ORIGINAL_CLERK_SECRET_KEY = process.env.CLERK_SECRET_KEY;
 
 // Helper to create mock for the single JOIN query used by resolveUserState
 // Now uses a single query with LEFT JOIN for user + profile
@@ -103,7 +113,20 @@ const createSimpleQueryMock = (result: unknown[]) => ({
 describe('gate.ts', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    process.env.CLERK_SECRET_KEY = 'sk_test_gate';
     mockIsWaitlistGateEnabled.mockResolvedValue(true);
+    mockClerkGetUser.mockResolvedValue({ emailAddresses: [] });
+    mockCreateClerkClient.mockReturnValue({
+      users: { getUser: mockClerkGetUser },
+    });
+  });
+
+  afterAll(() => {
+    if (ORIGINAL_CLERK_SECRET_KEY === undefined) {
+      delete process.env.CLERK_SECRET_KEY;
+      return;
+    }
+    process.env.CLERK_SECRET_KEY = ORIGINAL_CLERK_SECRET_KEY;
   });
 
   describe('CanonicalUserState enum', () => {

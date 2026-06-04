@@ -153,6 +153,24 @@ test('desktop navigation uses explicit URL disposition allowlists', async () => 
   );
   assert.match(
     mainSource,
+    /authHandoffWindow\.webContents\.on\('will-navigate', \(event, url\) =>/
+  );
+  assert.match(
+    mainSource,
+    /win\.webContents\.on\('will-navigate', \(event, url\) =>/
+  );
+  assert.match(
+    mainSource,
+    /win\.webContents\.on\('will-frame-navigate', event =>/
+  );
+  assert.match(
+    mainSource,
+    /win\.webContents\.on\('will-redirect', \(event, url, _isInPlace, isMainFrame\) =>/
+  );
+  assert.doesNotMatch(mainSource, /resolveNavigationUrl\(event\.url\)/);
+  assert.match(mainSource, /getUrlDisposition\(event\.url\) === 'in-app'/);
+  assert.match(
+    mainSource,
     /const DESKTOP_BROWSER_AUTH_PATHS = \[\s*'\/signin',\s*'\/signup',\s*'\/sign-in',\s*'\/sign-up',\s*\] as const;/
   );
   assert.match(mainSource, /'\/app\/auth\/callback'/);
@@ -309,7 +327,11 @@ test('hosted web app has an early Electron runtime marker before first paint', a
     'utf8'
   );
 
-  assert.match(rootLayout, /<script src='\/electron-runtime-init\.js' \/>/);
+  assert.match(rootLayout, /import Script from 'next\/script';/);
+  assert.match(
+    rootLayout,
+    /<Script src='\/electron-runtime-init\.js' strategy='beforeInteractive' \/>/
+  );
   assert.match(runtimeInit, /params\.get\('runtime'\) === 'electron'/);
   assert.match(runtimeInit, /JovieDesktop\\\//);
   assert.match(runtimeInit, /root\.dataset\.desktopRuntime = 'electron'/);

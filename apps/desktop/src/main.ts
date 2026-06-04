@@ -707,8 +707,8 @@ function showDesktopAuthHandoff(authUrl: string): void {
   );
   authHandoffWindow.webContents.session.setPermissionCheckHandler(() => false);
 
-  authHandoffWindow.webContents.on('will-navigate', event => {
-    const parsed = parseUrl(event.url);
+  authHandoffWindow.webContents.on('will-navigate', (event, url) => {
+    const parsed = parseUrl(url);
     if (
       parsed?.origin === APP_ORIGIN &&
       parsed.pathname === DESKTOP_AUTH_HANDOFF_PATH
@@ -716,7 +716,7 @@ function showDesktopAuthHandoff(authUrl: string): void {
       return;
     }
     event.preventDefault();
-    void openExternalUrl(event.url);
+    void openExternalUrl(url);
   });
 
   authHandoffWindow.webContents.setWindowOpenHandler(({ url }) => {
@@ -927,8 +927,8 @@ function createWindow(initialUrl = APP_ENTRY_URL): BrowserWindow {
 
   // Navigation guard: app-host routes stay in-window; auth routes get the
   // dedicated handoff; all other safe URLs open in the system browser.
-  win.webContents.on('will-navigate', event => {
-    const navigationUrl = resolveNavigationUrl(event.url);
+  win.webContents.on('will-navigate', (event, url) => {
+    const navigationUrl = resolveNavigationUrl(url);
     if (maybeShowDesktopAuthHandoff(navigationUrl)) {
       event.preventDefault();
       return;
@@ -952,8 +952,8 @@ function createWindow(initialUrl = APP_ENTRY_URL): BrowserWindow {
     event.preventDefault();
   });
 
-  win.webContents.on('will-redirect', event => {
-    const navigationUrl = resolveNavigationUrl(event.url);
+  win.webContents.on('will-redirect', (event, url, _isInPlace, isMainFrame) => {
+    const navigationUrl = resolveNavigationUrl(url);
     if (maybeShowDesktopAuthHandoff(navigationUrl)) {
       event.preventDefault();
       return;
@@ -967,7 +967,7 @@ function createWindow(initialUrl = APP_ENTRY_URL): BrowserWindow {
     if (disposition === 'in-app') return;
 
     event.preventDefault();
-    if (event.isMainFrame && disposition === 'external') {
+    if (isMainFrame && disposition === 'external') {
       void openExternalUrl(navigationUrl);
     }
   });
