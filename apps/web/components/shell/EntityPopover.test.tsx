@@ -133,5 +133,7 @@ describe('EntityPopover source contract', () => {
     expect(source).not.toContain('#1DB954');
     expect(source).not.toContain("'rounded-lg border border-default'");
     expect(source).not.toContain("'bg-surface-0 text-primary-token");
+    expect(source).not.toContain('zoom-in');
+    expect(source).not.toContain('slide-in');
   });
 });

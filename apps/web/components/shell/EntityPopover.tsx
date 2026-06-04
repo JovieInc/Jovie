@@ -679,9 +679,7 @@ export function EntityPopover({
       className={cn(
         LINEAR_SURFACE.popover,
         'text-primary-token',
-        'animate-in fade-in-0 zoom-in-95 duration-fast ease-subtle',
-        pos?.side === 'left' ? 'slide-in-from-right-1' : 'slide-in-from-left-1',
-        'motion-reduce:transition-opacity motion-reduce:transform-none'
+        'animate-in fade-in-0 duration-fast ease-subtle'
       )}
     >
       <div className='px-3 py-2.5'>
