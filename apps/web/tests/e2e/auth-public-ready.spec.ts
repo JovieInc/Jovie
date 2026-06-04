@@ -42,13 +42,13 @@ function expectPublicAuthReady(pathname: string) {
     });
     await expect(page.locator('[data-auth-stable-placeholder]')).toHaveCount(0);
 
-    const clerkSurface = page.locator('[data-auth-clerk-surface]').first();
-    await expect(clerkSurface).toBeVisible({
+    const ssoSurface = page.locator('[data-auth-sso-surface]').first();
+    await expect(ssoSurface).toBeVisible({
       timeout: SMOKE_TIMEOUTS.VISIBILITY,
     });
-    await expect(clerkSurface).not.toHaveAttribute('aria-hidden', 'true');
+    await expect(ssoSurface).not.toHaveAttribute('aria-hidden', 'true');
 
-    const surfaceState = await clerkSurface.evaluate(element => {
+    const surfaceState = await ssoSurface.evaluate(element => {
       const style = window.getComputedStyle(element);
       return {
         opacity: style.opacity,
@@ -64,8 +64,8 @@ function expectPublicAuthReady(pathname: string) {
 
     const liveAuthControls = page.locator(
       [
-        '[data-auth-clerk-surface] button:not([disabled])',
-        '[data-auth-clerk-surface] input:not([disabled])',
+        '[data-auth-sso-surface] button[data-auth-provider-slot]:not([disabled])',
+        '[data-auth-sso-surface] input:not([disabled])',
       ].join(', ')
     );
     await expect(liveAuthControls.first()).toBeVisible({
@@ -76,12 +76,12 @@ function expectPublicAuthReady(pathname: string) {
 
 test.describe('public auth readiness @production-smoke', () => {
   test(
-    'signin replaces the disabled placeholder with live Clerk controls',
+    'signin replaces the disabled placeholder with owned SSO controls',
     expectPublicAuthReady(APP_ROUTES.SIGNIN)
   );
 
   test(
-    'signup replaces the disabled placeholder with live Clerk controls',
+    'signup replaces the disabled placeholder with owned SSO controls',
     expectPublicAuthReady(APP_ROUTES.SIGNUP)
   );
 });
