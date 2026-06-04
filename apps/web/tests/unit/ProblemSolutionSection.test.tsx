@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 
@@ -8,6 +10,11 @@ vi.mock('@/lib/analytics', () => ({
 
 import { ProblemSolutionSection } from '@/features/home/ProblemSolutionSection';
 import { track } from '@/lib/analytics';
+
+const componentSourcePath = resolve(
+  process.cwd(),
+  'components/features/home/ProblemSolutionSection.tsx'
+);
 
 describe('ProblemSolutionSection', () => {
   it('renders unified section with problem and solution content', () => {
@@ -71,5 +78,14 @@ describe('ProblemSolutionSection', () => {
       name: /Your bio link is a speed bump/,
     });
     expect(heading).toHaveAttribute('id', 'problem-solution-heading');
+  });
+
+  it('keeps System B copy and decorative motion out of the section source', () => {
+    const source = readFileSync(componentSourcePath, 'utf8');
+
+    expect(source).not.toContain('Linear-inspired');
+    expect(source).not.toContain('animate-pulse');
+    expect(source).not.toContain('transition-transform');
+    expect(source).not.toContain('group-hover:translate-x');
   });
 });

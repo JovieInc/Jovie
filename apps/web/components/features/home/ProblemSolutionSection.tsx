@@ -16,10 +16,10 @@ export function ProblemSolutionSection() {
       className='relative border-t border-subtle'
     >
       <div className='mx-auto max-w-5xl px-4 py-14 md:py-18 text-center'>
-        {/* Unified badge with Linear-inspired styling */}
+        {/* System B status badge */}
         <div className='inline-flex items-center rounded-full bg-surface-1/80 px-4 py-2 text-sm font-medium text-secondary-token backdrop-blur-sm border border-subtle'>
           <div className='flex h-2 w-2 items-center justify-center mr-2'>
-            <div className='h-1.5 w-1.5 rounded-full bg-amber-400 dark:bg-amber-500 animate-pulse motion-reduce:animate-none' />
+            <div className='h-1.5 w-1.5 rounded-full bg-amber-400 dark:bg-amber-500' />
           </div>
           The Problem & Our Solution
         </div>
@@ -52,7 +52,7 @@ export function ProblemSolutionSection() {
           </p>
         </div>
 
-        {/* Linear-inspired CTA button */}
+        {/* System B CTA button */}
         <div className='mt-8'>
           <Button
             asChild
@@ -63,7 +63,7 @@ export function ProblemSolutionSection() {
             <Link href='/start' onClick={handleClick}>
               <span>Request Early Access</span>
               <svg
-                className='ml-2 h-4 w-4 transition-transform duration-slow group-hover:translate-x-1'
+                className='ml-2 h-4 w-4'
                 fill='none'
                 viewBox='0 0 24 24'
                 stroke='currentColor'
