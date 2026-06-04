@@ -64,6 +64,13 @@ describe('SeeItInActionCarousel', () => {
     expect(
       screen.getByRole('img', { name: /Take Me Over artwork/i })
     ).toBeInTheDocument();
+
+    for (const artwork of screen.getAllByRole('img', { name: /artwork/i })) {
+      expect(artwork).toHaveClass('object-cover');
+      expect(artwork.className).not.toMatch(
+        /group-hover:scale|transition-transform/
+      );
+    }
   });
 
   it('opens the popover and links DSP buttons to the smart link page', async () => {
