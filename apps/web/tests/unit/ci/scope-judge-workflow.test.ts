@@ -19,6 +19,25 @@ function getStepBlock(workflow: string, stepName: string): string {
 }
 
 describe('Scope Judge workflow cost controls', () => {
+  it('runs the LLM-backed judge through OpenRouter free models', () => {
+    const workflow = readFileSync(workflowPath, 'utf8');
+    const keyStep = getStepBlock(workflow, 'Check scope judge API key');
+    const judgeStep = getStepBlock(
+      workflow,
+      'Run scope alignment judge (OpenRouter)'
+    );
+
+    expect(keyStep).toContain('OPENROUTER_API_KEY');
+    expect(keyStep).not.toContain('OPENAI_API_KEY');
+    expect(judgeStep).toContain(
+      'https://openrouter.ai/api/v1/chat/completions'
+    );
+    expect(judgeStep).toContain('OPENROUTER_API_KEY');
+    expect(judgeStep).toContain('OPENROUTER_MODEL: openai/gpt-oss-20b:free');
+    expect(judgeStep).not.toContain('https://api.openai.com');
+    expect(judgeStep).not.toContain('gpt-4o-mini');
+  });
+
   it('posts a successful deterministic status when the LLM key is absent', () => {
     const workflow = readFileSync(workflowPath, 'utf8');
     const step = getStepBlock(
@@ -29,7 +48,7 @@ describe('Scope Judge workflow cost controls', () => {
     expect(step).toContain("steps.judge-key.outputs.has_key != 'true'");
     expect(step).toContain('-f state="success"');
     expect(step).toContain('context="scope-judge"');
-    expect(step).toContain('API key missing; no model call');
+    expect(step).toContain('OpenRouter API key missing; no model call');
     expect(step).not.toContain('-f state="failure"');
     expect(step).not.toContain('OPENAI_API_KEY');
   });
