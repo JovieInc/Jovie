@@ -45,4 +45,21 @@ describe('cn', () => {
   it('handles array inputs', () => {
     expect(cn(['foo', 'bar'])).toBe('foo bar');
   });
+
+  it('keeps System B text scale and text color tokens together', () => {
+    expect(cn('text-app', 'text-primary-token')).toContain('text-app');
+    expect(cn('text-app', 'text-primary-token')).toContain(
+      'text-primary-token'
+    );
+  });
+
+  it('still merges conflicting font sizes', () => {
+    expect(cn('text-lg', 'text-sm')).toBe('text-sm');
+  });
+
+  it('still merges conflicting text colors', () => {
+    expect(cn('text-primary-token', 'text-secondary-token')).toBe(
+      'text-secondary-token'
+    );
+  });
 });
