@@ -196,7 +196,7 @@ export const ChatStyleLinkItem = React.memo(function ChatStyleLinkItem<
               className={cn(
                 'flex h-11 w-11 cursor-grab items-center justify-center rounded-md sm:h-8 sm:w-8',
                 'text-tertiary-token transition-colors',
-                'hover:text-secondary-token active:cursor-grabbing active:scale-95',
+                'hover:text-secondary-token active:cursor-grabbing active:text-primary-token',
                 'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent'
               )}
               aria-label='Drag to reorder'
@@ -240,9 +240,8 @@ export const ChatStyleLinkItem = React.memo(function ChatStyleLinkItem<
             className={cn(
               'inline-flex h-11 w-11 items-center justify-center rounded-md sm:h-9 sm:w-9 sm:rounded-lg',
               'text-secondary-token transition-colors',
-              'hover:bg-surface-1 hover:text-primary-token',
-              'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent',
-              'active:scale-95'
+              'hover:bg-surface-1 hover:text-primary-token active:bg-surface-2 active:text-primary-token',
+              'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent'
             )}
             {...getReferenceProps()}
           >
@@ -279,7 +278,7 @@ export const ChatStyleLinkItem = React.memo(function ChatStyleLinkItem<
                       }}
                       className={cn(
                         MENU_ITEM_BASE,
-                        'min-h-[44px] w-full text-left active:scale-[0.98]',
+                        'min-h-[44px] w-full text-left active:bg-surface-2',
                         item.variant === 'destructive' && MENU_ITEM_DESTRUCTIVE
                       )}
                       {...getItemProps()}
