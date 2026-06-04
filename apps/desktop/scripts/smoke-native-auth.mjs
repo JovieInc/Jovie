@@ -564,7 +564,7 @@ async function signInWithFreshTicket(
 function isNavigationInterruption(error) {
   return (
     error instanceof Error &&
-    /Execution context was destroyed|Target page, context or browser has been closed/i.test(
+    /Execution context was destroyed|Target page, context or browser has been closed|Inspected target navigated or closed/i.test(
       error.message
     )
   );
@@ -1391,7 +1391,11 @@ async function main() {
     }
 
     const existing = await newAuthContext(browser, fapiHost, testingToken);
-    const existingSignin = await signInExisting(existing.page, email);
+    const existingSignin = await signInWithFreshTicket(
+      existing.page,
+      secretKey,
+      provisionedUser.userId
+    );
     await waitForAppSessionCookie(existing.context, 'existing-signin');
     const existingAuthUrl = await startElectronBrowserAuth();
     const existingCallback = await requestNativeCallback(
