@@ -50,6 +50,19 @@ const VARIANTS: ReadonlyArray<{ id: Variant; label: string; tone: string }> = [
   { id: 'd', label: 'Cinematic', tone: 'D' },
 ];
 
+const CONTROL_FEEDBACK_CLASSES =
+  'transition-[background-color,border-color,color,box-shadow,opacity] duration-subtle ease-out active:opacity-90';
+
+const DARK_PRIMARY_CONTROL_CLASSES =
+  'border border-(--linear-btn-primary-border) bg-(--linear-btn-primary-bg) text-(--linear-btn-primary-fg) shadow-(--linear-shadow-button) hover:border-(--linear-btn-primary-hover) hover:bg-(--linear-btn-primary-hover)';
+
+const CREAM_PRIMARY_CONTROL_CLASSES =
+  'border border-[#0a0a0a] bg-[#0a0a0a] text-[#F5F3EE] hover:bg-[#161616]';
+
+function primaryControlTone(onCream: boolean) {
+  return onCream ? CREAM_PRIMARY_CONTROL_CLASSES : DARK_PRIMARY_CONTROL_CLASSES;
+}
+
 // Static featured creators for the experimental page. Mirrors the shape
 // of FeaturedCreator (id, handle, name, src, alt) but uses seeded image
 // URLs so the route doesn't need DB access.
@@ -181,22 +194,23 @@ function VariantToggle({
   onChange: (v: Variant) => void;
 }) {
   return (
-    <div className='fixed bottom-4 right-4 z-50 flex items-center gap-1 rounded-full bg-black/70 backdrop-blur-md border border-white/12 p-1 shadow-[0_8px_28px_rgba(0,0,0,0.5)]'>
+    <div className='fixed bottom-4 left-3 right-3 z-50 flex items-center justify-center gap-1 rounded-full border border-white/12 bg-black/70 p-1 shadow-popover backdrop-blur-md sm:left-auto sm:right-4'>
       {VARIANTS.map(v => (
         <button
           key={v.id}
           type='button'
           onClick={() => onChange(v.id)}
           className={cn(
-            'inline-flex items-center gap-1.5 h-7 px-3 rounded-full text-[11.5px] font-medium tracking-[-0.005em] transition-all duration-150 ease-out',
+            'inline-flex h-7 min-h-7 w-9 items-center justify-center gap-1.5 rounded-full px-0 text-caption font-caption sm:w-auto sm:px-3',
+            CONTROL_FEEDBACK_CLASSES,
             variant === v.id
-              ? 'bg-white text-black'
+              ? DARK_PRIMARY_CONTROL_CLASSES
               : 'text-white/55 hover:text-white hover:bg-white/8'
           )}
           title={`Variant ${v.tone}: ${v.label}`}
         >
           <span className='font-mono text-[10px] opacity-60'>{v.tone}</span>
-          {v.label}
+          <span className='hidden sm:inline'>{v.label}</span>
         </button>
       ))}
     </div>
@@ -227,7 +241,7 @@ function Nav({ variant }: { variant: Variant }) {
         <Link
           href='/exp/auth-v1'
           className={cn(
-            'inline-flex items-center h-8 px-3.5 rounded-full text-[12.5px] transition-colors duration-150 ease-out',
+            'inline-flex items-center h-8 px-3.5 rounded-full text-[12.5px] transition-colors duration-subtle ease-out',
             onCream
               ? 'text-[#0a0a0a]/55 hover:text-[#0a0a0a]'
               : 'text-white/55 hover:text-white'
@@ -238,10 +252,9 @@ function Nav({ variant }: { variant: Variant }) {
         <Link
           href='/exp/auth-v1'
           className={cn(
-            'inline-flex items-center gap-1.5 h-8 px-4 rounded-full text-[12.5px] font-medium transition-all duration-150 ease-out',
-            onCream
-              ? 'bg-[#0a0a0a] text-[#F5F3EE] hover:brightness-110'
-              : 'bg-white text-black hover:brightness-110 active:scale-[0.99] shadow-[0_4px_14px_rgba(0,0,0,0.35),inset_0_1px_0_rgba(255,255,255,0.45)]'
+            'inline-flex h-8 min-h-8 items-center gap-1.5 rounded-full px-4 text-caption font-caption',
+            CONTROL_FEEDBACK_CLASSES,
+            primaryControlTone(onCream)
           )}
         >
           Get started
@@ -311,7 +324,7 @@ function HeroProductShell({
               key={label}
               type='button'
               onClick={() => onDraft(label)}
-              className='inline-flex items-center h-7 px-3 rounded-full text-[11.5px] text-white/55 bg-white/[0.03] border border-white/[0.06] hover:text-white hover:bg-white/[0.07] transition-colors duration-150 ease-out'
+              className='inline-flex items-center h-7 px-3 rounded-full text-[11.5px] text-white/55 bg-white/[0.03] border border-white/[0.06] hover:text-white hover:bg-white/[0.07] transition-colors duration-subtle ease-out'
             >
               {label}
             </button>
@@ -347,13 +360,7 @@ function ProductComposer({
       }}
       className='w-full'
     >
-      <div
-        className='relative flex items-center h-14 pl-5 pr-2 rounded-2xl bg-white/[0.04] border border-white/[0.10] focus-within:border-cyan-300/45 focus-within:bg-white/[0.06] transition-all duration-200 ease-out'
-        style={{
-          boxShadow:
-            '0 16px 48px -12px rgba(0,0,0,0.55), inset 0 1px 0 rgba(255,255,255,0.04)',
-        }}
-      >
+      <div className='relative flex h-14 items-center rounded-2xl border border-white/[0.10] bg-white/[0.04] pl-5 pr-2 shadow-popover transition-[background-color,border-color,box-shadow] duration-subtle ease-out focus-within:border-(--linear-border-focus)/45 focus-within:bg-white/[0.06]'>
         <input
           type='text'
           value={draft}
@@ -365,7 +372,7 @@ function ProductComposer({
         <button
           type='button'
           aria-label='Push-to-talk'
-          className='shrink-0 h-9 w-9 grid place-items-center rounded-full text-white/45 hover:text-white hover:bg-white/[0.07] transition-colors duration-150 ease-out'
+          className='shrink-0 h-9 w-9 grid place-items-center rounded-full text-white/45 hover:text-white hover:bg-white/[0.07] transition-colors duration-subtle ease-out'
         >
           <Mic className='h-4 w-4' strokeWidth={2.25} />
         </button>
@@ -374,10 +381,10 @@ function ProductComposer({
           aria-label='Continue'
           disabled={!draft.trim()}
           className={cn(
-            'shrink-0 ml-1 h-10 w-10 grid place-items-center rounded-xl bg-white text-black transition-all duration-150 ease-out',
-            draft.trim()
-              ? 'opacity-100 hover:brightness-110 active:scale-95 shadow-[0_4px_14px_rgba(255,255,255,0.18)]'
-              : 'opacity-40 cursor-not-allowed'
+            'ml-1 grid h-10 min-h-10 w-10 shrink-0 place-items-center rounded-xl',
+            DARK_PRIMARY_CONTROL_CLASSES,
+            CONTROL_FEEDBACK_CLASSES,
+            'disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-40 disabled:shadow-none'
           )}
         >
           <ArrowUp className='h-4 w-4' strokeWidth={2.5} />
@@ -436,7 +443,7 @@ function HeroConversation({
               key={label}
               type='button'
               onClick={() => onDraft(label)}
-              className='inline-flex items-center h-7 px-3 rounded-full text-[11.5px] text-white/52 bg-white/[0.04] border border-white/8 hover:text-white hover:bg-white/8 transition-colors duration-150 ease-out'
+              className='inline-flex items-center h-7 px-3 rounded-full text-[11.5px] text-white/52 bg-white/[0.04] border border-white/8 hover:text-white hover:bg-white/8 transition-colors duration-subtle ease-out'
             >
               {label}
             </button>
@@ -508,9 +515,10 @@ function HeroBrutalist({ draft, onDraft, onSubmit, onScrollNext }: HeroProps) {
               type='submit'
               disabled={!draft.trim()}
               className={cn(
-                'h-12 px-5 text-[12px] uppercase tracking-[0.14em] font-bold border-l-2 border-[#0a0a0a] transition-colors duration-150 ease-out',
+                'h-12 px-5 text-[12px] uppercase tracking-[0.14em] font-bold border-l-2 border-[#0a0a0a]',
+                CONTROL_FEEDBACK_CLASSES,
                 draft.trim()
-                  ? 'bg-[#0a0a0a] text-[#F5F3EE] hover:brightness-110'
+                  ? 'bg-[#0a0a0a] text-[#F5F3EE] hover:bg-[#161616]'
                   : 'bg-transparent text-[#0a0a0a]/50 cursor-not-allowed'
               )}
             >
@@ -526,7 +534,7 @@ function HeroBrutalist({ draft, onDraft, onSubmit, onScrollNext }: HeroProps) {
                 type='button'
                 onClick={() => onDraft(label)}
                 className={cn(
-                  'inline-flex items-center h-9 px-3 text-[10.5px] uppercase tracking-[0.12em] font-semibold border-2 border-[#0a0a0a] hover:bg-[#0a0a0a] hover:text-[#F5F3EE] transition-colors duration-150 ease-out',
+                  'inline-flex items-center h-9 px-3 text-[10.5px] uppercase tracking-[0.12em] font-semibold border-2 border-[#0a0a0a] hover:bg-[#0a0a0a] hover:text-[#F5F3EE] transition-colors duration-subtle ease-out',
                   i > 0 && 'border-l-0'
                 )}
               >
@@ -586,7 +594,11 @@ function HeroCinematic({ onScrollNext }: HeroProps) {
         </p>
         <Link
           href='/exp/auth-v1'
-          className='mt-10 inline-flex items-center gap-2 h-12 pl-6 pr-5 rounded-full bg-white text-black text-[13.5px] font-medium hover:brightness-110 active:scale-[0.99] shadow-[0_10px_36px_rgba(120,96,255,0.32),inset_0_1px_0_rgba(255,255,255,0.5)] transition-all duration-150 ease-out'
+          className={cn(
+            'mt-10 inline-flex h-12 min-h-12 items-center gap-2 rounded-full pl-6 pr-5 text-caption font-caption',
+            DARK_PRIMARY_CONTROL_CLASSES,
+            CONTROL_FEEDBACK_CLASSES
+          )}
         >
           Start free
           <ArrowRight className='h-4 w-4' strokeWidth={2.4} />
@@ -628,7 +640,7 @@ function Composer({
       }}
       className='mt-9 w-full'
     >
-      <div className='relative flex items-center h-12 pl-5 pr-2 rounded-full bg-white/[0.04] border border-white/10 focus-within:border-cyan-300/45 focus-within:bg-white/[0.06] transition-colors duration-150 ease-out'>
+      <div className='relative flex items-center h-12 pl-5 pr-2 rounded-full bg-white/[0.04] border border-white/10 focus-within:border-cyan-300/45 focus-within:bg-white/[0.06] transition-colors duration-subtle ease-out'>
         <input
           type='text'
           value={draft}
@@ -640,7 +652,7 @@ function Composer({
         <button
           type='button'
           aria-label='Push-to-talk'
-          className='shrink-0 h-8 w-8 grid place-items-center rounded-full text-white/45 hover:text-white hover:bg-white/8 transition-colors duration-150 ease-out'
+          className='shrink-0 h-8 w-8 grid place-items-center rounded-full text-white/45 hover:text-white hover:bg-white/8 transition-colors duration-subtle ease-out'
         >
           <Mic className='h-3.5 w-3.5' strokeWidth={2.25} />
         </button>
@@ -649,10 +661,10 @@ function Composer({
           aria-label='Continue'
           disabled={!draft.trim()}
           className={cn(
-            'shrink-0 ml-1 h-8 w-8 grid place-items-center rounded-full bg-white text-black transition-all duration-150 ease-out',
-            draft.trim()
-              ? 'opacity-100 hover:brightness-110 active:scale-95'
-              : 'opacity-40 cursor-not-allowed'
+            'ml-1 grid h-8 min-h-8 w-8 shrink-0 place-items-center rounded-full',
+            DARK_PRIMARY_CONTROL_CLASSES,
+            CONTROL_FEEDBACK_CLASSES,
+            'disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-40 disabled:shadow-none'
           )}
         >
           <ArrowUp className='h-3.5 w-3.5' strokeWidth={2.5} />
@@ -673,7 +685,7 @@ function ChatBubble({
     <div
       className='flex items-start gap-2.5 opacity-0'
       style={{
-        animation: `hv1-bubble-in 320ms ${EASE_CINEMATIC} ${delay}ms forwards`,
+        animation: `hv1-bubble-in var(--ds-motion-subtle-duration) ${EASE_CINEMATIC} ${delay}ms forwards`,
       }}
     >
       <span className='shrink-0 h-6 w-6 rounded-full bg-cyan-500/15 border border-cyan-500/30 grid place-items-center mt-1'>
@@ -691,7 +703,7 @@ function TypingDots({ delay = 0 }: { delay?: number }) {
     <div
       className='flex items-start gap-2.5 opacity-0'
       style={{
-        animation: `hv1-bubble-in 320ms ${EASE_CINEMATIC} ${delay}ms forwards`,
+        animation: `hv1-bubble-in var(--ds-motion-subtle-duration) ${EASE_CINEMATIC} ${delay}ms forwards`,
       }}
     >
       <span className='shrink-0 h-6 w-6 rounded-full bg-cyan-500/15 border border-cyan-500/30 grid place-items-center mt-1'>
@@ -725,7 +737,7 @@ function ScrollCue({
       onClick={onClick}
       aria-label='Scroll to next section'
       className={cn(
-        'absolute bottom-7 left-1/2 -translate-x-1/2 inline-flex items-center gap-2 h-8 px-3 rounded-full text-[11px] uppercase tracking-[0.14em] font-medium transition-colors duration-150 ease-out',
+        'absolute bottom-7 left-1/2 -translate-x-1/2 inline-flex items-center gap-2 h-8 px-3 rounded-full text-[11px] uppercase tracking-[0.14em] font-medium transition-colors duration-subtle ease-out',
         tone === 'dark'
           ? 'text-[#0a0a0a]/45 hover:text-[#0a0a0a] hover:bg-[#0a0a0a]/5'
           : 'text-white/35 hover:text-white hover:bg-white/8'
@@ -838,7 +850,7 @@ function ArtistsBuilt({ variant }: { variant: Variant }) {
               >
                 <div
                   className={cn(
-                    'relative w-24 h-24 sm:w-28 sm:h-28 md:w-32 md:h-32 rounded-full overflow-hidden border-2 transition-colors duration-200 ease-out',
+                    'relative w-24 h-24 sm:w-28 sm:h-28 md:w-32 md:h-32 rounded-full overflow-hidden border-2 transition-colors duration-subtle ease-out',
                     onCream
                       ? 'border-[#0a0a0a]/12 group-hover:border-[#0a0a0a]/40'
                       : 'border-white/[0.08] group-hover:border-white/35'
@@ -982,10 +994,9 @@ function FinalCta({ variant }: { variant: Variant }) {
           <Link
             href='/exp/auth-v1'
             className={cn(
-              'inline-flex items-center gap-1.5 h-10 px-5 rounded-full text-[13px] font-medium transition-all duration-150 ease-out',
-              onCream
-                ? 'bg-[#0a0a0a] text-[#F5F3EE] hover:brightness-110'
-                : 'bg-white text-black hover:brightness-110 active:scale-[0.99] shadow-[0_4px_14px_rgba(0,0,0,0.35),inset_0_1px_0_rgba(255,255,255,0.45)]'
+              'inline-flex h-10 min-h-10 items-center gap-1.5 rounded-full px-5 text-caption font-caption',
+              CONTROL_FEEDBACK_CLASSES,
+              primaryControlTone(onCream)
             )}
           >
             Get started
@@ -994,7 +1005,7 @@ function FinalCta({ variant }: { variant: Variant }) {
           <Link
             href='/exp/auth-v1'
             className={cn(
-              'inline-flex items-center h-10 px-5 rounded-full text-[13px] transition-colors duration-150 ease-out',
+              'inline-flex items-center h-10 px-5 rounded-full text-[13px] transition-colors duration-subtle ease-out',
               onCream
                 ? 'border-2 border-[#0a0a0a] text-[#0a0a0a] hover:bg-[#0a0a0a] hover:text-[#F5F3EE]'
                 : 'text-white/72 border border-white/10 hover:text-white hover:bg-white/[0.04]'
@@ -1031,7 +1042,7 @@ function Footer({ variant }: { variant: Variant }) {
           <Link
             href='/terms'
             className={cn(
-              'transition-colors duration-150 ease-out',
+              'transition-colors duration-subtle ease-out',
               onCream ? 'hover:text-[#0a0a0a]' : 'hover:text-white/72'
             )}
           >
@@ -1040,7 +1051,7 @@ function Footer({ variant }: { variant: Variant }) {
           <Link
             href='/privacy'
             className={cn(
-              'transition-colors duration-150 ease-out',
+              'transition-colors duration-subtle ease-out',
               onCream ? 'hover:text-[#0a0a0a]' : 'hover:text-white/72'
             )}
           >
@@ -1049,7 +1060,7 @@ function Footer({ variant }: { variant: Variant }) {
           <Link
             href='/'
             className={cn(
-              'transition-colors duration-150 ease-out',
+              'transition-colors duration-subtle ease-out',
               onCream ? 'hover:text-[#0a0a0a]' : 'hover:text-white/72'
             )}
           >
