@@ -2565,6 +2565,99 @@ body:has(.system-b-download-page) .marketing-glass-header__cta:focus-visible {
   color: var(--color-brand-spotify);
 }
 
+.system-b-release-provider-banner--spotify {
+  --system-b-release-provider-accent: var(--color-brand-spotify);
+  --system-b-release-provider-accent-hover: var(--color-brand-spotify-hover);
+}
+
+.system-b-release-provider-banner--apple {
+  --system-b-release-provider-accent: var(--color-brand-apple);
+  --system-b-release-provider-accent-hover: var(--color-brand-apple-hover);
+}
+
+.system-b-release-provider-banner--accent {
+  --system-b-release-provider-accent: var(--color-accent);
+  --system-b-release-provider-accent-hover: var(--color-accent-hover);
+}
+
+.system-b-release-provider-banner {
+  border-color: color-mix(
+    in oklab,
+    var(--system-b-release-provider-accent, var(--color-accent)) 15%,
+    transparent
+  );
+  border-radius: var(--linear-app-radius-item);
+  background: color-mix(
+    in oklab,
+    var(--system-b-release-provider-accent, var(--color-accent)) 4.5%,
+    var(--linear-app-content-surface)
+  );
+}
+
+.system-b-release-provider-banner-compact {
+  border-color: color-mix(
+    in oklab,
+    var(--system-b-release-provider-accent, var(--color-accent)) 17%,
+    transparent
+  );
+  background: color-mix(
+    in oklab,
+    var(--system-b-release-provider-accent, var(--color-accent)) 6%,
+    transparent
+  );
+}
+
+.system-b-release-provider-icon {
+  background: color-mix(
+    in oklab,
+    var(--system-b-release-provider-accent, var(--color-accent)) 8%,
+    transparent
+  );
+}
+
+.system-b-release-provider-action {
+  border-color: var(--system-b-release-provider-accent, var(--color-accent));
+  background: var(--system-b-release-provider-accent, var(--color-accent));
+  color: var(--color-accent-foreground);
+}
+
+.system-b-release-provider-action:hover,
+.system-b-release-provider-action:active {
+  border-color: var(
+    --system-b-release-provider-accent-hover,
+    var(--color-accent-hover)
+  );
+  background: var(
+    --system-b-release-provider-accent-hover,
+    var(--color-accent-hover)
+  );
+  color: var(--color-accent-foreground);
+}
+
+.system-b-release-provider-progress-track {
+  background: color-mix(
+    in oklab,
+    var(--system-b-release-provider-accent, var(--color-accent)) 12%,
+    transparent
+  );
+}
+
+.system-b-release-provider-progress-fill {
+  background: var(--system-b-release-provider-accent, var(--color-accent));
+}
+
+.system-b-release-provider-spinner {
+  border-color: color-mix(
+    in oklab,
+    var(--system-b-release-provider-accent, var(--color-accent)) 30%,
+    transparent
+  );
+  border-top-color: var(
+    --system-b-release-provider-accent,
+    var(--color-accent)
+  );
+}
+
 .system-b-dsp-status-dot-live {
   background: color-mix(in oklab, var(--color-success) 72%, transparent);
 }
