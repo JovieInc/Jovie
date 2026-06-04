@@ -8,9 +8,16 @@ import { fastRender } from '@/tests/utils/fast-render';
 import { EntityHoverLink, type EntityPopoverData } from './EntityPopover';
 
 vi.mock('next/image', () => ({
-  default: ({ src, alt, ...rest }: ComponentProps<'img'>) => (
-    <img src={src as string} alt={alt ?? ''} {...rest} />
-  ),
+  default: ({
+    src,
+    alt,
+    fill: _fill,
+    unoptimized: _unoptimized,
+    ...rest
+  }: ComponentProps<'img'> & {
+    fill?: boolean;
+    unoptimized?: boolean;
+  }) => <img src={src as string} alt={alt ?? ''} {...rest} />,
 }));
 
 const release = {
@@ -102,9 +109,7 @@ describe('EntityHoverLink', () => {
 
     expect(screen.getByRole('tooltip').textContent).toContain('Spotify artist');
     expect(
-      screen
-        .getByRole('tooltip')
-        .querySelector('.system-b-entity-popover-spotify-icon')
+      screen.getByRole('tooltip').querySelector('.system-b-brand-spotify-glyph')
     ).not.toBeNull();
   });
 });
@@ -124,7 +129,7 @@ describe('EntityPopover source contract', () => {
       "import { LINEAR_SURFACE } from '@/components/tokens/linear-surface';"
     );
     expect(source).toContain('LINEAR_SURFACE.popover');
-    expect(source).toContain('system-b-entity-popover-spotify-icon');
+    expect(source).toContain('system-b-brand-spotify-glyph');
     expect(source).not.toContain('#1DB954');
     expect(source).not.toContain("'rounded-lg border border-default'");
     expect(source).not.toContain("'bg-surface-0 text-primary-token");

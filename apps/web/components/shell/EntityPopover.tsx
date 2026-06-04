@@ -212,7 +212,7 @@ export function EntityRowArt({
     const stamp = stampParts(entity.eventDate);
     if (stamp) {
       return (
-        <span className='flex h-7 w-7 shrink-0 flex-col items-center justify-center rounded-md border border-subtle bg-surface-1 shadow-app-control'>
+        <span className='flex h-7 w-7 shrink-0 flex-col items-center justify-center rounded-xl border border-subtle bg-surface-1 shadow-app-control'>
           <span className='text-3xs font-caption leading-none text-tertiary-token'>
             {stamp.month}
           </span>
@@ -229,7 +229,7 @@ export function EntityRowArt({
       entity.kind === 'contact' ||
       entity.kind === 'teammate'
         ? 'rounded-full'
-        : 'rounded-md';
+        : 'rounded-xl';
     return (
       <span
         className={cn(
@@ -256,7 +256,7 @@ export function EntityRowArt({
     <span
       className={cn(
         'flex h-7 w-7 shrink-0 items-center justify-center border border-subtle bg-surface-1 text-3xs font-caption text-primary-token shadow-app-control',
-        isCircular ? 'rounded-full' : 'rounded-md'
+        isCircular ? 'rounded-full' : 'rounded-xl'
       )}
     >
       {getInitials(entity.label) || '·'}
@@ -457,7 +457,7 @@ function CardArtwork({ entity }: { readonly entity: EntityPopoverData }) {
     const stamp = stampParts(entity.eventDate);
     if (stamp) {
       return (
-        <div className='flex h-12 w-12 shrink-0 flex-col items-center justify-center rounded-md bg-surface-1'>
+        <div className='flex h-12 w-12 shrink-0 flex-col items-center justify-center rounded-xl bg-surface-1'>
           <span className='text-3xs font-caption text-tertiary-token'>
             {stamp.month}
           </span>
@@ -477,7 +477,7 @@ function CardArtwork({ entity }: { readonly entity: EntityPopoverData }) {
       <div
         className={cn(
           'relative h-12 w-12 shrink-0 overflow-hidden',
-          isCircular ? 'rounded-full' : 'rounded-md'
+          isCircular ? 'rounded-full' : 'rounded-xl'
         )}
       >
         <Image
@@ -495,7 +495,7 @@ function CardArtwork({ entity }: { readonly entity: EntityPopoverData }) {
     <div
       className={cn(
         'flex h-12 w-12 shrink-0 items-center justify-center bg-surface-1 text-app font-caption text-primary-token',
-        isCircular ? 'rounded-full' : 'rounded-md'
+        isCircular ? 'rounded-full' : 'rounded-xl'
       )}
     >
       {getInitials(entity.label) || '·'}
@@ -532,7 +532,7 @@ function EntityCard({ entity, onActivate }: EntityCardProps) {
           {artistDisp.useSpotifyIcon ? (
             <span className='inline-flex items-center gap-1.5'>
               <Music
-                className='system-b-entity-popover-spotify-icon h-3.5 w-3.5 shrink-0'
+                className='system-b-brand-spotify-glyph h-3.5 w-3.5 shrink-0'
                 aria-hidden='true'
               />
               {artistDisp.displayLabel}
@@ -552,7 +552,7 @@ function EntityCard({ entity, onActivate }: EntityCardProps) {
                 label: artistLink,
               });
             }}
-            className='mb-2 inline-flex items-center text-2xs font-caption text-secondary-token underline decoration-subtle underline-offset-2 transition-colors duration-subtle ease-subtle hover:text-primary-token hover:decoration-default'
+            className='mb-2 inline-flex items-center text-2xs font-caption text-secondary-token underline decoration-subtle underline-offset-2 transition-colors duration-fast ease-subtle hover:text-primary-token hover:decoration-default'
           >
             {artistLink}
           </button>
@@ -679,7 +679,7 @@ export function EntityPopover({
       className={cn(
         LINEAR_SURFACE.popover,
         'text-primary-token',
-        'animate-in fade-in-0 zoom-in-95 duration-subtle ease-subtle',
+        'animate-in fade-in-0 zoom-in-95 duration-fast ease-subtle',
         pos?.side === 'left' ? 'slide-in-from-right-1' : 'slide-in-from-left-1',
         'motion-reduce:transition-opacity motion-reduce:transform-none'
       )}
@@ -797,7 +797,7 @@ export function EntityHoverLink({
         // decoration — keeps entity-rich copy from reading as a wall of
         // dotted lines while still surfacing the affordance on intent.
         className={cn(
-          'inline-flex items-center rounded-md transition-colors duration-subtle ease-subtle hover:text-primary-token',
+          'inline-flex items-center rounded-full transition-colors duration-fast ease-subtle hover:text-primary-token',
           'no-underline hover:underline focus-visible:underline underline-offset-2',
           'focus-ring-themed',
           className
