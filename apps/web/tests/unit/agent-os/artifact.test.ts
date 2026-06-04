@@ -125,6 +125,7 @@ describe('AgentRunArtifactSchema', () => {
         {
           ...baseArtifact.verificationGates[0],
           evidenceUrl: 'javascript:alert(1)',
+          artifactUrls: ['data:text/html,<script>alert(1)</script>'],
         },
       ],
     });
@@ -135,8 +136,32 @@ describe('AgentRunArtifactSchema', () => {
         ['linearIssueUrl'],
         ['pullRequestUrl'],
         ['verificationGates', 0, 'evidenceUrl'],
+        ['verificationGates', 0, 'artifactUrls', 0],
       ])
     );
+  });
+
+  it('accepts CI harness artifacts on the aggregate github.ci gate', () => {
+    const artifact = parseAgentRunArtifact({
+      ...baseArtifact,
+      verificationGates: [
+        {
+          ...baseArtifact.verificationGates[1],
+          status: 'passed',
+          artifactUrls: [
+            'https://github.com/JovieInc/Jovie/actions/runs/123/artifacts/456',
+          ],
+          summary: 'PR Ready passed; ci-harness.v1.json uploaded.',
+        },
+      ],
+    });
+
+    expect(artifact.verificationGates[0]).toMatchObject({
+      name: 'github.ci',
+      artifactUrls: [
+        'https://github.com/JovieInc/Jovie/actions/runs/123/artifacts/456',
+      ],
+    });
   });
 
   it('returns schema failures instead of throwing for malformed URLs', () => {

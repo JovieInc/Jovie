@@ -646,41 +646,21 @@ jobs:
         run: |
           PR_NUMBER="${{ needs.guard.outputs.pr_number }}"
 
-          # Get changed files
-          CHANGED_FILES=$(gh pr diff $PR_NUMBER --name-only 2>/dev/null || echo "")
+          CHANGED_FILE_LIST="$RUNNER_TEMP/agent-pipeline-changed-files.txt"
+          RISK_JSON="$RUNNER_TEMP/agent-pipeline-ci-risk.json"
+          gh pr diff "$PR_NUMBER" --name-only 2>/dev/null > "$CHANGED_FILE_LIST" || true
 
-          # Define sensitive paths that require human review
-          SENSITIVE_PATTERNS=(
-            "^\.github/"                         # CI/CD and workflow changes
-            "^drizzle/migrations/"               # Database migrations
-            "^apps/web/lib/auth/"                 # Authentication
-            "^apps/web/lib/db/"                   # Database layer
-            "^apps/web/app/api/.*/billing"        # Billing API routes
-            "^apps/web/lib/stripe/"               # Stripe/payment code
-            "^apps/web/middleware"                 # Middleware (security surface)
-            "^\.env"                              # Environment files
-            "^CODEOWNERS"                         # Code ownership
-            "^agents\.md"                         # Agent guidelines
-            "^CLAUDE\.md"                         # Agent guidelines
-            "package\.json$"                      # Dependency changes
-            "pnpm-lock\.yaml$"                    # Lock file changes
-          )
+          node scripts/ci-harness.mjs classify-risk --files "$CHANGED_FILE_LIST" > "$RISK_JSON"
+          BLOCKS_UNATTENDED=$(jq -r '.blocksUnattendedAutoMerge' "$RISK_JSON")
+          SENSITIVE_FOUND=$(jq -r '.matchedRules[] | select(.blocksUnattendedAutoMerge == true) | "\(.title): \(.files | join(", "))"' "$RISK_JSON" || true)
 
-          SENSITIVE_FOUND=""
-          for pattern in "${SENSITIVE_PATTERNS[@]}"; do
-            MATCHES=$(echo "$CHANGED_FILES" | grep -E "$pattern" || true)
-            if [[ -n "$MATCHES" ]]; then
-              SENSITIVE_FOUND="${SENSITIVE_FOUND}${MATCHES}\n"
-            fi
-          done
-
-          if [[ -n "$SENSITIVE_FOUND" ]]; then
-            echo "Sensitive files changed — requires human review:"
-            echo -e "$SENSITIVE_FOUND"
+          if [[ "$BLOCKS_UNATTENDED" == "true" ]]; then
+            echo "CI harness risk classifier blocks unattended auto-merge:"
+            echo "$SENSITIVE_FOUND"
             echo "is_safe=false" >> "$GITHUB_OUTPUT"
-            echo "sensitive_files=$(echo -e "$SENSITIVE_FOUND" | head -5 | tr '\n' ', ')" >> "$GITHUB_OUTPUT"
+            echo "sensitive_files=$(echo "$SENSITIVE_FOUND" | head -5 | tr '\n' ', ')" >> "$GITHUB_OUTPUT"
           else
-            echo "No sensitive files changed"
+            echo "CI harness risk classifier allows unattended auto-merge."
             echo "is_safe=true" >> "$GITHUB_OUTPUT"
           fi
 

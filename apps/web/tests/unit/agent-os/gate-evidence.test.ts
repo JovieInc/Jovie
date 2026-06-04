@@ -197,6 +197,24 @@ describe('AgentOS gate evidence', () => {
     expect(evaluation.passed).toBe(true);
   });
 
+  it('accepts uploaded artifact URLs as gate evidence', () => {
+    const evaluation = evaluateAgentRunGateEvidence(
+      formatAgentRunArtifactComment({
+        ...baseArtifact,
+        verificationGates: baseArtifact.verificationGates.map(gate => ({
+          ...gate,
+          evidenceUrl: null,
+          artifactUrls: [
+            'https://github.com/JovieInc/Jovie/actions/runs/123/artifacts/456',
+          ],
+          summary: null,
+        })),
+      })
+    );
+
+    expect(evaluation.passed).toBe(true);
+  });
+
   it('can require evidence from the current source run', () => {
     const markdown = [
       formatAgentRunArtifactComment(baseArtifact),

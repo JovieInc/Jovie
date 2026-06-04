@@ -1,0 +1,128 @@
+name: Test Flakiness Report
+
+on:
+  workflow_run:
+    workflows: ["CI"]
+    types: [completed]
+  schedule:
+    # Generate weekly flakiness report every Monday at 08:00 UTC.
+    - cron: '0 8 * * 1'
+  workflow_dispatch:
+
+concurrency:
+  group: test-flakiness-report
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  issues: write
+  actions: read
+
+jobs:
+  analyze-flakiness:
+    name: Analyze Test Flakiness
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Analyze test results from recent runs
+        id: analyze
+        continue-on-error: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+        run: node .github/scripts/analyze-test-flakiness.js
+
+      - name: Upload flakiness report
+        if: always() && hashFiles('flakiness-report.md') != ''
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: flakiness-report-${{ github.run_id }}-${{ github.run_attempt }}
+          path: flakiness-report.md
+          retention-days: 90
+
+      - name: Find or create tracking issue
+        id: find-issue
+        if: always() && hashFiles('flakiness-report.md') != ''
+        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8.0.0
+        with:
+          script: |
+            const { data: issues } = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              labels: 'test-flakiness',
+              per_page: 1
+            });
+
+            if (issues.length > 0) {
+              core.setOutput('issue_number', issues[0].number);
+              core.setOutput('issue_exists', 'true');
+            } else {
+              core.setOutput('issue_exists', 'false');
+            }
+
+      - name: Create or update tracking issue
+        if: always() && hashFiles('flakiness-report.md') != ''
+        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8.0.0
+        env:
+          FLAKY_COUNT: ${{ steps.analyze.outputs.flaky_count || '0' }}
+          ISSUE_EXISTS: ${{ steps.find-issue.outputs.issue_exists }}
+          ISSUE_NUMBER: ${{ steps.find-issue.outputs.issue_number }}
+        with:
+          script: |
+            const fs = require('fs');
+            const report = fs.readFileSync('flakiness-report.md', 'utf8');
+            const flakyCount = Number.parseInt(process.env.FLAKY_COUNT || '0', 10);
+            const issueExists = process.env.ISSUE_EXISTS === 'true';
+            const issueNumber = process.env.ISSUE_NUMBER;
+            const workflowUrl = `${context.payload.repository.html_url}/actions/workflows/test-flakiness-report.yml`;
+            const body = `${report}\n\n---\n\nThis issue is automatically updated by the [Test Flakiness Report workflow](${workflowUrl}). The workflow is report-only and does not change quarantine files.`;
+
+            if (flakyCount === 0) {
+              if (issueExists) {
+                await github.rest.issues.update({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: issueNumber,
+                  state: 'closed',
+                  body: `${body}\n\nClosed: no flaky tests detected in the latest report.`
+                });
+                console.log(`Closed issue #${issueNumber} - no flaky tests detected`);
+              }
+              return;
+            }
+
+            if (issueExists) {
+              await github.rest.issues.update({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: issueNumber,
+                body
+              });
+              console.log(`Updated issue #${issueNumber} with latest flakiness report`);
+            } else {
+              const { data: newIssue } = await github.rest.issues.create({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                title: `Test Flakiness Detected - ${flakyCount} flaky tests`,
+                body,
+                labels: ['test-flakiness', 'automated']
+              });
+              console.log(`Created new tracking issue #${newIssue.number}`);
+            }
+
+      - name: Summarize report
+        if: always()
+        env:
+          FLAKY_COUNT: ${{ steps.analyze.outputs.flaky_count || '0' }}
+          RETRY_RATE: ${{ steps.analyze.outputs.retry_rate || '0' }}
+        run: |
+          {
+            echo "### Test flakiness report"
+            echo
+            echo "- Flaky tests: $FLAKY_COUNT"
+            echo "- Retry rate: $RETRY_RATE%"
+            echo "- Mode: report-only"
+          } >> "$GITHUB_STEP_SUMMARY"

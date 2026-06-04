@@ -1,0 +1,105 @@
+import { describe, expect, it } from 'vitest';
+import {
+  buildCiHarnessArtifact,
+  classifyCiRisk,
+  generateCiHarnessDocs,
+  loadCiHarnessManifest,
+  replaceGeneratedBlock,
+  validateCiHarnessManifest,
+} from '../ci-harness.mjs';
+
+const manifest = loadCiHarnessManifest();
+
+describe('ci-harness manifest', () => {
+  it('validates the checked-in manifest', () => {
+    const validation = validateCiHarnessManifest(manifest);
+    expect(validation.errors).toEqual([]);
+    expect(validation.ok).toBe(true);
+  });
+
+  it('generates stable docs from tiers, merge gates, and risk rules', () => {
+    const docs = generateCiHarnessDocs(manifest, 'CI Agent Harness');
+    expect(docs).toContain('Generated from `.github/ci-harness/manifest.json`');
+    expect(docs).toContain('| Fast Gate |');
+    expect(docs).toContain(
+      '`PR Ready` may require only jobs declared as merge gates'
+    );
+    expect(docs).toContain('| Auth and identity | high | yes | yes | yes |');
+  });
+
+  it('replaces an existing generated docs block', () => {
+    const existing = [
+      '# Doc',
+      '',
+      '<!-- ci-harness:start -->',
+      'stale',
+      '<!-- ci-harness:end -->',
+      '',
+      'tail',
+      '',
+    ].join('\n');
+    const next = replaceGeneratedBlock(existing, 'fresh');
+    expect(next).toBe(['# Doc', '', 'fresh', '', 'tail', ''].join('\n'));
+  });
+});
+
+describe('ci-harness risk classifier', () => {
+  it('requires smoke, preview, and human review for auth changes', () => {
+    const risk = classifyCiRisk(['apps/web/lib/auth/gate.ts'], manifest);
+    expect(risk.riskLevel).toBe('high');
+    expect(risk.requiresSmoke).toBe(true);
+    expect(risk.requiresPreview).toBe(true);
+    expect(risk.blocksUnattendedAutoMerge).toBe(true);
+    expect(risk.matchedRules.map(rule => rule.id)).toContain('auth-identity');
+  });
+
+  it('requires preview but does not block unattended auto-merge for public UI only', () => {
+    const risk = classifyCiRisk(
+      ['apps/web/components/features/profile/ProfileCompactSurface.tsx'],
+      manifest
+    );
+    expect(risk.riskLevel).toBe('medium');
+    expect(risk.requiresSmoke).toBe(false);
+    expect(risk.requiresPreview).toBe(true);
+    expect(risk.blocksUnattendedAutoMerge).toBe(false);
+  });
+
+  it('treats workflow edits as high-risk control-plane changes', () => {
+    const risk = classifyCiRisk(['.github/workflows/ci.yml'], manifest);
+    expect(risk.riskLevel).toBe('high');
+    expect(risk.requiresSmoke).toBe(true);
+    expect(risk.requiresPreview).toBe(false);
+    expect(risk.blocksUnattendedAutoMerge).toBe(true);
+  });
+});
+
+describe('ci-harness artifact formatter', () => {
+  it('emits required gates, remediation commands, preview URL, and risk evidence', () => {
+    const risk = classifyCiRisk(['apps/web/lib/auth/gate.ts'], manifest);
+    const artifact = buildCiHarnessArtifact({
+      runId: '123',
+      runAttempt: '2',
+      repository: 'JovieInc/Jovie',
+      prNumber: '99',
+      sha: 'abc123',
+      previewUrl: 'https://preview.example.com',
+      manifest,
+      risk,
+      jobResults: [
+        { id: 'ci-fast', status: 'success' },
+        { id: 'ci-structural-contract', status: 'failure' },
+        { id: 'ci-build-public', status: 'skipped', skipReason: 'docs only' },
+      ],
+    });
+
+    expect(artifact.schemaVersion).toBe(1);
+    expect(artifact.evidence.previewUrl).toBe('https://preview.example.com');
+    expect(artifact.evidence.risk.requiresSmoke).toBe(true);
+    expect(artifact.requiredGates.map(job => job.id)).toContain(
+      'ci-structural-contract'
+    );
+    expect(artifact.nextLocalCommands).toContain(
+      'pnpm ci:harness:check && pnpm next:proxy-guard && pnpm tailwind:check && pnpm --filter=@jovie/web run lint:no-native-dialogs'
+    );
+  });
+});

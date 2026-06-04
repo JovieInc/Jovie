@@ -19,8 +19,7 @@
 # 4. CI PR Ready check = success
 # 5. Scope judge = success
 # 6. CodeRabbit not blocking (no CHANGES_REQUESTED)
-# 7. No sensitive files (.github/, drizzle/migrations/, auth, billing, stripe,
-#    middleware, .env, package.json, pnpm-lock.yaml)
+# 7. CI harness risk classifier does not block unattended auto-merge
 # 8. Queue pressure guard: defers if 12+ other PRs already queued for auto-merge
 #
 # RELATIONSHIP TO agent-pipeline.yml:
@@ -63,6 +62,15 @@ jobs:
         with:
           app-id: ${{ vars.JOVIE_BOT_APP_ID }}
           private-key: ${{ secrets.JOVIE_BOT_PRIVATE_KEY }}
+
+      - name: Checkout main policy code
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          ref: main
+          persist-credentials: false
+
+      - name: Setup Node.js and pnpm
+        uses: ./.github/actions/setup-node-pnpm
 
       - name: Sweep and land eligible agent PRs
         env:
@@ -122,26 +130,7 @@ jobs:
           fi
 
           # ------------------------------------------------------------------
-          # 4. Sensitive path patterns (mirror agent-pipeline.yml)
-          # ------------------------------------------------------------------
-          SENSITIVE_PATTERNS=(
-            "^\.github/"
-            "^drizzle/migrations/"
-            "^apps/web/lib/auth/"
-            "^apps/web/lib/db/"
-            "^apps/web/app/api/.*/billing"
-            "^apps/web/lib/stripe/"
-            "^apps/web/middleware"
-            "^\.env"
-            "^CODEOWNERS"
-            "^agents\.md"
-            "^CLAUDE\.md"
-            "package\.json$"
-            "pnpm-lock\.yaml$"
-          )
-
-          # ------------------------------------------------------------------
-          # 5. Walk each agent PR and evaluate eligibility
+          # 4. Walk each agent PR and evaluate eligibility
           # ------------------------------------------------------------------
           LANDED=0
           SKIPPED=0
@@ -228,17 +217,16 @@ jobs:
               SKIPPED=$((SKIPPED + 1))
               continue
             fi
-            SENSITIVE_FOUND=""
-            for pattern in "${SENSITIVE_PATTERNS[@]}"; do
-              MATCHES=$(echo "$CHANGED_FILES" | grep -Ei "$pattern" || true)
-              if [[ -n "$MATCHES" ]]; then
-                SENSITIVE_FOUND="${SENSITIVE_FOUND}${MATCHES}\n"
-              fi
-            done
 
-            if [[ -n "$SENSITIVE_FOUND" ]]; then
-              echo "Sensitive files changed — requires human review:"
-              echo -e "$SENSITIVE_FOUND"
+            CHANGED_FILE_LIST="$RUNNER_TEMP/agent-landing-$PR_NUMBER-changed-files.txt"
+            RISK_JSON="$RUNNER_TEMP/agent-landing-$PR_NUMBER-ci-risk.json"
+            printf '%s\n' "$CHANGED_FILES" > "$CHANGED_FILE_LIST"
+            node scripts/ci-harness.mjs classify-risk --files "$CHANGED_FILE_LIST" > "$RISK_JSON"
+            BLOCKS_UNATTENDED=$(jq -r '.blocksUnattendedAutoMerge' "$RISK_JSON")
+
+            if [[ "$BLOCKS_UNATTENDED" == "true" ]]; then
+              echo "CI harness risk classifier blocks unattended auto-merge:"
+              jq -r '.matchedRules[] | select(.blocksUnattendedAutoMerge == true) | "- \(.title): \(.files | join(", "))"' "$RISK_JSON"
               SKIPPED=$((SKIPPED + 1))
               continue
             fi
