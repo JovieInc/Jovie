@@ -1,7 +1,14 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { OtpInput } from '@/features/auth/atoms/otp-input';
+
+const otpInputSourcePath = resolve(
+  process.cwd(),
+  'components/features/auth/atoms/otp-input/OtpInput.tsx'
+);
 
 // Mock haptic feedback hook
 vi.mock('@/hooks/useHapticFeedback', () => ({
@@ -162,6 +169,27 @@ describe('OtpInput', () => {
       '[class*="rounded-full"][class*="bg-"]'
     );
     expect(progressDots.length).toBe(6);
+    for (const dot of progressDots) {
+      expect(dot.className).toContain('h-1');
+      expect(dot.className).toContain('w-1');
+      expect(dot.className).not.toMatch(/\b(?:transition-all|scale-125)\b/);
+    }
+    expect(progressDots[0]?.className).toContain('bg-primary-token');
+    expect(progressDots[3]?.className).toContain('bg-tertiary-token');
+  });
+
+  it('keeps progress dots fixed-size with System B tokens', () => {
+    const source = readFileSync(otpInputSourcePath, 'utf8');
+
+    expect(source).not.toMatch(
+      /\b(?:transition-all|transition-transform|scale-(?:95|100|105|110|125))\b/
+    );
+    expect(source).not.toContain('profile-pearl');
+    expect(source).toContain(
+      'h-1 w-1 rounded-full transition-[background-color,opacity] duration-subtle ease-subtle'
+    );
+    expect(source).toContain('bg-primary-token opacity-100');
+    expect(source).toContain('bg-tertiary-token opacity-35');
   });
 
   it('supports controlled value', () => {

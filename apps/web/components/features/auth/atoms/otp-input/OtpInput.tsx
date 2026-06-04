@@ -92,10 +92,10 @@ export function OtpInput({
             <div
               key={key}
               className={cn(
-                'h-1 w-1 rounded-full transition-all duration-200',
+                'h-1 w-1 rounded-full transition-[background-color,opacity] duration-subtle ease-subtle',
                 i < currentValue.length
-                  ? 'scale-125 bg-[var(--profile-pearl-primary-bg)]'
-                  : 'bg-[color:var(--profile-pearl-border)]'
+                  ? 'bg-primary-token opacity-100'
+                  : 'bg-tertiary-token opacity-35'
               )}
             />
           ))}
