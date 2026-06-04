@@ -1,9 +1,9 @@
-import { clerkClient } from '@clerk/nextjs/server';
+import { getRequestClerkClient } from '@/lib/auth/request-clerk-client';
 
 export async function getMobileSessionUserId(
   request: Request
 ): Promise<string | null> {
-  const clerk = await clerkClient();
+  const clerk = await getRequestClerkClient(request);
   const requestState = await clerk.authenticateRequest(request, {
     acceptsToken: 'session_token',
   });

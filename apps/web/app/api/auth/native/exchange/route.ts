@@ -1,11 +1,11 @@
 import { createHash } from 'node:crypto';
-import { clerkClient } from '@clerk/nextjs/server';
 import {
   createAuthAnalyticsEvent,
   isAuthClient,
   type NativeAuthClient,
 } from '@jovie/auth-routing';
 import { NextResponse } from 'next/server';
+import { getRequestClerkClient } from '@/lib/auth/request-clerk-client';
 import { consumeStoredNativeExchangeCode } from '@/lib/auth/routing-state.server';
 import { captureError } from '@/lib/error-tracking';
 import { NO_STORE_HEADERS } from '@/lib/http/headers';
@@ -110,7 +110,7 @@ function isIosSessionTokenUnavailableError(error: unknown): boolean {
 }
 
 async function createNativeSignInTicketPayload(
-  clerk: Awaited<ReturnType<typeof clerkClient>>,
+  clerk: Awaited<ReturnType<typeof getRequestClerkClient>>,
   userId: string
 ): Promise<NativeExchangePayload> {
   const signInToken = await clerk.signInTokens.createSignInToken({
@@ -197,7 +197,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const clerk = await clerkClient();
+    const clerk = await getRequestClerkClient(request);
     let exchangePayload: NativeExchangePayload;
     try {
       exchangePayload =
@@ -252,14 +252,14 @@ export async function POST(request: Request) {
 }
 
 async function createDesktopNativeExchangePayload(
-  clerk: Awaited<ReturnType<typeof clerkClient>>,
+  clerk: Awaited<ReturnType<typeof getRequestClerkClient>>,
   userId: string
 ): Promise<NativeExchangePayload> {
   return createNativeSignInTicketPayload(clerk, userId);
 }
 
 async function createIosNativeExchangePayload(
-  clerk: Awaited<ReturnType<typeof clerkClient>>,
+  clerk: Awaited<ReturnType<typeof getRequestClerkClient>>,
   userId: string
 ): Promise<NativeExchangePayload> {
   try {

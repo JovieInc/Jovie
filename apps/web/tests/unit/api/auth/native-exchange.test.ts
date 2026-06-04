@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const {
   mockCaptureError,
   mockClerkClient,
+  mockCreateClerkClient,
   mockConsumeStoredNativeExchangeCode,
   mockCreateAuthAnalyticsEvent,
   mockCreateRateLimitHeaders,
@@ -16,6 +17,7 @@ const {
 } = vi.hoisted(() => ({
   mockCaptureError: vi.fn(),
   mockClerkClient: vi.fn(),
+  mockCreateClerkClient: vi.fn(),
   mockConsumeStoredNativeExchangeCode: vi.fn(),
   mockCreateAuthAnalyticsEvent: vi.fn(),
   mockCreateRateLimitHeaders: vi.fn(),
@@ -29,6 +31,10 @@ const {
 
 vi.mock('@clerk/nextjs/server', () => ({
   clerkClient: mockClerkClient,
+}));
+
+vi.mock('@clerk/backend', () => ({
+  createClerkClient: mockCreateClerkClient,
 }));
 
 vi.mock('@jovie/auth-routing', () => ({
@@ -60,6 +66,23 @@ function createExchangeRequest() {
   return new NextRequest('https://jov.ie/api/auth/native/exchange', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      client: 'ios',
+      code: 'native_code',
+      state: 'native_state',
+      codeVerifier: 'native_verifier',
+    }),
+  });
+}
+
+function createStagingExchangeRequest() {
+  return new NextRequest('https://staging.jov.ie/api/auth/native/exchange', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      host: 'staging.jov.ie',
+      'x-forwarded-host': 'staging.jov.ie',
+    },
     body: JSON.stringify({
       client: 'ios',
       code: 'native_code',
@@ -113,7 +136,7 @@ describe('POST /api/auth/native/exchange', () => {
     mockSessionsGetToken.mockResolvedValue({
       jwt: 'ios_session_token',
     });
-    mockClerkClient.mockResolvedValue({
+    const clerkApi = {
       sessions: {
         createSession: mockSessionsCreateSession,
         getToken: mockSessionsGetToken,
@@ -121,7 +144,9 @@ describe('POST /api/auth/native/exchange', () => {
       signInTokens: {
         createSignInToken: mockSignInTokensCreateSignInToken,
       },
-    });
+    };
+    mockClerkClient.mockResolvedValue(clerkApi);
+    mockCreateClerkClient.mockReturnValue(clerkApi);
     mockTrackServerEvent.mockResolvedValue(undefined);
   });
 
@@ -250,6 +275,38 @@ describe('POST /api/auth/native/exchange', () => {
     });
     expect(mockSessionsGetToken).not.toHaveBeenCalled();
     expect(mockCaptureError).not.toHaveBeenCalled();
+  });
+
+  it('uses staging Clerk keys for iOS native exchange on staging hosts', async () => {
+    vi.stubEnv('NODE_ENV', 'production');
+    vi.stubEnv('VERCEL_ENV', 'production');
+    vi.stubEnv('NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY', 'pk_live_production');
+    vi.stubEnv('CLERK_SECRET_KEY', 'sk_live_production');
+    vi.stubEnv('CLERK_PUBLISHABLE_KEY_STAGING', 'pk_live_staging');
+    vi.stubEnv('CLERK_SECRET_KEY_STAGING', 'sk_live_staging');
+    const unavailableError = new Error('Bad Request');
+    Object.assign(unavailableError, {
+      status: 400,
+      errors: [{ code: 'request_invalid_for_environment' }],
+    });
+    mockSessionsCreateSession.mockRejectedValue(unavailableError);
+
+    const { POST } = await import('@/app/api/auth/native/exchange/route');
+    const response = await POST(createStagingExchangeRequest());
+    const data = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(data).toMatchObject({
+      returnTo: '/app',
+      ticket: 'sign_in_ticket',
+      userId: 'user_native',
+      expiresInSeconds: 60,
+    });
+    expect(mockCreateClerkClient).toHaveBeenCalledWith({
+      publishableKey: 'pk_live_staging',
+      secretKey: 'sk_live_staging',
+    });
+    expect(mockClerkClient).not.toHaveBeenCalled();
   });
 
   it('accepts the Mac OS native exchange client and passes through its PKCE verifier', async () => {
