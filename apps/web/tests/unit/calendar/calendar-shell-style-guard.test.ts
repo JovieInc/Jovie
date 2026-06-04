@@ -11,6 +11,8 @@ const CALENDAR_CLIENT = join(
 const CHROME_CLASS_PATTERN = /(?:^|\s)(?:uppercase|tracking-[^\s'"]+)/;
 const LABEL_ELEMENT_PATTERN =
   /<(?:h3|h4|span)\b[\s\S]*?className=(?:'[^']*'|"[^"]*"|\{[^}]*\})[\s\S]*?>/g;
+const ROUTE_LOCAL_VISUAL_PATTERN =
+  /(?:text-\[[^\]]+\]|(?:min-[hw]|max-[hw]|w|h)-\[[^\]]+\]|border-\(--linear-[^)]+\)(?:\/\d+)?|(?:bg|text|border|accent)-(?:emerald|red|amber|violet|cyan)-[^\s'"]+|(?:bg|text)-quaternary-token\/\d+)/;
 
 function lineNumberFor(source: string, index: number): number {
   return source.slice(0, index).split('\n').length;
@@ -38,5 +40,23 @@ describe('calendar shell style guard', () => {
     const source = readFileSync(CALENDAR_CLIENT, 'utf8');
 
     expect(source).toContain('DAY_NAMES.map');
+  });
+
+  it('keeps route-local calendar chrome on named System B classes', () => {
+    const source = readFileSync(CALENDAR_CLIENT, 'utf8');
+    const offenders = source
+      .split('\n')
+      .map((line, index) => ({ line, lineNumber: index + 1 }))
+      .filter(({ line }) => ROUTE_LOCAL_VISUAL_PATTERN.test(line))
+      .map(
+        ({ line, lineNumber }) =>
+          `CalendarPageClient.tsx:${lineNumber} ${line.trim()}`
+      );
+
+    expect(source).toContain('system-b-calendar-day-cell');
+    expect(
+      offenders,
+      `Calendar visual chrome should use named system-b-calendar-* classes backed by design-system.css.\n${offenders.join('\n')}`
+    ).toEqual([]);
   });
 });

@@ -134,12 +134,12 @@ function buildMonthGrid(
 function statusTone(status: ReleaseDot['status']): string {
   switch (status) {
     case 'released':
-      return 'bg-emerald-400';
+      return 'system-b-calendar-release-dot-released';
     case 'scheduled':
-      return 'bg-cyan-400';
+      return 'system-b-calendar-release-dot-scheduled';
     case 'draft':
     default:
-      return 'bg-quaternary-token/60';
+      return 'system-b-calendar-release-dot-draft';
   }
 }
 
@@ -155,12 +155,12 @@ function eventDotClasses(event: EventRecord): string {
   // dashed border on pending signals "not yet trusted."
   const base = 'h-1.5 w-1.5 rounded-sm shrink-0';
   if (event.confirmationStatus === 'pending') {
-    return cn(base, 'border border-dashed border-amber-400/80 bg-transparent');
+    return cn(base, 'system-b-calendar-event-dot-pending');
   }
   if (event.confirmationStatus === 'rejected') {
-    return cn(base, 'bg-quaternary-token/40');
+    return cn(base, 'system-b-calendar-event-dot-rejected');
   }
-  return cn(base, 'bg-violet-400');
+  return cn(base, 'system-b-calendar-event-dot-confirmed');
 }
 
 function formatReviewedAt(iso: string | null): string | null {
@@ -468,7 +468,7 @@ export function CalendarPageClient() {
               >
                 <ChevronLeft className='h-4 w-4' strokeWidth={2.25} />
               </button>
-              <h2 className='min-w-[9.5rem] text-center text-[15px] font-medium text-primary-token tabular-nums'>
+              <h2 className='system-b-calendar-month-label'>
                 {MONTH_NAMES[cursor.getMonth()]} {cursor.getFullYear()}
               </h2>
               <button
@@ -487,7 +487,7 @@ export function CalendarPageClient() {
             <button
               type='button'
               onClick={() => setCursor(startOfMonth(new Date()))}
-              className='h-7 rounded-full bg-surface-1 px-3 text-[12px] font-caption text-tertiary-token transition-colors duration-subtle ease-subtle hover:bg-surface-0 hover:text-primary-token'
+              className='system-b-calendar-toolbar-button h-7 rounded-full bg-surface-1 px-3 font-caption text-tertiary-token transition-colors duration-subtle ease-subtle hover:bg-surface-0 hover:text-primary-token'
             >
               Today
             </button>
@@ -498,7 +498,7 @@ export function CalendarPageClient() {
               {DAY_NAMES.map(d => (
                 <div
                   key={d}
-                  className='px-2 py-2 text-center text-[10.5px] font-caption text-quaternary-token'
+                  className='system-b-calendar-weekday px-2 py-2 font-caption text-quaternary-token'
                 >
                   {d}
                 </div>
@@ -525,20 +525,21 @@ export function CalendarPageClient() {
                     type='button'
                     onClick={() => setSelectedDay(cell.date)}
                     className={cn(
-                      'relative flex min-h-[88px] flex-col items-start gap-1 border-(--linear-app-shell-border)/40 border-r border-b px-2 pt-2 pb-1.5 text-left transition-colors duration-subtle ease-subtle',
+                      'system-b-calendar-day-cell relative flex flex-col items-start gap-1 border-r border-b px-2 pt-2 pb-1.5 text-left transition-colors duration-subtle ease-subtle',
                       cell.inMonth
                         ? 'hover:bg-surface-0'
-                        : 'text-quaternary-token/70',
-                      isSelected && 'bg-cyan-300/[0.06]',
-                      cell.isToday &&
-                        'before:absolute before:top-1.5 before:left-1.5 before:h-1.5 before:w-1.5 before:rounded-full before:bg-cyan-300'
+                        : 'system-b-calendar-day-cell-muted',
+                      isSelected && 'system-b-calendar-day-cell-selected',
+                      cell.isToday && 'system-b-calendar-day-cell-today'
                     )}
                   >
                     <span
                       className={cn(
-                        'text-[12px] font-caption tabular-nums',
-                        cell.isToday && 'pl-3 font-medium text-primary-token',
-                        !cell.isToday && cell.inMonth && 'text-secondary-token'
+                        'system-b-calendar-day-number font-caption tabular-nums',
+                        cell.isToday && 'system-b-calendar-day-number-today',
+                        !cell.isToday &&
+                          cell.inMonth &&
+                          'system-b-calendar-day-number-current'
                       )}
                     >
                       {cell.date.getDate()}
@@ -558,7 +559,7 @@ export function CalendarPageClient() {
                                 statusTone(r.status)
                               )}
                             />
-                            <span className='truncate text-[10.5px] text-secondary-token'>
+                            <span className='system-b-calendar-cell-item-text truncate'>
                               {r.title}
                             </span>
                           </div>
@@ -577,12 +578,12 @@ export function CalendarPageClient() {
                               />
                               <span
                                 className={cn(
-                                  'truncate text-[10.5px]',
+                                  'truncate',
                                   e.confirmationStatus === 'pending'
-                                    ? 'text-tertiary-token italic'
+                                    ? 'system-b-calendar-cell-event-pending'
                                     : e.confirmationStatus === 'rejected'
-                                      ? 'text-quaternary-token line-through'
-                                      : 'text-secondary-token'
+                                      ? 'system-b-calendar-cell-event-rejected'
+                                      : 'system-b-calendar-cell-item-text'
                                 )}
                               >
                                 {e.title}
@@ -590,7 +591,7 @@ export function CalendarPageClient() {
                             </div>
                           ))}
                         {overflow > 0 && (
-                          <span className='text-[10px] text-quaternary-token'>
+                          <span className='system-b-calendar-overflow-count'>
                             +{overflow} more
                           </span>
                         )}
@@ -604,7 +605,7 @@ export function CalendarPageClient() {
 
           {selectedDay && (
             <section className='rounded-lg border border-subtle bg-surface-1 p-4 shadow-card'>
-              <h3 className='text-[13px] font-medium text-primary-token'>
+              <h3 className='system-b-calendar-detail-heading font-medium'>
                 {selectedDay.toLocaleDateString(undefined, {
                   weekday: 'long',
                   month: 'long',
@@ -614,13 +615,15 @@ export function CalendarPageClient() {
               </h3>
 
               {actionError && (
-                <p className='mt-2 text-[12px] text-red-300'>{actionError}</p>
+                <p className='system-b-calendar-error-text mt-2'>
+                  {actionError}
+                </p>
               )}
 
               {/* Releases */}
               {selectedReleases.length > 0 && (
                 <div className='mt-3'>
-                  <h4 className='text-[12px] font-medium text-secondary-token'>
+                  <h4 className='system-b-calendar-detail-section-heading font-medium'>
                     Releases
                   </h4>
                   <ul className='mt-2 flex flex-col gap-2'>
@@ -639,10 +642,10 @@ export function CalendarPageClient() {
                           )}
                         </div>
                         <div className='min-w-0 flex-1'>
-                          <div className='text-[12.5px] font-caption text-primary-token truncate'>
+                          <div className='system-b-calendar-row-title truncate font-caption'>
                             {r.title}
                           </div>
-                          <div className='text-[11px] text-tertiary-token capitalize'>
+                          <div className='system-b-calendar-row-meta capitalize'>
                             {r.status}
                           </div>
                         </div>
@@ -655,7 +658,7 @@ export function CalendarPageClient() {
               {/* Confirmed events */}
               {confirmedSelectedEvents.length > 0 && (
                 <div className='mt-4'>
-                  <h4 className='text-[12px] font-medium text-secondary-token'>
+                  <h4 className='system-b-calendar-detail-section-heading font-medium'>
                     Events
                   </h4>
                   <ul className='mt-2 flex flex-col gap-2'>
@@ -676,7 +679,7 @@ export function CalendarPageClient() {
               {pendingSelectedEvents.length > 0 && (
                 <div className='mt-4'>
                   <div className='flex items-center justify-between'>
-                    <h4 className='text-[12px] font-medium text-amber-300'>
+                    <h4 className='system-b-calendar-warning-heading font-medium'>
                       Pending review · {pendingSelectedEvents.length}
                     </h4>
                   </div>
@@ -700,7 +703,7 @@ export function CalendarPageClient() {
                         type='button'
                         onClick={handleBulkConfirm}
                         disabled={isActionPending}
-                        className='h-7 rounded-md bg-emerald-500/15 px-3 text-[12px] font-caption text-emerald-300 transition-colors duration-subtle ease-subtle hover:bg-emerald-500/25'
+                        className='system-b-calendar-action-confirm h-7 rounded-md px-3 font-caption transition-colors duration-subtle ease-subtle'
                       >
                         Confirm selected ({selectedPendingIds.size})
                       </button>
@@ -708,7 +711,7 @@ export function CalendarPageClient() {
                         type='button'
                         onClick={handleBulkReject}
                         disabled={isActionPending}
-                        className='h-7 rounded-md bg-red-500/15 px-3 text-[12px] font-caption text-red-300 transition-colors duration-subtle ease-subtle hover:bg-red-500/25'
+                        className='system-b-calendar-action-reject h-7 rounded-md px-3 font-caption transition-colors duration-subtle ease-subtle'
                       >
                         Reject selected ({selectedPendingIds.size})
                       </button>
@@ -716,7 +719,7 @@ export function CalendarPageClient() {
                         type='button'
                         onClick={() => setSelectedPendingIds(new Set())}
                         disabled={isActionPending}
-                        className='h-7 rounded-md px-2 text-[11px] text-tertiary-token transition-colors duration-subtle ease-subtle hover:text-primary-token'
+                        className='system-b-calendar-action-ghost h-7 rounded-md px-2 text-tertiary-token transition-colors duration-subtle ease-subtle hover:text-primary-token'
                       >
                         Clear
                       </button>
@@ -733,7 +736,7 @@ export function CalendarPageClient() {
                     onClick={() => setShowRejected(s => !s)}
                     aria-expanded={showRejected}
                     aria-controls='rejected-events-list'
-                    className='text-[11px] font-caption text-quaternary-token transition-colors duration-subtle ease-subtle hover:text-tertiary-token'
+                    className='system-b-calendar-rejected-toggle font-caption text-quaternary-token transition-colors duration-subtle ease-subtle hover:text-tertiary-token'
                   >
                     {showRejected
                       ? 'Hide rejected'
@@ -759,7 +762,7 @@ export function CalendarPageClient() {
               )}
 
               {selectedReleases.length === 0 && selectedEvents.length === 0 && (
-                <p className='mt-2 text-[12px] text-tertiary-token'>
+                <p className='system-b-calendar-empty-day mt-2 text-tertiary-token'>
                   Nothing on this day.
                 </p>
               )}
@@ -767,7 +770,7 @@ export function CalendarPageClient() {
           )}
 
           {isLoading && (
-            <div className='text-[12px] text-quaternary-token'>
+            <div className='system-b-calendar-loading-text text-quaternary-token'>
               Loading calendar…
             </div>
           )}
@@ -791,11 +794,11 @@ function FilterPill(props: FilterPillProps) {
       onClick={props.onClick}
       aria-pressed={props.active}
       className={cn(
-        'h-7 rounded-full px-3 text-[11.5px] font-caption transition-colors duration-subtle ease-subtle',
+        'system-b-calendar-filter-pill h-7 rounded-full px-3 font-caption transition-colors duration-subtle ease-subtle',
         props.active
           ? props.tone === 'warn'
-            ? 'bg-amber-400/15 text-amber-300'
-            : 'bg-surface-1 text-primary-token'
+            ? 'system-b-calendar-filter-pill-warn'
+            : 'system-b-calendar-filter-pill-active'
           : 'text-tertiary-token hover:text-primary-token hover:bg-surface-1'
       )}
     >
@@ -820,7 +823,7 @@ function EventRow(props: EventRowProps) {
   const reviewedLabel = formatReviewedAt(event.reviewedAt);
   const safeTicketUrl = normalizeTicketUrl(event.ticketUrl);
   return (
-    <li className='flex items-start gap-3 rounded-lg border border-(--linear-app-shell-border)/60 p-3'>
+    <li className='system-b-calendar-event-row flex items-start gap-3 rounded-lg border p-3'>
       {props.variant === 'pending' && props.onToggleSelect && (
         <input
           type='checkbox'
@@ -828,32 +831,32 @@ function EventRow(props: EventRowProps) {
           onChange={props.onToggleSelect}
           disabled={props.disabled}
           aria-label={`Select ${event.title}`}
-          className='mt-1 h-3.5 w-3.5 accent-amber-400 cursor-pointer'
+          className='system-b-calendar-pending-checkbox mt-1 h-3.5 w-3.5 cursor-pointer'
         />
       )}
       <div className='min-w-0 flex-1'>
         <div className='flex items-center gap-2 flex-wrap'>
-          <span className='text-[12.5px] font-caption text-primary-token truncate'>
+          <span className='system-b-calendar-row-title truncate font-caption'>
             {event.title}
           </span>
           <ProviderChip provider={event.provider ?? 'Manual'} />
           <TypeChip type={event.eventType} />
           {event.status && (
-            <span className='text-[10.5px] text-amber-400/90'>
+            <span className='system-b-calendar-status-text'>
               {event.status}
             </span>
           )}
         </div>
-        <div className='mt-1 text-[10.5px] text-tertiary-token'>
+        <div className='system-b-calendar-row-description mt-1 text-tertiary-token'>
           {event.subtitle}
         </div>
         {props.variant === 'pending' && event.lastSyncedAt && (
-          <div className='mt-1 text-[10px] text-quaternary-token'>
+          <div className='system-b-calendar-row-secondary mt-1 text-quaternary-token'>
             Last synced {formatReviewedAt(event.lastSyncedAt)}
           </div>
         )}
         {props.variant === 'confirmed' && reviewedLabel && (
-          <div className='mt-1 text-[10px] text-quaternary-token'>
+          <div className='system-b-calendar-row-secondary mt-1 text-quaternary-token'>
             Reviewed {reviewedLabel}
           </div>
         )}
@@ -864,7 +867,7 @@ function EventRow(props: EventRowProps) {
             href={safeTicketUrl}
             target='_blank'
             rel='noreferrer'
-            className='grid h-7 place-items-center rounded-md px-2 text-[11px] text-tertiary-token transition-colors duration-subtle ease-subtle hover:bg-surface-1 hover:text-primary-token'
+            className='system-b-calendar-action-ghost grid h-7 place-items-center rounded-md px-2 text-tertiary-token transition-colors duration-subtle ease-subtle hover:bg-surface-1 hover:text-primary-token'
           >
             Tickets
           </a>
@@ -875,7 +878,7 @@ function EventRow(props: EventRowProps) {
               type='button'
               onClick={props.onConfirm}
               disabled={props.disabled}
-              className='h-7 rounded-md bg-emerald-500/15 px-3 text-[11px] font-caption text-emerald-300 transition-colors duration-subtle ease-subtle hover:bg-emerald-500/25'
+              className='system-b-calendar-action-confirm h-7 rounded-md px-3 font-caption transition-colors duration-subtle ease-subtle'
             >
               Confirm
             </button>
@@ -883,7 +886,7 @@ function EventRow(props: EventRowProps) {
               type='button'
               onClick={props.onReject}
               disabled={props.disabled}
-              className='h-7 rounded-md bg-red-500/15 px-3 text-[11px] font-caption text-red-300 transition-colors duration-subtle ease-subtle hover:bg-red-500/25'
+              className='system-b-calendar-action-reject h-7 rounded-md px-3 font-caption transition-colors duration-subtle ease-subtle'
             >
               Reject
             </button>
@@ -894,7 +897,7 @@ function EventRow(props: EventRowProps) {
             type='button'
             onClick={props.onReject}
             disabled={props.disabled}
-            className='h-7 rounded-md px-2 text-[11px] text-tertiary-token transition-colors duration-subtle ease-subtle hover:bg-red-500/10 hover:text-red-300'
+            className='system-b-calendar-action-danger-ghost h-7 rounded-md px-2 text-tertiary-token transition-colors duration-subtle ease-subtle'
           >
             Reject
           </button>
@@ -904,7 +907,7 @@ function EventRow(props: EventRowProps) {
             type='button'
             onClick={props.onUndoReject}
             disabled={props.disabled}
-            className='h-7 rounded-md bg-surface-1 px-3 text-[11px] font-caption text-tertiary-token transition-colors duration-subtle ease-subtle hover:bg-surface-2 hover:text-primary-token'
+            className='system-b-calendar-action-secondary h-7 rounded-md bg-surface-1 px-3 font-caption text-tertiary-token transition-colors duration-subtle ease-subtle hover:bg-surface-2 hover:text-primary-token'
           >
             Undo reject
           </button>
@@ -920,7 +923,7 @@ type ProviderChipProps = Readonly<{
 
 function ProviderChip({ provider }: ProviderChipProps) {
   return (
-    <span className='rounded bg-surface-0 px-1.5 py-0.5 text-[11px] text-tertiary-token'>
+    <span className='system-b-calendar-provider-chip rounded bg-surface-0 px-1.5 py-0.5 text-tertiary-token'>
       {provider}
     </span>
   );
@@ -932,7 +935,7 @@ type TypeChipProps = Readonly<{
 
 function TypeChip({ type }: TypeChipProps) {
   return (
-    <span className='rounded bg-violet-400/15 px-1.5 py-0.5 text-[11px] text-violet-300'>
+    <span className='system-b-calendar-type-chip rounded px-1.5 py-0.5'>
       {EVENT_TYPE_LABEL[type]}
     </span>
   );

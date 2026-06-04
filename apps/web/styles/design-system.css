@@ -2713,6 +2713,228 @@ body:has(.system-b-download-page) .marketing-glass-header__cta:focus-visible {
   z-index: 150;
 }
 
+/* System B calendar route primitives */
+:where(.system-b-calendar-month-label) {
+  min-width: calc(var(--space-24) + var(--space-10) + var(--space-4));
+  color: var(--color-text-primary-token);
+  font-size: var(--text-mid);
+  font-weight: var(--font-weight-medium);
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+}
+
+:where(.system-b-calendar-toolbar-button),
+:where(.system-b-calendar-detail-section-heading),
+:where(.system-b-calendar-warning-heading),
+:where(.system-b-calendar-error-text),
+:where(.system-b-calendar-empty-day),
+:where(.system-b-calendar-loading-text) {
+  font-size: var(--text-2xs);
+}
+
+:where(.system-b-calendar-weekday),
+:where(.system-b-calendar-overflow-count),
+:where(.system-b-calendar-row-description),
+:where(.system-b-calendar-row-secondary),
+:where(.system-b-calendar-status-text) {
+  font-size: var(--text-3xs);
+}
+
+:where(.system-b-calendar-filter-pill),
+:where(.system-b-calendar-rejected-toggle),
+:where(.system-b-calendar-provider-chip),
+:where(.system-b-calendar-type-chip),
+:where(.system-b-calendar-action-confirm),
+:where(.system-b-calendar-action-reject),
+:where(.system-b-calendar-action-ghost),
+:where(.system-b-calendar-action-danger-ghost),
+:where(.system-b-calendar-action-secondary) {
+  font-size: var(--text-2xs);
+}
+
+:where(.system-b-calendar-detail-heading),
+:where(.system-b-calendar-row-title) {
+  color: var(--color-text-primary-token);
+  font-size: var(--text-app);
+}
+
+:where(.system-b-calendar-day-cell) {
+  min-height: calc(var(--space-20) + var(--space-2));
+  border-color: color-mix(
+    in oklab,
+    var(--color-border-subtle) 64%,
+    transparent
+  );
+}
+
+:where(.system-b-calendar-day-cell-muted) {
+  color: color-mix(
+    in oklab,
+    var(--color-text-quaternary-token) 70%,
+    transparent
+  );
+}
+
+:where(.system-b-calendar-day-cell-selected) {
+  background: color-mix(in oklab, var(--color-info) 8%, transparent);
+}
+
+:where(.system-b-calendar-day-cell-today)::before {
+  position: absolute;
+  top: var(--space-1-5);
+  left: var(--space-1-5);
+  width: var(--space-1-5);
+  height: var(--space-1-5);
+  border-radius: var(--radius-pill);
+  background: var(--system-b-accent-cyan);
+  content: "";
+}
+
+:where(.system-b-calendar-day-number) {
+  color: var(--color-text-quaternary-token);
+  font-size: var(--text-2xs);
+}
+
+:where(.system-b-calendar-day-number-current) {
+  color: var(--color-text-secondary-token);
+}
+
+:where(.system-b-calendar-day-number-today) {
+  padding-left: var(--space-3);
+  color: var(--color-text-primary-token);
+  font-weight: var(--font-weight-medium);
+}
+
+:where(.system-b-calendar-cell-item-text) {
+  color: var(--color-text-secondary-token);
+  font-size: var(--text-3xs);
+}
+
+:where(.system-b-calendar-cell-event-pending) {
+  color: var(--color-text-tertiary-token);
+  font-size: var(--text-3xs);
+  font-style: italic;
+}
+
+:where(.system-b-calendar-cell-event-rejected) {
+  color: var(--color-text-quaternary-token);
+  font-size: var(--text-3xs);
+  text-decoration-line: line-through;
+}
+
+:where(.system-b-calendar-overflow-count) {
+  color: var(--color-text-quaternary-token);
+}
+
+:where(.system-b-calendar-warning-heading),
+:where(.system-b-calendar-status-text) {
+  color: color-mix(in oklab, var(--color-warning) 82%, white 18%);
+}
+
+:where(.system-b-calendar-error-text) {
+  color: color-mix(in oklab, var(--color-error) 82%, white 18%);
+}
+
+:where(.system-b-calendar-event-row) {
+  border-color: color-mix(
+    in oklab,
+    var(--color-border-subtle) 72%,
+    transparent
+  );
+}
+
+:where(.system-b-calendar-row-meta),
+:where(.system-b-calendar-row-description) {
+  font-size: var(--text-2xs);
+}
+
+:where(.system-b-calendar-row-meta) {
+  color: var(--color-text-tertiary-token);
+}
+
+:where(.system-b-calendar-row-secondary) {
+  color: var(--color-text-quaternary-token);
+}
+
+:where(.system-b-calendar-release-dot-released) {
+  background: color-mix(in oklab, var(--color-success) 78%, transparent);
+}
+
+:where(.system-b-calendar-release-dot-scheduled) {
+  background: var(--system-b-accent-cyan);
+}
+
+:where(.system-b-calendar-release-dot-draft),
+:where(.system-b-calendar-event-dot-rejected) {
+  background: color-mix(
+    in oklab,
+    var(--color-text-quaternary-token) 44%,
+    transparent
+  );
+}
+
+:where(.system-b-calendar-event-dot-pending) {
+  border: 1px dashed color-mix(in oklab, var(--color-warning) 80%, transparent);
+  background: transparent;
+}
+
+:where(.system-b-calendar-event-dot-confirmed) {
+  background: var(--color-accent-purple);
+}
+
+:where(.system-b-calendar-filter-pill-active) {
+  background: var(--color-bg-surface-1);
+  color: var(--color-text-primary-token);
+}
+
+:where(.system-b-calendar-filter-pill-warn),
+:where(.system-b-calendar-type-chip) {
+  background: color-mix(in oklab, var(--color-warning) 14%, transparent);
+  color: color-mix(in oklab, var(--color-warning) 82%, white 18%);
+}
+
+:where(.system-b-calendar-type-chip) {
+  background: color-mix(in oklab, var(--color-accent-purple) 14%, transparent);
+  color: color-mix(in oklab, var(--color-accent-purple) 78%, white 22%);
+}
+
+:where(.system-b-calendar-pending-checkbox) {
+  accent-color: var(--color-warning);
+}
+
+:where(.system-b-calendar-provider-chip) {
+  color: var(--color-text-tertiary-token);
+}
+
+:where(.system-b-calendar-action-confirm) {
+  background: color-mix(in oklab, var(--color-success) 15%, transparent);
+  color: color-mix(in oklab, var(--color-success) 80%, white 20%);
+}
+
+:where(.system-b-calendar-action-confirm:hover) {
+  background: color-mix(in oklab, var(--color-success) 24%, transparent);
+}
+
+:where(.system-b-calendar-action-reject) {
+  background: color-mix(in oklab, var(--color-error) 15%, transparent);
+  color: color-mix(in oklab, var(--color-error) 82%, white 18%);
+}
+
+:where(.system-b-calendar-action-reject:hover) {
+  background: color-mix(in oklab, var(--color-error) 24%, transparent);
+}
+
+:where(.system-b-calendar-action-ghost),
+:where(.system-b-calendar-action-danger-ghost),
+:where(.system-b-calendar-action-secondary) {
+  font-family: var(--font-caption);
+}
+
+:where(.system-b-calendar-action-danger-ghost:hover) {
+  background: color-mix(in oklab, var(--color-error) 10%, transparent);
+  color: color-mix(in oklab, var(--color-error) 82%, white 18%);
+}
+
 :where(.system-b-shell-dropdown-content) {
   z-index: 90;
   min-width: var(--w);
