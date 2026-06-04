@@ -134,20 +134,20 @@ There is no workflow that reports the weekly health of the agent pipeline itself
 
 ---
 
-## 4. OpenRouter Free-Model Substitution Candidates
+## 4. OpenRouter Free-Model Routing
 
 | Cron / Agent | Current Model | Substitution Candidate | Acceptable? | Notes |
 |---|---|---|---|---|
 | `generate-insights` | Unknown (check `lib/services/insights/insight-generator.ts`) | `google/gemini-flash-1.5:free` or `meta-llama/llama-3.1-8b-instruct:free` | Maybe — flag for review | Insights are a Pro feature; output quality matters. Free models are worth A/B testing against current output before switching. |
 | `summarize-interviews` | Claude Haiku (`summarize-interviews` comment) | `google/gemini-flash-1.5:free` | Likely yes for internal interviews | Summarization is a structured extract task; free Gemini Flash handles it well. Use for internal/admin interviews; keep Haiku for user-facing summaries if quality bar is high. |
 | `generate-playlist` | Unknown (check `lib/playlists/pipeline.ts`) | `meta-llama/llama-3.1-8b-instruct:free` | Maybe | Playlist concept generation is creative; output quality is visible to admins. Test before switching. |
-| `scope-judge` (`scope-judge.yml`) | `gpt-4o-mini` (OpenAI) | `google/gemini-flash-1.5:free` via OpenRouter | Yes — low stakes | Scope alignment is a pass/fail classification task; free Gemini Flash is more than capable. Switching would eliminate the OpenAI API dependency for this workflow. Per-PR cost is ~1 small API call; at current throughput, switching saves a modest but real amount. |
+| `scope-judge` (`scope-judge.yml`) | `openai/gpt-oss-20b:free` via OpenRouter | Already routed | Yes — low stakes | Scope alignment is a pass/fail classification task; the workflow reads `OPENROUTER_API_KEY` and calls OpenRouter's chat completions endpoint. Per-PR cost stays on a free-model route while preserving the existing `scope-judge` status context. |
 | `linear-ai-orchestrator` (Claude Code action) | Claude Sonnet (Anthropic) | Not substitutable | No | Full code implementation requires strong reasoning. Claude Code OAuth token is a different billing vector (Anthropic usage, not OpenAI). Do not substitute. |
 | `main-autofix` (Claude Code action) | Claude Sonnet (Anthropic) | Not substitutable | No | Red-main fix requires strong code reasoning; wrong fixes compound the problem. Do not substitute. |
 | `sentry-autofix` (Claude Code action) | Claude Sonnet (Anthropic) | Not substitutable | No | Same as above. |
 | `agent-pipeline` fix job (Claude Code action) | Claude Sonnet (Anthropic) | Not substitutable | No | Same as above. |
 
-**Summary:** The only clear OpenRouter free-model win right now is the `scope-judge` workflow (swap `gpt-4o-mini` for `google/gemini-flash-1.5:free` via OpenRouter). The LLM-using cron routes are worth testing with free models on a staging branch before committing.
+**Summary:** The clear OpenRouter free-model win has been landed in the `scope-judge` workflow. The LLM-using cron routes are worth testing with free models on a staging branch before committing.
 
 ---
 
@@ -162,7 +162,7 @@ There is no workflow that reports the weekly health of the agent pipeline itself
 | `frequent` → `pixelRetry` / `pixel-forwarding` | FB/Google/TikTok pixel endpoints | Up to 500 events | 48 (minute ≥30 runs) | Up to 24,000 pixel forwards | O(pixel events) | Low — batch forwarding, not per-user API calls |
 | `generate-insights` | LLM API | Per eligible profile | 1 | O(Pro+ users with clicks) | O(users) | **Monitor as Pro user count grows** |
 | `summarize-interviews` | Claude Haiku | Per pending interview | 0 (not scheduled!) | 0 | O(interviews) | Currently zero cost (not running) |
-| `scope-judge` | OpenAI GPT-4o-mini | 1 per agent PR | ~10-20/day (estimate) | 10-20 calls | O(agent PRs) | Low; ~$0.01-0.02/day |
+| `scope-judge` | OpenRouter free model | 1 per agent PR | ~10-20/day (estimate) | 10-20 calls | O(agent PRs) | Low; free-model route, blocks only on the `OPENROUTER_API_KEY` secret |
 | `synthetic-monitoring` | Playwright against `jov.ie` | Read-only GET requests | ~80/day (mixed schedule) | ~80 runs × N requests | O(1) | Low; read-only production traffic |
 
 ### Quiet cost concern
