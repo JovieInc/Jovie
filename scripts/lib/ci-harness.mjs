@@ -1,0 +1,376 @@
+import { readFileSync, writeFileSync } from 'node:fs';
+import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+export const HARNESS_SCHEMA_VERSION = 1;
+export const DEFAULT_MANIFEST_PATH = '.github/ci-harness/manifest.json';
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const REPO_ROOT = resolve(__dirname, '..', '..');
+const GENERATED_START = '<!-- ci-harness:start -->';
+const GENERATED_END = '<!-- ci-harness:end -->';
+
+const LEVEL_WEIGHT = {
+  low: 1,
+  medium: 2,
+  high: 3,
+};
+
+function readJson(path) {
+  return JSON.parse(readFileSync(resolve(REPO_ROOT, path), 'utf8'));
+}
+
+function uniqueValues(values) {
+  return new Set(values).size === values.length;
+}
+
+function compilePattern(pattern, context, errors) {
+  try {
+    return new RegExp(pattern);
+  } catch (error) {
+    const reason = error instanceof Error ? error.message : String(error);
+    errors.push(`${context}: invalid pattern "${pattern}": ${reason}`);
+    return null;
+  }
+}
+
+function compareRiskLevel(left, right) {
+  return (LEVEL_WEIGHT[left] ?? 0) - (LEVEL_WEIGHT[right] ?? 0);
+}
+
+export function loadCiHarnessManifest(manifestPath = DEFAULT_MANIFEST_PATH) {
+  return readJson(manifestPath);
+}
+
+export function validateCiHarnessManifest(manifest) {
+  const errors = [];
+
+  if (manifest.schemaVersion !== HARNESS_SCHEMA_VERSION) {
+    errors.push(
+      `schemaVersion must be ${HARNESS_SCHEMA_VERSION}; got ${manifest.schemaVersion}`
+    );
+  }
+
+  if (!Array.isArray(manifest.tiers) || manifest.tiers.length === 0) {
+    errors.push('tiers must be a non-empty array');
+  }
+
+  if (!Array.isArray(manifest.jobs) || manifest.jobs.length === 0) {
+    errors.push('jobs must be a non-empty array');
+  }
+
+  if (!Array.isArray(manifest.riskRules) || manifest.riskRules.length === 0) {
+    errors.push('riskRules must be a non-empty array');
+  }
+
+  const tierIds = (manifest.tiers ?? []).map(tier => tier.id);
+  const jobIds = (manifest.jobs ?? []).map(job => job.id);
+  const riskIds = (manifest.riskRules ?? []).map(rule => rule.id);
+
+  if (!uniqueValues(tierIds)) errors.push('tier ids must be unique');
+  if (!uniqueValues(jobIds)) errors.push('job ids must be unique');
+  if (!uniqueValues(riskIds)) errors.push('risk rule ids must be unique');
+
+  const tierSet = new Set(tierIds);
+  for (const tier of manifest.tiers ?? []) {
+    if (!tier.id || !tier.name || !tier.purpose) {
+      errors.push(`tier ${tier.id ?? '<missing>'} must have id, name, purpose`);
+    }
+  }
+
+  for (const job of manifest.jobs ?? []) {
+    if (!job.id || !job.name || !job.tier) {
+      errors.push(`job ${job.id ?? '<missing>'} must have id, name, tier`);
+    }
+    if (!tierSet.has(job.tier)) {
+      errors.push(`job ${job.id} references unknown tier ${job.tier}`);
+    }
+    if (typeof job.mergeGate !== 'boolean') {
+      errors.push(`job ${job.id} must declare boolean mergeGate`);
+    }
+    if (!job.nextLocalCommand || !job.remediation) {
+      errors.push(
+        `job ${job.id} must include nextLocalCommand and remediation`
+      );
+    }
+  }
+
+  for (const rule of manifest.riskRules ?? []) {
+    if (!rule.id || !rule.title || !rule.level) {
+      errors.push(`risk rule ${rule.id ?? '<missing>'} missing id/title/level`);
+    }
+    if (!LEVEL_WEIGHT[rule.level]) {
+      errors.push(`risk rule ${rule.id} has unsupported level ${rule.level}`);
+    }
+    for (const key of [
+      'requiresSmoke',
+      'requiresPreview',
+      'blocksUnattendedAutoMerge',
+    ]) {
+      if (typeof rule[key] !== 'boolean') {
+        errors.push(`risk rule ${rule.id} must declare boolean ${key}`);
+      }
+    }
+    if (!Array.isArray(rule.patterns) || rule.patterns.length === 0) {
+      errors.push(`risk rule ${rule.id} must include non-empty patterns`);
+    }
+    for (const pattern of rule.patterns ?? []) {
+      compilePattern(pattern, `risk rule ${rule.id}`, errors);
+    }
+  }
+
+  return {
+    ok: errors.length === 0,
+    errors,
+  };
+}
+
+export function normalizeChangedFiles(files) {
+  return [...new Set((files ?? []).map(file => file.trim()).filter(Boolean))];
+}
+
+export function classifyCiRisk(files, manifest) {
+  const changedFiles = normalizeChangedFiles(files);
+  const errors = [];
+  const matches = [];
+
+  for (const rule of manifest.riskRules ?? []) {
+    const regexes = (rule.patterns ?? [])
+      .map(pattern => compilePattern(pattern, `risk rule ${rule.id}`, errors))
+      .filter(Boolean);
+    const matchedFiles = changedFiles.filter(file =>
+      regexes.some(regex => regex.test(file))
+    );
+    if (matchedFiles.length > 0) {
+      matches.push({
+        id: rule.id,
+        title: rule.title,
+        level: rule.level,
+        reason: rule.reason,
+        requiresSmoke: rule.requiresSmoke,
+        requiresPreview: rule.requiresPreview,
+        blocksUnattendedAutoMerge: rule.blocksUnattendedAutoMerge,
+        files: matchedFiles,
+      });
+    }
+  }
+
+  const riskLevel = matches.reduce(
+    (current, match) =>
+      compareRiskLevel(match.level, current) > 0 ? match.level : current,
+    'low'
+  );
+
+  const requiresSmoke = matches.some(match => match.requiresSmoke);
+  const requiresPreview = matches.some(match => match.requiresPreview);
+  const blocksUnattendedAutoMerge = matches.some(
+    match => match.blocksUnattendedAutoMerge
+  );
+
+  return {
+    schemaVersion: HARNESS_SCHEMA_VERSION,
+    changedFiles,
+    riskLevel,
+    requiresSmoke,
+    requiresPreview,
+    blocksUnattendedAutoMerge,
+    matchedRules: matches,
+    recommendedLabels: [
+      ...(requiresSmoke ? ['testing'] : []),
+      ...(blocksUnattendedAutoMerge ? ['needs-human'] : []),
+    ],
+    nextLocalCommands: buildRiskLocalCommands({
+      requiresSmoke,
+      requiresPreview,
+      blocksUnattendedAutoMerge,
+    }),
+    errors,
+  };
+}
+
+function buildRiskLocalCommands(classification) {
+  const commands = ['pnpm ci:harness:check'];
+  if (classification.requiresSmoke) {
+    commands.push('pnpm run test:web:smoke');
+  }
+  if (classification.requiresPreview) {
+    commands.push('pnpm run build:web');
+  }
+  if (classification.blocksUnattendedAutoMerge) {
+    commands.push('gh pr edit <pr> --add-label needs-human');
+  }
+  return commands;
+}
+
+function formatBool(value) {
+  return value ? 'yes' : 'no';
+}
+
+function tierRows(manifest) {
+  return (manifest.tiers ?? [])
+    .map(tier => {
+      const jobs = (manifest.jobs ?? []).filter(job => job.tier === tier.id);
+      const mergeGateJobs = jobs
+        .filter(job => job.mergeGate)
+        .map(job => `\`${job.name}\``)
+        .join(', ');
+      return `| ${tier.name} | ${tier.purpose} | ${mergeGateJobs || 'none'} |`;
+    })
+    .join('\n');
+}
+
+function riskRows(manifest) {
+  return (manifest.riskRules ?? [])
+    .map(
+      rule =>
+        `| ${rule.title} | ${rule.level} | ${formatBool(
+          rule.requiresSmoke
+        )} | ${formatBool(rule.requiresPreview)} | ${formatBool(
+          rule.blocksUnattendedAutoMerge
+        )} |`
+    )
+    .join('\n');
+}
+
+function mergeGateRows(manifest) {
+  return (manifest.jobs ?? [])
+    .filter(job => job.mergeGate)
+    .map(
+      job => `| \`${job.name}\` | ${job.tier} | \`${job.nextLocalCommand}\` |`
+    )
+    .join('\n');
+}
+
+export function generateCiHarnessDocs(manifest, title = 'CI Agent Harness') {
+  return [
+    GENERATED_START,
+    `## ${title}`,
+    '',
+    'Generated from `.github/ci-harness/manifest.json`. Do not hand-edit this block; run `pnpm ci:harness:docs` after changing the manifest.',
+    '',
+    '### Tiers',
+    '',
+    '| Tier | Purpose | Merge-gate jobs |',
+    '| --- | --- | --- |',
+    tierRows(manifest),
+    '',
+    '### Merge Gates',
+    '',
+    '`PR Ready` may require only jobs declared as merge gates below. Informational jobs must stay out of the aggregate merge gate.',
+    '',
+    '| Job | Tier | Local remediation command |',
+    '| --- | --- | --- |',
+    mergeGateRows(manifest),
+    '',
+    '### Risk-Triggered Evidence',
+    '',
+    'Sensitive changes are classified deterministically before auto-merge. High-risk changes require smoke and/or preview evidence and block unattended auto-merge.',
+    '',
+    '| Surface | Level | Smoke | Preview | Blocks unattended auto-merge |',
+    '| --- | --- | --- | --- | --- |',
+    riskRows(manifest),
+    GENERATED_END,
+  ].join('\n');
+}
+
+export function replaceGeneratedBlock(existing, generatedBlock) {
+  const start = existing.indexOf(GENERATED_START);
+  const end = existing.indexOf(GENERATED_END);
+
+  if (start === -1 || end === -1 || end < start) {
+    const trimmed = existing.trimEnd();
+    return `${trimmed}\n\n${generatedBlock}\n`;
+  }
+
+  return `${existing.slice(0, start)}${generatedBlock}${existing.slice(
+    end + GENERATED_END.length
+  )}`;
+}
+
+export function renderGeneratedDocsForPath(path, manifest) {
+  const target = (manifest.generatedDocs ?? []).find(
+    item => item.path === path
+  );
+  return generateCiHarnessDocs(manifest, target?.title ?? 'CI Agent Harness');
+}
+
+export function generateDocsFiles(manifest, { write = false } = {}) {
+  const results = [];
+  for (const target of manifest.generatedDocs ?? []) {
+    const absolutePath = resolve(REPO_ROOT, target.path);
+    const existing = readFileSync(absolutePath, 'utf8');
+    const generated = generateCiHarnessDocs(
+      manifest,
+      target.title ?? 'CI Agent Harness'
+    );
+    const next = replaceGeneratedBlock(existing, generated);
+    const changed = next !== existing;
+    if (write && changed) {
+      writeFileSync(absolutePath, next);
+    }
+    results.push({ path: target.path, changed });
+  }
+  return results;
+}
+
+export function buildCiHarnessArtifact({
+  runId,
+  runAttempt,
+  repository,
+  prNumber,
+  sha,
+  previewUrl,
+  jobResults,
+  risk,
+  manifest,
+}) {
+  const jobsById = new Map((manifest.jobs ?? []).map(job => [job.id, job]));
+  const normalizedJobs = (jobResults ?? []).map(result => {
+    const job = jobsById.get(result.id);
+    const status = result.status ?? 'not_run';
+    return {
+      id: result.id,
+      name: job?.name ?? result.name ?? result.id,
+      tier: job?.tier ?? result.tier ?? 'unknown',
+      mergeGate: Boolean(job?.mergeGate),
+      status,
+      skipReason: result.skipReason ?? null,
+      remediation: job?.remediation ?? null,
+      nextLocalCommand: job?.nextLocalCommand ?? null,
+    };
+  });
+
+  return {
+    schemaVersion: HARNESS_SCHEMA_VERSION,
+    run: {
+      id: runId ?? null,
+      attempt: runAttempt ?? null,
+      repository: repository ?? null,
+      pullRequest: prNumber ?? null,
+      sha: sha ?? null,
+    },
+    requiredGates: normalizedJobs.filter(job => job.mergeGate),
+    evidence: {
+      previewUrl: previewUrl || null,
+      risk: risk ?? null,
+    },
+    jobs: normalizedJobs,
+    nextLocalCommands: [
+      ...new Set(
+        normalizedJobs
+          .filter(job => job.status !== 'success' && job.nextLocalCommand)
+          .map(job => job.nextLocalCommand)
+      ),
+    ],
+    generatedAt: new Date().toISOString(),
+  };
+}
+
+export function parseJobResultsFromEnv(env, manifest) {
+  return (manifest.jobs ?? []).map(job => ({
+    id: job.id,
+    status:
+      env[`CI_HARNESS_JOB_${job.id.toUpperCase().replaceAll('-', '_')}`] ??
+      'not_run',
+  }));
+}

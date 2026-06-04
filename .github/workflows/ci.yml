@@ -227,6 +227,93 @@ jobs:
             echo "run_test=false" >> "$GITHUB_OUTPUT"
           fi
 
+  ci-risk-classifier:
+    name: CI Risk Classifier
+    needs: [ci-path-changes]
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    outputs:
+      risk_level: ${{ steps.classify.outputs.risk_level }}
+      requires_smoke: ${{ steps.classify.outputs.requires_smoke }}
+      requires_preview: ${{ steps.classify.outputs.requires_preview }}
+      blocks_unattended_auto_merge: ${{ steps.classify.outputs.blocks_unattended_auto_merge }}
+      recommended_labels: ${{ steps.classify.outputs.recommended_labels }}
+      matched_rule_ids: ${{ steps.classify.outputs.matched_rule_ids }}
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 0
+      - uses: ./.github/actions/setup-node-pnpm
+      - name: Collect changed files
+        id: changed-files
+        shell: bash
+        env:
+          BASE_REF: ${{ github.base_ref || 'main' }}
+          EVENT_NAME: ${{ github.event_name }}
+        run: |
+          set -euo pipefail
+
+          CHANGED_FILES="$RUNNER_TEMP/ci-risk-changed-files.txt"
+          : > "$CHANGED_FILES"
+
+          if [[ "$EVENT_NAME" == "pull_request" ]]; then
+            git fetch origin "$BASE_REF" --depth=1
+            git diff --name-only "origin/$BASE_REF" HEAD > "$CHANGED_FILES"
+          elif [[ "$EVENT_NAME" == "merge_group" ]]; then
+            git fetch origin main --depth=1
+            git diff --name-only origin/main HEAD > "$CHANGED_FILES" || true
+          elif [[ "$EVENT_NAME" == "push" ]]; then
+            git diff --name-only HEAD~1 HEAD > "$CHANGED_FILES" 2>/dev/null || git show --pretty="" --name-only HEAD > "$CHANGED_FILES"
+          elif [[ "$EVENT_NAME" == "workflow_dispatch" ]]; then
+            git ls-files > "$CHANGED_FILES"
+          fi
+
+          echo "Changed files for CI risk classification:"
+          sed 's/^/  /' "$CHANGED_FILES" || true
+          echo "path=$CHANGED_FILES" >> "$GITHUB_OUTPUT"
+      - name: Classify CI risk
+        id: classify
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/ci-harness"
+          RISK_JSON="$RUNNER_TEMP/ci-harness/ci-risk-classification.json"
+
+          node scripts/ci-harness.mjs classify-risk \
+            --files "${{ steps.changed-files.outputs.path }}" \
+            --github-output "$GITHUB_OUTPUT" | tee "$RISK_JSON"
+
+          RISK_LEVEL=$(jq -r '.riskLevel' "$RISK_JSON")
+          REQUIRES_SMOKE=$(jq -r '.requiresSmoke' "$RISK_JSON")
+          REQUIRES_PREVIEW=$(jq -r '.requiresPreview' "$RISK_JSON")
+          BLOCKS_UNATTENDED=$(jq -r '.blocksUnattendedAutoMerge' "$RISK_JSON")
+          MATCHED_RULES=$(jq -r '[.matchedRules[].id] | join(",") // ""' "$RISK_JSON")
+          if [[ -z "$MATCHED_RULES" ]]; then
+            MATCHED_RULES="none"
+          fi
+
+          {
+            echo "### CI risk classification"
+            echo
+            echo "- Risk level: $RISK_LEVEL"
+            echo "- Requires smoke: $REQUIRES_SMOKE"
+            echo "- Requires preview: $REQUIRES_PREVIEW"
+            echo "- Blocks unattended auto-merge: $BLOCKS_UNATTENDED"
+            echo "- Matched rules: $MATCHED_RULES"
+            echo
+            echo "Next local command:"
+            echo
+            echo '```bash'
+            echo 'pnpm ci:harness:check'
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+      - name: Upload CI risk artifact
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: ci-risk-classification-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/ci-harness/ci-risk-classification.json
+          retention-days: 7
+
   ci-env-example-guard:
     name: Env Example Guard
     # Always run; fast, prevents accidental secret commits.
@@ -285,6 +372,42 @@ jobs:
         # bump package.json without regenerating pnpm-lock.yaml.
         working-directory: apps/web
         run: node scripts/next-proxy-guard.mjs
+
+  ci-structural-contract:
+    name: Structural Contract
+    needs: [ci-risk-classifier]
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    env:
+      SHELLCHECK_OPTS: >-
+        --exclude=SC2001,SC2016,SC2028,SC2034,SC2086,SC2126,SC2129,SC2329
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with: { fetch-depth: 1 }
+      - uses: ./.github/actions/setup-node-pnpm
+      - name: Validate CI harness manifest and generated docs
+        run: pnpm ci:harness:check
+      - name: Run actionlint
+        uses: rhysd/actionlint@914e7df21a07ef503a81201c76d2b11c789d3fca # v1.7.12
+      - name: Run structural repo guardrails
+        run: |
+          pnpm next:proxy-guard
+          pnpm tailwind:check
+          pnpm --filter=@jovie/web run lint:no-native-dialogs
+      - name: Write remediation summary
+        if: always()
+        run: |
+          {
+            echo "### Structural Contract"
+            echo
+            echo "This lane enforces the CI harness manifest, generated docs, workflow syntax, proxy guard, Tailwind contract, and native-dialog ban."
+            echo
+            echo "Next local command:"
+            echo
+            echo '```bash'
+            echo "pnpm ci:harness:check && pnpm next:proxy-guard && pnpm tailwind:check && pnpm --filter=@jovie/web run lint:no-native-dialogs"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
 
   ci-biome:
     name: Lint
@@ -664,19 +787,19 @@ jobs:
   ci-fast:
     name: ci-fast
     # Gate for PRs, pushes, and merge queue: aggregate fast checks
-    needs: [ci-typecheck, ci-biome, ci-eslint, ci-guardrails]
+    needs: [ci-typecheck, ci-biome, ci-eslint, ci-guardrails, ci-structural-contract]
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
       - name: All fast checks passed
         run: |
-          echo "ci-fast passed: Typecheck, Biome (lint + format), ESLint (server boundaries), and guardrails succeeded"
+          echo "ci-fast passed: Typecheck, Biome (lint + format), ESLint (server boundaries), guardrails, and structural contract succeeded"
 
   ci-pr-ready:
     name: PR Ready
     # Single merge gate for PRs and merge queue.
     # Gates on fast checks (typecheck, lint, guardrails), unit tests, public-route build, and Lighthouse audits.
-    needs: [ci-fast, ci-unit-tests, ci-build-public, ci-lighthouse-dashboard-pr, ci-lighthouse-onboarding-pr, ci-lighthouse-admin-pr, ci-lighthouse-pr]
+    needs: [ci-risk-classifier, ci-fast, ci-unit-tests, ci-build-public, ci-lighthouse-dashboard-pr, ci-lighthouse-onboarding-pr, ci-lighthouse-admin-pr, ci-lighthouse-pr, ci-e2e-smoke, ci-pr-vercel-preview]
     if: ${{ always() && (github.event_name == 'pull_request' || github.event_name == 'merge_group') }}
     runs-on: ubuntu-latest
     timeout-minutes: 2
@@ -690,6 +813,15 @@ jobs:
           ONBOARDING_LIGHTHOUSE_RESULT="${{ needs.ci-lighthouse-onboarding-pr.result }}"
           ADMIN_LIGHTHOUSE_RESULT="${{ needs.ci-lighthouse-admin-pr.result }}"
           PUBLIC_LIGHTHOUSE_RESULT="${{ needs.ci-lighthouse-pr.result }}"
+          RISK_RESULT="${{ needs.ci-risk-classifier.result }}"
+          RISK_LEVEL="${{ needs.ci-risk-classifier.outputs.risk_level }}"
+          RISK_REQUIRES_SMOKE="${{ needs.ci-risk-classifier.outputs.requires_smoke }}"
+          RISK_REQUIRES_PREVIEW="${{ needs.ci-risk-classifier.outputs.requires_preview }}"
+          RISK_BLOCKS_UNATTENDED="${{ needs.ci-risk-classifier.outputs.blocks_unattended_auto_merge }}"
+          RISK_RULES="${{ needs.ci-risk-classifier.outputs.matched_rule_ids }}"
+          E2E_SMOKE_RESULT="${{ needs.ci-e2e-smoke.result }}"
+          PREVIEW_RESULT="${{ needs.ci-pr-vercel-preview.result }}"
+          EVENT_NAME="${{ github.event_name }}"
           echo "ci-fast: $FAST_RESULT"
           echo "ci-unit-tests: $UNIT_RESULT"
           echo "ci-build-public: $BUILD_RESULT"
@@ -697,22 +829,49 @@ jobs:
           echo "ci-lighthouse-onboarding-pr: $ONBOARDING_LIGHTHOUSE_RESULT"
           echo "ci-lighthouse-admin-pr: $ADMIN_LIGHTHOUSE_RESULT"
           echo "ci-lighthouse-pr: $PUBLIC_LIGHTHOUSE_RESULT"
+          echo "ci-risk-classifier: $RISK_RESULT ($RISK_LEVEL; rules: ${RISK_RULES:-none})"
+          echo "ci-e2e-smoke: $E2E_SMOKE_RESULT"
+          echo "ci-pr-vercel-preview: $PREVIEW_RESULT"
+
+          {
+            echo "### PR Ready"
+            echo
+            echo "| Gate | Result | Next local command |"
+            echo "| --- | --- | --- |"
+            echo "| ci-fast | $FAST_RESULT | \`pnpm run typecheck && pnpm run biome:check\` |"
+            echo "| Unit Tests | $UNIT_RESULT | \`pnpm --filter=@jovie/web run test:fast\` |"
+            echo "| Build (public routes) | $BUILD_RESULT | \`pnpm run build:web\` |"
+            echo "| Risk classifier | $RISK_RESULT | \`pnpm ci:harness:check\` |"
+            echo "| E2E Smoke | $E2E_SMOKE_RESULT | \`pnpm run test:web:smoke\` |"
+            echo "| Preview Deploy | $PREVIEW_RESULT | \`pnpm run build:web\` |"
+            echo
+            echo "Risk level: ${RISK_LEVEL:-low}; matched rules: ${RISK_RULES:-none}"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          if [[ "$RISK_RESULT" != "success" ]]; then
+            echo "❌ CI risk classifier did not pass (result: $RISK_RESULT)"
+            echo "Likely fix: run pnpm ci:harness:check and inspect .github/ci-harness/manifest.json."
+            exit 1
+          fi
 
           # ci-fast must succeed (or be skipped when path-gated with no app files changed)
           if [[ "$FAST_RESULT" != "success" && "$FAST_RESULT" != "skipped" ]]; then
             echo "❌ ci-fast did not pass (result: $FAST_RESULT)"
+            echo "Likely fix: run pnpm run typecheck && pnpm run biome:check, then inspect the failing fast-check job."
             exit 1
           fi
 
           # Unit tests must succeed (or be skipped when path-gated with no test files changed)
           if [[ "$UNIT_RESULT" != "success" && "$UNIT_RESULT" != "skipped" ]]; then
             echo "❌ Unit tests did not pass (result: $UNIT_RESULT)"
+            echo "Likely fix: run the failing Vitest file locally or pnpm --filter=@jovie/web run test:fast."
             exit 1
           fi
 
           # Build must succeed. Only skipped for fork PRs (no secrets).
           if [[ "$BUILD_RESULT" != "success" && "$BUILD_RESULT" != "skipped" ]]; then
             echo "❌ ci-build-public did not pass (result: $BUILD_RESULT)"
+            echo "Likely fix: run pnpm run build:web and inspect the first Next.js build error."
             exit 1
           fi
 
@@ -737,6 +896,22 @@ jobs:
           if [[ "$PUBLIC_LIGHTHOUSE_RESULT" != "success" && "$PUBLIC_LIGHTHOUSE_RESULT" != "skipped" ]]; then
             echo "❌ ci-lighthouse-pr did not pass (result: $PUBLIC_LIGHTHOUSE_RESULT)"
             exit 1
+          fi
+
+          if [[ "$EVENT_NAME" == "pull_request" && "$RISK_REQUIRES_SMOKE" == "true" && "$E2E_SMOKE_RESULT" != "success" ]]; then
+            echo "❌ Risk classifier requires E2E smoke evidence, but ci-e2e-smoke result was $E2E_SMOKE_RESULT"
+            echo "Likely fix: inspect the E2E Smoke job artifact, then run pnpm run test:web:smoke locally with the relevant env."
+            exit 1
+          fi
+
+          if [[ "$EVENT_NAME" == "pull_request" && "$RISK_REQUIRES_PREVIEW" == "true" && "$PREVIEW_RESULT" != "success" ]]; then
+            echo "❌ Risk classifier requires preview evidence, but Preview Deploy result was $PREVIEW_RESULT"
+            echo "Likely fix: inspect the Preview Deploy logs, then run pnpm run build:web locally."
+            exit 1
+          fi
+
+          if [[ "$RISK_BLOCKS_UNATTENDED" == "true" ]]; then
+            echo "Risk classifier blocks unattended auto-merge for this PR. Human review may still merge after required evidence is present."
           fi
 
           echo "All required PR checks passed: lint, typecheck, guardrails, unit tests, build, lighthouse"
@@ -2447,10 +2622,10 @@ jobs:
   ci-e2e-smoke:
     name: E2E Smoke (PR Fast Feedback)
     environment: Preview – jovie
-    # Gated: only runs with 'testing' label to save CI time on most PRs
-    # Full E2E runs on merge to main anyway
-    needs: [ci-fast, ci-path-changes, neon-db]
-    if: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork == false && contains(github.event.pull_request.labels.*.name, 'testing') }}
+    # Gated: runs with 'testing' label or deterministic high-risk classification.
+    # Full E2E runs on merge to main anyway.
+    needs: [ci-fast, ci-path-changes, ci-risk-classifier]
+    if: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork == false && (contains(github.event.pull_request.labels.*.name, 'testing') || needs.ci-risk-classifier.outputs.requires_smoke == 'true') }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
     outputs:
@@ -2463,7 +2638,7 @@ jobs:
       - name: Check for relevant changes
         id: check_changes
         shell: bash
-        run: echo "run_full_ci=${{ needs.ci-path-changes.outputs.run_e2e }}" >> "$GITHUB_OUTPUT"
+        run: echo "run_full_ci=${{ needs.ci-path-changes.outputs.run_e2e == 'true' || needs.ci-risk-classifier.outputs.requires_smoke == 'true' }}" >> "$GITHUB_OUTPUT"
 
       - name: Skip notification
         if: steps.check_changes.outputs.run_full_ci != 'true'
@@ -2483,7 +2658,7 @@ jobs:
           branch_name: e2e-smoke-${{ github.run_id }}-${{ github.run_attempt }}
           role: neondb_owner
           api_key: ${{ secrets.NEON_API_KEY }}
-          protected_branches: main,development,preview,br-main,br-production,${{ needs.neon-db.outputs.branch_name }}
+          protected_branches: main,development,preview,br-main,br-production
 
       - name: Resolve DATABASE_URL (Neon ephemeral)
         if: steps.check_changes.outputs.run_full_ci == 'true'
@@ -3040,8 +3215,8 @@ jobs:
     name: Preview Deploy (PR)
     # Preview deploys are the default QA surface for internal PRs.
     # Keep this independent from the main deploy gate so review happens before merge.
-    needs: [ci-fast, ci-path-changes]
-    if: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'main' && github.event.pull_request.head.repo.fork == false && github.event.pull_request.user.login && github.event.pull_request.user.login != 'dependabot[bot]' && needs.ci-path-changes.outputs.run_build == 'true' }}
+    needs: [ci-fast, ci-path-changes, ci-risk-classifier]
+    if: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'main' && github.event.pull_request.head.repo.fork == false && github.event.pull_request.user.login && github.event.pull_request.user.login != 'dependabot[bot]' && (needs.ci-path-changes.outputs.run_build == 'true' || needs.ci-risk-classifier.outputs.requires_preview == 'true') }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
     concurrency:
@@ -3122,7 +3297,7 @@ jobs:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           GIT_BRANCH: ${{ github.head_ref || github.ref_name }}
 
-  # PR Lighthouse re-added as ci-lighthouse-pr (informational) with stricter thresholds (0.75 perf, 0.85 a11y).
+  # PR Lighthouse runs as a path-gated preview-evidence lane with stricter thresholds (0.75 perf, 0.85 a11y).
   # Original removal was due to 0.5 thresholds being too relaxed. Updated .lighthouserc.pr.json fixes this.
   # Production Lighthouse (in ci-build job) has even stricter thresholds (0.8 perf, 0.95 a11y).
 
@@ -3136,6 +3311,8 @@ jobs:
     needs:
       - ci-env-example-guard
       - ci-guardrails
+      - ci-risk-classifier
+      - ci-structural-contract
       - ci-typecheck
       - ci-biome
       - neon-db
@@ -3155,10 +3332,88 @@ jobs:
       - ci-layout-guard
       - ci-lighthouse-pr
       - ci-lighthouse-dashboard-pr
+      - ci-lighthouse-onboarding-pr
+      - ci-lighthouse-admin-pr
       - ci-a11y
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with: { fetch-depth: 1 }
+      - uses: ./.github/actions/setup-node-pnpm
+      - name: Build CI harness artifact
+        env:
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          PR_PREVIEW_URL: ${{ needs.ci-pr-vercel-preview.outputs.deployment_url }}
+          RISK_LEVEL: ${{ needs.ci-risk-classifier.outputs.risk_level }}
+          RISK_REQUIRES_SMOKE: ${{ needs.ci-risk-classifier.outputs.requires_smoke }}
+          RISK_REQUIRES_PREVIEW: ${{ needs.ci-risk-classifier.outputs.requires_preview }}
+          RISK_BLOCKS_UNATTENDED: ${{ needs.ci-risk-classifier.outputs.blocks_unattended_auto_merge }}
+          RISK_RULES: ${{ needs.ci-risk-classifier.outputs.matched_rule_ids }}
+          CI_HARNESS_JOB_CI_RISK_CLASSIFIER: ${{ needs.ci-risk-classifier.result }}
+          CI_HARNESS_JOB_CI_FAST: ${{ needs.ci-fast.result }}
+          CI_HARNESS_JOB_CI_STRUCTURAL_CONTRACT: ${{ needs.ci-structural-contract.result }}
+          CI_HARNESS_JOB_CI_UNIT_TESTS: ${{ needs.ci-unit-tests.result }}
+          CI_HARNESS_JOB_CI_BUILD_PUBLIC: ${{ needs.ci-build-public.result }}
+          CI_HARNESS_JOB_CI_LIGHTHOUSE_PR: ${{ needs.ci-lighthouse-pr.result }}
+          CI_HARNESS_JOB_CI_LIGHTHOUSE_DASHBOARD_PR: ${{ needs.ci-lighthouse-dashboard-pr.result }}
+          CI_HARNESS_JOB_CI_LIGHTHOUSE_ONBOARDING_PR: ${{ needs.ci-lighthouse-onboarding-pr.result }}
+          CI_HARNESS_JOB_CI_LIGHTHOUSE_ADMIN_PR: ${{ needs.ci-lighthouse-admin-pr.result }}
+          CI_HARNESS_JOB_CI_E2E_SMOKE: ${{ needs.ci-e2e-smoke.result }}
+          CI_HARNESS_JOB_CI_PR_VERCEL_PREVIEW: ${{ needs.ci-pr-vercel-preview.result }}
+        run: |
+          set -euo pipefail
+
+          mkdir -p "$RUNNER_TEMP/ci-harness"
+          RISK_JSON="$RUNNER_TEMP/ci-harness/risk.json"
+          ARTIFACT_JSON="$RUNNER_TEMP/ci-harness/ci-harness.v1.json"
+
+          risk_level="${RISK_LEVEL:-low}"
+          requires_smoke="${RISK_REQUIRES_SMOKE:-false}"
+          requires_preview="${RISK_REQUIRES_PREVIEW:-false}"
+          blocks_unattended="${RISK_BLOCKS_UNATTENDED:-false}"
+          risk_rules="${RISK_RULES:-}"
+
+          jq -n \
+            --arg riskLevel "$risk_level" \
+            --arg rules "$risk_rules" \
+            --argjson requiresSmoke "$requires_smoke" \
+            --argjson requiresPreview "$requires_preview" \
+            --argjson blocksUnattended "$blocks_unattended" \
+            '{
+              schemaVersion: 1,
+              riskLevel: $riskLevel,
+              requiresSmoke: $requiresSmoke,
+              requiresPreview: $requiresPreview,
+              blocksUnattendedAutoMerge: $blocksUnattended,
+              matchedRules: ($rules | split(",") | map(select(length > 0) | {id: ., title: ., level: $riskLevel, files: []})),
+              recommendedLabels: ((if $requiresSmoke then ["testing"] else [] end) + (if $blocksUnattended then ["needs-human"] else [] end))
+            }' > "$RISK_JSON"
+
+          node scripts/ci-harness.mjs emit-artifact \
+            --risk "$RISK_JSON" \
+            --out "$ARTIFACT_JSON"
+
+          {
+            echo "### CI harness artifact"
+            echo
+            echo "- Artifact: \`ci-harness.v1.json\`"
+            echo "- Risk level: $risk_level"
+            echo "- Preview URL: ${PR_PREVIEW_URL:-none}"
+            echo
+            echo "Next local command:"
+            echo
+            echo '```bash'
+            echo "pnpm ci:harness:check"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+      - name: Upload CI harness artifact
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: ci-harness-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/ci-harness/ci-harness.v1.json
+          retention-days: 14
       - name: Post CI summary to PR
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         env:
@@ -3170,6 +3425,11 @@ jobs:
           PR_MIGRATE_RUN_FULL_CI: ${{ needs.ci-pr-neon-migrate.outputs.run_full_ci }}
           UNIT_RUN_FULL_CI: ${{ needs.ci-unit-tests.outputs.run_full_ci }}
           PR_PREVIEW_URL: ${{ needs.ci-pr-vercel-preview.outputs.deployment_url }}
+          RISK_LEVEL: ${{ needs.ci-risk-classifier.outputs.risk_level }}
+          RISK_REQUIRES_SMOKE: ${{ needs.ci-risk-classifier.outputs.requires_smoke }}
+          RISK_REQUIRES_PREVIEW: ${{ needs.ci-risk-classifier.outputs.requires_preview }}
+          RISK_BLOCKS_UNATTENDED: ${{ needs.ci-risk-classifier.outputs.blocks_unattended_auto_merge }}
+          RISK_RULES: ${{ needs.ci-risk-classifier.outputs.matched_rule_ids }}
         with:
           script: |
             const { owner, repo } = context.repo;
@@ -3239,6 +3499,8 @@ jobs:
 
             const summaryRows = [
               { label: '**PR Ready (merge gate)**', jobName: 'PR Ready' },
+              { label: 'CI Risk Classifier', jobName: 'CI Risk Classifier' },
+              { label: 'Structural Contract', jobName: 'Structural Contract' },
               { label: 'Env Example Guard', jobName: 'Env Example Guard' },
               { label: 'Guardrails', jobName: 'Guardrails (proxy)' },
               { label: 'Biome', jobName: 'Biome (lint + format)' },
@@ -3260,7 +3522,10 @@ jobs:
               },
               { label: 'Build (public routes)', jobName: 'Build (public routes)' },
               { label: 'Layout Guard', jobName: 'Layout Guard (informational)' },
-              { label: 'Lighthouse (PR)', jobName: 'Lighthouse (PR, informational)' },
+              { label: 'Lighthouse (public routes PR)', jobName: 'Lighthouse (public routes PR)' },
+              { label: 'Lighthouse (dashboard PR)', jobName: 'Lighthouse (dashboard PR)' },
+              { label: 'Lighthouse (onboarding PR)', jobName: 'Lighthouse (onboarding PR)' },
+              { label: 'Lighthouse (admin PR)', jobName: 'Lighthouse (admin PR)' },
               { label: 'A11y (axe)', jobName: 'A11y (axe)' },
               {
                 label: 'Unit Tests',
@@ -3310,6 +3575,10 @@ jobs:
               '## CI Summary',
               '',
               'A crisp snapshot of this PR run — executed vs. skipped, with timing for every key lane.',
+              '',
+              `**Risk:** ${process.env.RISK_LEVEL || 'low'} (smoke: ${process.env.RISK_REQUIRES_SMOKE || 'false'}, preview: ${process.env.RISK_REQUIRES_PREVIEW || 'false'}, blocks unattended auto-merge: ${process.env.RISK_BLOCKS_UNATTENDED || 'false'})`,
+              `**Matched risk rules:** ${process.env.RISK_RULES || 'none'}`,
+              '**Machine artifact:** `ci-harness.v1.json` uploaded to this workflow run.',
               previewUrlSection,
               '',
               '| Job | Status | Context | Time |',

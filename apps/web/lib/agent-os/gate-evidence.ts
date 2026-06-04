@@ -129,7 +129,9 @@ export function extractAgentRunArtifactsFromMarkdown(
 function gateHasRecordedEvidence(gate: VerificationGate): boolean {
   return (
     gate.status === 'passed' &&
-    (Boolean(gate.evidenceUrl?.trim()) || Boolean(gate.summary?.trim()))
+    (Boolean(gate.evidenceUrl?.trim()) ||
+      Boolean(gate.summary?.trim()) ||
+      Boolean(gate.artifactUrls?.some(url => url.trim().length > 0)))
   );
 }
 

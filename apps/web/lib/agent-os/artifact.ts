@@ -157,6 +157,7 @@ export const VerificationGateSchema = z
     required: z.boolean(),
     status: VerificationGateStatusSchema,
     evidenceUrl: nullableUrlSchema,
+    artifactUrls: z.array(AgentRunHttpUrlSchema).max(10).optional(),
     summary: nullableTextSchema,
     checkedAt: z.union([isoDateTimeSchema, z.null()]),
   })
