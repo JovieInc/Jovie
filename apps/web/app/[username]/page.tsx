@@ -2,6 +2,7 @@ import { type Metadata } from 'next';
 import { unstable_cache } from 'next/cache';
 import { notFound } from 'next/navigation';
 import { cache } from 'react';
+import { sanitizeCacheTags } from '@/lib/cache/tags';
 import { loadUpcomingTourDates } from '@/app/app/(shell)/dashboard/tour-dates/actions';
 import { ErrorBanner } from '@/components/feedback/ErrorBanner';
 import { ClaimBanner } from '@/components/profile/ClaimBanner';
@@ -349,7 +350,7 @@ const getCachedProfileAndLinks = async (username: string) => {
       },
       [`public-profile-${username}`],
       {
-        tags: ['profiles-all', `profile:${username}`],
+        tags: sanitizeCacheTags(['profiles-all', `profile:${username}`]),
         revalidate: PROFILE_SUCCESS_CACHE_TTL_SECONDS,
       }
     );
