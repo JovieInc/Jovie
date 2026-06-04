@@ -110,9 +110,8 @@ function PlatformSuggestionItem({
       data-option-id={optionId}
       type='button'
       className={cn(
-        'flex min-h-[44px] w-full items-center justify-between gap-2.5 px-3 py-2.5 text-left text-app text-primary-token transition',
-        active ? 'bg-surface-2' : 'hover:bg-surface-2',
-        'active:scale-[0.99]'
+        'flex min-h-[44px] w-full items-center justify-between gap-2.5 px-3 py-2.5 text-left text-app text-primary-token transition-[background-color,color] duration-subtle ease-subtle active:bg-surface-2',
+        active ? 'bg-surface-2' : 'hover:bg-surface-2'
       )}
       onMouseEnter={onMouseEnter}
       onClick={onClick}
