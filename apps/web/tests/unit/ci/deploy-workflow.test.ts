@@ -145,6 +145,8 @@ describe('deploy workflow Vercel env resolution', () => {
     const requiredKeys = [
       'NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY',
       'CLERK_SECRET_KEY',
+      'CLERK_PUBLISHABLE_KEY_STAGING',
+      'CLERK_SECRET_KEY_STAGING',
       'DATABASE_URL',
       'SESSION_SECRET',
       'AI_GATEWAY_API_KEY',

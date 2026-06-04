@@ -90,16 +90,107 @@ async function requestTestingToken(secretKey) {
   return data.token;
 }
 
+async function clerkBackendRequest(secretKey, path, { method = 'GET', body } = {}) {
+  const response = await fetch(`https://api.clerk.com/v1${path}`, {
+    method,
+    headers: {
+      Authorization: `Bearer ${secretKey}`,
+      ...(body ? { 'Content-Type': 'application/json' } : {}),
+    },
+    ...(body ? { body: JSON.stringify(body) } : {}),
+    signal: AbortSignal.timeout(30_000),
+  });
+
+  if (!response.ok) {
+    const responseBody = await response.text().catch(() => '');
+    throw new Error(
+      `Clerk Backend API request failed: ${method} ${path} ${response.status} ${responseBody}`
+    );
+  }
+
+  return await response.json();
+}
+
+function firstUserFromList(response) {
+  const users = Array.isArray(response) ? response : response?.data;
+  return Array.isArray(users) ? users[0] : null;
+}
+
+function getStableSmokeEmail() {
+  const hostname = new URL(BASE_URL).hostname
+    .replace(/[^a-z0-9]+/gi, '-')
+    .replace(/^-+|-+$/g, '')
+    .toLowerCase();
+  return `native-auth-smoke-${hostname || 'local'}+clerk_test@test.jovie.com`;
+}
+
+async function ensureSmokeUser(secretKey, email) {
+  const searchPath = `/users?email_address=${encodeURIComponent(email)}&limit=1`;
+  const existing = firstUserFromList(
+    await clerkBackendRequest(secretKey, searchPath)
+  );
+  if (existing?.id) {
+    return { userId: existing.id, reused: true };
+  }
+
+  const metadata = {
+    role: 'native_auth_smoke',
+    app: 'desktop',
+  };
+  let created;
+  try {
+    created = await clerkBackendRequest(secretKey, '/users', {
+      method: 'POST',
+      body: {
+        email_address: [email],
+        first_name: 'Native',
+        last_name: 'Auth QA',
+        public_metadata: metadata,
+        skip_password_requirement: true,
+      },
+    });
+  } catch (error) {
+    const raced = firstUserFromList(
+      await clerkBackendRequest(secretKey, searchPath).catch(() => null)
+    );
+    if (raced?.id) {
+      return { userId: raced.id, reused: true };
+    }
+    throw error;
+  }
+  if (!created?.id) {
+    const raced = firstUserFromList(
+      await clerkBackendRequest(secretKey, searchPath)
+    );
+    if (raced?.id) {
+      return { userId: raced.id, reused: true };
+    }
+    throw new Error('Clerk user create response missing id');
+  }
+
+  return { userId: created.id, reused: false };
+}
+
+async function createSignInTicket(secretKey, userId) {
+  const token = await clerkBackendRequest(secretKey, '/sign_in_tokens', {
+    method: 'POST',
+    body: {
+      user_id: userId,
+      expires_in_seconds: 300,
+    },
+  });
+  if (!token?.token) {
+    throw new Error('Clerk sign-in token response missing token');
+  }
+  return token.token;
+}
+
 function escapeRegExp(value) {
   return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
 async function setupClerkTestingToken(context, fapiHost, testingToken) {
-  const fapiPattern = new RegExp(
-    `^https://${escapeRegExp(fapiHost)}/v1/.*?(\\?.*)?$`
-  );
-
-  await context.route(fapiPattern, async route => {
+  async function appendTestingToken(route) {
     const url = new URL(route.request().url());
     url.searchParams.set(TESTING_TOKEN_PARAM, testingToken);
 
@@ -116,16 +207,25 @@ async function setupClerkTestingToken(context, fapiHost, testingToken) {
     } catch {
       await route.continue({ url: url.toString() });
     }
-  });
+  }
+
+  const fapiPattern = new RegExp(
+    `^https://${escapeRegExp(fapiHost)}/v1/.*?(\\?.*)?$`
+  );
+  const baseOrigin = new URL(BASE_URL).origin;
+  const proxyPattern = new RegExp(
+    `^${escapeRegExp(baseOrigin)}/__clerk/v1/.*?(\\?.*)?$`
+  );
+
+  await context.route(fapiPattern, appendTestingToken);
+  await context.route(proxyPattern, appendTestingToken);
 }
 
 async function newAuthContext(browser, fapiHost, testingToken) {
-  const context = await browser.newContext({
-    extraHTTPHeaders: {
-      'x-forwarded-for': SMOKE_CLIENT_IP,
-    },
-  });
-  await setupClerkTestingToken(context, fapiHost, testingToken);
+  const context = await browser.newContext();
+  if (testingToken) {
+    await setupClerkTestingToken(context, fapiHost, testingToken);
+  }
   const page = await context.newPage();
   await page.goto(`${BASE_URL}/signin`, {
     waitUntil: 'domcontentloaded',
@@ -295,6 +395,172 @@ async function signInExisting(page, email, redirectUrl = null) {
   }
 }
 
+async function signInWithTicket(page, ticket, expectedUserId, redirectUrl = null) {
+  try {
+    return await page.evaluate(
+      async ({
+        signInTicket,
+        expectedUserId: targetUserId,
+        redirectUrl: targetRedirectUrl,
+      }) => {
+        function describeError(error) {
+          try {
+            return JSON.stringify({
+              message: error?.message,
+              status: error?.status,
+              clerkError: error?.clerkError,
+              errors: error?.errors,
+              longMessage: error?.longMessage,
+            });
+          } catch {
+            return String(error);
+          }
+        }
+
+        async function waitForActiveIdentity(fallbackSessionId) {
+          for (let attempt = 0; attempt < 30; attempt += 1) {
+            if (clerk.user?.id || clerk.session?.id) {
+              return {
+                userId: clerk.user?.id ?? clerk.session?.user?.id ?? null,
+                sessionId: clerk.session?.id ?? fallbackSessionId ?? null,
+              };
+            }
+            await new Promise(resolve => setTimeout(resolve, 250));
+          }
+
+          return {
+            userId: clerk.user?.id ?? clerk.session?.user?.id ?? null,
+            sessionId: clerk.session?.id ?? fallbackSessionId ?? null,
+          };
+        }
+
+        const clerk = window.Clerk;
+        const signIn = clerk?.client?.signIn;
+        const futureSignIn = signIn?.__internal_future;
+        if (
+          !clerk?.setActive ||
+          (!signIn?.ticket && !futureSignIn?.ticket && !signIn?.create)
+        ) {
+          throw new Error('Clerk ticket API unavailable');
+        }
+
+        let ticketAttempt;
+        let finalizeAttempt = null;
+        if (signIn?.create) {
+          ticketAttempt = await signIn
+            .create({ strategy: 'ticket', ticket: signInTicket })
+            .catch(error => {
+              throw new Error(
+                `Clerk ticket sign-in threw: ${describeError(error)}`
+              );
+            });
+        } else if (signIn?.ticket && signIn?.finalize) {
+          ticketAttempt = await signIn.ticket({ ticket: signInTicket }).catch(
+            error => {
+              throw new Error(
+                `Clerk ticket sign-in threw: ${describeError(error)}`
+              );
+            }
+          );
+          if (ticketAttempt.error) {
+            throw new Error(
+              `Clerk ticket sign-in failed: ${describeError(ticketAttempt.error)}`
+            );
+          }
+          finalizeAttempt = await signIn.finalize().catch(error => {
+            throw new Error(
+              `Clerk ticket finalize threw: ${describeError(error)}`
+            );
+          });
+        } else {
+          ticketAttempt = await futureSignIn.ticket({ ticket: signInTicket }).catch(
+            error => {
+              throw new Error(
+                `Clerk future ticket sign-in threw: ${describeError(error)}`
+              );
+            }
+          );
+        }
+
+        if (ticketAttempt.error) {
+          throw new Error(
+            `Clerk ticket sign-in failed: ${describeError(ticketAttempt.error)}`
+          );
+        }
+        let sessionId =
+          ticketAttempt.createdSessionId ||
+          signIn.createdSessionId ||
+          futureSignIn?.createdSessionId;
+        finalizeAttempt =
+          !sessionId && futureSignIn?.finalize
+            ? await futureSignIn.finalize().catch(error => {
+                throw new Error(
+                  `Clerk future ticket finalize threw: ${describeError(error)}`
+                );
+              })
+            : finalizeAttempt;
+        if (finalizeAttempt?.error) {
+          throw new Error('Clerk ticket finalize failed');
+        }
+        sessionId = sessionId || finalizeAttempt?.createdSessionId;
+        if (!sessionId) {
+          throw new Error('Clerk ticket did not create a session');
+        }
+
+        await clerk.setActive({
+          session: sessionId,
+          ...(targetRedirectUrl ? { redirectUrl: targetRedirectUrl } : {}),
+        });
+        const identity = await waitForActiveIdentity(sessionId);
+        if (identity.userId !== targetUserId) {
+          throw new Error(
+            `Activated user mismatch: expected ${targetUserId}, got ${
+              identity.userId || 'null'
+            }`
+          );
+        }
+        return identity;
+      },
+      { signInTicket: ticket, expectedUserId, redirectUrl }
+    );
+  } catch (error) {
+    if (!isNavigationInterruption(error)) throw error;
+    return await getClerkPageIdentity(page, 'ticket-signin').catch(async () => {
+      await waitForAppSessionCookie(page.context(), 'ticket-signin');
+      return getClerkSessionIdentity(page.context(), 'ticket-signin');
+    });
+  }
+}
+
+async function signInWithFreshTicket(
+  page,
+  secretKey,
+  expectedUserId,
+  redirectUrl = null
+) {
+  const errors = [];
+  for (let attempt = 1; attempt <= 4; attempt += 1) {
+    try {
+      const ticket = await createSignInTicket(secretKey, expectedUserId);
+      return await signInWithTicket(
+        page,
+        ticket,
+        expectedUserId,
+        redirectUrl
+      );
+    } catch (error) {
+      errors.push(error instanceof Error ? error.message : String(error));
+      if (attempt < 4) {
+        await sleep(1000 * attempt);
+      }
+    }
+  }
+
+  throw new Error(
+    `Clerk ticket sign-in failed after retries: ${errors.join(' | ')}`
+  );
+}
+
 function isNavigationInterruption(error) {
   return (
     error instanceof Error &&
@@ -355,14 +621,7 @@ async function waitForAppSessionCookie(context, label) {
 
   while (Date.now() < deadline) {
     const cookies = await context.cookies(BASE_URL);
-    if (
-      cookies.some(
-        cookie =>
-          cookie.name.startsWith('__session') ||
-          cookie.name.startsWith('__client') ||
-          cookie.name.startsWith('__clerk')
-      )
-    ) {
+    if (cookies.some(cookie => cookie.name.startsWith('__session'))) {
       return;
     }
 
@@ -389,6 +648,16 @@ async function requestRedirect(page, targetUrl, label) {
   throw new Error(
     `${label} did not return a redirect: status=${response.status()} retry-after=${response.headers()['retry-after'] ?? ''} body=${JSON.stringify(bodySnippet)}`
   );
+}
+
+async function requestNativeCallbackRedirect(page, callbackPath, label) {
+  const nativeCallbackUrl = await requestRedirect(page, callbackPath, label);
+  if (!nativeCallbackUrl.startsWith('jovie://auth/complete?')) {
+    throw new Error(
+      `${label} did not return the Electron app callback: ${nativeCallbackUrl}`
+    );
+  }
+  return nativeCallbackUrl;
 }
 
 function waitForNativeProtocolRequest(page, label, timeout = 60_000) {
@@ -440,10 +709,6 @@ async function completeBrowserAuthState(page, authPageUrl, email) {
     `/auth/callback?state=${encodeURIComponent(authState)}`,
     BASE_URL
   ).toString();
-  const callbackPromise = Promise.race([
-    waitForNativeProtocolRequest(page, parsed.pathname),
-    waitForNativeRedirectResponse(page, parsed.pathname),
-  ]);
   await page.goto(authPageUrl, {
     waitUntil: 'domcontentloaded',
     timeout: 60_000,
@@ -456,46 +721,36 @@ async function completeBrowserAuthState(page, authPageUrl, email) {
     }
   );
 
-  const redirectActiveSession = page.evaluate(
-    async ({ redirectUrl }) => {
-      const clerk = window.Clerk;
-      const sessionId = clerk?.session?.id;
-      if (!sessionId) return false;
-      await clerk.setActive({ session: sessionId, redirectUrl });
-      return true;
-    },
-    { redirectUrl: callbackPath }
+  const activeSessionId = await page.evaluate(
+    () => window.Clerk?.session?.id ?? null
   );
+  if (activeSessionId) {
+    return await requestNativeCallbackRedirect(
+      page,
+      callbackPath,
+      'auth callback active-session'
+    );
+  }
 
-  const activeSessionRedirected = await redirectActiveSession.catch(error => {
+  const callbackPromise = Promise.race([
+    waitForNativeProtocolRequest(page, parsed.pathname),
+    waitForNativeRedirectResponse(page, parsed.pathname),
+  ]);
+  const authAction =
+    parsed.pathname === '/signup' || parsed.pathname === '/sign-up'
+      ? signUpFresh(page, email, callbackPath)
+      : signInExisting(page, email, callbackPath);
+  await authAction.catch(error => {
     if (
       error instanceof Error &&
       /Execution context was destroyed|Target page, context or browser has been closed/i.test(
         error.message
       )
     ) {
-      return true;
+      return;
     }
     throw error;
   });
-
-  if (!activeSessionRedirected) {
-    const authAction =
-      parsed.pathname === '/signup' || parsed.pathname === '/sign-up'
-        ? signUpFresh(page, email, callbackPath)
-        : signInExisting(page, email, callbackPath);
-    await authAction.catch(error => {
-      if (
-        error instanceof Error &&
-        /Execution context was destroyed|Target page, context or browser has been closed/i.test(
-          error.message
-        )
-      ) {
-        return;
-      }
-      throw error;
-    });
-  }
 
   return await callbackPromise;
 }
@@ -504,6 +759,11 @@ async function requestNativeCallback(page, authUrl, email) {
   const authCallbackUrl = await requestRedirect(page, authUrl, 'auth start');
   const parsedAuthCallback = new URL(authCallbackUrl);
   if (parsedAuthCallback.protocol === 'jovie:') {
+    if (!authCallbackUrl.startsWith('jovie://auth/complete?')) {
+      throw new Error(
+        `Auth start did not return the Electron app callback: ${authCallbackUrl}`
+      );
+    }
     return authCallbackUrl;
   }
 
@@ -521,18 +781,11 @@ async function requestNativeCallback(page, authUrl, email) {
     );
   }
 
-  const nativeCallbackUrl = await requestRedirect(
+  return await requestNativeCallbackRedirect(
     page,
     authCallbackUrl,
     'auth callback'
   );
-  if (!nativeCallbackUrl.startsWith('jovie://auth/complete?')) {
-    throw new Error(
-      `Auth callback did not return the Electron app callback: ${nativeCallbackUrl}`
-    );
-  }
-
-  return nativeCallbackUrl;
 }
 
 function openNativeCallback(callbackUrl) {
@@ -721,7 +974,27 @@ class CdpPage {
   }
 
   async navigate(url) {
-    await this.send('Page.navigate', { url });
+    const navigation = this.send('Runtime.evaluate', {
+      expression: `window.location.assign(${JSON.stringify(url)}); true`,
+      returnByValue: true,
+      userGesture: true,
+    });
+    const result = await Promise.race([
+      navigation.catch(error => {
+        if (isNavigationInterruption(error)) return null;
+        throw error;
+      }),
+      sleep(2000).then(() => null),
+    ]);
+    if (result?.exceptionDetails) {
+      const description =
+        result.exceptionDetails.exception?.description ??
+        result.exceptionDetails.text ??
+        'Runtime.evaluate failed';
+      if (!/Execution context was destroyed/i.test(description)) {
+        throw new Error(description);
+      }
+    }
   }
 
   close() {
@@ -1081,7 +1354,8 @@ async function main() {
   const testingToken = await getTestingToken(secretKey);
   const chromium = await getChromium();
   const browser = await chromium.launch({ headless: true });
-  const email = `native-${Date.now().toString(36)}+clerk_test@test.jovie.com`;
+  const email = getStableSmokeEmail();
+  const provisionedUser = await ensureSmokeUser(secretKey, email);
 
   try {
     if (!SKIP_START_SIGN_OUT) {
@@ -1091,8 +1365,12 @@ async function main() {
       }
     }
 
-    const fresh = await newAuthContext(browser, fapiHost, testingToken);
-    const freshSignup = await signUpFresh(fresh.page, email);
+    const fresh = await newAuthContext(browser, fapiHost, null);
+    const provisionedSignin = await signInWithFreshTicket(
+      fresh.page,
+      secretKey,
+      provisionedUser.userId
+    );
     await waitForAppSessionCookie(fresh.context, 'fresh-signup');
     const freshAuthUrl = await startElectronBrowserAuth();
     const freshCallback = await requestNativeCallback(
@@ -1102,7 +1380,7 @@ async function main() {
     );
     openNativeCallback(freshCallback);
     const freshElectron = await waitForElectronAuth(
-      freshSignup.userId,
+      provisionedSignin.userId,
       'fresh-signup'
     );
     await fresh.context.close();
@@ -1132,8 +1410,9 @@ async function main() {
       JSON.stringify(
         {
           email,
-          freshSignup: {
-            userId: freshSignup.userId,
+          provisionedSignin: {
+            userId: provisionedSignin.userId,
+            reused: provisionedUser.reused,
             electronUrl: redactTicketFromUrl(freshElectron.url),
             apiStatus: freshElectron.apiStatus,
           },

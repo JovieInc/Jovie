@@ -32,6 +32,16 @@ test('passes when only desktop contract tests changed', () => {
   assert.deepEqual(result.desktopFiles, []);
 });
 
+test('passes when only desktop smoke harnesses changed', () => {
+  const result = evaluateDesktopReleaseGuard([
+    'apps/desktop/scripts/smoke-native-auth.mjs',
+    'apps/web/app/page.tsx',
+  ]);
+
+  assert.equal(result.passed, true);
+  assert.deepEqual(result.desktopFiles, []);
+});
+
 test('still fails when a desktop test changes with release-impacting desktop code', () => {
   const result = evaluateDesktopReleaseGuard([
     'apps/desktop/scripts/desktop-icon-contract.test.mjs',
