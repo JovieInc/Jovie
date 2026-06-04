@@ -8,6 +8,7 @@ import { APP_ROUTES } from '@/constants/routes';
 import { AuthLayout, AuthRoutePrefetch, AuthShell } from '@/features/auth';
 import { buildAuthRouteUrl } from '@/lib/auth/build-auth-route-url';
 import { getCentralAuthCallbackPath } from '@/lib/auth/central-auth-routing';
+import { sanitizeRedirectUrl } from '@/lib/auth/constants';
 import {
   buildAuthRouteUrlWithDesktopReturn,
   buildDesktopAuthReturnPath,
@@ -139,7 +140,11 @@ function getFallbackRedirectUrl(
     return buildDesktopAuthReturnPath(options.desktopReturnRoute);
   }
 
-  return getCentralAuthCallbackPath(params) ?? undefined;
+  return (
+    getCentralAuthCallbackPath(params) ??
+    sanitizeRedirectUrl(params.get('redirect_url')) ??
+    undefined
+  );
 }
 
 export function SignInPageClient() {

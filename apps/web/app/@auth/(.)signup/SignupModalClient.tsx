@@ -10,6 +10,7 @@ import {
 } from '@/components/homepage/intent-store';
 import { APP_ROUTES } from '@/constants/routes';
 import { buildAuthRouteUrl } from '@/lib/auth/build-auth-route-url';
+import { sanitizeRedirectUrl } from '@/lib/auth/constants';
 
 /**
  * Intercepted signup modal.
@@ -50,7 +51,9 @@ export function SignupModalClient() {
   }, [searchParams]);
 
   const signInUrl = buildAuthRouteUrl(APP_ROUTES.SIGNIN, searchParams);
-  const redirectUrl = searchParams.get('redirect_url') ?? APP_ROUTES.WAITLIST;
+  const redirectUrl =
+    sanitizeRedirectUrl(searchParams.get('redirect_url')) ??
+    APP_ROUTES.WAITLIST;
 
   const statusRow = promptHint ? (
     <p aria-live='polite' className='truncate' title={promptHint}>

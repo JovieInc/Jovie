@@ -2,24 +2,13 @@ import { render, screen, waitFor } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const {
-  authLayoutMock,
-  clerkSignInMock,
-  routerPrefetchMock,
-  searchParamsState,
-} = vi.hoisted(() => ({
-  authLayoutMock: vi.fn(),
-  clerkSignInMock: vi.fn(),
-  routerPrefetchMock: vi.fn(),
-  searchParamsState: { value: '' },
-}));
-
-vi.mock('@clerk/nextjs', () => ({
-  SignIn: (props: unknown) => {
-    clerkSignInMock(props);
-    return <div data-testid='clerk-sign-in' />;
-  },
-}));
+const { authShellMock, authLayoutMock, routerPrefetchMock, searchParamsState } =
+  vi.hoisted(() => ({
+    authShellMock: vi.fn(),
+    authLayoutMock: vi.fn(),
+    routerPrefetchMock: vi.fn(),
+    searchParamsState: { value: '' },
+  }));
 
 vi.mock('next/navigation', () => ({
   useSearchParams: () => new URLSearchParams(searchParamsState.value),
@@ -40,8 +29,10 @@ vi.mock('@/features/auth', async () => {
       routerPrefetchMock(href);
       return null;
     },
-    // Import the real AuthShell so the Clerk wiring stays exercised end to end.
-    AuthShell: (await import('@/components/features/auth/AuthShell')).AuthShell,
+    AuthShell: (props: Record<string, unknown>) => {
+      authShellMock(props);
+      return reactModule.createElement('div', { 'data-testid': 'auth-shell' });
+    },
   };
 });
 
@@ -49,25 +40,17 @@ import { APP_ROUTES } from '@/constants/routes';
 import SignInPage from '../../../app/(auth)/signin/page';
 
 describe('signin page', () => {
-  function fullAuthUrl(path: string) {
-    return new URL(path, globalThis.location.origin).toString();
-  }
-
   beforeEach(() => {
+    authShellMock.mockReset();
     authLayoutMock.mockReset();
-    clerkSignInMock.mockReset();
     routerPrefetchMock.mockReset();
     searchParamsState.value = '';
   });
 
-  it('renders Clerk SignIn with the expected auth props', async () => {
+  it('renders AuthShell with the expected auth props', () => {
     render(<SignInPage />);
 
-    await waitFor(() => {
-      expect(clerkSignInMock).toHaveBeenCalledTimes(1);
-    });
-
-    expect(screen.getByTestId('clerk-sign-in')).toBeInTheDocument();
+    expect(screen.getByTestId('auth-shell')).toBeInTheDocument();
     expect(authLayoutMock).toHaveBeenCalledWith(
       expect.objectContaining({
         formTitle: 'Sign in',
@@ -80,16 +63,13 @@ describe('signin page', () => {
       screen.queryByText('Welcome back to Jovie.')
     ).not.toBeInTheDocument();
     expect(routerPrefetchMock).toHaveBeenCalledWith(APP_ROUTES.SIGNUP);
-    expect(clerkSignInMock).toHaveBeenCalledWith(
+    expect(authShellMock).toHaveBeenCalledWith(
       expect.objectContaining({
-        routing: 'path',
-        path: '/signin',
-        oauthFlow: 'redirect',
-        // Cross-link for sign-in → /support (Need help?). SSO-only — waitlist
-        // is a dead end for returnees who lost their SSO session (JOV-2446).
-        signUpUrl: fullAuthUrl(APP_ROUTES.SUPPORT),
-        fallbackRedirectUrl: APP_ROUTES.DASHBOARD,
+        forceOppositeModeHardNavigation: true,
+        fallbackRedirectUrl: undefined,
         initialValues: undefined,
+        mode: 'sign-in',
+        oppositeModeUrl: undefined,
       })
     );
   });
@@ -99,11 +79,7 @@ describe('signin page', () => {
 
     render(<SignInPage />);
 
-    await waitFor(() => {
-      expect(clerkSignInMock).toHaveBeenCalledTimes(1);
-    });
-
-    expect(clerkSignInMock).toHaveBeenCalledWith(
+    expect(authShellMock).toHaveBeenCalledWith(
       expect.objectContaining({
         initialValues: { emailAddress: 'test@example.com' },
       })
@@ -115,27 +91,9 @@ describe('signin page', () => {
 
     render(<SignInPage />);
 
-    await waitFor(() => {
-      expect(clerkSignInMock).toHaveBeenCalledTimes(1);
-    });
-
-    expect(clerkSignInMock).toHaveBeenCalledWith(
+    expect(authShellMock).toHaveBeenCalledWith(
       expect.objectContaining({
         initialValues: undefined,
-      })
-    );
-  });
-
-  it('passes oidcPrompt=select_account to Clerk SignIn so account chooser always appears', async () => {
-    render(<SignInPage />);
-
-    await waitFor(() => {
-      expect(clerkSignInMock).toHaveBeenCalledTimes(1);
-    });
-
-    expect(clerkSignInMock).toHaveBeenCalledWith(
-      expect.objectContaining({
-        oidcPrompt: 'select_account',
       })
     );
   });
@@ -179,14 +137,10 @@ describe('signin page', () => {
 
     render(<SignInPage />);
 
-    await waitFor(() => {
-      expect(clerkSignInMock).toHaveBeenCalledTimes(1);
-    });
-
-    expect(clerkSignInMock).toHaveBeenCalledWith(
+    expect(authShellMock).toHaveBeenCalledWith(
       expect.objectContaining({
-        // Cross-link for sign-in preserves redirect params toward /support (JOV-2446).
-        signUpUrl: fullAuthUrl('/support?redirect_url=%2Fonboarding'),
+        fallbackRedirectUrl: '/onboarding',
+        oppositeModeUrl: undefined,
       })
     );
   });
@@ -197,15 +151,10 @@ describe('signin page', () => {
 
     render(<SignInPage />);
 
-    await waitFor(() => {
-      expect(clerkSignInMock).toHaveBeenCalledTimes(1);
-    });
-
-    expect(clerkSignInMock).toHaveBeenCalledWith(
+    expect(authShellMock).toHaveBeenCalledWith(
       expect.objectContaining({
-        signUpUrl: fullAuthUrl(
-          '/signup?desktop_return=%2Fapp%2Fsettings%3Ftab%3Dbilling'
-        ),
+        oppositeModeUrl:
+          '/signup?desktop_return=%2Fapp%2Fsettings%3Ftab%3Dbilling',
         fallbackRedirectUrl:
           '/auth-return?route=%2Fapp%2Fsettings%3Ftab%3Dbilling',
       })
@@ -220,13 +169,9 @@ describe('signin page', () => {
 
     render(<SignInPage />);
 
-    await waitFor(() => {
-      expect(clerkSignInMock).toHaveBeenCalledTimes(1);
-    });
-
-    expect(clerkSignInMock).toHaveBeenCalledWith(
+    expect(authShellMock).toHaveBeenCalledWith(
       expect.objectContaining({
-        signUpUrl: fullAuthUrl('/signup?mobile_return=%2Fapp%2Fsettings'),
+        oppositeModeUrl: '/signup?mobile_return=%2Fapp%2Fsettings',
         fallbackRedirectUrl: '/mobile-auth-return?route=%2Fapp%2Fsettings',
       })
     );

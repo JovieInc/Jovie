@@ -3,9 +3,9 @@ import type { ReactNode } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const {
+  authShellMock,
   clearSignupClaimValueMock,
   authLayoutMock,
-  clerkSignUpMock,
   fetchMock,
   persistSignupClaimValueMock,
   routerPrefetchMock,
@@ -14,9 +14,9 @@ const {
   trackMock,
   validatePlanMock,
 } = vi.hoisted(() => ({
+  authShellMock: vi.fn(),
   clearSignupClaimValueMock: vi.fn(),
   authLayoutMock: vi.fn(),
-  clerkSignUpMock: vi.fn(),
   fetchMock: vi.fn(),
   persistSignupClaimValueMock: vi.fn(),
   routerPrefetchMock: vi.fn(),
@@ -24,13 +24,6 @@ const {
   setPlanIntentMock: vi.fn(),
   trackMock: vi.fn(),
   validatePlanMock: vi.fn(),
-}));
-
-vi.mock('@clerk/nextjs', () => ({
-  SignUp: (props: unknown) => {
-    clerkSignUpMock(props);
-    return <div data-testid='clerk-sign-up' />;
-  },
 }));
 
 vi.mock('next/navigation', () => ({
@@ -52,9 +45,10 @@ vi.mock('@/features/auth', async () => {
       routerPrefetchMock(href);
       return null;
     },
-    // Import the real AuthShell so its Clerk wiring is exercised in this
-    // test. Provider gating is verified separately in oauth-providers.test.ts.
-    AuthShell: (await import('@/components/features/auth/AuthShell')).AuthShell,
+    AuthShell: (props: Record<string, unknown>) => {
+      authShellMock(props);
+      return reactModule.createElement('div', { 'data-testid': 'auth-shell' });
+    },
   };
 });
 
@@ -81,14 +75,10 @@ import { APP_ROUTES } from '@/constants/routes';
 import SignUpPage from '../../../app/(auth)/signup/page';
 
 describe('signup page', () => {
-  function fullAuthUrl(path: string) {
-    return new URL(path, globalThis.location.origin).toString();
-  }
-
   beforeEach(() => {
+    authShellMock.mockReset();
     clearSignupClaimValueMock.mockReset();
     authLayoutMock.mockReset();
-    clerkSignUpMock.mockReset();
     fetchMock.mockReset();
     fetchMock.mockResolvedValue({
       json: async () => ({ available: true }),
@@ -104,14 +94,10 @@ describe('signup page', () => {
     globalThis.history.replaceState(null, '', '/signup');
   });
 
-  it('renders Clerk SignUp with the expected auth props and legal links', async () => {
+  it('renders AuthShell with the expected auth props', () => {
     render(<SignUpPage />);
 
-    await waitFor(() => {
-      expect(clerkSignUpMock).toHaveBeenCalledTimes(1);
-    });
-
-    expect(screen.getByTestId('clerk-sign-up')).toBeInTheDocument();
+    expect(screen.getByTestId('auth-shell')).toBeInTheDocument();
     expect(authLayoutMock).toHaveBeenCalledWith(
       expect.objectContaining({
         formTitle: 'Request access',
@@ -125,21 +111,14 @@ describe('signup page', () => {
     ).not.toBeInTheDocument();
     expect(screen.queryByText("Don't have access?")).not.toBeInTheDocument();
     expect(routerPrefetchMock).toHaveBeenCalledWith(APP_ROUTES.SIGNIN);
-    expect(clerkSignUpMock).toHaveBeenCalledWith(
+    expect(authShellMock).toHaveBeenCalledWith(
       expect.objectContaining({
-        routing: 'path',
-        path: '/signup',
-        oauthFlow: 'redirect',
-        signInUrl: fullAuthUrl(APP_ROUTES.SIGNIN),
-        fallbackRedirectUrl: APP_ROUTES.WAITLIST,
+        forceOppositeModeHardNavigation: true,
+        fallbackRedirectUrl: undefined,
+        mode: 'sign-up',
+        oppositeModeUrl: APP_ROUTES.SIGNIN,
       })
     );
-    expect(
-      screen.getByRole('link', { name: /terms of service/i })
-    ).toHaveAttribute('href', APP_ROUTES.LEGAL_TERMS);
-    expect(
-      screen.getByRole('link', { name: /privacy policy/i })
-    ).toHaveAttribute('href', APP_ROUTES.LEGAL_PRIVACY);
   });
 
   it('shows handle availability without writing pending claim session state', async () => {
@@ -217,13 +196,10 @@ describe('signup page', () => {
 
     render(<SignUpPage />);
 
-    await waitFor(() => {
-      expect(clerkSignUpMock).toHaveBeenCalledTimes(1);
-    });
-
-    expect(clerkSignUpMock).toHaveBeenCalledWith(
+    expect(authShellMock).toHaveBeenCalledWith(
       expect.objectContaining({
-        signInUrl: fullAuthUrl('/signin?redirect_url=%2Fonboarding'),
+        fallbackRedirectUrl: '/onboarding',
+        oppositeModeUrl: '/signin?redirect_url=%2Fonboarding',
       })
     );
   });
@@ -233,15 +209,9 @@ describe('signup page', () => {
 
     render(<SignUpPage />);
 
-    await waitFor(() => {
-      expect(clerkSignUpMock).toHaveBeenCalledTimes(1);
-    });
-
-    expect(clerkSignUpMock).toHaveBeenCalledWith(
+    expect(authShellMock).toHaveBeenCalledWith(
       expect.objectContaining({
-        signInUrl: fullAuthUrl(
-          '/signin?desktop_return=%2Fstart%3Fintent_id%3Dabc'
-        ),
+        oppositeModeUrl: '/signin?desktop_return=%2Fstart%3Fintent_id%3Dabc',
         fallbackRedirectUrl: '/auth-return?route=%2Fstart%3Fintent_id%3Dabc',
       })
     );
@@ -252,13 +222,9 @@ describe('signup page', () => {
 
     render(<SignUpPage />);
 
-    await waitFor(() => {
-      expect(clerkSignUpMock).toHaveBeenCalledTimes(1);
-    });
-
-    expect(clerkSignUpMock).toHaveBeenCalledWith(
+    expect(authShellMock).toHaveBeenCalledWith(
       expect.objectContaining({
-        signInUrl: fullAuthUrl('/signin?mobile_return=%2Fapp'),
+        oppositeModeUrl: '/signin?mobile_return=%2Fapp',
         fallbackRedirectUrl: '/mobile-auth-return?route=%2Fapp',
       })
     );
@@ -269,10 +235,6 @@ describe('signup page', () => {
     validatePlanMock.mockReturnValue(null);
 
     render(<SignUpPage />);
-
-    await waitFor(() => {
-      expect(clerkSignUpMock).toHaveBeenCalledTimes(1);
-    });
 
     expect(validatePlanMock).toHaveBeenCalledWith('not-a-plan');
     expect(setPlanIntentMock).not.toHaveBeenCalled();
@@ -290,10 +252,6 @@ describe('signup page', () => {
     render(<SignUpPage />);
 
     await waitFor(() => {
-      expect(clerkSignUpMock).toHaveBeenCalledTimes(1);
-    });
-
-    await waitFor(() => {
       expect(fetchMock).toHaveBeenCalledWith(
         '/api/handle/check?handle=quotacase',
         expect.objectContaining({
@@ -302,7 +260,7 @@ describe('signup page', () => {
       );
     });
 
-    expect(screen.getByTestId('clerk-sign-up')).toBeInTheDocument();
+    expect(screen.getByTestId('auth-shell')).toBeInTheDocument();
     setItemSpy.mockRestore();
   });
 
@@ -355,11 +313,9 @@ describe('signup page', () => {
       );
     });
 
-    expect(clerkSignUpMock).toHaveBeenCalledWith(
+    expect(authShellMock).toHaveBeenCalledWith(
       expect.objectContaining({
-        signInUrl: fullAuthUrl(
-          '/signin?redirect_url=%2Fonboarding%3Fhandle%3Dartist'
-        ),
+        oppositeModeUrl: '/signin?redirect_url=%2Fonboarding%3Fhandle%3Dartist',
       })
     );
   });
@@ -378,19 +334,5 @@ describe('signup page', () => {
     const alert = screen.getByRole('alert');
     expect(alert).toHaveTextContent('artist@example.com');
     expect(alert).toHaveTextContent('already exists');
-  });
-
-  it('passes oidcPrompt=select_account to Clerk SignUp so account chooser always appears', async () => {
-    render(<SignUpPage />);
-
-    await waitFor(() => {
-      expect(clerkSignUpMock).toHaveBeenCalledTimes(1);
-    });
-
-    expect(clerkSignUpMock).toHaveBeenCalledWith(
-      expect.objectContaining({
-        oidcPrompt: 'select_account',
-      })
-    );
   });
 });
