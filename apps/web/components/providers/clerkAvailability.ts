@@ -176,10 +176,12 @@ export function getClerkProxyUrl(
  *
  * Returns undefined in dev (pk_test_) so Clerk loads JS from its default CDN.
  */
-export function getClerkJSUrl(): string | undefined {
+export function getClerkJSUrl(
+  publishableKey = publicEnv.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY
+): string | undefined {
   if (publicEnv.NEXT_PUBLIC_CLERK_PROXY_DISABLED === '1') return undefined;
 
-  const pk = publicEnv.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY ?? '';
+  const pk = publishableKey?.trim() ?? '';
   if (!pk.startsWith('pk_live_')) return undefined;
 
   try {
