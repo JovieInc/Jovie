@@ -3,7 +3,8 @@
 # PURPOSE: Nightly regeneration of docs/TEST_COVERAGE_HEATMAP.md from the
 # hand-curated docs/TEST_RISK_REGISTER.md plus v8 coverage data.
 #
-# Output: commits an updated heatmap to main only when values change.
+# Output: commits an updated heatmap to main only when values change and uploads
+# daily unit coverage to Codecov.
 # Also commits apps/web/reports/test-coverage-snapshot.json (machine-readable
 # baseline) so any PR can run `pnpm run test:coverage:diff` and compare to
 # the canonical baseline from main.
@@ -59,6 +60,15 @@ jobs:
 
       - name: Generate heatmap
         run: pnpm exec tsx scripts/audit-test-coverage.ts
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@e79a6962e0d4c0c17b229090214935d2e33f8354 # v5
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: apps/web/coverage/lcov.info
+          flags: nightly-unittests
+          fail_ci_if_error: false
+          verbose: true
 
       - name: Commit if changed
         if: ${{ github.event_name == 'schedule' || inputs.commit }}
