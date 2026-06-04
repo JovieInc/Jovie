@@ -68,15 +68,24 @@ if [ "${JOVIE_DISABLE_MODEL_KEYS_FOR_EVALS:-0}" = "1" ]; then
   echo "Starting dev server with model provider env disabled for isolated evals" >&2
 fi
 
-doppler run --project jovie-web --config dev -- env \
-  "${ENV_UNSET_ARGS[@]}" \
-  E2E_USE_TEST_AUTH_BYPASS="${E2E_USE_TEST_AUTH_BYPASS:-1}" \
-  NEXT_PUBLIC_CLERK_MOCK="${NEXT_PUBLIC_CLERK_MOCK:-1}" \
-  NEXT_PUBLIC_CLERK_PROXY_DISABLED="${NEXT_PUBLIC_CLERK_PROXY_DISABLED:-1}" \
-  NEXT_DISABLE_TOOLBAR="${NEXT_DISABLE_TOOLBAR:-1}" \
-  JOVIE_ENABLE_LOCAL_SENTRY="${JOVIE_ENABLE_LOCAL_SENTRY:-0}" \
-  PORT="$PORT" \
-  pnpm --filter @jovie/web run dev:fast >"$LOG_FILE" 2>&1 &
+DEV_ENV_ARGS=(
+  E2E_USE_TEST_AUTH_BYPASS="${E2E_USE_TEST_AUTH_BYPASS:-1}"
+  NEXT_PUBLIC_CLERK_MOCK="${NEXT_PUBLIC_CLERK_MOCK:-1}"
+  NEXT_PUBLIC_CLERK_PROXY_DISABLED="${NEXT_PUBLIC_CLERK_PROXY_DISABLED:-1}"
+  NEXT_DISABLE_TOOLBAR="${NEXT_DISABLE_TOOLBAR:-1}"
+  JOVIE_ENABLE_LOCAL_SENTRY="${JOVIE_ENABLE_LOCAL_SENTRY:-0}"
+  PORT="$PORT"
+  pnpm --filter @jovie/web run dev:fast
+)
+
+if [ "${#ENV_UNSET_ARGS[@]}" -gt 0 ]; then
+  doppler run --project jovie-web --config dev -- env \
+    "${ENV_UNSET_ARGS[@]}" \
+    "${DEV_ENV_ARGS[@]}" >"$LOG_FILE" 2>&1 &
+else
+  doppler run --project jovie-web --config dev -- env \
+    "${DEV_ENV_ARGS[@]}" >"$LOG_FILE" 2>&1 &
+fi
 DEV_PID=$!
 
 tail -f "$LOG_FILE" &
