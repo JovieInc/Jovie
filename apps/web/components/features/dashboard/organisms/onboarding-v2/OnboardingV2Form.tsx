@@ -128,16 +128,14 @@ const STEP_ORDER: StepId[] = [
   'profile-ready',
 ];
 
-const SIDEBAR_STEPS: ReadonlyArray<
-  Readonly<{ id: StepId; label: string; color: string }>
-> = [
-  { id: 'handle', label: 'Handle', color: '#a78bfa' },
-  { id: 'spotify', label: 'Spotify', color: '#1DB954' },
-  { id: 'upgrade', label: 'Plan', color: '#f59e0b' },
-  { id: 'dsp', label: 'DSPs', color: '#38bdf8' },
-  { id: 'social', label: 'Social', color: '#f472b6' },
-  { id: 'releases', label: 'Releases', color: '#fb923c' },
-  { id: 'profile-ready', label: 'Finish', color: '#34d399' },
+const SIDEBAR_STEPS: ReadonlyArray<Readonly<{ id: StepId; label: string }>> = [
+  { id: 'handle', label: 'Handle' },
+  { id: 'spotify', label: 'Spotify' },
+  { id: 'upgrade', label: 'Plan' },
+  { id: 'dsp', label: 'DSPs' },
+  { id: 'social', label: 'Social' },
+  { id: 'releases', label: 'Releases' },
+  { id: 'profile-ready', label: 'Finish' },
 ];
 
 interface SelectedArtist {
@@ -564,7 +562,7 @@ function StepFrame({ actions, children, prompt, title }: StepFrameProps) {
   return (
     <div className='mx-auto flex w-full max-w-2xl flex-col gap-6'>
       <div className='space-y-3'>
-        <h1 className='text-3xl font-semibold tracking-[-0.04em] text-primary-token sm:text-[2.7rem]'>
+        <h1 className='text-3xl font-semibold tracking-normal text-primary-token sm:text-4xl'>
           {title}
         </h1>
         {prompt ? (
@@ -593,12 +591,7 @@ function FlatPanel({
   className?: string;
 }>) {
   return (
-    <div
-      className={cn(
-        'border-b border-[color-mix(in_oklab,var(--linear-app-frame-seam)_72%,transparent)] pb-5',
-        className
-      )}
-    >
+    <div className={cn('system-b-onboarding-flat-panel', className)}>
       {children}
     </div>
   );
@@ -610,7 +603,7 @@ function InlineNotice({
   children: React.ReactNode;
 }>) {
   return (
-    <div className='border-b border-[color-mix(in_oklab,var(--color-destructive)_28%,transparent)] pb-4 text-sm leading-6 text-secondary-token'>
+    <div className='system-b-onboarding-inline-notice text-sm leading-6 text-secondary-token'>
       {children}
     </div>
   );
@@ -621,7 +614,7 @@ function EmptyState({
   title,
 }: Readonly<{ body: string; title: string }>) {
   return (
-    <div className='border-b border-[color-mix(in_oklab,var(--linear-app-frame-seam)_58%,transparent)] pb-5'>
+    <div className='system-b-onboarding-empty-state'>
       <p className='text-sm font-semibold text-primary-token'>{title}</p>
       <p className='mt-1 text-sm leading-6 text-secondary-token'>{body}</p>
     </div>
@@ -630,17 +623,17 @@ function EmptyState({
 
 function StepCircleIcon({
   className,
-  color,
+  stepId,
   state,
 }: Readonly<{
   className?: string;
-  color: string;
+  stepId: StepId;
   state: 'complete' | 'current' | 'pending';
 }>) {
   let innerShape: React.ReactNode;
   if (state === 'complete') {
     innerShape = (
-      <circle cx='12' cy='12' r='10' stroke={color} strokeWidth='2' />
+      <circle cx='12' cy='12' r='10' stroke='currentColor' strokeWidth='2' />
     );
   } else if (state === 'current') {
     innerShape = (
@@ -648,14 +641,14 @@ function StepCircleIcon({
         {/* Solid left half */}
         <path
           d='M12 2a10 10 0 0 0 0 20'
-          stroke={color}
+          stroke='currentColor'
           strokeWidth='2'
           fill='none'
         />
         {/* Dotted right half */}
         <path
           d='M12 2a10 10 0 0 1 0 20'
-          stroke={color}
+          stroke='currentColor'
           strokeWidth='2'
           strokeDasharray='2.5 2.5'
           fill='none'
@@ -679,7 +672,11 @@ function StepCircleIcon({
   return (
     <svg
       aria-hidden='true'
-      className={className}
+      className={cn(
+        state === 'pending' ? 'text-current' : 'system-b-onboarding-step-icon',
+        className
+      )}
+      data-step={state === 'pending' ? undefined : stepId}
       viewBox='0 0 24 24'
       fill='none'
     >
@@ -751,7 +748,7 @@ function OnboardingSidebar({
               >
                 <StepCircleIcon
                   className='h-4 w-4 shrink-0'
-                  color={state === 'pending' ? 'currentColor' : step.color}
+                  stepId={step.id}
                   state={state}
                 />
                 <span className='font-semibold'>{step.label}</span>
@@ -1628,7 +1625,7 @@ export function OnboardingV2Form({
     return (
       <ContentSurfaceCard
         as='ul'
-        className='absolute top-full right-0 left-0 z-10 mt-2 max-h-[320px] overflow-y-auto p-1'
+        className='absolute top-full right-0 left-0 z-10 mt-2 max-h-80 overflow-y-auto p-1'
       >
         {results.map(artist => {
           const unavailable = isReservedArtist(artist);
@@ -2155,9 +2152,7 @@ export function OnboardingV2Form({
                 </div>
                 <ol className='space-y-3'>
                   <li className='flex items-start gap-3'>
-                    <span className='mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-(--linear-app-frame-seam) bg-surface-0 text-2xs font-semibold text-primary-token'>
-                      1
-                    </span>
+                    <span className='system-b-onboarding-step-number'>1</span>
                     <div className='min-w-0'>
                       <p className='text-sm font-semibold text-primary-token'>
                         Copy your Instagram bio link
@@ -2170,9 +2165,7 @@ export function OnboardingV2Form({
                     </div>
                   </li>
                   <li className='flex items-start gap-3'>
-                    <span className='mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-(--linear-app-frame-seam) bg-surface-0 text-2xs font-semibold text-primary-token'>
-                      2
-                    </span>
+                    <span className='system-b-onboarding-step-number'>2</span>
                     <div className='min-w-0'>
                       <p className='text-sm font-semibold text-primary-token'>
                         Open Instagram
@@ -2185,9 +2178,7 @@ export function OnboardingV2Form({
                     </div>
                   </li>
                   <li className='flex items-start gap-3'>
-                    <span className='mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-(--linear-app-frame-seam) bg-surface-0 text-2xs font-semibold text-primary-token'>
-                      3
-                    </span>
+                    <span className='system-b-onboarding-step-number'>3</span>
                     <div className='min-w-0'>
                       <p className='text-sm font-semibold text-primary-token'>
                         Paste it into your bio
@@ -2211,7 +2202,7 @@ export function OnboardingV2Form({
               </label>
               <textarea
                 id='onboarding-anything-else'
-                className='mt-3 min-h-[120px] w-full border-b border-[color-mix(in_oklab,var(--linear-app-frame-seam)_72%,transparent)] bg-transparent px-0 py-3 text-sm text-primary-token outline-none placeholder:text-tertiary-token'
+                className='system-b-onboarding-context-textarea mt-3 w-full bg-transparent px-0 text-sm text-primary-token outline-none placeholder:text-tertiary-token'
                 onChange={event => setAnythingElse(event.target.value)}
                 placeholder='Optional context for your first Jovie chat…'
                 value={anythingElse}

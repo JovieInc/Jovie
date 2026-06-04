@@ -91,6 +91,13 @@
   --system-b-duration-fast: var(--ds-motion-subtle-duration);
   --system-b-ease: var(--ds-motion-subtle-easing);
   --system-b-radius-pill: var(--radius-full);
+  --system-b-onboarding-step-handle: var(--geist-purple-solid);
+  --system-b-onboarding-step-spotify: var(--color-brand-spotify);
+  --system-b-onboarding-step-upgrade: var(--geist-amber-solid);
+  --system-b-onboarding-step-dsp: var(--geist-cyan-solid);
+  --system-b-onboarding-step-social: var(--geist-pink-solid);
+  --system-b-onboarding-step-releases: var(--color-warning);
+  --system-b-onboarding-step-profile-ready: var(--color-success);
 
   --ds-motion-subtle-duration: 150ms;
   --ds-motion-subtle-easing: cubic-bezier(0.4, 0, 0.2, 1);
@@ -2191,6 +2198,79 @@ body:has(.system-b-download-page) .marketing-glass-header__cta:focus-visible {
 
 :where(.system-b-download-legal-link:hover) {
   color: color-mix(in oklab, var(--system-b-text-primary) 70%, transparent);
+}
+
+/* ============================================
+   SYSTEM B ONBOARDING V2 PRIMITIVES
+   ============================================ */
+
+:where(.system-b-onboarding-flat-panel) {
+  border-bottom: 1px solid
+    color-mix(in oklab, var(--system-b-app-frame-seam) 72%, transparent);
+  padding-bottom: var(--space-5);
+}
+
+:where(.system-b-onboarding-inline-notice) {
+  border-bottom: 1px solid
+    color-mix(in oklab, var(--color-error) 28%, transparent);
+  padding-bottom: var(--space-4);
+}
+
+:where(.system-b-onboarding-empty-state) {
+  border-bottom: 1px solid
+    color-mix(in oklab, var(--system-b-app-frame-seam) 58%, transparent);
+  padding-bottom: var(--space-5);
+}
+
+:where(.system-b-onboarding-step-icon[data-step="handle"]) {
+  color: var(--system-b-onboarding-step-handle);
+}
+
+:where(.system-b-onboarding-step-icon[data-step="spotify"]) {
+  color: var(--system-b-onboarding-step-spotify);
+}
+
+:where(.system-b-onboarding-step-icon[data-step="upgrade"]) {
+  color: var(--system-b-onboarding-step-upgrade);
+}
+
+:where(.system-b-onboarding-step-icon[data-step="dsp"]) {
+  color: var(--system-b-onboarding-step-dsp);
+}
+
+:where(.system-b-onboarding-step-icon[data-step="social"]) {
+  color: var(--system-b-onboarding-step-social);
+}
+
+:where(.system-b-onboarding-step-icon[data-step="releases"]) {
+  color: var(--system-b-onboarding-step-releases);
+}
+
+:where(.system-b-onboarding-step-icon[data-step="profile-ready"]) {
+  color: var(--system-b-onboarding-step-profile-ready);
+}
+
+:where(.system-b-onboarding-step-number) {
+  display: flex;
+  width: var(--space-5);
+  height: var(--space-5);
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  margin-top: var(--space-0-5);
+  border: 1px solid var(--system-b-app-frame-seam);
+  border-radius: var(--system-b-radius-pill);
+  background: var(--system-b-bg-surface-0);
+  color: var(--color-text-primary-token);
+  font-size: var(--text-2xs);
+  font-weight: var(--font-weight-semibold);
+}
+
+:where(.system-b-onboarding-context-textarea) {
+  min-height: 120px;
+  border-bottom: 1px solid
+    color-mix(in oklab, var(--system-b-app-frame-seam) 72%, transparent);
+  padding-block: var(--space-3);
 }
 
 /* ============================================
