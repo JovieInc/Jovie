@@ -219,7 +219,7 @@ function ReleaseCard({
                 alt={`${release.title} artwork`}
                 fill
                 sizes='(min-width: 768px) 240px, 100vw'
-                className='object-cover transition-transform duration-[var(--linear-duration-normal)] group-hover:scale-[1.02]'
+                className='object-cover'
               />
             </div>
             <div className='mt-4'>
