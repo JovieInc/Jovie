@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { execFile } from 'node:child_process';
-import { readFile } from 'node:fs/promises';
+import { readFile, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
@@ -257,61 +257,61 @@ test('desktop dev defaults to the local app shell and packaged builds keep produ
     packageJson,
     /"predev": "cross-env ELECTRON_ENV=local node scripts\/write-env\.mjs"/
   );
+  const envGeneratedPath = join(desktopRoot, 'src/env.generated.ts');
+  const originalEnvGenerated = await readFile(envGeneratedPath, 'utf8');
 
-  const { stdout: localStdout } = await execFileAsync(
-    process.execPath,
-    [join(desktopRoot, 'scripts/write-env.mjs')],
-    {
-      cwd: desktopRoot,
-      env: {
-        ...process.env,
-        ELECTRON_ENV: 'local',
-        ELECTRON_APP_URL: 'http://127.0.0.1:3112/app/ignored',
-      },
-    }
-  );
-  const localEnv = await readFile(join(desktopRoot, 'src/env.generated.ts'), {
-    encoding: 'utf8',
-  });
-  assert.match(localStdout, /APP_ENV='local'/);
-  assert.match(localEnv, /APP_ENV: 'production' \| 'staging' \| 'local'/);
-  assert.match(localEnv, /APP_URL = 'http:\/\/127\.0\.0\.1:3112'/);
+  try {
+    const { stdout: localStdout } = await execFileAsync(
+      process.execPath,
+      [join(desktopRoot, 'scripts/write-env.mjs')],
+      {
+        cwd: desktopRoot,
+        env: {
+          ...process.env,
+          ELECTRON_ENV: 'local',
+          ELECTRON_APP_URL: 'http://127.0.0.1:3112/app/ignored',
+        },
+      }
+    );
+    const localEnv = await readFile(envGeneratedPath, {
+      encoding: 'utf8',
+    });
+    assert.match(localStdout, /APP_ENV='local'/);
+    assert.match(localEnv, /APP_ENV: 'production' \| 'staging' \| 'local'/);
+    assert.match(localEnv, /APP_URL = 'http:\/\/127\.0\.0\.1:3112'/);
 
-  const { stdout: productionStdout } = await execFileAsync(
-    process.execPath,
-    [join(desktopRoot, 'scripts/write-env.mjs')],
-    {
-      cwd: desktopRoot,
-      env: {
-        ...process.env,
-        ELECTRON_ENV: 'production',
-      },
-    }
-  );
-  const productionEnv = await readFile(
-    join(desktopRoot, 'src/env.generated.ts'),
-    'utf8'
-  );
-  assert.match(productionStdout, /APP_ENV='production'/);
-  assert.match(productionEnv, /APP_URL = 'https:\/\/jov\.ie'/);
+    const { stdout: productionStdout } = await execFileAsync(
+      process.execPath,
+      [join(desktopRoot, 'scripts/write-env.mjs')],
+      {
+        cwd: desktopRoot,
+        env: {
+          ...process.env,
+          ELECTRON_ENV: 'production',
+        },
+      }
+    );
+    const productionEnv = await readFile(envGeneratedPath, 'utf8');
+    assert.match(productionStdout, /APP_ENV='production'/);
+    assert.match(productionEnv, /APP_URL = 'https:\/\/jov\.ie'/);
 
-  const { stdout: stagingStdout } = await execFileAsync(
-    process.execPath,
-    [join(desktopRoot, 'scripts/write-env.mjs')],
-    {
-      cwd: desktopRoot,
-      env: {
-        ...process.env,
-        ELECTRON_ENV: 'staging',
-      },
-    }
-  );
-  const stagingEnv = await readFile(
-    join(desktopRoot, 'src/env.generated.ts'),
-    'utf8'
-  );
-  assert.match(stagingStdout, /APP_ENV='staging'/);
-  assert.match(stagingEnv, /APP_URL = 'https:\/\/staging\.jov\.ie'/);
+    const { stdout: stagingStdout } = await execFileAsync(
+      process.execPath,
+      [join(desktopRoot, 'scripts/write-env.mjs')],
+      {
+        cwd: desktopRoot,
+        env: {
+          ...process.env,
+          ELECTRON_ENV: 'staging',
+        },
+      }
+    );
+    const stagingEnv = await readFile(envGeneratedPath, 'utf8');
+    assert.match(stagingStdout, /APP_ENV='staging'/);
+    assert.match(stagingEnv, /APP_URL = 'https:\/\/staging\.jov\.ie'/);
+  } finally {
+    await writeFile(envGeneratedPath, originalEnvGenerated);
+  }
 });
 
 test('hosted web app has an early Electron runtime marker before first paint', async () => {

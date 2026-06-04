@@ -134,6 +134,14 @@ function assertTestOrAllowedInstance(
   // staging keys are often pk_live_ but scoped; allow if flag or known
 }
 
+function assertPatchTargetAllowed(doppler: DopplerRun, allowProd: boolean) {
+  if (doppler.clerkInstance === 'prod' && !allowProd) {
+    throw new Error(
+      'SAFETY: Refusing to patch the production Clerk app without --allow-prod.'
+    );
+  }
+}
+
 function ensureClerkCli(): void {
   try {
     execSync('clerk --version', { stdio: 'ignore' });
@@ -333,13 +341,8 @@ async function cmdSchema(options: ClerkConfigOptions): Promise<void> {
 async function cmdPatch(options: ClerkConfigOptions): Promise<void> {
   const doppler = getDopplerForInstance(options.instance);
   const prefix = getClerkCommandPrefix(doppler);
-  const targetInstance = options.instance ?? 'dev';
 
-  if (targetInstance === 'prod' && !options.allowProd) {
-    throw new Error(
-      'SAFETY: Refusing to patch the production Clerk app without --allow-prod.'
-    );
-  }
+  assertPatchTargetAllowed(doppler, !!options.allowProd);
 
   if (!options.dryRun && !options.yes && !options.allowProd) {
     // Force explicit intent for mutations
@@ -538,6 +541,13 @@ gh-9805 principles: explicit, complete, small, DRY, action-oriented.
       } catch (e: any) {
         if (!/SAFETY/.test(e.message)) throw e;
         console.log('self-test: prod guard PASS');
+      }
+      try {
+        assertPatchTargetAllowed(getDopplerForInstance('staging'), false);
+        throw new Error('staging patch guard did not fire');
+      } catch (e: any) {
+        if (!/SAFETY/.test(e.message)) throw e;
+        console.log('self-test: staging patch guard PASS');
       }
       console.log('All self-tests passed.');
       break;
