@@ -12,6 +12,7 @@ import {
 import { publicEnv } from '@/lib/env-public';
 import { authClerkAppearance } from './clerkAppearance';
 import {
+  getClerkJSUrl,
   getClerkProxyUrl,
   isPublicAuthHost,
   shouldBypassClerk,
@@ -64,10 +65,16 @@ export function AuthClientProviders({
     );
   }
 
+  const clerkJSUrl = getClerkJSUrl(publishableKey);
+  const clerkScriptProps = clerkJSUrl
+    ? { __internal_clerkJSUrl: clerkJSUrl }
+    : {};
+
   // @clerk/ui bundled locally to avoid CDN loading issues with frontendApiProxy.
   // Added to transpilePackages in next.config.js to resolve Turbopack + pnpm symlink issues.
   return (
     <ClerkProvider
+      {...clerkScriptProps}
       publishableKey={publishableKey}
       proxyUrl={getClerkProxyUrl(globalThis.location)}
       appearance={authClerkAppearance}

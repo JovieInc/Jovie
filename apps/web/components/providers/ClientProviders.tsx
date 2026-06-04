@@ -15,7 +15,11 @@ import { publicEnv } from '@/lib/env-public';
 import type { ThemeMode } from '@/types';
 import { CoreProviders } from './CoreProviders';
 import { clerkAppearanceBase } from './clerkAppearance';
-import { getClerkProxyUrl, shouldBypassClerk } from './clerkAvailability';
+import {
+  getClerkJSUrl,
+  getClerkProxyUrl,
+  shouldBypassClerk,
+} from './clerkAvailability';
 import { QueryProvider } from './QueryProvider';
 
 interface ClientProvidersProps {
@@ -88,8 +92,14 @@ export function ClientProviders({
     );
   }
 
+  const clerkJSUrl = getClerkJSUrl(publishableKey);
+  const clerkScriptProps = clerkJSUrl
+    ? { __internal_clerkJSUrl: clerkJSUrl }
+    : {};
+
   return (
     <ClerkProvider
+      {...clerkScriptProps}
       publishableKey={publishableKey}
       proxyUrl={getClerkProxyUrl(globalThis.location)}
       appearance={clerkAppearanceBase}

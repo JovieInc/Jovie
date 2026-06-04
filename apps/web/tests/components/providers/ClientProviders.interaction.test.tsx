@@ -45,6 +45,7 @@ vi.mock('@/lib/env-public', () => ({
 }));
 vi.mock('@/components/providers/clerkAvailability', () => ({
   shouldBypassClerk: () => availabilityState.shouldBypass,
+  getClerkJSUrl: () => undefined,
   getClerkProxyUrl: () => '/__clerk',
 }));
 

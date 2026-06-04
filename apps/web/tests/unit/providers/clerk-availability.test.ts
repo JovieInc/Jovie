@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
+  getClerkJSUrl,
   getClerkProxyUrl,
   getRequestLocationFromHeaders,
   isMockPublishableKey,
@@ -166,6 +167,44 @@ describe('clerkAvailability', () => {
       expect(getClerkProxyUrl(new URL('https://localhost:3000'))).toBe(
         '/__clerk'
       );
+    });
+  });
+
+  describe('getClerkJSUrl', () => {
+    it('derives the Clerk JS bundle URL from the runtime publishable key', () => {
+      vi.stubEnv('NEXT_PUBLIC_CLERK_PROXY_DISABLED', '');
+
+      expect(getClerkJSUrl('pk_live_Y2xlcmsuc3RhZ2luZy5qb3YuaWUk')).toBe(
+        'https://clerk.staging.jov.ie/npm/@clerk/clerk-js@6/dist/clerk.browser.js'
+      );
+    });
+
+    it('does not pin staging to the build-time production publishable key', () => {
+      vi.stubEnv('NEXT_PUBLIC_CLERK_PROXY_DISABLED', '');
+      vi.stubEnv(
+        'NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY',
+        'pk_live_Y2xlcmsuam92LmllJA'
+      );
+
+      expect(getClerkJSUrl('pk_live_Y2xlcmsuc3RhZ2luZy5qb3YuaWUk')).toContain(
+        'clerk.staging.jov.ie'
+      );
+    });
+
+    it('lets Clerk use its default script loader for test keys', () => {
+      vi.stubEnv('NEXT_PUBLIC_CLERK_PROXY_DISABLED', '');
+
+      expect(
+        getClerkJSUrl('pk_test_ZGV2LmNsZXJrLmFjY291bnRzLmRldiQ')
+      ).toBeUndefined();
+    });
+
+    it('returns undefined when the Clerk proxy is disabled', () => {
+      vi.stubEnv('NEXT_PUBLIC_CLERK_PROXY_DISABLED', '1');
+
+      expect(
+        getClerkJSUrl('pk_live_Y2xlcmsuc3RhZ2luZy5qb3YuaWUk')
+      ).toBeUndefined();
     });
   });
 
