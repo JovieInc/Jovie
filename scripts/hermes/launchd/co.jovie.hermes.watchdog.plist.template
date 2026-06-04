@@ -8,7 +8,7 @@
     <array>
         <string>/bin/bash</string>
         <string>-c</string>
-        <string>curl -fsS --max-time 5 http://localhost:7800/health > /dev/null || launchctl kickstart -k gui/$(id -u)/co.jovie.hermes.daemon</string>
+        <string>{{HERMES_BIN}} gateway status > /dev/null 2>&amp;1 || {{HERMES_BIN}} gateway start --all</string>
     </array>
     <key>StartInterval</key>
     <integer>60</integer>

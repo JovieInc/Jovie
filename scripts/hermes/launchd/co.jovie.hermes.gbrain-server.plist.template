@@ -8,6 +8,7 @@
     <array>
         <string>{{GBRAIN_BIN}}</string>
         <string>serve</string>
+        <string>--http</string>
         <string>--bind</string>
         <string>{{TAILSCALE_IP}}</string>
         <string>--port</string>
@@ -15,10 +16,8 @@
     </array>
     <key>EnvironmentVariables</key>
     <dict>
-        <key>GBRAIN_HOME</key>
-        <string>{{HOME}}/.gbrain</string>
         <key>PATH</key>
-        <string>{{HOME}}/.local/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin</string>
+        <string>{{HOME}}/.bun/bin:{{HOME}}/.hermes/bin:{{HOME}}/.local/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin</string>
     </dict>
     <key>RunAtLoad</key>
     <true/>

@@ -1,16 +1,17 @@
 # Hermes-Air launchd Units
 
-Templates for the launchd unit files installed by `scripts/hermes/bootstrap-air.sh`.
+Templates for the Jovie-owned launchd unit files installed by `scripts/hermes/bootstrap-air.sh`.
 
 Each `.plist.template` uses `{{HOME}}`, `{{JOVIE_REPO}}`, `{{HERMES_BIN}}`, `{{GBRAIN_BIN}}`, `{{TSX_BIN}}`, and `{{TAILSCALE_IP}}` placeholders. The bootstrap script substitutes these at install time (via Python so values containing shell-special characters render safely) before copying to `~/Library/LaunchAgents/`.
+
+The Hermes gateway itself is managed by the installed Hermes CLI as `ai.hermes.gateway`; these templates manage the Air-specific watchdog, gbrain server, and cron jobs around it.
 
 ## Units
 
 | File | Schedule | Purpose |
 |---|---|---|
-| `co.jovie.hermes.daemon.plist.template` | RunAtLoad + KeepAlive | The Hermes serve daemon (gateway + sub-agents) |
-| `co.jovie.hermes.watchdog.plist.template` | every 60s | Restart daemon if `/health` fails |
-| `co.jovie.hermes.gbrain-server.plist.template` | RunAtLoad + KeepAlive | gbrain serve on Tailscale interface |
+| `co.jovie.hermes.watchdog.plist.template` | every 60s | Start the Hermes gateway if `hermes gateway status` fails |
+| `co.jovie.hermes.gbrain-server.plist.template` | RunAtLoad + KeepAlive | `gbrain serve --http` on the Tailscale interface |
 | `co.jovie.hermes.voice-memo-watcher.plist.template` | WatchPaths | New voice memo → ingest |
 | `co.jovie.hermes.cron-hud.plist.template` | every 5 min | Refresh HUD snapshot |
 | `co.jovie.hermes.cron-pr-monitor.plist.template` | every 10 min | Detect stuck PRs |

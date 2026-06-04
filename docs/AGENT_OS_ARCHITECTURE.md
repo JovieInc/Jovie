@@ -125,7 +125,7 @@ Workflow, GitHub Actions, Hermes, and WDK PRs require `needs-human` if compile b
 
 ## Hermes-Air Node (always-on orchestration)
 
-A dedicated 16 GB MacBook Air runs `hermes serve` 24/7 as the always-on orchestration node. It ingests brain dumps (Telegram + macOS Voice Memos via iCloud), persists them to gbrain (Air-hosted, exposed to the Pro over Tailscale), classifies actionable spans, and files Linear issues using the canonical follow-up shape. **Engineering work flows through Linear** — the Pro's existing Hermes issue runner picks up issues automatically; the Air never opens `repository_dispatch` events.
+A dedicated 16 GB MacBook Air runs the Hermes gateway service 24/7 as the always-on orchestration node. It ingests brain dumps (Telegram + macOS Voice Memos via iCloud), persists them to gbrain (Air-hosted, exposed to the Pro over Tailscale), classifies actionable spans, and files Linear issues using the canonical follow-up shape. **Engineering work flows through Linear** — the Pro's existing Hermes issue runner picks up issues automatically; the Air never opens `repository_dispatch` events.
 
 - Operating contract: [`.claude/rules/hermes-air.md`](../.claude/rules/hermes-air.md)
 - Operator runbook: [`docs/HERMES_AIR.md`](./HERMES_AIR.md)
