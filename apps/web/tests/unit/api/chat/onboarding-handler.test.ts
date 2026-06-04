@@ -70,13 +70,6 @@ vi.mock('@sentry/nextjs', () => ({
   addBreadcrumb: hoisted.addBreadcrumbMock,
 }));
 
-// Default to development so the Turnstile fail-closed path doesn't fire in
-// the happy-path tests. The "non-dev" test overrides this with vi.doMock.
-vi.mock('@/lib/env-server', () => ({
-  env: { NODE_ENV: 'development' },
-  isSecureEnv: () => false,
-}));
-
 function makeRequest(body: unknown, cookieHeader = ''): Request {
   return new Request('http://localhost/api/chat', {
     method: 'POST',
@@ -120,15 +113,27 @@ function installDefaultDbMocks() {
   }));
 }
 
+function stubRuntimeEnv({
+  nodeEnv = 'development',
+  vercelEnv,
+}: {
+  readonly nodeEnv?: string;
+  readonly vercelEnv?: string;
+} = {}) {
+  vi.stubEnv('NODE_ENV', nodeEnv);
+  if (vercelEnv) {
+    vi.stubEnv('VERCEL_ENV', vercelEnv);
+  } else {
+    vi.stubEnv('VERCEL_ENV', '');
+  }
+}
+
 describe('tryHandleAnonymousOnboardingChat', () => {
   beforeEach(() => {
     vi.unstubAllEnvs();
     vi.resetModules();
-    vi.doMock('@/lib/env-server', () => ({
-      env: { NODE_ENV: 'development' },
-      isSecureEnv: () => false,
-    }));
-    vi.clearAllMocks();
+    vi.resetAllMocks();
+    stubRuntimeEnv();
     hoisted.checkGateForUserMock.mockResolvedValue(true);
     hoisted.checkAnonymousChatRateLimitMock.mockResolvedValue({
       success: true,
@@ -152,10 +157,7 @@ describe('tryHandleAnonymousOnboardingChat', () => {
 
   it('does not let the removed onboarding rollout gate disable the live route', async () => {
     vi.resetModules();
-    vi.doMock('@/lib/env-server', () => ({
-      env: { NODE_ENV: 'production' },
-      isSecureEnv: () => true,
-    }));
+    stubRuntimeEnv({ nodeEnv: 'production' });
     hoisted.checkGateForUserMock.mockResolvedValue(false);
     hoisted.isTurnstileConfiguredMock.mockReturnValue(true);
     hoisted.verifyTurnstileTokenMock.mockResolvedValue({
@@ -188,10 +190,7 @@ describe('tryHandleAnonymousOnboardingChat', () => {
 
   it('returns 503 when the global chat kill-switch is enabled', async () => {
     vi.resetModules();
-    vi.doMock('@/lib/env-server', () => ({
-      env: { NODE_ENV: 'production' },
-      isSecureEnv: () => true,
-    }));
+    stubRuntimeEnv({ nodeEnv: 'production' });
     hoisted.checkGateForUserMock.mockResolvedValue(true);
     const { tryHandleAnonymousOnboardingChat } = await import(
       '@/app/api/chat/onboarding-handler'
@@ -246,12 +245,8 @@ describe('tryHandleAnonymousOnboardingChat', () => {
   });
 
   it('returns 503 when Turnstile is not configured outside dev (first turn)', async () => {
-    // Re-mock env to non-dev for this case.
     vi.resetModules();
-    vi.doMock('@/lib/env-server', () => ({
-      env: { NODE_ENV: 'production' },
-      isSecureEnv: () => true,
-    }));
+    stubRuntimeEnv({ nodeEnv: 'production' });
     hoisted.checkGateForUserMock.mockResolvedValue(false);
     hoisted.isTurnstileConfiguredMock.mockReturnValue(false);
     const { tryHandleAnonymousOnboardingChat } = await import(
@@ -269,10 +264,7 @@ describe('tryHandleAnonymousOnboardingChat', () => {
 
   it('skips Turnstile verification in explicit E2E mock runtime', async () => {
     vi.resetModules();
-    vi.doMock('@/lib/env-server', () => ({
-      env: { NODE_ENV: 'test' },
-      isSecureEnv: () => false,
-    }));
+    stubRuntimeEnv({ nodeEnv: 'test' });
     vi.stubEnv('NEXT_PUBLIC_E2E_MODE', '1');
     vi.stubEnv('NEXT_PUBLIC_CLERK_MOCK', '1');
     hoisted.checkGateForUserMock.mockResolvedValue(true);
@@ -309,10 +301,7 @@ describe('tryHandleAnonymousOnboardingChat', () => {
 
   it('keeps Turnstile fail-closed in secure env even when mock flags are set', async () => {
     vi.resetModules();
-    vi.doMock('@/lib/env-server', () => ({
-      env: { NODE_ENV: 'production', VERCEL_ENV: 'preview' },
-      isSecureEnv: () => true,
-    }));
+    stubRuntimeEnv({ nodeEnv: 'production', vercelEnv: 'preview' });
     vi.stubEnv('NEXT_PUBLIC_E2E_MODE', '1');
     vi.stubEnv('NEXT_PUBLIC_CLERK_MOCK', '1');
     hoisted.checkGateForUserMock.mockResolvedValue(false);
@@ -337,11 +326,7 @@ describe('tryHandleAnonymousOnboardingChat', () => {
 
   it('dispatches executeChatTurn with mode=onboarding and the 7 onboarding tools', async () => {
     vi.resetModules();
-    // Restore the dev env mock so Turnstile gate is skipped.
-    vi.doMock('@/lib/env-server', () => ({
-      env: { NODE_ENV: 'development' },
-      isSecureEnv: () => false,
-    }));
+    stubRuntimeEnv();
     // Make executeChatTurn return a fake stream response.
     hoisted.executeChatTurnMock.mockResolvedValue({
       streamResult: {
@@ -405,10 +390,7 @@ describe('tryHandleAnonymousOnboardingChat', () => {
 
   it('fails closed before streaming when anonymous persistence is unavailable', async () => {
     vi.resetModules();
-    vi.doMock('@/lib/env-server', () => ({
-      env: { NODE_ENV: 'development' },
-      isSecureEnv: () => false,
-    }));
+    stubRuntimeEnv();
     installDefaultDbMocks();
     hoisted.dbSelectRowsMock.mockRejectedValueOnce(new Error('db unavailable'));
 
@@ -429,10 +411,7 @@ describe('tryHandleAnonymousOnboardingChat', () => {
 
   it('reuses an existing valid session cookie (no fresh cookie minted)', async () => {
     vi.resetModules();
-    vi.doMock('@/lib/env-server', () => ({
-      env: { NODE_ENV: 'development' },
-      isSecureEnv: () => false,
-    }));
+    stubRuntimeEnv();
     hoisted.executeChatTurnMock.mockResolvedValue({
       streamResult: {
         toUIMessageStreamResponse: ({
