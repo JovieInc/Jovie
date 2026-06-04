@@ -10,8 +10,10 @@ import {
   contextMenuContentCompactClasses,
   dropdownMenuContentClasses,
   dropdownMenuContentCompactClasses,
+  MENU_ICON_TRIGGER_BASE,
   MENU_ITEM_BASE,
   MENU_ITEM_COMPACT,
+  SELECT_TRIGGER_BASE,
 } from '../lib/dropdown-styles';
 import { cn } from '../lib/utils';
 import {
@@ -166,14 +168,7 @@ export function CommonDropdown(props: CommonDropdownProps) {
       return (
         <button
           type='button'
-          className={cn(
-            'flex h-10 w-full items-center justify-between rounded-xl border border-subtle bg-surface-1 px-3 py-2',
-            'text-sm',
-            'placeholder:text-tertiary-token',
-            'focus-visible:outline-none focus-visible:border-(--linear-border-focus) focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/24',
-            'disabled:cursor-not-allowed disabled:opacity-50',
-            triggerClassName
-          )}
+          className={cn(SELECT_TRIGGER_BASE, triggerClassName)}
           aria-label={ariaLabel || 'Open dropdown'}
         >
           <span>Select...</span>
@@ -185,10 +180,7 @@ export function CommonDropdown(props: CommonDropdownProps) {
     return (
       <button
         type='button'
-        className={cn(
-          'inline-flex h-8 w-8 items-center justify-center rounded-full border border-transparent bg-transparent text-tertiary-token transition-[background-color,color,box-shadow] duration-150 hover:bg-surface-1 hover:text-primary-token focus-visible:outline-none focus-visible:bg-surface-1 focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)/50',
-          triggerClassName
-        )}
+        className={cn(MENU_ICON_TRIGGER_BASE, triggerClassName)}
         aria-label={ariaLabel || 'More actions'}
         onClick={event => event.stopPropagation()}
       >
