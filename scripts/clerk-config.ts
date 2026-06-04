@@ -66,13 +66,30 @@ interface ClerkConfigOptions {
 interface DopplerRun {
   project: string;
   config: string;
+  appId: string;
+  clerkInstance: 'dev' | 'prod';
 }
 
 // --- Doppler + instance mapping (pragmatic, from .claude/rules/auth.md + setup.sh) ---
 const INSTANCE_TO_DOPPLER: Record<string, DopplerRun> = {
-  dev: { project: 'jovie-web', config: 'dev' },
-  staging: { project: 'jovie-web', config: 'staging' }, // adjust if separate Doppler project
-  prod: { project: 'jovie-web', config: 'prd' },
+  dev: {
+    project: 'jovie-web',
+    config: 'dev',
+    appId: 'app_30k0dWZPrUoCQ51f2ix99TWosSg',
+    clerkInstance: 'dev',
+  },
+  staging: {
+    project: 'jovie-web',
+    config: 'stg',
+    appId: 'app_31OUB1NkwJoCRW4w0ka65SRZCGz',
+    clerkInstance: 'prod',
+  },
+  prod: {
+    project: 'jovie-web',
+    config: 'prd',
+    appId: 'app_30k0dWZPrUoCQ51f2ix99TWosSg',
+    clerkInstance: 'prod',
+  },
 };
 
 function getDopplerForInstance(instance: string = 'dev'): DopplerRun {
@@ -115,6 +132,14 @@ function assertTestOrAllowedInstance(
     return;
   }
   // staging keys are often pk_live_ but scoped; allow if flag or known
+}
+
+function assertPatchTargetAllowed(doppler: DopplerRun, allowProd: boolean) {
+  if (doppler.clerkInstance === 'prod' && !allowProd) {
+    throw new Error(
+      'SAFETY: Refusing to patch the production Clerk app without --allow-prod.'
+    );
+  }
 }
 
 function ensureClerkCli(): void {
@@ -194,29 +219,44 @@ function runClerk(
   return (result.stdout || '').trim();
 }
 
+function addClerkTargetArgs(args: string[], doppler: DopplerRun): void {
+  args.push('--app', doppler.appId, '--instance', doppler.clerkInstance);
+}
+
 // --- Public helpers (exported for tests / reuse; DRY + explicit) ---
 export function extractAuthRelevantConfigKeys(
   configJson: string
 ): Record<string, unknown> {
   // Pragmatic extractor for common auth fix targets (redirects, oauth, native, webhooks, jwt).
-  // The real structure comes from `clerk config schema` / pull; we surface top-level + auth/* keys safely.
+  // The real structure comes from `clerk config schema` / pull; we surface the auth-shaped
+  // top-level keys that Clerk currently emits, plus a few older nested shapes for compatibility.
   try {
     const cfg = JSON.parse(configJson);
     const relevant: Record<string, unknown> = {};
-    const keysToExtract = [
+    const explicitKeys = [
       'auth',
-      'oauth',
-      'redirects',
       'allowed_origins',
-      'native_applications',
-      'webhooks',
-      'jwt_templates',
       'domains',
+      'jwt_templates',
+      'native_applications',
+      'oauth',
+      'paths',
+      'redirects',
+      'session',
       'sessions',
+      'webhooks',
     ];
-    for (const k of keysToExtract) {
+    for (const k of explicitKeys) {
       if (k in cfg) relevant[k] = cfg[k];
-      // Also look one level deep under "auth" etc if nested
+    }
+    for (const [key, value] of Object.entries(cfg)) {
+      if (
+        key.startsWith('auth_') ||
+        key.startsWith('connection_oauth_') ||
+        key === 'connections_oauth_custom'
+      ) {
+        relevant[key] = value;
+      }
     }
     if (cfg.auth && typeof cfg.auth === 'object') {
       for (const sub of [
@@ -258,7 +298,7 @@ async function cmdPull(options: ClerkConfigOptions): Promise<void> {
   const prefix = getClerkCommandPrefix(doppler);
 
   const args = ['config', 'pull'];
-  if (options.instance) args.push('--instance', options.instance);
+  addClerkTargetArgs(args, doppler);
   if (options.output) args.push('--output', options.output);
 
   const out = runClerk(args, prefix, options);
@@ -291,7 +331,7 @@ async function cmdSchema(options: ClerkConfigOptions): Promise<void> {
   const prefix = getClerkCommandPrefix(doppler);
 
   const args = ['config', 'schema'];
-  if (options.instance) args.push('--instance', options.instance);
+  addClerkTargetArgs(args, doppler);
   // schema supports --keys filter per CLI help
 
   const out = runClerk(args, prefix, options);
@@ -302,6 +342,8 @@ async function cmdPatch(options: ClerkConfigOptions): Promise<void> {
   const doppler = getDopplerForInstance(options.instance);
   const prefix = getClerkCommandPrefix(doppler);
 
+  assertPatchTargetAllowed(doppler, !!options.allowProd);
+
   if (!options.dryRun && !options.yes && !options.allowProd) {
     // Force explicit intent for mutations
     throw new Error(
@@ -311,7 +353,7 @@ async function cmdPatch(options: ClerkConfigOptions): Promise<void> {
   }
 
   const args = ['config', 'patch'];
-  if (options.instance) args.push('--instance', options.instance);
+  addClerkTargetArgs(args, doppler);
   if (options.dryRun) args.push('--dry-run');
   if (options.yes) args.push('--yes');
   if (options.file) args.push('--file', options.file);
@@ -338,7 +380,7 @@ async function cmdCheckRedirects(options: ClerkConfigOptions): Promise<void> {
     configJson = readFileSync(options.file, 'utf8');
   } else {
     const pullArgs = ['config', 'pull'];
-    if (options.instance) pullArgs.push('--instance', options.instance);
+    addClerkTargetArgs(pullArgs, doppler);
     configJson = runClerk(pullArgs, prefix, options);
   }
 
@@ -499,6 +541,13 @@ gh-9805 principles: explicit, complete, small, DRY, action-oriented.
       } catch (e: any) {
         if (!/SAFETY/.test(e.message)) throw e;
         console.log('self-test: prod guard PASS');
+      }
+      try {
+        assertPatchTargetAllowed(getDopplerForInstance('staging'), false);
+        throw new Error('staging patch guard did not fire');
+      } catch (e: any) {
+        if (!/SAFETY/.test(e.message)) throw e;
+        console.log('self-test: staging patch guard PASS');
       }
       console.log('All self-tests passed.');
       break;

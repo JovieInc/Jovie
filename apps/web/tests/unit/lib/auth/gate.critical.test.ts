@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
 // =============================================================================
 // 1. Hoist all mocks FIRST (before any module resolution)
@@ -17,6 +17,8 @@ const {
   mockIsWaitlistGateEnabled,
   mockNormalizeEmail,
   mockSentryAddBreadcrumb,
+  mockCreateClerkClient,
+  mockClerkGetUser,
 } = vi.hoisted(() => ({
   mockCachedAuth: vi.fn(),
   mockCachedCurrentUser: vi.fn(),
@@ -31,6 +33,8 @@ const {
   mockIsWaitlistGateEnabled: vi.fn().mockResolvedValue(true),
   mockNormalizeEmail: vi.fn((e: string) => e.toLowerCase().trim()),
   mockSentryAddBreadcrumb: vi.fn(),
+  mockCreateClerkClient: vi.fn(),
+  mockClerkGetUser: vi.fn(),
 }));
 
 // =============================================================================
@@ -127,6 +131,10 @@ vi.mock('@sentry/nextjs', () => ({
   addBreadcrumb: mockSentryAddBreadcrumb,
 }));
 
+vi.mock('@clerk/backend', () => ({
+  createClerkClient: mockCreateClerkClient,
+}));
+
 // =============================================================================
 // 3. Import tested module AFTER mocks
 // =============================================================================
@@ -139,6 +147,8 @@ import {
   requiresRedirect,
   resolveUserState,
 } from '@/lib/auth/gate';
+
+const ORIGINAL_CLERK_SECRET_KEY = process.env.CLERK_SECRET_KEY;
 
 // =============================================================================
 // Helpers
@@ -251,14 +261,27 @@ function setupNonBlockedStatus() {
 describe('@critical gate.ts', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    process.env.CLERK_SECRET_KEY = 'sk_test_gate';
     // Default: no fake timers needed since we mock setTimeout in retry tests
     mockIsWaitlistGateEnabled.mockResolvedValue(false);
+    mockClerkGetUser.mockResolvedValue({ emailAddresses: [] });
+    mockCreateClerkClient.mockReturnValue({
+      users: { getUser: mockClerkGetUser },
+    });
     setupNonBlockedStatus();
     mockResolveProfileState.mockReturnValue({
       state: CanonicalUserState.NEEDS_ONBOARDING,
       profileId: null,
       redirectTo: '/start?fresh_signup=true',
     });
+  });
+
+  afterAll(() => {
+    if (ORIGINAL_CLERK_SECRET_KEY === undefined) {
+      delete process.env.CLERK_SECRET_KEY;
+      return;
+    }
+    process.env.CLERK_SECRET_KEY = ORIGINAL_CLERK_SECRET_KEY;
   });
 
   // ===========================================================================
@@ -660,7 +683,52 @@ describe('@critical gate.ts', () => {
       expect(result.state).toBe(CanonicalUserState.NEEDS_ONBOARDING);
     });
 
+    it('retries Clerk backend email when dashboard reconciliation only has a Clerk id', async () => {
+      mockClerkGetUser
+        .mockResolvedValueOnce({ emailAddresses: [] })
+        .mockResolvedValueOnce({
+          emailAddresses: [
+            {
+              emailAddress: 'native@example.com',
+              verification: { status: 'verified' },
+            },
+          ],
+        });
+      mockIsWaitlistGateEnabled.mockResolvedValue(true);
+
+      let selectCallCount = 0;
+      mockDbSelect.mockImplementation(() => {
+        selectCallCount++;
+        if (selectCallCount === 1) {
+          return createJoinSelectChain([]);
+        }
+        if (selectCallCount === 2) {
+          return createSimpleSelectChain([
+            { id: 'waitlist-entry-123', status: 'claimed' },
+          ]);
+        }
+        if (selectCallCount === 3) {
+          return createJoinSelectChain([]);
+        }
+        return createSimpleSelectChain([
+          { userStatus: 'waitlist_approved', deletedAt: null },
+        ]);
+      });
+      mockDbInsert.mockReturnValue(createInsertChain([{ id: 'new-user-id' }]));
+
+      const result = await resolveUserState({ knownClerkUserId: 'clerk_123' });
+
+      expect(mockCachedAuth).not.toHaveBeenCalled();
+      expect(mockCachedCurrentUser).not.toHaveBeenCalled();
+      expect(mockClerkGetUser).toHaveBeenCalledTimes(2);
+      expect(mockClerkGetUser).toHaveBeenCalledWith('clerk_123');
+      expect(result.dbUserId).toBe('new-user-id');
+      expect(result.context.email).toBe('native@example.com');
+      expect(result.state).toBe(CanonicalUserState.NEEDS_ONBOARDING);
+    });
+
     it('throws TypeError when createDbUserIfMissing is true but no email', async () => {
+      delete process.env.CLERK_SECRET_KEY;
       mockCachedAuth.mockResolvedValue({ userId: 'clerk_123' });
       mockCachedCurrentUser.mockResolvedValue({
         emailAddresses: [],
@@ -676,6 +744,7 @@ describe('@critical gate.ts', () => {
     });
 
     it('does not create a DB user from an unverified primary email', async () => {
+      delete process.env.CLERK_SECRET_KEY;
       mockCachedAuth.mockResolvedValue({ userId: 'clerk_123' });
       mockCachedCurrentUser.mockResolvedValue({
         emailAddresses: [

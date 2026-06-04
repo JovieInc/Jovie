@@ -1023,7 +1023,7 @@ async function signOutElectron() {
   try {
     await page.evaluate(`(async () => {
       const redirectUrl = '/signin?redirect_url=%2Fapp%2Fchat%3Fruntime%3Delectron';
-      void window.Clerk?.signOut?.({ redirectUrl })?.catch?.(() => undefined);
+      await window.Clerk?.signOut?.({ redirectUrl })?.catch?.(() => undefined);
       return true;
     })()`);
   } finally {
@@ -1108,6 +1108,9 @@ async function main() {
     await fresh.context.close();
 
     const signedOut = await signOutElectron();
+    if (CLEAR_ELECTRON_AUTH_ON_START) {
+      await clearElectronAuthStorage();
+    }
 
     const existing = await newAuthContext(browser, fapiHost, testingToken);
     const existingSignin = await signInExisting(existing.page, email);

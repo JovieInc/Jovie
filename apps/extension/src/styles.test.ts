@@ -23,11 +23,18 @@ const sidepanelHtmlPath = resolve(
   dirname(fileURLToPath(import.meta.url)),
   '../public/sidepanel.html'
 );
+const manifestPath = resolve(
+  dirname(fileURLToPath(import.meta.url)),
+  '../public/manifest.json'
+);
 const styles = readFileSync(stylesPath, 'utf8');
 const tokens = readFileSync(tokensPath, 'utf8');
 const sidepanel = readFileSync(sidepanelPath, 'utf8');
 const staticCopy = readFileSync(staticCopyPath, 'utf8');
 const sidepanelHtml = readFileSync(sidepanelHtmlPath, 'utf8');
+const manifest = JSON.parse(readFileSync(manifestPath, 'utf8')) as {
+  host_permissions?: string[];
+};
 const stylesWithoutComments = styles.replace(/\/\*[\s\S]*?\*\//g, '');
 const tokensWithoutComments = tokens.replace(/\/\*[\s\S]*?\*\//g, '');
 const tokenRootBlockMatch = tokensWithoutComments.match(/:root\s*{[\s\S]*?\n}/);
@@ -101,11 +108,26 @@ describe('extension sidepanel System B styles', () => {
   it('keeps the signed-out sidepanel to one System B sign-in action', () => {
     expect(sidepanel).toContain("title.textContent = 'Sign In To Continue'");
     expect(sidepanel).toContain("createButton('Sign In', 'primary'");
-    expect(sidepanel).toContain("window.open('https://app.jov.ie/sign-in'");
+    expect(sidepanel).toContain("new URL('/sign-in', apiBaseUrl)");
+    expect(sidepanel).toContain('resolveApiBaseUrl(state.currentTabUrl)');
     expect(sidepanel).toContain('showTopRail: false');
     expect(sidepanel).toContain('showPromptDock: false');
+    expect(sidepanel).not.toContain('https://app.jov.ie');
     expect(sidepanel).not.toContain('https://app.jov.ie/sign-up');
     expect(sidepanel).not.toContain("'Log In'");
     expect(sidepanel).not.toContain('Bring Jovie Into This Page');
+  });
+
+  it('permits the live Jovie auth origins used by extension sign-in', () => {
+    expect(manifest.host_permissions).toEqual(
+      expect.arrayContaining([
+        'http://localhost/*',
+        'http://127.0.0.1/*',
+        'https://jov.ie/*',
+        'https://staging.jov.ie/*',
+      ])
+    );
+    expect(manifest.host_permissions).not.toContain('https://app.jov.ie/*');
+    expect(sidepanel).toContain("const DEFAULT_API_BASE_URL = 'https://jov.ie'");
   });
 });

@@ -1,5 +1,6 @@
 import 'server-only';
 
+import { createClerkClient } from '@clerk/backend';
 import * as Sentry from '@sentry/nextjs';
 import { sql as drizzleSql, eq } from 'drizzle-orm';
 import { db } from '@/lib/db';
@@ -96,6 +97,9 @@ type UserLifecycleStatus =
   | 'profile_claimed'
   | 'onboarding_incomplete'
   | 'active';
+
+const CLERK_BACKEND_EMAIL_FALLBACK_ATTEMPTS = 4;
+const CLERK_BACKEND_EMAIL_FALLBACK_DELAY_MS = 250;
 
 /** Data structure for existing user profile information */
 interface ExistingUserData {
@@ -516,11 +520,76 @@ async function resolveClerkIdentity(knownClerkUserId?: string): Promise<{
     getCachedCurrentUser(),
   ]);
   const clerkUserId = authResult.userId;
-  const email =
-    clerkUser?.emailAddresses?.find(e => e.verification?.status === 'verified')
-      ?.emailAddress ?? null;
+  const email = selectVerifiedClerkEmail(clerkUser?.emailAddresses);
 
   return { clerkUserId, email };
+}
+
+function selectVerifiedClerkEmail(
+  emailAddresses:
+    | ReadonlyArray<{
+        readonly emailAddress?: string | null;
+        readonly verification?: { readonly status?: string | null } | null;
+      }>
+    | null
+    | undefined
+): string | null {
+  return (
+    emailAddresses?.find(e => e.verification?.status === 'verified')
+      ?.emailAddress ?? null
+  );
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+async function resolveVerifiedEmailFromClerkBackend(
+  clerkUserId: string
+): Promise<string | null> {
+  const secretKey = process.env.CLERK_SECRET_KEY;
+  if (!secretKey) {
+    Sentry.addBreadcrumb({
+      category: 'auth-gate',
+      level: 'warning',
+      message: 'Clerk backend email fallback skipped: missing secret key',
+      data: { clerkUserId },
+    });
+    return null;
+  }
+
+  const clerk = createClerkClient({ secretKey });
+  let lastError: unknown = null;
+
+  for (
+    let attempt = 1;
+    attempt <= CLERK_BACKEND_EMAIL_FALLBACK_ATTEMPTS;
+    attempt++
+  ) {
+    try {
+      const clerkUser = await clerk.users.getUser(clerkUserId);
+      const email = selectVerifiedClerkEmail(clerkUser.emailAddresses);
+      if (email) return email;
+    } catch (error) {
+      lastError = error;
+    }
+
+    if (attempt < CLERK_BACKEND_EMAIL_FALLBACK_ATTEMPTS) {
+      await sleep(CLERK_BACKEND_EMAIL_FALLBACK_DELAY_MS * attempt);
+    }
+  }
+
+  Sentry.addBreadcrumb({
+    category: 'auth-gate',
+    level: 'warning',
+    message: 'Clerk backend email fallback failed',
+    data: {
+      clerkUserId,
+      attempts: CLERK_BACKEND_EMAIL_FALLBACK_ATTEMPTS,
+      error: lastError instanceof Error ? lastError.message : String(lastError),
+    },
+  });
+  return null;
 }
 
 async function loadAuthGateRecord(
@@ -650,9 +719,8 @@ export async function resolveUserState(
      * called inside unstable_cache or "use cache" boundaries.
      *
      * Pass this when the Clerk user ID is already known (e.g. from a cached
-     * function that received it as a parameter). In this case email will be
-     * null, so user creation via handleMissingDbUser will fail gracefully
-     * rather than throwing a ClerkUseCacheError.
+     * function that received it as a parameter). In this case the verified
+     * email is resolved from Clerk's backend API if a DB user must be created.
      */
     knownClerkUserId?: string;
   } = {}
@@ -680,17 +748,22 @@ export async function resolveUserState(
   // Extract user data from result (may be undefined if no user exists)
   const dbResult = lookupResult;
   const dbUser = toAuthGateDbUser(dbResult);
+  const resolvedEmail =
+    !dbUser && !email
+      ? await resolveVerifiedEmailFromClerkBackend(clerkUserId)
+      : email;
 
   const baseContext = {
     isAdmin: dbUser?.isAdmin ?? false,
     isPro: dbUser?.isPro ?? false,
-    email,
+    email: resolvedEmail,
   };
 
   // Sync email from Clerk if different (Clerk is source of truth for identity)
-  // Only sync verified emails to prevent hijacking. `email` is already the
-  // verified address resolved above, so reuse it directly.
-  await syncVerifiedEmailIfNeeded(dbUser, email);
+  // Only sync verified emails to prevent hijacking. `resolvedEmail` is selected
+  // from verified Clerk email addresses, either from currentUser() or the
+  // backend fallback.
+  await syncVerifiedEmailIfNeeded(dbUser, resolvedEmail);
 
   // Check if user is blocked (banned, suspended, or deleted)
   const statusCheck = checkUserStatus(
@@ -720,7 +793,7 @@ export async function resolveUserState(
       message: 'Using E2E test auth fallback for missing DB user',
       data: { clerkUserId },
     });
-    return createE2ETestAuthGateResult(clerkUserId, email);
+    return createE2ETestAuthGateResult(clerkUserId, resolvedEmail);
   }
 
   // Profile from the JOIN query (only valid if dbUser exists)
@@ -732,7 +805,7 @@ export async function resolveUserState(
       {
         createDbUserIfMissing,
         clerkUserId,
-        email,
+        email: resolvedEmail,
         baseContext,
       },
       waitlistGateEnabled
@@ -778,7 +851,7 @@ export async function resolveUserState(
     context: {
       isAdmin: dbUser?.isAdmin ?? false,
       isPro: dbUser?.isPro ?? false,
-      email,
+      email: resolvedEmail,
     },
   };
 }
