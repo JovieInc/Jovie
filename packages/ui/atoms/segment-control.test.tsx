@@ -232,6 +232,22 @@ describe('SegmentControl', () => {
       expect((root as HTMLElement).className).toContain('bg-transparent');
     });
 
+    it('keeps default variants on existing surface padding', () => {
+      const { container } = render(
+        <SegmentControl
+          value='links'
+          onValueChange={vi.fn()}
+          options={defaultOptions}
+          variant='default'
+          size='sm'
+        />
+      );
+
+      expect((container.firstChild as HTMLElement).className).toContain(
+        'p-0.5'
+      );
+    });
+
     it('renders the linear pill indicator', () => {
       const { container } = render(
         <SegmentControl
@@ -256,6 +272,20 @@ describe('SegmentControl', () => {
       expect((container.firstChild as HTMLElement).className).toContain(
         'bg-(--linear-bg-button)'
       );
+      expect((container.firstChild as HTMLElement).className).toContain(
+        'p-(--linear-pill-track-padding)'
+      );
+      expect((container.firstChild as HTMLElement).className).not.toContain(
+        'p-0.5'
+      );
+      expect(activeTab.className).toContain('font-caption');
+      expect(activeTab.className).toContain(
+        'tracking-(--linear-caption-tracking)'
+      );
+      expect(activeTab.className).toContain('text-caption');
+      expect(activeTab.className).not.toContain('font-[510]');
+      expect(activeTab.className).not.toContain('tracking-[-0.01em]');
+      expect(activeTab.className).not.toContain('text-[12px]');
     });
   });
 
