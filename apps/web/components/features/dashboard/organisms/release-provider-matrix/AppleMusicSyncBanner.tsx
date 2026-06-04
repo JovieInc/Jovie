@@ -130,7 +130,7 @@ export function AppleMusicSyncBanner({
       return (
         <div
           className={cn(
-            'inline-flex h-7.5 items-center gap-2 rounded-md border border-[#FA243C]/18 bg-[#FA243C]/6 px-2.5 text-xs text-secondary-token',
+            'system-b-release-provider-banner--apple system-b-release-provider-banner-compact inline-flex h-7.5 items-center gap-2 rounded-md border px-2.5 text-xs text-secondary-token',
             className
           )}
         >
@@ -145,7 +145,7 @@ export function AppleMusicSyncBanner({
     return (
       <div
         className={cn(
-          'inline-flex h-7.5 items-center gap-2 rounded-md border border-[#FA243C]/18 bg-[#FA243C]/6 px-2 text-xs text-primary-token',
+          'system-b-release-provider-banner--apple system-b-release-provider-banner-compact inline-flex h-7.5 items-center gap-2 rounded-md border px-2 text-xs text-primary-token',
           className
         )}
       >
@@ -169,7 +169,7 @@ export function AppleMusicSyncBanner({
             confirmMutation.mutate({ matchId: match.id, profileId })
           }
           disabled={confirmMutation.isPending || rejectMutation.isPending}
-          className='h-7 rounded-md border-[#FA243C] bg-[#FA243C] px-2 text-2xs hover:border-[#FA243C] hover:bg-[#FA243C]/90'
+          className='system-b-release-provider-action h-7 rounded-md px-2 text-2xs'
         >
           Confirm
         </DrawerButton>
@@ -187,7 +187,7 @@ export function AppleMusicSyncBanner({
           className
         )}
       >
-        <div className='flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[#FA243C]/8'>
+        <div className='system-b-release-provider-banner--apple system-b-release-provider-icon flex h-7 w-7 shrink-0 items-center justify-center rounded-full'>
           <DspProviderIcon provider='apple_music' size='md' />
         </div>
         <div className='min-w-0 flex-1'>
@@ -210,11 +210,11 @@ export function AppleMusicSyncBanner({
     <DrawerSurfaceCard
       variant='card'
       className={cn(
-        'flex items-center gap-3 rounded-[10px] border border-[#FA243C]/16 bg-[color-mix(in_oklab,#FA243C_4%,var(--linear-app-content-surface))] px-4 py-3',
+        'system-b-release-provider-banner system-b-release-provider-banner--apple flex items-center gap-3 border px-4 py-3',
         className
       )}
     >
-      <div className='flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[#FA243C]/8'>
+      <div className='system-b-release-provider-icon flex h-7 w-7 shrink-0 items-center justify-center rounded-full'>
         <DspProviderIcon provider='apple_music' size='md' />
       </div>
 
@@ -265,7 +265,7 @@ export function AppleMusicSyncBanner({
             confirmMutation.mutate({ matchId: match.id, profileId })
           }
           disabled={confirmMutation.isPending || rejectMutation.isPending}
-          className='h-7 rounded-lg border-[#FA243C] bg-[#FA243C] px-2.5 text-xs hover:border-[#FA243C] hover:bg-[#FA243C]/90'
+          className='system-b-release-provider-action h-7 rounded-lg px-2.5 text-xs'
         >
           {confirmMutation.isPending &&
           confirmMutation.variables?.matchId === match.id ? (

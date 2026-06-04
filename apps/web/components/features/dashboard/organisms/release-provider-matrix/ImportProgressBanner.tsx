@@ -39,7 +39,7 @@ export const ImportProgressBanner = memo(function ImportProgressBanner({
   if (compact) {
     return (
       <div
-        className='inline-flex h-7.5 items-center gap-2 rounded-md border border-[#1DB954]/16 bg-[#1DB954]/6 px-2.5 text-xs text-primary-token'
+        className='system-b-release-provider-banner--spotify system-b-release-provider-banner-compact inline-flex h-7.5 items-center gap-2 rounded-md border px-2.5 text-xs text-primary-token'
         aria-live='polite'
       >
         <ProviderIcon provider='spotify' className='h-3.5 w-3.5 shrink-0' />
@@ -66,7 +66,7 @@ export const ImportProgressBanner = memo(function ImportProgressBanner({
     >
       <DrawerSurfaceCard
         variant='card'
-        className='flex items-center gap-3 rounded-[10px] border border-[#1DB954]/14 bg-[color-mix(in_oklab,#1DB954_4.5%,var(--linear-app-content-surface))] px-4 py-3 transition-opacity duration-subtle'
+        className='system-b-release-provider-banner system-b-release-provider-banner--spotify flex items-center gap-3 border px-4 py-3 transition-opacity duration-subtle'
       >
         <ProviderIcon provider='spotify' className='h-4.5 w-4.5' />
         <div className='flex min-w-0 flex-1 flex-col gap-1'>
@@ -83,7 +83,7 @@ export const ImportProgressBanner = memo(function ImportProgressBanner({
             </span>
           </div>
           <div
-            className='h-1 w-full overflow-hidden rounded-full bg-[#1DB954]/12'
+            className='system-b-release-provider-progress-track h-1 w-full overflow-hidden rounded-full'
             role='progressbar'
             aria-valuenow={
               totalCount > 0
@@ -95,7 +95,7 @@ export const ImportProgressBanner = memo(function ImportProgressBanner({
             aria-label={progressLabel}
           >
             <motion.div
-              className='h-full rounded-full bg-[#1DB954]'
+              className='system-b-release-provider-progress-fill h-full rounded-full'
               initial={{ width: 0 }}
               animate={{
                 width:
@@ -112,17 +112,17 @@ export const ImportProgressBanner = memo(function ImportProgressBanner({
         <DrawerSurfaceCard
           variant='card'
           data-testid='release-enrichment-progress-banner'
-          className='mt-2 flex items-center gap-3 rounded-[10px] border border-accent/14 bg-[color-mix(in_oklab,var(--linear-accent)_4.5%,var(--linear-app-content-surface))] px-4 py-3 transition-opacity duration-subtle'
+          className='system-b-release-provider-banner system-b-release-provider-banner--accent mt-2 flex items-center gap-3 border px-4 py-3 transition-opacity duration-subtle'
         >
           <div className='flex h-5 w-5 items-center justify-center'>
-            <div className='h-4 w-4 animate-spin rounded-full border-2 border-accent/30 border-t-accent' />
+            <div className='system-b-release-provider-spinner h-4 w-4 animate-spin rounded-full border-2' />
           </div>
           <div className='flex min-w-0 flex-1 flex-col gap-1'>
             <span className='text-app text-primary-token'>
               Finding your music across streaming platforms...
             </span>
-            <div className='h-1 overflow-hidden rounded-full bg-accent/12'>
-              <div className='h-full w-1/3 animate-[progress-indeterminate_1.5s_ease-in-out_infinite] rounded-full bg-accent' />
+            <div className='system-b-release-provider-progress-track h-1 overflow-hidden rounded-full'>
+              <div className='system-b-release-provider-progress-fill h-full w-1/3 animate-[progress-indeterminate_1.5s_ease-in-out_infinite] rounded-full' />
             </div>
           </div>
         </DrawerSurfaceCard>
