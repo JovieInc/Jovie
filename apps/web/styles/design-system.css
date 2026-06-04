@@ -2561,6 +2561,10 @@ body:has(.system-b-download-page) .marketing-glass-header__cta:focus-visible {
   text-transform: uppercase;
 }
 
+.system-b-entity-popover-spotify-icon {
+  color: var(--color-brand-spotify);
+}
+
 .system-b-dsp-status-dot-live {
   background: color-mix(in oklab, var(--color-success) 72%, transparent);
 }

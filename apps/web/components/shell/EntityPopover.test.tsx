@@ -21,6 +21,13 @@ const release = {
   releaseType: 'Single',
 } satisfies EntityPopoverData;
 
+const spotifyUrlArtist = {
+  kind: 'artist',
+  id: 'artist_1',
+  label: 'https://open.spotify.com/artist/123',
+  handle: 'https://open.spotify.com/artist/123',
+} satisfies EntityPopoverData;
+
 afterEach(() => {
   vi.useRealTimers();
 });
@@ -80,6 +87,26 @@ describe('EntityHoverLink', () => {
 
     expect(screen.queryByRole('tooltip')).toBeNull();
   });
+
+  it('renders Spotify URL fallbacks with the named provider icon token', () => {
+    vi.useFakeTimers();
+    fastRender(
+      <EntityHoverLink entity={spotifyUrlArtist}>
+        Spotify artist
+      </EntityHoverLink>
+    );
+    const trigger = screen.getByRole('button', { name: 'Spotify artist' });
+
+    fireEvent.focus(trigger);
+    advanceTimers(200);
+
+    expect(screen.getByRole('tooltip').textContent).toContain('Spotify artist');
+    expect(
+      screen
+        .getByRole('tooltip')
+        .querySelector('.system-b-entity-popover-spotify-icon')
+    ).not.toBeNull();
+  });
 });
 
 describe('EntityPopover source contract', () => {
@@ -97,6 +124,8 @@ describe('EntityPopover source contract', () => {
       "import { LINEAR_SURFACE } from '@/components/tokens/linear-surface';"
     );
     expect(source).toContain('LINEAR_SURFACE.popover');
+    expect(source).toContain('system-b-entity-popover-spotify-icon');
+    expect(source).not.toContain('#1DB954');
     expect(source).not.toContain("'rounded-lg border border-default'");
     expect(source).not.toContain("'bg-surface-0 text-primary-token");
   });

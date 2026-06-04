@@ -11,6 +11,7 @@ const guardedFiles = [
   'components/jovie/components/EntityChipPopover.tsx',
   'components/jovie/components/EntityPreviewPane.tsx',
   'components/shell/DspAvatarStack.tsx',
+  'components/shell/EntityPopover.tsx',
 ];
 
 const rawVisualPatterns = [

@@ -532,8 +532,7 @@ function EntityCard({ entity, onActivate }: EntityCardProps) {
           {artistDisp.useSpotifyIcon ? (
             <span className='inline-flex items-center gap-1.5'>
               <Music
-                className='h-3.5 w-3.5 shrink-0'
-                style={{ color: '#1DB954' }}
+                className='system-b-entity-popover-spotify-icon h-3.5 w-3.5 shrink-0'
                 aria-hidden='true'
               />
               {artistDisp.displayLabel}
