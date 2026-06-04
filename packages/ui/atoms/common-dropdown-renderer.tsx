@@ -11,7 +11,9 @@ import {
   MENU_EMPTY_STATE_BASE,
   MENU_LEADING_SLOT_BASE,
   MENU_LOADING_STATE_BASE,
+  MENU_SEARCH_CLEAR_BUTTON_BASE,
   MENU_SEARCH_HEADER_BASE,
+  MENU_SEARCH_ICON_BASE,
   MENU_SEARCH_INPUT_BASE,
   subMenuContentClasses,
 } from '../lib/dropdown-styles';
@@ -136,7 +138,7 @@ export function SearchableContent({
   return (
     <div data-menu-header className={MENU_SEARCH_HEADER_BASE}>
       <div className='relative'>
-        <Search className='pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-(--linear-text-tertiary)' />
+        <Search className={MENU_SEARCH_ICON_BASE} />
         <input
           ref={setInputRef}
           type='text'
@@ -178,7 +180,7 @@ export function SearchableContent({
               onClear();
               localInputRef.current?.focus();
             }}
-            className='absolute right-1.5 top-1/2 inline-flex h-4 w-4 -translate-y-1/2 items-center justify-center rounded-(--linear-app-radius-item) text-(--linear-text-tertiary) hover:bg-(--linear-bg-surface-2) hover:text-(--linear-text-primary) focus-visible:outline-none focus-visible:bg-(--linear-bg-surface-2)'
+            className={MENU_SEARCH_CLEAR_BUTTON_BASE}
             aria-label='Clear search'
           >
             <X className='h-3 w-3' />

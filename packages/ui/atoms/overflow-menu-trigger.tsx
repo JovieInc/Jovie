@@ -4,29 +4,24 @@ import { cva, type VariantProps } from 'class-variance-authority';
 import { MoreHorizontal } from 'lucide-react';
 import * as React from 'react';
 
+import {
+  MENU_OVERFLOW_TRIGGER_BASE,
+  MENU_OVERFLOW_TRIGGER_DRAWER,
+  MENU_OVERFLOW_TRIGGER_SEGMENT,
+} from '../lib/dropdown-styles';
 import { cn } from '../lib/utils';
 
-const overflowTriggerVariants = cva(
-  [
-    'relative inline-flex shrink-0 items-center justify-center rounded-full border bg-transparent transition-[background-color,color,border-color] duration-150',
-    'hover:border-default hover:bg-surface-0 hover:text-primary-token',
-    'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/35 focus-visible:ring-offset-1 focus-visible:ring-offset-(--linear-bg-page)',
-    'text-tertiary-token',
-  ],
-  {
-    variants: {
-      variant: {
-        drawer:
-          'min-h-7 border-subtle px-2 text-[11.5px] font-[510] tracking-[-0.01em]',
-        segment:
-          'h-7 border-subtle px-2 text-[12px] font-[510] tracking-[-0.01em]',
-      },
+const overflowTriggerVariants = cva(MENU_OVERFLOW_TRIGGER_BASE, {
+  variants: {
+    variant: {
+      drawer: MENU_OVERFLOW_TRIGGER_DRAWER,
+      segment: MENU_OVERFLOW_TRIGGER_SEGMENT,
     },
-    defaultVariants: {
-      variant: 'drawer',
-    },
-  }
-);
+  },
+  defaultVariants: {
+    variant: 'drawer',
+  },
+});
 
 export interface OverflowMenuTriggerProps
   extends VariantProps<typeof overflowTriggerVariants> {

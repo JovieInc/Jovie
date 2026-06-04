@@ -28,13 +28,20 @@ import {
 } from 'react';
 
 import {
-  DROPDOWN_CONTENT_BASE,
-  DROPDOWN_SHADOW,
-  DROPDOWN_SLIDE_ANIMATIONS,
-  DROPDOWN_TRANSITIONS,
+  MENU_BADGE_BASE,
+  MENU_EMPTY_STATE_BASE,
   MENU_ITEM_BASE,
+  MENU_ITEM_DESCRIPTION_BASE,
   MENU_LABEL_BASE,
+  MENU_LEADING_SLOT_BASE,
+  MENU_LOADING_STATE_BASE,
+  MENU_SEARCH_CLEAR_BUTTON_BASE,
+  MENU_SEARCH_HEADER_BASE,
+  MENU_SEARCH_ICON_BASE,
+  MENU_SEARCH_INPUT_BASE,
   MENU_SEPARATOR_BASE,
+  MENU_SHORTCUT_BASE,
+  searchableSubMenuContentClasses,
 } from '../lib/dropdown-styles';
 import { cn } from '../lib/utils';
 
@@ -180,7 +187,7 @@ export function SearchableSubmenu({
   useEffect(() => {
     const itemRef = itemRefs.current.get(highlightedIndex);
     if (itemRef) {
-      itemRef.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+      itemRef.scrollIntoView({ block: 'nearest', behavior: 'auto' });
     }
   }, [highlightedIndex]);
 
@@ -284,15 +291,7 @@ export function SearchableSubmenu({
   );
 
   // Build content classes
-  const contentClasses = cn(
-    DROPDOWN_CONTENT_BASE,
-    DROPDOWN_SHADOW,
-    DROPDOWN_TRANSITIONS,
-    DROPDOWN_SLIDE_ANIMATIONS,
-    'min-w-[280px] max-w-[320px]',
-    'max-h-[400px] overflow-hidden flex flex-col',
-    contentClassName
-  );
+  const contentClasses = cn(searchableSubMenuContentClasses, contentClassName);
 
   let globalIndex = 0;
 
@@ -337,9 +336,9 @@ export function SearchableSubmenu({
           }}
         >
           {/* Search Input */}
-          <div className='sticky top-0 z-10 bg-surface-3 p-2 pb-1'>
+          <div className={MENU_SEARCH_HEADER_BASE}>
             <div className='relative'>
-              <Search className='absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-tertiary-token' />
+              <Search className={MENU_SEARCH_ICON_BASE} />
               <input
                 ref={searchInputRef}
                 id={searchId}
@@ -347,11 +346,7 @@ export function SearchableSubmenu({
                 placeholder={searchPlaceholder}
                 value={searchQuery}
                 onChange={handleSearchChange}
-                className={cn(
-                  'w-full rounded-lg border border-subtle bg-surface-2 py-2 pl-9 pr-8 text-sm',
-                  'text-primary-token placeholder:text-tertiary-token',
-                  'focus-visible:outline-none focus-visible:border-interactive'
-                )}
+                className={MENU_SEARCH_INPUT_BASE}
                 aria-label={searchPlaceholder}
                 aria-controls={listId}
                 aria-autocomplete='list'
@@ -367,7 +362,7 @@ export function SearchableSubmenu({
                 <button
                   type='button'
                   onClick={handleClearSearch}
-                  className='absolute right-2 top-1/2 -translate-y-1/2 rounded p-0.5 text-tertiary-token hover:bg-interactive-hover hover:text-primary-token'
+                  className={MENU_SEARCH_CLEAR_BUTTON_BASE}
                   aria-label='Clear search'
                 >
                   <X className='h-3.5 w-3.5' />
@@ -412,14 +407,12 @@ export function SearchableSubmenu({
             aria-hidden='true'
           >
             {isLoading && (
-              <div className='flex items-center justify-center py-8'>
+              <div className={MENU_LOADING_STATE_BASE}>
                 <Loader2 className='h-5 w-5 animate-spin text-tertiary-token' />
               </div>
             )}
             {!isLoading && !hasResults && (
-              <div className='py-8 text-center text-sm text-tertiary-token'>
-                {emptyMessage}
-              </div>
+              <div className={MENU_EMPTY_STATE_BASE}>{emptyMessage}</div>
             )}
             {!isLoading &&
               hasResults &&
@@ -455,25 +448,23 @@ export function SearchableSubmenu({
                         )}
                       >
                         {item.icon && (
-                          <span className='flex h-4 w-4 items-center justify-center text-tertiary-token'>
+                          <span className={MENU_LEADING_SLOT_BASE}>
                             {item.icon}
                           </span>
                         )}
                         <div className='flex flex-1 flex-col gap-0.5'>
                           <span className='truncate'>{item.label}</span>
                           {item.description && (
-                            <span className='truncate text-xs text-tertiary-token'>
+                            <span className={MENU_ITEM_DESCRIPTION_BASE}>
                               {item.description}
                             </span>
                           )}
                         </div>
                         {item.badge && (
-                          <span className='text-[10px] text-tertiary-token'>
-                            {item.badge}
-                          </span>
+                          <span className={MENU_BADGE_BASE}>{item.badge}</span>
                         )}
                         {item.shortcut && (
-                          <span className='ml-auto text-[10px] tracking-wider text-tertiary-token/70'>
+                          <span className={MENU_SHORTCUT_BASE}>
                             {item.shortcut}
                           </span>
                         )}
@@ -553,7 +544,7 @@ export function SearchableList({
   useEffect(() => {
     const itemRef = itemRefs.current.get(highlightedIndex);
     if (itemRef) {
-      itemRef.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+      itemRef.scrollIntoView({ block: 'nearest', behavior: 'auto' });
     }
   }, [highlightedIndex]);
 
@@ -601,21 +592,19 @@ export function SearchableList({
       {header}
 
       {/* Search Input */}
-      <div className='relative p-2'>
-        <Search className='absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-tertiary-token' />
-        <input
-          ref={searchInputRef}
-          type='text'
-          placeholder={searchPlaceholder}
-          value={searchQuery}
-          onChange={e => setSearchQuery(e.target.value)}
-          onKeyDown={handleKeyDown}
-          className={cn(
-            'w-full rounded-lg border border-subtle bg-surface-2 py-2 pl-9 pr-3 text-sm',
-            'text-primary-token placeholder:text-tertiary-token',
-            'focus-visible:outline-none focus-visible:border-interactive'
-          )}
-        />
+      <div className={MENU_SEARCH_HEADER_BASE}>
+        <div className='relative'>
+          <Search className={MENU_SEARCH_ICON_BASE} />
+          <input
+            ref={searchInputRef}
+            type='text'
+            placeholder={searchPlaceholder}
+            value={searchQuery}
+            onChange={e => setSearchQuery(e.target.value)}
+            onKeyDown={handleKeyDown}
+            className={MENU_SEARCH_INPUT_BASE}
+          />
+        </div>
       </div>
 
       <select
@@ -647,9 +636,7 @@ export function SearchableList({
       {/* Items */}
       <div className='flex-1 overflow-y-auto p-1.5 pt-0' aria-hidden='true'>
         {filteredItems.length === 0 ? (
-          <div className='py-8 text-center text-sm text-tertiary-token'>
-            {emptyMessage}
-          </div>
+          <div className={MENU_EMPTY_STATE_BASE}>{emptyMessage}</div>
         ) : (
           filteredItems.map((item, index) => (
             <button
@@ -669,22 +656,18 @@ export function SearchableList({
               )}
             >
               {item.icon && (
-                <span className='flex h-4 w-4 items-center justify-center text-tertiary-token'>
-                  {item.icon}
-                </span>
+                <span className={MENU_LEADING_SLOT_BASE}>{item.icon}</span>
               )}
               <div className='flex flex-1 flex-col gap-0.5'>
                 <span className='truncate'>{item.label}</span>
                 {item.description && (
-                  <span className='truncate text-xs text-tertiary-token'>
+                  <span className={MENU_ITEM_DESCRIPTION_BASE}>
                     {item.description}
                   </span>
                 )}
               </div>
               {item.badge && (
-                <span className='text-[10px] text-tertiary-token'>
-                  {item.badge}
-                </span>
+                <span className={MENU_BADGE_BASE}>{item.badge}</span>
               )}
             </button>
           ))
