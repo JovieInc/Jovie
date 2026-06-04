@@ -1,11 +1,11 @@
 # Auth & Onboarding (App Router)
 
-This directory contains the App Router auth pages for Jovie. The primary auth UI now uses Clerk's prebuilt components for reliability instead of the older custom multi-step forms.
+This directory contains the App Router auth pages for Jovie. The primary auth UI is SSO-only: Jovie renders first-party Google and Apple buttons, then starts Clerk OAuth through `useSignIn()` / `useSignUp()`.
 
 ## Runtime Model
 
-- `/signin` renders Clerk `<SignIn />` inside the existing `AuthLayout`.
-- `/signup` renders Clerk `<SignUp />` inside the existing `AuthLayout`.
+- `/signin` renders `AuthShell` inside the existing `AuthLayout` and starts Clerk sign-in redirects from app-owned provider buttons.
+- `/signup` renders `AuthShell` inside the existing `AuthLayout` and starts Clerk sign-up redirects from app-owned provider buttons.
 - Auth pages use the bundled Core 3 Clerk UI via `AuthClientProviders`, rather than relying on the CDN-loaded default auth styling path.
 - Auth pages use an auth-only Clerk appearance config with the Core 3 `simple` theme baseline, while non-auth Clerk surfaces keep the shared base appearance.
 - Host-to-instance mapping is strict:
@@ -14,19 +14,17 @@ This directory contains the App Router auth pages for Jovie. The primary auth UI
   - `jov.ie` uses the account A production instance via `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` + `CLERK_SECRET_KEY`
 - Staging auth must never fall back to production Clerk keys. If the staging pair is unavailable at runtime, auth pages must render the auth-unavailable state instead of a `500`.
 - Clerk traffic stays on the current origin and proxies through `/__clerk`; do not switch auth pages to direct `clerk.*` URLs.
-- Both pages use:
-  - `routing="hash"`
-  - `oauthFlow="redirect"`
-- Clerk Dashboard configuration is the source of truth for enabled auth methods and social providers. The app no longer forces an OTP-only UI.
+- Both pages use Clerk redirect OAuth and return through `/signin/sso-callback` or `/signup/sso-callback`.
+- The app is the rendering source of truth for allowed providers. Clerk Dashboard configuration must stay SSO-only, but credential inputs must not mount even if the dashboard regresses.
 
 ## Route Behavior
 
 - `GET /signin`
   - Falls back to [`APP_ROUTES.DASHBOARD`](../../constants/routes.ts) after successful sign-in.
-  - Accepts `?email=` and prefills Clerk `initialValues.emailAddress` when the value is a valid email.
-  - Preserves a valid `redirect_url` when linking onward to `/signup`.
+  - Accepts `?email=` for compatibility, but does not render or prefill a credential field.
+  - Links returnees who need help to `/support`, preserving safe query params.
 - `GET /signup`
-  - Falls back to [`APP_ROUTES.ONBOARDING`](../../constants/routes.ts) after successful sign-up.
+  - Falls back to [`APP_ROUTES.WAITLIST`](../../constants/routes.ts) after successful sign-up unless a central return route is supplied.
   - Preserves signup claim and pricing-plan intent data in session storage before the Clerk flow starts.
   - Shows a compatibility banner for `?oauth_error=` and removes only that query param after render.
   - Preserves a valid `redirect_url` when linking onward to `/signin`.
@@ -43,7 +41,7 @@ This directory contains the App Router auth pages for Jovie. The primary auth UI
 
 - [`tests/e2e/auth.setup.ts`](../../tests/e2e/auth.setup.ts) uses `@clerk/testing/playwright` to create the shared authenticated Playwright session for protected-route specs.
 - [`tests/e2e/auth.spec.ts`](../../tests/e2e/auth.spec.ts) intentionally creates a fresh signed-out browser context so `/signin` and `/signup` are tested as public auth pages, not as redirects for an already signed-in user.
-- [`tests/e2e/smoke-prod-auth.spec.ts`](../../tests/e2e/smoke-prod-auth.spec.ts) exercises the rendered Clerk flow with real credentials and branches on the next step Clerk presents, including password, email-code, or redirect.
+- [`tests/e2e/synthetic-auth-ui.spec.ts`](../../tests/e2e/synthetic-auth-ui.spec.ts) verifies the production auth surface renders SSO buttons without credential inputs.
 
 ## Manual QA
 

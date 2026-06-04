@@ -9,6 +9,7 @@ import { AuthLayout, AuthRoutePrefetch, AuthShell } from '@/features/auth';
 import { track } from '@/lib/analytics';
 import { buildAuthRouteUrl } from '@/lib/auth/build-auth-route-url';
 import { getCentralAuthCallbackPath } from '@/lib/auth/central-auth-routing';
+import { sanitizeRedirectUrl } from '@/lib/auth/constants';
 import { setPlanIntent, validatePlan } from '@/lib/auth/plan-intent';
 import {
   clearSignupClaimValue,
@@ -236,7 +237,11 @@ function getFallbackRedirectUrl(
     return buildDesktopAuthReturnPath(options.desktopReturnRoute);
   }
 
-  return getCentralAuthCallbackPath(params) ?? undefined;
+  return (
+    getCentralAuthCallbackPath(params) ??
+    sanitizeRedirectUrl(params.get('redirect_url')) ??
+    undefined
+  );
 }
 
 /**

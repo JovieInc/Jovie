@@ -1,7 +1,7 @@
 /**
  * Auth pages E2E tests — JOV-2037
  *
- * Covers /signin, /signup, redirect normalization, email prefill,
+ * Covers /signin, /signup, redirect normalization, SSO-only auth,
  * plan intent capture, and authenticated-user redirect behaviour.
  *
  * Tests use an anonymous context unless noted.
@@ -156,7 +156,7 @@ test.describe('/signin page', () => {
     }
   });
 
-  test('email prefill: ?email=test@example.com populates the email field', async ({
+  test('email query does not render credential fields on the SSO-only surface', async ({
     browser,
   }) => {
     const { page, context } = await createAnonPage(browser);
@@ -176,25 +176,17 @@ test.describe('/signin page', () => {
         return;
       }
 
-      // Look for the email field with the pre-filled value
-      const emailInput = page
-        .locator('input[type="email"], input[name="identifier"]')
-        .first();
-
-      // Clerk renders the field asynchronously; wait for it if needed
-      const inputVisible = await emailInput
-        .isVisible({ timeout: VISIBILITY_TIMEOUT })
-        .catch(() => false);
-
-      if (inputVisible) {
-        const value = await emailInput.inputValue();
-        expect(value).toBe(testEmail);
-      } else {
-        // In environments where Clerk is unavailable (no real instance),
-        // just verify the page loaded without error
-        const bodyText = await page.locator('body').textContent();
-        expect(bodyText).not.toContain('Unhandled Runtime Error');
-      }
+      await expect(
+        page.getByRole('button', { name: /continue with google/i })
+      ).toBeVisible({ timeout: VISIBILITY_TIMEOUT });
+      await expect(
+        page.getByRole('button', { name: /continue with apple/i })
+      ).toBeVisible({ timeout: VISIBILITY_TIMEOUT });
+      await expect(
+        page.locator(
+          'input[type="email"], input[name="identifier"], input[name="emailAddress"], input[type="password"]'
+        )
+      ).toHaveCount(0);
     } finally {
       await context.close();
     }

@@ -1,53 +1,52 @@
-import { render, waitFor } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const {
-  clerkRenderState,
-  clerkSignInMock,
-  clerkSignUpMock,
+  authResourceState,
   providerEnabledState,
   searchParamsState,
+  signInSsoMock,
+  signUpSsoMock,
 } = vi.hoisted(() => ({
-  clerkRenderState: {
-    signIn: 'empty' as 'empty' | 'credential' | 'social',
+  authResourceState: {
+    clerkLoaded: true,
+    signInLoaded: true,
+    signUpLoaded: true,
   },
-  clerkSignInMock: vi.fn(),
-  clerkSignUpMock: vi.fn(),
   providerEnabledState: {
     google: true,
     apple: true,
   },
   searchParamsState: { value: '' },
+  signInSsoMock: vi.fn(),
+  signUpSsoMock: vi.fn(),
 }));
 
 vi.mock('@clerk/nextjs', () => ({
-  SignIn: (props: unknown) => {
-    clerkSignInMock(props);
-
-    if (clerkRenderState.signIn === 'credential') {
-      return (
-        <form data-testid='clerk-sign-in'>
-          <input name='identifier' type='text' />
-          <input name='password' type='password' />
-          <button type='submit'>Continue</button>
-        </form>
-      );
-    }
-
-    if (clerkRenderState.signIn === 'social') {
-      return (
-        <div data-testid='clerk-sign-in'>
-          <button type='button'>Continue with Google</button>
-        </div>
-      );
-    }
-
-    return <div data-testid='clerk-sign-in' />;
-  },
-  SignUp: (props: unknown) => {
-    clerkSignUpMock(props);
-    return <div data-testid='clerk-sign-up' />;
-  },
+  useClerk: () => ({
+    loaded: authResourceState.clerkLoaded,
+  }),
+  useSignIn: () =>
+    authResourceState.signInLoaded
+      ? {
+          signIn: {
+            sso: signInSsoMock,
+          },
+        }
+      : {
+          signIn: null,
+        },
+  useSignUp: () =>
+    authResourceState.signUpLoaded
+      ? {
+          signUp: {
+            sso: signUpSsoMock,
+          },
+        }
+      : {
+          signUp: null,
+        },
 }));
 
 vi.mock('next/navigation', () => ({
@@ -74,121 +73,34 @@ vi.mock('@/lib/auth/oauth-providers', async () => {
 });
 
 import { authClerkLocalization } from '@/components/providers/clerkLocalization';
+import { APP_ROUTES } from '@/constants/routes';
 import { AuthShell } from '@/features/auth';
 
-describe('AuthShell — JOV-2446 SSO-only contract', () => {
+function expectNoCredentialInputs(container: HTMLElement) {
+  expect(
+    container.querySelector(
+      'input[name="identifier"], input[name="emailAddress"], input[type="email"], input[type="password"]'
+    )
+  ).toBeNull();
+}
+
+describe('AuthShell — JOV-2778 app-owned SSO-only contract', () => {
   beforeEach(() => {
-    clerkRenderState.signIn = 'empty';
-    clerkSignInMock.mockReset();
-    clerkSignUpMock.mockReset();
+    authResourceState.clerkLoaded = true;
+    authResourceState.signInLoaded = true;
+    authResourceState.signUpLoaded = true;
     providerEnabledState.google = true;
     providerEnabledState.apple = true;
     searchParamsState.value = '';
-  });
-
-  it('keeps required provider and last-used badge layout guards after caller overrides', async () => {
-    render(
-      <AuthShell
-        mode='sign-in'
-        appearance={{
-          elements: {
-            lastAuthenticationStrategyBadge: {
-              position: 'absolute',
-              transform: 'translate(10px, -50%)',
-            },
-            socialButtonsBlockButton: {
-              backgroundColor: 'rgb(1, 2, 3)',
-              display: 'grid',
-              overflow: 'hidden',
-            },
-            socialButtonsBlockButton__facebook: 'block',
-          },
-        }}
-      />
-    );
-
-    await waitFor(() => {
-      expect(clerkSignInMock).toHaveBeenCalledTimes(1);
-    });
-
-    const signInProps = clerkSignInMock.mock.calls[0]?.[0] as {
-      readonly appearance?: {
-        readonly elements?: Record<string, unknown>;
-      };
-    };
-    const elements = signInProps.appearance?.elements;
-
-    expect(elements?.socialButtonsBlockButton).toEqual(
-      expect.objectContaining({
-        backgroundColor: 'rgb(1, 2, 3)',
-        display: 'flex',
-        justifyContent: 'center',
-        overflow: 'visible',
-        position: 'relative',
-      })
-    );
-    expect(elements?.lastAuthenticationStrategyBadge).toEqual(
-      expect.objectContaining({
-        position: 'static',
-        transform: 'none',
-        whiteSpace: 'nowrap',
-      })
-    );
-    expect(elements?.socialButtonsBlockButton__facebook).toBe('hidden');
-  });
-
-  it('hides every credential element via appearance.elements (E1 defense in depth)', async () => {
-    render(<AuthShell mode='sign-in' />);
-
-    await waitFor(() => {
-      expect(clerkSignInMock).toHaveBeenCalledTimes(1);
-    });
-
-    const elements = (
-      clerkSignInMock.mock.calls[0]?.[0] as {
-        readonly appearance?: { readonly elements?: Record<string, unknown> };
-      }
-    ).appearance?.elements;
-
-    const HIDE_ELEMENT_STYLE = { display: 'none !important' };
-    // Row containers
-    expect(elements?.formFieldRow__identifier).toEqual(HIDE_ELEMENT_STYLE);
-    expect(elements?.formFieldRow__emailAddress).toEqual(HIDE_ELEMENT_STYLE);
-    expect(elements?.formFieldRow__password).toEqual(HIDE_ELEMENT_STYLE);
-    // Field wrappers
-    expect(elements?.formField__identifier).toEqual(HIDE_ELEMENT_STYLE);
-    expect(elements?.formField__emailAddress).toEqual(HIDE_ELEMENT_STYLE);
-    expect(elements?.formField__password).toEqual(HIDE_ELEMENT_STYLE);
-    // Inputs themselves
-    expect(elements?.formFieldInput__identifier).toEqual(HIDE_ELEMENT_STYLE);
-    expect(elements?.formFieldInput__emailAddress).toEqual(HIDE_ELEMENT_STYLE);
-    expect(elements?.formFieldInput__password).toEqual(HIDE_ELEMENT_STYLE);
-    // Labels
-    expect(elements?.formFieldLabel__identifier).toEqual(HIDE_ELEMENT_STYLE);
-    expect(elements?.formFieldLabel__emailAddress).toEqual(HIDE_ELEMENT_STYLE);
-    expect(elements?.formFieldLabel__password).toEqual(HIDE_ELEMENT_STYLE);
-    // Username/phone (forbidden by audit; assert defense-in-depth hides)
-    expect(elements?.formFieldRow__username).toEqual(HIDE_ELEMENT_STYLE);
-    expect(elements?.formField__username).toEqual(HIDE_ELEMENT_STYLE);
-    expect(elements?.formFieldInput__username).toEqual(HIDE_ELEMENT_STYLE);
-    expect(elements?.formFieldLabel__username).toEqual(HIDE_ELEMENT_STYLE);
-    expect(elements?.formFieldRow__phoneNumber).toEqual(HIDE_ELEMENT_STYLE);
-    expect(elements?.formField__phoneNumber).toEqual(HIDE_ELEMENT_STYLE);
-    expect(elements?.formFieldInput__phoneNumber).toEqual(HIDE_ELEMENT_STYLE);
-    expect(elements?.formFieldLabel__phoneNumber).toEqual(HIDE_ELEMENT_STYLE);
-    expect(elements?.formattedPhoneNumberInput).toEqual(HIDE_ELEMENT_STYLE);
-    // Verification-step fields
-    expect(elements?.formFieldInput__code).toEqual(HIDE_ELEMENT_STYLE);
-    expect(elements?.otpCodeFieldInput).toEqual(HIDE_ELEMENT_STYLE);
-    expect(elements?.formResendCodeLink).toEqual(HIDE_ELEMENT_STYLE);
-    // Form chrome
-    expect(elements?.formButtonPrimary).toEqual(HIDE_ELEMENT_STYLE);
-    expect(elements?.dividerRow).toEqual(HIDE_ELEMENT_STYLE);
-    expect(elements?.alternativeMethods).toEqual(HIDE_ELEMENT_STYLE);
-    expect(elements?.alternativeMethodsBlockButton).toEqual(HIDE_ELEMENT_STYLE);
+    signInSsoMock.mockReset();
+    signInSsoMock.mockResolvedValue({ error: null });
+    signUpSsoMock.mockReset();
+    signUpSsoMock.mockResolvedValue({ error: null });
   });
 
   it('renders stable full-label provider slots before Clerk is ready', () => {
+    authResourceState.signInLoaded = false;
+
     const { container } = render(<AuthShell mode='sign-in' />);
 
     expect(
@@ -197,9 +109,12 @@ describe('AuthShell — JOV-2446 SSO-only contract', () => {
     expect(
       container.querySelector('[data-auth-provider-slot="apple"]')
     ).toHaveTextContent('Continue with Apple');
+    expectNoCredentialInputs(container);
   });
 
   it('placeholder skeleton renders no input, no "or" divider, has animate-pulse + data-loading', () => {
+    authResourceState.signInLoaded = false;
+
     const { container } = render(<AuthShell mode='sign-in' />);
 
     const placeholder = container.querySelector(
@@ -214,13 +129,14 @@ describe('AuthShell — JOV-2446 SSO-only contract', () => {
     );
     expect(placeholder).toHaveAttribute('aria-busy', 'true');
     expect(placeholder?.classList.contains('animate-pulse')).toBe(true);
-    expect(placeholder?.querySelector('input')).toBeNull();
+    expect(
+      placeholder?.querySelector('[data-auth-oauth-error-slot]')
+    ).toHaveAttribute('aria-hidden', 'true');
+    expectNoCredentialInputs(container);
     expect(placeholder?.textContent ?? '').not.toMatch(/\bor\b/);
   });
 
-  it('releases the placeholder when Clerk renders a social-only start state', async () => {
-    clerkRenderState.signIn = 'social';
-
+  it('renders a ready sign-in SSO surface without mounting credential inputs', async () => {
     const { container } = render(<AuthShell mode='sign-in' />);
 
     await waitFor(() => {
@@ -229,57 +145,124 @@ describe('AuthShell — JOV-2446 SSO-only contract', () => {
         'true'
       );
     });
+
+    expect(container.querySelector('[data-auth-sso-surface]')).not.toBeNull();
     expect(
       container.querySelector('[data-auth-stable-placeholder]')
     ).toBeNull();
+    expectNoCredentialInputs(container);
+    expect(container.textContent ?? '').not.toMatch(/\bor\b/);
   });
 
-  it('keeps placeholder up when Clerk regresses to a credential-only start (prevention test for dashboard regression)', async () => {
-    // JOV-2446 contract: if Clerk's dashboard regresses and only credential
-    // inputs render, the readiness signal must NOT fire. The placeholder
-    // stays up, regression is visible to the Layer A canary, and the
-    // config-audit cron alerts within 30 min.
-    clerkRenderState.signIn = 'credential';
+  it('starts Google sign-in through Clerk redirect with the canonical callback and account chooser', async () => {
+    const user = userEvent.setup();
 
+    render(
+      <AuthShell mode='sign-in' fallbackRedirectUrl='/app?source=auth-test' />
+    );
+
+    const googleButton = await screen.findByRole('button', {
+      name: /continue with google/i,
+    });
+    await user.click(googleButton);
+
+    expect(signInSsoMock).toHaveBeenCalledWith({
+      oidcPrompt: 'select_account',
+      redirectCallbackUrl: '/signin/sso-callback',
+      redirectUrl: '/app?source=auth-test',
+      strategy: 'oauth_google',
+    });
+    expect(signUpSsoMock).not.toHaveBeenCalled();
+  });
+
+  it('starts Apple sign-up through Clerk redirect with the sign-up callback and legal acceptance', async () => {
+    const user = userEvent.setup();
+
+    render(<AuthShell mode='sign-up' />);
+
+    const appleButton = await screen.findByRole('button', {
+      name: /continue with apple/i,
+    });
+    await user.click(appleButton);
+
+    expect(signUpSsoMock).toHaveBeenCalledWith({
+      legalAccepted: true,
+      oidcPrompt: 'select_account',
+      redirectCallbackUrl: '/signup/sso-callback',
+      redirectUrl: APP_ROUTES.WAITLIST,
+      strategy: 'oauth_apple',
+    });
+    expect(signInSsoMock).not.toHaveBeenCalled();
+  });
+
+  it('renders a stable inline error when the OAuth redirect cannot start', async () => {
+    const user = userEvent.setup();
+    signInSsoMock.mockRejectedValueOnce(new Error('oauth down'));
+
+    render(<AuthShell mode='sign-in' />);
+
+    const googleButton = await screen.findByRole('button', {
+      name: /continue with google/i,
+    });
+    await user.click(googleButton);
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Could not start sign-in. Please try again.'
+    );
+    expect(googleButton).toBeEnabled();
+  });
+
+  it('renders a stable inline error when Clerk returns an SSO error object', async () => {
+    const user = userEvent.setup();
+    signInSsoMock.mockResolvedValueOnce({
+      error: new Error('oauth unavailable'),
+    });
+
+    render(<AuthShell mode='sign-in' />);
+
+    const googleButton = await screen.findByRole('button', {
+      name: /continue with google/i,
+    });
+    await user.click(googleButton);
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Could not start sign-in. Please try again.'
+    );
+    expect(googleButton).toBeEnabled();
+  });
+
+  it('/signin cross-link points to /support (Need help), not /waitlist', async () => {
     const { container } = render(<AuthShell mode='sign-in' />);
 
-    // Wait deterministically for MutationObserver-driven ready state to settle false (JOV-2446 Clerk regression guard).
-    await waitFor(() =>
+    await waitFor(() => {
       expect(container.firstElementChild).toHaveAttribute(
         'data-auth-shell-ready',
-        'false'
-      )
-    );
+        'true'
+      );
+    });
 
-    expect(
-      container.querySelector('[data-auth-stable-placeholder]')
-    ).not.toBeNull();
-  });
-
-  it('/signin cross-link points to /support (Need help), not /waitlist', () => {
-    const { container } = render(<AuthShell mode='sign-in' />);
-
-    const link = container.querySelector(
-      '[data-auth-stable-placeholder] a[href]'
-    );
-    expect(link).not.toBeNull();
-    expect(link?.getAttribute('href')).toContain('/support');
-    expect(link?.textContent ?? '').toMatch(/get help/i);
-    const prompt = link?.parentElement?.textContent ?? '';
-    expect(prompt).toMatch(/need help/i);
+    const link = screen.getByRole('link', { name: /get help/i });
+    expect(link).toHaveAttribute('href', '/support');
+    expect(link.parentElement?.textContent ?? '').toMatch(/need help/i);
     // Anti-regression: must not point at /waitlist
-    expect(link?.getAttribute('href')).not.toContain('/waitlist');
+    expect(link).not.toHaveAttribute(
+      'href',
+      expect.stringContaining('/waitlist')
+    );
   });
 
-  it('/signup cross-link still points to /signin (Have an account)', () => {
+  it('/signup cross-link still points to /signin (Have an account)', async () => {
     const { container } = render(<AuthShell mode='sign-up' />);
 
-    const link = container.querySelector(
-      '[data-auth-stable-placeholder] a[href]'
-    );
-    expect(link).not.toBeNull();
-    expect(link?.getAttribute('href')).toContain('/signin');
-    expect(link?.textContent ?? '').toMatch(/sign in/i);
+    await waitFor(() => {
+      expect(container.firstElementChild).toHaveAttribute(
+        'data-auth-shell-ready',
+        'true'
+      );
+    });
+
+    const link = screen.getByRole('link', { name: /sign in/i });
+    expect(link).toHaveAttribute('href', '/signin');
   });
 
   it('renders AuthProvidersUnavailable when zero OAuth providers are enabled', () => {
@@ -304,8 +287,7 @@ describe('AuthShell — JOV-2446 SSO-only contract', () => {
       'href',
       'mailto:support@jov.ie'
     );
-    // Clerk is NOT mounted on the unavailable surface.
-    expect(clerkSignInMock).not.toHaveBeenCalled();
+    expect(signInSsoMock).not.toHaveBeenCalled();
   });
 
   it('keeps legal copy in stable line groups with valid fallback hrefs', () => {
