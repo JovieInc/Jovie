@@ -2627,7 +2627,7 @@ jobs:
     needs: [ci-fast, ci-path-changes, ci-risk-classifier]
     if: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork == false && (contains(github.event.pull_request.labels.*.name, 'testing') || needs.ci-risk-classifier.outputs.requires_smoke == 'true') }}
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 30
     outputs:
       run_full_ci: ${{ steps.check_changes.outputs.run_full_ci }}
     steps:
