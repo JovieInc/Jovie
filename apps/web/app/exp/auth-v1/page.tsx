@@ -448,7 +448,7 @@ function GoogleButton({
       onClick={onClick}
       disabled={disabled}
       className={cn(
-        'inline-flex items-center justify-center gap-2 h-10 px-5 rounded-full text-[13px] font-medium text-primary-token bg-(--surface-1)/80 border border-(--linear-app-shell-border) hover:bg-(--surface-2)/80 hover:border-(--linear-app-shell-border) active:scale-[0.99] transition-colors duration-subtle ease-out',
+        'inline-flex h-(--linear-button-height-md) min-h-(--linear-button-height-md) items-center justify-center gap-(--linear-gap-buttons) rounded-full border border-subtle bg-(--linear-btn-secondary-bg) px-(--linear-space-4) text-caption font-caption text-primary-token transition-[background-color,border-color,color,box-shadow,opacity] duration-subtle ease-out hover:bg-(--linear-btn-secondary-hover) active:opacity-90',
         disabled && 'opacity-70'
       )}
     >
@@ -484,10 +484,8 @@ function ContinueButton({
       type='submit'
       disabled={submitting}
       className={cn(
-        // Match the shell's primary action: rounded-full pill, white tone,
-        // soft inner highlight + subtle drop shadow. Same vocabulary used
-        // by Open Jovie / Review pitch / Install.
-        'inline-flex items-center justify-center gap-1.5 h-10 px-5 rounded-full text-[13px] font-medium bg-white text-black hover:brightness-110 active:scale-[0.99] shadow-[0_4px_14px_rgba(0,0,0,0.35),inset_0_1px_0_rgba(255,255,255,0.45)] transition-colors duration-subtle ease-out',
+        // Match the shell's primary action vocabulary without local press motion.
+        'inline-flex h-(--linear-button-height-md) min-h-(--linear-button-height-md) items-center justify-center gap-(--linear-gap-buttons) rounded-full border border-(--linear-btn-primary-border) bg-(--linear-btn-primary-bg) px-(--linear-space-4) text-caption font-caption text-(--linear-btn-primary-fg) shadow-(--linear-shadow-button) transition-[background-color,border-color,color,box-shadow,opacity] duration-subtle ease-out hover:border-(--linear-btn-primary-hover) hover:bg-(--linear-btn-primary-hover) active:opacity-90',
         submitting && 'opacity-70'
       )}
     >
