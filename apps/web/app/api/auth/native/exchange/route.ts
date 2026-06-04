@@ -84,6 +84,47 @@ function isNotFoundError(error: unknown): boolean {
   return record.status === 404 || record.statusCode === 404;
 }
 
+function hasClerkErrorCode(error: unknown, code: string): boolean {
+  if (!error || typeof error !== 'object') {
+    return false;
+  }
+
+  const record = error as { errors?: unknown };
+  if (!Array.isArray(record.errors)) {
+    return false;
+  }
+
+  return record.errors.some(
+    entry =>
+      Boolean(entry) &&
+      typeof entry === 'object' &&
+      (entry as { code?: unknown }).code === code
+  );
+}
+
+function isIosSessionTokenUnavailableError(error: unknown): boolean {
+  return (
+    isNotFoundError(error) ||
+    hasClerkErrorCode(error, 'request_invalid_for_environment')
+  );
+}
+
+async function createNativeSignInTicketPayload(
+  clerk: Awaited<ReturnType<typeof clerkClient>>,
+  userId: string
+): Promise<NativeExchangePayload> {
+  const signInToken = await clerk.signInTokens.createSignInToken({
+    userId,
+    expiresInSeconds: SIGN_IN_TOKEN_TTL_SECONDS,
+  });
+
+  return {
+    ticket: signInToken.token,
+    userId,
+    expiresInSeconds: SIGN_IN_TOKEN_TTL_SECONDS,
+  };
+}
+
 export async function POST(request: Request) {
   try {
     const payload = (await request
@@ -214,16 +255,7 @@ async function createDesktopNativeExchangePayload(
   clerk: Awaited<ReturnType<typeof clerkClient>>,
   userId: string
 ): Promise<NativeExchangePayload> {
-  const signInToken = await clerk.signInTokens.createSignInToken({
-    userId,
-    expiresInSeconds: SIGN_IN_TOKEN_TTL_SECONDS,
-  });
-
-  return {
-    ticket: signInToken.token,
-    userId,
-    expiresInSeconds: SIGN_IN_TOKEN_TTL_SECONDS,
-  };
+  return createNativeSignInTicketPayload(clerk, userId);
 }
 
 async function createIosNativeExchangePayload(
@@ -245,29 +277,16 @@ async function createIosNativeExchangePayload(
       expiresInSeconds: SESSION_TOKEN_TTL_SECONDS,
     };
   } catch (error) {
-    if (!isNotFoundError(error)) {
+    if (!isIosSessionTokenUnavailableError(error)) {
       throw error;
     }
 
     /*
-     * If a preview environment has not been granted Sessions API access yet,
-     * keep the iOS test harness usable by falling back to Clerk's ticket flow.
-     * Production iOS prefers the session-token path so the app can persist the
-     * native session before calling /api/mobile/v1/me.
+     * Clerk only allows server-created sessions in development instances.
+     * Staging/production still complete native auth through the same one-time,
+     * PKCE-bound ticket flow that Electron uses; the iOS client then mints and
+     * persists its Clerk session token before calling /api/mobile/v1/me.
      */
-    if (!isProductionRuntimeEnvironment()) {
-      const signInToken = await clerk.signInTokens.createSignInToken({
-        userId,
-        expiresInSeconds: SIGN_IN_TOKEN_TTL_SECONDS,
-      });
-
-      return {
-        ticket: signInToken.token,
-        userId,
-        expiresInSeconds: SIGN_IN_TOKEN_TTL_SECONDS,
-      };
-    }
-
-    throw error;
+    return createNativeSignInTicketPayload(clerk, userId);
   }
 }
