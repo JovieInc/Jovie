@@ -182,8 +182,7 @@ function MenuItemLink({
     <Link
       href={item.href}
       className={cn(
-        'flex items-center gap-3 rounded-lg px-3 py-2.5 text-app font-caption transition-[background-color,color,transform] duration-subtle',
-        'active:scale-[0.98]',
+        'flex items-center gap-3 rounded-lg px-3 py-2.5 text-app font-caption transition-[background-color,color] duration-subtle ease-subtle active:bg-surface-2',
         active
           ? 'bg-bg-surface-2 text-primary-token'
           : 'text-secondary-token hover:text-primary-token hover:bg-surface-1'
@@ -261,8 +260,8 @@ export function LiquidGlassMenu({
         {/* Expanded menu */}
         <div
           className={cn(
-            'relative z-50 mx-3 mb-2 overflow-hidden rounded-xl transition-[transform,opacity] duration-cinematic ease-out',
-            isExpanded ? 'translate-y-0 scale-100' : 'translate-y-4 scale-95'
+            'relative z-50 mx-3 mb-2 overflow-hidden rounded-xl transition-opacity duration-cinematic ease-cinematic',
+            isExpanded ? 'opacity-100' : 'opacity-0'
           )}
           style={{
             background: 'var(--liquid-glass-bg-solid)',
@@ -311,7 +310,7 @@ export function LiquidGlassMenu({
                   <button
                     type='button'
                     onClick={onSignOut}
-                    className='flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-app font-caption text-secondary-token transition-[background-color,color,transform] duration-subtle hover:bg-surface-1 hover:text-primary-token active:scale-[0.98]'
+                    className='flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-app font-caption text-secondary-token transition-[background-color,color] duration-subtle ease-subtle hover:bg-surface-1 hover:text-primary-token active:bg-surface-2'
                   >
                     <LogOut
                       className='size-5 shrink-0 text-tertiary-token'
@@ -351,8 +350,7 @@ export function LiquidGlassMenu({
                 href={item.href}
                 aria-current={active ? 'page' : undefined}
                 className={cn(
-                  'relative flex min-w-[64px] flex-col items-center justify-center gap-0.5 rounded-lg py-1.5 transition-[color,transform] duration-subtle',
-                  'active:scale-95',
+                  'relative flex min-w-[64px] flex-col items-center justify-center gap-0.5 rounded-lg py-1.5 transition-colors duration-subtle ease-subtle active:text-primary-token',
                   active
                     ? 'text-primary-token'
                     : 'text-tertiary-token hover:text-secondary-token'
@@ -389,8 +387,7 @@ export function LiquidGlassMenu({
             aria-label={isExpanded ? 'Close menu' : 'More options'}
             aria-expanded={isExpanded}
             className={cn(
-              'relative flex min-w-[64px] flex-col items-center justify-center gap-0.5 rounded-lg py-1.5 transition-[color,transform] duration-subtle',
-              'active:scale-95',
+              'relative flex min-w-[64px] flex-col items-center justify-center gap-0.5 rounded-lg py-1.5 transition-colors duration-subtle ease-subtle active:text-primary-token',
               isExpanded
                 ? 'text-primary-token'
                 : 'text-tertiary-token hover:text-secondary-token'
@@ -413,7 +410,7 @@ export function LiquidGlassMenu({
               type='button'
               onClick={onSearchClick}
               aria-label='Search'
-              className='relative flex min-w-[64px] flex-col items-center justify-center gap-0.5 rounded-lg py-1.5 text-tertiary-token transition-[color,transform] duration-subtle hover:text-secondary-token active:scale-95'
+              className='relative flex min-w-[64px] flex-col items-center justify-center gap-0.5 rounded-lg py-1.5 text-tertiary-token transition-colors duration-subtle ease-subtle hover:text-secondary-token active:text-primary-token'
             >
               <Search className='h-5 w-5' aria-hidden='true' />
               <span className='sr-only'>Search</span>
