@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import path from 'node:path';
 import { fireEvent, render, screen } from '@testing-library/react';
 import * as React from 'react';
 import { describe, expect, it } from 'vitest';
@@ -5,6 +7,27 @@ import { describe, expect, it } from 'vitest';
 import { Textarea } from './textarea';
 
 describe('Textarea', () => {
+  describe('System B motion contract', () => {
+    it('uses explicit non-transform transitions only', () => {
+      const source = readFileSync(
+        path.join(process.cwd(), 'atoms/textarea.tsx'),
+        {
+          encoding: 'utf8',
+        }
+      );
+
+      expect(source).not.toMatch(
+        /\b(?:transition-all|transition-transform|active:scale|active:translate|hover:-translate)\b/
+      );
+      expect(source).not.toMatch(/\bduration-\d+\b/);
+      expect(source).toContain(
+        'transition-[background-color,border-color,box-shadow,color,opacity]'
+      );
+      expect(source).toContain('duration-normal');
+      expect(source).toContain('ease-interactive');
+    });
+  });
+
   describe('Basic Rendering', () => {
     it('renders with default props', () => {
       render(<Textarea placeholder='Enter text' />);
