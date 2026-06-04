@@ -137,10 +137,12 @@ export async function resolvePublishableKeyFromHeaders(): Promise<
 /**
  * Resolve the publishable key without calling headers() on production.
  *
- * On production (VERCEL_ENV === 'production'), the build-time
- * NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY is the correct key — no per-request
- * header read required. Returns the key without opting the page into
- * dynamic rendering, preserving static ISR caching for marketing routes.
+ * On the production host (VERCEL_ENV === 'production'), the build-time
+ * NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY is the correct key. When the deployment
+ * also carries staging-specific keys, inspect the request host once so a
+ * promoted staging deployment never renders with the production Clerk key.
+ * Otherwise return the production key without opting the page into dynamic
+ * rendering, preserving static ISR caching for marketing routes.
  *
  * On staging/preview/local (VERCEL_ENV !== 'production'), falls back to
  * resolvePublishableKeyFromHeaders() which reads the x-clerk-publishable-key
@@ -156,10 +158,28 @@ export async function resolvePublishableKeyFromHeaders(): Promise<
 export async function resolvePublishableKeyStaticFirst(): Promise<
   string | undefined
 > {
-  // On production the build-time key is always correct. Avoid calling headers()
-  // so the caller (e.g., @auth slot layout) does not opt marketing routes into
-  // dynamic rendering.
   if (process.env.VERCEL_ENV === 'production') {
+    // A promoted staging deployment can also report VERCEL_ENV=production.
+    // When staging-specific keys are present, inspect the request host so
+    // staging auth never renders with the production Clerk frontend key.
+    if (
+      process.env.CLERK_PUBLISHABLE_KEY_STAGING ||
+      process.env.CLERK_SECRET_KEY_STAGING
+    ) {
+      const hdrs = await headers();
+      const hostname = getRequestLocationFromHeaders(hdrs)?.hostname ?? '';
+      if (isStagingHost(hostname)) {
+        const preResolved = hdrs.get('x-clerk-publishable-key');
+        if (preResolved) return preResolved;
+        const keys = resolveClerkKeys(hostname);
+        if (keys.publishableKey && keys.secretKey) return keys.publishableKey;
+        return undefined;
+      }
+    }
+
+    // On production the build-time key is correct. Avoid calling headers()
+    // so the caller (e.g., @auth slot layout) does not opt marketing routes into
+    // dynamic rendering.
     const pk = publicEnv.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
     if (pk && process.env.CLERK_SECRET_KEY) return pk;
     // No valid key pair — Clerk unavailable on production. Caller will show

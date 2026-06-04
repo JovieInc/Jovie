@@ -26,6 +26,15 @@ Jovie has **two Clerk applications** on the account:
 | Main application (Account A) | production | jov.ie | `pk_live_...` |
 | Staging application (Account B) | staging | staging.jov.ie | `pk_live_...` (staging project) |
 
+The agent wrapper targets these apps explicitly so it works from detached
+worktrees that are not linked with `clerk link`:
+
+| Wrapper instance | Clerk app | Clerk instance |
+|---|---|---|
+| `dev` | `Jovie` | `dev` |
+| `staging` | `Jovie Preview` | `prod` |
+| `prod` | `Jovie` | `prod` |
+
 When the CLI prompts you to select an application:
 - Choose the **main application** for dev or production operations
 - Choose the **staging application** for staging.jov.ie operations

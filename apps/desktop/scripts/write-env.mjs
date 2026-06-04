@@ -23,7 +23,7 @@ const appEnv =
 
 function resolveAppUrl(env) {
   if (env === 'staging') {
-    return 'https://staging.app.jov.ie';
+    return 'https://staging.jov.ie';
   }
 
   if (env === 'local') {

@@ -276,6 +276,24 @@ test('desktop dev defaults to the local app shell and packaged builds keep produ
   );
   assert.match(productionStdout, /APP_ENV='production'/);
   assert.match(productionEnv, /APP_URL = 'https:\/\/jov\.ie'/);
+
+  const { stdout: stagingStdout } = await execFileAsync(
+    process.execPath,
+    [join(desktopRoot, 'scripts/write-env.mjs')],
+    {
+      cwd: desktopRoot,
+      env: {
+        ...process.env,
+        ELECTRON_ENV: 'staging',
+      },
+    }
+  );
+  const stagingEnv = await readFile(
+    join(desktopRoot, 'src/env.generated.ts'),
+    'utf8'
+  );
+  assert.match(stagingStdout, /APP_ENV='staging'/);
+  assert.match(stagingEnv, /APP_URL = 'https:\/\/staging\.jov\.ie'/);
 });
 
 test('hosted web app has an early Electron runtime marker before first paint', async () => {

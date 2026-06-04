@@ -248,6 +248,41 @@ describe('resolvePublishableKeyStaticFirst', () => {
     expect(headersMock).not.toHaveBeenCalled();
   });
 
+  it('uses the staging header on promoted staging deployments with VERCEL_ENV=production', async () => {
+    process.env.VERCEL_ENV = 'production';
+    process.env.CLERK_PUBLISHABLE_KEY_STAGING = 'pk_live_staging_example';
+    process.env.CLERK_SECRET_KEY_STAGING = 'sk_live_staging_example';
+    headersMock.mockResolvedValue(
+      new Headers({
+        host: 'staging.jov.ie',
+        'x-forwarded-host': 'staging.jov.ie',
+        'x-forwarded-proto': 'https',
+        'x-clerk-publishable-key': 'pk_live_staging_example',
+      })
+    );
+
+    const result = await resolvePublishableKeyStaticFirst();
+    expect(result).toBe('pk_live_staging_example');
+    expect(headersMock).toHaveBeenCalledOnce();
+  });
+
+  it('keeps the production key when staging keys exist but host is production', async () => {
+    process.env.VERCEL_ENV = 'production';
+    process.env.CLERK_PUBLISHABLE_KEY_STAGING = 'pk_live_staging_example';
+    process.env.CLERK_SECRET_KEY_STAGING = 'sk_live_staging_example';
+    headersMock.mockResolvedValue(
+      new Headers({
+        host: 'jov.ie',
+        'x-forwarded-host': 'jov.ie',
+        'x-forwarded-proto': 'https',
+      })
+    );
+
+    const result = await resolvePublishableKeyStaticFirst();
+    expect(result).toBe('pk_live_production_example');
+    expect(headersMock).toHaveBeenCalledOnce();
+  });
+
   it('returns undefined on production when the secret key is missing', async () => {
     process.env.VERCEL_ENV = 'production';
     delete process.env.CLERK_SECRET_KEY;

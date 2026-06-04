@@ -5,9 +5,10 @@
   "version": "0.1.0",
   "permissions": ["permissions", "sidePanel", "storage", "tabs"],
   "host_permissions": [
-    "http://localhost:3000/*",
-    "https://app.jov.ie/*",
-    "https://jov.ie/*"
+    "http://localhost/*",
+    "http://127.0.0.1/*",
+    "https://jov.ie/*",
+    "https://staging.jov.ie/*"
   ],
   "optional_host_permissions": [
     "https://distrokid.com/*",
