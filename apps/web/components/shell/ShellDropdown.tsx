@@ -110,55 +110,29 @@ const ENTITY_CLOSE_DELAY_MS = 120;
 // ---------------------------------------------------------------------------
 
 const CONTENT_CLASSES = cn(
-  'z-[90] min-w-[--w] max-w-[calc(100vw-16px)]',
-  'rounded-xl border border-(--linear-app-shell-border)',
-  'bg-(--linear-app-content-surface)/95 backdrop-blur-xl',
-  'shadow-[0_12px_40px_rgba(0,0,0,0.32)] p-1',
-  'origin-[--radix-dropdown-menu-content-transform-origin]',
+  'system-b-shell-dropdown-content',
   'data-[state=open]:animate-in data-[state=closed]:animate-out',
   'data-[state=open]:fade-in-0 data-[state=closed]:fade-out-0',
   'data-[state=open]:zoom-in-95 data-[state=closed]:zoom-out-95',
   'data-[side=bottom]:slide-in-from-top-1 data-[side=top]:slide-in-from-bottom-1',
   'data-[side=right]:slide-in-from-left-1 data-[side=left]:slide-in-from-right-1',
-  'duration-subtle ease-subtle',
+  'duration-fast ease-subtle',
   'will-change-transform'
 );
 
 const SUB_CONTENT_CLASSES = cn(
   CONTENT_CLASSES,
-  'origin-[--radix-dropdown-menu-content-transform-origin]'
+  'system-b-shell-dropdown-sub-content'
 );
 
-const ROW_BASE = cn(
-  'relative flex items-center gap-2.5 h-7 px-2 rounded-md select-none',
-  'text-[12.5px] font-caption text-secondary-token',
-  'outline-none cursor-default',
-  'transition-colors duration-subtle ease-subtle',
-  // Highlight (hover or keyboard nav) — Radix sets data-highlighted
-  'data-[highlighted]:bg-surface-1 data-[highlighted]:text-primary-token',
-  // Disabled
-  'data-[disabled]:opacity-50 data-[disabled]:pointer-events-none'
-);
+const ROW_BASE = cn('system-b-shell-dropdown-row');
 
-const ROW_DANGER = cn(
-  'text-rose-300/90',
-  'data-[highlighted]:bg-rose-500/10 data-[highlighted]:text-rose-200'
-);
+const ROW_DANGER = cn('system-b-shell-dropdown-row-danger');
 
-// Cyan pill chip — matches shell-v1 SELECTED_ROW_CLASSES at page.tsx:241.
-const ROW_SELECTED = cn(
-  "before:content-['']",
-  'before:absolute before:left-0.5 before:top-1/2 before:-translate-y-1/2',
-  'before:h-3.5 before:w-[3px] before:rounded-full',
-  'before:transition-colors before:duration-subtle before:ease-subtle',
-  'before:bg-cyan-300/0',
-  'data-[state=checked]:before:bg-cyan-300/85',
-  'data-[state=checked]:bg-surface-1/60',
-  'data-[state=checked]:text-primary-token'
-);
+// System B row-selection accent shared with shell list rows.
+const ROW_SELECTED = cn('system-b-shell-dropdown-row-selected');
 
-const ICON_CLASSES =
-  'h-3.5 w-3.5 shrink-0 text-tertiary-token group-data-[highlighted]:text-primary-token';
+const ICON_CLASSES = 'system-b-shell-dropdown-icon';
 
 // ---------------------------------------------------------------------------
 // Trigger wrapper — the user passes any element + we attach Radix Trigger.
@@ -355,13 +329,13 @@ function ShellDropdownRoot({
               ) : null}
               <div
                 className={cn(
-                  'max-h-[min(60vh,480px)] overflow-y-auto overflow-x-hidden',
+                  'system-b-shell-dropdown-scroll',
                   searchable && 'pt-0'
                 )}
               >
                 {children}
                 {isEmpty ? (
-                  <div className='px-3 py-5 text-center text-[12px] text-tertiary-token'>
+                  <div className='system-b-shell-dropdown-empty'>
                     {emptyMessage}
                   </div>
                 ) : null}
@@ -393,15 +367,8 @@ function FilterInput({
   placeholder,
 }: FilterInputProps) {
   return (
-    <div className='sticky top-0 z-10 -mx-1 -mt-1 mb-1 px-1 pt-1 pb-1 bg-(--linear-app-content-surface)/95 backdrop-blur-xl border-b border-(--linear-app-shell-border)/60'>
-      <label
-        className={cn(
-          'flex items-center gap-1.5 h-7 px-2 rounded-md',
-          'bg-surface-0/60 border border-transparent',
-          'focus-within:border-(--linear-app-shell-border)',
-          'transition-colors duration-subtle ease-subtle'
-        )}
-      >
+    <div className='system-b-shell-dropdown-filter'>
+      <label className='system-b-shell-dropdown-filter-shell'>
         <Search className='h-3 w-3 text-tertiary-token' strokeWidth={2.25} />
         <input
           ref={inputRef}
@@ -420,14 +387,14 @@ function FilterInput({
           }}
           placeholder={placeholder}
           aria-label='Filter dropdown items'
-          className='flex-1 min-w-0 bg-transparent text-[12.5px] text-primary-token placeholder:text-quaternary-token outline-none'
+          className='system-b-shell-dropdown-filter-input'
         />
         {value ? (
           <button
             type='button'
             onClick={() => onChange('')}
             aria-label='Clear filter'
-            className='h-4 px-1 rounded-[3px] inline-flex items-center text-[10px] uppercase tracking-[0.04em] text-tertiary-token hover:text-primary-token hover:bg-surface-1/60 transition-colors duration-subtle ease-subtle'
+            className='system-b-shell-dropdown-filter-clear'
           >
             <X className='h-3 w-3' strokeWidth={2.25} />
           </button>
@@ -470,15 +437,15 @@ function ShellDropdownHeader({ title, subtitle, avatar, entity }: HeaderProps) {
       onMouseLeave={onLeave}
       onFocus={onEnter}
       onBlur={onLeave}
-      className='flex items-start gap-2.5 px-2 py-2 mb-1 border-b border-(--linear-app-shell-border)/60'
+      className='system-b-shell-dropdown-header'
     >
       {avatar ? <span className='shrink-0'>{avatar}</span> : null}
       <div className='min-w-0 flex-1'>
-        <div className='text-[12.5px] font-caption text-primary-token leading-tight truncate'>
+        <div className='system-b-shell-dropdown-header-title truncate'>
           {title}
         </div>
         {subtitle ? (
-          <div className='text-[11px] text-tertiary-token leading-tight mt-0.5 truncate'>
+          <div className='system-b-shell-dropdown-header-subtitle truncate'>
             {subtitle}
           </div>
         ) : null}
@@ -488,7 +455,7 @@ function ShellDropdownHeader({ title, subtitle, avatar, entity }: HeaderProps) {
 }
 
 // ---------------------------------------------------------------------------
-// Section label — uppercase tracked.
+// Section label.
 // ---------------------------------------------------------------------------
 
 const ShellDropdownLabel = forwardRef<
@@ -497,10 +464,7 @@ const ShellDropdownLabel = forwardRef<
 >(({ className, ...props }, ref) => (
   <DropdownMenuPrimitive.Label
     ref={ref}
-    className={cn(
-      'px-2 pt-1.5 pb-1 text-[10px] uppercase tracking-wider text-tertiary-token font-semibold',
-      className
-    )}
+    className={cn('system-b-shell-dropdown-label', className)}
     {...props}
   />
 ));
@@ -516,10 +480,7 @@ const ShellDropdownSeparator = forwardRef<
 >(({ className, ...props }, ref) => (
   <DropdownMenuPrimitive.Separator
     ref={ref}
-    className={cn(
-      'my-1 border-t border-(--linear-app-shell-border)/60',
-      className
-    )}
+    className={cn('system-b-shell-dropdown-separator', className)}
     {...props}
   />
 ));
@@ -575,8 +536,7 @@ const ShellDropdownItem = forwardRef<
           <Icon
             className={cn(
               ICON_CLASSES,
-              tone === 'danger' &&
-                'text-rose-300/70 group-data-[highlighted]:text-rose-200'
+              tone === 'danger' && 'system-b-shell-dropdown-danger-icon'
             )}
             strokeWidth={2.25}
           />
@@ -603,7 +563,7 @@ function ItemBody({
   return (
     <span className='flex-1 min-w-0'>
       <span className='block truncate'>{label}</span>
-      <span className='block truncate text-[11px] text-tertiary-token leading-tight mt-0.5'>
+      <span className='system-b-shell-dropdown-item-description'>
         {description}
       </span>
     </span>
@@ -611,11 +571,7 @@ function ItemBody({
 }
 
 function ShortcutChip({ children }: { readonly children: ReactNode }) {
-  return (
-    <kbd className='ml-auto h-4 px-1 inline-flex items-center rounded-[3px] text-[10px] font-caption uppercase tracking-[0.04em] text-tertiary-token bg-surface-0/80 border border-(--linear-app-shell-border)/60 leading-none'>
-      {children}
-    </kbd>
-  );
+  return <kbd className='system-b-shell-dropdown-shortcut'>{children}</kbd>;
 }
 
 // ---------------------------------------------------------------------------
@@ -649,17 +605,10 @@ const ShellDropdownCheckboxItem = forwardRef<
         disabled={disabled}
         className={cn('group', ROW_BASE, ROW_SELECTED)}
       >
-        <span
-          className={cn(
-            'h-3.5 w-3.5 shrink-0 grid place-items-center rounded-[3px]',
-            'border border-(--linear-app-shell-border)',
-            'group-data-[state=checked]:bg-cyan-300/85 group-data-[state=checked]:border-cyan-300/85',
-            'transition-colors duration-subtle ease-subtle'
-          )}
-        >
+        <span className='system-b-shell-dropdown-checkbox-indicator'>
           <DropdownMenuPrimitive.ItemIndicator>
             <Check
-              className='h-3 w-3 text-(--linear-app-content-surface)'
+              className='h-3 w-3 text-(--system-b-app-content-surface)'
               strokeWidth={3}
             />
           </DropdownMenuPrimitive.ItemIndicator>
@@ -705,7 +654,10 @@ const ShellDropdownRadioItem = forwardRef<
       ) : (
         <span className='h-3.5 w-3.5 shrink-0 grid place-items-center'>
           <DropdownMenuPrimitive.ItemIndicator>
-            <Check className='h-3 w-3 text-cyan-300' strokeWidth={3} />
+            <Check
+              className='h-3 w-3 text-(--system-b-accent-cyan)'
+              strokeWidth={3}
+            />
           </DropdownMenuPrimitive.ItemIndicator>
         </span>
       )}
@@ -739,11 +691,7 @@ const ShellDropdownSubTrigger = forwardRef<
   return (
     <DropdownMenuPrimitive.SubTrigger
       ref={ref}
-      className={cn(
-        'group',
-        ROW_BASE,
-        'data-[state=open]:bg-surface-1 data-[state=open]:text-primary-token'
-      )}
+      className={cn('group', ROW_BASE, 'system-b-shell-dropdown-sub-trigger')}
     >
       {Icon ? <Icon className={ICON_CLASSES} strokeWidth={2.25} /> : null}
       <ItemBody label={label} description={description} />
@@ -820,10 +768,10 @@ function ShellDropdownSubContent({
               placeholder={searchPlaceholder}
             />
           ) : null}
-          <div className='max-h-[min(60vh,480px)] overflow-y-auto overflow-x-hidden'>
+          <div className='system-b-shell-dropdown-scroll'>
             {children}
             {isEmpty ? (
-              <div className='px-3 py-5 text-center text-[12px] text-tertiary-token'>
+              <div className='system-b-shell-dropdown-empty'>
                 {emptyMessage}
               </div>
             ) : null}
@@ -881,19 +829,15 @@ const ShellDropdownEntityItem = forwardRef<
         onFocus={onEnter}
         onBlur={onLeave}
         data-selected={selected ? '' : undefined}
-        className={cn(
-          'group',
-          ROW_BASE,
-          selected && 'bg-surface-1/60 text-primary-token'
-        )}
+        className={cn('group', ROW_BASE, selected && 'is-selected')}
       >
         <EntityRowArt entity={entity} />
         <span className='min-w-0 flex-1'>
-          <span className='block truncate text-[12.5px] font-caption'>
+          <span className='system-b-shell-dropdown-entity-title'>
             {resolvedLabel}
           </span>
           {resolvedSubtitle ? (
-            <span className='block truncate text-[11px] text-tertiary-token leading-tight mt-0.5'>
+            <span className='system-b-shell-dropdown-item-description'>
               {resolvedSubtitle}
             </span>
           ) : null}
@@ -902,7 +846,7 @@ const ShellDropdownEntityItem = forwardRef<
           <ShortcutChip>{shortcut}</ShortcutChip>
         ) : (
           <Link2
-            className='ml-auto h-3 w-3 shrink-0 text-quaternary-token group-data-[highlighted]:text-tertiary-token'
+            className='system-b-shell-dropdown-link-icon'
             strokeWidth={2.25}
             aria-hidden='true'
           />
