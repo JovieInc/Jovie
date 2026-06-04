@@ -9,8 +9,8 @@
 # HOW IT WORKS:
 # 1. Extracts Linear ticket intent from PR body (populated by linear-ai-orchestrator)
 # 2. Gets the full diff of the PR
-# 3. If an API key is configured, sends diff + intent to OpenAI GPT-4o for
-#    scope alignment judgment
+# 3. If an API key is configured, sends diff + intent to an OpenRouter free
+#    model for scope alignment judgment
 # 4. If no API key is configured, skips the LLM call and reports a deterministic
 #    no-cost success status so CI does not burn tokens or fail inconclusively
 # 5. Reports pass/fail/skip as a commit status (used as required check for auto-approve)
@@ -136,21 +136,22 @@ jobs:
         id: judge-key
         if: steps.intent.outputs.has_intent == 'true' && steps.diff.outputs.has_diff == 'true'
         env:
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
         run: |
-          if [[ -n "$OPENAI_API_KEY" ]]; then
-            echo "Scope judge API key is configured."
+          if [[ -n "$OPENROUTER_API_KEY" ]]; then
+            echo "Scope judge OpenRouter API key is configured."
             echo "has_key=true" >> "$GITHUB_OUTPUT"
           else
-            echo "Scope judge API key is not configured. Skipping LLM-backed scope judgment."
+            echo "Scope judge OpenRouter API key is not configured. Skipping LLM-backed scope judgment."
             echo "has_key=false" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Run scope alignment judge (OpenAI)
+      - name: Run scope alignment judge (OpenRouter)
         id: judge
         if: steps.intent.outputs.has_intent == 'true' && steps.diff.outputs.has_diff == 'true' && steps.judge-key.outputs.has_key == 'true'
         env:
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+          OPENROUTER_MODEL: openai/gpt-oss-20b:free
         run: |
           INTENT=$(echo "${{ steps.intent.outputs.intent }}" | base64 -d)
           DIFF=$(echo "${{ steps.diff.outputs.diff }}" | base64 -d)
@@ -188,15 +189,20 @@ jobs:
           PROMPTEOF
           )
 
-          # Call OpenAI API
-          RESPONSE=$(curl -sS --max-time 30 https://api.openai.com/v1/chat/completions \
-            -H "Authorization: Bearer $OPENAI_API_KEY" \
+          echo "Using OpenRouter model: $OPENROUTER_MODEL"
+
+          # Call OpenRouter API with a free model.
+          RESPONSE=$(curl -sS --max-time 30 https://openrouter.ai/api/v1/chat/completions \
+            -H "Authorization: Bearer $OPENROUTER_API_KEY" \
             -H "Content-Type: application/json" \
+            -H "HTTP-Referer: https://github.com/${{ github.repository }}" \
+            -H "X-OpenRouter-Title: Jovie Scope Judge" \
             -d "$(jq -n \
+              --arg model "$OPENROUTER_MODEL" \
               --arg system "$JUDGE_PROMPT" \
               --arg user "## TICKET INTENT\n$INTENT\n\n## CODE CHANGES\n$DIFF" \
               '{
-                model: "gpt-4o-mini",
+                model: $model,
                 messages: [
                   {role: "system", content: $system},
                   {role: "user", content: $user}
@@ -207,7 +213,7 @@ jobs:
             )")
 
           # Extract verdict
-          CONTENT=$(echo "$RESPONSE" | jq -r '.choices[0].message.content // "ERROR: No response"')
+          CONTENT=$(echo "$RESPONSE" | jq -r '.choices[0].message.content // .error.message // "ERROR: No response"')
           echo "Judge response: $CONTENT"
 
           VERDICT=$(echo "$CONTENT" | grep -oP '(?<=VERDICT:\s)(PASS|FAIL)' | head -1 || echo "")
@@ -267,7 +273,7 @@ jobs:
           gh api repos/${{ github.repository }}/statuses/$SHA \
             -f state="success" \
             -f target_url="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" \
-            -f description="Scope judge skipped - API key missing; no model call" \
+            -f description="Scope judge skipped - OpenRouter API key missing; no model call" \
             -f context="scope-judge"
 
       - name: Skip status (no Linear intent found)
