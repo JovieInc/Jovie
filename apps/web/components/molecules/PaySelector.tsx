@@ -184,7 +184,7 @@ export function PaySelector({
                         aria-label={`Select ${formatAmountForScreenReader(amount)} payment amount`}
                         onClick={() => handleAmountSelect(idx)}
                         className={cn(
-                          'flex h-[92px] items-center justify-center rounded-[22px] border text-center transition-[border-color,background-color,color,transform] duration-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--focus-ring))] focus-visible:ring-offset-2 focus-visible:ring-offset-transparent',
+                          'flex h-[92px] items-center justify-center rounded-[22px] border text-center transition-[border-color,background-color,box-shadow,color,opacity] duration-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--focus-ring))] focus-visible:ring-offset-2 focus-visible:ring-offset-transparent',
                           isSelected
                             ? 'border-white bg-white text-[#121216] shadow-[0_20px_40px_rgba(255,255,255,0.08)]'
                             : 'border-white/10 bg-white/[0.02] text-white hover:border-white/18 hover:bg-white/[0.04]'
