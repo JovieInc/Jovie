@@ -5,6 +5,17 @@
      5|The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
      6|and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.6.4] - 2026-06-04
+
+> Auth sign-in is now wired across the web app, Electron desktop app, iOS shell, and Chrome extension for dev, staging, and production verification.
+
+### Fixed
+
+- **Multi-surface Clerk routing**: maps dev, staging, and production to their explicit Doppler and Clerk instances, enables email-code sign-in checks, and keeps staging hosts on staging publishable keys even when Vercel reports a production runtime.
+- **Electron native auth handoff**: corrects Electron navigation event handling so browser-owned Clerk callbacks return to the native shell instead of falling through to `about:blank`.
+- **Cached auth recovery**: resolves verified Clerk email addresses through the backend when the database profile is not yet cached, keeping native dashboard hydration signed in after a browser handoff.
+- **Chrome extension sign-in**: opens sign-in on the active Jovie origin and grants dev, staging, and production host permissions.
+
 ## [26.6.3] - 2026-06-03
 
 > Electron now ships the System B desktop recovery shell through the desktop auto-update path.
