@@ -20,21 +20,21 @@ const segmentControlVariants = cva('inline-flex items-center rounded-full', {
       ghost: 'border-transparent bg-transparent shadow-none',
       'linear-pill': linearPillSurfaceClassName,
     },
-    size: {
-      sm: 'p-0.5',
-      md: 'p-1',
-      lg: 'p-1',
-    },
   },
   defaultVariants: {
     variant: 'default',
-    size: 'sm',
   },
 });
 
+const segmentControlSurfaceSizeClassNames = {
+  sm: 'p-0.5',
+  md: 'p-1',
+  lg: 'p-1',
+} as const;
+
 const segmentTriggerVariants = cva(
   [
-    'relative rounded-full border border-transparent bg-transparent font-[510] tracking-[-0.01em] transition-[background-color,color,box-shadow,border-color] duration-fast ease-interactive',
+    'relative rounded-full border border-transparent bg-transparent transition-[background-color,color,box-shadow,border-color]',
     'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--color-accent)/30 focus-visible:ring-offset-1 focus-visible:ring-offset-(--linear-app-content-surface)',
     'disabled:pointer-events-none disabled:opacity-45',
     // Inactive state
@@ -45,18 +45,13 @@ const segmentTriggerVariants = cva(
   {
     variants: {
       variant: {
-        default: '',
-        ghost: '',
+        default: 'font-[510] tracking-[-0.01em] duration-fast ease-interactive',
+        ghost: 'font-[510] tracking-[-0.01em] duration-fast ease-interactive',
         'linear-pill': cn(
           linearPillLabelClassName,
           linearPillFocusClassName,
           'text-(--linear-text-tertiary) hover:text-(--linear-text-primary) data-[state=active]:text-(--linear-btn-primary-fg)'
         ),
-      },
-      size: {
-        sm: 'h-7 px-2.5 text-[12px]',
-        md: 'h-[28px] px-2.5 text-[13px]',
-        lg: 'h-9 px-4 text-sm',
       },
       layout: {
         fill: 'flex-1',
@@ -65,11 +60,16 @@ const segmentTriggerVariants = cva(
     },
     defaultVariants: {
       variant: 'default',
-      size: 'sm',
       layout: 'fill',
     },
   }
 );
+
+const segmentTriggerSizeClassNames = {
+  sm: 'h-7 px-2.5 text-[12px]',
+  md: 'h-[28px] px-2.5 text-[13px]',
+  lg: 'h-9 px-4 text-sm',
+} as const;
 
 interface IndicatorLayout {
   readonly width: number;
@@ -244,7 +244,10 @@ export function SegmentControl<T extends string = string>({
       value={value}
       onValueChange={onValueChange as (value: string) => void}
       className={cn(
-        segmentControlVariants({ variant, size }),
+        segmentControlVariants({ variant }),
+        variant === 'linear-pill'
+          ? null
+          : segmentControlSurfaceSizeClassNames[size],
         layout === 'fill' ? 'w-full' : 'max-w-full',
         className
       )}
@@ -276,8 +279,9 @@ export function SegmentControl<T extends string = string>({
               triggerRefs.current[option.value] = node;
             }}
             className={cn(
-              segmentTriggerVariants({ layout, size, variant }),
-              linearPillTriggerSizeClassName,
+              segmentTriggerVariants({ layout, variant }),
+              linearPillTriggerSizeClassName ??
+                segmentTriggerSizeClassNames[size],
               variant !== 'linear-pill' &&
                 'motion-safe:transition-[background-color,color,box-shadow] motion-safe:duration-150 motion-safe:ease-out',
               triggerClassName

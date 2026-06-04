@@ -214,6 +214,13 @@
   --linear-hero-height: 392px;
   --linear-button-height-sm: 32px;
   --linear-button-height-md: 40px;
+  --linear-pill-track-padding: 3px;
+  --linear-pill-height-md: 36px;
+  --linear-pill-surface-shadow: var(--linear-shadow-button);
+  --linear-pill-indicator-shadow: var(
+    --shadow-button-inset,
+    var(--linear-shadow-button)
+  );
   --linear-radius-sm: 8px;
   --linear-radius-md: 8px;
   --linear-radius-lg: 12px;
