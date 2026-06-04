@@ -1,6 +1,6 @@
 # Hermes on the MacBook Air (Always-On Orchestration Node)
 
-Operating contract for the always-on Hermes daemon running on the dedicated 16 GB MacBook Air. This file is the canonical reference; the operator runbook lives at `docs/HERMES_AIR.md`.
+Operating contract for the always-on Hermes gateway running on the dedicated 16 GB MacBook Air. This file is the canonical reference; the operator runbook lives at `docs/HERMES_AIR.md`.
 
 ## What Hermes-Air IS
 
@@ -27,7 +27,7 @@ A dedicated orchestration node that:
 | Hermes-Air never edits code or merges PRs | Profile gate (`JOVIE_AGENT_PROFILE!=coder`); `orchestrator-boundary-check.sh` hook on any Claude Code session that ever runs on Air (should be zero) |
 | All engineering follow-ups go through Linear | `voice-memo-ingest.ts` and Telegram intake handlers both call the Linear API directly; no `repository_dispatch` from Air |
 | Inference cost is $0 unless user explicitly opts in | `free-model-router.ts` only selects `:free` OpenRouter variants; `cost-monitor.ts` kills non-watchdog jobs if any paid spend exceeds $0 in 24h |
-| gbrain stays local (Air-hosted, Tailscale-bound) | `gbrain serve` binds to the Tailscale interface only; no public exposure |
+| gbrain stays local (Air-hosted, Tailscale-bound) | `gbrain serve --http --bind <tailscale-ip>` binds to the Tailscale interface only; no public exposure |
 | Voice memo transcripts never leave the Air | Stored only in gbrain PGLite; embedding API calls use free providers; no Supabase sync in v1 |
 | Single heavy-job semaphore | Ollama inference and `whisper-cli` cannot run concurrently; protected by `~/.hermes/state/heavy-job.lock` |
 | Telegram bot token never logged | `~/.hermes/.env` only; `bootstrap-air.sh` verifies `.env` is `chmod 600` and never copied into logs |

@@ -1,6 +1,6 @@
 # Hermes-Air Operator Runbook
 
-Day-to-day operations for the always-on Hermes daemon running on the dedicated 16 GB MacBook Air. For the operating contract and invariants, read `.claude/rules/hermes-air.md`.
+Day-to-day operations for the always-on Hermes gateway running on the dedicated 16 GB MacBook Air. For the operating contract and invariants, read `.claude/rules/hermes-air.md`.
 
 ## What This Machine Is
 
@@ -60,7 +60,19 @@ doppler secrets set HERMES_TELEGRAM_BOT_TOKEN="$TELEGRAM_TOKEN" \
   --project jovie-web --config dev
 ```
 
-Then send the bot any message from your iPhone so it can capture your chat ID. The bootstrap script will surface the chat ID and write it to `~/.hermes/state/telegram-chat-id`.
+Then send the bot any message from your iPhone and read the latest private chat ID:
+
+```bash
+doppler run --project jovie-web --config dev -- \
+  sh -c 'curl -fsS "https://api.telegram.org/bot${HERMES_TELEGRAM_BOT_TOKEN}/getUpdates" | jq -r ".result[-1].message.chat.id"'
+```
+
+After you know the private chat ID, save it too:
+
+```bash
+doppler secrets set HERMES_TELEGRAM_CHAT_ID="<telegram-chat-id>" \
+  --project jovie-web --config dev
+```
 
 ## Required Secrets (Doppler `jovie-web/dev`)
 
@@ -72,6 +84,7 @@ Then send the bot any message from your iPhone so it can capture your chat ID. T
 | `GITHUB_TOKEN` | PR-stuck / CI-failure monitors | already provisioned |
 | `AIRTABLE_API_KEY` | Founder-OS profile (fundraising base) | already provisioned |
 | `SENTRY_AUTH_TOKEN` | Optional: ship Hermes errors to Sentry `hermes-air` env | already provisioned |
+| `HERMES_TELEGRAM_CHAT_ID` | Optional: Telegram private-chat allowlist + outbound target | manual after first bot message |
 
 The bootstrap script verifies every required secret is present before continuing.
 
@@ -91,13 +104,15 @@ Once installed, you should never need to interact with the Air directly. All con
 
 ```bash
 # All Hermes services
-launchctl list | grep co.jovie.hermes
+launchctl list | grep -E "(co.jovie.hermes|ai.hermes.gateway)"
 
-# Daemon health
-curl -sf http://localhost:7800/health && echo "OK" || echo "DOWN"
+# Hermes gateway health
+hermes gateway status
 
 # gbrain health
-gbrain doctor --fast --json | jq .health
+TAILSCALE_IP="$(tailscale ip -4 | head -1)"
+curl -sf "http://${TAILSCALE_IP}:7801/health" && echo "OK" || echo "DOWN"
+gbrain doctor --fast --json | jq .health_score
 
 # Resident memory of all Hermes-related processes
 ps -axm -o rss,command | awk '/hermes|gbrain|ollama|whisper/ { sum+=$1; print } END { printf "TOTAL: %.1f MB\n", sum/1024 }'
@@ -111,15 +126,16 @@ cat ~/.hermes/state/model-router-rankings.json | jq .
 
 ## Common Operations
 
-### Restart the daemon
+### Restart the gateway
 
 ```bash
-launchctl kickstart -k gui/$(id -u)/co.jovie.hermes.daemon
+hermes gateway restart --all
 ```
 
 ### Stop all Hermes services (without disabling)
 
 ```bash
+hermes gateway stop --all
 for s in $(launchctl list | grep co.jovie.hermes | awk '{print $3}'); do
   launchctl bootout gui/$(id -u)/$s
 done
@@ -128,6 +144,7 @@ done
 ### Re-enable after stop
 
 ```bash
+hermes gateway start --all
 for plist in ~/Library/LaunchAgents/co.jovie.hermes.*.plist; do
   launchctl bootstrap gui/$(id -u) "$plist"
 done
@@ -136,8 +153,11 @@ done
 ### Tail logs
 
 ```bash
-# Daemon stdout
-tail -f ~/.hermes/logs/daemon.log
+# Gateway stdout
+tail -f ~/.hermes/logs/gateway.log
+
+# Gateway stderr
+tail -f ~/.hermes/logs/gateway.error.log
 
 # All cron job runs
 tail -f ~/.hermes/logs/jobs.jsonl
@@ -151,17 +171,19 @@ tail -f ~/.hermes/logs/voice-memo.jsonl
 ```bash
 ./scripts/hermes/bootstrap-air.sh --reconfigure
 # then:
-launchctl kickstart -k gui/$(id -u)/co.jovie.hermes.daemon
+hermes gateway restart --all
+launchctl kickstart -k gui/$(id -u)/co.jovie.hermes.gbrain-server
 ```
 
 ## Recovery Procedures
 
-### Daemon won't start
+### Gateway won't start
 
-1. Check launchd error: `launchctl print gui/$(id -u)/co.jovie.hermes.daemon | grep -A 3 "last exit"`
-2. Tail daemon log: `tail -100 ~/.hermes/logs/daemon.log`
-3. Re-run bootstrap: `./scripts/hermes/bootstrap-air.sh` (idempotent)
-4. If config is corrupt: `mv ~/.hermes/config.yaml ~/.hermes/config.yaml.bak && ./scripts/hermes/bootstrap-air.sh --reconfigure`
+1. Check launchd state: `launchctl print gui/$(id -u)/ai.hermes.gateway | grep -A 3 "last exit"`
+2. Tail gateway log: `tail -100 ~/.hermes/logs/gateway.error.log`
+3. Confirm the supported Hermes gateway command works: `hermes gateway status`
+4. Re-run bootstrap: `./scripts/hermes/bootstrap-air.sh` (idempotent)
+5. If config is corrupt: `mv ~/.hermes/config.yaml ~/.hermes/config.yaml.bak && ./scripts/hermes/bootstrap-air.sh --reconfigure`
 
 ### Voice memo ingest stopped working
 
@@ -186,7 +208,7 @@ Once you understand the cause, fix it (likely in `free-model-router.ts` rankings
 ### gbrain unreachable from Pro
 
 1. On Air: `tailscale ip -4` — confirm Tailscale IP.
-2. On Air: `lsof -i :<gbrain-port>` — confirm `gbrain serve` is listening.
+2. On Air: `lsof -i :<gbrain-port>` — confirm `gbrain serve --http --bind <tailscale-ip>` is listening.
 3. On Pro: update MCP config to point at `http://<air-tailscale-ip>:<port>`.
 
 ### Air rebooted
@@ -199,7 +221,7 @@ Target steady-state memory budget (per `.claude/plans/system-instruction-you-are
 
 | Process | Resident (idle) |
 |---|---|
-| Hermes daemon | 300–600 MB |
+| Hermes gateway | 300–600 MB |
 | gbrain serve (PGLite) | 300–600 MB |
 | ruflo MCP | <100 MB |
 | Ollama (model unloaded between calls) | ~0 MB idle |
@@ -220,7 +242,7 @@ Removes all launchd plists, drops `~/.hermes/`, leaves Doppler and Tailscale alo
 
 | Path | What | Backup? |
 |---|---|---|
-| `~/.hermes/config.yaml` | Hermes daemon config (rendered from Doppler) | regenerable |
+| `~/.hermes/config.yaml` | Hermes gateway config (rendered from Doppler) | regenerable |
 | `~/.hermes/.env` | Secrets (chmod 600) | regenerable |
 | `~/.hermes/logs/` | All Hermes logs | rotate weekly via launchd |
 | `~/.hermes/state/voice-memos-seen.json` | Dedupe ledger | rebuildable (worst case: re-ingest 1 day) |

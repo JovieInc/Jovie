@@ -22,7 +22,8 @@ const JOB = 'cost-monitor';
 const KILL_SWITCH_PATH = join(HERMES_PATHS.stateDir, 'cost-kill-switch');
 
 const NON_WATCHDOG_SERVICES = [
-  'co.jovie.hermes.daemon',
+  'ai.hermes.gateway',
+  'co.jovie.hermes.gbrain-server',
   'co.jovie.hermes.cron-hud',
   'co.jovie.hermes.cron-pr-monitor',
   'co.jovie.hermes.cron-ci-monitor',

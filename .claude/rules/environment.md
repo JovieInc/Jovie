@@ -315,6 +315,6 @@ Three workspaces, each on a different machine, with a clear separation of concer
 
 - **Houston** (this repo, MacBook Pro 32 GB) — the **code** workspace. Default profile: `coder`. Claude Code, Codex CLI, Conductor worktrees, and Hermes issue runners all live here. PRs originate here.
 - **Raleigh** (`/Users/timwhite/conductor/workspaces/ops/raleigh`) — the **ops / FounderOS** workspace. Source of truth for `company_state.md`, daily briefings, and task routing.
-- **Hermes-Air** (MacBook Air 16 GB, dedicated) — the **always-on orchestration** node. Runs `hermes serve`, gbrain (as server, exposed over Tailscale), and ops crons. Ingests brain dumps (Telegram + Voice Memos) and files Linear issues consumed by Houston's runner. **Does no coding.** See [`.claude/rules/hermes-air.md`](hermes-air.md) and [`docs/HERMES_AIR.md`](../../docs/HERMES_AIR.md).
+- **Hermes-Air** (MacBook Air 16 GB, dedicated) — the **always-on orchestration** node. Runs the Hermes gateway service, gbrain (as server, exposed over Tailscale), and ops crons. Ingests brain dumps (Telegram + Voice Memos) and files Linear issues consumed by Houston's runner. **Does no coding.** See [`.claude/rules/hermes-air.md`](hermes-air.md) and [`docs/HERMES_AIR.md`](../../docs/HERMES_AIR.md).
 
 The contract between Hermes-Air and Houston is Linear issues. The contract between Hermes-Air and Raleigh is gbrain over Tailscale. Keep code changes in Houston; keep orchestration on the Air; keep company-state in Raleigh.

@@ -41,6 +41,14 @@ REQUIRED_SECRETS=(
   AIRTABLE_API_KEY
 )
 
+OPTIONAL_SECRETS=(
+  HERMES_TELEGRAM_CHAT_ID
+  TELEGRAM_ALLOWED_USERS
+  TELEGRAM_ALLOWED_CHATS
+  TELEGRAM_FREE_RESPONSE_CHATS
+  TELEGRAM_HOME_CHANNEL
+)
+
 # ─── helpers ─────────────────────────────────────────────────────────────────
 log()  { printf "\033[1;34m▶\033[0m %s\n" "$*"; }
 ok()   { printf "\033[1;32m✓\033[0m %s\n" "$*"; }
@@ -76,6 +84,9 @@ verify_arch() {
 # ─── teardown mode ───────────────────────────────────────────────────────────
 if [[ "$MODE" == "uninstall" ]]; then
   log "Uninstalling Hermes-Air launchd units"
+  if command -v hermes >/dev/null 2>&1; then
+    hermes gateway stop --all 2>/dev/null || true
+  fi
   for plist in "${LAUNCH_AGENTS}"/co.jovie.hermes.*.plist; do
     [[ -f "$plist" ]] || continue
     label="$(basename "$plist" .plist)"
@@ -96,6 +107,9 @@ fi
 if [[ "$MODE" == "resume" ]]; then
   log "Clearing cost kill switch"
   rm -f "${HERMES_HOME}/state/cost-kill-switch"
+  if command -v hermes >/dev/null 2>&1; then
+    hermes gateway start --all 2>/dev/null || true
+  fi
   for plist in "${LAUNCH_AGENTS}"/co.jovie.hermes.*.plist; do
     [[ -f "$plist" ]] || continue
     label="$(basename "$plist" .plist)"
@@ -225,21 +239,49 @@ log "Rendering ~/.hermes/.env"
     val="$(doppler_get "$key")"
     [[ -n "$val" ]] && printf "%s=%s\n" "$key" "$val"
   done
+  for key in "${OPTIONAL_SECRETS[@]}"; do
+    val="$(doppler_get "$key")"
+    [[ -n "$val" ]] && printf "%s=%s\n" "$key" "$val"
+  done
+  telegram_token="$(doppler_get HERMES_TELEGRAM_BOT_TOKEN)"
+  if [[ -n "$telegram_token" ]]; then
+    # Current Hermes Agent expects TELEGRAM_BOT_TOKEN; Jovie jobs use
+    # HERMES_TELEGRAM_BOT_TOKEN. Keep one Doppler source and render both.
+    printf "TELEGRAM_BOT_TOKEN=%s\n" "$telegram_token"
+  fi
+  telegram_chat_id="$(doppler_get HERMES_TELEGRAM_CHAT_ID)"
+  if [[ -n "$telegram_chat_id" ]]; then
+    telegram_allowed_chats="$(doppler_get TELEGRAM_ALLOWED_CHATS)"
+    telegram_free_response_chats="$(doppler_get TELEGRAM_FREE_RESPONSE_CHATS)"
+    telegram_home_channel="$(doppler_get TELEGRAM_HOME_CHANNEL)"
+    printf "TELEGRAM_ALLOWED_CHATS=%s\n" "${telegram_allowed_chats:-$telegram_chat_id}"
+    printf "TELEGRAM_FREE_RESPONSE_CHATS=%s\n" "${telegram_free_response_chats:-$telegram_chat_id}"
+    printf "TELEGRAM_HOME_CHANNEL=%s\n" "${telegram_home_channel:-$telegram_chat_id}"
+  fi
 } > "${HERMES_HOME}/.env"
 chmod 600 "${HERMES_HOME}/.env"
 ok "Secrets rendered (chmod 600)"
+
+telegram_chat_id="$(doppler_get HERMES_TELEGRAM_CHAT_ID)"
+if [[ -n "$telegram_chat_id" ]]; then
+  printf "%s\n" "$telegram_chat_id" > "${HERMES_HOME}/state/telegram-chat-id"
+  chmod 600 "${HERMES_HOME}/state/telegram-chat-id"
+  ok "Telegram chat id rendered for outbound notifications"
+fi
 
 # 11. Render ~/.hermes/config.yaml from template.
 # Only path substitution; secrets stay as ${ENV} references that Hermes
 # expands at runtime from ~/.hermes/.env. This keeps secrets out of YAML on
 # disk and avoids sed-special-char corruption for keys containing | or &.
 log "Rendering ~/.hermes/config.yaml"
-python3 - "$REPO_ROOT" "$HOME" "${HERMES_HOME}/config.yaml" <<'PYEOF'
+python3 - "$REPO_ROOT" "$HOME" "$TAILSCALE_IP" "${HERMES_HOME}/config.yaml" <<'PYEOF'
 import sys
 from pathlib import Path
-repo_root, home, out_path = sys.argv[1], sys.argv[2], sys.argv[3]
+repo_root, home, tailscale_ip, out_path = sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4]
 tmpl = Path(repo_root, "scripts/hermes/config.air.template.yaml").read_text()
-Path(out_path).write_text(tmpl.replace("{{HOME}}", home))
+Path(out_path).write_text(
+    tmpl.replace("{{HOME}}", home).replace("{{TAILSCALE_IP}}", tailscale_ip)
+)
 PYEOF
 chmod 600 "${HERMES_HOME}/config.yaml"
 ok "Hermes config rendered (secrets stay as env refs)"
@@ -277,7 +319,8 @@ done
 
 if [[ "$MODE" == "reconfigure" ]]; then
   log "Reconfigure complete. Restart services with:"
-  echo "  launchctl kickstart -k gui/\$(id -u)/co.jovie.hermes.daemon"
+  echo "  hermes gateway restart --all"
+  echo "  launchctl kickstart -k gui/\$(id -u)/co.jovie.hermes.gbrain-server"
   exit 0
 fi
 
@@ -291,6 +334,10 @@ for plist in "${LAUNCH_AGENTS}"/co.jovie.hermes.*.plist; do
   launchctl bootstrap "gui/$(id -u)" "$plist"
   ok "bootstrapped $label"
 done
+
+log "Starting Hermes gateway"
+"$HERMES_BIN" gateway start --all
+ok "Hermes gateway started"
 
 # 14. Manual GUI step: Full Disk Access
 warn ""
@@ -306,38 +353,24 @@ log "Verifying"
 
 VERIFY_OK=true
 
-if launchctl list | grep -q co.jovie.hermes.daemon; then
-  ok "daemon registered"
+if "$HERMES_BIN" gateway status >/dev/null 2>&1; then
+  ok "Hermes gateway status responds"
 else
-  warn "daemon not registered"; VERIFY_OK=false
-fi
-
-DAEMON_OK=false
-for _ in 1 2 3 4 5; do
-  if curl -fsS --max-time 5 http://localhost:7800/health >/dev/null; then
-    DAEMON_OK=true
-    break
-  fi
-  sleep 2
-done
-if $DAEMON_OK; then
-  ok "daemon /health responds"
-else
-  warn "daemon /health did not respond after 10s"; VERIFY_OK=false
+  warn "Hermes gateway status failed"; VERIFY_OK=false
 fi
 
 GBRAIN_OK=false
 for _ in 1 2 3 4 5; do
-  if curl -fsS --max-time 5 "http://127.0.0.1:7801/health" >/dev/null 2>&1; then
+  if curl -fsS --max-time 5 "http://${TAILSCALE_IP}:7801/health" >/dev/null 2>&1; then
     GBRAIN_OK=true
     break
   fi
   sleep 2
 done
 if $GBRAIN_OK; then
-  ok "gbrain server responds locally"
+  ok "gbrain server responds on Tailscale"
 else
-  warn "gbrain server not responding on :7801"; VERIFY_OK=false
+  warn "gbrain server not responding on ${TAILSCALE_IP}:7801"; VERIFY_OK=false
 fi
 
 if [[ -f "${HERMES_HOME}/.env" ]] && [[ "$(stat -f '%Lp' "${HERMES_HOME}/.env")" == "600" ]]; then
@@ -354,7 +387,7 @@ echo
 if $VERIFY_OK; then
   ok "Hermes-Air bootstrap complete."
   log "Send your Telegram bot a test message to capture the chat ID:"
-  echo "  tail -f ${HERMES_HOME}/logs/daemon.log"
+  echo "  tail -f ${HERMES_HOME}/logs/gateway.log"
   echo
   log "Next: configure the Pro to query gbrain at http://${TAILSCALE_IP}:7801"
   log "See docs/HERMES_AIR.md for ongoing ops."

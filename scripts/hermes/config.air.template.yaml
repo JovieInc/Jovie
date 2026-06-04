@@ -50,13 +50,13 @@ gateways:
 memory:
   provider: mcp
   mcp_server: gbrain
-  remote_url: http://127.0.0.1:7801
+  remote_url: http://{{TAILSCALE_IP}}:7801
 
 mcp:
   servers:
     - name: gbrain
       transport: http
-      url: http://127.0.0.1:7801
+      url: http://{{TAILSCALE_IP}}:7801
     - name: linear
       transport: http
       url: https://mcp.linear.app/mcp
