@@ -20,7 +20,7 @@ describe('ShellListRowFrame', () => {
     const row = getByTestId('row');
     expect(row).toHaveAttribute('data-shell-list-row', 'true');
     expect(row).toHaveAttribute('data-selected', 'true');
-    expect(row.className).toContain('bg-(--linear-row-selected)');
+    expect(row.className).toContain('system-b-table-row-selected');
     expect(row.className).toContain('cursor-pointer');
     expect(row.className).toContain('h-14');
   });
@@ -31,8 +31,7 @@ describe('ShellListRowFrame', () => {
       isSelected: false,
     });
 
-    expect(className).toContain('group-hover/task-row:bg-(--linear-row-hover)');
-    expect(className).toContain('group-focus-visible/task-row:bg-');
+    expect(className).toContain('system-b-shell-list-task-row-hover');
     expect(className).not.toContain('cursor-pointer');
   });
 
@@ -48,7 +47,7 @@ describe('ShellListRowFrame', () => {
     expect(row).toHaveAttribute('type', 'button');
     expect(row).toHaveAttribute('data-shell-list-row', 'true');
     expect(row).toHaveAttribute('data-selected', 'true');
-    expect(row.className).toContain('bg-(--linear-row-selected)');
+    expect(row.className).toContain('system-b-table-row-selected');
     expect(row.className).toContain('cursor-pointer');
     expect(row.className).toContain('px-3');
   });

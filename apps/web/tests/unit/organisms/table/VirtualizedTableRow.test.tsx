@@ -112,7 +112,7 @@ describe('VirtualizedTableRow', () => {
 
     const row = screen.getByRole('row');
     expect(row).toHaveAttribute('aria-selected', 'true');
-    expect(row.className).toContain('bg-(--linear-row-selected)');
-    expect(row.className).toContain('--linear-border-focus');
+    expect(row.className).toContain('system-b-table-row-selected');
+    expect(row.className).toContain('system-b-table-row-focus-within');
   });
 });

@@ -2713,6 +2713,145 @@ body:has(.system-b-download-page) .marketing-glass-header__cta:focus-visible {
   z-index: 150;
 }
 
+:where(.system-b-table-row-height) {
+  height: 40px;
+}
+
+:where(.system-b-table-column-small) {
+  width: 120px;
+}
+
+:where(.system-b-table-column-medium) {
+  width: 160px;
+}
+
+:where(.system-b-table-column-large) {
+  width: 200px;
+}
+
+:where(.system-b-table-column-xlarge) {
+  width: 320px;
+}
+
+:where(.system-b-table-column-actions) {
+  width: 140px;
+}
+
+:where(.system-b-table-row-shell) {
+  border-bottom: 1px solid
+    color-mix(in oklab, var(--system-b-app-frame-seam) 60%, transparent);
+}
+
+:where(.system-b-table-row-base),
+:where(.system-b-table-selection-unchecked) {
+  transition-duration: var(--system-b-duration-fast);
+  transition-property: background-color, box-shadow;
+  transition-timing-function: var(--system-b-ease);
+}
+
+:where(.system-b-table-row-hover):hover,
+:where(.system-b-table-row-focus-within):focus-within,
+:where(.system-b-table-row-focus-visible):focus-visible,
+:where(.system-b-table-row-focused),
+:where(.system-b-table-selection-hover):hover,
+:where(.system-b-table-selection-unchecked):hover,
+:where(.system-b-table-selection-unchecked):focus-within {
+  background: var(--linear-row-hover);
+}
+
+:where(.system-b-table-row-focus-visible):focus-visible {
+  outline: none;
+}
+
+:where(.system-b-table-row-focus-visible):focus-visible,
+:where(.system-b-table-row-focus-within):focus-within {
+  box-shadow: inset 0 0 0 1px
+    color-mix(in oklab, var(--linear-border-focus) 45%, transparent);
+}
+
+:where(.system-b-table-row-focused) {
+  box-shadow: inset 0 0 0 1px
+    color-mix(in oklab, var(--linear-border-focus) 35%, transparent);
+}
+
+:where(.system-b-table-row-selected),
+:where(.system-b-table-selection-selected) {
+  background: var(--linear-row-selected);
+  box-shadow: inset 0 0 0 1px
+    color-mix(in oklab, var(--linear-border-focus) 24%, transparent);
+}
+
+:where(.system-b-table-row-selected):hover,
+:where(.system-b-table-row-checked):hover,
+:where(.system-b-table-selection-selected):hover,
+:where(.system-b-table-selection-checked):hover,
+:where(.system-b-table-selection-checked):focus-within {
+  background: var(--linear-row-selected);
+}
+
+:where(.system-b-table-row-checked),
+:where(.system-b-table-selection-checked) {
+  background: var(--linear-row-selected);
+  box-shadow: inset 0 0 0 1px
+    color-mix(in oklab, var(--linear-border-focus) 28%, transparent);
+}
+
+:where(.system-b-table-sticky-header) {
+  background: color-mix(
+    in oklab,
+    var(--system-b-app-content-surface) 92%,
+    transparent
+  );
+  box-shadow: inset 0 -1px 0
+    color-mix(in oklab, var(--system-b-app-shell-border) 74%, transparent);
+}
+
+@supports (backdrop-filter: blur(1px)) {
+  :where(.system-b-table-sticky-header) {
+    backdrop-filter: blur(14px);
+  }
+}
+
+@supports (-webkit-backdrop-filter: blur(1px)) {
+  :where(.system-b-table-sticky-header) {
+    -webkit-backdrop-filter: blur(14px);
+  }
+}
+
+:where(.system-b-table-sticky-group-header) {
+  background: var(--system-b-app-content-surface);
+  border-bottom: 2px solid var(--color-border-subtle);
+}
+
+:where(.group\/task-row:hover, .group\/task-row:focus-visible)
+  :where(.system-b-shell-list-task-row-hover) {
+  background: var(--linear-row-hover);
+  box-shadow: inset 0 0 0 1px
+    color-mix(in oklab, var(--linear-border-focus) 45%, transparent);
+}
+
+:where(.group\/task-row:hover, .group\/task-row:focus-visible)
+  :where(.system-b-shell-list-task-row-selected) {
+  background: var(--linear-row-selected);
+  box-shadow: inset 0 0 0 1px
+    color-mix(in oklab, var(--linear-border-focus) 24%, transparent);
+}
+
+:where(.system-b-table-skeleton-release-title) {
+  height: 0.75rem;
+  width: 56%;
+}
+
+:where(.system-b-table-skeleton-release-meta) {
+  height: 0.625rem;
+  width: 38%;
+}
+
+:where(.system-b-table-skeleton-meta-grid) {
+  grid-template-columns: minmax(0, 1fr) 12px 28px;
+  min-width: 154px;
+}
+
 /* System B calendar route primitives */
 :where(.system-b-calendar-month-label) {
   min-width: calc(var(--space-24) + var(--space-10) + var(--space-4));

@@ -43,8 +43,8 @@ export function SkeletonCell({
       >
         <div className='mt-0.5 h-4 w-4 shrink-0 rounded skeleton' />
         <div className='min-w-0 flex-1 space-y-0.5'>
-          <div className='h-3 w-[56%] rounded-sm skeleton' />
-          <div className='h-2.5 w-[38%] rounded-sm skeleton' />
+          <div className='system-b-table-skeleton-release-title rounded-sm skeleton' />
+          <div className='system-b-table-skeleton-release-meta rounded-sm skeleton' />
         </div>
       </div>
     );
@@ -54,7 +54,7 @@ export function SkeletonCell({
     return (
       <div
         className={cn(
-          'ml-auto grid min-w-[154px] grid-cols-[minmax(0,1fr)_12px_28px] items-center gap-x-1',
+          'system-b-table-skeleton-meta-grid ml-auto grid items-center gap-x-1',
           className
         )}
         style={{ width }}

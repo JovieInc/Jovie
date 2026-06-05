@@ -18,7 +18,7 @@ export const typography = {
 export const alignment = {
   checkboxCell: 'flex items-center justify-center', // Center checkbox
   numberCell: 'flex items-center justify-end tabular-nums', // Right-align numbers
-  rowHeight: 'h-[40px]', // Comfortable density with room for two-line cells
+  rowHeight: 'system-b-table-row-height', // Comfortable density with room for two-line cells
   cellPadding: 'px-3 py-1', // Balanced padding for cells
   headerPadding: 'px-3 py-1.5', // Slightly more header breathing room
   checkboxSize: 'h-3.5 w-3.5', // 14px checkbox
@@ -26,28 +26,20 @@ export const alignment = {
 
 // Row Selection Colors — aligned with Linear design tokens
 export const selection = {
-  unchecked:
-    'hover:bg-(--linear-row-hover) focus-within:bg-(--linear-row-hover) transition-[background-color,box-shadow] duration-subtle',
-  checked:
-    'bg-(--linear-row-selected) hover:bg-(--linear-row-selected) focus-within:bg-(--linear-row-selected) shadow-[inset_0_0_0_1px_color-mix(in_oklab,var(--linear-border-focus)_28%,transparent)]',
-  selected:
-    'bg-(--linear-row-selected) shadow-[inset_0_0_0_1px_color-mix(in_oklab,var(--linear-border-focus)_24%,transparent)]',
-  hover: 'hover:bg-(--linear-row-hover)',
+  unchecked: 'system-b-table-selection-unchecked',
+  checked: 'system-b-table-selection-checked',
+  selected: 'system-b-table-selection-selected',
+  hover: 'system-b-table-selection-hover',
 } as const;
 
 export const rowState = {
-  base: 'transition-[background-color,box-shadow] duration-subtle ease-out',
-  hover: 'hover:bg-(--linear-row-hover)',
-  focusVisible:
-    'focus-visible:outline-none focus-visible:bg-(--linear-row-hover) focus-visible:shadow-[inset_0_0_0_1px_color-mix(in_oklab,var(--linear-border-focus)_45%,transparent)]',
-  focusWithin:
-    'focus-within:bg-(--linear-row-hover) focus-within:shadow-[inset_0_0_0_1px_color-mix(in_oklab,var(--linear-border-focus)_45%,transparent)]',
-  focused:
-    'bg-(--linear-row-hover) shadow-[inset_0_0_0_1px_color-mix(in_oklab,var(--linear-border-focus)_35%,transparent)]',
-  selected:
-    'bg-(--linear-row-selected) hover:bg-(--linear-row-selected) shadow-[inset_0_0_0_1px_color-mix(in_oklab,var(--linear-border-focus)_24%,transparent)]',
-  checked:
-    'bg-(--linear-row-selected) hover:bg-(--linear-row-selected) shadow-[inset_0_0_0_1px_color-mix(in_oklab,var(--linear-border-focus)_28%,transparent)]',
+  base: 'system-b-table-row-base',
+  hover: 'system-b-table-row-hover',
+  focusVisible: 'system-b-table-row-focus-visible',
+  focusWithin: 'system-b-table-row-focus-within',
+  focused: 'system-b-table-row-focused',
+  selected: 'system-b-table-row-selected',
+  checked: 'system-b-table-row-checked',
 } as const;
 
 // Icon Colors (use CSS variables where possible)
@@ -67,19 +59,19 @@ export const zIndex = {
 // Transition Timings — Linear uses 160ms cubic-bezier for bg
 export const transitions = {
   fast: 'transition-colors duration-fast ease-out',
-  standard: 'transition-colors duration-subtle ease-out',
-  slow: 'transition-colors duration-slow ease-out',
+  standard: 'transition-colors duration-fast ease-out',
+  slow: 'transition-colors duration-cinematic ease-out',
 } as const;
 
 // Column Widths (Standard)
 export const columnWidths = {
   checkbox: 'w-14', // 56px
   avatar: 'w-12', // 48px
-  small: 'w-[120px]',
-  medium: 'w-[160px]',
-  large: 'w-[200px]',
-  xlarge: 'w-[320px]',
-  actions: 'w-[140px]',
+  small: 'system-b-table-column-small',
+  medium: 'system-b-table-column-medium',
+  large: 'system-b-table-column-large',
+  xlarge: 'system-b-table-column-xlarge',
+  actions: 'system-b-table-column-actions',
 } as const;
 
 // Layout Stability - Fixed Heights to Prevent Layout Shift
@@ -137,19 +129,17 @@ export const presets = {
   stickyHeader: cn(
     'sticky top-0',
     zIndex.tableHeader,
-    'bg-[color-mix(in_oklab,var(--linear-app-content-surface)_92%,transparent)] backdrop-blur-[14px]',
-    'shadow-[inset_0_-1px_0_color-mix(in_oklab,var(--linear-app-shell-border)_74%,transparent)]',
+    'system-b-table-sticky-header',
     'align-middle'
   ),
   stickyGroupHeader: cn(
     'sticky top-0',
     zIndex.groupHeader,
-    'bg-(--linear-app-content-surface)',
-    borders.groupHeader
+    'system-b-table-sticky-group-header'
   ),
   tableRow: cn(
     alignment.rowHeight,
-    'border-b border-[color-mix(in_oklab,var(--linear-app-frame-seam)_60%,transparent)]',
+    'system-b-table-row-shell',
     rowState.base,
     rowState.hover,
     rowState.focusWithin,

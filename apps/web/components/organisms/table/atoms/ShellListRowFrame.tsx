@@ -19,13 +19,10 @@ export interface ShellListRowButtonProps
 
 function getTaskRowGroupState(isSelected: boolean): string {
   if (isSelected) {
-    return cn(
-      rowState.selected,
-      'group-hover/task-row:bg-(--linear-row-selected) group-focus-visible/task-row:bg-(--linear-row-selected) group-focus-visible/task-row:shadow-[inset_0_0_0_1px_color-mix(in_oklab,var(--linear-border-focus)_24%,transparent)]'
-    );
+    return cn(rowState.selected, 'system-b-shell-list-task-row-selected');
   }
 
-  return 'group-hover/task-row:bg-(--linear-row-hover) group-focus-visible/task-row:bg-(--linear-row-hover) group-focus-visible/task-row:shadow-[inset_0_0_0_1px_color-mix(in_oklab,var(--linear-border-focus)_45%,transparent)]';
+  return 'system-b-shell-list-task-row-hover';
 }
 
 export function getShellListRowFrameClassName({

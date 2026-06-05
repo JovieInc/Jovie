@@ -826,17 +826,17 @@ describe('TasksPageClient', () => {
 
     expect(
       getLatestTableProps()?.getRowClassName?.(mockTaskTwo, 0)
-    ).not.toContain('bg-(--linear-row-selected)');
+    ).not.toContain('system-b-table-row-selected');
 
     act(() => {
       getLatestTableProps()?.onRowClick?.(mockTaskTwo);
     });
 
     expect(getLatestTableProps()?.getRowClassName?.(mockTaskTwo, 0)).toContain(
-      'bg-(--linear-row-selected)'
+      'system-b-table-row-selected'
     );
     expect(getLatestTableProps()?.getRowClassName?.(mockTask, 1)).not.toContain(
-      'bg-(--linear-row-selected)'
+      'system-b-table-row-selected'
     );
   });
 
