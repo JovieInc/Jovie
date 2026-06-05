@@ -59,14 +59,10 @@ export const TrackRow = memo(function TrackRow({
   renderMode = 'table',
 }: TrackRowProps) {
   const { playbackState, toggleTrack } = useTrackAudioPlayer();
-  const rowStateClassName = isSelected
-    ? 'bg-[color-mix(in_oklab,var(--linear-row-selected)_24%,var(--linear-bg-surface-0))] shadow-[inset_2px_0_0_0_var(--linear-border-focus),inset_0_0_0_1px_color-mix(in_oklab,var(--linear-border-focus)_16%,var(--linear-app-frame-seam))] hover:bg-[color-mix(in_oklab,var(--linear-row-selected)_28%,var(--linear-bg-surface-0))]'
-    : 'bg-[color-mix(in_oklab,var(--linear-bg-surface-1)_70%,var(--linear-bg-surface-0))] shadow-[inset_0_0_0_1px_color-mix(in_oklab,var(--linear-app-frame-seam)_62%,transparent)] hover:bg-[color-mix(in_oklab,var(--linear-bg-surface-1)_76%,var(--linear-bg-surface-0))] transition-[background-color,box-shadow] duration-150 ease-out';
-
   const rowClassName = [
-    'group rounded-[10px]',
+    'system-b-track-row group',
+    isSelected ? 'system-b-track-row--selected' : 'system-b-track-row--idle',
     onClick ? 'cursor-pointer' : '',
-    rowStateClassName,
   ]
     .filter(Boolean)
     .join(' ');
@@ -134,7 +130,7 @@ export const TrackRow = memo(function TrackRow({
     <button
       type='button'
       onClick={handleTogglePlayback}
-      className='flex h-7 w-7 items-center justify-center rounded-full border border-transparent text-secondary-token transition-[background-color,border-color,color,box-shadow] duration-150 hover:border-subtle hover:bg-surface-0 hover:text-primary-token focus-visible:outline-none focus-visible:border-(--linear-border-focus) focus-visible:bg-surface-0 focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)'
+      className='focus-ring-transparent-offset flex h-7 w-7 items-center justify-center rounded-full border border-transparent text-secondary-token transition-colors duration-subtle hover:border-subtle hover:bg-surface-0 hover:text-primary-token'
       aria-label={isPlaying ? `Pause ${track.title}` : `Play ${track.title}`}
     >
       {isPlaying ? (
@@ -144,17 +140,17 @@ export const TrackRow = memo(function TrackRow({
       )}
     </button>
   ) : (
-    <span className='flex h-7 w-7 items-center justify-center rounded-full border border-(--linear-app-frame-seam) bg-[color-mix(in_oklab,var(--linear-bg-surface-1)_72%,transparent)] text-secondary-token/80'>
+    <span className='system-b-track-row-preview-unavailable flex h-7 w-7 items-center justify-center rounded-full text-secondary-token/80'>
       <VolumeX className='h-3.5 w-3.5' aria-label='No preview available' />
     </span>
   );
 
   if (renderMode === 'stack') {
     const stackClassName = cn(
-      'group w-full rounded-xl border border-[color:color-mix(in_oklab,var(--linear-app-frame-seam)_72%,transparent)] p-3 text-left transition-[background-color,border-color,box-shadow] duration-150 ease-out',
+      'system-b-track-row-stack-card group w-full p-3 text-left',
       isSelected
-        ? 'bg-[color-mix(in_oklab,var(--linear-row-selected)_18%,var(--linear-bg-surface-1))] shadow-[inset_2px_0_0_0_var(--linear-border-focus)]'
-        : 'bg-[color-mix(in_oklab,var(--linear-bg-surface-1)_82%,var(--linear-bg-surface-0))] hover:bg-[color-mix(in_oklab,var(--linear-bg-surface-1)_88%,var(--linear-bg-surface-0))]'
+        ? 'system-b-track-row-stack-card--selected'
+        : 'system-b-track-row-stack-card--idle'
     );
 
     const titleRow = (
@@ -164,7 +160,7 @@ export const TrackRow = memo(function TrackRow({
         </span>
         <TruncatedText
           lines={1}
-          className='text-[12.5px] font-caption text-primary-token'
+          className='text-xs font-caption text-primary-token'
           tooltipSide='top'
           tooltipAlign='start'
         >
@@ -193,7 +189,7 @@ export const TrackRow = memo(function TrackRow({
                 <button
                   type='button'
                   onClick={onClick}
-                  className='min-w-0 rounded-lg text-left focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)'
+                  className='focus-ring-transparent-offset min-w-0 rounded-lg text-left'
                   aria-label={`Open details for ${track.title}`}
                 >
                   {titleRow}
@@ -222,7 +218,7 @@ export const TrackRow = memo(function TrackRow({
                     summaryAriaLabel={`${availableCount} of ${allProviders.length} track DSP links`}
                     maxVisible={4}
                     className='justify-start'
-                    railClassName='max-w-[180px]'
+                    railClassName='system-b-track-row-stack-rail'
                   />
                 ) : (
                   <span className='text-2xs text-tertiary-token'>
@@ -280,7 +276,7 @@ export const TrackRow = memo(function TrackRow({
           <div className='relative flex items-center gap-2.5 pl-5'>
             <span
               aria-hidden='true'
-              className='absolute left-2 top-0.5 bottom-0.5 w-px rounded-full bg-[color-mix(in_oklab,var(--linear-app-frame-seam)_88%,transparent)]'
+              className='system-b-track-row-release-rail absolute left-2 top-0.5 bottom-0.5 w-px rounded-full'
             />
             {/* Track number */}
             <span className='w-7 shrink-0 text-right text-2xs tabular-nums text-tertiary-token'>
@@ -341,7 +337,7 @@ export const TrackRow = memo(function TrackRow({
                 summaryAriaLabel={`${availableCount} of ${allProviders.length} track DSP links`}
                 maxVisible={4}
                 className='justify-start'
-                railClassName='max-w-[132px] lg:max-w-[164px]'
+                railClassName='system-b-track-row-table-rail'
               />
             ) : (
               <span className='text-2xs text-tertiary-token'>—</span>
@@ -446,7 +442,7 @@ export const TrackRowsContainer = memo(function TrackRowsContainer({
   if (tracks.length === 0) {
     if (renderMode === 'stack') {
       return (
-        <div className='flex items-center gap-2 rounded-xl border border-[color:color-mix(in_oklab,var(--linear-app-frame-seam)_66%,transparent)] bg-[color-mix(in_oklab,var(--linear-bg-surface-1)_76%,var(--linear-bg-surface-0))] px-3 py-2.5 text-2xs text-tertiary-token'>
+        <div className='system-b-track-row-empty-stack flex items-center gap-2 px-3 py-2.5 text-2xs text-tertiary-token'>
           <Icon name='AlertCircle' className='h-3.5 w-3.5' />
           <span>No tracks found for this release</span>
         </div>
@@ -454,7 +450,7 @@ export const TrackRowsContainer = memo(function TrackRowsContainer({
     }
 
     return (
-      <tr className='bg-[color-mix(in_oklab,var(--linear-bg-surface-1)_76%,var(--linear-bg-surface-0))] shadow-[inset_0_0_0_1px_color-mix(in_oklab,var(--linear-app-frame-seam)_66%,transparent)]'>
+      <tr className='system-b-track-row-empty-table'>
         <td
           colSpan={columnCount}
           className='py-2.5 pl-20 text-2xs text-tertiary-token'
