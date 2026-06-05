@@ -31,11 +31,9 @@ describe('PillSearch', () => {
   it('uses a quiet tokenized focus ring instead of the cyan input ring', () => {
     setup();
     const input = screen.getByLabelText('Filter tracks');
-    expect(input.className).toContain('focus-visible:ring-1');
-    expect(input.className).toContain(
-      'focus-visible:ring-(--linear-border-focus)/25'
-    );
+    expect(input).toHaveClass('system-b-pill-search-input');
     expect(input.className).not.toContain('ring-cyan');
+    expect(input.className).not.toContain('--linear');
   });
 
   it('keeps the route search row at a stable single-line height', () => {
@@ -52,8 +50,8 @@ describe('PillSearch', () => {
     expect(row?.className).toContain('h-full');
     expect(row?.className).toContain('min-h-0');
     expect(row?.className).toContain('overflow-hidden');
-    expect(input.className).toContain('h-6');
-    expect(closeButton.className).toContain('h-5');
+    expect(input).toHaveClass('system-b-pill-search-input');
+    expect(closeButton).toHaveClass('system-b-pill-search-close');
     expect(closeButton.className).not.toContain('uppercase');
   });
 
