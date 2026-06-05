@@ -226,12 +226,12 @@ function HomepageHeroActions() {
   ).secondary;
 
   return (
-    <div className='homepage-hero-actions'>
+    <div className='homepage-hero-actions system-b-mounted-home-hero-actions'>
       <HomepageTrackedLink
         href={HERO_COPY.primaryCta.href}
         data-testid='homepage-primary-cta'
         data-cta-sign-up='true'
-        className='public-action-primary focus-ring-themed'
+        className='public-action-primary system-b-mounted-home-hero-primary focus-ring-themed'
         eventName='homepage_hero_cta_clicked'
         eventProperties={{ cta: 'primary', label: HERO_COPY.primaryCta.label }}
       >
@@ -240,7 +240,7 @@ function HomepageHeroActions() {
       {secondaryCta ? (
         <HomepageTrackedLink
           href={secondaryCta.href}
-          className='homepage-hero-secondary-link focus-ring-themed'
+          className='homepage-hero-secondary-link system-b-mounted-home-hero-secondary focus-ring-themed'
           eventName='homepage_hero_cta_clicked'
           eventProperties={{
             cta: 'secondary',
@@ -406,12 +406,12 @@ export default async function HomePage() {
   return (
     <HomePageShell>
       <section
-        className='homepage-hero-stage relative'
+        className='homepage-hero-stage system-b-mounted-home-hero-stage'
         aria-labelledby='home-hero-heading'
       >
         <div
           data-testid='homepage-hero-shell'
-          className='homepage-hero-shell relative flex min-h-[100svh] flex-col overflow-x-clip text-primary-token'
+          className='homepage-hero-shell system-b-mounted-home-hero-shell'
         >
           <div
             aria-hidden='true'
@@ -429,15 +429,15 @@ export default async function HomePage() {
             <div className='homepage-hero-shell__grid' />
           </div>
 
-          <div className='homepage-hero-inner relative z-[3] mx-auto flex w-full max-w-none min-w-0 flex-1 flex-col items-center justify-start'>
-            <div className='homepage-hero-copy w-full min-w-0'>
+          <div className='homepage-hero-inner system-b-mounted-home-hero-inner'>
+            <div className='homepage-hero-copy system-b-mounted-home-hero-copy'>
               <h1
                 id='home-hero-heading'
-                className='homepage-hero-headline self-center text-center text-white text-balance'
+                className='homepage-hero-headline system-b-mounted-home-hero-headline'
               >
                 {HERO_COPY.headline}
               </h1>
-              <p className='homepage-hero-subhead self-center text-center text-white/68'>
+              <p className='homepage-hero-subhead system-b-mounted-home-hero-subhead'>
                 {HERO_COPY.subhead}
               </p>
               <HomepageHeroActions />
