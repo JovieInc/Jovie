@@ -185,11 +185,7 @@ struct DashboardView: View {
             .interpolation(.none)
             .resizable()
             .scaledToFit()
-            .padding(24)
-            .background(
-              JovieColor.qrSurface,
-              in: RoundedRectangle(cornerRadius: JovieRadius.large, style: .continuous)
-            )
+            .jovieQRCodePlate()
             .accessibilityLabel("Profile QR Code")
         } else {
           Text("QR unavailable")

@@ -16,8 +16,7 @@ struct VenueModeView: View {
             .interpolation(.none)
             .resizable()
             .scaledToFit()
-            .padding(24)
-            .background(Color.white, in: RoundedRectangle(cornerRadius: 28, style: .continuous))
+            .jovieQRCodePlate()
             .accessibilityLabel("Fullscreen Profile QR Code")
         }
 

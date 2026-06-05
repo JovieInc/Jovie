@@ -61,6 +61,12 @@ enum JovieRadius {
   static let pill: CGFloat = 999
 }
 
+enum JovieQRCodePlate {
+  static let padding = JovieSpacing.xLarge
+  static let radius = JovieRadius.large
+  static let background = JovieColor.qrSurface
+}
+
 private struct JovieSurfaceModifier: ViewModifier {
   let radius: CGFloat
   let interactive: Bool
@@ -92,9 +98,24 @@ private struct JovieSurfaceModifier: ViewModifier {
   }
 }
 
+private struct JovieQRCodePlateModifier: ViewModifier {
+  func body(content: Content) -> some View {
+    content
+      .padding(JovieQRCodePlate.padding)
+      .background(
+        JovieQRCodePlate.background,
+        in: RoundedRectangle(cornerRadius: JovieQRCodePlate.radius, style: .continuous)
+      )
+  }
+}
+
 extension View {
   func jovieSurface(radius: CGFloat = JovieRadius.large, interactive: Bool = false) -> some View {
     modifier(JovieSurfaceModifier(radius: radius, interactive: interactive))
+  }
+
+  func jovieQRCodePlate() -> some View {
+    modifier(JovieQRCodePlateModifier())
   }
 }
 
