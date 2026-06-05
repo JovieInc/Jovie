@@ -2561,6 +2561,359 @@ body:has(.system-b-download-page) .marketing-glass-header__cta:focus-visible {
 }
 
 /* ============================================
+   SYSTEM B HOME RELEASE MODE MOCK CARD PRIMITIVES
+   ============================================ */
+
+:where(.system-b-release-mode-card) {
+  --system-b-release-mode-tone: var(--color-info);
+  --system-b-release-mode-state: var(--color-success);
+  --system-b-release-mode-progress: 100%;
+
+  display: flex;
+  height: 100%;
+  min-height: 0;
+  flex-direction: column;
+  padding: var(--space-4);
+}
+
+:where(.system-b-release-mode-artwork[data-tone="violet"]) {
+  --system-b-release-mode-tone: var(--color-accent);
+}
+
+:where(.system-b-release-mode-artwork[data-tone="blue"]) {
+  --system-b-release-mode-tone: var(--color-info);
+}
+
+:where(.system-b-release-mode-header) {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+:where(.system-b-release-mode-header-copy) {
+  min-width: 0;
+}
+
+:where(.system-b-release-mode-kicker),
+:where(.system-b-release-mode-artwork-kicker),
+:where(.system-b-release-mode-state-label),
+:where(.system-b-release-mode-label-heading) {
+  color: var(--color-text-tertiary-token);
+  font-size: var(--text-2xs);
+  font-weight: var(--font-weight-medium);
+  letter-spacing: 0;
+  line-height: var(--line-height-tight);
+}
+
+:where(.system-b-release-mode-subtitle),
+:where(.system-b-release-mode-metric-label),
+:where(.system-b-release-mode-overflow-copy) {
+  color: var(--color-text-quaternary-token);
+  font-size: var(--text-2xs);
+  font-weight: var(--font-weight-normal);
+  letter-spacing: 0;
+  line-height: var(--line-height-normal);
+}
+
+:where(.system-b-release-mode-subtitle),
+:where(.system-b-release-mode-artwork-artist),
+:where(.system-b-release-mode-state-copy) {
+  margin-top: var(--space-1);
+}
+
+:where(.system-b-release-mode-state-pill) {
+  display: inline-flex;
+  min-height: var(--space-6);
+  flex-shrink: 0;
+  align-items: center;
+  border: 1px solid
+    color-mix(in oklab, var(--system-b-release-mode-state) 26%, transparent);
+  border-radius: var(--system-b-radius-pill);
+  background: color-mix(
+    in oklab,
+    var(--system-b-release-mode-state) 10%,
+    transparent
+  );
+  color: var(--color-text-primary-token);
+  padding-inline: var(--space-2);
+  font-size: var(--text-2xs);
+  font-weight: var(--font-weight-medium);
+  letter-spacing: 0;
+  line-height: var(--line-height-tight);
+}
+
+:where(.system-b-release-mode-state-pill[data-state="presave"]) {
+  --system-b-release-mode-state: var(--color-accent);
+}
+
+:where(.system-b-release-mode-state-pill[data-state="live"]) {
+  --system-b-release-mode-state: var(--color-success);
+}
+
+:where(.system-b-release-mode-body) {
+  display: flex;
+  min-height: 0;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: var(--space-3);
+  margin-top: var(--space-4);
+}
+
+:where(.system-b-release-mode-body[data-layout="split"]) {
+  display: grid;
+  gap: var(--space-4);
+}
+
+:where(.system-b-release-mode-artwork-column) {
+  min-height: 0;
+}
+
+:where(.system-b-release-mode-artwork-column[data-layout="split"]) {
+  display: flex;
+  height: 100%;
+  flex-direction: column;
+}
+
+:where(.system-b-release-mode-artwork) {
+  position: relative;
+  min-height: calc(var(--space-24) + var(--space-4));
+  overflow: hidden;
+  border: 1px solid
+    color-mix(in oklab, var(--system-b-release-mode-tone) 20%, transparent);
+  border-radius: var(--radius-2xl);
+  background: color-mix(
+    in oklab,
+    var(--system-b-release-mode-tone) 20%,
+    var(--system-b-bg-surface-0) 80%
+  );
+}
+
+:where(.system-b-release-mode-artwork-field),
+:where(.system-b-release-mode-artwork-orbit),
+:where(.system-b-release-mode-artwork-node) {
+  pointer-events: none;
+  position: absolute;
+}
+
+:where(.system-b-release-mode-artwork-field) {
+  inset: var(--space-2);
+  border: 1px solid
+    color-mix(in oklab, var(--system-b-release-mode-tone) 18%, transparent);
+  border-radius: calc(var(--radius-2xl) - var(--space-1));
+  background: color-mix(
+    in oklab,
+    var(--system-b-release-mode-tone) 12%,
+    transparent
+  );
+}
+
+:where(.system-b-release-mode-artwork-orbit) {
+  inset-block-start: var(--space-8);
+  inset-inline-start: calc(var(--space-5) * -1);
+  width: var(--space-20);
+  height: var(--space-20);
+  border: 1px solid
+    color-mix(in oklab, var(--system-b-release-mode-tone) 28%, transparent);
+  border-radius: var(--system-b-radius-pill);
+}
+
+:where(.system-b-release-mode-artwork-node) {
+  right: var(--space-4);
+  bottom: var(--space-5);
+  width: var(--space-12);
+  height: var(--space-12);
+  border: 1px solid
+    color-mix(in oklab, var(--system-b-release-mode-tone) 28%, transparent);
+  border-radius: var(--system-b-radius-pill);
+  background: color-mix(
+    in oklab,
+    var(--system-b-release-mode-tone) 18%,
+    transparent
+  );
+}
+
+:where(.system-b-release-mode-artwork-content) {
+  position: relative;
+  display: flex;
+  height: 100%;
+  min-height: calc(var(--space-24) + var(--space-4));
+  flex-direction: column;
+  justify-content: space-between;
+  padding: var(--space-3);
+}
+
+:where(.system-b-release-mode-artwork-copy[data-compact="true"]) {
+  max-width: calc(var(--space-24) + var(--space-12));
+}
+
+:where(.system-b-release-mode-artwork-title) {
+  color: var(--color-text-primary-token);
+  font-size: var(--text-sm);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: 0;
+  line-height: var(--line-height-tight);
+}
+
+:where(.system-b-release-mode-artwork-artist) {
+  color: var(--color-text-tertiary-token);
+  font-size: var(--text-2xs);
+  font-weight: var(--font-weight-normal);
+  line-height: var(--line-height-normal);
+}
+
+:where(.system-b-release-mode-release-meta) {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin-top: var(--space-3);
+  color: var(--color-text-tertiary-token);
+  font-size: var(--text-2xs);
+  line-height: var(--line-height-normal);
+}
+
+:where(.system-b-release-mode-release-meta > :last-child) {
+  text-align: right;
+}
+
+:where(.system-b-release-mode-details) {
+  display: flex;
+  min-height: 0;
+  flex: 1 1 auto;
+  flex-direction: column;
+}
+
+:where(.system-b-release-mode-metric-grid) {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-2);
+  border-block: 1px solid
+    color-mix(in oklab, var(--system-b-app-frame-seam) 70%, transparent);
+  padding-block: var(--space-3);
+}
+
+:where(.system-b-release-mode-metric-grid[data-layout="stack"]) {
+  padding-block: var(--space-2);
+}
+
+:where(.system-b-release-mode-metric),
+:where(.system-b-release-mode-state-row),
+:where(.system-b-release-mode-labels[data-layout="panel"]) {
+  border: 1px solid
+    color-mix(in oklab, var(--system-b-app-frame-seam) 68%, transparent);
+  border-radius: var(--radius-xl);
+  background: color-mix(
+    in oklab,
+    var(--system-b-bg-surface-1) 76%,
+    transparent
+  );
+}
+
+:where(.system-b-release-mode-metric) {
+  padding: var(--space-2) var(--space-3);
+}
+
+:where(.system-b-release-mode-metric-value) {
+  margin-top: var(--space-1);
+  color: var(--color-text-primary-token);
+  font-size: var(--text-xl);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: 0;
+  line-height: var(--line-height-tight);
+}
+
+:where(.system-b-release-mode-metric-value[data-layout="stack"]) {
+  font-size: var(--text-lg);
+}
+
+:where(.system-b-release-mode-state-row) {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  min-height: calc(var(--space-12) + var(--space-2));
+  margin-top: var(--space-3);
+  padding: var(--space-2) var(--space-3);
+}
+
+:where(.system-b-release-mode-state-copy) {
+  color: var(--color-text-secondary-token);
+  font-size: var(--text-xs);
+  line-height: var(--line-height-normal);
+}
+
+:where(.system-b-release-mode-progress-track) {
+  width: var(--space-16);
+  height: calc(var(--space-1) + var(--space-0-5));
+  flex-shrink: 0;
+  overflow: hidden;
+  border-radius: var(--system-b-radius-pill);
+  background: color-mix(
+    in oklab,
+    var(--system-b-app-frame-seam) 54%,
+    transparent
+  );
+}
+
+:where(.system-b-release-mode-progress-fill) {
+  --system-b-release-mode-state: var(--color-success);
+  --system-b-release-mode-progress: 100%;
+
+  height: 100%;
+  width: var(--system-b-release-mode-progress);
+  border-radius: inherit;
+  background: var(--system-b-release-mode-state);
+}
+
+:where(.system-b-release-mode-progress-fill[data-state="presave"]) {
+  --system-b-release-mode-state: var(--color-accent);
+  --system-b-release-mode-progress: 58%;
+}
+
+:where(.system-b-release-mode-labels) {
+  margin-top: var(--space-3);
+}
+
+:where(.system-b-release-mode-labels[data-layout="flat"]) {
+  border-top: 1px solid
+    color-mix(in oklab, var(--system-b-app-frame-seam) 70%, transparent);
+  padding-top: var(--space-3);
+}
+
+:where(.system-b-release-mode-labels[data-layout="panel"]) {
+  padding: var(--space-3);
+}
+
+:where(.system-b-release-mode-label-list) {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  column-gap: var(--space-4);
+  row-gap: var(--space-3);
+}
+
+:where(
+    .system-b-release-mode-label-heading + .system-b-release-mode-label-list
+  ) {
+  margin-top: var(--space-3);
+}
+
+:where(.system-b-release-mode-label-logo) {
+  color: var(--color-text-secondary-token);
+}
+
+:where(.system-b-release-mode-overflow-copy) {
+  margin-top: var(--space-3);
+}
+
+@media (min-width: 768px) {
+  :where(.system-b-release-mode-body[data-layout="split"]) {
+    grid-template-columns: calc(var(--space-24) * 2) minmax(0, 1fr);
+  }
+}
+
+/* ============================================
    SYSTEM B ONBOARDING V2 PRIMITIVES
    ============================================ */
 
