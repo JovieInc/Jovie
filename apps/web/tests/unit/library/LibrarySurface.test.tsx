@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { TooltipProvider } from '@jovie/ui';
 import {
   fireEvent,
@@ -19,6 +21,20 @@ import {
 } from '@/contexts/ShellSidebarOverrideContext';
 
 Element.prototype.scrollIntoView = vi.fn();
+
+const LIBRARY_SURFACE_SOURCE = 'app/app/(shell)/library/LibrarySurface.tsx';
+const legacyGeistAccentPattern = new RegExp(
+  ['--', 'ge', 'ist-(?:cyan|blue)-solid'].join(''),
+  'u'
+);
+const legacySelectionAccentPatterns = [
+  legacyGeistAccentPattern,
+  new RegExp(['border-', 'cy', 'an-400/50'].join(''), 'u'),
+  new RegExp(['bg-', 'cy', 'an-400/\\[0\\.08\\]!'].join(''), 'u'),
+  new RegExp(['rgb\\(103', '_232_249'].join(''), 'u'),
+  new RegExp(['color-mix\\(in_oklab,var\\(--', 'ge', 'ist-'].join(''), 'u'),
+  new RegExp(['bg-', 'white/35'].join(''), 'u'),
+] as const;
 
 const navigationMock = vi.hoisted(() => ({
   refresh: vi.fn(),
@@ -185,6 +201,22 @@ describe('LibrarySurface', () => {
   afterEach(() => {
     vi.unstubAllGlobals();
     window.matchMedia = baseMatchMedia;
+  });
+
+  it('keeps library selection accents on System B semantic tokens', () => {
+    const source = readFileSync(
+      resolve(process.cwd(), LIBRARY_SURFACE_SOURCE),
+      'utf8'
+    );
+
+    for (const legacyPattern of legacySelectionAccentPatterns) {
+      expect(source).not.toMatch(legacyPattern);
+    }
+
+    expect(source).toContain('border-success/20 bg-success/10 text-success');
+    expect(source).toContain('border-info/20 bg-info/10 text-info');
+    expect(source).toContain('border-default bg-surface-1 text-primary-token');
+    expect(source).toContain('bg-surface-1! text-primary-token');
   });
 
   it('renders an empty read-only library state with a releases escape hatch', () => {
@@ -476,9 +508,9 @@ describe('LibrarySurface', () => {
       'false'
     );
     expect(row).toHaveAttribute('aria-selected', 'true');
-    expect(row.className).toContain('bg-cyan-400/[0.08]!');
+    expect(row.className).toContain('bg-surface-1!');
     expect(row.className).toContain(
-      'shadow-[inset_2px_0_0_0_rgb(103_232_249)]!'
+      'shadow-[inset_2px_0_0_0_var(--color-border-default)]!'
     );
     expect(screen.getByRole('link', { name: /Open Release/u })).toHaveAttribute(
       'href',

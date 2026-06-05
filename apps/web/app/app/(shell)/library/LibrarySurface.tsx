@@ -271,10 +271,10 @@ function formatLibraryStatus(asset: LibraryReleaseAsset): string {
 
 function releaseStatusClasses(status: LibraryReleaseAsset['status']): string {
   if (status === 'released') {
-    return 'border-[color-mix(in_oklab,var(--geist-cyan-solid)_24%,transparent)] bg-[color-mix(in_oklab,var(--geist-cyan-solid)_12%,var(--linear-app-content-surface))] text-[color:var(--geist-cyan-solid)]';
+    return 'border-success/20 bg-success/10 text-success';
   }
   if (status === 'scheduled') {
-    return 'border-[color-mix(in_oklab,var(--geist-blue-solid)_24%,transparent)] bg-[color-mix(in_oklab,var(--geist-blue-solid)_10%,var(--linear-app-content-surface))] text-[color:var(--geist-blue-solid)]';
+    return 'border-info/20 bg-info/10 text-info';
   }
   return 'border-subtle bg-surface-1 text-tertiary-token';
 }
@@ -282,9 +282,9 @@ function releaseStatusClasses(status: LibraryReleaseAsset['status']): string {
 function releaseStatusDotClasses(
   status: LibraryReleaseAsset['status']
 ): string {
-  if (status === 'released') return 'bg-[color:var(--geist-cyan-solid)]';
-  if (status === 'scheduled') return 'bg-[color:var(--geist-blue-solid)]';
-  return 'bg-white/35';
+  if (status === 'released') return 'bg-success';
+  if (status === 'scheduled') return 'bg-info';
+  return 'bg-muted';
 }
 
 function assetMatchesFilters(
@@ -684,8 +684,8 @@ function LibraryRail({
                 className={cn(
                   'flex h-8 w-full items-center gap-2 rounded-md border px-2 text-left text-[12.5px] transition-[background-color,border-color,color,box-shadow] duration-subtle ease-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/55 focus-visible:ring-offset-2 focus-visible:ring-offset-(--linear-app-content-surface) outline-none',
                   active
-                    ? 'border-[color-mix(in_oklab,var(--geist-cyan-solid)_20%,transparent)] bg-[color-mix(in_oklab,var(--geist-cyan-solid)_8%,var(--linear-app-content-surface))] text-primary-token'
-                    : 'border-transparent text-secondary-token hover:border-[color-mix(in_oklab,var(--geist-cyan-solid)_12%,transparent)] hover:bg-[color-mix(in_oklab,var(--geist-cyan-solid)_4%,var(--linear-app-content-surface))] hover:text-primary-token'
+                    ? 'border-default bg-surface-1 text-primary-token'
+                    : 'border-transparent text-secondary-token hover:border-default hover:bg-surface-1 hover:text-primary-token'
                 )}
               >
                 <span className='min-w-0 flex-1 truncate'>{view.label}</span>
@@ -705,7 +705,7 @@ function LibraryRail({
             <button
               type='button'
               onClick={onClearFilters}
-              className='rounded px-1.5 py-0.5 text-2xs text-tertiary-token transition-[background-color,color] duration-subtle ease-subtle hover:bg-[color-mix(in_oklab,var(--geist-cyan-solid)_5%,var(--linear-app-content-surface))] hover:text-primary-token'
+              className='rounded px-1.5 py-0.5 text-2xs text-tertiary-token transition-[background-color,color] duration-subtle ease-subtle hover:bg-surface-1 hover:text-primary-token'
             >
               Clear Filters ({activeFilterCount})
             </button>
@@ -810,7 +810,7 @@ function FilterSection({
         aria-controls={panelId}
         aria-expanded={open}
         onClick={() => setOpen(value => !value)}
-        className='flex h-6 w-full items-center justify-between rounded-md px-1 text-[11px] font-medium text-tertiary-token transition-[background-color,color] duration-subtle ease-subtle hover:bg-[color-mix(in_oklab,var(--geist-cyan-solid)_4%,var(--linear-app-content-surface))] hover:text-primary-token'
+        className='flex h-6 w-full items-center justify-between rounded-md px-1 text-[11px] font-medium text-tertiary-token transition-[background-color,color] duration-subtle ease-subtle hover:bg-surface-1 hover:text-primary-token'
       >
         <span>{label}</span>
         <ChevronDown
@@ -856,8 +856,8 @@ function FilterRow({
       className={cn(
         'flex h-7 w-full items-center gap-2 rounded-md border px-2 text-[12px] transition-[background-color,border-color,color,box-shadow] duration-subtle ease-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/55 focus-visible:ring-offset-2 focus-visible:ring-offset-(--linear-app-content-surface) outline-none',
         active
-          ? 'border-[color-mix(in_oklab,var(--geist-cyan-solid)_20%,transparent)] bg-[color-mix(in_oklab,var(--geist-cyan-solid)_8%,var(--linear-app-content-surface))] text-primary-token'
-          : 'border-transparent text-secondary-token hover:border-[color-mix(in_oklab,var(--geist-cyan-solid)_12%,transparent)] hover:bg-[color-mix(in_oklab,var(--geist-cyan-solid)_4%,var(--linear-app-content-surface))] hover:text-primary-token'
+          ? 'border-default bg-surface-1 text-primary-token'
+          : 'border-transparent text-secondary-token hover:border-default hover:bg-surface-1 hover:text-primary-token'
       )}
     >
       {Icon ? (
@@ -871,7 +871,7 @@ function FilterRow({
       <span className='min-w-0 flex-1 truncate text-left'>{label}</span>
       <span className='text-2xs tabular-nums text-tertiary-token'>{count}</span>
       {active ? (
-        <Check className='h-3 w-3 shrink-0 text-[color:var(--geist-cyan-solid)]' />
+        <Check className='h-3 w-3 shrink-0 text-primary-token' />
       ) : null}
     </button>
   );
@@ -1032,14 +1032,14 @@ const AssetCard = memo(function AssetCard({
       className={cn(
         'group relative min-w-0 overflow-hidden rounded-lg border bg-surface-0 transition-[border-color,background-color] duration-subtle ease-subtle',
         selected
-          ? 'border-cyan-400/50 bg-surface-1'
+          ? 'border-default bg-surface-1'
           : 'border-subtle hover:border-default'
       )}
     >
       {selected ? (
         <span
           aria-hidden='true'
-          className='pointer-events-none absolute inset-0 rounded-lg shadow-[inset_2px_0_0_0_rgb(103_232_249),inset_0_0_0_1px_rgb(103_232_249_/_0.08)]'
+          className='pointer-events-none absolute inset-0 rounded-lg shadow-[inset_2px_0_0_0_var(--color-border-default),inset_0_0_0_1px_var(--color-border-subtle)]'
         />
       ) : null}
       <button
@@ -1204,7 +1204,7 @@ function LibraryDataTable({
   const getRowClassName = useCallback(
     (asset: LibraryReleaseAsset) =>
       asset.id === selectedId
-        ? 'bg-cyan-400/[0.08]! text-primary-token shadow-[inset_2px_0_0_0_rgb(103_232_249)]!'
+        ? 'bg-surface-1! text-primary-token shadow-[inset_2px_0_0_0_var(--color-border-default)]!'
         : '',
     [selectedId]
   );
