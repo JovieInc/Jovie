@@ -37,17 +37,17 @@ const HomepageWorkspaceSectionImpl = dynamic(
       <section
         aria-hidden='true'
         data-testid='homepage-workspace-section-placeholder'
-        className='homepage-workspace-section'
+        className='homepage-workspace-section system-b-mounted-home-workspace'
       >
-        <div className='homepage-workspace-section__inner'>
-          <div className='homepage-workspace-section__copy'>
-            <h2 style={{ visibility: 'hidden' }}>
+        <div className='homepage-workspace-section__inner system-b-mounted-home-workspace-inner'>
+          <div className='homepage-workspace-section__copy system-b-mounted-home-workspace-copy'>
+            <h2 className='system-b-mounted-home-workspace-headline system-b-mounted-home-workspace-placeholder-heading'>
               {HOMEPAGE_LAUNCH_COPY.workspace.headline.split('\n').map(line => (
                 <span key={line}>{line}</span>
               ))}
             </h2>
           </div>
-          <div className='homepage-workspace-visual' />
+          <div className='homepage-workspace-visual system-b-mounted-home-workspace-visual' />
         </div>
       </section>
     ),
