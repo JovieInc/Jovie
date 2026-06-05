@@ -47,10 +47,7 @@ function extractMountedHeroPageSource(source: string): string {
   const heroStart = source.indexOf(
     "className='homepage-hero-stage system-b-mounted-home-hero-stage'"
   );
-  const heroEnd = source.indexOf(
-    "<div className='homepage-trust-section'>",
-    heroStart
-  );
+  const heroEnd = source.indexOf('homepage-trust-section', heroStart);
 
   expect(actionsStart, 'hero actions source exists').toBeGreaterThanOrEqual(0);
   expect(actionsEnd, 'hero actions source is bounded').toBeGreaterThan(

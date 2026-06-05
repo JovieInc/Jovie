@@ -21,7 +21,7 @@ function getInnerBoxClass(
   isInlineStrip: boolean,
   variant: 'default' | 'compact'
 ): string {
-  if (isInlineStrip) return 'px-0';
+  if (isInlineStrip) return 'system-b-mounted-home-trust-strip-inner';
   return cn(
     'rounded-[28px] border border-white/[0.08] bg-[linear-gradient(180deg,rgba(10,11,15,0.96)_0%,rgba(7,8,11,1)_100%)] shadow-[0_26px_72px_rgba(0,0,0,0.3),inset_0_1px_0_rgba(255,255,255,0.04)]',
     variant === 'compact'
@@ -42,7 +42,7 @@ function getSlotClass(isInlineStrip: boolean, slotName: string): string {
   return cn(
     'flex min-w-0 items-center justify-center',
     isInlineStrip &&
-      `homepage-trust-logo-slot homepage-trust-logo-slot--${slotName}`
+      `homepage-trust-logo-slot homepage-trust-logo-slot--${slotName} system-b-mounted-home-trust-strip-logo-slot system-b-mounted-home-trust-strip-logo-slot--${slotName}`
   );
 }
 
@@ -62,11 +62,9 @@ export function HomeTrustSection({
   label = 'Trusted by artists and teams releasing on',
 }: Readonly<HomeTrustSectionProps>) {
   const isInlineStrip = presentation === 'inline-strip';
-  const logoTone = isInlineStrip ? 'text-white/62' : 'text-white/55';
+  const logoTone = isInlineStrip ? '' : 'text-white/55';
   const innerBoxClass = getInnerBoxClass(isInlineStrip, variant);
-  const labelMarginClass = isInlineStrip
-    ? 'mb-8 sm:mb-10'
-    : getLabelMarginClass(isInlineStrip, variant);
+  const labelMarginClass = getLabelMarginClass(isInlineStrip, variant);
 
   return (
     <section
@@ -74,7 +72,7 @@ export function HomeTrustSection({
       data-presentation={presentation}
       className={cn(
         isInlineStrip
-          ? 'relative z-[1] mx-auto w-full overflow-hidden px-5 py-12 sm:px-6 sm:py-14 lg:px-0'
+          ? 'system-b-mounted-home-trust-strip'
           : 'relative z-[1] mx-auto w-full px-5 sm:px-6 lg:px-0',
         className
       )}
@@ -83,18 +81,17 @@ export function HomeTrustSection({
       <div
         className={cn(
           isInlineStrip
-            ? 'mx-auto max-w-[1320px] text-center'
+            ? 'homepage-trust-strip-inner'
             : 'mx-auto max-w-[var(--linear-content-max)]',
           innerBoxClass
         )}
       >
         <p
           className={cn(
-            'text-center font-medium tracking-[0.01em]',
             isInlineStrip
-              ? 'text-[12px] text-white/36'
-              : 'text-[12px] text-white/56',
-            labelMarginClass
+              ? 'system-b-mounted-home-trust-strip-label'
+              : 'text-center font-medium tracking-[0.01em] text-[12px] text-white/56',
+            !isInlineStrip && labelMarginClass
           )}
         >
           {label}
@@ -102,7 +99,7 @@ export function HomeTrustSection({
         <div
           className={cn(
             isInlineStrip
-              ? 'homepage-trust-logo-grid'
+              ? 'homepage-trust-logo-grid system-b-mounted-home-trust-strip-logo-grid'
               : 'grid grid-cols-1 items-center justify-items-center gap-x-6 gap-y-6 sm:flex sm:flex-wrap sm:items-center sm:justify-center sm:gap-x-10 sm:gap-y-5 lg:flex-nowrap lg:justify-between',
             variant === 'compact' &&
               !isInlineStrip &&
@@ -113,7 +110,7 @@ export function HomeTrustSection({
             <AwalLogo
               className={getLogoClass(
                 isInlineStrip,
-                'homepage-trust-logo homepage-trust-logo--awal w-auto max-w-[38vw] select-none',
+                'homepage-trust-logo homepage-trust-logo--awal system-b-mounted-home-trust-strip-logo system-b-mounted-home-trust-strip-logo--awal',
                 'h-[20px] w-auto max-w-[36vw] select-none sm:h-[22px]',
                 logoTone
               )}
@@ -123,7 +120,7 @@ export function HomeTrustSection({
             <TheOrchardLogo
               className={getLogoClass(
                 isInlineStrip,
-                'homepage-trust-logo homepage-trust-logo--orchard w-auto max-w-[44vw] select-none',
+                'homepage-trust-logo homepage-trust-logo--orchard system-b-mounted-home-trust-strip-logo system-b-mounted-home-trust-strip-logo--orchard',
                 'h-[28px] w-auto max-w-[34vw] select-none sm:h-[31px]',
                 logoTone
               )}
@@ -133,7 +130,7 @@ export function HomeTrustSection({
             <UniversalMusicGroupLogo
               className={getLogoClass(
                 isInlineStrip,
-                'homepage-trust-logo homepage-trust-logo--umg h-auto max-w-[52vw] select-none',
+                'homepage-trust-logo homepage-trust-logo--umg system-b-mounted-home-trust-strip-logo system-b-mounted-home-trust-strip-logo--umg',
                 'h-[14px] w-auto max-w-[72vw] select-none sm:h-[16px]',
                 logoTone
               )}
@@ -143,7 +140,7 @@ export function HomeTrustSection({
             <ArmadaMusicLogo
               className={getLogoClass(
                 isInlineStrip,
-                'homepage-trust-logo homepage-trust-logo--armada w-auto max-w-[44vw] select-none',
+                'homepage-trust-logo homepage-trust-logo--armada system-b-mounted-home-trust-strip-logo system-b-mounted-home-trust-strip-logo--armada',
                 'h-[22px] w-auto max-w-[38vw] select-none sm:h-[24px]',
                 logoTone
               )}
@@ -156,7 +153,7 @@ export function HomeTrustSection({
             <BlackHoleRecordingsLogo
               className={getLogoClass(
                 isInlineStrip,
-                'homepage-trust-logo homepage-trust-logo--black-hole h-auto',
+                'homepage-trust-logo homepage-trust-logo--black-hole system-b-mounted-home-trust-strip-logo system-b-mounted-home-trust-strip-logo--black-hole',
                 'h-[16px] w-auto sm:h-[18px]',
                 ''
               )}
