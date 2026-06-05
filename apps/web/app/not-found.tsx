@@ -6,38 +6,31 @@ import { MarketingHeader } from '@/components/site/MarketingHeader';
 export default function NotFound() {
   return (
     <div className='dark linear-marketing min-h-screen bg-base text-primary-token'>
-      <MarketingHeader logoSize='xs' />
+      <MarketingHeader logoSize='xs' variant='minimal' />
 
       <main
         id='main-content'
         data-testid='not-found'
-        style={{ paddingTop: 'var(--linear-header-height, 64px)' }}
+        className='system-b-root-not-found-main'
       >
-        <Container className='flex min-h-[calc(100vh-8rem)] items-center justify-center'>
-          <div className='w-full max-w-md mx-auto text-center px-4 py-16'>
-            {/* Error code — oversized, muted, architectural */}
-            <div className='mb-8 select-none'>
-              <span
-                className='block text-[120px] md:text-[160px] font-semibold leading-none tracking-tighter text-primary-token/[0.42]'
-                aria-hidden='true'
-              >
+        <Container className='system-b-root-not-found-container'>
+          <div className='system-b-root-not-found-content'>
+            <div className='system-b-root-not-found-code-wrap'>
+              <span className='system-b-root-not-found-code' aria-hidden='true'>
                 404
               </span>
             </div>
 
-            {/* Content — positioned to overlap the number visually */}
-            <div className='-mt-16 relative'>
-              <h1 className='text-xl font-semibold text-primary-token tracking-tight mb-2'>
-                Page not found
-              </h1>
-              <p className='text-[13px] text-tertiary-token leading-relaxed mb-8'>
+            <div className='system-b-root-not-found-copy'>
+              <h1 className='system-b-root-not-found-title'>Page not found</h1>
+              <p className='system-b-root-not-found-description'>
                 The link you followed may be broken, or the page may have been
                 removed.
               </p>
 
               <Link
                 href='/'
-                className='inline-flex items-center justify-center h-8 px-4 text-[13px] font-medium rounded-lg bg-[var(--color-btn-primary-bg)] text-[var(--color-btn-primary-fg)] hover:bg-[var(--color-btn-primary-hover)] transition-colors duration-subtle'
+                className='system-b-root-not-found-action focus-ring-transparent-offset'
               >
                 Return home
               </Link>
