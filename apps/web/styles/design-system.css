@@ -88,6 +88,11 @@
   --system-b-app-frame-seam: var(--app-shell-frame-seam);
   --system-b-app-content-surface: var(--app-shell-content-surface);
   --system-b-accent-cyan: var(--geist-cyan-solid);
+  --system-b-entity-chip-release-accent: var(--color-accent);
+  --system-b-entity-chip-artist-accent: var(--color-info);
+  --system-b-entity-chip-track-accent: var(--color-accent-pink);
+  --system-b-entity-chip-event-accent: var(--color-success);
+  --system-b-entity-chip-on-light-text: var(--color-text-primary-token);
   --system-b-duration-fast: var(--ds-motion-subtle-duration);
   --system-b-ease: var(--ds-motion-subtle-easing);
   --system-b-radius-pill: var(--radius-full);
@@ -2313,7 +2318,10 @@ body:has(.system-b-download-page) .marketing-glass-header__cta:focus-visible {
 .system-b-entity-chip[data-entity-variant="transcript"][data-entity-tone="onLight"] {
   border-color: color-mix(in srgb, var(--jovie-entity-accent) 30%, white);
   background: color-mix(in srgb, var(--jovie-entity-accent) 8%, white);
-  color: var(--system-b-entity-chip-on-light-text, #111216);
+  color: var(
+    --system-b-entity-chip-on-light-text,
+    var(--color-text-primary-token)
+  );
 }
 
 .system-b-entity-chip-thumbnail {

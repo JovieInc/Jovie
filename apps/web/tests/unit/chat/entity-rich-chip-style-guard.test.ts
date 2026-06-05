@@ -18,6 +18,7 @@ const rawVisualPatterns = [
   /\b(?:text|rounded|shadow|border|bg|px|py|min-w|min-h|max-w|max-h|w|h|tracking|duration|z)-\[[^\]]+\]/,
   /\bfont-\[[^\]]+\]/,
   /tracking-\[-/,
+  new RegExp(['--', 'geist-'].join('')),
   /color-mix\s*\(\s*in\s+srgb/i,
   /\brgba?\(/,
   /#[0-9A-Fa-f]{3,8}\b/,
