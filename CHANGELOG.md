@@ -5,6 +5,14 @@
      5|The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
      6|and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.6.6] - 2026-06-05
+
+> Shared button controls now use neutral System B tracking instead of hardcoded negative letter spacing.
+
+### Fixed
+
+- **Button typography contract (JOV-2826)**: normalizes the shared `Button` atom and `whitePill` variant to `tracking-normal`, and adds a focused guard so shared controls cannot drift back to negative tracking.
+
 ## [26.6.5] - 2026-06-05
 
 > Chrome extension signed-in sidepanel actions now keep stable System B geometry while switching from insert preview to confirm/cancel/copy.
