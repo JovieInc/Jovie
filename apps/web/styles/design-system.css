@@ -2206,6 +2206,57 @@ body:has(.system-b-download-page) .marketing-glass-header__cta:focus-visible {
 }
 
 /* ============================================
+   SYSTEM B UNAVAILABLE PAGE PRIMITIVES
+   ============================================ */
+
+:where(.system-b-unavailable-page) {
+  position: fixed;
+  inset: 0;
+  isolation: isolate;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  overflow-x: clip;
+  overflow-y: auto;
+  background: var(--system-b-bg-page);
+  color: var(--system-b-text-primary);
+  color-scheme: dark;
+  padding-block: clamp(var(--space-10), 7svh, var(--space-16));
+  padding-inline: var(--space-4);
+}
+
+:where(.system-b-unavailable-content) {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  width: 100%;
+  max-width: calc(var(--space-24) * 4 + var(--space-6));
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+
+:where(.system-b-unavailable-mark) {
+  margin-bottom: var(--space-6);
+}
+
+:where(.system-b-unavailable-title) {
+  margin: 0 0 var(--space-4);
+  color: var(--system-b-text-primary);
+  font-size: var(--text-lg);
+  font-weight: var(--font-weight-medium);
+  line-height: var(--leading-tight);
+  text-wrap: balance;
+}
+
+:where(.system-b-unavailable-copy) {
+  margin: 0;
+  color: var(--color-text-secondary-token);
+  font-size: var(--text-app);
+  line-height: var(--leading-normal);
+}
+
+/* ============================================
    SYSTEM B ONBOARDING V2 PRIMITIVES
    ============================================ */
 
