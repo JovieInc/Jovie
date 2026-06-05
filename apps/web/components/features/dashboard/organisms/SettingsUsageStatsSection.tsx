@@ -53,14 +53,26 @@ function formatResetAt(value: string | null | undefined): string {
 
 function getStatusToneClasses(state: ChatUsageState): string {
   if (state === 'healthy') {
-    return 'border-[color-mix(in_oklab,var(--geist-cyan-solid)_24%,transparent)] bg-[color-mix(in_oklab,var(--geist-cyan-solid)_10%,var(--linear-app-content-surface))] text-[color:var(--geist-cyan-solid)]';
+    return 'border-success/25 bg-success/10 text-success';
   }
 
   if (state === 'near_limit') {
-    return 'border-[color-mix(in_oklab,var(--geist-blue-solid)_24%,transparent)] bg-[color-mix(in_oklab,var(--geist-blue-solid)_10%,var(--linear-app-content-surface))] text-[color:var(--geist-blue-solid)]';
+    return 'border-warning/25 bg-warning/10 text-warning';
   }
 
-  return 'border-[color-mix(in_oklab,var(--geist-red-solid)_24%,transparent)] bg-[color-mix(in_oklab,var(--geist-red-solid)_10%,var(--linear-app-content-surface))] text-[color:var(--geist-red-solid)]';
+  return 'border-error/25 bg-error/10 text-error';
+}
+
+function getProgressToneClasses(state: ChatUsageState): string {
+  if (state === 'healthy') {
+    return 'bg-success/10 [&::-moz-progress-bar]:bg-success [&::-webkit-progress-bar]:bg-success/10 [&::-webkit-progress-value]:bg-success';
+  }
+
+  if (state === 'near_limit') {
+    return 'bg-warning/10 [&::-moz-progress-bar]:bg-warning [&::-webkit-progress-bar]:bg-warning/10 [&::-webkit-progress-value]:bg-warning';
+  }
+
+  return 'bg-error/10 [&::-moz-progress-bar]:bg-error [&::-webkit-progress-bar]:bg-error/10 [&::-webkit-progress-value]:bg-error';
 }
 
 function getMonthlyUsage(data: ChatUsageData): {
@@ -83,6 +95,7 @@ function getMonthlyUsage(data: ChatUsageData): {
 interface UsageMeterRowProps {
   readonly title: string;
   readonly description: string;
+  readonly state: ChatUsageState;
   readonly used: number;
   readonly limit: number;
   readonly remaining: number;
@@ -92,6 +105,7 @@ interface UsageMeterRowProps {
 function UsageMeterRow({
   title,
   description,
+  state,
   used,
   limit,
   remaining,
@@ -121,7 +135,10 @@ function UsageMeterRow({
           aria-label={`${title} usage`}
           value={clampedUsed}
           max={progressMax}
-          className='block h-2 w-full appearance-none overflow-hidden rounded-full bg-[color-mix(in_oklab,var(--geist-cyan-solid)_8%,var(--linear-app-content-surface))] [&::-moz-progress-bar]:rounded-full [&::-moz-progress-bar]:bg-[color:var(--geist-cyan-solid)] [&::-webkit-progress-bar]:rounded-full [&::-webkit-progress-bar]:bg-[color-mix(in_oklab,var(--geist-cyan-solid)_8%,var(--linear-app-content-surface))] [&::-webkit-progress-value]:rounded-full [&::-webkit-progress-value]:bg-[color:var(--geist-cyan-solid)]'
+          className={cn(
+            'block h-2 w-full appearance-none overflow-hidden rounded-full [&::-moz-progress-bar]:rounded-full [&::-webkit-progress-bar]:rounded-full [&::-webkit-progress-value]:rounded-full',
+            getProgressToneClasses(state)
+          )}
         />
       </div>
       <p className='mt-2 text-2xs text-tertiary-token'>
@@ -281,6 +298,7 @@ export function SettingsUsageStatsSection() {
         <UsageMeterRow
           title='Daily Messages'
           description='Quota for the current 24-hour window.'
+          state={copy.state}
           used={data.used}
           limit={data.dailyLimit}
           remaining={data.remaining}
@@ -289,6 +307,7 @@ export function SettingsUsageStatsSection() {
         <UsageMeterRow
           title='Monthly Capacity'
           description='Plan capacity across the current calendar month.'
+          state={copy.state}
           used={monthly.used}
           limit={monthly.limit}
           remaining={monthly.remaining}
