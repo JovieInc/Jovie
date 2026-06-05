@@ -2352,6 +2352,22 @@ body:has(.system-b-download-page) .marketing-glass-header__cta:focus-visible {
 }
 
 /* ============================================
+   SYSTEM B SHELL LOADING PRIMITIVES
+   ============================================ */
+
+:where(.system-b-shell-loading-composer) {
+  overflow: hidden;
+  border: 1px solid
+    color-mix(in oklab, var(--system-b-app-frame-seam) 72%, transparent);
+  border-radius: var(--system-b-radius-pill);
+  background: color-mix(
+    in oklab,
+    var(--system-b-app-content-surface) 94%,
+    var(--system-b-bg-surface-0) 6%
+  );
+}
+
+/* ============================================
    SYSTEM B ONBOARDING V2 PRIMITIVES
    ============================================ */
 

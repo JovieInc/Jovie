@@ -17,15 +17,15 @@ export default function ProfileLoading() {
 
             {/* Input area skeleton */}
             <div className='w-full max-w-[35rem] space-y-2'>
-              <div className='overflow-hidden rounded-[24px] border border-black/6 bg-[color-mix(in_oklab,var(--linear-app-content-surface)_98%,var(--linear-bg-surface-0))] shadow-[0_1px_0_rgba(255,255,255,0.72),0_10px_22px_-20px_rgba(15,23,42,0.42)] dark:border-white/8'>
+              <div className='system-b-shell-loading-composer'>
                 <div className='relative flex items-end gap-2 px-3 py-2.5'>
-                  <div className='flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-(--linear-app-frame-seam) bg-surface-0 opacity-80'>
+                  <div className='flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-subtle bg-surface-0 opacity-80'>
                     <LoadingSkeleton height='h-4' width='w-4' rounded='full' />
                   </div>
                   <div className='min-w-0 flex-1 py-1.5'>
                     <LoadingSkeleton height='h-5' width='w-full' rounded='md' />
                   </div>
-                  <div className='flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-(--linear-app-frame-seam) bg-surface-0'>
+                  <div className='flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-subtle bg-surface-0'>
                     <LoadingSkeleton height='h-4' width='w-4' rounded='full' />
                   </div>
                 </div>
