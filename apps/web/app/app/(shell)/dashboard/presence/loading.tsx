@@ -5,12 +5,12 @@ const CARD_KEYS = ['a', 'b', 'c'] as const;
 export default function PresenceLoading() {
   return (
     <div
-      className='flex h-full min-h-0 flex-col bg-[color-mix(in_oklab,var(--linear-bg-page)_72%,var(--linear-bg-surface-1))]'
+      className='flex h-full min-h-0 flex-col bg-base'
       aria-busy='true'
       data-testid='presence-loading-skeleton'
     >
       {/* Summary bar skeleton */}
-      <div className='shrink-0 border-b border-(--linear-app-frame-seam) px-3 py-2.5 lg:px-4'>
+      <div className='shrink-0 border-b border-subtle px-3 py-2.5 lg:px-4'>
         <div className='flex items-center gap-3'>
           <LoadingSkeleton height='h-4' width='w-28' rounded='md' />
           <LoadingSkeleton height='h-3' width='w-40' rounded='sm' />
