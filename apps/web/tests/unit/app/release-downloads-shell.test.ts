@@ -84,6 +84,35 @@ describe('release downloads shell contract', () => {
     expect(source).not.toContain("style={{ position: 'relative' }}");
   });
 
+  it('keeps the upload target visual states on named System B primitives', () => {
+    const source = readReleaseDownloadsSource();
+
+    for (const forbiddenPattern of [
+      /--linear-/,
+      /color-mix\(/,
+      /\b(?:bg|border|shadow)-\[/,
+      /\b(?:bg|border)-\(--/,
+      /\btransition-all\b/,
+      /\b(?:translate|scale)-/,
+    ]) {
+      expect(
+        source,
+        `release downloads page matched ${forbiddenPattern}`
+      ).not.toMatch(forbiddenPattern);
+    }
+
+    for (const className of [
+      'border-subtle',
+      'bg-surface-0',
+      'border-focus',
+      'bg-surface-1',
+      'ring-focus/20',
+      'transition-[background-color,border-color,box-shadow]',
+    ]) {
+      expect(source).toContain(className);
+    }
+  });
+
   it('surfaces network failures instead of silently swallowing them', () => {
     const source = readReleaseDownloadsSource();
 
