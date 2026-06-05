@@ -11,6 +11,7 @@ import { useExpandedTracks } from './hooks/useExpandedTracks';
 import { useSortingManager } from './hooks/useSortingManager';
 import { MobileReleaseListLazy } from './MobileReleaseListLazy';
 import type { ReleaseTableProps } from './ReleaseTable.types';
+import { getReleaseTableRowClassName } from './release-table-row-styles';
 import { getReleaseContextMenuItems } from './utils/release-context-actions';
 import {
   createExpandableReleaseCellRenderer,
@@ -33,7 +34,7 @@ const MetaHeaderCell = () => (
 
 function TrackRowsLoadingRow() {
   return (
-    <div className='rounded-xl border border-[color:color-mix(in_oklab,var(--linear-app-frame-seam)_66%,transparent)] bg-[color-mix(in_oklab,var(--linear-bg-surface-1)_76%,var(--linear-bg-surface-0))] px-3 py-2.5 text-2xs text-tertiary-token'>
+    <div className='system-b-release-table-track-loading px-3 py-2.5 text-2xs text-tertiary-token'>
       Loading tracks...
     </div>
   );
@@ -111,43 +112,13 @@ export function ReleaseTableWithTracks({
       const isRefreshing = refreshingReleaseId === row.id;
       const isFlashed = flashedReleaseId === row.id;
 
-      let baseClassName: string;
-      if (designV1 && isSelected) {
-        baseClassName =
-          'border-transparent bg-(--linear-bg-surface-1)/80 shadow-[inset_3px_0_0_0_var(--linear-accent),inset_0_0_0_1px_color-mix(in_oklab,var(--linear-border-focus)_24%,transparent)] hover:bg-(--linear-bg-surface-1)/90 focus-within:bg-(--linear-bg-surface-1)';
-      } else if (designV1 && isRowExpanded) {
-        baseClassName =
-          'border-transparent bg-(--linear-bg-surface-1)/58 hover:bg-(--linear-bg-surface-1)/64 focus-within:bg-(--linear-bg-surface-1)/70';
-      } else if (designV1) {
-        baseClassName =
-          'border-transparent bg-transparent hover:bg-(--linear-bg-surface-1)/55 focus-within:bg-(--linear-bg-surface-1)/65 transition-[background-color,box-shadow,color] duration-150 ease-out [&:hover_span]:text-primary-token [&:hover_p]:text-primary-token';
-      } else if (isSelected) {
-        baseClassName =
-          'bg-[color-mix(in_oklab,var(--linear-row-selected)_55%,transparent)] shadow-[inset_3px_0_0_0_var(--linear-accent)] hover:bg-[color-mix(in_oklab,var(--linear-row-selected)_65%,transparent)] focus-within:bg-[color-mix(in_oklab,var(--linear-row-selected)_72%,transparent)] focus-within:shadow-[inset_3px_0_0_0_var(--linear-accent),inset_0_0_0_1px_var(--linear-border-focus)]';
-      } else if (isRowExpanded) {
-        baseClassName =
-          'bg-[color-mix(in_oklab,var(--linear-bg-surface-1)_52%,transparent)] hover:bg-[color-mix(in_oklab,var(--linear-bg-surface-1)_58%,transparent)] focus-within:bg-[color-mix(in_oklab,var(--linear-bg-surface-1)_62%,transparent)]';
-      } else {
-        baseClassName =
-          'bg-transparent hover:bg-[color-mix(in_oklab,var(--linear-row-hover)_78%,transparent)] focus-within:bg-[color-mix(in_oklab,var(--linear-row-hover)_84%,transparent)] transition-[background-color,box-shadow,color] duration-150 ease-out [&:hover_span]:text-primary-token [&:hover_p]:text-primary-token';
-      }
-
-      const refreshClassName = isRefreshing
-        ? 'relative overflow-hidden skeleton'
-        : '';
-      const flashClassName = isFlashed
-        ? 'bg-emerald-500/5 transition-colors duration-700'
-        : '';
-
-      return [
-        designV1 ? 'rounded-md' : 'rounded-none',
-        'transition-[background-color,box-shadow] duration-150 ease-out',
-        baseClassName,
-        refreshClassName,
-        flashClassName,
-      ]
-        .filter(Boolean)
-        .join(' ');
+      return getReleaseTableRowClassName({
+        designV1,
+        isExpanded: isRowExpanded,
+        isFlashed,
+        isRefreshing,
+        isSelected,
+      });
     },
     [
       isExpanded,
@@ -257,7 +228,7 @@ export function ReleaseTableWithTracks({
           data-testid={`release-track-stack-${release.id}`}
           className={designV1 ? 'px-3 pb-2.5 pt-1' : 'px-4 pb-3 pt-1.5'}
         >
-          <div className='rounded-[14px] border border-[color:color-mix(in_oklab,var(--linear-app-frame-seam)_74%,transparent)] bg-[color-mix(in_oklab,var(--linear-bg-surface-1)_70%,var(--linear-bg-surface-0))] p-2.5 shadow-[inset_0_1px_0_color-mix(in_oklab,white_4%,transparent)]'>
+          <div className='system-b-release-table-track-stack p-2.5'>
             <Suspense fallback={<TrackRowsLoadingRow />}>
               <TrackRowsContainer
                 tracks={tracks}
@@ -298,7 +269,7 @@ export function ReleaseTableWithTracks({
           icon={<Icon name='Disc3' className='h-6 w-6' />}
           title='No releases found'
           description='Use the toolbar to create a release, sync from Spotify, or clear filters.'
-          className='mx-4 my-3 min-h-[160px]'
+          className='system-b-release-table-empty-state mx-4 my-3'
         />
       );
     }
@@ -335,7 +306,7 @@ export function ReleaseTableWithTracks({
       rowHeight={rowHeight}
       minWidth='0'
       hideHeader
-      className='text-[12.5px] text-primary-token'
+      className='text-app text-primary-token'
       containerClassName={
         designV1
           ? 'h-full px-2 pb-2 pt-1 md:px-2.5 md:pb-2.5 md:pt-1.5'
@@ -357,7 +328,7 @@ export function ReleaseTableWithTracks({
           icon={<Icon name='Disc3' className='h-6 w-6' />}
           title='No releases found'
           description='Use the toolbar to create a release, sync from Spotify, or clear filters.'
-          className='m-3 min-h-[160px]'
+          className='system-b-release-table-empty-state m-3'
         />
       }
     />
