@@ -2257,6 +2257,101 @@ body:has(.system-b-download-page) .marketing-glass-header__cta:focus-visible {
 }
 
 /* ============================================
+   SYSTEM B START LOADING PRIMITIVES
+   ============================================ */
+
+:where(.system-b-start-loading-page) {
+  position: relative;
+  display: flex;
+  height: 100%;
+  min-height: 0;
+  flex: 1 1 auto;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--system-b-app-content-surface);
+  color: var(--system-b-text-primary);
+  color-scheme: dark;
+}
+
+:where(.system-b-start-loading-scroll) {
+  flex: 1 1 auto;
+  overflow-y: auto;
+  padding-block: clamp(var(--space-5), 4svh, var(--space-8));
+  padding-inline: clamp(var(--space-4), 4vw, var(--space-8));
+}
+
+:where(.system-b-start-loading-content) {
+  display: flex;
+  width: 100%;
+  min-height: 100%;
+  max-width: var(--app-shell-content-max-reading);
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-6);
+  margin-inline: auto;
+}
+
+:where(.system-b-start-loading-mark) {
+  display: flex;
+  width: var(--space-8);
+  height: var(--space-8);
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  opacity: 0.92;
+}
+
+:where(.system-b-start-loading-composer-wrap) {
+  width: 100%;
+  max-width: var(--app-shell-content-max-form);
+}
+
+:where(.system-b-start-loading-composer) {
+  overflow: hidden;
+  border: 1px solid
+    color-mix(in oklab, var(--system-b-app-frame-seam) 84%, transparent);
+  border-radius: var(--system-b-radius-pill);
+  background: color-mix(
+    in oklab,
+    var(--system-b-app-content-surface) 88%,
+    var(--system-b-bg-page) 12%
+  );
+}
+
+:where(.system-b-start-loading-composer-row) {
+  display: flex;
+  min-height: calc(var(--space-10) + var(--space-4));
+  align-items: center;
+  gap: var(--space-2);
+  padding-block: var(--space-2);
+  padding-inline: var(--space-3);
+}
+
+:where(.system-b-start-loading-copy-slot) {
+  min-width: 0;
+  flex: 1 1 auto;
+  padding-inline: var(--space-3);
+}
+
+:where(.system-b-start-loading-title-skeleton) {
+  width: min(58%, calc(var(--space-24) * 2));
+  height: var(--space-5);
+}
+
+:where(.system-b-start-loading-actions) {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+:where(.system-b-start-loading-action-skeleton) {
+  width: calc(var(--space-8) + var(--space-1));
+  height: calc(var(--space-8) + var(--space-1));
+}
+
+/* ============================================
    SYSTEM B ONBOARDING V2 PRIMITIVES
    ============================================ */
 
