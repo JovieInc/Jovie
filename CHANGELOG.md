@@ -5,6 +5,14 @@
      5|The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
      6|and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.6.5] - 2026-06-05
+
+> Chrome extension signed-in sidepanel actions now keep stable System B geometry while switching from insert preview to confirm/cancel/copy.
+
+### Fixed
+
+- **Extension action dock (JOV-2824)**: adds action-count layout hooks, keeps signed-in entity action labels neutral, and locks the dock frame across two- and three-action states.
+
 ## [26.6.4] - 2026-06-04
 
 > Auth sign-in is now wired across the web app, Electron desktop app, iOS shell, and Chrome extension for dev, staging, and production verification.

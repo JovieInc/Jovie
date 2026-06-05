@@ -43,6 +43,25 @@ const tokensOutsideRoot = tokensWithoutComments.replace(
   ''
 );
 
+function getRule(source: string, selector: string) {
+  const escapedSelector = selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const match = source.match(new RegExp(`${escapedSelector}\\s*{[^}]*}`));
+
+  if (!match) {
+    throw new Error(`Could not find ${selector}`);
+  }
+
+  return match[0];
+}
+
+function getRules(source: string, selector: string) {
+  const escapedSelector = selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  return Array.from(
+    source.matchAll(new RegExp(`${escapedSelector}\\s*{[^}]*}`, 'g')),
+    match => match[0]
+  );
+}
+
 describe('extension sidepanel System B styles', () => {
   it('declares a dedicated local System B bridge token source', () => {
     expect(tokenRootBlockMatch?.[0]).toContain('color-scheme: dark');
@@ -113,12 +132,68 @@ describe('extension sidepanel System B styles', () => {
   });
 
   it('reserves stable shell space for action and prompt docks', () => {
+    const actionTrayRule = getRules(
+      stylesWithoutComments,
+      '.action-tray'
+    ).find(rule => rule.includes('display: grid;'));
+    const oneActionRule = getRule(
+      stylesWithoutComments,
+      '.action-tray[data-action-count="1"]'
+    );
+    const twoActionRule = getRule(
+      stylesWithoutComments,
+      '.action-tray[data-action-count="2"]'
+    );
+    const threeActionRule = getRule(
+      stylesWithoutComments,
+      '.action-tray[data-action-count="3"]'
+    );
+    const actionTrayButtonRule = getRule(
+      stylesWithoutComments,
+      '.action-tray .button'
+    );
+
     expect(styles).toContain('--extension-system-b-dock-min-height');
     expect(styles).toContain(
       'min-height: var(--extension-system-b-dock-min-height)'
     );
     expect(styles).toContain('.prompt-dock-stacked');
+    expect(sidepanel).toContain("shell.dataset.hasActionDock = 'true';");
+    expect(sidepanel).toContain(
+      'actionTray.dataset.actionCount = String(actionTray.childElementCount);'
+    );
+    expect(actionTrayRule).toContain('display: grid;');
+    expect(actionTrayRule).toContain(
+      'grid-auto-rows: var(--extension-system-b-action-height);'
+    );
+    expect(actionTrayRule).toContain('overflow-x: hidden;');
+    expect(oneActionRule).toContain('grid-template-columns: minmax(0, 1fr);');
+    expect(twoActionRule).toContain(
+      'grid-template-columns: repeat(2, minmax(0, 1fr));'
+    );
+    expect(threeActionRule).toContain(
+      'grid-template-columns: repeat(3, minmax(0, 1fr));'
+    );
+    expect(actionTrayButtonRule).toContain('min-width: 0;');
+    expect(actionTrayButtonRule).toContain('white-space: nowrap;');
     expect(stylesWithoutComments).not.toMatch(/position:\s*fixed/);
+  });
+
+  it('keeps signed-in entity action labels quiet', () => {
+    const actionRule = getRule(stylesWithoutComments, '.entity-card-action');
+    const activeActionRule = getRule(
+      stylesWithoutComments,
+      '.entity-card-active .entity-card-action'
+    );
+
+    expect(actionRule).toContain(
+      'color: var(--extension-system-b-text-tertiary);'
+    );
+    expect(actionRule).not.toMatch(/background:/);
+    expect(actionRule).not.toMatch(/--extension-system-b-focus/);
+    expect(activeActionRule).toContain(
+      'color: var(--extension-system-b-text-secondary);'
+    );
   });
 
   it('keeps the signed-out sidepanel to one System B sign-in action', () => {
