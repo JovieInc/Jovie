@@ -74,7 +74,7 @@ describe('TaskListRow', () => {
       'true'
     );
     expect(getByTestId('task-list-row-task-1').className).toContain(
-      'bg-(--linear-row-selected)'
+      'system-b-table-row-selected'
     );
   });
 

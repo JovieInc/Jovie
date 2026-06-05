@@ -100,8 +100,8 @@ describe('MobileReleaseList', () => {
 
     const row = screen.getByTestId('mobile-release-row-release-1');
     expect(row).toHaveAttribute('data-shell-list-row', 'true');
-    expect(row.className).toContain('hover:bg-(--linear-row-hover)');
-    expect(row.className).toContain('focus-visible:bg-(--linear-row-hover)');
+    expect(row.className).toContain('system-b-table-row-hover');
+    expect(row.className).toContain('system-b-table-row-focus-visible');
 
     await user.click(row);
 

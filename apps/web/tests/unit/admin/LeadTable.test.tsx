@@ -164,7 +164,7 @@ describe('LeadTable', () => {
 
     const row = document.querySelector('tbody tr');
     // Canonical shell row via presets.tableRow / rowState (no explicit 'group' needed for this table)
-    expect(row).toHaveClass('hover:bg-(--linear-row-hover)');
+    expect(row).toHaveClass('system-b-table-row-hover');
   });
 
   it('renders status filter tabs', async () => {
