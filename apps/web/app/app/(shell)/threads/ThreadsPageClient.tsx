@@ -105,7 +105,7 @@ export function ChatsPageClient() {
       surfaceMode='default'
     >
       <div className='flex h-full min-h-0 flex-col'>
-        <div className='shrink-0 border-b border-[color-mix(in_oklab,var(--linear-app-frame-seam)_44%,transparent)] px-4 py-3 sm:px-6'>
+        <div className='shrink-0 border-b border-subtle px-4 py-3 sm:px-6'>
           <div className='flex items-center gap-2'>
             <AppSearchField
               value={query}
@@ -147,7 +147,7 @@ export function ChatsPageClient() {
               }}
             />
           ) : filteredThreads.length === 0 ? (
-            <div className='grid min-h-[18rem] place-items-center rounded-2xl border border-dashed border-[color-mix(in_oklab,var(--linear-app-frame-seam)_48%,transparent)] bg-[color-mix(in_oklab,var(--linear-app-content-surface)_92%,transparent)] px-6 py-10 text-center'>
+            <div className='grid min-h-[18rem] place-items-center rounded-2xl border border-dashed border-subtle bg-surface-0 px-6 py-10 text-center'>
               <div className='max-w-sm space-y-3'>
                 <p className='text-[14px] font-semibold text-primary-token'>
                   {normalizedQuery
