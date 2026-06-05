@@ -284,7 +284,7 @@ function releaseStatusDotClasses(
 ): string {
   if (status === 'released') return 'bg-success';
   if (status === 'scheduled') return 'bg-info';
-  return 'bg-muted';
+  return 'bg-tertiary-token';
 }
 
 function assetMatchesFilters(
