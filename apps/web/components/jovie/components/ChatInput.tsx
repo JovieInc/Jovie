@@ -552,7 +552,7 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
                   width: geometry.width,
                   maxWidth: geometry.maxWidth,
                 }}
-                className='isolate max-h-[min(340px,calc(100vh-12rem))] overflow-hidden rounded-[24px] border border-(--linear-app-frame-seam) bg-surface-1 shadow-popover'
+                className='system-b-chat-composer-picker-shell isolate max-h-[min(340px,calc(100vh-12rem))] overflow-hidden'
               >
                 <SlashCommandMenu
                   profileId={pickerProfileId}
@@ -577,6 +577,9 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
             data-surface-mode={surfaceMode}
             data-compact={isCompact ? 'true' : 'false'}
             data-variant={variant}
+            data-hero={isHero ? 'true' : undefined}
+            data-expanded={isExpanded ? 'true' : undefined}
+            data-over-limit={isOverLimit ? 'true' : undefined}
             animate={
               reducedMotion
                 ? undefined
@@ -594,22 +597,13 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
               maxHeight: 'min(42vh, 280px)',
             }}
             className={cn(
-              'overflow-hidden border border-[color-mix(in_oklab,var(--linear-app-frame-seam)_84%,transparent)] bg-[linear-gradient(180deg,rgba(255,255,255,0.04)_0%,rgba(255,255,255,0.012)_100%),var(--linear-app-content-surface)] text-primary-token shadow-none',
-              isHero &&
-                'bg-[color-mix(in_oklab,var(--linear-app-content-surface)_88%,black_12%)] shadow-[0_18px_68px_-34px_rgba(0,0,0,0.96),inset_0_1px_0_rgba(255,255,255,0.08)]',
-              isExpanded &&
-                'border-[color-mix(in_oklab,var(--linear-border-focus)_46%,var(--linear-app-frame-seam))] bg-[linear-gradient(180deg,rgba(255,255,255,0.052)_0%,rgba(255,255,255,0.016)_100%),var(--linear-app-content-surface)]',
-              isHero &&
-                isExpanded &&
-                'bg-[color-mix(in_oklab,var(--linear-app-content-surface)_82%,white_6%)]',
-              'outline-none ring-0 focus-within:border-[color-mix(in_oklab,var(--linear-border-focus)_78%,transparent)] focus-within:ring-1 focus-within:ring-[color-mix(in_oklab,var(--linear-border-focus)_42%,transparent)] focus-within:outline-none',
-              isOverLimit && 'border-error',
+              'system-b-chat-composer-surface overflow-hidden outline-none ring-0 focus-within:outline-none',
               showEntitySurface && !isStacked ? 'flex' : 'flex flex-col'
             )}
           >
             {showEntitySurface && !isStacked ? (
               <div className='flex w-full'>
-                <aside className='flex w-[264px] shrink-0 flex-col border-r border-white/[0.065]'>
+                <aside className='system-b-chat-composer-seam flex w-[264px] shrink-0 flex-col border-r'>
                   <SlashCommandMenu
                     profileId={pickerProfileId}
                     state={picker.state}
@@ -627,17 +621,17 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
                   {activeEntity ? (
                     <EntityPreviewPane entity={activeEntity} />
                   ) : (
-                    <div className='flex-1 px-6 py-[22px] text-[12px] text-tertiary-token'>
+                    <div className='system-b-chat-composer-preview-empty flex-1 px-6'>
                       Pick {pickerKindArticle(picker.state.kind)}{' '}
                       {pickerKindNoun(picker.state.kind)} to preview.
                     </div>
                   )}
                   {statusBanner ? (
-                    <div className='border-t border-white/[0.065]'>
+                    <div className='system-b-chat-composer-seam border-t'>
                       {statusBanner}
                     </div>
                   ) : null}
-                  <div className='border-t border-white/[0.065]'>
+                  <div className='system-b-chat-composer-seam border-t'>
                     <InputRow
                       containerRef={containerRef}
                       hiddenDivRef={hiddenDivRef}
@@ -687,7 +681,7 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
                 {/* STACKED entity mode: rail (full width) above optional preview, above input */}
                 {showEntitySurface && isStacked ? (
                   <div className='flex flex-col'>
-                    <div className='border-b border-white/[0.065]'>
+                    <div className='system-b-chat-composer-seam border-b'>
                       <SlashCommandMenu
                         profileId={pickerProfileId}
                         state={picker.state}
@@ -702,7 +696,7 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
                       />
                     </div>
                     {activeEntity ? (
-                      <div className='border-b border-white/[0.065]'>
+                      <div className='system-b-chat-composer-seam border-b'>
                         <EntityPreviewPane entity={activeEntity} />
                       </div>
                     ) : null}
@@ -710,7 +704,7 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
                 ) : null}
 
                 {statusBanner ? (
-                  <div className='border-b border-white/[0.065]'>
+                  <div className='system-b-chat-composer-seam border-b'>
                     {statusBanner}
                   </div>
                 ) : null}
@@ -890,7 +884,7 @@ function InputRow({
     isHero && !hasPendingImages && (!hasInlineContent || hasOnlyRootSlashQuery);
 
   return (
-    <div className={cn(hasBorderTop && 'border-t border-white/[0.065]')}>
+    <div className={cn(hasBorderTop && 'system-b-chat-composer-seam border-t')}>
       {hasPendingImages && onRemoveImage ? (
         <div className='px-3 pt-3'>
           <ImagePreviewStrip
@@ -954,7 +948,7 @@ function InputRow({
               'min-w-[min(13rem,100%)] flex-[1_1_13rem] resize-none bg-transparent placeholder:text-quaternary-token',
               isHero
                 ? 'min-h-7 px-2 py-0.5 text-[15px] font-[450] leading-6 text-primary-token sm:text-[16px]'
-                : 'min-h-6 px-1.5 py-[1px] text-[15px] leading-6 text-white/92',
+                : 'min-h-6 px-1.5 py-[1px] text-[15px] leading-6 text-primary-token',
               // Remove the browser's default focus outline. The surrounding
               // surface provides the focus affordance (border glow via
               // isFocused→isExpanded). Using focus-visible:outline-none keeps
