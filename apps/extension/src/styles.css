@@ -291,7 +291,7 @@ button {
   min-height: var(--extension-system-b-action-height);
   align-items: center;
   justify-content: center;
-  border-radius: var(--extension-system-b-radius-sm);
+  border-radius: var(--extension-system-b-radius-pill);
   border: 1px solid transparent;
   padding: 0 var(--extension-system-b-space-4);
   font-size: var(--extension-system-b-text-sm);

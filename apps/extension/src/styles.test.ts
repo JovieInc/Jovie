@@ -58,6 +58,9 @@ describe('extension sidepanel System B styles', () => {
     );
     expect(tokenRootBlockMatch?.[0]).toContain('--extension-system-b-radius-lg');
     expect(tokenRootBlockMatch?.[0]).toContain(
+      '--extension-system-b-radius-pill'
+    );
+    expect(tokenRootBlockMatch?.[0]).toContain(
       '--extension-system-b-dock-min-height'
     );
     expect(tokenRootBlockMatch?.[0]).toContain(
@@ -94,6 +97,19 @@ describe('extension sidepanel System B styles', () => {
   it('uses tokens for radius and shadow recipes in component styles', () => {
     expect(stylesWithoutComments).not.toMatch(/border-radius:(?!\s*var\()/);
     expect(stylesWithoutComments).not.toMatch(/box-shadow:(?!\s*var\()/);
+  });
+
+  it('keeps extension command buttons pill-shaped', () => {
+    const buttonRule = stylesWithoutComments.match(
+      /^\.button\s*{[\s\S]*?\n}/m
+    );
+
+    expect(buttonRule?.[0]).toContain(
+      'border-radius: var(--extension-system-b-radius-pill)'
+    );
+    expect(buttonRule?.[0]).not.toContain(
+      'border-radius: var(--extension-system-b-radius-sm)'
+    );
   });
 
   it('reserves stable shell space for action and prompt docks', () => {
