@@ -12,7 +12,9 @@ const CHROME_CLASS_PATTERN = /(?:^|\s)(?:uppercase|tracking-[^\s'"]+)/;
 const LABEL_ELEMENT_PATTERN =
   /<(?:h3|h4|span)\b[\s\S]*?className=(?:'[^']*'|"[^"]*"|\{[^}]*\})[\s\S]*?>/g;
 const ROUTE_LOCAL_VISUAL_PATTERN =
-  /(?:text-\[[^\]]+\]|(?:min-[hw]|max-[hw]|w|h)-\[[^\]]+\]|border-\(--linear-[^)]+\)(?:\/\d+)?|(?:bg|text|border|accent)-(?:emerald|red|amber|violet|cyan)-[^\s'"]+|(?:bg|text)-quaternary-token\/\d+)/;
+  /(?:--linear-|color-mix\(|(?:bg|text|border|accent|ring|from|via|to|decoration)-(?:blue|sky|indigo|purple|violet|cyan|emerald|green|red|rose|pink|amber|yellow|orange|teal)-[^\s'"]+|(?:bg|text|border)-\[[^\]]+\]|(?:min-[hw]|max-[hw]|w|h)-\[[^\]]+\]|(?:bg|text)-quaternary-token\/\d+)/;
+const NAMED_COLOR_OWNER_PATTERN =
+  /className=(?:'[^']*\bsystem-b-calendar-(?:provider-chip|row-description|row-secondary)\b[^']*\btext-(?:tertiary-token|quaternary-token)\b[^']*'|"[^"]*\bsystem-b-calendar-(?:provider-chip|row-description|row-secondary)\b[^"]*\btext-(?:tertiary-token|quaternary-token)\b[^"]*")/g;
 
 function lineNumberFor(source: string, index: number): number {
   return source.slice(0, index).split('\n').length;
@@ -56,7 +58,20 @@ describe('calendar shell style guard', () => {
     expect(source).toContain('system-b-calendar-day-cell');
     expect(
       offenders,
-      `Calendar visual chrome should use named system-b-calendar-* classes backed by design-system.css.\n${offenders.join('\n')}`
+      `Calendar visual chrome should use named system-b-calendar-* classes instead of legacy Linear variables, color-mix(), arbitrary color utilities, or hardcoded accent utilities.\n${offenders.join('\n')}`
+    ).toEqual([]);
+  });
+
+  it('lets named detail metadata classes own their text color', () => {
+    const source = readFileSync(CALENDAR_CLIENT, 'utf8');
+    const offenders = [...source.matchAll(NAMED_COLOR_OWNER_PATTERN)].map(
+      match =>
+        `CalendarPageClient.tsx:${lineNumberFor(source, match.index ?? 0)} ${match[0].replace(/\s+/g, ' ').trim()}`
+    );
+
+    expect(
+      offenders,
+      `Calendar detail metadata classes should not carry duplicate route-local text color utilities.\n${offenders.join('\n')}`
     ).toEqual([]);
   });
 });

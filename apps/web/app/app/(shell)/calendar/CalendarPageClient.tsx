@@ -847,16 +847,16 @@ function EventRow(props: EventRowProps) {
             </span>
           )}
         </div>
-        <div className='system-b-calendar-row-description mt-1 text-tertiary-token'>
+        <div className='system-b-calendar-row-description mt-1'>
           {event.subtitle}
         </div>
         {props.variant === 'pending' && event.lastSyncedAt && (
-          <div className='system-b-calendar-row-secondary mt-1 text-quaternary-token'>
+          <div className='system-b-calendar-row-secondary mt-1'>
             Last synced {formatReviewedAt(event.lastSyncedAt)}
           </div>
         )}
         {props.variant === 'confirmed' && reviewedLabel && (
-          <div className='system-b-calendar-row-secondary mt-1 text-quaternary-token'>
+          <div className='system-b-calendar-row-secondary mt-1'>
             Reviewed {reviewedLabel}
           </div>
         )}
@@ -923,7 +923,7 @@ type ProviderChipProps = Readonly<{
 
 function ProviderChip({ provider }: ProviderChipProps) {
   return (
-    <span className='system-b-calendar-provider-chip rounded bg-surface-0 px-1.5 py-0.5 text-tertiary-token'>
+    <span className='system-b-calendar-provider-chip rounded bg-surface-0 px-1.5 py-0.5'>
       {provider}
     </span>
   );
