@@ -28,6 +28,24 @@ describe('Textarea', () => {
     });
   });
 
+  describe('System B typography contract', () => {
+    it('uses neutral tracking instead of arbitrary negative letter spacing', () => {
+      const source = readFileSync(
+        path.join(process.cwd(), 'atoms/textarea.tsx'),
+        {
+          encoding: 'utf8',
+        }
+      );
+
+      expect(source).not.toMatch(/\btracking-\[-[^\]]+\]/);
+
+      render(<Textarea aria-label='Bio' data-testid='textarea' />);
+      const textarea = screen.getByTestId('textarea');
+      expect(textarea.className).toContain('tracking-normal');
+      expect(textarea.className).not.toMatch(/\btracking-\[-[^\]]+\]/);
+    });
+  });
+
   describe('Basic Rendering', () => {
     it('renders with default props', () => {
       render(<Textarea placeholder='Enter text' />);

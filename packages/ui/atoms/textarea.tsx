@@ -8,7 +8,7 @@ import { cn } from '../lib/utils';
 const textareaVariants = cva(
   [
     'flex w-full rounded-lg border border-(--linear-border-subtle) bg-(--linear-bg-surface-1) px-3 py-2',
-    'text-[13px] font-[400] tracking-[-0.011em] text-(--linear-text-primary)',
+    'text-[13px] font-[400] tracking-normal text-(--linear-text-primary)',
     'placeholder:text-(--linear-text-tertiary)',
     'hover:border-(--linear-border-default)',
     'focus-visible:outline-none focus-visible:border-(--linear-border-focus) focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/24',
