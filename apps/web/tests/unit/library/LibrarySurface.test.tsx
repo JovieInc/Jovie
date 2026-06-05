@@ -34,6 +34,7 @@ const legacySelectionAccentPatterns = [
   new RegExp(['rgb\\(103', '_232_249'].join(''), 'u'),
   new RegExp(['color-mix\\(in_oklab,var\\(--', 'ge', 'ist-'].join(''), 'u'),
   new RegExp(['bg-', 'white/35'].join(''), 'u'),
+  new RegExp(['bg-', 'muted'].join(''), 'u'),
 ] as const;
 
 const navigationMock = vi.hoisted(() => ({
