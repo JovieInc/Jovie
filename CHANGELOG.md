@@ -5,6 +5,14 @@
      5|The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
      6|and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.6.7] - 2026-06-05
+
+> Desktop recovery now reports the actual runtime platform while shipping through the desktop release path.
+
+### Fixed
+
+- **Desktop recovery runtime label (JOV-2823)**: derives the recovery footer runtime label from Electron's `process.platform` instead of hardcoding macOS, keeps Windows and Linux recovery surfaces honest, and bumps the desktop release trigger so the next desktop build carries the fix.
+
 ## [26.6.6] - 2026-06-05
 
 > Shared button controls now use neutral System B tracking instead of hardcoded negative letter spacing.

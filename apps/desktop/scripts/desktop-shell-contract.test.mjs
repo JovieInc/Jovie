@@ -73,7 +73,20 @@ test('desktop window fails into a branded Jovie recovery surface', async () => {
   assert.match(mainSource, /function buildDesktopLoadFailureUrl\(\): string/);
   assert.match(mainSource, /Jovie Desktop/);
   assert.match(mainSource, /Built for artists/);
-  assert.match(mainSource, /Desktop shell runtime: Mac OS/);
+  assert.match(mainSource, /const DESKTOP_RUNTIME_LABEL_BY_PLATFORM/);
+  assert.match(mainSource, /darwin: 'Mac OS'/);
+  assert.match(mainSource, /linux: 'Linux'/);
+  assert.match(mainSource, /win32: 'Windows'/);
+  assert.match(
+    mainSource,
+    /function getDesktopRuntimeLabel\(\s*platform: NodeJS\.Platform = process\.platform\s*\): string/
+  );
+  assert.match(
+    mainSource,
+    /const runtimeLabel = escapeHtmlAttribute\(getDesktopRuntimeLabel\(\)\);/
+  );
+  assert.match(mainSource, /Desktop shell runtime: \$\{runtimeLabel\}/);
+  assert.doesNotMatch(mainSource, /Desktop shell runtime: Mac OS/);
   assert.match(mainSource, /data:text\/html;charset=utf-8/);
   assert.match(mainSource, /function escapeHtmlAttribute\(value: string\): string/);
   assert.match(mainSource, /<a class="primary" href="\$\{retryUrl\}">Retry<\/a>/);
