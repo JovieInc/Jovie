@@ -34,7 +34,7 @@ export function ThreadVideoCard({
 }: ThreadVideoCardProps) {
   const Thumb = onPlay ? 'button' : 'div';
   return (
-    <div className='rounded-xl border border-(--linear-app-shell-border) bg-(--surface-0)/40 overflow-hidden'>
+    <div className='system-b-thread-media-card'>
       <Thumb
         {...(onPlay
           ? {
@@ -43,23 +43,13 @@ export function ThreadVideoCard({
               'aria-label': `Play ${title}`,
             }
           : {})}
-        className='group/vid relative w-full aspect-[16/9] block focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-token'
+        className='system-b-thread-media-preview system-b-thread-video-preview'
       >
-        <span
-          aria-hidden='true'
-          className='absolute inset-0'
-          style={{
-            background:
-              'radial-gradient(ellipse at 60% 40%, rgba(255,255,255,0.06) 0%, rgba(0,0,0,0) 60%), linear-gradient(135deg, hsl(220, 30%, 12%), hsl(220, 30%, 4%))',
-          }}
-        />
-        <span className='absolute inset-0 grid place-items-center'>
+        <span aria-hidden='true' className='system-b-thread-video-backdrop' />
+        <span className='system-b-thread-play-shell'>
           <span
-            className={
-              onPlay
-                ? 'h-12 w-12 rounded-full bg-white/95 text-black grid place-items-center transition-colors duration-subtle ease-subtle group-hover/vid:bg-white'
-                : 'h-12 w-12 rounded-full bg-white/40 text-black grid place-items-center'
-            }
+            className='system-b-thread-play-button'
+            data-interactive={onPlay ? 'true' : 'false'}
           >
             <Play
               className='h-4 w-4 translate-x-px'
@@ -68,15 +58,13 @@ export function ThreadVideoCard({
             />
           </span>
         </span>
-        <span className='absolute bottom-2 right-2 inline-flex items-center h-5 px-1.5 rounded text-[10px] font-caption tabular-nums text-primary-token bg-black/60 backdrop-blur'>
+        <span className='system-b-thread-duration-badge'>
           {formatDuration(durationSec)}
         </span>
       </Thumb>
-      <div className='flex items-center gap-2 px-3 h-9 border-t border-(--linear-app-shell-border)/60'>
-        <Mic2 className='h-3 w-3 text-cyan-300/80' strokeWidth={2.25} />
-        <span className='flex-1 text-[11.5px] text-tertiary-token truncate'>
-          {title}
-        </span>
+      <div className='system-b-thread-media-footer'>
+        <Mic2 className='system-b-thread-media-icon' strokeWidth={2.25} />
+        <span className='system-b-thread-media-label'>{title}</span>
         {onFullscreen && (
           <ThreadCardIconBtn label='Full-screen' onClick={onFullscreen}>
             <Maximize2 className='h-3 w-3' strokeWidth={2.25} />

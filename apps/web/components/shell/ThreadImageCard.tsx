@@ -28,9 +28,6 @@ export type ThreadImageCardProps =
       readonly onRegenerate?: () => void;
     };
 
-const SHIMMER_BG =
-  'linear-gradient(110deg, transparent 0%, rgba(255,255,255,0.04) 35%, rgba(103,232,249,0.06) 50%, rgba(255,255,255,0.04) 65%, transparent 100%)';
-
 /**
  * Image generation card — clean attachment block. Shimmer + visible
  * prompt while generating; aspect-correct preview + tap-to-lightbox once
@@ -44,20 +41,12 @@ const SHIMMER_BG =
 export function ThreadImageCard(props: ThreadImageCardProps) {
   const { prompt, status } = props;
   return (
-    <div className='rounded-xl border border-(--linear-app-shell-border) bg-(--surface-0)/40 overflow-hidden'>
-      <div className='aspect-[16/10] relative bg-(--surface-2)'>
+    <div className='system-b-thread-media-card'>
+      <div className='system-b-thread-media-preview system-b-thread-image-preview'>
         {status === 'generating' ? (
-          <div className='absolute inset-0 grid place-items-center'>
-            <div
-              aria-hidden='true'
-              className='absolute inset-0'
-              style={{
-                backgroundImage: SHIMMER_BG,
-                backgroundSize: '200% 100%',
-                animation: 'shimmer 2.4s ease-in-out infinite',
-              }}
-            />
-            <p className='relative text-[12px] text-tertiary-token text-center px-6'>
+          <div className='system-b-thread-media-generating'>
+            <div aria-hidden='true' className='system-b-thread-image-shimmer' />
+            <p className='system-b-thread-generating-copy'>
               Generating &ldquo;{prompt}&rdquo;
             </p>
           </div>
@@ -72,11 +61,9 @@ export function ThreadImageCard(props: ThreadImageCardProps) {
           />
         )}
       </div>
-      <div className='flex items-center gap-2 px-3 h-9 border-t border-(--linear-app-shell-border)/60'>
-        <Sparkles className='h-3 w-3 text-cyan-300/80' strokeWidth={2.25} />
-        <span className='flex-1 text-[11.5px] text-tertiary-token truncate'>
-          {prompt}
-        </span>
+      <div className='system-b-thread-media-footer'>
+        <Sparkles className='system-b-thread-media-icon' strokeWidth={2.25} />
+        <span className='system-b-thread-media-label'>{prompt}</span>
         {status === 'ready' &&
           (props.onDownload || props.onCopy || props.onRegenerate) && (
             <span className='inline-flex items-center gap-0.5'>
