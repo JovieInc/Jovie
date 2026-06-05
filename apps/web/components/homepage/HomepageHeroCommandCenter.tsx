@@ -66,7 +66,10 @@ function ProductPane({
   sizes: string;
 }>) {
   return (
-    <figure className={`homepage-product-pane ${className}`} data-product-pane>
+    <figure
+      className={`homepage-product-pane system-b-mounted-home-command-pane ${className}`}
+      data-product-pane
+    >
       <Image
         src={image.publicUrl}
         alt={alt}
@@ -123,13 +126,13 @@ export function HomepageHeroCommandCenter({
   return (
     <section
       aria-label='Jovie release operating system preview'
-      className='homepage-hero-command-center'
+      className='homepage-hero-command-center system-b-mounted-home-command-center'
       data-testid='homepage-hero-command-center'
     >
-      <div className='homepage-product-controls'>
+      <div className='homepage-product-controls system-b-mounted-home-command-controls'>
         <button
           type='button'
-          className='homepage-product-control homepage-product-control--prev focus-ring-themed'
+          className='homepage-product-control system-b-mounted-home-command-control homepage-product-control--prev focus-ring-themed'
           aria-label='Previous product preview'
           onClick={() => scrollProductRail(-1)}
         >
@@ -137,14 +140,17 @@ export function HomepageHeroCommandCenter({
         </button>
         <button
           type='button'
-          className='homepage-product-control homepage-product-control--next focus-ring-themed'
+          className='homepage-product-control system-b-mounted-home-command-control homepage-product-control--next focus-ring-themed'
           aria-label='Next product preview'
           onClick={() => scrollProductRail(1)}
         >
           <ChevronRight aria-hidden='true' size={18} strokeWidth={1.8} />
         </button>
       </div>
-      <div ref={railRef} className='homepage-product-rail'>
+      <div
+        ref={railRef}
+        className='homepage-product-rail system-b-mounted-home-command-rail'
+      >
         <a
           href='#homepage-product-previews-end'
           className='sr-only focus:not-sr-only focus:absolute focus:left-6 focus:top-6 focus:z-10 focus:rounded-md focus:bg-surface-0 focus:px-3 focus:py-2 focus:text-sm focus:font-medium focus:text-primary-token focus-ring-themed'
