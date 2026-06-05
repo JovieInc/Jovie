@@ -76,14 +76,17 @@ export function HomepageWorkspaceSection({
     <section
       ref={sectionRef}
       id='release-workspace'
-      className='homepage-workspace-section'
+      className='homepage-workspace-section system-b-mounted-home-workspace'
       style={{ position: 'relative' }}
       aria-labelledby='homepage-workspace-heading'
       data-testid='homepage-workspace-section'
     >
-      <div className='homepage-workspace-section__inner'>
-        <div className='homepage-workspace-section__copy'>
-          <h2 id='homepage-workspace-heading'>
+      <div className='homepage-workspace-section__inner system-b-mounted-home-workspace-inner'>
+        <div className='homepage-workspace-section__copy system-b-mounted-home-workspace-copy'>
+          <h2
+            id='homepage-workspace-heading'
+            className='system-b-mounted-home-workspace-headline'
+          >
             {headlineLines.map(line => (
               <span key={line}>{line}</span>
             ))}
@@ -91,7 +94,7 @@ export function HomepageWorkspaceSection({
         </div>
 
         <motion.div
-          className='homepage-workspace-visual'
+          className='homepage-workspace-visual system-b-mounted-home-workspace-visual'
           style={
             // Only apply MotionValues after client mount to prevent hydration
             // mismatch between SSR-serialised styles and client initial render.
@@ -106,7 +109,7 @@ export function HomepageWorkspaceSection({
           }
         >
           <div
-            className='homepage-workspace-media'
+            className='homepage-workspace-media system-b-mounted-home-workspace-media'
             data-testid='homepage-workspace-screenshot'
           >
             <Image
@@ -121,12 +124,12 @@ export function HomepageWorkspaceSection({
           </div>
 
           <ol
-            className='homepage-workspace-callouts'
+            className='homepage-workspace-callouts system-b-mounted-home-workspace-callouts'
             aria-label='Release workspace flow'
           >
             {HOMEPAGE_LAUNCH_COPY.workspace.callouts.map((callout, index) => (
               <motion.li
-                className={`homepage-workspace-callout homepage-workspace-callout--${callout.key}`}
+                className={`homepage-workspace-callout system-b-mounted-home-workspace-callout homepage-workspace-callout--${callout.key}`}
                 key={callout.title}
                 style={
                   // Same guard: only bind MotionValues after mount.
@@ -135,9 +138,15 @@ export function HomepageWorkspaceSection({
                     : undefined
                 }
               >
-                <span>{callout.number}</span>
-                <h3>{callout.title}</h3>
-                <p>{callout.body}</p>
+                <span className='system-b-mounted-home-workspace-callout-label'>
+                  {callout.number}
+                </span>
+                <h3 className='system-b-mounted-home-workspace-callout-title'>
+                  {callout.title}
+                </h3>
+                <p className='system-b-mounted-home-workspace-callout-body'>
+                  {callout.body}
+                </p>
               </motion.li>
             ))}
           </ol>

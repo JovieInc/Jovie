@@ -5046,3 +5046,73 @@ body:has(.home-viewport)::-webkit-scrollbar {
 }
 
 /* SYSTEM B MOUNTED HOME PRODUCT STATEMENT PRIMITIVES END */
+
+/* ============================================
+   SYSTEM B MOUNTED HOME WORKSPACE SHELL PRIMITIVES
+   ============================================ */
+
+.system-b-mounted-home-workspace {
+  background: var(--system-b-bg-page);
+  color: var(--color-text-primary-token);
+}
+
+.system-b-mounted-home-workspace-inner {
+  gap: clamp(var(--space-10), 4.3vw, var(--space-16));
+}
+
+.system-b-mounted-home-workspace .system-b-mounted-home-workspace-headline {
+  color: var(--color-text-primary-token);
+  font-size: var(--text-5xl);
+  letter-spacing: 0;
+}
+
+.system-b-mounted-home-workspace-placeholder-heading {
+  visibility: hidden;
+}
+
+.system-b-mounted-home-workspace-media {
+  border: var(--space-px) solid var(--system-b-app-frame-seam);
+  border-radius: var(--radius-3xl);
+  background: var(--system-b-bg-page);
+  box-shadow: none;
+}
+
+.system-b-mounted-home-workspace-callout {
+  border: var(--space-px) solid var(--system-b-app-frame-seam);
+  border-radius: var(--radius-xl);
+  background: var(--system-b-app-content-surface);
+  color: var(--color-text-primary-token);
+  box-shadow: none;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+.system-b-mounted-home-workspace-callout::before {
+  background: var(--system-b-app-frame-seam);
+}
+
+.system-b-mounted-home-workspace-callout
+  .system-b-mounted-home-workspace-callout-label {
+  color: var(--color-text-tertiary-token);
+}
+
+.system-b-mounted-home-workspace-callout
+  .system-b-mounted-home-workspace-callout-title {
+  color: var(--color-text-primary-token);
+  font-size: var(--text-lg);
+  letter-spacing: 0;
+}
+
+.system-b-mounted-home-workspace-callout
+  .system-b-mounted-home-workspace-callout-body {
+  color: var(--color-text-tertiary-token);
+  font-size: var(--text-sm);
+}
+
+@media (max-width: 767px) {
+  .system-b-mounted-home-workspace .system-b-mounted-home-workspace-headline {
+    font-size: var(--text-4xl);
+  }
+}
+
+/* SYSTEM B MOUNTED HOME WORKSPACE SHELL PRIMITIVES END */
