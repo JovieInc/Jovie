@@ -38,10 +38,10 @@ const KIND_PREFIX: Record<EntityKind, string> = {
 };
 
 const KIND_ACCENT_VAR: Record<EntityKind, string> = {
-  release: '--geist-purple-solid',
-  artist: '--geist-blue-solid',
-  track: '--geist-pink-solid',
-  event: '--geist-green-solid',
+  release: '--system-b-entity-chip-release-accent',
+  artist: '--system-b-entity-chip-artist-accent',
+  track: '--system-b-entity-chip-track-accent',
+  event: '--system-b-entity-chip-event-accent',
 };
 
 /**

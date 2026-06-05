@@ -22,15 +22,15 @@ describe('EntityChip', () => {
     expect(chip.textContent).toContain('Sober');
     expect(chip.getAttribute('data-entity-kind')).toBe('release');
     expect(chip.style.getPropertyValue('--jovie-entity-accent')).toBe(
-      'var(--geist-purple-solid)'
+      'var(--system-b-entity-chip-release-accent)'
     );
   });
 
   it.each([
-    ['release', 'var(--geist-purple-solid)'],
-    ['artist', 'var(--geist-blue-solid)'],
-    ['track', 'var(--geist-pink-solid)'],
-    ['event', 'var(--geist-green-solid)'],
+    ['release', 'var(--system-b-entity-chip-release-accent)'],
+    ['artist', 'var(--system-b-entity-chip-artist-accent)'],
+    ['track', 'var(--system-b-entity-chip-track-accent)'],
+    ['event', 'var(--system-b-entity-chip-event-accent)'],
   ] as const)('maps kind=%s to the correct accent variable', (kind, accent) => {
     fastRender(
       <EntityChip
@@ -43,6 +43,21 @@ describe('EntityChip', () => {
         .getByTestId('entity-chip')
         .style.getPropertyValue('--jovie-entity-accent')
     ).toBe(accent);
+  });
+
+  it('keeps entity chip tones on System B aliases instead of legacy Geist tokens', () => {
+    fastRender(
+      <EntityChip
+        data={{ kind: 'artist', id: 'artist_1', label: 'Tim White' }}
+        variant='transcript'
+      />
+    );
+
+    const accent = screen
+      .getByTestId('entity-chip')
+      .style.getPropertyValue('--jovie-entity-accent');
+    expect(accent).toContain('--system-b-entity-chip-artist-accent');
+    expect(accent).not.toContain('geist');
   });
 
   it('renders thumbnail when provided', () => {

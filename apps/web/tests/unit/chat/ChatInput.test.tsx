@@ -525,7 +525,7 @@ describe('ChatInput', () => {
       within(inlineField).getByText('Performance Budget')
     ).toBeInTheDocument();
     expect(screen.getByTitle('Release: Performance Budget')).toHaveStyle({
-      '--jovie-entity-accent': 'var(--geist-purple-solid)',
+      '--jovie-entity-accent': 'var(--system-b-entity-chip-release-accent)',
     });
     expect(inlineField).toContainElement(
       screen.getByRole('textbox', { name: /chat message input/i })
