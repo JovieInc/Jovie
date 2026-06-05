@@ -27,13 +27,13 @@ export default function ChatLoading() {
 
             {/* Input area skeleton */}
             <div className='relative z-10 w-full max-w-[45rem] space-y-2'>
-              <div className='overflow-hidden rounded-[24px] border border-black/6 bg-[color-mix(in_oklab,var(--linear-app-content-surface)_98%,var(--linear-bg-surface-0))] shadow-[0_1px_0_rgba(255,255,255,0.72),0_10px_22px_-20px_rgba(15,23,42,0.42)] dark:border-white/8'>
+              <div className='system-b-shell-loading-composer'>
                 <div className='relative flex items-end gap-2 px-3 py-2.5'>
                   <button
                     type='button'
                     disabled
                     aria-label='Attachment options'
-                    className='flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-(--linear-app-frame-seam) bg-surface-0 text-secondary-token opacity-80'
+                    className='flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-subtle bg-surface-0 text-secondary-token opacity-80'
                   >
                     <LoadingSkeleton height='h-4' width='w-4' rounded='full' />
                   </button>
@@ -48,7 +48,7 @@ export default function ChatLoading() {
                     type='button'
                     disabled
                     aria-label='Send message'
-                    className='flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-(--linear-app-frame-seam) bg-surface-0 text-tertiary-token'
+                    className='flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-subtle bg-surface-0 text-tertiary-token'
                   >
                     <LoadingSkeleton height='h-4' width='w-4' rounded='full' />
                   </button>
