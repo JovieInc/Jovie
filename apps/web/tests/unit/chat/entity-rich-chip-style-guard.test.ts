@@ -10,6 +10,7 @@ const guardedFiles = [
   'components/jovie/components/EntityChip.tsx',
   'components/jovie/components/EntityChipPopover.tsx',
   'components/jovie/components/EntityPreviewPane.tsx',
+  'components/jovie/components/SkillChip.tsx',
   'components/shell/DspAvatarStack.tsx',
   'components/shell/EntityPopover.tsx',
 ];
@@ -35,5 +36,19 @@ describe('entity rich chip System B style guard', () => {
 
       expect(offenders, `${file} leaked ${offenders.join(', ')}`).toEqual([]);
     }
+  });
+
+  it('keeps input skill chip CSS on globally defined System B surface tokens', () => {
+    const source = readFileSync(
+      path.join(webRoot, 'styles/design-system.css'),
+      'utf8'
+    );
+    const skillChipCss = source.match(
+      /\.system-b-skill-chip[\s\S]*?\.system-b-entity-chip-popover-content/
+    )?.[0];
+
+    expect(skillChipCss).toContain('var(--system-b-bg-surface-1)');
+    expect(skillChipCss).toContain('var(--system-b-bg-surface-2)');
+    expect(skillChipCss).not.toMatch(/--surface-[0-9]/);
   });
 });
