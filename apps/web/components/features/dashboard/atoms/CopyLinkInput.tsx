@@ -7,7 +7,7 @@
  * - Displays URL in input-style container
  * - Copy icon button on the right
  * - Click to select all text
- * - Visual feedback on copy (green highlight)
+ * - Visual feedback on copy
  */
 
 import {
@@ -112,15 +112,13 @@ export function CopyLinkInput({
         value={displayValue ?? url}
         onClick={handleInputClick}
         aria-label='URL to copy'
+        data-copied={isCopied ? 'true' : undefined}
         className={cn(
-          'w-full rounded-full border border-(--linear-app-frame-seam) bg-surface-0 px-2.5 py-1.5 pr-9',
-          'truncate font-mono text-app text-secondary-token',
-          'cursor-text focus-visible:border-(--linear-border-focus) focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)',
-          'transition-colors',
+          'system-b-copy-link-input w-full rounded-full border px-2.5 py-1.5 pr-9',
+          'truncate font-mono text-app',
+          'cursor-text focus-visible:outline-none',
           size === 'sm' && 'h-7',
           size === 'md' && 'h-9',
-          isCopied &&
-            'bg-green-50 border-green-300 dark:bg-green-900/20 dark:border-green-700',
           inputClassName
         )}
       />
@@ -129,29 +127,23 @@ export function CopyLinkInput({
         onClick={handleCopy}
         aria-label={isCopied ? 'Copied to clipboard' : 'Copy to clipboard'}
         title={isCopied ? 'Copied!' : 'Copy to clipboard'}
+        data-copied={isCopied ? 'true' : undefined}
         className={cn(
-          'absolute right-1.5 top-1/2 -translate-y-1/2 rounded-full border border-transparent p-1',
-          'text-tertiary-token hover:border-(--linear-app-frame-seam) hover:bg-surface-1 hover:text-primary-token',
-          'transition-colors',
-          isCopied && 'text-success',
+          'system-b-copy-link-button absolute right-1.5 rounded-full border p-1',
           buttonClassName
         )}
       >
         <span className='relative flex h-3.5 w-3.5 items-center justify-center'>
           <Icon
             name='Copy'
-            className={cn(
-              'absolute h-3.5 w-3.5 transition-all duration-150',
-              isCopied ? 'scale-50 opacity-0' : 'scale-100 opacity-100'
-            )}
+            className='system-b-copy-link-icon absolute h-3.5 w-3.5'
+            data-visible={isCopied ? 'false' : 'true'}
             aria-hidden='true'
           />
           <Icon
             name='Check'
-            className={cn(
-              'absolute h-3.5 w-3.5 transition-all duration-150',
-              isCopied ? 'scale-100 opacity-100' : 'scale-50 opacity-0'
-            )}
+            className='system-b-copy-link-icon absolute h-3.5 w-3.5'
+            data-visible={isCopied ? 'true' : 'false'}
             aria-hidden='true'
           />
         </span>

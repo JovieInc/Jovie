@@ -4348,6 +4348,76 @@ body:has(.system-b-download-page) .marketing-glass-header__cta:focus-visible {
   }
 }
 
+.system-b-copy-link-input {
+  border-color: var(--system-b-app-frame-seam);
+  background: var(--system-b-bg-surface-0);
+  color: var(--color-text-secondary-token);
+  transition:
+    background-color var(--duration-fast) var(--ease-subtle),
+    border-color var(--duration-fast) var(--ease-subtle),
+    color var(--duration-fast) var(--ease-subtle),
+    box-shadow var(--duration-fast) var(--ease-subtle);
+}
+
+.system-b-copy-link-input:focus-visible {
+  border-color: var(--color-border-focus);
+  box-shadow: 0 0 0 1px var(--color-border-focus);
+}
+
+.system-b-copy-link-input[data-copied="true"] {
+  border-color: color-mix(
+    in oklab,
+    var(--color-success) 34%,
+    var(--system-b-app-frame-seam)
+  );
+  background: color-mix(
+    in oklab,
+    var(--color-success) 8%,
+    var(--system-b-bg-surface-0)
+  );
+  color: var(--color-text-primary-token);
+}
+
+.system-b-copy-link-button {
+  top: 50%;
+  transform: translateY(-50%);
+  border-color: transparent;
+  color: var(--color-text-tertiary-token);
+  transition:
+    background-color var(--duration-fast) var(--ease-subtle),
+    border-color var(--duration-fast) var(--ease-subtle),
+    color var(--duration-fast) var(--ease-subtle);
+}
+
+.system-b-copy-link-button:hover {
+  border-color: var(--system-b-app-frame-seam);
+  background: var(--system-b-bg-surface-1);
+  color: var(--color-text-primary-token);
+}
+
+.system-b-copy-link-button[data-copied="true"] {
+  border-color: color-mix(
+    in oklab,
+    var(--color-success) 32%,
+    var(--system-b-app-frame-seam)
+  );
+  background: color-mix(
+    in oklab,
+    var(--color-success) 10%,
+    var(--system-b-bg-surface-1)
+  );
+  color: var(--color-success);
+}
+
+.system-b-copy-link-icon {
+  opacity: 0;
+  transition: opacity var(--duration-fast) var(--ease-subtle);
+}
+
+.system-b-copy-link-icon[data-visible="true"] {
+  opacity: 1;
+}
+
 :where(.system-b-chat-composer-surface) {
   border: 1px solid
     color-mix(in oklab, var(--system-b-app-frame-seam) 84%, transparent);
