@@ -29,7 +29,7 @@ export default function HomeLayout({
       <main id='main-content' className='flex min-h-[100svh] flex-1 flex-col'>
         {children}
       </main>
-      <HomeLegalFooter />
+      <HomeLegalFooter className='system-b-mounted-home-footer' />
     </div>
   );
 }
