@@ -20,14 +20,11 @@ interface SkillChipProps {
 export function SkillChip({ label, onRemove, removeLabel }: SkillChipProps) {
   return (
     <span
-      className='inline-flex h-7 max-w-[220px] shrink-0 items-center gap-1.5 rounded-[9px] border border-white/[0.085] bg-white/[0.035] px-2 text-[13px] font-medium leading-none text-primary-token shadow-[inset_0_1px_0_rgba(255,255,255,0.045)] select-none'
+      className='system-b-skill-chip'
       title={label}
       data-testid='skill-chip'
     >
-      <span
-        aria-hidden
-        className='h-1.5 w-1.5 shrink-0 rounded-full bg-tertiary-token'
-      />
+      <span aria-hidden className='system-b-skill-chip-dot' />
       <span className='min-w-0 truncate'>{label}</span>
       {onRemove ? (
         <button
@@ -39,7 +36,7 @@ export function SkillChip({ label, onRemove, removeLabel }: SkillChipProps) {
           onClick={() => {
             onRemove();
           }}
-          className='-mr-0.5 inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-sm text-tertiary-token transition-colors duration-fast hover:bg-white/[0.07] hover:text-primary-token focus:outline-none focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-white/30'
+          className='system-b-skill-chip-remove'
         >
           <X className='h-3 w-3' />
         </button>

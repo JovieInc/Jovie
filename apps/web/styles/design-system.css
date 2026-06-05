@@ -2389,6 +2389,62 @@ body:has(.system-b-download-page) .marketing-glass-header__cta:focus-visible {
   box-shadow: 0 0 0 1px color-mix(in oklab, white 30%, transparent);
 }
 
+.system-b-skill-chip {
+  display: inline-flex;
+  height: 1.75rem;
+  max-width: 220px;
+  flex-shrink: 0;
+  align-items: center;
+  gap: var(--space-1-5);
+  border: 1px solid var(--system-b-app-frame-seam);
+  border-radius: var(--radius-full);
+  background: var(--system-b-bg-surface-1);
+  color: var(--color-text-primary-token);
+  font-size: var(--text-app);
+  font-weight: var(--font-weight-medium);
+  line-height: 1;
+  padding-inline: var(--space-2);
+  user-select: none;
+}
+
+.system-b-skill-chip-dot {
+  width: var(--space-1-5);
+  height: var(--space-1-5);
+  flex-shrink: 0;
+  border-radius: var(--radius-full);
+  background: var(--color-text-tertiary-token);
+}
+
+.system-b-skill-chip-remove {
+  display: inline-flex;
+  width: var(--space-4);
+  height: var(--space-4);
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  margin-right: calc(var(--space-0-5) * -1);
+  border-radius: var(--radius-full);
+  color: var(--color-text-tertiary-token);
+  transition:
+    background-color var(--system-b-duration-fast) var(--system-b-ease),
+    color var(--system-b-duration-fast) var(--system-b-ease);
+}
+
+.system-b-skill-chip-remove:hover {
+  background: var(--system-b-bg-surface-2);
+  color: var(--color-text-primary-token);
+}
+
+.system-b-skill-chip-remove:focus,
+.system-b-skill-chip-remove:focus-visible {
+  outline: none;
+}
+
+.system-b-skill-chip-remove:focus-visible {
+  box-shadow: 0 0 0 1px
+    color-mix(in oklab, var(--color-border-focus) 36%, transparent);
+}
+
 .system-b-entity-chip-popover-content {
   z-index: 150;
   width: min(272px, calc(100vw - var(--space-6)));
