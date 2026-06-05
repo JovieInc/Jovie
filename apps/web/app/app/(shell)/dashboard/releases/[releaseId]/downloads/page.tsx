@@ -233,9 +233,8 @@ export default function PromoDownloadsPage() {
                 }}
                 onDrop={handleDrop}
                 className={cn(
-                  'flex min-h-[154px] flex-col items-center justify-center rounded-lg border border-dashed border-(--linear-app-frame-seam) bg-surface-0 px-4 py-6 text-center transition-[background-color,border-color]',
-                  isDragging &&
-                    'border-(--linear-border-focus) bg-[color-mix(in_oklab,var(--linear-border-focus)_8%,var(--linear-bg-surface-0))]'
+                  'flex min-h-[154px] flex-col items-center justify-center rounded-lg border border-dashed border-subtle bg-surface-0 px-4 py-6 text-center transition-[background-color,border-color,box-shadow]',
+                  isDragging && 'border-focus bg-surface-1 ring-2 ring-focus/20'
                 )}
                 data-testid='promo-download-dropzone'
               >
