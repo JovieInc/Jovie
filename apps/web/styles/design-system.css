@@ -2445,6 +2445,244 @@ body:has(.system-b-download-page) .marketing-glass-header__cta:focus-visible {
     color-mix(in oklab, var(--color-border-focus) 36%, transparent);
 }
 
+:where(.system-b-thread-media-card) {
+  overflow: hidden;
+  border: 1px solid var(--system-b-app-shell-border);
+  border-radius: var(--radius-xl);
+  background: color-mix(
+    in oklab,
+    var(--system-b-bg-surface-0) 72%,
+    transparent
+  );
+}
+
+:where(.system-b-thread-media-preview) {
+  position: relative;
+  display: block;
+  width: 100%;
+  background: var(--system-b-bg-surface-2);
+}
+
+:where(.system-b-thread-image-preview) {
+  aspect-ratio: 16 / 10;
+}
+
+:where(.system-b-thread-video-preview) {
+  aspect-ratio: 16 / 9;
+}
+
+:where(.system-b-thread-video-preview:focus-visible) {
+  outline: none;
+  box-shadow: 0 0 0 2px
+    color-mix(in oklab, var(--color-border-focus) 55%, transparent);
+}
+
+:where(.system-b-thread-media-generating) {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+}
+
+:where(.system-b-thread-image-shimmer) {
+  position: absolute;
+  inset: 0;
+  animation: shimmer 2.4s ease-in-out infinite;
+  background-image: linear-gradient(
+    110deg,
+    transparent,
+    color-mix(in oklab, var(--color-text-primary-token) 4%, transparent) 35%,
+    color-mix(in oklab, var(--system-b-accent-cyan) 8%, transparent) 50%,
+    color-mix(in oklab, var(--color-text-primary-token) 4%, transparent) 65%,
+    transparent
+  );
+  background-size: 200% 100%;
+}
+
+:where(.system-b-thread-generating-copy) {
+  position: relative;
+  max-width: calc(var(--space-24) * 4);
+  padding-inline: var(--space-6);
+  color: var(--color-text-tertiary-token);
+  font-size: var(--text-xs);
+  line-height: var(--leading-normal);
+  text-align: center;
+}
+
+:where(.system-b-thread-video-backdrop) {
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(
+      ellipse at 60% 40%,
+      color-mix(in oklab, var(--color-text-primary-token) 6%, transparent),
+      transparent 60%
+    ),
+    linear-gradient(
+      135deg,
+      var(--system-b-bg-surface-2),
+      var(--system-b-bg-page)
+    );
+}
+
+:where(.system-b-thread-play-shell) {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+}
+
+:where(.system-b-thread-play-button) {
+  display: grid;
+  width: var(--space-12);
+  height: var(--space-12);
+  place-items: center;
+  border-radius: var(--radius-full);
+  background: var(--system-b-primary-bg);
+  color: var(--system-b-primary-fg);
+  transition:
+    background-color var(--system-b-duration-fast) var(--system-b-ease),
+    opacity var(--system-b-duration-fast) var(--system-b-ease);
+}
+
+:where(
+    .system-b-thread-video-preview:hover
+      .system-b-thread-play-button[data-interactive="true"]
+  ) {
+  background: color-mix(
+    in oklab,
+    var(--system-b-primary-bg) 94%,
+    var(--system-b-bg-surface-2)
+  );
+}
+
+:where(.system-b-thread-play-button[data-interactive="false"]) {
+  background: color-mix(in oklab, var(--system-b-primary-bg) 42%, transparent);
+}
+
+:where(.system-b-thread-duration-badge) {
+  position: absolute;
+  right: var(--space-2);
+  bottom: var(--space-2);
+  display: inline-flex;
+  height: var(--space-5);
+  align-items: center;
+  border-radius: var(--radius-sm);
+  background: color-mix(in oklab, var(--system-b-bg-page) 64%, transparent);
+  color: var(--color-text-primary-token);
+  font-family: var(--font-caption);
+  font-size: var(--text-3xs);
+  font-variant-numeric: tabular-nums;
+  line-height: var(--leading-none);
+  padding-inline: var(--space-1-5);
+}
+
+:where(.system-b-thread-media-footer) {
+  display: flex;
+  height: calc(var(--space-8) + var(--space-1));
+  align-items: center;
+  gap: var(--space-2);
+  border-top: 1px solid
+    color-mix(in oklab, var(--system-b-app-shell-border) 60%, transparent);
+  padding-inline: var(--space-3);
+}
+
+:where(.system-b-thread-media-icon) {
+  width: var(--space-3);
+  height: var(--space-3);
+  flex-shrink: 0;
+  color: color-mix(in oklab, var(--system-b-accent-cyan) 80%, transparent);
+}
+
+:where(.system-b-thread-media-label) {
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
+  color: var(--color-text-tertiary-token);
+  font-size: var(--text-2xs);
+  line-height: var(--leading-none);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+:where(.system-b-thread-audio-card) {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-2-5) var(--space-3);
+}
+
+:where(.system-b-thread-audio-artwork) {
+  display: grid;
+  width: var(--space-10);
+  height: var(--space-10);
+  flex-shrink: 0;
+  place-items: center;
+  border-radius: var(--radius-sm);
+  background: var(--system-b-bg-surface-2);
+  box-shadow: var(--shadow-button-inset);
+}
+
+:where(.system-b-thread-audio-copy) {
+  min-width: 0;
+  flex: 1;
+}
+
+:where(.system-b-thread-audio-title) {
+  margin: 0;
+  overflow: hidden;
+  color: var(--color-text-primary-token);
+  font-size: var(--text-app);
+  font-weight: var(--font-weight-medium);
+  line-height: var(--leading-tight);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+:where(.system-b-thread-audio-meta) {
+  margin: 0;
+  overflow: hidden;
+  color: var(--color-text-tertiary-token);
+  font-size: var(--text-2xs);
+  line-height: var(--leading-normal);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+:where(.system-b-thread-audio-play) {
+  display: grid;
+  width: var(--space-8);
+  height: var(--space-8);
+  flex-shrink: 0;
+  place-items: center;
+  border-radius: var(--radius-full);
+  background: var(--system-b-primary-bg);
+  color: var(--system-b-primary-fg);
+  transition:
+    background-color var(--system-b-duration-fast) var(--system-b-ease),
+    opacity var(--system-b-duration-fast) var(--system-b-ease);
+}
+
+:where(.system-b-thread-audio-play:hover:not(:disabled)) {
+  background: color-mix(
+    in oklab,
+    var(--system-b-primary-bg) 92%,
+    var(--system-b-bg-surface-2)
+  );
+}
+
+:where(.system-b-thread-audio-play:disabled) {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+:where(.system-b-thread-audio-play:focus-visible) {
+  outline: none;
+  box-shadow:
+    0 0 0 2px var(--system-b-bg-page),
+    0 0 0 4px color-mix(in oklab, var(--color-border-focus) 55%, transparent);
+}
+
 .system-b-entity-chip-popover-content {
   z-index: 150;
   width: min(272px, calc(100vw - var(--space-6)));
