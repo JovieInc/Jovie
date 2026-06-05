@@ -4791,7 +4791,7 @@ body:has(.home-viewport)::-webkit-scrollbar {
 .system-b-mounted-home-hero-shell {
   position: relative;
   display: flex;
-  min-height: 100svh;
+  min-height: 100vh;
   flex-direction: column;
   overflow-x: clip;
   isolation: isolate;
@@ -4800,7 +4800,7 @@ body:has(.home-viewport)::-webkit-scrollbar {
 }
 
 .system-b-mounted-home-hero-shell::before {
-  background: color-mix(in oklab, var(--system-b-bg-page) 92%, transparent);
+  background: var(--system-b-bg-page);
   opacity: 1;
 }
 
@@ -4859,12 +4859,7 @@ body:has(.home-viewport)::-webkit-scrollbar {
 }
 
 .system-b-mounted-home-hero-primary {
-  border: 1px solid
-    color-mix(
-      in oklab,
-      var(--system-b-primary-bg) 72%,
-      var(--system-b-app-frame-seam) 28%
-    );
+  border: 1px solid var(--system-b-app-frame-seam);
   background: var(--system-b-primary-bg);
   color: var(--system-b-primary-fg);
 }
@@ -4876,6 +4871,28 @@ body:has(.home-viewport)::-webkit-scrollbar {
 .system-b-mounted-home-hero-secondary:hover,
 .system-b-mounted-home-hero-secondary:focus-visible {
   color: var(--color-text-primary-token);
+}
+
+@supports (height: 100svh) {
+  .system-b-mounted-home-hero-shell {
+    min-height: 100svh;
+  }
+}
+
+@supports (
+    background: color-mix(in oklab, var(--system-b-bg-page) 50%, transparent)
+  ) {
+  .system-b-mounted-home-hero-shell::before {
+    background: color-mix(in oklab, var(--system-b-bg-page) 92%, transparent);
+  }
+
+  .system-b-mounted-home-hero-primary {
+    border-color: color-mix(
+      in oklab,
+      var(--system-b-primary-bg) 72%,
+      var(--system-b-app-frame-seam) 28%
+    );
+  }
 }
 
 /* SYSTEM B MOUNTED HOME HERO SHELL PRIMITIVES END */

@@ -105,7 +105,10 @@ describe('mounted homepage hero System B source contract', () => {
     expect(css).toContain('var(--color-text-primary-token)');
     expect(css).toContain('var(--color-text-tertiary-token)');
     expect(css).toContain('var(--space-');
+    expect(css).toContain('min-height: 100vh;');
     expect(css).toContain('min-height: 100svh;');
+    expect(css).toContain('@supports (height: 100svh)');
+    expect(css).toMatch(/@supports\s*\(\s*background:\s*color-mix\(/);
     expect(css).toContain(
       'min-height: calc(var(--space-10) + var(--space-0-5));'
     );
