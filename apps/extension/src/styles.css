@@ -209,10 +209,14 @@ button {
 }
 
 .entity-card-action {
-  color: var(--extension-system-b-text-quaternary);
+  color: var(--extension-system-b-text-tertiary);
   font-size: var(--extension-system-b-text-xs);
   font-weight: 510;
   white-space: nowrap;
+}
+
+.entity-card-active .entity-card-action {
+  color: var(--extension-system-b-text-secondary);
 }
 
 .entity-detail-header {
@@ -341,7 +345,6 @@ button {
 
 .signed-out-actions,
 .action-tray {
-  display: flex;
   min-height: var(--extension-system-b-dock-min-height);
   gap: var(--extension-system-b-space-3);
   border-radius: var(--extension-system-b-radius-lg);
@@ -350,13 +353,39 @@ button {
   padding: var(--extension-system-b-space-4);
 }
 
-.signed-out-actions .button,
-.action-tray .button {
+.signed-out-actions {
+  display: flex;
+}
+
+.signed-out-actions .button {
   flex: 1;
 }
 
 .action-tray {
+  display: grid;
+  grid-auto-rows: var(--extension-system-b-action-height);
+  overflow-x: hidden;
   box-shadow: var(--extension-system-b-shadow-dock);
+}
+
+.action-tray[data-action-count="1"] {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.action-tray[data-action-count="2"] {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.action-tray[data-action-count="3"] {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.action-tray .button {
+  width: 100%;
+  min-width: 0;
+  min-height: var(--extension-system-b-action-height);
+  padding-inline: var(--extension-system-b-space-3);
+  white-space: nowrap;
 }
 
 .prompt-dock-stacked {

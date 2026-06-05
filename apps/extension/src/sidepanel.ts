@@ -420,6 +420,9 @@ function renderShell(
   const contentChildren = children.filter(child => !isDockChild(child));
   const dockChildren = children.filter(isDockChild);
   const hasActionDock = dockChildren.length > 0;
+  if (hasActionDock) {
+    shell.dataset.hasActionDock = 'true';
+  }
 
   if (showTopRail) {
     const header = document.createElement('header');
@@ -534,7 +537,7 @@ function renderSummaryCard(summary: ExtensionSummaryResponse) {
 
   const eyebrow = document.createElement('p');
   eyebrow.className = 'eyebrow';
-  eyebrow.textContent = 'Page Context';
+  eyebrow.textContent = 'Suggested for this page';
 
   const title = document.createElement('h2');
   title.className = 'section-title';
@@ -625,7 +628,7 @@ function renderEntityDetail(entity: ExtensionEntitySummary) {
   const subtitle = document.createElement('p');
   subtitle.className = 'entity-card-meta';
   subtitle.textContent =
-    entity.subtitle ?? entity.metadataLine ?? 'Selected Entity';
+    entity.subtitle ?? entity.metadataLine ?? 'Selected entity';
   headerCopy.append(title, subtitle);
   header.appendChild(headerCopy);
   section.appendChild(header);
@@ -766,11 +769,11 @@ function renderPermissionCard(host: string) {
 
   const eyebrow = document.createElement('p');
   eyebrow.className = 'eyebrow';
-  eyebrow.textContent = 'Domain Access';
+  eyebrow.textContent = 'Enable domain';
 
   const title = document.createElement('h3');
   title.className = 'section-title';
-  title.textContent = `Enable Jovie On ${host}`;
+  title.textContent = `Enable Jovie on ${host}`;
 
   const body = document.createElement('p');
   body.className = 'section-body';
@@ -1201,6 +1204,7 @@ function renderReady(
     }
 
     if (actionTray.childElementCount > 0) {
+      actionTray.dataset.actionCount = String(actionTray.childElementCount);
       children.push(actionTray);
     }
   }
@@ -1222,7 +1226,7 @@ function render() {
   const selectedSummary = state.summary;
   if (!selectedSummary) {
     renderEmptyState(
-      'Jovie Is Standing By',
+      'Jovie is standing by',
       'Open a supported page to load your context.'
     );
     return;
