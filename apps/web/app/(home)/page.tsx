@@ -261,25 +261,34 @@ function HomepageProductStatement() {
 
   return (
     <section
-      className='homepage-product-statement'
+      className='homepage-product-statement system-b-mounted-home-product-statement'
       aria-labelledby='homepage-product-statement-heading'
       data-testid='homepage-product-statement'
     >
-      <div className='homepage-product-statement__inner'>
+      <div className='homepage-product-statement__inner system-b-mounted-home-product-statement-inner'>
         {copy.eyebrow ? (
-          <p className='homepage-section-eyebrow'>{copy.eyebrow}</p>
+          <p className='homepage-section-eyebrow system-b-mounted-home-product-statement-eyebrow'>
+            {copy.eyebrow}
+          </p>
         ) : null}
-        <h2 id='homepage-product-statement-heading'>
-          <span className='homepage-product-statement__lead'>{copy.lead}</span>{' '}
-          <span className='homepage-product-statement__body'>{copy.body}</span>
+        <h2
+          id='homepage-product-statement-heading'
+          className='system-b-mounted-home-product-statement-headline'
+        >
+          <span className='homepage-product-statement__lead system-b-mounted-home-product-statement-lead'>
+            {copy.lead}
+          </span>{' '}
+          <span className='homepage-product-statement__body system-b-mounted-home-product-statement-body'>
+            {copy.body}
+          </span>
         </h2>
         {FEATURE_FLAGS.SHOW_HOMEPAGE_AI_COMPOSER_SECTION ? (
           <div
-            className='homepage-product-statement__ai'
+            className='homepage-product-statement__ai system-b-mounted-home-product-statement-ai'
             data-testid='homepage-ai-composer-demo'
           >
             <HomeComposerHero />
-            <div className='homepage-product-statement__ai-copy'>
+            <div className='homepage-product-statement__ai-copy system-b-mounted-home-product-statement-ai-copy'>
               <h3>{aiCopy.headline}</h3>
               <p>{aiCopy.body}</p>
             </div>

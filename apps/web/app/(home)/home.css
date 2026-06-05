@@ -4950,3 +4950,99 @@ body:has(.home-viewport)::-webkit-scrollbar {
 }
 
 /* SYSTEM B MOUNTED HOME COMMAND CENTER PRIMITIVES END */
+
+/* ============================================
+   SYSTEM B MOUNTED HOME PRODUCT STATEMENT PRIMITIVES
+   ============================================ */
+
+.system-b-mounted-home-product-statement {
+  padding-block: clamp(
+      var(--space-24),
+      8vw,
+      calc(var(--space-24) + var(--space-8))
+    )
+    clamp(calc(var(--space-16) + var(--space-3)), 6.4vw, var(--space-24));
+  background: var(--system-b-bg-page);
+  color: var(--color-text-primary-token);
+}
+
+.homepage-story-stack--proof-transition
+  .system-b-mounted-home-product-statement {
+  padding-top: clamp(
+    calc(var(--space-24) + var(--space-3)),
+    9.4vw,
+    calc(var(--space-24) + var(--space-12))
+  );
+}
+
+.system-b-mounted-home-product-statement::before {
+  display: none;
+}
+
+.system-b-mounted-home-product-statement-inner {
+  gap: clamp(var(--space-8), 4.2vw, var(--space-16));
+}
+
+.system-b-mounted-home-product-statement
+  .system-b-mounted-home-product-statement-eyebrow {
+  color: var(--color-text-tertiary-token);
+}
+
+.system-b-mounted-home-product-statement
+  .system-b-mounted-home-product-statement-headline {
+  color: var(--color-text-tertiary-token);
+  font-size: var(--text-5xl);
+  letter-spacing: 0;
+}
+
+.system-b-mounted-home-product-statement-lead {
+  color: var(--color-text-primary-token);
+}
+
+.system-b-mounted-home-product-statement-body {
+  color: var(--color-text-tertiary-token);
+}
+
+.system-b-mounted-home-product-statement-ai {
+  color: var(--color-text-secondary-token);
+}
+
+.system-b-mounted-home-product-statement
+  .system-b-mounted-home-product-statement-ai-copy
+  h3 {
+  color: var(--color-text-primary-token);
+  letter-spacing: 0;
+}
+
+.system-b-mounted-home-product-statement
+  .system-b-mounted-home-product-statement-ai-copy
+  p {
+  color: var(--color-text-tertiary-token);
+}
+
+@media (max-width: 767px) {
+  .system-b-mounted-home-product-statement {
+    padding-block: clamp(
+        var(--space-20),
+        14vw,
+        calc(var(--space-24) + var(--space-1))
+      )
+      clamp(calc(var(--space-16) + var(--space-1)), 11vw, var(--space-20));
+  }
+
+  .homepage-story-stack--proof-transition
+    .system-b-mounted-home-product-statement {
+    padding-top: clamp(
+      calc(var(--space-20) + var(--space-0-5)),
+      14vw,
+      calc(var(--space-24) + var(--space-2))
+    );
+  }
+
+  .system-b-mounted-home-product-statement
+    .system-b-mounted-home-product-statement-headline {
+    font-size: var(--text-4xl);
+  }
+}
+
+/* SYSTEM B MOUNTED HOME PRODUCT STATEMENT PRIMITIVES END */
