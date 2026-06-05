@@ -71,7 +71,7 @@ export interface ChatProfileContextSummary {
 }
 
 const CHAT_ENTITY_RIGHT_PANEL_SHELL_CLASSNAME =
-  'hidden h-full min-h-0 w-[320px] shrink-0 overflow-hidden bg-(--linear-app-content-surface) lg:flex xl:w-[340px]';
+  'system-b-chat-entity-right-panel-shell hidden h-full min-h-0 w-[320px] shrink-0 overflow-hidden lg:flex xl:w-[340px]';
 
 function formatReleaseDate(value: string | undefined): string | null {
   if (!value) return null;
@@ -203,7 +203,7 @@ function ChatEntityContextCard({
       data-context-kind={target.kind}
       className='group relative flex min-w-0 items-center gap-3 rounded-lg px-3 py-2.5 text-left transition-colors hover:bg-surface-1'
     >
-      <div className='flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-cyan-400/[0.08] text-cyan-300'>
+      <div className='system-b-chat-entity-context-icon'>
         <ChatRailContextIcon kind={target.kind} />
       </div>
       <div className='min-w-0 flex-1'>
@@ -410,7 +410,7 @@ function ChatEntityPanelSection({
   children: ReactNode;
 }>) {
   return (
-    <section className='border-t border-[color-mix(in_oklab,var(--linear-app-shell-border)_58%,transparent)] px-4 py-4'>
+    <section className='system-b-chat-entity-panel-section px-4 py-4'>
       <div className='mb-3 flex items-center gap-2 text-[12px] font-semibold text-secondary-token'>
         {icon}
         <h3>{title}</h3>
@@ -464,10 +464,10 @@ function ChatReleaseEntityPanel({
   return (
     <TableContextMenu items={contextMenuItems}>
       <aside
-        className='flex h-full min-h-0 w-full flex-col overflow-hidden bg-(--linear-app-content-surface)'
+        className='system-b-chat-entity-panel-surface flex h-full min-h-0 w-full flex-col overflow-hidden'
         data-testid='chat-release-entity-panel'
       >
-        <div className='flex shrink-0 items-center justify-between border-b border-[color-mix(in_oklab,var(--linear-app-shell-border)_64%,transparent)] px-4 py-3'>
+        <div className='system-b-chat-entity-panel-header flex shrink-0 items-center justify-between px-4 py-3'>
           <div className='min-w-0'>
             <p className='text-[11px] text-tertiary-token'>Release</p>
             <h2 className='truncate text-[13px] font-semibold text-primary-token'>
@@ -729,10 +729,10 @@ function ChatSimpleEntityPanel({
   const hasContent = !loading && children !== null;
   return (
     <aside
-      className='flex h-full min-h-0 w-full flex-col overflow-hidden bg-(--linear-app-content-surface)'
+      className='system-b-chat-entity-panel-surface flex h-full min-h-0 w-full flex-col overflow-hidden'
       data-testid={testId}
     >
-      <div className='flex shrink-0 items-center justify-between border-b border-[color-mix(in_oklab,var(--linear-app-shell-border)_64%,transparent)] px-4 py-3'>
+      <div className='system-b-chat-entity-panel-header flex shrink-0 items-center justify-between px-4 py-3'>
         <div className='min-w-0'>
           <p className='text-[11px] text-tertiary-token'>{eyebrow}</p>
           <h2 className='truncate text-[13px] font-semibold text-primary-token'>
@@ -910,10 +910,10 @@ function ChatProfileBentoPanel({
   return (
     <TableContextMenu items={contextMenuItems}>
       <aside
-        className='flex h-full min-h-0 w-full flex-col overflow-hidden bg-(--linear-app-content-surface)'
+        className='system-b-chat-entity-panel-surface flex h-full min-h-0 w-full flex-col overflow-hidden'
         data-testid='chat-profile-bento-panel'
       >
-        <div className='flex shrink-0 items-center justify-between border-b border-[color-mix(in_oklab,var(--linear-app-shell-border)_64%,transparent)] px-4 py-3'>
+        <div className='system-b-chat-entity-panel-header flex shrink-0 items-center justify-between px-4 py-3'>
           <div className='min-w-0'>
             <p className='text-[11px] text-tertiary-token'>Profile</p>
             <h2 className='truncate text-[13px] font-semibold text-primary-token'>
@@ -1101,7 +1101,7 @@ export function ChatEntityRightPanelHost({
           className={cn(CHAT_ENTITY_RIGHT_PANEL_SHELL_CLASSNAME, 'flex-col')}
           data-testid='chat-rail-context-and-entity-panel'
         >
-          <div className='shrink-0 border-b border-[color-mix(in_oklab,var(--linear-app-shell-border)_64%,transparent)]'>
+          <div className='system-b-chat-entity-panel-context-divider shrink-0'>
             {contextCards}
           </div>
           <div className='min-h-0 flex-1'>{entityPanel}</div>
