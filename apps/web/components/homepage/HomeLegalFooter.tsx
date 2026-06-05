@@ -1,5 +1,9 @@
 import { MarketingFooter } from '@/components/site/MarketingFooter';
 
-export function HomeLegalFooter() {
-  return <MarketingFooter variant='expanded' />;
+interface HomeLegalFooterProps {
+  readonly className?: string;
+}
+
+export function HomeLegalFooter({ className }: HomeLegalFooterProps) {
+  return <MarketingFooter variant='expanded' className={className} />;
 }

@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { HomepageV2FinalCta } from '@/components/marketing/homepage-v2/HomepageV2Route';
 
 describe('HomepageV2FinalCta', () => {
-  it('renders the static CTA contract without a media background', () => {
+  it('renders the static CTA contract without decorative media', () => {
     const { container } = render(<HomepageV2FinalCta />);
 
     expect(screen.getByTestId('homepage-v2-final-cta')).toBeInTheDocument();
@@ -22,6 +22,6 @@ describe('HomepageV2FinalCta', () => {
     expect(
       screen.queryByTestId('homepage-v2-final-cta-video')
     ).not.toBeInTheDocument();
-    expect(container.querySelector('svg')).toBeInTheDocument();
+    expect(container.querySelector('svg')).not.toBeInTheDocument();
   });
 });
