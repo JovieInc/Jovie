@@ -32,7 +32,7 @@ function getButtonIcon(
   if (showStop) {
     return {
       key: 'stop',
-      icon: <span className='block h-3 w-3 rounded-[2px] bg-current' />,
+      icon: <span className='block h-3 w-3 rounded-sm bg-current' />,
     };
   }
   if (isLoading || isSubmitting) {
@@ -81,10 +81,8 @@ export function ComposerSendButton({
         onClick={showStop ? onStop : onSend}
         disabled={!showStop && !canSend}
         className={cn(
-          'flex h-9 w-9 shrink-0 items-center justify-center rounded-full transition-[background-color,color,box-shadow] duration-fast',
-          isInteractive
-            ? 'bg-gradient-to-b from-white to-[#e8e8eb] text-black shadow-[inset_0_0.5px_0_rgba(255,255,255,0.68),inset_0_-0.5px_0_rgba(0,0,0,0.1),0_1px_3px_rgba(0,0,0,0.42)] hover:shadow-[inset_0_0.5px_0_rgba(255,255,255,0.78),inset_0_-0.5px_0_rgba(0,0,0,0.12),0_4px_14px_-4px_rgba(0,0,0,0.62)]'
-            : 'cursor-not-allowed bg-white/[0.045] text-quaternary-token shadow-[inset_0_0_0_0.5px_rgba(255,255,255,0.045)]'
+          'system-b-chat-composer-primary-action flex h-9 w-9 shrink-0 items-center justify-center rounded-full',
+          !isInteractive && 'cursor-not-allowed'
         )}
         aria-label={showStop ? 'Stop generating' : 'Send message'}
       >
@@ -139,8 +137,7 @@ export function ComposerAttachButton({
           onMouseDown={onMouseDown}
           disabled={isImageProcessing || isLoading || isSubmitting || disabled}
           className={cn(
-            'flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-transparent bg-[color-mix(in_oklab,var(--linear-app-content-surface)_88%,var(--linear-bg-surface-0))] text-tertiary-token transition-[background-color,border-color,color,box-shadow] duration-fast',
-            'hover:border-(--linear-app-shell-border) hover:bg-surface-1/60 hover:text-primary-token hover:shadow-[inset_0_0_0_0.5px_rgba(255,255,255,0.055)]',
+            'system-b-chat-composer-icon-button flex h-9 w-9 shrink-0 items-center justify-center rounded-full',
             'disabled:cursor-not-allowed disabled:opacity-50'
           )}
           aria-label='Attachment options'
@@ -158,7 +155,7 @@ export function ComposerAttachButton({
         sideOffset={8}
         alignOffset={-4}
         collisionPadding={16}
-        className='w-48 rounded-xl border border-(--linear-app-shell-border) bg-(--linear-app-content-surface)/95 p-1.5 shadow-[0_12px_40px_rgba(0,0,0,0.32)] backdrop-blur-xl'
+        className='system-b-chat-composer-menu w-48 p-1.5'
       >
         <DropdownMenuItem
           className='min-h-9 gap-2 rounded-lg px-2.5 py-2'
@@ -204,13 +201,12 @@ export function ComposerMicButton({
         onMouseDown={onMouseDown}
         onClick={onToggle}
         disabled={isLoading || isSubmitting || !isSupported}
+        data-active={isListening ? 'true' : undefined}
         className={cn(
-          'flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-transparent bg-[color-mix(in_oklab,var(--linear-app-content-surface)_88%,var(--linear-bg-surface-0))] transition-[background-color,border-color,color,box-shadow] duration-fast',
+          'system-b-chat-composer-icon-button flex h-9 w-9 shrink-0 items-center justify-center rounded-full',
           !isSupported
             ? 'text-quaternary-token'
-            : isListening
-              ? 'border border-[color-mix(in_oklab,var(--geist-cyan-solid)_24%,transparent)] bg-[color-mix(in_oklab,var(--geist-cyan-solid)_12%,var(--linear-app-content-surface))] text-[color:var(--geist-cyan-solid)] hover:bg-[color-mix(in_oklab,var(--geist-cyan-solid)_16%,var(--linear-app-content-surface))] hover:text-[color:var(--geist-cyan-solid)]'
-              : 'text-tertiary-token hover:border-(--linear-app-shell-border) hover:bg-surface-1/60 hover:text-primary-token hover:shadow-[inset_0_0_0_0.5px_rgba(255,255,255,0.055)]',
+            : !isListening && 'text-tertiary-token',
           'disabled:cursor-not-allowed disabled:opacity-50'
         )}
         aria-label={label}

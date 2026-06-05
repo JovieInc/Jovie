@@ -275,7 +275,7 @@ describe('ChatInput', () => {
     expect(textarea.value).toBe('Please /skill:submitFeedback');
   });
 
-  it('renders the elevated no-shadow composer geometry', () => {
+  it('renders the tokenized composer geometry', () => {
     fastRender(
       withProviders(
         <ChatInput {...baseProps} value='' onImageAttach={vi.fn()} />
@@ -283,17 +283,18 @@ describe('ChatInput', () => {
     );
 
     const surface = screen.getByTestId('chat-composer-surface');
-    expect(surface.className).toContain('--linear-app-content-surface');
-    expect(surface.className).toContain('--linear-app-frame-seam');
-    expect(surface.className).toContain('shadow-none');
-    expect(surface.className).toContain('--linear-border-focus');
+    expect(surface).toHaveClass('system-b-chat-composer-surface');
+    expect(surface).not.toHaveAttribute('data-hero');
+    expect(surface).not.toHaveAttribute('data-expanded');
+    expect(surface).not.toHaveAttribute('data-over-limit');
+    expect(surface.className).not.toMatch(/--linear-|color-mix\(|shadow-\[/);
 
     const textarea = screen.getByRole('textbox', {
       name: /chat message input/i,
     });
     expect(textarea.className).toContain('text-[15px]');
     expect(textarea.className).toContain('leading-6');
-    expect(textarea.className).toContain('text-white/92');
+    expect(textarea.className).toContain('text-primary-token');
     expect(textarea.className).toContain('focus-visible:shadow-none!');
     expect(textarea).toHaveStyle({
       boxShadow: 'none',
@@ -447,9 +448,9 @@ describe('ChatInput', () => {
     expect(MockSpeechRecognition.instances).toHaveLength(1);
     expect(MockSpeechRecognition.instances[0]?.start).toHaveBeenCalledTimes(1);
     expect(dictationButton).toHaveAttribute('aria-pressed', 'true');
-    expect(dictationButton.className).toContain(
-      'bg-[color-mix(in_oklab,var(--geist-cyan-solid)_12%,var(--linear-app-content-surface))]'
-    );
+    expect(dictationButton).toHaveClass('system-b-chat-composer-icon-button');
+    expect(dictationButton).toHaveAttribute('data-active', 'true');
+    expect(dictationButton).not.toHaveClass('text-tertiary-token');
     expect(
       screen.getByRole('button', { name: /stop dictation/i })
     ).toBeEnabled();

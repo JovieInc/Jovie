@@ -4348,6 +4348,140 @@ body:has(.system-b-download-page) .marketing-glass-header__cta:focus-visible {
   }
 }
 
+:where(.system-b-chat-composer-surface) {
+  border: 1px solid
+    color-mix(in oklab, var(--system-b-app-frame-seam) 84%, transparent);
+  background: var(--system-b-app-content-surface);
+  color: var(--color-text-primary-token);
+  box-shadow: none;
+}
+
+:where(.system-b-chat-composer-surface[data-hero="true"]) {
+  background: color-mix(
+    in oklab,
+    var(--system-b-app-content-surface) 88%,
+    var(--system-b-cinematic-black) 12%
+  );
+  box-shadow: var(--shadow-card-elevated);
+}
+
+:where(.system-b-chat-composer-surface[data-expanded="true"]) {
+  border-color: color-mix(
+    in oklab,
+    var(--color-border-focus) 46%,
+    var(--system-b-app-frame-seam)
+  );
+}
+
+:where(
+    .system-b-chat-composer-surface[data-hero="true"][data-expanded="true"]
+  ) {
+  background: color-mix(
+    in oklab,
+    var(--system-b-app-content-surface) 82%,
+    var(--system-b-bg-surface-1) 18%
+  );
+}
+
+:where(.system-b-chat-composer-surface:focus-within) {
+  border-color: color-mix(in oklab, var(--color-border-focus) 78%, transparent);
+  box-shadow: 0 0 0 1px
+    color-mix(in oklab, var(--color-border-focus) 42%, transparent);
+}
+
+:where(.system-b-chat-composer-surface[data-over-limit="true"]) {
+  border-color: var(--color-error);
+}
+
+:where(.system-b-chat-composer-seam) {
+  border-color: color-mix(
+    in oklab,
+    var(--system-b-app-shell-border) 60%,
+    transparent
+  );
+}
+
+:where(.system-b-chat-composer-picker-shell) {
+  border: 1px solid var(--system-b-app-frame-seam);
+  border-radius: var(--radius-2xl);
+  background: var(--system-b-bg-surface-1);
+  box-shadow: var(--shadow-popover);
+}
+
+:where(.system-b-chat-composer-preview-empty) {
+  padding-top: calc(var(--space-5) + var(--space-0-5));
+  padding-bottom: calc(var(--space-5) + var(--space-0-5));
+  color: var(--color-text-tertiary-token);
+  font-size: var(--text-xs);
+}
+
+:where(.system-b-chat-composer-icon-button) {
+  border: 1px solid transparent;
+  background: color-mix(
+    in oklab,
+    var(--system-b-app-content-surface) 88%,
+    var(--system-b-bg-surface-0)
+  );
+  transition:
+    background-color var(--duration-fast) var(--ease-subtle),
+    border-color var(--duration-fast) var(--ease-subtle),
+    color var(--duration-fast) var(--ease-subtle),
+    box-shadow var(--duration-fast) var(--ease-subtle);
+}
+
+:where(.system-b-chat-composer-icon-button:not(:disabled):hover),
+:where(.system-b-chat-composer-icon-button[data-state="open"]) {
+  border-color: var(--system-b-app-shell-border);
+  background: var(--system-b-bg-surface-1);
+  color: var(--color-text-primary-token);
+  box-shadow: inset 0 0 0 1px
+    color-mix(in oklab, var(--system-b-app-shell-border) 40%, transparent);
+}
+
+:where(.system-b-chat-composer-icon-button[data-active="true"]) {
+  border-color: var(--color-border-default);
+  background: var(--system-b-bg-surface-2);
+  color: var(--color-text-primary-token);
+}
+
+:where(.system-b-chat-composer-icon-button:disabled) {
+  color: var(--color-text-quaternary-token);
+}
+
+:where(.system-b-chat-composer-primary-action) {
+  border: 1px solid transparent;
+  background: var(--color-btn-primary-bg);
+  color: var(--color-btn-primary-fg);
+  box-shadow: var(--shadow-button-inset);
+  transition:
+    background-color var(--duration-fast) var(--ease-subtle),
+    color var(--duration-fast) var(--ease-subtle),
+    box-shadow var(--duration-fast) var(--ease-subtle);
+}
+
+:where(.system-b-chat-composer-primary-action:not(:disabled):hover) {
+  background: var(--color-btn-primary-hover);
+}
+
+:where(.system-b-chat-composer-primary-action:disabled) {
+  background: var(--system-b-bg-surface-1);
+  color: var(--color-text-quaternary-token);
+  box-shadow: inset 0 0 0 1px var(--color-border-subtle);
+}
+
+:where(.system-b-chat-composer-menu) {
+  overflow: hidden;
+  border: 1px solid var(--system-b-app-shell-border);
+  border-radius: var(--radius-xl);
+  background: color-mix(
+    in oklab,
+    var(--system-b-app-content-surface) 95%,
+    transparent
+  );
+  box-shadow: var(--shadow-popover);
+  backdrop-filter: blur(var(--space-4));
+}
+
 :where(.system-b-chat-pitch-count) {
   color: var(--color-text-tertiary-token);
   font-size: var(--text-3xs);
