@@ -455,7 +455,7 @@ export default async function HomePage() {
           </div>
         </div>
       </section>
-      <div className='homepage-trust-section'>
+      <div className='homepage-trust-section system-b-mounted-home-trust-strip-shell'>
         <HomeTrustSection
           label='Used by artists and teams with releases distributed through'
           presentation='inline-strip'

@@ -5116,3 +5116,191 @@ body:has(.home-viewport)::-webkit-scrollbar {
 }
 
 /* SYSTEM B MOUNTED HOME WORKSPACE SHELL PRIMITIVES END */
+
+/* ============================================
+   SYSTEM B MOUNTED HOME TRUST STRIP PRIMITIVES
+   ============================================ */
+
+.system-b-mounted-home-trust-strip-shell {
+  background: var(--system-b-bg-page);
+  color: var(--color-text-primary-token);
+}
+
+.system-b-mounted-home-trust-strip-shell
+  > .system-b-mounted-home-trust-strip[data-presentation="inline-strip"] {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  margin-inline: auto;
+  overflow: hidden;
+  padding-block: clamp(var(--space-12), 5vw, var(--space-16))
+    clamp(var(--space-16), 7vw, var(--space-20));
+  padding-inline: var(--homepage-page-gutter);
+  background: var(--system-b-bg-page);
+  color: var(--color-text-primary-token);
+}
+
+.system-b-mounted-home-trust-strip-shell
+  > .system-b-mounted-home-trust-strip[data-presentation="inline-strip"]
+  > .system-b-mounted-home-trust-strip-inner {
+  width: 100%;
+  max-width: var(--homepage-section-max);
+  margin-inline: auto;
+  padding-inline: 0;
+  text-align: center;
+}
+
+.system-b-mounted-home-trust-strip .system-b-mounted-home-trust-strip-label {
+  margin: 0 0 clamp(var(--space-6), 3vw, var(--space-10));
+  color: var(--color-text-tertiary-token);
+  font-size: var(--text-xs);
+  font-weight: var(--font-weight-medium);
+  line-height: var(--leading-normal);
+  letter-spacing: 0;
+}
+
+.system-b-mounted-home-trust-strip
+  .system-b-mounted-home-trust-strip-logo-grid {
+  display: grid;
+  grid-template-columns:
+    minmax(var(--space-24), 0.95fr) minmax(var(--space-24), 1fr)
+    minmax(calc(var(--space-24) + var(--space-20)), 1.38fr)
+    minmax(var(--space-24), 1fr) minmax(var(--space-24), 0.9fr);
+  align-items: center;
+  gap: clamp(var(--space-4), 2.4vw, var(--space-12));
+  transform-origin: center top;
+  will-change: transform, opacity;
+}
+
+.system-b-mounted-home-trust-strip
+  .system-b-mounted-home-trust-strip-logo-slot {
+  display: flex;
+  min-width: 0;
+  height: clamp(var(--space-10), 4vw, calc(var(--space-12) + var(--space-2)));
+  align-items: center;
+  justify-content: center;
+  color: var(--color-text-tertiary-token);
+  filter: grayscale(1);
+  opacity: 1;
+}
+
+.system-b-mounted-home-trust-strip .system-b-mounted-home-trust-strip-logo {
+  display: block;
+  max-width: 100%;
+  color: var(--color-text-tertiary-token);
+  opacity: 1;
+  user-select: none;
+}
+
+.system-b-mounted-home-trust-strip
+  .system-b-mounted-home-trust-strip-logo--awal {
+  height: clamp(calc(var(--space-6) + var(--space-1)), 2.2vw, var(--space-8));
+  width: auto;
+}
+
+.system-b-mounted-home-trust-strip
+  .system-b-mounted-home-trust-strip-logo--orchard {
+  height: clamp(var(--space-12), 4.8vw, var(--space-16));
+  width: auto;
+}
+
+.system-b-mounted-home-trust-strip
+  .system-b-mounted-home-trust-strip-logo--umg {
+  width: clamp(
+    calc(var(--space-24) + var(--space-24)),
+    17vw,
+    calc(var(--space-24) * 2 + var(--space-10))
+  );
+  height: auto;
+}
+
+.system-b-mounted-home-trust-strip
+  .system-b-mounted-home-trust-strip-logo--armada {
+  height: clamp(
+    calc(var(--space-6) + var(--space-1)),
+    2.55vw,
+    calc(var(--space-8) + var(--space-1))
+  );
+  width: auto;
+}
+
+.system-b-mounted-home-trust-strip
+  .system-b-mounted-home-trust-strip-logo--black-hole {
+  width: clamp(
+    calc(var(--space-20) + var(--space-16)),
+    12.4vw,
+    calc(var(--space-24) + var(--space-20))
+  );
+  height: auto;
+}
+
+@media (max-width: 767px) {
+  .system-b-mounted-home-trust-strip-shell
+    > .system-b-mounted-home-trust-strip[data-presentation="inline-strip"] {
+    padding-block: clamp(
+        var(--space-12),
+        12vw,
+        calc(var(--space-12) + var(--space-2))
+      )
+      clamp(var(--space-16), 14vw, var(--space-20));
+  }
+
+  .system-b-mounted-home-trust-strip-shell
+    > .system-b-mounted-home-trust-strip[data-presentation="inline-strip"]
+    > .system-b-mounted-home-trust-strip-inner {
+    max-width: min(100%, calc(var(--space-24) * 4));
+  }
+
+  .system-b-mounted-home-trust-strip
+    .system-b-mounted-home-trust-strip-logo-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--space-4) var(--space-6);
+  }
+
+  .system-b-mounted-home-trust-strip
+    .system-b-mounted-home-trust-strip-logo-slot {
+    height: calc(var(--space-10) + var(--space-1));
+    justify-content: flex-start;
+  }
+
+  .system-b-mounted-home-trust-strip
+    .system-b-mounted-home-trust-strip-logo-slot--orchard,
+  .system-b-mounted-home-trust-strip
+    .system-b-mounted-home-trust-strip-logo-slot--black-hole {
+    justify-content: flex-end;
+  }
+
+  .system-b-mounted-home-trust-strip
+    .system-b-mounted-home-trust-strip-logo-slot--umg {
+    grid-column: 1 / -1;
+    height: calc(var(--space-8) + var(--space-1));
+    justify-content: center;
+  }
+
+  .system-b-mounted-home-trust-strip
+    .system-b-mounted-home-trust-strip-logo--awal {
+    height: calc(var(--space-6) + var(--space-1));
+  }
+
+  .system-b-mounted-home-trust-strip
+    .system-b-mounted-home-trust-strip-logo--orchard {
+    height: var(--space-12);
+  }
+
+  .system-b-mounted-home-trust-strip
+    .system-b-mounted-home-trust-strip-logo--umg {
+    width: min(calc(var(--space-24) * 2 + var(--space-4)), 100%);
+  }
+
+  .system-b-mounted-home-trust-strip
+    .system-b-mounted-home-trust-strip-logo--armada {
+    height: calc(var(--space-6) + var(--space-1));
+  }
+
+  .system-b-mounted-home-trust-strip
+    .system-b-mounted-home-trust-strip-logo--black-hole {
+    width: min(calc(var(--space-20) + var(--space-16)), 100%);
+  }
+}
+
+/* SYSTEM B MOUNTED HOME TRUST STRIP PRIMITIVES END */
