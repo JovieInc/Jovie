@@ -187,6 +187,14 @@ describe('ReleaseTable', () => {
     expect(expandedRow).toBeInTheDocument();
     expect(selectedRow).toBeInTheDocument();
     expect(expandedRow).not.toBe(selectedRow);
+    expect(expandedRow).toHaveClass(
+      'system-b-release-table-row',
+      'system-b-release-table-row--expanded'
+    );
+    expect(selectedRow).toHaveClass(
+      'system-b-release-table-row',
+      'system-b-release-table-row--selected'
+    );
   });
 
   it('gives idle release rows the same visible rounded hover silhouette', () => {
@@ -196,6 +204,10 @@ describe('ReleaseTable', () => {
       .getByTestId('release-row-wrapper-release_1')
       .querySelector('div');
     expect(idleRow).toBeInTheDocument();
+    expect(idleRow).toHaveClass(
+      'system-b-release-table-row',
+      'system-b-release-table-row--idle'
+    );
   });
 
   it('passes the selected track state into expanded track rows', async () => {

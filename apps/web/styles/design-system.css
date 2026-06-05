@@ -3106,6 +3106,97 @@ body:has(.system-b-download-page) .marketing-glass-header__cta:focus-visible {
   );
 }
 
+.system-b-release-table-row {
+  transition-duration: var(--system-b-duration-fast);
+  transition-property: background-color, border-color, box-shadow, color;
+  transition-timing-function: var(--system-b-ease);
+}
+
+.system-b-release-table-row--idle {
+  background: transparent;
+}
+
+.system-b-release-table-row--idle:hover,
+.system-b-release-table-row--idle:focus-within {
+  background: color-mix(
+    in oklab,
+    var(--system-b-app-content-surface) 58%,
+    transparent
+  );
+}
+
+.system-b-release-table-row--selected {
+  background: color-mix(in oklab, var(--color-border-focus) 12%, transparent);
+  box-shadow:
+    inset 3px 0 0 0 var(--color-border-focus),
+    inset 0 0 0 1px
+    color-mix(in oklab, var(--color-border-focus) 20%, transparent);
+}
+
+.system-b-release-table-row--selected:hover,
+.system-b-release-table-row--selected:focus-within {
+  background: color-mix(in oklab, var(--color-border-focus) 14%, transparent);
+}
+
+.system-b-release-table-row--expanded {
+  background: color-mix(
+    in oklab,
+    var(--system-b-app-content-surface) 54%,
+    transparent
+  );
+}
+
+.system-b-release-table-row--expanded:hover,
+.system-b-release-table-row--expanded:focus-within {
+  background: color-mix(
+    in oklab,
+    var(--system-b-app-content-surface) 62%,
+    transparent
+  );
+}
+
+.system-b-release-table-row--refreshing {
+  position: relative;
+  overflow: hidden;
+}
+
+.system-b-release-table-row--flashed {
+  background: color-mix(in oklab, var(--color-success) 8%, transparent);
+}
+
+.system-b-release-table-row:hover :where(span),
+.system-b-release-table-row:hover :where(p) {
+  color: var(--color-text-primary-token);
+}
+
+:where(.system-b-release-table-empty-state) {
+  min-height: calc(var(--space-20) * 2);
+}
+
+:where(.system-b-release-table-track-loading) {
+  border: 1px solid
+    color-mix(in oklab, var(--system-b-app-frame-seam) 66%, transparent);
+  border-radius: var(--radius-xl);
+  background: color-mix(
+    in oklab,
+    var(--system-b-app-content-surface) 76%,
+    var(--system-b-bg-page)
+  );
+}
+
+:where(.system-b-release-table-track-stack) {
+  border: 1px solid
+    color-mix(in oklab, var(--system-b-app-frame-seam) 74%, transparent);
+  border-radius: calc(var(--radius-xl) + var(--space-0-5));
+  background: color-mix(
+    in oklab,
+    var(--system-b-app-content-surface) 70%,
+    var(--system-b-bg-page)
+  );
+  box-shadow: inset 0 1px 0
+    color-mix(in oklab, var(--color-text-primary-token) 4%, transparent);
+}
+
 :where(.system-b-track-row),
 :where(.system-b-track-row-stack-card) {
   border-radius: var(--radius-lg);

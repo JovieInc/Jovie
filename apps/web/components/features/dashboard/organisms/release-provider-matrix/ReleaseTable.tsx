@@ -10,6 +10,7 @@ import type { ReleaseViewModel } from '@/lib/discography/types';
 import { useSortingManager } from './hooks/useSortingManager';
 import { MobileReleaseListLazy } from './MobileReleaseListLazy';
 import type { ReleaseTableProps } from './ReleaseTable.types';
+import { getReleaseTableRowClassName } from './release-table-row-styles';
 import { getReleaseContextMenuItems } from './utils/release-context-actions';
 import {
   createReleaseCellRenderer,
@@ -109,37 +110,12 @@ export function ReleaseTable({
       const isRefreshing = refreshingReleaseId === row.id;
       const isFlashed = flashedReleaseId === row.id;
 
-      let baseClassName: string;
-      if (designV1 && isSelected) {
-        baseClassName =
-          'border-transparent bg-(--linear-bg-surface-1)/80 shadow-[inset_3px_0_0_0_var(--linear-accent),inset_0_0_0_1px_color-mix(in_oklab,var(--linear-border-focus)_24%,transparent)] hover:bg-(--linear-bg-surface-1)/90 focus-within:bg-(--linear-bg-surface-1)';
-      } else if (designV1) {
-        baseClassName =
-          'border-transparent bg-transparent hover:bg-(--linear-bg-surface-1)/55 focus-within:bg-(--linear-bg-surface-1)/65 transition-[background-color,box-shadow,color] duration-150 ease-out [&:hover_span]:text-primary-token [&:hover_p]:text-primary-token';
-      } else if (isSelected) {
-        baseClassName =
-          'bg-[color-mix(in_oklab,var(--linear-row-selected)_55%,transparent)] shadow-[inset_3px_0_0_0_var(--linear-accent)] hover:bg-[color-mix(in_oklab,var(--linear-row-selected)_65%,transparent)] focus-within:bg-[color-mix(in_oklab,var(--linear-row-selected)_72%,transparent)] focus-within:shadow-[inset_3px_0_0_0_var(--linear-accent),inset_0_0_0_1px_var(--linear-border-focus)]';
-      } else {
-        baseClassName =
-          'bg-transparent hover:bg-[color-mix(in_oklab,var(--linear-row-hover)_78%,transparent)] focus-within:bg-[color-mix(in_oklab,var(--linear-row-hover)_84%,transparent)] transition-[background-color,box-shadow,color] duration-150 ease-out [&:hover_span]:text-primary-token [&:hover_p]:text-primary-token';
-      }
-
-      const refreshClassName = isRefreshing
-        ? 'relative overflow-hidden skeleton'
-        : '';
-      const flashClassName = isFlashed
-        ? 'bg-emerald-500/5 transition-colors duration-700'
-        : '';
-
-      return [
-        designV1 ? 'rounded-md' : 'rounded-none',
-        'transition-[background-color,box-shadow] duration-150 ease-out',
-        baseClassName,
-        refreshClassName,
-        flashClassName,
-      ]
-        .filter(Boolean)
-        .join(' ');
+      return getReleaseTableRowClassName({
+        designV1,
+        isFlashed,
+        isRefreshing,
+        isSelected,
+      });
     },
     [designV1, selectedReleaseId, refreshingReleaseId, flashedReleaseId]
   );
@@ -259,7 +235,7 @@ export function ReleaseTable({
           icon={<Icon name='Disc3' className='h-6 w-6' />}
           title='No releases found'
           description='Use the toolbar to create a release, sync from Spotify, or clear filters.'
-          className='mx-4 my-3 min-h-[160px]'
+          className='system-b-release-table-empty-state mx-4 my-3'
         />
       );
     }
@@ -296,11 +272,7 @@ export function ReleaseTable({
       rowHeight={rowHeight}
       minWidth={minWidth}
       hideHeader
-      className={
-        designV1
-          ? 'text-[12.5px] text-primary-token'
-          : 'text-app text-primary-token'
-      }
+      className='text-app text-primary-token'
       containerClassName={
         designV1
           ? 'h-full px-2 pb-2 pt-1 md:px-2.5 md:pb-2.5 md:pt-1.5'
@@ -319,7 +291,7 @@ export function ReleaseTable({
           icon={<Icon name='Disc3' className='h-6 w-6' />}
           title='No releases found'
           description='Use the toolbar to create a release, sync from Spotify, or clear filters.'
-          className='m-3 min-h-[160px]'
+          className='system-b-release-table-empty-state m-3'
         />
       }
     />
