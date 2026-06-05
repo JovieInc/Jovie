@@ -2206,6 +2206,90 @@ body:has(.system-b-download-page) .marketing-glass-header__cta:focus-visible {
 }
 
 /* ============================================
+   SYSTEM B ROOT NOT FOUND PRIMITIVES
+   ============================================ */
+
+:where(.system-b-root-not-found-main) {
+  padding-top: var(--system-b-header-height);
+}
+
+:where(.system-b-root-not-found-container) {
+  display: flex;
+  min-height: calc(100svh - (var(--space-16) * 2));
+  align-items: center;
+  justify-content: center;
+}
+
+:where(.system-b-root-not-found-content) {
+  width: 100%;
+  max-width: calc(var(--space-24) * 4 + var(--space-4));
+  margin-inline: auto;
+  padding-block: var(--space-16);
+  padding-inline: var(--space-4);
+  text-align: center;
+}
+
+:where(.system-b-root-not-found-code-wrap) {
+  margin-bottom: var(--space-8);
+  user-select: none;
+}
+
+:where(.system-b-root-not-found-code) {
+  display: block;
+  color: var(--color-text-quaternary-token);
+  font-size: clamp(
+    calc(var(--space-24) + var(--space-6)),
+    16vw,
+    calc(var(--space-24) + var(--space-16))
+  );
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: var(--tracking-normal);
+  line-height: 1;
+  opacity: 0.72;
+}
+
+:where(.system-b-root-not-found-copy) {
+  position: relative;
+  margin-top: calc(var(--space-16) * -1);
+}
+
+:where(.system-b-root-not-found-title) {
+  margin: 0 0 var(--space-2);
+  color: var(--system-b-text-primary);
+  font-size: var(--text-xl);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: var(--tracking-normal);
+  line-height: var(--leading-tight);
+}
+
+:where(.system-b-root-not-found-description) {
+  max-width: calc(var(--space-24) * 3 + var(--space-4));
+  margin: 0 auto var(--space-8);
+  color: var(--color-text-tertiary-token);
+  font-size: var(--text-sm);
+  line-height: var(--leading-relaxed);
+}
+
+:where(.system-b-root-not-found-action) {
+  display: inline-flex;
+  height: var(--space-8);
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-md);
+  background: var(--system-b-primary-bg);
+  color: var(--system-b-primary-fg);
+  font-size: var(--text-sm);
+  font-weight: var(--font-weight-medium);
+  padding-inline: var(--space-4);
+  text-decoration: none;
+  transition: background var(--system-b-duration-fast) var(--system-b-ease);
+}
+
+:where(.system-b-root-not-found-action:hover) {
+  background: var(--color-btn-primary-hover);
+}
+
+/* ============================================
    SYSTEM B UNAVAILABLE PAGE PRIMITIVES
    ============================================ */
 
