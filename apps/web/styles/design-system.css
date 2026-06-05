@@ -2444,6 +2444,36 @@ body:has(.system-b-download-page) .marketing-glass-header__cta:focus-visible {
    SYSTEM B CHAT ENTITY PREVIEW PRIMITIVES
    ============================================ */
 
+:where(.system-b-chat-entity-right-panel-shell),
+:where(.system-b-chat-entity-panel-surface) {
+  background: var(--system-b-app-content-surface);
+}
+
+:where(.system-b-chat-entity-panel-header),
+:where(.system-b-chat-entity-panel-context-divider) {
+  border-bottom: 1px solid
+    color-mix(in oklab, var(--system-b-app-frame-seam) 72%, transparent);
+}
+
+:where(.system-b-chat-entity-panel-section) {
+  border-top: 1px solid
+    color-mix(in oklab, var(--system-b-app-frame-seam) 58%, transparent);
+}
+
+:where(.system-b-chat-entity-context-icon) {
+  display: flex;
+  width: var(--space-8);
+  height: var(--space-8);
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid
+    color-mix(in oklab, var(--system-b-app-frame-seam) 64%, transparent);
+  border-radius: var(--radius-lg);
+  background: var(--system-b-bg-surface-1);
+  color: var(--color-text-tertiary-token);
+}
+
 .system-b-entity-chip {
   display: inline-flex;
   align-items: center;
