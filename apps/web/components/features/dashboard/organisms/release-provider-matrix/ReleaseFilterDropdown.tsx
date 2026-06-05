@@ -172,6 +172,8 @@ interface ReleaseFilterDropdownProps {
 
 const FILTER_TRIGGER_ACTIVE_CLASS =
   'border-transparent bg-surface-1 text-primary-token';
+const FILTER_COUNT_BADGE_CLASS =
+  'rounded-md bg-surface-1 px-1.5 py-0.5 text-3xs font-caption text-tertiary-token';
 
 export function ReleaseFilterDropdown({
   filters,
@@ -389,7 +391,7 @@ export function ReleaseFilterDropdown({
                         />
                         <span>Label</span>
                         {labelFilterCount > 0 && (
-                          <span className='rounded-md bg-(--linear-accent-subtle) px-1.5 py-0.5 text-3xs font-caption text-(--linear-accent)'>
+                          <span className={FILTER_COUNT_BADGE_CLASS}>
                             {labelFilterCount}
                           </span>
                         )}
