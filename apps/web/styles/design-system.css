@@ -2935,6 +2935,209 @@ body:has(.system-b-download-page) .marketing-glass-header__cta:focus-visible {
   color: color-mix(in oklab, var(--color-error) 82%, white 18%);
 }
 
+/* System B shell pill search primitives */
+:where(.system-b-pill-search-input) {
+  height: var(--space-6);
+  min-width: var(--space-24);
+  border-radius: var(--radius-xs);
+  font-size: var(--text-app);
+  line-height: var(--leading-none);
+  outline: none;
+}
+
+:where(.system-b-pill-search-input:focus),
+:where(.system-b-pill-search-input:focus-visible) {
+  outline: none;
+  box-shadow: none;
+}
+
+:where(.system-b-pill-search-input:focus-visible) {
+  box-shadow: 0 0 0 1px
+    color-mix(in oklab, var(--color-border-focus) 25%, transparent);
+}
+
+:where(.system-b-pill-search-close) {
+  display: inline-flex;
+  height: var(--space-5);
+  align-items: center;
+  border-radius: var(--radius-md);
+  padding-inline: var(--space-1-5);
+  color: var(--color-text-quaternary-token);
+  font-size: var(--text-2xs);
+  font-weight: var(--font-weight-medium);
+  transition:
+    background-color var(--duration-fast) var(--ease-subtle),
+    color var(--duration-fast) var(--ease-subtle),
+    box-shadow var(--duration-fast) var(--ease-subtle);
+}
+
+:where(.system-b-pill-search-close:hover) {
+  background: color-mix(
+    in oklab,
+    var(--system-b-bg-surface-1) 60%,
+    transparent
+  );
+  color: var(--color-text-primary-token);
+}
+
+:where(.system-b-pill-search-close:focus-visible) {
+  outline: none;
+  box-shadow: 0 0 0 1px
+    color-mix(in oklab, var(--color-border-focus) 28%, transparent);
+}
+
+:where(.system-b-pill-search-listbox) {
+  z-index: 90;
+  max-height: calc(var(--space-20) * 4);
+  border: 1px solid var(--system-b-app-shell-border);
+  border-radius: var(--radius-lg);
+  background: var(--system-b-app-content-surface);
+  box-shadow: var(--shadow-popover);
+}
+
+:where(.system-b-pill-search-option) {
+  padding: var(--space-1-5) var(--space-2-5);
+  color: var(--color-text-secondary-token);
+  font-size: var(--text-xs);
+  transition:
+    background-color var(--duration-fast) var(--ease-subtle),
+    color var(--duration-fast) var(--ease-subtle);
+}
+
+:where(.system-b-pill-search-option:hover) {
+  background: color-mix(
+    in oklab,
+    var(--system-b-bg-surface-1) 60%,
+    transparent
+  );
+}
+
+:where(.system-b-pill-search-option-highlighted) {
+  background: color-mix(in oklab, var(--system-b-accent-cyan) 10%, transparent);
+}
+
+:where(.system-b-pill-search-option-label) {
+  height: calc(var(--space-4) + var(--space-0-5));
+  border-radius: var(--radius-md);
+  padding-inline: var(--space-1-5);
+  font-family: var(--font-caption);
+  font-size: var(--text-3xs);
+  font-weight: var(--font-weight-medium);
+  letter-spacing: var(--tracking-normal);
+}
+
+:where(.system-b-pill-search-option-label-muted) {
+  background: var(--system-b-bg-surface-1);
+  color: var(--color-text-tertiary-token);
+}
+
+:where(.system-b-pill-search-option-label-highlighted) {
+  background: color-mix(in oklab, var(--system-b-accent-cyan) 15%, transparent);
+  color: color-mix(in oklab, var(--system-b-accent-cyan) 78%, white 22%);
+}
+
+:where(.system-b-pill-search-kbd) {
+  color: var(--color-text-quaternary-token);
+  font-size: var(--text-3xs);
+}
+
+:where(.system-b-pill-search-chip) {
+  height: calc(var(--space-5) + var(--space-0-5));
+  max-width: 13.75rem;
+  border: 1px solid
+    color-mix(in oklab, var(--system-b-accent-cyan) 30%, transparent);
+  border-radius: var(--radius-md);
+  background: color-mix(in oklab, var(--system-b-accent-cyan) 10%, transparent);
+  color: var(--color-text-secondary-token);
+  font-family: var(--font-caption);
+  font-size: var(--text-xs);
+  line-height: var(--leading-none);
+}
+
+:where(.system-b-pill-search-chip-field) {
+  display: inline-flex;
+  height: 100%;
+  align-items: center;
+  border-right: 1px solid
+    color-mix(in oklab, var(--system-b-accent-cyan) 20%, transparent);
+  padding-inline: var(--space-1-5);
+  color: color-mix(in oklab, var(--system-b-accent-cyan) 78%, white 22%);
+  font-size: var(--text-3xs);
+  font-weight: var(--font-weight-medium);
+  letter-spacing: var(--tracking-normal);
+}
+
+:where(.system-b-pill-search-chip-op) {
+  height: 100%;
+  padding-inline: var(--space-1-5);
+  color: var(--color-text-tertiary-token);
+  transition: color var(--duration-fast) var(--ease-subtle);
+}
+
+:where(.system-b-pill-search-chip-op:hover),
+:where(.system-b-pill-search-chip-op:focus-visible) {
+  color: var(--color-text-primary-token);
+}
+
+:where(.system-b-pill-search-chip-or) {
+  padding-inline: var(--space-0-5);
+  color: var(--color-text-quaternary-token);
+  font-size: var(--text-3xs);
+}
+
+:where(.system-b-pill-search-chip-value) {
+  height: calc(var(--space-4) + var(--space-0-5));
+  border-radius: var(--radius-md);
+  background: color-mix(in oklab, var(--system-b-accent-cyan) 15%, transparent);
+  padding-inline: var(--space-1-5);
+  color: color-mix(in oklab, var(--system-b-accent-cyan) 42%, white 58%);
+}
+
+:where(.system-b-pill-search-chip-value-remove),
+:where(.system-b-pill-search-chip-remove) {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-full);
+  color: color-mix(in oklab, var(--system-b-accent-cyan) 64%, transparent);
+  transition:
+    background-color var(--duration-fast) var(--ease-subtle),
+    color var(--duration-fast) var(--ease-subtle),
+    box-shadow var(--duration-fast) var(--ease-subtle);
+}
+
+:where(.system-b-pill-search-chip-value-remove) {
+  width: var(--space-4);
+  height: var(--space-4);
+  margin-left: var(--space-1);
+}
+
+:where(.system-b-pill-search-chip-remove) {
+  height: 100%;
+  padding-inline: var(--space-1-5);
+}
+
+:where(.system-b-pill-search-chip-value-remove:hover),
+:where(.system-b-pill-search-chip-remove:hover),
+:where(.system-b-pill-search-chip-value-remove:focus-visible),
+:where(.system-b-pill-search-chip-remove:focus-visible) {
+  color: color-mix(in oklab, var(--system-b-accent-cyan) 40%, white 60%);
+}
+
+:where(.system-b-pill-search-chip-value-remove:focus-visible),
+:where(.system-b-pill-search-chip-remove:focus-visible),
+:where(.system-b-pill-search-chip-op:focus-visible) {
+  outline: none;
+  box-shadow: 0 0 0 1px
+    color-mix(in oklab, var(--system-b-accent-cyan) 28%, transparent);
+}
+
+:where(.system-b-pill-search-remove-icon) {
+  width: var(--space-3);
+  height: var(--space-3);
+  flex-shrink: 0;
+}
+
 :where(.system-b-shell-dropdown-content) {
   z-index: 90;
   min-width: var(--w);
