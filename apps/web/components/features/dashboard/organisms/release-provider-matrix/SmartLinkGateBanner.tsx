@@ -102,7 +102,7 @@ export function SmartLinkGateBanner(props: SmartLinkGateBannerProps) {
       <div className='flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary/8'>
         <Icon
           name='Sparkles'
-          className='h-4 w-4 text-(--linear-accent)'
+          className='h-4 w-4 text-tertiary-token'
           aria-hidden='true'
         />
       </div>
