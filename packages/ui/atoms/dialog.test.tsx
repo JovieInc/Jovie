@@ -2,6 +2,7 @@ import { fireEvent, render, screen } from '@testing-library/react';
 import * as React from 'react';
 import { describe, expect, it, vi } from 'vitest';
 
+import { closeButtonClassName } from './close-button';
 import {
   Dialog,
   DialogClose,
@@ -182,6 +183,17 @@ describe('Dialog', () => {
     it('shows close button by default', () => {
       render(<TestDialog open={true} />);
       expect(screen.getByTestId('dialog-close-button')).toBeInTheDocument();
+    });
+
+    it('uses the shared pill close button styles', () => {
+      render(<TestDialog open={true} />);
+      const closeButton = screen.getByTestId('dialog-close-button');
+
+      expect(closeButton.className).toBe(closeButtonClassName);
+      expect(closeButton.className).toContain('rounded-full');
+      expect(closeButton.className).not.toContain(
+        'rounded-(--linear-app-radius-item)'
+      );
     });
 
     it('hides close button when hideClose is true', () => {
