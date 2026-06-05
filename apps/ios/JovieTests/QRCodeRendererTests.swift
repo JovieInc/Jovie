@@ -19,4 +19,9 @@ struct QRCodeRendererTests {
   @Test func skipsEmptyPayloads() {
     #expect(QRCodeRenderer.image(for: "") == nil)
   }
+
+  @Test func qrPlateStyleUsesSystemBTokens() {
+    #expect(JovieQRCodePlate.padding == JovieSpacing.xLarge)
+    #expect(JovieQRCodePlate.radius == JovieRadius.large)
+  }
 }
