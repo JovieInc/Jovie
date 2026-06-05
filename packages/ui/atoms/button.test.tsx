@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import path from 'node:path';
 import { render, screen } from '@testing-library/react';
 import * as React from 'react';
 import { describe, expect, it } from 'vitest';
@@ -5,6 +7,31 @@ import { describe, expect, it } from 'vitest';
 import { Button } from './button';
 
 describe('Button', () => {
+  describe('System B typography contract', () => {
+    it('keeps shared button tracking neutral and non-negative', () => {
+      const source = readFileSync(
+        path.join(process.cwd(), 'atoms/button.tsx'),
+        {
+          encoding: 'utf8',
+        }
+      );
+
+      expect(source).not.toMatch(/\btracking-\[-[^\]]+\]/);
+
+      render(
+        <>
+          <Button>Primary</Button>
+          <Button variant='whitePill'>White Pill</Button>
+        </>
+      );
+
+      for (const button of screen.getAllByRole('button')) {
+        expect(button.className).toContain('tracking-normal');
+        expect(button.className).not.toMatch(/\btracking-\[-[^\]]+\]/);
+      }
+    });
+  });
+
   it('renders with text', () => {
     render(<Button>Press</Button>);
     const btn = screen.getByRole('button', { name: /press/i });

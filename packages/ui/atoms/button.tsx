@@ -6,7 +6,7 @@ import { cva, type VariantProps } from 'class-variance-authority';
 import * as React from 'react';
 
 const buttonVariants = cva(
-  'relative inline-flex items-center justify-center rounded-full text-[13px] font-[510] tracking-[-0.011em] transition-colors duration-normal ease-interactive focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/55 focus-visible:ring-offset-2 focus-visible:ring-offset-(--linear-bg-page) disabled:opacity-50 disabled:pointer-events-none',
+  'relative inline-flex items-center justify-center rounded-full text-[13px] font-[510] tracking-normal transition-colors duration-normal ease-interactive focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/55 focus-visible:ring-offset-2 focus-visible:ring-offset-(--linear-bg-page) disabled:opacity-50 disabled:pointer-events-none',
   {
     variants: {
       variant: {
@@ -36,7 +36,7 @@ const buttonVariants = cva(
         // marketing headers and homepage sign-in. Calm color/opacity feedback
         // only — no decorative scale/translate. See .claude/rules/ui.md.
         whitePill:
-          'border border-white/88 bg-white text-black shadow-[0_8px_20px_rgba(0,0,0,0.14),inset_0_1px_0_rgba(255,255,255,0.72)] hover:bg-white/95 font-medium tracking-[-0.012em] sm:shadow-[0_10px_24px_rgba(0,0,0,0.18),inset_0_1px_0_rgba(255,255,255,0.72)]',
+          'border border-white/88 bg-white text-black shadow-[0_8px_20px_rgba(0,0,0,0.14),inset_0_1px_0_rgba(255,255,255,0.72)] hover:bg-white/95 font-medium tracking-normal sm:shadow-[0_10px_24px_rgba(0,0,0,0.18),inset_0_1px_0_rgba(255,255,255,0.72)]',
       },
       size: {
         default: 'h-8 px-3 py-1.5',
