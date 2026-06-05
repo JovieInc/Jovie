@@ -69,6 +69,13 @@ const AUTH_RETURN_HOST = 'auth';
 const AUTH_RETURN_COMPLETE_PATH = '/complete';
 const LEGACY_AUTH_RETURN_HOST = 'auth-return';
 const DICTATION_STATUS_CHANNEL = 'dictation-status';
+const DESKTOP_RUNTIME_LABEL_BY_PLATFORM: Partial<
+  Record<NodeJS.Platform, string>
+> = {
+  darwin: 'Mac OS',
+  linux: 'Linux',
+  win32: 'Windows',
+} as const;
 
 type UpdateChannel =
   | typeof UPDATE_AVAILABLE_CHANNEL
@@ -753,9 +760,16 @@ function escapeHtmlAttribute(value: string): string {
   return value.replaceAll('&', '&amp;').replaceAll('"', '&quot;');
 }
 
+function getDesktopRuntimeLabel(
+  platform: NodeJS.Platform = process.platform
+): string {
+  return DESKTOP_RUNTIME_LABEL_BY_PLATFORM[platform] ?? platform;
+}
+
 function buildDesktopLoadFailureUrl(): string {
   const retryUrl = escapeHtmlAttribute(APP_ENTRY_URL);
   const appOrigin = escapeHtmlAttribute(APP_ORIGIN);
+  const runtimeLabel = escapeHtmlAttribute(getDesktopRuntimeLabel());
   const html = `<!doctype html>
 <html lang="en">
   <head>
@@ -799,7 +813,7 @@ function buildDesktopLoadFailureUrl(): string {
         <a class="primary" href="${retryUrl}">Retry</a>
         <a href="${appOrigin}">Open Jovie</a>
       </div>
-      <div class="meta">Desktop shell runtime: Mac OS</div>
+      <div class="meta">Desktop shell runtime: ${runtimeLabel}</div>
     </main>
   </body>
 </html>`;
