@@ -18,7 +18,23 @@ vi.mock('@/components/molecules/drawer', () => ({
 }));
 
 vi.mock('@/components/atoms/Icon', () => ({
-  Icon: ({ name }: { name: string }) => <span>{name}</span>,
+  Icon: ({
+    name,
+    className,
+    'aria-hidden': ariaHidden,
+  }: {
+    readonly name: string;
+    readonly className?: string;
+    readonly 'aria-hidden'?: boolean | 'false' | 'true';
+  }) => (
+    <span
+      aria-hidden={ariaHidden}
+      className={className}
+      data-testid='gate-icon'
+    >
+      {name}
+    </span>
+  ),
 }));
 
 const mockNudgeState = vi.hoisted(() => ({
@@ -86,5 +102,17 @@ describe('SmartLinkGateBanner', () => {
 
     expect(screen.getByText('3 upcoming releases')).toBeInTheDocument();
     expect(screen.getByText('Get Pro')).toBeInTheDocument();
+  });
+
+  it('uses a quiet System B text token for the gate icon', () => {
+    setNudgeState('never_trialed');
+    render(
+      <SmartLinkGateBanner mode='soft-cap' releasedCount={124} softCap={100} />
+    );
+
+    const icon = screen.getByTestId('gate-icon');
+
+    expect(icon).toHaveClass('h-4', 'w-4', 'text-tertiary-token');
+    expect(icon.className).not.toContain('--linear-accent');
   });
 });
