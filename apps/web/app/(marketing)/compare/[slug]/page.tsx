@@ -161,7 +161,7 @@ export default async function ComparePage({ params }: ComparePageProps) {
           <div className='mt-8'>
             <Link
               href={APP_ROUTES.SIGNUP}
-              className='inline-flex items-center rounded-lg bg-accent-token px-6 py-3 text-sm font-medium text-white transition-colors hover:opacity-90'
+              className='inline-flex items-center rounded-lg border border-(--linear-btn-primary-border) bg-btn-primary px-6 py-3 text-sm font-medium text-btn-primary-foreground shadow-button-inset transition-colors hover:border-(--linear-btn-primary-hover) hover:bg-btn-primary-hover'
             >
               Try {APP_NAME} Free
             </Link>
