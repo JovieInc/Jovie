@@ -5,6 +5,14 @@
      5|The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
      6|and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.6.14] - 2026-06-06
+
+> Static comparison CTAs now use neutral primary controls instead of accent fills.
+
+### Fixed
+
+- **Marketing comparison CTAs (JOV-2881)**: replaces accent-filled final CTAs on static alternatives and compare pages with neutral primary button tokens, while preserving semantic accent highlights and adding a source guard for central conversion actions.
+
 ## [26.6.13] - 2026-06-06
 
 > Main push unit CI now follows the same bounded test path as PR and merge-queue runs.
