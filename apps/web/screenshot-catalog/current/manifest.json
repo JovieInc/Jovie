@@ -295,6 +295,20 @@
     "publicExportPath": "tim-white-profile-contact-phone.png"
   },
   {
+    "id": "tim-white-profile-more-menu-mobile",
+    "title": "Tim White Profile — More Menu",
+    "group": "marketing",
+    "groupLabel": "Marketing",
+    "route": "/demo/showcase/tim-white-profile?state=more-menu",
+    "viewport": "mobile",
+    "theme": "dark",
+    "consumers": ["admin", "marketing-export", "investor-ready"],
+    "capturedAt": "2026-06-06T05:09:04.381Z",
+    "gitSha": null,
+    "imagePath": "tim-white-profile-more-menu-mobile.png",
+    "publicExportPath": "tim-white-profile-more-menu-phone.png"
+  },
+  {
     "id": "tim-white-profile-presave-mobile",
     "title": "Tim White Profile — Presave Countdown",
     "group": "marketing",
