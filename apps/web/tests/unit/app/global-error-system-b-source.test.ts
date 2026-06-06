@@ -38,8 +38,9 @@ describe('Global error System B source tokens', () => {
     expect(source).not.toContain('dangerouslySetInnerHTML');
     expect(source).not.toContain('biome-ignore');
     expect(source).toContain("import './globals.css';");
-    expect(source).toContain("fill='currentColor'");
     expect(source).toContain("className='dark'");
-    expect(source).toContain('focus-ring-transparent-offset');
+    expect(source).toContain('SystemBErrorFallback');
+    expect(source).toContain('system-b-error-fallback-body');
+    expect(source).not.toContain('focus-ring-transparent-offset');
   });
 });

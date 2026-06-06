@@ -26,7 +26,8 @@ describe('App error System B source tokens', () => {
     expect(source).not.toMatch(rawGradientPattern);
     expect(source).not.toMatch(rawVisualUtilityPattern);
     expect(source).not.toMatch(negativeTrackingPattern);
-    expect(source).toContain("fill='currentColor'");
-    expect(source).toContain('focus-ring-transparent-offset');
+    expect(source).toContain('SystemBErrorFallback');
+    expect(source).not.toContain("fill='currentColor'");
+    expect(source).not.toContain('focus-ring-transparent-offset');
   });
 });
