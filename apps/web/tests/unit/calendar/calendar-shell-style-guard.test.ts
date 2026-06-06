@@ -7,6 +7,7 @@ const CALENDAR_CLIENT = join(
   ROOT,
   'app/app/(shell)/calendar/CalendarPageClient.tsx'
 );
+const DESIGN_SYSTEM = join(ROOT, 'styles/design-system.css');
 
 const CHROME_CLASS_PATTERN = /(?:^|\s)(?:uppercase|tracking-[^\s'"]+)/;
 const LABEL_ELEMENT_PATTERN =
@@ -15,6 +16,10 @@ const ROUTE_LOCAL_VISUAL_PATTERN =
   /(?:--linear-|color-mix\(|(?:bg|text|border|accent|ring|from|via|to|decoration)-(?:blue|sky|indigo|purple|violet|cyan|emerald|green|red|rose|pink|amber|yellow|orange|teal)-[^\s'"]+|(?:bg|text|border)-\[[^\]]+\]|(?:min-[hw]|max-[hw]|w|h)-\[[^\]]+\]|(?:bg|text)-quaternary-token\/\d+)/;
 const NAMED_COLOR_OWNER_PATTERN =
   /className=(?:'[^']*\bsystem-b-calendar-(?:provider-chip|row-description|row-secondary)\b[^']*\btext-(?:tertiary-token|quaternary-token)\b[^']*'|"[^"]*\bsystem-b-calendar-(?:provider-chip|row-description|row-secondary)\b[^"]*\btext-(?:tertiary-token|quaternary-token)\b[^"]*")/g;
+const CALENDAR_PRIMITIVES_PATTERN =
+  /\/\* System B calendar route primitives \*\/([\s\S]*?)\/\* System B shell pill search primitives \*\//;
+const CALENDAR_ACCENT_DRIFT_PATTERN =
+  /(?:--color-accent-(?:purple|pink)|var\(--color-accent(?:-(?:purple|pink))?\))/;
 
 function lineNumberFor(source: string, index: number): number {
   return source.slice(0, index).split('\n').length;
@@ -72,6 +77,28 @@ describe('calendar shell style guard', () => {
     expect(
       offenders,
       `Calendar detail metadata classes should not carry duplicate route-local text color utilities.\n${offenders.join('\n')}`
+    ).toEqual([]);
+  });
+
+  it('keeps calendar CSS primitives off decorative accent tokens', () => {
+    const source = readFileSync(DESIGN_SYSTEM, 'utf8');
+    const match = source.match(CALENDAR_PRIMITIVES_PATTERN);
+    const primitiveBlock = match?.[1] ?? '';
+    const blockStartLine =
+      typeof match?.index === 'number' ? lineNumberFor(source, match.index) : 1;
+    const offenders = primitiveBlock
+      .split('\n')
+      .map((line, index) => ({ line, lineNumber: index + 1 }))
+      .filter(({ line }) => CALENDAR_ACCENT_DRIFT_PATTERN.test(line))
+      .map(
+        ({ line, lineNumber }) =>
+          `design-system.css:${blockStartLine + lineNumber} ${line.trim()}`
+      );
+
+    expect(primitiveBlock).toContain('system-b-calendar-type-chip');
+    expect(
+      offenders,
+      `Calendar CSS primitives should use neutral System B tokens instead of purple or pink decorative accent ownership.\n${offenders.join('\n')}`
     ).toEqual([]);
   });
 });

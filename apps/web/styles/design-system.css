@@ -5904,7 +5904,7 @@ body:has(.system-b-download-page) .marketing-glass-header__cta:focus-visible {
 }
 
 :where(.system-b-calendar-event-dot-confirmed) {
-  background: var(--color-accent-purple);
+  background: var(--color-text-secondary-token);
 }
 
 :where(.system-b-calendar-filter-pill-active) {
@@ -5919,8 +5919,9 @@ body:has(.system-b-download-page) .marketing-glass-header__cta:focus-visible {
 }
 
 :where(.system-b-calendar-type-chip) {
-  background: color-mix(in oklab, var(--color-accent-purple) 14%, transparent);
-  color: color-mix(in oklab, var(--color-accent-purple) 78%, white 22%);
+  background: var(--system-b-bg-surface-0);
+  color: var(--color-text-tertiary-token);
+  box-shadow: inset 0 0 0 1px var(--color-border-subtle);
 }
 
 :where(.system-b-calendar-pending-checkbox) {
