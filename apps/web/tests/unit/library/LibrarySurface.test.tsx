@@ -36,6 +36,17 @@ const legacySelectionAccentPatterns = [
   new RegExp(['bg-', 'white/35'].join(''), 'u'),
   new RegExp(['bg-', 'muted'].join(''), 'u'),
 ] as const;
+const librarySurfaceLocalVisualRecipePatterns = [
+  /\btext-(?:2xs|xs|sm|app|base|lg|xl)\b/u,
+  /\btext-\[/u,
+  /\brounded-(?:md|lg)\b/u,
+  /\bshadow-\[/u,
+  /\bbg-black(?:\/|\b)/u,
+  /\bborder-white\//u,
+  /\btext-white\b/u,
+  /\bmin-h-\[118px\]/u,
+  /\bbg-\[color-mix/u,
+] as const;
 
 const navigationMock = vi.hoisted(() => ({
   refresh: vi.fn(),
@@ -204,7 +215,7 @@ describe('LibrarySurface', () => {
     window.matchMedia = baseMatchMedia;
   });
 
-  it('keeps library selection accents on System B semantic tokens', () => {
+  it('keeps library chrome on System B semantic tokens', () => {
     const source = readFileSync(
       resolve(process.cwd(), LIBRARY_SURFACE_SOURCE),
       'utf8'
@@ -213,11 +224,16 @@ describe('LibrarySurface', () => {
     for (const legacyPattern of legacySelectionAccentPatterns) {
       expect(source).not.toMatch(legacyPattern);
     }
+    for (const localRecipePattern of librarySurfaceLocalVisualRecipePatterns) {
+      expect(source).not.toMatch(localRecipePattern);
+    }
 
     expect(source).toContain('border-success/20 bg-success/10 text-success');
     expect(source).toContain('border-info/20 bg-info/10 text-info');
-    expect(source).toContain('border-default bg-surface-1 text-primary-token');
-    expect(source).toContain('bg-surface-1! text-primary-token');
+    expect(source).toContain('system-b-library-rail-button--active');
+    expect(source).toContain('system-b-library-card--selected');
+    expect(source).toContain('system-b-library-table-row-selected');
+    expect(source).toContain('system-b-library-dropzone--dragging');
   });
 
   it('renders an empty read-only library state with a releases escape hatch', () => {
@@ -509,10 +525,7 @@ describe('LibrarySurface', () => {
       'false'
     );
     expect(row).toHaveAttribute('aria-selected', 'true');
-    expect(row.className).toContain('bg-surface-1!');
-    expect(row.className).toContain(
-      'shadow-[inset_2px_0_0_0_var(--color-border-default)]!'
-    );
+    expect(row.className).toContain('system-b-library-table-row-selected');
     expect(screen.getByRole('link', { name: /Open Release/u })).toHaveAttribute(
       'href',
       '/tim/take-me-over'

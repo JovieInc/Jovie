@@ -453,7 +453,7 @@ const ReleaseCell = memo(function ReleaseCell({
 
   return (
     <div className='flex min-w-0 items-center gap-2.5'>
-      <span className='group/artwork relative h-10 w-10 shrink-0 overflow-hidden rounded-md bg-black'>
+      <span className='system-b-library-artwork-shell group/artwork relative h-10 w-10 shrink-0 overflow-hidden'>
         <Artwork asset={asset} size='row' />
         {hasPreview ? (
           <button
@@ -468,7 +468,7 @@ const ReleaseCell = memo(function ReleaseCell({
             aria-pressed={isPreviewPlaying}
             data-testid={`library-preview-row-${asset.id}`}
             className={cn(
-              'absolute inset-0 grid place-items-center bg-black/55 text-white transition-opacity duration-subtle ease-subtle focus-visible:outline-none focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/55',
+              'system-b-library-preview-overlay absolute inset-0 grid place-items-center transition-opacity duration-subtle ease-subtle focus-visible:outline-none focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/55',
               isPreviewPlaying
                 ? 'opacity-100'
                 : 'opacity-0 group-hover/artwork:opacity-100'
@@ -483,10 +483,10 @@ const ReleaseCell = memo(function ReleaseCell({
         ) : null}
       </span>
       <span className='min-w-0'>
-        <span className='block truncate text-sm font-medium text-primary-token'>
+        <span className='system-b-library-release-title block truncate'>
           {asset.title}
         </span>
-        <span className='mt-0.5 block truncate text-xs text-tertiary-token'>
+        <span className='system-b-library-release-meta mt-0.5 block truncate'>
           {asset.artist}
         </span>
       </span>
@@ -502,7 +502,7 @@ const StatusCell = memo(function StatusCell({
   return (
     <span
       className={cn(
-        'inline-flex h-6 w-fit items-center rounded-md border px-2 text-[11px] leading-4',
+        'system-b-library-status-pill inline-flex h-6 w-fit items-center border px-2 leading-4',
         releaseStatusClasses(asset.status)
       )}
     >
@@ -517,7 +517,7 @@ const ProvidersCell = memo(function ProvidersCell({
   readonly asset: LibraryReleaseAsset;
 }) {
   return (
-    <span className='inline-flex h-6 min-w-7 items-center justify-center rounded-md border border-subtle bg-surface-0 px-2 text-xs tabular-nums text-secondary-token'>
+    <span className='system-b-library-count-pill inline-flex h-6 min-w-7 items-center justify-center border border-subtle px-2 tabular-nums text-secondary-token'>
       {formatCompactCount(asset.providerCount)}
     </span>
   );
@@ -547,7 +547,7 @@ const LIBRARY_TABLE_COLUMNS = [
     id: 'type',
     header: 'Type',
     cell: ({ row }) => (
-      <span className='truncate text-xs text-tertiary-token'>
+      <span className='system-b-library-meta-text truncate text-tertiary-token'>
         {formatLibraryItemType(row.original)}
       </span>
     ),
@@ -567,7 +567,7 @@ const LIBRARY_TABLE_COLUMNS = [
     id: 'releaseDate',
     header: 'Release Date',
     cell: ({ row }) => (
-      <span className='block whitespace-nowrap text-right text-xs tabular-nums text-tertiary-token'>
+      <span className='system-b-library-meta-text block whitespace-nowrap text-right tabular-nums text-tertiary-token'>
         {row.original.releaseDate
           ? formatLibraryReleaseDate(row.original.releaseDate)
           : 'No date'}
@@ -663,12 +663,15 @@ function LibraryRail({
   return (
     <nav
       aria-label='Library navigation'
-      className={cn('flex min-h-0 flex-col bg-surface-0 p-2.5', className)}
+      className={cn(
+        'system-b-library-rail flex min-h-0 flex-col p-2.5',
+        className
+      )}
     >
       <div className='px-1.5 pb-2'>
         <div className='flex items-center justify-between gap-2'>
-          <p className='text-xs font-semibold text-primary-token'>Views</p>
-          <span className='text-2xs tabular-nums text-tertiary-token'>
+          <p className='system-b-library-rail-title'>Views</p>
+          <span className='system-b-library-rail-count tabular-nums'>
             {assets.length}
           </span>
         </div>
@@ -682,14 +685,12 @@ function LibraryRail({
                 type='button'
                 onClick={() => onPreset(view.id)}
                 className={cn(
-                  'flex h-8 w-full items-center gap-2 rounded-md border px-2 text-left text-[12.5px] transition-[background-color,border-color,color,box-shadow] duration-subtle ease-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/55 focus-visible:ring-offset-2 focus-visible:ring-offset-(--linear-app-content-surface) outline-none',
-                  active
-                    ? 'border-default bg-surface-1 text-primary-token'
-                    : 'border-transparent text-secondary-token hover:border-default hover:bg-surface-1 hover:text-primary-token'
+                  'system-b-library-rail-button flex h-8 w-full items-center gap-2 border px-2 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/55 focus-visible:ring-offset-2 focus-visible:ring-offset-(--linear-app-content-surface) outline-none',
+                  active && 'system-b-library-rail-button--active'
                 )}
               >
                 <span className='min-w-0 flex-1 truncate'>{view.label}</span>
-                <span className='text-2xs tabular-nums text-tertiary-token'>
+                <span className='system-b-library-rail-count tabular-nums'>
                   {count}
                 </span>
               </button>
@@ -700,12 +701,12 @@ function LibraryRail({
 
       <div className='min-h-0 flex-1 overflow-y-auto px-1.5 pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden'>
         <div className='flex items-center justify-between gap-2 pb-1 pt-2'>
-          <p className='text-xs font-semibold text-primary-token'>Filters</p>
+          <p className='system-b-library-rail-title'>Filters</p>
           {hasActiveFilters(filters) ? (
             <button
               type='button'
               onClick={onClearFilters}
-              className='rounded px-1.5 py-0.5 text-2xs text-tertiary-token transition-[background-color,color] duration-subtle ease-subtle hover:bg-surface-1 hover:text-primary-token'
+              className='system-b-library-clear-button px-1.5 py-0.5'
             >
               Clear Filters ({activeFilterCount})
             </button>
@@ -810,7 +811,7 @@ function FilterSection({
         aria-controls={panelId}
         aria-expanded={open}
         onClick={() => setOpen(value => !value)}
-        className='flex h-6 w-full items-center justify-between rounded-md px-1 text-[11px] font-medium text-tertiary-token transition-[background-color,color] duration-subtle ease-subtle hover:bg-surface-1 hover:text-primary-token'
+        className='system-b-library-filter-section-button flex h-6 w-full items-center justify-between px-1'
       >
         <span>{label}</span>
         <ChevronDown
@@ -854,22 +855,25 @@ function FilterRow({
       type='button'
       onClick={onClick}
       className={cn(
-        'flex h-7 w-full items-center gap-2 rounded-md border px-2 text-[12px] transition-[background-color,border-color,color,box-shadow] duration-subtle ease-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/55 focus-visible:ring-offset-2 focus-visible:ring-offset-(--linear-app-content-surface) outline-none',
-        active
-          ? 'border-default bg-surface-1 text-primary-token'
-          : 'border-transparent text-secondary-token hover:border-default hover:bg-surface-1 hover:text-primary-token'
+        'system-b-library-filter-row flex h-7 w-full items-center gap-2 border px-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/55 focus-visible:ring-offset-2 focus-visible:ring-offset-(--linear-app-content-surface) outline-none',
+        active && 'system-b-library-filter-row--active'
       )}
     >
       {Icon ? (
         <Icon className='h-3 w-3 shrink-0 text-tertiary-token' />
       ) : (
         <span
-          className={cn('h-1.5 w-1.5 shrink-0 rounded-full', dotClassName)}
+          className={cn(
+            'system-b-library-filter-dot h-1.5 w-1.5 shrink-0',
+            dotClassName
+          )}
           aria-hidden='true'
         />
       )}
       <span className='min-w-0 flex-1 truncate text-left'>{label}</span>
-      <span className='text-2xs tabular-nums text-tertiary-token'>{count}</span>
+      <span className='system-b-library-filter-count tabular-nums'>
+        {count}
+      </span>
       {active ? (
         <Check className='h-3 w-3 shrink-0 text-primary-token' />
       ) : null}
@@ -1003,7 +1007,7 @@ const AssetKindPill = memo(function AssetKindPill({
 }) {
   const Icon = ASSET_KIND_ICONS[kind];
   return (
-    <span className='inline-flex h-6 items-center gap-1 rounded-md bg-surface-1 px-2 text-xs text-secondary-token'>
+    <span className='system-b-library-kind-pill inline-flex h-6 items-center gap-1 px-2'>
       <Icon className='h-3 w-3' strokeWidth={2.25} />
       {ASSET_KIND_LABELS[kind]}
     </span>
@@ -1030,16 +1034,16 @@ const AssetCard = memo(function AssetCard({
   return (
     <article
       className={cn(
-        'group relative min-w-0 overflow-hidden rounded-lg border bg-surface-0 transition-[border-color,background-color] duration-subtle ease-subtle',
+        'system-b-library-card group relative min-w-0 overflow-hidden border',
         selected
-          ? 'border-default bg-surface-1'
-          : 'border-subtle hover:border-default'
+          ? 'system-b-library-card--selected'
+          : 'system-b-library-card--idle'
       )}
     >
       {selected ? (
         <span
           aria-hidden='true'
-          className='pointer-events-none absolute inset-0 rounded-lg shadow-[inset_2px_0_0_0_var(--color-border-default),inset_0_0_0_1px_var(--color-border-subtle)]'
+          className='system-b-library-card-selected-frame pointer-events-none absolute inset-0'
         />
       ) : null}
       <button
@@ -1047,15 +1051,15 @@ const AssetCard = memo(function AssetCard({
         onClick={onSelect}
         aria-label={`Inspect ${asset.title}`}
         className={cn(
-          'flex h-full w-full flex-col text-left transition-[background-color,box-shadow] duration-subtle ease-subtle',
+          'system-b-library-card-button flex h-full w-full flex-col text-left',
           LIBRARY_CARD_FOCUS_CLASS
         )}
       >
-        <div className='relative aspect-square overflow-hidden bg-black'>
+        <div className='system-b-library-card-artwork relative aspect-square overflow-hidden'>
           <Artwork asset={asset} />
           <span
             className={cn(
-              'absolute left-2 top-2 rounded-md border px-1.5 py-0.5 text-[11px] leading-4 shadow-[0_6px_16px_rgba(0,0,0,0.18)]',
+              'system-b-library-card-status absolute left-2 top-2 border px-1.5 py-0.5 leading-4',
               releaseStatusClasses(asset.status)
             )}
           >
@@ -1065,20 +1069,20 @@ const AssetCard = memo(function AssetCard({
         <div className='min-w-0 p-3'>
           <div className='flex min-w-0 items-start justify-between gap-2'>
             <div className='min-w-0'>
-              <h2 className='truncate text-sm font-semibold text-primary-token'>
+              <h2 className='system-b-library-card-title truncate'>
                 {asset.title}
               </h2>
-              <p className='mt-0.5 truncate text-xs text-secondary-token'>
+              <p className='system-b-library-card-meta mt-0.5 truncate'>
                 {asset.artist}
               </p>
             </div>
-            <span className='shrink-0 text-2xs tabular-nums text-tertiary-token'>
+            <span className='system-b-library-card-count shrink-0 tabular-nums'>
               {getLibraryItemKind(asset) === 'merch'
                 ? (asset.retailPriceLabel ?? 'Merch')
                 : formatCompactCount(asset.providerCount)}
             </span>
           </div>
-          <div className='mt-2 flex min-w-0 items-center gap-1.5 text-xs text-tertiary-token'>
+          <div className='system-b-library-card-summary mt-2 flex min-w-0 items-center gap-1.5'>
             {getLibraryItemKind(asset) === 'merch' ? (
               <Shirt className='h-3 w-3 shrink-0' />
             ) : (
@@ -1097,7 +1101,7 @@ const AssetCard = memo(function AssetCard({
               <AssetKindPill key={kind} kind={kind} />
             ))}
             {asset.assetKinds.length > 3 ? (
-              <span className='inline-flex h-6 items-center rounded-md bg-surface-1 px-2 text-xs text-tertiary-token'>
+              <span className='system-b-library-card-more-pill inline-flex h-6 items-center px-2'>
                 +{asset.assetKinds.length - 3}
               </span>
             ) : null}
@@ -1116,7 +1120,7 @@ const AssetCard = memo(function AssetCard({
           aria-pressed={isPreviewPlaying}
           data-testid={`library-preview-card-${asset.id}`}
           className={cn(
-            'absolute right-2 top-2 z-10 grid h-8 w-8 place-items-center rounded-full border border-white/20 bg-black/60 text-white shadow-[0_8px_20px_rgba(0,0,0,0.22)] backdrop-blur transition-[background-color,border-color,opacity] duration-subtle ease-subtle hover:border-white/35 hover:bg-black/70',
+            'system-b-library-preview-float absolute right-2 top-2 z-10 grid h-8 w-8 place-items-center backdrop-blur',
             isPreviewActive
               ? 'opacity-100'
               : 'opacity-90 group-hover:opacity-100',
@@ -1203,9 +1207,7 @@ function LibraryDataTable({
   );
   const getRowClassName = useCallback(
     (asset: LibraryReleaseAsset) =>
-      asset.id === selectedId
-        ? 'bg-surface-1! text-primary-token shadow-[inset_2px_0_0_0_var(--color-border-default)]!'
-        : '',
+      asset.id === selectedId ? 'system-b-library-table-row-selected' : '',
     [selectedId]
   );
 
@@ -1224,7 +1226,7 @@ function LibraryDataTable({
         rowHeight={LIBRARY_TABLE_ROW_HEIGHT}
         minWidth={LIBRARY_TABLE_MIN_WIDTH}
         hideHeader
-        className='text-app text-primary-token'
+        className='system-b-library-table'
         containerClassName='h-full px-2.5 pb-2.5 pt-1'
         skeletonRows={SKELETON_ROW_COUNT.TABLE}
         skeletonColumnConfig={LIBRARY_TABLE_SKELETON_CONFIG}
@@ -1250,7 +1252,7 @@ function EmptyCatalog() {
           <Link
             href={APP_ROUTES.RELEASES}
             className={cn(
-              'inline-flex h-8 items-center rounded-md border border-subtle bg-surface-0 px-3 text-sm font-medium text-primary-token transition-[background-color,border-color,box-shadow] duration-subtle hover:border-default hover:bg-surface-1',
+              'system-b-library-action system-b-library-action--standard system-b-library-action--surface-0 inline-flex items-center border border-subtle',
               LIBRARY_BUTTON_FOCUS_CLASS
             )}
           >
@@ -1273,7 +1275,7 @@ function NoResults({ onReset }: { readonly onReset: () => void }) {
           type='button'
           onClick={onReset}
           className={cn(
-            'inline-flex h-8 items-center rounded-md border border-subtle bg-surface-0 px-3 text-sm font-medium text-primary-token transition-[background-color,border-color,box-shadow] duration-subtle hover:border-default hover:bg-surface-1',
+            'system-b-library-action system-b-library-action--standard system-b-library-action--surface-0 inline-flex items-center border border-subtle',
             LIBRARY_BUTTON_FOCUS_CLASS
           )}
         >
@@ -1292,7 +1294,7 @@ function MetadataRow({
   readonly value: React.ReactNode;
 }) {
   return (
-    <div className='grid grid-cols-[96px_minmax(0,1fr)] gap-3 border-t border-subtle py-2 text-xs'>
+    <div className='system-b-library-metadata-row grid gap-3 border-t border-subtle py-2'>
       <dt className='text-tertiary-token'>{label}</dt>
       <dd className='min-w-0 text-primary-token'>{value}</dd>
     </div>
@@ -1336,8 +1338,10 @@ function PreviewActionButton({
       aria-pressed={isPreviewPlaying}
       tabIndex={disabledTabIndex}
       className={cn(
-        'inline-flex items-center justify-center gap-1.5 rounded-md border border-subtle bg-surface-1 text-xs font-medium text-primary-token transition-[background-color,border-color,box-shadow] duration-subtle hover:border-default hover:bg-surface-2',
-        compact ? 'h-7 w-7 px-0' : 'h-8 px-3',
+        'system-b-library-action inline-flex items-center justify-center gap-1.5 border border-subtle',
+        compact
+          ? 'system-b-library-action--icon'
+          : 'system-b-library-action--standard',
         LIBRARY_BUTTON_FOCUS_CLASS
       )}
     >
@@ -1471,11 +1475,10 @@ function LibraryAudioDropzone({
         tabIndex={disabledTabIndex}
         data-testid='library-audio-dropzone'
         className={cn(
-          'flex min-h-[118px] w-full flex-col items-center justify-center rounded-lg border border-dashed border-subtle bg-surface-0 px-3 py-4 text-center transition-[background-color,border-color,color] duration-subtle ease-subtle',
-          isDragging &&
-            'border-(--linear-border-focus) bg-[color-mix(in_oklab,var(--linear-border-focus)_8%,var(--linear-bg-surface-0))]',
+          'system-b-library-dropzone flex w-full flex-col items-center justify-center px-3 py-4 text-center',
+          isDragging && 'system-b-library-dropzone--dragging',
           !uploading &&
-            'hover:border-default hover:bg-surface-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/55 focus-visible:ring-offset-2 focus-visible:ring-offset-(--linear-app-content-surface)'
+            'system-b-library-dropzone--interactive focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/55 focus-visible:ring-offset-2 focus-visible:ring-offset-(--linear-app-content-surface)'
         )}
         aria-busy={uploading || undefined}
       >
@@ -1492,10 +1495,10 @@ function LibraryAudioDropzone({
             strokeWidth={2.25}
           />
         )}
-        <span className='mt-2 text-xs font-medium text-primary-token'>
+        <span className='system-b-library-audio-label mt-2 font-medium text-primary-token'>
           {uploading ? 'Uploading audio' : 'Drop audio'}
         </span>
-        <span className='mt-1 text-2xs leading-4 text-tertiary-token'>
+        <span className='system-b-library-audio-hint mt-1 leading-4'>
           MP3, WAV, FLAC, AIFF, AAC, or M4A. Max 150 MB.
         </span>
       </button>
@@ -1509,7 +1512,7 @@ function LibraryAudioDropzone({
         className='sr-only'
         aria-label={`Upload audio for ${asset.title}`}
       />
-      <output className='min-h-5 pt-1.5 text-2xs'>
+      <output className='system-b-library-audio-output min-h-5 pt-1.5'>
         {uploadError ? <p className='text-error'>{uploadError}</p> : null}
       </output>
     </div>
@@ -1534,7 +1537,7 @@ function LibraryAudioPanel({
       <div className='mb-2 flex h-7 items-center justify-between gap-2'>
         <div className='flex min-w-0 items-center gap-2'>
           <FileAudio2 className='h-3.5 w-3.5 shrink-0 text-tertiary-token' />
-          <h3 className='truncate text-xs font-semibold text-primary-token'>
+          <h3 className='system-b-library-audio-heading truncate font-semibold text-primary-token'>
             Audio
           </h3>
         </div>
@@ -1550,17 +1553,17 @@ function LibraryAudioPanel({
       </div>
       {asset.previewUrl ? (
         <div
-          className='flex min-h-[118px] items-center gap-3 rounded-lg border border-subtle bg-surface-0 px-3 py-3'
+          className='system-b-library-audio-ready flex items-center gap-3 px-3 py-3'
           data-testid='library-audio-ready'
         >
-          <span className='grid h-8 w-8 shrink-0 place-items-center rounded-md bg-surface-1 text-secondary-token'>
+          <span className='system-b-library-audio-icon grid h-8 w-8 shrink-0 place-items-center'>
             <FileAudio2 className='h-4 w-4' strokeWidth={2.25} />
           </span>
           <div className='min-w-0'>
-            <p className='truncate text-xs font-medium text-primary-token'>
+            <p className='system-b-library-audio-label truncate font-medium text-primary-token'>
               Audio attached
             </p>
-            <p className='mt-0.5 text-2xs leading-4 text-tertiary-token'>
+            <p className='system-b-library-audio-hint mt-0.5 leading-4'>
               Preview playback is available in the persistent player.
             </p>
           </div>
@@ -1624,10 +1627,10 @@ function AssetDrawer({
       aria-hidden={!open}
       inert={open ? undefined : true}
       className={cn(
-        'h-full min-h-0 overflow-hidden border-l border-subtle bg-surface-0 transition-[opacity,transform] duration-cinematic ease-cinematic',
+        'system-b-library-drawer h-full min-h-0 overflow-hidden border-l border-subtle transition-[opacity,transform] duration-cinematic ease-cinematic',
         isDesktopLayout
           ? 'static z-auto rounded-none border-y-0 border-r-0 shadow-none'
-          : 'fixed inset-x-3 bottom-20 top-16 z-40 rounded-lg border shadow-[0_18px_48px_rgba(0,0,0,0.28)]',
+          : 'system-b-library-drawer--mobile fixed inset-x-3 bottom-20 top-16 z-40 border',
         open ? 'translate-y-0 opacity-100' : closedDrawerClassName
       )}
       data-testid='library-asset-drawer'
@@ -1636,7 +1639,7 @@ function AssetDrawer({
         <TableContextMenu items={getContextMenuItems(current)}>
           <div className='flex h-full min-h-0 flex-col'>
             <div className='flex h-10 shrink-0 items-center justify-between gap-2 border-b border-subtle px-3'>
-              <span className='min-w-0 truncate text-xs font-semibold text-primary-token'>
+              <span className='system-b-library-drawer-kicker min-w-0 truncate'>
                 {isMerch ? 'Merch' : 'Release'}
               </span>
               <div className='flex shrink-0 items-center gap-1'>
@@ -1653,7 +1656,7 @@ function AssetDrawer({
                   {...closedInteractiveProps}
                   aria-label={`Open ${current.title}`}
                   className={cn(
-                    'grid h-7 w-7 place-items-center rounded-md border border-subtle bg-surface-1 text-tertiary-token transition-[background-color,border-color,color,box-shadow] duration-subtle hover:border-default hover:bg-surface-2 hover:text-primary-token',
+                    'system-b-library-icon-button system-b-library-icon-button--bordered grid h-7 w-7 place-items-center',
                     LIBRARY_ICON_FOCUS_CLASS
                   )}
                 >
@@ -1665,7 +1668,7 @@ function AssetDrawer({
                   aria-label='Close asset details'
                   {...closedInteractiveProps}
                   className={cn(
-                    'grid h-7 w-7 place-items-center rounded-md text-tertiary-token transition-[background-color,color,box-shadow] duration-subtle hover:bg-surface-1 hover:text-primary-token',
+                    'system-b-library-icon-button grid h-7 w-7 place-items-center',
                     LIBRARY_ICON_FOCUS_CLASS
                   )}
                 >
@@ -1675,17 +1678,17 @@ function AssetDrawer({
             </div>
 
             <div className='min-h-0 flex-1 overflow-y-auto p-3'>
-              <div className='overflow-hidden rounded-lg bg-black'>
+              <div className='system-b-library-drawer-artwork overflow-hidden'>
                 <div className='mx-auto aspect-square w-full max-w-80'>
                   <Artwork asset={current} size='drawer' />
                 </div>
               </div>
 
               <div className='mt-3'>
-                <h2 className='text-[18px] font-semibold leading-6 text-primary-token'>
+                <h2 className='system-b-library-drawer-title'>
                   {current.title}
                 </h2>
-                <p className='mt-1 text-sm text-secondary-token'>
+                <p className='system-b-library-drawer-artist mt-1'>
                   {current.artist}
                 </p>
               </div>
@@ -1693,7 +1696,7 @@ function AssetDrawer({
               <div className='mt-3 flex flex-wrap gap-1.5'>
                 <span
                   className={cn(
-                    'inline-flex h-6 items-center rounded-md border px-2 text-xs',
+                    'system-b-library-status-pill inline-flex h-6 items-center border px-2',
                     releaseStatusClasses(current.status)
                   )}
                 >
@@ -1709,7 +1712,7 @@ function AssetDrawer({
                   href={current.primaryActionHref ?? current.smartLinkPath}
                   {...closedInteractiveProps}
                   className={cn(
-                    'inline-flex h-8 items-center gap-1.5 rounded-md border border-subtle bg-surface-1 px-3 text-xs font-medium text-primary-token transition-[background-color,border-color,box-shadow] duration-subtle hover:border-default hover:bg-surface-2',
+                    'system-b-library-action system-b-library-action--standard inline-flex items-center gap-1.5 border border-subtle',
                     LIBRARY_BUTTON_FOCUS_CLASS
                   )}
                 >
@@ -1719,12 +1722,12 @@ function AssetDrawer({
               </div>
 
               {isMerch ? (
-                <div className='mt-4 rounded-lg border border-subtle bg-surface-0 px-3 py-3'>
-                  <div className='mb-2 flex items-center gap-2 text-xs font-semibold text-primary-token'>
+                <div className='system-b-library-drawer-panel mt-4 px-3 py-3'>
+                  <div className='system-b-library-drawer-panel-heading mb-2 flex items-center gap-2 font-semibold text-primary-token'>
                     <Shirt className='h-3.5 w-3.5 text-tertiary-token' />
                     Merch
                   </div>
-                  <p className='text-xs leading-5 text-secondary-token'>
+                  <p className='system-b-library-drawer-panel-copy leading-5 text-secondary-token'>
                     {current.description ?? 'Merch card saved from chat.'}
                   </p>
                 </div>
@@ -1808,7 +1811,7 @@ function AssetDrawer({
 
               {!isMerch ? (
                 <div className='mt-4 border-t border-subtle pt-3'>
-                  <h3 className='text-xs font-semibold text-primary-token'>
+                  <h3 className='system-b-library-audio-heading font-semibold text-primary-token'>
                     Providers
                   </h3>
                   {current.providers.length > 0 ? (
@@ -1821,7 +1824,7 @@ function AssetDrawer({
                           rel='noopener noreferrer'
                           {...closedInteractiveProps}
                           className={cn(
-                            'flex h-8 items-center gap-2 rounded-md px-2 text-xs text-secondary-token transition-[background-color,color,box-shadow] duration-subtle hover:bg-surface-1 hover:text-primary-token',
+                            'system-b-library-provider-link flex h-8 items-center gap-2 px-2',
                             LIBRARY_CARD_FOCUS_CLASS
                           )}
                         >
@@ -1834,7 +1837,7 @@ function AssetDrawer({
                       ))}
                     </div>
                   ) : (
-                    <p className='mt-2 text-xs leading-5 text-secondary-token'>
+                    <p className='system-b-library-provider-empty mt-2 leading-5 text-secondary-token'>
                       No provider links are connected for this release yet.
                     </p>
                   )}
@@ -1868,7 +1871,7 @@ function LibraryStatusBar({
     : idleSummary;
 
   return (
-    <div className='hidden h-8 shrink-0 items-center justify-between gap-3 border-t border-subtle bg-(--linear-app-content-surface) px-3 text-[11px] text-tertiary-token sm:flex'>
+    <div className='system-b-library-status-bar hidden h-8 shrink-0 items-center justify-between gap-3 border-t border-subtle px-3 sm:flex'>
       <span className='min-w-0 truncate'>
         {visibleCount} of {totalCount} Items
       </span>
