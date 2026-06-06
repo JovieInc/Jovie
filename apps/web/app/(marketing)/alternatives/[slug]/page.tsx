@@ -125,7 +125,7 @@ export default async function AlternativesPage({
             </p>
             <Link
               href={APP_ROUTES.SIGNUP}
-              className='mt-6 inline-flex items-center rounded-lg border border-(--linear-btn-primary-border) bg-btn-primary px-6 py-3 text-sm font-medium text-btn-primary-foreground shadow-button-inset transition-colors hover:border-(--linear-btn-primary-hover) hover:bg-btn-primary-hover'
+              className='mt-6 inline-flex items-center rounded-lg border border-(--linear-btn-primary-border) bg-btn-primary px-6 py-3 text-sm font-medium text-btn-primary-foreground shadow-button-inset transition-colors hover:border-(--linear-btn-primary-hover) hover:bg-(--linear-btn-primary-hover)'
             >
               Request Access
             </Link>
