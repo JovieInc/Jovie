@@ -82,32 +82,23 @@ export function ChatMessage({
       data-message-id={id}
       data-role={role}
       className={cn(
-        'group/message flex gap-3.5',
+        'system-b-chat-message-row group/message',
         isUser ? 'justify-end' : 'justify-start'
       )}
-      initial={
-        skipEntrance || shouldReduceMotion ? false : { opacity: 0, y: 8 }
-      }
-      animate={{ opacity: 1, y: 0 }}
+      initial={skipEntrance || shouldReduceMotion ? false : { opacity: 0 }}
+      animate={{ opacity: 1 }}
       transition={{ duration: 0.2, ease: 'easeOut' }}
     >
       {isUser ? (
         <div
           data-testid='chat-user-bubble'
           data-bubble-shape={useUserPillBubble ? 'pill' : 'rectangle'}
-          className={cn(
-            'flex min-h-7 max-w-[78%] flex-col justify-center border border-white/80 bg-white text-[#111216] shadow-[0_12px_38px_-28px_rgba(0,0,0,0.85),inset_0_1px_0_rgba(255,255,255,0.9)]',
-            useUserPillBubble
-              ? 'rounded-full px-3 py-1.5'
-              : 'rounded-[18px] px-3.5 py-2'
-          )}
+          className='system-b-chat-user-bubble'
         >
           {imageChips.length > 0 && (
             <div
-              className={cn(
-                'flex flex-wrap items-center gap-1.5',
-                messageText && 'mb-2'
-              )}
+              className='system-b-chat-user-attachments'
+              data-has-message={messageText ? 'true' : 'false'}
             >
               {imageChips.map(chip => (
                 <ImageAttachmentChip
@@ -120,33 +111,37 @@ export function ChatMessage({
             </div>
           )}
           {messageText && (
-            <div className='text-[13px] leading-5'>
+            <div className='system-b-chat-user-text'>
               <TokenizedText content={messageText} tone='onLight' />
             </div>
           )}
         </div>
       ) : (
-        <div className='w-full min-w-0 max-w-full'>
+        <div className='system-b-chat-assistant-frame'>
           {isThinking ? (
             <div
               data-testid='chat-loading-indicator'
-              className='flex min-h-7 w-full max-w-[78%] flex-col gap-2 text-[15px] leading-7'
+              className='system-b-chat-loading-indicator'
               role='status'
               aria-live='polite'
               aria-label='Jovie is thinking'
             >
               {/* Assistant thinking shimmer — ChatMessageSkeleton-style reserved space */}
-              <div className='flex items-center gap-2 pl-0.5'>
+              <div className='system-b-chat-loading-head'>
                 <Skeleton
-                  className='h-5.5 w-5.5 shrink-0'
+                  className='system-b-chat-loading-avatar'
                   rounded='full'
                   aria-hidden='true'
                 />
-                <Skeleton className='h-3 w-8' rounded='sm' aria-hidden='true' />
-              </div>
-              <div className='space-y-1.5 pl-7'>
                 <Skeleton
-                  className='h-4 w-[65%]'
+                  className='system-b-chat-loading-label'
+                  rounded='sm'
+                  aria-hidden='true'
+                />
+              </div>
+              <div className='system-b-chat-loading-body'>
+                <Skeleton
+                  className='system-b-chat-loading-line'
                   rounded='lg'
                   aria-hidden='true'
                 />
@@ -155,11 +150,11 @@ export function ChatMessage({
           ) : null}
 
           {!isThinking && hasAssistantContent ? (
-            <div className='space-y-3'>
+            <div className='system-b-chat-assistant-stack'>
               {messageText ? (
                 <div
                   data-testid='chat-message-reply'
-                  className='text-[15px] leading-7 text-primary-token sm:text-[15.5px]'
+                  className='system-b-chat-message-reply'
                 >
                   <ChatMarkdown
                     content={messageText}
@@ -180,20 +175,20 @@ export function ChatMessage({
           ) : null}
 
           {!isThinking && !isStreaming && messageText ? (
-            <div className='mt-1.5 flex h-7 items-center justify-start opacity-0 transition-opacity duration-subtle ease-subtle group-hover/message:opacity-100 group-focus-within/message:opacity-100'>
+            <div className='system-b-chat-copy-row'>
               <SimpleTooltip content={isSuccess ? 'Copied!' : 'Copy response'}>
                 <button
                   type='button'
                   onClick={() => copy(messageText)}
-                  className='inline-flex h-7 w-7 items-center justify-center rounded-full border border-transparent bg-transparent text-tertiary-token shadow-none transition-colors duration-subtle hover:bg-surface-1 hover:text-secondary-token focus-visible:bg-surface-1 focus-visible:outline-none'
+                  className='system-b-chat-copy-button'
                   aria-label={
                     isSuccess ? 'Copied to clipboard' : 'Copy message'
                   }
                 >
                   {isSuccess ? (
-                    <Check className='h-3.5 w-3.5' />
+                    <Check className='system-b-chat-copy-icon' />
                   ) : (
-                    <Copy className='h-3.5 w-3.5' />
+                    <Copy className='system-b-chat-copy-icon' />
                   )}
                 </button>
               </SimpleTooltip>
