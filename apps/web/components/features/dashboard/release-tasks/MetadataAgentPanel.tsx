@@ -403,7 +403,7 @@ export function MetadataAgentPanel({
               void handlePrepare();
             }}
             disabled={actionState === 'loading' || isPending}
-            className='rounded-md bg-accent px-3 py-2 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-60'
+            className='rounded-md border border-(--linear-btn-primary-border) bg-btn-primary px-3 py-2 text-sm font-medium text-btn-primary-foreground shadow-button-inset transition-colors duration-subtle hover:border-(--linear-btn-primary-hover) hover:bg-btn-primary-hover disabled:cursor-not-allowed disabled:opacity-60'
           >
             {latestRequest ? 'Rebuild Package' : 'Prepare Package'}
           </button>
