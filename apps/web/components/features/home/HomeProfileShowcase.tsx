@@ -90,18 +90,20 @@ function HomeProfileOverlayCard({
           'homepage-showcase-overlay-card-apple-pay'
         )}
       >
-        <div className='flex items-center justify-between gap-3'>
-          <p className='text-[13px] font-[620] tracking-[-0.02em] text-slate-950'>
-            {overlay.title}
-          </p>
-          <span className='rounded-full bg-slate-950 px-2.5 py-1 text-[10px] font-[620] tracking-[0.08em] text-white'>
+        <div className='homepage-showcase-overlay-row'>
+          <p className='homepage-showcase-overlay-title'>{overlay.title}</p>
+          <span
+            className='homepage-showcase-overlay-badge'
+            data-tone='on-light'
+          >
             Pay
           </span>
         </div>
-        <p className='mt-3 text-[20px] font-[650] tracking-[-0.04em] text-slate-950'>
-          {overlay.body}
-        </p>
-        <div className='mt-4 flex items-center justify-between rounded-[1rem] bg-white/80 px-3 py-2.5 text-[11px] font-semibold text-slate-600'>
+        <p className='homepage-showcase-overlay-headline'>{overlay.body}</p>
+        <div
+          className='homepage-showcase-overlay-meta-row'
+          data-tone='on-light'
+        >
           <span>{overlay.accentLabel}</span>
           <span>Face ID</span>
         </div>
@@ -119,16 +121,12 @@ function HomeProfileOverlayCard({
           'homepage-showcase-overlay-card-thank-you'
         )}
       >
-        <span className='inline-flex rounded-full bg-emerald-400/16 px-2.5 py-1 text-[10px] font-[620] tracking-[0.08em] text-emerald-300'>
+        <span className='homepage-showcase-overlay-badge' data-tone='success'>
           {overlay.accentLabel}
         </span>
-        <p className='mt-3 text-[19px] font-[650] tracking-[-0.04em] text-white'>
-          {overlay.title}
-        </p>
-        <p className='mt-2 text-[12px] leading-[1.6] text-white/68'>
-          {overlay.body}
-        </p>
-        <div className='mt-4 rounded-[1rem] border border-white/8 bg-white/[0.04] px-3 py-2.5 text-[11px] font-semibold text-white/76'>
+        <p className='homepage-showcase-overlay-headline'>{overlay.title}</p>
+        <p className='homepage-showcase-overlay-body'>{overlay.body}</p>
+        <div className='homepage-showcase-overlay-meta-row'>
           Take Me Over · Listen
         </div>
       </div>
@@ -141,22 +139,18 @@ function HomeProfileOverlayCard({
       data-testid='homepage-overlay-email-preview'
       className={cn(shellClassName, 'homepage-showcase-overlay-card-email')}
     >
-      <div className='flex items-start justify-between gap-3'>
-        <div>
-          <p className='text-[10px] font-[620] tracking-[0.08em] text-sky-300/88'>
+      <div className='homepage-showcase-overlay-row' data-align='start'>
+        <div className='homepage-showcase-overlay-copy'>
+          <p className='homepage-showcase-overlay-label' data-tone='info'>
             {overlay.accentLabel}
           </p>
-          <p className='mt-1 text-[13px] font-[620] tracking-[-0.02em] text-white'>
-            {overlay.title}
-          </p>
+          <p className='homepage-showcase-overlay-title'>{overlay.title}</p>
         </div>
-        <div className='rounded-full bg-white/10 px-2 py-1 text-[10px] font-semibold text-white/72'>
+        <div className='homepage-showcase-overlay-badge' data-tone='muted'>
           Email
         </div>
       </div>
-      <p className='mt-2 text-[12px] leading-[1.55] text-white/68'>
-        {overlay.body}
-      </p>
+      <p className='homepage-showcase-overlay-body'>{overlay.body}</p>
     </div>
   );
 }
@@ -258,10 +252,7 @@ function ShowcaseSurface({
   );
 
   return (
-    <div
-      className='homepage-showcase-surface relative h-full w-full bg-black/96'
-      style={profileAccentStyle}
-    >
+    <div className='homepage-showcase-surface' style={profileAccentStyle}>
       <ProfileCompactSurface
         dataTestId='homepage-profile-preview'
         renderMode='preview'
@@ -346,7 +337,7 @@ export function HomeProfileShowcase({
   if (referenceImageSrc) {
     content = (
       <div
-        className={cn('mx-auto w-full max-w-[853px]')}
+        className='homepage-showcase-reference'
         data-testid='homepage-mock-home-reference'
       >
         <Image
@@ -354,7 +345,7 @@ export function HomeProfileShowcase({
           alt='Tim White mock home review'
           width={853}
           height={1844}
-          className='h-auto w-full'
+          className='homepage-showcase-reference-image'
         />
       </div>
     );

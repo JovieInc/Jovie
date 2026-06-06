@@ -2736,6 +2736,288 @@ body:has(.system-b-download-page) .marketing-glass-header__cta:focus-visible {
 }
 
 /* ============================================
+   SYSTEM B HOME PROFILE SHOWCASE PRIMITIVES
+   ============================================ */
+
+:where(.homepage-showcase) {
+  isolation: isolate;
+}
+
+:where(.homepage-showcase-surface) {
+  position: relative;
+  height: 100%;
+  width: 100%;
+  background: color-mix(
+    in oklab,
+    var(--system-b-cinematic-black) 96%,
+    var(--system-b-bg-surface-0) 4%
+  );
+}
+
+:where(.homepage-showcase-reference) {
+  width: 100%;
+  max-width: 53.3125rem;
+  margin-inline: auto;
+}
+
+:where(.homepage-showcase-reference-image) {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+:where(.homepage-showcase-crop-viewport) {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 430 / 540;
+  overflow: hidden;
+  border: 1px solid
+    color-mix(in oklab, var(--system-b-app-frame-seam) 70%, transparent);
+  border-radius: var(--profile-card-radius);
+  background: var(--system-b-cinematic-black);
+}
+
+:where(.homepage-showcase[data-presentation="drawer-crop"])
+  :where(.homepage-showcase-crop-viewport) {
+  aspect-ratio: 430 / 500;
+}
+
+:where(.homepage-showcase[data-presentation="featured-card-crop"])
+  :where(.homepage-showcase-crop-viewport) {
+  aspect-ratio: 430 / 470;
+}
+
+:where(.homepage-showcase[data-presentation="surface-card"])
+  :where(.homepage-showcase-crop-viewport) {
+  aspect-ratio: 430 / 950;
+}
+
+:where(.homepage-showcase-crop-surface) {
+  position: absolute;
+  inset-inline: 0;
+  top: 50%;
+  width: 100%;
+  aspect-ratio: 430 / 950;
+  transform: translateY(-50%);
+}
+
+:where(.homepage-showcase[data-crop-anchor="bottom"])
+  :where(.homepage-showcase-crop-surface) {
+  top: auto;
+  bottom: 0;
+  transform: none;
+}
+
+:where(.homepage-showcase[data-crop-anchor="left"])
+  :where(.homepage-showcase-crop-surface) {
+  inset-inline-start: 0;
+  inset-inline-end: auto;
+}
+
+:where(.homepage-showcase[data-crop-anchor="right"])
+  :where(.homepage-showcase-crop-surface) {
+  inset-inline-start: auto;
+  inset-inline-end: 0;
+}
+
+:where(.homepage-showcase-overlay-card) {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid
+    color-mix(in oklab, var(--system-b-app-frame-seam) 78%, transparent);
+  border-radius: var(--profile-inner-radius);
+  background: color-mix(
+    in oklab,
+    var(--system-b-bg-surface-1) 86%,
+    transparent
+  );
+  color: var(--color-text-primary-token);
+  padding: var(--space-4);
+  backdrop-filter: blur(var(--space-5));
+}
+
+:where(.homepage-showcase-overlay-card-absolute) {
+  position: absolute;
+  right: var(--space-4);
+  bottom: var(--space-5);
+  left: var(--space-4);
+  z-index: 30;
+}
+
+:where(.homepage-showcase-overlay-card-standalone) {
+  width: min(100%, calc(var(--space-24) * 3));
+  margin-inline: auto;
+}
+
+:where(.homepage-showcase-overlay-card-apple-pay) {
+  border-color: color-mix(
+    in oklab,
+    var(--system-b-app-frame-seam) 24%,
+    transparent
+  );
+  background: color-mix(
+    in oklab,
+    var(--color-success-foreground) 90%,
+    var(--system-b-bg-surface-2) 10%
+  );
+  color: var(--system-b-cinematic-black);
+}
+
+:where(.homepage-showcase-overlay-card-thank-you) {
+  border-color: color-mix(in oklab, var(--color-success) 24%, transparent);
+  background: color-mix(
+    in oklab,
+    var(--system-b-bg-surface-1) 88%,
+    var(--color-success) 12%
+  );
+}
+
+:where(.homepage-showcase-overlay-card-email) {
+  border-color: color-mix(in oklab, var(--color-info) 22%, transparent);
+}
+
+:where(.homepage-showcase-overlay-row) {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+:where(.homepage-showcase-overlay-row[data-align="start"]) {
+  align-items: flex-start;
+}
+
+:where(.homepage-showcase-overlay-copy) {
+  min-width: 0;
+}
+
+:where(.homepage-showcase-overlay-label) {
+  color: var(--color-text-tertiary-token);
+  font-size: var(--text-3xs);
+  font-weight: var(--font-weight-medium);
+  letter-spacing: var(--tracking-normal);
+  line-height: var(--leading-tight);
+}
+
+:where(.homepage-showcase-overlay-label[data-tone="info"]) {
+  color: color-mix(
+    in oklab,
+    var(--color-info) 84%,
+    var(--color-success-foreground) 16%
+  );
+}
+
+:where(.homepage-showcase-overlay-title) {
+  color: currentColor;
+  font-size: var(--text-app);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: var(--tracking-normal);
+  line-height: var(--leading-tight);
+}
+
+:where(.homepage-showcase-overlay-label + .homepage-showcase-overlay-title) {
+  margin-top: var(--space-1);
+}
+
+:where(.homepage-showcase-overlay-headline) {
+  margin-top: var(--space-3);
+  color: currentColor;
+  font-size: var(--text-xl);
+  font-weight: var(--font-weight-bold);
+  letter-spacing: var(--tracking-normal);
+  line-height: var(--leading-tight);
+}
+
+:where(.homepage-showcase-overlay-card-thank-you)
+  :where(.homepage-showcase-overlay-headline) {
+  font-size: var(--text-lg);
+}
+
+:where(.homepage-showcase-overlay-body) {
+  margin-top: var(--space-2);
+  color: color-mix(
+    in oklab,
+    currentColor 68%,
+    var(--system-b-bg-surface-1) 32%
+  );
+  font-size: var(--text-xs);
+  line-height: var(--leading-relaxed);
+}
+
+:where(.homepage-showcase-overlay-badge) {
+  display: inline-flex;
+  min-height: var(--space-6);
+  flex-shrink: 0;
+  align-items: center;
+  border: 1px solid color-mix(in oklab, currentColor 14%, transparent);
+  border-radius: var(--system-b-radius-pill);
+  background: color-mix(in oklab, currentColor 9%, transparent);
+  color: currentColor;
+  padding-inline: var(--space-2);
+  font-size: var(--text-3xs);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: var(--tracking-normal);
+  line-height: var(--leading-tight);
+}
+
+:where(.homepage-showcase-overlay-badge[data-tone="on-light"]) {
+  background: var(--system-b-cinematic-black);
+  color: var(--color-success-foreground);
+}
+
+:where(.homepage-showcase-overlay-badge[data-tone="success"]) {
+  border-color: color-mix(in oklab, var(--color-success) 24%, transparent);
+  background: color-mix(in oklab, var(--color-success) 14%, transparent);
+  color: color-mix(
+    in oklab,
+    var(--color-success) 78%,
+    var(--color-success-foreground) 22%
+  );
+}
+
+:where(.homepage-showcase-overlay-badge[data-tone="muted"]) {
+  color: color-mix(in oklab, var(--color-text-primary-token) 72%, transparent);
+}
+
+:where(.homepage-showcase-overlay-meta-row) {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin-top: var(--space-4);
+  border: 1px solid
+    color-mix(in oklab, var(--system-b-app-frame-seam) 64%, transparent);
+  border-radius: var(--profile-action-radius);
+  background: color-mix(
+    in oklab,
+    var(--system-b-bg-surface-2) 38%,
+    transparent
+  );
+  color: color-mix(
+    in oklab,
+    currentColor 76%,
+    var(--system-b-bg-surface-1) 24%
+  );
+  padding: var(--space-2) var(--space-3);
+  font-size: var(--text-2xs);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: var(--tracking-normal);
+  line-height: var(--leading-tight);
+}
+
+:where(.homepage-showcase-overlay-meta-row[data-tone="on-light"]) {
+  border-color: transparent;
+  background: color-mix(
+    in oklab,
+    var(--color-success-foreground) 72%,
+    var(--system-b-bg-surface-2) 28%
+  );
+  color: color-mix(in oklab, var(--system-b-cinematic-black) 62%, transparent);
+}
+
+/* SYSTEM B HOME PROFILE SHOWCASE PRIMITIVES END */
+
+/* ============================================
    SYSTEM B HOME RELEASE MODE MOCK CARD PRIMITIVES
    ============================================ */
 
