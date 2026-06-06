@@ -12,21 +12,38 @@ function readSource(sourcePath: string) {
   return readFileSync(resolve(process.cwd(), sourcePath), 'utf8');
 }
 
+function extractClassNameValues(source: string) {
+  const values: string[] = [];
+  const classNamePattern =
+    /className\s*=\s*(?:"([^"]*)"|'([^']*)'|{\s*`([^`]*)`\s*}|{\s*(['"])([\s\S]*?)\4\s*}|{([\s\S]*?)})/g;
+
+  for (const match of source.matchAll(classNamePattern)) {
+    values.push(match[1] ?? match[2] ?? match[3] ?? match[5] ?? match[6] ?? '');
+  }
+
+  return values.join('\n');
+}
+
 function expectCentralCtaUsesNeutralPrimary(
   sourcePath: string,
   source: string
 ) {
+  const classNames = extractClassNameValues(source);
+
   expect(
-    source,
+    classNames,
     `${sourcePath} should not use accent-filled CTA classes`
-  ).not.toMatch(/className='[^']*\bbg-accent-token\b[^']*\btext-white\b[^']*'/);
-  expect(source, `${sourcePath} should use neutral primary CTA fill`).toContain(
-    'bg-btn-primary'
+  ).not.toMatch(
+    /\bbg-accent-token\b[\s\S]*\btext-white\b|\btext-white\b[\s\S]*\bbg-accent-token\b/
   );
   expect(
-    source,
+    classNames,
+    `${sourcePath} should use neutral primary CTA fill`
+  ).toMatch(/\bbg-btn-primary\b/);
+  expect(
+    classNames,
     `${sourcePath} should use neutral primary CTA foreground`
-  ).toContain('text-btn-primary-foreground');
+  ).toMatch(/\btext-btn-primary-foreground\b/);
 }
 
 describe('central conversion CTA neutral styling', () => {
