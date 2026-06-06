@@ -18,6 +18,7 @@ import { SUPPORTED_IMAGE_MIME_TYPES } from '@/lib/images/config';
 import { deriveChatRailContextTargets } from './chat-context-rail';
 import { CHAT_COMPOSER_DOCK_CLASSNAME } from './chat-layout';
 import {
+  ChatConversationComposerSkeleton,
   ChatEmptyStateComposerRegion,
   ChatInput,
   ChatMessage,
@@ -365,25 +366,14 @@ export function JovieChat({
   if (isLoadingConversation) {
     return (
       <div
-        className='flex h-full flex-col bg-(--linear-app-content-surface)'
+        className='system-b-chat-conversation-loading'
         data-testid='chat-loading-conversation-skeleton'
       >
-        <div className='flex-1 overflow-hidden px-4 py-5 sm:px-5'>
+        <div className='system-b-chat-conversation-loading-viewport'>
           <ChatMessageSkeleton />
         </div>
-        <div className='shrink-0 px-4 pb-4 pt-2 sm:px-5 sm:pb-5 sm:pt-2.5'>
-          <div className='mx-auto h-[88px] w-full max-w-[45rem] rounded-[28px] border border-white/[0.08] bg-[linear-gradient(180deg,rgba(255,255,255,0.035)_0%,rgba(255,255,255,0.014)_45%,transparent_100%),#16171b] shadow-[0_18px_56px_-30px_rgba(0,0,0,0.86),inset_0_1px_0_rgba(255,255,255,0.055)]'>
-            <div className='grid h-full grid-rows-[minmax(24px,auto)_40px] gap-2 px-3 py-2.5'>
-              <div className='mx-1 mt-1 h-5 w-44 rounded-full bg-white/[0.055]' />
-              <div className='flex items-center justify-between'>
-                <div className='h-9 w-9 rounded-full bg-white/[0.045]' />
-                <div className='flex items-center gap-2'>
-                  <div className='h-9 w-9 rounded-full bg-white/[0.045]' />
-                  <div className='h-9 w-9 rounded-full bg-white/[0.08]' />
-                </div>
-              </div>
-            </div>
-          </div>
+        <div className='system-b-chat-conversation-loading-dock'>
+          <ChatConversationComposerSkeleton />
         </div>
       </div>
     );

@@ -4,7 +4,10 @@ export { ChatInput } from './ChatInput';
 export { ChatLinkConfirmationCard } from './ChatLinkConfirmationCard';
 export { ChatMarkdown } from './ChatMarkdown';
 export { ChatMessage } from './ChatMessage';
-export { ChatMessageSkeleton } from './ChatMessageSkeleton';
+export {
+  ChatConversationComposerSkeleton,
+  ChatMessageSkeleton,
+} from './ChatMessageSkeleton';
 export { ChatPitchCard } from './ChatPitchCard';
 export { EntityChip, type EntityChipData } from './EntityChip';
 export { ErrorDisplay } from './ErrorDisplay';

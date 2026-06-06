@@ -91,12 +91,15 @@ vi.mock('@/components/jovie/components', () => ({
         />
         <div
           data-testid='chat-loading-bubble'
-          className='rounded-[18px] border bg-(--linear-app-content-surface) px-4 py-3.5'
+          className='system-b-chat-message-skeleton-assistant-frame'
         />
       </div>
     ) : (
       <div data-testid='chat-message' />
     ),
+  ChatConversationComposerSkeleton: () => (
+    <div data-testid='chat-conversation-composer-skeleton' />
+  ),
   ChatMessageSkeleton: () => <div data-testid='chat-message-skeleton' />,
   ErrorDisplay: () => <div data-testid='chat-error' />,
   ScrollToBottom: () => null,
