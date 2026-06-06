@@ -93,6 +93,19 @@
   --system-b-entity-chip-track-accent: var(--color-accent-pink);
   --system-b-entity-chip-event-accent: var(--color-success);
   --system-b-entity-chip-on-light-text: var(--color-text-primary-token);
+  --system-b-chat-message-max-width: 78%;
+  --system-b-chat-user-bubble-bg: var(--color-text-primary-token);
+  --system-b-chat-user-bubble-text: var(--system-b-cinematic-black);
+  --system-b-chat-user-bubble-border: color-mix(
+    in oklab,
+    var(--color-text-primary-token) 80%,
+    transparent
+  );
+  --system-b-chat-user-bubble-shadow:
+    0 var(--space-3) 38px -28px
+    color-mix(in oklab, var(--system-b-cinematic-black) 85%, transparent),
+    inset 0 var(--space-px) 0
+    color-mix(in oklab, var(--color-text-primary-token) 90%, transparent);
   --system-b-duration-fast: var(--ds-motion-subtle-duration);
   --system-b-ease: var(--ds-motion-subtle-easing);
   --system-b-radius-pill: var(--radius-full);
@@ -7519,6 +7532,157 @@ body:has(.system-b-download-page) .marketing-glass-header__cta:focus-visible {
   aspect-ratio: 3 / 1;
 }
 
+:where(.system-b-chat-message-row) {
+  display: flex;
+  gap: calc(var(--space-3) + var(--space-0-5));
+}
+
+:where(.system-b-chat-user-bubble) {
+  display: flex;
+  min-height: calc(var(--space-6) + var(--space-1));
+  max-width: var(--system-b-chat-message-max-width);
+  flex-direction: column;
+  justify-content: center;
+  border: 1px solid var(--system-b-chat-user-bubble-border);
+  background: var(--system-b-chat-user-bubble-bg);
+  color: var(--system-b-chat-user-bubble-text);
+  box-shadow: var(--system-b-chat-user-bubble-shadow);
+}
+
+:where(.system-b-chat-user-bubble[data-bubble-shape="pill"]) {
+  border-radius: var(--radius-full);
+  padding: var(--space-1-5) var(--space-3);
+}
+
+:where(.system-b-chat-user-bubble[data-bubble-shape="rectangle"]) {
+  border-radius: calc(var(--radius-xl) + var(--space-1-5));
+  padding: var(--space-2) calc(var(--space-3) + var(--space-0-5));
+}
+
+:where(.system-b-chat-user-attachments) {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-1-5);
+}
+
+:where(.system-b-chat-user-attachments[data-has-message="true"]) {
+  margin-bottom: var(--space-2);
+}
+
+:where(.system-b-chat-user-text) {
+  font-size: var(--text-app);
+  line-height: var(--space-5);
+}
+
+:where(.system-b-chat-assistant-frame) {
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+}
+
+:where(.system-b-chat-loading-indicator) {
+  display: flex;
+  min-height: calc(var(--space-6) + var(--space-1));
+  width: 100%;
+  max-width: var(--system-b-chat-message-max-width);
+  flex-direction: column;
+  gap: var(--space-2);
+  font-size: var(--text-mid);
+  line-height: calc(var(--space-6) + var(--space-1));
+}
+
+:where(.system-b-chat-loading-head) {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding-left: var(--space-0-5);
+}
+
+:where(.system-b-chat-loading-avatar) {
+  width: calc(var(--space-5) + var(--space-0-5));
+  height: calc(var(--space-5) + var(--space-0-5));
+  flex-shrink: 0;
+}
+
+:where(.system-b-chat-loading-label) {
+  width: var(--space-8);
+  height: var(--space-3);
+}
+
+:where(.system-b-chat-loading-body) {
+  padding-left: calc(var(--space-6) + var(--space-1));
+}
+
+:where(.system-b-chat-loading-line) {
+  width: 65%;
+  height: var(--space-4);
+}
+
+:where(.system-b-chat-assistant-stack) {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+:where(.system-b-chat-message-reply) {
+  color: var(--color-text-primary-token);
+  font-size: var(--text-mid);
+  line-height: calc(var(--space-6) + var(--space-1));
+}
+
+@media (min-width: 640px) {
+  :where(.system-b-chat-message-reply) {
+    font-size: calc(var(--text-mid) + var(--space-0-5));
+  }
+}
+
+:where(.system-b-chat-copy-row) {
+  display: flex;
+  height: calc(var(--space-6) + var(--space-1));
+  align-items: center;
+  justify-content: flex-start;
+  margin-top: var(--space-1-5);
+  opacity: 0;
+  transition: opacity var(--duration-subtle) var(--ease-subtle);
+}
+
+:where(.system-b-chat-message-row:hover .system-b-chat-copy-row),
+:where(.system-b-chat-message-row:focus-within .system-b-chat-copy-row) {
+  opacity: 1;
+}
+
+:where(.system-b-chat-copy-button) {
+  display: inline-flex;
+  width: calc(var(--space-6) + var(--space-1));
+  height: calc(var(--space-6) + var(--space-1));
+  align-items: center;
+  justify-content: center;
+  border: 1px solid transparent;
+  border-radius: var(--radius-full);
+  background: transparent;
+  color: var(--color-text-tertiary-token);
+  box-shadow: none;
+  transition:
+    background-color var(--duration-subtle) var(--ease-subtle),
+    color var(--duration-subtle) var(--ease-subtle);
+}
+
+:where(.system-b-chat-copy-button:hover),
+:where(.system-b-chat-copy-button:focus-visible) {
+  background: var(--system-b-bg-surface-1);
+  color: var(--color-text-secondary-token);
+}
+
+:where(.system-b-chat-copy-button:focus-visible) {
+  outline: none;
+}
+
+:where(.system-b-chat-copy-icon) {
+  width: calc(var(--space-3) + var(--space-0-5));
+  height: calc(var(--space-3) + var(--space-0-5));
+}
+
 :where(.system-b-transcript-skill-chip) {
   display: inline-flex;
   height: var(--space-6);
@@ -7539,7 +7703,7 @@ body:has(.system-b-download-page) .marketing-glass-header__cta:focus-visible {
 :where(.system-b-transcript-skill-chip-light) {
   border-color: color-mix(in oklab, black 10%, transparent);
   background: color-mix(in oklab, black 5.5%, transparent);
-  color: var(--system-b-chat-user-bubble-text, #111216);
+  color: var(--system-b-chat-user-bubble-text);
 }
 
 :where(.system-b-transcript-skill-chip-dark) {

@@ -40,6 +40,10 @@ vi.mock('@jovie/ui', () => ({
   }) => <div data-testid={testId}>{children}</div>,
   PopoverTrigger: ({ children }: { children: ReactNode }) => <>{children}</>,
   SimpleTooltip: ({ children }: { children: ReactNode }) => <>{children}</>,
+  Skeleton: ({
+    rounded: _rounded,
+    ...props
+  }: ComponentProps<'div'> & { rounded?: string }) => <div {...props} />,
 }));
 
 vi.mock('next/image', () => ({
@@ -75,13 +79,10 @@ describe('ChatMessage', () => {
     fastRender(<ChatMessage {...messageProps} />);
 
     const bubble = screen.getByTestId('chat-user-bubble');
-    expect(bubble.className).toContain('rounded-full');
-    expect(bubble.className).toContain('min-h-7');
-    expect(bubble.className).toContain('px-3');
-    expect(bubble.className).toContain('py-1.5');
-    expect(bubble.className).not.toContain('py-3.5');
-    expect(bubble.className).not.toContain('min-h-8');
+    expect(bubble).toHaveClass('system-b-chat-user-bubble');
     expect(bubble).toHaveAttribute('data-bubble-shape', 'pill');
+    expect(bubble.className).not.toContain('rounded-[');
+    expect(bubble.className).not.toContain('shadow-[');
   });
 
   it('renders long or multiline user messages as rounded rectangles', () => {
@@ -100,8 +101,9 @@ describe('ChatMessage', () => {
 
     const bubble = screen.getByTestId('chat-user-bubble');
     expect(bubble).toHaveAttribute('data-bubble-shape', 'rectangle');
-    expect(bubble.className).toContain('rounded-[18px]');
-    expect(bubble.className).toContain('py-2');
+    expect(bubble).toHaveClass('system-b-chat-user-bubble');
+    expect(bubble.className).not.toContain('rounded-[');
+    expect(bubble.className).not.toContain('py-');
   });
 
   it('renders multiline user messages as rectangles even under the short text limit', () => {
@@ -115,7 +117,7 @@ describe('ChatMessage', () => {
 
     const bubble = screen.getByTestId('chat-user-bubble');
     expect(bubble).toHaveAttribute('data-bubble-shape', 'rectangle');
-    expect(bubble.className).toContain('rounded-[18px]');
+    expect(bubble).toHaveClass('system-b-chat-user-bubble');
   });
 
   it('renders image file parts as compact attachment chips, not large inline image grids', () => {
@@ -143,6 +145,45 @@ describe('ChatMessage', () => {
       within(bubble).getByTestId('image-attachment-chip-trigger')
     ).toHaveAttribute('aria-haspopup', 'dialog');
     expect(bubble).toHaveAttribute('data-bubble-shape', 'rectangle');
+    expect(
+      within(bubble)
+        .getByTestId('image-attachment-chip')
+        .closest('.system-b-chat-user-attachments')
+    ).toHaveAttribute('data-has-message', 'true');
+  });
+
+  it('renders thinking with stable System B loading hooks', () => {
+    const messageProps = {
+      id: 'assistant-thinking',
+      role: 'assistant' as const,
+      parts: [],
+      isThinking: true,
+    };
+
+    fastRender(<ChatMessage {...messageProps} />);
+
+    const loading = screen.getByTestId('chat-loading-indicator');
+    expect(loading).toHaveClass('system-b-chat-loading-indicator');
+    expect(loading.querySelector('.system-b-chat-loading-avatar')).toBeTruthy();
+    expect(loading.querySelector('.system-b-chat-loading-label')).toBeTruthy();
+    expect(loading.querySelector('.system-b-chat-loading-line')).toBeTruthy();
+  });
+
+  it('keeps assistant reply and copy action on named System B primitives', () => {
+    const messageProps = {
+      id: 'assistant-copy',
+      role: 'assistant' as const,
+      parts: [{ type: 'text' as const, text: 'Audience summary is ready.' }],
+    };
+
+    fastRender(<ChatMessage {...messageProps} />);
+
+    expect(screen.getByTestId('chat-message-reply')).toHaveClass(
+      'system-b-chat-message-reply'
+    );
+    const copyButton = screen.getByRole('button', { name: 'Copy message' });
+    expect(copyButton).toHaveClass('system-b-chat-copy-button');
+    expect(copyButton.querySelector('.system-b-chat-copy-icon')).toBeTruthy();
   });
 
   it('renders one generic tool as an inline activity row without card chrome', () => {
