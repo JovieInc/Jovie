@@ -5,6 +5,14 @@
      5|The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
      6|and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.6.8] - 2026-06-05
+
+> Shared text-entry controls now use neutral System B tracking instead of hardcoded negative letter spacing.
+
+### Fixed
+
+- **Text field typography contract (JOV-2829)**: normalizes the shared `Input` and `Textarea` atoms to `tracking-normal`, and adds focused guards so shared text-entry controls cannot drift back to negative tracking.
+
 ## [26.6.7] - 2026-06-05
 
 > Desktop recovery now reports the actual runtime platform while shipping through the desktop release path.

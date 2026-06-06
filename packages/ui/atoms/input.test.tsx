@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import path from 'node:path';
 import { fireEvent, render, screen } from '@testing-library/react';
 import * as React from 'react';
 import { describe, expect, it } from 'vitest';
@@ -5,6 +7,21 @@ import { describe, expect, it } from 'vitest';
 import { Input } from './input';
 
 describe('Input', () => {
+  describe('System B typography contract', () => {
+    it('uses neutral tracking instead of arbitrary negative letter spacing', () => {
+      const source = readFileSync(path.join(process.cwd(), 'atoms/input.tsx'), {
+        encoding: 'utf8',
+      });
+
+      expect(source).not.toMatch(/\btracking-\[-[^\]]+\]/);
+
+      render(<Input aria-label='Name' data-testid='input' />);
+      const input = screen.getByTestId('input');
+      expect(input.className).toContain('tracking-normal');
+      expect(input.className).not.toMatch(/\btracking-\[-[^\]]+\]/);
+    });
+  });
+
   describe('Basic Rendering', () => {
     it('renders with default props', () => {
       render(<Input placeholder='Enter text' />);
