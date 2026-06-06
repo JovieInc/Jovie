@@ -2,7 +2,11 @@ import type {
   ReleaseSidebarAnalytics,
   ReleaseSidebarTrack,
 } from '@/components/organisms/release-sidebar/types';
-import type { ProviderKey, ReleaseViewModel } from '@/lib/discography/types';
+import type {
+  ProviderKey,
+  ReleaseViewModel,
+  TrackViewModel,
+} from '@/lib/discography/types';
 import type { PlanGateEntitlements } from '@/lib/queries';
 import type { CanvasStatus } from '@/lib/services/canvas/types';
 
@@ -76,6 +80,7 @@ export interface ReleaseExperienceAdapter {
   ) => Promise<void>;
   readonly onToggleArtworkDownloads?: (enabled: boolean) => Promise<void>;
   readonly sidebarDataByReleaseId?: Record<string, ReleaseSidebarFixtureData>;
+  readonly tracksByReleaseId?: Record<string, TrackViewModel[]>;
 }
 
 export type DraftState = Partial<Record<ProviderKey, string>>;

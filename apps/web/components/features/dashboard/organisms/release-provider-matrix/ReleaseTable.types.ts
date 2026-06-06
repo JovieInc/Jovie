@@ -1,5 +1,9 @@
 import type { TrackSidebarData } from '@/components/organisms/release-sidebar';
-import type { ProviderKey, ReleaseViewModel } from '@/lib/discography/types';
+import type {
+  ProviderKey,
+  ReleaseViewModel,
+  TrackViewModel,
+} from '@/lib/discography/types';
 
 export interface ProviderConfig {
   readonly label: string;
@@ -34,6 +38,7 @@ export interface ReleaseTableProps {
   readonly flashedReleaseId?: string | null;
   readonly selectedReleaseId?: string | null;
   readonly selectedTrackId?: string | null;
+  readonly tracksByReleaseId?: Record<string, TrackViewModel[]>;
   readonly designV1?: boolean;
   readonly isSmartLinkLocked?: (releaseId: string) => boolean;
   readonly getSmartLinkLockReason?: (

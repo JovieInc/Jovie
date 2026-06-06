@@ -962,6 +962,20 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
   const isTrackSidebarOpen = Boolean(editingTrack);
   const isSidebarOpen =
     isReleaseSidebarOpen || isTrackSidebarOpen || addReleaseOpen;
+  const tableTracksByReleaseId = useMemo(() => {
+    if (experienceAdapter?.tracksByReleaseId) {
+      return experienceAdapter.tracksByReleaseId;
+    }
+    if (!experienceAdapter?.sidebarDataByReleaseId) {
+      return undefined;
+    }
+
+    return Object.fromEntries(
+      Object.entries(experienceAdapter.sidebarDataByReleaseId)
+        .filter(([, data]) => data.tracks)
+        .map(([releaseId, data]) => [releaseId, data.tracks ?? []])
+    );
+  }, [experienceAdapter]);
 
   // Connect to tableMeta for drawer toggle button
   const { setTableMeta } = useTableMeta();
@@ -1290,6 +1304,7 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
                 groupByYear={groupByYear}
                 selectedReleaseId={editingRelease?.id}
                 selectedTrackId={editingTrack?.id}
+                tracksByReleaseId={tableTracksByReleaseId}
                 designV1={designV1ReleasesEnabled}
                 refreshingReleaseId={refreshingReleaseId}
                 flashedReleaseId={flashedReleaseId}
