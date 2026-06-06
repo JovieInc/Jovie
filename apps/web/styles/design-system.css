@@ -5800,6 +5800,39 @@ body:has(.system-b-download-page) .marketing-glass-header__cta:focus-visible {
   text-align: center;
 }
 
+:where(.system-b-calendar-month-control) {
+  padding: var(--space-0-5);
+  border-radius: var(--radius-pill);
+  background: var(--system-b-bg-surface-1);
+}
+
+:where(.system-b-calendar-icon-button),
+:where(.system-b-calendar-toolbar-button) {
+  border-radius: var(--radius-pill);
+  color: var(--color-text-tertiary-token);
+}
+
+:where(.system-b-calendar-icon-button:hover),
+:where(.system-b-calendar-toolbar-button:hover) {
+  background: var(--system-b-bg-surface-0);
+  color: var(--color-text-primary-token);
+}
+
+:where(.system-b-calendar-panel) {
+  border: 1px solid var(--system-b-app-frame-seam);
+  border-radius: var(--radius-lg);
+  background: var(--system-b-bg-surface-1);
+  box-shadow: var(--shadow-card);
+}
+
+:where(.system-b-calendar-detail-panel) {
+  padding: var(--space-4);
+}
+
+:where(.system-b-calendar-weekday-row) {
+  border-bottom: 1px solid var(--system-b-app-frame-seam);
+}
+
 :where(.system-b-calendar-toolbar-button),
 :where(.system-b-calendar-detail-section-heading),
 :where(.system-b-calendar-warning-heading),
@@ -5844,6 +5877,10 @@ body:has(.system-b-download-page) .marketing-glass-header__cta:focus-visible {
   );
 }
 
+:where(.system-b-calendar-day-cell-active:hover) {
+  background: var(--system-b-bg-surface-0);
+}
+
 :where(.system-b-calendar-day-cell-muted) {
   color: color-mix(
     in oklab,
@@ -5863,7 +5900,7 @@ body:has(.system-b-download-page) .marketing-glass-header__cta:focus-visible {
   width: var(--space-1-5);
   height: var(--space-1-5);
   border-radius: var(--radius-pill);
-  background: var(--system-b-accent-cyan);
+  background: var(--color-info);
   content: "";
 }
 
@@ -5908,6 +5945,15 @@ body:has(.system-b-download-page) .marketing-glass-header__cta:focus-visible {
   color: color-mix(in oklab, var(--color-warning) 82%, white 18%);
 }
 
+:where(.system-b-calendar-empty-day) {
+  color: var(--color-text-tertiary-token);
+}
+
+:where(.system-b-calendar-loading-text),
+:where(.system-b-calendar-weekday) {
+  color: var(--color-text-quaternary-token);
+}
+
 :where(.system-b-calendar-error-text) {
   color: color-mix(in oklab, var(--color-error) 82%, white 18%);
 }
@@ -5933,12 +5979,17 @@ body:has(.system-b-download-page) .marketing-glass-header__cta:focus-visible {
   color: var(--color-text-quaternary-token);
 }
 
+:where(.system-b-calendar-release-artwork) {
+  border-radius: var(--radius-sm);
+  background: var(--system-b-bg-surface-2);
+}
+
 :where(.system-b-calendar-release-dot-released) {
   background: color-mix(in oklab, var(--color-success) 78%, transparent);
 }
 
 :where(.system-b-calendar-release-dot-scheduled) {
-  background: var(--system-b-accent-cyan);
+  background: color-mix(in oklab, var(--color-info) 82%, transparent);
 }
 
 :where(.system-b-calendar-release-dot-draft),
@@ -5964,6 +6015,15 @@ body:has(.system-b-download-page) .marketing-glass-header__cta:focus-visible {
   color: var(--color-text-primary-token);
 }
 
+:where(.system-b-calendar-filter-pill-idle) {
+  color: var(--color-text-tertiary-token);
+}
+
+:where(.system-b-calendar-filter-pill-idle:hover) {
+  background: var(--system-b-bg-surface-1);
+  color: var(--color-text-primary-token);
+}
+
 :where(.system-b-calendar-filter-pill-warn),
 :where(.system-b-calendar-type-chip) {
   background: color-mix(in oklab, var(--color-warning) 14%, transparent);
@@ -5980,7 +6040,12 @@ body:has(.system-b-download-page) .marketing-glass-header__cta:focus-visible {
   accent-color: var(--color-warning);
 }
 
+:where(.system-b-calendar-bulk-action-slot) {
+  min-height: var(--space-7);
+}
+
 :where(.system-b-calendar-provider-chip) {
+  background: var(--system-b-bg-surface-0);
   color: var(--color-text-tertiary-token);
 }
 
@@ -6006,6 +6071,29 @@ body:has(.system-b-download-page) .marketing-glass-header__cta:focus-visible {
 :where(.system-b-calendar-action-danger-ghost),
 :where(.system-b-calendar-action-secondary) {
   font-family: var(--font-caption);
+  color: var(--color-text-tertiary-token);
+}
+
+:where(.system-b-calendar-action-ghost:hover) {
+  background: var(--system-b-bg-surface-1);
+  color: var(--color-text-primary-token);
+}
+
+:where(.system-b-calendar-rejected-toggle) {
+  color: var(--color-text-quaternary-token);
+}
+
+:where(.system-b-calendar-rejected-toggle:hover) {
+  color: var(--color-text-tertiary-token);
+}
+
+:where(.system-b-calendar-action-secondary) {
+  background: var(--system-b-bg-surface-1);
+}
+
+:where(.system-b-calendar-action-secondary:hover) {
+  background: var(--system-b-bg-surface-2);
+  color: var(--color-text-primary-token);
 }
 
 :where(.system-b-calendar-action-danger-ghost:hover) {

@@ -71,6 +71,32 @@ const pendingEvent: EventRecord = {
   provider: 'Bandsintown',
 };
 
+const confirmedEvent: EventRecord = {
+  ...pendingEvent,
+  id: 'event-2',
+  title: 'Warehouse Set',
+  subtitle: 'Detroit, MI · Manual',
+  confirmationStatus: 'confirmed',
+  providerKey: 'manual',
+  reviewedAt: '2026-05-11T00:00:00.000Z',
+  lastSyncedAt: null,
+  provider: 'Manual',
+  status: 'Sold out',
+  ticketUrl: 'https://tickets.example.com/warehouse-set',
+};
+
+const rejectedEvent: EventRecord = {
+  ...pendingEvent,
+  id: 'event-3',
+  title: 'Old Listing',
+  subtitle: 'Detroit, MI · Songkick',
+  confirmationStatus: 'rejected',
+  providerKey: 'songkick',
+  reviewedAt: '2026-05-12T00:00:00.000Z',
+  lastSyncedAt: null,
+  provider: 'Songkick',
+};
+
 function renderCalendar() {
   const client = new QueryClient({
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
@@ -132,5 +158,54 @@ describe('CalendarPageClient', () => {
 
     expect(mocks.useReleasesQuery).toHaveBeenCalledWith('');
     expect(mocks.useEventsQuery).toHaveBeenCalledWith('');
+  });
+
+  it('renders named hooks for selected day, bulk actions, rejected expansion, and loading', () => {
+    mocks.useEventsQuery.mockReturnValue({
+      data: [pendingEvent, confirmedEvent, rejectedEvent],
+      isLoading: true,
+    });
+
+    renderCalendar();
+
+    const eventDay = screen.getByRole('button', {
+      name: /18 Movement Festival Warehouse Set Old Listing/,
+    });
+    fireEvent.click(eventDay);
+
+    expect(eventDay).toHaveClass('system-b-calendar-day-cell-selected');
+    expect(screen.getByText('Loading calendar…')).toHaveClass(
+      'system-b-calendar-loading-text'
+    );
+
+    const bulkSlot = screen
+      .getByText('Pending review · 1')
+      .closest('div')
+      ?.parentElement?.querySelector('.system-b-calendar-bulk-action-slot');
+    expect(bulkSlot).toBeInTheDocument();
+    expect(bulkSlot).toHaveAttribute('data-active', 'false');
+
+    fireEvent.click(
+      screen.getByRole('checkbox', { name: /Movement Festival/ })
+    );
+
+    expect(bulkSlot).toHaveAttribute('data-active', 'true');
+    expect(screen.getByText('Confirm selected (1)')).toHaveClass(
+      'system-b-calendar-action-confirm'
+    );
+    expect(screen.getByText('Reject selected (1)')).toHaveClass(
+      'system-b-calendar-action-reject'
+    );
+
+    const rejectedToggle = screen.getByRole('button', {
+      name: 'Show rejected · 1',
+    });
+    expect(rejectedToggle).toHaveClass('system-b-calendar-rejected-toggle');
+    fireEvent.click(rejectedToggle);
+
+    expect(screen.getAllByText('Old Listing')).toHaveLength(2);
+    expect(screen.getByRole('button', { name: 'Undo reject' })).toHaveClass(
+      'system-b-calendar-action-secondary'
+    );
   });
 });
