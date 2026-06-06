@@ -3,6 +3,7 @@
 import Image from 'next/image';
 import { useSearchParams } from 'next/navigation';
 import { useMemo } from 'react';
+import { HomePhoneFrame } from '@/features/home/HomePhoneFrame';
 import { HomeProfileShowcase } from '@/features/home/HomeProfileShowcase';
 import {
   HOMEPAGE_PROFILE_PREVIEW_ARTIST,
@@ -12,6 +13,7 @@ import {
   HOMEPAGE_PROFILE_PREVIEW_RELEASES,
   HOMEPAGE_PROFILE_PREVIEW_SOCIAL_LINKS,
   HOMEPAGE_PROFILE_PREVIEW_TOUR_DATES,
+  HOMEPAGE_PROFILE_SHOWCASE_STATES,
 } from '@/features/home/homepage-profile-preview-fixture';
 import {
   type ProfileMode,
@@ -27,8 +29,13 @@ import {
   StaticArtistPage,
   type StaticArtistPageProps,
 } from '@/features/profile/StaticArtistPage';
+import { ProfileCompactSurface } from '@/features/profile/templates/ProfileCompactSurface';
 import type { UserLocation } from '@/hooks/useUserLocation';
 import type { ConfirmedFeaturedPlaylistFallback } from '@/lib/profile/featured-playlist-fallback';
+import {
+  buildProfileAccentCssVars,
+  readProfileAccentTheme,
+} from '@/lib/profile/profile-theme';
 import type { TourDateViewModel } from '@/lib/tour-dates/types';
 import { DemoClientProviders } from './DemoClientProviders';
 
@@ -633,6 +640,73 @@ function SingleStatePhonePreview({
   );
 }
 
+function MoreMenuPhonePreview() {
+  const state = HOMEPAGE_PROFILE_SHOWCASE_STATES['more-menu'];
+  const profileAccentStyle = buildProfileAccentCssVars(
+    readProfileAccentTheme(HOMEPAGE_PROFILE_PREVIEW_ARTIST.theme)
+  );
+
+  return (
+    <DemoClientProviders>
+      <DemoShowcaseShell
+        testId='demo-showcase-tim-white-profile-state'
+        title='Single Profile State'
+        subtitle='Use the state query param to pin one Tim White profile state for screenshots or focused review.'
+      >
+        <div className='flex items-center justify-center'>
+          <HomePhoneFrame className='homepage-showcase-phone-frame max-w-[24rem]'>
+            <div
+              className='homepage-showcase-surface relative h-full w-full bg-black/96'
+              style={profileAccentStyle}
+            >
+              <ProfileCompactSurface
+                dataTestId='homepage-profile-preview'
+                renderMode='interactive'
+                presentation='embedded'
+                artist={HOMEPAGE_PROFILE_PREVIEW_ARTIST}
+                socialLinks={[...HOMEPAGE_PROFILE_PREVIEW_SOCIAL_LINKS]}
+                contacts={[...HOMEPAGE_PROFILE_PREVIEW_CONTACTS]}
+                latestRelease={HOMEPAGE_PROFILE_PREVIEW_RELEASES.live}
+                profileSettings={{ showOldReleases: true }}
+                genres={HOMEPAGE_PROFILE_PREVIEW_ARTIST.genres ?? []}
+                photoDownloadSizes={[]}
+                pressPhotos={[]}
+                allowPhotoDownloads={false}
+                tourDates={[...HOMEPAGE_PROFILE_PREVIEW_TOUR_DATES]}
+                releases={[...HOMEPAGE_PROFILE_PREVIEW_DRAWER_RELEASES]}
+                showSubscriptionConfirmedBanner={
+                  state.showSubscriptionConfirmedBanner
+                }
+                drawerOpen
+                drawerView={state.drawerView ?? 'menu'}
+                activeMode='profile'
+                onDrawerOpenChange={() => {}}
+                onDrawerViewChange={() => {}}
+                onModeSelect={() => {}}
+                onBack={() => {}}
+                onOpenMenu={() => {}}
+                onPlayClick={() => {}}
+                onShare={() => {}}
+                profileHref={`/${HOMEPAGE_PROFILE_PREVIEW_ARTIST.handle}`}
+                isSubscribed={false}
+                onTogglePref={() => {}}
+                onUnsubscribe={() => {}}
+                onManageNotifications={() => {}}
+                onRegisterReveal={() => {}}
+                onRevealNotifications={() => {}}
+                previewNotificationsState={state.notifications}
+                previewReleaseActionLabel={state.releaseActionLabel}
+                hideJovieBranding
+                hideMoreMenu
+              />
+            </div>
+          </HomePhoneFrame>
+        </div>
+      </DemoShowcaseShell>
+    </DemoClientProviders>
+  );
+}
+
 export function DemoTimWhiteProfileSurface() {
   const searchParams = useSearchParams();
   const modeParam = searchParams.get('mode');
@@ -726,6 +800,10 @@ export function DemoTimWhiteProfileSurface() {
   }
 
   if (showcaseState) {
+    if (showcaseState === 'more-menu') {
+      return <MoreMenuPhonePreview />;
+    }
+
     return (
       <SingleStatePhonePreview
         stateId={showcaseState}
