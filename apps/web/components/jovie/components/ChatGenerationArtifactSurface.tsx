@@ -22,12 +22,12 @@ export function ChatGenerationArtifactSurface({
       data-testid='chat-generation-artifact-surface'
       className={cn('system-b-chat-generation-artifact-surface', className)}
     >
-      <div className='system-b-chat-generation-artifact-header flex h-9 items-center gap-2 px-3'>
+      <div className='system-b-chat-generation-artifact-header'>
         <Sparkles
-          className='system-b-chat-generation-artifact-icon h-3.5 w-3.5'
+          className='system-b-chat-generation-artifact-icon'
           strokeWidth={2.25}
         />
-        <div className='min-w-0 flex-1'>
+        <div className='system-b-chat-generation-artifact-copy'>
           <p className='system-b-chat-generation-artifact-title'>{title}</p>
           {subtitle ? (
             <p className='system-b-chat-generation-artifact-subtitle'>
@@ -36,7 +36,7 @@ export function ChatGenerationArtifactSurface({
           ) : null}
         </div>
       </div>
-      <div className='p-3'>{children}</div>
+      <div className='system-b-chat-generation-artifact-body'>{children}</div>
     </section>
   );
 }

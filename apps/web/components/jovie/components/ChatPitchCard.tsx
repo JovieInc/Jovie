@@ -4,7 +4,6 @@ import { useCallback, useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import { CopyToggleIcon } from '@/components/atoms/CopyToggleIcon';
 import { PLATFORM_LIMITS } from '@/lib/services/pitch/types';
-import { cn } from '@/lib/utils';
 import { ChatGenerationArtifactSurface } from './ChatGenerationArtifactSurface';
 
 const PLATFORM_CONFIG = [
@@ -75,10 +74,10 @@ function CopyButton({
     <button
       type='button'
       onClick={handleCopy}
-      className='shrink-0 rounded-md p-1 text-tertiary-token transition-colors hover:bg-surface-2 hover:text-secondary-token'
+      className='system-b-chat-pitch-copy-button focus-ring'
       aria-label={`Copy ${platform} pitch`}
     >
-      <CopyToggleIcon copied={copied} size='h-3.5 w-3.5' />
+      <CopyToggleIcon copied={copied} size='system-b-chat-pitch-copy-icon' />
     </button>
   );
 }
@@ -92,12 +91,10 @@ function PitchBlock({
   const isLong = text.length > 180;
 
   return (
-    <div className='rounded-lg border border-subtle bg-surface-1 p-2.5'>
-      <div className='mb-1.5 flex items-center justify-between'>
-        <span className='text-2xs font-medium text-secondary-token'>
-          {label}
-        </span>
-        <div className='flex items-center gap-1.5'>
+    <div className='system-b-chat-pitch-block'>
+      <div className='system-b-chat-pitch-block-header'>
+        <span className='system-b-chat-pitch-block-label'>{label}</span>
+        <div className='system-b-chat-pitch-block-meta'>
           {limit ? (
             <span
               className='system-b-chat-pitch-count'
@@ -110,10 +107,8 @@ function PitchBlock({
         </div>
       </div>
       <p
-        className={cn(
-          'text-xs leading-relaxed text-primary-token',
-          !expanded && isLong && 'line-clamp-3'
-        )}
+        className='system-b-chat-pitch-block-text'
+        data-clamped={!expanded && isLong ? 'true' : undefined}
       >
         {text}
       </p>
@@ -121,7 +116,7 @@ function PitchBlock({
         <button
           type='button'
           onClick={() => setExpanded(!expanded)}
-          className='mt-1 text-2xs font-medium text-accent-token hover:underline'
+          className='system-b-chat-pitch-toggle focus-ring'
         >
           {expanded ? 'Show less' : 'Show more'}
         </button>
@@ -140,21 +135,18 @@ export function ChatPitchCard({
   if (state === 'loading') {
     return (
       <ChatGenerationArtifactSurface title='Generating Pitch'>
-        <div className='relative overflow-hidden rounded-lg bg-surface-0 p-2'>
+        <div className='system-b-chat-pitch-loading'>
           <div
             aria-hidden='true'
-            className='system-b-chat-generation-shimmer absolute inset-0'
+            className='system-b-chat-generation-shimmer'
           />
-          <div className='relative space-y-2'>
+          <div className='system-b-chat-pitch-loading-stack'>
             {[1, 2, 3, 4].map(i => (
-              <div
-                key={i}
-                className='animate-pulse rounded-lg bg-surface-1 p-3'
-              >
-                <div className='mb-2 h-3 w-20 rounded bg-surface-2' />
-                <div className='space-y-1.5'>
-                  <div className='h-2.5 w-full rounded bg-surface-2' />
-                  <div className='h-2.5 w-3/4 rounded bg-surface-2' />
+              <div key={i} className='system-b-chat-pitch-loading-card'>
+                <div className='system-b-chat-pitch-loading-title' />
+                <div className='system-b-chat-pitch-loading-lines'>
+                  <div className='system-b-chat-pitch-loading-line' />
+                  <div className='system-b-chat-pitch-loading-line-short' />
                 </div>
               </div>
             ))}
@@ -166,13 +158,11 @@ export function ChatPitchCard({
 
   if (state === 'error') {
     return (
-      <output className='block text-app text-primary-token'>
-        <span className='block font-medium text-error'>
+      <output className='system-b-chat-pitch-error'>
+        <span className='system-b-chat-pitch-error-title'>
           Pitch Generation Failed
         </span>
-        {error && (
-          <p className='mt-1.5 text-xs text-secondary-token'>{error}</p>
-        )}
+        {error && <p className='system-b-chat-pitch-error-message'>{error}</p>}
       </output>
     );
   }
@@ -191,13 +181,13 @@ export function ChatPitchCard({
             : pitch.destinationLabel
         }
       >
-        <div className='space-y-2'>
+        <div className='system-b-chat-pitch-stack'>
           {pitch.subjectLine ? (
             <PitchBlock label='Subject' text={pitch.subjectLine} limit={120} />
           ) : null}
           <PitchBlock label='Pitch' text={pitch.body} />
-          <div className='flex items-center justify-between rounded-lg border border-subtle bg-surface-1 px-2.5 py-2'>
-            <span className='min-w-0 truncate text-2xs text-secondary-token'>
+          <div className='system-b-chat-pitch-full-draft-row'>
+            <span className='system-b-chat-pitch-full-draft-label'>
               Full draft
             </span>
             <CopyButton text={copyText} platform='Pitch' />
@@ -214,7 +204,7 @@ export function ChatPitchCard({
       title='Generated Pitches'
       subtitle={releaseTitle ?? null}
     >
-      <div className='space-y-2'>
+      <div className='system-b-chat-pitch-stack'>
         {PLATFORM_CONFIG.map(({ key, label, limit }) => {
           const text = pitches[key];
           if (!text) return null;
