@@ -11,7 +11,7 @@ const launchVisibleSourcePaths = [
 ] as const;
 
 const forbiddenRouteVisualPatterns = [
-  /style=\{/,
+  /\bstyle\s*=\s*\{/,
   /#[0-9a-fA-F]{3,8}/,
   /rgba?\(/,
   /hsla?\(/,
@@ -25,7 +25,7 @@ const forbiddenRouteVisualPatterns = [
 ] as const;
 
 const forbiddenImportedDemoVisualPatterns = [
-  /style=\{/,
+  /\bstyle\s*=\s*\{/,
   /#[0-9a-fA-F]{3,8}/,
   /rgba?\(/,
   /hsla?\(/,
@@ -33,6 +33,8 @@ const forbiddenImportedDemoVisualPatterns = [
   /\btransition-all\b/,
   /transform:\s*/,
   /translate(?:3d|X|Y)?\(/,
+  /\b(?:[a-z-]+:)*-?translate(?:-[xy])?-[A-Za-z0-9_.\/[\]%-]+/,
+  /\b(?:[a-z-]+:)*scale-[A-Za-z0-9_.\/[\]%-]+/,
   /<svg\b|<path\b|<rect\b/,
   /[☰☷✉■☆✓×▶□]/,
 ] as const;
