@@ -3127,6 +3127,58 @@ body:has(.system-b-download-page) .marketing-glass-header__cta:focus-visible {
 /* SYSTEM B HOME PROFILE SHOWCASE PRIMITIVES END */
 
 /* ============================================
+   SYSTEM B HOME BENTO FEATURE GRID PRIMITIVES
+   ============================================ */
+
+:where(.system-b-home-bento-card) {
+  --system-b-home-bento-accent: var(--color-accent);
+}
+
+:where(.system-b-home-bento-card[data-tone="success"]) {
+  --system-b-home-bento-accent: var(--color-success);
+}
+
+:where(.system-b-home-bento-card[data-tone="notification"]) {
+  --system-b-home-bento-accent: var(--color-accent);
+}
+
+:where(.system-b-home-bento-card[data-tone="trend"]) {
+  --system-b-home-bento-accent: var(--color-info);
+}
+
+:where(.system-b-home-bento-curve) {
+  width: 100%;
+  height: 100%;
+}
+
+:where(.system-b-home-bento-curve-axis) {
+  stroke: color-mix(in oklab, var(--system-b-app-frame-seam) 62%, transparent);
+}
+
+:where(.system-b-home-bento-curve-line) {
+  stroke: var(--system-b-home-bento-accent);
+  fill: none;
+}
+
+:where(.system-b-home-bento-curve-node) {
+  fill: var(--system-b-home-bento-accent);
+}
+
+:where(.system-b-home-bento-curve-node-halo) {
+  fill: color-mix(in oklab, var(--system-b-home-bento-accent) 20%, transparent);
+}
+
+:where(.system-b-home-bento-curve-flatline) {
+  stroke: var(--color-text-quaternary-token);
+}
+
+:where(.system-b-home-bento-curve-flatline-node) {
+  fill: var(--color-text-quaternary-token);
+}
+
+/* SYSTEM B HOME BENTO FEATURE GRID PRIMITIVES END */
+
+/* ============================================
    SYSTEM B HOME RELEASE MODE MOCK CARD PRIMITIVES
    ============================================ */
 
