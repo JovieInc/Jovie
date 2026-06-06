@@ -56,6 +56,7 @@ export function ReleaseTable({
   groupByYear = false,
   selectedReleaseId,
   selectedTrackId,
+  tracksByReleaseId,
   designV1 = false,
   refreshingReleaseId,
   flashedReleaseId,
@@ -218,6 +219,7 @@ export function ReleaseTable({
           flashedReleaseId={flashedReleaseId}
           selectedReleaseId={selectedReleaseId}
           selectedTrackId={selectedTrackId}
+          tracksByReleaseId={tracksByReleaseId}
           designV1={designV1}
           isSmartLinkLocked={isSmartLinkLocked}
           getSmartLinkLockReason={getSmartLinkLockReason}

@@ -55,6 +55,7 @@ export function ReleaseTableWithTracks({
   groupByYear = false,
   selectedReleaseId,
   selectedTrackId,
+  tracksByReleaseId,
   designV1 = false,
   refreshingReleaseId,
   flashedReleaseId,
@@ -69,7 +70,7 @@ export function ReleaseTableWithTracks({
     isLoading: isLoadingTracks,
     toggleExpansion,
     getTracksForRelease,
-  } = useExpandedTracks();
+  } = useExpandedTracks(tracksByReleaseId);
   const { sorting, onSortingChange, isSorting, isLargeDataset } =
     useSortingManager({ rowCount: releases.length });
 

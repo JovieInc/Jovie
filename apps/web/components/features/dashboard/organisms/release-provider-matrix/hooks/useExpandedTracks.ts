@@ -34,7 +34,9 @@ export interface UseExpandedTracksResult {
  * - Loading state: shows spinner while fetching
  * - Session-only state: expanded state is not persisted
  */
-export function useExpandedTracks(): UseExpandedTracksResult {
+export function useExpandedTracks(
+  seededTracksByReleaseId?: Record<string, TrackViewModel[]>
+): UseExpandedTracksResult {
   const [expandedReleaseIds, setExpandedReleaseIds] = useState<Set<string>>(
     new Set()
   );
@@ -104,6 +106,17 @@ export function useExpandedTracks(): UseExpandedTracksResult {
         return;
       }
 
+      const seededTracks = seededTracksByReleaseId?.[releaseId];
+      if (seededTracks) {
+        setTracksByReleaseId(prev => {
+          const next = new Map(prev);
+          next.set(releaseId, seededTracks);
+          return next;
+        });
+        setExpandedReleaseIds(prev => new Set(prev).add(releaseId));
+        return;
+      }
+
       // Mark as loading (both state and ref)
       loadingReleaseIdsRef.current.add(releaseId);
       setLoadingReleaseIds(prev => new Set(prev).add(releaseId));
@@ -132,7 +145,16 @@ export function useExpandedTracks(): UseExpandedTracksResult {
           releaseSlug: release.slug,
           route: APP_ROUTES.RELEASES,
         });
-        // Could show a toast here
+        if (loadingReleaseIdsRef.current.has(releaseId)) {
+          startTransition(() => {
+            setTracksByReleaseId(prev => {
+              const next = new Map(prev);
+              next.set(releaseId, seededTracksByReleaseId?.[releaseId] ?? []);
+              return next;
+            });
+            setExpandedReleaseIds(prev => new Set(prev).add(releaseId));
+          });
+        }
       } finally {
         // Clear loading state (both state and ref)
         loadingReleaseIdsRef.current.delete(releaseId);
@@ -143,7 +165,12 @@ export function useExpandedTracks(): UseExpandedTracksResult {
         });
       }
     },
-    [expandedReleaseIds, fetchReleaseTracks, tracksByReleaseId]
+    [
+      expandedReleaseIds,
+      fetchReleaseTracks,
+      seededTracksByReleaseId,
+      tracksByReleaseId,
+    ]
   );
 
   const collapseAll = useCallback(() => {
