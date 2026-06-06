@@ -13,7 +13,7 @@ const CHROME_CLASS_PATTERN = /(?:^|\s)(?:uppercase|tracking-[^\s'"]+)/;
 const LABEL_ELEMENT_PATTERN =
   /<(?:h3|h4|span)\b[\s\S]*?className=(?:'[^']*'|"[^"]*"|\{[^}]*\})[\s\S]*?>/g;
 const ROUTE_LOCAL_VISUAL_PATTERN =
-  /(?:--linear-|color-mix\(|(?:bg|text|border|accent|ring|from|via|to|decoration)-(?:blue|sky|indigo|purple|violet|cyan|emerald|green|red|rose|pink|amber|yellow|orange|teal)-[^\s'"]+|(?:bg|text|border)-\[[^\]]+\]|(?:min-[hw]|max-[hw]|w|h)-\[[^\]]+\]|(?:bg|text)-quaternary-token\/\d+)/;
+  /(?:--linear-|color-mix\(|shadow-card|(?:bg|border|text)-(?:surface-\d|subtle|primary-token|secondary-token|tertiary-token|quaternary-token)|(?:bg|text|border|accent|ring|from|via|to|decoration)-(?:blue|sky|indigo|purple|violet|cyan|emerald|green|red|rose|pink|amber|yellow|orange|teal)-[^\s'"]+|(?:bg|text|border)-\[[^\]]+\]|(?:min-[hw]|max-[hw]|w|h)-\[[^\]]+\]|(?:bg|text)-quaternary-token\/\d+)/;
 const NAMED_COLOR_OWNER_PATTERN =
   /className=(?:'[^']*\bsystem-b-calendar-(?:provider-chip|row-description|row-secondary)\b[^']*\btext-(?:tertiary-token|quaternary-token)\b[^']*'|"[^"]*\bsystem-b-calendar-(?:provider-chip|row-description|row-secondary)\b[^"]*\btext-(?:tertiary-token|quaternary-token)\b[^"]*")/g;
 const CALENDAR_PRIMITIVES_PATTERN =
@@ -61,9 +61,11 @@ describe('calendar shell style guard', () => {
       );
 
     expect(source).toContain('system-b-calendar-day-cell');
+    expect(source).toContain('system-b-calendar-panel');
+    expect(source).toContain('system-b-calendar-bulk-action-slot');
     expect(
       offenders,
-      `Calendar visual chrome should use named system-b-calendar-* classes instead of legacy Linear variables, color-mix(), arbitrary color utilities, or hardcoded accent utilities.\n${offenders.join('\n')}`
+      `Calendar visual chrome should use named system-b-calendar-* classes instead of legacy Linear variables, route-local surface utilities, shadow recipes, color-mix(), arbitrary color utilities, or hardcoded accent utilities.\n${offenders.join('\n')}`
     ).toEqual([]);
   });
 
@@ -96,9 +98,21 @@ describe('calendar shell style guard', () => {
       );
 
     expect(primitiveBlock).toContain('system-b-calendar-type-chip');
+    expect(primitiveBlock).toContain('system-b-calendar-panel');
+    expect(primitiveBlock).toContain('system-b-calendar-day-cell-selected');
+    expect(primitiveBlock).toContain('system-b-calendar-action-reject');
     expect(
       offenders,
       `Calendar CSS primitives should use neutral System B tokens instead of purple or pink decorative accent ownership.\n${offenders.join('\n')}`
     ).toEqual([]);
+  });
+
+  it('keeps selected, bulk-action, rejected, and loading states on named hooks', () => {
+    const source = readFileSync(CALENDAR_CLIENT, 'utf8');
+
+    expect(source).toContain('system-b-calendar-day-cell-selected');
+    expect(source).toContain('system-b-calendar-bulk-action-slot');
+    expect(source).toContain('system-b-calendar-rejected-toggle');
+    expect(source).toContain('system-b-calendar-loading-text');
   });
 });
