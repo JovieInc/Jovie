@@ -43,11 +43,11 @@ function SearchDropdownState({
     >
       <DrawerSurfaceCard
         variant='card'
-        className='flex min-h-[56px] items-center bg-[color-mix(in_oklab,var(--linear-bg-surface-1)_88%,var(--linear-bg-surface-0))] px-2.5'
+        className='system-b-spotify-connect-status-card px-2.5'
       >
         <p
           className={cn(
-            'text-xs leading-[17px]',
+            'system-b-spotify-connect-status-copy text-xs',
             tone === 'error' ? 'text-error' : 'text-secondary-token'
           )}
         >
@@ -61,7 +61,7 @@ function SearchDropdownState({
 function SearchResultsLoadingSkeleton() {
   return (
     <output
-      className='block p-2.5 space-y-1'
+      className='block space-y-1 p-2.5'
       aria-live='polite'
       aria-label='Loading Spotify artist results'
       aria-busy='true'
@@ -70,7 +70,7 @@ function SearchResultsLoadingSkeleton() {
         <DrawerSurfaceCard
           key={key}
           variant='card'
-          className='flex min-h-[56px] items-center gap-2.5 bg-[color-mix(in_oklab,var(--linear-bg-surface-1)_88%,var(--linear-bg-surface-0))] px-2.5'
+          className='system-b-spotify-connect-status-card gap-2.5 px-2.5'
           aria-hidden='true'
         >
           <div className='h-10 w-10 shrink-0 rounded-full skeleton' />
@@ -130,33 +130,42 @@ function SearchInputTrailing({
 }) {
   if (showClaimButton) {
     return (
-      <DrawerButton
-        type='button'
-        tone='primary'
-        disabled={claimButtonDisabled}
-        onClick={onClaimArtist}
-        className={cn(
-          'h-8 shrink-0 px-3 text-app',
-          claimButtonDisabled && 'text-white/60'
-        )}
-      >
-        {(isLoading || isPending) && (
-          <LoadingSpinner size='sm' tone='inverse' label='Connecting' />
-        )}
-        Connect Spotify
-      </DrawerButton>
+      <div className='system-b-spotify-connect-trailing'>
+        <DrawerButton
+          type='button'
+          tone='primary'
+          disabled={claimButtonDisabled}
+          onClick={onClaimArtist}
+          className={cn(
+            'system-b-spotify-connect-claim-button h-8 shrink-0 px-3 text-app',
+            claimButtonDisabled &&
+              'system-b-spotify-connect-claim-button--disabled'
+          )}
+        >
+          {(isLoading || isPending) && (
+            <LoadingSpinner size='sm' tone='inverse' label='Connecting' />
+          )}
+          Connect Spotify
+        </DrawerButton>
+      </div>
     );
   }
 
   if (isPending) {
-    return <LoadingSpinner size='sm' tone='muted' label='Loading' />;
+    return (
+      <div className='system-b-spotify-connect-trailing'>
+        <LoadingSpinner size='sm' tone='muted' label='Loading' />
+      </div>
+    );
   }
 
   return (
-    <Search
-      className='h-4 w-4 shrink-0 text-tertiary-token'
-      aria-hidden='true'
-    />
+    <div className='system-b-spotify-connect-trailing'>
+      <Search
+        className='h-4 w-4 shrink-0 text-tertiary-token'
+        aria-hidden='true'
+      />
+    </div>
   );
 }
 
@@ -425,13 +434,13 @@ export function SpotifyConnectDialog({
       <DialogBody className='space-y-3'>
         <DrawerSurfaceCard
           variant='card'
-          className='overflow-visible bg-(--linear-app-content-surface) p-3.5'
+          className='system-b-spotify-connect-card p-3.5'
         >
           <div className='mb-2.5'>
             <p className='text-2xs font-caption leading-none text-tertiary-token'>
               Artist search
             </p>
-            <p className='mt-1 text-xs leading-[17px] text-secondary-token'>
+            <p className='system-b-spotify-connect-helper-copy mt-1 text-xs text-secondary-token'>
               Search by artist name or paste your Spotify artist URL to connect
               instantly.
             </p>
@@ -442,15 +451,14 @@ export function SpotifyConnectDialog({
             </label>
             <div
               className={cn(
-                'flex min-h-11 w-full items-center gap-2.5 rounded-[11px] border border-(--linear-app-frame-seam) bg-surface-0 px-2.5 py-2',
-                'transition-[border-color,box-shadow] duration-150',
+                'system-b-spotify-connect-input-shell',
                 shouldShowDropdown
-                  ? 'border-(--linear-border-focus) ring-2 ring-(--linear-border-focus)/20'
-                  : 'hover:border-(--linear-border-focus)',
+                  ? 'system-b-spotify-connect-input-shell--active'
+                  : 'system-b-spotify-connect-input-shell--idle',
                 isPending && 'opacity-60'
               )}
             >
-              <div className='flex items-center justify-center w-6 h-6 rounded-full shrink-0 bg-brand-spotify-subtle'>
+              <div className='flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-brand-spotify-subtle'>
                 <ProviderIcon provider='spotify' className='h-3.5 w-3.5' />
               </div>
               <input
@@ -505,7 +513,7 @@ export function SpotifyConnectDialog({
             )}
 
             {shouldShowDropdown && (
-              <div className='absolute z-50 mt-1.5 w-full overflow-hidden rounded-xl border border-(--linear-app-frame-seam) bg-(--linear-app-content-surface) shadow-popover'>
+              <div className='system-b-spotify-connect-dropdown absolute z-50 mt-1.5 w-full overflow-hidden'>
                 <select
                   id='spotify-connect-results'
                   className='sr-only'
@@ -580,13 +588,13 @@ export function SpotifyConnectDialog({
                         tabIndex={artist.isClaimed ? -1 : 0}
                         disabled={artist.isClaimed}
                         className={cn(
-                          'mb-1 flex w-full items-center gap-2.5 rounded-[10px] border border-transparent bg-[color-mix(in_oklab,var(--linear-bg-surface-1)_72%,var(--linear-bg-surface-0))] px-2.5 py-2 text-left transition-colors last:mb-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/20 focus-visible:ring-inset',
+                          'system-b-spotify-connect-result-row mb-1 flex w-full items-center gap-2.5 px-2.5 py-2 text-left last:mb-0 focus-visible:outline-none',
                           index === formState.activeResultIndex &&
                             !artist.isClaimed &&
-                            'border-(--linear-app-frame-seam) bg-surface-1',
+                            'system-b-spotify-connect-result-row--active',
                           artist.isClaimed
                             ? 'opacity-50 cursor-not-allowed'
-                            : 'cursor-pointer hover:border-(--linear-app-frame-seam) hover:bg-surface-1'
+                            : 'system-b-spotify-connect-result-row--interactive cursor-pointer'
                         )}
                         onClick={() =>
                           !artist.isClaimed && handleArtistSelect(artist)
@@ -604,7 +612,7 @@ export function SpotifyConnectDialog({
                           })
                         }
                       >
-                        <div className='relative h-10 w-10 shrink-0 overflow-hidden rounded-[10px] border border-(--linear-app-frame-seam) bg-surface-1'>
+                        <div className='system-b-spotify-connect-result-artwork relative h-10 w-10 shrink-0 overflow-hidden'>
                           {artist.imageUrl ? (
                             <Image
                               src={artist.imageUrl}
@@ -615,7 +623,7 @@ export function SpotifyConnectDialog({
                               unoptimized
                             />
                           ) : (
-                            <div className='w-full h-full flex items-center justify-center'>
+                            <div className='flex h-full w-full items-center justify-center'>
                               <ProviderIcon
                                 provider='spotify'
                                 className='h-5 w-5'
@@ -623,7 +631,7 @@ export function SpotifyConnectDialog({
                             </div>
                           )}
                         </div>
-                        <div className='flex-1 min-w-0'>
+                        <div className='min-w-0 flex-1'>
                           <div className='truncate text-app font-caption text-primary-token'>
                             {artist.name}
                           </div>
@@ -658,9 +666,9 @@ export function SpotifyConnectDialog({
                   type='button'
                   tabIndex={0}
                   className={cn(
-                    'm-2 mt-0 flex w-[calc(100%-1rem)] cursor-pointer items-center gap-2.5 rounded-[10px] border border-(--linear-app-frame-seam) bg-surface-0 px-3 py-2 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/20 focus-visible:ring-inset hover:bg-surface-1',
+                    'system-b-spotify-connect-paste-row m-2 mt-0 flex cursor-pointer items-center gap-2.5 px-3 py-2 text-left focus-visible:outline-none',
                     formState.activeResultIndex === pasteUrlIndex &&
-                      'bg-surface-1'
+                      'system-b-spotify-connect-paste-row--active'
                   )}
                   onClick={handlePasteUrlClick}
                   onKeyDown={event =>
@@ -673,7 +681,7 @@ export function SpotifyConnectDialog({
                     })
                   }
                 >
-                  <div className='flex h-10 w-10 items-center justify-center rounded-[10px] border border-(--linear-app-frame-seam) bg-surface-1'>
+                  <div className='system-b-spotify-connect-paste-icon flex h-10 w-10 items-center justify-center'>
                     <Link2
                       className='h-5 w-5 text-tertiary-token'
                       aria-hidden='true'

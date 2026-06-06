@@ -9,7 +9,7 @@ type DrawerButtonSize = 'sm' | 'icon';
 
 const TONE_CLASSNAMES: Record<DrawerButtonTone, string> = {
   primary:
-    'border-(--linear-accent) bg-(--linear-accent) text-white hover:border-(--linear-accent) hover:bg-(--linear-accent-hover,rgba(91,111,255,0.92)) hover:text-white active:border-(--linear-accent) active:bg-(--linear-accent-hover,rgba(91,111,255,0.88))',
+    'border-(--color-btn-primary-bg) bg-btn-primary text-btn-primary-foreground hover:border-(--color-btn-primary-hover) hover:bg-btn-primary-hover hover:text-btn-primary-foreground active:border-(--color-btn-primary-hover) active:bg-btn-primary-hover active:text-btn-primary-foreground',
   secondary:
     'border-subtle bg-surface-0 text-secondary-token hover:border-default hover:bg-surface-1 hover:text-primary-token active:border-default active:bg-surface-2',
   ghost:
@@ -28,7 +28,7 @@ export interface DrawerButtonProps
 }
 
 export const DRAWER_BUTTON_CLASSNAME =
-  'border font-caption tracking-[-0.01em] shadow-none transition-[background-color,border-color,color] duration-150 focus-visible:outline-none focus-visible:border-(--linear-border-focus) focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/20';
+  'border font-caption tracking-[-0.01em] shadow-none transition-[background-color,border-color,color] duration-subtle focus-visible:outline-none focus-visible:border-(--linear-border-focus) focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/20';
 
 export const DrawerButton = React.forwardRef<
   HTMLButtonElement,
