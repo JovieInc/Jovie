@@ -106,6 +106,10 @@
     color-mix(in oklab, var(--system-b-cinematic-black) 85%, transparent),
     inset 0 var(--space-px) 0
     color-mix(in oklab, var(--color-text-primary-token) 90%, transparent);
+  --system-b-chat-action-card-min-height: 148px;
+  --system-b-chat-action-card-min-height-compact: 132px;
+  --system-b-chat-action-card-icon-size: 28px;
+  --system-b-chat-action-card-primary-height: 32px;
   --system-b-duration-fast: var(--ds-motion-subtle-duration);
   --system-b-ease: var(--ds-motion-subtle-easing);
   --system-b-radius-pill: var(--radius-full);
@@ -6611,6 +6615,163 @@ body:has(.system-b-download-page) .marketing-glass-header__cta:focus-visible {
       .system-b-shell-dropdown-link-icon
   ) {
   color: var(--color-text-tertiary-token);
+}
+
+:where(.system-b-chat-action-card) {
+  position: relative;
+  display: grid;
+  width: 100%;
+  min-height: var(--system-b-chat-action-card-min-height);
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: flex-start;
+  gap: var(--space-3);
+  border: 1px solid
+    color-mix(
+      in oklab,
+      var(--linear-border-focus) 22%,
+      var(--system-b-app-frame-seam)
+    );
+  border-radius: var(--radius-2xl);
+  background:
+    linear-gradient(
+      180deg,
+      color-mix(in oklab, var(--color-text-primary-token) 5%, transparent),
+      color-mix(in oklab, var(--color-text-primary-token) 1.6%, transparent)
+    ),
+    var(--system-b-app-content-surface);
+  padding: var(--space-4);
+  text-align: left;
+  box-shadow: none;
+}
+
+@media (min-width: 640px) {
+  :where(.system-b-chat-action-card) {
+    min-height: var(--system-b-chat-action-card-min-height-compact);
+    align-items: center;
+    padding-inline: var(--space-5);
+  }
+}
+
+:where(.system-b-chat-action-card-icon-shell) {
+  display: inline-flex;
+  width: var(--system-b-chat-action-card-icon-size);
+  height: var(--system-b-chat-action-card-icon-size);
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  margin-top: var(--space-0-5);
+  border: 1px solid
+    color-mix(in oklab, var(--color-text-primary-token) 8%, transparent);
+  border-radius: var(--radius-full);
+  background: color-mix(
+    in oklab,
+    var(--color-text-primary-token) 3.5%,
+    transparent
+  );
+  color: var(--color-text-secondary-token);
+}
+
+@media (min-width: 640px) {
+  :where(.system-b-chat-action-card-icon-shell) {
+    margin-top: 0;
+  }
+}
+
+:where(.system-b-chat-action-card-icon) {
+  width: var(--space-4);
+  height: var(--space-4);
+}
+
+:where(.system-b-chat-action-card-copy) {
+  min-width: 0;
+  padding-right: var(--space-1);
+}
+
+:where(.system-b-chat-action-card-title) {
+  color: var(--color-text-primary-token);
+  font-size: var(--text-mid);
+  font-weight: var(--font-weight-semibold);
+  line-height: var(--space-5);
+  text-wrap: pretty;
+}
+
+:where(.system-b-chat-action-card-body) {
+  max-width: 48ch;
+  margin-top: var(--space-1-5);
+  color: var(--color-text-tertiary-token);
+  font-size: var(--text-xs);
+  line-height: var(--space-5);
+  text-wrap: pretty;
+}
+
+:where(.system-b-chat-action-card-primary) {
+  display: inline-flex;
+  min-height: var(--system-b-chat-action-card-primary-height);
+  align-items: center;
+  gap: var(--space-1-5);
+  margin-top: var(--space-3);
+  border: 1px solid var(--color-btn-primary-bg);
+  border-radius: var(--radius-full);
+  background: var(--color-btn-primary-bg);
+  color: var(--color-btn-primary-fg);
+  padding-inline: calc(var(--space-3) + var(--space-0-5));
+  font-size: var(--text-xs);
+  font-weight: var(--font-weight-medium);
+  box-shadow: var(--shadow-button-inset);
+  transition:
+    background-color var(--duration-fast) var(--ease-subtle),
+    border-color var(--duration-fast) var(--ease-subtle),
+    color var(--duration-fast) var(--ease-subtle),
+    box-shadow var(--duration-fast) var(--ease-subtle);
+}
+
+:where(.system-b-chat-action-card-primary:hover) {
+  border-color: var(--color-btn-primary-hover);
+  background: var(--color-btn-primary-hover);
+}
+
+.system-b-chat-action-card-primary:focus-visible {
+  outline: calc(var(--space-px) * 2) solid
+    color-mix(in oklab, var(--linear-border-focus) 70%, transparent);
+  outline-offset: var(--space-0-5);
+  box-shadow: var(--shadow-button-inset);
+}
+
+:where(.system-b-chat-action-card-primary-icon),
+:where(.system-b-chat-action-card-dismiss-icon) {
+  width: calc(var(--space-3) + var(--space-0-5));
+  height: calc(var(--space-3) + var(--space-0-5));
+  flex-shrink: 0;
+}
+
+:where(.system-b-chat-action-card-dismiss) {
+  display: inline-flex;
+  width: var(--system-b-chat-action-card-icon-size);
+  height: var(--system-b-chat-action-card-icon-size);
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid transparent;
+  border-radius: var(--radius-full);
+  color: var(--color-text-tertiary-token);
+  transition:
+    background-color var(--duration-fast) var(--ease-subtle),
+    border-color var(--duration-fast) var(--ease-subtle),
+    color var(--duration-fast) var(--ease-subtle);
+}
+
+:where(.system-b-chat-action-card-dismiss:hover) {
+  border-color: color-mix(
+    in oklab,
+    var(--color-text-primary-token) 8%,
+    transparent
+  );
+  background: color-mix(
+    in oklab,
+    var(--color-text-primary-token) 6%,
+    transparent
+  );
+  color: var(--color-text-primary-token);
 }
 
 :where(.system-b-chat-generation-artifact-surface) {
