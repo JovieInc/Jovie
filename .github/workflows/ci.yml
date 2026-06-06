@@ -2395,8 +2395,6 @@ jobs:
       - name: Run unit tests
         if: steps.check_changes.outputs.run_full_ci == 'true'
         env:
-          UPSTASH_REDIS_REST_URL: ${{ secrets.UPSTASH_REDIS_REST_URL }}
-          UPSTASH_REDIS_REST_TOKEN: ${{ secrets.UPSTASH_REDIS_REST_TOKEN }}
           TURBO_SCM_HEAD: ${{ github.sha }}
           TURBO_SCM_BASE: ${{ github.event_name == 'merge_group' && 'origin/main' || (github.base_ref && format('origin/{0}', github.base_ref)) || '' }}
         run: |
@@ -2413,8 +2411,8 @@ jobs:
           OUTPUT_FLAG="--outputFile=test-report.${SHARD_SLUG}.junit.xml"
 
           if [ "${{ github.ref }}" = "refs/heads/main" ]; then
-            echo "main: Running web unit suite without coverage; nightly coverage audit uploads Codecov coverage"
-            pnpm --filter=@jovie/web run test:fast -- $VITEST_CI_FLAGS $RETRY_FLAG --shard=${{ matrix.shard }} ${{ steps.quarantine.outputs.unit_excludes }} $OUTPUT_FLAG
+            echo "main: Running web unit suite through Turbo without coverage; nightly coverage audit uploads Codecov coverage"
+            pnpm turbo test:fast --filter=@jovie/web -- $VITEST_CI_FLAGS $RETRY_FLAG --shard=${{ matrix.shard }} ${{ steps.quarantine.outputs.unit_excludes }} $OUTPUT_FLAG
           elif [ -n "${{ github.base_ref }}" ] || [ "${{ github.event_name }}" = "merge_group" ]; then
             echo "🔍 PR/merge queue: Running full test suite"
             # Run all tests on PRs and merge queue to catch regressions before merge
@@ -2431,8 +2429,6 @@ jobs:
         if: steps.check_changes.outputs.run_full_ci == 'true' && steps.quarantine.outputs.has_unit == 'true'
         continue-on-error: true
         env:
-          UPSTASH_REDIS_REST_URL: ${{ secrets.UPSTASH_REDIS_REST_URL }}
-          UPSTASH_REDIS_REST_TOKEN: ${{ secrets.UPSTASH_REDIS_REST_TOKEN }}
           TURBO_SCM_HEAD: ${{ github.sha }}
           TURBO_SCM_BASE: ${{ github.event_name == 'merge_group' && 'origin/main' || (github.base_ref && format('origin/{0}', github.base_ref)) || '' }}
         run: pnpm turbo test:fast --affected -- --pool=forks --maxWorkers=2 --retry=2 ${{ steps.quarantine.outputs.unit_files }}

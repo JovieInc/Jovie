@@ -60,6 +60,9 @@ export interface IdempotencyOptions {
 
 const memoryLocks = new Map<string, number>();
 const MEMORY_CLEANUP_INTERVAL = 60_000; // 1 minute
+type MemoryCleanupTimer = ReturnType<typeof setInterval> & {
+  readonly unref?: () => void;
+};
 
 /**
  * Clean up expired memory locks
@@ -75,7 +78,11 @@ function cleanupMemoryLocks(): void {
 
 // Run cleanup periodically
 if (typeof setInterval !== 'undefined') {
-  setInterval(cleanupMemoryLocks, MEMORY_CLEANUP_INTERVAL);
+  const cleanupTimer = setInterval(
+    cleanupMemoryLocks,
+    MEMORY_CLEANUP_INTERVAL
+  ) as MemoryCleanupTimer;
+  cleanupTimer.unref?.();
 }
 
 // ============================================================================
