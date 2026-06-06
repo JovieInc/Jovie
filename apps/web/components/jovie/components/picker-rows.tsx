@@ -104,7 +104,7 @@ export const ReleaseArt = memo(function ReleaseArt({
 }) {
   if (entity.thumbnail) {
     return (
-      <div className='relative h-9 w-9 shrink-0 overflow-hidden rounded-md shadow-[inset_0_0_0_0.5px_rgba(255,255,255,0.05)]'>
+      <div className='system-b-picker-art system-b-picker-art-image'>
         <Image
           src={entity.thumbnail}
           alt=''
@@ -117,7 +117,7 @@ export const ReleaseArt = memo(function ReleaseArt({
     );
   }
   return (
-    <div className='h-9 w-9 shrink-0 rounded-md bg-gradient-to-br from-[#2a2a2f] to-[#16161a] shadow-[inset_0_0_0_0.5px_rgba(255,255,255,0.05)]' />
+    <div className='system-b-picker-art system-b-picker-art-release-fallback' />
   );
 });
 
@@ -128,7 +128,7 @@ export const ArtistArt = memo(function ArtistArt({
 }) {
   if (entity.thumbnail) {
     return (
-      <div className='relative h-9 w-9 shrink-0 overflow-hidden rounded-full shadow-[inset_0_0_0_0.5px_rgba(255,255,255,0.05)]'>
+      <div className='system-b-picker-art system-b-picker-art-image system-b-picker-art-round'>
         <Image
           src={entity.thumbnail}
           alt=''
@@ -147,7 +147,7 @@ export const ArtistArt = memo(function ArtistArt({
     .join('')
     .toUpperCase();
   return (
-    <div className='flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-[#3a3a40] to-[#1a1a1d] text-[12px] font-semibold tracking-[-0.01em] text-primary-token shadow-[inset_0_0_0_0.5px_rgba(255,255,255,0.05)]'>
+    <div className='system-b-picker-art system-b-picker-art-round system-b-picker-art-artist-fallback'>
       {initials || '·'}
     </div>
   );
@@ -160,8 +160,8 @@ export const SkillArt = memo(function SkillArt({
 }) {
   const Icon = ICON_MAP[skill.iconName] ?? Calendar;
   return (
-    <div className='flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-surface-2 text-secondary-token shadow-[inset_0_0.5px_0_rgba(255,255,255,0.06),inset_0_0_0_0.5px_rgba(255,255,255,0.04)]'>
-      <Icon className='h-[14px] w-[14px]' strokeWidth={1.5} />
+    <div className='system-b-picker-art system-b-picker-art-icon'>
+      <Icon className='system-b-picker-art-glyph' strokeWidth={1.5} />
     </div>
   );
 });
@@ -173,16 +173,16 @@ export const NavArt = memo(function NavArt({
 }) {
   const Icon = ICON_MAP[nav.iconName] ?? Calendar;
   return (
-    <div className='flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-surface-2 text-secondary-token shadow-[inset_0_0.5px_0_rgba(255,255,255,0.06),inset_0_0_0_0.5px_rgba(255,255,255,0.04)]'>
-      <Icon className='h-[14px] w-[14px]' strokeWidth={1.5} />
+    <div className='system-b-picker-art system-b-picker-art-icon'>
+      <Icon className='system-b-picker-art-glyph' strokeWidth={1.5} />
     </div>
   );
 });
 
 export const PromptArt = memo(function PromptArt() {
   return (
-    <div className='flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-surface-2 text-secondary-token shadow-[inset_0_0.5px_0_rgba(255,255,255,0.06),inset_0_0_0_0.5px_rgba(255,255,255,0.04)]'>
-      <Sparkles className='h-[14px] w-[14px]' strokeWidth={1.5} />
+    <div className='system-b-picker-art system-b-picker-art-icon'>
+      <Sparkles className='system-b-picker-art-glyph' strokeWidth={1.5} />
     </div>
   );
 });
@@ -200,14 +200,14 @@ export const RowVisual = memo(function RowVisual({
   if (item.entity.kind === 'artist') return <ArtistArt entity={item.entity} />;
   if (item.entity.kind === 'event') {
     return (
-      <div className='flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-surface-2 text-secondary-token shadow-[inset_0_0_0_0.5px_rgba(255,255,255,0.05)]'>
-        <Calendar className='h-[14px] w-[14px]' strokeWidth={1.5} />
+      <div className='system-b-picker-art system-b-picker-art-icon'>
+        <Calendar className='system-b-picker-art-glyph' strokeWidth={1.5} />
       </div>
     );
   }
   return (
-    <div className='flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-surface-2 text-secondary-token shadow-[inset_0_0_0_0.5px_rgba(255,255,255,0.05)]'>
-      <Music2 className='h-[14px] w-[14px]' strokeWidth={1.5} />
+    <div className='system-b-picker-art system-b-picker-art-icon'>
+      <Music2 className='system-b-picker-art-glyph' strokeWidth={1.5} />
     </div>
   );
 });
@@ -220,50 +220,32 @@ export const RowBody = memo(function RowBody({
   if (item.kind === 'skill') {
     return (
       <div className='min-w-0 flex-1'>
-        <p className='truncate text-[13.5px] font-medium leading-tight tracking-[-0.005em] text-primary-token'>
-          {item.skill.label}
-        </p>
-        <p className='mt-[3px] truncate text-[11.5px] text-tertiary-token'>
-          {item.skill.description}
-        </p>
+        <p className='system-b-picker-row-title'>{item.skill.label}</p>
+        <p className='system-b-picker-row-meta'>{item.skill.description}</p>
       </div>
     );
   }
   if (item.kind === 'nav') {
     return (
       <div className='min-w-0 flex-1'>
-        <p className='truncate text-[13.5px] font-medium leading-tight tracking-[-0.005em] text-primary-token'>
-          {item.nav.label}
-        </p>
-        <p className='mt-[3px] truncate text-[11.5px] text-tertiary-token'>
-          {item.nav.description}
-        </p>
+        <p className='system-b-picker-row-title'>{item.nav.label}</p>
+        <p className='system-b-picker-row-meta'>{item.nav.description}</p>
       </div>
     );
   }
   if (item.kind === 'prompt') {
     return (
       <div className='min-w-0 flex-1'>
-        <p className='truncate text-[13.5px] font-medium leading-tight tracking-[-0.005em] text-primary-token'>
-          {item.prompt.label}
-        </p>
-        <p className='mt-[3px] truncate text-[11.5px] text-tertiary-token'>
-          {item.prompt.description}
-        </p>
+        <p className='system-b-picker-row-title'>{item.prompt.label}</p>
+        <p className='system-b-picker-row-meta'>{item.prompt.description}</p>
       </div>
     );
   }
   const meta = formatRowMeta(item.entity);
   return (
     <div className='min-w-0 flex-1'>
-      <p className='truncate text-[13.5px] font-medium leading-tight tracking-[-0.005em] text-primary-token'>
-        {item.entity.label}
-      </p>
-      {meta ? (
-        <p className='mt-[3px] truncate text-[11.5px] text-tertiary-token'>
-          {meta}
-        </p>
-      ) : null}
+      <p className='system-b-picker-row-title'>{item.entity.label}</p>
+      {meta ? <p className='system-b-picker-row-meta'>{meta}</p> : null}
     </div>
   );
 });
@@ -306,10 +288,8 @@ export const PickerRow = memo(function PickerRow({
         onCommit(index);
       }}
       className={cn(
-        'flex w-full items-center gap-[10px] rounded-lg px-[9px] py-[7px] text-left transition-colors duration-subtle ease-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/55 focus-visible:ring-offset-2 focus-visible:ring-offset-(--linear-bg-page) outline-none',
-        isActive
-          ? 'bg-white/[0.06] shadow-[inset_0_0_0_0.5px_rgba(255,255,255,0.05)]'
-          : 'hover:bg-white/[0.035]'
+        'system-b-picker-row',
+        isActive ? 'system-b-picker-row-active' : 'system-b-picker-row-idle'
       )}
     >
       <RowVisual item={item} />
