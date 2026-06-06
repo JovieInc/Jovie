@@ -5,6 +5,14 @@
      5|The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
      6|and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.6.9] - 2026-06-05
+
+> Chat transcript entity chips now reserve stable width and thumbnail slots for long labels and fallback accents.
+
+### Fixed
+
+- **Transcript entity chip stability (JOV-2830)**: bounds transcript chip width, keeps fallback accent dots and resolved thumbnails in the same reserved slot, and adds a System B guard for long-label truncation and media stability.
+
 ## [26.6.8] - 2026-06-05
 
 > Shared text-entry controls now use neutral System B tracking instead of hardcoded negative letter spacing.
