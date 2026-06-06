@@ -4506,6 +4506,137 @@ body:has(.system-b-download-page) .marketing-glass-header__cta:focus-visible {
     0 0 0 4px color-mix(in oklab, var(--color-border-focus) 55%, transparent);
 }
 
+:where(.system-b-entity-chip-trigger) {
+  display: inline-flex;
+  align-items: baseline;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-full);
+  appearance: none;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  font: inherit;
+  vertical-align: baseline;
+}
+
+:where(.system-b-entity-chip-trigger:focus) {
+  outline: none;
+}
+
+:where(.system-b-entity-chip-popover-body) {
+  display: flex;
+  gap: var(--space-2-5);
+  padding: var(--space-3);
+}
+
+:where(.system-b-entity-chip-popover-media) {
+  flex-shrink: 0;
+}
+
+:where(.system-b-entity-chip-popover-thumbnail),
+:where(.system-b-entity-chip-popover-placeholder) {
+  width: var(--space-12);
+  height: var(--space-12);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-button-inset);
+}
+
+:where(.system-b-entity-chip-popover-thumbnail) {
+  display: block;
+  object-fit: cover;
+}
+
+:where(.system-b-entity-chip-popover-placeholder) {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--system-b-bg-surface-1);
+  color: var(--color-text-primary-token);
+  font-family: var(--font-caption);
+  font-size: var(--text-app);
+}
+
+:where(.system-b-entity-chip-popover-copy) {
+  min-width: 0;
+  flex: 1;
+}
+
+:where(.system-b-entity-chip-popover-eyebrow),
+:where(.system-b-entity-chip-popover-title),
+:where(.system-b-entity-chip-popover-subtitle),
+:where(.system-b-entity-chip-popover-stats) {
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+:where(.system-b-entity-chip-popover-eyebrow) {
+  color: var(--color-text-tertiary-token);
+  font-family: var(--font-caption);
+  font-size: var(--text-2xs);
+}
+
+:where(.system-b-entity-chip-popover-title) {
+  margin-top: var(--space-0-5);
+  color: var(--color-text-primary-token);
+  font-family: var(--font-caption);
+  font-size: var(--text-app);
+  line-height: 1.25;
+}
+
+:where(.system-b-entity-chip-popover-subtitle) {
+  margin-top: var(--space-0-5);
+  color: var(--color-text-secondary-token);
+  font-size: var(--text-2xs);
+  line-height: 1.25;
+}
+
+:where(.system-b-entity-chip-popover-stats) {
+  margin-top: var(--space-1);
+  color: var(--color-text-tertiary-token);
+  font-size: var(--text-2xs);
+  line-height: 1.25;
+}
+
+:where(.system-b-entity-chip-popover-action) {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  margin-top: var(--space-2);
+  padding: var(--space-0-5) var(--space-1-5);
+  border: 0;
+  border-radius: var(--radius-full);
+  appearance: none;
+  background: transparent;
+  color: var(--color-text-secondary-token);
+  cursor: pointer;
+  font-family: var(--font-caption);
+  font-size: var(--text-2xs);
+  line-height: 1.25;
+  transition:
+    background-color var(--system-b-duration-fast) var(--system-b-ease),
+    color var(--system-b-duration-fast) var(--system-b-ease);
+}
+
+:where(.system-b-entity-chip-popover-action:hover) {
+  background: var(--system-b-bg-surface-1);
+  color: var(--color-text-primary-token);
+}
+
+:where(.system-b-entity-chip-popover-action:focus) {
+  outline: none;
+}
+
+:where(.system-b-entity-chip-popover-action-icon) {
+  width: var(--space-3);
+  height: var(--space-3);
+  flex-shrink: 0;
+}
+
 .system-b-entity-chip-popover-content {
   z-index: 150;
   width: min(272px, calc(100vw - var(--space-6)));

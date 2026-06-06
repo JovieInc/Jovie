@@ -17,7 +17,6 @@ import { useOptionalChatEntityPanel } from '@/app/app/(shell)/chat/ChatEntityPan
 import type { EntityKind } from '@/lib/chat/tokens';
 import type { EntityRef, EntityRefMeta } from '@/lib/commands/entities';
 import { useAppFlag } from '@/lib/flags/client';
-import { cn } from '@/lib/utils';
 import { getInitials } from '@/lib/utils/initials';
 
 const HOVER_OPEN_DELAY_MS = 200;
@@ -152,10 +151,7 @@ export function EntityChipPopover({
           onPointerEnter={handlePointerEnter}
           onPointerLeave={handlePointerLeave}
           onKeyDown={handleKeyDown}
-          className={cn(
-            'm-0 inline-flex cursor-pointer appearance-none items-baseline align-baseline border-0 bg-transparent p-0',
-            'rounded-full focus:outline-none focus-visible:outline-none focus-ring'
-          )}
+          className='system-b-entity-chip-trigger focus-ring'
           data-testid='entity-chip-popover-trigger'
         >
           {children}
@@ -211,49 +207,40 @@ function EntityChipPopoverBody({
   const thumbnail = entity?.thumbnail;
 
   return (
-    <div className='flex gap-2.5 p-3'>
-      <div className='shrink-0'>
+    <div className='system-b-entity-chip-popover-body'>
+      <div className='system-b-entity-chip-popover-media'>
         {thumbnail ? (
           <Image
             src={thumbnail}
             alt=''
             width={48}
             height={48}
-            className='h-12 w-12 rounded-xl border border-subtle object-cover shadow-app-control'
+            className='system-b-entity-chip-popover-thumbnail'
             aria-hidden
           />
         ) : (
-          <div
-            aria-hidden
-            className='flex h-12 w-12 items-center justify-center rounded-xl border border-subtle bg-surface-1 text-app font-caption text-primary-token shadow-app-control'
-          >
+          <div aria-hidden className='system-b-entity-chip-popover-placeholder'>
             {getInitials(label) || '·'}
           </div>
         )}
       </div>
-      <div className='min-w-0 flex-1'>
-        <p className='text-2xs font-caption text-tertiary-token'>{eyebrow}</p>
-        <p className='mt-0.5 truncate text-app font-caption leading-tight text-primary-token'>
-          {label}
-        </p>
+      <div className='system-b-entity-chip-popover-copy'>
+        <p className='system-b-entity-chip-popover-eyebrow'>{eyebrow}</p>
+        <p className='system-b-entity-chip-popover-title'>{label}</p>
         {subtitle ? (
-          <p className='mt-0.5 truncate text-2xs leading-tight text-secondary-token'>
-            {subtitle}
-          </p>
+          <p className='system-b-entity-chip-popover-subtitle'>{subtitle}</p>
         ) : null}
         {stats ? (
-          <p className='mt-1 truncate text-2xs leading-tight text-tertiary-token'>
-            {stats}
-          </p>
+          <p className='system-b-entity-chip-popover-stats'>{stats}</p>
         ) : null}
         {canOpen ? (
           <button
             type='button'
             onClick={onOpenEntity}
-            className='mt-2 inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-2xs font-caption text-secondary-token transition-colors duration-fast ease-subtle hover:bg-surface-1 hover:text-primary-token focus:outline-none focus-visible:outline-none focus-ring'
+            className='system-b-entity-chip-popover-action focus-ring'
           >
-            Open {KIND_PREFIX[kind].toLowerCase()}
-            <ArrowUpRight className='h-3 w-3' />
+            Open {KIND_PREFIX[kind]}
+            <ArrowUpRight className='system-b-entity-chip-popover-action-icon' />
           </button>
         ) : null}
       </div>

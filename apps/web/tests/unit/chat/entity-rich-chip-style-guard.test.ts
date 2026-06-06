@@ -76,4 +76,33 @@ describe('entity rich chip System B style guard', () => {
       'background: var(--jovie-entity-accent);'
     );
   });
+
+  it('keeps entity chip popover internals on named System B primitives', () => {
+    const popoverSource = readFileSync(
+      path.join(webRoot, 'components/jovie/components/EntityChipPopover.tsx'),
+      'utf8'
+    );
+    const designSystemSource = readFileSync(
+      path.join(webRoot, 'styles/design-system.css'),
+      'utf8'
+    );
+    const requiredClasses = [
+      'system-b-entity-chip-trigger',
+      'system-b-entity-chip-popover-body',
+      'system-b-entity-chip-popover-thumbnail',
+      'system-b-entity-chip-popover-placeholder',
+      'system-b-entity-chip-popover-title',
+      'system-b-entity-chip-popover-action',
+      'system-b-entity-chip-popover-action-icon',
+    ];
+
+    for (const className of requiredClasses) {
+      expect(popoverSource).toContain(className);
+      expect(designSystemSource).toContain(`.${className}`);
+    }
+
+    expect(popoverSource).not.toMatch(
+      /h-12 w-12|rounded-xl border border-subtle|mt-2 inline-flex|text-2xs font-caption/
+    );
+  });
 });
