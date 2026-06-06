@@ -2833,7 +2833,6 @@ body:has(.system-b-download-page) .marketing-glass-header__cta:focus-visible {
   );
   color: var(--color-text-primary-token);
   padding: var(--space-4);
-  backdrop-filter: blur(var(--space-5));
 }
 
 :where(.homepage-showcase-overlay-card-absolute) {
