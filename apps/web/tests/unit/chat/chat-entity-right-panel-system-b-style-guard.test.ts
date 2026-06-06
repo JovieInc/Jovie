@@ -12,6 +12,13 @@ const legacyRightPanelPatterns = [
   /bg-cyan-/,
   /text-cyan-/,
   /border-\[color-mix\(in_oklab,var\(--linear-/,
+  /\b(?:bg|border|bottom|font|h|min-h|right|rounded|shadow|text|tracking|w)-\[[^\]]+\]/,
+  /\b(?:text-xs|text-sm)\b/,
+  /\b(?:bg|border|text)-white\/\d+/,
+  /\bbg-green-500\b/,
+  /\b(?:scale|translate)-/,
+  /#[0-9a-f]{3,8}\b/i,
+  /(?:linear|radial)-gradient/,
 ];
 
 describe('chat entity right panel System B style guard', () => {
@@ -29,6 +36,8 @@ describe('chat entity right panel System B style guard', () => {
     expect(source).toContain('system-b-chat-entity-panel-header');
     expect(source).toContain('system-b-chat-entity-panel-section');
     expect(source).toContain('system-b-chat-entity-context-icon');
+    expect(source).toContain('system-b-chat-profile-preview-card');
+    expect(source).toContain('system-b-chat-entity-provider-dot');
   });
 
   it('defines right-panel chrome from System B aliases', () => {
@@ -41,7 +50,11 @@ describe('chat entity right panel System B style guard', () => {
     expect(panelCss).toContain('var(--system-b-app-content-surface)');
     expect(panelCss).toContain('var(--system-b-app-frame-seam)');
     expect(panelCss).toContain('var(--system-b-bg-surface-1)');
+    expect(panelCss).toContain('var(--color-success)');
     expect(panelCss).not.toMatch(/--linear-/);
     expect(panelCss).not.toMatch(/\b(?:bg|text|border)-cyan-/);
+    expect(panelCss).not.toMatch(/#[0-9a-f]{3,8}\b/i);
+    expect(panelCss).not.toMatch(/\brgba?\(/);
+    expect(panelCss).not.toMatch(/(?:linear|radial)-gradient/);
   });
 });
