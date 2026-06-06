@@ -40,7 +40,7 @@ jobs:
   generate:
     name: Generate Screenshots
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 35
     permissions:
       contents: read
     defaults:
@@ -77,8 +77,12 @@ jobs:
 
       - name: Start production server
         run: |
-          pnpm run start &
-          for attempt in $(seq 1 30); do
+          if [ -f .next/standalone/apps/web/server.js ]; then
+            node .next/standalone/apps/web/server.js &
+          else
+            pnpm run start &
+          fi
+          for _attempt in $(seq 1 30); do
             if curl -fsS http://localhost:3000 >/dev/null 2>&1; then
               exit 0
             fi
@@ -88,6 +92,7 @@ jobs:
           exit 1
 
       - name: Capture screenshot catalog
+        timeout-minutes: 30
         run: |
           pnpm exec playwright test \
             --config=playwright.config.screenshots.ts \
