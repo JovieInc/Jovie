@@ -28,7 +28,7 @@ export function ReleaseTaskEmptyState({
         type='button'
         onClick={onSetUp}
         disabled={isLoading}
-        className='rounded-md bg-accent px-4 py-2 text-xs font-medium text-white hover:opacity-90 transition-opacity disabled:opacity-50'
+        className='rounded-md border border-(--linear-btn-primary-border) bg-btn-primary px-4 py-2 text-xs font-medium text-btn-primary-foreground shadow-button-inset transition-colors duration-subtle hover:border-(--linear-btn-primary-hover) hover:bg-btn-primary-hover disabled:cursor-not-allowed disabled:opacity-50'
       >
         {isLoading ? 'Generating...' : 'Generate Release Plan'}
       </button>

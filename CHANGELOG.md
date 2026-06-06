@@ -5,6 +5,14 @@
      5|The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
      6|and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.6.11] - 2026-06-06
+
+> System B primary actions now stay neutral across onboarding, alerts, demo, and release-task surfaces.
+
+### Fixed
+
+- **Neutral primary actions (JOV-2728, JOV-2853, JOV-2854, JOV-2877)**: replaces accent-filled central CTAs and action buttons with neutral primary tokens across onboarding demo, release workspace actions, alert capture, onboarding checkout, and handle claim controls, with focused source guards.
+
 ## [26.6.10] - 2026-06-05
 
 > Root 404 now keeps its oversized System B code contrast-safe on dark backgrounds.
