@@ -1,30 +1,38 @@
 'use client';
 
+import { Music2 } from 'lucide-react';
 import Image from 'next/image';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
+import { cn } from '@/lib/utils';
 
 const RELEASES = [
   {
     title: 'Signals',
     type: 'Album',
     meta: 'Feb 2022 · 12 tracks',
-    color: '#6366f1',
+    tone: 'primary',
   },
   {
     title: 'Where It Goes',
     type: 'Single',
     meta: 'Jun 2020',
-    color: '#f59e0b',
+    tone: 'secondary',
   },
   {
     title: 'Fading Light',
     type: 'EP',
     meta: 'Nov 2019 · 5 tracks',
-    color: '#ec4899',
+    tone: 'tertiary',
   },
-];
+] as const;
 
 const CTA_INTERVAL = 5000;
+
+const RELEASE_ART_TONE_CLASS = {
+  primary: 'bg-surface-1',
+  secondary: 'bg-surface-2',
+  tertiary: 'bg-surface-3',
+} as const satisfies Record<(typeof RELEASES)[number]['tone'], string>;
 
 /** Fallback values used when no profile data is provided */
 const FALLBACK = {
@@ -58,8 +66,6 @@ export function ProfileMockup({
 
   const [isListen, setIsListen] = useState(false);
   const [prefersReducedMotion, setPrefersReducedMotion] = useState(false);
-  const barRef = useRef<HTMLProgressElement>(null);
-  const progressPercent = useRef(0);
 
   // Check reduced motion preference
   useEffect(() => {
@@ -71,27 +77,13 @@ export function ProfileMockup({
     return () => mq.removeEventListener('change', handler);
   }, []);
 
-  const resetProgressBar = useCallback(() => {
-    const el = barRef.current;
-    if (!el || prefersReducedMotion) return;
-    el.style.animation = 'none';
-    el.getBoundingClientRect();
-    el.style.animation = `ctaFill ${CTA_INTERVAL}ms linear forwards`;
-    progressPercent.current = 0;
-  }, [prefersReducedMotion]);
-
   useEffect(() => {
     if (prefersReducedMotion) return;
-    resetProgressBar();
     const id = setInterval(() => {
       setIsListen(prev => !prev);
     }, CTA_INTERVAL);
     return () => clearInterval(id);
-  }, [resetProgressBar, prefersReducedMotion]);
-
-  useEffect(() => {
-    if (!prefersReducedMotion) resetProgressBar();
-  }, [isListen, resetProgressBar, prefersReducedMotion]);
+  }, [prefersReducedMotion]);
 
   return (
     <figure
@@ -103,17 +95,20 @@ export function ProfileMockup({
           from { width: 0%; }
           to { width: 100%; }
         }
+        .profile-mockup-cta-progress {
+          animation: ctaFill 5000ms linear forwards;
+        }
         @media (prefers-reduced-motion: reduce) {
-          .cta-progress { animation: none !important; width: 100% !important; }
+          .profile-mockup-cta-progress { animation: none !important; width: 100% !important; }
         }
       `}</style>
 
       {/* Browser chrome */}
       <div className='flex items-center gap-2 px-3.5 py-2.5 border-b border-subtle'>
         <div className='flex gap-[5px]'>
-          <span className='w-2 h-2 rounded-full bg-[#2a2a2a]' />
-          <span className='w-2 h-2 rounded-full bg-[#2a2a2a]' />
-          <span className='w-2 h-2 rounded-full bg-[#2a2a2a]' />
+          <span className='w-2 h-2 rounded-full bg-surface-3' />
+          <span className='w-2 h-2 rounded-full bg-surface-3' />
+          <span className='w-2 h-2 rounded-full bg-surface-3' />
         </div>
         <div className='flex-1 text-center text-xs text-tertiary-token'>
           jov.ie/{displayHandle}
@@ -134,10 +129,7 @@ export function ProfileMockup({
             />
           ) : (
             <div
-              className='w-16 h-16 rounded-full flex items-center justify-center text-2xl font-semibold text-primary-token shrink-0'
-              style={{
-                background: 'linear-gradient(135deg, #2a1f3d, #1a1a2e)',
-              }}
+              className='w-16 h-16 rounded-full flex items-center justify-center border border-subtle bg-surface-1 text-2xl font-semibold text-primary-token shrink-0'
               aria-hidden='true'
             >
               {displayName.charAt(0).toUpperCase()}
@@ -158,8 +150,10 @@ export function ProfileMockup({
           {RELEASES.map(release => (
             <div key={release.title} className='flex items-center gap-3'>
               <div
-                className='w-10 h-10 rounded-md shrink-0 opacity-80'
-                style={{ backgroundColor: release.color }}
+                className={cn(
+                  'w-10 h-10 rounded-md shrink-0 border border-subtle',
+                  RELEASE_ART_TONE_CLASS[release.tone]
+                )}
                 aria-hidden='true'
               />
               <div className='min-w-0'>
@@ -175,58 +169,46 @@ export function ProfileMockup({
         </div>
 
         {/* CTA area */}
-        <div className='relative overflow-hidden rounded-lg'>
+        <div className='relative h-10 overflow-hidden rounded-lg'>
           {/* Subscribe CTA */}
           <div
-            className='py-2.5 px-3.5 rounded-lg text-[13px] font-medium text-center transition-all duration-500'
-            style={{
-              opacity: isListen ? 0 : 1,
-              transform: isListen ? 'translateY(-8px)' : 'translateY(0)',
-              position: isListen ? 'absolute' : 'relative',
-              inset: isListen ? 0 : undefined,
-              backgroundColor: '#ffffff',
-              color: '#111111',
-            }}
+            aria-hidden={isListen}
+            className={cn(
+              'absolute inset-0 flex items-center justify-center rounded-lg bg-btn-primary px-3.5 text-center text-[13px] font-medium text-btn-primary-foreground transition-opacity duration-cinematic',
+              isListen ? 'pointer-events-none opacity-0' : 'opacity-100'
+            )}
           >
             Get updates from {displayName}
           </div>
 
           {/* Listen CTA */}
           <div
-            className='py-2.5 px-3.5 rounded-lg text-[13px] font-medium text-center transition-all duration-500'
-            style={{
-              opacity: isListen ? 1 : 0,
-              transform: isListen ? 'translateY(0)' : 'translateY(8px)',
-              position: isListen ? 'relative' : 'absolute',
-              inset: isListen ? undefined : 0,
-              backgroundColor: 'rgba(52,211,153,0.08)',
-              color: 'rgb(52 211 153)',
-              border: '1px solid rgba(52,211,153,0.15)',
-            }}
+            aria-hidden={!isListen}
+            className={cn(
+              'absolute inset-0 flex items-center justify-center gap-2 rounded-lg border border-subtle bg-surface-1 px-3.5 text-center text-[13px] font-medium text-primary-token transition-opacity duration-cinematic',
+              isListen ? 'opacity-100' : 'pointer-events-none opacity-0'
+            )}
           >
-            ▶ Play Signals on Spotify
+            <Music2 className='h-3.5 w-3.5 shrink-0' aria-hidden='true' />
+            <span>Play Signals on Spotify</span>
           </div>
 
           {/* Progress bar */}
           <progress
-            ref={barRef}
+            key={isListen ? 'listen' : 'subscribe'}
             value={0}
             max={100}
             aria-label='Time until CTA switches'
-            className='cta-progress absolute bottom-0 left-0 h-[3px] opacity-60 appearance-none [&::-webkit-progress-bar]:bg-transparent [&::-webkit-progress-value]:bg-current [&::-moz-progress-bar]:bg-current'
-            style={{
-              backgroundColor: isListen
-                ? 'rgb(52 211 153)'
-                : 'var(--linear-text-primary)',
-              animation: prefersReducedMotion
-                ? 'none'
-                : `ctaFill ${CTA_INTERVAL}ms linear forwards`,
-            }}
+            className={cn(
+              'profile-mockup-cta-progress absolute bottom-0 left-0 h-[3px] opacity-60 appearance-none [&::-moz-progress-bar]:bg-current [&::-webkit-progress-bar]:bg-transparent [&::-webkit-progress-value]:bg-current',
+              isListen ? 'text-primary-token' : 'text-tertiary-token',
+              prefersReducedMotion && 'w-full'
+            )}
           />
         </div>
 
         {/* Label */}
-        <div className='mt-2 text-center text-[11px] text-tertiary-token transition-opacity duration-500'>
+        <div className='mt-2 text-center text-[11px] text-tertiary-token transition-opacity duration-cinematic'>
           {isListen
             ? 'Return visitor · preferred streaming platform'
             : 'New visitor · email / sms notification opt-in'}
