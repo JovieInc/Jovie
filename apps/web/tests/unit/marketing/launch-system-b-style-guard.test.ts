@@ -4,6 +4,11 @@ import { describe, expect, it } from 'vitest';
 
 const pageSourcePath = 'app/(marketing)/launch/page.tsx';
 const designSystemPath = 'styles/design-system.css';
+const launchVisibleSourcePaths = [
+  pageSourcePath,
+  'components/features/home/ProfileMockup.tsx',
+  'components/features/home/AiDemo.tsx',
+] as const;
 
 const forbiddenRouteVisualPatterns = [
   /style=\{/,
@@ -17,6 +22,19 @@ const forbiddenRouteVisualPatterns = [
   /\b(?:emerald|fuchsia|amber|sky|indigo|orange|rose|cyan|violet|red|black|white)-(?:[0-9]|\[|\/)/,
   /[☰☷✉■☆✓×▶□]/,
   /&#(?:10024|9634|9654|9679);/,
+] as const;
+
+const forbiddenImportedDemoVisualPatterns = [
+  /style=\{/,
+  /#[0-9a-fA-F]{3,8}/,
+  /rgba?\(/,
+  /hsla?\(/,
+  /linear-gradient|radial-gradient/,
+  /\btransition-all\b/,
+  /transform:\s*/,
+  /translate(?:3d|X|Y)?\(/,
+  /<svg\b|<path\b|<rect\b/,
+  /[☰☷✉■☆✓×▶□]/,
 ] as const;
 
 const forbiddenLaunchCssPatterns = [
@@ -59,6 +77,16 @@ describe('launch page System B source contract', () => {
       expect(source, `${pageSourcePath} matched ${pattern}`).not.toMatch(
         pattern
       );
+    }
+  });
+
+  it('keeps launch-visible imported demos on the same System B guardrails', () => {
+    for (const sourcePath of launchVisibleSourcePaths) {
+      const source = readFileSync(resolve(process.cwd(), sourcePath), 'utf8');
+
+      for (const pattern of forbiddenImportedDemoVisualPatterns) {
+        expect(source, `${sourcePath} matched ${pattern}`).not.toMatch(pattern);
+      }
     }
   });
 

@@ -1,5 +1,6 @@
 'use client';
 
+import { Pause, Play } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { cn } from '@/lib/utils';
 
@@ -96,14 +97,10 @@ function resolveToggleLabel(
   return 'Pause demo';
 }
 
-function AiDemoCursor({ isPremium }: Readonly<{ isPremium: boolean }>) {
+function AiDemoCursor() {
   return (
     <span
-      className='ai-demo-cursor ml-0.5 inline-block h-[15px] w-[7px] align-text-bottom'
-      style={{
-        backgroundColor: isPremium ? 'rgb(196 181 253)' : 'rgb(167 139 250)',
-        animation: 'cursorBlink 1s step-end infinite',
-      }}
+      className='ai-demo-cursor ml-0.5 inline-block h-[15px] w-[7px] bg-current align-text-bottom text-primary-token'
       aria-hidden='true'
     />
   );
@@ -226,7 +223,7 @@ export function AiDemo({
       className={cn(
         'overflow-hidden font-sans',
         isPremium
-          ? 'rounded-[1.35rem] border border-white/10 bg-[linear-gradient(180deg,rgba(16,18,26,0.95),rgba(10,12,18,0.98))] shadow-[0_30px_80px_rgba(0,0,0,0.34),0_10px_24px_rgba(0,0,0,0.24)]'
+          ? 'rounded-[1.35rem] border border-subtle bg-surface-1 shadow-panel-ring'
           : 'rounded-t-xl rounded-b-none bg-surface-0 shadow-panel-ring',
         className
       )}
@@ -244,6 +241,12 @@ export function AiDemo({
           0%, 100% { opacity: 1; }
           50% { opacity: 0; }
         }
+        .ai-demo-segment {
+          animation: segmentIn 0.3s ease forwards;
+        }
+        .ai-demo-cursor {
+          animation: cursorBlink 1s step-end infinite;
+        }
         @media (prefers-reduced-motion: reduce) {
           .ai-demo-segment { animation: none !important; }
           .ai-demo-cursor { animation: none !important; }
@@ -252,27 +255,16 @@ export function AiDemo({
 
       <div
         className={cn(
-          'flex items-center gap-2 border-b px-3.5 py-2.5',
-          isPremium ? 'border-white/10 bg-white/[0.03]' : 'border-subtle'
+          'flex items-center gap-2 border-b border-subtle px-3.5 py-2.5',
+          isPremium && 'bg-surface-0'
         )}
       >
         <div className='flex gap-[5px]'>
           {[1, 2, 3].map(dot => (
-            <span
-              key={dot}
-              className={cn(
-                'h-2 w-2 rounded-full',
-                isPremium ? 'bg-white/20' : 'bg-[#2a2a2a]'
-              )}
-            />
+            <span key={dot} className='h-2 w-2 rounded-full bg-surface-3' />
           ))}
         </div>
-        <div
-          className={cn(
-            'flex-1 text-center text-xs',
-            isPremium ? 'text-white/58' : 'text-tertiary-token'
-          )}
-        >
+        <div className='flex-1 text-center text-xs text-tertiary-token'>
           Jovie AI
         </div>
         <button
@@ -282,39 +274,24 @@ export function AiDemo({
           className={cn(
             'focus-ring flex h-6 w-6 items-center justify-center rounded transition-colors',
             isPremium
-              ? 'text-white/42 hover:text-white/74'
+              ? 'text-tertiary-token hover:text-primary-token'
               : 'text-tertiary-token hover:text-secondary-token'
           )}
         >
           {prefersReducedMotion || isPaused ? (
-            <svg
-              viewBox='0 0 16 16'
-              fill='currentColor'
-              className='h-3 w-3'
-              aria-hidden='true'
-            >
-              <path d='M4 2l10 6-10 6V2z' />
-            </svg>
+            <Play className='h-3 w-3' aria-hidden='true' />
           ) : (
-            <svg
-              viewBox='0 0 16 16'
-              fill='currentColor'
-              className='h-3 w-3'
-              aria-hidden='true'
-            >
-              <rect x='2' y='2' width='4' height='12' />
-              <rect x='10' y='2' width='4' height='12' />
-            </svg>
+            <Pause className='h-3 w-3' aria-hidden='true' />
           )}
         </button>
       </div>
 
       {isPremium && contextChips.length > 0 ? (
-        <div className='flex flex-wrap gap-2 border-b border-white/8 px-4 py-3'>
+        <div className='flex flex-wrap gap-2 border-b border-subtle px-4 py-3'>
           {contextChips.map(chip => (
             <span
               key={chip}
-              className='rounded-full border border-white/8 bg-white/[0.04] px-2.5 py-1 text-[10px] tracking-[0.02em] text-white/62'
+              className='rounded-full border border-subtle bg-surface-0 px-2.5 py-1 text-[10px] text-tertiary-token'
             >
               {chip}
             </span>
@@ -322,64 +299,35 @@ export function AiDemo({
         </div>
       ) : null}
 
-      <div
-        className={cn(
-          'border-b px-4 py-3',
-          isPremium ? 'border-white/8' : 'border-subtle'
-        )}
-      >
-        <p
-          className={cn(
-            'font-mono text-[12px]',
-            isPremium ? 'text-white/58' : 'text-tertiary-token'
-          )}
-        >
+      <div className='border-b border-subtle px-4 py-3'>
+        <p className='font-mono text-[12px] text-tertiary-token'>
           {currentDemo.prompt}
         </p>
       </div>
 
       <div
-        className={cn(
-          'min-h-[160px] px-4 py-4',
-          isPremium &&
-            'bg-[radial-gradient(circle_at_top,rgba(129,140,248,0.08),transparent_44%)]'
-        )}
+        className={cn('min-h-[160px] px-4 py-4', isPremium && 'bg-surface-0')}
       >
         <output
           aria-live='polite'
-          className={cn(
-            'block text-[13px] leading-[1.75]',
-            isPremium ? 'text-white/90' : 'text-primary-token'
-          )}
+          className='block text-[13px] leading-[1.75] text-secondary-token'
         >
           {currentDemo.segments.map((segment, index) => {
             if (index >= visibleCount) return null;
             return (
               <span
                 key={`${demoIndex}-${segment.text.slice(0, 20)}`}
-                className='ai-demo-segment'
-                style={{
-                  animation: prefersReducedMotion
-                    ? 'none'
-                    : 'segmentIn 0.3s ease forwards',
-                  ...(segment.highlight
-                    ? {
-                        color: isPremium
-                          ? 'rgb(196 181 253)'
-                          : 'rgb(255 255 255)',
-                        fontWeight: 500,
-                      }
-                    : {}),
-                }}
+                className={cn(
+                  'ai-demo-segment',
+                  segment.highlight && 'font-medium text-primary-token'
+                )}
               >
                 {segment.text}
               </span>
             );
           })}
 
-          {hasStarted && !prefersReducedMotion ? (
-            <AiDemoCursor isPremium={isPremium} />
-          ) : null}
+          {hasStarted && !prefersReducedMotion ? <AiDemoCursor /> : null}
         </output>
       </div>
     </figure>
