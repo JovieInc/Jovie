@@ -141,7 +141,7 @@ export function OnboardingHandleStep({
               }
               className={cn(
                 'inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full transition-[background-color,opacity] duration-subtle',
-                'bg-accent text-white hover:bg-accent-hover',
+                'border border-(--linear-btn-primary-border) bg-btn-primary text-btn-primary-foreground shadow-button-inset hover:border-(--linear-btn-primary-hover) hover:bg-btn-primary-hover',
                 'disabled:cursor-not-allowed disabled:opacity-40'
               )}
             >

@@ -343,7 +343,7 @@ export function OnboardingCheckoutClient({
         <Button
           onClick={handleCheckout}
           disabled={isLoading}
-          variant='accent'
+          variant='primary'
           size='xl'
           className='w-full'
           aria-busy={isLoading}
