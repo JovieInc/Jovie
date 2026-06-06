@@ -2245,7 +2245,6 @@ body:has(.system-b-download-page) .marketing-glass-header__cta:focus-visible {
   font-weight: var(--font-weight-semibold);
   letter-spacing: var(--tracking-normal);
   line-height: 1;
-  opacity: 0.72;
 }
 
 :where(.system-b-root-not-found-copy) {

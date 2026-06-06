@@ -54,4 +54,15 @@ describe('root not-found System B source tokens', () => {
     expect(block).not.toMatch(rawGradientPattern);
     expect(block).not.toContain('--linear-');
   });
+
+  it('keeps the decorative root not-found code contrast stable', async () => {
+    const css = await readFile(designSystemPath, 'utf8');
+    const codeBlock = css.match(
+      /:where\(\.system-b-root-not-found-code\) \{[\s\S]*?\n\}/
+    )?.[0];
+
+    expect(codeBlock).toBeTruthy();
+    expect(codeBlock).toContain('color: var(--color-text-quaternary-token);');
+    expect(codeBlock).not.toContain('opacity:');
+  });
 });
