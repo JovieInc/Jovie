@@ -1,7 +1,19 @@
-import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
+import {
+  afterAll,
+  afterEach,
+  beforeAll,
+  describe,
+  expect,
+  it,
+  vi,
+} from 'vitest';
 import { CHAT_COMPOSER_DOCK_CLASSNAME } from '@/components/jovie/chat-layout';
 import { JovieChat } from '@/components/jovie/JovieChat';
 import { renderWithQueryClient } from '@/tests/utils/test-utils';
+
+const mockChatState = vi.hoisted(() => ({
+  isLoadingConversation: false,
+}));
 
 vi.mock('@/app/app/(shell)/dashboard/DashboardDataContext', () => ({
   DashboardDataContext: {
@@ -46,7 +58,7 @@ vi.mock('@/components/jovie/hooks', async importOriginal => {
       isLoading: true,
       isSubmitting: false,
       hasMessages: true,
-      isLoadingConversation: false,
+      isLoadingConversation: mockChatState.isLoadingConversation,
       conversationTitle: null,
       status: 'streaming',
       inputRef: { current: null },
@@ -123,6 +135,10 @@ beforeAll(() => {
   });
 });
 
+afterEach(() => {
+  mockChatState.isLoadingConversation = false;
+});
+
 afterAll(() => {
   if (originalScrollIntoView) {
     Object.defineProperty(
@@ -164,5 +180,20 @@ describe('JovieChat styling regressions', () => {
     expect(composerDock?.className).toContain(
       'max-lg:pb-[calc(1.5rem+env(safe-area-inset-bottom))]'
     );
+  });
+
+  it('marks runtime conversation loading shell as busy for assistive technology', () => {
+    mockChatState.isLoadingConversation = true;
+
+    const { container } = renderWithQueryClient(
+      <JovieChat profileId='profile-1' />
+    );
+
+    const loadingShell = container.querySelector(
+      '[data-testid="chat-loading-conversation-skeleton"]'
+    );
+
+    expect(loadingShell?.getAttribute('aria-busy')).toBe('true');
+    expect(loadingShell?.getAttribute('aria-live')).toBe('polite');
   });
 });

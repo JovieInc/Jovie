@@ -368,6 +368,8 @@ export function JovieChat({
       <div
         className='system-b-chat-conversation-loading'
         data-testid='chat-loading-conversation-skeleton'
+        aria-busy='true'
+        aria-live='polite'
       >
         <div className='system-b-chat-conversation-loading-viewport'>
           <ChatMessageSkeleton />
