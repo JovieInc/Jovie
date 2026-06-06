@@ -169,7 +169,7 @@ export function ChatLinkConfirmationCard({
             disabled={state === 'adding'}
             className={cn(
               'system-b-chat-link-primary-action',
-              'bg-accent text-accent-foreground hover:bg-accent/90',
+              'border border-(--linear-btn-primary-border) bg-btn-primary text-btn-primary-foreground shadow-button-inset hover:border-(--linear-btn-primary-hover) hover:bg-btn-primary-hover',
               'disabled:opacity-50 transition-colors'
             )}
           >
