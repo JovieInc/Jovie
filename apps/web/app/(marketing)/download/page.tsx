@@ -16,15 +16,12 @@ import { MarketingFooterCta } from '@/components/site/MarketingFooterCta';
 import { APP_NAME, BASE_URL } from '@/constants/app';
 import { APP_ROUTES } from '@/constants/routes';
 import { buildBreadcrumbSchema, buildFaqSchema } from '@/lib/constants/schemas';
-import {
-  DESKTOP_RELEASES_HTML_URL,
-  fetchLatestDesktopRelease,
-} from '@/lib/desktop/github-releases';
 import { getMarketingExportImage } from '@/lib/screenshots/registry';
 
 export const revalidate = false;
 
 const DOWNLOAD_URL = '/api/desktop/download';
+const DESKTOP_RELEASES_HTML_URL = 'https://github.com/JovieInc/Jovie/releases';
 const DESKTOP_IMAGE = getMarketingExportImage('shell-v1-releases-desktop');
 const PROFILE_IMAGE = getMarketingExportImage('tim-white-profile-live-mobile');
 
@@ -131,41 +128,15 @@ const BREADCRUMB_SCHEMA = buildBreadcrumbSchema([
   { name: 'Download', url: `${BASE_URL}/download` },
 ]);
 
-function formatBytes(bytes: number): string {
-  if (bytes <= 0) return '';
-  const mb = bytes / (1024 * 1024);
-  return mb >= 1024 ? `${(mb / 1024).toFixed(1)} GB` : `${Math.round(mb)} MB`;
-}
-
-export default async function DownloadPage() {
-  const release = await fetchLatestDesktopRelease();
-  const versionLabel = release?.version ? `v${release.version}` : null;
-  const sizeLabel = release?.mac?.sizeBytes
-    ? formatBytes(release.mac.sizeBytes)
-    : null;
-  const meta = [versionLabel, sizeLabel, 'Apple Silicon + Intel']
-    .filter((value): value is string => Boolean(value))
-    .join(' / ');
-
+export default function DownloadPage() {
   return (
     <>
       <script type='application/ld+json'>{FAQ_SCHEMA}</script>
       <script type='application/ld+json'>{BREADCRUMB_SCHEMA}</script>
 
       <main className='system-b-download-page'>
-        <section
-          className='homepage-hero-stage relative'
-          aria-labelledby='download-hero-heading'
-        >
-          <div className='homepage-hero-shell system-b-download-hero-shell'>
-            <div
-              aria-hidden='true'
-              className='homepage-hero-shell__layer homepage-hero-shell__beam'
-            />
-            <div aria-hidden='true' className='homepage-hero-shell__grid-wrap'>
-              <div className='homepage-hero-shell__grid' />
-            </div>
-
+        <section aria-labelledby='download-hero-heading'>
+          <div className='system-b-download-hero-shell'>
             <MarketingContainer
               width='page'
               className='system-b-download-hero-container'
@@ -213,7 +184,7 @@ export default async function DownloadPage() {
                   <div className='system-b-download-meta'>
                     <span>Developer ID signed</span>
                     <span>Apple notarized</span>
-                    {meta ? <span>{meta}</span> : null}
+                    <span>Apple Silicon + Intel</span>
                   </div>
                 </div>
 

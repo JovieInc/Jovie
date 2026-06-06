@@ -14,6 +14,14 @@ const forbiddenRouteVisualPatterns = [
   /\b(?:rounded|text|h|w|max-w|min-h|tracking|leading|px|py|pt|pb|z)-\[/,
   /\b(?:emerald|fuchsia|amber|sky|indigo|orange|rose|cyan|violet|red|black|white)-(?:[0-9]|\[|\/)/,
 ] as const;
+const forbiddenImportedDecorationPatterns = [
+  /\bhomepage-hero(?:-[\w-]+|__[\w-]+)?\b/,
+] as const;
+const forbiddenStaticBypassPatterns = [
+  /fetchLatestDesktopRelease/,
+  /@\/lib\/desktop\/github-releases/,
+  /async\s+function\s+DownloadPage/,
+] as const;
 
 const forbiddenDownloadCssPatterns = [
   /#[0-9a-fA-F]{3,8}/,
@@ -51,6 +59,26 @@ describe('download page System B source contract', () => {
     const source = readFileSync(resolve(process.cwd(), pageSourcePath), 'utf8');
 
     for (const pattern of forbiddenRouteVisualPatterns) {
+      expect(source, `${pageSourcePath} matched ${pattern}`).not.toMatch(
+        pattern
+      );
+    }
+  });
+
+  it('does not import homepage hero decoration into download', () => {
+    const source = readFileSync(resolve(process.cwd(), pageSourcePath), 'utf8');
+
+    for (const pattern of forbiddenImportedDecorationPatterns) {
+      expect(source, `${pageSourcePath} matched ${pattern}`).not.toMatch(
+        pattern
+      );
+    }
+  });
+
+  it('keeps live desktop release lookup out of the static render path', () => {
+    const source = readFileSync(resolve(process.cwd(), pageSourcePath), 'utf8');
+
+    for (const pattern of forbiddenStaticBypassPatterns) {
       expect(source, `${pageSourcePath} matched ${pattern}`).not.toMatch(
         pattern
       );
