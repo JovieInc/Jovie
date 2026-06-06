@@ -313,7 +313,7 @@ export function AlertGrowthLanding({
             <button
               type='submit'
               disabled={isPending}
-              className='bg-accent text-on-accent h-12 w-full rounded-[var(--profile-action-radius)] px-4 text-[14px] font-semibold disabled:opacity-60'
+              className='h-12 w-full rounded-[var(--profile-action-radius)] border border-(--linear-btn-primary-border) bg-btn-primary px-4 text-[14px] font-semibold text-btn-primary-foreground shadow-button-inset transition-colors duration-subtle hover:border-(--linear-btn-primary-hover) hover:bg-btn-primary-hover disabled:opacity-60'
             >
               {isPending ? 'Sending…' : 'Get alerts'}
             </button>
@@ -389,7 +389,7 @@ function ChannelToggle({
       onClick={onSelect}
       className={
         pressed
-          ? 'border-accent bg-accent/10 text-primary-token flex-1 rounded-[var(--profile-action-radius)] border px-4 py-3 text-[13px] font-semibold disabled:opacity-60'
+          ? 'border-default bg-surface-1 text-primary-token flex-1 rounded-[var(--profile-action-radius)] border px-4 py-3 text-[13px] font-semibold disabled:opacity-60'
           : 'border-subtle bg-surface-0 text-secondary-token flex-1 rounded-[var(--profile-action-radius)] border px-4 py-3 text-[13px] font-semibold disabled:opacity-60'
       }
     >
