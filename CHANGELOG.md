@@ -5,6 +5,14 @@
      5|The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
      6|and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.6.12] - 2026-06-06
+
+> Chat social-link Add actions now stay on neutral System B primary controls.
+
+### Fixed
+
+- **Chat social Add actions (JOV-2879)**: replaces accent-filled Add buttons in the live chat link confirmation card and social suggestion rows with neutral primary button tokens, and adds a source guard so central chat/social actions cannot drift back to accent-filled styling.
+
 ## [26.6.11] - 2026-06-06
 
 > System B primary actions now stay neutral across onboarding, alerts, demo, and release-task surfaces.
