@@ -5,6 +5,14 @@
      5|The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
      6|and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.6.10] - 2026-06-05
+
+> Root 404 now keeps its oversized System B code contrast-safe on dark backgrounds.
+
+### Fixed
+
+- **Root 404 a11y contrast (JOV-2831)**: removes the extra opacity from the decorative 404 code, keeps the neutral System B token, and guards the primitive against future contrast-reducing opacity.
+
 ## [26.6.9] - 2026-06-05
 
 > Chat transcript entity chips now reserve stable width and thumbnail slots for long labels and fallback accents.
