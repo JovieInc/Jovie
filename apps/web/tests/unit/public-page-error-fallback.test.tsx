@@ -56,16 +56,15 @@ describe('PublicPageErrorFallback', () => {
       })
     ).toBeInTheDocument();
     expect(screen.getByText('Try refreshing the page.')).toBeInTheDocument();
-    expect(screen.getByText('Error ID abc123')).toBeInTheDocument();
+    expect(screen.getByText('Error ID: abc123')).toBeInTheDocument();
     expect(screen.getByRole('alert')).toHaveClass(
       'dark',
-      'bg-base',
-      'text-primary-token'
+      'system-b-error-fallback'
     );
     expect(screen.getAllByRole('button')).toHaveLength(1);
     expect(screen.getByRole('button', { name: 'Refresh' })).toHaveClass(
-      'bg-btn-primary',
-      'text-btn-primary-foreground',
+      'system-b-error-fallback__action',
+      'system-b-error-fallback__action--primary',
       'focus-ring-transparent-offset'
     );
 
@@ -99,10 +98,9 @@ describe('PublicPageErrorFallback', () => {
     expect(source).not.toContain('const styles');
     expect(source).not.toContain('style={');
     expect(source).not.toContain('JovieMarkElectric');
-    expect(source).toContain('JOVIE_ICON_PATH');
-    expect(source).toContain("fill='currentColor'");
-    expect(source).toContain('bg-base');
-    expect(source).toContain('bg-btn-primary');
-    expect(source).toContain('focus-ring-transparent-offset');
+    expect(source).not.toContain('JOVIE_ICON_PATH');
+    expect(source).not.toContain("fill='currentColor'");
+    expect(source).not.toContain('focus-ring-transparent-offset');
+    expect(source).toContain('SystemBErrorFallback');
   });
 });

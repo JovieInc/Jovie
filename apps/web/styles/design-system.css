@@ -2289,6 +2289,116 @@ body:has(.system-b-download-page) .marketing-glass-header__cta:focus-visible {
 }
 
 /* ============================================
+   SYSTEM B ERROR FALLBACK PRIMITIVES
+   ============================================ */
+
+:where(.system-b-error-fallback-body) {
+  min-height: 100dvh;
+  margin: 0;
+  background: var(--system-b-bg-page);
+  color: var(--system-b-text-primary);
+  font-family: var(--font-sans), system-ui, sans-serif;
+}
+
+:where(.system-b-error-fallback) {
+  display: flex;
+  min-height: 100dvh;
+  align-items: center;
+  justify-content: center;
+  background: var(--system-b-bg-page);
+  color: var(--system-b-text-primary);
+  color-scheme: dark;
+  padding-inline: var(--space-6);
+  text-align: center;
+}
+
+:where(.system-b-error-fallback__content) {
+  display: flex;
+  width: 100%;
+  max-width: calc(var(--space-24) * 3 + var(--space-4));
+  flex-direction: column;
+  align-items: center;
+}
+
+:where(.system-b-error-fallback__mark) {
+  width: var(--space-8);
+  height: var(--space-8);
+  color: var(--system-b-text-primary);
+}
+
+:where(.system-b-error-fallback__title) {
+  margin: var(--space-5) 0 0;
+  color: var(--system-b-text-primary);
+  font-size: var(--text-lg);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: var(--tracking-normal);
+  line-height: var(--leading-snug);
+}
+
+:where(.system-b-error-fallback__description) {
+  margin: var(--space-2) 0 0;
+  color: var(--color-text-tertiary-token);
+  font-size: var(--text-sm);
+  line-height: var(--leading-normal);
+}
+
+:where(.system-b-error-fallback__actions) {
+  display: flex;
+  flex-flow: row wrap;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-3);
+  margin-top: var(--space-6);
+}
+
+:where(.system-b-error-fallback__action) {
+  display: inline-flex;
+  min-height: calc(var(--space-8) + var(--space-1));
+  cursor: pointer;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--system-b-radius-pill);
+  font-size: var(--text-sm);
+  font-weight: var(--font-weight-medium);
+  padding-inline: var(--space-4);
+  text-decoration: none;
+  transition:
+    background-color var(--system-b-duration-fast) var(--system-b-ease),
+    border-color var(--system-b-duration-fast) var(--system-b-ease),
+    color var(--system-b-duration-fast) var(--system-b-ease),
+    opacity var(--system-b-duration-fast) var(--system-b-ease);
+}
+
+:where(.system-b-error-fallback__action--primary) {
+  border: var(--space-px) solid var(--color-btn-primary-bg);
+  background: var(--color-btn-primary-bg);
+  color: var(--color-btn-primary-fg);
+}
+
+:where(.system-b-error-fallback__action--primary:hover) {
+  opacity: 0.95;
+}
+
+:where(.system-b-error-fallback__action--secondary) {
+  border: var(--space-px) solid var(--color-border-subtle);
+  background: transparent;
+  color: var(--color-text-tertiary-token);
+}
+
+:where(.system-b-error-fallback__action--secondary:hover) {
+  border-color: var(--color-border-default);
+  background: var(--color-bg-surface-0);
+  color: var(--system-b-text-primary);
+}
+
+:where(.system-b-error-fallback__digest) {
+  margin: var(--space-5) 0 0;
+  color: var(--color-text-quaternary-token);
+  font-size: var(--text-xs);
+  line-height: var(--leading-normal);
+}
+
+/* ============================================
    SYSTEM B PUBLIC PROFILE NOT FOUND PRIMITIVES
    ============================================ */
 
