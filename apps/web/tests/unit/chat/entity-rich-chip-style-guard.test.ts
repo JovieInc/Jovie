@@ -51,4 +51,29 @@ describe('entity rich chip System B style guard', () => {
     expect(skillChipCss).toContain('var(--system-b-bg-surface-2)');
     expect(skillChipCss).not.toMatch(/--surface-[0-9]/);
   });
+
+  it('keeps transcript entity chips bounded and thumbnail-stable', () => {
+    const source = readFileSync(
+      path.join(webRoot, 'styles/design-system.css'),
+      'utf8'
+    );
+    const transcriptChipCss = source.match(
+      /\.system-b-entity-chip\[data-entity-variant="transcript"\]\s*\{[\s\S]*?\n\}/
+    )?.[0];
+    const transcriptDotCss = source.match(
+      /\.system-b-entity-chip\[data-entity-variant="transcript"\]\s+\.system-b-entity-chip-dot\s*\{[\s\S]*?\n\}/
+    )?.[0];
+    const transcriptDotInnerCss = source.match(
+      /\.system-b-entity-chip\[data-entity-variant="transcript"\]\s+\.system-b-entity-chip-dot::after\s*\{[\s\S]*?\n\}/
+    )?.[0];
+
+    expect(transcriptChipCss).toContain('max-width: 220px;');
+    expect(transcriptDotCss).toContain('width: var(--space-4);');
+    expect(transcriptDotCss).toContain('height: var(--space-4);');
+    expect(transcriptDotCss).toContain('background: transparent;');
+    expect(transcriptDotInnerCss).toContain('inset: var(--space-1);');
+    expect(transcriptDotInnerCss).toContain(
+      'background: var(--jovie-entity-accent);'
+    );
+  });
 });

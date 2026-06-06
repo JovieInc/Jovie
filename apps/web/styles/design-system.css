@@ -3221,6 +3221,7 @@ body:has(.system-b-download-page) .marketing-glass-header__cta:focus-visible {
 }
 
 .system-b-entity-chip[data-entity-variant="transcript"] {
+  max-width: 220px;
   border: 1px solid
     color-mix(in srgb, var(--jovie-entity-accent) 22%, transparent);
   background: color-mix(in srgb, var(--jovie-entity-accent) 11%, transparent);
@@ -3270,8 +3271,19 @@ body:has(.system-b-download-page) .marketing-glass-header__cta:focus-visible {
 
 .system-b-entity-chip[data-entity-variant="transcript"]
   .system-b-entity-chip-dot {
-  width: var(--space-2);
-  height: var(--space-2);
+  position: relative;
+  width: var(--space-4);
+  height: var(--space-4);
+  background: transparent;
+}
+
+.system-b-entity-chip[data-entity-variant="transcript"]
+  .system-b-entity-chip-dot::after {
+  position: absolute;
+  inset: var(--space-1);
+  border-radius: var(--radius-full);
+  background: var(--jovie-entity-accent);
+  content: "";
 }
 
 .system-b-entity-chip-remove {
