@@ -71,7 +71,7 @@ export interface ChatProfileContextSummary {
 }
 
 const CHAT_ENTITY_RIGHT_PANEL_SHELL_CLASSNAME =
-  'system-b-chat-entity-right-panel-shell hidden h-full min-h-0 w-[320px] shrink-0 overflow-hidden lg:flex xl:w-[340px]';
+  'system-b-chat-entity-right-panel-shell';
 
 function formatReleaseDate(value: string | undefined): string | null {
   if (!value) return null;
@@ -152,9 +152,9 @@ function ChatProfileContextCard({
     <div
       data-testid='chat-rail-context-card'
       data-context-kind='profile'
-      className='group relative flex min-w-0 items-center gap-3 rounded-lg px-3 py-2.5 text-left transition-colors hover:bg-surface-1'
+      className='system-b-chat-entity-context-card group'
     >
-      <div className='relative h-9 w-9 shrink-0 overflow-hidden rounded-lg bg-surface-1 text-[12px] font-semibold text-secondary-token'>
+      <div className='system-b-chat-entity-context-avatar'>
         {profile?.avatarUrl ? (
           <Image
             src={profile.avatarUrl}
@@ -169,11 +169,9 @@ function ChatProfileContextCard({
           </div>
         )}
       </div>
-      <div className='min-w-0 flex-1'>
-        <p className='truncate text-[13px] font-semibold text-primary-token'>
-          {title}
-        </p>
-        <p className='truncate text-[11.5px] text-tertiary-token'>{meta}</p>
+      <div className='system-b-chat-entity-context-copy'>
+        <p className='system-b-chat-entity-context-title'>{title}</p>
+        <p className='system-b-chat-entity-context-meta'>{meta}</p>
       </div>
       <Button
         type='button'
@@ -181,7 +179,7 @@ function ChatProfileContextCard({
         size='icon'
         aria-label='Dismiss profile context'
         onClick={() => onDismiss(target.focusKey)}
-        className='h-7 w-7 shrink-0 opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100'
+        className='system-b-chat-entity-context-dismiss'
       >
         <X className='h-3.5 w-3.5' />
       </Button>
@@ -201,16 +199,14 @@ function ChatEntityContextCard({
     <div
       data-testid='chat-rail-context-card'
       data-context-kind={target.kind}
-      className='group relative flex min-w-0 items-center gap-3 rounded-lg px-3 py-2.5 text-left transition-colors hover:bg-surface-1'
+      className='system-b-chat-entity-context-card group'
     >
       <div className='system-b-chat-entity-context-icon'>
         <ChatRailContextIcon kind={target.kind} />
       </div>
-      <div className='min-w-0 flex-1'>
-        <p className='truncate text-[13px] font-semibold text-primary-token'>
-          {title}
-        </p>
-        <p className='truncate text-[11.5px] text-tertiary-token'>
+      <div className='system-b-chat-entity-context-copy'>
+        <p className='system-b-chat-entity-context-title'>{title}</p>
+        <p className='system-b-chat-entity-context-meta'>
           {contextKindLabel(target.kind)} Context
         </p>
       </div>
@@ -220,7 +216,7 @@ function ChatEntityContextCard({
         size='icon'
         aria-label={`Dismiss ${contextKindLabel(target.kind)} context`}
         onClick={() => onDismiss(target.focusKey)}
-        className='h-7 w-7 shrink-0 opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100'
+        className='system-b-chat-entity-context-dismiss'
       >
         <X className='h-3.5 w-3.5' />
       </Button>
@@ -316,9 +312,9 @@ function ChatReleaseContextCard({
       <div
         data-testid='chat-rail-context-card'
         data-context-kind='release'
-        className='group relative flex min-w-0 items-center gap-3 rounded-lg px-3 py-2.5 text-left transition-colors hover:bg-surface-1'
+        className='system-b-chat-entity-context-card group'
       >
-        <div className='relative h-9 w-9 shrink-0 overflow-hidden rounded-lg bg-surface-1 text-tertiary-token'>
+        <div className='system-b-chat-entity-context-avatar'>
           {release?.artworkUrl ? (
             <Image
               src={release.artworkUrl}
@@ -333,11 +329,9 @@ function ChatReleaseContextCard({
             </div>
           )}
         </div>
-        <div className='min-w-0 flex-1'>
-          <p className='truncate text-[13px] font-semibold text-primary-token'>
-            {title}
-          </p>
-          <p className='truncate text-[11.5px] text-tertiary-token'>{meta}</p>
+        <div className='system-b-chat-entity-context-copy'>
+          <p className='system-b-chat-entity-context-title'>{title}</p>
+          <p className='system-b-chat-entity-context-meta'>{meta}</p>
         </div>
         <Button
           type='button'
@@ -345,7 +339,7 @@ function ChatReleaseContextCard({
           size='icon'
           aria-label='Dismiss release context'
           onClick={() => onDismiss(target.focusKey)}
-          className='h-7 w-7 shrink-0 opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100'
+          className='system-b-chat-entity-context-dismiss'
         >
           <X className='h-3.5 w-3.5' />
         </Button>
@@ -410,8 +404,8 @@ function ChatEntityPanelSection({
   children: ReactNode;
 }>) {
   return (
-    <section className='system-b-chat-entity-panel-section px-4 py-4'>
-      <div className='mb-3 flex items-center gap-2 text-[12px] font-semibold text-secondary-token'>
+    <section className='system-b-chat-entity-panel-section'>
+      <div className='system-b-chat-entity-section-heading'>
         {icon}
         <h3>{title}</h3>
       </div>
@@ -464,13 +458,13 @@ function ChatReleaseEntityPanel({
   return (
     <TableContextMenu items={contextMenuItems}>
       <aside
-        className='system-b-chat-entity-panel-surface flex h-full min-h-0 w-full flex-col overflow-hidden'
+        className='system-b-chat-entity-panel-surface'
         data-testid='chat-release-entity-panel'
       >
-        <div className='system-b-chat-entity-panel-header flex shrink-0 items-center justify-between px-4 py-3'>
-          <div className='min-w-0'>
-            <p className='text-[11px] text-tertiary-token'>Release</p>
-            <h2 className='truncate text-[13px] font-semibold text-primary-token'>
+        <div className='system-b-chat-entity-panel-header'>
+          <div className='system-b-chat-entity-panel-header-copy'>
+            <p className='system-b-chat-entity-panel-eyebrow'>Release</p>
+            <h2 className='system-b-chat-entity-panel-title'>
               {release?.title ?? label ?? 'Release'}
             </h2>
           </div>
@@ -480,7 +474,7 @@ function ChatReleaseEntityPanel({
             size='icon'
             aria-label='Close entity panel'
             onClick={onClose}
-            className='h-8 w-8 shrink-0'
+            className='system-b-chat-entity-panel-close'
           >
             <X className='h-4 w-4' />
           </Button>
@@ -488,7 +482,7 @@ function ChatReleaseEntityPanel({
 
         {loading ? (
           <div
-            className='flex flex-1 items-center justify-center px-6'
+            className='system-b-chat-entity-panel-status'
             role='status'
             aria-live='polite'
           >
@@ -501,8 +495,8 @@ function ChatReleaseEntityPanel({
         ) : release ? (
           <div className='min-h-0 flex-1 overflow-y-auto'>
             <div className='px-4 py-4'>
-              <div className='flex items-start gap-3'>
-                <div className='relative h-16 w-16 shrink-0 overflow-hidden rounded-lg bg-surface-1'>
+              <div className='system-b-chat-release-summary'>
+                <div className='system-b-chat-release-artwork'>
                   {release.artworkUrl ? (
                     <Image
                       src={release.artworkUrl}
@@ -517,22 +511,22 @@ function ChatReleaseEntityPanel({
                     </div>
                   )}
                 </div>
-                <div className='min-w-0 flex-1'>
-                  <h3 className='text-[17px] font-semibold leading-tight text-primary-token'>
+                <div className='system-b-chat-release-copy'>
+                  <h3 className='system-b-chat-release-title'>
                     {release.title}
                   </h3>
-                  <div className='mt-2 flex flex-wrap items-center gap-1.5 text-[11px] text-secondary-token'>
-                    <span className='inline-flex items-center gap-1 rounded-md bg-surface-1 px-1.5 py-1'>
+                  <div className='system-b-chat-entity-meta-row'>
+                    <span className='system-b-chat-entity-meta-pill'>
                       <Disc3 className='h-3 w-3 text-tertiary-token' />
                       {releaseTypeLabel(release.releaseType)}
                     </span>
                     {releaseDate ? (
-                      <span className='inline-flex items-center gap-1 rounded-md bg-surface-1 px-1.5 py-1'>
+                      <span className='system-b-chat-entity-meta-pill'>
                         <Calendar className='h-3 w-3 text-tertiary-token' />
                         {releaseDate}
                       </span>
                     ) : null}
-                    <span className='rounded-md bg-surface-1 px-1.5 py-1'>
+                    <span className='system-b-chat-entity-meta-pill'>
                       {release.status}
                     </span>
                   </div>
@@ -547,7 +541,7 @@ function ChatReleaseEntityPanel({
                   onClick={() =>
                     router.push(buildReleaseTasksRoute(release.id))
                   }
-                  className='inline-flex h-8 items-center gap-1.5 rounded-md border border-subtle bg-surface-1 px-3 text-xs font-medium text-primary-token transition-colors hover:border-default hover:bg-surface-2'
+                  className='system-b-chat-entity-action-link'
                 >
                   <CheckSquare className='h-3.5 w-3.5 text-tertiary-token' />
                   Tasks
@@ -555,7 +549,7 @@ function ChatReleaseEntityPanel({
                 {release.smartLinkPath ? (
                   <Link
                     href={release.smartLinkPath}
-                    className='inline-flex h-8 items-center gap-1.5 rounded-md border border-subtle bg-surface-1 px-3 text-xs font-medium text-primary-token transition-colors hover:border-default hover:bg-surface-2'
+                    className='system-b-chat-entity-action-link'
                   >
                     <ExternalLink className='h-3.5 w-3.5 text-tertiary-token' />
                     Open
@@ -571,8 +565,8 @@ function ChatReleaseEntityPanel({
               >
                 <div className='space-y-3'>
                   {release.previewUrl ? (
-                    <div className='rounded-lg bg-surface-1 px-3 py-2.5'>
-                      <div className='mb-2 flex items-center gap-2 text-[11.5px] font-semibold text-secondary-token'>
+                    <div className='system-b-chat-entity-audio-card'>
+                      <div className='system-b-chat-entity-audio-label'>
                         <Music2 className='h-3.5 w-3.5 text-tertiary-token' />
                         Preview
                       </div>
@@ -594,19 +588,15 @@ function ChatReleaseEntityPanel({
                           href={provider.url}
                           target='_blank'
                           rel='noreferrer'
-                          className='flex min-w-0 items-center gap-2 rounded-md px-2 py-1.5 text-[12px] text-secondary-token transition-colors hover:bg-surface-1 hover:text-primary-token focus-visible:bg-surface-1 focus-visible:outline-none'
+                          className='system-b-chat-entity-provider-link'
                         >
                           <LinkIcon className='h-3.5 w-3.5 shrink-0 text-tertiary-token' />
                           <span className='min-w-0 flex-1 truncate'>
                             {provider.label}
                           </span>
                           <span
-                            className={cn(
-                              'h-1.5 w-1.5 rounded-full',
-                              provider.isPrimary
-                                ? 'bg-green-500'
-                                : 'bg-tertiary-token'
-                            )}
+                            className='system-b-chat-entity-provider-dot'
+                            data-primary={provider.isPrimary ? 'true' : 'false'}
                           />
                         </a>
                       ))}
@@ -623,7 +613,7 @@ function ChatReleaseEntityPanel({
                   <MessageSquareText className='h-3.5 w-3.5 text-tertiary-token' />
                 }
               >
-                <div className='rounded-lg bg-surface-1 px-3 py-2.5 text-[12px] text-secondary-token'>
+                <div className='system-b-chat-entity-note-card'>
                   <p className='truncate font-semibold text-primary-token'>
                     {threadTitle}
                   </p>
@@ -673,7 +663,7 @@ function ChatReleaseEntityPanel({
             ) : null}
           </div>
         ) : (
-          <div className='flex flex-1 items-center justify-center px-6 text-center text-[13px] text-tertiary-token'>
+          <div className='system-b-chat-entity-panel-status'>
             This release is not available in the current profile.
           </div>
         )}
@@ -728,16 +718,11 @@ function ChatSimpleEntityPanel({
 }>) {
   const hasContent = !loading && children !== null;
   return (
-    <aside
-      className='system-b-chat-entity-panel-surface flex h-full min-h-0 w-full flex-col overflow-hidden'
-      data-testid={testId}
-    >
-      <div className='system-b-chat-entity-panel-header flex shrink-0 items-center justify-between px-4 py-3'>
-        <div className='min-w-0'>
-          <p className='text-[11px] text-tertiary-token'>{eyebrow}</p>
-          <h2 className='truncate text-[13px] font-semibold text-primary-token'>
-            {title}
-          </h2>
+    <aside className='system-b-chat-entity-panel-surface' data-testid={testId}>
+      <div className='system-b-chat-entity-panel-header'>
+        <div className='system-b-chat-entity-panel-header-copy'>
+          <p className='system-b-chat-entity-panel-eyebrow'>{eyebrow}</p>
+          <h2 className='system-b-chat-entity-panel-title'>{title}</h2>
         </div>
         <Button
           type='button'
@@ -745,23 +730,19 @@ function ChatSimpleEntityPanel({
           size='icon'
           aria-label='Close entity panel'
           onClick={onClose}
-          className='h-8 w-8 shrink-0'
+          className='system-b-chat-entity-panel-close'
         >
           <X className='h-4 w-4' />
         </Button>
       </div>
       {loading ? (
-        <div className='flex flex-1 items-center justify-center px-6 text-center text-[13px] text-tertiary-token'>
-          Loading…
-        </div>
+        <div className='system-b-chat-entity-panel-status'>Loading…</div>
       ) : hasContent ? (
         <div className='min-h-0 flex-1 overflow-y-auto px-4 py-4'>
           {children}
         </div>
       ) : (
-        <div className='flex flex-1 items-center justify-center px-6 text-center text-[13px] text-tertiary-token'>
-          {emptyMessage}
-        </div>
+        <div className='system-b-chat-entity-panel-status'>{emptyMessage}</div>
       )}
     </aside>
   );
@@ -794,16 +775,16 @@ function ChatContactEntityPanelLoader({
       testId='chat-contact-entity-panel'
     >
       {contact ? (
-        <div className='space-y-2 text-[12px] text-secondary-token'>
+        <div className='system-b-chat-contact-details'>
           {contact.role ? (
-            <span className='inline-flex items-center rounded-md bg-surface-1 px-1.5 py-1 text-[11px]'>
+            <span className='system-b-chat-entity-meta-pill'>
               {contact.role}
             </span>
           ) : null}
           {contact.email ? (
             <a
               href={`mailto:${contact.email}`}
-              className='flex items-center gap-2 rounded-md px-2 py-1.5 transition-colors hover:bg-surface-1 hover:text-primary-token'
+              className='system-b-chat-entity-provider-link'
             >
               <LinkIcon className='h-3.5 w-3.5 shrink-0 text-tertiary-token' />
               <span className='truncate'>{contact.email}</span>
@@ -812,14 +793,14 @@ function ChatContactEntityPanelLoader({
           {contact.phone ? (
             <a
               href={`tel:${contact.phone}`}
-              className='flex items-center gap-2 rounded-md px-2 py-1.5 transition-colors hover:bg-surface-1 hover:text-primary-token'
+              className='system-b-chat-entity-provider-link'
             >
               <LinkIcon className='h-3.5 w-3.5 shrink-0 text-tertiary-token' />
               <span className='truncate'>{contact.phone}</span>
             </a>
           ) : null}
           {contact.territories.length > 0 ? (
-            <p className='text-[12px] text-secondary-token'>
+            <p className='system-b-chat-contact-copy'>
               {contact.territories.join(', ')}
             </p>
           ) : null}
@@ -854,26 +835,26 @@ function ChatTourDateEntityPanelLoader({
     >
       {event ? (
         <div className='space-y-3'>
-          <div className='flex flex-wrap items-center gap-1.5 text-[11px] text-secondary-token'>
+          <div className='system-b-chat-entity-meta-row'>
             {eventDate ? (
-              <span className='inline-flex items-center gap-1 rounded-md bg-surface-1 px-1.5 py-1'>
+              <span className='system-b-chat-entity-meta-pill'>
                 <Calendar className='h-3 w-3 text-tertiary-token' />
                 {eventDate}
               </span>
             ) : null}
             {event.status ? (
-              <span className='rounded-md bg-surface-1 px-1.5 py-1'>
+              <span className='system-b-chat-entity-meta-pill'>
                 {event.status}
               </span>
             ) : null}
             {event.provider ? (
-              <span className='rounded-md bg-surface-1 px-1.5 py-1'>
+              <span className='system-b-chat-entity-meta-pill'>
                 {event.provider}
               </span>
             ) : null}
           </div>
           {event.subtitle ? (
-            <p className='text-[12px] text-secondary-token'>{event.subtitle}</p>
+            <p className='system-b-chat-contact-copy'>{event.subtitle}</p>
           ) : null}
         </div>
       ) : null}
@@ -910,15 +891,13 @@ function ChatProfileBentoPanel({
   return (
     <TableContextMenu items={contextMenuItems}>
       <aside
-        className='system-b-chat-entity-panel-surface flex h-full min-h-0 w-full flex-col overflow-hidden'
+        className='system-b-chat-entity-panel-surface'
         data-testid='chat-profile-bento-panel'
       >
-        <div className='system-b-chat-entity-panel-header flex shrink-0 items-center justify-between px-4 py-3'>
-          <div className='min-w-0'>
-            <p className='text-[11px] text-tertiary-token'>Profile</p>
-            <h2 className='truncate text-[13px] font-semibold text-primary-token'>
-              {displayName}
-            </h2>
+        <div className='system-b-chat-entity-panel-header'>
+          <div className='system-b-chat-entity-panel-header-copy'>
+            <p className='system-b-chat-entity-panel-eyebrow'>Profile</p>
+            <h2 className='system-b-chat-entity-panel-title'>{displayName}</h2>
           </div>
           <Button
             type='button'
@@ -926,16 +905,16 @@ function ChatProfileBentoPanel({
             size='icon'
             aria-label='Close profile panel'
             onClick={onClose}
-            className='h-8 w-8 shrink-0'
+            className='system-b-chat-entity-panel-close'
           >
             <X className='h-4 w-4' />
           </Button>
         </div>
 
         <div className='min-h-0 flex-1 overflow-y-auto p-4'>
-          <div className='relative min-h-[300px] overflow-hidden rounded-lg border border-white/12 bg-[linear-gradient(135deg,#11151d_0%,#202735_46%,#121821_100%)] px-4 py-5 text-white shadow-[0_22px_52px_rgba(0,0,0,0.28)]'>
-            <div className='relative z-10 flex items-center gap-3'>
-              <div className='relative h-14 w-14 shrink-0 overflow-hidden rounded-2xl bg-white/14 text-sm font-semibold text-white'>
+          <div className='system-b-chat-profile-preview-card'>
+            <div className='system-b-chat-profile-preview-header'>
+              <div className='system-b-chat-profile-preview-avatar'>
                 {profile?.avatarUrl ? (
                   <Image
                     src={profile.avatarUrl}
@@ -950,37 +929,37 @@ function ChatProfileBentoPanel({
                   </div>
                 )}
               </div>
-              <div className='min-w-0'>
-                <h3 className='truncate text-[20px] font-semibold leading-6'>
+              <div className='system-b-chat-profile-preview-copy'>
+                <h3 className='system-b-chat-profile-preview-name'>
                   {displayName}
                 </h3>
                 {username ? (
-                  <p className='mt-1 truncate text-xs text-white/68'>
+                  <p className='system-b-chat-profile-preview-handle'>
                     /{username}
                   </p>
                 ) : null}
               </div>
             </div>
 
-            <div className='relative z-10 mt-5 flex flex-wrap gap-1.5 text-[11px] text-white/80'>
+            <div className='system-b-chat-profile-preview-stats'>
               {completion !== null ? (
-                <span className='rounded-md border border-white/14 bg-white/10 px-2 py-1'>
+                <span className='system-b-chat-profile-preview-stat'>
                   {completion}% Complete
                 </span>
               ) : null}
-              <span className='rounded-md border border-white/14 bg-white/10 px-2 py-1'>
+              <span className='system-b-chat-profile-preview-stat'>
                 {profile?.hasMusicLinks ? 'Music Connected' : 'Music Links'}
               </span>
-              <span className='rounded-md border border-white/14 bg-white/10 px-2 py-1'>
+              <span className='system-b-chat-profile-preview-stat'>
                 {profile?.hasSocialLinks ? 'Social Connected' : 'Social Links'}
               </span>
             </div>
 
-            <div className='absolute bottom-[-34px] right-4 h-[212px] w-[106px] rounded-[24px] border border-white/25 bg-black p-1 shadow-2xl'>
-              <div className='relative h-full overflow-hidden rounded-[20px] bg-[#111318]'>
-                <div className='mx-auto mt-2 h-1.5 w-10 rounded-full bg-white/20' />
-                <div className='mx-3 mt-5 overflow-hidden rounded-xl bg-white/10 p-2'>
-                  <div className='relative mx-auto h-12 w-12 overflow-hidden rounded-xl bg-white/12'>
+            <div className='system-b-chat-profile-preview-phone'>
+              <div className='system-b-chat-profile-preview-phone-screen'>
+                <div className='system-b-chat-profile-preview-phone-notch' />
+                <div className='system-b-chat-profile-preview-phone-card'>
+                  <div className='system-b-chat-profile-preview-phone-avatar'>
                     {profile?.avatarUrl ? (
                       <Image
                         src={profile.avatarUrl}
@@ -990,23 +969,23 @@ function ChatProfileBentoPanel({
                         className='object-cover'
                       />
                     ) : (
-                      <div className='flex h-full w-full items-center justify-center text-xs text-white/78'>
+                      <div className='system-b-chat-profile-preview-phone-initials'>
                         {profile ? getProfileInitials(profile) : 'P'}
                       </div>
                     )}
                   </div>
-                  <div className='mt-3 h-2 rounded-full bg-white/24' />
-                  <div className='mt-2 h-2 w-2/3 rounded-full bg-white/12' />
+                  <div className='system-b-chat-profile-preview-phone-line' />
+                  <div className='system-b-chat-profile-preview-phone-line system-b-chat-profile-preview-phone-line-short' />
                 </div>
-                <div className='absolute bottom-4 left-3 right-3 grid gap-1'>
-                  <div className='h-6 rounded-md bg-white/14' />
-                  <div className='h-6 rounded-md bg-white/8' />
+                <div className='system-b-chat-profile-preview-phone-actions'>
+                  <div className='system-b-chat-profile-preview-phone-button' />
+                  <div className='system-b-chat-profile-preview-phone-button system-b-chat-profile-preview-phone-button-muted' />
                 </div>
               </div>
             </div>
 
             <Smartphone
-              className='absolute bottom-4 left-4 h-5 w-5 text-white/42'
+              className='system-b-chat-profile-preview-device-icon'
               aria-hidden='true'
             />
           </div>
@@ -1014,21 +993,21 @@ function ChatProfileBentoPanel({
           <div className='mt-4 space-y-1'>
             <Link
               href={publicHref}
-              className='flex h-9 items-center justify-between rounded-md px-2.5 text-sm text-primary-token transition-colors hover:bg-surface-1'
+              className='system-b-chat-profile-preview-link'
             >
               <span>Open Public Profile</span>
               <ExternalLink className='h-3.5 w-3.5 text-tertiary-token' />
             </Link>
             <Link
               href={APP_ROUTES.LIBRARY}
-              className='flex h-9 items-center justify-between rounded-md px-2.5 text-sm text-primary-token transition-colors hover:bg-surface-1'
+              className='system-b-chat-profile-preview-link'
             >
               <span>Library</span>
               <ExternalLink className='h-3.5 w-3.5 text-tertiary-token' />
             </Link>
             <Link
               href={APP_ROUTES.TASKS}
-              className='flex h-9 items-center justify-between rounded-md px-2.5 text-sm text-primary-token transition-colors hover:bg-surface-1'
+              className='system-b-chat-profile-preview-link'
             >
               <span>Tasks</span>
               <ExternalLink className='h-3.5 w-3.5 text-tertiary-token' />
