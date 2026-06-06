@@ -9,6 +9,9 @@ vi.mock('@/components/jovie/ChatWorkspaceSurface', () => ({
 
 vi.mock('@/components/jovie/components/ChatMessageSkeleton', () => ({
   ChatMessageSkeleton: () => <div data-testid='chat-message-skeleton' />,
+  ChatConversationComposerSkeleton: () => (
+    <div data-testid='chat-conversation-composer-skeleton' />
+  ),
 }));
 
 vi.mock('@/components/molecules/LoadingSkeleton', () => ({
@@ -86,6 +89,8 @@ describe('ChatConversationLoading (chat/[id])', () => {
       '@/app/app/(shell)/chat/[id]/loading'
     );
     render(<ChatConversationLoading />);
-    expect(screen.getByTestId('loading-skeleton')).toBeTruthy();
+    expect(
+      screen.getByTestId('chat-conversation-composer-skeleton')
+    ).toBeTruthy();
   });
 });
