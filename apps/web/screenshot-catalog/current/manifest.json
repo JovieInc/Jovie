@@ -11,8 +11,8 @@
     "viewport": "desktop",
     "theme": "dark",
     "consumers": ["admin", "investor-ready"],
-    "capturedAt": "2026-06-06T09:05:36.137Z",
-    "gitSha": "7a407cbe39518ebf61ea80f78bcdd9f6639bd9d1",
+    "capturedAt": "2026-06-06T10:10:00.043Z",
+    "gitSha": "9fed497188770356e7d458d03d35a84973668896",
     "imagePath": "marketing-home-desktop.png"
   },
   {
@@ -114,8 +114,8 @@
     "viewport": "desktop",
     "theme": "dark",
     "consumers": ["admin", "investor-ready"],
-    "capturedAt": "2026-06-06T09:07:04.928Z",
-    "gitSha": "7a407cbe39518ebf61ea80f78bcdd9f6639bd9d1",
+    "capturedAt": "2026-06-06T10:11:28.925Z",
+    "gitSha": "9fed497188770356e7d458d03d35a84973668896",
     "imagePath": "artist-profile-adaptive-section-desktop.png"
   },
   {
@@ -153,8 +153,8 @@
     "viewport": "desktop",
     "theme": "dark",
     "consumers": ["admin", "investor-ready"],
-    "capturedAt": "2026-06-06T06:58:38.556Z",
-    "gitSha": "69f49f3be6c7371f42e4f79d3179798d1df7385b",
+    "capturedAt": "2026-06-06T10:12:43.001Z",
+    "gitSha": "9fed497188770356e7d458d03d35a84973668896",
     "imagePath": "artist-profile-reactivation-section-desktop.png"
   },
   {
@@ -179,8 +179,8 @@
     "viewport": "desktop",
     "theme": "dark",
     "consumers": ["admin", "investor-ready"],
-    "capturedAt": "2026-06-06T09:09:08.457Z",
-    "gitSha": "7a407cbe39518ebf61ea80f78bcdd9f6639bd9d1",
+    "capturedAt": "2026-06-06T10:13:32.251Z",
+    "gitSha": "9fed497188770356e7d458d03d35a84973668896",
     "imagePath": "artist-profile-power-features-section-desktop.png"
   },
   {
@@ -608,8 +608,8 @@
     "viewport": "desktop",
     "theme": "dark",
     "consumers": ["admin", "marketing-export", "investor-ready"],
-    "capturedAt": "2026-06-06T09:16:26.045Z",
-    "gitSha": "7a407cbe39518ebf61ea80f78bcdd9f6639bd9d1",
+    "capturedAt": "2026-06-06T10:20:49.489Z",
+    "gitSha": "9fed497188770356e7d458d03d35a84973668896",
     "imagePath": "shell-v1-releases-desktop.png",
     "publicExportPath": "shell-v1-releases.png"
   },
