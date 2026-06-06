@@ -5,6 +5,14 @@
      5|The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
      6|and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.6.13] - 2026-06-06
+
+> Main push unit CI now follows the same bounded test path as PR and merge-queue runs.
+
+### Fixed
+
+- **Main unit CI stability (JOV-2880)**: routes main-branch web unit shards through Turbo, removes live Redis secrets from unit-test steps, and unrefs the idempotency fallback cleanup timer so imported modules cannot keep Vitest workers alive after tests finish.
+
 ## [26.6.12] - 2026-06-06
 
 > Chat social-link Add actions now stay on neutral System B primary controls.
