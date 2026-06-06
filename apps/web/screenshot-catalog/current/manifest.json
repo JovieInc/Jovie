@@ -11,8 +11,8 @@
     "viewport": "desktop",
     "theme": "dark",
     "consumers": ["admin", "investor-ready"],
-    "capturedAt": "2026-06-06T18:43:54.240Z",
-    "gitSha": "5a1d9ee5bd9f6515b32cae2b2a4bf74a0a01e53a",
+    "capturedAt": "2026-06-06T20:49:20.400Z",
+    "gitSha": "3f7c6ff708c4ef8e9c7c053b95aa53ba2ea2f9d7",
     "imagePath": "marketing-home-desktop.png"
   },
   {
@@ -127,8 +127,8 @@
     "viewport": "desktop",
     "theme": "dark",
     "consumers": ["admin", "investor-ready"],
-    "capturedAt": "2026-06-06T18:45:48.637Z",
-    "gitSha": "5a1d9ee5bd9f6515b32cae2b2a4bf74a0a01e53a",
+    "capturedAt": "2026-06-06T20:51:14.804Z",
+    "gitSha": "3f7c6ff708c4ef8e9c7c053b95aa53ba2ea2f9d7",
     "imagePath": "artist-profile-built-for-artists-section-desktop.png"
   },
   {
@@ -153,8 +153,8 @@
     "viewport": "desktop",
     "theme": "dark",
     "consumers": ["admin", "investor-ready"],
-    "capturedAt": "2026-06-06T18:46:37.557Z",
-    "gitSha": "5a1d9ee5bd9f6515b32cae2b2a4bf74a0a01e53a",
+    "capturedAt": "2026-06-06T20:52:03.750Z",
+    "gitSha": "3f7c6ff708c4ef8e9c7c053b95aa53ba2ea2f9d7",
     "imagePath": "artist-profile-reactivation-section-desktop.png"
   },
   {
@@ -166,8 +166,8 @@
     "viewport": "desktop",
     "theme": "dark",
     "consumers": ["admin", "investor-ready"],
-    "capturedAt": "2026-06-06T18:47:01.923Z",
-    "gitSha": "5a1d9ee5bd9f6515b32cae2b2a4bf74a0a01e53a",
+    "capturedAt": "2026-06-06T20:52:28.115Z",
+    "gitSha": "3f7c6ff708c4ef8e9c7c053b95aa53ba2ea2f9d7",
     "imagePath": "artist-profile-monetization-section-desktop.png"
   },
   {
@@ -179,8 +179,8 @@
     "viewport": "desktop",
     "theme": "dark",
     "consumers": ["admin", "investor-ready"],
-    "capturedAt": "2026-06-06T18:47:26.812Z",
-    "gitSha": "5a1d9ee5bd9f6515b32cae2b2a4bf74a0a01e53a",
+    "capturedAt": "2026-06-06T20:52:52.953Z",
+    "gitSha": "3f7c6ff708c4ef8e9c7c053b95aa53ba2ea2f9d7",
     "imagePath": "artist-profile-power-features-section-desktop.png"
   },
   {
@@ -771,8 +771,8 @@
     "viewport": "desktop",
     "theme": "dark",
     "consumers": ["admin", "investor-ready"],
-    "capturedAt": "2026-06-06T05:59:32.501Z",
-    "gitSha": "762eda0370baaf042d41f3762ac227ce721201a0",
+    "capturedAt": "2026-06-06T21:03:57.486Z",
+    "gitSha": "3f7c6ff708c4ef8e9c7c053b95aa53ba2ea2f9d7",
     "imagePath": "onboarding-handle-desktop.png"
   },
   {
