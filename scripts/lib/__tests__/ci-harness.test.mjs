@@ -64,6 +64,39 @@ describe('ci-harness risk classifier', () => {
     expect(risk.blocksUnattendedAutoMerge).toBe(false);
   });
 
+  it('does not escalate version-only package manifest bumps to smoke', () => {
+    const risk = classifyCiRisk(
+      [
+        'package.json',
+        'apps/web/package.json',
+        'apps/web/app/(marketing)/compare/[slug]/page.tsx',
+      ],
+      manifest,
+      {
+        isVersionOnlyPackageManifestChange: file =>
+          file === 'package.json' || file === 'apps/web/package.json',
+      }
+    );
+
+    expect(risk.riskLevel).toBe('medium');
+    expect(risk.requiresSmoke).toBe(false);
+    expect(risk.requiresPreview).toBe(true);
+    expect(risk.blocksUnattendedAutoMerge).toBe(false);
+    expect(risk.matchedRules.map(rule => rule.id)).toEqual(['public-ui']);
+  });
+
+  it('keeps package manifest dependency changes in the env-config smoke lane', () => {
+    const risk = classifyCiRisk(['package.json'], manifest, {
+      isVersionOnlyPackageManifestChange: () => false,
+    });
+
+    expect(risk.riskLevel).toBe('high');
+    expect(risk.requiresSmoke).toBe(true);
+    expect(risk.requiresPreview).toBe(true);
+    expect(risk.blocksUnattendedAutoMerge).toBe(true);
+    expect(risk.matchedRules.map(rule => rule.id)).toContain('env-config');
+  });
+
   it('treats workflow edits as high-risk control-plane changes', () => {
     const risk = classifyCiRisk(['.github/workflows/ci.yml'], manifest);
     expect(risk.riskLevel).toBe('high');

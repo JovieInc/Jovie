@@ -1,3 +1,4 @@
+import { execFileSync } from 'node:child_process';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -129,7 +130,54 @@ export function normalizeChangedFiles(files) {
   return [...new Set((files ?? []).map(file => file.trim()).filter(Boolean))];
 }
 
-export function classifyCiRisk(files, manifest) {
+function stripVersionField(manifest) {
+  if (!manifest || typeof manifest !== 'object' || Array.isArray(manifest)) {
+    return manifest;
+  }
+
+  const { version: _version, ...rest } = manifest;
+  return rest;
+}
+
+function readJsonAtRef(ref, file) {
+  const contents = execFileSync('git', ['show', `${ref}:${file}`], {
+    encoding: 'utf8',
+    stdio: ['ignore', 'pipe', 'ignore'],
+  });
+  return JSON.parse(contents);
+}
+
+function isPackageManifestPath(file) {
+  return file === 'package.json' || file.endsWith('/package.json');
+}
+
+function isVersionOnlyPackageManifestChange(file, diffBase) {
+  if (!diffBase || !isPackageManifestPath(file)) return false;
+
+  try {
+    const before = readJsonAtRef(diffBase, file);
+    const after = JSON.parse(readFileSync(resolve(REPO_ROOT, file), 'utf8'));
+    return (
+      before.version !== after.version &&
+      JSON.stringify(stripVersionField(before)) ===
+        JSON.stringify(stripVersionField(after))
+    );
+  } catch {
+    return false;
+  }
+}
+
+function shouldIgnoreRuleFile(file, rule, options) {
+  if (rule.id !== 'env-config') return false;
+  const versionOnlyPredicate =
+    options?.isVersionOnlyPackageManifestChange ??
+    (candidate =>
+      isVersionOnlyPackageManifestChange(candidate, options?.diffBase));
+
+  return versionOnlyPredicate(file);
+}
+
+export function classifyCiRisk(files, manifest, options = {}) {
   const changedFiles = normalizeChangedFiles(files);
   const errors = [];
   const matches = [];
@@ -141,7 +189,10 @@ export function classifyCiRisk(files, manifest) {
     const matchedFiles = changedFiles.filter(file =>
       regexes.some(regex => regex.test(file))
     );
-    if (matchedFiles.length > 0) {
+    const effectiveMatchedFiles = matchedFiles.filter(
+      file => !shouldIgnoreRuleFile(file, rule, options)
+    );
+    if (effectiveMatchedFiles.length > 0) {
       matches.push({
         id: rule.id,
         title: rule.title,
@@ -150,7 +201,7 @@ export function classifyCiRisk(files, manifest) {
         requiresSmoke: rule.requiresSmoke,
         requiresPreview: rule.requiresPreview,
         blocksUnattendedAutoMerge: rule.blocksUnattendedAutoMerge,
-        files: matchedFiles,
+        files: effectiveMatchedFiles,
       });
     }
   }

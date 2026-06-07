@@ -255,15 +255,19 @@ jobs:
 
           CHANGED_FILES="$RUNNER_TEMP/ci-risk-changed-files.txt"
           : > "$CHANGED_FILES"
+          DIFF_BASE=""
 
           if [[ "$EVENT_NAME" == "pull_request" ]]; then
             git fetch origin "$BASE_REF" --depth=1
-            git diff --name-only "origin/$BASE_REF" HEAD > "$CHANGED_FILES"
+            DIFF_BASE="origin/$BASE_REF"
+            git diff --name-only "$DIFF_BASE" HEAD > "$CHANGED_FILES"
           elif [[ "$EVENT_NAME" == "merge_group" ]]; then
             git fetch origin main --depth=1
-            git diff --name-only origin/main HEAD > "$CHANGED_FILES" || true
+            DIFF_BASE="origin/main"
+            git diff --name-only "$DIFF_BASE" HEAD > "$CHANGED_FILES" || true
           elif [[ "$EVENT_NAME" == "push" ]]; then
-            git diff --name-only HEAD~1 HEAD > "$CHANGED_FILES" 2>/dev/null || git show --pretty="" --name-only HEAD > "$CHANGED_FILES"
+            DIFF_BASE="HEAD~1"
+            git diff --name-only "$DIFF_BASE" HEAD > "$CHANGED_FILES" 2>/dev/null || git show --pretty="" --name-only HEAD > "$CHANGED_FILES"
           elif [[ "$EVENT_NAME" == "workflow_dispatch" ]]; then
             git ls-files > "$CHANGED_FILES"
           fi
@@ -271,6 +275,7 @@ jobs:
           echo "Changed files for CI risk classification:"
           sed 's/^/  /' "$CHANGED_FILES" || true
           echo "path=$CHANGED_FILES" >> "$GITHUB_OUTPUT"
+          echo "diff_base=$DIFF_BASE" >> "$GITHUB_OUTPUT"
       - name: Classify CI risk
         id: classify
         shell: bash
@@ -281,6 +286,7 @@ jobs:
 
           node scripts/ci-harness.mjs classify-risk \
             --files "${{ steps.changed-files.outputs.path }}" \
+            --diff-base "${{ steps.changed-files.outputs.diff_base }}" \
             --github-output "$GITHUB_OUTPUT" | tee "$RISK_JSON"
 
           RISK_LEVEL=$(jq -r '.riskLevel' "$RISK_JSON")
