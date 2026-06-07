@@ -293,6 +293,26 @@ describe('InlineChatArea tool invocation rendering', () => {
     expect(screen.queryByTestId('link-confirmation-card')).toBeNull();
   });
 
+  it('renders user transcript bubbles with neutral System B chrome', () => {
+    mockMessages = [
+      {
+        id: 'msg-1',
+        role: 'user',
+        parts: [{ type: 'text', text: 'Keep this quiet and neutral' }],
+      },
+    ];
+
+    renderInlineChat();
+
+    const textNode = screen.getByText('Keep this quiet and neutral');
+    const bubble = textNode.parentElement;
+
+    expect(bubble?.className).toContain('bg-surface-1');
+    expect(bubble?.className).toContain('text-primary-token');
+    expect(bubble?.className).not.toContain('bg-accent');
+    expect(bubble?.className).not.toContain('text-accent-foreground');
+  });
+
   it('renders a compact status row for unknown tools', () => {
     mockMessages = [
       {

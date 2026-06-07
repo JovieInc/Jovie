@@ -83,7 +83,7 @@ const InlineChatMessage = memo(function InlineChatMessage({
             className={cn(
               'max-w-[85%] rounded-xl px-3 py-2',
               message.role === 'user'
-                ? 'bg-accent text-accent-foreground'
+                ? 'border border-(--linear-app-frame-seam) bg-surface-1 text-primary-token'
                 : 'border border-(--linear-app-frame-seam) bg-surface-0 text-primary-token'
             )}
           >
