@@ -82,9 +82,7 @@ const InlineChatMessage = memo(function InlineChatMessage({
           <div
             className={cn(
               'max-w-[85%] rounded-xl px-3 py-2',
-              message.role === 'user'
-                ? 'border border-(--linear-app-frame-seam) bg-surface-1 text-primary-token'
-                : 'border border-(--linear-app-frame-seam) bg-surface-0 text-primary-token'
+              'border border-(--linear-app-frame-seam) bg-surface-0 text-primary-token'
             )}
           >
             <div className='whitespace-pre-wrap text-app leading-relaxed'>
