@@ -5,6 +5,14 @@
      5|The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
      6|and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.6.15] - 2026-06-06
+
+> Version-only release bumps no longer force expensive PR smoke runs.
+
+### Fixed
+
+- **CI risk routing (JOV-2884)**: teaches the CI harness classifier to ignore package manifest matches in the runtime-config smoke lane when the manifest diff only changes `version`, while preserving smoke escalation for dependency, script, and config changes.
+
 ## [26.6.14] - 2026-06-06
 
 > Static comparison CTAs now use neutral primary controls instead of accent fills.

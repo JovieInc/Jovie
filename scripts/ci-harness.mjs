@@ -70,7 +70,9 @@ function runGenerateDocs(manifest, args) {
 
 function runClassifyRisk(manifest, args) {
   const files = readFilesArg(args);
-  const classification = classifyCiRisk(files, manifest);
+  const classification = classifyCiRisk(files, manifest, {
+    diffBase: argValue(args, '--diff-base', process.env.CI_RISK_DIFF_BASE),
+  });
   const outputPath = argValue(
     args,
     '--github-output',
