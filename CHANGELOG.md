@@ -5,6 +5,14 @@
      5|The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
      6|and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.6.19] - 2026-06-07
+
+> Inline dashboard chat user bubbles now use neutral transcript chrome instead of accent fill.
+
+### Fixed
+
+- **Inline chat bubble neutrality (JOV-2888)**: replaces `InlineChatArea` user message accent fill with neutral System B surface/text tokens, and extends the focused chat rendering guard so ordinary transcript bubbles cannot drift back to accent-filled chrome.
+
 ## [26.6.18] - 2026-06-07
 
 > Artist selection no longer uses purple/blue ambient accent orbs behind the central action.
