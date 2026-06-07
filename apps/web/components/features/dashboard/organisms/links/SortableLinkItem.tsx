@@ -15,7 +15,10 @@ import { type DetectedLink } from '@/lib/utils/platform-detection';
 import { compactUrlDisplay, suggestionIdentity } from './utils';
 
 const SWIPE_ACTION_CLASS =
-  'flex h-full flex-col items-center justify-center gap-1 px-4 text-white text-xs font-caption transition-colors active:opacity-80';
+  'flex h-full flex-col items-center justify-center gap-1 px-4 text-xs font-caption transition-colors active:opacity-80';
+const NEUTRAL_SWIPE_ACTION_CLASS =
+  'bg-surface-2 text-primary-token hover:bg-surface-3';
+const DESTRUCTIVE_SWIPE_ACTION_CLASS = 'bg-red-500 text-white';
 
 /**
  * Determine the pill state based on visibility and validity.
@@ -169,7 +172,7 @@ export const SortableLinkItem = React.memo(function SortableLinkItem<
       <button
         type='button'
         onClick={() => onEdit(index)}
-        className={cn(SWIPE_ACTION_CLASS, 'bg-blue-500')}
+        className={cn(SWIPE_ACTION_CLASS, NEUTRAL_SWIPE_ACTION_CLASS)}
         aria-label={`Edit ${primaryLabel}`}
       >
         <Icon name='Pencil' className='h-4 w-4' />
@@ -178,7 +181,7 @@ export const SortableLinkItem = React.memo(function SortableLinkItem<
       <button
         type='button'
         onClick={() => onToggle(index)}
-        className={cn(SWIPE_ACTION_CLASS, 'bg-surface-2')}
+        className={cn(SWIPE_ACTION_CLASS, NEUTRAL_SWIPE_ACTION_CLASS)}
         aria-label={visible ? 'Hide link' : 'Show link'}
       >
         <Icon name={visible ? 'EyeOff' : 'Eye'} className='h-4 w-4' />
@@ -187,7 +190,7 @@ export const SortableLinkItem = React.memo(function SortableLinkItem<
       <button
         type='button'
         onClick={() => onRemove(index)}
-        className={cn(SWIPE_ACTION_CLASS, 'bg-red-500')}
+        className={cn(SWIPE_ACTION_CLASS, DESTRUCTIVE_SWIPE_ACTION_CLASS)}
         aria-label={`Delete ${primaryLabel}`}
       >
         <Icon name='Trash' className='h-4 w-4' />
