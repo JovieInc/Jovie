@@ -1033,7 +1033,6 @@ body {
     grid-template-columns: repeat(4, minmax(0, 1fr));
   }
   .marketing-pricing-plan-card {
-    --marketing-plan-accent: #00c8ff;
     position: relative;
     display: flex;
     min-height: 24rem;
@@ -1043,25 +1042,11 @@ body {
     border-radius: 18px;
     padding: clamp(1.2rem, 2vw, 1.55rem);
     background:
-      radial-gradient(
-        92% 62% at 50% 0%,
-        color-mix(in oklab, var(--marketing-plan-accent) 15%, transparent),
-        transparent 62%
-      ),
       linear-gradient(180deg, rgba(255, 255, 255, 0.04), transparent 42%),
       rgba(255, 255, 255, 0.02);
     box-shadow:
       0 28px 80px rgba(0, 0, 0, 0.24),
       inset 0 1px 0 rgba(255, 255, 255, 0.055);
-  }
-  .marketing-pricing-plan-card--blue {
-    --marketing-plan-accent: #1463ff;
-  }
-  .marketing-pricing-plan-card--pink {
-    --marketing-plan-accent: #ff3b8a;
-  }
-  .marketing-pricing-plan-card--violet {
-    --marketing-plan-accent: #7b2cff;
   }
   .marketing-pricing-plan-card__topline {
     position: absolute;
@@ -1069,7 +1054,7 @@ body {
     height: 1px;
     background: linear-gradient(
       90deg,
-      color-mix(in oklab, var(--marketing-plan-accent) 68%, transparent),
+      rgba(255, 255, 255, 0.18),
       rgba(255, 255, 255, 0.16),
       transparent
     );
@@ -1147,7 +1132,7 @@ body {
   }
   .marketing-pricing-plan-card__features svg {
     margin-top: 0.12rem;
-    color: color-mix(in oklab, var(--marketing-plan-accent) 70%, white 30%);
+    color: rgba(255, 255, 255, 0.58);
   }
   @media (max-width: 1180px) {
     .marketing-pricing-plans--compact,

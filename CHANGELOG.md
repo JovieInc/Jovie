@@ -5,6 +5,14 @@
      5|The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
      6|and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.6.17] - 2026-06-06
+
+> Pricing conversion actions now stay neutral instead of leaning on plan accent color.
+
+### Fixed
+
+- **Pricing CTA neutrality (JOV-2886)**: replaces the legacy home pricing Pro CTA accent variant with the neutral primary button, removes colored plan-card glows from reusable marketing pricing cards, and adds focused guards so pricing conversion actions cannot drift back to purple/blue/accent fills.
+
 ## [26.6.16] - 2026-06-06
 
 > Dead homepage-era accent CTA components no longer survive outside the System B surface.
