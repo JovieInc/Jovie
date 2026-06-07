@@ -5,6 +5,14 @@
      5|The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
      6|and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.6.21] - 2026-06-07
+
+> The onboarding checkout upgrade CTA now has a guardrail that keeps it on neutral primary styling.
+
+### Fixed
+
+- **Onboarding checkout CTA guard (JOV-2890)**: adds focused coverage that prevents the central upgrade checkout action from regressing to accent-filled button styling.
+
 ## [26.6.20] - 2026-06-07
 
 > Detected social profiles now use neutral panel chrome instead of accent-tinted framing.
