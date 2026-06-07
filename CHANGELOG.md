@@ -5,6 +5,14 @@
      5|The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
      6|and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.6.25] - 2026-06-07
+
+> The Venmo payment method selector now uses neutral action chrome with provider color only on the logo.
+
+### Fixed
+
+- **Venmo method selector neutrality (JOV-2901)**: replaces the provider-blue Venmo payment method button fill with neutral primary styling, keeps Venmo blue on the logo mark, and extends the TipSection guard so payment method selection cannot regress to provider-filled central action styling.
+
 ## [26.6.24] - 2026-06-07
 
 > Public DSP/listen actions now stay neutral, with provider color limited to service marks.

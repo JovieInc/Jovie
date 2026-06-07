@@ -13,6 +13,8 @@ import { cn } from '@/lib/utils';
 
 const CARD_CLASSES =
   'rounded-2xl border border-subtle bg-surface-1 p-6 shadow-sm';
+const PAY_METHOD_BUTTON_CLASSES =
+  'flex w-full items-center justify-center rounded-lg border border-(--linear-btn-primary-border) bg-btn-primary px-4 py-3 text-btn-primary-foreground shadow-button-inset transition-colors hover:border-(--linear-btn-primary-hover) hover:bg-(--linear-btn-primary-hover) active:opacity-80';
 
 function ApplePayLogo({ className }: { readonly className?: string }) {
   return (
@@ -183,7 +185,7 @@ export function PaySection({
             <button
               type='button'
               onClick={() => setPaymentMethod('stripe')}
-              className='flex w-full items-center justify-center gap-1 rounded-lg bg-black px-4 py-3 text-white transition-opacity hover:opacity-90 active:opacity-80 dark:bg-white dark:text-black'
+              className={cn(PAY_METHOD_BUTTON_CLASSES, 'gap-1')}
               aria-label='Pay with Apple Pay or Card'
             >
               <ApplePayLogo className='h-6 w-auto' />
@@ -191,10 +193,10 @@ export function PaySection({
             <button
               type='button'
               onClick={() => setPaymentMethod('venmo')}
-              className='flex w-full items-center justify-center gap-2 rounded-lg bg-[#008CFF] px-4 py-3 text-white transition-opacity hover:opacity-90 active:opacity-80'
+              className={cn(PAY_METHOD_BUTTON_CLASSES, 'gap-2')}
               aria-label='Pay with Venmo'
             >
-              <VenmoLogo className='h-5 w-auto' />
+              <VenmoLogo className='h-5 w-auto text-[#008CFF]' />
             </button>
           </div>
         </div>
