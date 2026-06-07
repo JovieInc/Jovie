@@ -123,23 +123,13 @@ export function PricingSection() {
             </div>
 
             <div
-              className='relative flex h-full flex-col overflow-hidden rounded-[1rem] p-6 md:p-7'
+              className='relative flex h-full flex-col rounded-[1rem] p-6 md:p-7'
               style={{
-                background:
-                  'linear-gradient(180deg, color-mix(in oklab, var(--linear-bg-surface-0) 78%, rgba(113,112,255,0.16)) 0%, var(--linear-bg-surface-0) 36%)',
-                border: '1px solid var(--linear-pricing-accent-border)',
-                boxShadow:
-                  'var(--linear-shadow-card-elevated), 0 0 0 1px var(--linear-pricing-accent-shadow)',
+                backgroundColor: 'var(--linear-bg-surface-0)',
+                border: '1px solid var(--linear-border-subtle)',
+                boxShadow: 'var(--linear-shadow-card-elevated)',
               }}
             >
-              <div
-                aria-hidden='true'
-                className='absolute inset-x-0 top-0 h-px'
-                style={{
-                  background:
-                    'linear-gradient(90deg, transparent, var(--linear-pricing-accent) 40%, var(--linear-pricing-accent) 60%, transparent)',
-                }}
-              />
               <div className='flex items-center justify-between'>
                 <p className='text-sm font-medium tracking-[-0.01em] text-tertiary-token'>
                   {proPlan.displayName}
@@ -171,13 +161,7 @@ export function PricingSection() {
                 ))}
               </ul>
 
-              <div
-                className='mt-5 rounded-[0.9rem] border border-subtle p-4'
-                style={{
-                  backgroundColor:
-                    'color-mix(in oklab, var(--linear-bg-surface-1) 95%, transparent)',
-                }}
-              >
+              <div className='mt-5 rounded-[0.9rem] border border-subtle bg-surface-1 p-4'>
                 <p className='text-xs font-semibold uppercase tracking-[0.08em] text-tertiary-token'>
                   Includes
                 </p>
@@ -188,9 +172,9 @@ export function PricingSection() {
 
               <Button
                 asChild
-                variant='accent'
+                variant='primary'
                 size='xl'
-                className='mt-7 w-full text-[var(--linear-btn-primary-fg)] hover:text-[var(--linear-btn-primary-fg)]'
+                className='mt-7 w-full'
               >
                 <Link href={`${APP_ROUTES.SIGNUP}?plan=pro`}>Choose Pro</Link>
               </Button>

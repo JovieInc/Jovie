@@ -29,7 +29,6 @@ function MarketingPricingPlanCard({
       data-plan-active={active ? 'true' : 'false'}
       className={cn(
         'marketing-pricing-plan-card',
-        `marketing-pricing-plan-card--${plan.accent}`,
         mode === 'expanded' && 'marketing-pricing-plan-card--expanded'
       )}
     >

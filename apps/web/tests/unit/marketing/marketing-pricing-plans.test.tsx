@@ -47,4 +47,14 @@ describe('MarketingPricingPlans', () => {
       screen.queryByRole('link', { name: 'Contact Sales' })
     ).not.toBeInTheDocument();
   });
+
+  it('keeps default pricing plan cards neutral instead of plan-accented', () => {
+    render(<MarketingPricingPlans mode='compact' />);
+
+    for (const plan of ['free', 'pro', 'max']) {
+      expect(
+        screen.getByTestId(`marketing-pricing-plan-${plan}`).className
+      ).not.toMatch(/marketing-pricing-plan-card--(?:blue|pink|violet)/);
+    }
+  });
 });
