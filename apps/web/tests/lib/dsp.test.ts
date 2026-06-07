@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { geoAwarePopularityIndex } from '@/constants/app';
 import {
   DSP_CONFIGS,
+  generateDSPButtonHTML,
   getAvailableDSPs,
   isValidDspUrl,
   sortDSPsForDevice,
@@ -262,6 +263,28 @@ describe('DSP Utils', () => {
         textColor: 'white',
         logoSvg: expect.stringContaining('<svg'),
       });
+    });
+  });
+
+  describe('generateDSPButtonHTML', () => {
+    it('keeps provider color on the logo instead of the central button fill', () => {
+      const html = generateDSPButtonHTML({
+        key: 'spotify',
+        name: 'Spotify',
+        url: 'https://open.spotify.com/track/123',
+        config: DSP_CONFIGS.spotify,
+      });
+
+      expect(html).toContain('background-color: #ffffff');
+      expect(html).toContain('color: #0a0a0a');
+      expect(html).toContain(`color: ${DSP_CONFIGS.spotify.color};`);
+      expect(html).not.toContain(
+        `background-color: ${DSP_CONFIGS.spotify.color}`
+      );
+      expect(html).not.toContain(`color: ${DSP_CONFIGS.spotify.textColor}`);
+      expect(html).not.toContain('transition: all');
+      expect(html).not.toContain('translateY');
+      expect(html).not.toContain('boxShadow');
     });
   });
 

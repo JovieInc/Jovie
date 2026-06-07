@@ -51,16 +51,14 @@ export function DSPButton({
   const sanitizedLogo = DOMPurify.sanitize(logoSvg, {
     USE_PROFILES: { svg: true },
   });
+  // EVENT: Provider color is an accent on the logo only; the central action stays neutral.
+  const providerLogoColor = disabled ? undefined : backgroundColor || textColor;
 
   return (
     <Button
       onClick={handleClick}
       disabled={disabled}
       size={sizeMap[size]}
-      style={{
-        backgroundColor: disabled ? undefined : backgroundColor,
-        color: disabled ? undefined : textColor,
-      }}
       className={cn(
         'w-full max-w-md',
         disabled && 'bg-surface-3 text-tertiary-token',
@@ -77,6 +75,7 @@ export function DSPButton({
         <span
           className='shrink-0'
           aria-hidden='true'
+          style={providerLogoColor ? { color: providerLogoColor } : undefined}
           // biome-ignore lint/security/noDangerouslySetInnerHtml: Required for DSP embed content
           dangerouslySetInnerHTML={{ __html: sanitizedLogo }}
         />

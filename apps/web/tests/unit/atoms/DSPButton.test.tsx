@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 
@@ -88,15 +89,15 @@ describe('DSPButton', () => {
     expect(handleClick).not.toHaveBeenCalled();
   });
 
-  it('applies custom background and text colors', () => {
+  it('keeps provider color on the logo instead of the button fill', () => {
     render(<DSPButton {...defaultProps} />);
     const button = screen.getByRole('button', {
       name: 'Open in Spotify (opens in new window)',
     });
-    expect(button).toHaveStyle({
-      backgroundColor: '#1DB954',
-      color: '#FFFFFF',
-    });
+    const logoContainer = button.querySelector('[aria-hidden="true"]');
+
+    expect(button).not.toHaveAttribute('style');
+    expect(logoContainer).toHaveStyle({ color: '#1DB954' });
   });
 
   it('renders the sanitized logo SVG', () => {
@@ -112,5 +113,15 @@ describe('DSPButton', () => {
   it('has no accessibility violations', async () => {
     const { container } = render(<DSPButton {...defaultProps} />);
     await expectNoA11yViolations(container);
+  });
+
+  it('keeps provider colors out of central button fill source', () => {
+    const source = readFileSync('components/atoms/DSPButton.tsx', 'utf8');
+
+    expect(source).not.toContain(
+      'backgroundColor: disabled ? undefined : backgroundColor'
+    );
+    expect(source).not.toContain('color: disabled ? undefined : textColor');
+    expect(source).toContain('Provider color is an accent on the logo only');
   });
 });
