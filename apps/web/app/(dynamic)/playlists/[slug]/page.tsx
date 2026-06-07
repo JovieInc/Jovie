@@ -293,9 +293,13 @@ export default async function PlaylistPage({
               href={spotifyUrl}
               target='_blank'
               rel='noopener noreferrer'
-              className='mt-6 flex w-full items-center justify-center gap-2 rounded-full bg-[#1DB954] px-6 py-3 text-[15px] font-[510] text-white transition-opacity hover:opacity-90'
+              className='mt-6 flex w-full items-center justify-center gap-2 rounded-full bg-white px-6 py-3 text-[15px] font-[510] text-black transition-colors hover:bg-white/90'
             >
-              <SocialIcon platform='spotify' className='h-5 w-5' aria-hidden />
+              <SocialIcon
+                platform='spotify'
+                className='h-5 w-5 text-[#1DB954]'
+                aria-hidden
+              />
               Open in Spotify
             </a>
           )}

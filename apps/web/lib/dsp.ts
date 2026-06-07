@@ -261,10 +261,10 @@ export function generateDSPButtonHTML(dsp: AvailableDSP): string {
       data-url="${dsp.url}"
       aria-label="Open in ${dsp.name} app if installed, otherwise opens in web browser"
       style="
-        background-color: ${dsp.config.color};
-        color: ${dsp.config.textColor};
-        border: none;
-        border-radius: 8px;
+        background-color: #ffffff;
+        color: #0a0a0a;
+        border: 1px solid rgba(0, 0, 0, 0.08);
+        border-radius: 9999px;
         padding: 12px 24px;
         font-size: 16px;
         font-weight: 600;
@@ -275,16 +275,14 @@ export function generateDSPButtonHTML(dsp: AvailableDSP): string {
         gap: 8px;
         width: 100%;
         max-width: 320px;
-        transition: all 0.2s ease;
+        transition: opacity 0.15s ease, background-color 0.15s ease;
         text-decoration: none;
         margin-bottom: 12px;
       "
-      onmouseover="this.style.opacity='0.9'; this.style.transform='translateY(-2px)'; this.style.boxShadow='0 4px 12px rgba(0,0,0,0.15)'"
-      onmouseout="this.style.opacity='1'; this.style.transform='translateY(0)'; this.style.boxShadow='0 1px 3px rgba(0,0,0,0.1)'"
-      onmousedown="this.style.transform='translateY(-1px)'"
-      onmouseup="this.style.transform='translateY(-2px)'"
+      onmouseover="this.style.opacity='0.92'"
+      onmouseout="this.style.opacity='1'"
     >
-      <span style="display: flex; align-items: center;">
+      <span style="display: flex; align-items: center; color: ${dsp.config.color};">
         ${dsp.config.logoSvg}
       </span>
       Open in ${dsp.name}

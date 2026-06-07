@@ -5,6 +5,14 @@
      5|The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
      6|and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.6.24] - 2026-06-07
+
+> Public DSP/listen actions now stay neutral, with provider color limited to service marks.
+
+### Fixed
+
+- **DSP listen CTA neutrality (JOV-2900)**: removes provider-colored fills from shared DSP buttons, the exported DSP button HTML helper, and public playlist Spotify CTAs while preserving provider color on logos/icons, and adds focused guards so central listen actions cannot regress to Spotify-green or provider-filled buttons.
+
 ## [26.6.23] - 2026-06-07
 
 > Dashboard link swipe edit actions now use neutral chrome instead of blue fills.
