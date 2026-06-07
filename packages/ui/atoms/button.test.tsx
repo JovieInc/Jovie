@@ -49,6 +49,28 @@ describe('Button', () => {
     expect(btn.className).toContain('h-7');
   });
 
+  it('keeps the legacy accent variant neutral instead of accent-filled', () => {
+    const source = readFileSync(path.join(process.cwd(), 'atoms/button.tsx'), {
+      encoding: 'utf8',
+    });
+    const accentVariantSource = source.match(/accent:\s*'(?<classes>[^']+)'/)
+      ?.groups?.classes;
+
+    expect(accentVariantSource).toBeDefined();
+    expect(accentVariantSource).toContain('bg-btn-primary');
+    expect(accentVariantSource).toContain('text-btn-primary-foreground');
+    expect(accentVariantSource).not.toMatch(
+      /\bbg-accent\b|text-accent-foreground|text-on-accent|hover:bg-accent|\bbg-(?:blue|purple|violet|indigo)-\d/
+    );
+
+    render(<Button variant='accent'>Upgrade</Button>);
+    const btn = screen.getByRole('button', { name: 'Upgrade' });
+    expect(btn.className).toContain('bg-btn-primary');
+    expect(btn.className).toContain('text-btn-primary-foreground');
+    expect(btn.className).not.toContain('bg-accent');
+    expect(btn.className).not.toContain('text-accent-foreground');
+  });
+
   it('uses the Jovie focus token', () => {
     render(<Button>Press</Button>);
     const btn = screen.getByRole('button');

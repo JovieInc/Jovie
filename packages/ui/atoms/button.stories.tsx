@@ -62,9 +62,9 @@ export const Primary: Story = {
   },
 };
 
-export const Accent: Story = {
+export const NeutralAlias: Story = {
   args: {
-    children: 'Accent Button',
+    children: 'Neutral Alias',
     variant: 'accent',
   },
 };
@@ -256,7 +256,7 @@ export const AllVariants: Story = {
         <h3 className='text-sm font-semibold mb-2'>Core Variants</h3>
         <div className='flex gap-2 flex-wrap'>
           <Button variant='primary'>Primary</Button>
-          <Button variant='accent'>Accent</Button>
+          <Button variant='accent'>Neutral Alias</Button>
           <Button variant='secondary'>Secondary</Button>
           <Button variant='ghost'>Ghost</Button>
           <Button variant='outline'>Outline</Button>

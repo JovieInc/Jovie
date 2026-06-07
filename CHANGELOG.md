@@ -5,6 +5,14 @@
      5|The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
      6|and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.6.22] - 2026-06-07
+
+> Shared Button accent variants now render as neutral primary controls instead of accent-filled CTAs.
+
+### Fixed
+
+- **Button accent variant neutrality (JOV-2898)**: maps the legacy `Button` `accent` variant to neutral primary button tokens, updates the `/ui/buttons` gallery to show upgrade actions as primary, and adds package-level coverage so accent-filled CTA styling cannot return silently.
+
 ## [26.6.21] - 2026-06-07
 
 > The onboarding checkout upgrade CTA now has a guardrail that keeps it on neutral primary styling.
