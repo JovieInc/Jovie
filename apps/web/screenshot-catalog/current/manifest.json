@@ -11,8 +11,8 @@
     "viewport": "desktop",
     "theme": "dark",
     "consumers": ["admin", "investor-ready"],
-    "capturedAt": "2026-06-07T00:02:12.131Z",
-    "gitSha": "192a674b45ba2a2bc4ada56c9254ac00ffc0a22a",
+    "capturedAt": "2026-06-07T00:50:49.021Z",
+    "gitSha": "cbd2472ee3b2c5f9b1bbbed2fdb2f26346aeb251",
     "imagePath": "marketing-home-desktop.png"
   },
   {
@@ -114,8 +114,8 @@
     "viewport": "desktop",
     "theme": "dark",
     "consumers": ["admin", "investor-ready"],
-    "capturedAt": "2026-06-07T00:03:41.170Z",
-    "gitSha": "192a674b45ba2a2bc4ada56c9254ac00ffc0a22a",
+    "capturedAt": "2026-06-07T00:52:18.405Z",
+    "gitSha": "cbd2472ee3b2c5f9b1bbbed2fdb2f26346aeb251",
     "imagePath": "artist-profile-adaptive-section-desktop.png"
   },
   {
@@ -153,8 +153,8 @@
     "viewport": "desktop",
     "theme": "dark",
     "consumers": ["admin", "investor-ready"],
-    "capturedAt": "2026-06-07T00:04:55.511Z",
-    "gitSha": "192a674b45ba2a2bc4ada56c9254ac00ffc0a22a",
+    "capturedAt": "2026-06-07T00:53:32.696Z",
+    "gitSha": "cbd2472ee3b2c5f9b1bbbed2fdb2f26346aeb251",
     "imagePath": "artist-profile-reactivation-section-desktop.png"
   },
   {
@@ -166,8 +166,8 @@
     "viewport": "desktop",
     "theme": "dark",
     "consumers": ["admin", "investor-ready"],
-    "capturedAt": "2026-06-07T00:05:19.899Z",
-    "gitSha": "192a674b45ba2a2bc4ada56c9254ac00ffc0a22a",
+    "capturedAt": "2026-06-07T00:53:57.111Z",
+    "gitSha": "cbd2472ee3b2c5f9b1bbbed2fdb2f26346aeb251",
     "imagePath": "artist-profile-monetization-section-desktop.png"
   },
   {
@@ -608,8 +608,8 @@
     "viewport": "desktop",
     "theme": "dark",
     "consumers": ["admin", "marketing-export", "investor-ready"],
-    "capturedAt": "2026-06-07T00:13:02.550Z",
-    "gitSha": "192a674b45ba2a2bc4ada56c9254ac00ffc0a22a",
+    "capturedAt": "2026-06-07T01:01:39.842Z",
+    "gitSha": "cbd2472ee3b2c5f9b1bbbed2fdb2f26346aeb251",
     "imagePath": "shell-v1-releases-desktop.png",
     "publicExportPath": "shell-v1-releases.png"
   },
