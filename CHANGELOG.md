@@ -5,6 +5,14 @@
      5|The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
      6|and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.6.23] - 2026-06-07
+
+> Dashboard link swipe edit actions now use neutral chrome instead of blue fills.
+
+### Fixed
+
+- **Link swipe action neutrality (JOV-2899)**: replaces blue-filled dashboard link swipe edit actions with neutral System B surface styling while preserving destructive red for delete, and extends the link action guard so non-destructive swipe actions cannot drift back to accent-filled colors.
+
 ## [26.6.22] - 2026-06-07
 
 > Shared Button accent variants now render as neutral primary controls instead of accent-filled CTAs.
