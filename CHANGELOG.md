@@ -5,6 +5,14 @@
      5|The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
      6|and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.6.18] - 2026-06-07
+
+> Artist selection no longer uses purple/blue ambient accent orbs behind the central action.
+
+### Fixed
+
+- **Artist selection accent cleanup (JOV-2887)**: removes decorative gradient orb layers from the artist-selection route while preserving the neutral grid/background surface, and adds a focused guard so ambient purple/blue/cyan accent decoration cannot return silently.
+
 ## [26.6.17] - 2026-06-06
 
 > Pricing conversion actions now stay neutral instead of leaning on plan accent color.
