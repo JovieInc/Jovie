@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -80,6 +82,10 @@ vi.mock('@/lib/entitlements/registry', () => ({
 
 import { OnboardingCheckoutClient } from '@/app/onboarding/checkout/OnboardingCheckoutClient';
 
+const appRoot = resolve(__dirname, '../../..');
+const checkoutClientSourcePath =
+  'app/onboarding/checkout/OnboardingCheckoutClient.tsx';
+
 const defaultProps = {
   plan: 'pro' as const,
   monthlyPriceId: 'price_monthly',
@@ -134,6 +140,23 @@ describe('OnboardingCheckoutClient', () => {
         has_annual: true,
         intent_source: 'paid_intent',
       })
+    );
+  });
+
+  it('keeps the checkout upgrade CTA on neutral primary button styling', () => {
+    const source = readFileSync(
+      resolve(appRoot, checkoutClientSourcePath),
+      'utf8'
+    );
+    const checkoutCtaSource = source.match(
+      /<Button\s+[\s\S]*?onClick=\{handleCheckout\}[\s\S]*?<\/Button>/
+    )?.[0];
+
+    expect(checkoutCtaSource).toBeDefined();
+    expect(checkoutCtaSource).toContain("variant='primary'");
+    expect(checkoutCtaSource).not.toContain("variant='accent'");
+    expect(checkoutCtaSource).not.toMatch(
+      /bg-accent|text-accent-foreground|hover:bg-accent/
     );
   });
 
