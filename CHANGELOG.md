@@ -5,6 +5,14 @@
      5|The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
      6|and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.6.20] - 2026-06-07
+
+> Detected social profiles now use neutral panel chrome instead of accent-tinted framing.
+
+### Fixed
+
+- **Social suggestion panel neutrality (JOV-2889)**: replaces the detected-profile suggestion panel's accent border, background, and dividers with neutral System B surface tokens, and extends the focused chat/social style guard so accent panel chrome cannot return silently.
+
 ## [26.6.19] - 2026-06-07
 
 > Inline dashboard chat user bubbles now use neutral transcript chrome instead of accent fill.

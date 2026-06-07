@@ -26,7 +26,7 @@ export function SocialLinkSuggestionRows({
       <p className='text-app font-caption text-secondary-token'>
         Detected profiles
       </p>
-      <div className='rounded-lg border border-accent/20 bg-accent/5 divide-y divide-accent/10'>
+      <div className='rounded-lg border border-(--linear-app-frame-seam) bg-surface-0 divide-y divide-(--linear-border-subtle)'>
         {suggestions.map(suggestion => {
           const isActioning = actioningId === suggestion.id;
 

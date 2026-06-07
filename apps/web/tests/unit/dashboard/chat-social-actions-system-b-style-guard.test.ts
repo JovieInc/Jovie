@@ -9,12 +9,21 @@ const actionSourcePaths = [
   'components/features/dashboard/organisms/socials-form/SocialLinkSuggestionRows.tsx',
 ] as const;
 
+const socialSuggestionRowsSourcePath =
+  'components/features/dashboard/organisms/socials-form/SocialLinkSuggestionRows.tsx';
+
 const forbiddenCentralActionPatterns = [
   /bg-accent text-accent-foreground/,
   /hover:bg-accent\/90/,
   /text-on-accent/,
   /text-white/,
   /\bbg-(?:blue|purple|violet|indigo)-\d/,
+] as const;
+
+const forbiddenSuggestionPanelPatterns = [
+  /border-accent\/20/,
+  /bg-accent\/5/,
+  /divide-accent\/10/,
 ] as const;
 
 describe('chat social add action System B source contract', () => {
@@ -30,5 +39,23 @@ describe('chat social add action System B source contract', () => {
       expect(source).toContain('text-btn-primary-foreground');
       expect(source).toContain('hover:bg-btn-primary-hover');
     }
+  });
+
+  it('keeps the detected profile panel on neutral surface tokens', () => {
+    const source = readFileSync(
+      resolve(appRoot, socialSuggestionRowsSourcePath),
+      'utf8'
+    );
+
+    for (const pattern of forbiddenSuggestionPanelPatterns) {
+      expect(
+        source,
+        `${socialSuggestionRowsSourcePath} leaked ${pattern}`
+      ).not.toMatch(pattern);
+    }
+
+    expect(source).toContain('border-(--linear-app-frame-seam)');
+    expect(source).toContain('bg-surface-0');
+    expect(source).toContain('divide-(--linear-border-subtle)');
   });
 });
