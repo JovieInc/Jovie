@@ -1,6 +1,6 @@
 {
   "name": "@jovie/should-i-make",
-  "version": "26.6.24",
+  "version": "26.6.25",
   "private": true,
   "engines": {
     "node": ">=22.13.0"

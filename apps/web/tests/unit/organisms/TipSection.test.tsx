@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import type React from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -99,6 +100,35 @@ describe('TipSection', () => {
     expect(
       screen.getByRole('button', { name: 'Pay with Venmo' })
     ).toBeInTheDocument();
+  });
+
+  it('keeps the Venmo payment method action neutral with provider color only on the logo', () => {
+    render(
+      <PaySection
+        handle='artist123'
+        onStripePayment={mockOnStripePayment}
+        venmoLink='https://venmo.com/user'
+        onVenmoPayment={mockOnVenmoPayment}
+      />
+    );
+
+    const venmoButton = screen.getByRole('button', { name: 'Pay with Venmo' });
+    const venmoLogoClass = venmoButton
+      .querySelector('svg')
+      ?.getAttribute('class');
+
+    expect(venmoButton.className).toContain('bg-btn-primary');
+    expect(venmoButton.className).not.toContain('bg-[#008CFF]');
+    expect(venmoLogoClass).toContain('text-[#008CFF]');
+  });
+
+  it('keeps provider colors out of the payment method selector source', () => {
+    const source = readFileSync('components/organisms/PaySection.tsx', 'utf8');
+
+    expect(source).not.toContain('bg-[#008CFF]');
+    expect(source).not.toContain('transition-opacity hover:opacity-90');
+    expect(source).toContain('PAY_METHOD_BUTTON_CLASSES');
+    expect(source).toContain("VenmoLogo className='h-5 w-auto text-[#008CFF]'");
   });
 
   it('calls onVenmoPayment with a properly constructed URL when Venmo is used', () => {
