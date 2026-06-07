@@ -71,8 +71,8 @@ export default function ButtonsPage() {
         <Stack title='destructive'>
           <Button variant='destructive'>Delete</Button>
         </Stack>
-        <Stack title='accent'>
-          <Button variant='accent'>Upgrade</Button>
+        <Stack title='upgrade'>
+          <Button variant='primary'>Upgrade</Button>
         </Stack>
         <Stack title='link'>
           <Button variant='link'>Learn more</Button>

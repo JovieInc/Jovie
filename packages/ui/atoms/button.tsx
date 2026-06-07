@@ -13,7 +13,10 @@ const buttonVariants = cva(
         // Core variants — Linear-aligned shadows and radii
         primary:
           'border border-(--linear-btn-primary-border) bg-btn-primary text-btn-primary-foreground shadow-button-inset hover:border-(--linear-btn-primary-hover) hover:bg-(--linear-btn-primary-hover)',
-        accent: 'bg-accent text-accent-foreground hover:bg-accent/90',
+        // EVENT: central actions stay neutral; keep this legacy variant as a
+        // primary alias so old callers do not render accent-filled CTAs.
+        accent:
+          'border border-(--linear-btn-primary-border) bg-btn-primary text-btn-primary-foreground shadow-button-inset hover:border-(--linear-btn-primary-hover) hover:bg-(--linear-btn-primary-hover)',
         secondary:
           'border border-(--linear-border-subtle) bg-btn-secondary text-btn-secondary-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.04),0_1px_1px_rgba(0,0,0,0.08)] hover:border-(--linear-border-default) hover:bg-(--linear-btn-secondary-hover)',
         ghost:
