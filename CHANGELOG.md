@@ -5,6 +5,14 @@
      5|The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
      6|and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.6.16] - 2026-06-06
+
+> Dead homepage-era accent CTA components no longer survive outside the System B surface.
+
+### Removed
+
+- **Dead home accent actions (JOV-2885)**: removes unused `ArtistSearch`, `FeatureFlaggedArtistSearch`, and `WaitlistLink` components that still carried purple/blue filled central action styles, and adds a focused guard so those orphaned action recipes cannot return silently.
+
 ## [26.6.15] - 2026-06-06
 
 > Version-only release bumps no longer force expensive PR smoke runs.
