@@ -34,6 +34,7 @@ describe('Scope Judge workflow cost controls', () => {
     );
     expect(judgeStep).toContain('OPENROUTER_API_KEY');
     expect(judgeStep).toContain('OPENROUTER_MODEL: openai/gpt-oss-20b:free');
+    expect(judgeStep).toContain('for attempt in 1 2 3; do');
     expect(judgeStep).not.toContain('https://api.openai.com');
     expect(judgeStep).not.toContain('gpt-4o-mini');
   });

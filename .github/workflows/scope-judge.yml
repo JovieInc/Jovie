@@ -191,26 +191,42 @@ jobs:
 
           echo "Using OpenRouter model: $OPENROUTER_MODEL"
 
-          # Call OpenRouter API with a free model.
-          RESPONSE=$(curl -sS --max-time 30 https://openrouter.ai/api/v1/chat/completions \
-            -H "Authorization: Bearer $OPENROUTER_API_KEY" \
-            -H "Content-Type: application/json" \
-            -H "HTTP-Referer: https://github.com/${{ github.repository }}" \
-            -H "X-OpenRouter-Title: Jovie Scope Judge" \
-            -d "$(jq -n \
-              --arg model "$OPENROUTER_MODEL" \
-              --arg system "$JUDGE_PROMPT" \
-              --arg user "## TICKET INTENT\n$INTENT\n\n## CODE CHANGES\n$DIFF" \
-              '{
-                model: $model,
-                messages: [
-                  {role: "system", content: $system},
-                  {role: "user", content: $user}
-                ],
-                max_tokens: 200,
-                temperature: 0.1
-              }'
-            )")
+          call_openrouter() {
+            curl -sS --max-time 30 https://openrouter.ai/api/v1/chat/completions \
+              -H "Authorization: Bearer $OPENROUTER_API_KEY" \
+              -H "Content-Type: application/json" \
+              -H "HTTP-Referer: https://github.com/${{ github.repository }}" \
+              -H "X-OpenRouter-Title: Jovie Scope Judge" \
+              -d "$(jq -n \
+                --arg model "$OPENROUTER_MODEL" \
+                --arg system "$JUDGE_PROMPT" \
+                --arg user "## TICKET INTENT\n$INTENT\n\n## CODE CHANGES\n$DIFF" \
+                '{
+                  model: $model,
+                  messages: [
+                    {role: "system", content: $system},
+                    {role: "user", content: $user}
+                  ],
+                  max_tokens: 200,
+                  temperature: 0.1
+                }'
+              )"
+          }
+
+          RESPONSE=""
+          for attempt in 1 2 3; do
+            RESPONSE=$(call_openrouter)
+            if echo "$RESPONSE" | jq -e '.choices[0].message.content' >/dev/null 2>&1; then
+              echo "OpenRouter judge succeeded on attempt $attempt"
+              break
+            fi
+
+            API_ERROR=$(echo "$RESPONSE" | jq -r '.error.message // empty')
+            echo "OpenRouter judge attempt $attempt failed: ${API_ERROR:-unknown error}"
+            if [[ "$attempt" -lt 3 ]]; then
+              sleep $((attempt * 2))
+            fi
+          done
 
           # Extract verdict
           CONTENT=$(echo "$RESPONSE" | jq -r '.choices[0].message.content // .error.message // "ERROR: No response"')
