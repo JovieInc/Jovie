@@ -14,6 +14,7 @@ import {
   Mic2,
   Music,
   PanelLeft,
+  PanelRight,
   Play,
   Radio,
   Search,
@@ -129,6 +130,14 @@ export const KEYBOARD_SHORTCUTS: KeyboardShortcut[] = [
     icon: PanelLeft,
     shortcutKey: 'Meta+b',
     decision: { status: 'required', binding: 'useSidebarKeyboardShortcut' },
+  },
+  {
+    id: 'toggle-right-rail',
+    label: 'Toggle right rail',
+    keys: ']',
+    category: 'general',
+    icon: PanelRight,
+    decision: { status: 'required', binding: 'useRightRailKeyboardShortcut' },
   },
 
   // Navigation shortcuts (G then letter)
