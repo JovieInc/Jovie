@@ -79,7 +79,7 @@ describe('AppShellFrame', () => {
     );
   });
 
-  it('wraps the right panel in the shared AppShellRightRail slot', () => {
+  it('keeps the right rail outside the non-scrolling shell clip', () => {
     render(
       <AppShellFrame
         sidebar={<aside>Sidebar</aside>}
@@ -92,6 +92,8 @@ describe('AppShellFrame', () => {
     const scrollPane = screen.getByTestId('app-shell-scroll');
     const rightRail = screen.getByTestId('app-shell-right-rail');
 
+    expect(scrollPane).toHaveClass('overflow-hidden');
+    expect(scrollPane).not.toHaveClass('overflow-y-auto');
     expect(scrollPane).toContainElement(screen.getByText('Main Content'));
     expect(scrollPane).not.toContainElement(rightRail);
     expect(rightRail).toContainElement(
