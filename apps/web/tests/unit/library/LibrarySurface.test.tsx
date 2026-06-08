@@ -241,6 +241,25 @@ describe('LibrarySurface', () => {
     expect(source).toContain('system-b-library-dropzone--dragging');
   });
 
+  it('aligns library grid and list insets with the shell header padding contract', () => {
+    const source = readFileSync(
+      resolve(process.cwd(), LIBRARY_SURFACE_SOURCE),
+      'utf8'
+    );
+
+    expect(source).toContain('LIBRARY_CONTENT_INSET_CLASS');
+    expect(source).toContain(
+      'px-(--linear-app-header-padding-x) py-(--linear-app-content-padding-y)'
+    );
+    expect(source).toContain('LIBRARY_GRID_LAYOUT_CLASS');
+    expect(source).toContain(
+      'grid gap-3 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4'
+    );
+    expect(source).toContain('px-(--linear-app-header-padding-x) sm:flex');
+    expect(source).not.toContain('px-2.5 pb-2.5 pt-1');
+    expect(source).not.toMatch(/grid gap-2\.5/u);
+  });
+
   it('renders an empty read-only library state with a releases escape hatch', () => {
     renderLibrary([]);
 
