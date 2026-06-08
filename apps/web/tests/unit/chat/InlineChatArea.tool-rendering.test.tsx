@@ -307,7 +307,7 @@ describe('InlineChatArea tool invocation rendering', () => {
     const textNode = screen.getByText('Keep this quiet and neutral');
     const bubble = textNode.parentElement;
 
-    expect(bubble?.className).toContain('bg-surface-1');
+    expect(bubble?.className).toContain('bg-surface-0');
     expect(bubble?.className).toContain('text-primary-token');
     expect(bubble?.className).not.toContain('bg-accent');
     expect(bubble?.className).not.toContain('text-accent-foreground');
