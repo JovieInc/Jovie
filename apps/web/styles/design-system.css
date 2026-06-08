@@ -202,6 +202,17 @@
   max-width: min(var(--profile-shell-max-width), 100%);
 }
 
+/* Short-viewport home hero: reserve room for the showcase release card below. */
+[data-testid="profile-compact-surface"][data-mode="profile"] {
+  @media (max-height: 880px) and (min-height: 761px) {
+    --cover-height: clamp(214px, 36svh, 218px);
+  }
+
+  @media (max-height: 760px) {
+    --cover-height: 178px;
+  }
+}
+
 @media (min-width: 768px) {
   .public-profile-compact-shell {
     --cover-height: 340px;
@@ -5759,6 +5770,7 @@ body:has(.system-b-download-page) .marketing-glass-header__cta:focus-visible {
   font-weight: var(--font-weight-semibold);
 }
 
+:where(.system-b-library-filter-pill),
 :where(.system-b-library-rail-count),
 :where(.system-b-library-clear-button),
 :where(.system-b-library-filter-count),
@@ -5840,6 +5852,24 @@ body:has(.system-b-download-page) .marketing-glass-header__cta:focus-visible {
 
 :where(.system-b-library-filter-dot) {
   border-radius: var(--radius-full);
+}
+
+:where(.system-b-library-filter-pill) {
+  font-size: var(--text-2xs);
+}
+
+:where(.system-b-library-filter-pill-active) {
+  background: var(--color-bg-surface-1);
+  color: var(--color-text-primary-token);
+}
+
+:where(.system-b-library-filter-pill-idle) {
+  color: var(--color-text-tertiary-token);
+}
+
+:where(.system-b-library-filter-pill-idle:hover) {
+  background: var(--system-b-bg-surface-1);
+  color: var(--color-text-primary-token);
 }
 
 :where(.system-b-library-kind-pill),

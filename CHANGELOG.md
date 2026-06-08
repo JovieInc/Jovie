@@ -5,6 +5,14 @@
      5|The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
      6|and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.6.29] - 2026-06-08
+
+> Tasks now use the same shell header search entry as Releases and Library.
+
+### Changed
+
+- **App-wide search entry (JOV-2644)**: routes task title search through the shared `useRegisterHeaderSearch` header pill surface, removes the duplicate `HeaderSearchAction` from the tasks workspace toolbar, and adds guardrails so tasks stay on the canonical shell header search contract.
+
 ## [26.6.28] - 2026-06-07
 
 > Admin settings headings now use the quiet app-scale typography instead of tracked all-caps or oversized display sizes.
