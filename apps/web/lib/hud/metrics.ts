@@ -2,11 +2,13 @@ import 'server-only';
 
 import { getAdminMercuryMetrics } from '@/lib/admin/mercury-metrics';
 import { getAdminReliabilitySummary } from '@/lib/admin/overview';
+import { getAdminSentryMetrics } from '@/lib/admin/sentry-metrics';
 import { getAdminStripeOverviewMetrics } from '@/lib/admin/stripe-metrics';
 import { checkDbHealth } from '@/lib/db';
 import { getHudDeployments } from '@/lib/deployments/github';
 import { env } from '@/lib/env-server';
 import { getHudAiOpsSummary } from '@/lib/hud/ai-ops';
+import { buildHudMetricSources } from '@/lib/hud/source-trust';
 import type { HudAccessMode, HudMetrics } from '@/types/hud';
 
 function normalizeIso(value: unknown): string {
@@ -138,6 +140,7 @@ export async function getHudMetrics(mode: HudAccessMode): Promise<HudMetrics> {
     stripeMetrics,
     mercuryMetrics,
     reliabilitySummary,
+    sentryMetrics,
     dbHealth,
     deployments,
     aiOps,
@@ -145,6 +148,7 @@ export async function getHudMetrics(mode: HudAccessMode): Promise<HudMetrics> {
     getAdminStripeOverviewMetrics(),
     getAdminMercuryMetrics(),
     getAdminReliabilitySummary(),
+    getAdminSentryMetrics(),
     checkDbHealth(),
     getHudDeployments(),
     getHudAiOpsSummary(generatedAt),
@@ -172,6 +176,23 @@ export async function getHudMetrics(mode: HudAccessMode): Promise<HudMetrics> {
     }
     return null;
   })();
+
+  const fetchedAtIso = generatedAt.toISOString();
+  const sources = buildHudMetricSources({
+    stripe: stripeMetrics,
+    mercury: mercuryMetrics,
+    sentry: sentryMetrics,
+    operations: {
+      status: dbHealth.healthy ? 'ok' : 'degraded',
+      dbLatencyMs: dbHealth.latency ?? null,
+      checkedAtIso: fetchedAtIso,
+    },
+    deployments,
+    fetchedAtIso,
+    sentryOrgSlug: env.SENTRY_ORG_SLUG,
+    githubOwner: env.HUD_GITHUB_OWNER,
+    githubRepo: env.HUD_GITHUB_REPO,
+  });
 
   return {
     accessMode: mode,
@@ -203,6 +224,7 @@ export async function getHudMetrics(mode: HudAccessMode): Promise<HudMetrics> {
     },
     deployments,
     aiOps,
-    generatedAtIso: generatedAt.toISOString(),
+    sources,
+    generatedAtIso: fetchedAtIso,
   };
 }
