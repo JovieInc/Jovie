@@ -275,8 +275,17 @@ describe('ChatMessage', () => {
                 concept: 'Cover art on heavyweight black fleece.',
                 mockup_urls: ['https://cdn.example.com/hoodie.png'],
                 price_recommendation: {
-                  retail_price: '$68.00',
-                  artist_share: '$22.00',
+                  sale_price: '$68.00',
+                  profit: '$22.00',
+                  margin_preset: 'standard',
+                  presets: [
+                    {
+                      preset: 'standard',
+                      label: 'Standard',
+                      sale_price: '$68.00',
+                      profit: '$22.00',
+                    },
+                  ],
                 },
               },
             ],

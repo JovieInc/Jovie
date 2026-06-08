@@ -88,6 +88,7 @@ describe('ProfileMerchCard', () => {
       screen.getByRole('heading', { name: 'Static Bloom Tee' })
     ).toBeInTheDocument();
     expect(screen.getByText('$45.00')).toBeInTheDocument();
+    expect(screen.getByText('Profit $11.87')).toBeInTheDocument();
     expect(screen.getByAltText('Static Bloom Tee')).toHaveAttribute(
       'src',
       'https://cdn.test/mockup.jpg'

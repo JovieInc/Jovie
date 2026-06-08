@@ -12,6 +12,29 @@ export const MERCH_TARGET_JOVIE_MARGIN_CENTS = 800;
 export const MERCH_TARGET_JOVIE_MARGIN_RATE_BPS = 1500;
 export const MERCH_PRINTFUL_COST_MAX_AGE_MS = 24 * 60 * 60 * 1000;
 
+export type MerchMarginPreset = 'safe' | 'standard' | 'aggressive';
+
+export const MERCH_DEFAULT_MARGIN_PRESET: MerchMarginPreset = 'standard';
+
+export const MERCH_MARGIN_PRESET_OPTIONS: readonly {
+  readonly id: MerchMarginPreset;
+  readonly label: string;
+  readonly markupBps: number;
+}[] = [
+  { id: 'safe', label: 'Safe', markupBps: 4_500 },
+  { id: 'standard', label: 'Standard', markupBps: 6_500 },
+  { id: 'aggressive', label: 'Aggressive', markupBps: 9_000 },
+] as const;
+
+export interface MerchPresetPriceQuote {
+  readonly preset: MerchMarginPreset;
+  readonly label: string;
+  readonly salePriceCents: number;
+  readonly profitCents: number;
+  readonly salePrice: string;
+  readonly profit: string;
+}
+
 export interface MerchEconomicsInput {
   readonly currency?: string;
   readonly retailPriceCents: number;
@@ -104,6 +127,107 @@ export function getJovieTargetMarginCents(retailPriceCents: number): number {
   return Math.max(MERCH_TARGET_JOVIE_MARGIN_CENTS, rateTarget);
 }
 
+export function getArtistProfitCents(pricing: MerchPricingSnapshot): number {
+  return pricing.artistPayoutPerUnitEstimateCents;
+}
+
+function roundSalePriceToWholeDollar(cents: number): number {
+  return Math.max(100, Math.ceil(cents / 100) * 100);
+}
+
+function getPresetMarkupBps(preset: MerchMarginPreset): number {
+  const option = MERCH_MARGIN_PRESET_OPTIONS.find(item => item.id === preset);
+  return option?.markupBps ?? MERCH_MARGIN_PRESET_OPTIONS[1].markupBps;
+}
+
+export function calculateRecommendedSalePriceCents(
+  printfulProductCostCents: number,
+  preset: MerchMarginPreset = MERCH_DEFAULT_MARGIN_PRESET,
+  overrides?: {
+    readonly shippingCostCents?: number;
+    readonly refundReserveCents?: number;
+    readonly artistRoyaltyRateBps?: number;
+    readonly printfulCostSource?: MerchPricingSnapshot['printfulCostSource'];
+    readonly printfulCostUpdatedAt?: string | null;
+  }
+): number {
+  assertNonNegativeInteger(
+    printfulProductCostCents,
+    'printfulProductCostCents'
+  );
+
+  const shippingCostCents =
+    overrides?.shippingCostCents ?? MERCH_DEFAULT_SHIPPING_CENTS;
+  const refundReserveCents =
+    overrides?.refundReserveCents ?? MERCH_DEFAULT_REFUND_RESERVE_CENTS;
+  const markupBps = getPresetMarkupBps(preset);
+  const loadedBaseCents =
+    printfulProductCostCents + shippingCostCents + refundReserveCents;
+  let candidate = roundSalePriceToWholeDollar(
+    loadedBaseCents + Math.ceil((loadedBaseCents * markupBps) / 10_000)
+  );
+
+  for (let attempt = 0; attempt < 12; attempt += 1) {
+    const snapshot = buildMerchPricingSnapshot({
+      retailPriceCents: candidate,
+      printfulProductCostCents,
+      shippingCostCents,
+      refundReserveCents,
+      artistRoyaltyRateBps: overrides?.artistRoyaltyRateBps,
+      printfulCostSource: overrides?.printfulCostSource,
+      printfulCostUpdatedAt: overrides?.printfulCostUpdatedAt,
+    });
+    const marginFloor = getJovieMarginFloorCents(candidate);
+    const clearsFloor =
+      snapshot.jovieMarginPerUnitEstimateCents >= marginFloor &&
+      snapshot.artistPayoutPerUnitEstimateCents > 0 &&
+      candidate > printfulProductCostCents;
+
+    if (clearsFloor) {
+      return candidate;
+    }
+
+    candidate += 100;
+  }
+
+  return candidate;
+}
+
+export function buildMerchPresetPriceQuotes(params: {
+  readonly printfulProductCostCents: number;
+  readonly shippingCostCents?: number;
+  readonly refundReserveCents?: number;
+  readonly artistRoyaltyRateBps?: number;
+  readonly printfulCostSource?: MerchPricingSnapshot['printfulCostSource'];
+  readonly printfulCostUpdatedAt?: string | null;
+}): readonly MerchPresetPriceQuote[] {
+  return MERCH_MARGIN_PRESET_OPTIONS.map(option => {
+    const salePriceCents = calculateRecommendedSalePriceCents(
+      params.printfulProductCostCents,
+      option.id,
+      params
+    );
+    const snapshot = buildMerchPricingSnapshot({
+      retailPriceCents: salePriceCents,
+      printfulProductCostCents: params.printfulProductCostCents,
+      shippingCostCents: params.shippingCostCents,
+      refundReserveCents: params.refundReserveCents,
+      artistRoyaltyRateBps: params.artistRoyaltyRateBps,
+      printfulCostSource: params.printfulCostSource,
+      printfulCostUpdatedAt: params.printfulCostUpdatedAt,
+    });
+
+    return {
+      preset: option.id,
+      label: option.label,
+      salePriceCents,
+      profitCents: getArtistProfitCents(snapshot),
+      salePrice: formatMerchMoney(salePriceCents),
+      profit: formatMerchMoney(getArtistProfitCents(snapshot)),
+    };
+  });
+}
+
 function parseFreshnessDate(value: Date | string | null | undefined): number {
   if (!value) return Number.NaN;
   const date = value instanceof Date ? value : new Date(value);
@@ -191,11 +315,22 @@ export function buildMerchPricingSnapshot(params?: {
   readonly printfulCostSource?: MerchPricingSnapshot['printfulCostSource'];
   readonly printfulCostUpdatedAt?: string | null;
 }): MerchPricingSnapshot {
-  const retailPriceCents =
-    params?.retailPriceCents ?? MERCH_DEFAULT_RETAIL_PRICE_CENTS;
   const estimatedPrintfulProductCostCents =
     params?.printfulProductCostCents ??
     MERCH_DEFAULT_PRINTFUL_PRODUCT_COST_CENTS;
+  const retailPriceCents =
+    params?.retailPriceCents ??
+    calculateRecommendedSalePriceCents(
+      estimatedPrintfulProductCostCents,
+      MERCH_DEFAULT_MARGIN_PRESET,
+      {
+        shippingCostCents: params?.shippingCostCents,
+        refundReserveCents: params?.refundReserveCents,
+        artistRoyaltyRateBps: params?.artistRoyaltyRateBps,
+        printfulCostSource: params?.printfulCostSource,
+        printfulCostUpdatedAt: params?.printfulCostUpdatedAt,
+      }
+    );
   const estimatedShippingCostCents =
     params?.shippingCostCents ?? MERCH_DEFAULT_SHIPPING_CENTS;
   const refundReserveCents =

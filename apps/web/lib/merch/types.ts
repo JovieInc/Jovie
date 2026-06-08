@@ -44,14 +44,16 @@ export interface MerchGenerationOptionView {
     | 'sublimation'
     | 'other';
   readonly price_recommendation: {
-    readonly retail_price: string;
-    readonly estimated_printful_cost: string;
-    readonly estimated_shipping: string;
-    readonly estimated_gross_margin: string;
-    readonly artist_share: string;
-    readonly jovie_share: string;
-    readonly minimum_jovie_margin?: string;
-    readonly target_jovie_margin?: string;
+    readonly sale_price: string;
+    readonly profit: string;
+    readonly margin_preset: 'safe' | 'standard' | 'aggressive';
+    readonly presets: readonly {
+      readonly preset: 'safe' | 'standard' | 'aggressive';
+      readonly label: string;
+      readonly sale_price: string;
+      readonly profit: string;
+    }[];
+    readonly estimated_printful_cost?: string;
   };
   readonly sellability?: {
     readonly sellable: boolean;
