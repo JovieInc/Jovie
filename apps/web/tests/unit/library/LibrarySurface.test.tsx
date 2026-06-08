@@ -91,6 +91,7 @@ vi.mock('@vercel/blob/client', () => ({
 vi.mock('next/navigation', () => ({
   useRouter: () => ({
     push: vi.fn(),
+    replace: vi.fn(),
     refresh: navigationMock.refresh,
   }),
   useSearchParams: () => navigationMock.searchParams,
@@ -230,7 +231,7 @@ describe('LibrarySurface', () => {
 
     expect(source).toContain('border-success/20 bg-success/10 text-success');
     expect(source).toContain('border-info/20 bg-info/10 text-info');
-    expect(source).toContain('system-b-library-rail-button--active');
+    expect(source).toContain('system-b-library-filter-pill-active');
     expect(source).toContain('system-b-library-card--selected');
     expect(source).toContain('system-b-library-table-row-selected');
     expect(source).toContain('system-b-library-dropzone--dragging');
@@ -566,7 +567,7 @@ describe('LibrarySurface', () => {
     ).not.toBeInTheDocument();
   });
 
-  it('filters library assets from the Library navigation', async () => {
+  it('filters library assets from top-level view chips', async () => {
     renderLibrary([
       buildAsset(),
       buildAsset({
@@ -583,7 +584,7 @@ describe('LibrarySurface', () => {
       }),
     ]);
 
-    fireEvent.click(screen.getByRole('button', { name: 'Show filters' }));
+    expect(screen.getByTestId('library-view-filter-chips')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: /Audio/u }));
 
     await waitFor(() => {
@@ -623,15 +624,16 @@ describe('LibrarySurface', () => {
     expect(contract).toHaveAttribute('data-key', 'library');
     expect(contract).toHaveAttribute('data-back-href', APP_ROUTES.CHAT);
     expect(contract).toHaveAttribute('data-back-label', 'Back to App');
+    expect(screen.getByTestId('library-view-filter-chips')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Merch/u })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Audio/u })).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Show filters' }));
     expect(
-      screen.getByRole('navigation', { name: 'Library navigation' })
+      screen.getByRole('navigation', { name: 'Library filters' })
     ).toBeInTheDocument();
     expect(
       screen.queryByRole('button', { name: /All Releases/u })
     ).not.toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /Merch/u })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /Audio/u })).toBeInTheDocument();
   });
 
   it('keeps library filters reachable on desktop without taking over the shell sidebar', async () => {
