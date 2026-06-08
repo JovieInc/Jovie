@@ -151,148 +151,26 @@ jobs:
         run: |
           node <<'NODE'
           const fs = require('node:fs');
+          const {
+            DEFAULT_RESULT_FILES,
+            formatGithubOutput,
+            parseSyntheticTestResults,
+          } = require('./.github/scripts/parse-synthetic-test-results.js');
+
           const legacyCanaryEnabled = process.env.LEGACY_CANARY_ENABLED === '1';
+          const result = parseSyntheticTestResults({
+            resultFiles: DEFAULT_RESULT_FILES(legacyCanaryEnabled),
+          });
 
-          const resultFiles = [
-            {
-              name: 'synthetic-auth-ui',
-              path: 'apps/web/test-results/synthetic-auth-ui-results.json',
-              required: true,
-            },
-            {
-              name: 'synthetic-golden-path',
-              path: 'apps/web/test-results/synthetic-golden-path-results.json',
-              required: true,
-            },
-            {
-              name: 'onboarding-robot-full',
-              path: 'apps/web/test-results/onboarding-robot-full-results.json',
-              required: true,
-            },
-            {
-              name: 'public-profile-smoke',
-              path: 'apps/web/test-results/public-profile-smoke-results.json',
-              required: true,
-            },
-            {
-              // Optional — legacy OTP canary is gated at the workflow level on
-              // `E2E_PROD_LEGACY_CANARY` (JOV-2446). When the step is skipped,
-              // no results file is produced and we must NOT treat that as an
-              // error.
-              name: 'synthetic-legacy-otp',
-              path: 'apps/web/test-results/synthetic-legacy-otp-results.json',
-              required: legacyCanaryEnabled,
-            },
-          ];
-          const outputFile = process.env.GITHUB_OUTPUT;
-
-          function emit(line) {
-            if (outputFile) {
-              fs.appendFileSync(outputFile, `${line}\n`);
-            } else {
-              console.log(line);
-            }
-          }
-
-          function emitMultiline(name, lines) {
-            emit(`${name}<<EOF`);
-            for (const line of lines) emit(line);
-            emit('EOF');
-          }
-
-          const specs = [];
-          const missingResults = [];
-
-          function collectSpecs(suites = [], source) {
-            for (const suite of suites) {
-              specs.push(
-                ...(suite.specs ?? []).map(spec => ({ source, spec }))
-              );
-              collectSpecs(suite.suites ?? [], source);
-            }
-          }
-
-          for (const resultFile of resultFiles) {
-            if (!fs.existsSync(resultFile.path)) {
-              if (resultFile.required !== false) {
-                missingResults.push(
-                  `${resultFile.name}: Test results file not found (${resultFile.path})`
-                );
-              } else {
-                console.log(
-                  `${resultFile.name}: optional results not produced (step likely skipped); ignoring.`
-                );
-              }
-              continue;
-            }
-
-            try {
-              const results = JSON.parse(
-                fs.readFileSync(resultFile.path, 'utf8')
-              );
-              collectSpecs(results.suites ?? [], resultFile.name);
-            } catch (error) {
-              missingResults.push(
-                `${resultFile.name}: Failed to parse ${resultFile.path}: ${error.message}`
-              );
-            }
-          }
-
-          const tests = specs.flatMap(({ source, spec }) =>
-            (spec.tests ?? []).map(testCase => ({ source, spec, testCase }))
-          );
-          const skipped = tests.filter(({ testCase }) =>
-            testCase.status === 'skipped' ||
-            (testCase.results ?? []).some(result => result.status === 'skipped')
-          );
-          const warnings = tests.flatMap(({ source, spec, testCase }) =>
-            (testCase.results ?? []).flatMap(result =>
-              [...(result.stdout ?? []), ...(result.stderr ?? [])]
-                .map(entry => entry.text ?? '')
-                .filter(text => text.includes('[Synthetic][warning]'))
-                .map(text => `${source}: ${spec.title}: ${text.trim()}`)
-            )
-          );
-          const flaky = tests.filter(({ testCase }) => testCase.status === 'flaky');
-          const failed = tests.filter(
-            ({ testCase }) => testCase.status === 'unexpected'
-          );
-          const passed = tests.filter(
-            ({ testCase }) =>
-              ['expected', 'flaky'].includes(testCase.status) &&
-              !(testCase.results ?? []).some(result => result.status === 'skipped')
-          );
-
-          emit(`total_tests=${tests.length}`);
-          emit(`passed_tests=${passed.length}`);
-          emit(`flaky_tests=${flaky.length}`);
-          emit(`skipped_tests=${skipped.length}`);
-          emit(`warning_count=${warnings.length}`);
-
-          const details = [
-            ...missingResults,
-            ...failed.map(({ source, spec }) => `${source}: ${spec.title}`),
-            ...(skipped.length > 0
-              ? [
-                  'Skipped tests:',
-                  ...skipped.map(({ source, spec }) => `${source}: ${spec.title}`),
-                ]
-              : []),
-          ];
-          emitMultiline('failed_tests', details);
-          emitMultiline('test_warnings', warnings);
-          for (const warning of warnings) {
+          for (const warning of result.testWarnings) {
             console.log(`::warning::${warning}`);
           }
 
-          if (missingResults.length > 0 || tests.length === 0) {
-            emit('test_status=error');
-          } else if (failed.length > 0 || skipped.length > 0) {
-            emit('test_status=failed');
-          } else if (passed.length === tests.length) {
-            emit('test_status=passed');
+          const outputFile = process.env.GITHUB_OUTPUT;
+          if (outputFile) {
+            fs.appendFileSync(outputFile, formatGithubOutput(result));
           } else {
-            emit('test_status=error');
+            process.stdout.write(formatGithubOutput(result));
           }
           NODE
 
