@@ -5,6 +5,14 @@
      5|The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
      6|and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.6.26] - 2026-06-07
+
+> Main CI health monitoring works again without failing on Jovie Bot token creation.
+
+### Fixed
+
+- **Main CI health monitor token permissions (JOV-2779)**: removes the Jovie Bot app-token step that requested Actions write (not granted on the installation), keeps the monitor job read-only for evaluation and Slack alerts, and moves one-shot auto-rerun into a separate job with scoped `GITHUB_TOKEN` write access.
+
 ## [26.6.25] - 2026-06-07
 
 > The Venmo payment method selector now uses neutral action chrome with provider color only on the logo.
