@@ -39,6 +39,25 @@ const INVESTOR_TABLE_PRIMITIVES = findSourceFile(
   )
 );
 
+const INVESTOR_SETTINGS_PAGE = findSourceFile(
+  resolve(process.cwd(), 'app/app/(shell)/admin/investors/settings/page.tsx'),
+  resolve(
+    process.cwd(),
+    'apps/web/app/app/(shell)/admin/investors/settings/page.tsx'
+  )
+);
+
+const INVESTOR_SETTINGS_FORM = findSourceFile(
+  resolve(
+    process.cwd(),
+    'app/app/(shell)/admin/investors/settings/InvestorSettingsForm.tsx'
+  ),
+  resolve(
+    process.cwd(),
+    'apps/web/app/app/(shell)/admin/investors/settings/InvestorSettingsForm.tsx'
+  )
+);
+
 describe('admin investor shell normalization', () => {
   it('keeps investor tables on the local shared table primitives', () => {
     const pageSource = readFileSync(INVESTORS_PAGE, 'utf8');
@@ -83,5 +102,29 @@ describe('admin investor shell normalization', () => {
 
     expect(sources).not.toMatch(/uppercase\s+tracking-/);
     expect(sources).not.toMatch(/tracking-\[/);
+  });
+
+  it('keeps investor pipeline chrome out of nested section headers', () => {
+    const pageSource = readFileSync(INVESTORS_PAGE, 'utf8');
+    const linksSource = readFileSync(INVESTOR_LINKS_MANAGER, 'utf8');
+
+    expect(pageSource).not.toContain('ContentSectionHeader');
+    expect(linksSource).not.toContain('ContentSectionHeader');
+    expect(pageSource).not.toMatch(
+      /rounded-full border border-subtle bg-surface-0/
+    );
+    expect(linksSource).not.toMatch(
+      /rounded-full border border-subtle bg-surface-0/
+    );
+  });
+
+  it('routes investor settings navigation through the admin page shell', () => {
+    const settingsPageSource = readFileSync(INVESTOR_SETTINGS_PAGE, 'utf8');
+    const settingsFormSource = readFileSync(INVESTOR_SETTINGS_FORM, 'utf8');
+
+    expect(settingsPageSource).toContain('APP_ROUTES.ADMIN_INVESTORS');
+    expect(settingsPageSource).toContain('actions={');
+    expect(settingsFormSource).not.toContain('Investor portal settings');
+    expect(settingsFormSource).not.toContain('Loading settings');
   });
 });

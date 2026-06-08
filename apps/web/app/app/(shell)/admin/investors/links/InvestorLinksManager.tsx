@@ -7,7 +7,6 @@ import {
   CheckCircle2,
   CircleSlash,
   Copy,
-  Link2,
   Loader2,
   Plus,
   Trash2,
@@ -18,7 +17,6 @@ import { toast } from 'sonner';
 import { Icon } from '@/components/atoms/Icon';
 import { TableActionMenu } from '@/components/atoms/table-action-menu/TableActionMenu';
 import { ConfirmDialog } from '@/components/molecules/ConfirmDialog';
-import { ContentSectionHeader } from '@/components/molecules/ContentSectionHeader';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import {
   DrawerButton,
@@ -499,10 +497,6 @@ export function InvestorLinksManager() {
   if (loading) {
     return (
       <ContentSurfaceCard className='overflow-hidden p-0'>
-        <ContentSectionHeader
-          title='Loading investor links'
-          subtitle='Preparing link manager.'
-        />
         <div className='space-y-2 px-3 py-3'>
           {Array.from({ length: 4 }, (_, i) => (
             <div
@@ -539,46 +533,22 @@ export function InvestorLinksManager() {
   return (
     <>
       <ContentSurfaceCard className='overflow-hidden p-0'>
-        <ContentSectionHeader
-          title='Manage investor links'
-          className='flex-col items-start gap-2 py-3 sm:flex-row sm:items-center sm:gap-2 sm:py-1.5'
-          titleClassName='overflow-visible whitespace-normal sm:overflow-hidden sm:whitespace-nowrap'
-          actionsClassName='ml-0 w-full justify-end sm:ml-auto sm:w-auto'
-          subtitle={(() => {
-            if (links.length === 0)
-              return 'Create shareable entry points into the investor portal.';
-            const plural = links.length === 1 ? '' : 's';
-            return `${links.length} link${plural} in your pipeline.`;
-          })()}
-          actions={
-            <div className='flex items-center gap-2'>
-              <Button variant='secondary' size='sm' asChild>
-                <Link href={APP_ROUTES.ADMIN_INVESTORS}>
-                  <ArrowLeft className='mr-1.5 h-3.5 w-3.5' />
-                  Pipeline
-                </Link>
-              </Button>
-              <Button size='sm' onClick={() => setCreateDialogOpen(true)}>
-                <Plus className='mr-1.5 h-3.5 w-3.5' />
-                Create link
-              </Button>
-            </div>
-          }
-        />
+        <div className='flex items-center justify-end gap-2 px-3 py-2'>
+          <Button variant='secondary' size='sm' asChild>
+            <Link href={APP_ROUTES.ADMIN_INVESTORS}>
+              <ArrowLeft className='mr-1.5 h-3.5 w-3.5' />
+              Pipeline
+            </Link>
+          </Button>
+          <Button size='sm' onClick={() => setCreateDialogOpen(true)}>
+            <Plus className='mr-1.5 h-3.5 w-3.5' />
+            Create link
+          </Button>
+        </div>
 
         {links.length === 0 ? (
-          <div className='flex flex-col items-center gap-3 px-6 py-10 text-center'>
-            <div className='flex h-11 w-11 items-center justify-center rounded-full border border-subtle bg-surface-0 text-secondary-token'>
-              <Link2 className='h-4 w-4' aria-hidden='true' />
-            </div>
-            <p className='max-w-md text-app leading-[19px] text-secondary-token'>
-              Each investor link is a unique, token-gated entry point to your
-              portal. Create one per investor for personalized tracking.
-            </p>
-            <Button size='sm' onClick={() => setCreateDialogOpen(true)}>
-              <Plus className='mr-1.5 h-3.5 w-3.5' />
-              Create your first link
-            </Button>
+          <div className='px-(--linear-app-header-padding-x) py-6 text-app text-secondary-token'>
+            No investor links yet.
           </div>
         ) : (
           <InvestorTable minWidth='min-w-[700px]'>
