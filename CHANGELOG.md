@@ -5,6 +5,14 @@
      5|The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
      6|and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.6.28] - 2026-06-07
+
+> Admin settings headings now use the quiet app-scale typography instead of tracked all-caps or oversized display sizes.
+
+### Fixed
+
+- **Admin settings heading typography (JOV-2102)**: normalizes `/app/settings/admin` and admin settings surfaces onto `text-app font-[540]` row and panel headings, removes tracked eyebrow styling from campaign settings metrics, and replaces the oversized effective-rate display with compact settings-scale copy.
+
 ## [26.6.27] - 2026-06-07
 
 > Admin investor pipeline surfaces now lean on the shared page shell instead of nested section chrome.
