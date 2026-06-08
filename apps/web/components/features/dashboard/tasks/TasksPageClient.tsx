@@ -71,8 +71,12 @@ import {
   type TableNavAction,
 } from '@/components/organisms/table/utils/tableKeyMap';
 import { useViewMode } from '@/components/organisms/table/utils/useViewMode';
+import type { FilterPill } from '@/components/shell/pill-search.types';
 import { APP_ROUTES } from '@/constants/routes';
-import { useRegisterHeaderActions } from '@/contexts/HeaderActionsContext';
+import {
+  useRegisterHeaderActions,
+  useRegisterHeaderSearch,
+} from '@/contexts/HeaderActionsContext';
 import { useBreakpoint } from '@/hooks/useBreakpoint';
 import { useIsomorphicLayoutEffect } from '@/hooks/useIsomorphicLayoutEffect';
 import { useMediaQuery } from '@/hooks/useMediaQuery';
@@ -121,6 +125,7 @@ import {
   TaskSubviewTabs,
   TaskWorkspaceHeaderBar,
 } from './TaskWorkspaceHeaderBar';
+import { distinctTaskTitles, taskSearchFromPills } from './task-header-search';
 import {
   getTaskAssigneeVisual,
   getTaskPriorityVisual,
@@ -1349,7 +1354,7 @@ export function TasksPageClient() {
     '(min-width: 1720px)'
   );
   const [headerMode, setHeaderMode] = useState<'default' | 'create'>('default');
-  const [search, setSearch] = useState('');
+  const [pills, setPills] = useState<FilterPill[]>([]);
   const [statusFilter, setStatusFilter] = useState<TaskStatus | 'all'>('all');
   const [priorityFilter, setPriorityFilter] = useState<TaskPriority | 'all'>(
     'all'
@@ -1370,7 +1375,11 @@ export function TasksPageClient() {
   const [editorTitle, setEditorTitle] = useState('');
   const [editorDescription, setEditorDescription] = useState('');
   const latestSelectedTaskIdRef = useRef<string | null>(null);
-  const deferredSearch = useDeferredValue(search);
+  const deferredPills = useDeferredValue(pills);
+  const searchFilter = useMemo(
+    () => taskSearchFromPills(deferredPills),
+    [deferredPills]
+  );
   const { viewMode, setViewMode } = useViewMode({
     storageKey: 'jovie-dashboard-tasks-view-mode',
     defaultMode: 'list',
@@ -1394,7 +1403,6 @@ export function TasksPageClient() {
     profileId ?? '',
     selectedReleaseId ?? ''
   );
-  const searchFilter = deferredSearch.trim();
   const listFilters = useMemo<TaskFilters>(
     () => ({
       limit: 100,
@@ -1530,7 +1538,7 @@ export function TasksPageClient() {
     Boolean(selectedReleaseId) && !canShowTaskDocumentAlongsideReleaseSidebar;
   const artistName = resolveArtistName(selectedProfile);
   const hasFilters =
-    Boolean(deferredSearch.trim()) ||
+    pills.length > 0 ||
     statusFilter !== 'all' ||
     priorityFilter !== 'all' ||
     assigneeFilter !== 'human';
@@ -1546,7 +1554,7 @@ export function TasksPageClient() {
     !shouldPrioritizeRightPanel &&
     ((isDesktopTaskLayout && viewMode !== 'board') || Boolean(selectedTask));
   const clearFilters = useCallback(() => {
-    setSearch('');
+    setPills([]);
     setStatusFilter('all');
     setPriorityFilter('all');
     setAssigneeFilter('human');
@@ -1930,6 +1938,37 @@ export function TasksPageClient() {
   ) : null;
   useRegisterRightPanel(sidebarPanel);
 
+  const taskTitleOptions = useMemo(
+    () => distinctTaskTitles(taskSubviewBaseTasks),
+    [taskSubviewBaseTasks]
+  );
+
+  const headerSearchAdapter = useMemo(
+    () =>
+      taskSubviewBaseTasks.length === 0
+        ? null
+        : {
+            key: 'tasks',
+            pills,
+            onPillsChange: setPills,
+            artistOptions: [],
+            titleOptions: taskTitleOptions,
+            albumOptions: [],
+            totalCount: taskSubviewBaseTasks.length,
+            visibleCount: tasks.length,
+            triggerLabel:
+              pills.length > 0
+                ? `Filter Tasks (${pills.length})`
+                : 'Filter Tasks',
+            ariaLabel: 'Filter tasks',
+            placeholder: 'Search tasks',
+            allowedFields: ['title'] as const,
+          },
+    [pills, taskSubviewBaseTasks.length, taskTitleOptions, tasks.length]
+  );
+
+  useRegisterHeaderSearch(headerSearchAdapter);
+
   const headerActions = useMemo(
     () => (
       <DashboardHeaderActionGroup>
@@ -2137,9 +2176,6 @@ export function TasksPageClient() {
               }}
               onSubmitCreate={handleCreateTask}
               createPending={createTaskMutation.isPending}
-              searchValue={search}
-              onSearchValueChange={setSearch}
-              onClearSearch={() => setSearch('')}
               filterCategories={taskFilterCategories}
               onClearFilters={clearFilters}
               onCreateTask={() => setHeaderMode('create')}
