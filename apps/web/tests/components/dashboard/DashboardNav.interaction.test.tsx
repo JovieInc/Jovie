@@ -296,8 +296,8 @@ describe('DashboardNav interactions', () => {
       '/app/chat/thread-newer'
     );
     expect(
-      screen.queryByRole('button', { name: 'Chat actions' })
-    ).not.toBeInTheDocument();
+      screen.getByRole('button', { name: 'Chat actions for Pitch tasks' })
+    ).toBeInTheDocument();
   });
 
   it('renders compact chat loading without adding duplicate empty-state chat controls', () => {

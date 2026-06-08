@@ -22,6 +22,7 @@ import {
   toSidebarThread,
   writeThreadReadState,
 } from '@/components/shell/SidebarThreadsSection';
+import { useChatThreadContextMenu } from '@/components/shell/useChatThreadContextMenu';
 import { APP_ROUTES, isDemoRoutePath } from '@/constants/routes';
 import { useAppFlag } from '@/lib/flags/client';
 import { NAV_SHORTCUTS } from '@/lib/keyboard-shortcuts';
@@ -411,6 +412,10 @@ export function DashboardNav(_: DashboardNavProps) {
     return id ? decodeURIComponent(id) : null;
   }, [pathname]);
 
+  const { onThreadContextMenu, contextMenuOverlay } = useChatThreadContextMenu({
+    activeThreadId,
+  });
+
   useEffect(() => {
     if (!activeThreadId || !conversations) return;
 
@@ -519,107 +524,111 @@ export function DashboardNav(_: DashboardNavProps) {
   );
 
   return (
-    <nav className='flex flex-1 flex-col' aria-label='Dashboard navigation'>
-      {isInSettings ? (
-        <>
-          <SidebarCollapsibleGroup
-            label='General'
-            defaultOpen
-            storageKey='settings.general'
-          >
-            {renderSection(userSettingsNavigation)}
-          </SidebarCollapsibleGroup>
-          <SidebarCollapsibleGroup
-            label={artistSettingsLabel}
-            defaultOpen={false}
-            storageKey='settings.artist'
-          >
-            {renderSection(artistSettingsNavigation)}
-          </SidebarCollapsibleGroup>
-        </>
-      ) : (
-        <SidebarGroup className='mb-0.5'>
-          <SidebarGroupContent className='space-y-0.5'>
-            {navSections.map((section, index) => (
-              <div key={section.key} data-nav-section>
-                {/* Section divider for visual separation (except for first section) */}
-                {index > 0 && <div className='my-1.5' />}
-                {section.label ? (
-                  <SidebarCollapsibleGroup
-                    label={section.label}
-                    defaultOpen
-                    storageKey={`dashboard.${section.key}`}
-                  >
-                    {renderSection(section.items)}
-                  </SidebarCollapsibleGroup>
-                ) : (
-                  renderSection(section.items)
-                )}
-              </div>
-            ))}
-          </SidebarGroupContent>
-        </SidebarGroup>
-      )}
+    <>
+      <nav className='flex flex-1 flex-col' aria-label='Dashboard navigation'>
+        {isInSettings ? (
+          <>
+            <SidebarCollapsibleGroup
+              label='General'
+              defaultOpen
+              storageKey='settings.general'
+            >
+              {renderSection(userSettingsNavigation)}
+            </SidebarCollapsibleGroup>
+            <SidebarCollapsibleGroup
+              label={artistSettingsLabel}
+              defaultOpen={false}
+              storageKey='settings.artist'
+            >
+              {renderSection(artistSettingsNavigation)}
+            </SidebarCollapsibleGroup>
+          </>
+        ) : (
+          <SidebarGroup className='mb-0.5'>
+            <SidebarGroupContent className='space-y-0.5'>
+              {navSections.map((section, index) => (
+                <div key={section.key} data-nav-section>
+                  {/* Section divider for visual separation (except for first section) */}
+                  {index > 0 && <div className='my-1.5' />}
+                  {section.label ? (
+                    <SidebarCollapsibleGroup
+                      label={section.label}
+                      defaultOpen
+                      storageKey={`dashboard.${section.key}`}
+                    >
+                      {renderSection(section.items)}
+                    </SidebarCollapsibleGroup>
+                  ) : (
+                    renderSection(section.items)
+                  )}
+                </div>
+              ))}
+            </SidebarGroupContent>
+          </SidebarGroup>
+        )}
 
-      {threadsVisible ? (
-        <div className='mt-1.5'>
-          <SidebarThreadsSection
-            threads={sidebarThreads}
-            activeThreadId={activeThreadId}
-            allThreadsActive={
-              normalizeTrailingSlash(pathname) === APP_ROUTES.CHATS
-            }
-            onNewThread={() => {
-              router.push(APP_ROUTES.CHAT);
-            }}
-            state={
-              conversationsError
-                ? 'error'
-                : conversationsLoading
-                  ? 'loading'
-                  : 'idle'
-            }
-            onRetry={handleRetryThreads}
-            tight
-            collapsed={false}
-          />
-        </div>
-      ) : null}
+        {threadsVisible ? (
+          <div className='mt-1.5'>
+            <SidebarThreadsSection
+              threads={sidebarThreads}
+              activeThreadId={activeThreadId}
+              allThreadsActive={
+                normalizeTrailingSlash(pathname) === APP_ROUTES.CHATS
+              }
+              onThreadContextMenu={onThreadContextMenu}
+              onNewThread={() => {
+                router.push(APP_ROUTES.CHAT);
+              }}
+              state={
+                conversationsError
+                  ? 'error'
+                  : conversationsLoading
+                    ? 'loading'
+                    : 'idle'
+              }
+              onRetry={handleRetryThreads}
+              tight
+              collapsed={false}
+            />
+          </div>
+        ) : null}
 
-      {moreSection ? (
-        <div data-nav-section={moreSection.key} className='mt-3'>
-          <SidebarCollapsibleGroup
-            label={moreSection.label}
-            defaultOpen={false}
-            storageKey={moreSection.key}
-          >
-            {renderSection(moreSection.items)}
-          </SidebarCollapsibleGroup>
-        </div>
-      ) : null}
+        {moreSection ? (
+          <div data-nav-section={moreSection.key} className='mt-3'>
+            <SidebarCollapsibleGroup
+              label={moreSection.label}
+              defaultOpen={false}
+              storageKey={moreSection.key}
+            >
+              {renderSection(moreSection.items)}
+            </SidebarCollapsibleGroup>
+          </div>
+        ) : null}
 
-      {isAdmin && !isInSettings && (
-        <div data-testid='admin-nav-section' className='mt-3'>
-          <SidebarCollapsibleGroup
-            label='Admin'
-            defaultOpen={false}
-            storageKey='dashboard.admin'
-          >
-            {adminNavigationSections.map(section => (
-              <div
-                key={section.label}
-                className='space-y-2'
-                data-admin-section={section.label}
-              >
-                <p className='px-2.5 pb-0.5 text-2xs font-semibold tracking-[-0.01em] text-sidebar-muted/80 group-data-[collapsible=icon]:hidden'>
-                  {section.label}
-                </p>
-                {renderSection(section.items)}
-              </div>
-            ))}
-          </SidebarCollapsibleGroup>
-        </div>
-      )}
-    </nav>
+        {isAdmin && !isInSettings && (
+          <div data-testid='admin-nav-section' className='mt-3'>
+            <SidebarCollapsibleGroup
+              label='Admin'
+              defaultOpen={false}
+              storageKey='dashboard.admin'
+            >
+              {adminNavigationSections.map(section => (
+                <div
+                  key={section.label}
+                  className='space-y-2'
+                  data-admin-section={section.label}
+                >
+                  <p className='px-2.5 pb-0.5 text-2xs font-semibold tracking-[-0.01em] text-sidebar-muted/80 group-data-[collapsible=icon]:hidden'>
+                    {section.label}
+                  </p>
+                  {renderSection(section.items)}
+                </div>
+              ))}
+            </SidebarCollapsibleGroup>
+          </div>
+        )}
+      </nav>
+      {contextMenuOverlay}
+    </>
   );
 }

@@ -87,6 +87,13 @@ vi.mock('@/lib/hooks/useNotifications', () => ({
   useNotifications: () => ({ success: vi.fn(), error: vi.fn() }),
 }));
 
+vi.mock('@/hooks/useClipboard', () => ({
+  useClipboard: () => ({
+    copy: vi.fn(),
+    isSuccess: false,
+  }),
+}));
+
 vi.mock('@/lib/queries/useReleasesQuery', () => ({
   useReleasesQuery: () => ({ data: undefined, isLoading: false }),
 }));
@@ -102,6 +109,10 @@ vi.mock('@/lib/queries', async () => {
   return {
     ...actual,
     usePlanGate: (...args: unknown[]) => mockUsePlanGate(...args),
+    useDeleteConversationMutation: () => ({
+      mutateAsync: vi.fn(),
+      isPending: false,
+    }),
   };
 });
 
