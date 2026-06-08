@@ -78,6 +78,8 @@ DEV_ENV_ARGS=(
   pnpm --filter @jovie/web run dev:fast
 )
 
+# macOS ships Bash 3.2; with `set -u`, expanding an empty ENV_UNSET_ARGS array
+# makes `env` fail before the dev server starts. Only pass -u flags when present.
 if [ "${#ENV_UNSET_ARGS[@]}" -gt 0 ]; then
   doppler run --project jovie-web --config dev -- env \
     "${ENV_UNSET_ARGS[@]}" \

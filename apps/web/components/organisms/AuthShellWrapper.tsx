@@ -30,6 +30,7 @@ import {
   useTableMeta,
 } from '@/contexts/TableMetaContext';
 import { HeaderChatUsageIndicator } from '@/features/dashboard/atoms/HeaderChatUsageIndicator';
+import { RightRailKeyboardHandler } from '@/hooks/RightRailKeyboardHandler';
 import { useAuthRouteConfig } from '@/hooks/useAuthRouteConfig';
 import { useDashboardShortcuts } from '@/hooks/useDashboardShortcuts';
 import { useGlobalShortcutActions } from '@/hooks/useGlobalShortcutActions';
@@ -253,6 +254,7 @@ function AuthShellWrapperInner({
             defaultOpen={shouldDefaultOpenPreviewPanel}
             enabled={previewEnabled}
           >
+            <RightRailKeyboardHandler />
             <AuthShell
               section={config.section}
               breadcrumbs={config.breadcrumbs}

@@ -82,6 +82,49 @@ test('dev-web-fast keeps optional unset args behind a non-empty guard', () => {
   );
 });
 
+test('dev-web-fast starts when eval unset args are populated', async () => {
+  const tmp = mkdtempSync(path.join(tmpdir(), 'jovie-dev-web-fast-test-'));
+  const binDir = path.join(tmp, 'bin');
+  const capturePath = path.join(tmp, 'doppler-args.txt');
+
+  try {
+    mkdirSync(binDir, { recursive: true });
+    makeFakeDoppler(binDir);
+
+    const port = await getAvailablePort();
+    const result = spawnSync('bash', [devWebFastScript], {
+      cwd: repoRoot,
+      encoding: 'utf8',
+      env: {
+        ...process.env,
+        PATH: `${binDir}:${process.env.PATH ?? ''}`,
+        PORT: String(port),
+        TMPDIR: tmp,
+        JOVIE_DEV_WARM_ROUTES: '',
+        JOVIE_DEV_READY_TIMEOUT: '5',
+        JOVIE_DISABLE_MODEL_KEYS_FOR_EVALS: '1',
+        JOVIE_DISABLE_REDIS_FOR_EVALS: '1',
+        JOVIE_FAKE_DOPPLER_CAPTURE: capturePath,
+      },
+      timeout: 10_000,
+    });
+
+    const output = `${result.stdout}\n${result.stderr}`;
+    assert.equal(result.status, 0, output);
+    assert.match(output, /Redis env disabled for isolated evals/);
+    assert.match(output, /model provider env disabled for isolated evals/);
+    assert.doesNotMatch(output, /ENV_UNSET_ARGS/);
+
+    const dopplerArgs = readFileSync(capturePath, 'utf8').trim().split('\n');
+    assert.ok(dopplerArgs.includes('-u'));
+    assert.ok(dopplerArgs.includes('UPSTASH_REDIS_REST_URL'));
+    assert.ok(dopplerArgs.includes('AI_GATEWAY_API_KEY'));
+    assert.ok(dopplerArgs.includes('pnpm'));
+  } finally {
+    rmSync(tmp, { force: true, recursive: true });
+  }
+});
+
 test('dev-web-fast starts when optional env unset args are empty', async () => {
   const tmp = mkdtempSync(path.join(tmpdir(), 'jovie-dev-web-fast-test-'));
   const binDir = path.join(tmp, 'bin');

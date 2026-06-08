@@ -28,6 +28,10 @@ vi.mock('@/app/app/(shell)/dashboard/PreviewPanelContext', () => ({
   PreviewPanelProvider: previewPanelProviderMock,
 }));
 
+vi.mock('@/hooks/RightRailKeyboardHandler', () => ({
+  RightRailKeyboardHandler: () => null,
+}));
+
 vi.mock('@/contexts/KeyboardShortcutsContext', () => ({
   KeyboardShortcutsProvider: ({ children }: { children: ReactNode }) =>
     children,
