@@ -202,6 +202,17 @@
   max-width: min(var(--profile-shell-max-width), 100%);
 }
 
+/* Short-viewport home hero: reserve room for the showcase release card below. */
+[data-testid="profile-compact-surface"][data-mode="profile"] {
+  @media (max-height: 880px) and (min-height: 761px) {
+    --cover-height: clamp(214px, 36svh, 218px);
+  }
+
+  @media (max-height: 760px) {
+    --cover-height: 178px;
+  }
+}
+
 @media (min-width: 768px) {
   .public-profile-compact-shell {
     --cover-height: 340px;
