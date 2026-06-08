@@ -382,6 +382,31 @@ describe('LibrarySurface', () => {
     expect(screen.queryByTestId('library-audio-dropzone')).toBeNull();
   });
 
+  it('renders the library right rail as a sticky carded panel', () => {
+    renderLibrary([buildAsset()]);
+
+    fireEvent.click(
+      screen.getByRole('button', { name: /Inspect Take Me Over/u })
+    );
+
+    const drawer = screen.getByTestId('library-asset-drawer');
+    const stickyRail = screen.getByTestId('library-asset-drawer-sticky-rail');
+    const stickyCard = stickyRail.querySelector('[data-variant="card"]');
+
+    expect(stickyCard).toBeInTheDocument();
+    expect(stickyCard).toContainElement(
+      screen.getByRole('button', { name: 'Close asset details' })
+    );
+    expect(
+      within(stickyRail).getByRole('heading', { name: 'Take Me Over' })
+    ).toBeInTheDocument();
+    expect(
+      drawer.querySelectorAll('[data-variant="card"]').length
+    ).toBeGreaterThan(1);
+    expect(drawer.textContent).toContain('Details');
+    expect(drawer.textContent).toContain('Providers');
+  });
+
   it('uses shell focus tokens for library cards and drawer actions', () => {
     renderLibrary([buildAsset()]);
     clickGridView();
