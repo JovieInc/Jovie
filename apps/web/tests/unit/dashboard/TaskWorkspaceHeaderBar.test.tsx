@@ -21,42 +21,6 @@ vi.mock('@/components/molecules/filters', () => ({
   TableFilterDropdown: () => <button type='button'>Filters</button>,
 }));
 
-vi.mock('@/components/molecules/HeaderSearchAction', () => ({
-  HeaderSearchAction: ({
-    searchValue,
-    onSearchValueChange,
-    onClearAction,
-    ariaLabel,
-    submitAriaLabel,
-    placeholder,
-  }: {
-    readonly searchValue: string;
-    readonly onSearchValueChange: (value: string) => void;
-    readonly onClearAction?: () => void;
-    readonly ariaLabel: string;
-    readonly submitAriaLabel: string;
-    readonly placeholder: string;
-  }) =>
-    searchValue.length > 0 ? (
-      <div>
-        <input
-          type='search'
-          value={searchValue}
-          onChange={event => onSearchValueChange(event.target.value)}
-          placeholder={placeholder}
-          aria-label={ariaLabel}
-        />
-        <button type='button' aria-label='Close search' onClick={onClearAction}>
-          Close search
-        </button>
-      </div>
-    ) : (
-      <button type='button' aria-label={submitAriaLabel}>
-        Search
-      </button>
-    ),
-}));
-
 vi.mock('@/components/molecules/tab-bar/TabBar', () => ({
   TabBar: ({
     value,
@@ -150,9 +114,6 @@ function createBaseProps() {
       event.preventDefault()
     ),
     createPending: false,
-    searchValue: '',
-    onSearchValueChange: vi.fn(),
-    onClearSearch: vi.fn(),
     filterCategories: [],
     onClearFilters: vi.fn(),
     viewMode: 'board',
@@ -183,9 +144,6 @@ describe('TaskWorkspaceHeaderBar', () => {
     expect(
       screen.getByRole('tab', { name: 'Assigned To Me 1' })
     ).toBeInTheDocument();
-    expect(
-      screen.getByRole('button', { name: 'Search tasks' })
-    ).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Filters' })).toBeInTheDocument();
     expect(
       screen.getByRole('button', { name: 'Display options' })
@@ -210,22 +168,6 @@ describe('TaskWorkspaceHeaderBar', () => {
     fireEvent.click(screen.getByRole('button', { name: 'List view' }));
 
     expect(props.onViewModeChange).toHaveBeenCalledWith('list');
-  });
-
-  it('emits compact task search changes and clears the field', () => {
-    const props = createBaseProps();
-
-    render(
-      <TaskWorkspaceHeaderBar {...props} mode='default' searchValue='press' />
-    );
-
-    fireEvent.change(screen.getByRole('searchbox', { name: 'Search tasks' }), {
-      target: { value: 'metadata' },
-    });
-    fireEvent.click(screen.getByRole('button', { name: 'Close search' }));
-
-    expect(props.onSearchValueChange).toHaveBeenCalledWith('metadata');
-    expect(props.onClearSearch).toHaveBeenCalledTimes(1);
   });
 
   it('renders create mode controls and submits the draft form', () => {

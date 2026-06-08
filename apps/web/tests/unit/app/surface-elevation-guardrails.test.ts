@@ -358,6 +358,26 @@ describe('surface elevation guardrails', () => {
     expect(appShellLoading).toContain('LibraryLoadingState');
   });
 
+  it('routes task filters through the shared header search contract', () => {
+    const tasksPageClient = readFileSync(
+      join(ROOT, 'components/features/dashboard/tasks/TasksPageClient.tsx'),
+      'utf-8'
+    );
+    const taskWorkspaceHeaderBar = readFileSync(
+      join(
+        ROOT,
+        'components/features/dashboard/tasks/TaskWorkspaceHeaderBar.tsx'
+      ),
+      'utf-8'
+    );
+
+    expect(tasksPageClient).toContain('useRegisterHeaderSearch');
+    expect(tasksPageClient).toContain("key: 'tasks'");
+    expect(tasksPageClient).toContain('Filter Tasks');
+    expect(tasksPageClient).not.toContain('HeaderSearchAction');
+    expect(taskWorkspaceHeaderBar).not.toContain('HeaderSearchAction');
+  });
+
   it('keeps task and preview cards off the shell canvas token', () => {
     const files = [
       'components/features/dashboard/layout/PreviewPanel.tsx',
