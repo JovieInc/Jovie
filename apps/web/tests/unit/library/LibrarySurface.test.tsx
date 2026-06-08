@@ -198,6 +198,10 @@ function renderLibraryWithSidebarOverride(
   );
 }
 
+function clickGridView() {
+  fireEvent.click(screen.getByRole('button', { name: 'Grid view' }));
+}
+
 describe('LibrarySurface', () => {
   const baseMatchMedia = window.matchMedia;
 
@@ -252,8 +256,21 @@ describe('LibrarySurface', () => {
     );
   });
 
+  it('defaults to list view on first load', () => {
+    renderLibrary([buildAsset()]);
+
+    expect(screen.getByRole('table')).toBeInTheDocument();
+    expect(
+      screen.getByTestId('library-release-row-release-1')
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: /Inspect Take Me Over/u })
+    ).toBeNull();
+  });
+
   it('renders release assets with grid cards and a read-only detail drawer', () => {
     renderLibrary([buildAsset()]);
+    clickGridView();
 
     expect(screen.getByTestId('library-surface')).toBeDefined();
     expect(screen.getByRole('heading', { name: 'Take Me Over' })).toBeDefined();
@@ -319,6 +336,7 @@ describe('LibrarySurface', () => {
         assetKinds: ['artwork'],
       }),
     ]);
+    clickGridView();
 
     expect(
       screen.getByRole('heading', { name: 'Never Say A Word Hoodie' })
@@ -347,6 +365,7 @@ describe('LibrarySurface', () => {
 
   it('uses shell focus tokens for library cards and drawer actions', () => {
     renderLibrary([buildAsset()]);
+    clickGridView();
 
     const assetCardButton = screen.getByRole('button', {
       name: /Inspect Take Me Over/u,
@@ -409,6 +428,9 @@ describe('LibrarySurface', () => {
       }),
     ]);
 
+    expect(screen.getByRole('table')).toBeInTheDocument();
+    clickGridView();
+    expect(screen.queryByRole('table')).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'List view' }));
 
     expect(screen.getByRole('table')).toBeInTheDocument();
@@ -422,7 +444,7 @@ describe('LibrarySurface', () => {
   it('starts the persistent player from real production preview data', () => {
     renderLibrary([buildAsset()]);
 
-    fireEvent.click(screen.getByTestId('library-preview-card-release-1'));
+    fireEvent.click(screen.getByTestId('library-preview-row-release-1'));
 
     expect(audioMock.toggleTrack).toHaveBeenCalledWith({
       id: 'release-1',
@@ -443,9 +465,7 @@ describe('LibrarySurface', () => {
       }),
     ]);
 
-    fireEvent.click(
-      screen.getByRole('button', { name: /Inspect Take Me Over/u })
-    );
+    fireEvent.click(screen.getByTestId('library-release-row-release-1'));
 
     expect(screen.getByTestId('library-audio-dropzone')).toBeInTheDocument();
     expect(
@@ -475,9 +495,7 @@ describe('LibrarySurface', () => {
       }),
     ]);
 
-    fireEvent.click(
-      screen.getByRole('button', { name: /Inspect Take Me Over/u })
-    );
+    fireEvent.click(screen.getByTestId('library-release-row-release-1'));
     fireEvent.change(screen.getByLabelText('Upload audio for Take Me Over'), {
       target: {
         files: [
@@ -515,7 +533,6 @@ describe('LibrarySurface', () => {
   it('opens the read-only asset drawer from list rows', () => {
     renderLibrary([buildAsset()]);
 
-    fireEvent.click(screen.getByRole('button', { name: 'List view' }));
     const row = screen.getByTestId('library-release-row-release-1');
 
     fireEvent.click(row);
@@ -560,10 +577,10 @@ describe('LibrarySurface', () => {
     );
 
     expect(
-      screen.getByRole('heading', { name: 'Never Say A Word' })
+      screen.getByTestId('library-release-row-release-2')
     ).toBeInTheDocument();
     expect(
-      screen.queryByRole('heading', { name: 'Take Me Over' })
+      screen.queryByTestId('library-release-row-release-1')
     ).not.toBeInTheDocument();
   });
 
@@ -588,22 +605,14 @@ describe('LibrarySurface', () => {
     fireEvent.click(screen.getByRole('button', { name: /Audio/u }));
 
     await waitFor(() => {
-      expect(
-        screen.getByRole('heading', { name: 'Take Me Over' })
-      ).toBeInTheDocument();
-      expect(
-        screen.queryByRole('heading', { name: 'Never Say A Word' })
-      ).not.toBeInTheDocument();
+      expect(screen.getByText('Take Me Over')).toBeInTheDocument();
+      expect(screen.queryByText('Never Say A Word')).not.toBeInTheDocument();
     });
 
     fireEvent.click(screen.getByRole('button', { name: /^All/u }));
 
-    expect(
-      screen.getByRole('heading', { name: 'Take Me Over' })
-    ).toBeInTheDocument();
-    expect(
-      screen.getByRole('heading', { name: 'Never Say A Word' })
-    ).toBeInTheDocument();
+    expect(screen.getByText('Take Me Over')).toBeInTheDocument();
+    expect(screen.getByText('Never Say A Word')).toBeInTheDocument();
   });
 
   it('keeps Library inside the standard app shell without a route sidebar takeover', async () => {
