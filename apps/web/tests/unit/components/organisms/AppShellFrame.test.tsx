@@ -79,6 +79,29 @@ describe('AppShellFrame', () => {
     );
   });
 
+  it('keeps the right rail outside the main scroll pane', () => {
+    render(
+      <AppShellFrame
+        sidebar={<aside>Sidebar</aside>}
+        header={<header>Header</header>}
+        main={<div>Main Content</div>}
+        rightPanel={<aside data-testid='fixture-right-rail'>Right rail</aside>}
+      />
+    );
+
+    const scrollPane = screen.getByTestId('app-shell-scroll');
+    const rightRail = screen.getByTestId('app-shell-right-rail');
+
+    expect(scrollPane).toHaveClass('overflow-hidden');
+    expect(scrollPane).not.toHaveClass('overflow-y-auto');
+    expect(scrollPane).toContainElement(screen.getByText('Main Content'));
+    expect(scrollPane).not.toContainElement(rightRail);
+    expect(rightRail).toContainElement(
+      screen.getByTestId('fixture-right-rail')
+    );
+    expect(rightRail).toHaveClass('sticky', 'top-0');
+  });
+
   it('renders the shared audio player slot inside the shell frame', () => {
     render(
       <AppShellFrame

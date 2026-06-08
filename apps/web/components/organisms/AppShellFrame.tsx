@@ -16,7 +16,6 @@ interface AppShellFrameProps {
   readonly mobileBottomNav?: ReactNode;
   readonly contentClassName?: string;
   readonly containerClassName?: string;
-  readonly isTableRoute?: boolean;
   readonly variant?: AppShellFrameVariant;
 }
 
@@ -38,7 +37,6 @@ export const AppShellFrame = memo(function AppShellFrame({
   mobileBottomNav,
   contentClassName,
   containerClassName,
-  isTableRoute = false,
   // Default to 'legacy' so callers that don't pass `variant` (AppShellSkeleton,
   // DemoShell, future surfaces) match the current production state. AuthShell
   // explicitly passes 'shellChatV1' when DESIGN_V1 is on.
@@ -89,16 +87,22 @@ export const AppShellFrame = memo(function AppShellFrame({
             <div
               data-testid='app-shell-scroll'
               className={cn(
-                'flex flex-1 min-h-0 min-w-0 flex-col pb-[var(--dev-toolbar-height,0px)]',
-                isTableRoute
-                  ? 'overflow-hidden overflow-x-auto overscroll-contain'
-                  : 'overflow-y-auto overflow-x-hidden overscroll-contain',
+                // Shell-level pane never owns vertical scroll — routes and table
+                // surfaces scroll inside this clip so the right rail stays fixed.
+                'flex flex-1 min-h-0 min-w-0 flex-col overflow-hidden overflow-x-auto overscroll-contain pb-[var(--dev-toolbar-height,0px)]',
                 contentClassName
               )}
             >
               {main}
             </div>
-            {rightPanel}
+            {rightPanel ? (
+              <div
+                data-testid='app-shell-right-rail'
+                className='sticky top-0 z-10 flex h-full min-h-0 shrink-0 flex-col self-start overflow-hidden'
+              >
+                {rightPanel}
+              </div>
+            ) : null}
           </div>
           {audioPlayer}
         </main>

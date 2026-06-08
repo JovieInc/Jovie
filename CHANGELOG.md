@@ -9,9 +9,15 @@
 
 > Chat merch generation now requests photorealistic Printful mockups after artwork is created.
 
+> The app shell main pane no longer scrolls as a whole — route content scrolls inside the clip so the right rail stays fixed.
+
 ### Added
 
 - **Printful merch mockup pipeline (JOV-2621)**: adds a mockup catalog, Printful mockup task creation/polling, authenticated `/api/merch/mockups`, and async chat merch enrichment that merges photorealistic mockup URLs into design options.
+
+### Fixed
+
+- **Shell scroll + right rail stickiness (JOV-2639)**: makes `app-shell-scroll` a non-scrolling clip, wraps the right rail in a dedicated `app-shell-right-rail` slot outside that pane, and tightens the shell child height chain so context panels no longer ride along when lists or grids scroll.
 
 ## [26.6.30] - 2026-06-08
 
