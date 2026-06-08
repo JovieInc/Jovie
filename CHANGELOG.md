@@ -5,14 +5,6 @@
      5|The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
      6|and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
-## [26.6.31] - 2026-06-08
-
-> The public investor pitch deck at `/pitch` stays fully static, search-hidden, and covered by the same NOINDEX guardrails as other sensitive routes.
-
-### Added
-
-- **Public pitch deck guardrails (JOV-2357)**: extends the public-surface NOINDEX contract test to `/pitch`, keeping the fully static investor deck route (iframe to `/pitch/index.html`, `revalidate = false`, PDF download) aligned with investor-portal reuse and search-engine hiding.
-
 ## [26.6.30] - 2026-06-08
 
 > Library grid cards and list rows now line up with the page toolbar instead of sitting on a tighter inset.
