@@ -18,7 +18,12 @@ import {
   getDefaultVariantIds,
   MERCH_DEFAULT_PRINTFUL_PRODUCT,
 } from './default-catalog';
-import { buildMerchPricingSnapshot } from './pricing';
+import {
+  buildMerchPricingSnapshot,
+  calculateRecommendedSalePriceCents,
+  MERCH_DEFAULT_MARGIN_PRESET,
+  MERCH_DEFAULT_PRINTFUL_PRODUCT_COST_CENTS,
+} from './pricing';
 
 export interface MerchCatalogSelection {
   readonly catalogProductId: number;
@@ -57,6 +62,15 @@ function defaultSelection(
     availabilityRegion: MERCH_DEFAULT_PRINTFUL_PRODUCT.availabilityRegion,
     shippingProfile: MERCH_DEFAULT_PRINTFUL_PRODUCT.shippingProfile,
     pricing: buildMerchPricingSnapshot({
+      retailPriceCents: calculateRecommendedSalePriceCents(
+        MERCH_DEFAULT_PRINTFUL_PRODUCT_COST_CENTS,
+        MERCH_DEFAULT_MARGIN_PRESET,
+        {
+          printfulCostSource: 'jovie_default',
+          printfulCostUpdatedAt: null,
+        }
+      ),
+      printfulProductCostCents: MERCH_DEFAULT_PRINTFUL_PRODUCT_COST_CENTS,
       printfulCostSource: 'jovie_default',
       printfulCostUpdatedAt: null,
     }),
@@ -224,6 +238,14 @@ export async function resolveMerchCatalogSelection(
       availabilityRegion: MERCH_DEFAULT_PRINTFUL_PRODUCT.availabilityRegion,
       shippingProfile: MERCH_DEFAULT_PRINTFUL_PRODUCT.shippingProfile,
       pricing: buildMerchPricingSnapshot({
+        retailPriceCents: calculateRecommendedSalePriceCents(
+          productCostCents,
+          MERCH_DEFAULT_MARGIN_PRESET,
+          {
+            printfulCostSource: 'printful',
+            printfulCostUpdatedAt: new Date().toISOString(),
+          }
+        ),
         printfulProductCostCents: productCostCents,
         printfulCostSource: 'printful',
         printfulCostUpdatedAt: new Date().toISOString(),

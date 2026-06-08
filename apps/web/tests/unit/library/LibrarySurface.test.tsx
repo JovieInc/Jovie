@@ -308,9 +308,8 @@ describe('LibrarySurface', () => {
         primaryActionLabel: 'Open Merch',
         primaryActionHref: '/app/library?view=merch',
         productType: 'hoodie',
-        retailPriceLabel: '$68.00',
-        artistPayoutLabel: '$22.00',
-        jovieMarginLabel: '$9.00',
+        salePriceLabel: '$68.00',
+        profitLabel: '$22.00',
         description: 'Black hoodie with Never Say A Word cover art.',
         previewUrl: null,
         providerCount: 0,
@@ -337,7 +336,7 @@ describe('LibrarySurface', () => {
       drawer.getByText('Black hoodie with Never Say A Word cover art.')
     ).toBeInTheDocument();
     expect(drawer.getByText('$22.00')).toBeInTheDocument();
-    expect(drawer.getByText('$9.00')).toBeInTheDocument();
+    expect(drawer.queryByText('$9.00')).toBeNull();
     expect(drawer.getByRole('link', { name: /Open Merch/u })).toHaveAttribute(
       'href',
       '/app/library?view=merch'

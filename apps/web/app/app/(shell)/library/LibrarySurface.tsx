@@ -1078,7 +1078,7 @@ const AssetCard = memo(function AssetCard({
             </div>
             <span className='system-b-library-card-count shrink-0 tabular-nums'>
               {getLibraryItemKind(asset) === 'merch'
-                ? (asset.retailPriceLabel ?? 'Merch')
+                ? (asset.salePriceLabel ?? 'Merch')
                 : formatCompactCount(asset.providerCount)}
             </span>
           </div>
@@ -1753,16 +1753,12 @@ function AssetDrawer({
                 {isMerch ? (
                   <>
                     <MetadataRow
-                      label='Price'
-                      value={current.retailPriceLabel ?? 'No Price'}
+                      label='Sale Price'
+                      value={current.salePriceLabel ?? 'No Price'}
                     />
                     <MetadataRow
-                      label='Artist Share'
-                      value={current.artistPayoutLabel ?? 'No Estimate'}
-                    />
-                    <MetadataRow
-                      label='Jovie Margin'
-                      value={current.jovieMarginLabel ?? 'No Estimate'}
+                      label='Profit'
+                      value={current.profitLabel ?? 'No Estimate'}
                     />
                     <MetadataRow
                       label='Sellability'

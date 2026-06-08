@@ -146,9 +146,8 @@ describe('library data', () => {
         productType: 'hoodie',
         primaryActionLabel: 'Open Merch',
         smartLinkPath: '/app/library?view=merch',
-        retailPriceLabel: '$68.00',
-        artistPayoutLabel: '$22.00',
-        jovieMarginLabel: '$9.00',
+        salePriceLabel: '$68.00',
+        profitLabel: '$22.00',
       }),
     ]);
   });

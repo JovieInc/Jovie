@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import {
   assertSellableMerchEconomics,
+  buildMerchPresetPriceQuotes,
   buildMerchPricingSnapshot,
+  calculateRecommendedSalePriceCents,
   estimateStripeFeeCents,
   formatMerchMoney,
   getMerchSellability,
@@ -14,18 +16,35 @@ describe('merch pricing', () => {
     expect(estimateStripeFeeCents(5025)).toBe(176);
   });
 
-  it('defaults artist payout to 50% of estimated net profit', () => {
+  it('auto-sets sale price from the standard margin preset', () => {
     const pricing = buildMerchPricingSnapshot();
 
     expect(pricing.currency).toBe('USD');
-    expect(pricing.retailPriceCents).toBe(4500);
+    expect(pricing.retailPriceCents).toBe(4100);
     expect(pricing.estimatedPrintfulProductCostCents).toBe(1750);
     expect(pricing.estimatedShippingCostCents).toBe(525);
     expect(pricing.refundReserveCents).toBe(200);
-    expect(pricing.stripeFeeEstimateCents).toBe(176);
+    expect(pricing.stripeFeeEstimateCents).toBe(164);
     expect(pricing.artistRoyaltyRateBps).toBe(5000);
-    expect(pricing.artistPayoutPerUnitEstimateCents).toBe(1187);
-    expect(pricing.jovieMarginPerUnitEstimateCents).toBe(1187);
+    expect(pricing.artistPayoutPerUnitEstimateCents).toBe(993);
+    expect(pricing.jovieMarginPerUnitEstimateCents).toBe(993);
+  });
+
+  it('builds safe, standard, and aggressive preset quotes from wholesale cost', () => {
+    const quotes = buildMerchPresetPriceQuotes({
+      printfulProductCostCents: 1750,
+    });
+
+    expect(quotes.map(quote => quote.preset)).toEqual([
+      'safe',
+      'standard',
+      'aggressive',
+    ]);
+    expect(quotes[0].salePriceCents).toBeLessThan(quotes[1].salePriceCents);
+    expect(quotes[1].salePriceCents).toBeLessThan(quotes[2].salePriceCents);
+    expect(quotes[1].salePriceCents).toBe(
+      calculateRecommendedSalePriceCents(1750, 'standard')
+    );
   });
 
   it('marks below-cost pricing as unsellable instead of trusting zeroed payouts', () => {

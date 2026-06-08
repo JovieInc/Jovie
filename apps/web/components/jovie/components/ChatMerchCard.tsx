@@ -4,7 +4,11 @@ import { Button } from '@jovie/ui';
 import { AlertTriangle, CheckCircle2, ExternalLink, Shirt } from 'lucide-react';
 import Image from 'next/image';
 import Link from 'next/link';
-import { useCallback } from 'react';
+import { useCallback, useMemo, useState } from 'react';
+import { MerchPricingPresetPicker } from '@/components/molecules/MerchPricingPresetPicker';
+import { MerchPricingSummary } from '@/components/molecules/MerchPricingSummary';
+import type { MerchMarginPreset } from '@/lib/merch/pricing';
+import { MERCH_DEFAULT_MARGIN_PRESET } from '@/lib/merch/pricing';
 import { cn } from '@/lib/utils';
 import { ChatGenerationArtifactSurface } from './ChatGenerationArtifactSurface';
 
@@ -17,12 +21,16 @@ interface MerchGenerationOption {
   readonly colorway?: string;
   readonly available_sizes?: readonly string[];
   readonly price_recommendation?: {
-    readonly retail_price?: string;
-    readonly estimated_gross_margin?: string;
-    readonly artist_share?: string;
-    readonly jovie_share?: string;
-    readonly minimum_jovie_margin?: string;
-    readonly target_jovie_margin?: string;
+    readonly sale_price?: string;
+    readonly profit?: string;
+    readonly margin_preset?: MerchMarginPreset;
+    readonly presets?: readonly {
+      readonly preset: MerchMarginPreset;
+      readonly label: string;
+      readonly sale_price: string;
+      readonly profit: string;
+    }[];
+    readonly estimated_printful_cost?: string;
   };
   readonly sellability?: {
     readonly sellable: boolean;
@@ -95,6 +103,63 @@ function optionPrompt(
   return `${action} merch option ${option.option_number} from generation ${generationId}.`;
 }
 
+function MerchOptionPricing({
+  recommendation,
+}: {
+  readonly recommendation: MerchGenerationOption['price_recommendation'];
+}) {
+  const presetOptions = useMemo(
+    () =>
+      (recommendation?.presets ?? []).map(preset => ({
+        preset: preset.preset,
+        label: preset.label,
+        salePrice: preset.sale_price,
+        profit: preset.profit,
+      })),
+    [recommendation?.presets]
+  );
+  const [selectedPreset, setSelectedPreset] = useState<MerchMarginPreset>(
+    recommendation?.margin_preset ?? MERCH_DEFAULT_MARGIN_PRESET
+  );
+  const activeQuote = useMemo(() => {
+    const selected = presetOptions.find(
+      option => option.preset === selectedPreset
+    );
+    if (selected) return selected;
+    return {
+      preset: MERCH_DEFAULT_MARGIN_PRESET,
+      label: 'Standard',
+      salePrice: recommendation?.sale_price ?? '$0.00',
+      profit: recommendation?.profit ?? '$0.00',
+    };
+  }, [
+    presetOptions,
+    recommendation?.profit,
+    recommendation?.sale_price,
+    selectedPreset,
+  ]);
+
+  if (!recommendation?.sale_price && !recommendation?.profit) {
+    return null;
+  }
+
+  return (
+    <div className='space-y-1.5'>
+      {presetOptions.length > 1 ? (
+        <MerchPricingPresetPicker
+          options={presetOptions}
+          value={selectedPreset}
+          onChange={setSelectedPreset}
+        />
+      ) : null}
+      <MerchPricingSummary
+        salePrice={activeQuote.salePrice}
+        profit={activeQuote.profit}
+      />
+    </div>
+  );
+}
+
 export function ChatMerchOptionsCard({
   result,
 }: {
@@ -161,28 +226,9 @@ export function ChatMerchOptionsCard({
                 <p className='line-clamp-3 min-h-[54px] text-[11.5px] leading-[18px] text-secondary-token'>
                   {option.concept}
                 </p>
-                <div className='grid min-h-[58px] grid-cols-2 gap-1'>
-                  {option.price_recommendation?.retail_price ? (
-                    <span className='rounded-md bg-surface-1 px-1.5 py-1 text-[10.5px] text-secondary-token'>
-                      Price {option.price_recommendation.retail_price}
-                    </span>
-                  ) : null}
-                  {option.price_recommendation?.artist_share ? (
-                    <span className='rounded-md bg-surface-1 px-1.5 py-1 text-[10.5px] text-secondary-token'>
-                      Artist {option.price_recommendation.artist_share}
-                    </span>
-                  ) : null}
-                  {option.price_recommendation?.jovie_share ? (
-                    <span className='rounded-md bg-surface-1 px-1.5 py-1 text-[10.5px] text-secondary-token'>
-                      Jovie {option.price_recommendation.jovie_share}
-                    </span>
-                  ) : null}
-                  {option.price_recommendation?.minimum_jovie_margin ? (
-                    <span className='rounded-md bg-surface-1 px-1.5 py-1 text-[10.5px] text-secondary-token'>
-                      Floor {option.price_recommendation.minimum_jovie_margin}
-                    </span>
-                  ) : null}
-                </div>
+                <MerchOptionPricing
+                  recommendation={option.price_recommendation}
+                />
                 <div className='flex flex-wrap gap-1.5 pt-0.5'>
                   <Button
                     type='button'
