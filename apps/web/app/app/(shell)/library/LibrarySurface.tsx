@@ -1731,7 +1731,10 @@ function AssetDrawer({
                       </>
                     ) : (
                       <>
-                        <MetadataRow label='Tracks' value={current.trackCount} />
+                        <MetadataRow
+                          label='Tracks'
+                          value={current.trackCount}
+                        />
                         <MetadataRow
                           label='Duration'
                           value={formatLibraryDuration(current.totalDurationMs)}

@@ -442,6 +442,7 @@ describe('LibrarySurface', () => {
 
   it('renders the library right rail as a sticky carded panel', () => {
     renderLibrary([buildAsset()]);
+    clickGridView();
 
     fireEvent.click(
       screen.getByRole('button', { name: /Inspect Take Me Over/u })
