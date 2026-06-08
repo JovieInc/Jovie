@@ -1,17 +1,10 @@
 import { Badge, Button } from '@jovie/ui';
 import type { ColumnDef } from '@tanstack/react-table';
-import {
-  CheckCircle2,
-  CircleSlash,
-  Link2,
-  Plus,
-  Settings2,
-} from 'lucide-react';
+import { CheckCircle2, CircleSlash, Plus, Settings2 } from 'lucide-react';
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { Suspense } from 'react';
 import { AdminPage } from '@/components/features/admin/layout/AdminPage';
-import { ContentSectionHeader } from '@/components/molecules/ContentSectionHeader';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { UnifiedTableSkeleton } from '@/components/organisms/table';
 import { APP_ROUTES } from '@/constants/routes';
@@ -137,19 +130,8 @@ async function InvestorPipelineTable() {
   if (links.length === 0) {
     return (
       <ContentSurfaceCard className='overflow-hidden p-0'>
-        <ContentSectionHeader
-          title='No investor links yet'
-          subtitle='Create a first link to start tracking investor views and responses.'
-        />
-        <div className='flex flex-col items-center gap-3 px-6 py-10 text-center'>
-          <div className='flex h-11 w-11 items-center justify-center rounded-full border border-subtle bg-surface-0 text-secondary-token'>
-            <Link2 className='h-4 w-4' aria-hidden='true' />
-          </div>
-          <p className='max-w-md text-app leading-[19px] text-secondary-token'>
-            Investor links become the canonical handoff surface for deck access,
-            memo reviews, and response tracking.
-          </p>
-          <CreateLinkButton />
+        <div className='px-(--linear-app-header-padding-x) py-6 text-app text-secondary-token'>
+          No investor links yet.
         </div>
       </ContentSurfaceCard>
     );
@@ -160,10 +142,6 @@ async function InvestorPipelineTable() {
       className='overflow-hidden p-0'
       data-testid='admin-investors-table'
     >
-      <ContentSectionHeader
-        title='Active investor links'
-        subtitle={`${links.length} tracked link${links.length === 1 ? '' : 's'} across your pipeline.`}
-      />
       <InvestorTable minWidth='min-w-[760px]'>
         <InvestorTableHead>
           <InvestorTableHeaderRow>
@@ -311,17 +289,13 @@ function TokenDisplay({ token }: { readonly token: string }) {
 function TableSkeleton() {
   return (
     <ContentSurfaceCard className='overflow-hidden p-0'>
-      <ContentSectionHeader
-        title='Loading investor links'
-        subtitle='Preparing the latest pipeline state.'
-      />
       <UnifiedTableSkeleton<InvestorPipelineSkeletonRow>
         columns={INVESTOR_TABLE_SKELETON_COLUMNS}
         skeletonRows={5}
         skeletonColumnConfig={INVESTOR_TABLE_SKELETON_COLUMN_CONFIG}
         rowHeight={40}
         minWidth={INVESTOR_TABLE_MIN_WIDTH}
-        containerClassName='px-3 pb-3 pt-0'
+        containerClassName='px-3 py-3'
       />
     </ContentSurfaceCard>
   );

@@ -1,8 +1,7 @@
 'use client';
 
-import { Button, Input, Switch } from '@jovie/ui';
-import { ArrowLeft, Loader2, Save } from 'lucide-react';
-import Link from 'next/link';
+import { Input, Switch } from '@jovie/ui';
+import { Loader2, Save } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
 import { Icon } from '@/components/atoms/Icon';
 import { ContentSectionHeader } from '@/components/molecules/ContentSectionHeader';
@@ -12,7 +11,6 @@ import {
   DrawerFormField,
   DrawerSurfaceCard,
 } from '@/components/molecules/drawer';
-import { APP_ROUTES } from '@/constants/routes';
 
 // Mirrored from schema to avoid server-only import in client component
 interface InvestorSettings {
@@ -178,10 +176,6 @@ export function InvestorSettingsForm() {
   if (loading) {
     return (
       <ContentSurfaceCard className='overflow-hidden p-0'>
-        <ContentSectionHeader
-          title='Loading settings'
-          subtitle='Preparing portal configuration.'
-        />
         <div className='space-y-2 px-6 py-6'>
           {Array.from({ length: 5 }, (_, i) => (
             <div
@@ -197,20 +191,7 @@ export function InvestorSettingsForm() {
 
   return (
     <div className='space-y-4'>
-      {/* Fundraise Display */}
       <ContentSurfaceCard className='overflow-hidden p-0'>
-        <ContentSectionHeader
-          title='Investor portal settings'
-          subtitle='Configure the fundraise display, CTAs, and automation for the investor portal.'
-          actions={
-            <Button variant='secondary' size='sm' asChild>
-              <Link href={APP_ROUTES.ADMIN_INVESTORS}>
-                <ArrowLeft className='mr-1.5 h-3.5 w-3.5' />
-                Pipeline
-              </Link>
-            </Button>
-          }
-        />
         <div className='divide-y divide-subtle px-(--linear-app-content-padding-x)'>
           <SettingRow
             label='Show progress bar'
