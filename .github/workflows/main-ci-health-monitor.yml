@@ -34,14 +34,6 @@ jobs:
       - name: Checkout
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
 
-      - name: Generate Jovie Bot token
-        id: app-token
-        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
-        with:
-          app-id: ${{ vars.JOVIE_BOT_APP_ID }}
-          private-key: ${{ secrets.JOVIE_BOT_PRIVATE_KEY }}
-          permission-actions: write
-
       - name: Evaluate main CI health
         id: evaluate
         uses: ./.github/actions/eval-main-health
@@ -80,11 +72,28 @@ jobs:
           GH_REPOSITORY: ${{ github.repository }}
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
 
-      - name: Auto-rerun failed deploy (self-healing)
-        if: ${{ steps.evaluate.outputs.should_alert == 'true' && steps.evaluate.outputs.failed_run_id != '' }}
+      - name: Fail job when unhealthy
+        if: ${{ steps.evaluate.outputs.should_alert == 'true' }}
         env:
-          GH_TOKEN: ${{ steps.app-token.outputs.token }}
-          FAILED_RUN_ID: ${{ steps.evaluate.outputs.failed_run_id }}
+          SUMMARY: ${{ steps.evaluate.outputs.summary }}
+          DETAILS: ${{ steps.evaluate.outputs.details }}
+        run: |
+          echo "$SUMMARY"
+          echo "$DETAILS"
+          exit 1
+
+  auto-rerun:
+    name: Auto-rerun failed deploy (self-healing)
+    needs: monitor
+    if: ${{ always() && needs.monitor.outputs.should_alert == 'true' && needs.monitor.outputs.failed_run_id != '' }}
+    runs-on: ubuntu-latest
+    permissions:
+      actions: write
+    steps:
+      - name: Auto-rerun failed deploy (self-healing)
+        env:
+          GH_TOKEN: ${{ github.token }}
+          FAILED_RUN_ID: ${{ needs.monitor.outputs.failed_run_id }}
           GH_REPO: ${{ github.repository }}
         run: |
           echo "Evaluating failed CI run $FAILED_RUN_ID for auto-rerun..."
@@ -99,13 +108,3 @@ jobs:
 
           echo "Re-running failed CI run $FAILED_RUN_ID (failed jobs only)..."
           gh run rerun "$FAILED_RUN_ID" --failed || echo "Auto-rerun failed (may require manual intervention)"
-
-      - name: Fail job when unhealthy
-        if: ${{ steps.evaluate.outputs.should_alert == 'true' }}
-        env:
-          SUMMARY: ${{ steps.evaluate.outputs.summary }}
-          DETAILS: ${{ steps.evaluate.outputs.details }}
-        run: |
-          echo "$SUMMARY"
-          echo "$DETAILS"
-          exit 1
