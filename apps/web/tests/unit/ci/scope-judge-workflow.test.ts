@@ -38,6 +38,36 @@ describe('Scope Judge workflow cost controls', () => {
     expect(judgeStep).not.toContain('gpt-4o-mini');
   });
 
+  it('escapes judge reasons with shell metacharacters before reporting status', () => {
+    const workflow = readFileSync(workflowPath, 'utf8');
+    const judgeStep = getStepBlock(
+      workflow,
+      'Run scope alignment judge (OpenRouter)'
+    );
+    const reportStep = getStepBlock(workflow, 'Report scope judge status');
+    const commentStep = getStepBlock(
+      workflow,
+      'Comment on PR if scope creep detected'
+    );
+
+    expect(judgeStep).toContain('write_multiline_output reason "$REASON"');
+    expect(judgeStep).not.toContain(
+      'echo "reason=$REASON" >> "$GITHUB_OUTPUT"'
+    );
+    expect(reportStep).toContain(
+      'JUDGE_REASON: ${{ steps.judge.outputs.reason }}'
+    );
+    expect(reportStep).not.toContain(
+      'REASON="${{ steps.judge.outputs.reason }}"'
+    );
+    expect(commentStep).toContain(
+      'JUDGE_REASON: ${{ steps.judge.outputs.reason }}'
+    );
+    expect(commentStep).not.toContain(
+      'REASON="${{ steps.judge.outputs.reason }}"'
+    );
+  });
+
   it('posts a successful deterministic status when the LLM key is absent', () => {
     const workflow = readFileSync(workflowPath, 'utf8');
     const step = getStepBlock(
