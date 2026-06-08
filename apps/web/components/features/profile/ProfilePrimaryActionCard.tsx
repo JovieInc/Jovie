@@ -113,7 +113,7 @@ function buildCardStyles(
     shellClassName: cn(
       'group w-full rounded-[var(--profile-action-radius)] border border-white/[0.08] bg-white/[0.05] text-left backdrop-blur-2xl transition-[background-color,box-shadow,opacity] duration-150 hover:bg-white/[0.08] active:opacity-[0.9]',
       isShowcase
-        ? 'relative block min-h-[198px] overflow-hidden shadow-[0_18px_46px_rgba(0,0,0,0.34)]'
+        ? 'relative block min-h-[198px] overflow-hidden shadow-[0_18px_46px_rgba(0,0,0,0.34)] [@media(max-height:880px)]:min-h-[172px] [@media(max-height:760px)]:min-h-[156px]'
         : 'flex min-h-[64px] items-center gap-3 px-3 py-2.5',
       className
     ),
@@ -179,10 +179,10 @@ function ReleaseCard({
           aria-hidden='true'
           className='absolute inset-x-0 bottom-0 h-24 bg-[radial-gradient(circle_at_24%_100%,rgba(255,255,255,0.18),transparent_46%)]'
         />
-        <div className='relative z-10 flex min-h-[198px] flex-col justify-end p-4'>
+        <div className='relative z-10 flex min-h-[198px] flex-col justify-end p-4 [@media(max-height:880px)]:min-h-[172px] [@media(max-height:880px)]:p-3.5 [@media(max-height:760px)]:min-h-[156px] [@media(max-height:760px)]:p-3'>
           <div className='flex min-w-0 items-end justify-between gap-3'>
             <div className='min-w-0 flex-1'>
-              <p className='line-clamp-2 text-[17px] font-semibold leading-[1.08] text-white [overflow-wrap:anywhere]'>
+              <p className='line-clamp-2 text-[17px] font-semibold leading-[1.08] text-white [overflow-wrap:anywhere] [@media(max-height:880px)]:text-[16px] [@media(max-height:760px)]:text-[15px]'>
                 {state.release.title}
               </p>
               <div className='mt-1 space-y-0.5'>

@@ -399,7 +399,7 @@ export function ProfileCompactSurface({
   const socialIconClassName =
     'inline-flex h-7 w-7 items-center justify-center text-white/68 transition-colors duration-subtle hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/80 focus-visible:ring-offset-2 focus-visible:ring-offset-transparent';
   const heroHeightClassName = isHomeMode
-    ? 'h-[var(--cover-height)] min-h-[300px] max-h-[430px]'
+    ? 'h-[var(--cover-height)] max-h-[430px] [@media(max-height:880px)]:max-h-[218px] [@media(max-height:760px)]:h-[178px] [@media(max-height:760px)]:max-h-[178px]'
     : 'h-[calc(3.5rem+max(env(safe-area-inset-top),0px))] border-b border-white/[0.075]';
   const locationLabel = artist.location?.trim() || artist.hometown?.trim();
   const registerNotificationsReveal = useCallback(
@@ -538,8 +538,8 @@ export function ProfileCompactSurface({
                 )}
               </div>
 
-              <div className='pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,rgba(2,3,4,0.04)_0%,rgba(2,3,4,0.12)_36%,rgba(3,4,6,0.38)_68%,rgba(5,6,8,0.9)_92%,var(--profile-stage-bg)_100%)]' />
-              <div className='pointer-events-none absolute inset-x-0 bottom-0 h-[48%] bg-[linear-gradient(180deg,transparent_0%,rgba(0,0,0,0.48)_38%,rgba(0,0,0,0.84)_74%,var(--profile-stage-bg)_100%)]' />
+              <div className='pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,rgba(2,3,4,0.1)_0%,rgba(2,3,4,0.18)_30%,rgba(3,4,6,0.48)_64%,rgba(5,6,8,0.94)_88%,var(--profile-stage-bg)_100%)]' />
+              <div className='pointer-events-none absolute inset-x-0 bottom-0 h-28 bg-[linear-gradient(180deg,transparent,var(--profile-stage-bg)_90%)]' />
             </>
           ) : (
             <div className='absolute inset-0 bg-black/94 backdrop-blur-2xl' />
@@ -605,9 +605,9 @@ export function ProfileCompactSurface({
           </div>
 
           {isHomeMode ? (
-            <div className='absolute inset-x-0 bottom-0 z-10 px-[var(--page-pad)] pb-4'>
+            <div className='absolute inset-x-0 bottom-0 z-10 px-[var(--page-pad)] pb-5 [@media(max-height:820px)]:pb-4 [@media(max-height:760px)]:pb-3'>
               <div
-                className='min-w-0 px-0 py-0 [overflow-wrap:anywhere]'
+                className='min-w-0 rounded-[18px] bg-black/18 px-3 py-2.5 shadow-[0_16px_38px_-24px_rgba(0,0,0,0.72)] backdrop-blur-[2px] [overflow-wrap:anywhere] [@media(max-height:820px)]:px-2.5 [@media(max-height:820px)]:py-2'
                 data-testid='profile-hero-identity-block'
               >
                 <IdentityHeading
