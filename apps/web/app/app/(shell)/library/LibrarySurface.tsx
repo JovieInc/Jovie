@@ -90,6 +90,10 @@ import {
 
 const LIBRARY_TABLE_ROW_HEIGHT = 56;
 const LIBRARY_TABLE_MIN_WIDTH = '0';
+const LIBRARY_CONTENT_INSET_CLASS =
+  'px-(--linear-app-header-padding-x) py-(--linear-app-content-padding-y)';
+const LIBRARY_GRID_LAYOUT_CLASS =
+  'grid gap-3 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4';
 const LIBRARY_CARD_FOCUS_CLASS =
   'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/55 focus-visible:ring-offset-2 focus-visible:ring-offset-(--linear-app-content-surface) outline-none';
 const LIBRARY_BUTTON_FOCUS_CLASS =
@@ -615,7 +619,7 @@ export function LibraryLoadingState() {
         minWidth={LIBRARY_TABLE_MIN_WIDTH}
         skeletonRows={SKELETON_ROW_COUNT.TABLE}
         skeletonColumnConfig={LIBRARY_TABLE_SKELETON_CONFIG}
-        containerClassName='h-full px-2.5 pb-2.5 pt-1'
+        containerClassName={cn('h-full', LIBRARY_CONTENT_INSET_CLASS)}
       />
     </PageShell>
   );
@@ -1203,7 +1207,7 @@ function AssetGrid({
   readonly getContextMenuItems: LibraryContextMenuBuilder;
 }) {
   return (
-    <div className='grid gap-2.5 px-2.5 pb-2.5 pt-1 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4'>
+    <div className={cn(LIBRARY_GRID_LAYOUT_CLASS, LIBRARY_CONTENT_INSET_CLASS)}>
       {assets.map(asset => (
         <TableContextMenu key={asset.id} items={getContextMenuItems(asset)}>
           <AssetCard
@@ -1271,7 +1275,7 @@ function LibraryDataTable({
         minWidth={LIBRARY_TABLE_MIN_WIDTH}
         hideHeader
         className='system-b-library-table'
-        containerClassName='h-full px-2.5 pb-2.5 pt-1'
+        containerClassName={cn('h-full', LIBRARY_CONTENT_INSET_CLASS)}
         skeletonRows={SKELETON_ROW_COUNT.TABLE}
         skeletonColumnConfig={LIBRARY_TABLE_SKELETON_CONFIG}
       />
@@ -1911,7 +1915,7 @@ function LibraryStatusBar({
     : idleSummary;
 
   return (
-    <div className='system-b-library-status-bar hidden h-8 shrink-0 items-center justify-between gap-3 border-t border-subtle px-3 sm:flex'>
+    <div className='system-b-library-status-bar hidden h-8 shrink-0 items-center justify-between gap-3 border-t border-subtle px-(--linear-app-header-padding-x) sm:flex'>
       <span className='min-w-0 truncate'>
         {visibleCount} of {totalCount} Items
       </span>
