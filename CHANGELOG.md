@@ -5,6 +5,14 @@
      5|The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
      6|and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.6.27] - 2026-06-07
+
+> Admin investor pipeline surfaces now lean on the shared page shell instead of nested section chrome.
+
+### Changed
+
+- **[internal] Admin investor pipeline subtraction (JOV-2101)**: removes nested `ContentSectionHeader` wrappers, icon empty states, and duplicate settings navigation from the investor pipeline, links manager, and settings form so the canonical `AdminPage` shell owns page titles and actions.
+
 ## [26.6.26] - 2026-06-07
 
 > Main CI health monitoring works again without failing on Jovie Bot token creation.
