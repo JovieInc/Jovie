@@ -3,8 +3,9 @@
 import { Button } from '@jovie/ui';
 import { Search } from 'lucide-react';
 import Link from 'next/link';
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { AppSearchField } from '@/components/molecules/AppSearchField';
+import { ConfirmDialog } from '@/components/molecules/ConfirmDialog';
 import { PageShell } from '@/components/organisms/PageShell';
 import {
   readThreadReadState,
@@ -13,8 +14,11 @@ import {
   toSidebarThread,
   writeThreadReadState,
 } from '@/components/shell/SidebarThreadsSection';
+import { useChatThreadContextMenu } from '@/components/shell/useChatThreadContextMenu';
 import { APP_ROUTES } from '@/constants/routes';
 import { PageErrorState } from '@/features/feedback/PageErrorState';
+import { useNotifications } from '@/lib/hooks/useNotifications';
+import { useDeleteConversationMutation } from '@/lib/queries';
 import { useChatConversationsQuery } from '@/lib/queries/useChatConversationsQuery';
 
 const THREAD_LIMIT = 50;
@@ -39,8 +43,13 @@ function ChatListSkeleton() {
 
 export function ChatsPageClient() {
   const [query, setQuery] = useState('');
+  const [archiveAllOpen, setArchiveAllOpen] = useState(false);
   const [threadReadAtById, setThreadReadAtById] =
     useState<Record<string, string>>(readThreadReadState);
+  const notifications = useNotifications();
+  const deleteConversation = useDeleteConversationMutation();
+  const { onThreadContextMenu, contextMenuOverlay } =
+    useChatThreadContextMenu();
 
   const {
     data: conversations,
@@ -96,6 +105,21 @@ export function ChatsPageClient() {
 
   const unreadCount = sidebarThreads.filter(thread => thread.unread).length;
 
+  const handleArchiveAll = useCallback(async () => {
+    if (sidebarThreads.length === 0) return;
+
+    try {
+      await Promise.all(
+        sidebarThreads.map(thread =>
+          deleteConversation.mutateAsync({ conversationId: thread.id })
+        )
+      );
+      notifications.success('All chats archived');
+    } catch {
+      notifications.error('Could not archive all chats');
+    }
+  }, [deleteConversation, notifications, sidebarThreads]);
+
   return (
     <PageShell
       data-testid='chats-page'
@@ -115,9 +139,21 @@ export function ChatsPageClient() {
               className='max-w-2xl flex-1'
               inputClassName='text-[13px]'
             />
-            <Button asChild variant='secondary' size='sm'>
-              <Link href={APP_ROUTES.CHAT}>New Chat</Link>
-            </Button>
+            <div className='flex items-center gap-2'>
+              {sidebarThreads.length > 0 ? (
+                <Button
+                  type='button'
+                  variant='secondary'
+                  size='sm'
+                  onClick={() => setArchiveAllOpen(true)}
+                >
+                  Archive All Chats
+                </Button>
+              ) : null}
+              <Button asChild variant='secondary' size='sm'>
+                <Link href={APP_ROUTES.CHAT}>New Chat</Link>
+              </Button>
+            </div>
           </div>
           <div className='mt-2 flex items-center gap-3 text-[11px] text-tertiary-token'>
             <span>{sidebarThreads.length} chats</span>
@@ -172,13 +208,25 @@ export function ChatsPageClient() {
                   thread={thread}
                   active={false}
                   unread={!!thread.unread}
-                  hasThreadActions={false}
+                  hasThreadActions
+                  onThreadContextMenu={onThreadContextMenu}
                 />
               ))}
             </div>
           )}
         </div>
       </div>
+      <ConfirmDialog
+        open={archiveAllOpen}
+        onOpenChange={setArchiveAllOpen}
+        title='Archive all chats?'
+        description={`This will archive ${sidebarThreads.length} chat${sidebarThreads.length === 1 ? '' : 's'}. You cannot undo this action.`}
+        confirmLabel='Archive All'
+        variant='destructive'
+        onConfirm={handleArchiveAll}
+        isLoading={deleteConversation.isPending}
+      />
+      {contextMenuOverlay}
     </PageShell>
   );
 }

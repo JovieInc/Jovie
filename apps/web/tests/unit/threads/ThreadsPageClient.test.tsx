@@ -1,10 +1,20 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ThreadsPageClient } from '@/app/app/(shell)/threads/ThreadsPageClient';
 import { APP_ROUTES } from '@/constants/routes';
 
-const { mockUseChatConversationsQuery } = vi.hoisted(() => ({
+const {
+  mockUseChatConversationsQuery,
+  mutateAsync,
+  copySessionId,
+  mockNotificationsSuccess,
+  mockNotificationsError,
+} = vi.hoisted(() => ({
   mockUseChatConversationsQuery: vi.fn(),
+  mutateAsync: vi.fn(),
+  copySessionId: vi.fn(),
+  mockNotificationsSuccess: vi.fn(),
+  mockNotificationsError: vi.fn(),
 }));
 
 vi.mock('@/lib/queries/useChatConversationsQuery', () => ({
@@ -12,10 +22,39 @@ vi.mock('@/lib/queries/useChatConversationsQuery', () => ({
     mockUseChatConversationsQuery(...args),
 }));
 
+vi.mock('@/lib/queries', () => ({
+  useDeleteConversationMutation: () => ({
+    mutateAsync,
+    isPending: false,
+  }),
+}));
+
+vi.mock('@/hooks/useClipboard', () => ({
+  useClipboard: (options?: { onSuccess?: () => void }) => ({
+    copy: async (value: string) => {
+      copySessionId(value);
+      options?.onSuccess?.();
+    },
+    isSuccess: false,
+  }),
+}));
+
+vi.mock('@/lib/hooks/useNotifications', () => ({
+  useNotifications: () => ({
+    success: mockNotificationsSuccess,
+    error: mockNotificationsError,
+  }),
+}));
+
 describe('ChatsPageClient', () => {
   beforeEach(() => {
     localStorage.clear();
     mockUseChatConversationsQuery.mockReset();
+    mutateAsync.mockReset();
+    copySessionId.mockReset();
+    mockNotificationsSuccess.mockReset();
+    mockNotificationsError.mockReset();
+    mutateAsync.mockResolvedValue({ success: true });
   });
 
   afterEach(() => {
@@ -140,5 +179,86 @@ describe('ChatsPageClient', () => {
 
     expect(screen.getByText('No chats match "Missing".')).toBeInTheDocument();
     expect(screen.getAllByRole('link', { name: 'New Chat' })).toHaveLength(2);
+  });
+
+  it('opens per-chat actions from the hover menu and right-click', async () => {
+    mockUseChatConversationsQuery.mockReturnValue({
+      data: [
+        {
+          id: 'thread-newer',
+          title: 'Pitch tasks',
+          createdAt: '2026-05-02T00:00:00.000Z',
+          updatedAt: '2026-05-12T00:00:00.000Z',
+          latestMessageRole: 'assistant',
+          latestTurnStatus: 'completed',
+        },
+      ],
+      isLoading: false,
+      isError: false,
+      refetch: vi.fn(),
+    });
+
+    render(<ThreadsPageClient />);
+
+    const threadLink = screen.getByRole('link', { name: 'Pitch tasks' });
+    fireEvent.contextMenu(threadLink);
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Copy Session ID' }));
+
+    expect(copySessionId).toHaveBeenCalledWith('thread-newer');
+
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Chat actions for Pitch tasks' })
+    );
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Archive' }));
+
+    await waitFor(() => {
+      expect(mutateAsync).toHaveBeenCalledWith({
+        conversationId: 'thread-newer',
+      });
+    });
+  });
+
+  it('archives all chats after confirmation', async () => {
+    mockUseChatConversationsQuery.mockReturnValue({
+      data: [
+        {
+          id: 'thread-older',
+          title: 'Release rollout',
+          createdAt: '2026-05-01T00:00:00.000Z',
+          updatedAt: '2026-05-10T00:00:00.000Z',
+          latestMessageRole: 'assistant',
+          latestTurnStatus: 'completed',
+        },
+        {
+          id: 'thread-newer',
+          title: 'Pitch tasks',
+          createdAt: '2026-05-02T00:00:00.000Z',
+          updatedAt: '2026-05-12T00:00:00.000Z',
+          latestMessageRole: 'assistant',
+          latestTurnStatus: 'completed',
+        },
+      ],
+      isLoading: false,
+      isError: false,
+      refetch: vi.fn(),
+    });
+
+    render(<ThreadsPageClient />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Archive All Chats' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Archive All' }));
+
+    await waitFor(() => {
+      expect(mutateAsync).toHaveBeenCalledTimes(2);
+      expect(mutateAsync).toHaveBeenCalledWith({
+        conversationId: 'thread-older',
+      });
+      expect(mutateAsync).toHaveBeenCalledWith({
+        conversationId: 'thread-newer',
+      });
+      expect(mockNotificationsSuccess).toHaveBeenCalledWith(
+        'All chats archived'
+      );
+    });
   });
 });
