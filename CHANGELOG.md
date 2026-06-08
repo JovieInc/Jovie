@@ -5,6 +5,14 @@
      5|The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
      6|and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.6.30] - 2026-06-08
+
+> Library grid cards and list rows now line up with the page toolbar instead of sitting on a tighter inset.
+
+### Changed
+
+- **Library grid spacing and header alignment (JOV-2647)**: normalizes library grid gap and horizontal padding to the shared shell header/content tokens so toolbar meta, grid cards, list rows, loading skeletons, and the status bar share the same left edge.
+
 ## [26.6.29] - 2026-06-08
 
 > Tasks now use the same shell header search entry as Releases and Library.
