@@ -11,8 +11,8 @@
     "viewport": "desktop",
     "theme": "dark",
     "consumers": ["admin", "investor-ready"],
-    "capturedAt": "2026-06-07T11:11:52.455Z",
-    "gitSha": "4af4b58f682415fe29eb2f19d005c83b8db5663c",
+    "capturedAt": "2026-06-08T00:39:52.099Z",
+    "gitSha": "fef9adf0c27c362d97fce4f7b514327136f0615f",
     "imagePath": "marketing-home-desktop.png"
   },
   {
@@ -114,8 +114,8 @@
     "viewport": "desktop",
     "theme": "dark",
     "consumers": ["admin", "investor-ready"],
-    "capturedAt": "2026-06-07T11:13:21.387Z",
-    "gitSha": "4af4b58f682415fe29eb2f19d005c83b8db5663c",
+    "capturedAt": "2026-06-08T00:41:21.518Z",
+    "gitSha": "fef9adf0c27c362d97fce4f7b514327136f0615f",
     "imagePath": "artist-profile-adaptive-section-desktop.png"
   },
   {
@@ -153,8 +153,8 @@
     "viewport": "desktop",
     "theme": "dark",
     "consumers": ["admin", "investor-ready"],
-    "capturedAt": "2026-06-07T11:14:35.493Z",
-    "gitSha": "4af4b58f682415fe29eb2f19d005c83b8db5663c",
+    "capturedAt": "2026-06-08T00:42:35.722Z",
+    "gitSha": "fef9adf0c27c362d97fce4f7b514327136f0615f",
     "imagePath": "artist-profile-reactivation-section-desktop.png"
   },
   {
@@ -179,8 +179,8 @@
     "viewport": "desktop",
     "theme": "dark",
     "consumers": ["admin", "investor-ready"],
-    "capturedAt": "2026-06-07T11:15:24.626Z",
-    "gitSha": "4af4b58f682415fe29eb2f19d005c83b8db5663c",
+    "capturedAt": "2026-06-08T00:43:24.902Z",
+    "gitSha": "fef9adf0c27c362d97fce4f7b514327136f0615f",
     "imagePath": "artist-profile-power-features-section-desktop.png"
   },
   {
@@ -580,8 +580,8 @@
     "viewport": "desktop",
     "theme": "dark",
     "consumers": ["admin", "marketing-export", "investor-ready"],
-    "capturedAt": "2026-06-07T07:36:03.074Z",
-    "gitSha": "5320c9986eeba3bea3a88379c5e83f61ba9486b9",
+    "capturedAt": "2026-06-08T00:49:53.686Z",
+    "gitSha": "fef9adf0c27c362d97fce4f7b514327136f0615f",
     "imagePath": "shell-v1-dashboard-desktop.png",
     "publicExportPath": "shell-v1-dashboard.png"
   },
@@ -608,8 +608,8 @@
     "viewport": "desktop",
     "theme": "dark",
     "consumers": ["admin", "marketing-export", "investor-ready"],
-    "capturedAt": "2026-06-07T11:22:41.860Z",
-    "gitSha": "4af4b58f682415fe29eb2f19d005c83b8db5663c",
+    "capturedAt": "2026-06-08T00:50:42.857Z",
+    "gitSha": "fef9adf0c27c362d97fce4f7b514327136f0615f",
     "imagePath": "shell-v1-releases-desktop.png",
     "publicExportPath": "shell-v1-releases.png"
   },
