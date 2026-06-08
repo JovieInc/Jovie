@@ -552,9 +552,18 @@ type ReleaseCardLayout = {
     readonly width: number;
     readonly height: number;
   } | null;
+  readonly title: {
+    readonly top: number;
+    readonly bottom: number;
+    readonly left: number;
+    readonly right: number;
+  } | null;
   readonly hero: {
     readonly top: number;
     readonly bottom: number;
+  } | null;
+  readonly cover: {
+    readonly height: number;
   } | null;
 };
 
@@ -566,8 +575,13 @@ async function collectMockHomeReleaseCardLayout(
       '[data-testid="profile-home-primary-action-card"]'
     );
     const artwork = card?.querySelector<HTMLImageElement>('img') ?? null;
+    const title =
+      card?.querySelector<HTMLElement>('p.line-clamp-2, p.truncate') ?? null;
     const hero = document.querySelector<HTMLElement>(
       '[data-testid="profile-hero-identity-block"]'
+    );
+    const cover = document.querySelector<HTMLElement>(
+      '[data-testid="profile-cover"]'
     );
 
     if (!card) {
@@ -589,7 +603,13 @@ async function collectMockHomeReleaseCardLayout(
     return {
       card: rect(card),
       artwork: artwork ? rect(artwork) : null,
+      title: title ? rect(title) : null,
       hero: hero ? rect(hero) : null,
+      cover: cover
+        ? {
+            height: cover.getBoundingClientRect().height,
+          }
+        : null,
     };
   });
 }
@@ -642,6 +662,24 @@ test.describe('Public Profile Mock Home Release Card Layout @smoke @critical', (
         layout.artwork?.width ?? 0,
         `${viewport.label} bento artwork should fill the card width`
       ).toBeGreaterThanOrEqual(layout.card.width - 2);
+
+      if (layout.title) {
+        expect(
+          layout.title.top,
+          `${viewport.label} release title should stay inside the card`
+        ).toBeGreaterThanOrEqual(layout.card.top + 6);
+        expect(
+          layout.title.bottom,
+          `${viewport.label} release title should stay inside the card`
+        ).toBeLessThanOrEqual(layout.card.bottom - 6);
+      }
+
+      if (viewport.height <= 760 && layout.cover) {
+        expect(
+          layout.cover.height,
+          `${viewport.label} home hero should compress on short viewports`
+        ).toBeLessThanOrEqual(190);
+      }
     });
   }
 });

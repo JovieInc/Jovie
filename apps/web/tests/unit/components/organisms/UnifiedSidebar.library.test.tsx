@@ -83,8 +83,8 @@ function LibrarySidebarOverride({
     backHref: APP_ROUTES.CHAT,
     backLabel: 'Back to App',
     content: (
-      <nav aria-label='Library navigation'>
-        <button type='button'>All</button>
+      <nav aria-label='Library filters'>
+        <button type='button'>Status</button>
         {children}
       </nav>
     ),
@@ -162,11 +162,11 @@ describe('UnifiedSidebar library route', () => {
 
     await waitFor(() => {
       expect(
-        screen.getByRole('navigation', { name: 'Library navigation' })
+        screen.getByRole('navigation', { name: 'Library filters' })
       ).toBeInTheDocument();
     });
 
-    expect(screen.getByRole('button', { name: 'All' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Status' })).toBeInTheDocument();
     expect(
       screen.getByRole('button', { name: 'Needs Assets' })
     ).toBeInTheDocument();

@@ -196,8 +196,6 @@ const mockCreateTask = vi.fn();
 const mockDeleteTask = vi.fn();
 const mockUpdateTask = vi.fn();
 const mockMoveTask = vi.fn();
-const mockSetHeaderActions = vi.fn();
-let setHeaderActionsHost: ((actions: React.ReactNode) => void) | null = null;
 let mockIsXlUp = true;
 let mockIs2xlUp = true;
 let mockTasksData: TaskView[] = [mockTask, mockTaskTwo];
@@ -240,11 +238,6 @@ function createMockTaskBoardResult(
   };
 }
 
-function setHeaderActionsForTest(actions: React.ReactNode) {
-  mockSetHeaderActions(actions);
-  setHeaderActionsHost?.(actions);
-}
-
 function openTask(task: TaskView = mockTaskTwo) {
   act(() => {
     getLatestTableProps()?.onRowClick?.(task);
@@ -266,22 +259,6 @@ vi.mock('@/app/app/(shell)/dashboard/DashboardDataContext', () => ({
     },
   }),
 }));
-
-vi.mock('@/contexts/HeaderActionsContext', async () => {
-  const ReactModule = await vi.importActual<typeof import('react')>('react');
-
-  return {
-    useRegisterHeaderActions: (actions: React.ReactNode) => {
-      ReactModule.useEffect(() => {
-        setHeaderActionsForTest(actions);
-        return () => setHeaderActionsForTest(null);
-      }, [actions]);
-    },
-    useSetHeaderActions: () => ({
-      setHeaderActions: setHeaderActionsForTest,
-    }),
-  };
-});
 
 vi.mock('@/hooks/useRegisterRightPanel', () => ({
   useRegisterRightPanel: mockRegisterRightPanel,
@@ -592,28 +569,41 @@ vi.mock('@/components/organisms/release-sidebar', () => ({
   ReleaseSidebar: () => null,
 }));
 
+import { HeaderSearchSurfaceFromContext } from '@/components/shell/HeaderSearchSurface';
+import type { HeaderSearchAdapter } from '@/contexts/HeaderActionsContext';
+import {
+  HeaderActionsProvider,
+  useOptionalHeaderActions,
+} from '@/contexts/HeaderActionsContext';
+
 const { TasksPageClient } = await import(
   '@/components/features/dashboard/tasks/TasksPageClient'
 );
 
+let latestHeaderSearchAdapter: HeaderSearchAdapter | null = null;
+
 function HeaderActionsHost() {
-  const [actions, setActions] = React.useState<React.ReactNode>(null);
+  const state = useOptionalHeaderActions();
 
   React.useEffect(() => {
-    setHeaderActionsHost = setActions;
-    return () => {
-      setHeaderActionsHost = null;
-    };
-  }, []);
+    latestHeaderSearchAdapter = state?.headerSearchAdapter ?? null;
+  }, [state?.headerSearchAdapter]);
 
-  return <div data-testid='header-actions-host'>{actions}</div>;
+  return (
+    <div data-testid='header-actions-host'>
+      <HeaderSearchSurfaceFromContext />
+      {state?.headerActions}
+    </div>
+  );
 }
 
 function renderPage() {
   return render(
     <TooltipProvider>
-      <HeaderActionsHost />
-      <TasksPageClient />
+      <HeaderActionsProvider>
+        <HeaderActionsHost />
+        <TasksPageClient />
+      </HeaderActionsProvider>
     </TooltipProvider>
   );
 }
@@ -635,8 +625,8 @@ function getLatestTableProps() {
 }
 
 function openDesktopTaskSearch() {
-  fireEvent.click(screen.getByRole('button', { name: 'Search tasks' }));
-  return screen.getByRole('searchbox', { name: 'Search tasks' });
+  fireEvent.click(screen.getByRole('button', { name: /filter tasks/i }));
+  return screen.getByRole('combobox', { name: 'Filter tasks' });
 }
 
 function enableDesignV1Tasks() {
@@ -646,12 +636,12 @@ function enableDesignV1Tasks() {
 describe('TasksPageClient', () => {
   beforeEach(() => {
     vi.useFakeTimers();
+    latestHeaderSearchAdapter = null;
     mockCreateTask.mockReset();
     mockDeleteTask.mockReset();
     mockUpdateTask.mockReset();
     mockMoveTask.mockReset();
     mockSetViewMode.mockClear();
-    mockSetHeaderActions.mockReset();
     mockRegisterRightPanel.mockReset();
     mockRouterPush.mockReset();
     mockUseReleaseEntityQuery.mockClear();
@@ -1072,8 +1062,10 @@ describe('TasksPageClient', () => {
 
     view.rerender(
       <TooltipProvider>
-        <HeaderActionsHost />
-        <TasksPageClient />
+        <HeaderActionsProvider>
+          <HeaderActionsHost />
+          <TasksPageClient />
+        </HeaderActionsProvider>
       </TooltipProvider>
     );
 
@@ -1261,65 +1253,52 @@ describe('TasksPageClient', () => {
     expect(screen.getByRole('button', { name: 'Next task' })).toBeEnabled();
   }, 10000);
 
-  it('keeps task search collapsed in the workspace toolbar by default', () => {
+  it('registers shell search exposing the task count in the shared trigger', () => {
     renderPage();
 
-    const headerActions = screen.getByTestId('header-actions-host');
-
+    const filterTrigger = screen.getByRole('button', { name: /filter tasks/i });
+    expect(filterTrigger).toHaveTextContent('2');
+    expect(filterTrigger).toHaveAttribute('data-app-search-trigger', 'true');
     expect(
-      headerActions.querySelector('[aria-label="Search tasks"]')
+      screen.queryByRole('button', { name: 'Search tasks' })
     ).not.toBeInTheDocument();
     expect(
-      within(headerActions).getByRole('button', { name: 'Create task' })
+      within(screen.getByTestId('header-actions-host')).getByRole('button', {
+        name: 'Create task',
+      })
     ).toBeInTheDocument();
+  }, 10000);
+
+  it('opens the tasks filter through the shell-owned trigger', () => {
+    renderPage();
+
     expect(
-      screen.getByRole('button', { name: 'Search tasks' })
-    ).toBeInTheDocument();
-    expect(
-      screen.queryByRole('searchbox', { name: 'Search tasks' })
-    ).toBeNull();
+      screen.queryByRole('combobox', { name: 'Filter tasks' })
+    ).not.toBeInTheDocument();
 
     openDesktopTaskSearch();
 
     expect(
-      screen.getByRole('searchbox', { name: 'Search tasks' })
+      screen.getByRole('combobox', { name: 'Filter tasks' })
     ).toBeInTheDocument();
-  }, 10000);
-
-  it('does not open or focus task search with the slash key', () => {
-    renderPage();
-    openTask();
-
-    const searchButton = screen.getByRole('button', { name: 'Search tasks' });
-
-    fireEvent.keyDown(screen.getByLabelText('Task title'), { key: '/' });
-
-    expect(
-      screen.queryByRole('searchbox', { name: 'Search tasks' })
-    ).toBeNull();
-    expect(document.activeElement).not.toBe(searchButton);
-
-    fireEvent.keyDown(window, { key: '/' });
-
-    expect(
-      screen.queryByRole('searchbox', { name: 'Search tasks' })
-    ).toBeNull();
-    expect(document.activeElement).not.toBe(searchButton);
-  });
-
-  it('focuses task search when the shared search action opens it', () => {
-    renderPage();
-
-    const searchBox = openDesktopTaskSearch();
-
-    expect(document.activeElement).toBe(searchBox);
   });
 
   it('keeps task title search wired into list filters', () => {
     renderPage();
 
-    fireEvent.change(openDesktopTaskSearch(), {
-      target: { value: 'metadata' },
+    act(() => {
+      latestHeaderSearchAdapter?.onPillsChange([
+        {
+          id: 'pill-1',
+          field: 'title',
+          op: 'is',
+          values: ['metadata'],
+        },
+      ]);
+    });
+
+    act(() => {
+      vi.advanceTimersByTime(500);
     });
 
     expect(mockUseTasksQuery.mock.calls.at(-1)?.[1]).toEqual(
@@ -1332,8 +1311,19 @@ describe('TasksPageClient', () => {
 
     renderPage();
 
-    fireEvent.change(openDesktopTaskSearch(), {
-      target: { value: 'press' },
+    act(() => {
+      latestHeaderSearchAdapter?.onPillsChange([
+        {
+          id: 'pill-1',
+          field: 'title',
+          op: 'is',
+          values: ['press'],
+        },
+      ]);
+    });
+
+    act(() => {
+      vi.advanceTimersByTime(500);
     });
 
     expect(mockUseTaskBoardQuery.mock.calls.at(-1)?.[1]).toEqual(
@@ -1541,7 +1531,7 @@ describe('TasksPageClient', () => {
 
     expect(screen.getByText('2 total tasks')).toBeInTheDocument();
     expect(
-      screen.queryByRole('searchbox', { name: 'Search tasks' })
+      screen.queryByRole('combobox', { name: 'Filter tasks' })
     ).not.toBeInTheDocument();
 
     const firstMobileRow = screen.getAllByTestId('mobile-task-row')[0]!;
