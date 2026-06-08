@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import React from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import {
@@ -51,10 +51,29 @@ const generationResult: ChatMerchGenerationResult = {
       concept: 'A premium shirt with restrained artist typography.',
       mockup_urls: ['https://cdn.test/signal.jpg'],
       price_recommendation: {
-        retail_price: '$45.00',
-        artist_share: '$11.87',
-        jovie_share: '$11.87',
-        minimum_jovie_margin: '$5.00',
+        sale_price: '$45.00',
+        profit: '$11.87',
+        margin_preset: 'standard',
+        presets: [
+          {
+            preset: 'safe',
+            label: 'Safe',
+            sale_price: '$42.00',
+            profit: '$10.50',
+          },
+          {
+            preset: 'standard',
+            label: 'Standard',
+            sale_price: '$45.00',
+            profit: '$11.87',
+          },
+          {
+            preset: 'aggressive',
+            label: 'Aggressive',
+            sale_price: '$49.00',
+            profit: '$13.25',
+          },
+        ],
       },
       sellability: { sellable: true, reasons: [] },
       production_warnings: [],
@@ -68,10 +87,29 @@ const generationResult: ChatMerchGenerationResult = {
       concept: 'A heavier item waiting on provider pricing.',
       mockup_urls: ['https://cdn.test/hoodie.jpg'],
       price_recommendation: {
-        retail_price: '$58.00',
-        artist_share: '$0.00',
-        jovie_share: '$0.00',
-        minimum_jovie_margin: '$5.80',
+        sale_price: '$58.00',
+        profit: '$0.00',
+        margin_preset: 'standard',
+        presets: [
+          {
+            preset: 'safe',
+            label: 'Safe',
+            sale_price: '$55.00',
+            profit: '$0.00',
+          },
+          {
+            preset: 'standard',
+            label: 'Standard',
+            sale_price: '$58.00',
+            profit: '$0.00',
+          },
+          {
+            preset: 'aggressive',
+            label: 'Aggressive',
+            sale_price: '$62.00',
+            profit: '$0.00',
+          },
+        ],
       },
       sellability: {
         sellable: false,
@@ -86,9 +124,15 @@ describe('ChatMerchCard', () => {
   it('shows merch option economics and disables publish when blocked', () => {
     render(<ChatMerchOptionsCard result={generationResult} />);
 
-    expect(screen.getByText('Price $45.00')).toBeInTheDocument();
-    expect(screen.getByText('Jovie $11.87')).toBeInTheDocument();
-    expect(screen.getByText('Floor $5.80')).toBeInTheDocument();
+    const optionCards = screen.getAllByTestId('chat-merch-option-card');
+    const sellableCard = within(optionCards[0]);
+    expect(sellableCard.getByTestId('merch-pricing-summary')).toHaveTextContent(
+      '$45.00'
+    );
+    expect(sellableCard.getByTestId('merch-pricing-summary')).toHaveTextContent(
+      '$11.87'
+    );
+    expect(sellableCard.getByRole('radio', { name: 'Standard' })).toBeChecked();
     expect(screen.getByText('Draft')).toBeInTheDocument();
     expect(
       screen.getByText(

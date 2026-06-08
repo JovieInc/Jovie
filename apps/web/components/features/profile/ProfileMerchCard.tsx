@@ -60,21 +60,32 @@ export function ProfileMerchCard({
           </div>
           <div className='mt-2 flex items-center justify-between gap-2'>
             {(() => {
-              const p = getMerchPriceDisplay(card.retailPriceCents); // gh-9802 simplify: sale/profit hero via shared helper (explicit, ready for salePriceCents + creatorProfit)
+              const p = getMerchPriceDisplay(
+                card.retailPriceCents,
+                null,
+                card.pricing.artistPayoutPerUnitEstimateCents
+              );
               return (
-                <span className='text-[13px] font-semibold text-white'>
-                  {p.isOnSale ? (
-                    <>
-                      <span className='text-emerald-400'>Sale </span>
-                      {p.displayPrice}
-                      <span className='ml-1 text-[10px] line-through text-white/50'>
-                        {p.originalPrice}
-                      </span>
-                    </>
-                  ) : (
-                    p.displayPrice
-                  )}
-                </span>
+                <div className='min-w-0'>
+                  <span className='text-[13px] font-semibold text-white'>
+                    {p.isOnSale ? (
+                      <>
+                        <span className='text-emerald-400'>Sale </span>
+                        {p.displayPrice}
+                        <span className='ml-1 text-[10px] line-through text-white/50'>
+                          {p.originalPrice}
+                        </span>
+                      </>
+                    ) : (
+                      p.displayPrice
+                    )}
+                  </span>
+                  {p.creatorProfit ? (
+                    <p className='mt-0.5 text-[11px] text-white/58'>
+                      Profit {p.creatorProfit}
+                    </p>
+                  ) : null}
+                </div>
               );
             })()}
             <span className='rounded-full border border-white/12 px-2 py-1 text-[11px] font-medium text-white/78'>

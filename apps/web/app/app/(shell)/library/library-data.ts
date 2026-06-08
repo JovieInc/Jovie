@@ -54,9 +54,8 @@ export interface LibraryReleaseAsset {
   readonly primaryActionLabel?: string;
   readonly primaryActionHref?: string | null;
   readonly productType?: string;
-  readonly retailPriceLabel?: string;
-  readonly artistPayoutLabel?: string;
-  readonly jovieMarginLabel?: string;
+  readonly salePriceLabel?: string;
+  readonly profitLabel?: string;
   readonly sellabilityLabel?: string;
   readonly description?: string;
   readonly createdAt?: string;
@@ -188,11 +187,8 @@ export function buildLibraryMerchAssets(
       primaryActionLabel: 'Open Merch',
       primaryActionHref: '/app/library?view=merch',
       productType: card.productType,
-      retailPriceLabel: formatMerchCents(card.retailPriceCents),
-      artistPayoutLabel: formatMerchCents(
-        card.artistPayoutPerUnitEstimateCents
-      ),
-      jovieMarginLabel: formatMerchCents(card.jovieMarginPerUnitEstimateCents),
+      salePriceLabel: formatMerchCents(card.retailPriceCents),
+      profitLabel: formatMerchCents(card.artistPayoutPerUnitEstimateCents),
       sellabilityLabel: card.sellable
         ? 'Ready To Sell'
         : (card.sellabilityReasons?.[0] ?? 'Blocked'),

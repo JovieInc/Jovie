@@ -37,8 +37,10 @@ import { resolveMerchCatalogSelection } from './catalog';
 import { MERCH_DEFAULT_PRINTFUL_PRODUCT } from './default-catalog';
 import { attachMockupsToDesignOption, generateProductMockups } from './mockups'; // HOT ZONE pipeline (gh-9803)
 import {
+  buildMerchPresetPriceQuotes,
   buildMerchPricingSnapshot,
   formatMerchMoney,
+  MERCH_DEFAULT_MARGIN_PRESET,
   type MerchSellabilityResult,
 } from './pricing';
 import { getMerchCardSellability } from './safety';
@@ -357,6 +359,36 @@ function validateMerchCardForPublishing(card: MerchCard): void {
   }
 }
 
+function buildOptionPriceRecommendation(option: MerchDesignOption) {
+  const presetQuotes = buildMerchPresetPriceQuotes({
+    printfulProductCostCents: option.estimatedPrintfulProductCostCents,
+    shippingCostCents: option.estimatedShippingCostCents,
+    refundReserveCents: option.pricing.refundReserveCents,
+    artistRoyaltyRateBps: option.pricing.artistRoyaltyRateBps,
+    printfulCostSource: option.pricing.printfulCostSource,
+    printfulCostUpdatedAt: option.pricing.printfulCostUpdatedAt,
+  });
+  const activePreset =
+    presetQuotes.find(quote => quote.preset === MERCH_DEFAULT_MARGIN_PRESET) ??
+    presetQuotes[1];
+
+  return {
+    sale_price: activePreset.salePrice,
+    profit: activePreset.profit,
+    margin_preset: activePreset.preset,
+    presets: presetQuotes.map(quote => ({
+      preset: quote.preset,
+      label: quote.label,
+      sale_price: quote.salePrice,
+      profit: quote.profit,
+    })),
+    estimated_printful_cost:
+      option.estimatedPrintfulProductCostCents > 0
+        ? formatMerchMoney(option.estimatedPrintfulProductCostCents)
+        : undefined,
+  };
+}
+
 function optionToView(option: MerchDesignOption): MerchGenerationOptionView {
   const sellability = getDesignOptionSellability(option);
   return {
@@ -371,24 +403,7 @@ function optionToView(option: MerchDesignOption): MerchGenerationOptionView {
     available_sizes: option.availableSizes,
     placements: option.placements,
     technique: option.technique,
-    price_recommendation: {
-      retail_price: formatMerchMoney(option.retailPriceCents),
-      estimated_printful_cost: formatMerchMoney(
-        option.estimatedPrintfulProductCostCents
-      ),
-      estimated_shipping: formatMerchMoney(option.estimatedShippingCostCents),
-      estimated_gross_margin: formatMerchMoney(
-        option.estimatedGrossMarginCents
-      ),
-      artist_share: formatMerchMoney(option.artistShareCents),
-      jovie_share: formatMerchMoney(option.jovieShareCents),
-      minimum_jovie_margin: option.pricing.minimumJovieMarginCents
-        ? formatMerchMoney(option.pricing.minimumJovieMarginCents)
-        : undefined,
-      target_jovie_margin: option.pricing.targetJovieMarginCents
-        ? formatMerchMoney(option.pricing.targetJovieMarginCents)
-        : undefined,
-    },
+    price_recommendation: buildOptionPriceRecommendation(option),
     sellability,
     concept: option.concept,
     why_it_fits: option.whyItFits,
