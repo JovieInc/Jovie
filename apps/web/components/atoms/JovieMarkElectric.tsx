@@ -25,7 +25,7 @@ interface JovieMarkElectricProps {
   readonly spark?: boolean;
 }
 
-const ASPECT_RATIO = 347.97 / 353.68;
+const ASPECT_RATIO = 1;
 
 export function JovieMarkElectric({
   size,
