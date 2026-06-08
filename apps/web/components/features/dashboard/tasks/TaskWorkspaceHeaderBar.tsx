@@ -7,7 +7,6 @@ import {
   TableFilterDropdown,
   type TableFilterDropdownCategory,
 } from '@/components/molecules/filters';
-import { HeaderSearchAction } from '@/components/molecules/HeaderSearchAction';
 import { TabBar } from '@/components/molecules/tab-bar/TabBar';
 import {
   PageToolbar,
@@ -38,9 +37,6 @@ export interface TaskWorkspaceHeaderBarProps {
   readonly onCancelCreate: () => void;
   readonly onSubmitCreate: (event: FormEvent<HTMLFormElement>) => void;
   readonly createPending: boolean;
-  readonly searchValue: string;
-  readonly onSearchValueChange: (value: string) => void;
-  readonly onClearSearch: () => void;
   readonly filterCategories: ReadonlyArray<TableFilterDropdownCategory>;
   readonly onClearFilters: () => void;
   readonly onCreateTask: () => void;
@@ -63,9 +59,6 @@ export function TaskWorkspaceHeaderBar({
   onCancelCreate,
   onSubmitCreate,
   createPending,
-  searchValue,
-  onSearchValueChange,
-  onClearSearch,
   filterCategories,
   onClearFilters,
   onCreateTask,
@@ -133,16 +126,6 @@ export function TaskWorkspaceHeaderBar({
       </>
     ) : (
       <>
-        <HeaderSearchAction
-          searchValue={searchValue}
-          onSearchValueChange={onSearchValueChange}
-          onClearAction={onClearSearch}
-          placeholder='Search tasks'
-          ariaLabel='Search tasks'
-          submitAriaLabel='Search tasks'
-          tooltipLabel='Search'
-          className='hidden h-7 text-xs text-tertiary-token hover:text-primary-token lg:flex'
-        />
         <TableFilterDropdown
           categories={filterCategories}
           onClearAll={onClearFilters}
