@@ -579,6 +579,8 @@ const LIBRARY_TABLE_COLUMNS = [
   }),
 ] as ColumnDef<LibraryReleaseAsset, unknown>[];
 
+const LIBRARY_VIEW_FILTER_CHIP_KEYS = PRESETS.map(preset => preset.id);
+
 export function LibraryLoadingState() {
   return (
     <PageShell
@@ -590,12 +592,18 @@ export function LibraryLoadingState() {
       toolbar={
         <PageToolbar
           start={
-            <span className={PAGE_TOOLBAR_META_TEXT_CLASS}>
-              <span
-                className='inline-block h-3 w-36 rounded-sm skeleton motion-reduce:animate-none align-middle'
-                aria-hidden='true'
-              />
-            </span>
+            <div
+              className='flex min-w-0 flex-wrap items-center gap-1'
+              data-testid='library-view-filter-chips'
+            >
+              {LIBRARY_VIEW_FILTER_CHIP_KEYS.map(key => (
+                <span
+                  key={key}
+                  className='inline-block h-7 w-16 rounded-full skeleton motion-reduce:animate-none'
+                  aria-hidden='true'
+                />
+              ))}
+            </div>
           }
         />
       }
@@ -613,19 +621,73 @@ export function LibraryLoadingState() {
   );
 }
 
-function LibraryRail({
+function LibraryViewFilterChip({
+  label,
+  count,
+  active,
+  onClick,
+}: {
+  readonly label: string;
+  readonly count: number;
+  readonly active: boolean;
+  readonly onClick: () => void;
+}) {
+  return (
+    <button
+      type='button'
+      onClick={onClick}
+      aria-pressed={active}
+      className={cn(
+        'system-b-library-filter-pill h-7 rounded-full px-3 font-caption transition-colors duration-subtle ease-subtle',
+        active
+          ? 'system-b-library-filter-pill-active'
+          : 'system-b-library-filter-pill-idle'
+      )}
+    >
+      {label}
+      <span className='system-b-library-rail-count ml-1 tabular-nums'>
+        {count}
+      </span>
+    </button>
+  );
+}
+
+function LibraryViewFilterChips({
   assets,
   preset,
-  filters,
   onPreset,
+}: {
+  readonly assets: readonly LibraryReleaseAsset[];
+  readonly preset: LibraryPresetId;
+  readonly onPreset: (preset: LibraryPresetId) => void;
+}) {
+  return (
+    <div
+      className='flex min-w-0 flex-wrap items-center gap-1'
+      data-testid='library-view-filter-chips'
+    >
+      {PRESETS.map(view => (
+        <LibraryViewFilterChip
+          key={view.id}
+          label={view.label}
+          count={assets.filter(view.predicate).length}
+          active={preset === view.id}
+          onClick={() => onPreset(view.id)}
+        />
+      ))}
+    </div>
+  );
+}
+
+function LibraryRail({
+  assets,
+  filters,
   onFilters,
   onClearFilters,
   className,
 }: {
   readonly assets: readonly LibraryReleaseAsset[];
-  readonly preset: LibraryPresetId;
   readonly filters: LibraryFilters;
-  readonly onPreset: (preset: LibraryPresetId) => void;
   readonly onFilters: (filters: LibraryFilters) => void;
   readonly onClearFilters: () => void;
   readonly className?: string;
@@ -662,43 +724,12 @@ function LibraryRail({
 
   return (
     <nav
-      aria-label='Library navigation'
+      aria-label='Library filters'
       className={cn(
         'system-b-library-rail flex min-h-0 flex-col p-2.5',
         className
       )}
     >
-      <div className='px-1.5 pb-2'>
-        <div className='flex items-center justify-between gap-2'>
-          <p className='system-b-library-rail-title'>Views</p>
-          <span className='system-b-library-rail-count tabular-nums'>
-            {assets.length}
-          </span>
-        </div>
-        <div className='mt-1.5 space-y-px'>
-          {PRESETS.map(view => {
-            const active = preset === view.id;
-            const count = assets.filter(view.predicate).length;
-            return (
-              <button
-                key={view.id}
-                type='button'
-                onClick={() => onPreset(view.id)}
-                className={cn(
-                  'system-b-library-rail-button flex h-8 w-full items-center gap-2 border px-2 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/55 focus-visible:ring-offset-2 focus-visible:ring-offset-(--linear-app-content-surface) outline-none',
-                  active && 'system-b-library-rail-button--active'
-                )}
-              >
-                <span className='min-w-0 flex-1 truncate'>{view.label}</span>
-                <span className='system-b-library-rail-count tabular-nums'>
-                  {count}
-                </span>
-              </button>
-            );
-          })}
-        </div>
-      </div>
-
       <div className='min-h-0 flex-1 overflow-y-auto px-1.5 pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden'>
         <div className='flex items-center justify-between gap-2 pb-1 pt-2'>
           <p className='system-b-library-rail-title'>Filters</p>
@@ -949,6 +980,9 @@ function ViewToggle({
 }
 
 function LibraryToolbar({
+  assets,
+  preset,
+  onPreset,
   sort,
   onSort,
   view,
@@ -959,6 +993,9 @@ function LibraryToolbar({
   onToggleMobileFilters,
   activeFilterCount,
 }: {
+  readonly assets: readonly LibraryReleaseAsset[];
+  readonly preset: LibraryPresetId;
+  readonly onPreset: (preset: LibraryPresetId) => void;
   readonly sort: LibrarySortKey;
   readonly onSort: (sort: LibrarySortKey) => void;
   readonly view: LibraryViewMode;
@@ -972,10 +1009,17 @@ function LibraryToolbar({
   return (
     <PageToolbar
       start={
-        <span className={PAGE_TOOLBAR_META_TEXT_CLASS}>
-          {visibleCount}
-          {visibleCount === totalCount ? '' : ` of ${totalCount}`} visible
-        </span>
+        <div className='flex min-w-0 flex-col gap-1.5 sm:flex-row sm:items-center sm:gap-2'>
+          <LibraryViewFilterChips
+            assets={assets}
+            preset={preset}
+            onPreset={onPreset}
+          />
+          <span className={PAGE_TOOLBAR_META_TEXT_CLASS}>
+            {visibleCount}
+            {visibleCount === totalCount ? '' : ` of ${totalCount}`} visible
+          </span>
+        </div>
       }
       end={
         <>
@@ -1892,7 +1936,7 @@ export function LibrarySurface({
   );
   const [filters, setFilters] = useState<LibraryFilters>(() => emptyFilters());
   const [sort, setSort] = useState<LibrarySortKey>('releaseDate');
-  const [view, setView] = useState<LibraryViewMode>('grid');
+  const [view, setView] = useState<LibraryViewMode>('list');
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
@@ -2023,8 +2067,26 @@ export function LibrarySurface({
     return () => globalThis.removeEventListener('keydown', onKeyDown);
   }, [drawerOpen]);
 
+  const handlePresetChange = useCallback(
+    (next: LibraryPresetId) => {
+      setPreset(next);
+      const params = new URLSearchParams(searchParams.toString());
+      if (next === 'all') {
+        params.delete('view');
+      } else {
+        params.set('view', next);
+      }
+      const query = params.toString();
+      router.replace(
+        query ? `${APP_ROUTES.LIBRARY}?${query}` : APP_ROUTES.LIBRARY,
+        { scroll: false }
+      );
+    },
+    [router, searchParams]
+  );
+
   function resetView() {
-    setPreset('all');
+    handlePresetChange('all');
     setFilters(emptyFilters());
     setPills([]);
   }
@@ -2128,14 +2190,12 @@ export function LibrarySurface({
     () => (
       <LibraryRail
         assets={effectiveAssets}
-        preset={preset}
         filters={filters}
-        onPreset={setPreset}
         onFilters={setFilters}
         onClearFilters={() => setFilters(emptyFilters())}
       />
     ),
-    [effectiveAssets, filters, preset]
+    [effectiveAssets, filters]
   );
 
   useRegisterShellSidebarOverride(
@@ -2177,6 +2237,9 @@ export function LibrarySurface({
       data-testid='library-surface'
       toolbar={
         <LibraryToolbar
+          assets={effectiveAssets}
+          preset={preset}
+          onPreset={handlePresetChange}
           sort={sort}
           onSort={setSort}
           view={view}
