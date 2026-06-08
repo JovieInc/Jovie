@@ -191,30 +191,56 @@ jobs:
 
           echo "Using OpenRouter model: $OPENROUTER_MODEL"
 
-          # Call OpenRouter API with a free model.
-          RESPONSE=$(curl -sS --max-time 30 https://openrouter.ai/api/v1/chat/completions \
-            -H "Authorization: Bearer $OPENROUTER_API_KEY" \
-            -H "Content-Type: application/json" \
-            -H "HTTP-Referer: https://github.com/${{ github.repository }}" \
-            -H "X-OpenRouter-Title: Jovie Scope Judge" \
-            -d "$(jq -n \
-              --arg model "$OPENROUTER_MODEL" \
-              --arg system "$JUDGE_PROMPT" \
-              --arg user "## TICKET INTENT\n$INTENT\n\n## CODE CHANGES\n$DIFF" \
-              '{
-                model: $model,
-                messages: [
-                  {role: "system", content: $system},
-                  {role: "user", content: $user}
-                ],
-                max_tokens: 200,
-                temperature: 0.1
-              }'
-            )")
+          call_openrouter() {
+            curl -sS --max-time 30 https://openrouter.ai/api/v1/chat/completions \
+              -H "Authorization: Bearer $OPENROUTER_API_KEY" \
+              -H "Content-Type: application/json" \
+              -H "HTTP-Referer: https://github.com/${{ github.repository }}" \
+              -H "X-OpenRouter-Title: Jovie Scope Judge" \
+              -d "$(jq -n \
+                --arg model "$OPENROUTER_MODEL" \
+                --arg system "$JUDGE_PROMPT" \
+                --arg user "## TICKET INTENT\n$INTENT\n\n## CODE CHANGES\n$DIFF" \
+                '{
+                  model: $model,
+                  messages: [
+                    {role: "system", content: $system},
+                    {role: "user", content: $user}
+                  ],
+                  max_tokens: 200,
+                  temperature: 0.1
+                }'
+              )"
+          }
+
+          RESPONSE=""
+          for attempt in 1 2 3; do
+            RESPONSE=$(call_openrouter)
+            if echo "$RESPONSE" | jq -e '.choices[0].message.content' >/dev/null 2>&1; then
+              echo "OpenRouter judge succeeded on attempt $attempt"
+              break
+            fi
+
+            API_ERROR=$(echo "$RESPONSE" | jq -r '.error.message // empty')
+            echo "OpenRouter judge attempt $attempt failed: ${API_ERROR:-unknown error}"
+            if [[ "$attempt" -lt 3 ]]; then
+              sleep $((attempt * 2))
+            fi
+          done
 
           # Extract verdict
           CONTENT=$(echo "$RESPONSE" | jq -r '.choices[0].message.content // .error.message // "ERROR: No response"')
           echo "Judge response: $CONTENT"
+
+          write_multiline_output() {
+            local name="$1"
+            local value="$2"
+            {
+              echo "${name}<<EOF"
+              printf '%s\n' "$value"
+              echo 'EOF'
+            } >> "$GITHUB_OUTPUT"
+          }
 
           VERDICT=$(echo "$CONTENT" | grep -oP '(?<=VERDICT:\s)(PASS|FAIL)' | head -1 || echo "")
           REASON=$(echo "$CONTENT" | grep -oP '(?<=REASON:\s).*' | head -1 || echo "Unable to determine")
@@ -222,33 +248,33 @@ jobs:
           if [[ "$VERDICT" == "PASS" ]]; then
             echo "Scope judge: PASS"
             echo "verdict=pass" >> "$GITHUB_OUTPUT"
-            echo "reason=$REASON" >> "$GITHUB_OUTPUT"
+            write_multiline_output reason "$REASON"
           elif [[ "$VERDICT" == "FAIL" ]]; then
             echo "Scope judge: FAIL - $REASON"
             echo "verdict=fail" >> "$GITHUB_OUTPUT"
-            echo "reason=$REASON" >> "$GITHUB_OUTPUT"
+            write_multiline_output reason "$REASON"
           else
             # Fail open: treat unclear responses as needing human review
             echo "Scope judge: INCONCLUSIVE - flagging for human review"
             echo "verdict=inconclusive" >> "$GITHUB_OUTPUT"
-            echo "reason=Judge response was inconclusive. Flagging for human review." >> "$GITHUB_OUTPUT"
+            write_multiline_output reason "Judge response was inconclusive. Flagging for human review."
           fi
 
       - name: Report scope judge status
         if: steps.intent.outputs.has_intent == 'true' && steps.diff.outputs.has_diff == 'true' && steps.judge-key.outputs.has_key == 'true'
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          JUDGE_VERDICT: ${{ steps.judge.outputs.verdict }}
+          JUDGE_REASON: ${{ steps.judge.outputs.reason }}
         run: |
-          VERDICT="${{ steps.judge.outputs.verdict }}"
-          REASON="${{ steps.judge.outputs.reason }}"
           SHA="${{ github.event.pull_request.head.sha }}"
 
-          if [[ "$VERDICT" == "pass" ]]; then
+          if [[ "$JUDGE_VERDICT" == "pass" ]]; then
             STATE="success"
             DESCRIPTION="Scope aligned with ticket intent"
-          elif [[ "$VERDICT" == "fail" ]]; then
+          elif [[ "$JUDGE_VERDICT" == "fail" ]]; then
             STATE="failure"
-            DESCRIPTION="Scope creep detected: $REASON"
+            DESCRIPTION="Scope creep detected: $JUDGE_REASON"
           else
             STATE="failure"
             DESCRIPTION="Inconclusive — needs human review"
@@ -294,15 +320,15 @@ jobs:
         if: steps.judge.outputs.verdict == 'fail'
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          JUDGE_REASON: ${{ steps.judge.outputs.reason }}
         run: |
           PR_NUMBER="${{ github.event.pull_request.number }}"
-          REASON="${{ steps.judge.outputs.reason }}"
 
           gh pr comment $PR_NUMBER --body "## Scope Judge: Changes Exceed Ticket Intent
 
           **Verdict:** The changes in this PR extend beyond what the Linear ticket requested.
 
-          **Reason:** $REASON
+          **Reason:** $JUDGE_REASON
 
           **What to do:**
           - Review the diff and remove out-of-scope changes
