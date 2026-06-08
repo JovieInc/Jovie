@@ -5,7 +5,6 @@ import { Loader2 } from 'lucide-react';
 import type { ChangeEvent } from 'react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Icon } from '@/components/atoms/Icon';
-import { ContentMetricCard } from '@/components/molecules/ContentMetricCard';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { SettingsPanel } from '@/components/molecules/settings/SettingsPanel';
 import {
@@ -252,14 +251,19 @@ export function CampaignSettingsPanel() {
             </div>
           </ContentSurfaceCard>
 
-          <ContentMetricCard
-            label='Effective Rate'
-            value={`~${effectiveRatePerHour}/hour`}
-            subtitle={`Avg delay: ${avgDelaySeconds}s`}
-            className='h-full'
-            labelClassName='tracking-[0.06em]'
-            valueClassName='text-[24px]'
-          />
+          <ContentSurfaceCard className='h-full bg-surface-0 px-4 py-3.5'>
+            <div className='space-y-1'>
+              <p className='text-2xs font-semibold tracking-normal text-tertiary-token'>
+                Effective rate
+              </p>
+              <p className='text-app font-caption tabular-nums text-primary-token'>
+                ~{effectiveRatePerHour}/hour
+              </p>
+              <p className='text-xs text-secondary-token'>
+                Avg delay: {avgDelaySeconds}s
+              </p>
+            </div>
+          </ContentSurfaceCard>
         </div>
 
         <ContentSurfaceCard className='flex items-start gap-2 border-warning/20 bg-warning/10 px-4 py-3'>
