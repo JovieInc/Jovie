@@ -1892,7 +1892,7 @@ export function LibrarySurface({
   );
   const [filters, setFilters] = useState<LibraryFilters>(() => emptyFilters());
   const [sort, setSort] = useState<LibrarySortKey>('releaseDate');
-  const [view, setView] = useState<LibraryViewMode>('grid');
+  const [view, setView] = useState<LibraryViewMode>('list');
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
