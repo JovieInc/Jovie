@@ -4,11 +4,11 @@ import { requireAuth } from '@/lib/auth/require-auth';
 import { getSessionContext } from '@/lib/auth/session';
 import { captureError } from '@/lib/error-tracking';
 import { NO_STORE_HEADERS } from '@/lib/http/headers';
+import { isLibraryApprovalStatus } from '@/lib/library/approval-status';
 import {
   getLibraryApprovalStatusForAsset,
-  isLibraryApprovalStatus,
   upsertLibraryApprovalStatus,
-} from '@/lib/library/approval-status';
+} from '@/lib/library/approval-status.server';
 
 export const runtime = 'nodejs';
 

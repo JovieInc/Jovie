@@ -1,6 +1,6 @@
 import { APP_ROUTES } from '@/constants/routes';
 import { captureError } from '@/lib/error-tracking';
-import { getLibraryApprovalStatusMapForProfile } from '@/lib/library/approval-status';
+import { getLibraryApprovalStatusMapForProfile } from '@/lib/library/approval-status.server';
 import { getLibraryMerchCardsForProfile } from '@/lib/merch/service';
 import { queryKeys } from '@/lib/queries';
 import { HydrateClient } from '@/lib/queries/HydrateClient';

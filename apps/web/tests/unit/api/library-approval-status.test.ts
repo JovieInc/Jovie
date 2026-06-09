@@ -19,16 +19,11 @@ vi.mock('@/lib/auth/session', () => ({
   getSessionContext: authMocks.getSessionContext,
 }));
 
-vi.mock('@/lib/library/approval-status', async importOriginal => {
-  const actual =
-    await importOriginal<typeof import('@/lib/library/approval-status')>();
-  return {
-    ...actual,
-    getLibraryApprovalStatusForAsset:
-      serviceMocks.getLibraryApprovalStatusForAsset,
-    upsertLibraryApprovalStatus: serviceMocks.upsertLibraryApprovalStatus,
-  };
-});
+vi.mock('@/lib/library/approval-status.server', () => ({
+  getLibraryApprovalStatusForAsset:
+    serviceMocks.getLibraryApprovalStatusForAsset,
+  upsertLibraryApprovalStatus: serviceMocks.upsertLibraryApprovalStatus,
+}));
 
 describe('/api/library/approval-status', () => {
   beforeEach(() => {
