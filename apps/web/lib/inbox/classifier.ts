@@ -9,6 +9,7 @@
 import { gateway } from '@ai-sdk/gateway';
 import { z } from 'zod';
 import { generateObject } from '@/lib/ai/sdk';
+import { buildAiTelemetry } from '@/lib/ai/telemetry';
 import { CHAT_MODEL_LIGHT } from '@/lib/constants/ai-models';
 import { logger } from '@/lib/utils/logger';
 
@@ -50,6 +51,8 @@ interface ClassificationInput {
   artistName: string;
   artistGenres: string[] | null;
   artistLocation?: string | null;
+  userId?: string | null;
+  sessionId?: string | null;
 }
 
 /**
@@ -66,6 +69,13 @@ export async function classifyEmail(
       schema: classificationSchema,
       prompt: buildClassificationPrompt(input),
       maxOutputTokens: 500,
+      experimental_telemetry: buildAiTelemetry({
+        functionId: 'jovie-email-classifier',
+        identity: {
+          userId: input.userId,
+          sessionId: input.sessionId,
+        },
+      }),
     });
 
     return result.object;
