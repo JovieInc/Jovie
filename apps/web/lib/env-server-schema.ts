@@ -216,6 +216,10 @@ export const ServerEnvSchema = z.object({
   // OpenAI (for vision model fallback in asset extraction)
   OPENAI_API_KEY: z.string().optional(),
 
+  // ElevenLabs (voice clone, promo TTS, voice pipeline webhooks)
+  ELEVENLABS_API_KEY: z.string().optional(),
+  ELEVENLABS_WEBHOOK_SECRET: z.string().optional(),
+
   // Braintrust observability (LLM tracing + evals)
   BRAINTRUST_API_KEY: z.string().optional(),
 
@@ -417,6 +421,8 @@ export const ENV_KEYS = [
   'STATSIG_SERVER_SECRET',
   'AI_GATEWAY_API_KEY',
   'OPENAI_API_KEY',
+  'ELEVENLABS_API_KEY',
+  'ELEVENLABS_WEBHOOK_SECRET',
   'BRAINTRUST_API_KEY',
   'AGNOST_ORG_ID',
   'JOVIE_ENABLE_AGNOST',
