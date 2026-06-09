@@ -295,4 +295,23 @@ describe('ProfilePrimaryActionCard', () => {
 
     expect(screen.getByRole('link')).toHaveAttribute('href', '/tim/listen');
   });
+
+  it('keeps the listen fallback card compact without low-signal helper copy', () => {
+    render(
+      <ProfilePrimaryActionCard
+        artist={makeArtist()}
+        latestRelease={null}
+        profileSettings={{ showOldReleases: true }}
+        tourDates={[]}
+        hasPlayableDestinations={true}
+        now={new Date('2026-04-20T12:00:00.000Z')}
+      />
+    );
+
+    expect(screen.getByText('Tim White')).toBeInTheDocument();
+    expect(screen.getByText('Listen')).toBeInTheDocument();
+    expect(
+      screen.queryByText('Listen across your preferred platforms')
+    ).not.toBeInTheDocument();
+  });
 });

@@ -434,11 +434,6 @@ function ListenCard({
       )}
       <div className='min-w-0 flex-1'>
         <p className={cn('truncate', styles.titleClassName)}>{artist.name}</p>
-        <div className='mt-1 space-y-0.5'>
-          <p className={cn('truncate font-semibold', styles.metaClassName)}>
-            Listen across your preferred platforms
-          </p>
-        </div>
       </div>
       <ActionPill label={actionLabel} />
     </ActionCardShell>
