@@ -3611,7 +3611,9 @@ body:has(.system-b-download-page) .marketing-glass-header__cta:focus-visible {
   display: none;
 }
 
-:where(.system-b-release-operating-system-slot[data-layout="desktop"][data-slot="ai"]) {
+:where(
+    .system-b-release-operating-system-slot[data-layout="desktop"][data-slot="ai"]
+  ) {
   position: absolute;
   top: var(--space-6);
   left: var(--space-6);
@@ -3699,7 +3701,11 @@ body:has(.system-b-download-page) .marketing-glass-header__cta:focus-visible {
   border: 1px solid
     color-mix(in oklab, var(--system-b-app-frame-seam) 62%, transparent);
   border-radius: var(--system-b-radius-pill);
-  background: color-mix(in oklab, var(--system-b-bg-surface-0) 30%, transparent);
+  background: color-mix(
+    in oklab,
+    var(--system-b-bg-surface-0) 30%,
+    transparent
+  );
   padding-inline: var(--space-3);
   padding-block: var(--space-2);
   color: var(--color-text-secondary-token);
