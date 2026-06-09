@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 
+import { validateAudioFile } from '@/lib/audio/constants';
 import { validateAvatarFile } from '@/lib/avatar/validation';
 import { SUPPORTED_IMAGE_MIME_TYPES } from '@/lib/images/config';
 import {
@@ -28,6 +29,7 @@ export interface PendingImage {
 
 interface UseChatImageAttachmentsOptions {
   readonly onError: (message: string) => void;
+  readonly onAudioFiles?: (files: File[]) => void;
   readonly disabled?: boolean;
 }
 
@@ -58,6 +60,7 @@ function readFileAsDataUrl(file: File): Promise<string> {
 
 export function useChatImageAttachments({
   onError,
+  onAudioFiles,
   disabled = false,
 }: UseChatImageAttachmentsOptions): UseChatImageAttachmentsReturn {
   const [pendingImages, setPendingImages] = useState<PendingImage[]>([]);
@@ -142,15 +145,27 @@ export function useChatImageAttachments({
     [onError]
   );
 
+  const onAudioFilesRef = useRef(onAudioFiles);
+  useEffect(() => {
+    onAudioFilesRef.current = onAudioFiles;
+  }, [onAudioFiles]);
+
   const addFiles = useCallback(
     (files: FileList | File[]) => {
       if (disabled) return;
 
       const fileArray = Array.from(files);
       const imageFiles = fileArray.filter(f => f.type.startsWith('image/'));
+      const audioFiles = fileArray.filter(
+        f => f.type.startsWith('audio/') || validateAudioFile(f) === null
+      );
 
       if (imageFiles.length === 0) {
-        onError('Please select image files only.');
+        if (audioFiles.length > 0) {
+          onAudioFilesRef.current?.(audioFiles);
+          return;
+        }
+        onError('Please select image or audio files only.');
         return;
       }
 
@@ -221,7 +236,7 @@ export function useChatImageAttachments({
     const onDragEnter = (e: DragEvent) => {
       e.preventDefault();
       e.stopPropagation();
-      if (!disabled) {
+      if (!disabled && (e.dataTransfer?.types.includes('Files') ?? false)) {
         setIsDragOver(true);
       }
     };

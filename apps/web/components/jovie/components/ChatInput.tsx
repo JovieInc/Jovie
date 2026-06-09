@@ -17,6 +17,7 @@ import { serializeEntity, serializeSkill } from '@/lib/chat/tokens';
 import type { TranscriberErrorCode } from '@/lib/chat/transcriber';
 import { cn } from '@/lib/utils';
 
+import type { PendingAudio } from '../hooks/useChatAudioAttachments';
 import type { PendingImage } from '../hooks/useChatImageAttachments';
 import { useSpeechRecognition } from '../hooks/useSpeechRecognition';
 import {
@@ -24,6 +25,7 @@ import {
   useTextareaAutosize,
 } from '../hooks/useTextareaAutosize';
 import { MAX_MESSAGE_LENGTH } from '../types';
+import { AudioPreviewStrip } from './AudioPreviewStrip';
 import {
   ComposerAttachButton,
   ComposerMicButton,
@@ -55,9 +57,13 @@ export interface ChatInputProps {
   readonly placeholder?: string;
   readonly variant?: 'default' | 'compact' | 'hero';
   readonly onImageAttach?: () => void;
+  readonly onAudioAttach?: () => void;
   readonly isImageProcessing?: boolean;
+  readonly isAudioProcessing?: boolean;
   readonly pendingImages?: PendingImage[];
+  readonly pendingAudio?: PendingAudio | null;
   readonly onRemoveImage?: (id: string) => void;
+  readonly onRemoveAudio?: () => void;
   readonly onPaste?: (e: React.ClipboardEvent) => void;
   readonly quickActions?: readonly ChatQuickAction[];
   readonly onQuickActionSelect?: (prompt: string) => void;
@@ -200,9 +206,13 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
       placeholder = 'Ask Jovie anything',
       variant = 'default',
       onImageAttach,
+      onAudioAttach,
       isImageProcessing = false,
+      isAudioProcessing = false,
       pendingImages,
+      pendingAudio = null,
       onRemoveImage,
+      onRemoveAudio,
       onPaste,
       quickActions,
       onQuickActionSelect,
@@ -223,8 +233,9 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
     const characterCount = value.length;
     const isNearLimit = characterCount > MAX_MESSAGE_LENGTH * 0.9;
     const isOverLimit = characterCount > MAX_MESSAGE_LENGTH;
-    const hasAttachButton = Boolean(onImageAttach);
+    const hasAttachButton = Boolean(onImageAttach || onAudioAttach);
     const hasPendingImages = (pendingImages?.length ?? 0) > 0;
+    const hasPendingAudio = Boolean(pendingAudio);
     const hasChips = (chips?.length ?? 0) > 0;
 
     const [plusMenuOpen, setPlusMenuOpen] = useState(false);
@@ -313,11 +324,14 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
     // is open above it and Enter is committing the active row, not sending.
     const sendBlockedByPicker = isPickerOpen && value.trim() === '/';
     const canSend =
-      Boolean(value.trim() || hasPendingImages || hasChips) &&
+      Boolean(
+        value.trim() || hasPendingImages || hasPendingAudio || hasChips
+      ) &&
       !isLoading &&
       !isSubmitting &&
       !isOverLimit &&
       !isImageProcessing &&
+      !isAudioProcessing &&
       !sendBlockedByPicker;
 
     const handlePickerClose = useCallback(() => {
@@ -745,7 +759,9 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
                       isNearLimit={isNearLimit}
                       hasAttachButton={hasAttachButton}
                       onImageAttach={onImageAttach}
+                      onAudioAttach={onAudioAttach}
                       isImageProcessing={isImageProcessing}
+                      isAudioProcessing={isAudioProcessing}
                       isLoading={isLoading}
                       isSubmitting={isSubmitting}
                       plusMenuOpen={plusMenuOpen}
@@ -763,7 +779,10 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
                       setIsFocused={setIsFocused}
                       hasPendingImages={hasPendingImages}
                       pendingImages={pendingImages}
+                      hasPendingAudio={hasPendingAudio}
+                      pendingAudio={pendingAudio}
                       onRemoveImage={onRemoveImage}
+                      onRemoveAudio={onRemoveAudio}
                       chips={chips}
                       onRemoveChipAt={onRemoveChipAt}
                       isPickerOpen={isPickerOpen}
@@ -830,7 +849,9 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
                   isNearLimit={isNearLimit}
                   hasAttachButton={hasAttachButton}
                   onImageAttach={onImageAttach}
+                  onAudioAttach={onAudioAttach}
                   isImageProcessing={isImageProcessing}
+                  isAudioProcessing={isAudioProcessing}
                   isLoading={isLoading}
                   isSubmitting={isSubmitting}
                   plusMenuOpen={plusMenuOpen}
@@ -848,7 +869,10 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
                   setIsFocused={setIsFocused}
                   hasPendingImages={hasPendingImages}
                   pendingImages={pendingImages}
+                  hasPendingAudio={hasPendingAudio}
+                  pendingAudio={pendingAudio}
                   onRemoveImage={onRemoveImage}
+                  onRemoveAudio={onRemoveAudio}
                   chips={chips}
                   onRemoveChipAt={onRemoveChipAt}
                   hasBorderTop={
@@ -905,7 +929,9 @@ interface InputRowProps {
   readonly isNearLimit: boolean;
   readonly hasAttachButton: boolean;
   readonly onImageAttach?: () => void;
+  readonly onAudioAttach?: () => void;
   readonly isImageProcessing: boolean;
+  readonly isAudioProcessing?: boolean;
   readonly isLoading: boolean;
   readonly isSubmitting: boolean;
   readonly plusMenuOpen: boolean;
@@ -925,7 +951,10 @@ interface InputRowProps {
   readonly setIsFocused: (focused: boolean) => void;
   readonly hasPendingImages: boolean;
   readonly pendingImages?: import('../hooks/useChatImageAttachments').PendingImage[];
+  readonly hasPendingAudio?: boolean;
+  readonly pendingAudio?: PendingAudio | null;
   readonly onRemoveImage?: (id: string) => void;
+  readonly onRemoveAudio?: () => void;
   readonly chips?: readonly import('../hooks/useChipTray').TrayChip[];
   readonly onRemoveChipAt?: (index: number) => void;
   /** Add hairline divider above the input (when picker sits above it). */
@@ -958,7 +987,9 @@ function InputRow({
   isNearLimit,
   hasAttachButton,
   onImageAttach,
+  onAudioAttach,
   isImageProcessing,
+  isAudioProcessing = false,
   isLoading,
   isSubmitting,
   plusMenuOpen,
@@ -976,7 +1007,10 @@ function InputRow({
   setIsFocused,
   hasPendingImages,
   pendingImages,
+  hasPendingAudio = false,
+  pendingAudio = null,
   onRemoveImage,
+  onRemoveAudio,
   chips,
   onRemoveChipAt,
   hasBorderTop = false,
@@ -993,7 +1027,10 @@ function InputRow({
     value.trim().startsWith('/') &&
     (chips?.length ?? 0) === 0;
   const useHeroPill =
-    isHero && !hasPendingImages && (!hasInlineContent || hasOnlyRootSlashQuery);
+    isHero &&
+    !hasPendingImages &&
+    !hasPendingAudio &&
+    (!hasInlineContent || hasOnlyRootSlashQuery);
 
   return (
     <div className={cn(hasBorderTop && 'system-b-chat-composer-seam border-t')}>
@@ -1003,6 +1040,11 @@ function InputRow({
             images={pendingImages ?? []}
             onRemove={onRemoveImage}
           />
+        </div>
+      ) : null}
+      {hasPendingAudio && pendingAudio ? (
+        <div className='px-3 pt-3'>
+          <AudioPreviewStrip audio={pendingAudio} onRemove={onRemoveAudio} />
         </div>
       ) : null}
 
@@ -1021,16 +1063,18 @@ function InputRow({
         )}
       >
         <div ref={hiddenDivRef} style={HIDDEN_DIV_STYLES} aria-hidden />
-        {useHeroPill && hasAttachButton && onImageAttach ? (
+        {useHeroPill && hasAttachButton ? (
           <ComposerAttachButton
             isImageProcessing={isImageProcessing}
+            isAudioProcessing={isAudioProcessing}
             isLoading={isLoading}
             isSubmitting={isSubmitting}
             disabled={attachDisabledForPicker}
             plusMenuOpen={plusMenuOpen}
             onOpenChange={setPlusMenuOpen}
             onMouseDown={handlePreserveFocus}
-            onImageAttach={onImageAttach}
+            onImageAttach={onImageAttach ?? (() => undefined)}
+            onAudioAttach={onAudioAttach}
           />
         ) : null}
         <div
@@ -1106,16 +1150,18 @@ function InputRow({
           )}
         >
           <div className='flex min-w-0 items-center gap-2'>
-            {!useHeroPill && hasAttachButton && onImageAttach ? (
+            {!useHeroPill && hasAttachButton ? (
               <ComposerAttachButton
                 isImageProcessing={isImageProcessing}
+                isAudioProcessing={isAudioProcessing}
                 isLoading={isLoading}
                 isSubmitting={isSubmitting}
                 disabled={attachDisabledForPicker}
                 plusMenuOpen={plusMenuOpen}
                 onOpenChange={setPlusMenuOpen}
                 onMouseDown={handlePreserveFocus}
-                onImageAttach={onImageAttach}
+                onImageAttach={onImageAttach ?? (() => undefined)}
+                onAudioAttach={onAudioAttach}
               />
             ) : null}
           </div>
