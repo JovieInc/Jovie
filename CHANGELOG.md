@@ -5,6 +5,14 @@
      5|The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
      6|and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.6.32] - 2026-06-09
+
+> Releases now support audio upload with waveform preview and snippet trim.
+
+### Added
+
+- **Release audio upload + trim (JOV-2929)**: adds audio upload, waveform preview, and snippet trim for releases.
+
 ## [26.6.31] - 2026-06-08
 
 > Chat merch generation now requests photorealistic Printful mockups after artwork is created.
