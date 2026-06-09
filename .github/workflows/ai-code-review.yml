@@ -1,0 +1,98 @@
+name: AI Code Review
+
+on:
+  pull_request:
+    types: [opened, reopened, ready_for_review]
+
+jobs:
+  ai-review:
+    runs-on: ubuntu-latest
+    if: github.event.pull_request.draft == false
+    permissions:
+      contents: read
+      pull-requests: write
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup prompt file
+        run: |
+          mkdir -p .github/review
+          cp .github/review/system-prompt.txt /tmp/system_prompt.txt 2>/dev/null || true
+
+      - name: Get PR diff
+        id: diff
+        run: |
+          git fetch origin ${{ github.event.pull_request.base.ref }}
+          git diff origin/${{ github.event.pull_request.base.ref }}...HEAD > /tmp/pr.diff
+          echo "size=$(wc -c < /tmp/pr.diff)" >> $GITHUB_OUTPUT
+          git diff --name-only origin/${{ github.event.pull_request.base.ref }}...HEAD > /tmp/changed_files.txt
+
+      - name: Skip if diff too large
+        if: steps.diff.outputs.size > 500000
+        run: |
+          echo "Diff too large, skipping"
+          exit 0
+
+      - name: AI Code Review
+        env:
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+        run: |
+          PR_NUMBER="${{ github.event.pull_request.number }}"
+          PR_TITLE="${{ github.event.pull_request.title }}"
+          PR_BODY="${{ github.event.pull_request.body }}"
+
+          # Build user prompt
+          {
+            echo "## PR #${PR_NUMBER}: ${PR_TITLE}"
+            echo ""
+            echo "### Description"
+            echo "${PR_BODY:-_No description_}"
+            echo ""
+            echo "### Files changed"
+            cat /tmp/changed_files.txt
+            echo ""
+            echo "### Diff"
+            head -30000 /tmp/pr.diff
+          } > /tmp/user_prompt.txt
+
+          # Build JSON payload
+          jq -n \
+            --arg model "nvidia/nemotron-3-super-120b-a12b:free" \
+            --rawfile system /tmp/system_prompt.txt \
+            --arg user "$(cat /tmp/user_prompt.txt)" \
+            '{model: $model, messages: [{role: "system", content: $system}, {role: "user", content: $user}], temperature: 0.2, max_tokens: 4096, stream: false}' > /tmp/payload.json
+
+          # Call OpenRouter
+          RESPONSE=$(curl -s --max-time 180 -X POST https://openrouter.ai/api/v1/chat/completions \
+            -H "Authorization: Bearer *** \
+            -H "Content-Type: application/json" \
+            -H "HTTP-Referer: https://github.com/JovieInc/Jovie" \
+            -H "X-Title: Jovie AI Code Review" \
+            -d @/tmp/payload.json)
+
+          REVIEW_TEXT=$(echo "$RESPONSE" | jq -r '.choices[0].message.content // empty')
+
+          if [ -z "$REVIEW_TEXT" ]; then
+            echo "ERROR: No review text received"
+            echo "$RESPONSE" | jq '.error // .' | head -5
+            exit 1
+          fi
+
+          # Extract confidence
+          CONFIDENCE=$(echo "$REVIEW_TEXT" | grep -oP 'Confidence\*\*\s*:\s*\K\d+' || echo "3")
+
+          # Post as PR comment
+          {
+            echo "## 🤖 AI Code Review (nemotron-120b:free) (confidence: ${CONFIDENCE}/5)"
+            echo ""
+            echo "${REVIEW_TEXT}"
+            echo ""
+            echo "---"
+            echo "*Automated review — please verify all suggestions before applying.*"
+          } | gh pr comment "$PR_NUMBER" --body-file -
+
+          echo "Review posted successfully"
