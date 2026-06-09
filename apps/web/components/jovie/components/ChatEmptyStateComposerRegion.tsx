@@ -16,12 +16,12 @@ export function ChatEmptyStateComposerRegion({
       data-testid='chat-empty-state-composer-region'
     >
       <div
-        className='pointer-events-none absolute left-1/2 top-1/2 h-[min(46vw,28rem)] w-[min(46vw,28rem)] -translate-x-1/2 -translate-y-[60%] opacity-85 drop-shadow-[0_0_34px_rgba(68,188,255,0.18)] max-sm:h-[min(72vw,18rem)] max-sm:w-[min(72vw,18rem)]'
+        className='pointer-events-none absolute left-1/2 top-1/2 h-[min(46vw,28rem)] w-[min(46vw,28rem)] -translate-x-1/2 -translate-y-[60%] opacity-70 drop-shadow-[0_0_34px_rgba(68,188,255,0.14)] max-sm:h-[min(72vw,18rem)] max-sm:w-[min(72vw,18rem)]'
         style={{
           maskImage:
-            'radial-gradient(ellipse at center, black 54%, rgba(0,0,0,0.72) 68%, transparent 88%)',
+            'radial-gradient(ellipse at center, black 38%, rgba(0,0,0,0.55) 56%, rgba(0,0,0,0.2) 72%, transparent 86%)',
           WebkitMaskImage:
-            'radial-gradient(ellipse at center, black 54%, rgba(0,0,0,0.72) 68%, transparent 88%)',
+            'radial-gradient(ellipse at center, black 38%, rgba(0,0,0,0.55) 56%, rgba(0,0,0,0.2) 72%, transparent 86%)',
         }}
         data-testid='chat-empty-state-logo'
       >

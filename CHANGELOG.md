@@ -5,6 +5,14 @@
      5|The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
      6|and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.6.31] - 2026-06-08
+
+> Chat merch generation now requests photorealistic Printful mockups after artwork is created.
+
+### Added
+
+- **Printful merch mockup pipeline (JOV-2621)**: adds a mockup catalog, Printful mockup task creation/polling, authenticated `/api/merch/mockups`, and async chat merch enrichment that merges photorealistic mockup URLs into design options.
+
 ## [26.6.30] - 2026-06-08
 
 > Library grid cards and list rows now line up with the page toolbar instead of sitting on a tighter inset.
