@@ -81,19 +81,25 @@ import { capitalizeFirst } from '@/lib/utils/string-utils';
 import {
   formatLibraryDuration,
   formatLibraryReleaseDate,
+  getLibraryAspectRatioClass,
+  getLibraryAssetAspectRatio,
   getLibraryItemKind,
+  LIBRARY_GRID_DENSITY_LAYOUT,
   type LibraryAssetKind,
+  type LibraryGridDensity,
   type LibraryReleaseAsset,
   type LibraryView,
   libraryAssetMatchesView,
 } from './library-data';
+import {
+  LIBRARY_GRID_DENSITY_OPTIONS,
+  useLibraryGridDensity,
+} from './library-grid-preferences';
 
 const LIBRARY_TABLE_ROW_HEIGHT = 56;
 const LIBRARY_TABLE_MIN_WIDTH = '0';
 const LIBRARY_CONTENT_INSET_CLASS =
   'px-(--linear-app-header-padding-x) py-(--linear-app-content-padding-y)';
-const LIBRARY_GRID_LAYOUT_CLASS =
-  'grid gap-3 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4';
 const LIBRARY_CARD_FOCUS_CLASS =
   'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/55 focus-visible:ring-offset-2 focus-visible:ring-offset-(--linear-app-content-surface) outline-none';
 const LIBRARY_BUTTON_FOCUS_CLASS =
@@ -983,6 +989,33 @@ function ViewToggle({
   );
 }
 
+function GridDensityToggle({
+  density,
+  onDensity,
+}: {
+  readonly density: LibraryGridDensity;
+  readonly onDensity: (density: LibraryGridDensity) => void;
+}) {
+  return (
+    <fieldset
+      className={cn(PAGE_TOOLBAR_END_GROUP_CLASS, 'ml-0 gap-0.5 border-0 p-0')}
+      data-testid='library-grid-density-toggle'
+      aria-label='Card size'
+    >
+      {LIBRARY_GRID_DENSITY_OPTIONS.map(option => (
+        <PageToolbarActionButton
+          key={option.value}
+          label={option.label}
+          active={density === option.value}
+          onClick={() => onDensity(option.value)}
+          tooltipLabel={option.tooltip}
+          ariaLabel={`${option.tooltip} card size`}
+        />
+      ))}
+    </fieldset>
+  );
+}
+
 function LibraryToolbar({
   assets,
   preset,
@@ -991,6 +1024,8 @@ function LibraryToolbar({
   onSort,
   view,
   onView,
+  gridDensity,
+  onGridDensity,
   visibleCount,
   totalCount,
   mobileFiltersOpen,
@@ -1004,6 +1039,8 @@ function LibraryToolbar({
   readonly onSort: (sort: LibrarySortKey) => void;
   readonly view: LibraryViewMode;
   readonly onView: (view: LibraryViewMode) => void;
+  readonly gridDensity: LibraryGridDensity;
+  readonly onGridDensity: (density: LibraryGridDensity) => void;
   readonly visibleCount: number;
   readonly totalCount: number;
   readonly mobileFiltersOpen: boolean;
@@ -1041,6 +1078,12 @@ function LibraryToolbar({
             className='lg:hidden'
           />
           <SortDropdown sort={sort} onSort={onSort} />
+          {view === 'grid' ? (
+            <GridDensityToggle
+              density={gridDensity}
+              onDensity={onGridDensity}
+            />
+          ) : null}
           <ViewToggle view={view} onView={onView} />
         </>
       }
@@ -1078,6 +1121,7 @@ const AssetCard = memo(function AssetCard({
   readonly onTogglePreview: LibraryPreviewToggle;
 }) {
   const hasPreview = Boolean(asset.previewUrl);
+  const aspectRatio = getLibraryAssetAspectRatio(asset);
 
   return (
     <article
@@ -1103,7 +1147,12 @@ const AssetCard = memo(function AssetCard({
           LIBRARY_CARD_FOCUS_CLASS
         )}
       >
-        <div className='system-b-library-card-artwork relative aspect-square overflow-hidden'>
+        <div
+          className={cn(
+            'system-b-library-card-artwork relative overflow-hidden',
+            getLibraryAspectRatioClass(aspectRatio)
+          )}
+        >
           <Artwork asset={asset} />
           <span
             className={cn(
@@ -1194,6 +1243,7 @@ function AssetGrid({
   selectedId,
   activePreviewId,
   playingPreviewId,
+  gridDensity,
   onSelect,
   onTogglePreview,
   getContextMenuItems,
@@ -1202,12 +1252,18 @@ function AssetGrid({
   readonly selectedId: string | null;
   readonly activePreviewId: string | null;
   readonly playingPreviewId: string | null;
+  readonly gridDensity: LibraryGridDensity;
   readonly onSelect: (id: string) => void;
   readonly onTogglePreview: LibraryPreviewToggle;
   readonly getContextMenuItems: LibraryContextMenuBuilder;
 }) {
   return (
-    <div className={cn(LIBRARY_GRID_LAYOUT_CLASS, LIBRARY_CONTENT_INSET_CLASS)}>
+    <div
+      className={cn(
+        LIBRARY_GRID_DENSITY_LAYOUT[gridDensity],
+        LIBRARY_CONTENT_INSET_CLASS
+      )}
+    >
       {assets.map(asset => (
         <TableContextMenu key={asset.id} items={getContextMenuItems(asset)}>
           <AssetCard
@@ -1727,7 +1783,14 @@ function AssetDrawer({
 
             <div className='min-h-0 flex-1 overflow-y-auto p-3'>
               <div className='system-b-library-drawer-artwork overflow-hidden'>
-                <div className='mx-auto aspect-square w-full max-w-80'>
+                <div
+                  className={cn(
+                    'mx-auto w-full max-w-80',
+                    getLibraryAspectRatioClass(
+                      getLibraryAssetAspectRatio(current)
+                    )
+                  )}
+                >
                   <Artwork asset={current} size='drawer' />
                 </div>
               </div>
@@ -1945,6 +2008,8 @@ export function LibrarySurface({
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
   const [pills, setPills] = useState<FilterPill[]>([]);
+  const { density: gridDensity, setDensity: setGridDensity } =
+    useLibraryGridDensity();
   const isDesktopLayout = useBreakpoint('lg');
   const deferredFilters = useDeferredValue(filters);
   const deferredPreset = useDeferredValue(preset);
@@ -2248,6 +2313,8 @@ export function LibrarySurface({
           onSort={setSort}
           view={view}
           onView={setView}
+          gridDensity={gridDensity}
+          onGridDensity={setGridDensity}
           visibleCount={visibleAssets.length}
           totalCount={effectiveAssets.length}
           mobileFiltersOpen={mobileFiltersOpen}
@@ -2284,6 +2351,7 @@ export function LibrarySurface({
                 selectedId={selectedId}
                 activePreviewId={activePreviewId}
                 playingPreviewId={playingPreviewId}
+                gridDensity={gridDensity}
                 onSelect={openAsset}
                 onTogglePreview={handleTogglePreview}
                 getContextMenuItems={getContextMenuItems}

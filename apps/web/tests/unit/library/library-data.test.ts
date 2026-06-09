@@ -1,9 +1,13 @@
 import { describe, expect, it } from 'vitest';
+import type { LibraryReleaseAsset } from '@/app/app/(shell)/library/library-data';
 import {
   buildLibraryMerchAssets,
   buildLibraryReleaseAssets,
   formatLibraryDuration,
   formatLibraryReleaseDate,
+  getLibraryAspectRatioClass,
+  getLibraryAssetAspectRatio,
+  LIBRARY_GRID_DENSITY_LAYOUT,
 } from '@/app/app/(shell)/library/library-data';
 import type { ReleaseViewModel } from '@/lib/discography/types';
 import type { LibraryMerchCard } from '@/lib/merch/types';
@@ -164,5 +168,89 @@ describe('library data', () => {
     expect(formatLibraryDuration(0)).toBe('No Duration');
     expect(formatLibraryDuration(212_000)).toBe('3:32');
     expect(formatLibraryDuration(3_661_000)).toBe('1:01:01');
+  });
+
+  it('derives square aspect ratios for releases and merch', () => {
+    const releaseAsset = buildLibraryReleaseAssets([buildRelease()])[0];
+    const merchAsset = buildLibraryMerchAssets(
+      [
+        {
+          id: 'merch-1',
+          status: 'draft',
+          title: 'Hoodie',
+          description: 'Black hoodie',
+          productType: 'hoodie',
+          primaryImageUrl: 'https://cdn.example.com/hoodie.png',
+          mockupUrls: [],
+          retailPriceCents: 6800,
+          artistPayoutPerUnitEstimateCents: 2200,
+          jovieMarginPerUnitEstimateCents: 900,
+          rankScore: 91,
+          position: 0,
+          pinned: false,
+          createdAt: '2026-05-24T00:00:00.000Z',
+          updatedAt: '2026-05-25T00:00:00.000Z',
+          publishedAt: null,
+        },
+      ],
+      'Tim White'
+    )[0];
+
+    expect(getLibraryAssetAspectRatio(releaseAsset)).toBe('1:1');
+    expect(getLibraryAssetAspectRatio(merchAsset)).toBe('1:1');
+    expect(getLibraryAspectRatioClass('1:1')).toBe('aspect-square');
+  });
+
+  it('derives landscape and portrait video aspect ratios', () => {
+    const landscapeVideo: LibraryReleaseAsset = {
+      id: 'video-landscape',
+      title: 'Music Video',
+      artist: 'Tim White',
+      artworkUrl: 'https://cdn.example.com/video.jpg',
+      previewUrl: null,
+      smartLinkPath: '/app/library?view=videos',
+      releaseDate: null,
+      releaseType: 'single',
+      status: 'released',
+      trackCount: 0,
+      providerCount: 0,
+      providers: [],
+      hasLyrics: false,
+      hasArtwork: true,
+      hasVideoLinks: true,
+      assetKinds: ['artwork', 'video'],
+      genres: [],
+      spotifyPopularity: null,
+      targetPlaylistCount: 0,
+      isExplicit: false,
+      label: null,
+      upc: null,
+      distributor: null,
+      totalDurationMs: null,
+      itemKind: 'video',
+    };
+    const portraitVideo: LibraryReleaseAsset = {
+      ...landscapeVideo,
+      id: 'video-portrait',
+      title: 'Reel',
+      mediaOrientation: 'portrait',
+    };
+
+    expect(getLibraryAssetAspectRatio(landscapeVideo)).toBe('16:9');
+    expect(getLibraryAssetAspectRatio(portraitVideo)).toBe('9:16');
+    expect(getLibraryAspectRatioClass('16:9')).toBe('aspect-video');
+    expect(getLibraryAspectRatioClass('9:16')).toBe('aspect-[9/16]');
+  });
+
+  it('exposes density-aware grid layout classes', () => {
+    expect(LIBRARY_GRID_DENSITY_LAYOUT.comfortable).toContain(
+      'sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4'
+    );
+    expect(LIBRARY_GRID_DENSITY_LAYOUT.compact).toContain(
+      'sm:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5'
+    );
+    expect(LIBRARY_GRID_DENSITY_LAYOUT.spacious).toContain(
+      'sm:grid-cols-2 xl:grid-cols-2 2xl:grid-cols-3'
+    );
   });
 });
