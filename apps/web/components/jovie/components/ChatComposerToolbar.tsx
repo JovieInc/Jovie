@@ -9,6 +9,7 @@ import {
 } from '@jovie/ui';
 import { ArrowUp, ImagePlus, Loader2, Mic, MicOff, Plus } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
+import { useCallback, useRef } from 'react';
 
 import { cn } from '@/lib/utils';
 import { TRANSITION_FAST } from './chat-motion';
@@ -18,7 +19,7 @@ import { TRANSITION_FAST } from './chat-motion';
  *
  * Three pieces, exposed independently so the surface can place them itself:
  *   - <ComposerAttachButton>: leading + button → image upload dropdown.
- *   - <ComposerMicButton>: trailing mic toggle.
+ *   - <ComposerMicButton>: trailing push-to-talk mic control.
  *   - <ComposerSendButton>: trailing primary send / stop.
  *
  * Pulled out of ChatInput to keep that file focused on layout + state.
@@ -176,7 +177,11 @@ export interface ComposerMicButtonProps {
   readonly isLoading: boolean;
   readonly isSubmitting: boolean;
   readonly isSupported: boolean;
-  readonly onMouseDown: (event: React.MouseEvent<HTMLButtonElement>) => void;
+  readonly onPreserveFocus: (
+    event: React.MouseEvent<HTMLButtonElement>
+  ) => void;
+  readonly onPushStart: () => void;
+  readonly onPushEnd: () => void;
   readonly onToggle: () => void;
 }
 
@@ -185,25 +190,66 @@ export function ComposerMicButton({
   isLoading,
   isSubmitting,
   isSupported,
-  onMouseDown,
+  onPreserveFocus,
+  onPushStart,
+  onPushEnd,
   onToggle,
 }: ComposerMicButtonProps) {
+  const suppressClickToggleRef = useRef(false);
+
   const label = isSupported
     ? isListening
-      ? 'Stop dictation'
-      : 'Dictate message'
+      ? 'Release to stop dictation'
+      : 'Hold to dictate'
     : 'Dictation unavailable';
 
+  const tooltip = isSupported
+    ? isListening
+      ? 'Release to stop dictation'
+      : 'Hold to dictate · press to toggle'
+    : 'Dictation unavailable in this browser';
+
+  const handlePointerDown = useCallback(
+    (event: React.PointerEvent<HTMLButtonElement>) => {
+      onPreserveFocus(event);
+      if (isLoading || isSubmitting || !isSupported) return;
+      suppressClickToggleRef.current = false;
+      if (typeof event.currentTarget.setPointerCapture === 'function') {
+        event.currentTarget.setPointerCapture(event.pointerId);
+      }
+      onPushStart();
+    },
+    [isLoading, isSubmitting, isSupported, onPreserveFocus, onPushStart]
+  );
+
+  const handlePointerEnd = useCallback(() => {
+    if (isLoading || isSubmitting || !isSupported) return;
+    suppressClickToggleRef.current = true;
+    onPushEnd();
+  }, [isLoading, isSubmitting, isSupported, onPushEnd]);
+
+  const handleClick = useCallback(() => {
+    if (suppressClickToggleRef.current) {
+      suppressClickToggleRef.current = false;
+      return;
+    }
+    onToggle();
+  }, [onToggle]);
+
   return (
-    <SimpleTooltip content={label}>
+    <SimpleTooltip content={tooltip}>
       <button
         type='button'
-        onMouseDown={onMouseDown}
-        onClick={onToggle}
+        onPointerDown={handlePointerDown}
+        onPointerUp={handlePointerEnd}
+        onPointerCancel={handlePointerEnd}
+        onPointerLeave={isListening ? handlePointerEnd : undefined}
+        onClick={handleClick}
         disabled={isLoading || isSubmitting || !isSupported}
+        data-testid='dictation-toggle'
         data-active={isListening ? 'true' : undefined}
         className={cn(
-          'system-b-chat-composer-icon-button flex h-9 w-9 shrink-0 items-center justify-center rounded-full',
+          'system-b-chat-composer-icon-button flex h-9 w-9 shrink-0 items-center justify-center rounded-full touch-none select-none',
           !isSupported
             ? 'text-quaternary-token'
             : !isListening && 'text-tertiary-token',

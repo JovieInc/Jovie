@@ -12,7 +12,9 @@ import {
   useRef,
   useState,
 } from 'react';
+import { DictationWaveform } from '@/components/shell/DictationWaveform';
 import { serializeEntity, serializeSkill } from '@/lib/chat/tokens';
+import type { TranscriberErrorCode } from '@/lib/chat/transcriber';
 import { cn } from '@/lib/utils';
 
 import type { PendingImage } from '../hooks/useChatImageAttachments';
@@ -122,6 +124,69 @@ function pickerKindArticle(
 ): string {
   // Vowel-initial nouns get "an"; everything else "a".
   return kind === 'artist' || kind === 'event' ? 'an' : 'a';
+}
+
+function dictationErrorMessage(code: TranscriberErrorCode): string {
+  switch (code) {
+    case 'not-allowed':
+    case 'service-not-allowed':
+    case 'audio-capture':
+      return 'Microphone access was denied. You can keep typing your message.';
+    case 'no-speech':
+      return "Didn't catch speech — try again or keep typing.";
+    case 'network':
+      return 'Dictation needs a network connection. You can keep typing.';
+    default:
+      return 'Dictation unavailable right now. You can keep typing.';
+  }
+}
+
+function DictationStatusBanner({
+  isListening,
+  error,
+  onDismissError,
+}: {
+  readonly isListening: boolean;
+  readonly error: TranscriberErrorCode | null;
+  readonly onDismissError: () => void;
+}) {
+  if (!isListening && !error) return null;
+
+  if (error) {
+    return (
+      <div
+        role='alert'
+        className='flex items-center justify-between gap-3 px-3 py-2 text-[12px] text-tertiary-token'
+      >
+        <span>{dictationErrorMessage(error)}</span>
+        <button
+          type='button'
+          onClick={onDismissError}
+          className='shrink-0 rounded-md px-2 py-1 text-[11px] text-primary-token hover:bg-surface-1/60'
+        >
+          Dismiss
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div
+      role='status'
+      aria-live='polite'
+      className='flex items-center gap-3 px-3 py-2'
+    >
+      <DictationWaveform active bars={16} className='h-6 w-28' />
+      <div className='min-w-0'>
+        <div className='text-[12px] font-medium text-primary-token'>
+          Listening
+        </div>
+        <div className='text-[11px] text-tertiary-token'>
+          Speak now — release the mic when finished
+        </div>
+      </div>
+    </div>
+  );
 }
 
 export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
@@ -412,6 +477,10 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
     const {
       isSupported: isDictationSupported,
       isListening,
+      error: dictationError,
+      clearError: clearDictationError,
+      start: startDictation,
+      stop: stopDictation,
       toggle: toggleDictation,
     } = useSpeechRecognition({
       onTranscript: sessionTranscript => {
@@ -425,12 +494,27 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
       }, 0);
     }, []);
 
+    const captureDictationBaseline = useCallback(() => {
+      dictationBaselineRef.current = value;
+    }, [value]);
+
+    const handleMicPushStart = useCallback(() => {
+      if (isListening) return;
+      captureDictationBaseline();
+      startDictation();
+    }, [captureDictationBaseline, isListening, startDictation]);
+
+    const handleMicPushEnd = useCallback(() => {
+      if (!isListening) return;
+      stopDictation();
+    }, [isListening, stopDictation]);
+
     const handleMicToggle = useCallback(() => {
       if (!isListening) {
-        dictationBaselineRef.current = value;
+        captureDictationBaseline();
       }
       toggleDictation();
-    }, [isListening, toggleDictation, value]);
+    }, [captureDictationBaseline, isListening, toggleDictation]);
 
     const handleFormSubmit = useCallback(
       (e: React.FormEvent) => {
@@ -528,6 +612,15 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
     useLayoutEffect(() => {
       onPickerOpenChange?.(picker.state.status !== 'closed');
     }, [picker.state.status, onPickerOpenChange]);
+
+    const dictationBanner = (
+      <DictationStatusBanner
+        isListening={isListening}
+        error={dictationError}
+        onDismissError={clearDictationError}
+      />
+    );
+    const showDictationBanner = isListening || Boolean(dictationError);
 
     return (
       <form
@@ -631,6 +724,11 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
                       {statusBanner}
                     </div>
                   ) : null}
+                  {showDictationBanner ? (
+                    <div className='system-b-chat-composer-seam border-t'>
+                      {dictationBanner}
+                    </div>
+                  ) : null}
                   <div className='system-b-chat-composer-seam border-t'>
                     <InputRow
                       containerRef={containerRef}
@@ -655,6 +753,8 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
                       handlePreserveFocus={handlePreserveFocus}
                       isDictationSupported={isDictationSupported}
                       isListening={isListening}
+                      handleMicPushStart={handleMicPushStart}
+                      handleMicPushEnd={handleMicPushEnd}
                       handleMicToggle={handleMicToggle}
                       canSend={canSend}
                       isStreaming={isStreaming}
@@ -709,6 +809,12 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
                   </div>
                 ) : null}
 
+                {showDictationBanner ? (
+                  <div className='system-b-chat-composer-seam border-b'>
+                    {dictationBanner}
+                  </div>
+                ) : null}
+
                 <InputRow
                   containerRef={containerRef}
                   hiddenDivRef={hiddenDivRef}
@@ -732,6 +838,8 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
                   handlePreserveFocus={handlePreserveFocus}
                   isDictationSupported={isDictationSupported}
                   isListening={isListening}
+                  handleMicPushStart={handleMicPushStart}
+                  handleMicPushEnd={handleMicPushEnd}
                   handleMicToggle={handleMicToggle}
                   canSend={canSend}
                   isStreaming={isStreaming}
@@ -807,6 +915,8 @@ interface InputRowProps {
   ) => void;
   readonly isDictationSupported: boolean;
   readonly isListening: boolean;
+  readonly handleMicPushStart: () => void;
+  readonly handleMicPushEnd: () => void;
   readonly handleMicToggle: () => void;
   readonly canSend: boolean;
   readonly isStreaming: boolean;
@@ -856,6 +966,8 @@ function InputRow({
   handlePreserveFocus,
   isDictationSupported,
   isListening,
+  handleMicPushStart,
+  handleMicPushEnd,
   handleMicToggle,
   canSend,
   isStreaming,
@@ -1014,7 +1126,9 @@ function InputRow({
               isLoading={isLoading}
               isSubmitting={isSubmitting}
               isSupported={isDictationSupported}
-              onMouseDown={handlePreserveFocus}
+              onPreserveFocus={handlePreserveFocus}
+              onPushStart={handleMicPushStart}
+              onPushEnd={handleMicPushEnd}
               onToggle={handleMicToggle}
             />
 
