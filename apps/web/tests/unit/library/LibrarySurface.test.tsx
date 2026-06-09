@@ -254,10 +254,8 @@ describe('LibrarySurface', () => {
     expect(source).toContain(
       'px-(--linear-app-header-padding-x) py-(--linear-app-content-padding-y)'
     );
-    expect(source).toContain('LIBRARY_GRID_LAYOUT_CLASS');
-    expect(source).toContain(
-      'grid gap-3 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4'
-    );
+    expect(source).toContain('LIBRARY_GRID_DENSITY_LAYOUT');
+    expect(source).toContain('useLibraryGridDensity');
     expect(source).toContain('px-(--linear-app-header-padding-x) sm:flex');
     expect(source).not.toContain('px-2.5 pb-2.5 pt-1');
     expect(source).not.toMatch(/grid gap-2\.5/u);
@@ -288,6 +286,63 @@ describe('LibrarySurface', () => {
     expect(
       screen.queryByRole('button', { name: /Inspect Take Me Over/u })
     ).toBeNull();
+  });
+
+  it('shows the card-size toggle in grid view and persists density preference', () => {
+    renderLibrary([buildAsset()]);
+
+    expect(
+      screen.queryByTestId('library-grid-density-toggle')
+    ).not.toBeInTheDocument();
+
+    clickGridView();
+    expect(
+      screen.getByTestId('library-grid-density-toggle')
+    ).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: /Small cards/u }));
+    expect(window.localStorage.getItem('jovie:library-grid-density')).toBe(
+      'compact'
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: /Large cards/u }));
+    expect(window.localStorage.getItem('jovie:library-grid-density')).toBe(
+      'spacious'
+    );
+  });
+
+  it('renders aspect-ratio-aware artwork frames in grid cards', () => {
+    renderLibrary([
+      buildAsset(),
+      buildAsset({
+        id: 'video-landscape',
+        title: 'Music Video',
+        itemKind: 'video',
+        assetKinds: ['artwork', 'video'],
+      }),
+      buildAsset({
+        id: 'video-portrait',
+        title: 'Reel',
+        itemKind: 'video',
+        mediaOrientation: 'portrait',
+        assetKinds: ['artwork', 'video'],
+      }),
+    ]);
+    clickGridView();
+
+    const releaseCard = screen
+      .getByRole('button', { name: /Inspect Take Me Over/u })
+      .querySelector('.system-b-library-card-artwork');
+    const landscapeCard = screen
+      .getByRole('button', { name: /Inspect Music Video/u })
+      .querySelector('.system-b-library-card-artwork');
+    const portraitCard = screen
+      .getByRole('button', { name: /Inspect Reel/u })
+      .querySelector('.system-b-library-card-artwork');
+
+    expect(releaseCard?.className).toContain('aspect-square');
+    expect(landscapeCard?.className).toContain('aspect-video');
+    expect(portraitCard?.className).toContain('aspect-[9/16]');
   });
 
   it('renders release assets with grid cards and a read-only detail drawer', () => {
