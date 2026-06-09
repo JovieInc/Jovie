@@ -432,35 +432,112 @@ describe('ChatInput', () => {
     expect(screen.getByRole('button', { name: /send message/i })).toBeEnabled();
   });
 
-  it('toggles dictation when speech input is supported', async () => {
+  it('starts push-to-talk dictation on pointer down and stops on release', async () => {
+    installMockSpeechRecognition();
+
+    fastRender(withProviders(<ChatInput {...baseProps} />));
+
+    const dictationButton = await screen.findByTestId('dictation-toggle');
+    await waitFor(() => expect(dictationButton).toBeEnabled());
+
+    fireEvent.pointerDown(dictationButton);
+    expect(MockSpeechRecognition.instances).toHaveLength(1);
+    expect(MockSpeechRecognition.instances[0]?.start).toHaveBeenCalledTimes(1);
+    expect(dictationButton).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByRole('status')).toHaveTextContent(/listening/i);
+
+    fireEvent.pointerUp(dictationButton);
+    expect(MockSpeechRecognition.instances[0]?.stop).toHaveBeenCalledTimes(1);
+    expect(dictationButton).toHaveAttribute('aria-pressed', 'false');
+  });
+
+  it('toggles dictation from the keyboard when speech input is supported', async () => {
     const user = userEvent.setup();
     installMockSpeechRecognition();
 
     fastRender(withProviders(<ChatInput {...baseProps} />));
 
     const dictationButton = await screen.findByRole('button', {
-      name: /dictate message/i,
+      name: /hold to dictate/i,
     });
     await waitFor(() => expect(dictationButton).toBeEnabled());
 
-    await user.click(dictationButton);
+    dictationButton.focus();
+    await user.keyboard('{Enter}');
 
     expect(MockSpeechRecognition.instances).toHaveLength(1);
     expect(MockSpeechRecognition.instances[0]?.start).toHaveBeenCalledTimes(1);
     expect(dictationButton).toHaveAttribute('aria-pressed', 'true');
-    expect(dictationButton).toHaveClass('system-b-chat-composer-icon-button');
-    expect(dictationButton).toHaveAttribute('data-active', 'true');
-    expect(dictationButton).not.toHaveClass('text-tertiary-token');
-    expect(
-      screen.getByRole('button', { name: /stop dictation/i })
-    ).toBeEnabled();
 
-    await user.click(screen.getByRole('button', { name: /stop dictation/i }));
-
+    await user.keyboard('{Enter}');
     expect(MockSpeechRecognition.instances[0]?.stop).toHaveBeenCalledTimes(1);
-    expect(
-      screen.getByRole('button', { name: /dictate message/i })
-    ).toBeEnabled();
+    expect(dictationButton).toHaveAttribute('aria-pressed', 'false');
+  });
+
+  it('streams partial transcripts into the composer while listening', async () => {
+    installMockSpeechRecognition();
+
+    function DraftHarness() {
+      const [value, setValue] = useState('Draft ');
+      return (
+        <ChatInput
+          value={value}
+          onChange={setValue}
+          onSubmit={vi.fn()}
+          isLoading={false}
+          isSubmitting={false}
+        />
+      );
+    }
+
+    fastRender(withProviders(<DraftHarness />));
+
+    const dictationButton = await screen.findByTestId('dictation-toggle');
+    await waitFor(() => expect(dictationButton).toBeEnabled());
+
+    fireEvent.pointerDown(dictationButton);
+    const recognition = MockSpeechRecognition.instances[0];
+    recognition?.onresult?.({
+      results: [
+        {
+          0: { transcript: 'next tour dates', confidence: 1 },
+          length: 1,
+          item: (index: number) =>
+            ({
+              0: { transcript: 'next tour dates', confidence: 1 },
+              length: 1,
+              item: () => ({ transcript: 'next tour dates', confidence: 1 }),
+            })[index],
+        },
+      ],
+    } as Event);
+
+    await waitFor(() => {
+      expect(
+        screen.getByRole('textbox', { name: /chat message input/i })
+      ).toHaveValue('Draft next tour dates');
+    });
+  });
+
+  it('surfaces microphone permission errors without blocking send', async () => {
+    installMockSpeechRecognition();
+
+    fastRender(withProviders(<ChatInput {...baseProps} />));
+
+    const dictationButton = await screen.findByTestId('dictation-toggle');
+    await waitFor(() => expect(dictationButton).toBeEnabled());
+
+    fireEvent.pointerDown(dictationButton);
+    MockSpeechRecognition.instances[0]?.onerror?.({
+      error: 'not-allowed',
+    } as Event);
+
+    await waitFor(() => {
+      expect(screen.getByRole('alert')).toHaveTextContent(
+        /microphone access was denied/i
+      );
+    });
+    expect(screen.getByRole('button', { name: /send message/i })).toBeEnabled();
   });
 
   it('keeps dictation disabled in stale Electron when the desktop bridge cannot allow fallback', async () => {
@@ -491,11 +568,11 @@ describe('ChatInput', () => {
 
     fastRender(withProviders(<ChatInput {...baseProps} />));
 
-    const dictationButton = await screen.findByRole('button', {
-      name: /dictate message/i,
-    });
+    const dictationButton = await screen.findByTestId('dictation-toggle');
     await waitFor(() => expect(dictationButton).toBeEnabled());
-    await user.click(dictationButton);
+
+    dictationButton.focus();
+    await user.keyboard('{Enter}');
 
     expect(MockSpeechRecognition.instances).toHaveLength(1);
     expect(MockSpeechRecognition.instances[0]?.start).toHaveBeenCalledTimes(1);

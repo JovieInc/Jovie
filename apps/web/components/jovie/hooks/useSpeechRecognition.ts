@@ -1,54 +1,12 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
+import {
+  createWebSpeechTranscriber,
+  type Transcriber,
+  type TranscriberErrorCode,
+} from '@/lib/chat/transcriber';
 import { useDesktopDictationStatus } from '@/lib/desktop/electron-bridge';
-
-// Minimal Web Speech API types for cross-browser support.
-// The standard SpeechRecognition interface is not yet in all TS dom libs.
-interface SpeechRecognitionResult {
-  readonly length: number;
-  item(index: number): SpeechRecognitionAlternative;
-  [index: number]: SpeechRecognitionAlternative;
-}
-
-interface SpeechRecognitionAlternative {
-  readonly transcript: string;
-  readonly confidence: number;
-}
-
-interface SpeechRecognitionResultList {
-  readonly length: number;
-  item(index: number): SpeechRecognitionResult;
-  [index: number]: SpeechRecognitionResult;
-}
-
-interface SpeechRecognitionEvent extends Event {
-  readonly results: SpeechRecognitionResultList;
-}
-
-interface SpeechRecognitionErrorEvent extends Event {
-  readonly error: string;
-}
-
-interface SpeechRecognitionInstance extends EventTarget {
-  continuous: boolean;
-  interimResults: boolean;
-  lang: string;
-  onresult: ((event: SpeechRecognitionEvent) => void) | null;
-  onend: (() => void) | null;
-  onerror: ((event: SpeechRecognitionErrorEvent) => void) | null;
-  start(): void;
-  stop(): void;
-}
-
-type SpeechRecognitionConstructor = new () => SpeechRecognitionInstance;
-
-declare global {
-  interface Window {
-    SpeechRecognition?: SpeechRecognitionConstructor;
-    webkitSpeechRecognition?: SpeechRecognitionConstructor;
-  }
-}
 
 interface UseSpeechRecognitionOptions {
   /** Called with the accumulated transcript as the user speaks */
@@ -62,6 +20,10 @@ interface UseSpeechRecognitionReturn {
   isSupported: boolean;
   /** Whether the mic is currently listening */
   isListening: boolean;
+  /** Last dictation error, if any */
+  error: TranscriberErrorCode | null;
+  /** Clear the surfaced error */
+  clearError: () => void;
   /** Start listening */
   start: () => void;
   /** Stop listening */
@@ -71,7 +33,7 @@ interface UseSpeechRecognitionReturn {
 }
 
 /**
- * Hook wrapping the Web Speech API for voice-to-text dictation.
+ * Hook wrapping chat dictation via the Transcriber abstraction.
  * Falls back gracefully when the API is unavailable (returns isSupported=false).
  */
 export function useSpeechRecognition({
@@ -80,88 +42,63 @@ export function useSpeechRecognition({
 }: UseSpeechRecognitionOptions): UseSpeechRecognitionReturn {
   const desktopDictationStatus = useDesktopDictationStatus();
   const [isListening, setIsListening] = useState(false);
+  const [error, setError] = useState<TranscriberErrorCode | null>(null);
   // Start as false so SSR and the first client render agree, then flip to
   // the real value after mount. Otherwise the chat composer renders
   // <ComposerMicButton> on the client but not the server, which swaps the
   // hydrated <button> slot at the trailing edge of the input row and
   // tears the entire send-button subtree (Radix Tooltip + Mic icon).
   const [isSupported, setIsSupported] = useState(false);
-  const recognitionRef = useRef<SpeechRecognitionInstance | null>(null);
+  const transcriberRef = useRef<Transcriber | null>(null);
   const onTranscriptRef = useRef(onTranscript);
   const browserWindow = globalThis.window ?? undefined;
+
   useEffect(() => {
     onTranscriptRef.current = onTranscript;
   }, [onTranscript]);
 
   useEffect(() => {
     if (!browserWindow) return;
-    const browserSpeechSupported =
-      'SpeechRecognition' in browserWindow ||
-      'webkitSpeechRecognition' in browserWindow;
-    setIsSupported(
-      browserSpeechSupported && desktopDictationStatus.webSpeechFallbackAllowed
+    const transcriber = createWebSpeechTranscriber(
+      {
+        onTranscript: text => {
+          onTranscriptRef.current(text);
+        },
+        onError: code => {
+          setError(code);
+          setIsListening(false);
+        },
+        onEnd: () => {
+          setIsListening(false);
+        },
+      },
+      { lang, browserWindow }
     );
-  }, [browserWindow, desktopDictationStatus.webSpeechFallbackAllowed]);
+    transcriberRef.current = transcriber;
+    setIsSupported(
+      transcriber.isSupported && desktopDictationStatus.webSpeechFallbackAllowed
+    );
 
-  const getRecognition = useCallback(() => {
-    if (recognitionRef.current) return recognitionRef.current;
-    if (!isSupported) return null;
-
-    const Ctor =
-      browserWindow?.SpeechRecognition ??
-      browserWindow?.webkitSpeechRecognition;
-    if (!Ctor) return null;
-
-    const recognition = new Ctor();
-    recognition.continuous = true;
-    recognition.interimResults = true;
-    recognition.lang = lang;
-
-    recognition.onresult = (event: SpeechRecognitionEvent) => {
-      // Accumulate the full session transcript on every event.
-      // resultIndex marks where the new/updated results begin; earlier
-      // indices are already-final results whose text must also be included
-      // so the caller always receives the complete in-session transcript.
-      let transcript = '';
-      for (const result of Array.from(event.results)) {
-        transcript += result[0].transcript;
-      }
-      onTranscriptRef.current(transcript);
+    return () => {
+      transcriber.dispose();
+      transcriberRef.current = null;
     };
+  }, [browserWindow, desktopDictationStatus.webSpeechFallbackAllowed, lang]);
 
-    recognition.onend = () => {
-      // Discard the instance so the next start() creates a fresh one.
-      // Reusing a stopped SpeechRecognition instance throws InvalidStateError
-      // in Chrome, causing the mic button to appear as a mute toggle.
-      recognitionRef.current = null;
-      setIsListening(false);
-    };
-
-    recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
-      if (event.error !== 'aborted') {
-        setIsListening(false);
-      }
-    };
-
-    recognitionRef.current = recognition;
-    return recognition;
-  }, [browserWindow, isSupported, lang]);
+  const clearError = useCallback(() => {
+    setError(null);
+  }, []);
 
   const start = useCallback(() => {
-    const recognition = getRecognition();
-    if (!recognition) return;
-    try {
-      recognition.start();
-      setIsListening(true);
-    } catch {
-      // Already started — ignore
-    }
-  }, [getRecognition]);
+    const transcriber = transcriberRef.current;
+    if (!transcriber?.isSupported) return;
+    setError(null);
+    transcriber.start();
+    setIsListening(true);
+  }, []);
 
   const stop = useCallback(() => {
-    const recognition = recognitionRef.current;
-    if (!recognition) return;
-    recognition.stop();
+    transcriberRef.current?.stop();
     setIsListening(false);
   }, []);
 
@@ -173,11 +110,5 @@ export function useSpeechRecognition({
     }
   }, [isListening, start, stop]);
 
-  useEffect(() => {
-    return () => {
-      recognitionRef.current?.stop();
-    };
-  }, []);
-
-  return { isSupported, isListening, start, stop, toggle };
+  return { isSupported, isListening, error, clearError, start, stop, toggle };
 }
