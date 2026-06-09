@@ -1,6 +1,6 @@
 {
   "name": "@jovie/ui",
-  "version": "26.6.30",
+  "version": "26.6.31",
   "private": true,
   "sideEffects": [
     "*.css"
