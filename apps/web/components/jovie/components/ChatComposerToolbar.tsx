@@ -7,7 +7,15 @@ import {
   DropdownMenuTrigger,
   SimpleTooltip,
 } from '@jovie/ui';
-import { ArrowUp, ImagePlus, Loader2, Mic, MicOff, Plus } from 'lucide-react';
+import {
+  ArrowUp,
+  FileAudio2,
+  ImagePlus,
+  Loader2,
+  Mic,
+  MicOff,
+  Plus,
+} from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
 
 import { cn } from '@/lib/utils';
@@ -105,6 +113,7 @@ export function ComposerSendButton({
 
 export interface ComposerAttachButtonProps {
   readonly isImageProcessing: boolean;
+  readonly isAudioProcessing?: boolean;
   readonly isLoading: boolean;
   readonly isSubmitting: boolean;
   /**
@@ -117,10 +126,12 @@ export interface ComposerAttachButtonProps {
   readonly onOpenChange: (open: boolean) => void;
   readonly onMouseDown: (event: React.MouseEvent<HTMLButtonElement>) => void;
   readonly onImageAttach: () => void;
+  readonly onAudioAttach?: () => void;
 }
 
 export function ComposerAttachButton({
   isImageProcessing,
+  isAudioProcessing = false,
   isLoading,
   isSubmitting,
   disabled = false,
@@ -128,21 +139,24 @@ export function ComposerAttachButton({
   onOpenChange,
   onMouseDown,
   onImageAttach,
+  onAudioAttach,
 }: ComposerAttachButtonProps) {
+  const isProcessing = isImageProcessing || isAudioProcessing;
+
   return (
     <DropdownMenu open={plusMenuOpen} onOpenChange={onOpenChange}>
       <DropdownMenuTrigger asChild>
         <button
           type='button'
           onMouseDown={onMouseDown}
-          disabled={isImageProcessing || isLoading || isSubmitting || disabled}
+          disabled={isProcessing || isLoading || isSubmitting || disabled}
           className={cn(
             'system-b-chat-composer-icon-button flex h-9 w-9 shrink-0 items-center justify-center rounded-full',
             'disabled:cursor-not-allowed disabled:opacity-50'
           )}
           aria-label='Attachment options'
         >
-          {isImageProcessing ? (
+          {isProcessing ? (
             <Loader2 className='h-4 w-4 animate-spin' strokeWidth={2.25} />
           ) : (
             <Plus className='h-4 w-4' strokeWidth={2.25} />
@@ -166,6 +180,17 @@ export function ComposerAttachButton({
           <ImagePlus className='h-3.5 w-3.5' />
           Attach image
         </DropdownMenuItem>
+        {onAudioAttach ? (
+          <DropdownMenuItem
+            className='min-h-9 gap-2 rounded-lg px-2.5 py-2'
+            onSelect={() => {
+              onAudioAttach();
+            }}
+          >
+            <FileAudio2 className='h-3.5 w-3.5' />
+            Attach audio
+          </DropdownMenuItem>
+        ) : null}
       </DropdownMenuContent>
     </DropdownMenu>
   );
