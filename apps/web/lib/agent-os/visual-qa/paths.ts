@@ -1,6 +1,7 @@
 import path from 'node:path';
 import { resolveMonorepoPath } from '@/lib/filesystem-paths';
 import { validatePathTraversal } from '@/lib/security/path-traversal';
+import type { VisualQaPhase } from '@/lib/visual-qa/types';
 
 export const VISUAL_QA_ROOT_SEGMENTS = [
   'agentos',
@@ -46,6 +47,19 @@ export function resolveVisualQaSurfaceDirectory(
   const safeSurfaceId = assertValidVisualQaSurfaceId(surfaceId);
   return validatePathTraversal(
     path.join(safeRunId, safeSurfaceId),
+    getVisualQaRootDirectory()
+  );
+}
+
+export function resolveVisualQaPhaseScreenshotPath(
+  runId: string,
+  surfaceId: string,
+  phase: VisualQaPhase
+): string {
+  const safeRunId = assertValidVisualQaRunId(runId);
+  const safeSurfaceId = assertValidVisualQaSurfaceId(surfaceId);
+  return validatePathTraversal(
+    path.join(safeRunId, safeSurfaceId, `${phase}.png`),
     getVisualQaRootDirectory()
   );
 }
