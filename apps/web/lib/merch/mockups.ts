@@ -314,7 +314,7 @@ export async function attachMockupsToDesignOption(
   const newUrls = mockupUrls.filter(url => !existing.has(url));
   if (newUrls.length === 0) return;
 
-  const merged = [...(option.mockupUrls ?? []), ...newUrls];
+  const merged = [...newUrls, ...(option.mockupUrls ?? [])];
   await db
     .update(merchDesignOptions)
     .set({ mockupUrls: merged, updatedAt: new Date() })
