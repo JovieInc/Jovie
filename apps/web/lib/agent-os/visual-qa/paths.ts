@@ -72,6 +72,14 @@ export function resolveVisualQaManifestPath(runId: string): string {
   );
 }
 
+export function resolveVisualQaBreakpointReportPath(runId: string): string {
+  const safeRunId = assertValidVisualQaRunId(runId);
+  return validatePathTraversal(
+    path.join(safeRunId, 'breakpoint-report.json'),
+    getVisualQaRootDirectory()
+  );
+}
+
 export function toVisualQaRelativePath(absolutePath: string): string {
   const root = getVisualQaRootDirectory();
   const resolvedRoot = path.resolve(root);

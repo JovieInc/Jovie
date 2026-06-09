@@ -2,6 +2,7 @@ import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
   getVisualQaRootDirectory,
+  resolveVisualQaBreakpointReportPath,
   resolveVisualQaManifestPath,
   resolveVisualQaPhaseScreenshotPath,
   resolveVisualQaRunDirectory,
@@ -25,6 +26,9 @@ describe('visual-qa paths', () => {
       path.join(runDirectory, 'shell-desktop-idle', 'baseline.png')
     );
     expect(manifestPath).toBe(path.join(runDirectory, 'manifest.json'));
+    expect(resolveVisualQaBreakpointReportPath('demo-run')).toBe(
+      path.join(runDirectory, 'breakpoint-report.json')
+    );
   });
 
   it('rejects traversal attempts in run ids', () => {
