@@ -21,6 +21,7 @@ import {
   isBrowserNavigation,
 } from '@/lib/auth/auth-degraded-fallback';
 import { buildProtectedAuthRedirectUrl } from '@/lib/auth/build-auth-route-url';
+import { isCentralAuthPassThroughRoute } from '@/lib/auth/central-auth-routing';
 import { handleClerkFapiProxy } from '@/lib/auth/clerk-fapi-proxy';
 import {
   type ClerkBypassPathInfo,
@@ -388,7 +389,10 @@ async function handleRequest(req: NextRequest, userId: string | null) {
     // Native auth start must also reach its route handler for authenticated
     // users so it can issue the central callback instead of being redirected
     // by waitlist/onboarding middleware state.
-    if (pathInfo.isAuthCallbackPath || pathname === '/auth/start') {
+    if (
+      pathInfo.isAuthCallbackPath ||
+      isCentralAuthPassThroughRoute(pathname)
+    ) {
       return buildFinalResponse(
         req,
         NextResponse.next({ request: { headers: requestHeaders } }),
