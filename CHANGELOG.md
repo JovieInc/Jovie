@@ -5,6 +5,14 @@
      5|The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
      6|and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.6.32] - 2026-06-09
+
+> Admin Overview now leads with MRR and operator metrics in the canonical page shell.
+
+### Changed
+
+- **Admin shell + Overview redesign (JOV-2525, PR-1)**: establishes the unified `AdminPage` shell with optional hero and tabs slots, rewrites `/app/admin` to lead with hero MRR/paying/WoW metrics (removes the legacy scoreboard/workspaces tab toggle), extends `AnalyticsCard` with a `hero` variant, deprecates `AdminToolPage`/`AdminWorkspacePage` shims behind a CI ratchet, and adds shell-normalization guardrails for the overview route.
+
 ## [26.6.31] - 2026-06-08
 
 > Chat merch generation now requests photorealistic Printful mockups after artwork is created.
