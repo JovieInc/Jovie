@@ -1,8 +1,7 @@
 import { createClerkClient } from '@clerk/backend';
-import { clerkClient } from '@clerk/nextjs/server';
 import { isStagingHost, resolveClerkKeys } from '@/lib/auth/staging-clerk-keys';
 
-type ClerkClient = Awaited<ReturnType<typeof clerkClient>>;
+type ClerkClient = ReturnType<typeof createClerkClient>;
 
 function hostnameFromHeader(value: string | null): string | null {
   const firstHost = value?.split(',')[0]?.trim();
@@ -22,17 +21,16 @@ export async function getRequestClerkClient(
   request: Request
 ): Promise<ClerkClient> {
   const hostname = getRequestHostname(request);
-  if (!isStagingHost(hostname)) {
-    return clerkClient();
-  }
-
   const keys = resolveClerkKeys(hostname);
   if (!keys.secretKey) {
-    throw new Error(`Staging Clerk secret unavailable: ${keys.status}`);
+    const prefix = isStagingHost(hostname) ? 'Staging Clerk' : 'Clerk';
+    throw new Error(`${prefix} secret unavailable: ${keys.status}`);
   }
 
+  // Native exchange and other server routes that bypass Clerk middleware must
+  // not depend on clerkClient() from @clerk/nextjs/server.
   return createClerkClient({
     publishableKey: keys.publishableKey,
     secretKey: keys.secretKey,
-  }) as ClerkClient;
+  });
 }

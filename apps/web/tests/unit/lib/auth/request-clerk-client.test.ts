@@ -51,17 +51,20 @@ describe('request Clerk client resolution', () => {
     restoreEnv();
   });
 
-  it('uses the default Next Clerk client for production hosts', async () => {
+  it('uses backend Clerk client with production keys for production hosts', async () => {
     const { getRequestClerkClient } = await import(
       '@/lib/auth/request-clerk-client'
     );
     const request = new Request('https://jov.ie/api/mobile/v1/me');
 
     await expect(getRequestClerkClient(request)).resolves.toEqual({
-      source: 'next',
+      source: 'backend',
     });
-    expect(mockClerkClient).toHaveBeenCalledOnce();
-    expect(mockCreateClerkClient).not.toHaveBeenCalled();
+    expect(mockCreateClerkClient).toHaveBeenCalledWith({
+      publishableKey: 'pk_live_production',
+      secretKey: 'sk_live_production',
+    });
+    expect(mockClerkClient).not.toHaveBeenCalled();
   });
 
   it('uses explicit staging Clerk keys for staging hosts', async () => {
