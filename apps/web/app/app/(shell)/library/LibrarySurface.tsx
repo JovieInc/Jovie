@@ -5,7 +5,6 @@ import {
   createColumnHelper,
   type RowSelectionState,
 } from '@tanstack/react-table';
-import { upload } from '@vercel/blob/client';
 import {
   ArrowUpDown,
   Check,
@@ -19,13 +18,11 @@ import {
   Grid3x3,
   ImageIcon,
   LayoutList,
-  Loader2,
   type LucideIcon,
   Music2,
   Pause,
   PlayCircle,
   Shirt,
-  Upload,
   Video,
   X,
 } from 'lucide-react';
@@ -33,11 +30,9 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import {
-  type ChangeEvent,
   type CSSProperties,
   cloneElement,
   createContext,
-  type DragEvent,
   type MouseEvent,
   memo,
   type ReactNode,
@@ -47,11 +42,11 @@ import {
   useEffect,
   useId,
   useMemo,
-  useRef,
   useState,
 } from 'react';
 import { toast } from 'sonner';
 import { ArtworkFallbackTile } from '@/components/atoms/ArtworkFallbackTile';
+import { ReleaseAudioAssetPanel } from '@/components/features/release/ReleaseAudioAssetPanel';
 import { PageShell } from '@/components/organisms/PageShell';
 import { useTrackAudioPlayer } from '@/components/organisms/release-sidebar/useTrackAudioPlayer';
 import {
@@ -100,22 +95,6 @@ const LIBRARY_BUTTON_FOCUS_CLASS =
   'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/55 focus-visible:ring-offset-2 focus-visible:ring-offset-(--linear-app-content-surface) outline-none';
 const LIBRARY_ICON_FOCUS_CLASS =
   'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/55 focus-visible:ring-offset-2 focus-visible:ring-offset-(--linear-app-content-surface) outline-none';
-const LIBRARY_AUDIO_MAX_FILE_SIZE = 150 * 1024 * 1024;
-const LIBRARY_AUDIO_ACCEPT =
-  'audio/aac,audio/aiff,audio/flac,audio/mp4,audio/mpeg,audio/wav,audio/x-aiff,audio/x-flac,audio/x-m4a,audio/x-wav';
-const LIBRARY_AUDIO_MIME_TYPES = new Set([
-  'audio/aac',
-  'audio/aiff',
-  'audio/flac',
-  'audio/mp4',
-  'audio/mpeg',
-  'audio/wav',
-  'audio/x-aiff',
-  'audio/x-flac',
-  'audio/x-m4a',
-  'audio/x-wav',
-]);
-
 const LIBRARY_TABLE_SKELETON_CONFIG: Array<{
   readonly width?: string;
   readonly variant?:
@@ -1403,170 +1382,6 @@ function PreviewActionButton({
   );
 }
 
-function isSupportedAudioFile(file: File): boolean {
-  if (LIBRARY_AUDIO_MIME_TYPES.has(file.type)) return true;
-  return /\.(aac|aiff?|flac|m4a|mp3|wav)$/i.test(file.name);
-}
-
-function LibraryAudioDropzone({
-  asset,
-  onUploaded,
-  disabledTabIndex,
-}: {
-  readonly asset: LibraryReleaseAsset;
-  readonly onUploaded: (assetId: string, previewUrl: string) => void;
-  readonly disabledTabIndex?: number;
-}) {
-  const inputRef = useRef<HTMLInputElement>(null);
-  const [isDragging, setIsDragging] = useState(false);
-  const [uploading, setUploading] = useState(false);
-  const [uploadError, setUploadError] = useState<string | null>(null);
-
-  const uploadFile = useCallback(
-    async (file: File) => {
-      if (!isSupportedAudioFile(file)) {
-        setUploadError('Use MP3, WAV, FLAC, AIFF, AAC, or M4A audio.');
-        return;
-      }
-
-      if (file.size > LIBRARY_AUDIO_MAX_FILE_SIZE) {
-        setUploadError('Audio must be 150 MB or smaller.');
-        return;
-      }
-
-      setUploading(true);
-      setUploadError(null);
-
-      try {
-        const blob = await upload(file.name, file, {
-          access: 'public',
-          handleUploadUrl: '/api/library/audio/upload-token',
-        });
-        const response = await fetch('/api/library/audio/confirm', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            releaseId: asset.id,
-            blobUrl: blob.url,
-            blobPathname: blob.pathname,
-            fileName: file.name,
-            fileMimeType: file.type,
-            fileSizeBytes: file.size,
-          }),
-        });
-        const body = (await response.json().catch(() => ({}))) as {
-          readonly previewUrl?: string;
-          readonly error?: string;
-        };
-
-        if (!response.ok || !body.previewUrl) {
-          throw new Error(body.error ?? 'Audio upload failed');
-        }
-
-        onUploaded(asset.id, body.previewUrl);
-      } catch (error) {
-        const message =
-          error instanceof Error ? error.message : 'Audio upload failed';
-        setUploadError(message);
-        toast.error(message);
-      } finally {
-        setUploading(false);
-        if (inputRef.current) {
-          inputRef.current.value = '';
-        }
-      }
-    },
-    [asset.id, onUploaded]
-  );
-
-  const handleInputChange = useCallback(
-    (event: ChangeEvent<HTMLInputElement>) => {
-      const file = event.target.files?.[0];
-      if (file) {
-        uploadFile(file).catch(() => {});
-      }
-    },
-    [uploadFile]
-  );
-
-  const handleDrop = useCallback(
-    (event: DragEvent<HTMLButtonElement>) => {
-      event.preventDefault();
-      setIsDragging(false);
-      const file = event.dataTransfer.files?.[0];
-      if (file) {
-        uploadFile(file).catch(() => {});
-      }
-    },
-    [uploadFile]
-  );
-
-  return (
-    <div>
-      <button
-        type='button'
-        onClick={() => inputRef.current?.click()}
-        onDragEnter={event => {
-          event.preventDefault();
-          setIsDragging(true);
-        }}
-        onDragOver={event => {
-          event.preventDefault();
-          setIsDragging(true);
-        }}
-        onDragLeave={event => {
-          event.preventDefault();
-          setIsDragging(false);
-        }}
-        onDrop={handleDrop}
-        disabled={uploading}
-        tabIndex={disabledTabIndex}
-        data-testid='library-audio-dropzone'
-        className={cn(
-          'system-b-library-dropzone flex w-full flex-col items-center justify-center px-3 py-4 text-center',
-          isDragging && 'system-b-library-dropzone--dragging',
-          !uploading &&
-            'system-b-library-dropzone--interactive focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/55 focus-visible:ring-offset-2 focus-visible:ring-offset-(--linear-app-content-surface)'
-        )}
-        aria-busy={uploading || undefined}
-      >
-        {uploading ? (
-          <Loader2
-            className='h-5 w-5 animate-spin text-secondary-token motion-reduce:animate-none'
-            aria-hidden='true'
-            strokeWidth={2.25}
-          />
-        ) : (
-          <Upload
-            className='h-5 w-5 text-tertiary-token'
-            aria-hidden='true'
-            strokeWidth={2.25}
-          />
-        )}
-        <span className='system-b-library-audio-label mt-2 font-medium text-primary-token'>
-          {uploading ? 'Uploading audio' : 'Drop audio'}
-        </span>
-        <span className='system-b-library-audio-hint mt-1 leading-4'>
-          MP3, WAV, FLAC, AIFF, AAC, or M4A. Max 150 MB.
-        </span>
-      </button>
-      <input
-        ref={inputRef}
-        type='file'
-        accept={LIBRARY_AUDIO_ACCEPT}
-        onChange={handleInputChange}
-        disabled={uploading}
-        tabIndex={disabledTabIndex}
-        className='sr-only'
-        aria-label={`Upload audio for ${asset.title}`}
-      />
-      <output className='system-b-library-audio-output min-h-5 pt-1.5'>
-        {uploadError ? <p className='text-error'>{uploadError}</p> : null}
-      </output>
-    </div>
-  );
-}
-
 function LibraryAudioPanel({
   asset,
   isPreviewPlaying,
@@ -1599,30 +1414,15 @@ function LibraryAudioPanel({
           />
         ) : null}
       </div>
-      {asset.previewUrl ? (
-        <div
-          className='system-b-library-audio-ready flex items-center gap-3 px-3 py-3'
-          data-testid='library-audio-ready'
-        >
-          <span className='system-b-library-audio-icon grid h-8 w-8 shrink-0 place-items-center'>
-            <FileAudio2 className='h-4 w-4' strokeWidth={2.25} />
-          </span>
-          <div className='min-w-0'>
-            <p className='system-b-library-audio-label truncate font-medium text-primary-token'>
-              Audio attached
-            </p>
-            <p className='system-b-library-audio-hint mt-0.5 leading-4'>
-              Preview playback is available in the persistent player.
-            </p>
-          </div>
-        </div>
-      ) : (
-        <LibraryAudioDropzone
-          asset={asset}
-          onUploaded={onUploaded}
-          disabledTabIndex={disabledTabIndex}
-        />
-      )}
+      <ReleaseAudioAssetPanel
+        releaseId={asset.id}
+        releaseTitle={asset.title}
+        previewUrl={asset.previewUrl}
+        durationMs={asset.totalDurationMs}
+        disabledTabIndex={disabledTabIndex}
+        testIdPrefix='library'
+        onUploaded={previewUrl => onUploaded(asset.id, previewUrl)}
+      />
     </div>
   );
 }
