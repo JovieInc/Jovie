@@ -79,6 +79,22 @@ vi.mock('@/lib/queries/useArtistSearchQuery', () => ({
   }),
 }));
 
+vi.mock('@/lib/queries/useChatCapabilitiesQuery', () => ({
+  useChatCapabilitiesQuery: () => ({
+    data: {
+      tools: {
+        albumArt: {
+          availability: 'available',
+          reason: null,
+          reasonCode: null,
+        },
+      },
+    },
+    isLoading: false,
+    isError: false,
+  }),
+}));
+
 describe('SharedCommandPalette (cmd+k surface)', () => {
   it('exposes both skills and navs from the registry on the cmdk surface', () => {
     const cmds = commandsForSurface('cmdk');
