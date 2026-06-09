@@ -5,6 +5,14 @@
      5|The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
      6|and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.6.32] - 2026-06-09
+
+> Dialog close buttons now share the same pill-shaped System B styling as other overlay primitives.
+
+### Fixed
+
+- **Dialog pill close button styles (JOV-2821)**: reuses the shared `closeButtonClassName` helper for `DialogContent` and adds helper-level regression coverage so the close affordance stays `rounded-full` instead of drifting back to legacy item-radius styling.
+
 ## [26.6.31] - 2026-06-08
 
 > Chat merch generation now requests photorealistic Printful mockups after artwork is created.
