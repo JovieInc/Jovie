@@ -1,5 +1,5 @@
-import { auth } from '@clerk/nextjs/server';
 import { NextRequest, NextResponse } from 'next/server';
+import { getCachedSessionTokenAuth } from '@/lib/auth/cached';
 import { isProfileComplete } from '@/lib/auth/profile-completeness';
 import { getSessionContext, withDbSessionTx } from '@/lib/auth/session';
 import { verifyProfileOwnership } from '@/lib/db/queries/shared';
@@ -21,7 +21,7 @@ import {
 export const runtime = 'nodejs';
 
 export async function GET(request: NextRequest) {
-  const { userId } = await auth({ acceptsToken: 'session_token' });
+  const { userId } = await getCachedSessionTokenAuth();
   if (!userId) {
     return NextResponse.json(
       { error: 'Unauthorized' },
