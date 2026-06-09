@@ -18,6 +18,7 @@ const chatMocks = vi.hoisted(() => ({
   }>,
   onError: undefined as undefined | ((error: Error) => void),
   sendMessage: vi.fn(),
+  setMessages: vi.fn(),
   status: 'ready' as 'ready' | 'submitted' | 'streaming',
   stop: vi.fn(),
 }));
@@ -49,9 +50,20 @@ vi.mock('ai', () => ({
 vi.mock('@ai-sdk/react', () => ({
   useChat: (options: { readonly onError?: (error: Error) => void }) => {
     chatMocks.onError = options.onError;
+    chatMocks.setMessages.mockImplementation(
+      (
+        updater:
+          | typeof chatMocks.messages
+          | ((current: typeof chatMocks.messages) => typeof chatMocks.messages)
+      ) => {
+        chatMocks.messages =
+          typeof updater === 'function' ? updater(chatMocks.messages) : updater;
+      }
+    );
     return {
       messages: chatMocks.messages,
       sendMessage: chatMocks.sendMessage,
+      setMessages: chatMocks.setMessages,
       status: chatMocks.status,
       stop: chatMocks.stop,
     };
@@ -174,6 +186,7 @@ function TurnstileHarness({
           <div data-testid='test-turnstile-panel'>{instruction}</div>
         ) : null
       }
+      turnstilePanelVisible={Boolean(instruction)}
       onTurnstileRequired={message => {
         onTurnstileRequired(message);
         setInstruction(message ?? null);
@@ -217,6 +230,7 @@ describe('OnboardingChat Turnstile gating', () => {
     chatMocks.messages = [];
     chatMocks.onError = undefined;
     chatMocks.sendMessage.mockReset();
+    chatMocks.setMessages.mockReset();
     chatMocks.status = 'ready';
     chatMocks.stop.mockReset();
     analyticsMocks.track.mockReset();
@@ -435,6 +449,108 @@ describe('OnboardingChat Turnstile gating', () => {
       text: 'I am Test Artist',
     });
     expect(analyticsMocks.track).toHaveBeenCalledTimes(1);
+  });
+
+  it('rolls back the optimistic user turn when Turnstile rejects the first message', () => {
+    const onTurnstileRejected = vi.fn();
+    render(
+      <TurnstileHarness
+        initialToken='stale-token'
+        onTurnstileRejected={onTurnstileRejected}
+      />
+    );
+
+    chatMocks.messages = [
+      {
+        id: 'message-1',
+        role: 'user',
+        parts: [{ type: 'text', text: 'I am Test Artist' }],
+      },
+    ];
+
+    const input = screen.getByLabelText('Chat message input');
+    fireEvent.change(input, { target: { value: 'I am Test Artist' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Send message' }));
+
+    errorMocks.metadata = {
+      errorCode: 'TURNSTILE_REQUIRED',
+      message: 'Bot challenge failed',
+      requestId: 'req-1',
+    };
+    act(() => {
+      chatMocks.onError?.(new Error('Bot challenge failed'));
+    });
+
+    expect(chatMocks.setMessages).toHaveBeenCalled();
+    expect(chatMocks.messages).toEqual([]);
+    expect(onTurnstileRejected).toHaveBeenCalledTimes(1);
+    expect(screen.getByLabelText('Chat message input')).toHaveValue(
+      'I am Test Artist'
+    );
+  });
+
+  it('auto-retries a rejected first turn after fresh Turnstile verification', async () => {
+    const onTurnstileRejected = vi.fn();
+    function TokenRefreshHarness() {
+      const [turnstileToken, setTurnstileToken] = useState<string | null>(
+        'stale-token'
+      );
+      const [instruction, setInstruction] = useState<string | null>(null);
+
+      return (
+        <>
+          <button
+            type='button'
+            onClick={() => setTurnstileToken('fresh-token')}
+          >
+            Refresh token
+          </button>
+          <OnboardingChat
+            turnstileToken={turnstileToken}
+            turnstileStatus={turnstileToken ? 'verified' : 'interactive'}
+            turnstilePanel={
+              instruction ? (
+                <div data-testid='test-turnstile-panel'>{instruction}</div>
+              ) : null
+            }
+            turnstilePanelVisible={Boolean(instruction)}
+            onTurnstileRequired={message => {
+              setInstruction(message ?? null);
+            }}
+            onTurnstileRejected={() => {
+              onTurnstileRejected();
+              setTurnstileToken(null);
+              setInstruction('Verify you are human to send');
+            }}
+          />
+        </>
+      );
+    }
+
+    render(<TokenRefreshHarness />);
+
+    const input = screen.getByLabelText('Chat message input');
+    fireEvent.change(input, { target: { value: 'I am Test Artist' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Send message' }));
+
+    errorMocks.metadata = {
+      errorCode: 'TURNSTILE_REQUIRED',
+      message: 'Bot challenge failed',
+      requestId: 'req-1',
+    };
+    act(() => {
+      chatMocks.onError?.(new Error('Bot challenge failed'));
+    });
+
+    chatMocks.sendMessage.mockClear();
+    fireEvent.click(screen.getByRole('button', { name: 'Refresh token' }));
+
+    await waitFor(() => {
+      expect(chatMocks.sendMessage).toHaveBeenCalledWith({
+        text: 'I am Test Artist',
+      });
+    });
+    expect(chatMocks.messages).toEqual([]);
   });
 
   it('resets rejected Turnstile tokens, preserves the failed message, and blocks retry until fresh verification', () => {

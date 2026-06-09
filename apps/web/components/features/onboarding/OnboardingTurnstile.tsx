@@ -114,6 +114,22 @@ function getHeading(status: OnboardingTurnstileStatus) {
   return 'Security Check';
 }
 
+export function isOnboardingTurnstilePanelVisible(
+  state: OnboardingTurnstileState,
+  instruction?: string | null,
+  siteKey?: string | null
+): boolean {
+  if (instruction) return true;
+  if (!siteKey) return true;
+  return (
+    state.status === 'interactive' ||
+    state.status === 'error' ||
+    state.status === 'expired' ||
+    state.status === 'timeout' ||
+    state.status === 'unsupported'
+  );
+}
+
 export function OnboardingTurnstile({
   onToken,
   onStateChange,
@@ -142,24 +158,21 @@ export function OnboardingTurnstile({
     [onStateChange]
   );
 
-  const resetWidget = useCallback(
-    (message = 'Verification reset. Complete the check to retry.') => {
-      const widgetId = widgetIdRef.current;
-      const turnstile = getTurnstile();
-      if (widgetId && turnstile) {
-        try {
-          turnstile.reset(widgetId);
-          commitState({ status: 'loading', message });
-          return;
-        } catch (err) {
-          widgetIdRef.current = null;
-          console.error('[onboarding] turnstile reset error', err);
-        }
+  const clearWidget = useCallback(() => {
+    const widgetId = widgetIdRef.current;
+    const turnstile = getTurnstile();
+    if (widgetId && turnstile) {
+      try {
+        turnstile.remove(widgetId);
+      } catch (err) {
+        console.error('[onboarding] turnstile remove error', err);
       }
-      commitState({ status: 'loading', message });
-    },
-    [commitState]
-  );
+    }
+    widgetIdRef.current = null;
+    if (containerRef.current) {
+      containerRef.current.replaceChildren();
+    }
+  }, []);
 
   const render = useCallback(() => {
     if (shouldBypassTurnstile || !siteKey) return; // local fallback handled server-side
@@ -187,9 +200,6 @@ export function OnboardingTurnstile({
             status: 'expired',
             message: 'Verification expired. Complete the check again to send.',
           });
-          resetWidget(
-            'Verification expired. Complete the check again to send.'
-          );
         },
         'timeout-callback': () =>
           commitState({
@@ -220,7 +230,16 @@ export function OnboardingTurnstile({
       });
       console.error('[onboarding] turnstile render error', err);
     }
-  }, [commitState, onToken, resetWidget, shouldBypassTurnstile, siteKey]);
+  }, [commitState, onToken, shouldBypassTurnstile, siteKey]);
+
+  const resetWidget = useCallback(
+    (message = 'Verification reset. Complete the check to retry.') => {
+      clearWidget();
+      commitState({ status: 'loading', message });
+      render();
+    },
+    [clearWidget, commitState, render]
+  );
 
   useEffect(() => {
     if (shouldBypassTurnstile) {
@@ -273,15 +292,19 @@ export function OnboardingTurnstile({
     state.status === 'error' ||
     state.status === 'expired' ||
     state.status === 'timeout';
-  const shouldShowPanel =
-    !siteKey ||
-    state.status === 'loading' ||
-    state.status === 'interactive' ||
-    state.status === 'error' ||
-    state.status === 'expired' ||
-    state.status === 'timeout' ||
-    state.status === 'unsupported' ||
-    Boolean(instruction);
+  const shouldShowPanel = isOnboardingTurnstilePanelVisible(
+    state,
+    instruction,
+    siteKey
+  );
+  const shouldShowWidgetFrame =
+    shouldShowPanel &&
+    siteKey &&
+    (state.status === 'interactive' ||
+      state.status === 'error' ||
+      state.status === 'expired' ||
+      state.status === 'timeout' ||
+      Boolean(instruction));
 
   return (
     <>
@@ -292,53 +315,60 @@ export function OnboardingTurnstile({
           onLoad={() => render()}
         />
       ) : null}
-      <section
-        ref={panelRef}
-        aria-labelledby={headingId}
-        tabIndex={-1}
-        hidden={!shouldShowPanel}
-        data-testid='onboarding-turnstile-panel'
-        data-turnstile-status={state.status}
-        className={cn(
-          'px-3 py-2.5 text-primary-token outline-none sm:px-3.5 sm:py-3',
-          'focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/20'
-        )}
-      >
-        <div className='flex flex-col gap-2.5 sm:flex-row sm:items-start sm:justify-between'>
-          <div className='min-w-0'>
-            <p
-              id={headingId}
-              className='text-app font-medium leading-5 text-primary-token'
-            >
-              {getHeading(state.status)}
-            </p>
-            <p className='mt-0.5 max-w-[34rem] text-2xs leading-5 text-secondary-token sm:text-[12px]'>
-              {panelCopy}
-            </p>
+      {shouldShowPanel ? (
+        <section
+          ref={panelRef}
+          aria-labelledby={headingId}
+          tabIndex={-1}
+          data-testid='onboarding-turnstile-panel'
+          data-turnstile-status={state.status}
+          className={cn(
+            'px-3 py-2.5 text-primary-token outline-none sm:px-3.5 sm:py-3',
+            'focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/20'
+          )}
+        >
+          <div className='flex flex-col gap-2.5 sm:flex-row sm:items-start sm:justify-between'>
+            <div className='min-w-0'>
+              <p
+                id={headingId}
+                className='text-app font-medium leading-5 text-primary-token'
+              >
+                {getHeading(state.status)}
+              </p>
+              <p className='mt-0.5 max-w-[34rem] text-2xs leading-5 text-secondary-token sm:text-[12px]'>
+                {panelCopy}
+              </p>
+            </div>
+            {isActionable ? (
+              <button
+                type='button'
+                onClick={() => resetWidget()}
+                className='h-7 shrink-0 rounded-full border border-subtle px-2.5 text-2xs font-medium text-secondary-token transition-[background-color,border-color,color] duration-subtle hover:bg-surface-0 hover:text-primary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/20'
+              >
+                Retry Verification
+              </button>
+            ) : null}
           </div>
-          {isActionable ? (
-            <button
-              type='button'
-              onClick={() => resetWidget()}
-              className='h-7 shrink-0 rounded-full border border-subtle px-2.5 text-2xs font-medium text-secondary-token transition-[background-color,border-color,color] duration-subtle hover:bg-surface-0 hover:text-primary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/20'
-            >
-              Retry Verification
-            </button>
-          ) : null}
-        </div>
-        {siteKey ? (
+        </section>
+      ) : null}
+      {siteKey ? (
+        <div
+          className={cn(
+            shouldShowWidgetFrame
+              ? 'mt-2.5 overflow-hidden rounded-[10px] border border-subtle bg-surface-0'
+              : 'sr-only h-0 overflow-hidden',
+            !shouldShowPanel && 'sr-only h-0 overflow-hidden'
+          )}
+          data-testid='onboarding-turnstile-widget-frame'
+          aria-hidden={!shouldShowWidgetFrame ? 'true' : undefined}
+        >
           <div
-            className='mt-2.5 overflow-hidden rounded-[10px] border border-subtle bg-surface-0'
-            data-testid='onboarding-turnstile-widget-frame'
-          >
-            <div
-              ref={containerRef}
-              id={`cf-turnstile-${widgetDomId}`}
-              className='min-h-[64px]'
-            />
-          </div>
-        ) : null}
-      </section>
+            ref={containerRef}
+            id={`cf-turnstile-${widgetDomId}`}
+            className='min-h-[64px]'
+          />
+        </div>
+      ) : null}
     </>
   );
 }

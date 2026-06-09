@@ -75,6 +75,8 @@ interface OnboardingChatProps {
   readonly turnstileStatus?: OnboardingTurnstileStatus;
   /** Visible Turnstile challenge panel rendered near the composer. */
   readonly turnstilePanel?: ReactNode;
+  /** Whether the Turnstile security chrome should appear in the composer. */
+  readonly turnstilePanelVisible?: boolean;
   /** Requests the visible Turnstile panel when a send needs verification. */
   readonly onTurnstileRequired?: (message?: string) => void;
   /** Clears stale verification after the server rejects a token. */
@@ -567,6 +569,25 @@ function isTurnstileTokenUsable(
   return !BLOCKED_TURNSTILE_TOKEN_STATUSES.has(status);
 }
 
+function rollbackFailedUserTurn(
+  messages: readonly UIMessage[],
+  failedText: string | null | undefined
+): readonly UIMessage[] {
+  const trimmedFailed = failedText?.trim();
+  if (!trimmedFailed) return messages;
+
+  for (let index = messages.length - 1; index >= 0; index -= 1) {
+    const message = messages[index];
+    if (message.role !== 'user') continue;
+    if (getMessageText(message).trim() === trimmedFailed) {
+      return messages.slice(0, index);
+    }
+    break;
+  }
+
+  return messages;
+}
+
 function getDisplayMessages(
   messages: readonly UIMessage[],
   shouldShowThinking: boolean
@@ -736,6 +757,7 @@ export function OnboardingChat({
   onTurnstileRequired,
   starterPrompt,
   turnstilePanel,
+  turnstilePanelVisible = false,
   turnstileStatus,
   turnstileToken,
 }: OnboardingChatProps) {
@@ -755,6 +777,7 @@ export function OnboardingChat({
   const hasAutoSubmittedStarterPromptRef = useRef(false);
   const hasRequestedStarterVerificationRef = useRef(false);
   const pendingStarterPromptRef = useRef<string | null>(null);
+  const wasAwaitingTurnstileRetryRef = useRef(false);
   const formatArtistSelectionMessage = useArtistSelectionMessage();
 
   const transport = useMemo(
@@ -775,23 +798,27 @@ export function OnboardingChat({
     [turnstileToken]
   );
 
-  const { messages, sendMessage, status, stop } = useChat({
+  const { messages, sendMessage, setMessages, status, stop } = useChat({
     id: 'onboarding',
     transport,
     onError: error => {
       const type = getErrorType(error);
       const metadata = extractErrorMetadata(error);
       const message = getPreferredErrorMessage(error, type, metadata);
+      const failedMessage = lastAttemptedMessageRef.current ?? undefined;
       setChatError({
         type,
         message: getOnboardingErrorMessage(message),
         retryAfter: metadata.retryAfter,
         errorCode: metadata.errorCode,
         requestId: metadata.requestId,
-        failedMessage: lastAttemptedMessageRef.current ?? undefined,
+        failedMessage,
       });
-      if (lastAttemptedMessageRef.current) {
-        setInput(lastAttemptedMessageRef.current);
+      if (failedMessage) {
+        setInput(failedMessage);
+        setMessages(current => [
+          ...rollbackFailedUserTurn(current, failedMessage),
+        ]);
       }
       if (metadata.errorCode === 'TURNSTILE_REQUIRED') {
         setHasSentFirst(false);
@@ -829,7 +856,6 @@ export function OnboardingChat({
       const text = composeMessage(chipTray.chips, rawText).trim();
       if (!text || isBusy) return;
       if (isAwaitingFirstToken) {
-        setChatError(null);
         onTurnstileRequired?.('Verify you are human to send');
         return;
       }
@@ -963,6 +989,31 @@ export function OnboardingChat({
   }, [messages.length]);
 
   useEffect(() => {
+    if (isAwaitingFirstToken) {
+      if (chatError?.errorCode === 'TURNSTILE_REQUIRED') {
+        wasAwaitingTurnstileRetryRef.current = true;
+      }
+      return;
+    }
+
+    if (!wasAwaitingTurnstileRetryRef.current) return;
+    if (chatError?.errorCode !== 'TURNSTILE_REQUIRED') return;
+    if (!chatError.failedMessage || isBusy) return;
+
+    wasAwaitingTurnstileRetryRef.current = false;
+    const failedMessage = chatError.failedMessage;
+    setChatError(null);
+    submitText(failedMessage);
+  }, [
+    chatError,
+    isAwaitingFirstToken,
+    isBusy,
+    submitText,
+    turnstileStatus,
+    turnstileToken,
+  ]);
+
+  useEffect(() => {
     if (status !== 'ready') return;
     const completedUserTurns = messages.filter(
       message => message.role === 'user'
@@ -979,7 +1030,7 @@ export function OnboardingChat({
   }, [messages, onConversationActivity, status]);
 
   const shouldShowTurnstileBanner =
-    Boolean(turnstilePanel) && isAwaitingFirstToken;
+    Boolean(turnstilePanel) && turnstilePanelVisible && isAwaitingFirstToken;
   const hasComposerStatusBanner =
     shouldShowTurnstileBanner || chatError !== null;
   const composerStatusBanner = hasComposerStatusBanner ? (
