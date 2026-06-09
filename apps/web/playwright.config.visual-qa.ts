@@ -4,6 +4,7 @@
  * Usage:
  *   VISUAL_QA_RUN_ID=demo-run pnpm --filter web visual-qa:capture
  *   VISUAL_QA_RUN_ID=demo-run VISUAL_QA_PHASE=baseline pnpm --filter web visual-qa:capture
+ *   VISUAL_QA_RUN_ID=demo-run VISUAL_QA_BREAKPOINTS=compact pnpm --filter web visual-qa:breakpoint-check
  */
 
 import { defineConfig, devices } from '@playwright/test';

@@ -1,3 +1,5 @@
+import type { VisualQaBreakpoint } from '@/lib/visual-qa/breakpoints';
+import { parseVisualQaBreakpointWidths } from '@/lib/visual-qa/breakpoints';
 import { VISUAL_QA_PHASES, type VisualQaPhase } from '@/lib/visual-qa/types';
 
 export type VisualQaCapturePhaseRequest = VisualQaPhase | 'both';
@@ -6,6 +8,7 @@ export interface VisualQaCaptureRequest {
   readonly runId: string;
   readonly phases: readonly VisualQaPhase[];
   readonly surfaceIds: readonly string[];
+  readonly breakpoints: readonly VisualQaBreakpoint[];
 }
 
 const RUN_ID_PATTERN = /^[a-z0-9][a-z0-9._-]{0,79}$/i;
@@ -35,6 +38,7 @@ export function parseVisualQaCaptureRequest(input: {
   readonly runId?: string | null;
   readonly phase?: string | null;
   readonly surfaces?: string | null;
+  readonly breakpoints?: string | null;
 }): VisualQaCaptureRequest {
   const runId = input.runId?.trim() ?? '';
   if (!RUN_ID_PATTERN.test(runId)) {
@@ -53,5 +57,6 @@ export function parseVisualQaCaptureRequest(input: {
     runId,
     phases: resolveVisualQaCapturePhases(phase),
     surfaceIds,
+    breakpoints: parseVisualQaBreakpointWidths(input.breakpoints),
   };
 }

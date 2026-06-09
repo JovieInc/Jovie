@@ -92,6 +92,14 @@ export function resolveVisualQaDiffOverlayPath(
   );
 }
 
+export function resolveVisualQaBreakpointReportPath(runId: string): string {
+  const safeRunId = assertValidVisualQaRunId(runId);
+  return validatePathTraversal(
+    path.join(safeRunId, 'breakpoint-report.json'),
+    getVisualQaRootDirectory()
+  );
+}
+
 export function resolveVisualQaRunRelativePath(
   runId: string,
   relativePath: string
