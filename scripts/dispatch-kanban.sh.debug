@@ -1,4 +1,5 @@
 #!/bin/bash
+trap 'echo "Exited at line $LINENO"' EXIT
 # Kanban auto-dispatch script for Jovie Product
 # Reads ~/.hermes/boards/jovie-product.json, picks "ready" unblocked tasks,
 # dispatches to Claude Code (subscription-billed), updates board + Linear.
@@ -141,7 +142,7 @@ cd "$REPO"
 git fetch origin main 2>/dev/null || true
 
 # Get board stats and find ready unblocked tasks
-python3 <<END_OF_PYTHON > /tmp/dispatch_stats.txt 2>&1
+python3 -c "
 import json
 with open('$BOARD') as f: b = json.load(f)
 tasks = {t['id']: t for t in b['tasks']}
@@ -159,11 +160,11 @@ def is_blocker_done(blocker):
     return False
 unblocked = [t for t in ready if not t.get('blockers') or all(is_blocker_done(b) for b in t.get('blockers', []))]
 blocked = [t for t in ready if t.get('blockers') and not all(is_blocker_done(b) for b in t.get('blockers', []))]
-print('Board: {0} total, {1} ready, {2} unblocked, {3} blocked'.format(len(b['tasks']), len(ready), len(unblocked), len(blocked)))
+print(f'Board: {len(b[\\\"tasks\\\"])} total, {len(ready)} ready, {len(unblocked)} unblocked, {len(blocked)} blocked')
 # For debugging, list unblocked tasks
 for t in unblocked:
-    print('UNBLOCKED: {0} {1}'.format(t['id'], t['title']))
-END_OF_PYTHON
+    print(f'UNBLOCKED: {t[\"id\"]} {t[\"title\"]}')
+" > /tmp/dispatch_stats.txt 2>&1
 
 cat /tmp/dispatch_stats.txt
 log "$(cat /tmp/dispatch_stats.txt)"
@@ -213,12 +214,12 @@ Working directory: $REPO. Tim approved merging PR #8465 (Phase 6 profile hardeni
       ;;
     pr-8470)
       dispatch_claude "$UNBLOCKED_TASK_ID" "$LINEAR_ID" "
-dispatch_claude \"$UNBLOCKED_TASK_ID\" \"$LINEAR_ID\" \"\nWorking directory: $REPO. Profile hardening Phase 7 (JOV-2025): token cleanup and legacy component removal. Tasks: (1) cd $REPO (2) git checkout main && git pull origin main (3) git checkout -b fix/profile-hardening-phase-7-tokens (4) Scan apps/web/components/features/profile/ for unused/legacy components and remove dead code (5) Replace hardcoded values with design tokens from DESIGN.md and tailwind.config.ts (6) Run pnpm --filter @jovie/web run typecheck -- --pretty false (7) Run pnpm biome check --write apps/web/components/features/profile (8) git add -A && git commit -m \\\\\\\"fix(profile): token cleanup and legacy component removal (JOV-2025)\\\\\\\" (9) git push -u origin fix/profile-hardening-phase-7-tokens (10) gh pr create --fill --title \\\\\\\"fix(profile): token cleanup and legacy component removal (JOV-2025)\\\\\\\" --body \\\\\\\"Phase 7 of profile hardening: removes unused components, replaces hardcoded values with design tokens. Part of the Public Profile Hardening epic.\\\\\\\"\n\" 60
+Working directory: $REPO. Profile hardening Phase 7 (JOV-2025): token cleanup and legacy component removal. Tasks: (1) cd $REPO (2) git checkout main && git pull origin main (3) git checkout -b fix/profile-hardening-phase-7-tokens (4) Scan apps/web/components/features/profile/ for unused/legacy components and remove dead code (5) Replace hardcoded values with design tokens from DESIGN.md and tailwind.config.ts (6) Run pnpm --filter @jovie/web run typecheck -- --pretty false (7) Run pnpm biome check --write apps/web/components/features/profile (8) git add -A && git commit -m \\\"fix(profile): token cleanup and legacy component removal (JOV-2025)\\\" (9) git push -u origin fix/profile-hardening-phase-7-tokens (10) gh pr create --fill --draft --title \\\"fix(profile): token cleanup and legacy component removal (JOV-2025)\\\" --body \\\"Phase 7 of profile hardening: removes unused components, replaces hardcoded values with design tokens. Part of the Public Profile Hardening epic.\\\""
       60
       ;;
     ci-2049)
       dispatch_claude "$UNBLOCKED_TASK_ID" "$LINEAR_ID" "
-Working directory: $REPO. Fix CI knip false positive and stuck unit shards (JOV-2049). Tasks: (1) cd $REPO (2) git checkout main && git pull origin main (3) git checkout -b fix/ci-knip-false-positive (4) Read knip.json and understand the knip configuration (5) Run pnpm knip 2>&1 | head -50 (6) Check if the knip false positive references stale paths. Fix any misconfigurations. (7) Run pnpm --filter web exec vitest run --shard=1/6 --reporter=verbose 2>&1 | tail -30 (8) Run pnpm --filter @jovie/web run typecheck  (9) git add -A && git commit -m \\\"fix(ci): resolve knip false positive (JOV-2049)\\\" (10) git push -u origin fix/ci-knip-false-positive (11) gh pr create --fill
+Working directory: $REPO. Fix CI knip false positive and stuck unit shards (JOV-2049). Tasks: (1) cd $REPO (2) git checkout main && git pull origin main (3) git checkout -b fix/ci-knip-false-positive (4) Read knip.json and understand the knip configuration (5) Run pnpm knip 2>&1 | head -50 (6) Check if the knip false positive references stale paths. Fix any misconfigurations. (7) Run pnpm --filter web exec vitest run --shard=1/6 --reporter=verbose 2>&1 | tail -30 (8) Run pnpm --filter @jovie/web run typecheck  (9) git add -A && git commit -m \\\"fix(ci): resolve knip false positive (JOV-2049)\\\" (10) git push -u origin fix/ci-knip-false-positive (11) gh pr create --fill --draft
 " 40
       ;;
     fix-ios-auth-clerk)

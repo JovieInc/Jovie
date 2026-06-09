@@ -1,0 +1,4861 @@
+{
+  "generated_at": "2026-06-08T16:50:21.819170+00:00",
+  "repo": "/Users/timwhite/conductor/repos/jovie-v1",
+  "total_items": 606,
+  "items": [
+    {
+      "file": ".agents/skills/gstack/CHANGELOG.md",
+      "line": 1252,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "`). Added design-consultation to command validation."
+    },
+    {
+      "file": ".agents/skills/gstack/CHANGELOG.md",
+      "line": 1524,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": ".md` (roadmap) and `TODOS.md` (near-term) into one file organized by skill/component with P0-P4 priority ordering and a Completed section."
+    },
+    {
+      "file": ".agents/skills/gstack/CHANGELOG.md",
+      "line": 1527,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "item format referenced by `/ship` and `/plan-ceo-review` to prevent format drift (DRY)."
+    },
+    {
+      "file": ".agents/skills/gstack/CHANGELOG.md",
+      "line": 1538,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": ".md` deleted \u2014 all items merged into `TODOS.md`."
+    },
+    {
+      "file": ".agents/skills/gstack/TODOS.md",
+      "line": 442,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "is about making it even easier via a flag on `runSkillTest()`."
+    },
+    {
+      "file": ".agents/skills/gstack/browse/test/sidebar-ux.test.ts",
+      "line": 591,
+      "category": "hack",
+      "interest": 5,
+      "auto_fixable": false,
+      "description": "', () => {"
+    },
+    {
+      "file": ".agents/skills/gstack/cso/SKILL.md",
+      "line": 562,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "\") excluded. Test fixtures excluded unless same value in non-test code. Rotated secrets still flagged (they were exposed). `.env.local` in `.gitignore` is expected."
+    },
+    {
+      "file": ".agents/skills/gstack/docs/designs/SELF_LEARNING_V0.md",
+      "line": 131,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "lifecycle (/triage for interactive approval, /resolve for batch"
+    },
+    {
+      "file": ".agents/skills/gstack/document-release/SKILL.md",
+      "line": 635,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "Context + Linear Follow-Ups"
+    },
+    {
+      "file": ".agents/skills/gstack/document-release/SKILL.md",
+      "line": 638,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "items. Read `review/LINEAR-followups.md` for"
+    },
+    {
+      "file": ".agents/skills/gstack/document-release/SKILL.md",
+      "line": 644,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "items. If a TODO is clearly"
+    },
+    {
+      "file": ".agents/skills/gstack/document-release/SKILL.md",
+      "line": 648,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "references files or components that were"
+    },
+    {
+      "file": ".agents/skills/gstack/document-release/SKILL.md",
+      "line": 652,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "`, `FIXME`, `HACK`, and `XXX` comments. For"
+    },
+    {
+      "file": ".agents/skills/gstack/document-release/SKILL.md",
+      "line": 652,
+      "category": "fixme",
+      "interest": 5,
+      "auto_fixable": false,
+      "description": "`, `HACK`, and `XXX` comments. For"
+    },
+    {
+      "file": ".agents/skills/gstack/document-release/SKILL.md",
+      "line": 652,
+      "category": "hack",
+      "interest": 5,
+      "auto_fixable": false,
+      "description": "`, and `XXX` comments. For"
+    },
+    {
+      "file": ".agents/skills/gstack/plan-ceo-review/SKILL.md",
+      "line": 547,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "\\|FIXME\\|HACK\\|XXX\" -l --exclude-dir=node_modules --exclude-dir=vendor --exclude-dir=.git . | head -30"
+    },
+    {
+      "file": ".agents/skills/gstack/plan-ceo-review/SKILL.md",
+      "line": 547,
+      "category": "fixme",
+      "interest": 5,
+      "auto_fixable": false,
+      "description": "\\|HACK\\|XXX\" -l --exclude-dir=node_modules --exclude-dir=vendor --exclude-dir=.git . | head -30"
+    },
+    {
+      "file": ".agents/skills/gstack/plan-ceo-review/SKILL.md",
+      "line": 547,
+      "category": "hack",
+      "interest": 5,
+      "auto_fixable": false,
+      "description": "\\|XXX\" -l --exclude-dir=node_modules --exclude-dir=vendor --exclude-dir=.git . | head -30"
+    },
+    {
+      "file": ".agents/skills/gstack/plan-ceo-review/SKILL.md",
+      "line": 682,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "comments in files this plan touches?"
+    },
+    {
+      "file": ".agents/skills/gstack/plan-ceo-review/SKILL.md",
+      "line": 682,
+      "category": "fixme",
+      "interest": 5,
+      "auto_fixable": false,
+      "description": "/TODO comments in files this plan touches?"
+    },
+    {
+      "file": ".agents/skills/gstack/plan-eng-review/SKILL.md",
+      "line": 559,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "cross-reference:** Read `TODOS.md` if it exists as legacy context only. Are any deferred items blocking this plan? Can any deferred items be bundled into this PR without expanding "
+    },
+    {
+      "file": ".agents/skills/gstack/qa-only/SKILL.md",
+      "line": 549,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "describes a bug that this branch should fix, add it to your test plan. If you find a new bug during QA that isn't in TODOS.md, note it in the report."
+    },
+    {
+      "file": ".agents/skills/gstack/qa/SKILL.md",
+      "line": 781,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "describes a bug that this branch should fix, add it to your test plan. If you find a new bug during QA that isn't in TODOS.md, note it in the report."
+    },
+    {
+      "file": ".agents/skills/gstack/review/SKILL.md",
+      "line": 564,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "decide\")"
+    },
+    {
+      "file": ".agents/skills/gstack/review/SKILL.md",
+      "line": 636,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": ")"
+    },
+    {
+      "file": ".agents/skills/gstack/review/SKILL.md",
+      "line": 1067,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "<title>\""
+    },
+    {
+      "file": ".agents/skills/gstack/review/SKILL.md",
+      "line": 1068,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "?** If yes, flag it as an informational finding."
+    },
+    {
+      "file": ".agents/skills/gstack/review/TODOS-format.md",
+      "line": 23,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "Item Format"
+    },
+    {
+      "file": ".agents/skills/gstack/review/specialists/api-contract.md",
+      "line": 23,
+      "category": "deprecated",
+      "interest": 3,
+      "auto_fixable": false,
+      "description": "endpoints without a sunset timeline or migration guide"
+    },
+    {
+      "file": ".agents/skills/gstack/review/specialists/maintainability.md",
+      "line": 26,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "/FIXME comments that reference completed work"
+    },
+    {
+      "file": ".agents/skills/gstack/review/specialists/maintainability.md",
+      "line": 26,
+      "category": "fixme",
+      "interest": 5,
+      "auto_fixable": false,
+      "description": "comments that reference completed work"
+    },
+    {
+      "file": ".agents/skills/gstack/scripts/resolvers/review.ts",
+      "line": 742,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "decide\")"
+    },
+    {
+      "file": ".agents/skills/gstack/scripts/resolvers/review.ts",
+      "line": 845,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": ")"
+    },
+    {
+      "file": ".agents/skills/gstack/scripts/resolvers/utility.ts",
+      "line": 129,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "describes a bug that this branch should fix, add it to your test plan. If you find a new bug during QA that isn't in TODOS.md, note it in the report."
+    },
+    {
+      "file": ".agents/skills/gstack/ship/SKILL.md",
+      "line": 401,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "cross-reference that does not create new follow-up work"
+    },
+    {
+      "file": ".agents/skills/gstack/ship/SKILL.md",
+      "line": 1179,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "decide\")"
+    },
+    {
+      "file": ".agents/skills/gstack/ship/SKILL.md",
+      "line": 1971,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "items were incidentally completed by this PR, list them. Never add new TODO items here. If none, omit this section.>"
+    },
+    {
+      "file": ".agents/skills/gstack/ship/SKILL.md",
+      "line": 2061,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "items; create Linear issues for actionable follow-ups."
+    },
+    {
+      "file": ".agents/skills/gstack/test/skill-e2e.test.ts",
+      "line": 1871,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "entries, no selection needed"
+    },
+    {
+      "file": ".agents/skills/gstack/test/skill-e2e.test.ts",
+      "line": 1874,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "('/ship completes full workflow');"
+    },
+    {
+      "file": ".agents/skills/gstack/test/skill-e2e.test.ts",
+      "line": 1877,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "('/setup-browser-cookies imports cookies');"
+    },
+    {
+      "file": ".agents/skills/gstack/test/skill-routing-e2e.test.ts",
+      "line": 382,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "implement\\n  }\\n}\\n');"
+    },
+    {
+      "file": ".claude/commands/audit-db-connections.md",
+      "line": 14,
+      "category": "deprecated",
+      "interest": 3,
+      "auto_fixable": false,
+      "description": "3. **Legacy client** - `@/lib/db/client` is deprecated"
+    },
+    {
+      "file": ".claude/commands/autopilot.md",
+      "line": 103,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "`"
+    },
+    {
+      "file": ".claude/commands/next-linear.md",
+      "line": 79,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "`"
+    },
+    {
+      "file": ".claude/rules/linear.md",
+      "line": 28,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "` comments, `TODOS.md`, PR-body bullets, chat memory, review summaries, or \"remaining risks\" prose. If it is worth mentioning as future work, it is worth tracking in Linear."
+    },
+    {
+      "file": ".claude/skills/consolidate-ui.md",
+      "line": 103,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "\" placeholders | Delete them or implement them |"
+    },
+    {
+      "file": ".claude/skills/gstack/.factory/skills/gstack-autoplan/SKILL.md",
+      "line": 242,
+      "category": "deprecated",
+      "interest": 3,
+      "auto_fixable": false,
+      "description": "."
+    },
+    {
+      "file": ".claude/skills/gstack/.factory/skills/gstack-autoplan/SKILL.md",
+      "line": 466,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "list discipline.** When working through a multi-step plan, mark each task"
+    },
+    {
+      "file": ".claude/skills/gstack/.factory/skills/gstack-benchmark/SKILL.md",
+      "line": 239,
+      "category": "deprecated",
+      "interest": 3,
+      "auto_fixable": false,
+      "description": "."
+    },
+    {
+      "file": ".claude/skills/gstack/.factory/skills/gstack-benchmark/SKILL.md",
+      "line": 404,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "list discipline.** When working through a multi-step plan, mark each task"
+    },
+    {
+      "file": ".claude/skills/gstack/.factory/skills/gstack-browse/SKILL.md",
+      "line": 239,
+      "category": "deprecated",
+      "interest": 3,
+      "auto_fixable": false,
+      "description": "."
+    },
+    {
+      "file": ".claude/skills/gstack/.factory/skills/gstack-browse/SKILL.md",
+      "line": 404,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "list discipline.** When working through a multi-step plan, mark each task"
+    },
+    {
+      "file": ".claude/skills/gstack/.factory/skills/gstack-canary/SKILL.md",
+      "line": 238,
+      "category": "deprecated",
+      "interest": 3,
+      "auto_fixable": false,
+      "description": "."
+    },
+    {
+      "file": ".claude/skills/gstack/.factory/skills/gstack-canary/SKILL.md",
+      "line": 462,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "list discipline.** When working through a multi-step plan, mark each task"
+    },
+    {
+      "file": ".claude/skills/gstack/.factory/skills/gstack-checkpoint/SKILL.md",
+      "line": 256,
+      "category": "deprecated",
+      "interest": 3,
+      "auto_fixable": false,
+      "description": ". We will not keep vendored copies"
+    },
+    {
+      "file": ".claude/skills/gstack/.factory/skills/gstack-checkpoint/SKILL.md",
+      "line": 261,
+      "category": "deprecated",
+      "interest": 3,
+      "auto_fixable": false,
+      "description": "."
+    },
+    {
+      "file": ".claude/skills/gstack/.factory/skills/gstack-cso/SKILL.md",
+      "line": 240,
+      "category": "deprecated",
+      "interest": 3,
+      "auto_fixable": false,
+      "description": "."
+    },
+    {
+      "file": ".claude/skills/gstack/.factory/skills/gstack-cso/SKILL.md",
+      "line": 464,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "list discipline.** When working through a multi-step plan, mark each task"
+    },
+    {
+      "file": ".claude/skills/gstack/.factory/skills/gstack-cso/SKILL.md",
+      "line": 910,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "\") excluded. Test fixtures excluded unless same value in non-test code. Rotated secrets still flagged (they were exposed). `.env.local` in `.gitignore` is expected."
+    },
+    {
+      "file": ".claude/skills/gstack/.factory/skills/gstack-design-consultation/SKILL.md",
+      "line": 240,
+      "category": "deprecated",
+      "interest": 3,
+      "auto_fixable": false,
+      "description": "."
+    },
+    {
+      "file": ".claude/skills/gstack/.factory/skills/gstack-design-consultation/SKILL.md",
+      "line": 464,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "list discipline.** When working through a multi-step plan, mark each task"
+    },
+    {
+      "file": ".claude/skills/gstack/.factory/skills/gstack-design-html/SKILL.md",
+      "line": 242,
+      "category": "deprecated",
+      "interest": 3,
+      "auto_fixable": false,
+      "description": "."
+    },
+    {
+      "file": ".claude/skills/gstack/.factory/skills/gstack-design-html/SKILL.md",
+      "line": 466,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "list discipline.** When working through a multi-step plan, mark each task"
+    },
+    {
+      "file": ".claude/skills/gstack/.factory/skills/gstack-design-review/SKILL.md",
+      "line": 240,
+      "category": "deprecated",
+      "interest": 3,
+      "auto_fixable": false,
+      "description": "."
+    },
+    {
+      "file": ".claude/skills/gstack/.factory/skills/gstack-design-review/SKILL.md",
+      "line": 464,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "list discipline.** When working through a multi-step plan, mark each task"
+    },
+    {
+      "file": ".claude/skills/gstack/.factory/skills/gstack-design-shotgun/SKILL.md",
+      "line": 239,
+      "category": "deprecated",
+      "interest": 3,
+      "auto_fixable": false,
+      "description": "."
+    },
+    {
+      "file": ".claude/skills/gstack/.factory/skills/gstack-design-shotgun/SKILL.md",
+      "line": 463,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "list discipline.** When working through a multi-step plan, mark each task"
+    },
+    {
+      "file": ".claude/skills/gstack/.factory/skills/gstack-document-release/SKILL.md",
+      "line": 238,
+      "category": "deprecated",
+      "interest": 3,
+      "auto_fixable": false,
+      "description": "."
+    },
+    {
+      "file": ".claude/skills/gstack/.factory/skills/gstack-document-release/SKILL.md",
+      "line": 462,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "list discipline.** When working through a multi-step plan, mark each task"
+    },
+    {
+      "file": ".claude/skills/gstack/.factory/skills/gstack-document-release/SKILL.md",
+      "line": 946,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "item format."
+    },
+    {
+      "file": ".claude/skills/gstack/.factory/skills/gstack-document-release/SKILL.md",
+      "line": 950,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "items. If a"
+    },
+    {
+      "file": ".claude/skills/gstack/.factory/skills/gstack-document-release/SKILL.md",
+      "line": 951,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "is clearly completed by the changes in this branch, move it to the Completed section"
+    },
+    {
+      "file": ".claude/skills/gstack/.factory/skills/gstack-document-release/SKILL.md",
+      "line": 955,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "references files or components that were"
+    },
+    {
+      "file": ".claude/skills/gstack/.factory/skills/gstack-document-release/SKILL.md",
+      "line": 957,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "should be updated, completed, or left as-is."
+    },
+    {
+      "file": ".claude/skills/gstack/.factory/skills/gstack-document-release/SKILL.md",
+      "line": 959,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "`, `FIXME`, `HACK`, and `XXX` comments. For"
+    },
+    {
+      "file": ".claude/skills/gstack/.factory/skills/gstack-document-release/SKILL.md",
+      "line": 959,
+      "category": "fixme",
+      "interest": 5,
+      "auto_fixable": false,
+      "description": "`, `HACK`, and `XXX` comments. For"
+    },
+    {
+      "file": ".claude/skills/gstack/.factory/skills/gstack-document-release/SKILL.md",
+      "line": 959,
+      "category": "hack",
+      "interest": 5,
+      "auto_fixable": false,
+      "description": "`, and `XXX` comments. For"
+    },
+    {
+      "file": ".claude/skills/gstack/.factory/skills/gstack-health/SKILL.md",
+      "line": 238,
+      "category": "deprecated",
+      "interest": 3,
+      "auto_fixable": false,
+      "description": "."
+    },
+    {
+      "file": ".claude/skills/gstack/.factory/skills/gstack-health/SKILL.md",
+      "line": 462,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "list discipline.** When working through a multi-step plan, mark each task"
+    },
+    {
+      "file": ".claude/skills/gstack/.factory/skills/gstack-investigate/SKILL.md",
+      "line": 242,
+      "category": "deprecated",
+      "interest": 3,
+      "auto_fixable": false,
+      "description": "."
+    },
+    {
+      "file": ".claude/skills/gstack/.factory/skills/gstack-investigate/SKILL.md",
+      "line": 466,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "list discipline.** When working through a multi-step plan, mark each task"
+    },
+    {
+      "file": ".claude/skills/gstack/.factory/skills/gstack-land-and-deploy/SKILL.md",
+      "line": 238,
+      "category": "deprecated",
+      "interest": 3,
+      "auto_fixable": false,
+      "description": "."
+    },
+    {
+      "file": ".claude/skills/gstack/.factory/skills/gstack-land-and-deploy/SKILL.md",
+      "line": 462,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "list discipline.** When working through a multi-step plan, mark each task"
+    },
+    {
+      "file": ".claude/skills/gstack/.factory/skills/gstack-learn/SKILL.md",
+      "line": 238,
+      "category": "deprecated",
+      "interest": 3,
+      "auto_fixable": false,
+      "description": "."
+    },
+    {
+      "file": ".claude/skills/gstack/.factory/skills/gstack-learn/SKILL.md",
+      "line": 462,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "list discipline.** When working through a multi-step plan, mark each task"
+    },
+    {
+      "file": ".claude/skills/gstack/.factory/skills/gstack-office-hours/SKILL.md",
+      "line": 244,
+      "category": "deprecated",
+      "interest": 3,
+      "auto_fixable": false,
+      "description": "."
+    },
+    {
+      "file": ".claude/skills/gstack/.factory/skills/gstack-office-hours/SKILL.md",
+      "line": 468,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "list discipline.** When working through a multi-step plan, mark each task"
+    },
+    {
+      "file": ".claude/skills/gstack/.factory/skills/gstack-plan-ceo-review/SKILL.md",
+      "line": 241,
+      "category": "deprecated",
+      "interest": 3,
+      "auto_fixable": false,
+      "description": "."
+    },
+    {
+      "file": ".claude/skills/gstack/.factory/skills/gstack-plan-ceo-review/SKILL.md",
+      "line": 465,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "list discipline.** When working through a multi-step plan, mark each task"
+    },
+    {
+      "file": ".claude/skills/gstack/.factory/skills/gstack-plan-ceo-review/SKILL.md",
+      "line": 855,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "\\|FIXME\\|HACK\\|XXX\" -l --exclude-dir=node_modules --exclude-dir=vendor --exclude-dir=.git . | head -30"
+    },
+    {
+      "file": ".claude/skills/gstack/.factory/skills/gstack-plan-ceo-review/SKILL.md",
+      "line": 855,
+      "category": "fixme",
+      "interest": 5,
+      "auto_fixable": false,
+      "description": "\\|HACK\\|XXX\" -l --exclude-dir=node_modules --exclude-dir=vendor --exclude-dir=.git . | head -30"
+    },
+    {
+      "file": ".claude/skills/gstack/.factory/skills/gstack-plan-ceo-review/SKILL.md",
+      "line": 855,
+      "category": "hack",
+      "interest": 5,
+      "auto_fixable": false,
+      "description": "\\|XXX\" -l --exclude-dir=node_modules --exclude-dir=vendor --exclude-dir=.git . | head -30"
+    },
+    {
+      "file": ".claude/skills/gstack/.factory/skills/gstack-plan-ceo-review/SKILL.md",
+      "line": 990,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "comments in files this plan touches?"
+    },
+    {
+      "file": ".claude/skills/gstack/.factory/skills/gstack-plan-ceo-review/SKILL.md",
+      "line": 990,
+      "category": "fixme",
+      "interest": 5,
+      "auto_fixable": false,
+      "description": "/TODO comments in files this plan touches?"
+    },
+    {
+      "file": ".claude/skills/gstack/.factory/skills/gstack-plan-ceo-review/SKILL.md",
+      "line": 1735,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "as its own individual AskUserQuestion. Never batch TODOs \u2014 one per question. Never silently skip this step. Follow the format in `.factory/skills/gstack/review/TODOS-format.md`."
+    },
+    {
+      "file": ".claude/skills/gstack/.factory/skills/gstack-plan-ceo-review/SKILL.md",
+      "line": 1737,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": ", describe:"
+    },
+    {
+      "file": ".claude/skills/gstack/.factory/skills/gstack-plan-design-review/SKILL.md",
+      "line": 240,
+      "category": "deprecated",
+      "interest": 3,
+      "auto_fixable": false,
+      "description": "."
+    },
+    {
+      "file": ".claude/skills/gstack/.factory/skills/gstack-plan-design-review/SKILL.md",
+      "line": 464,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "list discipline.** When working through a multi-step plan, mark each task"
+    },
+    {
+      "file": ".claude/skills/gstack/.factory/skills/gstack-plan-design-review/SKILL.md",
+      "line": 1551,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "as its own individual AskUserQuestion. Never batch TODOs \u2014 one per question. Never silently skip this step."
+    },
+    {
+      "file": ".claude/skills/gstack/.factory/skills/gstack-plan-design-review/SKILL.md",
+      "line": 1553,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "gets:"
+    },
+    {
+      "file": ".claude/skills/gstack/.factory/skills/gstack-plan-eng-review/SKILL.md",
+      "line": 240,
+      "category": "deprecated",
+      "interest": 3,
+      "auto_fixable": false,
+      "description": "."
+    },
+    {
+      "file": ".claude/skills/gstack/.factory/skills/gstack-plan-eng-review/SKILL.md",
+      "line": 464,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "list discipline.** When working through a multi-step plan, mark each task"
+    },
+    {
+      "file": ".claude/skills/gstack/.factory/skills/gstack-plan-eng-review/SKILL.md",
+      "line": 869,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "?"
+    },
+    {
+      "file": ".claude/skills/gstack/.factory/skills/gstack-plan-eng-review/SKILL.md",
+      "line": 1345,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "as its own individual AskUserQuestion. Never batch TODOs \u2014 one per question. Never silently skip this step. Follow the format in `.factory/skills/gstack/review/TODOS-format.md`."
+    },
+    {
+      "file": ".claude/skills/gstack/.factory/skills/gstack-plan-eng-review/SKILL.md",
+      "line": 1347,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": ", describe:"
+    },
+    {
+      "file": ".claude/skills/gstack/.factory/skills/gstack-plan-eng-review/SKILL.md",
+      "line": 1357,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "without context is worse than no TODO \u2014 it creates false confidence that the idea was captured while actually losing the reasoning."
+    },
+    {
+      "file": ".claude/skills/gstack/.factory/skills/gstack-qa-only/SKILL.md",
+      "line": 239,
+      "category": "deprecated",
+      "interest": 3,
+      "auto_fixable": false,
+      "description": "."
+    },
+    {
+      "file": ".claude/skills/gstack/.factory/skills/gstack-qa-only/SKILL.md",
+      "line": 463,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "list discipline.** When working through a multi-step plan, mark each task"
+    },
+    {
+      "file": ".claude/skills/gstack/.factory/skills/gstack-qa-only/SKILL.md",
+      "line": 898,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "describes a bug that this branch should fix, add it to your test plan. If you find a new bug during QA that isn't in TODOS.md, note it in the report."
+    },
+    {
+      "file": ".claude/skills/gstack/.factory/skills/gstack-qa/SKILL.md",
+      "line": 242,
+      "category": "deprecated",
+      "interest": 3,
+      "auto_fixable": false,
+      "description": "."
+    },
+    {
+      "file": ".claude/skills/gstack/.factory/skills/gstack-qa/SKILL.md",
+      "line": 466,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "list discipline.** When working through a multi-step plan, mark each task"
+    },
+    {
+      "file": ".claude/skills/gstack/.factory/skills/gstack-qa/SKILL.md",
+      "line": 1129,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "describes a bug that this branch should fix, add it to your test plan. If you find a new bug during QA that isn't in TODOS.md, note it in the report."
+    },
+    {
+      "file": ".claude/skills/gstack/.factory/skills/gstack-retro/SKILL.md",
+      "line": 238,
+      "category": "deprecated",
+      "interest": 3,
+      "auto_fixable": false,
+      "description": "."
+    },
+    {
+      "file": ".claude/skills/gstack/.factory/skills/gstack-retro/SKILL.md",
+      "line": 462,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "list discipline.** When working through a multi-step plan, mark each task"
+    },
+    {
+      "file": ".claude/skills/gstack/.factory/skills/gstack-review/SKILL.md",
+      "line": 237,
+      "category": "deprecated",
+      "interest": 3,
+      "auto_fixable": false,
+      "description": "."
+    },
+    {
+      "file": ".claude/skills/gstack/.factory/skills/gstack-review/SKILL.md",
+      "line": 461,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "list discipline.** When working through a multi-step plan, mark each task"
+    },
+    {
+      "file": ".claude/skills/gstack/.factory/skills/gstack-review/SKILL.md",
+      "line": 870,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "decide\")"
+    },
+    {
+      "file": ".claude/skills/gstack/.factory/skills/gstack-review/SKILL.md",
+      "line": 942,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": ")"
+    },
+    {
+      "file": ".claude/skills/gstack/.factory/skills/gstack-review/SKILL.md",
+      "line": 1483,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "<title>\""
+    },
+    {
+      "file": ".claude/skills/gstack/.factory/skills/gstack-review/SKILL.md",
+      "line": 1484,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "?** If yes, flag it as an informational finding."
+    },
+    {
+      "file": ".claude/skills/gstack/.factory/skills/gstack-setup-browser-cookies/SKILL.md",
+      "line": 237,
+      "category": "deprecated",
+      "interest": 3,
+      "auto_fixable": false,
+      "description": "."
+    },
+    {
+      "file": ".claude/skills/gstack/.factory/skills/gstack-setup-browser-cookies/SKILL.md",
+      "line": 402,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "list discipline.** When working through a multi-step plan, mark each task"
+    },
+    {
+      "file": ".claude/skills/gstack/.factory/skills/gstack-setup-deploy/SKILL.md",
+      "line": 239,
+      "category": "deprecated",
+      "interest": 3,
+      "auto_fixable": false,
+      "description": "."
+    },
+    {
+      "file": ".claude/skills/gstack/.factory/skills/gstack-setup-deploy/SKILL.md",
+      "line": 463,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "list discipline.** When working through a multi-step plan, mark each task"
+    },
+    {
+      "file": ".claude/skills/gstack/.factory/skills/gstack-ship/SKILL.md",
+      "line": 239,
+      "category": "deprecated",
+      "interest": 3,
+      "auto_fixable": false,
+      "description": "."
+    },
+    {
+      "file": ".claude/skills/gstack/.factory/skills/gstack-ship/SKILL.md",
+      "line": 463,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "list discipline.** When working through a multi-step plan, mark each task"
+    },
+    {
+      "file": ".claude/skills/gstack/.factory/skills/gstack-ship/SKILL.md",
+      "line": 1154,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "\u2014 fix after this branch lands \u2014 Completeness: 7/10"
+    },
+    {
+      "file": ".claude/skills/gstack/.factory/skills/gstack-ship/SKILL.md",
+      "line": 1170,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "\u2014 Completeness: 7/10"
+    },
+    {
+      "file": ".claude/skills/gstack/.factory/skills/gstack-ship/SKILL.md",
+      "line": 1181,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "\":**"
+    },
+    {
+      "file": ".claude/skills/gstack/.factory/skills/gstack-ship/SKILL.md",
+      "line": 1595,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "decide\")"
+    },
+    {
+      "file": ".claude/skills/gstack/.factory/skills/gstack-ship/SKILL.md",
+      "line": 1662,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "in Step 5.5 with \"Deferred from plan: {plan file path}\"."
+    },
+    {
+      "file": ".claude/skills/gstack/.factory/skills/gstack-ship/SKILL.md",
+      "line": 2605,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "item, check if the changes in this PR complete it by:"
+    },
+    {
+      "file": ".claude/skills/gstack/.factory/skills/gstack-ship/SKILL.md",
+      "line": 2606,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "title and description"
+    },
+    {
+      "file": ".claude/skills/gstack/.factory/skills/gstack-ship/SKILL.md",
+      "line": 2607,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "appear in the diff"
+    },
+    {
+      "file": ".claude/skills/gstack/.factory/skills/gstack-ship/SKILL.md",
+      "line": 2608,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "'s described work matches the functional changes"
+    },
+    {
+      "file": ".claude/skills/gstack/.factory/skills/gstack-ship/SKILL.md",
+      "line": 2610,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "as completed if there is clear evidence in the diff. If uncertain, leave it alone."
+    },
+    {
+      "file": ".claude/skills/gstack/.factory/skills/gstack-ship/SKILL.md",
+      "line": 2876,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "items completed in this PR.\">"
+    },
+    {
+      "file": ".claude/skills/gstack/.factory/skills/gstack/SKILL.md",
+      "line": 237,
+      "category": "deprecated",
+      "interest": 3,
+      "auto_fixable": false,
+      "description": "."
+    },
+    {
+      "file": ".claude/skills/gstack/.factory/skills/gstack/SKILL.md",
+      "line": 402,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "list discipline.** When working through a multi-step plan, mark each task"
+    },
+    {
+      "file": ".claude/skills/setup-gbrain/SKILL.md",
+      "line": 247,
+      "category": "deprecated",
+      "interest": 3,
+      "auto_fixable": false,
+      "description": "."
+    },
+    {
+      "file": ".claude/skills/setup-gbrain/SKILL.md",
+      "line": 471,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "list discipline.** When working through a multi-step plan, mark each task"
+    },
+    {
+      "file": ".claude/skills/setup-gbrain/SKILL.md",
+      "line": 1488,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "; until it ships,"
+    },
+    {
+      "file": ".claude/skills/sync-gbrain/SKILL.md",
+      "line": 247,
+      "category": "deprecated",
+      "interest": 3,
+      "auto_fixable": false,
+      "description": "."
+    },
+    {
+      "file": ".claude/skills/sync-gbrain/SKILL.md",
+      "line": 471,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "list discipline.** When working through a multi-step plan, mark each task"
+    },
+    {
+      "file": ".claude/skills/sync-gbrain/SKILL.md",
+      "line": 781,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": ".\""
+    },
+    {
+      "file": ".coderabbit.yaml",
+      "line": 219,
+      "category": "deprecated",
+      "interest": 3,
+      "auto_fixable": false,
+      "description": "keys: 'auto_labeling', 'label_instructions'"
+    },
+    {
+      "file": ".github/WORKFLOW_ORGANIZATION.md",
+      "line": 356,
+      "category": "deprecated",
+      "interest": 3,
+      "auto_fixable": false,
+      "description": "** (Preview branch no longer exists)"
+    },
+    {
+      "file": ".github/WORKFLOW_ORGANIZATION.md",
+      "line": 357,
+      "category": "deprecated",
+      "interest": 3,
+      "auto_fixable": false,
+      "description": "** (Preview DB resync no longer needed)"
+    },
+    {
+      "file": ".github/WORKFLOW_ORGANIZATION.md",
+      "line": 361,
+      "category": "deprecated",
+      "interest": 3,
+      "auto_fixable": false,
+      "description": "branch model:** Moved from develop \u2192 preview \u2192 production to main \u2192 production"
+    },
+    {
+      "file": ".github/copilot-instructions.md",
+      "line": 325,
+      "category": "deprecated",
+      "interest": 3,
+      "auto_fixable": false,
+      "description": "package warnings (non-blocking)"
+    },
+    {
+      "file": ".github/workflows/ci.yml",
+      "line": 3097,
+      "category": "deprecated",
+      "interest": 3,
+      "auto_fixable": false,
+      "description": "Turbo env overrides (preview)"
+    },
+    {
+      "file": ".github/workflows/ci.yml",
+      "line": 3757,
+      "category": "deprecated",
+      "interest": 3,
+      "auto_fixable": false,
+      "description": "Turbo env overrides (production)"
+    },
+    {
+      "file": ".github/workflows/linear-ai-dispatcher.yml",
+      "line": 18,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "issues with this label'"
+    },
+    {
+      "file": ".github/workflows/linear-ai-dispatcher.yml",
+      "line": 103,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "issues found for project '$PROJECT_NAME' with label '$READY_LABEL'\""
+    },
+    {
+      "file": ".github/workflows/linear-ai-dispatcher.yml",
+      "line": 163,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "."
+    },
+    {
+      "file": ".github/workflows/linear-ai-orchestrator.yml",
+      "line": 304,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "\" && \"${STATE_TYPE,,}\" != \"unstarted\" ]]; then"
+    },
+    {
+      "file": ".github/workflows/linear-ai-orchestrator.yml",
+      "line": 305,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "/Unstarted (state: ${STATE_NAME}, type: ${STATE_TYPE}); stopping run\""
+    },
+    {
+      "file": "AGENTS.md",
+      "line": 93,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "`, `TODOS.md`, PR bullets, or chat memory."
+    },
+    {
+      "file": "AUTH_FIX_LOG.md",
+      "line": 46,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "."
+    },
+    {
+      "file": "CHANGELOG.md",
+      "line": 279,
+      "category": "hack",
+      "interest": 5,
+      "auto_fixable": false,
+      "description": "that previously rendered the header twice (one copy hidden via `display: none`) and zeroed `#main-content`'s top radius to fake a stitched surface."
+    },
+    {
+      "file": "CHANGELOG.md",
+      "line": 1207,
+      "category": "deprecated",
+      "interest": 3,
+      "auto_fixable": false,
+      "description": "`daemon` config** so local Turbo commands no longer emit the Turbo 2.9 deprecation warning."
+    },
+    {
+      "file": "CLAUDE.md",
+      "line": 93,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "`, `TODOS.md`, PR bullets, or chat memory."
+    },
+    {
+      "file": "CONTRIBUTING.md",
+      "line": 147,
+      "category": "deprecated",
+      "interest": 3,
+      "auto_fixable": false,
+      "description": ")"
+    },
+    {
+      "file": "CONTRIBUTING.md",
+      "line": 200,
+      "category": "deprecated",
+      "interest": 3,
+      "auto_fixable": false,
+      "description": "approaches (JWT templates, etc.)"
+    },
+    {
+      "file": "LINEAR_ISSUES.md",
+      "line": 119,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "to open a custom UTM builder modal instead of just copying preset UTM links."
+    },
+    {
+      "file": "TODOS.md",
+      "line": 31,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "should cover extension-specific budgets such as panel open time, candidate list render time, preview readiness time, and layout-shift regressions. It should integrate with the exte"
+    },
+    {
+      "file": "TODOS.md",
+      "line": 49,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "should define the next tier clearly so the program does not drift into being \u201cjust a smart autofill extension.\u201d"
+    },
+    {
+      "file": "TODOS.md",
+      "line": 421,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "):** Periodic health check pings YouTube Data API for each music_video release. When a video is unavailable: temporarily hide the release, redirect the page server-side (before it "
+    },
+    {
+      "file": "TODOS.md",
+      "line": 422,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "):** Email the artist: \"Your video [title] is temporarily hidden because [reason]. Update the YouTube link or contact support.\" Artists don't have dev tools or observability \u2014 we n"
+    },
+    {
+      "file": "agentos/roadmap/README.md",
+      "line": 11,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "(JOV-1930): SYNC_MODEL.md is being defined in the parallel R1 task. Once that PR lands, update this README to link directly to SYNC_MODEL.md \u00a73 for the backlog.json schema. -->"
+    },
+    {
+      "file": "agentos/roadmap/SYNC_MODEL.md",
+      "line": 19,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "/ In Progress / In Review / Done / Canceled / Duplicate) | \u2014 |"
+    },
+    {
+      "file": "agentos/roadmap/SYNC_MODEL.md",
+      "line": 52,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "\u2192 In Progress \u2192 In Review \u2192 Done only); attaching links/PRs | Editing title; editing description; changing priority; changing assignee; transitioning to Canceled/Duplicate; any wri"
+    },
+    {
+      "file": "agentos/roadmap/SYNC_MODEL.md",
+      "line": 281,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "\u2192 In Progress \u2192 In Review \u2192 Done` is proposed. Should the app user also be allowed to move issues to `Backlog` (e.g. when a brief is rejected pre-execution)? JOV-1934 should resolv"
+    },
+    {
+      "file": "apps/web/.claude/ideation/quality-ideas.json",
+      "line": 321,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "comment indicates planned feature. Currently users click button that does nothing useful.\","
+    },
+    {
+      "file": "apps/web/.claude/ideation/quality-ideas.json",
+      "line": 351,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "comment explaining Phase 2 extraction work needed\","
+    },
+    {
+      "file": "apps/web/app/api/admin/creator-invite/bulk/lib/queries.ts",
+      "line": 96,
+      "category": "deprecated",
+      "interest": 3,
+      "auto_fixable": false,
+      "description": "Use fetchProfilesByFitScore instead - identical implementation."
+    },
+    {
+      "file": "apps/web/app/api/admin/test-user/set-plan/route.ts",
+      "line": 26,
+      "category": "deprecated",
+      "interest": 3,
+      "auto_fixable": false,
+      "description": "endpoint. Use /api/dev/test-user/set-plan for authenticated test-user plan changes.',"
+    },
+    {
+      "file": "apps/web/app/api/mobile/v1/auth/ticket/route.ts",
+      "line": 7,
+      "category": "deprecated",
+      "interest": 3,
+      "auto_fixable": false,
+      "description": "compatibility endpoint."
+    },
+    {
+      "file": "apps/web/app/api/mobile/v1/auth/ticket/route.ts",
+      "line": 17,
+      "category": "deprecated",
+      "interest": 3,
+      "auto_fixable": false,
+      "description": "auth ticket route',"
+    },
+    {
+      "file": "apps/web/app/api/webhooks/linear/route.ts",
+      "line": 7,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "\" / unstarted state \u2192 dispatches `linear_todo_ready`"
+    },
+    {
+      "file": "apps/web/app/api/webhooks/linear/route.ts",
+      "line": 120,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "';"
+    },
+    {
+      "file": "apps/web/app/api/webhooks/linear/route.ts",
+      "line": 243,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "'}`;"
+    },
+    {
+      "file": "apps/web/app/api/webhooks/sms/route.ts",
+      "line": 122,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "upgrade to claim-and-retry per"
+    },
+    {
+      "file": "apps/web/app/app/(shell)/dashboard/PreviewPanelContext.tsx",
+      "line": 198,
+      "category": "deprecated",
+      "interest": 3,
+      "auto_fixable": false,
+      "description": "Prefer using {@link usePreviewPanelState} (for isOpen/open/close/toggle)"
+    },
+    {
+      "file": "apps/web/app/app/(shell)/dashboard/actions/dashboard-data.ts",
+      "line": 1351,
+      "category": "deprecated",
+      "interest": 3,
+      "auto_fixable": false,
+      "description": "Use getDashboardData() instead. This alias is planned for removal in a future major release; migrate to getDashboardData() to avoid breakage."
+    },
+    {
+      "file": "apps/web/app/app/(shell)/dashboard/audience/audience-data.ts",
+      "line": 81,
+      "category": "deprecated",
+      "interest": 3,
+      "auto_fixable": false,
+      "description": "Use cursor instead. */"
+    },
+    {
+      "file": "apps/web/app/app/(shell)/dashboard/audience/audience-data.ts",
+      "line": 96,
+      "category": "deprecated",
+      "interest": 3,
+      "auto_fixable": false,
+      "description": "Use cursor instead. */"
+    },
+    {
+      "file": "apps/web/app/app/(shell)/dashboard/releases/catalog-task-actions.ts",
+      "line": 147,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "' as const,"
+    },
+    {
+      "file": "apps/web/app/app/(shell)/dashboard/releases/catalog-task-actions.ts",
+      "line": 402,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "' as const,"
+    },
+    {
+      "file": "apps/web/app/app/(shell)/dashboard/releases/task-actions.ts",
+      "line": 150,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "' as const,"
+    },
+    {
+      "file": "apps/web/app/app/(shell)/dashboard/releases/task-actions.ts",
+      "line": 249,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "' | 'in_progress' | 'done' | 'cancelled';"
+    },
+    {
+      "file": "apps/web/app/app/(shell)/dashboard/tasks/task-actions.ts",
+      "line": 104,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "= 0;"
+    },
+    {
+      "file": "apps/web/app/app/(shell)/dashboard/tasks/task-actions.ts",
+      "line": 115,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "':"
+    },
+    {
+      "file": "apps/web/app/app/(shell)/dashboard/tasks/task-actions.ts",
+      "line": 116,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "= value;"
+    },
+    {
+      "file": "apps/web/app/app/(shell)/dashboard/tasks/task-actions.ts",
+      "line": 134,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": ","
+    },
+    {
+      "file": "apps/web/app/app/(shell)/dashboard/tasks/task-actions.ts",
+      "line": 138,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "+ inProgress,"
+    },
+    {
+      "file": "apps/web/app/app/(shell)/dashboard/tasks/task-actions.ts",
+      "line": 258,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "',"
+    },
+    {
+      "file": "apps/web/app/app/(shell)/dashboard/tasks/task-actions.ts",
+      "line": 920,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "', 'in_progress']),"
+    },
+    {
+      "file": "apps/web/app/exp/shell-v1/page.tsx",
+      "line": 1496,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "' | 'in_progress' | 'done' | 'cancelled';"
+    },
+    {
+      "file": "apps/web/app/exp/shell-v1/page.tsx",
+      "line": 1531,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "',"
+    },
+    {
+      "file": "apps/web/app/exp/shell-v1/page.tsx",
+      "line": 1555,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "',"
+    },
+    {
+      "file": "apps/web/app/exp/shell-v1/page.tsx",
+      "line": 1566,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "',"
+    },
+    {
+      "file": "apps/web/app/exp/shell-v1/page.tsx",
+      "line": 1601,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "',"
+    },
+    {
+      "file": "apps/web/app/exp/shell-v1/page.tsx",
+      "line": 6802,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "':"
+    },
+    {
+      "file": "apps/web/app/exp/shell-v1/page.tsx",
+      "line": 6803,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "';"
+    },
+    {
+      "file": "apps/web/app/globals.css",
+      "line": 1,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "(DS_FOUNDATION_V1 Wave 4): audit for token redefinitions */"
+    },
+    {
+      "file": "apps/web/app/ui/selects/page.tsx",
+      "line": 195,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "'>Todo</SelectItem>"
+    },
+    {
+      "file": "apps/web/components/features/admin/ClaimLinkCopyButton.tsx",
+      "line": 4,
+      "category": "deprecated",
+      "interest": 3,
+      "auto_fixable": false,
+      "description": "* ClaimLinkCopyButton - Deprecated"
+    },
+    {
+      "file": "apps/web/components/features/admin/layout/AdminToolPage.tsx",
+      "line": 14,
+      "category": "deprecated",
+      "interest": 3,
+      "auto_fixable": false,
+      "description": "Use `AdminPage` from `@/components/features/admin/layout/AdminPage` instead."
+    },
+    {
+      "file": "apps/web/components/features/admin/layout/AdminWorkspacePage.tsx",
+      "line": 26,
+      "category": "deprecated",
+      "interest": 3,
+      "auto_fixable": false,
+      "description": "Use `AdminPage` from `@/components/features/admin/layout/AdminPage`"
+    },
+    {
+      "file": "apps/web/components/features/admin/table/index.ts",
+      "line": 2,
+      "category": "deprecated",
+      "interest": 3,
+      "auto_fixable": false,
+      "description": "Import from @/components/organisms/table instead"
+    },
+    {
+      "file": "apps/web/components/features/admin/table/index.ts",
+      "line": 13,
+      "category": "deprecated",
+      "interest": 3,
+      "auto_fixable": false,
+      "description": ")"
+    },
+    {
+      "file": "apps/web/components/features/admin/table/molecules/index.ts",
+      "line": 2,
+      "category": "deprecated",
+      "interest": 3,
+      "auto_fixable": false,
+      "description": "Import from @/components/organisms/table instead"
+    },
+    {
+      "file": "apps/web/components/features/admin/table/organisms/index.ts",
+      "line": 2,
+      "category": "deprecated",
+      "interest": 3,
+      "auto_fixable": false,
+      "description": "Import from @/components/organisms/table instead"
+    },
+    {
+      "file": "apps/web/components/features/dashboard/atoms/PlatformPill.tsx",
+      "line": 43,
+      "category": "deprecated",
+      "interest": 3,
+      "auto_fixable": false,
+      "description": "Use collapsed instead */"
+    },
+    {
+      "file": "apps/web/components/features/dashboard/audience/table/atoms/index.ts",
+      "line": 2,
+      "category": "deprecated",
+      "interest": 3,
+      "auto_fixable": false,
+      "description": "Import from @/components/organisms/table instead"
+    },
+    {
+      "file": "apps/web/components/features/dashboard/audience/table/index.ts",
+      "line": 2,
+      "category": "deprecated",
+      "interest": 3,
+      "auto_fixable": false,
+      "description": "Import atoms from @/components/organisms/table instead"
+    },
+    {
+      "file": "apps/web/components/features/dashboard/molecules/FeedbackModal.tsx",
+      "line": 13,
+      "category": "deprecated",
+      "interest": 3,
+      "auto_fixable": false,
+      "description": "This component is a wrapper that adds business logic (analytics tracking)."
+    },
+    {
+      "file": "apps/web/components/features/dashboard/organisms/DashboardWorkspacePanel.tsx",
+      "line": 2,
+      "category": "deprecated",
+      "interest": 3,
+      "auto_fixable": false,
+      "description": "Use `PageShell` from `@/components/organisms/PageShell` instead."
+    },
+    {
+      "file": "apps/web/components/features/dashboard/organisms/InlineChatArea.tsx",
+      "line": 41,
+      "category": "deprecated",
+      "interest": 3,
+      "auto_fixable": false,
+      "description": "Use profileId instead. Client-provided artist context for backward compatibility. */"
+    },
+    {
+      "file": "apps/web/components/features/dashboard/organisms/contacts-table/row-actions.tsx",
+      "line": 14,
+      "category": "deprecated",
+      "interest": 3,
+      "auto_fixable": false,
+      "description": "Use `buildContactActions` directly from `./contact-actions`."
+    },
+    {
+      "file": "apps/web/components/features/dashboard/tasks/TasksPageClient.tsx",
+      "line": 147,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "', 'Todo'],"
+    },
+    {
+      "file": "apps/web/components/features/dashboard/tasks/task-presentation.test.ts",
+      "line": 43,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "', 'idle')).toMatchObject({"
+    },
+    {
+      "file": "apps/web/components/features/dashboard/tasks/task-presentation.ts",
+      "line": 53,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "() => ({"
+    },
+    {
+      "file": "apps/web/components/features/dashboard/tasks/task-presentation.ts",
+      "line": 99,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "{"
+    },
+    {
+      "file": "apps/web/components/features/dashboard/tasks/task-presentation.ts",
+      "line": 100,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "',"
+    },
+    {
+      "file": "apps/web/components/features/demo/DemoReleaseTasksSurface.tsx",
+      "line": 61,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "',"
+    },
+    {
+      "file": "apps/web/components/features/demo/DemoReleaseTasksSurface.tsx",
+      "line": 70,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "',"
+    },
+    {
+      "file": "apps/web/components/features/demo/DemoReleaseTasksSurface.tsx",
+      "line": 88,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "',"
+    },
+    {
+      "file": "apps/web/components/features/profile/ProfileDrawerShell.tsx",
+      "line": 19,
+      "category": "deprecated",
+      "interest": 3,
+      "auto_fixable": false,
+      "description": "Prefer uniform styling. Only use for edge cases. */"
+    },
+    {
+      "file": "apps/web/components/features/profile/ProfileDrawerShell.tsx",
+      "line": 21,
+      "category": "deprecated",
+      "interest": 3,
+      "auto_fixable": false,
+      "description": "Prefer uniform styling. Only use for edge cases. */"
+    },
+    {
+      "file": "apps/web/components/features/profile/ProfileDrawerShell.tsx",
+      "line": 35,
+      "category": "deprecated",
+      "interest": 3,
+      "auto_fixable": false,
+      "description": "prop kept for backward compat; used internally to apply caller overrides"
+    },
+    {
+      "file": "apps/web/components/features/profile/ProfileDrawerShell.tsx",
+      "line": 36,
+      "category": "deprecated",
+      "interest": 3,
+      "auto_fixable": false,
+      "description": "prop kept for backward compat; used internally to apply caller overrides"
+    },
+    {
+      "file": "apps/web/components/features/profile/ProfileHeroCard.tsx",
+      "line": 280,
+      "category": "deprecated",
+      "interest": 3,
+      "auto_fixable": false,
+      "description": "Use ArtistHero instead */"
+    },
+    {
+      "file": "apps/web/components/features/profile/ProfilePrimaryCTA.tsx",
+      "line": 56,
+      "category": "deprecated",
+      "interest": 3,
+      "auto_fixable": false,
+      "description": "Use client-side cookie reading instead */"
+    },
+    {
+      "file": "apps/web/components/features/release/PreSaveActions.tsx",
+      "line": 35,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "Re-enable platform presaves once email signup flow is solid"
+    },
+    {
+      "file": "apps/web/components/jovie/JovieChat.tsx",
+      "line": 55,
+      "category": "deprecated",
+      "interest": 3,
+      "auto_fixable": false,
+      "description": "prop"
+    },
+    {
+      "file": "apps/web/components/jovie/hooks/useJovieChat.ts",
+      "line": 50,
+      "category": "deprecated",
+      "interest": 3,
+      "auto_fixable": false,
+      "description": "Use profileId instead. Client-provided artist context for backward compatibility. */"
+    },
+    {
+      "file": "apps/web/components/jovie/types.ts",
+      "line": 31,
+      "category": "deprecated",
+      "interest": 3,
+      "auto_fixable": false,
+      "description": "Use profileId instead. Client-provided artist context for backward compatibility. */"
+    },
+    {
+      "file": "apps/web/components/marketing/MarketingContainer.tsx",
+      "line": 15,
+      "category": "deprecated",
+      "interest": 3,
+      "auto_fixable": false,
+      "description": "Use `'page'`. `landing` remains as a source-compatible alias until DS_FOUNDATION_V1 Wave 4. */"
+    },
+    {
+      "file": "apps/web/components/molecules/ContentSurfaceCard.tsx",
+      "line": 24,
+      "category": "deprecated",
+      "interest": 3,
+      "auto_fixable": false,
+      "description": "Use `contentSurfaceCardVariants` instead for new code. */"
+    },
+    {
+      "file": "apps/web/components/molecules/filters/FilterCheckboxItem.test.tsx",
+      "line": 9,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "'"
+    },
+    {
+      "file": "apps/web/components/molecules/filters/FilterCheckboxItem.test.tsx",
+      "line": 16,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "/ });"
+    },
+    {
+      "file": "apps/web/components/molecules/filters/FilterCheckboxItem.test.tsx",
+      "line": 28,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "'"
+    },
+    {
+      "file": "apps/web/components/molecules/filters/FilterCheckboxItem.test.tsx",
+      "line": 34,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "' }), {"
+    },
+    {
+      "file": "apps/web/components/molecules/filters/TableFilterDropdown.test.tsx",
+      "line": 87,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "', label: 'Todo' }],"
+    },
+    {
+      "file": "apps/web/components/molecules/filters/TableFilterDropdown.test.tsx",
+      "line": 110,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "', label: 'Todo', count: 2 }],"
+    },
+    {
+      "file": "apps/web/components/molecules/filters/TableFilterDropdown.test.tsx",
+      "line": 111,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "'],"
+    },
+    {
+      "file": "apps/web/components/organisms/Sidebar.tsx",
+      "line": 6,
+      "category": "deprecated",
+      "interest": 3,
+      "auto_fixable": false,
+      "description": "This file is maintained for backwards compatibility."
+    },
+    {
+      "file": "apps/web/components/shell/TaskStatusIcon.test.tsx",
+      "line": 11,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "glyph with the correct aria-label', () => {"
+    },
+    {
+      "file": "apps/web/components/shell/TaskStatusIcon.test.tsx",
+      "line": 12,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "' />);"
+    },
+    {
+      "file": "apps/web/components/shell/TaskStatusIcon.test.tsx",
+      "line": 13,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "')).toBeInTheDocument();"
+    },
+    {
+      "file": "apps/web/components/shell/TaskStatusIcon.tsx",
+      "line": 18,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "'"
+    },
+    {
+      "file": "apps/web/components/shell/TaskStatusIcon.tsx",
+      "line": 27,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "` \u2014 solid circle outline, tertiary tone (queued)."
+    },
+    {
+      "file": "apps/web/components/shell/TaskStatusIcon.tsx",
+      "line": 60,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "':"
+    },
+    {
+      "file": "apps/web/components/shell/TaskStatusIcon.tsx",
+      "line": 65,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "'"
+    },
+    {
+      "file": "apps/web/components/shell/TasksRouteSkeleton.tsx",
+      "line": 12,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "', 'progress'] as const;"
+    },
+    {
+      "file": "apps/web/components/site/Container.tsx",
+      "line": 22,
+      "category": "deprecated",
+      "interest": 3,
+      "auto_fixable": false,
+      "description": "Use the default size (`'lg'`) which resolves to the canonical 1298px width, or migrate to a layout primitive. Will be removed in DS_FOUNDATION_V1 Wave 4. */"
+    },
+    {
+      "file": "apps/web/components/site/Container.tsx",
+      "line": 24,
+      "category": "deprecated",
+      "interest": 3,
+      "auto_fixable": false,
+      "description": "Use the default size (`'lg'`) which resolves to the canonical 1298px width, or migrate to a layout primitive. Will be removed in DS_FOUNDATION_V1 Wave 4. */"
+    },
+    {
+      "file": "apps/web/components/site/Container.tsx",
+      "line": 27,
+      "category": "deprecated",
+      "interest": 3,
+      "auto_fixable": false,
+      "description": "Use `'lg'` (the default). `xl` is now an alias of the canonical 1298px width and will be removed in DS_FOUNDATION_V1 Wave 4. */"
+    },
+    {
+      "file": "apps/web/components/site/Container.tsx",
+      "line": 30,
+      "category": "deprecated",
+      "interest": 3,
+      "auto_fixable": false,
+      "description": "Use `'lg'` (the default). `homepage` is now an alias of the canonical 1298px width and will be removed in DS_FOUNDATION_V1 Wave 4. */"
+    },
+    {
+      "file": "apps/web/constants/app.ts",
+      "line": 45,
+      "category": "deprecated",
+      "interest": 3,
+      "auto_fixable": false,
+      "description": "). Use `lib/feature-flags.ts`."
+    },
+    {
+      "file": "apps/web/constants/domains.ts",
+      "line": 23,
+      "category": "deprecated",
+      "interest": 3,
+      "auto_fixable": false,
+      "description": "Use HOSTNAME instead */"
+    },
+    {
+      "file": "apps/web/constants/domains.ts",
+      "line": 26,
+      "category": "deprecated",
+      "interest": 3,
+      "auto_fixable": false,
+      "description": "Use HOSTNAME instead - now same as PROFILE_HOSTNAME */"
+    },
+    {
+      "file": "apps/web/constants/domains.ts",
+      "line": 35,
+      "category": "deprecated",
+      "interest": 3,
+      "auto_fixable": false,
+      "description": "Use BASE_URL instead */"
+    },
+    {
+      "file": "apps/web/constants/domains.ts",
+      "line": 38,
+      "category": "deprecated",
+      "interest": 3,
+      "auto_fixable": false,
+      "description": "Use BASE_URL instead */"
+    },
+    {
+      "file": "apps/web/constants/domains.ts",
+      "line": 62,
+      "category": "deprecated",
+      "interest": 3,
+      "auto_fixable": false,
+      "description": "Use getPayUrl instead */"
+    },
+    {
+      "file": "apps/web/constants/domains.ts",
+      "line": 85,
+      "category": "deprecated",
+      "interest": 3,
+      "auto_fixable": false,
+      "description": "Use isMainDomain instead */"
+    },
+    {
+      "file": "apps/web/constants/domains.ts",
+      "line": 88,
+      "category": "deprecated",
+      "interest": 3,
+      "auto_fixable": false,
+      "description": "Use isMainDomain instead */"
+    },
+    {
+      "file": "apps/web/constants/routes.ts",
+      "line": 39,
+      "category": "deprecated",
+      "interest": 3,
+      "auto_fixable": false,
+      "description": "Profile is now a drawer on the chat route. Use CHAT instead. */"
+    },
+    {
+      "file": "apps/web/constants/routes.ts",
+      "line": 71,
+      "category": "deprecated",
+      "interest": 3,
+      "auto_fixable": false,
+      "description": "Use SETTINGS_DATA_PRIVACY instead */"
+    },
+    {
+      "file": "apps/web/drizzle/config.ts",
+      "line": 6,
+      "category": "deprecated",
+      "interest": 3,
+      "auto_fixable": false,
+      "description": "Legacy HTTP-based DB connection factory."
+    },
+    {
+      "file": "apps/web/drizzle/migrations/meta/0000_snapshot.json",
+      "line": 10744,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "'\""
+    },
+    {
+      "file": "apps/web/drizzle/migrations/meta/0000_snapshot.json",
+      "line": 14232,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "\", \"in_progress\", \"done\", \"cancelled\"]"
+    },
+    {
+      "file": "apps/web/drizzle/migrations/meta/0003_snapshot.json",
+      "line": 10756,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "'\""
+    },
+    {
+      "file": "apps/web/drizzle/migrations/meta/0003_snapshot.json",
+      "line": 14244,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "\", \"in_progress\", \"done\", \"cancelled\"]"
+    },
+    {
+      "file": "apps/web/drizzle/migrations/meta/0005_snapshot.json",
+      "line": 10768,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "'\""
+    },
+    {
+      "file": "apps/web/drizzle/migrations/meta/0005_snapshot.json",
+      "line": 14256,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "\", \"in_progress\", \"done\", \"cancelled\"]"
+    },
+    {
+      "file": "apps/web/drizzle/migrations/meta/0009_snapshot.json",
+      "line": 10774,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "'\""
+    },
+    {
+      "file": "apps/web/drizzle/migrations/meta/0009_snapshot.json",
+      "line": 14262,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "\", \"in_progress\", \"done\", \"cancelled\"]"
+    },
+    {
+      "file": "apps/web/drizzle/migrations/meta/0010_snapshot.json",
+      "line": 10931,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "'\""
+    },
+    {
+      "file": "apps/web/drizzle/migrations/meta/0010_snapshot.json",
+      "line": 14419,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "\", \"in_progress\", \"done\", \"cancelled\"]"
+    },
+    {
+      "file": "apps/web/drizzle/migrations/meta/0011_snapshot.json",
+      "line": 10972,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "'\""
+    },
+    {
+      "file": "apps/web/drizzle/migrations/meta/0011_snapshot.json",
+      "line": 14460,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "\", \"in_progress\", \"done\", \"cancelled\"]"
+    },
+    {
+      "file": "apps/web/drizzle/migrations/meta/0012_snapshot.json",
+      "line": 10978,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "'\""
+    },
+    {
+      "file": "apps/web/drizzle/migrations/meta/0012_snapshot.json",
+      "line": 14466,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "\", \"in_progress\", \"done\", \"cancelled\"]"
+    },
+    {
+      "file": "apps/web/drizzle/migrations/meta/0013_snapshot.json",
+      "line": 11390,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "'\""
+    },
+    {
+      "file": "apps/web/drizzle/migrations/meta/0013_snapshot.json",
+      "line": 14893,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "\", \"in_progress\", \"done\", \"cancelled\"]"
+    },
+    {
+      "file": "apps/web/drizzle/migrations/meta/0014_snapshot.json",
+      "line": 11411,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "'\""
+    },
+    {
+      "file": "apps/web/drizzle/migrations/meta/0014_snapshot.json",
+      "line": 14914,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "\", \"in_progress\", \"done\", \"cancelled\"]"
+    },
+    {
+      "file": "apps/web/drizzle/migrations/meta/0015_snapshot.json",
+      "line": 11411,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "'\""
+    },
+    {
+      "file": "apps/web/drizzle/migrations/meta/0015_snapshot.json",
+      "line": 14914,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "\", \"in_progress\", \"done\", \"cancelled\"]"
+    },
+    {
+      "file": "apps/web/drizzle/migrations/meta/0016_snapshot.json",
+      "line": 11417,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "'\""
+    },
+    {
+      "file": "apps/web/drizzle/migrations/meta/0016_snapshot.json",
+      "line": 14920,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "\", \"in_progress\", \"done\", \"cancelled\"]"
+    },
+    {
+      "file": "apps/web/drizzle/migrations/meta/0018_snapshot.json",
+      "line": 11417,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "'\""
+    },
+    {
+      "file": "apps/web/drizzle/migrations/meta/0018_snapshot.json",
+      "line": 14941,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "\", \"in_progress\", \"done\", \"cancelled\"]"
+    },
+    {
+      "file": "apps/web/drizzle/migrations/meta/0019_snapshot.json",
+      "line": 11417,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "'\""
+    },
+    {
+      "file": "apps/web/drizzle/migrations/meta/0019_snapshot.json",
+      "line": 14941,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "\", \"in_progress\", \"done\", \"cancelled\"]"
+    },
+    {
+      "file": "apps/web/drizzle/migrations/meta/0021_snapshot.json",
+      "line": 11569,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "'\""
+    },
+    {
+      "file": "apps/web/drizzle/migrations/meta/0021_snapshot.json",
+      "line": 12889,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "'\""
+    },
+    {
+      "file": "apps/web/drizzle/migrations/meta/0021_snapshot.json",
+      "line": 15434,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "\", \"in_progress\", \"done\", \"cancelled\"]"
+    },
+    {
+      "file": "apps/web/drizzle/migrations/meta/0022_snapshot.json",
+      "line": 12033,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "'\""
+    },
+    {
+      "file": "apps/web/drizzle/migrations/meta/0022_snapshot.json",
+      "line": 15578,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "\", \"in_progress\", \"done\", \"cancelled\"]"
+    },
+    {
+      "file": "apps/web/drizzle/migrations/meta/0023_snapshot.json",
+      "line": 12191,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "'\""
+    },
+    {
+      "file": "apps/web/drizzle/migrations/meta/0023_snapshot.json",
+      "line": 13511,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "'\""
+    },
+    {
+      "file": "apps/web/drizzle/migrations/meta/0023_snapshot.json",
+      "line": 16077,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "\", \"in_progress\", \"done\", \"cancelled\"]"
+    },
+    {
+      "file": "apps/web/drizzle/migrations/meta/0024_snapshot.json",
+      "line": 12571,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "'\""
+    },
+    {
+      "file": "apps/web/drizzle/migrations/meta/0024_snapshot.json",
+      "line": 13891,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "'\""
+    },
+    {
+      "file": "apps/web/drizzle/migrations/meta/0024_snapshot.json",
+      "line": 16472,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "\", \"in_progress\", \"done\", \"cancelled\"]"
+    },
+    {
+      "file": "apps/web/drizzle/migrations/meta/0025_snapshot.json",
+      "line": 12577,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "'\""
+    },
+    {
+      "file": "apps/web/drizzle/migrations/meta/0025_snapshot.json",
+      "line": 13897,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "'\""
+    },
+    {
+      "file": "apps/web/drizzle/migrations/meta/0025_snapshot.json",
+      "line": 16478,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "\", \"in_progress\", \"done\", \"cancelled\"]"
+    },
+    {
+      "file": "apps/web/drizzle/migrations/meta/0026_snapshot.json",
+      "line": 12885,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "'\""
+    },
+    {
+      "file": "apps/web/drizzle/migrations/meta/0026_snapshot.json",
+      "line": 14205,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "'\""
+    },
+    {
+      "file": "apps/web/drizzle/migrations/meta/0026_snapshot.json",
+      "line": 16786,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "\", \"in_progress\", \"done\", \"cancelled\"]"
+    },
+    {
+      "file": "apps/web/drizzle/migrations/meta/0027_snapshot.json",
+      "line": 13274,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "'\""
+    },
+    {
+      "file": "apps/web/drizzle/migrations/meta/0027_snapshot.json",
+      "line": 14594,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "'\""
+    },
+    {
+      "file": "apps/web/drizzle/migrations/meta/0027_snapshot.json",
+      "line": 17187,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "\", \"in_progress\", \"done\", \"cancelled\"]"
+    },
+    {
+      "file": "apps/web/drizzle/migrations/meta/0028_snapshot.json",
+      "line": 13415,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "'\""
+    },
+    {
+      "file": "apps/web/drizzle/migrations/meta/0028_snapshot.json",
+      "line": 14735,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "'\""
+    },
+    {
+      "file": "apps/web/drizzle/migrations/meta/0028_snapshot.json",
+      "line": 17344,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "\", \"in_progress\", \"done\", \"cancelled\"]"
+    },
+    {
+      "file": "apps/web/drizzle/migrations/meta/0031_snapshot.json",
+      "line": 13434,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "'\""
+    },
+    {
+      "file": "apps/web/drizzle/migrations/meta/0031_snapshot.json",
+      "line": 14754,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "'\""
+    },
+    {
+      "file": "apps/web/drizzle/migrations/meta/0031_snapshot.json",
+      "line": 17363,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "\", \"in_progress\", \"done\", \"cancelled\"]"
+    },
+    {
+      "file": "apps/web/drizzle/migrations/meta/0032_snapshot.json",
+      "line": 13446,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "'\""
+    },
+    {
+      "file": "apps/web/drizzle/migrations/meta/0032_snapshot.json",
+      "line": 14766,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "'\""
+    },
+    {
+      "file": "apps/web/drizzle/migrations/meta/0032_snapshot.json",
+      "line": 17400,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "\", \"in_progress\", \"done\", \"cancelled\"]"
+    },
+    {
+      "file": "apps/web/drizzle/migrations/meta/0033_snapshot.json",
+      "line": 13446,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "'\""
+    },
+    {
+      "file": "apps/web/drizzle/migrations/meta/0033_snapshot.json",
+      "line": 14766,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "'\""
+    },
+    {
+      "file": "apps/web/drizzle/migrations/meta/0033_snapshot.json",
+      "line": 17401,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "\", \"in_progress\", \"done\", \"cancelled\"]"
+    },
+    {
+      "file": "apps/web/drizzle/migrations/meta/0034_snapshot.json",
+      "line": 14067,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "'\""
+    },
+    {
+      "file": "apps/web/drizzle/migrations/meta/0034_snapshot.json",
+      "line": 15387,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "'\""
+    },
+    {
+      "file": "apps/web/drizzle/migrations/meta/0034_snapshot.json",
+      "line": 18022,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "\", \"in_progress\", \"done\", \"cancelled\"]"
+    },
+    {
+      "file": "apps/web/drizzle/migrations/meta/0035_snapshot.json",
+      "line": 13541,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "'\""
+    },
+    {
+      "file": "apps/web/drizzle/migrations/meta/0035_snapshot.json",
+      "line": 14861,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "'\""
+    },
+    {
+      "file": "apps/web/drizzle/migrations/meta/0035_snapshot.json",
+      "line": 17496,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "\", \"in_progress\", \"done\", \"cancelled\"]"
+    },
+    {
+      "file": "apps/web/drizzle/migrations/meta/0036_snapshot.json",
+      "line": 14162,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "'\""
+    },
+    {
+      "file": "apps/web/drizzle/migrations/meta/0036_snapshot.json",
+      "line": 15482,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "'\""
+    },
+    {
+      "file": "apps/web/drizzle/migrations/meta/0036_snapshot.json",
+      "line": 18257,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "\", \"in_progress\", \"done\", \"cancelled\"]"
+    },
+    {
+      "file": "apps/web/drizzle/migrations/meta/0037_snapshot.json",
+      "line": 14686,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "'\""
+    },
+    {
+      "file": "apps/web/drizzle/migrations/meta/0037_snapshot.json",
+      "line": 16006,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "'\""
+    },
+    {
+      "file": "apps/web/drizzle/migrations/meta/0037_snapshot.json",
+      "line": 18781,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "\", \"in_progress\", \"done\", \"cancelled\"]"
+    },
+    {
+      "file": "apps/web/drizzle/migrations/meta/0039_snapshot.json",
+      "line": 14698,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "'\""
+    },
+    {
+      "file": "apps/web/drizzle/migrations/meta/0039_snapshot.json",
+      "line": 16018,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "'\""
+    },
+    {
+      "file": "apps/web/drizzle/migrations/meta/0039_snapshot.json",
+      "line": 18793,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "\", \"in_progress\", \"done\", \"cancelled\"]"
+    },
+    {
+      "file": "apps/web/drizzle/migrations/meta/0040_snapshot.json",
+      "line": 14746,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "'\""
+    },
+    {
+      "file": "apps/web/drizzle/migrations/meta/0040_snapshot.json",
+      "line": 16066,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "'\""
+    },
+    {
+      "file": "apps/web/drizzle/migrations/meta/0040_snapshot.json",
+      "line": 18841,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "\", \"in_progress\", \"done\", \"cancelled\"]"
+    },
+    {
+      "file": "apps/web/drizzle/migrations/meta/0041_snapshot.json",
+      "line": 14935,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "'\""
+    },
+    {
+      "file": "apps/web/drizzle/migrations/meta/0041_snapshot.json",
+      "line": 16519,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "'\""
+    },
+    {
+      "file": "apps/web/drizzle/migrations/meta/0041_snapshot.json",
+      "line": 19294,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "\", \"in_progress\", \"done\", \"cancelled\"]"
+    },
+    {
+      "file": "apps/web/drizzle/migrations/meta/0042_snapshot.json",
+      "line": 15435,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "'\""
+    },
+    {
+      "file": "apps/web/drizzle/migrations/meta/0042_snapshot.json",
+      "line": 17079,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "'\""
+    },
+    {
+      "file": "apps/web/drizzle/migrations/meta/0042_snapshot.json",
+      "line": 20165,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "\","
+    },
+    {
+      "file": "apps/web/drizzle/migrations/meta/0043_snapshot.json",
+      "line": 15435,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "'\""
+    },
+    {
+      "file": "apps/web/drizzle/migrations/meta/0043_snapshot.json",
+      "line": 17079,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "'\""
+    },
+    {
+      "file": "apps/web/drizzle/migrations/meta/0043_snapshot.json",
+      "line": 20537,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "\","
+    },
+    {
+      "file": "apps/web/drizzle/migrations/meta/0044_snapshot.json",
+      "line": 15477,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "'\""
+    },
+    {
+      "file": "apps/web/drizzle/migrations/meta/0044_snapshot.json",
+      "line": 17121,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "'\""
+    },
+    {
+      "file": "apps/web/drizzle/migrations/meta/0044_snapshot.json",
+      "line": 20579,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "\","
+    },
+    {
+      "file": "apps/web/drizzle/migrations/meta/0045_snapshot.json",
+      "line": 15477,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "'\""
+    },
+    {
+      "file": "apps/web/drizzle/migrations/meta/0045_snapshot.json",
+      "line": 17121,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "'\""
+    },
+    {
+      "file": "apps/web/drizzle/migrations/meta/0045_snapshot.json",
+      "line": 20579,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "\","
+    },
+    {
+      "file": "apps/web/drizzle/migrations/meta/0046_snapshot.json",
+      "line": 15477,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "'\""
+    },
+    {
+      "file": "apps/web/drizzle/migrations/meta/0046_snapshot.json",
+      "line": 17149,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "'\""
+    },
+    {
+      "file": "apps/web/drizzle/migrations/meta/0046_snapshot.json",
+      "line": 20607,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "\","
+    },
+    {
+      "file": "apps/web/drizzle/migrations/meta/0047_snapshot.json",
+      "line": 15519,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "'\""
+    },
+    {
+      "file": "apps/web/drizzle/migrations/meta/0047_snapshot.json",
+      "line": 17191,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "'\""
+    },
+    {
+      "file": "apps/web/drizzle/migrations/meta/0047_snapshot.json",
+      "line": 20649,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "\","
+    },
+    {
+      "file": "apps/web/drizzle/migrations/meta/0048_snapshot.json",
+      "line": 16182,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "'\""
+    },
+    {
+      "file": "apps/web/drizzle/migrations/meta/0048_snapshot.json",
+      "line": 18031,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "'\""
+    },
+    {
+      "file": "apps/web/drizzle/migrations/meta/0048_snapshot.json",
+      "line": 21724,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "\","
+    },
+    {
+      "file": "apps/web/drizzle/migrations/meta/0049_snapshot.json",
+      "line": 16416,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "'\""
+    },
+    {
+      "file": "apps/web/drizzle/migrations/meta/0049_snapshot.json",
+      "line": 18265,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "'\""
+    },
+    {
+      "file": "apps/web/drizzle/migrations/meta/0049_snapshot.json",
+      "line": 21958,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "\","
+    },
+    {
+      "file": "apps/web/drizzle/migrations/meta/0050_snapshot.json",
+      "line": 16511,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "'\""
+    },
+    {
+      "file": "apps/web/drizzle/migrations/meta/0050_snapshot.json",
+      "line": 18360,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "'\""
+    },
+    {
+      "file": "apps/web/drizzle/migrations/meta/0050_snapshot.json",
+      "line": 22053,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "\","
+    },
+    {
+      "file": "apps/web/drizzle/migrations/meta/0051_snapshot.json",
+      "line": 16511,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "'\""
+    },
+    {
+      "file": "apps/web/drizzle/migrations/meta/0051_snapshot.json",
+      "line": 18649,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "'\""
+    },
+    {
+      "file": "apps/web/drizzle/migrations/meta/0051_snapshot.json",
+      "line": 22443,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "\","
+    },
+    {
+      "file": "apps/web/drizzle/migrations/meta/0053_snapshot.json",
+      "line": 18167,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "'\""
+    },
+    {
+      "file": "apps/web/drizzle/migrations/meta/0053_snapshot.json",
+      "line": 20311,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "'\""
+    },
+    {
+      "file": "apps/web/drizzle/migrations/meta/0053_snapshot.json",
+      "line": 24195,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "\","
+    },
+    {
+      "file": "apps/web/drizzle/migrations/meta/0054_snapshot.json",
+      "line": 18188,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "'\""
+    },
+    {
+      "file": "apps/web/drizzle/migrations/meta/0054_snapshot.json",
+      "line": 20332,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "'\""
+    },
+    {
+      "file": "apps/web/drizzle/migrations/meta/0054_snapshot.json",
+      "line": 24216,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "\","
+    },
+    {
+      "file": "apps/web/drizzle/migrations/meta/0055_snapshot.json",
+      "line": 19737,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "'\""
+    },
+    {
+      "file": "apps/web/drizzle/migrations/meta/0055_snapshot.json",
+      "line": 21881,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "'\""
+    },
+    {
+      "file": "apps/web/drizzle/migrations/meta/0055_snapshot.json",
+      "line": 25828,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "\","
+    },
+    {
+      "file": "apps/web/eslint-rules/no-banned-marketing-copy.js",
+      "line": 82,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "',"
+    },
+    {
+      "file": "apps/web/eslint-rules/no-banned-marketing-copy.js",
+      "line": 84,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "comment in JSX string will appear in rendered output. Remove from marketing copy.',"
+    },
+    {
+      "file": "apps/web/eslint.config.js",
+      "line": 394,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "Add cross-feature import ban when eslint-plugin-boundaries"
+    },
+    {
+      "file": "apps/web/lib/analytics/tracking-rate-limit.ts",
+      "line": 7,
+      "category": "deprecated",
+      "interest": 3,
+      "auto_fixable": false,
+      "description": "Import from '@/lib/rate-limit' instead for new code"
+    },
+    {
+      "file": "apps/web/lib/db/schema/enums.ts",
+      "line": 641,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "',"
+    },
+    {
+      "file": "apps/web/lib/db/schema/profiles.ts",
+      "line": 115,
+      "category": "deprecated",
+      "interest": 3,
+      "auto_fixable": false,
+      "description": "\u2014 ownership now tracked via userProfileClaims join table."
+    },
+    {
+      "file": "apps/web/lib/db/schema/profiles.ts",
+      "line": 154,
+      "category": "deprecated",
+      "interest": 3,
+      "auto_fixable": false,
+      "description": "\u2014 claimed status now derived from userProfileClaims."
+    },
+    {
+      "file": "apps/web/lib/db/schema/release-tasks.ts",
+      "line": 110,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "'),"
+    },
+    {
+      "file": "apps/web/lib/db/schema/tasks.ts",
+      "line": 34,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "'),"
+    },
+    {
+      "file": "apps/web/lib/discography/utils.ts",
+      "line": 102,
+      "category": "deprecated",
+      "interest": 3,
+      "auto_fixable": false,
+      "description": ", kept for backwards compatibility)"
+    },
+    {
+      "file": "apps/web/lib/discography/utils.ts",
+      "line": 106,
+      "category": "deprecated",
+      "interest": 3,
+      "auto_fixable": false,
+      "description": "Use buildSmartLinkPath with handle and slug instead."
+    },
+    {
+      "file": "apps/web/lib/discography/utils.ts",
+      "line": 114,
+      "category": "deprecated",
+      "interest": 3,
+      "auto_fixable": false,
+      "description": "Use buildSmartLinkPath with handle and slug instead."
+    },
+    {
+      "file": "apps/web/lib/discography/utils.ts",
+      "line": 126,
+      "category": "deprecated",
+      "interest": 3,
+      "auto_fixable": false,
+      "description": "Use buildSmartLinkUrl with handle and slug instead."
+    },
+    {
+      "file": "apps/web/lib/email/jobs/enqueue.ts",
+      "line": 98,
+      "category": "deprecated",
+      "interest": 3,
+      "auto_fixable": false,
+      "description": "Use minDelayMs/maxDelayMs instead. Fixed delay between emails (no randomization). */"
+    },
+    {
+      "file": "apps/web/lib/entitlements/server.ts",
+      "line": 63,
+      "category": "deprecated",
+      "interest": 3,
+      "auto_fixable": false,
+      "description": "No longer thrown in production. Will be removed in a future release."
+    },
+    {
+      "file": "apps/web/lib/error-tracking.ts",
+      "line": 285,
+      "category": "deprecated",
+      "interest": 3,
+      "auto_fixable": false,
+      "description": "API usage"
+    },
+    {
+      "file": "apps/web/lib/feature-flags/client.tsx",
+      "line": 4,
+      "category": "deprecated",
+      "interest": 3,
+      "auto_fixable": false,
+      "description": "compatibility surface. Runtime app flags now live under"
+    },
+    {
+      "file": "apps/web/lib/feature-flags/server.ts",
+      "line": 4,
+      "category": "deprecated",
+      "interest": 3,
+      "auto_fixable": false,
+      "description": "compatibility surface. Runtime app flags now live under"
+    },
+    {
+      "file": "apps/web/lib/feature-flags/shared.ts",
+      "line": 2,
+      "category": "deprecated",
+      "interest": 3,
+      "auto_fixable": false,
+      "description": "compatibility surface for static marketing flags and legacy"
+    },
+    {
+      "file": "apps/web/lib/geo.ts",
+      "line": 57,
+      "category": "deprecated",
+      "interest": 3,
+      "auto_fixable": false,
+      "description": "Use calculateLocalNearbyRadius() for density-aware thresholds."
+    },
+    {
+      "file": "apps/web/lib/hud/auth.ts",
+      "line": 2,
+      "category": "deprecated",
+      "interest": 3,
+      "auto_fixable": false,
+      "description": "Import from '@/lib/auth/hud' instead."
+    },
+    {
+      "file": "apps/web/lib/ingestion/processor.ts",
+      "line": 7,
+      "category": "deprecated",
+      "interest": 3,
+      "auto_fixable": false,
+      "description": "Direct imports from this file are deprecated."
+    },
+    {
+      "file": "apps/web/lib/ingestion/strategies/base.ts",
+      "line": 4,
+      "category": "deprecated",
+      "interest": 3,
+      "auto_fixable": false,
+      "description": "This file is maintained for backwards compatibility."
+    },
+    {
+      "file": "apps/web/lib/leads/google-cse.ts",
+      "line": 86,
+      "category": "deprecated",
+      "interest": 3,
+      "auto_fixable": false,
+      "description": "by Google for new customers)"
+    },
+    {
+      "file": "apps/web/lib/leads/google-cse.ts",
+      "line": 203,
+      "category": "deprecated",
+      "interest": 3,
+      "auto_fixable": false,
+      "description": "for new customers)"
+    },
+    {
+      "file": "apps/web/lib/pacer/index.ts",
+      "line": 4,
+      "category": "deprecated",
+      "interest": 3,
+      "auto_fixable": false,
+      "description": "Import directly from sub-modules or `@tanstack/react-pacer`."
+    },
+    {
+      "file": "apps/web/lib/playlists/pipeline.ts",
+      "line": 136,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "Upload fullResBuffer to CDN and get URL"
+    },
+    {
+      "file": "apps/web/lib/queries/useReleaseTaskMutations.ts",
+      "line": 81,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "',"
+    },
+    {
+      "file": "apps/web/lib/queries/useReleaseTaskMutations.ts",
+      "line": 100,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "' as const),"
+    },
+    {
+      "file": "apps/web/lib/queries/useTaskMutations.ts",
+      "line": 223,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "') +"
+    },
+    {
+      "file": "apps/web/lib/queries/useTaskMutations.ts",
+      "line": 240,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "' ? previousStatusCount : stats.todo) +"
+    },
+    {
+      "file": "apps/web/lib/rate-limit/limiters.ts",
+      "line": 545,
+      "category": "deprecated",
+      "interest": 3,
+      "auto_fixable": false,
+      "description": "Use aiChatDailyPlanAwareLimiter instead for new code."
+    },
+    {
+      "file": "apps/web/lib/rate-limit/limiters.ts",
+      "line": 715,
+      "category": "deprecated",
+      "interest": 3,
+      "auto_fixable": false,
+      "description": "symbol warnings)"
+    },
+    {
+      "file": "apps/web/lib/rate-limit/limiters.ts",
+      "line": 727,
+      "category": "deprecated",
+      "interest": 3,
+      "auto_fixable": false,
+      "description": "Use appleMusicRescanPlanAwareLimiter instead for new code."
+    },
+    {
+      "file": "apps/web/lib/rate-limit/limiters.ts",
+      "line": 736,
+      "category": "deprecated",
+      "interest": 3,
+      "auto_fixable": false,
+      "description": "Use appleMusicRescanPlanAwareLimiter instead for new code."
+    },
+    {
+      "file": "apps/web/lib/rate-limit/limiters.ts",
+      "line": 776,
+      "category": "deprecated",
+      "interest": 3,
+      "auto_fixable": false,
+      "description": "symbol warnings)"
+    },
+    {
+      "file": "apps/web/lib/rate-limit/limiters.ts",
+      "line": 788,
+      "category": "deprecated",
+      "interest": 3,
+      "auto_fixable": false,
+      "description": "Use releaseRefreshPlanAwareLimiter instead for new code."
+    },
+    {
+      "file": "apps/web/lib/rate-limit/limiters.ts",
+      "line": 797,
+      "category": "deprecated",
+      "interest": 3,
+      "auto_fixable": false,
+      "description": "Use releaseRefreshPlanAwareLimiter instead for new code."
+    },
+    {
+      "file": "apps/web/lib/redis.ts",
+      "line": 102,
+      "category": "deprecated",
+      "interest": 3,
+      "auto_fixable": false,
+      "description": "Prefer using getRedis() for automatic retry on transient failures."
+    },
+    {
+      "file": "apps/web/lib/release-tasks/types.ts",
+      "line": 18,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "' | 'in_progress' | 'done' | 'cancelled';"
+    },
+    {
+      "file": "apps/web/lib/services/merch/mockup-generator.ts",
+      "line": 100,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "Call Printful Mockup Generator API when available."
+    },
+    {
+      "file": "apps/web/lib/services/merch/mockup-generator.ts",
+      "line": 237,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "query Printful API for mockup generation status"
+    },
+    {
+      "file": "apps/web/lib/stripe/customer-sync.ts",
+      "line": 5,
+      "category": "deprecated",
+      "interest": 3,
+      "auto_fixable": false,
+      "description": "This file is maintained for backwards compatibility."
+    },
+    {
+      "file": "apps/web/lib/tasks/task-board.test.ts",
+      "line": 51,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "',"
+    },
+    {
+      "file": "apps/web/lib/tasks/task-board.test.ts",
+      "line": 77,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "', 'todo', 1),"
+    },
+    {
+      "file": "apps/web/lib/tasks/task-board.test.ts",
+      "line": 82,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "',"
+    },
+    {
+      "file": "apps/web/lib/tasks/task-board.test.ts",
+      "line": 94,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "', 'in_progress', 'done']);"
+    },
+    {
+      "file": "apps/web/lib/tasks/task-board.test.ts",
+      "line": 101,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "', 'in_progress', 'done', 'cancelled']);"
+    },
+    {
+      "file": "apps/web/lib/tasks/task-board.test.ts",
+      "line": 113,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "1', 'todo', 1),"
+    },
+    {
+      "file": "apps/web/lib/tasks/task-board.test.ts",
+      "line": 114,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "2', 'todo', 2),"
+    },
+    {
+      "file": "apps/web/lib/tasks/task-board.test.ts",
+      "line": 119,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "2',"
+    },
+    {
+      "file": "apps/web/lib/tasks/task-board.test.ts",
+      "line": 127,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "')"
+    },
+    {
+      "file": "apps/web/lib/tasks/task-board.test.ts",
+      "line": 129,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "1']);"
+    },
+    {
+      "file": "apps/web/lib/tasks/task-board.test.ts",
+      "line": 134,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "2', 'done-1']);"
+    },
+    {
+      "file": "apps/web/lib/tasks/task-board.test.ts",
+      "line": 136,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "')?.totalCount"
+    },
+    {
+      "file": "apps/web/lib/tasks/task-board.test.ts",
+      "line": 148,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "1', 'todo', 1),"
+    },
+    {
+      "file": "apps/web/lib/tasks/task-board.test.ts",
+      "line": 160,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "1', 'todo'],"
+    },
+    {
+      "file": "apps/web/lib/tasks/task-board.ts",
+      "line": 11,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "',"
+    },
+    {
+      "file": "apps/web/lib/tasks/task-board.ts",
+      "line": 19,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "',"
+    },
+    {
+      "file": "apps/web/lib/tasks/task-board.ts",
+      "line": 26,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "1,"
+    },
+    {
+      "file": "apps/web/lib/tasks/task-update.test.ts",
+      "line": 9,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "',"
+    },
+    {
+      "file": "apps/web/lib/tasks/types.ts",
+      "line": 3,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "'"
+    },
+    {
+      "file": "apps/web/lib/tasks/types.ts",
+      "line": 91,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "number;"
+    },
+    {
+      "file": "apps/web/lib/ui/accent-palette.ts",
+      "line": 26,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "'blue',"
+    },
+    {
+      "file": "apps/web/lib/username/sync.ts",
+      "line": 167,
+      "category": "deprecated",
+      "interest": 3,
+      "auto_fixable": false,
+      "description": "Clerk username is no longer synced. Use app UI to change username."
+    },
+    {
+      "file": "apps/web/lib/utils.ts",
+      "line": 12,
+      "category": "deprecated",
+      "interest": 3,
+      "auto_fixable": false,
+      "description": "Prefer using TanStack Pacer hooks directly in React components:"
+    },
+    {
+      "file": "apps/web/lib/utils/rate-limit.ts",
+      "line": 7,
+      "category": "deprecated",
+      "interest": 3,
+      "auto_fixable": false,
+      "description": "Import from '@/lib/rate-limit' instead"
+    },
+    {
+      "file": "apps/web/lib/utils/rate-limit.ts",
+      "line": 64,
+      "category": "deprecated",
+      "interest": 3,
+      "auto_fixable": false,
+      "description": "Use generalLimiter or healthLimiter from '@/lib/rate-limit' instead"
+    },
+    {
+      "file": "apps/web/lib/utils/rate-limit.ts",
+      "line": 80,
+      "category": "deprecated",
+      "interest": 3,
+      "auto_fixable": false,
+      "description": "Use limiter.getStatus() from '@/lib/rate-limit' instead"
+    },
+    {
+      "file": "apps/web/lib/utils/rate-limit.ts",
+      "line": 105,
+      "category": "deprecated",
+      "interest": 3,
+      "auto_fixable": false,
+      "description": "Use getClientIP from '@/lib/rate-limit' instead"
+    },
+    {
+      "file": "apps/web/lib/utils/rate-limit.ts",
+      "line": 112,
+      "category": "deprecated",
+      "interest": 3,
+      "auto_fixable": false,
+      "description": "Use createRateLimitHeaders from '@/lib/rate-limit' instead"
+    },
+    {
+      "file": "apps/web/lib/utils/rate-limit.ts",
+      "line": 127,
+      "category": "deprecated",
+      "interest": 3,
+      "auto_fixable": false,
+      "description": "Use publicProfileLimiter, publicClickLimiter, or publicVisitLimiter from '@/lib/rate-limit' instead"
+    },
+    {
+      "file": "apps/web/lib/utils/rate-limit.ts",
+      "line": 150,
+      "category": "deprecated",
+      "interest": 3,
+      "auto_fixable": false,
+      "description": "Use limiter.getStatus() from '@/lib/rate-limit' instead"
+    },
+    {
+      "file": "apps/web/lib/validation/schemas/dashboard/audience.ts",
+      "line": 85,
+      "category": "deprecated",
+      "interest": 3,
+      "auto_fixable": false,
+      "description": "Use `cursor` instead. Kept for backward-compatibility. */"
+    },
+    {
+      "file": "apps/web/next.config.js",
+      "line": 454,
+      "category": "deprecated",
+      "interest": 3,
+      "auto_fixable": false,
+      "description": "in Next.js 15.3"
+    },
+    {
+      "file": "apps/web/scripts/seed-demo-account.ts",
+      "line": 591,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "' as const),"
+    },
+    {
+      "file": "apps/web/scripts/validate-db-schema.ts",
+      "line": 43,
+      "category": "deprecated",
+      "interest": 3,
+      "auto_fixable": false,
+      "description": "/legacy and can be ignored"
+    },
+    {
+      "file": "apps/web/styles/design-system.css",
+      "line": 30,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "(DS_FOUNDATION_V1 Wave 1): migrate consumers to --ds-public-content-max (1298px) and remove these legacy variants */"
+    },
+    {
+      "file": "apps/web/styles/design-system.css",
+      "line": 33,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "(DS_FOUNDATION_V1 Wave 4): consider deprecating once consumers migrate to --ds-prose-max */"
+    },
+    {
+      "file": "apps/web/styles/linear-tokens.css",
+      "line": 1,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "(DS_FOUNDATION_V1 Wave 4): consume --ds-public-content-max instead of hardcoded 1298px */"
+    },
+    {
+      "file": "apps/web/styles/theme.css",
+      "line": 1,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "(DS_FOUNDATION_V1 Wave 4): audit for any token redefinitions vs design-system.css */"
+    },
+    {
+      "file": "apps/web/tests/e2e/profile/copy-regression.spec.ts",
+      "line": 7,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": ", FIXME, TBD, etc.)"
+    },
+    {
+      "file": "apps/web/tests/e2e/profile/copy-regression.spec.ts",
+      "line": 7,
+      "category": "fixme",
+      "interest": 5,
+      "auto_fixable": false,
+      "description": ", TBD, etc.)"
+    },
+    {
+      "file": "apps/web/tests/e2e/profile/copy-regression.spec.ts",
+      "line": 37,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "\" inside \"todorovich\")."
+    },
+    {
+      "file": "apps/web/tests/e2e/tasks-layout.spec.ts",
+      "line": 382,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "')).toBeVisible({"
+    },
+    {
+      "file": "apps/web/tests/integration/rls-access-control.test.ts",
+      "line": 30,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "('skips because no database connection is configured');"
+    },
+    {
+      "file": "apps/web/tests/setup-browser.ts",
+      "line": 26,
+      "category": "deprecated",
+      "interest": 3,
+      "auto_fixable": false,
+      "description": "addListener: vi.fn(), // deprecated"
+    },
+    {
+      "file": "apps/web/tests/setup-browser.ts",
+      "line": 27,
+      "category": "deprecated",
+      "interest": 3,
+      "auto_fixable": false,
+      "description": "removeListener: vi.fn(), // deprecated"
+    },
+    {
+      "file": "apps/web/tests/unit/FeaturedCreators.test.tsx",
+      "line": 150,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "('should handle timeout with mock data fallback');"
+    },
+    {
+      "file": "apps/web/tests/unit/FeaturedCreators.test.tsx",
+      "line": 152,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "('should handle schema errors with mock data fallback');"
+    },
+    {
+      "file": "apps/web/tests/unit/FeaturedCreators.test.tsx",
+      "line": 154,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "('should handle empty results with mock data fallback');"
+    },
+    {
+      "file": "apps/web/tests/unit/admin-shell-deprecation.test.ts",
+      "line": 4,
+      "category": "deprecated",
+      "interest": 3,
+      "auto_fixable": false,
+      "description": "` shims that"
+    },
+    {
+      "file": "apps/web/tests/unit/admin-shell-deprecation.test.ts",
+      "line": 8,
+      "category": "deprecated",
+      "interest": 3,
+      "auto_fixable": false,
+      "description": "wrappers"
+    },
+    {
+      "file": "apps/web/tests/unit/admin-shell-deprecation.test.ts",
+      "line": 32,
+      "category": "deprecated",
+      "interest": 3,
+      "auto_fixable": false,
+      "description": "wrappers themselves \u2014 they reference their own"
+    },
+    {
+      "file": "apps/web/tests/unit/admin-shell-deprecation.test.ts",
+      "line": 53,
+      "category": "deprecated",
+      "interest": 3,
+      "auto_fixable": false,
+      "description": "wrappers. Matches both"
+    },
+    {
+      "file": "apps/web/tests/unit/admin-shell-deprecation.test.ts",
+      "line": 57,
+      "category": "deprecated",
+      "interest": 3,
+      "auto_fixable": false,
+      "description": "usage,"
+    },
+    {
+      "file": "apps/web/tests/unit/api/mobile/v1/auth-ticket.test.ts",
+      "line": 13,
+      "category": "deprecated",
+      "interest": 3,
+      "auto_fixable": false,
+      "description": "auth ticket route',"
+    },
+    {
+      "file": "apps/web/tests/unit/api/webhooks/linear.test.ts",
+      "line": 72,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "' },"
+    },
+    {
+      "file": "apps/web/tests/unit/api/webhooks/linear.test.ts",
+      "line": 109,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "' },"
+    },
+    {
+      "file": "apps/web/tests/unit/api/webhooks/linear.test.ts",
+      "line": 159,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "' },"
+    },
+    {
+      "file": "apps/web/tests/unit/api/webhooks/linear.test.ts",
+      "line": 178,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "'"
+    },
+    {
+      "file": "apps/web/tests/unit/api/webhooks/linear.test.ts",
+      "line": 211,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "' },"
+    },
+    {
+      "file": "apps/web/tests/unit/auth/waitlist-gating.test.ts",
+      "line": 821,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "("
+    },
+    {
+      "file": "apps/web/tests/unit/auth/waitlist-gating.test.ts",
+      "line": 848,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "("
+    },
+    {
+      "file": "apps/web/tests/unit/components/organisms/AppShellFrame.test.tsx",
+      "line": 37,
+      "category": "hack",
+      "interest": 5,
+      "auto_fixable": false,
+      "description": ")."
+    },
+    {
+      "file": "apps/web/tests/unit/dashboard/DashboardNav.test.tsx",
+      "line": 380,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "2,"
+    },
+    {
+      "file": "apps/web/tests/unit/dashboard/DashboardNav.test.tsx",
+      "line": 398,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "2,"
+    },
+    {
+      "file": "apps/web/tests/unit/dashboard/DashboardNav.test.tsx",
+      "line": 431,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "2,"
+    },
+    {
+      "file": "apps/web/tests/unit/dashboard/ReleaseTaskChecklist.test.tsx",
+      "line": 112,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "',"
+    },
+    {
+      "file": "apps/web/tests/unit/dashboard/ReleaseTaskPage.test.tsx",
+      "line": 68,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "',"
+    },
+    {
+      "file": "apps/web/tests/unit/dashboard/ReleaseTaskRow.test.tsx",
+      "line": 19,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "',"
+    },
+    {
+      "file": "apps/web/tests/unit/dashboard/TasksPageClient.test.tsx",
+      "line": 153,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "',"
+    },
+    {
+      "file": "apps/web/tests/unit/dashboard/TasksPageClient.test.tsx",
+      "line": 186,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "',"
+    },
+    {
+      "file": "apps/web/tests/unit/dashboard/TasksPageClient.test.tsx",
+      "line": 223,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "',"
+    },
+    {
+      "file": "apps/web/tests/unit/discography/links.test.ts",
+      "line": 58,
+      "category": "deprecated",
+      "interest": 3,
+      "auto_fixable": false,
+      "description": ")', () => {"
+    },
+    {
+      "file": "apps/web/tests/unit/ladygaga-seed.test.ts",
+      "line": 4,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "('should not rely on seeded creator profiles');"
+    },
+    {
+      "file": "apps/web/tests/unit/lib/accent-palette.test.ts",
+      "line": 27,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "'blue',"
+    },
+    {
+      "file": "apps/web/tests/unit/lib/entitlements/billing-unavailable.contract.test.ts",
+      "line": 2,
+      "category": "deprecated",
+      "interest": 3,
+      "auto_fixable": false,
+      "description": "compat surface for entitlements-registry RED)."
+    },
+    {
+      "file": "apps/web/tests/unit/lib/entitlements/billing-unavailable.contract.test.ts",
+      "line": 45,
+      "category": "deprecated",
+      "interest": 3,
+      "auto_fixable": false,
+      "description": "export remains constructible without throw"
+    },
+    {
+      "file": "apps/web/tests/unit/lib/queries/useTaskMutations.test.tsx",
+      "line": 38,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "',"
+    },
+    {
+      "file": "apps/web/tests/unit/lib/queries/useTaskMutations.test.tsx",
+      "line": 74,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "',"
+    },
+    {
+      "file": "apps/web/tests/unit/lib/queries/useTaskMutations.test.tsx",
+      "line": 97,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "1,"
+    },
+    {
+      "file": "apps/web/tests/unit/lib/queries/useTaskMutations.test.tsx",
+      "line": 161,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "0,"
+    },
+    {
+      "file": "apps/web/tests/unit/lib/queries/useTaskMutations.test.tsx",
+      "line": 331,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "',"
+    },
+    {
+      "file": "apps/web/tests/unit/lib/queries/useTaskMutations.test.tsx",
+      "line": 367,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "')"
+    },
+    {
+      "file": "apps/web/tests/unit/lib/queries/useTaskMutations.test.tsx",
+      "line": 397,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "' });"
+    },
+    {
+      "file": "apps/web/tests/unit/lib/queries/useTaskMutations.test.tsx",
+      "line": 439,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "' });"
+    },
+    {
+      "file": "apps/web/tests/unit/lib/queries/useTaskMutations.test.tsx",
+      "line": 489,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "' });"
+    },
+    {
+      "file": "apps/web/tests/unit/organisms/CommandPalette.test.tsx",
+      "line": 115,
+      "category": "deprecated",
+      "interest": 3,
+      "auto_fixable": false,
+      "description": "HTML attribute \u2014 assert focus state instead."
+    },
+    {
+      "file": "apps/web/tests/unit/release-tasks/task-logic.test.ts",
+      "line": 35,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "' as const,"
+    },
+    {
+      "file": "apps/web/tests/unit/release-tasks/task-logic.test.ts",
+      "line": 90,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "');"
+    },
+    {
+      "file": "apps/web/types/db.ts",
+      "line": 89,
+      "category": "deprecated",
+      "interest": 3,
+      "auto_fixable": false,
+      "description": "\u2014 ownership now tracked via user_profile_claims */"
+    },
+    {
+      "file": "apps/web/types/db.ts",
+      "line": 117,
+      "category": "deprecated",
+      "interest": 3,
+      "auto_fixable": false,
+      "description": "\u2014 claimed status now derived from user_profile_claims */"
+    },
+    {
+      "file": "apps/web/types/db.ts",
+      "line": 486,
+      "category": "deprecated",
+      "interest": 3,
+      "auto_fixable": false,
+      "description": "\u2014 use user_profile_claims"
+    },
+    {
+      "file": "apps/web/types/db.ts",
+      "line": 556,
+      "category": "deprecated",
+      "interest": 3,
+      "auto_fixable": false,
+      "description": "\u2014 use user_profile_claims"
+    },
+    {
+      "file": "audits/claim-handle-form-homepage-audit.md",
+      "line": 35,
+      "category": "deprecated",
+      "interest": 3,
+      "auto_fixable": false,
+      "description": ", renders null)"
+    },
+    {
+      "file": "audits/claim-handle-form-homepage-audit.md",
+      "line": 145,
+      "category": "deprecated",
+      "interest": 3,
+      "auto_fixable": false,
+      "description": "and renders `null`. Dead code. | `claim-handle/ClaimHandleStyles.tsx` | Delete the file. |"
+    },
+    {
+      "file": "docs/API_ROUTE_MAP.md",
+      "line": 69,
+      "category": "deprecated",
+      "interest": 3,
+      "auto_fixable": false,
+      "description": "admin namespace endpoint (returns 410; use `/api/dev/test-user/set-plan`) |"
+    },
+    {
+      "file": "docs/AUTOMATION_AUDIT.md",
+      "line": 71,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "issues in \"Design V1 Rollout / Flag Hardening\" project, dispatches up to 2 per cycle | Scheduled retry loop with capacity awareness | **Keep \u2014 review project scope** \u2014 currently ha"
+    },
+    {
+      "file": "docs/PR_WORKFLOW_GUIDE.md",
+      "line": 8,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "\u2192 [agent: In Progress] \u2192 [PR opened: In Review] \u2192 [PR merged: Done]"
+    },
+    {
+      "file": "docs/TECH_DEBT_TRACKER.md",
+      "line": 41,
+      "category": "deprecated",
+      "interest": 3,
+      "auto_fixable": false,
+      "description": "files | ~40 \u2192 ~36 (4 removed, 4 imports migrated) | 0 | 2026-01-30 |"
+    },
+    {
+      "file": "docs/TECH_DEBT_TRACKER.md",
+      "line": 42,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "comments | 6 | 0 | 2026-01-14 |"
+    },
+    {
+      "file": "docs/TECH_DEBT_TRACKER.md",
+      "line": 115,
+      "category": "deprecated",
+      "interest": 3,
+      "auto_fixable": false,
+      "description": "Files)"
+    },
+    {
+      "file": "docs/TECH_DEBT_TRACKER.md",
+      "line": 117,
+      "category": "deprecated",
+      "interest": 3,
+      "auto_fixable": false,
+      "description": "` that should be migrated:"
+    },
+    {
+      "file": "docs/TECH_DEBT_TRACKER.md",
+      "line": 127,
+      "category": "deprecated",
+      "interest": 3,
+      "auto_fixable": false,
+      "description": "| TBD |"
+    },
+    {
+      "file": "docs/TECH_DEBT_TRACKER.md",
+      "line": 132,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "Comments)"
+    },
+    {
+      "file": "docs/TECH_DEBT_TRACKER.md",
+      "line": 136,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "Use Clerk testing token |"
+    },
+    {
+      "file": "docs/TECH_DEBT_TRACKER.md",
+      "line": 137,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "extend activity feed |"
+    },
+    {
+      "file": "docs/TECH_DEBT_TRACKER.md",
+      "line": 138,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "When database table is available |"
+    },
+    {
+      "file": "docs/TECH_DEBT_TRACKER.md",
+      "line": 139,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "When external audit service is available |"
+    },
+    {
+      "file": "docs/TECH_DEBT_TRACKER.md",
+      "line": 140,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "Integrate with analytics service |"
+    },
+    {
+      "file": "docs/TECH_DEBT_TRACKER.md",
+      "line": 141,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "extend reliability metrics |"
+    },
+    {
+      "file": "docs/TECH_DEBT_TRACKER.md",
+      "line": 185,
+      "category": "deprecated",
+      "interest": 3,
+      "auto_fixable": false,
+      "description": "files with no consumers; migrated 4 imports from deprecated paths |"
+    },
+    {
+      "file": "docs/TESTING_GUIDELINES.md",
+      "line": 57,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "with an owner to unskip."
+    },
+    {
+      "file": "docs/TESTING_GUIDELINES.md",
+      "line": 69,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "and owner?"
+    },
+    {
+      "file": "docs/WEBHOOK_MAP.md",
+      "line": 17,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "\" state, CodeRabbit plan-ready comment | Deduplication via Redis (60s TTL). Fires GitHub `repository_dispatch` (`linear_todo_ready` or `linear_plan_ready`) to trigger CI automation"
+    },
+    {
+      "file": "docs/company/operating-principles.md",
+      "line": 40,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "` comment is not documented.** Linear or it didn't happen. (Reference: [`.claude/rules/linear.md`](../../.claude/rules/linear.md) \u2014 Durable Follow-Up Capture.)"
+    },
+    {
+      "file": "docs/company/operating-principles.md",
+      "line": 65,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "` comment."
+    },
+    {
+      "file": "docs/design-system/deprecation-map.md",
+      "line": 9,
+      "category": "deprecated",
+      "interest": 3,
+      "auto_fixable": false,
+      "description": "| `apps/web/components/marketing/MarketingContainer.tsx` | Public profile not-found route is migrated; storybook-only use is acceptable during migration |"
+    },
+    {
+      "file": "docs/design-system/deprecation-map.md",
+      "line": 10,
+      "category": "deprecated",
+      "interest": 3,
+      "auto_fixable": false,
+      "description": "| `apps/web/components/site/PublicPageShell.tsx` | Marketing/legal/blog-style routes should converge here |"
+    },
+    {
+      "file": "docs/design-system/deprecation-map.md",
+      "line": 16,
+      "category": "deprecated",
+      "interest": 3,
+      "auto_fixable": false,
+      "description": "| `apps/web/components/molecules/PublicTableOfContents.tsx` | Investor long-form surfaces still need migration |"
+    },
+    {
+      "file": "docs/design-system/deprecation-map.md",
+      "line": 17,
+      "category": "deprecated",
+      "interest": 3,
+      "auto_fixable": false,
+      "description": "for new work | shared public CTA classes / `AuthActions` | Existing untouched routes still need migration |"
+    },
+    {
+      "file": "docs/design-system/deprecation-map.md",
+      "line": 24,
+      "category": "deprecated",
+      "interest": 3,
+      "auto_fixable": false,
+      "description": "for new work | shared public CTA contract | Guarded in representative marketing/public surfaces; long-tail public routes still need migration |"
+    },
+    {
+      "file": "docs/design-system/deprecation-map.md",
+      "line": 25,
+      "category": "deprecated",
+      "interest": 3,
+      "auto_fixable": false,
+      "description": "| shared public CTA contract | Address in public-template slice |"
+    },
+    {
+      "file": "docs/design-system/deprecation-map.md",
+      "line": 38,
+      "category": "deprecated",
+      "interest": 3,
+      "auto_fixable": false,
+      "description": "| `PageErrorState` | Guarded across settings page/content entrypoints |"
+    },
+    {
+      "file": "docs/design-system/deprecation-map.md",
+      "line": 39,
+      "category": "deprecated",
+      "interest": 3,
+      "auto_fixable": false,
+      "description": "| `ContentSurfaceCard` | Guarded in `admin-playlists-surface-guard.test.ts` |"
+    },
+    {
+      "file": "docs/design-system/deprecation-map.md",
+      "line": 40,
+      "category": "deprecated",
+      "interest": 3,
+      "auto_fixable": false,
+      "description": "| `ContentSurfaceCard` | Guarded in `internal-shell-surface-guard.test.ts` |"
+    },
+    {
+      "file": "docs/design-system/deprecation-map.md",
+      "line": 46,
+      "category": "deprecated",
+      "interest": 3,
+      "auto_fixable": false,
+      "description": "| dialog + plain button contract via `ProfileDrawerShell` | Guarded in `ProfileMenuDrawer.test.tsx` |"
+    },
+    {
+      "file": "docs/design-system/deprecation-map.md",
+      "line": 53,
+      "category": "deprecated",
+      "interest": 3,
+      "auto_fixable": false,
+      "description": "| `MarketingContainer` | Search public routes before adding new wrappers |"
+    },
+    {
+      "file": "docs/features/presale-profile-takeover.md",
+      "line": 398,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "SMS announcements"
+    },
+    {
+      "file": "docs/nextjs-16-upgrade-guide.md",
+      "line": 8,
+      "category": "deprecated",
+      "interest": 3,
+      "auto_fixable": false,
+      "description": "and will be removed in Next.js 16"
+    },
+    {
+      "file": "docs/nextjs-16-upgrade-guide.md",
+      "line": 20,
+      "category": "deprecated",
+      "interest": 3,
+      "auto_fixable": false,
+      "description": "APIs"
+    },
+    {
+      "file": "docs/nextjs-16-upgrade-guide.md",
+      "line": 79,
+      "category": "deprecated",
+      "interest": 3,
+      "auto_fixable": false,
+      "description": "options"
+    },
+    {
+      "file": "docs/performance/PERFORMANCE_AUDIT.md",
+      "line": 159,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "to migrate to Radix/cmdk."
+    },
+    {
+      "file": "docs/public-profile-hardening-audit.md",
+      "line": 63,
+      "category": "deprecated",
+      "interest": 3,
+      "auto_fixable": false,
+      "description": "** | Comment in source: \"AnimatedArtistPage is itself deprecated; both are legacy non-production components\" |"
+    },
+    {
+      "file": "docs/public-profile-hardening-audit.md",
+      "line": 162,
+      "category": "deprecated",
+      "interest": 3,
+      "auto_fixable": false,
+      "description": "in source comment; no live callers | JOV-2021 |"
+    },
+    {
+      "file": "docs/public-profile-hardening-audit.md",
+      "line": 187,
+      "category": "hack",
+      "interest": 5,
+      "auto_fixable": false,
+      "description": "| Location | Impact | Phase |"
+    },
+    {
+      "file": "docs/public-profile-hardening-audit.md",
+      "line": 192,
+      "category": "deprecated",
+      "interest": 3,
+      "auto_fixable": false,
+      "description": "API fallback in `ProfileCompactTemplate` | `ProfileCompactTemplate.tsx:298-302` | `MediaQueryList.addListener` is deprecated; fallback still present | JOV-2022 |"
+    },
+    {
+      "file": "docs/public-profile-surface-spec.md",
+      "line": 243,
+      "category": "deprecated",
+      "interest": 3,
+      "auto_fixable": false,
+      "description": ", redirect to `/{username}/alerts`.**"
+    },
+    {
+      "file": "docs/refactor/REFACTORING_PLAN.md",
+      "line": 69,
+      "category": "deprecated",
+      "interest": 3,
+      "auto_fixable": false,
+      "description": "- re-exports from schema/index.ts"
+    },
+    {
+      "file": "docs/refactor/REFACTORING_PLAN.md",
+      "line": 221,
+      "category": "deprecated",
+      "interest": 3,
+      "auto_fixable": false,
+      "description": "re-export"
+    },
+    {
+      "file": "docs/refactor/REFACTORING_PLAN.md",
+      "line": 310,
+      "category": "deprecated",
+      "interest": 3,
+      "auto_fixable": false,
+      "description": "re-export (47 lines)"
+    },
+    {
+      "file": "docs/refactor/REFACTORING_PLAN.md",
+      "line": 415,
+      "category": "deprecated",
+      "interest": 3,
+      "auto_fixable": false,
+      "description": "re-export (68 lines)"
+    },
+    {
+      "file": "docs/refactor/REFACTORING_PLAN.md",
+      "line": 884,
+      "category": "deprecated",
+      "interest": 3,
+      "auto_fixable": false,
+      "description": "notice pointing to new location. Component now correctly classified as molecule due to useState, useEffect, and fetch API usage."
+    },
+    {
+      "file": "docs/refactor/REFACTORING_PLAN.md",
+      "line": 910,
+      "category": "deprecated",
+      "interest": 3,
+      "auto_fixable": false,
+      "description": "notices"
+    },
+    {
+      "file": "docs/refactor/REFACTORING_PLAN.md",
+      "line": 920,
+      "category": "deprecated",
+      "interest": 3,
+      "auto_fixable": false,
+      "description": "notices pointing users to new import paths. This maintains compatibility while encouraging migration to the atomic structure."
+    },
+    {
+      "file": "docs/refactor/REFACTORING_PLAN.md",
+      "line": 1013,
+      "category": "deprecated",
+      "interest": 3,
+      "auto_fixable": false,
+      "description": "` with pointer to new location"
+    },
+    {
+      "file": "docs/refactor/dashboard-refactor.md",
+      "line": 22,
+      "category": "deprecated",
+      "interest": 3,
+      "auto_fixable": false,
+      "description": ") |"
+    },
+    {
+      "file": "docs/refactor/dashboard-refactor.md",
+      "line": 29,
+      "category": "deprecated",
+      "interest": 3,
+      "auto_fixable": false,
+      "description": "), `components/ui/CTAButton.tsx`, `components/ui/FrostedButton.tsx`, loading variants | `@jovie/ui` `Button` | Atom | Codemod imports to `@jovie/ui` with `asChild` for `next/link` "
+    },
+    {
+      "file": "docs/refactor/dashboard-refactor.md",
+      "line": 88,
+      "category": "deprecated",
+      "interest": 3,
+      "auto_fixable": false,
+      "description": "duplicates; add deprecation tags; codemod import paths."
+    },
+    {
+      "file": "packages/ui/atoms/checkbox.tsx",
+      "line": 12,
+      "category": "deprecated",
+      "interest": 3,
+      "auto_fixable": false,
+      "description": "Use `checked=\"indeterminate\"` instead."
+    },
+    {
+      "file": "packages/ui/lib/dropdown-styles.ts",
+      "line": 230,
+      "category": "deprecated",
+      "interest": 3,
+      "auto_fixable": false,
+      "description": "Use MENU_ITEM_DESTRUCTIVE instead \u2014 identical styles."
+    },
+    {
+      "file": "plan.md",
+      "line": 3,
+      "category": "todo",
+      "interest": 2,
+      "auto_fixable": false,
+      "description": "scope, scheduler 019e806d18b1, strict filter passed: pure backend/product memory engineering, area:memory, type:feature, codex. No fundraising/outreach/content/ADR)."
+    },
+    {
+      "file": "pnpm-lock.yaml",
+      "line": 2011,
+      "category": "deprecated",
+      "interest": 3,
+      "auto_fixable": false,
+      "description": "'Merged into tsx: https://tsx.is'"
+    },
+    {
+      "file": "pnpm-lock.yaml",
+      "line": 2015,
+      "category": "deprecated",
+      "interest": 3,
+      "auto_fixable": false,
+      "description": "'Merged into tsx: https://tsx.is'"
+    },
+    {
+      "file": "pnpm-lock.yaml",
+      "line": 3384,
+      "category": "deprecated",
+      "interest": 3,
+      "auto_fixable": false,
+      "description": "This functionality has been moved to @npmcli/fs"
+    },
+    {
+      "file": "pnpm-lock.yaml",
+      "line": 5598,
+      "category": "deprecated",
+      "interest": 3,
+      "auto_fixable": false,
+      "description": "Deprecated due to incompatibility with Node.js 18 in some environments https://github.com/smithy-lang/smithy-typescript/issues/2022"
+    },
+    {
+      "file": "pnpm-lock.yaml",
+      "line": 7050,
+      "category": "deprecated",
+      "interest": 3,
+      "auto_fixable": false,
+      "description": "Potential CWE-502 - Update to 1.3.1 or higher"
+    },
+    {
+      "file": "pnpm-lock.yaml",
+      "line": 7930,
+      "category": "deprecated",
+      "interest": 3,
+      "auto_fixable": false,
+      "description": "This package is no longer supported."
+    },
+    {
+      "file": "pnpm-lock.yaml",
+      "line": 8296,
+      "category": "deprecated",
+      "interest": 3,
+      "auto_fixable": false,
+      "description": "Package no longer supported. Contact Support at https://www.npmjs.com/support for more info."
+    },
+    {
+      "file": "pnpm-lock.yaml",
+      "line": 10561,
+      "category": "deprecated",
+      "interest": 3,
+      "auto_fixable": false,
+      "description": "This package is no longer supported."
+    },
+    {
+      "file": "pnpm-lock.yaml",
+      "line": 10580,
+      "category": "deprecated",
+      "interest": 3,
+      "auto_fixable": false,
+      "description": "This package is no longer supported."
+    },
+    {
+      "file": "pnpm-lock.yaml",
+      "line": 10689,
+      "category": "deprecated",
+      "interest": 3,
+      "auto_fixable": false,
+      "description": "Old versions of glob are not supported, and contain widely publicized security vulnerabilities, which have been fixed in the current version. Please update. Support for old version"
+    },
+    {
+      "file": "pnpm-lock.yaml",
+      "line": 10698,
+      "category": "deprecated",
+      "interest": 3,
+      "auto_fixable": false,
+      "description": "Old versions of glob are not supported, and contain widely publicized security vulnerabilities, which have been fixed in the current version. Please update. Support for old version"
+    },
+    {
+      "file": "pnpm-lock.yaml",
+      "line": 10703,
+      "category": "deprecated",
+      "interest": 3,
+      "auto_fixable": false,
+      "description": "Old versions of glob are not supported, and contain widely publicized security vulnerabilities, which have been fixed in the current version. Please update. Support for old version"
+    },
+    {
+      "file": "pnpm-lock.yaml",
+      "line": 11115,
+      "category": "deprecated",
+      "interest": 3,
+      "auto_fixable": false,
+      "description": "This module is not supported, and leaks memory. Do not use it. Check out lru-cache if you want a good and tested way to coalesce async requests by a key value, which is much more c"
+    },
+    {
+      "file": "pnpm-lock.yaml",
+      "line": 11974,
+      "category": "deprecated",
+      "interest": 3,
+      "auto_fixable": false,
+      "description": "This package is deprecated. Use require('node:util').isDeepStrictEqual instead."
+    },
+    {
+      "file": "pnpm-lock.yaml",
+      "line": 12177,
+      "category": "deprecated",
+      "interest": 3,
+      "auto_fixable": false,
+      "description": "Version 4 replaces this package with the scoped package @mathjax/src"
+    },
+    {
+      "file": "pnpm-lock.yaml",
+      "line": 12879,
+      "category": "deprecated",
+      "interest": 3,
+      "auto_fixable": false,
+      "description": "Use your platform's native DOMException instead"
+    },
+    {
+      "file": "pnpm-lock.yaml",
+      "line": 12995,
+      "category": "deprecated",
+      "interest": 3,
+      "auto_fixable": false,
+      "description": "This package is no longer supported."
+    },
+    {
+      "file": "pnpm-lock.yaml",
+      "line": 13668,
+      "category": "deprecated",
+      "interest": 3,
+      "auto_fixable": false,
+      "description": "No longer maintained. Please contact the author of the relevant native addon; alternatives are available."
+    },
+    {
+      "file": "pnpm-lock.yaml",
+      "line": 14262,
+      "category": "deprecated",
+      "interest": 3,
+      "auto_fixable": false,
+      "description": "Rimraf versions prior to v4 are no longer supported"
+    },
+    {
+      "file": "pnpm-lock.yaml",
+      "line": 14267,
+      "category": "deprecated",
+      "interest": 3,
+      "auto_fixable": false,
+      "description": "Rimraf versions prior to v4 are no longer supported"
+    },
+    {
+      "file": "pnpm-lock.yaml",
+      "line": 15911,
+      "category": "deprecated",
+      "interest": 3,
+      "auto_fixable": false,
+      "description": "Use @exodus/bytes instead for a more spec-conformant and faster implementation"
+    },
+    {
+      "file": "tools/codemods/README.md",
+      "line": 190,
+      "category": "deprecated",
+      "interest": 3,
+      "auto_fixable": false,
+      "description": ".ts` - Remove deprecated component files"
+    }
+  ],
+  "breakdown": {
+    "todo": 381,
+    "hack": 8,
+    "fixme": 8,
+    "deprecated": 209
+  }
+}

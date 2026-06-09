@@ -1,0 +1,188 @@
+/**
+ * Jovie Blog Design Tokens
+ *
+ * Standalone CSS for blog.timwhite.co
+ * Extracted from Jovie's Linear-inspired OKLCH design system.
+ *
+ * This file can be consumed by any Next.js app that wants
+ * the Jovie design system without importing the full monorepo.
+ *
+ * Usage: import this file in your global CSS or _app.tsx
+ */
+
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap");
+
+:root {
+  /* Theme Inputs */
+  --theme-base-hue: 282;
+  --theme-base-chroma: 0.015;
+  --theme-accent-hue: 282;
+  --theme-accent-chroma: 0.18;
+  --theme-contrast: 65;
+
+  /* Geist Accent Colors */
+  --geist-cyan-solid: oklch(72% 0.18 195);
+  --geist-cyan-foreground: oklch(98% 0.01 195);
+  --geist-purple-solid: oklch(62% 0.22 282);
+  --geist-purple-foreground: oklch(98% 0.01 282);
+
+  /* Surface Colors — Dark Mode */
+  --color-bg-base: oklch(7% 0.008 282);
+  --color-bg-surface-0: oklch(9% 0.008 282);
+  --color-bg-surface-1: oklch(11% 0.008 282);
+  --color-bg-surface-2: oklch(16% 0.008 282);
+  --color-bg-surface-3: oklch(20% 0.008 282);
+  --color-bg-page: var(--color-bg-base);
+  --color-bg-hover: oklch(13% 0.008 282);
+  --color-bg-elevated: oklch(14% 0.008 282);
+  --color-bg-input: oklch(12% 0.008 282);
+  --color-bg-active: oklch(18% 0.008 282);
+  --color-bg-button: oklch(20% 0.008 282);
+  --color-bg-tooltip: oklch(16% 0.008 282);
+
+  /* Text Colors — Dark Mode */
+  --color-text-primary-token: oklch(97% 0.005 282);
+  --color-text-secondary-token: oklch(58% 0.012 282);
+  --color-text-tertiary-token: oklch(45% 0.01 282);
+  --color-text-quaternary-token: oklch(35% 0.008 282);
+  --color-text-disabled-token: oklch(25% 0.008 282);
+  --color-text-tooltip: oklch(97% 0.005 282);
+
+  /* Border Colors — Dark Mode */
+  --color-border-subtle: oklch(16% 0.008 282);
+  --color-border-default: oklch(22% 0.008 282);
+  --color-border-strong: oklch(30% 0.008 282);
+  --color-border-focus: oklch(40% 0.008 282);
+
+  /* Accent Colors */
+  --color-accent: var(--geist-cyan-solid);
+  --color-accent-hover: oklch(78% 0.18 195);
+  --color-accent-active: oklch(65% 0.18 195);
+  --color-accent-subtle: oklch(20% 0.05 195);
+  --color-accent-foreground: var(--geist-cyan-foreground);
+
+  /* Button Colors */
+  --color-btn-primary-bg: oklch(97% 0.005 282);
+  --color-btn-primary-fg: oklch(7% 0.008 282);
+  --color-btn-primary-hover: oklch(90% 0.005 282);
+  --color-btn-primary-border: oklch(97% 0.005 282);
+  --color-btn-secondary-bg: oklch(14% 0.008 282);
+  --color-btn-secondary-fg: oklch(97% 0.005 282);
+  --color-btn-secondary-hover: oklch(18% 0.008 282);
+
+  /* Interactive States */
+  --color-interactive-hover: oklch(13% 0.008 282);
+  --color-interactive-active: oklch(18% 0.008 282);
+
+  /* Status Colors */
+  --color-success: oklch(65% 0.15 145);
+  --color-success-subtle: oklch(20% 0.05 145);
+  --color-success-foreground: oklch(97% 0.005 145);
+  --color-warning: oklch(70% 0.15 80);
+  --color-warning-subtle: oklch(20% 0.05 80);
+  --color-warning-foreground: oklch(97% 0.005 80);
+  --color-error: oklch(60% 0.2 25);
+  --color-error-subtle: oklch(20% 0.05 25);
+  --color-error-foreground: oklch(97% 0.005 25);
+
+  /* Typography */
+  --font-sans: "Inter", system-ui, -apple-system, sans-serif;
+  --font-mono: "SF Mono", "Fira Code", monospace;
+
+  /* Spacing & Layout */
+  --content-max: 680px;
+  --content-max-wide: 1298px;
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
+  --radius-full: 9999px;
+
+  /* Motion */
+  --duration-fast: 150ms;
+  --duration-normal: 200ms;
+  --duration-cinematic: 420ms;
+  --ease-interactive: cubic-bezier(0.4, 0, 0.2, 1);
+  --ease-cinematic: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* Light mode */
+@media (prefers-color-scheme: light) {
+  :root {
+    --color-bg-base: oklch(98.5% 0.002 282);
+    --color-bg-surface-0: oklch(100% 0 0);
+    --color-bg-surface-1: oklch(97% 0.002 282);
+    --color-bg-surface-2: oklch(95% 0.003 282);
+    --color-bg-surface-3: oklch(92% 0.005 282);
+    --color-bg-page: var(--color-bg-base);
+    --color-bg-hover: oklch(93% 0.003 282);
+    --color-bg-elevated: oklch(100% 0 0);
+    --color-bg-input: oklch(97% 0.002 282);
+    --color-bg-active: oklch(90% 0.005 282);
+    --color-bg-button: oklch(92% 0.005 282);
+    --color-bg-tooltip: oklch(16% 0.008 282);
+
+    --color-text-primary-token: oklch(12% 0.005 282);
+    --color-text-secondary-token: oklch(42% 0.012 282);
+    --color-text-tertiary-token: oklch(45% 0.01 282);
+    --color-text-quaternary-token: oklch(55% 0.008 282);
+    --color-text-disabled-token: oklch(70% 0.008 282);
+    --color-text-tooltip: oklch(97% 0.005 282);
+
+    --color-border-subtle: oklch(90% 0.008 282);
+    --color-border-default: oklch(85% 0.008 282);
+    --color-border-strong: oklch(75% 0.008 282);
+    --color-border-focus: oklch(50% 0.008 282);
+
+    --color-btn-primary-bg: oklch(15% 0.005 282);
+    --color-btn-primary-fg: oklch(98% 0 0);
+    --color-btn-primary-hover: oklch(22% 0.005 282);
+    --color-btn-primary-border: oklch(15% 0.005 282);
+    --color-btn-secondary-bg: oklch(92% 0.005 282);
+    --color-btn-secondary-fg: oklch(15% 0.005 282);
+    --color-btn-secondary-hover: oklch(88% 0.005 282);
+
+    --color-interactive-hover: oklch(93% 0.003 282);
+    --color-interactive-active: oklch(88% 0.005 282);
+  }
+}
+
+/* Base */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html {
+  scroll-behavior: smooth;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  font-family: var(--font-sans);
+  background: var(--color-bg-page);
+  color: var(--color-text-primary-token);
+  line-height: 1.6;
+  font-size: 15px;
+  letter-spacing: -0.011em;
+}
+
+::selection {
+  background: var(--color-accent);
+  color: var(--color-bg-page);
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+a:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}

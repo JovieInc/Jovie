@@ -1,14 +1,13 @@
 #!/bin/bash
 # Kanban auto-dispatch script for Jovie Product
 # Reads ~/.hermes/boards/jovie-product.json, picks "ready" unblocked tasks,
-# dispatches to appropriate Hermes profile (jovie-orchestrator, jovie-reviewer, jovie-merger, jovie-implementer),
-# updates board + Linear.
+# dispatches to Claude Code (subscription-billed), updates board + Linear.
 #
 # Usage: ./scripts/dispatch-kanban.sh [--dry-run]
 # Cron:  */30 * * * * /Users/timwhite/conductor/repos/jovie-v1/scripts/dispatch-kanban.sh
 set -euo pipefail
 
-BOARD="${HOME}/.hermes/boards/jovie-product.json"
+BOARD="/Users/timwhite/.hermes/boards/jovie-product.json"
 REPO="/Users/timwhite/conductor/repos/jovie-v1"
 LOG="${HOME}/.hermes/logs/dispatch-kanban.log"
 mkdir -p "$(dirname "$LOG")"
@@ -42,24 +41,71 @@ mark_linear() {
   [ -z "$key" ] && return 0
   local sid="721e032a-fe72-4374-9a61-d9976d079e1e"
   local iid
-  iid=$(curl -s -X POST https://api.linear.app/graphql \
-    -H "Content-Type: application/json" \
-    -H "Authorization: $key" \
-    -d "{\"query\":\"{ issueSearch(term:\\\"$linear_id\\\") { nodes { id identifier } } }\"}" \
-    | python3 -c "import sys,json;d=json.load(sys.stdin);print([n['id'] for n in d['data']['issueSearch']['nodes'] if n['identifier']=='$linear_id'][0] if any(n['identifier']=='$linear_id' for n in d['data']['issueSearch']['nodes']) else '')" 2>/dev/null) || true
+  iid=$(
+    LINEAR_API_KEY="$key" LINEAR_ID="$linear_id" python3 <<'PY'
+import json
+import os
+import urllib.request
+
+linear_id = os.environ["LINEAR_ID"]
+payload = {
+    "query": "query($term: String!) { issueSearch(term: $term) { nodes { id identifier } } }",
+    "variables": {"term": linear_id},
+}
+request = urllib.request.Request(
+    "https://api.linear.app/graphql",
+    data=json.dumps(payload).encode("utf-8"),
+    headers={
+        "Content-Type": "application/json",
+        "Authorization": os.environ["LINEAR_API_KEY"],
+    },
+)
+with urllib.request.urlopen(request, timeout=20) as response:
+    data = json.load(response)
+print(
+    next(
+        (
+            node["id"]
+            for node in data["data"]["issueSearch"]["nodes"]
+            if node["identifier"] == linear_id
+        ),
+        "",
+    )
+)
+PY
+  ) || true
   if [ -n "$iid" ]; then
-    curl -s -X POST https://api.linear.app/graphql \
-      -H "Content-Type: application/json" \
-      -H "Authorization: $key" \
-      -d "{\"query\":\"mutation { issueUpdate(id:\\\"$iid\\\", input: { stateId: \\\"$sid\\\" }) { success } }\"}" > /dev/null
+    LINEAR_API_KEY="$key" LINEAR_ISSUE_ID="$iid" LINEAR_STATE_ID="$sid" python3 <<'PY' >/dev/null 2>&1
+import json
+import os
+import urllib.request
+
+payload = {
+    "query": "mutation($id: String!, $stateId: String!) { issueUpdate(id: $id, input: { stateId: $stateId }) { success } }",
+    "variables": {
+        "id": os.environ["LINEAR_ISSUE_ID"],
+        "stateId": os.environ["LINEAR_STATE_ID"],
+    },
+}
+request = urllib.request.Request(
+    "https://api.linear.app/graphql",
+    data=json.dumps(payload).encode("utf-8"),
+    headers={
+        "Content-Type": "application/json",
+        "Authorization": os.environ["LINEAR_API_KEY"],
+    },
+)
+with urllib.request.urlopen(request, timeout=20) as response:
+    response.read()
+PY
     log "linear: $linear_id -> In Progress"
   fi
 }
 
-dispatch_hermes() {
-  local id="$1" linear_id="$2" prompt="$3" turns="${4:-40}" profile="$5"
+dispatch_claude() {
+  local id="$1" linear_id="$2" prompt="$3" turns="${4:-40}"
 
-  log "dispatch: $id ($linear_id) max_turns=$turns profile=$profile"
+  log "dispatch: $id ($linear_id) max_turns=$turns"
   if [ "${1:-}" = "--dry-run" ]; then
     echo "    DRY RUN"
     return 0
@@ -69,9 +115,7 @@ dispatch_hermes() {
   update_board "$id" "in-progress"
 
   set +e
-  # Change to repo directory and run the Hermes profile one-shot
-  cd "$REPO"
-  OUTPUT=$(hermes -p "$profile" -z "$prompt" chat --max-turns "$turns" 2>&1)
+  OUTPUT=$(claude -p "$prompt" --max-turns "$turns" --print 2>&1)
   EXIT=$?
   set -e
 
@@ -96,38 +140,97 @@ dispatch_hermes() {
 cd "$REPO"
 git fetch origin main 2>/dev/null || true
 
-python3 -c "
+# Get board stats and find ready unblocked tasks
+python3 <<'EOF' > /tmp/dispatch_stats.txt 2>&1
 import json
 with open('$BOARD') as f: b = json.load(f)
+tasks = {t['id']: t for t in b['tasks']}
 ready = [t for t in b['tasks'] if t['status'] == 'ready']
-unblocked = [t for t in ready if not t.get('blockers')]
-blocked = [t for t in ready if t.get('blockers')]
-print(f'Board: {len(b[\"tasks\"])} total, {len(ready)} ready, {len(unblocked)} unblocked, {len(blocked)} blocked')
-"
+def is_blocker_done(blocker):
+    task = tasks.get(blocker)
+    if task and task.get('status') == 'done':
+        return True
+    for t in b['tasks']:
+        if t.get('linear_id') == blocker and t.get('status') == 'done':
+            return True
+    return False
+unblocked = [t for t in ready if not t.get('blockers') or all(is_blocker_done(b) for b in t.get('blockers', []))]
+blocked = [t for t in ready if t.get('blockers') and not all(is_blocker_done(b) for b in t.get('blockers', []))]
+print('Board: {0} total, {1} ready, {2} unblocked, {3} blocked'.format(len(b['tasks']), len(ready), len(unblocked), len(blocked)))
+# For debugging, list unblocked tasks
+for t in unblocked:
+    print('UNBLOCKED: {0} {1}'.format(t['id'], t['title']))
+
+cat /tmp/dispatch_stats.txt
+log "$(cat /tmp/dispatch_stats.txt)"
 
 # Check what's pending and dispatch
-# pr-8465: merge Phase 6
-STATUS_8465=$(python3 -c "import json;b=json.load(open('$BOARD'));print([t['status'] for t in b['tasks'] if t['id']=='pr-8465'][0])" 2>/dev/null)
-if [ "$STATUS_8465" = "ready" ] || [ "$STATUS_8465" = "review" ]; then
-  dispatch_hermes "pr-8465" "JOV-2024" \
-    "Working directory: /Users/timwhite/conductor/repos/jovie-v1. Tim approved merging PR #8465 (Phase 6 profile hardening). Tasks: (1) git checkout main && git pull origin main (2) gh pr merge 8465 --squash --subject \"fix(profile): Phase 6 scroll/viewport/safe-area hardening (JOV-2024)\" (3) git push origin main (4) git branch -D fix/profile-hardening-phase-6-scroll 2>/dev/null || true (5) git push origin --delete fix/profile-hardening-phase-6-scroll 2>/dev/null || true" \
-    15 "jovie-merger"
-fi
+# We'll dispatch the first unblocked ready task (if any)
+UNBLOCKED_TASK_ID=$(python3 -c "
+import json
+with open('$BOARD') as f: b = json.load(f)
+tasks = {t['id']: t for t in b['tasks']}
+ready = [t for t in b['tasks'] if t['status'] == 'ready']
+def is_blocker_done(blocker):
+    task = tasks.get(blocker)
+    if task and task.get('status') == 'done':
+        return True
+    for t in b['tasks']:
+        if t.get('linear_id') == blocker and t.get('status') == 'done':
+            return True
+    return False
+unblocked = [t for t in ready if not t.get('blockers') or all(is_blocker_done(b) for b in t.get('blockers', []))]
+if unblocked:
+    print(unblocked[0]['id'])
+")
 
-# pr-8470: Phase 7 tokens
-STATUS_8470=$(python3 -c "import json;b=json.load(open('$BOARD'));print([t['status'] for t in b['tasks'] if t['id']=='pr-8470'][0])" 2>/dev/null)
-if [ "$STATUS_8470" = "ready" ]; then
-  dispatch_hermes "pr-8470" "JOV-2025" \
-    "Working directory: /Users/timwhite/conductor/repos/jovie-v1. Profile hardening Phase 7 (JOV-2025): token cleanup and legacy component removal. Tasks: (1) cd /Users/timwhite/conductor/repos/jovie-v1 (2) git checkout main && git pull origin main (3) git checkout -b fix/profile-hardening-phase-7-tokens (4) Scan apps/web/components/features/profile/ for unused/legacy components and remove dead code (5) Replace hardcoded values with design tokens from DESIGN.md and tailwind.config.ts (6) Run pnpm --filter @jovie/web run typecheck -- --pretty false (7) Run pnpm biome check --write apps/web/components/features/profile (8) git add -A && git commit -m \"fix(profile): token cleanup and legacy component removal (JOV-2025)\" (9) git push -u origin fix/profile-hardening-phase-7-tokens (10) gh pr create --fill --title \"fix(profile): token cleanup and legacy component removal (JOV-2025)\" --body \"Phase 7 of profile hardening: removes unused components, replaces hardcoded values with design tokens. Part of the Public Profile Hardening epic.\"" \
-    60 "jovie-implementer"
-fi
-
-# ci-2049: CI fix
-STATUS_CI=$(python3 -c "import json;b=json.load(open('$BOARD'));print([t['status'] for t in b['tasks'] if t['id']=='ci-2049'][0])" 2>/dev/null)
-if [ "$STATUS_CI" = "ready" ]; then
-  dispatch_hermes "ci-2049" "JOV-2049" \
-    "Working directory: /Users/timwhite/conductor/repos/jovie-v1. Fix CI knip false positive and stuck unit shards (JOV-2049). Tasks: (1) cd /Users/timwhite/conductor/repos/jovie-v1 (2) git checkout main && git pull origin main (3) git checkout -b fix/ci-knip-false-positive (4) Read knip.json and understand the knip configuration (5) Run pnpm knip 2>&1 | head -50 (6) Check if the knip false positive references stale paths. Fix any misconfigurations. (7) Run pnpm --filter web exec vitest run --shard=1/6 --reporter=verbose 2>&1 | tail -30 (8) Run pnpm --filter @jovie/web run typecheck  (9) git add -A && git commit -m \"fix(ci): resolve knip false positive (JOV-2049)\" (10) git push -u origin fix/ci-knip-false-positive (11) gh pr create --fill --title \"fix(ci): resolve knip false positive (JOV-2049)\" --body \"Resolve knip false positive and stuck unit shards. Part of CI reliability work.\"" \
-    40 "jovie-implementer"
+if [ -n "$UNBLOCKED_TASK_ID" ]; then
+  # Get task details
+  TASK_INFO=$(python3 -c "
+import json
+with open('$BOARD') as f: b = json.load(f)
+for t in b['tasks']:
+    if t['id'] == '$UNBLOCKED_TASK_ID':
+        print(t.get('title',''))
+        print(t.get('linear_id',''))
+        print(t.get('profile','coder'))
+        break
+  ")
+  read -r TITLE LINEAR_ID PROFILE <<< "$TASK_INFO"
+  # Default profile to coder if empty
+  PROFILE=${PROFILE:-coder}
+  # Build prompt based on task id and known dispatch patterns
+  # We'll reuse the existing dispatch logic for known tasks, otherwise generic
+  case "$UNBLOCKED_TASK_ID" in
+    pr-8465)
+      dispatch_claude "$UNBLOCKED_TASK_ID" "$LINEAR_ID" "
+Working directory: $REPO. Tim approved merging PR #8465 (Phase 6 profile hardening). Tasks: (1) git checkout main && git pull origin main (2) gh pr merge 8465 --squash --subject \\\"fix(profile): Phase 6 scroll/viewport/safe-area hardening (JOV-2024)\\\" (3) git push origin main (4) git branch -D fix/profile-hardening-phase-6-scroll 2>/dev/null || true (5) git push origin --delete fix/profile-hardening-phase-6-scroll 2>/dev/null || true
+" 15
+      ;;
+    pr-8470)
+      dispatch_claude "$UNBLOCKED_TASK_ID" "$LINEAR_ID" "
+Working directory: $REPO. Profile hardening Phase 7 (JOV-2025): token cleanup and legacy component removal. Tasks: (1) cd $REPO (2) git checkout main && git pull origin main (3) git checkout -b fix/profile-hardening-phase-7-tokens (4) Scan apps/web/components/features/profile/ for unused/legacy components and remove dead code (5) Replace hardcoded values with design tokens from DESIGN.md and tailwind.config.ts (6) Run pnpm --filter @jovie/web run typecheck -- --pretty false (7) Run pnpm biome check --write apps/web/components/features/profile (8) git add -A && git commit -m \\\"fix(profile): token cleanup and legacy component removal (JOV-2025)\\\" (9) git push -u origin fix/profile-hardening-phase-7-tokens (10) gh pr create --fill --draft --title \\\"fix(profile): token cleanup and legacy component removal (JOV-2025)\\\" --body \\\"Phase 7 of profile hardening: removes unused components, replaces hardcoded values with design tokens. Part of the Public Profile Hardening epic.\\\""
+      60
+      ;;
+    ci-2049)
+      dispatch_claude "$UNBLOCKED_TASK_ID" "$LINEAR_ID" "
+Working directory: $REPO. Fix CI knip false positive and stuck unit shards (JOV-2049). Tasks: (1) cd $REPO (2) git checkout main && git pull origin main (3) git checkout -b fix/ci-knip-false-positive (4) Read knip.json and understand the knip configuration (5) Run pnpm knip 2>&1 | head -50 (6) Check if the knip false positive references stale paths. Fix any misconfigurations. (7) Run pnpm --filter web exec vitest run --shard=1/6 --reporter=verbose 2>&1 | tail -30 (8) Run pnpm --filter @jovie/web run typecheck  (9) git add -A && git commit -m \\\"fix(ci): resolve knip false positive (JOV-2049)\\\" (10) git push -u origin fix/ci-knip-false-positive (11) gh pr create --fill --draft
+" 40
+      ;;
+    fix-ios-auth-clerk)
+      dispatch_claude "$UNBLOCKED_TASK_ID" "$LINEAR_ID" "
+Working directory: $REPO. Fix iOS auth configuration with Clerk (#9806). iOS auth flow is failing, likely Clerk config. Check apps/ios/ for auth configuration, URL schemes, redirect handling. Fix and PR.
+" 40
+      ;;
+    *)
+      # Generic dispatch for other tasks
+      dispatch_claude "$UNBLOCKED_TASK_ID" "$LINEAR_ID" "
+Working directory: $REPO. Implement task $UNBLOCKED_TASK_ID: $TITLE. Profile: $PROFILE. Refer to the task description in the Kanban board for details.
+" 40
+      ;;
+  esac
+else
+  echo "No unblocked ready tasks to dispatch."
 fi
 
 echo "---"
