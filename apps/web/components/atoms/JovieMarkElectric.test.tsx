@@ -44,4 +44,14 @@ describe('JovieMarkElectric', () => {
     const paths = container.querySelectorAll('path[stroke-dasharray]');
     expect(paths.length).toBe(0);
   });
+
+  it('plays the electric spark intro animation exactly once', () => {
+    const { container } = render(<JovieMarkElectric />);
+    const sparkPaths = container.querySelectorAll('path[stroke-dasharray]');
+    for (const path of sparkPaths) {
+      expect(path.getAttribute('style')).toContain(
+        'animation-iteration-count: 1'
+      );
+    }
+  });
 });
