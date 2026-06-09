@@ -14,29 +14,36 @@ function MonitoringPanel() {
   return (
     <div
       data-testid='homepage-release-operating-system-monitoring'
-      className='rounded-[1.15rem] border border-white/10 bg-[linear-gradient(180deg,rgba(18,20,28,0.96),rgba(10,12,18,0.94))] p-4 shadow-[0_24px_80px_rgba(0,0,0,0.3)]'
+      className='system-b-release-operating-system-monitoring-panel'
     >
-      <div className='flex items-center justify-between gap-3 border-b border-white/6 pb-3'>
+      <div className='system-b-release-operating-system-monitoring-header'>
         <div>
-          <p className='text-[10px] font-medium text-white/42'>Monitoring</p>
-          <p className='mt-1 text-[12px] font-semibold text-white'>
+          <p className='system-b-release-operating-system-monitoring-kicker'>
+            Monitoring
+          </p>
+          <p className='system-b-release-operating-system-monitoring-title'>
             Coverage and sync
           </p>
         </div>
-        <Radar className='h-4 w-4 text-white/34' aria-hidden='true' />
+        <Radar
+          className='system-b-release-operating-system-monitoring-icon'
+          aria-hidden='true'
+        />
       </div>
 
-      <div className='mt-3 space-y-2'>
+      <div className='system-b-release-operating-system-monitoring-list'>
         {HOME_OPERATING_MONITORING_SIGNALS.map(item => (
           <div
             key={item.partner}
-            className='flex items-center justify-between rounded-full border border-white/8 bg-white/[0.03] px-3 py-2 text-[11px] text-white/78'
+            className='system-b-release-operating-system-monitoring-row'
           >
             <HomepageLabelLogoMark
               partner={item.partner}
-              className='text-white/70'
+              className='system-b-release-operating-system-label-logo'
             />
-            <span className='text-white/40'>{item.status}</span>
+            <span className='system-b-release-operating-system-monitoring-status'>
+              {item.status}
+            </span>
           </div>
         ))}
       </div>
@@ -46,9 +53,17 @@ function MonitoringPanel() {
 
 export function ReleaseOperatingSystemShowcase() {
   return (
-    <div data-testid='homepage-release-operating-system-surface'>
-      <div className='space-y-4 lg:hidden'>
-        <div data-testid='homepage-release-operating-system-tasks'>
+    <div
+      data-testid='homepage-release-operating-system-surface'
+      className='system-b-release-operating-system-surface'
+    >
+      <div className='system-b-release-operating-system-mobile-stack'>
+        <div
+          data-testid='homepage-release-operating-system-tasks'
+          className='system-b-release-operating-system-slot'
+          data-slot='tasks'
+          data-layout='mobile'
+        >
           <MarketingSurfaceCard
             src={RELEASE_TASKS_IMAGE.publicUrl}
             alt='Jovie release task manager with a populated campaign checklist'
@@ -60,32 +75,41 @@ export function ReleaseOperatingSystemShowcase() {
           />
         </div>
 
-        <div data-testid='homepage-release-operating-system-ai'>
+        <div
+          data-testid='homepage-release-operating-system-ai'
+          className='system-b-release-operating-system-slot'
+          data-slot='ai'
+          data-layout='mobile'
+        >
           <AiDemo variant='premium' contextChips={HOME_RELEASE_AI_CONTEXT} />
         </div>
 
         <MonitoringPanel />
       </div>
 
-      <div className='relative hidden min-h-[36rem] overflow-hidden rounded-[2rem] border border-white/8 bg-[linear-gradient(180deg,rgba(14,16,22,0.82),rgba(8,10,15,0.64))] p-6 shadow-[0_36px_110px_rgba(0,0,0,0.34)] lg:block'>
+      <div className='system-b-release-operating-system-desktop-stage'>
         <div
           aria-hidden='true'
-          className='pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(96,165,250,0.12),transparent_30%),radial-gradient(circle_at_bottom_right,rgba(251,191,36,0.1),transparent_34%)]'
+          className='system-b-release-operating-system-desktop-glow'
         />
         <div
           aria-hidden='true'
-          className='pointer-events-none absolute inset-x-0 top-0 h-px bg-[linear-gradient(90deg,transparent,rgba(255,255,255,0.35),transparent)]'
+          className='system-b-release-operating-system-desktop-seam'
         />
 
         <div
-          className='absolute left-6 top-6 z-20 w-[19rem]'
+          className='system-b-release-operating-system-slot'
+          data-slot='ai'
+          data-layout='desktop'
           data-testid='homepage-release-operating-system-ai'
         >
           <AiDemo variant='premium' contextChips={HOME_RELEASE_AI_CONTEXT} />
         </div>
 
         <div
-          className='absolute right-6 top-6 z-10 w-[38rem]'
+          className='system-b-release-operating-system-slot'
+          data-slot='tasks'
+          data-layout='desktop'
           data-testid='homepage-release-operating-system-tasks'
         >
           <MarketingSurfaceCard
@@ -99,7 +123,11 @@ export function ReleaseOperatingSystemShowcase() {
           />
         </div>
 
-        <div className='absolute bottom-6 left-6 z-30 w-[17rem]'>
+        <div
+          className='system-b-release-operating-system-slot'
+          data-slot='monitoring'
+          data-layout='desktop'
+        >
           <MonitoringPanel />
         </div>
       </div>
