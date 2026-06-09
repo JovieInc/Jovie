@@ -125,6 +125,7 @@ function buildAsset(
     releaseDate: '2026-04-28T00:00:00.000Z',
     releaseType: 'single',
     status: 'released',
+    approvalStatus: 'draft',
     trackCount: 1,
     providerCount: 1,
     providers: [
@@ -285,6 +286,37 @@ describe('LibrarySurface', () => {
     expect(
       screen.queryByRole('button', { name: /Inspect Take Me Over/u })
     ).toBeNull();
+  });
+
+  it('renders approval status badges and supports filtering by approval status', async () => {
+    renderLibraryWithSidebarOverride([
+      buildAsset({ approvalStatus: 'needs_review' }),
+      buildAsset({
+        id: 'release-2',
+        title: 'Second Track',
+        approvalStatus: 'approved',
+      }),
+    ]);
+    clickGridView();
+
+    expect(
+      screen.getByTestId('library-approval-status-release-1')
+    ).toHaveTextContent('Needs Review');
+    expect(
+      screen.getByTestId('library-approval-status-release-2')
+    ).toHaveTextContent('Approved');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Show filters' }));
+    fireEvent.click(screen.getByRole('button', { name: /Needs Review/u }));
+
+    await waitFor(() => {
+      expect(
+        screen.getByTestId('library-approval-status-release-1')
+      ).toBeInTheDocument();
+      expect(
+        screen.queryByTestId('library-approval-status-release-2')
+      ).toBeNull();
+    });
   });
 
   it('renders release assets with grid cards and a read-only detail drawer', () => {

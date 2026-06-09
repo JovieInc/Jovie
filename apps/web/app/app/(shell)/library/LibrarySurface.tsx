@@ -76,6 +76,13 @@ import { useRegisterHeaderSearch } from '@/contexts/HeaderActionsContext';
 import { useRegisterShellSidebarOverride } from '@/contexts/ShellSidebarOverrideContext';
 import { useBreakpoint } from '@/hooks/useBreakpoint';
 import { SKELETON_ROW_COUNT } from '@/lib/constants/layout';
+import {
+  formatLibraryApprovalStatus,
+  LIBRARY_APPROVAL_STATUSES,
+  type LibraryApprovalStatus,
+  libraryApprovalStatusClasses,
+  libraryApprovalStatusDotClasses,
+} from '@/lib/library/approval-status';
 import { cn } from '@/lib/utils';
 import { capitalizeFirst } from '@/lib/utils/string-utils';
 import {
@@ -127,6 +134,7 @@ const LIBRARY_TABLE_SKELETON_CONFIG: Array<{
     | 'meta';
 }> = [
   { variant: 'release', width: '100%' },
+  { variant: 'badge', width: '108px' },
   { variant: 'badge', width: '92px' },
   { variant: 'text', width: '88px' },
   { variant: 'meta', width: '72px' },
@@ -155,6 +163,7 @@ const LibraryPreviewContext = createContext<{
 
 type LibraryFilters = {
   readonly statuses: Set<LibraryReleaseAsset['status']>;
+  readonly approvalStatuses: Set<LibraryApprovalStatus>;
   readonly releaseTypes: Set<LibraryReleaseAsset['releaseType']>;
   readonly assetKinds: Set<LibraryAssetKind>;
   readonly providers: Set<string>;
@@ -232,6 +241,7 @@ const PRESETS: readonly {
 function emptyFilters(): LibraryFilters {
   return {
     statuses: new Set(),
+    approvalStatuses: new Set(),
     releaseTypes: new Set(),
     assetKinds: new Set(),
     providers: new Set(),
@@ -299,6 +309,12 @@ function assetMatchesFilters(
     return false;
   }
   if (
+    filters.approvalStatuses.size > 0 &&
+    !filters.approvalStatuses.has(asset.approvalStatus)
+  ) {
+    return false;
+  }
+  if (
     filters.releaseTypes.size > 0 &&
     !filters.releaseTypes.has(asset.releaseType)
   ) {
@@ -347,6 +363,8 @@ function assetMatchesPills(
         return valuesMatchPill([asset.title], pill);
       case 'status':
         return valuesMatchPill([asset.status], pill);
+      case 'approval':
+        return valuesMatchPill([asset.approvalStatus], pill);
       case 'has':
         return valuesMatchPill(asset.assetKinds, pill);
       case 'album':
@@ -358,6 +376,7 @@ function assetMatchesPills(
 function hasActiveFilters(filters: LibraryFilters): boolean {
   return (
     filters.statuses.size +
+      filters.approvalStatuses.size +
       filters.releaseTypes.size +
       filters.assetKinds.size +
       filters.providers.size >
@@ -515,6 +534,24 @@ const StatusCell = memo(function StatusCell({
   );
 });
 
+const ApprovalStatusCell = memo(function ApprovalStatusCell({
+  asset,
+}: {
+  readonly asset: LibraryReleaseAsset;
+}) {
+  return (
+    <span
+      className={cn(
+        'system-b-library-status-pill inline-flex h-6 w-fit items-center border px-2 leading-4',
+        libraryApprovalStatusClasses(asset.approvalStatus)
+      )}
+      data-testid={`library-approval-status-${asset.id}`}
+    >
+      {formatLibraryApprovalStatus(asset.approvalStatus)}
+    </span>
+  );
+});
+
 const ProvidersCell = memo(function ProvidersCell({
   asset,
 }: {
@@ -541,10 +578,18 @@ const LIBRARY_TABLE_COLUMNS = [
   }),
   libraryColumnHelper.display({
     id: 'status',
-    header: 'Status',
+    header: 'Release',
     cell: ({ row }) => <StatusCell asset={row.original} />,
     size: 112,
     minSize: 96,
+    meta: { className: 'hidden xl:table-cell px-2' },
+  }),
+  libraryColumnHelper.display({
+    id: 'approval',
+    header: 'Approval',
+    cell: ({ row }) => <ApprovalStatusCell asset={row.original} />,
+    size: 128,
+    minSize: 108,
     meta: { className: 'hidden md:table-cell px-2' },
   }),
   libraryColumnHelper.display({
@@ -698,6 +743,9 @@ function LibraryRail({
 }) {
   const releaseTypes = uniqueSorted(assets.map(asset => asset.releaseType));
   const statuses = uniqueSorted(assets.map(asset => asset.status));
+  const approvalStatuses = uniqueSorted(
+    assets.map(asset => asset.approvalStatus)
+  );
   const providerKeys = uniqueSorted(
     assets.flatMap(asset => asset.providers.map(provider => provider.key))
   );
@@ -714,6 +762,7 @@ function LibraryRail({
   const counts = {
     releaseTypes: countBy(assets, asset => [asset.releaseType]),
     statuses: countBy(assets, asset => [asset.status]),
+    approvalStatuses: countBy(assets, asset => [asset.approvalStatus]),
     providers: countBy(
       assets,
       asset => asset.providers.map(provider => provider.key) as string[]
@@ -722,6 +771,7 @@ function LibraryRail({
   };
   const activeFilterCount =
     filters.statuses.size +
+    filters.approvalStatuses.size +
     filters.releaseTypes.size +
     filters.assetKinds.size +
     filters.providers.size;
@@ -748,7 +798,25 @@ function LibraryRail({
           ) : null}
         </div>
 
-        <FilterSection label='Status'>
+        <FilterSection label='Approval Status'>
+          {approvalStatuses.map(status => (
+            <FilterRow
+              key={status}
+              active={filters.approvalStatuses.has(status)}
+              count={counts.approvalStatuses.get(status) ?? 0}
+              label={formatLibraryApprovalStatus(status)}
+              dotClassName={libraryApprovalStatusDotClasses(status)}
+              onClick={() =>
+                onFilters({
+                  ...filters,
+                  approvalStatuses: toggleSet(filters.approvalStatuses, status),
+                })
+              }
+            />
+          ))}
+        </FilterSection>
+
+        <FilterSection label='Release Status'>
           {statuses.map(status => (
             <FilterRow
               key={status}
@@ -1108,10 +1176,11 @@ const AssetCard = memo(function AssetCard({
           <span
             className={cn(
               'system-b-library-card-status absolute left-2 top-2 border px-1.5 py-0.5 leading-4',
-              releaseStatusClasses(asset.status)
+              libraryApprovalStatusClasses(asset.approvalStatus)
             )}
+            data-testid={`library-approval-status-${asset.id}`}
           >
-            {formatLibraryStatus(asset)}
+            {formatLibraryApprovalStatus(asset.approvalStatus)}
           </span>
         </div>
         <div className='min-w-0 p-3'>
@@ -1627,6 +1696,92 @@ function LibraryAudioPanel({
   );
 }
 
+function ApprovalStatusEditor({
+  asset,
+  profileId,
+  disabled,
+  onStatusChange,
+}: {
+  readonly asset: LibraryReleaseAsset;
+  readonly profileId: string | null;
+  readonly disabled: boolean;
+  readonly onStatusChange: (
+    assetId: string,
+    approvalStatus: LibraryApprovalStatus
+  ) => void;
+}) {
+  const [saving, setSaving] = useState(false);
+  const selectId = useId();
+
+  async function handleChange(event: ChangeEvent<HTMLSelectElement>) {
+    const nextStatus = event.target.value;
+    if (
+      !profileId ||
+      !LIBRARY_APPROVAL_STATUSES.includes(nextStatus as LibraryApprovalStatus)
+    ) {
+      return;
+    }
+
+    const approvalStatus = nextStatus as LibraryApprovalStatus;
+    if (approvalStatus === asset.approvalStatus) return;
+
+    setSaving(true);
+    onStatusChange(asset.id, approvalStatus);
+
+    try {
+      const response = await fetch('/api/library/approval-status', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          profileId,
+          assetId: asset.id,
+          itemKind: getLibraryItemKind(asset),
+          approvalStatus,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Approval status update failed');
+      }
+    } catch {
+      toast.error('Unable to update approval status right now');
+      onStatusChange(asset.id, asset.approvalStatus);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className='system-b-library-drawer-panel mt-4 px-3 py-3'>
+      <label
+        htmlFor={selectId}
+        className='system-b-library-drawer-panel-heading mb-2 block font-semibold text-primary-token'
+      >
+        Approval Status
+      </label>
+      <select
+        id={selectId}
+        value={asset.approvalStatus}
+        onChange={event => {
+          void handleChange(event);
+        }}
+        disabled={disabled || saving || !profileId}
+        data-testid={`library-approval-status-select-${asset.id}`}
+        className={cn(
+          'system-b-library-action system-b-library-action--standard h-8 w-full border border-subtle px-2',
+          LIBRARY_BUTTON_FOCUS_CLASS
+        )}
+      >
+        {LIBRARY_APPROVAL_STATUSES.map(status => (
+          <option key={status} value={status}>
+            {formatLibraryApprovalStatus(status)}
+          </option>
+        ))}
+      </select>
+    </div>
+  );
+}
+
 function AssetDrawer({
   asset,
   open,
@@ -1637,6 +1792,8 @@ function AssetDrawer({
   onTogglePreview,
   onAudioUploaded,
   getContextMenuItems,
+  profileId,
+  onApprovalStatusChange,
 }: {
   readonly asset: LibraryReleaseAsset | null;
   readonly open: boolean;
@@ -1647,6 +1804,11 @@ function AssetDrawer({
   readonly onTogglePreview: LibraryPreviewToggle;
   readonly onAudioUploaded: (assetId: string, previewUrl: string) => void;
   readonly getContextMenuItems: LibraryContextMenuBuilder;
+  readonly profileId: string | null;
+  readonly onApprovalStatusChange: (
+    assetId: string,
+    approvalStatus: LibraryApprovalStatus
+  ) => void;
 }) {
   const [stickyAsset, setStickyAsset] = useState<LibraryReleaseAsset | null>(
     asset
@@ -1745,6 +1907,15 @@ function AssetDrawer({
                 <span
                   className={cn(
                     'system-b-library-status-pill inline-flex h-6 items-center border px-2',
+                    libraryApprovalStatusClasses(current.approvalStatus)
+                  )}
+                  data-testid={`library-approval-status-${current.id}`}
+                >
+                  {formatLibraryApprovalStatus(current.approvalStatus)}
+                </span>
+                <span
+                  className={cn(
+                    'system-b-library-status-pill inline-flex h-6 items-center border px-2',
                     releaseStatusClasses(current.status)
                   )}
                 >
@@ -1754,6 +1925,13 @@ function AssetDrawer({
                   <AssetKindPill key={kind} kind={kind} />
                 ))}
               </div>
+
+              <ApprovalStatusEditor
+                asset={current}
+                profileId={profileId}
+                disabled={!open}
+                onStatusChange={onApprovalStatusChange}
+              />
 
               <div className='mt-4 flex flex-wrap gap-1.5'>
                 <Link
@@ -1926,8 +2104,10 @@ function LibraryStatusBar({
 
 export function LibrarySurface({
   assets,
+  profileId = null,
 }: {
   readonly assets: readonly LibraryReleaseAsset[];
+  readonly profileId?: string | null;
 }) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -1935,6 +2115,9 @@ export function LibrarySurface({
   const [audioOverrides, setAudioOverrides] = useState<Record<string, string>>(
     {}
   );
+  const [approvalStatusOverrides, setApprovalStatusOverrides] = useState<
+    Record<string, LibraryApprovalStatus>
+  >({});
   const [preset, setPreset] = useState<LibraryPresetId>(() =>
     parseLibraryViewParam(searchParams.get('view'))
   );
@@ -1959,19 +2142,25 @@ export function LibrarySurface({
     () =>
       assets.map((asset): LibraryReleaseAsset => {
         const previewUrl = audioOverrides[asset.id];
-        if (!previewUrl) return asset;
+        const approvalStatus =
+          approvalStatusOverrides[asset.id] ?? asset.approvalStatus;
         const assetKinds: readonly LibraryAssetKind[] =
-          asset.assetKinds.includes('preview')
-            ? asset.assetKinds
-            : [...asset.assetKinds, 'preview'];
+          previewUrl && !asset.assetKinds.includes('preview')
+            ? [...asset.assetKinds, 'preview']
+            : asset.assetKinds;
+
+        if (!previewUrl && approvalStatus === asset.approvalStatus) {
+          return asset;
+        }
 
         return {
           ...asset,
-          previewUrl,
+          ...(previewUrl ? { previewUrl } : {}),
+          approvalStatus,
           assetKinds,
         };
       }),
-    [assets, audioOverrides]
+    [approvalStatusOverrides, assets, audioOverrides]
   );
 
   const visibleAssets = useMemo(() => {
@@ -2002,6 +2191,10 @@ export function LibrarySurface({
   );
   const statusOptions = useMemo(
     () => uniqueSorted(effectiveAssets.map(asset => asset.status)),
+    [effectiveAssets]
+  );
+  const approvalOptions = useMemo(
+    () => uniqueSorted(effectiveAssets.map(asset => asset.approvalStatus)),
     [effectiveAssets]
   );
   const hasOptions = useMemo(
@@ -2148,8 +2341,19 @@ export function LibrarySurface({
     [handleTogglePreview, playingPreviewId, router]
   );
 
+  const handleApprovalStatusChange = useCallback(
+    (assetId: string, approvalStatus: LibraryApprovalStatus) => {
+      setApprovalStatusOverrides(previous => ({
+        ...previous,
+        [assetId]: approvalStatus,
+      }));
+    },
+    []
+  );
+
   const activeFilterCount =
     filters.statuses.size +
+    filters.approvalStatuses.size +
     filters.releaseTypes.size +
     filters.assetKinds.size +
     filters.providers.size;
@@ -2166,6 +2370,7 @@ export function LibrarySurface({
             titleOptions,
             albumOptions: [],
             statusOptions,
+            approvalOptions,
             hasOptions,
             totalCount: effectiveAssets.length,
             visibleCount: visibleAssets.length,
@@ -2175,9 +2380,16 @@ export function LibrarySurface({
                 : 'Filter Library',
             ariaLabel: 'Filter library assets',
             placeholder: 'Search library',
-            allowedFields: ['artist', 'title', 'status', 'has'] as const,
+            allowedFields: [
+              'artist',
+              'title',
+              'status',
+              'approval',
+              'has',
+            ] as const,
           },
     [
+      approvalOptions,
       artistOptions,
       effectiveAssets.length,
       hasOptions,
@@ -2317,6 +2529,8 @@ export function LibrarySurface({
           onTogglePreview={handleTogglePreview}
           onAudioUploaded={handleAudioUploaded}
           getContextMenuItems={getContextMenuItems}
+          profileId={profileId}
+          onApprovalStatusChange={handleApprovalStatusChange}
         />
       </div>
     </PageShell>

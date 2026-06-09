@@ -1,4 +1,8 @@
 import type { ReleaseViewModel } from '@/lib/discography/types';
+import {
+  DEFAULT_LIBRARY_APPROVAL_STATUS,
+  type LibraryApprovalStatus,
+} from '@/lib/library/approval-status';
 import type { LibraryMerchCard } from '@/lib/merch/types';
 
 export interface LibraryProviderLink {
@@ -35,6 +39,7 @@ export interface LibraryReleaseAsset {
   readonly releaseDate: string | null;
   readonly releaseType: ReleaseViewModel['releaseType'];
   readonly status: ReleaseViewModel['status'];
+  readonly approvalStatus: LibraryApprovalStatus;
   readonly trackCount: number;
   readonly providerCount: number;
   readonly providers: readonly LibraryProviderLink[];
@@ -68,8 +73,18 @@ function normalizeHttpUrl(value: string | null | undefined): string | null {
   return trimmed;
 }
 
+function resolveLibraryApprovalStatus(
+  assetId: string,
+  approvalStatusByAssetId?: ReadonlyMap<string, LibraryApprovalStatus>
+): LibraryApprovalStatus {
+  return (
+    approvalStatusByAssetId?.get(assetId) ?? DEFAULT_LIBRARY_APPROVAL_STATUS
+  );
+}
+
 export function buildLibraryReleaseAssets(
-  releases: readonly ReleaseViewModel[]
+  releases: readonly ReleaseViewModel[],
+  approvalStatusByAssetId?: ReadonlyMap<string, LibraryApprovalStatus>
 ): LibraryReleaseAsset[] {
   return releases.map(release => {
     const providers = release.providers.flatMap(provider => {
@@ -106,6 +121,10 @@ export function buildLibraryReleaseAssets(
       releaseDate: release.releaseDate ?? null,
       releaseType: release.releaseType,
       status: release.status,
+      approvalStatus: resolveLibraryApprovalStatus(
+        release.id,
+        approvalStatusByAssetId
+      ),
       trackCount: release.totalTracks,
       providerCount: providers.length,
       providers,
@@ -153,13 +172,15 @@ function formatMerchStatus(status: LibraryMerchCard['status']): string {
 
 export function buildLibraryMerchAssets(
   cards: readonly LibraryMerchCard[],
-  artistName: string
+  artistName: string,
+  approvalStatusByAssetId?: ReadonlyMap<string, LibraryApprovalStatus>
 ): LibraryReleaseAsset[] {
   return cards.map(card => {
     const imageUrl = normalizeHttpUrl(card.primaryImageUrl);
+    const assetId = `merch-${card.id}`;
     return {
       itemKind: 'merch',
-      id: `merch-${card.id}`,
+      id: assetId,
       title: card.title,
       artist: artistName,
       artworkUrl: imageUrl,
@@ -168,6 +189,10 @@ export function buildLibraryMerchAssets(
       releaseDate: card.publishedAt ?? card.updatedAt,
       releaseType: 'single',
       status: merchStatusToReleaseStatus(card.status),
+      approvalStatus: resolveLibraryApprovalStatus(
+        assetId,
+        approvalStatusByAssetId
+      ),
       trackCount: 0,
       providerCount: 0,
       providers: [],

@@ -36,6 +36,8 @@ export interface PillSearchProps {
   readonly albumOptions: readonly string[];
   /** Distinct status values. Defaults to release status values. */
   readonly statusOptions?: readonly string[];
+  /** Distinct approval status values. */
+  readonly approvalOptions?: readonly string[];
   /** Distinct "has" values. Defaults to release asset values. */
   readonly hasOptions?: readonly string[];
   /** Called when the user hits Esc on an empty input or focus leaves the surface. */
@@ -97,6 +99,7 @@ function fieldValueOptions(
   titleOptions: readonly string[],
   albumOptions: readonly string[],
   statusOptions: readonly string[],
+  approvalOptions: readonly string[],
   hasOptions: readonly string[]
 ): readonly string[] {
   switch (field) {
@@ -108,6 +111,8 @@ function fieldValueOptions(
       return albumOptions;
     case 'status':
       return statusOptions;
+    case 'approval':
+      return approvalOptions;
     case 'has':
       return hasOptions;
   }
@@ -154,6 +159,7 @@ export function PillSearch({
   titleOptions,
   albumOptions,
   statusOptions = STATUS_VALUES,
+  approvalOptions = [],
   hasOptions = HAS_VALUES,
   onClose,
   ariaLabel = 'Filter tracks',
@@ -221,6 +227,7 @@ export function PillSearch({
         titleOptions,
         albumOptions,
         statusOptions,
+        approvalOptions,
         hasOptions
       );
       return opts
@@ -265,6 +272,13 @@ export function PillSearch({
           out.push({ kind: 'value', field: 'status', value: v, score: s });
       });
     }
+    if (allowedFieldSet.has('approval')) {
+      approvalOptions.forEach(v => {
+        const s = fuzzy(q, v);
+        if (s > 0)
+          out.push({ kind: 'value', field: 'approval', value: v, score: s });
+      });
+    }
     if (allowedFieldSet.has('has')) {
       hasOptions.forEach(v => {
         const s = fuzzy(q, v);
@@ -280,6 +294,7 @@ export function PillSearch({
     titleOptions,
     albumOptions,
     statusOptions,
+    approvalOptions,
     hasOptions,
     effectiveFields,
     text,

@@ -798,3 +798,8 @@ export const retouchJobStatusEnum = pgEnum('retouch_job_status', [
   'rejected_by_user',
   'accepted_by_user',
 ]);
+
+export const libraryAssetApprovalStatusEnum = pgEnum(
+  'library_asset_approval_status',
+  ['draft', 'needs_review', 'approved', 'archived']
+);
