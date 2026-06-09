@@ -21,7 +21,8 @@ vi.mock('@/features/home/MarketingSurfaceCard', () => ({
 }));
 
 const webRoot = path.resolve(__dirname, '../../..');
-const sourcePath = 'components/features/home/ReleaseOperatingSystemShowcase.tsx';
+const sourcePath =
+  'components/features/home/ReleaseOperatingSystemShowcase.tsx';
 const cssPath = 'styles/design-system.css';
 
 const forbiddenSourceVisualPatterns = [
@@ -55,9 +56,10 @@ function extractReleaseOperatingSystemShowcaseCss(source: string): string {
     start
   );
 
-  expect(start, 'release operating system showcase CSS block exists').toBeGreaterThanOrEqual(
-    0
-  );
+  expect(
+    start,
+    'release operating system showcase CSS block exists'
+  ).toBeGreaterThanOrEqual(0);
   expect(
     end,
     'release operating system showcase CSS block is bounded'
@@ -77,7 +79,9 @@ describe('ReleaseOperatingSystemShowcase System B source contract', () => {
     expect(source).toContain('system-b-release-operating-system-surface');
     expect(source).toContain('system-b-release-operating-system-mobile-stack');
     expect(source).toContain('system-b-release-operating-system-desktop-stage');
-    expect(source).toContain('system-b-release-operating-system-monitoring-panel');
+    expect(source).toContain(
+      'system-b-release-operating-system-monitoring-panel'
+    );
     expect(source).toContain('system-b-release-operating-system-slot');
     expect(source).toContain('data-slot=');
     expect(source).toContain('data-layout=');
