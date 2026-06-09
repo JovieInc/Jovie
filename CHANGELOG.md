@@ -5,6 +5,14 @@
      5|The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
      6|and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [Unreleased]
+
+> Homepage release operating system showcase visuals now route through System B primitives.
+
+### Changed
+
+- **Release operating system showcase tokenization (JOV-2809)**: replaces inline Tailwind gradients, shadows, and arbitrary sizing on `ReleaseOperatingSystemShowcase` with named System B CSS primitives, and adds a source guard so the static marketing proof surface cannot drift back to ad-hoc chrome.
+
 ## [26.6.31] - 2026-06-08
 
 > Chat merch generation now requests photorealistic Printful mockups after artwork is created.
