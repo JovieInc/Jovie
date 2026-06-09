@@ -212,8 +212,8 @@ describe('attachMockupsToDesignOption', () => {
 
     expect(dbMocks.lastUpdatedValues).toEqual({
       mockupUrls: [
-        'https://cdn.test/internal-mockup.jpg',
         'https://printful.test/mockup-tee.jpg',
+        'https://cdn.test/internal-mockup.jpg',
       ],
       updatedAt: expect.any(Date),
     });

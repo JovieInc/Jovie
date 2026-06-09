@@ -35,6 +35,7 @@ import { logger } from '@/lib/utils/logger';
 import { createMerchArtwork } from './artwork';
 import { resolveMerchCatalogSelection } from './catalog';
 import { MERCH_DEFAULT_PRINTFUL_PRODUCT } from './default-catalog';
+import { selectPreferredMockupUrl } from './mockup-urls';
 import { attachMockupsToDesignOption, generateProductMockups } from './mockups'; // HOT ZONE pipeline (gh-9803)
 import {
   buildMerchPresetPriceQuotes,
@@ -339,7 +340,7 @@ function getDesignOptionSellability(
         option.estimatedPrintfulProductCostCents,
       artistRoyaltyRateBps: option.pricing.artistRoyaltyRateBps,
       pricing: option.pricing,
-      primaryImageUrl: option.mockupUrls[0] ?? '',
+      primaryImageUrl: selectPreferredMockupUrl(option.mockupUrls) ?? '',
       mockupUrls: option.mockupUrls,
       printful,
     }).reasons,
@@ -745,7 +746,7 @@ export async function selectMerchDesign(params: {
         title: selected.designName,
         description: selected.concept,
         productType: selected.productType,
-        primaryImageUrl: selected.mockupUrls[0] ?? '',
+        primaryImageUrl: selectPreferredMockupUrl(selected.mockupUrls) ?? '',
         mockupUrls: selected.mockupUrls,
         printful,
         currency: 'USD',

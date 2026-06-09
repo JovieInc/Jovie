@@ -5,6 +5,14 @@
      5|The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
      6|and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.6.32] - 2026-06-09
+
+> Merch mockups now composite the generated design onto blank garments instead of showing empty shirts.
+
+### Fixed
+
+- **Merch mockup compositing (JOV-2894)**: embeds Inter for deterministic SVG rendering, crops the chest print region before garment compositing, prefers Printful photorealistic mockups over internal placeholders, and hardens chat merch cards with loading/fallback states.
+
 ## [26.6.31] - 2026-06-08
 
 > Chat merch generation now requests photorealistic Printful mockups after artwork is created.
