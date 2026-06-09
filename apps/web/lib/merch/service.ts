@@ -584,34 +584,47 @@ export async function createMerchGeneration(params: {
       insertedOptions.push(option);
     }
 
-    // Merch generation pipeline (gh-9803 / JOV-2650): image assets -> mockups (Printful or internal) -> sellable variants + profit.
-    // Fire async (non-block per existing patterns); explicit, complete edges, reuse pricing/artwork (6 principles).
+    // Async Printful photorealistic mockups (non-blocking). Internal artwork mockups
+    // are already persisted; Printful URLs are merged when tasks complete.
     void Promise.allSettled(
       insertedOptions.map(async option => {
-        try {
-          const mockupRes = await generateProductMockups({
-            designOptionId: option.id,
-            // designAssetUrl from prior artwork step (optional in pipeline input; fallback internal if absent)
-            catalogProductId:
-              option.printfulCatalogProductId ??
-              MERCH_DEFAULT_PRINTFUL_PRODUCT.catalogProductId,
-            placements: option.placements,
-          });
-          await attachMockupsToDesignOption(option.id, mockupRes.mockupUrls);
-          // Mark sellable via pricing snapshot + safety (profit > min, etc)
-          // (pricing snapshot ensures profit calc; sellability on read via getMerchCardSellability; pipeline ensures data present)
-          void buildMerchPricingSnapshot({
-            retailPriceCents: option.retailPriceCents,
-            printfulProductCostCents: option.estimatedPrintfulProductCostCents,
-          });
-          logger.info('[merch-pipeline] mockups attached + priced', {
+        const printFileUrl = option.printFileUrls[0];
+        if (!printFileUrl) {
+          logger.warn('[merch-pipeline] skipping mockups without print file', {
             optionId: option.id,
-            provider: mockupRes.provider,
           });
-        } catch (e) {
+          return;
+        }
+
+        try {
+          const { results, errors } = await generateProductMockups({
+            printFileUrl,
+            catalogProductId: option.printfulCatalogProductId,
+            catalogVariantIds: option.printfulCatalogVariantIds,
+            placements: option.placements,
+            technique: option.technique,
+            productTypes: [option.productType],
+          });
+          const mockupUrls = results.flatMap(result => result.mockupUrls);
+          if (mockupUrls.length > 0) {
+            await attachMockupsToDesignOption(option.id, mockupUrls);
+            logger.info('[merch-pipeline] Printful mockups attached', {
+              optionId: option.id,
+              mockupCount: mockupUrls.length,
+            });
+          } else if (errors.length > 0) {
+            logger.warn('[merch-pipeline] Printful mockup generation failed', {
+              optionId: option.id,
+              errors,
+            });
+          }
+        } catch (error) {
           logger.warn(
             '[merch-pipeline] mockup step failed (non-fatal for batch)',
-            { optionId: option.id, err: String(e) }
+            {
+              optionId: option.id,
+              err: error instanceof Error ? error.message : String(error),
+            }
           );
         }
       })
