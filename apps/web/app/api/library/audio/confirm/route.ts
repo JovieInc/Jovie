@@ -10,32 +10,17 @@ import { and, eq } from 'drizzle-orm';
 import { revalidateTag } from 'next/cache';
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
+import { ALLOWED_AUDIO_MIME_TYPES } from '@/lib/audio/constants';
+import { resolvePrimaryRecordingForRelease } from '@/lib/audio/resolve-release-recording';
 import { requireAuth } from '@/lib/auth/require-auth';
 import { getSessionContext } from '@/lib/auth/session';
 import { createSmartLinkContentTag } from '@/lib/cache/tags';
 import { db } from '@/lib/db';
-import {
-  discogRecordings,
-  discogReleases,
-  discogReleaseTracks,
-} from '@/lib/db/schema/content';
+import { discogRecordings } from '@/lib/db/schema/content';
 import { captureError } from '@/lib/error-tracking';
 import { NO_STORE_HEADERS } from '@/lib/http/headers';
 
 export const runtime = 'nodejs';
-
-const ALLOWED_AUDIO_MIME_TYPES = new Set([
-  'audio/aac',
-  'audio/aiff',
-  'audio/flac',
-  'audio/mp4',
-  'audio/mpeg',
-  'audio/wav',
-  'audio/x-aiff',
-  'audio/x-flac',
-  'audio/x-m4a',
-  'audio/x-wav',
-]);
 
 const confirmSchema = z.object({
   releaseId: z.string().uuid(),
@@ -80,37 +65,19 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const [row] = await db
-      .select({
-        recordingId: discogRecordings.id,
-        currentPreviewUrl: discogRecordings.previewUrl,
-      })
-      .from(discogReleases)
-      .innerJoin(
-        discogReleaseTracks,
-        eq(discogReleaseTracks.releaseId, discogReleases.id)
-      )
-      .innerJoin(
-        discogRecordings,
-        eq(discogRecordings.id, discogReleaseTracks.recordingId)
-      )
-      .where(
-        and(
-          eq(discogReleases.id, releaseId),
-          eq(discogReleases.creatorProfileId, profile.id)
-        )
-      )
-      .orderBy(discogReleaseTracks.discNumber, discogReleaseTracks.trackNumber)
-      .limit(1);
+    const recording = await resolvePrimaryRecordingForRelease(
+      releaseId,
+      profile.id
+    );
 
-    if (!row) {
+    if (!recording) {
       return NextResponse.json(
         { error: 'Release recording not found' },
         { status: 404, headers: NO_STORE_HEADERS }
       );
     }
 
-    if (row.currentPreviewUrl) {
+    if (recording.previewUrl) {
       return NextResponse.json(
         { error: 'Release already has audio' },
         { status: 409, headers: NO_STORE_HEADERS }
@@ -127,7 +94,7 @@ export async function POST(request: NextRequest) {
       })
       .where(
         and(
-          eq(discogRecordings.id, row.recordingId),
+          eq(discogRecordings.id, recording.recordingId),
           eq(discogRecordings.creatorProfileId, profile.id)
         )
       );
@@ -136,7 +103,11 @@ export async function POST(request: NextRequest) {
     revalidateTag(createSmartLinkContentTag(profile.id), 'max');
 
     return NextResponse.json(
-      { success: true, previewUrl: blobUrl },
+      {
+        success: true,
+        previewUrl: blobUrl,
+        recordingId: recording.recordingId,
+      },
       { status: 200, headers: NO_STORE_HEADERS }
     );
   } catch (err) {

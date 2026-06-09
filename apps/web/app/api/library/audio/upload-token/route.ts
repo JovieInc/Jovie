@@ -7,26 +7,15 @@
 
 import { type HandleUploadBody, handleUpload } from '@vercel/blob/client';
 import { NextRequest, NextResponse } from 'next/server';
+import {
+  ALLOWED_AUDIO_MIME_TYPES,
+  AUDIO_MAX_FILE_SIZE_BYTES,
+} from '@/lib/audio/constants';
 import { requireAuth } from '@/lib/auth/require-auth';
 import { getSessionContext } from '@/lib/auth/session';
 import { NO_STORE_HEADERS } from '@/lib/http/headers';
 
 export const runtime = 'nodejs';
-
-const MAX_FILE_SIZE_BYTES = 150 * 1024 * 1024;
-
-const ALLOWED_AUDIO_MIME_TYPES = new Set([
-  'audio/aac',
-  'audio/aiff',
-  'audio/flac',
-  'audio/mp4',
-  'audio/mpeg',
-  'audio/wav',
-  'audio/x-aiff',
-  'audio/x-flac',
-  'audio/x-m4a',
-  'audio/x-wav',
-]);
 
 export async function POST(request: NextRequest) {
   const { userId: clerkUserId, error } = await requireAuth();
@@ -51,7 +40,7 @@ export async function POST(request: NextRequest) {
 
         return {
           allowedContentTypes: [...ALLOWED_AUDIO_MIME_TYPES],
-          maximumSizeInBytes: MAX_FILE_SIZE_BYTES,
+          maximumSizeInBytes: AUDIO_MAX_FILE_SIZE_BYTES,
           tokenPayload: JSON.stringify({
             creatorProfileId: profile.id,
             userId: clerkUserId,
