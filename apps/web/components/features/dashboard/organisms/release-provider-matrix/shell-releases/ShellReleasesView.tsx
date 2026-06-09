@@ -94,6 +94,8 @@ function releaseMatchesField(
       return release.title.toLowerCase().includes(v);
     case 'status':
       return releaseStatusToShell(release.status) === value;
+    case 'approval':
+      return false;
     case 'has':
       if (value === 'video') return Boolean(release.hasVideoLinks);
       if (value === 'canvas') {
