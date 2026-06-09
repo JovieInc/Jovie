@@ -1,0 +1,11 @@
+{
+  "board": "jovie-product",
+  "task_id": "t_b9c018a0",
+  "title": "Phase 1: improvement_items Drizzle table + migration",
+  "repo": "/Users/timwhite/Jovie",
+  "worktree": "/Users/timwhite/.codex/kanban-worktrees/t_b9c018a0",
+  "branch": "codex/t_b9c018a0/20260607054344",
+  "prompt_file": "/Users/timwhite/.codex/kanban-worktrees/t_b9c018a0/.codex-kanban-prompt.md",
+  "prepared_at": "2026-06-07T05:44:04.089575+00:00",
+  "launch_command": "cd /Users/timwhite/.codex/kanban-worktrees/t_b9c018a0 && codex exec --full-auto \"$(cat /Users/timwhite/.codex/kanban-worktrees/t_b9c018a0/.codex-kanban-prompt.md)\""
+}

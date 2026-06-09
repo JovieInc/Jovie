@@ -431,6 +431,16 @@ export {
   type NewArtistIdentityLink,
   selectArtistIdentityLinkSchema,
 } from './identity';
+// Improvement Items (Chat Session Improvement Analysis)
+export {
+  type ImprovementItem,
+  type ImprovementItemStatus,
+  improvementItemStatusEnumValues,
+  improvementItems,
+  insertImprovementItemSchema,
+  type NewImprovementItem,
+  selectImprovementItemSchema,
+} from './improvements';
 // Inbox (Inbound emails, Threads, Outbound routing replies)
 export {
   type EmailThread,
