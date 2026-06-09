@@ -341,5 +341,5 @@ description: Engineering backlog (MarcDoc-style)
 - **Acceptance criteria**:
   - Logo edges fade softly behind the focus ring.
   - Electric spark intro plays once per mount.
-- **PR**: (opening)
+- **PR**: https://github.com/JovieInc/Jovie/pull/10373
 - **Date**: 2026-06-09
