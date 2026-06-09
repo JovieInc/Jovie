@@ -95,6 +95,7 @@
     "screenshots:capture": "playwright test --config=playwright.config.screenshots.ts",
     "screenshots:seed": "tsx tests/product-screenshots/seed.ts",
     "visual-qa:capture": "playwright test --config=playwright.config.visual-qa.ts",
+    "visual-qa:theme-check": "tsx scripts/visual-qa-theme-check.ts",
     "visual-qa": "pnpm run visual-qa:capture",
     "e2e:full:noauth": "playwright test --config=playwright.config.noauth.ts",
     "e2e:chaos": "playwright test --config=playwright.config.nightly.ts tests/e2e/nightly/chaos-click-testing.spec.ts",

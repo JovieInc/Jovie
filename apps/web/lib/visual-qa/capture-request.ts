@@ -1,3 +1,9 @@
+import {
+  parseVisualQaThemeToken,
+  resolveVisualQaColorSchemes,
+  type VisualQaColorScheme,
+  type VisualQaThemeRequest,
+} from '@/lib/visual-qa/themes';
 import { VISUAL_QA_PHASES, type VisualQaPhase } from '@/lib/visual-qa/types';
 
 export type VisualQaCapturePhaseRequest = VisualQaPhase | 'both';
@@ -5,6 +11,7 @@ export type VisualQaCapturePhaseRequest = VisualQaPhase | 'both';
 export interface VisualQaCaptureRequest {
   readonly runId: string;
   readonly phases: readonly VisualQaPhase[];
+  readonly themes: readonly VisualQaColorScheme[];
   readonly surfaceIds: readonly string[];
 }
 
@@ -34,6 +41,7 @@ export function resolveVisualQaCapturePhases(
 export function parseVisualQaCaptureRequest(input: {
   readonly runId?: string | null;
   readonly phase?: string | null;
+  readonly themes?: string | null;
   readonly surfaces?: string | null;
 }): VisualQaCaptureRequest {
   const runId = input.runId?.trim() ?? '';
@@ -44,6 +52,9 @@ export function parseVisualQaCaptureRequest(input: {
   }
 
   const phase = parsePhaseToken(input.phase ?? 'both');
+  const themes = resolveVisualQaColorSchemes(
+    parseVisualQaThemeToken(input.themes ?? 'both')
+  );
   const surfaceIds = (input.surfaces ?? '')
     .split(',')
     .map(surfaceId => surfaceId.trim())
@@ -52,6 +63,9 @@ export function parseVisualQaCaptureRequest(input: {
   return {
     runId,
     phases: resolveVisualQaCapturePhases(phase),
+    themes,
     surfaceIds,
   };
 }
+
+export type { VisualQaThemeRequest };
