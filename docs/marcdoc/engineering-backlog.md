@@ -333,3 +333,13 @@ description: Engineering backlog (MarcDoc-style)
 - **Acceptance criteria**:
   - Request ID propagated.
   - Errors include key context without PII.
+
+## ENG-033 — New chat empty-state logo polish (edge fade + single spark intro)
+- **Status**: `P1-Doing`
+- **Why it matters**: Most-seen chat surface; hard logo edges and double animation felt unfinished.
+- **Where**: `ChatEmptyStateComposerRegion.tsx`, `JovieMarkElectric.tsx`.
+- **Acceptance criteria**:
+  - Logo edges fade softly behind the focus ring.
+  - Electric spark intro plays once per mount.
+- **PR**: (opening)
+- **Date**: 2026-06-09
