@@ -5,6 +5,14 @@
      5|The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
      6|and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.6.32] - 2026-06-09
+
+> Daily-use admin toggles now live on the Ops screen instead of Settings.
+
+### Changed
+
+- **[internal] Admin operational control panel (JOV-2115)**: consolidates dev toolbar, waitlist intake, and campaign defaults into a single `OperationalControlPanel` on `/app/admin/ops`, redirects legacy `/app/settings/admin` to Ops, and removes the Settings sidebar Administration entry.
+
 ## [26.6.31] - 2026-06-08
 
 > Chat merch generation now requests photorealistic Printful mockups after artwork is created.
