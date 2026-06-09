@@ -95,7 +95,7 @@ export function JovieMarkElectric({
                 animationName: sparkAnimationName,
                 animationDuration: sparkDuration,
                 animationTimingFunction: 'var(--ds-motion-subtle-easing)',
-                animationIterationCount: 2,
+                animationIterationCount: 1,
                 animationFillMode: 'both',
                 animationDelay: sparkDelay,
               }}
@@ -112,7 +112,7 @@ export function JovieMarkElectric({
                 animationName: sparkAnimationName,
                 animationDuration: sparkDuration,
                 animationTimingFunction: 'var(--ds-motion-subtle-easing)',
-                animationIterationCount: 2,
+                animationIterationCount: 1,
                 animationFillMode: 'both',
                 animationDelay: sparkDelay,
               }}
