@@ -13,21 +13,44 @@ import {
 import type { VisualQaPhase } from '@/lib/visual-qa/types';
 import { prepareVisualQaCapture, writeVisualQaScreenshot } from './helpers';
 
-const captureRequest = parseVisualQaCaptureRequest({
-  runId: process.env.VISUAL_QA_RUN_ID,
-  phase: process.env.VISUAL_QA_PHASE,
-  surfaces: process.env.VISUAL_QA_SURFACES,
-});
+function resolveCaptureRun() {
+  if (!process.env.VISUAL_QA_RUN_ID?.trim()) {
+    return null;
+  }
 
-const surfaces = listVisualQaSurfaces(captureRequest.surfaceIds);
-const gitSha = process.env.GITHUB_SHA ?? null;
+  const captureRequest = parseVisualQaCaptureRequest({
+    runId: process.env.VISUAL_QA_RUN_ID,
+    phase: process.env.VISUAL_QA_PHASE,
+    surfaces: process.env.VISUAL_QA_SURFACES,
+  });
+  const surfaces = listVisualQaSurfaces(captureRequest.surfaceIds);
 
-if (surfaces.length === 0) {
-  throw new Error('No Visual QA surfaces matched the requested capture run.');
+  if (surfaces.length === 0) {
+    throw new Error('No Visual QA surfaces matched the requested capture run.');
+  }
+
+  return { captureRequest, surfaces };
 }
 
+const captureRun = resolveCaptureRun();
+const gitSha = process.env.GITHUB_SHA ?? null;
+
 test.describe('Visual QA capture pipeline', () => {
+  test.skip(
+    captureRun === null,
+    'Set VISUAL_QA_RUN_ID to run the Visual QA capture lane.'
+  );
+
   test.describe.configure({ mode: 'serial' });
+
+  const { captureRequest, surfaces } = captureRun ?? {
+    captureRequest: {
+      runId: 'skipped',
+      phases: [],
+      surfaceIds: [],
+    },
+    surfaces: [],
+  };
 
   for (const surface of surfaces) {
     for (const phase of captureRequest.phases) {
