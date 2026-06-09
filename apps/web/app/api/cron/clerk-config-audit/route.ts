@@ -12,36 +12,24 @@ export const maxDuration = 60;
 const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
 
 /**
- * Clerk instance config-audit cron (JOV-2446).
+ * Clerk instance config-audit cron (JOV-2446, relaxed JOV-2763).
  *
- * Jovie is SSO-only (Google + Apple). The Clerk dashboard for both production
- * and staging instances must NEVER have email/password or email-OTP enabled
- * as authentication strategies. The AuthShell appearance map (defense in
- * depth) and the Layer A canary catch UI-visible regressions, but the actual
- * security boundary is the Clerk dashboard config — a regression there leaves
- * `https://clerk.<env>.jov.ie/v1/client/sign_ins` open to credential POSTs
- * even when the UI hides the form.
+ * Polls Clerk's public Frontend API `environment` endpoint (the same endpoint
+ * the Clerk JS SDK uses to decide which auth UI to render) and alerts via
+ * captureError + Slack if unsupported first-factor strategies are enabled.
  *
- * This cron polls Clerk's public Frontend API `environment` endpoint (the
- * same endpoint the Clerk JS SDK uses to decide which auth UI to render) and
- * alerts via captureError + Slack if any forbidden strategy is enabled.
+ * Email auth (password, email_code, email_link) is intentional per founder
+ * decision (JOV-2763). This cron no longer enforces SSO-only; it only flags
+ * strategies Jovie does not support (phone OTP, username).
  *
  * Scheduled every 30 min in vercel.json. The FAPI environment endpoint does
  * not require auth credentials — it returns the public auth-strategy config
  * the user-facing app reads. We probe both prod and staging in a single run.
  */
 
-const FORBIDDEN_FIRST_FACTOR_STRATEGIES = new Set([
-  'password',
-  'email_code',
-  'email_link',
-  'phone_code',
-  'username',
-]);
+const FORBIDDEN_FIRST_FACTOR_STRATEGIES = new Set(['phone_code', 'username']);
 
 const FORBIDDEN_IDENTIFICATION_REQUIREMENTS = new Set([
-  'email',
-  'email_address',
   'phone_number',
   'username',
 ]);
@@ -272,7 +260,9 @@ export async function auditClerkInstances(
 }
 
 function formatViolationMessage(violations: readonly InstanceAuditResult[]) {
-  const lines = ['Clerk instance config audit detected SSO-only violations:'];
+  const lines = [
+    'Clerk instance config audit detected unsupported auth strategies:',
+  ];
   for (const violation of violations) {
     lines.push(
       `- [${violation.label}] fapi=${violation.fapiHost ?? 'unknown'} ` +
@@ -280,7 +270,9 @@ function formatViolationMessage(violations: readonly InstanceAuditResult[]) {
         `identifications=${violation.forbiddenIdentifications.join(',') || 'none'}`
     );
   }
-  lines.push('Flip the Clerk dashboard back to SSO-only (JOV-2446).');
+  lines.push(
+    'Disable unsupported phone/username strategies in the Clerk dashboard.'
+  );
   return lines.join('\n');
 }
 
@@ -308,7 +300,7 @@ export async function GET(request: Request) {
       const message = formatViolationMessage(outcome.violations);
       logger.error('[clerk-config-audit] VIOLATION', { message });
       await captureError(
-        'Clerk dashboard regressed off SSO-only (JOV-2446)',
+        'Clerk dashboard has unsupported auth strategies enabled',
         new Error(message),
         {
           route: '/api/cron/clerk-config-audit',

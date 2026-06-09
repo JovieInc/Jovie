@@ -48,7 +48,7 @@ function mockFetchSequence(
 }
 
 describe('clerk-config-audit cron', () => {
-  it('reports ok when both instances expose only OAuth first-factor strategies', async () => {
+  it('reports ok when both instances expose OAuth and email first-factor strategies', async () => {
     const audit = await loadAuditClerkInstances();
 
     mockFetchSequence([
@@ -56,8 +56,13 @@ describe('clerk-config-audit cron', () => {
         ok: true,
         body: {
           auth_config: {
-            first_factors: ['oauth_google', 'oauth_apple'],
-            identification_requirements: [],
+            first_factors: [
+              'oauth_google',
+              'oauth_apple',
+              'email_code',
+              'password',
+            ],
+            identification_requirements: ['email_address'],
           },
         },
       },
@@ -65,8 +70,8 @@ describe('clerk-config-audit cron', () => {
         ok: true,
         body: {
           auth_config: {
-            first_factors: ['oauth_google', 'oauth_apple'],
-            identification_requirements: [],
+            first_factors: ['oauth_google', 'oauth_apple', 'email_link'],
+            identification_requirements: ['email'],
           },
         },
       },
@@ -83,7 +88,7 @@ describe('clerk-config-audit cron', () => {
     expect(outcome.results.every(r => r.probed)).toBe(true);
   });
 
-  it('flags `password` as a forbidden first-factor strategy', async () => {
+  it('flags `phone_code` as an unsupported first-factor strategy', async () => {
     const audit = await loadAuditClerkInstances();
 
     mockFetchSequence([
@@ -91,43 +96,8 @@ describe('clerk-config-audit cron', () => {
         ok: true,
         body: {
           auth_config: {
-            first_factors: ['oauth_google', 'oauth_apple', 'password'],
-            identification_requirements: ['email', 'email_address'],
-          },
-        },
-      },
-      {
-        ok: true,
-        body: {
-          auth_config: {
-            first_factors: ['oauth_google', 'oauth_apple'],
-            identification_requirements: [],
-          },
-        },
-      },
-    ]);
-
-    const outcome = await audit();
-
-    expect(outcome.ok).toBe(false);
-    expect(outcome.violations).toHaveLength(1);
-    expect(outcome.violations[0]?.label).toBe('production');
-    expect(outcome.violations[0]?.forbiddenStrategies).toContain('password');
-    expect(outcome.violations[0]?.forbiddenIdentifications).toContain('email');
-    expect(outcome.violations[0]?.forbiddenIdentifications).toContain(
-      'email_address'
-    );
-  });
-
-  it('flags `email_code` (OTP signup regression scenario)', async () => {
-    const audit = await loadAuditClerkInstances();
-
-    mockFetchSequence([
-      {
-        ok: true,
-        body: {
-          auth_config: {
-            first_factors: ['oauth_google', 'oauth_apple'],
+            first_factors: ['oauth_google', 'oauth_apple', 'phone_code'],
+            identification_requirements: ['phone_number'],
           },
         },
       },
@@ -146,11 +116,48 @@ describe('clerk-config-audit cron', () => {
 
     expect(outcome.ok).toBe(false);
     expect(outcome.violations).toHaveLength(1);
-    expect(outcome.violations[0]?.label).toBe('staging');
-    expect(outcome.violations[0]?.forbiddenStrategies).toContain('email_code');
+    expect(outcome.violations[0]?.label).toBe('production');
+    expect(outcome.violations[0]?.forbiddenStrategies).toContain('phone_code');
+    expect(outcome.violations[0]?.forbiddenIdentifications).toContain(
+      'phone_number'
+    );
   });
 
-  it('derives first-factor strategies from `user_settings.attributes` when `auth_config.first_factors` is absent', async () => {
+  it('flags `username` as an unsupported first-factor strategy', async () => {
+    const audit = await loadAuditClerkInstances();
+
+    mockFetchSequence([
+      {
+        ok: true,
+        body: {
+          auth_config: {
+            first_factors: ['oauth_google', 'oauth_apple'],
+          },
+        },
+      },
+      {
+        ok: true,
+        body: {
+          auth_config: {
+            first_factors: ['oauth_google', 'oauth_apple', 'username'],
+            identification_requirements: ['username'],
+          },
+        },
+      },
+    ]);
+
+    const outcome = await audit();
+
+    expect(outcome.ok).toBe(false);
+    expect(outcome.violations).toHaveLength(1);
+    expect(outcome.violations[0]?.label).toBe('staging');
+    expect(outcome.violations[0]?.forbiddenStrategies).toContain('username');
+    expect(outcome.violations[0]?.forbiddenIdentifications).toContain(
+      'username'
+    );
+  });
+
+  it('derives first-factor strategies from `user_settings.attributes` without flagging email auth', async () => {
     const audit = await loadAuditClerkInstances();
 
     mockFetchSequence([
@@ -185,13 +192,11 @@ describe('clerk-config-audit cron', () => {
 
     const outcome = await audit();
 
-    expect(outcome.ok).toBe(false);
-    const prod = outcome.violations.find(v => v.label === 'production');
-    expect(prod).toBeDefined();
-    expect(prod?.forbiddenStrategies).toEqual(
-      expect.arrayContaining(['email_code', 'password'])
-    );
-    expect(prod?.forbiddenIdentifications).toContain('email_address');
+    expect(outcome.ok).toBe(true);
+    expect(outcome.violations).toHaveLength(0);
+    const prod = outcome.results.find(r => r.label === 'production');
+    expect(prod?.forbiddenStrategies).toEqual([]);
+    expect(prod?.forbiddenIdentifications).toEqual([]);
   });
 
   it('records probe errors without crashing when a FAPI host returns 500', async () => {
