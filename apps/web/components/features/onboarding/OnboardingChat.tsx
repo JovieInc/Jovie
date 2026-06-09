@@ -75,6 +75,8 @@ interface OnboardingChatProps {
   readonly turnstileStatus?: OnboardingTurnstileStatus;
   /** Visible Turnstile challenge panel rendered near the composer. */
   readonly turnstilePanel?: ReactNode;
+  /** Whether the Turnstile security chrome should appear in the composer. */
+  readonly turnstilePanelVisible?: boolean;
   /** Requests the visible Turnstile panel when a send needs verification. */
   readonly onTurnstileRequired?: (message?: string) => void;
   /** Clears stale verification after the server rejects a token. */
@@ -736,6 +738,7 @@ export function OnboardingChat({
   onTurnstileRequired,
   starterPrompt,
   turnstilePanel,
+  turnstilePanelVisible = false,
   turnstileStatus,
   turnstileToken,
 }: OnboardingChatProps) {
@@ -979,7 +982,7 @@ export function OnboardingChat({
   }, [messages, onConversationActivity, status]);
 
   const shouldShowTurnstileBanner =
-    Boolean(turnstilePanel) && isAwaitingFirstToken;
+    Boolean(turnstilePanel) && turnstilePanelVisible && isAwaitingFirstToken;
   const hasComposerStatusBanner =
     shouldShowTurnstileBanner || chatError !== null;
   const composerStatusBanner = hasComposerStatusBanner ? (
