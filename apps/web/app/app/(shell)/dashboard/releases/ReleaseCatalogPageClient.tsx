@@ -13,6 +13,10 @@ import {
 import { ShellReleasesView } from '@/components/features/dashboard/organisms/release-provider-matrix/shell-releases/ShellReleasesView';
 import { PageErrorState } from '@/features/feedback/PageErrorState';
 import { useAppFlag } from '@/lib/flags/client';
+import {
+  isLibraryApprovalStatus,
+  type LibraryApprovalStatus,
+} from '@/lib/library/approval-status';
 import type { LibraryMerchCard } from '@/lib/merch/types';
 import { useReleasesQuery } from '@/lib/queries/useReleasesQuery';
 import { primaryProviderKeys, providerConfig } from './config';
@@ -33,11 +37,23 @@ export type ReleaseCatalogView = 'list' | 'assets';
 interface ReleaseCatalogPageClientProps {
   readonly view: ReleaseCatalogView;
   readonly merchCards?: readonly LibraryMerchCard[];
+  readonly approvalStatusByAssetId?: Readonly<Record<string, string>>;
+}
+
+function toApprovalStatusMap(
+  approvalStatusByAssetId: Readonly<Record<string, string>>
+): ReadonlyMap<string, LibraryApprovalStatus> {
+  const entries = Object.entries(approvalStatusByAssetId).flatMap(
+    ([assetId, status]) =>
+      isLibraryApprovalStatus(status) ? [[assetId, status] as const] : []
+  );
+  return new Map(entries);
 }
 
 export function ReleaseCatalogPageClient({
   view,
   merchCards = [],
+  approvalStatusByAssetId = {},
 }: ReleaseCatalogPageClientProps) {
   const { selectedProfile } = useDashboardData();
   const profileId = selectedProfile?.id ?? '';
@@ -94,11 +110,14 @@ export function ReleaseCatalogPageClient({
       selectedProfile?.username ??
       'Artist';
 
+    const approvalStatusMap = toApprovalStatusMap(approvalStatusByAssetId);
+
     return (
       <LibrarySurface
+        profileId={profileId}
         assets={[
-          ...buildLibraryReleaseAssets(releases),
-          ...buildLibraryMerchAssets(merchCards, artistName),
+          ...buildLibraryReleaseAssets(releases, approvalStatusMap),
+          ...buildLibraryMerchAssets(merchCards, artistName, approvalStatusMap),
         ]}
       />
     );

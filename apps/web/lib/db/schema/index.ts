@@ -364,6 +364,7 @@ export {
   leadRampModeEnum,
   leadSourcePlatformEnum,
   leadStatusEnum,
+  libraryAssetApprovalStatusEnum,
   linkTypeEnum,
   merchCardStatusEnum,
   merchDesignLaneEnum,
@@ -535,6 +536,15 @@ export {
   selectLibraryShareDropItemSchema,
   selectLibraryShareDropSchema,
 } from './library-share-drops';
+// Library asset approval workflow (JOV-2932)
+export {
+  insertLibraryAssetApprovalStatusSchema,
+  type LibraryAssetApprovalStatusRow,
+  type LibraryAssetApprovalStatusValue,
+  libraryAssetApprovalStatuses,
+  type NewLibraryAssetApprovalStatusRow,
+  selectLibraryAssetApprovalStatusSchema,
+} from './library';
 // Links (Social, Wrapped, Signed)
 export {
   type DashboardIdempotencyKey,
