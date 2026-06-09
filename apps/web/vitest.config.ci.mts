@@ -21,6 +21,7 @@ export default defineConfig({
       'tests/eval/**',
       'tests/performance/**',
       'tests/product-screenshots/**',
+      'tests/visual-qa/**',
       'node_modules/**',
       '.next/**',
     ],
