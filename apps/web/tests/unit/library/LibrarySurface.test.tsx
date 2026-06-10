@@ -236,6 +236,7 @@ describe('LibrarySurface', () => {
     expect(source).toContain('border-success/20 bg-success/10 text-success');
     expect(source).toContain('border-info/20 bg-info/10 text-info');
     expect(source).toContain('system-b-library-filter-pill-active');
+    expect(source).toContain('system-b-library-rail-button--active');
     expect(source).toContain('system-b-library-card--selected');
     expect(source).toContain('system-b-library-table-row-selected');
     expect(source).toContain('system-b-library-dropzone--dragging');
@@ -603,6 +604,35 @@ describe('LibrarySurface', () => {
     ).not.toBeInTheDocument();
   });
 
+  it('filters library assets from sidebar smart filter views', async () => {
+    renderLibraryWithSidebarOverride([
+      buildAsset(),
+      buildAsset({
+        id: 'release-2',
+        title: 'Never Say A Word',
+        artist: 'Other Artist',
+        previewUrl: null,
+        assetKinds: ['artwork', 'lyrics', 'providers'],
+      }),
+    ]);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Show filters' }));
+    expect(
+      screen.getByTestId('library-saved-filter-views')
+    ).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /Missing audio/u }));
+
+    await waitFor(() => {
+      expect(screen.getByText('Never Say A Word')).toBeInTheDocument();
+      expect(screen.queryByText('Take Me Over')).not.toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: /^All items/u }));
+
+    expect(screen.getByText('Take Me Over')).toBeInTheDocument();
+    expect(screen.getByText('Never Say A Word')).toBeInTheDocument();
+  });
+
   it('filters library assets from top-level view chips', async () => {
     renderLibrary([
       buildAsset(),
@@ -658,6 +688,9 @@ describe('LibrarySurface', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Show filters' }));
     expect(
       screen.getByRole('navigation', { name: 'Library filters' })
+    ).toBeInTheDocument();
+    expect(
+      screen.getByTestId('library-saved-filter-views')
     ).toBeInTheDocument();
     expect(
       screen.queryByRole('button', { name: /All Releases/u })
