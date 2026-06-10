@@ -180,3 +180,23 @@ clerk users delete <user_id>            # delete a user (irreversible — confir
 - Staging application (Account B): staging (`pk_live_...`) → staging.jov.ie
 
 Always confirm `clerk whoami` shows the correct instance before running write operations. For bulk E2E test-user cleanup, prefer `apps/web/scripts/cleanup-e2e-users.ts` over direct CLI deletion.
+
+### Clerk config automation (agents)
+
+For inspecting or safely mutating Clerk instance settings (redirect URLs, OAuth/native apps, allowed origins, webhooks, JWT templates), use the Doppler-wrapped automation script — not manual dashboard edits:
+
+```bash
+# Pull + auth-key preview
+doppler run --project jovie-web --config dev -- \
+  pnpm tsx scripts/clerk-config.ts pull --instance dev
+
+# Diagnose iOS/native redirect gaps
+doppler run --project jovie-web --config dev -- \
+  pnpm tsx scripts/clerk-config.ts check-redirects --pattern "myapp://|jov.ie"
+
+# Preview a patch (mutations require --dry-run first)
+doppler run --project jovie-web --config dev -- \
+  pnpm tsx scripts/clerk-config.ts patch --dry-run --json '{"auth":{"redirect_urls":["..."]}}'
+```
+
+Safety: `whoami` + audit logging always; `sk_live_` / prod patches refused without `--allow-prod`; staging/prod patches need explicit human review. Invoke the `/clerk-cli` skill for full workflows. See `docs/CLERK_CLI.md` and `scripts/clerk-config.ts --help`.
