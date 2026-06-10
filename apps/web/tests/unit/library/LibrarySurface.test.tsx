@@ -241,7 +241,7 @@ describe('LibrarySurface', () => {
     expect(source).toContain('system-b-library-rail-button--active');
     expect(source).toContain('system-b-library-card--selected');
     expect(source).toContain('system-b-library-table-row-selected');
-    expect(source).toContain('system-b-library-dropzone--dragging');
+    expect(source).toContain('ReleaseAudioAssetPanel');
   });
 
   it('aligns library grid and list insets with the shell header padding contract', () => {
