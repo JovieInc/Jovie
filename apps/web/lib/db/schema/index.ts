@@ -520,6 +520,21 @@ export {
   selectLeadSchema,
   selectLeadSearchResultSchema,
 } from './leads';
+// Library Share Drops (press kit / label review portals)
+export {
+  insertLibraryShareDropItemSchema,
+  insertLibraryShareDropSchema,
+  type LibraryShareDrop,
+  type LibraryShareDropItem,
+  type LibraryShareDropLayout,
+  libraryShareDropItems,
+  libraryShareDropLayoutEnum,
+  libraryShareDrops,
+  type NewLibraryShareDrop,
+  type NewLibraryShareDropItem,
+  selectLibraryShareDropItemSchema,
+  selectLibraryShareDropSchema,
+} from './library-share-drops';
 // Links (Social, Wrapped, Signed)
 export {
   type DashboardIdempotencyKey,

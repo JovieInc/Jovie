@@ -29,7 +29,6 @@ import {
   Video,
   X,
 } from 'lucide-react';
-import Image from 'next/image';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import {
@@ -51,7 +50,7 @@ import {
   useState,
 } from 'react';
 import { toast } from 'sonner';
-import { ArtworkFallbackTile } from '@/components/atoms/ArtworkFallbackTile';
+import { LibraryShareDropCreator } from '@/components/features/library-share/LibraryShareDropCreator';
 import { PageShell } from '@/components/organisms/PageShell';
 import { useTrackAudioPlayer } from '@/components/organisms/release-sidebar/useTrackAudioPlayer';
 import {
@@ -78,6 +77,7 @@ import { useBreakpoint } from '@/hooks/useBreakpoint';
 import { SKELETON_ROW_COUNT } from '@/lib/constants/layout';
 import { cn } from '@/lib/utils';
 import { capitalizeFirst } from '@/lib/utils/string-utils';
+import { LibraryMediaThumbnail } from './LibraryMediaThumbnail';
 import {
   formatLibraryDuration,
   formatLibraryReleaseDate,
@@ -87,6 +87,14 @@ import {
   type LibraryView,
   libraryAssetMatchesView,
 } from './library-data';
+import {
+  countLibrarySavedViewMatches,
+  getLibrarySavedViewPredicate,
+  LIBRARY_SAVED_VIEWS,
+  type LibrarySavedViewId,
+  persistLibrarySavedView,
+  readPersistedLibrarySavedView,
+} from './library-saved-views';
 
 const LIBRARY_TABLE_ROW_HEIGHT = 56;
 const LIBRARY_TABLE_MIN_WIDTH = '0';
@@ -136,7 +144,6 @@ const LIBRARY_TABLE_SKELETON_CONFIG: Array<{
 type LibraryViewMode = 'grid' | 'list';
 type LibrarySortKey = 'releaseDate' | 'title' | 'status' | 'providers';
 type LibraryPresetId = LibraryView;
-type ArtworkSize = 'card' | 'row' | 'drawer';
 type LibraryPreviewToggle = (
   asset: LibraryReleaseAsset,
   event?: MouseEvent<HTMLElement>
@@ -402,48 +409,6 @@ function formatCompactCount(value: number): string {
   return String(value);
 }
 
-function Artwork({
-  asset,
-  size = 'card',
-}: {
-  readonly asset: LibraryReleaseAsset;
-  readonly size?: ArtworkSize;
-}) {
-  const sizeClasses = {
-    card: 'h-full w-full',
-    row: 'h-10 w-10',
-    drawer: 'h-full w-full',
-  } satisfies Record<ArtworkSize, string>;
-
-  if (asset.artworkUrl) {
-    return (
-      <Image
-        src={asset.artworkUrl}
-        alt=''
-        width={size === 'row' ? 48 : 320}
-        height={size === 'row' ? 48 : 320}
-        className={cn('object-cover', sizeClasses[size])}
-        loading={size === 'row' ? 'lazy' : 'eager'}
-        unoptimized
-      />
-    );
-  }
-
-  return (
-    <div
-      className={cn(
-        'relative overflow-hidden border border-subtle bg-surface-1',
-        sizeClasses[size]
-      )}
-    >
-      <ArtworkFallbackTile
-        seed={asset.title}
-        iconClassName={size === 'row' ? 'h-4 w-4' : 'h-[36%] w-[36%]'}
-      />
-    </div>
-  );
-}
-
 const ReleaseCell = memo(function ReleaseCell({
   asset,
 }: {
@@ -458,7 +423,7 @@ const ReleaseCell = memo(function ReleaseCell({
   return (
     <div className='flex min-w-0 items-center gap-2.5'>
       <span className='system-b-library-artwork-shell group/artwork relative h-10 w-10 shrink-0 overflow-hidden'>
-        <Artwork asset={asset} size='row' />
+        <LibraryMediaThumbnail asset={asset} size='row' />
         {hasPreview ? (
           <button
             type='button'
@@ -683,14 +648,45 @@ function LibraryViewFilterChips({
   );
 }
 
+function LibrarySavedViewRow({
+  label,
+  count,
+  active,
+  onClick,
+}: {
+  readonly label: string;
+  readonly count: number;
+  readonly active: boolean;
+  readonly onClick: () => void;
+}) {
+  return (
+    <button
+      type='button'
+      onClick={onClick}
+      aria-pressed={active}
+      className={cn(
+        'system-b-library-rail-button flex h-7 w-full items-center gap-2 border px-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/55 focus-visible:ring-offset-2 focus-visible:ring-offset-(--linear-app-content-surface) outline-none',
+        active && 'system-b-library-rail-button--active'
+      )}
+    >
+      <span className='min-w-0 flex-1 truncate text-left'>{label}</span>
+      <span className='system-b-library-rail-count tabular-nums'>{count}</span>
+    </button>
+  );
+}
+
 function LibraryRail({
   assets,
+  savedView,
+  onSavedView,
   filters,
   onFilters,
   onClearFilters,
   className,
 }: {
   readonly assets: readonly LibraryReleaseAsset[];
+  readonly savedView: LibrarySavedViewId;
+  readonly onSavedView: (savedView: LibrarySavedViewId) => void;
   readonly filters: LibraryFilters;
   readonly onFilters: (filters: LibraryFilters) => void;
   readonly onClearFilters: () => void;
@@ -735,7 +731,22 @@ function LibraryRail({
       )}
     >
       <div className='min-h-0 flex-1 overflow-y-auto px-1.5 pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden'>
-        <div className='flex items-center justify-between gap-2 pb-1 pt-2'>
+        <div className='pb-2'>
+          <p className='system-b-library-rail-title pb-1 pt-2'>Smart Filters</p>
+          <div className='space-y-px' data-testid='library-saved-filter-views'>
+            {LIBRARY_SAVED_VIEWS.map(view => (
+              <LibrarySavedViewRow
+                key={view.id}
+                label={view.label}
+                count={countLibrarySavedViewMatches(assets, view.id)}
+                active={savedView === view.id}
+                onClick={() => onSavedView(view.id)}
+              />
+            ))}
+          </div>
+        </div>
+
+        <div className='flex items-center justify-between gap-2 border-t border-subtle pb-1 pt-2'>
           <p className='system-b-library-rail-title'>Filters</p>
           {hasActiveFilters(filters) ? (
             <button
@@ -1104,7 +1115,7 @@ const AssetCard = memo(function AssetCard({
         )}
       >
         <div className='system-b-library-card-artwork relative aspect-square overflow-hidden'>
-          <Artwork asset={asset} />
+          <LibraryMediaThumbnail asset={asset} size='card' />
           <span
             className={cn(
               'system-b-library-card-status absolute left-2 top-2 border px-1.5 py-0.5 leading-4',
@@ -1728,7 +1739,7 @@ function AssetDrawer({
             <div className='min-h-0 flex-1 overflow-y-auto p-3'>
               <div className='system-b-library-drawer-artwork overflow-hidden'>
                 <div className='mx-auto aspect-square w-full max-w-80'>
-                  <Artwork asset={current} size='drawer' />
+                  <LibraryMediaThumbnail asset={current} size='drawer' />
                 </div>
               </div>
 
@@ -1768,6 +1779,15 @@ function AssetDrawer({
                   <ExternalLink className='h-3 w-3' />
                 </Link>
               </div>
+
+              {!isMerch ? (
+                <div className='mt-4'>
+                  <LibraryShareDropCreator
+                    releaseIds={[current.id]}
+                    defaultTitle={`${current.title} press kit`}
+                  />
+                </div>
+              ) : null}
 
               {isMerch ? (
                 <div className='system-b-library-drawer-panel mt-4 px-3 py-3'>
@@ -1938,6 +1958,9 @@ export function LibrarySurface({
   const [preset, setPreset] = useState<LibraryPresetId>(() =>
     parseLibraryViewParam(searchParams.get('view'))
   );
+  const [savedView, setSavedView] = useState<LibrarySavedViewId>(() =>
+    readPersistedLibrarySavedView()
+  );
   const [filters, setFilters] = useState<LibraryFilters>(() => emptyFilters());
   const [sort, setSort] = useState<LibrarySortKey>('releaseDate');
   const [view, setView] = useState<LibraryViewMode>('list');
@@ -1948,6 +1971,7 @@ export function LibrarySurface({
   const isDesktopLayout = useBreakpoint('lg');
   const deferredFilters = useDeferredValue(filters);
   const deferredPreset = useDeferredValue(preset);
+  const deferredSavedView = useDeferredValue(savedView);
   const deferredPills = useDeferredValue(pills);
   const deferredSort = useDeferredValue(sort);
 
@@ -1978,9 +2002,11 @@ export function LibrarySurface({
     const presetPredicate =
       PRESETS.find(item => item.id === deferredPreset)?.predicate ??
       (() => true);
+    const savedViewPredicate = getLibrarySavedViewPredicate(deferredSavedView);
 
     return effectiveAssets
       .filter(presetPredicate)
+      .filter(savedViewPredicate)
       .filter(asset => assetMatchesFilters(asset, deferredFilters))
       .filter(asset => assetMatchesPills(asset, deferredPills))
       .toSorted(compareAssets(deferredSort));
@@ -1988,6 +2014,7 @@ export function LibrarySurface({
     deferredFilters,
     deferredPills,
     deferredPreset,
+    deferredSavedView,
     deferredSort,
     effectiveAssets,
   ]);
@@ -2089,8 +2116,14 @@ export function LibrarySurface({
     [router, searchParams]
   );
 
+  const handleSavedViewChange = useCallback((next: LibrarySavedViewId) => {
+    setSavedView(next);
+    persistLibrarySavedView(next);
+  }, []);
+
   function resetView() {
     handlePresetChange('all');
+    handleSavedViewChange('all');
     setFilters(emptyFilters());
     setPills([]);
   }
@@ -2194,12 +2227,14 @@ export function LibrarySurface({
     () => (
       <LibraryRail
         assets={effectiveAssets}
+        savedView={savedView}
+        onSavedView={handleSavedViewChange}
         filters={filters}
         onFilters={setFilters}
         onClearFilters={() => setFilters(emptyFilters())}
       />
     ),
-    [effectiveAssets, filters]
+    [effectiveAssets, filters, handleSavedViewChange, savedView]
   );
 
   useRegisterShellSidebarOverride(

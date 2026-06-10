@@ -69,6 +69,12 @@ export function mapReleaseToViewModel(
     copyrightLine: release.copyrightLine ?? null,
     distributor: release.distributor ?? null,
     canvasStatus: getCanvasStatusFromMetadata(release.metadata),
+    canvasVideoUrl:
+      typeof (release.metadata as Record<string, unknown> | null)
+        ?.canvasVideoUrl === 'string'
+        ? ((release.metadata as Record<string, unknown>)
+            .canvasVideoUrl as string)
+        : null,
     originalArtworkUrl: (release.metadata as Record<string, unknown> | null)
       ?.originalArtworkUrl as string | undefined,
     hasVideoLinks: release.providerLinks.some(link =>
