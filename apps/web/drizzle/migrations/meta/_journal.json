@@ -407,6 +407,13 @@
       "when": 1780900000000,
       "tag": "0057_thankful_stone_men",
       "breakpoints": true
+    },
+    {
+      "idx": 58,
+      "version": "7",
+      "when": 1781005950752,
+      "tag": "0058_fair_madame_masque",
+      "breakpoints": true
     }
   ]
 }

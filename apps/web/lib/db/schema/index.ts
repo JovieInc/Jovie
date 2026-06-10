@@ -364,6 +364,7 @@ export {
   leadRampModeEnum,
   leadSourcePlatformEnum,
   leadStatusEnum,
+  libraryAssetApprovalStatusEnum,
   linkTypeEnum,
   merchCardStatusEnum,
   merchDesignLaneEnum,
@@ -520,6 +521,15 @@ export {
   selectLeadSchema,
   selectLeadSearchResultSchema,
 } from './leads';
+// Library asset approval workflow (JOV-2932)
+export {
+  insertLibraryAssetApprovalStatusSchema,
+  type LibraryAssetApprovalStatusRow,
+  type LibraryAssetApprovalStatusValue,
+  libraryAssetApprovalStatuses,
+  type NewLibraryAssetApprovalStatusRow,
+  selectLibraryAssetApprovalStatusSchema,
+} from './library';
 // Library Share Drops (press kit / label review portals)
 export {
   insertLibraryShareDropItemSchema,
