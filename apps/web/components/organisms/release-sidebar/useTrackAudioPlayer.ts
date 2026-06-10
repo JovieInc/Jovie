@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 
-interface AudioTrackSource {
+export interface AudioTrackSource {
   readonly id: string;
   readonly title: string;
   /** Required when loading a new track; omit when resuming the same track. */
@@ -13,6 +13,11 @@ interface AudioTrackSource {
   readonly artistName?: string;
   readonly artworkUrl?: string | null;
   readonly hasLyrics?: boolean;
+}
+
+export interface ToggleTrackOptions {
+  /** Ordered playable context for next/previous transport in the shell player. */
+  readonly queue?: readonly AudioTrackSource[];
 }
 
 interface PlaybackState {
@@ -31,6 +36,10 @@ interface PlaybackState {
   readonly artistName: string | null;
   readonly artworkUrl: string | null;
   readonly hasLyrics: boolean;
+  readonly queueLength: number;
+  readonly queueIndex: number;
+  readonly hasNext: boolean;
+  readonly hasPrevious: boolean;
 }
 
 let _audio: HTMLAudioElement | null = null;
@@ -40,6 +49,8 @@ let _playToken = 0;
 let _activeTrackIsrc: string | null = null;
 /** Whether we already attempted a preview URL refresh for this track. Prevents infinite retry loops. */
 let _hasRetriedRefresh = false;
+let _queue: readonly AudioTrackSource[] = [];
+let _queueIndex = -1;
 
 /** Lazily create the Audio element — safe to call during SSR (returns null server-side). */
 function getAudio(): HTMLAudioElement | null {
@@ -50,6 +61,46 @@ function getAudio(): HTMLAudioElement | null {
     bindAudioEvents(_audio);
   }
   return _audio;
+}
+
+function isPlayableTrack(track: AudioTrackSource): boolean {
+  return Boolean(track.audioUrl);
+}
+
+function getQueueSnapshot(): Pick<
+  PlaybackState,
+  'queueLength' | 'queueIndex' | 'hasNext' | 'hasPrevious'
+> {
+  return {
+    queueLength: _queue.length,
+    queueIndex: _queueIndex,
+    hasNext: _queueIndex >= 0 && _queueIndex < _queue.length - 1,
+    hasPrevious: _queueIndex > 0,
+  };
+}
+
+function setPlaybackQueue(
+  queue: readonly AudioTrackSource[] | undefined,
+  activeTrackId: string
+): void {
+  if (!queue || queue.length === 0) {
+    _queue = [];
+    _queueIndex = -1;
+    return;
+  }
+
+  _queue = queue.filter(isPlayableTrack);
+  _queueIndex = _queue.findIndex(track => track.id === activeTrackId);
+}
+
+function clearPlaybackQueue(): void {
+  _queue = [];
+  _queueIndex = -1;
+}
+
+function getQueueTrackAt(index: number): AudioTrackSource | null {
+  if (index < 0 || index >= _queue.length) return null;
+  return _queue[index] ?? null;
 }
 
 let state: PlaybackState = {
@@ -64,6 +115,10 @@ let state: PlaybackState = {
   artistName: null,
   artworkUrl: null,
   hasLyrics: false,
+  queueLength: 0,
+  queueIndex: -1,
+  hasNext: false,
+  hasPrevious: false,
 };
 
 const listeners = new Set<() => void>();
@@ -96,6 +151,7 @@ function handlePlaybackFailure(
     audio.pause();
     audio.src = '';
   }
+  clearPlaybackQueue();
   setState({
     activeTrackId: null,
     isPlaying: false,
@@ -108,8 +164,60 @@ function handlePlaybackFailure(
     artistName: null,
     artworkUrl: null,
     hasLyrics: false,
+    ...getQueueSnapshot(),
   });
   notifyPlaybackError(reason);
+}
+
+async function loadAndPlayTrack(track: AudioTrackSource): Promise<void> {
+  const audio = getAudio();
+  if (!audio) return;
+
+  if (!track.audioUrl) {
+    handlePlaybackFailure(audio, 'missing_source');
+    return;
+  }
+
+  const token = ++_playToken;
+  _activeTrackIsrc = track.isrc ?? null;
+  _hasRetriedRefresh = false;
+  audio.pause();
+  audio.src = track.audioUrl;
+  setState({
+    activeTrackId: track.id,
+    isPlaying: false,
+    playbackStatus: 'loading',
+    lastErrorReason: null,
+    currentTime: 0,
+    duration: 0,
+    trackTitle: track.title,
+    releaseTitle: track.releaseTitle ?? null,
+    artistName: track.artistName ?? null,
+    artworkUrl: track.artworkUrl ?? null,
+    hasLyrics: Boolean(track.hasLyrics),
+    ...getQueueSnapshot(),
+  });
+
+  try {
+    await audio.play();
+  } catch (error) {
+    if (_playToken === token) {
+      handlePlaybackFailure(audio, 'play_rejected');
+    }
+    throw error;
+  }
+
+  if (_playToken !== token) {
+    return;
+  }
+}
+
+async function advanceQueueToIndex(index: number): Promise<void> {
+  const track = getQueueTrackAt(index);
+  if (!track) return;
+
+  _queueIndex = index;
+  await loadAndPlayTrack(track);
 }
 
 function bindAudioEvents(el: HTMLAudioElement): void {
@@ -138,9 +246,21 @@ function bindAudioEvents(el: HTMLAudioElement): void {
       playbackStatus: state.activeTrackId ? 'paused' : 'idle',
     })
   );
-  el.addEventListener('ended', () =>
-    setState({ isPlaying: false, playbackStatus: 'paused', currentTime: 0 })
-  );
+  el.addEventListener('ended', () => {
+    const nextIndex = _queueIndex + 1;
+    const nextTrack = getQueueTrackAt(nextIndex);
+    if (nextTrack) {
+      void advanceQueueToIndex(nextIndex);
+      return;
+    }
+
+    setState({
+      isPlaying: false,
+      playbackStatus: 'paused',
+      currentTime: 0,
+      ...getQueueSnapshot(),
+    });
+  });
   el.addEventListener('loadedmetadata', () => {
     setState({
       duration: Number.isFinite(el.duration) ? el.duration : 0,
@@ -217,61 +337,45 @@ export function useTrackAudioPlayer() {
     };
   }, []);
 
-  const toggleTrack = useCallback(async (track: AudioTrackSource) => {
-    const audio = getAudio();
-    if (!audio) return;
+  const toggleTrack = useCallback(
+    async (track: AudioTrackSource, options?: ToggleTrackOptions) => {
+      const audio = getAudio();
+      if (!audio) return;
 
-    // Same track — toggle pause/resume
-    if (state.activeTrackId === track.id) {
-      if (audio.paused) {
-        try {
-          await audio.play();
-        } catch (error) {
-          handlePlaybackFailure(audio, 'play_rejected');
-          throw error;
+      // Same track — toggle pause/resume
+      if (state.activeTrackId === track.id) {
+        if (audio.paused) {
+          try {
+            await audio.play();
+          } catch (error) {
+            handlePlaybackFailure(audio, 'play_rejected');
+            throw error;
+          }
+        } else {
+          audio.pause();
         }
-      } else {
-        audio.pause();
+        return;
       }
-      return;
-    }
 
-    // New track — cancel any in-flight play() from a prior switch
-    if (!track.audioUrl) {
-      handlePlaybackFailure(audio, 'missing_source');
-      return;
-    }
-    const token = ++_playToken;
-    _activeTrackIsrc = track.isrc ?? null;
-    _hasRetriedRefresh = false;
-    audio.pause();
-    audio.src = track.audioUrl;
-    setState({
-      activeTrackId: track.id,
-      isPlaying: false,
-      playbackStatus: 'loading',
-      lastErrorReason: null,
-      currentTime: 0,
-      duration: 0,
-      trackTitle: track.title,
-      releaseTitle: track.releaseTitle ?? null,
-      artistName: track.artistName ?? null,
-      artworkUrl: track.artworkUrl ?? null,
-      hasLyrics: Boolean(track.hasLyrics),
-    });
-    try {
-      await audio.play();
-    } catch (error) {
-      if (_playToken === token) {
-        handlePlaybackFailure(audio, 'play_rejected');
+      if (options?.queue) {
+        setPlaybackQueue(options.queue, track.id);
+      } else {
+        clearPlaybackQueue();
       }
-      throw error;
-    }
-    // Another toggle fired while this play() was in-flight. The newer call owns
-    // the shared audio element now, so avoid pausing here.
-    if (_playToken !== token) {
-      return;
-    }
+
+      await loadAndPlayTrack(track);
+    },
+    []
+  );
+
+  const playNext = useCallback(async () => {
+    if (!state.hasNext) return;
+    await advanceQueueToIndex(_queueIndex + 1);
+  }, []);
+
+  const playPrevious = useCallback(async () => {
+    if (!state.hasPrevious) return;
+    await advanceQueueToIndex(_queueIndex - 1);
   }, []);
 
   const seek = useCallback((time: number) => {
@@ -289,6 +393,7 @@ export function useTrackAudioPlayer() {
       audio.pause();
       audio.src = '';
     }
+    clearPlaybackQueue();
     setState({
       activeTrackId: null,
       isPlaying: false,
@@ -301,6 +406,7 @@ export function useTrackAudioPlayer() {
       artistName: null,
       artworkUrl: null,
       hasLyrics: false,
+      ...getQueueSnapshot(),
     });
   }, []);
 
@@ -317,6 +423,8 @@ export function useTrackAudioPlayer() {
   return {
     playbackState,
     toggleTrack,
+    playNext,
+    playPrevious,
     seek,
     stop,
     onError,
