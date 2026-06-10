@@ -1,7 +1,7 @@
 'use client';
 
 import { ChevronRight, Pause, Play } from 'lucide-react';
-import { useCallback } from 'react';
+import { useCallback, useMemo } from 'react';
 import { toast } from 'sonner';
 import { DrawerEmptyState } from '@/components/molecules/drawer';
 import type { ReleaseSidebarTrack } from '@/lib/discography/types';
@@ -77,6 +77,29 @@ function getDisplayTrackLabel(params: {
   return getCanonicalTrackLabel(track);
 }
 
+function buildReleasePlaybackQueue(
+  tracks: readonly ReleaseSidebarTrack[],
+  release: Release
+): TrackControlSource[] {
+  return tracks.flatMap(track => {
+    const audioUrl = track.audioUrl ?? track.previewUrl ?? undefined;
+    if (!audioUrl) return [];
+
+    return [
+      {
+        id: track.id,
+        title: track.title,
+        audioUrl,
+        isrc: track.isrc,
+        releaseTitle: release.title,
+        artistName: release.artistNames?.[0],
+        artworkUrl: release.artworkUrl,
+        hasLyrics: Boolean(track.lyrics?.trim()),
+      },
+    ];
+  });
+}
+
 export function ReleaseTrackList({
   release,
   tracksOverride,
@@ -93,6 +116,10 @@ export function ReleaseTrackList({
     !tracksOverride && release.totalTracks > 0
   );
   const tracks = tracksOverride ?? fetchedTracks;
+  const playbackQueue = useMemo(
+    () => (tracks ? buildReleasePlaybackQueue(tracks, release) : []),
+    [release, tracks]
+  );
 
   let liveAnnouncement = '';
   if (playbackState.playbackStatus === 'error') {
@@ -174,6 +201,7 @@ export function ReleaseTrackList({
           })}
           release={release}
           playbackState={playbackState}
+          playbackQueue={playbackQueue}
           onToggleTrack={toggleTrack}
           isLastRow={index === tracks.length - 1}
           onSelect={
@@ -192,6 +220,7 @@ function TrackListRow({
   trackLabel,
   release,
   playbackState,
+  playbackQueue,
   onToggleTrack,
   isLastRow,
   onSelect,
@@ -204,7 +233,11 @@ function TrackListRow({
     isPlaying: boolean;
     playbackStatus?: 'idle' | 'loading' | 'playing' | 'paused' | 'error';
   };
-  readonly onToggleTrack: (track: TrackControlSource) => Promise<void>;
+  readonly playbackQueue: readonly TrackControlSource[];
+  readonly onToggleTrack: (
+    track: TrackControlSource,
+    options?: { queue?: readonly TrackControlSource[] }
+  ) => Promise<void>;
   readonly isLastRow: boolean;
   readonly onSelect?: () => void;
 }) {
@@ -229,21 +262,25 @@ function TrackListRow({
       return;
     }
 
-    onToggleTrack({
-      id: track.id,
-      title: track.title,
-      audioUrl: playableUrl,
-      isrc: track.isrc,
-      releaseTitle: release.title,
-      artistName: release.artistNames?.[0],
-      artworkUrl: release.artworkUrl,
-      hasLyrics: Boolean(track.lyrics?.trim()),
-    }).catch(() => {
+    onToggleTrack(
+      {
+        id: track.id,
+        title: track.title,
+        audioUrl: playableUrl,
+        isrc: track.isrc,
+        releaseTitle: release.title,
+        artistName: release.artistNames?.[0],
+        artworkUrl: release.artworkUrl,
+        hasLyrics: Boolean(track.lyrics?.trim()),
+      },
+      { queue: playbackQueue }
+    ).catch(() => {
       toast.error('Unable to play this track right now');
     });
   }, [
     isActiveTrack,
     onToggleTrack,
+    playbackQueue,
     playableUrl,
     release.artistNames,
     release.artworkUrl,
