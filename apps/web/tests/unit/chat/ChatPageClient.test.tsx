@@ -57,13 +57,15 @@ vi.mock('next/dynamic', () => ({
     },
 }));
 
+const mockRouter = {
+  push: vi.fn(),
+  replace: mockReplace,
+  back: vi.fn(),
+  refresh: vi.fn(),
+};
+
 vi.mock('next/navigation', () => ({
-  useRouter: () => ({
-    push: vi.fn(),
-    replace: mockReplace,
-    back: vi.fn(),
-    refresh: vi.fn(),
-  }),
+  useRouter: () => mockRouter,
   useSearchParams: () => mockSearchParams,
   usePathname: () => '/app/chat',
 }));
@@ -550,7 +552,9 @@ describe('ChatPageClient', () => {
 
     renderChatPage();
 
-    await vi.runAllTimersAsync();
+    // 1500 + 3000 + 5000ms retry delays, plus buffer for fetch microtasks.
+    await vi.advanceTimersByTimeAsync(10_000);
+    await vi.runOnlyPendingTimersAsync();
 
     expect(mockErrorNotification).not.toHaveBeenCalled();
     expect(screen.queryByRole('alert')).toBeNull();
