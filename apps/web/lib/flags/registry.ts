@@ -95,6 +95,7 @@ export const APP_FLAG_REGISTRY = {
   DESIGN_V1_ONBOARDING: buildBooleanFlag('DESIGN_V1_ONBOARDING'),
   AI_CONNECTORS_BETA: buildBooleanFlag('AI_CONNECTORS_BETA'),
   MERCH_MVP: buildBooleanFlag('MERCH_MVP'),
+  BULK_PRESS_PHOTO_IMPORT: buildBooleanFlag('BULK_PRESS_PHOTO_IMPORT'),
 } as const satisfies Record<AppFlagName, Flag<boolean, FlagEntities>>;
 
 export const SUBSCRIBE_CTA_VARIANT_FLAG = flag<

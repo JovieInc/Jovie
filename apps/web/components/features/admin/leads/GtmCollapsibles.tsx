@@ -71,7 +71,7 @@ function AccordionSection({
       >
         <ChevronRight
           className={cn(
-            'h-3.5 w-3.5 shrink-0 text-tertiary-token transition-transform duration-200',
+            'h-3.5 w-3.5 shrink-0 text-tertiary-token transition-transform duration-subtle',
             isOpen && 'rotate-90'
           )}
         />
@@ -154,7 +154,7 @@ export function GtmCollapsibles({ initialOpen }: GtmCollapsiblesProps) {
       <GrowthStatusPanel />
 
       <AccordionSection
-        title='Tools'
+        title='Intake & Keywords'
         isOpen={openSections.has(0)}
         onToggle={() => toggle(0)}
       >
@@ -163,36 +163,32 @@ export function GtmCollapsibles({ initialOpen }: GtmCollapsiblesProps) {
             <GrowthIntakeComposer
               initialMode={initialOpen === 'ingest' ? 'queue' : 'single'}
             />
-            <LeadKeywordsManager />
+            <LeadKeywordsManager embedded />
           </div>
         )}
       </AccordionSection>
 
       <AccordionSection
-        title='Advanced settings & actions'
+        title='Advanced Settings'
         isOpen={openSections.has(1)}
         onToggle={() => toggle(1)}
       >
         {everOpened.has(1) && (
           <div className='px-(--linear-app-content-padding-x) py-(--linear-app-content-padding-y)'>
-            <p className='mb-3 text-xs font-book text-secondary-token'>
-              These values are set automatically by the speed dial. Override
-              here if needed.
-            </p>
-            <LeadPipelineControls hideMainSwitch />
+            <LeadPipelineControls hideMainSwitch embedded />
           </div>
         )}
       </AccordionSection>
 
       <AccordionSection
-        title='Outreach, campaigns & insights'
+        title='Outreach & Campaigns'
         isOpen={openSections.has(2)}
         onToggle={() => toggle(2)}
       >
         {everOpened.has(2) && (
           <div className='space-y-4 px-(--linear-app-content-padding-x) py-(--linear-app-content-padding-y)'>
-            <OutreachOverviewPanel />
-            <InviteCampaignManager />
+            <OutreachOverviewPanel embedded />
+            <InviteCampaignManager embedded />
           </div>
         )}
       </AccordionSection>

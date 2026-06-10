@@ -1,9 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { mockClerkClient, mockCreateClerkClient } = vi.hoisted(() => ({
-  mockClerkClient: vi.fn(),
-  mockCreateClerkClient: vi.fn(),
-}));
+const { mockClerkClient, mockCreateClerkClient, headersMock } = vi.hoisted(
+  () => ({
+    mockClerkClient: vi.fn(),
+    mockCreateClerkClient: vi.fn(),
+    headersMock: vi.fn(),
+  })
+);
 
 vi.mock('@clerk/nextjs/server', () => ({
   clerkClient: mockClerkClient,
@@ -11,6 +14,10 @@ vi.mock('@clerk/nextjs/server', () => ({
 
 vi.mock('@clerk/backend', () => ({
   createClerkClient: mockCreateClerkClient,
+}));
+
+vi.mock('next/headers', () => ({
+  headers: headersMock,
 }));
 
 const ORIGINAL_ENV = {
@@ -39,6 +46,7 @@ describe('request Clerk client resolution', () => {
   beforeEach(() => {
     vi.resetModules();
     vi.clearAllMocks();
+    headersMock.mockReset();
     process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY = 'pk_live_production';
     process.env.CLERK_SECRET_KEY = 'sk_live_production';
     delete process.env.CLERK_PUBLISHABLE_KEY_STAGING;
@@ -84,6 +92,46 @@ describe('request Clerk client resolution', () => {
       publishableKey: 'pk_live_staging',
       secretKey: 'sk_live_staging',
     });
+    expect(mockClerkClient).not.toHaveBeenCalled();
+  });
+
+  it('uses explicit staging Clerk keys for server actions on staging hosts', async () => {
+    process.env.CLERK_PUBLISHABLE_KEY_STAGING = 'pk_live_staging';
+    process.env.CLERK_SECRET_KEY_STAGING = 'sk_live_staging';
+    headersMock.mockResolvedValue(
+      new Headers({
+        host: 'staging.jov.ie',
+      })
+    );
+
+    const { getServerClerkClient } = await import(
+      '@/lib/auth/request-clerk-client'
+    );
+
+    await expect(getServerClerkClient()).resolves.toEqual({
+      source: 'backend',
+    });
+    expect(mockCreateClerkClient).toHaveBeenCalledWith({
+      publishableKey: 'pk_live_staging',
+      secretKey: 'sk_live_staging',
+    });
+    expect(mockClerkClient).not.toHaveBeenCalled();
+  });
+
+  it('returns null for staging hosts when the staging secret is unavailable', async () => {
+    process.env.CLERK_PUBLISHABLE_KEY_STAGING = 'pk_live_staging';
+    headersMock.mockResolvedValue(
+      new Headers({
+        host: 'staging.jov.ie',
+      })
+    );
+
+    const { getServerClerkClient } = await import(
+      '@/lib/auth/request-clerk-client'
+    );
+
+    await expect(getServerClerkClient()).resolves.toBeNull();
+    expect(mockCreateClerkClient).not.toHaveBeenCalled();
     expect(mockClerkClient).not.toHaveBeenCalled();
   });
 

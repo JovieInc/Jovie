@@ -1,6 +1,5 @@
 import 'server-only';
 
-import { createClerkClient } from '@clerk/backend';
 import * as Sentry from '@sentry/nextjs';
 import { sql as drizzleSql, eq } from 'drizzle-orm';
 import { db } from '@/lib/db';
@@ -27,6 +26,7 @@ import {
   resolveCanonicalState,
 } from './canonical-user-state';
 import { syncEmailFromClerk } from './clerk-sync';
+import { getServerClerkClient } from './request-clerk-client';
 import { checkUserStatus } from './status-checker';
 
 export type { UserStateInput } from './canonical-user-state';
@@ -423,14 +423,27 @@ async function handleMissingDbUser(
     };
   }
 
-  // Need email to proceed
+  // Need email to proceed — return a terminal state instead of throwing so
+  // cached dashboard reconciliation can fail closed without duplicate Sentry noise.
   if (!email) {
     await captureError(
       'Cannot create user without email',
       new TypeError('Email is required for user creation'),
       { clerkUserId, operation: 'resolveUserState' }
     );
-    throw new TypeError('Email is required for user creation');
+
+    return {
+      state: CanonicalUserState.USER_CREATION_FAILED,
+      clerkUserId,
+      dbUserId: null,
+      profileId: null,
+      redirectTo: '/error/user-creation-failed',
+      context: {
+        ...baseContext,
+        email,
+        errorCode: 'EMAIL_REQUIRED_FOR_USER_CREATION',
+      },
+    };
   }
 
   // Check waitlist status before creating user. Gate OFF opens daily intake
@@ -547,8 +560,8 @@ function sleep(ms: number): Promise<void> {
 async function resolveVerifiedEmailFromClerkBackend(
   clerkUserId: string
 ): Promise<string | null> {
-  const secretKey = process.env.CLERK_SECRET_KEY;
-  if (!secretKey) {
+  const clerk = await getServerClerkClient();
+  if (!clerk) {
     Sentry.addBreadcrumb({
       category: 'auth-gate',
       level: 'warning',
@@ -558,7 +571,6 @@ async function resolveVerifiedEmailFromClerkBackend(
     return null;
   }
 
-  const clerk = createClerkClient({ secretKey });
   let lastError: unknown = null;
 
   for (
