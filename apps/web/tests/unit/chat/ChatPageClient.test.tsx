@@ -532,4 +532,27 @@ describe('ChatPageClient', () => {
       'Starting your onboarding chat.'
     );
   });
+
+  it('does not show a destructive toast after welcome chat bootstrap retries exhaust', async () => {
+    vi.useFakeTimers();
+    mockSearchParams = new URLSearchParams('from=onboarding');
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(() =>
+        Promise.resolve(
+          new Response(null, {
+            status: 503,
+            statusText: 'Service Unavailable',
+          })
+        )
+      )
+    );
+
+    renderChatPage();
+
+    await vi.runAllTimersAsync();
+
+    expect(mockErrorNotification).not.toHaveBeenCalled();
+    expect(screen.queryByRole('alert')).toBeNull();
+  });
 });
