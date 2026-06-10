@@ -501,7 +501,7 @@ export function ProfileMobileNotificationsFlow({
       return (
         <ScreenShell
           title={channel === 'sms' ? 'Text Alerts' : 'Email Alerts'}
-          body={`We'll send ${artistName} alerts here.`}
+          body={`${artistName} alerts.`}
           footer={
             <div className='space-y-3'>
               {error ? (
@@ -540,7 +540,7 @@ export function ProfileMobileNotificationsFlow({
       return (
         <ScreenShell
           title='Enter the code'
-          body={`Verify your ${channel === 'sms' ? 'phone' : 'email'} to activate ${artistName} alerts.`}
+          body={`Confirm your ${channel === 'sms' ? 'phone' : 'email'}.`}
           footer={
             <div className='space-y-3'>
               {error ? (
@@ -645,7 +645,6 @@ export function ProfileMobileNotificationsFlow({
       return (
         <ScreenShell
           title='Alerts'
-          body='Choose what to receive.'
           footer={
             canEditPreferences ? (
               <PrimaryButton
@@ -659,18 +658,12 @@ export function ProfileMobileNotificationsFlow({
         >
           <div className='space-y-6'>
             <div className='space-y-3'>
-              <div className='space-y-1'>
-                <p
-                  className='text-[13px] font-semibold tracking-[-0.01em] text-white/42'
-                  data-testid='profile-mobile-notifications-sent-from'
-                >
-                  Sent from Jovie
-                </p>
-                <p className='text-[14px] leading-5 text-white/58'>
-                  Jovie sends verified release and show alerts to your{' '}
-                  {channel === 'sms' ? 'phone' : 'email'}.
-                </p>
-              </div>
+              <p
+                className='text-[13px] font-semibold tracking-[-0.01em] text-white/42'
+                data-testid='profile-mobile-notifications-sent-from'
+              >
+                Sent from Jovie
+              </p>
 
               {(JOVIE_ALERT_KEYS as readonly NotificationContentType[]).map(
                 key => {
@@ -708,15 +701,9 @@ export function ProfileMobileNotificationsFlow({
               <>
                 <div className='h-px bg-white/8' />
                 <div className='space-y-3'>
-                  <div className='space-y-1'>
-                    <p className='text-[13px] font-semibold tracking-[-0.01em] text-white/42'>
-                      Sent by {artistName}
-                    </p>
-                    <p className='text-[14px] leading-5 text-white/58'>
-                      Share your email with {artistName} for occasional artist
-                      emails.
-                    </p>
-                  </div>
+                  <p className='text-[13px] font-semibold tracking-[-0.01em] text-white/42'>
+                    Sent by {artistName}
+                  </p>
 
                   <div className='flex items-center justify-between gap-4 py-2'>
                     <div className='flex items-center gap-3'>

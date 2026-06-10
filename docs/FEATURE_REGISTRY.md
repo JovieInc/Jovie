@@ -43,6 +43,7 @@ This document is the canonical feature list for Jovie. It is designed for onboar
 | Profile | About page | Shipped | Free+ | None | /username/about |
 | Profile | DSP bulk press-photo import | Shipped (flagged) | Flag + evidence-gated | `bulk_press_photo_import` | Default off; requires platform activation evidence before auto-ingesting DSP images as draft press photos |
 | Profile | Tour dates (Bandsintown) | Shipped | Free+ | None | /username/tour |
+| Profile | Apple Wallet profile pass | Shipped (flagged) | Flag-gated | `apple_wallet_profile_pass` | First-party generic Wallet pass with tracked QR source link and PassKit update service |
 | Profile | Latest release card on profile | Shipped (flagged) | Free+ | `feature_latest_release_card` | Rollout-controlled UI module |
 | Profile | Verified badge | Shipped | Pro+ | None | Entitlement-backed (`canBeVerified`) |
 | Analytics | Click & visit tracking | Shipped | Free+ | None | Default analytics |

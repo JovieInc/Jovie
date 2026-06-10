@@ -64,6 +64,14 @@ describe('shouldBypassClerkForRequest', () => {
         pathname: '/api/mobile/v1/me',
       })
     ).toBe(false);
+
+    expect(
+      shouldBypassClerkForRequest({
+        cookies: [],
+        pathInfo: PUBLIC_PATH_INFO,
+        pathname: '/api/wallet/apple/profile-pass',
+      })
+    ).toBe(false);
   });
 
   it('keeps Clerk enabled for API requests with an active session', () => {

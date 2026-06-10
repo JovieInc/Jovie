@@ -36,7 +36,6 @@ export const DashboardSettings = memo(function DashboardSettings({
         artist={artist}
         onArtistUpdate={setArtist}
         focusSection={focusSection}
-        isAdmin={dashboardData.isAdmin}
       />
     </div>
   );

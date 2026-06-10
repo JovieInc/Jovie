@@ -451,10 +451,10 @@ export function InviteCampaignManager({
           {Math.round(throttling.maxDelayMs / 1000)}s delay (~
           {effectiveRatePerHour}/hour).{' '}
           <a
-            href={APP_ROUTES.SETTINGS_ADMIN}
+            href={APP_ROUTES.ADMIN_OPS}
             className='underline hover:text-primary-token'
           >
-            Change in Settings
+            Change in Ops
           </a>
         </p>
       </CampaignCallout>
