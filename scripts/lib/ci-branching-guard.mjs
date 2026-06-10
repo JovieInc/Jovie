@@ -65,7 +65,11 @@ export function suggestIntegrationBranch(headRef) {
   ) {
     return `${INTEGRATION_BRANCH_PREFIX}ui`;
   }
-  if (/ci|workflow|harness|hook|script|infra|agent/.test(lower)) {
+  if (
+    /ci|workflow|harness|hook|script|infra|agent|observability|agnost|migration|improvement_items/.test(
+      lower
+    )
+  ) {
     return `${INTEGRATION_BRANCH_PREFIX}infra`;
   }
   return `${INTEGRATION_BRANCH_PREFIX}ui`;

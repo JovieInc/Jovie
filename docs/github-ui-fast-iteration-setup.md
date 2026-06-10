@@ -18,7 +18,7 @@ Current active ruleset:
 - Target: `refs/heads/main`
 - Merge queue: enabled
 - Merge method in queue: `SQUASH`
-- Max entries to build: `5`
+- Max entries to build: `3` (reduced per btw CI plan — caps concurrent merge-queue runs during agent waves)
 - Min entries to merge: `1`
 - Max entries to merge: `10`
 - Grouping strategy: `ALLGREEN`
@@ -45,7 +45,7 @@ Recommended UI settings for the `main` ruleset:
 6. Confirm `Require branches to be up to date before merging` is enabled.
 7. Confirm `Merge queue` is enabled with:
    - merge method `Squash`
-   - `max entries to build = 5`
+   - `max entries to build = 3`
    - `min entries to merge = 1`
    - `max entries to merge = 10`
 8. Do not add long-running checks like extended smoke, full E2E, Lighthouse, or Sentry soak as required status checks.
