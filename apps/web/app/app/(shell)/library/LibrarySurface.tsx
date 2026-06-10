@@ -29,6 +29,7 @@ import {
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import {
+  type ChangeEvent,
   type CSSProperties,
   cloneElement,
   createContext,
