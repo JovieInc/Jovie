@@ -1885,7 +1885,10 @@ function createSubmitFeedbackTool(clerkUserId: string) {
  * Creates the generateReleasePitch tool for chat-first release pitching.
  * Saves the latest generated draft to the release's generatedPitches field.
  */
-function createGenerateReleasePitchTool(resolvedProfileId: string) {
+function createGenerateReleasePitchTool(
+  resolvedProfileId: string,
+  identity: { clerkUserId: string; conversationId: string | null }
+) {
   return tool({
     description: `Generate one copy-paste-ready release pitch for a specific destination. Use for playlist, radio, Sirius XM, install, playback/music supervisor, editorial post, record label, or collaborator pitching. Ask the artist where they want to pitch it before calling this tool unless a task or user message clearly maps to one of these destinations: ${PITCH_TARGET_OPTIONS_TEXT}. Ask which release they want to pitch if unclear. If the artist provides custom guidance, pass it via instructions.`,
     inputSchema: z.object({
@@ -1985,6 +1988,10 @@ function createGenerateReleasePitchTool(resolvedProfileId: string) {
           input: pitchInput,
           destination,
           instructions,
+          identity: {
+            userId: identity.clerkUserId,
+            sessionId: identity.conversationId,
+          },
         });
 
         await db
@@ -2089,8 +2096,13 @@ function buildChatTools(
     ...(resolvedProfileId
       ? {
           createRelease: createReleaseTool(resolvedProfileId),
-          generateReleasePitch:
-            createGenerateReleasePitchTool(resolvedProfileId),
+          generateReleasePitch: createGenerateReleasePitchTool(
+            resolvedProfileId,
+            {
+              clerkUserId,
+              conversationId: reservedTurn?.conversationId ?? null,
+            }
+          ),
         }
       : {}),
     ...(canAccessMerchCreation

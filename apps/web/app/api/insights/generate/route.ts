@@ -22,7 +22,9 @@ import { MIN_TOTAL_CLICKS } from '@/lib/services/insights/thresholds';
  */
 export async function POST() {
   try {
-    const { profile } = await getSessionContext({ requireProfile: false });
+    const { profile, clerkUserId } = await getSessionContext({
+      requireProfile: false,
+    });
 
     if (!profile) {
       return NextResponse.json(
@@ -100,7 +102,10 @@ export async function POST() {
       const existingTypes = await getExistingInsightTypes(profile.id);
 
       // Generate insights via AI
-      const result = await generateInsights(metrics, existingTypes);
+      const result = await generateInsights(metrics, existingTypes, {
+        userId: clerkUserId,
+        sessionId: run.id,
+      });
 
       // Persist insights
       const persisted = await persistInsights(

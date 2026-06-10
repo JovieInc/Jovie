@@ -113,6 +113,7 @@ async function processInboundEmail(
       bodyText: fullEmail?.text ?? null,
       artistName: artist.displayName ?? artist.username ?? 'Artist',
       artistGenres: artist.genres,
+      sessionId: threadId,
     });
 
     if (classification) {

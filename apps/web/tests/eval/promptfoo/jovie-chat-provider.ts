@@ -7013,6 +7013,10 @@ function evaluateChatTitleContract(vars: EvalVars) {
     resolve(process.cwd(), routeSourcePath),
     'utf8'
   );
+  const telemetrySource = readFileSync(
+    resolve(process.cwd(), 'lib/ai/telemetry.ts'),
+    'utf8'
+  );
   const systemPrompt =
     routeSource.match(/system:\s*'([^']+)'/)?.[1]?.trim() ?? '';
   const guardedNullUpdateCount = [
@@ -7044,12 +7048,16 @@ function evaluateChatTitleContract(vars: EvalVars) {
       'maxOutputTokens: 30',
       'AbortSignal.timeout(5000)',
     ]),
-    redactsTitleTelemetryInputsAndOutputs: textIncludesAll(routeSource, [
-      'experimental_telemetry',
-      'recordInputs: false',
-      'recordOutputs: false',
-      "functionId: 'jovie-chat-title'",
-    ]),
+    redactsTitleTelemetryInputsAndOutputs:
+      textIncludesAll(routeSource, [
+        'experimental_telemetry: buildAiTelemetry',
+        "functionId: 'jovie-chat-title'",
+        'sessionId: conversationId',
+      ]) &&
+      textIncludesAll(telemetrySource, [
+        'recordInputs: options.recordInputs ?? false',
+        'recordOutputs: options.recordOutputs ?? false',
+      ]),
     sanitizesAllTitleInputsAndOutputs: textIncludesAll(routeSource, [
       'sanitizeConversationTitle(userMessage?.content, 200)',
       'sanitizeConversationTitle(m.content, 200)',
@@ -7063,7 +7071,8 @@ function evaluateChatTitleContract(vars: EvalVars) {
     schedulesTitleGenerationAfterPersistence: textIncludesAll(routeSource, [
       'const titlePending = hasUserMessage && !conversation.title',
       'after(async () =>',
-      'await maybeGenerateTitle(conversationId, messagesToInsert)',
+      'await maybeGenerateTitle(conversationId, messagesToInsert,',
+      'userId: clerkUserId',
     ]),
   };
   const runtimeFacts = {

@@ -84,6 +84,10 @@ export const ServerEnvSchema = z.object({
   // Vercel Blob
   BLOB_READ_WRITE_TOKEN: z.string().optional(),
 
+  // Telegram Bot (for asset ingestion webhook)
+  TELEGRAM_BOT_TOKEN: z.string().optional(),
+  TELEGRAM_WEBHOOK_SECRET: z.string().optional(),
+
   // Stripe server-side configuration
   STRIPE_SECRET_KEY: z.string().optional(),
   STRIPE_WEBHOOK_SECRET: z.string().optional(),
@@ -197,9 +201,6 @@ export const ServerEnvSchema = z.object({
   // Linear API key for HUD queries (tim-action-required issues)
   LINEAR_API_KEY: z.string().optional(),
 
-  // Voice pipeline (ElevenLabs async webhooks + cron processor) (gh-9810)
-  ELEVENLABS_WEBHOOK_SECRET: z.string().optional(),
-
   // GitHub dispatch (Sentry autofix pipeline)
   GH_DISPATCH_TOKEN: z.string().optional(),
   // Vercel-injected Git metadata (used to target the dispatch repo)
@@ -212,8 +213,20 @@ export const ServerEnvSchema = z.object({
   // AI Gateway auth (required for chat completions)
   AI_GATEWAY_API_KEY: z.string().optional(),
 
+  // OpenAI (for vision model fallback in asset extraction)
+  OPENAI_API_KEY: z.string().optional(),
+
+  // ElevenLabs (voice clone, promo TTS, voice pipeline webhooks)
+  ELEVENLABS_API_KEY: z.string().optional(),
+  ELEVENLABS_WEBHOOK_SECRET: z.string().optional(),
+
   // Braintrust observability (LLM tracing + evals)
   BRAINTRUST_API_KEY: z.string().optional(),
+
+  // Agnost AI analytics (Vercel AI SDK telemetry via OpenTelemetry)
+  AGNOST_ORG_ID: z.string().uuid().optional(),
+  /** Set to `1` to export Agnost traces in local development. */
+  JOVIE_ENABLE_AGNOST: z.enum(['0', '1']).optional(),
 
   // AgentOS workflows are compile-ready but runtime-disabled by default.
   AGENT_OS_WORKFLOWS_ENABLED: z.enum(['true', 'false']).optional(),
@@ -261,7 +274,6 @@ export const ServerEnvSchema = z.object({
   E2E_USE_TEST_AUTH_BYPASS: z.string().optional(),
   E2E_CLERK_USER_ID: z.string().optional(),
   E2E_CLERK_USER_USERNAME: z.string().optional(),
-  E2E_SYNTHETIC_MODE: z.string().optional(),
   E2E_PROD_SIGNUP_EMAIL_BASE: z.string().email().optional(),
   E2E_PROD_SIGNUP_PASSWORD: z.string().optional(),
   E2E_PROD_MAILBOX_PROVIDER: z
@@ -332,6 +344,8 @@ export const ENV_KEYS = [
   'IOS_TESTFLIGHT_PUBLIC_LINK',
   'BANDSINTOWN_APP_ID',
   'BLOB_READ_WRITE_TOKEN',
+  'TELEGRAM_BOT_TOKEN',
+  'TELEGRAM_WEBHOOK_SECRET',
   'STRIPE_SECRET_KEY',
   'STRIPE_WEBHOOK_SECRET',
   'STRIPE_CONNECT_WEBHOOK_SECRET',
@@ -380,7 +394,6 @@ export const ENV_KEYS = [
   'UPSTASH_REDIS_REST_TOKEN',
   'SESSION_SECRET',
   'TURNSTILE_SECRET_KEY',
-  'E2E_SYNTHETIC_MODE',
   'E2E_PROD_SIGNUP_EMAIL_BASE',
   'E2E_PROD_SIGNUP_PASSWORD',
   'E2E_PROD_MAILBOX_PROVIDER',
@@ -402,13 +415,17 @@ export const ENV_KEYS = [
   'SENTRY_ORG_SLUG',
   'LINEAR_WEBHOOK_SECRET',
   'LINEAR_API_KEY',
-  'ELEVENLABS_WEBHOOK_SECRET',
   'GH_DISPATCH_TOKEN',
   'VERCEL_GIT_REPO_OWNER',
   'VERCEL_GIT_REPO_SLUG',
   'STATSIG_SERVER_SECRET',
   'AI_GATEWAY_API_KEY',
+  'OPENAI_API_KEY',
+  'ELEVENLABS_API_KEY',
+  'ELEVENLABS_WEBHOOK_SECRET',
   'BRAINTRUST_API_KEY',
+  'AGNOST_ORG_ID',
+  'JOVIE_ENABLE_AGNOST',
   'AGENT_OS_WORKFLOWS_ENABLED',
   'XAI_API_KEY',
   'ALBUM_ART_IMAGE_MODEL',
