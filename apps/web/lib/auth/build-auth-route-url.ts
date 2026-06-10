@@ -1,4 +1,13 @@
+import { APP_ROUTES } from '@/constants/routes';
+
 import { sanitizeRedirectUrl } from './constants';
+
+/**
+ * Default post-auth destination for sign-up flows when no redirect_url is set.
+ */
+export function getDefaultSignUpFallbackRedirectUrl(): string {
+  return APP_ROUTES.START;
+}
 
 interface SearchParamReader {
   get(key: string): string | null;
