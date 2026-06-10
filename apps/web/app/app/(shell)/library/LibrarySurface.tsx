@@ -29,7 +29,6 @@ import {
   Video,
   X,
 } from 'lucide-react';
-import Image from 'next/image';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import {
@@ -51,7 +50,6 @@ import {
   useState,
 } from 'react';
 import { toast } from 'sonner';
-import { ArtworkFallbackTile } from '@/components/atoms/ArtworkFallbackTile';
 import { PageShell } from '@/components/organisms/PageShell';
 import { useTrackAudioPlayer } from '@/components/organisms/release-sidebar/useTrackAudioPlayer';
 import {
@@ -78,6 +76,7 @@ import { useBreakpoint } from '@/hooks/useBreakpoint';
 import { SKELETON_ROW_COUNT } from '@/lib/constants/layout';
 import { cn } from '@/lib/utils';
 import { capitalizeFirst } from '@/lib/utils/string-utils';
+import { LibraryMediaThumbnail } from './LibraryMediaThumbnail';
 import {
   formatLibraryDuration,
   formatLibraryReleaseDate,
@@ -144,7 +143,6 @@ const LIBRARY_TABLE_SKELETON_CONFIG: Array<{
 type LibraryViewMode = 'grid' | 'list';
 type LibrarySortKey = 'releaseDate' | 'title' | 'status' | 'providers';
 type LibraryPresetId = LibraryView;
-type ArtworkSize = 'card' | 'row' | 'drawer';
 type LibraryPreviewToggle = (
   asset: LibraryReleaseAsset,
   event?: MouseEvent<HTMLElement>
@@ -410,48 +408,6 @@ function formatCompactCount(value: number): string {
   return String(value);
 }
 
-function Artwork({
-  asset,
-  size = 'card',
-}: {
-  readonly asset: LibraryReleaseAsset;
-  readonly size?: ArtworkSize;
-}) {
-  const sizeClasses = {
-    card: 'h-full w-full',
-    row: 'h-10 w-10',
-    drawer: 'h-full w-full',
-  } satisfies Record<ArtworkSize, string>;
-
-  if (asset.artworkUrl) {
-    return (
-      <Image
-        src={asset.artworkUrl}
-        alt=''
-        width={size === 'row' ? 48 : 320}
-        height={size === 'row' ? 48 : 320}
-        className={cn('object-cover', sizeClasses[size])}
-        loading={size === 'row' ? 'lazy' : 'eager'}
-        unoptimized
-      />
-    );
-  }
-
-  return (
-    <div
-      className={cn(
-        'relative overflow-hidden border border-subtle bg-surface-1',
-        sizeClasses[size]
-      )}
-    >
-      <ArtworkFallbackTile
-        seed={asset.title}
-        iconClassName={size === 'row' ? 'h-4 w-4' : 'h-[36%] w-[36%]'}
-      />
-    </div>
-  );
-}
-
 const ReleaseCell = memo(function ReleaseCell({
   asset,
 }: {
@@ -466,7 +422,7 @@ const ReleaseCell = memo(function ReleaseCell({
   return (
     <div className='flex min-w-0 items-center gap-2.5'>
       <span className='system-b-library-artwork-shell group/artwork relative h-10 w-10 shrink-0 overflow-hidden'>
-        <Artwork asset={asset} size='row' />
+        <LibraryMediaThumbnail asset={asset} size='row' />
         {hasPreview ? (
           <button
             type='button'
@@ -1158,7 +1114,7 @@ const AssetCard = memo(function AssetCard({
         )}
       >
         <div className='system-b-library-card-artwork relative aspect-square overflow-hidden'>
-          <Artwork asset={asset} />
+          <LibraryMediaThumbnail asset={asset} size='card' />
           <span
             className={cn(
               'system-b-library-card-status absolute left-2 top-2 border px-1.5 py-0.5 leading-4',
@@ -1782,7 +1738,7 @@ function AssetDrawer({
             <div className='min-h-0 flex-1 overflow-y-auto p-3'>
               <div className='system-b-library-drawer-artwork overflow-hidden'>
                 <div className='mx-auto aspect-square w-full max-w-80'>
-                  <Artwork asset={current} size='drawer' />
+                  <LibraryMediaThumbnail asset={current} size='drawer' />
                 </div>
               </div>
 

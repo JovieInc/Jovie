@@ -1,5 +1,6 @@
 import type { ReleaseViewModel } from '@/lib/discography/types';
 import type { LibraryMerchCard } from '@/lib/merch/types';
+import { hashLibraryWaveformSeed } from './library-waveform-peaks';
 
 export interface LibraryProviderLink {
   readonly key: string;
@@ -31,6 +32,8 @@ export interface LibraryReleaseAsset {
   readonly artist: string;
   readonly artworkUrl: string | null;
   readonly previewUrl: string | null;
+  readonly videoUrl: string | null;
+  readonly waveformSeed: number;
   readonly smartLinkPath: string;
   readonly releaseDate: string | null;
   readonly releaseType: ReleaseViewModel['releaseType'];
@@ -86,6 +89,7 @@ export function buildLibraryReleaseAssets(
     });
     const artworkUrl = normalizeHttpUrl(release.artworkUrl);
     const previewUrl = normalizeHttpUrl(release.previewUrl);
+    const videoUrl = normalizeHttpUrl(release.canvasVideoUrl);
     const hasArtwork = Boolean(artworkUrl);
     const hasLyrics = Boolean(release.lyrics?.trim());
     const hasVideoLinks = Boolean(release.hasVideoLinks);
@@ -102,6 +106,8 @@ export function buildLibraryReleaseAssets(
       artist: release.artistNames?.[0]?.trim() || 'Unknown Artist',
       artworkUrl,
       previewUrl,
+      videoUrl,
+      waveformSeed: hashLibraryWaveformSeed(release.id),
       smartLinkPath: release.smartLinkPath,
       releaseDate: release.releaseDate ?? null,
       releaseType: release.releaseType,
@@ -157,13 +163,16 @@ export function buildLibraryMerchAssets(
 ): LibraryReleaseAsset[] {
   return cards.map(card => {
     const imageUrl = normalizeHttpUrl(card.primaryImageUrl);
+    const assetId = `merch-${card.id}`;
     return {
       itemKind: 'merch',
-      id: `merch-${card.id}`,
+      id: assetId,
       title: card.title,
       artist: artistName,
       artworkUrl: imageUrl,
       previewUrl: null,
+      videoUrl: null,
+      waveformSeed: hashLibraryWaveformSeed(assetId),
       smartLinkPath: '/app/library?view=merch',
       releaseDate: card.publishedAt ?? card.updatedAt,
       releaseType: 'single',

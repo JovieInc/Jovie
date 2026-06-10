@@ -121,6 +121,8 @@ function buildAsset(
     artist: 'Tim White',
     artworkUrl: 'https://cdn.example.com/artwork.jpg',
     previewUrl: 'https://cdn.example.com/preview.mp3',
+    videoUrl: null,
+    waveformSeed: 17,
     smartLinkPath: '/tim/take-me-over',
     releaseDate: '2026-04-28T00:00:00.000Z',
     releaseType: 'single',
