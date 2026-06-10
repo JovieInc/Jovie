@@ -5,7 +5,8 @@ set -euo pipefail
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$REPO_ROOT"
 
-TRAIN_PRS=(10455 10456 10457)
+# Update this list when opening new integration→main train PRs.
+TRAIN_PRS=()
 
 for num in "${TRAIN_PRS[@]}"; do
   state="$(gh pr view "$num" --json mergeStateStatus -q .mergeStateStatus 2>/dev/null || echo MISSING)"
