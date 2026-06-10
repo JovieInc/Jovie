@@ -1,3 +1,4 @@
+import type { SkillCommand } from '@/lib/commands/registry';
 import type { getCurrentUserEntitlements } from '@/lib/entitlements/server';
 
 export type ToolAvailability = 'available' | 'unavailable' | 'unknown';
@@ -70,6 +71,27 @@ export function detectAlbumArtGenerationIntent(input: {
     /\bbrief\b/.test(normalized) || /\bdraft\b/.test(normalized);
 
   return mentionsAlbumArt && asksForGeneration && !asksForBrief;
+}
+
+/** Provider-down and feature-flag kills are broken states — hide entry points. */
+export function shouldHideAlbumArtChatSuggestion(
+  capability: AlbumArtCapability
+): boolean {
+  return (
+    capability.availability === 'unavailable' &&
+    (capability.reasonCode === 'PROVIDER_UNAVAILABLE' ||
+      capability.reasonCode === 'FEATURE_DISABLED')
+  );
+}
+
+export function filterSkillsHidingBrokenAlbumArt(
+  skills: readonly SkillCommand[],
+  capability: AlbumArtCapability | undefined
+): readonly SkillCommand[] {
+  if (!capability || !shouldHideAlbumArtChatSuggestion(capability)) {
+    return skills;
+  }
+  return skills.filter(skill => skill.id !== 'generateAlbumArt');
 }
 
 export function buildAlbumArtUnavailableAssistantMessage(

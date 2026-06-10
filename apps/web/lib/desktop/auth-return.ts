@@ -1,9 +1,9 @@
 import { APP_ROUTES } from '@/constants/routes';
 
 export const DESKTOP_RETURN_PARAM = 'desktop_return';
-export const DESKTOP_AUTH_RETURN_PATH = '/auth-return';
-export const DESKTOP_AUTH_HANDOFF_PATH = '/desktop-auth';
-export const DESKTOP_AUTH_START_PATH = '/auth/start';
+export const DESKTOP_AUTH_RETURN_PATH = APP_ROUTES.AUTH_RETURN;
+export const DESKTOP_AUTH_HANDOFF_PATH = APP_ROUTES.DESKTOP_AUTH;
+export const DESKTOP_AUTH_START_PATH = APP_ROUTES.AUTH_START;
 export const DESKTOP_AUTH_URL_PARAM = 'auth_url';
 export const JOVIE_AUTH_RETURN_PROTOCOL_URL = 'jovie://auth-return';
 
