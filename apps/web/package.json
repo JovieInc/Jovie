@@ -1,6 +1,6 @@
 {
   "name": "@jovie/web",
-  "version": "26.6.31",
+  "version": "26.6.33",
   "private": true,
   "sideEffects": false,
   "engines": {
@@ -161,6 +161,7 @@
     "qa:overnight:dry-run": "tsx scripts/overnight-qa-controller.ts --dry-run",
     "hermes:worker": "tsx scripts/hermes-cli-worker.ts",
     "profile:mock-diff": "tsx scripts/profile-mock-diff.ts",
+    "visual-qa:diff": "tsx scripts/visual-qa-diff.ts",
     "perf:loop": "tsx scripts/performance-optimizer.ts",
     "perf:loop:end-user": "tsx scripts/performance-optimizer.ts --scope end-user",
     "perf:overnight": "tsx scripts/performance-overnight.ts",

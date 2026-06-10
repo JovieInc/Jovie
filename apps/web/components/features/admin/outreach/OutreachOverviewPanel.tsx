@@ -15,7 +15,13 @@ interface OutreachCountsResponse {
   };
 }
 
-export function OutreachOverviewPanel() {
+interface OutreachOverviewPanelProps {
+  readonly embedded?: boolean;
+}
+
+export function OutreachOverviewPanel({
+  embedded = false,
+}: Readonly<OutreachOverviewPanelProps> = {}) {
   const [counts, setCounts] = useState({
     email: 0,
     dm: 0,
@@ -62,6 +68,19 @@ export function OutreachOverviewPanel() {
   }, [fetchCounts]);
 
   if (loading) {
+    if (embedded) {
+      return (
+        <div
+          className='grid gap-3 sm:grid-cols-2 xl:grid-cols-4'
+          aria-hidden='true'
+        >
+          {['total', 'email', 'dm', 'review'].map(key => (
+            <ContentMetricCardSkeleton key={key} />
+          ))}
+        </div>
+      );
+    }
+
     return (
       <ContentSurfaceCard className='overflow-hidden' aria-hidden='true'>
         <ContentSectionHeaderSkeleton
@@ -82,11 +101,11 @@ export function OutreachOverviewPanel() {
   return (
     <div className='flex flex-col gap-4'>
       {loadError && (
-        <ContentSurfaceCard className='px-(--linear-app-content-padding-x) py-3 text-app leading-[18px] text-secondary-token'>
-          <p>{loadError}</p>
-        </ContentSurfaceCard>
+        <p className='text-app leading-[18px] text-secondary-token'>
+          {loadError}
+        </p>
       )}
-      <OutreachKpis counts={counts} />
+      <OutreachKpis counts={counts} embedded={embedded} />
     </div>
   );
 }
