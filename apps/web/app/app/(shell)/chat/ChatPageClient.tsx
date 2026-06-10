@@ -172,7 +172,7 @@ function getWelcomeChatBootstrapAnnouncement(
     case 'scheduled':
       return 'Still setting up your onboarding chat. Retrying now.';
     case 'failed':
-      return 'We could not start your onboarding chat. Refresh to try again.';
+      return '';
     default:
       return '';
   }
@@ -705,10 +705,9 @@ export function ChatPageClient({
         welcomeChatRetryCountRef.current >=
           WELCOME_CHAT_BOOTSTRAP_RETRY_DELAYS_MS.length
       ) {
-        setWelcomeChatBootstrapStatus('failed');
-        notifications.error(
-          'We could not start your onboarding chat. Refresh to try again.'
-        );
+        // Welcome chat bootstrap is a non-blocking enhancement. The chat shell
+        // remains usable even when auto-creating the welcome thread fails.
+        setWelcomeChatBootstrapStatus('done');
         return;
       }
 
