@@ -46,6 +46,7 @@ describe('public surface guardrails', () => {
       import('../../../app/investor-portal/respond/page'),
       import('../../../app/(marketing)/ai/page'),
       import('../../../app/(marketing)/investors/page'),
+      import('../../../app/pitch/page'),
     ]);
 
     for (const routeModule of modules) {
