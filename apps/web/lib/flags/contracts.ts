@@ -21,6 +21,7 @@ export const LEGACY_STATSIG_GATE_KEYS = {
   AI_CONNECTORS_BETA: 'ai_connectors_beta',
   IOS_APP_ALPHA_ACCESS: 'ios_app_alpha_access',
   MERCH_MVP: 'merch_mvp',
+  BULK_PRESS_PHOTO_IMPORT: 'bulk_press_photo_import',
 } as const;
 
 export type StatsigGateKey =
@@ -45,6 +46,7 @@ export const APP_FLAG_DEFAULTS = {
   AI_CONNECTORS_BETA: false,
   IOS_APP_ALPHA_ACCESS: false,
   MERCH_MVP: false,
+  BULK_PRESS_PHOTO_IMPORT: false,
   // DESIGN_V1 and all its surface aliases are permanently enabled.
   // Statsig gate "design_v1" is also set to 100% rollout.
   // The true default here ensures the new design is on even if Statsig is
@@ -76,6 +78,7 @@ export const APP_FLAG_KEYS = {
   AI_CONNECTORS_BETA: 'ai_connectors_beta',
   IOS_APP_ALPHA_ACCESS: 'ios_app_alpha_access',
   MERCH_MVP: LEGACY_STATSIG_GATE_KEYS.MERCH_MVP,
+  BULK_PRESS_PHOTO_IMPORT: LEGACY_STATSIG_GATE_KEYS.BULK_PRESS_PHOTO_IMPORT,
   DESIGN_V1: 'design_v1',
   SHELL_CHAT_V1: LEGACY_STATSIG_GATE_KEYS.DESIGN_V1,
   DESIGN_V1_RELEASES: LEGACY_STATSIG_GATE_KEYS.DESIGN_V1,
@@ -100,6 +103,7 @@ export const APP_FLAG_OVERRIDE_KEYS = {
   AI_CONNECTORS_BETA: 'code:AI_CONNECTORS_BETA',
   IOS_APP_ALPHA_ACCESS: 'code:IOS_APP_ALPHA_ACCESS',
   MERCH_MVP: 'code:MERCH_MVP',
+  BULK_PRESS_PHOTO_IMPORT: 'code:BULK_PRESS_PHOTO_IMPORT',
   DESIGN_V1: 'code:DESIGN_V1',
   SHELL_CHAT_V1: 'code:DESIGN_V1',
   DESIGN_V1_RELEASES: 'code:DESIGN_V1',
@@ -121,6 +125,7 @@ export const APP_FLAG_TO_STATSIG_GATE = {
   AI_CONNECTORS_BETA: LEGACY_STATSIG_GATE_KEYS.AI_CONNECTORS_BETA,
   IOS_APP_ALPHA_ACCESS: LEGACY_STATSIG_GATE_KEYS.IOS_APP_ALPHA_ACCESS,
   MERCH_MVP: LEGACY_STATSIG_GATE_KEYS.MERCH_MVP,
+  BULK_PRESS_PHOTO_IMPORT: LEGACY_STATSIG_GATE_KEYS.BULK_PRESS_PHOTO_IMPORT,
 } as const satisfies Partial<Record<AppFlagName, StatsigGateKey>>;
 
 export type StatsigBackedAppFlagName = keyof typeof APP_FLAG_TO_STATSIG_GATE;
@@ -140,6 +145,8 @@ export const APP_FLAG_DESCRIPTIONS = {
     'AI Connectors v1 beta (Gmail booking extraction → calendar)',
   IOS_APP_ALPHA_ACCESS: 'Internal iOS TestFlight alpha install access',
   MERCH_MVP: 'Jovie-owned merch creation, checkout, and Printful fulfillment',
+  BULK_PRESS_PHOTO_IMPORT:
+    'DSP bulk press-photo import after platform activation evidence passes',
   DESIGN_V1: 'New production design',
   SHELL_CHAT_V1: 'New production design alias for shell and chat',
   DESIGN_V1_RELEASES: 'New production design alias for releases',
