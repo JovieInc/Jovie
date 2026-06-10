@@ -72,6 +72,37 @@ export function resolveVisualQaManifestPath(runId: string): string {
   );
 }
 
+export function resolveVisualQaDiffSummaryPath(runId: string): string {
+  const safeRunId = assertValidVisualQaRunId(runId);
+  return validatePathTraversal(
+    path.join(safeRunId, 'diff-summary.json'),
+    getVisualQaRootDirectory()
+  );
+}
+
+export function resolveVisualQaDiffOverlayPath(
+  runId: string,
+  surfaceId: string
+): string {
+  const safeRunId = assertValidVisualQaRunId(runId);
+  const safeSurfaceId = assertValidVisualQaSurfaceId(surfaceId);
+  return validatePathTraversal(
+    path.join(safeRunId, safeSurfaceId, 'diff-overlay.png'),
+    getVisualQaRootDirectory()
+  );
+}
+
+export function resolveVisualQaRunRelativePath(
+  runId: string,
+  relativePath: string
+): string {
+  const safeRunId = assertValidVisualQaRunId(runId);
+  return validatePathTraversal(
+    path.join(safeRunId, relativePath),
+    getVisualQaRootDirectory()
+  );
+}
+
 export function toVisualQaRelativePath(absolutePath: string): string {
   const root = getVisualQaRootDirectory();
   const resolvedRoot = path.resolve(root);

@@ -47,7 +47,11 @@ export function isExemptFromIntegrationTarget({ headRef, labels = [] }) {
  */
 export function suggestIntegrationBranch(headRef) {
   const lower = headRef.toLowerCase();
-  if (/auth|clerk|signin|signup|entitlement|proxy/.test(lower)) {
+  if (
+    /auth|clerk|signin|signup|entitlement|proxy|onboarding|turnstile/.test(
+      lower
+    )
+  ) {
     return `${INTEGRATION_BRANCH_PREFIX}auth`;
   }
   if (/library|upload|waveform|share-drop|approval/.test(lower)) {
