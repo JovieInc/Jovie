@@ -4,6 +4,8 @@ Canonical reference for lead-orchestrated parallel agent swarms using ruflo MCP 
 
 **Related:** The `/swarm` gstack skill handles Linear-driven swarms. This file documents the ad-hoc ruflo-coordinated pattern for multi-chunk work that does not require Linear issues — see `.claude/rules/gstack.md` for the cross-reference.
 
+**Integration branches (24/7 agent loop):** Parallel coders merge feature branches into `integration/loop-{domain}` via `scripts/loop-integration-ship.sh`; the lead opens one train PR per domain to `main`. Full policy: [`.claude/rules/ci-branching.md`](ci-branching.md). State: `.context/loop-state.json`.
+
 ## When to Use
 
 Use this pattern when you need to parallelize large mechanical work across multiple independent chunks:
