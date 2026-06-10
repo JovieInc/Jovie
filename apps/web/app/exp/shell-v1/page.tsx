@@ -6358,6 +6358,8 @@ function trackMatchesPill(
       return t.album.toLowerCase().includes(v);
     case 'status':
       return t.status === value;
+    case 'approval':
+      return false;
     case 'has':
       return value === 'video'
         ? t.hasVideo

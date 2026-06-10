@@ -127,6 +127,7 @@ function buildAsset(
     releaseDate: '2026-04-28T00:00:00.000Z',
     releaseType: 'single',
     status: 'released',
+    approvalStatus: 'draft',
     trackCount: 1,
     providerCount: 1,
     providers: [
@@ -241,7 +242,7 @@ describe('LibrarySurface', () => {
     expect(source).toContain('system-b-library-rail-button--active');
     expect(source).toContain('system-b-library-card--selected');
     expect(source).toContain('system-b-library-table-row-selected');
-    expect(source).toContain('system-b-library-dropzone--dragging');
+    expect(source).toContain('ReleaseAudioAssetPanel');
   });
 
   it('aligns library grid and list insets with the shell header padding contract', () => {
@@ -254,10 +255,8 @@ describe('LibrarySurface', () => {
     expect(source).toContain(
       'px-(--linear-app-header-padding-x) py-(--linear-app-content-padding-y)'
     );
-    expect(source).toContain('LIBRARY_GRID_LAYOUT_CLASS');
-    expect(source).toContain(
-      'grid gap-3 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4'
-    );
+    expect(source).toContain('LIBRARY_GRID_DENSITY_LAYOUT');
+    expect(source).toContain('useLibraryGridDensity');
     expect(source).toContain('px-(--linear-app-header-padding-x) sm:flex');
     expect(source).not.toContain('px-2.5 pb-2.5 pt-1');
     expect(source).not.toMatch(/grid gap-2\.5/u);
@@ -288,6 +287,94 @@ describe('LibrarySurface', () => {
     expect(
       screen.queryByRole('button', { name: /Inspect Take Me Over/u })
     ).toBeNull();
+  });
+
+  it('shows the card-size toggle in grid view and persists density preference', () => {
+    renderLibrary([buildAsset()]);
+
+    expect(
+      screen.queryByTestId('library-grid-density-toggle')
+    ).not.toBeInTheDocument();
+
+    clickGridView();
+    expect(
+      screen.getByTestId('library-grid-density-toggle')
+    ).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: /Small cards/u }));
+    expect(window.localStorage.getItem('jovie:library-grid-density')).toBe(
+      'compact'
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: /Large cards/u }));
+    expect(window.localStorage.getItem('jovie:library-grid-density')).toBe(
+      'spacious'
+    );
+  });
+
+  it('renders aspect-ratio-aware artwork frames in grid cards', () => {
+    renderLibrary([
+      buildAsset(),
+      buildAsset({
+        id: 'video-landscape',
+        title: 'Music Video',
+        itemKind: 'video',
+        assetKinds: ['artwork', 'video'],
+      }),
+      buildAsset({
+        id: 'video-portrait',
+        title: 'Reel',
+        itemKind: 'video',
+        mediaOrientation: 'portrait',
+        assetKinds: ['artwork', 'video'],
+      }),
+    ]);
+    clickGridView();
+
+    const releaseCard = screen
+      .getByRole('button', { name: /Inspect Take Me Over/u })
+      .querySelector('.system-b-library-card-artwork');
+    const landscapeCard = screen
+      .getByRole('button', { name: /Inspect Music Video/u })
+      .querySelector('.system-b-library-card-artwork');
+    const portraitCard = screen
+      .getByRole('button', { name: /Inspect Reel/u })
+      .querySelector('.system-b-library-card-artwork');
+
+    expect(releaseCard?.className).toContain('aspect-square');
+    expect(landscapeCard?.className).toContain('aspect-video');
+    expect(portraitCard?.className).toContain('aspect-[9/16]');
+  });
+
+  it('renders approval status badges and supports filtering by approval status', async () => {
+    renderLibraryWithSidebarOverride([
+      buildAsset({ approvalStatus: 'needs_review' }),
+      buildAsset({
+        id: 'release-2',
+        title: 'Second Track',
+        approvalStatus: 'approved',
+      }),
+    ]);
+    clickGridView();
+
+    expect(
+      screen.getByTestId('library-approval-status-release-1')
+    ).toHaveTextContent('Needs Review');
+    expect(
+      screen.getByTestId('library-approval-status-release-2')
+    ).toHaveTextContent('Approved');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Show filters' }));
+    fireEvent.click(screen.getByRole('button', { name: /Needs Review/u }));
+
+    await waitFor(() => {
+      expect(
+        screen.getByTestId('library-approval-status-release-1')
+      ).toBeInTheDocument();
+      expect(
+        screen.queryByTestId('library-approval-status-release-2')
+      ).toBeNull();
+    });
   });
 
   it('renders release assets with grid cards and a read-only detail drawer', () => {
@@ -383,6 +470,32 @@ describe('LibrarySurface', () => {
       '/app/library?view=merch'
     );
     expect(screen.queryByTestId('library-audio-dropzone')).toBeNull();
+  });
+
+  it('renders the library right rail as a sticky carded panel', () => {
+    renderLibrary([buildAsset()]);
+    clickGridView();
+
+    fireEvent.click(
+      screen.getByRole('button', { name: /Inspect Take Me Over/u })
+    );
+
+    const drawer = screen.getByTestId('library-asset-drawer');
+    const stickyRail = screen.getByTestId('library-asset-drawer-sticky-rail');
+    const stickyCard = stickyRail.querySelector('[data-variant="card"]');
+
+    expect(stickyCard).toBeInTheDocument();
+    expect(stickyCard).toContainElement(
+      screen.getByRole('button', { name: 'Close asset details' })
+    );
+    expect(
+      within(stickyRail).getByRole('heading', { name: 'Take Me Over' })
+    ).toBeInTheDocument();
+    expect(
+      drawer.querySelectorAll('[data-variant="card"]').length
+    ).toBeGreaterThan(1);
+    expect(drawer.textContent).toContain('Details');
+    expect(drawer.textContent).toContain('Providers');
   });
 
   it('uses shell focus tokens for library cards and drawer actions', () => {

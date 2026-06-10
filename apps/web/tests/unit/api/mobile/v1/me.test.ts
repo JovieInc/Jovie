@@ -7,6 +7,7 @@ const hoisted = vi.hoisted(() => ({
   getMobileSessionUserIdMock: vi.fn(),
   getSessionContextMock: vi.fn(),
   isProfileCompleteMock: vi.fn(),
+  isAppleWalletProfilePassAvailableMock: vi.fn(),
 }));
 
 vi.mock('@/constants/domains', () => ({
@@ -35,6 +36,11 @@ vi.mock('@/lib/mobile/session-auth', () => ({
   getMobileSessionUserId: hoisted.getMobileSessionUserIdMock,
 }));
 
+vi.mock('@/lib/wallet/apple/profile-pass', () => ({
+  isAppleWalletProfilePassAvailable:
+    hoisted.isAppleWalletProfilePassAvailableMock,
+}));
+
 const routeModulePromise = import('@/app/api/mobile/v1/me/route');
 
 function makeRequest() {
@@ -54,6 +60,7 @@ describe('GET /api/mobile/v1/me', () => {
       (handle: string) => `https://jov.ie/${handle}`
     );
     hoisted.isProfileCompleteMock.mockReturnValue(true);
+    hoisted.isAppleWalletProfilePassAvailableMock.mockResolvedValue(true);
   });
 
   it('returns 401 when unauthenticated', async () => {
@@ -93,6 +100,7 @@ describe('GET /api/mobile/v1/me', () => {
         userStatus: 'active',
       },
       profile: {
+        id: 'profile_123',
         username: 'djshadow',
         usernameNormalized: 'djshadow',
         displayName: 'DJ Shadow',
@@ -116,6 +124,7 @@ describe('GET /api/mobile/v1/me', () => {
       qrPayload: 'https://jov.ie/djshadow',
       avatarUrl: 'https://cdn.jov.ie/avatar.png',
       continueOnWebUrl: 'https://jov.ie/app',
+      appleWalletProfilePassAvailable: true,
     });
     expect(hoisted.isProfileCompleteMock).toHaveBeenCalledWith({
       username: 'djshadow',
@@ -144,6 +153,7 @@ describe('GET /api/mobile/v1/me', () => {
       qrPayload: null,
       avatarUrl: null,
       continueOnWebUrl: 'https://jov.ie/app',
+      appleWalletProfilePassAvailable: false,
     });
   });
 
@@ -168,6 +178,7 @@ describe('GET /api/mobile/v1/me', () => {
       qrPayload: null,
       avatarUrl: null,
       continueOnWebUrl: 'https://jov.ie/app',
+      appleWalletProfilePassAvailable: false,
     });
   });
 
@@ -178,6 +189,7 @@ describe('GET /api/mobile/v1/me', () => {
         userStatus: 'active',
       },
       profile: {
+        id: 'profile_123',
         username: 'djshadow',
         usernameNormalized: 'djshadow',
         displayName: 'DJ Shadow',
@@ -200,6 +212,7 @@ describe('GET /api/mobile/v1/me', () => {
       qrPayload: null,
       avatarUrl: null,
       continueOnWebUrl: 'https://jov.ie/app',
+      appleWalletProfilePassAvailable: false,
     });
   });
 

@@ -19,6 +19,7 @@ export type AudienceEventConfidence =
 
 export type AudienceSourceType =
   | 'qr'
+  | 'wallet_pass'
   | 'short_link'
   | 'utm'
   | 'referrer'

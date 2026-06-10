@@ -133,6 +133,7 @@ vi.mock('@/lib/error-tracking', () => ({
 describe('GET /s/[code]', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mocks.sourceLink.sourceType = 'qr';
     mocks.selectLimitMock.mockResolvedValue([mocks.sourceLink]);
   });
 
@@ -157,6 +158,25 @@ describe('GET /s/[code]', () => {
       expect.objectContaining({
         audienceMemberId: 'audience_member_123',
         eventType: 'source_scanned',
+      })
+    );
+  });
+
+  it('classifies Wallet profile pass scans separately from short links', async () => {
+    mocks.sourceLink.sourceType = 'wallet_pass';
+
+    const request = new NextRequest('http://localhost/s/abc123');
+
+    const response = await GET(request, {
+      params: Promise.resolve({ code: 'abc123' }),
+    });
+
+    expect(response.status).toBe(302);
+    expect(recordAudienceEvent).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        eventType: 'source_scanned',
+        sourceKind: 'wallet_pass',
       })
     );
   });
