@@ -36,7 +36,9 @@ function getOAuthStrategy(
 }
 
 function getSsoCallbackPath(mode: AuthShellMode): string {
-  return mode === 'sign-up' ? '/signup/sso-callback' : '/signin/sso-callback';
+  return mode === 'sign-up'
+    ? APP_ROUTES.SIGNUP_SSO_CALLBACK
+    : APP_ROUTES.SIGNIN_SSO_CALLBACK;
 }
 
 function getAuthStartErrorMessage(mode: AuthShellMode): string {
