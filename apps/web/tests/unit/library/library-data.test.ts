@@ -65,6 +65,7 @@ describe('library data', () => {
         releaseDate: null,
         releaseType: 'single',
         status: 'released',
+        approvalStatus: 'draft',
         trackCount: 1,
         providerCount: 1,
         providers: [
@@ -136,6 +137,15 @@ describe('library data', () => {
     });
   });
 
+  it('applies persisted approval statuses when building library assets', () => {
+    const assets = buildLibraryReleaseAssets(
+      [buildRelease()],
+      new Map([['release-1', 'approved']])
+    );
+
+    expect(assets[0]?.approvalStatus).toBe('approved');
+  });
+
   it('derives library merch assets from chat-selected merch cards', () => {
     const cards: LibraryMerchCard[] = [
       {
@@ -165,6 +175,7 @@ describe('library data', () => {
         artist: 'Tim White',
         artworkUrl: 'https://cdn.example.com/hoodie.png',
         itemKind: 'merch',
+        approvalStatus: 'draft',
         itemStatusLabel: 'Draft',
         productType: 'hoodie',
         primaryActionLabel: 'Open Merch',
