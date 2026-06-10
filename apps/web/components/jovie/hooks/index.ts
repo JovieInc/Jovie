@@ -1,3 +1,4 @@
+export { useChatAudioAttachments } from './useChatAudioAttachments';
 export { useChatImageAttachments } from './useChatImageAttachments';
 export { useChatJankMonitor } from './useChatJankMonitor';
 export { useJovieChat } from './useJovieChat';
