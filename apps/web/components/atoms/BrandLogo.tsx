@@ -1,8 +1,5 @@
 import type { CSSProperties } from 'react';
-import {
-  JOVIE_ICON_PATH,
-  JOVIE_ICON_VIEW_BOX,
-} from '@/components/atoms/jovie-icon-path';
+import { JOVIE_PATH, JOVIE_VIEWBOX } from '@/lib/brand/tokens';
 import { cn } from '@/lib/utils';
 
 export type BrandLogoTone = 'auto' | 'white' | 'color' | 'muted';
@@ -23,6 +20,8 @@ const TONE_CLASSES: Record<BrandLogoTone, string | undefined> = {
   color: 'text-accent',
   muted: 'text-muted-foreground/50',
 };
+
+const BRAND_VIEW_BOX = `0 0 ${JOVIE_VIEWBOX.width} ${JOVIE_VIEWBOX.height}`;
 
 export function BrandLogo({
   size = 48,
@@ -46,15 +45,16 @@ export function BrandLogo({
     >
       <svg
         xmlns='http://www.w3.org/2000/svg'
-        viewBox={JOVIE_ICON_VIEW_BOX}
+        viewBox={BRAND_VIEW_BOX}
         width={size}
         height={size}
         fill='currentColor'
+        shapeRendering='geometricPrecision'
         role={ariaHidden ? undefined : 'img'}
         aria-label={ariaHidden ? undefined : alt}
       >
         {!ariaHidden && <title>{alt}</title>}
-        <path d={JOVIE_ICON_PATH} />
+        <path d={JOVIE_PATH} />
       </svg>
     </span>
   );
