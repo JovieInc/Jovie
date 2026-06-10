@@ -131,9 +131,7 @@ describe('ban-check.ts', () => {
       cachedAt: '2026-06-10T00:00:00.000Z',
     });
 
-    const consoleSpy = vi
-      .spyOn(console, 'error')
-      .mockImplementation(() => {});
+    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
 
     const result = await getUserBanStatus('clerk_banned');
 
@@ -164,9 +162,7 @@ describe('ban-check.ts', () => {
     });
     mockRedisGet.mockResolvedValue(null);
 
-    const consoleSpy = vi
-      .spyOn(console, 'warn')
-      .mockImplementation(() => {});
+    const consoleSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
 
     const result = await getUserBanStatus('clerk_unknown');
 
