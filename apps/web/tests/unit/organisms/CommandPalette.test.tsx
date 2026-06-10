@@ -51,6 +51,22 @@ vi.mock('@/lib/queries/useArtistSearchQuery', () => ({
   }),
 }));
 
+vi.mock('@/lib/queries/useChatCapabilitiesQuery', () => ({
+  useChatCapabilitiesQuery: () => ({
+    data: {
+      tools: {
+        albumArt: {
+          availability: 'available',
+          reason: null,
+          reasonCode: null,
+        },
+      },
+    },
+    isLoading: false,
+    isError: false,
+  }),
+}));
+
 vi.mock('@/lib/queries', async () => {
   const actual =
     await vi.importActual<typeof import('@/lib/queries')>('@/lib/queries');

@@ -19,6 +19,7 @@ import { Search } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { APP_ROUTES } from '@/constants/routes';
+import { filterSkillsHidingBrokenAlbumArt } from '@/lib/chat/album-art-capability';
 import { type EntityRef } from '@/lib/commands/entities';
 import { resolveEntityHref } from '@/lib/commands/entity-routing';
 import {
@@ -28,6 +29,7 @@ import {
   type SkillCommand,
 } from '@/lib/commands/registry';
 import { useArtistSearchQuery } from '@/lib/queries/useArtistSearchQuery';
+import { useChatCapabilitiesQuery } from '@/lib/queries/useChatCapabilitiesQuery';
 import { useReleasesQuery } from '@/lib/queries/useReleasesQuery';
 import {
   artistResultToEntityRef,
@@ -63,9 +65,17 @@ function useCmdkData(profileId: string, query: string, open: boolean) {
     () => commandsForSurface('cmdk'),
     []
   );
+  const { data: chatCapabilities } = useChatCapabilitiesQuery({
+    profileId,
+    enabled: open,
+  });
   const skills = useMemo(
-    () => commands.filter((c): c is SkillCommand => c.kind === 'skill'),
-    [commands]
+    () =>
+      filterSkillsHidingBrokenAlbumArt(
+        commands.filter((c): c is SkillCommand => c.kind === 'skill'),
+        chatCapabilities?.tools.albumArt
+      ),
+    [chatCapabilities?.tools.albumArt, commands]
   );
   const navs = useMemo(
     () => commands.filter((c): c is NavCommand => c.kind === 'nav'),
