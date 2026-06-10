@@ -45,7 +45,7 @@ export async function isVisitorBlocked(
     return blocked.length > 0;
   } catch (error) {
     // Fail open: don't lock out visitors on DB errors.
-    // Matches ban-check.ts fail-open pattern.
+    // ban-check.ts uses a Redis cached fallback before failing open.
     captureError('Audience block check failed', error, {
       profileId,
       fingerprint: fingerprint.slice(0, 8),
