@@ -36,7 +36,6 @@ import {
 import { attributeLeadSignupFromClerkUserId } from '@/lib/leads/funnel-events';
 import { cacheHandleAvailability } from '@/lib/onboarding/handle-availability-cache';
 import { enforceOnboardingRateLimit } from '@/lib/onboarding/rate-limit';
-import { withTimeout } from '@/lib/resilience/primitives';
 import { extractClientIP } from '@/lib/utils/ip-extraction';
 import { isContentClean } from '@/lib/validation/content-filter';
 import { normalizeUsername, validateUsername } from '@/lib/validation/username';
@@ -45,6 +44,10 @@ import { handleBackgroundAvatarUpload } from './avatar';
 import { logOnboardingError } from './errors';
 import { profileIsPublishable } from './helpers';
 import {
+  finalizePostOnboarding,
+  runBoundedPostOnboardingSideEffect,
+} from './post-onboarding';
+import {
   createProfileForExistingUser,
   createUserAndProfile,
   deactivateOrphanedProfiles,
@@ -52,11 +55,8 @@ import {
   fetchExistingUser,
   updateExistingProfile,
 } from './profile-setup';
-import { runBackgroundSyncOperations } from './sync';
 import type { CompletionResult } from './types';
 import { ensureEmailAvailable, ensureHandleAvailable } from './validation';
-
-const POST_ONBOARDING_SIDE_EFFECT_TIMEOUT_MS = 2_000;
 
 function isHandleUniqueViolation(error: unknown): boolean {
   const unwrapped = unwrapDatabaseError(error);
@@ -103,24 +103,6 @@ async function recoverConcurrentProfileClaim(
       profileId: existingProfile.id,
     };
   });
-}
-
-async function runBoundedPostOnboardingSideEffect(
-  context: string,
-  operation: () => Promise<void>,
-  contextData?: Record<string, string | null | undefined>
-): Promise<void> {
-  try {
-    await withTimeout(operation(), {
-      timeoutMs: POST_ONBOARDING_SIDE_EFFECT_TIMEOUT_MS,
-      context,
-    });
-  } catch (error) {
-    await captureError(`${context} failed`, error, {
-      route: 'onboarding',
-      contextData,
-    });
-  }
 }
 
 async function applyPendingClaimTx(
@@ -453,13 +435,9 @@ export async function completeOnboarding({
       );
     }
 
-    // Steps 8-9: Sync, trial activation, and completion cookie (fire-and-forget)
+    // Steps 8-9: Durable bounded sync + trial activation, then completion cookie
     if (shouldFinalizeOnboarding) {
-      runBackgroundSyncOperations(userId, completion.username);
-
-      void import('./activate-trial').then(({ activateTrial }) =>
-        activateTrial(userId)
-      );
+      await finalizePostOnboarding(userId, completion.username);
 
       // ENG-002: Set completion cookie to prevent redirect loop race condition
       const cookieStore = await cookies();
