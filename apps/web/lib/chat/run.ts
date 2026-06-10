@@ -6,6 +6,7 @@ import {
   type UIMessage,
 } from 'ai';
 import { streamText } from '@/lib/ai/sdk';
+import { buildAiTelemetry } from '@/lib/ai/telemetry';
 import type { ChatAccountContext } from '@/lib/chat/account-context';
 import { selectKnowledgeContext } from '@/lib/chat/knowledge/router';
 import { ONBOARDING_SYSTEM_PROMPT } from '@/lib/chat/prompts/onboarding';
@@ -248,15 +249,14 @@ export async function executeChatTurn(
     messages: modelMessages,
     tools,
     abortSignal: signal,
-    experimental_telemetry: {
-      isEnabled: true,
-      // PII: do not capture prompts/outputs in AI SDK spans. Tokens, model,
-      // latency, and tool-call structure are still captured.
-      recordInputs: false,
-      recordOutputs: false,
+    experimental_telemetry: buildAiTelemetry({
       functionId: 'jovie-chat',
+      identity: {
+        userId,
+        sessionId: resolvedConversationId,
+      },
       metadata: { model: selectedModel, plan: userPlan },
-    },
+    }),
     onError: async ({ error }) => {
       if (isClientDisconnect(error, signal)) return;
 

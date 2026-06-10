@@ -55,7 +55,9 @@ async function processProfile(
   }
 
   const existingTypes = await getExistingInsightTypes(profileId);
-  const result = await generateInsights(metrics, existingTypes);
+  const result = await generateInsights(metrics, existingTypes, {
+    sessionId: profileId,
+  });
 
   const persisted = await persistInsights(
     profileId,

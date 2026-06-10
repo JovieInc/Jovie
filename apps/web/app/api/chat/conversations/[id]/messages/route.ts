@@ -2,6 +2,7 @@ import { gateway } from '@ai-sdk/gateway';
 import { and, sql as drizzleSql, eq, isNull } from 'drizzle-orm';
 import { after, NextResponse } from 'next/server';
 import { generateText } from '@/lib/ai/sdk';
+import { buildAiTelemetry } from '@/lib/ai/telemetry';
 import { getSessionContext } from '@/lib/auth/session';
 import { sanitizeConversationTitle } from '@/lib/chat/title';
 import {
@@ -30,7 +31,8 @@ interface RouteParams {
  */
 async function maybeGenerateTitle(
   conversationId: string,
-  messages: ChatPersistenceMessage[]
+  messages: ChatPersistenceMessage[],
+  identity?: { userId?: string | null }
 ): Promise<void> {
   const userMessage = messages.find(m => m.role === 'user');
   const titleSource = sanitizeConversationTitle(userMessage?.content, 200);
@@ -52,12 +54,13 @@ async function maybeGenerateTitle(
       prompt: context,
       maxOutputTokens: 30,
       abortSignal: AbortSignal.timeout(5000),
-      experimental_telemetry: {
-        isEnabled: true,
-        recordInputs: false,
-        recordOutputs: false,
+      experimental_telemetry: buildAiTelemetry({
         functionId: 'jovie-chat-title',
-      },
+        identity: {
+          userId: identity?.userId,
+          sessionId: conversationId,
+        },
+      }),
     });
 
     const title = sanitizeConversationTitle(text);
@@ -97,7 +100,9 @@ async function maybeGenerateTitle(
 export async function POST(req: Request, { params }: RouteParams) {
   try {
     const { id: conversationId } = await params;
-    const { profile } = await getSessionContext({ requireProfile: true });
+    const { profile, clerkUserId } = await getSessionContext({
+      requireProfile: true,
+    });
 
     if (!profile) {
       return NextResponse.json(
@@ -199,7 +204,9 @@ export async function POST(req: Request, { params }: RouteParams) {
     if (titlePending) {
       after(async () => {
         try {
-          await maybeGenerateTitle(conversationId, messagesToInsert);
+          await maybeGenerateTitle(conversationId, messagesToInsert, {
+            userId: clerkUserId,
+          });
         } catch (error) {
           logger.error('Title generation error:', error);
         }

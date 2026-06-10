@@ -150,6 +150,17 @@ async function runEnvironmentValidationWithRetry() {
 
 export async function register() {
   if (process.env.NEXT_RUNTIME === 'nodejs') {
+    // Agnost AI analytics (Vercel AI SDK spans via OpenTelemetry).
+    // Lazy import keeps OTel out of Edge bundles; init failure must not block boot.
+    try {
+      const { initAgnostTelemetry } = await import(
+        '@/lib/observability/agnost'
+      );
+      await initAgnostTelemetry();
+    } catch (error) {
+      console.warn('[STARTUP] Agnost telemetry bootstrap failed:', error);
+    }
+
     // Braintrust observability. Lazy dynamic import keeps the SDK out of the
     // Edge bundle; the webpack-loader (next.config.js) handles foreign-module
     // span propagation. Init failure must not block app boot.
