@@ -1,4 +1,5 @@
 import type { CanonicalSurfaceId } from '@/lib/canonical-surfaces';
+import type { VisualQaColorScheme } from '@/lib/visual-qa/themes';
 
 export const VISUAL_QA_PHASES = ['baseline', 'after'] as const;
 
@@ -12,6 +13,7 @@ export interface VisualQaCaptureConfig {
   readonly route: string;
   readonly waitFor: string;
   readonly viewport: VisualQaViewport;
+  readonly colorScheme?: VisualQaColorScheme;
   readonly captureTarget?: VisualQaCaptureTarget;
   readonly captureSelector?: string;
   readonly fullPage?: boolean;
@@ -26,6 +28,7 @@ export interface VisualQaSurface {
   readonly description: string;
   readonly parityLedgerGroup?: string;
   readonly canonicalSurfaceId?: CanonicalSurfaceId;
+  readonly themes?: readonly VisualQaColorScheme[];
   readonly baseline: VisualQaCaptureConfig;
   readonly after?: Partial<VisualQaCaptureConfig>;
 }
@@ -35,14 +38,20 @@ export interface VisualQaViewportSize {
   readonly height: number;
 }
 
-export interface VisualQaSurfaceCaptureRecord {
-  readonly surfaceId: string;
-  readonly title: string;
+export interface VisualQaPhaseCaptureRecord {
   readonly baselinePath: string;
   readonly afterPath: string;
   readonly baselineCapturedAt: string | null;
   readonly afterCapturedAt: string | null;
+}
+
+export interface VisualQaSurfaceCaptureRecord {
+  readonly surfaceId: string;
+  readonly title: string;
   readonly viewport: VisualQaViewportSize;
+  readonly themes: Partial<
+    Record<VisualQaColorScheme, VisualQaPhaseCaptureRecord>
+  >;
 }
 
 export interface VisualQaRunManifest {
@@ -51,6 +60,24 @@ export interface VisualQaRunManifest {
   readonly updatedAt: string;
   readonly gitSha: string | null;
   readonly surfaces: readonly VisualQaSurfaceCaptureRecord[];
+}
+
+function isVisualQaPhaseCaptureRecord(
+  value: unknown
+): value is VisualQaPhaseCaptureRecord {
+  if (!value || typeof value !== 'object') {
+    return false;
+  }
+
+  const record = value as Partial<VisualQaPhaseCaptureRecord>;
+  return (
+    typeof record.baselinePath === 'string' &&
+    typeof record.afterPath === 'string' &&
+    (typeof record.baselineCapturedAt === 'string' ||
+      record.baselineCapturedAt === null) &&
+    (typeof record.afterCapturedAt === 'string' ||
+      record.afterCapturedAt === null)
+  );
 }
 
 export function isVisualQaRunManifest(
@@ -72,15 +99,18 @@ export function isVisualQaRunManifest(
         return false;
       }
 
+      const themes = surface.themes;
+      const hasValidThemes =
+        !!themes &&
+        typeof themes === 'object' &&
+        Object.values(themes).every(themeRecord =>
+          isVisualQaPhaseCaptureRecord(themeRecord)
+        );
+
       return (
         typeof surface.surfaceId === 'string' &&
         typeof surface.title === 'string' &&
-        typeof surface.baselinePath === 'string' &&
-        typeof surface.afterPath === 'string' &&
-        (typeof surface.baselineCapturedAt === 'string' ||
-          surface.baselineCapturedAt === null) &&
-        (typeof surface.afterCapturedAt === 'string' ||
-          surface.afterCapturedAt === null) &&
+        hasValidThemes &&
         typeof surface.viewport?.width === 'number' &&
         typeof surface.viewport?.height === 'number'
       );
