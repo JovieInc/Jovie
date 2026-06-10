@@ -25,6 +25,7 @@ experiments used by the web app.
 | `ai_connectors_beta` | `LEGACY_STATSIG_GATE_KEYS.AI_CONNECTORS_BETA` | `false` | AI Connector v1 closed beta — Gmail booking email → Google Calendar event flow | Active |
 | `ios_app_alpha_access` | `LEGACY_STATSIG_GATE_KEYS.IOS_APP_ALPHA_ACCESS` | `false` | Internal iOS TestFlight install access | Active |
 | `merch_mvp` | `LEGACY_STATSIG_GATE_KEYS.MERCH_MVP` | `false` | Jovie-owned merch generation, public merch cards, checkout, and Printful fulfillment | Active |
+| `bulk_press_photo_import` | `LEGACY_STATSIG_GATE_KEYS.BULK_PRESS_PHOTO_IMPORT` | `false` | DSP bulk press-photo import after platform activation evidence passes | Active |
 | `ai_chat_disabled` | `CHAT_KILL_SWITCH_GATES.DISABLED` | `false` | Emergency kill switch for `/api/chat` | Active |
 | `ai_chat_force_light` | `CHAT_KILL_SWITCH_GATES.FORCE_LIGHT` | `false` | Runtime switch to route `/api/chat` to the lighter model | Active |
 

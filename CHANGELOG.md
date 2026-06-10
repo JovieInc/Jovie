@@ -13,6 +13,10 @@
 
 - **Printful merch mockup pipeline (JOV-2621)**: adds a mockup catalog, Printful mockup task creation/polling, authenticated `/api/merch/mockups`, and async chat merch enrichment that merges photorealistic mockup URLs into design options.
 
+### Changed
+
+- **[internal] Bulk press-photo import gate (JOV-2878)**: adds `bulk_press_photo_import` Statsig gate (default off), platform activation-evidence evaluation for manual press-photo usage, and gated scheduling after profile enrichment. Manual single-photo upload remains the default path; bulk import stays deferred until evidence thresholds pass.
+
 ## [26.6.30] - 2026-06-08
 
 > Library grid cards and list rows now line up with the page toolbar instead of sitting on a tighter inset.
