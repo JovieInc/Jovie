@@ -110,6 +110,8 @@ describe('POST /api/auth/native/exchange', () => {
     vi.clearAllMocks();
     vi.resetModules();
     vi.unstubAllEnvs();
+    vi.stubEnv('NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY', 'pk_live_production');
+    vi.stubEnv('CLERK_SECRET_KEY', 'sk_live_production');
 
     mockCaptureError.mockResolvedValue(undefined);
     mockCreateAuthAnalyticsEvent.mockReturnValue({});
@@ -274,6 +276,55 @@ describe('POST /api/auth/native/exchange', () => {
       expiresInSeconds: 60,
     });
     expect(mockSessionsGetToken).not.toHaveBeenCalled();
+    expect(mockCaptureError).not.toHaveBeenCalled();
+  });
+
+  it('uses production Clerk keys for iOS native exchange on production hosts', async () => {
+    vi.stubEnv('NODE_ENV', 'production');
+    vi.stubEnv('VERCEL_ENV', 'production');
+    vi.stubEnv('NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY', 'pk_live_production');
+    vi.stubEnv('CLERK_SECRET_KEY', 'sk_live_production');
+
+    const { POST } = await import('@/app/api/auth/native/exchange/route');
+    const response = await POST(createExchangeRequest());
+    const data = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(data).toMatchObject({
+      returnTo: '/app',
+      sessionToken: 'ios_session_token',
+      sessionId: 'sess_ios',
+      userId: 'user_native',
+    });
+    expect(mockCreateClerkClient).toHaveBeenCalledWith({
+      publishableKey: 'pk_live_production',
+      secretKey: 'sk_live_production',
+    });
+    expect(mockClerkClient).not.toHaveBeenCalled();
+  });
+
+  it('falls back to a sign-in ticket when Clerk session token minting returns Not Found', async () => {
+    const unavailableError = new Error('Not Found');
+    mockSessionsGetToken.mockRejectedValue(unavailableError);
+
+    const { POST } = await import('@/app/api/auth/native/exchange/route');
+    const response = await POST(createExchangeRequest());
+    const data = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(data).toMatchObject({
+      returnTo: '/app',
+      ticket: 'sign_in_ticket',
+      userId: 'user_native',
+      expiresInSeconds: 60,
+    });
+    expect(mockSessionsCreateSession).toHaveBeenCalledWith({
+      userId: 'user_native',
+    });
+    expect(mockSignInTokensCreateSignInToken).toHaveBeenCalledWith({
+      userId: 'user_native',
+      expiresInSeconds: 60,
+    });
     expect(mockCaptureError).not.toHaveBeenCalled();
   });
 
