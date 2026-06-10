@@ -132,6 +132,7 @@ Read the file for the topic you're touching. More-local instructions override th
 | [`.claude/rules/ui.md`](.claude/rules/ui.md) | Design system, component hierarchy, surfaces, taste rules, marketing |
 | [`.claude/rules/security.md`](.claude/rules/security.md) | CSP, webhooks, secrets, email, fail-closed persistence, entitlements |
 | [`.claude/rules/release.md`](.claude/rules/release.md) | PR discipline, ship, deploy, branch strategy, bot reviews |
+| [`.claude/rules/ci-branching.md`](.claude/rules/ci-branching.md) | Agent integration branches, train PRs, CI throughput for parallel work |
 | [`.claude/rules/testing.md`](.claude/rules/testing.md) | E2E patterns, test perf, coverage, verify-before-done |
 | [`.claude/rules/infra.md`](.claude/rules/infra.md) | Cron, API budgets, forbidden infra, cost disclosure, API runtime |
 | [`.claude/rules/code-style.md`](.claude/rules/code-style.md) | TypeScript, React, server/client boundaries, canonical imports, ESLint, hooks |

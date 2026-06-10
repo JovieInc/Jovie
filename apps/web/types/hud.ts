@@ -48,6 +48,30 @@ export interface HudBranding {
   logoUrl: string | null;
 }
 
+export type HudMetricSourceKey =
+  | 'stripe'
+  | 'mercury'
+  | 'database'
+  | 'sentry'
+  | 'github';
+
+export type HudMetricSourceState =
+  | 'ok'
+  | 'unavailable'
+  | 'not_configured'
+  | 'no_data';
+
+export interface HudMetricSourceTrust {
+  readonly key: HudMetricSourceKey;
+  readonly label: string;
+  readonly state: HudMetricSourceState;
+  readonly fetchedAtIso: string;
+  readonly errorMessage: string | null;
+  readonly dashboardUrl: string | null;
+  readonly configureUrl: string | null;
+  readonly nextStep: string | null;
+}
+
 export interface HudMetrics {
   accessMode: HudAccessMode;
   branding: HudBranding;
@@ -64,5 +88,7 @@ export interface HudMetrics {
   };
   deployments: HudDeployments;
   aiOps: HermesAiOpsSummary;
+  /** Per-source fetch metadata for ops metric cards (freshness + failure states). */
+  sources: Record<HudMetricSourceKey, HudMetricSourceTrust>;
   generatedAtIso: string;
 }
