@@ -8,6 +8,7 @@ import {
   ExternalLink,
   Loader2,
   QrCode,
+  Wallet,
 } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -29,8 +30,13 @@ import { BASE_URL } from '@/constants/domains';
 import { CopyLinkInput } from '@/features/dashboard/atoms/CopyLinkInput';
 import { ProfilePreview } from '@/features/dashboard/molecules/ProfilePreview';
 import { LINEAR_SURFACE } from '@/features/dashboard/tokens';
+import { useAppFlag } from '@/lib/flags/client';
 import { useQrCodeDownloadMutation } from '@/lib/queries';
 import { cn } from '@/lib/utils';
+import {
+  isAppleWalletPassSupportedClient,
+  openAppleWalletProfilePass,
+} from '@/lib/wallet/apple/client';
 
 export const PREVIEW_PANEL_WIDTH = 360;
 
@@ -135,9 +141,15 @@ export function PreviewPanel() {
   const { previewData } = usePreviewPanelData();
   const qrCodeDownload = useQrCodeDownloadMutation();
   const [isUrlCopied, setIsUrlCopied] = useState(false);
+  const appleWalletEnabled = useAppFlag('APPLE_WALLET_PROFILE_PASS');
+  const [supportsAppleWallet, setSupportsAppleWallet] = useState(false);
   const copyResetTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(
     null
   );
+
+  useEffect(() => {
+    setSupportsAppleWallet(isAppleWalletPassSupportedClient());
+  }, []);
 
   useEffect(() => {
     return () => {
@@ -234,8 +246,26 @@ export function PreviewPanel() {
         icon: <Download className='h-3.5 w-3.5' />,
         onClick: handleDownloadVcard,
       },
+      ...(appleWalletEnabled && supportsAppleWallet
+        ? [
+            {
+              type: 'action' as const,
+              id: 'apple-wallet-profile-pass',
+              label: 'Add to Apple Wallet',
+              icon: <Wallet className='h-3.5 w-3.5' />,
+              onClick: openAppleWalletProfilePass,
+            },
+          ]
+        : []),
     ],
-    [handleCopyUrl, handleDownloadQr, handleDownloadVcard, profileUrl]
+    [
+      appleWalletEnabled,
+      handleCopyUrl,
+      handleDownloadQr,
+      handleDownloadVcard,
+      profileUrl,
+      supportsAppleWallet,
+    ]
   );
 
   // Header actions using DrawerHeaderActions for consistent styling

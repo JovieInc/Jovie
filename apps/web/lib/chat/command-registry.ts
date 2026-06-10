@@ -17,6 +17,7 @@ interface CommandMatch {
 
 export interface CommandContext {
   readonly username?: string;
+  readonly appleWalletProfilePassAvailable?: boolean;
   readonly router: { push: (path: string) => void };
 }
 
@@ -28,6 +29,34 @@ interface CommandDefinition {
 }
 
 const COMMANDS: readonly CommandDefinition[] = [
+  {
+    keywords: ['apple', 'wallet'],
+    result: ctx => ({
+      confirmationMessage:
+        ctx.username && ctx.appleWalletProfilePassAvailable
+          ? `Opening Apple Wallet so your Jovie profile can be added for in-person scans.`
+          : `Apple Wallet is not available for this profile yet.`,
+      execute: () => {
+        if (ctx.username && ctx.appleWalletProfilePassAvailable) {
+          globalThis.location.assign('/api/wallet/apple/profile-pass');
+        }
+      },
+    }),
+  },
+  {
+    keywords: ['wallet', 'profile'],
+    result: ctx => ({
+      confirmationMessage:
+        ctx.username && ctx.appleWalletProfilePassAvailable
+          ? `Opening Apple Wallet so your Jovie profile can be added for in-person scans.`
+          : `Apple Wallet is not available for this profile yet.`,
+      execute: () => {
+        if (ctx.username && ctx.appleWalletProfilePassAvailable) {
+          globalThis.location.assign('/api/wallet/apple/profile-pass');
+        }
+      },
+    }),
+  },
   {
     keywords: ['move', 'remix', 'la show'],
     result: () => {
@@ -115,7 +144,9 @@ const COMMANDS: readonly CommandDefinition[] = [
     keywords: ['share', 'profile'],
     result: ctx => ({
       confirmationMessage: ctx.username
-        ? `Sharing your profile link.`
+        ? ctx.appleWalletProfilePassAvailable
+          ? `Sharing your profile link. Add it to Apple Wallet from your profile share menu for in-person scans.`
+          : `Sharing your profile link.`
         : `I couldn't determine your username. Please check your profile settings.`,
       execute: async () => {
         if (!ctx.username) return;
