@@ -3,6 +3,10 @@
 import { Share2 } from 'lucide-react';
 import { useState } from 'react';
 import { toast } from 'sonner';
+import {
+  type LibraryShareExpiryPreset,
+  resolveLibraryShareExpiryIso,
+} from '@/lib/library-share/expiry';
 
 interface LibraryShareDropCreatorProps {
   readonly releaseIds: readonly string[];
@@ -20,6 +24,8 @@ export function LibraryShareDropCreator({
   const [message, setMessage] = useState('');
   const [layout, setLayout] = useState<'grid' | 'list' | 'reel'>('grid');
   const [downloadsEnabled, setDownloadsEnabled] = useState(true);
+  const [expiryPreset, setExpiryPreset] =
+    useState<LibraryShareExpiryPreset>('never');
   const [passphrase, setPassphrase] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -34,6 +40,7 @@ export function LibraryShareDropCreator({
           message: message.trim() || null,
           layout,
           downloadsEnabled,
+          expiresAt: resolveLibraryShareExpiryIso(expiryPreset),
           passphrase: passphrase.trim() || null,
           releaseIds,
         }),
@@ -126,6 +133,22 @@ export function LibraryShareDropCreator({
             onChange={event => setDownloadsEnabled(event.target.checked)}
           />
           Allow downloads
+        </label>
+        <label className='block text-xs font-medium text-secondary-token'>
+          Expires
+          <select
+            value={expiryPreset}
+            onChange={event =>
+              setExpiryPreset(event.target.value as LibraryShareExpiryPreset)
+            }
+            className='mt-1 w-full rounded-xl border border-subtle bg-surface-1 px-3 py-2 text-sm text-primary-token'
+            data-testid='library-share-expiry-select'
+          >
+            <option value='never'>Never</option>
+            <option value='7d'>7 days</option>
+            <option value='30d'>30 days</option>
+            <option value='90d'>90 days</option>
+          </select>
         </label>
         <label className='block text-xs font-medium text-secondary-token'>
           Passphrase (optional)
