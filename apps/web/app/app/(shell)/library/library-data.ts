@@ -25,6 +25,12 @@ export type LibraryView =
   | 'videos'
   | 'audio';
 
+export type LibraryAspectRatio = '1:1' | '16:9' | '9:16';
+
+export type LibraryGridDensity = 'compact' | 'comfortable' | 'spacious';
+
+export type LibraryMediaOrientation = 'landscape' | 'portrait';
+
 export interface LibraryReleaseAsset {
   readonly itemKind?: LibraryItemKind;
   readonly id: string;
@@ -63,6 +69,38 @@ export interface LibraryReleaseAsset {
   readonly description?: string;
   readonly createdAt?: string;
   readonly updatedAt?: string;
+  readonly aspectRatio?: LibraryAspectRatio;
+  readonly mediaOrientation?: LibraryMediaOrientation;
+}
+
+export const LIBRARY_GRID_DENSITY_LAYOUT: Record<LibraryGridDensity, string> = {
+  compact: 'grid gap-2 sm:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5',
+  comfortable: 'grid gap-3 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4',
+  spacious: 'grid gap-4 sm:grid-cols-2 xl:grid-cols-2 2xl:grid-cols-3',
+};
+
+export function getLibraryAssetAspectRatio(
+  asset: LibraryReleaseAsset
+): LibraryAspectRatio {
+  if (asset.aspectRatio) return asset.aspectRatio;
+
+  const itemKind = getLibraryItemKind(asset);
+  if (itemKind === 'video') {
+    return asset.mediaOrientation === 'portrait' ? '9:16' : '16:9';
+  }
+
+  return '1:1';
+}
+
+export function getLibraryAspectRatioClass(ratio: LibraryAspectRatio): string {
+  switch (ratio) {
+    case '16:9':
+      return 'aspect-video';
+    case '9:16':
+      return 'aspect-[9/16]';
+    default:
+      return 'aspect-square';
+  }
 }
 
 function normalizeHttpUrl(value: string | null | undefined): string | null {
