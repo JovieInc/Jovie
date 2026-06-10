@@ -4,8 +4,9 @@ import { expect } from '@playwright/test';
 interface ScrollAssertionOptions {
   /**
    * CSS selector for the element that owns the scroll. Defaults to the
-   * document scrolling element. For app-shell routes, scroll lives on the
-   * inner AppShellFrame content pane — pass `[data-testid="app-shell-scroll"]`.
+   * document scrolling element. For app-shell routes, scroll lives on a
+   * route-owned pane inside the shell clip — pass that pane's selector, not
+   * `[data-testid="app-shell-scroll"]` (the shell clip itself does not scroll).
    */
   readonly containerSelector?: string;
   /** Viewport height to test at. Defaults to 720px. */
