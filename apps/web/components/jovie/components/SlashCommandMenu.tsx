@@ -29,10 +29,15 @@ import {
   flattenSections,
   InlinePalette,
 } from '@/components/organisms/SharedCommandPalette';
+import {
+  filterSkillsHidingBrokenAlbumArt,
+  shouldHideAlbumArtChatSuggestion,
+} from '@/lib/chat/album-art-capability';
 import type { EntityKind } from '@/lib/chat/tokens';
 import type { EntityRef } from '@/lib/commands/entities';
 import { commandsForSurface, type SkillCommand } from '@/lib/commands/registry';
 import { useArtistSearchQuery } from '@/lib/queries/useArtistSearchQuery';
+import { useChatCapabilitiesQuery } from '@/lib/queries/useChatCapabilitiesQuery';
 import { useEventsQuery } from '@/lib/queries/useEventsQuery';
 import { useReleasesQuery } from '@/lib/queries/useReleasesQuery';
 import {
@@ -154,6 +159,11 @@ export function useSlashItems(
     artistSearchSearch(artistQueryString);
   }, [artistQueryString, artistSearchSearch]);
 
+  const { data: chatCapabilities } = useChatCapabilitiesQuery({
+    profileId,
+    enabled: Boolean(profileId) && isRoot,
+  });
+
   return useMemo<UseSlashItemsResult>(() => {
     if (state.status === 'closed') {
       return { items: [], sections: [], isLoading: false };
@@ -206,9 +216,12 @@ export function useSlashItems(
     }
 
     // root: skills + entity suggestions per kind
-    const skills = commandsForSurface('chat-slash')
-      .filter((c): c is SkillCommand => c.kind === 'skill')
-      .filter(s => fuzzyMatch(`${s.label} ${s.description}`, query));
+    const skills = filterSkillsHidingBrokenAlbumArt(
+      commandsForSurface('chat-slash').filter(
+        (c): c is SkillCommand => c.kind === 'skill'
+      ),
+      chatCapabilities?.tools.albumArt
+    ).filter(s => fuzzyMatch(`${s.label} ${s.description}`, query));
 
     const sections: ListSection[] = [];
     const items: SlashMenuItem[] = [];
@@ -261,6 +274,7 @@ export function useSlashItems(
     eventLoading,
     artistSearch.results,
     artistSearch.state,
+    chatCapabilities?.tools,
   ]);
 }
 
@@ -346,9 +360,20 @@ export function SlashCommandMenu({
 }: SlashCommandMenuProps) {
   const { sections, isLoading } = useSlashItems(state, profileId);
   const query = state.status === 'closed' ? '' : state.query;
+  const { data: chatCapabilities } = useChatCapabilitiesQuery({
+    profileId,
+    enabled: Boolean(profileId) && state.status === 'root',
+  });
+  const hideAlbumArtSuggestions = chatCapabilities?.tools.albumArt
+    ? shouldHideAlbumArtChatSuggestion(chatCapabilities.tools.albumArt)
+    : false;
   const promptItems = useMemo<PickerItem[]>(() => {
     if (state.status !== 'root' || !promptActions?.length) return [];
     return promptActions
+      .filter(
+        action =>
+          !(hideAlbumArtSuggestions && action.label === 'Generate album art')
+      )
       .filter(action => fuzzyMatch(`${action.label} ${action.prompt}`, query))
       .map(action => ({
         kind: 'prompt' as const,
@@ -359,7 +384,7 @@ export function SlashCommandMenu({
           prompt: action.prompt,
         },
       }));
-  }, [promptActions, query, state.status]);
+  }, [hideAlbumArtSuggestions, promptActions, query, state.status]);
 
   // Map legacy SlashMenuItem sections → PickerItem sections for the shared
   // shell. The shape is structurally equivalent; the indirection just gates

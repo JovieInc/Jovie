@@ -11,6 +11,7 @@ import {
 } from 'lucide-react';
 import type { ComponentType, SVGProps } from 'react';
 
+import { shouldHideAlbumArtChatSuggestion } from '@/lib/chat/album-art-capability';
 import { cn } from '@/lib/utils';
 import {
   type ChatSuggestion,
@@ -141,10 +142,9 @@ export function SuggestedPrompts({
   // point. Plan-gated ('PLAN_UNAVAILABLE') and profile-pending
   // ('PROFILE_REQUIRED') reasons remain visible-but-disabled because the user
   // has an action to take (upgrade, finish onboarding).
-  const isAlbumArtProviderBroken =
-    resolvedAlbumArtCapability.availability === 'unavailable' &&
-    (resolvedAlbumArtCapability.reasonCode === 'PROVIDER_UNAVAILABLE' ||
-      resolvedAlbumArtCapability.reasonCode === 'FEATURE_DISABLED');
+  const isAlbumArtProviderBroken = shouldHideAlbumArtChatSuggestion(
+    resolvedAlbumArtCapability
+  );
   const draftAlbumArtBriefSuggestion: ChatSuggestion | null =
     resolvedAlbumArtCapability.availability === 'unavailable'
       ? {

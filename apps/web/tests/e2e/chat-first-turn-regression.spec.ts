@@ -3,7 +3,7 @@
  *
  * Covers the user-visible regression contract:
  * - chat opens as a chat-specific empty state, not the dashboard welcome state
- * - unavailable album-art action is disabled before invocation
+ * - empty chat does not advertise album-art generation when provider is down
  * - typed album-art generation produces a durable assistant transcript item
  * - refresh restores the same user + assistant messages
  */
@@ -134,10 +134,7 @@ test('new thread album-art unavailable state survives refresh', async ({
   await expect(page.getByText(/Welcome back/i)).toHaveCount(0);
   await expect(
     page.getByRole('button', { name: 'Generate album art' })
-  ).toBeDisabled();
-  await expect(
-    page.getByRole('button', { name: 'Draft album-art brief' })
-  ).toBeEnabled();
+  ).toHaveCount(0);
 
   const composer = page
     .getByPlaceholder(/ask jovie|ask a follow-up|chat message/i)
