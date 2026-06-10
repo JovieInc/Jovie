@@ -12,7 +12,13 @@
  * from the original shell-v1 set because they don't have value options
  * and would land users in a dead-end state if surfaced via the slash menu.
  */
-export type FilterField = 'artist' | 'title' | 'album' | 'status' | 'has';
+export type FilterField =
+  | 'artist'
+  | 'title'
+  | 'album'
+  | 'status'
+  | 'approval'
+  | 'has';
 
 export interface FilterPill {
   /** Stable identifier used for React keys and pill mutation callbacks. */
@@ -28,6 +34,7 @@ export const FIELD_LABEL: Record<FilterField, string> = {
   title: 'Title',
   album: 'Album',
   status: 'Status',
+  approval: 'Approval',
   has: 'Has',
 };
 

@@ -115,7 +115,6 @@ function AuthShellInner({
       audioPlayer={audioPlayer}
       mobileBottomNav={mobileBottomNav}
       contentClassName={getContentClassName(showMobileTabs, isTableRoute)}
-      isTableRoute={isTableRoute}
       variant={shellVariant}
     />
   );

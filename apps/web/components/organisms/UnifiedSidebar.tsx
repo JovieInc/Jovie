@@ -31,7 +31,6 @@ import { APP_ROUTES, isDemoRoutePath } from '@/constants/routes';
 import { useShellSidebarOverride } from '@/contexts/ShellSidebarOverrideContext';
 import { DashboardNav } from '@/features/dashboard/dashboard-nav';
 import {
-  adminSettingsNavItem,
   artistSettingsNavigation,
   paymentsNavItem,
   userSettingsNavigation,
@@ -128,7 +127,7 @@ function SettingsNavigation({
   pathname: string;
   section: string;
 }) {
-  const { selectedProfile, isAdmin } = useDashboardData();
+  const { selectedProfile } = useDashboardData();
   const isStripeConnectEnabled = useAppFlag('STRIPE_CONNECT_ENABLED');
   // Prefer the TanStack Query cache (updated by profile mutations) over
   // the server-rendered context so the sidebar reflects name edits immediately.
@@ -186,17 +185,6 @@ function SettingsNavigation({
         </span>
         <SettingsNavGroup items={artistItems} pathname={pathname} />
       </div>
-      {isAdmin && (
-        <div>
-          <span className='mb-1.5 block px-2.5 text-2xs uppercase tracking-[0.08em] text-sidebar-muted group-data-[collapsible=icon]:hidden [font-weight:var(--font-weight-nav)]'>
-            Administration
-          </span>
-          <SettingsNavGroup
-            items={[adminSettingsNavItem]}
-            pathname={pathname}
-          />
-        </div>
-      )}
     </nav>
   );
 }

@@ -174,12 +174,14 @@ const settingsRoutes = [
   },
   {
     path: APP_ROUTES.SETTINGS_ADMIN,
-    name: 'Settings Admin',
-    kind: 'render',
+    name: 'Settings Admin Redirect',
+    kind: 'redirect',
     surface: 'settings',
     authRole: 'admin',
-    contentSelector: 'section#admin',
-    acceptedDestinations: [APP_ROUTES.SETTINGS_ARTIST_PROFILE],
+    acceptedDestinations: [
+      APP_ROUTES.ADMIN_OPS,
+      APP_ROUTES.SETTINGS_ARTIST_PROFILE,
+    ],
     requiresUserButton: true,
     performanceBudgetMs: SETTINGS_DEFAULT_BUDGET_MS,
   },

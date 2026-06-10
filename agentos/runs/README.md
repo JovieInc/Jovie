@@ -8,6 +8,8 @@ Examples:
 - `design-review/2026-05-08/abc123/`
 - `qa/2026-05-08/def456/`
 - `visual-qa/<run_id>/<surface>/{baseline,after}-{dark,light}.png` (proposal-validation captures; see `apps/web/lib/visual-qa/registry.ts`)
+- `visual-qa/<run_id>/<surface>/diff-overlay.png` (pixel-diff overlay artifacts)
+- `visual-qa/<run_id>/diff-summary.json` (pixel-diff summary)
 - `visual-qa/<run_id>/breakpoint-report.json` (responsive breakpoint check summary)
 
 Binary artifact files (images, zips, built assets) are gitignored via `agentos/runs/**/artifacts/`. Only run metadata files (JSON summaries, markdown reports) are committed.

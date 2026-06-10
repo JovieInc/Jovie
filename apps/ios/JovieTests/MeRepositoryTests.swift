@@ -23,6 +23,10 @@ private actor MutableAPIClient: APIClientProtocol {
     }
   }
 
+  func fetchAppleWalletProfilePass() async throws -> Data {
+    Data()
+  }
+
   func updateMode(_ mode: Mode) {
     self.mode = mode
   }

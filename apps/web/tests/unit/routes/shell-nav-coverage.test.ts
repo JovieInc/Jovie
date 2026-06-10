@@ -3,7 +3,6 @@ import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
   adminNavigation,
-  adminSettingsNavItem,
   adminSettingsNavigation,
   artistSettingsNavigation,
   paymentsNavItem,
@@ -37,6 +36,7 @@ const INTENTIONAL_INTERNAL_ROUTES: Record<string, string> = {
   '/app/dashboard/tasks': 'Legacy tasks workspace retained for old bookmarks',
   '/app/settings/retargeting-ads':
     'Legacy settings route redirected to Audience',
+  '/app/settings/admin': 'Legacy admin settings route redirected to Ops',
   '/app/dashboard/release-plan':
     'Release plan demo page (gated by RELEASE_PLAN_DEMO flag)',
   '/app/insights':
@@ -106,7 +106,6 @@ function getNavRoutePaths(): Set<string> {
     ...userSettingsNavigation,
     paymentsNavItem,
     ...artistSettingsNavigation,
-    adminSettingsNavItem,
     ...adminNavigation,
     ...adminSettingsNavigation,
   ];

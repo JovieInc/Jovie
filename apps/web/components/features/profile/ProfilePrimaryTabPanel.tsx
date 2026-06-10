@@ -88,7 +88,7 @@ function PreviewAlertsPanel({
     state.helper ??
     (state.kind === 'status'
       ? 'Music, shows, and merch updates are ready.'
-      : 'Get new music and tour updates the moment they land.');
+      : undefined);
 
   return (
     <div
@@ -105,12 +105,14 @@ function PreviewAlertsPanel({
         </div>
 
         <div className='space-y-1.5'>
-          <p className='text-[22px] font-semibold tracking-[-0.045em] text-white'>
+          <p className='text-[20px] font-semibold tracking-[-0.014em] text-white'>
             {resolvedTitle}
           </p>
-          <p className='max-w-[28ch] text-sm leading-6 text-white/68'>
-            {resolvedBody}
-          </p>
+          {resolvedBody ? (
+            <p className='max-w-[28ch] text-[13px] leading-5 text-white/58'>
+              {resolvedBody}
+            </p>
+          ) : null}
         </div>
 
         {state.kind === 'button' ? (

@@ -3,6 +3,7 @@ import {
   filterCriticalErrors,
   isExpectedError,
   isExpectedWarning,
+  isTransientNavigationError,
 } from '@/tests/e2e/utils/smoke-test-utils';
 
 describe('smoke-test-utils', () => {
@@ -85,6 +86,36 @@ describe('smoke-test-utils', () => {
       expect(
         isExpectedWarning(
           'A cross-origin script attempted to access a restricted frame.'
+        )
+      ).toBe(false);
+    });
+  });
+
+  describe('isTransientNavigationError', () => {
+    it('treats navigation timeouts and transient network failures as retryable', () => {
+      expect(
+        isTransientNavigationError(
+          new Error('page.goto: Timeout 120000ms exceeded.')
+        )
+      ).toBe(true);
+
+      expect(
+        isTransientNavigationError(new Error('net::ERR_EMPTY_RESPONSE'))
+      ).toBe(true);
+
+      expect(
+        isTransientNavigationError(
+          new Error(
+            'locator.click: Target page, context or browser has been closed'
+          )
+        )
+      ).toBe(true);
+    });
+
+    it('does not treat assertion failures as transient navigation errors', () => {
+      expect(
+        isTransientNavigationError(
+          new Error('expect(locator).toBeVisible() failed')
         )
       ).toBe(false);
     });

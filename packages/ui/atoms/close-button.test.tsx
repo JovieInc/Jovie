@@ -100,4 +100,11 @@ describe('closeButtonClassName', () => {
     expect(closeButtonClassName).toContain('disabled:pointer-events-none');
     expect(closeButtonClassName).toContain('ring-offset-(--linear-bg-page)');
   });
+
+  it('uses the shared pill close button shape', () => {
+    expect(closeButtonClassName).toContain('rounded-full');
+    expect(closeButtonClassName).not.toContain(
+      'rounded-(--linear-app-radius-item)'
+    );
+  });
 });

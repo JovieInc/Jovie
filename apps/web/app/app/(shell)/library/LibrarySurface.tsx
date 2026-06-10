@@ -5,7 +5,6 @@ import {
   createColumnHelper,
   type RowSelectionState,
 } from '@tanstack/react-table';
-import { upload } from '@vercel/blob/client';
 import {
   ArrowUpDown,
   Check,
@@ -19,13 +18,11 @@ import {
   Grid3x3,
   ImageIcon,
   LayoutList,
-  Loader2,
   type LucideIcon,
   Music2,
   Pause,
   PlayCircle,
   Shirt,
-  Upload,
   Video,
   X,
 } from 'lucide-react';
@@ -36,7 +33,6 @@ import {
   type CSSProperties,
   cloneElement,
   createContext,
-  type DragEvent,
   type MouseEvent,
   memo,
   type ReactNode,
@@ -46,11 +42,16 @@ import {
   useEffect,
   useId,
   useMemo,
-  useRef,
   useState,
 } from 'react';
 import { toast } from 'sonner';
 import { LibraryShareDropCreator } from '@/components/features/library-share/LibraryShareDropCreator';
+import { ReleaseAudioAssetPanel } from '@/components/features/release/ReleaseAudioAssetPanel';
+import {
+  DrawerHeader,
+  DrawerSection,
+  DrawerSurfaceCard,
+} from '@/components/molecules/drawer';
 import { PageShell } from '@/components/organisms/PageShell';
 import { useTrackAudioPlayer } from '@/components/organisms/release-sidebar/useTrackAudioPlayer';
 import {
@@ -75,18 +76,33 @@ import { useRegisterHeaderSearch } from '@/contexts/HeaderActionsContext';
 import { useRegisterShellSidebarOverride } from '@/contexts/ShellSidebarOverrideContext';
 import { useBreakpoint } from '@/hooks/useBreakpoint';
 import { SKELETON_ROW_COUNT } from '@/lib/constants/layout';
+import {
+  formatLibraryApprovalStatus,
+  LIBRARY_APPROVAL_STATUSES,
+  type LibraryApprovalStatus,
+  libraryApprovalStatusClasses,
+  libraryApprovalStatusDotClasses,
+} from '@/lib/library/approval-status';
 import { cn } from '@/lib/utils';
 import { capitalizeFirst } from '@/lib/utils/string-utils';
 import { LibraryMediaThumbnail } from './LibraryMediaThumbnail';
 import {
   formatLibraryDuration,
   formatLibraryReleaseDate,
+  getLibraryAspectRatioClass,
+  getLibraryAssetAspectRatio,
   getLibraryItemKind,
+  LIBRARY_GRID_DENSITY_LAYOUT,
   type LibraryAssetKind,
+  type LibraryGridDensity,
   type LibraryReleaseAsset,
   type LibraryView,
   libraryAssetMatchesView,
 } from './library-data';
+import {
+  LIBRARY_GRID_DENSITY_OPTIONS,
+  useLibraryGridDensity,
+} from './library-grid-preferences';
 import {
   countLibrarySavedViewMatches,
   getLibrarySavedViewPredicate,
@@ -100,30 +116,12 @@ const LIBRARY_TABLE_ROW_HEIGHT = 56;
 const LIBRARY_TABLE_MIN_WIDTH = '0';
 const LIBRARY_CONTENT_INSET_CLASS =
   'px-(--linear-app-header-padding-x) py-(--linear-app-content-padding-y)';
-const LIBRARY_GRID_LAYOUT_CLASS =
-  'grid gap-3 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4';
 const LIBRARY_CARD_FOCUS_CLASS =
   'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/55 focus-visible:ring-offset-2 focus-visible:ring-offset-(--linear-app-content-surface) outline-none';
 const LIBRARY_BUTTON_FOCUS_CLASS =
   'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/55 focus-visible:ring-offset-2 focus-visible:ring-offset-(--linear-app-content-surface) outline-none';
 const LIBRARY_ICON_FOCUS_CLASS =
   'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/55 focus-visible:ring-offset-2 focus-visible:ring-offset-(--linear-app-content-surface) outline-none';
-const LIBRARY_AUDIO_MAX_FILE_SIZE = 150 * 1024 * 1024;
-const LIBRARY_AUDIO_ACCEPT =
-  'audio/aac,audio/aiff,audio/flac,audio/mp4,audio/mpeg,audio/wav,audio/x-aiff,audio/x-flac,audio/x-m4a,audio/x-wav';
-const LIBRARY_AUDIO_MIME_TYPES = new Set([
-  'audio/aac',
-  'audio/aiff',
-  'audio/flac',
-  'audio/mp4',
-  'audio/mpeg',
-  'audio/wav',
-  'audio/x-aiff',
-  'audio/x-flac',
-  'audio/x-m4a',
-  'audio/x-wav',
-]);
-
 const LIBRARY_TABLE_SKELETON_CONFIG: Array<{
   readonly width?: string;
   readonly variant?:
@@ -135,6 +133,7 @@ const LIBRARY_TABLE_SKELETON_CONFIG: Array<{
     | 'meta';
 }> = [
   { variant: 'release', width: '100%' },
+  { variant: 'badge', width: '108px' },
   { variant: 'badge', width: '92px' },
   { variant: 'text', width: '88px' },
   { variant: 'meta', width: '72px' },
@@ -162,6 +161,7 @@ const LibraryPreviewContext = createContext<{
 
 type LibraryFilters = {
   readonly statuses: Set<LibraryReleaseAsset['status']>;
+  readonly approvalStatuses: Set<LibraryApprovalStatus>;
   readonly releaseTypes: Set<LibraryReleaseAsset['releaseType']>;
   readonly assetKinds: Set<LibraryAssetKind>;
   readonly providers: Set<string>;
@@ -239,6 +239,7 @@ const PRESETS: readonly {
 function emptyFilters(): LibraryFilters {
   return {
     statuses: new Set(),
+    approvalStatuses: new Set(),
     releaseTypes: new Set(),
     assetKinds: new Set(),
     providers: new Set(),
@@ -306,6 +307,12 @@ function assetMatchesFilters(
     return false;
   }
   if (
+    filters.approvalStatuses.size > 0 &&
+    !filters.approvalStatuses.has(asset.approvalStatus)
+  ) {
+    return false;
+  }
+  if (
     filters.releaseTypes.size > 0 &&
     !filters.releaseTypes.has(asset.releaseType)
   ) {
@@ -354,6 +361,8 @@ function assetMatchesPills(
         return valuesMatchPill([asset.title], pill);
       case 'status':
         return valuesMatchPill([asset.status], pill);
+      case 'approval':
+        return valuesMatchPill([asset.approvalStatus], pill);
       case 'has':
         return valuesMatchPill(asset.assetKinds, pill);
       case 'album':
@@ -365,6 +374,7 @@ function assetMatchesPills(
 function hasActiveFilters(filters: LibraryFilters): boolean {
   return (
     filters.statuses.size +
+      filters.approvalStatuses.size +
       filters.releaseTypes.size +
       filters.assetKinds.size +
       filters.providers.size >
@@ -480,6 +490,24 @@ const StatusCell = memo(function StatusCell({
   );
 });
 
+const ApprovalStatusCell = memo(function ApprovalStatusCell({
+  asset,
+}: {
+  readonly asset: LibraryReleaseAsset;
+}) {
+  return (
+    <span
+      className={cn(
+        'system-b-library-status-pill inline-flex h-6 w-fit items-center border px-2 leading-4',
+        libraryApprovalStatusClasses(asset.approvalStatus)
+      )}
+      data-testid={`library-approval-status-${asset.id}`}
+    >
+      {formatLibraryApprovalStatus(asset.approvalStatus)}
+    </span>
+  );
+});
+
 const ProvidersCell = memo(function ProvidersCell({
   asset,
 }: {
@@ -506,10 +534,18 @@ const LIBRARY_TABLE_COLUMNS = [
   }),
   libraryColumnHelper.display({
     id: 'status',
-    header: 'Status',
+    header: 'Release',
     cell: ({ row }) => <StatusCell asset={row.original} />,
     size: 112,
     minSize: 96,
+    meta: { className: 'hidden xl:table-cell px-2' },
+  }),
+  libraryColumnHelper.display({
+    id: 'approval',
+    header: 'Approval',
+    cell: ({ row }) => <ApprovalStatusCell asset={row.original} />,
+    size: 128,
+    minSize: 108,
     meta: { className: 'hidden md:table-cell px-2' },
   }),
   libraryColumnHelper.display({
@@ -694,6 +730,9 @@ function LibraryRail({
 }) {
   const releaseTypes = uniqueSorted(assets.map(asset => asset.releaseType));
   const statuses = uniqueSorted(assets.map(asset => asset.status));
+  const approvalStatuses = uniqueSorted(
+    assets.map(asset => asset.approvalStatus)
+  );
   const providerKeys = uniqueSorted(
     assets.flatMap(asset => asset.providers.map(provider => provider.key))
   );
@@ -710,6 +749,7 @@ function LibraryRail({
   const counts = {
     releaseTypes: countBy(assets, asset => [asset.releaseType]),
     statuses: countBy(assets, asset => [asset.status]),
+    approvalStatuses: countBy(assets, asset => [asset.approvalStatus]),
     providers: countBy(
       assets,
       asset => asset.providers.map(provider => provider.key) as string[]
@@ -718,6 +758,7 @@ function LibraryRail({
   };
   const activeFilterCount =
     filters.statuses.size +
+    filters.approvalStatuses.size +
     filters.releaseTypes.size +
     filters.assetKinds.size +
     filters.providers.size;
@@ -759,7 +800,25 @@ function LibraryRail({
           ) : null}
         </div>
 
-        <FilterSection label='Status'>
+        <FilterSection label='Approval Status'>
+          {approvalStatuses.map(status => (
+            <FilterRow
+              key={status}
+              active={filters.approvalStatuses.has(status)}
+              count={counts.approvalStatuses.get(status) ?? 0}
+              label={formatLibraryApprovalStatus(status)}
+              dotClassName={libraryApprovalStatusDotClasses(status)}
+              onClick={() =>
+                onFilters({
+                  ...filters,
+                  approvalStatuses: toggleSet(filters.approvalStatuses, status),
+                })
+              }
+            />
+          ))}
+        </FilterSection>
+
+        <FilterSection label='Release Status'>
           {statuses.map(status => (
             <FilterRow
               key={status}
@@ -994,6 +1053,33 @@ function ViewToggle({
   );
 }
 
+function GridDensityToggle({
+  density,
+  onDensity,
+}: {
+  readonly density: LibraryGridDensity;
+  readonly onDensity: (density: LibraryGridDensity) => void;
+}) {
+  return (
+    <fieldset
+      className={cn(PAGE_TOOLBAR_END_GROUP_CLASS, 'ml-0 gap-0.5 border-0 p-0')}
+      data-testid='library-grid-density-toggle'
+      aria-label='Card size'
+    >
+      {LIBRARY_GRID_DENSITY_OPTIONS.map(option => (
+        <PageToolbarActionButton
+          key={option.value}
+          label={option.label}
+          active={density === option.value}
+          onClick={() => onDensity(option.value)}
+          tooltipLabel={option.tooltip}
+          ariaLabel={`${option.tooltip} card size`}
+        />
+      ))}
+    </fieldset>
+  );
+}
+
 function LibraryToolbar({
   assets,
   preset,
@@ -1002,6 +1088,8 @@ function LibraryToolbar({
   onSort,
   view,
   onView,
+  gridDensity,
+  onGridDensity,
   visibleCount,
   totalCount,
   mobileFiltersOpen,
@@ -1015,6 +1103,8 @@ function LibraryToolbar({
   readonly onSort: (sort: LibrarySortKey) => void;
   readonly view: LibraryViewMode;
   readonly onView: (view: LibraryViewMode) => void;
+  readonly gridDensity: LibraryGridDensity;
+  readonly onGridDensity: (density: LibraryGridDensity) => void;
   readonly visibleCount: number;
   readonly totalCount: number;
   readonly mobileFiltersOpen: boolean;
@@ -1052,6 +1142,12 @@ function LibraryToolbar({
             className='lg:hidden'
           />
           <SortDropdown sort={sort} onSort={onSort} />
+          {view === 'grid' ? (
+            <GridDensityToggle
+              density={gridDensity}
+              onDensity={onGridDensity}
+            />
+          ) : null}
           <ViewToggle view={view} onView={onView} />
         </>
       }
@@ -1089,6 +1185,7 @@ const AssetCard = memo(function AssetCard({
   readonly onTogglePreview: LibraryPreviewToggle;
 }) {
   const hasPreview = Boolean(asset.previewUrl);
+  const aspectRatio = getLibraryAssetAspectRatio(asset);
 
   return (
     <article
@@ -1114,15 +1211,21 @@ const AssetCard = memo(function AssetCard({
           LIBRARY_CARD_FOCUS_CLASS
         )}
       >
-        <div className='system-b-library-card-artwork relative aspect-square overflow-hidden'>
+        <div
+          className={cn(
+            'system-b-library-card-artwork relative overflow-hidden',
+            getLibraryAspectRatioClass(aspectRatio)
+          )}
+        >
           <LibraryMediaThumbnail asset={asset} size='card' />
           <span
             className={cn(
               'system-b-library-card-status absolute left-2 top-2 border px-1.5 py-0.5 leading-4',
-              releaseStatusClasses(asset.status)
+              libraryApprovalStatusClasses(asset.approvalStatus)
             )}
+            data-testid={`library-approval-status-${asset.id}`}
           >
-            {formatLibraryStatus(asset)}
+            {formatLibraryApprovalStatus(asset.approvalStatus)}
           </span>
         </div>
         <div className='min-w-0 p-3'>
@@ -1205,6 +1308,7 @@ function AssetGrid({
   selectedId,
   activePreviewId,
   playingPreviewId,
+  gridDensity,
   onSelect,
   onTogglePreview,
   getContextMenuItems,
@@ -1213,12 +1317,18 @@ function AssetGrid({
   readonly selectedId: string | null;
   readonly activePreviewId: string | null;
   readonly playingPreviewId: string | null;
+  readonly gridDensity: LibraryGridDensity;
   readonly onSelect: (id: string) => void;
   readonly onTogglePreview: LibraryPreviewToggle;
   readonly getContextMenuItems: LibraryContextMenuBuilder;
 }) {
   return (
-    <div className={cn(LIBRARY_GRID_LAYOUT_CLASS, LIBRARY_CONTENT_INSET_CLASS)}>
+    <div
+      className={cn(
+        LIBRARY_GRID_DENSITY_LAYOUT[gridDensity],
+        LIBRARY_CONTENT_INSET_CLASS
+      )}
+    >
       {assets.map(asset => (
         <TableContextMenu key={asset.id} items={getContextMenuItems(asset)}>
           <AssetCard
@@ -1414,226 +1524,137 @@ function PreviewActionButton({
   );
 }
 
-function isSupportedAudioFile(file: File): boolean {
-  if (LIBRARY_AUDIO_MIME_TYPES.has(file.type)) return true;
-  return /\.(aac|aiff?|flac|m4a|mp3|wav)$/i.test(file.name);
-}
-
-function LibraryAudioDropzone({
-  asset,
-  onUploaded,
-  disabledTabIndex,
-}: {
-  readonly asset: LibraryReleaseAsset;
-  readonly onUploaded: (assetId: string, previewUrl: string) => void;
-  readonly disabledTabIndex?: number;
-}) {
-  const inputRef = useRef<HTMLInputElement>(null);
-  const [isDragging, setIsDragging] = useState(false);
-  const [uploading, setUploading] = useState(false);
-  const [uploadError, setUploadError] = useState<string | null>(null);
-
-  const uploadFile = useCallback(
-    async (file: File) => {
-      if (!isSupportedAudioFile(file)) {
-        setUploadError('Use MP3, WAV, FLAC, AIFF, AAC, or M4A audio.');
-        return;
-      }
-
-      if (file.size > LIBRARY_AUDIO_MAX_FILE_SIZE) {
-        setUploadError('Audio must be 150 MB or smaller.');
-        return;
-      }
-
-      setUploading(true);
-      setUploadError(null);
-
-      try {
-        const blob = await upload(file.name, file, {
-          access: 'public',
-          handleUploadUrl: '/api/library/audio/upload-token',
-        });
-        const response = await fetch('/api/library/audio/confirm', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            releaseId: asset.id,
-            blobUrl: blob.url,
-            blobPathname: blob.pathname,
-            fileName: file.name,
-            fileMimeType: file.type,
-            fileSizeBytes: file.size,
-          }),
-        });
-        const body = (await response.json().catch(() => ({}))) as {
-          readonly previewUrl?: string;
-          readonly error?: string;
-        };
-
-        if (!response.ok || !body.previewUrl) {
-          throw new Error(body.error ?? 'Audio upload failed');
-        }
-
-        onUploaded(asset.id, body.previewUrl);
-      } catch (error) {
-        const message =
-          error instanceof Error ? error.message : 'Audio upload failed';
-        setUploadError(message);
-        toast.error(message);
-      } finally {
-        setUploading(false);
-        if (inputRef.current) {
-          inputRef.current.value = '';
-        }
-      }
-    },
-    [asset.id, onUploaded]
-  );
-
-  const handleInputChange = useCallback(
-    (event: ChangeEvent<HTMLInputElement>) => {
-      const file = event.target.files?.[0];
-      if (file) {
-        uploadFile(file).catch(() => {});
-      }
-    },
-    [uploadFile]
-  );
-
-  const handleDrop = useCallback(
-    (event: DragEvent<HTMLButtonElement>) => {
-      event.preventDefault();
-      setIsDragging(false);
-      const file = event.dataTransfer.files?.[0];
-      if (file) {
-        uploadFile(file).catch(() => {});
-      }
-    },
-    [uploadFile]
-  );
-
-  return (
-    <div>
-      <button
-        type='button'
-        onClick={() => inputRef.current?.click()}
-        onDragEnter={event => {
-          event.preventDefault();
-          setIsDragging(true);
-        }}
-        onDragOver={event => {
-          event.preventDefault();
-          setIsDragging(true);
-        }}
-        onDragLeave={event => {
-          event.preventDefault();
-          setIsDragging(false);
-        }}
-        onDrop={handleDrop}
-        disabled={uploading}
-        tabIndex={disabledTabIndex}
-        data-testid='library-audio-dropzone'
-        className={cn(
-          'system-b-library-dropzone flex w-full flex-col items-center justify-center px-3 py-4 text-center',
-          isDragging && 'system-b-library-dropzone--dragging',
-          !uploading &&
-            'system-b-library-dropzone--interactive focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/55 focus-visible:ring-offset-2 focus-visible:ring-offset-(--linear-app-content-surface)'
-        )}
-        aria-busy={uploading || undefined}
-      >
-        {uploading ? (
-          <Loader2
-            className='h-5 w-5 animate-spin text-secondary-token motion-reduce:animate-none'
-            aria-hidden='true'
-            strokeWidth={2.25}
-          />
-        ) : (
-          <Upload
-            className='h-5 w-5 text-tertiary-token'
-            aria-hidden='true'
-            strokeWidth={2.25}
-          />
-        )}
-        <span className='system-b-library-audio-label mt-2 font-medium text-primary-token'>
-          {uploading ? 'Uploading audio' : 'Drop audio'}
-        </span>
-        <span className='system-b-library-audio-hint mt-1 leading-4'>
-          MP3, WAV, FLAC, AIFF, AAC, or M4A. Max 150 MB.
-        </span>
-      </button>
-      <input
-        ref={inputRef}
-        type='file'
-        accept={LIBRARY_AUDIO_ACCEPT}
-        onChange={handleInputChange}
-        disabled={uploading}
-        tabIndex={disabledTabIndex}
-        className='sr-only'
-        aria-label={`Upload audio for ${asset.title}`}
-      />
-      <output className='system-b-library-audio-output min-h-5 pt-1.5'>
-        {uploadError ? <p className='text-error'>{uploadError}</p> : null}
-      </output>
-    </div>
-  );
-}
-
 function LibraryAudioPanel({
   asset,
   isPreviewPlaying,
   onTogglePreview,
   onUploaded,
   disabledTabIndex,
+  embedded = false,
 }: {
   readonly asset: LibraryReleaseAsset;
   readonly isPreviewPlaying: boolean;
   readonly onTogglePreview: LibraryPreviewToggle;
   readonly onUploaded: (assetId: string, previewUrl: string) => void;
   readonly disabledTabIndex?: number;
+  readonly embedded?: boolean;
 }) {
   return (
-    <div className='mt-4 border-t border-subtle pt-3'>
-      <div className='mb-2 flex h-7 items-center justify-between gap-2'>
-        <div className='flex min-w-0 items-center gap-2'>
-          <FileAudio2 className='h-3.5 w-3.5 shrink-0 text-tertiary-token' />
-          <h3 className='system-b-library-audio-heading truncate font-semibold text-primary-token'>
-            Audio
-          </h3>
-        </div>
-        {asset.previewUrl ? (
-          <PreviewActionButton
-            asset={asset}
-            isPreviewPlaying={isPreviewPlaying}
-            onTogglePreview={onTogglePreview}
-            compact
-            disabledTabIndex={disabledTabIndex}
-          />
-        ) : null}
-      </div>
-      {asset.previewUrl ? (
-        <div
-          className='system-b-library-audio-ready flex items-center gap-3 px-3 py-3'
-          data-testid='library-audio-ready'
-        >
-          <span className='system-b-library-audio-icon grid h-8 w-8 shrink-0 place-items-center'>
-            <FileAudio2 className='h-4 w-4' strokeWidth={2.25} />
-          </span>
-          <div className='min-w-0'>
-            <p className='system-b-library-audio-label truncate font-medium text-primary-token'>
-              Audio attached
-            </p>
-            <p className='system-b-library-audio-hint mt-0.5 leading-4'>
-              Preview playback is available in the persistent player.
-            </p>
+    <div className={embedded ? undefined : 'mt-4 border-t border-subtle pt-3'}>
+      {embedded ? null : (
+        <div className='mb-2 flex h-7 items-center justify-between gap-2'>
+          <div className='flex min-w-0 items-center gap-2'>
+            <FileAudio2 className='h-3.5 w-3.5 shrink-0 text-tertiary-token' />
+            <h3 className='system-b-library-audio-heading truncate font-semibold text-primary-token'>
+              Audio
+            </h3>
           </div>
+          {asset.previewUrl ? (
+            <PreviewActionButton
+              asset={asset}
+              isPreviewPlaying={isPreviewPlaying}
+              onTogglePreview={onTogglePreview}
+              compact
+              disabledTabIndex={disabledTabIndex}
+            />
+          ) : null}
         </div>
-      ) : (
-        <LibraryAudioDropzone
-          asset={asset}
-          onUploaded={onUploaded}
-          disabledTabIndex={disabledTabIndex}
-        />
       )}
+      <ReleaseAudioAssetPanel
+        releaseId={asset.id}
+        releaseTitle={asset.title}
+        previewUrl={asset.previewUrl}
+        durationMs={asset.totalDurationMs}
+        disabledTabIndex={disabledTabIndex}
+        testIdPrefix='library'
+        onUploaded={previewUrl => onUploaded(asset.id, previewUrl)}
+      />
+    </div>
+  );
+}
+
+function ApprovalStatusEditor({
+  asset,
+  profileId,
+  disabled,
+  onStatusChange,
+}: {
+  readonly asset: LibraryReleaseAsset;
+  readonly profileId: string | null;
+  readonly disabled: boolean;
+  readonly onStatusChange: (
+    assetId: string,
+    approvalStatus: LibraryApprovalStatus
+  ) => void;
+}) {
+  const [saving, setSaving] = useState(false);
+  const selectId = useId();
+
+  async function handleChange(event: ChangeEvent<HTMLSelectElement>) {
+    const nextStatus = event.target.value;
+    if (
+      !profileId ||
+      !LIBRARY_APPROVAL_STATUSES.includes(nextStatus as LibraryApprovalStatus)
+    ) {
+      return;
+    }
+
+    const approvalStatus = nextStatus as LibraryApprovalStatus;
+    if (approvalStatus === asset.approvalStatus) return;
+
+    setSaving(true);
+    onStatusChange(asset.id, approvalStatus);
+
+    try {
+      const response = await fetch('/api/library/approval-status', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          profileId,
+          assetId: asset.id,
+          itemKind: getLibraryItemKind(asset),
+          approvalStatus,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Approval status update failed');
+      }
+    } catch {
+      toast.error('Unable to update approval status right now');
+      onStatusChange(asset.id, asset.approvalStatus);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className='system-b-library-drawer-panel mt-4 px-3 py-3'>
+      <label
+        htmlFor={selectId}
+        className='system-b-library-drawer-panel-heading mb-2 block font-semibold text-primary-token'
+      >
+        Approval Status
+      </label>
+      <select
+        id={selectId}
+        value={asset.approvalStatus}
+        onChange={event => {
+          void handleChange(event);
+        }}
+        disabled={disabled || saving || !profileId}
+        data-testid={`library-approval-status-select-${asset.id}`}
+        className={cn(
+          'system-b-library-action system-b-library-action--standard h-8 w-full border border-subtle px-2',
+          LIBRARY_BUTTON_FOCUS_CLASS
+        )}
+      >
+        {LIBRARY_APPROVAL_STATUSES.map(status => (
+          <option key={status} value={status}>
+            {formatLibraryApprovalStatus(status)}
+          </option>
+        ))}
+      </select>
     </div>
   );
 }
@@ -1648,6 +1669,8 @@ function AssetDrawer({
   onTogglePreview,
   onAudioUploaded,
   getContextMenuItems,
+  profileId,
+  onApprovalStatusChange,
 }: {
   readonly asset: LibraryReleaseAsset | null;
   readonly open: boolean;
@@ -1658,6 +1681,11 @@ function AssetDrawer({
   readonly onTogglePreview: LibraryPreviewToggle;
   readonly onAudioUploaded: (assetId: string, previewUrl: string) => void;
   readonly getContextMenuItems: LibraryContextMenuBuilder;
+  readonly profileId: string | null;
+  readonly onApprovalStatusChange: (
+    assetId: string,
+    approvalStatus: LibraryApprovalStatus
+  ) => void;
 }) {
   const [stickyAsset, setStickyAsset] = useState<LibraryReleaseAsset | null>(
     asset
@@ -1680,6 +1708,41 @@ function AssetDrawer({
     'pointer-events-none opacity-0',
     isDesktopLayout ? null : 'translate-y-2 hidden'
   );
+  const drawerHeaderActions = current ? (
+    <>
+      <PreviewActionButton
+        asset={current}
+        isPreviewPlaying={isPreviewPlaying}
+        onTogglePreview={onTogglePreview}
+        compact
+        disabledTabIndex={closedTabIndex}
+        reserveSpace
+      />
+      <Link
+        href={current.primaryActionHref ?? current.smartLinkPath}
+        {...closedInteractiveProps}
+        aria-label={`Open ${current.title}`}
+        className={cn(
+          'system-b-library-icon-button system-b-library-icon-button--bordered grid h-7 w-7 place-items-center',
+          LIBRARY_ICON_FOCUS_CLASS
+        )}
+      >
+        <ExternalLink className='h-3.5 w-3.5' />
+      </Link>
+      <button
+        type='button'
+        onClick={onClose}
+        aria-label='Close asset details'
+        {...closedInteractiveProps}
+        className={cn(
+          'system-b-library-icon-button grid h-7 w-7 place-items-center',
+          LIBRARY_ICON_FOCUS_CLASS
+        )}
+      >
+        <X className='h-3.5 w-3.5' />
+      </button>
+    </>
+  ) : null;
 
   return (
     <aside
@@ -1696,217 +1759,234 @@ function AssetDrawer({
     >
       {current ? (
         <TableContextMenu items={getContextMenuItems(current)}>
-          <div className='flex h-full min-h-0 flex-col'>
-            <div className='flex h-10 shrink-0 items-center justify-between gap-2 border-b border-subtle px-3'>
-              <span className='system-b-library-drawer-kicker min-w-0 truncate'>
-                {isMerch ? 'Merch' : 'Release'}
-              </span>
-              <div className='flex shrink-0 items-center gap-1'>
-                <PreviewActionButton
-                  asset={current}
-                  isPreviewPlaying={isPreviewPlaying}
-                  onTogglePreview={onTogglePreview}
-                  compact
-                  disabledTabIndex={closedTabIndex}
-                  reserveSpace
+          <div className='flex h-full min-h-0 flex-col gap-1.5 px-1.5 py-1.5 lg:px-0 lg:py-0'>
+            <div
+              className='shrink-0 space-y-2.5'
+              data-testid='library-asset-drawer-sticky-rail'
+            >
+              <DrawerSurfaceCard variant='card' className='overflow-hidden'>
+                <DrawerHeader
+                  title={isMerch ? 'Merch' : 'Release'}
+                  actions={drawerHeaderActions}
                 />
-                <Link
-                  href={current.primaryActionHref ?? current.smartLinkPath}
-                  {...closedInteractiveProps}
-                  aria-label={`Open ${current.title}`}
-                  className={cn(
-                    'system-b-library-icon-button system-b-library-icon-button--bordered grid h-7 w-7 place-items-center',
-                    LIBRARY_ICON_FOCUS_CLASS
-                  )}
-                >
-                  <ExternalLink className='h-3.5 w-3.5' />
-                </Link>
-                <button
-                  type='button'
-                  onClick={onClose}
-                  aria-label='Close asset details'
-                  {...closedInteractiveProps}
-                  className={cn(
-                    'system-b-library-icon-button grid h-7 w-7 place-items-center',
-                    LIBRARY_ICON_FOCUS_CLASS
-                  )}
-                >
-                  <X className='h-3.5 w-3.5' />
-                </button>
-              </div>
+                <div className='space-y-3 overflow-visible px-3 pb-3 pt-3'>
+                  <div className='system-b-library-drawer-artwork overflow-hidden'>
+                    <div
+                      className={cn(
+                        'mx-auto w-full max-w-80',
+                        getLibraryAspectRatioClass(
+                          getLibraryAssetAspectRatio(current)
+                        )
+                      )}
+                    >
+                      <LibraryMediaThumbnail asset={current} size='drawer' />
+                    </div>
+                  </div>
+
+                  <div>
+                    <h2 className='system-b-library-drawer-title'>
+                      {current.title}
+                    </h2>
+                    <p className='system-b-library-drawer-artist mt-1'>
+                      {current.artist}
+                    </p>
+                  </div>
+
+                  <div className='flex flex-wrap gap-1.5'>
+                    <span
+                      className={cn(
+                        'system-b-library-status-pill inline-flex h-6 items-center border px-2',
+                        libraryApprovalStatusClasses(current.approvalStatus)
+                      )}
+                      data-testid={`library-approval-status-${current.id}`}
+                    >
+                      {formatLibraryApprovalStatus(current.approvalStatus)}
+                    </span>
+                    <span
+                      className={cn(
+                        'system-b-library-status-pill inline-flex h-6 items-center border px-2',
+                        releaseStatusClasses(current.status)
+                      )}
+                    >
+                      {formatLibraryStatus(current)}
+                    </span>
+                    {current.assetKinds.map(kind => (
+                      <AssetKindPill key={kind} kind={kind} />
+                    ))}
+                  </div>
+
+                  <div className='flex flex-wrap gap-1.5'>
+                    <Link
+                      href={current.primaryActionHref ?? current.smartLinkPath}
+                      {...closedInteractiveProps}
+                      className={cn(
+                        'system-b-library-action system-b-library-action--standard inline-flex items-center gap-1.5 border border-subtle',
+                        LIBRARY_BUTTON_FOCUS_CLASS
+                      )}
+                    >
+                      {current.primaryActionLabel ?? 'Open Release'}
+                      <ExternalLink className='h-3 w-3' />
+                    </Link>
+                  </div>
+                </div>
+              </DrawerSurfaceCard>
             </div>
 
-            <div className='min-h-0 flex-1 overflow-y-auto p-3'>
-              <div className='system-b-library-drawer-artwork overflow-hidden'>
-                <div className='mx-auto aspect-square w-full max-w-80'>
-                  <LibraryMediaThumbnail asset={current} size='drawer' />
-                </div>
-              </div>
-
-              <div className='mt-3'>
-                <h2 className='system-b-library-drawer-title'>
-                  {current.title}
-                </h2>
-                <p className='system-b-library-drawer-artist mt-1'>
-                  {current.artist}
-                </p>
-              </div>
-
-              <div className='mt-3 flex flex-wrap gap-1.5'>
-                <span
-                  className={cn(
-                    'system-b-library-status-pill inline-flex h-6 items-center border px-2',
-                    releaseStatusClasses(current.status)
-                  )}
-                >
-                  {formatLibraryStatus(current)}
-                </span>
-                {current.assetKinds.map(kind => (
-                  <AssetKindPill key={kind} kind={kind} />
-                ))}
-              </div>
-
-              <div className='mt-4 flex flex-wrap gap-1.5'>
-                <Link
-                  href={current.primaryActionHref ?? current.smartLinkPath}
-                  {...closedInteractiveProps}
-                  className={cn(
-                    'system-b-library-action system-b-library-action--standard inline-flex items-center gap-1.5 border border-subtle',
-                    LIBRARY_BUTTON_FOCUS_CLASS
-                  )}
-                >
-                  {current.primaryActionLabel ?? 'Open Release'}
-                  <ExternalLink className='h-3 w-3' />
-                </Link>
-              </div>
-
-              {!isMerch ? (
-                <div className='mt-4'>
-                  <LibraryShareDropCreator
-                    releaseIds={[current.id]}
-                    defaultTitle={`${current.title} press kit`}
+            <div className='flex-1 min-h-0 overflow-y-auto overflow-x-hidden overscroll-contain lg:px-0 lg:pt-0'>
+              <div className='space-y-2.5'>
+                <DrawerSection surface='card' title='Approval'>
+                  <ApprovalStatusEditor
+                    asset={current}
+                    profileId={profileId}
+                    disabled={!open}
+                    onStatusChange={onApprovalStatusChange}
                   />
-                </div>
-              ) : null}
+                </DrawerSection>
 
-              {isMerch ? (
-                <div className='system-b-library-drawer-panel mt-4 px-3 py-3'>
-                  <div className='system-b-library-drawer-panel-heading mb-2 flex items-center gap-2 font-semibold text-primary-token'>
-                    <Shirt className='h-3.5 w-3.5 text-tertiary-token' />
-                    Merch
-                  </div>
-                  <p className='system-b-library-drawer-panel-copy leading-5 text-secondary-token'>
-                    {current.description ?? 'Merch card saved from chat.'}
-                  </p>
-                </div>
-              ) : (
-                <LibraryAudioPanel
-                  asset={current}
-                  isPreviewPlaying={isPreviewPlaying}
-                  onTogglePreview={onTogglePreview}
-                  onUploaded={onAudioUploaded}
-                  disabledTabIndex={closedTabIndex}
-                />
-              )}
-
-              <dl className='mt-4'>
-                <MetadataRow
-                  label={isMerch ? 'Updated' : 'Release Date'}
-                  value={formatLibraryReleaseDate(current.releaseDate)}
-                />
-                <MetadataRow
-                  label='Type'
-                  value={formatLibraryItemType(current)}
-                />
                 {isMerch ? (
-                  <>
-                    <MetadataRow
-                      label='Sale Price'
-                      value={current.salePriceLabel ?? 'No Price'}
-                    />
-                    <MetadataRow
-                      label='Profit'
-                      value={current.profitLabel ?? 'No Estimate'}
-                    />
-                    <MetadataRow
-                      label='Sellability'
-                      value={current.sellabilityLabel ?? 'Not Checked'}
-                    />
-                  </>
+                  <DrawerSection surface='card' title='Merch'>
+                    <p className='system-b-library-drawer-panel-copy leading-5 text-secondary-token'>
+                      {current.description ?? 'Merch card saved from chat.'}
+                    </p>
+                  </DrawerSection>
                 ) : (
                   <>
-                    <MetadataRow label='Tracks' value={current.trackCount} />
-                    <MetadataRow
-                      label='Duration'
-                      value={formatLibraryDuration(current.totalDurationMs)}
-                    />
+                    <DrawerSection
+                      surface='card'
+                      title='Audio'
+                      actions={
+                        current.previewUrl ? (
+                          <PreviewActionButton
+                            asset={current}
+                            isPreviewPlaying={isPreviewPlaying}
+                            onTogglePreview={onTogglePreview}
+                            compact
+                            disabledTabIndex={closedTabIndex}
+                          />
+                        ) : null
+                      }
+                    >
+                      <LibraryAudioPanel
+                        asset={current}
+                        isPreviewPlaying={isPreviewPlaying}
+                        onTogglePreview={onTogglePreview}
+                        onUploaded={onAudioUploaded}
+                        disabledTabIndex={closedTabIndex}
+                        embedded
+                      />
+                    </DrawerSection>
+
+                    <DrawerSection surface='card' title='Share'>
+                      <LibraryShareDropCreator
+                        releaseIds={[current.id]}
+                        defaultTitle={`${current.title} press kit`}
+                      />
+                    </DrawerSection>
                   </>
                 )}
-                {!isMerch ? (
-                  <>
-                    <MetadataRow
-                      label='Popularity'
-                      value={
-                        current.spotifyPopularity == null
-                          ? 'No Score'
-                          : `${current.spotifyPopularity}/100`
-                      }
-                    />
-                    <MetadataRow
-                      label='Genres'
-                      value={
-                        current.genres.length > 0
-                          ? current.genres.join(', ')
-                          : 'No Genres'
-                      }
-                    />
-                    <MetadataRow
-                      label='Label'
-                      value={current.label ?? current.distributor ?? 'No Label'}
-                    />
-                    <MetadataRow label='UPC' value={current.upc ?? 'No UPC'} />
-                    <MetadataRow
-                      label='Pitch Targets'
-                      value={current.targetPlaylistCount}
-                    />
-                  </>
-                ) : null}
-              </dl>
 
-              {!isMerch ? (
-                <div className='mt-4 border-t border-subtle pt-3'>
-                  <h3 className='system-b-library-audio-heading font-semibold text-primary-token'>
-                    Providers
-                  </h3>
-                  {current.providers.length > 0 ? (
-                    <div className='mt-2 space-y-1'>
-                      {current.providers.map(provider => (
-                        <a
-                          key={`${current.id}-${provider.key}`}
-                          href={provider.url}
-                          target='_blank'
-                          rel='noopener noreferrer'
-                          {...closedInteractiveProps}
-                          className={cn(
-                            'system-b-library-provider-link flex h-8 items-center gap-2 px-2',
-                            LIBRARY_CARD_FOCUS_CLASS
-                          )}
-                        >
-                          <Music2 className='h-3.5 w-3.5 text-tertiary-token' />
-                          <span className='min-w-0 flex-1 truncate'>
-                            {provider.label}
-                          </span>
-                          <ExternalLink className='h-3 w-3 text-tertiary-token' />
-                        </a>
-                      ))}
-                    </div>
-                  ) : (
-                    <p className='system-b-library-provider-empty mt-2 leading-5 text-secondary-token'>
-                      No provider links are connected for this release yet.
-                    </p>
-                  )}
-                </div>
-              ) : null}
+                <DrawerSection surface='card' title='Details'>
+                  <dl>
+                    <MetadataRow
+                      label={isMerch ? 'Updated' : 'Release Date'}
+                      value={formatLibraryReleaseDate(current.releaseDate)}
+                    />
+                    <MetadataRow
+                      label='Type'
+                      value={formatLibraryItemType(current)}
+                    />
+                    {isMerch ? (
+                      <>
+                        <MetadataRow
+                          label='Sale Price'
+                          value={current.salePriceLabel ?? 'No Price'}
+                        />
+                        <MetadataRow
+                          label='Profit'
+                          value={current.profitLabel ?? 'No Estimate'}
+                        />
+                        <MetadataRow
+                          label='Sellability'
+                          value={current.sellabilityLabel ?? 'Not Checked'}
+                        />
+                      </>
+                    ) : (
+                      <>
+                        <MetadataRow
+                          label='Tracks'
+                          value={current.trackCount}
+                        />
+                        <MetadataRow
+                          label='Duration'
+                          value={formatLibraryDuration(current.totalDurationMs)}
+                        />
+                        <MetadataRow
+                          label='Popularity'
+                          value={
+                            current.spotifyPopularity == null
+                              ? 'No Score'
+                              : `${current.spotifyPopularity}/100`
+                          }
+                        />
+                        <MetadataRow
+                          label='Genres'
+                          value={
+                            current.genres.length > 0
+                              ? current.genres.join(', ')
+                              : 'No Genres'
+                          }
+                        />
+                        <MetadataRow
+                          label='Label'
+                          value={
+                            current.label ?? current.distributor ?? 'No Label'
+                          }
+                        />
+                        <MetadataRow
+                          label='UPC'
+                          value={current.upc ?? 'No UPC'}
+                        />
+                        <MetadataRow
+                          label='Pitch Targets'
+                          value={current.targetPlaylistCount}
+                        />
+                      </>
+                    )}
+                  </dl>
+                </DrawerSection>
+
+                {!isMerch ? (
+                  <DrawerSection surface='card' title='Providers'>
+                    {current.providers.length > 0 ? (
+                      <div className='space-y-1'>
+                        {current.providers.map(provider => (
+                          <a
+                            key={`${current.id}-${provider.key}`}
+                            href={provider.url}
+                            target='_blank'
+                            rel='noopener noreferrer'
+                            {...closedInteractiveProps}
+                            className={cn(
+                              'system-b-library-provider-link flex h-8 items-center gap-2 px-2',
+                              LIBRARY_CARD_FOCUS_CLASS
+                            )}
+                          >
+                            <Music2 className='h-3.5 w-3.5 text-tertiary-token' />
+                            <span className='min-w-0 flex-1 truncate'>
+                              {provider.label}
+                            </span>
+                            <ExternalLink className='h-3 w-3 text-tertiary-token' />
+                          </a>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className='system-b-library-provider-empty leading-5 text-secondary-token'>
+                        No provider links are connected for this release yet.
+                      </p>
+                    )}
+                  </DrawerSection>
+                ) : null}
+              </div>
             </div>
           </div>
         </TableContextMenu>
@@ -1946,8 +2026,10 @@ function LibraryStatusBar({
 
 export function LibrarySurface({
   assets,
+  profileId = null,
 }: {
   readonly assets: readonly LibraryReleaseAsset[];
+  readonly profileId?: string | null;
 }) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -1955,6 +2037,9 @@ export function LibrarySurface({
   const [audioOverrides, setAudioOverrides] = useState<Record<string, string>>(
     {}
   );
+  const [approvalStatusOverrides, setApprovalStatusOverrides] = useState<
+    Record<string, LibraryApprovalStatus>
+  >({});
   const [preset, setPreset] = useState<LibraryPresetId>(() =>
     parseLibraryViewParam(searchParams.get('view'))
   );
@@ -1968,6 +2053,8 @@ export function LibrarySurface({
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
   const [pills, setPills] = useState<FilterPill[]>([]);
+  const { density: gridDensity, setDensity: setGridDensity } =
+    useLibraryGridDensity();
   const isDesktopLayout = useBreakpoint('lg');
   const deferredFilters = useDeferredValue(filters);
   const deferredPreset = useDeferredValue(preset);
@@ -1983,19 +2070,25 @@ export function LibrarySurface({
     () =>
       assets.map((asset): LibraryReleaseAsset => {
         const previewUrl = audioOverrides[asset.id];
-        if (!previewUrl) return asset;
+        const approvalStatus =
+          approvalStatusOverrides[asset.id] ?? asset.approvalStatus;
         const assetKinds: readonly LibraryAssetKind[] =
-          asset.assetKinds.includes('preview')
-            ? asset.assetKinds
-            : [...asset.assetKinds, 'preview'];
+          previewUrl && !asset.assetKinds.includes('preview')
+            ? [...asset.assetKinds, 'preview']
+            : asset.assetKinds;
+
+        if (!previewUrl && approvalStatus === asset.approvalStatus) {
+          return asset;
+        }
 
         return {
           ...asset,
-          previewUrl,
+          ...(previewUrl ? { previewUrl } : {}),
+          approvalStatus,
           assetKinds,
         };
       }),
-    [assets, audioOverrides]
+    [approvalStatusOverrides, assets, audioOverrides]
   );
 
   const visibleAssets = useMemo(() => {
@@ -2029,6 +2122,10 @@ export function LibrarySurface({
   );
   const statusOptions = useMemo(
     () => uniqueSorted(effectiveAssets.map(asset => asset.status)),
+    [effectiveAssets]
+  );
+  const approvalOptions = useMemo(
+    () => uniqueSorted(effectiveAssets.map(asset => asset.approvalStatus)),
     [effectiveAssets]
   );
   const hasOptions = useMemo(
@@ -2181,8 +2278,19 @@ export function LibrarySurface({
     [handleTogglePreview, playingPreviewId, router]
   );
 
+  const handleApprovalStatusChange = useCallback(
+    (assetId: string, approvalStatus: LibraryApprovalStatus) => {
+      setApprovalStatusOverrides(previous => ({
+        ...previous,
+        [assetId]: approvalStatus,
+      }));
+    },
+    []
+  );
+
   const activeFilterCount =
     filters.statuses.size +
+    filters.approvalStatuses.size +
     filters.releaseTypes.size +
     filters.assetKinds.size +
     filters.providers.size;
@@ -2199,6 +2307,7 @@ export function LibrarySurface({
             titleOptions,
             albumOptions: [],
             statusOptions,
+            approvalOptions,
             hasOptions,
             totalCount: effectiveAssets.length,
             visibleCount: visibleAssets.length,
@@ -2208,9 +2317,16 @@ export function LibrarySurface({
                 : 'Filter Library',
             ariaLabel: 'Filter library assets',
             placeholder: 'Search library',
-            allowedFields: ['artist', 'title', 'status', 'has'] as const,
+            allowedFields: [
+              'artist',
+              'title',
+              'status',
+              'approval',
+              'has',
+            ] as const,
           },
     [
+      approvalOptions,
       artistOptions,
       effectiveAssets.length,
       hasOptions,
@@ -2283,6 +2399,8 @@ export function LibrarySurface({
           onSort={setSort}
           view={view}
           onView={setView}
+          gridDensity={gridDensity}
+          onGridDensity={setGridDensity}
           visibleCount={visibleAssets.length}
           totalCount={effectiveAssets.length}
           mobileFiltersOpen={mobileFiltersOpen}
@@ -2319,6 +2437,7 @@ export function LibrarySurface({
                 selectedId={selectedId}
                 activePreviewId={activePreviewId}
                 playingPreviewId={playingPreviewId}
+                gridDensity={gridDensity}
                 onSelect={openAsset}
                 onTogglePreview={handleTogglePreview}
                 getContextMenuItems={getContextMenuItems}
@@ -2352,6 +2471,8 @@ export function LibrarySurface({
           onTogglePreview={handleTogglePreview}
           onAudioUploaded={handleAudioUploaded}
           getContextMenuItems={getContextMenuItems}
+          profileId={profileId}
+          onApprovalStatusChange={handleApprovalStatusChange}
         />
       </div>
     </PageShell>

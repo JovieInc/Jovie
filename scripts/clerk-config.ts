@@ -49,6 +49,7 @@
 import { execSync, spawnSync } from 'node:child_process';
 import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
+import { pathToFileURL } from 'node:url';
 
 // --- Types (explicit, no clever golf) ---
 interface ClerkConfigOptions {
@@ -92,7 +93,7 @@ const INSTANCE_TO_DOPPLER: Record<string, DopplerRun> = {
   },
 };
 
-function getDopplerForInstance(instance: string = 'dev'): DopplerRun {
+export function getDopplerForInstance(instance: string = 'dev'): DopplerRun {
   const key = (
     instance || 'dev'
   ).toLowerCase() as keyof typeof INSTANCE_TO_DOPPLER;
@@ -116,7 +117,7 @@ function getClerkCommandPrefix(doppler: DopplerRun): string[] {
 }
 
 // --- Safety guards (explicit, reused patterns) ---
-function assertTestOrAllowedInstance(
+export function assertTestOrAllowedInstance(
   secretKey: string | undefined,
   allowProd: boolean
 ): void {
@@ -134,7 +135,10 @@ function assertTestOrAllowedInstance(
   // staging keys are often pk_live_ but scoped; allow if flag or known
 }
 
-function assertPatchTargetAllowed(doppler: DopplerRun, allowProd: boolean) {
+export function assertPatchTargetAllowed(
+  doppler: DopplerRun,
+  allowProd: boolean
+) {
   if (doppler.clerkInstance === 'prod' && !allowProd) {
     throw new Error(
       'SAFETY: Refusing to patch the production Clerk app without --allow-prod.'
@@ -558,8 +562,13 @@ gh-9805 principles: explicit, complete, small, DRY, action-oriented.
   }
 }
 
-main().catch(err => {
-  console.error('clerk-config error:', err?.message || err);
-  logAudit('error', { message: String(err?.message || err) });
-  process.exit(1);
-});
+if (
+  process.argv[1] &&
+  import.meta.url === pathToFileURL(process.argv[1]).href
+) {
+  main().catch(err => {
+    console.error('clerk-config error:', err?.message || err);
+    logAudit('error', { message: String(err?.message || err) });
+    process.exit(1);
+  });
+}

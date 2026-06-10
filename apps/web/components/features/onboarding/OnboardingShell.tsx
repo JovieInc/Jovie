@@ -5,6 +5,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { AppShellFrame } from '@/components/organisms/AppShellFrame';
 import { SidebarProvider } from '@/components/organisms/Sidebar';
 import { track } from '@/lib/analytics';
+import { publicEnv } from '@/lib/env-public';
 import { ONBOARDING_FUNNEL_EVENTS } from '@/lib/onboarding/funnel-events';
 import { cn } from '@/lib/utils';
 import { OnboardingChat } from './OnboardingChat';
@@ -14,6 +15,7 @@ import {
   OnboardingProfileRail,
 } from './OnboardingProfileRail';
 import {
+  isOnboardingTurnstilePanelVisible,
   OnboardingTurnstile,
   type OnboardingTurnstileState,
 } from './OnboardingTurnstile';
@@ -110,6 +112,11 @@ export function OnboardingShell({
       resetSignal={turnstileResetSignal}
     />
   );
+  const turnstilePanelVisible = isOnboardingTurnstilePanelVisible(
+    turnstileState,
+    turnstileInstruction,
+    publicEnv.NEXT_PUBLIC_TURNSTILE_SITE_KEY
+  );
 
   const isTurnstileUnavailable =
     turnstileState.status === 'error' ||
@@ -159,6 +166,7 @@ export function OnboardingShell({
               turnstileToken={turnstileToken}
               turnstileStatus={turnstileState.status}
               turnstilePanel={turnstilePanel}
+              turnstilePanelVisible={turnstilePanelVisible}
               onTurnstileRequired={handleTurnstileRequired}
               onTurnstileRejected={handleTurnstileRejected}
             />

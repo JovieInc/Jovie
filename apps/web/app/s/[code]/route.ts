@@ -73,6 +73,14 @@ function resolveObjectType(
   }
 }
 
+function resolveSourceKind(
+  sourceType: string
+): 'qr' | 'wallet_pass' | 'short_link' {
+  if (sourceType === 'qr') return 'qr';
+  if (sourceType === 'wallet_pass') return 'wallet_pass';
+  return 'short_link';
+}
+
 async function resolveAudienceMemberId(
   tx: Parameters<Parameters<typeof withSystemIngestionSession>[0]>[0],
   input: {
@@ -237,7 +245,7 @@ export async function GET(
           eventType: 'source_scanned',
           verb: 'scanned',
           confidence: 'observed',
-          sourceKind: sourceLink.sourceType === 'qr' ? 'qr' : 'short_link',
+          sourceKind: resolveSourceKind(sourceLink.sourceType),
           sourceLabel: sourceLink.name,
           sourceLinkId: sourceLink.id,
           objectType: resolveObjectType(sourceLink.destinationKind),

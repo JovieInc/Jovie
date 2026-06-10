@@ -215,7 +215,7 @@ function AuthShellWrapperInner({
     [clearPendingShell, pendingShellRoute, showPendingShell]
   );
   const shellChildren = (
-    <div className='relative min-h-full'>
+    <div className='relative flex h-full min-h-0 flex-col'>
       {children}
       <div
         ref={releasesShellOverlayRef}

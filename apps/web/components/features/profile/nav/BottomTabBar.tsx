@@ -12,7 +12,7 @@
  * Constants: apps/web/lib/profile/nav-constants.ts
  *
  * Tab definitions (spec §2.1, fixed order):
- *   1. Profile  (mode: profile)   — UserRound icon
+ *   1. Home     (mode: profile)   — UserRound icon
  *   2. Music    (mode: listen)    — Music2 icon
  *   3. Events   (mode: tour)      — CalendarDays icon
  *   4. Alerts   (mode: subscribe) — Bell icon
@@ -44,7 +44,7 @@ interface TabDefinition {
  * All four primary tab definitions, in canonical order.
  */
 const ALL_PRIMARY_TABS: ReadonlyArray<TabDefinition> = [
-  { mode: 'profile', label: 'Profile', icon: UserRound },
+  { mode: 'profile', label: 'Home', icon: UserRound },
   { mode: 'listen', label: 'Music', icon: Music2 },
   { mode: 'tour', label: 'Events', icon: CalendarDays },
   { mode: 'subscribe', label: 'Alerts', icon: Bell },

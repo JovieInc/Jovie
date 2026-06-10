@@ -22,9 +22,7 @@ vi.mock('@/features/dashboard/organisms/account-settings', () => ({
 vi.mock('@/features/dashboard/organisms/DataPrivacySection', () => ({
   DataPrivacySection: () => <div>Data Privacy</div>,
 }));
-vi.mock('@/features/dashboard/organisms/SettingsAdminSection', () => ({
-  SettingsAdminSection: () => <div>Admin Settings</div>,
-}));
+
 vi.mock('@/features/dashboard/organisms/SettingsAdPixelsSection', () => ({
   SettingsAdPixelsSection: () => <div>Pixels</div>,
 }));

@@ -212,6 +212,12 @@ private struct AppContentView: View {
             isOffline: appState.isOffline,
             brightnessManager: appState.brightnessManager,
             showVenueModeOnLaunch: appState.launchMode.opensVenueModeOnLaunch,
+            loadAppleWalletProfilePass: {
+              try await APIClient(
+                baseURL: appState.configuration.apiBaseURL,
+                tokenProvider: ClerkTokenProvider()
+              ).fetchAppleWalletProfilePass()
+            },
             onRetry: { await appState.retry() }
           )
         } chatContent: { draft in
