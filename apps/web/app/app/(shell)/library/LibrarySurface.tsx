@@ -46,6 +46,11 @@ import {
 import { toast } from 'sonner';
 import { LibraryShareDropCreator } from '@/components/features/library-share/LibraryShareDropCreator';
 import { ReleaseAudioAssetPanel } from '@/components/features/release/ReleaseAudioAssetPanel';
+import {
+  DrawerHeader,
+  DrawerSection,
+  DrawerSurfaceCard,
+} from '@/components/molecules/drawer';
 import { PageShell } from '@/components/organisms/PageShell';
 import { useTrackAudioPlayer } from '@/components/organisms/release-sidebar/useTrackAudioPlayer';
 import {
@@ -1455,32 +1460,36 @@ function LibraryAudioPanel({
   onTogglePreview,
   onUploaded,
   disabledTabIndex,
+  embedded = false,
 }: {
   readonly asset: LibraryReleaseAsset;
   readonly isPreviewPlaying: boolean;
   readonly onTogglePreview: LibraryPreviewToggle;
   readonly onUploaded: (assetId: string, previewUrl: string) => void;
   readonly disabledTabIndex?: number;
+  readonly embedded?: boolean;
 }) {
   return (
-    <div className='mt-4 border-t border-subtle pt-3'>
-      <div className='mb-2 flex h-7 items-center justify-between gap-2'>
-        <div className='flex min-w-0 items-center gap-2'>
-          <FileAudio2 className='h-3.5 w-3.5 shrink-0 text-tertiary-token' />
-          <h3 className='system-b-library-audio-heading truncate font-semibold text-primary-token'>
-            Audio
-          </h3>
+    <div className={embedded ? undefined : 'mt-4 border-t border-subtle pt-3'}>
+      {embedded ? null : (
+        <div className='mb-2 flex h-7 items-center justify-between gap-2'>
+          <div className='flex min-w-0 items-center gap-2'>
+            <FileAudio2 className='h-3.5 w-3.5 shrink-0 text-tertiary-token' />
+            <h3 className='system-b-library-audio-heading truncate font-semibold text-primary-token'>
+              Audio
+            </h3>
+          </div>
+          {asset.previewUrl ? (
+            <PreviewActionButton
+              asset={asset}
+              isPreviewPlaying={isPreviewPlaying}
+              onTogglePreview={onTogglePreview}
+              compact
+              disabledTabIndex={disabledTabIndex}
+            />
+          ) : null}
         </div>
-        {asset.previewUrl ? (
-          <PreviewActionButton
-            asset={asset}
-            isPreviewPlaying={isPreviewPlaying}
-            onTogglePreview={onTogglePreview}
-            compact
-            disabledTabIndex={disabledTabIndex}
-          />
-        ) : null}
-      </div>
+      )}
       <ReleaseAudioAssetPanel
         releaseId={asset.id}
         releaseTitle={asset.title}
@@ -1536,6 +1545,41 @@ function AssetDrawer({
     'pointer-events-none opacity-0',
     isDesktopLayout ? null : 'translate-y-2 hidden'
   );
+  const drawerHeaderActions = current ? (
+    <>
+      <PreviewActionButton
+        asset={current}
+        isPreviewPlaying={isPreviewPlaying}
+        onTogglePreview={onTogglePreview}
+        compact
+        disabledTabIndex={closedTabIndex}
+        reserveSpace
+      />
+      <Link
+        href={current.primaryActionHref ?? current.smartLinkPath}
+        {...closedInteractiveProps}
+        aria-label={`Open ${current.title}`}
+        className={cn(
+          'system-b-library-icon-button system-b-library-icon-button--bordered grid h-7 w-7 place-items-center',
+          LIBRARY_ICON_FOCUS_CLASS
+        )}
+      >
+        <ExternalLink className='h-3.5 w-3.5' />
+      </Link>
+      <button
+        type='button'
+        onClick={onClose}
+        aria-label='Close asset details'
+        {...closedInteractiveProps}
+        className={cn(
+          'system-b-library-icon-button grid h-7 w-7 place-items-center',
+          LIBRARY_ICON_FOCUS_CLASS
+        )}
+      >
+        <X className='h-3.5 w-3.5' />
+      </button>
+    </>
+  ) : null;
 
   return (
     <aside
@@ -1552,224 +1596,216 @@ function AssetDrawer({
     >
       {current ? (
         <TableContextMenu items={getContextMenuItems(current)}>
-          <div className='flex h-full min-h-0 flex-col'>
-            <div className='flex h-10 shrink-0 items-center justify-between gap-2 border-b border-subtle px-3'>
-              <span className='system-b-library-drawer-kicker min-w-0 truncate'>
-                {isMerch ? 'Merch' : 'Release'}
-              </span>
-              <div className='flex shrink-0 items-center gap-1'>
-                <PreviewActionButton
-                  asset={current}
-                  isPreviewPlaying={isPreviewPlaying}
-                  onTogglePreview={onTogglePreview}
-                  compact
-                  disabledTabIndex={closedTabIndex}
-                  reserveSpace
+          <div className='flex h-full min-h-0 flex-col gap-1.5 px-1.5 py-1.5 lg:px-0 lg:py-0'>
+            <div
+              className='shrink-0 space-y-2.5'
+              data-testid='library-asset-drawer-sticky-rail'
+            >
+              <DrawerSurfaceCard variant='card' className='overflow-hidden'>
+                <DrawerHeader
+                  title={isMerch ? 'Merch' : 'Release'}
+                  actions={drawerHeaderActions}
                 />
-                <Link
-                  href={current.primaryActionHref ?? current.smartLinkPath}
-                  {...closedInteractiveProps}
-                  aria-label={`Open ${current.title}`}
-                  className={cn(
-                    'system-b-library-icon-button system-b-library-icon-button--bordered grid h-7 w-7 place-items-center',
-                    LIBRARY_ICON_FOCUS_CLASS
-                  )}
-                >
-                  <ExternalLink className='h-3.5 w-3.5' />
-                </Link>
-                <button
-                  type='button'
-                  onClick={onClose}
-                  aria-label='Close asset details'
-                  {...closedInteractiveProps}
-                  className={cn(
-                    'system-b-library-icon-button grid h-7 w-7 place-items-center',
-                    LIBRARY_ICON_FOCUS_CLASS
-                  )}
-                >
-                  <X className='h-3.5 w-3.5' />
-                </button>
-              </div>
+                <div className='space-y-3 overflow-visible px-3 pb-3 pt-3'>
+                  <div className='system-b-library-drawer-artwork overflow-hidden'>
+                    <div
+                      className={cn(
+                        'mx-auto w-full max-w-80',
+                        getLibraryAspectRatioClass(
+                          getLibraryAssetAspectRatio(current)
+                        )
+                      )}
+                    >
+                      <LibraryMediaThumbnail asset={current} size='drawer' />
+                    </div>
+                  </div>
+
+                  <div>
+                    <h2 className='system-b-library-drawer-title'>
+                      {current.title}
+                    </h2>
+                    <p className='system-b-library-drawer-artist mt-1'>
+                      {current.artist}
+                    </p>
+                  </div>
+
+                  <div className='flex flex-wrap gap-1.5'>
+                    <span
+                      className={cn(
+                        'system-b-library-status-pill inline-flex h-6 items-center border px-2',
+                        releaseStatusClasses(current.status)
+                      )}
+                    >
+                      {formatLibraryStatus(current)}
+                    </span>
+                    {current.assetKinds.map(kind => (
+                      <AssetKindPill key={kind} kind={kind} />
+                    ))}
+                  </div>
+
+                  <div className='flex flex-wrap gap-1.5'>
+                    <Link
+                      href={current.primaryActionHref ?? current.smartLinkPath}
+                      {...closedInteractiveProps}
+                      className={cn(
+                        'system-b-library-action system-b-library-action--standard inline-flex items-center gap-1.5 border border-subtle',
+                        LIBRARY_BUTTON_FOCUS_CLASS
+                      )}
+                    >
+                      {current.primaryActionLabel ?? 'Open Release'}
+                      <ExternalLink className='h-3 w-3' />
+                    </Link>
+                  </div>
+                </div>
+              </DrawerSurfaceCard>
             </div>
 
-            <div className='min-h-0 flex-1 overflow-y-auto p-3'>
-              <div className='system-b-library-drawer-artwork overflow-hidden'>
-                <div
-                  className={cn(
-                    'mx-auto w-full max-w-80',
-                    getLibraryAspectRatioClass(
-                      getLibraryAssetAspectRatio(current)
-                    )
-                  )}
-                >
-                  <LibraryMediaThumbnail asset={current} size='drawer' />
-                </div>
-              </div>
-
-              <div className='mt-3'>
-                <h2 className='system-b-library-drawer-title'>
-                  {current.title}
-                </h2>
-                <p className='system-b-library-drawer-artist mt-1'>
-                  {current.artist}
-                </p>
-              </div>
-
-              <div className='mt-3 flex flex-wrap gap-1.5'>
-                <span
-                  className={cn(
-                    'system-b-library-status-pill inline-flex h-6 items-center border px-2',
-                    releaseStatusClasses(current.status)
-                  )}
-                >
-                  {formatLibraryStatus(current)}
-                </span>
-                {current.assetKinds.map(kind => (
-                  <AssetKindPill key={kind} kind={kind} />
-                ))}
-              </div>
-
-              <div className='mt-4 flex flex-wrap gap-1.5'>
-                <Link
-                  href={current.primaryActionHref ?? current.smartLinkPath}
-                  {...closedInteractiveProps}
-                  className={cn(
-                    'system-b-library-action system-b-library-action--standard inline-flex items-center gap-1.5 border border-subtle',
-                    LIBRARY_BUTTON_FOCUS_CLASS
-                  )}
-                >
-                  {current.primaryActionLabel ?? 'Open Release'}
-                  <ExternalLink className='h-3 w-3' />
-                </Link>
-              </div>
-
-              {!isMerch ? (
-                <div className='mt-4'>
-                  <LibraryShareDropCreator
-                    releaseIds={[current.id]}
-                    defaultTitle={`${current.title} press kit`}
-                  />
-                </div>
-              ) : null}
-
-              {isMerch ? (
-                <div className='system-b-library-drawer-panel mt-4 px-3 py-3'>
-                  <div className='system-b-library-drawer-panel-heading mb-2 flex items-center gap-2 font-semibold text-primary-token'>
-                    <Shirt className='h-3.5 w-3.5 text-tertiary-token' />
-                    Merch
-                  </div>
-                  <p className='system-b-library-drawer-panel-copy leading-5 text-secondary-token'>
-                    {current.description ?? 'Merch card saved from chat.'}
-                  </p>
-                </div>
-              ) : (
-                <LibraryAudioPanel
-                  asset={current}
-                  isPreviewPlaying={isPreviewPlaying}
-                  onTogglePreview={onTogglePreview}
-                  onUploaded={onAudioUploaded}
-                  disabledTabIndex={closedTabIndex}
-                />
-              )}
-
-              <dl className='mt-4'>
-                <MetadataRow
-                  label={isMerch ? 'Updated' : 'Release Date'}
-                  value={formatLibraryReleaseDate(current.releaseDate)}
-                />
-                <MetadataRow
-                  label='Type'
-                  value={formatLibraryItemType(current)}
-                />
+            <div className='flex-1 min-h-0 overflow-y-auto overflow-x-hidden overscroll-contain lg:px-0 lg:pt-0'>
+              <div className='space-y-2.5'>
                 {isMerch ? (
-                  <>
-                    <MetadataRow
-                      label='Sale Price'
-                      value={current.salePriceLabel ?? 'No Price'}
-                    />
-                    <MetadataRow
-                      label='Profit'
-                      value={current.profitLabel ?? 'No Estimate'}
-                    />
-                    <MetadataRow
-                      label='Sellability'
-                      value={current.sellabilityLabel ?? 'Not Checked'}
-                    />
-                  </>
+                  <DrawerSection surface='card' title='Merch'>
+                    <p className='system-b-library-drawer-panel-copy leading-5 text-secondary-token'>
+                      {current.description ?? 'Merch card saved from chat.'}
+                    </p>
+                  </DrawerSection>
                 ) : (
                   <>
-                    <MetadataRow label='Tracks' value={current.trackCount} />
-                    <MetadataRow
-                      label='Duration'
-                      value={formatLibraryDuration(current.totalDurationMs)}
-                    />
+                    <DrawerSection
+                      surface='card'
+                      title='Audio'
+                      actions={
+                        current.previewUrl ? (
+                          <PreviewActionButton
+                            asset={current}
+                            isPreviewPlaying={isPreviewPlaying}
+                            onTogglePreview={onTogglePreview}
+                            compact
+                            disabledTabIndex={closedTabIndex}
+                          />
+                        ) : null
+                      }
+                    >
+                      <LibraryAudioPanel
+                        asset={current}
+                        isPreviewPlaying={isPreviewPlaying}
+                        onTogglePreview={onTogglePreview}
+                        onUploaded={onAudioUploaded}
+                        disabledTabIndex={closedTabIndex}
+                        embedded
+                      />
+                    </DrawerSection>
+
+                    <DrawerSection surface='card' title='Share'>
+                      <LibraryShareDropCreator
+                        releaseIds={[current.id]}
+                        defaultTitle={`${current.title} press kit`}
+                      />
+                    </DrawerSection>
                   </>
                 )}
-                {!isMerch ? (
-                  <>
-                    <MetadataRow
-                      label='Popularity'
-                      value={
-                        current.spotifyPopularity == null
-                          ? 'No Score'
-                          : `${current.spotifyPopularity}/100`
-                      }
-                    />
-                    <MetadataRow
-                      label='Genres'
-                      value={
-                        current.genres.length > 0
-                          ? current.genres.join(', ')
-                          : 'No Genres'
-                      }
-                    />
-                    <MetadataRow
-                      label='Label'
-                      value={current.label ?? current.distributor ?? 'No Label'}
-                    />
-                    <MetadataRow label='UPC' value={current.upc ?? 'No UPC'} />
-                    <MetadataRow
-                      label='Pitch Targets'
-                      value={current.targetPlaylistCount}
-                    />
-                  </>
-                ) : null}
-              </dl>
 
-              {!isMerch ? (
-                <div className='mt-4 border-t border-subtle pt-3'>
-                  <h3 className='system-b-library-audio-heading font-semibold text-primary-token'>
-                    Providers
-                  </h3>
-                  {current.providers.length > 0 ? (
-                    <div className='mt-2 space-y-1'>
-                      {current.providers.map(provider => (
-                        <a
-                          key={`${current.id}-${provider.key}`}
-                          href={provider.url}
-                          target='_blank'
-                          rel='noopener noreferrer'
-                          {...closedInteractiveProps}
-                          className={cn(
-                            'system-b-library-provider-link flex h-8 items-center gap-2 px-2',
-                            LIBRARY_CARD_FOCUS_CLASS
-                          )}
-                        >
-                          <Music2 className='h-3.5 w-3.5 text-tertiary-token' />
-                          <span className='min-w-0 flex-1 truncate'>
-                            {provider.label}
-                          </span>
-                          <ExternalLink className='h-3 w-3 text-tertiary-token' />
-                        </a>
-                      ))}
-                    </div>
-                  ) : (
-                    <p className='system-b-library-provider-empty mt-2 leading-5 text-secondary-token'>
-                      No provider links are connected for this release yet.
-                    </p>
-                  )}
-                </div>
-              ) : null}
+                <DrawerSection surface='card' title='Details'>
+                  <dl>
+                    <MetadataRow
+                      label={isMerch ? 'Updated' : 'Release Date'}
+                      value={formatLibraryReleaseDate(current.releaseDate)}
+                    />
+                    <MetadataRow
+                      label='Type'
+                      value={formatLibraryItemType(current)}
+                    />
+                    {isMerch ? (
+                      <>
+                        <MetadataRow
+                          label='Sale Price'
+                          value={current.salePriceLabel ?? 'No Price'}
+                        />
+                        <MetadataRow
+                          label='Profit'
+                          value={current.profitLabel ?? 'No Estimate'}
+                        />
+                        <MetadataRow
+                          label='Sellability'
+                          value={current.sellabilityLabel ?? 'Not Checked'}
+                        />
+                      </>
+                    ) : (
+                      <>
+                        <MetadataRow
+                          label='Tracks'
+                          value={current.trackCount}
+                        />
+                        <MetadataRow
+                          label='Duration'
+                          value={formatLibraryDuration(current.totalDurationMs)}
+                        />
+                        <MetadataRow
+                          label='Popularity'
+                          value={
+                            current.spotifyPopularity == null
+                              ? 'No Score'
+                              : `${current.spotifyPopularity}/100`
+                          }
+                        />
+                        <MetadataRow
+                          label='Genres'
+                          value={
+                            current.genres.length > 0
+                              ? current.genres.join(', ')
+                              : 'No Genres'
+                          }
+                        />
+                        <MetadataRow
+                          label='Label'
+                          value={
+                            current.label ?? current.distributor ?? 'No Label'
+                          }
+                        />
+                        <MetadataRow
+                          label='UPC'
+                          value={current.upc ?? 'No UPC'}
+                        />
+                        <MetadataRow
+                          label='Pitch Targets'
+                          value={current.targetPlaylistCount}
+                        />
+                      </>
+                    )}
+                  </dl>
+                </DrawerSection>
+
+                {!isMerch ? (
+                  <DrawerSection surface='card' title='Providers'>
+                    {current.providers.length > 0 ? (
+                      <div className='space-y-1'>
+                        {current.providers.map(provider => (
+                          <a
+                            key={`${current.id}-${provider.key}`}
+                            href={provider.url}
+                            target='_blank'
+                            rel='noopener noreferrer'
+                            {...closedInteractiveProps}
+                            className={cn(
+                              'system-b-library-provider-link flex h-8 items-center gap-2 px-2',
+                              LIBRARY_CARD_FOCUS_CLASS
+                            )}
+                          >
+                            <Music2 className='h-3.5 w-3.5 text-tertiary-token' />
+                            <span className='min-w-0 flex-1 truncate'>
+                              {provider.label}
+                            </span>
+                            <ExternalLink className='h-3 w-3 text-tertiary-token' />
+                          </a>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className='system-b-library-provider-empty leading-5 text-secondary-token'>
+                        No provider links are connected for this release yet.
+                      </p>
+                    )}
+                  </DrawerSection>
+                ) : null}
+              </div>
             </div>
           </div>
         </TableContextMenu>
