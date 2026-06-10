@@ -50,6 +50,7 @@ import {
   useState,
 } from 'react';
 import { toast } from 'sonner';
+import { LibraryShareDropCreator } from '@/components/features/library-share/LibraryShareDropCreator';
 import { PageShell } from '@/components/organisms/PageShell';
 import { useTrackAudioPlayer } from '@/components/organisms/release-sidebar/useTrackAudioPlayer';
 import {
@@ -1778,6 +1779,15 @@ function AssetDrawer({
                   <ExternalLink className='h-3 w-3' />
                 </Link>
               </div>
+
+              {!isMerch ? (
+                <div className='mt-4'>
+                  <LibraryShareDropCreator
+                    releaseIds={[current.id]}
+                    defaultTitle={`${current.title} press kit`}
+                  />
+                </div>
+              ) : null}
 
               {isMerch ? (
                 <div className='system-b-library-drawer-panel mt-4 px-3 py-3'>

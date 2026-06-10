@@ -5,6 +5,14 @@
      5|The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
      6|and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.6.33] - 2026-06-09
+
+> Library release assets can now be shared as a branded press-kit drop with optional passphrase and download controls.
+
+### Added
+
+- **Library branded share page (JOV-2936)**: adds `library_share_drops` storage, authenticated share-drop creation from the Library drawer, public `/drop/[token]` press-kit surfaces with grid/list/reel layouts, optional comment + download toggles, and passphrase gating with expiry handling.
+
 ## [26.6.32] - 2026-06-09
 
 > Library thumbnails now expose hover scrub previews for audio waveforms and canvas videos.
