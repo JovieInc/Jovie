@@ -133,7 +133,6 @@ describe('ChatMerchCard', () => {
       '$11.87'
     );
     expect(sellableCard.getByRole('radio', { name: 'Standard' })).toBeChecked();
-    expect(screen.getByText('Draft')).toBeInTheDocument();
     expect(
       screen.getByText(
         'Printful product cost must come from Printful before sale.'

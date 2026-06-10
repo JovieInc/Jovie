@@ -1,5 +1,7 @@
 import 'server-only';
 
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { put } from '@vercel/blob';
 import sharp from 'sharp';
 import { uploadBufferToBlob } from '@/app/api/images/upload/lib/blob-upload';
@@ -14,6 +16,22 @@ const PRINT_HEIGHT = 5400;
 const MOCKUP_WIDTH = 1800;
 const MOCKUP_HEIGHT = 2200;
 
+const PRINT_CHEST_REGION = {
+  left: 450,
+  top: 420,
+  width: 3600,
+  height: 4300,
+} as const;
+
+const SHIRT_CHEST = {
+  left: 500,
+  top: 700,
+  width: 800,
+  height: 980,
+} as const;
+
+let embeddedInterFontFace: string | null = null;
+
 function escapeXml(value: string): string {
   return value
     .replaceAll('&', '&amp;')
@@ -25,6 +43,25 @@ function escapeXml(value: string): string {
 
 function fallbackBlobUrl(path: string): string {
   return `https://blob.vercel-storage.com/${path}`;
+}
+
+function getEmbeddedInterFontFace(): string {
+  if (embeddedInterFontFace) return embeddedInterFontFace;
+
+  const fontPath = join(process.cwd(), 'public/fonts/Inter-Latin.woff2');
+  const fontData = readFileSync(fontPath).toString('base64');
+  embeddedInterFontFace = `
+    <style>
+      @font-face {
+        font-family: 'Jovie Inter';
+        src: url('data:font/woff2;base64,${fontData}') format('woff2');
+        font-weight: 100 900;
+        font-style: normal;
+      }
+    </style>
+  `;
+
+  return embeddedInterFontFace;
 }
 
 async function uploadPublicBuffer(params: {
@@ -129,46 +166,62 @@ function buildPrintSvg(params: {
   const artistText = artistLines
     .map(
       (line, index) =>
-        `<text x="2250" y="${artistStartY + index * 420}" text-anchor="middle" font-family="Arial Black, Arial, sans-serif" font-size="420" font-weight="900" letter-spacing="0" fill="#f3f3f0">${escapeXml(line)}</text>`
+        `<text x="2250" y="${artistStartY + index * 420}" text-anchor="middle" font-family="'Jovie Inter', Inter, Helvetica, Arial, sans-serif" font-size="420" font-weight="900" letter-spacing="0" fill="#f3f3f0">${escapeXml(line)}</text>`
     )
     .join('');
   const designText = designLines
     .map(
       (line, index) =>
-        `<text x="2250" y="${designStartY + index * 220}" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="190" font-weight="700" letter-spacing="0" fill="#f3f3f0" opacity=".92">${escapeXml(line)}</text>`
+        `<text x="2250" y="${designStartY + index * 220}" text-anchor="middle" font-family="'Jovie Inter', Inter, Helvetica, Arial, sans-serif" font-size="190" font-weight="700" letter-spacing="0" fill="#f3f3f0" opacity=".92">${escapeXml(line)}</text>`
     )
     .join('');
 
   // eslint-disable-next-line @jovie/icon-usage -- SVG string for Sharp image processing, not a React component
   const svg = `<svg width="${PRINT_WIDTH}" height="${PRINT_HEIGHT}" viewBox="0 0 ${PRINT_WIDTH} ${PRINT_HEIGHT}" xmlns="http://www.w3.org/2000/svg">
+    ${getEmbeddedInterFontFace()}
     <rect x="0" y="0" width="${PRINT_WIDTH}" height="${PRINT_HEIGHT}" fill="none"/>
     <g>
       ${motif}
-      <text x="2250" y="650" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="140" font-weight="800" letter-spacing="0" fill="#f3f3f0" opacity=".82">${escapeXml(lane.eyebrow)}</text>
+      <text x="2250" y="650" text-anchor="middle" font-family="'Jovie Inter', Inter, Helvetica, Arial, sans-serif" font-size="140" font-weight="800" letter-spacing="0" fill="#f3f3f0" opacity=".82">${escapeXml(lane.eyebrow)}</text>
       ${artistText}
       ${designText}
-      <text x="2250" y="4640" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="128" font-weight="700" letter-spacing="0" fill="#f3f3f0" opacity=".8">${escapeXml(lane.footer)}</text>
+      <text x="2250" y="4640" text-anchor="middle" font-family="'Jovie Inter', Inter, Helvetica, Arial, sans-serif" font-size="128" font-weight="700" letter-spacing="0" fill="#f3f3f0" opacity=".8">${escapeXml(lane.footer)}</text>
     </g>
   </svg>`;
 
   return Buffer.from(svg);
 }
 
-async function renderMockup(printFile: Buffer): Promise<Buffer> {
-  const shirtSvg =
-    Buffer.from(`<svg width="${MOCKUP_WIDTH}" height="${MOCKUP_HEIGHT}" viewBox="0 0 ${MOCKUP_WIDTH} ${MOCKUP_HEIGHT}" xmlns="http://www.w3.org/2000/svg">
+function buildBlankGarmentSvg(): Buffer {
+  return Buffer.from(`<svg width="${MOCKUP_WIDTH}" height="${MOCKUP_HEIGHT}" viewBox="0 0 ${MOCKUP_WIDTH} ${MOCKUP_HEIGHT}" xmlns="http://www.w3.org/2000/svg">
     <rect width="${MOCKUP_WIDTH}" height="${MOCKUP_HEIGHT}" fill="#f4f2ed"/>
     <path d="M560 260 L720 420 H1080 L1240 260 L1560 420 L1390 760 L1260 690 V1880 H540 V690 L410 760 L240 420 Z" fill="#111" stroke="#050505" stroke-width="8"/>
     <path d="M720 420 C780 560 1020 560 1080 420" fill="none" stroke="#242424" stroke-width="16"/>
   </svg>`);
+}
 
-  const resizedPrint = await sharp(printFile)
-    .resize(760, 920, { fit: 'inside' })
+export async function renderMockup(printFile: Buffer): Promise<Buffer> {
+  const garmentBuffer = await sharp(buildBlankGarmentSvg()).png().toBuffer();
+
+  const croppedPrint = await sharp(printFile)
+    .extract(PRINT_CHEST_REGION)
+    .resize(SHIRT_CHEST.width, SHIRT_CHEST.height, {
+      fit: 'inside',
+      withoutEnlargement: false,
+    })
     .png()
     .toBuffer();
 
-  return sharp(shirtSvg)
-    .composite([{ input: resizedPrint, top: 720, left: 520 }])
+  const printMeta = await sharp(croppedPrint).metadata();
+  const printWidth = printMeta.width ?? SHIRT_CHEST.width;
+  const printHeight = printMeta.height ?? SHIRT_CHEST.height;
+  const left =
+    SHIRT_CHEST.left + Math.round((SHIRT_CHEST.width - printWidth) / 2);
+  const top =
+    SHIRT_CHEST.top + Math.round((SHIRT_CHEST.height - printHeight) / 2);
+
+  return sharp(garmentBuffer)
+    .composite([{ input: croppedPrint, top, left, blend: 'over' }])
     .jpeg({ quality: 88 })
     .toBuffer();
 }
