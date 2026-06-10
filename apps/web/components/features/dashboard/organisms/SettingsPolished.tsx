@@ -16,7 +16,7 @@ import { APP_ROUTES } from '@/constants/routes';
 import { SettingsErrorState } from '@/features/dashboard/molecules/SettingsErrorState';
 import { AccountSettingsSection } from '@/features/dashboard/organisms/account-settings';
 import { DataPrivacySection } from '@/features/dashboard/organisms/DataPrivacySection';
-import { SettingsAdminSection } from '@/features/dashboard/organisms/SettingsAdminSection';
+
 import { SettingsAdPixelsSection } from '@/features/dashboard/organisms/SettingsAdPixelsSection';
 import { SettingsAnalyticsSection } from '@/features/dashboard/organisms/SettingsAnalyticsSection';
 import { SettingsAudienceSection } from '@/features/dashboard/organisms/SettingsAudienceSection';
@@ -38,7 +38,6 @@ interface SettingsPolishedProps {
   readonly artist: Artist;
   readonly onArtistUpdate?: (updatedArtist: Artist) => void;
   readonly focusSection?: string;
-  readonly isAdmin?: boolean;
 }
 
 interface SettingsSectionConfig {
@@ -78,8 +77,6 @@ function getFocusedSettingsHref(sectionId: string): string {
       return APP_ROUTES.SETTINGS_TOURING;
     case 'audience-tracking':
       return APP_ROUTES.SETTINGS_AUDIENCE;
-    case 'admin':
-      return APP_ROUTES.SETTINGS_ADMIN;
     case 'analytics':
       return `${APP_ROUTES.SETTINGS}#analytics`;
     case 'payments':
@@ -187,7 +184,6 @@ export function SettingsPolished({
   artist,
   onArtistUpdate,
   focusSection,
-  isAdmin = false,
 }: SettingsPolishedProps) {
   const router = useRouter();
   const [activeHashSectionId, setActiveHashSectionId] = useState<
@@ -344,23 +340,6 @@ export function SettingsPolished({
     []
   );
 
-  // -- Admin-only settings (only visible to admin users) --
-  const adminSections = useMemo<ReadonlyArray<SettingsSectionConfig>>(
-    () =>
-      isAdmin
-        ? [
-            {
-              id: 'admin',
-              title: 'General',
-              description:
-                'Dev toolbar, waitlist controls, campaign targeting, and admin quick links.',
-              render: () => <SettingsAdminSection />,
-            },
-          ]
-        : [],
-    [isAdmin]
-  );
-
   const sectionGroups = useMemo<ReadonlyArray<SettingsSectionGroup>>(
     () => [
       {
@@ -388,19 +367,9 @@ export function SettingsPolished({
         label: 'Privacy & Data',
         sections: privacySections,
       },
-      ...(adminSections.length > 0
-        ? [
-            {
-              id: 'admin',
-              label: 'Admin',
-              sections: adminSections,
-            },
-          ]
-        : []),
     ],
     [
       accountSections,
-      adminSections,
       audienceSections,
       creativeSections,
       monetizationSections,
