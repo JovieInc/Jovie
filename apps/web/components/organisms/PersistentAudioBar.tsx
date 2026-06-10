@@ -54,8 +54,15 @@ export function PersistentAudioBar({
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const designV1LyricsEnabled = useAppFlag('DESIGN_V1');
-  const { playbackState, toggleTrack, seek, stop, onError } =
-    useTrackAudioPlayer();
+  const {
+    playbackState,
+    toggleTrack,
+    playNext,
+    playPrevious,
+    seek,
+    stop,
+    onError,
+  } = useTrackAudioPlayer();
   const [imgError, setImgError] = useState(false);
   const [barCollapsed, setBarCollapsed] = useState(false);
   const [waveformOn, setWaveformOn] = useState(true);
@@ -387,6 +394,14 @@ export function PersistentAudioBar({
         <AudioBar
           isPlaying={playbackState.isPlaying}
           onPlay={handleToggle}
+          onPrevious={
+            playbackState.hasPrevious
+              ? () => playPrevious().catch(() => {})
+              : undefined
+          }
+          onNext={
+            playbackState.hasNext ? () => playNext().catch(() => {}) : undefined
+          }
           onCollapse={() => setBarCollapsed(true)}
           currentTime={playbackState.currentTime}
           duration={playbackState.duration}

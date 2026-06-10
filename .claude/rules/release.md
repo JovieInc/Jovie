@@ -33,8 +33,9 @@ The gstack skill pipeline handles verification. The standard agent workflow:
 ### Branch Hygiene
 
 - Always rebase on main before pushing (not merge).
-- Follow the branch strategy: `feature/* → main` (CI deploys to staging, then promotes to production).
-- If a PR has been open >24h without progress, close it and re-create from fresh main.
+- **Agent routine work:** `tim/jov-*` → `integration/loop-{domain}` → train PR → `main` (see [`.claude/rules/ci-branching.md`](ci-branching.md)). Do not open routine agent PRs directly to `main`.
+- **Human / hotfix:** `hotfix/*` or `needs-human` labeled PRs may target `main` with full CI.
+- If a PR has been open >24h without progress, close it and re-create from fresh integration base or `main`.
 
 ### Incremental Shipping (Ship Fast, Fail Fast)
 

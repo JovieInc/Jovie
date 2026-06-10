@@ -30,6 +30,7 @@ import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { QRCode } from '@/components/molecules/QRCode';
 import { ShellListRowFrame } from '@/components/organisms/table';
 import { AGENT_OS_ADMIN_FIXTURE_ARTIFACTS } from '@/lib/agent-os/fixtures';
+import { isHudMetricValueAvailable } from '@/lib/hud/source-trust';
 import {
   getDefaultStatusTone,
   getDeploymentLabel,
@@ -43,6 +44,7 @@ import type {
   HudMetrics,
 } from '@/types/hud';
 import { HudClockClient } from './HudClockClient';
+import { HudMetricSourceTrust } from './HudMetricSourceTrust';
 import { HudStatusPill } from './HudStatusPill';
 import { useHudMetricsQuery } from './useHudMetricsQuery';
 
@@ -334,6 +336,25 @@ function DeploymentsPanel({
   );
 }
 
+function DeploymentsPanelWithTrust({
+  deployments,
+  detail,
+  githubSource,
+  onRetry,
+}: Readonly<{
+  readonly deployments: HudMetrics['deployments'];
+  readonly detail: string;
+  readonly githubSource: HudMetrics['sources']['github'];
+  readonly onRetry?: () => void;
+}>) {
+  return (
+    <div className='space-y-2'>
+      <DeploymentsPanel deployments={deployments} detail={detail} />
+      <HudMetricSourceTrust source={githubSource} onRetry={onRetry} />
+    </div>
+  );
+}
+
 function AiOpsItemRow({
   item,
   onDismiss,
@@ -545,6 +566,19 @@ function makeItemKey(item: HudMetrics['aiOps']['blockers'][number]): string {
   return `${item.source}|${item.summary}|${item.updatedAt}`;
 }
 
+function metricSubtitleWithTrust(
+  body: ReactNode,
+  source: HudMetrics['sources'][keyof HudMetrics['sources']],
+  onRetry?: () => void
+): ReactNode {
+  return (
+    <>
+      {body}
+      <HudMetricSourceTrust source={source} onRetry={onRetry} />
+    </>
+  );
+}
+
 export function HudDashboardClient({
   initialMetrics,
   density = 'kiosk',
@@ -579,6 +613,14 @@ export function HudDashboardClient({
   const deploymentDetail = getDeploymentDetail(metrics.deployments);
   const aiOpsTone = getAiOpsTone(metrics.aiOps);
   const aiOpsLabel = getAiOpsLabel(metrics.aiOps);
+  const stripeSource = metrics.sources.stripe;
+  const mercurySource = metrics.sources.mercury;
+  const databaseSource = metrics.sources.database;
+  const sentrySource = metrics.sources.sentry;
+  const githubSource = metrics.sources.github;
+  const handleSourceRetry = () => {
+    refetch().catch(() => {});
+  };
 
   const isShell = density === 'shell';
   const showDispatch = presentationMode !== 'token';
@@ -624,13 +666,20 @@ export function HudDashboardClient({
         <div className='grid gap-3 md:grid-cols-2 xl:grid-cols-4'>
           <ContentMetricCard
             label='MRR'
-            value={formatUsd(metrics.overview.mrrUsd)}
-            subtitle={
-              <span>
-                {metrics.overview.activeSubscribers.toLocaleString('en-US')}{' '}
-                subscribers
-              </span>
+            value={
+              isHudMetricValueAvailable(stripeSource)
+                ? formatUsd(metrics.overview.mrrUsd)
+                : '\u2014'
             }
+            subtitle={metricSubtitleWithTrust(
+              <span>
+                {isHudMetricValueAvailable(stripeSource)
+                  ? `${metrics.overview.activeSubscribers.toLocaleString('en-US')} subscribers`
+                  : 'Stripe data unavailable'}
+              </span>,
+              stripeSource,
+              handleSourceRetry
+            )}
             headerRight={
               <HudStatusPill label={deploymentLabel} tone={deploymentsTone} />
             }
@@ -640,13 +689,13 @@ export function HudDashboardClient({
           <ContentMetricCard
             label='Runway'
             value={
-              metrics.overview.financialDataAvailable
+              isHudMetricValueAvailable(mercurySource)
                 ? formatRunway(metrics.overview.runwayMonths)
                 : '\u2014'
             }
-            subtitle={
-              metrics.overview.financialDataAvailable ? (
-                <div className='mt-2 grid gap-1.5'>
+            subtitle={metricSubtitleWithTrust(
+              isHudMetricValueAvailable(mercurySource) ? (
+                <div className='grid gap-1.5'>
                   <ContentMetricRow
                     label='Cash'
                     value={formatUsd(metrics.overview.balanceUsd)}
@@ -657,27 +706,35 @@ export function HudDashboardClient({
                   />
                 </div>
               ) : (
-                'Unavailable'
-              )
-            }
+                <span>Mercury data unavailable</span>
+              ),
+              mercurySource,
+              handleSourceRetry
+            )}
             className='p-3'
             valueClassName={secondaryValueClass}
           />
           <ContentMetricCard
             label='Operations'
             value={metrics.operations.status === 'ok' ? 'Healthy' : 'Degraded'}
-            subtitle={
+            subtitle={metricSubtitleWithTrust(
               metrics.operations.dbLatencyMs === null
-                ? 'DB latency -'
-                : `DB latency ${metrics.operations.dbLatencyMs.toFixed(0)}ms`
-            }
+                ? 'DB latency —'
+                : `DB latency ${metrics.operations.dbLatencyMs.toFixed(0)}ms`,
+              databaseSource,
+              handleSourceRetry
+            )}
             className='p-3'
             valueClassName={secondaryValueClass}
           />
           <ContentMetricCard
             label='Reliability'
             value={`${metrics.reliability.reliabilityScorePercent.toFixed(1)}%`}
-            subtitle={formatReliabilitySubtitle(metrics.reliability)}
+            subtitle={metricSubtitleWithTrust(
+              formatReliabilitySubtitle(metrics.reliability),
+              sentrySource,
+              handleSourceRetry
+            )}
             className='p-3'
             valueClassName={secondaryValueClass}
           />
@@ -689,9 +746,11 @@ export function HudDashboardClient({
             summary={aiOpsSummary}
             status={<HudStatusPill label={aiOpsLabel} tone={aiOpsTone} />}
             deploymentsPanel={
-              <DeploymentsPanel
+              <DeploymentsPanelWithTrust
                 deployments={metrics.deployments}
                 detail={deploymentDetail}
+                githubSource={githubSource}
+                onRetry={handleSourceRetry}
               />
             }
           />
@@ -787,13 +846,20 @@ export function HudDashboardClient({
         <div className='grid gap-3 content-start'>
           <ContentMetricCard
             label='Monthly recurring revenue'
-            value={formatUsd(metrics.overview.mrrUsd)}
-            subtitle={
-              <span className='text-[14px] text-secondary-token'>
-                {metrics.overview.activeSubscribers.toLocaleString('en-US')}{' '}
-                subscribers
-              </span>
+            value={
+              isHudMetricValueAvailable(stripeSource)
+                ? formatUsd(metrics.overview.mrrUsd)
+                : '\u2014'
             }
+            subtitle={metricSubtitleWithTrust(
+              <span className='text-[14px] text-secondary-token'>
+                {isHudMetricValueAvailable(stripeSource)
+                  ? `${metrics.overview.activeSubscribers.toLocaleString('en-US')} subscribers`
+                  : 'Stripe data unavailable'}
+              </span>,
+              stripeSource,
+              handleSourceRetry
+            )}
             headerRight={
               <HudStatusPill label={deploymentLabel} tone={deploymentsTone} />
             }
@@ -805,13 +871,13 @@ export function HudDashboardClient({
             <ContentMetricCard
               label='Runway'
               value={
-                metrics.overview.financialDataAvailable
+                isHudMetricValueAvailable(mercurySource)
                   ? formatRunway(metrics.overview.runwayMonths)
-                  : '—'
+                  : '\u2014'
               }
-              subtitle={
-                metrics.overview.financialDataAvailable ? (
-                  <div className='mt-2 grid gap-1.5'>
+              subtitle={metricSubtitleWithTrust(
+                isHudMetricValueAvailable(mercurySource) ? (
+                  <div className='grid gap-1.5'>
                     <ContentMetricRow
                       label='Cash'
                       value={formatUsd(metrics.overview.balanceUsd)}
@@ -822,9 +888,11 @@ export function HudDashboardClient({
                     />
                   </div>
                 ) : (
-                  'Unavailable'
-                )
-              }
+                  <span>Mercury data unavailable</span>
+                ),
+                mercurySource,
+                handleSourceRetry
+              )}
               className='p-3'
               valueClassName={secondaryValueClass}
             />
@@ -833,18 +901,24 @@ export function HudDashboardClient({
               value={
                 metrics.operations.status === 'ok' ? 'Healthy' : 'Degraded'
               }
-              subtitle={
+              subtitle={metricSubtitleWithTrust(
                 metrics.operations.dbLatencyMs === null
                   ? 'DB latency —'
-                  : `DB latency ${metrics.operations.dbLatencyMs.toFixed(0)}ms`
-              }
+                  : `DB latency ${metrics.operations.dbLatencyMs.toFixed(0)}ms`,
+                databaseSource,
+                handleSourceRetry
+              )}
               className='p-3'
               valueClassName={secondaryValueClass}
             />
             <ContentMetricCard
               label='Reliability'
               value={`${metrics.reliability.reliabilityScorePercent.toFixed(1)}%`}
-              subtitle={formatReliabilitySubtitle(metrics.reliability)}
+              subtitle={metricSubtitleWithTrust(
+                formatReliabilitySubtitle(metrics.reliability),
+                sentrySource,
+                handleSourceRetry
+              )}
               className='p-3 col-span-2'
               valueClassName={secondaryValueClass}
             />
@@ -873,6 +947,10 @@ export function HudDashboardClient({
                 No recent runs.
               </p>
             )}
+            <HudMetricSourceTrust
+              source={githubSource}
+              onRetry={handleSourceRetry}
+            />
           </ContentSurfaceCard>
 
           <ContentSurfaceCard surface='details' className='space-y-4 p-3'>
@@ -914,6 +992,10 @@ export function HudDashboardClient({
           ) : (
             <p className='text-[13px] text-secondary-token'>No recent runs.</p>
           )}
+          <HudMetricSourceTrust
+            source={githubSource}
+            onRetry={handleSourceRetry}
+          />
         </ContentSurfaceCard>
       )}
 

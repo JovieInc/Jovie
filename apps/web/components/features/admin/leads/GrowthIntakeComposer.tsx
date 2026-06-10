@@ -350,16 +350,6 @@ export function GrowthIntakeComposer({
 
   return (
     <div className='space-y-3' data-testid='admin-growth-view-ingest'>
-      <div className='space-y-1'>
-        <h3 className='text-app font-medium text-primary-token'>
-          Unified Intake
-        </h3>
-        <p className='text-xs text-secondary-token'>
-          Add one profile, run a batch import, or feed fresh lead URLs from the
-          same control.
-        </p>
-      </div>
-
       <SegmentControl
         value={mode}
         onValueChange={value => {
