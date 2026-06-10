@@ -430,7 +430,7 @@ describe('ProfileCompactTemplate', () => {
     );
 
     const bottomNav = screen.getByTestId('profile-bottom-nav');
-    for (const label of ['Profile', 'Music', 'Events', 'Alerts']) {
+    for (const label of ['Home', 'Music', 'Events', 'Alerts']) {
       expect(
         within(bottomNav).getByRole('button', { name: label })
       ).toBeInTheDocument();
@@ -452,7 +452,7 @@ describe('ProfileCompactTemplate', () => {
 
     const bottomNav = screen.getByTestId('profile-bottom-nav');
     expect(
-      within(bottomNav).getByRole('button', { name: 'Profile' })
+      within(bottomNav).getByRole('button', { name: 'Home' })
     ).toHaveAttribute('aria-current', 'page');
   });
 
