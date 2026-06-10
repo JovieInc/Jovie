@@ -1,6 +1,6 @@
 {
   "name": "jovie-monorepo",
-  "version": "26.6.31",
+  "version": "26.6.33",
   "private": true,
   "config": {
     "commitizen": {
@@ -132,7 +132,9 @@
     "ci:harness:validate": "node scripts/ci-harness.mjs validate",
     "ci:harness:docs": "node scripts/ci-harness.mjs generate-docs --write",
     "ci:harness:check": "pnpm ci:harness:validate && node scripts/ci-harness.mjs generate-docs --check",
-    "ci:harness:test": "vitest --root scripts --config vitest.config.mts lib/__tests__/ci-harness.test.mjs",
+    "ci:branching-guard": "node scripts/ci-branching-guard.mjs",
+    "ci:branching-guard:validate": "node scripts/ci-branching-guard.mjs validate",
+    "ci:harness:test": "vitest --root scripts --config vitest.config.mts run lib/__tests__",
     "commit": "cz",
     "clean": "node scripts/turbo-local.mjs clean && rm -rf node_modules",
     "prepare": "husky",

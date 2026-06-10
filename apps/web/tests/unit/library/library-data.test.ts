@@ -55,6 +55,8 @@ describe('library data', () => {
         artist: 'Test Artist',
         artworkUrl: 'https://example.com/art.jpg',
         previewUrl: 'https://example.com/preview.mp3',
+        videoUrl: null,
+        waveformSeed: expect.any(Number),
         smartLinkPath: '/artist/test-release',
         releaseDate: null,
         releaseType: 'single',
@@ -82,6 +84,23 @@ describe('library data', () => {
         totalDurationMs: null,
       },
     ]);
+  });
+
+  it('maps canvas video URLs and deterministic waveform seeds for scrub previews', () => {
+    const assets = buildLibraryReleaseAssets([
+      buildRelease({
+        id: 'release-canvas',
+        previewUrl: 'https://example.com/preview.mp3',
+        canvasVideoUrl: 'https://example.com/canvas.mp4',
+      }),
+    ]);
+
+    expect(assets[0]).toMatchObject({
+      previewUrl: 'https://example.com/preview.mp3',
+      videoUrl: 'https://example.com/canvas.mp4',
+      waveformSeed: expect.any(Number),
+    });
+    expect(assets[0]?.waveformSeed).toBeGreaterThan(0);
   });
 
   it('hides unavailable or invalid media URLs instead of mocking assets', () => {
