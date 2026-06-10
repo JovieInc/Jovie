@@ -174,6 +174,7 @@ function TurnstileHarness({
           <div data-testid='test-turnstile-panel'>{instruction}</div>
         ) : null
       }
+      turnstilePanelVisible={Boolean(instruction)}
       onTurnstileRequired={message => {
         onTurnstileRequired(message);
         setInstruction(message ?? null);
