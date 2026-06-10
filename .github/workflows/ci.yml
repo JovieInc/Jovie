@@ -2,7 +2,7 @@ name: CI
 
 on:
   pull_request:
-    branches: [main]
+    branches: [main, 'integration/**']
   merge_group:
   push:
     branches: [main]
@@ -76,6 +76,9 @@ jobs:
           if [[ "${{ github.event_name }}" == "pull_request" ]]; then
             git fetch origin "${{ github.base_ref }}"
             CHANGED_FILES=$(git diff --name-only "origin/${{ github.base_ref }}" HEAD)
+          elif [[ "${{ github.event_name }}" == "merge_group" ]]; then
+            git fetch origin main --depth=1
+            CHANGED_FILES=$(git diff --name-only origin/main HEAD)
           elif [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
             # Manual dispatch: run everything
             echo "Manual dispatch: running all checks"
@@ -803,10 +806,10 @@ jobs:
 
   ci-pr-ready:
     name: PR Ready
-    # Single merge gate for PRs and merge queue.
-    # Gates on fast checks (typecheck, lint, guardrails), unit tests, public-route build, and Lighthouse audits.
+    # PR gate: fast checks + unit tests + build + Lighthouse (+ risk-triggered smoke/preview).
+    # Merge queue gate: ci-fast + risk classifier only (build/tests already passed on the PR).
     needs: [ci-risk-classifier, ci-fast, ci-unit-tests, ci-build-public, ci-lighthouse-dashboard-pr, ci-lighthouse-onboarding-pr, ci-lighthouse-admin-pr, ci-lighthouse-pr, ci-e2e-smoke, ci-pr-vercel-preview]
-    if: ${{ always() && (github.event_name == 'pull_request' || github.event_name == 'merge_group') }}
+    if: ${{ always() && ((github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'main') || github.event_name == 'merge_group') }}
     runs-on: ubuntu-latest
     timeout-minutes: 2
     steps:
@@ -858,6 +861,16 @@ jobs:
             echo "❌ CI risk classifier did not pass (result: $RISK_RESULT)"
             echo "Likely fix: run pnpm ci:harness:check and inspect .github/ci-harness/manifest.json."
             exit 1
+          fi
+
+          # Merge queue: lightweight re-validation only (see branch-protection merge_queue contract).
+          if [[ "$EVENT_NAME" == "merge_group" ]]; then
+            if [[ "$FAST_RESULT" != "success" && "$FAST_RESULT" != "skipped" ]]; then
+              echo "❌ merge_group requires ci-fast (result: $FAST_RESULT)"
+              exit 1
+            fi
+            echo "Merge queue fast lane passed: ci-fast + risk classifier"
+            exit 0
           fi
 
           # ci-fast must succeed (or be skipped when path-gated with no app files changed)
@@ -922,15 +935,39 @@ jobs:
 
           echo "All required PR checks passed: lint, typecheck, guardrails, unit tests, build, lighthouse"
 
+  ci-integration-ready:
+    name: Integration Fast
+    # Lightweight gate for integration/* PRs (agent batch lanes). Full CI runs on train PRs to main.
+    needs: [ci-risk-classifier, ci-fast]
+    if: ${{ always() && github.event_name == 'pull_request' && startsWith(github.event.pull_request.base.ref, 'integration/') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Evaluate integration fast checks
+        run: |
+          FAST_RESULT="${{ needs.ci-fast.result }}"
+          RISK_RESULT="${{ needs.ci-risk-classifier.result }}"
+          echo "ci-fast: $FAST_RESULT"
+          echo "ci-risk-classifier: $RISK_RESULT"
+          if [[ "$RISK_RESULT" != "success" ]]; then
+            echo "Integration fast lane failed: risk classifier"
+            exit 1
+          fi
+          if [[ "$FAST_RESULT" != "success" && "$FAST_RESULT" != "skipped" ]]; then
+            echo "Integration fast lane failed: ci-fast"
+            exit 1
+          fi
+          echo "Integration fast lane passed"
+
   ci-build-public:
     name: Build (public routes)
     needs: [ci-path-changes]
     # Shared Next.js build for a11y + layout-guard — build once, test twice.
-    # On PRs: always runs (non-fork) for build validation. Part of the merge gate.
-    # On merge_group: runs to validate build hasn't regressed before merge.
+    # On PRs to main: always runs (non-fork) for build validation. Part of the merge gate.
+    # Merge queue intentionally skips build (already validated on the PR).
     # On main push: always runs for full coverage.
     # Fork PRs are excluded (no secrets) — skipped via fork-pr-gate.
-    if: ${{ (github.event_name == 'push' && github.ref == 'refs/heads/main') || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork == false) || github.event_name == 'merge_group' || github.event_name == 'workflow_dispatch' }}
+    if: ${{ (github.event_name == 'push' && github.ref == 'refs/heads/main') || (github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'main' && github.event.pull_request.head.repo.fork == false) || github.event_name == 'workflow_dispatch' }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     outputs:
@@ -998,7 +1035,7 @@ jobs:
     # Fully informational — never blocks PRs or merge queue.
     # Runs when ci-build-public produced an artifact. Failures are logged but don't gate merges.
     # Skipped on push-to-main (merge queue already validated).
-    if: ${{ github.event_name == 'pull_request' && needs.ci-build-public.outputs.has_artifact == 'true' }}
+    if: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'main' && needs.ci-build-public.outputs.has_artifact == 'true' }}
     continue-on-error: true
     runs-on: ubuntu-latest
     timeout-minutes: 8
@@ -1070,7 +1107,7 @@ jobs:
   ci-mobile-overflow:
     name: Mobile Overflow Guard (${{ matrix.width }}px)
     needs: [ci-fast, ci-path-changes, neon-db]
-    if: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork == false && needs.ci-path-changes.outputs.run_e2e == 'true' && github.event.pull_request.user.login && github.event.pull_request.user.login != 'dependabot[bot]' }}
+    if: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'main' && github.event.pull_request.head.repo.fork == false && needs.ci-path-changes.outputs.run_e2e == 'true' && github.event.pull_request.user.login && github.event.pull_request.user.login != 'dependabot[bot]' }}
     runs-on: ubuntu-latest
     timeout-minutes: 45
     strategy:
@@ -1191,7 +1228,7 @@ jobs:
     needs: [ci-build-public, ci-path-changes, neon-db]
     # Runs Lighthouse CI against the public-route build artifact on PRs.
     # Blocks PRs when triggered (path-gated to public-route changes).
-    if: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork == false && github.event.pull_request.user.login && github.event.pull_request.user.login != 'dependabot[bot]' && needs.ci-build-public.outputs.has_artifact == 'true' && needs.ci-path-changes.outputs.run_public_lighthouse == 'true' }}
+    if: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'main' && github.event.pull_request.head.repo.fork == false && github.event.pull_request.user.login && github.event.pull_request.user.login != 'dependabot[bot]' && needs.ci-build-public.outputs.has_artifact == 'true' && needs.ci-path-changes.outputs.run_public_lighthouse == 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -1322,7 +1359,7 @@ jobs:
   ci-lighthouse-dashboard-pr:
     name: Lighthouse (dashboard PR)
     needs: [ci-fast, ci-path-changes, neon-db]
-    if: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork == false && contains(github.event.pull_request.labels.*.name, 'testing') }}
+    if: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'main' && github.event.pull_request.head.repo.fork == false && contains(github.event.pull_request.labels.*.name, 'testing') }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -1480,7 +1517,7 @@ jobs:
   ci-lighthouse-onboarding-pr:
     name: Lighthouse (onboarding PR)
     needs: [ci-fast, ci-path-changes, neon-db]
-    if: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork == false && github.event.pull_request.user.login && github.event.pull_request.user.login != 'dependabot[bot]' && needs.ci-path-changes.outputs.run_onboarding_lighthouse == 'true' }}
+    if: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'main' && github.event.pull_request.head.repo.fork == false && github.event.pull_request.user.login && github.event.pull_request.user.login != 'dependabot[bot]' && needs.ci-path-changes.outputs.run_onboarding_lighthouse == 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -1627,7 +1664,7 @@ jobs:
     # so dependent jobs would silently skip on admin-UI-only PRs. This job creates
     # its own ephemeral branch below and does not reuse the shared neon-db branch.
     needs: [ci-fast, ci-path-changes]
-    if: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork == false && github.event.pull_request.user.login && github.event.pull_request.user.login != 'dependabot[bot]' && needs.ci-path-changes.outputs.run_admin_lighthouse == 'true' }}
+    if: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'main' && github.event.pull_request.head.repo.fork == false && github.event.pull_request.user.login && github.event.pull_request.user.login != 'dependabot[bot]' && needs.ci-path-changes.outputs.run_admin_lighthouse == 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -1762,7 +1799,7 @@ jobs:
     # baselines stabilize this can be promoted to a hard gate by removing
     # `continue-on-error` and adding the job to ci-pr-ready.needs.
     needs: [ci-fast, ci-path-changes, neon-db]
-    if: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork == false && github.event.pull_request.user.login && github.event.pull_request.user.login != 'dependabot[bot]' && needs.ci-path-changes.outputs.run_chat_lighthouse == 'true' }}
+    if: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'main' && github.event.pull_request.head.repo.fork == false && github.event.pull_request.user.login && github.event.pull_request.user.login != 'dependabot[bot]' && needs.ci-path-changes.outputs.run_chat_lighthouse == 'true' }}
     continue-on-error: true
     runs-on: ubuntu-latest
     timeout-minutes: 30
@@ -2342,10 +2379,10 @@ jobs:
   ci-unit-tests:
     name: Unit Tests (${{ matrix.shard }})
     needs: [ci-path-changes]
-    # Runs on PRs, main pushes, merge queue, and manual dispatch.
+    # Runs on PRs to main, main pushes, and manual dispatch. Merge queue skips (PR-validated).
     # Parallel with typecheck/build for faster CI.
     # Path-gated: skips test execution when no test-relevant files changed.
-    if: ${{ github.event_name == 'pull_request' || (github.event_name == 'push' && github.ref == 'refs/heads/main') || github.event_name == 'merge_group' || github.event_name == 'workflow_dispatch' }}
+    if: ${{ (github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'main') || (github.event_name == 'push' && github.ref == 'refs/heads/main') || github.event_name == 'workflow_dispatch' }}
     runs-on: ${{ vars.CI_FAST_RUNNER || 'ubuntu-latest' }}
     timeout-minutes: 40
     strategy:
@@ -2457,7 +2494,7 @@ jobs:
     name: A11y (axe)
     # Runs axe-core WCAG 2.1 AA audit on public routes — uses shared build artifact.
     needs: [ci-build-public, ci-path-changes, neon-db]
-    if: ${{ ((github.event_name == 'push' && github.ref == 'refs/heads/main') || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork == false && github.event.pull_request.user.login && github.event.pull_request.user.login != 'dependabot[bot]') || github.event_name == 'workflow_dispatch') && needs.ci-build-public.outputs.has_artifact == 'true' }}
+    if: ${{ ((github.event_name == 'push' && github.ref == 'refs/heads/main') || (github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'main' && github.event.pull_request.head.repo.fork == false && github.event.pull_request.user.login && github.event.pull_request.user.login != 'dependabot[bot]') || github.event_name == 'workflow_dispatch') && needs.ci-build-public.outputs.has_artifact == 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -2627,7 +2664,7 @@ jobs:
     # Gated: runs with 'testing' label or deterministic high-risk classification.
     # Full E2E runs on merge to main anyway.
     needs: [ci-fast, ci-path-changes, ci-risk-classifier]
-    if: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork == false && (contains(github.event.pull_request.labels.*.name, 'testing') || needs.ci-risk-classifier.outputs.requires_smoke == 'true') }}
+    if: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'main' && github.event.pull_request.head.repo.fork == false && (contains(github.event.pull_request.labels.*.name, 'testing') || needs.ci-risk-classifier.outputs.requires_smoke == 'true') }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
     outputs:
