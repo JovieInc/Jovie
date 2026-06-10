@@ -5,27 +5,30 @@ import {
 } from '@/lib/visual-qa/capture-request';
 
 describe('visual-qa capture request', () => {
-  it('defaults to both phases when phase is omitted', () => {
+  it('defaults to both phases and themes when omitted', () => {
     const request = parseVisualQaCaptureRequest({
       runId: 'proposal-001',
     });
 
     expect(request.phases).toEqual(['baseline', 'after']);
+    expect(request.themes).toEqual(['dark', 'light']);
     expect(request.surfaceIds).toEqual([]);
     expect(request.breakpoints.map(breakpoint => breakpoint.width)).toEqual([
       320, 360, 375, 390, 414, 768, 820, 1024, 1280, 1440, 1536,
     ]);
   });
 
-  it('parses explicit phase and surface filters', () => {
+  it('parses explicit phase, theme, and surface filters', () => {
     const request = parseVisualQaCaptureRequest({
       runId: 'proposal-001',
       phase: 'baseline',
+      themes: 'dark',
       surfaces: 'shell-desktop-idle, drawer-release-open',
       breakpoints: '390,768,1440',
     });
 
     expect(request.phases).toEqual(['baseline']);
+    expect(request.themes).toEqual(['dark']);
     expect(request.surfaceIds).toEqual([
       'shell-desktop-idle',
       'drawer-release-open',
@@ -46,7 +49,7 @@ describe('visual-qa capture request', () => {
     ]);
   });
 
-  it('rejects invalid run ids and phases', () => {
+  it('rejects invalid run ids, phases, and themes', () => {
     expect(() =>
       parseVisualQaCaptureRequest({
         runId: '../bad',
@@ -59,6 +62,13 @@ describe('visual-qa capture request', () => {
         phase: 'middle',
       })
     ).toThrow(/phase/i);
+
+    expect(() =>
+      parseVisualQaCaptureRequest({
+        runId: 'valid-run',
+        themes: 'sepia',
+      })
+    ).toThrow(/theme/i);
   });
 
   it('expands both to baseline and after', () => {

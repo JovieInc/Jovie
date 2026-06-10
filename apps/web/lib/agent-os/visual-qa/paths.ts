@@ -1,6 +1,7 @@
 import path from 'node:path';
 import { resolveMonorepoPath } from '@/lib/filesystem-paths';
 import { validatePathTraversal } from '@/lib/security/path-traversal';
+import type { VisualQaColorScheme } from '@/lib/visual-qa/themes';
 import type { VisualQaPhase } from '@/lib/visual-qa/types';
 
 export const VISUAL_QA_ROOT_SEGMENTS = [
@@ -54,12 +55,13 @@ export function resolveVisualQaSurfaceDirectory(
 export function resolveVisualQaPhaseScreenshotPath(
   runId: string,
   surfaceId: string,
-  phase: VisualQaPhase
+  phase: VisualQaPhase,
+  colorScheme: VisualQaColorScheme
 ): string {
   const safeRunId = assertValidVisualQaRunId(runId);
   const safeSurfaceId = assertValidVisualQaSurfaceId(surfaceId);
   return validatePathTraversal(
-    path.join(safeRunId, safeSurfaceId, `${phase}.png`),
+    path.join(safeRunId, safeSurfaceId, `${phase}-${colorScheme}.png`),
     getVisualQaRootDirectory()
   );
 }
