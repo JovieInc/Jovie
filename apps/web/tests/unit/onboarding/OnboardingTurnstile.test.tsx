@@ -83,7 +83,37 @@ describe('OnboardingTurnstile', () => {
     expect(onStateChange).toHaveBeenCalledWith(
       expect.objectContaining({ status: 'verified' })
     );
-    expect(screen.getByTestId('onboarding-turnstile-panel')).not.toBeVisible();
+    expect(
+      screen.queryByTestId('onboarding-turnstile-panel')
+    ).not.toBeInTheDocument();
+  });
+
+  it('keeps the security chrome hidden while Turnstile is still loading', async () => {
+    vi.stubEnv('NODE_ENV', 'test');
+    vi.stubEnv('NEXT_PUBLIC_TURNSTILE_SITE_KEY', 'site-key');
+    const onToken = vi.fn();
+    const onStateChange = vi.fn();
+    const renderMock = vi.fn(
+      (_target: HTMLElement, _options: TurnstileOptions) => 'widget-1'
+    );
+    window.turnstile = {
+      render: renderMock,
+      reset: vi.fn(),
+      remove: vi.fn(),
+    };
+
+    render(
+      <OnboardingTurnstile onToken={onToken} onStateChange={onStateChange} />
+    );
+
+    await waitFor(() => expect(renderMock).toHaveBeenCalled());
+    expect(
+      screen.queryByTestId('onboarding-turnstile-panel')
+    ).not.toBeInTheDocument();
+    expect(screen.getByTestId('onboarding-turnstile-widget-frame')).toHaveClass(
+      'sr-only'
+    );
+    expect(screen.queryByText('Security Check')).not.toBeInTheDocument();
   });
 
   it('bypasses verification in runtime E2E mode', async () => {
