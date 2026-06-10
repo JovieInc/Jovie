@@ -1,6 +1,7 @@
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import { BrandLogo } from '@/components/atoms/BrandLogo';
+import { JOVIE_PATH, JOVIE_VIEWBOX } from '@/lib/brand/tokens';
 import { expectNoA11yViolations } from '@/tests/utils/a11y';
 
 describe('BrandLogo', () => {
@@ -106,6 +107,16 @@ describe('BrandLogo', () => {
     const { container } = render(<BrandLogo />);
     const svg = container.querySelector('svg');
     expect(svg).toHaveAttribute('fill', 'currentColor');
+  });
+
+  it('renders the canonical brand mark path and viewBox', () => {
+    const { container } = render(<BrandLogo />);
+    const svg = container.querySelector('svg');
+    const path = container.querySelector('path');
+    expect(svg?.getAttribute('viewBox')).toBe(
+      `0 0 ${JOVIE_VIEWBOX.width} ${JOVIE_VIEWBOX.height}`
+    );
+    expect(path?.getAttribute('d')).toBe(JOVIE_PATH);
   });
 
   it('wraps svg in span to isolate from parent [&>svg] selectors', () => {
