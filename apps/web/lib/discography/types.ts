@@ -163,6 +163,8 @@ export interface ReleaseViewModel {
   distributor?: string | null;
   /** Spotify Canvas video status for this release */
   canvasStatus?: CanvasStatus;
+  /** Uploaded or generated canvas video URL for hover scrub previews */
+  canvasVideoUrl?: string | null;
   /** Original DSP-ingested artwork URL (available when user has uploaded custom art) */
   originalArtworkUrl?: string;
   /** Whether this release has short-form video provider links (TikTok, Reels, Shorts) */

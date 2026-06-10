@@ -39,9 +39,24 @@ vi.mock('@/lib/admin/mercury-metrics', () => ({
 vi.mock('@/lib/admin/overview', () => ({
   getAdminReliabilitySummary: vi.fn(async () => ({
     errorRatePercent: 0.1,
+    reliabilityScorePercent: 99.9,
     p95LatencyMs: 250,
     incidents24h: 0,
     lastIncidentAt: null,
+    unresolvedSentryIssues24h: 0,
+  })),
+}));
+
+vi.mock('@/lib/admin/sentry-metrics', () => ({
+  getAdminSentryMetrics: vi.fn(async () => ({
+    unresolvedIssues24h: 0,
+    totalEvents24h: 0,
+    impactedUsers24h: 0,
+    criticalIssues24h: 0,
+    topIssueTitle: null,
+    topIssueShortId: null,
+    isConfigured: true,
+    isAvailable: true,
   })),
 }));
 
@@ -187,6 +202,23 @@ describe('getHudMetrics', () => {
     expect(metrics.aiOps.counts.blocked).toBe(1);
   });
 
+  it('includes per-source trust metadata in the HUD payload', async () => {
+    mockGetHudDeployments.mockResolvedValueOnce({
+      availability: 'not_configured',
+      current: null,
+      recent: [],
+    });
+
+    const metrics = await getHudMetrics('admin');
+
+    expect(metrics.sources.stripe.state).toBe('ok');
+    expect(metrics.sources.mercury.state).toBe('ok');
+    expect(metrics.sources.database.state).toBe('ok');
+    expect(metrics.sources.sentry.state).toBe('ok');
+    expect(metrics.sources.github.state).toBe('not_configured');
+    expect(metrics.sources.stripe.fetchedAtIso).toBe(metrics.generatedAtIso);
+  });
+
   it('marks financial data unavailable when Stripe is down', async () => {
     mockGetHudDeployments.mockResolvedValueOnce({
       availability: 'not_configured',
@@ -209,5 +241,7 @@ describe('getHudMetrics', () => {
     expect(metrics.overview.defaultStatusDetail).toContain(
       'Stripe (unavailable)'
     );
+    expect(metrics.sources.stripe.state).toBe('unavailable');
+    expect(metrics.sources.stripe.nextStep).toContain('retry');
   });
 });

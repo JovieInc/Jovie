@@ -196,7 +196,7 @@ describe('ReleaseTrackList', () => {
 
     await user.click(screen.getByRole('button', { name: 'Play Static Skies' }));
 
-    expect(mockToggleTrack).toHaveBeenCalledWith({
+    const expectedTrack = {
       id: 'track_1',
       title: 'Static Skies',
       audioUrl: 'https://example.com/preview.mp3',
@@ -205,6 +205,10 @@ describe('ReleaseTrackList', () => {
       artistName: release.artistNames?.[0],
       artworkUrl: release.artworkUrl,
       hasLyrics: false,
+    };
+
+    expect(mockToggleTrack).toHaveBeenCalledWith(expectedTrack, {
+      queue: [expectedTrack],
     });
   });
 

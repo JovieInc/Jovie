@@ -137,10 +137,12 @@ function KeywordDiagnosticRow({
 
 interface LeadPipelineControlsProps {
   readonly hideMainSwitch?: boolean;
+  readonly embedded?: boolean;
 }
 
 export function LeadPipelineControls({
   hideMainSwitch = false,
+  embedded = false,
 }: LeadPipelineControlsProps = {}) {
   const queryClient = useQueryClient();
   const [settings, setSettings] = useState<LeadPipelineSettings | null>(null);
@@ -218,9 +220,9 @@ export function LeadPipelineControls({
 
   if (settingsQuery.isLoading || (settingsQuery.isFetching && !settings)) {
     return (
-      <ContentSurfaceCard className='px-(--linear-app-content-padding-x) py-(--linear-app-content-padding-y) text-sm text-secondary-token'>
+      <div className='text-sm text-secondary-token'>
         Loading pipeline settings...
-      </ContentSurfaceCard>
+      </div>
     );
   }
 
@@ -228,10 +230,289 @@ export function LeadPipelineControls({
     const errorMsg =
       settingsQuery.error?.message ||
       'Unable to load pipeline settings. Please refresh.';
+    return <div className='text-sm text-destructive'>{errorMsg}</div>;
+  }
+
+  const controlsBody = (
+    <div className='divide-y divide-subtle'>
+      {!hideMainSwitch && (
+        <div className='flex items-start justify-between gap-4 px-(--linear-app-content-padding-x) py-3.5'>
+          <div>
+            <p className='text-sm text-primary-token'>Pipeline enabled</p>
+            <p className='text-xs text-secondary-token'>
+              Master switch for the entire lead discovery pipeline.
+            </p>
+          </div>
+          <Switch
+            checked={settings.enabled}
+            onCheckedChange={checked =>
+              setSettings(s => (s ? { ...s, enabled: checked } : s))
+            }
+            aria-label='Toggle pipeline'
+            disabled={saveSettingsMutation.isPending}
+          />
+        </div>
+      )}
+
+      <div className='flex items-start justify-between gap-4 px-(--linear-app-content-padding-x) py-3.5'>
+        <div>
+          <p className='text-sm text-primary-token'>Discovery enabled</p>
+          <p className='text-xs text-secondary-token'>
+            Run Google CSE searches on cron to find new leads.
+          </p>
+        </div>
+        <Switch
+          checked={settings.discoveryEnabled}
+          onCheckedChange={checked =>
+            setSettings(s => (s ? { ...s, discoveryEnabled: checked } : s))
+          }
+          aria-label='Toggle discovery'
+          disabled={saveSettingsMutation.isPending}
+        />
+      </div>
+
+      <div className='flex items-start justify-between gap-4 px-(--linear-app-content-padding-x) py-3.5'>
+        <div>
+          <p className='text-sm text-primary-token'>Auto-ingest on approve</p>
+          <p className='text-xs text-secondary-token'>
+            Automatically create creator profiles when leads are approved.
+          </p>
+        </div>
+        <Switch
+          checked={settings.autoIngestEnabled}
+          onCheckedChange={checked =>
+            setSettings(s => (s ? { ...s, autoIngestEnabled: checked } : s))
+          }
+          aria-label='Toggle auto-ingest'
+          disabled={saveSettingsMutation.isPending}
+        />
+      </div>
+
+      <div className='flex items-start justify-between gap-4 px-(--linear-app-content-padding-x) py-3.5'>
+        <div>
+          <p className='text-sm text-primary-token'>Guardrails enabled</p>
+          <p className='text-xs text-secondary-token'>
+            Enforce throttle recommendations and pause signals in admin.
+          </p>
+        </div>
+        <Switch
+          checked={settings.guardrailsEnabled}
+          onCheckedChange={checked =>
+            setSettings(s => (s ? { ...s, guardrailsEnabled: checked } : s))
+          }
+          aria-label='Toggle guardrails'
+          disabled={saveSettingsMutation.isPending}
+        />
+      </div>
+
+      <div className='grid gap-3 px-(--linear-app-content-padding-x) py-3.5 sm:grid-cols-2 xl:grid-cols-3'>
+        <label htmlFor='auto-ingest-min-score' className='block'>
+          <span className='text-sm text-primary-token'>
+            Min fit score for auto-ingest
+          </span>
+          <Input
+            id='auto-ingest-min-score'
+            type='number'
+            min={0}
+            max={100}
+            value={settings.autoIngestMinFitScore}
+            onChange={(e: ChangeEvent<HTMLInputElement>) => {
+              const val = Number.parseInt(e.target.value, 10);
+              setSettings(s =>
+                s
+                  ? {
+                      ...s,
+                      autoIngestMinFitScore: Number.isFinite(val) ? val : 0,
+                    }
+                  : s
+              );
+            }}
+            className='mt-1 w-24'
+            disabled={saveSettingsMutation.isPending}
+          />
+        </label>
+
+        <label htmlFor='daily-query-budget' className='block'>
+          <span className='text-sm text-primary-token'>Daily query budget</span>
+          <Input
+            id='daily-query-budget'
+            type='number'
+            min={1}
+            max={10000}
+            value={settings.dailyQueryBudget}
+            onChange={(e: ChangeEvent<HTMLInputElement>) => {
+              const val = Number.parseInt(e.target.value, 10);
+              setSettings(s =>
+                s
+                  ? {
+                      ...s,
+                      dailyQueryBudget: Number.isFinite(val) ? val : 100,
+                    }
+                  : s
+              );
+            }}
+            className='mt-1 w-24'
+            disabled={saveSettingsMutation.isPending}
+          />
+          <p className='mt-1 text-xs text-secondary-token'>
+            Used today: {settings.queriesUsedToday}
+          </p>
+        </label>
+
+        <label htmlFor='auto-ingest-daily-limit' className='block'>
+          <span className='text-sm text-primary-token'>
+            Auto-ingest daily limit
+          </span>
+          <Input
+            id='auto-ingest-daily-limit'
+            type='number'
+            min={1}
+            max={1000}
+            value={settings.autoIngestDailyLimit}
+            onChange={(e: ChangeEvent<HTMLInputElement>) => {
+              const val = Number.parseInt(e.target.value, 10);
+              setSettings(s =>
+                s
+                  ? {
+                      ...s,
+                      autoIngestDailyLimit: Number.isFinite(val) ? val : 10,
+                    }
+                  : s
+              );
+            }}
+            className='mt-1 w-24'
+            disabled={saveSettingsMutation.isPending}
+          />
+        </label>
+
+        <label htmlFor='daily-send-cap' className='block'>
+          <span className='text-sm text-primary-token'>Daily send cap</span>
+          <Input
+            id='daily-send-cap'
+            type='number'
+            min={1}
+            max={10000}
+            value={settings.dailySendCap}
+            onChange={(e: ChangeEvent<HTMLInputElement>) => {
+              const val = Number.parseInt(e.target.value, 10);
+              setSettings(s =>
+                s
+                  ? {
+                      ...s,
+                      dailySendCap: Number.isFinite(val) ? val : 10,
+                    }
+                  : s
+              );
+            }}
+            className='mt-1 w-24'
+            disabled={saveSettingsMutation.isPending}
+          />
+        </label>
+
+        <label htmlFor='max-per-hour' className='block'>
+          <span className='text-sm text-primary-token'>Max per hour</span>
+          <Input
+            id='max-per-hour'
+            type='number'
+            min={1}
+            max={1000}
+            value={settings.maxPerHour}
+            onChange={(e: ChangeEvent<HTMLInputElement>) => {
+              const val = Number.parseInt(e.target.value, 10);
+              setSettings(s =>
+                s
+                  ? {
+                      ...s,
+                      maxPerHour: Number.isFinite(val) ? val : 5,
+                    }
+                  : s
+              );
+            }}
+            className='mt-1 w-24'
+            disabled={saveSettingsMutation.isPending}
+          />
+        </label>
+      </div>
+
+      <div className='flex items-center justify-between gap-4 px-(--linear-app-content-padding-x) py-3.5'>
+        <div>
+          <p className='text-sm text-primary-token'>Ramp mode</p>
+          <p className='text-xs text-secondary-token'>
+            Manual keeps operator approval in charge. Recommend-only surfaces
+            scale advice without auto-increasing sends.
+          </p>
+        </div>
+        <Button
+          variant='outline'
+          size='sm'
+          onClick={() =>
+            setSettings(s =>
+              s
+                ? {
+                    ...s,
+                    rampMode:
+                      s.rampMode === 'manual' ? 'recommend_only' : 'manual',
+                  }
+                : s
+            )
+          }
+          disabled={saveSettingsMutation.isPending}
+        >
+          {settings.rampMode === 'manual' ? 'Manual' : 'Recommend only'}
+        </Button>
+      </div>
+
+      <div className='flex flex-wrap gap-2 px-(--linear-app-content-padding-x) py-3.5'>
+        <Button
+          onClick={() => void save()}
+          disabled={saveSettingsMutation.isPending}
+          size='sm'
+        >
+          {saveSettingsMutation.isPending && (
+            <Loader2 className='mr-2 h-4 w-4 animate-spin' />
+          )}
+          Save settings
+        </Button>
+
+        <Button
+          variant='outline'
+          size='sm'
+          onClick={() => void triggerDiscovery()}
+          disabled={discoveryMutation.isPending}
+        >
+          {discoveryMutation.isPending ? (
+            <Loader2 className='mr-2 h-4 w-4 animate-spin' />
+          ) : (
+            <Play className='mr-2 h-4 w-4' />
+          )}
+          Run discovery
+        </Button>
+
+        <Button
+          variant='outline'
+          size='sm'
+          onClick={() => void triggerQualification()}
+          disabled={qualificationMutation.isPending}
+        >
+          {qualificationMutation.isPending ? (
+            <Loader2 className='mr-2 h-4 w-4 animate-spin' />
+          ) : (
+            <Zap className='mr-2 h-4 w-4' />
+          )}
+          Qualify discovered
+        </Button>
+      </div>
+    </div>
+  );
+
+  if (embedded) {
     return (
-      <ContentSurfaceCard className='px-(--linear-app-content-padding-x) py-(--linear-app-content-padding-y) text-sm text-destructive'>
-        {errorMsg}
-      </ContentSurfaceCard>
+      <section>
+        {controlsBody}
+        {lastDiscoveryResult && (
+          <DiagnosticPanel result={lastDiscoveryResult} />
+        )}
+      </section>
     );
   }
 
@@ -251,280 +532,7 @@ export function LeadPipelineControls({
             actionsClassName='shrink-0'
           />
         )}
-
-        <div className='divide-y divide-subtle'>
-          {!hideMainSwitch && (
-            <div className='flex items-start justify-between gap-4 px-(--linear-app-content-padding-x) py-3.5'>
-              <div>
-                <p className='text-sm text-primary-token'>Pipeline enabled</p>
-                <p className='text-xs text-secondary-token'>
-                  Master switch for the entire lead discovery pipeline.
-                </p>
-              </div>
-              <Switch
-                checked={settings.enabled}
-                onCheckedChange={checked =>
-                  setSettings(s => (s ? { ...s, enabled: checked } : s))
-                }
-                aria-label='Toggle pipeline'
-                disabled={saveSettingsMutation.isPending}
-              />
-            </div>
-          )}
-
-          <div className='flex items-start justify-between gap-4 px-(--linear-app-content-padding-x) py-3.5'>
-            <div>
-              <p className='text-sm text-primary-token'>Discovery enabled</p>
-              <p className='text-xs text-secondary-token'>
-                Run Google CSE searches on cron to find new leads.
-              </p>
-            </div>
-            <Switch
-              checked={settings.discoveryEnabled}
-              onCheckedChange={checked =>
-                setSettings(s => (s ? { ...s, discoveryEnabled: checked } : s))
-              }
-              aria-label='Toggle discovery'
-              disabled={saveSettingsMutation.isPending}
-            />
-          </div>
-
-          <div className='flex items-start justify-between gap-4 px-(--linear-app-content-padding-x) py-3.5'>
-            <div>
-              <p className='text-sm text-primary-token'>
-                Auto-ingest on approve
-              </p>
-              <p className='text-xs text-secondary-token'>
-                Automatically create creator profiles when leads are approved.
-              </p>
-            </div>
-            <Switch
-              checked={settings.autoIngestEnabled}
-              onCheckedChange={checked =>
-                setSettings(s => (s ? { ...s, autoIngestEnabled: checked } : s))
-              }
-              aria-label='Toggle auto-ingest'
-              disabled={saveSettingsMutation.isPending}
-            />
-          </div>
-
-          <div className='flex items-start justify-between gap-4 px-(--linear-app-content-padding-x) py-3.5'>
-            <div>
-              <p className='text-sm text-primary-token'>Guardrails enabled</p>
-              <p className='text-xs text-secondary-token'>
-                Enforce throttle recommendations and pause signals in admin.
-              </p>
-            </div>
-            <Switch
-              checked={settings.guardrailsEnabled}
-              onCheckedChange={checked =>
-                setSettings(s => (s ? { ...s, guardrailsEnabled: checked } : s))
-              }
-              aria-label='Toggle guardrails'
-              disabled={saveSettingsMutation.isPending}
-            />
-          </div>
-
-          <div className='grid gap-3 px-(--linear-app-content-padding-x) py-3.5 sm:grid-cols-2 xl:grid-cols-3'>
-            <label htmlFor='auto-ingest-min-score' className='block'>
-              <span className='text-sm text-primary-token'>
-                Min fit score for auto-ingest
-              </span>
-              <Input
-                id='auto-ingest-min-score'
-                type='number'
-                min={0}
-                max={100}
-                value={settings.autoIngestMinFitScore}
-                onChange={(e: ChangeEvent<HTMLInputElement>) => {
-                  const val = Number.parseInt(e.target.value, 10);
-                  setSettings(s =>
-                    s
-                      ? {
-                          ...s,
-                          autoIngestMinFitScore: Number.isFinite(val) ? val : 0,
-                        }
-                      : s
-                  );
-                }}
-                className='mt-1 w-24'
-                disabled={saveSettingsMutation.isPending}
-              />
-            </label>
-
-            <label htmlFor='daily-query-budget' className='block'>
-              <span className='text-sm text-primary-token'>
-                Daily query budget
-              </span>
-              <Input
-                id='daily-query-budget'
-                type='number'
-                min={1}
-                max={10000}
-                value={settings.dailyQueryBudget}
-                onChange={(e: ChangeEvent<HTMLInputElement>) => {
-                  const val = Number.parseInt(e.target.value, 10);
-                  setSettings(s =>
-                    s
-                      ? {
-                          ...s,
-                          dailyQueryBudget: Number.isFinite(val) ? val : 100,
-                        }
-                      : s
-                  );
-                }}
-                className='mt-1 w-24'
-                disabled={saveSettingsMutation.isPending}
-              />
-              <p className='mt-1 text-xs text-secondary-token'>
-                Used today: {settings.queriesUsedToday}
-              </p>
-            </label>
-
-            <label htmlFor='auto-ingest-daily-limit' className='block'>
-              <span className='text-sm text-primary-token'>
-                Auto-ingest daily limit
-              </span>
-              <Input
-                id='auto-ingest-daily-limit'
-                type='number'
-                min={1}
-                max={1000}
-                value={settings.autoIngestDailyLimit}
-                onChange={(e: ChangeEvent<HTMLInputElement>) => {
-                  const val = Number.parseInt(e.target.value, 10);
-                  setSettings(s =>
-                    s
-                      ? {
-                          ...s,
-                          autoIngestDailyLimit: Number.isFinite(val) ? val : 10,
-                        }
-                      : s
-                  );
-                }}
-                className='mt-1 w-24'
-                disabled={saveSettingsMutation.isPending}
-              />
-            </label>
-
-            <label htmlFor='daily-send-cap' className='block'>
-              <span className='text-sm text-primary-token'>Daily send cap</span>
-              <Input
-                id='daily-send-cap'
-                type='number'
-                min={1}
-                max={10000}
-                value={settings.dailySendCap}
-                onChange={(e: ChangeEvent<HTMLInputElement>) => {
-                  const val = Number.parseInt(e.target.value, 10);
-                  setSettings(s =>
-                    s
-                      ? {
-                          ...s,
-                          dailySendCap: Number.isFinite(val) ? val : 10,
-                        }
-                      : s
-                  );
-                }}
-                className='mt-1 w-24'
-                disabled={saveSettingsMutation.isPending}
-              />
-            </label>
-
-            <label htmlFor='max-per-hour' className='block'>
-              <span className='text-sm text-primary-token'>Max per hour</span>
-              <Input
-                id='max-per-hour'
-                type='number'
-                min={1}
-                max={1000}
-                value={settings.maxPerHour}
-                onChange={(e: ChangeEvent<HTMLInputElement>) => {
-                  const val = Number.parseInt(e.target.value, 10);
-                  setSettings(s =>
-                    s
-                      ? {
-                          ...s,
-                          maxPerHour: Number.isFinite(val) ? val : 5,
-                        }
-                      : s
-                  );
-                }}
-                className='mt-1 w-24'
-                disabled={saveSettingsMutation.isPending}
-              />
-            </label>
-          </div>
-
-          <div className='flex items-center justify-between gap-4 px-(--linear-app-content-padding-x) py-3.5'>
-            <div>
-              <p className='text-sm text-primary-token'>Ramp mode</p>
-              <p className='text-xs text-secondary-token'>
-                Manual keeps operator approval in charge. Recommend-only
-                surfaces scale advice without auto-increasing sends.
-              </p>
-            </div>
-            <Button
-              variant='outline'
-              size='sm'
-              onClick={() =>
-                setSettings(s =>
-                  s
-                    ? {
-                        ...s,
-                        rampMode:
-                          s.rampMode === 'manual' ? 'recommend_only' : 'manual',
-                      }
-                    : s
-                )
-              }
-              disabled={saveSettingsMutation.isPending}
-            >
-              {settings.rampMode === 'manual' ? 'Manual' : 'Recommend only'}
-            </Button>
-          </div>
-
-          <div className='flex flex-wrap gap-2 px-(--linear-app-content-padding-x) py-3.5'>
-            <Button
-              onClick={() => void save()}
-              disabled={saveSettingsMutation.isPending}
-              size='sm'
-            >
-              {saveSettingsMutation.isPending && (
-                <Loader2 className='mr-2 h-4 w-4 animate-spin' />
-              )}
-              Save settings
-            </Button>
-
-            <Button
-              variant='outline'
-              size='sm'
-              onClick={() => void triggerDiscovery()}
-              disabled={discoveryMutation.isPending}
-            >
-              {discoveryMutation.isPending ? (
-                <Loader2 className='mr-2 h-4 w-4 animate-spin' />
-              ) : (
-                <Play className='mr-2 h-4 w-4' />
-              )}
-              Run discovery
-            </Button>
-
-            <Button
-              variant='outline'
-              size='sm'
-              onClick={() => void triggerQualification()}
-              disabled={qualificationMutation.isPending}
-            >
-              {qualificationMutation.isPending ? (
-                <Loader2 className='mr-2 h-4 w-4 animate-spin' />
-              ) : (
-                <Zap className='mr-2 h-4 w-4' />
-              )}
-              Qualify discovered
-            </Button>
-          </div>
-        </div>
+        {controlsBody}
       </ContentSurfaceCard>
 
       {lastDiscoveryResult && <DiagnosticPanel result={lastDiscoveryResult} />}
