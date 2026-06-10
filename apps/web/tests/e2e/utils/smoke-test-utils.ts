@@ -725,6 +725,44 @@ export async function checkElementVisibility(
 // ============================================================================
 
 /**
+ * Navigate to an authenticated app chat route with retries for transient CI
+ * failures (Neon cold start, Turbopack compile stalls, net::ERR_*).
+ *
+ * Uses `waitUntil: 'commit'` so navigation does not block on a hung SSR render
+ * when the database is slow; callers should assert route-specific UI after.
+ */
+export async function gotoAuthenticatedChatRoute(
+  page: Page,
+  options?: {
+    path?: string;
+    perAttemptTimeout?: number;
+    retries?: number;
+  }
+): Promise<void> {
+  const path = options?.path ?? '/app/chat';
+  const perAttemptTimeout = options?.perAttemptTimeout ?? 60_000;
+  const maxAttempts = (options?.retries ?? RETRY_CONFIG.DEFAULT_RETRIES) + 1;
+
+  for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+    try {
+      await page.goto(path, {
+        timeout: perAttemptTimeout,
+        waitUntil: 'commit',
+      });
+      return;
+    } catch (error) {
+      if (attempt < maxAttempts && isTransientNavigationError(error)) {
+        console.warn(
+          `Transient navigation failure for ${path} (attempt ${attempt}/${maxAttempts}); retrying`
+        );
+        continue;
+      }
+      throw error;
+    }
+  }
+}
+
+/**
  * Navigate with retry logic for flaky network conditions
  */
 export async function smokeNavigateWithRetry(
