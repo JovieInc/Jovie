@@ -12,39 +12,16 @@
  * @smoke
  */
 
-import { expect, type Page, test } from '@playwright/test';
+import { expect, test } from '@playwright/test';
 import { APP_FLAG_OVERRIDE_KEYS } from '@/lib/flags/contracts';
 import {
   APP_FLAG_OVERRIDES_COOKIE,
   FF_OVERRIDES_KEY,
 } from '@/lib/flags/overrides';
 import { setTestAuthBypassSession } from '../helpers/clerk-auth';
+import { gotoAuthenticatedChatRoute } from './utils/smoke-test-utils';
 
 test.use({ storageState: { cookies: [], origins: [] } });
-
-async function gotoChatRoute(page: Page) {
-  const maxAttempts = 3;
-
-  for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
-    try {
-      await page.goto('/app/chat', {
-        timeout: 120_000,
-        waitUntil: 'domcontentloaded',
-      });
-      return;
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      const shouldRetry =
-        attempt < maxAttempts && /ERR_EMPTY_RESPONSE|ECONNRESET/i.test(message);
-
-      if (!shouldRetry) {
-        throw error;
-      }
-
-      await page.waitForTimeout(1000 * attempt);
-    }
-  }
-}
 
 test('chat route renders the legacy shell frame when DESIGN_V1 is forced off', async ({
   page,
@@ -75,7 +52,7 @@ test('chat route renders the legacy shell frame when DESIGN_V1 is forced off', a
   );
 
   await setTestAuthBypassSession(page, 'creator-ready');
-  await gotoChatRoute(page);
+  await gotoAuthenticatedChatRoute(page);
   await page.waitForURL(/\/app\/chat/, { timeout: 60_000 });
 
   // The legacy shell frame still mounts and stays interactive even when the
