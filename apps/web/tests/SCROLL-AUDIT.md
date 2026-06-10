@@ -13,7 +13,7 @@
 | Root | `html, body` | `overscroll-behavior: none` | Prevents iOS rubber-band bounce and Android pull-to-refresh on the document root |
 | App shell outer | `AppShellFrame` outer `div` | `overflow-hidden` | Hard clip — nothing escapes the viewport frame |
 | App shell inner scroll panel | `AppShellFrame` content `div` | `overscroll-behavior: contain` (`overscroll-contain`) | Prevents scroll bleed from reaching the `html`/`body` layer when a user scrolls past the end of the inner panel |
-| Table routes | Same content `div`, table variant | `overscroll-behavior: contain` | Same containment for horizontal-scroll table views |
+| Table routes | Route-owned panes inside the shell clip | `overscroll-behavior: contain` on each scrollable pane | Vertical scroll never lives on the shell clip |
 
 **Rule of thumb:** every element with `overflow-y-auto` or `overflow-x-auto` that
 a user can physically scroll must carry `overscroll-behavior: contain` (Tailwind:

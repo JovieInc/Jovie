@@ -7,6 +7,7 @@ import type {
   ShippingVelocityResponse,
 } from '@/app/api/admin/hud/shipping-velocity/route';
 import { AdminPage } from '@/components/features/admin/layout/AdminPage';
+import { OperationalControlPanel } from '@/components/features/admin/OperationalControlPanel';
 import { APP_ROUTES } from '@/constants/routes';
 import { getPublicProfileCanaryStatus } from '@/lib/admin/ops-queries';
 import { env } from '@/lib/env-server';
@@ -177,6 +178,8 @@ export default async function AdminOpsPage({
           </span>
         ) : null}
       </div>
+
+      <OperationalControlPanel />
 
       <HudDashboardClient
         initialMetrics={metrics}

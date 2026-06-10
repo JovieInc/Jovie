@@ -400,6 +400,13 @@
       "when": 1780360738024,
       "tag": "0056_library_share_drops",
       "breakpoints": true
+    },
+    {
+      "idx": 57,
+      "version": "7",
+      "when": 1780900000000,
+      "tag": "0057_thankful_stone_men",
+      "breakpoints": true
     }
   ]
 }

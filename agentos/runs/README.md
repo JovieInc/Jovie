@@ -7,5 +7,6 @@ Run directories follow the naming convention: `<run-type>/<YYYY-MM-DD>/<run-id>/
 Examples:
 - `design-review/2026-05-08/abc123/`
 - `qa/2026-05-08/def456/`
+- `visual-qa/<run_id>/<surface>/{baseline,after}.png` (proposal-validation captures; see `apps/web/lib/visual-qa/registry.ts`)
 
 Binary artifact files (images, zips, built assets) are gitignored via `agentos/runs/**/artifacts/`. Only run metadata files (JSON summaries, markdown reports) are committed.

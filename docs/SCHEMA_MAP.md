@@ -71,6 +71,12 @@ Token read/write must go through `apps/web/lib/connectors/token-vault.ts` — ne
 |-------------|--------|---------------|
 | `links.ts` | `socialLinks`, `socialAccounts`, `wrappedLinks`, `signedLinkAccess`, `dashboardIdempotencyKeys` | `socialLinks.creatorProfileId` → `creatorProfiles` |
 
+### Wallet
+
+| Schema File | Tables | Key Relations |
+|-------------|--------|---------------|
+| `wallet.ts` | `appleWalletProfilePasses`, `appleWalletPassDevices`, `appleWalletPassRegistrations` | Profile passes belong to `creatorProfiles` and reuse `audienceSourceLinks`; registrations join passes to Wallet device library IDs for update pushes |
+
 ### Billing
 
 | Schema File | Tables | Key Relations |

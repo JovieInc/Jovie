@@ -437,7 +437,6 @@ export function DemoShell({
         }
         main={children}
         rightPanel={isRightPanelOpen ? rightPanel : undefined}
-        isTableRoute={activeTab === 'releases' || activeTab === 'audience'}
       />
     </SidebarProvider>
   );

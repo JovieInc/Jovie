@@ -2,6 +2,7 @@ import type { ReactNode } from 'react';
 import { memo } from 'react';
 import { CanvasGrain } from '@/components/atoms/CanvasGrain';
 import { DesktopTitlebar } from '@/components/atoms/DesktopTitlebar';
+import { AppShellRightRail } from '@/components/shell/AppShellRightRail';
 import { isEnabled } from '@/lib/feature-flags';
 import { cn } from '@/lib/utils';
 
@@ -16,7 +17,6 @@ interface AppShellFrameProps {
   readonly mobileBottomNav?: ReactNode;
   readonly contentClassName?: string;
   readonly containerClassName?: string;
-  readonly isTableRoute?: boolean;
   readonly variant?: AppShellFrameVariant;
 }
 
@@ -38,7 +38,6 @@ export const AppShellFrame = memo(function AppShellFrame({
   mobileBottomNav,
   contentClassName,
   containerClassName,
-  isTableRoute = false,
   // Default to 'legacy' so callers that don't pass `variant` (AppShellSkeleton,
   // DemoShell, future surfaces) match the current production state. AuthShell
   // explicitly passes 'shellChatV1' when DESIGN_V1 is on.
@@ -89,16 +88,19 @@ export const AppShellFrame = memo(function AppShellFrame({
             <div
               data-testid='app-shell-scroll'
               className={cn(
-                'flex flex-1 min-h-0 min-w-0 flex-col pb-[var(--dev-toolbar-height,0px)]',
-                isTableRoute
-                  ? 'overflow-hidden overflow-x-auto overscroll-contain'
-                  : 'overflow-y-auto overflow-x-hidden overscroll-contain',
+                // Shell-level pane never owns vertical scroll — routes and table
+                // surfaces scroll inside this clip so the right rail stays fixed.
+                'flex flex-1 min-h-0 min-w-0 flex-col overflow-hidden overflow-x-auto overscroll-contain pb-[var(--dev-toolbar-height,0px)]',
                 contentClassName
               )}
             >
               {main}
             </div>
-            {rightPanel}
+            {rightPanel ? (
+              <AppShellRightRail variant={variant}>
+                {rightPanel}
+              </AppShellRightRail>
+            ) : null}
           </div>
           {audioPlayer}
         </main>
