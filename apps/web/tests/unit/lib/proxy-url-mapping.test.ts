@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { APP_ROUTES } from '@/constants/routes';
 import {
   analyzeHost,
   categorizePath,
@@ -64,15 +65,15 @@ describe('proxy routing helpers', () => {
     });
 
     it('recognizes auth entrypoints and callback aliases', () => {
-      expect(categorizePath('/signin').isAuthPath).toBe(true);
-      expect(categorizePath('/signup').isAuthPath).toBe(true);
-      expect(categorizePath('/signin/sso-callback').isAuthCallbackPath).toBe(
-        true
-      );
-      expect(categorizePath('/sign-up/sso-callback').isAuthCallbackPath).toBe(
-        true
-      );
-      expect(categorizePath('/pricing').isAuthCallbackPath).toBe(false);
+      expect(categorizePath(APP_ROUTES.SIGNIN).isAuthPath).toBe(true);
+      expect(categorizePath(APP_ROUTES.SIGNUP).isAuthPath).toBe(true);
+      expect(
+        categorizePath(APP_ROUTES.SIGNIN_SSO_CALLBACK).isAuthCallbackPath
+      ).toBe(true);
+      expect(
+        categorizePath(APP_ROUTES.SIGNUP_HYPHEN_SSO_CALLBACK).isAuthCallbackPath
+      ).toBe(true);
+      expect(categorizePath(APP_ROUTES.PRICING).isAuthCallbackPath).toBe(false);
     });
 
     it('only adds nonce requirements to app and api surfaces', () => {

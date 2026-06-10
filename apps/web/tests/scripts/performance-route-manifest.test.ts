@@ -22,6 +22,29 @@ interface CreatorShellRouteExpectation {
 
 const CREATOR_SHELL_SLICE_ROUTES = [
   {
+    id: 'creator-chat',
+    path: APP_ROUTES.CHAT,
+    measureMode: 'page-load',
+    warmupStrategy: 'authenticated-route',
+    primaryMetric: 'skeleton-to-content',
+  },
+  {
+    id: 'creator-chat-thread',
+    path: '/app/chat/[id]',
+    measureMode: 'page-load',
+    warmupStrategy: 'authenticated-route',
+    primaryMetric: 'skeleton-to-content',
+    resolvesDynamicPath: true,
+  },
+  {
+    id: 'creator-releases',
+    path: APP_ROUTES.RELEASES,
+    measureMode: 'warm-navigation',
+    warmupStrategy: 'authenticated-shell',
+    primaryMetric: 'warm-shell-response',
+    navTrigger: `a[href="${APP_ROUTES.RELEASES}"]`,
+  },
+  {
     id: 'creator-library',
     path: APP_ROUTES.LIBRARY,
     measureMode: 'warm-navigation',
@@ -55,6 +78,7 @@ const CREATOR_SHELL_SLICE_ROUTES = [
 ] as const satisfies readonly CreatorShellRouteExpectation[];
 
 const RELEASE_BUDGET_CREATOR_SHELL_ROUTE_IDS = [
+  'creator-releases',
   'creator-library',
   'creator-tasks',
   'creator-lyrics',

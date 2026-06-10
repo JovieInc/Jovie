@@ -36,6 +36,22 @@ vi.mock('@/lib/queries/useEventsQuery', () => ({
   useEventsQuery: mockUseEventsQuery,
 }));
 
+vi.mock('@/lib/queries/useChatCapabilitiesQuery', () => ({
+  useChatCapabilitiesQuery: () => ({
+    data: {
+      tools: {
+        albumArt: {
+          availability: 'available',
+          reason: null,
+          reasonCode: null,
+        },
+      },
+    },
+    isLoading: false,
+    isError: false,
+  }),
+}));
+
 function withProviders(ui: ReactNode) {
   const client = new QueryClient({
     defaultOptions: {
