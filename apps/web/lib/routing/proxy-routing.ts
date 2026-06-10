@@ -75,14 +75,14 @@ const SYSTEM_RESERVED_SEGMENTS = new Set([
 
 // Auth single-segment paths (some not enumerated in APP_ROUTES).
 const AUTH_RESERVED_SEGMENTS = new Set([
-  'signin',
-  'signup',
-  'sign-in',
-  'sign-up',
-  'sso-callback',
-  'auth-return',
-  'desktop-auth',
-  'mobile-auth-return',
+  APP_ROUTES.SIGNIN.slice(1),
+  APP_ROUTES.SIGNUP.slice(1),
+  APP_ROUTES.SIGNIN_HYPHEN.slice(1),
+  APP_ROUTES.SIGNUP_HYPHEN.slice(1),
+  APP_ROUTES.SSO_CALLBACK.slice(1),
+  APP_ROUTES.AUTH_RETURN.slice(1),
+  APP_ROUTES.DESKTOP_AUTH.slice(1),
+  APP_ROUTES.MOBILE_AUTH_RETURN.slice(1),
 ]);
 
 const ALL_RESERVED_ROOT_SEGMENTS = new Set<string>([
@@ -134,7 +134,7 @@ export function isProxyRewriteExempt(pathname: string): boolean {
   if (pathname === APP_ROUTES.START) return true;
   if (pathname === APP_ROUTES.ONBOARDING) return true;
   if (pathname === APP_ROUTES.ONBOARDING_CHECKOUT) return true;
-  if (pathname === '/mobile-auth-return') return true;
+  if (pathname === APP_ROUTES.MOBILE_AUTH_RETURN) return true;
   return false;
 }
 
@@ -145,19 +145,19 @@ export function isProxyRewriteExempt(pathname: string): boolean {
  */
 export function categorizePath(pathname: string): PathCategory {
   const isAuthPath =
-    pathname === '/signin' ||
-    pathname === '/sign-in' ||
-    pathname === '/signup' ||
-    pathname === '/sign-up';
+    pathname === APP_ROUTES.SIGNIN ||
+    pathname === APP_ROUTES.SIGNIN_HYPHEN ||
+    pathname === APP_ROUTES.SIGNUP ||
+    pathname === APP_ROUTES.SIGNUP_HYPHEN;
 
   const isAuthCallbackPath =
-    pathname === '/auth/callback' ||
-    pathname === '/app/auth/callback' ||
-    pathname === '/sso-callback' ||
-    pathname === '/signup/sso-callback' ||
-    pathname === '/signin/sso-callback' ||
-    pathname === '/sign-up/sso-callback' ||
-    pathname === '/sign-in/sso-callback';
+    pathname === APP_ROUTES.AUTH_CALLBACK ||
+    pathname === APP_ROUTES.LEGACY_APP_AUTH_CALLBACK ||
+    pathname === APP_ROUTES.SSO_CALLBACK ||
+    pathname === APP_ROUTES.SIGNUP_SSO_CALLBACK ||
+    pathname === APP_ROUTES.SIGNIN_SSO_CALLBACK ||
+    pathname === APP_ROUTES.SIGNUP_HYPHEN_SSO_CALLBACK ||
+    pathname === APP_ROUTES.SIGNIN_HYPHEN_SSO_CALLBACK;
 
   const isAppShellPath = pathname === '/app' || pathname.startsWith('/app/');
   const isAccountPath = matchesRoute(pathname, '/account');
@@ -223,4 +223,4 @@ export function analyzeHost(hostname: string): HostInfo {
 }
 
 /** Dashboard is always at /app in single-domain architecture */
-export const DASHBOARD_URL = '/app';
+export const DASHBOARD_URL = APP_ROUTES.DASHBOARD;
