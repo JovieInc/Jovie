@@ -13,8 +13,8 @@ interface ClerkCookieLike {
 
 const CLERK_REQUIRED_EXACT_PATHS = [
   APP_ROUTES.DASHBOARD,
-  '/auth/callback',
-  '/auth/start',
+  APP_ROUTES.AUTH_CALLBACK,
+  APP_ROUTES.AUTH_START,
   '/__clerk',
   '/monitoring',
 ] as const;

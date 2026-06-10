@@ -813,9 +813,9 @@ describe('proxy.ts middleware', () => {
 
   describe('auth redirects for authenticated users', () => {
     it.each([
-      '/auth/start',
-      '/auth/callback',
-      '/app/auth/callback',
+      APP_ROUTES.AUTH_START,
+      APP_ROUTES.AUTH_CALLBACK,
+      APP_ROUTES.LEGACY_APP_AUTH_CALLBACK,
     ])('lets authenticated central auth route %s reach its handler without user-state redirects', async pathname => {
       mocks.getUserState.mockResolvedValue(USER_STATES.needsWaitlist);
 
