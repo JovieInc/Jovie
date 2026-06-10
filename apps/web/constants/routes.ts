@@ -155,6 +155,24 @@ export const APP_ROUTES = {
   // Auth & Onboarding
   SIGNIN: '/signin',
   SIGNUP: '/signup',
+  /** Legacy Clerk hyphenated alias. */
+  SIGNIN_HYPHEN: '/sign-in',
+  SIGNUP_HYPHEN: '/sign-up',
+  SSO_CALLBACK: '/sso-callback',
+  SIGNIN_SSO_CALLBACK: '/signin/sso-callback',
+  SIGNUP_SSO_CALLBACK: '/signup/sso-callback',
+  SIGNIN_HYPHEN_SSO_CALLBACK: '/sign-in/sso-callback',
+  SIGNUP_HYPHEN_SSO_CALLBACK: '/sign-up/sso-callback',
+  /** Central auth handoff for web, iOS, and Electron clients. */
+  AUTH_START: '/auth/start',
+  AUTH_CALLBACK: '/auth/callback',
+  /** Legacy native callback alias retained for older client builds. */
+  LEGACY_APP_AUTH_CALLBACK: '/app/auth/callback',
+  AUTH_NATIVE_COMPLETE: '/auth/native-complete',
+  AUTH_IOS_COMPLETE: '/auth/ios/complete',
+  AUTH_RETURN: '/auth-return',
+  DESKTOP_AUTH: '/desktop-auth',
+  MOBILE_AUTH_RETURN: '/mobile-auth-return',
   ONBOARDING: '/onboarding',
   ONBOARDING_CHECKOUT: '/onboarding/checkout',
   WAITLIST: '/waitlist',
