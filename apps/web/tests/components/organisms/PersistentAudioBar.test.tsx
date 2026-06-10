@@ -21,6 +21,8 @@ import { AppFlagProvider } from '@/lib/flags/client';
 import { APP_FLAG_DEFAULTS } from '@/lib/flags/contracts';
 
 const toggleTrack = vi.fn().mockResolvedValue(undefined);
+const playNext = vi.fn().mockResolvedValue(undefined);
+const playPrevious = vi.fn().mockResolvedValue(undefined);
 const stop = vi.fn();
 const seek = vi.fn();
 const onError = vi.fn().mockReturnValue(() => {});
@@ -44,6 +46,10 @@ const basePlaybackState = {
   artistName: null as string | null,
   artworkUrl: null as string | null,
   hasLyrics: false,
+  queueLength: 0,
+  queueIndex: -1,
+  hasNext: false,
+  hasPrevious: false,
 };
 
 type MockPlaybackState = typeof basePlaybackState;
@@ -53,6 +59,8 @@ vi.mock('@/components/organisms/release-sidebar/useTrackAudioPlayer', () => ({
   useTrackAudioPlayer: () => ({
     playbackState: mockPlaybackState,
     toggleTrack,
+    playNext,
+    playPrevious,
     seek,
     stop,
     onError,
@@ -119,6 +127,8 @@ function setPlaying(overrides: Partial<MockPlaybackState> = {}) {
 describe('PersistentAudioBar', () => {
   beforeEach(() => {
     toggleTrack.mockClear();
+    playNext.mockClear();
+    playPrevious.mockClear();
     stop.mockClear();
     seek.mockClear();
     onError.mockClear().mockReturnValue(() => {});
@@ -291,6 +301,40 @@ describe('PersistentAudioBar', () => {
       'aria-hidden',
       'true'
     );
+  });
+
+  it('wires shell V1 queue transport to the shared audio player', async () => {
+    const user = userEvent.setup();
+    setPlaying({
+      artistName: 'DJ Cool',
+      hasNext: true,
+      hasPrevious: true,
+      queueLength: 3,
+      queueIndex: 1,
+    });
+
+    render(<PersistentAudioBar variant='shellChatV1' />);
+
+    await user.click(screen.getByRole('button', { name: 'Next' }));
+    await user.click(screen.getByRole('button', { name: 'Previous' }));
+
+    expect(playNext).toHaveBeenCalledTimes(1);
+    expect(playPrevious).toHaveBeenCalledTimes(1);
+  });
+
+  it('hides shell V1 queue transport when the queue has no neighbors', () => {
+    setPlaying({
+      artistName: 'DJ Cool',
+      hasNext: false,
+      hasPrevious: false,
+      queueLength: 1,
+      queueIndex: 0,
+    });
+
+    render(<PersistentAudioBar variant='shellChatV1' />);
+
+    expect(screen.queryByRole('button', { name: 'Next' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Previous' })).toBeNull();
   });
 
   it('wires shell V1 waveform seeking to the shared audio player', () => {
