@@ -753,7 +753,6 @@ export function ChatPageClient({
     activeProfile,
     conversationId,
     fromOnboarding,
-    notifications,
     router,
     setWelcomeChatBootstrapStatus,
   ]);

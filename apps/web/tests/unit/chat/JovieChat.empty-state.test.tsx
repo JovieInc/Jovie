@@ -60,6 +60,15 @@ vi.mock('@/components/jovie/hooks', () => ({
     toFileUIParts: () => [],
     dropZoneRef: { current: null },
   }),
+  useChatAudioAttachments: () => ({
+    pendingAudio: null,
+    isDragOver: false,
+    isProcessing: false,
+    addFiles: vi.fn(),
+    clearAudio: vi.fn(),
+    dropZoneRef: { current: null },
+    accept: 'audio/*',
+  }),
   useStickToBottom: () => ({
     isStuckToBottom: true,
     setStuckToBottom: vi.fn(),
