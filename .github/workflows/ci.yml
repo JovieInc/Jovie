@@ -396,6 +396,8 @@ jobs:
       - uses: ./.github/actions/setup-node-pnpm
       - name: Validate CI harness manifest and generated docs
         run: pnpm ci:harness:check
+      - name: Validate CI branching policy
+        run: pnpm ci:branching-guard:validate
       - name: Run actionlint
         uses: rhysd/actionlint@914e7df21a07ef503a81201c76d2b11c789d3fca # v1.7.12
       - name: Run structural repo guardrails
