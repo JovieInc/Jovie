@@ -6,6 +6,7 @@ import { syncSocialLinksFromPrimaryMusicUrls } from '@/lib/db/social-links-sync'
 import { captureError } from '@/lib/error-tracking';
 import { parseJsonBody } from '@/lib/http/parse-json';
 import { logger } from '@/lib/utils/logger';
+import { refreshAppleWalletProfilePassForProfileId } from '@/lib/wallet/apple/profile-pass';
 import type { ProfileUpdateInput } from './lib';
 import {
   addAvatarCacheBust,
@@ -197,6 +198,7 @@ export async function PUT(req: Request) {
             | undefined,
           youtubeUrl: dbProfileUpdates.youtubeUrl as string | null | undefined,
         }),
+        refreshAppleWalletProfilePassForProfileId(updatedProfile.id),
         finalizeProfileResponse({
           updatedProfile,
           oldUsernameNormalized,

@@ -1,12 +1,23 @@
 'use client';
 
 import { Button } from '@jovie/ui';
-import { AlertTriangle, CheckCircle2, ExternalLink, Shirt } from 'lucide-react';
+import {
+  AlertTriangle,
+  CheckCircle2,
+  ExternalLink,
+  Loader2,
+} from 'lucide-react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { useCallback, useMemo, useState } from 'react';
 import { MerchPricingPresetPicker } from '@/components/molecules/MerchPricingPresetPicker';
 import { MerchPricingSummary } from '@/components/molecules/MerchPricingSummary';
+import {
+  hasRenderableMockup,
+  isInternalMerchMockupUrl,
+  isPrintfulMockupUrl,
+  selectPreferredMockupUrl,
+} from '@/lib/merch/mockup-urls';
 import type { MerchMarginPreset } from '@/lib/merch/pricing';
 import { MERCH_DEFAULT_MARGIN_PRESET } from '@/lib/merch/pricing';
 import { cn } from '@/lib/utils';
@@ -180,7 +191,12 @@ export function ChatMerchOptionsCard({
     >
       <div className='grid gap-2.5 md:grid-cols-3'>
         {result.options.map(option => {
-          const imageUrl = option.mockup_urls?.[0] ?? null;
+          const mockupUrls = option.mockup_urls ?? [];
+          const imageUrl = selectPreferredMockupUrl(mockupUrls);
+          const mockupPending =
+            hasRenderableMockup(mockupUrls) &&
+            mockupUrls.every(url => isInternalMerchMockupUrl(url)) &&
+            !mockupUrls.some(isPrintfulMockupUrl);
           const sellable = option.sellability?.sellable ?? true;
           const blockedReasons = option.sellability?.reasons ?? [];
           return (
@@ -193,23 +209,35 @@ export function ChatMerchOptionsCard({
                 {imageUrl ? (
                   <Image
                     src={imageUrl}
-                    alt=''
+                    alt={`${option.design_name} mockup`}
                     fill
                     sizes='180px'
                     className='object-cover'
                     unoptimized
                   />
                 ) : (
-                  <div className='flex h-full w-full items-center justify-center text-tertiary-token'>
-                    <Shirt className='h-9 w-9' strokeWidth={1.8} />
+                  <div
+                    data-testid='chat-merch-mockup-fallback'
+                    className='flex h-full w-full flex-col items-center justify-center gap-2 text-tertiary-token'
+                  >
+                    <Loader2
+                      className='h-7 w-7 animate-spin'
+                      strokeWidth={1.8}
+                    />
+                    <span className='text-[10.5px] font-medium'>
+                      Rendering mockup
+                    </span>
                   </div>
                 )}
-                <div className='absolute left-2 right-2 top-2 flex items-center justify-between gap-2'>
+                {mockupPending ? (
+                  <div className='absolute inset-x-0 bottom-0 flex items-center justify-center gap-1.5 bg-black/45 px-2 py-1.5 text-[10px] font-medium text-white backdrop-blur'>
+                    <Loader2 className='h-3 w-3 animate-spin' strokeWidth={2} />
+                    Photorealistic preview pending
+                  </div>
+                ) : null}
+                <div className='absolute left-2 top-2'>
                   <span className='rounded-md border border-white/15 bg-black/55 px-1.5 py-0.5 text-[10.5px] font-medium text-white backdrop-blur'>
                     Option {option.option_number}
-                  </span>
-                  <span className='rounded-md border border-white/15 bg-black/55 px-1.5 py-0.5 text-[10.5px] font-medium text-white backdrop-blur'>
-                    {sellable ? 'Ready' : 'Draft'}
                   </span>
                 </div>
               </div>
@@ -247,16 +275,11 @@ export function ChatMerchOptionsCard({
                     Publish
                   </Button>
                 </div>
-                {blockedReasons.length || option.production_warnings?.length ? (
+                {blockedReasons.length ? (
                   <p className='flex min-h-8 items-start gap-1.5 text-[10.5px] leading-4 text-tertiary-token'>
                     <AlertTriangle className='mt-0.5 h-3 w-3 shrink-0' />
                     <span className='line-clamp-2'>
-                      {[
-                        ...blockedReasons,
-                        ...(option.production_warnings ?? []),
-                      ]
-                        .filter(Boolean)
-                        .join(' ')}
+                      {blockedReasons.join(' ')}
                     </span>
                   </p>
                 ) : null}

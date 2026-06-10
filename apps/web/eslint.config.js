@@ -19,6 +19,7 @@ const noBannedMarketingCopyRule = require('./eslint-rules/no-banned-marketing-co
 const noRawFocusRingRule = require('./eslint-rules/no-raw-focus-ring');
 const noAdHocCurrencyRule = require('./eslint-rules/no-ad-hoc-currency');
 const clerkOauthOptionsMustIncludePromptRule = require('./eslint-rules/clerk-oauth-options-must-include-prompt');
+const canonicalUiLabelCasingRule = require('./eslint-rules/canonical-ui-label-casing');
 
 const [nextBase, nextTypescript, nextIgnores] = nextConfig;
 
@@ -46,6 +47,7 @@ const baseConfig = {
         'no-ad-hoc-currency': noAdHocCurrencyRule,
         'clerk-oauth-options-must-include-prompt':
           clerkOauthOptionsMustIncludePromptRule,
+        'canonical-ui-label-casing': canonicalUiLabelCasingRule,
       },
     },
   },
@@ -203,6 +205,8 @@ const baseConfig = {
     // its internal file-path check, so setting 'error' globally is safe — it
     // will only fire on files under app/(auth)/.
     '@jovie/clerk-oauth-options-must-include-prompt': 'error',
+    // DESIGN.md text casing — Title Case labels, sentence case body/toasts/tooltips
+    '@jovie/canonical-ui-label-casing': 'error',
   },
 };
 

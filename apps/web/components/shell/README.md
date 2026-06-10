@@ -44,6 +44,12 @@ ledger and delete-later inventory.
 If another caller needs a differently shaped source, add a small adapter at
 that caller boundary instead of widening the component contract.
 
+## App shell frame
+
+| Component | Purpose | Wired in production |
+|-----------|---------|---------------------|
+| `AppShellRightRail` | Sticky frame slot for the app-shell context panel. Rendered by `AppShellFrame` beside the main scroll clip so route-owned lists/grids do not drag the rail. Card elevation stays in `RightDrawer` / `EntitySidebarShell` / `DrawerSurfaceCard`. | Yes — `AppShellFrame` |
+
 ## Drawer
 
 | Component | Purpose |

@@ -25,6 +25,7 @@ const hoisted = vi.hoisted(() => {
     requireAuthMock: vi.fn(),
     getSessionContextMock: vi.fn(),
     handleUploadMock: vi.fn(),
+    resolvePrimaryRecordingForReleaseMock: vi.fn(),
     selectMock,
     selectLimitMock,
     updateMock,
@@ -54,6 +55,11 @@ vi.mock('@/lib/auth/session', () => ({
 vi.mock('@/lib/cache/tags', () => ({
   createSmartLinkContentTag: (profileId: string) =>
     `smart-link-content:${profileId}`,
+}));
+
+vi.mock('@/lib/audio/resolve-release-recording', () => ({
+  resolvePrimaryRecordingForRelease:
+    hoisted.resolvePrimaryRecordingForReleaseMock,
 }));
 
 vi.mock('@/lib/db', () => ({
@@ -124,12 +130,13 @@ describe('library audio upload API', () => {
   });
 
   it('attaches uploaded audio to the first recording for an owned release', async () => {
-    hoisted.selectLimitMock.mockResolvedValue([
-      {
-        recordingId: 'recording_123',
-        currentPreviewUrl: null,
-      },
-    ]);
+    hoisted.resolvePrimaryRecordingForReleaseMock.mockResolvedValue({
+      recordingId: 'recording_123',
+      previewUrl: null,
+      audioUrl: null,
+      durationMs: null,
+      metadata: {},
+    });
     hoisted.updateWhereMock.mockResolvedValue({ rowCount: 1 });
 
     const { POST } = await import('@/app/api/library/audio/confirm/route');
@@ -162,12 +169,13 @@ describe('library audio upload API', () => {
   });
 
   it('refuses to overwrite existing release audio', async () => {
-    hoisted.selectLimitMock.mockResolvedValue([
-      {
-        recordingId: 'recording_123',
-        currentPreviewUrl: 'https://cdn.example.com/existing.mp3',
-      },
-    ]);
+    hoisted.resolvePrimaryRecordingForReleaseMock.mockResolvedValue({
+      recordingId: 'recording_123',
+      previewUrl: 'https://cdn.example.com/existing.mp3',
+      audioUrl: 'https://cdn.example.com/existing.mp3',
+      durationMs: 180_000,
+      metadata: {},
+    });
 
     const { POST } = await import('@/app/api/library/audio/confirm/route');
     const response = await POST(

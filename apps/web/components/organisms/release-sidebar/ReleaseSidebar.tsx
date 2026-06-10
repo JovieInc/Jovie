@@ -22,6 +22,7 @@ import { toast } from 'sonner';
 import { updateAllowArtworkDownloads } from '@/app/app/(shell)/dashboard/releases/actions';
 import { Icon } from '@/components/atoms/Icon';
 import { ReleaseTaskChecklist } from '@/components/features/dashboard/release-tasks';
+import { ReleaseAudioAssetPanel } from '@/components/features/release/ReleaseAudioAssetPanel';
 import {
   DrawerAsyncToggle,
   DrawerCardActionBar,
@@ -882,6 +883,24 @@ export function ReleaseSidebar({
               providerConfig={providerConfig}
             />
           ) : null}
+          <DrawerSection
+            title='Audio'
+            surface='plain'
+            defaultOpen
+            testId='release-audio-card'
+            contentClassName='space-y-3 p-3'
+          >
+            <ReleaseAudioAssetPanel
+              releaseId={release.id}
+              releaseTitle={release.title}
+              previewUrl={release.previewUrl}
+              durationMs={release.totalDurationMs}
+              isEditable={isEditable}
+              onUploaded={() => {
+                router.refresh();
+              }}
+            />
+          </DrawerSection>
           {isEditable ? (
             <DrawerSection
               title='Artwork'

@@ -259,7 +259,7 @@ test.describe('Admin Navigation Persistence @smoke', () => {
     });
   });
 
-  test('admin nav shows only primary workspaces and settings keeps tool links', async ({
+  test('admin nav shows only primary workspaces and legacy settings admin redirects to ops', async ({
     page,
   }) => {
     test.setTimeout(120_000);
@@ -293,14 +293,10 @@ test.describe('Admin Navigation Persistence @smoke', () => {
     });
     await settleAdminNavigation(page);
 
-    for (const href of [
-      APP_ROUTES.ADMIN_INVESTORS,
-      APP_ROUTES.ADMIN_SCREENSHOTS,
-    ]) {
-      await expect(page.locator(`a[href="${href}"]`)).toBeVisible({
-        timeout: SMOKE_TIMEOUTS.VISIBILITY,
-      });
-    }
+    await expect(page).toHaveURL(new RegExp(`${APP_ROUTES.ADMIN_OPS}$`));
+    await expect(page.getByTestId('operational-control-panel')).toBeVisible({
+      timeout: SMOKE_TIMEOUTS.VISIBILITY,
+    });
   });
 
   test('legacy algorithm health route redirects to creators workspace', async ({

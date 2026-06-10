@@ -21,6 +21,7 @@ import type { ReactNode } from 'react';
 import { useState } from 'react';
 import { toast } from 'sonner';
 import { AgentOsRunsPanel } from '@/components/features/admin/agent-os';
+import { DesignProposalReviewPanel } from '@/components/features/admin/design-lab';
 import type { DailyBucket } from '@/components/features/admin/ShippingVelocityChart';
 import { ShippingVelocityChart } from '@/components/features/admin/ShippingVelocityChart';
 import { TimActionRequiredSection } from '@/components/features/admin/TimActionRequiredSection';
@@ -662,6 +663,7 @@ export function HudDashboardClient({
     return (
       <div className={outerClass}>
         <TimActionRequiredSection />
+        <DesignProposalReviewPanel />
 
         <div className='grid gap-3 md:grid-cols-2 xl:grid-cols-4'>
           <ContentMetricCard

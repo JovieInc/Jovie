@@ -1,0 +1,53 @@
+export type LibraryApprovalStatus =
+  | 'draft'
+  | 'needs_review'
+  | 'approved'
+  | 'archived';
+
+export const LIBRARY_APPROVAL_STATUSES = [
+  'draft',
+  'needs_review',
+  'approved',
+  'archived',
+] as const satisfies readonly LibraryApprovalStatus[];
+
+export const DEFAULT_LIBRARY_APPROVAL_STATUS: LibraryApprovalStatus = 'draft';
+
+export function isLibraryApprovalStatus(
+  value: string
+): value is LibraryApprovalStatus {
+  return (LIBRARY_APPROVAL_STATUSES as readonly string[]).includes(value);
+}
+
+export function formatLibraryApprovalStatus(
+  status: LibraryApprovalStatus
+): string {
+  return status
+    .split('_')
+    .map(part => part.slice(0, 1).toUpperCase() + part.slice(1))
+    .join(' ');
+}
+
+export function libraryApprovalStatusClasses(
+  status: LibraryApprovalStatus
+): string {
+  if (status === 'approved') {
+    return 'border-success/20 bg-success/10 text-success';
+  }
+  if (status === 'needs_review') {
+    return 'border-warning/20 bg-warning/10 text-warning';
+  }
+  if (status === 'archived') {
+    return 'border-subtle bg-surface-1 text-tertiary-token';
+  }
+  return 'border-subtle bg-surface-1 text-secondary-token';
+}
+
+export function libraryApprovalStatusDotClasses(
+  status: LibraryApprovalStatus
+): string {
+  if (status === 'approved') return 'bg-success';
+  if (status === 'needs_review') return 'bg-warning';
+  if (status === 'archived') return 'bg-tertiary-token';
+  return 'bg-secondary-token';
+}

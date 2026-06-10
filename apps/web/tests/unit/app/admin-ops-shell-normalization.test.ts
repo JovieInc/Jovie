@@ -18,10 +18,16 @@ const TIM_ACTION_REQUIRED_SECTION = join(
   '../../../components/features/admin/TimActionRequiredSection.tsx'
 );
 
+const OPERATIONAL_CONTROL_PANEL = join(
+  TEST_DIR,
+  '../../../components/features/admin/OperationalControlPanel.tsx'
+);
+
 const OPS_COMPONENT_FILES = [
   OPS_PAGE,
   HUD_DASHBOARD_CLIENT,
   HUD_STATUS_PILL,
+  OPERATIONAL_CONTROL_PANEL,
   join(OPS_ROUTE_DIR, 'HudClockClient.tsx'),
 ] as const;
 
@@ -38,6 +44,13 @@ describe('admin ops shell normalization', () => {
     expect(source).toContain("value === 'kiosk' ? 'admin-kiosk' : 'shell'");
     expect(source).toContain("presentationMode='admin-kiosk'");
     expect(source).toContain("density='kiosk'");
+  });
+
+  it('mounts the consolidated operational control panel on the shell ops surface', () => {
+    const source = readSource(OPS_PAGE);
+
+    expect(source).toContain('OperationalControlPanel');
+    expect(source).toContain('<OperationalControlPanel');
   });
 
   it('does not reintroduce uppercase tracked SectionEyebrow styling', () => {

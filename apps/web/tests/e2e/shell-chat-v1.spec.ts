@@ -16,6 +16,7 @@ import {
   FF_OVERRIDES_KEY,
 } from '@/lib/flags/overrides';
 import { setTestAuthBypassSession } from '../helpers/clerk-auth';
+import { gotoAuthenticatedChatRoute } from './utils/smoke-test-utils';
 
 test.use({ storageState: { cookies: [], origins: [] } });
 
@@ -28,52 +29,10 @@ interface Box {
   readonly height: number;
 }
 
-async function gotoChatRoute(page: Page) {
-  const maxAttempts = 3;
-
-  for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
-    try {
-      await page.goto('/app/chat', {
-        timeout: 120_000,
-        waitUntil: 'domcontentloaded',
-      });
-      return;
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      const shouldRetry =
-        attempt < maxAttempts && /ERR_EMPTY_RESPONSE|ECONNRESET/i.test(message);
-
-      if (!shouldRetry) {
-        throw error;
-      }
-
-      await page.waitForTimeout(1000 * attempt);
-    }
-  }
-}
-
 async function gotoChatConversation(page: Page, conversationId: string) {
-  const maxAttempts = 3;
-
-  for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
-    try {
-      await page.goto(`/app/chat/${conversationId}`, {
-        timeout: 120_000,
-        waitUntil: 'domcontentloaded',
-      });
-      return;
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      const shouldRetry =
-        attempt < maxAttempts && /ERR_EMPTY_RESPONSE|ECONNRESET/i.test(message);
-
-      if (!shouldRetry) {
-        throw error;
-      }
-
-      await page.waitForTimeout(1000 * attempt);
-    }
-  }
+  await gotoAuthenticatedChatRoute(page, {
+    path: `/app/chat/${conversationId}`,
+  });
 }
 
 async function forceDesignV1(page: Page) {
@@ -323,7 +282,7 @@ test('chat route renders the Shell V1 app frame when forced on', async ({
   await forceDesignV1(page);
 
   await setTestAuthBypassSession(page, 'creator-ready', 'e2e-shell-chat-user');
-  await gotoChatRoute(page);
+  await gotoAuthenticatedChatRoute(page);
   await page.waitForURL(/\/app\/chat/, { timeout: 60_000 });
 
   const { chatContent, composer, shellFrame } = shellChatFrameLocators(page);
@@ -355,7 +314,7 @@ test('chat route picker opens without moving the shell or composer', async ({
     'creator-ready',
     'e2e-shell-chat-picker-user'
   );
-  await gotoChatRoute(page);
+  await gotoAuthenticatedChatRoute(page);
   await page.waitForURL(/\/app\/chat/, { timeout: 60_000 });
 
   const { composer, input, shellScroll } = shellChatFrameLocators(page);
@@ -471,7 +430,7 @@ test('chat composer clears mobile shell tabs on tablet and phone', async ({
       width: viewport.width,
       height: viewport.height,
     });
-    await gotoChatRoute(page);
+    await gotoAuthenticatedChatRoute(page);
     await page.waitForURL(/\/app\/chat/, { timeout: 60_000 });
 
     const { composer } = shellChatFrameLocators(page);

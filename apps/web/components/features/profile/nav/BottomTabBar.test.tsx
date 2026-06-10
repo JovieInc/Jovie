@@ -39,7 +39,7 @@ function makeProps(overrides?: Partial<BottomTabBarProps>): BottomTabBarProps {
 describe('BottomTabBar — tab rendering', () => {
   it('renders all four primary tabs when hasTourDates is true', () => {
     render(<BottomTabBar {...makeProps({ hasTourDates: true })} />);
-    expect(screen.getByRole('button', { name: 'Profile' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Home' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Music' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Events' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Alerts' })).toBeInTheDocument();
@@ -47,7 +47,7 @@ describe('BottomTabBar — tab rendering', () => {
 
   it('keeps the Events tab when hasTourDates is false', () => {
     render(<BottomTabBar {...makeProps({ hasTourDates: false })} />);
-    expect(screen.getByRole('button', { name: 'Profile' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Home' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Music' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Events' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Alerts' })).toBeInTheDocument();
@@ -83,7 +83,7 @@ describe('BottomTabBar — active state', () => {
 
   it('does not mark inactive tabs with aria-current', () => {
     render(<BottomTabBar {...makeProps({ activeTab: 'listen' })} />);
-    const homeBtn = screen.getByRole('button', { name: 'Profile' });
+    const homeBtn = screen.getByRole('button', { name: 'Home' });
     expect(homeBtn).not.toHaveAttribute('aria-current', 'page');
     expect(homeBtn.getAttribute('aria-current')).toBeNull();
   });
@@ -106,7 +106,7 @@ describe('BottomTabBar — active state', () => {
 
   it('marks the profile tab active by default', () => {
     render(<BottomTabBar {...makeProps({ activeTab: 'profile' })} />);
-    expect(screen.getByRole('button', { name: 'Profile' })).toHaveAttribute(
+    expect(screen.getByRole('button', { name: 'Home' })).toHaveAttribute(
       'aria-current',
       'page'
     );
@@ -131,10 +131,10 @@ describe('BottomTabBar — active state', () => {
 // ---------------------------------------------------------------------------
 
 describe('BottomTabBar — interaction handlers', () => {
-  it('calls onTabSelect with "profile" when Profile is clicked', () => {
+  it('calls onTabSelect with "profile" when Home is clicked', () => {
     const onTabSelect = vi.fn();
     render(<BottomTabBar {...makeProps({ onTabSelect })} />);
-    fireEvent.click(screen.getByRole('button', { name: 'Profile' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Home' }));
     expect(onTabSelect).toHaveBeenCalledTimes(1);
     expect(onTabSelect).toHaveBeenCalledWith('profile');
   });
