@@ -79,6 +79,27 @@ describe('AppShellFrame', () => {
     );
   });
 
+  it('wraps the right panel in the shared AppShellRightRail slot', () => {
+    render(
+      <AppShellFrame
+        sidebar={<aside>Sidebar</aside>}
+        header={<header>Header</header>}
+        main={<div>Main Content</div>}
+        rightPanel={<div data-testid='fixture-right-rail'>Right rail</div>}
+      />
+    );
+
+    const scrollPane = screen.getByTestId('app-shell-scroll');
+    const rightRail = screen.getByTestId('app-shell-right-rail');
+
+    expect(scrollPane).toContainElement(screen.getByText('Main Content'));
+    expect(scrollPane).not.toContainElement(rightRail);
+    expect(rightRail).toContainElement(
+      screen.getByTestId('fixture-right-rail')
+    );
+    expect(rightRail).toHaveClass('sticky', 'top-0');
+  });
+
   it('renders the shared audio player slot inside the shell frame', () => {
     render(
       <AppShellFrame

@@ -2,6 +2,7 @@ import type { ReactNode } from 'react';
 import { memo } from 'react';
 import { CanvasGrain } from '@/components/atoms/CanvasGrain';
 import { DesktopTitlebar } from '@/components/atoms/DesktopTitlebar';
+import { AppShellRightRail } from '@/components/shell/AppShellRightRail';
 import { isEnabled } from '@/lib/feature-flags';
 import { cn } from '@/lib/utils';
 
@@ -98,7 +99,11 @@ export const AppShellFrame = memo(function AppShellFrame({
             >
               {main}
             </div>
-            {rightPanel}
+            {rightPanel ? (
+              <AppShellRightRail variant={variant}>
+                {rightPanel}
+              </AppShellRightRail>
+            ) : null}
           </div>
           {audioPlayer}
         </main>
