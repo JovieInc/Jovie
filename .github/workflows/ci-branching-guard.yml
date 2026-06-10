@@ -47,6 +47,7 @@ jobs:
       - name: Evaluate PR branching policy
         id: guard
         env:
+          GH_TOKEN: ${{ github.token }}
           CI_BRANCHING_GUARD_MODE: ${{ vars.CI_BRANCHING_GUARD_MODE || 'warn' }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
         run: |
