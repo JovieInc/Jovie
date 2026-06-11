@@ -255,7 +255,7 @@ export function PersistentAudioBar({
 
   const legacyBar = (className?: string) => (
     <section
-      aria-label='Audio player'
+      aria-label='Audio Player'
       className={cn(
         'animate-in fade-in slide-in-from-bottom-2 duration-cinematic shrink-0 border-t border-subtle bg-(--linear-app-content-surface) backdrop-blur-xl px-3 py-2 max-lg:mb-[calc(3.5rem+env(safe-area-inset-bottom))]',
         className
@@ -337,7 +337,7 @@ export function PersistentAudioBar({
           type='button'
           onClick={stop}
           className='relative flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-quaternary-token transition-colors duration-subtle hover:text-secondary-token focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-(--linear-border-focus) before:absolute before:-inset-2.5 before:content-[""]'
-          aria-label='Dismiss player'
+          aria-label='Dismiss Player'
         >
           <X className='h-3.5 w-3.5' />
         </button>
