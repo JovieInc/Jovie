@@ -713,12 +713,16 @@ describe('Public Profile Page Logic', () => {
 
   describe('reserved handle short-circuit (JOV-3054)', () => {
     it('rejects reserved usernames before the profile loader runs', () => {
-      expect(PUBLIC_PROFILE_PAGE_SOURCE).toContain('isReservedUsername(username)');
+      expect(PUBLIC_PROFILE_PAGE_SOURCE).toContain(
+        'isReservedUsername(username)'
+      );
       expect(PUBLIC_PROFILE_PAGE_SOURCE).toContain('notFound()');
     });
 
     it('fast-fails reserved handles inside the shared profile loader', () => {
-      expect(PUBLIC_PROFILE_LOADER_SOURCE).toContain('isReservedUsername(username)');
+      expect(PUBLIC_PROFILE_LOADER_SOURCE).toContain(
+        'isReservedUsername(username)'
+      );
       expect(PUBLIC_PROFILE_LOADER_SOURCE).toContain(
         'return RESERVED_PROFILE_NOT_FOUND'
       );
