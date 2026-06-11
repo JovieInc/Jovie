@@ -1,4 +1,5 @@
 import {
+  getCspConnectSrcDomains,
   getCspImgSrcDomains,
   getCspMediaSrcDomains,
 } from '@/constants/platforms/cdn-domains';
@@ -109,8 +110,10 @@ const STATIC_CSP_PARTS = {
   imgSrc: ["img-src 'self' data: blob:", ...getCspImgSrcDomains()].join(' '),
 
   // Pre-computed connect-src prefix (excludes dev-only localhost)
+  // @see constants/platforms/cdn-domains.ts
   connectSrcBase: [
     "connect-src 'self'",
+    ...getCspConnectSrcDomains(),
     'https://distinct-giraffe-5.clerk.accounts.dev',
     'https://clerk.com',
     'https://cdn.clerk.com',
