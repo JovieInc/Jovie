@@ -290,6 +290,15 @@ async function assertSlashMenuClearsThreadContent(page: Page) {
   }
 }
 
+async function resetSlashPicker(page: Page) {
+  const { input } = shellChatFrameLocators(page);
+  await page.keyboard.press('Escape');
+  await input.fill('');
+  await expect(page.locator('[data-testid="slash-command-menu"]')).toHaveCount(
+    0
+  );
+}
+
 test('chat route renders the Shell V1 app frame when forced on', async ({
   page,
 }) => {
@@ -395,6 +404,7 @@ test('chat route slash picker clears active transcript content in populated thre
 
     const { composer, input } = shellChatFrameLocators(page);
     await expect(composer).toBeVisible({ timeout: 30_000 });
+    await resetSlashPicker(page);
 
     const latestAssistantReply = page.getByTestId('chat-message-reply').filter({
       hasText: 'Your bio is currently not set',
@@ -419,6 +429,7 @@ test('chat route slash picker clears active transcript content in populated thre
         `${viewport.label} composer y stays stable`
       ).toBeLessThanOrEqual(1);
     }
+    await resetSlashPicker(page);
   }
 });
 
