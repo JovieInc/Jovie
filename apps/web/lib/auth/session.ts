@@ -2,7 +2,12 @@ import 'server-only';
 
 import { sql as drizzleSql, eq } from 'drizzle-orm';
 import { getCachedAuth } from '@/lib/auth/cached';
-import { type DbOrTransaction, db } from '@/lib/db';
+import {
+  applyRlsSessionUser,
+  type DbOrTransaction,
+  db,
+  resetRlsSession,
+} from '@/lib/db';
 import { logDbError, logDbInfo, withRetry } from '@/lib/db/client';
 import { runLegacyDbTransaction } from '@/lib/db/legacy-transaction';
 import { users } from '@/lib/db/schema/auth';
@@ -100,11 +105,8 @@ export async function setTransactionSessionUserId(
 
 async function applySessionUserId(userId: string): Promise<void> {
   // setupDbSession is used outside explicit transaction boundaries.
-  // Use session-scoped set_config (is_local=false) directly to avoid
-  // emitting avoidable query errors for transaction-local scope.
-  await db.execute(
-    drizzleSql`SELECT set_config('app.clerk_user_id', ${userId}, false)`
-  );
+  // Clear any stale pooled identity before setting the current user.
+  await applyRlsSessionUser(db, userId);
 }
 
 /**
@@ -120,9 +122,16 @@ export async function setupDbSession(clerkUserId?: string) {
   try {
     userId = await resolveClerkUserId(clerkUserId);
   } catch (error) {
-    // If no authenticated user, skip RLS setup gracefully
+    // If no authenticated user, clear any stale pooled identity so later
+    // queries on this connection cannot inherit a prior user's RLS context.
     if (isUnauthorizedSessionError(error)) {
-      logDbInfo('setupDbSession', 'Skipping RLS setup — no authenticated user');
+      logDbInfo(
+        'setupDbSession',
+        'Clearing RLS session — no authenticated user'
+      );
+      await withRetry(async () => {
+        await resetRlsSession(db);
+      }, 'setupDbSession_reset');
       return { userId: null };
     }
     throw error;

@@ -23,6 +23,8 @@ export type {
 
 // Re-export all client functionality from the modular client directory
 export {
+  // Session helpers
+  applyRlsSessionUser,
   // Health checks
   checkDbHealth,
   checkDbPerformance,
@@ -35,9 +37,11 @@ export {
   getDb,
   getDbConfig,
   getPoolMetrics,
+  getRlsSessionResetSql,
+  getRlsSessionSetSql,
   initializeDb,
   isRetryableError,
-  // Session helpers
+  resetRlsSession,
   setSessionUser,
   validateDbConnection,
   withDb,
