@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.6.45] - 2026-06-11
+
+> The post-onboarding interview modal now uses shared System B surfaces and controls.
+
+### Fixed
+
+- **Onboarding interview modal System B cleanup**: replaces hardcoded modal colors, white-alpha input styling, raw shadows, and glyph progress with tokenized System B surface classes, the shared textarea primitive, and stable progress dots.
+
 ## [26.6.44] - 2026-06-11
 
 > Central transport and speed controls now use neutral System B primary button surfaces.
