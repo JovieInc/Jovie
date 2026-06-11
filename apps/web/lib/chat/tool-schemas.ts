@@ -91,7 +91,8 @@ export const TOOL_SCHEMAS = {
   },
 
   publishMerchCard: {
-    description: 'Publish an existing merch card to the public artist profile.',
+    description:
+      'Propose publishing an existing merch card to the public artist profile. Returns a confirmation card; does not publish until the artist confirms.',
     inputSchema: chatToolSchema({
       merchCardId: z.string().uuid(),
     }),
@@ -105,7 +106,8 @@ export const TOOL_SCHEMAS = {
   },
 
   unpauseMerchCard: {
-    description: 'Make a paused merch card live again after validating it.',
+    description:
+      'Propose making a paused merch card live again. Returns a confirmation card; does not unpause until the artist confirms.',
     inputSchema: chatToolSchema({
       merchCardId: z.string().uuid(),
     }),
@@ -113,7 +115,7 @@ export const TOOL_SCHEMAS = {
 
   deleteOrArchiveMerchCard: {
     description:
-      'Archive a merch card. Use for kill/delete/remove merch requests.',
+      'Propose archiving a merch card. Returns a confirmation card; does not archive until the artist confirms.',
     inputSchema: chatToolSchema({
       merchCardId: z.string().uuid(),
     }),

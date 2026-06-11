@@ -485,7 +485,7 @@ export function JovieChat({
 
       <ChatInput
         {...chatInputProps}
-        placeholder='Ask Jovie...'
+        placeholder='Ask jovie...'
         variant={showThreadView ? 'compact' : 'hero'}
       />
     </div>
@@ -599,63 +599,26 @@ export function JovieChat({
                       paddingBottom: messageViewportPaddingBottom,
                     }}
                   >
-                      {virtualizer.getVirtualItems().map(virtualItem => {
-                        const message = messages[virtualItem.index];
-                        const index = virtualItem.index;
-                        const isThinking =
-                          message.role === 'assistant' &&
-                          message.status === 'pending';
-                        return (
-                          <div
-                            key={message.id}
-                            data-index={virtualItem.index}
-                            ref={virtualizer.measureElement}
-                            style={{
-                              position: 'absolute',
-                              top: 0,
-                              left: 0,
-                              width: '100%',
-                              transform: `translateY(${virtualItem.start}px)`,
-                            }}
-                          >
-                            <div className='pb-4'>
-                              <ChatMessage
-                                id={message.id}
-                                role={message.role}
-                                parts={message.parts}
-                                isStreaming={
-                                  isStreaming && index === lastAssistantIndex
-                                }
-                                isThinking={isThinking}
-                                avatarUrl={
-                                  message.role === 'user'
-                                    ? avatarUrl
-                                    : undefined
-                                }
-                                profileId={profileId}
-                                skipEntrance={knownMessageIdsRef.current.has(
-                                  message.id
-                                )}
-                              />
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  ) : (
-                    <div
-                      ref={totalSizeRef}
-                      className='mx-auto flex min-h-full w-full max-w-[44rem] flex-col'
-                      style={{
-                        paddingBottom: messageViewportPaddingBottom,
-                      }}
-                    >
-                      {messages.map((message, index) => {
-                        const isThinking =
-                          message.role === 'assistant' &&
-                          message.status === 'pending';
-                        return (
-                          <div key={message.id} className='pb-4'>
+                    {virtualizer.getVirtualItems().map(virtualItem => {
+                      const message = messages[virtualItem.index];
+                      const index = virtualItem.index;
+                      const isThinking =
+                        message.role === 'assistant' &&
+                        message.status === 'pending';
+                      return (
+                        <div
+                          key={message.id}
+                          data-index={virtualItem.index}
+                          ref={virtualizer.measureElement}
+                          style={{
+                            position: 'absolute',
+                            top: 0,
+                            left: 0,
+                            width: '100%',
+                            transform: `translateY(${virtualItem.start}px)`,
+                          }}
+                        >
+                          <div className='pb-4'>
                             <ChatMessage
                               id={message.id}
                               role={message.role}
@@ -673,10 +636,45 @@ export function JovieChat({
                               )}
                             />
                           </div>
-                        );
-                      })}
-                    </div>
-                  )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <div
+                    ref={totalSizeRef}
+                    className='mx-auto flex min-h-full w-full max-w-[44rem] flex-col'
+                    style={{
+                      paddingBottom: messageViewportPaddingBottom,
+                    }}
+                  >
+                    {messages.map((message, index) => {
+                      const isThinking =
+                        message.role === 'assistant' &&
+                        message.status === 'pending';
+                      return (
+                        <div key={message.id} className='pb-4'>
+                          <ChatMessage
+                            id={message.id}
+                            role={message.role}
+                            parts={message.parts}
+                            isStreaming={
+                              isStreaming && index === lastAssistantIndex
+                            }
+                            isThinking={isThinking}
+                            avatarUrl={
+                              message.role === 'user' ? avatarUrl : undefined
+                            }
+                            profileId={profileId}
+                            skipEntrance={knownMessageIdsRef.current.has(
+                              message.id
+                            )}
+                          />
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
 
                 {inlineChatError}
 

@@ -76,6 +76,7 @@ import {
   preparePersistedToolEventsForTurnFinish,
   resolvePersistedToolEventsForDisplay,
 } from '@/lib/chat/tool-events';
+import { proposeMerchAction } from '@/lib/chat/tools/merch-propose';
 import {
   createMerchGenerateTool,
   createMerchPreviewTool,
@@ -116,7 +117,6 @@ import { formatMerchMoney } from '@/lib/merch/pricing';
 import {
   createMerchGeneration,
   optimizeMerchCards,
-  publishMerchCard,
   reorderMerchCards,
   selectMerchDesign,
   showArtistPayouts,
@@ -1246,7 +1246,7 @@ function createMerchStatusTool(params: {
 }) {
   return tool({
     description:
-      'Change a merch card status. Use publish for live, pause for kill temporarily, unpause to bring back, and archive for delete/remove.',
+      'Change a merch card status. Use publish for live, pause for kill temporarily, unpause to bring back, and archive for delete/remove. Publish, unpause, and archive require user confirmation — they return a confirmation card and do not write immediately.',
     inputSchema: chatToolSchema({
       merchCardId: z.string().uuid(),
     }),
@@ -1255,18 +1255,16 @@ function createMerchStatusTool(params: {
         return { success: false as const, error: 'Profile ID required' };
       }
 
-      if (params.action === 'publish') {
-        const card = await publishMerchCard({
-          cardId: merchCardId,
+      if (
+        params.action === 'publish' ||
+        params.action === 'unpause' ||
+        params.action === 'archive'
+      ) {
+        return proposeMerchAction({
+          action: params.action,
+          merchCardId,
           profileId: params.profileId,
-          clerkUserId: params.clerkUserId,
         });
-        return {
-          success: true as const,
-          merchCardId: card.id,
-          status: card.status,
-          title: card.title,
-        };
       }
 
       const status = getMerchCardUpdateStatus(params.action);
@@ -1314,15 +1312,27 @@ function createMerchUpdateTool(params: {
         description: input.description,
         primaryImageUrl: input.primaryImageUrl,
         retailPriceCents: input.retailPriceCents,
-        makeLive: input.makeLive,
+        makeLive: false,
       });
-      return {
+
+      const result = {
         success: true as const,
         merchCardId: card.id,
         status: card.status,
         title: card.title,
         retailPrice: formatMerchMoney(card.retailPriceCents),
       };
+
+      if (input.makeLive === true) {
+        const publishProposal = await proposeMerchAction({
+          action: 'publish',
+          merchCardId: card.id,
+          profileId: params.profileId,
+        });
+        return { ...result, publishProposal };
+      }
+
+      return result;
     },
   });
 }
