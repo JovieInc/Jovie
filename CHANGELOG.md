@@ -5,6 +5,14 @@
      5|The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
      6|and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.6.39] - 2026-06-11
+
+> Codex issue shipper dispatch is gated, sandboxed, and resilient to GBrain capture failures.
+
+### Fixed
+
+- **Codex issue shipper hardening**: requires the maintainer-applied `codex-approved` label before dispatch, bounds untrusted issue prompt text, runs Codex with a workspace-write sandbox and explicit approval policy, exits nonzero on fatal job failures, and lets dispatch continue when GBrain capture fails instead of retry-looping the issue.
+
 ## [26.6.38] - 2026-06-11
 
 > Admin execution actions now use neutral System B primary button surfaces instead of raw colored fills.

@@ -2,8 +2,9 @@
 /**
  * Codex Issue Shipper — Hermes-Air
  *
- * Watches open GitHub issues labeled `codex`, claims one eligible issue, writes
- * dispatch context to gbrain, then starts a coder-profile agent to ship it.
+ * Watches open GitHub issues labeled `codex` and `codex-approved`, claims one
+ * eligible issue, writes dispatch context to gbrain, then starts a
+ * coder-profile agent to ship it.
  *
  * The empty-queue path is intentionally cheap: GitHub scan, log, exit. No
  * gbrain query, model call, subagent, or CodeRabbit work happens unless an
@@ -30,6 +31,7 @@ import {
   buildGbrainQuery,
   CODEX_BLOCKED_LABEL,
   CODEX_CLAIM_LABEL,
+  CODEX_TRUSTED_LABEL,
   type DispatchPlan,
   type GbrainContext,
   type GithubIssue,
@@ -202,6 +204,12 @@ function ensureControlLabels(config: ShipperConfig): void {
     CODEX_BLOCKED_LABEL,
     'd1242f',
     'Codex issue shipper hit a real blocker and will not retry automatically'
+  );
+  ensureLabel(
+    config,
+    CODEX_TRUSTED_LABEL,
+    '0e8a16',
+    'Maintainer approval for the local codex issue shipper to run an agent'
   );
 }
 
@@ -392,19 +400,29 @@ function collectGbrainContext(plan: DispatchPlan): GbrainContext {
     .replace(/Z$/, 'z');
   const slug = `ops/codex-issue-shipper/github-${plan.issue.number}-${timestamp}`;
   const captureText = buildGbrainCaptureText(plan.issue);
-  const captureOut = execFileSync(
-    bin,
-    ['capture', '--stdin', '--type', 'report', '--slug', slug, '--json'],
-    {
-      encoding: 'utf8',
-      input: captureText,
-      timeout: 30_000,
-      maxBuffer: 256 * 1024,
-    }
-  );
+  let captureSlug = slug;
+  try {
+    const captureOut = execFileSync(
+      bin,
+      ['capture', '--stdin', '--type', 'report', '--slug', slug, '--json'],
+      {
+        encoding: 'utf8',
+        input: captureText,
+        timeout: 30_000,
+        maxBuffer: 256 * 1024,
+      }
+    );
+    captureSlug = gbrainCaptureSlug(captureOut, slug);
+  } catch (err) {
+    const captureError = `gbrain capture failed: ${shortError(err)}`;
+    queryResult = [queryResult.trim(), captureError]
+      .filter(Boolean)
+      .join('\n\n');
+    captureSlug = `${slug} (capture failed)`;
+  }
 
   return {
-    captureSlug: gbrainCaptureSlug(captureOut, slug),
+    captureSlug,
     queryText,
     queryResult,
   };
@@ -679,5 +697,5 @@ void main().catch(err => {
     stack: err instanceof Error ? err.stack : undefined,
   });
   console.error(`[${JOB}] fatal:`, err);
-  process.exit(0); // never loop launchd on transient failures
+  process.exit(1);
 });
