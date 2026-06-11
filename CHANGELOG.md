@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.6.46] - 2026-06-11
+
+> Merch confirmation actions in chat now use the neutral System B primary button surface.
+
+### Fixed
+
+- **Chat merch neutral action**: moves non-destructive merch confirmation buttons from raw primary color fills onto neutral primary button tokens while preserving the destructive archive styling.
+
 ## [26.6.45] - 2026-06-11
 
 > The post-onboarding interview modal now uses shared System B surfaces and controls.

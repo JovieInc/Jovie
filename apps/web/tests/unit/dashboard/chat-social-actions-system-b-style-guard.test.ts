@@ -6,6 +6,7 @@ const appRoot = resolve(__dirname, '../../..');
 
 const actionSourcePaths = [
   'components/jovie/components/ChatLinkConfirmationCard.tsx',
+  'components/jovie/components/ChatMerchActionCard.tsx',
   'components/features/dashboard/organisms/socials-form/SocialLinkSuggestionRows.tsx',
 ] as const;
 
@@ -17,6 +18,8 @@ const forbiddenCentralActionPatterns = [
   /hover:bg-accent\/90/,
   /text-on-accent/,
   /text-white/,
+  /bg-primary text-primary-foreground/,
+  /hover:bg-primary\/90/,
   /\bbg-(?:blue|purple|violet|indigo)-\d/,
 ] as const;
 
