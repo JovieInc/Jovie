@@ -23,6 +23,13 @@ describe('DisplayMenuDropdown System B style guard', () => {
   it('keeps switch state transitions layout-stable', () => {
     const source = readFileSync(sourcePath, 'utf8');
 
+    expect(source).toContain('transition-[background-color]');
+    expect(source).toContain('hover:bg-surface-1');
+    expect(source).toContain('focus-visible:bg-surface-1');
+    expect(source).toContain('focus-visible:outline-none');
+    expect(source).toContain(
+      'focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)'
+    );
     expect(source).toContain('h-4 w-7 shrink-0');
     expect(source).toContain('h-3 w-3 rounded-full');
     expect(source).toContain('translate-x-3');
