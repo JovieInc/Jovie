@@ -3,6 +3,20 @@ import { normalizeEmail } from '@/lib/utils/email';
 
 export interface ClerkEmailAddress {
   emailAddress?: string | null;
+  verification?: { status?: string | null } | null;
+}
+
+/**
+ * Prefer a verified Clerk email over `emailAddresses[0]` or primary.
+ * Unverified addresses must not drive identity-sensitive DB rebinding.
+ */
+export function selectVerifiedClerkEmail(
+  emailAddresses: ReadonlyArray<ClerkEmailAddress> | null | undefined
+): string | null {
+  return (
+    emailAddresses?.find(e => e.verification?.status === 'verified')
+      ?.emailAddress ?? null
+  );
 }
 
 export interface ClerkPrivateMetadata {

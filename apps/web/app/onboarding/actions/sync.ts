@@ -1,5 +1,8 @@
 /**
- * Background sync operations for onboarding
+ * Background sync operations for onboarding.
+ * Prefer finalizePostOnboarding() in post-onboarding.ts for durable,
+ * bounded sync + trial activation that survives redirect().
+ *
  * Note: This is a helper module, not a Server Action file.
  * It's called internally by server actions, not from the client.
  */

@@ -158,24 +158,21 @@ export function OnboardingTurnstile({
     [onStateChange]
   );
 
-  const resetWidget = useCallback(
-    (message = 'Verification reset. Complete the check to retry.') => {
-      const widgetId = widgetIdRef.current;
-      const turnstile = getTurnstile();
-      if (widgetId && turnstile) {
-        try {
-          turnstile.reset(widgetId);
-          commitState({ status: 'loading', message });
-          return;
-        } catch (err) {
-          widgetIdRef.current = null;
-          console.error('[onboarding] turnstile reset error', err);
-        }
+  const clearWidget = useCallback(() => {
+    const widgetId = widgetIdRef.current;
+    const turnstile = getTurnstile();
+    if (widgetId && turnstile) {
+      try {
+        turnstile.remove(widgetId);
+      } catch (err) {
+        console.error('[onboarding] turnstile remove error', err);
       }
-      commitState({ status: 'loading', message });
-    },
-    [commitState]
-  );
+    }
+    widgetIdRef.current = null;
+    if (containerRef.current) {
+      containerRef.current.replaceChildren();
+    }
+  }, []);
 
   const render = useCallback(() => {
     if (shouldBypassTurnstile || !siteKey) return; // local fallback handled server-side
@@ -203,9 +200,6 @@ export function OnboardingTurnstile({
             status: 'expired',
             message: 'Verification expired. Complete the check again to send.',
           });
-          resetWidget(
-            'Verification expired. Complete the check again to send.'
-          );
         },
         'timeout-callback': () =>
           commitState({
@@ -236,7 +230,16 @@ export function OnboardingTurnstile({
       });
       console.error('[onboarding] turnstile render error', err);
     }
-  }, [commitState, onToken, resetWidget, shouldBypassTurnstile, siteKey]);
+  }, [commitState, onToken, shouldBypassTurnstile, siteKey]);
+
+  const resetWidget = useCallback(
+    (message = 'Verification reset. Complete the check to retry.') => {
+      clearWidget();
+      commitState({ status: 'loading', message });
+      render();
+    },
+    [clearWidget, commitState, render]
+  );
 
   useEffect(() => {
     if (shouldBypassTurnstile) {

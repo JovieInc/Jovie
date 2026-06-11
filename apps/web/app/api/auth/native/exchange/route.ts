@@ -80,8 +80,19 @@ function isNotFoundError(error: unknown): boolean {
     return false;
   }
 
-  const record = error as { status?: unknown; statusCode?: unknown };
-  return record.status === 404 || record.statusCode === 404;
+  const record = error as {
+    status?: unknown;
+    statusCode?: unknown;
+    message?: unknown;
+  };
+  if (record.status === 404 || record.statusCode === 404) {
+    return true;
+  }
+
+  return (
+    typeof record.message === 'string' &&
+    record.message.toLowerCase().includes('not found')
+  );
 }
 
 function hasClerkErrorCode(error: unknown, code: string): boolean {

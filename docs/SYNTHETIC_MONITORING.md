@@ -8,7 +8,7 @@ Synthetic monitoring runs automated tests against production to make sure a real
 
 The production suite is split by responsibility:
 
-- `synthetic-auth-ui.spec.ts` validates that Google/Apple auth surfaces and provider handoff initiation are healthy.
+- `synthetic-auth-ui.spec.ts` validates that Google/Apple SSO buttons, the intentional email/identifier auth surface, and provider handoff initiation are healthy.
 - `synthetic-golden-path.spec.ts` validates the public front-door signup journey.
 - `onboarding-robot.full.spec.ts` validates app behavior after Clerk authentication: profile creation, dashboard load, public profile load, welcome-chat continuity, and exact cleanup.
 - `public-profile-smoke.spec.ts` validates the public profile rendering baseline.
