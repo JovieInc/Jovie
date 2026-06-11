@@ -132,6 +132,18 @@ require_cmd gh
 require_cmd jq
 require_cmd sqlite3
 require_cmd curl
+require_cmd node
+
+NODE_VERSION="$(node --version)"
+if [[ ! "$NODE_VERSION" =~ ^v22\.([0-9]+)\.([0-9]+) ]]; then
+  die "Node 22.x required, found $NODE_VERSION. Run: nvm use 22 && corepack prepare pnpm@9.15.4 --activate"
+fi
+NODE_MINOR="${BASH_REMATCH[1]}"
+if (( 10#$NODE_MINOR < 13 )); then
+  die "Node >=22.13.0 required, found $NODE_VERSION. Run: nvm use 22 && corepack prepare pnpm@9.15.4 --activate"
+fi
+ok "Node $NODE_VERSION supported"
+NODE_BIN_DIR="$(dirname "$(command -v node)")"
 
 # 2. Doppler auth + scope
 doppler setup --project "$DOPPLER_PROJECT" --config "$DOPPLER_CONFIG" --no-interactive >/dev/null
@@ -220,6 +232,7 @@ else
   HERMES_BIN="$(command -v hermes || echo /usr/local/bin/hermes)"
   GBRAIN_BIN="$(command -v gbrain || echo /usr/local/bin/gbrain)"
   TSX_BIN="$(command -v tsx || echo "${REPO_ROOT}/node_modules/.bin/tsx")"
+  NODE_BIN_DIR="$(dirname "$(command -v node)")"
   TAILSCALE_IP="$(tailscale ip -4 2>/dev/null | head -1 || echo 127.0.0.1)"
 fi
 
@@ -295,7 +308,7 @@ for tmpl in "${REPO_ROOT}/scripts/hermes/launchd/"*.plist.template; do
   out="${LAUNCH_AGENTS}/${label}.plist"
   # Python substitution is safer than sed for paths that may contain |, &, /, etc.
   HOME_V="$HOME" REPO_V="$REPO_ROOT" HERMES_V="$HERMES_BIN" \
-  GBRAIN_V="$GBRAIN_BIN" TSX_V="$TSX_BIN" TS_IP_V="$TAILSCALE_IP" \
+  GBRAIN_V="$GBRAIN_BIN" TSX_V="$TSX_BIN" NODE_BIN_V="$NODE_BIN_DIR" TS_IP_V="$TAILSCALE_IP" \
   python3 - "$tmpl" "$out" <<'PYEOF'
 import os, sys
 src, dst = sys.argv[1], sys.argv[2]
@@ -305,6 +318,7 @@ mapping = {
     "{{HERMES_BIN}}": os.environ["HERMES_V"],
     "{{GBRAIN_BIN}}": os.environ["GBRAIN_V"],
     "{{TSX_BIN}}": os.environ["TSX_V"],
+    "{{NODE_BIN_DIR}}": os.environ["NODE_BIN_V"],
     "{{TAILSCALE_IP}}": os.environ["TS_IP_V"],
 }
 with open(src, "r") as f:
