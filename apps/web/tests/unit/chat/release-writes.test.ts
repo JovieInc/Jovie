@@ -55,7 +55,16 @@ describe('owned release writes', () => {
     const updated = await updateOwnedReleaseGeneratedPitches({
       releaseId: 'release-1',
       creatorProfileId: 'profile-a',
-      generatedPitches: { body: 'pitch' },
+      generatedPitches: {
+        target: 'playlist',
+        platform: 'spotify',
+        destinationLabel: 'Spotify Editorial',
+        audience: 'indie listeners',
+        subjectLine: null,
+        body: 'pitch',
+        generatedAt: '2026-06-11T00:00:00.000Z',
+        modelUsed: 'test-model',
+      },
     });
 
     expect(updated).toBe(false);
@@ -71,7 +80,16 @@ describe('owned release writes', () => {
     const updated = await updateOwnedReleaseGeneratedPitches({
       releaseId: 'release-1',
       creatorProfileId: 'profile-a',
-      generatedPitches: { body: 'pitch' },
+      generatedPitches: {
+        target: 'playlist',
+        platform: 'spotify',
+        destinationLabel: 'Spotify Editorial',
+        audience: 'indie listeners',
+        subjectLine: null,
+        body: 'pitch',
+        generatedAt: '2026-06-11T00:00:00.000Z',
+        modelUsed: 'test-model',
+      },
     });
 
     expect(updated).toBe(true);

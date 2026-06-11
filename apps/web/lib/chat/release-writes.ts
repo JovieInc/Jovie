@@ -3,6 +3,7 @@ import 'server-only';
 import { and, eq } from 'drizzle-orm';
 import { db } from '@/lib/db';
 import { discogReleases } from '@/lib/db/schema/content';
+import type { GeneratedPitchDraft } from '@/lib/services/pitch/types';
 
 /** WHERE clause that re-asserts profile ownership on release writes. */
 export function ownedReleaseWhere(releaseId: string, creatorProfileId: string) {
@@ -31,7 +32,7 @@ export async function updateOwnedReleaseMetadata(input: {
 export async function updateOwnedReleaseGeneratedPitches(input: {
   releaseId: string;
   creatorProfileId: string;
-  generatedPitches: unknown;
+  generatedPitches: GeneratedPitchDraft;
 }): Promise<boolean> {
   const result = await db
     .update(discogReleases)
