@@ -342,7 +342,7 @@ async function ensureBoardViewMode(page: Page): Promise<void> {
   const displayOptions = page.getByRole('button', { name: 'Display options' });
   await expect(displayOptions).toBeVisible({ timeout: 90_000 });
   await displayOptions.click();
-  await page.getByRole('button', { name: 'Board view' }).click();
+  await page.getByRole('button', { name: 'Board View' }).click();
   await expect(board).toBeVisible({ timeout: 90_000 });
 }
 
@@ -564,7 +564,7 @@ test.describe('Tasks layout', () => {
       });
 
       await page.getByRole('button', { name: 'Display options' }).click();
-      await page.getByRole('button', { name: 'Board view' }).click();
+      await page.getByRole('button', { name: 'Board View' }).click();
 
       await expect(page.getByTestId('tasks-board')).toBeVisible({
         timeout: 60_000,

@@ -91,7 +91,7 @@ vi.mock('@/components/organisms/table/molecules/DisplayMenuDropdown', () => ({
     <div>
       {trigger}
       <button type='button' onClick={() => onViewModeChange?.('list')}>
-        List view
+        List View
       </button>
     </div>
   ),
@@ -165,7 +165,7 @@ describe('TaskWorkspaceHeaderBar', () => {
 
     render(<TaskWorkspaceHeaderBar {...props} mode='default' />);
 
-    fireEvent.click(screen.getByRole('button', { name: 'List view' }));
+    fireEvent.click(screen.getByRole('button', { name: 'List View' }));
 
     expect(props.onViewModeChange).toHaveBeenCalledWith('list');
   });
