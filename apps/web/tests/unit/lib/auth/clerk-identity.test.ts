@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest';
 
-import { resolveClerkIdentity } from '@/lib/auth/clerk-identity';
+import {
+  resolveClerkIdentity,
+  selectVerifiedClerkEmail,
+} from '@/lib/auth/clerk-identity';
 
 describe('resolveClerkIdentity', () => {
   it('prefers privateMetadata.fullName over other name sources', () => {
@@ -143,5 +146,33 @@ describe('resolveClerkIdentity', () => {
 
     expect(identity.displayName).toBe('user123');
     expect(identity.displayNameSource).toBe('clerk_username');
+  });
+});
+
+describe('selectVerifiedClerkEmail', () => {
+  it('returns the verified address instead of emailAddresses[0]', () => {
+    const email = selectVerifiedClerkEmail([
+      {
+        emailAddress: 'unverified@example.com',
+        verification: { status: 'unverified' },
+      },
+      {
+        emailAddress: 'verified@example.com',
+        verification: { status: 'verified' },
+      },
+    ]);
+
+    expect(email).toBe('verified@example.com');
+  });
+
+  it('returns null when no verified email exists', () => {
+    expect(
+      selectVerifiedClerkEmail([
+        {
+          emailAddress: 'unverified@example.com',
+          verification: { status: 'unverified' },
+        },
+      ])
+    ).toBeNull();
   });
 });
