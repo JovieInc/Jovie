@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.6.49] - 2026-06-11
+
+> Calendar date selection uses neutral System B controls.
+
+### Fixed
+
+- **Calendar neutral selected date**: moves selected days and calendar focus rings off accent tokens onto neutral System B button and ring tokens while preserving fixed day and navigation control dimensions.
+
 ## [26.6.48] - 2026-06-11
 
 > Display menu switches use neutral System B controls.

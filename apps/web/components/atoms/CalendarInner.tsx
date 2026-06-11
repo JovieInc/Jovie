@@ -35,12 +35,12 @@ export default function CalendarInner({
         button_previous: cn(
           'inline-flex h-6 w-6 items-center justify-center rounded-md text-secondary-token',
           'hover:bg-interactive-hover hover:text-primary-token transition-colors',
-          'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent'
+          'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring'
         ),
         button_next: cn(
           'inline-flex h-6 w-6 items-center justify-center rounded-md text-secondary-token',
           'hover:bg-interactive-hover hover:text-primary-token transition-colors',
-          'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent'
+          'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring'
         ),
         month_grid: 'w-full border-collapse',
         weekdays: 'flex',
@@ -51,11 +51,11 @@ export default function CalendarInner({
         day_button: cn(
           'inline-flex h-8 w-8 items-center justify-center rounded-md text-app font-normal text-primary-token',
           'hover:bg-interactive-hover transition-colors',
-          'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent'
+          'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring'
         ),
         selected:
-          '[&>button]:bg-accent [&>button]:text-accent-foreground [&>button]:hover:bg-accent [&>button]:font-medium',
-        today: '[&>button]:text-accent [&>button]:font-medium',
+          '[&>button]:bg-btn-primary [&>button]:text-btn-primary-foreground [&>button]:hover:bg-btn-primary-hover [&>button]:font-medium',
+        today: '[&>button]:text-primary-token [&>button]:font-medium',
         outside: '[&>button]:text-tertiary-token [&>button]:opacity-50',
         disabled: '[&>button]:opacity-40 [&>button]:pointer-events-none',
         hidden: 'invisible',
