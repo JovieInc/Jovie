@@ -57,13 +57,15 @@ vi.mock('next/dynamic', () => ({
     },
 }));
 
+const mockRouter = {
+  push: vi.fn(),
+  replace: mockReplace,
+  back: vi.fn(),
+  refresh: vi.fn(),
+};
+
 vi.mock('next/navigation', () => ({
-  useRouter: () => ({
-    push: vi.fn(),
-    replace: mockReplace,
-    back: vi.fn(),
-    refresh: vi.fn(),
-  }),
+  useRouter: () => mockRouter,
   useSearchParams: () => mockSearchParams,
   usePathname: () => '/app/chat',
 }));
@@ -531,5 +533,30 @@ describe('ChatPageClient', () => {
     expect(await screen.findByRole('status')).toHaveTextContent(
       'Starting your onboarding chat.'
     );
+  });
+
+  it('does not show a destructive toast after welcome chat bootstrap retries exhaust', async () => {
+    vi.useFakeTimers();
+    mockSearchParams = new URLSearchParams('from=onboarding');
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(() =>
+        Promise.resolve(
+          new Response(null, {
+            status: 503,
+            statusText: 'Service Unavailable',
+          })
+        )
+      )
+    );
+
+    renderChatPage();
+
+    // 1500 + 3000 + 5000ms retry delays, plus buffer for fetch microtasks.
+    await vi.advanceTimersByTimeAsync(10_000);
+    await vi.runOnlyPendingTimersAsync();
+
+    expect(mockErrorNotification).not.toHaveBeenCalled();
+    expect(screen.queryByRole('alert')).toBeNull();
   });
 });

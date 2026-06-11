@@ -30,11 +30,13 @@ import { ChatProvidersRegistrar } from './components/ChatProvidersRegistrar';
 import { ChatUsageAlert } from './components/ChatUsageAlert';
 import { EntityResolutionProvider } from './components/EntityResolutionProvider';
 import {
+  useChatAudioAttachments,
   useChatImageAttachments,
   useChatJankMonitor,
   useJovieChat,
   useStickToBottom,
 } from './hooks';
+import type { ChatAudioUploadResult } from './hooks/useChatAudioAttachments';
 import type { JovieChatProps } from './types';
 
 const VIRTUALIZATION_THRESHOLD = 12;
@@ -66,6 +68,7 @@ export function JovieChat({
   const initialQuerySubmitted = useRef(false);
   const initialSkillApplied = useRef(false);
   const imageFileInputRef = useRef<HTMLInputElement>(null);
+  const audioFileInputRef = useRef<HTMLInputElement>(null);
   const [composerPickerOpen, setComposerPickerOpen] = useState(false);
   // Track message IDs that were loaded from persistence to skip entrance animation
   const knownMessageIdsRef = useRef<Set<string>>(new Set());
@@ -98,21 +101,6 @@ export function JovieChat({
     username,
   });
 
-  // Image attachments for chat messages
-  const {
-    pendingImages,
-    isDragOver,
-    isProcessing: isImageProcessing,
-    addFiles,
-    removeImage,
-    clearImages,
-    toFileUIParts,
-    dropZoneRef,
-  } = useChatImageAttachments({
-    onError: error => setChatError({ type: 'unknown', message: error }),
-    disabled: isLoading || isSubmitting,
-  });
-
   // ─── Sticky scroll via ResizeObserver ────────────────────────────
   const {
     isStuckToBottom,
@@ -135,8 +123,62 @@ export function JovieChat({
     enabled: jankMonitorEnabled,
   });
 
+  const handleAudioUploaded = useCallback(
+    (result: ChatAudioUploadResult) => {
+      const focusKey = `audio-upload:${result.releaseId}`;
+      chatEntityPanel?.upsertContext({
+        kind: 'release',
+        id: result.releaseId,
+        label: result.releaseTitle,
+        source: 'route-hint',
+        focusKey,
+      });
+      chatEntityPanel?.open({
+        kind: 'release',
+        id: result.releaseId,
+        label: result.releaseTitle,
+        source: 'route-hint',
+        focusKey,
+      });
+      notifyJankSend();
+      void submitMessage(result.prompt);
+    },
+    [chatEntityPanel, notifyJankSend, submitMessage]
+  );
+
+  const {
+    pendingAudio,
+    isProcessing: isAudioProcessing,
+    addFiles: addAudioFiles,
+    clearAudio,
+    accept: audioAccept,
+  } = useChatAudioAttachments({
+    onError: error => setChatError({ type: 'unknown', message: error }),
+    onUploaded: handleAudioUploaded,
+    disabled: isLoading || isSubmitting,
+  });
+
+  const {
+    pendingImages,
+    isDragOver,
+    isProcessing: isImageProcessing,
+    addFiles,
+    removeImage,
+    clearImages,
+    toFileUIParts,
+    dropZoneRef,
+  } = useChatImageAttachments({
+    onError: error => setChatError({ type: 'unknown', message: error }),
+    onAudioFiles: addAudioFiles,
+    disabled: isLoading || isSubmitting,
+  });
+
   const openImagePicker = useCallback(() => {
     imageFileInputRef.current?.click();
+  }, []);
+
+  const openAudioPicker = useCallback(() => {
+    audioFileInputRef.current?.click();
   }, []);
 
   const handleImageFileChange = useCallback(
@@ -145,6 +187,14 @@ export function JovieChat({
       e.target.value = '';
     },
     [addFiles]
+  );
+
+  const handleAudioFileChange = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      if (e.target.files) addAudioFiles(e.target.files);
+      e.target.value = '';
+    },
+    [addAudioFiles]
   );
 
   const handlePaste = useCallback(
@@ -392,9 +442,13 @@ export function JovieChat({
     isStreaming,
     onStop: stop,
     onImageAttach: openImagePicker,
+    onAudioAttach: openAudioPicker,
     isImageProcessing,
+    isAudioProcessing,
     pendingImages,
+    pendingAudio,
     onRemoveImage: removeImage,
+    onRemoveAudio: clearAudio,
     onPaste: handlePaste,
     chips: chipTray.chips,
     onRemoveChipAt: chipTray.removeAt,
@@ -452,13 +506,21 @@ export function JovieChat({
         {/* Registers entity providers (release, artist) for the slash menu */}
         {profileId ? <ChatProvidersRegistrar profileId={profileId} /> : null}
 
-        {/* Hidden file input for image attachments */}
+        {/* Hidden file inputs for composer attachments */}
         <input
           ref={imageFileInputRef}
           type='file'
           accept={SUPPORTED_IMAGE_MIME_TYPES.join(',')}
           onChange={handleImageFileChange}
           multiple
+          className='hidden'
+          tabIndex={-1}
+        />
+        <input
+          ref={audioFileInputRef}
+          type='file'
+          accept={audioAccept}
+          onChange={handleAudioFileChange}
           className='hidden'
           tabIndex={-1}
         />
@@ -482,10 +544,11 @@ export function JovieChat({
                 />
                 <div>
                   <p className='text-sm font-semibold text-primary-token'>
-                    Drop images to attach
+                    Drop files to attach
                   </p>
                   <p className='mt-1 text-xs leading-5 text-secondary-token'>
-                    Up to 4 images, 10 MB each.
+                    Images up to 4 files / 10 MB each, or one audio file up to
+                    150 MB.
                   </p>
                 </div>
               </div>
