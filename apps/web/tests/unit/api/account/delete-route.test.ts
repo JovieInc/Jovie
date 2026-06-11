@@ -170,13 +170,18 @@ describe('POST /api/account/delete', () => {
     expect(response.status).toBe(404);
   });
 
-  it('returns 409 when already deleted', async () => {
+  it('retries idempotently when account was partially deleted', async () => {
     selectResults.queue.push([{ id: 'user_1', deletedAt: new Date() }]);
+    selectResults.queue.push([{ usernameNormalized: 'testartist' }]);
 
     const { POST } = await import('@/app/api/account/delete/route');
     const response = await POST(makeRequest({ confirmation: 'DELETE' }));
 
-    expect(response.status).toBe(409);
+    expect(response.status).toBe(200);
+    const json = await response.json();
+    expect(json.success).toBe(true);
+    expect(mockDbDelete).toHaveBeenCalledTimes(4);
+    expect(mockDbUpdate).not.toHaveBeenCalled();
   });
 
   it('successfully deletes user and all associated data', async () => {
@@ -192,11 +197,12 @@ describe('POST /api/account/delete', () => {
     const json = await response.json();
     expect(json.success).toBe(true);
 
-    // Verify user was anonymized (update called)
-    expect(mockDbUpdate).toHaveBeenCalled();
-
-    // Verify deletes were called (creatorProfiles + preSaveTokens + feedbackItems + emailSuppressions = 4)
+    // Verify dependent rows are removed before the user success-fence
     expect(mockDbDelete).toHaveBeenCalledTimes(4);
+    expect(mockDbUpdate).toHaveBeenCalled();
+    expect(mockDbDelete.mock.invocationCallOrder[0]).toBeLessThan(
+      mockDbUpdate.mock.invocationCallOrder[0]
+    );
 
     // Verify handle cache was invalidated
     expect(mockInvalidateHandleCache).toHaveBeenCalledWith('testartist');

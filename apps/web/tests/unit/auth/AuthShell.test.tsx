@@ -215,9 +215,7 @@ describe('AuthShell — app-owned SSO + email-code contract', () => {
     });
 
     await user.type(emailInput, 'artist@example.com');
-    await user.click(
-      screen.getByRole('button', { name: /email me a code/i })
-    );
+    await user.click(screen.getByRole('button', { name: /email me a code/i }));
 
     await waitFor(() => {
       expect(signInEmailCodeSendMock).toHaveBeenCalledWith({

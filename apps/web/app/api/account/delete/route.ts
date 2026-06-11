@@ -32,6 +32,13 @@ interface DeleteAccountBody {
  * Allows users to delete their own account and all associated data.
  *
  * Requires confirmation text "DELETE" in the request body.
+ *
+ * Deletion is idempotent: a prior partial failure can be retried safely.
+ * Dependent rows are removed first; `users.deletedAt` is written last as a
+ * success-fence so a mid-chain error never leaves a banned limbo account.
+ *
+ * `setupDbSession` scopes RLS to the authenticated Clerk user — all deletes
+ * below must filter by the resolved `user.id` from that session.
  */
 export async function POST(request: Request) {
   const { userId: clerkUserId } = await getCachedAuth();
@@ -89,30 +96,7 @@ export async function POST(request: Request) {
       );
     }
 
-    if (user.deletedAt) {
-      return NextResponse.json(
-        { error: 'Account is already deleted' },
-        { status: 409, headers: NO_STORE_HEADERS }
-      );
-    }
-
     const now = new Date();
-
-    // Soft-delete: anonymize all personal data and mark as deleted
-    // GDPR requires removal of all PII - we retain only structural fields
-    await db
-      .update(users)
-      .set({
-        name: null,
-        email: null,
-        stripeCustomerId: null,
-        stripeSubscriptionId: null,
-        waitlistEntryId: null,
-        deletedAt: now,
-        userStatus: 'banned',
-        updatedAt: now,
-      })
-      .where(eq(users.id, user.id));
 
     // Fetch usernames before deletion so we can invalidate handle availability cache
     const profiles = await db
@@ -120,15 +104,31 @@ export async function POST(request: Request) {
       .from(creatorProfiles)
       .where(eq(creatorProfiles.userId, user.id));
 
-    // Delete creator profiles (cascades to links, contacts, analytics)
+    // Delete dependent data first — users.deletedAt is the success-fence below
     await db.delete(creatorProfiles).where(eq(creatorProfiles.userId, user.id));
-
-    // Clean up orphaned user data (tables with onDelete: 'set null')
     await db.delete(preSaveTokens).where(eq(preSaveTokens.userId, user.id));
     await db.delete(feedbackItems).where(eq(feedbackItems.userId, user.id));
     await db
       .delete(emailSuppressions)
       .where(eq(emailSuppressions.createdBy, user.id));
+
+    if (!user.deletedAt) {
+      // Soft-delete: anonymize all personal data and mark as deleted
+      // GDPR requires removal of all PII - we retain only structural fields
+      await db
+        .update(users)
+        .set({
+          name: null,
+          email: null,
+          stripeCustomerId: null,
+          stripeSubscriptionId: null,
+          waitlistEntryId: null,
+          deletedAt: now,
+          userStatus: 'banned',
+          updatedAt: now,
+        })
+        .where(eq(users.id, user.id));
+    }
 
     // Invalidate handle availability cache so deleted usernames become available
     for (const profile of profiles) {
