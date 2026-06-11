@@ -1,6 +1,6 @@
 {
   "name": "@jovie/docs",
-  "version": "26.6.35",
+  "version": "26.6.36",
   "private": true,
   "sideEffects": false,
   "engines": {

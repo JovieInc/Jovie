@@ -5,6 +5,14 @@
      5|The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
      6|and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.6.36] - 2026-06-11
+
+> Settings SMS access requests now use the neutral System B primary button instead of a colored fill.
+
+### Fixed
+
+- **Settings SMS neutral action (JOV-3031)**: replaces the colored `bg-primary-token` request CTA in the SMS access settings section with neutral primary button tokens, keeping accent color reserved for the surrounding informational state.
+
 ## [26.6.35] - 2026-06-11
 
 > Dashboard header creation actions now use neutral toolbar controls instead of colored fills.
