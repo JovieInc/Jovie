@@ -10,7 +10,16 @@ log() { echo "[$(date -u +%Y-%m-%dT%H:%M:%SZ)] $*" | tee -a "$LOG/orchestrator.l
 open_prs() { gh pr list --state open --json number --jq 'length' 2>/dev/null || echo 999; }
 eligible_todos() {
   if [[ ! -f "$ROOT/scripts/linear-query-todo.mjs" ]]; then echo 999; return; fi
-  doppler run --project jovie-web --config dev -- node "$ROOT/scripts/linear-query-todo.mjs" 2>/dev/null | wc -l | tr -d ' '
+  local output
+  if ! output="$(doppler run --project jovie-web --config dev -- node "$ROOT/scripts/linear-query-todo.mjs" 2>/dev/null)"; then
+    echo 999
+    return
+  fi
+  if [[ -z "$output" ]]; then
+    echo 0
+    return
+  fi
+  printf '%s\n' "$output" | wc -l | tr -d ' '
 }
 log "orchestrator start interval=${INTERVAL}s pid=$$"
 while true; do

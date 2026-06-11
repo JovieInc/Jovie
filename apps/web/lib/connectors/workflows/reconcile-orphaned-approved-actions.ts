@@ -42,18 +42,24 @@ export async function enqueueApprovedActionWorkflow(input: {
   userId: string;
   approvalId: string;
   eventPayload: BookingPayload | null;
-}): Promise<void> {
-  await db.insert(workflowRuns).values({
-    kind: 'execute_approved_action',
-    userId: input.userId,
-    status: 'queued',
-    currentStep: 'create_calendar_event',
-    stepOutputs: {
-      approvalId: input.approvalId,
-      eventPayload: input.eventPayload,
-    },
-    runAt: new Date(),
-  });
+}): Promise<'enqueued' | 'already-queued'> {
+  const inserted = await db
+    .insert(workflowRuns)
+    .values({
+      kind: 'execute_approved_action',
+      userId: input.userId,
+      status: 'queued',
+      currentStep: 'create_calendar_event',
+      stepOutputs: {
+        approvalId: input.approvalId,
+        eventPayload: input.eventPayload,
+      },
+      runAt: new Date(),
+    })
+    .onConflictDoNothing()
+    .returning({ id: workflowRuns.id });
+
+  return inserted.length > 0 ? 'enqueued' : 'already-queued';
 }
 
 export async function recoverOrphanedApprovedAction(input: {
@@ -94,11 +100,15 @@ export async function recoverOrphanedApprovedAction(input: {
     return 'already-queued';
   }
 
-  await enqueueApprovedActionWorkflow({
+  const enqueueResult = await enqueueApprovedActionWorkflow({
     userId: action.userId,
     approvalId: action.id,
     eventPayload: action.payload as BookingPayload | null,
   });
+
+  if (enqueueResult === 'already-queued') {
+    return 'already-queued';
+  }
 
   logger.info('[reconcile] recovered orphaned accepted suggested_action', {
     approvalId: input.approvalId,
@@ -128,12 +138,14 @@ export async function reconcileOrphanedAcceptedActions(
 
   let enqueued = 0;
   for (const action of orphaned) {
-    await enqueueApprovedActionWorkflow({
+    const enqueueResult = await enqueueApprovedActionWorkflow({
       userId: action.userId,
       approvalId: action.id,
       eventPayload: action.payload as BookingPayload | null,
     });
-    enqueued++;
+    if (enqueueResult === 'enqueued') {
+      enqueued++;
+    }
   }
 
   if (enqueued > 0) {

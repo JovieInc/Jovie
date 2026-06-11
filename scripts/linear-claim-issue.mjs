@@ -11,6 +11,12 @@ async function gql(q, v = {}) {
     headers: { 'Content-Type': 'application/json', Authorization: key },
     body: JSON.stringify({ query: q, variables: v }),
   });
+  if (!r.ok) {
+    const body = await r.text();
+    throw new Error(
+      `Linear API request failed (${r.status} ${r.statusText}): ${body}`
+    );
+  }
   const d = await r.json();
   if (d.errors) throw new Error(JSON.stringify(d.errors));
   return d.data;
@@ -19,8 +25,17 @@ const { issues } = await gql(
   `query($n: Float!) { issues(filter: { team: { key: { eq: "JOV" } }, number: { eq: $n } }, first: 1) { nodes { id identifier team { states { nodes { id name } } } } } }`,
   { n: Number.parseInt(m[1], 10) }
 );
-const issue = issues.nodes[0];
-const st = issue.team.states.nodes.find(s => /in progress/i.test(s.name));
+const issue = issues?.nodes?.[0];
+if (!issue) {
+  throw new Error(`Linear issue ${identifier.toUpperCase()} not found`);
+}
+const states = issue.team?.states?.nodes ?? [];
+const st = states.find(s => /in progress/i.test(s.name));
+if (!st) {
+  throw new Error(
+    `Linear "In Progress" state not found for ${issue.identifier}`
+  );
+}
 await gql(
   `mutation($id: String!, $sid: String!) { issueUpdate(id: $id, input: { stateId: $sid }) { success } }`,
   { id: issue.id, sid: st.id }

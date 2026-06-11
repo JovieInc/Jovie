@@ -39,7 +39,7 @@ export async function uploadBufferToBlob(
   const token = env.BLOB_READ_WRITE_TOKEN;
 
   if (!put || !token) {
-    if (env.NODE_ENV === 'production') {
+    if (process.env.NODE_ENV === 'production') {
       throw new TypeError('Blob storage not configured');
     }
     logger.warn(
