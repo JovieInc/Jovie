@@ -35,7 +35,7 @@ import { isSecureEnv } from '@/lib/env-server';
 import { captureError } from '@/lib/error-tracking';
 import { refreshFeaturedPlaylistFallbackCandidate } from '@/lib/profile/featured-playlist-fallback';
 import { trackServerEvent } from '@/lib/server-analytics';
-import { runBackgroundSyncOperations } from './sync';
+import { finalizePostOnboarding } from './post-onboarding';
 
 const SPOTIFY_ALREADY_CLAIMED_MESSAGE =
   'This Spotify artist is already linked to another Jovie account. Please sign in with the original account or choose a different artist.';
@@ -291,19 +291,7 @@ export async function connectOnboardingSpotifyArtist(
         invalidateProfileCache(profile.handle),
         invalidateProxyUserStateCache(userId),
       ]);
-      runBackgroundSyncOperations(userId, profile.handle);
-      void import('./activate-trial')
-        .then(({ activateTrial }) => activateTrial(userId))
-        .catch(error => {
-          void captureError(
-            'activateTrial failed after direct profile claim',
-            error,
-            {
-              action: 'connectOnboardingSpotifyArtist',
-              creatorProfileId: profile.id,
-            }
-          );
-        });
+      await finalizePostOnboarding(userId, profile.handle);
     } else {
       await db
         .update(creatorProfiles)

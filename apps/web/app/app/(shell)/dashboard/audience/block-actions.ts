@@ -3,6 +3,10 @@
 import { and, eq, inArray, isNull } from 'drizzle-orm';
 import { revalidateTag } from 'next/cache';
 
+import {
+  markProfileHasAudienceBlocks,
+  markProfileHasNoAudienceBlocks,
+} from '@/lib/audience/public-profile-block';
 import { getSessionContext } from '@/lib/auth/session';
 import { createAudienceDataTag } from '@/lib/cache/tags';
 import { db } from '@/lib/db';
@@ -33,6 +37,7 @@ export async function blockAudienceMember(
         geoCountry: audienceMembers.geoCountry,
       },
       profileId: creatorProfiles.id,
+      profileUsername: creatorProfiles.username,
     })
     .from(audienceMembers)
     .innerJoin(
@@ -49,7 +54,7 @@ export async function blockAudienceMember(
 
   if (!member[0]) throw new Error('Member not found');
 
-  const { member: m, profileId } = member[0];
+  const { member: m, profileId, profileUsername } = member[0];
 
   if (!m.fingerprint) {
     throw new Error(
@@ -79,6 +84,10 @@ export async function blockAudienceMember(
   }
 
   revalidateTag(createAudienceDataTag(profileId), 'max');
+
+  if (profileUsername) {
+    await markProfileHasAudienceBlocks(profileUsername);
+  }
 }
 
 /**
@@ -112,4 +121,29 @@ export async function unblockAudienceMember(blockId: string) {
   }
 
   revalidateTag(createAudienceDataTag(result[0].profileId), 'max');
+
+  const [profile] = await db
+    .select({ username: creatorProfiles.username })
+    .from(creatorProfiles)
+    .where(eq(creatorProfiles.id, result[0].profileId))
+    .limit(1);
+
+  const remainingBlocks = await db
+    .select({ id: audienceBlocks.id })
+    .from(audienceBlocks)
+    .where(
+      and(
+        eq(audienceBlocks.creatorProfileId, result[0].profileId),
+        isNull(audienceBlocks.unblockedAt)
+      )
+    )
+    .limit(1);
+
+  if (profile?.username) {
+    if (remainingBlocks.length === 0) {
+      await markProfileHasNoAudienceBlocks(profile.username);
+    } else {
+      await markProfileHasAudienceBlocks(profile.username);
+    }
+  }
 }

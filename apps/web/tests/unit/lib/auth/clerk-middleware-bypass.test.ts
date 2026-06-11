@@ -38,6 +38,14 @@ describe('shouldBypassClerkForRequest', () => {
         pathname: '/api/profile/view',
       })
     ).toBe(true);
+
+    expect(
+      shouldBypassClerkForRequest({
+        cookies: [],
+        pathInfo: PUBLIC_PATH_INFO,
+        pathname: '/api/auth/native/exchange',
+      })
+    ).toBe(true);
   });
 
   it('keeps Clerk enabled for authenticated API families', () => {

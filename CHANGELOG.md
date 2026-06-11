@@ -5,6 +5,38 @@
      5|The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
      6|and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.6.37] - 2026-06-11
+
+> Founder demo approval actions now use the neutral System B primary button instead of a local colored fill.
+
+### Fixed
+
+- **Founder demo neutral approval action (JOV-3034)**: replaces the raw `bg-primary-token` `Approve drop` CTA in the recording demo with neutral primary button tokens while preserving demo timing, copy, and progress accents.
+
+## [26.6.36] - 2026-06-11
+
+> Settings SMS access requests now use the neutral System B primary button instead of a colored fill.
+
+### Fixed
+
+- **Settings SMS neutral action (JOV-3031)**: replaces the colored `bg-primary-token` request CTA in the SMS access settings section with neutral primary button tokens, keeping accent color reserved for the surrounding informational state.
+
+## [26.6.35] - 2026-06-11
+
+> Dashboard header creation actions now use neutral toolbar controls instead of colored fills.
+
+### Fixed
+
+- **Dashboard header neutral actions (JOV-3030)**: removes colored `bg-primary-token` fills from release creation and task creation header actions, preserving compact toolbar behavior while keeping accent colors reserved for status, progress, and selection states.
+
+## [26.6.34] - 2026-06-10
+
+> Library share submit actions now use neutral System B button surfaces instead of colored fills.
+
+### Fixed
+
+- **Library share neutral actions (JOV-3026)**: replaces colored `bg-primary-token` fills on the share-drop creator and passphrase gate submit buttons with neutral System B primary button tokens, keeping accent color reserved for progress, status, marks, and highlights.
+
 ## [26.6.33] - 2026-06-09
 
 > Library release assets can now be shared as a branded press-kit drop with optional passphrase and download controls.

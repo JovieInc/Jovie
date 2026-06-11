@@ -2,6 +2,7 @@ import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
   getVisualQaRootDirectory,
+  resolveVisualQaBreakpointReportPath,
   resolveVisualQaManifestPath,
   resolveVisualQaPhaseScreenshotPath,
   resolveVisualQaRunDirectory,
@@ -9,12 +10,13 @@ import {
 } from '@/lib/agent-os/visual-qa/paths';
 
 describe('visual-qa paths', () => {
-  it('resolves run and phase screenshot paths under agentos/runs/visual-qa', () => {
+  it('resolves run and theme-aware phase screenshot paths under agentos/runs/visual-qa', () => {
     const runDirectory = resolveVisualQaRunDirectory('demo-run');
     const screenshotPath = resolveVisualQaPhaseScreenshotPath(
       'demo-run',
       'shell-desktop-idle',
-      'baseline'
+      'baseline',
+      'dark'
     );
     const manifestPath = resolveVisualQaManifestPath('demo-run');
 
@@ -22,9 +24,12 @@ describe('visual-qa paths', () => {
       path.join('agentos', 'runs', 'visual-qa', 'demo-run')
     );
     expect(screenshotPath).toBe(
-      path.join(runDirectory, 'shell-desktop-idle', 'baseline.png')
+      path.join(runDirectory, 'shell-desktop-idle', 'baseline-dark.png')
     );
     expect(manifestPath).toBe(path.join(runDirectory, 'manifest.json'));
+    expect(resolveVisualQaBreakpointReportPath('demo-run')).toBe(
+      path.join(runDirectory, 'breakpoint-report.json')
+    );
   });
 
   it('rejects traversal attempts in run ids', () => {
@@ -37,11 +42,12 @@ describe('visual-qa paths', () => {
     const absolutePath = resolveVisualQaPhaseScreenshotPath(
       'demo-run',
       'list-releases-default',
-      'after'
+      'after',
+      'light'
     );
 
     expect(toVisualQaRelativePath(absolutePath)).toBe(
-      'demo-run/list-releases-default/after.png'
+      'demo-run/list-releases-default/after-light.png'
     );
     expect(getVisualQaRootDirectory()).toContain(
       path.join('agentos', 'runs', 'visual-qa')

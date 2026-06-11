@@ -47,6 +47,7 @@ const AUTHENTICATED_API_PREFIXES = [
 ] as const;
 
 const PUBLIC_API_EXACT_PATHS = [
+  '/api/auth/native/exchange',
   '/api/profile/view',
   '/api/stripe/pricing-options',
 ] as const;

@@ -189,7 +189,7 @@ describe('AuthShell — JOV-2778 app-owned SSO-only contract', () => {
       legalAccepted: true,
       oidcPrompt: 'select_account',
       redirectCallbackUrl: '/signup/sso-callback',
-      redirectUrl: APP_ROUTES.WAITLIST,
+      redirectUrl: APP_ROUTES.START,
       strategy: 'oauth_apple',
     });
     expect(signInSsoMock).not.toHaveBeenCalled();

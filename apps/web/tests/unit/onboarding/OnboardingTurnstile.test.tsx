@@ -189,19 +189,86 @@ describe('OnboardingTurnstile', () => {
     expect(onToken).not.toHaveBeenCalled();
   });
 
-  it('resets expired and externally rejected widgets for a fresh token', async () => {
+  it('hides the security panel during silent loading', async () => {
     vi.stubEnv('NODE_ENV', 'test');
     vi.stubEnv('NEXT_PUBLIC_TURNSTILE_SITE_KEY', 'site-key');
     const onToken = vi.fn();
     const onStateChange = vi.fn();
-    const resetMock = vi.fn();
     const renderMock = vi.fn(
       (_target: HTMLElement, _options: TurnstileOptions) => 'widget-1'
     );
     window.turnstile = {
       render: renderMock,
-      reset: resetMock,
+      reset: vi.fn(),
       remove: vi.fn(),
+    };
+
+    render(
+      <OnboardingTurnstile onToken={onToken} onStateChange={onStateChange} />
+    );
+
+    await waitFor(() => expect(renderMock).toHaveBeenCalled());
+    expect(
+      screen.queryByTestId('onboarding-turnstile-panel')
+    ).not.toBeInTheDocument();
+    expect(
+      screen.getByTestId('onboarding-turnstile-widget-frame')
+    ).toBeTruthy();
+  });
+
+  it('remounts the widget when verification is reset externally', async () => {
+    vi.stubEnv('NODE_ENV', 'test');
+    vi.stubEnv('NEXT_PUBLIC_TURNSTILE_SITE_KEY', 'site-key');
+    const onToken = vi.fn();
+    const onStateChange = vi.fn();
+    const removeMock = vi.fn();
+    const renderMock = vi.fn(
+      (_target: HTMLElement, _options: TurnstileOptions) => 'widget-1'
+    );
+    window.turnstile = {
+      render: renderMock,
+      reset: vi.fn(),
+      remove: removeMock,
+    };
+
+    const { rerender } = render(
+      <OnboardingTurnstile
+        onToken={onToken}
+        onStateChange={onStateChange}
+        resetSignal={0}
+      />
+    );
+
+    await waitFor(() => expect(renderMock).toHaveBeenCalledTimes(1));
+
+    rerender(
+      <OnboardingTurnstile
+        onToken={onToken}
+        onStateChange={onStateChange}
+        resetSignal={1}
+      />
+    );
+
+    expect(removeMock).toHaveBeenCalledWith('widget-1');
+    expect(renderMock).toHaveBeenCalledTimes(2);
+    expect(onStateChange).toHaveBeenCalledWith(
+      expect.objectContaining({ status: 'loading' })
+    );
+  });
+
+  it('resets expired and externally rejected widgets for a fresh token', async () => {
+    vi.stubEnv('NODE_ENV', 'test');
+    vi.stubEnv('NEXT_PUBLIC_TURNSTILE_SITE_KEY', 'site-key');
+    const onToken = vi.fn();
+    const onStateChange = vi.fn();
+    const removeMock = vi.fn();
+    const renderMock = vi.fn(
+      (_target: HTMLElement, _options: TurnstileOptions) => 'widget-1'
+    );
+    window.turnstile = {
+      render: renderMock,
+      reset: vi.fn(),
+      remove: removeMock,
     };
 
     const { rerender } = render(
@@ -219,7 +286,7 @@ describe('OnboardingTurnstile', () => {
     expect(onStateChange).toHaveBeenCalledWith(
       expect.objectContaining({ status: 'expired' })
     );
-    expect(resetMock).toHaveBeenCalledWith('widget-1');
+    expect(removeMock).not.toHaveBeenCalled();
 
     rerender(
       <OnboardingTurnstile
@@ -228,6 +295,7 @@ describe('OnboardingTurnstile', () => {
         resetSignal={1}
       />
     );
-    expect(resetMock).toHaveBeenCalledTimes(2);
+    expect(removeMock).toHaveBeenCalledWith('widget-1');
+    expect(renderMock).toHaveBeenCalledTimes(2);
   });
 });

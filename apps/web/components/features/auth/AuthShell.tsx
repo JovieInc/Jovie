@@ -9,7 +9,10 @@ import {
   AuthProviderButtonSlot,
   AuthProviderButtonSlots,
 } from '@/features/auth/AuthProviderButtons';
-import { buildAuthRouteUrl } from '@/lib/auth/build-auth-route-url';
+import {
+  buildAuthRouteUrl,
+  getDefaultSignUpFallbackRedirectUrl,
+} from '@/lib/auth/build-auth-route-url';
 import { CLERK_COMPONENT_OPTIONS } from '@/lib/auth/clerk-options';
 import {
   getEnabledAuthOAuthProviders,
@@ -53,7 +56,7 @@ interface AuthShellProps {
   /**
    * Where to send Clerk after a successful sign-in or sign-up. Defaults match
    * the post-auth routing used elsewhere in the app (dashboard for sign-in,
-   * waitlist for sign-up).
+   * /start for sign-up).
    */
   readonly fallbackRedirectUrl?: string;
   /**
@@ -125,7 +128,9 @@ export function AuthShell(props: Readonly<AuthShellProps>) {
       isSignUp ? APP_ROUTES.SIGNIN : APP_ROUTES.SUPPORT,
       searchParams
     );
-  const defaultRedirect = isSignUp ? APP_ROUTES.WAITLIST : APP_ROUTES.DASHBOARD;
+  const defaultRedirect = isSignUp
+    ? getDefaultSignUpFallbackRedirectUrl()
+    : APP_ROUTES.DASHBOARD;
   const resolvedRedirect = fallbackRedirectUrl ?? defaultRedirect;
   const enabledOAuthProviders = useMemo(
     () => getEnabledAuthOAuthProviders(),
