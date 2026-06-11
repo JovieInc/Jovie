@@ -217,6 +217,12 @@ export const ServerEnvSchema = z.object({
   VERCEL_GIT_REPO_OWNER: z.string().optional(),
   VERCEL_GIT_REPO_SLUG: z.string().optional(),
 
+  // Vercel deploy admin (promote/status endpoints)
+  VERCEL_API_TOKEN: z.string().optional(),
+  VERCEL_PROJECT_ID: z.string().optional(),
+  VERCEL_TEAM_ID: z.string().optional(),
+  VERCEL_PRODUCTION_DEPLOY_HOOK: z.string().url().optional(),
+
   // Statsig server-side (feature flags)
   STATSIG_SERVER_SECRET: z.string().optional(),
 
@@ -262,6 +268,8 @@ export const ServerEnvSchema = z.object({
   // Development tools
   JOVIE_DEV_MEMORY_MONITOR: z.string().optional(),
   JOVIE_PROMPTFOO_EXPECT_MODEL_KEYS_DISABLED: z.string().optional(),
+  /** Dev/E2E token for iOS real-browser auth harness rate-limit bypass */
+  JOVIE_IOS_REAL_BROWSER_AUTH_TOKEN: z.string().optional(),
 
   // Instantly (outreach email campaigns)
   INSTANTLY_API_KEY: z.string().optional(),
@@ -436,6 +444,10 @@ export const ENV_KEYS = [
   'GH_DISPATCH_TOKEN',
   'VERCEL_GIT_REPO_OWNER',
   'VERCEL_GIT_REPO_SLUG',
+  'VERCEL_API_TOKEN',
+  'VERCEL_PROJECT_ID',
+  'VERCEL_TEAM_ID',
+  'VERCEL_PRODUCTION_DEPLOY_HOOK',
   'STATSIG_SERVER_SECRET',
   'AI_GATEWAY_API_KEY',
   'OPENAI_API_KEY',
@@ -451,6 +463,7 @@ export const ENV_KEYS = [
   'ALBUM_ART_GENERATION_BURST_LIMIT',
   'JOVIE_DEV_MEMORY_MONITOR',
   'JOVIE_PROMPTFOO_EXPECT_MODEL_KEYS_DISABLED',
+  'JOVIE_IOS_REAL_BROWSER_AUTH_TOKEN',
   'INSTANTLY_API_KEY',
   'INSTANTLY_CAMPAIGN_ID',
   'SERPAPI_API_KEY',
