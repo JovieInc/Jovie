@@ -400,15 +400,17 @@ export async function getUserState(
     return cached;
   }
 
-  // Layer 3: Database query
+  // Layer 3: Database query + waitlist gate (parallel — both are cache-miss work)
   try {
     const dbQueryStart = Date.now();
-    const [result] = await executeUserStateQuery(clerkUserId);
+    const [[result], gateEnabled] = await Promise.all([
+      executeUserStateQuery(clerkUserId),
+      isWaitlistGateEnabled(),
+    ]);
     const dbQueryDuration = Date.now() - dbQueryStart;
 
     logDbQueryPerformance(dbQueryDuration, !!result?.dbUserId);
 
-    const gateEnabled = await isWaitlistGateEnabled();
     const userState = determineUserState(result, gateEnabled);
 
     // Populate both cache layers

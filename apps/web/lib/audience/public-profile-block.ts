@@ -1,7 +1,10 @@
 import 'server-only';
 
+import * as Sentry from '@sentry/nextjs';
 import { createFingerprintEdge } from '@/lib/audience/fingerprint';
 import { env } from '@/lib/env-server';
+import { captureWarning } from '@/lib/error-tracking';
+import { getRedis } from '@/lib/redis';
 
 /**
  * Mirror extractClientIP() priority for the middleware audience-block check.
@@ -16,11 +19,264 @@ export function getAudienceBlockIpFromHeaders(headers: Headers): string | null {
   );
 }
 
+// ---------------------------------------------------------------------------
+// Multi-layer cache for middleware audience-block checks
+// ---------------------------------------------------------------------------
+// proxy.ts calls this on every single-segment public-profile candidate. Most
+// paths are unknown usernames, typos, or profiles with zero blocks — cache
+// those outcomes so scanner floods do not amplify into Postgres JOIN load.
+// ---------------------------------------------------------------------------
+const NEGATIVE_CACHE_KEY_PREFIX = 'proxy:audience-block:neg:';
+const HAS_BLOCKS_CACHE_KEY_PREFIX = 'proxy:audience-block:has:';
+const MEMORY_CACHE_TTL_MS = 10_000; // 10s — collapse rapid navigations per isolate
+const REDIS_CACHE_TTL_SECONDS = 60; // ≤60s per audit acceptance criteria
+const REDIS_CACHE_TIMEOUT_MS = 500;
+const MEMORY_CACHE_MAX_ENTRIES = 1_000;
+
+type MemoryCacheKind = 'negative' | 'has-blocks';
+
+interface MemoryCacheEntry {
+  kind: MemoryCacheKind;
+  expiresAt: number;
+}
+
+const memoryCache = new Map<string, MemoryCacheEntry>();
+
+function normalizeUsername(username: string): string {
+  return username.toLowerCase();
+}
+
+function negativeCacheKey(username: string): string {
+  return `${NEGATIVE_CACHE_KEY_PREFIX}${normalizeUsername(username)}`;
+}
+
+function hasBlocksCacheKey(username: string): string {
+  return `${HAS_BLOCKS_CACHE_KEY_PREFIX}${normalizeUsername(username)}`;
+}
+
+function tryGetMemoryCache(
+  cacheKey: string,
+  kind: MemoryCacheKind
+): boolean | null {
+  const entry = memoryCache.get(cacheKey);
+  if (!entry || entry.kind !== kind) return null;
+  if (Date.now() < entry.expiresAt) return true;
+  memoryCache.delete(cacheKey);
+  return null;
+}
+
+function setMemoryCache(cacheKey: string, kind: MemoryCacheKind): void {
+  if (memoryCache.size >= MEMORY_CACHE_MAX_ENTRIES) {
+    const firstKey = memoryCache.keys().next().value;
+    if (firstKey) memoryCache.delete(firstKey);
+  }
+  memoryCache.set(cacheKey, {
+    kind,
+    expiresAt: Date.now() + MEMORY_CACHE_TTL_MS,
+  });
+}
+
+function clearMemoryCache(cacheKey: string): void {
+  memoryCache.delete(cacheKey);
+}
+
+async function tryGetRedisFlag(cacheKey: string): Promise<boolean> {
+  const redis = getRedis();
+  if (!redis) return false;
+
+  try {
+    const cacheStart = Date.now();
+    const redisTimeoutPromise = new Promise<null>(resolve => {
+      setTimeout(() => resolve(null), REDIS_CACHE_TIMEOUT_MS);
+    });
+    const cached = await Promise.race([
+      redis.get<boolean>(cacheKey),
+      redisTimeoutPromise,
+    ]);
+    const cacheDuration = Date.now() - cacheStart;
+
+    if (cached) {
+      Sentry.addBreadcrumb({
+        category: 'audience-block',
+        message: 'Cache hit',
+        level: 'info',
+        data: { cacheKey, durationMs: cacheDuration },
+      });
+      return true;
+    }
+
+    Sentry.addBreadcrumb({
+      category: 'audience-block',
+      message: 'Cache miss',
+      level: 'info',
+      data: { cacheKey, durationMs: cacheDuration },
+    });
+  } catch (error) {
+    captureWarning('[audience-block] Redis cache read failed', { error });
+  }
+
+  return false;
+}
+
+function setRedisFlag(cacheKey: string): void {
+  const redis = getRedis();
+  if (!redis) return;
+
+  redis.set(cacheKey, true, { ex: REDIS_CACHE_TTL_SECONDS }).catch(error => {
+    captureWarning('[audience-block] Redis cache write failed', { error });
+  });
+}
+
+function deleteRedisFlag(cacheKey: string): void {
+  const redis = getRedis();
+  if (!redis) return;
+
+  redis.del(cacheKey).catch(error => {
+    captureWarning('[audience-block] Redis cache delete failed', { error });
+  });
+}
+
+function setNegativeCache(username: string): void {
+  const cacheKey = negativeCacheKey(username);
+  setMemoryCache(cacheKey, 'negative');
+  setRedisFlag(cacheKey);
+}
+
+function setHasBlocksFlag(username: string): void {
+  const cacheKey = hasBlocksCacheKey(username);
+  setMemoryCache(cacheKey, 'has-blocks');
+  setRedisFlag(cacheKey);
+}
+
+function clearHasBlocksFlag(username: string): void {
+  const cacheKey = hasBlocksCacheKey(username);
+  clearMemoryCache(cacheKey);
+  deleteRedisFlag(cacheKey);
+}
+
+async function isNegativeCacheHit(username: string): Promise<boolean> {
+  const cacheKey = negativeCacheKey(username);
+  if (tryGetMemoryCache(cacheKey, 'negative')) return true;
+  if (await tryGetRedisFlag(cacheKey)) {
+    setMemoryCache(cacheKey, 'negative');
+    return true;
+  }
+  return false;
+}
+
+async function isHasBlocksFlagSet(username: string): Promise<boolean> {
+  const cacheKey = hasBlocksCacheKey(username);
+  if (tryGetMemoryCache(cacheKey, 'has-blocks')) return true;
+  if (await tryGetRedisFlag(cacheKey)) {
+    setMemoryCache(cacheKey, 'has-blocks');
+    return true;
+  }
+  return false;
+}
+
+/**
+ * Invalidate cached audience-block state for a profile username.
+ * Call after block/unblock mutations so middleware sees fresh state.
+ */
+export async function invalidateProfileAudienceBlockCache(
+  username: string
+): Promise<void> {
+  const normalized = normalizeUsername(username);
+  clearMemoryCache(negativeCacheKey(normalized));
+  clearMemoryCache(hasBlocksCacheKey(normalized));
+  deleteRedisFlag(negativeCacheKey(normalized));
+  deleteRedisFlag(hasBlocksCacheKey(normalized));
+}
+
+/**
+ * Mark a profile as having active audience blocks.
+ * Clears any negative cache so middleware re-checks Postgres.
+ */
+export async function markProfileHasAudienceBlocks(
+  username: string
+): Promise<void> {
+  const normalized = normalizeUsername(username);
+  clearMemoryCache(negativeCacheKey(normalized));
+  deleteRedisFlag(negativeCacheKey(normalized));
+  setHasBlocksFlag(normalized);
+}
+
+/**
+ * Mark a profile as having no active audience blocks.
+ * Used after the final unblock so middleware can skip Postgres again.
+ */
+export async function markProfileHasNoAudienceBlocks(
+  username: string
+): Promise<void> {
+  const normalized = normalizeUsername(username);
+  clearHasBlocksFlag(normalized);
+  setNegativeCache(normalized);
+}
+
+async function profileHasActiveBlocks(username: string): Promise<boolean> {
+  const { db } = await import('@/lib/db');
+  const { and, eq, exists, isNull } = await import('drizzle-orm');
+  const { audienceBlocks } = await import('@/lib/db/schema/analytics');
+  const { creatorProfiles } = await import('@/lib/db/schema/profiles');
+
+  const [result] = await db
+    .select({ profileId: creatorProfiles.id })
+    .from(creatorProfiles)
+    .where(
+      and(
+        eq(creatorProfiles.username, normalizeUsername(username)),
+        exists(
+          db
+            .select({ id: audienceBlocks.id })
+            .from(audienceBlocks)
+            .where(
+              and(
+                eq(audienceBlocks.creatorProfileId, creatorProfiles.id),
+                isNull(audienceBlocks.unblockedAt)
+              )
+            )
+        )
+      )
+    )
+    .limit(1);
+
+  return !!result;
+}
+
+async function isVisitorBlockedByFingerprint(
+  username: string,
+  fingerprint: string
+): Promise<boolean> {
+  const { db } = await import('@/lib/db');
+  const { and, eq, isNull } = await import('drizzle-orm');
+  const { audienceBlocks } = await import('@/lib/db/schema/analytics');
+  const { creatorProfiles } = await import('@/lib/db/schema/profiles');
+
+  const [result] = await db
+    .select({ blockId: audienceBlocks.id })
+    .from(creatorProfiles)
+    .innerJoin(
+      audienceBlocks,
+      eq(audienceBlocks.creatorProfileId, creatorProfiles.id)
+    )
+    .where(
+      and(
+        eq(creatorProfiles.username, normalizeUsername(username)),
+        eq(audienceBlocks.fingerprint, fingerprint),
+        isNull(audienceBlocks.unblockedAt)
+      )
+    )
+    .limit(1);
+
+  return !!result;
+}
+
 /**
  * Check if a public profile visitor should be blocked.
  *
- * Uses a single JOIN query (creator_profiles x audience_blocks) so no round-trip
- * is wasted when the profile exists but the visitor isn't blocked.
+ * Uses a bounded in-memory + Redis cache so unknown usernames and profiles
+ * without active blocks avoid Postgres on repeat middleware hits. Only
+ * profiles with active blocks run the fingerprint JOIN.
  *
  * Fails open on any error. A blocked user slipping through once is preferable
  * to locking out all visitors during a DB hiccup.
@@ -34,32 +290,23 @@ export async function checkProfileVisitorBlocked(
   if (env.PUBLIC_NOAUTH_SMOKE === '1') return false;
 
   try {
+    const normalizedUsername = normalizeUsername(username);
+
+    if (await isNegativeCacheHit(normalizedUsername)) {
+      return false;
+    }
+
+    if (!(await isHasBlocksFlagSet(normalizedUsername))) {
+      const hasBlocks = await profileHasActiveBlocks(normalizedUsername);
+      if (!hasBlocks) {
+        setNegativeCache(normalizedUsername);
+        return false;
+      }
+      setHasBlocksFlag(normalizedUsername);
+    }
+
     const fingerprint = await createFingerprintEdge(ip, ua);
-
-    // Lazy imports keep DB modules out of middleware invocations that do not
-    // hit a valid public-profile candidate.
-    const { db } = await import('@/lib/db');
-    const { and, eq, isNull } = await import('drizzle-orm');
-    const { audienceBlocks } = await import('@/lib/db/schema/analytics');
-    const { creatorProfiles } = await import('@/lib/db/schema/profiles');
-
-    const [result] = await db
-      .select({ blockId: audienceBlocks.id })
-      .from(creatorProfiles)
-      .innerJoin(
-        audienceBlocks,
-        eq(audienceBlocks.creatorProfileId, creatorProfiles.id)
-      )
-      .where(
-        and(
-          eq(creatorProfiles.username, username.toLowerCase()),
-          eq(audienceBlocks.fingerprint, fingerprint),
-          isNull(audienceBlocks.unblockedAt)
-        )
-      )
-      .limit(1);
-
-    return !!result;
+    return isVisitorBlockedByFingerprint(normalizedUsername, fingerprint);
   } catch {
     return false;
   }

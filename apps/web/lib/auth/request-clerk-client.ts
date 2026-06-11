@@ -20,27 +20,22 @@ export function getRequestHostname(request: Request): string {
   );
 }
 
-function createStagingClerkClient(hostname: string): ClerkClient {
-  const keys = resolveClerkKeys(hostname);
-  if (!keys.secretKey) {
-    throw new Error(`Staging Clerk secret unavailable: ${keys.status}`);
-  }
-
-  return createClerkClient({
-    publishableKey: keys.publishableKey,
-    secretKey: keys.secretKey,
-  }) as ClerkClient;
-}
-
 export async function getRequestClerkClient(
   request: Request
 ): Promise<ClerkClient> {
   const hostname = getRequestHostname(request);
-  if (!isStagingHost(hostname)) {
-    return clerkClient();
+  const keys = resolveClerkKeys(hostname);
+  if (!keys.secretKey) {
+    const prefix = isStagingHost(hostname) ? 'Staging Clerk' : 'Clerk';
+    throw new Error(`${prefix} secret unavailable: ${keys.status}`);
   }
 
-  return createStagingClerkClient(hostname);
+  // Native exchange and other server routes that bypass Clerk middleware must
+  // not depend on clerkClient() from @clerk/nextjs/server.
+  return createClerkClient({
+    publishableKey: keys.publishableKey,
+    secretKey: keys.secretKey,
+  }) as ClerkClient;
 }
 
 /**

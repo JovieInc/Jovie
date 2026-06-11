@@ -1,184 +1,39 @@
 import 'server-only';
 
 import {
-  executeWithRetry,
-  type RetryPolicy,
-} from '@/lib/resilience/primitives';
+  type BoundedFetchOptions,
+  type BoundedFetchRetryOptions,
+  BoundedFetchTimeoutError,
+  boundedFetch,
+  isRetryableTransportError,
+} from '@/lib/http/bounded-fetch';
 
-export class ServerFetchTimeoutError extends Error {
-  constructor(
-    message: string,
-    public readonly timeoutMs: number,
-    public readonly context: string
-  ) {
-    super(message);
+export class ServerFetchTimeoutError extends BoundedFetchTimeoutError {
+  constructor(message: string, timeoutMs: number, context: string) {
+    super(message, timeoutMs, context);
     this.name = 'ServerFetchTimeoutError';
   }
 }
 
-class ServerFetchRetryableStatusError extends Error {
-  constructor(
-    public readonly response: Response,
-    public readonly context: string
-  ) {
-    super(`${context} returned retryable status ${response.status}`);
-    this.name = 'ServerFetchRetryableStatusError';
-  }
-}
+export type ServerFetchRetryOptions = BoundedFetchRetryOptions;
 
-export interface ServerFetchRetryOptions {
-  maxRetries: number;
-  baseDelayMs: number;
-  maxDelayMs?: number;
-  backoffMultiplier?: number;
-  retryOn?: (params: { response?: Response; error?: Error }) => boolean;
-}
+type ServerFetchOptions = BoundedFetchOptions;
 
-type ServerFetchOptions = RequestInit & {
-  timeoutMs?: number;
-  context?: string;
-  retry?: ServerFetchRetryOptions;
-};
-
-function isRetryableStatus(status: number): boolean {
-  return status === 408 || status === 429 || status >= 500;
-}
-
-function cancelResponseBody(response: Response): void {
-  const cancelPromise = response.body?.cancel();
-  if (cancelPromise) {
-    void cancelPromise.catch(() => {});
-  }
-}
-
-/**
- * Limits retries on mutating requests to transport-layer failures only.
- */
-export function isRetryableTransportError(error: unknown): boolean {
-  if (!(error instanceof Error)) {
-    return false;
-  }
-  return (
-    error instanceof ServerFetchTimeoutError ||
-    error.name === 'TypeError' ||
-    error.name === 'FetchError' ||
-    /network|fetch failed|econn|socket|dns/i.test(error.message)
-  );
-}
-
-function isRetryableError(error: Error): boolean {
-  if (error instanceof ServerFetchRetryableStatusError) {
-    return true;
-  }
-
-  return isRetryableTransportError(error);
-}
+export { isRetryableTransportError };
 
 export async function serverFetch(
   input: RequestInfo | URL,
   options: ServerFetchOptions = {}
 ): Promise<Response> {
-  const {
-    timeoutMs = 5000,
-    context = 'External request',
-    retry,
-    signal: externalSignal,
-    ...fetchOptions
-  } = options;
-
-  const performFetch = async (): Promise<Response> => {
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
-    const abortFromExternalSignal = () => controller.abort();
-
-    if (externalSignal) {
-      if (externalSignal.aborted) {
-        controller.abort();
-      } else {
-        externalSignal.addEventListener('abort', abortFromExternalSignal, {
-          once: true,
-        });
-      }
-    }
-
-    try {
-      const response = await fetch(input, {
-        ...fetchOptions,
-        signal: controller.signal,
-      });
-
-      const shouldRetry =
-        retry &&
-        isRetryableStatus(response.status) &&
-        (retry.retryOn?.({ response }) ?? true);
-
-      if (shouldRetry) {
-        throw new ServerFetchRetryableStatusError(response, context);
-      }
-
-      return response;
-    } catch (error) {
-      if (error instanceof ServerFetchRetryableStatusError) {
-        throw error;
-      }
-
-      if (error instanceof Error && error.name === 'AbortError') {
-        throw new ServerFetchTimeoutError(
-          `${context} timed out after ${timeoutMs}ms`,
-          timeoutMs,
-          context
-        );
-      }
-
-      throw error;
-    } finally {
-      clearTimeout(timeoutId);
-      if (externalSignal) {
-        externalSignal.removeEventListener('abort', abortFromExternalSignal);
-      }
-    }
-  };
-
-  if (!retry || retry.maxRetries <= 0) {
-    try {
-      return await performFetch();
-    } catch (error) {
-      if (error instanceof ServerFetchRetryableStatusError) {
-        return error.response;
-      }
-
-      throw error;
-    }
-  }
-
-  const policy: RetryPolicy = {
-    maxRetries: retry.maxRetries,
-    baseDelayMs: retry.baseDelayMs,
-    maxDelayMs: retry.maxDelayMs,
-    backoffMultiplier: retry.backoffMultiplier,
-    isRetryable: error => {
-      if (!(error instanceof Error)) {
-        return false;
-      }
-
-      if (!isRetryableError(error)) {
-        return false;
-      }
-
-      return retry.retryOn?.({ error }) ?? true;
-    },
-    onRetry: ({ error }) => {
-      if (error instanceof ServerFetchRetryableStatusError) {
-        cancelResponseBody(error.response);
-      }
-    },
-  };
-
   try {
-    return await executeWithRetry(performFetch, policy);
+    return await boundedFetch(input, options);
   } catch (error) {
-    if (error instanceof ServerFetchRetryableStatusError) {
-      return error.response;
+    if (error instanceof BoundedFetchTimeoutError) {
+      throw new ServerFetchTimeoutError(
+        error.message,
+        error.timeoutMs,
+        error.context
+      );
     }
 
     throw error;

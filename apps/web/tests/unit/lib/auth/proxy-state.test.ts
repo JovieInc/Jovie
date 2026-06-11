@@ -1,8 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 // Hoist mocks before module resolution
-const { mockDbSelect } = vi.hoisted(() => ({
+const { mockDbSelect, mockIsWaitlistGateEnabled } = vi.hoisted(() => ({
   mockDbSelect: vi.fn(),
+  mockIsWaitlistGateEnabled: vi.fn().mockResolvedValue(true),
 }));
 
 // Mock database
@@ -64,7 +65,7 @@ vi.mock('@/lib/db/client/retry', () => ({
 
 // Mock waitlist as enabled for proxy-state tests (tests waitlist behavior)
 vi.mock('@/lib/waitlist/settings', () => ({
-  isWaitlistGateEnabled: vi.fn().mockResolvedValue(true),
+  isWaitlistGateEnabled: mockIsWaitlistGateEnabled,
 }));
 
 // Import once — clear in-memory cache between tests via invalidateProxyUserStateCache
@@ -76,12 +77,44 @@ import {
 describe('proxy-state.ts', () => {
   beforeEach(async () => {
     mockDbSelect.mockClear();
+    mockIsWaitlistGateEnabled.mockClear();
+    mockIsWaitlistGateEnabled.mockResolvedValue(true);
     // Clear the module's in-memory cache to prevent cross-test contamination
     await invalidateProxyUserStateCache('clerk_123');
     await invalidateProxyUserStateCache('clerk_test_user');
+    await invalidateProxyUserStateCache('clerk_parallel_gate');
   });
 
   describe('getUserState', () => {
+    it('fetches waitlist gate in parallel with the DB query on cache miss', async () => {
+      let gateLookupStarted = false;
+      let dbLookupStarted = false;
+
+      mockIsWaitlistGateEnabled.mockImplementation(async () => {
+        gateLookupStarted = true;
+        expect(dbLookupStarted).toBe(true);
+        return true;
+      });
+
+      mockDbSelect.mockReturnValue({
+        from: vi.fn().mockReturnValue({
+          leftJoin: vi.fn().mockReturnValue({
+            where: vi.fn().mockReturnValue({
+              limit: vi.fn().mockImplementation(async () => {
+                dbLookupStarted = true;
+                expect(gateLookupStarted).toBe(true);
+                return [];
+              }),
+            }),
+          }),
+        }),
+      });
+
+      await getUserState('clerk_parallel_gate');
+
+      expect(mockIsWaitlistGateEnabled).toHaveBeenCalledTimes(1);
+    });
+
     it('returns needsWaitlist when no DB user exists', async () => {
       mockDbSelect.mockReturnValue({
         from: vi.fn().mockReturnValue({

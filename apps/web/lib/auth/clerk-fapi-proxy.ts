@@ -7,6 +7,16 @@ import {
 import { decodeFapiHostFromPublishableKey } from '@/lib/auth/decode-fapi-host';
 import { resolveClerkKeys } from '@/lib/auth/staging-clerk-keys';
 import { captureError } from '@/lib/error-tracking';
+import {
+  BoundedFetchTimeoutError,
+  boundedFetch,
+  isRetryableTransportError,
+} from '@/lib/http/bounded-fetch';
+
+/** Clerk FAPI proxy must not hang edge middleware on slow upstream responses. */
+const CLERK_FAPI_PROXY_TIMEOUT_MS = 10_000;
+const CLERK_FAPI_PROXY_RETRY_BASE_DELAY_MS = 100;
+const CLERK_FAPI_PROXY_MAX_RETRIES = 1;
 
 function hasCookieNameAfterComma(header: string, commaIndex: number) {
   let index = commaIndex + 1;
@@ -137,12 +147,28 @@ export async function handleClerkFapiProxy(
     if (referer) headers.set('referer', referer);
   }
 
+  const isMutatingRequest =
+    req.method !== 'GET' && req.method !== 'HEAD' && req.method !== 'OPTIONS';
+
   try {
-    const proxyRes = await fetch(targetUrl, {
+    const proxyRes = await boundedFetch(targetUrl, {
       method: req.method,
       headers,
       body: body && body.byteLength > 0 ? body : undefined,
       redirect: 'manual',
+      timeoutMs: CLERK_FAPI_PROXY_TIMEOUT_MS,
+      context: 'clerk-fapi-proxy',
+      retry: isMutatingRequest
+        ? {
+            maxRetries: CLERK_FAPI_PROXY_MAX_RETRIES,
+            baseDelayMs: CLERK_FAPI_PROXY_RETRY_BASE_DELAY_MS,
+            retryOn: ({ response, error }) =>
+              !response && Boolean(error && isRetryableTransportError(error)),
+          }
+        : {
+            maxRetries: CLERK_FAPI_PROXY_MAX_RETRIES,
+            baseDelayMs: CLERK_FAPI_PROXY_RETRY_BASE_DELAY_MS,
+          },
     });
 
     // Streaming a raw 3xx Response with a non-null body through Next.js
@@ -201,7 +227,12 @@ export async function handleClerkFapiProxy(
       headers: resHeaders,
     });
   } catch (err) {
-    const errName = err instanceof Error ? err.name : 'UnknownError';
+    const errName =
+      err instanceof BoundedFetchTimeoutError
+        ? 'BoundedFetchTimeoutError'
+        : err instanceof Error
+          ? err.name
+          : 'UnknownError';
     const errMessage = err instanceof Error ? err.message : String(err);
     await captureError('[clerk-proxy] fetch failed', err, {
       pathname,

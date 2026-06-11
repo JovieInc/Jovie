@@ -20,6 +20,7 @@ import {
 import { cn } from '@/lib/utils';
 
 const USER_PROMPT = 'Show me the EDC opportunity.';
+const CHAT_PLACEHOLDER = 'Ask Jovie';
 
 const OPPORTUNITY_RESPONSE = `Cosmic Gate is playing EDC Las Vegas this weekend.
 
@@ -272,7 +273,7 @@ function RecordingChatPanel({
             onSubmit={() => undefined}
             isLoading={false}
             isSubmitting={false}
-            placeholder='Ask Jovie'
+            placeholder={CHAT_PLACEHOLDER}
             variant='compact'
           />
         }
@@ -304,7 +305,7 @@ function RecordingChatPanel({
               performance.
             </div>
             <button
-              className='h-8 w-full rounded-md bg-primary-token text-[12.5px] font-medium text-(--linear-app-content-surface)'
+              className='h-8 w-full rounded-md border border-(--linear-btn-primary-border) bg-btn-primary text-[12.5px] font-medium text-btn-primary-foreground shadow-button-inset transition-colors hover:border-(--linear-btn-primary-hover) hover:bg-btn-primary-hover'
               type='button'
             >
               Approve drop

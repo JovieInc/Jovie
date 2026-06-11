@@ -31,7 +31,7 @@ const {
   mockRedirect,
   mockReservePrebuiltProfileForUser,
   mockResolveClerkIdentity,
-  mockRunBackgroundSyncOperations,
+  mockFinalizePostOnboarding,
   mockMarkWaitlistSignedUpInTx,
   mockUpdateExistingProfile,
   mockValidateUsername,
@@ -73,7 +73,7 @@ const {
   }),
   mockReservePrebuiltProfileForUser: vi.fn(),
   mockResolveClerkIdentity: vi.fn(),
-  mockRunBackgroundSyncOperations: vi.fn(),
+  mockFinalizePostOnboarding: vi.fn(),
   mockMarkWaitlistSignedUpInTx: vi.fn(),
   mockUpdateExistingProfile: vi.fn(),
   mockValidateUsername: vi.fn(),
@@ -187,8 +187,24 @@ vi.mock('@/app/onboarding/actions/profile-setup', () => ({
   updateExistingProfile: mockUpdateExistingProfile,
 }));
 
-vi.mock('@/app/onboarding/actions/sync', () => ({
-  runBackgroundSyncOperations: mockRunBackgroundSyncOperations,
+vi.mock('@/app/onboarding/actions/post-onboarding', () => ({
+  finalizePostOnboarding: mockFinalizePostOnboarding,
+  runBoundedPostOnboardingSideEffect: vi.fn(
+    async (
+      context: string,
+      operation: () => Promise<void>,
+      contextData?: Record<string, string | null | undefined>
+    ) => {
+      try {
+        await operation();
+      } catch (error) {
+        await mockCaptureError(`${context} failed`, error, {
+          route: 'onboarding',
+          contextData,
+        });
+      }
+    }
+  ),
 }));
 
 vi.mock('@/app/onboarding/actions/validation', () => ({
@@ -237,6 +253,7 @@ describe('completeOnboarding', () => {
     mockInvalidateProxyUserStateCache.mockResolvedValue(undefined);
     mockInvalidateProfileCache.mockResolvedValue(undefined);
     mockHandleBackgroundAvatarUpload.mockResolvedValue(undefined);
+    mockFinalizePostOnboarding.mockResolvedValue(undefined);
     mockAttributeLeadSignupFromClerkUserId.mockResolvedValue({
       leadId: null,
       userId: null,
@@ -455,7 +472,7 @@ describe('completeOnboarding', () => {
       'https://images.test/avatar.png',
       'session=test'
     );
-    expect(mockRunBackgroundSyncOperations).toHaveBeenCalledWith(
+    expect(mockFinalizePostOnboarding).toHaveBeenCalledWith(
       'clerk-user-123',
       'artist'
     );

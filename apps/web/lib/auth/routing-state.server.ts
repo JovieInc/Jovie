@@ -225,7 +225,9 @@ export async function consumeStoredNativeExchangeCode(input: {
 }): Promise<NativeExchangeValidationResult> {
   const redis = getRequiredRedis();
   const key = buildNativeExchangeKey(input.code);
-  const stored = await redis.get(key);
+  const now = input.now ?? Date.now();
+  // Atomically claim the code so concurrent exchange attempts cannot both succeed.
+  const stored = await redis.getdel(key);
   const record = parseStoredNativeExchange(stored);
   const result = validateNativeExchange({
     record,
@@ -233,12 +235,13 @@ export async function consumeStoredNativeExchangeCode(input: {
     code: input.code,
     state: input.state,
     codeVerifier: input.codeVerifier,
-    now: input.now ?? Date.now(),
+    now,
     createCodeChallenge: input.createCodeChallenge,
   });
 
-  if (result.ok) {
-    await redis.del(key);
+  if (!result.ok && result.reason === 'wrong_verifier' && record) {
+    const ttlSeconds = Math.max(1, Math.ceil((record.expiresAt - now) / 1000));
+    await redis.set(key, JSON.stringify(record), { ex: ttlSeconds });
   }
 
   return result;
