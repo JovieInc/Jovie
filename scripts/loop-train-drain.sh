@@ -6,7 +6,7 @@ REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$REPO_ROOT"
 
 # Update this list when opening new integration→main train PRs.
-TRAIN_PRS=(10702 10704 10710)
+TRAIN_PRS=(10702 10704 10718)
 
 for num in "${TRAIN_PRS[@]}"; do
   state="$(gh pr view "$num" --json mergeStateStatus -q .mergeStateStatus 2>/dev/null || echo MISSING)"
