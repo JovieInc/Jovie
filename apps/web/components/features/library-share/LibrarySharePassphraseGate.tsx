@@ -67,7 +67,7 @@ export function LibrarySharePassphraseGate({
         <button
           type='submit'
           disabled={loading || passphrase.length === 0}
-          className='w-full rounded-xl bg-primary-token px-4 py-3 text-sm font-medium text-inverse-token transition-opacity disabled:opacity-50'
+          className='w-full rounded-xl border border-(--linear-btn-primary-border) bg-btn-primary px-4 py-3 text-sm font-medium text-btn-primary-foreground shadow-button-inset transition-colors hover:border-(--linear-btn-primary-hover) hover:bg-btn-primary-hover disabled:opacity-50'
         >
           {loading ? 'Unlocking…' : 'Unlock drop'}
         </button>
