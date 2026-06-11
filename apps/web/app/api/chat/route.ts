@@ -63,8 +63,9 @@ import {
 } from '@/lib/chat/tool-access';
 import {
   decodeToolEvents,
-  encodeToolEvents,
   type PersistedToolEvent,
+  preparePersistedToolEventsForTurnFinish,
+  resolvePersistedToolEventsForDisplay,
 } from '@/lib/chat/tool-events';
 import {
   createMerchGenerateTool,
@@ -2560,8 +2561,14 @@ export async function POST(req: Request) {
         .reverse()
         .find(message => message.role === 'assistant');
       const assistantToolCalls = assistantMessage?.toolCalls;
-      const hasPersistedToolState =
-        decodeToolEvents(assistantToolCalls).events.length > 0;
+      const resolvedToolCalls = resolvePersistedToolEventsForDisplay(
+        decodeToolEvents(assistantToolCalls).events,
+        {
+          messageCreatedAt: assistantMessage?.createdAt,
+          turnStatus: reservation.turn.status,
+        }
+      );
+      const hasPersistedToolState = resolvedToolCalls.length > 0;
       const replayText =
         assistantMessage?.content ||
         (hasPersistedToolState
@@ -2569,7 +2576,8 @@ export async function POST(req: Request) {
           : 'This chat action already finished. Please send a new message if you need anything else.');
       return createAssistantReplayStreamResponse({
         text: replayText,
-        toolCalls: assistantToolCalls,
+        toolCalls:
+          resolvedToolCalls.length > 0 ? resolvedToolCalls : assistantToolCalls,
         requestId,
         corsHeaders,
         headers: {
@@ -2834,23 +2842,33 @@ export async function POST(req: Request) {
               requestId,
             })
           : undefined,
-      onFinish: async ({ responseMessage }) => {
+      onFinish: async ({ responseMessage, isAborted }) => {
         if (!reservedTurn || streamFailurePersisted) return;
 
         const assistantText = extractUIMessageText(
           responseMessage.parts as Array<{ type: string; text?: string }>
         );
-        const toolCalls = encodeToolEvents(responseMessage.parts);
+        const toolCalls = preparePersistedToolEventsForTurnFinish({
+          parts: responseMessage.parts,
+          isAborted,
+        });
         await persistTerminalAssistantMessage({
           conversationId: reservedTurn.conversationId,
           turnId: reservedTurn.turnId,
-          status: 'completed',
-          content:
-            assistantText ||
-            (toolCalls && toolCalls.length > 0
-              ? ''
-              : 'Done. What would you like to do next?'),
+          status: isAborted ? 'canceled' : 'completed',
+          content: isAborted
+            ? 'This response was canceled before Jovie could finish. Retry when you are ready.'
+            : assistantText ||
+              (toolCalls && toolCalls.length > 0
+                ? ''
+                : 'Done. What would you like to do next?'),
           toolCalls,
+          ...(isAborted
+            ? {
+                errorCode: 'CLIENT_DISCONNECTED',
+                errorMessage: 'Client disconnected',
+              }
+            : {}),
         });
       },
       onError: () => {
