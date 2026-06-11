@@ -64,8 +64,19 @@ function buildErrorResponse(message: string): AdminSentryMetrics {
   };
 }
 
-function isExpectedSentryAuthError(message: string): boolean {
-  return message.startsWith('401 ') || message.startsWith('403 ');
+const NON_REPORTABLE_SENTRY_API_STATUS_PREFIXES = [
+  '401 ',
+  '403 ',
+  '429 ',
+  '502 ',
+  '503 ',
+  '504 ',
+] as const;
+
+function isNonReportableSentryApiError(message: string): boolean {
+  return NON_REPORTABLE_SENTRY_API_STATUS_PREFIXES.some(prefix =>
+    message.startsWith(prefix)
+  );
 }
 
 function getCacheKey(orgSlug: string): string {
@@ -174,7 +185,7 @@ export async function getAdminSentryMetrics(): Promise<AdminSentryMetrics> {
     return metrics;
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unknown error';
-    if (!isExpectedSentryAuthError(message)) {
+    if (!isNonReportableSentryApiError(message)) {
       captureError('Error loading Sentry metrics', error, { message });
     }
     return buildErrorResponse(message);

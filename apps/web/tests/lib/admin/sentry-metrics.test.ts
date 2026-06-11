@@ -75,4 +75,20 @@ describe('getAdminSentryMetrics', () => {
     expect(metrics.errorMessage).toContain('401 Unauthorized');
     expect(mockCaptureError).not.toHaveBeenCalled();
   });
+
+  it('gracefully degrades when sentry api is temporarily unavailable', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce({
+      ok: false,
+      status: 503,
+      statusText: 'Service Unavailable',
+    } as Response);
+
+    const metrics = await getAdminSentryMetrics();
+
+    expect(metrics.unresolvedIssues24h).toBe(0);
+    expect(metrics.isConfigured).toBe(true);
+    expect(metrics.isAvailable).toBe(false);
+    expect(metrics.errorMessage).toContain('503 Service Unavailable');
+    expect(mockCaptureError).not.toHaveBeenCalled();
+  });
 });

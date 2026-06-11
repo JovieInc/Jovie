@@ -5,9 +5,11 @@ import {
   toVisualQaRelativePath,
 } from '@/lib/agent-os/visual-qa/paths';
 import { getVisualQaSurface } from '@/lib/visual-qa/registry';
+import type { VisualQaColorScheme } from '@/lib/visual-qa/themes';
 import {
   isVisualQaRunManifest,
   type VisualQaPhase,
+  type VisualQaPhaseCaptureRecord,
   type VisualQaRunManifest,
   type VisualQaSurfaceCaptureRecord,
 } from '@/lib/visual-qa/types';
@@ -17,6 +19,7 @@ interface RecordVisualQaCaptureInput {
   readonly runId: string;
   readonly surfaceId: string;
   readonly phase: VisualQaPhase;
+  readonly colorScheme: VisualQaColorScheme;
   readonly screenshotPath: string;
   readonly gitSha?: string | null;
 }
@@ -43,6 +46,18 @@ async function readManifest(
   }
 }
 
+function createThemeCaptureRecord(
+  surfaceId: string,
+  colorScheme: VisualQaColorScheme
+): VisualQaPhaseCaptureRecord {
+  return {
+    baselinePath: `${surfaceId}/baseline-${colorScheme}.png`,
+    afterPath: `${surfaceId}/after-${colorScheme}.png`,
+    baselineCapturedAt: null,
+    afterCapturedAt: null,
+  };
+}
+
 function createSurfaceRecord(surfaceId: string): VisualQaSurfaceCaptureRecord {
   const surface = getVisualQaSurface(surfaceId);
   if (!surface) {
@@ -50,15 +65,21 @@ function createSurfaceRecord(surfaceId: string): VisualQaSurfaceCaptureRecord {
   }
 
   const viewport = VISUAL_QA_VIEWPORTS[surface.baseline.viewport];
+  const themes = (surface.themes ?? ['dark', 'light']).reduce<
+    Partial<Record<VisualQaColorScheme, VisualQaPhaseCaptureRecord>>
+  >((accumulator, colorScheme) => {
+    accumulator[colorScheme] = createThemeCaptureRecord(
+      surface.id,
+      colorScheme
+    );
+    return accumulator;
+  }, {});
 
   return {
     surfaceId: surface.id,
     title: surface.title,
-    baselinePath: `${surface.id}/baseline.png`,
-    afterPath: `${surface.id}/after.png`,
-    baselineCapturedAt: null,
-    afterCapturedAt: null,
     viewport,
+    themes,
   };
 }
 
@@ -94,22 +115,36 @@ export async function recordVisualQaCapture(
     input.surfaceId
   );
 
-  const updatedSurfaceRecord: VisualQaSurfaceCaptureRecord = {
-    ...nextSurfaceRecord,
+  const existingThemeRecord =
+    nextSurfaceRecord.themes[input.colorScheme] ??
+    createThemeCaptureRecord(input.surfaceId, input.colorScheme);
+
+  const updatedThemeRecord: VisualQaPhaseCaptureRecord = {
+    ...existingThemeRecord,
     baselineCapturedAt:
       input.phase === 'baseline'
         ? capturedAt
-        : nextSurfaceRecord.baselineCapturedAt,
+        : existingThemeRecord.baselineCapturedAt,
     afterCapturedAt:
-      input.phase === 'after' ? capturedAt : nextSurfaceRecord.afterCapturedAt,
+      input.phase === 'after'
+        ? capturedAt
+        : existingThemeRecord.afterCapturedAt,
     baselinePath:
       input.phase === 'baseline'
         ? relativeScreenshotPath
-        : nextSurfaceRecord.baselinePath,
+        : existingThemeRecord.baselinePath,
     afterPath:
       input.phase === 'after'
         ? relativeScreenshotPath
-        : nextSurfaceRecord.afterPath,
+        : existingThemeRecord.afterPath,
+  };
+
+  const updatedSurfaceRecord: VisualQaSurfaceCaptureRecord = {
+    ...nextSurfaceRecord,
+    themes: {
+      ...nextSurfaceRecord.themes,
+      [input.colorScheme]: updatedThemeRecord,
+    },
   };
 
   const remainingSurfaces =

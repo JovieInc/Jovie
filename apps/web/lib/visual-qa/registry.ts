@@ -1,4 +1,8 @@
 import { APP_FLAG_OVERRIDE_KEYS } from '@/lib/flags/contracts';
+import {
+  VISUAL_QA_COLOR_SCHEMES,
+  type VisualQaColorScheme,
+} from '@/lib/visual-qa/themes';
 import type {
   VisualQaCaptureConfig,
   VisualQaSurface,
@@ -28,6 +32,7 @@ function defineSurface(seed: VisualQaSurfaceSeed): VisualQaSurface {
     description: seed.description,
     parityLedgerGroup: seed.parityLedgerGroup,
     canonicalSurfaceId: seed.canonicalSurfaceId,
+    themes: seed.themes ?? [...VISUAL_QA_COLOR_SCHEMES],
     baseline,
     after: seed.after,
   };
@@ -127,18 +132,31 @@ export function listVisualQaSurfaces(
 
 export function resolveVisualQaCaptureConfig(
   surface: VisualQaSurface,
-  phase: 'baseline' | 'after'
+  phase: 'baseline' | 'after',
+  colorScheme: VisualQaColorScheme
 ): VisualQaCaptureConfig {
-  if (phase === 'baseline') {
-    return surface.baseline;
-  }
+  const baseConfig =
+    phase === 'baseline'
+      ? surface.baseline
+      : {
+          ...surface.baseline,
+          ...surface.after,
+          flagOverrides: {
+            ...surface.baseline.flagOverrides,
+            ...surface.after?.flagOverrides,
+          },
+        };
 
   return {
-    ...surface.baseline,
-    ...surface.after,
-    flagOverrides: {
-      ...surface.baseline.flagOverrides,
-      ...surface.after?.flagOverrides,
-    },
+    ...baseConfig,
+    colorScheme: baseConfig.colorScheme ?? colorScheme,
   };
+}
+
+export function resolveVisualQaSurfaceThemes(
+  surface: VisualQaSurface,
+  requestedThemes: readonly VisualQaColorScheme[]
+): readonly VisualQaColorScheme[] {
+  const allowed = new Set(surface.themes ?? VISUAL_QA_COLOR_SCHEMES);
+  return requestedThemes.filter(theme => allowed.has(theme));
 }
