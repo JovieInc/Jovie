@@ -6044,7 +6044,7 @@ function evaluateAlbumArtProviderContract(vars: EvalVars) {
       chatRouteSource,
       [
         'if (!isXaiConfigured())',
-        'const releases = await fetchReleasesForChat(params.profileId)',
+        'const target = resolveAlbumArtReleaseTarget(params.releases, {',
         'const burstLimit = await albumArtGenerationBurstLimiter.limit',
         'const generated = await generateAlbumArtBackgrounds',
       ]
