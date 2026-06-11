@@ -175,7 +175,7 @@ describe('JovieChat empty state', () => {
     expect(queryByTestId('suggested-prompts-rail')).toBeNull();
     expect(getByTestId('chat-input')).toBeTruthy();
     expect(getByTestId('chat-input').getAttribute('data-placeholder')).toBe(
-      'Ask Jovie...'
+      'Ask jovie...'
     );
     expect(getByTestId('chat-input').getAttribute('data-variant')).toBe('hero');
     expect(
@@ -317,7 +317,7 @@ describe('JovieChat empty state', () => {
     expect(getAllByTestId('chat-message')).toHaveLength(2);
     expect(
       screen.getByTestId('chat-input').getAttribute('data-placeholder')
-    ).toBe('Ask Jovie...');
+    ).toBe('Ask jovie...');
     expect(screen.getByTestId('chat-input').getAttribute('data-variant')).toBe(
       'compact'
     );
