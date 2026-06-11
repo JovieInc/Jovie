@@ -75,6 +75,7 @@ vi.mock('@/components/jovie/hooks', () => ({
     onScroll: vi.fn(),
     totalSizeRef: vi.fn(),
     scrollContainerRef: { current: null },
+    bottomSentinelRef: vi.fn(),
   }),
   useChatJankMonitor: () => ({
     onSend: vi.fn(),
