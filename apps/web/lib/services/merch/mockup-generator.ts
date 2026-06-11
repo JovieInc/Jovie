@@ -8,11 +8,19 @@ import 'server-only';
  * generation request, and status polling.
  *
  * @see @/lib/printful/client.ts - Printful API transport layer
+ * @see @/lib/merch/mockups.ts - Canonical Printful mockup pipeline
  * @see @/lib/services/merch/merch-generator.ts - Parent generation service
  */
 
 import { z } from 'zod';
-import { createPrintfulFile } from '@/lib/printful/client';
+import { env } from '@/lib/env-server';
+import {
+  createMockupTask,
+  createPrintfulFile,
+  isPrintfulConfigured,
+  type PrintfulMockupTask,
+  retrieveMockupTasks,
+} from '@/lib/printful/client';
 import type { DesignOption, SelectedProduct } from './merch-generator';
 
 // ---------------------------------------------------------------------------
@@ -72,19 +80,62 @@ export const mockupTaskSchema = z.object({
 });
 
 // ---------------------------------------------------------------------------
-// Mockup generation — production path (Printful API)
+// Printful helpers
 // ---------------------------------------------------------------------------
+
+function extractMockupUrls(task: PrintfulMockupTask): string[] {
+  const urls: string[] = [];
+  for (const variantMockup of task.catalog_variant_mockups ?? []) {
+    for (const mockup of variantMockup.mockups ?? []) {
+      if (mockup.mockup_url) {
+        urls.push(mockup.mockup_url);
+      }
+    }
+  }
+  return [...new Set(urls)];
+}
+
+function mapPrintfulStatus(status: string): MockupTaskStatus {
+  switch (status) {
+    case 'completed':
+      return MockupTaskStatus.COMPLETED;
+    case 'failed':
+      return MockupTaskStatus.FAILED;
+    case 'pending':
+      return MockupTaskStatus.PENDING;
+    default:
+      return MockupTaskStatus.PROCESSING;
+  }
+}
+
+function isPrintfulTaskId(taskId: string): boolean {
+  return /^\d+$/.test(taskId);
+}
 
 async function uploadPrintFile(
   svgContent: string,
   fileName: string
 ): Promise<string> {
-  // In production, upload the SVG to a CDN/asset service first,
-  // then register it with Printful via createPrintfulFile.
-  // For now we return a placeholder URL — the real CDN upload
-  // will be wired when asset hosting is configured.
+  const objectPath = `merch/printfiles/${fileName}`;
+  let publicUrl: string;
+
+  if (env.BLOB_READ_WRITE_TOKEN) {
+    const { put } = await import('@vercel/blob');
+    const blob = await put(objectPath, svgContent, {
+      access: 'public',
+      token: env.BLOB_READ_WRITE_TOKEN,
+      contentType: 'image/svg+xml',
+      addRandomSuffix: false,
+    });
+    publicUrl = blob.url;
+  } else if (env.NODE_ENV === 'production') {
+    throw new Error('Blob storage is not configured');
+  } else {
+    publicUrl = `https://blob.vercel-storage.com/${objectPath}`;
+  }
+
   const file = await createPrintfulFile({
-    url: `https://cdn.jov.ie/merch/${fileName}`,
+    url: publicUrl,
     filename: fileName,
     type: 'printfile',
   });
@@ -96,11 +147,36 @@ async function requestPrintfulMockup(params: {
   readonly printFileUrl: string;
   readonly placement: string;
   readonly productId: number;
-}): Promise<readonly string[]> {
-  // TODO: Call Printful Mockup Generator API when available.
-  // For now return empty — the sync polling layer will be added
-  // alongside the mockup API integration.
-  return [];
+}): Promise<{
+  readonly mockupUrls: readonly string[];
+  readonly printfulTaskId: string;
+  readonly status: MockupTaskStatus;
+}> {
+  if (!isPrintfulConfigured()) {
+    return {
+      mockupUrls: [],
+      printfulTaskId: '',
+      status: MockupTaskStatus.PENDING,
+    };
+  }
+
+  const task = await createMockupTask({
+    catalogProductId: params.productId,
+    catalogVariantIds: [...params.variantIds],
+    placements: [
+      {
+        placement: params.placement,
+        technique: 'dtg',
+        layers: [{ type: 'file', url: params.printFileUrl }],
+      },
+    ],
+  });
+
+  return {
+    mockupUrls: extractMockupUrls(task),
+    printfulTaskId: String(task.id),
+    status: mapPrintfulStatus(task.status),
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -147,10 +223,11 @@ export async function generateMockups(
 
   for (const product of products) {
     for (const variantId of product.variantIds) {
-      const taskId = `mockup-${designOption.id}-${product.productId}-${variantId}-${Date.now()}`;
+      const localTaskId = `mockup-${designOption.id}-${product.productId}-${variantId}-${Date.now()}`;
 
       try {
-        const usePlaceholder = options?.usePlaceholder ?? true;
+        const usePlaceholder =
+          options?.usePlaceholder ?? !isPrintfulConfigured();
 
         if (usePlaceholder) {
           const mockupUrls = generateMockupUrlsForVariants(
@@ -159,7 +236,7 @@ export async function generateMockups(
             'front'
           );
           tasks.push({
-            id: taskId,
+            id: localTaskId,
             designOptionId: designOption.id,
             productId: product.productId,
             variantId,
@@ -170,34 +247,41 @@ export async function generateMockups(
           });
         } else {
           const printFileUrl = designOption.svgContent
-            ? await uploadPrintFile(designOption.svgContent, `${taskId}.svg`)
+            ? await uploadPrintFile(
+                designOption.svgContent,
+                `${localTaskId}.svg`
+              )
             : null;
 
-          const mockupUrls = await requestPrintfulMockup({
+          if (!printFileUrl) {
+            throw new Error('Print file upload failed');
+          }
+
+          const mockupResult = await requestPrintfulMockup({
             variantIds: [variantId],
-            printFileUrl: printFileUrl ?? '',
+            printFileUrl,
             placement: 'front',
             productId: product.productId,
           });
 
           tasks.push({
-            id: taskId,
+            id: mockupResult.printfulTaskId || localTaskId,
             designOptionId: designOption.id,
             productId: product.productId,
             variantId,
             placement: 'front',
             printFileUrl,
             status:
-              mockupUrls.length > 0
+              mockupResult.mockupUrls.length > 0
                 ? MockupTaskStatus.COMPLETED
-                : MockupTaskStatus.PENDING,
-            mockupUrls,
+                : mockupResult.status,
+            mockupUrls: mockupResult.mockupUrls,
           });
         }
       } catch (error) {
         failedCount += 1;
         tasks.push({
-          id: taskId,
+          id: localTaskId,
           designOptionId: designOption.id,
           productId: product.productId,
           variantId,
@@ -227,15 +311,39 @@ export async function pollMockupTaskStatus(
   tasks: readonly MockupTask[]
 ): Promise<readonly MockupTask[]> {
   const stillProcessing = tasks.filter(
-    t => t.status === MockupTaskStatus.PROCESSING
+    t =>
+      t.status === MockupTaskStatus.PROCESSING ||
+      t.status === MockupTaskStatus.PENDING
   );
 
-  if (stillProcessing.length === 0) {
+  if (stillProcessing.length === 0 || !isPrintfulConfigured()) {
     return tasks;
   }
 
-  // TODO: query Printful API for mockup generation status
-  // For now return unchanged — full polling integration ships
-  // alongside the real mockup API key setup.
-  return tasks;
+  const printfulTaskIds = stillProcessing
+    .map(task => task.id)
+    .filter(isPrintfulTaskId);
+
+  if (printfulTaskIds.length === 0) {
+    return tasks;
+  }
+
+  const remoteTasks = await retrieveMockupTasks(printfulTaskIds);
+  const remoteById = new Map(remoteTasks.map(task => [String(task.id), task]));
+
+  return tasks.map(task => {
+    const remote = remoteById.get(task.id);
+    if (!remote) {
+      return task;
+    }
+
+    const mockupUrls = extractMockupUrls(remote);
+    const status = mapPrintfulStatus(remote.status);
+
+    return {
+      ...task,
+      status: mockupUrls.length > 0 ? MockupTaskStatus.COMPLETED : status,
+      mockupUrls: mockupUrls.length > 0 ? mockupUrls : task.mockupUrls,
+    };
+  });
 }
