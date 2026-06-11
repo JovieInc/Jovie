@@ -12,6 +12,7 @@ import { getProfileWithLinks as getCreatorProfileWithLinks } from '@/lib/service
 import { isDspPlatform } from '@/lib/services/social-links/types';
 import { toISOStringSafe } from '@/lib/utils/date';
 import { logger } from '@/lib/utils/logger';
+import { isReservedUsername } from '@/lib/validation/username-core';
 import type { CreatorProfile, LegacySocialLink } from '@/types/db';
 import type { PressPhoto } from '@/types/press-photos';
 import { mapProfileWithLinksToCreatorProfile } from './profile-mapper';
@@ -33,6 +34,18 @@ export interface PublicProfileLoaderResult {
   readonly pressPhotos: PressPhoto[];
   readonly status: 'ok' | 'not_found' | 'error';
 }
+
+const RESERVED_PROFILE_NOT_FOUND: PublicProfileLoaderResult = {
+  profile: null,
+  links: [],
+  contacts: [],
+  creatorIsPro: false,
+  creatorClerkId: null,
+  genres: null,
+  latestRelease: null,
+  pressPhotos: [],
+  status: 'not_found',
+};
 
 function calculateProfileCompletion(result: {
   displayName?: string | null;
@@ -70,6 +83,10 @@ function calculateProfileCompletion(result: {
 const fetchProfileAndLinks = async (
   username: string
 ): Promise<PublicProfileLoaderResult> => {
+  if (isReservedUsername(username)) {
+    return RESERVED_PROFILE_NOT_FOUND;
+  }
+
   try {
     // The page-level unstable_cache is the canonical cache for public profile
     // rendering. Bypass the profile service's Redis layer here because its

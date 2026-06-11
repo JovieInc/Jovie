@@ -152,6 +152,7 @@ export const RESERVED_USERNAMES = [
   'links',
   'bio',
   'waitlist',
+  'request-access',
   'invite',
   'invites',
   'referral',
@@ -187,6 +188,11 @@ export type ProfileModeReservedToken =
 
 // Set for O(1) lookups
 const RESERVED_SET = new Set(RESERVED_USERNAMES.map(u => u.toLowerCase()));
+
+/** Returns true when the segment is a reserved handle (not a public profile). */
+export function isReservedUsername(username: string): boolean {
+  return RESERVED_SET.has(username.toLowerCase().trim());
+}
 
 // ============================================================================
 // Types
