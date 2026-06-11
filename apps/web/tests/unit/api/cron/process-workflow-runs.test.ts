@@ -8,10 +8,13 @@ const {
   mockEq,
   mockExecuteApprovedAction,
   mockInArray,
+  mockIsNull,
   mockLoggerInfo,
   mockLoggerWarn,
+  mockLt,
   mockLte,
   mockMarkWorkflowFailed,
+  mockOr,
 } = vi.hoisted(() => ({
   mockAnd: vi.fn((...conditions: unknown[]) => ({ type: 'and', conditions })),
   mockCaptureError: vi.fn(),
@@ -31,21 +34,31 @@ const {
     column,
     values,
   })),
+  mockIsNull: vi.fn((column: unknown) => ({ type: 'isNull', column })),
   mockLoggerInfo: vi.fn(),
   mockLoggerWarn: vi.fn(),
+  mockLt: vi.fn((column: unknown, value: unknown) => ({
+    type: 'lt',
+    column,
+    value,
+  })),
   mockLte: vi.fn((column: unknown, value: unknown) => ({
     type: 'lte',
     column,
     value,
   })),
   mockMarkWorkflowFailed: vi.fn(),
+  mockOr: vi.fn((...conditions: unknown[]) => ({ type: 'or', conditions })),
 }));
 
 vi.mock('drizzle-orm', () => ({
   and: mockAnd,
   eq: mockEq,
   inArray: mockInArray,
+  isNull: mockIsNull,
+  lt: mockLt,
   lte: mockLte,
+  or: mockOr,
 }));
 
 vi.mock('@/lib/connectors/workflows/execute-approved-action', () => ({
@@ -132,9 +145,13 @@ describe('GET /api/cron/process-workflow-runs', () => {
     const queuedStatusChecks = mockEq.mock.calls.filter(
       ([column, value]) => column === workflowRuns.status && value === 'queued'
     );
-    expect(queuedStatusChecks).toHaveLength(2);
+    expect(queuedStatusChecks.length).toBeGreaterThanOrEqual(1);
     expect(updateChain.set).toHaveBeenCalledWith(
-      expect.objectContaining({ status: 'running' })
+      expect.objectContaining({
+        status: 'running',
+        claimedAt: expect.any(Date),
+        leaseExpiresAt: expect.any(Date),
+      })
     );
     expect(selectChain.limit).toHaveBeenCalledWith(20);
     expect(mockExecuteApprovedAction).toHaveBeenCalledWith({

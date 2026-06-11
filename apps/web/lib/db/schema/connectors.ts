@@ -524,6 +524,15 @@ export const workflowRuns = pgTable(
     /** Earliest time this workflow should be picked up by the cron processor. */
     runAt: timestamp('run_at', { withTimezone: true }).notNull().defaultNow(),
 
+    /** When this run was claimed by the cron processor (lease start). */
+    claimedAt: timestamp('claimed_at', { withTimezone: true }),
+
+    /**
+     * Lease expiry for in-flight runs. Expired leases are reclaimed on the next
+     * cron tick so lambda timeouts cannot orphan rows in `running` forever.
+     */
+    leaseExpiresAt: timestamp('lease_expires_at', { withTimezone: true }),
+
     createdAt: timestamp('created_at', { withTimezone: true })
       .notNull()
       .defaultNow(),

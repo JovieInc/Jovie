@@ -28,7 +28,7 @@
  * In practice: only runs when there are queued workflow_runs rows.
  */
 
-import { and, eq, inArray, lte } from 'drizzle-orm';
+import { and, eq, inArray, isNull, lt, lte, or } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 import {
   executeApprovedAction,
@@ -44,6 +44,19 @@ export const maxDuration = 300;
 
 const MAX_RUNS_PER_TICK = 20;
 const MAX_CONCURRENT_RUNS = 5;
+/** Reclaim in-flight runs whose lease expired (lambda timeout / crash guard). */
+const LEASE_DURATION_MS = 10 * 60 * 1000;
+
+function leaseExpiredBefore(now: Date) {
+  const staleBefore = new Date(now.getTime() - LEASE_DURATION_MS);
+  return or(
+    lt(workflowRuns.leaseExpiresAt, now),
+    and(
+      isNull(workflowRuns.leaseExpiresAt),
+      lt(workflowRuns.updatedAt, staleBefore)
+    )
+  );
+}
 
 export async function GET(request: Request): Promise<Response> {
   // Verify cron secret
@@ -55,28 +68,41 @@ export async function GET(request: Request): Promise<Response> {
   const now = new Date();
 
   try {
-    // Step 1: SELECT up to MAX_RUNS_PER_TICK queued runs (uses LIMIT)
-    const queuedRuns = await db
+    const leaseExpiresAt = new Date(now.getTime() + LEASE_DURATION_MS);
+
+    // Step 1: SELECT claimable runs — queued due now, or running with expired lease
+    const claimableRuns = await db
       .select({ id: workflowRuns.id, kind: workflowRuns.kind })
       .from(workflowRuns)
       .where(
-        and(eq(workflowRuns.status, 'queued'), lte(workflowRuns.runAt, now))
+        or(
+          and(eq(workflowRuns.status, 'queued'), lte(workflowRuns.runAt, now)),
+          and(eq(workflowRuns.status, 'running'), leaseExpiredBefore(now))
+        )
       )
       .limit(MAX_RUNS_PER_TICK);
 
-    if (queuedRuns.length === 0) {
+    if (claimableRuns.length === 0) {
       return NextResponse.json({ ok: true, processed: 0 });
     }
 
-    // Step 2: CAS claim by ID — atomically transition to 'running'
-    const queuedIds = queuedRuns.map(r => r.id);
+    // Step 2: CAS claim by ID — atomically transition/refresh lease to 'running'
+    const claimableIds = claimableRuns.map(r => r.id);
     const claimed = await db
       .update(workflowRuns)
-      .set({ status: 'running', updatedAt: now })
+      .set({
+        status: 'running',
+        claimedAt: now,
+        leaseExpiresAt,
+        updatedAt: now,
+      })
       .where(
         and(
-          inArray(workflowRuns.id, queuedIds),
-          eq(workflowRuns.status, 'queued')
+          inArray(workflowRuns.id, claimableIds),
+          or(
+            eq(workflowRuns.status, 'queued'),
+            and(eq(workflowRuns.status, 'running'), leaseExpiredBefore(now))
+          )
         )
       )
       .returning({
