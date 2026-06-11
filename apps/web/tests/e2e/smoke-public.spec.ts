@@ -1,5 +1,9 @@
 import { expect, test } from '@playwright/test';
-import { isTransientNavigationError } from './utils/smoke-test-utils';
+import {
+  isTransientNavigationError,
+  SMOKE_TIMEOUTS,
+  smokeNavigateWithRetry,
+} from './utils/smoke-test-utils';
 
 /**
  * Suite 1: Public Profile Experience + Public Pages (JOV-1427)
@@ -171,12 +175,13 @@ test.describe('Public Profile', () => {
   const TEST_PROFILE = 'dualipa';
 
   test('profile page shows artist name and DSP links', async ({ page }) => {
-    test.setTimeout(90_000);
+    test.setTimeout(120_000);
     await blockAnalytics(page);
 
-    await page.goto(`/${TEST_PROFILE}`, {
+    await smokeNavigateWithRetry(page, `/${TEST_PROFILE}`, {
       waitUntil: 'domcontentloaded',
-      timeout: 60_000,
+      timeout: SMOKE_TIMEOUTS.NAVIGATION,
+      retries: 3,
     });
 
     // Hard fail if profile missing — seeding must have worked

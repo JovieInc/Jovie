@@ -53,7 +53,6 @@ test('chat route renders the legacy shell frame when DESIGN_V1 is forced off', a
 
   await setTestAuthBypassSession(page, 'creator-ready');
   await gotoAuthenticatedChatRoute(page);
-  await page.waitForURL(/\/app\/chat/, { timeout: 60_000 });
 
   // The legacy shell frame still mounts and stays interactive even when the
   // New Design override is off. We assert by attribute rather than by the

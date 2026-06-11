@@ -32,7 +32,21 @@ interface Box {
 async function gotoChatConversation(page: Page, conversationId: string) {
   await gotoAuthenticatedChatRoute(page, {
     path: `/app/chat/${conversationId}`,
+    urlPattern: new RegExp(`/app/chat/${conversationId}$`),
   });
+}
+
+async function mockStableSlashPickerNetwork(page: Page) {
+  // Root slash queries like `/t` fan out to artist search. In CI the real
+  // Spotify route can stall for ~10s and return 503, which keeps the picker
+  // in a loading state long enough for transcript overlap assertions to flake.
+  await page.route('**/api/spotify/search**', route =>
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify([]),
+    })
+  );
 }
 
 async function forceDesignV1(page: Page) {
@@ -70,6 +84,8 @@ function toolEvent(): PersistedToolEvent {
 }
 
 async function mockFlyoutConversation(page: Page) {
+  await mockStableSlashPickerNetwork(page);
+
   const historicalMessages = Array.from({ length: 8 }, (_, index) => {
     const role = index % 2 === 0 ? 'assistant' : 'user';
     return {
@@ -224,8 +240,13 @@ function expectBoxInsideViewport(
 }
 
 async function assertSlashMenuClearsThreadContent(page: Page) {
+  const chatContent = page.locator('[data-testid="chat-content"]');
+  await expect(chatContent).toHaveAttribute('data-picker-open', 'true', {
+    timeout: 15_000,
+  });
+
   const slashMenu = page.locator('[data-testid="slash-command-menu"]').last();
-  await expect(slashMenu).toBeVisible({ timeout: 10_000 });
+  await expect(slashMenu).toBeVisible({ timeout: 15_000 });
 
   const menuBox = await slashMenu.boundingBox();
   expectBoxInsideViewport(menuBox, page.viewportSize());
@@ -263,7 +284,7 @@ async function assertSlashMenuClearsThreadContent(page: Page) {
           if (!currentMenuBox || !currentTargetBox) return false;
           return !boxesOverlap(currentMenuBox, currentTargetBox, 4);
         },
-        { message: `${label} clears slash menu`, timeout: 10_000 }
+        { message: `${label} clears slash menu`, timeout: 20_000 }
       )
       .toBe(true);
   }
@@ -283,7 +304,6 @@ test('chat route renders the Shell V1 app frame when forced on', async ({
 
   await setTestAuthBypassSession(page, 'creator-ready', 'e2e-shell-chat-user');
   await gotoAuthenticatedChatRoute(page);
-  await page.waitForURL(/\/app\/chat/, { timeout: 60_000 });
 
   const { chatContent, composer, shellFrame } = shellChatFrameLocators(page);
 
@@ -308,6 +328,7 @@ test('chat route picker opens without moving the shell or composer', async ({
   );
   test.setTimeout(180_000);
 
+  await mockStableSlashPickerNetwork(page);
   await forceDesignV1(page);
   await setTestAuthBypassSession(
     page,
@@ -315,7 +336,6 @@ test('chat route picker opens without moving the shell or composer', async ({
     'e2e-shell-chat-picker-user'
   );
   await gotoAuthenticatedChatRoute(page);
-  await page.waitForURL(/\/app\/chat/, { timeout: 60_000 });
 
   const { composer, input, shellScroll } = shellChatFrameLocators(page);
   await expect(composer).toBeVisible({ timeout: 30_000 });
@@ -362,6 +382,8 @@ test('chat route slash picker clears active transcript content in populated thre
     'e2e-shell-chat-flyout-user'
   );
 
+  await gotoChatConversation(page, FLYOUT_CONVERSATION_ID);
+
   for (const viewport of [
     { label: 'desktop', width: 1440, height: 900 },
     { label: 'short desktop', width: 1280, height: 720 },
@@ -369,10 +391,6 @@ test('chat route slash picker clears active transcript content in populated thre
     await page.setViewportSize({
       width: viewport.width,
       height: viewport.height,
-    });
-    await gotoChatConversation(page, FLYOUT_CONVERSATION_ID);
-    await page.waitForURL(new RegExp(`/app/chat/${FLYOUT_CONVERSATION_ID}$`), {
-      timeout: 60_000,
     });
 
     const { composer, input } = shellChatFrameLocators(page);
@@ -431,7 +449,6 @@ test('chat composer clears mobile shell tabs on tablet and phone', async ({
       height: viewport.height,
     });
     await gotoAuthenticatedChatRoute(page);
-    await page.waitForURL(/\/app\/chat/, { timeout: 60_000 });
 
     const { composer } = shellChatFrameLocators(page);
     const mobileTabs = page.getByRole('navigation', {
