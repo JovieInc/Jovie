@@ -134,4 +134,9 @@ export async function getProfileAlertOptInVariant(
   });
 }
 
-export { checkGateForUser, getExperiment, shutdownStatsig } from './statsig';
+export {
+  checkGateForUser,
+  checkGatesForUser,
+  getExperiment,
+  shutdownStatsig,
+} from './statsig';

@@ -11,6 +11,7 @@ import { buildAiTelemetry } from '@/lib/ai/telemetry';
 import type { ChatAccountContext } from '@/lib/chat/account-context';
 import { resolveImportBioRestrictedTools } from '@/lib/chat/import-bio-turn-guard';
 import { selectKnowledgeContext } from '@/lib/chat/knowledge/router';
+import { extractLastUserText } from '@/lib/chat/message-text';
 import { ONBOARDING_SYSTEM_PROMPT } from '@/lib/chat/prompts/onboarding';
 import { buildSystemPrompt } from '@/lib/chat/system-prompt';
 import {
@@ -51,7 +52,8 @@ const SIMPLE_INTENT_PATTERNS = [
  */
 export function canUseLightModel(
   messages: UIMessage[],
-  aiCanUseTools: boolean
+  aiCanUseTools: boolean,
+  lastUserText?: string
 ): boolean {
   // Free-plan users don't have advanced tools — always use the light model
   if (!aiCanUseTools) return true;
@@ -59,17 +61,8 @@ export function canUseLightModel(
   // Only consider light model for short conversations
   if (messages.length > 6) return false;
 
-  const lastUserMsg = [...messages].reverse().find(m => m.role === 'user');
-  if (!lastUserMsg) return false;
-
-  const text = lastUserMsg.parts
-    .filter(
-      (p): p is { type: 'text'; text: string } =>
-        p.type === 'text' && typeof p.text === 'string'
-    )
-    .map(p => p.text)
-    .join('')
-    .trim();
+  const text = lastUserText ?? extractLastUserText(messages);
+  if (!text) return false;
 
   // Short, clearly tool-oriented requests
   return text.length < 200 && SIMPLE_INTENT_PATTERNS.some(p => p.test(text));
@@ -123,6 +116,8 @@ export interface ExecuteChatTurnInput {
   insightsEnabled: boolean;
   accountContext?: ChatAccountContext;
   forceLightModel: boolean;
+  /** Precomputed once per turn to avoid repeated message scans. */
+  lastUserText?: string;
   /**
    * Pre-built tools for the turn. The caller composes free + paid tool sets
    * based on plan and feature flags before invoking. For `mode='onboarding'`,
@@ -187,6 +182,7 @@ export async function executeChatTurn(
     insightsEnabled,
     accountContext,
     forceLightModel,
+    lastUserText,
     tools,
     signal,
     requestId,
@@ -227,7 +223,11 @@ export async function executeChatTurn(
   // variable keeps the precedence explicit (|| binds tighter than ?:).
   const shouldUseLightModel =
     forceLightModel ||
-    canUseLightModel(uiMessages, planLimits.booleans.aiCanUseTools);
+    canUseLightModel(
+      uiMessages,
+      planLimits.booleans.aiCanUseTools,
+      lastUserText
+    );
   const selectedModel = shouldUseLightModel ? CHAT_MODEL_LIGHT : CHAT_MODEL;
 
   // Tag the request scope with chat-specific dimensions so all telemetry

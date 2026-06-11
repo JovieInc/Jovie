@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import {
+  capPersistedToolOutput,
   decodeToolEvents,
   encodeToolEvents,
+  PERSISTED_TOOL_OUTPUT_MAX_BYTES,
   persistedToolEventsSchema,
   preparePersistedToolEventsForTurnFinish,
   resolvePersistedToolEventsForDisplay,
@@ -221,6 +223,68 @@ describe('tool event contract', () => {
         observedAt: new Date('2026-06-10T12:00:10Z'),
       })
     ).toEqual([runningEvent]);
+  });
+
+  it('caps oversized persisted tool outputs with summary and refetchable id', () => {
+    const oversizedOutput = {
+      success: true,
+      releaseId: 'release-123',
+      summary: 'Generated album art',
+      candidates: Array.from({ length: 200 }, (_, index) => ({
+        id: `candidate-${index}`,
+        previewUrl: `https://example.com/preview-${index}.jpg`,
+        fullResUrl: `https://example.com/full-${index}.jpg`,
+        prompt: 'x'.repeat(500),
+      })),
+    };
+
+    const capped = capPersistedToolOutput(oversizedOutput);
+
+    expect(capped).toEqual(
+      expect.objectContaining({
+        success: true,
+        truncated: true,
+        summary: 'Generated album art',
+        refetchableId: 'release-123',
+      })
+    );
+    expect(
+      new TextEncoder().encode(JSON.stringify(capped)).byteLength
+    ).toBeLessThanOrEqual(PERSISTED_TOOL_OUTPUT_MAX_BYTES);
+  });
+
+  it('encodes oversized tool outputs within the persisted byte budget', () => {
+    const [event] =
+      encodeToolEvents([
+        {
+          type: 'dynamic-tool',
+          toolName: 'generateAlbumArt',
+          toolCallId: 'album-art-1',
+          state: 'output-available',
+          input: { releaseTitle: 'Midnight' },
+          output: {
+            success: true,
+            generationId: 'gen-1',
+            summary: 'Generated album art',
+            candidates: Array.from({ length: 200 }, (_, index) => ({
+              id: `candidate-${index}`,
+              previewUrl: `https://example.com/preview-${index}.jpg`,
+              fullResUrl: `https://example.com/full-${index}.jpg`,
+              prompt: 'x'.repeat(500),
+            })),
+          },
+        },
+      ]) ?? [];
+
+    expect(event?.output).toEqual(
+      expect.objectContaining({
+        truncated: true,
+        refetchableId: 'gen-1',
+      })
+    );
+    expect(
+      new TextEncoder().encode(JSON.stringify(event?.output)).byteLength
+    ).toBeLessThanOrEqual(PERSISTED_TOOL_OUTPUT_MAX_BYTES);
   });
 
   it('preserves approval responses through persistence and hydration', () => {
