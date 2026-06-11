@@ -8,6 +8,13 @@ const {
   searchParamsState,
   signInSsoMock,
   signUpSsoMock,
+  signInEmailCodeSendMock,
+  signInEmailCodeVerifyMock,
+  signInFinalizeMock,
+  signUpCreateMock,
+  signUpSendEmailCodeMock,
+  signUpVerifyEmailCodeMock,
+  signUpFinalizeMock,
 } = vi.hoisted(() => ({
   authResourceState: {
     clerkLoaded: true,
@@ -21,6 +28,13 @@ const {
   searchParamsState: { value: '' },
   signInSsoMock: vi.fn(),
   signUpSsoMock: vi.fn(),
+  signInEmailCodeSendMock: vi.fn(),
+  signInEmailCodeVerifyMock: vi.fn(),
+  signInFinalizeMock: vi.fn(),
+  signUpCreateMock: vi.fn(),
+  signUpSendEmailCodeMock: vi.fn(),
+  signUpVerifyEmailCodeMock: vi.fn(),
+  signUpFinalizeMock: vi.fn(),
 }));
 
 vi.mock('@clerk/nextjs', () => ({
@@ -32,6 +46,11 @@ vi.mock('@clerk/nextjs', () => ({
       ? {
           signIn: {
             sso: signInSsoMock,
+            emailCode: {
+              sendCode: signInEmailCodeSendMock,
+              verifyCode: signInEmailCodeVerifyMock,
+            },
+            finalize: signInFinalizeMock,
           },
         }
       : {
@@ -42,6 +61,12 @@ vi.mock('@clerk/nextjs', () => ({
       ? {
           signUp: {
             sso: signUpSsoMock,
+            create: signUpCreateMock,
+            verifications: {
+              sendEmailCode: signUpSendEmailCodeMock,
+              verifyEmailCode: signUpVerifyEmailCodeMock,
+            },
+            finalize: signUpFinalizeMock,
           },
         }
       : {
@@ -84,7 +109,11 @@ function expectNoCredentialInputs(container: HTMLElement) {
   ).toBeNull();
 }
 
-describe('AuthShell — JOV-2778 app-owned SSO-only contract', () => {
+function expectNoPasswordInputs(container: HTMLElement) {
+  expect(container.querySelector('input[type="password"]')).toBeNull();
+}
+
+describe('AuthShell — app-owned SSO + email-code contract', () => {
   beforeEach(() => {
     authResourceState.clerkLoaded = true;
     authResourceState.signInLoaded = true;
@@ -96,6 +125,18 @@ describe('AuthShell — JOV-2778 app-owned SSO-only contract', () => {
     signInSsoMock.mockResolvedValue({ error: null });
     signUpSsoMock.mockReset();
     signUpSsoMock.mockResolvedValue({ error: null });
+    for (const mock of [
+      signInEmailCodeSendMock,
+      signInEmailCodeVerifyMock,
+      signInFinalizeMock,
+      signUpCreateMock,
+      signUpSendEmailCodeMock,
+      signUpVerifyEmailCodeMock,
+      signUpFinalizeMock,
+    ]) {
+      mock.mockReset();
+      mock.mockResolvedValue({ error: null });
+    }
   });
 
   it('renders stable full-label provider slots before Clerk is ready', () => {
@@ -136,7 +177,7 @@ describe('AuthShell — JOV-2778 app-owned SSO-only contract', () => {
     expect(placeholder?.textContent ?? '').not.toMatch(/\bor\b/);
   });
 
-  it('renders a ready sign-in SSO surface without mounting credential inputs', async () => {
+  it('renders a ready sign-in surface with SSO buttons and the email-code form, never a password input', async () => {
     const { container } = render(<AuthShell mode='sign-in' />);
 
     await waitFor(() => {
@@ -150,8 +191,41 @@ describe('AuthShell — JOV-2778 app-owned SSO-only contract', () => {
     expect(
       container.querySelector('[data-auth-stable-placeholder]')
     ).toBeNull();
-    expectNoCredentialInputs(container);
-    expect(container.textContent ?? '').not.toMatch(/\bor\b/);
+    // Email OTP is the supported credential path (intentional, 2026-06).
+    expect(
+      container.querySelector('input[type="email"][name="emailAddress"]')
+    ).not.toBeNull();
+    expect(
+      container.querySelector('[data-auth-method-divider]')
+    ).not.toBeNull();
+    expectNoPasswordInputs(container);
+  });
+
+  it('sends an email code and advances to the code step on submit (sign-in)', async () => {
+    const user = userEvent.setup();
+
+    const { container } = render(<AuthShell mode='sign-in' />);
+
+    const emailInput = await waitFor(() => {
+      const input = container.querySelector<HTMLInputElement>(
+        'input[type="email"][name="emailAddress"]'
+      );
+      expect(input).not.toBeNull();
+      return input as HTMLInputElement;
+    });
+
+    await user.type(emailInput, 'artist@example.com');
+    await user.click(screen.getByRole('button', { name: /email me a code/i }));
+
+    await waitFor(() => {
+      expect(signInEmailCodeSendMock).toHaveBeenCalledWith({
+        emailAddress: 'artist@example.com',
+      });
+    });
+    expect(
+      container.querySelector('[data-auth-email-code-step="code"]')
+    ).not.toBeNull();
+    expectNoPasswordInputs(container);
   });
 
   it('starts Google sign-in through Clerk redirect with the canonical callback and account chooser', async () => {
@@ -265,9 +339,36 @@ describe('AuthShell — JOV-2778 app-owned SSO-only contract', () => {
     expect(link).toHaveAttribute('href', '/signin');
   });
 
-  it('renders AuthProvidersUnavailable when zero OAuth providers are enabled', () => {
+  it('falls back to the email-code form when zero OAuth providers are enabled but Clerk is ready', async () => {
     providerEnabledState.google = false;
     providerEnabledState.apple = false;
+
+    const { container } = render(<AuthShell mode='sign-in' />);
+
+    await waitFor(() => {
+      expect(container.firstElementChild).toHaveAttribute(
+        'data-auth-shell-ready',
+        'true'
+      );
+    });
+
+    // Email auth keeps the surface usable during an OAuth-provider incident.
+    expect(
+      container.querySelector('input[type="email"][name="emailAddress"]')
+    ).not.toBeNull();
+    expect(container.querySelector('[data-auth-provider-slots]')).toBeNull();
+    expect(container.querySelector('[data-auth-method-divider]')).toBeNull();
+    expect(
+      container.querySelector('[data-auth-providers-unavailable]')
+    ).toBeNull();
+    expect(signInSsoMock).not.toHaveBeenCalled();
+  });
+
+  it('renders AuthProvidersUnavailable when zero providers are enabled and Clerk never becomes ready', () => {
+    providerEnabledState.google = false;
+    providerEnabledState.apple = false;
+    authResourceState.clerkLoaded = false;
+    authResourceState.signInLoaded = false;
 
     const { container, getByRole } = render(<AuthShell mode='sign-in' />);
 

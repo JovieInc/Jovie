@@ -124,6 +124,12 @@ function setPlaying(overrides: Partial<MockPlaybackState> = {}) {
   };
 }
 
+function getExpandedShellMinimizeButton() {
+  return within(screen.getByTestId('audio-surface-expanded-shell')).getByTestId(
+    'audio-bar-minimize'
+  );
+}
+
 describe('PersistentAudioBar', () => {
   beforeEach(() => {
     toggleTrack.mockClear();
@@ -164,7 +170,7 @@ describe('PersistentAudioBar', () => {
       'https://cdn.example.com/art.jpg'
     );
     expect(
-      screen.getByRole('button', { name: 'Dismiss Player' })
+      screen.getByRole('button', { name: 'Dismiss player' })
     ).toBeInTheDocument();
   });
 
@@ -198,7 +204,7 @@ describe('PersistentAudioBar', () => {
 
     render(<PersistentAudioBar />);
 
-    await user.click(screen.getByRole('button', { name: 'Dismiss Player' }));
+    await user.click(screen.getByRole('button', { name: 'Dismiss player' }));
 
     expect(stop).toHaveBeenCalled();
   });
@@ -272,7 +278,7 @@ describe('PersistentAudioBar', () => {
     render(<PersistentAudioBar />);
 
     expect(
-      screen.getByRole('region', { name: 'Audio Player' })
+      screen.getByRole('region', { name: 'Audio player' })
     ).toBeInTheDocument();
   });
 
@@ -284,9 +290,7 @@ describe('PersistentAudioBar', () => {
 
     render(<PersistentAudioBar variant='shellChatV1' />);
 
-    expect(
-      screen.getByRole('button', { name: 'Minimize Player' })
-    ).toBeInTheDocument();
+    expect(getExpandedShellMinimizeButton()).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Loop: off' })).toBeNull();
     expect(screen.getAllByText('Midnight Drive').length).toBeGreaterThan(0);
     expect(screen.getAllByText('DJ Cool').length).toBeGreaterThan(0);
@@ -461,7 +465,7 @@ describe('PersistentAudioBar', () => {
 
     render(<PersistentAudioBar variant='shellChatV1' />);
 
-    await user.click(screen.getByRole('button', { name: 'Minimize Player' }));
+    await user.click(getExpandedShellMinimizeButton());
 
     await user.click(screen.getByRole('button', { name: 'Pause' }));
 
@@ -483,7 +487,7 @@ describe('PersistentAudioBar', () => {
     expect(expandedSurface).toHaveAttribute('aria-hidden', 'false');
     expect(compactSurface).toHaveAttribute('aria-hidden', 'true');
 
-    await user.click(screen.getByRole('button', { name: 'Minimize Player' }));
+    await user.click(getExpandedShellMinimizeButton());
 
     expect(expandedSurface).toHaveAttribute('aria-hidden', 'true');
     expect(compactSurface).toHaveAttribute('aria-hidden', 'false');
@@ -501,7 +505,7 @@ describe('PersistentAudioBar', () => {
       fullPlayerVisible: true,
     });
 
-    await user.click(screen.getByRole('button', { name: 'Minimize Player' }));
+    await user.click(getExpandedShellMinimizeButton());
 
     await waitFor(() => {
       expect(getAudioChromeSnapshot()).toEqual({
