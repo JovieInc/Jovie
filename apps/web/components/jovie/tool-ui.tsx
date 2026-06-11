@@ -20,6 +20,7 @@ import { ChatAnalyticsCard } from './components/ChatAnalyticsCard';
 import { ChatAvatarUploadCard } from './components/ChatAvatarUploadCard';
 import { ChatLinkConfirmationCard } from './components/ChatLinkConfirmationCard';
 import { ChatLinkRemovalCard } from './components/ChatLinkRemovalCard';
+import { ChatMerchActionCard } from './components/ChatMerchActionCard';
 import {
   ChatMerchOptionsCard,
   ChatMerchSelectionCard,
@@ -430,12 +431,72 @@ function renderMerchGenerationArtifact(event: PersistedToolEvent): ReactNode {
   return <ChatMerchOptionsCard result={event.output} />;
 }
 
-function renderMerchSelectionArtifact(event: PersistedToolEvent): ReactNode {
+function renderMerchSelectionArtifact(
+  event: PersistedToolEvent,
+  profileId?: string
+): ReactNode {
   if (!isChatMerchSelectionResult(event.output)) {
     return null;
   }
 
-  return <ChatMerchSelectionCard result={event.output} />;
+  return <ChatMerchSelectionCard result={event.output} profileId={profileId} />;
+}
+
+interface MerchActionToolResult {
+  readonly success: true;
+  readonly action: 'publish_merch' | 'archive_merch' | 'unpause_merch';
+  readonly merchCardId: string;
+  readonly title: string;
+  readonly currentStatus: string;
+  readonly retailPrice: string;
+}
+
+function isMerchActionResult(result: unknown): result is MerchActionToolResult {
+  return (
+    typeof result === 'object' &&
+    result !== null &&
+    (result as { success?: unknown }).success === true &&
+    typeof (result as { action?: unknown }).action === 'string' &&
+    typeof (result as { merchCardId?: unknown }).merchCardId === 'string'
+  );
+}
+
+function merchActionFromToolName(
+  toolName: string
+): 'publish' | 'archive' | 'unpause' | null {
+  switch (toolName) {
+    case 'publishMerchCard':
+      return 'publish';
+    case 'unpauseMerchCard':
+      return 'unpause';
+    case 'deleteOrArchiveMerchCard':
+      return 'archive';
+    default:
+      return null;
+  }
+}
+
+function renderMerchActionArtifact(
+  event: PersistedToolEvent,
+  profileId?: string
+): ReactNode {
+  if (!profileId || !isMerchActionResult(event.output)) {
+    return null;
+  }
+
+  const action = merchActionFromToolName(event.toolName);
+  if (!action) return null;
+
+  return (
+    <ChatMerchActionCard
+      profileId={profileId}
+      merchCardId={event.output.merchCardId}
+      action={action}
+      title={event.output.title}
+      currentStatus={event.output.currentStatus}
+      retailPrice={event.output.retailPrice}
+    />
+  );
 }
 
 const ARTIFACT_RENDERERS: Partial<Record<string, ArtifactRenderer>> = {
@@ -452,7 +513,14 @@ const ARTIFACT_RENDERERS: Partial<Record<string, ArtifactRenderer>> = {
   generateReleasePitch: event => renderReleasePitchArtifact(event),
   createMerch: event => renderMerchGenerationArtifact(event),
   previewMerchOptions: event => renderMerchGenerationArtifact(event),
-  selectMerchDesign: event => renderMerchSelectionArtifact(event),
+  selectMerchDesign: (event, profileId) =>
+    renderMerchSelectionArtifact(event, profileId),
+  publishMerchCard: (event, profileId) =>
+    renderMerchActionArtifact(event, profileId),
+  unpauseMerchCard: (event, profileId) =>
+    renderMerchActionArtifact(event, profileId),
+  deleteOrArchiveMerchCard: (event, profileId) =>
+    renderMerchActionArtifact(event, profileId),
 };
 
 function renderArtifactCard(

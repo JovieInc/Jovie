@@ -2,15 +2,21 @@ import { gateway } from '@ai-sdk/gateway';
 import {
   convertToModelMessages,
   type ModelMessage,
+  stepCountIs,
   type ToolSet,
   type UIMessage,
 } from 'ai';
 import { streamText } from '@/lib/ai/sdk';
 import { buildAiTelemetry } from '@/lib/ai/telemetry';
 import type { ChatAccountContext } from '@/lib/chat/account-context';
+import { resolveImportBioRestrictedTools } from '@/lib/chat/import-bio-turn-guard';
 import { selectKnowledgeContext } from '@/lib/chat/knowledge/router';
 import { ONBOARDING_SYSTEM_PROMPT } from '@/lib/chat/prompts/onboarding';
 import { buildSystemPrompt } from '@/lib/chat/system-prompt';
+import {
+  isChatToolStepCapExhausted,
+  resolveChatToolStepLimit,
+} from '@/lib/chat/tool-step-limit';
 import type {
   ArtistContext,
   ChatTelemetry,
@@ -242,12 +248,26 @@ export async function executeChatTurn(
   }
 
   const toolNames = Object.keys(tools).sort((a, b) => a.localeCompare(b));
+  const toolStepLimit = resolveChatToolStepLimit(
+    planLimits.booleans.aiCanUseTools
+  );
 
   const streamResult = streamText({
     model: gateway(selectedModel),
     system: systemPrompt,
     messages: modelMessages,
     tools,
+    stopWhen: stepCountIs(toolStepLimit),
+    prepareStep: ({ steps, stepNumber }) => {
+      const restrictedTools = resolveImportBioRestrictedTools(
+        steps,
+        stepNumber
+      );
+      if (restrictedTools) {
+        return { activeTools: restrictedTools };
+      }
+      return {};
+    },
     abortSignal: signal,
     experimental_telemetry: buildAiTelemetry({
       functionId: 'jovie-chat',
@@ -255,8 +275,37 @@ export async function executeChatTurn(
         userId,
         sessionId: resolvedConversationId,
       },
-      metadata: { model: selectedModel, plan: userPlan },
+      metadata: {
+        model: selectedModel,
+        plan: userPlan,
+        chatToolStepLimit: toolStepLimit,
+      },
     }),
+    onFinish: ({ steps }) => {
+      if (!isChatToolStepCapExhausted(steps, toolStepLimit)) {
+        return;
+      }
+
+      telemetry?.setTags?.({
+        chat_tool_step_cap_exhausted: 'true',
+      });
+      telemetry?.setExtra?.('chat_tool_step_count', steps.length);
+      telemetry?.setExtra?.('chat_tool_step_limit', toolStepLimit);
+      telemetry?.addBreadcrumb?.({
+        category: 'ai-chat',
+        message: 'chat_tool_step_cap_exhausted',
+        level: 'warning',
+        data: {
+          stepLimit: toolStepLimit,
+          stepCount: steps.length,
+          requestId,
+          conversationId: resolvedConversationId,
+          profileId: resolvedProfileId,
+          plan: userPlan,
+          mode,
+        },
+      });
+    },
     onError: async ({ error }) => {
       if (isClientDisconnect(error, signal)) return;
 

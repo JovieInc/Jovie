@@ -1,5 +1,6 @@
 'use client';
 
+import { memo } from 'react';
 import { Streamdown } from 'streamdown';
 
 import { getChatMarkdownStreamdownConfig } from '@/lib/markdown/streamdown-config';
@@ -13,7 +14,7 @@ interface ChatMarkdownProps {
 /**
  * Renders chat markdown with streamdown's streaming-safe parser and sanitization.
  */
-export function ChatMarkdown({
+export const ChatMarkdown = memo(function ChatMarkdown({
   content,
   className,
   isStreaming = false,
@@ -23,4 +24,4 @@ export function ChatMarkdown({
       {content}
     </Streamdown>
   );
-}
+});
