@@ -85,6 +85,10 @@ vi.mock('@/lib/error-tracking', () => ({
 }));
 
 // Mock proxy state
+vi.mock('@/lib/auth/ban-check', () => ({
+  invalidateBanStatusCache: vi.fn().mockResolvedValue(undefined),
+}));
+
 vi.mock('@/lib/auth/proxy-state', () => ({
   invalidateProxyUserStateCache: mockInvalidateProxyUserStateCache,
 }));

@@ -9,7 +9,10 @@ import {
   readHomepageIntent,
 } from '@/components/homepage/intent-store';
 import { APP_ROUTES } from '@/constants/routes';
-import { buildAuthRouteUrl } from '@/lib/auth/build-auth-route-url';
+import {
+  buildAuthRouteUrl,
+  getDefaultSignUpFallbackRedirectUrl,
+} from '@/lib/auth/build-auth-route-url';
 import { sanitizeRedirectUrl } from '@/lib/auth/constants';
 
 /**
@@ -53,7 +56,7 @@ export function SignupModalClient() {
   const signInUrl = buildAuthRouteUrl(APP_ROUTES.SIGNIN, searchParams);
   const redirectUrl =
     sanitizeRedirectUrl(searchParams.get('redirect_url')) ??
-    APP_ROUTES.WAITLIST;
+    getDefaultSignUpFallbackRedirectUrl();
 
   const statusRow = promptHint ? (
     <p aria-live='polite' className='truncate' title={promptHint}>

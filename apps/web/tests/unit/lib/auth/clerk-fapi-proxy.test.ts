@@ -130,7 +130,8 @@ describe('clerk-fapi-proxy', () => {
 
   it('captures fetch failures and returns a bounded 502 response', async () => {
     const fetchError = new TypeError('fetch failed');
-    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(fetchError));
+    const fetchMock = vi.fn().mockRejectedValue(fetchError);
+    vi.stubGlobal('fetch', fetchMock);
 
     const { handleClerkFapiProxy } = await import(
       '@/lib/auth/clerk-fapi-proxy'
@@ -144,6 +145,7 @@ describe('clerk-fapi-proxy', () => {
       code: 'TypeError',
       hint: 'fetch failed',
     });
+    expect(fetchMock).toHaveBeenCalledTimes(2);
     expect(mockCaptureError).toHaveBeenCalledWith(
       '[clerk-proxy] fetch failed',
       fetchError,
@@ -154,5 +156,70 @@ describe('clerk-fapi-proxy', () => {
         method: 'GET',
       })
     );
+  });
+
+  it('retries GET upstream 503 responses before succeeding', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(new Response('unavailable', { status: 503 }))
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ ok: true }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        })
+      );
+    vi.stubGlobal('fetch', fetchMock);
+
+    const { handleClerkFapiProxy } = await import(
+      '@/lib/auth/clerk-fapi-proxy'
+    );
+
+    const response = await handleClerkFapiProxy(request('/__clerk/v1/client'));
+
+    expect(response?.status).toBe(200);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it('does not retry POST upstream 503 responses', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue(new Response('unavailable', { status: 503 }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    const { handleClerkFapiProxy } = await import(
+      '@/lib/auth/clerk-fapi-proxy'
+    );
+
+    const response = await handleClerkFapiProxy(
+      request('/__clerk/v1/oauth_callback', {
+        method: 'POST',
+        body: 'code=oauth-code',
+        headers: {
+          'content-type': 'application/x-www-form-urlencoded',
+        },
+      })
+    );
+
+    expect(response?.status).toBe(503);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('passes an abort signal for bounded upstream GET requests', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue(
+        new Response(JSON.stringify({ ok: true }), { status: 200 })
+      );
+    vi.stubGlobal('fetch', fetchMock);
+
+    const { handleClerkFapiProxy } = await import(
+      '@/lib/auth/clerk-fapi-proxy'
+    );
+
+    await handleClerkFapiProxy(request('/__clerk/v1/client'));
+
+    const fetchInit = fetchMock.mock.calls[0]?.[1] as RequestInit;
+    expect(fetchInit.redirect).toBe('manual');
+    expect(fetchInit.signal).toBeInstanceOf(AbortSignal);
   });
 });
