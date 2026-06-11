@@ -14,14 +14,18 @@ vi.mock('@/lib/auth/cached', () => ({
   getCachedAuth: mockCachedAuth,
 }));
 
-// Mock database
-vi.mock('@/lib/db', () => ({
-  db: {
-    execute: mockDbExecute,
-    select: mockDbSelect,
-    transaction: mockDbTransaction,
-  },
-}));
+// Mock database while preserving real RLS session helpers
+vi.mock('@/lib/db', async importOriginal => {
+  const actual = await importOriginal<typeof import('@/lib/db')>();
+  return {
+    ...actual,
+    db: {
+      execute: mockDbExecute,
+      select: mockDbSelect,
+      transaction: mockDbTransaction,
+    },
+  };
+});
 
 // Mock schema
 vi.mock('@/lib/db/schema', () => ({
@@ -111,13 +115,12 @@ describe('@critical session.ts', () => {
   });
 
   describe('setupDbSession', () => {
-    it('sets session variables for provided clerkUserId', async () => {
+    it('resets then sets session variables for provided clerkUserId', async () => {
       const { setupDbSession } = await import('@/lib/auth/session');
 
       const result = await setupDbSession('user_provided_123');
 
       expect(result.userId).toBe('user_provided_123');
-      // Combined into single query for performance
       expect(mockDbExecute).toHaveBeenCalledTimes(1);
 
       const executedSql = mockDbExecute.mock.calls[0]?.[0];
@@ -125,23 +128,26 @@ describe('@critical session.ts', () => {
 
       expect(queryText).toContain('app.clerk_user_id');
       expect(queryText).not.toContain('app.user_id');
+      expect(queryText).toMatch(
+        /set_config\('app\.clerk_user_id'.*false.*set_config\('app\.clerk_user_id'/
+      );
     });
 
-    it('throws when session-scoped set_config fails', async () => {
+    it('throws when session-scoped set_config and fallback both fail', async () => {
       const { setupDbSession } = await import('@/lib/auth/session');
 
-      mockDbExecute.mockRejectedValueOnce(new Error('set_config unavailable'));
+      mockDbExecute.mockRejectedValue(new Error('set_config unavailable'));
 
       await expect(setupDbSession('user_fallback_123')).rejects.toThrow(
         'set_config unavailable'
       );
-      expect(mockDbExecute).toHaveBeenCalledTimes(1);
+      expect(mockDbExecute.mock.calls.length).toBeGreaterThanOrEqual(1);
 
       const queryText = JSON.stringify(mockDbExecute.mock.calls[0]?.[0]);
       expect(queryText).toContain("set_config('app.clerk_user_id'");
     });
 
-    it('returns null userId when no authenticated user and no clerkUserId', async () => {
+    it('clears stale RLS session when no authenticated user and no clerkUserId', async () => {
       mockCachedAuth.mockResolvedValue({ userId: null });
 
       const { setupDbSession } = await import('@/lib/auth/session');
@@ -149,8 +155,11 @@ describe('@critical session.ts', () => {
       const result = await setupDbSession();
 
       expect(result.userId).toBeNull();
-      // Should not attempt set_config at all
-      expect(mockDbExecute).not.toHaveBeenCalled();
+      expect(mockDbExecute).toHaveBeenCalledTimes(1);
+
+      const queryText = JSON.stringify(mockDbExecute.mock.calls[0]?.[0]);
+      expect(queryText).toContain("set_config('app.clerk_user_id'");
+      expect(queryText).toContain("''");
     });
 
     it('uses getCachedAuth when no clerkUserId provided', async () => {
