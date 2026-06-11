@@ -5,17 +5,42 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
-## [26.6.47] - 2026-06-11
+## [26.6.50] - 2026-06-11
 
-> Infra train desktop release guard and audio bar test label alignment.
+> Infra train refresh after ui train merge; desktop security ships with DMG release handling.
 
 ### Changed
 
-- **VERSION**: bumps train integration to v26.6.47 so desktop security hardening ships with DMG release handling.
+- **VERSION**: bumps train integration to v26.6.50 so desktop security hardening ships with DMG release handling.
 
 ### Fixed
 
 - **PersistentAudioBar tests**: align dismiss and region aria-label assertions with Title Case labels.
+- **Shell AudioBar neutral play control**: moves central transport play/pause from accent fill onto neutral System B primary button tokens.
+
+## [26.6.49] - 2026-06-11
+
+> Calendar date selection uses neutral System B controls.
+
+### Fixed
+
+- **Calendar neutral selected date**: moves selected days and calendar focus rings off accent tokens onto neutral System B button and ring tokens while preserving fixed day and navigation control dimensions.
+
+## [26.6.48] - 2026-06-11
+
+> Display menu switches use neutral System B controls.
+
+### Fixed
+
+- **Display menu neutral switch**: moves checked switch tracks from raw primary fill onto neutral button tokens and guards the layout-stable control against accent drift.
+
+## [26.6.47] - 2026-06-11
+
+> The iOS auth loading state keeps the central browser action neutral.
+
+### Fixed
+
+- **iOS auth neutral loading indicator**: removes the accent-blue spinner from the Continue in Browser primary action and guards the button against future accent-color drift.
 
 ## [26.6.46] - 2026-06-11
 
@@ -64,7 +89,6 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 ### Fixed
 
 - **Chat slash picker clearance**: grows the virtualized transcript scroll range while the root slash picker is open so active thread content stays clear of the suggestion surface without moving the composer dock.
-
 ## [26.6.41] - 2026-06-11
 
 > Codex issue shipper GBrain capture metadata no longer carries a redundant slug assignment.
