@@ -5,16 +5,15 @@ import type { ChatErrorType, MessagePart } from './types';
 /**
  * Cheap fingerprint for streamed part updates. Avoids JSON.stringify on the hot path.
  */
-export function getPartsChangeFingerprint(
-  parts: UIMessage['parts']
-): string {
+export function getPartsChangeFingerprint(parts: UIMessage['parts']): string {
   let fingerprint = `${parts.length}:`;
 
   for (const part of parts) {
     const type = part.type;
 
     if (type === 'text' || type === 'reasoning') {
-      const text = 'text' in part && typeof part.text === 'string' ? part.text : '';
+      const text =
+        'text' in part && typeof part.text === 'string' ? part.text : '';
       fingerprint += `${type[0]}${text.length}|`;
       continue;
     }
