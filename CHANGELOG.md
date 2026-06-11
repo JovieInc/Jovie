@@ -5,6 +5,14 @@
      5|The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
      6|and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.6.34] - 2026-06-10
+
+> Library share submit actions now use neutral System B button surfaces instead of colored fills.
+
+### Fixed
+
+- **Library share neutral actions (JOV-3026)**: replaces colored `bg-primary-token` fills on the share-drop creator and passphrase gate submit buttons with neutral System B primary button tokens, keeping accent color reserved for progress, status, marks, and highlights.
+
 ## [26.6.33] - 2026-06-09
 
 > Library release assets can now be shared as a branded press-kit drop with optional passphrase and download controls.
