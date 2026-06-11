@@ -170,7 +170,7 @@ describe('PersistentAudioBar', () => {
       'https://cdn.example.com/art.jpg'
     );
     expect(
-      screen.getByRole('button', { name: 'Dismiss player' })
+      screen.getByRole('button', { name: 'Dismiss Player' })
     ).toBeInTheDocument();
   });
 
@@ -204,7 +204,7 @@ describe('PersistentAudioBar', () => {
 
     render(<PersistentAudioBar />);
 
-    await user.click(screen.getByRole('button', { name: 'Dismiss player' }));
+    await user.click(screen.getByRole('button', { name: 'Dismiss Player' }));
 
     expect(stop).toHaveBeenCalled();
   });
@@ -278,7 +278,7 @@ describe('PersistentAudioBar', () => {
     render(<PersistentAudioBar />);
 
     expect(
-      screen.getByRole('region', { name: 'Audio player' })
+      screen.getByRole('region', { name: 'Audio Player' })
     ).toBeInTheDocument();
   });
 

@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.6.47] - 2026-06-11
+
+> Infra train desktop release guard and audio bar test label alignment.
+
+### Changed
+
+- **VERSION**: bumps train integration to v26.6.47 so desktop security hardening ships with DMG release handling.
+
+### Fixed
+
+- **PersistentAudioBar tests**: align dismiss and region aria-label assertions with Title Case labels.
+
 ## [26.6.46] - 2026-06-11
 
 > Merch confirmation actions in chat now use the neutral System B primary button surface.
