@@ -15,6 +15,7 @@ const {
   mockLte,
   mockMarkWorkflowFailed,
   mockOr,
+  mockVerifyCronRequest,
 } = vi.hoisted(() => ({
   mockAnd: vi.fn((...conditions: unknown[]) => ({ type: 'and', conditions })),
   mockCaptureError: vi.fn(),
@@ -49,6 +50,11 @@ const {
   })),
   mockMarkWorkflowFailed: vi.fn(),
   mockOr: vi.fn((...conditions: unknown[]) => ({ type: 'or', conditions })),
+  mockVerifyCronRequest: vi.fn(),
+}));
+
+vi.mock('@/lib/cron/auth', () => ({
+  verifyCronRequest: mockVerifyCronRequest,
 }));
 
 vi.mock('drizzle-orm', () => ({
@@ -68,10 +74,6 @@ vi.mock('@/lib/connectors/workflows/execute-approved-action', () => ({
 
 vi.mock('@/lib/db', () => ({
   db: mockDb,
-}));
-
-vi.mock('@/lib/env-server', () => ({
-  env: { CRON_SECRET: 'test-secret' },
 }));
 
 vi.mock('@/lib/error-tracking', () => ({
@@ -121,6 +123,7 @@ describe('GET /api/cron/process-workflow-runs', () => {
     vi.resetModules();
     mockExecuteApprovedAction.mockResolvedValue(undefined);
     mockMarkWorkflowFailed.mockResolvedValue(undefined);
+    mockVerifyCronRequest.mockReturnValue(null);
   });
 
   it('claims queued workflow runs before executing them', async () => {
@@ -158,5 +161,12 @@ describe('GET /api/cron/process-workflow-runs', () => {
       workflowRunId: 'workflow-run-1',
     });
     expect(mockCaptureWarning).not.toHaveBeenCalled();
+    expect(mockVerifyCronRequest).toHaveBeenCalledWith(
+      expect.any(Request),
+      expect.objectContaining({
+        route: '/api/cron/process-workflow-runs',
+        requireTrustedOrigin: true,
+      })
+    );
   });
 });
