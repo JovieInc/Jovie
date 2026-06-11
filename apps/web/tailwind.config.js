@@ -130,6 +130,7 @@ module.exports = {
         // Button colors
         'btn-primary': 'var(--color-btn-primary-bg)',
         'btn-primary-foreground': 'var(--color-btn-primary-fg)',
+        'btn-primary-hover': 'var(--color-btn-primary-hover)',
         'btn-secondary': 'var(--color-btn-secondary-bg)',
         'btn-secondary-foreground': 'var(--color-btn-secondary-fg)',
 
@@ -229,6 +230,7 @@ module.exports = {
 
       // Ring colors (for focus rings)
       ringColor: {
+        ring: 'var(--linear-border-focus)',
         accent: 'var(--color-accent)',
         focus: 'var(--color-border-focus)',
         success: 'var(--color-success)',
