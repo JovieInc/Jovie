@@ -5,6 +5,14 @@
      5|The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
      6|and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.6.38] - 2026-06-11
+
+> Admin execution actions now use neutral System B primary button surfaces instead of raw colored fills.
+
+### Fixed
+
+- **Admin execution neutral actions (JOV-3036)**: removes local primary-token and primary-color fills from the impersonation `End Session` and ops `Dispatch worker` actions, preserving warning/status color while keeping central execution controls neutral.
+
 ## [26.6.37] - 2026-06-11
 
 > Founder demo approval actions now use the neutral System B primary button instead of a local colored fill.
