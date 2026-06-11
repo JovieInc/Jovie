@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.6.45] - 2026-06-11
+
+> Infra train version bump for desktop release guard.
+
+### Changed
+
+- **VERSION**: bumps train integration to v26.6.45 so desktop security changes ship with DMG release handling.
+
 ## [26.6.44] - 2026-06-11
 
 > Desktop security hardening plus neutral System B action controls.
