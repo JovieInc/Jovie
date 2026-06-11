@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.6.43] - 2026-06-11
+
+> Chat slash picker scroll clearance avoids redundant observer work while typing.
+
+### Fixed
+
+- **Chat slash picker scroll effect**: keeps picker-open transcript clearance stable without rebuilding scroll observers on every composer keystroke, and falls back cleanly if `ResizeObserver` setup fails.
+
 ## [26.6.42] - 2026-06-11
 
 > Chat slash-command suggestions reserve real transcript clearance in populated threads.
