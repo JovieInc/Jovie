@@ -21,6 +21,38 @@ let statsigWarnedNoSecret = false;
 const isE2ERuntime = publicEnv.NEXT_PUBLIC_E2E_MODE === '1';
 const STATSIG_INIT_TIMEOUT_MS = 10_000;
 const STATSIG_SHUTDOWN_TIMEOUT_MS = 1500;
+const GATE_CACHE_TTL_MS = 10_000;
+const gateCache = new Map<string, { value: boolean; expiresAt: number }>();
+
+function gateCacheKey(userId: string | null, gateKey: string): string {
+  return `${userId ?? 'anonymous'}:${gateKey}`;
+}
+
+function readCachedGateValue(
+  userId: string | null,
+  gateKey: string
+): boolean | undefined {
+  const cached = gateCache.get(gateCacheKey(userId, gateKey));
+  if (!cached || cached.expiresAt <= Date.now()) {
+    if (cached) {
+      gateCache.delete(gateCacheKey(userId, gateKey));
+    }
+    return undefined;
+  }
+
+  return cached.value;
+}
+
+function writeCachedGateValue(
+  userId: string | null,
+  gateKey: string,
+  value: boolean
+): void {
+  gateCache.set(gateCacheKey(userId, gateKey), {
+    value,
+    expiresAt: Date.now() + GATE_CACHE_TTL_MS,
+  });
+}
 
 function getStatsigUser(userId: string | null): StatsigUser {
   return StatsigUser.withUserID(userId ?? 'anonymous');
@@ -113,6 +145,11 @@ export async function checkGateForUser(
     return defaultValue;
   }
 
+  const cachedValue = readCachedGateValue(userId, gateKey);
+  if (cachedValue !== undefined) {
+    return cachedValue;
+  }
+
   await initializeStatsig();
 
   if (!statsigInitialized) {
@@ -126,14 +163,27 @@ export async function checkGateForUser(
     }
 
     const gate = statsig.getFeatureGate(getStatsigUser(userId), gateKey);
-    if (gate.getEvaluationDetails().reason === 'Unrecognized') {
-      return defaultValue;
-    }
-    return gate.value;
+    const value =
+      gate.getEvaluationDetails().reason === 'Unrecognized'
+        ? defaultValue
+        : gate.value;
+    writeCachedGateValue(userId, gateKey, value);
+    return value;
   } catch (error) {
     logger.error(`[Statsig] Error checking gate ${gateKey}`, error, 'Statsig');
     return defaultValue;
   }
+}
+
+export async function checkGatesForUser(
+  userId: string | null,
+  gates: ReadonlyArray<{ key: string; defaultValue?: boolean }>
+): Promise<boolean[]> {
+  return Promise.all(
+    gates.map(({ key, defaultValue = false }) =>
+      checkGateForUser(userId, key, defaultValue)
+    )
+  );
 }
 
 export async function getStatsigGateValue(
