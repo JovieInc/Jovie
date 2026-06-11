@@ -21,6 +21,7 @@
 import { and, eq } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/auth/require-auth';
+import { recoverOrphanedApprovedAction } from '@/lib/connectors/workflows/reconcile-orphaned-approved-actions';
 import { db } from '@/lib/db';
 import { suggestedActions, workflowRuns } from '@/lib/db/schema/connectors';
 import { captureError } from '@/lib/error-tracking';
@@ -64,6 +65,32 @@ export async function POST(_request: Request, { params }: RouteParams) {
       });
 
     if (updated.length === 0) {
+      const recovery = await recoverOrphanedApprovedAction({
+        approvalId: id,
+        userId,
+      });
+
+      if (recovery === 'enqueued' || recovery === 'already-queued') {
+        return NextResponse.json(
+          {
+            ok: true,
+            approvalId: id,
+            status:
+              recovery === 'enqueued'
+                ? 'approved-recovered'
+                : 'approved-pending-enqueue',
+          },
+          { status: 200, headers: NO_STORE_HEADERS }
+        );
+      }
+
+      if (recovery === 'not-found') {
+        return NextResponse.json(
+          { error: 'not-found' },
+          { status: 404, headers: NO_STORE_HEADERS }
+        );
+      }
+
       // 0 rows returned = CAS missed (already decided or not found)
       return NextResponse.json(
         { error: 'already-decided' },
