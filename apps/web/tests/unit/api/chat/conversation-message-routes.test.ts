@@ -7,7 +7,11 @@ const hoisted = vi.hoisted(() => {
     limit: selectLimitMock,
     orderBy: selectOrderByMock,
   }));
-  const selectFromMock = vi.fn().mockReturnValue({ where: selectWhereMock });
+  const selectLeftJoinMock = vi.fn().mockReturnValue({ where: selectWhereMock });
+  const selectFromMock = vi.fn().mockReturnValue({
+    where: selectWhereMock,
+    leftJoin: selectLeftJoinMock,
+  });
   const selectMock = vi.fn().mockReturnValue({ from: selectFromMock });
 
   const insertReturningMock = vi.fn();
@@ -65,7 +69,12 @@ vi.mock('@/lib/db/schema/chat', () => ({
     role: 'role',
     content: 'content',
     toolCalls: 'toolCalls',
+    turnId: 'turnId',
     createdAt: 'createdAt',
+  },
+  chatTurns: {
+    id: 'turnId',
+    status: 'status',
   },
 }));
 
@@ -245,6 +254,9 @@ describe('chat conversation message routes', () => {
           id: 'msg-v2',
           role: 'assistant',
           content: '',
+          clientMessageId: null,
+          turnId: null,
+          turnStatus: null,
           toolCalls: [
             {
               schemaVersion: 2,
@@ -262,6 +274,9 @@ describe('chat conversation message routes', () => {
           id: 'msg-legacy',
           role: 'assistant',
           content: '',
+          clientMessageId: null,
+          turnId: null,
+          turnStatus: null,
           toolCalls: [
             {
               type: 'tool-invocation',
