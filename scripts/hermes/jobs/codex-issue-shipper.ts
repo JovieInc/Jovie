@@ -408,7 +408,7 @@ function collectGbrainContext(plan: DispatchPlan): GbrainContext {
     .replace(/Z$/, 'z');
   const slug = `ops/codex-issue-shipper/github-${plan.issue.number}-${timestamp}`;
   const captureText = buildGbrainCaptureText(plan.issue);
-  let captureSlug = slug;
+  let captureSlug: string;
   try {
     const captureOut = execFileSync(
       bin,
