@@ -71,7 +71,7 @@ describe('NewReleaseHeaderAction', () => {
     );
 
     expect(
-      screen.getByRole('button', { name: 'Create a new release' })
+      screen.getByRole('button', { name: 'Create A New Release' })
     ).toBeInTheDocument();
     expect(screen.getByText('New release')).toBeInTheDocument();
   });

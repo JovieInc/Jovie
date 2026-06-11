@@ -5,6 +5,14 @@
      5|The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
      6|and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.6.35] - 2026-06-11
+
+> Dashboard header creation actions now use neutral toolbar controls instead of colored fills.
+
+### Fixed
+
+- **Dashboard header neutral actions (JOV-3030)**: removes colored `bg-primary-token` fills from release creation and task creation header actions, preserving compact toolbar behavior while keeping accent colors reserved for status, progress, and selection states.
+
 ## [26.6.34] - 2026-06-10
 
 > Library share submit actions now use neutral System B button surfaces instead of colored fills.
