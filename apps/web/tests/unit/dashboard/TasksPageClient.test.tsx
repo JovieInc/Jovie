@@ -1248,9 +1248,9 @@ describe('TasksPageClient', () => {
     openTask();
 
     expect(
-      screen.getByRole('button', { name: 'Previous task' })
+      screen.getByRole('button', { name: 'Previous Task' })
     ).toBeDisabled();
-    expect(screen.getByRole('button', { name: 'Next task' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Next Task' })).toBeEnabled();
   }, 10000);
 
   it('registers shell search exposing the task count in the shared trigger', () => {
@@ -1340,7 +1340,7 @@ describe('TasksPageClient', () => {
       })
     );
 
-    expect(screen.getByLabelText('New task name')).toBeInTheDocument();
+    expect(screen.getByLabelText('New Task Name')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Create' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Cancel' })).toBeInTheDocument();
   });

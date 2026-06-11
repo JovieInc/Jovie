@@ -112,58 +112,117 @@ function _parseTestName(stepName) {
 }
 
 /**
+ * Filter workflow jobs down to test-relevant lanes.
+ */
+function filterTestJobs(jobs) {
+  return jobs.filter(
+    job =>
+      job.name.includes('E2E') ||
+      job.name.includes('Smoke') ||
+      job.name.includes('Unit')
+  );
+}
+
+/**
+ * Collect normalized test-step executions from a workflow run's jobs.
+ */
+function collectRunExecutions(jobs) {
+  const executions = [];
+
+  for (const job of filterTestJobs(jobs)) {
+    executions.push(...extractTestExecutions(job));
+  }
+
+  return executions;
+}
+
+/**
+ * Record attempt-1 outcomes per commit so later workflow retries only count
+ * when the same step failed on the first attempt.
+ */
+function buildAttemptOneOutcomes(runsWithJobs) {
+  const outcomesBySha = new Map();
+
+  for (const { run, jobs } of runsWithJobs) {
+    if (run.run_attempt !== 1) continue;
+
+    const stepOutcomes = new Map();
+    for (const execution of collectRunExecutions(jobs)) {
+      stepOutcomes.set(execution.name, execution.conclusion);
+    }
+
+    outcomesBySha.set(run.head_sha, stepOutcomes);
+  }
+
+  return outcomesBySha;
+}
+
+/**
+ * Count a retry only when a workflow re-run recovered a step that failed on
+ * attempt 1. Unrelated workflow retries should not inflate stable steps.
+ */
+function shouldCountAsRetry({ attemptOneConclusion, runAttempt, conclusion }) {
+  return (
+    runAttempt > 1 &&
+    conclusion === 'success' &&
+    attemptOneConclusion === 'failure'
+  );
+}
+
+/**
  * Analyze workflow runs for test flakiness
  */
 async function analyzeFlakiness(token, owner, repo) {
   const runs = await fetchWorkflowRuns(token, owner, repo);
   console.log(`Analyzing ${runs.length} workflow runs...`);
 
+  const runsWithJobs = [];
+  for (const run of runs) {
+    const jobs = await fetchRunJobs(token, owner, repo, run.id);
+    runsWithJobs.push({ run, jobs });
+  }
+
+  const attemptOneOutcomes = buildAttemptOneOutcomes(runsWithJobs);
   const testStats = new Map(); // testName -> { failures, successes, retries, runs }
   let totalRuns = 0;
   let runsWithRetries = 0;
   let runsWithFailures = 0;
 
-  for (const run of runs) {
+  for (const { run, jobs } of runsWithJobs) {
     totalRuns++;
-    const jobs = await fetchRunJobs(token, owner, repo, run.id);
-
-    // Look for E2E and Smoke test jobs
-    const testJobs = jobs.filter(
-      j =>
-        j.name.includes('E2E') ||
-        j.name.includes('Smoke') ||
-        j.name.includes('Unit')
-    );
-
     const runHadRetry = run.run_attempt > 1;
     let runHadFailure = false;
+    const firstAttemptOutcomes =
+      attemptOneOutcomes.get(run.head_sha) ?? new Map();
 
-    for (const job of testJobs) {
-      const executions = extractTestExecutions(job);
+    for (const execution of collectRunExecutions(jobs)) {
+      if (!testStats.has(execution.name)) {
+        testStats.set(execution.name, {
+          failures: 0,
+          successes: 0,
+          retries: 0,
+          runs: 0,
+          lastFailure: null,
+        });
+      }
 
-      for (const execution of executions) {
-        if (!testStats.has(execution.name)) {
-          testStats.set(execution.name, {
-            failures: 0,
-            successes: 0,
-            retries: 0,
-            runs: 0,
-            lastFailure: null,
-          });
-        }
+      const stats = testStats.get(execution.name);
+      stats.runs++;
 
-        const stats = testStats.get(execution.name);
-        stats.runs++;
-
-        if (execution.conclusion === 'failure') {
-          stats.failures++;
-          stats.lastFailure = run.created_at;
-          runHadFailure = true;
-        } else if (execution.conclusion === 'success') {
-          stats.successes++;
-          if (run.run_attempt > 1) {
-            stats.retries++;
-          }
+      if (execution.conclusion === 'failure') {
+        stats.failures++;
+        stats.lastFailure = run.created_at;
+        runHadFailure = true;
+      } else if (execution.conclusion === 'success') {
+        stats.successes++;
+        if (
+          shouldCountAsRetry({
+            attemptOneConclusion: firstAttemptOutcomes.get(execution.name),
+            runAttempt: run.run_attempt,
+            conclusion: execution.conclusion,
+          })
+        ) {
+          stats.retries++;
         }
       }
     }
@@ -463,8 +522,11 @@ if (require.main === module) {
 
 module.exports = {
   analyzeFlakiness,
+  buildAttemptOneOutcomes,
   calculateMetrics,
+  collectRunExecutions,
   extractTestExecutions,
   normalizeJobName,
   generateReport,
+  shouldCountAsRetry,
 };

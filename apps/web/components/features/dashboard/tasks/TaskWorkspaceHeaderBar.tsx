@@ -88,7 +88,7 @@ export function TaskWorkspaceHeaderBar({
           value={draftTitle}
           onChange={event => onDraftTitleChange(event.target.value)}
           placeholder='Draft press release, update bio, pitch sync supervisor...'
-          aria-label='New task name'
+          aria-label='New Task Name'
           autoFocus
           className='h-8 max-w-[32rem] min-w-0'
         />
@@ -138,7 +138,7 @@ export function TaskWorkspaceHeaderBar({
           label='New Task'
           onClick={onCreateTask}
           icon={<Plus className='h-3.5 w-3.5' />}
-          className='hidden bg-primary-token px-2.5 text-on-primary hover:bg-primary-token/90 hover:text-on-primary lg:inline-flex'
+          className='hidden px-2.5 lg:inline-flex'
         />
         <DisplayMenuDropdown
           viewMode={viewMode}
@@ -153,8 +153,8 @@ export function TaskWorkspaceHeaderBar({
           }}
           trigger={
             <PageToolbarActionButton
-              ariaLabel='Display options'
-              label='Display options'
+              ariaLabel='Display Options'
+              label='Display Options'
               tooltipLabel='Display'
               iconOnly
               icon={<Settings2 className='h-3.5 w-3.5' />}
@@ -164,19 +164,19 @@ export function TaskWorkspaceHeaderBar({
         {showTaskNavigation ? (
           <div className='flex items-center gap-0.5'>
             <PageToolbarActionButton
-              ariaLabel='Previous task'
-              label='Previous task'
+              ariaLabel='Previous Task'
+              label='Previous Task'
               onClick={onSelectPrevious}
-              tooltipLabel='Previous task'
+              tooltipLabel='Previous Task'
               disabled={!canSelectPrevious}
               iconOnly
               icon={<ArrowUp className='h-3.5 w-3.5' />}
             />
             <PageToolbarActionButton
-              ariaLabel='Next task'
-              label='Next task'
+              ariaLabel='Next Task'
+              label='Next Task'
               onClick={onSelectNext}
-              tooltipLabel='Next task'
+              tooltipLabel='Next Task'
               disabled={!canSelectNext}
               iconOnly
               icon={<ArrowDown className='h-3.5 w-3.5' />}
