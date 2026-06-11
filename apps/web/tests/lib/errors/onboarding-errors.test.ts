@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   createOnboardingError,
+  isHandleUniqueViolation,
   mapDatabaseError,
   OnboardingErrorCode,
   onboardingErrorToError,
@@ -17,6 +18,17 @@ describe('onboardingErrorToError', () => {
 
     expect(error).toBeInstanceOf(Error);
     expect(error.message).toBe('[USERNAME_TAKEN] Username is already taken');
+  });
+
+  it('detects handle unique violations via isHandleUniqueViolation', () => {
+    const dbError = {
+      code: '23505',
+      message:
+        'duplicate key value violates unique constraint "creator_profiles_username_normalized_unique"',
+    };
+
+    expect(isHandleUniqueViolation(dbError)).toBe(true);
+    expect(isHandleUniqueViolation(new Error('network timeout'))).toBe(false);
   });
 
   it('works with errors mapped from database constraints', () => {
