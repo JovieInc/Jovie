@@ -40,7 +40,7 @@ import type { ChatAudioUploadResult } from './hooks/useChatAudioAttachments';
 import type { JovieChatProps } from './types';
 
 const VIRTUALIZATION_THRESHOLD = 12;
-const CHAT_PICKER_THREAD_CLEARANCE = 'min(340px, calc(100vh - 12rem))';
+const CHAT_PICKER_THREAD_CLEARANCE = 'min(620px, calc(100vh - 8rem))';
 
 function findLastAssistantIndex(
   messages: readonly { id: string; role: string }[]
@@ -398,6 +398,11 @@ export function JovieChat({
     ? CHAT_PICKER_THREAD_CLEARANCE
     : undefined;
   const [virtualizedMinHeight, setVirtualizedMinHeight] = useState(0);
+  const scrollThreadToBottom = useCallback(() => {
+    const scrollContainer = scrollContainerRef.current;
+    if (!scrollContainer) return;
+    scrollContainer.scrollTop = scrollContainer.scrollHeight;
+  }, [scrollContainerRef]);
 
   useLayoutEffect(() => {
     if (!showThreadView || !shouldVirtualizeMessages) return;
@@ -425,13 +430,51 @@ export function JovieChat({
 
   useLayoutEffect(() => {
     if (!shouldReservePickerClearance) return;
+    let frame: number | null = null;
+    let settleFrame: number | null = null;
+    const scheduleScroll = () => {
+      if (frame !== null) {
+        cancelAnimationFrame(frame);
+      }
+      if (settleFrame !== null) {
+        cancelAnimationFrame(settleFrame);
+      }
+      frame = requestAnimationFrame(() => {
+        scrollThreadToBottom();
+        settleFrame = requestAnimationFrame(scrollThreadToBottom);
+      });
+    };
+
+    scheduleScroll();
+    window.addEventListener('resize', scheduleScroll);
+    window.visualViewport?.addEventListener('resize', scheduleScroll);
+
     const scrollContainer = scrollContainerRef.current;
-    if (!scrollContainer) return;
-    const frame = requestAnimationFrame(() => {
-      scrollContainer.scrollTop = scrollContainer.scrollHeight;
-    });
-    return () => cancelAnimationFrame(frame);
-  }, [scrollContainerRef, shouldReservePickerClearance]);
+    const resizeObserver =
+      scrollContainer && typeof ResizeObserver !== 'undefined'
+        ? new ResizeObserver(scheduleScroll)
+        : null;
+    if (scrollContainer) {
+      resizeObserver?.observe(scrollContainer);
+    }
+
+    return () => {
+      if (frame !== null) {
+        cancelAnimationFrame(frame);
+      }
+      if (settleFrame !== null) {
+        cancelAnimationFrame(settleFrame);
+      }
+      resizeObserver?.disconnect();
+      window.removeEventListener('resize', scheduleScroll);
+      window.visualViewport?.removeEventListener('resize', scheduleScroll);
+    };
+  }, [
+    input,
+    scrollContainerRef,
+    scrollThreadToBottom,
+    shouldReservePickerClearance,
+  ]);
 
   // Show skeleton while fetching existing conversation
   if (isLoadingConversation) {
