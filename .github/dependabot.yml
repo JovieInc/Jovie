@@ -19,6 +19,12 @@ updates:
     labels:
       - 'dependencies'
       - 'automated'
+    groups:
+      electron-major:
+        patterns:
+          - 'electron'
+        update-types:
+          - 'version-update:semver-major'
     ignore:
       # Ignore ALL automated Clerk SDK updates — element-key naming drifts
       # silently between minor versions and breaks the AuthShell SSO-only
