@@ -70,6 +70,8 @@ export const ServerEnvSchema = z.object({
 
   // Database configuration (required at runtime, but optional during build)
   DATABASE_URL: databaseUrlValidator,
+  /** Opt-in pool-level PostgreSQL statement_timeout in milliseconds. */
+  DB_STATEMENT_TIMEOUT_MS: z.string().regex(/^\d+$/).optional(),
 
   // Server or build-time envs (may be undefined locally)
   SPOTIFY_CLIENT_ID: z.string().optional(),
@@ -347,6 +349,7 @@ export const ENV_KEYS = [
   'RESEND_INBOUND_WEBHOOK_SECRET',
   'SLACK_WEBHOOK_URL',
   'DATABASE_URL',
+  'DB_STATEMENT_TIMEOUT_MS',
   'SPOTIFY_CLIENT_ID',
   'SPOTIFY_CLIENT_SECRET',
   'JOVIE_SYSTEM_CLERK_USER_ID',
