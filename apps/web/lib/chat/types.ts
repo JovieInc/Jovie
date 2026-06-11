@@ -5,6 +5,8 @@ import type { CanvasStatus } from '@/lib/services/canvas/types';
  * Zod schema for validating client-provided artist context.
  * Used when profileId is not provided (backward compatibility).
  */
+// Not a chat tool schema — artist context validation for the HTTP route.
+// eslint-disable-next-line @jovie/chat-tool-schema-strict -- request DTO, not LLM tool input
 export const artistContextSchema = z.object({
   displayName: z.string().max(100),
   username: z.string().max(50),
@@ -47,9 +49,17 @@ export interface ReleaseContext {
  * unit tests they can be no-ops or write to a local sink. Decoupling lets
  * `executeChatTurn` stay free of Sentry imports without losing observability.
  */
+export interface ChatTelemetryBreadcrumb {
+  category: string;
+  message: string;
+  level?: 'debug' | 'info' | 'warning' | 'error';
+  data?: Record<string, unknown>;
+}
+
 export interface ChatTelemetry {
   setTags?(tags: Record<string, string>): void;
   setExtra?(key: string, value: unknown): void;
+  addBreadcrumb?(breadcrumb: ChatTelemetryBreadcrumb): void;
   captureException?(
     error: unknown,
     context: { tags?: Record<string, string>; extra?: Record<string, unknown> }
