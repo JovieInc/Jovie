@@ -39,12 +39,13 @@ function ToggleSwitch({
       <span
         className={cn(
           'flex h-4 w-7 shrink-0 items-center rounded-full p-0.5 transition-colors',
-          checked ? 'bg-primary' : 'bg-surface-2'
+          checked ? 'bg-btn-primary' : 'bg-surface-2'
         )}
       >
         <span
           className={cn(
-            'h-3 w-3 rounded-full bg-white transition-transform',
+            'h-3 w-3 rounded-full transition-[background-color,transform]',
+            checked ? 'bg-btn-primary-foreground' : 'bg-white',
             checked && 'translate-x-3'
           )}
         />
@@ -169,7 +170,7 @@ export function DisplayMenuDropdown({
           <div className='border-b border-subtle px-2.5 py-1.5'>
             <fieldset
               className='relative inline-flex w-full items-center rounded bg-surface-1 p-0.5'
-              aria-label='View mode toggle'
+              aria-label='View Mode Toggle'
             >
               {/* Sliding background indicator */}
               <div
@@ -190,7 +191,7 @@ export function DisplayMenuDropdown({
                     : 'text-tertiary-token hover:text-secondary-token'
                 )}
                 aria-pressed={viewMode === 'list'}
-                aria-label='List view'
+                aria-label='List View'
               >
                 <LayoutList className='h-4 w-4' />
                 <span>List</span>
@@ -206,7 +207,7 @@ export function DisplayMenuDropdown({
                     : 'text-tertiary-token hover:text-secondary-token'
                 )}
                 aria-pressed={viewMode === 'board'}
-                aria-label='Board view'
+                aria-label='Board View'
               >
                 <LayoutGrid className='h-4 w-4' />
                 <span>Board</span>
