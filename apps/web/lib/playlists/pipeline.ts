@@ -133,10 +133,9 @@ export async function generatePlaylist(
     for (const j of jovieArtistTracks)
       jovieTrackLookup.set(j.spotifyTrackId, j);
 
-    // TODO: Upload fullResBuffer to CDN and get URL
-    // For now, we'll store the cover art URL after Spotify upload
-    const coverImageUrl = null;
-    const coverImageUrlForDb: string | null = coverImageUrl ?? null;
+    // Cover art is generated and uploaded at admin approval time
+    // (see playlist-actions.ts approvePlaylist).
+    const coverImageUrlForDb: string | null = null;
 
     const playlistId = randomUUID();
     const generatedAt = new Date();
@@ -338,10 +337,6 @@ export async function generatePlaylist(
         )
       `);
     }
-
-    // Store cover art base64 temporarily for publish step
-    // In production, this would go to a CDN/blob store
-    // For now, we'll regenerate at publish time
 
     return {
       success: true,
