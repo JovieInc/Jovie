@@ -18,6 +18,7 @@ import {
   getEnabledAuthOAuthProviders,
   type PrimaryAuthOAuthProvider,
 } from '@/lib/auth/oauth-providers';
+import { EmailCodeAuthForm } from './EmailCodeAuthForm';
 
 export type AuthShellMode = 'sign-in' | 'sign-up';
 
@@ -84,8 +85,7 @@ interface AuthShellProps {
    */
   readonly appearance?: Record<string, unknown>;
   /**
-   * Legacy email prefill prop. Kept so callers can pass it without rendering
-   * a credential input on the SSO-only auth surface.
+   * Email prefill for the email-code form (e.g. `?email=` deep links).
    */
   readonly initialValues?: { readonly emailAddress?: string };
 }
@@ -93,10 +93,12 @@ interface AuthShellProps {
 /**
  * Canonical auth surface for Jovie.
  *
- * Jovie is SSO-only (Google + Apple via Clerk) — see JOV-2446 and JOV-2778.
- * The shell owns the visible OAuth buttons and calls Clerk's redirect APIs
- * directly, so Clerk credential fields never mount even if the dashboard
- * configuration regresses.
+ * Renders SSO (Google + Apple via Clerk) plus the email one-time-code flow.
+ * Email (`email_code`) auth is intentionally enabled (founder decision,
+ * 2026-06) — this supersedes the SSO-only contract from JOV-2446/JOV-2778.
+ * Password auth remains intentionally unsupported: the shell owns all
+ * visible auth controls and never mounts a password field, even if the
+ * Clerk dashboard configuration regresses.
  *
  * See JOV-2064, JOV-2437, JOV-2446, JOV-2778.
  */
@@ -185,10 +187,11 @@ export function AuthShell(props: Readonly<AuthShellProps>) {
   const hasNoEnabledProviders = enabledOAuthProviders.length === 0;
   const showStablePlaceholder = !isAuthStartReady;
 
-  // If absolutely no providers are gated on, render the unavailable card
-  // instead of an indefinite placeholder. This prevents the auth surface
-  // from looking broken during a provider-wide incident.
-  if (hasNoEnabledProviders) {
+  // If absolutely no OAuth providers are gated on, the email-code form is
+  // still a valid auth path, so only render the unavailable card when Clerk
+  // itself never becomes ready. With zero providers we skip the OAuth grid
+  // and lead with the email form.
+  if (hasNoEnabledProviders && !isAuthStartReady) {
     return (
       <div
         data-auth-shell-mode={mode}
@@ -226,6 +229,8 @@ export function AuthShell(props: Readonly<AuthShellProps>) {
           pendingProvider={pendingProvider}
           errorMessage={oauthError}
           onProviderSelect={handleProviderSelect}
+          redirectUrl={resolvedRedirect}
+          initialEmailAddress={props.initialValues?.emailAddress}
         />
       )}
     </div>
@@ -271,6 +276,14 @@ function AuthStableStartPlaceholder({
 
       <AuthProviderButtonSlots providers={providers} />
 
+      {/* Reserved space for the email-code form (divider + input + button)
+          so the placeholder → ready transition does not shift layout. */}
+      <div data-auth-email-form-slot aria-hidden='true' className='mt-4'>
+        <div className='h-5' />
+        <div className='h-11 rounded-(--linear-radius-sm) bg-surface-0' />
+        <div className='mt-3 h-11 rounded-(--linear-radius-sm) bg-surface-0' />
+      </div>
+
       <div
         data-auth-oauth-error-slot
         className='mt-3 min-h-5 text-center'
@@ -296,6 +309,8 @@ function AuthOAuthStartSurface({
   pendingProvider,
   errorMessage,
   onProviderSelect,
+  redirectUrl,
+  initialEmailAddress,
 }: Readonly<{
   mode: AuthShellMode;
   oppositeModeUrl: string;
@@ -304,27 +319,42 @@ function AuthOAuthStartSurface({
   pendingProvider: PrimaryAuthOAuthProvider | null;
   errorMessage: string | null;
   onProviderSelect: (provider: PrimaryAuthOAuthProvider) => void;
+  redirectUrl: string;
+  initialEmailAddress?: string;
 }>) {
+  const hasProviders = providers.length > 0;
+
   return (
     <div data-auth-sso-surface>
       <AuthShellTitle mode={mode} />
 
-      <fieldset
-        data-auth-provider-slots
-        className='grid grid-cols-1 gap-1.5'
-        aria-busy={pendingProvider ? 'true' : undefined}
-      >
-        <legend className='sr-only'>Social sign-in options</legend>
-        {providers.map(provider => (
-          <AuthProviderButtonSlot
-            key={provider}
-            provider={provider}
-            disabled={Boolean(pendingProvider)}
-            pending={pendingProvider === provider}
-            onClick={() => onProviderSelect(provider)}
-          />
-        ))}
-      </fieldset>
+      {hasProviders ? (
+        <fieldset
+          data-auth-provider-slots
+          className='grid grid-cols-1 gap-1.5'
+          aria-busy={pendingProvider ? 'true' : undefined}
+        >
+          <legend className='sr-only'>Social sign-in options</legend>
+          {providers.map(provider => (
+            <AuthProviderButtonSlot
+              key={provider}
+              provider={provider}
+              disabled={Boolean(pendingProvider)}
+              pending={pendingProvider === provider}
+              onClick={() => onProviderSelect(provider)}
+            />
+          ))}
+        </fieldset>
+      ) : null}
+
+      <div data-auth-email-form-slot className='mt-4'>
+        {hasProviders ? <AuthMethodDivider /> : null}
+        <EmailCodeAuthForm
+          mode={mode}
+          redirectUrl={redirectUrl}
+          initialEmailAddress={initialEmailAddress}
+        />
+      </div>
 
       <div
         data-auth-oauth-error-slot
@@ -348,6 +378,22 @@ function AuthOAuthStartSurface({
       />
 
       <AuthLegalText mode={mode} />
+    </div>
+  );
+}
+
+function AuthMethodDivider() {
+  return (
+    <div
+      data-auth-method-divider
+      className='mb-4 flex items-center gap-3'
+      aria-hidden='true'
+    >
+      <span className='h-px flex-1 bg-(--linear-border-subtle)' />
+      <span className='text-2xs uppercase tracking-wide text-secondary-token'>
+        or
+      </span>
+      <span className='h-px flex-1 bg-(--linear-border-subtle)' />
     </div>
   );
 }
