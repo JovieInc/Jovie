@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.6.47] - 2026-06-11
+
+> The iOS auth loading state keeps the central browser action neutral.
+
+### Fixed
+
+- **iOS auth neutral loading indicator**: removes the accent-blue spinner from the Continue in Browser primary action and guards the button against future accent-color drift.
+
 ## [26.6.46] - 2026-06-11
 
 > Merch confirmation actions in chat now use the neutral System B primary button surface.
