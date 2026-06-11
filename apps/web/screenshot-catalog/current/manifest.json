@@ -114,8 +114,8 @@
     "viewport": "desktop",
     "theme": "dark",
     "consumers": ["admin", "investor-ready"],
-    "capturedAt": "2026-06-10T22:36:35.663Z",
-    "gitSha": "b6f9f152935dc52ea81d3bf3b00a6f93760c186d",
+    "capturedAt": "2026-06-11T00:09:38.294Z",
+    "gitSha": "655d226c0d448572e84f9f553f29d15300c3db84",
     "imagePath": "artist-profile-adaptive-section-desktop.png"
   },
   {
@@ -153,8 +153,8 @@
     "viewport": "desktop",
     "theme": "dark",
     "consumers": ["admin", "investor-ready"],
-    "capturedAt": "2026-06-10T22:37:49.936Z",
-    "gitSha": "b6f9f152935dc52ea81d3bf3b00a6f93760c186d",
+    "capturedAt": "2026-06-11T00:10:52.377Z",
+    "gitSha": "655d226c0d448572e84f9f553f29d15300c3db84",
     "imagePath": "artist-profile-reactivation-section-desktop.png"
   },
   {
@@ -166,8 +166,8 @@
     "viewport": "desktop",
     "theme": "dark",
     "consumers": ["admin", "investor-ready"],
-    "capturedAt": "2026-06-10T22:38:14.367Z",
-    "gitSha": "b6f9f152935dc52ea81d3bf3b00a6f93760c186d",
+    "capturedAt": "2026-06-11T00:11:16.733Z",
+    "gitSha": "655d226c0d448572e84f9f553f29d15300c3db84",
     "imagePath": "artist-profile-monetization-section-desktop.png"
   },
   {
@@ -179,8 +179,8 @@
     "viewport": "desktop",
     "theme": "dark",
     "consumers": ["admin", "investor-ready"],
-    "capturedAt": "2026-06-10T22:38:39.209Z",
-    "gitSha": "b6f9f152935dc52ea81d3bf3b00a6f93760c186d",
+    "capturedAt": "2026-06-11T00:11:41.549Z",
+    "gitSha": "655d226c0d448572e84f9f553f29d15300c3db84",
     "imagePath": "artist-profile-power-features-section-desktop.png"
   },
   {
@@ -608,8 +608,8 @@
     "viewport": "desktop",
     "theme": "dark",
     "consumers": ["admin", "marketing-export", "investor-ready"],
-    "capturedAt": "2026-06-10T21:07:49.071Z",
-    "gitSha": "7a106de9f4c9be4d258fdc7ac0dd722fabd8ba90",
+    "capturedAt": "2026-06-11T00:18:57.861Z",
+    "gitSha": "655d226c0d448572e84f9f553f29d15300c3db84",
     "imagePath": "shell-v1-releases-desktop.png",
     "publicExportPath": "shell-v1-releases.png"
   },
