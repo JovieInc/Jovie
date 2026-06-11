@@ -29,9 +29,9 @@ import { isSecureEnv } from '@/lib/env-server';
 import { captureError } from '@/lib/error-tracking';
 import {
   createOnboardingError,
+  isHandleUniqueViolation,
   OnboardingErrorCode,
   onboardingErrorToError,
-  unwrapDatabaseError,
 } from '@/lib/errors/onboarding';
 import { attributeLeadSignupFromClerkUserId } from '@/lib/leads/funnel-events';
 import { cacheHandleAvailability } from '@/lib/onboarding/handle-availability-cache';
@@ -57,26 +57,6 @@ import {
 } from './profile-setup';
 import type { CompletionResult } from './types';
 import { ensureEmailAvailable, ensureHandleAvailable } from './validation';
-
-function isHandleUniqueViolation(error: unknown): boolean {
-  const unwrapped = unwrapDatabaseError(error);
-  const message = (
-    unwrapped.message || (error instanceof Error ? error.message : '')
-  ).toLowerCase();
-  const constraint = (unwrapped.constraint ?? '').toLowerCase();
-  const detail = (unwrapped.detail ?? '').toLowerCase();
-
-  if (unwrapped.code !== '23505' && !message.includes('duplicate')) {
-    return false;
-  }
-
-  return (
-    constraint.includes('creator_profiles_username_normalized_unique') ||
-    message.includes('username_normalized') ||
-    detail.includes('username_normalized') ||
-    detail.includes('username')
-  );
-}
 
 async function recoverConcurrentProfileClaim(
   clerkUserId: string,
