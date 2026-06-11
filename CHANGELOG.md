@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.6.48] - 2026-06-11
+
+> Display menu switches use neutral System B controls.
+
+### Fixed
+
+- **Display menu neutral switch**: moves checked switch tracks from raw primary fill onto neutral button tokens and guards the layout-stable control against accent drift.
+
 ## [26.6.47] - 2026-06-11
 
 > The iOS auth loading state keeps the central browser action neutral.
