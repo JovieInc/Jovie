@@ -1,9 +1,17 @@
-     1|# Changelog
-     2|
-     3|All notable changes to this project will be documented in this file.
-     4|
-     5|The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
-     6|and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
+# Changelog
+
+All notable changes to this project will be documented in this file.
+
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
+and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
+
+## [26.6.41] - 2026-06-11
+
+> Codex issue shipper GBrain capture metadata no longer carries a redundant slug assignment.
+
+### Fixed
+
+- **Codex issue shipper capture metadata**: removes the unused initial `captureSlug` assignment so the capture result is assigned exactly once from either the successful GBrain capture output or the captured failure fallback.
 
 ## [26.6.40] - 2026-06-11
 
