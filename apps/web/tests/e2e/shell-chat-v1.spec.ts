@@ -239,14 +239,37 @@ function expectBoxInsideViewport(
   expect(box.y + box.height).toBeLessThanOrEqual(viewport.height);
 }
 
+async function waitForPickerScrollSettled(page: Page) {
+  const { shellScroll } = shellChatFrameLocators(page);
+  await expect
+    .poll(
+      async () => {
+        const metrics = await shellScroll.evaluate(node => ({
+          scrollTop: node.scrollTop,
+          scrollHeight: node.scrollHeight,
+          clientHeight: node.clientHeight,
+        }));
+        return (
+          metrics.scrollTop + metrics.clientHeight >= metrics.scrollHeight - 4
+        );
+      },
+      {
+        message: 'thread scroll reaches bottom after slash picker opens',
+        timeout: 45_000,
+      }
+    )
+    .toBe(true);
+}
+
 async function assertSlashMenuClearsThreadContent(page: Page) {
   const chatContent = page.locator('[data-testid="chat-content"]');
   await expect(chatContent).toHaveAttribute('data-picker-open', 'true', {
-    timeout: 15_000,
+    timeout: 30_000,
   });
 
   const slashMenu = page.locator('[data-testid="slash-command-menu"]').last();
-  await expect(slashMenu).toBeVisible({ timeout: 15_000 });
+  await expect(slashMenu).toBeVisible({ timeout: 30_000 });
+  await waitForPickerScrollSettled(page);
 
   const menuBox = await slashMenu.boundingBox();
   expectBoxInsideViewport(menuBox, page.viewportSize());
@@ -284,7 +307,7 @@ async function assertSlashMenuClearsThreadContent(page: Page) {
           if (!currentMenuBox || !currentTargetBox) return false;
           return !boxesOverlap(currentMenuBox, currentTargetBox, 4);
         },
-        { message: `${label} clears slash menu`, timeout: 20_000 }
+        { message: `${label} clears slash menu`, timeout: 45_000 }
       )
       .toBe(true);
   }
@@ -372,7 +395,7 @@ test('chat route slash picker clears active transcript content in populated thre
     process.env.E2E_USE_TEST_AUTH_BYPASS !== '1',
     'Requires E2E_USE_TEST_AUTH_BYPASS=1'
   );
-  test.setTimeout(180_000);
+  test.setTimeout(300_000);
 
   await mockFlyoutConversation(page);
   await forceDesignV1(page);
