@@ -38,6 +38,10 @@ export {
   initializeDb,
   isRetryableError,
   // Session helpers
+  applyRlsSessionUser,
+  getRlsSessionResetSql,
+  getRlsSessionSetSql,
+  resetRlsSession,
   setSessionUser,
   validateDbConnection,
   withDb,

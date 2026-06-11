@@ -18,6 +18,47 @@ import { withRetry } from './retry';
 import type { DbType } from './types';
 
 /**
+ * SQL that clears the RLS session variable on the current connection.
+ * Required before setting a new identity on pooled connections, which can
+ * otherwise inherit a prior request's `app.clerk_user_id`.
+ */
+export function getRlsSessionResetSql() {
+  return drizzleSql`SELECT set_config('app.clerk_user_id', '', false)`;
+}
+
+/**
+ * SQL that atomically clears then sets the RLS session variable for a user.
+ * Uses is_local=false (session-scoped) so the setting persists for the
+ * lifetime of the pooled connection.
+ */
+export function getRlsSessionSetSql(userId: string) {
+  return drizzleSql`SELECT set_config('app.clerk_user_id', '', false), set_config('app.clerk_user_id', ${userId}, false)`;
+}
+
+/**
+ * Clear any stale RLS identity left on a pooled connection.
+ */
+export async function resetRlsSession(db: DbType): Promise<void> {
+  await db.execute(getRlsSessionResetSql());
+}
+
+/**
+ * Reset then set the RLS session user on the provided connection.
+ */
+export async function applyRlsSessionUser(
+  db: DbType,
+  userId: string
+): Promise<void> {
+  try {
+    await db.execute(getRlsSessionSetSql(userId));
+  } catch (error) {
+    logDbError('applyRlsSessionUser_set_config_failed', error, { userId });
+    await resetRlsSession(db);
+    await db.execute(drizzleSql`SET app.clerk_user_id = ${userId}`);
+  }
+}
+
+/**
  * Helper to safely execute database operations with error handling and retry logic
  */
 export async function withDb<T>(
@@ -36,15 +77,10 @@ export async function withDb<T>(
 /**
  * Set session user ID for RLS policies with retry logic.
  *
- * Uses set_config with is_local=false (session-scoped) so the setting
- * persists for the lifetime of the connection.
+ * Clears any stale identity on the pooled connection before setting the
+ * current user's `app.clerk_user_id` via session-scoped set_config.
  */
 export async function setSessionUser(userId: string): Promise<void> {
-  if (!userId) {
-    logDbInfo('setSessionUser', 'Skipping RLS setup — no userId provided');
-    return;
-  }
-
   try {
     await withRetry(async () => {
       let db = getInternalDb();
@@ -52,20 +88,22 @@ export async function setSessionUser(userId: string): Promise<void> {
         db = initializeDb();
         setInternalDb(db);
       }
-      // Set the RLS session variable in a single round-trip.
-      // is_local=false so the setting takes effect for the current connection
-      // rather than requiring a transaction block that doesn't exist.
-      try {
-        await db.execute(
-          drizzleSql`SELECT set_config('app.clerk_user_id', ${userId}, false)`
+
+      if (!userId) {
+        logDbInfo(
+          'setSessionUser',
+          'Clearing RLS session — no userId provided'
         );
-      } catch (error) {
-        logDbError('setSessionUser_set_config_failed', error, { userId });
-        await db.execute(drizzleSql`SET app.clerk_user_id = ${userId}`);
+        await resetRlsSession(db);
+        return;
       }
+
+      await applyRlsSessionUser(db, userId);
     }, 'setSessionUser');
 
-    logDbInfo('setSessionUser', 'Session user set successfully', { userId });
+    if (userId) {
+      logDbInfo('setSessionUser', 'Session user set successfully', { userId });
+    }
   } catch (error) {
     logDbError('setSessionUser', error, { userId });
     throw error;
