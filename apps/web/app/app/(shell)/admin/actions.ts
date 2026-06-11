@@ -5,9 +5,9 @@ import { revalidatePath } from 'next/cache';
 import { APP_ROUTES } from '@/constants/routes';
 
 import { isAdmin as checkAdminRole } from '@/lib/admin/roles';
+import { invalidateBanStatusCache } from '@/lib/auth/ban-check';
 import { getCachedAuth } from '@/lib/auth/cached';
 import { syncAllClerkMetadata } from '@/lib/auth/clerk-sync';
-import { invalidateBanStatusCache } from '@/lib/auth/ban-check';
 import { invalidateProxyUserStateCache } from '@/lib/auth/proxy-state';
 import { checkUserStatus } from '@/lib/auth/status-checker';
 import { invalidateProfileCache } from '@/lib/cache/profile';
