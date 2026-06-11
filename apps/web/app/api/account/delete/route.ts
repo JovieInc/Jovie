@@ -83,15 +83,18 @@ export async function POST(request: Request) {
   }
 
   try {
-    const user = await withDbSession(async sessionClerkUserId => {
-      const [row] = await db
-        .select({ id: users.id, deletedAt: users.deletedAt })
-        .from(users)
-        .where(eq(users.clerkId, sessionClerkUserId))
-        .limit(1);
+    const user = await withDbSession(
+      async sessionClerkUserId => {
+        const [row] = await db
+          .select({ id: users.id, deletedAt: users.deletedAt })
+          .from(users)
+          .where(eq(users.clerkId, sessionClerkUserId))
+          .limit(1);
 
-      return row;
-    }, { clerkUserId });
+        return row;
+      },
+      { clerkUserId }
+    );
 
     if (!user) {
       return NextResponse.json(
@@ -102,42 +105,45 @@ export async function POST(request: Request) {
 
     const now = new Date();
 
-    const profiles = await withDbSessionTx(async tx => {
-      const profileRows = await tx
-        .select({ usernameNormalized: creatorProfiles.usernameNormalized })
-        .from(creatorProfiles)
-        .where(eq(creatorProfiles.userId, user.id));
+    const profiles = await withDbSessionTx(
+      async tx => {
+        const profileRows = await tx
+          .select({ usernameNormalized: creatorProfiles.usernameNormalized })
+          .from(creatorProfiles)
+          .where(eq(creatorProfiles.userId, user.id));
 
-      // Delete dependent data first — users.deletedAt is the success-fence below
-      await tx
-        .delete(creatorProfiles)
-        .where(eq(creatorProfiles.userId, user.id));
-      await tx.delete(preSaveTokens).where(eq(preSaveTokens.userId, user.id));
-      await tx.delete(feedbackItems).where(eq(feedbackItems.userId, user.id));
-      await tx
-        .delete(emailSuppressions)
-        .where(eq(emailSuppressions.createdBy, user.id));
-
-      if (!user.deletedAt) {
-        // Soft-delete: anonymize all personal data and mark as deleted
-        // GDPR requires removal of all PII - we retain only structural fields
+        // Delete dependent data first — users.deletedAt is the success-fence below
         await tx
-          .update(users)
-          .set({
-            name: null,
-            email: null,
-            stripeCustomerId: null,
-            stripeSubscriptionId: null,
-            waitlistEntryId: null,
-            deletedAt: now,
-            userStatus: 'banned',
-            updatedAt: now,
-          })
-          .where(eq(users.id, user.id));
-      }
+          .delete(creatorProfiles)
+          .where(eq(creatorProfiles.userId, user.id));
+        await tx.delete(preSaveTokens).where(eq(preSaveTokens.userId, user.id));
+        await tx.delete(feedbackItems).where(eq(feedbackItems.userId, user.id));
+        await tx
+          .delete(emailSuppressions)
+          .where(eq(emailSuppressions.createdBy, user.id));
 
-      return profileRows;
-    }, { clerkUserId });
+        if (!user.deletedAt) {
+          // Soft-delete: anonymize all personal data and mark as deleted
+          // GDPR requires removal of all PII - we retain only structural fields
+          await tx
+            .update(users)
+            .set({
+              name: null,
+              email: null,
+              stripeCustomerId: null,
+              stripeSubscriptionId: null,
+              waitlistEntryId: null,
+              deletedAt: now,
+              userStatus: 'banned',
+              updatedAt: now,
+            })
+            .where(eq(users.id, user.id));
+        }
+
+        return profileRows;
+      },
+      { clerkUserId }
+    );
 
     // Invalidate handle availability cache so deleted usernames become available
     for (const profile of profiles) {

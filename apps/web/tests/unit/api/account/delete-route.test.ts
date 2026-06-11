@@ -204,14 +204,12 @@ describe('POST /api/account/delete', () => {
     expect(mockWithDbSession.mock.invocationCallOrder[0]).toBeLessThan(
       mockWithDbSessionTx.mock.invocationCallOrder[0]
     );
-    expect(mockWithDbSession).toHaveBeenCalledWith(
-      expect.any(Function),
-      { clerkUserId: 'clerk_user_1' }
-    );
-    expect(mockWithDbSessionTx).toHaveBeenCalledWith(
-      expect.any(Function),
-      { clerkUserId: 'clerk_user_1' }
-    );
+    expect(mockWithDbSession).toHaveBeenCalledWith(expect.any(Function), {
+      clerkUserId: 'clerk_user_1',
+    });
+    expect(mockWithDbSessionTx).toHaveBeenCalledWith(expect.any(Function), {
+      clerkUserId: 'clerk_user_1',
+    });
   });
 
   it('retries idempotently when account was partially deleted', async () => {
