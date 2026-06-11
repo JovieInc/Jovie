@@ -20,6 +20,7 @@ import 'server-only';
 
 import { tool } from 'ai';
 import { TOOL_SCHEMAS } from '@/lib/chat/tool-schemas';
+import { proposeMerchAction } from '@/lib/chat/tools/merch-propose';
 import {
   generateMerchFromConcept,
   previewMerchFromConcept,
@@ -118,13 +119,24 @@ export function createMerchSelectTool(params: {
         return { success: false as const, error: 'Profile ID required' };
       }
 
-      return selectAndCreateMerchCard({
+      const result = await selectAndCreateMerchCard({
         generationId,
         clerkUserId: params.clerkUserId,
         optionId: optionId ?? null,
         optionNumber: optionNumber ?? null,
-        publish: makeLive === true,
+        publish: false,
       });
+
+      if (makeLive === true && result.success && params.profileId) {
+        const publishProposal = await proposeMerchAction({
+          action: 'publish',
+          merchCardId: result.merchCardId,
+          profileId: params.profileId,
+        });
+        return { ...result, publishProposal };
+      }
+
+      return result;
     },
   });
 }

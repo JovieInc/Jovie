@@ -1,8 +1,8 @@
 import 'server-only';
 
 import { tool } from 'ai';
-import { z } from 'zod';
 import { APP_ROUTES } from '@/constants/routes';
+import { chatToolSchema } from '@/lib/chat/strict-schema';
 import { publicEnv } from '@/lib/env-public';
 import { createBillingPortalSession } from '@/lib/stripe/client';
 import { getUserBillingInfo } from '@/lib/stripe/customer-sync';
@@ -46,13 +46,13 @@ export function createAccountChatTools(accountContext: ChatAccountContext) {
     showAccountStatus: tool({
       description:
         'Show the authenticated account plan, billing verification state, feature access, merch access, and safe next action.',
-      inputSchema: z.object({}),
+      inputSchema: chatToolSchema({}),
       execute: async () => buildAccountStatusPayload(accountContext),
     }),
     showUsage: tool({
       description:
         'Show AI chat usage, limits, remaining messages, and reset times for the authenticated account.',
-      inputSchema: z.object({}),
+      inputSchema: chatToolSchema({}),
       execute: async () => {
         if (!accountContext.usage) {
           return {
@@ -74,7 +74,7 @@ export function createAccountChatTools(accountContext: ChatAccountContext) {
     openBillingPortal: tool({
       description:
         'Open Stripe billing portal when available, or return the billing/settings route when no Stripe customer exists. Does not mutate subscriptions.',
-      inputSchema: z.object({}),
+      inputSchema: chatToolSchema({}),
       execute: async () => {
         const billing = await getUserBillingInfo();
         if (!billing.success) {

@@ -13,6 +13,7 @@ import { toast } from 'sonner';
 import { usePreviewPanelContext } from '@/app/app/(shell)/dashboard/PreviewPanelContext';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { DrawerButton } from '@/components/molecules/drawer';
+import { stripUntrustedSourceFence } from '@/lib/ai/tools/untrusted-source-fence';
 import { useConfirmChatEditMutation } from '@/lib/queries';
 import { cn } from '@/lib/utils';
 
@@ -64,13 +65,17 @@ export function ProfileEditPreviewCard({
   const [cancelled, setCancelled] = useState(false);
   const confirmEdit = useConfirmChatEditMutation();
   const previewPanel = usePreviewPanelContext();
+  const resolvedNewValue =
+    preview.field === 'bio' && typeof preview.newValue === 'string'
+      ? stripUntrustedSourceFence(preview.newValue)
+      : preview.newValue;
 
   const handleApply = useCallback(async () => {
     confirmEdit.mutate(
       {
         profileId,
         field: preview.field,
-        newValue: preview.newValue,
+        newValue: resolvedNewValue,
       },
       {
         onSuccess: () => {
@@ -93,7 +98,14 @@ export function ProfileEditPreviewCard({
         },
       }
     );
-  }, [profileId, preview, onApply, confirmEdit, previewPanel]);
+  }, [
+    profileId,
+    preview,
+    resolvedNewValue,
+    onApply,
+    confirmEdit,
+    previewPanel,
+  ]);
 
   const handleCancel = useCallback(() => {
     setCancelled(true);
@@ -194,7 +206,7 @@ export function ProfileEditPreviewCard({
             New
           </div>
           <div className='text-app tracking-[-0.01em] text-primary-token'>
-            {formatValue(preview.newValue)}
+            {formatValue(resolvedNewValue)}
           </div>
         </div>
       </div>

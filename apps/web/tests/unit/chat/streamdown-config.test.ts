@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest';
 
-import { getChatMarkdownStreamdownConfig } from '@/lib/markdown/streamdown-config';
+import {
+  CHAT_MARKDOWN_STATIC_CONFIG,
+  CHAT_MARKDOWN_STREAMING_CONFIG,
+  getChatMarkdownStreamdownConfig,
+} from '@/lib/markdown/streamdown-config';
 
 describe('getChatMarkdownStreamdownConfig', () => {
   it('enables streaming mode and caret while streaming', () => {
@@ -11,6 +15,15 @@ describe('getChatMarkdownStreamdownConfig', () => {
     expect(config.caret).toBe('block');
     expect(config.className).toContain('text-[15px]');
     expect(config.className).toContain('custom-class');
+  });
+
+  it('reuses frozen streamdown configs on the hot path', () => {
+    expect(getChatMarkdownStreamdownConfig(true)).toBe(
+      CHAT_MARKDOWN_STREAMING_CONFIG
+    );
+    expect(getChatMarkdownStreamdownConfig(false)).toBe(
+      CHAT_MARKDOWN_STATIC_CONFIG
+    );
   });
 
   it('blocks unsafe protocols from links', () => {

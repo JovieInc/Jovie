@@ -4,6 +4,7 @@ import { SimpleTooltip, Skeleton } from '@jovie/ui';
 import { Check, Copy } from 'lucide-react';
 import { motion, useReducedMotion } from 'motion/react';
 import dynamic from 'next/dynamic';
+import { memo } from 'react';
 import { useClipboard } from '@/hooks/useClipboard';
 import { cn } from '@/lib/utils';
 import { getRenderableToolEvents, ToolPartsRenderer } from '../tool-ui';
@@ -38,7 +39,24 @@ interface ChatMessageProps {
   readonly renderTools?: boolean;
 }
 
-export function ChatMessage({
+function areChatMessagePropsEqual(
+  previous: ChatMessageProps,
+  next: ChatMessageProps
+): boolean {
+  return (
+    previous.id === next.id &&
+    previous.role === next.role &&
+    previous.parts === next.parts &&
+    previous.isStreaming === next.isStreaming &&
+    previous.isThinking === next.isThinking &&
+    previous.avatarUrl === next.avatarUrl &&
+    previous.profileId === next.profileId &&
+    previous.skipEntrance === next.skipEntrance &&
+    previous.renderTools === next.renderTools
+  );
+}
+
+export const ChatMessage = memo(function ChatMessage({
   id,
   role,
   parts,
@@ -198,4 +216,4 @@ export function ChatMessage({
       )}
     </motion.div>
   );
-}
+}, areChatMessagePropsEqual);

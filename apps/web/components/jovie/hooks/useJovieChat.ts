@@ -5,18 +5,10 @@ import { useAsyncRateLimiter } from '@tanstack/react-pacer';
 import { useQueryClient } from '@tanstack/react-query';
 import { DefaultChatTransport, type UIMessage } from 'ai';
 import { useRouter } from 'next/navigation';
-import {
-  useCallback,
-  useEffect,
-  useMemo,
-  useReducer,
-  useRef,
-  useState,
-} from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { track } from '@/lib/analytics';
 import { matchCommand } from '@/lib/chat/command-registry';
 import { consumePendingChatPrompt } from '@/lib/chat/open-chat-with-prompt';
-import { useAppFlag } from '@/lib/flags/client';
 import { PACER_TIMING } from '@/lib/pacer/hooks/timing';
 import { queryKeys, useChatConversationQuery } from '@/lib/queries';
 import { captureException } from '@/lib/sentry/client-lite';
@@ -41,6 +33,7 @@ import { MAX_MESSAGE_LENGTH } from '../types';
 import {
   extractErrorMetadata,
   getErrorType,
+  getPartsChangeFingerprint,
   getPreferredErrorMessage,
 } from '../utils';
 import { composeMessage, useChipTray } from './useChipTray';
@@ -159,10 +152,6 @@ function getLastAssistantMessage(messages: readonly UIMessage[]) {
   return undefined;
 }
 
-function getPartsSignature(parts: UIMessage['parts']): string {
-  return JSON.stringify(parts);
-}
-
 function summarizeTimelineState(state: ChatTimelineState) {
   return {
     conversationId: state.conversationId,
@@ -218,7 +207,6 @@ export function useJovieChat({
   username,
 }: UseJovieChatOptions) {
   const router = useRouter();
-  const appleWalletProfilePassEnabled = useAppFlag('APPLE_WALLET_PROFILE_PASS');
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const lastAttemptedMessageRef = useRef<string>('');
   const activeClientTurnIdRef = useRef<string | null>(null);
@@ -234,10 +222,8 @@ export function useJovieChat({
     string | null
   >(conversationId ?? null);
   const queryClient = useQueryClient();
-  const [timelineState, dispatchTimeline] = useReducer(
-    reduceChatTimeline,
-    activeConversationId,
-    getCachedTimelineState
+  const [timelineState, setTimelineState] = useState<ChatTimelineState>(() =>
+    getCachedTimelineState(activeConversationId)
   );
   const timelineStateRef = useRef(timelineState);
   useEffect(() => {
@@ -245,37 +231,39 @@ export function useJovieChat({
     cacheTimelineState(timelineState);
   }, [timelineState]);
   const dispatchTimelineEvent = useCallback((event: ChatTimelineEvent) => {
-    const previousState = timelineStateRef.current;
-    const nextState = reduceChatTimeline(previousState, event);
-    timelineStateRef.current = nextState;
-    cacheTimelineState(nextState);
-    const ignoredAsStale = nextState.diagnostics.some(
-      diagnostic =>
-        diagnostic.event === event.type &&
-        diagnostic.type === 'stale-event-ignored'
-    );
+    setTimelineState(previousState => {
+      const nextState = reduceChatTimeline(previousState, event);
+      timelineStateRef.current = nextState;
+      cacheTimelineState(nextState);
 
-    if (isTimelineDebugEnabled() || ignoredAsStale) {
-      const payload = {
-        eventName: event.type,
-        conversationId:
-          event.conversationId ?? nextState.conversationId ?? null,
-        requestId: event.requestId ?? null,
-        previousState: summarizeTimelineState(previousState),
-        nextState: summarizeTimelineState(nextState),
-        ignoredAsStale,
-        timestamp: Date.now(),
-      };
+      const ignoredAsStale = nextState.diagnostics.some(
+        diagnostic =>
+          diagnostic.event === event.type &&
+          diagnostic.type === 'stale-event-ignored'
+      );
 
-      logger.info('chat_timeline.transition', payload, 'chat-timeline');
-      try {
-        track('chat_timeline.transition', payload);
-      } catch {
-        // Analytics failures must not affect chat state.
+      if (isTimelineDebugEnabled() || ignoredAsStale) {
+        const payload = {
+          eventName: event.type,
+          conversationId:
+            event.conversationId ?? nextState.conversationId ?? null,
+          requestId: event.requestId ?? null,
+          previousState: summarizeTimelineState(previousState),
+          nextState: summarizeTimelineState(nextState),
+          ignoredAsStale,
+          timestamp: Date.now(),
+        };
+
+        logger.info('chat_timeline.transition', payload, 'chat-timeline');
+        try {
+          track('chat_timeline.transition', payload);
+        } catch {
+          // Analytics failures must not affect chat state.
+        }
       }
-    }
 
-    dispatchTimeline(event);
+      return nextState;
+    });
   }, []);
   const messages = selectRenderableMessages(timelineState);
 
@@ -553,7 +541,7 @@ export function useJovieChat({
     }
 
     if (parts.length === 0) return;
-    const signature = getPartsSignature(parts);
+    const signature = getPartsChangeFingerprint(parts);
     if (signature === lastAssistantPartsSignatureRef.current) return;
 
     lastAssistantPartsSignatureRef.current = signature;
@@ -665,12 +653,7 @@ export function useJovieChat({
   /** Try to handle text as a deterministic command. Returns true if handled. */
   const tryHandleCommand = useCallback(
     (trimmedText: string): boolean => {
-      const commandCtx = {
-        username,
-        appleWalletProfilePassAvailable:
-          appleWalletProfilePassEnabled && Boolean(username),
-        router,
-      };
+      const commandCtx = { username, router };
       const command = matchCommand(trimmedText, commandCtx);
       if (!command) return false;
 
@@ -688,14 +671,7 @@ export function useJovieChat({
       command.execute(commandCtx);
       return true;
     },
-    [
-      activeConversationId,
-      appleWalletProfilePassEnabled,
-      dispatchTimelineEvent,
-      username,
-      router,
-      setInput,
-    ]
+    [activeConversationId, dispatchTimelineEvent, username, router, setInput]
   );
 
   // Core submit logic

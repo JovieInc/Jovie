@@ -4,9 +4,11 @@ import type React from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { useChatJankMonitor } from '@/components/jovie/hooks/useChatJankMonitor';
+import * as jankMonitorModule from '@/lib/chat/jank-monitor';
 import {
   JANK_EVENT_NAMES,
   type JankEventName,
+  type JankMonitor,
   type JankPayload,
 } from '@/lib/chat/jank-monitor';
 
@@ -173,6 +175,53 @@ describe('useChatJankMonitor', () => {
     });
 
     expect(emit).not.toHaveBeenCalled();
+  });
+
+  it('throttles streaming snapshot observation to 200ms intervals', () => {
+    const emit = vi.fn();
+    const scrollRef = makeRef();
+    const observeSpy = vi.fn();
+    const monitor = {
+      observeMessages: observeSpy,
+      tickStall: vi.fn(),
+      onScrollAnchorBroken: vi.fn(),
+      onScrollAnchorRestored: vi.fn(),
+      onSend: vi.fn(),
+      getSummary: vi.fn(),
+    } as unknown as JankMonitor;
+
+    const createSpy = vi
+      .spyOn(jankMonitorModule, 'createJankMonitor')
+      .mockReturnValue(monitor);
+
+    const initial: HookProps = {
+      conversationId: 'c1',
+      messages: [makeMessage('a', 'assistant', 'hello')],
+      status: 'streaming',
+      isStuckToBottom: true,
+      scrollContainerRef: scrollRef,
+      enabled: true,
+      emit,
+    };
+
+    const { rerender } = renderHook((p: HookProps) => useChatJankMonitor(p), {
+      initialProps: initial,
+    });
+
+    expect(observeSpy).toHaveBeenCalledTimes(1);
+
+    rerender({
+      ...initial,
+      messages: [makeMessage('a', 'assistant', 'hello world')],
+    });
+    expect(observeSpy).toHaveBeenCalledTimes(1);
+
+    act(() => {
+      vi.advanceTimersByTime(200);
+    });
+    expect(observeSpy).toHaveBeenCalledTimes(2);
+
+    createSpy.mockRestore();
   });
 
   it('cleans up the stall interval on unmount', () => {

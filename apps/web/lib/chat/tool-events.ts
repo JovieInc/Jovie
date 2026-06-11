@@ -353,6 +353,110 @@ function dedupeEvents(events: PersistedToolEvent[]): PersistedToolEvent[] {
   return Array.from(byId.values());
 }
 
+export const STALE_RUNNING_TOOL_EVENT_MS = 5 * 60 * 1000;
+
+const CLIENT_DISCONNECT_TOOL_ERROR =
+  'This tool was interrupted when the chat disconnected. Retry when you are ready.';
+
+const STALE_RUNNING_TOOL_ERROR =
+  'This tool call timed out before it could finish. Retry when you are ready.';
+
+export function terminalizeRunningToolEvents(
+  events: readonly PersistedToolEvent[] | undefined,
+  input?: { readonly errorMessage?: string }
+): PersistedToolEvent[] | undefined {
+  if (!events || events.length === 0) {
+    return undefined;
+  }
+
+  const errorMessage =
+    input?.errorMessage ??
+    'Tool execution was interrupted before it could finish.';
+  let changed = false;
+
+  const terminalized = events.map(event => {
+    if (event.state !== 'running') {
+      return event;
+    }
+
+    changed = true;
+    return {
+      ...event,
+      state: 'failed' as const,
+      errorMessage,
+      summary: errorMessage,
+    };
+  });
+
+  return changed ? terminalized : [...events];
+}
+
+export function preparePersistedToolEventsForTurnFinish(input: {
+  readonly parts: ReadonlyArray<UIMessage['parts'][number]>;
+  readonly isAborted: boolean;
+}): PersistedToolEvent[] | undefined {
+  const encoded = encodeToolEvents(input.parts);
+  if (!encoded) {
+    return undefined;
+  }
+
+  if (!input.isAborted) {
+    return encoded;
+  }
+
+  return terminalizeRunningToolEvents(encoded, {
+    errorMessage: CLIENT_DISCONNECT_TOOL_ERROR,
+  });
+}
+
+export function resolvePersistedToolEventsForDisplay(
+  events: readonly PersistedToolEvent[],
+  input?: {
+    readonly messageCreatedAt?: Date | string | null;
+    readonly observedAt?: Date;
+    readonly turnStatus?: string | null;
+  }
+): PersistedToolEvent[] {
+  if (events.length === 0) {
+    return [];
+  }
+
+  const hasRunning = events.some(event => event.state === 'running');
+  if (!hasRunning) {
+    return [...events];
+  }
+
+  if (input?.turnStatus === 'canceled') {
+    return (
+      terminalizeRunningToolEvents(events, {
+        errorMessage: CLIENT_DISCONNECT_TOOL_ERROR,
+      }) ?? [...events]
+    );
+  }
+
+  const observedAt = input?.observedAt ?? new Date();
+  const createdAt =
+    input?.messageCreatedAt instanceof Date
+      ? input.messageCreatedAt
+      : typeof input?.messageCreatedAt === 'string'
+        ? new Date(input.messageCreatedAt)
+        : null;
+  const ageMs =
+    createdAt && !Number.isNaN(createdAt.getTime())
+      ? observedAt.getTime() - createdAt.getTime()
+      : 0;
+
+  if (ageMs >= STALE_RUNNING_TOOL_EVENT_MS) {
+    return (
+      terminalizeRunningToolEvents(events, {
+        errorMessage: STALE_RUNNING_TOOL_ERROR,
+      }) ?? [...events]
+    );
+  }
+
+  return [...events];
+}
+
 export function encodeToolEvents(
   parts: ReadonlyArray<UIMessage['parts'][number]>
 ): PersistedToolEvent[] | undefined {
