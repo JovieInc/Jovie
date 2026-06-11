@@ -166,10 +166,10 @@ export function GtmSpeedDial() {
             disabled={mutation.isPending}
             aria-pressed={currentSpeed === speed}
             className={cn(
-              'rounded-[10px] px-3.5 py-1.5 text-app font-medium transition-colors',
+              'rounded-[10px] border px-3.5 py-1.5 text-app font-medium transition-colors',
               currentSpeed === speed
-                ? 'bg-primary-token text-on-primary'
-                : 'bg-surface-0 text-secondary-token hover:text-primary-token hover:bg-surface-0/80'
+                ? 'border-(--linear-btn-primary-border) bg-btn-primary text-btn-primary-foreground shadow-button-inset hover:border-(--linear-btn-primary-hover) hover:bg-btn-primary-hover'
+                : 'border-transparent bg-surface-0 text-secondary-token hover:bg-surface-0/80 hover:text-primary-token'
             )}
           >
             {SPEED_LABELS[speed]}
@@ -184,7 +184,7 @@ export function GtmSpeedDial() {
               type='button'
               onClick={() => void applySpeed('normal')}
               disabled={mutation.isPending}
-              className='text-xs text-accent hover:underline'
+              className='text-xs text-secondary-token underline-offset-2 hover:text-primary-token hover:underline'
             >
               Reset to Normal
             </button>

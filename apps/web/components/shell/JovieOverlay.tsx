@@ -1,9 +1,8 @@
 import { Mic } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
-// Cinematic ease — same curve used across the shell for layout-revealing
-// transitions. Inlined here so this leaf has no cross-file dependency.
-const EASE_CINEMATIC = 'cubic-bezier(0.32, 0.72, 0, 1)';
+const MOTION_CINEMATIC =
+  'var(--ds-motion-cinematic-duration) var(--ds-motion-cinematic-easing)';
 
 /**
  * JovieOverlay — push-to-talk listening overlay.
@@ -43,7 +42,7 @@ export function JovieOverlay({
         style={{
           opacity: listening ? 0.55 : 0,
           backdropFilter: listening ? 'blur(2px)' : 'blur(0)',
-          transition: `opacity 350ms ${EASE_CINEMATIC}, backdrop-filter 350ms ${EASE_CINEMATIC}`,
+          transition: `opacity ${MOTION_CINEMATIC}, backdrop-filter ${MOTION_CINEMATIC}`,
         }}
       />
 
@@ -58,7 +57,7 @@ export function JovieOverlay({
           transform: listening
             ? 'translateY(0) scale(1)'
             : 'translateY(16px) scale(0.96)',
-          transition: `opacity 350ms ${EASE_CINEMATIC}, transform 350ms ${EASE_CINEMATIC}`,
+          transition: `opacity ${MOTION_CINEMATIC}, transform ${MOTION_CINEMATIC}`,
         }}
       >
         <div
@@ -68,11 +67,11 @@ export function JovieOverlay({
           )}
         >
           <div className='flex items-center gap-3 self-start'>
-            <span className='relative h-8 w-8 rounded-full bg-primary text-on-primary grid place-items-center'>
+            <span className='relative h-8 w-8 rounded-full border border-(--linear-btn-primary-border) bg-btn-primary text-btn-primary-foreground shadow-button-inset grid place-items-center'>
               <Mic className='h-3.5 w-3.5' strokeWidth={2.5} />
               <span
                 aria-hidden='true'
-                className='absolute inset-0 rounded-full ring-2 ring-primary/40 anim-calm-halo'
+                className='absolute inset-0 rounded-full ring-2 ring-(--linear-border-focus)/35 anim-calm-halo'
               />
             </span>
             <div className='flex-1 min-w-0'>
@@ -134,7 +133,7 @@ function DictationWaveform({ active }: { active: boolean }) {
                   ? `dict-bar ${duration}ms cubic-bezier(0.4, 0, 0.6, 1) ${delay}ms infinite`
                   : 'none',
                 opacity: active ? 1 : 0.4,
-                transition: `opacity 350ms ${EASE_CINEMATIC}`,
+                transition: `opacity ${MOTION_CINEMATIC}`,
               }}
             />
           );

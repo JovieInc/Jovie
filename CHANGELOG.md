@@ -7,11 +7,15 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ## [26.6.44] - 2026-06-11
 
-> Desktop security hardening and infra train integration.
+> Desktop security hardening plus neutral System B action controls.
 
 ### Changed
 
 - **Desktop security (infra train)**: hardens Electron shell auth, CSP watchdog, permissions, and window-state handling ahead of the next DMG release.
+
+### Fixed
+
+- **System B neutral action controls**: moves admin speed presets, celebration card size selection, audio transport buttons, and the listening overlay icon from primary/accent fills onto neutral primary button tokens while leaving progress and status accents intact.
 
 ## [26.6.43] - 2026-06-11
 
