@@ -248,7 +248,7 @@ export function EmailCodeAuthForm({
         autoComplete='email'
         inputMode='email'
         placeholder='Email address'
-        aria-label='Email address'
+        aria-label='Email Address'
         value={emailAddress}
         error={Boolean(errorMessage)}
         disabled={isPending}
