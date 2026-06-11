@@ -4,7 +4,7 @@ Day-to-day operations for the always-on Hermes gateway running on the dedicated 
 
 ## What This Machine Is
 
-A single-purpose orchestration node. It listens for brain dumps (Telegram + Voice Memos), persists them to gbrain, routes engineering work to Linear (the Pro's existing runner consumes it), and routes ops tasks to sub-agents. It does **zero coding**.
+A single-purpose orchestration node. It listens for brain dumps (Telegram + Voice Memos), persists them to gbrain, routes engineering work to Linear, and routes ops tasks to sub-agents. The Hermes scanner code does **zero coding** itself. The opt-in codex issue shipper can start a separate `JOVIE_AGENT_PROFILE=coder` child session for GitHub issues explicitly labeled `codex`.
 
 ## First-Time Setup
 
@@ -96,6 +96,7 @@ Once installed, you should never need to interact with the Air directly. All con
 |---|---|
 | Brain-dump an idea | Telegram the bot, or record a Voice Memo on iPhone |
 | File a bug | Voice-memo "Hermes, file a Linear issue for ..." or type it |
+| Queue local coding work | Add the GitHub issue label `codex` |
 | Ask a strategic question | Telegram the bot; the chief profile routes |
 | Get a daily summary | Wait for the 07:00 briefing, or Telegram "brief me" |
 | Push back rate-limited | Hermes will respond with which model it used |
@@ -119,6 +120,10 @@ ps -axm -o rss,command | awk '/hermes|gbrain|ollama|whisper/ { sum+=$1; print } 
 
 # Recent dispatch log
 tail -50 ~/.hermes/logs/dispatch.jsonl | jq .
+
+# Codex issue shipper logs
+tail -50 ~/.hermes/logs/launchd/cron-codex-issue-shipper.log
+tail -50 ~/.hermes/logs/codex-issue-shipper/*.log 2>/dev/null  # after a non-dry-run agent dispatch
 
 # Free-model rankings
 cat ~/.hermes/state/model-router-rankings.json | jq .
@@ -174,6 +179,41 @@ tail -f ~/.hermes/logs/voice-memo.jsonl
 hermes gateway restart --all
 launchctl kickstart -k gui/$(id -u)/co.jovie.hermes.gbrain-server
 ```
+
+### Run the codex issue shipper once
+
+```bash
+HERMES_CODEX_SHIPPER_DRY_RUN=1 tsx scripts/hermes/jobs/codex-issue-shipper.ts
+tsx scripts/hermes/jobs/codex-issue-shipper.ts
+```
+
+The job watches open GitHub issues labeled `codex`. Empty runs only call GitHub, write a JSONL event, and exit. No gbrain query, model call, subagent, or CodeRabbit review starts until an eligible issue exists.
+
+Config variables:
+
+| Variable | Default | Purpose | Update path |
+|---|---:|---|---|
+| `HERMES_CODEX_SHIPPER_MAX_ISSUES_PER_RUN` | `1` | Max Codex issues shipped per run; controls concurrency and spend | Doppler or plist env, then `./scripts/hermes/bootstrap-air.sh --reconfigure` |
+| `HERMES_CODEX_SHIPPER_INTEGRATION_THRESHOLD` | `4` | Eligible queue depth that routes trainable issues through `integration/codex-queue` | Doppler or plist env, then `./scripts/hermes/bootstrap-air.sh --reconfigure` |
+| `HERMES_CODEX_SHIPPER_AGENT` | `claude` | Local coding agent binary; `claude` keeps subagent support, `codex` is available as an explicit override | Doppler or plist env, then `./scripts/hermes/bootstrap-air.sh --reconfigure` |
+
+Control labels:
+
+| Label | Meaning |
+|---|---|
+| `codex` | Eligible source queue |
+| `codex-in-progress` | Claimed by the local shipper |
+| `codex-blocked` | Real blocker; the shipper will not retry automatically |
+| `human-review-required` | Hard skip |
+| `integration-branch` | Batch trainable issues through the integration branch |
+
+Ship now / Re-evaluate when / Then:
+
+| Decision | Trigger | Action |
+|---|---|---|
+| Ship now | Default `HERMES_CODEX_SHIPPER_MAX_ISSUES_PER_RUN=1`, because one coder session can consume hours of agent time plus CI minutes | Keep one issue per run and let the 15-minute cron continue draining |
+| Re-evaluate when | Eligible `codex` queue stays above 4 issues for two consecutive runs and cost per shipped issue stays under the weekly unit target: CI minutes x runner cost plus agent minutes x model cost | Raise `HERMES_CODEX_SHIPPER_MAX_ISSUES_PER_RUN` or add an `integration-branch` label to queue trainable issues |
+| Then | CI minutes x runner cost plus agent minutes x model cost stay within the weekly agent budget | Keep the higher concurrency; otherwise return to one issue per run |
 
 ## Recovery Procedures
 
@@ -245,6 +285,7 @@ Removes all launchd plists, drops `~/.hermes/`, leaves Doppler and Tailscale alo
 | `~/.hermes/config.yaml` | Hermes gateway config (rendered from Doppler) | regenerable |
 | `~/.hermes/.env` | Secrets (chmod 600) | regenerable |
 | `~/.hermes/logs/` | All Hermes logs | rotate weekly via launchd |
+| `~/.hermes/logs/codex-issue-shipper/` | Coder prompts and run logs for `codex` issue dispatches | operator-managed; prune if large |
 | `~/.hermes/state/voice-memos-seen.json` | Dedupe ledger | rebuildable (worst case: re-ingest 1 day) |
 | `~/.hermes/state/heavy-job.lock` | Semaphore for Ollama vs whisper | ephemeral |
 | `~/.hermes/state/model-router-rankings.json` | Free-model rankings | regenerable nightly |
