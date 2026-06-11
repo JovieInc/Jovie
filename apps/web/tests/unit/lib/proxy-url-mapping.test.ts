@@ -4,6 +4,7 @@ import {
   analyzeHost,
   categorizePath,
   DASHBOARD_URL,
+  getPublicProfileCandidate,
 } from '@/lib/routing/proxy-routing';
 
 describe('proxy routing helpers', () => {
@@ -90,5 +91,17 @@ describe('proxy routing helpers', () => {
 
   it('keeps the dashboard path stable across environments', () => {
     expect(DASHBOARD_URL).toBe('/app');
+  });
+
+  describe('getPublicProfileCandidate reserved short-circuit (JOV-3054)', () => {
+    it('excludes reserved legacy paths before any profile DB work', () => {
+      expect(getPublicProfileCandidate('/login')).toBeNull();
+      expect(getPublicProfileCandidate('/request-access')).toBeNull();
+      expect(getPublicProfileCandidate('/register')).toBeNull();
+    });
+
+    it('still recognizes real public profile handles', () => {
+      expect(getPublicProfileCandidate('/timwhite')).toBe('timwhite');
+    });
   });
 });

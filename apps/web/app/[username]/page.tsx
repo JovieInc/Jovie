@@ -35,7 +35,6 @@ import { getConfirmedFeaturedPlaylistFallback } from '@/lib/profile/featured-pla
 import {
   buildPublicProfileMetadata,
   PROFILE_ERROR_METADATA,
-  PROFILE_NOT_FOUND_METADATA,
 } from '@/lib/profile/metadata';
 import { isShopEnabled } from '@/lib/profile/shop-settings';
 import { getUpcomingTourDatesForProfile } from '@/lib/tour-dates/queries';
@@ -44,6 +43,7 @@ import { buildAvatarSizes } from '@/lib/utils/avatar-sizes';
 import { safeJsonLdStringify } from '@/lib/utils/json-ld';
 import { logger } from '@/lib/utils/logger';
 import {
+  isReservedUsername,
   USERNAME_MAX_LENGTH,
   USERNAME_MIN_LENGTH,
   USERNAME_PATTERN,
@@ -342,11 +342,12 @@ export default async function ArtistPage({ params }: Readonly<Props>) {
   const { username } = await params;
   const initialMode = 'profile';
 
-  // Early reject obviously invalid usernames before hitting the database
+  // Early reject obviously invalid or reserved usernames before hitting the database
   if (
     username.length < USERNAME_MIN_LENGTH ||
     username.length > USERNAME_MAX_LENGTH ||
-    !USERNAME_PATTERN.test(username)
+    !USERNAME_PATTERN.test(username) ||
+    isReservedUsername(username)
   ) {
     notFound();
   }
@@ -545,6 +546,16 @@ export default async function ArtistPage({ params }: Readonly<Props>) {
 // every public-profile route.
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { username } = await params;
+
+  if (
+    username.length < USERNAME_MIN_LENGTH ||
+    username.length > USERNAME_MAX_LENGTH ||
+    !USERNAME_PATTERN.test(username) ||
+    isReservedUsername(username)
+  ) {
+    notFound();
+  }
+
   const profileResult = await getProfileAndLinks(username);
   const { profile, genres, status } = profileResult;
 
@@ -553,7 +564,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   }
 
   if (!profile) {
-    return PROFILE_NOT_FOUND_METADATA;
+    notFound();
   }
 
   return buildPublicProfileMetadata({ profile, genres });

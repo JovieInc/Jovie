@@ -246,6 +246,37 @@ describe('proxy.ts middleware', () => {
   });
 
   // ==========================================================================
+  // Catch-all handle hardening (JOV-3054)
+  // ==========================================================================
+  describe('catch-all handle hardening', () => {
+    it('redirects /login to /signin without touching the audience block', async () => {
+      const req = createUnauthenticatedRequest({ pathname: '/login' });
+      const res = await callMiddleware(req);
+
+      expect(res.status).toBe(308);
+      expect(isRedirectTo(res, '/signin')).toBe(true);
+      expect(mocks.checkProfileVisitorBlocked).not.toHaveBeenCalled();
+    });
+
+    it('redirects /request-access to /start without touching the audience block', async () => {
+      const req = createUnauthenticatedRequest({ pathname: '/request-access' });
+      const res = await callMiddleware(req);
+
+      expect(res.status).toBe(308);
+      expect(isRedirectTo(res, '/start')).toBe(true);
+      expect(mocks.checkProfileVisitorBlocked).not.toHaveBeenCalled();
+    });
+
+    it('returns a fast 404 for other reserved catch-all segments', async () => {
+      const req = createUnauthenticatedRequest({ pathname: '/register' });
+      const res = await callMiddleware(req);
+
+      expect(res.status).toBe(404);
+      expect(mocks.checkProfileVisitorBlocked).not.toHaveBeenCalled();
+    });
+  });
+
+  // ==========================================================================
   // Cookie Banner Geo-Detection
   // ==========================================================================
   describe('cookie banner geo-detection', () => {
