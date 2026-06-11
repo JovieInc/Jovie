@@ -253,6 +253,12 @@ export {
   type ConfirmChatLinkInput,
   useConfirmChatLinkMutation,
 } from './useConfirmChatLinkMutation';
+// Confirm chat merch action mutation
+export {
+  type ConfirmChatMerchActionInput,
+  type ConfirmChatMerchActionType,
+  useConfirmChatMerchActionMutation,
+} from './useConfirmChatMerchActionMutation';
 // Confirm chat remove link mutation
 export {
   type ConfirmChatRemoveLinkInput,

@@ -9,6 +9,7 @@ import {
 import { streamText } from '@/lib/ai/sdk';
 import { buildAiTelemetry } from '@/lib/ai/telemetry';
 import type { ChatAccountContext } from '@/lib/chat/account-context';
+import { resolveImportBioRestrictedTools } from '@/lib/chat/import-bio-turn-guard';
 import { selectKnowledgeContext } from '@/lib/chat/knowledge/router';
 import { ONBOARDING_SYSTEM_PROMPT } from '@/lib/chat/prompts/onboarding';
 import { buildSystemPrompt } from '@/lib/chat/system-prompt';

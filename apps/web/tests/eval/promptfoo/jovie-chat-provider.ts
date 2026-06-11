@@ -4157,13 +4157,42 @@ function defaultToolResult(toolName: string, input: unknown): unknown {
         optionId: args.optionId ?? null,
       };
     case 'publishMerchCard':
-    case 'pauseMerchCard':
+      return {
+        success: true,
+        action: 'publish_merch',
+        merchCardId: args.merchCardId,
+        title: 'Tour Tee',
+        currentStatus: 'draft',
+        retailPrice: '$25.00',
+        primaryImageUrl: null,
+      };
     case 'unpauseMerchCard':
+      return {
+        success: true,
+        action: 'unpause_merch',
+        merchCardId: args.merchCardId,
+        title: 'Tour Tee',
+        currentStatus: 'paused',
+        retailPrice: '$25.00',
+        primaryImageUrl: null,
+      };
     case 'deleteOrArchiveMerchCard':
+      return {
+        success: true,
+        action: 'archive_merch',
+        merchCardId: args.merchCardId,
+        title: 'Tour Tee',
+        currentStatus: 'draft',
+        retailPrice: '$25.00',
+        primaryImageUrl: null,
+      };
+    case 'pauseMerchCard':
       return {
         success: true,
         action: toolName,
         merchCardId: args.merchCardId,
+        status: 'paused',
+        title: 'Tour Tee',
       };
     case 'reorderMerchCards':
       return {

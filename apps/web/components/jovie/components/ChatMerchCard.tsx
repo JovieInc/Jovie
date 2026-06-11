@@ -22,6 +22,7 @@ import type { MerchMarginPreset } from '@/lib/merch/pricing';
 import { MERCH_DEFAULT_MARGIN_PRESET } from '@/lib/merch/pricing';
 import { cn } from '@/lib/utils';
 import { ChatGenerationArtifactSurface } from './ChatGenerationArtifactSurface';
+import { ChatMerchActionCard } from './ChatMerchActionCard';
 
 interface MerchGenerationOption {
   readonly id: string;
@@ -61,6 +62,15 @@ export interface ChatMerchGenerationResult {
   readonly options: readonly MerchGenerationOption[];
 }
 
+interface MerchPublishProposal {
+  readonly success: true;
+  readonly action: 'publish_merch';
+  readonly merchCardId: string;
+  readonly title: string;
+  readonly currentStatus: string;
+  readonly retailPrice: string;
+}
+
 export interface ChatMerchSelectionResult {
   readonly success: true;
   readonly merchCardId: string;
@@ -69,6 +79,7 @@ export interface ChatMerchSelectionResult {
   readonly title: string;
   readonly publicUrl: string | null;
   readonly publishBlockedReasons?: readonly string[];
+  readonly publishProposal?: MerchPublishProposal;
 }
 
 export function isChatMerchGenerationResult(
@@ -294,8 +305,10 @@ export function ChatMerchOptionsCard({
 
 export function ChatMerchSelectionCard({
   result,
+  profileId,
 }: {
   readonly result: ChatMerchSelectionResult;
+  readonly profileId?: string;
 }) {
   const statusLabel =
     result.status.slice(0, 1).toUpperCase() + result.status.slice(1);
@@ -354,6 +367,18 @@ export function ChatMerchSelectionCard({
           </div>
         </div>
       </div>
+      {profileId && result.publishProposal?.success ? (
+        <div className='mt-3'>
+          <ChatMerchActionCard
+            profileId={profileId}
+            merchCardId={result.publishProposal.merchCardId}
+            action='publish'
+            title={result.publishProposal.title}
+            currentStatus={result.publishProposal.currentStatus}
+            retailPrice={result.publishProposal.retailPrice}
+          />
+        </div>
+      ) : null}
     </ChatGenerationArtifactSurface>
   );
 }
