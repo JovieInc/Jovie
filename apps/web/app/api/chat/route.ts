@@ -56,7 +56,16 @@ import {
   detectAlbumArtGenerationIntent,
   resolveAlbumArtCapability,
 } from '@/lib/chat/album-art-capability';
+import {
+  updateOwnedReleaseGeneratedPitches,
+  updateOwnedReleaseMetadata,
+} from '@/lib/chat/release-writes';
+import {
+  extractUIMessageText,
+  parseChatRequestBody,
+} from '@/lib/chat/request-validation';
 import { executeChatTurn, isClientDisconnect } from '@/lib/chat/run';
+import { chatToolSchema } from '@/lib/chat/strict-schema';
 import {
   canUsePaidChatTools,
   resolveChatTurnPlanLimits,
@@ -161,12 +170,6 @@ import { detectPlatform } from '@/lib/utils/platform-detection/detector';
 export const dynamic = 'force-dynamic';
 
 export const maxDuration = 60;
-
-/** Maximum allowed message length (characters) */
-const MAX_MESSAGE_LENGTH = 4000;
-
-/** Maximum allowed messages per request */
-const MAX_MESSAGES_PER_REQUEST = 50;
 
 /**
  * Statsig gate keys for the chat kill switch. Declared as const so typos fail
@@ -434,80 +437,6 @@ async function resolveArtistContext(
   return { context: parseResult.data };
 }
 
-/**
- * Extracts text content from a UIMessage's parts array.
- */
-function extractUIMessageText(
-  parts: Array<{ type: string; text?: string }>
-): string {
-  return parts
-    .filter(
-      (p): p is { type: 'text'; text: string } =>
-        p.type === 'text' && typeof p.text === 'string'
-    )
-    .map(p => p.text)
-    .join('');
-}
-
-/**
- * Validates a single UIMessage object.
- * AI SDK v6 UIMessages have { id, role, parts } instead of { role, content }.
- * Returns an error message string if invalid, null if valid.
- */
-function validateMessage(message: unknown): string | null {
-  if (typeof message !== 'object' || message === null || !('role' in message)) {
-    return 'Invalid message format';
-  }
-
-  const msg = message as Record<string, unknown>;
-
-  if (msg.role !== 'user' && msg.role !== 'assistant') {
-    return 'Invalid message role';
-  }
-
-  // UIMessages must have a parts array
-  if (!('parts' in msg) || !Array.isArray(msg.parts)) {
-    return 'Invalid message format';
-  }
-
-  // Validate content length for user messages
-  if (msg.role === 'user') {
-    const contentStr = extractUIMessageText(
-      msg.parts as Array<{ type: string; text?: string }>
-    );
-    if (contentStr.length > MAX_MESSAGE_LENGTH) {
-      return `Message too long. Maximum is ${MAX_MESSAGE_LENGTH} characters`;
-    }
-  }
-
-  return null;
-}
-
-/**
- * Validates the messages array (UIMessage format).
- * Returns an error message string if invalid, null if valid.
- */
-function validateMessagesArray(messages: unknown): string | null {
-  if (!Array.isArray(messages)) {
-    return 'Messages must be an array';
-  }
-  if (messages.length === 0) {
-    return 'Messages array cannot be empty';
-  }
-  if (messages.length > MAX_MESSAGES_PER_REQUEST) {
-    return `Too many messages. Maximum is ${MAX_MESSAGES_PER_REQUEST}`;
-  }
-
-  for (const message of messages) {
-    const error = validateMessage(message);
-    if (error) {
-      return error;
-    }
-  }
-
-  return null;
-}
-
 function extractRequestId(req: Request): string {
   const incomingRequestId = req.headers.get('x-request-id')?.trim();
   if (incomingRequestId) return incomingRequestId.slice(0, 120);
@@ -715,7 +644,7 @@ function createAvatarUploadTool() {
   return tool({
     description:
       'Show a profile photo upload widget in the chat. Use this when the artist wants to change, update, or set their profile photo. Do not describe how to upload — just call this tool.',
-    inputSchema: z.object({}),
+    inputSchema: chatToolSchema({}),
     execute: async () => {
       return { success: true, action: 'avatar_upload' as const };
     },
@@ -730,7 +659,7 @@ function createSocialLinkTool() {
   return tool({
     description:
       'Propose adding a social link to the artist profile. Pass the full URL. The client will show a confirmation card with the detected platform. Use this when the artist asks to add a link or social profile URL.',
-    inputSchema: z.object({
+    inputSchema: chatToolSchema({
       url: z
         .string()
         .describe(
@@ -771,7 +700,7 @@ function createSocialLinkRemovalTool(profileId: string | null) {
   return tool({
     description:
       'Propose removing a social link from the artist profile. Use this when the artist asks to remove or delete a link. Returns a confirmation card with link details. You must specify the platform name (e.g. "instagram", "spotify", "twitter") to identify which link to remove.',
-    inputSchema: z.object({
+    inputSchema: chatToolSchema({
       platform: z
         .string()
         .describe(
@@ -841,7 +770,7 @@ function createCheckCanvasStatusTool(profileId: string | null) {
   return tool({
     description:
       "Check which of the artist's releases have Spotify Canvas videos set and which are missing them. Use this when the artist asks about canvas videos or wants to generate them.",
-    inputSchema: z.object({
+    inputSchema: chatToolSchema({
       includeAll: z
         .boolean()
         .optional()
@@ -913,7 +842,7 @@ function createSuggestRelatedArtistsTool(context: ArtistContext) {
   return tool({
     description:
       "Suggest related artists for playlist pitching, ad targeting, and collaboration based on the artist's genre, style, and popularity level. Returns advice on which artists to target.",
-    inputSchema: z.object({
+    inputSchema: chatToolSchema({
       purpose: z
         .enum(['playlist_pitching', 'ad_targeting', 'collaboration', 'all'])
         .describe('What the related artists will be used for'),
@@ -952,7 +881,7 @@ function createGenerateCanvasPlanTool(profileId: string | null) {
   return tool({
     description:
       'Generate a detailed plan for creating a Spotify Canvas video from album artwork. Includes artwork processing steps, animation style recommendations, and technical specs. Use this when an artist wants to create a canvas for a specific release.',
-    inputSchema: z.object({
+    inputSchema: chatToolSchema({
       releaseTitle: z
         .string()
         .describe('The title of the release to generate canvas for'),
@@ -992,7 +921,7 @@ function createGenerateAlbumArtTool(params: {
   return tool({
     description:
       'Generate three album art options for a release. Use this when the artist asks to generate, create, or design album artwork or cover art. If no matching release exists, return a target-selection result so the client can ask whether to create a release or attach the art to an existing release.',
-    inputSchema: z.object({
+    inputSchema: chatToolSchema({
       releaseTitle: z
         .string()
         .max(200)
@@ -1229,7 +1158,7 @@ function _createMerchGenerationTool(params: {
   return tool({
     description:
       'Generate exactly three premium merch design options for the current artist. Use for make merch, create a tee, create a hoodie, or make something that would sell.',
-    inputSchema: z.object({
+    inputSchema: chatToolSchema({
       prompt: z.string().max(500).optional(),
       itemType: z.string().max(80).optional(),
       makeLive: z.boolean().optional(),
@@ -1317,7 +1246,7 @@ function createMerchStatusTool(params: {
   return tool({
     description:
       'Change a merch card status. Use publish for live, pause for kill temporarily, unpause to bring back, and archive for delete/remove.',
-    inputSchema: z.object({
+    inputSchema: chatToolSchema({
       merchCardId: z.string().uuid(),
     }),
     execute: async ({ merchCardId }) => {
@@ -1363,7 +1292,7 @@ function createMerchUpdateTool(params: {
   return tool({
     description:
       'Update a merch card name, description, image URL, or retail price. If asked to make it live, run the merch safety guard before publishing.',
-    inputSchema: z.object({
+    inputSchema: chatToolSchema({
       merchCardId: z.string().uuid(),
       title: z.string().min(1).max(120).optional(),
       description: z.string().min(1).max(500).optional(),
@@ -1400,7 +1329,7 @@ function createMerchUpdateTool(params: {
 function createMerchSalesTool(profileId: string | null) {
   return tool({
     description: 'Show merch revenue and purchase counts for this artist.',
-    inputSchema: z.object({}),
+    inputSchema: chatToolSchema({}),
     execute: async () => {
       if (!profileId) {
         return { success: false as const, error: 'Profile ID required' };
@@ -1420,7 +1349,7 @@ function createMerchPayoutsTool(profileId: string | null) {
   return tool({
     description:
       'Show manual merch payout liability for this artist. MVP payouts are not automatic.',
-    inputSchema: z.object({}),
+    inputSchema: chatToolSchema({}),
     execute: async () => {
       if (!profileId) {
         return { success: false as const, error: 'Profile ID required' };
@@ -1507,7 +1436,7 @@ function createPromoStrategyTool(
   return tool({
     description:
       'Create a comprehensive promotion strategy for a release, including social media video ads, TikTok strategy, Spotify Canvas, and ad targeting recommendations. Use this when an artist asks for help promoting their music.',
-    inputSchema: z.object({
+    inputSchema: chatToolSchema({
       releaseTitle: z
         .string()
         .optional()
@@ -1569,7 +1498,7 @@ function createShowTopInsightsTool(profileId: string | null) {
   return tool({
     description:
       'Show the artist their top audience, release, track, and monetization signals as structured insight cards. Use this when they ask what is working, what to focus on, or how their audience and releases are performing.',
-    inputSchema: z.object({}),
+    inputSchema: chatToolSchema({}),
     execute: async () => {
       if (!profileId) {
         return {
@@ -1600,7 +1529,7 @@ function createMarkCanvasUploadedTool(profileId: string | null) {
   return tool({
     description:
       "Mark a release as having a Spotify Canvas video uploaded. Use this when the artist confirms they've already set a canvas for a track/release in Spotify for Artists, or when they tell you a canvas is already uploaded.",
-    inputSchema: z.object({
+    inputSchema: chatToolSchema({
       releaseTitle: z
         .string()
         .describe('The title of the release that has a canvas uploaded'),
@@ -1620,17 +1549,21 @@ function createMarkCanvasUploadedTool(profileId: string | null) {
         };
       }
 
-      // Update the release metadata with canvas status
-      await db
-        .update(discogReleases)
-        .set({
-          metadata: {
-            ...release.metadata,
-            ...buildCanvasMetadata('uploaded'),
-          },
-          updatedAt: new Date(),
-        })
-        .where(eq(discogReleases.id, release.id));
+      const updated = await updateOwnedReleaseMetadata({
+        releaseId: release.id,
+        creatorProfileId: profileId,
+        metadata: {
+          ...release.metadata,
+          ...buildCanvasMetadata('uploaded'),
+        },
+      });
+
+      if (!updated) {
+        return {
+          success: false,
+          error: 'Release not found or unauthorized',
+        };
+      }
 
       return {
         success: true,
@@ -1650,7 +1583,7 @@ function createMarkCanvasUploadedTool(profileId: string | null) {
  * This tool directly creates the release in the database and returns the result.
  */
 function createReleaseTool(resolvedProfileId: string) {
-  const createReleaseSchema = z.object({
+  const createReleaseSchema = chatToolSchema({
     title: z.string().min(1).max(200).describe('The title of the release'),
     releaseType: z
       .enum([
@@ -1744,7 +1677,7 @@ function createWorldClassBioTool(
   return tool({
     description:
       'Write a world-class artist bio in an editorial style suitable for Spotify, Apple Music, and press use. Uses real artist context from profile + DSP metadata.',
-    inputSchema: z.object({
+    inputSchema: chatToolSchema({
       goal: z
         .enum(['spotify', 'apple_music', 'press_kit', 'general'])
         .optional()
@@ -1814,7 +1747,7 @@ function createLyricsFormatTool() {
   return tool({
     description:
       'Format lyrics to Apple Music guidelines. Applies deterministic rules: removes section labels like [Verse]/[Chorus], straightens curly quotes, normalizes punctuation, collapses blank lines, and trims whitespace. Use when an artist asks to clean up or format lyrics.',
-    inputSchema: z.object({
+    inputSchema: chatToolSchema({
       lyrics: z
         .string()
         .min(1)
@@ -1863,7 +1796,7 @@ function createSubmitFeedbackTool(clerkUserId: string) {
   return tool({
     description:
       'Submit product feedback from the artist. Use this when the artist wants to share feedback, report a bug, or request a feature. Collect their feedback message first, then call this tool with the full text.',
-    inputSchema: z.object({
+    inputSchema: chatToolSchema({
       message: z
         .string()
         .min(5)
@@ -1891,7 +1824,7 @@ function createGenerateReleasePitchTool(
 ) {
   return tool({
     description: `Generate one copy-paste-ready release pitch for a specific destination. Use for playlist, radio, Sirius XM, install, playback/music supervisor, editorial post, record label, or collaborator pitching. Ask the artist where they want to pitch it before calling this tool unless a task or user message clearly maps to one of these destinations: ${PITCH_TARGET_OPTIONS_TEXT}. Ask which release they want to pitch if unclear. If the artist provides custom guidance, pass it via instructions.`,
-    inputSchema: z.object({
+    inputSchema: chatToolSchema({
       releaseTitle: z
         .string()
         .max(200)
@@ -1994,10 +1927,18 @@ function createGenerateReleasePitchTool(
           },
         });
 
-        await db
-          .update(discogReleases)
-          .set({ generatedPitches: result.pitch })
-          .where(eq(discogReleases.id, release.id));
+        const updated = await updateOwnedReleaseGeneratedPitches({
+          releaseId: release.id,
+          creatorProfileId: resolvedProfileId,
+          generatedPitches: result.pitch,
+        });
+
+        if (!updated) {
+          return {
+            success: false as const,
+            error: 'Release not found or unauthorized',
+          };
+        }
 
         return {
           success: true as const,
@@ -2150,7 +2091,7 @@ function buildChatTools(
           reorderMerchCards: tool({
             description:
               'Record the desired order for merch cards. Use only when the artist gives explicit card IDs.',
-            inputSchema: z.object({
+            inputSchema: chatToolSchema({
               merchCardIds: z.array(z.string().uuid()).min(1).max(12),
             }),
             execute: async ({ merchCardIds }) => {
@@ -2175,7 +2116,7 @@ function buildChatTools(
           optimizeMerchCards: tool({
             description:
               'Optimize merch card ranking using current conversion, revenue, margin, and recency signals.',
-            inputSchema: z.object({}),
+            inputSchema: chatToolSchema({}),
             execute: async () => {
               if (!resolvedProfileId) {
                 return {
@@ -2434,27 +2375,16 @@ export async function POST(req: Request) {
     CHAT_KILL_SWITCH_GATES.FORCE_LIGHT,
     false
   );
-  // Parse and validate request body
-  let body: {
-    messages?: unknown;
-    profileId?: unknown;
-    conversationId?: unknown;
-    artistContext?: unknown;
-    clientTurnId?: unknown;
-    clientMessageId?: unknown;
-    source?: unknown;
-    toolIntent?: unknown;
-  };
-  try {
-    body = await req.json();
-  } catch {
-    return NextResponse.json(
-      { error: 'Invalid JSON body', requestId },
-      { status: 400, headers: { ...corsHeaders, 'x-request-id': requestId } }
-    );
+  const parsedRequest = await parseChatRequestBody(req, {
+    corsHeaders,
+    requestId,
+  });
+  if (!parsedRequest.ok) {
+    return parsedRequest.response;
   }
 
-  const { messages, profileId, conversationId } = body;
+  const { body, uiMessages } = parsedRequest;
+  const { profileId, conversationId } = body;
 
   // Validate that either profileId or artistContext is provided
   if (
@@ -2466,18 +2396,6 @@ export async function POST(req: Request) {
       { status: 400, headers: { ...corsHeaders, 'x-request-id': requestId } }
     );
   }
-
-  // Validate messages array and individual messages
-  const messagesError = validateMessagesArray(messages);
-  if (messagesError) {
-    return NextResponse.json(
-      { error: messagesError, requestId },
-      { status: 400, headers: { ...corsHeaders, 'x-request-id': requestId } }
-    );
-  }
-
-  // After validation, we know messages is a valid UIMessage array
-  const uiMessages = messages as UIMessage[];
   const userText = extractLastUserText(uiMessages);
   const clientTurnId = normalizeClientId(body.clientTurnId);
   const clientMessageId = normalizeClientId(body.clientMessageId);
