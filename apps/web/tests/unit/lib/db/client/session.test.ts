@@ -28,9 +28,7 @@ describe('lib/db/client/session RLS helpers', () => {
   });
 
   it('getRlsSessionResetSql clears app.clerk_user_id', async () => {
-    const { getRlsSessionResetSql } = await import(
-      '@/lib/db/client/session'
-    );
+    const { getRlsSessionResetSql } = await import('@/lib/db/client/session');
 
     const sql = getRlsSessionResetSql();
     expect(JSON.stringify(sql)).toContain("set_config('app.clerk_user_id'");
