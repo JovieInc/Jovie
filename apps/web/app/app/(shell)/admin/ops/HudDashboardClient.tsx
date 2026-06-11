@@ -139,6 +139,9 @@ const DEPLOYMENT_STATE_DOT_CLASSNAMES: Record<HudDeploymentState, string> = {
   not_configured: 'bg-tertiary-token',
 };
 
+const DISPATCH_SOURCE_PLACEHOLDER = 'Linear, GitHub, or Sentry URL';
+const CASH_BURN_LABEL = 'Burn (30d)';
+
 function getAiOpsTone(aiOps: HudMetrics['aiOps']): HudTone {
   if (aiOps.counts.failed > 0 || aiOps.counts.blocked > 0) return 'bad';
   if (aiOps.counts.stale > 0 || aiOps.availability === 'partial') {
@@ -196,7 +199,7 @@ function DeploymentActionsMenu({
       <DropdownMenuTrigger asChild>
         <button
           type='button'
-          aria-label='Deployment actions'
+          aria-label='Deployment Actions'
           className='flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-tertiary-token transition-colors duration-subtle hover:bg-surface-1 hover:text-secondary-token focus-visible:bg-surface-1 focus-visible:outline-none'
         >
           <MoreHorizontal className='h-3.5 w-3.5' aria-hidden='true' />
@@ -383,7 +386,7 @@ function AiOpsItemRow({
           <button
             type='button'
             onClick={onUndismiss}
-            aria-label='Restore item'
+            aria-label='Restore Item'
             className='rounded px-1 py-0.5 text-[11px] text-tertiary-token hover:text-primary-token'
           >
             Undo
@@ -392,7 +395,7 @@ function AiOpsItemRow({
           <button
             type='button'
             onClick={onDismiss}
-            aria-label='Dismiss item'
+            aria-label='Dismiss Item'
             className='rounded p-0.5 text-tertiary-token hover:text-primary-token'
           >
             <X className='h-3.5 w-3.5' aria-hidden='true' />
@@ -483,7 +486,7 @@ function HermesDispatchControls({
           type='url'
           value={sourceUrl}
           onChange={event => setSourceUrl(event.target.value)}
-          placeholder='Linear, GitHub, or Sentry URL'
+          placeholder={DISPATCH_SOURCE_PLACEHOLDER}
           className='min-h-10 rounded-lg border border-subtle bg-surface-0 px-3 text-[13px] text-primary-token outline-none'
         />
         <select
@@ -515,7 +518,7 @@ function HermesDispatchControls({
           type='button'
           onClick={() => void dispatchWorker(false)}
           disabled={isDispatching}
-          className='inline-flex min-h-10 items-center gap-2 rounded-lg border border-subtle bg-primary px-3 text-[13px] font-semibold text-primary-foreground disabled:cursor-not-allowed disabled:opacity-60'
+          className='inline-flex min-h-10 items-center gap-2 rounded-lg border border-(--linear-btn-primary-border) bg-btn-primary px-3 text-[13px] font-semibold text-btn-primary-foreground shadow-button-inset transition-colors hover:border-(--linear-btn-primary-hover) hover:bg-btn-primary-hover disabled:cursor-not-allowed disabled:opacity-60'
         >
           {isDispatching ? (
             <Loader2 className='h-4 w-4 animate-spin' aria-hidden='true' />
@@ -703,7 +706,7 @@ export function HudDashboardClient({
                     value={formatUsd(metrics.overview.balanceUsd)}
                   />
                   <ContentMetricRow
-                    label='Burn (30d)'
+                    label={CASH_BURN_LABEL}
                     value={formatUsd(metrics.overview.burnRateUsd)}
                   />
                 </div>
@@ -847,7 +850,7 @@ export function HudDashboardClient({
         {/* MRR + small metric tiles */}
         <div className='grid gap-3 content-start'>
           <ContentMetricCard
-            label='Monthly recurring revenue'
+            label='Monthly Recurring Revenue'
             value={
               isHudMetricValueAvailable(stripeSource)
                 ? formatUsd(metrics.overview.mrrUsd)
@@ -885,7 +888,7 @@ export function HudDashboardClient({
                       value={formatUsd(metrics.overview.balanceUsd)}
                     />
                     <ContentMetricRow
-                      label='Burn (30d)'
+                      label={CASH_BURN_LABEL}
                       value={formatUsd(metrics.overview.burnRateUsd)}
                     />
                   </div>
@@ -970,7 +973,7 @@ export function HudDashboardClient({
                 <QRCode
                   data={hudUrl ?? ''}
                   size={196}
-                  label='HUD link'
+                  label='HUD Link'
                   className='rounded-lg bg-white'
                 />
               </div>

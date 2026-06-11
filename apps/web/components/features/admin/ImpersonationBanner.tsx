@@ -160,7 +160,7 @@ export function ImpersonationBanner({
             size='sm'
             onClick={() => setMinimized(true)}
             className='text-amber-900 hover:bg-amber-600/30 hover:text-black'
-            aria-label='Minimize impersonation banner'
+            aria-label='Minimize Impersonation Banner'
           >
             <EyeOff className='size-4' />
           </Button>
@@ -171,7 +171,7 @@ export function ImpersonationBanner({
             size='sm'
             onClick={handleEndImpersonation}
             disabled={ending}
-            className='bg-primary-token text-base hover:opacity-90'
+            className='text-base'
           >
             {ending ? (
               'Ending...'
