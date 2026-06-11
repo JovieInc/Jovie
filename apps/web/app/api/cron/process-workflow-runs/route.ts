@@ -34,12 +34,13 @@ import {
   executeApprovedAction,
   markWorkflowFailed,
 } from '@/lib/connectors/workflows/execute-approved-action';
+import { verifyCronRequest } from '@/lib/cron/auth';
 import { db } from '@/lib/db';
 import { workflowRuns } from '@/lib/db/schema/connectors';
-import { env } from '@/lib/env-server';
 import { captureError, captureWarning } from '@/lib/error-tracking';
 import { logger } from '@/lib/utils/logger';
 
+export const runtime = 'nodejs';
 export const maxDuration = 300;
 
 const MAX_RUNS_PER_TICK = 20;
@@ -59,11 +60,11 @@ function leaseExpiredBefore(now: Date) {
 }
 
 export async function GET(request: Request): Promise<Response> {
-  // Verify cron secret
-  const authHeader = request.headers.get('authorization');
-  if (authHeader !== `Bearer ${env.CRON_SECRET}`) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
+  const authError = verifyCronRequest(request, {
+    route: '/api/cron/process-workflow-runs',
+    requireTrustedOrigin: true,
+  });
+  if (authError) return authError;
 
   const now = new Date();
 
