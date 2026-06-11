@@ -4,10 +4,53 @@ import dynamic from 'next/dynamic';
 import { PageContent, PageShell } from '@/components/organisms/PageShell';
 import { PageToolbar } from '@/components/organisms/table';
 
-const CALENDAR_GRID_CELL_KEYS = Array.from(
-  { length: 35 },
-  (_, index) => `calendar-cell-${index + 1}`
-);
+const CALENDAR_WEEKDAY_KEYS = [
+  'weekday-sun',
+  'weekday-mon',
+  'weekday-tue',
+  'weekday-wed',
+  'weekday-thu',
+  'weekday-fri',
+  'weekday-sat',
+] as const;
+
+const CALENDAR_GRID_CELL_KEYS = [
+  'calendar-cell-01',
+  'calendar-cell-02',
+  'calendar-cell-03',
+  'calendar-cell-04',
+  'calendar-cell-05',
+  'calendar-cell-06',
+  'calendar-cell-07',
+  'calendar-cell-08',
+  'calendar-cell-09',
+  'calendar-cell-10',
+  'calendar-cell-11',
+  'calendar-cell-12',
+  'calendar-cell-13',
+  'calendar-cell-14',
+  'calendar-cell-15',
+  'calendar-cell-16',
+  'calendar-cell-17',
+  'calendar-cell-18',
+  'calendar-cell-19',
+  'calendar-cell-20',
+  'calendar-cell-21',
+  'calendar-cell-22',
+  'calendar-cell-23',
+  'calendar-cell-24',
+  'calendar-cell-25',
+  'calendar-cell-26',
+  'calendar-cell-27',
+  'calendar-cell-28',
+  'calendar-cell-29',
+  'calendar-cell-30',
+  'calendar-cell-31',
+  'calendar-cell-32',
+  'calendar-cell-33',
+  'calendar-cell-34',
+  'calendar-cell-35',
+] as const;
 
 function CalendarRouteSkeleton() {
   return (
@@ -37,8 +80,8 @@ function CalendarRouteSkeleton() {
           </div>
           <div className='overflow-hidden rounded-xl border border-subtle'>
             <div className='grid grid-cols-7 border-b border-subtle'>
-              {Array.from({ length: 7 }, (_, index) => (
-                <div key={`weekday-${index + 1}`} className='px-2 py-2'>
+              {CALENDAR_WEEKDAY_KEYS.map(key => (
+                <div key={key} className='px-2 py-2'>
                   <div className='skeleton mx-auto h-3 w-8 rounded-sm' />
                 </div>
               ))}
