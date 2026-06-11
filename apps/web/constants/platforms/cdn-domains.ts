@@ -3,7 +3,7 @@
  *
  * All image CDN domains for supported platforms, used by:
  * - avatar-hosts.ts (runtime hostname validation)
- * - content-security-policy.ts (CSP img-src directive)
+ * - content-security-policy.ts (CSP img-src, media-src, connect-src directives)
  * - dsp-images.ts (DSP image optimization bypass)
  * - next.config.js (Next.js remotePatterns — inline copy, verified by sync test)
  *
@@ -81,6 +81,18 @@ export const PLATFORM_MEDIA_DOMAINS: Record<string, readonly string[]> = {
 export const INFRASTRUCTURE_MEDIA_DOMAINS: readonly string[] = [
   // Vercel Blob storage (demo video, uploaded media)
   '*.blob.vercel-storage.com',
+];
+
+/**
+ * Infrastructure connect domains not tied to a specific platform.
+ *
+ * Separate from image/media domains because they map to CSP `connect-src`
+ * (not `img-src` or `media-src`). Only include hosts the browser fetches
+ * directly — server-side API calls do not need entries here.
+ */
+export const INFRASTRUCTURE_CONNECT_DOMAINS: readonly string[] = [
+  // Vercel dashboard/API (chat surface deployment status, toolbar)
+  'vercel.com',
 ];
 
 /**
@@ -172,4 +184,12 @@ export function getCspMediaSrcDomains(): string[] {
     ...INFRASTRUCTURE_MEDIA_DOMAINS,
   ];
   return [...new Set(allDomains)].map(d => `https://${d}`);
+}
+
+/**
+ * Returns all connect domains prefixed with `https://` for CSP connect-src.
+ * Used by content-security-policy.ts.
+ */
+export function getCspConnectSrcDomains(): string[] {
+  return [...new Set(INFRASTRUCTURE_CONNECT_DOMAINS)].map(d => `https://${d}`);
 }

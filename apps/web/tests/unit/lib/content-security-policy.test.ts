@@ -61,6 +61,16 @@ describe('buildContentSecurityPolicy', () => {
     expect(frameSrc).not.toContain('https://vercel.live');
   });
 
+  it('includes vercel.com in connect-src from canonical registry', () => {
+    const csp = buildContentSecurityPolicy({
+      nonce: 'test-nonce',
+      isDev: false,
+    });
+    const connectSrc = findDirective(csp, 'connect-src');
+
+    expect(connectSrc).toContain('https://vercel.com');
+  });
+
   it('includes Sentry regional ingest wildcard in connect-src', () => {
     const csp = buildContentSecurityPolicy({
       nonce: 'test-nonce',
