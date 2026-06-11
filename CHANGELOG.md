@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.6.44] - 2026-06-11
+
+> Desktop security hardening and infra train integration.
+
+### Changed
+
+- **Desktop security (infra train)**: hardens Electron shell auth, CSP watchdog, permissions, and window-state handling ahead of the next DMG release.
+
 ## [26.6.43] - 2026-06-11
 
 > Chat slash picker scroll clearance avoids redundant observer work while typing.
