@@ -7,7 +7,9 @@ const hoisted = vi.hoisted(() => {
     limit: selectLimitMock,
     orderBy: selectOrderByMock,
   }));
-  const selectLeftJoinMock = vi.fn().mockReturnValue({ where: selectWhereMock });
+  const selectLeftJoinMock = vi
+    .fn()
+    .mockReturnValue({ where: selectWhereMock });
   const selectFromMock = vi.fn().mockReturnValue({
     where: selectWhereMock,
     leftJoin: selectLeftJoinMock,
