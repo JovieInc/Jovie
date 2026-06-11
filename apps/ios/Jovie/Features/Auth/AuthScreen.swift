@@ -410,7 +410,7 @@ private struct ContinueInBrowserButton: View {
         if isOpening, !isDisabled {
           ProgressView()
             .controlSize(.small)
-            .tint(JovieColor.accentBlue)
+            .tint(JovieColor.backgroundBase)
         }
 
         Text(buttonTitle)

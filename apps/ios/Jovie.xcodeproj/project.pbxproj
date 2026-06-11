@@ -34,6 +34,7 @@
 		A0B10F00000000000000000E /* ObservabilityTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0B10F00000000000000000C /* ObservabilityTests.swift */; };
 		A0B10F00000000000000000F /* ObservabilityRedactionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0B10F00000000000000000D /* ObservabilityRedactionTests.swift */; };
 		A0B10F000000000000000012 /* Sentry in Frameworks */ = {isa = PBXBuildFile; productRef = A0B10F000000000000000011 /* Sentry */; };
+		A0B10F000000000000000020 /* AuthScreenStyleGuardTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0B10F000000000000000021 /* AuthScreenStyleGuardTests.swift */; };
 		A13F86A7D4F0C7F83D2BB000 /* ScreenBrightnessManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3FA81B967152B211E5988375 /* ScreenBrightnessManager.swift */; };
 		ADC14533827EFD888D1ED50F /* QRCodeRenderer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000F426E1AB94DD5401C3341 /* QRCodeRenderer.swift */; };
 		B0B0995CD42EDBEAFBAABE04 /* JovieUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 611EE527D20DC6F6872CBF33 /* JovieUITests.swift */; };
@@ -114,6 +115,7 @@
 		A0B10F000000000000000005 /* SentryObservabilityProvider.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SentryObservabilityProvider.swift; sourceTree = "<group>"; };
 		A0B10F00000000000000000C /* ObservabilityTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ObservabilityTests.swift; sourceTree = "<group>"; };
 		A0B10F00000000000000000D /* ObservabilityRedactionTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ObservabilityRedactionTests.swift; sourceTree = "<group>"; };
+		A0B10F000000000000000021 /* AuthScreenStyleGuardTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AuthScreenStyleGuardTests.swift; sourceTree = "<group>"; };
 		A0J0V26350000000000000001 /* MobileAuthFinalization.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MobileAuthFinalization.swift; sourceTree = "<group>"; };
 		A0J0V26350000000000000003 /* MobileAuthFinalizationTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MobileAuthFinalizationTests.swift; sourceTree = "<group>"; };
 		A93DB506915B418D06E897A4 /* AppStateTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AppStateTests.swift; sourceTree = "<group>"; };
@@ -210,6 +212,7 @@
 			children = (
 				4C8753F36E077F69D925EE26 /* APIClientTests.swift */,
 				A93DB506915B418D06E897A4 /* AppStateTests.swift */,
+				A0B10F000000000000000021 /* AuthScreenStyleGuardTests.swift */,
 				191669F70597A1039C74C0B1 /* MeRepositoryTests.swift */,
 				B83A77F0A36DF3E6D5C77C2F /* MobileMeResponseTests.swift */,
 				A0B10F00000000000000000D /* ObservabilityRedactionTests.swift */,
@@ -525,6 +528,7 @@
 				BD6A822847064E6F3E3E5228 /* QRCodeRendererTests.swift in Sources */,
 				DA762182661489283A851F6B /* ScreenBrightnessManagerTests.swift in Sources */,
 				A0J0V26350000000000000004 /* MobileAuthFinalizationTests.swift in Sources */,
+				A0B10F000000000000000020 /* AuthScreenStyleGuardTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
