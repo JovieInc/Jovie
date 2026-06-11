@@ -751,8 +751,12 @@ export async function resolveUserState(
   }
 
   // 2. Query DB user AND profile in a single JOIN query (performance optimization)
-  // This reduces database round trips from 2 to 1
-  const lookupResult = await loadAuthGateRecord(clerkUserId, email);
+  // This reduces database round trips from 2 to 1. Fetch the waitlist gate flag in
+  // parallel so cache-miss auth reconciliation does not serialize two hot lookups.
+  const [lookupResult, waitlistGateEnabled] = await Promise.all([
+    loadAuthGateRecord(clerkUserId, email),
+    isWaitlistGateEnabled(),
+  ]);
   if (lookupResult && 'state' in lookupResult) {
     return lookupResult;
   }
@@ -812,7 +816,6 @@ export async function resolveUserState(
   let profile = toAuthGateProfile(dbResult);
 
   if (!dbUserId) {
-    const waitlistGateEnabled = await isWaitlistGateEnabled();
     const creationResult = await handleMissingDbUser(
       {
         createDbUserIfMissing,
@@ -844,7 +847,6 @@ export async function resolveUserState(
     profile = null;
   }
 
-  const waitlistGateEnabled = await isWaitlistGateEnabled();
   const state = resolveCanonicalState({
     isAuthenticated: true,
     hasDbUser: Boolean(dbUserId),

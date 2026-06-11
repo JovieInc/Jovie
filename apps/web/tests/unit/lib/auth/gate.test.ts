@@ -412,6 +412,44 @@ describe('gate.ts', () => {
       expect(result.context.email).toBe('admin@example.com');
     });
 
+
+    it('fetches waitlist gate once in parallel with the DB lookup', async () => {
+      mockCachedAuth.mockResolvedValue({ userId: 'clerk_123' });
+      mockCachedCurrentUser.mockResolvedValue({
+        emailAddresses: [
+          {
+            emailAddress: 'test@example.com',
+            verification: { status: 'verified' },
+          },
+        ],
+      });
+
+      mockDbSelect.mockReturnValue(
+        createJoinQueryMock([
+          {
+            id: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890',
+            email: 'test@example.com',
+            userStatus: 'active',
+            isAdmin: false,
+            isPro: true,
+            deletedAt: null,
+            profileId: 'profile-123',
+            profileUsername: 'testuser',
+            profileUsernameNormalized: 'testuser',
+            profileDisplayName: 'Test User',
+            profileAvatarUrl: 'https://example.com/avatar.jpg',
+            profileIsPublic: true,
+            profileOnboardingCompletedAt: new Date(),
+            profileIsClaimed: true,
+          },
+        ])
+      );
+
+      await resolveUserState();
+
+      expect(mockIsWaitlistGateEnabled).toHaveBeenCalledTimes(1);
+    });
+
     it('returns NEEDS_DB_USER when createDbUserIfMissing is false', async () => {
       mockCachedAuth.mockResolvedValue({ userId: 'clerk_123' });
       mockCachedCurrentUser.mockResolvedValue({
