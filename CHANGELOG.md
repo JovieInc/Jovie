@@ -7,11 +7,15 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ## [26.6.45] - 2026-06-11
 
-> Infra train version bump for desktop release guard.
+> Infra train version bump for desktop release guard; post-onboarding interview modal uses shared System B surfaces.
 
 ### Changed
 
 - **VERSION**: bumps train integration to v26.6.45 so desktop security changes ship with DMG release handling.
+
+### Fixed
+
+- **Onboarding interview modal System B cleanup**: replaces hardcoded modal colors, white-alpha input styling, raw shadows, and glyph progress with tokenized System B surface classes, the shared textarea primitive, and stable progress dots.
 
 ## [26.6.44] - 2026-06-11
 
