@@ -5,9 +5,16 @@ import {
   sanitizeConversationTitle,
   withSanitizedConversationTitle,
 } from '@/lib/chat/title';
-import { decodeToolEvents } from '@/lib/chat/tool-events';
+import {
+  decodeToolEvents,
+  resolvePersistedToolEventsForDisplay,
+} from '@/lib/chat/tool-events';
 import { db } from '@/lib/db';
-import { chatConversations, chatMessages } from '@/lib/db/schema/chat';
+import {
+  chatConversations,
+  chatMessages,
+  chatTurns,
+} from '@/lib/db/schema/chat';
 import { captureError } from '@/lib/error-tracking';
 import { logger } from '@/lib/utils/logger';
 import { getSessionErrorResponse } from '../../session-error-response';
@@ -89,9 +96,11 @@ export async function GET(req: Request, { params }: RouteParams) {
         toolCalls: chatMessages.toolCalls,
         clientMessageId: chatMessages.clientMessageId,
         turnId: chatMessages.turnId,
+        turnStatus: chatTurns.status,
         createdAt: chatMessages.createdAt,
       })
       .from(chatMessages)
+      .leftJoin(chatTurns, eq(chatMessages.turnId, chatTurns.id))
       .where(and(...conditions))
       .orderBy(desc(chatMessages.createdAt))
       .limit(limit + 1);
@@ -111,10 +120,22 @@ export async function GET(req: Request, { params }: RouteParams) {
         );
       }
 
+      const resolvedToolCalls = resolvePersistedToolEventsForDisplay(
+        decodedToolCalls.events,
+        {
+          messageCreatedAt: row.createdAt,
+          turnStatus: row.turnStatus,
+        }
+      );
+
       return {
-        ...row,
-        toolCalls:
-          decodedToolCalls.events.length > 0 ? decodedToolCalls.events : null,
+        id: row.id,
+        role: row.role,
+        content: row.content,
+        clientMessageId: row.clientMessageId,
+        turnId: row.turnId,
+        createdAt: row.createdAt,
+        toolCalls: resolvedToolCalls.length > 0 ? resolvedToolCalls : null,
       };
     });
 
