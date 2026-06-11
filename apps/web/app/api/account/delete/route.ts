@@ -2,7 +2,7 @@ import { clerkClient } from '@clerk/nextjs/server';
 import { eq } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 import { getCachedAuth } from '@/lib/auth/cached';
-import { setupDbSession } from '@/lib/auth/session';
+import { withDbSession, withDbSessionTx } from '@/lib/auth/session';
 import { invalidateProfileCache } from '@/lib/cache/profile';
 import { db } from '@/lib/db';
 import { users } from '@/lib/db/schema/auth';
@@ -37,8 +37,10 @@ interface DeleteAccountBody {
  * Dependent rows are removed first; `users.deletedAt` is written last as a
  * success-fence so a mid-chain error never leaves a banned limbo account.
  *
- * `setupDbSession` scopes RLS to the authenticated Clerk user — all deletes
- * below must filter by the resolved `user.id` from that session.
+ * RLS contract: existence checks run in `withDbSession` (read-only). The
+ * destructive delete chain runs inside `withDbSessionTx` so `app.clerk_user_id`
+ * is set on the same connection as every DELETE/UPDATE. All cross-table deletes
+ * must filter by the resolved `user.id` — never rely on RLS alone.
  */
 export async function POST(request: Request) {
   const { userId: clerkUserId } = await getCachedAuth();
@@ -81,13 +83,15 @@ export async function POST(request: Request) {
   }
 
   try {
-    await setupDbSession(clerkUserId);
+    const user = await withDbSession(async sessionClerkUserId => {
+      const [row] = await db
+        .select({ id: users.id, deletedAt: users.deletedAt })
+        .from(users)
+        .where(eq(users.clerkId, sessionClerkUserId))
+        .limit(1);
 
-    const [user] = await db
-      .select({ id: users.id, deletedAt: users.deletedAt })
-      .from(users)
-      .where(eq(users.clerkId, clerkUserId))
-      .limit(1);
+      return row;
+    }, { clerkUserId });
 
     if (!user) {
       return NextResponse.json(
@@ -98,37 +102,42 @@ export async function POST(request: Request) {
 
     const now = new Date();
 
-    // Fetch usernames before deletion so we can invalidate handle availability cache
-    const profiles = await db
-      .select({ usernameNormalized: creatorProfiles.usernameNormalized })
-      .from(creatorProfiles)
-      .where(eq(creatorProfiles.userId, user.id));
+    const profiles = await withDbSessionTx(async tx => {
+      const profileRows = await tx
+        .select({ usernameNormalized: creatorProfiles.usernameNormalized })
+        .from(creatorProfiles)
+        .where(eq(creatorProfiles.userId, user.id));
 
-    // Delete dependent data first — users.deletedAt is the success-fence below
-    await db.delete(creatorProfiles).where(eq(creatorProfiles.userId, user.id));
-    await db.delete(preSaveTokens).where(eq(preSaveTokens.userId, user.id));
-    await db.delete(feedbackItems).where(eq(feedbackItems.userId, user.id));
-    await db
-      .delete(emailSuppressions)
-      .where(eq(emailSuppressions.createdBy, user.id));
+      // Delete dependent data first — users.deletedAt is the success-fence below
+      await tx
+        .delete(creatorProfiles)
+        .where(eq(creatorProfiles.userId, user.id));
+      await tx.delete(preSaveTokens).where(eq(preSaveTokens.userId, user.id));
+      await tx.delete(feedbackItems).where(eq(feedbackItems.userId, user.id));
+      await tx
+        .delete(emailSuppressions)
+        .where(eq(emailSuppressions.createdBy, user.id));
 
-    if (!user.deletedAt) {
-      // Soft-delete: anonymize all personal data and mark as deleted
-      // GDPR requires removal of all PII - we retain only structural fields
-      await db
-        .update(users)
-        .set({
-          name: null,
-          email: null,
-          stripeCustomerId: null,
-          stripeSubscriptionId: null,
-          waitlistEntryId: null,
-          deletedAt: now,
-          userStatus: 'banned',
-          updatedAt: now,
-        })
-        .where(eq(users.id, user.id));
-    }
+      if (!user.deletedAt) {
+        // Soft-delete: anonymize all personal data and mark as deleted
+        // GDPR requires removal of all PII - we retain only structural fields
+        await tx
+          .update(users)
+          .set({
+            name: null,
+            email: null,
+            stripeCustomerId: null,
+            stripeSubscriptionId: null,
+            waitlistEntryId: null,
+            deletedAt: now,
+            userStatus: 'banned',
+            updatedAt: now,
+          })
+          .where(eq(users.id, user.id));
+      }
+
+      return profileRows;
+    }, { clerkUserId });
 
     // Invalidate handle availability cache so deleted usernames become available
     for (const profile of profiles) {

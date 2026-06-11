@@ -1,21 +1,26 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 // ---- hoisted mocks ----
-const mockAuth = vi.hoisted(() => vi.fn());
+const mockGetCachedAuth = vi.hoisted(() => vi.fn());
 const mockClerkClient = vi.hoisted(() => vi.fn());
-const mockSetupDbSession = vi.hoisted(() => vi.fn());
+const mockWithDbSession = vi.hoisted(() => vi.fn());
+const mockWithDbSessionTx = vi.hoisted(() => vi.fn());
 const mockCaptureError = vi.hoisted(() => vi.fn());
 const mockCheckAccountDeleteRateLimit = vi.hoisted(() => vi.fn());
 const mockInvalidateHandleCache = vi.hoisted(() => vi.fn());
 const mockInvalidateProfileCache = vi.hoisted(() => vi.fn());
 
+vi.mock('@/lib/auth/cached', () => ({
+  getCachedAuth: mockGetCachedAuth,
+}));
+
 vi.mock('@clerk/nextjs/server', () => ({
-  auth: mockAuth,
   clerkClient: mockClerkClient,
 }));
 
 vi.mock('@/lib/auth/session', () => ({
-  setupDbSession: mockSetupDbSession,
+  withDbSession: mockWithDbSession,
+  withDbSessionTx: mockWithDbSessionTx,
 }));
 
 vi.mock('@/lib/error-tracking', () => ({
@@ -67,8 +72,8 @@ function makeChain(resolveValue: unknown = undefined) {
 const mockDbUpdate = vi.hoisted(() => vi.fn());
 const mockDbDelete = vi.hoisted(() => vi.fn());
 
-vi.mock('@/lib/db', () => ({
-  db: {
+function makeTx() {
+  return {
     select: vi.fn().mockImplementation(() => {
       const result =
         selectResults.queue.length > 0 ? selectResults.queue.shift() : [];
@@ -76,6 +81,16 @@ vi.mock('@/lib/db', () => ({
     }),
     update: mockDbUpdate.mockImplementation(() => makeChain()),
     delete: mockDbDelete.mockImplementation(() => makeChain()),
+  };
+}
+
+vi.mock('@/lib/db', () => ({
+  db: {
+    select: vi.fn().mockImplementation(() => {
+      const result =
+        selectResults.queue.length > 0 ? selectResults.queue.shift() : [];
+      return makeChain(result);
+    }),
   },
 }));
 
@@ -121,16 +136,21 @@ describe('POST /api/account/delete', () => {
     vi.clearAllMocks();
     selectResults.queue = [];
 
-    mockAuth.mockResolvedValue({ userId: 'clerk_user_1' });
+    mockGetCachedAuth.mockResolvedValue({ userId: 'clerk_user_1' });
     mockCheckAccountDeleteRateLimit.mockResolvedValue({ success: true });
-    mockSetupDbSession.mockResolvedValue(undefined);
+    mockWithDbSession.mockImplementation(async (operation, options) =>
+      operation(options?.clerkUserId ?? 'clerk_user_1')
+    );
+    mockWithDbSessionTx.mockImplementation(async (operation, options) =>
+      operation(makeTx(), options?.clerkUserId ?? 'clerk_user_1')
+    );
     mockClerkClient.mockResolvedValue({
       users: { deleteUser: vi.fn().mockResolvedValue(undefined) },
     });
   });
 
   it('returns 401 when unauthenticated', async () => {
-    mockAuth.mockResolvedValue({ userId: null });
+    mockGetCachedAuth.mockResolvedValue({ userId: null });
 
     const { POST } = await import('@/app/api/account/delete/route');
     const response = await POST(makeRequest({ confirmation: 'DELETE' }));
@@ -168,6 +188,30 @@ describe('POST /api/account/delete', () => {
     const response = await POST(makeRequest({ confirmation: 'DELETE' }));
 
     expect(response.status).toBe(404);
+    expect(mockWithDbSession).toHaveBeenCalledTimes(1);
+    expect(mockWithDbSessionTx).not.toHaveBeenCalled();
+  });
+
+  it('scopes RLS to existence check then delete transaction (JOV-3048)', async () => {
+    selectResults.queue.push([{ id: 'user_1', deletedAt: null }]);
+    selectResults.queue.push([{ usernameNormalized: 'testartist' }]);
+
+    const { POST } = await import('@/app/api/account/delete/route');
+    await POST(makeRequest({ confirmation: 'DELETE' }));
+
+    expect(mockWithDbSession).toHaveBeenCalledTimes(1);
+    expect(mockWithDbSessionTx).toHaveBeenCalledTimes(1);
+    expect(mockWithDbSession.mock.invocationCallOrder[0]).toBeLessThan(
+      mockWithDbSessionTx.mock.invocationCallOrder[0]
+    );
+    expect(mockWithDbSession).toHaveBeenCalledWith(
+      expect.any(Function),
+      { clerkUserId: 'clerk_user_1' }
+    );
+    expect(mockWithDbSessionTx).toHaveBeenCalledWith(
+      expect.any(Function),
+      { clerkUserId: 'clerk_user_1' }
+    );
   });
 
   it('retries idempotently when account was partially deleted', async () => {
