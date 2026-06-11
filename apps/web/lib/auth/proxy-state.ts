@@ -27,11 +27,11 @@ const USER_STATE_CACHE_TTL_SECONDS = 120; // 2 minutes - transitional users (inv
 const USER_STATE_CACHE_TTL_ACTIVE_SECONDS = 300; // 5 minutes - stable active users
 
 // Timeout for DB query to prevent proxy hanging on Neon cold starts.
-// Kept below the Neon p99 cold-start budget (~3 s) so that a single cache-miss
-// does not block authenticated navigations for more than ~3 s. Retries are
+// 5 s matches the API query budget and tolerates Neon cold starts better than
+// the prior 3 s cap, while still bounding cache-miss latency. Retries are
 // intentionally disabled for this query (maxRetries: 1) — retrying on timeout
 // compounds latency rather than reducing it.
-const DB_QUERY_TIMEOUT_MS = 3000; // 3 seconds
+const DB_QUERY_TIMEOUT_MS = 5000; // 5 seconds
 
 // Timeout for Redis cache reads. Upstash REST calls are normally <50 ms but
 // can stall under network partitions; cap them so a Redis hiccup does not add
@@ -47,11 +47,16 @@ const REDIS_CACHE_TIMEOUT_MS = 500; // 500 ms
 // ---------------------------------------------------------------------------
 const MEMORY_CACHE_TTL_ACTIVE_MS = 10_000; // 10s for active users
 const MEMORY_CACHE_TTL_TRANSITIONAL_MS = 5_000; // 5s for transitional users
+// Extended TTL for fail-safe: when Redis times out or DB is slow, serve the
+// last known state from this isolate instead of blocking on a cold Neon query.
+const MEMORY_CACHE_STALE_TTL_ACTIVE_MS = 60_000; // 60s stale fallback for active users
+const MEMORY_CACHE_STALE_TTL_TRANSITIONAL_MS = 30_000; // 30s stale fallback for transitional users
 const MEMORY_CACHE_MAX_ENTRIES = 1_000;
 
 interface MemoryCacheEntry {
   state: ProxyUserState;
   expiresAt: number;
+  staleUntil: number;
 }
 
 const memoryCache = new Map<string, MemoryCacheEntry>();
@@ -60,6 +65,13 @@ function tryGetMemoryCachedState(cacheKey: string): ProxyUserState | null {
   const entry = memoryCache.get(cacheKey);
   if (!entry) return null;
   if (Date.now() < entry.expiresAt) return entry.state;
+  return null;
+}
+
+function tryGetStaleMemoryCachedState(cacheKey: string): ProxyUserState | null {
+  const entry = memoryCache.get(cacheKey);
+  if (!entry) return null;
+  if (Date.now() < entry.staleUntil) return entry.state;
   memoryCache.delete(cacheKey);
   return null;
 }
@@ -70,10 +82,18 @@ function setMemoryCachedState(cacheKey: string, state: ProxyUserState): void {
     const firstKey = memoryCache.keys().next().value;
     if (firstKey) memoryCache.delete(firstKey);
   }
+  const now = Date.now();
   const ttlMs = state.isActive
     ? MEMORY_CACHE_TTL_ACTIVE_MS
     : MEMORY_CACHE_TTL_TRANSITIONAL_MS;
-  memoryCache.set(cacheKey, { state, expiresAt: Date.now() + ttlMs });
+  const staleTtlMs = state.isActive
+    ? MEMORY_CACHE_STALE_TTL_ACTIVE_MS
+    : MEMORY_CACHE_STALE_TTL_TRANSITIONAL_MS;
+  memoryCache.set(cacheKey, {
+    state,
+    expiresAt: now + ttlMs,
+    staleUntil: now + staleTtlMs,
+  });
 }
 
 /** Get a human-readable label for user state (for logging) */
@@ -145,6 +165,27 @@ async function tryGetCachedState(
   }
 
   return null;
+}
+
+/**
+ * Best-effort Redis read without the short timeout race.
+ * Used only on DB timeout fail-safe so a slow Upstash response can still
+ * recover the last cached state instead of falling through to onboarding.
+ */
+async function tryGetStaleRedisCachedState(
+  cacheKey: string
+): Promise<ProxyUserState | null> {
+  const redis = getRedis();
+  if (!redis) return null;
+
+  try {
+    return (await redis.get<ProxyUserState>(cacheKey)) ?? null;
+  } catch (cacheError) {
+    captureWarning('[proxy-state] Stale Redis cache read failed', {
+      error: cacheError,
+    });
+    return null;
+  }
 }
 
 /** Statuses that indicate waitlist approval */
@@ -400,15 +441,29 @@ export async function getUserState(
     return cached;
   }
 
-  // Layer 3: Database query
+  // Layer 2b: Stale in-memory cache when Redis misses/times out.
+  // Skips the DB round-trip so a slow Redis response does not compound into
+  // a Neon cold-start timeout on every authenticated navigation.
+  const staleMemoryCached = tryGetStaleMemoryCachedState(cacheKey);
+  if (staleMemoryCached) {
+    captureWarning('[proxy-state] Using stale memory cache after Redis miss', {
+      clerkUserId,
+      userState: getUserStateLabel(staleMemoryCached),
+    });
+    return staleMemoryCached;
+  }
+
+  // Layer 3: Database query + waitlist gate (parallel — both are cache-miss work)
   try {
     const dbQueryStart = Date.now();
-    const [result] = await executeUserStateQuery(clerkUserId);
+    const [[result], gateEnabled] = await Promise.all([
+      executeUserStateQuery(clerkUserId),
+      isWaitlistGateEnabled(),
+    ]);
     const dbQueryDuration = Date.now() - dbQueryStart;
 
     logDbQueryPerformance(dbQueryDuration, !!result?.dbUserId);
 
-    const gateEnabled = await isWaitlistGateEnabled();
     const userState = determineUserState(result, gateEnabled);
 
     // Populate both cache layers
@@ -418,8 +473,35 @@ export async function getUserState(
 
     return userState;
   } catch (error) {
-    const isTransient =
-      error instanceof QueryTimeoutError || isRetryableError(error);
+    const isTimeout = error instanceof QueryTimeoutError;
+    const isTransient = isTimeout || isRetryableError(error);
+
+    if (isTimeout) {
+      const staleMemoryFallback = tryGetStaleMemoryCachedState(cacheKey);
+      if (staleMemoryFallback) {
+        captureWarning(
+          '[proxy-state] DB query timed out, using stale memory cache',
+          {
+            clerkUserId,
+            userState: getUserStateLabel(staleMemoryFallback),
+          }
+        );
+        return staleMemoryFallback;
+      }
+
+      const staleRedisCached = await tryGetStaleRedisCachedState(cacheKey);
+      if (staleRedisCached) {
+        setMemoryCachedState(cacheKey, staleRedisCached);
+        captureWarning(
+          '[proxy-state] DB query timed out, using stale Redis cache',
+          {
+            clerkUserId,
+            userState: getUserStateLabel(staleRedisCached),
+          }
+        );
+        return staleRedisCached;
+      }
+    }
 
     await captureError('Database query failed in proxy state check', error, {
       clerkUserId,
