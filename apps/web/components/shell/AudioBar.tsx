@@ -138,7 +138,7 @@ export function AudioBar({
         <button
           type='button'
           onClick={onPlay}
-          className='h-8 w-8 rounded-full grid place-items-center bg-primary text-on-primary transition-colors duration-subtle ease-subtle hover:bg-primary/90'
+          className='h-8 w-8 rounded-full grid place-items-center border border-(--linear-btn-primary-border) bg-btn-primary text-btn-primary-foreground shadow-button-inset transition-colors duration-subtle ease-subtle hover:border-(--linear-btn-primary-hover) hover:bg-btn-primary-hover'
           aria-label={isPlaying ? 'Pause (space)' : 'Play (space)'}
         >
           {isPlaying ? (
@@ -203,7 +203,7 @@ export function AudioBar({
       )}
       {onCollapse && (
         <IconBtn
-          label='Minimize player'
+          label='Minimize Player'
           shortcut={SHORTCUTS.toggleBar}
           onClick={onCollapse}
           tooltipSide='top'
@@ -217,7 +217,7 @@ export function AudioBar({
 
   return (
     <section
-      aria-label='Audio player'
+      aria-label='Audio Player'
       className={cn(
         'group/bar shrink-0 hidden lg:grid grid-cols-[1fr_minmax(360px,_720px)_1fr] gap-4 items-center px-8 py-2',
         className

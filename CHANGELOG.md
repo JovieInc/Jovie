@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.6.44] - 2026-06-11
+
+> Central transport and speed controls now use neutral System B primary button surfaces.
+
+### Fixed
+
+- **System B neutral action controls**: moves admin speed presets, celebration card size selection, audio transport buttons, and the listening overlay icon from primary/accent fills onto neutral primary button tokens while leaving progress and status accents intact.
+
 ## [26.6.43] - 2026-06-11
 
 > Chat slash picker scroll clearance avoids redundant observer work while typing.

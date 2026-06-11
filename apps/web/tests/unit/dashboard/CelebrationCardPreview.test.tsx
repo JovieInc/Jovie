@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { cleanup, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { CelebrationCardPreview } from '@/components/features/dashboard/molecules/CelebrationCardPreview';
@@ -53,5 +55,21 @@ describe('CelebrationCardPreview', () => {
     expect(img.getAttribute('src')).toContain(
       '/api/celebration-card/testartist'
     );
+  });
+
+  it('keeps size picker actions on neutral System B button tokens', () => {
+    const source = readFileSync(
+      resolve(
+        __dirname,
+        '../../../components/features/dashboard/molecules/CelebrationCardPreview.tsx'
+      ),
+      'utf8'
+    );
+
+    expect(source).not.toContain('bg-primary-token text-on-primary');
+    expect(source).not.toMatch(/\bbg-(?:blue|purple|violet|indigo)-\d/);
+    expect(source).toContain('bg-btn-primary');
+    expect(source).toContain('text-btn-primary-foreground');
+    expect(source).toContain('hover:bg-btn-primary-hover');
   });
 });
