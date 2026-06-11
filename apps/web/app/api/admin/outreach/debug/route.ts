@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { leadPipelineSettings, leads } from '@/lib/db/schema/leads';
 import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
+import { env } from '@/lib/env';
 import { captureError, getSafeErrorMessage } from '@/lib/error-tracking';
 import { ServerFetchTimeoutError, serverFetch } from '@/lib/http/server-fetch';
 import { isSpotifyConfigured, validateSpotifyEnv } from '@/lib/spotify/env';
@@ -25,27 +26,27 @@ interface ConnectivityResult {
 function checkEnvVars() {
   const vars = {
     INSTANTLY_API_KEY: {
-      present: !!process.env.INSTANTLY_API_KEY,
+      present: !!env.INSTANTLY_API_KEY,
       required: true,
     },
     INSTANTLY_CAMPAIGN_ID: {
-      present: !!process.env.INSTANTLY_CAMPAIGN_ID,
+      present: !!env.INSTANTLY_CAMPAIGN_ID,
       required: true,
     },
     GOOGLE_CSE_API_KEY: {
-      present: !!process.env.GOOGLE_CSE_API_KEY,
+      present: !!env.GOOGLE_CSE_API_KEY,
       required: true,
     },
     GOOGLE_CSE_ENGINE_ID: {
-      present: !!process.env.GOOGLE_CSE_ENGINE_ID,
+      present: !!env.GOOGLE_CSE_ENGINE_ID,
       required: true,
     },
     SPOTIFY_CLIENT_ID: {
-      present: !!process.env.SPOTIFY_CLIENT_ID,
+      present: !!env.SPOTIFY_CLIENT_ID,
       required: true,
     },
     SPOTIFY_CLIENT_SECRET: {
-      present: !!process.env.SPOTIFY_CLIENT_SECRET,
+      present: !!env.SPOTIFY_CLIENT_SECRET,
       required: true,
     },
   };
@@ -62,7 +63,7 @@ function checkEnvVars() {
 // ---------------------------------------------------------------------------
 
 async function probeInstantly(): Promise<ConnectivityResult> {
-  const apiKey = process.env.INSTANTLY_API_KEY;
+  const apiKey = env.INSTANTLY_API_KEY;
   if (!apiKey) {
     return {
       ok: false,
@@ -113,8 +114,8 @@ async function probeInstantly(): Promise<ConnectivityResult> {
 }
 
 async function probeGoogleCSE(): Promise<ConnectivityResult> {
-  const apiKey = process.env.GOOGLE_CSE_API_KEY;
-  const engineId = process.env.GOOGLE_CSE_ENGINE_ID;
+  const apiKey = env.GOOGLE_CSE_API_KEY;
+  const engineId = env.GOOGLE_CSE_ENGINE_ID;
   if (!apiKey || !engineId) {
     return {
       ok: false,
