@@ -21,6 +21,7 @@ import {
   type SafeFetchError,
   safeFetchPublicHtml,
 } from './safe-fetch-public-html';
+import { wrapUntrustedSourceContent } from './untrusted-source-fence';
 
 type ImportBioFailureReason = SafeFetchError | 'no_bio_found' | 'rate_limited';
 
@@ -111,9 +112,10 @@ export function createImportBioFromUrlTool(context: ImportBioContext) {
 
       return {
         ok: true as const,
-        candidateBio: candidate,
+        candidateBio: wrapUntrustedSourceContent(candidate, fetched.finalUrl),
         sourceUrl: fetched.finalUrl,
         sourceTitle: fetched.sourceTitle,
+        nextAllowedTool: 'proposeProfileEdit' as const,
       };
     },
   });

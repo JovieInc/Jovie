@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 /** Scroll distance (px) from bottom before considering "scrolled away". */
-const SCROLL_THRESHOLD = 200;
+export const SCROLL_THRESHOLD = 200;
 
 interface UseStickToBottomOptions {
   /** Number of messages — resets sticky state when this changes */
@@ -15,101 +15,141 @@ interface UseStickToBottomReturn {
   isStuckToBottom: boolean;
   /** Manually set stuck state (e.g., when clicking scroll-to-bottom button) */
   setStuckToBottom: (stuck: boolean) => void;
-  /** Scroll event handler — attach to the scroll container */
+  /**
+   * Legacy scroll handler — stuck detection is driven by IntersectionObserver.
+   * Kept as a no-op so existing call sites can keep `onScroll={onScroll}`.
+   */
   onScroll: () => void;
   /** Ref to attach to the virtualizer's total-size inner container */
   totalSizeRef: React.RefCallback<HTMLDivElement>;
   /** Ref to attach to the scroll container */
   scrollContainerRef: React.RefObject<HTMLDivElement | null>;
+  /** Ref to attach to a 1px sentinel at the bottom of the transcript */
+  bottomSentinelRef: React.RefCallback<HTMLDivElement>;
 }
 
 /**
  * Implements sticky-to-bottom scroll behavior for virtualized chat.
  *
- * Uses ResizeObserver on the total-size container to detect content growth
- * during streaming (where message count doesn't change but content grows).
- *
- * Rules:
- * - Stuck by default and on new messages
- * - Released when user scrolls up past threshold
- * - Re-attached when user scrolls back to bottom
- * - Resize-driven scroll uses `behavior: 'auto'` (instant, no lag)
- * - Manual scroll-to-bottom button should use virtualizer.scrollToIndex + setStuckToBottom(true)
+ * Uses IntersectionObserver on a bottom sentinel (no sync layout reads on scroll)
+ * and a rAF-batched ResizeObserver to follow content growth during streaming.
  */
 export function useStickToBottom({
   messageCount,
 }: UseStickToBottomOptions): UseStickToBottomReturn {
   const [isStuckToBottom, setIsStuckToBottom] = useState(true);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
-  const observerRef = useRef<ResizeObserver | null>(null);
+  const resizeObserverRef = useRef<ResizeObserver | null>(null);
+  const intersectionObserverRef = useRef<IntersectionObserver | null>(null);
+  const sentinelNodeRef = useRef<HTMLDivElement | null>(null);
   const isStuckRef = useRef(true);
+  const scrollRafRef = useRef<number | null>(null);
 
-  // Reset stuck state when message count changes (new message sent/received)
-  useEffect(() => {
-    if (messageCount > 0) {
-      setIsStuckToBottom(true);
-      isStuckRef.current = true;
-    }
-  }, [messageCount]);
-
-  // Scroll handler — detect user scrolling up
-  const onScroll = useCallback(() => {
-    const container = scrollContainerRef.current;
-    if (!container) return;
-
-    const distanceFromBottom =
-      container.scrollHeight - container.scrollTop - container.clientHeight;
-
-    if (distanceFromBottom > SCROLL_THRESHOLD) {
-      if (isStuckRef.current) {
-        setIsStuckToBottom(false);
-        isStuckRef.current = false;
-      }
-    } else if (distanceFromBottom <= 2) {
-      // User scrolled back to bottom
-      if (!isStuckRef.current) {
-        setIsStuckToBottom(true);
-        isStuckRef.current = true;
-      }
-    }
-  }, []);
-
-  // Manual set (for scroll-to-bottom button)
   const setStuckToBottom = useCallback((stuck: boolean) => {
     setIsStuckToBottom(stuck);
     isStuckRef.current = stuck;
   }, []);
 
-  // ResizeObserver callback — scroll to bottom when stuck and content grows
-  const totalSizeRef = useCallback((node: HTMLDivElement | null) => {
-    // Cleanup previous observer
-    if (observerRef.current) {
-      observerRef.current.disconnect();
-      observerRef.current = null;
-    }
+  const updateStuckFromIntersection = useCallback((intersecting: boolean) => {
+    if (isStuckRef.current === intersecting) return;
+    isStuckRef.current = intersecting;
+    setIsStuckToBottom(intersecting);
+  }, []);
 
-    if (!node) return;
-    if (typeof ResizeObserver === 'undefined') return;
+  const scheduleScrollToBottom = useCallback(() => {
+    if (scrollRafRef.current !== null) return;
 
-    const observer = new ResizeObserver(() => {
+    scrollRafRef.current = requestAnimationFrame(() => {
+      scrollRafRef.current = null;
       if (!isStuckRef.current) return;
 
       const container = scrollContainerRef.current;
       if (!container) return;
 
-      // Use instant scroll to avoid lag during streaming
       container.scrollTop = container.scrollHeight;
     });
-
-    observer.observe(node);
-    observerRef.current = observer;
   }, []);
 
-  // Cleanup on unmount
+  useEffect(() => {
+    if (messageCount > 0) {
+      setStuckToBottom(true);
+    }
+  }, [messageCount, setStuckToBottom]);
+
+  const attachSentinelObserver = useCallback(
+    (sentinel: HTMLDivElement | null) => {
+      sentinelNodeRef.current = sentinel;
+
+      if (intersectionObserverRef.current) {
+        intersectionObserverRef.current.disconnect();
+        intersectionObserverRef.current = null;
+      }
+
+      if (!sentinel) return;
+
+      const root = scrollContainerRef.current;
+      if (!root || typeof IntersectionObserver === 'undefined') return;
+
+      const observer = new IntersectionObserver(
+        entries => {
+          const entry = entries[0];
+          if (!entry) return;
+          updateStuckFromIntersection(entry.isIntersecting);
+        },
+        {
+          root,
+          threshold: 0,
+          rootMargin: `0px 0px ${SCROLL_THRESHOLD}px 0px`,
+        }
+      );
+
+      observer.observe(sentinel);
+      intersectionObserverRef.current = observer;
+    },
+    [updateStuckFromIntersection]
+  );
+
+  const bottomSentinelRef = useCallback(
+    (node: HTMLDivElement | null) => {
+      attachSentinelObserver(node);
+    },
+    [attachSentinelObserver]
+  );
+
+  useEffect(() => {
+    if (!sentinelNodeRef.current) return;
+    attachSentinelObserver(sentinelNodeRef.current);
+  }, [attachSentinelObserver]);
+
+  const totalSizeRef = useCallback(
+    (node: HTMLDivElement | null) => {
+      if (resizeObserverRef.current) {
+        resizeObserverRef.current.disconnect();
+        resizeObserverRef.current = null;
+      }
+
+      if (!node || typeof ResizeObserver === 'undefined') return;
+
+      const observer = new ResizeObserver(() => {
+        scheduleScrollToBottom();
+      });
+
+      observer.observe(node);
+      resizeObserverRef.current = observer;
+    },
+    [scheduleScrollToBottom]
+  );
+
+  const onScroll = useCallback(() => {
+    // Stuck detection is handled by IntersectionObserver — avoid layout reads here.
+  }, []);
+
   useEffect(() => {
     return () => {
-      if (observerRef.current) {
-        observerRef.current.disconnect();
+      resizeObserverRef.current?.disconnect();
+      intersectionObserverRef.current?.disconnect();
+      if (scrollRafRef.current !== null) {
+        cancelAnimationFrame(scrollRafRef.current);
       }
     };
   }, []);
@@ -120,5 +160,6 @@ export function useStickToBottom({
     onScroll,
     totalSizeRef,
     scrollContainerRef,
+    bottomSentinelRef,
   };
 }

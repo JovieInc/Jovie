@@ -15,6 +15,10 @@ import {
   executeChatTurn,
   selectKnowledgeContextForTurn,
 } from '@/lib/chat/run';
+import {
+  CHAT_TOOL_STEP_LIMIT_FREE,
+  CHAT_TOOL_STEP_LIMIT_PAID,
+} from '@/lib/chat/tool-step-limit';
 import type {
   ArtistContext,
   ChatTelemetry,
@@ -239,6 +243,95 @@ describe('executeChatTurn — parity assertions', () => {
     });
 
     expect(setExtra).not.toHaveBeenCalled();
+  });
+
+  it('passes a plan-aware stopWhen step cap to streamText', async () => {
+    const paidTurn = await executeChatTurn({
+      ...baseInput,
+      uiMessages: [userMessage('hello')],
+      planLimits: paidPlanLimits,
+    });
+    const paidOpts = (
+      paidTurn.streamResult as unknown as { __opts: { stopWhen: unknown } }
+    ).__opts;
+    expect(paidOpts.stopWhen).toBeTypeOf('function');
+    expect(
+      (
+        paidOpts.stopWhen as (arg: {
+          steps: Array<{ toolCalls: unknown[] }>;
+        }) => boolean
+      )({
+        steps: Array.from({ length: CHAT_TOOL_STEP_LIMIT_PAID }, () => ({
+          toolCalls: [{}],
+        })),
+      })
+    ).toBe(true);
+
+    const freeTurn = await executeChatTurn({
+      ...baseInput,
+      uiMessages: [userMessage('hello')],
+      planLimits: freePlanLimits,
+    });
+    const freeOpts = (
+      freeTurn.streamResult as unknown as { __opts: { stopWhen: unknown } }
+    ).__opts;
+    expect(
+      (
+        freeOpts.stopWhen as (arg: {
+          steps: Array<{ toolCalls: unknown[] }>;
+        }) => boolean
+      )({
+        steps: Array.from({ length: CHAT_TOOL_STEP_LIMIT_FREE }, () => ({
+          toolCalls: [{}],
+        })),
+      })
+    ).toBe(true);
+  });
+
+  it('emits telemetry when the in-turn tool step cap is exhausted', async () => {
+    const setTags = vi.fn();
+    const setExtra = vi.fn();
+    const addBreadcrumb = vi.fn();
+    const telemetry: ChatTelemetry = { setTags, setExtra, addBreadcrumb };
+
+    const turn = await executeChatTurn({
+      ...baseInput,
+      uiMessages: [userMessage('hello')],
+      planLimits: freePlanLimits,
+      telemetry,
+    });
+
+    type MockedOpts = {
+      onFinish: (arg: {
+        steps: Array<{ toolCalls: Array<{ toolName: string }> }>;
+      }) => void;
+    };
+    const opts = (turn.streamResult as unknown as { __opts: MockedOpts })
+      .__opts;
+    opts.onFinish({
+      steps: Array.from({ length: CHAT_TOOL_STEP_LIMIT_FREE }, () => ({
+        toolCalls: [{ toolName: 'loopTool' }],
+      })),
+    });
+
+    expect(setTags).toHaveBeenCalledWith({
+      chat_tool_step_cap_exhausted: 'true',
+    });
+    expect(setExtra).toHaveBeenCalledWith(
+      'chat_tool_step_count',
+      CHAT_TOOL_STEP_LIMIT_FREE
+    );
+    expect(setExtra).toHaveBeenCalledWith(
+      'chat_tool_step_limit',
+      CHAT_TOOL_STEP_LIMIT_FREE
+    );
+    expect(addBreadcrumb).toHaveBeenCalledWith(
+      expect.objectContaining({
+        category: 'ai-chat',
+        message: 'chat_tool_step_cap_exhausted',
+        level: 'warning',
+      })
+    );
   });
 
   it('routes captureException through telemetry on stream error (no Sentry import in run.ts)', async () => {

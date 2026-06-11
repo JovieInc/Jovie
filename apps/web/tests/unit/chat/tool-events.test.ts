@@ -3,6 +3,10 @@ import {
   decodeToolEvents,
   encodeToolEvents,
   persistedToolEventsSchema,
+  preparePersistedToolEventsForTurnFinish,
+  resolvePersistedToolEventsForDisplay,
+  STALE_RUNNING_TOOL_EVENT_MS,
+  terminalizeRunningToolEvents,
   toolEventToMessagePart,
 } from '@/lib/chat/tool-events';
 import { ONBOARDING_TOOLS } from '@/lib/chat/tool-schemas';
@@ -84,6 +88,139 @@ describe('tool event contract', () => {
     for (const toolName of [...CHAT_ROUTE_TOOL_NAMES, ...ONBOARDING_TOOLS]) {
       expect(TOOL_UI_REGISTRY[toolName]).toBeDefined();
     }
+  });
+
+  it('terminalizes running tool events for aborted turn persistence', () => {
+    const toolCalls = preparePersistedToolEventsForTurnFinish({
+      isAborted: true,
+      parts: [
+        {
+          type: 'dynamic-tool',
+          toolName: 'showTopInsights',
+          toolCallId: 'tool-running',
+          state: 'input-available',
+          input: { profileId: 'profile-1' },
+        },
+        {
+          type: 'dynamic-tool',
+          toolName: 'submitFeedback',
+          toolCallId: 'tool-done',
+          state: 'output-available',
+          input: { feedback: 'Ship it' },
+          output: { success: true },
+        },
+      ],
+    });
+
+    expect(toolCalls).toEqual([
+      expect.objectContaining({
+        toolCallId: 'tool-running',
+        state: 'failed',
+        errorMessage:
+          'This tool was interrupted when the chat disconnected. Retry when you are ready.',
+      }),
+      expect.objectContaining({
+        toolCallId: 'tool-done',
+        state: 'succeeded',
+      }),
+    ]);
+  });
+
+  it('resolves canceled-turn running tools for replay and reload', () => {
+    const runningEvent = {
+      schemaVersion: 2 as const,
+      toolCallId: 'tool-running',
+      toolName: 'showTopInsights',
+      state: 'running' as const,
+      uiHint: 'artifact' as const,
+    };
+
+    expect(
+      resolvePersistedToolEventsForDisplay([runningEvent], {
+        turnStatus: 'canceled',
+        messageCreatedAt: new Date('2026-06-10T12:00:00Z'),
+        observedAt: new Date('2026-06-10T12:00:10Z'),
+      })
+    ).toEqual([
+      expect.objectContaining({
+        toolCallId: 'tool-running',
+        state: 'failed',
+      }),
+    ]);
+  });
+
+  it('terminalizes stale running tools after the hydration grace window', () => {
+    const runningEvent = {
+      schemaVersion: 2 as const,
+      toolCallId: 'tool-stale',
+      toolName: 'showTopInsights',
+      state: 'running' as const,
+      uiHint: 'artifact' as const,
+    };
+    const createdAt = new Date('2026-06-10T12:00:00Z');
+
+    expect(
+      resolvePersistedToolEventsForDisplay([runningEvent], {
+        messageCreatedAt: createdAt,
+        observedAt: new Date(
+          createdAt.getTime() + STALE_RUNNING_TOOL_EVENT_MS + 1_000
+        ),
+      })
+    ).toEqual([
+      expect.objectContaining({
+        toolCallId: 'tool-stale',
+        state: 'failed',
+        errorMessage:
+          'This tool call timed out before it could finish. Retry when you are ready.',
+      }),
+    ]);
+  });
+
+  it('terminalizeRunningToolEvents only rewrites running entries', () => {
+    const runningEvent = {
+      schemaVersion: 2 as const,
+      toolCallId: 'tool-active',
+      toolName: 'showTopInsights',
+      state: 'running' as const,
+      uiHint: 'artifact' as const,
+    };
+    const succeededEvent = {
+      ...runningEvent,
+      toolCallId: 'tool-done',
+      state: 'succeeded' as const,
+      output: { success: true },
+    };
+
+    expect(
+      terminalizeRunningToolEvents([runningEvent, succeededEvent], {
+        errorMessage: 'Interrupted',
+      })
+    ).toEqual([
+      expect.objectContaining({
+        toolCallId: 'tool-active',
+        state: 'failed',
+        errorMessage: 'Interrupted',
+      }),
+      succeededEvent,
+    ]);
+  });
+
+  it('leaves in-flight running tools untouched while the turn is still active', () => {
+    const runningEvent = {
+      schemaVersion: 2 as const,
+      toolCallId: 'tool-active',
+      toolName: 'showTopInsights',
+      state: 'running' as const,
+      uiHint: 'artifact' as const,
+    };
+
+    expect(
+      resolvePersistedToolEventsForDisplay([runningEvent], {
+        turnStatus: 'streaming',
+        messageCreatedAt: new Date('2026-06-10T12:00:00Z'),
+        observedAt: new Date('2026-06-10T12:00:10Z'),
+      })
+    ).toEqual([runningEvent]);
   });
 
   it('preserves approval responses through persistence and hydration', () => {
