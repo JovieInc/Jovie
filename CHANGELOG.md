@@ -15,6 +15,7 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ### Fixed
 
+- **Loop infra review blockers**: hardens workflow-run CAS claims, connector enum casts, approved-action workflow enqueue idempotency, and per-source memory evidence metadata.
 - **PersistentAudioBar tests**: align dismiss and region aria-label assertions with Title Case labels.
 - **Shell AudioBar neutral play control**: moves central transport play/pause from accent fill onto neutral System B primary button tokens.
 
@@ -72,6 +73,7 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ### Fixed
 
+- **Electron shell security (JOV-3014)**: bumps Electron to 42.4.0 and removes sandbox-weakening macOS entitlements so desktop releases ship with defense-in-depth defaults.
 - **System B neutral action controls**: moves admin speed presets, celebration card size selection, audio transport buttons, and the listening overlay icon from primary/accent fills onto neutral primary button tokens while leaving progress and status accents intact.
 
 ## [26.6.43] - 2026-06-11
@@ -120,46 +122,6 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 ### Fixed
 
 - **Admin execution neutral actions (JOV-3036)**: removes local primary-token and primary-color fills from the impersonation `End Session` and ops `Dispatch worker` actions, preserving warning/status color while keeping central execution controls neutral.
-
-## [26.6.37] - 2026-06-11
-
-> Founder demo approval actions now use the neutral System B primary button instead of a local colored fill.
-
-### Fixed
-
-- **Founder demo neutral approval action (JOV-3034)**: replaces the raw `bg-primary-token` `Approve drop` CTA in the recording demo with neutral primary button tokens while preserving demo timing, copy, and progress accents.
-
-## [26.6.36] - 2026-06-11
-
-> Settings SMS access requests now use the neutral System B primary button instead of a colored fill.
-
-### Fixed
-
-- **Settings SMS neutral action (JOV-3031)**: replaces the colored `bg-primary-token` request CTA in the SMS access settings section with neutral primary button tokens, keeping accent color reserved for the surrounding informational state.
-
-## [26.6.35] - 2026-06-11
-
-> Dashboard header creation actions now use neutral toolbar controls instead of colored fills.
-
-### Fixed
-
-- **Dashboard header neutral actions (JOV-3030)**: removes colored `bg-primary-token` fills from release creation and task creation header actions, preserving compact toolbar behavior while keeping accent colors reserved for status, progress, and selection states.
-
-## [26.6.34] - 2026-06-10
-
-> Library share submit actions now use neutral System B button surfaces instead of colored fills.
-
-### Fixed
-
-- **Library share neutral actions (JOV-3026)**: replaces colored `bg-primary-token` fills on the share-drop creator and passphrase gate submit buttons with neutral System B primary button tokens, keeping accent color reserved for progress, status, marks, and highlights.
-
-## [26.6.38] - 2026-06-11
-
-> Desktop shell security hardening ships with a new Electron runtime and tightened macOS entitlements.
-
-### Fixed
-
-- **Electron shell security (JOV-3014)**: bumps Electron to 42.4.0 and removes sandbox-weakening macOS entitlements so desktop releases ship with defense-in-depth defaults.
 
 ## [26.6.37] - 2026-06-11
 

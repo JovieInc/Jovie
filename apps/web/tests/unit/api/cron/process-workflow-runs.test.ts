@@ -149,6 +149,10 @@ describe('GET /api/cron/process-workflow-runs', () => {
       ([column, value]) => column === workflowRuns.status && value === 'queued'
     );
     expect(queuedStatusChecks.length).toBeGreaterThanOrEqual(1);
+    const dueRunAtChecks = mockLte.mock.calls.filter(
+      ([column]) => column === workflowRuns.runAt
+    );
+    expect(dueRunAtChecks).toHaveLength(2);
     expect(updateChain.set).toHaveBeenCalledWith(
       expect.objectContaining({
         status: 'running',

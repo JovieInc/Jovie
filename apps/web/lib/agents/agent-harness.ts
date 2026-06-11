@@ -205,7 +205,7 @@ export class OpenAIAgentsAdapter implements AgentHarness {
               [{ sourceRecordId: correlatedSource.id }],
               {
                 phase: 'context_correlation_v0',
-                refs: nearbyContextRefs,
+                refs: [ref],
                 studioSessionLink: true,
               }
             ),
@@ -216,7 +216,7 @@ export class OpenAIAgentsAdapter implements AgentHarness {
           sourceRecordId: correlatedSource.id,
           entityId: personResolved.entityId,
           kind: 'context_correlation',
-          sourceRefs: nearbyContextRefs,
+          sourceRefs: [ref],
           confidence: 0.7,
           data: correlationObservation.metadata as Record<string, unknown>,
         });

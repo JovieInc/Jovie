@@ -5,11 +5,25 @@ if (!key) {
   process.exit(1);
 }
 const query = `query { issues(filter: { team: { key: { eq: "JOV" } }, state: { name: { in: ["Todo", "Triage", "Backlog"] } } }, first: 40, orderBy: updatedAt) { nodes { identifier title priority priorityLabel branchName labels { nodes { name } } description } } }`;
-const res = await fetch('https://api.linear.app/graphql', {
-  method: 'POST',
-  headers: { 'Content-Type': 'application/json', Authorization: key },
-  body: JSON.stringify({ query }),
-});
+let res;
+try {
+  res = await fetch('https://api.linear.app/graphql', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: key },
+    body: JSON.stringify({ query }),
+    signal: AbortSignal.timeout(15_000),
+  });
+} catch (error) {
+  console.error(error instanceof Error ? error.message : String(error));
+  process.exit(1);
+}
+if (!res.ok) {
+  const body = await res.text();
+  console.error(
+    `Linear API request failed (${res.status} ${res.statusText}): ${body}`
+  );
+  process.exit(1);
+}
 const data = await res.json();
 if (data.errors) {
   console.error(JSON.stringify(data.errors));

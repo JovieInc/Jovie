@@ -12,6 +12,7 @@
  *   `waiting_for_approval`.
  */
 
+import { sql as drizzleSql } from 'drizzle-orm';
 import {
   index,
   jsonb,
@@ -540,7 +541,14 @@ export const workflowRuns = pgTable(
       .notNull()
       .defaultNow(),
   },
-  t => [index('workflow_runs_status_run_at_idx').on(t.status, t.runAt)]
+  t => [
+    index('workflow_runs_status_run_at_idx').on(t.status, t.runAt),
+    uniqueIndex('workflow_runs_execute_approved_action_approval_uniq')
+      .on(drizzleSql`${t.stepOutputs} ->> 'approvalId'`)
+      .where(
+        drizzleSql`${t.kind} = 'execute_approved_action' AND ${t.stepOutputs} ->> 'approvalId' IS NOT NULL`
+      ),
+  ]
 );
 
 export type WorkflowRun = typeof workflowRuns.$inferSelect;

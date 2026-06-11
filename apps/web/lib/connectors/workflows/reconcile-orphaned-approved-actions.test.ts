@@ -37,9 +37,11 @@ function mockSelectChain(rows: unknown[]) {
   return chain;
 }
 
-function mockInsertChain() {
+function mockInsertChain(rows = [{ id: 'workflow-run-id' }]) {
   const chain = {
-    values: vi.fn().mockResolvedValue([{ id: 'workflow-run-id' }]),
+    values: vi.fn().mockReturnThis(),
+    onConflictDoNothing: vi.fn().mockReturnThis(),
+    returning: vi.fn().mockResolvedValue(rows),
   };
   vi.mocked(db.insert).mockReturnValue(
     chain as unknown as ReturnType<typeof db.insert>
@@ -153,6 +155,40 @@ describe('recoverOrphanedApprovedAction', () => {
         },
       })
     );
+    expect(insertChain.onConflictDoNothing).toHaveBeenCalledOnce();
+  });
+
+  it('returns already-queued when a concurrent enqueue wins the unique constraint', async () => {
+    let selectCall = 0;
+    vi.mocked(db.select).mockImplementation(() => {
+      selectCall++;
+      const rows =
+        selectCall === 1
+          ? [
+              {
+                id: ACTION_ID,
+                status: 'accepted',
+                userId: USER_ID,
+                payload: { title: 'Show' },
+              },
+            ]
+          : [];
+      return {
+        from: vi.fn().mockReturnThis(),
+        where: vi.fn().mockReturnThis(),
+        limit: vi.fn().mockResolvedValue(rows),
+      } as unknown as ReturnType<typeof db.select>;
+    });
+    const insertChain = mockInsertChain([]);
+
+    await expect(
+      recoverOrphanedApprovedAction({
+        approvalId: ACTION_ID,
+        userId: USER_ID,
+      })
+    ).resolves.toBe('already-queued');
+
+    expect(insertChain.onConflictDoNothing).toHaveBeenCalledOnce();
   });
 });
 
@@ -177,5 +213,6 @@ describe('reconcileOrphanedAcceptedActions', () => {
     });
 
     expect(insertChain.values).toHaveBeenCalledOnce();
+    expect(insertChain.onConflictDoNothing).toHaveBeenCalledOnce();
   });
 });

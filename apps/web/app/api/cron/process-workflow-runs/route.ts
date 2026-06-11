@@ -101,7 +101,10 @@ export async function GET(request: Request): Promise<Response> {
         and(
           inArray(workflowRuns.id, claimableIds),
           or(
-            eq(workflowRuns.status, 'queued'),
+            and(
+              eq(workflowRuns.status, 'queued'),
+              lte(workflowRuns.runAt, now)
+            ),
             and(eq(workflowRuns.status, 'running'), leaseExpiredBefore(now))
           )
         )

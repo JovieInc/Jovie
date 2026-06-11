@@ -21,9 +21,12 @@
 import { and, eq } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/auth/require-auth';
-import { recoverOrphanedApprovedAction } from '@/lib/connectors/workflows/reconcile-orphaned-approved-actions';
+import {
+  enqueueApprovedActionWorkflow,
+  recoverOrphanedApprovedAction,
+} from '@/lib/connectors/workflows/reconcile-orphaned-approved-actions';
 import { db } from '@/lib/db';
-import { suggestedActions, workflowRuns } from '@/lib/db/schema/connectors';
+import { suggestedActions } from '@/lib/db/schema/connectors';
 import { captureError } from '@/lib/error-tracking';
 import { logger } from '@/lib/utils/logger';
 
@@ -102,19 +105,16 @@ export async function POST(_request: Request, { params }: RouteParams) {
     // without a second DB round-trip to reload the suggested_action row.
     const eventPayload = updated[0].payload as BookingPayload | null;
 
-    // Insert workflow_runs to execute the approved action
-    await db.insert(workflowRuns).values({
-      kind: 'execute_approved_action',
+    const enqueueResult = await enqueueApprovedActionWorkflow({
       userId,
-      status: 'queued',
-      currentStep: 'create_calendar_event',
-      stepOutputs: { approvalId: id, eventPayload },
-      runAt: new Date(),
+      approvalId: id,
+      eventPayload,
     });
 
     logger.info('[approve] suggested_action approved, workflow_run queued', {
       approvalId: id,
       userId,
+      enqueueResult,
     });
 
     return NextResponse.json(
