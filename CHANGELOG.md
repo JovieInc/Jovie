@@ -5,6 +5,38 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.6.45] - 2026-06-11
+
+> The post-onboarding interview modal now uses shared System B surfaces and controls.
+
+### Fixed
+
+- **Onboarding interview modal System B cleanup**: replaces hardcoded modal colors, white-alpha input styling, raw shadows, and glyph progress with tokenized System B surface classes, the shared textarea primitive, and stable progress dots.
+
+## [26.6.44] - 2026-06-11
+
+> Central transport and speed controls now use neutral System B primary button surfaces.
+
+### Fixed
+
+- **System B neutral action controls**: moves admin speed presets, celebration card size selection, audio transport buttons, and the listening overlay icon from primary/accent fills onto neutral primary button tokens while leaving progress and status accents intact.
+
+## [26.6.43] - 2026-06-11
+
+> Chat slash picker scroll clearance avoids redundant observer work while typing.
+
+### Fixed
+
+- **Chat slash picker scroll effect**: keeps picker-open transcript clearance stable without rebuilding scroll observers on every composer keystroke, and falls back cleanly if `ResizeObserver` setup fails.
+
+## [26.6.42] - 2026-06-11
+
+> Chat slash-command suggestions reserve real transcript clearance in populated threads.
+
+### Fixed
+
+- **Chat slash picker clearance**: grows the virtualized transcript scroll range while the root slash picker is open so active thread content stays clear of the suggestion surface without moving the composer dock.
+
 ## [26.6.41] - 2026-06-11
 
 > Codex issue shipper GBrain capture metadata no longer carries a redundant slug assignment.

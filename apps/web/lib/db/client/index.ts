@@ -33,7 +33,14 @@ export { logDbError, logDbInfo } from './logging';
 export { DB_CONFIG, isRetryableError, withRetry } from './retry';
 
 // Session Helpers
-export { setSessionUser, withDb } from './session';
+export {
+  applyRlsSessionUser,
+  getRlsSessionResetSql,
+  getRlsSessionSetSql,
+  resetRlsSession,
+  setSessionUser,
+  withDb,
+} from './session';
 // Types
 export type {
   ActiveConnectionsRow,
