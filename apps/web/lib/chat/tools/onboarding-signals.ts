@@ -13,6 +13,7 @@
  */
 
 import { z } from 'zod';
+import { chatToolSchema } from '@/lib/chat/strict-schema';
 
 /** Release stage the artist self-reports. */
 export const releaseStageSchema = z.enum([
@@ -36,7 +37,7 @@ export const audienceBandSchema = z.enum([
 export type AudienceBand = z.infer<typeof audienceBandSchema>;
 
 /** What the artist is currently using (the status quo Jovie is replacing). */
-export const currentToolSchema = z.object({
+export const currentToolSchema = chatToolSchema({
   /** Free-text identifier: "linktree", "bio.fm", "my own site", "nothing", etc. */
   name: z.string().min(1).max(120),
   /** What about it does/doesn't work — short free text. Optional. */
@@ -44,7 +45,7 @@ export const currentToolSchema = z.object({
 });
 
 /** A single objection or hesitation the user raised. */
-export const objectionSchema = z.object({
+export const objectionSchema = chatToolSchema({
   /** Categorized objection kind, free-text fallback allowed via `other`. */
   category: z.enum([
     'price',
@@ -65,26 +66,24 @@ export const objectionSchema = z.object({
  * The tool can pass only the fields it has signal on — every field is
  * optional, but at least one MUST be present (enforced via refine).
  */
-export const interviewSignalSchema = z
-  .object({
-    releaseStage: releaseStageSchema.optional(),
-    audienceBand: audienceBandSchema.optional(),
-    currentTool: currentToolSchema.optional(),
-    objection: objectionSchema.optional(),
-    /** Free-form note for anything that doesn't fit the typed schema yet. */
-    freeNote: z.string().max(2000).optional(),
-  })
-  .refine(
-    v =>
-      Boolean(
-        v.releaseStage ||
-          v.audienceBand ||
-          v.currentTool ||
-          v.objection ||
-          v.freeNote
-      ),
-    { message: 'At least one signal field must be present' }
-  );
+export const interviewSignalSchema = chatToolSchema({
+  releaseStage: releaseStageSchema.optional(),
+  audienceBand: audienceBandSchema.optional(),
+  currentTool: currentToolSchema.optional(),
+  objection: objectionSchema.optional(),
+  /** Free-form note for anything that doesn't fit the typed schema yet. */
+  freeNote: z.string().max(2000).optional(),
+}).refine(
+  v =>
+    Boolean(
+      v.releaseStage ||
+        v.audienceBand ||
+        v.currentTool ||
+        v.objection ||
+        v.freeNote
+    ),
+  { message: 'At least one signal field must be present' }
+);
 export type InterviewSignal = z.infer<typeof interviewSignalSchema>;
 
 /**

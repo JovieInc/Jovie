@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>co.jovie.hermes.cron-codex-issue-shipper</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>{{TSX_BIN}}</string>
+        <string>{{JOVIE_REPO}}/scripts/hermes/jobs/codex-issue-shipper.ts</string>
+    </array>
+    <key>WorkingDirectory</key>
+    <string>{{JOVIE_REPO}}</string>
+    <key>StartInterval</key>
+    <integer>900</integer>
+    <key>RunAtLoad</key>
+    <false/>
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>HERMES_HOME</key>
+        <string>{{HOME}}/.hermes</string>
+        <key>HERMES_CODEX_SHIPPER_MAX_ISSUES_PER_RUN</key>
+        <string>1</string>
+        <key>HERMES_CODEX_SHIPPER_INTEGRATION_THRESHOLD</key>
+        <string>4</string>
+        <key>HERMES_CODEX_SHIPPER_AGENT</key>
+        <string>claude</string>
+        <key>HERMES_CODEX_SHIPPER_SIMPLE_MODEL</key>
+        <string>sonnet</string>
+        <key>HERMES_CODEX_SHIPPER_STANDARD_MODEL</key>
+        <string>sonnet</string>
+        <key>HERMES_CODEX_SHIPPER_ESCALATION_MODEL</key>
+        <string>opus</string>
+        <key>HERMES_CODEX_SHIPPER_FALLBACK_MODEL</key>
+        <string>sonnet</string>
+        <key>PATH</key>
+        <string>{{NODE_BIN_DIR}}:{{HOME}}/.bun/bin:{{HOME}}/.hermes/bin:{{HOME}}/.local/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin</string>
+    </dict>
+    <key>StandardOutPath</key>
+    <string>{{HOME}}/.hermes/logs/launchd/cron-codex-issue-shipper.log</string>
+    <key>StandardErrorPath</key>
+    <string>{{HOME}}/.hermes/logs/launchd/cron-codex-issue-shipper.err.log</string>
+</dict>
+</plist>

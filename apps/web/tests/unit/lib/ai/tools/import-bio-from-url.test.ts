@@ -74,7 +74,9 @@ describe('importBioFromUrl', () => {
     };
 
     expect(result.ok).toBe(true);
-    expect(result.candidateBio).toBe('Brooklyn DJ blending house and disco.');
+    expect(result.candidateBio).toBe(
+      '<untrusted-source url="https://timwhite.co/">Brooklyn DJ blending house and disco.</untrusted-source>'
+    );
     expect(result.sourceUrl).toBe('https://timwhite.co/');
     expect(result.sourceTitle).toBe('Tim White');
   });

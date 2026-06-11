@@ -105,9 +105,9 @@ export function JovieChat({
   const {
     isStuckToBottom,
     setStuckToBottom,
-    onScroll,
     totalSizeRef,
     scrollContainerRef,
+    bottomSentinelRef,
   } = useStickToBottom({ messageCount: messages.length });
 
   // ─── Chat jank instrumentation (flag-gated) ─────────────────
@@ -397,9 +397,27 @@ export function JovieChat({
   const messageViewportPaddingBottom = shouldReservePickerClearance
     ? CHAT_PICKER_THREAD_CLEARANCE
     : undefined;
+  const [virtualizedMinHeight, setVirtualizedMinHeight] = useState(0);
+
+  useLayoutEffect(() => {
+    if (!showThreadView || !shouldVirtualizeMessages) return;
+    const container = scrollContainerRef.current;
+    if (!container) return;
+    const nextMinHeight = container.clientHeight;
+    setVirtualizedMinHeight(prev =>
+      prev === nextMinHeight ? prev : nextMinHeight
+    );
+  }, [
+    showThreadView,
+    shouldVirtualizeMessages,
+    scrollContainerRef,
+    messages.length,
+  ]);
+
   const virtualizedMessageViewportBaseHeight = Math.max(
     virtualizer.getTotalSize(),
-    scrollContainerRef.current?.clientHeight ?? 0
+    scrollContainerRef.current?.clientHeight ?? 0,
+    virtualizedMinHeight
   );
   const virtualizedMessageViewportHeight = messageViewportPaddingBottom
     ? `calc(${virtualizedMessageViewportBaseHeight}px + ${messageViewportPaddingBottom})`
@@ -409,7 +427,10 @@ export function JovieChat({
     if (!shouldReservePickerClearance) return;
     const scrollContainer = scrollContainerRef.current;
     if (!scrollContainer) return;
-    scrollContainer.scrollTop = scrollContainer.scrollHeight;
+    const frame = requestAnimationFrame(() => {
+      scrollContainer.scrollTop = scrollContainer.scrollHeight;
+    });
+    return () => cancelAnimationFrame(frame);
   }, [scrollContainerRef, shouldReservePickerClearance]);
 
   // Show skeleton while fetching existing conversation
@@ -472,7 +493,7 @@ export function JovieChat({
 
       <ChatInput
         {...chatInputProps}
-        placeholder='Ask Jovie...'
+        placeholder='Ask jovie...'
         variant={showThreadView ? 'compact' : 'hero'}
       />
     </div>
@@ -563,89 +584,48 @@ export function JovieChat({
           <div
             ref={scrollContainerRef}
             className='relative flex flex-1 flex-col overflow-y-auto px-4 py-5 sm:px-5'
-            onScroll={onScroll}
           >
-            <AnimatePresence mode='popLayout' initial={false}>
-              {!showThreadView ? (
-                <div
-                  key='joviechat-empty-upper'
-                  className='relative min-h-full'
-                >
-                  <ChatEmptyStateComposerRegion>
-                    {composerSurface}
-                    {inlineChatError ? (
-                      <div className='mt-3 w-full'>{inlineChatError}</div>
-                    ) : null}
-                  </ChatEmptyStateComposerRegion>
-                </div>
-              ) : (
-                <div key='joviechat-messages'>
-                  {shouldVirtualizeMessages ? (
-                    <div
-                      ref={totalSizeRef}
-                      className='mx-auto flex min-h-full w-full max-w-[44rem] flex-col'
-                      style={{
-                        position: 'relative',
-                        height: virtualizedMessageViewportHeight,
-                      }}
-                    >
-                      {virtualizer.getVirtualItems().map(virtualItem => {
-                        const message = messages[virtualItem.index];
-                        const index = virtualItem.index;
-                        const isThinking =
-                          message.role === 'assistant' &&
-                          message.status === 'pending';
-                        return (
-                          <div
-                            key={message.id}
-                            data-index={virtualItem.index}
-                            ref={virtualizer.measureElement}
-                            style={{
-                              position: 'absolute',
-                              top: 0,
-                              left: 0,
-                              width: '100%',
-                              transform: `translateY(${virtualItem.start}px)`,
-                            }}
-                          >
-                            <div className='pb-4'>
-                              <ChatMessage
-                                id={message.id}
-                                role={message.role}
-                                parts={message.parts}
-                                isStreaming={
-                                  isStreaming && index === lastAssistantIndex
-                                }
-                                isThinking={isThinking}
-                                avatarUrl={
-                                  message.role === 'user'
-                                    ? avatarUrl
-                                    : undefined
-                                }
-                                profileId={profileId}
-                                skipEntrance={knownMessageIdsRef.current.has(
-                                  message.id
-                                )}
-                              />
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  ) : (
-                    <div
-                      ref={totalSizeRef}
-                      className='mx-auto flex min-h-full w-full max-w-[44rem] flex-col'
-                      style={{
-                        paddingBottom: messageViewportPaddingBottom,
-                      }}
-                    >
-                      {messages.map((message, index) => {
-                        const isThinking =
-                          message.role === 'assistant' &&
-                          message.status === 'pending';
-                        return (
-                          <div key={message.id} className='pb-4'>
+            {!showThreadView ? (
+              <div className='relative min-h-full'>
+                <ChatEmptyStateComposerRegion>
+                  {composerSurface}
+                  {inlineChatError ? (
+                    <div className='mt-3 w-full'>{inlineChatError}</div>
+                  ) : null}
+                </ChatEmptyStateComposerRegion>
+              </div>
+            ) : (
+              <div>
+                {shouldVirtualizeMessages ? (
+                  <div
+                    ref={totalSizeRef}
+                    className='mx-auto flex min-h-full w-full max-w-[44rem] flex-col'
+                    style={{
+                      position: 'relative',
+                      height: virtualizedMessageViewportHeight,
+                      minHeight: virtualizedMinHeight || undefined,
+                    }}
+                  >
+                    {virtualizer.getVirtualItems().map(virtualItem => {
+                      const message = messages[virtualItem.index];
+                      const index = virtualItem.index;
+                      const isThinking =
+                        message.role === 'assistant' &&
+                        message.status === 'pending';
+                      return (
+                        <div
+                          key={message.id}
+                          data-index={virtualItem.index}
+                          ref={virtualizer.measureElement}
+                          style={{
+                            position: 'absolute',
+                            top: 0,
+                            left: 0,
+                            width: '100%',
+                            transform: `translateY(${virtualItem.start}px)`,
+                          }}
+                        >
+                          <div className='pb-4'>
                             <ChatMessage
                               id={message.id}
                               role={message.role}
@@ -663,21 +643,62 @@ export function JovieChat({
                               )}
                             />
                           </div>
-                        );
-                      })}
-                    </div>
-                  )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <div
+                    ref={totalSizeRef}
+                    className='mx-auto flex min-h-full w-full max-w-[44rem] flex-col'
+                    style={{
+                      paddingBottom: messageViewportPaddingBottom,
+                    }}
+                  >
+                    {messages.map((message, index) => {
+                      const isThinking =
+                        message.role === 'assistant' &&
+                        message.status === 'pending';
+                      return (
+                        <div key={message.id} className='pb-4'>
+                          <ChatMessage
+                            id={message.id}
+                            role={message.role}
+                            parts={message.parts}
+                            isStreaming={
+                              isStreaming && index === lastAssistantIndex
+                            }
+                            isThinking={isThinking}
+                            avatarUrl={
+                              message.role === 'user' ? avatarUrl : undefined
+                            }
+                            profileId={profileId}
+                            skipEntrance={knownMessageIdsRef.current.has(
+                              message.id
+                            )}
+                          />
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
 
-                  {inlineChatError}
+                {inlineChatError}
 
-                  {/* Scroll to bottom button */}
-                  <ScrollToBottom
-                    visible={!isStuckToBottom}
-                    onClick={() => scrollToBottom()}
-                  />
-                </div>
-              )}
-            </AnimatePresence>
+                <div
+                  ref={bottomSentinelRef}
+                  aria-hidden
+                  className='h-px w-full shrink-0'
+                  data-testid='chat-bottom-sentinel'
+                />
+
+                {/* Scroll to bottom button */}
+                <ScrollToBottom
+                  visible={!isStuckToBottom}
+                  onClick={() => scrollToBottom()}
+                />
+              </div>
+            )}
           </div>
 
           {/*

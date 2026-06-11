@@ -10,7 +10,7 @@ Provider-neutral chat-turn pipeline. Wraps the Vercel AI SDK with Jovie-specific
 2. **System prompt** — `system-prompt.ts:buildSystemPrompt()` composes artist context, discography summary, plan capabilities, and tool docs.
 3. **Message conversion** — UIMessage history → AI SDK ModelMessage format.
 4. **Model selection** — frontier model by default; `forceLightModel` (Statsig kill-switch) routes to the cheaper/faster model. Free-tier short-intent traffic also routes light.
-5. **`streamText()`** — AI SDK call with system prompt, messages, and tools.
+5. **`streamText()`** — AI SDK call with system prompt, messages, tools, and a plan-aware `stopWhen: stepCountIs(N)` cap (8 paid / 3 free) to guard in-turn tool loops.
 6. **Streaming** — return a UIMessage stream the route hands directly to the client.
 
 Key files:
@@ -37,7 +37,7 @@ Tools are NOT defined here. They are built in the route (`buildFreeChatTools`, `
 
 ## Telemetry contract
 
-`types.ts` defines `ChatTelemetry` with `setTags`, `setExtra`, `captureException`. The route binds Sentry; eval scripts pass a no-op. The pipeline never imports `@sentry/nextjs` directly.
+`types.ts` defines `ChatTelemetry` with `setTags`, `setExtra`, `addBreadcrumb`, `captureException`. The route binds Sentry; eval scripts pass a no-op. The pipeline never imports `@sentry/nextjs` directly.
 
 ## Adding a new tool
 

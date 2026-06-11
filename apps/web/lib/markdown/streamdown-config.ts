@@ -35,9 +35,8 @@ const urlTransform: NonNullable<StreamdownProps['urlTransform']> = url => {
 
 const baseStreamdownConfig: Omit<
   StreamdownProps,
-  'children' | 'mode' | 'isAnimating'
+  'children' | 'mode' | 'isAnimating' | 'className'
 > = {
-  className: CHAT_MARKDOWN_STYLES,
   skipHtml: true,
   urlTransform,
   allowedElements: [
@@ -65,15 +64,36 @@ const baseStreamdownConfig: Omit<
   caret: 'block',
 };
 
+/** Frozen config objects so Streamdown can bail out when only content changes. */
+export const CHAT_MARKDOWN_STREAMING_CONFIG: StreamdownProps = {
+  ...baseStreamdownConfig,
+  className: CHAT_MARKDOWN_STYLES,
+  mode: 'streaming',
+  isAnimating: true,
+};
+
+export const CHAT_MARKDOWN_STATIC_CONFIG: StreamdownProps = {
+  ...baseStreamdownConfig,
+  className: CHAT_MARKDOWN_STYLES,
+  mode: 'static',
+  isAnimating: false,
+};
+
 export function getChatMarkdownStreamdownConfig(
   isStreaming: boolean,
   className?: string
 ): StreamdownProps {
+  const baseConfig = isStreaming
+    ? CHAT_MARKDOWN_STREAMING_CONFIG
+    : CHAT_MARKDOWN_STATIC_CONFIG;
+
+  if (!className) {
+    return baseConfig;
+  }
+
   return {
-    ...baseStreamdownConfig,
+    ...baseConfig,
     className: cn(CHAT_MARKDOWN_STYLES, className),
-    mode: isStreaming ? 'streaming' : 'static',
-    isAnimating: isStreaming,
   };
 }
 

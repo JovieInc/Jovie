@@ -2,7 +2,9 @@ import * as Sentry from '@sentry/nextjs';
 import { eq } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
+import { stripUntrustedSourceFence } from '@/lib/ai/tools/untrusted-source-fence';
 import { getCachedAuth } from '@/lib/auth/cached';
+import { chatToolSchema } from '@/lib/chat/strict-schema';
 import { db } from '@/lib/db';
 import { chatAuditLog } from '@/lib/db/schema/chat';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
@@ -14,7 +16,7 @@ import { refreshAppleWalletProfilePassForProfileId } from '@/lib/wallet/apple/pr
 /**
  * Schema for validating the edit request body
  */
-const confirmEditSchema = z.object({
+const confirmEditSchema = chatToolSchema({
   profileId: z.string().uuid(),
   field: z.enum(['displayName', 'bio']),
   newValue: z.string(),
@@ -86,6 +88,9 @@ export async function POST(req: Request) {
       );
     }
 
+    const sanitizedValue =
+      field === 'bio' ? stripUntrustedSourceFence(newValue) : newValue;
+
     // Get the old value for audit logging
     const oldValue = profile[field];
 
@@ -93,7 +98,7 @@ export async function POST(req: Request) {
     await db
       .update(creatorProfiles)
       .set({
-        [field]: newValue,
+        [field]: sanitizedValue,
         updatedAt: new Date(),
       })
       .where(eq(creatorProfiles.id, profileId));
@@ -114,7 +119,7 @@ export async function POST(req: Request) {
       action: 'profile_edit',
       field,
       previousValue: JSON.stringify(oldValue),
-      newValue: JSON.stringify(newValue),
+      newValue: JSON.stringify(sanitizedValue),
       ipAddress: ipAddress ?? null,
       userAgent: userAgent ?? null,
     });
@@ -123,7 +128,7 @@ export async function POST(req: Request) {
       {
         success: true,
         field,
-        newValue,
+        newValue: sanitizedValue,
       },
       { headers: NO_CACHE_HEADERS }
     );

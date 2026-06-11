@@ -62,6 +62,7 @@ const MAX_ONBOARDING_MESSAGE_LENGTH = 4000;
  * main `/api/chat` handler can fall through to the authenticated chat flow.
  */
 
+// eslint-disable-next-line @jovie/chat-tool-schema-strict -- HTTP request DTO, not LLM tool input
 const onboardingPayloadSchema = z.object({
   mode: z.literal('onboarding'),
   turnstileToken: z.string().max(2048).optional(),
@@ -354,6 +355,16 @@ export async function tryHandleAnonymousOnboardingChat(
     setExtra: (key, value) => {
       try {
         Sentry.setExtra(key, value);
+      } catch {}
+    },
+    addBreadcrumb: breadcrumb => {
+      try {
+        Sentry.addBreadcrumb({
+          category: breadcrumb.category,
+          message: breadcrumb.message,
+          level: breadcrumb.level,
+          data: breadcrumb.data,
+        });
       } catch {}
     },
     captureException: (error, context) => {
