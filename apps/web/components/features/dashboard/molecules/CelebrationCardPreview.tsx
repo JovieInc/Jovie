@@ -101,10 +101,10 @@ export function CelebrationCardPreview({
               setSelectedSize(size);
               onInteraction?.();
             }}
-            className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${
+            className={`rounded-full border px-3 py-1 text-xs font-medium transition-colors ${
               selectedSize === size
-                ? 'bg-primary-token text-on-primary'
-                : 'bg-surface-2 text-secondary-token hover:text-primary-token'
+                ? 'border-(--linear-btn-primary-border) bg-btn-primary text-btn-primary-foreground shadow-button-inset hover:border-(--linear-btn-primary-hover) hover:bg-btn-primary-hover'
+                : 'border-transparent bg-surface-2 text-secondary-token hover:text-primary-token'
             }`}
           >
             {SIZE_LABELS[size]}

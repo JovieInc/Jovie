@@ -23,6 +23,7 @@
  * - `INFRASTRUCTURE_IMAGE_DOMAINS` - Non-platform image domains (storage, auth, etc.)
  * - `getAllImageDomainPatterns()` - Flat deduplicated list of all image domain patterns
  * - `getCspImgSrcDomains()` - Domains formatted for CSP img-src directive
+ * - `getCspConnectSrcDomains()` - Domains formatted for CSP connect-src directive
  * - `getDspCdnDomains()` - Base domains for music DSP image bypass
  *
  * **Functions:**
@@ -40,9 +41,11 @@ export { CATEGORY_LABELS, CATEGORY_ORDER } from './categories';
 // CDN Domains
 export {
   getAllImageDomainPatterns,
+  getCspConnectSrcDomains,
   getCspImgSrcDomains,
   getDspCdnDomains,
   getImageServingPlatformIds,
+  INFRASTRUCTURE_CONNECT_DOMAINS,
   INFRASTRUCTURE_IMAGE_DOMAINS,
   PLATFORM_CDN_DOMAINS,
 } from './cdn-domains';

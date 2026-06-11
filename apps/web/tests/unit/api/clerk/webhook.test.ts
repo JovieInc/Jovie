@@ -446,6 +446,25 @@ describe('/api/clerk/webhook', () => {
   });
 
   describe('error handling', () => {
+    it('returns 200 with a generic error body when verification throws unexpectedly', async () => {
+      mockHeaders.mockRejectedValue(new Error('Neon connection timeout'));
+
+      const request = new NextRequest(
+        'http://localhost:3000/api/clerk/webhook',
+        {
+          method: 'POST',
+          body: 'test',
+        }
+      );
+
+      const response = await POST(request);
+      const result = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(result).toEqual({ ok: false, error: 'processing-failed' });
+      expect(result.message).toBeUndefined();
+    });
+
     it('should handle Clerk API errors gracefully', async () => {
       const eventData = {
         data: {
