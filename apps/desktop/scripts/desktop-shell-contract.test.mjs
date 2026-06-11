@@ -250,13 +250,17 @@ test('desktop bridge exposes bounded dictation support', async () => {
   assert.match(mainSource, /function getDesktopDictationStatus\(\)/);
   assert.match(mainSource, /nativeAvailable: false/);
   assert.match(mainSource, /webSpeechFallbackAllowed: true/);
-  assert.match(mainSource, /permission === 'media'/);
-  assert.match(mainSource, /function isAudioOnlyMediaPermissionRequest/);
-  assert.match(mainSource, /mediaTypes\.includes\('audio'\)/);
-  assert.match(mainSource, /!mediaTypes\.includes\('video'\)/);
-  assert.match(mainSource, /mediaType\?: unknown/);
-  assert.match(mainSource, /mediaType === 'audio'/);
-  assert.match(mainSource, /isTrustedPermissionRequest/);
+  assert.match(mainSource, /shouldGrantTrustedAudioPermission/);
+  assert.match(mainSource, /shouldGrantTrustedAudioPermissionCheck/);
+  assert.match(mainSource, /backgroundThrottling: false/);
+  assert.match(mainSource, /installDesktopCspWatchdog/);
+  assert.match(mainSource, /autoUpdater\.allowDowngrade = false/);
+  assert.match(mainSource, /process\.platform === 'linux'/);
+  assert.match(mainSource, /sanitizeWindowState/);
+  assert.match(mainSource, /bindPendingDesktopAuthCompletion/);
+  assert.match(mainSource, /DESKTOP_AUTH_FLOW_PARAM/);
+  assert.match(mainSource, /!app\.isPackaged/);
+  assert.match(mainSource, /reportDesktopSecurityEvent/);
   assert.match(preloadSource, /getDictationStatus/);
   assert.match(
     preloadSource,

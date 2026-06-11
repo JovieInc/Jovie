@@ -8,10 +8,23 @@ import {
   ipcMain,
   Menu,
   type MenuItemConstructorOptions,
+  screen,
   shell,
-  type WebContents,
 } from 'electron';
 import { autoUpdater } from 'electron-updater';
+import {
+  bindPendingDesktopAuthCompletion,
+  DESKTOP_AUTH_FLOW_PARAM,
+  type PendingDesktopAuthPkce,
+  parseAuthReturnDeepLink,
+  reportDesktopAuthBindingFailure,
+} from './desktop-auth-security';
+import { installDesktopCspWatchdog } from './desktop-csp-watchdog';
+import {
+  shouldGrantTrustedAudioPermission,
+  shouldGrantTrustedAudioPermissionCheck,
+} from './desktop-permissions';
+import { createDesktopSecurityReporter } from './desktop-security-reporting';
 import { APP_ENV, APP_URL } from './env';
 import {
   getUrlDisposition as getDesktopUrlDisposition,
@@ -21,6 +34,7 @@ import {
   type UrlDisposition,
 } from './navigation';
 import { SYSTEM_B_DESKTOP_TOKENS } from './system-b-tokens';
+import { sanitizeWindowState, type WindowState } from './window-state';
 
 // Separate userData for non-production shells so local, staging, and production
 // sessions coexist without sharing cookies or corrupted renderer state.
@@ -105,12 +119,6 @@ interface DesktopAuthOpenResult {
   readonly reason?: string;
 }
 
-interface PendingDesktopAuthPkce {
-  readonly codeVerifier: string;
-  readonly codeChallenge: string;
-  readonly createdAt: number;
-}
-
 interface RecentDesktopAuthCompletion {
   readonly completion: DesktopAuthCompletion;
   readonly expiresAt: number;
@@ -123,6 +131,7 @@ const AUTH_HANDOFF_WINDOW_BOUNDS = {
   minHeight: 460,
 } as const;
 const AUTH_COMPLETION_REPLAY_TTL_MS = 60_000;
+const reportDesktopSecurityEvent = createDesktopSecurityReporter();
 
 let updateReadyToInstall = false;
 let mainWindow: BrowserWindow | null = null;
@@ -306,6 +315,7 @@ function createDesktopAuthPkce(): PendingDesktopAuthPkce {
   return {
     codeVerifier,
     codeChallenge,
+    flowNonce: base64Url(randomBytes(24)),
     createdAt: Date.now(),
   };
 }
@@ -313,12 +323,6 @@ function createDesktopAuthPkce(): PendingDesktopAuthPkce {
 function rememberDesktopAuthPkce(pkce: PendingDesktopAuthPkce): void {
   pendingDesktopAuthPkce = pkce;
   recentAuthCompletion = null;
-}
-
-function consumePendingDesktopAuthPkce(): PendingDesktopAuthPkce | null {
-  const pending = pendingDesktopAuthPkce;
-  pendingDesktopAuthPkce = null;
-  return pending;
 }
 
 function buildCentralDesktopAuthUrl(
@@ -334,6 +338,7 @@ function buildCentralDesktopAuthUrl(
   authUrl.searchParams.set('return_to', returnTo);
   authUrl.searchParams.set('code_challenge', pkce.codeChallenge);
   authUrl.searchParams.set('code_challenge_method', 'S256');
+  authUrl.searchParams.set(DESKTOP_AUTH_FLOW_PARAM, pkce.flowNonce);
   return `${authUrl.pathname}${authUrl.search}`;
 }
 
@@ -382,31 +387,19 @@ function buildDesktopAuthHandoffUrl(authUrl: string): string {
   return url.toString();
 }
 
-function parseAuthReturnDeepLink(
-  urlString: string
-): Omit<DesktopAuthCompletion, 'codeVerifier'> | null {
-  const parsed = parseUrl(urlString);
-  if (
-    !parsed ||
-    parsed.protocol !== AUTH_RETURN_PROTOCOL ||
-    parsed.hostname !== AUTH_RETURN_HOST ||
-    parsed.pathname !== AUTH_RETURN_COMPLETE_PATH
-  ) {
-    return null;
-  }
-
-  const code = parsed.searchParams.get('code');
-  const state = parsed.searchParams.get('state');
-  if (!code || !state) return null;
-
-  return { code, state };
+function parseDesktopAuthReturnDeepLink(urlString: string) {
+  return parseAuthReturnDeepLink(
+    urlString,
+    parseUrl,
+    AUTH_RETURN_PROTOCOL,
+    AUTH_RETURN_HOST,
+    AUTH_RETURN_COMPLETE_PATH
+  );
 }
 
-function findAuthReturnInArgv(
-  argv: readonly string[]
-): Omit<DesktopAuthCompletion, 'codeVerifier'> | null {
+function findAuthReturnInArgv(argv: readonly string[]) {
   for (const arg of argv) {
-    const completion = parseAuthReturnDeepLink(arg);
+    const completion = parseDesktopAuthReturnDeepLink(arg);
     if (completion) return completion;
   }
   return null;
@@ -433,38 +426,6 @@ function findLegacyAuthReturnRouteInArgv(argv: readonly string[]): string | null
   return null;
 }
 
-function isTrustedPermissionOrigin(urlString?: string): boolean {
-  const parsed = parseUrl(urlString ?? '');
-  return parsed?.origin === APP_ORIGIN;
-}
-
-function isTrustedPermissionRequest(
-  webContents: WebContents | null,
-  requestingOrigin?: string
-): boolean {
-  if (requestingOrigin !== undefined) {
-    return isTrustedPermissionOrigin(requestingOrigin);
-  }
-  return (
-    webContents !== null && isTrustedPermissionOrigin(webContents.getURL())
-  );
-}
-
-function isAudioOnlyMediaPermissionRequest(details: unknown): boolean {
-  if (details === null || typeof details !== 'object') return false;
-  const mediaTypes = (details as { mediaTypes?: unknown }).mediaTypes;
-  return (
-    Array.isArray(mediaTypes) &&
-    mediaTypes.includes('audio') &&
-    !mediaTypes.includes('video')
-  );
-}
-
-function isAudioMediaPermissionCheck(details: unknown): boolean {
-  if (details === null || typeof details !== 'object') return false;
-  return (details as { mediaType?: unknown }).mediaType === 'audio';
-}
-
 function getDesktopDictationStatus(): DesktopDictationStatus {
   return {
     ok: true,
@@ -478,13 +439,6 @@ function getDesktopDictationStatus(): DesktopDictationStatus {
   };
 }
 
-interface WindowState {
-  x?: number;
-  y?: number;
-  width: number;
-  height: number;
-}
-
 const WINDOW_STATE_FILE = path.join(
   app.getPath('userData'),
   'window-state.json'
@@ -495,23 +449,15 @@ function getAppIconPath(): string | undefined {
 }
 
 function loadWindowState(): WindowState {
+  const displayBounds = screen.getPrimaryDisplay().workArea;
+
   try {
     const raw = fs.readFileSync(WINDOW_STATE_FILE, 'utf8');
     const parsed: unknown = JSON.parse(raw);
-    if (
-      parsed !== null &&
-      typeof parsed === 'object' &&
-      'width' in parsed &&
-      'height' in parsed &&
-      typeof (parsed as Record<string, unknown>).width === 'number' &&
-      typeof (parsed as Record<string, unknown>).height === 'number'
-    ) {
-      return parsed as WindowState;
-    }
+    return sanitizeWindowState(parsed, displayBounds, reportDesktopSecurityEvent);
   } catch {
-    // Missing or corrupt — use defaults
+    return sanitizeWindowState(undefined, displayBounds);
   }
-  return { width: 1280, height: 800 };
 }
 
 function saveWindowState(win: BrowserWindow): void {
@@ -599,14 +545,23 @@ function loadAuthCompletion(completion: DesktopAuthCompletion): void {
 }
 
 function handleAuthCompletion(
-  completion: Omit<DesktopAuthCompletion, 'codeVerifier'>
+  completion: NonNullable<ReturnType<typeof parseDesktopAuthReturnDeepLink>>
 ): void {
-  const pkce = consumePendingDesktopAuthPkce();
-  if (!pkce) return;
+  const binding = bindPendingDesktopAuthCompletion(
+    pendingDesktopAuthPkce,
+    completion
+  );
+  pendingDesktopAuthPkce = null;
+
+  if (!binding.ok) {
+    reportDesktopAuthBindingFailure(reportDesktopSecurityEvent, binding);
+    return;
+  }
 
   const nativeCompletion: DesktopAuthCompletion = {
-    ...completion,
-    codeVerifier: pkce.codeVerifier,
+    code: completion.code,
+    state: completion.state,
+    codeVerifier: binding.codeVerifier,
   };
 
   if (app.isReady()) {
@@ -685,6 +640,7 @@ function showDesktopAuthHandoff(authUrl: string): void {
     backgroundColor: APP_BACKGROUND_COLOR,
     modal: false,
     webPreferences: {
+      backgroundThrottling: false,
       contextIsolation: true,
       devTools: ENABLE_DEVTOOLS,
       nodeIntegration: false,
@@ -844,6 +800,7 @@ function createWindow(initialUrl = APP_ENTRY_URL): BrowserWindow {
     trafficLightPosition:
       process.platform === 'darwin' ? MACOS_TRAFFIC_LIGHT_POSITION : undefined,
     webPreferences: {
+      backgroundThrottling: false,
       contextIsolation: true,
       devTools: ENABLE_DEVTOOLS,
       nodeIntegration: false,
@@ -854,6 +811,12 @@ function createWindow(initialUrl = APP_ENTRY_URL): BrowserWindow {
       webSecurity: true,
       webviewTag: false,
     },
+  });
+
+  installDesktopCspWatchdog({
+    session: win.webContents.session,
+    appOrigin: APP_ORIGIN,
+    report: reportDesktopSecurityEvent,
   });
 
   win.once('ready-to-show', () => {
@@ -924,19 +887,28 @@ function createWindow(initialUrl = APP_ENTRY_URL): BrowserWindow {
           ? details.requestingUrl
           : undefined;
       callback(
-        permission === 'media' &&
-          isAudioOnlyMediaPermissionRequest(details) &&
-          isTrustedPermissionRequest(webContents, requestingOrigin)
+        shouldGrantTrustedAudioPermission({
+          permission,
+          details,
+          webContents,
+          requestingOrigin,
+          parseUrl,
+          appOrigin: APP_ORIGIN,
+        })
       );
     }
   );
 
   win.webContents.session.setPermissionCheckHandler(
-    (webContents, permission, requestingOrigin, details) => {
-      if (permission !== 'media') return false;
-      if (!isAudioMediaPermissionCheck(details)) return false;
-      return isTrustedPermissionRequest(webContents, requestingOrigin);
-    }
+    (webContents, permission, requestingOrigin, details) =>
+      shouldGrantTrustedAudioPermissionCheck({
+        permission,
+        details,
+        webContents,
+        requestingOrigin,
+        parseUrl,
+        appOrigin: APP_ORIGIN,
+      })
   );
 
   // Navigation guard: app-host routes stay in-window; auth routes get the
@@ -1056,6 +1028,10 @@ function refreshApplicationMenu(): void {
 }
 
 function checkForUpdatesFromMenu(): void {
+  if (process.platform === 'linux') {
+    return;
+  }
+
   if (updateReadyToInstall) {
     autoUpdater.quitAndInstall();
     return;
@@ -1064,6 +1040,24 @@ function checkForUpdatesFromMenu(): void {
   autoUpdater.checkForUpdatesAndNotify().catch(() => {
     // Network unavailable or no update server configured yet — non-fatal
   });
+}
+
+function scheduleDesktopAutoUpdate(): void {
+  if (process.platform === 'linux') {
+    return;
+  }
+
+  autoUpdater.allowDowngrade = false;
+  autoUpdater.checkForUpdatesAndNotify().catch(() => {
+    // Network unavailable or no update server configured yet — non-fatal
+  });
+
+  const UPDATE_INTERVAL_MS = 30 * 60 * 1000;
+  setInterval(() => {
+    autoUpdater.checkForUpdatesAndNotify().catch(() => {
+      // Same: non-fatal update check failure
+    });
+  }, UPDATE_INTERVAL_MS);
 }
 
 function buildUpdateMenuItem(): MenuItemConstructorOptions {
@@ -1300,7 +1294,11 @@ function registerAuthReturnProtocol(): void {
     readonly defaultApp?: boolean;
   };
 
-  if (defaultAppProcess.defaultApp && process.argv.length >= 2) {
+  if (
+    defaultAppProcess.defaultApp &&
+    process.argv.length >= 2 &&
+    !app.isPackaged
+  ) {
     app.setAsDefaultProtocolClient('jovie', process.execPath, [
       path.resolve(process.argv[1]),
     ]);
@@ -1318,6 +1316,16 @@ if (gotSingleInstanceLock) {
       return;
     }
 
+    const invalidAuthReturn = argv.some(
+      arg =>
+        arg.startsWith(`${AUTH_RETURN_PROTOCOL}//${AUTH_RETURN_HOST}`) &&
+        !parseDesktopAuthReturnDeepLink(arg)
+    );
+    if (invalidAuthReturn) {
+      reportDesktopSecurityEvent('auth-deep-link-invalid-params');
+      return;
+    }
+
     const legacyRoute = findLegacyAuthReturnRouteInArgv(argv);
     if (legacyRoute) {
       handleLegacyAuthReturnRoute(legacyRoute);
@@ -1331,9 +1339,14 @@ if (gotSingleInstanceLock) {
 
   app.on('open-url', (event, url) => {
     event.preventDefault();
-    const completion = parseAuthReturnDeepLink(url);
+    const completion = parseDesktopAuthReturnDeepLink(url);
     if (completion) {
       handleAuthCompletion(completion);
+      return;
+    }
+
+    if (url.startsWith('jovie://auth/complete')) {
+      reportDesktopSecurityEvent('auth-deep-link-invalid-params');
       return;
     }
 
@@ -1364,18 +1377,7 @@ app.whenReady().then(() => {
       : APP_ENTRY_URL
   );
   pendingLegacyAuthReturnRoute = null;
-
-  // Auto-update: check on launch then every 30 minutes
-  autoUpdater.checkForUpdatesAndNotify().catch(() => {
-    // Network unavailable or no update server configured yet — non-fatal
-  });
-
-  const UPDATE_INTERVAL_MS = 30 * 60 * 1000;
-  setInterval(() => {
-    autoUpdater.checkForUpdatesAndNotify().catch(() => {
-      // Same: non-fatal update check failure
-    });
-  }, UPDATE_INTERVAL_MS);
+  scheduleDesktopAutoUpdate();
 
   app.on('activate', () => {
     if (isAuthHandoffOpen() && authHandoffWindow) {

@@ -44,6 +44,7 @@ export interface AuthStateRecord {
   readonly returnTo: string;
   readonly state: string;
   readonly codeChallenge: string | null;
+  readonly desktopFlow: string | null;
   readonly createdAt: number;
   readonly expiresAt: number;
   readonly consumedAt?: number | null;
@@ -291,6 +292,7 @@ export function createAuthStateRecord(input: {
   readonly returnTo: string;
   readonly state: string;
   readonly codeChallenge?: string | null;
+  readonly desktopFlow?: string | null;
   readonly now: number;
 }): AuthStateRecord {
   const returnTo = sanitizeReturnTo(input.client, input.returnTo);
@@ -304,6 +306,7 @@ export function createAuthStateRecord(input: {
     returnTo,
     state: input.state,
     codeChallenge: input.codeChallenge ?? null,
+    desktopFlow: input.desktopFlow ?? null,
     createdAt: input.now,
     expiresAt: input.now + AUTH_STATE_TTL_MS,
     consumedAt: null,
@@ -315,11 +318,15 @@ function buildUrlWithCodeAndState(
   input: {
     readonly code: string;
     readonly state: string;
+    readonly desktopFlow?: string | null;
   }
 ): string {
   const url = new URL(baseUrl);
   url.searchParams.set('code', input.code);
   url.searchParams.set('state', input.state);
+  if (input.desktopFlow) {
+    url.searchParams.set('desktop_flow', input.desktopFlow);
+  }
   return url.toString();
 }
 
@@ -344,6 +351,7 @@ export function buildIosUniversalAuthCompleteUrl(input: {
 export function buildElectronAuthCompleteUrl(input: {
   readonly code: string;
   readonly state: string;
+  readonly desktopFlow?: string | null;
 }): string {
   return buildUrlWithCodeAndState(ELECTRON_AUTH_COMPLETE_URL, input);
 }
@@ -388,6 +396,7 @@ export function resolveAuthCallback(input: {
     redirectUrl: buildElectronAuthCompleteUrl({
       code: input.exchangeCode,
       state: stateRecord.state,
+      desktopFlow: stateRecord.desktopFlow,
     }),
   };
 }
