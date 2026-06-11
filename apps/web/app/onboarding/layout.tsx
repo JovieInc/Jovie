@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import { ResolvedClientProviders } from '@/components/providers/ResolvedClientProviders';
 import { AppFlagProvider } from '@/lib/flags/client';
+import { resolveOnboardingRouteFlagNames } from '@/lib/flags/route-snapshots';
 import { getAppFlagsSnapshot } from '@/lib/flags/server';
 
 export const dynamic = 'force-dynamic';
@@ -16,7 +17,9 @@ export default async function OnboardingLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const initialFlags = await getAppFlagsSnapshot();
+  const initialFlags = await getAppFlagsSnapshot({
+    flagNames: resolveOnboardingRouteFlagNames(),
+  });
 
   return (
     <ResolvedClientProviders>
