@@ -140,7 +140,8 @@ const DEPLOYMENT_STATE_DOT_CLASSNAMES: Record<HudDeploymentState, string> = {
 };
 
 const DISPATCH_SOURCE_PLACEHOLDER = 'Linear, GitHub, or Sentry URL';
-const CASH_BURN_LABEL = 'Burn (30d)';
+const RUNWAY_BURN_LABEL = 'Burn (30d)';
+const OVERVIEW_BURN_LABEL = 'Burn (30d)';
 
 function getAiOpsTone(aiOps: HudMetrics['aiOps']): HudTone {
   if (aiOps.counts.failed > 0 || aiOps.counts.blocked > 0) return 'bad';
@@ -706,7 +707,7 @@ export function HudDashboardClient({
                     value={formatUsd(metrics.overview.balanceUsd)}
                   />
                   <ContentMetricRow
-                    label={CASH_BURN_LABEL}
+                    label={RUNWAY_BURN_LABEL}
                     value={formatUsd(metrics.overview.burnRateUsd)}
                   />
                 </div>
@@ -888,7 +889,7 @@ export function HudDashboardClient({
                       value={formatUsd(metrics.overview.balanceUsd)}
                     />
                     <ContentMetricRow
-                      label={CASH_BURN_LABEL}
+                      label={OVERVIEW_BURN_LABEL}
                       value={formatUsd(metrics.overview.burnRateUsd)}
                     />
                   </div>
