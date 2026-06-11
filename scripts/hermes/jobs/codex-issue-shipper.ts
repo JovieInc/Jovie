@@ -269,6 +269,8 @@ function markBlocked(
   plan: DispatchPlan,
   reason: string
 ): void {
+  removeClaimLabel(config, plan, 'mark_blocked_claim_remove_failed');
+
   try {
     run(
       [
@@ -278,8 +280,6 @@ function markBlocked(
         String(plan.issue.number),
         '--repo',
         config.repo,
-        '--remove-label',
-        CODEX_CLAIM_LABEL,
         '--add-label',
         CODEX_BLOCKED_LABEL,
       ],
@@ -310,10 +310,10 @@ function markBlocked(
   }
 }
 
-function releaseClaimForRetry(
+function removeClaimLabel(
   config: ShipperConfig,
   plan: DispatchPlan,
-  reason: string
+  event: string
 ): void {
   try {
     run(
@@ -332,11 +332,19 @@ function releaseClaimForRetry(
   } catch (err) {
     logJobEvent({
       job: JOB,
-      event: 'release_claim_label_failed',
+      event,
       issue: plan.issue.number,
       error: shortError(err),
     });
   }
+}
+
+function releaseClaimForRetry(
+  config: ShipperConfig,
+  plan: DispatchPlan,
+  reason: string
+): void {
+  removeClaimLabel(config, plan, 'release_claim_label_failed');
 
   try {
     commentIssue(
@@ -601,17 +609,31 @@ async function dispatchPlan(
     return;
   }
 
-  commentIssue(
-    config,
-    plan.issue.number,
-    [
-      `Codex issue shipper completed agent run and found PR #${pr.number}.`,
-      '',
-      `PR: ${pr.url}`,
-      `GBrain dispatch slug: \`${gbrain.captureSlug}\``,
-      `Log: \`${agentResult.logPath}\``,
-    ].join('\n')
-  );
+  let successCommentPosted = true;
+  try {
+    commentIssue(
+      config,
+      plan.issue.number,
+      [
+        `Codex issue shipper completed agent run and found PR #${pr.number}.`,
+        '',
+        `PR: ${pr.url}`,
+        `GBrain dispatch slug: \`${gbrain.captureSlug}\``,
+        `Log: \`${agentResult.logPath}\``,
+      ].join('\n')
+    );
+  } catch (err) {
+    successCommentPosted = false;
+    logJobEvent({
+      job: JOB,
+      event: 'success_comment_failed',
+      issue: plan.issue.number,
+      pr: pr.number,
+      error: shortError(err),
+    });
+  }
+
+  removeClaimLabel(config, plan, 'success_claim_remove_failed');
 
   logJobEvent({
     job: JOB,
@@ -619,6 +641,7 @@ async function dispatchPlan(
     issue: plan.issue.number,
     pr: pr.number,
     url: pr.url,
+    successCommentPosted,
   });
 }
 

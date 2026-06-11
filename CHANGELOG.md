@@ -5,6 +5,14 @@
      5|The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
      6|and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.6.40] - 2026-06-11
+
+> Codex issue shipper success and blocker label handling is resilient to GitHub comment and label edge cases.
+
+### Fixed
+
+- **Codex issue shipper cleanup**: clears the `codex-in-progress` label after a PR is found, logs success-comment failures without marking completed work blocked, and adds `codex-blocked` independently from best-effort claim-label removal.
+
 ## [26.6.39] - 2026-06-11
 
 > Codex issue shipper dispatch is gated, sandboxed, and resilient to GBrain capture failures.
