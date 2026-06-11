@@ -397,7 +397,6 @@ export function JovieChat({
   const messageViewportPaddingBottom = shouldReservePickerClearance
     ? CHAT_PICKER_THREAD_CLEARANCE
     : undefined;
-  const virtualizedMessageViewportHeight = virtualizer.getTotalSize();
   const [virtualizedMinHeight, setVirtualizedMinHeight] = useState(0);
 
   useLayoutEffect(() => {
@@ -414,6 +413,15 @@ export function JovieChat({
     scrollContainerRef,
     messages.length,
   ]);
+
+  const virtualizedMessageViewportBaseHeight = Math.max(
+    virtualizer.getTotalSize(),
+    scrollContainerRef.current?.clientHeight ?? 0,
+    virtualizedMinHeight
+  );
+  const virtualizedMessageViewportHeight = messageViewportPaddingBottom
+    ? `calc(${virtualizedMessageViewportBaseHeight}px + ${messageViewportPaddingBottom})`
+    : virtualizedMessageViewportBaseHeight;
 
   useLayoutEffect(() => {
     if (!shouldReservePickerClearance) return;
@@ -596,7 +604,6 @@ export function JovieChat({
                       position: 'relative',
                       height: virtualizedMessageViewportHeight,
                       minHeight: virtualizedMinHeight || undefined,
-                      paddingBottom: messageViewportPaddingBottom,
                     }}
                   >
                     {virtualizer.getVirtualItems().map(virtualItem => {
