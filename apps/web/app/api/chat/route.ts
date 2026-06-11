@@ -2695,6 +2695,15 @@ export async function POST(req: Request) {
       setTags: tags => safeSetSentryContext(() => Sentry.setTags(tags)),
       setExtra: (key, value) =>
         safeSetSentryContext(() => Sentry.setExtra(key, value)),
+      addBreadcrumb: breadcrumb =>
+        safeSetSentryContext(() =>
+          Sentry.addBreadcrumb({
+            category: breadcrumb.category,
+            message: breadcrumb.message,
+            level: breadcrumb.level,
+            data: breadcrumb.data,
+          })
+        ),
       captureException: (error, context) =>
         Sentry.captureException(error, context),
     };
