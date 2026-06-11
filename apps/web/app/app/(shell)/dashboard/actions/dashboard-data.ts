@@ -373,7 +373,7 @@ function buildProfileCompletion(
   if (!completion.hasName) {
     steps.push({
       id: 'name',
-      label: 'Add your artist name',
+      label: 'Add Your Artist Name',
       description: 'A clear name helps fans recognize and trust your profile.',
       href: APP_ROUTES.SETTINGS_ARTIST_PROFILE,
     });
@@ -382,7 +382,7 @@ function buildProfileCompletion(
   if (!completion.hasAvatar) {
     steps.push({
       id: 'avatar',
-      label: 'Add a profile photo',
+      label: 'Add A Profile Photo',
       description: 'A recognizable photo makes your page feel personal.',
       href: APP_ROUTES.SETTINGS_ARTIST_PROFILE,
     });
@@ -391,7 +391,7 @@ function buildProfileCompletion(
   if (!completion.hasEmail) {
     steps.push({
       id: 'email',
-      label: 'Add your account email',
+      label: 'Add Your Account Email',
       description: 'Email keeps your account recoverable and mission-critical.',
       href: APP_ROUTES.SETTINGS_ARTIST_PROFILE,
     });
@@ -400,9 +400,8 @@ function buildProfileCompletion(
   if (!completion.hasMusicLinks) {
     steps.push({
       id: 'music-links',
-      label: 'Add your music platforms',
-      description:
-        'Help listeners stream you on Spotify, Apple Music, and more.',
+      label: 'Add Your Music Platforms',
+      description: 'Help listeners stream your music on major platforms',
       href: APP_ROUTES.CHAT_PROFILE_PANEL,
     });
   }
