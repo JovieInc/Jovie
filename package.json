@@ -148,7 +148,8 @@
     "version:check": "node scripts/version-check.mjs",
     "changelog:send": "doppler run -- node scripts/send-changelog-email.mjs",
     "video:footer:generate": "doppler run --project jovie-web --config dev -- tsx scripts/generate-footer-cta-video.ts",
-    "hermes:worker": "pnpm --filter @jovie/web run hermes:worker"
+    "hermes:worker": "pnpm --filter @jovie/web run hermes:worker",
+    "hermes:codex-shipper": "tsx scripts/hermes/jobs/codex-issue-shipper.ts"
   },
   "devDependencies": {
     "@anthropic-ai/sdk": "^0.100.1",
