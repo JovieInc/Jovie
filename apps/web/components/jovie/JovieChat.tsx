@@ -450,12 +450,14 @@ export function JovieChat({
     window.visualViewport?.addEventListener('resize', scheduleScroll);
 
     const scrollContainer = scrollContainerRef.current;
-    const resizeObserver =
-      scrollContainer && typeof ResizeObserver !== 'undefined'
-        ? new ResizeObserver(scheduleScroll)
-        : null;
-    if (scrollContainer) {
-      resizeObserver?.observe(scrollContainer);
+    let resizeObserver: ResizeObserver | null = null;
+    if (scrollContainer && typeof ResizeObserver !== 'undefined') {
+      try {
+        resizeObserver = new ResizeObserver(scheduleScroll);
+        resizeObserver.observe(scrollContainer);
+      } catch {
+        resizeObserver = null;
+      }
     }
 
     return () => {
@@ -469,12 +471,7 @@ export function JovieChat({
       window.removeEventListener('resize', scheduleScroll);
       window.visualViewport?.removeEventListener('resize', scheduleScroll);
     };
-  }, [
-    input,
-    scrollContainerRef,
-    scrollThreadToBottom,
-    shouldReservePickerClearance,
-  ]);
+  }, [scrollContainerRef, scrollThreadToBottom, shouldReservePickerClearance]);
 
   // Show skeleton while fetching existing conversation
   if (isLoadingConversation) {
