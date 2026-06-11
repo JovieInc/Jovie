@@ -302,6 +302,52 @@ function markBlocked(
   }
 }
 
+function releaseClaimForRetry(
+  config: ShipperConfig,
+  plan: DispatchPlan,
+  reason: string
+): void {
+  try {
+    run(
+      [
+        'gh',
+        'issue',
+        'edit',
+        String(plan.issue.number),
+        '--repo',
+        config.repo,
+        '--remove-label',
+        CODEX_CLAIM_LABEL,
+      ],
+      config
+    );
+  } catch (err) {
+    logJobEvent({
+      job: JOB,
+      event: 'release_claim_label_failed',
+      issue: plan.issue.number,
+      error: shortError(err),
+    });
+  }
+
+  try {
+    commentIssue(
+      config,
+      plan.issue.number,
+      [`Codex issue shipper released this issue for retry.`, '', reason].join(
+        '\n'
+      )
+    );
+  } catch (err) {
+    logJobEvent({
+      job: JOB,
+      event: 'release_claim_comment_failed',
+      issue: plan.issue.number,
+      error: shortError(err),
+    });
+  }
+}
+
 function gbrainCaptureSlug(raw: string, fallback: string): string {
   const trimmed = raw.trim();
   if (!trimmed) return fallback;
@@ -464,7 +510,7 @@ async function dispatchPlan(
     gbrain = collectGbrainContext(plan);
   } catch (err) {
     const reason = `GBrain capture failed, so no coding agent was started.\n\n\`\`\`text\n${shortError(err)}\n\`\`\``;
-    markBlocked(config, plan, reason);
+    releaseClaimForRetry(config, plan, reason);
     logJobEvent({
       job: JOB,
       event: 'gbrain_failed',
