@@ -120,11 +120,8 @@ export async function POST(request: NextRequest) {
       method: 'POST',
     });
     return NextResponse.json(
-      {
-        error: 'Internal server error',
-        message: error instanceof Error ? error.message : 'Unknown error',
-      },
-      { status: 500, headers: NO_STORE_HEADERS }
+      { ok: false, error: 'processing-failed' },
+      { status: 200, headers: NO_STORE_HEADERS }
     );
   }
 }
