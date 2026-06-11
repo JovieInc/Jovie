@@ -1,5 +1,5 @@
 import 'server-only';
-import { and, sql as drizzleSql, eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import {
   buildGmailBookingQuery,
   type GmailMessage,
@@ -16,6 +16,7 @@ import {
   listCalendarEvents,
   SyncTokenExpiredError,
 } from '@/lib/connectors/google-calendar/list-events';
+import { CONNECTOR_PROVIDERS } from '@/lib/connectors/registry';
 import { loadDecryptedToken } from '@/lib/connectors/token-vault';
 import { db } from '@/lib/db';
 import {
@@ -52,8 +53,8 @@ export async function extractAndPropose(userId: string): Promise<number> {
       .where(
         and(
           eq(connectorAccounts.userId, userId),
-          drizzleSql`${connectorAccounts.provider} = 'gmail'::connector_provider`,
-          drizzleSql`${connectorAccounts.status} = 'connected'::connector_status`
+          eq(connectorAccounts.provider, CONNECTOR_PROVIDERS.gmail),
+          eq(connectorAccounts.status, 'connected')
         )
       )
       .limit(1)
@@ -64,8 +65,8 @@ export async function extractAndPropose(userId: string): Promise<number> {
       .where(
         and(
           eq(connectorAccounts.userId, userId),
-          drizzleSql`${connectorAccounts.provider} = 'google_calendar'::connector_provider`,
-          drizzleSql`${connectorAccounts.status} = 'connected'::connector_status`
+          eq(connectorAccounts.provider, CONNECTOR_PROVIDERS.google_calendar),
+          eq(connectorAccounts.status, 'connected')
         )
       )
       .limit(1)
@@ -137,7 +138,7 @@ export async function extractAndPropose(userId: string): Promise<number> {
         .insert(externalObjects)
         .values({
           connectorAccountId: gmailAccount.id,
-          provider: drizzleSql`'gmail'::connector_provider`,
+          provider: CONNECTOR_PROVIDERS.gmail,
           kind: 'gmail_message',
           providerId: m.messageId,
           payload: {
@@ -221,8 +222,7 @@ export async function extractAndPropose(userId: string): Promise<number> {
           kind: 'calendar.create_event',
           targetConnectorAccountId: calendarAccount.id,
           payload,
-          status:
-            drizzleSql`'pending'::suggested_action_status` as unknown as 'pending',
+          status: 'pending',
           sourceRefs: [event.sourceRef],
           rationale: event.rationale,
           idempotencyKey: `${userId}-${event.sourceRef.messageId}-${event.startsAt}`,
