@@ -69,6 +69,16 @@ describe('Scope Judge workflow cost controls', () => {
     );
   });
 
+  it('checks the OpenRouter key before requiring a PR diff', () => {
+    const workflow = readFileSync(workflowPath, 'utf8');
+    const keyStep = getStepBlock(workflow, 'Check scope judge API key');
+
+    expect(keyStep).toContain("if: steps.intent.outputs.has_intent == 'true'");
+    expect(keyStep).not.toContain('steps.diff.outputs.has_diff');
+    expect(keyStep).toContain('OPENROUTER_API_KEY');
+    expect(keyStep).not.toContain('OPENAI_API_KEY');
+  });
+
   it('posts a successful deterministic status when the LLM key is absent', () => {
     const workflow = readFileSync(workflowPath, 'utf8');
     const step = getStepBlock(
@@ -77,9 +87,46 @@ describe('Scope Judge workflow cost controls', () => {
     );
 
     expect(step).toContain("steps.judge-key.outputs.has_key != 'true'");
+    expect(step).not.toContain('steps.diff.outputs.has_diff');
     expect(step).toContain('-f state="success"');
     expect(step).toContain('context="scope-judge"');
     expect(step).toContain('OpenRouter API key missing; no model call');
+    expect(step).not.toContain('-f state="failure"');
+    expect(step).not.toContain('OPENAI_API_KEY');
+  });
+
+  it('skips deterministically when OpenRouter never returns model content', () => {
+    const workflow = readFileSync(workflowPath, 'utf8');
+    const judgeStep = getStepBlock(
+      workflow,
+      'Run scope alignment judge (OpenRouter)'
+    );
+    const reportStep = getStepBlock(workflow, 'Report scope judge status');
+
+    expect(judgeStep).toContain('HAS_MODEL_CONTENT=false');
+    expect(judgeStep).toContain('verdict=api_unavailable');
+    expect(judgeStep).toContain(
+      'OpenRouter API unavailable - deterministic skip'
+    );
+    expect(reportStep).toContain('api_unavailable');
+    expect(reportStep).toContain(
+      'Scope judge skipped - OpenRouter API unavailable; no model call'
+    );
+    expect(reportStep).toContain('STATE="success"');
+  });
+
+  it('posts a successful deterministic status when the PR diff is unavailable', () => {
+    const workflow = readFileSync(workflowPath, 'utf8');
+    const step = getStepBlock(
+      workflow,
+      'Deterministic status (no PR diff available)'
+    );
+
+    expect(step).toContain("steps.judge-key.outputs.has_key == 'true'");
+    expect(step).toContain("steps.diff.outputs.has_diff != 'true'");
+    expect(step).toContain('-f state="success"');
+    expect(step).toContain('context="scope-judge"');
+    expect(step).toContain('PR diff unavailable; no model call');
     expect(step).not.toContain('-f state="failure"');
     expect(step).not.toContain('OPENAI_API_KEY');
   });

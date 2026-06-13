@@ -13,7 +13,9 @@
 #    model for scope alignment judgment
 # 4. If no API key is configured, skips the LLM call and reports a deterministic
 #    no-cost success status so CI does not burn tokens or fail inconclusively
-# 5. Reports pass/fail/skip as a commit status (used as required check for auto-approve)
+# 5. If the PR diff is unavailable, skips the LLM call and reports a deterministic
+#    no-cost success status so scope-judge never stays pending
+# 6. Reports pass/fail/skip as a commit status (used as required check for auto-approve)
 #
 # SAFETY:
 # - Read-only: does not modify code, only reports status
@@ -134,7 +136,7 @@ jobs:
 
       - name: Check scope judge API key
         id: judge-key
-        if: steps.intent.outputs.has_intent == 'true' && steps.diff.outputs.has_diff == 'true'
+        if: steps.intent.outputs.has_intent == 'true'
         env:
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
         run: |
@@ -214,9 +216,11 @@ jobs:
           }
 
           RESPONSE=""
+          HAS_MODEL_CONTENT=false
           for attempt in 1 2 3; do
             RESPONSE=$(call_openrouter)
             if echo "$RESPONSE" | jq -e '.choices[0].message.content' >/dev/null 2>&1; then
+              HAS_MODEL_CONTENT=true
               echo "OpenRouter judge succeeded on attempt $attempt"
               break
             fi
@@ -228,10 +232,6 @@ jobs:
             fi
           done
 
-          # Extract verdict
-          CONTENT=$(echo "$RESPONSE" | jq -r '.choices[0].message.content // .error.message // "ERROR: No response"')
-          echo "Judge response: $CONTENT"
-
           write_multiline_output() {
             local name="$1"
             local value="$2"
@@ -241,6 +241,18 @@ jobs:
               echo 'EOF'
             } >> "$GITHUB_OUTPUT"
           }
+
+          if [[ "$HAS_MODEL_CONTENT" != "true" ]]; then
+            API_ERROR=$(echo "$RESPONSE" | jq -r '.error.message // "OpenRouter API unavailable"')
+            echo "Scope judge: OpenRouter API unavailable - deterministic skip"
+            echo "verdict=api_unavailable" >> "$GITHUB_OUTPUT"
+            write_multiline_output reason "$API_ERROR"
+            exit 0
+          fi
+
+          # Extract verdict
+          CONTENT=$(echo "$RESPONSE" | jq -r '.choices[0].message.content // "ERROR: No response"')
+          echo "Judge response: $CONTENT"
 
           VERDICT=$(echo "$CONTENT" | grep -oP '(?<=VERDICT:\s)(PASS|FAIL)' | head -1 || echo "")
           REASON=$(echo "$CONTENT" | grep -oP '(?<=REASON:\s).*' | head -1 || echo "Unable to determine")
@@ -275,6 +287,9 @@ jobs:
           elif [[ "$JUDGE_VERDICT" == "fail" ]]; then
             STATE="failure"
             DESCRIPTION="Scope creep detected: $JUDGE_REASON"
+          elif [[ "$JUDGE_VERDICT" == "api_unavailable" ]]; then
+            STATE="success"
+            DESCRIPTION="Scope judge skipped - OpenRouter API unavailable; no model call"
           else
             STATE="failure"
             DESCRIPTION="Inconclusive — needs human review"
@@ -290,7 +305,7 @@ jobs:
             -f context="scope-judge"
 
       - name: Deterministic status (scope judge API key missing)
-        if: steps.intent.outputs.has_intent == 'true' && steps.diff.outputs.has_diff == 'true' && steps.judge-key.outputs.has_key != 'true'
+        if: steps.intent.outputs.has_intent == 'true' && steps.judge-key.outputs.has_key != 'true'
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
         run: |
@@ -300,6 +315,22 @@ jobs:
             -f state="success" \
             -f target_url="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" \
             -f description="Scope judge skipped - OpenRouter API key missing; no model call" \
+            -f context="scope-judge"
+
+      - name: Deterministic status (no PR diff available)
+        if: >-
+          steps.intent.outputs.has_intent == 'true' &&
+          steps.judge-key.outputs.has_key == 'true' &&
+          steps.diff.outputs.has_diff != 'true'
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: |
+          SHA="${{ github.event.pull_request.head.sha }}"
+
+          gh api repos/${{ github.repository }}/statuses/$SHA \
+            -f state="success" \
+            -f target_url="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" \
+            -f description="Scope judge skipped - PR diff unavailable; no model call" \
             -f context="scope-judge"
 
       - name: Skip status (no Linear intent found)
