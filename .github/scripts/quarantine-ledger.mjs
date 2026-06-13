@@ -7,13 +7,10 @@
  *   node .github/scripts/quarantine-ledger.mjs emit-github-output
  */
 
-import { readFileSync, appendFileSync } from 'node:fs';
+import { appendFileSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
-const LEDGER_PATH = resolve(
-  process.cwd(),
-  'apps/web/tests/quarantine.json'
-);
+const LEDGER_PATH = resolve(process.cwd(), 'apps/web/tests/quarantine.json');
 
 const DEFAULT_RETRY_BUDGET = {
   unitDefaultRetries: 1,
