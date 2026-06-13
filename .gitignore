@@ -72,6 +72,8 @@ storybook-static/
 .claude/projects/
 .claude/teams/
 .claude/tasks/
+.claude/settings.local.json
+.claude/settings.local.json.*
 .claude_settings.json
 .auto-claude*
 # Codex team config is tracked; runtime/local artifacts stay ignored.
