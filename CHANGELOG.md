@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.6.51] - 2026-06-13
+
+> [internal] Bug fixes now require regression test evidence before ship.
+
+### Added
+
+- [internal] **Bug-to-test rule enforcement (JOV-1873)**: adds `pnpm test:bug-to-test`, PR template checklist, Danger gate, and `/ship` Step 3.35 to require regression tests (or documented waivers) on bug-fix PRs.
+
 ## [26.6.50] - 2026-06-11
 
 > Infra train refresh after ui train merge; desktop security ships with DMG release handling.
