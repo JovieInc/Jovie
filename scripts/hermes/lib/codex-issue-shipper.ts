@@ -21,6 +21,10 @@ export interface ShipperConfig {
   readonly repo: string;
   readonly repoRoot: string;
   readonly maxIssuesPerRun: number;
+  readonly maxParallelAgents: number;
+  readonly minFreeMemoryMb: number;
+  readonly maxLoadPerCpu: number;
+  readonly singletonLockStaleMs: number;
   readonly issueFetchLimit: number;
   readonly integrationThreshold: number;
   readonly agent: 'claude' | 'codex';
@@ -99,6 +103,15 @@ function parsePositiveInt(value: string | undefined, fallback: number): number {
   return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
 }
 
+function parsePositiveFloat(
+  value: string | undefined,
+  fallback: number
+): number {
+  if (!value) return fallback;
+  const parsed = Number.parseFloat(value);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+}
+
 function parseBool(value: string | undefined): boolean {
   return value === '1' || value?.toLowerCase() === 'true';
 }
@@ -123,7 +136,23 @@ export function loadShipperConfig(
     repoRoot,
     maxIssuesPerRun: parsePositiveInt(
       env.HERMES_CODEX_SHIPPER_MAX_ISSUES_PER_RUN,
-      1
+      3
+    ),
+    maxParallelAgents: parsePositiveInt(
+      env.HERMES_CODEX_SHIPPER_MAX_PARALLEL_AGENTS,
+      3
+    ),
+    minFreeMemoryMb: parsePositiveInt(
+      env.HERMES_CODEX_SHIPPER_MIN_FREE_MEMORY_MB,
+      4096
+    ),
+    maxLoadPerCpu: parsePositiveFloat(
+      env.HERMES_CODEX_SHIPPER_MAX_LOAD_PER_CPU,
+      1.5
+    ),
+    singletonLockStaleMs: parsePositiveInt(
+      env.HERMES_CODEX_SHIPPER_SINGLETON_LOCK_STALE_MS,
+      8 * 60 * 60 * 1000
     ),
     issueFetchLimit: parsePositiveInt(
       env.HERMES_CODEX_SHIPPER_ISSUE_FETCH_LIMIT,

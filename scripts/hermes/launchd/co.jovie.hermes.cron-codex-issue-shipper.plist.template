@@ -20,7 +20,15 @@
         <key>HERMES_HOME</key>
         <string>{{HOME}}/.hermes</string>
         <key>HERMES_CODEX_SHIPPER_MAX_ISSUES_PER_RUN</key>
-        <string>1</string>
+        <string>3</string>
+        <key>HERMES_CODEX_SHIPPER_MAX_PARALLEL_AGENTS</key>
+        <string>3</string>
+        <key>HERMES_CODEX_SHIPPER_MIN_FREE_MEMORY_MB</key>
+        <string>4096</string>
+        <key>HERMES_CODEX_SHIPPER_MAX_LOAD_PER_CPU</key>
+        <string>1.5</string>
+        <key>HERMES_CODEX_SHIPPER_SINGLETON_LOCK_STALE_MS</key>
+        <string>28800000</string>
         <key>HERMES_CODEX_SHIPPER_INTEGRATION_THRESHOLD</key>
         <string>4</string>
         <key>HERMES_CODEX_SHIPPER_AGENT</key>

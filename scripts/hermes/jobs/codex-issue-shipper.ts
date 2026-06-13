@@ -11,7 +11,7 @@
  * issue is eligible and claimed.
  */
 
-import { execFileSync, spawnSync } from 'node:child_process';
+import { execFileSync, spawn } from 'node:child_process';
 import {
   appendFileSync,
   closeSync,
@@ -19,8 +19,10 @@ import {
   mkdirSync,
   openSync,
   readFileSync,
+  rmSync,
   writeFileSync,
 } from 'node:fs';
+import { availableParallelism, freemem, loadavg, tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 import {
@@ -40,7 +42,7 @@ import {
   loadShipperConfig,
   type ShipperConfig,
 } from '../lib/codex-issue-shipper';
-import { withHeavyJobLock } from '../lib/heavy-job-lock';
+import { tryWithHeavyJobLock } from '../lib/heavy-job-lock';
 import { HERMES_PATHS } from '../lib/hermes-paths';
 import { logJobEvent, withJobLogging } from '../lib/jobs-log';
 
@@ -53,6 +55,15 @@ interface AgentRunResult {
   readonly error?: string;
   readonly logPath: string;
   readonly promptPath: string;
+}
+
+interface CapacitySnapshot {
+  readonly allowedAgents: number;
+  readonly cpuCount: number;
+  readonly freeMemoryMb: number;
+  readonly loadAverage1m: number;
+  readonly loadPerCpu: number;
+  readonly reasons: ReadonlyArray<string>;
 }
 
 function shortError(err: unknown): string {
@@ -93,6 +104,143 @@ function run(args: ReadonlyArray<string>, config: ShipperConfig): string {
     timeout: 30_000,
     maxBuffer: 5 * 1024 * 1024,
   });
+}
+
+function systemCapacity(config: ShipperConfig): CapacitySnapshot {
+  const cpuCount = Math.max(1, availableParallelism());
+  const freeMemoryMb = Math.round(freemem() / 1024 / 1024);
+  const loadAverage1m = loadavg()[0] ?? 0;
+  const loadPerCpu = loadAverage1m / cpuCount;
+  const reasons: string[] = [];
+  let allowedAgents = Math.min(
+    config.maxIssuesPerRun,
+    config.maxParallelAgents
+  );
+
+  if (freeMemoryMb < config.minFreeMemoryMb) {
+    allowedAgents = Math.min(allowedAgents, 1);
+    reasons.push(
+      `free memory ${freeMemoryMb}MB below ${config.minFreeMemoryMb}MB`
+    );
+  }
+
+  if (loadPerCpu > config.maxLoadPerCpu) {
+    allowedAgents = Math.min(allowedAgents, 1);
+    reasons.push(
+      `load ${loadPerCpu.toFixed(2)}/cpu above ${config.maxLoadPerCpu}`
+    );
+  }
+
+  if (
+    freeMemoryMb < config.minFreeMemoryMb / 2 ||
+    loadPerCpu > config.maxLoadPerCpu * 1.5
+  ) {
+    allowedAgents = 0;
+    reasons.push('system pressure too high to launch another coding agent');
+  }
+
+  return {
+    allowedAgents,
+    cpuCount,
+    freeMemoryMb,
+    loadAverage1m,
+    loadPerCpu,
+    reasons,
+  };
+}
+
+function timestampSlug(): string {
+  return new Date().toISOString().replace(/[:.]/g, '-').replace(/Z$/, 'z');
+}
+
+function branchExists(config: ShipperConfig, branchName: string): boolean {
+  const local = spawnSyncSafe(
+    'git',
+    ['rev-parse', '--verify', `refs/heads/${branchName}`],
+    config.repoRoot
+  );
+  if (local.status === 0) return true;
+
+  const remote = spawnSyncSafe(
+    'git',
+    ['ls-remote', '--exit-code', '--heads', 'origin', branchName],
+    config.repoRoot
+  );
+  return remote.status === 0;
+}
+
+function spawnSyncSafe(
+  command: string,
+  args: ReadonlyArray<string>,
+  cwd: string
+): { readonly status: number | null } {
+  try {
+    const result = execFileSync(command, args, {
+      cwd,
+      encoding: 'utf8',
+      timeout: 30_000,
+      stdio: 'ignore',
+    });
+    void result;
+    return { status: 0 };
+  } catch (err) {
+    const status =
+      typeof (err as { status?: unknown }).status === 'number'
+        ? ((err as { status: number }).status ?? 1)
+        : 1;
+    return { status };
+  }
+}
+
+function prepareWorktree(
+  config: ShipperConfig,
+  plan: DispatchPlan
+): { readonly plan: DispatchPlan; readonly repoRoot: string } {
+  const base = timestampSlug();
+  const branchName = branchExists(config, plan.branchName)
+    ? `${plan.branchName}-${base}`
+    : plan.branchName;
+  const root =
+    process.env.HERMES_CODEX_SHIPPER_WORKTREE_ROOT ??
+    join(tmpdir(), 'jovie-worktrees');
+  const repoRoot = join(root, `gh-${plan.issue.number}-${base}`);
+
+  mkdirSync(root, { recursive: true });
+  run(['git', 'fetch', 'origin', 'main'], config);
+  run(
+    ['git', 'worktree', 'add', '-b', branchName, repoRoot, 'origin/main'],
+    config
+  );
+
+  return {
+    plan: { ...plan, branchName },
+    repoRoot,
+  };
+}
+
+function cleanupWorktree(config: ShipperConfig, repoRoot: string): void {
+  try {
+    run(['git', 'worktree', 'remove', '--force', repoRoot], config);
+    return;
+  } catch (err) {
+    logJobEvent({
+      job: JOB,
+      event: 'worktree_remove_failed',
+      repoRoot,
+      error: shortError(err),
+    });
+  }
+
+  try {
+    rmSync(repoRoot, { recursive: true, force: true });
+  } catch (err) {
+    logJobEvent({
+      job: JOB,
+      event: 'worktree_cleanup_failed',
+      repoRoot,
+      error: shortError(err),
+    });
+  }
 }
 
 function detectRepoRoot(): string {
@@ -445,8 +593,9 @@ function agentLogsDir(): string {
 function runAgent(
   config: ShipperConfig,
   plan: DispatchPlan,
-  prompt: string
-): AgentRunResult {
+  prompt: string,
+  repoRoot: string
+): Promise<AgentRunResult> {
   const timestamp = new Date()
     .toISOString()
     .replace(/[:.]/g, '-')
@@ -468,30 +617,59 @@ function runAgent(
     ].join('\n')
   );
 
-  const command = buildAgentCommand(config, plan.route);
+  const agentConfig = { ...config, repoRoot };
+  const command = buildAgentCommand(agentConfig, plan.route);
   const fd = openSync(logPath, 'a');
-  try {
-    const result = spawnSync(command.command, [...command.args], {
-      cwd: config.repoRoot,
+  return new Promise(resolve => {
+    let settled = false;
+    let timedOut = false;
+    let timeout: NodeJS.Timeout;
+    const child = spawn(command.command, [...command.args], {
+      cwd: repoRoot,
       env: {
         ...process.env,
         JOVIE_AGENT_PROFILE: 'coder',
       },
-      input: prompt,
-      timeout: config.agentTimeoutMs,
       stdio: ['pipe', fd, fd],
     });
-    return {
-      ok: result.status === 0,
-      status: result.status,
-      signal: result.signal,
-      error: result.error ? shortError(result.error) : undefined,
-      logPath,
-      promptPath,
+
+    const finish = (
+      result: Omit<AgentRunResult, 'logPath' | 'promptPath'>
+    ): void => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timeout);
+      closeSync(fd);
+      resolve({ ...result, logPath, promptPath });
     };
-  } finally {
-    closeSync(fd);
-  }
+
+    timeout = setTimeout(() => {
+      timedOut = true;
+      child.kill('SIGTERM');
+    }, config.agentTimeoutMs);
+
+    child.on('error', err => {
+      finish({
+        ok: false,
+        status: null,
+        signal: null,
+        error: shortError(err),
+      });
+    });
+
+    child.on('close', (status, signal) => {
+      finish({
+        ok: status === 0,
+        status,
+        signal,
+        error: timedOut
+          ? `Agent timeout after ${config.agentTimeoutMs}ms`
+          : undefined,
+      });
+    });
+
+    child.stdin.end(prompt);
+  });
 }
 
 function findPrForBranch(
@@ -529,120 +707,156 @@ async function dispatchPlan(
   config: ShipperConfig,
   plan: DispatchPlan
 ): Promise<void> {
-  claimIssue(config, plan);
-
-  let gbrain: GbrainContext;
+  const prepared = prepareWorktree(config, plan);
+  const dispatch = prepared.plan;
   try {
-    gbrain = collectGbrainContext(plan);
-  } catch (err) {
-    const reason = `GBrain capture failed, so no coding agent was started.\n\n\`\`\`text\n${shortError(err)}\n\`\`\``;
-    releaseClaimForRetry(config, plan, reason);
-    logJobEvent({
-      job: JOB,
-      event: 'gbrain_failed',
-      issue: plan.issue.number,
-      error: shortError(err),
+    claimIssue(config, dispatch);
+
+    let gbrain: GbrainContext;
+    try {
+      gbrain = collectGbrainContext(dispatch);
+    } catch (err) {
+      const reason = `GBrain capture failed, so no coding agent was started.\n\n\`\`\`text\n${shortError(err)}\n\`\`\``;
+      releaseClaimForRetry(config, dispatch, reason);
+      logJobEvent({
+        job: JOB,
+        event: 'gbrain_failed',
+        issue: dispatch.issue.number,
+        error: shortError(err),
+      });
+      return;
+    }
+
+    const prompt = buildAgentPrompt({
+      issue: dispatch.issue,
+      branchName: dispatch.branchName,
+      baseBranch: 'main',
+      integrationBranch: dispatch.integrationBranch,
+      route: dispatch.route,
+      gbrain,
+      repoRoot: prepared.repoRoot,
     });
-    return;
-  }
 
-  const prompt = buildAgentPrompt({
-    issue: plan.issue,
-    branchName: plan.branchName,
-    baseBranch: 'main',
-    integrationBranch: plan.integrationBranch,
-    route: plan.route,
-    gbrain,
-    repoRoot: config.repoRoot,
-  });
-
-  const agentResult = runAgent(config, plan, prompt);
-  logJobEvent({
-    job: JOB,
-    event: agentResult.ok ? 'agent_succeeded' : 'agent_failed',
-    issue: plan.issue.number,
-    status: agentResult.status,
-    signal: agentResult.signal,
-    error: agentResult.error,
-    logPath: agentResult.logPath,
-    promptPath: agentResult.promptPath,
-    gbrainSlug: gbrain.captureSlug,
-  });
-
-  if (!agentResult.ok) {
-    markBlocked(
+    const agentResult = await runAgent(
       config,
-      plan,
-      [
-        `Agent exited without successfully shipping.`,
-        '',
-        `Status: \`${agentResult.status ?? 'null'}\``,
-        `Signal: \`${agentResult.signal ?? 'null'}\``,
-        agentResult.error ? `Error: \`${agentResult.error}\`` : null,
-        `Log: \`${agentResult.logPath}\``,
-        `Prompt: \`${agentResult.promptPath}\``,
-      ]
-        .filter((line): line is string => line !== null)
-        .join('\n')
-    );
-    return;
-  }
-
-  const pr = findPrForBranch(config, plan.branchName);
-  if (!pr) {
-    markBlocked(
-      config,
-      plan,
-      [
-        `Agent exited 0 but no open PR exists for \`${plan.branchName}\`.`,
-        '',
-        `Log: \`${agentResult.logPath}\``,
-        `Prompt: \`${agentResult.promptPath}\``,
-      ].join('\n')
+      dispatch,
+      prompt,
+      prepared.repoRoot
     );
     logJobEvent({
       job: JOB,
-      event: 'missing_pr_after_success',
-      issue: plan.issue.number,
-      branch: plan.branchName,
+      event: agentResult.ok ? 'agent_succeeded' : 'agent_failed',
+      issue: dispatch.issue.number,
+      status: agentResult.status,
+      signal: agentResult.signal,
+      error: agentResult.error,
+      logPath: agentResult.logPath,
+      promptPath: agentResult.promptPath,
+      gbrainSlug: gbrain.captureSlug,
     });
-    return;
-  }
 
-  let successCommentPosted = true;
-  try {
-    commentIssue(
-      config,
-      plan.issue.number,
-      [
-        `Codex issue shipper completed agent run and found PR #${pr.number}.`,
-        '',
-        `PR: ${pr.url}`,
-        `GBrain dispatch slug: \`${gbrain.captureSlug}\``,
-        `Log: \`${agentResult.logPath}\``,
-      ].join('\n')
-    );
-  } catch (err) {
-    successCommentPosted = false;
+    if (!agentResult.ok) {
+      markBlocked(
+        config,
+        dispatch,
+        [
+          `Agent exited without successfully shipping.`,
+          '',
+          `Status: \`${agentResult.status ?? 'null'}\``,
+          `Signal: \`${agentResult.signal ?? 'null'}\``,
+          agentResult.error ? `Error: \`${agentResult.error}\`` : null,
+          `Log: \`${agentResult.logPath}\``,
+          `Prompt: \`${agentResult.promptPath}\``,
+        ]
+          .filter((line): line is string => line !== null)
+          .join('\n')
+      );
+      return;
+    }
+
+    const pr = findPrForBranch(config, dispatch.branchName);
+    if (!pr) {
+      markBlocked(
+        config,
+        dispatch,
+        [
+          `Agent exited 0 but no open PR exists for \`${dispatch.branchName}\`.`,
+          '',
+          `Log: \`${agentResult.logPath}\``,
+          `Prompt: \`${agentResult.promptPath}\``,
+        ].join('\n')
+      );
+      logJobEvent({
+        job: JOB,
+        event: 'missing_pr_after_success',
+        issue: plan.issue.number,
+        branch: dispatch.branchName,
+      });
+      return;
+    }
+
+    let successCommentPosted = true;
+    try {
+      commentIssue(
+        config,
+        dispatch.issue.number,
+        [
+          `Codex issue shipper completed agent run and found PR #${pr.number}.`,
+          '',
+          `PR: ${pr.url}`,
+          `GBrain dispatch slug: \`${gbrain.captureSlug}\``,
+          `Log: \`${agentResult.logPath}\``,
+        ].join('\n')
+      );
+    } catch (err) {
+      successCommentPosted = false;
+      logJobEvent({
+        job: JOB,
+        event: 'success_comment_failed',
+        issue: plan.issue.number,
+        pr: pr.number,
+        error: shortError(err),
+      });
+    }
+
+    removeClaimLabel(config, dispatch, 'success_claim_remove_failed');
+
     logJobEvent({
       job: JOB,
-      event: 'success_comment_failed',
-      issue: plan.issue.number,
+      event: 'pr_found_after_success',
+      issue: dispatch.issue.number,
       pr: pr.number,
-      error: shortError(err),
+      url: pr.url,
+      successCommentPosted,
     });
+  } finally {
+    cleanupWorktree(config, prepared.repoRoot);
   }
+}
 
-  removeClaimLabel(config, plan, 'success_claim_remove_failed');
-
-  logJobEvent({
-    job: JOB,
-    event: 'pr_found_after_success',
-    issue: plan.issue.number,
-    pr: pr.number,
-    url: pr.url,
-    successCommentPosted,
-  });
+async function dispatchBatch(
+  config: ShipperConfig,
+  plans: ReadonlyArray<DispatchPlan>
+): Promise<void> {
+  await Promise.all(
+    plans.map(async plan => {
+      try {
+        await dispatchPlan(config, plan);
+      } catch (err) {
+        logJobEvent({
+          job: JOB,
+          event: 'dispatch_failed',
+          issue: plan.issue.number,
+          error: shortError(err),
+        });
+        markBlocked(
+          config,
+          plan,
+          `Dispatcher failed before a clean agent handoff.\n\n\`\`\`text\n${shortError(err)}\n\`\`\``
+        );
+      }
+    })
+  );
 }
 
 async function main(): Promise<void> {
@@ -652,63 +866,81 @@ async function main(): Promise<void> {
   const config = loadShipperConfig(process.env, repoRoot, repo);
 
   await withJobLogging(JOB, async () => {
-    const issues = listCodexIssues(config);
-    const plans = buildDispatchPlans(issues, config);
-    const skippedHuman = issues.filter(issue =>
-      labelNames(issue).includes(HUMAN_REVIEW_LABEL)
-    ).length;
+    const lockResult = await tryWithHeavyJobLock(
+      JOB,
+      async () => {
+        let controlLabelsEnsured = false;
 
-    logJobEvent({
-      job: JOB,
-      event: 'scanned',
-      issueCount: issues.length,
-      dispatchableCount: plans.length,
-      skippedHuman,
-      maxIssuesPerRun: config.maxIssuesPerRun,
-      dryRun: config.dryRun,
-    });
+        for (;;) {
+          const issues = listCodexIssues(config);
+          const plans = buildDispatchPlans(issues, config);
+          const skippedHuman = issues.filter(issue =>
+            labelNames(issue).includes(HUMAN_REVIEW_LABEL)
+          ).length;
+          const capacity = systemCapacity(config);
+          const batch = plans.slice(0, capacity.allowedAgents);
 
-    if (plans.length === 0) {
-      logJobEvent({ job: JOB, event: 'empty_queue' });
-      return;
-    }
+          logJobEvent({
+            job: JOB,
+            event: 'scanned',
+            issueCount: issues.length,
+            dispatchableCount: plans.length,
+            skippedHuman,
+            batchCount: batch.length,
+            maxIssuesPerRun: config.maxIssuesPerRun,
+            maxParallelAgents: config.maxParallelAgents,
+            capacity,
+            dryRun: config.dryRun,
+          });
 
-    if (config.dryRun) {
+          if (plans.length === 0) {
+            logJobEvent({ job: JOB, event: 'empty_queue' });
+            return;
+          }
+
+          if (batch.length === 0) {
+            logJobEvent({
+              job: JOB,
+              event: 'capacity_throttled',
+              capacity,
+            });
+            return;
+          }
+
+          if (config.dryRun) {
+            logJobEvent({
+              job: JOB,
+              event: 'dry_run_planned',
+              plans: batch.map(plan => ({
+                issue: plan.issue.number,
+                branch: plan.branchName,
+                risk: plan.route.riskLevel,
+                model: plan.route.sessionModel,
+                integrationBranch: plan.integrationBranch,
+              })),
+            });
+            return;
+          }
+
+          if (!controlLabelsEnsured) {
+            ensureControlLabels(config);
+            controlLabelsEnsured = true;
+          }
+
+          await dispatchBatch(config, batch);
+        }
+      },
+      { staleMs: config.singletonLockStaleMs }
+    );
+
+    if (!lockResult.acquired) {
       logJobEvent({
         job: JOB,
-        event: 'dry_run_planned',
-        plans: plans.map(plan => ({
-          issue: plan.issue.number,
-          branch: plan.branchName,
-          risk: plan.route.riskLevel,
-          model: plan.route.sessionModel,
-          integrationBranch: plan.integrationBranch,
-        })),
+        event: 'singleton_active_skip',
+        owner: lockResult.owner,
       });
       return;
     }
-
-    ensureControlLabels(config);
-
-    await withHeavyJobLock(JOB, async () => {
-      for (const plan of plans) {
-        try {
-          await dispatchPlan(config, plan);
-        } catch (err) {
-          logJobEvent({
-            job: JOB,
-            event: 'dispatch_failed',
-            issue: plan.issue.number,
-            error: shortError(err),
-          });
-          markBlocked(
-            config,
-            plan,
-            `Dispatcher failed before a clean agent handoff.\n\n\`\`\`text\n${shortError(err)}\n\`\`\``
-          );
-        }
-      }
-    });
   });
 }
 

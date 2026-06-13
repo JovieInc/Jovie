@@ -21,6 +21,16 @@ import { HERMES_PATHS } from './hermes-paths';
 const LOCK = HERMES_PATHS.heavyJobLock;
 const STALE_MS = 5 * 60 * 1000;
 
+export interface HeavyJobLockOwner {
+  readonly caller?: string;
+  readonly pid?: number;
+  readonly ts?: number;
+}
+
+export type HeavyJobLockResult<T> =
+  | { readonly acquired: true; readonly value: T }
+  | { readonly acquired: false; readonly owner: HeavyJobLockOwner | null };
+
 function isProcessAlive(pid: number): boolean {
   try {
     process.kill(pid, 0);
@@ -55,19 +65,22 @@ function tryClaim(caller: string): boolean {
   return true;
 }
 
+function readLockOwner(): HeavyJobLockOwner | null {
+  try {
+    return JSON.parse(readFileSync(LOCK, 'utf8')) as HeavyJobLockOwner;
+  } catch {
+    return null;
+  }
+}
+
 /**
  * If the lock is genuinely stale (process gone or older than STALE_MS),
  * remove it so the next claim attempt can succeed. Returns true if we
  * removed it.
  */
-function reapIfStale(): boolean {
-  let data: { pid?: number; ts?: number };
-  try {
-    data = JSON.parse(readFileSync(LOCK, 'utf8')) as {
-      pid?: number;
-      ts?: number;
-    };
-  } catch {
+function reapIfStale(staleMs = STALE_MS): boolean {
+  const data = readLockOwner();
+  if (!data) {
     // Unreadable lock — assume corrupt, try to remove.
     try {
       unlinkSync(LOCK);
@@ -81,7 +94,7 @@ function reapIfStale(): boolean {
       ? Date.now() - data.ts
       : Number.POSITIVE_INFINITY;
   const dead = typeof data.pid === 'number' ? !isProcessAlive(data.pid) : true;
-  if (age > STALE_MS || dead) {
+  if (dead || age > staleMs) {
     try {
       unlinkSync(LOCK);
       return true;
@@ -92,10 +105,33 @@ function reapIfStale(): boolean {
   return false;
 }
 
+export async function tryWithHeavyJobLock<T>(
+  caller: string,
+  fn: () => Promise<T>,
+  options: { readonly staleMs?: number } = {}
+): Promise<HeavyJobLockResult<T>> {
+  if (
+    !tryClaim(caller) &&
+    (!reapIfStale(options.staleMs) || !tryClaim(caller))
+  ) {
+    return { acquired: false, owner: readLockOwner() };
+  }
+
+  try {
+    return { acquired: true, value: await fn() };
+  } finally {
+    try {
+      unlinkSync(LOCK);
+    } catch {
+      // best effort
+    }
+  }
+}
+
 export async function withHeavyJobLock<T>(
   caller: string,
   fn: () => Promise<T>,
-  options: { readonly timeoutMs?: number } = {}
+  options: { readonly timeoutMs?: number; readonly staleMs?: number } = {}
 ): Promise<T> {
   const timeoutMs = options.timeoutMs ?? 5 * 60 * 1000;
   const deadline = Date.now() + timeoutMs;
@@ -113,7 +149,7 @@ export async function withHeavyJobLock<T>(
       }
     }
     // Couldn't claim; check for stale and retry.
-    if (!reapIfStale()) {
+    if (!reapIfStale(options.staleMs)) {
       await new Promise(resolve => setTimeout(resolve, 2000));
     }
   }

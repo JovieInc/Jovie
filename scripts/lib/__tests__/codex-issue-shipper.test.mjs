@@ -9,6 +9,7 @@ import {
   CODEX_TRUSTED_LABEL,
   eligibleCodexIssues,
   HUMAN_REVIEW_LABEL,
+  loadShipperConfig,
   selectTaskRoute,
   shellQuote,
 } from '../../hermes/lib/codex-issue-shipper.ts';
@@ -135,6 +136,16 @@ describe('codex issue shipper planner', () => {
     expect(plans).toHaveLength(2);
     expect(plans.map(plan => plan.issue.number)).toEqual([1, 2]);
   });
+
+  it('defaults to three parallel shipper lanes with resource guardrails', () => {
+    const loaded = loadShipperConfig({}, '/repo', 'JovieInc/Jovie');
+
+    expect(loaded.maxIssuesPerRun).toBe(3);
+    expect(loaded.maxParallelAgents).toBe(3);
+    expect(loaded.minFreeMemoryMb).toBe(4096);
+    expect(loaded.maxLoadPerCpu).toBe(1.5);
+    expect(loaded.singletonLockStaleMs).toBe(8 * 60 * 60 * 1000);
+  });
 });
 
 describe('codex issue shipper prompt', () => {
@@ -255,6 +266,10 @@ describe('codex issue shipper prompt', () => {
         repo: 'JovieInc/Jovie',
         repoRoot: '/repo',
         maxIssuesPerRun: 1,
+        maxParallelAgents: 3,
+        minFreeMemoryMb: 4096,
+        maxLoadPerCpu: 1.5,
+        singletonLockStaleMs: 1000,
         issueFetchLimit: 25,
         integrationThreshold: 3,
         agent: 'codex',
