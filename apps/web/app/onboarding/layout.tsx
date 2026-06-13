@@ -1,8 +1,5 @@
 import type { Metadata } from 'next';
-import { ResolvedClientProviders } from '@/components/providers/ResolvedClientProviders';
-import { AppFlagProvider } from '@/lib/flags/client';
-import { resolveOnboardingRouteFlagNames } from '@/lib/flags/route-snapshots';
-import { getAppFlagsSnapshot } from '@/lib/flags/server';
+import type { ReactNode } from 'react';
 
 export const dynamic = 'force-dynamic';
 
@@ -12,18 +9,10 @@ export const metadata: Metadata = {
   robots: { index: false, follow: false },
 };
 
-export default async function OnboardingLayout({
+export default function OnboardingLayout({
   children,
 }: Readonly<{
-  children: React.ReactNode;
+  children: ReactNode;
 }>) {
-  const initialFlags = await getAppFlagsSnapshot({
-    flagNames: resolveOnboardingRouteFlagNames(),
-  });
-
-  return (
-    <ResolvedClientProviders>
-      <AppFlagProvider initialFlags={initialFlags}>{children}</AppFlagProvider>
-    </ResolvedClientProviders>
-  );
+  return children;
 }
