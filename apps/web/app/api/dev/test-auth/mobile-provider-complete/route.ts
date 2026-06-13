@@ -10,6 +10,7 @@ import type { DevTestAuthPersona } from '@/lib/auth/dev-test-auth-types';
 import { resolveConfiguredNativeTestClerkUserId } from '@/lib/auth/native-test-clerk-user.server';
 import { createStoredNativeExchangeCode } from '@/lib/auth/routing-state.server';
 import { NO_STORE_HEADERS } from '@/lib/http/headers';
+import { isVercelProductionDeployment } from '@/lib/security/development-only';
 
 export const runtime = 'nodejs';
 
@@ -22,12 +23,8 @@ function readTrimmedEnv(name: string): string | null {
   return value ? value : null;
 }
 
-function isProductionDeployment(): boolean {
-  return process.env.VERCEL_ENV === 'production';
-}
-
 function hasValidTunnelToken(request: NextRequest): boolean {
-  if (isProductionDeployment()) {
+  if (isVercelProductionDeployment()) {
     return false;
   }
 
@@ -40,11 +37,11 @@ function hasValidTunnelToken(request: NextRequest): boolean {
 }
 
 function getRequestDevTestAuthAvailability(request: NextRequest) {
-  if (isProductionDeployment()) {
+  if (isVercelProductionDeployment()) {
     return {
       enabled: false,
       trustedHost: false,
-      reason: 'Not available in production',
+      reason: 'Not available outside development',
     };
   }
 

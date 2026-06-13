@@ -2,6 +2,7 @@ import { TooltipProvider } from '@jovie/ui';
 import type { Metadata } from 'next';
 import type { ReactNode } from 'react';
 import { QueryProvider } from '@/components/providers/QueryProvider';
+import { requireDevelopmentOnlyPage } from '@/lib/security/require-development-only';
 import { NOINDEX_ROBOTS } from '@/lib/seo/noindex-metadata';
 
 export const metadata: Metadata = {
@@ -16,6 +17,8 @@ export default function ExpLayout({
 }: {
   readonly children: ReactNode;
 }) {
+  requireDevelopmentOnlyPage();
+
   return (
     <QueryProvider>
       <TooltipProvider delayDuration={400}>

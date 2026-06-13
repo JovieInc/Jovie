@@ -21,6 +21,10 @@ import { db } from '@/lib/db';
 import { users } from '@/lib/db/schema/auth';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
 import {
+  DEVELOPMENT_ONLY_ERROR,
+  isExplicitDevelopmentEnvironment,
+} from '@/lib/security/development-only';
+import {
   DEFAULT_TEST_AVATAR_URL,
   ensureClerkTestUser,
   ensureCreatorProfileRecord,
@@ -77,13 +81,6 @@ interface PersonaSeedConfig {
   readonly lastName: string;
   readonly isAdmin: boolean;
   readonly profilePath: string | null;
-}
-
-function isProductionEnvironment(): boolean {
-  return (
-    process.env.NODE_ENV === 'production' &&
-    process.env.VERCEL_ENV === 'production'
-  );
 }
 
 function splitFullName(fullName: string) {
@@ -160,11 +157,11 @@ export function parseDevTestAuthPersona(
 export function getDevTestAuthAvailability(
   hostname: string | null
 ): DevTestAuthAvailability {
-  if (isProductionEnvironment()) {
+  if (!isExplicitDevelopmentEnvironment()) {
     return {
       enabled: false,
       trustedHost: false,
-      reason: 'Not available in production',
+      reason: DEVELOPMENT_ONLY_ERROR,
     };
   }
 

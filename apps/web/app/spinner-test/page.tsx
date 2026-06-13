@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import { ContentSectionHeader } from '@/components/molecules/ContentSectionHeader';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { StandaloneProductPage } from '@/components/organisms/StandaloneProductPage';
+import { requireDevelopmentOnlyPage } from '@/lib/security/require-development-only';
 import { NOINDEX_ROBOTS } from '@/lib/seo/noindex-metadata';
 
 export const metadata: Metadata = {
@@ -9,6 +10,8 @@ export const metadata: Metadata = {
 };
 
 export default function SpinnerTestPage() {
+  requireDevelopmentOnlyPage();
+
   return (
     <StandaloneProductPage width='sm' centered>
       <ContentSurfaceCard surface='details' className='overflow-hidden'>
