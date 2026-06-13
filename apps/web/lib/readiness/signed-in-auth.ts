@@ -283,7 +283,9 @@ function resolveClerkKeysForEnv(
 
 function checkStagingHostnames(): SignedInAuthCheck {
   const expected = [`staging.${HOSTNAME}`, `main.${HOSTNAME}`];
-  const actual = Array.from(STAGING_HOSTNAMES).sort();
+  const actual = Array.from(STAGING_HOSTNAMES).sort((a, b) =>
+    a.localeCompare(b)
+  );
   const matches =
     expected.every(hostname => STAGING_HOSTNAMES.has(hostname)) &&
     actual.length === expected.length;
@@ -366,15 +368,62 @@ interface ProbeSignedInAuthDeploymentOptions {
   readonly timeoutMs?: number;
 }
 
-export async function probeSignedInAuthDeployment(
-  baseUrl: string,
-  options: ProbeSignedInAuthDeploymentOptions = {}
-): Promise<SignedInAuthProbeResult> {
-  const timeoutMs = options.timeoutMs ?? 15_000;
-  const parsedBaseUrl = new URL(baseUrl);
-  const hostname = parsedBaseUrl.hostname;
-  const checks: SignedInAuthCheck[] = [];
+function resolveClerkKeyStatus(
+  headerValue: string | null
+): ClerkKeyStatus | 'missing' {
+  if (
+    headerValue === 'ok' ||
+    headerValue === 'no_publishable_key' ||
+    headerValue === 'staging_missing' ||
+    headerValue === 'staging_inherits_prod'
+  ) {
+    return headerValue;
+  }
 
+  return 'missing';
+}
+
+function buildSignInProbeChecks(
+  signInResponse: Response,
+  clerkKeyStatus: ClerkKeyStatus | 'missing',
+  authUnavailable: boolean
+): SignedInAuthCheck[] {
+  return [
+    {
+      id: 'signin-reachable',
+      status: signInResponse.ok ? 'pass' : 'fail',
+      message: signInResponse.ok
+        ? 'Sign-in page responded successfully'
+        : `Sign-in page returned HTTP ${signInResponse.status}`,
+      evidence: `status=${signInResponse.status}`,
+    },
+    {
+      id: 'clerk-key-status-header',
+      status: clerkKeyStatus === 'ok' ? 'pass' : 'fail',
+      message:
+        clerkKeyStatus === 'ok'
+          ? 'Middleware reported healthy Clerk key routing'
+          : `Middleware reported Clerk key status ${clerkKeyStatus}`,
+      evidence: `${CLERK_KEY_STATUS_HEADER}=${clerkKeyStatus}`,
+    },
+    {
+      id: 'auth-unavailable-copy',
+      status: authUnavailable ? 'fail' : 'pass',
+      message: authUnavailable
+        ? 'Sign-in page rendered auth-unavailable copy'
+        : 'Sign-in page did not render auth-unavailable copy',
+    },
+  ];
+}
+
+async function probeSignInPage(
+  baseUrl: string,
+  timeoutMs: number,
+  checks: SignedInAuthCheck[]
+): Promise<{
+  readonly clerkKeyStatus: ClerkKeyStatus | 'missing';
+  readonly authUnavailable: boolean;
+}> {
   const signInResponse = await fetch(new URL('/signin', baseUrl), {
     method: 'GET',
     redirect: 'follow',
@@ -389,94 +438,96 @@ export async function probeSignedInAuthDeployment(
     return null;
   });
 
-  let clerkKeyStatus: ClerkKeyStatus | 'missing' = 'missing';
-  let authUnavailable = false;
-
-  if (signInResponse) {
-    const headerValue = signInResponse.headers.get(CLERK_KEY_STATUS_HEADER);
-    clerkKeyStatus =
-      headerValue === 'ok' ||
-      headerValue === 'no_publishable_key' ||
-      headerValue === 'staging_missing' ||
-      headerValue === 'staging_inherits_prod'
-        ? headerValue
-        : 'missing';
-
-    const bodyText = await signInResponse.text().catch(() => '');
-    authUnavailable = hasAuthUnavailableCopy(bodyText);
-
-    checks.push({
-      id: 'signin-reachable',
-      status: signInResponse.ok ? 'pass' : 'fail',
-      message: signInResponse.ok
-        ? 'Sign-in page responded successfully'
-        : `Sign-in page returned HTTP ${signInResponse.status}`,
-      evidence: `status=${signInResponse.status}`,
-    });
-
-    checks.push({
-      id: 'clerk-key-status-header',
-      status: clerkKeyStatus === 'ok' ? 'pass' : 'fail',
-      message:
-        clerkKeyStatus === 'ok'
-          ? 'Middleware reported healthy Clerk key routing'
-          : `Middleware reported Clerk key status ${clerkKeyStatus}`,
-      evidence: `${CLERK_KEY_STATUS_HEADER}=${clerkKeyStatus}`,
-    });
-
-    checks.push({
-      id: 'auth-unavailable-copy',
-      status: authUnavailable ? 'fail' : 'pass',
-      message: authUnavailable
-        ? 'Sign-in page rendered auth-unavailable copy'
-        : 'Sign-in page did not render auth-unavailable copy',
-    });
+  if (!signInResponse) {
+    return { clerkKeyStatus: 'missing', authUnavailable: false };
   }
 
-  let testAuthSessionOk: boolean | null = null;
-  if (isLoopbackHost(hostname)) {
-    const sessionResponse = await fetch(
-      new URL('/api/dev/test-auth/session', baseUrl),
-      {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          [TEST_MODE_HEADER]: TEST_AUTH_BYPASS_MODE,
-        },
-        body: JSON.stringify({ persona: 'creator-ready' }),
-        signal: AbortSignal.timeout(timeoutMs),
-      }
-    ).catch(error => {
-      checks.push({
-        id: 'dev-test-auth-session',
-        status: 'fail',
-        message: 'Dev test-auth session bootstrap failed',
-        evidence: error instanceof Error ? error.message : String(error),
-      });
-      testAuthSessionOk = false;
-      return null;
-    });
+  const clerkKeyStatus = resolveClerkKeyStatus(
+    signInResponse.headers.get(CLERK_KEY_STATUS_HEADER)
+  );
+  const bodyText = await signInResponse.text().catch(() => '');
+  const authUnavailable = hasAuthUnavailableCopy(bodyText);
 
-    if (sessionResponse) {
-      testAuthSessionOk = sessionResponse.ok;
-      const responseText = await sessionResponse.text().catch(() => '');
-      checks.push({
-        id: 'dev-test-auth-session',
-        status: sessionResponse.ok ? 'pass' : 'fail',
-        message: sessionResponse.ok
-          ? 'Dev test-auth session bootstrap succeeded'
-          : 'Dev test-auth session bootstrap returned a non-OK response',
-        evidence: `status=${sessionResponse.status} body=${responseText.slice(0, 160)}`,
-      });
-    }
-  } else {
+  checks.push(
+    ...buildSignInProbeChecks(signInResponse, clerkKeyStatus, authUnavailable)
+  );
+
+  return { clerkKeyStatus, authUnavailable };
+}
+
+async function probeDevTestAuthSession(
+  baseUrl: string,
+  hostname: string,
+  timeoutMs: number,
+  checks: SignedInAuthCheck[]
+): Promise<boolean | null> {
+  if (!isLoopbackHost(hostname)) {
     checks.push({
       id: 'dev-test-auth-session',
       status: 'skip',
       message:
         'Remote deployment probe skips loopback-only dev test-auth session',
     });
+    return null;
   }
+
+  const sessionResponse = await fetch(
+    new URL('/api/dev/test-auth/session', baseUrl),
+    {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        [TEST_MODE_HEADER]: TEST_AUTH_BYPASS_MODE,
+      },
+      body: JSON.stringify({ persona: 'creator-ready' }),
+      signal: AbortSignal.timeout(timeoutMs),
+    }
+  ).catch(error => {
+    checks.push({
+      id: 'dev-test-auth-session',
+      status: 'fail',
+      message: 'Dev test-auth session bootstrap failed',
+      evidence: error instanceof Error ? error.message : String(error),
+    });
+    return null;
+  });
+
+  if (!sessionResponse) {
+    return false;
+  }
+
+  const responseText = await sessionResponse.text().catch(() => '');
+  checks.push({
+    id: 'dev-test-auth-session',
+    status: sessionResponse.ok ? 'pass' : 'fail',
+    message: sessionResponse.ok
+      ? 'Dev test-auth session bootstrap succeeded'
+      : 'Dev test-auth session bootstrap returned a non-OK response',
+    evidence: `status=${sessionResponse.status} body=${responseText.slice(0, 160)}`,
+  });
+
+  return sessionResponse.ok;
+}
+
+export async function probeSignedInAuthDeployment(
+  baseUrl: string,
+  options: ProbeSignedInAuthDeploymentOptions = {}
+): Promise<SignedInAuthProbeResult> {
+  const timeoutMs = options.timeoutMs ?? 15_000;
+  const hostname = new URL(baseUrl).hostname;
+  const checks: SignedInAuthCheck[] = [];
+
+  const { clerkKeyStatus, authUnavailable } = await probeSignInPage(
+    baseUrl,
+    timeoutMs,
+    checks
+  );
+  const testAuthSessionOk = await probeDevTestAuthSession(
+    baseUrl,
+    hostname,
+    timeoutMs,
+    checks
+  );
 
   const ok = checks.every(
     check => check.status === 'pass' || check.status === 'skip'

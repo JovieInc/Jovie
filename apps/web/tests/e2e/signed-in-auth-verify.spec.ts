@@ -97,10 +97,10 @@ test.describe('Signed-in auth verification @smoke', () => {
     page,
   }) => {
     test.setTimeout(180_000);
-
-    if (!canRunSignedInAuthVerification()) {
-      test.skip();
-    }
+    test.skip(
+      !canRunSignedInAuthVerification(),
+      'Requires Clerk test credentials or E2E_USE_TEST_AUTH_BYPASS=1'
+    );
 
     const { getContext, cleanup } = setupPageMonitoring(page);
 
