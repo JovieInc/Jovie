@@ -1,4 +1,8 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
+const TRUSTED_CRON_HEADERS = {
+  'x-forwarded-host': 'staging.jov.ie',
+} as const;
 
 const {
   mockAnd,
@@ -15,7 +19,6 @@ const {
   mockLte,
   mockMarkWorkflowFailed,
   mockOr,
-  mockVerifyCronRequest,
 } = vi.hoisted(() => ({
   mockAnd: vi.fn((...conditions: unknown[]) => ({ type: 'and', conditions })),
   mockCaptureError: vi.fn(),
@@ -50,11 +53,6 @@ const {
   })),
   mockMarkWorkflowFailed: vi.fn(),
   mockOr: vi.fn((...conditions: unknown[]) => ({ type: 'or', conditions })),
-  mockVerifyCronRequest: vi.fn(),
-}));
-
-vi.mock('@/lib/cron/auth', () => ({
-  verifyCronRequest: mockVerifyCronRequest,
 }));
 
 vi.mock('drizzle-orm', () => ({
@@ -121,9 +119,63 @@ describe('GET /api/cron/process-workflow-runs', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.resetModules();
+    vi.stubEnv('CRON_SECRET', 'test-secret');
     mockExecuteApprovedAction.mockResolvedValue(undefined);
     mockMarkWorkflowFailed.mockResolvedValue(undefined);
-    mockVerifyCronRequest.mockReturnValue(null);
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  it('returns 401 for invalid cron auth', async () => {
+    const { GET } = await import('@/app/api/cron/process-workflow-runs/route');
+    const response = await GET(
+      new Request('http://localhost/api/cron/process-workflow-runs', {
+        headers: {
+          Authorization: 'Bearer wrong-secret',
+          ...TRUSTED_CRON_HEADERS,
+        },
+      })
+    );
+    const data = await response.json();
+
+    expect(response.status).toBe(401);
+    expect(data.error).toBe('Unauthorized');
+    expect(mockDb.select).not.toHaveBeenCalled();
+  });
+
+  it('returns 401 without authorization', async () => {
+    const { GET } = await import('@/app/api/cron/process-workflow-runs/route');
+    const response = await GET(
+      new Request('http://localhost/api/cron/process-workflow-runs', {
+        headers: TRUSTED_CRON_HEADERS,
+      })
+    );
+    const data = await response.json();
+
+    expect(response.status).toBe(401);
+    expect(data.error).toBe('Unauthorized');
+    expect(mockDb.select).not.toHaveBeenCalled();
+  });
+
+  it('returns 403 for untrusted origins before bearer auth', async () => {
+    vi.stubEnv('NODE_ENV', 'production');
+
+    const { GET } = await import('@/app/api/cron/process-workflow-runs/route');
+    const response = await GET(
+      new Request('http://localhost/api/cron/process-workflow-runs', {
+        headers: {
+          Authorization: 'Bearer test-secret',
+          'x-forwarded-host': 'attacker-project.vercel.app',
+        },
+      })
+    );
+    const data = await response.json();
+
+    expect(response.status).toBe(403);
+    expect(data.error).toBe('Forbidden');
+    expect(mockDb.select).not.toHaveBeenCalled();
   });
 
   it('claims queued workflow runs before executing them', async () => {
@@ -133,7 +185,10 @@ describe('GET /api/cron/process-workflow-runs', () => {
 
     const response = await GET(
       new Request('http://localhost/api/cron/process-workflow-runs', {
-        headers: { authorization: 'Bearer test-secret' },
+        headers: {
+          Authorization: 'Bearer test-secret',
+          ...TRUSTED_CRON_HEADERS,
+        },
       })
     );
     const payload = await response.json();
@@ -165,12 +220,5 @@ describe('GET /api/cron/process-workflow-runs', () => {
       workflowRunId: 'workflow-run-1',
     });
     expect(mockCaptureWarning).not.toHaveBeenCalled();
-    expect(mockVerifyCronRequest).toHaveBeenCalledWith(
-      expect.any(Request),
-      expect.objectContaining({
-        route: '/api/cron/process-workflow-runs',
-        requireTrustedOrigin: true,
-      })
-    );
   });
 });
