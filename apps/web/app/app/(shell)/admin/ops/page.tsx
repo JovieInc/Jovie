@@ -9,10 +9,17 @@ import type {
 import { AdminPage } from '@/components/features/admin/layout/AdminPage';
 import { OperationalControlPanel } from '@/components/features/admin/OperationalControlPanel';
 import { APP_ROUTES } from '@/constants/routes';
-import { getPublicProfileCanaryStatus } from '@/lib/admin/ops-queries';
+import {
+  getNightlyTestingAgentStatus,
+  getPublicProfileCanaryStatus,
+} from '@/lib/admin/ops-queries';
 import { env } from '@/lib/env-server';
 import { getHudMetrics } from '@/lib/hud/metrics';
 import { NOINDEX_ROBOTS } from '@/lib/seo/noindex-metadata';
+import {
+  formatNightlyAgentSummary,
+  NIGHTLY_AGENT_REPORT_DOC_PATH,
+} from '@/lib/testing/nightly-agent-report';
 import { logger } from '@/lib/utils/logger';
 import { HudDashboardClient } from './HudDashboardClient';
 
@@ -83,11 +90,13 @@ export default async function AdminOpsPage({
   // The admin layout has already verified admin entitlement; getHudMetrics
   // accepts the access mode for downstream auth-aware features (e.g. AI ops
   // dispatch UI). Admin sees full dispatch; kiosk-token would not.
-  const [metrics, shippingPrefetch, canaryStatus] = await Promise.all([
-    getHudMetrics('admin'),
-    getInitialShippingData(),
-    getPublicProfileCanaryStatus(),
-  ]);
+  const [metrics, shippingPrefetch, canaryStatus, nightlyAgentStatus] =
+    await Promise.all([
+      getHudMetrics('admin'),
+      getInitialShippingData(),
+      getPublicProfileCanaryStatus(),
+      getNightlyTestingAgentStatus(),
+    ]);
 
   // In admin-kiosk presentation, render the kiosk-density body inside the
   // shell so admins keep their navigation. The full standalone TV experience
@@ -119,6 +128,21 @@ export default async function AdminOpsPage({
       })
     : null;
 
+  const nightlyAgentPass = nightlyAgentStatus?.pass ?? null;
+  const nightlyAgentRunAt = nightlyAgentStatus?.generatedAt
+    ? new Date(nightlyAgentStatus.generatedAt).toLocaleString('en-US', {
+        month: 'short',
+        day: 'numeric',
+        hour: 'numeric',
+        minute: '2-digit',
+        timeZone: 'UTC',
+        timeZoneName: 'short',
+      })
+    : null;
+  const nightlyAgentSummary = nightlyAgentStatus
+    ? formatNightlyAgentSummary(nightlyAgentStatus)
+    : null;
+
   return (
     <AdminPage
       title='Ops'
@@ -130,7 +154,7 @@ export default async function AdminOpsPage({
             href={PRESENTATION_VIEW_HREF}
             target='_blank'
             rel='noopener'
-            aria-label='Open TV view in a new tab'
+            aria-label='Open TV View In A New Tab'
           >
             <Maximize2 className='h-3.5 w-3.5' aria-hidden='true' />
             TV view
@@ -175,6 +199,58 @@ export default async function AdminOpsPage({
         {canaryRunAt ? (
           <span className='ml-auto text-[12px] text-tertiary-token'>
             {canaryRunAt}
+          </span>
+        ) : null}
+      </div>
+
+      {/* Nightly testing agent status (JOV-1870) */}
+      <div
+        className='flex flex-wrap items-center gap-2 rounded-md border border-subtle bg-surface-1 px-3 py-2 text-[13px]'
+        data-testid='nightly-testing-agent-status'
+      >
+        {nightlyAgentPass === null ? (
+          <span
+            className='h-2 w-2 rounded-full bg-tertiary-token'
+            aria-hidden='true'
+          />
+        ) : nightlyAgentPass ? (
+          <CheckCircle2
+            className='h-3.5 w-3.5 shrink-0 text-success'
+            aria-label='Pass'
+          />
+        ) : (
+          <XCircle
+            className='h-3.5 w-3.5 shrink-0 text-destructive'
+            aria-label='Fail'
+          />
+        )}
+        <span className='font-medium text-secondary-token'>
+          Nightly testing agent
+        </span>
+        <span className='text-tertiary-token'>
+          {nightlyAgentPass === null ? 'No data yet' : nightlyAgentSummary}
+        </span>
+        {nightlyAgentStatus?.workflowRunUrl ? (
+          <Link
+            href={nightlyAgentStatus.workflowRunUrl}
+            target='_blank'
+            rel='noopener noreferrer'
+            className='text-[12px] text-secondary-token underline-offset-2 hover:underline'
+          >
+            Last run
+          </Link>
+        ) : null}
+        <Link
+          href={`https://github.com/JovieInc/Jovie/blob/main/${NIGHTLY_AGENT_REPORT_DOC_PATH}`}
+          target='_blank'
+          rel='noopener noreferrer'
+          className='text-[12px] text-secondary-token underline-offset-2 hover:underline'
+        >
+          Daily report
+        </Link>
+        {nightlyAgentRunAt ? (
+          <span className='ml-auto text-[12px] text-tertiary-token'>
+            {nightlyAgentRunAt}
           </span>
         ) : null}
       </div>

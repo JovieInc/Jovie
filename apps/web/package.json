@@ -58,6 +58,7 @@
     "test:nightly-agent:normalize": "tsx scripts/nightly-test-agent.ts normalize",
     "test:nightly-agent:validate-candidate": "tsx scripts/nightly-test-agent.ts validate-candidate",
     "test:nightly-agent:emit-delta": "tsx scripts/nightly-test-agent.ts emit-delta",
+    "test:nightly-agent:publish-status": "tsx scripts/nightly-test-agent.ts publish-status",
     "test:lighthouse:pr": "BASE_URL=${BASE_URL:-http://localhost:3000} lhci autorun --config=.lighthouserc.pr.json --collect.url=$BASE_URL/ --collect.url=$BASE_URL/tim",
     "test:lighthouse:public:launch": "tsx scripts/run-public-lighthouse.ts",
     "test:lighthouse:dashboard:pr": "node scripts/lighthouse-dashboard-auth.cjs",
