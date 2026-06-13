@@ -19,6 +19,7 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ### Added
 
+- [internal] **Signed-in auth verification harness (JOV-2761)**: adds `check:signed-in-auth`, `verify:signed-in-auth`, `test:auth:web`, Clerk key-routing preflight, deployment probe, and Playwright signed-in session proof for web (Electron/iOS/extension follow-up tracked separately).
 - [internal] **Bug-to-test rule enforcement (JOV-1873)**: adds `pnpm test:bug-to-test`, PR template checklist, Danger gate, and `/ship` Step 3.35 to require regression tests (or documented waivers) on bug-fix PRs.
 
 ## [26.6.50] - 2026-06-11
