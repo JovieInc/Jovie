@@ -1,3 +1,4 @@
+import crypto from 'node:crypto';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('@/lib/utils/logger', () => ({
@@ -40,6 +41,26 @@ describe('verifyCronRequest', () => {
     );
 
     expect(result?.status).toBe(401);
+  });
+
+  it('compares bearer tokens with timingSafeEqual', async () => {
+    vi.stubEnv('CRON_SECRET', 'test-secret');
+    const timingSafeEqualSpy = vi
+      .spyOn(crypto, 'timingSafeEqual')
+      .mockReturnValue(true);
+
+    const { verifyCronRequest } = await import('@/lib/cron/auth');
+
+    const result = verifyCronRequest(
+      new Request('https://example.com/api/cron/test', {
+        headers: { Authorization: 'Bearer test-secret' },
+      }),
+      { route: '/api/cron/test' }
+    );
+
+    expect(result).toBeNull();
+    expect(timingSafeEqualSpy).toHaveBeenCalledOnce();
+    timingSafeEqualSpy.mockRestore();
   });
 
   it('returns 500 when the cron secret is missing', async () => {
