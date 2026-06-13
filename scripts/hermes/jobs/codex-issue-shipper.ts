@@ -400,7 +400,7 @@ function claimIssue(config: ShipperConfig, plan: DispatchPlan): void {
     config,
     plan.issue.number,
     [
-      `Codex issue shipper claimed this issue.`,
+      `Jovie agent (codex issue shipper) claimed this issue.`,
       '',
       `Branch: \`${plan.branchName}\``,
       `Risk: \`${plan.route.riskLevel}\``,
@@ -446,7 +446,11 @@ function markBlocked(
     commentIssue(
       config,
       plan.issue.number,
-      [`Codex issue shipper stopped on a real blocker.`, '', reason].join('\n')
+      [
+        `Jovie agent (codex issue shipper) stopped on a real blocker.`,
+        '',
+        reason,
+      ].join('\n')
     );
   } catch (err) {
     logJobEvent({
@@ -498,9 +502,11 @@ function releaseClaimForRetry(
     commentIssue(
       config,
       plan.issue.number,
-      [`Codex issue shipper released this issue for retry.`, '', reason].join(
-        '\n'
-      )
+      [
+        `Jovie agent (codex issue shipper) released this issue for retry.`,
+        '',
+        reason,
+      ].join('\n')
     );
   } catch (err) {
     logJobEvent({
@@ -801,7 +807,7 @@ async function dispatchPlan(
         config,
         dispatch.issue.number,
         [
-          `Codex issue shipper completed agent run and found PR #${pr.number}.`,
+          `Jovie agent completed this issue and opened PR #${pr.number}.`,
           '',
           `PR: ${pr.url}`,
           `GBrain dispatch slug: \`${gbrain.captureSlug}\``,
