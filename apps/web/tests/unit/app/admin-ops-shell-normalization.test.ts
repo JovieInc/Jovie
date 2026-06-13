@@ -53,6 +53,15 @@ describe('admin ops shell normalization', () => {
     expect(source).toContain('<OperationalControlPanel');
   });
 
+  it('surfaces nightly testing agent health on the shell ops page', () => {
+    const source = readSource(OPS_PAGE);
+
+    expect(source).toContain('getNightlyTestingAgentStatus');
+    expect(source).toContain("data-testid='nightly-testing-agent-status'");
+    expect(source).toContain('NIGHTLY_AGENT_REPORT_DOC_PATH');
+    expect(source).toContain('Daily report');
+  });
+
   it('does not reintroduce uppercase tracked SectionEyebrow styling', () => {
     const source = readSource(HUD_DASHBOARD_CLIENT);
 
