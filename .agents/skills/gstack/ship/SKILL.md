@@ -869,6 +869,31 @@ If multiple suites need to run, run them sequentially (each needs a test lane). 
 
 ---
 
+## Step 3.35: Bug-to-Test Gate (Jovie)
+
+When the repo contains `apps/web/scripts/check-bug-to-test-rule.ts`, enforce the bug-to-test rule before continuing.
+
+```bash
+pnpm --filter @jovie/web run test:bug-to-test
+```
+
+If a PR body already exists, pass it to the checker:
+
+```bash
+gh pr view --json body --jq '.body // ""' | pnpm --filter @jovie/web exec tsx scripts/check-bug-to-test-rule.ts --body-file -
+```
+
+**IRON RULE:** Bug fixes (`fix:` commits/title, `fix/` branch, or PR template bug-fix checkbox) require regression test evidence:
+- a changed `*.test.*` / `*.spec.*` file, OR
+- `bug-to-test: satisfied` / `Regression test: <path>` in the PR body, OR
+- `bug-to-test: waived — <reason>` for copy-only/config-only fixes.
+
+If the command exits non-zero, **STOP**. Add the regression test or document the waiver in the PR body, then re-run the gate.
+
+If the script is absent, print "Bug-to-test gate skipped — checker not present in repo." and continue.
+
+---
+
 ## Step 3.4: Test Coverage Audit
 
 100% coverage is the goal — every untested path is a path where bugs hide and vibe coding becomes yolo coding. Evaluate what was ACTUALLY coded (from the diff), not what was planned.
@@ -1930,6 +1955,9 @@ not a substantive change). Group the remaining commits into logical sections (e.
 "**Performance**", "**Dead Code Removal**", "**Infrastructure**"). Every substantive commit
 must appear in at least one section. If a commit's work isn't reflected in the summary,
 you missed it.>
+
+## Bug-to-Test
+<Output from Step 3.35: "bug-to-test: satisfied" | "bug-to-test: waived — …" | "bug-to-test: not applicable">
 
 ## Test Coverage
 <coverage diagram from Step 3.4, or "All new code paths have test coverage.">

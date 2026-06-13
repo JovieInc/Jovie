@@ -21,6 +21,18 @@ The gstack skill pipeline handles verification. The standard agent workflow:
 
 `/ship` runs typecheck, lint, and tests as part of its pre-flight checks. There is no separate `/verify` step.
 
+### Bug-to-Test Gate (required before `/ship`)
+
+Bug fixes must ship with regression test evidence. Before `/ship`, run:
+
+```bash
+pnpm --filter @jovie/web run test:bug-to-test
+```
+
+- **Pass:** continue to `/ship`.
+- **Fail:** add/update the smallest regression test, or document `bug-to-test: waived — <reason>` in the PR body for copy-only/config-only fixes.
+- `/ship` Step 3.35 re-runs this gate and blocks PR creation when evidence is missing.
+
 **IMPORTANT:** Always run `pnpm biome check --write apps/web` before pushing so formatting issues are fixed in-place. The pre-push hook calls `biome check .` (read-only) and will reject pushes with formatter violations.
 
 ### One PR = One Concern
