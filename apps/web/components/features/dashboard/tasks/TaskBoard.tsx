@@ -24,7 +24,10 @@ import { Disc3, Plus } from 'lucide-react';
 import { memo, useMemo, useState } from 'react';
 import { ReleaseDueBadge } from '@/components/molecules/ReleaseDueBadge';
 import { type ContextMenuItemType } from '@/components/organisms/table';
-import { TASK_BOARD_STATUSES } from '@/lib/tasks/task-board';
+import {
+  getTaskBoardColumnDroppableId,
+  resolveTaskBoardMoveInput,
+} from '@/lib/tasks/task-board';
 import type {
   MoveTaskInput,
   TaskBoardColumnResult,
@@ -65,17 +68,6 @@ const TASK_AGENT_STATUS_LABELS: Partial<
   failed: 'Failed',
 };
 
-function getColumnDroppableId(status: TaskStatus): string {
-  return `task-board-column:${status}`;
-}
-
-function getStatusFromColumnDroppableId(id: string): TaskStatus | null {
-  const status = id.replace('task-board-column:', '');
-  return TASK_BOARD_STATUSES.includes(status as TaskStatus)
-    ? (status as TaskStatus)
-    : null;
-}
-
 function findBoardTask(
   columns: ReadonlyArray<TaskBoardColumnResult>,
   taskId: string
@@ -86,116 +78,6 @@ function findBoardTask(
   }
 
   return null;
-}
-
-function findTaskStatus(
-  columns: ReadonlyArray<TaskBoardColumnResult>,
-  taskId: string
-): TaskStatus | null {
-  return (
-    columns.find(column => column.tasks.some(task => task.id === taskId))
-      ?.status ?? null
-  );
-}
-
-function resolveDropInsertIndex({
-  overTaskIndex,
-  destinationLength,
-  isSameColumn,
-  sourceIndex,
-  overIndex,
-}: Readonly<{
-  overTaskIndex: number;
-  destinationLength: number;
-  isSameColumn: boolean;
-  sourceIndex: number;
-  overIndex: number;
-}>): number {
-  if (overTaskIndex === -1) {
-    return destinationLength;
-  }
-
-  if (isSameColumn && sourceIndex < overIndex) {
-    return overTaskIndex + 1;
-  }
-
-  return overTaskIndex;
-}
-
-function resolveTaskBoardMoveInput({
-  activeTaskId,
-  overId,
-  columns,
-}: Readonly<{
-  activeTaskId: string;
-  overId: string;
-  columns: ReadonlyArray<TaskBoardColumnResult>;
-}>): MoveTaskInput | null {
-  const activeTask = findBoardTask(columns, activeTaskId);
-  if (!activeTask || activeTask.id === overId) {
-    return null;
-  }
-
-  const overColumnStatus =
-    getStatusFromColumnDroppableId(overId) ?? findTaskStatus(columns, overId);
-  if (!overColumnStatus) {
-    return null;
-  }
-
-  const destinationColumn = columns.find(
-    column => column.status === overColumnStatus
-  );
-  if (!destinationColumn) {
-    return null;
-  }
-
-  const destinationTasksWithoutActive = destinationColumn.tasks.filter(
-    task => task.id !== activeTaskId
-  );
-  const overTaskIndex = destinationTasksWithoutActive.findIndex(
-    task => task.id === overId
-  );
-  const sourceColumn = columns.find(
-    column => column.status === activeTask.status
-  );
-  const sourceIndex =
-    sourceColumn?.tasks.findIndex(task => task.id === activeTaskId) ?? -1;
-  const overIndex =
-    destinationColumn.tasks.findIndex(task => task.id === overId) ?? -1;
-  const insertIndex = resolveDropInsertIndex({
-    overTaskIndex,
-    destinationLength: destinationTasksWithoutActive.length,
-    isSameColumn: activeTask.status === overColumnStatus,
-    sourceIndex,
-    overIndex,
-  });
-  const beforeTaskId = destinationTasksWithoutActive[insertIndex]?.id ?? null;
-  const afterTaskId =
-    destinationTasksWithoutActive[insertIndex - 1]?.id ?? null;
-
-  if (activeTask.status === overColumnStatus && sourceColumn) {
-    const sourceTasksWithoutActive = sourceColumn.tasks.filter(
-      task => task.id !== activeTaskId
-    );
-    const currentBeforeTaskId =
-      sourceTasksWithoutActive[sourceIndex]?.id ?? null;
-    const currentAfterTaskId =
-      sourceTasksWithoutActive[sourceIndex - 1]?.id ?? null;
-
-    if (
-      currentBeforeTaskId === beforeTaskId &&
-      currentAfterTaskId === afterTaskId
-    ) {
-      return null;
-    }
-  }
-
-  return {
-    taskId: activeTaskId,
-    toStatus: overColumnStatus,
-    beforeTaskId,
-    afterTaskId,
-  };
 }
 
 function useVisibleTaskBoardColumns({
@@ -338,7 +220,7 @@ function TaskBoardColumn({
   const accent = getAccentCssVars(visual.accent);
   const StatusIcon = visual.icon;
   const { setNodeRef, isOver } = useDroppable({
-    id: getColumnDroppableId(column.status),
+    id: getTaskBoardColumnDroppableId(column.status),
     data: { type: 'column', status: column.status },
   });
 
