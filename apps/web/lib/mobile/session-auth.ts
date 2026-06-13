@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
-import { getSessionContext } from '@/lib/auth/session';
 import { getRequestClerkClient } from '@/lib/auth/request-clerk-client';
+import { getSessionContext } from '@/lib/auth/session';
 import { NO_STORE_HEADERS } from '@/lib/http/headers';
 
 export async function getMobileSessionUserId(
