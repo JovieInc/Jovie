@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.6.52] - 2026-06-13
+
+> Desktop auth callback no longer falls through to the PWA offline page.
+
+### Fixed
+
+- **Desktop login auth callback (JOV-3119)**: unregisters stale PWA service workers in Electron sessions, bypasses offline fallback on auth/OAuth routes, and stamps the desktop user agent on the auth handoff window so callback navigations reach the network.
+
 ## [26.6.51] - 2026-06-13
 
 > [internal] Bug fixes now require regression test evidence before ship.
