@@ -20,6 +20,7 @@ const HOMEPAGE_PRIMARY_CTA_TEST_ID = 'homepage-primary-cta';
 const SIGNUP_PATH = '/signup';
 const START_PATH = '/start';
 const TURNSTILE_CONFIG_ERROR = 'turnstile is not configured';
+const TURNSTILE_DOMAIN_ERROR = 'verification failed (110200)';
 
 test.describe('Synthetic Monitoring - Golden Path', () => {
   // Only run in synthetic monitoring mode
@@ -72,6 +73,7 @@ test.describe('Synthetic Monitoring - Golden Path', () => {
         'text="Internal Server Error"',
         'text="Something went wrong"',
         `text="${TURNSTILE_CONFIG_ERROR}"`,
+        `text="${TURNSTILE_DOMAIN_ERROR}"`,
         '[data-testid="error-boundary"]',
       ];
 
