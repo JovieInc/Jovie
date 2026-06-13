@@ -3736,6 +3736,10 @@ jobs:
           NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
           # Keep rebuild fallback equivalent to the shared ci-build artifact.
           NEXT_PUBLIC_TURNSTILE_SITE_KEY: 1x00000000000000000000AA
+          # NEXT_PUBLIC_* must be present at build time for standalone smoke runs.
+          NEXT_PUBLIC_E2E_MODE: '1'
+          NEXT_PUBLIC_CLERK_MOCK: '1'
+          NEXT_PUBLIC_CLERK_PROXY_DISABLED: '1'
           NEXT_IGNORE_ESLINT: '1'
           NEXT_IGNORE_TYPECHECK: '1'
           NEXT_PRIVATE_SKIP_SIZE_CHECK: 'true'
