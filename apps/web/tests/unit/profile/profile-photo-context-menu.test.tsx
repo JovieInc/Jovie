@@ -27,12 +27,12 @@ const multipleSizes: AvatarSize[] = [
   {
     key: 'medium',
     label: 'Medium (512 x 512)',
-    url: '/_next/image?url=https%3A%2F%2Fcdn.jov.ie%2Favatar-original.png&w=512&q=90',
+    url: '/_next/image?url=https%3A%2F%2Fcdn.jov.ie%2Favatar-original.png&w=512&q=100',
   },
   {
     key: 'large',
     label: 'Large (1024 x 1024)',
-    url: '/_next/image?url=https%3A%2F%2Fcdn.jov.ie%2Favatar-original.png&w=1024&q=90',
+    url: '/_next/image?url=https%3A%2F%2Fcdn.jov.ie%2Favatar-original.png&w=1024&q=100',
   },
   {
     key: 'original',
