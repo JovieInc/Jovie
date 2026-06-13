@@ -28,7 +28,12 @@ const INSIGHT_PRIORITY_RANK: Record<InsightPriority, number> = {
   low: 2,
 };
 
+const INSIGHT_DEDUP_READ_LIMIT = 150;
+const INSIGHT_SUMMARY_CANDIDATE_LIMIT = 50;
+const FALLBACK_PRIORITY_RANK = 99;
+
 type InsightDedupCandidate = {
+  insightType: string;
   category: InsightCategory;
   title: string;
   description: string;
@@ -224,17 +229,27 @@ export async function getActiveInsights(
 
   const whereClause = and(...conditions);
 
-  const rows = await db
-    .select()
-    .from(aiInsights)
-    .where(whereClause)
-    .orderBy(INSIGHT_PRIORITY_ORDER, desc(aiInsights.createdAt));
+  const candidateLimit = Math.min(limit * 3, INSIGHT_DEDUP_READ_LIMIT);
+
+  const [rows, totalRows] = await Promise.all([
+    db
+      .select()
+      .from(aiInsights)
+      .where(whereClause)
+      .orderBy(INSIGHT_PRIORITY_ORDER, desc(aiInsights.createdAt))
+      .limit(candidateLimit)
+      .offset(offset),
+    db
+      .select({ total: drizzleSql<number>`count(*)::int` })
+      .from(aiInsights)
+      .where(whereClause),
+  ]);
   const dedupedRows = dedupeVisibleInsights(rows);
-  const pagedRows = dedupedRows.slice(offset, offset + limit);
+  const pagedRows = dedupedRows.slice(0, limit);
 
   return {
     insights: pagedRows.map(formatInsightResponse),
-    total: dedupedRows.length,
+    total: totalRows[0]?.total ?? 0,
   };
 }
 
@@ -246,18 +261,19 @@ export async function getInsightsSummary(
 ): Promise<InsightsSummaryResponse> {
   const now = new Date();
 
-  const [insights, lastRun] = await Promise.all([
+  const activeWhereClause = and(
+    eq(aiInsights.creatorProfileId, creatorProfileId),
+    eq(aiInsights.status, 'active'),
+    gte(aiInsights.expiresAt, now)
+  );
+
+  const [insights, lastRun, totalRows] = await Promise.all([
     db
       .select()
       .from(aiInsights)
       .orderBy(INSIGHT_PRIORITY_ORDER, desc(aiInsights.createdAt))
-      .where(
-        and(
-          eq(aiInsights.creatorProfileId, creatorProfileId),
-          eq(aiInsights.status, 'active'),
-          gte(aiInsights.expiresAt, now)
-        )
-      ),
+      .where(activeWhereClause)
+      .limit(INSIGHT_SUMMARY_CANDIDATE_LIMIT),
     db
       .select({ createdAt: insightGenerationRuns.createdAt })
       .from(insightGenerationRuns)
@@ -269,6 +285,10 @@ export async function getInsightsSummary(
       )
       .orderBy(desc(insightGenerationRuns.createdAt))
       .limit(1),
+    db
+      .select({ total: drizzleSql<number>`count(*)::int` })
+      .from(aiInsights)
+      .where(activeWhereClause),
   ]);
 
   const dedupedInsights = dedupeVisibleInsights(insights);
@@ -278,7 +298,7 @@ export async function getInsightsSummary(
 
   return {
     insights: sortedInsights.slice(0, 3),
-    totalActive: dedupedInsights.length,
+    totalActive: totalRows[0]?.total ?? 0,
     lastGeneratedAt: lastRun[0]?.createdAt
       ? toISOStringSafe(lastRun[0].createdAt)
       : null,
@@ -361,8 +381,7 @@ export function prepareInsightsForPersistence(
   return dedupeVisibleInsights(
     [...insights].sort(
       (left, right) =>
-        INSIGHT_PRIORITY_RANK[left.priority] -
-          INSIGHT_PRIORITY_RANK[right.priority] ||
+        getPriorityRank(left.priority) - getPriorityRank(right.priority) ||
         right.confidence - left.confidence
     )
   );
@@ -413,10 +432,24 @@ function formatInsightResponse(
 function buildInsightDedupKey(insight: InsightDedupCandidate): string {
   const sourceKey = getInsightSourceKey(insight.dataSnapshot);
   if (sourceKey) {
-    return `${insight.category}|${sourceKey}`;
+    return `${insight.category}|${getInsightDedupFamily(insight.insightType)}|${sourceKey}`;
   }
 
-  return `${insight.category}|${normalizeInsightCopy(insight.title)}|${normalizeInsightCopy(insight.description)}`;
+  return `${insight.category}|${insight.insightType}|${normalizeInsightCopy(insight.title)}|${normalizeInsightCopy(insight.description)}`;
+}
+
+function getPriorityRank(priority: InsightPriority): number {
+  return INSIGHT_PRIORITY_RANK[priority] ?? FALLBACK_PRIORITY_RANK;
+}
+
+function getInsightDedupFamily(insightType: string): string {
+  switch (insightType) {
+    case 'city_growth':
+    case 'new_market':
+      return 'city_growth';
+    default:
+      return insightType;
+  }
 }
 
 function getInsightSourceKey(dataSnapshot: unknown): string | null {
