@@ -50,7 +50,10 @@ export async function GET(request: Request, { params }: RouteParams) {
         before,
       });
     } catch (error) {
-      if (error instanceof Error && error.message === 'INVALID_BEFORE_CURSOR') {
+      if (
+        error instanceof TypeError &&
+        error.message === 'INVALID_BEFORE_CURSOR'
+      ) {
         return NextResponse.json(
           { error: 'Invalid "before" cursor' },
           { status: 400, headers: NO_STORE_HEADERS }
