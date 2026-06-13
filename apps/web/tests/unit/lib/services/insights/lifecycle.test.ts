@@ -54,6 +54,19 @@ describe('insight lifecycle deduplication', () => {
     ]);
   });
 
+  it('deduplicates top-level and nested location snapshots consistently', () => {
+    const result = dedupeVisibleInsights([
+      baseInsight,
+      {
+        ...baseInsight,
+        dataSnapshot: { location: { city: 'Austin', country: 'US' } },
+        title: 'Austin is breaking out',
+      },
+    ]);
+
+    expect(result).toHaveLength(1);
+  });
+
   it('uses normalized copy fallback when there is no structured source key', () => {
     const result = dedupeVisibleInsights([
       {

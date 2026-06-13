@@ -22,6 +22,7 @@ import { GENERATION_COOLDOWN_HOURS } from './thresholds';
 
 const INSIGHT_PRIORITY_ORDER = drizzleSql`case ${aiInsights.priority} when 'high' then 0 when 'medium' then 1 when 'low' then 2 end`;
 
+// Keep in sync with INSIGHT_PRIORITY_ORDER so DB and JS ordering match.
 const INSIGHT_PRIORITY_RANK: Record<InsightPriority, number> = {
   high: 0,
   medium: 1,
@@ -458,43 +459,71 @@ function getInsightSourceKey(dataSnapshot: unknown): string | null {
   }
 
   const snapshot = dataSnapshot as Record<string, unknown>;
-  const city = normalizeSnapshotToken(snapshot.city);
-  const country = normalizeSnapshotToken(snapshot.country);
+  const city = getSnapshotToken(snapshot, 'city', ['location', 'city']);
+  const country = getSnapshotToken(snapshot, 'country', [
+    'location',
+    'country',
+  ]);
   if (city) {
     return country ? `city:${city}|${country}` : `city:${city}`;
   }
 
-  const market = normalizeSnapshotToken(snapshot.market);
+  const market = getSnapshotToken(snapshot, 'market');
   if (market) {
     return `market:${market}`;
   }
 
-  const release = normalizeSnapshotToken(snapshot.release);
+  const release = getSnapshotToken(snapshot, 'release');
   if (release) {
     return `release:${release}`;
   }
 
-  const referrer = normalizeSnapshotToken(snapshot.referrer);
+  const referrer = getSnapshotToken(snapshot, 'referrer');
   if (referrer) {
     return `referrer:${referrer}`;
   }
 
-  const spikeDate = normalizeSnapshotToken(snapshot.spikeDate);
+  const spikeDate = getSnapshotToken(snapshot, 'spikeDate');
   if (spikeDate) {
     return `spikeDate:${spikeDate}`;
   }
 
-  const deviceType = normalizeSnapshotToken(snapshot.deviceType);
+  const deviceType = getSnapshotToken(snapshot, 'deviceType');
   if (deviceType) {
     return `deviceType:${deviceType}`;
   }
 
-  const linkType = normalizeSnapshotToken(snapshot.linkType);
+  const linkType = getSnapshotToken(snapshot, 'linkType');
   if (linkType) {
     return `linkType:${linkType}`;
   }
 
   return null;
+}
+
+function getSnapshotToken(
+  snapshot: Record<string, unknown>,
+  key: string,
+  nestedPath?: readonly string[]
+): string | null {
+  const topLevelValue = normalizeSnapshotToken(snapshot[key]);
+  if (topLevelValue) {
+    return topLevelValue;
+  }
+
+  if (!nestedPath) {
+    return null;
+  }
+
+  let value: unknown = snapshot;
+  for (const segment of nestedPath) {
+    if (!value || typeof value !== 'object') {
+      return null;
+    }
+    value = (value as Record<string, unknown>)[segment];
+  }
+
+  return normalizeSnapshotToken(value);
 }
 
 function normalizeSnapshotToken(value: unknown): string | null {
