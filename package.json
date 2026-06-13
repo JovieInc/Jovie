@@ -89,6 +89,7 @@
     "ios:runtime-performance": "bash apps/ios/scripts/measure-runtime-performance.sh",
     "ios:memory": "bash apps/ios/scripts/capture-memory-baseline.sh",
     "test:auth:ios": "bash apps/ios/scripts/test-auth-callback.sh",
+    "test:auth:web": "pnpm --filter @jovie/web exec vitest run tests/unit/lib/readiness/signed-in-auth.test.ts && doppler run --project jovie-web --config dev -- pnpm --filter @jovie/web exec playwright test tests/e2e/signed-in-auth-verify.spec.ts --project=chromium --reporter=line",
     "test:auth:native": "pnpm --filter @jovie/web exec vitest run tests/unit/desktop/native-complete.test.ts tests/unit/dashboard/session-device-name.test.ts tests/unit/auth/AuthUnavailableCard.compact.test.tsx tests/unit/customer-facing-vendor-copy.test.ts tests/unit/api/auth/native-exchange.test.ts tests/unit/api/dev/test-auth-routes.test.ts && pnpm --filter @jovie/desktop run test && pnpm run test:auth:ios",
     "ios:screenshots": "bash apps/ios/scripts/capture-screenshots.sh",
     "build": "node scripts/turbo-local.mjs build",

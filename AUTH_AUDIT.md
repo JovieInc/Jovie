@@ -21,14 +21,23 @@ across Web, iOS, Electron, and Chrome Extension.
 | TestFlight launch crash guard | Installed TestFlight build `1.0 (40)` crash reports showed `EXC_BREAKPOINT` with Swift `_assertionFailure` after the Release config rejected a `pk_test` Clerk key. PR #9918 replaced the launch-time fatal error with a fail-closed path, and PR #9920 restored mock UI-test auth behavior. Main TestFlight run `26841365624` distributed build `1.0 (42)`; local build 42 launched and remained running with no fresh `Jovie*.ips` crash report. | Passed for no-crash launch |
 | TestFlight live sign-in config | Local build `1.0 (42)` still embeds a `pk_test` Clerk publishable key and therefore shows `Sign-in Unavailable`. Production Clerk secret/config remediation is tracked by [JOV-2713](https://linear.app/jovie/issue/JOV-2713/provision-production-clerk-key-for-ios-testflight-sign-in). | Open |
 
+## Web Evidence (JOV-2761)
+
+| Flow | Evidence | Result |
+| --- | --- | --- |
+| Clerk key routing preflight | `pnpm --filter @jovie/web run check:signed-in-auth -- --target=local\|stg\|prd` validates required env keys, staging host routing, and `staging_inherits_prod` guardrails. | Harness shipped |
+| Deployment Clerk status probe | `pnpm --filter @jovie/web run verify:signed-in-auth -- --target=<env> --probe --base-url=<url>` records `x-clerk-key-status`, auth-unavailable copy, and loopback dev test-auth session proof. | Harness shipped |
+| Signed-in web session harness | `pnpm run test:auth:web` runs unit checks plus `tests/e2e/signed-in-auth-verify.spec.ts` for session bootstrap, authenticated app shell, API/session proof, and sign-out. | Harness shipped |
+| Native surfaces follow-up | Electron, iOS live TestFlight sign-in, and Chrome extension signed-in proof remain tracked under JOV-2761 follow-up / JOV-2712. | Open |
+
 ## Current Platform Status
 
 | Platform | Status |
 | --- | --- |
 | iOS | Local auth callback, real-browser auth callback, live-auth PR verification, TestFlight launch no-crash proof, and CI evidence are current through `8e333b2e97`; live TestFlight sign-in remains blocked by JOV-2713. |
-| Web | Evidence required under JOV-2712. |
-| Electron | Evidence required under JOV-2712. |
-| Chrome Extension | Evidence required under JOV-2712. |
+| Web | JOV-2761 web harness covers Clerk routing preflight, deployment probe, and signed-in Playwright verification; staging/production live proof uses Doppler-backed `verify:signed-in-auth --probe`. |
+| Electron | Evidence required under JOV-2712 / JOV-2761 follow-up. |
+| Chrome Extension | Evidence required under JOV-2712 / JOV-2761 follow-up. |
 
 ## Acceptance Checks
 
