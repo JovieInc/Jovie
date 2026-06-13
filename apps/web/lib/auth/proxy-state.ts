@@ -23,8 +23,14 @@ export interface ProxyUserState {
 // Safe to use longer TTLs because all state transitions (waitlist approval,
 // onboarding completion, user deletion) explicitly call invalidateProxyUserStateCache().
 const USER_STATE_CACHE_KEY_PREFIX = 'proxy:user-state:';
+const USER_STATE_STALE_CACHE_KEY_PREFIX = 'proxy:user-state:stale:';
 const USER_STATE_CACHE_TTL_SECONDS = 120; // 2 minutes - transitional users (invalidation is explicit)
 const USER_STATE_CACHE_TTL_ACTIVE_SECONDS = 300; // 5 minutes - stable active users
+// Longer-lived stale snapshot used when the primary cache expires but Neon is
+// still waking up. State transitions call invalidateProxyUserStateCache() so
+// stale entries cannot outlive an explicit status change.
+const USER_STATE_STALE_CACHE_TTL_SECONDS = 1800; // 30 minutes
+const USER_STATE_STALE_CACHE_TTL_ACTIVE_SECONDS = 3600; // 1 hour - stable active users
 
 // Timeout for DB query to prevent proxy hanging on Neon cold starts.
 // Kept below the Neon p99 cold-start budget (~3 s) so that a single cache-miss
@@ -94,6 +100,18 @@ function getTtlForUserState(state: ProxyUserState): number {
   return USER_STATE_CACHE_TTL_SECONDS;
 }
 
+function getStaleTtlForUserState(state: ProxyUserState): number {
+  if (state.isActive) return USER_STATE_STALE_CACHE_TTL_ACTIVE_SECONDS;
+  return USER_STATE_STALE_CACHE_TTL_SECONDS;
+}
+
+function getStaleCacheKey(cacheKey: string): string {
+  return cacheKey.replace(
+    USER_STATE_CACHE_KEY_PREFIX,
+    USER_STATE_STALE_CACHE_KEY_PREFIX
+  );
+}
+
 /**
  * Try to get user state from Redis cache
  */
@@ -147,6 +165,52 @@ async function tryGetCachedState(
   return null;
 }
 
+/**
+ * Try to get user state from the longer-lived stale Redis snapshot.
+ * Used when the primary cache has expired and the DB is slow or timing out.
+ */
+async function tryGetStaleCachedState(
+  cacheKey: string,
+  clerkUserId: string
+): Promise<ProxyUserState | null> {
+  const redis = getRedis();
+  if (!redis) return null;
+
+  const staleCacheKey = getStaleCacheKey(cacheKey);
+
+  try {
+    const cacheStart = Date.now();
+    const redisTimeoutPromise = new Promise<null>(resolve => {
+      setTimeout(() => resolve(null), REDIS_CACHE_TIMEOUT_MS);
+    });
+    const cached = await Promise.race([
+      redis.get<ProxyUserState>(staleCacheKey),
+      redisTimeoutPromise,
+    ]);
+    const cacheDuration = Date.now() - cacheStart;
+
+    if (cached) {
+      Sentry.addBreadcrumb({
+        category: 'proxy-state',
+        message: 'Stale cache hit',
+        level: 'info',
+        data: {
+          cacheKey: staleCacheKey.replace(clerkUserId, '[REDACTED]'),
+          durationMs: cacheDuration,
+          userState: getUserStateLabel(cached),
+        },
+      });
+      return cached;
+    }
+  } catch (cacheError) {
+    captureWarning('[proxy-state] Redis stale cache read failed', {
+      error: cacheError,
+    });
+  }
+
+  return null;
+}
+
 /** Statuses that indicate waitlist approval */
 const APPROVED_STATUSES = [
   'waitlist_approved',
@@ -170,7 +234,6 @@ function hasCompleteProfile(result: {
   profileUsername: string | null;
   profileUsernameNormalized: string | null;
   profileDisplayName: string | null;
-  profileAvatarUrl: string | null;
   profileIsPublic: boolean | null;
 }): boolean {
   if (!result.profileId) return false;
@@ -197,7 +260,6 @@ function determineUserState(
         profileUsername: string | null;
         profileUsernameNormalized: string | null;
         profileDisplayName: string | null;
-        profileAvatarUrl: string | null;
         profileIsPublic: boolean | null;
       }
     | undefined,
@@ -247,12 +309,18 @@ function determineUserState(
 function cacheUserState(
   cacheKey: string,
   userState: ProxyUserState,
-  ttlSeconds: number
+  ttlSeconds: number,
+  staleTtlSeconds: number
 ): void {
   const redis = getRedis();
   if (!redis) return;
 
-  redis.set(cacheKey, userState, { ex: ttlSeconds }).catch(cacheError => {
+  const staleCacheKey = getStaleCacheKey(cacheKey);
+
+  Promise.all([
+    redis.set(cacheKey, userState, { ex: ttlSeconds }),
+    redis.set(staleCacheKey, userState, { ex: staleTtlSeconds }),
+  ]).catch(cacheError => {
     captureWarning('[proxy-state] Redis cache write failed', {
       error: cacheError,
     });
@@ -313,7 +381,6 @@ async function executeUserStateQuery(clerkUserId: string) {
           profileUsername: creatorProfiles.username,
           profileUsernameNormalized: creatorProfiles.usernameNormalized,
           profileDisplayName: creatorProfiles.displayName,
-          profileAvatarUrl: creatorProfiles.avatarUrl,
           profileIsPublic: creatorProfiles.isPublic,
         })
         .from(users)
@@ -416,18 +483,49 @@ export async function getUserState(
     // Populate both cache layers
     setMemoryCachedState(cacheKey, userState);
     const ttl = getTtlForUserState(userState);
-    cacheUserState(cacheKey, userState, ttl);
+    const staleTtl = getStaleTtlForUserState(userState);
+    cacheUserState(cacheKey, userState, ttl, staleTtl);
 
     return userState;
   } catch (error) {
-    const isTransient =
-      error instanceof QueryTimeoutError || isRetryableError(error);
+    const isTimeout = error instanceof QueryTimeoutError;
+    const isTransient = isTimeout || isRetryableError(error);
 
-    await captureError('Database query failed in proxy state check', error, {
-      clerkUserId,
-      operation: 'getProxyUserState',
-      errorType: isTransient ? 'transient' : 'persistent',
-    });
+    const staleCached = await tryGetStaleCachedState(cacheKey, clerkUserId);
+    if (staleCached) {
+      await captureWarning(
+        '[proxy-state] Serving stale cache after DB failure',
+        error,
+        {
+          clerkUserId,
+          operation: 'getProxyUserState',
+          errorType: isTransient ? 'transient' : 'persistent',
+          fallback: 'stale-cache',
+        }
+      );
+      setMemoryCachedState(cacheKey, staleCached);
+      return staleCached;
+    }
+
+    if (isTimeout) {
+      await captureWarning(
+        '[proxy-state] DB query timed out without stale cache fallback',
+        error,
+        {
+          clerkUserId,
+          operation: 'getProxyUserState',
+          errorType: 'transient',
+          fallback: 'needs-onboarding',
+        }
+      );
+    } else {
+      await captureError('Database query failed in proxy state check', error, {
+        clerkUserId,
+        operation: 'getProxyUserState',
+        errorType: isTransient ? 'transient' : 'persistent',
+        fallback: 'needs-onboarding',
+      });
+    }
 
     return { ...NEEDS_ONBOARDING_STATE };
   }
@@ -462,7 +560,10 @@ export async function invalidateProxyUserStateCache(
   if (!redis) return;
 
   try {
-    await redis.del(cacheKey);
+    await Promise.all([
+      redis.del(cacheKey),
+      redis.del(getStaleCacheKey(cacheKey)),
+    ]);
   } catch (error) {
     captureWarning('[proxy-state] Failed to invalidate cache', { error });
   }
