@@ -38,13 +38,20 @@ vi.mock('@/lib/utils/logger', () => ({
   },
 }));
 
-vi.mock('@/lib/services/insights/lifecycle', () => ({
-  expireStaleInsights: expireStaleInsightsMock,
-  createGenerationRun: createGenerationRunMock,
-  getExistingInsightTypes: getExistingInsightTypesMock,
-  persistInsights: persistInsightsMock,
-  completeGenerationRun: completeGenerationRunMock,
-}));
+vi.mock('@/lib/services/insights/lifecycle', async () => {
+  const actual = await vi.importActual<
+    typeof import('@/lib/services/insights/lifecycle')
+  >('@/lib/services/insights/lifecycle');
+
+  return {
+    ...actual,
+    expireStaleInsights: expireStaleInsightsMock,
+    createGenerationRun: createGenerationRunMock,
+    getExistingInsightTypes: getExistingInsightTypesMock,
+    persistInsights: persistInsightsMock,
+    completeGenerationRun: completeGenerationRunMock,
+  };
+});
 
 vi.mock('@/lib/services/insights/data-aggregator', () => ({
   aggregateMetrics: aggregateMetricsMock,
@@ -116,5 +123,91 @@ describe('GET /api/cron/generate-insights', () => {
     expect(maxInFlight).toBeGreaterThan(1);
     expect(data.stats.processed).toBe(6);
     expect(data.stats.insightsGenerated).toBe(6);
+  });
+
+  it('deduplicates obvious same-fact insights before persistence', async () => {
+    executeMock.mockResolvedValue({
+      rows: [{ profile_id: 'profile-1' }],
+    });
+
+    createGenerationRunMock.mockResolvedValue({ id: 'run-profile-1' });
+    generateInsightsMock.mockResolvedValue({
+      insights: [
+        {
+          insightType: 'city_growth',
+          category: 'geographic',
+          priority: 'medium',
+          title: 'Austin listeners grew 34% this month',
+          description: 'Austin traffic is accelerating compared to last month.',
+          actionSuggestion: 'Consider a new Austin push.',
+          confidence: 0.81,
+          dataSnapshot: { city: 'Austin', country: 'US', growthRate: 0.34 },
+          expiresInDays: 7,
+        },
+        {
+          insightType: 'new_market',
+          category: 'geographic',
+          priority: 'high',
+          title: 'Austin is becoming a breakout market',
+          description:
+            'Austin traffic is accelerating compared to last month with repeat growth.',
+          actionSuggestion: 'Consider a new Austin push.',
+          confidence: 0.93,
+          dataSnapshot: { city: 'Austin', country: 'US', currentViews: 44 },
+          expiresInDays: 7,
+        },
+        {
+          insightType: 'tip_hotspot',
+          category: 'revenue',
+          priority: 'medium',
+          title: 'Austin fans tip above your average',
+          description:
+            'Austin supporters tip more than the rest of your audience.',
+          actionSuggestion: 'Test a VIP offer in Austin.',
+          confidence: 0.72,
+          dataSnapshot: { city: 'Austin', avgTip: 2100, overallAvg: 1200 },
+          expiresInDays: 7,
+        },
+      ],
+      modelUsed: 'gpt',
+      promptTokens: 10,
+      completionTokens: 10,
+    });
+    persistInsightsMock.mockResolvedValue(2);
+
+    const { GET } = await import('@/app/api/cron/generate-insights/route');
+
+    const response = await GET(
+      new Request('http://localhost/api/cron/generate-insights', {
+        headers: { authorization: 'Bearer test-secret' },
+      })
+    );
+    const data = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(persistInsightsMock).toHaveBeenCalledTimes(1);
+
+    const dedupedInsights = persistInsightsMock.mock.calls[0]?.[2];
+    expect(dedupedInsights).toHaveLength(2);
+    expect(dedupedInsights).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          insightType: 'new_market',
+          category: 'geographic',
+        }),
+        expect.objectContaining({
+          insightType: 'tip_hotspot',
+          category: 'revenue',
+        }),
+      ])
+    );
+    expect(data.stats.insightsGenerated).toBe(2);
+    expect(completeGenerationRunMock).toHaveBeenCalledWith(
+      'run-profile-1',
+      expect.objectContaining({
+        status: 'completed',
+        insightsGenerated: 2,
+      })
+    );
   });
 });
