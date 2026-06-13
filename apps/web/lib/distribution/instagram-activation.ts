@@ -1,4 +1,5 @@
 import { getProfileUrl } from '@/constants/domains';
+import { unwrapPgError } from '@/lib/db/errors';
 import { buildUTMUrlString, slugify } from '@/lib/utm';
 import { UTM_PRESET_MAP } from '@/lib/utm/presets';
 
@@ -28,6 +29,13 @@ export type CreatorDistributionEventType =
   (typeof CREATOR_DISTRIBUTION_EVENT_TYPES)[number];
 
 export type BioLinkActivationStatus = 'pending' | 'activated' | 'expired';
+
+/** True when Postgres reports the creator_distribution_events relation is missing. */
+export function isMissingCreatorDistributionEventsTableError(
+  error: unknown
+): boolean {
+  return unwrapPgError(error).code === '42P01';
+}
 
 export interface DistributionEventPayload {
   readonly eventType: CreatorDistributionEventType;

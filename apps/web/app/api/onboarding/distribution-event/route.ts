@@ -4,13 +4,13 @@ import {
   isUnauthorizedSessionError,
   withDbSessionTx,
 } from '@/lib/auth/session';
-import { unwrapPgError } from '@/lib/db/errors';
 import { getAuthenticatedProfile } from '@/lib/db/queries/shared';
 import { creatorDistributionEvents } from '@/lib/db/schema/profiles';
 import {
   buildDistributionDedupeKey,
   CREATOR_DISTRIBUTION_EVENT_TYPES,
   INSTAGRAM_DISTRIBUTION_PLATFORM,
+  isMissingCreatorDistributionEventsTableError,
 } from '@/lib/distribution/instagram-activation';
 import { captureError, captureWarning } from '@/lib/error-tracking';
 import { NO_STORE_HEADERS } from '@/lib/http/headers';
@@ -28,10 +28,6 @@ const distributionEventSchema = z.object({
 type DistributionEventResolution =
   | { kind: 'response'; response: Response }
   | { kind: 'success' };
-
-function isMissingCreatorDistributionEventsTableError(error: unknown): boolean {
-  return unwrapPgError(error).code === '42P01';
-}
 
 export async function POST(request: Request) {
   try {
