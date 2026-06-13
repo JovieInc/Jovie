@@ -195,7 +195,11 @@ SESSION_SECRET
 AI_GATEWAY_API_KEY
 NEXT_PUBLIC_TURNSTILE_SITE_KEY
 TURNSTILE_SECRET_KEY
+CLOUDFLARE_API_TOKEN
 ```
+
+`CLOUDFLARE_API_TOKEN` is optional for runtime but required for Turnstile widget
+hostname automation (`scripts/turnstile-config.ts`). See `docs/TURNSTILE_SETUP.md`.
 
 Run the redacted readiness check before promoting production:
 
