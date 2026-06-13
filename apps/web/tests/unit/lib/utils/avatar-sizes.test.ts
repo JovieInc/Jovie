@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { buildAvatarSizes } from '@/lib/utils/avatar-sizes';
+import {
+  ALLOWED_NEXT_IMAGE_QUALITIES,
+  buildAvatarSizes,
+  PROFILE_PHOTO_DOWNLOAD_QUALITY,
+} from '@/lib/utils/avatar-sizes';
 
 describe('buildAvatarSizes', () => {
   it('returns empty array when no sizesMap or avatarUrl', () => {
@@ -88,6 +92,30 @@ describe('buildAvatarSizes', () => {
     expect(sizes[0].key).toBe('medium');
     expect(sizes[0].url).toContain('/_next/image');
     expect(sizes[2].key).toBe('original');
+  });
+
+  it('uses only allowed Next.js image optimization quality values', () => {
+    const sizes = buildAvatarSizes(
+      null,
+      'https://example.blob.vercel-storage.com/avatars/photo.avif'
+    );
+
+    for (const size of sizes) {
+      if (!size.url.includes('/_next/image?')) continue;
+      const quality = new URL(size.url, 'https://jov.ie').searchParams.get('q');
+      expect(quality).not.toBeNull();
+      expect(
+        ALLOWED_NEXT_IMAGE_QUALITIES.includes(
+          Number(quality) as (typeof ALLOWED_NEXT_IMAGE_QUALITIES)[number]
+        )
+      ).toBe(true);
+    }
+
+    const mediumQuality = new URL(
+      sizes[0].url,
+      'https://jov.ie'
+    ).searchParams.get('q');
+    expect(mediumQuality).toBe(String(PROFILE_PHOTO_DOWNLOAD_QUALITY));
   });
 
   it('encodes Supabase avatar URLs correctly for Next.js image optimizer variants', () => {
