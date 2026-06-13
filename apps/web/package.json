@@ -1,6 +1,6 @@
 {
   "name": "@jovie/web",
-  "version": "26.6.50",
+  "version": "26.6.51",
   "private": true,
   "sideEffects": false,
   "engines": {
@@ -46,6 +46,7 @@
     "test:ci": "NODE_OPTIONS=--max-old-space-size=8192 vitest run --pool=forks --maxWorkers=2",
     "test:coverage": "vitest run --coverage",
     "test:truth": "node scripts/test-truth-guard.mjs",
+    "test:bug-to-test": "tsx scripts/check-bug-to-test-rule.ts",
     "test:watch": "vitest --config=vitest.config.mts",
     "test:fast": "vitest run --config=vitest.config.mts",
     "test:profile": "tsx scripts/test-performance-profiler.ts",

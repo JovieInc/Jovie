@@ -19,6 +19,18 @@ Brief description of the changes in this PR.
 - [ ] Manual testing completed
 - [ ] New tests added (if applicable)
 
+### Bug-to-Test Rule (required for bug fixes)
+
+Per `.claude/rules/testing.md`, **every bug fix needs a regression test** at the smallest layer that would have caught the bug.
+
+Complete this section when the PR is a bug fix (`fix:` commits/title, `fix/` branch, or the Bug fix checkbox below):
+
+- [ ] Regression test added or updated (`*.test.*` / `*.spec.*`)
+- [ ] `bug-to-test: satisfied` noted in this PR description
+- [ ] OR `bug-to-test: waived — <reason>` documented (copy-only / config-only fixes only)
+
+If this is **not** a bug fix and no new test is required, say so explicitly (for example: `bug-to-test: not applicable — feature work`).
+
 ## Icon Usage Standards ✅
 
 *Complete this section if your PR includes any icon usage*
