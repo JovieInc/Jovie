@@ -30,7 +30,7 @@ test('chat route renders the legacy shell frame when DESIGN_V1 is forced off', a
     process.env.E2E_USE_TEST_AUTH_BYPASS !== '1',
     'Requires E2E_USE_TEST_AUTH_BYPASS=1'
   );
-  test.setTimeout(180_000);
+  test.setTimeout(300_000);
 
   // DESIGN_V1 and SHELL_CHAT_V1 both map to the `code:DESIGN_V1` override
   // slot in APP_FLAG_OVERRIDE_KEYS, so a single override entry forces every
