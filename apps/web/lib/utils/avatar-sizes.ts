@@ -11,6 +11,12 @@ export interface AvatarSize {
   readonly url: string;
 }
 
+/** Must stay in sync with `images.qualities` in apps/web/next.config.js */
+export const ALLOWED_NEXT_IMAGE_QUALITIES = [25, 50, 75, 85, 100] as const;
+
+/** Highest allowed quality for profile photo download variants */
+export const PROFILE_PHOTO_DOWNLOAD_QUALITY = 100;
+
 /** Standard download size presets aligned to profile photo export UX */
 const SIZE_PRESETS = [
   { key: 'medium', label: 'Medium (512 x 512)', dimension: 512 },
@@ -26,7 +32,7 @@ function buildNextImageUrl(url: string, width: number): string {
   const params = new URLSearchParams({
     url,
     w: String(width),
-    q: '90',
+    q: String(PROFILE_PHOTO_DOWNLOAD_QUALITY),
   });
   return `/_next/image?${params.toString()}`;
 }
