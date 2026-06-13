@@ -24,7 +24,8 @@ async function main() {
   );
 
   const demoInput = {
-    userId: 'demo_user_creator_001',
+    userId: '00000000-0000-4000-8000-000000000001',
+    creatorProfileId: '00000000-0000-4000-8000-000000000002',
     triggerContext: {
       photoId: 'photo_demo_001',
       taggedName: 'Jordan Hale',
