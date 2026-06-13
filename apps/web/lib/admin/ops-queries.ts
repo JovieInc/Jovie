@@ -1,6 +1,10 @@
 import 'server-only';
 
 import {
+  AUTH_SIGNUP_ONBOARDING_CANARY_REDIS_KEY,
+  type CanaryReport as AuthSignupOnboardingCanaryReport,
+} from '@/lib/canaries/auth-signup-onboarding';
+import {
   CANARY_REDIS_KEY,
   type CanaryCheckResult,
   type CanaryReport,
@@ -44,25 +48,41 @@ function parseCanaryReport(raw: unknown): CanaryReport | null {
  * Fetch the latest public-profile canary run result from Redis.
  * Returns null if Redis is unavailable or the key has expired (> 26h since last run).
  */
-export async function getPublicProfileCanaryStatus(): Promise<CanaryReport | null> {
+async function loadCanaryReportFromRedis(
+  key: string,
+  context: string
+): Promise<CanaryReport | null> {
   const redis = getRedis();
   if (!redis) return null;
 
   try {
-    const raw = await redis.get<unknown>(CANARY_REDIS_KEY);
+    const raw = await redis.get<unknown>(key);
     if (!raw) return null;
 
     const report = parseCanaryReport(raw);
     if (!report) {
-      logger.warn('[admin/ops] Ignoring malformed canary status from Redis');
+      logger.warn(
+        `[admin/ops] Ignoring malformed canary status for ${context}`
+      );
     }
 
     return report;
   } catch (err) {
-    logger.warn('[admin/ops] Failed to load canary status from Redis', err);
-    await captureError('Admin ops: canary status load failed', err, {
+    logger.warn(`[admin/ops] Failed to load canary status for ${context}`, err);
+    await captureError(`Admin ops: ${context} canary status load failed`, err, {
       context: 'ops-queries',
     });
     return null;
   }
+}
+
+export async function getPublicProfileCanaryStatus(): Promise<CanaryReport | null> {
+  return loadCanaryReportFromRedis(CANARY_REDIS_KEY, 'public-profile');
+}
+
+export async function getAuthSignupOnboardingCanaryStatus(): Promise<AuthSignupOnboardingCanaryReport | null> {
+  return loadCanaryReportFromRedis(
+    AUTH_SIGNUP_ONBOARDING_CANARY_REDIS_KEY,
+    'auth-signup-onboarding'
+  );
 }
