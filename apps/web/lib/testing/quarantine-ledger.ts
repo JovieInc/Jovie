@@ -138,17 +138,44 @@ function normalizeRetryBudget(
   };
 }
 
+function slugifyLedgerPath(path: string): string {
+  const trimmed = path.startsWith('apps/web/')
+    ? path.slice('apps/web/'.length)
+    : path;
+  const parts: string[] = [];
+  let current = '';
+
+  for (const char of trimmed) {
+    const code = char.charCodeAt(0);
+    const isAlphaNumeric =
+      (code >= 48 && code <= 57) ||
+      (code >= 65 && code <= 90) ||
+      (code >= 97 && code <= 122);
+
+    if (isAlphaNumeric) {
+      current += char.toLowerCase();
+      continue;
+    }
+
+    if (current.length > 0) {
+      parts.push(current);
+      current = '';
+    }
+  }
+
+  if (current.length > 0) {
+    parts.push(current);
+  }
+
+  return parts.join('-');
+}
+
 function legacyEntry(
   kind: QuarantineEntryKind,
   path: string,
   index: number
 ): QuarantineLedgerEntry {
-  const slug = path
-    .replace(/^apps\/web\//, '')
-    .replace(/[^a-zA-Z0-9]+/g, '-')
-    .replace(/^-+/, '')
-    .replace(/-+$/, '')
-    .toLowerCase();
+  const slug = slugifyLedgerPath(path);
 
   return {
     id: `legacy-${kind}-${index}-${slug || 'entry'}`,
