@@ -3752,6 +3752,8 @@ jobs:
           # IMPORTANT: Pass runtime env vars explicitly — the step's env: block only applies to
           # the shell process, but backgrounded processes inherit from the shell's exported vars.
           export DATABASE_URL="${{ env.DATABASE_URL }}"
+          export NODE_ENV=test
+          export VERCEL_ENV=development
           export NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY="${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}"
           export NEXT_PUBLIC_TURNSTILE_SITE_KEY="1x00000000000000000000AA"
           export TURNSTILE_SECRET_KEY="1x0000000000000000000000000000000AA"
