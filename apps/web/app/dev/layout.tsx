@@ -7,11 +7,11 @@ export const metadata: Metadata = {
   robots: NOINDEX_ROBOTS,
 };
 
-export default function SentryExampleLayout({
+export default function DevLayout({
   children,
-}: Readonly<{
-  children: ReactNode;
-}>) {
+}: {
+  readonly children: ReactNode;
+}) {
   requireDevelopmentOnlyPage();
   return children;
 }

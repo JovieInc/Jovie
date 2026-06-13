@@ -34,6 +34,7 @@ const FRONT_DOOR_CONFIG_ERRORS = [
   'auth unavailable',
   'clerk is not configured',
   'turnstile is not configured',
+  'verification failed (110200)',
 ] as const;
 
 const EMAIL_IDENTIFIER_INPUT_SELECTOR =

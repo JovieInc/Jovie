@@ -9,6 +9,10 @@ import { storeTokens } from '@/lib/connectors/token-vault';
 import { db } from '@/lib/db';
 import { users } from '@/lib/db/schema/auth';
 import { connectorAccounts, externalObjects } from '@/lib/db/schema/connectors';
+import {
+  developmentOnlyForbiddenJson,
+  isExplicitDevelopmentEnvironment,
+} from '@/lib/security/development-only';
 import { logger } from '@/lib/utils/logger';
 
 export const runtime = 'nodejs';
@@ -20,15 +24,12 @@ export const dynamic = 'force-dynamic';
  * LOCAL-ONLY dev endpoint. Seeds fixture Gmail messages + Calendar connector accounts
  * so that `extractAndPropose` can run without real OAuth credentials.
  *
- * Gated by `process.env.NODE_ENV !== 'production'`.
+ * Gated to explicit development environments only.
  * Redirects to settings/connectors with ?connected=mock after seeding.
  */
 export async function GET(request: Request) {
-  if (process.env.NODE_ENV === 'production') {
-    return NextResponse.json(
-      { error: 'Not available in production' },
-      { status: 403 }
-    );
+  if (!isExplicitDevelopmentEnvironment()) {
+    return developmentOnlyForbiddenJson();
   }
 
   const { searchParams, origin } = new URL(request.url);
