@@ -309,6 +309,58 @@ describe('@critical gate.ts', () => {
       expect(result.context.isAdmin).toBe(false);
     });
 
+    it('prefetches waitlist gate status before the auth gate DB query finishes', async () => {
+      mockCachedAuth.mockResolvedValue({ userId: 'clerk_parallel_gate' });
+      mockCachedCurrentUser.mockResolvedValue(mockClerkUser());
+
+      const callOrder: string[] = [];
+
+      mockIsWaitlistGateEnabled.mockImplementation(async () => {
+        callOrder.push('gate');
+        return true;
+      });
+
+      mockDbSelect.mockReturnValue({
+        from: vi.fn().mockReturnValue({
+          leftJoin: vi.fn().mockReturnValue({
+            where: vi.fn().mockReturnValue({
+              limit: vi.fn().mockImplementation(async () => {
+                callOrder.push('db');
+                return [
+                  mockDbUserResult({
+                    profileId: 'profile-123',
+                    profileOnboardingCompletedAt: new Date(),
+                  }),
+                ];
+              }),
+            }),
+          }),
+        }),
+      });
+
+      await resolveUserState();
+
+      expect(callOrder).toEqual(['gate', 'db']);
+      expect(mockIsWaitlistGateEnabled).toHaveBeenCalledTimes(1);
+    });
+
+    it('fetches waitlist gate status only once for existing users', async () => {
+      mockCachedAuth.mockResolvedValue({ userId: 'clerk_123' });
+      mockCachedCurrentUser.mockResolvedValue(mockClerkUser());
+      mockDbSelect.mockReturnValue(
+        createJoinSelectChain([
+          mockDbUserResult({
+            profileId: 'profile-123',
+            profileOnboardingCompletedAt: new Date(),
+          }),
+        ])
+      );
+
+      await resolveUserState();
+
+      expect(mockIsWaitlistGateEnabled).toHaveBeenCalledTimes(1);
+    });
+
     it('returns ACTIVE for a fully set up user with complete profile', async () => {
       mockCachedAuth.mockResolvedValue({ userId: 'clerk_123' });
       mockCachedCurrentUser.mockResolvedValue(mockClerkUser());

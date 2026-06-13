@@ -2,6 +2,7 @@ import 'server-only';
 
 import * as Sentry from '@sentry/nextjs';
 import { sql as drizzleSql, eq } from 'drizzle-orm';
+import { cache } from 'react';
 import { db } from '@/lib/db';
 import {
   getDeepErrorMessage,
@@ -708,6 +709,29 @@ async function syncVerifiedEmailIfNeeded(
   });
 }
 
+export interface ResolveUserStateOptions {
+  createDbUserIfMissing?: boolean;
+  /**
+   * Pre-resolved Clerk user ID. When provided, skips calling auth() and
+   * currentUser() — both of which read request headers and must NOT be
+   * called inside unstable_cache or "use cache" boundaries.
+   *
+   * Pass this when the Clerk user ID is already known (e.g. from a cached
+   * function that received it as a parameter). In this case the verified
+   * email is resolved from Clerk's backend API if a DB user must be created.
+   */
+  knownClerkUserId?: string;
+}
+
+function serializeResolveUserStateOptions(
+  options: ResolveUserStateOptions
+): string {
+  return JSON.stringify({
+    createDbUserIfMissing: options.createDbUserIfMissing ?? true,
+    knownClerkUserId: options.knownClerkUserId ?? null,
+  });
+}
+
 /**
  * Centralized auth gate function that resolves the current user's state.
  *
@@ -720,39 +744,34 @@ async function syncVerifiedEmailIfNeeded(
  * 3. Check user status → BANNED
  * 4. Check waitlist/profile state → WAITLIST_*, NEEDS_ONBOARDING, ACTIVE
  *
+ * Wrapped in React.cache() so repeated calls within the same server request
+ * reuse one DB/auth resolution pass (JOV-2993).
+ *
  * @param options.createDbUserIfMissing - If true, creates a DB user row when missing (default: true)
  */
-export async function resolveUserState(
-  options: {
-    createDbUserIfMissing?: boolean;
-    /**
-     * Pre-resolved Clerk user ID. When provided, skips calling auth() and
-     * currentUser() — both of which read request headers and must NOT be
-     * called inside unstable_cache or "use cache" boundaries.
-     *
-     * Pass this when the Clerk user ID is already known (e.g. from a cached
-     * function that received it as a parameter). In this case the verified
-     * email is resolved from Clerk's backend API if a DB user must be created.
-     */
-    knownClerkUserId?: string;
-  } = {}
+async function resolveUserStateInternal(
+  options: ResolveUserStateOptions = {}
 ): Promise<AuthGateResult> {
   const { createDbUserIfMissing = true, knownClerkUserId } = options;
 
-  // 1. Resolve the Clerk user ID.
-  //
-  // When knownClerkUserId is provided (e.g. from a cached function), skip
-  // getCachedAuth() and getCachedCurrentUser() — both access headers()
-  // internally and will throw ClerkUseCacheError inside unstable_cache scopes.
-  const { clerkUserId, email } = await resolveClerkIdentity(knownClerkUserId);
+  // 1. Resolve Clerk identity and prefetch waitlist gate in parallel.
+  // Gate status is needed for every authenticated path; starting it early
+  // overlaps with identity resolution and the DB JOIN below (JOV-2993).
+  const identityPromise = resolveClerkIdentity(knownClerkUserId);
+  const waitlistGatePromise = isWaitlistGateEnabled();
+  const { clerkUserId, email } = await identityPromise;
 
   if (!clerkUserId) {
     return createUnauthenticatedAuthGateResult();
   }
 
   // 2. Query DB user AND profile in a single JOIN query (performance optimization)
-  // This reduces database round trips from 2 to 1
-  const lookupResult = await loadAuthGateRecord(clerkUserId, email);
+  // This reduces database round trips from 2 to 1. Run in parallel with the
+  // waitlist gate lookup started above (matches proxy-state.ts hot-path pattern).
+  const [lookupResult, waitlistGateEnabled] = await Promise.all([
+    loadAuthGateRecord(clerkUserId, email),
+    waitlistGatePromise,
+  ]);
   if (lookupResult && 'state' in lookupResult) {
     return lookupResult;
   }
@@ -812,7 +831,6 @@ export async function resolveUserState(
   let profile = toAuthGateProfile(dbResult);
 
   if (!dbUserId) {
-    const waitlistGateEnabled = await isWaitlistGateEnabled();
     const creationResult = await handleMissingDbUser(
       {
         createDbUserIfMissing,
@@ -844,7 +862,6 @@ export async function resolveUserState(
     profile = null;
   }
 
-  const waitlistGateEnabled = await isWaitlistGateEnabled();
   const state = resolveCanonicalState({
     isAuthenticated: true,
     hasDbUser: Boolean(dbUserId),
@@ -866,6 +883,26 @@ export async function resolveUserState(
       email: resolvedEmail,
     },
   };
+}
+
+const resolveUserStateCached = cache(
+  async (optionsKey: string): Promise<AuthGateResult> => {
+    const parsed = JSON.parse(optionsKey) as {
+      createDbUserIfMissing: boolean;
+      knownClerkUserId: string | null;
+    };
+
+    return resolveUserStateInternal({
+      createDbUserIfMissing: parsed.createDbUserIfMissing,
+      knownClerkUserId: parsed.knownClerkUserId ?? undefined,
+    });
+  }
+);
+
+export async function resolveUserState(
+  options: ResolveUserStateOptions = {}
+): Promise<AuthGateResult> {
+  return resolveUserStateCached(serializeResolveUserStateOptions(options));
 }
 
 // =============================================================================
