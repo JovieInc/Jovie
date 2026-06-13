@@ -97,10 +97,10 @@ test.describe('Signed-in auth verification @smoke', () => {
     page,
   }) => {
     test.setTimeout(180_000);
-    test.skip(
-      !canRunSignedInAuthVerification(),
-      'Requires Clerk test credentials or E2E_USE_TEST_AUTH_BYPASS=1'
-    );
+    // Intentional conditional skip when Clerk credentials or dev test-auth bypass are unavailable. NOSONAR S1607
+    if (!canRunSignedInAuthVerification()) {
+      test.skip(); // NOSONAR S1607 — requires Clerk test credentials or E2E_USE_TEST_AUTH_BYPASS=1
+    }
 
     const { getContext, cleanup } = setupPageMonitoring(page);
 
