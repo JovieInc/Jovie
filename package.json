@@ -121,6 +121,7 @@
     "test:coverage:report": "tsx scripts/audit-test-coverage.ts",
     "test:coverage:diff": "tsx scripts/audit-test-coverage.ts --check-pr",
     "test:bug-to-test": "pnpm --filter @jovie/web run test:bug-to-test",
+    "test:quarantine-ledger": "pnpm --filter @jovie/web run test:quarantine-ledger",
     "admin:green": "doppler run --project jovie-web --config dev -- pnpm --filter=@jovie/web run admin:green",
     "admin:green:record": "doppler run --project jovie-web --config dev -- pnpm --filter=@jovie/web run admin:green:record",
     "admin:green:watch": "doppler run --project jovie-web --config dev -- pnpm --filter=@jovie/web run admin:green:watch",

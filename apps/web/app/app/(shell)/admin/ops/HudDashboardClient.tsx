@@ -115,6 +115,23 @@ function formatReliabilitySubtitle(
   return `${reliability.unresolvedSentryIssues24h.toLocaleString('en-US')} unresolved | p95 ${p95}`;
 }
 
+function formatTestingQuarantineSubtitle(
+  quarantine: HudMetrics['testing']['quarantine']
+): string {
+  const budget = `${quarantine.estimatedRetryAttemptsPerRun}/${quarantine.retryBudgetCap} retries`;
+  const mix = `${quarantine.unitCount} unit | ${quarantine.e2eCount} e2e`;
+  if (!quarantine.isValid) {
+    return `Ledger invalid | ${budget}`;
+  }
+  if (!quarantine.withinRetryBudget) {
+    return `Over budget | ${mix}`;
+  }
+  if (quarantine.expiredCount > 0) {
+    return `${quarantine.expiredCount} expired | ${budget}`;
+  }
+  return `${mix} | ${budget}`;
+}
+
 function formatDefaultStatusLabel(
   status: HudMetrics['overview']['defaultStatus']
 ): string {
@@ -744,6 +761,18 @@ export function HudDashboardClient({
             className='p-3'
             valueClassName={secondaryValueClass}
           />
+          <ContentMetricCard
+            label='Flaky Quarantine'
+            value={metrics.testing.quarantine.activeCount.toLocaleString(
+              'en-US'
+            )}
+            subtitle={formatTestingQuarantineSubtitle(
+              metrics.testing.quarantine
+            )}
+            className='p-3'
+            valueClassName={secondaryValueClass}
+            data-testid='hud-flaky-quarantine-card'
+          />
         </div>
 
         {metrics.accessMode === 'admin' ? (
@@ -925,8 +954,20 @@ export function HudDashboardClient({
                 sentrySource,
                 handleSourceRetry
               )}
-              className='p-3 col-span-2'
+              className='p-3'
               valueClassName={secondaryValueClass}
+            />
+            <ContentMetricCard
+              label='Flaky Quarantine'
+              value={metrics.testing.quarantine.activeCount.toLocaleString(
+                'en-US'
+              )}
+              subtitle={formatTestingQuarantineSubtitle(
+                metrics.testing.quarantine
+              )}
+              className='p-3'
+              valueClassName={secondaryValueClass}
+              data-testid='hud-flaky-quarantine-card'
             />
           </div>
         </div>

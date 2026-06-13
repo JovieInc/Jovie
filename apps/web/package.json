@@ -47,6 +47,7 @@
     "test:coverage": "vitest run --coverage",
     "test:truth": "node scripts/test-truth-guard.mjs",
     "test:bug-to-test": "tsx scripts/check-bug-to-test-rule.ts",
+    "test:quarantine-ledger": "tsx scripts/check-quarantine-ledger.ts",
     "test:watch": "vitest --config=vitest.config.mts",
     "test:fast": "vitest run --config=vitest.config.mts",
     "test:profile": "tsx scripts/test-performance-profiler.ts",
