@@ -9,7 +9,7 @@
  * - No social/write scopes ever enabled in v0.
  *
  * Triggered from: demo script, future Trigger.dev job (trigger/ dir), or cron on photo tags.
- * When 9872 lands: replace synthetic ids with real person_entities / studio_sessions / content_opportunities inserts.
+ * Uses canonical memory schema (gh-9872) via MemoryIngestHarness in agent-harness.
  */
 
 import {
