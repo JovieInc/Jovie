@@ -146,7 +146,8 @@ function legacyEntry(
   const slug = path
     .replace(/^apps\/web\//, '')
     .replace(/[^a-zA-Z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '')
+    .replace(/^-+/, '')
+    .replace(/-+$/, '')
     .toLowerCase();
 
   return {
