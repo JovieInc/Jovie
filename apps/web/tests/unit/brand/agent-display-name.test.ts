@@ -1,6 +1,5 @@
-import { execFileSync } from 'node:child_process';
-import { readFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { readdirSync, readFileSync, statSync } from 'node:fs';
+import { join, relative } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
   FORBIDDEN_USER_VISIBLE_AGENT_BRANDS,
@@ -15,6 +14,28 @@ const USER_VISIBLE_SCAN_ROOTS = [
   'lib',
   'constants',
 ] as const;
+const SCANNED_EXTENSIONS = new Set(['.ts', '.tsx', '.md', '.mdx', '.json']);
+const EXCLUDED_RELATIVE_PATHS = new Set(['lib/brand/agent-display-name.ts']);
+
+function collectScannableFiles(directory: string): string[] {
+  const files: string[] = [];
+
+  for (const entry of readdirSync(directory, { withFileTypes: true })) {
+    const absolutePath = join(directory, entry.name);
+
+    if (entry.isDirectory()) {
+      files.push(...collectScannableFiles(absolutePath));
+      continue;
+    }
+
+    const extension = absolutePath.slice(absolutePath.lastIndexOf('.'));
+    if (SCANNED_EXTENSIONS.has(extension)) {
+      files.push(absolutePath);
+    }
+  }
+
+  return files;
+}
 
 describe('agent display name brand guard (JOV-3121)', () => {
   it('exports the canonical Jovie agent label', () => {
@@ -24,31 +45,23 @@ describe('agent display name brand guard (JOV-3121)', () => {
   it('does not leak forbidden Hermes agent wording in user-visible web sources', () => {
     const matches: string[] = [];
 
-    for (const pattern of FORBIDDEN_USER_VISIBLE_AGENT_BRANDS) {
-      for (const root of USER_VISIBLE_SCAN_ROOTS) {
-        let output = '';
-        try {
-          output = execFileSync(
-            'rg',
-            ['-l', pattern, root, '-g', '*.{ts,tsx,md,mdx,json}'],
-            { cwd: WEB_ROOT, encoding: 'utf8' }
-          ).trim();
-        } catch (error) {
-          const execError = error as NodeJS.ErrnoException & {
-            status?: number;
-            stdout?: string;
-          };
-          if (execError.status === 1) {
-            output = (execError.stdout ?? '').trim();
-          } else {
-            throw error;
-          }
+    for (const root of USER_VISIBLE_SCAN_ROOTS) {
+      const absoluteRoot = join(WEB_ROOT, root);
+      if (!statSync(absoluteRoot).isDirectory()) {
+        continue;
+      }
+
+      for (const absolutePath of collectScannableFiles(absoluteRoot)) {
+        const relativePath = relative(WEB_ROOT, absolutePath);
+        if (EXCLUDED_RELATIVE_PATHS.has(relativePath)) {
+          continue;
         }
 
-        if (!output) continue;
-        for (const relativePath of output.split('\n')) {
-          if (relativePath === 'lib/brand/agent-display-name.ts') continue;
-          matches.push(`${relativePath}: ${pattern}`);
+        const source = readFileSync(absolutePath, 'utf8');
+        for (const pattern of FORBIDDEN_USER_VISIBLE_AGENT_BRANDS) {
+          if (source.includes(pattern)) {
+            matches.push(`${relativePath}: ${pattern}`);
+          }
         }
       }
     }
