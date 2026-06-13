@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.6.50] - 2026-06-11
+
+> Infra train refresh after ui train merge; desktop security ships with DMG release handling.
+
+### Changed
+
+- **VERSION**: bumps train integration to v26.6.50 so desktop security hardening ships with DMG release handling.
+
+### Fixed
+
+- **Loop infra review blockers**: hardens workflow-run CAS claims, connector enum casts, approved-action workflow enqueue idempotency, and per-source memory evidence metadata.
+- **PersistentAudioBar tests**: align dismiss and region aria-label assertions with Title Case labels.
+- **Shell AudioBar neutral play control**: moves central transport play/pause from accent fill onto neutral System B primary button tokens.
+
 ## [26.6.49] - 2026-06-11
 
 > Calendar date selection uses neutral System B controls.
@@ -39,7 +53,11 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ## [26.6.45] - 2026-06-11
 
-> The post-onboarding interview modal now uses shared System B surfaces and controls.
+> Infra train version bump for desktop release guard; post-onboarding interview modal uses shared System B surfaces.
+
+### Changed
+
+- **VERSION**: bumps train integration to v26.6.45 so desktop security changes ship with DMG release handling.
 
 ### Fixed
 
@@ -47,10 +65,15 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ## [26.6.44] - 2026-06-11
 
-> Central transport and speed controls now use neutral System B primary button surfaces.
+> Desktop security hardening plus neutral System B action controls.
+
+### Changed
+
+- **Desktop security (infra train)**: hardens Electron shell auth, CSP watchdog, permissions, and window-state handling ahead of the next DMG release.
 
 ### Fixed
 
+- **Electron shell security (JOV-3014)**: bumps Electron to 42.4.0 and removes sandbox-weakening macOS entitlements so desktop releases ship with defense-in-depth defaults.
 - **System B neutral action controls**: moves admin speed presets, celebration card size selection, audio transport buttons, and the listening overlay icon from primary/accent fills onto neutral primary button tokens while leaving progress and status accents intact.
 
 ## [26.6.43] - 2026-06-11

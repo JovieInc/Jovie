@@ -255,6 +255,15 @@ describe('auth routing boundary', () => {
     expect(buildElectronAuthCompleteUrl({ code: 'c', state: 's' })).toBe(
       'jovie://auth/complete?code=c&state=s'
     );
+    expect(
+      buildElectronAuthCompleteUrl({
+        code: 'c',
+        state: 's',
+        desktopFlow: 'desktop_flow_nonce_12345',
+      })
+    ).toBe(
+      'jovie://auth/complete?code=c&state=s&desktop_flow=desktop_flow_nonce_12345'
+    );
   });
 
   it('creates analytics payloads without leaking return URLs or token values', () => {

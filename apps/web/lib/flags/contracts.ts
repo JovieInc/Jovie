@@ -66,6 +66,8 @@ export const APP_FLAG_DEFAULTS = {
 
 export type AppFlagName = keyof typeof APP_FLAG_DEFAULTS;
 export type AppFlagSnapshot = Record<AppFlagName, boolean>;
+/** Trimmed server-to-client payload — only flags resolved for the active route. */
+export type PartialAppFlagSnapshot = Partial<Record<AppFlagName, boolean>>;
 
 export const APP_FLAG_KEYS = {
   BILLING_UPGRADE_DIRECT: LEGACY_STATSIG_GATE_KEYS.BILLING_UPGRADE_DIRECT,

@@ -32,7 +32,21 @@ interface Box {
 async function gotoChatConversation(page: Page, conversationId: string) {
   await gotoAuthenticatedChatRoute(page, {
     path: `/app/chat/${conversationId}`,
+    urlPattern: new RegExp(`/app/chat/${conversationId}$`),
   });
+}
+
+async function mockStableSlashPickerNetwork(page: Page) {
+  // Root slash queries like `/t` fan out to artist search. In CI the real
+  // Spotify route can stall for ~10s and return 503, which keeps the picker
+  // in a loading state long enough for transcript overlap assertions to flake.
+  await page.route('**/api/spotify/search**', route =>
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify([]),
+    })
+  );
 }
 
 async function forceDesignV1(page: Page) {
@@ -70,6 +84,8 @@ function toolEvent(): PersistedToolEvent {
 }
 
 async function mockFlyoutConversation(page: Page) {
+  await mockStableSlashPickerNetwork(page);
+
   const historicalMessages = Array.from({ length: 8 }, (_, index) => {
     const role = index % 2 === 0 ? 'assistant' : 'user';
     return {
@@ -223,9 +239,37 @@ function expectBoxInsideViewport(
   expect(box.y + box.height).toBeLessThanOrEqual(viewport.height);
 }
 
+async function waitForPickerScrollSettled(page: Page) {
+  const { shellScroll } = shellChatFrameLocators(page);
+  await expect
+    .poll(
+      async () => {
+        const metrics = await shellScroll.evaluate(node => ({
+          scrollTop: node.scrollTop,
+          scrollHeight: node.scrollHeight,
+          clientHeight: node.clientHeight,
+        }));
+        return (
+          metrics.scrollTop + metrics.clientHeight >= metrics.scrollHeight - 4
+        );
+      },
+      {
+        message: 'thread scroll reaches bottom after slash picker opens',
+        timeout: 45_000,
+      }
+    )
+    .toBe(true);
+}
+
 async function assertSlashMenuClearsThreadContent(page: Page) {
+  const chatContent = page.locator('[data-testid="chat-content"]');
+  await expect(chatContent).toHaveAttribute('data-picker-open', 'true', {
+    timeout: 30_000,
+  });
+
   const slashMenu = page.locator('[data-testid="slash-command-menu"]').last();
-  await expect(slashMenu).toBeVisible({ timeout: 10_000 });
+  await expect(slashMenu).toBeVisible({ timeout: 30_000 });
+  await waitForPickerScrollSettled(page);
 
   const menuBox = await slashMenu.boundingBox();
   expectBoxInsideViewport(menuBox, page.viewportSize());
@@ -263,10 +307,19 @@ async function assertSlashMenuClearsThreadContent(page: Page) {
           if (!currentMenuBox || !currentTargetBox) return false;
           return !boxesOverlap(currentMenuBox, currentTargetBox, 4);
         },
-        { message: `${label} clears slash menu`, timeout: 10_000 }
+        { message: `${label} clears slash menu`, timeout: 45_000 }
       )
       .toBe(true);
   }
+}
+
+async function resetSlashPicker(page: Page) {
+  const { input } = shellChatFrameLocators(page);
+  await page.keyboard.press('Escape');
+  await input.fill('');
+  await expect(page.locator('[data-testid="slash-command-menu"]')).toHaveCount(
+    0
+  );
 }
 
 test('chat route renders the Shell V1 app frame when forced on', async ({
@@ -283,7 +336,6 @@ test('chat route renders the Shell V1 app frame when forced on', async ({
 
   await setTestAuthBypassSession(page, 'creator-ready', 'e2e-shell-chat-user');
   await gotoAuthenticatedChatRoute(page);
-  await page.waitForURL(/\/app\/chat/, { timeout: 60_000 });
 
   const { chatContent, composer, shellFrame } = shellChatFrameLocators(page);
 
@@ -308,6 +360,7 @@ test('chat route picker opens without moving the shell or composer', async ({
   );
   test.setTimeout(180_000);
 
+  await mockStableSlashPickerNetwork(page);
   await forceDesignV1(page);
   await setTestAuthBypassSession(
     page,
@@ -315,7 +368,6 @@ test('chat route picker opens without moving the shell or composer', async ({
     'e2e-shell-chat-picker-user'
   );
   await gotoAuthenticatedChatRoute(page);
-  await page.waitForURL(/\/app\/chat/, { timeout: 60_000 });
 
   const { composer, input, shellScroll } = shellChatFrameLocators(page);
   await expect(composer).toBeVisible({ timeout: 30_000 });
@@ -352,7 +404,7 @@ test('chat route slash picker clears active transcript content in populated thre
     process.env.E2E_USE_TEST_AUTH_BYPASS !== '1',
     'Requires E2E_USE_TEST_AUTH_BYPASS=1'
   );
-  test.setTimeout(180_000);
+  test.setTimeout(300_000);
 
   await mockFlyoutConversation(page);
   await forceDesignV1(page);
@@ -362,6 +414,8 @@ test('chat route slash picker clears active transcript content in populated thre
     'e2e-shell-chat-flyout-user'
   );
 
+  await gotoChatConversation(page, FLYOUT_CONVERSATION_ID);
+
   for (const viewport of [
     { label: 'desktop', width: 1440, height: 900 },
     { label: 'short desktop', width: 1280, height: 720 },
@@ -370,13 +424,10 @@ test('chat route slash picker clears active transcript content in populated thre
       width: viewport.width,
       height: viewport.height,
     });
-    await gotoChatConversation(page, FLYOUT_CONVERSATION_ID);
-    await page.waitForURL(new RegExp(`/app/chat/${FLYOUT_CONVERSATION_ID}$`), {
-      timeout: 60_000,
-    });
 
     const { composer, input } = shellChatFrameLocators(page);
     await expect(composer).toBeVisible({ timeout: 30_000 });
+    await resetSlashPicker(page);
 
     const latestAssistantReply = page.getByTestId('chat-message-reply').filter({
       hasText: 'Your bio is currently not set',
@@ -401,6 +452,7 @@ test('chat route slash picker clears active transcript content in populated thre
         `${viewport.label} composer y stays stable`
       ).toBeLessThanOrEqual(1);
     }
+    await resetSlashPicker(page);
   }
 });
 
@@ -431,7 +483,6 @@ test('chat composer clears mobile shell tabs on tablet and phone', async ({
       height: viewport.height,
     });
     await gotoAuthenticatedChatRoute(page);
-    await page.waitForURL(/\/app\/chat/, { timeout: 60_000 });
 
     const { composer } = shellChatFrameLocators(page);
     const mobileTabs = page.getByRole('navigation', {

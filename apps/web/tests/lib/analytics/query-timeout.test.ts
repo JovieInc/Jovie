@@ -7,6 +7,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   apiQuery,
   dashboardQuery,
+  executeWithTimeout,
   isPostgresTimeoutError,
   isQueryTimeoutError,
   QUERY_TIMEOUTS,
@@ -111,6 +112,28 @@ describe('Query Timeout', () => {
       const result = await apiQuery(fastQuery, 'Test API query');
 
       expect(result).toEqual({ data: 'result' });
+    });
+  });
+
+  describe('executeWithTimeout statement_timeout opt-in', () => {
+    it('sets PostgreSQL statement_timeout when db client is provided', async () => {
+      const execute = vi.fn().mockResolvedValue(undefined);
+      const db = { execute } as const;
+
+      await executeWithTimeout(async () => 'ok', 'api', 'Test query', {
+        db,
+        timeoutMs: 5000,
+      });
+
+      expect(execute).toHaveBeenCalledTimes(1);
+    });
+
+    it('skips PostgreSQL statement_timeout when db client is omitted', async () => {
+      const execute = vi.fn().mockResolvedValue(undefined);
+
+      await executeWithTimeout(async () => 'ok', 'api', 'Test query');
+
+      expect(execute).not.toHaveBeenCalled();
     });
   });
 

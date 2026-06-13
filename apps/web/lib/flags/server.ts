@@ -6,8 +6,8 @@ import {
   APP_FLAG_DEFAULTS,
   APP_FLAG_OVERRIDE_KEYS,
   type AppFlagName,
-  type AppFlagSnapshot,
   LEGACY_STATSIG_GATE_KEYS,
+  type PartialAppFlagSnapshot,
   type ProfileAlertOptInVariant,
   type StatsigFeatureFlagsBootstrap,
   type SubscribeCTAVariant,
@@ -75,17 +75,20 @@ export async function getAppFlagValue(
 
 export async function getAppFlagsSnapshot(options?: {
   readonly userId?: string | null;
-}): Promise<AppFlagSnapshot> {
+  readonly flagNames?: readonly AppFlagName[];
+}): Promise<PartialAppFlagSnapshot> {
   const userId = options?.userId ?? null;
+  const flagNames =
+    options?.flagNames ?? (Object.keys(APP_FLAG_REGISTRY) as AppFlagName[]);
 
   const resolvedEntries = await Promise.all(
-    (Object.keys(APP_FLAG_REGISTRY) as AppFlagName[]).map(async flagName => [
+    flagNames.map(async flagName => [
       flagName,
       await getAppFlagValue(flagName, { userId }),
     ])
   );
 
-  return Object.fromEntries(resolvedEntries) as AppFlagSnapshot;
+  return Object.fromEntries(resolvedEntries) as PartialAppFlagSnapshot;
 }
 
 export async function getFeatureFlagsBootstrap(

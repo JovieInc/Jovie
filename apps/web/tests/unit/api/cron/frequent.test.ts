@@ -18,6 +18,7 @@ const {
   mockHandleIngestionJobFailure,
   mockWithSystemIngestionSession,
   mockProcessOutreachBatch,
+  mockReconcileOrphanedAcceptedActions,
 } = vi.hoisted(() => ({
   mockDbExecute: vi.fn(),
   mockDbSelect: vi.fn(),
@@ -36,7 +37,15 @@ const {
   mockHandleIngestionJobFailure: vi.fn(),
   mockWithSystemIngestionSession: vi.fn(),
   mockProcessOutreachBatch: vi.fn(),
+  mockReconcileOrphanedAcceptedActions: vi.fn(),
 }));
+
+vi.mock(
+  '@/lib/connectors/workflows/reconcile-orphaned-approved-actions',
+  () => ({
+    reconcileOrphanedAcceptedActions: mockReconcileOrphanedAcceptedActions,
+  })
+);
 
 vi.mock('@/lib/db', () => ({
   db: {
@@ -184,6 +193,10 @@ describe('GET /api/cron/frequent', () => {
     mockWithSystemIngestionSession.mockImplementation(async callback =>
       callback({})
     );
+    mockReconcileOrphanedAcceptedActions.mockResolvedValue({
+      scanned: 0,
+      enqueued: 0,
+    });
   });
 
   afterEach(() => {
@@ -205,6 +218,11 @@ describe('GET /api/cron/frequent', () => {
     expect(mockProcessOutreachBatch).toHaveBeenCalledWith(10);
     expect(mockScheduleReleaseNotifications).toHaveBeenCalledTimes(1);
     expect(mockSendPendingNotifications).toHaveBeenCalledTimes(1);
+    expect(mockReconcileOrphanedAcceptedActions).toHaveBeenCalledWith(20);
+    expect(data.results.workflowApprovalRecovery).toEqual({
+      success: true,
+      data: { scanned: 0, enqueued: 0 },
+    });
     expect(data.results.outreach).toEqual({
       success: true,
       data: {

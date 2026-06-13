@@ -14,7 +14,7 @@
 import { createHmac, timingSafeEqual } from 'node:crypto';
 import { NextRequest, NextResponse } from 'next/server';
 
-import { env } from '@/lib/env-server';
+import { env } from '@/lib/env';
 import { captureCriticalError } from '@/lib/error-tracking';
 import { ServerFetchTimeoutError, serverFetch } from '@/lib/http/server-fetch';
 import { logger } from '@/lib/utils/logger';
@@ -163,8 +163,8 @@ export async function POST(request: NextRequest) {
       : '';
 
     // Fire GitHub repository_dispatch
-    const owner = process.env.VERCEL_GIT_REPO_OWNER || 'TheBlackFuture';
-    const repo = process.env.VERCEL_GIT_REPO_SLUG || 'Jovie';
+    const owner = env.VERCEL_GIT_REPO_OWNER || 'TheBlackFuture';
+    const repo = env.VERCEL_GIT_REPO_SLUG || 'Jovie';
 
     const dispatchResponse = await serverFetch(
       `https://api.github.com/repos/${owner}/${repo}/dispatches`,

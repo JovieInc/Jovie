@@ -19,7 +19,7 @@ import { withDbSessionTx } from '@/lib/auth/session';
 import { CACHE_TAGS, CACHE_TTL } from '@/lib/cache/tags';
 import { type DbOrTransaction, doesTableExist } from '@/lib/db';
 import { getAvatarQualityForProfile } from '@/lib/db/queries/avatar-quality';
-import { dashboardQuery } from '@/lib/db/query-timeout';
+import { dashboardQuery, QUERY_TIMEOUTS } from '@/lib/db/query-timeout';
 import { clickEvents, tips } from '@/lib/db/schema/analytics';
 import { userSettings, users } from '@/lib/db/schema/auth';
 import { socialLinks } from '@/lib/db/schema/links';
@@ -373,7 +373,7 @@ function buildProfileCompletion(
   if (!completion.hasName) {
     steps.push({
       id: 'name',
-      label: 'Add your artist name',
+      label: 'Add Your Artist Name',
       description: 'A clear name helps fans recognize and trust your profile.',
       href: APP_ROUTES.SETTINGS_ARTIST_PROFILE,
     });
@@ -382,7 +382,7 @@ function buildProfileCompletion(
   if (!completion.hasAvatar) {
     steps.push({
       id: 'avatar',
-      label: 'Add a profile photo',
+      label: 'Add A Profile Photo',
       description: 'A recognizable photo makes your page feel personal.',
       href: APP_ROUTES.SETTINGS_ARTIST_PROFILE,
     });
@@ -391,7 +391,7 @@ function buildProfileCompletion(
   if (!completion.hasEmail) {
     steps.push({
       id: 'email',
-      label: 'Add your account email',
+      label: 'Add Your Account Email',
       description: 'Email keeps your account recoverable and mission-critical.',
       href: APP_ROUTES.SETTINGS_ARTIST_PROFILE,
     });
@@ -400,9 +400,8 @@ function buildProfileCompletion(
   if (!completion.hasMusicLinks) {
     steps.push({
       id: 'music-links',
-      label: 'Add your music platforms',
-      description:
-        'Help listeners stream you on Spotify, Apple Music, and more.',
+      label: 'Add Your Music Platforms',
+      description: 'Help listeners stream your music on major platforms',
       href: APP_ROUTES.CHAT_PROFILE_PANEL,
     });
   }
@@ -868,14 +867,6 @@ async function fetchTippingStatsWithSession(
   profileId: string
 ): Promise<TippingStats> {
   try {
-    // Set a PostgreSQL-level statement timeout to prevent long-running queries
-    // from holding Neon WebSocket connections open past the idle timeout.
-    // This is a safety net in addition to the JS-level timeout.
-    // Use SET (session-scoped) instead of SET LOCAL — SET LOCAL is a no-op
-    // outside a transaction block and the Neon HTTP driver does not support
-    // transactions. See lib/db/query-timeout.ts for documentation.
-    await tx.execute(drizzleSql`SET statement_timeout = '5000ms'`);
-
     const startOfMonth = new Date();
     startOfMonth.setUTCDate(1);
     startOfMonth.setUTCHours(0, 0, 0, 0);
@@ -915,7 +906,8 @@ async function fetchTippingStatsWithSession(
           })
           .from(tips)
           .where(eq(tips.creatorProfileId, profileId)),
-      'Tipping stats query'
+      'Tipping stats query',
+      { db: tx, timeoutMs: QUERY_TIMEOUTS.api }
     );
 
     // Limit click events query to last 12 months to leverage indexes
@@ -935,7 +927,8 @@ async function fetchTippingStatsWithSession(
               drizzleSql`${clickEvents.createdAt} >= ${twelveMonthsAgoISO}::timestamp`
             )
           ),
-      'Click events query'
+      'Click events query',
+      { db: tx, timeoutMs: QUERY_TIMEOUTS.api }
     );
 
     const tipTotalsRaw = tipTotalsRawResult?.[0];

@@ -1,6 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { getAdminMercuryMetrics } from '@/lib/admin/mercury-metrics';
 import { getAdminStripeOverviewMetrics } from '@/lib/admin/stripe-metrics';
-import { getHudMetrics } from '@/lib/hud/metrics';
+import { ServerFetchTimeoutError } from '@/lib/http/server-fetch';
+import { buildDegradedHudMetrics, getHudMetrics } from '@/lib/hud/metrics';
 
 const mockGetHudDeployments = vi.hoisted(() => vi.fn());
 const mockGetHudAiOpsSummary = vi.hoisted(() => vi.fn());
@@ -217,6 +219,47 @@ describe('getHudMetrics', () => {
     expect(metrics.sources.sentry.state).toBe('ok');
     expect(metrics.sources.github.state).toBe('not_configured');
     expect(metrics.sources.stripe.fetchedAtIso).toBe(metrics.generatedAtIso);
+  });
+
+  it('returns degraded metrics when an upstream fetch times out', async () => {
+    mockGetHudDeployments.mockResolvedValueOnce({
+      availability: 'not_configured',
+      current: null,
+      recent: [],
+    });
+    vi.mocked(getAdminMercuryMetrics).mockRejectedValueOnce(
+      new ServerFetchTimeoutError(
+        'External request timed out after 8000ms',
+        8000,
+        'Mercury checking balance'
+      )
+    );
+
+    const metrics = await getHudMetrics('kiosk');
+
+    expect(metrics.accessMode).toBe('kiosk');
+    expect(metrics.operations.status).toBe('degraded');
+    expect(metrics.overview.financialDataAvailable).toBe(false);
+    expect(metrics.overview.defaultStatusDetail).toContain(
+      'Metrics temporarily unavailable due to upstream timeout'
+    );
+    expect(metrics.sources.mercury.state).toBe('unavailable');
+    expect(metrics.sources.mercury.errorMessage).toContain(
+      'Mercury checking balance timed out after 8000ms'
+    );
+  });
+
+  it('buildDegradedHudMetrics exposes timeout context in source trust metadata', () => {
+    const metrics = buildDegradedHudMetrics('admin', {
+      context: 'GitHub workflow runs',
+      timeoutMs: 5000,
+    });
+
+    expect(metrics.operations.status).toBe('degraded');
+    expect(metrics.deployments.errorMessage).toContain(
+      'GitHub workflow runs timed out after 5000ms'
+    );
+    expect(metrics.sources.github.state).toBe('unavailable');
   });
 
   it('marks financial data unavailable when Stripe is down', async () => {

@@ -4,6 +4,7 @@
  * Handles uploading images to Vercel Blob storage.
  */
 
+import { env } from '@/lib/env';
 import { logger } from '@/lib/utils/logger';
 import { BLOB_RETRY_DELAY_MS, MAX_BLOB_UPLOAD_RETRIES } from './constants';
 import type { BlobPut } from './types';
@@ -35,7 +36,7 @@ export async function uploadBufferToBlob(
   buffer: Buffer,
   contentType: string
 ): Promise<string> {
-  const token = process.env.BLOB_READ_WRITE_TOKEN;
+  const token = env.BLOB_READ_WRITE_TOKEN;
 
   if (!put || !token) {
     if (process.env.NODE_ENV === 'production') {

@@ -737,10 +737,14 @@ export async function gotoAuthenticatedChatRoute(
     path?: string;
     perAttemptTimeout?: number;
     retries?: number;
+    urlPattern?: RegExp;
+    urlSettleTimeout?: number;
   }
 ): Promise<void> {
   const path = options?.path ?? '/app/chat';
   const perAttemptTimeout = options?.perAttemptTimeout ?? 60_000;
+  const urlPattern = options?.urlPattern ?? /\/app\/chat/;
+  const urlSettleTimeout = options?.urlSettleTimeout ?? 20_000;
   const maxAttempts = (options?.retries ?? RETRY_CONFIG.DEFAULT_RETRIES) + 1;
 
   for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
@@ -749,6 +753,7 @@ export async function gotoAuthenticatedChatRoute(
         timeout: perAttemptTimeout,
         waitUntil: 'commit',
       });
+      await page.waitForURL(urlPattern, { timeout: urlSettleTimeout });
       return;
     } catch (error) {
       if (attempt < maxAttempts && isTransientNavigationError(error)) {
@@ -801,6 +806,8 @@ export function isTransientNavigationError(error: unknown): boolean {
     msg.includes('net::ERR_CONNECTION_REFUSED') ||
     msg.includes('net::ERR_CONNECTION_RESET') ||
     msg.includes('net::ERR_EMPTY_RESPONSE') ||
+    msg.includes('net::ERR_ABORTED') ||
+    msg.includes('frame was detached') ||
     msg.includes('Target closed') ||
     msg.includes('Target page, context or browser has been closed') ||
     msg.includes('browser has disconnected') ||

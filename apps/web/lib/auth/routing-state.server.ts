@@ -80,6 +80,8 @@ function parseStoredAuthState(value: unknown): AuthStateRecord | null {
     returnTo: record.returnTo,
     state: record.state,
     codeChallenge: record.codeChallenge ?? null,
+    desktopFlow:
+      typeof record.desktopFlow === 'string' ? record.desktopFlow : null,
     createdAt: record.createdAt,
     expiresAt: record.expiresAt,
     consumedAt:
@@ -135,6 +137,7 @@ export async function createStoredAuthState(input: {
   readonly returnTo: string;
   readonly state: string;
   readonly codeChallenge?: string | null;
+  readonly desktopFlow?: string | null;
   readonly now?: number;
 }): Promise<AuthStateRecord> {
   const redis = getRequiredRedis();
@@ -144,6 +147,7 @@ export async function createStoredAuthState(input: {
     returnTo: input.returnTo,
     state: input.state,
     codeChallenge: input.codeChallenge,
+    desktopFlow: input.desktopFlow,
     now: input.now ?? Date.now(),
   });
 

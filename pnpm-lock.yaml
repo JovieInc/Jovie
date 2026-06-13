@@ -140,7 +140,7 @@ importers:
         version: 7.0.3
       electron:
         specifier: ^42.0.0
-        version: 42.0.0
+        version: 42.4.0
       electron-builder:
         specifier: ^25.0.0
         version: 25.1.8(electron-builder-squirrel-windows@25.1.8)
@@ -1935,6 +1935,10 @@ packages:
   '@edge-runtime/vm@3.2.0':
     resolution: {integrity: sha512-0dEVyRLM/lG4gp1R/Ik5bfPl/1wX00xFwd5KcNH602tzBa09oF7pbTKETEhR1GjZ75K6OJnYFu8II2dyMhONMw==}
     engines: {node: '>=16'}
+
+  '@electron-internal/extract-zip@1.0.2':
+    resolution: {integrity: sha512-VJuNETNPEhrmQEZezeTZO5TZMV+dobBRyJ7zHjGJWIhMS7m7W1UeClt69u4hkUxv9ZZVxuli/E9Yvc4gDNHGsg==}
+    engines: {node: '>=22.12.0'}
 
   '@electron/asar@3.4.1':
     resolution: {integrity: sha512-i4/rNPRS84t0vSRa2HorerGRXWyF4vThfHesw0dmcWHp+cspK743UanA0suA5Q5y8kzY2y6YKrvbIUn69BCAiA==}
@@ -9815,8 +9819,8 @@ packages:
   electron-updater@6.8.3:
     resolution: {integrity: sha512-Z6sgw3jgbikWKXei1ENdqFOxBP0WlXg3TtKfz0rgw2vIZFJUyI4pD7ZN7jrkm7EoMK+tcm/qTnPUdqfZukBlBQ==}
 
-  electron@42.0.0:
-    resolution: {integrity: sha512-in5jnW/Ywy3Rh3FPr4MR80exPEkywKYAmDJRZ/gIKlr8VXEi3zXgiAZbf0Si7KRccHTF2y8euVMRz7M6HqTjMA==}
+  electron@42.4.0:
+    resolution: {integrity: sha512-OXXqh9LD9KxXPv2Fe25EfU9N9AvWTuV6V81sfhQaNvTAXCd9ONA+Q4OWvMe+CmYD6xIwjFxGGtG/ZphDYYC5OQ==}
     engines: {node: '>= 22.12.0'}
     hasBin: true
 
@@ -18252,6 +18256,8 @@ snapshots:
     dependencies:
       '@edge-runtime/primitives': 4.1.0
 
+  '@electron-internal/extract-zip@1.0.2': {}
+
   '@electron/asar@3.4.1':
     dependencies:
       commander: 5.1.0
@@ -18266,10 +18272,10 @@ snapshots:
       env-paths: 3.0.0
       graceful-fs: 4.2.11
       progress: 2.0.3
-      semver: 7.8.0
+      semver: 7.8.1
       sumchecker: 3.0.1
     optionalDependencies:
-      undici: 6.25.0
+      undici: 6.26.0
     transitivePeerDependencies:
       - supports-color
 
@@ -23212,7 +23218,7 @@ snapshots:
 
   '@types/connect@3.4.38':
     dependencies:
-      '@types/node': 22.19.18
+      '@types/node': 22.19.19
 
   '@types/cors@2.8.19':
     dependencies:
@@ -23372,7 +23378,7 @@ snapshots:
 
   '@types/fs-extra@9.0.13':
     dependencies:
-      '@types/node': 22.19.18
+      '@types/node': 22.19.19
 
   '@types/geojson@7946.0.16': {}
 
@@ -23414,7 +23420,7 @@ snapshots:
   '@types/liftoff@4.0.3':
     dependencies:
       '@types/fined': 1.1.5
-      '@types/node': 22.19.18
+      '@types/node': 22.19.19
 
   '@types/md5@2.3.6': {}
 
@@ -23428,7 +23434,7 @@ snapshots:
 
   '@types/mysql@2.15.27':
     dependencies:
-      '@types/node': 22.19.18
+      '@types/node': 22.19.19
 
   '@types/nlcst@2.0.3':
     dependencies:
@@ -23482,7 +23488,7 @@ snapshots:
 
   '@types/pg@8.15.6':
     dependencies:
-      '@types/node': 22.19.18
+      '@types/node': 22.19.19
       pg-protocol: 1.13.0
       pg-types: 2.2.0
 
@@ -23496,7 +23502,7 @@ snapshots:
 
   '@types/plist@3.0.5':
     dependencies:
-      '@types/node': 22.19.17
+      '@types/node': 22.19.19
       xmlbuilder: 15.1.1
     optional: true
 
@@ -23528,7 +23534,7 @@ snapshots:
 
   '@types/tedious@4.0.14':
     dependencies:
-      '@types/node': 22.19.18
+      '@types/node': 22.19.19
 
   '@types/through@0.0.33':
     dependencies:
@@ -23577,7 +23583,7 @@ snapshots:
 
   '@types/yauzl@2.10.3':
     dependencies:
-      '@types/node': 22.19.18
+      '@types/node': 22.19.19
     optional: true
 
   '@typescript-eslint/eslint-plugin@8.58.1(@typescript-eslint/parser@8.58.1(eslint@10.4.1(jiti@2.6.1))(typescript@6.0.3))(eslint@10.4.1(jiti@2.6.1))(typescript@6.0.3)':
@@ -24754,7 +24760,7 @@ snapshots:
       '@workflow/world': 4.1.1(zod@4.3.6)
       async-sema: 3.1.1
       ulid: 3.0.2
-      undici: 6.25.0
+      undici: 6.26.0
       zod: 4.3.6
     optionalDependencies:
       '@opentelemetry/api': 1.9.1
@@ -24766,7 +24772,7 @@ snapshots:
       '@workflow/errors': 4.1.1
       '@workflow/world': 4.1.1(zod@4.3.6)
       cbor-x: 1.6.0
-      undici: 6.25.0
+      undici: 6.26.0
       zod: 4.3.6
     optionalDependencies:
       '@opentelemetry/api': 1.9.1
@@ -25940,7 +25946,7 @@ snapshots:
 
   chrome-launcher@1.2.1:
     dependencies:
-      '@types/node': 22.19.18
+      '@types/node': 22.19.19
       escape-string-regexp: 4.0.0
       is-wsl: 2.2.0
       lighthouse-logger: 2.0.2
@@ -27015,11 +27021,11 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  electron@42.0.0:
+  electron@42.4.0:
     dependencies:
+      '@electron-internal/extract-zip': 1.0.2
       '@electron/get': 5.0.0
       '@types/node': 24.12.3
-      extract-zip: 2.0.1
     transitivePeerDependencies:
       - supports-color
 
@@ -33822,7 +33828,7 @@ snapshots:
 
   speedline-core@1.4.3:
     dependencies:
-      '@types/node': 22.19.18
+      '@types/node': 22.19.19
       image-ssim: 0.2.0
       jpeg-js: 0.4.4
 

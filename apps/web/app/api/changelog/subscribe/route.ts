@@ -8,6 +8,7 @@ import {
 } from '@/lib/db/schema/product-update-subscribers';
 import { sendEmail } from '@/lib/email/send';
 import { getChangelogVerifyEmail } from '@/lib/email/templates/changelog-verify';
+import { env } from '@/lib/env';
 import { captureError } from '@/lib/error-tracking';
 import { ServerFetchTimeoutError, serverFetch } from '@/lib/http/server-fetch';
 import {
@@ -54,9 +55,9 @@ async function verifyTurnstile(
   token: string,
   ip: string
 ): Promise<TurnstileVerificationResult> {
-  const secret = process.env.TURNSTILE_SECRET_KEY;
+  const secret = env.TURNSTILE_SECRET_KEY;
   if (!secret) {
-    if (process.env.NODE_ENV === 'production') {
+    if (env.NODE_ENV === 'production') {
       logger.error('TURNSTILE_SECRET_KEY not configured in production');
       return 'unavailable';
     }

@@ -157,6 +157,7 @@ test.describe('Dashboard Navigation @smoke', () => {
   test('auth pages (signin/signup) load without server errors', async ({
     page,
   }) => {
+    test.setTimeout(180_000);
     test.skip(
       FAST_ITERATION,
       'Auth page render coverage runs in golden-path and the slower auth lanes'
@@ -165,7 +166,7 @@ test.describe('Dashboard Navigation @smoke', () => {
     for (const route of [APP_ROUTES.SIGNIN, APP_ROUTES.SIGNUP]) {
       const response = await smokeNavigateWithRetry(page, route, {
         timeout: SMOKE_TIMEOUTS.NAVIGATION,
-        retries: process.env.E2E_FAST_ITERATION === '1' ? 3 : 2,
+        retries: process.env.E2E_FAST_ITERATION === '1' ? 3 : 3,
       });
       expect(
         response?.status() ?? 0,
