@@ -6,6 +6,10 @@ import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
 import { env } from '@/lib/env';
 import { captureError, getSafeErrorMessage } from '@/lib/error-tracking';
 import { ServerFetchTimeoutError, serverFetch } from '@/lib/http/server-fetch';
+import {
+  developmentOnlyForbiddenJson,
+  isExplicitDevelopmentEnvironment,
+} from '@/lib/security/development-only';
 import { isSpotifyConfigured, validateSpotifyEnv } from '@/lib/spotify/env';
 
 const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
@@ -274,6 +278,12 @@ async function getRecentFailures() {
 // ---------------------------------------------------------------------------
 
 export async function GET() {
+  if (!isExplicitDevelopmentEnvironment()) {
+    return developmentOnlyForbiddenJson(undefined, {
+      headers: NO_STORE_HEADERS,
+    });
+  }
+
   const entitlements = await getCurrentUserEntitlements();
   if (!entitlements.isAuthenticated) {
     return NextResponse.json(

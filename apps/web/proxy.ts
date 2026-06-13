@@ -49,11 +49,13 @@ import {
   isProxyRewriteExempt,
 } from '@/lib/routing/proxy-routing';
 import { SCRIPT_NONCE_HEADER } from '@/lib/security/content-security-policy';
+import { isExplicitDevelopmentEnvironment } from '@/lib/security/development-only';
 import {
   createFastNotFoundResponse,
   createProbeDropResponse,
   isMaliciousProbePath,
 } from '@/lib/security/probe-detection';
+import { isProductionBlockedDebugPath } from '@/lib/security/production-blocked-routes';
 import { ensureSentry } from '@/lib/sentry/ensure';
 import { createBotResponse } from '@/lib/utils/bot-detection';
 import { isReservedUsername } from '@/lib/validation/username-core';
@@ -251,11 +253,10 @@ async function handleRequest(req: NextRequest, userId: string | null) {
     // Early exits that don't need CSP or user state (no DB/Redis calls)
     // ========================================================================
 
-    // Block Sentry example pages in production
+    // Block debug/test/dev surfaces outside explicit development environments.
     if (
-      process.env.NODE_ENV === 'production' &&
-      (pathname === '/sentry-example-page' ||
-        pathname === '/api/sentry-example-api')
+      !isExplicitDevelopmentEnvironment() &&
+      isProductionBlockedDebugPath(pathname)
     ) {
       return NextResponse.rewrite(new URL('/404', req.url));
     }

@@ -2,6 +2,7 @@ import { TooltipProvider } from '@jovie/ui';
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import type { ReactNode } from 'react';
+import { requireDevelopmentOnlyPage } from '@/lib/security/require-development-only';
 import { NOINDEX_ROBOTS } from '@/lib/seo/noindex-metadata';
 
 export const metadata: Metadata = {
@@ -32,6 +33,8 @@ export default function UILayout({
 }: {
   readonly children: ReactNode;
 }) {
+  requireDevelopmentOnlyPage();
+
   return (
     <TooltipProvider delayDuration={0}>
       <div className='flex h-screen bg-page text-primary-token'>
