@@ -1,0 +1,169 @@
+import SwiftUI
+
+struct MobileChatView: View {
+  @Bindable var repository: ChatRepository
+  @Binding var draft: String
+  let webBaseURL: URL
+
+  var body: some View {
+    ZStack {
+      JovieColor.backgroundBase.ignoresSafeArea()
+
+      VStack(spacing: 0) {
+        if repository.timeline.isEmpty {
+          emptyState
+        } else {
+          ScrollView {
+            LazyVStack(alignment: .leading, spacing: JovieSpacing.large) {
+              ForEach(repository.timeline) { item in
+                MobileChatMessageRow(item: item, webBaseURL: webBaseURL) {
+                  guard let clientTurnId = item.clientTurnId else { return }
+                  Task { await repository.retry(clientTurnId: clientTurnId) }
+                }
+              }
+            }
+            .padding(.horizontal, JovieSpacing.large)
+            .padding(.top, JovieSpacing.xLarge)
+            .padding(.bottom, JovieSpacing.medium)
+          }
+        }
+
+        if let errorMessage = repository.lastErrorMessage, repository.isOffline {
+          Text(errorMessage)
+            .font(JovieFont.body(size: 13))
+            .foregroundStyle(JovieColor.textTertiary)
+            .multilineTextAlignment(.center)
+            .padding(.horizontal, JovieSpacing.large)
+            .padding(.bottom, JovieSpacing.small)
+        }
+
+        ChatComposerView(
+          draft: $draft,
+          isSending: repository.isSending,
+          isOffline: repository.isOffline
+        ) {
+          let text = draft
+          draft = ""
+          Task { await repository.send(text: text) }
+        }
+        .padding(.horizontal, JovieSpacing.large)
+        .padding(.bottom, JovieSpacing.medium)
+      }
+    }
+    .accessibilityIdentifier("mobile-chat")
+    .task {
+      await repository.refreshConversations()
+    }
+  }
+
+  private var emptyState: some View {
+    VStack(spacing: JovieSpacing.large) {
+      Spacer(minLength: 120)
+
+      VStack(spacing: JovieSpacing.large) {
+        JovieLogoMark(size: 34)
+
+        VStack(spacing: JovieSpacing.small) {
+          Text("Ask Jovie")
+            .font(JovieFont.display(size: 28))
+            .foregroundStyle(JovieColor.textPrimary)
+            .multilineTextAlignment(.center)
+
+          Text(
+            repository.isOffline
+              ? "Offline. Drafts stay on this device and cached history remains available."
+              : "Native chat is in alpha for internal testers."
+          )
+          .font(JovieFont.body(size: 15))
+          .foregroundStyle(JovieColor.textTertiary)
+          .multilineTextAlignment(.center)
+          .fixedSize(horizontal: false, vertical: true)
+        }
+      }
+      .frame(maxWidth: 330)
+      .padding(.horizontal, JovieSpacing.xLarge)
+
+      Spacer(minLength: 48)
+    }
+  }
+}
+
+private struct MobileChatMessageRow: View {
+  let item: MobileChatTimelineItem
+  let webBaseURL: URL
+  let onRetry: () -> Void
+
+  var body: some View {
+    VStack(alignment: item.role == .user ? .trailing : .leading, spacing: JovieSpacing.small) {
+      Text(item.content.isEmpty && item.status == .streaming ? "Thinking…" : item.content)
+        .font(JovieFont.body(size: 16))
+        .foregroundStyle(item.role == .user ? JovieColor.backgroundBase : JovieColor.textPrimary)
+        .padding(.horizontal, JovieSpacing.large)
+        .padding(.vertical, JovieSpacing.medium)
+        .background(
+          item.role == .user ? Color.white : JovieColor.surface1,
+          in: RoundedRectangle(cornerRadius: 22, style: .continuous)
+        )
+        .frame(maxWidth: 320, alignment: item.role == .user ? .trailing : .leading)
+
+      if item.requiresWebHandoff, let handoffURL = item.handoffURL {
+        Link("Continue on web", destination: handoffURL)
+          .font(JovieFont.body(size: 14, weight: .semibold))
+          .foregroundStyle(JovieColor.textPrimary)
+      }
+
+      if item.status == .failed {
+        Button("Retry", action: onRetry)
+          .font(JovieFont.body(size: 14, weight: .semibold))
+          .foregroundStyle(JovieColor.textPrimary)
+      }
+    }
+    .frame(maxWidth: .infinity, alignment: item.role == .user ? .trailing : .leading)
+  }
+}
+
+private struct ChatComposerView: View {
+  @Binding var draft: String
+  let isSending: Bool
+  let isOffline: Bool
+  let onSend: () -> Void
+
+  var body: some View {
+    let trimmedDraft = draft.trimmingCharacters(in: .whitespacesAndNewlines)
+
+    HStack(spacing: JovieSpacing.medium) {
+      TextField(isOffline ? "Ask Jovie (offline)" : "Ask Jovie", text: $draft)
+        .textInputAutocapitalization(.sentences)
+        .disableAutocorrection(false)
+        .font(JovieFont.body(size: 16))
+        .foregroundStyle(JovieColor.textPrimary)
+        .frame(height: 52)
+
+      Button(action: onSend) {
+        Image(systemName: isSending ? "ellipsis" : "arrow.up")
+          .font(.system(size: 16, weight: .bold))
+          .foregroundStyle(
+            trimmedDraft.isEmpty || isSending
+              ? JovieColor.textTertiary
+              : JovieColor.backgroundBase
+          )
+          .frame(width: 36, height: 36)
+          .background(
+            trimmedDraft.isEmpty || isSending ? JovieColor.surface2 : Color.white,
+            in: Circle()
+          )
+      }
+      .buttonStyle(.plain)
+      .disabled(trimmedDraft.isEmpty || isSending)
+      .accessibilityLabel("Send")
+    }
+    .padding(.horizontal, JovieSpacing.large)
+    .frame(height: 64)
+    .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 28, style: .continuous))
+    .overlay {
+      RoundedRectangle(cornerRadius: 28, style: .continuous)
+        .stroke(JovieColor.borderDefault, lineWidth: 1)
+    }
+    .accessibilityIdentifier("chat-composer")
+  }
+}

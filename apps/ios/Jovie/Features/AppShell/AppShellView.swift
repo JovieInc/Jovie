@@ -63,6 +63,8 @@ struct AppShellView<ProfileContent: View, ChatContent: View>: View {
   let isOffline: Bool
   let opensSettingsOnLaunch: Bool
   let billingURL: URL
+  let recentConversations: [MobileConversationSummary]
+  let onSelectConversation: (String) -> Void
   let onLogout: @MainActor () async -> Void
   @ViewBuilder let profileContent: ProfileContent
   let chatContent: (Binding<String>) -> ChatContent
@@ -79,6 +81,8 @@ struct AppShellView<ProfileContent: View, ChatContent: View>: View {
     initialTab: AppShellTab = .profile,
     opensSettingsOnLaunch: Bool = false,
     billingURL: URL,
+    recentConversations: [MobileConversationSummary] = [],
+    onSelectConversation: @escaping (String) -> Void = { _ in },
     onLogout: @escaping @MainActor () async -> Void,
     @ViewBuilder profileContent: () -> ProfileContent,
     @ViewBuilder chatContent: @escaping (Binding<String>) -> ChatContent
@@ -87,6 +91,8 @@ struct AppShellView<ProfileContent: View, ChatContent: View>: View {
     self.isOffline = isOffline
     self.opensSettingsOnLaunch = opensSettingsOnLaunch
     self.billingURL = billingURL
+    self.recentConversations = recentConversations
+    self.onSelectConversation = onSelectConversation
     self.onLogout = onLogout
     self.profileContent = profileContent()
     self.chatContent = chatContent
@@ -128,8 +134,14 @@ struct AppShellView<ProfileContent: View, ChatContent: View>: View {
         profile: profile,
         isOffline: isOffline,
         selectedTab: selectedTab,
+        recentConversations: recentConversations,
         onSelectTab: { tab in
           selectedTab = tab
+          isShowingMenu = false
+        },
+        onSelectConversation: { conversationID in
+          onSelectConversation(conversationID)
+          selectedTab = .chat
           isShowingMenu = false
         },
         onOpenSettings: {
@@ -271,7 +283,9 @@ private struct AppNavigationMenu: View {
   let profile: AppShellProfile
   let isOffline: Bool
   let selectedTab: AppShellTab
+  let recentConversations: [MobileConversationSummary]
   let onSelectTab: (AppShellTab) -> Void
+  let onSelectConversation: (String) -> Void
   let onOpenSettings: () -> Void
   let onClose: () -> Void
 
@@ -326,10 +340,30 @@ private struct AppNavigationMenu: View {
             .font(JovieFont.body(size: 13, weight: .semibold))
             .foregroundStyle(JovieColor.textTertiary)
 
-          Text("Conversations will appear here when mobile chat is enabled.")
-            .font(JovieFont.body(size: 15))
-            .foregroundStyle(JovieColor.textTertiary)
-            .fixedSize(horizontal: false, vertical: true)
+          if recentConversations.isEmpty {
+            Text("Start a chat to see recent conversations here.")
+              .font(JovieFont.body(size: 15))
+              .foregroundStyle(JovieColor.textTertiary)
+              .fixedSize(horizontal: false, vertical: true)
+          } else {
+            VStack(spacing: JovieSpacing.small) {
+              ForEach(recentConversations.prefix(5)) { conversation in
+                Button {
+                  onSelectConversation(conversation.id)
+                } label: {
+                  HStack {
+                    Text(conversation.title ?? "New chat")
+                      .font(JovieFont.body(size: 15))
+                      .foregroundStyle(JovieColor.textPrimary)
+                      .lineLimit(1)
+                    Spacer()
+                  }
+                  .padding(.vertical, JovieSpacing.small)
+                }
+                .buttonStyle(.plain)
+              }
+            }
+          }
         }
         .padding(.top, JovieSpacing.medium)
 

@@ -65,6 +65,12 @@ Optional internal TestFlight install URL used by authenticated, alpha-gated iOS
 download surfaces. Leave unset to keep the iOS alpha visible but not directly
 installable from web UI.
 
+### `MOBILE_CHAT_RUNTIME_ENABLED`
+
+Set to `true` on environments that should serve native iOS chat turns from
+`POST /api/mobile/v1/chat/turns`. Leave unset/false in production until the
+`ios_app_alpha_access` gate and mobile chat contract tests pass in CI.
+
 ## Feature Flags (Statsig)
 
 ### `STATSIG_SERVER_SECRET`

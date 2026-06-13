@@ -1,20 +1,13 @@
-import { and, desc, eq, lt } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 import { getSessionContext } from '@/lib/auth/session';
+import { getCreatorConversationDetail } from '@/lib/chat/conversation-queries';
 import {
   sanitizeConversationTitle,
   withSanitizedConversationTitle,
 } from '@/lib/chat/title';
-import {
-  decodeToolEvents,
-  resolvePersistedToolEventsForDisplay,
-} from '@/lib/chat/tool-events';
 import { db } from '@/lib/db';
-import {
-  chatConversations,
-  chatMessages,
-  chatTurns,
-} from '@/lib/db/schema/chat';
+import { chatConversations } from '@/lib/db/schema/chat';
 import { captureError } from '@/lib/error-tracking';
 import { logger } from '@/lib/utils/logger';
 import { getSessionErrorResponse } from '../../session-error-response';
@@ -55,95 +48,49 @@ export async function GET(req: Request, { params }: RouteParams) {
     );
     const before = url.searchParams.get('before');
 
-    // Get the conversation, ensuring it belongs to the user's profile
-    const [conversation] = await db
-      .select()
-      .from(chatConversations)
-      .where(
-        and(
-          eq(chatConversations.id, id),
-          eq(chatConversations.creatorProfileId, profile.id)
-        )
-      )
-      .limit(1);
+    let detail;
+    try {
+      detail = await getCreatorConversationDetail({
+        conversationId: id,
+        creatorProfileId: profile.id,
+        limit,
+        before,
+      });
+    } catch (error) {
+      if (
+        error instanceof TypeError &&
+        error.message === 'INVALID_BEFORE_CURSOR'
+      ) {
+        return NextResponse.json(
+          { error: 'Invalid "before" cursor' },
+          { status: 400, headers: NO_STORE_HEADERS }
+        );
+      }
+      throw error;
+    }
 
-    if (!conversation) {
+    if (!detail) {
       return NextResponse.json(
         { error: 'Conversation not found' },
         { status: 404, headers: NO_STORE_HEADERS }
       );
     }
 
-    // Build where conditions for messages
-    const conditions = [eq(chatMessages.conversationId, id)];
-    if (before) {
-      const beforeDate = new Date(before);
-      if (Number.isNaN(beforeDate.getTime())) {
-        return NextResponse.json(
-          { error: 'Invalid "before" cursor' },
-          { status: 400, headers: NO_STORE_HEADERS }
-        );
-      }
-      conditions.push(lt(chatMessages.createdAt, beforeDate));
-    }
-
-    // Fetch the most recent N messages (DESC + limit), then reverse to chronological order
-    const rows = await db
-      .select({
-        id: chatMessages.id,
-        role: chatMessages.role,
-        content: chatMessages.content,
-        toolCalls: chatMessages.toolCalls,
-        clientMessageId: chatMessages.clientMessageId,
-        turnId: chatMessages.turnId,
-        turnStatus: chatTurns.status,
-        createdAt: chatMessages.createdAt,
-      })
-      .from(chatMessages)
-      .leftJoin(chatTurns, eq(chatMessages.turnId, chatTurns.id))
-      .where(and(...conditions))
-      .orderBy(desc(chatMessages.createdAt))
-      .limit(limit + 1);
-
-    const hasMore = rows.length > limit;
-    if (hasMore) rows.pop();
-    rows.reverse();
-
-    const messages = rows.map(row => {
-      const decodedToolCalls = decodeToolEvents(row.toolCalls);
-
-      if (decodedToolCalls.source === 'legacy') {
-        logger.warn(
-          'Decoded legacy tool calls while loading conversation',
-          { conversationId: id, messageId: row.id },
-          'chat-conversation'
-        );
-      }
-
-      const resolvedToolCalls = resolvePersistedToolEventsForDisplay(
-        decodedToolCalls.events,
-        {
-          messageCreatedAt: row.createdAt,
-          turnStatus: row.turnStatus,
-        }
-      );
-
-      return {
-        id: row.id,
-        role: row.role,
-        content: row.content,
-        clientMessageId: row.clientMessageId,
-        turnId: row.turnId,
-        createdAt: row.createdAt,
-        toolCalls: resolvedToolCalls.length > 0 ? resolvedToolCalls : null,
-      };
-    });
+    const messages = detail.messages.map(message => ({
+      id: message.id,
+      role: message.role,
+      content: message.content,
+      clientMessageId: message.clientMessageId,
+      turnId: message.turnId,
+      createdAt: message.createdAt,
+      toolCalls: message.toolCalls.length > 0 ? message.toolCalls : null,
+    }));
 
     return NextResponse.json(
       {
-        conversation: withSanitizedConversationTitle(conversation),
+        conversation: withSanitizedConversationTitle(detail.conversation),
         messages,
-        hasMore,
+        hasMore: detail.hasMore,
       },
       { status: 200, headers: NO_STORE_HEADERS }
     );

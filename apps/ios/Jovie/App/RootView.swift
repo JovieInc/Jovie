@@ -170,6 +170,8 @@ private struct AppContentView: View {
   let onLogout: @MainActor () async -> Void
   let onAuthReturn: @MainActor (MobileAuthReturn) -> Void
   let onAuthError: @MainActor (String?) -> Void
+  @State private var chatRepository: ChatRepository?
+  @State private var chatDraft = ""
 
   var body: some View {
     Group {
@@ -192,11 +194,23 @@ private struct AppContentView: View {
           initialTab: .profile,
           opensSettingsOnLaunch: appState.launchMode.opensSettingsOnLaunch,
           billingURL: appState.billingURL,
+          recentConversations: chatRepository?.conversations ?? [],
+          onSelectConversation: { conversationID in
+            Task { await chatRepository?.openConversation(conversationID) }
+          },
           onLogout: onLogout
         ) {
           NeedsOnboardingView(continueURL: appState.continueOnWebURL)
         } chatContent: { draft in
-          MobileChatHomeView(isOffline: false, draft: draft)
+          if let chatRepository {
+            MobileChatView(
+              repository: chatRepository,
+              draft: draft,
+              webBaseURL: appState.configuration.webBaseURL
+            )
+          } else {
+            MobileChatPlaceholderView(isOffline: false, draft: draft)
+          }
         }
       case .ready:
         AppShellView(
@@ -205,6 +219,10 @@ private struct AppContentView: View {
           initialTab: appState.launchMode.opensChatOnLaunch ? .chat : .profile,
           opensSettingsOnLaunch: appState.launchMode.opensSettingsOnLaunch,
           billingURL: appState.billingURL,
+          recentConversations: chatRepository?.conversations ?? [],
+          onSelectConversation: { conversationID in
+            Task { await chatRepository?.openConversation(conversationID) }
+          },
           onLogout: onLogout
         ) {
           DashboardView(
@@ -221,14 +239,42 @@ private struct AppContentView: View {
             onRetry: { await appState.retry() }
           )
         } chatContent: { draft in
-          MobileChatHomeView(isOffline: appState.isOffline, draft: draft)
+          if let chatRepository {
+            MobileChatView(
+              repository: chatRepository,
+              draft: draft,
+              webBaseURL: appState.configuration.webBaseURL
+            )
+          } else {
+            MobileChatPlaceholderView(isOffline: appState.isOffline, draft: draft)
+          }
         }
+      }
+    }
+    .task(id: appState.activeUserID) {
+      guard let activeUserID = appState.activeUserID else {
+        chatRepository = nil
+        return
+      }
+
+      if chatRepository == nil {
+        let repository = ChatRepository(
+          client: MobileChatClient(
+            baseURL: appState.configuration.apiBaseURL,
+            tokenProvider: ClerkTokenProvider()
+          ),
+          cache: ChatCache(),
+          clerkUserID: activeUserID,
+          webBaseURL: appState.configuration.webBaseURL
+        )
+        await repository.bootstrap()
+        chatRepository = repository
       }
     }
   }
 }
 
-private struct MobileChatHomeView: View {
+private struct MobileChatPlaceholderView: View {
   let isOffline: Bool
   @Binding var draft: String
 
