@@ -1,5 +1,6 @@
 import { HOSTNAME, STAGING_HOSTNAMES } from '@/constants/domains';
 import { APP_ROUTES } from '@/constants/routes';
+import { isReservedUsername } from '@/lib/validation/username-core';
 
 export interface PathCategory {
   needsNonce: boolean;
@@ -91,6 +92,11 @@ const ALL_RESERVED_ROOT_SEGMENTS = new Set<string>([
   ...APP_ROUTES_RESERVED,
 ]);
 
+/** True when a single-segment path is a known app/system route (not a handle). */
+export function isDedicatedRootSegment(segment: string): boolean {
+  return ALL_RESERVED_ROOT_SEGMENTS.has(segment);
+}
+
 /**
  * Returns the candidate username for a public profile path, or null.
  * Pure, synchronous, edge-compatible, fully testable.
@@ -103,6 +109,7 @@ export function getPublicProfileCandidate(pathname: string): string | null {
 
   const segment = parts[0];
   if (ALL_RESERVED_ROOT_SEGMENTS.has(segment)) return null;
+  if (isReservedUsername(segment)) return null;
 
   // Username bounds from lib/validation/username-core.ts
   if (segment.length < 3 || segment.length > 30) return null;

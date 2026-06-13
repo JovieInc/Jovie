@@ -6,9 +6,10 @@
  * Stripe webhook handlers).
  */
 
-import { and, count, desc, sql as drizzleSql, eq, sum } from 'drizzle-orm';
+import { and, count, desc, eq, sum } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 import { withDbSessionTx } from '@/lib/auth/session';
+import { apiQuery, QUERY_TIMEOUTS } from '@/lib/db/query-timeout';
 import { tips } from '@/lib/db/schema/analytics';
 import { users } from '@/lib/db/schema/auth';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
@@ -49,26 +50,24 @@ export async function GET() {
         );
       }
 
-      // Set a PostgreSQL-level statement timeout to prevent long-running queries
-      // from holding Neon WebSocket connections (JOVIE-WEB-8D / JOVIE-WEB-DP).
-      // Use SET (session-scoped) instead of SET LOCAL — SET LOCAL is a no-op
-      // outside a transaction block and the Neon HTTP driver does not support
-      // transactions. See lib/db/query-timeout.ts for documentation.
-      await tx.execute(drizzleSql`SET statement_timeout = '5000ms'`);
-
       // Fetch aggregated stats for completed tips
-      const [statsRow] = await tx
-        .select({
-          totalRevenueCents: sum(tips.amountCents),
-          totalTips: count(),
-        })
-        .from(tips)
-        .where(
-          and(
-            eq(tips.creatorProfileId, profile.id),
-            eq(tips.status, 'completed')
-          )
-        );
+      const [statsRow] = await apiQuery(
+        () =>
+          tx
+            .select({
+              totalRevenueCents: sum(tips.amountCents),
+              totalTips: count(),
+            })
+            .from(tips)
+            .where(
+              and(
+                eq(tips.creatorProfileId, profile.id),
+                eq(tips.status, 'completed')
+              )
+            ),
+        'Dashboard earnings stats query',
+        { db: tx, timeoutMs: QUERY_TIMEOUTS.api }
+      );
 
       const totalRevenueCents = Number(statsRow?.totalRevenueCents ?? 0);
       const totalTips = Number(statsRow?.totalTips ?? 0);

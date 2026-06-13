@@ -18,6 +18,7 @@
 
 import { sql as drizzleSql, eq } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
+import { reconcileOrphanedAcceptedActions } from '@/lib/connectors/workflows/reconcile-orphaned-approved-actions';
 import { verifyCronRequest } from '@/lib/cron/auth';
 import { db } from '@/lib/db';
 import {
@@ -265,7 +266,13 @@ export async function GET(request: Request) {
     results.alphabetCache = { success: true, skipped: true };
   }
 
-  // 8. Fallback ingestion job processing — drains up to 2 jobs if the
+  // 8. Recover accepted suggested_actions missing workflow_runs enqueue
+  results.workflowApprovalRecovery = await runSubJob(
+    'workflowApprovalRecovery',
+    async () => reconcileOrphanedAcceptedActions(20)
+  );
+
+  // 9. Fallback ingestion job processing — drains up to 2 jobs if the
   //    dedicated cron hasn't picked them up. Runs last to stay within budget.
   const elapsed = Date.now() - startTime;
   if (elapsed < 50_000) {

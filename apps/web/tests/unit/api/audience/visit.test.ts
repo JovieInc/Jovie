@@ -13,6 +13,9 @@ const mockCheckVisitRateLimit = vi.hoisted(() => vi.fn());
 const mockIsTrackingTokenEnabled = vi.hoisted(() => vi.fn());
 const mockCaptureWarning = vi.hoisted(() => vi.fn());
 const mockCaptureError = vi.hoisted(() => vi.fn());
+const mockRecordAudienceEvent = vi.hoisted(() =>
+  vi.fn().mockResolvedValue(undefined)
+);
 
 vi.mock('@/lib/rate-limit', () => ({
   publicVisitLimiter: {
@@ -64,6 +67,10 @@ vi.mock('@/lib/utils/ip-extraction', () => ({
 
 vi.mock('@/lib/audience/block-check', () => ({
   isVisitorBlocked: vi.fn().mockResolvedValue(false),
+}));
+
+vi.mock('@/lib/audience/record-audience-event', () => ({
+  recordAudienceEvent: mockRecordAudienceEvent,
 }));
 
 const { POST } = await import('@/app/api/audience/visit/route');
@@ -557,7 +564,6 @@ describe('POST /api/audience/visit', () => {
     });
 
     const insertedValues: Record<string, unknown>[] = [];
-    const updatedValues: Record<string, unknown>[] = [];
     mockWithSystemIngestionSession.mockImplementation(async callback => {
       const mockInsert = vi.fn().mockReturnValue({
         values: vi.fn().mockImplementation((value: Record<string, unknown>) => {
@@ -567,14 +573,6 @@ describe('POST /api/audience/visit', () => {
               returning: vi.fn().mockResolvedValue([{ id: 'inserted_member' }]),
             }),
             onConflictDoUpdate: vi.fn().mockResolvedValue(undefined),
-          };
-        }),
-      });
-      const mockUpdate = vi.fn().mockReturnValue({
-        set: vi.fn().mockImplementation((value: Record<string, unknown>) => {
-          updatedValues.push(value);
-          return {
-            where: vi.fn().mockResolvedValue(undefined),
           };
         }),
       });
@@ -588,7 +586,6 @@ describe('POST /api/audience/visit', () => {
           }),
         }),
         insert: mockInsert,
-        update: mockUpdate,
       });
     });
 
@@ -619,13 +616,20 @@ describe('POST /api/audience/visit', () => {
       })
     );
     expect(audienceMemberInsert).not.toHaveProperty('latestReferrerUrl');
-    expect(updatedValues).toHaveLength(1);
-    expect(updatedValues[0]).toHaveProperty('latestActions');
-    expect(updatedValues[0]).not.toHaveProperty('latestActionLabel');
+    expect(mockRecordAudienceEvent).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        eventType: 'profile_visited',
+        verb: 'visited',
+      }),
+      expect.objectContaining({
+        includeLatestActionLabel: false,
+      })
+    );
     expect(mockCaptureError).not.toHaveBeenCalled();
   });
 
-  it('fails soft when optional persistence degrades after fingerprint resolution', async () => {
+  it('fails closed when persistence fails after fingerprint resolution', async () => {
     mockDbSelect.mockReturnValue({
       from: vi.fn().mockReturnValue({
         where: vi.fn().mockReturnValue({
@@ -650,19 +654,20 @@ describe('POST /api/audience/visit', () => {
     const response = await POST(request);
     const data = await response.json();
 
-    expect(response.status).toBe(200);
-    expect(data.success).toBe(true);
-    expect(data.degraded).toBe(true);
-    expect(data.fingerprint).toBeDefined();
-    expect(mockCaptureWarning).toHaveBeenCalledWith(
-      'Audience visit persistence degraded',
+    expect(response.status).toBe(500);
+    expect(data).toEqual({ error: 'Unable to record visit' });
+    expect(data.success).toBeUndefined();
+    expect(data.degraded).toBeUndefined();
+    expect(data.fingerprint).toBeUndefined();
+    expect(mockCaptureError).toHaveBeenCalledWith(
+      'Audience visit tracking failed',
       expect.any(Error),
       expect.objectContaining({
         route: '/api/audience/visit',
         method: 'POST',
-        profileId: '123e4567-e89b-12d3-a456-426614174000',
       })
     );
+    expect(mockCaptureWarning).not.toHaveBeenCalled();
   });
 
   it('writes one activated event for Instagram-sourced visits inside the activation window', async () => {

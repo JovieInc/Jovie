@@ -132,6 +132,29 @@ test('desktop window fails into a branded Jovie recovery surface', async () => {
   assert.match(tokenSource, /radiusPill: '999px'/);
 });
 
+const FORBIDDEN_MAC_ENTITLEMENTS = [
+  'com.apple.security.cs.allow-unsigned-executable-memory',
+  'com.apple.security.cs.disable-library-validation',
+];
+
+test('desktop macOS entitlements keep only allow-jit (no sandbox-weakening flags)', async () => {
+  for (const fileName of ['entitlements.mac.plist', 'entitlements.mac.inherit.plist']) {
+    const entitlements = await readFile(
+      join(desktopRoot, 'build', fileName),
+      'utf8'
+    );
+
+    assert.match(
+      entitlements,
+      /<key>com\.apple\.security\.cs\.allow-jit<\/key>\s*\n\s*<true\/>/
+    );
+
+    for (const forbidden of FORBIDDEN_MAC_ENTITLEMENTS) {
+      assert.doesNotMatch(entitlements, new RegExp(`<key>${forbidden}</key>`));
+    }
+  }
+});
+
 test('desktop production bundle declares the jovie auth protocol', async () => {
   const builderConfig = await readFile(
     join(desktopRoot, 'electron-builder.yml'),
@@ -250,13 +273,17 @@ test('desktop bridge exposes bounded dictation support', async () => {
   assert.match(mainSource, /function getDesktopDictationStatus\(\)/);
   assert.match(mainSource, /nativeAvailable: false/);
   assert.match(mainSource, /webSpeechFallbackAllowed: true/);
-  assert.match(mainSource, /permission === 'media'/);
-  assert.match(mainSource, /function isAudioOnlyMediaPermissionRequest/);
-  assert.match(mainSource, /mediaTypes\.includes\('audio'\)/);
-  assert.match(mainSource, /!mediaTypes\.includes\('video'\)/);
-  assert.match(mainSource, /mediaType\?: unknown/);
-  assert.match(mainSource, /mediaType === 'audio'/);
-  assert.match(mainSource, /isTrustedPermissionRequest/);
+  assert.match(mainSource, /shouldGrantTrustedAudioPermission/);
+  assert.match(mainSource, /shouldGrantTrustedAudioPermissionCheck/);
+  assert.match(mainSource, /backgroundThrottling: false/);
+  assert.match(mainSource, /installDesktopCspWatchdog/);
+  assert.match(mainSource, /autoUpdater\.allowDowngrade = false/);
+  assert.match(mainSource, /process\.platform === 'linux'/);
+  assert.match(mainSource, /sanitizeWindowState/);
+  assert.match(mainSource, /bindPendingDesktopAuthCompletion/);
+  assert.match(mainSource, /DESKTOP_AUTH_FLOW_PARAM/);
+  assert.match(mainSource, /!app\.isPackaged/);
+  assert.match(mainSource, /reportDesktopSecurityEvent/);
   assert.match(preloadSource, /getDictationStatus/);
   assert.match(
     preloadSource,

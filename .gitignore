@@ -144,5 +144,10 @@ apps/desktop/*
 !apps/desktop/src/
 apps/desktop/src/*
 !apps/desktop/src/system-b-tokens.ts
+!apps/desktop/src/desktop-auth-security.ts
+!apps/desktop/src/desktop-csp-watchdog.ts
+!apps/desktop/src/desktop-permissions.ts
+!apps/desktop/src/desktop-security-reporting.ts
+!apps/desktop/src/window-state.ts
 apps/extension/
 .agents/

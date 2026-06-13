@@ -722,19 +722,15 @@ export const referralCommissionStatusEnum = pgEnum(
 // ---------------------------------------------------------------------------
 
 export const connectorProviderEnum = pgEnum('connector_provider', [
-  'spotify',
-  'apple_music',
-  'youtube',
-  'instagram',
-  'tiktok',
-  'soundcloud',
+  'google_calendar',
+  'gmail',
 ]);
 
 export const connectorStatusEnum = pgEnum('connector_status', [
   'connected',
-  'disconnected',
+  'needs_reauth',
   'error',
-  'reauth_required',
+  'disabled',
 ]);
 
 export const webhookProviderEnum = pgEnum('webhook_provider', [

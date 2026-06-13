@@ -5,6 +5,7 @@ import { withDbSessionTx } from '@/lib/auth/session';
 import { getUserByClerkId } from '@/lib/db/queries/shared';
 import { discogReleases } from '@/lib/db/schema/content';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
+import { env } from '@/lib/env';
 import { captureError } from '@/lib/error-tracking';
 import { artworkUploadLimiter } from '@/lib/rate-limit';
 import { logger } from '@/lib/utils/logger';
@@ -38,7 +39,7 @@ async function uploadArtworkSizes(
       const blobPath = `artwork/releases/${releaseId}/${sizeKey}.avif`;
 
       if (!put || !token) {
-        if (process.env.NODE_ENV === 'production') {
+        if (env.NODE_ENV === 'production') {
           throw new TypeError('Blob storage not configured');
         }
         return [
@@ -112,10 +113,7 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  if (
-    process.env.NODE_ENV === 'production' &&
-    !process.env.BLOB_READ_WRITE_TOKEN
-  ) {
+  if (env.NODE_ENV === 'production' && !env.BLOB_READ_WRITE_TOKEN) {
     logger.error('BLOB_READ_WRITE_TOKEN is not configured');
     return errorResponse(
       'Image upload is temporarily unavailable. Please try again later.',
@@ -240,7 +238,7 @@ export async function POST(request: NextRequest) {
       );
 
       const put = await getVercelBlobUploader();
-      const token = process.env.BLOB_READ_WRITE_TOKEN;
+      const token = env.BLOB_READ_WRITE_TOKEN;
       const sizes = await uploadArtworkSizes(processed, releaseId, put, token);
 
       // Primary artwork URL is the 1000px version (good balance of quality/size)

@@ -1,7 +1,8 @@
 import 'server-only';
 
-import { and, sql as drizzleSql, eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import type { ConnectorStatus } from '@/components/features/connectors/ConnectorCard';
+import { CONNECTOR_PROVIDERS } from '@/lib/connectors/registry';
 import { db } from '@/lib/db';
 import { getUserByClerkId } from '@/lib/db/queries/shared';
 import {
@@ -88,7 +89,7 @@ export async function loadSettingsConnectorsData(
       .where(
         and(
           eq(connectorAccounts.userId, dbUser.id),
-          drizzleSql`${connectorAccounts.provider} = 'gmail'::connector_provider`
+          eq(connectorAccounts.provider, CONNECTOR_PROVIDERS.gmail)
         )
       )
       .limit(1)
@@ -103,7 +104,7 @@ export async function loadSettingsConnectorsData(
       .where(
         and(
           eq(connectorAccounts.userId, dbUser.id),
-          drizzleSql`${connectorAccounts.provider} = 'google_calendar'::connector_provider`
+          eq(connectorAccounts.provider, CONNECTOR_PROVIDERS.google_calendar)
         )
       )
       .limit(1)
