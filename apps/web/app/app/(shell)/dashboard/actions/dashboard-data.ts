@@ -19,7 +19,12 @@ import { withDbSessionTx } from '@/lib/auth/session';
 import { CACHE_TAGS, CACHE_TTL } from '@/lib/cache/tags';
 import { type DbOrTransaction, doesTableExist } from '@/lib/db';
 import { getAvatarQualityForProfile } from '@/lib/db/queries/avatar-quality';
-import { dashboardQuery, QUERY_TIMEOUTS } from '@/lib/db/query-timeout';
+import {
+  dashboardQuery,
+  isPostgresTimeoutError,
+  isQueryTimeoutError,
+  QUERY_TIMEOUTS,
+} from '@/lib/db/query-timeout';
 import { clickEvents, tips } from '@/lib/db/schema/analytics';
 import { userSettings, users } from '@/lib/db/schema/auth';
 import { socialLinks } from '@/lib/db/schema/links';
@@ -39,6 +44,7 @@ import {
   type BioLinkActivation,
   getBioLinkActivationWindowEnd,
   INSTAGRAM_DISTRIBUTION_PLATFORM,
+  isMissingCreatorDistributionEventsTableError,
   resolveBioLinkActivationStatus,
 } from '@/lib/distribution/instagram-activation';
 import { isE2EFastOnboardingEnabled } from '@/lib/e2e/runtime';
@@ -237,14 +243,41 @@ async function buildBioLinkActivation(
             )
           )
           .orderBy(asc(creatorDistributionEvents.createdAt)),
-      'Creator distribution events query'
+      'Creator distribution events query',
+      { db: tx }
     ).catch((error: unknown) => {
+      if (isMissingCreatorDistributionEventsTableError(error)) {
+        Sentry.logger.warn(
+          '[Dashboard] creator_distribution_events table missing; skipping activation lookup',
+          { profileId: profile.id }
+        );
+        return [];
+      }
+
+      const migrationResult = handleMigrationErrors(error, {
+        userId: profile.id,
+        operation: 'creator_distribution_events',
+      });
+
+      if (!migrationResult.shouldRetry) {
+        return (migrationResult.fallbackData ?? []) as Array<{
+          createdAt: Date;
+          eventType: string;
+        }>;
+      }
+
+      const level =
+        isQueryTimeoutError(error) || isPostgresTimeoutError(error)
+          ? 'warning'
+          : 'error';
+
       Sentry.captureException(error, {
-        level: 'warning',
+        level,
         tags: {
           query: 'creator_distribution_events',
           context: 'dashboard_data_settled',
         },
+        extra: { profileId: profile.id },
       });
       return [];
     });
