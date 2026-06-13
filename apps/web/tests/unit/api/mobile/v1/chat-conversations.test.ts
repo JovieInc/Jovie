@@ -1,18 +1,15 @@
+import { NextResponse } from 'next/server';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { NO_STORE_HEADERS } from '@/lib/http/headers';
 
 const hoisted = vi.hoisted(() => ({
-  getMobileSessionUserIdMock: vi.fn(),
-  getSessionContextMock: vi.fn(),
+  requireMobileProfileSessionMock: vi.fn(),
   listMobileConversationsMock: vi.fn(),
   getMobileConversationDetailMock: vi.fn(),
 }));
 
 vi.mock('@/lib/mobile/session-auth', () => ({
-  getMobileSessionUserId: hoisted.getMobileSessionUserIdMock,
-}));
-
-vi.mock('@/lib/auth/session', () => ({
-  getSessionContext: hoisted.getSessionContextMock,
+  requireMobileProfileSession: hoisted.requireMobileProfileSessionMock,
 }));
 
 vi.mock('@/lib/mobile/chat/conversations', () => ({
@@ -28,9 +25,9 @@ const detailRoutePromise = import(
 describe('GET /api/mobile/v1/chat/conversations', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    hoisted.getMobileSessionUserIdMock.mockResolvedValue('user_123');
-    hoisted.getSessionContextMock.mockResolvedValue({
+    hoisted.requireMobileProfileSessionMock.mockResolvedValue({
       profile: { id: 'profile_123' },
+      userId: 'user_123',
     });
     hoisted.listMobileConversationsMock.mockResolvedValue([
       {
@@ -45,7 +42,12 @@ describe('GET /api/mobile/v1/chat/conversations', () => {
   });
 
   it('returns 401 without a mobile session token', async () => {
-    hoisted.getMobileSessionUserIdMock.mockResolvedValue(null);
+    hoisted.requireMobileProfileSessionMock.mockResolvedValue({
+      errorResponse: NextResponse.json(
+        { error: 'Unauthorized' },
+        { status: 401, headers: NO_STORE_HEADERS }
+      ),
+    });
     const { GET } = await listRoutePromise;
     const response = await GET(
       new Request('https://jov.ie/api/mobile/v1/chat/conversations')
@@ -83,9 +85,9 @@ describe('GET /api/mobile/v1/chat/conversations', () => {
 describe('GET /api/mobile/v1/chat/conversations/[id]', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    hoisted.getMobileSessionUserIdMock.mockResolvedValue('user_123');
-    hoisted.getSessionContextMock.mockResolvedValue({
+    hoisted.requireMobileProfileSessionMock.mockResolvedValue({
       profile: { id: 'profile_123' },
+      userId: 'user_123',
     });
     hoisted.getMobileConversationDetailMock.mockResolvedValue({
       conversation: {

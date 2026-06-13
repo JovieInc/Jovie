@@ -12,6 +12,7 @@ import {
   chatMessages,
   chatTurns,
 } from '@/lib/db/schema/chat';
+import { logger } from '@/lib/utils/logger';
 
 export interface CreatorConversationSummary {
   readonly id: string;
@@ -133,6 +134,16 @@ export async function getCreatorConversationDetail(input: {
 
   const messages = rows.map(row => {
     const decodedToolCalls = decodeToolEvents(row.toolCalls);
+    if (decodedToolCalls.source === 'legacy') {
+      logger.warn(
+        'Decoded legacy tool calls while loading conversation',
+        {
+          conversationId: input.conversationId,
+          messageId: row.id,
+        },
+        'chat-conversation'
+      );
+    }
     const resolvedToolCalls = resolvePersistedToolEventsForDisplay(
       decodedToolCalls.events,
       {
