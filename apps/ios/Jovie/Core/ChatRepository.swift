@@ -26,7 +26,10 @@ final class ChatRepository {
     self.cache = cache
     self.clerkUserID = clerkUserID
     self.webBaseURL = webBaseURL
-    hydrateFromCache()
+  }
+
+  func bootstrap() async {
+    await hydrateFromCache()
   }
 
   func refreshConversations() async {
@@ -40,7 +43,7 @@ final class ChatRepository {
       lastErrorMessage = nil
       await persistCache()
     } catch {
-      hydrateFromCache()
+      await hydrateFromCache()
       isOffline = true
       lastErrorMessage = error.localizedDescription
     }
@@ -56,7 +59,7 @@ final class ChatRepository {
       lastErrorMessage = nil
       await persistCache(messages: detail.messages, conversationID: conversationID)
     } catch {
-      hydrateConversationFromCache(conversationID)
+      await hydrateConversationFromCache(conversationID)
       isOffline = true
       lastErrorMessage = error.localizedDescription
     }
@@ -221,8 +224,8 @@ final class ChatRepository {
     timeline[index] = transform(timeline[index])
   }
 
-  private func hydrateFromCache() {
-    guard let snapshot = cache.load(for: clerkUserID) else { return }
+  private func hydrateFromCache() async {
+    guard let snapshot = await cache.load(for: clerkUserID) else { return }
     conversations = snapshot.conversations
     if let activeConversationID,
        let cachedMessages = snapshot.messagesByConversationID[activeConversationID]
@@ -231,9 +234,9 @@ final class ChatRepository {
     }
   }
 
-  private func hydrateConversationFromCache(_ conversationID: String) {
+  private func hydrateConversationFromCache(_ conversationID: String) async {
     guard
-      let snapshot = cache.load(for: clerkUserID),
+      let snapshot = await cache.load(for: clerkUserID),
       let cachedMessages = snapshot.messagesByConversationID[conversationID]
     else {
       return
@@ -246,7 +249,7 @@ final class ChatRepository {
     conversationID: String? = nil
   ) async {
     var messagesByConversationID =
-      cache.load(for: clerkUserID)?.messagesByConversationID ?? [:]
+      (await cache.load(for: clerkUserID))?.messagesByConversationID ?? [:]
 
     if let messages, let conversationID {
       messagesByConversationID[conversationID] = messages

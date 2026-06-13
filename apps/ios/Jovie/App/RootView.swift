@@ -258,7 +258,7 @@ private struct AppContentView: View {
       }
 
       if chatRepository == nil {
-        chatRepository = ChatRepository(
+        let repository = ChatRepository(
           client: MobileChatClient(
             baseURL: appState.configuration.apiBaseURL,
             tokenProvider: ClerkTokenProvider()
@@ -267,6 +267,8 @@ private struct AppContentView: View {
           clerkUserID: activeUserID,
           webBaseURL: appState.configuration.webBaseURL
         )
+        await repository.bootstrap()
+        chatRepository = repository
       }
     }
   }

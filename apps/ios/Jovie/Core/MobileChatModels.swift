@@ -57,8 +57,8 @@ struct MobileChatTimelineItem: Identifiable, Equatable, Sendable {
   var content: String
   var status: MobileChatTimelineStatus
   let clientTurnId: String?
-  let requiresWebHandoff: Bool
-  let handoffURL: URL?
+  var requiresWebHandoff: Bool
+  var handoffURL: URL?
 }
 
 struct CachedChatSnapshot: Codable, Equatable, Sendable {
