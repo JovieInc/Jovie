@@ -213,6 +213,8 @@ describe('getHudMetrics', () => {
 
     const metrics = await getHudMetrics('admin');
 
+    expect(metrics.testing.quarantine.activeCount).toBeGreaterThanOrEqual(0);
+    expect(metrics.testing.quarantine.retryBudgetCap).toBeGreaterThan(0);
     expect(metrics.sources.stripe.state).toBe('ok');
     expect(metrics.sources.mercury.state).toBe('ok');
     expect(metrics.sources.database.state).toBe('ok');

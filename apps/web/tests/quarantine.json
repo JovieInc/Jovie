@@ -1,7 +1,46 @@
 {
-  "unit": [
-    "tests/contracts/dashboard-apis.spec.ts",
-    "tests/unit/dashboard/SettingsAdPixelsSection.test.tsx"
-  ],
-  "e2e": ["apps/web/tests/e2e/dashboard-pages-health.spec.ts"]
+  "schemaVersion": 1,
+  "retryBudget": {
+    "unitDefaultRetries": 1,
+    "quarantineUnitRetries": 2,
+    "e2eDefaultRetries": 0,
+    "quarantineE2eRetries": 2,
+    "maxRetryAttemptsPerCiRun": 120,
+    "unitShardCount": 6
+  },
+  "entries": [
+    {
+      "id": "unit-dashboard-apis-contract",
+      "kind": "unit",
+      "path": "tests/contracts/dashboard-apis.spec.ts",
+      "owner": "platform",
+      "firstSeenAt": "2026-02-10",
+      "reproductionCommand": "pnpm --filter @jovie/web exec vitest run tests/contracts/dashboard-apis.spec.ts",
+      "fixIssueUrl": "https://linear.app/jovie/issue/JOV-782",
+      "expiresAt": "2026-09-30",
+      "consecutiveSuccesses": 0
+    },
+    {
+      "id": "unit-settings-ad-pixels",
+      "kind": "unit",
+      "path": "tests/unit/dashboard/SettingsAdPixelsSection.test.tsx",
+      "owner": "platform",
+      "firstSeenAt": "2026-02-10",
+      "reproductionCommand": "pnpm --filter @jovie/web exec vitest run tests/unit/dashboard/SettingsAdPixelsSection.test.tsx",
+      "fixIssueUrl": "https://linear.app/jovie/issue/JOV-782",
+      "expiresAt": "2026-09-30",
+      "consecutiveSuccesses": 0
+    },
+    {
+      "id": "e2e-dashboard-pages-health",
+      "kind": "e2e",
+      "path": "apps/web/tests/e2e/dashboard-pages-health.spec.ts",
+      "owner": "platform",
+      "firstSeenAt": "2026-02-10",
+      "reproductionCommand": "cd apps/web && pnpm playwright test tests/e2e/dashboard-pages-health.spec.ts --project=chromium",
+      "fixIssueUrl": "https://linear.app/jovie/issue/JOV-782",
+      "expiresAt": "2026-09-30",
+      "consecutiveSuccesses": 0
+    }
+  ]
 }

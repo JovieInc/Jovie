@@ -405,6 +405,8 @@ jobs:
           pnpm next:proxy-guard
           pnpm tailwind:check
           pnpm --filter=@jovie/web run lint:no-native-dialogs
+      - name: Validate flaky quarantine ledger
+        run: node .github/scripts/quarantine-ledger.mjs validate
       - name: Write remediation summary
         if: always()
         run: |
@@ -2418,24 +2420,7 @@ jobs:
       - name: Load quarantined unit tests
         if: steps.check_changes.outputs.run_full_ci == 'true'
         id: quarantine
-        run: |
-          FILE="apps/web/tests/quarantine.json"
-          UNIT_FILES=""
-          UNIT_EXCLUDES=""
-
-          if [ -f "$FILE" ]; then
-            UNIT_FILES=$(jq -r '.unit // [] | join(" ")' "$FILE")
-            UNIT_EXCLUDES=$(jq -r '.unit // [] | map("--exclude=" + .) | join(" ")' "$FILE")
-          fi
-
-          echo "unit_files=$UNIT_FILES" >> "$GITHUB_OUTPUT"
-          echo "unit_excludes=$UNIT_EXCLUDES" >> "$GITHUB_OUTPUT"
-
-          if [ -n "$UNIT_FILES" ]; then
-            echo "has_unit=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "has_unit=false" >> "$GITHUB_OUTPUT"
-          fi
+        run: node .github/scripts/quarantine-ledger.mjs emit-github-output
 
       - name: Run unit tests
         if: steps.check_changes.outputs.run_full_ci == 'true'
@@ -2446,8 +2431,8 @@ jobs:
           # Use forked pool with limited workers to reduce CI flakiness from memory pressure
           export NODE_OPTIONS="--max-old-space-size=2048"
           VITEST_CI_FLAGS="--pool=forks --maxWorkers=2"
-          # Mitigate low-frequency flakes by retrying failed tests once in CI
-          RETRY_FLAG="--retry=1"
+          # Retry budget comes from apps/web/tests/quarantine.json
+          RETRY_FLAG="--retry=${{ steps.quarantine.outputs.unit_default_retries }}"
           # Use shard-specific output file so Codecov Test Analytics receives all 6 shards
           # (a shared filename causes only the last upload to be recorded)
           # Note: vitest runs from apps/web/, so path is relative to that directory
@@ -2476,7 +2461,7 @@ jobs:
         env:
           TURBO_SCM_HEAD: ${{ github.sha }}
           TURBO_SCM_BASE: ${{ github.event_name == 'merge_group' && 'origin/main' || (github.base_ref && format('origin/{0}', github.base_ref)) || '' }}
-        run: pnpm turbo test:fast --affected -- --pool=forks --maxWorkers=2 --retry=2 ${{ steps.quarantine.outputs.unit_files }}
+        run: pnpm turbo test:fast --affected -- --pool=forks --maxWorkers=2 --retry=${{ steps.quarantine.outputs.quarantine_unit_retries }} ${{ steps.quarantine.outputs.unit_files }}
 
       - name: Run packages/ui unit tests
         if: steps.check_changes.outputs.run_full_ci == 'true'
@@ -2859,11 +2844,12 @@ jobs:
         id: quarantine
         if: steps.check_changes.outputs.run_full_ci == 'true'
         run: |
+          node .github/scripts/quarantine-ledger.mjs validate
           FILE="apps/web/tests/quarantine.json"
           QUARANTINED=()
 
           if [ -f "$FILE" ]; then
-            mapfile -t QUARANTINED < <(jq -r '.e2e // [] | .[]' "$FILE")
+            mapfile -t QUARANTINED < <(jq -r '.entries[]? | select(.kind == "e2e") | .path' "$FILE")
           fi
 
           ADMIN_SPEC="apps/web/tests/e2e/dashboard-pages-health.spec.ts"
@@ -3070,11 +3056,12 @@ jobs:
         if: ${{ (hashFiles('apps/web/tests/e2e/**') != '' || hashFiles('apps/web/tests/smoke/**') != '') }}
         id: quarantine
         run: |
+          node .github/scripts/quarantine-ledger.mjs validate
           FILE="apps/web/tests/quarantine.json"
           QUARANTINED=()
 
           if [ -f "$FILE" ]; then
-            mapfile -t QUARANTINED < <(jq -r '.e2e // [] | .[]' "$FILE")
+            mapfile -t QUARANTINED < <(jq -r '.entries[]? | select(.kind == "e2e") | .path' "$FILE")
           fi
 
           mapfile -t ALL_SPECS < <(git ls-files "apps/web/tests/e2e/**/*.spec.ts" "apps/web/tests/smoke/**/*.spec.ts")
@@ -3199,7 +3186,9 @@ jobs:
           SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
           SENTRY_ENVIRONMENT: ci-main-e2e-quarantine
           SENTRY_RELEASE: ${{ github.sha }}
-        run: cd apps/web && pnpm playwright test --retries=2 ${{ steps.quarantine.outputs.quarantined_specs }}
+        run: |
+          RETRIES=$(jq -r '.retryBudget.quarantineE2eRetries // 2' apps/web/tests/quarantine.json)
+          cd apps/web && pnpm playwright test --retries="$RETRIES" ${{ steps.quarantine.outputs.quarantined_specs }}
 
       - name: Upload Playwright Report on Failure
         if: ${{ failure() && (hashFiles('apps/web/tests/e2e/**') != '' || hashFiles('apps/web/tests/smoke/**') != '') }}
