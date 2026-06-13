@@ -1,10 +1,28 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 // Hoist mocks before module resolution
-const { mockDbSelect, mockIsWaitlistGateEnabled } = vi.hoisted(() => ({
-  mockDbSelect: vi.fn(),
-  mockIsWaitlistGateEnabled: vi.fn().mockResolvedValue(true),
-}));
+const {
+  mockDbSelect,
+  mockIsWaitlistGateEnabled,
+  mockRedisGet,
+  mockRedisSet,
+  mockRedisDel,
+  mockGetRedis,
+} = vi.hoisted(() => {
+  const mockRedisGet = vi.fn();
+  const mockRedisSet = vi.fn().mockResolvedValue('OK');
+  const mockRedisDel = vi.fn().mockResolvedValue(1);
+  const mockGetRedis = vi.fn().mockReturnValue(null);
+
+  return {
+    mockDbSelect: vi.fn(),
+    mockIsWaitlistGateEnabled: vi.fn().mockResolvedValue(true),
+    mockRedisGet,
+    mockRedisSet,
+    mockRedisDel,
+    mockGetRedis,
+  };
+});
 
 // Mock database
 vi.mock('@/lib/db', () => ({
@@ -54,7 +72,7 @@ vi.mock('@/lib/sentry/init', () => ({
 }));
 
 vi.mock('@/lib/redis', () => ({
-  getRedis: vi.fn().mockReturnValue(null),
+  getRedis: mockGetRedis,
 }));
 
 // Mock retry to skip exponential backoff delays — just execute the operation once
@@ -68,21 +86,28 @@ vi.mock('@/lib/waitlist/settings', () => ({
   isWaitlistGateEnabled: mockIsWaitlistGateEnabled,
 }));
 
-// Import once — clear in-memory cache between tests via invalidateProxyUserStateCache
 import {
   getUserState,
   invalidateProxyUserStateCache,
 } from '@/lib/auth/proxy-state';
+// Import once — clear in-memory cache between tests via invalidateProxyUserStateCache
+import { QueryTimeoutError } from '@/lib/db/query-timeout';
 
 describe('proxy-state.ts', () => {
   beforeEach(async () => {
     mockDbSelect.mockClear();
     mockIsWaitlistGateEnabled.mockClear();
+    mockRedisGet.mockClear();
+    mockRedisSet.mockClear();
+    mockRedisDel.mockClear();
+    mockGetRedis.mockReset();
+    mockGetRedis.mockReturnValue(null);
     mockIsWaitlistGateEnabled.mockResolvedValue(true);
     // Clear the module's in-memory cache to prevent cross-test contamination
     await invalidateProxyUserStateCache('clerk_123');
     await invalidateProxyUserStateCache('clerk_test_user');
     await invalidateProxyUserStateCache('clerk_parallel_gate');
+    await invalidateProxyUserStateCache('clerk_stale_timeout');
   });
 
   describe('getUserState', () => {
@@ -454,6 +479,118 @@ describe('proxy-state.ts', () => {
       );
 
       consoleSpy.mockRestore();
+    });
+
+    it('serves stale Redis cache when DB query times out', async () => {
+      const staleState = {
+        needsWaitlist: false,
+        needsOnboarding: false,
+        isActive: true,
+        isBanned: false,
+      };
+
+      mockGetRedis.mockReturnValue({
+        get: mockRedisGet,
+        set: mockRedisSet,
+        del: mockRedisDel,
+      });
+      mockRedisGet.mockImplementation(async (key: string) => {
+        if (key === 'proxy:user-state:clerk_stale_timeout') return null;
+        if (key === 'proxy:user-state:stale:clerk_stale_timeout') {
+          return staleState;
+        }
+        return null;
+      });
+
+      mockDbSelect.mockReturnValue({
+        from: vi.fn().mockReturnValue({
+          leftJoin: vi.fn().mockReturnValue({
+            where: vi.fn().mockReturnValue({
+              limit: vi
+                .fn()
+                .mockRejectedValue(
+                  new QueryTimeoutError(
+                    '[proxy-state] DB query timed out after 3000ms'
+                  )
+                ),
+            }),
+          }),
+        }),
+      });
+
+      const consoleSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+      const result = await getUserState('clerk_stale_timeout');
+
+      expect(result).toEqual(staleState);
+      expect(consoleSpy).toHaveBeenCalledWith(
+        expect.stringContaining(
+          '[WARNING] [proxy-state] Serving stale cache after DB failure'
+        )
+      );
+
+      consoleSpy.mockRestore();
+    });
+
+    it('downgrades timeout without stale cache to warning fallback', async () => {
+      mockGetRedis.mockReturnValue({
+        get: mockRedisGet,
+        set: mockRedisSet,
+        del: mockRedisDel,
+      });
+      mockRedisGet.mockResolvedValue(null);
+
+      mockDbSelect.mockReturnValue({
+        from: vi.fn().mockReturnValue({
+          leftJoin: vi.fn().mockReturnValue({
+            where: vi.fn().mockReturnValue({
+              limit: vi
+                .fn()
+                .mockRejectedValue(
+                  new QueryTimeoutError(
+                    '[proxy-state] DB query timed out after 3000ms'
+                  )
+                ),
+            }),
+          }),
+        }),
+      });
+
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+      const result = await getUserState('clerk_123');
+
+      expect(result).toEqual({
+        needsWaitlist: false,
+        needsOnboarding: true,
+        isActive: false,
+        isBanned: false,
+      });
+      expect(warnSpy).toHaveBeenCalledWith(
+        expect.stringContaining(
+          '[WARNING] [proxy-state] DB query timed out without stale cache fallback'
+        )
+      );
+      expect(errorSpy).not.toHaveBeenCalled();
+
+      warnSpy.mockRestore();
+      errorSpy.mockRestore();
+    });
+
+    it('invalidates both primary and stale Redis cache keys', async () => {
+      mockGetRedis.mockReturnValue({
+        get: mockRedisGet,
+        set: mockRedisSet,
+        del: mockRedisDel,
+      });
+
+      await invalidateProxyUserStateCache('clerk_123');
+
+      expect(mockRedisDel).toHaveBeenCalledWith('proxy:user-state:clerk_123');
+      expect(mockRedisDel).toHaveBeenCalledWith(
+        'proxy:user-state:stale:clerk_123'
+      );
     });
 
     it('handles non-Error objects in catch block', async () => {
