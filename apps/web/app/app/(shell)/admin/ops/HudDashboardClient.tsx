@@ -132,6 +132,88 @@ function formatTestingQuarantineSubtitle(
   return `${mix} | ${budget}`;
 }
 
+function HudHealthMetricCards({
+  metrics,
+  secondaryValueClass,
+  databaseSource,
+  sentrySource,
+  handleSourceRetry,
+}: Readonly<{
+  readonly metrics: HudMetrics;
+  readonly secondaryValueClass: string;
+  readonly databaseSource: HudMetrics['sources']['database'];
+  readonly sentrySource: HudMetrics['sources']['sentry'];
+  readonly handleSourceRetry: () => void;
+}>) {
+  return (
+    <>
+      <ContentMetricCard
+        label='Operations'
+        value={metrics.operations.status === 'ok' ? 'Healthy' : 'Degraded'}
+        subtitle={metricSubtitleWithTrust(
+          metrics.operations.dbLatencyMs === null
+            ? 'DB latency —'
+            : `DB latency ${metrics.operations.dbLatencyMs.toFixed(0)}ms`,
+          databaseSource,
+          handleSourceRetry
+        )}
+        className='p-3'
+        valueClassName={secondaryValueClass}
+      />
+      <ContentMetricCard
+        label='Reliability'
+        value={`${metrics.reliability.reliabilityScorePercent.toFixed(1)}%`}
+        subtitle={metricSubtitleWithTrust(
+          formatReliabilitySubtitle(metrics.reliability),
+          sentrySource,
+          handleSourceRetry
+        )}
+        className='p-3'
+        valueClassName={secondaryValueClass}
+      />
+      <ContentMetricCard
+        label='Flaky Quarantine'
+        value={metrics.testing.quarantine.activeCount.toLocaleString('en-US')}
+        subtitle={formatTestingQuarantineSubtitle(metrics.testing.quarantine)}
+        className='p-3'
+        valueClassName={secondaryValueClass}
+        data-testid='hud-flaky-quarantine-card'
+      />
+    </>
+  );
+}
+
+function HudDeploymentsSurfaceCard({
+  metrics,
+  deploymentDetail,
+  githubSource,
+  handleSourceRetry,
+}: Readonly<{
+  readonly metrics: HudMetrics;
+  readonly deploymentDetail: string;
+  readonly githubSource: HudMetrics['sources']['github'];
+  readonly handleSourceRetry: () => void;
+}>) {
+  return (
+    <ContentSurfaceCard surface='details' className='space-y-3 p-3'>
+      <div className='flex items-center justify-between gap-3'>
+        <SectionLabel>Deployments</SectionLabel>
+        <p className='text-[12px] text-secondary-token'>{deploymentDetail}</p>
+      </div>
+      {metrics.deployments.recent.length > 0 ? (
+        <div className='grid gap-2'>
+          {metrics.deployments.recent.slice(0, 5).map(run => (
+            <DeploymentRow key={run.id} run={run} />
+          ))}
+        </div>
+      ) : (
+        <p className='text-[13px] text-secondary-token'>No recent runs.</p>
+      )}
+      <HudMetricSourceTrust source={githubSource} onRetry={handleSourceRetry} />
+    </ContentSurfaceCard>
+  );
+}
+
 function formatDefaultStatusLabel(
   status: HudMetrics['overview']['defaultStatus']
 ): string {
@@ -737,41 +819,12 @@ export function HudDashboardClient({
             className='p-3'
             valueClassName={secondaryValueClass}
           />
-          <ContentMetricCard
-            label='Operations'
-            value={metrics.operations.status === 'ok' ? 'Healthy' : 'Degraded'}
-            subtitle={metricSubtitleWithTrust(
-              metrics.operations.dbLatencyMs === null
-                ? 'DB latency —'
-                : `DB latency ${metrics.operations.dbLatencyMs.toFixed(0)}ms`,
-              databaseSource,
-              handleSourceRetry
-            )}
-            className='p-3'
-            valueClassName={secondaryValueClass}
-          />
-          <ContentMetricCard
-            label='Reliability'
-            value={`${metrics.reliability.reliabilityScorePercent.toFixed(1)}%`}
-            subtitle={metricSubtitleWithTrust(
-              formatReliabilitySubtitle(metrics.reliability),
-              sentrySource,
-              handleSourceRetry
-            )}
-            className='p-3'
-            valueClassName={secondaryValueClass}
-          />
-          <ContentMetricCard
-            label='Flaky Quarantine'
-            value={metrics.testing.quarantine.activeCount.toLocaleString(
-              'en-US'
-            )}
-            subtitle={formatTestingQuarantineSubtitle(
-              metrics.testing.quarantine
-            )}
-            className='p-3'
-            valueClassName={secondaryValueClass}
-            data-testid='hud-flaky-quarantine-card'
+          <HudHealthMetricCards
+            metrics={metrics}
+            secondaryValueClass={secondaryValueClass}
+            databaseSource={databaseSource}
+            sentrySource={sentrySource}
+            handleSourceRetry={handleSourceRetry}
           />
         </div>
 
@@ -931,43 +984,12 @@ export function HudDashboardClient({
               className='p-3'
               valueClassName={secondaryValueClass}
             />
-            <ContentMetricCard
-              label='Operations'
-              value={
-                metrics.operations.status === 'ok' ? 'Healthy' : 'Degraded'
-              }
-              subtitle={metricSubtitleWithTrust(
-                metrics.operations.dbLatencyMs === null
-                  ? 'DB latency —'
-                  : `DB latency ${metrics.operations.dbLatencyMs.toFixed(0)}ms`,
-                databaseSource,
-                handleSourceRetry
-              )}
-              className='p-3'
-              valueClassName={secondaryValueClass}
-            />
-            <ContentMetricCard
-              label='Reliability'
-              value={`${metrics.reliability.reliabilityScorePercent.toFixed(1)}%`}
-              subtitle={metricSubtitleWithTrust(
-                formatReliabilitySubtitle(metrics.reliability),
-                sentrySource,
-                handleSourceRetry
-              )}
-              className='p-3'
-              valueClassName={secondaryValueClass}
-            />
-            <ContentMetricCard
-              label='Flaky Quarantine'
-              value={metrics.testing.quarantine.activeCount.toLocaleString(
-                'en-US'
-              )}
-              subtitle={formatTestingQuarantineSubtitle(
-                metrics.testing.quarantine
-              )}
-              className='p-3'
-              valueClassName={secondaryValueClass}
-              data-testid='hud-flaky-quarantine-card'
+            <HudHealthMetricCards
+              metrics={metrics}
+              secondaryValueClass={secondaryValueClass}
+              databaseSource={databaseSource}
+              sentrySource={sentrySource}
+              handleSourceRetry={handleSourceRetry}
             />
           </div>
         </div>
@@ -976,29 +998,12 @@ export function HudDashboardClient({
       {/* Deployments + optional QR panel */}
       {showQrPanel ? (
         <div className='grid gap-3 xl:grid-cols-[minmax(0,1.6fr)_minmax(320px,0.9fr)]'>
-          <ContentSurfaceCard surface='details' className='space-y-3 p-3'>
-            <div className='flex items-center justify-between gap-3'>
-              <SectionLabel>Deployments</SectionLabel>
-              <p className='text-[12px] text-secondary-token'>
-                {deploymentDetail}
-              </p>
-            </div>
-            {metrics.deployments.recent.length > 0 ? (
-              <div className='grid gap-2'>
-                {metrics.deployments.recent.slice(0, 5).map(run => (
-                  <DeploymentRow key={run.id} run={run} />
-                ))}
-              </div>
-            ) : (
-              <p className='text-[13px] text-secondary-token'>
-                No recent runs.
-              </p>
-            )}
-            <HudMetricSourceTrust
-              source={githubSource}
-              onRetry={handleSourceRetry}
-            />
-          </ContentSurfaceCard>
+          <HudDeploymentsSurfaceCard
+            metrics={metrics}
+            deploymentDetail={deploymentDetail}
+            githubSource={githubSource}
+            handleSourceRetry={handleSourceRetry}
+          />
 
           <ContentSurfaceCard surface='details' className='space-y-4 p-3'>
             <div className='flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between'>
@@ -1023,27 +1028,12 @@ export function HudDashboardClient({
           </ContentSurfaceCard>
         </div>
       ) : (
-        <ContentSurfaceCard surface='details' className='space-y-3 p-3'>
-          <div className='flex items-center justify-between gap-3'>
-            <SectionLabel>Deployments</SectionLabel>
-            <p className='text-[12px] text-secondary-token'>
-              {deploymentDetail}
-            </p>
-          </div>
-          {metrics.deployments.recent.length > 0 ? (
-            <div className='grid gap-2'>
-              {metrics.deployments.recent.slice(0, 5).map(run => (
-                <DeploymentRow key={run.id} run={run} />
-              ))}
-            </div>
-          ) : (
-            <p className='text-[13px] text-secondary-token'>No recent runs.</p>
-          )}
-          <HudMetricSourceTrust
-            source={githubSource}
-            onRetry={handleSourceRetry}
-          />
-        </ContentSurfaceCard>
+        <HudDeploymentsSurfaceCard
+          metrics={metrics}
+          deploymentDetail={deploymentDetail}
+          githubSource={githubSource}
+          handleSourceRetry={handleSourceRetry}
+        />
       )}
 
       {/* AI Ops / Hermes control plane */}
