@@ -5,6 +5,7 @@ import { withDbSessionTx } from '@/lib/auth/session';
 import { invalidateProfileCache } from '@/lib/cache';
 import { getUserByClerkId } from '@/lib/db/queries/shared';
 import { creatorProfiles, profilePhotos } from '@/lib/db/schema/profiles';
+import { env } from '@/lib/env';
 import { captureError } from '@/lib/error-tracking';
 import { logger } from '@/lib/utils/logger';
 
@@ -16,7 +17,7 @@ const NO_STORE_HEADERS = {
 export const runtime = 'nodejs';
 
 async function deletePressPhotoBlobs(urls: string[]): Promise<void> {
-  const token = process.env.BLOB_READ_WRITE_TOKEN;
+  const token = env.BLOB_READ_WRITE_TOKEN;
 
   if (!token || urls.length === 0) {
     return;

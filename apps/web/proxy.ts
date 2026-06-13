@@ -40,21 +40,25 @@ import {
   resolveTestBypassUserId,
 } from '@/lib/auth/test-mode';
 import { captureError, captureWarning } from '@/lib/error-tracking';
+import { resolveLegacyRootPathRedirect } from '@/lib/routing/legacy-root-path-redirects';
 import {
   analyzeHost,
   categorizePath,
   DASHBOARD_URL,
+  isDedicatedRootSegment,
   isProxyRewriteExempt,
 } from '@/lib/routing/proxy-routing';
 import { SCRIPT_NONCE_HEADER } from '@/lib/security/content-security-policy';
 import { isExplicitDevelopmentEnvironment } from '@/lib/security/development-only';
 import {
+  createFastNotFoundResponse,
   createProbeDropResponse,
   isMaliciousProbePath,
 } from '@/lib/security/probe-detection';
 import { isProductionBlockedDebugPath } from '@/lib/security/production-blocked-routes';
 import { ensureSentry } from '@/lib/sentry/ensure';
 import { createBotResponse } from '@/lib/utils/bot-detection';
+import { isReservedUsername } from '@/lib/validation/username-core';
 
 // ============================================================================
 // Single Domain Architecture
@@ -291,6 +295,32 @@ async function handleRequest(req: NextRequest, userId: string | null) {
       const targetUrl = req.nextUrl.clone();
       targetUrl.pathname = APP_ROUTES.START;
       return NextResponse.redirect(targetUrl, 308);
+    }
+
+    // Legacy single-segment paths (e.g. /login, /request-access) must never
+    // hit the public profile catch-all — redirect before any DB work (JOV-3054).
+    if (isNavigationMethod) {
+      const legacyRedirect = resolveLegacyRootPathRedirect(pathname);
+      if (legacyRedirect) {
+        const targetUrl = req.nextUrl.clone();
+        targetUrl.pathname = legacyRedirect;
+        return NextResponse.redirect(targetUrl, 308);
+      }
+    }
+
+    // Reserved handle segments with no dedicated route get a real 404 at the
+    // edge — no soft-404 HTML, no DB (JOV-3054).
+    if (isNavigationMethod) {
+      const pathParts = pathname.split('/').filter(Boolean);
+      const rootSegment = pathParts[0];
+      if (
+        rootSegment &&
+        pathParts.length === 1 &&
+        isReservedUsername(rootSegment) &&
+        !isDedicatedRootSegment(rootSegment)
+      ) {
+        return createFastNotFoundResponse();
+      }
     }
 
     // Authenticated legacy earnings deep links should land directly on the

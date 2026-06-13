@@ -11,6 +11,7 @@
  * - Cleanup SMS subscribe intents: every day (folded from standalone cron per JOV-1901)
  * - Waitlist auto-accept: every day when enabled
  * - Data retention: Sundays only (heavy operation)
+ * - Under-enriched discography sweep: every day (bounded batch)
  *
  * Each sub-job runs in an independent try-catch so one failure
  * doesn't block the others.
@@ -21,6 +22,7 @@
 import { NextResponse } from 'next/server';
 import { runDataRetentionCleanup } from '@/lib/analytics/data-retention';
 import { verifyCronRequest } from '@/lib/cron/auth';
+import { sweepUnderEnrichedProfilesForCron } from '@/lib/discography/re-enrich';
 import { captureError } from '@/lib/error-tracking';
 import { logger } from '@/lib/utils/logger';
 import { runWaitlistAutoAccept } from '@/lib/waitlist/auto-accept';
@@ -106,7 +108,13 @@ export async function GET(request: Request) {
     runWaitlistAutoAccept
   );
 
-  // 6. Data retention — Sundays only (heavy operation)
+  // 6. Under-enriched discography sweep — bounded daily batch (JOV-3068)
+  results.discographyReEnrich = await runSubJob(
+    'discographyReEnrich',
+    sweepUnderEnrichedProfilesForCron
+  );
+
+  // 7. Data retention — Sundays only (heavy operation)
   const isSunday = new Date().getDay() === 0;
   results.dataRetention = isSunday
     ? await runSubJob('dataRetention', runDataRetentionCleanup)

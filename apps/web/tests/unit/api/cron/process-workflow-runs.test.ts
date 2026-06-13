@@ -8,10 +8,14 @@ const {
   mockEq,
   mockExecuteApprovedAction,
   mockInArray,
+  mockIsNull,
   mockLoggerInfo,
   mockLoggerWarn,
+  mockLt,
   mockLte,
   mockMarkWorkflowFailed,
+  mockOr,
+  mockVerifyCronRequest,
 } = vi.hoisted(() => ({
   mockAnd: vi.fn((...conditions: unknown[]) => ({ type: 'and', conditions })),
   mockCaptureError: vi.fn(),
@@ -31,21 +35,36 @@ const {
     column,
     values,
   })),
+  mockIsNull: vi.fn((column: unknown) => ({ type: 'isNull', column })),
   mockLoggerInfo: vi.fn(),
   mockLoggerWarn: vi.fn(),
+  mockLt: vi.fn((column: unknown, value: unknown) => ({
+    type: 'lt',
+    column,
+    value,
+  })),
   mockLte: vi.fn((column: unknown, value: unknown) => ({
     type: 'lte',
     column,
     value,
   })),
   mockMarkWorkflowFailed: vi.fn(),
+  mockOr: vi.fn((...conditions: unknown[]) => ({ type: 'or', conditions })),
+  mockVerifyCronRequest: vi.fn(),
+}));
+
+vi.mock('@/lib/cron/auth', () => ({
+  verifyCronRequest: mockVerifyCronRequest,
 }));
 
 vi.mock('drizzle-orm', () => ({
   and: mockAnd,
   eq: mockEq,
   inArray: mockInArray,
+  isNull: mockIsNull,
+  lt: mockLt,
   lte: mockLte,
+  or: mockOr,
 }));
 
 vi.mock('@/lib/connectors/workflows/execute-approved-action', () => ({
@@ -55,10 +74,6 @@ vi.mock('@/lib/connectors/workflows/execute-approved-action', () => ({
 
 vi.mock('@/lib/db', () => ({
   db: mockDb,
-}));
-
-vi.mock('@/lib/env-server', () => ({
-  env: { CRON_SECRET: 'test-secret' },
 }));
 
 vi.mock('@/lib/error-tracking', () => ({
@@ -108,6 +123,7 @@ describe('GET /api/cron/process-workflow-runs', () => {
     vi.resetModules();
     mockExecuteApprovedAction.mockResolvedValue(undefined);
     mockMarkWorkflowFailed.mockResolvedValue(undefined);
+    mockVerifyCronRequest.mockReturnValue(null);
   });
 
   it('claims queued workflow runs before executing them', async () => {
@@ -132,14 +148,29 @@ describe('GET /api/cron/process-workflow-runs', () => {
     const queuedStatusChecks = mockEq.mock.calls.filter(
       ([column, value]) => column === workflowRuns.status && value === 'queued'
     );
-    expect(queuedStatusChecks).toHaveLength(2);
+    expect(queuedStatusChecks.length).toBeGreaterThanOrEqual(1);
+    const dueRunAtChecks = mockLte.mock.calls.filter(
+      ([column]) => column === workflowRuns.runAt
+    );
+    expect(dueRunAtChecks).toHaveLength(2);
     expect(updateChain.set).toHaveBeenCalledWith(
-      expect.objectContaining({ status: 'running' })
+      expect.objectContaining({
+        status: 'running',
+        claimedAt: expect.any(Date),
+        leaseExpiresAt: expect.any(Date),
+      })
     );
     expect(selectChain.limit).toHaveBeenCalledWith(20);
     expect(mockExecuteApprovedAction).toHaveBeenCalledWith({
       workflowRunId: 'workflow-run-1',
     });
     expect(mockCaptureWarning).not.toHaveBeenCalled();
+    expect(mockVerifyCronRequest).toHaveBeenCalledWith(
+      expect.any(Request),
+      expect.objectContaining({
+        route: '/api/cron/process-workflow-runs',
+        requireTrustedOrigin: true,
+      })
+    );
   });
 });

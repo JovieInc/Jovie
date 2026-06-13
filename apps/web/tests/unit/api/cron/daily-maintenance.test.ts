@@ -6,6 +6,7 @@ const mockCleanupExpiredKeys = vi.hoisted(() => vi.fn());
 const mockCleanupOrphanedPhotos = vi.hoisted(() => vi.fn());
 const mockCleanupSmsIntents = vi.hoisted(() => vi.fn());
 const mockRunWaitlistAutoAccept = vi.hoisted(() => vi.fn());
+const mockSweepUnderEnrichedProfilesForCron = vi.hoisted(() => vi.fn());
 
 vi.mock('@/lib/analytics/data-retention', () => ({
   runDataRetentionCleanup: mockRunDataRetentionCleanup,
@@ -42,6 +43,10 @@ vi.mock('@/lib/waitlist/auto-accept', () => ({
   runWaitlistAutoAccept: mockRunWaitlistAutoAccept,
 }));
 
+vi.mock('@/lib/discography/re-enrich', () => ({
+  sweepUnderEnrichedProfilesForCron: mockSweepUnderEnrichedProfilesForCron,
+}));
+
 describe('GET /api/cron/daily-maintenance', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -70,6 +75,12 @@ describe('GET /api/cron/daily-maintenance', () => {
       skipped: 0,
       failed: 0,
       capacityRemaining: 0,
+    });
+    mockSweepUnderEnrichedProfilesForCron.mockResolvedValue({
+      profilesProcessed: 1,
+      totalLinksDiscovered: 4,
+      errors: [],
+      hasMoreProfiles: true,
     });
   });
 
@@ -105,6 +116,14 @@ describe('GET /api/cron/daily-maintenance', () => {
     expect(data.results.billingReconciliation.success).toBe(true);
     expect(data.results.cleanupSmsIntents.success).toBe(true);
     expect(data.results.waitlistAutoAccept.success).toBe(true);
+    expect(data.results.discographyReEnrich.success).toBe(true);
+    expect(data.results.discographyReEnrich.data).toEqual({
+      profilesProcessed: 1,
+      totalLinksDiscovered: 4,
+      errors: [],
+      hasMoreProfiles: true,
+    });
+    expect(mockSweepUnderEnrichedProfilesForCron).toHaveBeenCalledTimes(1);
     expect(data.results.dataRetention.success).toBe(true);
   });
 });

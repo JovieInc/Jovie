@@ -7,8 +7,8 @@ import { ImpersonationBannerWrapper } from '@/features/admin/ImpersonationBanner
 import { OperatorBanner } from '@/features/admin/OperatorBanner';
 import { getUserBanStatus } from '@/lib/auth/ban-check';
 import { AppFlagProvider } from '@/lib/flags/client';
-import { APP_FLAG_DEFAULTS, type AppFlagSnapshot } from '@/lib/flags/contracts';
-import { getAppFlagsSnapshot, getAppFlagValue } from '@/lib/flags/server';
+import { resolveAppShellRouteFlagNames } from '@/lib/flags/route-snapshots';
+import { getAppFlagsSnapshot } from '@/lib/flags/server';
 import { HydrateClient } from '@/lib/queries';
 import { getDehydratedState } from '@/lib/queries/server';
 import { DashboardLoadTracker } from './DashboardLoadTracker';
@@ -23,25 +23,6 @@ import {
   shouldRedirectToOnboarding,
   shouldUseEssentialShellData,
 } from './shell-route-matches';
-
-async function getEssentialShellFlagsSnapshot(
-  userId: string
-): Promise<AppFlagSnapshot> {
-  const designV1 = await getAppFlagValue('DESIGN_V1', { userId });
-
-  return {
-    ...APP_FLAG_DEFAULTS,
-    DESIGN_V1: designV1,
-    SHELL_CHAT_V1: designV1,
-    DESIGN_V1_RELEASES: designV1,
-    DESIGN_V1_TASKS: designV1,
-    DESIGN_V1_CHAT_ENTITIES: designV1,
-    DESIGN_V1_LYRICS: designV1,
-    DESIGN_V1_LIBRARY: designV1,
-    DESIGN_V1_AUTH: designV1,
-    DESIGN_V1_ONBOARDING: designV1,
-  };
-}
 
 /**
  * Async server component that fetches dashboard data,
@@ -70,9 +51,10 @@ export async function DashboardShellContent({
   // page data should not force the shared shell through the full dashboard path.
   const useEssentialShell = shouldUseEssentialShellData(pathname);
   const cookieStorePromise = cookies();
-  const initialFlagsPromise = useEssentialShell
-    ? getEssentialShellFlagsSnapshot(userId)
-    : getAppFlagsSnapshot({ userId });
+  const initialFlagsPromise = getAppFlagsSnapshot({
+    userId,
+    flagNames: resolveAppShellRouteFlagNames(pathname),
+  });
 
   // Run ban check in parallel with dashboard data fetch
   const [dashboardData, banStatus, cookieStore, initialFlags] =

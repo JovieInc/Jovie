@@ -4,12 +4,12 @@
  * Thin runner / workflow executor.
  * - Gate: FEATURE_MEMORY_STUDIO_SESSION_V0 (default false)
  * - Uses AgentHarness for enrichment + opportunity proposal
- * - Full evidence/provenance on every fact (context_facts + synthetic refs)
+ * - Full evidence/provenance on every fact (memory source records + observations)
  * - Reuses patterns from lib/connectors/workflows/execute-approved-action.ts (CAS, logging, captureError)
  * - No social/write scopes ever enabled in v0.
  *
  * Triggered from: demo script, future Trigger.dev job (trigger/ dir), or cron on photo tags.
- * Uses canonical memory schema (gh-9872) via MemoryIngestHarness in agent-harness.
+ * Writes to memory.ts tables via AgentHarness + MemoryStore.
  */
 
 import {
@@ -52,7 +52,7 @@ export async function runStudioSessionMemoryLoop(
       evidence: [],
       provenance: {
         triggeredAt: new Date().toISOString(),
-        sources: input.sourceContextFactIds || [],
+        sources: input.sourceMemoryRecordIds || [],
         flag: flagName,
       },
       gated: true,
@@ -76,7 +76,7 @@ export async function runStudioSessionMemoryLoop(
     };
 
     // In future: enqueue a workflowRuns row of kind 'studio_session_memory_v0' for durable follow-up (Trigger.dev or cron)
-    // For v0 the harness already wrote the evidence facts + opportunity proposal.
+    // For v0 the harness already wrote memory source records, observations, and opportunity.
 
     return result;
   } catch (err) {
