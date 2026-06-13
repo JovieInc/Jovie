@@ -105,7 +105,9 @@ describe('Scope Judge workflow cost controls', () => {
 
     expect(judgeStep).toContain('HAS_MODEL_CONTENT=false');
     expect(judgeStep).toContain('verdict=api_unavailable');
-    expect(judgeStep).toContain('OpenRouter API unavailable - deterministic skip');
+    expect(judgeStep).toContain(
+      'OpenRouter API unavailable - deterministic skip'
+    );
     expect(reportStep).toContain('api_unavailable');
     expect(reportStep).toContain(
       'Scope judge skipped - OpenRouter API unavailable; no model call'
