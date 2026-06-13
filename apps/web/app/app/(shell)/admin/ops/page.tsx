@@ -9,7 +9,11 @@ import type {
 import { AdminPage } from '@/components/features/admin/layout/AdminPage';
 import { OperationalControlPanel } from '@/components/features/admin/OperationalControlPanel';
 import { APP_ROUTES } from '@/constants/routes';
-import { getPublicProfileCanaryStatus } from '@/lib/admin/ops-queries';
+import {
+  getAuthSignupOnboardingCanaryStatus,
+  getPublicProfileCanaryStatus,
+} from '@/lib/admin/ops-queries';
+import type { CanaryReport } from '@/lib/canaries/public-profile';
 import { env } from '@/lib/env-server';
 import { getHudMetrics } from '@/lib/hud/metrics';
 import { NOINDEX_ROBOTS } from '@/lib/seo/noindex-metadata';
@@ -31,6 +35,69 @@ const PRESENTATION_VIEW_HREF = `${APP_ROUTES.ADMIN_OPS}?mode=kiosk`;
 
 function resolvePresentationMode(value: unknown): PresentationMode {
   return value === 'kiosk' ? 'admin-kiosk' : 'shell';
+}
+
+function formatCanaryRunAt(runAt: string | undefined): string | null {
+  if (!runAt) return null;
+  return new Date(runAt).toLocaleString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+    timeZone: 'UTC',
+    timeZoneName: 'short',
+  });
+}
+
+function CanaryStatusRow({
+  label,
+  status,
+  testId,
+}: Readonly<{
+  label: string;
+  status: CanaryReport | null;
+  testId: string;
+}>) {
+  const pass = status?.pass ?? null;
+  const runAt = formatCanaryRunAt(status?.runAt);
+
+  return (
+    <div
+      className='flex items-center gap-2 rounded-md border border-subtle bg-surface-1 px-3 py-2 text-[13px]'
+      data-testid={testId}
+    >
+      {pass === null ? (
+        <span
+          className='h-2 w-2 rounded-full bg-tertiary-token'
+          aria-hidden='true'
+        />
+      ) : pass ? (
+        <CheckCircle2
+          className='h-3.5 w-3.5 shrink-0 text-success'
+          aria-label='Pass'
+        />
+      ) : (
+        <XCircle
+          className='h-3.5 w-3.5 shrink-0 text-destructive'
+          aria-label='Fail'
+        />
+      )}
+      <span className='font-medium text-secondary-token'>{label}</span>
+      <span className='text-tertiary-token'>
+        {pass === null
+          ? 'No data yet'
+          : pass
+            ? 'Pass'
+            : `Fail — ${status?.checks
+                .filter(check => !check.ok)
+                .map(check => check.name)
+                .join(', ')}`}
+      </span>
+      {runAt ? (
+        <span className='ml-auto text-[12px] text-tertiary-token'>{runAt}</span>
+      ) : null}
+    </div>
+  );
 }
 
 /**
@@ -83,10 +150,16 @@ export default async function AdminOpsPage({
   // The admin layout has already verified admin entitlement; getHudMetrics
   // accepts the access mode for downstream auth-aware features (e.g. AI ops
   // dispatch UI). Admin sees full dispatch; kiosk-token would not.
-  const [metrics, shippingPrefetch, canaryStatus] = await Promise.all([
+  const [
+    metrics,
+    shippingPrefetch,
+    publicProfileCanaryStatus,
+    authCanaryStatus,
+  ] = await Promise.all([
     getHudMetrics('admin'),
     getInitialShippingData(),
     getPublicProfileCanaryStatus(),
+    getAuthSignupOnboardingCanaryStatus(),
   ]);
 
   // In admin-kiosk presentation, render the kiosk-density body inside the
@@ -106,19 +179,6 @@ export default async function AdminOpsPage({
     );
   }
 
-  // Derive canary display state
-  const canaryPass = canaryStatus?.pass ?? null;
-  const canaryRunAt = canaryStatus?.runAt
-    ? new Date(canaryStatus.runAt).toLocaleString('en-US', {
-        month: 'short',
-        day: 'numeric',
-        hour: 'numeric',
-        minute: '2-digit',
-        timeZone: 'UTC',
-        timeZoneName: 'short',
-      })
-    : null;
-
   return (
     <AdminPage
       title='Ops'
@@ -130,7 +190,7 @@ export default async function AdminOpsPage({
             href={PRESENTATION_VIEW_HREF}
             target='_blank'
             rel='noopener'
-            aria-label='Open TV view in a new tab'
+            aria-label='Open TV View In A New Tab'
           >
             <Maximize2 className='h-3.5 w-3.5' aria-hidden='true' />
             TV view
@@ -138,45 +198,17 @@ export default async function AdminOpsPage({
         </Button>
       }
     >
-      {/* Public-profile canary status (JOV-1872) — one line + status dot */}
-      <div
-        className='flex items-center gap-2 rounded-md border border-subtle bg-surface-1 px-3 py-2 text-[13px]'
-        data-testid='public-profile-canary-status'
-      >
-        {canaryPass === null ? (
-          <span
-            className='h-2 w-2 rounded-full bg-tertiary-token'
-            aria-hidden='true'
-          />
-        ) : canaryPass ? (
-          <CheckCircle2
-            className='h-3.5 w-3.5 shrink-0 text-success'
-            aria-label='Pass'
-          />
-        ) : (
-          <XCircle
-            className='h-3.5 w-3.5 shrink-0 text-destructive'
-            aria-label='Fail'
-          />
-        )}
-        <span className='font-medium text-secondary-token'>
-          Public profile canary
-        </span>
-        <span className='text-tertiary-token'>
-          {canaryPass === null
-            ? 'No data yet'
-            : canaryPass
-              ? 'Pass'
-              : `Fail — ${canaryStatus?.checks
-                  .filter(c => !c.ok)
-                  .map(c => c.name)
-                  .join(', ')}`}
-        </span>
-        {canaryRunAt ? (
-          <span className='ml-auto text-[12px] text-tertiary-token'>
-            {canaryRunAt}
-          </span>
-        ) : null}
+      <div className='flex flex-col gap-2'>
+        <CanaryStatusRow
+          label='Public Profile Canary'
+          status={publicProfileCanaryStatus}
+          testId='public-profile-canary-status'
+        />
+        <CanaryStatusRow
+          label='Auth Signup Onboarding Canary'
+          status={authCanaryStatus}
+          testId='auth-signup-onboarding-canary-status'
+        />
       </div>
 
       <OperationalControlPanel />
