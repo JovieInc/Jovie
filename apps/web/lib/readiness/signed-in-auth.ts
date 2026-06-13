@@ -112,25 +112,73 @@ function checkRequiredEnvKeys(
   ];
 }
 
+interface ClerkEnvSnapshot {
+  readonly publishableKey?: string;
+  readonly secretKey?: string;
+  readonly stagingPublishableKey?: string;
+  readonly stagingSecretKey?: string;
+}
+
+function snapshotClerkEnv(): ClerkEnvSnapshot {
+  return {
+    publishableKey: process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY,
+    secretKey: process.env.CLERK_SECRET_KEY,
+    stagingPublishableKey: process.env.CLERK_PUBLISHABLE_KEY_STAGING,
+    stagingSecretKey: process.env.CLERK_SECRET_KEY_STAGING,
+  };
+}
+
+function restoreClerkEnv(snapshot: ClerkEnvSnapshot): void {
+  if (snapshot.publishableKey === undefined) {
+    delete process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
+  } else {
+    process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY = snapshot.publishableKey;
+  }
+
+  if (snapshot.secretKey === undefined) {
+    delete process.env.CLERK_SECRET_KEY;
+  } else {
+    process.env.CLERK_SECRET_KEY = snapshot.secretKey;
+  }
+
+  if (snapshot.stagingPublishableKey === undefined) {
+    delete process.env.CLERK_PUBLISHABLE_KEY_STAGING;
+  } else {
+    process.env.CLERK_PUBLISHABLE_KEY_STAGING = snapshot.stagingPublishableKey;
+  }
+
+  if (snapshot.stagingSecretKey === undefined) {
+    delete process.env.CLERK_SECRET_KEY_STAGING;
+  } else {
+    process.env.CLERK_SECRET_KEY_STAGING = snapshot.stagingSecretKey;
+  }
+}
+
+function withClerkEnv<T>(
+  env: Partial<Record<string, string | undefined>>,
+  run: () => T
+): T {
+  const snapshot = snapshotClerkEnv();
+
+  process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY =
+    env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
+  process.env.CLERK_SECRET_KEY = env.CLERK_SECRET_KEY;
+  process.env.CLERK_PUBLISHABLE_KEY_STAGING = env.CLERK_PUBLISHABLE_KEY_STAGING;
+  process.env.CLERK_SECRET_KEY_STAGING = env.CLERK_SECRET_KEY_STAGING;
+
+  try {
+    return run();
+  } finally {
+    restoreClerkEnv(snapshot);
+  }
+}
+
 function checkClerkKeyRouting(
   env: Partial<Record<string, string | undefined>>,
   target: SignedInAuthTarget,
   hostname: string
 ): SignedInAuthCheck[] {
-  const previousPublishableKey = process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
-  const previousSecretKey = process.env.CLERK_SECRET_KEY;
-  const previousStagingPublishableKey =
-    process.env.CLERK_PUBLISHABLE_KEY_STAGING;
-  const previousStagingSecretKey = process.env.CLERK_SECRET_KEY_STAGING;
-
-  try {
-    process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY =
-      env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
-    process.env.CLERK_SECRET_KEY = env.CLERK_SECRET_KEY;
-    process.env.CLERK_PUBLISHABLE_KEY_STAGING =
-      env.CLERK_PUBLISHABLE_KEY_STAGING;
-    process.env.CLERK_SECRET_KEY_STAGING = env.CLERK_SECRET_KEY_STAGING;
-
+  return withClerkEnv(env, () => {
     const keys = resolveClerkKeys(hostname);
 
     if (target === 'stg' && keys.status === 'staging_inherits_prod') {
@@ -176,31 +224,7 @@ function checkClerkKeyRouting(
         evidence: `status=${keys.status} publishableKeyPrefix=${publishableKeyPrefix(keys.publishableKey) ?? 'missing'}`,
       },
     ];
-  } finally {
-    if (previousPublishableKey === undefined) {
-      delete process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
-    } else {
-      process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY = previousPublishableKey;
-    }
-
-    if (previousSecretKey === undefined) {
-      delete process.env.CLERK_SECRET_KEY;
-    } else {
-      process.env.CLERK_SECRET_KEY = previousSecretKey;
-    }
-
-    if (previousStagingPublishableKey === undefined) {
-      delete process.env.CLERK_PUBLISHABLE_KEY_STAGING;
-    } else {
-      process.env.CLERK_PUBLISHABLE_KEY_STAGING = previousStagingPublishableKey;
-    }
-
-    if (previousStagingSecretKey === undefined) {
-      delete process.env.CLERK_SECRET_KEY_STAGING;
-    } else {
-      process.env.CLERK_SECRET_KEY_STAGING = previousStagingSecretKey;
-    }
-  }
+  });
 }
 
 function checkPublishableKeyType(
@@ -240,45 +264,7 @@ function resolveClerkKeysForEnv(
   env: Partial<Record<string, string | undefined>>,
   hostname: string
 ) {
-  const previousPublishableKey = process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
-  const previousSecretKey = process.env.CLERK_SECRET_KEY;
-  const previousStagingPublishableKey =
-    process.env.CLERK_PUBLISHABLE_KEY_STAGING;
-  const previousStagingSecretKey = process.env.CLERK_SECRET_KEY_STAGING;
-
-  process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY =
-    env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
-  process.env.CLERK_SECRET_KEY = env.CLERK_SECRET_KEY;
-  process.env.CLERK_PUBLISHABLE_KEY_STAGING = env.CLERK_PUBLISHABLE_KEY_STAGING;
-  process.env.CLERK_SECRET_KEY_STAGING = env.CLERK_SECRET_KEY_STAGING;
-
-  const keys = resolveClerkKeys(hostname);
-
-  if (previousPublishableKey === undefined) {
-    delete process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
-  } else {
-    process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY = previousPublishableKey;
-  }
-
-  if (previousSecretKey === undefined) {
-    delete process.env.CLERK_SECRET_KEY;
-  } else {
-    process.env.CLERK_SECRET_KEY = previousSecretKey;
-  }
-
-  if (previousStagingPublishableKey === undefined) {
-    delete process.env.CLERK_PUBLISHABLE_KEY_STAGING;
-  } else {
-    process.env.CLERK_PUBLISHABLE_KEY_STAGING = previousStagingPublishableKey;
-  }
-
-  if (previousStagingSecretKey === undefined) {
-    delete process.env.CLERK_SECRET_KEY_STAGING;
-  } else {
-    process.env.CLERK_SECRET_KEY_STAGING = previousStagingSecretKey;
-  }
-
-  return keys;
+  return withClerkEnv(env, () => resolveClerkKeys(hostname));
 }
 
 function checkStagingHostnames(): SignedInAuthCheck {
