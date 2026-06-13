@@ -58,6 +58,23 @@ function isSocialLinksColumnMissing(message: string): boolean {
   );
 }
 
+function isCreatorDistributionEventsSchemaIssue(message: string): boolean {
+  const normalizedMessage = message.toLowerCase();
+  const referencesDistributionEventsTable =
+    normalizedMessage.includes('from "creator_distribution_events"') ||
+    normalizedMessage.includes('from creator_distribution_events') ||
+    normalizedMessage.includes('relation "creator_distribution_events"') ||
+    normalizedMessage.includes('relation creator_distribution_events');
+
+  return (
+    normalizedMessage.includes(
+      'relation "creator_distribution_events" does not exist'
+    ) ||
+    (normalizedMessage.includes('failed query:') &&
+      referencesDistributionEventsTable)
+  );
+}
+
 function isUserSettingsSchemaIssue(message: string): boolean {
   const normalizedMessage = message.toLowerCase();
   const referencesUserSettingsTable =
@@ -117,6 +134,17 @@ function resolveOperationFallback(
         return {
           log: '[Dashboard] social_links migration in progress; treating as no links',
           fallbackData: { hasLinks: false, hasMusicLinks: false },
+        };
+      }
+      break;
+    case 'creator_distribution_events':
+      if (
+        hasMigrationErrorCode ||
+        isCreatorDistributionEventsSchemaIssue(message)
+      ) {
+        return {
+          log: '[Dashboard] creator_distribution_events migration in progress; treating as no activation events',
+          fallbackData: [],
         };
       }
       break;

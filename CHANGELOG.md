@@ -5,12 +5,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.6.52] - 2026-06-13
+
+> Desktop auth callback no longer falls through to the PWA offline page.
+
+### Fixed
+
+- **Desktop login auth callback (JOV-3119)**: unregisters stale PWA service workers in Electron sessions, bypasses offline fallback on auth/OAuth routes, and stamps the desktop user agent on the auth handoff window so callback navigations reach the network.
+
 ## [26.6.51] - 2026-06-13
 
 > [internal] Bug fixes now require regression test evidence before ship.
 
 ### Added
 
+- [internal] **Signed-in auth verification harness (JOV-2761)**: adds `check:signed-in-auth`, `verify:signed-in-auth`, `test:auth:web`, Clerk key-routing preflight, deployment probe, and Playwright signed-in session proof for web (Electron/iOS/extension follow-up tracked separately).
 - [internal] **Bug-to-test rule enforcement (JOV-1873)**: adds `pnpm test:bug-to-test`, PR template checklist, Danger gate, and `/ship` Step 3.35 to require regression tests (or documented waivers) on bug-fix PRs.
 
 ## [26.6.50] - 2026-06-11

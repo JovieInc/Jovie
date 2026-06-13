@@ -11,8 +11,33 @@ import { getHermesDispatchAvailability } from '@/lib/hermes/dispatch';
 import { ServerFetchTimeoutError } from '@/lib/http/server-fetch';
 import { getHudAiOpsSummary } from '@/lib/hud/ai-ops';
 import { buildHudMetricSources } from '@/lib/hud/source-trust';
+import { getHudQuarantineMetrics } from '@/lib/testing/quarantine-ledger.server';
 import { logger } from '@/lib/utils/logger';
 import type { HudAccessMode, HudMetrics } from '@/types/hud';
+
+function buildHudTestingMetrics(): HudMetrics['testing'] {
+  const quarantine = getHudQuarantineMetrics();
+
+  return {
+    quarantine: {
+      activeCount: quarantine.summary.activeCount,
+      expiredCount: quarantine.summary.expiredCount,
+      expiringSoonCount: quarantine.summary.expiringSoonCount,
+      unitCount: quarantine.summary.unitCount,
+      e2eCount: quarantine.summary.e2eCount,
+      estimatedRetryAttemptsPerRun:
+        quarantine.summary.estimatedRetryAttemptsPerRun,
+      retryBudgetCap: quarantine.summary.retryBudgetCap,
+      retryBudgetUsagePercent: quarantine.summary.retryBudgetUsagePercent,
+      withinRetryBudget: quarantine.summary.withinRetryBudget,
+      unitDefaultRetries: quarantine.retryBudget.unitDefaultRetries,
+      quarantineUnitRetries: quarantine.retryBudget.quarantineUnitRetries,
+      quarantineE2eRetries: quarantine.retryBudget.quarantineE2eRetries,
+      isValid: quarantine.isValid,
+      ledgerPath: quarantine.ledgerPath,
+    },
+  };
+}
 
 export interface BuildDegradedHudMetricsOptions {
   context?: string;
@@ -222,6 +247,7 @@ export function buildDegradedHudMetrics(
       lastIncidentAtIso: null,
       unresolvedSentryIssues24h: 0,
     },
+    testing: buildHudTestingMetrics(),
     deployments,
     aiOps: {
       availability: 'error',
@@ -389,6 +415,7 @@ async function fetchHudMetrics(mode: HudAccessMode): Promise<HudMetrics> {
       lastIncidentAtIso,
       unresolvedSentryIssues24h: reliabilitySummary.unresolvedSentryIssues24h,
     },
+    testing: buildHudTestingMetrics(),
     deployments,
     aiOps,
     sources,

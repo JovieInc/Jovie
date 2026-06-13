@@ -3,6 +3,7 @@ import {
   buildInstagramBioLink,
   getBioLinkActivationWindowEnd,
   isInstagramActivationSource,
+  isMissingCreatorDistributionEventsTableError,
   postDistributionEvent,
   resolveBioLinkActivationStatus,
 } from '@/lib/distribution/instagram-activation';
@@ -74,6 +75,22 @@ describe('instagram activation helpers', () => {
         windowEndsAt,
       })
     ).toBe('expired');
+  });
+
+  it('detects missing creator_distribution_events table errors', () => {
+    expect(
+      isMissingCreatorDistributionEventsTableError(
+        new Error('relation "creator_distribution_events" does not exist', {
+          cause: { code: '42P01' },
+        })
+      )
+    ).toBe(true);
+
+    expect(
+      isMissingCreatorDistributionEventsTableError(
+        new Error('Failed query: select from creator_distribution_events')
+      )
+    ).toBe(false);
   });
 
   it('no-ops if the distribution event helper is called on the server', async () => {

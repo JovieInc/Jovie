@@ -653,6 +653,10 @@ function showDesktopAuthHandoff(authUrl: string): void {
     },
   });
 
+  authHandoffWindow.webContents.setUserAgent(
+    `${authHandoffWindow.webContents.getUserAgent()} ${DESKTOP_USER_AGENT_PRODUCT}`
+  );
+
   authHandoffWindow.once('ready-to-show', () => {
     hideMainWindowForAuthHandoff();
     if (authHandoffWindow) showWindow(authHandoffWindow);

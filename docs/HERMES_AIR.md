@@ -189,11 +189,17 @@ tsx scripts/hermes/jobs/codex-issue-shipper.ts
 
 The job watches open GitHub issues labeled `codex`. Empty runs only call GitHub, write a JSONL event, and exit. No gbrain query, model call, subagent, or CodeRabbit review starts until an eligible issue exists.
 
+Only one shipper run may own the queue at a time. A new cron invocation takes a non-blocking singleton lock check; if another shipper is still active, the new invocation logs `singleton_active_skip` and exits. The active run keeps draining the queue in batches until no eligible issues remain, the machine is under too much pressure to launch another agent, or all remaining issues are blocked or human-gated.
+
 Config variables:
 
 | Variable | Default | Purpose | Update path |
 |---|---:|---|---|
-| `HERMES_CODEX_SHIPPER_MAX_ISSUES_PER_RUN` | `1` | Max Codex issues shipped per run; controls concurrency and spend | Doppler or plist env, then `./scripts/hermes/bootstrap-air.sh --reconfigure` |
+| `HERMES_CODEX_SHIPPER_MAX_ISSUES_PER_RUN` | `3` | Max Codex issues selected per drain batch; also caps parallel agent fan-out | Doppler or plist env, then `./scripts/hermes/bootstrap-air.sh --reconfigure` |
+| `HERMES_CODEX_SHIPPER_MAX_PARALLEL_AGENTS` | `3` | Absolute cap for concurrent coder agents inside the singleton shipper run | Doppler or plist env, then `./scripts/hermes/bootstrap-air.sh --reconfigure` |
+| `HERMES_CODEX_SHIPPER_MIN_FREE_MEMORY_MB` | `4096` | Below this free-memory floor, launch at most one new coder; below half this floor, launch none | Doppler or plist env, then `./scripts/hermes/bootstrap-air.sh --reconfigure` |
+| `HERMES_CODEX_SHIPPER_MAX_LOAD_PER_CPU` | `1.5` | Above this one-minute load-per-CPU threshold, launch at most one new coder; above 1.5x this threshold, launch none | Doppler or plist env, then `./scripts/hermes/bootstrap-air.sh --reconfigure` |
+| `HERMES_CODEX_SHIPPER_SINGLETON_LOCK_STALE_MS` | `28800000` | Long-running shipper lock TTL; new crons skip while the owning process is alive | Doppler or plist env, then `./scripts/hermes/bootstrap-air.sh --reconfigure` |
 | `HERMES_CODEX_SHIPPER_INTEGRATION_THRESHOLD` | `4` | Eligible queue depth that routes trainable issues through `integration/codex-queue` | Doppler or plist env, then `./scripts/hermes/bootstrap-air.sh --reconfigure` |
 | `HERMES_CODEX_SHIPPER_AGENT` | `claude` | Local coding agent binary; `claude` keeps subagent support, `codex` is available as an explicit override | Doppler or plist env, then `./scripts/hermes/bootstrap-air.sh --reconfigure` |
 
@@ -211,9 +217,9 @@ Ship now / Re-evaluate when / Then:
 
 | Decision | Trigger | Action |
 |---|---|---|
-| Ship now | Default `HERMES_CODEX_SHIPPER_MAX_ISSUES_PER_RUN=1`, because one coder session can consume hours of agent time plus CI minutes | Keep one issue per run and let the 15-minute cron continue draining |
-| Re-evaluate when | Eligible `codex` queue stays above 4 issues for two consecutive runs and cost per shipped issue stays under the weekly unit target: CI minutes x runner cost plus agent minutes x model cost | Raise `HERMES_CODEX_SHIPPER_MAX_ISSUES_PER_RUN` or add an `integration-branch` label to queue trainable issues |
-| Then | CI minutes x runner cost plus agent minutes x model cost stay within the weekly agent budget | Keep the higher concurrency; otherwise return to one issue per run |
+| Ship now | Default `HERMES_CODEX_SHIPPER_MAX_ISSUES_PER_RUN=3` and `HERMES_CODEX_SHIPPER_MAX_PARALLEL_AGENTS=3`, because one singleton run can keep the queue hot without duplicate cron owners | Keep up to three coder lanes active while free memory stays above 4096MB and load stays below 1.5 per CPU |
+| Re-evaluate when | Cost per shipped issue rises above the weekly unit target: CI minutes x runner cost plus agent minutes x model cost, or local pressure repeatedly logs `capacity_throttled` | Lower `HERMES_CODEX_SHIPPER_MAX_PARALLEL_AGENTS`, raise machine capacity, or route more trainable issues through `integration-branch` labels |
+| Then | CI minutes x runner cost plus agent minutes x model cost stay within the weekly agent budget | Keep three lanes; otherwise reduce the cap until the queue drain cost is back inside target |
 
 ## Recovery Procedures
 

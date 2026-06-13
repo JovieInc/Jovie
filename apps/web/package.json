@@ -1,6 +1,6 @@
 {
   "name": "@jovie/web",
-  "version": "26.6.51",
+  "version": "26.6.52",
   "private": true,
   "sideEffects": false,
   "engines": {
@@ -14,6 +14,8 @@
     "dev:local:playwright": "NEXT_PUBLIC_E2E_MODE=1 NEXT_DISABLE_TOOLBAR=1 next dev --webpack",
     "validate-env": "tsx scripts/validate-env.ts",
     "check:signup-readiness": "tsx scripts/check-signup-readiness.ts",
+    "check:signed-in-auth": "tsx scripts/verify-signed-in-auth.ts",
+    "verify:signed-in-auth": "tsx scripts/verify-signed-in-auth.ts",
     "build": "NODE_OPTIONS=--max-old-space-size=8192 NEXT_IGNORE_TYPECHECK=1 next build --turbopack",
     "build:strict": "pnpm run typecheck && NODE_OPTIONS=--max-old-space-size=8192 next build --turbopack",
     "analyze": "NODE_OPTIONS=--max-old-space-size=8192 ANALYZE=true NEXT_IGNORE_TYPECHECK=1 next build --webpack",
@@ -47,6 +49,7 @@
     "test:coverage": "vitest run --coverage",
     "test:truth": "node scripts/test-truth-guard.mjs",
     "test:bug-to-test": "tsx scripts/check-bug-to-test-rule.ts",
+    "test:quarantine-ledger": "tsx scripts/check-quarantine-ledger.ts",
     "test:watch": "vitest --config=vitest.config.mts",
     "test:fast": "vitest run --config=vitest.config.mts",
     "test:profile": "tsx scripts/test-performance-profiler.ts",

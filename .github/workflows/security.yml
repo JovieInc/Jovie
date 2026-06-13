@@ -41,6 +41,9 @@ jobs:
           GITLEAKS_LICENSE: ${{ secrets.GITLEAKS_LICENSE }}
           GITLEAKS_ENABLE_COMMENTS: false
 
+      - name: Verify gitleaks detects Neon/Clerk leak shapes (JOV-2940)
+        run: ./scripts/security/verify-gitleaks-coverage.sh
+
   trivy:
     name: Trivy Vulnerability Scanning
     runs-on: ubuntu-latest

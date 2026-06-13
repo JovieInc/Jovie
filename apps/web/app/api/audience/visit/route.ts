@@ -32,6 +32,7 @@ import {
   getInstagramReferrerHost,
   INSTAGRAM_DISTRIBUTION_PLATFORM,
   isInstagramActivationSource,
+  isMissingCreatorDistributionEventsTableError,
 } from '@/lib/distribution/instagram-activation';
 import { captureError, captureWarning } from '@/lib/error-tracking';
 import { withSystemIngestionSession } from '@/lib/ingestion/session';
@@ -335,10 +336,6 @@ async function incrementDailyProfileViews(
 }
 
 function isMissingDailyProfileViewsTableError(error: unknown): boolean {
-  return unwrapPgError(error).code === '42P01';
-}
-
-function isMissingCreatorDistributionEventsTableError(error: unknown): boolean {
   return unwrapPgError(error).code === '42P01';
 }
 

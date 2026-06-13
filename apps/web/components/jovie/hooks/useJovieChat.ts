@@ -178,8 +178,22 @@ function getCachedTimelineState(conversationId: string | null) {
   );
 }
 
+function shouldCacheTimelineState(state: ChatTimelineState) {
+  return !state.messages.some(
+    message =>
+      message.status === 'sending' ||
+      message.status === 'pending' ||
+      message.status === 'sent' ||
+      message.status === 'streaming'
+  );
+}
+
 function cacheTimelineState(state: ChatTimelineState) {
   if (!state.conversationId) return;
+  if (!shouldCacheTimelineState(state)) {
+    timelineStateCache.delete(state.conversationId);
+    return;
+  }
   timelineStateCache.set(state.conversationId, state);
   while (timelineStateCache.size > TIMELINE_CACHE_LIMIT) {
     const oldestKey = timelineStateCache.keys().next().value;
@@ -296,6 +310,10 @@ export function useJovieChat({
     },
     [activeConversationId, onConversationCreate]
   );
+  const adoptServerConversationIdRef = useRef(adoptServerConversationId);
+  useEffect(() => {
+    adoptServerConversationIdRef.current = adoptServerConversationId;
+  }, [adoptServerConversationId]);
 
   // Determine whether to poll: only while we're actively waiting for a title
   // and haven't exceeded the max poll duration.
@@ -334,7 +352,10 @@ export function useJovieChat({
           const serverTurnId = response.headers.get('x-chat-turn-id');
           const clientTurnId = activeClientTurnIdRef.current;
           if (serverConversationId) {
-            adoptServerConversationId(serverConversationId, 'reserved');
+            adoptServerConversationIdRef.current(
+              serverConversationId,
+              'reserved'
+            );
           }
           if (serverConversationId && clientTurnId) {
             dispatchTimelineEvent({
@@ -349,13 +370,7 @@ export function useJovieChat({
           return response;
         },
       }),
-    [
-      profileId,
-      artistContext,
-      activeConversationId,
-      adoptServerConversationId,
-      dispatchTimelineEvent,
-    ]
+    [profileId, artistContext, activeConversationId, dispatchTimelineEvent]
   );
 
   // Convert loaded messages to canonical timeline input. Query data feeds the

@@ -1,10 +1,8 @@
 # Gitleaks Configuration for Jovie
 # https://github.com/gitleaks/gitleaks
 #
-# This file configures secret detection scanning with allowlists for:
-# - Test fixtures and mock data
-# - Example environment files
-# - Documentation with sample values
+# Scans the full git history on push-to-main and weekly schedule.
+# Keep allowlists narrow — broad docs/*.md exclusions hid real secrets (JOV-2940).
 
 [extend]
 # Use the default gitleaks config as a base
@@ -16,7 +14,7 @@
 # Files and directories that should be excluded from scanning
 
 [allowlist]
-description = "Global allowlist for test fixtures, examples, and templates"
+description = "Narrow allowlist for test fixtures, examples, and templates"
 
 # Regex patterns for paths to ignore
 paths = [
@@ -32,12 +30,6 @@ paths = [
     '''\.env\.example$''',
     '''\.env\.sample$''',
     '''\.env\.template$''',
-
-    # Documentation
-    '''(?i)docs?/''',
-    '''(?i)\.md$''',
-    '''(?i)README''',
-    '''(?i)CONTRIBUTING''',
 
     # Generated/build output (should not contain secrets anyway)
     '''node_modules/''',
@@ -64,6 +56,9 @@ paths = [
 
     # Log files from test runs
     '''\.log$''',
+
+    # Gitleaks self-test fixture (intentionally contains leak-shaped strings)
+    '''scripts/security/gitleaks-fixture\.txt$''',
 ]
 
 # Regex patterns for content to ignore (false positive patterns)
@@ -71,6 +66,7 @@ regexes = [
     # Placeholder values in env examples
     '''your_.*_here''',
     '''YOUR_.*_HERE''',
+    '''your-real-.*-key''',
     '''placeholder''',
     '''PLACEHOLDER''',
 
@@ -109,16 +105,20 @@ regexes = [
 commits = []
 
 # =============================================================================
-# Custom Rules (Optional Overrides)
+# Custom Rules — close gaps that allowed JOV-2940 to land
 # =============================================================================
-# You can add custom rules or modify built-in rule behavior here
 
-# Example: If you need to create a specific rule allowlist
-# [[rules]]
-# id = "custom-rule-id"
-# description = "Custom rule description"
-# regex = '''pattern'''
-# allowlist = { paths = ['specific/path'] }
+[[rules]]
+id = "neon-postgres-connection-string"
+description = "Neon Postgres connection string with embedded password"
+regex = '''postgresql://[^:]+:[^@\s'"]+@[^\s'"]*neon\.tech[^\s'"]*'''
+tags = ["database", "neon", "jovie"]
+
+[[rules]]
+id = "clerk-secret-key"
+description = "Clerk secret key (sk_test_ or sk_live_)"
+regex = '''(?i)(?:CLERK_SECRET_KEY\s*=\s*)?sk_(?:test|live)_[A-Za-z0-9]{20,}'''
+tags = ["clerk", "auth", "jovie"]
 
 # =============================================================================
 # Stop Words

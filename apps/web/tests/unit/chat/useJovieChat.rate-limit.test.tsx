@@ -230,6 +230,35 @@ describe('useJovieChat', () => {
     expect(setMessagesMock).not.toHaveBeenCalled();
   });
 
+  it('does not restore in-progress timeline rows from cache after remount', async () => {
+    const { result, unmount } = renderHook(() =>
+      useJovieChat({ profileId: 'profile_1', conversationId: 'conv_cache' })
+    );
+
+    await act(async () => {
+      await result.current.submitMessage('Keep streaming');
+    });
+
+    expect(result.current.messages).toMatchObject([
+      {
+        role: 'user',
+        status: 'sending',
+      },
+      {
+        role: 'assistant',
+        status: 'pending',
+      },
+    ]);
+
+    unmount();
+
+    const remounted = renderHook(() =>
+      useJovieChat({ profileId: 'profile_1', conversationId: 'conv_cache' })
+    );
+
+    expect(remounted.result.current.messages).toHaveLength(0);
+  });
+
   it('merges loaded conversation messages into the canonical timeline without SDK replacement', () => {
     mockConversationData = {
       conversation: { id: 'conv_merge', title: null },
