@@ -20,6 +20,21 @@ import type {
 } from '@/types/insights';
 import { GENERATION_COOLDOWN_HOURS } from './thresholds';
 
+const INSIGHT_PRIORITY_ORDER = drizzleSql`case ${aiInsights.priority} when 'high' then 0 when 'medium' then 1 when 'low' then 2 end`;
+
+const INSIGHT_PRIORITY_RANK: Record<InsightPriority, number> = {
+  high: 0,
+  medium: 1,
+  low: 2,
+};
+
+type InsightDedupCandidate = {
+  category: InsightCategory;
+  title: string;
+  description: string;
+  dataSnapshot: unknown;
+};
+
 // ---------------------------------------------------------------------------
 // Insight Generation Runs
 // ---------------------------------------------------------------------------
@@ -110,13 +125,14 @@ export async function persistInsights(
   period: { start: Date; end: Date },
   comparisonPeriod: { start: Date; end: Date }
 ): Promise<number> {
-  if (insights.length === 0) return 0;
+  const dedupedInsights = prepareInsightsForPersistence(insights);
+  if (dedupedInsights.length === 0) return 0;
 
   const now = new Date();
   let persisted = 0;
 
   // Insert each insight individually to handle dedup gracefully
-  for (const insight of insights) {
+  for (const insight of dedupedInsights) {
     const expiresAt = new Date(now);
     expiresAt.setDate(expiresAt.getDate() + insight.expiresInDays);
 
@@ -208,28 +224,17 @@ export async function getActiveInsights(
 
   const whereClause = and(...conditions);
 
-  const [rows, countResult] = await Promise.all([
-    db
-      .select()
-      .from(aiInsights)
-      .where(whereClause)
-      .orderBy(
-        drizzleSql`case ${aiInsights.priority} when 'high' then 0 when 'medium' then 1 when 'low' then 2 end`,
-        desc(aiInsights.createdAt)
-      )
-      .limit(limit)
-      .offset(offset),
-    db
-      .select({ count: drizzleSql<number>`count(*)::int` })
-      .from(aiInsights)
-      .where(whereClause),
-  ]);
-
-  const total = countResult[0]?.count ?? 0;
+  const rows = await db
+    .select()
+    .from(aiInsights)
+    .where(whereClause)
+    .orderBy(INSIGHT_PRIORITY_ORDER, desc(aiInsights.createdAt));
+  const dedupedRows = dedupeVisibleInsights(rows);
+  const pagedRows = dedupedRows.slice(offset, offset + limit);
 
   return {
-    insights: rows.map(formatInsightResponse),
-    total,
+    insights: pagedRows.map(formatInsightResponse),
+    total: dedupedRows.length,
   };
 }
 
@@ -241,20 +246,11 @@ export async function getInsightsSummary(
 ): Promise<InsightsSummaryResponse> {
   const now = new Date();
 
-  const [insights, countResult, lastRun] = await Promise.all([
+  const [insights, lastRun] = await Promise.all([
     db
       .select()
       .from(aiInsights)
-      .where(
-        and(
-          eq(aiInsights.creatorProfileId, creatorProfileId),
-          eq(aiInsights.status, 'active'),
-          gte(aiInsights.expiresAt, now)
-        )
-      ),
-    db
-      .select({ count: drizzleSql<number>`count(*)::int` })
-      .from(aiInsights)
+      .orderBy(INSIGHT_PRIORITY_ORDER, desc(aiInsights.createdAt))
       .where(
         and(
           eq(aiInsights.creatorProfileId, creatorProfileId),
@@ -275,13 +271,14 @@ export async function getInsightsSummary(
       .limit(1),
   ]);
 
+  const dedupedInsights = dedupeVisibleInsights(insights);
   const sortedInsights = sortInsightsForChat(
-    insights.map(formatInsightResponse)
+    dedupedInsights.map(formatInsightResponse)
   );
 
   return {
     insights: sortedInsights.slice(0, 3),
-    totalActive: countResult[0]?.count ?? 0,
+    totalActive: dedupedInsights.length,
     lastGeneratedAt: lastRun[0]?.createdAt
       ? toISOStringSafe(lastRun[0].createdAt)
       : null,
@@ -358,9 +355,40 @@ export async function getExistingInsightTypes(
   return rows.map(r => r.insightType);
 }
 
+export function prepareInsightsForPersistence(
+  insights: readonly GeneratedInsight[]
+): GeneratedInsight[] {
+  return dedupeVisibleInsights(
+    [...insights].sort(
+      (left, right) =>
+        INSIGHT_PRIORITY_RANK[left.priority] -
+          INSIGHT_PRIORITY_RANK[right.priority] ||
+        right.confidence - left.confidence
+    )
+  );
+}
+
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
+
+export function dedupeVisibleInsights<T extends InsightDedupCandidate>(
+  insights: readonly T[]
+): T[] {
+  const seen = new Set<string>();
+  const deduped: T[] = [];
+
+  for (const insight of insights) {
+    const key = buildInsightDedupKey(insight);
+    if (seen.has(key)) {
+      continue;
+    }
+    seen.add(key);
+    deduped.push(insight);
+  }
+
+  return deduped;
+}
 
 function formatInsightResponse(
   row: typeof aiInsights.$inferSelect
@@ -380,4 +408,71 @@ function formatInsightResponse(
     createdAt: toISOStringSafe(row.createdAt),
     expiresAt: toISOStringSafe(row.expiresAt),
   };
+}
+
+function buildInsightDedupKey(insight: InsightDedupCandidate): string {
+  const sourceKey = getInsightSourceKey(insight.dataSnapshot);
+  if (sourceKey) {
+    return `${insight.category}|${sourceKey}`;
+  }
+
+  return `${insight.category}|${normalizeInsightCopy(insight.title)}|${normalizeInsightCopy(insight.description)}`;
+}
+
+function getInsightSourceKey(dataSnapshot: unknown): string | null {
+  if (!dataSnapshot || typeof dataSnapshot !== 'object') {
+    return null;
+  }
+
+  const snapshot = dataSnapshot as Record<string, unknown>;
+  const city = normalizeSnapshotToken(snapshot.city);
+  const country = normalizeSnapshotToken(snapshot.country);
+  if (city) {
+    return country ? `city:${city}|${country}` : `city:${city}`;
+  }
+
+  const market = normalizeSnapshotToken(snapshot.market);
+  if (market) {
+    return `market:${market}`;
+  }
+
+  const release = normalizeSnapshotToken(snapshot.release);
+  if (release) {
+    return `release:${release}`;
+  }
+
+  const referrer = normalizeSnapshotToken(snapshot.referrer);
+  if (referrer) {
+    return `referrer:${referrer}`;
+  }
+
+  const spikeDate = normalizeSnapshotToken(snapshot.spikeDate);
+  if (spikeDate) {
+    return `spikeDate:${spikeDate}`;
+  }
+
+  const deviceType = normalizeSnapshotToken(snapshot.deviceType);
+  if (deviceType) {
+    return `deviceType:${deviceType}`;
+  }
+
+  const linkType = normalizeSnapshotToken(snapshot.linkType);
+  if (linkType) {
+    return `linkType:${linkType}`;
+  }
+
+  return null;
+}
+
+function normalizeSnapshotToken(value: unknown): string | null {
+  if (typeof value !== 'string' && typeof value !== 'number') {
+    return null;
+  }
+
+  const normalized = String(value).trim().toLowerCase();
+  return normalized ? normalized : null;
+}
+
+function normalizeInsightCopy(value: string): string {
+  return value.trim().toLowerCase().replace(/\s+/g, ' ');
 }
