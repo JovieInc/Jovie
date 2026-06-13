@@ -77,17 +77,31 @@ export class QueryTimeoutError extends Error {
   }
 }
 
+function assertPositiveTimeoutMs(timeoutMs: number): number {
+  const safeMs = Math.floor(timeoutMs);
+  if (!Number.isFinite(safeMs) || safeMs <= 0) {
+    throw new Error(`Invalid statement_timeout ms: ${timeoutMs}`);
+  }
+
+  return safeMs;
+}
+
 /**
  * Sets the PostgreSQL statement timeout for the current session.
- * Uses SET (session-scoped) instead of SET LOCAL, because SET LOCAL is a
- * no-op outside a transaction block and the Neon HTTP driver does not
- * support transactions.
+ *
+ * Uses parameterized `set_config` instead of `SET statement_timeout = $1`.
+ * PostgreSQL rejects bind parameters on SET, which surfaced in production as
+ * "Failed query: SET statement_timeout = $1".
  */
 export async function setStatementTimeout(
   db: DbOrTransaction,
   timeoutMs: number
 ): Promise<void> {
-  await db.execute(drizzleSql`SET statement_timeout = ${timeoutMs}`);
+  const safeMs = assertPositiveTimeoutMs(timeoutMs);
+
+  await db.execute(
+    drizzleSql`SELECT set_config('statement_timeout', ${String(safeMs)}, false)`
+  );
 }
 
 /**
