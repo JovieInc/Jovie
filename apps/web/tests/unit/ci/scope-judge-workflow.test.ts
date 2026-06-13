@@ -95,6 +95,24 @@ describe('Scope Judge workflow cost controls', () => {
     expect(step).not.toContain('OPENAI_API_KEY');
   });
 
+  it('skips deterministically when OpenRouter never returns model content', () => {
+    const workflow = readFileSync(workflowPath, 'utf8');
+    const judgeStep = getStepBlock(
+      workflow,
+      'Run scope alignment judge (OpenRouter)'
+    );
+    const reportStep = getStepBlock(workflow, 'Report scope judge status');
+
+    expect(judgeStep).toContain('HAS_MODEL_CONTENT=false');
+    expect(judgeStep).toContain('verdict=api_unavailable');
+    expect(judgeStep).toContain('OpenRouter API unavailable - deterministic skip');
+    expect(reportStep).toContain('api_unavailable');
+    expect(reportStep).toContain(
+      'Scope judge skipped - OpenRouter API unavailable; no model call'
+    );
+    expect(reportStep).toContain('STATE="success"');
+  });
+
   it('posts a successful deterministic status when the PR diff is unavailable', () => {
     const workflow = readFileSync(workflowPath, 'utf8');
     const step = getStepBlock(

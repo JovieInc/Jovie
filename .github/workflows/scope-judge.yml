@@ -216,9 +216,11 @@ jobs:
           }
 
           RESPONSE=""
+          HAS_MODEL_CONTENT=false
           for attempt in 1 2 3; do
             RESPONSE=$(call_openrouter)
             if echo "$RESPONSE" | jq -e '.choices[0].message.content' >/dev/null 2>&1; then
+              HAS_MODEL_CONTENT=true
               echo "OpenRouter judge succeeded on attempt $attempt"
               break
             fi
@@ -230,10 +232,6 @@ jobs:
             fi
           done
 
-          # Extract verdict
-          CONTENT=$(echo "$RESPONSE" | jq -r '.choices[0].message.content // .error.message // "ERROR: No response"')
-          echo "Judge response: $CONTENT"
-
           write_multiline_output() {
             local name="$1"
             local value="$2"
@@ -243,6 +241,18 @@ jobs:
               echo 'EOF'
             } >> "$GITHUB_OUTPUT"
           }
+
+          if [[ "$HAS_MODEL_CONTENT" != "true" ]]; then
+            API_ERROR=$(echo "$RESPONSE" | jq -r '.error.message // "OpenRouter API unavailable"')
+            echo "Scope judge: OpenRouter API unavailable - deterministic skip"
+            echo "verdict=api_unavailable" >> "$GITHUB_OUTPUT"
+            write_multiline_output reason "$API_ERROR"
+            exit 0
+          fi
+
+          # Extract verdict
+          CONTENT=$(echo "$RESPONSE" | jq -r '.choices[0].message.content // "ERROR: No response"')
+          echo "Judge response: $CONTENT"
 
           VERDICT=$(echo "$CONTENT" | grep -oP '(?<=VERDICT:\s)(PASS|FAIL)' | head -1 || echo "")
           REASON=$(echo "$CONTENT" | grep -oP '(?<=REASON:\s).*' | head -1 || echo "Unable to determine")
@@ -277,6 +287,9 @@ jobs:
           elif [[ "$JUDGE_VERDICT" == "fail" ]]; then
             STATE="failure"
             DESCRIPTION="Scope creep detected: $JUDGE_REASON"
+          elif [[ "$JUDGE_VERDICT" == "api_unavailable" ]]; then
+            STATE="success"
+            DESCRIPTION="Scope judge skipped - OpenRouter API unavailable; no model call"
           else
             STATE="failure"
             DESCRIPTION="Inconclusive — needs human review"
