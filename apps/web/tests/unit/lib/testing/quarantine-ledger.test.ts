@@ -122,7 +122,7 @@ describe('quarantine ledger', () => {
     expect(summary.activeCount).toBe(1);
     expect(summary.expiredCount).toBe(1);
     expect(summary.unitCount).toBe(1);
-    expect(summary.e2eCount).toBe(1);
+    expect(summary.e2eCount).toBe(0);
   });
 
   it('formats a validation report', () => {

@@ -384,15 +384,15 @@ export function buildQuarantineLedgerSummary(input: {
     const expiresMs = Date.parse(entry.expiresAt);
     const isExpired = !Number.isNaN(expiresMs) && expiresMs < nowMs;
 
-    if (entry.kind === 'unit') unitCount += 1;
-    if (entry.kind === 'e2e') e2eCount += 1;
-
     if (isExpired) {
       expiredCount += 1;
       continue;
     }
 
     activeCount += 1;
+    if (entry.kind === 'unit') unitCount += 1;
+    if (entry.kind === 'e2e') e2eCount += 1;
+
     if (!Number.isNaN(expiresMs) && expiresMs - nowMs <= soonThresholdMs) {
       expiringSoonCount += 1;
     }
