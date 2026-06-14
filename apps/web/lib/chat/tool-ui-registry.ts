@@ -131,6 +131,14 @@ export const TOOL_UI_REGISTRY = {
     successTitle: 'Merch pick saved',
     errorTitle: "Couldn't save that merch pick",
   },
+  createMerchAlternativeItem: {
+    label: 'Merch item',
+    uiHint: 'artifact',
+    renderer: 'artifact',
+    loadingTitle: 'Creating alternate item…',
+    successTitle: 'Alternate item saved',
+    errorTitle: "Couldn't create that item",
+  },
   publishMerchCard: {
     label: 'Merch publish',
     uiHint: 'artifact',

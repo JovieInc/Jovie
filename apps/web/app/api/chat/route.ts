@@ -79,6 +79,7 @@ import {
 } from '@/lib/chat/tool-events';
 import { proposeMerchAction } from '@/lib/chat/tools/merch-propose';
 import {
+  createMerchAlternativeTool,
   createMerchGenerateTool,
   createMerchPreviewTool,
   createMerchSelectTool,
@@ -2043,6 +2044,12 @@ function buildChatTools(
           selectMerchDesign: createMerchSelectTool({
             profileId: resolvedProfileId,
             clerkUserId,
+          }),
+          createMerchAlternativeItem: createMerchAlternativeTool({
+            profileId: resolvedProfileId,
+            clerkUserId,
+            conversationId: reservedTurn?.conversationId ?? null,
+            turnId: reservedTurn?.turnId ?? null,
           }),
           updateMerchCard: createMerchUpdateTool({
             profileId: resolvedProfileId,

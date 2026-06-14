@@ -5,6 +5,7 @@ import type {
   MerchVariantMap,
 } from '@/lib/db/schema/merch';
 import {
+  getCatalogProduct,
   getCatalogProductAvailability,
   getCatalogVariantPrices,
   isPrintfulConfigured,
@@ -24,6 +25,9 @@ import {
   MERCH_DEFAULT_MARGIN_PRESET,
   MERCH_DEFAULT_PRINTFUL_PRODUCT_COST_CENTS,
 } from './pricing';
+
+const CATALOG_PAGE_SIZE = 100;
+const MAX_CATALOG_PRODUCTS = 500;
 
 export interface MerchCatalogSelection {
   readonly catalogProductId: number;
@@ -93,15 +97,93 @@ function productMatchesRequest(
 ): boolean {
   if (!request)
     return product.id === MERCH_DEFAULT_PRINTFUL_PRODUCT.catalogProductId;
+  const requestTokens = request
+    .split(' ')
+    .filter(Boolean)
+    .filter(token => token.length > 1)
+    .filter(
+      token =>
+        ![
+          'create',
+          'make',
+          'merch',
+          'product',
+          'catalog',
+          'printful',
+          'version',
+        ].includes(token)
+    );
+  if (requestTokens.length === 0) {
+    return product.id === MERCH_DEFAULT_PRINTFUL_PRODUCT.catalogProductId;
+  }
   const haystack = normalize(
     [product.name, product.type, product.brand, product.model]
       .filter(Boolean)
       .join(' ')
   );
-  return request
-    .split(' ')
-    .filter(Boolean)
-    .some(token => haystack.includes(token));
+  return requestTokens.some(token => haystack.includes(token));
+}
+
+function extractCatalogProductId(request: string): number | null {
+  const tokens = request.split(' ').filter(Boolean);
+  for (const [index, token] of tokens.entries()) {
+    const id = Number.parseInt(token, 10);
+    const isCatalogSizedNumber =
+      String(id) === token && token.length >= 2 && token.length <= 6;
+    if (!isCatalogSizedNumber || id <= 0) continue;
+
+    const context = tokens.slice(Math.max(0, index - 4), index);
+    const hasProductWord = context.some(item =>
+      ['product', 'item', 'sku'].includes(item)
+    );
+    const hasCatalogWord = context.some(item =>
+      ['catalog', 'printful'].includes(item)
+    );
+    if (hasProductWord || hasCatalogWord) {
+      return id;
+    }
+  }
+
+  return null;
+}
+
+async function listCatalogProductsForSelection(): Promise<
+  PrintfulCatalogProduct[]
+> {
+  const products: PrintfulCatalogProduct[] = [];
+
+  for (
+    let offset = 0;
+    offset < MAX_CATALOG_PRODUCTS;
+    offset += CATALOG_PAGE_SIZE
+  ) {
+    const page = await listCatalogProducts({
+      sellingRegionName: 'north_america',
+      placements: MERCH_DEFAULT_PRINTFUL_PRODUCT.placements,
+      limit: CATALOG_PAGE_SIZE,
+      offset,
+    });
+    products.push(...page);
+
+    if (page.length < CATALOG_PAGE_SIZE) break;
+  }
+
+  return products;
+}
+
+async function resolveRequestedCatalogProduct(
+  request: string
+): Promise<PrintfulCatalogProduct | null> {
+  const requestedProductId = extractCatalogProductId(request);
+  if (!requestedProductId) return null;
+
+  const product = await getCatalogProduct(requestedProductId);
+  if (product.is_discontinued) {
+    throw new Error(
+      `Printful catalog product ${requestedProductId} is discontinued`
+    );
+  }
+  return product;
 }
 
 function variantKey(variant: PrintfulCatalogVariant, index: number): string {
@@ -160,11 +242,10 @@ export async function resolveMerchCatalogSelection(
 
   try {
     const request = normalize(itemRequest);
-    const products = await listCatalogProducts({
-      sellingRegionName: 'north_america',
-      placements: MERCH_DEFAULT_PRINTFUL_PRODUCT.placements,
-      limit: 50,
-    });
+    const requestedProduct = await resolveRequestedCatalogProduct(request);
+    const products = requestedProduct
+      ? [requestedProduct]
+      : await listCatalogProductsForSelection();
     const product =
       products.find(
         item => !item.is_discontinued && productMatchesRequest(item, request)

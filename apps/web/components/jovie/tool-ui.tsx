@@ -515,6 +515,8 @@ const ARTIFACT_RENDERERS: Partial<Record<string, ArtifactRenderer>> = {
   previewMerchOptions: event => renderMerchGenerationArtifact(event),
   selectMerchDesign: (event, profileId) =>
     renderMerchSelectionArtifact(event, profileId),
+  createMerchAlternativeItem: (event, profileId) =>
+    renderMerchSelectionArtifact(event, profileId),
   publishMerchCard: (event, profileId) =>
     renderMerchActionArtifact(event, profileId),
   unpauseMerchCard: (event, profileId) =>

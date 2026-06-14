@@ -7,7 +7,11 @@ import 'server-only';
  * to the canonical merch service.
  */
 
-import { createMerchGeneration, selectMerchDesign } from '@/lib/merch/service';
+import {
+  createAlternativeMerchItem,
+  createMerchGeneration,
+  selectMerchDesign,
+} from '@/lib/merch/service';
 import type {
   MerchGenerationOptionView,
   MerchGenerationResult,
@@ -142,6 +146,24 @@ export async function selectAndCreateMerchCard(params: {
     optionId: params.optionId ?? null,
     optionNumber: params.optionNumber ?? null,
     publish: params.publish === true,
+  });
+}
+
+export async function createAlternativeMerchFromCard(params: {
+  readonly merchCardId: string;
+  readonly profileId: string;
+  readonly clerkUserId: string;
+  readonly itemType: string;
+  readonly conversationId?: string | null;
+  readonly turnId?: string | null;
+}): Promise<MerchSelectionResult> {
+  return createAlternativeMerchItem({
+    merchCardId: params.merchCardId,
+    profileId: params.profileId,
+    clerkUserId: params.clerkUserId,
+    itemType: params.itemType,
+    conversationId: params.conversationId ?? null,
+    turnId: params.turnId ?? null,
   });
 }
 

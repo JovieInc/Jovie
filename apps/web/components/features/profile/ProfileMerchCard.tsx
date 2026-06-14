@@ -47,7 +47,7 @@ export function ProfileMerchCard({
         </div>
         <div className='flex min-w-0 flex-1 flex-col justify-between py-0.5'>
           <div className='min-w-0'>
-            <div className='mb-1 flex items-center gap-1.5 text-[10px] font-semibold uppercase leading-none text-white/58 [letter-spacing:0]'>
+            <div className='mb-1 flex items-center gap-1.5 text-[10px] font-semibold leading-none text-white/58 [letter-spacing:0]'>
               <ShoppingBag className='h-3 w-3 shrink-0' />
               <span>Merch</span>
             </div>
