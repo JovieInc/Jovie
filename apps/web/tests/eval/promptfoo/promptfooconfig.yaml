@@ -1522,6 +1522,7 @@ tests:
           - checkHandle
           - confirmSpotifyArtist
           - createMerch
+          - createMerchAlternativeItem
           - createPromoStrategy
           - createRelease
           - deleteOrArchiveMerchCard
@@ -2954,6 +2955,28 @@ tests:
         generationId: "00000000-0000-4000-8000-000000000b01"
         optionNumber: 2
         makeLive: false
+    assert:
+      - type: javascript
+        value: file://assertions.cjs:assertDeterministicNoSpend
+      - type: javascript
+        value: file://assertions.cjs:assertToolAvailable
+      - type: javascript
+        value: file://assertions.cjs:assertToolSchemaValid
+      - type: javascript
+        value: file://assertions.cjs:assertToolExecuted
+
+  - description: Tool contract accepts paid merch alternative item creation
+    metadata:
+      cost: deterministic
+    vars:
+      input: "Put this same design on a hoodie."
+      target: tool-contract
+      toolName: createMerchAlternativeItem
+      mode: app
+      plan: pro
+      toolInput:
+        merchCardId: "00000000-0000-4000-8000-000000000c01"
+        itemType: hoodie
     assert:
       - type: javascript
         value: file://assertions.cjs:assertDeterministicNoSpend

@@ -90,6 +90,21 @@ export const TOOL_SCHEMAS = {
     }),
   },
 
+  createMerchAlternativeItem: {
+    description:
+      'Create a new merch card that keeps an existing card design but moves it onto a different Printful product. Use when the artist asks for the same design on another item, like a hoodie, hat, tank, or a specific Printful catalog product ID.',
+    inputSchema: chatToolSchema({
+      merchCardId: z.string().uuid(),
+      itemType: z
+        .string()
+        .min(2)
+        .max(120)
+        .describe(
+          'Target product type or Printful catalog product ID, for example "hoodie", "hat", or "catalog product 71".'
+        ),
+    }),
+  },
+
   publishMerchCard: {
     description:
       'Propose publishing an existing merch card to the public artist profile. Returns a confirmation card; does not publish until the artist confirms.',

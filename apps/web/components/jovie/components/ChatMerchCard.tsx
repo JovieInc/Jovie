@@ -6,6 +6,7 @@ import {
   CheckCircle2,
   ExternalLink,
   Loader2,
+  Shirt,
 } from 'lucide-react';
 import Image from 'next/image';
 import Link from 'next/link';
@@ -125,6 +126,10 @@ function optionPrompt(
   return `${action} merch option ${option.option_number} from generation ${generationId}.`;
 }
 
+function alternativeItemPrompt(merchCardId: string, itemType: string): string {
+  return `Create a ${itemType} version of merch card ${merchCardId} with the same design.`;
+}
+
 function MerchOptionPricing({
   recommendation,
 }: {
@@ -204,6 +209,8 @@ export function ChatMerchOptionsCard({
         {result.options.map(option => {
           const mockupUrls = option.mockup_urls ?? [];
           const imageUrl = selectPreferredMockupUrl(mockupUrls);
+          const productLabel =
+            option.printful_product_name ?? option.product_type;
           const mockupPending =
             hasRenderableMockup(mockupUrls) &&
             mockupUrls.every(url => isInternalMerchMockupUrl(url)) &&
@@ -258,7 +265,7 @@ export function ChatMerchOptionsCard({
                     {option.design_name}
                   </h3>
                   <p className='mt-0.5 truncate text-[11px] text-tertiary-token'>
-                    {option.product_type}
+                    {productLabel}
                     {option.colorway ? ` - ${option.colorway}` : ''}
                   </p>
                 </div>
@@ -313,6 +320,12 @@ export function ChatMerchSelectionCard({
   const statusLabel =
     result.status.slice(0, 1).toUpperCase() + result.status.slice(1);
   const blockedReasons = result.publishBlockedReasons ?? [];
+  const handleAlternativeItem = useCallback(
+    (itemType: string) => {
+      submitMerchPrompt(alternativeItemPrompt(result.merchCardId, itemType));
+    },
+    [result.merchCardId]
+  );
 
   return (
     <ChatGenerationArtifactSurface
@@ -364,6 +377,26 @@ export function ChatMerchSelectionCard({
                 <ExternalLink className='h-3 w-3' />
               </a>
             ) : null}
+            <Button
+              type='button'
+              size='sm'
+              variant='secondary'
+              className='h-8 gap-1.5'
+              onClick={() => handleAlternativeItem('hoodie')}
+            >
+              <Shirt className='h-3 w-3' />
+              Hoodie
+            </Button>
+            <Button
+              type='button'
+              size='sm'
+              variant='secondary'
+              className='h-8 gap-1.5'
+              onClick={() => handleAlternativeItem('hat')}
+            >
+              <Shirt className='h-3 w-3' />
+              Hat
+            </Button>
           </div>
         </div>
       </div>

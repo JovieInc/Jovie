@@ -464,6 +464,7 @@ const MERCH_TOOL_NAMES = [
   'createMerch',
   'previewMerchOptions',
   'selectMerchDesign',
+  'createMerchAlternativeItem',
   'publishMerchCard',
   'pauseMerchCard',
   'unpauseMerchCard',
@@ -649,6 +650,7 @@ const TOOL_RESULT_REQUIRED_KEYS: Record<string, readonly string[]> = {
   checkHandle: ['action', 'handle', 'available', 'summary'],
   confirmSpotifyArtist: ['action', 'spotifyArtistId', 'artist', 'summary'],
   createMerch: ['success', 'action', 'generationId', 'options'],
+  createMerchAlternativeItem: ['success', 'action', 'merchCardId'],
   createPromoStrategy: [
     'success',
     'action',
@@ -4156,6 +4158,16 @@ function defaultToolResult(toolName: string, input: unknown): unknown {
         optionNumber: args.optionNumber ?? null,
         optionId: args.optionId ?? null,
       };
+    case 'createMerchAlternativeItem':
+      return {
+        success: true,
+        action: 'create_merch_alternative_item',
+        merchCardId: '00000000-0000-4000-8000-000000000c03',
+        sourceMerchCardId: args.merchCardId,
+        itemType: args.itemType,
+        status: 'draft',
+        title: 'Tour Hoodie',
+      };
     case 'publishMerchCard':
       return {
         success: true,
@@ -4789,6 +4801,11 @@ function sampleToolInput(toolName: string): Record<string, unknown> {
       return {
         generationId: '00000000-0000-4000-8000-000000000b01',
         optionNumber: 1,
+      };
+    case 'createMerchAlternativeItem':
+      return {
+        merchCardId: '00000000-0000-4000-8000-000000000c01',
+        itemType: 'hoodie',
       };
     case 'publishMerchCard':
     case 'pauseMerchCard':

@@ -31,6 +31,8 @@ export const HIDDEN_TOOLS: Readonly<Record<string, string>> = {
     'Onboarding-only continuation from the Spotify picker; requires a selected candidate.',
   createMerch:
     'Conversational merch creation is gated by plan and rollout flags before broader slash exposure.',
+  createMerchAlternativeItem:
+    'Follow-up from a saved merch card; shown as card/menu actions once a source design exists.',
   createPromoStrategy: 'Pro-only; surfaced via the release detail surface.',
   createRelease: 'Surfaced in the releases dashboard; chat tool is a fallback.',
   deleteOrArchiveMerchCard:

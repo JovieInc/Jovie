@@ -22,6 +22,7 @@ import { tool } from 'ai';
 import { TOOL_SCHEMAS } from '@/lib/chat/tool-schemas';
 import { proposeMerchAction } from '@/lib/chat/tools/merch-propose';
 import {
+  createAlternativeMerchFromCard,
   generateMerchFromConcept,
   previewMerchFromConcept,
   selectAndCreateMerchCard,
@@ -137,6 +138,32 @@ export function createMerchSelectTool(params: {
       }
 
       return result;
+    },
+  });
+}
+
+export function createMerchAlternativeTool(params: {
+  readonly profileId: string | null;
+  readonly clerkUserId: string;
+  readonly conversationId?: string | null;
+  readonly turnId?: string | null;
+}) {
+  return tool({
+    description: TOOL_SCHEMAS.createMerchAlternativeItem.description,
+    inputSchema: TOOL_SCHEMAS.createMerchAlternativeItem.inputSchema,
+    execute: async ({ merchCardId, itemType }) => {
+      if (!params.profileId) {
+        return { success: false as const, error: 'Profile ID required' };
+      }
+
+      return createAlternativeMerchFromCard({
+        merchCardId,
+        profileId: params.profileId,
+        clerkUserId: params.clerkUserId,
+        itemType,
+        conversationId: params.conversationId ?? null,
+        turnId: params.turnId ?? null,
+      });
     },
   });
 }
