@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   isProductionBlockedDebugPath,
+  PRODUCT_SCREENSHOT_CAPTURE_PAGE_PATHS,
   PRODUCTION_BLOCKED_API_PREFIXES,
   PRODUCTION_BLOCKED_PAGE_PREFIXES,
 } from '@/lib/security/production-blocked-routes';
@@ -22,6 +23,10 @@ describe('production-blocked debug routes', () => {
     );
   });
 
+  it('keeps the product screenshot capture inventory exact', () => {
+    expect(PRODUCT_SCREENSHOT_CAPTURE_PAGE_PATHS).toEqual(['/exp/shell-v1']);
+  });
+
   it.each([
     '/api/dev/test-auth/session',
     '/api/dev/clear-session',
@@ -35,6 +40,24 @@ describe('production-blocked debug routes', () => {
     '/sentry-example-page',
   ])('blocks %s outside development', route => {
     expect(isProductionBlockedDebugPath(route)).toBe(true);
+  });
+
+  it('allows only explicit product screenshot fixture routes when requested', () => {
+    expect(
+      isProductionBlockedDebugPath('/exp/shell-v1', {
+        allowProductScreenshotCaptureRoutes: true,
+      })
+    ).toBe(false);
+    expect(
+      isProductionBlockedDebugPath('/exp/shell-v1/other', {
+        allowProductScreenshotCaptureRoutes: true,
+      })
+    ).toBe(true);
+    expect(
+      isProductionBlockedDebugPath('/exp/library-v1', {
+        allowProductScreenshotCaptureRoutes: true,
+      })
+    ).toBe(true);
   });
 
   it.each([

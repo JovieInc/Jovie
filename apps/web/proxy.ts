@@ -49,7 +49,11 @@ import {
   isProxyRewriteExempt,
 } from '@/lib/routing/proxy-routing';
 import { SCRIPT_NONCE_HEADER } from '@/lib/security/content-security-policy';
-import { isExplicitDevelopmentEnvironment } from '@/lib/security/development-only';
+import {
+  isExplicitDevelopmentEnvironment,
+  isLocalDevelopmentAutomationHostname,
+  isLocalDevelopmentAutomationRequest,
+} from '@/lib/security/development-only';
 import {
   createFastNotFoundResponse,
   createProbeDropResponse,
@@ -106,6 +110,17 @@ function isElectronAppShellNavigation(
     (req.nextUrl.pathname === APP_ROUTES.DASHBOARD ||
       req.nextUrl.pathname.startsWith('/app/')) &&
     req.nextUrl.searchParams.get('runtime') === 'electron'
+  );
+}
+
+function shouldAllowProductScreenshotCaptureRoutes(req: NextRequest): boolean {
+  if (isLocalDevelopmentAutomationRequest(req.headers)) {
+    return true;
+  }
+
+  return (
+    process.env.E2E_USE_TEST_AUTH_BYPASS === '1' &&
+    isLocalDevelopmentAutomationHostname(req.nextUrl.hostname)
   );
 }
 
@@ -256,7 +271,10 @@ async function handleRequest(req: NextRequest, userId: string | null) {
     // Block debug/test/dev surfaces outside explicit development environments.
     if (
       !isExplicitDevelopmentEnvironment() &&
-      isProductionBlockedDebugPath(pathname)
+      isProductionBlockedDebugPath(pathname, {
+        allowProductScreenshotCaptureRoutes:
+          shouldAllowProductScreenshotCaptureRoutes(req),
+      })
     ) {
       return NextResponse.rewrite(new URL('/404', req.url));
     }

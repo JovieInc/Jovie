@@ -6,6 +6,10 @@ export const DEVELOPMENT_ONLY_ERROR = 'Not available outside development';
 
 const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
 
+interface HeaderReader {
+  get(name: string): string | null;
+}
+
 /**
  * ALLOW gate for dev/test/debug routes.
  *
@@ -26,6 +30,52 @@ export function isExplicitDevelopmentEnvironment(): boolean {
 /** Hard production deploy check used for defence-in-depth proxy blocks. */
 export function isVercelProductionDeployment(): boolean {
   return process.env.VERCEL_ENV === 'production';
+}
+
+function extractHostname(value: string | null): string | null {
+  const normalized = value?.split(',')[0]?.trim();
+  if (!normalized) return null;
+
+  if (normalized.startsWith('http://') || normalized.startsWith('https://')) {
+    try {
+      return new URL(normalized).hostname.toLowerCase();
+    } catch {
+      return null;
+    }
+  }
+
+  return normalized.replace(/:\d+$/, '').toLowerCase();
+}
+
+export function isLocalDevelopmentAutomationHostname(
+  hostname: string | null
+): boolean {
+  const normalized = hostname?.trim().toLowerCase() ?? null;
+  return (
+    normalized === 'localhost' ||
+    normalized === '127.0.0.1' ||
+    normalized === '::1' ||
+    normalized === '[::1]' ||
+    Boolean(normalized?.endsWith('.localhost'))
+  );
+}
+
+/**
+ * Local-only automation escape hatch for production-built test servers.
+ * This intentionally requires an existing E2E opt-in and a loopback host.
+ */
+export function isLocalDevelopmentAutomationRequest(
+  headerReader: HeaderReader
+): boolean {
+  if (process.env.E2E_USE_TEST_AUTH_BYPASS !== '1') return false;
+
+  const hostname =
+    extractHostname(headerReader.get('x-forwarded-host')) ??
+    extractHostname(headerReader.get('host')) ??
+    extractHostname(headerReader.get('origin')) ??
+    extractHostname(headerReader.get('referer'));
+
+  return isLocalDevelopmentAutomationHostname(hostname);
 }
 
 export function developmentOnlyForbiddenResponse(

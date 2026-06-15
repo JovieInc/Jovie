@@ -68,4 +68,55 @@ describe('development-only security helpers', () => {
       });
     });
   });
+
+  describe('isLocalDevelopmentAutomationRequest', () => {
+    it('classifies loopback hostnames for local automation', async () => {
+      const { isLocalDevelopmentAutomationHostname } = await import(
+        '@/lib/security/development-only'
+      );
+
+      expect(isLocalDevelopmentAutomationHostname('localhost')).toBe(true);
+      expect(isLocalDevelopmentAutomationHostname('preview.localhost')).toBe(
+        true
+      );
+      expect(isLocalDevelopmentAutomationHostname('jov.ie')).toBe(false);
+      expect(isLocalDevelopmentAutomationHostname(null)).toBe(false);
+    });
+
+    it('allows E2E automation on localhost', async () => {
+      vi.stubEnv('E2E_USE_TEST_AUTH_BYPASS', '1');
+      const { isLocalDevelopmentAutomationRequest } = await import(
+        '@/lib/security/development-only'
+      );
+
+      expect(
+        isLocalDevelopmentAutomationRequest(
+          new Headers({ host: 'localhost:3000' })
+        )
+      ).toBe(true);
+    });
+
+    it('rejects localhost without explicit E2E opt-in', async () => {
+      const { isLocalDevelopmentAutomationRequest } = await import(
+        '@/lib/security/development-only'
+      );
+
+      expect(
+        isLocalDevelopmentAutomationRequest(
+          new Headers({ host: 'localhost:3000' })
+        )
+      ).toBe(false);
+    });
+
+    it('rejects public hosts even with explicit E2E opt-in', async () => {
+      vi.stubEnv('E2E_USE_TEST_AUTH_BYPASS', '1');
+      const { isLocalDevelopmentAutomationRequest } = await import(
+        '@/lib/security/development-only'
+      );
+
+      expect(
+        isLocalDevelopmentAutomationRequest(new Headers({ host: 'jov.ie' }))
+      ).toBe(false);
+    });
+  });
 });
