@@ -55,7 +55,10 @@ describe('completeDesktopNativeAuth', () => {
       strategy: 'ticket',
       ticket: 'ticket_123',
     });
-    expect(setActive).toHaveBeenCalledWith({ session: 'sess_123' });
+    expect(setActive).toHaveBeenCalledWith({
+      session: 'sess_123',
+      redirectUrl: '/app/chat',
+    });
   });
 
   it('does not set an active session when the native exchange fails', async () => {
@@ -172,6 +175,117 @@ describe('completeDesktopNativeAuth', () => {
 
     expect(reloadClerk).toHaveBeenCalledTimes(1);
     expect(setActive).not.toHaveBeenCalled();
+  });
+
+  it('continues when Clerk setActive does not settle but the session hydrates', async () => {
+    vi.useFakeTimers();
+    try {
+      const consumeCompletion = vi.fn(async () => ({
+        ok: true as const,
+        completion: {
+          code: 'code_123',
+          state: 'state_123',
+          codeVerifier: 'verifier_123',
+        },
+      }));
+      const fetchNativeExchange = vi.fn(async () => ({
+        ok: true,
+        json: async () => ({
+          ticket: 'ticket_123',
+          returnTo: '/app/chat',
+          userId: 'user_123',
+        }),
+      }));
+      const signIn = {
+        create: vi.fn(async () => ({
+          status: 'complete',
+          createdSessionId: 'sess_123',
+          error: null,
+        })),
+      };
+      const setActive = vi.fn(() => new Promise<void>(() => {}));
+      const verifyReturnRoute = vi.fn(async () => 'ready' as const);
+      let sessionId: string | null = null;
+      const reloadClerk = vi.fn(async () => {
+        sessionId = 'sess_123';
+      });
+
+      const result = completeDesktopNativeAuth({
+        consumeCompletion,
+        fetchNativeExchange,
+        signIn,
+        setActive,
+        reloadClerk,
+        getActiveSessionId: () => sessionId,
+        getActiveUserId: () => 'user_123',
+        setActiveTimeoutMs: 1,
+        verifyReturnRoute,
+      });
+
+      await vi.advanceTimersByTimeAsync(1);
+      await expect(result).resolves.toEqual({ returnTo: '/app/chat' });
+
+      expect(setActive).toHaveBeenCalledWith({
+        session: 'sess_123',
+        redirectUrl: '/app/chat',
+      });
+      expect(reloadClerk).toHaveBeenCalledTimes(1);
+      expect(verifyReturnRoute).toHaveBeenCalledWith('/app/chat');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('rejects a hydrated Clerk session when the return route still resolves as signed out', async () => {
+    vi.useFakeTimers();
+    try {
+      const consumeCompletion = vi.fn(async () => ({
+        ok: true as const,
+        completion: {
+          code: 'code_123',
+          state: 'state_123',
+          codeVerifier: 'verifier_123',
+        },
+      }));
+      const fetchNativeExchange = vi.fn(async () => ({
+        ok: true,
+        json: async () => ({
+          ticket: 'ticket_123',
+          returnTo: '/app/chat',
+          userId: 'user_123',
+        }),
+      }));
+      const signIn = {
+        create: vi.fn(async () => ({
+          status: 'complete',
+          createdSessionId: 'sess_123',
+          error: null,
+        })),
+      };
+      const setActive = vi.fn(async () => undefined);
+      const verifyReturnRoute = vi.fn(async () => 'unauthenticated' as const);
+
+      const result = completeDesktopNativeAuth({
+        consumeCompletion,
+        fetchNativeExchange,
+        signIn,
+        setActive,
+        reloadClerk: vi.fn(async () => undefined),
+        getActiveSessionId: () => 'sess_123',
+        getActiveUserId: () => 'user_123',
+        returnRouteVerificationTimeoutMs: 1,
+        verifyReturnRoute,
+      });
+
+      const expectation = expect(result).rejects.toThrow(
+        'desktop-auth-server-session-not-active'
+      );
+      await vi.advanceTimersByTimeAsync(501);
+      await expectation;
+      expect(verifyReturnRoute).toHaveBeenCalledWith('/app/chat');
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('rejects a hydrated Clerk session for a different user', async () => {

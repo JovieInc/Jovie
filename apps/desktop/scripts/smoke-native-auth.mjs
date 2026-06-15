@@ -1,7 +1,7 @@
 import { Buffer } from 'node:buffer';
 import { execFileSync } from 'node:child_process';
 
-const BASE_URL = process.env.BASE_URL ?? 'http://127.0.0.1:3112';
+const BASE_URL = process.env.BASE_URL ?? 'http://localhost:3112';
 const ELECTRON_CDP_URL =
   process.env.ELECTRON_CDP_URL ?? 'http://localhost:9223';
 const MACOS_PROTOCOL_OPEN_BUNDLE_ID =
@@ -14,8 +14,18 @@ const SMOKE_CLIENT_IP =
 const CLEAR_ELECTRON_AUTH_ON_START =
   process.env.SMOKE_CLEAR_ELECTRON_AUTH === '1';
 const SKIP_START_SIGN_OUT = process.env.SMOKE_SKIP_START_SIGNOUT === '1';
+const REQUEST_TIMEOUT_MS = parsePositiveInteger(
+  process.env.SMOKE_REQUEST_TIMEOUT_MS,
+  180_000
+);
+const SMOKE_AUTH_EVIDENCE_KEY = 'jovie.desktopAuth.smokeAuthEvidence';
 
 let playwrightChromium;
+
+function parsePositiveInteger(value, fallback) {
+  const parsed = Number.parseInt(value ?? '', 10);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+}
 
 function sleep(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
@@ -634,7 +644,7 @@ async function waitForAppSessionCookie(context, label) {
 async function requestRedirect(page, targetUrl, label) {
   const response = await page.request.get(targetUrl, {
     maxRedirects: 0,
-    timeout: 90_000,
+    timeout: REQUEST_TIMEOUT_MS,
     headers: {
       'x-forwarded-for': SMOKE_CLIENT_IP,
     },
@@ -705,9 +715,10 @@ async function completeBrowserAuthState(page, authPageUrl, email) {
     throw new Error('Browser auth page is missing auth_state');
   }
 
+  const callbackOrigin = parsed.origin;
   const callbackPath = new URL(
     `/auth/callback?state=${encodeURIComponent(authState)}`,
-    BASE_URL
+    callbackOrigin
   ).toString();
   await page.goto(authPageUrl, {
     waitUntil: 'domcontentloaded',
@@ -1006,21 +1017,30 @@ async function connectCdpPage(target) {
   return await new CdpPage(target).connect();
 }
 
-async function waitForContinueInBrowserButton(page, label, timeout = 30_000) {
+async function waitForDesktopAuthHandoff(page, label, timeout = 30_000) {
   const deadline = Date.now() + timeout;
   while (Date.now() < deadline) {
-    const hasButton = await page
+    const isReady = await page
       .evaluate(`(() => {
+        const handoff = document.querySelector(
+          '[data-testid="desktop-auth-handoff"], [data-testid="desktop-auth-route-handoff"]'
+        );
+        if (!handoff) return false;
+        const state = handoff.getAttribute('data-desktop-auth-state');
+        if (state === 'idle' || state === 'opened' || state === 'error') {
+          return true;
+        }
         return [...document.querySelectorAll('button')].some(candidate =>
-          candidate.textContent?.includes('Continue in Browser')
+          candidate.textContent?.includes('Continue in Browser') ||
+          candidate.textContent?.includes('Cancel Sign-In')
         );
       })()`)
       .catch(() => false);
-    if (hasButton) return;
+    if (isReady) return;
     await new Promise(resolve => setTimeout(resolve, 250));
   }
 
-  throw new Error(`Continue in Browser button missing: ${label}`);
+  throw new Error(`Desktop auth handoff missing: ${label}`);
 }
 
 async function startElectronBrowserAuth() {
@@ -1031,7 +1051,7 @@ async function startElectronBrowserAuth() {
   if (existingAuthTarget) {
     const existingAuthPage = await connectCdpPage(existingAuthTarget);
     try {
-      await waitForContinueInBrowserButton(
+      await waitForDesktopAuthHandoff(
         existingAuthPage,
         'existing desktop auth handoff'
       );
@@ -1073,7 +1093,7 @@ async function startElectronBrowserAuth() {
   if (isDesktopAuthRouteHandoffTarget(initialAuthTarget)) {
     const routePage = await connectCdpPage(initialAuthTarget);
     try {
-      await waitForContinueInBrowserButton(routePage, 'auth route fallback');
+      await waitForDesktopAuthHandoff(routePage, 'auth route fallback');
       const result = await routePage.evaluate(`(async () => {
         return await window.electronAPI.startDesktopAuthHandoff(
           window.location.href
@@ -1104,7 +1124,7 @@ async function startElectronBrowserAuth() {
 
   const authPage = await connectCdpPage(authTarget);
   try {
-    await waitForContinueInBrowserButton(authPage, 'desktop auth handoff');
+    await waitForDesktopAuthHandoff(authPage, 'desktop auth handoff');
   } finally {
     authPage.close();
   }
@@ -1162,6 +1182,84 @@ async function findAuthenticatedElectronPage(expectedUserId) {
   }
 
   throw new Error('Electron did not become authenticated');
+}
+
+function parseStoredSmokeAuthEvidence(value, expectedUserId, minCapturedAt) {
+  if (typeof value !== 'string' || value.length === 0) return null;
+
+  try {
+    const parsed = JSON.parse(value);
+    if (
+      parsed?.apiOk === true &&
+      parsed?.userId === expectedUserId &&
+      typeof parsed?.capturedAt === 'number' &&
+      parsed.capturedAt >= minCapturedAt
+    ) {
+      return parsed;
+    }
+  } catch {
+    return null;
+  }
+
+  return null;
+}
+
+async function readStoredSmokeAuthEvidence(
+  page,
+  expectedUserId,
+  minCapturedAt
+) {
+  const rawEvidence = await page.evaluate(`(() => {
+    try {
+      return window.localStorage.getItem(${JSON.stringify(SMOKE_AUTH_EVIDENCE_KEY)});
+    } catch {
+      return null;
+    }
+  })()`);
+
+  return parseStoredSmokeAuthEvidence(
+    rawEvidence,
+    expectedUserId,
+    minCapturedAt
+  );
+}
+
+async function captureElectronAuthEvidence(page, expectedUserId) {
+  return await page.evaluate(`(async () => {
+    if (
+      !window.Clerk?.loaded ||
+      window.Clerk?.user?.id !== ${JSON.stringify(expectedUserId)} ||
+      !window.Clerk?.session
+    ) {
+      return null;
+    }
+
+    const token = await window.Clerk.session.getToken();
+    const api = await fetch('/api/mobile/v1/me', {
+      headers: { Authorization: 'Bearer ' + token },
+    });
+    const state = {
+      url: window.location.href,
+      userId: window.Clerk.user.id,
+      hasSession: Boolean(window.Clerk.session),
+      hasToken: Boolean(token),
+      apiStatus: api.status,
+      apiOk: api.ok,
+      capturedAt: Date.now(),
+      evidenceSource: 'clerk-token',
+    };
+
+    if (state.apiOk) {
+      try {
+        window.localStorage.setItem(
+          ${JSON.stringify(SMOKE_AUTH_EVIDENCE_KEY)},
+          JSON.stringify(state)
+        );
+      } catch {}
+    }
+
+    return state;
+  })()`);
 }
 
 async function findSignedInElectronPage() {
@@ -1230,6 +1328,18 @@ async function getElectronSessionState() {
   return fallback;
 }
 
+function getElectronStorageOrigins() {
+  const base = new URL(BASE_URL);
+  const origins = new Set([base.origin]);
+  const portSuffix = base.port ? `:${base.port}` : '';
+  if (base.hostname === 'localhost') {
+    origins.add(`http://127.0.0.1${portSuffix}`);
+  } else if (base.hostname === '127.0.0.1') {
+    origins.add(`http://localhost${portSuffix}`);
+  }
+  return [...origins];
+}
+
 async function waitForElectronSignedOut() {
   const deadline = Date.now() + 60_000;
   let lastState = null;
@@ -1247,40 +1357,63 @@ async function waitForElectronSignedOut() {
 
 async function waitForElectronAuth(expectedUserId, label) {
   const deadline = Date.now() + 120_000;
+  const minCapturedAt = Date.now();
+  const unwaitlistedTargets = new Set();
   let lastState = null;
   let lastError = null;
 
   while (Date.now() < deadline) {
-    const page = await findAuthenticatedElectronPage(expectedUserId);
+    const targets = (await getElectronTargets()).filter(isBaseUrlTarget);
+    for (const target of targets) {
+      const page = await connectCdpPage(target).catch(() => null);
+      if (!page) continue;
 
-    try {
-      const state = await page.evaluate(`(async () => {
-        const token = await window.Clerk.session.getToken();
-        const api = await fetch('/api/mobile/v1/me', {
-          headers: { Authorization: 'Bearer ' + token },
-        });
-        return {
-          url: window.location.href,
-          userId: window.Clerk.user.id,
-          hasSession: Boolean(window.Clerk.session),
-          hasToken: Boolean(token),
-          apiStatus: api.status,
-          apiOk: api.ok,
-        };
-      })()`);
+      try {
+        const storedEvidence = await readStoredSmokeAuthEvidence(
+          page,
+          expectedUserId,
+          minCapturedAt
+        );
+        if (storedEvidence) {
+          return storedEvidence;
+        }
 
-      lastState = state;
+        if (!unwaitlistedTargets.has(target.id)) {
+          const unwaitlistResult = await page.evaluate(`(async () => {
+            const body = document.body?.innerText ?? '';
+            if (!/waitlist/i.test(body)) return null;
+            const response = await fetch('/api/dev/unwaitlist', {
+              method: 'POST',
+            });
+            return { status: response.status, ok: response.ok };
+          })()`);
+          if (unwaitlistResult) {
+            unwaitlistedTargets.add(target.id);
+            if (!unwaitlistResult.ok && unwaitlistResult.status !== 404) {
+              throw new Error(
+                `Dev unwaitlist failed with ${unwaitlistResult.status}`
+              );
+            }
+            await page.navigate(`${BASE_URL}/app/chat?runtime=electron`);
+            continue;
+          }
+        }
 
-      if (state.apiOk) {
-        return state;
+        const state = await captureElectronAuthEvidence(page, expectedUserId);
+        if (state) {
+          lastState = state;
+          if (state.apiOk) {
+            return state;
+          }
+        }
+      } catch (error) {
+        lastError = error instanceof Error ? error.message : String(error);
+      } finally {
+        page.close();
       }
-    } catch (error) {
-      lastError = error instanceof Error ? error.message : String(error);
-    } finally {
-      page.close();
     }
 
-    await new Promise(resolve => setTimeout(resolve, 1000));
+    await new Promise(resolve => setTimeout(resolve, 250));
   }
 
   throw new Error(
@@ -1306,18 +1439,39 @@ async function signOutElectron() {
   return await waitForElectronSignedOut();
 }
 
+async function signOutOrClearElectronAuth() {
+  try {
+    return await signOutElectron();
+  } catch (error) {
+    if (!CLEAR_ELECTRON_AUTH_ON_START) {
+      throw error;
+    }
+
+    await clearElectronAuthStorage();
+    return await waitForElectronSignedOut();
+  }
+}
+
 async function clearElectronAuthStorage() {
-  const targets = (await getElectronTargets()).filter(isBaseUrlTarget);
+  const targets = (await getElectronTargets()).filter(
+    target => target.type === 'page'
+  );
+  const origins = getElectronStorageOrigins();
   for (const target of targets) {
     const page = await connectCdpPage(target).catch(() => null);
     if (!page) continue;
     try {
-      await page
-        .send('Storage.clearDataForOrigin', {
-          origin: new URL(BASE_URL).origin,
-          storageTypes: 'all',
-        })
-        .catch(() => undefined);
+      await page.send('Network.enable').catch(() => undefined);
+      await page.send('Network.clearBrowserCookies').catch(() => undefined);
+      await page.send('Network.clearBrowserCache').catch(() => undefined);
+      for (const origin of origins) {
+        await page
+          .send('Storage.clearDataForOrigin', {
+            origin,
+            storageTypes: 'all',
+          })
+          .catch(() => undefined);
+      }
       await page.evaluate(`(() => {
         try {
           localStorage.clear();
@@ -1385,7 +1539,7 @@ async function main() {
     );
     await fresh.context.close();
 
-    const signedOut = await signOutElectron();
+    const signedOut = await signOutOrClearElectronAuth();
     if (CLEAR_ELECTRON_AUTH_ON_START) {
       await clearElectronAuthStorage();
     }

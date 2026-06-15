@@ -77,9 +77,19 @@ describe('proxy routing helpers', () => {
       expect(categorizePath(APP_ROUTES.PRICING).isAuthCallbackPath).toBe(false);
     });
 
-    it('only adds nonce requirements to app and api surfaces', () => {
+    it('adds nonce requirements to app, api, and hydrated auth surfaces', () => {
       expect(categorizePath('/api/stripe/checkout').needsNonce).toBe(true);
       expect(categorizePath('/app/dashboard').needsNonce).toBe(true);
+      expect(categorizePath(APP_ROUTES.SIGNIN).needsNonce).toBe(true);
+      expect(categorizePath(APP_ROUTES.SIGNUP).needsNonce).toBe(true);
+      expect(categorizePath(APP_ROUTES.SIGNIN_SSO_CALLBACK).needsNonce).toBe(
+        true
+      );
+      expect(categorizePath(APP_ROUTES.DESKTOP_AUTH).needsNonce).toBe(true);
+      expect(categorizePath(APP_ROUTES.AUTH_NATIVE_COMPLETE).needsNonce).toBe(
+        true
+      );
+      expect(categorizePath(APP_ROUTES.START).needsNonce).toBe(true);
       expect(categorizePath('/pricing').needsNonce).toBe(false);
     });
 

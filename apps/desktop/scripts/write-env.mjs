@@ -27,7 +27,7 @@ function resolveAppUrl(env) {
   }
 
   if (env === 'local') {
-    const localUrl = process.env.ELECTRON_APP_URL || 'http://127.0.0.1:3112';
+    const localUrl = process.env.ELECTRON_APP_URL || 'http://localhost:3112';
     const parsed = new URL(localUrl);
     const isLoopback =
       parsed.hostname === 'localhost' ||
