@@ -194,6 +194,52 @@ describe('proxy debug/test route lockdown', () => {
     expect(new URL(rewriteUrl!).pathname).toBe('/404');
   });
 
+  it('allows shell-v1 product screenshots on loopback automation', async () => {
+    vi.stubEnv('NODE_ENV', 'production');
+    vi.stubEnv('VERCEL_ENV', 'production');
+    vi.stubEnv('E2E_USE_TEST_AUTH_BYPASS', '1');
+
+    const req = createTestRequest({
+      pathname: '/exp/shell-v1',
+      hostname: 'localhost',
+    });
+    const response = await callMiddleware(req);
+
+    expect(response.headers.get('x-middleware-rewrite')).toBeNull();
+  });
+
+  it('blocks shell-v1 product screenshots on public hosts even with test env', async () => {
+    vi.stubEnv('NODE_ENV', 'production');
+    vi.stubEnv('VERCEL_ENV', 'production');
+    vi.stubEnv('E2E_USE_TEST_AUTH_BYPASS', '1');
+
+    const req = createTestRequest({
+      pathname: '/exp/shell-v1',
+      hostname: 'jov.ie',
+    });
+    const response = await callMiddleware(req);
+    const rewriteUrl = response.headers.get('x-middleware-rewrite');
+
+    expect(rewriteUrl).toBeTruthy();
+    expect(new URL(rewriteUrl!).pathname).toBe('/404');
+  });
+
+  it('keeps other experiment routes blocked on loopback automation', async () => {
+    vi.stubEnv('NODE_ENV', 'production');
+    vi.stubEnv('VERCEL_ENV', 'production');
+    vi.stubEnv('E2E_USE_TEST_AUTH_BYPASS', '1');
+
+    const req = createTestRequest({
+      pathname: '/exp/library-v1',
+      hostname: 'localhost',
+    });
+    const response = await callMiddleware(req);
+    const rewriteUrl = response.headers.get('x-middleware-rewrite');
+
+    expect(rewriteUrl).toBeTruthy();
+    expect(new URL(rewriteUrl!).pathname).toBe('/404');
+  });
+
   it('allows debug routes during explicit local development', async () => {
     vi.stubEnv('NODE_ENV', 'development');
     vi.stubEnv('VERCEL_ENV', '');
