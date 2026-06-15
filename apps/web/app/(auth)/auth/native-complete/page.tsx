@@ -4,7 +4,10 @@ import { useClerk, useSignIn } from '@clerk/nextjs';
 import { useRouter } from 'next/navigation';
 import { Suspense, useEffect, useRef, useState } from 'react';
 import { consumeDesktopAuthCompletion } from '@/lib/desktop/electron-bridge';
-import { completeDesktopNativeAuth } from '@/lib/desktop/native-complete';
+import {
+  completeDesktopNativeAuth,
+  type DesktopReturnRouteVerificationResult,
+} from '@/lib/desktop/native-complete';
 
 type CompletionState = 'loading' | 'error';
 type ClerkBrowserGlobal = {
@@ -57,6 +60,27 @@ function isRecoverableCompletionReplayError(error: unknown): boolean {
   );
 }
 
+async function verifyDesktopReturnRoute(
+  returnTo: string
+): Promise<DesktopReturnRouteVerificationResult> {
+  const response = await fetch(returnTo, {
+    cache: 'no-store',
+    credentials: 'same-origin',
+    redirect: 'follow',
+  });
+  const finalUrl = new URL(response.url || returnTo, globalThis.location.href);
+  if (
+    finalUrl.pathname === '/signin' ||
+    finalUrl.pathname === '/signup' ||
+    finalUrl.pathname === '/sign-in' ||
+    finalUrl.pathname === '/sign-up'
+  ) {
+    return 'unauthenticated';
+  }
+
+  return response.ok ? 'ready' : 'unknown';
+}
+
 function NativeCompleteContent() {
   const router = useRouter();
   const clerk = useClerk();
@@ -87,6 +111,7 @@ function NativeCompleteContent() {
           reloadClerk: reloadBrowserClerk,
           getActiveSessionId: () => clerk.session?.id ?? null,
           getActiveUserId: () => clerk.user?.id ?? null,
+          verifyReturnRoute: verifyDesktopReturnRoute,
         });
 
         if (isActive) {

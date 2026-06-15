@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.6.53] - 2026-06-15
+
+> The Mac desktop app now completes browser sign-in more reliably and ships as a desktop release.
+
+### Fixed
+
+- **Mac desktop sign-in**: verifies that the signed-in session is visible to the protected return route before continuing in Electron, keeps local auth on a single loopback host, and adds release handling so the desktop app receives the fix.
+
 ## [26.6.52] - 2026-06-13
 
 > Desktop auth callback no longer falls through to the PWA offline page.

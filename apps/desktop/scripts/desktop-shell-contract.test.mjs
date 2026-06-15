@@ -309,7 +309,6 @@ test('desktop dev defaults to the local app shell and packaged builds keep produ
         env: {
           ...process.env,
           ELECTRON_ENV: 'local',
-          ELECTRON_APP_URL: 'http://127.0.0.1:3112/app/ignored',
         },
       }
     );
@@ -318,7 +317,25 @@ test('desktop dev defaults to the local app shell and packaged builds keep produ
     });
     assert.match(localStdout, /APP_ENV='local'/);
     assert.match(localEnv, /APP_ENV: 'production' \| 'staging' \| 'local'/);
-    assert.match(localEnv, /APP_URL = 'http:\/\/127\.0\.0\.1:3112'/);
+    assert.match(localEnv, /APP_URL = 'http:\/\/localhost:3112'/);
+
+    const { stdout: localOverrideStdout } = await execFileAsync(
+      process.execPath,
+      [join(desktopRoot, 'scripts/write-env.mjs')],
+      {
+        cwd: desktopRoot,
+        env: {
+          ...process.env,
+          ELECTRON_ENV: 'local',
+          ELECTRON_APP_URL: 'http://127.0.0.1:3112/app/ignored',
+        },
+      }
+    );
+    const localOverrideEnv = await readFile(envGeneratedPath, {
+      encoding: 'utf8',
+    });
+    assert.match(localOverrideStdout, /APP_ENV='local'/);
+    assert.match(localOverrideEnv, /APP_URL = 'http:\/\/127\.0\.0\.1:3112'/);
 
     const { stdout: productionStdout } = await execFileAsync(
       process.execPath,
@@ -352,6 +369,41 @@ test('desktop dev defaults to the local app shell and packaged builds keep produ
   } finally {
     await writeFile(envGeneratedPath, originalEnvGenerated);
   }
+});
+
+test('native auth smoke keeps browser callbacks on the browser auth origin', async () => {
+  const smokeSource = await readFile(
+    join(desktopRoot, 'scripts/smoke-native-auth.mjs'),
+    'utf8'
+  );
+
+  assert.match(smokeSource, /const callbackOrigin = parsed\.origin;/);
+  assert.match(smokeSource, /const BASE_URL = process\.env\.BASE_URL \?\? 'http:\/\/localhost:3112';/);
+  assert.match(smokeSource, /async function waitForDesktopAuthHandoff/);
+  assert.match(smokeSource, /state === 'opened'/);
+  assert.match(smokeSource, /candidate\.textContent\?\.includes\('Cancel Sign-In'\)/);
+  assert.match(smokeSource, /process\.env\.SMOKE_REQUEST_TIMEOUT_MS/);
+  assert.match(smokeSource, /180_000/);
+  assert.match(
+    smokeSource,
+    /const SMOKE_AUTH_EVIDENCE_KEY = 'jovie\.desktopAuth\.smokeAuthEvidence';/
+  );
+  assert.match(smokeSource, /readStoredSmokeAuthEvidence/);
+  assert.match(smokeSource, /captureElectronAuthEvidence/);
+  assert.match(smokeSource, /async function signOutOrClearElectronAuth/);
+  assert.match(smokeSource, /window\.localStorage\.setItem/);
+  assert.match(smokeSource, /evidenceSource: 'clerk-token'/);
+  assert.match(smokeSource, /function getElectronStorageOrigins\(\)/);
+  assert.match(smokeSource, /Network\.clearBrowserCookies/);
+  assert.match(smokeSource, /Storage\.clearDataForOrigin/);
+  assert.match(
+    smokeSource,
+    /new URL\(\s*`\/auth\/callback\?state=\$\{encodeURIComponent\(authState\)\}`,\s*callbackOrigin\s*\)/
+  );
+  assert.doesNotMatch(
+    smokeSource,
+    /new URL\(\s*`\/auth\/callback\?state=\$\{encodeURIComponent\(authState\)\}`,\s*BASE_URL\s*\)/
+  );
 });
 
 test('hosted web app has an early Electron runtime marker before first paint', async () => {

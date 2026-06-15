@@ -175,6 +175,9 @@ export function categorizePath(pathname: string): PathCategory {
     '/onboarding/checkout'
   );
   const isWaitlistPath = matchesRoute(pathname, '/waitlist');
+  const isDesktopAuthPath = pathname === APP_ROUTES.DESKTOP_AUTH;
+  const isNativeAuthCompletePath = pathname === APP_ROUTES.AUTH_NATIVE_COMPLETE;
+  const isStartPath = pathname === APP_ROUTES.START;
 
   const isProtectedPath =
     isAppShellPath ||
@@ -187,8 +190,13 @@ export function categorizePath(pathname: string): PathCategory {
     pathname.startsWith('/api/') ||
     isAppShellPath ||
     isAccountPath ||
+    isAuthPath ||
+    isAuthCallbackPath ||
     isBillingPath ||
+    isDesktopAuthPath ||
+    isNativeAuthCompletePath ||
     isOnboardingPath ||
+    isStartPath ||
     isWaitlistPath;
 
   const publicProfileCandidate = getPublicProfileCandidate(pathname);
