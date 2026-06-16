@@ -30,6 +30,7 @@
 
 import { and, eq, inArray, isNull, lt, lte, or } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
+import { isMissingConnectorWorkflowTablesError } from '@/lib/connectors/schema-errors';
 import {
   executeApprovedAction,
   markWorkflowFailed,
@@ -172,6 +173,13 @@ export async function GET(request: Request): Promise<Response> {
       failed,
     });
   } catch (err) {
+    if (isMissingConnectorWorkflowTablesError(err)) {
+      logger.info(
+        '[process-workflow-runs] connector workflow tables not migrated; skipping tick'
+      );
+      return NextResponse.json({ ok: true, processed: 0, skipped: true });
+    }
+
     // JOV-2326: a failed cron tick is self-healing — the next tick (6 min) will retry
     // any pending rows. Log at warn level to avoid Sentry noise from transient Neon
     // connection failures; escalate only if the error recurs persistently.
