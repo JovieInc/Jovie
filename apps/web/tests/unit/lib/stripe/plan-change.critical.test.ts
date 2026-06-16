@@ -66,7 +66,7 @@ vi.mock('@/lib/utils/logger', () => ({
 vi.mock('@/lib/stripe/config', () => ({
   getActivePriceIds: mockGetActivePriceIds,
   getPriceMappingDetails: mockGetPriceMappingDetails,
-  get PRICE_MAPPINGS() {
+  get ACTIVE_PRICE_MAPPINGS() {
     return mockPriceMappings;
   },
 }));
@@ -170,7 +170,7 @@ describe('@critical plan-change.ts', () => {
       (priceId: string) => priceMappingsData[priceId] || null
     );
 
-    // Populate PRICE_MAPPINGS object
+    // Populate ACTIVE_PRICE_MAPPINGS object
     Object.keys(mockPriceMappings).forEach(
       k => delete (mockPriceMappings as Record<string, unknown>)[k]
     );

@@ -114,6 +114,9 @@ export const ServerEnvSchema = z.object({
   PRINTFUL_STORE_ID: z.string().optional(),
   PRINTFUL_WEBHOOK_SECRET: z.string().optional(),
 
+  // Retired founding tier — webhook lookup only (founding -> pro entitlements)
+  STRIPE_PRICE_FOUNDING_MONTHLY: z.string().startsWith('price_').optional(),
+
   // Stripe price IDs for Pro tier (amounts in lib/config/plan-prices.ts)
   STRIPE_PRICE_PRO_MONTHLY: z.string().startsWith('price_').optional(),
   STRIPE_PRICE_PRO_ANNUAL: z.string().startsWith('price_').optional(),
@@ -385,6 +388,7 @@ export const ENV_KEYS = [
   'PRINTFUL_API_BASE_URL',
   'PRINTFUL_STORE_ID',
   'PRINTFUL_WEBHOOK_SECRET',
+  'STRIPE_PRICE_FOUNDING_MONTHLY',
   'STRIPE_PRICE_PRO_MONTHLY',
   'STRIPE_PRICE_PRO_ANNUAL',
   'STRIPE_PRICE_PRO_YEARLY',
