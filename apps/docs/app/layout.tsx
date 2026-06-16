@@ -46,7 +46,9 @@ export default async function RootLayout({
           docsRepositoryBase='https://github.com/ArtistFirst/Jovie/tree/main/apps/docs'
           editLink='Edit this page on GitHub'
           footer={
-            <Footer>Copyright {new Date().getFullYear()} Jovie Inc.</Footer>
+            <Footer>
+              Copyright {new Date().getFullYear()} Jovie Technology Inc.
+            </Footer>
           }
           search={<Search />}
         >
