@@ -354,6 +354,39 @@ jobs:
 
           echo "✅ .env.example looks safe (no obvious secrets)."
 
+  ci-secret-scan:
+    name: Secret Scan (gitleaks + trufflehog)
+    # Always run; fast, catches secrets in PR diffs including *.backup files (JOV-3215).
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          fetch-depth: 0
+      - name: Run secret scan
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            git fetch origin "${{ github.base_ref }}"
+            ./scripts/security/scan-secrets.sh ci-pr "origin/${{ github.base_ref }}"
+          elif [[ "${{ github.event_name }}" == "merge_group" ]]; then
+            git fetch origin main --depth=1
+            ./scripts/security/scan-secrets.sh ci-pr "origin/main"
+          elif [[ "${{ github.event_name }}" == "push" ]]; then
+            if [[ "${{ github.event.before }}" == "0000000000000000000000000000000000000000" ]]; then
+              git fetch origin main --depth=1
+              ./scripts/security/scan-secrets.sh ci-pr "origin/main"
+            else
+              ./scripts/security/scan-secrets.sh ci-pr "${{ github.event.before }}"
+            fi
+          else
+            git fetch origin main --depth=1
+            ./scripts/security/scan-secrets.sh ci-pr "origin/main"
+          fi
+      - name: Verify backup-file fixture coverage
+        run: ./scripts/security/verify-gitleaks-coverage.sh
+
   ci-guardrails:
     name: Guardrails (proxy)
     # Draft PRs skip; ready PRs + pushes + merge queue enforce core repo guardrails
@@ -3340,6 +3373,7 @@ jobs:
       contents: read
     needs:
       - ci-env-example-guard
+      - ci-secret-scan
       - ci-guardrails
       - ci-risk-classifier
       - ci-structural-contract
