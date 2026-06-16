@@ -178,6 +178,35 @@ describe('GET /api/cron/process-workflow-runs', () => {
     expect(mockDb.select).not.toHaveBeenCalled();
   });
 
+  it('skips the tick when connector workflow tables are not migrated', async () => {
+    mockDb.select.mockImplementation(() => {
+      throw new Error(
+        'Failed query: select "id", "kind" from "workflow_runs"',
+        {
+          cause: {
+            code: '42P01',
+            message: 'relation "workflow_runs" does not exist',
+          },
+        }
+      );
+    });
+
+    const { GET } = await import('@/app/api/cron/process-workflow-runs/route');
+    const response = await GET(
+      new Request('http://localhost/api/cron/process-workflow-runs', {
+        headers: {
+          Authorization: 'Bearer test-secret',
+          ...TRUSTED_CRON_HEADERS,
+        },
+      })
+    );
+    const payload = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(payload).toEqual({ ok: true, processed: 0, skipped: true });
+    expect(mockCaptureWarning).not.toHaveBeenCalled();
+  });
+
   it('claims queued workflow runs before executing them', async () => {
     const { selectChain, updateChain } = setupDbChains();
     const { workflowRuns } = await import('@/lib/db/schema/connectors');

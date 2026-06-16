@@ -197,6 +197,26 @@ describe('reconcileOrphanedAcceptedActions', () => {
     vi.clearAllMocks();
   });
 
+  it('returns empty results when connector workflow tables are not migrated', async () => {
+    vi.mocked(db.select).mockImplementation(() => {
+      throw new Error(
+        'Failed query: select "id", "user_id", "payload" from "suggested_actions"',
+        {
+          cause: {
+            code: '42P01',
+            message: 'relation "suggested_actions" does not exist',
+          },
+        }
+      );
+    });
+
+    await expect(reconcileOrphanedAcceptedActions(20)).resolves.toEqual({
+      scanned: 0,
+      enqueued: 0,
+    });
+    expect(db.insert).not.toHaveBeenCalled();
+  });
+
   it('enqueues workflow runs for each orphaned accepted action', async () => {
     mockSelectChain([
       {
