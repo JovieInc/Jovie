@@ -1,8 +1,9 @@
 # Gitleaks Configuration for Jovie
 # https://github.com/gitleaks/gitleaks
 #
-# Scans the full git history on push-to-main and weekly schedule.
+# Scans staged changes (pre-commit), PR diffs (CI), and full git history (main + schedule).
 # Keep allowlists narrow — broad docs/*.md exclusions hid real secrets (JOV-2940).
+# Backup files (*.backup, *.bak) are intentionally NOT allowlisted (JOV-3215).
 
 [extend]
 # Use the default gitleaks config as a base
@@ -18,13 +19,13 @@ description = "Narrow allowlist for test fixtures, examples, and templates"
 
 # Regex patterns for paths to ignore
 paths = [
-    # Test directories and fixtures
-    '''(?i)tests?/''',
-    '''(?i)__tests__/''',
+    # Test directories and fixtures (anchored — avoid matching paths like contests/)
+    '''(?:^|/)tests?/''',
+    '''(?:^|/)__tests__/''',
     '''(?i)\.test\.(ts|tsx|js|jsx)$''',
     '''(?i)\.spec\.(ts|tsx|js|jsx)$''',
-    '''(?i)fixtures?/''',
-    '''(?i)mocks?/''',
+    '''(?:^|/)fixtures?/''',
+    '''(?:^|/)mocks?/''',
 
     # Example and template files
     '''\.env\.example$''',
@@ -57,8 +58,9 @@ paths = [
     # Log files from test runs
     '''\.log$''',
 
-    # Gitleaks self-test fixture (intentionally contains leak-shaped strings)
+    # Gitleaks self-test fixtures (intentionally contain leak-shaped strings)
     '''scripts/security/gitleaks-fixture\.txt$''',
+    '''scripts/security/gitleaks-backup-fixture\.txt$''',
 ]
 
 # Regex patterns for content to ignore (false positive patterns)

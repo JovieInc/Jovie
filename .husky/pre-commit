@@ -2,6 +2,7 @@
 set -e  # Required: ensures check-conflict-markers.sh failure actually blocks commits
 
 bash scripts/check-conflict-markers.sh
+bash scripts/security/scan-secrets.sh pre-commit
 pnpm run next:proxy-guard
 node scripts/turbo-warm-precommit-cache.mjs
 pnpm exec lint-staged
