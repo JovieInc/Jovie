@@ -297,7 +297,7 @@ export const DashboardAudienceTableUnified = memo(
     const handleRemoveMember = React.useCallback(
       async (member: AudienceMember) => {
         if (!profileId) {
-          toast.error('Unable to block member — profile not loaded');
+          toast.error('Unable to remove member. Please refresh and try again.');
           return;
         }
         try {
@@ -492,7 +492,7 @@ export const DashboardAudienceTableUnified = memo(
     const handleSourceLinkAction = React.useCallback(
       async (action: 'copy' | 'open' | 'download') => {
         if (!profileId) {
-          toast.error('Profile is still loading');
+          toast.error('Unable to complete action. Please refresh and try again.');
           return;
         }
 

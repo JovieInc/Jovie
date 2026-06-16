@@ -202,7 +202,7 @@ export function useSuggestionSync({
       suggestion: DetectedLink & { suggestionId?: string }
     ): Promise<LinkItem | null> => {
       if (!profileId) {
-        toast.error('Missing profile id; please refresh and try again.');
+        toast.error('Unable to update suggestion. Please refresh and try again.');
         return null;
       }
 
@@ -242,7 +242,7 @@ export function useSuggestionSync({
       suggestion: DetectedLink & { suggestionId?: string }
     ): Promise<void> => {
       if (!profileId) {
-        toast.error('Missing profile id; please refresh and try again.');
+        toast.error('Unable to update suggestion. Please refresh and try again.');
         return;
       }
 
