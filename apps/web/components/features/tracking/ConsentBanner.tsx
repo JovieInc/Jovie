@@ -86,7 +86,7 @@ export function ConsentBanner({ className }: ConsentBannerProps) {
         'fixed bottom-0 left-0 right-0 z-50',
         'backdrop-blur-sm',
         'px-4 py-2.5',
-        'animate-in slide-in-from-bottom-4 duration-300',
+        'animate-in slide-in-from-bottom-4 duration-subtle',
         className
       )}
       style={{
@@ -109,10 +109,13 @@ export function ConsentBanner({ className }: ConsentBannerProps) {
             color: 'var(--linear-text-secondary)',
           }}
         >
-          We use cookies to understand how you use this page and improve your
-          experience.{' '}
+          We use cookies and similar technologies to understand how you use this
+          page, improve your experience, and (with your consent) measure ad
+          campaign performance through server-side event sharing with
+          advertising partners including Meta, Google, and TikTok. No
+          third-party tracking scripts are loaded on your device.{' '}
           <a
-            href='/privacy'
+            href='/legal/cookies'
             className='underline hover:opacity-80'
             style={{ color: 'var(--linear-text-primary)' }}
             target='_blank'

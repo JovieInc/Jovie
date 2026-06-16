@@ -118,11 +118,11 @@ export function isMarketingAllowed(): boolean {
 
   try {
     const raw = globalThis.localStorage?.getItem('jv_cc');
-    if (!raw) return true; // No consent interaction yet — fire by default
+    if (!raw) return false; // No consent interaction yet — do not fire by default
     const parsed = JSON.parse(raw);
-    return parsed?.marketing !== false;
+    return parsed?.marketing === true; // Only fire if explicitly accepted
   } catch {
-    return true; // Malformed data — treat as no consent interaction
+    return false; // Malformed data — treat as no consent
   }
 }
 

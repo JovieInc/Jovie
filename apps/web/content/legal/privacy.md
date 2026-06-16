@@ -120,16 +120,29 @@ When you start a new chat conversation, the first messages are sent to **Google*
 
 Aggregated analytics data (profile views, click patterns, geographic distribution) may be sent to **Anthropic** (Claude) to generate personalized career insights. This data consists of anonymized summaries, not raw user activity.
 
+### Email Classification
+
+When you receive inbound emails through Jovie's inbox feature, the sender name, subject, and body text of each email are sent to **Anthropic** (Claude) via the Vercel AI Gateway to classify the email (e.g., booking, fan mail, press, collaboration) and extract structured data. The classification result is stored in your inbox to help you organize and prioritize messages.
+
+### Playlist Pitch Generator
+
+When you use the AI pitch generator, your release metadata (title, artist name, genres, and optionally release date) is sent to **Anthropic** (Claude) via the Vercel AI Gateway to generate platform-specific playlist pitches.
+
 ### What We Do NOT Send to AI Providers
 
 - Your email address or authentication credentials
 - Your payment information
 - Your IP address
 - Raw click-level analytics data identifying your fans
+- Fan personally identifiable information (fan names, fan emails, fan message content beyond what is needed for classification)
+
+### Data Retention by AI Providers
+
+All AI providers (Anthropic, Google) process data through the Vercel AI Gateway, which enforces zero data retention (ZDR). Prompts and responses are not stored by the AI providers beyond the duration of the request and are not used to train models.
 
 ### Your Controls
 
-You can choose not to use AI features. The AI chat assistant is optional and does not activate unless you open it. There is no AI processing of your data outside of features you explicitly use.
+You can choose not to use AI features. The AI chat assistant, email classification, pitch generator, and insights features are all optional. There is no AI processing of your data outside of features you explicitly use.
 
 ## Data Sharing
 

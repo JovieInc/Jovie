@@ -29,9 +29,7 @@ When enabled, these help us understand how visitors interact with Jovie so we ca
 
 ### Marketing Cookies
 
-When enabled, these allow us to deliver relevant advertisements and measure campaign effectiveness.
-
-We do not place any marketing cookies on your device. However, when you accept marketing cookies, we use server-side event forwarding to send anonymized profile visit data to advertising platforms including Meta, Google, and TikTok. This allows us to measure the effectiveness of retargeting campaigns. No third-party tracking scripts are loaded on your device.
+When you accept marketing cookies, we use server-side event forwarding to send anonymized profile visit data to advertising platforms including Meta (Facebook), Google, and TikTok. This allows us to measure the effectiveness of retargeting campaigns. No third-party tracking scripts are loaded on your device. The data shared includes: page URL, referrer, device/browser type (user agent), and a hashed visitor identifier. Raw IP addresses are also shared with ad platforms as required by their server-side event APIs for user matching.
 
 ## Managing Your Preferences
 
