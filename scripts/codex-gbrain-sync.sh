@@ -10,6 +10,11 @@ set -u
 PHASE="${1:-manual}"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
+
+# Supabase-backed brains: clamp per-process pool multiplication before any gbrain CLI.
+# shellcheck source=lib/gbrain-pool-env.sh
+. "${SCRIPT_DIR}/lib/gbrain-pool-env.sh"
+apply_gbrain_pool_budget
 GBRAIN_DOCTOR_TIMEOUT_SECONDS="${CODEX_GBRAIN_DOCTOR_TIMEOUT_SECONDS:-10}"
 GBRAIN_SYNC_TIMEOUT_SECONDS="${CODEX_GBRAIN_SYNC_TIMEOUT_SECONDS:-60}"
 

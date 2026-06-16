@@ -960,6 +960,25 @@ Walk the user through the supabase.com steps:
 
 Then follow the same secret-read + verify + init flow as Path 1.
 
+### Supabase pool budget (Paths 1, 2a, 2b)
+
+After any Supabase `gbrain init`, clamp per-process pool multiplication so
+overlapping CLI processes (serve, autopilot, sync) do not exhaust the
+Supavisor session pool. Jovie-owned wrappers source
+`scripts/lib/gbrain-pool-env.sh`; for interactive shells add the same exports
+to `~/.zshrc` or your launchd/cron env:
+
+```bash
+export GBRAIN_DISABLE_DIRECT_POOL=1
+export GBRAIN_POOL_SIZE=2
+export GBRAIN_DIRECT_POOL_SIZE=1
+export GBRAIN_MAX_CONNECTIONS=15   # tune to your Supabase tier / pool_size
+```
+
+`GBRAIN_MAX_CONNECTIONS` turns on gbrain's opt-in budget clamp (v0.42+).
+Verify with `gbrain doctor --json | jq '.checks[] | select(.name=="pool_budget")'`.
+See `docs/GBRAIN_POOL_BUDGET.md` for tier guidance and troubleshooting.
+
 ### Path 3 (PGLite local)
 
 ```bash
