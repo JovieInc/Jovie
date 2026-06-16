@@ -380,10 +380,10 @@ export default async function ArtistPage({ params }: Readonly<Props>) {
       <div className='px-4 py-8'>
         <ErrorBanner
           title='Profile is temporarily unavailable'
-          description='We could not load this Jovie profile right now. Please refresh or try again in a few minutes.'
+          description='We could not load this profile right now, so please refresh or try again in a few minutes.'
           actions={[
-            { label: 'Try again', href: `/${username.toLowerCase()}` },
-            { label: 'Go home', href: '/' },
+            { label: 'Try Again', href: `/${username.toLowerCase()}` },
+            { label: 'Go Home', href: '/' },
           ]}
           testId='public-profile-error'
         />
@@ -421,12 +421,8 @@ export default async function ArtistPage({ params }: Readonly<Props>) {
   // Generate a short-lived HMAC token so the client can authenticate its visit
   // tracking request to /api/audience/visit (requires TRACKING_TOKEN_SECRET).
   // Falls back to undefined gracefully if the secret is not configured.
-  let visitTrackingToken: string | undefined;
-  try {
-    visitTrackingToken = getClientTrackingToken(profile.id).token;
-  } catch {
-    // Secret not configured — visit tracking will proceed without token auth
-  }
+  const visitTrackingToken =
+    getClientTrackingToken(profile.id).token ?? undefined;
 
   const latestRelease = fetchedLatestRelease;
 
