@@ -59,6 +59,7 @@ jobs:
       run_admin_lighthouse: ${{ steps.detect.outputs.run_admin_lighthouse }}
       run_chat_lighthouse: ${{ steps.detect.outputs.run_chat_lighthouse }}
       run_promptfoo_evals: ${{ steps.detect.outputs.run_promptfoo_evals }}
+      run_golden_eval_set: ${{ steps.detect.outputs.run_golden_eval_set }}
       run_e2e: ${{ steps.detect.outputs.run_e2e }}
       run_drizzle: ${{ steps.detect.outputs.run_drizzle }}
       run_neon: ${{ steps.detect.outputs.run_neon }}
@@ -82,7 +83,7 @@ jobs:
           elif [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
             # Manual dispatch: run everything
             echo "Manual dispatch: running all checks"
-            for t in run_build run_test run_public_lighthouse run_dashboard_lighthouse run_onboarding_lighthouse run_admin_lighthouse run_chat_lighthouse run_promptfoo_evals run_e2e run_drizzle run_neon has_code_changes; do
+            for t in run_build run_test run_public_lighthouse run_dashboard_lighthouse run_onboarding_lighthouse run_admin_lighthouse run_chat_lighthouse run_promptfoo_evals run_golden_eval_set run_e2e run_drizzle run_neon has_code_changes; do
               echo "$t=true" >> "$GITHUB_OUTPUT"
             done
             exit 0
@@ -92,13 +93,14 @@ jobs:
 
           FULL_CI_LABEL="${{ github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'testing') }}"
 
-          PROMPTFOO_INFRA_TRIGGER_PATTERN='^(\.github/workflows/evals-periodic\.yml|\.github/workflows/README\.md|apps/web/tests/eval/promptfoo/)'
-          PROMPTFOO_INFRA_ALLOWED_PATTERN='^(\.github/workflows/ci\.yml|\.github/workflows/evals-periodic\.yml|\.github/workflows/README\.md|apps/web/tests/eval/promptfoo/.*|apps/web/package.*\.json|package.*\.json|pnpm-lock\.yaml)$'
+          PROMPTFOO_INFRA_TRIGGER_PATTERN='^(\.github/workflows/evals-periodic\.yml|\.github/workflows/README\.md|apps/web/tests/eval/promptfoo/|apps/web/tests/eval/golden/)'
+          PROMPTFOO_INFRA_ALLOWED_PATTERN='^(\.github/workflows/ci\.yml|\.github/workflows/evals-periodic\.yml|\.github/workflows/README\.md|apps/web/tests/eval/promptfoo/.*|apps/web/tests/eval/golden/.*|apps/web/vitest\.config\.golden-eval\.mts|apps/web/scripts/run-golden-eval-set-ci\.sh|apps/web/package.*\.json|package.*\.json|pnpm-lock\.yaml)$'
           if echo "$CHANGED_FILES" | grep -q -E "$PROMPTFOO_INFRA_TRIGGER_PATTERN" &&
             ! echo "$CHANGED_FILES" | grep -v -E "$PROMPTFOO_INFRA_ALLOWED_PATTERN" | grep -q .; then
             echo "Promptfoo eval-infrastructure-only change: running deterministic eval CI and core static checks, even if the PR has the testing label."
             echo "has_code_changes=true" >> "$GITHUB_OUTPUT"
             echo "run_promptfoo_evals=true" >> "$GITHUB_OUTPUT"
+            echo "run_golden_eval_set=true" >> "$GITHUB_OUTPUT"
             for t in run_build run_test run_public_lighthouse run_dashboard_lighthouse run_onboarding_lighthouse run_admin_lighthouse run_chat_lighthouse run_e2e run_drizzle run_neon; do
               echo "$t=false" >> "$GITHUB_OUTPUT"
             done
@@ -110,7 +112,7 @@ jobs:
           # into Neon, Lighthouse, or Playwright work by label accident.
           if [[ "$FULL_CI_LABEL" == "true" ]]; then
             echo "Forcing full CI run due to 'testing' label"
-            for t in run_build run_test run_public_lighthouse run_dashboard_lighthouse run_onboarding_lighthouse run_admin_lighthouse run_chat_lighthouse run_promptfoo_evals run_e2e run_drizzle run_neon has_code_changes; do
+            for t in run_build run_test run_public_lighthouse run_dashboard_lighthouse run_onboarding_lighthouse run_admin_lighthouse run_chat_lighthouse run_promptfoo_evals run_golden_eval_set run_e2e run_drizzle run_neon has_code_changes; do
               echo "$t=true" >> "$GITHUB_OUTPUT"
             done
             exit 0
@@ -120,7 +122,7 @@ jobs:
           if ! echo "$CHANGED_FILES" | grep -q -E '^\.github/' &&
             ! echo "$CHANGED_FILES" | grep -q -v -E '\.(md|txt)$'; then
             echo "Only documentation files changed"
-            for t in run_build run_test run_public_lighthouse run_dashboard_lighthouse run_onboarding_lighthouse run_admin_lighthouse run_chat_lighthouse run_promptfoo_evals run_e2e run_drizzle run_neon has_code_changes; do
+            for t in run_build run_test run_public_lighthouse run_dashboard_lighthouse run_onboarding_lighthouse run_admin_lighthouse run_chat_lighthouse run_promptfoo_evals run_golden_eval_set run_e2e run_drizzle run_neon has_code_changes; do
               echo "$t=false" >> "$GITHUB_OUTPUT"
             done
             exit 0
@@ -183,11 +185,13 @@ jobs:
             echo "run_chat_lighthouse=false" >> "$GITHUB_OUTPUT"
           fi
 
-          PROMPTFOO_EVAL_PATTERN='^(\.github/workflows/ci\.yml|apps/web/tests/eval/promptfoo/|apps/web/lib/chat/|apps/web/app/api/chat/|apps/web/package.*\.json|package.*\.json|pnpm-lock\.yaml)'
+          PROMPTFOO_EVAL_PATTERN='^(\.github/workflows/ci\.yml|apps/web/tests/eval/promptfoo/|apps/web/tests/eval/golden/|apps/web/vitest\.config\.golden-eval\.mts|apps/web/scripts/run-golden-eval-set-ci\.sh|apps/web/lib/chat/|apps/web/app/api/chat/|apps/web/package.*\.json|package.*\.json|pnpm-lock\.yaml)'
           if echo "$CHANGED_FILES" | grep -q -E "$PROMPTFOO_EVAL_PATTERN"; then
             echo "run_promptfoo_evals=true" >> "$GITHUB_OUTPUT"
+            echo "run_golden_eval_set=true" >> "$GITHUB_OUTPUT"
           else
             echo "run_promptfoo_evals=false" >> "$GITHUB_OUTPUT"
+            echo "run_golden_eval_set=false" >> "$GITHUB_OUTPUT"
           fi
 
           # E2E paths
@@ -514,6 +518,24 @@ jobs:
         run: pnpm --filter @jovie/web run evals:validate
       - name: Run deterministic Promptfoo evals
         run: pnpm run evals
+
+  ci-golden-eval-set:
+    name: Golden Eval Set (deterministic)
+    needs: [ci-path-changes]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    if: ${{ github.event_name == 'workflow_dispatch' || needs.ci-path-changes.outputs.run_golden_eval_set == 'true' }}
+    env:
+      JOVIE_RUN_LIVE_EVALS: '0'
+      JOVIE_RUN_LIVE_HTTP_EVALS: '0'
+      JOVIE_RUN_LIVE_HTTP_RATE_LIMIT_EVALS: '0'
+      JOVIE_RUN_LIVE_HTTP_MODEL_ERROR_EVALS: '0'
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with: { fetch-depth: 1 }
+      - uses: ./.github/actions/setup-node-pnpm
+      - name: Run golden eval-set CI gate
+        run: pnpm run evals:golden
 
   ci-eslint:
     name: ESLint Server Boundaries
