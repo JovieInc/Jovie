@@ -515,7 +515,7 @@ export function ListenNowForm({ artist, onUpdate }: ListenNowFormProps) {
       {success && (
         <ContentSurfaceCard className='border-emerald-500/20 bg-emerald-500/5 p-3'>
           <p className='text-sm text-emerald-600 dark:text-emerald-400'>
-            Music links saved successfully!
+            Music links saved!
           </p>
         </ContentSurfaceCard>
       )}
