@@ -20,9 +20,9 @@ Orchestrated sessions must set `JOVIE_AGENT_PROFILE` before editing:
 - `founder-os`: GTM, fundraising, applications, company facts. Do not code.
 - `code-orchestrator`: plan, decompose, review, and create manifests. Do not implement.
 - `coder`: implement assigned HUD/delegation manifests only.
-- `no_agent`: deterministic scripts, HUD refresh, cron checks, usage ledger, GBrain sync.
+- `no_agent`: deterministic scripts, HUD refresh, cron checks, usage ledger.
 
-If a non-coding profile discovers work that needs product/CI changes, create or update a HUD/delegation manifest with KPI, owner, profile, runtime, cost route, GBrain queries, gstack skills, expected output, and verification. Then dispatch a `coder` profile. Do not check out teammate branches, edit code, commit, push, merge, deploy, or repair CI directly from Chief/default/code-orchestrator sessions.
+If a non-coding profile discovers work that needs product/CI changes, create or update a HUD/delegation manifest with KPI, owner, profile, runtime, cost route, gstack skills, expected output, and verification. Then dispatch a `coder` profile. Do not check out teammate branches, edit code, commit, push, merge, deploy, or repair CI directly from Chief/default/code-orchestrator sessions.
 
 ## Instruction Architecture
 
@@ -151,7 +151,7 @@ Use /browse from gstack for all web browsing. Never use mcp__claude-in-chrome__*
 Available skills: /office-hours, /plan-ceo-review, /plan-eng-review, /plan-design-review,
 /design-consultation, /design-shotgun, /design-html, /review, /ship, /land-and-deploy,
 /canary, /benchmark, /browse, /open-gstack-browser, /qa, /qa-only, /design-review,
-/setup-browser-cookies, /setup-deploy, /setup-gbrain, /sync-gbrain, /retro, /investigate, /document-release,
+/setup-browser-cookies, /setup-deploy, /retro, /investigate, /document-release,
 /codex, /cso, /autoplan, /perf-loop, /pair-agent, /careful, /freeze, /guard, /unfreeze, /gstack-upgrade, /learn.
 
 ## Coding Tasks
