@@ -15,6 +15,7 @@ import { DrawerHeaderActions } from '@/components/molecules/drawer-header/Drawer
 import { LoadingSkeleton } from '@/components/molecules/LoadingSkeleton';
 import { useDashboardAnalyticsQuery } from '@/lib/queries';
 import { cn } from '@/lib/utils';
+import { formatAnalyticsStageRate } from '@/lib/utils/analytics-growth';
 import type {
   AnalyticsRange,
   DashboardAnalyticsResponse,
@@ -22,14 +23,13 @@ import type {
 
 /**
  * Calculate conversion rate between two funnel stages.
- * Returns null when the denominator is 0 to avoid division by zero.
+ * Suppresses misleading percents on small bases — see formatAnalyticsStageRate.
  */
 export function calculateConversionRate(
   current: number,
   previous: number
 ): string | null {
-  if (previous === 0) return null;
-  return `${Math.round((current / previous) * 100)}%`;
+  return formatAnalyticsStageRate(current, previous);
 }
 
 interface RangeOption {
@@ -38,8 +38,8 @@ interface RangeOption {
 }
 
 const RANGE_OPTIONS: RangeOption[] = [
-  { value: '7d', label: '7d' },
-  { value: '30d', label: '30d' },
+  { value: '7d', label: '7D' }, // ui-casing-allow: compact range pill
+  { value: '30d', label: '30D' }, // ui-casing-allow: compact range pill
 ];
 
 export type AnalyticsTab = 'cities' | 'countries' | 'sources' | 'links';
@@ -137,7 +137,7 @@ function FunnelStage({
   );
 }
 
-/** Vertical waterfall funnel card — Views → Visitors → Followers */
+/** Vertical waterfall funnel card — Views → Fans → Subscribed Fans */
 function FunnelCard({
   stages,
   loading,
@@ -280,8 +280,8 @@ export function AnalyticsSidebarView({
   const showTipLinkVisits = (data?.tip_link_visits ?? 0) > 0;
   const stages = [
     { label: 'Profile Views', value: data?.profile_views ?? 0 },
-    { label: 'Unique Visitors', value: data?.unique_users ?? 0 },
-    { label: 'Followers', value: data?.subscribers ?? 0 },
+    { label: 'Fans', value: data?.unique_users ?? 0 },
+    { label: 'Subscribed Fans', value: data?.subscribers ?? 0 },
   ];
 
   return (
@@ -319,7 +319,7 @@ export function AnalyticsSidebarView({
                   size='sm'
                   className='w-full'
                   triggerClassName='flex-1'
-                  aria-label='Analytics time range'
+                  aria-label='Analytics Time Range'
                 />
               ) : (
                 <div aria-hidden='true' className='h-7 invisible' />
