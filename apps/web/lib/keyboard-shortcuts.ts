@@ -25,7 +25,7 @@ import {
   Users,
   X,
 } from 'lucide-react';
-import { APP_ROUTES, buildLibraryViewRoute } from '@/constants/routes';
+import { APP_ROUTES } from '@/constants/routes';
 // Unicode glyphs via String.fromCodePoint so they survive encoding-unaware
 // pipelines (CI, bundlers, proxies) without producing mojibake.
 export const GLYPH_CMD = String.fromCodePoint(0x2318);
@@ -183,7 +183,7 @@ export const KEYBOARD_SHORTCUTS: KeyboardShortcut[] = [
     keys: 'G then R',
     category: 'navigation',
     icon: Music,
-    href: buildLibraryViewRoute('releases'),
+    href: APP_ROUTES.RELEASES,
     isSequential: true,
     firstKey: 'g',
     secondKey: 'r',
