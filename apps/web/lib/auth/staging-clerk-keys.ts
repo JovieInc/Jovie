@@ -34,11 +34,28 @@ function runtimePublicEnv(key: string): string | undefined {
 }
 
 /**
+ * Module-scope memoization cache for resolveClerkKeys.
+ *
+ * Env vars are fixed at container start — caching avoids repeated env reads
+ * on every middleware invocation (3-4× per request).
+ *
+ * SAFETY: only entries with BOTH keys present (status === 'ok') are stored.
+ * Incomplete / degraded statuses ('staging_missing', 'staging_inherits_prod',
+ * 'no_publishable_key', 'missing') are returned directly and never stored, so
+ * a transient env-miss on a cold start cannot be pinned for the worker lifetime.
+ *
+ * Exported for test teardown only. Do not call from production code.
+ */
+export const _resolveClerkKeysCache = new Map<string, ClerkKeys>();
+
+/**
  * Resolve Clerk keys for a given hostname.
  * Returns staging keys when on a staging host and staging keys are configured.
  * Staging must never silently fall back to production keys.
  */
 export function resolveClerkKeys(hostname: string): ClerkKeys {
+  const cached = _resolveClerkKeysCache.get(hostname);
+  if (cached) return cached;
   if (isStagingHost(hostname)) {
     const explicitPk = process.env.CLERK_PUBLISHABLE_KEY_STAGING;
     const explicitSk = process.env.CLERK_SECRET_KEY_STAGING;
@@ -52,11 +69,13 @@ export function resolveClerkKeys(hostname: string): ClerkKeys {
           status: 'staging_missing',
         };
       }
-      return {
+      const result: ClerkKeys = {
         publishableKey: explicitPk,
         secretKey: explicitSk,
         status: 'ok',
       };
+      _resolveClerkKeysCache.set(hostname, result);
+      return result;
     }
 
     // No _STAGING vars at all: fall back to the standard env vars read at
@@ -85,19 +104,26 @@ export function resolveClerkKeys(hostname: string): ClerkKeys {
         status: 'staging_inherits_prod',
       };
     }
-    return {
+    const stagingResult: ClerkKeys = {
       publishableKey: runtimePk,
       secretKey: runtimeSk,
       status: 'ok',
     };
+    _resolveClerkKeysCache.set(hostname, stagingResult);
+    return stagingResult;
   }
 
   const publishableKey = publicEnv.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
   const secretKey = process.env.CLERK_SECRET_KEY || undefined;
+  if (publishableKey && secretKey) {
+    const prodResult: ClerkKeys = { publishableKey, secretKey, status: 'ok' };
+    _resolveClerkKeysCache.set(hostname, prodResult);
+    return prodResult;
+  }
   return {
     publishableKey,
     secretKey,
-    status: publishableKey && secretKey ? 'ok' : 'no_publishable_key',
+    status: 'no_publishable_key',
   };
 }
 

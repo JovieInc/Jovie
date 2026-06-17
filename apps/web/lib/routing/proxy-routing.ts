@@ -139,11 +139,25 @@ export function isProxyRewriteExempt(pathname: string): boolean {
 }
 
 /**
+ * Module-scope cache for categorizePath results.
+ *
+ * Bounded to 1000 entries with FIFO eviction (usernames are unbounded so an
+ * unguarded Map would grow without limit).  The returned PathCategory object
+ * is treated as immutable by all callers — the only spread site
+ * (clerk-middleware-bypass.ts) produces a new object from the spread, so
+ * sharing the cached reference is safe.
+ */
+const CATEGORIZE_PATH_CACHE_MAX = 1000;
+const categorizePathCache = new Map<string, PathCategory>();
+
+/**
  * Categorize a pathname once for all routing decisions.
  * Eliminates redundant path matching throughout the middleware.
  * Now also owns public-profile candidate detection (derived from APP_ROUTES).
  */
 export function categorizePath(pathname: string): PathCategory {
+  const cached = categorizePathCache.get(pathname);
+  if (cached) return cached;
   const isAuthPath =
     pathname === APP_ROUTES.SIGNIN ||
     pathname === APP_ROUTES.SIGNIN_HYPHEN ||
@@ -186,7 +200,7 @@ export function categorizePath(pathname: string): PathCategory {
 
   const publicProfileCandidate = getPublicProfileCandidate(pathname);
 
-  return {
+  const result: PathCategory = {
     needsNonce,
     isProtectedPath,
     isAuthPath,
@@ -194,7 +208,25 @@ export function categorizePath(pathname: string): PathCategory {
     isSensitiveAPI: pathname.startsWith('/api/link/'),
     publicProfileCandidate,
   };
+
+  if (categorizePathCache.size >= CATEGORIZE_PATH_CACHE_MAX) {
+    // FIFO eviction: remove the oldest entry
+    const firstKey = categorizePathCache.keys().next().value;
+    if (firstKey !== undefined) categorizePathCache.delete(firstKey);
+  }
+  categorizePathCache.set(pathname, result);
+  return result;
 }
+
+/**
+ * Module-scope cache for analyzeHost results.
+ *
+ * Capped at 50 entries: the set of real hostnames (jov.ie, staging.jov.ie,
+ * localhost, Vercel preview URLs) is small and bounded in practice.
+ * FIFO eviction prevents unbounded growth from fuzz/scan traffic.
+ */
+const ANALYZE_HOST_CACHE_MAX = 50;
+const analyzeHostCache = new Map<string, HostInfo>();
 
 /**
  * Analyze hostname once for all routing decisions.
@@ -202,13 +234,15 @@ export function categorizePath(pathname: string): PathCategory {
  * Investor portal: /investor-portal (path-based, bypasses Clerk auth)
  */
 export function analyzeHost(hostname: string): HostInfo {
+  const cached = analyzeHostCache.get(hostname);
+  if (cached) return cached;
   const isDevOrPreview =
     hostname === 'localhost' ||
     hostname === '127.0.0.1' ||
     hostname.includes('vercel.app') ||
     STAGING_HOSTNAMES.has(hostname);
 
-  return {
+  const result: HostInfo = {
     isDevOrPreview,
     isMainHost:
       hostname === HOSTNAME ||
@@ -220,6 +254,14 @@ export function analyzeHost(hostname: string): HostInfo {
     isSupportHost: hostname === `support.${HOSTNAME}`,
     isInvestorPortal: INVESTOR_HOSTNAMES.has(hostname),
   };
+
+  if (analyzeHostCache.size >= ANALYZE_HOST_CACHE_MAX) {
+    // FIFO eviction: remove the oldest entry
+    const firstKey = analyzeHostCache.keys().next().value;
+    if (firstKey !== undefined) analyzeHostCache.delete(firstKey);
+  }
+  analyzeHostCache.set(hostname, result);
+  return result;
 }
 
 /** Dashboard is always at /app in single-domain architecture */
