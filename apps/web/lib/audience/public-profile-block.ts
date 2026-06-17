@@ -2,9 +2,15 @@ import 'server-only';
 
 import * as Sentry from '@sentry/nextjs';
 import { createFingerprintEdge } from '@/lib/audience/fingerprint';
+import { withTimeout } from '@/lib/db/query-timeout';
 import { env } from '@/lib/env-server';
 import { captureWarning } from '@/lib/error-tracking';
 import { getRedis } from '@/lib/redis';
+
+// Timeout for audience-block DB queries. Matches proxy-state.ts budget — kept
+// below the Neon p99 cold-start budget (~3 s) so a cache-miss does not stall
+// every visitor navigation for more than ~3 s. Fails open on timeout.
+const AUDIENCE_BLOCK_DB_QUERY_TIMEOUT_MS = 3000;
 
 /**
  * Mirror extractClientIP() priority for the middleware audience-block check.
@@ -219,7 +225,7 @@ async function profileHasActiveBlocks(username: string): Promise<boolean> {
   const { audienceBlocks } = await import('@/lib/db/schema/analytics');
   const { creatorProfiles } = await import('@/lib/db/schema/profiles');
 
-  const [result] = await db
+  const queryPromise = db
     .select({ profileId: creatorProfiles.id })
     .from(creatorProfiles)
     .where(
@@ -240,6 +246,12 @@ async function profileHasActiveBlocks(username: string): Promise<boolean> {
     )
     .limit(1);
 
+  const [result] = await withTimeout(
+    queryPromise,
+    AUDIENCE_BLOCK_DB_QUERY_TIMEOUT_MS,
+    '[audience-block] profileHasActiveBlocks'
+  );
+
   return !!result;
 }
 
@@ -252,7 +264,7 @@ async function isVisitorBlockedByFingerprint(
   const { audienceBlocks } = await import('@/lib/db/schema/analytics');
   const { creatorProfiles } = await import('@/lib/db/schema/profiles');
 
-  const [result] = await db
+  const queryPromise = db
     .select({ blockId: audienceBlocks.id })
     .from(creatorProfiles)
     .innerJoin(
@@ -267,6 +279,12 @@ async function isVisitorBlockedByFingerprint(
       )
     )
     .limit(1);
+
+  const [result] = await withTimeout(
+    queryPromise,
+    AUDIENCE_BLOCK_DB_QUERY_TIMEOUT_MS,
+    '[audience-block] isVisitorBlockedByFingerprint'
+  );
 
   return !!result;
 }
@@ -306,7 +324,7 @@ export async function checkProfileVisitorBlocked(
     }
 
     const fingerprint = await createFingerprintEdge(ip, ua);
-    return isVisitorBlockedByFingerprint(normalizedUsername, fingerprint);
+    return await isVisitorBlockedByFingerprint(normalizedUsername, fingerprint);
   } catch {
     return false;
   }
