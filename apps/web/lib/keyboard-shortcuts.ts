@@ -25,7 +25,7 @@ import {
   Users,
   X,
 } from 'lucide-react';
-import { APP_ROUTES } from '@/constants/routes';
+import { APP_ROUTES, buildLibraryViewRoute } from '@/constants/routes';
 // Unicode glyphs via String.fromCodePoint so they survive encoding-unaware
 // pipelines (CI, bundlers, proxies) without producing mojibake.
 export const GLYPH_CMD = String.fromCodePoint(0x2318);
@@ -183,7 +183,7 @@ export const KEYBOARD_SHORTCUTS: KeyboardShortcut[] = [
     keys: 'G then R',
     category: 'navigation',
     icon: Music,
-    href: APP_ROUTES.RELEASES,
+    href: buildLibraryViewRoute('releases'),
     isSequential: true,
     firstKey: 'g',
     secondKey: 'r',
@@ -388,6 +388,7 @@ export const KEYBOARD_SHORTCUTS: KeyboardShortcut[] = [
 export const NAV_SHORTCUTS: Record<string, KeyboardShortcut> = {
   overview: KEYBOARD_SHORTCUTS.find(s => s.id === 'nav-dashboard')!,
   profile: KEYBOARD_SHORTCUTS.find(s => s.id === 'nav-profile')!,
+  'artist-profile': KEYBOARD_SHORTCUTS.find(s => s.id === 'nav-profile')!,
   releases: KEYBOARD_SHORTCUTS.find(s => s.id === 'nav-releases')!,
   calendar: KEYBOARD_SHORTCUTS.find(s => s.id === 'nav-calendar')!,
   audience: KEYBOARD_SHORTCUTS.find(s => s.id === 'nav-audience')!,
