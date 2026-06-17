@@ -134,6 +134,17 @@ export async function doesTableExist(tableName: string): Promise<boolean> {
 }
 
 /**
+ * Drop a cached column-existence result so the next lookup re-queries
+ * information_schema. Used when a write fails with undefined_column (42703).
+ */
+export function invalidateColumnExistenceCache(
+  tableName: string,
+  columnName: string
+): void {
+  columnExistenceCache.delete(`${tableName}.${columnName}`);
+}
+
+/**
  * Check if a column exists in a public table.
  * Uses the same TTL cache, retry, and timeout policy as doesTableExist so
  * public routes can avoid issuing schema-incompatible writes during rollout.
@@ -188,7 +199,14 @@ export async function doesColumnExist(
     const firstRow = result.rows[0];
     const exists = isColumnExistsRow(firstRow) ? firstRow.column_exists : false;
 
-    columnExistenceCache.set(cacheKey, { exists, timestamp: Date.now() });
+    // Only cache negative results. A stale positive cache can survive schema
+    // rollbacks/restores that share the same DATABASE_URL and cause public
+    // routes to write columns that no longer exist (JOV-3178).
+    if (!exists) {
+      columnExistenceCache.set(cacheKey, { exists, timestamp: Date.now() });
+    } else {
+      columnExistenceCache.delete(cacheKey);
+    }
 
     return exists;
   } catch (error) {

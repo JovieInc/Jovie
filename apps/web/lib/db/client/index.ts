@@ -25,6 +25,7 @@ export {
   doesColumnExist,
   doesTableExist,
   getDbConfig,
+  invalidateColumnExistenceCache,
   validateDbConnection,
 } from './health';
 // Logging
