@@ -154,7 +154,7 @@ const MobileCardList = memo(function MobileCardList({
             loading={isFetchingNextPage}
             onClick={() => onLoadMore?.()}
           >
-            Load more members
+            Load More Members
           </Button>
         </div>
       ) : null}
@@ -297,7 +297,9 @@ export const DashboardAudienceTableUnified = memo(
     const handleRemoveMember = React.useCallback(
       async (member: AudienceMember) => {
         if (!profileId) {
-          toast.error('Unable to remove member. Please refresh and try again.');
+          toast.error(
+            'Unable to remove member — please refresh and try again.'
+          );
           return;
         }
         try {
@@ -492,7 +494,9 @@ export const DashboardAudienceTableUnified = memo(
     const handleSourceLinkAction = React.useCallback(
       async (action: 'copy' | 'open' | 'download') => {
         if (!profileId) {
-          toast.error('Unable to complete action. Please refresh and try again.');
+          toast.error(
+            'Unable to complete action — please refresh and try again.'
+          );
           return;
         }
 
@@ -677,11 +681,11 @@ export const DashboardAudienceTableUnified = memo(
           },
         }
       : {
-          label: 'Open profile settings',
+          label: 'Open Profile Settings',
           href: APP_ROUTES.SETTINGS_ARTIST_PROFILE,
         };
     const emptyStateSecondaryAction = {
-      label: 'Learn about audience',
+      label: 'Learn About Audience',
       href: '/support',
     };
 
@@ -801,7 +805,7 @@ export const DashboardAudienceTableUnified = memo(
                 type='button'
                 variant='ghost'
                 size='icon'
-                aria-label='Source link actions'
+                aria-label='Source Link Actions'
                 title='Source link'
                 className={DASHBOARD_HEADER_ACTION_ICON_BUTTON_CLASS}
               >
