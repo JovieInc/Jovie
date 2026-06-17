@@ -215,7 +215,7 @@ describe('CopyToClipboardButton', () => {
     await flushPromises();
 
     const statusElement = screen.getByRole('status');
-    expect(statusElement).toHaveTextContent('Profile URL copied to clipboard');
+    expect(statusElement).toHaveTextContent('Link copied');
   });
 
   it('updates accessibility status on error', async () => {

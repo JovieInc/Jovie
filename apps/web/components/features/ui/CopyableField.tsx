@@ -47,7 +47,7 @@ export function CopyableField({
       try {
         await navigator.clipboard.writeText(value);
         if (showToast) {
-          toast.success(`${label} copied to clipboard`);
+          toast.success('Copied');
         }
         setIsCopied(true);
         if (copyTimeoutRef.current) clearTimeout(copyTimeoutRef.current);
@@ -115,7 +115,7 @@ export function buildCopyMenuItems(
       icon: <Copy className='h-3.5 w-3.5' />,
       onClick: () => {
         void navigator.clipboard.writeText(field.value);
-        toast.success(`${field.label} copied to clipboard`);
+        toast.success('Copied');
       },
     }));
 }
