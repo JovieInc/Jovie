@@ -112,6 +112,26 @@ final class JovieUITests: XCTestCase {
     )
   }
 
+  func testSwipeNavigatesBetweenProfileAndChat() {
+    let app = launchMockApp(launchArgument: "-ui-testing-chat", expectedElementDescription: "\"Ask Jovie\"") {
+      $0.textFields["Ask Jovie"]
+    }
+
+    // Launches on Chat; swiping right reveals the Profile screen.
+    app.swipeRight()
+    XCTAssertTrue(
+      app.buttons["Copy URL"].waitForExistence(timeout: 3),
+      "Swiping right did not reveal the Profile screen.\n\(app.debugDescription)"
+    )
+
+    // Swiping left returns to Chat.
+    app.swipeLeft()
+    XCTAssertTrue(
+      app.textFields["Ask Jovie"].waitForExistence(timeout: 3),
+      "Swiping left did not return to the Chat screen.\n\(app.debugDescription)"
+    )
+  }
+
   func testChatComposerPreservesDraftAcrossShellNavigation() {
     let app = launchMockApp(launchArgument: "-ui-testing-chat", expectedElementDescription: "\"Ask Jovie\"") {
       $0.textFields["Ask Jovie"]
@@ -129,7 +149,7 @@ final class JovieUITests: XCTestCase {
     input.typeText(draft)
     XCTAssertEqual(input.value as? String, draft)
 
-    app.buttons["Open Profile"].tap()
+    app.buttons["shell-tab-profile"].tap()
     XCTAssertTrue(
       app.buttons["Copy URL"].waitForExistence(timeout: 3),
       "Shell navigation did not switch to Profile.\n\(app.debugDescription)"
@@ -191,7 +211,7 @@ final class JovieUITests: XCTestCase {
       $0.buttons["Copy URL"]
     }
 
-    app.buttons["Open Menu"].tap()
+    app.buttons["More"].tap()
     XCTAssertTrue(
       app.staticTexts["Jovie"].waitForExistence(timeout: 3),
       "Shell navigation did not reveal the menu.\n\(app.debugDescription)"
