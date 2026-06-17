@@ -25,7 +25,9 @@ import {
 
 const ADMIN_DEFAULT_TRUE_FLAGS = new Set<AppFlagName>(
   (Object.keys(APP_FLAG_DEFAULTS) as AppFlagName[]).filter(
-    flagName => flagName !== 'RELEASE_PLAN_DEMO'
+    flagName =>
+      flagName !== 'RELEASE_PLAN_DEMO' &&
+      flagName !== 'RELEASE_TO_REVENUE_AUTOPILOT'
   )
 );
 
