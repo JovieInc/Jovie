@@ -75,6 +75,7 @@ struct AppShellView<ProfileContent: View, ChatContent: View>: View {
   @State private var isShowingMenu = false
   @State private var didOpenLaunchSettings = false
   @State private var chatDraft = ""
+  @State private var intentStore = IntentNavigationStore.shared
 
   init(
     profile: AppShellProfile,
@@ -158,6 +159,31 @@ struct AppShellView<ProfileContent: View, ChatContent: View>: View {
       didOpenLaunchSettings = true
       await Task.yield()
       navigationPath.append(.settings)
+    }
+    .task {
+      applyPendingIntentNavigation()
+    }
+    .onChange(of: intentStore.pending) {
+      applyPendingIntentNavigation()
+    }
+  }
+
+  // Consume a navigation request raised by an App Intent (Siri / Shortcuts /
+  // Spotlight). Chat-bound requests land on Profile when chat is unavailable.
+  private func applyPendingIntentNavigation() {
+    guard let request = intentStore.consume() else { return }
+    guard chatEnabled else { return }
+
+    switch request {
+    case .openChat, .continueLastConversation:
+      withAnimation(.easeInOut(duration: 0.25)) {
+        selectedTab = .chat
+      }
+    case let .sendMessage(text):
+      chatDraft = text
+      withAnimation(.easeInOut(duration: 0.25)) {
+        selectedTab = .chat
+      }
     }
   }
 
