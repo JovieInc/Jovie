@@ -17,7 +17,7 @@ export interface ThreadViewProps {
   readonly thread: ThreadViewData;
   /** Rendered turns / cards (typically `<ThreadTurn>`s and `<Thread*Card>`s). */
   readonly children: ReactNode;
-  /** Composer slot — defaults to `<ThreadComposer placeholder="Reply to this chat..." />`. */
+  /** Composer slot — defaults to `<ThreadComposer placeholder="Reply to this conversation..." />`. */
   readonly composer?: ReactNode;
   /** Submit handler forwarded to the default ThreadComposer. */
   readonly onComposerSubmit?: (text: string) => void;
@@ -60,7 +60,7 @@ export function ThreadView({
   children,
   composer,
   onComposerSubmit,
-  composerPlaceholder = 'Reply to this chat...',
+  composerPlaceholder = 'Reply to this conversation...',
 }: ThreadViewProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const [atBottom, setAtBottom] = useState(true);
@@ -124,7 +124,7 @@ export function ThreadView({
             <button
               type='button'
               onClick={scrollToBottom}
-              aria-label='Scroll to bottom'
+              aria-label='Scroll To Bottom'
               className={cn(
                 'absolute left-1/2 -top-10 z-10 grid h-8 w-8 -translate-x-1/2 place-items-center rounded-full border border-(--linear-app-shell-border) bg-(--linear-app-content-surface) text-secondary-token shadow-popover transition-colors duration-subtle ease-subtle hover:bg-surface-1 hover:text-primary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/55'
               )}

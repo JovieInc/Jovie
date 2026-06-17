@@ -258,7 +258,7 @@ export function CmdKPalette({
           Command palette
         </DialogPrimitive.Title>
         <DialogPrimitive.Description className='sr-only'>
-          Search routes, skills, releases, artists, and recent chats.
+          Search routes, skills, releases, artists, and recent conversations.
         </DialogPrimitive.Description>
         <div
           className='flex flex-col'
@@ -278,9 +278,9 @@ export function CmdKPalette({
                 setQuery(e.target.value);
                 setSelectedIndex(0);
               }}
-              placeholder='Jump to a page, skill, release, or chat...'
+              placeholder='Jump to a page, skill, release, or conversation...'
               className='flex-1 appearance-none bg-transparent text-sm text-primary-token outline-none placeholder:text-tertiary-token focus:outline-none focus-visible:outline-none focus-visible:shadow-[inset_0_0_0_1px_color-mix(in_oklab,var(--linear-border-focus)_45%,transparent)]'
-              aria-label='Command palette search'
+              aria-label='Command Palette Search'
             />
             <span className='hidden shrink-0 px-1 text-[11px] font-medium text-quaternary-token sm:inline'>
               Esc
@@ -289,7 +289,7 @@ export function CmdKPalette({
           <div
             className='max-h-[420px] overflow-y-auto px-2 pb-2 pt-1.5'
             role='listbox'
-            aria-label='Command palette results'
+            aria-label='Command Palette Results'
           >
             <PaletteList
               sections={allSections}

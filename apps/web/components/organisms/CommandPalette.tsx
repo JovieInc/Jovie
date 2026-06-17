@@ -87,15 +87,15 @@ function CommandPaletteInner({ profileId }: CommandPaletteInnerProps) {
     if (conversations && conversations.length > 0) {
       sections.push({
         id: 'recent-chats',
-        label: 'Recent chats',
+        label: 'Recent Conversations',
         items: conversations.map(convo => {
           const entity: EntityRef = {
             kind: 'track', // Reuses the generic Music2 fallback art.
             id: `thread:${convo.id}`,
-            label: convo.title || 'Untitled chat',
+            label: convo.title || 'Untitled conversation',
             meta: {
               kind: 'track',
-              subtitle: 'Chat',
+              subtitle: 'Conversation',
             },
           };
           return { kind: 'entity', entity };

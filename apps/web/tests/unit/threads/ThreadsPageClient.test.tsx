@@ -92,10 +92,9 @@ describe('ChatsPageClient', () => {
       limit: 50,
     });
     expect(screen.queryByRole('heading', { name: 'Threads' })).toBeNull();
-    expect(screen.getByRole('link', { name: 'New Chat' })).toHaveAttribute(
-      'href',
-      APP_ROUTES.CHAT
-    );
+    expect(
+      screen.getByRole('link', { name: 'New Conversation' })
+    ).toHaveAttribute('href', APP_ROUTES.CHAT);
 
     const threadLinks = screen
       .getAllByRole('link')
@@ -144,9 +143,12 @@ describe('ChatsPageClient', () => {
     );
     expect(document.querySelector('.anim-calm-breath')).toBeInTheDocument();
 
-    fireEvent.change(screen.getByRole('searchbox', { name: 'Search chats' }), {
-      target: { value: 'Pitch' },
-    });
+    fireEvent.change(
+      screen.getByRole('searchbox', { name: 'Search Conversations' }),
+      {
+        target: { value: 'Pitch' },
+      }
+    );
 
     expect(screen.queryByRole('link', { name: 'Unread answer' })).toBeNull();
     expect(
@@ -173,12 +175,19 @@ describe('ChatsPageClient', () => {
 
     render(<ThreadsPageClient />);
 
-    fireEvent.change(screen.getByRole('searchbox', { name: 'Search chats' }), {
-      target: { value: 'Missing' },
-    });
+    fireEvent.change(
+      screen.getByRole('searchbox', { name: 'Search Conversations' }),
+      {
+        target: { value: 'Missing' },
+      }
+    );
 
-    expect(screen.getByText('No chats match "Missing".')).toBeInTheDocument();
-    expect(screen.getAllByRole('link', { name: 'New Chat' })).toHaveLength(2);
+    expect(
+      screen.getByText('No conversations match "Missing".')
+    ).toBeInTheDocument();
+    expect(
+      screen.getAllByRole('link', { name: 'New Conversation' })
+    ).toHaveLength(2);
   });
 
   it('opens per-chat actions from the hover menu and right-click', async () => {
@@ -207,7 +216,9 @@ describe('ChatsPageClient', () => {
     expect(copySessionId).toHaveBeenCalledWith('thread-newer');
 
     fireEvent.click(
-      screen.getByRole('button', { name: 'Chat actions for Pitch tasks' })
+      screen.getByRole('button', {
+        name: 'Conversation Actions for Pitch tasks',
+      })
     );
     fireEvent.click(screen.getByRole('menuitem', { name: 'Archive' }));
 
@@ -245,7 +256,9 @@ describe('ChatsPageClient', () => {
 
     render(<ThreadsPageClient />);
 
-    fireEvent.click(screen.getByRole('button', { name: 'Archive All Chats' }));
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Archive All Conversations' })
+    );
     fireEvent.click(screen.getByRole('button', { name: 'Archive All' }));
 
     await waitFor(() => {
@@ -257,7 +270,7 @@ describe('ChatsPageClient', () => {
         conversationId: 'thread-newer',
       });
       expect(mockNotificationsSuccess).toHaveBeenCalledWith(
-        'All chats archived'
+        'All conversations archived'
       );
     });
   });

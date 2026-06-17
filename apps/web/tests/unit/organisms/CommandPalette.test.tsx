@@ -137,7 +137,7 @@ describe('CommandPalette', () => {
     fireEvent.keyDown(globalThis, { key: 'k', metaKey: true });
     expect(screen.getByText('Recent chats')).toBeInTheDocument();
     expect(screen.getByText('Q1 release plan')).toBeInTheDocument();
-    expect(screen.getByText('Untitled chat')).toBeInTheDocument();
+    expect(screen.getByText('Untitled conversation')).toBeInTheDocument();
   });
 
   it('routes a recent-chat commit to the chat route', () => {

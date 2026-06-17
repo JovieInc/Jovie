@@ -42,12 +42,12 @@ export function useChatThreadContextMenu(
     async (threadId: string) => {
       try {
         await deleteConversation.mutateAsync({ conversationId: threadId });
-        notifications.success('Chat archived');
+        notifications.success('Conversation archived');
         if (options.activeThreadId === threadId) {
           router.push(APP_ROUTES.CHAT);
         }
       } catch {
-        notifications.error('Could not archive chat');
+        notifications.error('Could not archive conversation');
       }
     },
     [deleteConversation, notifications, options.activeThreadId, router]

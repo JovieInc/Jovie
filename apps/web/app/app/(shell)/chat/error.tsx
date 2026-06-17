@@ -17,7 +17,7 @@ export default function ChatError({ error, reset }: ErrorProps) {
           <AlertCircle className='h-8 w-8 text-tertiary-token' />
           <div className='space-y-1'>
             <p className='text-sm font-medium text-primary-token'>
-              Chat couldn&apos;t load
+              Conversation couldn&apos;t load
             </p>
             <p className='text-sm text-secondary-token'>
               Something went wrong. Please try again.
