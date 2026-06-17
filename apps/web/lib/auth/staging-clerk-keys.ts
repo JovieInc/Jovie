@@ -44,9 +44,28 @@ function runtimePublicEnv(key: string): string | undefined {
  * 'no_publishable_key', 'missing') are returned directly and never stored, so
  * a transient env-miss on a cold start cannot be pinned for the worker lifetime.
  *
+ * BOUNDED: capped at 50 entries with FIFO eviction. Real hostnames are few
+ * (jov.ie, staging.jov.ie, localhost, preview URLs), but `hostname` derives
+ * from the attacker-controllable Host header — the cap defends against a
+ * scanner spraying unique Host values that would otherwise grow the Map until
+ * the worker OOMs.
+ *
  * Exported for test teardown only. Do not call from production code.
  */
+const RESOLVE_CLERK_KEYS_CACHE_MAX = 50;
 export const _resolveClerkKeysCache = new Map<string, ClerkKeys>();
+
+/**
+ * Store a resolved key set with FIFO eviction so the cache stays bounded.
+ * Only called for status:'ok' results (both keys present).
+ */
+function cacheClerkKeys(hostname: string, result: ClerkKeys): void {
+  if (_resolveClerkKeysCache.size >= RESOLVE_CLERK_KEYS_CACHE_MAX) {
+    const firstKey = _resolveClerkKeysCache.keys().next().value;
+    if (firstKey !== undefined) _resolveClerkKeysCache.delete(firstKey);
+  }
+  _resolveClerkKeysCache.set(hostname, result);
+}
 
 /**
  * Resolve Clerk keys for a given hostname.
@@ -74,7 +93,7 @@ export function resolveClerkKeys(hostname: string): ClerkKeys {
         secretKey: explicitSk,
         status: 'ok',
       };
-      _resolveClerkKeysCache.set(hostname, result);
+      cacheClerkKeys(hostname, result);
       return result;
     }
 
@@ -109,7 +128,7 @@ export function resolveClerkKeys(hostname: string): ClerkKeys {
       secretKey: runtimeSk,
       status: 'ok',
     };
-    _resolveClerkKeysCache.set(hostname, stagingResult);
+    cacheClerkKeys(hostname, stagingResult);
     return stagingResult;
   }
 
@@ -117,7 +136,7 @@ export function resolveClerkKeys(hostname: string): ClerkKeys {
   const secretKey = process.env.CLERK_SECRET_KEY || undefined;
   if (publishableKey && secretKey) {
     const prodResult: ClerkKeys = { publishableKey, secretKey, status: 'ok' };
-    _resolveClerkKeysCache.set(hostname, prodResult);
+    cacheClerkKeys(hostname, prodResult);
     return prodResult;
   }
   return {
