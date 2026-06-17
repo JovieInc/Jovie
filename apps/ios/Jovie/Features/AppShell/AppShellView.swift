@@ -63,6 +63,7 @@ struct AppShellView<ProfileContent: View, ChatContent: View>: View {
   let isOffline: Bool
   let opensSettingsOnLaunch: Bool
   let billingURL: URL
+  let chatEnabled: Bool
   let recentConversations: [MobileConversationSummary]
   let onSelectConversation: (String) -> Void
   let onLogout: @MainActor () async -> Void
@@ -81,6 +82,7 @@ struct AppShellView<ProfileContent: View, ChatContent: View>: View {
     initialTab: AppShellTab = .profile,
     opensSettingsOnLaunch: Bool = false,
     billingURL: URL,
+    chatEnabled: Bool = false,
     recentConversations: [MobileConversationSummary] = [],
     onSelectConversation: @escaping (String) -> Void = { _ in },
     onLogout: @escaping @MainActor () async -> Void,
@@ -91,12 +93,13 @@ struct AppShellView<ProfileContent: View, ChatContent: View>: View {
     self.isOffline = isOffline
     self.opensSettingsOnLaunch = opensSettingsOnLaunch
     self.billingURL = billingURL
+    self.chatEnabled = chatEnabled
     self.recentConversations = recentConversations
     self.onSelectConversation = onSelectConversation
     self.onLogout = onLogout
     self.profileContent = profileContent()
     self.chatContent = chatContent
-    _selectedTab = State(initialValue: initialTab)
+    _selectedTab = State(initialValue: chatEnabled ? initialTab : .profile)
   }
 
   var body: some View {
@@ -134,6 +137,7 @@ struct AppShellView<ProfileContent: View, ChatContent: View>: View {
         profile: profile,
         isOffline: isOffline,
         selectedTab: selectedTab,
+        chatEnabled: chatEnabled,
         recentConversations: recentConversations,
         onSelectTab: { tab in
           selectedTab = tab
@@ -163,7 +167,11 @@ struct AppShellView<ProfileContent: View, ChatContent: View>: View {
   private var activeContent: some View {
     switch selectedTab {
     case .chat:
-      chatContent($chatDraft)
+      if chatEnabled {
+        chatContent($chatDraft)
+      } else {
+        profileContent
+      }
     case .profile:
       profileContent
     }
@@ -210,28 +218,31 @@ struct AppShellView<ProfileContent: View, ChatContent: View>: View {
     .background(JovieColor.backgroundBase.opacity(0.96))
   }
 
+  @ViewBuilder
   private var bottomNavigation: some View {
-    HStack(spacing: JovieSpacing.small) {
-      tabButton(.chat)
-      tabButton(.profile)
-    }
-    .padding(6)
-    .frame(width: 236)
-    .background {
-      if #available(iOS 26.0, *) {
-        Capsule(style: .continuous)
-          .fill(JovieColor.surface1.opacity(0.54))
-          .glassEffect(.regular.tint(JovieColor.surface1.opacity(0.54)), in: .rect(cornerRadius: 28))
-      } else {
-        Capsule(style: .continuous)
-          .fill(.ultraThinMaterial)
-          .overlay {
-            Capsule(style: .continuous)
-              .stroke(JovieColor.borderDefault, lineWidth: 1)
-          }
+    if chatEnabled {
+      HStack(spacing: JovieSpacing.small) {
+        tabButton(.chat)
+        tabButton(.profile)
       }
+      .padding(6)
+      .frame(width: 236)
+      .background {
+        if #available(iOS 26.0, *) {
+          Capsule(style: .continuous)
+            .fill(JovieColor.surface1.opacity(0.54))
+            .glassEffect(.regular.tint(JovieColor.surface1.opacity(0.54)), in: .rect(cornerRadius: 28))
+        } else {
+          Capsule(style: .continuous)
+            .fill(.ultraThinMaterial)
+            .overlay {
+              Capsule(style: .continuous)
+                .stroke(JovieColor.borderDefault, lineWidth: 1)
+            }
+        }
+      }
+      .padding(.bottom, JovieSpacing.medium)
     }
-    .padding(.bottom, JovieSpacing.medium)
   }
 
   private func tabButton(_ tab: AppShellTab) -> some View {
@@ -283,6 +294,7 @@ private struct AppNavigationMenu: View {
   let profile: AppShellProfile
   let isOffline: Bool
   let selectedTab: AppShellTab
+  let chatEnabled: Bool
   let recentConversations: [MobileConversationSummary]
   let onSelectTab: (AppShellTab) -> Void
   let onSelectConversation: (String) -> Void
@@ -311,12 +323,14 @@ private struct AppNavigationMenu: View {
         MenuAccountView(profile: profile, isOffline: isOffline)
 
         VStack(spacing: JovieSpacing.small) {
-          MenuRow(
-            title: "Chat",
-            systemImage: AppShellTab.chat.systemImage,
-            isSelected: selectedTab == .chat
-          ) {
-            onSelectTab(.chat)
+          if chatEnabled {
+            MenuRow(
+              title: "Chat",
+              systemImage: AppShellTab.chat.systemImage,
+              isSelected: selectedTab == .chat
+            ) {
+              onSelectTab(.chat)
+            }
           }
 
           MenuRow(
@@ -335,37 +349,39 @@ private struct AppNavigationMenu: View {
           )
         }
 
-        VStack(alignment: .leading, spacing: JovieSpacing.medium) {
-          Text("Recent")
-            .font(JovieFont.body(size: 13, weight: .semibold))
-            .foregroundStyle(JovieColor.textTertiary)
-
-          if recentConversations.isEmpty {
-            Text("Start a chat to see recent conversations here.")
-              .font(JovieFont.body(size: 15))
+        if chatEnabled {
+          VStack(alignment: .leading, spacing: JovieSpacing.medium) {
+            Text("Recent")
+              .font(JovieFont.body(size: 13, weight: .semibold))
               .foregroundStyle(JovieColor.textTertiary)
-              .fixedSize(horizontal: false, vertical: true)
-          } else {
-            VStack(spacing: JovieSpacing.small) {
-              ForEach(recentConversations.prefix(5)) { conversation in
-                Button {
-                  onSelectConversation(conversation.id)
-                } label: {
-                  HStack {
-                    Text(conversation.title ?? "New chat")
-                      .font(JovieFont.body(size: 15))
-                      .foregroundStyle(JovieColor.textPrimary)
-                      .lineLimit(1)
-                    Spacer()
+
+            if recentConversations.isEmpty {
+              Text("Start a chat to see recent conversations here.")
+                .font(JovieFont.body(size: 15))
+                .foregroundStyle(JovieColor.textTertiary)
+                .fixedSize(horizontal: false, vertical: true)
+            } else {
+              VStack(spacing: JovieSpacing.small) {
+                ForEach(recentConversations.prefix(5)) { conversation in
+                  Button {
+                    onSelectConversation(conversation.id)
+                  } label: {
+                    HStack {
+                      Text(conversation.title ?? "New chat")
+                        .font(JovieFont.body(size: 15))
+                        .foregroundStyle(JovieColor.textPrimary)
+                        .lineLimit(1)
+                      Spacer()
+                    }
+                    .padding(.vertical, JovieSpacing.small)
                   }
-                  .padding(.vertical, JovieSpacing.small)
+                  .buttonStyle(.plain)
                 }
-                .buttonStyle(.plain)
               }
             }
           }
+          .padding(.top, JovieSpacing.medium)
         }
-        .padding(.top, JovieSpacing.medium)
 
         Spacer(minLength: 0)
       }
