@@ -16,12 +16,12 @@ import {
   reserveChatTurn,
   TURN_IN_PROGRESS_ERROR_CODE,
 } from '@/lib/chat/turns';
-import { getAppFlagValue } from '@/lib/flags/server';
 import {
   classifyIntent,
   isDeterministicIntent,
   routeIntent,
 } from '@/lib/intent-detection';
+import { hasMobileChatAlphaAccess } from '@/lib/mobile/chat/access';
 import { fetchMobileArtistContext } from '@/lib/mobile/chat/artist-context';
 import {
   buildMobileChatHandoffUrl,
@@ -96,22 +96,6 @@ function errorNdjsonResponse(
       },
     }
   );
-}
-
-async function hasMobileChatAlphaAccess(clerkUserId: string): Promise<boolean> {
-  const session = await getSessionContext({
-    clerkUserId,
-    requireUser: true,
-    requireProfile: false,
-  });
-
-  if (session.user.isAdmin) {
-    return true;
-  }
-
-  return getAppFlagValue('IOS_APP_ALPHA_ACCESS', {
-    userId: clerkUserId,
-  });
 }
 
 export async function handleMobileChatTurn(
