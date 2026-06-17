@@ -1,5 +1,8 @@
 import type { Metadata } from 'next';
+import { redirect } from 'next/navigation';
 import { OnboardingShell } from '@/components/features/onboarding/OnboardingShell';
+import { getStartRouteRedirect } from '@/lib/auth/access-route-redirect';
+import { resolveUserState } from '@/lib/auth/gate';
 
 /**
  * Canonical onboarding chat entry point.
@@ -21,7 +24,7 @@ export const dynamic = 'force-dynamic';
 
 export const metadata: Metadata = {
   title: 'Start with Jovie',
-  description: 'Set up your Jovie artist profile in one conversation.',
+  description: 'Start your artist profile in one conversation.',
   robots: { index: false, follow: false },
 };
 
@@ -39,6 +42,12 @@ export default async function StartPage(
     typeof params.starter_prompt === 'string'
       ? params.starter_prompt
       : undefined;
+
+  const authResult = await resolveUserState();
+  const startRedirect = getStartRouteRedirect(authResult.state);
+  if (startRedirect) {
+    redirect(startRedirect);
+  }
 
   return (
     <OnboardingShell

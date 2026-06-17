@@ -9,8 +9,10 @@ import { LyricsRouteSkeleton } from '@/components/shell/LyricsRouteSkeleton';
 import { TasksRouteSkeleton } from '@/components/shell/TasksRouteSkeleton';
 import { APP_ROUTES } from '@/constants/routes';
 import { ErrorBanner } from '@/features/feedback/ErrorBanner';
+import { canAccessAppShell } from '@/lib/auth/access-route-redirect';
 import { buildAppShellSignInUrl } from '@/lib/auth/build-app-shell-signin-url';
 import { getCachedAuth } from '@/lib/auth/cached';
+import { resolveUserState } from '@/lib/auth/gate';
 import { getAppFlagValue } from '@/lib/flags/server';
 import ChatLoading from './chat/loading';
 import { DashboardShellContent } from './DashboardShellContent';
@@ -77,6 +79,13 @@ export default async function AppShellLayout({
           origin: resolveRequestOrigin(headerStore),
         })
       );
+    }
+
+    const authResult = await resolveUserState({
+      knownClerkUserId: auth.userId,
+    });
+    if (!canAccessAppShell(authResult.state) && authResult.redirectTo) {
+      redirect(authResult.redirectTo);
     }
 
     // Resolve the shell variant up front so the Suspense fallback skeleton
@@ -147,10 +156,10 @@ export default async function AppShellLayout({
         <div className='w-full max-w-lg space-y-4'>
           <ErrorBanner
             title='Dashboard failed to load'
-            description='We could not load your workspace data. Refresh to try again or return to your profile.'
+            description='We could not load your workspace data; refresh to try again or return to your profile.'
             actions={[
               { label: 'Retry', href: APP_ROUTES.DASHBOARD },
-              { label: 'Go to my profile', href: '/' },
+              { label: 'Go To My Profile', href: '/' },
             ]}
             testId='dashboard-error'
           />

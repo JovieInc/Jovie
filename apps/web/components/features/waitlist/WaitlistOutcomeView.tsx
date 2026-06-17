@@ -57,8 +57,8 @@ const OUTCOME_COPY: Record<
     icon: Clock3,
   },
   pending: {
-    title: 'You Are On The Waitlist',
-    body: 'Your access request is saved. We will email you when your account is ready to continue.',
+    title: "You're on the list",
+    body: "We'll email you when your account is ready.",
     icon: Clock3,
   },
   save_failed: {

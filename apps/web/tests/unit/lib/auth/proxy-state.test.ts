@@ -157,7 +157,7 @@ describe('proxy-state.ts', () => {
       expect(mockIsWaitlistGateEnabled).toHaveBeenCalledTimes(1);
     });
 
-    it('returns needsWaitlist when no DB user exists', async () => {
+    it('returns needsOnboarding when no DB user exists', async () => {
       mockDbSelect.mockReturnValue({
         from: vi.fn().mockReturnValue({
           leftJoin: vi.fn().mockReturnValue({
@@ -171,14 +171,14 @@ describe('proxy-state.ts', () => {
       const result = await getUserState('clerk_123');
 
       expect(result).toEqual({
-        needsWaitlist: true,
-        needsOnboarding: false,
+        needsWaitlist: false,
+        needsOnboarding: true,
         isActive: false,
         isBanned: false,
       });
     });
 
-    it('returns needsWaitlist when dbUserId is null', async () => {
+    it('returns needsOnboarding when dbUserId is null', async () => {
       mockDbSelect.mockReturnValue({
         from: vi.fn().mockReturnValue({
           leftJoin: vi.fn().mockReturnValue({
@@ -192,8 +192,8 @@ describe('proxy-state.ts', () => {
       const result = await getUserState('clerk_123');
 
       expect(result).toEqual({
-        needsWaitlist: true,
-        needsOnboarding: false,
+        needsWaitlist: false,
+        needsOnboarding: true,
         isActive: false,
         isBanned: false,
       });
