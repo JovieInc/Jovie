@@ -1,9 +1,15 @@
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 
-const { getOrMintOnboardingSessionIdMock } = vi.hoisted(() => ({
-  getOrMintOnboardingSessionIdMock: vi.fn(),
-}));
+const { getOrMintOnboardingSessionIdMock, resolveUserStateMock } = vi.hoisted(
+  () => ({
+    getOrMintOnboardingSessionIdMock: vi.fn(),
+    resolveUserStateMock: vi.fn().mockResolvedValue({
+      state: 'UNAUTHENTICATED',
+      redirectTo: '/signin',
+    }),
+  })
+);
 
 vi.mock('@/components/features/onboarding/OnboardingShell', () => ({
   OnboardingShell: ({ sessionLabel }: { readonly sessionLabel: string }) => (
@@ -13,6 +19,13 @@ vi.mock('@/components/features/onboarding/OnboardingShell', () => ({
 
 vi.mock('@/lib/onboarding/session', () => ({
   getOrMintOnboardingSessionId: getOrMintOnboardingSessionIdMock,
+}));
+
+// The /start page resolves canonical access state server-side via
+// `resolveUserState` (Clerk `auth()` → `server-only`). Mock the gate so the
+// page module can be imported in the jsdom unit environment.
+vi.mock('@/lib/auth/gate', () => ({
+  resolveUserState: resolveUserStateMock,
 }));
 
 describe('/start page', () => {
