@@ -10,12 +10,16 @@ import { sendEmail } from '@/lib/email/send';
 import { getChangelogVerifyEmail } from '@/lib/email/templates/changelog-verify';
 import { env } from '@/lib/env';
 import { captureError } from '@/lib/error-tracking';
-import { ServerFetchTimeoutError, serverFetch } from '@/lib/http/server-fetch';
 import {
   changelogSubscribeLimiter,
   createRateLimitHeaders,
   getClientIP,
 } from '@/lib/rate-limit';
+import {
+  classifyTurnstileFailure,
+  isTurnstileConfigured,
+  verifyTurnstileToken,
+} from '@/lib/turnstile/verify';
 import { logger } from '@/lib/utils/logger';
 
 const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
@@ -55,8 +59,9 @@ async function verifyTurnstile(
   token: string,
   ip: string
 ): Promise<TurnstileVerificationResult> {
-  const secret = env.TURNSTILE_SECRET_KEY;
-  if (!secret) {
+  // Single source of truth: delegate to the shared, bounded (timeout + retry)
+  // siteverify helper instead of re-implementing the Cloudflare call here.
+  if (!isTurnstileConfigured()) {
     if (env.NODE_ENV === 'production') {
       logger.error('TURNSTILE_SECRET_KEY not configured in production');
       return 'unavailable';
@@ -68,41 +73,9 @@ async function verifyTurnstile(
     return 'verified';
   }
 
-  if (!token) return 'rejected';
-
-  try {
-    const response = await serverFetch(
-      'https://challenges.cloudflare.com/turnstile/v0/siteverify',
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: new URLSearchParams({ secret, response: token, remoteip: ip }),
-        timeoutMs: 10_000,
-        context: 'Turnstile verification',
-        retry: {
-          maxRetries: 1,
-          baseDelayMs: 300,
-        },
-      }
-    );
-
-    if (!response.ok) {
-      logger.warn('Turnstile verification endpoint returned non-2xx', {
-        status: response.status,
-      });
-      return 'unavailable';
-    }
-
-    const data = (await response.json()) as { success: boolean };
-    return data.success ? 'verified' : 'rejected';
-  } catch (error) {
-    if (error instanceof ServerFetchTimeoutError) {
-      logger.warn('Turnstile verification timed out', {
-        timeoutMs: error.timeoutMs,
-      });
-    }
-    return 'unavailable';
-  }
+  const result = await verifyTurnstileToken(token, ip);
+  if (result.success) return 'verified';
+  return classifyTurnstileFailure(result);
 }
 
 async function sendVerificationEmail(
