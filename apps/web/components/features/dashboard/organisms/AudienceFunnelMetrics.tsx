@@ -85,14 +85,14 @@ export function AudienceFunnelMetrics() {
       />
       <FunnelArrow />
       <FunnelStep
-        label='Visitors'
+        label='Fans'
         value={fmt.format(uniqueVisitors)}
         rate={visitorRate}
         loading={isLoading}
       />
       <FunnelArrow />
       <FunnelStep
-        label='Subscribers'
+        label='Subscribed Fans'
         value={fmt.format(subscribers)}
         rate={subscriberRate}
         loading={isLoading}

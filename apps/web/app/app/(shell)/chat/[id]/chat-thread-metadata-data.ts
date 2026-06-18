@@ -6,7 +6,7 @@ import { sanitizeConversationTitle } from '@/lib/chat/title';
 import { db } from '@/lib/db';
 import { chatConversations } from '@/lib/db/schema/chat';
 
-export const CHAT_THREAD_TITLE_FALLBACK = 'Thread';
+export const CHAT_THREAD_TITLE_FALLBACK = 'Conversation';
 
 export async function loadChatThreadTitle(
   conversationId: string

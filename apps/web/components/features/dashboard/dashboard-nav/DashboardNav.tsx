@@ -23,7 +23,11 @@ import {
   writeThreadReadState,
 } from '@/components/shell/SidebarThreadsSection';
 import { useChatThreadContextMenu } from '@/components/shell/useChatThreadContextMenu';
-import { APP_ROUTES, isDemoRoutePath } from '@/constants/routes';
+import {
+  APP_ROUTES,
+  buildLibraryViewRoute,
+  isDemoRoutePath,
+} from '@/constants/routes';
 import { useAppFlag } from '@/lib/flags/client';
 import { NAV_SHORTCUTS } from '@/lib/keyboard-shortcuts';
 import { usePlanGate } from '@/lib/queries';
@@ -31,16 +35,16 @@ import { useChatConversationsQuery } from '@/lib/queries/useChatConversationsQue
 import { useTaskStatsQuery } from '@/lib/queries/useTasksQuery';
 import {
   adminNavigationSections,
+  artistProfileNavItem,
   artistSettingsNavigation,
-  libraryNavItem,
   newThreadNavItem,
   primaryNavigation,
-  profileNavItem,
+  releasesNavItem,
   settingsNavItem,
+  touringNavItem,
   userSettingsNavigation,
 } from './config';
 import { NavMenuItem } from './NavMenuItem';
-import { ProfileMenuActions } from './ProfileMenuActions';
 import type { DashboardNavProps, NavItem } from './types';
 
 const searchNavItem: NavItem = {
@@ -49,7 +53,7 @@ const searchNavItem: NavItem = {
   id: 'search',
   icon: Search,
   description:
-    'Search app content across chats, releases, artists, tasks, and more',
+    'Search app content across conversations, releases, artists, tasks, and more',
 };
 
 type DashboardNavSection = {
@@ -64,13 +68,42 @@ type MoreNavSection = {
   readonly items: NavItem[];
 };
 
+function navItemPathname(href: string): string {
+  return new URL(href, 'https://jovie.local').pathname;
+}
+
+function isReleasesRoute(pathname: string): boolean {
+  return (
+    pathname === APP_ROUTES.LIBRARY ||
+    pathname === APP_ROUTES.DASHBOARD_LIBRARY ||
+    pathname === APP_ROUTES.LEGACY_DASHBOARD_LIBRARY ||
+    pathname === APP_ROUTES.RELEASES ||
+    pathname === APP_ROUTES.DASHBOARD_RELEASES
+  );
+}
+
 function isItemActive(pathname: string, item: NavItem): boolean {
+  if (item.id === 'releases') {
+    return isReleasesRoute(pathname);
+  }
+
+  if (item.id === 'artist-profile') {
+    return (
+      pathname === APP_ROUTES.SETTINGS_ARTIST_PROFILE ||
+      pathname.startsWith(`${APP_ROUTES.SETTINGS_ARTIST_PROFILE}/`)
+    );
+  }
+
+  if (item.id === 'touring') {
+    return (
+      pathname === APP_ROUTES.SETTINGS_TOURING ||
+      pathname.startsWith(`${APP_ROUTES.SETTINGS_TOURING}/`)
+    );
+  }
+
   const normalizedPathname = (() => {
-    if (
-      pathname === APP_ROUTES.DASHBOARD_RELEASES ||
-      pathname === APP_ROUTES.RELEASES
-    ) {
-      return APP_ROUTES.RELEASES;
+    if (isReleasesRoute(pathname)) {
+      return APP_ROUTES.LIBRARY;
     }
     if (
       pathname === APP_ROUTES.DASHBOARD_AUDIENCE ||
@@ -81,12 +114,9 @@ function isItemActive(pathname: string, item: NavItem): boolean {
     return pathname;
   })();
 
-  if (
-    normalizedPathname === item.href ||
-    (normalizedPathname === APP_ROUTES.RELEASES &&
-      (item.href === APP_ROUTES.RELEASES ||
-        item.href === APP_ROUTES.DASHBOARD_RELEASES))
-  ) {
+  const itemPathname = navItemPathname(item.href);
+
+  if (normalizedPathname === itemPathname || normalizedPathname === item.href) {
     return true;
   }
 
@@ -95,7 +125,7 @@ function isItemActive(pathname: string, item: NavItem): boolean {
     return false;
   }
 
-  return normalizedPathname.startsWith(`${item.href}/`);
+  return normalizedPathname.startsWith(`${itemPathname}/`);
 }
 
 function normalizeTrailingSlash(pathname: string): string {
@@ -147,19 +177,6 @@ export function DashboardNav(_: DashboardNavProps) {
   const [tasksSeenAt, setTasksSeenAt] = useState<string | null>(
     readTasksSeenAt
   );
-  const username =
-    selectedProfile?.usernameNormalized ?? selectedProfile?.username;
-  const publicProfileHref = username ? `/${username}` : undefined;
-
-  // Memoize profile actions to prevent creating new JSX on every render
-  const profileActions = useMemo(
-    () =>
-      publicProfileHref ? (
-        <ProfileMenuActions publicProfileHref={publicProfileHref} />
-      ) : null,
-    [publicProfileHref]
-  );
-
   const artistName = selectedProfile?.displayName?.trim();
   const profileId = selectedProfile?.id ?? '';
   const isDemo = isDemoRoutePath(pathname);
@@ -235,20 +252,15 @@ export function DashboardNav(_: DashboardNavProps) {
           }
         : item;
 
-    const releaseItem = primaryNavigation.find(item => item.id === 'releases');
     const audienceItem = primaryNavigation.find(item => item.id === 'audience');
     const tasksItem = primaryNavigation.find(item => item.id === 'tasks');
-    const artistProfileItem: NavItem = {
-      ...profileNavItem,
-      name: artistSettingsLabel,
-    };
 
     if (shellChatV1Enabled) {
       return {
         moreSection: {
           key: 'more',
           label: moreLabel,
-          items: [artistProfileItem, settingsNavItem].map(decorateItem),
+          items: [settingsNavItem].map(decorateItem),
         },
         navSections: [
           {
@@ -256,14 +268,15 @@ export function DashboardNav(_: DashboardNavProps) {
             items: [
               decorateItem(newThreadNavItem),
               searchNavItem,
-              decorateItem(libraryNavItem),
+              decorateItem(releasesNavItem),
             ],
           },
           {
             key: 'artist',
             label: artistSettingsLabel,
             items: [
-              ...(releaseItem ? [decorateItem(releaseItem)] : []),
+              decorateItem(artistProfileNavItem),
+              decorateItem(touringNavItem),
               ...(audienceItem ? [decorateItem(audienceItem)] : []),
               ...(tasksItem ? [decorateItem(tasksItem)] : []),
             ],
@@ -312,13 +325,15 @@ export function DashboardNav(_: DashboardNavProps) {
       return;
     }
 
+    const releasesRoute = buildLibraryViewRoute('releases');
+
     if (releasesPrefetchedProfileIdRef.current === profileId) {
-      router.prefetch(APP_ROUTES.RELEASES);
+      router.prefetch(releasesRoute);
       return;
     }
 
     releasesPrefetchedProfileIdRef.current = profileId;
-    router.prefetch(APP_ROUTES.RELEASES);
+    router.prefetch(releasesRoute);
 
     try {
       await Promise.all([
@@ -343,7 +358,8 @@ export function DashboardNav(_: DashboardNavProps) {
       !profileId ||
       releasesWarmReadyProfileIdRef.current === profileId ||
       pathname === APP_ROUTES.RELEASES ||
-      pathname === APP_ROUTES.DASHBOARD_RELEASES
+      pathname === APP_ROUTES.DASHBOARD_RELEASES ||
+      pathname === APP_ROUTES.LIBRARY
     ) {
       return;
     }
@@ -456,15 +472,12 @@ export function DashboardNav(_: DashboardNavProps) {
   // Memoize renderNavItem to prevent creating new functions on every render
   const renderNavItem = useCallback(
     (item: NavItem, _index: number) => {
-      const isProfileItem = item.id === 'profile';
       const isReleasesItem = item.id === 'releases';
       const isSearchItem = item.id === 'search';
       const isNewThreadItem =
         item.id === 'chat' && item.href === APP_ROUTES.CHAT;
       let isActive = false;
-      if (isProfileItem) {
-        isActive = isItemActive(pathname, item);
-      } else if (isNewThreadItem) {
+      if (isNewThreadItem) {
         isActive = normalizeTrailingSlash(pathname) === APP_ROUTES.CHAT;
       } else if (!isSearchItem) {
         isActive = isItemActive(pathname, item);
@@ -485,7 +498,6 @@ export function DashboardNav(_: DashboardNavProps) {
           isActive={isActive}
           shortcut={shortcut}
           prefetch={undefined}
-          actions={isProfileItem ? profileActions : null}
           onClick={onClick}
           preventNavigation={demoUnavailable}
           renderAsButton={renderAsButton}
@@ -502,7 +514,6 @@ export function DashboardNav(_: DashboardNavProps) {
     },
     [
       pathname,
-      profileActions,
       handleDemoNavClick,
       handlePrefetch,
       handleSearchClick,
@@ -525,7 +536,7 @@ export function DashboardNav(_: DashboardNavProps) {
 
   return (
     <>
-      <nav className='flex flex-1 flex-col' aria-label='Dashboard navigation'>
+      <nav className='flex flex-1 flex-col' aria-label='Dashboard Navigation'>
         {isInSettings ? (
           <>
             <SidebarCollapsibleGroup

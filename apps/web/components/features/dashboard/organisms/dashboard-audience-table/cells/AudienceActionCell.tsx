@@ -2,10 +2,12 @@
 
 import { Button } from '@jovie/ui';
 import { memo, useCallback } from 'react';
-import { toast } from 'sonner';
 import type { AudienceMember } from '@/types';
 import { useAudienceTableStableContext } from '../AudienceTableContext';
-import { isAudienceMemberReachable } from '../row-contract';
+import {
+  canMessageAudienceMember,
+  getAudienceDisplayName,
+} from '../row-contract';
 
 export interface AudienceActionCellProps {
   readonly member: AudienceMember;
@@ -15,19 +17,26 @@ export const AudienceActionCell = memo(function AudienceActionCell({
   member,
 }: AudienceActionCellProps) {
   const { onSendNotification } = useAudienceTableStableContext();
-  const reachable = isAudienceMemberReachable(member);
+  const canMessage = canMessageAudienceMember(member);
 
   const handleClick = useCallback(
     (event: React.MouseEvent<HTMLButtonElement>) => {
       event.stopPropagation();
-      if (!reachable) {
-        toast.message('No reachable channel for this fan');
+      if (!canMessage) {
         return;
       }
       onSendNotification(member);
     },
-    [member, onSendNotification, reachable]
+    [member, onSendNotification, canMessage]
   );
+
+  if (!canMessage) {
+    return (
+      <span className='sr-only'>No message action for anonymous fans</span>
+    );
+  }
+
+  const displayName = getAudienceDisplayName(member);
 
   return (
     <div className='flex justify-end'>
@@ -36,8 +45,7 @@ export const AudienceActionCell = memo(function AudienceActionCell({
         variant='secondary'
         size='sm'
         onClick={handleClick}
-        disabled={!reachable}
-        aria-label={`Message ${member.displayName ?? 'fan'}`}
+        aria-label={`Message ${displayName}`}
         className='min-h-[28px] px-2.5 text-2xs'
       >
         Message

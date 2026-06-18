@@ -4,8 +4,8 @@ import { Bell, Copy, Download, Eye, Phone, UserMinus } from 'lucide-react';
 import type { ContextMenuItemType } from '@/components/organisms/table';
 import type { AudienceMember } from '@/types';
 import {
+  canMessageAudienceMember,
   getAudienceVisibleEmail,
-  isAudienceMemberReachable,
 } from './row-contract';
 
 // Module-level icon constants — allocated once, reused across all rows and renders.
@@ -39,43 +39,49 @@ export function buildAudienceActions(
   callbacks: BuildAudienceActionsCallbacks
 ): ContextMenuItemType[] {
   const visibleEmail = getAudienceVisibleEmail(member);
-  const reachable = isAudienceMemberReachable(member);
+  const canMessage = canMessageAudienceMember(member);
 
-  return [
+  const items: ContextMenuItemType[] = [
     // ── View group ──
     {
       id: 'view-details',
-      label: 'View details',
+      label: 'View Details',
       icon: ICON_EYE,
       onClick: () => callbacks.onViewDetails(member),
     },
     // ── Copy group ──
     {
       id: 'copy-email',
-      label: 'Copy email',
+      label: 'Copy Email',
       icon: ICON_COPY,
       onClick: () => callbacks.onCopyEmail(member),
       disabled: !visibleEmail,
     },
     {
       id: 'copy-phone',
-      label: 'Copy phone',
+      label: 'Copy Phone',
       icon: ICON_PHONE,
       onClick: () => callbacks.onCopyPhone(member),
       disabled: !member.phone,
     },
-    {
+  ];
+
+  if (canMessage) {
+    items.push({
       id: 'send-notification',
-      label: 'Send notification',
+      label: 'Send Notification',
       icon: ICON_BELL,
       onClick: () => callbacks.onSendNotification(member),
-      disabled: !reachable,
-    },
+    });
+  }
+
+  return [
+    ...items,
     // ── Export group ──
     { type: 'separator' as const },
     {
       id: 'export-contact',
-      label: 'Export as vCard',
+      label: 'Export As vCard',
       icon: ICON_DOWNLOAD,
       onClick: () => callbacks.onExportVCard(member),
     },

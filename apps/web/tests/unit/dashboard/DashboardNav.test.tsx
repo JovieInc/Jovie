@@ -2,7 +2,7 @@ import { fireEvent } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { DashboardData } from '@/app/app/(shell)/dashboard/actions/dashboard-data';
 import { OPEN_COMMAND_PALETTE_EVENT } from '@/components/organisms/command-palette-events';
-import { APP_ROUTES } from '@/constants/routes';
+import { APP_ROUTES, buildLibraryViewRoute } from '@/constants/routes';
 import {
   mockRouterPush,
   mockUseChatConversationsQuery,
@@ -24,30 +24,36 @@ describe('DashboardNav', () => {
       renderFn: fastRender,
     });
 
-    expect(getByRole('link', { name: 'New Chat' }).getAttribute('href')).toBe(
-      APP_ROUTES.CHAT
-    );
+    expect(
+      getByRole('link', { name: 'New Conversation' }).getAttribute('href')
+    ).toBe(APP_ROUTES.CHAT);
     expect(getByRole('button', { name: 'Search' })).toBeDefined();
-    expect(getByRole('link', { name: 'Library' }).getAttribute('href')).toBe(
-      APP_ROUTES.LIBRARY
+    expect(getByRole('link', { name: 'Releases' }).getAttribute('href')).toBe(
+      buildLibraryViewRoute('releases')
     );
-    expect(getByRole('link', { name: 'Releases' })).toBeDefined();
+    expect(
+      getByRole('link', { name: 'Artist Profile' }).getAttribute('href')
+    ).toBe(APP_ROUTES.SETTINGS_ARTIST_PROFILE);
+    expect(getByRole('link', { name: 'Touring' }).getAttribute('href')).toBe(
+      APP_ROUTES.SETTINGS_TOURING
+    );
     expect(getByRole('link', { name: 'Tasks' }).getAttribute('href')).toBe(
       APP_ROUTES.TASKS
     );
     expect(getByRole('link', { name: 'Audience' })).toBeDefined();
     expect(queryByRole('link', { name: 'Calendar' })).toBeNull();
+    expect(queryByRole('link', { name: 'Library' })).toBeNull();
     expect(queryByRole('link', { name: 'Earnings' })).toBeNull();
   });
 
-  it('renders Library in the grouped shell top nav', () => {
+  it('renders Releases in the grouped shell top nav', () => {
     const { getByRole } = renderDashboardNav({
       renderFn: fastRender,
       appFlags: { DESIGN_V1: true },
     });
 
-    expect(getByRole('link', { name: 'Library' }).getAttribute('href')).toBe(
-      APP_ROUTES.LIBRARY
+    expect(getByRole('link', { name: 'Releases' }).getAttribute('href')).toBe(
+      buildLibraryViewRoute('releases')
     );
   });
 
@@ -70,15 +76,23 @@ describe('DashboardNav', () => {
       'true'
     );
     const releasesLink = getByRole('link', { name: 'Releases' });
-    expect(releasesLink.getAttribute('href')).toBe(APP_ROUTES.RELEASES);
+    expect(releasesLink.getAttribute('href')).toBe(
+      buildLibraryViewRoute('releases')
+    );
     expect(releasesLink.className).toContain(
       'grid-cols-[22px_minmax(0,1fr)_34px]'
+    );
+    expect(
+      getByRole('link', { name: 'Artist Profile' }).getAttribute('href')
+    ).toBe(APP_ROUTES.SETTINGS_ARTIST_PROFILE);
+    expect(getByRole('link', { name: 'Touring' }).getAttribute('href')).toBe(
+      APP_ROUTES.SETTINGS_TOURING
     );
     expect(queryByRole('link', { name: 'Calendar' })).toBeNull();
   });
 
   it('applies active state to current page', () => {
-    mockUsePathname.mockReturnValueOnce('/app/releases');
+    mockUsePathname.mockReturnValueOnce(APP_ROUTES.LIBRARY);
     const { getByRole } = renderDashboardNav({ renderFn: fastRender });
 
     const activeLink = getByRole('link', { name: 'Releases' });
@@ -90,11 +104,13 @@ describe('DashboardNav', () => {
     const { getByRole } = renderDashboardNav({ renderFn: fastRender });
 
     const releasesLink = getByRole('link', { name: 'Releases' });
-    expect(releasesLink.getAttribute('href')).toBe(APP_ROUTES.RELEASES);
+    expect(releasesLink.getAttribute('href')).toBe(
+      buildLibraryViewRoute('releases')
+    );
     expect(releasesLink.getAttribute('aria-current')).toBe('page');
   });
 
-  it('only marks New Chat active on the chat root', () => {
+  it('only marks New Conversation active on the chat root', () => {
     mockUsePathname.mockReturnValueOnce(`${APP_ROUTES.CHAT}/thread-123`);
 
     const { getByRole } = renderDashboardNav({
@@ -103,11 +119,13 @@ describe('DashboardNav', () => {
     });
 
     expect(
-      getByRole('link', { name: 'New Chat' }).getAttribute('aria-current')
+      getByRole('link', { name: 'New Conversation' }).getAttribute(
+        'aria-current'
+      )
     ).toBeNull();
   });
 
-  it('keeps New Chat on the default shell tone when it is inactive', () => {
+  it('keeps New Conversation on the default shell tone when it is inactive', () => {
     mockUsePathname.mockReturnValueOnce(APP_ROUTES.RELEASES);
 
     const { getByRole } = renderDashboardNav({
@@ -115,20 +133,20 @@ describe('DashboardNav', () => {
       appFlags: { DESIGN_V1: true },
     });
 
-    const newThreadLink = getByRole('link', { name: 'New Chat' });
+    const newThreadLink = getByRole('link', { name: 'New Conversation' });
     expect(newThreadLink.className).toContain('text-sidebar-muted/80');
     expect(newThreadLink.className).not.toContain(
       'bg-[color-mix(in_oklab,var(--linear-app-content-surface)_92%,white_8%)]'
     );
   });
 
-  it('renders one canonical New Chat nav row in Design V1', () => {
+  it('renders one canonical New Conversation nav row in Design V1', () => {
     const { getAllByRole } = renderDashboardNav({
       renderFn: fastRender,
       appFlags: { DESIGN_V1: true },
     });
 
-    expect(getAllByRole('link', { name: 'New Chat' })).toHaveLength(1);
+    expect(getAllByRole('link', { name: 'New Conversation' })).toHaveLength(1);
   });
 
   it('opens the global command palette from Search instead of navigating', () => {
@@ -207,7 +225,7 @@ describe('DashboardNav', () => {
       appFlags: { DESIGN_V1: true },
     });
 
-    const newThreadLink = getByRole('link', { name: 'New Chat' });
+    const newThreadLink = getByRole('link', { name: 'New Conversation' });
     expect(newThreadLink.className).toContain(
       'group-data-[collapsible=icon]:justify-center'
     );
@@ -223,13 +241,21 @@ describe('DashboardNav', () => {
       appFlags: { DESIGN_V1: true },
     });
 
-    expect(getByRole('link', { name: 'New Chat' })).toHaveAttribute(
+    expect(getByRole('link', { name: 'New Conversation' })).toHaveAttribute(
       'href',
       APP_ROUTES.CHAT
     );
-    expect(getByRole('link', { name: 'Library' })).toHaveAttribute(
+    expect(getByRole('link', { name: 'Releases' })).toHaveAttribute(
       'href',
-      APP_ROUTES.LIBRARY
+      buildLibraryViewRoute('releases')
+    );
+    expect(getByRole('link', { name: 'Artist Profile' })).toHaveAttribute(
+      'href',
+      APP_ROUTES.SETTINGS_ARTIST_PROFILE
+    );
+    expect(getByRole('link', { name: 'Touring' })).toHaveAttribute(
+      'href',
+      APP_ROUTES.SETTINGS_TOURING
     );
     expect(getByRole('button', { name: 'Artist' })).toHaveAttribute(
       'aria-expanded',
@@ -315,7 +341,7 @@ describe('DashboardNav', () => {
     expect(audienceLink.getAttribute('aria-current')).toBe('page');
   });
 
-  it('surfaces Library as a nav item when the legacy route is current', () => {
+  it('highlights Releases when the legacy library route is current', () => {
     mockUsePathname.mockReturnValueOnce(APP_ROUTES.DASHBOARD_LIBRARY);
 
     const { getByRole } = renderDashboardNav({
@@ -323,9 +349,9 @@ describe('DashboardNav', () => {
       appFlags: { DESIGN_V1: true },
     });
 
-    expect(getByRole('link', { name: 'Library' })).toHaveAttribute(
-      'href',
-      APP_ROUTES.LIBRARY
+    expect(getByRole('link', { name: 'Releases' })).toHaveAttribute(
+      'aria-current',
+      'page'
     );
   });
 
