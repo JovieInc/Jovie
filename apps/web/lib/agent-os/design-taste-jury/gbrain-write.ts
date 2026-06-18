@@ -97,10 +97,20 @@ function buildGbrainPageBody(finding: DesignTasteConsensusFinding): string {
     .join('\n');
 }
 
+/** Allowed characters in a gbrain slug segment: lowercase alphanumeric, hyphens, dots. */
+const GBRAIN_SLUG_SEGMENT_PATTERN = /[^a-z0-9.-]/g;
+
+function sanitizeGbrainSlugSegment(segment: string): string {
+  return segment.toLowerCase().replaceAll(GBRAIN_SLUG_SEGMENT_PATTERN, '-');
+}
+
 async function writeFindingToGbrain(
   finding: DesignTasteConsensusFinding
 ): Promise<boolean> {
-  const slug = `design-taste-jury/${finding.id.replaceAll(':', '-')}`;
+  // Sanitize every path segment before passing to spawn to prevent argument injection.
+  const rawSegment = finding.id.replaceAll(':', '-');
+  const safeSegment = sanitizeGbrainSlugSegment(rawSegment);
+  const slug = `design-taste-jury/${safeSegment}`;
 
   return new Promise(resolve => {
     const child = spawn('gbrain', ['write', slug, '--stdin'], {
@@ -121,6 +131,13 @@ async function writeFindingToGbrain(
       clearTimeout(timeout);
       resolve(code === 0);
     });
+
+    if (!child.stdin) {
+      clearTimeout(timeout);
+      child.kill();
+      resolve(false);
+      return;
+    }
 
     child.stdin.write(buildGbrainPageBody(finding));
     child.stdin.end();

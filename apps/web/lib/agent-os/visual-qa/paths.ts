@@ -1,4 +1,5 @@
 import path from 'node:path';
+import { assertValidAgentOsRunId } from '@/lib/agent-os/run-id';
 import { resolveMonorepoPath } from '@/lib/filesystem-paths';
 import { validatePathTraversal } from '@/lib/security/path-traversal';
 import type { VisualQaColorScheme } from '@/lib/visual-qa/themes';
@@ -10,7 +11,6 @@ export const VISUAL_QA_ROOT_SEGMENTS = [
   'visual-qa',
 ] as const;
 
-const RUN_ID_PATTERN = /^[a-z0-9][a-z0-9._-]{0,79}$/i;
 const SURFACE_ID_PATTERN = /^[a-z0-9][a-z0-9._-]{0,79}$/i;
 
 export function getVisualQaRootDirectory(): string {
@@ -18,12 +18,7 @@ export function getVisualQaRootDirectory(): string {
 }
 
 export function assertValidVisualQaRunId(runId: string): string {
-  const safeRunId = runId.trim();
-  if (!RUN_ID_PATTERN.test(safeRunId)) {
-    throw new Error(`Invalid Visual QA run id: ${runId}`);
-  }
-
-  return safeRunId;
+  return assertValidAgentOsRunId(runId, 'Visual QA run id');
 }
 
 export function assertValidVisualQaSurfaceId(surfaceId: string): string {

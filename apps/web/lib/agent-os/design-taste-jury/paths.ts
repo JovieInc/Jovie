@@ -1,4 +1,5 @@
 import path from 'node:path';
+import { assertValidAgentOsRunId } from '@/lib/agent-os/run-id';
 import { resolveMonorepoPath } from '@/lib/filesystem-paths';
 import { validatePathTraversal } from '@/lib/security/path-traversal';
 
@@ -8,19 +9,12 @@ export const DESIGN_TASTE_JURY_ROOT_SEGMENTS = [
   'design-taste-jury',
 ] as const;
 
-const RUN_ID_PATTERN = /^[a-z0-9][a-z0-9._-]{0,79}$/i;
-
 export function getDesignTasteJuryRootDirectory(): string {
   return resolveMonorepoPath(...DESIGN_TASTE_JURY_ROOT_SEGMENTS);
 }
 
 export function assertValidDesignTasteJuryRunId(runId: string): string {
-  const safeRunId = runId.trim();
-  if (!RUN_ID_PATTERN.test(safeRunId)) {
-    throw new Error(`Invalid design taste jury run id: ${runId}`);
-  }
-
-  return safeRunId;
+  return assertValidAgentOsRunId(runId, 'design taste jury run id');
 }
 
 export function resolveDesignTasteJuryRunDirectory(runId: string): string {
