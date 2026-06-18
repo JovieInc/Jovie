@@ -1,6 +1,8 @@
-import { describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it } from 'vitest';
 import { APP_ROUTES } from '@/constants/routes';
 import {
+  _analyzeHostCache,
+  _categorizePathCache,
   analyzeHost,
   categorizePath,
   DASHBOARD_URL,
@@ -8,6 +10,56 @@ import {
 } from '@/lib/routing/proxy-routing';
 
 describe('proxy routing helpers', () => {
+  beforeEach(() => {
+    _analyzeHostCache.clear();
+    _categorizePathCache.clear();
+  });
+
+  describe('proxy hot path memoization', () => {
+    it('reuses the cached analyzeHost result for the same hostname', () => {
+      const first = analyzeHost('jov.ie');
+      const second = analyzeHost('jov.ie');
+
+      expect(second).toBe(first);
+      expect(_analyzeHostCache.size).toBe(1);
+    });
+
+    it('evicts the oldest analyzeHost entry at the 50-host cap', () => {
+      for (let i = 0; i < 50; i++) {
+        analyzeHost(`host-${i}.example.com`);
+      }
+
+      const cachedFirst = analyzeHost('host-0.example.com');
+      analyzeHost('host-50.example.com');
+
+      expect(_analyzeHostCache.has('host-0.example.com')).toBe(false);
+      expect(analyzeHost('host-0.example.com')).not.toBe(cachedFirst);
+    });
+
+    it('reuses the cached categorizePath result for the same pathname', () => {
+      const first = categorizePath('/app/dashboard');
+      const second = categorizePath('/app/dashboard');
+
+      expect(second).toBe(first);
+      expect(_categorizePathCache.size).toBe(1);
+    });
+
+    it('evicts the oldest categorizePath entry at the 1000-path cap', () => {
+      const firstPath = '/usr0000';
+      categorizePath(firstPath);
+
+      for (let i = 1; i < 1000; i++) {
+        categorizePath(`/usr${String(i).padStart(4, '0')}`);
+      }
+
+      const cachedFirst = categorizePath(firstPath);
+      categorizePath('/usr1000');
+
+      expect(_categorizePathCache.has(firstPath)).toBe(false);
+      expect(categorizePath(firstPath)).not.toBe(cachedFirst);
+    });
+  });
+
   describe('analyzeHost', () => {
     it('treats local, preview, staging, and production app hosts as main hosts', () => {
       const hosts = [

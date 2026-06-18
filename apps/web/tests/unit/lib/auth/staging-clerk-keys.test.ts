@@ -59,6 +59,38 @@ describe('staging Clerk key resolution', () => {
     }
   });
 
+  describe('resolveClerkKeys memoization (proxy hot path)', () => {
+    it('returns the same cached object for repeated ok lookups', () => {
+      const first = resolveClerkKeys('jov.ie');
+      const second = resolveClerkKeys('jov.ie');
+
+      expect(second).toBe(first);
+      expect(_resolveClerkKeysCache.size).toBe(1);
+    });
+
+    it('does not cache staging_missing so a cold-start env fix can resolve', () => {
+      process.env.CLERK_PUBLISHABLE_KEY_STAGING = 'pk_live_staging_example';
+
+      resolveClerkKeys('staging.jov.ie');
+
+      expect(_resolveClerkKeysCache.size).toBe(0);
+    });
+
+    it('does not cache staging_inherits_prod', () => {
+      resolveClerkKeys('staging.jov.ie');
+
+      expect(_resolveClerkKeysCache.size).toBe(0);
+    });
+
+    it('does not cache when the production secret key is missing', () => {
+      delete process.env.CLERK_SECRET_KEY;
+
+      resolveClerkKeys('jov.ie');
+
+      expect(_resolveClerkKeysCache.size).toBe(0);
+    });
+  });
+
   it('uses the staging Clerk pair for staging hosts when both staging keys exist', () => {
     process.env.CLERK_PUBLISHABLE_KEY_STAGING = 'pk_live_staging_example';
     process.env.CLERK_SECRET_KEY_STAGING = 'sk_live_staging_example';
