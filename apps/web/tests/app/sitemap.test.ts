@@ -194,4 +194,18 @@ describe('sitemap', () => {
     expect(selectMock).toHaveBeenCalledTimes(4);
     expect(queryMock).toHaveBeenCalled();
   });
+
+  it('returns a non-empty sitemap where every entry has lastModified', async () => {
+    getBlogPosts.mockResolvedValue([]);
+    whereMock.mockResolvedValue([]);
+
+    const { default: sitemap } = await import('../../app/sitemap');
+    const entries = await sitemap();
+
+    expect(entries.length).toBeGreaterThan(0);
+    for (const entry of entries) {
+      expect(entry.url).toMatch(/^https:\/\/jov\.ie/);
+      expect(entry.lastModified).toBeInstanceOf(Date);
+    }
+  });
 });
