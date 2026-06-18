@@ -9,7 +9,20 @@
 
 ## Surface Classification
 
-Jovie uses two related but distinct design systems based on surface purpose:
+> **Direction (2026-06-18, founder-locked): one design system, two languages.**
+> Jovie is converging on a single token foundation, one color palette, and one core
+> typeface (Inter), expressed as a compact **product language** (operational, Linear-like)
+> and a more editorial **marketing language** (more spacing, larger type scale, more
+> cinematic motion — same tokens underneath). **System B is canonical.** The historical
+> "System A vs System B" split documented below is being **actively retired**: System A
+> surfaces are reskinned onto System B tokens with their editorial layouts preserved.
+> DM Sans was retired 2026-06-18 — Inter is the sole body/UI face; **Satoshi is the one
+> approved display exception** (hero / large display). This supersedes the earlier
+> "full retirement deferred 3 months" note. The table below reflects migration *state*,
+> not the target.
+
+Jovie historically used two related but distinct design systems based on surface purpose
+(now converging — see the banner above):
 
 | Surface | System | Mood | Routes |
 |---------|--------|------|--------|
@@ -22,7 +35,7 @@ Jovie uses two related but distinct design systems based on surface purpose:
 
 **Decision tree:** Selling/explaining (blog, pricing, legal) → System A. Everything else (homepage, auth, app, profiles) → System B.
 
-Note: the homepage migrated from System A to System B on 2026-04-22. The chat-intake surface is product, not marketing. The restraint is the brand. Full System A retirement is TBD after 3 months of shipping.
+Migration status: homepage migrated 2026-04-22; pricing, download, launch, artist-notifications, and pay since. **Full System A retirement is now in progress (founder-directed 2026-06-18), superseding the earlier 3-month deferral.** Remaining holdouts being reskinned onto System B tokens: `(marketing)/{about, ai, artist-profile, artist-profiles, blog, changelog, compare/[slug], alternatives/[slug], support, investors, voice, new}` and `(dynamic)/legal/*`. Each surface ships with its own `*-system-b-style-guard` test, and a global ratchet keeps the holdout list shrink-only.
 
 See the [Surface Classification](#canonical-surface-split) section below for full route mapping.
 
@@ -30,20 +43,28 @@ See the [Surface Classification](#canonical-surface-split) section below for ful
 
 ## Typography
 
-### System A — Marketing (Satoshi + DM Sans)
+### Marketing language — display type (Satoshi) — formerly "System A"
 
-Marketing pages use a two-font system loaded via `next/font/local` in the marketing layout:
+> **DM Sans retired 2026-06-18.** Marketing body + UI is now **Inter** (the single body/UI
+> face). **Satoshi** is retained only as the approved **display** exception for headings /
+> hero on the editorial marketing language. `--marketing-font-body` now resolves to Inter
+> (`var(--font-sans)`); `--marketing-font-display` stays Satoshi.
+
+The editorial marketing language uses Satoshi at display sizes only:
 
 - **Display/Hero:** Satoshi Variable (weight 800, letter-spacing -0.025em)
 - **Section headlines:** Satoshi Variable (weight 700, letter-spacing -0.02em)
 - **Subsection:** Satoshi Variable (weight 600, letter-spacing -0.015em)
-- **Buttons:** Satoshi Variable (weight 600, letter-spacing -0.01em) — buttons are controls, not copy
-- **Body:** DM Sans Variable (weight 400, letter-spacing -0.005em)
-- **Captions/meta:** DM Sans Variable (weight 500)
+- **Buttons:** Inter (weight 600) — buttons are product controls, on the product UI face
+- **Body:** Inter Variable — unified body face (was DM Sans, retired 2026-06-18)
+- **Captions/meta:** Inter Variable
 
-Font files: `apps/web/public/fonts/Satoshi-Variable.woff2` (~42KB), `apps/web/public/fonts/DMSans-Variable.woff2` (~48KB).
+Font files: `apps/web/public/fonts/Satoshi-Latin.woff2`. The DM Sans web font is no longer
+loaded in `app/layout.tsx`. (`DMSans-Regular.ttf` remains only for server-side OG-image
+Satori rendering, which is a build-time asset, not live page type — tracked for cleanup.)
 
-CSS variables: `--font-satoshi`, `--font-dm-sans` (set by `next/font/local`). Scoped to `.linear-marketing` wrapper via `--marketing-font-display` and `--marketing-font-body`.
+CSS variables: `--font-satoshi` (set by `next/font/local`); `--marketing-font-display`
+(Satoshi) and `--marketing-font-body` (Inter) scoped to the `.linear-marketing` wrapper.
 
 ### System B — App (Inter)
 
@@ -775,3 +796,5 @@ The `/start` onboarding composer fix (JOV-2496 follow-up) is the canonical examp
 | 2026-04-11 | Canonical 1200px width for all marketing | Fixed inconsistent widths (header 1200px, hero 1120px). Everything boxed at 1200px now. |
 | 2026-04-11 | Ban emoji-on-colored-square icons | Replaced with accent color on card title text. Icon-on-square reads as AI slop and cheapens the brand. |
 | 2026-04-11 | Ban gold colors | Gold signals prestige-seeking. Not appropriate for Jovie's DJ audience. |
+| 2026-06-18 | **Unify on one design system, two languages.** Retire System A; conform whole app to System B tokens. | Founder-directed (supersedes the 2026-04-22 "defer 3 months" note). Target = one token foundation, one palette, one core typeface (Inter), expressed as a compact product language + an editorial marketing language. Aligns with gbrain "design system review" canon ("not two design systems — one system, two languages"). Editorial layouts are preserved; surfaces are reskinned onto System B tokens, each with a `*-system-b-style-guard` test + a global shrink-only ratchet. |
+| 2026-06-18 | Retire DM Sans; Inter is the sole body/UI face; Satoshi kept for display only | One core typeface for the unified system. Satoshi remains the single approved display exception (hero / large editorial headings), generalizing the 2026-04-28 homepage-hero exception. DM Sans `next/font` load removed from `app/layout.tsx`; `--font-body` and `--marketing-font-body` repoint to Inter. |
