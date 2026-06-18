@@ -6,7 +6,8 @@ const mockUpdateSet = vi.hoisted(() => vi.fn());
 const mockInsertValues = vi.hoisted(() => vi.fn());
 const mockSendEmail = vi.hoisted(() => vi.fn());
 const mockCaptureError = vi.hoisted(() => vi.fn());
-const mockServerFetch = vi.hoisted(() => vi.fn());
+const mockVerifyTurnstileToken = vi.hoisted(() => vi.fn());
+const mockIsTurnstileConfigured = vi.hoisted(() => vi.fn());
 const mockLimiterLimit = vi.hoisted(() => vi.fn());
 const mockCreateRateLimitHeaders = vi.hoisted(() => vi.fn());
 const mockGetClientIP = vi.hoisted(() => vi.fn());
@@ -56,14 +57,15 @@ vi.mock('@/lib/error-tracking', () => ({
   captureError: mockCaptureError,
 }));
 
-vi.mock('@/lib/http/server-fetch', async () => {
-  const actual = await vi.importActual<
-    typeof import('@/lib/http/server-fetch')
-  >('@/lib/http/server-fetch');
+vi.mock('server-only', () => ({}));
 
+vi.mock('@/lib/turnstile/verify', async importOriginal => {
+  const actual =
+    await importOriginal<typeof import('@/lib/turnstile/verify')>();
   return {
     ...actual,
-    serverFetch: mockServerFetch,
+    isTurnstileConfigured: mockIsTurnstileConfigured,
+    verifyTurnstileToken: mockVerifyTurnstileToken,
   };
 });
 
@@ -112,12 +114,8 @@ describe('POST /api/changelog/subscribe', () => {
     });
     mockInsertValues.mockResolvedValue(undefined);
     mockSendEmail.mockResolvedValue(undefined);
-    mockServerFetch.mockResolvedValue(
-      new Response(JSON.stringify({ success: true }), {
-        status: 200,
-        headers: { 'Content-Type': 'application/json' },
-      })
-    );
+    mockIsTurnstileConfigured.mockReturnValue(true);
+    mockVerifyTurnstileToken.mockResolvedValue({ success: true });
     vi.stubEnv('TURNSTILE_SECRET_KEY', 'turnstile-secret');
   });
 
@@ -142,15 +140,14 @@ describe('POST /api/changelog/subscribe', () => {
     expect(await response.json()).toEqual({
       error: 'Subscription is temporarily unavailable.',
     });
-    expect(mockServerFetch).not.toHaveBeenCalled();
+    expect(mockVerifyTurnstileToken).not.toHaveBeenCalled();
   });
 
   it('returns 503 when Turnstile verification is unavailable', async () => {
-    const { ServerFetchTimeoutError } = await import('@/lib/http/server-fetch');
-
-    mockServerFetch.mockRejectedValue(
-      new ServerFetchTimeoutError('timed out', 10_000, 'Turnstile verification')
-    );
+    mockVerifyTurnstileToken.mockResolvedValue({
+      success: false,
+      reason: 'siteverify_timeout',
+    });
 
     const { POST } = await import('@/app/api/changelog/subscribe/route');
     const response = await POST(
