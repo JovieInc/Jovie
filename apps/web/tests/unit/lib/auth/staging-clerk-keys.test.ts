@@ -7,6 +7,7 @@ vi.mock('next/headers', () => ({
 }));
 
 import {
+  _resolveClerkKeysCache,
   resolveClerkKeys,
   resolvePublishableKeyFromHeaders,
   resolvePublishableKeyStaticFirst,
@@ -22,6 +23,7 @@ const ORIGINAL_ENV = {
 describe('staging Clerk key resolution', () => {
   beforeEach(() => {
     headersMock.mockReset();
+    _resolveClerkKeysCache.clear();
     process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY =
       'pk_live_production_example';
     process.env.CLERK_SECRET_KEY = 'sk_live_production_example';
@@ -215,6 +217,7 @@ describe('resolvePublishableKeyStaticFirst', () => {
 
   beforeEach(() => {
     headersMock.mockReset();
+    _resolveClerkKeysCache.clear();
     process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY =
       'pk_live_production_example';
     process.env.CLERK_SECRET_KEY = 'sk_live_production_example';

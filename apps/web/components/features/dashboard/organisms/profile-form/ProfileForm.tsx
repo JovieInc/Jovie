@@ -116,7 +116,7 @@ export function ProfileForm({ artist, onUpdate }: ProfileFormProps) {
           as='output'
         >
           <p className='text-app text-emerald-600 dark:text-emerald-400'>
-            Profile updated successfully!
+            Profile updated!
           </p>
         </ContentSurfaceCard>
       )}

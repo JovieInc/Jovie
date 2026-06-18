@@ -1,5 +1,8 @@
 'use client';
 
+import { Skeleton } from '@jovie/ui';
+import { RotateCcw, ShieldAlert, ShieldCheck, ShieldOff } from 'lucide-react';
+import { useReducedMotion } from 'motion/react';
 import Script from 'next/script';
 import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import { publicEnv } from '@/lib/env-public';
@@ -114,6 +117,44 @@ function getHeading(status: OnboardingTurnstileStatus) {
   return 'Security Check';
 }
 
+type TurnstileTone = 'neutral' | 'success' | 'warning' | 'muted';
+
+const TONE_BADGE_CLASSES: Record<TurnstileTone, string> = {
+  neutral: 'border-subtle bg-surface-0 text-secondary-token',
+  success: 'border-success/30 bg-success/10 text-success',
+  warning: 'border-warning/30 bg-warning/10 text-warning',
+  muted: 'border-subtle bg-surface-0 text-tertiary-token',
+};
+
+function getStatusTone(status: OnboardingTurnstileStatus): TurnstileTone {
+  if (status === 'verified' || status === 'bypassed') return 'success';
+  if (status === 'error' || status === 'timeout' || status === 'expired') {
+    return 'warning';
+  }
+  if (status === 'unsupported' || status === 'unconfigured') return 'muted';
+  return 'neutral';
+}
+
+function TurnstileStatusIcon({
+  status,
+  className,
+}: {
+  readonly status: OnboardingTurnstileStatus;
+  readonly className?: string;
+}) {
+  switch (getStatusTone(status)) {
+    case 'warning':
+      return <ShieldAlert className={className} strokeWidth={2} />;
+    case 'muted':
+      return <ShieldOff className={className} strokeWidth={2} />;
+    default:
+      return <ShieldCheck className={className} strokeWidth={2} />;
+  }
+}
+
+/** Hold the "Verified" confirmation briefly before the panel collapses. */
+const VERIFIED_MOMENT_MS = 600;
+
 export function isOnboardingTurnstilePanelVisible(
   state: OnboardingTurnstileState,
   instruction?: string | null,
@@ -143,7 +184,13 @@ export function OnboardingTurnstile({
   const lastResetSignalRef = useRef(resetSignal);
   const widgetDomId = useId();
   const headingId = useId();
+  const reducedMotion = useReducedMotion();
   const [state, setState] = useState<OnboardingTurnstileState>(DEFAULT_STATE);
+  // True only while the brief "Verified" confirmation is held open after a
+  // *visible* challenge. Silent (invisible-first) verifications never set it,
+  // so the panel stays collapsed when the user never saw a challenge.
+  const [verifiedMoment, setVerifiedMoment] = useState(false);
+  const panelVisibleRef = useRef(false);
   const siteKey = publicEnv.NEXT_PUBLIC_TURNSTILE_SITE_KEY;
   const shouldBypassTurnstile =
     process.env.NODE_ENV === 'development' ||
@@ -188,6 +235,11 @@ export function OnboardingTurnstile({
         theme: 'dark',
         callback: token => {
           onToken(token);
+          // Only celebrate when the user actually saw a challenge. Silent
+          // invisible-first verifications collapse straight away (no UI churn).
+          if (panelVisibleRef.current && !reducedMotion) {
+            setVerifiedMoment(true);
+          }
           commitState({ status: 'verified' });
         },
         'error-callback': code =>
@@ -230,11 +282,21 @@ export function OnboardingTurnstile({
       });
       console.error('[onboarding] turnstile render error', err);
     }
-  }, [commitState, onToken, shouldBypassTurnstile, siteKey]);
+  }, [commitState, onToken, reducedMotion, shouldBypassTurnstile, siteKey]);
+
+  useEffect(() => {
+    if (!verifiedMoment) return;
+    const timer = setTimeout(
+      () => setVerifiedMoment(false),
+      VERIFIED_MOMENT_MS
+    );
+    return () => clearTimeout(timer);
+  }, [verifiedMoment]);
 
   const resetWidget = useCallback(
     (message = 'Verification reset. Complete the check to retry.') => {
       clearWidget();
+      setVerifiedMoment(false);
       commitState({ status: 'loading', message });
       render();
     },
@@ -282,6 +344,17 @@ export function OnboardingTurnstile({
     panelRef.current?.focus({ preventScroll: true });
   }, [focusSignal]);
 
+  const shouldShowPanel =
+    isOnboardingTurnstilePanelVisible(state, instruction, siteKey) ||
+    verifiedMoment;
+  // Track the panel's visibility so the success callback can tell a *visible*
+  // challenge (worth a "Verified" beat) from a silent invisible verification.
+  // Synced in an effect (never written during render) so the value reflects the
+  // last committed render when Cloudflare's async callback fires.
+  useEffect(() => {
+    panelVisibleRef.current = shouldShowPanel;
+  }, [shouldShowPanel]);
+
   if (shouldBypassTurnstile) {
     // No Turnstile UI in dev. The server-side dev-mode skip still owns trust.
     return null;
@@ -292,11 +365,6 @@ export function OnboardingTurnstile({
     state.status === 'error' ||
     state.status === 'expired' ||
     state.status === 'timeout';
-  const shouldShowPanel = isOnboardingTurnstilePanelVisible(
-    state,
-    instruction,
-    siteKey
-  );
   const shouldShowWidgetFrame =
     shouldShowPanel &&
     siteKey &&
@@ -304,7 +372,11 @@ export function OnboardingTurnstile({
       state.status === 'error' ||
       state.status === 'expired' ||
       state.status === 'timeout' ||
+      // Keep the frame reserved through the "Verified" beat so the panel
+      // collapses in one clean step instead of shrinking twice.
+      verifiedMoment ||
       Boolean(instruction));
+  const tone = getStatusTone(state.status);
 
   return (
     <>
@@ -327,27 +399,41 @@ export function OnboardingTurnstile({
             'focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/20'
           )}
         >
-          <div className='flex flex-col gap-2.5 sm:flex-row sm:items-start sm:justify-between'>
-            <div className='min-w-0'>
-              <p
-                id={headingId}
-                className='text-app font-medium leading-5 text-primary-token'
-              >
-                {getHeading(state.status)}
-              </p>
-              <p className='mt-0.5 max-w-[34rem] text-2xs leading-5 text-secondary-token sm:text-[12px]'>
-                {panelCopy}
-              </p>
+          <div className='flex items-start gap-2.5'>
+            <span
+              aria-hidden='true'
+              data-testid='onboarding-turnstile-icon'
+              data-turnstile-icon={state.status}
+              className={cn(
+                'mt-px flex size-7 shrink-0 items-center justify-center rounded-[8px] border transition-colors duration-subtle',
+                TONE_BADGE_CLASSES[tone]
+              )}
+            >
+              <TurnstileStatusIcon status={state.status} className='size-4' />
+            </span>
+            <div className='flex min-w-0 flex-1 flex-col gap-2.5 sm:flex-row sm:items-start sm:justify-between'>
+              <div className='min-w-0'>
+                <p
+                  id={headingId}
+                  className='text-app font-medium leading-5 text-primary-token'
+                >
+                  {getHeading(state.status)}
+                </p>
+                <p className='mt-0.5 max-w-[34rem] text-2xs leading-5 text-secondary-token sm:text-[12px]'>
+                  {panelCopy}
+                </p>
+              </div>
+              {isActionable ? (
+                <button
+                  type='button'
+                  onClick={() => resetWidget()}
+                  className='inline-flex h-7 shrink-0 items-center gap-1.5 rounded-full border border-subtle px-2.5 text-2xs font-medium text-secondary-token transition-[background-color,border-color,color] duration-subtle hover:bg-surface-0 hover:text-primary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/20'
+                >
+                  <RotateCcw className='size-3.5' aria-hidden='true' />
+                  Retry Verification
+                </button>
+              ) : null}
             </div>
-            {isActionable ? (
-              <button
-                type='button'
-                onClick={() => resetWidget()}
-                className='h-7 shrink-0 rounded-full border border-subtle px-2.5 text-2xs font-medium text-secondary-token transition-[background-color,border-color,color] duration-subtle hover:bg-surface-0 hover:text-primary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/20'
-              >
-                Retry Verification
-              </button>
-            ) : null}
           </div>
         </section>
       ) : null}
@@ -355,17 +441,25 @@ export function OnboardingTurnstile({
         <div
           className={cn(
             shouldShowWidgetFrame
-              ? 'mt-2.5 overflow-hidden rounded-[10px] border border-subtle bg-surface-0'
+              ? 'relative mt-2 overflow-hidden rounded-[8px] border border-subtle bg-surface-0 p-1.5'
               : 'sr-only h-0 overflow-hidden',
             !shouldShowPanel && 'sr-only h-0 overflow-hidden'
           )}
           data-testid='onboarding-turnstile-widget-frame'
           aria-hidden={!shouldShowWidgetFrame ? 'true' : undefined}
         >
+          {shouldShowWidgetFrame && state.status !== 'verified' ? (
+            <Skeleton
+              aria-hidden='true'
+              data-testid='onboarding-turnstile-widget-skeleton'
+              rounded='md'
+              className='pointer-events-none absolute inset-1.5'
+            />
+          ) : null}
           <div
             ref={containerRef}
             id={`cf-turnstile-${widgetDomId}`}
-            className='min-h-[64px]'
+            className='relative min-h-[64px]'
           />
         </div>
       ) : null}

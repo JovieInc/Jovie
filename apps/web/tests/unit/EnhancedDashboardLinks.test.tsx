@@ -306,7 +306,7 @@ describe.skip('EnhancedDashboardLinks', () => {
     await waitFor(() => {
       expect(fetchMock).toHaveBeenCalled();
       expect(toast.success).toHaveBeenCalledWith(
-        expect.stringContaining('Links saved successfully')
+        expect.stringContaining('Links saved.')
       );
       expect(toast.error).not.toHaveBeenCalled();
     });
