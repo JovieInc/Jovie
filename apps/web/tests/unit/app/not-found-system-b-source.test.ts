@@ -32,8 +32,8 @@ describe('root not-found System B source tokens', () => {
     expect(source).not.toContain('style={{');
     expect(source).toContain("variant='minimal'");
     expect(source).toContain('system-b-root-not-found-main');
-    expect(source).toContain('system-b-root-not-found-action');
-    expect(source.match(/system-b-root-not-found-action/g)).toHaveLength(1);
+    expect(source).toContain('NotFoundPageContent');
+    expect(source).toContain("variant='generic'");
   });
 
   it('backs the root not-found primitives with System B tokens', async () => {
@@ -47,6 +47,8 @@ describe('root not-found System B source tokens', () => {
     expect(block).toContain('var(--system-b-text-primary)');
     expect(block).toContain('var(--system-b-primary-bg)');
     expect(block).toContain('var(--system-b-primary-fg)');
+    expect(block).toContain('system-b-root-not-found-actions');
+    expect(block).toContain('system-b-root-not-found-action-secondary');
     expect(block).toContain('var(--space-16)');
     expect(block).not.toMatch(hardcodedHashColorPattern);
     expect(block).not.toMatch(rawAlphaColorPattern);

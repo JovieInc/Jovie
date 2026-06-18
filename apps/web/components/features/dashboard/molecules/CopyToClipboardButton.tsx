@@ -42,7 +42,7 @@ function getButtonIcon(
 }
 
 function getStatusMessage(status: 'idle' | 'success' | 'error'): string {
-  if (status === 'success') return 'Profile URL copied to clipboard';
+  if (status === 'success') return 'Link copied';
   if (status === 'error') return 'Failed to copy profile URL';
   return '';
 }
@@ -60,7 +60,7 @@ export function CopyToClipboardButton({
   const notifications = useNotifications();
 
   const defaultOnSuccess = () => {
-    notifications.success('Copied to clipboard', { duration: 2000 });
+    notifications.success('Link copied', { duration: 2000 });
     track('profile_copy_url_click', { status: 'success' });
   };
 

@@ -592,7 +592,7 @@ export const DashboardAudienceTableUnified = memo(
             if (m.email) {
               void copyTextToClipboard(m.email).then(success => {
                 if (success) {
-                  toast.success('Email copied to clipboard');
+                  toast.success('Copied');
                   return;
                 }
                 toast.error('Unable to copy email');
@@ -603,7 +603,7 @@ export const DashboardAudienceTableUnified = memo(
             if (m.phone) {
               void copyTextToClipboard(m.phone).then(success => {
                 if (success) {
-                  toast.success('Phone number copied to clipboard');
+                  toast.success('Copied');
                   return;
                 }
                 toast.error('Unable to copy phone number');

@@ -33,7 +33,7 @@ describe('useNotifications', () => {
       expect(TOAST_MESSAGES.SAVE_SUCCESS).toBe('Changes saved');
       expect(TOAST_MESSAGES.UPLOAD_SUCCESS).toBe('Upload complete');
       expect(TOAST_MESSAGES.DELETE_SUCCESS).toBe('Deleted successfully');
-      expect(TOAST_MESSAGES.COPY_SUCCESS).toBe('Copied to clipboard');
+      expect(TOAST_MESSAGES.COPY_SUCCESS).toBe('Copied');
       expect(TOAST_MESSAGES.SEND_SUCCESS).toBe('Sent successfully');
     });
 

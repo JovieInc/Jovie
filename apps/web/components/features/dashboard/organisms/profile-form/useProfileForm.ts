@@ -51,7 +51,7 @@ export function useProfileForm({
 
       const successMessage = document.getElementById('success-message');
       if (successMessage) {
-        successMessage.textContent = 'Profile updated successfully!';
+        successMessage.textContent = 'Profile updated!';
       }
     },
     // Let the hook handle error toasts
