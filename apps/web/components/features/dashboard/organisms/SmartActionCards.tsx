@@ -130,7 +130,7 @@ export const SmartActionCards = memo(function SmartActionCards({
   );
   const notifications = useNotifications();
   const { copy } = useClipboard({
-    onSuccess: () => notifications.success('Profile link copied!'),
+    onSuccess: () => notifications.success('Link copied'),
     onError: () => notifications.error('Could not copy link'),
   });
 

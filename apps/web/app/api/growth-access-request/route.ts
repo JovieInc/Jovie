@@ -14,6 +14,11 @@ import { users } from '@/lib/db/schema/auth';
 import { captureError } from '@/lib/error-tracking';
 import { NO_STORE_HEADERS } from '@/lib/http/headers';
 import { notifySlackGrowthRequest } from '@/lib/notifications/providers/slack';
+import {
+  createRateLimitHeaders,
+  generalLimiter,
+  getClientIP,
+} from '@/lib/rate-limit';
 import { logger } from '@/lib/utils/logger';
 
 const growthAccessSchema = z.object({
@@ -27,6 +32,20 @@ const growthAccessSchema = z.object({
 export async function POST(request: Request) {
   const { userId, error } = await requireAuth();
   if (error) return error;
+
+  // Defense in depth: even though this is auth-gated and one-shot per user,
+  // rate-limit by user (falling back to IP) so a scripted client can't hammer
+  // the DB write + Slack notification path.
+  const rateLimit = await generalLimiter.limit(userId ?? getClientIP(request));
+  if (!rateLimit.success) {
+    return NextResponse.json(
+      { error: 'Too many requests. Please try again in a moment.' },
+      {
+        status: 429,
+        headers: { ...NO_STORE_HEADERS, ...createRateLimitHeaders(rateLimit) },
+      }
+    );
+  }
 
   try {
     const body = await request.json();

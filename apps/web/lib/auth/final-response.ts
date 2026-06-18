@@ -28,6 +28,8 @@ import {
   getCspReportUri,
 } from '@/lib/security/csp-reporting';
 
+const CSP_REPORT_URI = getCspReportUri();
+
 /**
  * Get geo info preferring Vercel edge headers (x-vercel-ip-*) with fallback
  * to the req.geo object injected by the platform. Matches the original
@@ -82,22 +84,21 @@ export function buildFinalResponse(
       buildContentSecurityPolicy({ nonce, allowTestRuntimeRelaxations })
     );
 
-    const cspReportUri = getCspReportUri();
-    if (cspReportUri) {
+    if (CSP_REPORT_URI) {
       const reportOnlyPolicy = buildContentSecurityPolicyReportOnly({
         nonce,
         allowTestRuntimeRelaxations,
-        reportUri: cspReportUri,
+        reportUri: CSP_REPORT_URI,
       });
       if (reportOnlyPolicy) {
         res.headers.set(
           'Content-Security-Policy-Report-Only',
           reportOnlyPolicy
         );
-        res.headers.set('Report-To', buildReportToHeader(cspReportUri));
+        res.headers.set('Report-To', buildReportToHeader(CSP_REPORT_URI));
         res.headers.set(
           'Reporting-Endpoints',
-          buildReportingEndpointsHeader(cspReportUri)
+          buildReportingEndpointsHeader(CSP_REPORT_URI)
         );
       }
     }
