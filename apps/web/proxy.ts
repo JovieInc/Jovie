@@ -634,31 +634,6 @@ async function handleRequest(req: NextRequest, userId: string | null) {
   }
 }
 
-/**
- * Build the final response with CSP headers and cookies.
- * The nonce is pre-generated and set on request headers for Server Components.
- * Here we set it on response headers for the CSP policy.
- */
-
-function _getGeoFromRequest(req: NextRequest): {
-  city: string | null;
-  region: string | null;
-} {
-  const geoRequest = req as NextRequest & {
-    geo?: { city?: string | null; region?: string | null };
-  };
-
-  const rawCity = req.headers.get('x-vercel-ip-city')?.trim() ?? null;
-  const cityFromHeader = rawCity ? decodeURIComponent(rawCity) : null;
-  const regionFromHeader =
-    req.headers.get('x-vercel-ip-country-region')?.trim() ?? null;
-
-  return {
-    city: cityFromHeader || geoRequest.geo?.city?.trim() || null,
-    region: regionFromHeader || geoRequest.geo?.region?.trim() || null,
-  };
-}
-
 // Production Clerk middleware (default keys from env)
 const clerkProductionMiddleware = clerkMiddleware(async (auth, req) => {
   const { userId } = await auth();

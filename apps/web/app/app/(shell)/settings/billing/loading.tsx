@@ -10,10 +10,10 @@ export default function SettingsBillingLoading() {
           {/* Static heading — visible immediately */}
           <div className='mb-6 space-y-2'>
             <h2 className='text-lg font-semibold tracking-tight text-primary-token'>
-              Billing &amp; Subscription
+              Billing
             </h2>
             <p className='text-sm text-secondary-token'>
-              Plan, payment methods, and invoices.
+              Current plan status only; billing details open outside this page.
             </p>
           </div>
 

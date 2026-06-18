@@ -124,7 +124,7 @@ const COMMANDS: readonly CommandDefinition[] = [
         const url = `https://jov.ie/${ctx.username}`;
         try {
           await navigator.clipboard.writeText(url);
-          toast.success('Link copied to clipboard');
+          toast.success('Link copied');
         } catch {
           toast.error('Failed to copy link');
         }
@@ -156,11 +156,11 @@ const COMMANDS: readonly CommandDefinition[] = [
           if (navigator.share) {
             await navigator.share({ title: 'My Jovie Profile', url });
           } else {
-            toast.success('Link copied to clipboard');
+            toast.success('Link copied');
           }
         } catch {
           // User cancelled share sheet or clipboard failed — toast as fallback
-          toast.success('Link copied to clipboard');
+          toast.success('Link copied');
         }
       },
     }),

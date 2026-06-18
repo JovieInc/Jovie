@@ -372,7 +372,7 @@ export function SlashCommandMenu({
     return promptActions
       .filter(
         action =>
-          !(hideAlbumArtSuggestions && action.label === 'Generate album art')
+          !(hideAlbumArtSuggestions && action.label === 'Generate Album Art')
       )
       .filter(action => fuzzyMatch(`${action.label} ${action.prompt}`, query))
       .map(action => ({

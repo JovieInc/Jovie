@@ -203,7 +203,7 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
       onSubmit,
       isLoading,
       isSubmitting,
-      placeholder = 'Ask Jovie anything',
+      placeholder = 'What are you working on?',
       variant = 'default',
       onImageAttach,
       onAudioAttach,
