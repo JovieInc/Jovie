@@ -54,6 +54,34 @@ interface ParsedRobotsRule {
   readonly disallow: readonly string[];
 }
 
+const SITEMAP_SUFFIX = '/sitemap.xml';
+
+/**
+ * True when any `Sitemap:` directive points at a `/sitemap.xml` URL.
+ *
+ * Implemented as a linear line scan (not a regex) to avoid the super-linear
+ * backtracking that a `^sitemap:\s*.+/sitemap\.xml\s*$` pattern is prone to
+ * (overlap between `.+` and a trailing `\s*` on adversarial input).
+ */
+function referencesSitemap(content: string): boolean {
+  for (const rawLine of content.split(/\r?\n/)) {
+    const line = rawLine.trim();
+    const separatorIndex = line.indexOf(':');
+    if (separatorIndex === -1) continue;
+    if (line.slice(0, separatorIndex).trim().toLowerCase() !== 'sitemap') {
+      continue;
+    }
+    const value = line.slice(separatorIndex + 1).trim();
+    if (
+      value.length > SITEMAP_SUFFIX.length &&
+      value.endsWith(SITEMAP_SUFFIX)
+    ) {
+      return true;
+    }
+  }
+  return false;
+}
+
 function parseRobotsRules(content: string): ParsedRobotsRule[] {
   const rules: ParsedRobotsRule[] = [];
   let currentAgents: string[] = [];
@@ -133,7 +161,7 @@ export function validateRobotsTxt(content: string): SeoGuardrailResult {
     }
   }
 
-  const hasSitemap = /^sitemap:\s*.+\/sitemap\.xml\s*$/im.test(content);
+  const hasSitemap = referencesSitemap(content);
   if (!hasSitemap) {
     errors.push(
       failure(

@@ -82,6 +82,45 @@ describe('validateRobotsTxt', () => {
     );
   });
 
+  it('accepts a sitemap directive with trailing whitespace', () => {
+    const withTrailingSpace = PRODUCTION_ROBOTS.replace(
+      'Sitemap: https://jov.ie/sitemap.xml',
+      'Sitemap:   https://jov.ie/sitemap.xml   '
+    );
+    const result = validateRobotsTxt(withTrailingSpace);
+    expect(result.errors.map(error => error.code)).not.toContain(
+      'robots.missing-sitemap'
+    );
+  });
+
+  it('does not treat a non-/sitemap.xml directive as a sitemap reference', () => {
+    const wrongSuffix = PRODUCTION_ROBOTS.replace(
+      'Sitemap: https://jov.ie/sitemap.xml',
+      'Sitemap: https://jov.ie/sitemap_index.xml'
+    );
+    const result = validateRobotsTxt(wrongSuffix);
+    expect(result.errors.map(error => error.code)).toContain(
+      'robots.missing-sitemap'
+    );
+  });
+
+  it('handles adversarial sitemap input without super-linear backtracking', () => {
+    // Long run of whitespace after a `Sitemap:` directive that never resolves
+    // to /sitemap.xml — would trigger catastrophic backtracking on a naive
+    // `^sitemap:\s*.+/sitemap\.xml\s*$` regex (SonarCloud S5852).
+    const adversarial = `${PRODUCTION_ROBOTS.replace(
+      'Sitemap: https://jov.ie/sitemap.xml\n',
+      ''
+    )}Sitemap: ${' '.repeat(100_000)}`;
+    const start = performance.now();
+    const result = validateRobotsTxt(adversarial);
+    const elapsedMs = performance.now() - start;
+    expect(elapsedMs).toBeLessThan(1000);
+    expect(result.errors.map(error => error.code)).toContain(
+      'robots.missing-sitemap'
+    );
+  });
+
   it('fails when a required AI crawler rule is missing', () => {
     const withoutGptBot = `User-agent: *
 Allow: /
