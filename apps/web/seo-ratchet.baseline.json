@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 1,
+  "description": "SEO/AEO ratchet baseline. Once clean, can never regress. Update via intentional PR.",
+  "robots": {
+    "requiredAiCrawlers": [
+      "GPTBot",
+      "ChatGPT-User",
+      "Claude-Web",
+      "Applebot-Extended",
+      "PerplexityBot",
+      "Google-Extended"
+    ],
+    "requiredDisallowPaths": ["/app/", "/api/"],
+    "failSafeNote": "VERCEL_ENV undefined/empty must produce production-allow config, not preview-block."
+  }
+}
