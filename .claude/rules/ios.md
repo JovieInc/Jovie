@@ -65,4 +65,6 @@ Same contract as the web app (`.claude/rules/ui.md` → "Layout Shift Prevention
 3. Add a `pnpm run ios:lint` (or equivalent) pointing at the repo's Swift source dir.
 4. Adopt the performance canon and layout-shift rules above in that repo's agent rules.
 
+Verify a local checkout with `pnpm run ios:guardrail:audit -- <repo-path>`. The audit fails if an iOS-touching repo is missing the vendored lint script, an explicit Swift-source lint entrypoint, a pre-build CI step, or the canon in its agent rules.
+
 Rollout to other repos is tracked in Linear (this repo cannot edit other repos). When standing up iOS code in a new repo, copy the lint and wire the CI step in the same PR — do not ship SwiftUI without the guardrail.
