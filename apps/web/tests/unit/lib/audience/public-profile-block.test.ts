@@ -9,9 +9,20 @@ const mocks = vi.hoisted(() => ({
   isNull: vi.fn(() => 'is-null-clause'),
   getRedis: vi.fn(),
   addBreadcrumb: vi.fn(),
+  withTimeout: vi.fn(),
 }));
 
 vi.mock('server-only', () => ({}));
+
+vi.mock('@/lib/db/query-timeout', () => ({
+  withTimeout: mocks.withTimeout,
+  QueryTimeoutError: class QueryTimeoutError extends Error {
+    constructor(message: string) {
+      super(message);
+      this.name = 'QueryTimeoutError';
+    }
+  },
+}));
 
 vi.mock('@sentry/nextjs', () => ({
   addBreadcrumb: mocks.addBreadcrumb,
@@ -88,6 +99,15 @@ describe('public profile audience block helper', () => {
   beforeEach(async () => {
     vi.clearAllMocks();
     mocks.getRedis.mockReturnValue(null);
+    // Default: withTimeout passes the promise through unchanged so existing
+    // tests continue to work without being aware of the timeout wrapper.
+    mocks.withTimeout.mockImplementation(
+      (promise: Promise<unknown>) => promise
+    );
+    // Reset select to a clean no-op so persistent mockImplementation from a
+    // prior test (e.g. "fails open when the DB query throws") does not bleed
+    // into subsequent tests.
+    mocks.select.mockReset();
     process.env.NODE_ENV = originalNodeEnv;
     if (originalSmoke === undefined) {
       delete process.env.PUBLIC_NOAUTH_SMOKE;
@@ -250,5 +270,40 @@ describe('public profile audience block helper', () => {
     await expect(
       checkProfileVisitorBlocked('tim', '1.2.3.4', 'Mozilla')
     ).resolves.toBe(false);
+  });
+
+  it('fails open after DB query timeout', async () => {
+    process.env.NODE_ENV = 'production';
+    // profileHasActiveBlocks builds the query promise first (db.select chain),
+    // then passes it to withTimeout. We need select to return a valid chain for
+    // BOTH the outer select and the inner exists-subquery select so the
+    // queryPromise is fully constructed. Only then does withTimeout get called.
+    // withTimeout rejecting with QueryTimeoutError simulates a Neon cold-start
+    // timeout. This also validates the `return await` fix: without it, the
+    // rejected promise escapes the local try/catch in checkProfileVisitorBlocked
+    // and the caller would see an unhandled rejection instead of `false`.
+    const { QueryTimeoutError } = await import('@/lib/db/query-timeout');
+    // Outer select chain (profileId row)
+    mockProfileHasBlocksRows([]);
+    // Inner exists-subquery select chain (audienceBlocks.id row) — needs to
+    // produce a chainable object even though we never await its result.
+    const innerLimit = vi.fn().mockResolvedValue([]);
+    const innerWhere = vi.fn(() => ({ limit: innerLimit }));
+    const innerFrom = vi.fn(() => ({ where: innerWhere }));
+    mocks.select.mockReturnValueOnce({ from: innerFrom });
+
+    mocks.withTimeout.mockRejectedValueOnce(
+      new QueryTimeoutError(
+        '[audience-block] profileHasActiveBlocks timed out after 3000ms'
+      )
+    );
+
+    await expect(
+      checkProfileVisitorBlocked('tim', '1.2.3.4', 'Mozilla')
+    ).resolves.toBe(false);
+
+    // withTimeout must have been reached — both select chains were constructed
+    // and the timeout wrapper was invoked before the rejection.
+    expect(mocks.withTimeout).toHaveBeenCalledTimes(1);
   });
 });
