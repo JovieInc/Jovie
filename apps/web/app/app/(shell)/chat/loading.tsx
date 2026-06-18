@@ -41,7 +41,7 @@ export default function ChatLoading() {
                     disabled
                     rows={1}
                     aria-label='Chat message input'
-                    placeholder='Ask Jovie anything'
+                    placeholder='What are you working on?'
                     className='min-w-0 flex-1 resize-none bg-transparent py-1.5 text-sm leading-6 text-primary-token placeholder:text-tertiary-token focus:outline-none'
                   />
                   <button

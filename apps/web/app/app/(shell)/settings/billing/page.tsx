@@ -8,7 +8,7 @@ export default function SettingsBillingPage() {
     <SettingsSection
       id='billing'
       title='Billing'
-      description='Plan, payment methods, and invoices.'
+      description='Current plan status only; billing details open outside this page.'
     >
       <SettingsBillingSection />
     </SettingsSection>
