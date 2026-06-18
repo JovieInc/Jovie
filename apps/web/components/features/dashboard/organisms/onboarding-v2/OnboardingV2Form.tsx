@@ -1838,11 +1838,11 @@ export function OnboardingV2Form({
           >
             <ContentSurfaceCard className='p-5'>
               <p className='text-sm font-semibold text-primary-token'>
-                Discovery is already complete for this onboarding pass.
+                Your import is ready.
               </p>
               <p className='mt-2 text-sm leading-6 text-secondary-token'>
-                Checkout still returns directly to the onboarding flow, so this
-                is a short detour rather than a separate setup.
+                Upgrade unlocks album art, pitch tools, and advanced AI. After
+                checkout, you&apos;ll return here to finish setup.
               </p>
             </ContentSurfaceCard>
           </StepFrame>

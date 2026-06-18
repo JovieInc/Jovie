@@ -430,9 +430,7 @@ export function SocialsForm({ artist }: Readonly<SocialsFormProps>) {
 
       {success && (
         <ContentSurfaceCard className='border-success/25 bg-success/5 px-3.5 py-3'>
-          <p className='text-app text-success'>
-            Social links saved successfully!
-          </p>
+          <p className='text-app text-success'>Social links saved!</p>
         </ContentSurfaceCard>
       )}
 
