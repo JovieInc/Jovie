@@ -20,7 +20,6 @@ enum MobileAuthDiagnostics {
     }
 
     defaults.set(Date().timeIntervalSince1970, forKey: timestampKey)
-    defaults.synchronize()
   }
 }
 
