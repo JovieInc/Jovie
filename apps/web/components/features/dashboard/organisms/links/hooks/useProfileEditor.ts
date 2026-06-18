@@ -167,7 +167,7 @@ export function useProfileEditor(
           error: 'Missing profile id; please refresh and try again.',
           lastSaved: null,
         });
-        toast.error('Missing profile id; please refresh and try again.');
+        toast.error('Unable to save profile — please refresh and try again.');
         return;
       }
 
