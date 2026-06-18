@@ -16,7 +16,11 @@ afterAll(() => {
   }
 });
 
-import { isTurnstileConfigured, verifyTurnstileToken } from './verify';
+import {
+  classifyTurnstileFailure,
+  isTurnstileConfigured,
+  verifyTurnstileToken,
+} from './verify';
 
 describe('verifyTurnstileToken', () => {
   beforeEach(() => {
@@ -114,5 +118,40 @@ describe('verifyTurnstileToken', () => {
 describe('isTurnstileConfigured', () => {
   it('returns true when TURNSTILE_SECRET_KEY is set', () => {
     expect(isTurnstileConfigured()).toBe(true);
+  });
+});
+
+describe('classifyTurnstileFailure', () => {
+  it('treats a missing token as a client rejection', () => {
+    expect(
+      classifyTurnstileFailure({ success: false, reason: 'missing_token' })
+    ).toBe('rejected');
+  });
+
+  it('treats a genuinely invalid token as a client rejection', () => {
+    expect(
+      classifyTurnstileFailure({
+        success: false,
+        reason: 'siteverify_failed',
+        errorCodes: ['invalid-input-response'],
+      })
+    ).toBe('rejected');
+  });
+
+  it.each([
+    'turnstile_not_configured',
+    'siteverify_timeout',
+    'siteverify_error',
+    'siteverify_exhausted_retries',
+    'siteverify_http_500',
+    'siteverify_http_429',
+  ])('treats %s as service-unavailable (retryable)', reason => {
+    expect(classifyTurnstileFailure({ success: false, reason })).toBe(
+      'unavailable'
+    );
+  });
+
+  it('defaults an unknown reason to a client rejection (fail-closed)', () => {
+    expect(classifyTurnstileFailure({ success: false })).toBe('rejected');
   });
 });
