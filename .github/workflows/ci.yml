@@ -874,6 +874,8 @@ jobs:
     timeout-minutes: 2
     steps:
       - name: Evaluate required PR checks
+        env:
+          PR_HEAD_REF: ${{ github.head_ref }}
         run: |
           FAST_RESULT="${{ needs.ci-fast.result }}"
           UNIT_RESULT="${{ needs.ci-unit-tests.result }}"
@@ -892,7 +894,7 @@ jobs:
           PREVIEW_RESULT="${{ needs.ci-pr-vercel-preview.result }}"
           EVENT_NAME="${{ github.event_name }}"
           PR_ACTOR="${{ github.actor }}"
-          PR_BRANCH="${{ github.head_ref }}"
+          PR_BRANCH="$PR_HEAD_REF"
           echo "ci-fast: $FAST_RESULT"
           echo "ci-unit-tests: $UNIT_RESULT"
           echo "ci-build-public: $BUILD_RESULT"
