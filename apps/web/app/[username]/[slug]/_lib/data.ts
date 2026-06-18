@@ -194,6 +194,10 @@ export interface ContentData {
     url: string;
     sourceType?: string | null;
     metadata?: Record<string, unknown> | null;
+    /** Whether this is the artist's canonical/primary DSP link */
+    isPrimary?: boolean;
+    /** DSP-specific catalog ID (Spotify track ID, Apple Music song ID, etc.) */
+    externalId?: string | null;
   }>;
   artworkSizes?: Record<string, string> | null;
   /** Raw release metadata JSONB (includes MusicVideoMetadata for music_video releases) */
@@ -212,6 +216,8 @@ export interface ContentData {
   durationMs?: number | null;
   /** ISRC code (from discog_recordings) */
   isrc?: string | null;
+  /** UPC code (from discog_releases) — used for DSP catalog ID resolution */
+  upc?: string | null;
   /** Track position within the release (from discog_release_tracks) */
   trackNumber?: number | null;
   creator: {
@@ -240,6 +246,8 @@ export interface CachedContentData {
     url: string;
     sourceType?: string | null;
     metadata?: Record<string, unknown> | null;
+    isPrimary?: boolean;
+    externalId?: string | null;
   }>;
   artworkSizes?: Record<string, string> | null;
   metadata?: Record<string, unknown> | null;
@@ -249,6 +257,7 @@ export interface CachedContentData {
   previewMetadata?: Record<string, unknown> | null;
   durationMs?: number | null;
   isrc?: string | null;
+  upc?: string | null;
   releaseId?: string | null;
   releaseSlug?: string | null;
   releaseTitle?: string | null;
@@ -374,6 +383,7 @@ const fetchContentBySlug = async (
         releaseType: discogReleases.releaseType,
         totalTracks: discogReleases.totalTracks,
         metadata: discogReleases.metadata,
+        upc: discogReleases.upc,
       })
       .from(discogReleases)
       .where(
@@ -393,6 +403,8 @@ const fetchContentBySlug = async (
             url: providerLinks.url,
             sourceType: providerLinks.sourceType,
             metadata: providerLinks.metadata,
+            isPrimary: providerLinks.isPrimary,
+            externalId: providerLinks.externalId,
           })
           .from(providerLinks)
           .where(
@@ -448,6 +460,7 @@ const fetchContentBySlug = async (
         previewUrl: previewRow?.previewUrl ?? null,
         previewMetadata: previewRow?.previewMetadata ?? null,
         isrc: previewRow?.isrc ?? null,
+        upc: release.upc,
         credits,
       };
     }
@@ -520,6 +533,8 @@ const fetchContentBySlug = async (
                 url: providerLinks.url,
                 sourceType: providerLinks.sourceType,
                 metadata: providerLinks.metadata,
+                isPrimary: providerLinks.isPrimary,
+                externalId: providerLinks.externalId,
               })
               .from(providerLinks)
               .where(
@@ -600,6 +615,8 @@ const fetchContentBySlug = async (
             url: providerLinks.url,
             sourceType: providerLinks.sourceType,
             metadata: providerLinks.metadata,
+            isPrimary: providerLinks.isPrimary,
+            externalId: providerLinks.externalId,
           })
           .from(providerLinks)
           .where(
@@ -781,6 +798,8 @@ export const getTrackBySlugInRelease = cache(
                   url: providerLinks.url,
                   sourceType: providerLinks.sourceType,
                   metadata: providerLinks.metadata,
+                  isPrimary: providerLinks.isPrimary,
+                  externalId: providerLinks.externalId,
                 })
                 .from(providerLinks)
                 .where(
@@ -810,6 +829,8 @@ export const getTrackBySlugInRelease = cache(
                   url: providerLinks.url,
                   sourceType: providerLinks.sourceType,
                   metadata: providerLinks.metadata,
+                  isPrimary: providerLinks.isPrimary,
+                  externalId: providerLinks.externalId,
                 })
                 .from(providerLinks)
                 .where(
@@ -894,6 +915,8 @@ export const getTrackBySlugInRelease = cache(
                 url: providerLinks.url,
                 sourceType: providerLinks.sourceType,
                 metadata: providerLinks.metadata,
+                isPrimary: providerLinks.isPrimary,
+                externalId: providerLinks.externalId,
               })
               .from(providerLinks)
               .where(
