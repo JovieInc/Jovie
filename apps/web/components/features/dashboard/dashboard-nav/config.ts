@@ -12,7 +12,6 @@ import {
   IdCard,
   Image as ImageIcon,
   LayoutDashboard,
-  Library as LibraryIcon,
   Lock,
   type LucideIcon,
   MailCheck,
@@ -32,7 +31,7 @@ import {
   ADMIN_SETTINGS_TOOL_IDS,
   type AdminWorkspaceId,
 } from '@/constants/admin-navigation';
-import { APP_ROUTES } from '@/constants/routes';
+import { APP_ROUTES, buildLibraryViewRoute } from '@/constants/routes';
 
 import type { NavItem } from './types';
 
@@ -60,29 +59,43 @@ export const profileNavItem: NavItem = {
   name: 'Profile',
   href: APP_ROUTES.CHAT_PROFILE_PANEL,
   id: 'profile',
-  icon: UserCircle,
   description: 'Open profile preview and links',
+  icon: UserCircle,
 };
 
-export const libraryNavItem: NavItem = {
-  name: 'Library',
-  href: APP_ROUTES.LIBRARY,
-  id: 'library',
-  icon: LibraryIcon,
-  description: 'Browse releases, merch, images, videos, and audio',
+export const releasesNavItem: NavItem = {
+  name: 'Releases',
+  href: buildLibraryViewRoute('releases'),
+  id: 'releases',
+  icon: Music,
+  description:
+    'Browse releases and link out every provider with one smart link',
+};
+
+/** @deprecated Use releasesNavItem — Library is the canonical Releases surface. */
+export const libraryNavItem: NavItem = releasesNavItem;
+
+export const artistProfileNavItem: NavItem = {
+  name: 'Artist Profile',
+  href: APP_ROUTES.SETTINGS_ARTIST_PROFILE,
+  id: 'artist-profile',
+  icon: UserCircle,
+  description: 'Edit your artist profile, links, and branding',
+};
+
+export const touringNavItem: NavItem = {
+  name: 'Touring',
+  href: APP_ROUTES.SETTINGS_TOURING,
+  id: 'touring',
+  icon: CalendarDays,
+  description: 'Manage tour dates and touring settings',
 };
 
 export const primaryNavigation: NavItem[] = [
   newThreadNavItem,
-  libraryNavItem,
-  profileNavItem,
-  {
-    name: 'Releases',
-    href: APP_ROUTES.RELEASES,
-    id: 'releases',
-    icon: Music,
-    description: 'Link out every provider with one smart link',
-  },
+  releasesNavItem,
+  artistProfileNavItem,
+  touringNavItem,
   {
     name: 'Calendar',
     href: APP_ROUTES.CALENDAR,
@@ -286,6 +299,8 @@ export const mobilePrimaryNavigation: NavItem[] = [
 
 /** Items shown in the expanded "more" menu on mobile. */
 export const mobileExpandedNavigation: NavItem[] = [
+  artistProfileNavItem,
+  touringNavItem,
   calendarNavItem,
   primaryNavigation.find(i => i.id === 'tasks')!,
   settingsNavItem,
