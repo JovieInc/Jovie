@@ -391,29 +391,32 @@ export function parseRobotsTxt(text: string): {
   const sitemapUrls: string[] = [];
   const aiCrawlerAllows: Record<string, boolean> = {};
 
+  // Parse directives by splitting on the first colon rather than regex.
+  // robots.txt is a simple `Directive: value` format; a linear split avoids
+  // the super-linear backtracking risk of `\s*(.+)` style patterns (S5852).
   for (const line of lines) {
-    const sitemapMatch = line.match(/^Sitemap:\s*(.+)$/i);
-    if (sitemapMatch?.[1]) {
-      sitemapUrls.push(sitemapMatch[1].trim());
+    const colonIndex = line.indexOf(':');
+    if (colonIndex === -1) continue;
+
+    const directive = line.slice(0, colonIndex).trim().toLowerCase();
+    const value = line.slice(colonIndex + 1).trim();
+
+    if (directive === 'sitemap') {
+      if (value) sitemapUrls.push(value);
       continue;
     }
 
-    const agentMatch = line.match(/^User-agent:\s*(.+)$/i);
-    if (agentMatch?.[1]) {
-      currentAgents = [agentMatch[1].trim()];
+    if (directive === 'user-agent') {
+      if (value) currentAgents = [value];
       continue;
     }
 
-    const disallowMatch = line.match(/^Disallow:\s*(.*)$/i);
-    if (disallowMatch) {
-      const value = disallowMatch[1]?.trim() ?? '';
+    if (directive === 'disallow') {
       if (currentAgents.includes('*')) wildcardDisallow.push(value);
       continue;
     }
 
-    const allowMatch = line.match(/^Allow:\s*(.*)$/i);
-    if (allowMatch) {
-      const value = allowMatch[1]?.trim() ?? '';
+    if (directive === 'allow') {
       for (const agent of currentAgents) {
         if (value === '/') aiCrawlerAllows[agent] = true;
       }

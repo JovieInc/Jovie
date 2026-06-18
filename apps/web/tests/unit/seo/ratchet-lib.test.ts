@@ -32,6 +32,18 @@ describe('SEO ratchet library — live robots/sitemap parsers (JOV-11044)', () =
     expect(parseRobotsTxt(robots).wildcardDisallow).not.toContain('/');
   });
 
+  it('parses sitemap URLs without truncating at the scheme colon (S5852-safe parser)', () => {
+    const robots = [
+      'user-agent: *',
+      'ALLOW: /',
+      'Sitemap: https://jov.ie/sitemap.xml',
+    ].join('\n');
+
+    const parsed = parseRobotsTxt(robots);
+    expect(parsed.sitemapUrls).toEqual(['https://jov.ie/sitemap.xml']);
+    expect(parsed.aiCrawlerAllows['*']).toBe(true);
+  });
+
   it('rejects global Disallow: / on wildcard user-agent', () => {
     const robots = ['User-agent: *', 'Disallow: /'].join('\n');
     const issues = validateLiveRobotsTxt(robots);
