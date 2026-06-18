@@ -16,7 +16,6 @@ import {
   reserveChatTurn,
   TURN_IN_PROGRESS_ERROR_CODE,
 } from '@/lib/chat/turns';
-import { getAppFlagValue } from '@/lib/flags/server';
 import {
   classifyIntent,
   isDeterministicIntent,
@@ -26,7 +25,6 @@ import { fetchMobileArtistContext } from '@/lib/mobile/chat/artist-context';
 import {
   buildMobileChatHandoffUrl,
   encodeMobileChatNdjsonEvent,
-  MOBILE_CHAT_ALPHA_REQUIRED_CODE,
   MOBILE_CHAT_PROFILE_REQUIRED_CODE,
   type MobileChatNdjsonEvent,
   type ParsedMobileChatTurnRequest,
@@ -98,35 +96,11 @@ function errorNdjsonResponse(
   );
 }
 
-async function hasMobileChatAlphaAccess(clerkUserId: string): Promise<boolean> {
-  const session = await getSessionContext({
-    clerkUserId,
-    requireUser: true,
-    requireProfile: false,
-  });
-
-  if (session.user.isAdmin) {
-    return true;
-  }
-
-  return getAppFlagValue('IOS_APP_ALPHA_ACCESS', {
-    userId: clerkUserId,
-  });
-}
-
 export async function handleMobileChatTurn(
   userId: string,
   parsed: ParsedMobileChatTurnRequest,
   signal: AbortSignal
 ): Promise<Response> {
-  if (!(await hasMobileChatAlphaAccess(userId))) {
-    return errorNdjsonResponse(
-      403,
-      MOBILE_CHAT_ALPHA_REQUIRED_CODE,
-      'Native chat is limited to internal alpha testers.'
-    );
-  }
-
   const session = await getSessionContext({
     clerkUserId: userId,
     requireUser: true,

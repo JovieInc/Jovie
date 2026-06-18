@@ -80,7 +80,7 @@ export function ProfileEditPreviewCard({
       {
         onSuccess: () => {
           setApplied(true);
-          toast.success(`${preview.fieldLabel} updated successfully`);
+          toast.success(`${preview.fieldLabel} updated`);
 
           // Instantly update sidebar preview if available
           if (
@@ -121,7 +121,7 @@ export function ProfileEditPreviewCard({
             <p className='truncate text-app font-semibold tracking-[-0.01em] text-primary-token'>
               {preview.fieldLabel}
             </p>
-            <p className='text-xs text-secondary-token'>Updated successfully</p>
+            <p className='text-xs text-secondary-token'>Updated</p>
           </div>
           <span className='inline-flex shrink-0 items-center gap-1 rounded-md border border-subtle bg-surface-1 px-1.5 py-0.5 text-2xs font-caption tracking-[-0.01em] text-success'>
             <Check className='h-3.5 w-3.5' />

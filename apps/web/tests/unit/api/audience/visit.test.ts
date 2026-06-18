@@ -8,6 +8,7 @@ const mockDetectBot = vi.hoisted(() => vi.fn());
 const mockDbSelect = vi.hoisted(() => vi.fn());
 const mockDoesColumnExist = vi.hoisted(() => vi.fn());
 const mockDoesTableExist = vi.hoisted(() => vi.fn());
+const mockInvalidateColumnExistenceCache = vi.hoisted(() => vi.fn());
 const mockWithSystemIngestionSession = vi.hoisted(() => vi.fn());
 const mockCheckVisitRateLimit = vi.hoisted(() => vi.fn());
 const mockIsTrackingTokenEnabled = vi.hoisted(() => vi.fn());
@@ -34,6 +35,7 @@ vi.mock('@/lib/db', () => ({
   },
   doesColumnExist: mockDoesColumnExist,
   doesTableExist: mockDoesTableExist,
+  invalidateColumnExistenceCache: mockInvalidateColumnExistenceCache,
 }));
 
 vi.mock('@/lib/db/schema', () => ({
@@ -626,6 +628,90 @@ describe('POST /api/audience/visit', () => {
         includeLatestActionLabel: false,
       })
     );
+    expect(mockCaptureError).not.toHaveBeenCalled();
+  });
+
+  it('retries visit persistence when stale column cache causes summary column writes', async () => {
+    mockDoesColumnExist.mockResolvedValue(true);
+    mockDoesTableExist.mockResolvedValue(true);
+    mockDbSelect.mockReturnValue({
+      from: vi.fn().mockReturnValue({
+        where: vi.fn().mockReturnValue({
+          limit: vi
+            .fn()
+            .mockResolvedValue([{ id: 'profile_123', isPublic: true }]),
+        }),
+      }),
+    });
+
+    const insertedValues: Record<string, unknown>[] = [];
+    let sessionAttempt = 0;
+    mockWithSystemIngestionSession.mockImplementation(async callback => {
+      sessionAttempt += 1;
+
+      if (sessionAttempt === 1) {
+        throw new Error('column "latest_referrer_url" does not exist');
+      }
+
+      const mockInsert = vi.fn().mockReturnValue({
+        values: vi
+          .fn()
+          .mockReturnValueOnce({
+            onConflictDoUpdate: vi.fn().mockResolvedValue(undefined),
+          })
+          .mockImplementation((value: Record<string, unknown>) => {
+            insertedValues.push(value);
+            return {
+              onConflictDoNothing: vi.fn().mockReturnValue({
+                returning: vi
+                  .fn()
+                  .mockResolvedValue([{ id: 'inserted_member' }]),
+              }),
+            };
+          }),
+      });
+
+      await callback({
+        select: vi.fn().mockReturnValue({
+          from: vi.fn().mockReturnValue({
+            where: vi.fn().mockReturnValue({
+              limit: vi.fn().mockResolvedValue([]),
+            }),
+          }),
+        }),
+        insert: mockInsert,
+      });
+    });
+
+    const request = new NextRequest('http://localhost/api/audience/visit', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        profileId: '123e4567-e89b-12d3-a456-426614174000',
+        referrer: 'https://example.com/profile',
+      }),
+    });
+
+    const response = await POST(request);
+    const data = await response.json();
+    const audienceMemberInsert = insertedValues.find(
+      value => value.type === 'anonymous'
+    );
+
+    expect(response.status).toBe(200);
+    expect(data.success).toBe(true);
+    expect(sessionAttempt).toBe(2);
+    expect(mockInvalidateColumnExistenceCache).toHaveBeenCalledWith(
+      'audience_members',
+      'latest_referrer_url'
+    );
+    expect(mockCaptureWarning).toHaveBeenCalledWith(
+      '[audience/visit] audience_members summary column missing; retrying without optional column writes',
+      expect.any(Error),
+      { column: 'latest_referrer_url' }
+    );
+    expect(audienceMemberInsert).toBeDefined();
+    expect(audienceMemberInsert).not.toHaveProperty('latestReferrerUrl');
     expect(mockCaptureError).not.toHaveBeenCalled();
   });
 

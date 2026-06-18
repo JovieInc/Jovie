@@ -61,7 +61,7 @@ export function ErrorDetails({ error, extraContext }: ErrorDetailsProps) {
     navigator.clipboard
       .writeText(details)
       .then(() => {
-        toast.success('Error details copied to clipboard');
+        toast.success('Copied');
       })
       .catch(() => {
         toast.error('Failed to copy error details');

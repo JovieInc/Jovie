@@ -185,9 +185,7 @@ function processSaveSuccess({
   track('dashboard_social_links_saved', { profileId });
 
   const now = new Date();
-  toast.success(
-    `Links saved successfully. Last saved: ${now.toLocaleTimeString()}`
-  );
+  toast.success(`Links saved. Last saved: ${now.toLocaleTimeString()}`);
 }
 
 /**
