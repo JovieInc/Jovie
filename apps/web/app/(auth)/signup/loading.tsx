@@ -6,7 +6,7 @@ import { AuthPageSkeleton } from '@/features/auth';
 export default function SignUpLoading() {
   return (
     <AuthPageSkeleton
-      formTitle='Request access'
+      formTitle='Create your account'
       showFormTitle={false}
       layoutVariant='split'
     />

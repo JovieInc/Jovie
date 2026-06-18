@@ -222,8 +222,8 @@ export const COMMANDS: readonly Command[] = [
   ),
   nav(
     'go-chats',
-    'Chats',
-    'Open the all-chats workspace.',
+    'Conversations',
+    'Open the all-conversations workspace.',
     'MessageSquare',
     APP_ROUTES.CHATS
   ),

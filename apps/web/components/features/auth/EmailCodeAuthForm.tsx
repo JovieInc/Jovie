@@ -64,7 +64,7 @@ function getSendErrorMessage(mode: AuthShellMode, error: unknown): string {
   const { code } = readClerkError(error);
 
   if (mode === 'sign-in' && code === 'form_identifier_not_found') {
-    return 'No account found for this email. Request access below to get started.';
+    return 'No account found for this email. Create your account below to get started.';
   }
   if (mode === 'sign-up' && code === 'form_identifier_exists') {
     return 'An account with this email already exists. Sign in instead.';

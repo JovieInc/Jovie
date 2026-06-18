@@ -86,7 +86,7 @@ describe('DesktopTitlebar', () => {
       screen.getByTestId('electron-sidebar-toggle').querySelector('svg')
     ).toBeTruthy();
     expect(
-      screen.queryByRole('link', { name: 'New Chat' })
+      screen.queryByRole('link', { name: 'New Conversation' })
     ).not.toBeInTheDocument();
   });
 
