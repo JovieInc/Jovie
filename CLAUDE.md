@@ -70,6 +70,7 @@ These rules will block your changes if violated.
 - **Outbound email personalization must fail safe (generic fallback)** → [`.claude/rules/security.md`](.claude/rules/security.md)
 - **Entitlements: single source of truth (`getCurrentUserEntitlements()`)** → [`.claude/rules/security.md`](.claude/rules/security.md)
 - **Performance must not replace route UIs (same design, faster)** → [`.claude/rules/ui.md`](.claude/rules/ui.md)
+- **iOS: no raw `AsyncImage`, no CoreImage in views, no main-thread blocking, cache-first loads** → [`.claude/rules/ios.md`](.claude/rules/ios.md)
 - **Founder/featured-creator identity must be canonical (Tim White Spotify ID `4u`)** → [`.claude/rules/ui.md`](.claude/rules/ui.md)
 - **Bot review comments (CodeRabbit, Greptile) block merge** → [`.claude/rules/release.md`](.claude/rules/release.md)
 - **Conventional commits required** → [`.claude/rules/release.md`](.claude/rules/release.md)
@@ -135,6 +136,7 @@ Read the file for the topic you're touching. More-local instructions override th
 | [`.claude/rules/ci-branching.md`](.claude/rules/ci-branching.md) | Agent integration branches, train PRs, CI throughput for parallel work |
 | [`.claude/rules/testing.md`](.claude/rules/testing.md) | E2E patterns, test perf, coverage, verify-before-done |
 | [`.claude/rules/infra.md`](.claude/rules/infra.md) | Cron, API budgets, forbidden infra, cost disclosure, API runtime |
+| [`.claude/rules/ios.md`](.claude/rules/ios.md) | Native SwiftUI app: cache-first loads, off-main rendering, image caching, layout shift, guardrail lint, company-wide portability |
 | [`.claude/rules/code-style.md`](.claude/rules/code-style.md) | TypeScript, React, server/client boundaries, canonical imports, ESLint, hooks |
 | [`.claude/rules/linear.md`](.claude/rules/linear.md) | Issue gating, ownership contract |
 | [`.claude/rules/gstack.md`](.claude/rules/gstack.md) | Vendored toolkit, skill routing |
