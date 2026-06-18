@@ -1,6 +1,8 @@
-import { describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it } from 'vitest';
 import { APP_ROUTES } from '@/constants/routes';
 import {
+  _analyzeHostCache,
+  _categorizePathCache,
   analyzeHost,
   categorizePath,
   DASHBOARD_URL,
@@ -8,6 +10,46 @@ import {
 } from '@/lib/routing/proxy-routing';
 
 describe('proxy routing helpers', () => {
+  beforeEach(() => {
+    _categorizePathCache.clear();
+    _analyzeHostCache.clear();
+  });
+
+  describe('memoization', () => {
+    it('returns the same cached object for repeated categorizePath calls', () => {
+      const first = categorizePath('/timwhite');
+      const second = categorizePath('/timwhite');
+
+      expect(second).toBe(first);
+    });
+
+    it('returns the same cached object for repeated analyzeHost calls', () => {
+      const first = analyzeHost('jov.ie');
+      const second = analyzeHost('jov.ie');
+
+      expect(second).toBe(first);
+    });
+
+    it('bounds categorizePath cache at 1000 entries with FIFO eviction', () => {
+      for (let i = 0; i < 1001; i++) {
+        categorizePath(`/user-${i}`);
+      }
+
+      expect(_categorizePathCache.size).toBe(1000);
+      expect(_categorizePathCache.has('/user-0')).toBe(false);
+      expect(_categorizePathCache.has('/user-1000')).toBe(true);
+    });
+
+    it('bounds analyzeHost cache at 50 entries with FIFO eviction', () => {
+      for (let i = 0; i < 51; i++) {
+        analyzeHost(`host-${i}.example.com`);
+      }
+
+      expect(_analyzeHostCache.size).toBe(50);
+      expect(_analyzeHostCache.has('host-0.example.com')).toBe(false);
+      expect(_analyzeHostCache.has('host-50.example.com')).toBe(true);
+    });
+  });
   describe('analyzeHost', () => {
     it('treats local, preview, staging, and production app hosts as main hosts', () => {
       const hosts = [
