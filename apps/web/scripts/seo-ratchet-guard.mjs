@@ -6,9 +6,13 @@
  *  1. Contains all AI crawlers listed in seo-ratchet.baseline.json
  *  2. Does NOT use fail-dangerous production detection (=== 'production')
  *  3. Retains /app/ and /api/ disallow paths
+ *  4. References sitemap.xml
  *
- * This is intentionally zero-network: no server is needed. Behavioral
- * correctness is covered by tests/app/robots.test.ts.
+ * Verifies sitemap.ts emits lastModified for every entry.
+ * Verifies profile/asset routes retain JSON-LD + metadata markers.
+ *
+ * Behavioral correctness is covered by tests/app/robots.test.ts,
+ * tests/app/sitemap.test.ts, and tests/app/seo-ratchet.test.ts.
  *
  * Exit 0 = all checks passed. Exit 1 = at least one failure (with remediation).
  */
@@ -21,6 +25,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const projectRoot = join(__dirname, '..');
 
 const ROBOTS_PATH = join(projectRoot, 'app', 'robots.ts');
+const SITEMAP_PATH = join(projectRoot, 'app', 'sitemap.ts');
 const BASELINE_PATH = join(projectRoot, 'seo-ratchet.baseline.json');
 
 const errors = [];
@@ -30,6 +35,10 @@ const warnings = [];
 
 if (!existsSync(ROBOTS_PATH)) {
   errors.push(`robots.ts not found at ${ROBOTS_PATH}`);
+}
+
+if (!existsSync(SITEMAP_PATH)) {
+  errors.push(`sitemap.ts not found at ${SITEMAP_PATH}`);
 }
 
 if (!existsSync(BASELINE_PATH)) {
@@ -42,6 +51,7 @@ if (errors.length > 0) {
 }
 
 const robotsSrc = readFileSync(ROBOTS_PATH, 'utf8');
+const sitemapSrc = readFileSync(SITEMAP_PATH, 'utf8');
 const baseline = JSON.parse(readFileSync(BASELINE_PATH, 'utf8'));
 
 // ── Check 1: All required AI crawlers are present ───────────────────────────
@@ -111,6 +121,57 @@ if (!robotsSrc.includes('sitemap.xml')) {
   );
 } else {
   console.log(`[seo-ratchet] ✓ sitemap.xml reference present`);
+}
+
+// ── Check 5: sitemap.ts emits lastModified ───────────────────────────────────
+
+if (baseline.sitemap?.requireLastModified) {
+  if (!/lastModified/.test(sitemapSrc)) {
+    errors.push(
+      `sitemap.ts does not set lastModified on sitemap entries.\n` +
+        `  Every public URL must include <lastmod> in sitemap.xml.`
+    );
+  } else {
+    console.log(`[seo-ratchet] ✓ sitemap.ts sets lastModified on entries`);
+  }
+}
+
+// ── Check 6: profile/asset JSON-LD source markers ───────────────────────────
+
+for (const marker of baseline.sourceMarkers ?? []) {
+  const filePath = join(projectRoot, marker.file);
+  if (!existsSync(filePath)) {
+    errors.push(
+      `SEO source marker file missing: ${marker.file}\n` +
+        `  Update seo-ratchet.baseline.json if this route moved.`
+    );
+    continue;
+  }
+
+  const source = readFileSync(filePath, 'utf8');
+  const missingMarkers = marker.markers.filter(
+    token => !source.includes(token)
+  );
+  if (missingMarkers.length > 0) {
+    errors.push(
+      `${marker.file} lost required SEO/AEO markers for ${marker.id}: ${missingMarkers.join(', ')}\n` +
+        `  Restore JSON-LD/metadata wiring or update seo-ratchet.baseline.json intentionally.`
+    );
+  } else {
+    console.log(`[seo-ratchet] ✓ ${marker.id} source markers present`);
+  }
+}
+
+// ── Check 7: baseline route registry is non-empty ─────────────────────────────
+
+if (!Array.isArray(baseline.routes) || baseline.routes.length === 0) {
+  errors.push(
+    'seo-ratchet.baseline.json must list at least one SEO-clean route in `routes`.'
+  );
+} else {
+  console.log(
+    `[seo-ratchet] ✓ ${baseline.routes.length} baseline SEO-clean routes registered`
+  );
 }
 
 // ── Report ───────────────────────────────────────────────────────────────────

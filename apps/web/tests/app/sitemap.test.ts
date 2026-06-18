@@ -183,6 +183,14 @@ describe('sitemap', () => {
       expect(entries.map(entry => entry.url)).not.toContain(blockedUrl);
     }
 
+    for (const entry of entries) {
+      expect(
+        entry.lastModified,
+        `${entry.url} must include lastModified for sitemap <lastmod>`
+      ).toBeDefined();
+    }
+
+    expect(entries.length).toBeGreaterThan(0);
     expect(selectMock).toHaveBeenCalledTimes(4);
     expect(queryMock).toHaveBeenCalled();
   });
