@@ -51,10 +51,9 @@ describe('DashboardNav interactions', () => {
   it('renders the full primary navigation config', () => {
     renderDashboardNav({ renderFn: render });
 
-    expect(screen.getByRole('link', { name: 'New Chat' })).toHaveAttribute(
-      'href',
-      APP_ROUTES.CHAT
-    );
+    expect(
+      screen.getByRole('link', { name: 'New Conversation' })
+    ).toHaveAttribute('href', APP_ROUTES.CHAT);
     expect(screen.getByRole('link', { name: 'Releases' })).toHaveAttribute(
       'href',
       buildLibraryViewRoute('releases')
@@ -84,10 +83,9 @@ describe('DashboardNav interactions', () => {
       'href',
       buildLibraryViewRoute('releases')
     );
-    expect(screen.getByRole('link', { name: 'New Chat' })).toHaveAttribute(
-      'href',
-      APP_ROUTES.CHAT
-    );
+    expect(
+      screen.getByRole('link', { name: 'New Conversation' })
+    ).toHaveAttribute('href', APP_ROUTES.CHAT);
   });
 
   it('shows grouped admin navigation with growth links for admin users', () => {
@@ -267,7 +265,7 @@ describe('DashboardNav interactions', () => {
       appFlags: { DESIGN_V1: true },
     });
 
-    expect(screen.getByText('Chats')).toBeInTheDocument();
+    expect(screen.getByText('Conversations')).toBeInTheDocument();
     expect(mockUseChatConversationsQuery).toHaveBeenCalledWith({
       limit: 10,
       enabled: true,
@@ -278,7 +276,9 @@ describe('DashboardNav interactions', () => {
       '/app/chat/thread-newer'
     );
     expect(
-      screen.getByRole('button', { name: 'Chat actions for Pitch tasks' })
+      screen.getByRole('button', {
+        name: 'Conversation Actions for Pitch tasks',
+      })
     ).toBeInTheDocument();
   });
 
@@ -308,9 +308,11 @@ describe('DashboardNav interactions', () => {
       appFlags: { DESIGN_V1: true },
     });
 
-    expect(screen.getAllByRole('link', { name: 'New Chat' })).toHaveLength(1);
     expect(
-      screen.getByRole('button', { name: 'New Chat' })
+      screen.getAllByRole('link', { name: 'New Conversation' })
+    ).toHaveLength(1);
+    expect(
+      screen.getByRole('button', { name: 'New Conversation' })
     ).toBeInTheDocument();
   });
 

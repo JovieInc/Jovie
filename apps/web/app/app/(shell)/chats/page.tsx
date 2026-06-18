@@ -11,7 +11,7 @@ export default async function ChatsPage() {
     route: APP_ROUTES.CHATS,
     dashboardErrorLogMessage: 'Dashboard data load failed on chats page',
     dashboardErrorMessage:
-      'Failed to load chats data. Please refresh the page.',
+      'Failed to load conversations data. Please refresh the page.',
   });
   if (!routeContext.ok) {
     return routeContext.error;
