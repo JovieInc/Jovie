@@ -892,6 +892,7 @@ jobs:
           PREVIEW_RESULT="${{ needs.ci-pr-vercel-preview.result }}"
           EVENT_NAME="${{ github.event_name }}"
           PR_ACTOR="${{ github.actor }}"
+          PR_BRANCH="${{ github.head_ref }}"
           echo "ci-fast: $FAST_RESULT"
           echo "ci-unit-tests: $UNIT_RESULT"
           echo "ci-build-public: $BUILD_RESULT"
@@ -985,7 +986,7 @@ jobs:
           fi
 
           if [[ "$EVENT_NAME" == "pull_request" && "$RISK_REQUIRES_PREVIEW" == "true" && "$PREVIEW_RESULT" != "success" ]]; then
-            if [[ "$PR_ACTOR" == "dependabot[bot]" && "$PREVIEW_RESULT" == "skipped" ]]; then
+            if [[ ("$PR_ACTOR" == "dependabot[bot]" || "$PR_BRANCH" == dependabot/*) && "$PREVIEW_RESULT" == "skipped" ]]; then
               echo "Preview deploy skipped for Dependabot PR — waived (preview job intentionally excluded for bot PRs)."
             else
               echo "❌ Risk classifier requires preview evidence, but Preview Deploy result was $PREVIEW_RESULT"
