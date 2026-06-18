@@ -11,8 +11,13 @@ import { env } from '@/lib/env-server';
 //
 // Uses VERCEL_ENV to distinguish production from preview/staging at build time,
 // making this route statically renderable (no runtime headers() dependency).
-
-const isProduction = env.VERCEL_ENV === 'production';
+//
+// Fail-safe default: serve allow-rules UNLESS an affirmative non-prod signal is
+// present. A missing or empty VERCEL_ENV must never block production crawlers —
+// the original `=== 'production'` check was fail-dangerous (undefined → Disallow: /).
+const isPreview =
+  env.VERCEL_ENV === 'preview' || env.VERCEL_ENV === 'development';
+const isProduction = !isPreview;
 
 /**
  * Paths blocked from indexing.
