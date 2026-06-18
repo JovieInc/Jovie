@@ -11,7 +11,7 @@
     "dev:fast": "node scripts/dev-fast.mjs",
     "dev:local": "next dev",
     "dev:local:browse": "E2E_USE_TEST_AUTH_BYPASS=1 NEXT_PUBLIC_CLERK_MOCK=1 NEXT_PUBLIC_CLERK_PROXY_DISABLED=1 next dev",
-    "dev:local:playwright": "NEXT_PUBLIC_E2E_MODE=1 NEXT_DISABLE_TOOLBAR=1 next dev --webpack",
+    "dev:local:playwright": "NODE_OPTIONS=--max-old-space-size=4096 NEXT_PUBLIC_E2E_MODE=1 NEXT_DISABLE_TOOLBAR=1 next dev --webpack",
     "validate-env": "tsx scripts/validate-env.ts",
     "check:signup-readiness": "tsx scripts/check-signup-readiness.ts",
     "check:signed-in-auth": "tsx scripts/verify-signed-in-auth.ts",
