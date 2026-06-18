@@ -11,14 +11,10 @@ struct VenueModeView: View {
       JovieColor.backgroundBase.ignoresSafeArea()
 
       VStack(spacing: JovieSpacing.large) {
-        if let image = QRCodeRenderer.image(for: qrPayload) {
-          Image(uiImage: image)
-            .interpolation(.none)
-            .resizable()
-            .scaledToFit()
-            .jovieQRCodePlate()
-            .accessibilityLabel("Fullscreen Profile QR Code")
-        }
+        QRCodeCardView(
+          payload: qrPayload,
+          accessibilityLabelText: "Fullscreen Profile QR Code"
+        )
 
         Button("Done") {
           onDismiss()
