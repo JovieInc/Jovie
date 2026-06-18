@@ -109,3 +109,34 @@ export function isUniqueViolation(
     (pg.detail ?? '').includes(constraint)
   );
 }
+
+/**
+ * Check whether an error (possibly Drizzle-wrapped) is a PostgreSQL
+ * undefined_column error (42703).
+ */
+export function isUndefinedColumnError(error: unknown): boolean {
+  return unwrapPgError(error).code === '42703';
+}
+
+/**
+ * Check whether an error references a specific missing column name.
+ * Matches both quoted (`"column_name"`) and unquoted forms in PG messages.
+ */
+export function isMissingColumnError(
+  error: unknown,
+  columnName: string
+): boolean {
+  const message = getDeepErrorMessage(error).toLowerCase();
+  const normalizedColumn = columnName.toLowerCase();
+
+  const mentionsColumn =
+    message.includes(`"${normalizedColumn}"`) ||
+    message.includes(`column ${normalizedColumn}`) ||
+    message.includes(`column "${normalizedColumn}"`);
+
+  if (!mentionsColumn) {
+    return false;
+  }
+
+  return isUndefinedColumnError(error) || message.includes('does not exist');
+}

@@ -102,7 +102,7 @@ function SettingsNavGroup({
                   const url = `${origin}${item.href}`;
                   const ok = await copyToClipboard(url);
                   if (ok) {
-                    toast.success('Link copied to clipboard');
+                    toast.success('Link copied');
                   } else {
                     toast.error('Failed to copy link');
                   }

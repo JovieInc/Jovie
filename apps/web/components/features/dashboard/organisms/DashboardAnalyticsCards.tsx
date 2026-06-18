@@ -212,7 +212,7 @@ export const DashboardAnalyticsCards = memo(function DashboardAnalyticsCards({
     try {
       await navigator.clipboard.writeText(profileUrl);
       setCopied(true);
-      notifications.success('Copied to clipboard', { duration: 2000 });
+      notifications.success('Copied', { duration: 2000 });
       setTimeout(() => setCopied(false), CLIPBOARD_FEEDBACK_DELAY_MS);
     } catch (e) {
       void captureError('Failed to copy profile URL to clipboard', e, {

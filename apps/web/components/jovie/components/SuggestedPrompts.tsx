@@ -49,6 +49,8 @@ interface SuggestedPromptsProps {
   readonly latestReleaseTitle?: string | null;
   readonly canUseAdvancedTools?: boolean;
   readonly albumArtCapability?: PromptCapability;
+  /** When true, hides the "Build artist profile" chip — profile setup is done. */
+  readonly isProfileComplete?: boolean;
   readonly layout?: 'rail' | 'grid' | 'flat';
   /**
    * Variant F: while the slash picker is open, fade chips out (don't unmount)
@@ -107,11 +109,19 @@ export function SuggestedPrompts({
   latestReleaseTitle,
   canUseAdvancedTools = false,
   albumArtCapability,
+  isProfileComplete = false,
   layout = 'rail',
   dimmed = false,
 }: SuggestedPromptsProps) {
+  const filterProfileSuggestion = (suggestions: readonly ChatSuggestion[]) =>
+    isProfileComplete
+      ? suggestions.filter(
+          suggestion => suggestion.label !== 'Build Artist Profile'
+        )
+      : suggestions;
+
   const promptSuggestions = isFirstSession
-    ? FIRST_SESSION_SUGGESTIONS.map(suggestion => {
+    ? filterProfileSuggestion(FIRST_SESSION_SUGGESTIONS).map(suggestion => {
         if (
           suggestion.icon === 'Link2' &&
           typeof latestReleaseTitle === 'string' &&
@@ -127,7 +137,7 @@ export function SuggestedPrompts({
 
         return suggestion;
       })
-    : DEFAULT_SUGGESTIONS;
+    : filterProfileSuggestion(DEFAULT_SUGGESTIONS);
 
   const resolvedAlbumArtCapability = albumArtCapability ?? {
     availability: 'unknown' as const,
@@ -158,7 +168,7 @@ export function SuggestedPrompts({
 
   const promptSuggestionsWithCapabilities = promptSuggestions.flatMap(
     suggestion => {
-      if (suggestion.label !== 'Generate album art') return [suggestion];
+      if (suggestion.label !== 'Generate Album Art') return [suggestion];
       // Provider broken → drop the album-art pill entirely; surface the brief
       // fallback in its place so the row keeps a creative-direction action.
       if (isAlbumArtProviderBroken) {
@@ -229,7 +239,7 @@ export function SuggestedPrompts({
               onSelect={onSelect}
               className='min-w-0 max-w-none justify-start px-3.5 py-2'
               disabled={
-                suggestion.label === 'Generate album art' && albumArtDisabled
+                suggestion.label === 'Generate Album Art' && albumArtDisabled
               }
               disabledReason={resolvedAlbumArtCapability.reason}
             />
@@ -246,7 +256,7 @@ export function SuggestedPrompts({
                 density='compact'
                 className='min-w-0 max-w-none px-3'
                 disabled={
-                  suggestion.label === 'Generate album art' && albumArtDisabled
+                  suggestion.label === 'Generate Album Art' && albumArtDisabled
                 }
                 disabledReason={resolvedAlbumArtCapability.reason}
               />
@@ -275,7 +285,7 @@ export function SuggestedPrompts({
               onClick={() => {
                 if (
                   !(
-                    suggestion.label === 'Generate album art' &&
+                    suggestion.label === 'Generate Album Art' &&
                     albumArtDisabled
                   )
                 ) {
@@ -283,12 +293,12 @@ export function SuggestedPrompts({
                 }
               }}
               disabled={
-                suggestion.label === 'Generate album art' && albumArtDisabled
+                suggestion.label === 'Generate Album Art' && albumArtDisabled
               }
               className='group system-b-chat-suggested-prompts-flat-button'
               aria-label={suggestion.label}
               title={
-                suggestion.label === 'Generate album art'
+                suggestion.label === 'Generate Album Art'
                   ? (resolvedAlbumArtCapability.reason ?? undefined)
                   : undefined
               }
@@ -332,7 +342,7 @@ export function SuggestedPrompts({
               onSelect={onSelect}
               className='snap-start'
               disabled={
-                suggestion.label === 'Generate album art' && albumArtDisabled
+                suggestion.label === 'Generate Album Art' && albumArtDisabled
               }
               disabledReason={resolvedAlbumArtCapability.reason}
             />

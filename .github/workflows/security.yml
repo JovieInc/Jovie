@@ -2,6 +2,7 @@
 #
 # This workflow complements CodeQL by adding:
 # - Gitleaks: Secret detection in git history
+# - TruffleHog: Defense-in-depth secret scanning (JOV-3215)
 # - Trivy: Vulnerability scanning for dependencies and filesystem (added in subtask-1-4)
 # - OSSF Scorecard: Supply chain security scoring (added in subtask-1-5)
 #
@@ -10,8 +11,8 @@ name: Security Scanning
 on:
   push:
     branches: ['main']
-  # Removed pull_request trigger — security scanning on push-to-main catches
-  # everything that merges, weekly schedule covers drift. Saves ~300 runs/month.
+  pull_request:
+    branches: ['main']
   schedule:
     - cron: '0 6 * * 1' # Weekly on Monday at 6:00 AM UTC
   workflow_dispatch:
@@ -41,8 +42,25 @@ jobs:
           GITLEAKS_LICENSE: ${{ secrets.GITLEAKS_LICENSE }}
           GITLEAKS_ENABLE_COMMENTS: false
 
-      - name: Verify gitleaks detects Neon/Clerk leak shapes (JOV-2940)
+      - name: Verify gitleaks detects Neon/Clerk leak shapes and backup files
         run: ./scripts/security/verify-gitleaks-coverage.sh
+
+  trufflehog:
+    name: TruffleHog Secret Scanning
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          fetch-depth: 0
+
+      - name: Run TruffleHog (full history on main/schedule, PR diff on pull_request)
+        uses: trufflesecurity/trufflehog@d411fff7b8879a62509f3fa98c07f247ac089a51 # v3.95.5
+        with:
+          path: ./
+          extra_args: --no-verification --exclude-paths=.trufflehog-exclude.txt
 
   trivy:
     name: Trivy Vulnerability Scanning

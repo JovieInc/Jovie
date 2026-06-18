@@ -981,6 +981,20 @@ describe('proxy.ts middleware', () => {
       expect(res.headers.get('location')).toContain('handle=artist');
     });
 
+    it('redirects authenticated needsOnboarding users from / to /start without bouncing through /app (JOV-2454)', async () => {
+      mocks.getUserState.mockResolvedValue(USER_STATES.needsOnboarding);
+
+      const req = createAuthenticatedRequest('clerk_user_1', {
+        pathname: '/',
+      });
+      const res = await callMiddleware(req);
+
+      expect(res.status).toBeGreaterThanOrEqual(300);
+      expect(res.status).toBeLessThan(400);
+      expect(isRedirectTo(res, '/start')).toBe(true);
+      expect(isRedirectTo(res, '/app')).toBe(false);
+    });
+
     it('redirects authenticated legacy earnings deep links to artist profile pay', async () => {
       mocks.getUserState.mockResolvedValue(USER_STATES.active);
 
@@ -1024,7 +1038,7 @@ describe('proxy.ts middleware', () => {
   // Circuit Breaker
   // ==========================================================================
   describe('circuit breaker (redirect loop prevention)', () => {
-    it('rewrites to /start and increments redirect count', async () => {
+    it('redirects to /start and increments redirect count', async () => {
       mocks.getUserState.mockResolvedValue(USER_STATES.needsOnboarding);
 
       const req = createAuthenticatedRequest('clerk_user_1', {
@@ -1032,16 +1046,15 @@ describe('proxy.ts middleware', () => {
       });
       const res = await callMiddleware(req);
 
-      // Verify the rewrite destination is /start
-      const rewriteUrl = res.headers.get('x-middleware-rewrite');
-      expect(rewriteUrl).toBeTruthy();
-      expect(new URL(rewriteUrl!).pathname).toBe('/start');
+      expect(res.status).toBeGreaterThanOrEqual(300);
+      expect(res.status).toBeLessThan(400);
+      expect(isRedirectTo(res, '/start')).toBe(true);
 
       const cookies = getResponseCookies(res);
       expect(cookies.jovie_redirect_count).toBe('1');
     });
 
-    it('increments redirect count on subsequent rewrites', async () => {
+    it('increments redirect count on subsequent redirects', async () => {
       mocks.getUserState.mockResolvedValue(USER_STATES.needsOnboarding);
 
       const req = createAuthenticatedRequest('clerk_user_1', {
@@ -1083,7 +1096,7 @@ describe('proxy.ts middleware', () => {
       expect(res.status).toBeLessThan(300);
     });
 
-    it('rewrites needsWaitlist user from /pricing to /waitlist and increments count', async () => {
+    it('redirects needsWaitlist user from /pricing to /waitlist and increments count', async () => {
       mocks.getUserState.mockResolvedValue(USER_STATES.needsWaitlist);
 
       const req = createAuthenticatedRequest('clerk_user_1', {
@@ -1091,9 +1104,9 @@ describe('proxy.ts middleware', () => {
       });
       const res = await callMiddleware(req);
 
-      const rewriteUrl = res.headers.get('x-middleware-rewrite');
-      expect(rewriteUrl).toBeTruthy();
-      expect(new URL(rewriteUrl!).pathname).toBe('/waitlist');
+      expect(res.status).toBeGreaterThanOrEqual(300);
+      expect(res.status).toBeLessThan(400);
+      expect(isRedirectTo(res, '/waitlist')).toBe(true);
 
       const cookies = getResponseCookies(res);
       expect(cookies.jovie_redirect_count).toBe('1');
@@ -1109,9 +1122,7 @@ describe('proxy.ts middleware', () => {
       const res = await callMiddleware(req);
 
       // Cookie was unparseable → treat as 0 and increment to 1, NOT NaN+1.
-      const rewriteUrl = res.headers.get('x-middleware-rewrite');
-      expect(rewriteUrl).toBeTruthy();
-      expect(new URL(rewriteUrl!).pathname).toBe('/start');
+      expect(isRedirectTo(res, '/start')).toBe(true);
       const cookies = getResponseCookies(res);
       expect(cookies.jovie_redirect_count).toBe('1');
     });

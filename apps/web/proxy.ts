@@ -155,25 +155,27 @@ function readRedirectCount(req: NextRequest): number {
 }
 
 /**
- * Apply a state-based rewrite with a shared redirect-loop circuit breaker.
- * Returns the rewritten NextResponse, or null when the breaker fires (caller
+ * Apply a state-based redirect with a shared redirect-loop circuit breaker.
+ * Returns the redirect NextResponse, or null when the breaker fires (caller
  * falls through with NextResponse.next() and a Sentry event).
  *
- * The counter is shared across all state-based rewrites (waitlist + onboarding)
+ * Uses redirect (not rewrite) so the URL bar moves to the canonical target.
+ * Rewrites left the original pathname in the address bar, which caused
+ * repeated middleware hits (RSC prefetches) on non-exempt paths and tripped
+ * the breaker even when the user was already viewing onboarding content.
+ *
+ * The counter is shared across all state-based redirects (waitlist + onboarding)
  * so any loop class trips the same breaker.
  */
-function applyStateRewrite(
+function applyStateRedirect(
   req: NextRequest,
-  requestHeaders: Headers,
   target: string
 ): NextResponse | null {
   const redirectCount = readRedirectCount(req);
   if (redirectCount >= PROXY_REWRITE_CIRCUIT_BREAKER_THRESHOLD) {
     return null;
   }
-  const res = NextResponse.rewrite(new URL(target, req.url), {
-    request: { headers: requestHeaders },
-  });
+  const res = NextResponse.redirect(new URL(target, req.url));
   res.cookies.set(PROXY_REWRITE_COUNT_COOKIE, String(redirectCount + 1), {
     maxAge: PROXY_REWRITE_COUNT_TTL_SECONDS,
     path: '/',
@@ -459,17 +461,10 @@ async function handleRequest(req: NextRequest, userId: string | null) {
       req.headers.get('Next-Router-Prefetch') === '1' ||
       req.nextUrl.searchParams.has('_rsc');
 
-    // Authenticated users on homepage → redirect to dashboard at the edge.
-    // Skips the client-side AuthRedirectHandler overlay (black flash) entirely.
-    // No getUserState needed — /app handles waitlist/onboarding gating in its layout.
-    if (pathname === '/' && isNavigationMethod && !isRSCPrefetch) {
-      return NextResponse.redirect(new URL(DASHBOARD_URL, req.url));
-    }
-
     // Fetch user state ONCE for all authenticated routing decisions
     let userState: ProxyUserState | null = null;
 
-    // Only non-/app page routes need user state for middleware rewrites.
+    // Only non-/app page routes need user state for middleware redirects.
     // /app and /app/* perform auth and onboarding/waitlist gating deeper in
     // route handlers/layouts, so proxy-level state lookups are unnecessary.
     const needsUserState =
@@ -480,13 +475,27 @@ async function handleRequest(req: NextRequest, userId: string | null) {
 
     // Skip the getUserState call for RSC prefetch requests when the user is
     // already known-active from the in-memory cache. Active users don't need
-    // routing intervention (no waitlist/onboarding rewrite), so the prefetch
+    // routing intervention (no waitlist/onboarding redirect), so the prefetch
     // can pass through immediately. The subsequent full navigation will still
     // call getUserState normally.
     const canSkipForPrefetch = isRSCPrefetch && isKnownActiveUser(userId);
 
     if (needsUserState && !canSkipForPrefetch) {
       userState = await getUserState(userId);
+    }
+
+    // Authenticated users on homepage → route based on user state at the edge.
+    // needsOnboarding users go directly to /start so we never bounce through
+    // /app (which immediately redirects back to /start and can loop with
+    // /onboarding/checkout — JOV-2454 / ENG-002).
+    if (pathname === '/' && isNavigationMethod && !isRSCPrefetch) {
+      if (userState?.needsOnboarding) {
+        return NextResponse.redirect(new URL(APP_ROUTES.START, req.url));
+      }
+      if (userState?.needsWaitlist) {
+        return NextResponse.redirect(new URL('/waitlist', req.url));
+      }
+      return NextResponse.redirect(new URL(DASHBOARD_URL, req.url));
     }
 
     let res: NextResponse;
@@ -548,12 +557,8 @@ async function handleRequest(req: NextRequest, userId: string | null) {
         !isInviteRedemptionPath &&
         !isProxyRewriteExempt(pathname)
       ) {
-        const waitlistRewrite = applyStateRewrite(
-          req,
-          requestHeaders,
-          '/waitlist'
-        );
-        if (waitlistRewrite === null) {
+        const waitlistRedirect = applyStateRedirect(req, '/waitlist');
+        if (waitlistRedirect === null) {
           await captureWarning(
             '[proxy] Redirect loop circuit breaker triggered',
             new Error('Redirect loop detected'),
@@ -567,7 +572,7 @@ async function handleRequest(req: NextRequest, userId: string | null) {
           res = NextResponse.next({ request: { headers: requestHeaders } });
           res.cookies.delete(PROXY_REWRITE_COUNT_COOKIE);
         } else {
-          res = waitlistRewrite;
+          res = waitlistRedirect;
         }
       } else if (
         userState.needsOnboarding &&
@@ -582,12 +587,8 @@ async function handleRequest(req: NextRequest, userId: string | null) {
           res = NextResponse.next({ request: { headers: requestHeaders } });
           res.cookies.delete('jovie_onboarding_complete');
         } else {
-          const rewriteRes = applyStateRewrite(
-            req,
-            requestHeaders,
-            APP_ROUTES.START
-          );
-          if (rewriteRes === null) {
+          const onboardingRedirect = applyStateRedirect(req, APP_ROUTES.START);
+          if (onboardingRedirect === null) {
             await captureWarning(
               '[proxy] Redirect loop circuit breaker triggered',
               new Error('Redirect loop detected'),
@@ -601,7 +602,7 @@ async function handleRequest(req: NextRequest, userId: string | null) {
             res = NextResponse.next({ request: { headers: requestHeaders } });
             res.cookies.delete(PROXY_REWRITE_COUNT_COOKIE);
           } else {
-            res = rewriteRes;
+            res = onboardingRedirect;
           }
         }
       } else if (
@@ -631,31 +632,6 @@ async function handleRequest(req: NextRequest, userId: string | null) {
     });
     return NextResponse.next();
   }
-}
-
-/**
- * Build the final response with CSP headers and cookies.
- * The nonce is pre-generated and set on request headers for Server Components.
- * Here we set it on response headers for the CSP policy.
- */
-
-function _getGeoFromRequest(req: NextRequest): {
-  city: string | null;
-  region: string | null;
-} {
-  const geoRequest = req as NextRequest & {
-    geo?: { city?: string | null; region?: string | null };
-  };
-
-  const rawCity = req.headers.get('x-vercel-ip-city')?.trim() ?? null;
-  const cityFromHeader = rawCity ? decodeURIComponent(rawCity) : null;
-  const regionFromHeader =
-    req.headers.get('x-vercel-ip-country-region')?.trim() ?? null;
-
-  return {
-    city: cityFromHeader || geoRequest.geo?.city?.trim() || null,
-    region: regionFromHeader || geoRequest.geo?.region?.trim() || null,
-  };
 }
 
 // Production Clerk middleware (default keys from env)

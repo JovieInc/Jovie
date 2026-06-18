@@ -129,6 +129,10 @@ output/
 .swarm/
 ruvector.db
 
+# no-mistakes gate evidence (branch-scoped artifacts; keep directory only)
+.no-mistakes/evidence/**
+!.no-mistakes/evidence/.gitkeep
+
 # AgentOS run artifacts (binary outputs not source-controlled)
 agentos/runs/**/artifacts/
 .hermes/

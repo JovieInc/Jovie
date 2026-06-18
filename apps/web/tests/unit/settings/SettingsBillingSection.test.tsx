@@ -72,7 +72,7 @@ describe('SettingsBillingSection', () => {
     expect(screen.getByText('Active')).toBeInTheDocument();
     expect(
       screen.getByText(
-        'Manage invoices, payment methods, and subscription details without leaving the app.'
+        'Open Stripe to manage invoices, payment methods, and subscription details.'
       )
     ).toBeInTheDocument();
     expect(

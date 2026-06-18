@@ -257,6 +257,15 @@ Once you understand the cause, fix it (likely in `free-model-router.ts` rankings
 2. On Air: `lsof -i :<gbrain-port>` — confirm `gbrain serve --http --bind <tailscale-ip>` is listening.
 3. On Pro: update MCP config to point at `http://<air-tailscale-ip>:<port>`.
 
+### Supabase connection exhaustion (Pro-hosted company brain)
+
+Hermes-Air runs gbrain on **PGLite** — no Postgres pool budget needed on the Air.
+The shared Supabase company brain on the MacBook Pro is different: each gbrain
+process multiplies pools unless clamped. See [`docs/GBRAIN_POOL_BUDGET.md`](./GBRAIN_POOL_BUDGET.md)
+for `GBRAIN_POOL_SIZE`, `GBRAIN_MAX_CONNECTIONS`, and verification steps.
+Codex hooks already source `scripts/lib/gbrain-pool-env.sh`; long-lived Pro
+cron/launchd wrappers must export the same env.
+
 ### Air rebooted
 
 launchd handles this. All services come back automatically because `RunAtLoad: true` is set on every plist. Confirm with status checks above.

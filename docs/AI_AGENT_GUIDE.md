@@ -554,7 +554,7 @@ For the full set of enforced rules, see [`AGENTS.md`](../AGENTS.md). Key points:
 - **No emoji in UI** -- use SVG icons
 - **Conventional commits** -- `type(scope): description`
 - **PR size limits** -- max 10 files, 400 lines diff
-- **Pre-push gate** -- typecheck, lint, test, boundaries check
+- **Pre-push gate** -- `scripts/hooks/pre-push-gate.sh` (husky + [no-mistakes OWL pilot](NO_MISTAKES_GATE.md)); escape: `JOVIE_SKIP_PRE_PUSH_GATE=1`
 - **Static marketing pages** -- no per-request data in `app/(marketing)`
 - **TanStack Query** -- always use cache presets, always pass AbortSignal
 - **Route constants** -- import `APP_ROUTES`, never hardcode paths

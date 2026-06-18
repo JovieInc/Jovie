@@ -38,6 +38,7 @@ import {
   ChatProposeNextStepCard,
   type NextStepCardPayload,
 } from './ChatProposeNextStepCard';
+import { OnboardingChatEmptyIntro } from './OnboardingChatEmptyIntro';
 import type {
   OnboardingProfileArtist,
   OnboardingProfileBuilderState,
@@ -682,11 +683,15 @@ interface OnboardingMessageRegionProps {
   readonly onboardingComposerSurface: ReactNode;
   readonly onHandleCandidateChange: (handle: string | null) => void;
   readonly onSelectArtist: (artist: OnboardingArtistSelection) => void;
+  readonly onSelectStarterSuggestion: (prompt: string) => void;
   readonly profileBuilderState: OnboardingProfileBuilderState;
   readonly shouldDockComposer: boolean;
+  readonly showEmptyIntro: boolean;
+  readonly composerPickerOpen: boolean;
 }
 
 function OnboardingMessageRegion({
+  composerPickerOpen,
   displayMessages,
   hasConversationStarted,
   isBusy,
@@ -695,8 +700,10 @@ function OnboardingMessageRegion({
   onboardingComposerSurface,
   onHandleCandidateChange,
   onSelectArtist,
+  onSelectStarterSuggestion,
   profileBuilderState,
   shouldDockComposer,
+  showEmptyIntro,
 }: OnboardingMessageRegionProps) {
   if (shouldDockComposer) {
     return (
@@ -717,7 +724,17 @@ function OnboardingMessageRegion({
 
   if (!hasConversationStarted) {
     return (
-      <ChatEmptyStateComposerRegion>
+      <ChatEmptyStateComposerRegion
+        above={
+          showEmptyIntro ? (
+            <OnboardingChatEmptyIntro
+              onSelectSuggestion={onSelectStarterSuggestion}
+              dimmed={composerPickerOpen}
+              isBusy={isBusy}
+            />
+          ) : undefined
+        }
+      >
         <div className='w-full' data-testid='onboarding-centered-composer'>
           {onboardingComposerSurface}
         </div>
@@ -1050,6 +1067,7 @@ export function OnboardingChat({
   const hasConversationStarted = messages.length > 0 || hasSentFirst;
   const shouldDockComposer =
     chatError !== null || userTurnCount > 1 || selectedArtist !== null;
+  const showEmptyIntro = !intentId && !starterPrompt;
 
   useEffect(() => {
     if (shouldDockComposer) return;
@@ -1091,7 +1109,7 @@ export function OnboardingChat({
   return (
     <section
       className='relative flex h-full min-h-0 flex-1 flex-col overflow-hidden bg-(--linear-app-content-surface)'
-      aria-label='Jovie onboarding chat'
+      aria-label='Jovie Onboarding Chat'
       data-testid='onboarding-chat'
       data-picker-open={composerPickerOpen ? 'true' : undefined}
     >
@@ -1113,6 +1131,7 @@ export function OnboardingChat({
           )}
         >
           <OnboardingMessageRegion
+            composerPickerOpen={composerPickerOpen}
             displayMessages={displayMessages}
             hasConversationStarted={hasConversationStarted}
             isBusy={isBusy}
@@ -1121,8 +1140,10 @@ export function OnboardingChat({
             onboardingComposerSurface={onboardingComposerSurface}
             onHandleCandidateChange={setHandleDraft}
             onSelectArtist={handleArtistSelect}
+            onSelectStarterSuggestion={submitText}
             profileBuilderState={profileBuilderState}
             shouldDockComposer={shouldDockComposer}
+            showEmptyIntro={showEmptyIntro}
           />
         </div>
       </div>

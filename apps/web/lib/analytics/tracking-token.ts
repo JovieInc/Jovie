@@ -75,6 +75,10 @@ function verifySignature(
   timestamp: number
 ): boolean {
   const expectedSignature = generateSignature(profileId, timestamp);
+  if (!expectedSignature) {
+    return false;
+  }
+
   const signatureBuffer = Buffer.from(signature, 'hex');
   const expectedBuffer = Buffer.from(expectedSignature, 'hex');
 
@@ -94,23 +98,31 @@ export function isTrackingTokenEnabled(): boolean {
 /**
  * Generate HMAC-SHA256 signature for a payload
  */
-function generateSignature(profileId: string, timestamp: number): string {
+function generateSignature(
+  profileId: string,
+  timestamp: number
+): string | null {
   const secret = getTrackingSecret();
   if (!secret) {
-    throw new TypeError('TRACKING_TOKEN_SECRET not configured');
+    return null;
   }
 
   const data = `${profileId}:${timestamp}`;
   return crypto.createHmac('sha256', secret).update(data).digest('hex');
 }
 
+export interface ClientTrackingToken {
+  token: string | null;
+  expiresAt: number | null;
+}
+
 /**
  * Generate a signed tracking token for a profile
  *
  * @param profileId - The creator profile ID
- * @returns Signed token string
+ * @returns Signed token string, dev placeholder in development, or null when signing is disabled
  */
-export function generateTrackingToken(profileId: string): string {
+export function generateTrackingToken(profileId: string): string | null {
   if (!isTrackingTokenEnabled()) {
     // Return a placeholder token in development
     if (env.NODE_ENV === 'development') {
@@ -122,11 +134,21 @@ export function generateTrackingToken(profileId: string): string {
       });
       return `${profileId}:${Date.now()}:dev`;
     }
-    throw new TypeError('Tracking token signing not configured');
+
+    Sentry.addBreadcrumb({
+      category: 'tracking-token',
+      message: 'TRACKING_TOKEN_SECRET not set - skipping token generation',
+      level: 'warning',
+      data: { profileId },
+    });
+    return null;
   }
 
   const timestamp = Date.now();
   const signature = generateSignature(profileId, timestamp);
+  if (!signature) {
+    return null;
+  }
 
   return `${profileId}:${timestamp}:${signature}`;
 }
@@ -226,11 +248,12 @@ export class TrackingTokenError extends Error {
  * Generate a tracking token for client-side use
  * This should be called server-side and passed to the client
  */
-export function getClientTrackingToken(profileId: string): {
-  token: string;
-  expiresAt: number;
-} {
+export function getClientTrackingToken(profileId: string): ClientTrackingToken {
   const token = generateTrackingToken(profileId);
+  if (!token) {
+    return { token: null, expiresAt: null };
+  }
+
   const expiresAt = Date.now() + TOKEN_VALIDITY_MS;
 
   return { token, expiresAt };

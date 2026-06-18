@@ -1,0 +1,2 @@
+scripts/security/gitleaks-fixture.txt
+scripts/security/gitleaks-backup-fixture.txt

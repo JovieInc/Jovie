@@ -29,7 +29,7 @@ export function ProfileMenuActions({
     const success = await copyToClipboard(profileUrl);
 
     if (success) {
-      notifications.success('Copied to clipboard');
+      notifications.success('Copied');
     } else {
       notifications.error('Failed to copy');
     }

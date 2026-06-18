@@ -6,6 +6,8 @@ Each `.plist.template` uses `{{HOME}}`, `{{JOVIE_REPO}}`, `{{HERMES_BIN}}`, `{{G
 
 The Hermes gateway itself is managed by the installed Hermes CLI as `ai.hermes.gateway`; these templates manage the Air-specific watchdog, gbrain server, and cron jobs around it.
 
+**Supabase pool budget:** Hermes-Air's `gbrain serve` uses PGLite and does not need Postgres pool env vars. If you run a Supabase-backed gbrain on the MacBook Pro (serve/autopilot/cron), export the clamp documented in `docs/GBRAIN_POOL_BUDGET.md` in every long-lived wrapper — Codex hooks already source `scripts/lib/gbrain-pool-env.sh`.
+
 ## Units
 
 | File | Schedule | Purpose |

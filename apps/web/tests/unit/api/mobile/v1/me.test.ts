@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const hoisted = vi.hoisted(() => ({
   captureErrorMock: vi.fn(),
@@ -61,6 +61,11 @@ describe('GET /api/mobile/v1/me', () => {
     );
     hoisted.isProfileCompleteMock.mockReturnValue(true);
     hoisted.isAppleWalletProfilePassAvailableMock.mockResolvedValue(true);
+    vi.stubEnv('MOBILE_CHAT_RUNTIME_ENABLED', 'true');
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
   });
 
   it('returns 401 when unauthenticated', async () => {
@@ -125,6 +130,7 @@ describe('GET /api/mobile/v1/me', () => {
       avatarUrl: 'https://cdn.jov.ie/avatar.png',
       continueOnWebUrl: 'https://jov.ie/app',
       appleWalletProfilePassAvailable: true,
+      chatEnabled: true,
     });
     expect(hoisted.isProfileCompleteMock).toHaveBeenCalledWith({
       username: 'djshadow',
@@ -133,6 +139,32 @@ describe('GET /api/mobile/v1/me', () => {
       isPublic: true,
       onboardingCompletedAt: new Date('2026-04-01T00:00:00.000Z'),
     });
+  });
+
+  it('reports chatEnabled from the mobile chat runtime switch', async () => {
+    vi.stubEnv('MOBILE_CHAT_RUNTIME_ENABLED', '');
+    hoisted.getSessionContextMock.mockResolvedValue({
+      user: {
+        userStatus: 'active',
+        isAdmin: false,
+      },
+      profile: {
+        id: 'profile_123',
+        username: 'djshadow',
+        usernameNormalized: 'djshadow',
+        displayName: 'DJ Shadow',
+        avatarUrl: null,
+        isPublic: true,
+        onboardingCompletedAt: new Date('2026-04-01T00:00:00.000Z'),
+      },
+    });
+
+    const { GET } = await routeModulePromise;
+    const response = await GET(makeRequest());
+    const data = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(data.chatEnabled).toBe(false);
   });
 
   it('returns needs_onboarding when the DB user is missing', async () => {
@@ -154,6 +186,7 @@ describe('GET /api/mobile/v1/me', () => {
       avatarUrl: null,
       continueOnWebUrl: 'https://jov.ie/app',
       appleWalletProfilePassAvailable: false,
+      chatEnabled: false,
     });
   });
 
@@ -179,6 +212,7 @@ describe('GET /api/mobile/v1/me', () => {
       avatarUrl: null,
       continueOnWebUrl: 'https://jov.ie/app',
       appleWalletProfilePassAvailable: false,
+      chatEnabled: false,
     });
   });
 
@@ -213,6 +247,7 @@ describe('GET /api/mobile/v1/me', () => {
       avatarUrl: null,
       continueOnWebUrl: 'https://jov.ie/app',
       appleWalletProfilePassAvailable: false,
+      chatEnabled: false,
     });
   });
 
