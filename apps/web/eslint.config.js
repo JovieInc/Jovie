@@ -21,6 +21,7 @@ const noAdHocCurrencyRule = require('./eslint-rules/no-ad-hoc-currency');
 const clerkOauthOptionsMustIncludePromptRule = require('./eslint-rules/clerk-oauth-options-must-include-prompt');
 const chatToolSchemaStrictRule = require('./eslint-rules/chat-tool-schema-strict');
 const canonicalUiLabelCasingRule = require('./eslint-rules/canonical-ui-label-casing');
+const noHardcodedThemeColorsRule = require('./eslint-rules/no-hardcoded-theme-colors');
 
 const [nextBase, nextTypescript, nextIgnores] = nextConfig;
 
@@ -50,6 +51,7 @@ const baseConfig = {
           clerkOauthOptionsMustIncludePromptRule,
         'chat-tool-schema-strict': chatToolSchemaStrictRule,
         'canonical-ui-label-casing': canonicalUiLabelCasingRule,
+        'no-hardcoded-theme-colors': noHardcodedThemeColorsRule,
       },
     },
   },
@@ -210,6 +212,9 @@ const baseConfig = {
     '@jovie/chat-tool-schema-strict': 'error',
     // DESIGN.md text casing — Title Case labels, sentence case body/toasts/tooltips
     '@jovie/canonical-ui-label-casing': 'error',
+    // Contrast guardrail — bare text-black/bg-white without dark: counterpart (JOV-11038)
+    // warn rather than error to avoid blocking legacy code; ratchet is the hard gate
+    '@jovie/no-hardcoded-theme-colors': 'warn',
   },
 };
 
