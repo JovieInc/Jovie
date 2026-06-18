@@ -247,7 +247,6 @@ enum NativeTicketSignInDiagnostics {
 
   private static func setSummary(_ summary: String) {
     UserDefaults.standard.set(summary, forKey: summaryKey)
-    UserDefaults.standard.synchronize()
   }
 }
 #endif

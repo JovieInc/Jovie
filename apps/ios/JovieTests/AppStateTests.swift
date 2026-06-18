@@ -7,10 +7,16 @@ private actor MockRepository: AppStateRepository {
   private var clearedUserIDs: [String] = []
   private var loadCallCount = 0
   private let loadDelay: Duration?
+  private let cached: MobileMeResponse?
 
-  init(nextResult: Result<MeRepositoryResult, Error>, loadDelay: Duration? = nil) {
+  init(
+    nextResult: Result<MeRepositoryResult, Error>,
+    loadDelay: Duration? = nil,
+    cached: MobileMeResponse? = nil
+  ) {
     self.nextResult = nextResult
     self.loadDelay = loadDelay
+    self.cached = cached
   }
 
   func loadMe(for clerkUserID: String) async throws -> MeRepositoryResult {
@@ -19,6 +25,10 @@ private actor MockRepository: AppStateRepository {
       try await Task.sleep(for: loadDelay)
     }
     return try nextResult.get()
+  }
+
+  func cachedSnapshot(for clerkUserID: String) -> MobileMeResponse? {
+    cached
   }
 
   func clearCachedUser(_ clerkUserID: String) {
@@ -74,6 +84,70 @@ struct AppStateTests {
 
     #expect(appState.route == .ready)
     #expect(appState.dashboardState == .loaded(.previewReady))
+  }
+
+  @Test func paintsCachedSnapshotInstantlyThenRevalidates() async throws {
+    let fresh = MobileMeResponse(
+      state: .ready,
+      displayName: "Fresh Name",
+      username: "fresh",
+      publicProfileURL: "https://jov.ie/fresh",
+      qrPayload: "https://jov.ie/fresh",
+      avatarURL: nil,
+      appleWalletProfilePassAvailable: false,
+      chatEnabled: true,
+      continueOnWebURL: "https://jov.ie/app"
+    )
+    let repository = MockRepository(
+      nextResult: .success(MeRepositoryResult(response: fresh, isStale: false)),
+      loadDelay: .milliseconds(300),
+      cached: .previewReady
+    )
+    let appState = AppState(
+      configuration: configuration,
+      launchMode: .live,
+      repository: repository,
+      brightnessManager: MockBrightnessController()
+    )
+    appState.didLoadClerk = true
+
+    async let change: Void = appState.handleSignedInUserChange("user_123")
+
+    // Well before the 300ms network delay resolves, the cached profile must
+    // already be on screen — this is the "blazing fast" guarantee.
+    try await Task.sleep(for: .milliseconds(40))
+    #expect(appState.route == .ready)
+    #expect(appState.dashboardState == .loaded(.previewReady))
+
+    await change
+
+    // Once revalidation lands, the fresh profile silently replaces the cache.
+    #expect(appState.dashboardState == .loaded(fresh))
+    #expect(appState.isOffline == false)
+  }
+
+  @Test func cachedSnapshotPaintDoesNotDuplicateNetworkLoad() async throws {
+    let repository = MockRepository(
+      nextResult: .success(
+        MeRepositoryResult(response: .previewReady, isStale: false)
+      ),
+      loadDelay: .milliseconds(50),
+      cached: .previewReady
+    )
+    let appState = AppState(
+      configuration: configuration,
+      launchMode: .live,
+      repository: repository,
+      brightnessManager: MockBrightnessController()
+    )
+    appState.didLoadClerk = true
+
+    async let first: Void = appState.handleSignedInUserChange("user_123")
+    async let second: Void = appState.handleSignedInUserChange("user_123")
+    _ = await (first, second)
+
+    #expect(await repository.loadCount() == 1)
+    #expect(appState.route == .ready)
   }
 
   @Test func mapsNeedsOnboardingResponseToNeedsOnboardingRoute() async throws {

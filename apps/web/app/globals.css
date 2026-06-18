@@ -2087,7 +2087,7 @@ body {
   }
   /* Micro-animations */
   .card-hover {
-    @apply transform transition-all duration-slow ease-out hover:-translate-y-1 hover:shadow-lg hover:shadow-gray-200/25 dark:hover:shadow-gray-900/25;
+    @apply transition-shadow duration-subtle ease-subtle hover:shadow-lg hover:shadow-gray-200/25 dark:hover:shadow-gray-900/25;
   }
   .input-focus-glow {
     @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-1 focus-visible:shadow-lg transition-all duration-slow;
@@ -2098,7 +2098,7 @@ body {
     );
   }
   .btn-press {
-    @apply transform transition-transform duration-100 ease-out active:scale-95;
+    @apply transition-opacity duration-subtle ease-subtle active:opacity-80;
   }
   /* Chat empty state — refined depth & motion */
   .chat-logo-mark {
