@@ -1,0 +1,42 @@
+{
+  "version": 1,
+  "description": "SEO/AEO ratchet baseline (JovieInc/Jovie#11044). Lists routes that are SEO-clean and the signals they must maintain. Update only via intentional PR — the test hard-fails when a baseline-clean route loses required coverage.",
+  "routes": [
+    {
+      "path": "app/(home)/page.tsx",
+      "checks": ["metadata-export", "openGraph", "twitter", "canonical"]
+    },
+    {
+      "path": "app/(marketing)/pricing/page.tsx",
+      "checks": ["metadata-export", "openGraph", "twitter"]
+    },
+    {
+      "path": "app/(marketing)/about/page.tsx",
+      "checks": ["metadata-export", "openGraph", "canonical"]
+    },
+    {
+      "path": "app/(marketing)/blog/page.tsx",
+      "checks": ["metadata-export", "canonical"]
+    },
+    {
+      "path": "app/(marketing)/blog/[slug]/page.tsx",
+      "checks": ["metadata-export", "openGraph", "twitter", "canonical"]
+    },
+    {
+      "path": "app/(marketing)/support/page.tsx",
+      "checks": ["metadata-export", "canonical"]
+    },
+    {
+      "path": "app/(marketing)/changelog/page.tsx",
+      "checks": ["metadata-export", "canonical"]
+    },
+    {
+      "path": "app/[username]/page.tsx",
+      "checks": ["metadata-export"]
+    },
+    {
+      "path": "app/[username]/[slug]/page.tsx",
+      "checks": ["metadata-export"]
+    }
+  ]
+}
