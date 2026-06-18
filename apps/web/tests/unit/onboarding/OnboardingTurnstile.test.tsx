@@ -298,4 +298,128 @@ describe('OnboardingTurnstile', () => {
     expect(removeMock).toHaveBeenCalledWith('widget-1');
     expect(renderMock).toHaveBeenCalledTimes(2);
   });
+
+  it('renders a state-aware security icon badge', async () => {
+    vi.stubEnv('NODE_ENV', 'test');
+    vi.stubEnv('NEXT_PUBLIC_TURNSTILE_SITE_KEY', 'site-key');
+    const renderMock = vi.fn(
+      (_target: HTMLElement, _options: TurnstileOptions) => 'widget-1'
+    );
+    window.turnstile = {
+      render: renderMock,
+      reset: vi.fn(),
+      remove: vi.fn(),
+    };
+
+    render(<OnboardingTurnstile onToken={vi.fn()} onStateChange={vi.fn()} />);
+
+    await waitFor(() => expect(renderMock).toHaveBeenCalled());
+    const options = renderMock.mock.calls[0]?.[1];
+
+    act(() => options?.['before-interactive-callback']?.());
+    expect(screen.getByTestId('onboarding-turnstile-icon')).toHaveAttribute(
+      'data-turnstile-icon',
+      'interactive'
+    );
+
+    act(() => options?.['error-callback']?.('bad-token'));
+    expect(screen.getByTestId('onboarding-turnstile-icon')).toHaveAttribute(
+      'data-turnstile-icon',
+      'error'
+    );
+  });
+
+  it('shows a shimmer placeholder in the widget frame during a challenge', async () => {
+    vi.stubEnv('NODE_ENV', 'test');
+    vi.stubEnv('NEXT_PUBLIC_TURNSTILE_SITE_KEY', 'site-key');
+    const renderMock = vi.fn(
+      (_target: HTMLElement, _options: TurnstileOptions) => 'widget-1'
+    );
+    window.turnstile = {
+      render: renderMock,
+      reset: vi.fn(),
+      remove: vi.fn(),
+    };
+
+    render(<OnboardingTurnstile onToken={vi.fn()} onStateChange={vi.fn()} />);
+
+    await waitFor(() => expect(renderMock).toHaveBeenCalled());
+    const options = renderMock.mock.calls[0]?.[1];
+
+    // Silent loading: no challenge UI, so no shimmer.
+    expect(
+      screen.queryByTestId('onboarding-turnstile-widget-skeleton')
+    ).not.toBeInTheDocument();
+
+    act(() => options?.['before-interactive-callback']?.());
+    expect(
+      screen.getByTestId('onboarding-turnstile-widget-skeleton')
+    ).toBeInTheDocument();
+  });
+
+  it('holds a brief Verified confirmation after a visible challenge, then collapses', async () => {
+    vi.stubEnv('NODE_ENV', 'test');
+    vi.stubEnv('NEXT_PUBLIC_TURNSTILE_SITE_KEY', 'site-key');
+    const onToken = vi.fn();
+    const onStateChange = vi.fn();
+    const renderMock = vi.fn(
+      (_target: HTMLElement, _options: TurnstileOptions) => 'widget-1'
+    );
+    window.turnstile = {
+      render: renderMock,
+      reset: vi.fn(),
+      remove: vi.fn(),
+    };
+
+    render(
+      <OnboardingTurnstile onToken={onToken} onStateChange={onStateChange} />
+    );
+
+    await waitFor(() => expect(renderMock).toHaveBeenCalled());
+    const options = renderMock.mock.calls[0]?.[1];
+
+    // The user actually sees a challenge first.
+    act(() => options?.['before-interactive-callback']?.());
+    expect(screen.getByTestId('onboarding-turnstile-panel')).toBeVisible();
+
+    // Success while visible holds a brief "Verified" beat.
+    act(() => options?.callback('turnstile-token'));
+    expect(screen.getByTestId('onboarding-turnstile-panel')).toHaveAttribute(
+      'data-turnstile-status',
+      'verified'
+    );
+    expect(screen.getByText('Verified')).toBeVisible();
+
+    // The panel collapses once the confirmation hold elapses.
+    await waitFor(() =>
+      expect(
+        screen.queryByTestId('onboarding-turnstile-panel')
+      ).not.toBeInTheDocument()
+    );
+    expect(onToken).toHaveBeenCalledWith('turnstile-token');
+  });
+
+  it('collapses immediately on a silent verification (no challenge shown)', async () => {
+    vi.stubEnv('NODE_ENV', 'test');
+    vi.stubEnv('NEXT_PUBLIC_TURNSTILE_SITE_KEY', 'site-key');
+    const renderMock = vi.fn(
+      (_target: HTMLElement, _options: TurnstileOptions) => 'widget-1'
+    );
+    window.turnstile = {
+      render: renderMock,
+      reset: vi.fn(),
+      remove: vi.fn(),
+    };
+
+    render(<OnboardingTurnstile onToken={vi.fn()} onStateChange={vi.fn()} />);
+
+    await waitFor(() => expect(renderMock).toHaveBeenCalled());
+    const options = renderMock.mock.calls[0]?.[1];
+
+    // No before-interactive callback: token arrives silently.
+    act(() => options?.callback('turnstile-token'));
+    expect(
+      screen.queryByTestId('onboarding-turnstile-panel')
+    ).not.toBeInTheDocument();
+  });
 });
