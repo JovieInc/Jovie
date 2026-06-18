@@ -306,7 +306,14 @@ test.describe('canonical /start onboarding chat', () => {
     await expect(
       page.getByTestId('chat-empty-state-centered-composer')
     ).toBeVisible();
-    await expect(page.getByText("Hey, I'm Jovie.")).toHaveCount(0);
+    await expect(page.getByTestId('onboarding-empty-intro')).toBeVisible();
+    await expect(
+      page.getByTestId('onboarding-starter-suggestions')
+    ).toBeVisible();
+    await expect(page.getByTestId('onboarding-sign-in-skip')).toBeVisible();
+    await expect(
+      page.getByText(/remember this chat so we can pick up where we left off/i)
+    ).toBeVisible();
     const mainBox = await page.locator('#main-content').boundingBox();
     const chatBox = await page.locator(CHAT_PANEL).boundingBox();
     expect(mainBox).not.toBeNull();

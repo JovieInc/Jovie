@@ -21,12 +21,10 @@ import {
   isDeterministicIntent,
   routeIntent,
 } from '@/lib/intent-detection';
-import { hasMobileChatAlphaAccess } from '@/lib/mobile/chat/access';
 import { fetchMobileArtistContext } from '@/lib/mobile/chat/artist-context';
 import {
   buildMobileChatHandoffUrl,
   encodeMobileChatNdjsonEvent,
-  MOBILE_CHAT_ALPHA_REQUIRED_CODE,
   MOBILE_CHAT_PROFILE_REQUIRED_CODE,
   type MobileChatNdjsonEvent,
   type ParsedMobileChatTurnRequest,
@@ -103,14 +101,6 @@ export async function handleMobileChatTurn(
   parsed: ParsedMobileChatTurnRequest,
   signal: AbortSignal
 ): Promise<Response> {
-  if (!(await hasMobileChatAlphaAccess(userId))) {
-    return errorNdjsonResponse(
-      403,
-      MOBILE_CHAT_ALPHA_REQUIRED_CODE,
-      'Native chat is limited to internal alpha testers.'
-    );
-  }
-
   const session = await getSessionContext({
     clerkUserId: userId,
     requireUser: true,
