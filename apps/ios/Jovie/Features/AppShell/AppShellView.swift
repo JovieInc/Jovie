@@ -391,7 +391,7 @@ private struct AppNavigationMenu: View {
               .foregroundStyle(JovieColor.textTertiary)
 
             if recentConversations.isEmpty {
-              Text("Start a chat to see recent conversations here.")
+              Text("Start a conversation to see recent conversations here.")
                 .font(JovieFont.body(size: 15))
                 .foregroundStyle(JovieColor.textTertiary)
                 .fixedSize(horizontal: false, vertical: true)
@@ -402,7 +402,7 @@ private struct AppNavigationMenu: View {
                     onSelectConversation(conversation.id)
                   } label: {
                     HStack {
-                      Text(conversation.title ?? "New chat")
+                      Text(conversation.title ?? "New Conversation")
                         .font(JovieFont.body(size: 15))
                         .foregroundStyle(JovieColor.textPrimary)
                         .lineLimit(1)

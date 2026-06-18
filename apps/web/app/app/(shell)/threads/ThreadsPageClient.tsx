@@ -114,9 +114,9 @@ export function ChatsPageClient() {
           deleteConversation.mutateAsync({ conversationId: thread.id })
         )
       );
-      notifications.success('All chats archived');
+      notifications.success('All conversations archived');
     } catch {
-      notifications.error('Could not archive all chats');
+      notifications.error('Could not archive all conversations');
     }
   }, [deleteConversation, notifications, sidebarThreads]);
 
@@ -134,8 +134,8 @@ export function ChatsPageClient() {
             <AppSearchField
               value={query}
               onChange={setQuery}
-              placeholder='Search chats'
-              ariaLabel='Search chats'
+              placeholder='Search conversations'
+              ariaLabel='Search Conversations'
               className='max-w-2xl flex-1'
               inputClassName='text-[13px]'
             />
@@ -147,19 +147,19 @@ export function ChatsPageClient() {
                   size='sm'
                   onClick={() => setArchiveAllOpen(true)}
                 >
-                  Archive All Chats
+                  Archive All Conversations
                 </Button>
               ) : null}
               <Button asChild variant='secondary' size='sm'>
-                <Link href={APP_ROUTES.CHAT}>New Chat</Link>
+                <Link href={APP_ROUTES.CHAT}>New Conversation</Link>
               </Button>
             </div>
           </div>
           <div className='mt-2 flex items-center gap-3 text-[11px] text-tertiary-token'>
-            <span>{sidebarThreads.length} chats</span>
+            <span>{sidebarThreads.length} conversations</span>
             <span className='inline-flex items-center gap-1'>
               <Search className='h-3 w-3' />
-              Search is local to chat titles and statuses
+              Search is local to conversation titles and statuses
             </span>
             {unreadCount > 0 ? <span>{unreadCount} unread</span> : null}
           </div>
@@ -170,15 +170,15 @@ export function ChatsPageClient() {
             <ChatListSkeleton />
           ) : isError ? (
             <PageErrorState
-              title='Unable to load chats'
-              message='We could not load your recent chats. Retry the request or refresh the page.'
+              title='Unable to load conversations'
+              message='We could not load your recent conversations. Retry the request or refresh the page.'
               error={error instanceof Error ? error : undefined}
               actionLabel='Retry load'
               onRetry={() => {
                 refetch();
               }}
               secondaryAction={{
-                label: 'Refresh page',
+                label: 'Refresh Page',
                 onClick: () => globalThis.location.reload(),
               }}
             />
@@ -187,16 +187,16 @@ export function ChatsPageClient() {
               <div className='max-w-sm space-y-3'>
                 <p className='text-[14px] font-semibold text-primary-token'>
                   {normalizedQuery
-                    ? `No chats match "${trimmedQuery}".`
-                    : 'No chats yet'}
+                    ? `No conversations match "${trimmedQuery}".`
+                    : 'No conversations yet'}
                 </p>
                 <p className='text-[13px] leading-6 text-secondary-token'>
                   {normalizedQuery
                     ? 'Clear the search or try a different phrase.'
-                    : 'Start a new chat to see conversations appear here.'}
+                    : 'Start a new conversation and it will appear here.'}
                 </p>
                 <Button asChild variant='secondary' size='sm'>
-                  <Link href={APP_ROUTES.CHAT}>New Chat</Link>
+                  <Link href={APP_ROUTES.CHAT}>New Conversation</Link>
                 </Button>
               </div>
             </div>
@@ -219,8 +219,8 @@ export function ChatsPageClient() {
       <ConfirmDialog
         open={archiveAllOpen}
         onOpenChange={setArchiveAllOpen}
-        title='Archive all chats?'
-        description={`This will archive ${sidebarThreads.length} chat${sidebarThreads.length === 1 ? '' : 's'}. You cannot undo this action.`}
+        title='Archive all conversations?'
+        description={`This will archive ${sidebarThreads.length} conversation${sidebarThreads.length === 1 ? '' : 's'}. You cannot undo this action.`}
         confirmLabel='Archive All'
         variant='destructive'
         onConfirm={handleArchiveAll}

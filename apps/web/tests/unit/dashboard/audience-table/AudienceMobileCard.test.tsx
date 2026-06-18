@@ -46,7 +46,7 @@ describe('AudienceMobileCard', () => {
     expect(screen.queryByText('hidden@example.com')).not.toBeInTheDocument();
   });
 
-  it('disables the message button when the only contact is a gated email', () => {
+  it('hides the message button for anonymous fans', () => {
     render(
       <AudienceMobileCard
         member={{
@@ -61,9 +61,7 @@ describe('AudienceMobileCard', () => {
       />
     );
 
-    expect(
-      screen.getByRole('button', { name: /message anonymous fan/i })
-    ).toBeDisabled();
+    expect(screen.queryByRole('button', { name: /message/i })).toBeNull();
   });
 
   it('keeps the primary row tap target active when the message button is disabled', () => {
