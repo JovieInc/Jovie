@@ -254,10 +254,28 @@ function isSentenceCase(value) {
   }
   if (isAllCapsPhrase(trimmed)) return false;
 
-  for (let index = 1; index < words.length; index += 1) {
-    const word = words[index];
-    if (isAbbreviation(word) || isBrandWord(word)) continue;
-    if (/^[A-Z][a-z]/.test(word)) return false;
+  // Walk raw (un-stripped) tokens so sentence boundaries are respected: a
+  // capitalized word is legitimate when it starts a new sentence (the previous
+  // token ended with sentence-terminating punctuation). Without this, valid
+  // multi-sentence copy ("...your career. Smart links...") false-positives.
+  const rawWords = trimmed.split(' ');
+  let prevEndsSentence = true;
+  for (const raw of rawWords) {
+    const word = stripEdgePunctuation(raw);
+    const endsSentence = /[.!?:][)"'\]]*$/.test(raw);
+    if (!word) {
+      if (endsSentence) prevEndsSentence = true;
+      continue;
+    }
+    if (
+      !prevEndsSentence &&
+      !isAbbreviation(word) &&
+      !isBrandWord(word) &&
+      /^[A-Z][a-z]/.test(word)
+    ) {
+      return false;
+    }
+    prevEndsSentence = endsSentence;
   }
 
   return true;
