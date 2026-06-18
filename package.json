@@ -117,6 +117,7 @@
     "test:mobile-overflow": "doppler run --project jovie-web --config dev -- env E2E_USE_TEST_AUTH_BYPASS=1 NEXT_PUBLIC_CLERK_MOCK=1 NEXT_PUBLIC_CLERK_PROXY_DISABLED=1 pnpm --filter @jovie/web exec playwright test tests/e2e/mobile-overflow.spec.ts --project=chromium --reporter=line",
     "test:ci": "node scripts/turbo-local.mjs test:ci",
     "test:fast": "node scripts/turbo-local.mjs test:fast",
+    "test:seo": "pnpm --filter @jovie/web run test:seo",
     "test:e2e": "node scripts/turbo-local.mjs test:e2e",
     "test:guard": "pnpm --filter=@jovie/web run test:guard",
     "test:profile": "pnpm --filter=@jovie/web run test:profile",
