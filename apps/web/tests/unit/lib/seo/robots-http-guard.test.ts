@@ -24,6 +24,23 @@ describe('robots-http-guard (#11043 regression)', () => {
     expect(result.ok).toBe(false);
     expect(result.violations.join('\n')).toMatch(/GPTBot/);
   });
+
+  it('flags a missing Sitemap: directive', () => {
+    const body = ['User-agent: *', 'Allow: /'].join('\n');
+    const result = validateRobotsTxtBody(body);
+    expect(result.violations.join('\n')).toMatch(/missing a Sitemap/);
+  });
+
+  it('accepts a present Sitemap: directive (no false missing-sitemap violation)', () => {
+    const body = [
+      '# comment',
+      'User-agent: *',
+      'Allow: /',
+      'Sitemap:   https://jov.ie/sitemap.xml',
+    ].join('\n');
+    const result = validateRobotsTxtBody(body);
+    expect(result.violations.join('\n')).not.toMatch(/missing a Sitemap/);
+  });
 });
 
 describe('sitemap-http-guard', () => {

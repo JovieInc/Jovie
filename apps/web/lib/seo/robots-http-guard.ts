@@ -63,6 +63,30 @@ function parseRobotsGroups(body: string): ParsedRobotsGroup[] {
   return groups;
 }
 
+/**
+ * Detect a `Sitemap:` directive without a backtracking regex.
+ *
+ * Scans line-by-line (same idiom as parseRobotsGroups) so the check stays
+ * linear in the body length and cannot be abused for ReDoS.
+ */
+function hasSitemapDirective(body: string): boolean {
+  for (const rawLine of body.split('\n')) {
+    const line = rawLine.split('#')[0]?.trim() ?? '';
+    if (!line) continue;
+
+    const colonIndex = line.indexOf(':');
+    if (colonIndex === -1) continue;
+
+    const directive = line.slice(0, colonIndex).trim().toLowerCase();
+    if (directive !== 'sitemap') continue;
+
+    const value = line.slice(colonIndex + 1).trim();
+    if (value.length > 0) return true;
+  }
+
+  return false;
+}
+
 function isGlobalBlock(group: ParsedRobotsGroup): boolean {
   if (!group.userAgents.includes('*')) return false;
   if (!group.disallow.includes('/')) return false;
@@ -91,7 +115,7 @@ export function validateRobotsTxtBody(body: string): RobotsHttpGuardResult {
     );
   }
 
-  if (!/^\s*sitemap:\s*\S+/im.test(body)) {
+  if (!hasSitemapDirective(body)) {
     violations.push(
       'robots.txt is missing a Sitemap: directive — crawlers cannot discover sitemap.xml'
     );
