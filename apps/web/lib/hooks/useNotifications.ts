@@ -11,7 +11,7 @@ export const TOAST_MESSAGES = {
   SAVE_SUCCESS: 'Changes saved',
   UPLOAD_SUCCESS: 'Upload complete',
   DELETE_SUCCESS: 'Deleted successfully',
-  COPY_SUCCESS: 'Copied to clipboard',
+  COPY_SUCCESS: 'Copied',
   SEND_SUCCESS: 'Sent successfully',
 
   // Error messages

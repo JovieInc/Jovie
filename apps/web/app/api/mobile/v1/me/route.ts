@@ -4,7 +4,7 @@ import { isProfileComplete } from '@/lib/auth/profile-completeness';
 import { getSessionContext, SESSION_ERRORS } from '@/lib/auth/session';
 import { captureError } from '@/lib/error-tracking';
 import { NO_STORE_HEADERS } from '@/lib/http/headers';
-import { isMobileChatEnabledForUser } from '@/lib/mobile/chat/access';
+import { isMobileChatRuntimeEnabled } from '@/lib/mobile/chat/access';
 import { getMobileSessionUserId } from '@/lib/mobile/session-auth';
 import { isAppleWalletProfilePassAvailable } from '@/lib/wallet/apple/profile-pass';
 
@@ -106,9 +106,7 @@ export async function GET(request: Request) {
         isPublic: profile.isPublic,
         onboardingCompletedAt: profile.onboardingCompletedAt,
       });
-    const chatEnabled = await isMobileChatEnabledForUser(userId, {
-      isAdmin: session.user.isAdmin,
-    });
+    const chatEnabled = isMobileChatRuntimeEnabled();
     const payload: MobileMeResponse = {
       state: 'ready',
       displayName: profile.displayName,

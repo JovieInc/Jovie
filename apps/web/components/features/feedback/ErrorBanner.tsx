@@ -49,7 +49,7 @@ export function ErrorBanner({
     navigator.clipboard
       .writeText(details)
       .then(() => {
-        toast.success('Error details copied to clipboard');
+        toast.success('Copied');
       })
       .catch(() => {
         toast.error('Failed to copy error details');
