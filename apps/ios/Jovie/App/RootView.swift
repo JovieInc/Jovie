@@ -178,6 +178,7 @@ private struct AppContentView: View {
       switch appState.route {
       case .launching:
         SplashView()
+          .transition(.opacity)
       case .signedOut:
         AuthScreen(
           isMock: !isAuthAvailable,
@@ -187,6 +188,7 @@ private struct AppContentView: View {
           onAuthReturn: onAuthReturn,
           onAuthError: onAuthError
         )
+        .transition(.opacity)
       case .needsOnboarding:
         AppShellView(
           profile: AppShellProfile(response: nil),
@@ -213,6 +215,7 @@ private struct AppContentView: View {
             MobileChatPlaceholderView(isOffline: false, draft: draft)
           }
         }
+        .transition(.opacity)
       case .ready:
         AppShellView(
           profile: AppShellProfile(response: appState.loadedDashboardResponse),
@@ -251,8 +254,13 @@ private struct AppContentView: View {
             MobileChatPlaceholderView(isOffline: appState.isOffline, draft: draft)
           }
         }
+        .transition(.opacity)
       }
     }
+    // Cross-fade between top-level routes (notably splash → app) so the first
+    // content paint feels intentional rather than a hard cut. Opacity-only, so
+    // no layout shift and no decorative spatial motion.
+    .animation(.easeInOut(duration: 0.28), value: appState.route)
     .task(id: appState.activeUserID) {
       guard let activeUserID = appState.activeUserID else {
         chatRepository = nil
@@ -422,8 +430,6 @@ private enum LiveAuthUITestStatus {
     } else if status == "starting" {
       defaults.removeObject(forKey: userIDKey)
     }
-
-    defaults.synchronize()
   }
 
   @MainActor

@@ -84,6 +84,7 @@
     "ios:open": "open apps/ios/Jovie.xcodeproj",
     "ios:setup-env": "bash apps/ios/scripts/setup-env.sh",
     "ios:build": "bash apps/ios/scripts/run-xcodebuild.sh build",
+    "ios:lint": "bash scripts/ios-best-practices-lint.sh apps/ios/Jovie",
     "ios:test": "bash apps/ios/scripts/run-xcodebuild.sh test",
     "ios:performance": "bash apps/ios/scripts/measure-launch-performance.sh",
     "ios:runtime-performance": "bash apps/ios/scripts/measure-runtime-performance.sh",
