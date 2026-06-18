@@ -284,7 +284,7 @@ describe('useLinksPersistence', () => {
 
       await waitFor(() => {
         expect(toast.success).toHaveBeenCalledWith(
-          expect.stringContaining('Links saved successfully')
+          expect.stringContaining('Links saved.')
         );
       });
     });

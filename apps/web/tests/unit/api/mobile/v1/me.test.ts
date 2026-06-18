@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const hoisted = vi.hoisted(() => ({
   captureErrorMock: vi.fn(),
@@ -8,7 +8,6 @@ const hoisted = vi.hoisted(() => ({
   getSessionContextMock: vi.fn(),
   isProfileCompleteMock: vi.fn(),
   isAppleWalletProfilePassAvailableMock: vi.fn(),
-  isMobileChatEnabledForUserMock: vi.fn(),
 }));
 
 vi.mock('@/constants/domains', () => ({
@@ -42,10 +41,6 @@ vi.mock('@/lib/wallet/apple/profile-pass', () => ({
     hoisted.isAppleWalletProfilePassAvailableMock,
 }));
 
-vi.mock('@/lib/mobile/chat/access', () => ({
-  isMobileChatEnabledForUser: hoisted.isMobileChatEnabledForUserMock,
-}));
-
 const routeModulePromise = import('@/app/api/mobile/v1/me/route');
 
 function makeRequest() {
@@ -66,7 +61,11 @@ describe('GET /api/mobile/v1/me', () => {
     );
     hoisted.isProfileCompleteMock.mockReturnValue(true);
     hoisted.isAppleWalletProfilePassAvailableMock.mockResolvedValue(true);
-    hoisted.isMobileChatEnabledForUserMock.mockResolvedValue(true);
+    vi.stubEnv('MOBILE_CHAT_RUNTIME_ENABLED', 'true');
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
   });
 
   it('returns 401 when unauthenticated', async () => {
@@ -142,8 +141,8 @@ describe('GET /api/mobile/v1/me', () => {
     });
   });
 
-  it('reports chatEnabled from the mobile chat access gate', async () => {
-    hoisted.isMobileChatEnabledForUserMock.mockResolvedValue(false);
+  it('reports chatEnabled from the mobile chat runtime switch', async () => {
+    vi.stubEnv('MOBILE_CHAT_RUNTIME_ENABLED', '');
     hoisted.getSessionContextMock.mockResolvedValue({
       user: {
         userStatus: 'active',
@@ -166,10 +165,6 @@ describe('GET /api/mobile/v1/me', () => {
 
     expect(response.status).toBe(200);
     expect(data.chatEnabled).toBe(false);
-    expect(hoisted.isMobileChatEnabledForUserMock).toHaveBeenCalledWith(
-      'user_123',
-      { isAdmin: false }
-    );
   });
 
   it('returns needs_onboarding when the DB user is missing', async () => {
