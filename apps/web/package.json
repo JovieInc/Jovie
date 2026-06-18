@@ -14,6 +14,8 @@
     "dev:local:playwright": "NEXT_PUBLIC_E2E_MODE=1 NEXT_DISABLE_TOOLBAR=1 next dev --webpack",
     "validate-env": "tsx scripts/validate-env.ts",
     "check:signup-readiness": "tsx scripts/check-signup-readiness.ts",
+    "seo:ratchet": "vitest run tests/unit/seo --config=vitest.config.mts",
+    "seo:ratchet:live": "tsx scripts/seo-ratchet-live-check.ts",
     "check:signed-in-auth": "tsx scripts/verify-signed-in-auth.ts",
     "verify:signed-in-auth": "tsx scripts/verify-signed-in-auth.ts",
     "build": "NODE_OPTIONS=--max-old-space-size=8192 NEXT_IGNORE_TYPECHECK=1 next build --turbopack",
