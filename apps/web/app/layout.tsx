@@ -30,17 +30,9 @@ const satoshi = localFont({
   weight: '300 900',
 });
 
-// JOV-2267: DM Sans is only used in below-fold marketing sections
-// (HomeLoopDiagramSection, HomeStatQuoteSection, HomeBentoPairs) via
-// --marketing-font-body. Setting preload:false prevents a 68KB preload hint
-// on every page; display:'optional' already suppresses FOUT.
-const dmSans = localFont({
-  src: '../public/fonts/DMSans-Latin.woff2',
-  variable: '--font-dm-sans',
-  display: 'optional',
-  preload: false,
-  weight: '100 1000',
-});
+// DM Sans retired 2026-06-18 (JOV design-system unification — "one system, two
+// languages"). Body + UI type is now Inter everywhere; Satoshi is the single
+// approved display exception (hero / large display). See DESIGN.md decision log.
 
 export const metadata: Metadata = {
   title: {
@@ -206,7 +198,7 @@ export default async function RootLayout({
     );
   }
 
-  const bodyClassName = `${inter.variable} ${satoshi.variable} ${dmSans.variable} font-sans antialiased bg-base text-primary-token`;
+  const bodyClassName = `${inter.variable} ${satoshi.variable} font-sans antialiased bg-base text-primary-token`;
 
   const content = (
     <>
