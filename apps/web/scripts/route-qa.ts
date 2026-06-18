@@ -132,6 +132,7 @@ export function isNotFoundLike({
     loweredTitle.includes('not found') ||
     bodyText.includes('page not found') ||
     bodyText.includes('content not found') ||
+    bodyText.includes("can't find that page") ||
     bodyText.includes("doesn't exist") ||
     bodyText.includes("couldn't find")
   );
