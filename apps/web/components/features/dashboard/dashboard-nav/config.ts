@@ -44,15 +44,15 @@ export const dashboardHome: NavItem = {
   href: APP_ROUTES.CHAT,
   id: 'overview',
   icon: Home,
-  description: 'Start a new chat',
+  description: 'Start a new conversation',
 };
 
 export const newThreadNavItem: NavItem = {
-  name: 'New Chat',
+  name: 'New Conversation',
   href: APP_ROUTES.CHAT,
   id: 'chat',
   icon: SquarePen,
-  description: 'Start a new chat',
+  description: 'Start a new conversation',
 };
 
 export const profileNavItem: NavItem = {
@@ -287,7 +287,7 @@ export const mobileHome: NavItem = {
   href: APP_ROUTES.CHAT,
   id: 'home',
   icon: SquarePen,
-  description: 'Start a new chat',
+  description: 'Start a new conversation',
 };
 
 /** Items shown as icons in the bottom tab bar (max 3). */

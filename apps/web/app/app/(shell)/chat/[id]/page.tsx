@@ -11,7 +11,7 @@ interface Props {
   }>;
 }
 
-const CONVERSATION_DESCRIPTION = 'Thread with Jovie AI';
+const CONVERSATION_DESCRIPTION = 'Conversation with Jovie AI';
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { id } = await params;

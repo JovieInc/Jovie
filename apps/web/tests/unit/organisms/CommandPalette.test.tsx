@@ -125,7 +125,7 @@ describe('CommandPalette', () => {
   it('opens on Cmd+K and shows the autofocused search input', () => {
     render(withDashboard(<CommandPalette />));
     fireEvent.keyDown(globalThis, { key: 'k', metaKey: true });
-    const input = screen.getByLabelText('Command palette search');
+    const input = screen.getByLabelText('Command Palette Search');
     expect(input).toBeInTheDocument();
     // React applies autofocus by calling .focus() on mount, not by emitting
     // the deprecated HTML attribute — assert focus state instead.
@@ -135,9 +135,9 @@ describe('CommandPalette', () => {
   it('lists recent chats with safe fallback titles', () => {
     render(withDashboard(<CommandPalette />));
     fireEvent.keyDown(globalThis, { key: 'k', metaKey: true });
-    expect(screen.getByText('Recent chats')).toBeInTheDocument();
+    expect(screen.getByText('Recent Conversations')).toBeInTheDocument();
     expect(screen.getByText('Q1 release plan')).toBeInTheDocument();
-    expect(screen.getByText('Untitled chat')).toBeInTheDocument();
+    expect(screen.getByText('Untitled conversation')).toBeInTheDocument();
   });
 
   it('routes a recent-chat commit to the chat route', () => {
@@ -156,11 +156,11 @@ describe('CommandPalette', () => {
     render(withDashboard(<CommandPalette />));
     fireEvent.keyDown(globalThis, { key: 'k', metaKey: true });
     expect(
-      screen.queryByLabelText('Command palette search')
+      screen.queryByLabelText('Command Palette Search')
     ).toBeInTheDocument();
     fireEvent.keyDown(globalThis, { key: 'k', metaKey: true });
     expect(
-      screen.queryByLabelText('Command palette search')
+      screen.queryByLabelText('Command Palette Search')
     ).not.toBeInTheDocument();
   });
 });

@@ -177,7 +177,7 @@ describe('UnifiedSidebar library route', () => {
     );
   });
 
-  it('omits header New Chat and the web collapse control in Electron dashboard mode', () => {
+  it('omits header New Conversation and the web collapse control in Electron dashboard mode', () => {
     renderUnifiedSidebar({
       designV1: false,
       pathname: APP_ROUTES.DASHBOARD,
@@ -186,7 +186,7 @@ describe('UnifiedSidebar library route', () => {
 
     expect(screen.getByText('Jovie', { selector: 'span' })).toBeInTheDocument();
     expect(
-      screen.queryByRole('link', { name: 'New Chat' })
+      screen.queryByRole('link', { name: 'New Conversation' })
     ).not.toBeInTheDocument();
     expect(
       screen.queryByRole('button', { name: 'Collapse sidebar' })
@@ -205,7 +205,7 @@ describe('UnifiedSidebar library route', () => {
       screen.getByRole('button', { name: 'Collapse sidebar' })
     ).toBeInTheDocument();
     expect(
-      screen.queryByRole('link', { name: 'New Chat' })
+      screen.queryByRole('link', { name: 'New Conversation' })
     ).not.toBeInTheDocument();
   });
 });

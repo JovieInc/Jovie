@@ -53,7 +53,7 @@ const searchNavItem: NavItem = {
   id: 'search',
   icon: Search,
   description:
-    'Search app content across chats, releases, artists, tasks, and more',
+    'Search app content across conversations, releases, artists, tasks, and more',
 };
 
 type DashboardNavSection = {

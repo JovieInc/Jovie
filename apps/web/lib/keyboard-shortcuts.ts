@@ -239,7 +239,7 @@ export const KEYBOARD_SHORTCUTS: KeyboardShortcut[] = [
   },
   {
     id: 'nav-chat',
-    label: 'Go to chat',
+    label: 'Go to conversation',
     keys: 'G then T',
     category: 'navigation',
     icon: MessageCircle,

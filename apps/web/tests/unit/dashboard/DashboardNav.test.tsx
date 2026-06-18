@@ -24,9 +24,9 @@ describe('DashboardNav', () => {
       renderFn: fastRender,
     });
 
-    expect(getByRole('link', { name: 'New Chat' }).getAttribute('href')).toBe(
-      APP_ROUTES.CHAT
-    );
+    expect(
+      getByRole('link', { name: 'New Conversation' }).getAttribute('href')
+    ).toBe(APP_ROUTES.CHAT);
     expect(getByRole('button', { name: 'Search' })).toBeDefined();
     expect(getByRole('link', { name: 'Releases' }).getAttribute('href')).toBe(
       buildLibraryViewRoute('releases')
@@ -110,7 +110,7 @@ describe('DashboardNav', () => {
     expect(releasesLink.getAttribute('aria-current')).toBe('page');
   });
 
-  it('only marks New Chat active on the chat root', () => {
+  it('only marks New Conversation active on the chat root', () => {
     mockUsePathname.mockReturnValueOnce(`${APP_ROUTES.CHAT}/thread-123`);
 
     const { getByRole } = renderDashboardNav({
@@ -119,11 +119,13 @@ describe('DashboardNav', () => {
     });
 
     expect(
-      getByRole('link', { name: 'New Chat' }).getAttribute('aria-current')
+      getByRole('link', { name: 'New Conversation' }).getAttribute(
+        'aria-current'
+      )
     ).toBeNull();
   });
 
-  it('keeps New Chat on the default shell tone when it is inactive', () => {
+  it('keeps New Conversation on the default shell tone when it is inactive', () => {
     mockUsePathname.mockReturnValueOnce(APP_ROUTES.RELEASES);
 
     const { getByRole } = renderDashboardNav({
@@ -131,20 +133,20 @@ describe('DashboardNav', () => {
       appFlags: { DESIGN_V1: true },
     });
 
-    const newThreadLink = getByRole('link', { name: 'New Chat' });
+    const newThreadLink = getByRole('link', { name: 'New Conversation' });
     expect(newThreadLink.className).toContain('text-sidebar-muted/80');
     expect(newThreadLink.className).not.toContain(
       'bg-[color-mix(in_oklab,var(--linear-app-content-surface)_92%,white_8%)]'
     );
   });
 
-  it('renders one canonical New Chat nav row in Design V1', () => {
+  it('renders one canonical New Conversation nav row in Design V1', () => {
     const { getAllByRole } = renderDashboardNav({
       renderFn: fastRender,
       appFlags: { DESIGN_V1: true },
     });
 
-    expect(getAllByRole('link', { name: 'New Chat' })).toHaveLength(1);
+    expect(getAllByRole('link', { name: 'New Conversation' })).toHaveLength(1);
   });
 
   it('opens the global command palette from Search instead of navigating', () => {
@@ -223,7 +225,7 @@ describe('DashboardNav', () => {
       appFlags: { DESIGN_V1: true },
     });
 
-    const newThreadLink = getByRole('link', { name: 'New Chat' });
+    const newThreadLink = getByRole('link', { name: 'New Conversation' });
     expect(newThreadLink.className).toContain(
       'group-data-[collapsible=icon]:justify-center'
     );
@@ -239,7 +241,7 @@ describe('DashboardNav', () => {
       appFlags: { DESIGN_V1: true },
     });
 
-    expect(getByRole('link', { name: 'New Chat' })).toHaveAttribute(
+    expect(getByRole('link', { name: 'New Conversation' })).toHaveAttribute(
       'href',
       APP_ROUTES.CHAT
     );

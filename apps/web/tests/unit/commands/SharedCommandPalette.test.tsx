@@ -151,7 +151,7 @@ describe('SharedCommandPalette (cmd+k surface)', () => {
         expect.objectContaining({
           kind: 'nav',
           id: 'go-chats',
-          label: 'Chats',
+          label: 'Conversations',
           href: APP_ROUTES.CHATS,
         }),
       ])
