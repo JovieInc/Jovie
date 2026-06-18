@@ -266,7 +266,7 @@ Generated from `.github/ci-harness/manifest.json`. Do not hand-edit this block; 
 | Job | Tier | Local remediation command |
 | --- | --- | --- |
 | `ci-fast` | fast-gate | `pnpm run typecheck && pnpm run biome:check` |
-| `Structural Contract` | structural-contract | `pnpm ci:harness:check && pnpm next:proxy-guard && pnpm tailwind:check && pnpm --filter=@jovie/web run lint:no-native-dialogs` |
+| `Structural Contract` | structural-contract | `pnpm ci:harness:check && pnpm next:proxy-guard && pnpm tailwind:check && pnpm --filter=@jovie/web run lint:no-native-dialogs && pnpm --filter=@jovie/web run lint:seo` |
 | `CI Risk Classifier` | structural-contract | `pnpm ci:harness:check` |
 | `Unit Tests` | fast-gate | `pnpm --filter=@jovie/web run test:fast` |
 | `Build (public routes)` | preview-evidence | `pnpm run build:web` |

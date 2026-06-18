@@ -92,6 +92,19 @@ describe('robots.ts — production behavior', () => {
     expect(allowList).toContain('/');
   });
 
+  it('blocks /app/ and /api/ for the wildcard (*) user-agent', async () => {
+    const robots = await importRobots(undefined);
+    const result = robots();
+    const rules = Array.isArray(result.rules) ? result.rules : [result.rules];
+    const wildcardRule = rules.find(r => {
+      const ua = (r as { userAgent?: string | string[] }).userAgent;
+      return ua === '*' || (Array.isArray(ua) && ua.includes('*'));
+    });
+    const disallows = allDisallows([wildcardRule]);
+    expect(disallows).toContain('/app/');
+    expect(disallows).toContain('/api/');
+  });
+
   it.each(
     REQUIRED_AI_CRAWLERS
   )('explicitly allows AI crawler "%s" in production', async crawler => {
@@ -107,7 +120,7 @@ describe('robots.ts — production behavior', () => {
     );
   });
 
-  it('AI crawler rules allow / and do not globally block all paths', async () => {
+  it('AI crawler rules allow / and /llms.txt and do not globally block all paths', async () => {
     const robots = await importRobots(undefined);
     const result = robots();
     const rules = Array.isArray(result.rules) ? result.rules : [result.rules];
@@ -122,6 +135,9 @@ describe('robots.ts — production behavior', () => {
       const allows = (rule as { allow?: string | string[] }).allow;
       const allowList = Array.isArray(allows) ? allows : allows ? [allows] : [];
       expect(allowList, `${crawler} must allow /`).toContain('/');
+      expect(allowList, `${crawler} must allow /llms.txt`).toContain(
+        '/llms.txt'
+      );
 
       const disallows = allDisallows([rule]);
       expect(
@@ -146,6 +162,7 @@ describe('robots.ts — preview/staging behavior', () => {
     const rules = Array.isArray(result.rules) ? result.rules : [result.rules];
     const disallows = allDisallows(rules);
 
+    expect(rules).toHaveLength(1);
     expect(
       disallows,
       `VERCEL_ENV=${vercelEnv} must block all crawlers`
