@@ -1,5 +1,6 @@
 import { act, renderHook } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { APP_ROUTES } from '@/constants/routes';
 
 // Mock next/navigation
 const mockPush = vi.fn();
@@ -61,7 +62,7 @@ describe('useSequentialShortcuts', () => {
       fireKey('p');
     });
 
-    expect(mockPush).toHaveBeenCalledWith('/app/chat');
+    expect(mockPush).toHaveBeenCalledWith(APP_ROUTES.SETTINGS_ARTIST_PROFILE);
   });
 
   it('navigates on valid G then O sequence (tour dates)', () => {

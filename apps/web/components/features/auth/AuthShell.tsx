@@ -243,7 +243,7 @@ function AuthShellTitle({ mode }: Readonly<{ mode: AuthShellMode }>) {
   return (
     <div className='mb-4 text-center'>
       <p className='text-2xl font-semibold leading-tight tracking-normal text-primary-token'>
-        {isSignUp ? 'Request access' : 'Welcome back'}
+        {isSignUp ? 'Create your account' : 'Welcome back'}
       </p>
     </div>
   );

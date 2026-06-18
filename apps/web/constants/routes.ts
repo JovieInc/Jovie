@@ -240,6 +240,16 @@ export function buildReleaseTasksRoute(releaseId: string): string {
   return `${APP_ROUTES.RELEASES}/${encodeURIComponent(releaseId)}/tasks`;
 }
 
+export function buildLibraryViewRoute(
+  view?: 'releases' | 'merch' | 'images' | 'videos' | 'audio'
+): string {
+  if (!view) {
+    return APP_ROUTES.LIBRARY;
+  }
+
+  return `${APP_ROUTES.LIBRARY}?view=${encodeURIComponent(view)}`;
+}
+
 export function isDemoRoutePath(pathname: string | null | undefined): boolean {
   return (
     typeof pathname === 'string' &&

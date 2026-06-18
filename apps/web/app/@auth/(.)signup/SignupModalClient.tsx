@@ -70,7 +70,7 @@ export function SignupModalClient() {
 
   return (
     <AuthModalShell
-      ariaLabel='Request access to Jovie'
+      ariaLabel='Create your account on Jovie'
       statusRow={statusRow}
       backButtonLabel={promptHint ? 'Back to chat' : 'Go back'}
     >
