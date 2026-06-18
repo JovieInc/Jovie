@@ -87,14 +87,14 @@ describe('dashboard metadata generation', () => {
     const { generateMetadata } = await import('@/app/app/(shell)/page');
     const metadata = await generateMetadata();
 
-    expect(metadata.title).toBe('Home | Jovie');
+    expect(metadata.title).toBe('Home');
   });
 
   it('falls back to dashboard title when profile display name is missing', async () => {
     const { generateMetadata } = await import('@/app/app/(shell)/chat/page');
     const metadata = await generateMetadata();
 
-    expect(metadata.title).toBe('Home | Jovie');
+    expect(metadata.title).toBe('Home');
   });
 
   it('uses conversation title for chat thread metadata when present', async () => {
@@ -107,7 +107,7 @@ describe('dashboard metadata generation', () => {
       params: Promise.resolve({ id: 'conversation-123' }),
     });
 
-    expect(metadata.title).toBe('Launch Plan | Jovie');
+    expect(metadata.title).toBe('Launch Plan');
   });
 
   it('falls back to generic thread title when conversation title is missing', async () => {
@@ -118,7 +118,7 @@ describe('dashboard metadata generation', () => {
       params: Promise.resolve({ id: 'conversation-123' }),
     });
 
-    expect(metadata.title).toBe('Thread | Jovie');
+    expect(metadata.title).toBe('Thread');
   });
 
   it('keeps chat thread metadata queries outside the page module', () => {
