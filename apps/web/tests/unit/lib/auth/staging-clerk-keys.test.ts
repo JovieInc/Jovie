@@ -196,6 +196,53 @@ describe('staging Clerk key resolution', () => {
     await expect(resolvePublishableKeyFromHeaders()).resolves.toBeUndefined();
   });
 
+  it('memoizes ok results so repeated lookups return the same object', () => {
+    const first = resolveClerkKeys('jov.ie');
+    const second = resolveClerkKeys('jov.ie');
+
+    expect(second).toBe(first);
+    expect(_resolveClerkKeysCache.size).toBe(1);
+  });
+
+  it('does not cache staging_missing so a later key pair can resolve', () => {
+    process.env.CLERK_PUBLISHABLE_KEY_STAGING = 'pk_live_staging_example';
+
+    expect(resolveClerkKeys('staging.jov.ie')).toEqual({
+      publishableKey: undefined,
+      secretKey: undefined,
+      status: 'staging_missing',
+    });
+    expect(_resolveClerkKeysCache.size).toBe(0);
+
+    process.env.CLERK_SECRET_KEY_STAGING = 'sk_live_staging_example';
+
+    expect(resolveClerkKeys('staging.jov.ie')).toEqual({
+      publishableKey: 'pk_live_staging_example',
+      secretKey: 'sk_live_staging_example',
+      status: 'ok',
+    });
+    expect(_resolveClerkKeysCache.size).toBe(1);
+  });
+
+  it('does not cache staging_inherits_prod results', () => {
+    expect(resolveClerkKeys('staging.jov.ie')).toEqual({
+      publishableKey: undefined,
+      secretKey: undefined,
+      status: 'staging_inherits_prod',
+    });
+    expect(_resolveClerkKeysCache.size).toBe(0);
+  });
+
+  it('evicts oldest resolveClerkKeys entries with FIFO at 50 hostnames', () => {
+    for (let i = 0; i < 51; i++) {
+      resolveClerkKeys(`host-${i}.example.com`);
+    }
+
+    expect(_resolveClerkKeysCache.size).toBe(50);
+    expect(_resolveClerkKeysCache.has('host-0.example.com')).toBe(false);
+    expect(_resolveClerkKeysCache.has('host-50.example.com')).toBe(true);
+  });
+
   it('prefers the middleware-injected publishable key header when present', async () => {
     headersMock.mockResolvedValue(
       new Headers({
