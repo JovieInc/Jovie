@@ -4,39 +4,66 @@
   "routes": [
     {
       "path": "app/(home)/page.tsx",
-      "checks": ["metadata-export", "openGraph", "twitter", "canonical"]
+      "checks": [
+        "metadata-export",
+        "description",
+        "openGraph",
+        "twitter",
+        "canonical",
+        "json-ld"
+      ]
     },
     {
       "path": "app/(marketing)/pricing/page.tsx",
-      "checks": ["metadata-export", "openGraph", "twitter"]
+      "checks": ["metadata-export", "description", "openGraph", "twitter"]
     },
     {
       "path": "app/(marketing)/about/page.tsx",
-      "checks": ["metadata-export", "openGraph", "canonical"]
+      "checks": ["metadata-export", "description", "openGraph", "canonical"]
     },
     {
       "path": "app/(marketing)/blog/page.tsx",
-      "checks": ["metadata-export", "canonical"]
+      "checks": ["metadata-export", "description", "canonical"]
     },
     {
       "path": "app/(marketing)/blog/[slug]/page.tsx",
-      "checks": ["metadata-export", "openGraph", "twitter", "canonical"]
+      "checks": [
+        "metadata-export",
+        "description",
+        "openGraph",
+        "twitter",
+        "canonical"
+      ]
     },
     {
       "path": "app/(marketing)/support/page.tsx",
-      "checks": ["metadata-export", "canonical"]
+      "checks": ["metadata-export", "description", "canonical"]
     },
     {
       "path": "app/(marketing)/changelog/page.tsx",
-      "checks": ["metadata-export", "canonical"]
+      "checks": ["metadata-export", "description", "canonical"]
     },
     {
       "path": "app/[username]/page.tsx",
-      "checks": ["metadata-export"]
+      "checks": [
+        "metadata-export",
+        "description",
+        "openGraph",
+        "twitter",
+        "canonical",
+        "json-ld"
+      ]
     },
     {
       "path": "app/[username]/[slug]/page.tsx",
-      "checks": ["metadata-export"]
+      "checks": [
+        "metadata-export",
+        "description",
+        "openGraph",
+        "twitter",
+        "canonical",
+        "json-ld"
+      ]
     }
   ]
 }

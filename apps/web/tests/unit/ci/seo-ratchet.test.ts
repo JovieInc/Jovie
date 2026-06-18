@@ -12,9 +12,11 @@
  *
  * Checks run against the raw TypeScript/TSX source (no compilation needed):
  *   metadata-export — file exports `metadata` constant or `generateMetadata` fn
+ *   description     — file sets `description` in metadata
  *   openGraph       — file references `openGraph:`
  *   twitter         — file references `twitter:`
  *   canonical       — file references `canonical:` or `alternates:`
+ *   json-ld         — file emits structured data (`safeJsonLdStringify` or ld+json script)
  */
 
 import { existsSync, readFileSync, statSync } from 'node:fs';
@@ -54,12 +56,27 @@ const baseline: Baseline = JSON.parse(
 // Pattern definitions (checked against raw source)
 // ---------------------------------------------------------------------------
 
+const CHECK_REMEDIATION: Record<string, string> = {
+  'metadata-export':
+    'Export `metadata` or `generateMetadata` from the route module (or its metadata builder import).',
+  description:
+    'Set `description` in the route metadata object (apps/web/lib/profile/metadata.ts for profiles).',
+  openGraph: 'Add `openGraph: { ... }` to the route metadata export.',
+  twitter: 'Add `twitter: { ... }` to the route metadata export.',
+  canonical:
+    'Add `alternates: { canonical: ... }` (or `canonical:`) to the route metadata export.',
+  'json-ld':
+    'Emit JSON-LD via `safeJsonLdStringify()` or a `<script type="application/ld+json">` block.',
+};
+
 const CHECK_PATTERNS: Record<string, RegExp> = {
   'metadata-export':
     /export\s+(const\s+metadata\b|async\s+function\s+generateMetadata\b|function\s+generateMetadata\b)/,
+  description: /\bdescription\s*[:,]/,
   openGraph: /\bopenGraph\s*:/,
   twitter: /\btwitter\s*:/,
   canonical: /\b(?:canonical\s*:|alternates\s*:)/,
+  'json-ld': /safeJsonLdStringify\s*\(|type=['"]application\/ld\+json['"]/,
 };
 
 // ---------------------------------------------------------------------------
@@ -161,11 +178,15 @@ describe('SEO ratchet baseline', () => {
           ).toBeDefined();
 
           const source = readSourceWithMetadataImports(filePath);
+          const remediation =
+            CHECK_REMEDIATION[check] ??
+            'Restore the missing SEO signal or update seo-ratchet-baseline.json via intentional PR.';
           expect(
             pattern!.test(source),
             [
               `"${routePath}" is missing required SEO signal: ${check}`,
               `Pattern: ${pattern!.source}`,
+              `Auto-fix: ${remediation}`,
               `This route was previously SEO-clean. Either restore the signal or`,
               `intentionally update seo-ratchet-baseline.json via PR.`,
             ].join('\n')

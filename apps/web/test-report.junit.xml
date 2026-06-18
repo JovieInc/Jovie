@@ -1,301 +1,157 @@
 <?xml version="1.0" encoding="UTF-8" ?>
-<testsuites name="vitest tests" tests="140" failures="0" errors="0" time="0.125795582">
-    <testsuite name="tests/unit/lib/csp-reporting.test.ts" timestamp="2026-06-17T05:27:38.188Z" hostname="mac.lan" tests="12" failures="0" errors="0" skipped="0" time="0.003078458">
-        <testcase classname="tests/unit/lib/csp-reporting.test.ts" name="csp-reporting &gt; parseSentryDsn &gt; parses a valid Sentry DSN" time="0.000870583">
+<testsuites name="vitest tests" tests="73" failures="0" errors="0" time="0.260472375">
+    <testsuite name="tests/app/robots.test.ts" timestamp="2026-06-18T09:16:39.313Z" hostname="mac.lan" tests="13" failures="0" errors="0" skipped="0" time="0.018405125">
+        <testcase classname="tests/app/robots.test.ts" name="robots.ts — production behavior &gt; VERCEL_ENV=undefined (fail-safe default) never emits a global Disallow: /" time="0.006452084">
         </testcase>
-        <testcase classname="tests/unit/lib/csp-reporting.test.ts" name="csp-reporting &gt; parseSentryDsn &gt; returns null for invalid URL" time="0.00009875">
+        <testcase classname="tests/app/robots.test.ts" name="robots.ts — production behavior &gt; VERCEL_ENV=empty string never emits a global Disallow: /" time="0.000916917">
         </testcase>
-        <testcase classname="tests/unit/lib/csp-reporting.test.ts" name="csp-reporting &gt; parseSentryDsn &gt; returns null for missing public key" time="0.000089917">
+        <testcase classname="tests/app/robots.test.ts" name="robots.ts — production behavior &gt; includes sitemap URL pointing to /sitemap.xml" time="0.001043875">
         </testcase>
-        <testcase classname="tests/unit/lib/csp-reporting.test.ts" name="csp-reporting &gt; parseSentryDsn &gt; returns null for missing project ID" time="0.000119333">
+        <testcase classname="tests/app/robots.test.ts" name="robots.ts — production behavior &gt; allows / for the wildcard (*) user-agent" time="0.000716833">
         </testcase>
-        <testcase classname="tests/unit/lib/csp-reporting.test.ts" name="csp-reporting &gt; buildCspReportUri &gt; builds correct report URI from DSN" time="0.000137">
+        <testcase classname="tests/app/robots.test.ts" name="robots.ts — production behavior &gt; explicitly allows AI crawler &quot;GPTBot&quot; in production" time="0.000756416">
         </testcase>
-        <testcase classname="tests/unit/lib/csp-reporting.test.ts" name="csp-reporting &gt; buildCspReportUri &gt; returns null for invalid DSN" time="0.000048708">
+        <testcase classname="tests/app/robots.test.ts" name="robots.ts — production behavior &gt; explicitly allows AI crawler &quot;ChatGPT-User&quot; in production" time="0.000633709">
         </testcase>
-        <testcase classname="tests/unit/lib/csp-reporting.test.ts" name="csp-reporting &gt; getCspReportUri &gt; returns explicit URI if set" time="0.000325167">
+        <testcase classname="tests/app/robots.test.ts" name="robots.ts — production behavior &gt; explicitly allows AI crawler &quot;Claude-Web&quot; in production" time="0.000616292">
         </testcase>
-        <testcase classname="tests/unit/lib/csp-reporting.test.ts" name="csp-reporting &gt; getCspReportUri &gt; falls back to DSN-generated URI" time="0.000127625">
+        <testcase classname="tests/app/robots.test.ts" name="robots.ts — production behavior &gt; explicitly allows AI crawler &quot;PerplexityBot&quot; in production" time="0.000495791">
         </testcase>
-        <testcase classname="tests/unit/lib/csp-reporting.test.ts" name="csp-reporting &gt; getCspReportUri &gt; returns null if neither env var is set" time="0.000293958">
+        <testcase classname="tests/app/robots.test.ts" name="robots.ts — production behavior &gt; explicitly allows AI crawler &quot;Google-Extended&quot; in production" time="0.002642333">
         </testcase>
-        <testcase classname="tests/unit/lib/csp-reporting.test.ts" name="csp-reporting &gt; buildReportToHeader &gt; builds correct Report-To header JSON" time="0.000117291">
+        <testcase classname="tests/app/robots.test.ts" name="robots.ts — production behavior &gt; AI crawler rules allow / and do not globally block all paths" time="0.001270917">
         </testcase>
-        <testcase classname="tests/unit/lib/csp-reporting.test.ts" name="csp-reporting &gt; buildReportToHeader &gt; uses CSP_REPORT_GROUP as group name" time="0.00008775">
+        <testcase classname="tests/app/robots.test.ts" name="robots.ts — preview/staging behavior &gt; VERCEL_ENV=preview blocks all crawlers with Disallow: /" time="0.000666">
         </testcase>
-        <testcase classname="tests/unit/lib/csp-reporting.test.ts" name="csp-reporting &gt; buildReportingEndpointsHeader &gt; builds correct Reporting-Endpoints header" time="0.0000385">
+        <testcase classname="tests/app/robots.test.ts" name="robots.ts — preview/staging behavior &gt; VERCEL_ENV=development blocks all crawlers with Disallow: /" time="0.000564292">
         </testcase>
-    </testsuite>
-    <testsuite name="tests/unit/middleware/proxy-auth-degraded-html.test.ts" timestamp="2026-06-17T05:27:38.189Z" hostname="mac.lan" tests="14" failures="0" errors="0" skipped="0" time="0.028535458">
-        <testcase classname="tests/unit/middleware/proxy-auth-degraded-html.test.ts" name="proxy.ts 503 path: /__clerk FAPI host decode failure &gt; returns a 503 JSON response when FAPI host cannot be decoded from publishable key" time="0.005865834">
-        </testcase>
-        <testcase classname="tests/unit/middleware/proxy-auth-degraded-html.test.ts" name="proxy.ts 503 path: /__clerk FAPI host decode failure &gt; does NOT fire captureErrorWithHostnameLimit for the /__clerk proxy path (handled upstream)" time="0.001901875">
-        </testcase>
-        <testcase classname="tests/unit/middleware/proxy-auth-degraded-html.test.ts" name="proxy.ts 503 paths: clerkConfigMissing for protected routes (Site 2) &gt; returns HTML for browser navigation to /app/dashboard when Clerk config is missing" time="0.003072166">
-        </testcase>
-        <testcase classname="tests/unit/middleware/proxy-auth-degraded-html.test.ts" name="proxy.ts 503 paths: clerkConfigMissing for protected routes (Site 2) &gt; returns JSON for API/fetch caller to /app/dashboard when Clerk config is missing" time="0.000718167">
-        </testcase>
-        <testcase classname="tests/unit/middleware/proxy-auth-degraded-html.test.ts" name="proxy.ts 503 paths: clerkConfigMissing for protected routes (Site 2) &gt; fires captureErrorWithHostnameLimit on clerkConfigMissing 503 (not raw captureError)" time="0.001423708">
-        </testcase>
-        <testcase classname="tests/unit/middleware/proxy-auth-degraded-html.test.ts" name="proxy.ts 503 paths: clerkConfigMissing for protected routes (Site 2) &gt; passes auth/public paths through even when Clerk config is missing (canProceedWithoutClerk)" time="0.004457042">
-        </testcase>
-        <testcase classname="tests/unit/middleware/proxy-auth-degraded-html.test.ts" name="proxy.ts 503 paths: !selectedMiddleware for protected routes &gt; returns HTML for browser navigation to /app/dashboard when Clerk middleware is null" time="0.001606292">
-        </testcase>
-        <testcase classname="tests/unit/middleware/proxy-auth-degraded-html.test.ts" name="proxy.ts 503 paths: !selectedMiddleware for protected routes &gt; returns JSON for API/fetch caller to /app/dashboard when Clerk middleware is null" time="0.001189333">
-        </testcase>
-        <testcase classname="tests/unit/middleware/proxy-auth-degraded-html.test.ts" name="proxy.ts 503 paths: !selectedMiddleware for protected routes &gt; fires captureErrorWithHostnameLimit on !selectedMiddleware 503" time="0.001929625">
-        </testcase>
-        <testcase classname="tests/unit/middleware/proxy-auth-degraded-html.test.ts" name="proxy.ts 503 paths: !selectedMiddleware for protected routes &gt; passes public/auth paths through even when Clerk middleware is null" time="0.002116208">
-        </testcase>
-        <testcase classname="tests/unit/middleware/proxy-auth-degraded-html.test.ts" name="proxy.ts 503 paths: staging Clerk middleware throw &gt; returns HTML for browser navigation to /app/dashboard on staging Clerk throw" time="0.000829458">
-        </testcase>
-        <testcase classname="tests/unit/middleware/proxy-auth-degraded-html.test.ts" name="proxy.ts 503 paths: staging Clerk middleware throw &gt; returns JSON for API/fetch caller on staging Clerk throw" time="0.000427459">
-        </testcase>
-        <testcase classname="tests/unit/middleware/proxy-auth-degraded-html.test.ts" name="proxy.ts 503 paths: staging Clerk middleware throw &gt; fires captureErrorWithHostnameLimit on staging Clerk throw" time="0.000392791">
-        </testcase>
-        <testcase classname="tests/unit/middleware/proxy-auth-degraded-html.test.ts" name="/waitlist 503 path &gt; returns HTML for browser navigation to /waitlist when auth is degraded" time="0.000255334">
+        <testcase classname="tests/app/robots.test.ts" name="robots.ts — preview/staging behavior &gt; VERCEL_ENV=preview emits no sitemap" time="0.000488292">
         </testcase>
     </testsuite>
-    <testsuite name="tests/unit/middleware/proxy-behavioral.test.ts" timestamp="2026-06-17T05:27:38.190Z" hostname="mac.lan" tests="83" failures="0" errors="0" skipped="0" time="0.055763291">
-        <testcase classname="tests/unit/middleware/proxy-behavioral.test.ts" name="proxy.ts middleware &gt; scanner probe drop &gt; returns 404 for probe path /some-creator/wp-content/plugins/hellopress/wp_filemanager.php without invoking Clerk" time="0.007009208">
+    <testsuite name="tests/app/sitemap.test.ts" timestamp="2026-06-18T09:16:39.315Z" hostname="mac.lan" tests="2" failures="0" errors="0" skipped="0" time="0.223711208">
+        <testcase classname="tests/app/sitemap.test.ts" name="sitemap &gt; returns marketing, blog, profile, release, and deduplicated track URLs" time="0.221989334">
         </testcase>
-        <testcase classname="tests/unit/middleware/proxy-behavioral.test.ts" name="proxy.ts middleware &gt; scanner probe drop &gt; returns 404 for probe path /timwhite/wp-admin/install.php without invoking Clerk" time="0.001345875">
-        </testcase>
-        <testcase classname="tests/unit/middleware/proxy-behavioral.test.ts" name="proxy.ts middleware &gt; scanner probe drop &gt; returns 404 for probe path /xmlrpc.php without invoking Clerk" time="0.001214666">
-        </testcase>
-        <testcase classname="tests/unit/middleware/proxy-behavioral.test.ts" name="proxy.ts middleware &gt; scanner probe drop &gt; returns 404 for probe path /.env without invoking Clerk" time="0.000389125">
-        </testcase>
-        <testcase classname="tests/unit/middleware/proxy-behavioral.test.ts" name="proxy.ts middleware &gt; scanner probe drop &gt; returns 404 for probe path /some/random.php without invoking Clerk" time="0.000638875">
-        </testcase>
-        <testcase classname="tests/unit/middleware/proxy-behavioral.test.ts" name="proxy.ts middleware &gt; scanner probe drop &gt; still serves a legitimate profile path that contains no probe markers" time="0.005078875">
-        </testcase>
-        <testcase classname="tests/unit/middleware/proxy-behavioral.test.ts" name="proxy.ts middleware &gt; catch-all handle hardening &gt; redirects /login to /signin without touching the audience block" time="0.001613167">
-        </testcase>
-        <testcase classname="tests/unit/middleware/proxy-behavioral.test.ts" name="proxy.ts middleware &gt; catch-all handle hardening &gt; redirects /request-access to /start without touching the audience block" time="0.0004625">
-        </testcase>
-        <testcase classname="tests/unit/middleware/proxy-behavioral.test.ts" name="proxy.ts middleware &gt; catch-all handle hardening &gt; returns a fast 404 for other reserved catch-all segments" time="0.0008005">
-        </testcase>
-        <testcase classname="tests/unit/middleware/proxy-behavioral.test.ts" name="proxy.ts middleware &gt; cookie banner geo-detection &gt; sets jv_cc_required=1 for EU country (Germany)" time="0.001456042">
-        </testcase>
-        <testcase classname="tests/unit/middleware/proxy-behavioral.test.ts" name="proxy.ts middleware &gt; cookie banner geo-detection &gt; keeps only pre-consent cookies for consent-required visitors without consent" time="0.000936292">
-        </testcase>
-        <testcase classname="tests/unit/middleware/proxy-behavioral.test.ts" name="proxy.ts middleware &gt; cookie banner geo-detection &gt; deletes existing nonessential proxy cookies when consent is missing" time="0.001534792">
-        </testcase>
-        <testcase classname="tests/unit/middleware/proxy-behavioral.test.ts" name="proxy.ts middleware &gt; cookie banner geo-detection &gt; sets nonessential proxy cookies after analytics consent is granted" time="0.001151584">
-        </testcase>
-        <testcase classname="tests/unit/middleware/proxy-behavioral.test.ts" name="proxy.ts middleware &gt; cookie banner geo-detection &gt; does not set analytics-classified cookies for marketing-only consent" time="0.000787375">
-        </testcase>
-        <testcase classname="tests/unit/middleware/proxy-behavioral.test.ts" name="proxy.ts middleware &gt; cookie banner geo-detection &gt; deletes analytics-classified cookies for marketing-only consent" time="0.000924625">
-        </testcase>
-        <testcase classname="tests/unit/middleware/proxy-behavioral.test.ts" name="proxy.ts middleware &gt; cookie banner geo-detection &gt; sets jv_cc_required=1 for US California (CCPA)" time="0.00037325">
-        </testcase>
-        <testcase classname="tests/unit/middleware/proxy-behavioral.test.ts" name="proxy.ts middleware &gt; cookie banner geo-detection &gt; sets jv_cc_required=0 for US Texas (no state law)" time="0.000364542">
-        </testcase>
-        <testcase classname="tests/unit/middleware/proxy-behavioral.test.ts" name="proxy.ts middleware &gt; cookie banner geo-detection &gt; does not re-set cookie when value already matches" time="0.000261">
-        </testcase>
-        <testcase classname="tests/unit/middleware/proxy-behavioral.test.ts" name="proxy.ts middleware &gt; auth redirects for unauthenticated users &gt; redirects unauthenticated GET /app to /signin" time="0.001048125">
-        </testcase>
-        <testcase classname="tests/unit/middleware/proxy-behavioral.test.ts" name="proxy.ts middleware &gt; auth redirects for unauthenticated users &gt; redirects signed-out Electron app shell requests with an absolute signin location before Clerk dev-browser handling" time="0.00048475">
-        </testcase>
-        <testcase classname="tests/unit/middleware/proxy-behavioral.test.ts" name="proxy.ts middleware &gt; auth redirects for unauthenticated users &gt; redirects unauthenticated GET /app/dashboard to /signin" time="0.000604625">
-        </testcase>
-        <testcase classname="tests/unit/middleware/proxy-behavioral.test.ts" name="proxy.ts middleware &gt; auth redirects for unauthenticated users &gt; keeps unauthenticated legacy earnings deep links behind signin" time="0.001031792">
-        </testcase>
-        <testcase classname="tests/unit/middleware/proxy-behavioral.test.ts" name="proxy.ts middleware &gt; auth redirects for unauthenticated users &gt; keeps unauthenticated app earnings aliases behind signin" time="0.0007375">
-        </testcase>
-        <testcase classname="tests/unit/middleware/proxy-behavioral.test.ts" name="proxy.ts middleware &gt; auth redirects for unauthenticated users &gt; redirects unauthenticated GET /onboarding to /start before rendering" time="0.000641292">
-        </testcase>
-        <testcase classname="tests/unit/middleware/proxy-behavioral.test.ts" name="proxy.ts middleware &gt; auth redirects for unauthenticated users &gt; redirects unauthenticated GET /waitlist to /start" time="0.000251709">
-        </testcase>
-        <testcase classname="tests/unit/middleware/proxy-behavioral.test.ts" name="proxy.ts middleware &gt; auth redirects for unauthenticated users &gt; allows unauthenticated access to public paths" time="0.000744791">
-        </testcase>
-        <testcase classname="tests/unit/middleware/proxy-behavioral.test.ts" name="proxy.ts middleware &gt; auth redirects for unauthenticated users &gt; does not run the audience block lookup for reserved public routes" time="0.002230958">
-        </testcase>
-        <testcase classname="tests/unit/middleware/proxy-behavioral.test.ts" name="proxy.ts middleware &gt; auth redirects for unauthenticated users &gt; runs the audience block lookup for public profile root paths only" time="0.001064167">
-        </testcase>
-        <testcase classname="tests/unit/middleware/proxy-behavioral.test.ts" name="proxy.ts middleware &gt; auth redirects for unauthenticated users &gt; redirects blocked public profile visitors before route handling continues" time="0.0002395">
-        </testcase>
-        <testcase classname="tests/unit/middleware/proxy-behavioral.test.ts" name="proxy.ts middleware &gt; auth redirects for unauthenticated users &gt; normalizes /sign-in to /signin" time="0.00036875">
-        </testcase>
-        <testcase classname="tests/unit/middleware/proxy-behavioral.test.ts" name="proxy.ts middleware &gt; auth redirects for unauthenticated users &gt; normalizes /sign-up to /signup" time="0.000215125">
-        </testcase>
-        <testcase classname="tests/unit/middleware/proxy-behavioral.test.ts" name="proxy.ts middleware &gt; private-origin Clerk handling &gt; keeps Clerk middleware enabled for authenticated mobile APIs on localhost" time="0.001286083">
-        </testcase>
-        <testcase classname="tests/unit/middleware/proxy-behavioral.test.ts" name="proxy.ts middleware &gt; staging Clerk contract &gt; fails closed on staging auth routes when staging Clerk keys are missing" time="0.000371834">
-        </testcase>
-        <testcase classname="tests/unit/middleware/proxy-behavioral.test.ts" name="proxy.ts middleware &gt; staging Clerk contract &gt; renders auth routes on production runtime when Clerk keys are missing" time="0.000227084">
-        </testcase>
-        <testcase classname="tests/unit/middleware/proxy-behavioral.test.ts" name="proxy.ts middleware &gt; staging Clerk contract &gt; returns 503 for protected staging routes when staging Clerk keys are missing" time="0.000213959">
-        </testcase>
-        <testcase classname="tests/unit/middleware/proxy-behavioral.test.ts" name="proxy.ts middleware &gt; staging Clerk contract &gt; returns 503 (not a signin redirect) when staging Clerk middleware throws on a protected path (JOV-1902)" time="0.000171625">
-        </testcase>
-        <testcase classname="tests/unit/middleware/proxy-behavioral.test.ts" name="proxy.ts middleware &gt; staging Clerk contract &gt; falls back to unauthenticated handling when staging Clerk throws on a public path" time="0.000200958">
-        </testcase>
-        <testcase classname="tests/unit/middleware/proxy-behavioral.test.ts" name="proxy.ts middleware &gt; staging Clerk contract &gt; falls back to unauthenticated handling when staging Clerk throws on an auth page" time="0.000201083">
-        </testcase>
-        <testcase classname="tests/unit/middleware/proxy-behavioral.test.ts" name="proxy.ts middleware &gt; staging Clerk contract &gt; returns 503 (not a signin redirect) when staging Clerk middleware throws on /app" time="0.000234667">
-        </testcase>
-        <testcase classname="tests/unit/middleware/proxy-behavioral.test.ts" name="proxy.ts middleware &gt; auth redirects for authenticated users &gt; lets authenticated central auth route /auth/start reach its handler without user-state redirects" time="0.000434166">
-        </testcase>
-        <testcase classname="tests/unit/middleware/proxy-behavioral.test.ts" name="proxy.ts middleware &gt; auth redirects for authenticated users &gt; lets authenticated central auth route /auth/callback reach its handler without user-state redirects" time="0.000177292">
-        </testcase>
-        <testcase classname="tests/unit/middleware/proxy-behavioral.test.ts" name="proxy.ts middleware &gt; auth redirects for authenticated users &gt; lets authenticated central auth route /app/auth/callback reach its handler without user-state redirects" time="0.000150542">
-        </testcase>
-        <testcase classname="tests/unit/middleware/proxy-behavioral.test.ts" name="proxy.ts middleware &gt; auth redirects for authenticated users &gt; redirects authenticated user on /signin to /app" time="0.000136959">
-        </testcase>
-        <testcase classname="tests/unit/middleware/proxy-behavioral.test.ts" name="proxy.ts middleware &gt; auth redirects for authenticated users &gt; redirects authenticated user on /signup to /app" time="0.000105458">
-        </testcase>
-        <testcase classname="tests/unit/middleware/proxy-behavioral.test.ts" name="proxy.ts middleware &gt; auth redirects for authenticated users &gt; redirects authenticated user with needsWaitlist on /signin to /waitlist" time="0.000095125">
-        </testcase>
-        <testcase classname="tests/unit/middleware/proxy-behavioral.test.ts" name="proxy.ts middleware &gt; auth redirects for authenticated users &gt; redirects authenticated user with needsOnboarding on /signin to /start" time="0.000089334">
-        </testcase>
-        <testcase classname="tests/unit/middleware/proxy-behavioral.test.ts" name="proxy.ts middleware &gt; auth redirects for authenticated users &gt; returns approved invite recipients from /signin to the invite redemption page" time="0.0002045">
-        </testcase>
-        <testcase classname="tests/unit/middleware/proxy-behavioral.test.ts" name="proxy.ts middleware &gt; auth redirects for authenticated users &gt; lets needsOnboarding users redeem waitlist invite links" time="0.000248375">
-        </testcase>
-        <testcase classname="tests/unit/middleware/proxy-behavioral.test.ts" name="proxy.ts middleware &gt; auth redirects for authenticated users &gt; lets waitlisted users redeem waitlist invite links" time="0.000181625">
-        </testcase>
-        <testcase classname="tests/unit/middleware/proxy-behavioral.test.ts" name="proxy.ts middleware &gt; auth redirects for authenticated users &gt; redirects active user away from /waitlist to /app" time="0.000172625">
-        </testcase>
-        <testcase classname="tests/unit/middleware/proxy-behavioral.test.ts" name="proxy.ts middleware &gt; auth redirects for authenticated users &gt; redirects active users from legacy /onboarding to /start" time="0.000193125">
-        </testcase>
-        <testcase classname="tests/unit/middleware/proxy-behavioral.test.ts" name="proxy.ts middleware &gt; auth redirects for authenticated users &gt; redirects authenticated needsOnboarding users from / to /start without bouncing through /app (JOV-2454)" time="0.000109083">
-        </testcase>
-        <testcase classname="tests/unit/middleware/proxy-behavioral.test.ts" name="proxy.ts middleware &gt; auth redirects for authenticated users &gt; redirects authenticated legacy earnings deep links to artist profile pay" time="0.000154666">
-        </testcase>
-        <testcase classname="tests/unit/middleware/proxy-behavioral.test.ts" name="proxy.ts middleware &gt; auth redirects for authenticated users &gt; redirects authenticated app earnings aliases to artist profile pay" time="0.000144292">
-        </testcase>
-        <testcase classname="tests/unit/middleware/proxy-behavioral.test.ts" name="proxy.ts middleware &gt; circuit breaker (redirect loop prevention) &gt; redirects to /start and increments redirect count" time="0.000536375">
-        </testcase>
-        <testcase classname="tests/unit/middleware/proxy-behavioral.test.ts" name="proxy.ts middleware &gt; circuit breaker (redirect loop prevention) &gt; increments redirect count on subsequent redirects" time="0.000320792">
-        </testcase>
-        <testcase classname="tests/unit/middleware/proxy-behavioral.test.ts" name="proxy.ts middleware &gt; circuit breaker (redirect loop prevention) &gt; breaks the loop at count &gt;= 3" time="0.000642583">
-        </testcase>
-        <testcase classname="tests/unit/middleware/proxy-behavioral.test.ts" name="proxy.ts middleware &gt; circuit breaker (redirect loop prevention) &gt; lets request through when onboarding_complete cookie is set" time="0.00042275">
-        </testcase>
-        <testcase classname="tests/unit/middleware/proxy-behavioral.test.ts" name="proxy.ts middleware &gt; circuit breaker (redirect loop prevention) &gt; redirects needsWaitlist user from /pricing to /waitlist and increments count" time="0.000731958">
-        </testcase>
-        <testcase classname="tests/unit/middleware/proxy-behavioral.test.ts" name="proxy.ts middleware &gt; circuit breaker (redirect loop prevention) &gt; treats a tampered jovie_redirect_count cookie (NaN) as 0 (defense in depth)" time="0.000544709">
-        </testcase>
-        <testcase classname="tests/unit/middleware/proxy-behavioral.test.ts" name="proxy.ts middleware &gt; circuit breaker (redirect loop prevention) &gt; breaks needsWaitlist rewrite loop at count &gt;= 3 (JOV-2161 regression guard)" time="0.000938208">
-        </testcase>
-        <testcase classname="tests/unit/middleware/proxy-behavioral.test.ts" name="proxy.ts middleware &gt; rewrite-exempt paths &gt; does NOT rewrite /start for a needsWaitlist user (lets OnboardingShell mount)" time="0.000278">
-        </testcase>
-        <testcase classname="tests/unit/middleware/proxy-behavioral.test.ts" name="proxy.ts middleware &gt; rewrite-exempt paths &gt; does NOT rewrite /start for a needsOnboarding user" time="0.0002565">
-        </testcase>
-        <testcase classname="tests/unit/middleware/proxy-behavioral.test.ts" name="proxy.ts middleware &gt; rewrite-exempt paths &gt; does NOT rewrite /onboarding/checkout for a needsWaitlist user" time="0.000733792">
-        </testcase>
-        <testcase classname="tests/unit/middleware/proxy-behavioral.test.ts" name="proxy.ts middleware &gt; rewrite-exempt paths &gt; does NOT rewrite /onboarding/checkout for a needsOnboarding user" time="0.000661458">
-        </testcase>
-        <testcase classname="tests/unit/middleware/proxy-behavioral.test.ts" name="proxy.ts middleware &gt; bot detection &gt; blocks Meta bots on sensitive API paths" time="0.000388">
-        </testcase>
-        <testcase classname="tests/unit/middleware/proxy-behavioral.test.ts" name="proxy.ts middleware &gt; bot detection &gt; allows normal user agents on sensitive API paths" time="0.000417625">
-        </testcase>
-        <testcase classname="tests/unit/middleware/proxy-behavioral.test.ts" name="proxy.ts middleware &gt; bot detection &gt; does not block Meta bots on non-sensitive paths" time="0.000577833">
-        </testcase>
-        <testcase classname="tests/unit/middleware/proxy-behavioral.test.ts" name="proxy.ts middleware &gt; banned user handling &gt; rewrites banned user to /unavailable on non-/app paths" time="0.000461625">
-        </testcase>
-        <testcase classname="tests/unit/middleware/proxy-behavioral.test.ts" name="proxy.ts middleware &gt; banned user handling &gt; rewrites banned user on marketing pages" time="0.000236291">
-        </testcase>
-        <testcase classname="tests/unit/middleware/proxy-behavioral.test.ts" name="proxy.ts middleware &gt; Clerk FAPI proxy (vercel.json) &gt; does not have clerk rewrites — middleware fetch proxy handles this" time="0.000858291">
-        </testcase>
-        <testcase classname="tests/unit/middleware/proxy-behavioral.test.ts" name="proxy.ts middleware &gt; Clerk FAPI proxy (vercel.json) &gt; routes staging Clerk proxy traffic to the staging FAPI host" time="0.000633625">
-        </testcase>
-        <testcase classname="tests/unit/middleware/proxy-behavioral.test.ts" name="proxy.ts middleware &gt; Clerk FAPI proxy (vercel.json) &gt; handles upstream 3xx redirects via NextResponse.redirect (avoids middleware crash on streamed redirect bodies)" time="0.000366958">
-        </testcase>
-        <testcase classname="tests/unit/middleware/proxy-behavioral.test.ts" name="proxy.ts middleware &gt; Clerk FAPI proxy (vercel.json) &gt; rewrites FAPI-relative Location headers to absolute proxy URLs (Apple OAuth form_post redirect)" time="0.000229375">
-        </testcase>
-        <testcase classname="tests/unit/middleware/proxy-behavioral.test.ts" name="proxy.ts middleware &gt; Clerk FAPI proxy (vercel.json) &gt; passes through upstream non-redirect 3xx-adjacent responses (e.g. 304) without rewriting Location" time="0.000272667">
-        </testcase>
-        <testcase classname="tests/unit/middleware/proxy-behavioral.test.ts" name="proxy.ts middleware &gt; Clerk FAPI proxy (vercel.json) &gt; returns 503 for staging Clerk proxy traffic when staging keys are missing" time="0.000935542">
-        </testcase>
-        <testcase classname="tests/unit/middleware/proxy-behavioral.test.ts" name="proxy.ts middleware &gt; meetjovie.com redirect &gt; 301 redirects meetjovie.com to jov.ie" time="0.00038925">
-        </testcase>
-        <testcase classname="tests/unit/middleware/proxy-behavioral.test.ts" name="proxy.ts middleware &gt; support.jov.ie redirect &gt; 308 redirects support.jov.ie to jov.ie/support and preserves query params" time="0.000117833">
-        </testcase>
-        <testcase classname="tests/unit/middleware/proxy-behavioral.test.ts" name="proxy.ts middleware &gt; support.jov.ie redirect &gt; redirects support.jov.ie investor paths before investor handling runs" time="0.000090125">
-        </testcase>
-        <testcase classname="tests/unit/middleware/proxy-behavioral.test.ts" name="proxy.ts middleware &gt; path-based investor portal (proxy investor early returns) &gt; lets investor response links bypass Clerk without stripping token params" time="0.000120667">
-        </testcase>
-        <testcase classname="tests/unit/middleware/proxy-behavioral.test.ts" name="proxy.ts middleware &gt; investors.jov.ie legacy subdomain (proxy investor 301 early returns) &gt; 301 redirects investors.jov.ie non-static paths to jov.ie/investor-portal preserving token" time="0.000118584">
-        </testcase>
-        <testcase classname="tests/unit/middleware/proxy-behavioral.test.ts" name="proxy.ts middleware &gt; investors.jov.ie legacy subdomain (proxy investor 301 early returns) &gt; passes through _next static assets on investors.jov.ie without redirect (early return)" time="0.000086292">
-        </testcase>
-        <testcase classname="tests/unit/middleware/proxy-behavioral.test.ts" name="proxy.ts middleware &gt; investors.jov.ie legacy subdomain (proxy investor 301 early returns) &gt; 301 redirects investors.jov.ie root to jov.ie/investor-portal" time="0.000080292">
+        <testcase classname="tests/app/sitemap.test.ts" name="sitemap &gt; returns a non-empty sitemap where every entry has lastModified" time="0.000961334">
         </testcase>
     </testsuite>
-    <testsuite name="tests/unit/middleware/proxy-composition.critical.test.ts" timestamp="2026-06-17T05:27:38.193Z" hostname="mac.lan" tests="12" failures="0" errors="0" skipped="0" time="0.013085125">
-        <testcase classname="tests/unit/middleware/proxy-composition.critical.test.ts" name="proxy composition (critical) &gt; CSP nonce on response &gt; does NOT generate nonce for marketing paths (homepage)" time="0.005475458">
+    <testsuite name="tests/unit/ci/seo-ratchet.test.ts" timestamp="2026-06-18T09:16:39.315Z" hostname="mac.lan" tests="50" failures="0" errors="0" skipped="0" time="0.012719459">
+        <testcase classname="tests/unit/ci/seo-ratchet.test.ts" name="SEO ratchet baseline &gt; baseline file is valid and non-empty" time="0.001303833">
         </testcase>
-        <testcase classname="tests/unit/middleware/proxy-composition.critical.test.ts" name="proxy composition (critical) &gt; CSP nonce on response &gt; generates nonce for app paths" time="0.001262666">
+        <testcase classname="tests/unit/ci/seo-ratchet.test.ts" name="SEO ratchet baseline &gt; route: app/(home)/page.tsx &gt; source file exists" time="0.000283083">
         </testcase>
-        <testcase classname="tests/unit/middleware/proxy-composition.critical.test.ts" name="proxy composition (critical) &gt; CSP nonce on response &gt; generates nonce for API paths" time="0.000689583">
+        <testcase classname="tests/unit/ci/seo-ratchet.test.ts" name="SEO ratchet baseline &gt; route: app/(home)/page.tsx &gt; has required SEO signal: metadata-export" time="0.000727625">
         </testcase>
-        <testcase classname="tests/unit/middleware/proxy-composition.critical.test.ts" name="proxy composition (critical) &gt; CSP nonce on response &gt; generates nonce for desktop auth handoff pages" time="0.00047775">
+        <testcase classname="tests/unit/ci/seo-ratchet.test.ts" name="SEO ratchet baseline &gt; route: app/(home)/page.tsx &gt; has required SEO signal: description" time="0.000351833">
         </testcase>
-        <testcase classname="tests/unit/middleware/proxy-composition.critical.test.ts" name="proxy composition (critical) &gt; CSP nonce on response &gt; generates nonce for the dynamic start route used after desktop auth" time="0.000656292">
+        <testcase classname="tests/unit/ci/seo-ratchet.test.ts" name="SEO ratchet baseline &gt; route: app/(home)/page.tsx &gt; has required SEO signal: openGraph" time="0.000339875">
         </testcase>
-        <testcase classname="tests/unit/middleware/proxy-composition.critical.test.ts" name="proxy composition (critical) &gt; test bypass auth path &gt; resolves test user when bypass is enabled" time="0.000572833">
+        <testcase classname="tests/unit/ci/seo-ratchet.test.ts" name="SEO ratchet baseline &gt; route: app/(home)/page.tsx &gt; has required SEO signal: twitter" time="0.000155167">
         </testcase>
-        <testcase classname="tests/unit/middleware/proxy-composition.critical.test.ts" name="proxy composition (critical) &gt; test bypass auth path &gt; treats request as unauthenticated when no test user resolved" time="0.00044975">
+        <testcase classname="tests/unit/ci/seo-ratchet.test.ts" name="SEO ratchet baseline &gt; route: app/(home)/page.tsx &gt; has required SEO signal: canonical" time="0.0001415">
         </testcase>
-        <testcase classname="tests/unit/middleware/proxy-composition.critical.test.ts" name="proxy composition (critical) &gt; x-clerk-publishable-key header &gt; sets header when both publishableKey and secretKey are present" time="0.000739334">
+        <testcase classname="tests/unit/ci/seo-ratchet.test.ts" name="SEO ratchet baseline &gt; route: app/(home)/page.tsx &gt; has required SEO signal: json-ld" time="0.000192083">
         </testcase>
-        <testcase classname="tests/unit/middleware/proxy-composition.critical.test.ts" name="proxy composition (critical) &gt; x-clerk-publishable-key header &gt; does NOT set header when secretKey is missing (staging without CLERK_SECRET_KEY)" time="0.001157334">
+        <testcase classname="tests/unit/ci/seo-ratchet.test.ts" name="SEO ratchet baseline &gt; route: app/(marketing)/pricing/page.tsx &gt; source file exists" time="0.000459375">
         </testcase>
-        <testcase classname="tests/unit/middleware/proxy-composition.critical.test.ts" name="proxy composition (critical) &gt; x-clerk-publishable-key header &gt; does NOT set header when publishableKey is missing" time="0.000455125">
+        <testcase classname="tests/unit/ci/seo-ratchet.test.ts" name="SEO ratchet baseline &gt; route: app/(marketing)/pricing/page.tsx &gt; has required SEO signal: metadata-export" time="0.000403584">
         </testcase>
-        <testcase classname="tests/unit/middleware/proxy-composition.critical.test.ts" name="proxy composition (critical) &gt; matcher config &gt; exports a config with matcher that excludes /monitoring" time="0.000209959">
+        <testcase classname="tests/unit/ci/seo-ratchet.test.ts" name="SEO ratchet baseline &gt; route: app/(marketing)/pricing/page.tsx &gt; has required SEO signal: description" time="0.000186833">
         </testcase>
-        <testcase classname="tests/unit/middleware/proxy-composition.critical.test.ts" name="proxy composition (critical) &gt; matcher config &gt; exports a config with matcher that excludes static files" time="0.00005725">
+        <testcase classname="tests/unit/ci/seo-ratchet.test.ts" name="SEO ratchet baseline &gt; route: app/(marketing)/pricing/page.tsx &gt; has required SEO signal: openGraph" time="0.00014275">
+        </testcase>
+        <testcase classname="tests/unit/ci/seo-ratchet.test.ts" name="SEO ratchet baseline &gt; route: app/(marketing)/pricing/page.tsx &gt; has required SEO signal: twitter" time="0.000112791">
+        </testcase>
+        <testcase classname="tests/unit/ci/seo-ratchet.test.ts" name="SEO ratchet baseline &gt; route: app/(marketing)/about/page.tsx &gt; source file exists" time="0.000129834">
+        </testcase>
+        <testcase classname="tests/unit/ci/seo-ratchet.test.ts" name="SEO ratchet baseline &gt; route: app/(marketing)/about/page.tsx &gt; has required SEO signal: metadata-export" time="0.000461375">
+        </testcase>
+        <testcase classname="tests/unit/ci/seo-ratchet.test.ts" name="SEO ratchet baseline &gt; route: app/(marketing)/about/page.tsx &gt; has required SEO signal: description" time="0.000134708">
+        </testcase>
+        <testcase classname="tests/unit/ci/seo-ratchet.test.ts" name="SEO ratchet baseline &gt; route: app/(marketing)/about/page.tsx &gt; has required SEO signal: openGraph" time="0.000110875">
+        </testcase>
+        <testcase classname="tests/unit/ci/seo-ratchet.test.ts" name="SEO ratchet baseline &gt; route: app/(marketing)/about/page.tsx &gt; has required SEO signal: canonical" time="0.000116583">
+        </testcase>
+        <testcase classname="tests/unit/ci/seo-ratchet.test.ts" name="SEO ratchet baseline &gt; route: app/(marketing)/blog/page.tsx &gt; source file exists" time="0.000048542">
+        </testcase>
+        <testcase classname="tests/unit/ci/seo-ratchet.test.ts" name="SEO ratchet baseline &gt; route: app/(marketing)/blog/page.tsx &gt; has required SEO signal: metadata-export" time="0.000289667">
+        </testcase>
+        <testcase classname="tests/unit/ci/seo-ratchet.test.ts" name="SEO ratchet baseline &gt; route: app/(marketing)/blog/page.tsx &gt; has required SEO signal: description" time="0.000090625">
+        </testcase>
+        <testcase classname="tests/unit/ci/seo-ratchet.test.ts" name="SEO ratchet baseline &gt; route: app/(marketing)/blog/page.tsx &gt; has required SEO signal: canonical" time="0.00008375">
+        </testcase>
+        <testcase classname="tests/unit/ci/seo-ratchet.test.ts" name="SEO ratchet baseline &gt; route: app/(marketing)/blog/[slug]/page.tsx &gt; source file exists" time="0.000047208">
+        </testcase>
+        <testcase classname="tests/unit/ci/seo-ratchet.test.ts" name="SEO ratchet baseline &gt; route: app/(marketing)/blog/[slug]/page.tsx &gt; has required SEO signal: metadata-export" time="0.00036425">
+        </testcase>
+        <testcase classname="tests/unit/ci/seo-ratchet.test.ts" name="SEO ratchet baseline &gt; route: app/(marketing)/blog/[slug]/page.tsx &gt; has required SEO signal: description" time="0.000100209">
+        </testcase>
+        <testcase classname="tests/unit/ci/seo-ratchet.test.ts" name="SEO ratchet baseline &gt; route: app/(marketing)/blog/[slug]/page.tsx &gt; has required SEO signal: openGraph" time="0.000086792">
+        </testcase>
+        <testcase classname="tests/unit/ci/seo-ratchet.test.ts" name="SEO ratchet baseline &gt; route: app/(marketing)/blog/[slug]/page.tsx &gt; has required SEO signal: twitter" time="0.000094583">
+        </testcase>
+        <testcase classname="tests/unit/ci/seo-ratchet.test.ts" name="SEO ratchet baseline &gt; route: app/(marketing)/blog/[slug]/page.tsx &gt; has required SEO signal: canonical" time="0.000090458">
+        </testcase>
+        <testcase classname="tests/unit/ci/seo-ratchet.test.ts" name="SEO ratchet baseline &gt; route: app/(marketing)/support/page.tsx &gt; source file exists" time="0.000056583">
+        </testcase>
+        <testcase classname="tests/unit/ci/seo-ratchet.test.ts" name="SEO ratchet baseline &gt; route: app/(marketing)/support/page.tsx &gt; has required SEO signal: metadata-export" time="0.0002685">
+        </testcase>
+        <testcase classname="tests/unit/ci/seo-ratchet.test.ts" name="SEO ratchet baseline &gt; route: app/(marketing)/support/page.tsx &gt; has required SEO signal: description" time="0.000089958">
+        </testcase>
+        <testcase classname="tests/unit/ci/seo-ratchet.test.ts" name="SEO ratchet baseline &gt; route: app/(marketing)/support/page.tsx &gt; has required SEO signal: canonical" time="0.000086875">
+        </testcase>
+        <testcase classname="tests/unit/ci/seo-ratchet.test.ts" name="SEO ratchet baseline &gt; route: app/(marketing)/changelog/page.tsx &gt; source file exists" time="0.00004925">
+        </testcase>
+        <testcase classname="tests/unit/ci/seo-ratchet.test.ts" name="SEO ratchet baseline &gt; route: app/(marketing)/changelog/page.tsx &gt; has required SEO signal: metadata-export" time="0.00027575">
+        </testcase>
+        <testcase classname="tests/unit/ci/seo-ratchet.test.ts" name="SEO ratchet baseline &gt; route: app/(marketing)/changelog/page.tsx &gt; has required SEO signal: description" time="0.000111959">
+        </testcase>
+        <testcase classname="tests/unit/ci/seo-ratchet.test.ts" name="SEO ratchet baseline &gt; route: app/(marketing)/changelog/page.tsx &gt; has required SEO signal: canonical" time="0.000092">
+        </testcase>
+        <testcase classname="tests/unit/ci/seo-ratchet.test.ts" name="SEO ratchet baseline &gt; route: app/[username]/page.tsx &gt; source file exists" time="0.00010575">
+        </testcase>
+        <testcase classname="tests/unit/ci/seo-ratchet.test.ts" name="SEO ratchet baseline &gt; route: app/[username]/page.tsx &gt; has required SEO signal: metadata-export" time="0.00067075">
+        </testcase>
+        <testcase classname="tests/unit/ci/seo-ratchet.test.ts" name="SEO ratchet baseline &gt; route: app/[username]/page.tsx &gt; has required SEO signal: description" time="0.000183875">
+        </testcase>
+        <testcase classname="tests/unit/ci/seo-ratchet.test.ts" name="SEO ratchet baseline &gt; route: app/[username]/page.tsx &gt; has required SEO signal: openGraph" time="0.000185541">
+        </testcase>
+        <testcase classname="tests/unit/ci/seo-ratchet.test.ts" name="SEO ratchet baseline &gt; route: app/[username]/page.tsx &gt; has required SEO signal: twitter" time="0.000199958">
+        </testcase>
+        <testcase classname="tests/unit/ci/seo-ratchet.test.ts" name="SEO ratchet baseline &gt; route: app/[username]/page.tsx &gt; has required SEO signal: canonical" time="0.000190167">
+        </testcase>
+        <testcase classname="tests/unit/ci/seo-ratchet.test.ts" name="SEO ratchet baseline &gt; route: app/[username]/page.tsx &gt; has required SEO signal: json-ld" time="0.00020225">
+        </testcase>
+        <testcase classname="tests/unit/ci/seo-ratchet.test.ts" name="SEO ratchet baseline &gt; route: app/[username]/[slug]/page.tsx &gt; source file exists" time="0.000049958">
+        </testcase>
+        <testcase classname="tests/unit/ci/seo-ratchet.test.ts" name="SEO ratchet baseline &gt; route: app/[username]/[slug]/page.tsx &gt; has required SEO signal: metadata-export" time="0.000440916">
+        </testcase>
+        <testcase classname="tests/unit/ci/seo-ratchet.test.ts" name="SEO ratchet baseline &gt; route: app/[username]/[slug]/page.tsx &gt; has required SEO signal: description" time="0.000149958">
+        </testcase>
+        <testcase classname="tests/unit/ci/seo-ratchet.test.ts" name="SEO ratchet baseline &gt; route: app/[username]/[slug]/page.tsx &gt; has required SEO signal: openGraph" time="0.000113625">
+        </testcase>
+        <testcase classname="tests/unit/ci/seo-ratchet.test.ts" name="SEO ratchet baseline &gt; route: app/[username]/[slug]/page.tsx &gt; has required SEO signal: twitter" time="0.0001065">
+        </testcase>
+        <testcase classname="tests/unit/ci/seo-ratchet.test.ts" name="SEO ratchet baseline &gt; route: app/[username]/[slug]/page.tsx &gt; has required SEO signal: canonical" time="0.000112292">
+        </testcase>
+        <testcase classname="tests/unit/ci/seo-ratchet.test.ts" name="SEO ratchet baseline &gt; route: app/[username]/[slug]/page.tsx &gt; has required SEO signal: json-ld" time="0.000098459">
         </testcase>
     </testsuite>
-    <testsuite name="tests/unit/middleware/proxy-debug-route-lockdown.test.ts" timestamp="2026-06-17T05:27:38.194Z" hostname="mac.lan" tests="7" failures="0" errors="0" skipped="0" time="0.01023">
-        <testcase classname="tests/unit/middleware/proxy-debug-route-lockdown.test.ts" name="proxy debug/test route lockdown &gt; rewrites debug API routes to /404 on preview deployments" time="0.003988917">
+    <testsuite name="tests/unit/seo/guardrail-check.test.ts" timestamp="2026-06-18T09:16:39.320Z" hostname="mac.lan" tests="8" failures="0" errors="0" skipped="0" time="0.005636583">
+        <testcase classname="tests/unit/seo/guardrail-check.test.ts" name="validateRobotsTxt &gt; passes production-shaped robots with sitemap and AI crawlers" time="0.002094375">
         </testcase>
-        <testcase classname="tests/unit/middleware/proxy-debug-route-lockdown.test.ts" name="proxy debug/test route lockdown &gt; rewrites debug page routes to /404 on production deployments" time="0.001261167">
+        <testcase classname="tests/unit/seo/guardrail-check.test.ts" name="validateRobotsTxt &gt; fails when User-agent: * globally blocks all paths" time="0.000576875">
         </testcase>
-        <testcase classname="tests/unit/middleware/proxy-debug-route-lockdown.test.ts" name="proxy debug/test route lockdown &gt; allows shell-v1 product screenshots on loopback automation" time="0.001633958">
+        <testcase classname="tests/unit/seo/guardrail-check.test.ts" name="validateRobotsTxt &gt; fails when sitemap reference is missing" time="0.000309875">
         </testcase>
-        <testcase classname="tests/unit/middleware/proxy-debug-route-lockdown.test.ts" name="proxy debug/test route lockdown &gt; blocks shell-v1 product screenshots on public hosts even with test env" time="0.000424166">
+        <testcase classname="tests/unit/seo/guardrail-check.test.ts" name="validateRobotsTxt &gt; fails when a required AI crawler rule is missing" time="0.000319458">
         </testcase>
-        <testcase classname="tests/unit/middleware/proxy-debug-route-lockdown.test.ts" name="proxy debug/test route lockdown &gt; keeps other experiment routes blocked on loopback automation" time="0.000531959">
+        <testcase classname="tests/unit/seo/guardrail-check.test.ts" name="validateSitemapXml &gt; passes non-empty sitemap entries with lastmod" time="0.000790417">
         </testcase>
-        <testcase classname="tests/unit/middleware/proxy-debug-route-lockdown.test.ts" name="proxy debug/test route lockdown &gt; allows debug routes during explicit local development" time="0.000858625">
-            <system-out>
-[API] GET /api/dev/test-auth/session - 1ms
-
-            </system-out>
+        <testcase classname="tests/unit/seo/guardrail-check.test.ts" name="validateSitemapXml &gt; fails on empty body" time="0.000125042">
         </testcase>
-        <testcase classname="tests/unit/middleware/proxy-debug-route-lockdown.test.ts" name="proxy debug/test route lockdown &gt; keeps /demo reachable outside development" time="0.000832334">
+        <testcase classname="tests/unit/seo/guardrail-check.test.ts" name="validateSitemapXml &gt; fails when url entries are missing lastmod" time="0.000159542">
         </testcase>
-    </testsuite>
-    <testsuite name="tests/unit/middleware/proxy-regions.contract.test.ts" timestamp="2026-06-17T05:27:38.194Z" hostname="mac.lan" tests="5" failures="0" errors="0" skipped="0" time="0.007686042">
-        <testcase classname="tests/unit/middleware/proxy-regions.contract.test.ts" name="Proxy regions contract (RED 43 — investor / Clerk FAPI / audience / degraded) &gt; maskIpForFingerprint and createFingerprintEdge produce stable, masked output" time="0.001185833">
-        </testcase>
-        <testcase classname="tests/unit/middleware/proxy-regions.contract.test.ts" name="Proxy regions contract (RED 43 — investor / Clerk FAPI / audience / degraded) &gt; investor portal and Clerk FAPI paths short-circuit early (high priority routing)" time="0.001200334">
-        </testcase>
-        <testcase classname="tests/unit/middleware/proxy-regions.contract.test.ts" name="Proxy regions contract (RED 43 — investor / Clerk FAPI / audience / degraded) &gt; malicious probes return 404 without leaking info (fail-closed security)" time="0.003190459">
-        </testcase>
-        <testcase classname="tests/unit/middleware/proxy-regions.contract.test.ts" name="Proxy regions contract (RED 43 — investor / Clerk FAPI / audience / degraded) &gt; returns 503 JSON when Clerk config missing on protected path (non-browser)" time="0.001061167">
-        </testcase>
-        <testcase classname="tests/unit/middleware/proxy-regions.contract.test.ts" name="Proxy regions contract (RED 43 — investor / Clerk FAPI / audience / degraded) &gt; clerkMiddleware mock uses correct (authCallable, req) signature (nit fix)" time="0.000091708">
-        </testcase>
-    </testsuite>
-    <testsuite name="tests/unit/middleware/route-policy.test.ts" timestamp="2026-06-17T05:27:38.195Z" hostname="mac.lan" tests="7" failures="0" errors="0" skipped="0" time="0.007417208">
-        <testcase classname="tests/unit/middleware/route-policy.test.ts" name="route-policy (proxy-routing) &gt; public profile candidate classification (bugfix) &gt; returns null for /start, /pricing, /about, /investors (never enter DB block lookup)" time="0.002149334">
-        </testcase>
-        <testcase classname="tests/unit/middleware/route-policy.test.ts" name="route-policy (proxy-routing) &gt; public profile candidate classification (bugfix) &gt; returns null for other reserved APP_ROUTES and system segments" time="0.000377417">
-        </testcase>
-        <testcase classname="tests/unit/middleware/route-policy.test.ts" name="route-policy (proxy-routing) &gt; public profile candidate classification (bugfix) &gt; reserves every single-segment APP_ROUTES value from public-profile lookup" time="0.000792792">
-        </testcase>
-        <testcase classname="tests/unit/middleware/route-policy.test.ts" name="route-policy (proxy-routing) &gt; public profile candidate classification (bugfix) &gt; returns the username for valid single-segment profile-shaped paths" time="0.000422917">
-        </testcase>
-        <testcase classname="tests/unit/middleware/route-policy.test.ts" name="route-policy (proxy-routing) &gt; public profile candidate classification (bugfix) &gt; rejects too-short or invalid usernames" time="0.000336334">
-        </testcase>
-        <testcase classname="tests/unit/middleware/route-policy.test.ts" name="route-policy (proxy-routing) &gt; categorizePath now owns publicProfileCandidate &gt; exposes publicProfileCandidate on the returned category" time="0.000662084">
-        </testcase>
-        <testcase classname="tests/unit/middleware/route-policy.test.ts" name="route-policy (proxy-routing) &gt; rewrite exemptions (owned by route-policy) &gt; exempts known paths" time="0.000274167">
+        <testcase classname="tests/unit/seo/guardrail-check.test.ts" name="validateSitemapXml &gt; fails when sitemap has no url entries" time="0.000090166">
         </testcase>
     </testsuite>
 </testsuites>
