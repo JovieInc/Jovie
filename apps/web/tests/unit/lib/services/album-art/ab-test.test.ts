@@ -17,6 +17,10 @@ describe('selectAlbumArtVariant', () => {
     expect(() => selectAlbumArtVariant([], 'seed')).toThrow(RangeError);
   });
 
+  it('throws when variantIds contains duplicates', () => {
+    expect(() => selectAlbumArtVariant(['v1', 'v2', 'v1'], 'seed')).toThrow(RangeError);
+  });
+
   it('is deterministic — same seed always returns same variant', () => {
     const ids = ['control', 'challenger-a', 'challenger-b'];
     const seed = 'visitor-fingerprint-abc123';
@@ -79,6 +83,33 @@ describe('computeAlbumArtWinner', () => {
       { variantId: 'challenger', impressions: minI, clicks: 20 },
     ]);
     expect(result).toBeNull();
+  });
+
+  it('throws when impressions are negative', () => {
+    expect(() =>
+      computeAlbumArtWinner([
+        { variantId: 'control', impressions: -10, clicks: 5 },
+        { variantId: 'challenger', impressions: 100, clicks: 20 },
+      ])
+    ).toThrow(RangeError);
+  });
+
+  it('throws when clicks are negative', () => {
+    expect(() =>
+      computeAlbumArtWinner([
+        { variantId: 'control', impressions: 100, clicks: -5 },
+        { variantId: 'challenger', impressions: 100, clicks: 20 },
+      ])
+    ).toThrow(RangeError);
+  });
+
+  it('throws when clicks exceed impressions', () => {
+    expect(() =>
+      computeAlbumArtWinner([
+        { variantId: 'control', impressions: 100, clicks: 150 },
+        { variantId: 'challenger', impressions: 100, clicks: 20 },
+      ])
+    ).toThrow(RangeError);
   });
 
   it('returns null when no challenger beats control CTR', () => {

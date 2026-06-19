@@ -68,6 +68,9 @@ export function selectAlbumArtVariant(
   if (variantIds.length === 0) {
     throw new RangeError('selectAlbumArtVariant: variantIds must be non-empty');
   }
+  if (new Set(variantIds).size !== variantIds.length) {
+    throw new RangeError('selectAlbumArtVariant: variantIds must be unique');
+  }
   if (variantIds.length === 1) return variantIds[0]!;
   return variantIds[hashSeed(visitorSeed) % variantIds.length]!;
 }
@@ -94,6 +97,19 @@ export function computeAlbumArtWinner(
   const minImpressions = options.minImpressions ?? ALBUM_ART_AB_MIN_IMPRESSIONS;
 
   if (variants.length < 2) return null;
+
+  for (const v of variants) {
+    if (v.impressions < 0 || v.clicks < 0) {
+      throw new RangeError(
+        `computeAlbumArtWinner: impressions and clicks must be non-negative (got impressions=${v.impressions}, clicks=${v.clicks} for variant ${v.variantId})`
+      );
+    }
+    if (v.clicks > v.impressions) {
+      throw new RangeError(
+        `computeAlbumArtWinner: clicks cannot exceed impressions (got ${v.clicks} clicks on ${v.impressions} impressions for variant ${v.variantId})`
+      );
+    }
+  }
 
   // variants[0] is the control (canonical cover art) per the JSDoc contract.
   // If control hasn't reached the impression threshold we can't make a valid
