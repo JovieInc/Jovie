@@ -112,6 +112,7 @@ export default async function MerchProductPage({
     name: card.title,
     description: card.description,
     image: imageUrl ? [imageUrl] : [],
+    sku: card.id,
     brand: {
       '@type': 'Brand',
       name: artistName,
@@ -121,7 +122,13 @@ export default async function MerchProductPage({
       priceCurrency: 'USD',
       price: (card.retailPriceCents / 100).toFixed(2),
       availability: 'https://schema.org/InStock',
+      itemCondition: 'https://schema.org/NewCondition',
       url: `${BASE_URL}/${handle}/merch/${card.id}`,
+      seller: {
+        '@type': 'Organization',
+        name: 'Jovie',
+        url: BASE_URL,
+      },
     },
   };
 
