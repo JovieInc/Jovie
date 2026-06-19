@@ -1,0 +1,5 @@
+{
+  "_comment": "Contrast ratchet baseline — counts of hardcoded theme-color violations (JOV-11038). To reduce: fix violations then run `pnpm --filter web lint:contrast-ratchet --update`. CI fails if counts exceed these baselines.",
+  "bareTextBlack": 92,
+  "bareBgWhite": 93
+}
