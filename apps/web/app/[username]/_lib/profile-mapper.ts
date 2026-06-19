@@ -32,6 +32,7 @@ export function mapProfileWithLinksToCreatorProfile(
     deezer_id: result.deezerId ?? null,
     tidal_id: result.tidalId ?? null,
     soundcloud_id: result.soundcloudId ?? null,
+    musicbrainz_id: result.musicbrainzId ?? null,
     is_public: !!result.isPublic,
     is_verified: !!result.isVerified,
     is_claimed: !!result.isClaimed,
