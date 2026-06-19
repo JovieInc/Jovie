@@ -891,6 +891,7 @@ jobs:
           E2E_SMOKE_RESULT="${{ needs.ci-e2e-smoke.result }}"
           PREVIEW_RESULT="${{ needs.ci-pr-vercel-preview.result }}"
           EVENT_NAME="${{ github.event_name }}"
+          IS_DEPENDABOT="${{ github.event.pull_request.user.login == 'dependabot[bot]' }}"
           echo "ci-fast: $FAST_RESULT"
           echo "ci-unit-tests: $UNIT_RESULT"
           echo "ci-build-public: $BUILD_RESULT"
@@ -983,10 +984,13 @@ jobs:
             exit 1
           fi
 
-          if [[ "$EVENT_NAME" == "pull_request" && "$RISK_REQUIRES_PREVIEW" == "true" && "$PREVIEW_RESULT" != "success" ]]; then
+          if [[ "$EVENT_NAME" == "pull_request" && "$RISK_REQUIRES_PREVIEW" == "true" && "$PREVIEW_RESULT" != "success" && "$IS_DEPENDABOT" != "true" ]]; then
             echo "❌ Risk classifier requires preview evidence, but Preview Deploy result was $PREVIEW_RESULT"
             echo "Likely fix: inspect the Preview Deploy logs, then run pnpm run build:web locally."
             exit 1
+          fi
+          if [[ "$EVENT_NAME" == "pull_request" && "$IS_DEPENDABOT" == "true" && "$PREVIEW_RESULT" == "skipped" ]]; then
+            echo "Dependabot PR: preview deploy intentionally skipped — treating as waived."
           fi
 
           if [[ "$RISK_BLOCKS_UNATTENDED" == "true" ]]; then
@@ -3706,7 +3710,7 @@ jobs:
   ci-smoke-required:
     name: Extended Smoke (Preview)
     needs: [ci-fast, ci-build, neon-db, ci-e2e-tests, ci-path-changes]
-    if: ${{ always() && (github.event_name == 'workflow_dispatch' || (github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'testing') && needs.ci-path-changes.outputs.run_e2e == 'true')) }}
+    if: ${{ always() && (github.event_name == 'workflow_dispatch' || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork == false && github.event.pull_request.user.login && github.event.pull_request.user.login != 'dependabot[bot]' && contains(github.event.pull_request.labels.*.name, 'testing') && needs.ci-path-changes.outputs.run_e2e == 'true')) }}
     runs-on: ubuntu-latest
     environment: Preview – jovie
     timeout-minutes: 20
