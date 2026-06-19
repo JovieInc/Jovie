@@ -18,6 +18,7 @@ import { discogRecordings } from '@/lib/db/schema/content';
 import { dspArtistMatches } from '@/lib/db/schema/dsp-enrichment';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
 
+import { resolveEntityIds } from '@/lib/entity/resolve';
 import { captureError } from '@/lib/error-tracking';
 import { enqueueDspTrackEnrichmentJob } from '@/lib/ingestion/jobs';
 import { logger } from '@/lib/utils/logger';
@@ -625,10 +626,24 @@ async function discoverMusicBrainzMatch(
     status,
   });
   if (status === 'auto_confirmed' && matchId) {
+    const mbid = matchingResult.bestMatch.externalArtistId;
     await tx
       .update(creatorProfiles)
-      .set({ musicbrainzId: matchingResult.bestMatch.externalArtistId })
+      .set({ musicbrainzId: mbid })
       .where(eq(creatorProfiles.id, creatorProfileId));
+
+    const sourceRequestUrl = localArtist.spotifyId
+      ? `https://open.spotify.com/artist/${localArtist.spotifyId}`
+      : `https://musicbrainz.org/artist/${mbid}`;
+    try {
+      await resolveEntityIds(tx, creatorProfileId, mbid, sourceRequestUrl);
+    } catch (err) {
+      logger.warn('Entity resolution after MusicBrainz auto-confirm failed', {
+        creatorProfileId,
+        mbid,
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
   }
   return { match: matchingResult.bestMatch, status };
 }
