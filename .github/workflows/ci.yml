@@ -436,6 +436,7 @@ jobs:
           pnpm tailwind:check
           pnpm --filter=@jovie/web run lint:no-native-dialogs
           pnpm --filter=@jovie/web run lint:seo
+          pnpm --filter=@jovie/web run lint:contrast-ratchet
       - name: Validate flaky quarantine ledger
         run: node .github/scripts/quarantine-ledger.mjs validate
       - name: Write remediation summary
@@ -444,12 +445,12 @@ jobs:
           {
             echo "### Structural Contract"
             echo
-            echo "This lane enforces the CI harness manifest, generated docs, workflow syntax, proxy guard, Tailwind contract, native-dialog ban, and SEO/AEO ratchet."
+            echo "This lane enforces the CI harness manifest, generated docs, workflow syntax, proxy guard, Tailwind contract, native-dialog ban, SEO/AEO ratchet, and contrast ratchet."
             echo
             echo "Next local command:"
             echo
             echo '```bash'
-            echo "pnpm ci:harness:check && pnpm next:proxy-guard && pnpm tailwind:check && pnpm --filter=@jovie/web run lint:no-native-dialogs && pnpm --filter=@jovie/web run lint:seo"
+            echo "pnpm ci:harness:check && pnpm next:proxy-guard && pnpm tailwind:check && pnpm --filter=@jovie/web run lint:no-native-dialogs && pnpm --filter=@jovie/web run lint:seo && pnpm --filter=@jovie/web run lint:contrast-ratchet"
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
 
