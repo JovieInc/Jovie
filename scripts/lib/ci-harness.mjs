@@ -151,6 +151,26 @@ function isPackageManifestPath(file) {
   return file === 'package.json' || file.endsWith('/package.json');
 }
 
+const PACKAGE_DEPENDENCY_FIELDS = [
+  'dependencies',
+  'devDependencies',
+  'optionalDependencies',
+  'peerDependencies',
+];
+
+function stripPackageDependencyFields(manifest) {
+  if (!manifest || typeof manifest !== 'object' || Array.isArray(manifest)) {
+    return manifest;
+  }
+
+  const result = { ...manifest };
+  for (const field of PACKAGE_DEPENDENCY_FIELDS) {
+    delete result[field];
+  }
+  delete result.version;
+  return result;
+}
+
 function isVersionOnlyPackageManifestChange(file, diffBase) {
   if (!diffBase || !isPackageManifestPath(file)) return false;
 
@@ -167,14 +187,80 @@ function isVersionOnlyPackageManifestChange(file, diffBase) {
   }
 }
 
-function shouldIgnoreRuleFile(file, rule, options) {
-  if (rule.id !== 'env-config') return false;
+function isDependencyOnlyPackageManifestChange(file, diffBase) {
+  if (!diffBase || !isPackageManifestPath(file)) return false;
+
+  try {
+    const before = readJsonAtRef(diffBase, file);
+    const after = JSON.parse(readFileSync(resolve(REPO_ROOT, file), 'utf8'));
+
+    if (
+      JSON.stringify(stripPackageDependencyFields(before)) !==
+      JSON.stringify(stripPackageDependencyFields(after))
+    ) {
+      return false;
+    }
+
+    let hasDependencyVersionChange = false;
+    for (const field of PACKAGE_DEPENDENCY_FIELDS) {
+      const beforeSection = before[field] ?? {};
+      const afterSection = after[field] ?? {};
+      const beforeKeys = Object.keys(beforeSection).sort();
+      const afterKeys = Object.keys(afterSection).sort();
+
+      if (JSON.stringify(beforeKeys) !== JSON.stringify(afterKeys)) {
+        return false;
+      }
+
+      for (const key of beforeKeys) {
+        if (beforeSection[key] !== afterSection[key]) {
+          hasDependencyVersionChange = true;
+        }
+      }
+    }
+
+    return hasDependencyVersionChange;
+  } catch {
+    return false;
+  }
+}
+
+function isLockfilePath(file) {
+  return file === 'pnpm-lock.yaml' || file.endsWith('/pnpm-lock.yaml');
+}
+
+function isLowRiskEnvConfigFile(file, options) {
   const versionOnlyPredicate =
     options?.isVersionOnlyPackageManifestChange ??
     (candidate =>
       isVersionOnlyPackageManifestChange(candidate, options?.diffBase));
+  const dependencyOnlyPredicate =
+    options?.isDependencyOnlyPackageManifestChange ??
+    (candidate =>
+      isDependencyOnlyPackageManifestChange(candidate, options?.diffBase));
 
-  return versionOnlyPredicate(file);
+  if (isPackageManifestPath(file)) {
+    return versionOnlyPredicate(file) || dependencyOnlyPredicate(file);
+  }
+
+  if (!isLockfilePath(file)) {
+    return false;
+  }
+
+  const changedFiles = options?.changedFiles ?? [];
+  const packageManifestFiles = changedFiles.filter(isPackageManifestPath);
+  return (
+    packageManifestFiles.length > 0 &&
+    packageManifestFiles.every(
+      candidate =>
+        versionOnlyPredicate(candidate) || dependencyOnlyPredicate(candidate)
+    )
+  );
+}
+
+function shouldIgnoreRuleFile(file, rule, options) {
+  if (rule.id !== 'env-config') return false;
+  return isLowRiskEnvConfigFile(file, options);
 }
 
 export function classifyCiRisk(files, manifest, options = {}) {
@@ -190,7 +276,11 @@ export function classifyCiRisk(files, manifest, options = {}) {
       regexes.some(regex => regex.test(file))
     );
     const effectiveMatchedFiles = matchedFiles.filter(
-      file => !shouldIgnoreRuleFile(file, rule, options)
+      file =>
+        !shouldIgnoreRuleFile(file, rule, {
+          ...options,
+          changedFiles,
+        })
     );
     if (effectiveMatchedFiles.length > 0) {
       matches.push({
