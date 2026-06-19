@@ -675,7 +675,7 @@ jobs:
           PR_NUMBER="${{ needs.guard.outputs.pr_number }}"
           READY_THRESHOLD=12
 
-          OPEN_PRS=$(gh pr list --state open --base main --limit 100 --json number,isDraft,mergeStateStatus,autoMergeRequest,headRefName)
+          OPEN_PRS=$(gh pr list --state open --base main --limit 100 --json number,isDraft,mergeStateStatus,labels,headRefName)
 
           READY_COUNT=$(echo "$OPEN_PRS" | jq '
             [
@@ -683,7 +683,7 @@ jobs:
               | select(.isDraft == false)
               | select(.number != '"$PR_NUMBER"')
               | select(
-                  (.autoMergeRequest != null) or
+                  (.labels | any(.name == "merge-queue")) or
                   (.mergeStateStatus == "CLEAN") or
                   (.mergeStateStatus == "UNSTABLE")
                 )
@@ -766,7 +766,7 @@ jobs:
 
           echo "PR #$PR_NUMBER approved"
 
-      - name: Enable auto-merge
+      - name: Add to Graphite merge queue
         if: >-
           steps.check-statuses.outputs.all_passed == 'true' &&
           steps.sensitive-check.outputs.is_safe == 'true' &&
@@ -777,15 +777,15 @@ jobs:
         run: |
           PR_NUMBER="${{ needs.guard.outputs.pr_number }}"
 
-          # Enable auto-merge (squash) which will enter the merge queue
-          gh pr merge $PR_NUMBER --auto --squash || echo "Auto-merge already enabled or not available"
+          # Graphite enqueues by label; native auto-merge retired
+          gh pr edit $PR_NUMBER --add-label "merge-queue" || { echo "::error::Failed to add merge-queue label to #$PR_NUMBER"; exit 1; }
 
           # Add label for tracking
           gh api repos/${{ github.repository }}/issues/$PR_NUMBER/labels \
             --method POST \
             --field "labels[]=auto-approved" || true
 
-          echo "Auto-merge enabled for PR #$PR_NUMBER"
+          echo "Added PR #$PR_NUMBER to the Graphite merge queue"
 
       - name: Defer auto-merge under queue pressure
         if: >-
@@ -817,7 +817,7 @@ jobs:
 
           Re-enable auto-merge later with:
 
-          \`gh pr merge $PR_NUMBER --auto --squash\`"
+          \`gh pr edit $PR_NUMBER --add-label merge-queue\`"
 
           echo "Auto-merge deferred for PR #$PR_NUMBER due to queue pressure"
 
