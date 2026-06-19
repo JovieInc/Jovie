@@ -108,6 +108,7 @@ function generateProfileStructuredData(
   // Build canonical sameAs: KB identifiers (MB/Wikidata/ISNI) + DSP + social
   const uniqueSocialUrls = buildEntitySameAs(
     {
+      musicbrainzId: profile.musicbrainz_id,
       spotifyUrl: profile.spotify_url,
       appleMusicUrl: profile.apple_music_url,
       youtubeUrl: profile.youtube_url,

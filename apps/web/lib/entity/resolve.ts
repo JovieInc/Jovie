@@ -1,6 +1,13 @@
 /**
  * Entity ID resolution pipeline.
  *
+ * Identity resolution ladder (long-tail artists without Wikipedia sitelinks):
+ *   1. Spotify connect → DSP discovery → MusicBrainz MBID (auto-confirm or human review)
+ *   2. MBID → MusicBrainz url-rels → Wikidata QID (works without a Wikipedia sitelink)
+ *   3. MBID → MusicBrainz ISNI list → ISNI.org identifiers
+ *   4. Missing MB/Wikidata nodes → human-in-loop creation (not auto-published here)
+ *   5. buildEntitySameAs() renders the dense sameAs array from stored IDs
+ *
  * Given a profile with a known MusicBrainz MBID, fetches the full MB artist
  * record (url-rels + ISNI list) and stores resolved Wikidata QID and ISNI
  * identifiers into artist_identity_links.

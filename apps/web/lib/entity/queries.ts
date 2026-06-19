@@ -9,7 +9,12 @@ import { and, eq, inArray } from 'drizzle-orm';
 import { db } from '@/lib/db';
 import { artistIdentityLinks } from '@/lib/db/schema/identity';
 import { logger } from '@/lib/utils/logger';
-import type { EntityIdentityLink } from './sameAs';
+import {
+  buildEntitySameAs,
+  type EntityIdentityLink,
+  type EntityProfile,
+  type EntitySocialLink,
+} from './sameAs';
 
 /** Platforms we care about for sameAs / structured data */
 const ENTITY_PLATFORMS = [
@@ -65,4 +70,17 @@ export async function getEntityIdentityLinks(
     });
     return [];
   }
+}
+
+/**
+ * Build the canonical artist sameAs array from stored identity links.
+ * Shared by profile and asset structured-data surfaces.
+ */
+export async function getArtistEntitySameAs(
+  profileId: string,
+  profile: EntityProfile,
+  socialLinks: EntitySocialLink[] = []
+): Promise<string[]> {
+  const identityLinks = await getEntityIdentityLinks(profileId);
+  return buildEntitySameAs(profile, identityLinks, socialLinks);
 }

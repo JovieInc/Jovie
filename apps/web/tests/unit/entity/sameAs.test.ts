@@ -77,6 +77,13 @@ describe('buildEntitySameAs', () => {
     expect(result).toContain('https://isni.org/isni/0000000121032683');
   });
 
+  it('includes MusicBrainz URI from profile musicbrainzId column', () => {
+    const mbid = 'f4a31f0a-51dd-4fa7-986d-3095c40c5ed9';
+    const profile: EntityProfile = { musicbrainzId: mbid };
+    const result = buildEntitySameAs(profile, NO_LINKS, NO_SOCIAL);
+    expect(result).toContain(`https://musicbrainz.org/artist/${mbid}`);
+  });
+
   it('includes MusicBrainz URI from musicbrainz identity link', () => {
     const mbid = 'f4a31f0a-51dd-4fa7-986d-3095c40c5ed9';
     const links: EntityIdentityLink[] = [

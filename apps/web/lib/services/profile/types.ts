@@ -53,6 +53,7 @@ export type ProfileData = Pick<
   | 'deezerId'
   | 'tidalId'
   | 'soundcloudId'
+  | 'musicbrainzId'
   | 'isPublic'
   | 'isVerified'
   | 'isClaimed'
