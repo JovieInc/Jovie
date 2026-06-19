@@ -551,6 +551,47 @@ export function openDeepLink(
   });
 }
 
+// Android package names for DSP content (track/album) deep links
+const DSP_CONTENT_ANDROID_PACKAGES: Record<string, string> = {
+  spotify: 'com.spotify.music',
+  apple_music: 'com.apple.android.music',
+  youtube: 'com.google.android.apps.youtube.music',
+  youtube_music: 'com.google.android.apps.youtube.music',
+  amazon_music: 'com.amazon.mp3',
+  tidal: 'com.aspiro.tidal',
+  deezer: 'deezer.android.app',
+};
+
+/**
+ * Build a native app deep link for DSP content (track or album).
+ *
+ * - iOS: universal links (open.spotify.com, music.apple.com, etc.) open the native
+ *   app automatically via iOS App Links — returns the web URL unchanged.
+ * - Android: builds an `intent://` URL so the OS routes to the native app with a
+ *   web-URL fallback when the app isn't installed.
+ * - Desktop: returns the web URL unchanged.
+ */
+export function buildDspContentDeepLinkUrl(
+  url: string,
+  providerId: string,
+  platform?: PlatformInfo
+): string {
+  const platformInfo = platform ?? detectPlatform();
+
+  // iOS universal links handle routing automatically; desktop uses web URL.
+  if (platformInfo.platform !== 'android') return url;
+
+  const packageName = DSP_CONTENT_ANDROID_PACKAGES[providerId.toLowerCase()];
+  if (!packageName) return url;
+
+  try {
+    const parsed = new URL(url);
+    return `intent://${parsed.hostname}${parsed.pathname}${parsed.search}#Intent;package=${packageName};scheme=https;end`;
+  } catch {
+    return url;
+  }
+}
+
 /**
  * Gets the appropriate deep link configuration for a social platform
  */
