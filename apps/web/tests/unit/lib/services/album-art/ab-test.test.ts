@@ -18,7 +18,9 @@ describe('selectAlbumArtVariant', () => {
   });
 
   it('throws when variantIds contains duplicates', () => {
-    expect(() => selectAlbumArtVariant(['v1', 'v2', 'v1'], 'seed')).toThrow(RangeError);
+    expect(() => selectAlbumArtVariant(['v1', 'v2', 'v1'], 'seed')).toThrow(
+      RangeError
+    );
   });
 
   it('is deterministic — same seed always returns same variant', () => {
