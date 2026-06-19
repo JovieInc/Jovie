@@ -23,7 +23,11 @@ export const runtime = 'nodejs';
 const JPEG_MIME_TYPE = 'image/jpeg';
 
 function toJpegFilename(filename: string): string {
-  return filename.replace(/\.[^.]+$/, '') + '.jpg';
+  const base = filename.replace(/\.[^.]+$/, '');
+  // Strip characters that break Content-Disposition header parsing (RFC 6266):
+  // double-quotes, backslashes, and ASCII control characters.
+  const safe = base.replace(/["\\]/g, '').replace(/[\x00-\x1f\x7f]/g, '');
+  return (safe || 'converted') + '.jpg';
 }
 
 export async function POST(request: Request) {
