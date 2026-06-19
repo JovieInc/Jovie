@@ -3,11 +3,8 @@ name: CI
 on:
   pull_request:
     branches: [main, 'integration/**']
-<<<<<<< HEAD
   # merge_group retired 2026-06-18: Graphite owns the merge queue; GitHub never
   # creates a merge_group, so this trigger would never fire. See .github/MERGE_QUEUE.md.
-=======
->>>>>>> origin/main
   push:
     branches: [main]
     paths-ignore:
