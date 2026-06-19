@@ -2,6 +2,7 @@ import { render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import { ProfileHomeRail } from '@/features/profile/ProfileHomeRail';
 import type { ProfilePrimaryActionCardRelease } from '@/features/profile/ProfilePrimaryActionCard';
+import type { PublicRelease } from '@/features/profile/releases/types';
 import type { Artist } from '@/types/db';
 
 function makeArtist(overrides: Partial<Artist> = {}): Artist {
@@ -88,6 +89,54 @@ describe('ProfileHomeRail', () => {
     ).toBeInTheDocument();
     expect(screen.getByTestId('profile-home-feature-card')).toBeInTheDocument();
     expect(screen.getByText('The Deep End')).toBeInTheDocument();
+  });
+
+  it('wraps the live release card in a catalog carousel when older releases exist', () => {
+    const catalogReleases: PublicRelease[] = [
+      {
+        id: 'release-2',
+        title: 'Older Single',
+        slug: 'older-single',
+        releaseType: 'single',
+        releaseDate: '2025-01-01',
+        artworkUrl: '/img/releases/older-single.jpg',
+        artistNames: ['Tim White'],
+      },
+    ];
+
+    render(
+      <ProfileHomeRail
+        artist={makeArtist()}
+        latestRelease={makeRelease()}
+        profileSettings={{ showOldReleases: true }}
+        featuredPlaylistFallback={null}
+        tourDates={[]}
+        hasPlayableDestinations
+        renderMode='preview'
+        isSubscribed={false}
+        releases={[
+          {
+            id: 'release-1',
+            title: 'The Deep End',
+            slug: 'the-deep-end',
+            releaseType: 'single',
+            releaseDate: '2026-03-10T07:00:00.000Z',
+            artworkUrl: '/img/releases/the-deep-end.jpg',
+            artistNames: ['Tim White'],
+          },
+          ...catalogReleases,
+        ]}
+      />
+    );
+
+    expect(screen.getByTestId('release-catalog-carousel')).toBeInTheDocument();
+    expect(
+      screen.getByTestId('profile-home-primary-action-card')
+    ).toBeInTheDocument();
+    expect(
+      screen.getByTestId('catalog-release-card-release-2')
+    ).toBeInTheDocument();
+    expect(screen.getByText('Older Single')).toBeInTheDocument();
   });
 
   it('hides the alerts card entirely once subscribed', () => {
