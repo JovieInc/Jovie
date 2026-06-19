@@ -112,8 +112,8 @@ For each COMMENTS_TO_ADDRESS PR, follow this cycle:
 For every open sonar-fix PR (including ones just fixed):
 
 ```bash
-# Enable auto-merge if not already
-gh pr merge <NUMBER> --auto --squash
+# Add to Graphite merge queue (enqueues by label; native auto-merge retired)
+gh pr edit <NUMBER> --add-label merge-queue
 
 # Update branch with latest base
 gh api repos/{owner}/{repo}/pulls/<NUMBER>/update-branch --method PUT
@@ -252,7 +252,8 @@ Fixes {N} SonarCloud issues ({severity} priority):
 EOF
 )"
 
-gh pr merge --auto --squash
+# Add the PR to the Graphite merge queue (enqueues by label)
+gh pr edit --add-label merge-queue
 ```
 
 **Do NOT wait for CI.** Immediately return to develop and start the next batch.
