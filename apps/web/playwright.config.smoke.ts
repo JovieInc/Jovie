@@ -107,6 +107,8 @@ export default defineConfig({
                   NEXT_PUBLIC_CLERK_PROXY_DISABLED: '1',
                 }
               : {}),
+            NODE_OPTIONS:
+              `${process.env.NODE_OPTIONS || ''} --max-old-space-size=8192`.trim(),
           },
           url: managedWebServerUrl.origin,
           reuseExistingServer: true,

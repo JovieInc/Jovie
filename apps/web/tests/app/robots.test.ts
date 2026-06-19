@@ -12,9 +12,12 @@
  *     PerplexityBot, and Google-Extended.
  *  5. AI-crawler rules must include an Allow for '/' (not just block everything).
  *  6. Preview/development mode is allowed to block all (intentional behaviour).
+ *
+ * robots.ts evaluates isPreview/isProduction at module load time, so each
+ * scenario uses vi.resetModules() + vi.doMock() + dynamic import.
  */
 
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const BASE_URL = 'https://jov.ie';
 const EXPECTED_SITEMAP_URL = `${BASE_URL}/sitemap.xml`;
@@ -22,6 +25,7 @@ const EXPECTED_SITEMAP_URL = `${BASE_URL}/sitemap.xml`;
 // Required AI crawlers per issue #11044 / AEO epic #11029.
 const REQUIRED_AI_CRAWLERS = [
   'GPTBot',
+  'ChatGPT-User',
   'Claude-Web',
   'PerplexityBot',
   'Google-Extended',
@@ -68,13 +72,37 @@ function isGlobalBlock(rule: RobotsRule): boolean {
   return !allows.includes('/');
 }
 
-describe('robots.ts SEO ratchet', () => {
-  beforeEach(() => {
-    // Reset module registry so each test re-evaluates the module-level constants
-    // (`isPreview` / `isProduction`) with a fresh mock for VERCEL_ENV.
-    vi.resetModules();
+function allDisallows(rules: unknown[]): string[] {
+  return rules.flatMap(rule => {
+    const r = rule as { disallow?: string | string[] };
+    const d = r.disallow;
+    if (!d) return [];
+    return Array.isArray(d) ? d : [d];
   });
+}
 
+beforeEach(() => {
+  vi.resetModules();
+});
+
+afterEach(() => {
+  vi.restoreAllMocks();
+});
+
+async function importRobots(vercelEnv: string | undefined) {
+  vi.doMock('@/constants/app', () => ({ BASE_URL: 'https://jov.ie' }));
+  vi.doMock('@/lib/env-server', () => ({
+    env: { VERCEL_ENV: vercelEnv },
+  }));
+  const { default: robots } = await import('../../app/robots');
+  return robots;
+}
+
+// ---------------------------------------------------------------------------
+// PR #11044 describe-style suite (named helper)
+// ---------------------------------------------------------------------------
+
+describe('robots.ts SEO ratchet', () => {
   describe('production mode (VERCEL_ENV = "production")', () => {
     async function loadProductionRobots(): Promise<RobotsResult> {
       vi.doMock('@/lib/env-server', () => ({
@@ -222,5 +250,132 @@ describe('robots.ts SEO ratchet', () => {
             : [wildcardRule!.disallow];
       expect(disallows).toContain('/');
     });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Main-branch it.each suite (importRobots helper)
+// ---------------------------------------------------------------------------
+
+describe('robots.ts — production behavior', () => {
+  it.each([
+    ['undefined (fail-safe default)', undefined],
+    ['empty string', ''],
+  ])('VERCEL_ENV=%s never emits a global Disallow: /', async (_label, vercelEnv) => {
+    const robots = await importRobots(vercelEnv);
+    const result = robots();
+    const rules = Array.isArray(result.rules) ? result.rules : [result.rules];
+    const disallows = allDisallows(rules);
+
+    // The bare '/' disallow blocks everything — it must never appear in
+    // any production rule for any user-agent.
+    expect(disallows).not.toContain('/');
+  });
+
+  it('includes sitemap URL pointing to /sitemap.xml', async () => {
+    const robots = await importRobots(undefined);
+    const result = robots();
+    expect(result.sitemap).toBeDefined();
+    expect(String(result.sitemap)).toMatch(/\/sitemap\.xml$/);
+  });
+
+  it('allows / for the wildcard (*) user-agent', async () => {
+    const robots = await importRobots(undefined);
+    const result = robots();
+    const rules = Array.isArray(result.rules) ? result.rules : [result.rules];
+    const wildcardRule = rules.find(r => {
+      const ua = (r as { userAgent?: string | string[] }).userAgent;
+      return ua === '*' || (Array.isArray(ua) && ua.includes('*'));
+    });
+    expect(
+      wildcardRule,
+      'wildcard (*) user-agent rule must exist'
+    ).toBeDefined();
+    const allows = (wildcardRule as { allow?: string | string[] }).allow;
+    const allowList = Array.isArray(allows) ? allows : [allows];
+    expect(allowList).toContain('/');
+  });
+
+  it('blocks /app/ and /api/ for the wildcard (*) user-agent', async () => {
+    const robots = await importRobots(undefined);
+    const result = robots();
+    const rules = Array.isArray(result.rules) ? result.rules : [result.rules];
+    const wildcardRule = rules.find(r => {
+      const ua = (r as { userAgent?: string | string[] }).userAgent;
+      return ua === '*' || (Array.isArray(ua) && ua.includes('*'));
+    });
+    const disallows = allDisallows([wildcardRule]);
+    expect(disallows).toContain('/app/');
+    expect(disallows).toContain('/api/');
+  });
+
+  it.each(
+    REQUIRED_AI_CRAWLERS
+  )('explicitly allows AI crawler "%s" in production', async crawler => {
+    const robots = await importRobots(undefined);
+    const result = robots();
+    const rules = Array.isArray(result.rules) ? result.rules : [result.rules];
+    const agentNames = rules.flatMap(r => {
+      const ua = (r as { userAgent?: string | string[] }).userAgent;
+      return Array.isArray(ua) ? ua : ua ? [ua] : [];
+    });
+    expect(agentNames, `missing AI crawler rule: ${crawler}`).toContain(
+      crawler
+    );
+  });
+
+  it('AI crawler rules allow / and /llms.txt and do not globally block all paths', async () => {
+    const robots = await importRobots(undefined);
+    const result = robots();
+    const rules = Array.isArray(result.rules) ? result.rules : [result.rules];
+
+    for (const crawler of REQUIRED_AI_CRAWLERS) {
+      const rule = rules.find(r => {
+        const ua = (r as { userAgent?: string | string[] }).userAgent;
+        return ua === crawler || (Array.isArray(ua) && ua.includes(crawler));
+      });
+      if (!rule) continue; // already caught by per-crawler test above
+
+      const allows = (rule as { allow?: string | string[] }).allow;
+      const allowList = Array.isArray(allows) ? allows : allows ? [allows] : [];
+      expect(allowList, `${crawler} must allow /`).toContain('/');
+      expect(allowList, `${crawler} must allow /llms.txt`).toContain(
+        '/llms.txt'
+      );
+
+      const disallows = allDisallows([rule]);
+      expect(
+        disallows,
+        `${crawler} must not have global Disallow: /`
+      ).not.toContain('/');
+    }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Preview / staging (intentional block-all)
+// ---------------------------------------------------------------------------
+
+describe('robots.ts — preview/staging behavior', () => {
+  it.each([
+    ['preview', 'preview'],
+    ['development', 'development'],
+  ])('VERCEL_ENV=%s blocks all crawlers with Disallow: /', async (_label, vercelEnv) => {
+    const robots = await importRobots(vercelEnv);
+    const result = robots();
+    const rules = Array.isArray(result.rules) ? result.rules : [result.rules];
+    const disallows = allDisallows(rules);
+
+    expect(rules).toHaveLength(1);
+    expect(
+      disallows,
+      `VERCEL_ENV=${vercelEnv} must block all crawlers`
+    ).toContain('/');
+  });
+
+  it('VERCEL_ENV=preview emits no sitemap', async () => {
+    const robots = await importRobots('preview');
+    const result = robots();
+    expect(result.sitemap).toBeUndefined();
   });
 });
