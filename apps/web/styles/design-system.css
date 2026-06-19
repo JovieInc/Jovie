@@ -330,8 +330,9 @@
   --color-accent-teal: #0f9b8e;
   --color-accent-teal-subtle: #e8f7f5;
 
-  /* Default product accent uses the palette purple */
-  --color-accent: var(--color-accent-purple);
+  /* Interactive accent (focus, links, active) — canonical Jovie DS #7170ff,
+     decoupled from the purple feature accent (carbon palette, title text only) */
+  --color-accent: #7170ff;
   --color-accent-hover: #9a46ff;
   --color-accent-active: #7612df;
   --color-accent-subtle: var(--color-accent-purple-subtle);
@@ -572,8 +573,9 @@
   --color-accent-teal: #22b8a7;
   --color-accent-teal-subtle: rgb(15 155 142 / 0.18);
 
-  /* Default product accent uses the palette purple */
-  --color-accent: var(--color-accent-purple);
+  /* Interactive accent (focus, links, active) — canonical Jovie DS #7170ff,
+     decoupled from the purple feature accent (carbon palette, title text only) */
+  --color-accent: #7170ff;
   --color-accent-hover: #b06bff;
   --color-accent-active: #8a37f4;
   --color-accent-subtle: var(--color-accent-purple-subtle);
@@ -1232,8 +1234,8 @@
   /* Modals, sheets — extracted: 16px on elevated panels */
   --radius-3xl: 22px;
   /* Large modals — extracted: 22px on hero sections */
-  --radius-pill: 48px;
-  /* Pill buttons (observed in Linear) */
+  --radius-pill: 9999px;
+  /* All app buttons / inputs / tabs — canonical Jovie DS true pill */
   --radius-full: 9999px;
   /* Circles, tags */
 }
