@@ -197,13 +197,14 @@ jobs:
 
           echo "pr_url=${PR_URL}" >> "$GITHUB_OUTPUT"
 
-      - name: Enable auto-merge
+      - name: Add to Graphite merge queue
         if: steps.create-pr.outputs.has_changes == 'true'
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
           PR_URL: ${{ steps.create-pr.outputs.pr_url }}
         run: |
-          gh pr merge "$PR_URL" --auto --squash || echo "Auto-merge not available (branch protection may not be configured)"
+          # Graphite enqueues by label; native auto-merge retired
+          gh pr edit "$PR_URL" --add-label "merge-queue" || { echo "::error::Failed to add merge-queue label to $PR_URL"; exit 1; }
 
       - name: Fallback — convert to draft if validation failed
         if: failure() && steps.dedup.outputs.skip != 'true'
