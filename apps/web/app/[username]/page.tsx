@@ -9,6 +9,7 @@ import type { PublicRelease } from '@/components/features/profile/releases/types
 import { BASE_URL } from '@/constants/app';
 import { ErrorBanner } from '@/features/feedback/ErrorBanner';
 import { DesktopQrOverlayClient } from '@/features/profile/DesktopQrOverlayClient';
+import { ProfileAeoContent } from '@/features/profile/ProfileAeoContent';
 import { ProfileViewTracker } from '@/features/profile/ProfileViewTracker';
 import { getProfileModeDefinition } from '@/features/profile/registry';
 import { StaticArtistPage } from '@/features/profile/StaticArtistPage';
@@ -31,6 +32,7 @@ import {
   getProfileAlertOptInVariant,
 } from '@/lib/flags/profile-variant';
 import { getLiveMerchCardsForProfile } from '@/lib/merch/service';
+import { buildProfileAeoContent } from '@/lib/profile/aeo-content';
 import { getConfirmedFeaturedPlaylistFallback } from '@/lib/profile/featured-playlist-fallback';
 import {
   buildPublicProfileMetadata,
@@ -480,6 +482,15 @@ export default async function ArtistPage({ params }: Readonly<Props>) {
     links,
     tourDates
   );
+  const aeoContent = buildProfileAeoContent({
+    artist,
+    genres,
+    latestRelease,
+    releases,
+    tourDates,
+    merchCards,
+    socialLinks: links,
+  });
 
   return (
     <>
@@ -529,6 +540,7 @@ export default async function ArtistPage({ params }: Readonly<Props>) {
         releases={releases}
         merchCards={merchCards}
       />
+      <ProfileAeoContent content={aeoContent} />
       {isPublicNoAuthSmoke ? null : (
         <DesktopQrOverlayClient handle={artist.handle} />
       )}
