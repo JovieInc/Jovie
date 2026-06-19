@@ -102,9 +102,11 @@ export function computeAlbumArtWinner(
   if (control.impressions < minImpressions) return null;
 
   // Only challengers with sufficient impressions are eligible.
+  // Guard against impressions === 0 explicitly: when minImpressions is 0 the
+  // >= check passes but division in the reduce would produce NaN.
   const challengers = variants
     .slice(1)
-    .filter(v => v.impressions >= minImpressions);
+    .filter(v => v.impressions >= minImpressions && v.impressions > 0);
   if (challengers.length === 0) return null;
 
   const controlCtr =
