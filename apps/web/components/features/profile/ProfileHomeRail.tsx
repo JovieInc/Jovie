@@ -159,6 +159,7 @@ export function ProfileHomeRail({
   artist,
   latestRelease,
   profileSettings,
+  featuredPlaylistFallback,
   tourDates = [],
   renderMode = 'interactive',
   onAlertsClick,
@@ -198,7 +199,10 @@ export function ProfileHomeRail({
     const items: EntityCardModel[] = [];
 
     // Featured: the latest release when it's visible per profile settings.
-    if (releaseVisibility?.show && latestRelease) {
+    const hasFeaturedRelease = Boolean(
+      releaseVisibility?.show && latestRelease
+    );
+    if (hasFeaturedRelease && latestRelease) {
       items.push(
         releaseToEntityCard(
           {
@@ -211,6 +215,24 @@ export function ProfileHomeRail({
           { handle: artist.handle, now }
         )
       );
+    } else if (upcomingTourDates.length === 0 && featuredPlaylistFallback) {
+      // Fallback feature when there's no release or upcoming show: the
+      // artist's confirmed "This Is" playlist, as a music card.
+      items.push({
+        id: `playlist-${featuredPlaylistFallback.playlistId}`,
+        kind: 'music',
+        href: featuredPlaylistFallback.url,
+        imageUrl: featuredPlaylistFallback.imageUrl,
+        imageAlt: featuredPlaylistFallback.title,
+        accent: 'green',
+        eyebrow: 'Playlist',
+        title: featuredPlaylistFallback.title,
+        cta: {
+          label: 'Open Playlist',
+          href: featuredPlaylistFallback.url,
+          external: true,
+        },
+      });
     }
 
     // Shoppable merch (revenue) next.
@@ -238,6 +260,7 @@ export function ProfileHomeRail({
     return items;
   }, [
     artist.handle,
+    featuredPlaylistFallback,
     latestRelease,
     merchCards,
     nearbyTourDateId,

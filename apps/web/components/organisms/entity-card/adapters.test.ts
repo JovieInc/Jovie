@@ -87,7 +87,7 @@ describe('releaseToEntityCard', () => {
     expect(model.eyebrow).toBe('Coming Soon');
     expect(model.meta).toBe('EP · 2026');
     expect(model.status).toEqual({ label: 'Scheduled', tone: 'scheduled' });
-    expect(model.cta).toEqual({ label: 'Notify me', href: null });
+    expect(model.cta).toEqual({ label: 'Notify Me', href: null });
   });
 
   it('supports the video kind', () => {

@@ -128,7 +128,7 @@ export function releaseToEntityCard(
       ? { label: 'Scheduled', tone: 'scheduled' }
       : { label: 'Out Now', tone: 'live' },
     cta: {
-      label: isFuture ? 'Notify me' : preset.ctaLabel,
+      label: isFuture ? 'Notify Me' : preset.ctaLabel,
       href: isFuture ? null : href,
     },
   };
