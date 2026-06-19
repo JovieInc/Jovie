@@ -19,7 +19,8 @@ for num in "${TRAIN_PRS[@]}"; do
       echo "  (update-branch skipped — may be in merge queue)"
   fi
   if [[ "$state" == "CLEAN" ]]; then
-    gh pr merge "$num" --auto --squash 2>/dev/null || true
+    # Graphite enqueues by label; native auto-merge retired
+    gh pr edit "$num" --add-label "merge-queue" || echo "WARN: failed to enqueue #$num into Graphite merge queue" >&2
   fi
 done
 
