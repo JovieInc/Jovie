@@ -157,3 +157,6 @@ apps/desktop/src/*
 !apps/desktop/src/window-state.ts
 apps/extension/
 .agents/
+
+# Vitest junit output (generated; never commit — caused recurring PR conflicts)
+*.junit.xml
