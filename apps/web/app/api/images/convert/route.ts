@@ -1,3 +1,4 @@
+import { auth } from '@clerk/nextjs/server';
 import { NextResponse } from 'next/server';
 import {
   AVATAR_MAX_FILE_SIZE_BYTES,
@@ -26,6 +27,11 @@ function toJpegFilename(filename: string): string {
 }
 
 export async function POST(request: Request) {
+  const { userId } = await auth();
+  if (!userId) {
+    return errorResponse('Unauthorized', UPLOAD_ERROR_CODES.UNAUTHORIZED, 401);
+  }
+
   const contentType = request.headers.get('content-type');
   if (!contentType?.startsWith('multipart/form-data')) {
     return errorResponse(
@@ -81,11 +87,20 @@ export async function POST(request: Request) {
     );
   }
 
-  const jpegBuffer = await withTimeout(
-    convertImageBufferToJpeg(fileBuffer),
-    PROCESSING_TIMEOUT_MS,
-    'HEIC image conversion'
-  );
+  let jpegBuffer: Buffer;
+  try {
+    jpegBuffer = await withTimeout(
+      convertImageBufferToJpeg(fileBuffer),
+      PROCESSING_TIMEOUT_MS,
+      'HEIC image conversion'
+    );
+  } catch {
+    return errorResponse(
+      'Image conversion failed. Please try again.',
+      UPLOAD_ERROR_CODES.UPLOAD_FAILED,
+      500
+    );
+  }
 
   const headers = new Headers(NO_STORE_HEADERS);
   headers.set('Content-Type', JPEG_MIME_TYPE);
