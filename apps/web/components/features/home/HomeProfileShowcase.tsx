@@ -18,6 +18,7 @@ import { HomePhoneFrame } from './HomePhoneFrame';
 import {
   HOMEPAGE_PROFILE_PREVIEW_ARTIST,
   HOMEPAGE_PROFILE_PREVIEW_CONTACTS,
+  HOMEPAGE_PROFILE_PREVIEW_DRAWER_RELEASES,
   HOMEPAGE_PROFILE_PREVIEW_MOCK_HOME_ARTIST,
   HOMEPAGE_PROFILE_PREVIEW_MOCK_HOME_RELEASE,
   HOMEPAGE_PROFILE_PREVIEW_MOCK_HOME_SOCIAL_LINKS,
@@ -173,6 +174,14 @@ function getLatestRelease(stateId: ProfileShowcaseStateId) {
   }
 }
 
+function getPreviewReleases(stateId: ProfileShowcaseStateId) {
+  if (stateId === 'mock-home' || getLatestRelease(stateId) !== null) {
+    return [...HOMEPAGE_PROFILE_PREVIEW_DRAWER_RELEASES];
+  }
+
+  return [];
+}
+
 function getTourDates(stateId: ProfileShowcaseStateId) {
   switch (stateId) {
     case 'mock-home':
@@ -269,6 +278,7 @@ function ShowcaseSurface({
         pressPhotos={[]}
         allowPhotoDownloads={false}
         tourDates={getTourDates(state.id)}
+        releases={getPreviewReleases(state.id)}
         viewerLocation={getViewerLocation(state.id)}
         resolveNearbyTour={shouldResolveNearbyTour(state.id)}
         showSubscriptionConfirmedBanner={state.showSubscriptionConfirmedBanner}
