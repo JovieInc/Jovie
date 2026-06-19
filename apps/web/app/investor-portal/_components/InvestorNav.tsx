@@ -100,7 +100,7 @@ export function InvestorNav({ investorName, pages }: InvestorNavProps) {
             onClick={toggleSheet}
             aria-expanded={isOpen}
             aria-controls='mobile-nav'
-            aria-label={isOpen ? 'Close navigation' : 'Open navigation'}
+            aria-label={isOpen ? 'Close Navigation' : 'Open Navigation'}
             className={cn(
               'flex h-8 w-8 items-center justify-center rounded',
               'text-secondary-token hover:bg-interactive-hover',
