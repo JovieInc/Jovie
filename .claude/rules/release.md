@@ -138,9 +138,9 @@ When in doubt, skip auto-merge and request review.
 3. **When ready to ship:** run `/qa` → `/review` → `/ship` (skip `/qa` or `/review` if already run manually).
 4. `/ship` handles: tests, review, version bump, CHANGELOG, commit, push, PR creation/update.
 5. `/land-and-deploy` handles: merge, CI wait, deploy verification.
-6. **Enable automerge** with squash after the PR is marked ready:
+6. **Add to the Graphite merge queue** after the PR is marked ready. Apply the `merge-queue` label and Graphite enqueues and merges the PR when CI is green:
    ```bash
-   gh pr merge --auto --squash
+   gh pr edit --add-label merge-queue
    ```
 
 ## Conventional Commits Required
