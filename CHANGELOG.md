@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.6.53.1] - 2026-06-19
+
+> [internal] Repo hygiene: remove competitor-analysis doc leaked into public repo; add blocking CI guard.
+
+### Removed
+
+- **[internal] Competitor teardown doc removed from public repo**: `docs/plans/lyb-aesthetics-workout-tracker-validation.md` (RP Hypertrophy analysis) was accidentally merged via PR #11018 and is now removed. Private strategy docs must live in a private repo.
+
+### Added
+
+- **[internal] Brand-scrub CI gate** (`scripts/brand-scrub.py` + `.github/workflows/brand-scrub.yml`): blocking check on every PR that (a) rejects new files under `docs/plans/`, `docs/ideation/`, and similar strategy-doc paths, and (b) flags known competitor brand names in file content. 14 unit tests cover both rules.
+
 ## [26.6.53] - 2026-06-15
 
 > The Mac desktop app now completes browser sign-in more reliably and ships as a desktop release.
