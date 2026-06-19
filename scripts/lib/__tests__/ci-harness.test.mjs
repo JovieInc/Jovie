@@ -104,6 +104,24 @@ describe('ci-harness risk classifier', () => {
     expect(risk.requiresPreview).toBe(false);
     expect(risk.blocksUnattendedAutoMerge).toBe(true);
   });
+
+  it('does not require smoke for documentation-only agent control plane edits', () => {
+    const risk = classifyCiRisk(['.claude/rules/ui.md'], manifest);
+    expect(risk.riskLevel).toBe('low');
+    expect(risk.requiresSmoke).toBe(false);
+    expect(risk.blocksUnattendedAutoMerge).toBe(false);
+    expect(risk.matchedRules).toEqual([]);
+  });
+
+  it('still requires smoke for executable agent control plane edits', () => {
+    const risk = classifyCiRisk(['.claude/hooks/lint-check.sh'], manifest);
+    expect(risk.riskLevel).toBe('high');
+    expect(risk.requiresSmoke).toBe(true);
+    expect(risk.blocksUnattendedAutoMerge).toBe(true);
+    expect(risk.matchedRules.map(rule => rule.id)).toContain(
+      'agent-control-plane'
+    );
+  });
 });
 
 describe('ci-harness artifact formatter', () => {
