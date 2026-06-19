@@ -174,11 +174,13 @@ jobs:
 
           if [ -n "$EXISTING_PR" ]; then
             echo "Updated existing PR #$EXISTING_PR via force-push"
-            # Re-enable auto-merge (GitHub disables it on force-push)
-            gh pr merge --auto --squash "$EXISTING_PR" 2>/dev/null || true
+            # Re-apply merge-queue label (idempotent; Graphite enqueues by label)
+            # Graphite enqueues by label; native auto-merge retired
+            gh pr edit --add-label "merge-queue" "$EXISTING_PR" || { echo "::error::Failed to add merge-queue label to $EXISTING_PR"; exit 1; }
           else
             PR_URL=$(gh pr create \
               --title "chore: update product screenshots" \
               --body "Auto-generated screenshot update triggered by ${GITHUB_SHA::8}.")
-            gh pr merge --auto --squash "$PR_URL" || true
+            # Graphite enqueues by label; native auto-merge retired
+            gh pr edit --add-label "merge-queue" "$PR_URL" || { echo "::error::Failed to add merge-queue label to $PR_URL"; exit 1; }
           fi

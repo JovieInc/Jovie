@@ -34,7 +34,10 @@ while true; do
   [[ -x "$ROOT/scripts/loop-train-drain.sh" ]] && "$ROOT/scripts/loop-train-drain.sh" >>"$LOG/train.log" 2>&1 || true
   gh pr list --state open --json number,mergeStateStatus,headRefName,baseRefName \
     --jq '.[] | select(.baseRefName=="main") | select(.mergeStateStatus=="CLEAN") | .number' 2>/dev/null \
-    | while read -r n; do [[ -n "$n" ]] && gh pr merge "$n" --auto --squash 2>/dev/null || true; done
+    | while read -r n; do
+        # Graphite enqueues by label; native auto-merge retired
+        [[ -n "$n" ]] && { gh pr edit "$n" --add-label "merge-queue" || echo "WARN: failed to enqueue #$n into Graphite merge queue" >&2; }
+      done
   log "sleep ${INTERVAL}s"
   sleep "$INTERVAL"
 done
