@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import {
+  buildDspContentDeepLinkUrl,
   createDeepLink,
   DSP_DEEP_LINKS,
   detectPlatform,
@@ -242,6 +243,65 @@ describe('Deep Links', () => {
       const config = SOCIAL_DEEP_LINKS.whatsapp;
       const phone = config.extractId?.('https://wa.me/15551234567');
       expect(phone).toBe('15551234567');
+    });
+  });
+
+  describe('DSP content deep links (buildDspContentDeepLinkUrl)', () => {
+    it('builds Android intent:// for Spotify track', () => {
+      expect(
+        buildDspContentDeepLinkUrl(
+          'https://open.spotify.com/track/4iV5W9uYEdYUVa79Axb7Rh',
+          'spotify',
+          { platform: 'android' }
+        )
+      ).toBe(
+        'intent://open.spotify.com/track/4iV5W9uYEdYUVa79Axb7Rh#Intent;package=com.spotify.music;scheme=https;end'
+      );
+    });
+
+    it('builds Android intent:// for Apple Music album', () => {
+      expect(
+        buildDspContentDeepLinkUrl(
+          'https://music.apple.com/us/album/midnights/1649434004',
+          'apple_music',
+          { platform: 'android' }
+        )
+      ).toBe(
+        'intent://music.apple.com/us/album/midnights/1649434004#Intent;package=com.apple.android.music;scheme=https;end'
+      );
+    });
+
+    it('builds Android intent:// for YouTube Music track (query string preserved)', () => {
+      expect(
+        buildDspContentDeepLinkUrl(
+          'https://music.youtube.com/watch?v=HhjHYkPQ8F0',
+          'youtube',
+          { platform: 'android' }
+        )
+      ).toBe(
+        'intent://music.youtube.com/watch?v=HhjHYkPQ8F0#Intent;package=com.google.android.apps.youtube.music;scheme=https;end'
+      );
+    });
+
+    it('returns web URL unchanged on iOS (universal links handle routing)', () => {
+      const url = 'https://open.spotify.com/track/4iV5W9uYEdYUVa79Axb7Rh';
+      expect(
+        buildDspContentDeepLinkUrl(url, 'spotify', { platform: 'ios' })
+      ).toBe(url);
+    });
+
+    it('returns web URL unchanged on desktop', () => {
+      const url = 'https://music.apple.com/us/album/name/123';
+      expect(
+        buildDspContentDeepLinkUrl(url, 'apple_music', { platform: 'desktop' })
+      ).toBe(url);
+    });
+
+    it('returns web URL unchanged for unknown DSP provider', () => {
+      const url = 'https://example.com/track/123';
+      expect(
+        buildDspContentDeepLinkUrl(url, 'unknown_dsp', { platform: 'android' })
+      ).toBe(url);
     });
   });
 
