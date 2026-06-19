@@ -191,7 +191,7 @@ function DesktopSurfaceCard({
       data-testid={testId}
     >
       <div className='mb-4 flex items-center justify-between gap-4'>
-        <h2 className='text-[16px] font-semibold tracking-[-0.02em] text-white'>
+        <h2 className='text-base font-semibold tracking-[-0.02em] text-white'>
           {title}
         </h2>
         {actionLabel && onAction ? (
@@ -214,7 +214,7 @@ function EmptySurfaceBlock({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <div className='flex min-h-[120px] items-center rounded-[18px] bg-white/[0.025] px-4 text-[14px] leading-6 text-white/54'>
+    <div className='flex min-h-30 items-center rounded-[18px] bg-white/[0.025] px-4 text-sm leading-6 text-white/54'>
       {children}
     </div>
   );
@@ -433,7 +433,7 @@ export function ProfileDesktopSurface({
 
               <div className='flex flex-wrap items-center gap-2.5'>
                 {primaryActionElement}
-                <span className='inline-flex h-9 items-center gap-2 rounded-full border border-white/12 bg-white/8 px-3 text-[12px] font-semibold tracking-[-0.01em] text-white/82'>
+                <span className='inline-flex h-9 items-center gap-2 rounded-full border border-white/12 bg-white/8 px-3 text-xs font-semibold tracking-[-0.01em] text-white/82'>
                   <span className='h-1.5 w-1.5 rounded-full bg-white/52' />
                   <span>{statusPill.label}</span>
                 </span>
@@ -489,10 +489,10 @@ export function ProfileDesktopSurface({
                       </div>
                     </div>
                     <div className='min-w-0'>
-                      <p className='truncate text-[18px] font-medium tracking-[-0.03em] text-white'>
+                      <p className='truncate text-lg font-medium tracking-[-0.03em] text-white'>
                         {tourDate.venueName}
                       </p>
-                      <p className='truncate text-[14px] text-white/48'>
+                      <p className='truncate text-sm text-white/48'>
                         {[tourDate.city, tourDate.region]
                           .filter(Boolean)
                           .join(', ')}
@@ -501,7 +501,7 @@ export function ProfileDesktopSurface({
                     {tourDate.ticketUrl ? (
                       <a
                         href={tourDate.ticketUrl}
-                        className='inline-flex h-9 items-center rounded-full border border-white/12 px-3 text-[12px] font-medium text-white/82 transition-colors duration-subtle hover:bg-white/[0.04]'
+                        className='inline-flex h-9 items-center rounded-full border border-white/12 px-3 text-xs font-medium text-white/82 transition-colors duration-subtle hover:bg-white/[0.04]'
                       >
                         Tickets
                       </a>
@@ -583,7 +583,7 @@ export function ProfileDesktopSurface({
                   <span className='block truncate text-[15px] font-semibold tracking-[-0.015em] text-white'>
                     Release Alerts
                   </span>
-                  <span className='block truncate text-[12px] leading-5 text-white/48'>
+                  <span className='block truncate text-xs leading-5 text-white/48'>
                     New music, shows, and merch.
                   </span>
                 </span>
@@ -592,10 +592,10 @@ export function ProfileDesktopSurface({
                     className='relative h-[26px] w-[42px] shrink-0 rounded-full border border-white/16 bg-white/10 p-0.5'
                     aria-hidden='true'
                   >
-                    <span className='block h-[22px] w-[22px] rounded-full bg-white shadow-[0_4px_10px_rgba(0,0,0,0.22)]' />
+                    <span className='block h-[22px] w-[22px] rounded-full bg-white dark:bg-white shadow-[0_4px_10px_rgba(0,0,0,0.22)]' />
                   </span>
                 ) : (
-                  <span className='inline-flex h-8 shrink-0 items-center rounded-full bg-white px-3 text-[12px] font-semibold text-black'>
+                  <span className='inline-flex h-8 shrink-0 items-center rounded-full bg-white dark:bg-white px-3 text-xs font-semibold text-black dark:text-black'>
                     Get alerts
                   </span>
                 )}
@@ -618,7 +618,7 @@ export function ProfileDesktopSurface({
                   >
                     <div className='flex items-center gap-3'>
                       <Icon className='size-4 text-white/62' />
-                      <span className='text-[14px] font-medium tracking-[-0.015em] text-white/84'>
+                      <span className='text-sm font-medium tracking-[-0.015em] text-white/84'>
                         {item.label}
                       </span>
                     </div>
@@ -640,7 +640,7 @@ export function ProfileDesktopSurface({
                     <p className='text-[13px] font-semibold tracking-[-0.01em] text-white/44'>
                       Sent by {artist.name}
                     </p>
-                    <p className='text-[14px] leading-5 text-white/58'>
+                    <p className='text-sm leading-5 text-white/58'>
                       Share your email with {artist.name} for occasional artist
                       emails.
                     </p>
@@ -648,14 +648,14 @@ export function ProfileDesktopSurface({
                   <div className='flex items-center justify-between gap-4'>
                     <div className='flex items-center gap-3'>
                       <Mail className='size-4 text-white/62' />
-                      <span className='text-[14px] font-medium tracking-[-0.015em] text-white/84'>
+                      <span className='text-sm font-medium tracking-[-0.015em] text-white/84'>
                         Artist Emails
                       </span>
                     </div>
                     <Switch
                       checked={isSubscribed}
                       onCheckedChange={() => onModeSelect('subscribe')}
-                      aria-label='Artist emails'
+                      aria-label='Artist Emails'
                       className='data-[state=checked]:bg-white/36 data-[state=unchecked]:bg-white/14'
                     />
                   </div>
@@ -712,10 +712,10 @@ export function ProfileDesktopSurface({
                 />
               </div>
               <div>
-                <p className='text-[20px] font-semibold tracking-[-0.03em] text-white'>
+                <p className='text-xl font-semibold tracking-[-0.03em] text-white'>
                   {latestVisibleRelease?.title ?? 'Latest release'}
                 </p>
-                <p className='mt-1 text-[14px] text-white/48'>
+                <p className='mt-1 text-sm text-white/48'>
                   {formatReleaseMeta(
                     latestVisibleRelease?.releaseType,
                     latestVisibleRelease?.releaseDate
@@ -733,7 +733,7 @@ export function ProfileDesktopSurface({
               <button
                 type='button'
                 onClick={() => onDrawerViewChange('pay')}
-                className='inline-flex h-12 items-center rounded-full border border-white/12 px-4 text-[14px] font-medium text-white/84 transition-colors duration-subtle hover:bg-white/[0.04]'
+                className='inline-flex h-12 items-center rounded-full border border-white/12 px-4 text-sm font-medium text-white/84 transition-colors duration-subtle hover:bg-white/[0.04]'
               >
                 Pay {artist.name}
               </button>
@@ -763,10 +763,10 @@ export function ProfileDesktopSurface({
                   </div>
                 </div>
                 <div className='min-w-0'>
-                  <p className='truncate text-[20px] font-medium tracking-[-0.03em] text-white'>
+                  <p className='truncate text-xl font-medium tracking-[-0.03em] text-white'>
                     {tourDate.venueName}
                   </p>
-                  <div className='mt-1 flex items-center gap-2 text-[14px] text-white/48'>
+                  <div className='mt-1 flex items-center gap-2 text-sm text-white/48'>
                     <MapPin className='h-4 w-4' />
                     <span className='truncate'>
                       {[tourDate.city, tourDate.region]
@@ -778,7 +778,7 @@ export function ProfileDesktopSurface({
                 {tourDate.ticketUrl ? (
                   <a
                     href={tourDate.ticketUrl}
-                    className='inline-flex h-11 items-center rounded-full border border-white/12 px-4 text-[14px] font-medium text-white/84 transition-colors duration-subtle hover:bg-white/[0.04]'
+                    className='inline-flex h-11 items-center rounded-full border border-white/12 px-4 text-sm font-medium text-white/84 transition-colors duration-subtle hover:bg-white/[0.04]'
                   >
                     Tickets
                   </a>
@@ -817,7 +817,7 @@ export function ProfileDesktopSurface({
         <div className='relative z-20 flex shrink-0 items-center justify-between gap-4 px-5 pt-5'>
           <nav
             className='flex min-w-0 items-center gap-1 rounded-full bg-black/24 p-1 backdrop-blur-xl'
-            aria-label='Profile navigation'
+            aria-label='Profile Navigation'
           >
             {visiblePrimaryTabs.map(tab => {
               const Icon = tab.icon;
