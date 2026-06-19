@@ -36,6 +36,7 @@ import { findRedirectByOldSlug } from '@/lib/discography/slug';
 import type { MusicVideoMetadata, ProviderKey } from '@/lib/discography/types';
 import { isVideoProviderKey } from '@/lib/discography/video-providers';
 import { getCreatorEntitlements } from '@/lib/entitlements/creator-plan';
+import { getArtistEntitySameAs } from '@/lib/entity/queries';
 import { toDateOnlySafe, toISOStringOrNull } from '@/lib/utils/date';
 import { safeJsonLdStringify } from '@/lib/utils/json-ld';
 import {
@@ -152,11 +153,18 @@ export default async function ContentSmartLinkPage({
     ? `/${creator.usernameNormalized}/${content.slug}/sounds`
     : null;
 
-  // Fetch track list for release structured data (errors silently ignored)
-  const trackList =
+  // Fetch track list + entity sameAs for structured data (errors silently ignored)
+  const [trackList, artistSameAs] = await Promise.all([
     content.type === 'release' && content.totalTracks && content.totalTracks > 0
-      ? await getReleaseTrackList(content.id).catch(() => null)
-      : null;
+      ? getReleaseTrackList(content.id).catch(() => null)
+      : Promise.resolve(null),
+    getArtistEntitySameAs(creator.id, {
+      musicbrainzId: creator.musicbrainzId,
+      spotifyUrl: creator.spotifyUrl,
+      appleMusicUrl: creator.appleMusicUrl,
+      youtubeUrl: creator.youtubeUrl,
+    }).catch(() => [] as string[]),
+  ]);
 
   // Generate structured data for SEO
   const structuredData = generateMusicStructuredData(
@@ -186,7 +194,7 @@ export default async function ContentSmartLinkPage({
             }
           : null,
     },
-    creator,
+    { ...creator, artistSameAs },
     trackList
   );
 
