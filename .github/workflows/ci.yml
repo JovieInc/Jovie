@@ -1086,6 +1086,11 @@ jobs:
 
       - name: Upload build artifact
         if: steps.check_changes.outputs.run_full_ci == 'true'
+        # ponytail: artifact only feeds informational downstream jobs (layout-guard,
+        # a11y), so a transient FinalizeArtifact timeout must not fail this merge gate.
+        # Build correctness is already asserted by the build + "Verify build output"
+        # steps above. Re-enable hard failure if a downstream gate ever depends on it.
+        continue-on-error: true
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: nextjs-build-${{ github.run_id }}
