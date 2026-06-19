@@ -167,7 +167,22 @@ function isVersionOnlyPackageManifestChange(file, diffBase) {
   }
 }
 
+function isDocumentationOnlyPolicyFile(file) {
+  return (
+    /^\.claude\/.*\.(md|txt)$/.test(file) ||
+    /^\.agents\/.*\.(md|txt)$/.test(file) ||
+    /^(AGENTS|CODEX)\.md$/.test(file)
+  );
+}
+
 function shouldIgnoreRuleFile(file, rule, options) {
+  if (
+    rule.id === 'agent-control-plane' &&
+    isDocumentationOnlyPolicyFile(file)
+  ) {
+    return true;
+  }
+
   if (rule.id !== 'env-config') return false;
   const versionOnlyPredicate =
     options?.isVersionOnlyPackageManifestChange ??
