@@ -29,8 +29,12 @@ remove_testing_label() {
 
 enable_automerge() {
   local num="$1"
-  echo "Enabling auto-merge on #$num"
-  gh pr merge "$num" --auto --squash 2>/dev/null || true
+  echo "Adding #$num to Graphite merge queue"
+  # Graphite enqueues by label; native auto-merge retired
+  if ! gh pr edit "$num" --add-label "merge-queue"; then
+    echo "WARN: failed to enqueue #$num into Graphite merge queue" >&2
+    return 1
+  fi
 }
 
 update_branch() {
