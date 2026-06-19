@@ -233,6 +233,33 @@ If removing an element makes the screen clearer and does not reduce comprehensio
 
 ---
 
+## Use Tokens, Not Raw Colors
+
+Raw Tailwind color utilities (`text-black`, `bg-white`, `text-[#fff]`) are the root cause of black-on-black / white-on-white contrast failures when the app renders across light and dark themes. **Always use System B semantic tokens** so values adapt automatically.
+
+### Banned patterns
+
+| Banned | Why | Use instead |
+|--------|-----|-------------|
+| `text-black` without `dark:text-*` | Black text invisible in dark mode | `text-foreground` |
+| `text-white` without `dark:text-*` | White text invisible in light mode | `text-foreground` or `text-primary-token` |
+| `bg-white` without `dark:bg-*` | White bg may trap dark text in dark mode | `bg-background` or `bg-surface-1` |
+| `bg-black` without `dark:bg-*` | Black bg may trap light text | `bg-background` |
+| `text-[#hex]` / `bg-[#hex]` / `border-[#hex]` | Arbitrary hex bypasses token system entirely | Pick a named token from the Color System tables below |
+
+**Opacity-modified overlay patterns** (`text-black/20`, `bg-white/5`) are intentional and allowed — they represent translucent overlays on known-dark surfaces, not absolute colors.
+
+### Enforcement
+
+A custom ESLint rule (`@jovie/no-hardcoded-theme-colors`, set to `warn`) flags these patterns at author time. A ratchet script (`pnpm --filter web lint:contrast-ratchet`) counts existing violations and fails CI if new ones are introduced.
+
+To fix a violation:
+1. Replace with a semantic token (preferred), or
+2. Pair with a `dark:` counterpart (`text-black dark:text-white`), or
+3. Add `// eslint-disable-next-line @jovie/no-hardcoded-theme-colors -- <reason>` for intentional brand/brand-swatch exceptions.
+
+---
+
 ## Color System
 
 ### Theme Generation
