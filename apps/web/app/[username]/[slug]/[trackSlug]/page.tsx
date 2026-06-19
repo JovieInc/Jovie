@@ -19,6 +19,7 @@ import {
 } from '@/lib/discography/audio-qa';
 import { PROVIDER_CONFIG } from '@/lib/discography/config';
 import type { ProviderKey } from '@/lib/discography/types';
+import { getArtistEntitySameAs } from '@/lib/entity/queries';
 import { toISOStringOrNull } from '@/lib/utils/date';
 import { safeJsonLdStringify } from '@/lib/utils/json-ld';
 import {
@@ -116,6 +117,13 @@ export default async function TrackDeepLinkPage({
   const isUnreleased =
     track.releaseDate && new Date(track.releaseDate) > new Date();
 
+  const artistSameAs = await getArtistEntitySameAs(creator.id, {
+    musicbrainzId: creator.musicbrainzId,
+    spotifyUrl: creator.spotifyUrl,
+    appleMusicUrl: creator.appleMusicUrl,
+    youtubeUrl: creator.youtubeUrl,
+  }).catch(() => [] as string[]);
+
   // Reuse shared structured data generator with track-specific fields
   const structuredData = generateMusicStructuredData(
     {
@@ -134,7 +142,7 @@ export default async function TrackDeepLinkPage({
         id: `${releaseUrl}#release`,
       },
     },
-    creator,
+    { ...creator, artistSameAs },
     BASE_URL
   );
 
