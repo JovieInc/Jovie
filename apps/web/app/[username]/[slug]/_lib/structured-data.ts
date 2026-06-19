@@ -137,6 +137,8 @@ export function generateMusicStructuredData(
     displayName: string | null;
     username: string;
     usernameNormalized: string;
+    /** Canonical entity graph sameAs — mirrors profile page MusicGroup */
+    artistSameAs?: string[];
   },
   trackList?: TrackListItem[] | null
 ) {
@@ -198,6 +200,10 @@ export function generateMusicStructuredData(
       '@id': `${artistUrl}#musicgroup`,
       name: artistName,
       url: artistUrl,
+      ...(creator.artistSameAs &&
+        creator.artistSameAs.length > 0 && {
+          sameAs: creator.artistSameAs,
+        }),
     },
     ...(sameAs.length > 0 && { sameAs }),
     ...(content.type === 'release' &&
