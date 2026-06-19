@@ -45,6 +45,9 @@ export const CACHE_TAGS = {
 
   // Audience data caches
   AUDIENCE_DATA: 'audience-data',
+
+  // Sitemap catalog — invalidated when releases/profiles are updated
+  SITEMAP_CATALOG: 'sitemap-catalog',
 } as const;
 
 export type CacheTag = (typeof CACHE_TAGS)[keyof typeof CACHE_TAGS];
