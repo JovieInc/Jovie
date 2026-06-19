@@ -363,6 +363,16 @@ export const getCreatorByUsername = cache(
   }
 );
 
+/** Shared column projection for provider-link lookups (release/track/recording). */
+const PROVIDER_LINK_COLUMNS = {
+  providerId: providerLinks.providerId,
+  url: providerLinks.url,
+  sourceType: providerLinks.sourceType,
+  metadata: providerLinks.metadata,
+  isPrimary: providerLinks.isPrimary,
+  externalId: providerLinks.externalId,
+} as const;
+
 /**
  * Fetch content (release or track) by creator and slug.
  */
@@ -398,14 +408,7 @@ const fetchContentBySlug = async (
     if (release) {
       const [links, credits, previewRow] = await Promise.all([
         db
-          .select({
-            providerId: providerLinks.providerId,
-            url: providerLinks.url,
-            sourceType: providerLinks.sourceType,
-            metadata: providerLinks.metadata,
-            isPrimary: providerLinks.isPrimary,
-            externalId: providerLinks.externalId,
-          })
+          .select(PROVIDER_LINK_COLUMNS)
           .from(providerLinks)
           .where(
             and(
@@ -528,14 +531,7 @@ const fetchContentBySlug = async (
           : Promise.resolve(undefined),
         rt
           ? db
-              .select({
-                providerId: providerLinks.providerId,
-                url: providerLinks.url,
-                sourceType: providerLinks.sourceType,
-                metadata: providerLinks.metadata,
-                isPrimary: providerLinks.isPrimary,
-                externalId: providerLinks.externalId,
-              })
+              .select(PROVIDER_LINK_COLUMNS)
               .from(providerLinks)
               .where(
                 and(
@@ -610,14 +606,7 @@ const fetchContentBySlug = async (
           .limit(1)
           .then(rows => rows[0]),
         db
-          .select({
-            providerId: providerLinks.providerId,
-            url: providerLinks.url,
-            sourceType: providerLinks.sourceType,
-            metadata: providerLinks.metadata,
-            isPrimary: providerLinks.isPrimary,
-            externalId: providerLinks.externalId,
-          })
+          .select(PROVIDER_LINK_COLUMNS)
           .from(providerLinks)
           .where(
             and(
@@ -793,14 +782,7 @@ export const getTrackBySlugInRelease = cache(
                 )
                 .limit(1),
               db
-                .select({
-                  providerId: providerLinks.providerId,
-                  url: providerLinks.url,
-                  sourceType: providerLinks.sourceType,
-                  metadata: providerLinks.metadata,
-                  isPrimary: providerLinks.isPrimary,
-                  externalId: providerLinks.externalId,
-                })
+                .select(PROVIDER_LINK_COLUMNS)
                 .from(providerLinks)
                 .where(
                   and(
@@ -824,14 +806,7 @@ export const getTrackBySlugInRelease = cache(
 
           const legacyTrackLinks = legacyTrack
             ? await db
-                .select({
-                  providerId: providerLinks.providerId,
-                  url: providerLinks.url,
-                  sourceType: providerLinks.sourceType,
-                  metadata: providerLinks.metadata,
-                  isPrimary: providerLinks.isPrimary,
-                  externalId: providerLinks.externalId,
-                })
+                .select(PROVIDER_LINK_COLUMNS)
                 .from(providerLinks)
                 .where(
                   and(
@@ -910,14 +885,7 @@ export const getTrackBySlugInRelease = cache(
               )
               .limit(1),
             db
-              .select({
-                providerId: providerLinks.providerId,
-                url: providerLinks.url,
-                sourceType: providerLinks.sourceType,
-                metadata: providerLinks.metadata,
-                isPrimary: providerLinks.isPrimary,
-                externalId: providerLinks.externalId,
-              })
+              .select(PROVIDER_LINK_COLUMNS)
               .from(providerLinks)
               .where(
                 and(
