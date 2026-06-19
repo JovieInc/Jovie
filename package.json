@@ -85,6 +85,7 @@
     "ios:setup-env": "bash apps/ios/scripts/setup-env.sh",
     "ios:build": "bash apps/ios/scripts/run-xcodebuild.sh build",
     "ios:lint": "bash scripts/ios-best-practices-lint.sh apps/ios/Jovie",
+    "ios:guardrail:audit": "node scripts/ios-guardrail-rollout-audit.mjs .",
     "ios:test": "bash apps/ios/scripts/run-xcodebuild.sh test",
     "ios:performance": "bash apps/ios/scripts/measure-launch-performance.sh",
     "ios:runtime-performance": "bash apps/ios/scripts/measure-runtime-performance.sh",

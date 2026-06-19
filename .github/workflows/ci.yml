@@ -397,7 +397,7 @@ jobs:
           BASE_REF: ${{ github.base_ref || 'main' }}
         run: node scripts/desktop-release-guard.mjs --base "origin/${BASE_REF}"
       - name: Script unit tests
-        run: node --test scripts/desktop-release-guard.test.mjs scripts/dev-web-fast.test.mjs
+        run: node --test scripts/desktop-release-guard.test.mjs scripts/dev-web-fast.test.mjs scripts/ios-guardrail-rollout-audit.test.mjs
       - name: Version consistency guard
         run: node scripts/version-check.mjs
       - name: Next.js proxy guard
