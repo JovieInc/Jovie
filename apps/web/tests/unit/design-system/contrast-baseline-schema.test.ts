@@ -6,13 +6,7 @@
  *     ContrastInventory schema — the gate (#11025) can read it safely.
  *  2. The critical high-priority surfaces are represented in the inventory
  *     route list (public profile, onboarding, paywall, dashboard).
- *  3. The bySelector index is consistent with the violations array.
- *
- * This test:
- *  - PASSES when the baseline file doesn't exist yet (first run before sweep).
- *  - FAILS if the baseline file is malformed after a sweep.
- *  - FAILS if required critical routes are missing from the sweep route list
- *    defined in contrast-inventory.spec.ts.
+ *  3. The bySelector/byComponent indexes are consistent with violations.
  *
  * Run: pnpm --filter web exec vitest run tests/unit/design-system/contrast-baseline-schema.test.ts
  *
@@ -23,22 +17,25 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import type { ContrastInventory } from '../../e2e/contrast-inventory.spec';
+import { APP_ROUTES } from '@/constants/routes';
+import {
+  buildComponentIndex,
+  buildFixClusters,
+  buildSelectorIndex,
+  type ContrastInventory,
+  inferComponentKey,
+} from '../../e2e/utils/contrast-inventory';
 
 const WEB_ROOT = process.cwd();
 const BASELINE_PATH = join(WEB_ROOT, 'tests/e2e/contrast-baseline.json');
+const SPEC_PATH = join(WEB_ROOT, 'tests/e2e/contrast-inventory.spec.ts');
 
-// Routes that MUST be present in the sweep — highest-priority per #11028
-const CRITICAL_ROUTE_PREFIXES = [
-  '/app/dashboard',
-  '/app/settings/billing',
-  '/onboarding',
-  '/app/upgrade',
+const CRITICAL_ROUTE_CONSTANTS = [
+  'APP_ROUTES.LEGACY_DASHBOARD',
+  'APP_ROUTES.SETTINGS_BILLING',
+  'APP_ROUTES.ONBOARDING',
+  'APP_ROUTES.BILLING',
 ] as const;
-
-// ---------------------------------------------------------------------------
-// Schema validators
-// ---------------------------------------------------------------------------
 
 function isContrastNode(
   n: unknown
@@ -64,6 +61,37 @@ function isContrastViolationRecord(
   );
 }
 
+function isIndexEntry(
+  entry: unknown
+): entry is ContrastInventory['bySelector'][string] {
+  if (typeof entry !== 'object' || entry === null) return false;
+  const o = entry as Record<string, unknown>;
+  return (
+    typeof o['count'] === 'number' &&
+    Array.isArray(o['routes']) &&
+    Array.isArray(o['themes']) &&
+    typeof o['sampleSelector'] === 'string'
+  );
+}
+
+function isFixCluster(
+  cluster: unknown
+): cluster is ContrastInventory['fixClusters'][number] {
+  if (typeof cluster !== 'object' || cluster === null) return false;
+  const o = cluster as Record<string, unknown>;
+  return (
+    typeof o['componentKey'] === 'string' &&
+    typeof o['count'] === 'number' &&
+    Array.isArray(o['routes']) &&
+    Array.isArray(o['themes']) &&
+    (o['priority'] === 'critical' ||
+      o['priority'] === 'high' ||
+      o['priority'] === 'normal') &&
+    typeof o['suggestedIssueTitle'] === 'string' &&
+    typeof o['sampleSelector'] === 'string'
+  );
+}
+
 function isContrastInventory(data: unknown): data is ContrastInventory {
   if (typeof data !== 'object' || data === null) return false;
   const o = data as Record<string, unknown>;
@@ -75,51 +103,120 @@ function isContrastInventory(data: unknown): data is ContrastInventory {
     Array.isArray(o['violations']) &&
     (o['violations'] as unknown[]).every(isContrastViolationRecord) &&
     typeof o['bySelector'] === 'object' &&
-    o['bySelector'] !== null
+    o['bySelector'] !== null &&
+    typeof o['byComponent'] === 'object' &&
+    o['byComponent'] !== null &&
+    Array.isArray(o['fixClusters']) &&
+    (o['fixClusters'] as unknown[]).every(isFixCluster) &&
+    Object.values(o['bySelector'] as Record<string, unknown>).every(
+      isIndexEntry
+    ) &&
+    Object.values(o['byComponent'] as Record<string, unknown>).every(
+      isIndexEntry
+    )
   );
 }
 
-// ---------------------------------------------------------------------------
-// Tests
-// ---------------------------------------------------------------------------
-
 describe('Contrast baseline schema (JOV-#11028)', () => {
   it('contrast-inventory.spec.ts must include all critical authenticated routes', () => {
-    // This test validates the source file, not the generated baseline —
-    // it fails even before a sweep runs, ensuring the spec is complete.
-    const specPath = join(WEB_ROOT, 'tests/e2e/contrast-inventory.spec.ts');
-    expect(existsSync(specPath), 'contrast-inventory.spec.ts must exist').toBe(
+    expect(existsSync(SPEC_PATH), 'contrast-inventory.spec.ts must exist').toBe(
       true
     );
 
-    const specSource = readFileSync(specPath, 'utf8');
+    const specSource = readFileSync(SPEC_PATH, 'utf8');
 
-    for (const prefix of CRITICAL_ROUTE_PREFIXES) {
+    for (const routeConstant of CRITICAL_ROUTE_CONSTANTS) {
       expect(
         specSource,
-        `contrast-inventory.spec.ts must include critical route "${prefix}"`
-      ).toContain(`'${prefix}'`);
+        `contrast-inventory.spec.ts must include critical route constant "${routeConstant}"`
+      ).toContain(routeConstant);
     }
+
+    expect(APP_ROUTES.LEGACY_DASHBOARD).toBe('/app/dashboard');
+    expect(APP_ROUTES.BILLING).toBe('/billing');
   });
 
   it('contrast-inventory.spec.ts must cover both light and dark themes', () => {
-    const specPath = join(WEB_ROOT, 'tests/e2e/contrast-inventory.spec.ts');
-    const src = readFileSync(specPath, 'utf8');
+    const src = readFileSync(SPEC_PATH, 'utf8');
     expect(src, 'spec must cover light theme').toContain("'light'");
     expect(src, 'spec must cover dark theme').toContain("'dark'");
   });
 
   it('contrast-inventory.spec.ts must use axe color-contrast rule exclusively', () => {
-    const specPath = join(WEB_ROOT, 'tests/e2e/contrast-inventory.spec.ts');
-    const src = readFileSync(specPath, 'utf8');
+    const src = readFileSync(SPEC_PATH, 'utf8');
     expect(src, 'spec must use color-contrast axe rule').toContain(
       "withRules(['color-contrast'])"
     );
   });
 
+  it('contrast-inventory.spec.ts must not use import.meta.url (breaks Playwright loader)', () => {
+    const src = readFileSync(SPEC_PATH, 'utf8');
+    expect(src, 'import.meta.url breaks Playwright ESM loading').not.toContain(
+      'import.meta.url'
+    );
+  });
+
+  it('component inference groups token classes for shared fixes', () => {
+    const key = inferComponentKey(
+      'button.text-tertiary-token.bg-surface-1.rounded-full'
+    );
+    expect(key).toBe('.bg-surface-1 .text-tertiary-token');
+  });
+
+  it('inventory indexes stay consistent for synthetic violations', () => {
+    const violations: ContrastInventory['violations'] = [
+      {
+        route: '/billing',
+        theme: 'dark',
+        ruleId: 'color-contrast',
+        impact: 'serious',
+        nodes: [
+          {
+            selector: 'button.text-tertiary-token',
+            failureSummary: 'Fix contrast',
+            data: {
+              fgColor: '#666',
+              bgColor: '#000',
+              contrastRatio: 2.1,
+              expectedContrastRatio: 4.5,
+            },
+          },
+        ],
+      },
+      {
+        route: '/onboarding',
+        theme: 'light',
+        ruleId: 'color-contrast',
+        impact: 'serious',
+        nodes: [
+          {
+            selector: 'button.text-tertiary-token',
+            failureSummary: 'Fix contrast',
+            data: {
+              fgColor: '#777',
+              bgColor: '#fff',
+              contrastRatio: 2.4,
+              expectedContrastRatio: 4.5,
+            },
+          },
+        ],
+      },
+    ];
+
+    const bySelector = buildSelectorIndex(violations);
+    const byComponent = buildComponentIndex(violations);
+    const fixClusters = buildFixClusters(byComponent);
+
+    expect(bySelector['button.text-tertiary-token']?.count).toBe(2);
+    expect(byComponent['.text-tertiary-token']?.count).toBe(2);
+    expect(fixClusters[0]?.priority).toBe('critical');
+    expect(fixClusters[0]?.routes).toEqual(
+      expect.arrayContaining(['/billing', '/onboarding'])
+    );
+  });
+
   it('baseline schema is valid when the file exists', () => {
     if (!existsSync(BASELINE_PATH)) {
-      // Not yet generated — skip gracefully (first run before sweep)
       return;
     }
 
@@ -140,23 +237,30 @@ describe('Contrast baseline schema (JOV-#11028)', () => {
 
     const inventory = parsed as ContrastInventory;
 
-    // bySelector count consistency: sum of node counts across all violations
-    // must match totalViolations
     const computedTotal = inventory.violations.reduce(
       (sum, v) => sum + v.nodes.length,
       0
     );
-    const indexedTotal = Object.values(inventory.bySelector).reduce(
+    const indexedSelectorTotal = Object.values(inventory.bySelector).reduce(
       (sum, s) => sum + s.count,
       0
     );
+    const indexedComponentTotal = Object.values(inventory.byComponent).reduce(
+      (sum, s) => sum + s.count,
+      0
+    );
+
     expect(
       inventory.totalViolations,
       'totalViolations must equal sum of violation nodes'
     ).toBe(computedTotal);
     expect(
-      indexedTotal,
+      indexedSelectorTotal,
       'bySelector count sum must equal totalViolations'
+    ).toBe(computedTotal);
+    expect(
+      indexedComponentTotal,
+      'byComponent count sum must equal totalViolations'
     ).toBe(computedTotal);
   });
 
@@ -174,6 +278,8 @@ describe('Contrast baseline schema (JOV-#11028)', () => {
       'totalViolations',
       'violations',
       'bySelector',
+      'byComponent',
+      'fixClusters',
     ] as const;
 
     for (const field of requiredFields) {
