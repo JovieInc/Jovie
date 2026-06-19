@@ -181,6 +181,18 @@ async function fetchRecordingCredits(
   return groupReleaseCredits(rows);
 }
 
+/** Provider/DSP link entry shared by ContentData and its cached form. */
+export interface ContentProviderLink {
+  providerId: string;
+  url: string;
+  sourceType?: string | null;
+  metadata?: Record<string, unknown> | null;
+  /** Whether this is the artist's canonical/primary DSP link */
+  isPrimary?: boolean;
+  /** DSP-specific catalog ID (Spotify track ID, Apple Music song ID, etc.) */
+  externalId?: string | null;
+}
+
 export interface ContentData {
   type: ContentType;
   id: string;
@@ -189,12 +201,7 @@ export interface ContentData {
   artworkUrl: string | null;
   releaseDate: Date | null;
   revealDate?: Date | null;
-  providerLinks: Array<{
-    providerId: string;
-    url: string;
-    sourceType?: string | null;
-    metadata?: Record<string, unknown> | null;
-  }>;
+  providerLinks: ContentProviderLink[];
   artworkSizes?: Record<string, string> | null;
   /** Raw release metadata JSONB (includes MusicVideoMetadata for music_video releases) */
   metadata?: Record<string, unknown> | null;
@@ -212,6 +219,8 @@ export interface ContentData {
   durationMs?: number | null;
   /** ISRC code (from discog_recordings) */
   isrc?: string | null;
+  /** UPC code (from discog_releases) — used for DSP catalog ID resolution */
+  upc?: string | null;
   /** Track position within the release (from discog_release_tracks) */
   trackNumber?: number | null;
   creator: {
@@ -235,12 +244,7 @@ export interface CachedContentData {
   artworkUrl: string | null;
   releaseDate: string | null;
   revealDate?: string | null;
-  providerLinks: Array<{
-    providerId: string;
-    url: string;
-    sourceType?: string | null;
-    metadata?: Record<string, unknown> | null;
-  }>;
+  providerLinks: ContentProviderLink[];
   artworkSizes?: Record<string, string> | null;
   metadata?: Record<string, unknown> | null;
   releaseType?: string | null;
@@ -249,6 +253,7 @@ export interface CachedContentData {
   previewMetadata?: Record<string, unknown> | null;
   durationMs?: number | null;
   isrc?: string | null;
+  upc?: string | null;
   releaseId?: string | null;
   releaseSlug?: string | null;
   releaseTitle?: string | null;
@@ -358,6 +363,16 @@ export const getCreatorByUsername = cache(
   }
 );
 
+/** Shared column projection for provider-link lookups (release/track/recording). */
+const PROVIDER_LINK_COLUMNS = {
+  providerId: providerLinks.providerId,
+  url: providerLinks.url,
+  sourceType: providerLinks.sourceType,
+  metadata: providerLinks.metadata,
+  isPrimary: providerLinks.isPrimary,
+  externalId: providerLinks.externalId,
+} as const;
+
 /**
  * Fetch content (release or track) by creator and slug.
  */
@@ -378,6 +393,7 @@ const fetchContentBySlug = async (
         releaseType: discogReleases.releaseType,
         totalTracks: discogReleases.totalTracks,
         metadata: discogReleases.metadata,
+        upc: discogReleases.upc,
       })
       .from(discogReleases)
       .where(
@@ -392,12 +408,7 @@ const fetchContentBySlug = async (
     if (release) {
       const [links, credits, previewRow] = await Promise.all([
         db
-          .select({
-            providerId: providerLinks.providerId,
-            url: providerLinks.url,
-            sourceType: providerLinks.sourceType,
-            metadata: providerLinks.metadata,
-          })
+          .select(PROVIDER_LINK_COLUMNS)
           .from(providerLinks)
           .where(
             and(
@@ -452,6 +463,7 @@ const fetchContentBySlug = async (
         previewUrl: previewRow?.previewUrl ?? null,
         previewMetadata: previewRow?.previewMetadata ?? null,
         isrc: previewRow?.isrc ?? null,
+        upc: release.upc,
         credits,
       };
     }
@@ -519,12 +531,7 @@ const fetchContentBySlug = async (
           : Promise.resolve(undefined),
         rt
           ? db
-              .select({
-                providerId: providerLinks.providerId,
-                url: providerLinks.url,
-                sourceType: providerLinks.sourceType,
-                metadata: providerLinks.metadata,
-              })
+              .select(PROVIDER_LINK_COLUMNS)
               .from(providerLinks)
               .where(
                 and(
@@ -599,12 +606,7 @@ const fetchContentBySlug = async (
           .limit(1)
           .then(rows => rows[0]),
         db
-          .select({
-            providerId: providerLinks.providerId,
-            url: providerLinks.url,
-            sourceType: providerLinks.sourceType,
-            metadata: providerLinks.metadata,
-          })
+          .select(PROVIDER_LINK_COLUMNS)
           .from(providerLinks)
           .where(
             and(
@@ -780,12 +782,7 @@ export const getTrackBySlugInRelease = cache(
                 )
                 .limit(1),
               db
-                .select({
-                  providerId: providerLinks.providerId,
-                  url: providerLinks.url,
-                  sourceType: providerLinks.sourceType,
-                  metadata: providerLinks.metadata,
-                })
+                .select(PROVIDER_LINK_COLUMNS)
                 .from(providerLinks)
                 .where(
                   and(
@@ -809,12 +806,7 @@ export const getTrackBySlugInRelease = cache(
 
           const legacyTrackLinks = legacyTrack
             ? await db
-                .select({
-                  providerId: providerLinks.providerId,
-                  url: providerLinks.url,
-                  sourceType: providerLinks.sourceType,
-                  metadata: providerLinks.metadata,
-                })
+                .select(PROVIDER_LINK_COLUMNS)
                 .from(providerLinks)
                 .where(
                   and(
@@ -893,12 +885,7 @@ export const getTrackBySlugInRelease = cache(
               )
               .limit(1),
             db
-              .select({
-                providerId: providerLinks.providerId,
-                url: providerLinks.url,
-                sourceType: providerLinks.sourceType,
-                metadata: providerLinks.metadata,
-              })
+              .select(PROVIDER_LINK_COLUMNS)
               .from(providerLinks)
               .where(
                 and(
