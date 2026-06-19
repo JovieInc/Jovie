@@ -102,7 +102,9 @@ export function computeAlbumArtWinner(
   if (control.impressions < minImpressions) return null;
 
   // Only challengers with sufficient impressions are eligible.
-  const challengers = variants.slice(1).filter(v => v.impressions >= minImpressions);
+  const challengers = variants
+    .slice(1)
+    .filter(v => v.impressions >= minImpressions);
   if (challengers.length === 0) return null;
 
   const controlCtr =

@@ -130,7 +130,7 @@ describe('computeAlbumArtWinner', () => {
     // control CTR=0.1, challenger CTR=0.105 (5% lift < 10% threshold)
     // Using 1000 impressions so the 5% lift is representable in integer clicks.
     const result = computeAlbumArtWinner([
-      { variantId: 'control', impressions: 1000, clicks: 100 },    // CTR = 0.10
+      { variantId: 'control', impressions: 1000, clicks: 100 }, // CTR = 0.10
       { variantId: 'challenger', impressions: 1000, clicks: 105 }, // CTR = 0.105 → +5% lift
     ]);
     expect(result).not.toBeNull();
