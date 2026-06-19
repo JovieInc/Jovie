@@ -269,6 +269,8 @@ export const ServerEnvSchema = z.object({
   GMAIL_HISTORY_WINDOW_DAYS: z.string().optional(),
   /** Per-user per-day Gateway token budget for AI Connector extraction (default: 100000) */
   AI_CONNECTORS_DAILY_TOKEN_BUDGET: z.string().optional(),
+  /** Optional override for the Release-to-Revenue design-partner creator username */
+  RELEASE_TO_REVENUE_DESIGN_PARTNER_USERNAME: z.string().optional(),
 
   // Development tools
   JOVIE_DEV_MEMORY_MONITOR: z.string().optional(),
