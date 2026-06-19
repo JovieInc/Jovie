@@ -24,6 +24,8 @@ import { getProfileReleaseVisibility } from '@/lib/profile/release-visibility';
 import type { TourDateViewModel } from '@/lib/tour-dates/types';
 import { cn } from '@/lib/utils';
 import type { Artist } from '@/types/db';
+import { ReleaseCatalogCarousel } from './ReleaseCatalogCarousel';
+import type { PublicRelease } from './releases/types';
 
 interface ProfileHomeRailProps {
   readonly artist: Artist;
@@ -42,6 +44,7 @@ interface ProfileHomeRailProps {
   readonly viewerLocation?: UserLocation | null;
   readonly resolveNearbyTour?: boolean;
   readonly merchCards?: readonly PublicMerchCard[];
+  readonly releases?: readonly PublicRelease[];
 }
 
 function getUpcomingTourDates(
@@ -168,6 +171,7 @@ export function ProfileHomeRail({
   viewerLocation,
   resolveNearbyTour = true,
   merchCards = [],
+  releases = [],
 }: Readonly<ProfileHomeRailProps>) {
   // Re-evaluate visibility at the release boundary so the rail's "Drops in"
   // chrome transitions to "Out Now" when the release drops, even if the
@@ -225,6 +229,14 @@ export function ProfileHomeRail({
     featuredState.kind === 'tour_next' ||
     featuredState.kind === 'playlist_fallback';
 
+  const isFeaturedRelease =
+    featuredState.kind === 'release_live' ||
+    featuredState.kind === 'release_countdown';
+
+  const catalogReleases = isFeaturedRelease
+    ? releases.filter(r => r.slug !== latestRelease?.slug)
+    : [];
+
   const alertsCard = isSubscribed ? null : (
     <HomeAlertsCard
       artist={artist}
@@ -273,9 +285,17 @@ export function ProfileHomeRail({
       data-testid='profile-home-rail'
       data-feature-state={featuredState.kind}
     >
-      {featureCard ? (
+      {hasPrimaryFeature ? (
         <div className='min-w-0' data-testid='profile-home-feature-card'>
-          {featureCard}
+          {catalogReleases.length > 0 && featureCard !== null ? (
+            <ReleaseCatalogCarousel
+              primaryCard={featureCard}
+              catalogReleases={catalogReleases}
+              artistHandle={artist.handle}
+            />
+          ) : (
+            featureCard
+          )}
         </div>
       ) : null}
       {merchCards.slice(0, 3).map(card => (
