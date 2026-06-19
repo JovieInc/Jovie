@@ -13,7 +13,7 @@ import type {
 } from '@/lib/tour-dates/types';
 import { loadAppShellRouteContext } from '../app-shell-route-context';
 import { loadTourDates } from '../dashboard/tour-dates/actions';
-import { CalendarPageClient } from './CalendarPageClient';
+import { LazyCalendarPageClient } from './LazyCalendarPageClient';
 
 export const runtime = 'nodejs';
 
@@ -120,7 +120,7 @@ export default async function CalendarPage() {
 
   return (
     <HydrateClient state={getDehydratedState()}>
-      <CalendarPageClient />
+      <LazyCalendarPageClient />
     </HydrateClient>
   );
 }
