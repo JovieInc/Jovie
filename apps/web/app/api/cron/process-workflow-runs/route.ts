@@ -39,6 +39,8 @@ import { verifyCronRequest } from '@/lib/cron/auth';
 import { db } from '@/lib/db';
 import { workflowRuns } from '@/lib/db/schema/connectors';
 import { captureError, captureWarning } from '@/lib/error-tracking';
+import { RELEASE_TO_REVENUE_WORKFLOW_KIND } from '@/lib/release-to-revenue/types';
+import { initializeReleaseToRevenueRun } from '@/lib/release-to-revenue/workflows/initialize-run';
 import { logger } from '@/lib/utils/logger';
 
 export const runtime = 'nodejs';
@@ -134,6 +136,9 @@ export async function GET(request: Request): Promise<Response> {
           try {
             if (run.kind === 'execute_approved_action') {
               await executeApprovedAction({ workflowRunId: run.id });
+              processed++;
+            } else if (run.kind === RELEASE_TO_REVENUE_WORKFLOW_KIND) {
+              await initializeReleaseToRevenueRun({ workflowRunId: run.id });
               processed++;
             } else {
               logger.warn('[process-workflow-runs] unknown workflow kind', {
