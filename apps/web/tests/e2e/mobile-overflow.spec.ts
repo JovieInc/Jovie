@@ -21,6 +21,7 @@ import {
 const DEFAULT_MOBILE_WIDTHS = [
   320, 360, 375, 390, 393, 402, 414, 428, 430,
 ] as const;
+const DEFAULT_PUBLIC_BOUNDARY_WIDTHS = [320, 430] as const;
 const MOBILE_HEIGHT = 844;
 const FOCUS_TRAVERSAL_LIMIT = getPositiveIntegerEnv(
   'MOBILE_OVERFLOW_FOCUS_LIMIT',
@@ -31,6 +32,27 @@ const USE_TEST_AUTH_BYPASS = process.env.E2E_USE_TEST_AUTH_BYPASS === '1';
 const MOBILE_WIDTHS =
   getMobileWidthsFromEnv(process.env.MOBILE_OVERFLOW_WIDTHS) ??
   DEFAULT_MOBILE_WIDTHS;
+const PUBLIC_BOUNDARY_WIDTHS =
+  getMobileWidthsFromEnv(process.env.MOBILE_OVERFLOW_PUBLIC_WIDTHS) ??
+  DEFAULT_PUBLIC_BOUNDARY_WIDTHS;
+const HAS_DATABASE = Boolean(
+  process.env.DATABASE_URL && !process.env.DATABASE_URL.includes('dummy')
+);
+const ONE_PIXEL_GIF = Buffer.from(
+  'R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==',
+  'base64'
+);
+const SEEDED_SURFACE_FAMILIES = new Set<ResolvedPublicSurfaceSpec['family']>([
+  'profile-core',
+  'profile-mode',
+  'release',
+  'track',
+  'countdown',
+  'playlist-or-sounds',
+  'download',
+]);
+const UNAVAILABLE_SURFACE_TEXT =
+  /profile not found|temporarily unavailable|loading jovie profile/i;
 
 const PUBLIC_SURFACE_IDS = [
   'home',
@@ -76,14 +98,37 @@ function getMobileWidthsFromEnv(value: string | undefined) {
   return widths && widths.length > 0 ? widths : null;
 }
 
+const RESOLVED_PUBLIC_SURFACES = resolvePublicSurfaceManifestSync();
+
 const PUBLIC_SURFACES_BY_ID = new Map(
-  resolvePublicSurfaceManifestSync().map(surface => [surface.id, surface])
+  RESOLVED_PUBLIC_SURFACES.map(surface => [surface.id, surface])
 );
 
 const PUBLIC_SURFACES = PUBLIC_SURFACE_IDS.map(surfaceId => {
   const surface = PUBLIC_SURFACES_BY_ID.get(surfaceId);
   if (!surface) {
     throw new Error(`Missing public mobile overflow surface: ${surfaceId}`);
+  }
+  return surface;
+});
+
+function getPublicSurfaceFilterFromEnv(value: string | undefined) {
+  const surfaceIds = value
+    ?.split(',')
+    .map(surfaceId => surfaceId.trim())
+    .filter(Boolean);
+
+  return surfaceIds && surfaceIds.length > 0
+    ? surfaceIds
+    : RESOLVED_PUBLIC_SURFACES.map(surface => surface.id);
+}
+
+const ALL_PUBLIC_SURFACES = getPublicSurfaceFilterFromEnv(
+  process.env.MOBILE_OVERFLOW_PUBLIC_SURFACES
+).map(surfaceId => {
+  const surface = PUBLIC_SURFACES_BY_ID.get(surfaceId);
+  if (!surface) {
+    throw new Error(`Unknown public mobile overflow surface: ${surfaceId}`);
   }
   return surface;
 });
@@ -167,7 +212,7 @@ async function gotoRouteWithRetry(
   page: Page,
   route: MobileOverflowRoute
 ): Promise<Response | null> {
-  const maxAttempts = 2;
+  const maxAttempts = 4;
   let lastError: unknown = null;
 
   for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
@@ -185,7 +230,14 @@ async function gotoRouteWithRetry(
       lastError = error;
       const message = error instanceof Error ? error.message : String(error);
       const shouldRetry =
-        attempt < maxAttempts && /ERR_EMPTY_RESPONSE|ECONNRESET/i.test(message);
+        attempt < maxAttempts &&
+        /ERR_EMPTY_RESPONSE|ERR_CONNECTION_REFUSED|ERR_CONNECTION_RESET|ECONNREFUSED|ECONNRESET/i.test(
+          message
+        );
+      if (shouldRetry) {
+        await page.waitForTimeout(1_000 * attempt);
+        continue;
+      }
       if (!shouldRetry) break;
     }
   }
@@ -211,10 +263,45 @@ async function navigateToPublicSurface(
   await waitForHydration(page, {
     timeout: surface.readyVisibleTimeoutMs ?? SMOKE_TIMEOUTS.VISIBILITY,
   });
-  await waitForAnySelector(
-    page,
-    surface.readySelectors,
-    surface.readyVisibleTimeoutMs ?? SMOKE_TIMEOUTS.VISIBILITY
+  try {
+    await waitForAnySelector(
+      page,
+      surface.readySelectors,
+      surface.readyVisibleTimeoutMs ?? SMOKE_TIMEOUTS.VISIBILITY
+    );
+  } catch (error) {
+    await skipUnavailableSeededSurface(page, surface);
+    throw error;
+  }
+  await skipUnavailableSeededSurface(page, surface);
+}
+
+async function skipUnavailableSeededSurface(
+  page: Page,
+  surface: ResolvedPublicSurfaceSpec
+): Promise<void> {
+  if (HAS_DATABASE || !SEEDED_SURFACE_FAMILIES.has(surface.family)) {
+    return;
+  }
+
+  const bodyText =
+    (await page
+      .locator('body')
+      .textContent()
+      .catch(() => '')) ?? '';
+  test.skip(
+    UNAVAILABLE_SURFACE_TEXT.test(bodyText),
+    `${surface.id} unavailable without DATABASE_URL`
+  );
+}
+
+async function stabilizeImageOptimizerRequests(page: Page): Promise<void> {
+  await page.route('**/_next/image?**', route =>
+    route.fulfill({
+      status: 200,
+      contentType: 'image/gif',
+      body: ONE_PIXEL_GIF,
+    })
   );
 }
 
@@ -324,6 +411,31 @@ test.describe('Mobile Overflow', () => {
               page,
               testInfo,
               `${route.id} ${width}px`
+            );
+          });
+        }
+      });
+    }
+  });
+
+  test.describe('All Public Surface Boundary Guard', () => {
+    test.describe.configure({ mode: 'parallel' });
+    test.setTimeout(180_000);
+
+    for (const width of PUBLIC_BOUNDARY_WIDTHS) {
+      test.describe(`${width}px`, () => {
+        test.use({ viewport: { width, height: MOBILE_HEIGHT } });
+
+        for (const surface of ALL_PUBLIC_SURFACES) {
+          test(`public boundary ${surface.id} has no horizontal overflow @ ${width}px`, async ({
+            page,
+          }, testInfo) => {
+            await stabilizeImageOptimizerRequests(page);
+            await navigateToPublicSurface(page, surface);
+            await assertSurfaceDoesNotOverflow(
+              page,
+              testInfo,
+              `${surface.id} ${width}px`
             );
           });
         }
