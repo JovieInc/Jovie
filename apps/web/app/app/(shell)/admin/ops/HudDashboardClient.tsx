@@ -365,7 +365,7 @@ function CompactDeploymentRow({
         </div>
       </div>
       <p
-        className='truncate text-[12px] leading-4 text-secondary-token'
+        className='truncate text-xs leading-4 text-secondary-token'
         title={run.branch ?? undefined}
       >
         {run.branch ?? '\u2014'}
@@ -521,7 +521,7 @@ function HermesDispatchControls({
 
   if (!aiOps.dispatch.available) {
     return (
-      <p className='text-[13px] leading-5 text-secondary-token'>
+      <p className='text-app leading-5 text-secondary-token'>
         {aiOps.dispatch.unavailableReason ??
           'Hermes dispatch is not configured.'}
       </p>
@@ -637,7 +637,7 @@ function HermesDispatchControls({
         </button>
       </div>
       {message ? (
-        <p className='text-[13px] leading-5 text-secondary-token'>{message}</p>
+        <p className='text-app leading-5 text-secondary-token'>{message}</p>
       ) : null}
     </div>
   );
@@ -747,7 +747,7 @@ export function HudDashboardClient({
 
   // Operations / Reliability / Runway KPIs likewise scale down in shell.
   const secondaryValueClass = isShell
-    ? 'text-[24px] font-[620] leading-none tracking-[-0.03em] sm:text-[28px]'
+    ? 'text-2xl font-[620] leading-none tracking-[-0.03em] sm:text-[28px]'
     : 'text-[36px] font-[620] leading-none tracking-[-0.04em] sm:text-[42px]';
 
   const aiOpsSummary = (
@@ -864,7 +864,7 @@ export function HudDashboardClient({
                 <p className='text-[26px] font-[620] leading-none tracking-[-0.03em] text-primary-token sm:text-[32px]'>
                   {formatDefaultStatusLabel(metrics.overview.defaultStatus)}
                 </p>
-                <p className='max-w-4xl text-[13px] leading-6 text-secondary-token'>
+                <p className='max-w-4xl text-app leading-6 text-secondary-token'>
                   {metrics.overview.defaultStatusDetail}
                 </p>
               </div>
@@ -1012,7 +1012,7 @@ export function HudDashboardClient({
                 <p className='text-[20px] font-[620] tracking-[-0.03em] text-primary-token'>
                   Scan to view
                 </p>
-                <p className='max-w-[28ch] text-[13px] leading-5 text-secondary-token'>
+                <p className='max-w-[28ch] text-app leading-5 text-secondary-token'>
                   Open the live HUD on another device using this kiosk link.
                 </p>
               </div>
@@ -1041,10 +1041,10 @@ export function HudDashboardClient({
         <div className='flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between'>
           <div className='space-y-1'>
             <SectionLabel>AI ops</SectionLabel>
-            <p className='text-[24px] font-[620] leading-none text-primary-token sm:text-[28px]'>
+            <p className='text-2xl font-[620] leading-none text-primary-token sm:text-[28px]'>
               Hermes control plane
             </p>
-            <p className='text-[13px] leading-5 text-secondary-token'>
+            <p className='text-app leading-5 text-secondary-token'>
               {metrics.aiOps.mergeQueue.openAgentPrs} /{' '}
               {metrics.aiOps.mergeQueue.openAgentPrThreshold} agent PRs open
             </p>
@@ -1144,7 +1144,7 @@ export function HudDashboardClient({
                 }}
               />
             ) : (
-              <p className='text-[13px] leading-5 text-secondary-token'>
+              <p className='text-app leading-5 text-secondary-token'>
                 {showDispatch
                   ? 'Admin access required for worker dispatch.'
                   : 'Dispatch is hidden on the TV/wallboard view.'}
@@ -1228,8 +1228,8 @@ export function HudDashboardClient({
             <p
               className={
                 isShell
-                  ? 'max-w-4xl text-[13px] leading-6 text-secondary-token'
-                  : 'max-w-4xl text-[15px] leading-7 text-secondary-token'
+                  ? 'max-w-4xl text-app leading-6 text-secondary-token'
+                  : 'max-w-4xl text-mid leading-7 text-secondary-token'
               }
             >
               {metrics.overview.defaultStatusDetail}
