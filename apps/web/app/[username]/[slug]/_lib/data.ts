@@ -181,6 +181,18 @@ async function fetchRecordingCredits(
   return groupReleaseCredits(rows);
 }
 
+/** Provider/DSP link entry shared by ContentData and its cached form. */
+export interface ContentProviderLink {
+  providerId: string;
+  url: string;
+  sourceType?: string | null;
+  metadata?: Record<string, unknown> | null;
+  /** Whether this is the artist's canonical/primary DSP link */
+  isPrimary?: boolean;
+  /** DSP-specific catalog ID (Spotify track ID, Apple Music song ID, etc.) */
+  externalId?: string | null;
+}
+
 export interface ContentData {
   type: ContentType;
   id: string;
@@ -189,16 +201,7 @@ export interface ContentData {
   artworkUrl: string | null;
   releaseDate: Date | null;
   revealDate?: Date | null;
-  providerLinks: Array<{
-    providerId: string;
-    url: string;
-    sourceType?: string | null;
-    metadata?: Record<string, unknown> | null;
-    /** Whether this is the artist's canonical/primary DSP link */
-    isPrimary?: boolean;
-    /** DSP-specific catalog ID (Spotify track ID, Apple Music song ID, etc.) */
-    externalId?: string | null;
-  }>;
+  providerLinks: ContentProviderLink[];
   artworkSizes?: Record<string, string> | null;
   /** Raw release metadata JSONB (includes MusicVideoMetadata for music_video releases) */
   metadata?: Record<string, unknown> | null;
@@ -241,14 +244,7 @@ export interface CachedContentData {
   artworkUrl: string | null;
   releaseDate: string | null;
   revealDate?: string | null;
-  providerLinks: Array<{
-    providerId: string;
-    url: string;
-    sourceType?: string | null;
-    metadata?: Record<string, unknown> | null;
-    isPrimary?: boolean;
-    externalId?: string | null;
-  }>;
+  providerLinks: ContentProviderLink[];
   artworkSizes?: Record<string, string> | null;
   metadata?: Record<string, unknown> | null;
   releaseType?: string | null;
