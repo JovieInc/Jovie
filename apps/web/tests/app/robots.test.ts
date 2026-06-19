@@ -27,6 +27,8 @@ const REQUIRED_AI_CRAWLERS = [
   'GPTBot',
   'ChatGPT-User',
   'Claude-Web',
+  'ClaudeBot',
+  'Anthropic-AI',
   'PerplexityBot',
   'Google-Extended',
 ];
