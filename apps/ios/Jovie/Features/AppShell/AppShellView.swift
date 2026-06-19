@@ -129,6 +129,7 @@ struct AppShellView<ProfileContent: View, ChatContent: View>: View {
             profile: profile,
             buildInfo: .current(),
             billingURL: billingURL,
+            onClose: { navigationPath.removeLast() },
             onLogout: onLogout
           )
           .navigationBarBackButtonHidden()
