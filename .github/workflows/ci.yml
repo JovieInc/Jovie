@@ -891,6 +891,7 @@ jobs:
           E2E_SMOKE_RESULT="${{ needs.ci-e2e-smoke.result }}"
           PREVIEW_RESULT="${{ needs.ci-pr-vercel-preview.result }}"
           EVENT_NAME="${{ github.event_name }}"
+          IS_DEPENDABOT="${{ github.event.pull_request.user.login == 'dependabot[bot]' }}"
           echo "ci-fast: $FAST_RESULT"
           echo "ci-unit-tests: $UNIT_RESULT"
           echo "ci-build-public: $BUILD_RESULT"
@@ -983,10 +984,13 @@ jobs:
             exit 1
           fi
 
-          if [[ "$EVENT_NAME" == "pull_request" && "$RISK_REQUIRES_PREVIEW" == "true" && "$PREVIEW_RESULT" != "success" ]]; then
+          if [[ "$EVENT_NAME" == "pull_request" && "$RISK_REQUIRES_PREVIEW" == "true" && "$PREVIEW_RESULT" != "success" && "$IS_DEPENDABOT" != "true" ]]; then
             echo "❌ Risk classifier requires preview evidence, but Preview Deploy result was $PREVIEW_RESULT"
             echo "Likely fix: inspect the Preview Deploy logs, then run pnpm run build:web locally."
             exit 1
+          fi
+          if [[ "$EVENT_NAME" == "pull_request" && "$IS_DEPENDABOT" == "true" && "$PREVIEW_RESULT" == "skipped" ]]; then
+            echo "Dependabot PR: preview deploy intentionally skipped — treating as waived."
           fi
 
           if [[ "$RISK_BLOCKS_UNATTENDED" == "true" ]]; then
@@ -2059,6 +2063,12 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          fetch-depth: 1
+
+      - uses: ./.github/actions/setup-node-pnpm
+
       - name: Wait for CDN propagation
         run: |
           echo "Waiting 30s for Vercel CDN propagation after deploy..."
@@ -2140,7 +2150,7 @@ jobs:
             return 0
           }
 
-          echo "=== 1/4 Health API ==="
+          echo "=== 1/5 Health API ==="
           if ! retry "Health API" check_health; then
             FAILURES=$((FAILURES + 1))
           fi
@@ -2171,7 +2181,7 @@ jobs:
             return 0
           }
 
-          echo "=== 2/4 Homepage ==="
+          echo "=== 2/5 Homepage ==="
           if ! retry "Homepage" check_homepage; then
             FAILURES=$((FAILURES + 1))
           fi
@@ -2214,7 +2224,7 @@ jobs:
             return 0
           }
 
-          echo "=== 3/4 Public Profile ==="
+          echo "=== 3/5 Public Profile ==="
           if ! retry "Public Profile" check_profile; then
             FAILURES=$((FAILURES + 1))
           fi
@@ -2240,18 +2250,24 @@ jobs:
             return 0
           }
 
-          echo "=== 4/4 Critical Pages ==="
+          echo "=== 4/5 Critical Pages ==="
           if ! retry "Critical Pages" check_critical_pages; then
+            FAILURES=$((FAILURES + 1))
+          fi
+
+          # -- 5. Production SEO surfaces: robots.txt + sitemap.xml --
+          echo "=== 5/5 Production SEO Surfaces ==="
+          if ! retry "Production SEO Surfaces" bash -c 'BASE_URL=https://jov.ie pnpm --filter=@jovie/web exec tsx scripts/seo-ratchet-live.ts'; then
             FAILURES=$((FAILURES + 1))
           fi
 
           # -- Summary --
           echo ""
           if [ $FAILURES -gt 0 ]; then
-            echo "::error::Post-deploy smoke failed: $FAILURES/4 checks failed"
+            echo "::error::Post-deploy smoke failed: $FAILURES/5 checks failed"
             exit 1
           fi
-          echo "Post-deploy smoke passed: 4/4 checks OK"
+          echo "Post-deploy smoke passed: 5/5 checks OK"
 
   # Post-deploy authenticated smoke test — lightweight Playwright test against production.
   # Verifies sign-in + dashboard load with real credentials after deploy.
@@ -3706,7 +3722,7 @@ jobs:
   ci-smoke-required:
     name: Extended Smoke (Preview)
     needs: [ci-fast, ci-build, neon-db, ci-e2e-tests, ci-path-changes]
-    if: ${{ always() && (github.event_name == 'workflow_dispatch' || (github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'testing') && needs.ci-path-changes.outputs.run_e2e == 'true')) }}
+    if: ${{ always() && (github.event_name == 'workflow_dispatch' || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork == false && github.event.pull_request.user.login && github.event.pull_request.user.login != 'dependabot[bot]' && contains(github.event.pull_request.labels.*.name, 'testing') && needs.ci-path-changes.outputs.run_e2e == 'true')) }}
     runs-on: ubuntu-latest
     environment: Preview – jovie
     timeout-minutes: 20

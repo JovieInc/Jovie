@@ -20,6 +20,8 @@ export function mapProfileWithLinksToCreatorProfile(
     username: result.username,
     display_name: result.displayName,
     bio: result.bio,
+    career_highlights: result.careerHighlights ?? null,
+    target_playlists: result.targetPlaylists ?? null,
     avatar_url: result.avatarUrl,
     spotify_url: result.spotifyUrl,
     apple_music_url: result.appleMusicUrl,
