@@ -70,8 +70,10 @@ vi.mock('@/app/app/(shell)/dashboard/tour-dates/actions', () => ({
   loadTourDates: mocks.loadTourDates,
 }));
 
-vi.mock('@/app/app/(shell)/calendar/CalendarPageClient', () => ({
-  CalendarPageClient: () => <div data-testid='calendar-client'>Calendar</div>,
+vi.mock('@/app/app/(shell)/calendar/LazyCalendarPageClient', () => ({
+  LazyCalendarPageClient: () => (
+    <div data-testid='calendar-client'>Calendar</div>
+  ),
 }));
 
 const { default: CalendarPage } = await import(
