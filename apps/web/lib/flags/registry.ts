@@ -85,6 +85,18 @@ export const APP_FLAG_REGISTRY = {
       return !IS_VERCEL_PRODUCTION;
     },
   }),
+  RELEASE_TO_REVENUE_AUTOPILOT: flag<boolean, FlagEntities>({
+    key: APP_FLAG_KEYS.RELEASE_TO_REVENUE_AUTOPILOT,
+    defaultValue: APP_FLAG_DEFAULTS.RELEASE_TO_REVENUE_AUTOPILOT,
+    description: APP_FLAG_DESCRIPTIONS.RELEASE_TO_REVENUE_AUTOPILOT,
+    options: [
+      { label: 'Off', value: false },
+      { label: 'On', value: true },
+    ],
+    async decide() {
+      return !IS_VERCEL_PRODUCTION;
+    },
+  }),
   DESIGN_V1: buildBooleanFlag('DESIGN_V1'),
   SHELL_CHAT_V1: buildBooleanFlag('SHELL_CHAT_V1'),
   DESIGN_V1_RELEASES: buildBooleanFlag('DESIGN_V1_RELEASES'),
