@@ -73,6 +73,14 @@ describe('computeAlbumArtWinner', () => {
     expect(result).toBeNull();
   });
 
+  it('returns null when control has insufficient impressions even if challengers qualify', () => {
+    const result = computeAlbumArtWinner([
+      { variantId: 'control', impressions: minI - 1, clicks: 10 },
+      { variantId: 'challenger', impressions: minI, clicks: 20 },
+    ]);
+    expect(result).toBeNull();
+  });
+
   it('returns null when no challenger beats control CTR', () => {
     const result = computeAlbumArtWinner([
       { variantId: 'control', impressions: minI, clicks: 20 },
@@ -119,26 +127,14 @@ describe('computeAlbumArtWinner', () => {
   });
 
   it('marks result as NOT significant when lift is below threshold', () => {
-    // challenger barely beats control (< 10% lift)
-    const controlClicks = 100;
-    const controlImpressions = 1000;
-    const controlCtr = controlClicks / controlImpressions;
-    // 5% lift → 0.1 * 1.05 = 0.105
-    const challengerClicks = Math.floor(controlCtr * 1.05 * minI);
+    // control CTR=0.1, challenger CTR=0.105 (5% lift < 10% threshold)
+    // Using 1000 impressions so the 5% lift is representable in integer clicks.
     const result = computeAlbumArtWinner([
-      { variantId: 'control', impressions: minI, clicks: controlClicks },
-      {
-        variantId: 'challenger',
-        impressions: minI,
-        clicks: challengerClicks,
-      },
+      { variantId: 'control', impressions: 1000, clicks: 100 },    // CTR = 0.10
+      { variantId: 'challenger', impressions: 1000, clicks: 105 }, // CTR = 0.105 → +5% lift
     ]);
-    // With 100 impressions and 5% lift, challenger CTR = 0.105 vs control 0.1
-    // liftPercent = 0.05 < ALBUM_ART_AB_MIN_LIFT (0.1)
-    if (result) {
-      expect(result.isStatisticallySignificant).toBe(false);
-    }
-    // If null (tie or control wins), that's also fine — both mean not significant
+    expect(result).not.toBeNull();
+    expect(result!.isStatisticallySignificant).toBe(false);
   });
 
   it('picks the best challenger when multiple challengers are qualified', () => {

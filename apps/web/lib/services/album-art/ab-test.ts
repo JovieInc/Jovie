@@ -93,13 +93,17 @@ export function computeAlbumArtWinner(
 ): AlbumArtWinnerResult | null {
   const minImpressions = options.minImpressions ?? ALBUM_ART_AB_MIN_IMPRESSIONS;
 
-  const qualified = variants.filter(v => v.impressions >= minImpressions);
-  if (qualified.length < 2) return null;
+  if (variants.length < 2) return null;
 
-  const [control, ...challengers] = qualified as [
-    AlbumArtVariantStats,
-    ...AlbumArtVariantStats[],
-  ];
+  // variants[0] is the control (canonical cover art) per the JSDoc contract.
+  // If control hasn't reached the impression threshold we can't make a valid
+  // comparison — return null rather than misidentifying a challenger as control.
+  const control = variants[0]!;
+  if (control.impressions < minImpressions) return null;
+
+  // Only challengers with sufficient impressions are eligible.
+  const challengers = variants.slice(1).filter(v => v.impressions >= minImpressions);
+  if (challengers.length === 0) return null;
 
   const controlCtr =
     control.impressions > 0 ? control.clicks / control.impressions : 0;
