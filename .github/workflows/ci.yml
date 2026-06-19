@@ -409,7 +409,7 @@ jobs:
 
   ci-structural-contract:
     name: Structural Contract
-    needs: [ci-risk-classifier]
+    needs: [ci-path-changes]
     runs-on: ubuntu-latest
     timeout-minutes: 8
     env:
@@ -604,9 +604,8 @@ jobs:
           path: |
             .cache/tsbuildinfo
             apps/web/.cache/tsbuildinfo
-          key: ${{ runner.os }}-tsc-${{ github.ref }}-${{ hashFiles('**/tsconfig*.json', '**/pnpm-lock.yaml', '**/package.json') }}
+          key: ${{ runner.os }}-tsc-${{ hashFiles('**/tsconfig*.json', '**/pnpm-lock.yaml', '**/package.json') }}
           restore-keys: |
-            ${{ runner.os }}-tsc-${{ github.ref }}-
             ${{ runner.os }}-tsc-
       - name: Run typecheck
         env:
