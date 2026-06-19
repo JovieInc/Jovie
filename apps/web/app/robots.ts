@@ -49,6 +49,8 @@ const AI_CRAWLERS = [
   'GPTBot',
   'ChatGPT-User',
   'Claude-Web',
+  'ClaudeBot',
+  'Anthropic-AI',
   'Applebot-Extended',
   'PerplexityBot',
   'Google-Extended',
