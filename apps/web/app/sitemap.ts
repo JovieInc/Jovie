@@ -7,6 +7,7 @@ import { APP_ROUTES } from '@/constants/routes';
 import { getAlternativeSlugs } from '@/content/alternatives';
 import { getComparisonSlugs } from '@/content/comparisons';
 import { getBlogPosts, slugifyCategory } from '@/lib/blog/getBlogPosts';
+import { CACHE_TAGS } from '@/lib/cache/tags';
 import { db } from '@/lib/db';
 import {
   discogRecordings,
@@ -130,8 +131,8 @@ const getSitemapCatalog = unstable_cache(
       return { profiles: [], releases: [], tracks: [], playlists: [] };
     }
   },
-  ['sitemap-catalog-v1'],
-  { revalidate: 3600 }
+  ['sitemap-catalog-v2'],
+  { revalidate: 3600, tags: [CACHE_TAGS.SITEMAP_CATALOG] }
 );
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
