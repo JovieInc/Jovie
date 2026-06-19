@@ -181,7 +181,7 @@
     "turbo": "^2.9.14",
     "typescript": "^6.0.3",
     "vercel": "54.7.1",
-    "vitest": "4.1.7"
+    "vitest": "4.1.8"
   },
   "lint-staged": {
     "apps/web/drizzle/migrations/**/*.{sql,ts}": [
