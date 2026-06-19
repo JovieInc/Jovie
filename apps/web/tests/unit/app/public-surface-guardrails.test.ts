@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
+import { validateProductionRobots } from '@/lib/seo/ratchet';
 
 describe('public surface guardrails', () => {
   it('keeps production robots disallows scoped to safe namespaces', async () => {
@@ -80,6 +81,30 @@ describe('public surface guardrails', () => {
       const rules = Array.isArray(meta.rules) ? meta.rules : [];
       const wildcard = rules.find(r => r.userAgent === '*');
       expect(wildcard?.allow).toBe('/');
+    });
+  });
+
+  describe('AEO ratchet — AI crawler allow rules (JOV-11044)', () => {
+    async function getProductionRobots() {
+      vi.resetModules();
+      vi.doMock('@/constants/app', () => ({ BASE_URL: 'https://jov.ie' }));
+      vi.doMock('@/lib/env-server', () => ({
+        env: { VERCEL_ENV: 'production' },
+      }));
+      const { default: robots } = await import('../../../app/robots');
+      return robots();
+    }
+
+    it('production robots config passes SEO/AEO ratchet (JOV-11044)', async () => {
+      const meta = await getProductionRobots();
+      const issues = validateProductionRobots(meta);
+
+      expect(
+        issues,
+        issues
+          .map(issue => `${issue.message}\n  ↳ ${issue.remediation}`)
+          .join('\n')
+      ).toEqual([]);
     });
   });
 
