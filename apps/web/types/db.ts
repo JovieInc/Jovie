@@ -108,6 +108,7 @@ export interface CreatorProfile {
   deezer_id?: string | null;
   tidal_id?: string | null;
   soundcloud_id?: string | null;
+  musicbrainz_id?: string | null;
   // Visibility and metadata
   is_public: boolean;
   is_verified: boolean;
