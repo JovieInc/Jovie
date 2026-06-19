@@ -9,6 +9,7 @@ describe('audience app shell route', () => {
       'utf8'
     );
 
+    expect(source).toContain('LazyDashboardAudienceClient');
     expect(source).toContain('loadAppShellRouteContext');
     expect(source).toContain('loadAuthenticatedAppShellUserId');
     expect(source).toContain('requireAppShellDashboardUserId');
