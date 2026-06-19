@@ -125,7 +125,8 @@ gh pr create \
 EOF
 )"
 
-gh pr merge --auto --squash
+# Add the PR to the Graphite merge queue (enqueues by label)
+gh pr edit --add-label merge-queue
 
 # Return to develop for next batch
 git checkout develop

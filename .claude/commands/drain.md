@@ -92,8 +92,8 @@ gh pr create --base main --head fix/systemic-ci-blockers --title "fix: resolve s
 gh run list --branch fix/systemic-ci-blockers --limit 1 --json databaseId,status,conclusion
 # If still running, wait:
 gh run watch <RUN_ID>
-# Once green, merge the PR:
-gh pr merge --auto --squash
+# Once green, add the PR to the Graphite merge queue:
+gh pr edit --add-label merge-queue
 ```
 
 **Do NOT proceed to Phase 2 until main CI is green.**
@@ -217,8 +217,8 @@ OPEN_PRS=$(gh pr list --state open --json number --jq '.[].number')
 for PR in $OPEN_PRS; do
   FAILING=$(gh pr checks $PR 2>/dev/null | grep -v skipping | grep "fail" | grep -v "Preview Deploy")
   if [ -z "$FAILING" ]; then
-    echo "PR #$PR passed CI — enabling auto-merge"
-    gh pr merge $PR --auto --squash
+    echo "PR #$PR passed CI — adding to Graphite merge queue"
+    gh pr edit $PR --add-label merge-queue
   else
     echo "PR #$PR still has failures"
   fi
