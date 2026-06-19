@@ -25,6 +25,8 @@ import {
 } from '@/lib/constants/schemas';
 import { toPublicContacts } from '@/lib/contacts/mapper';
 import { getReleasesForProfileLite } from '@/lib/discography/queries';
+import { getEntityIdentityLinks } from '@/lib/entity/queries';
+import { buildEntitySameAs } from '@/lib/entity/sameAs';
 import { captureError } from '@/lib/error-tracking';
 // ISR-safe: profile-variant.ts does NOT import cookies() — no dynamic opt-in
 import {
@@ -97,31 +99,25 @@ function generateProfileStructuredData(
   profile: CreatorProfile,
   genres: string[] | null,
   links: LegacySocialLink[],
-  tourDates: TourDateViewModel[]
+  tourDates: TourDateViewModel[],
+  entityLinks: import('@/lib/entity/sameAs').EntityIdentityLink[] = []
 ) {
   const artistName = profile.display_name || profile.username;
   const normalizedUsername =
     profile.username_normalized || profile.username.toLowerCase();
   const profileUrl = `${BASE_URL}/${normalizedUsername}`;
 
-  // Extract social profile URLs for sameAs
-  const socialUrls = links
-    .filter(link =>
-      [
-        'instagram',
-        'twitter',
-        'facebook',
-        'youtube',
-        'tiktok',
-        'spotify',
-      ].includes((link.platform ?? '').toLowerCase())
-    )
-    .map(link => link.url);
-
-  if (profile.spotify_url) socialUrls.push(profile.spotify_url);
-  if (profile.apple_music_url) socialUrls.push(profile.apple_music_url);
-  if (profile.youtube_url) socialUrls.push(profile.youtube_url);
-  const uniqueSocialUrls = [...new Set(socialUrls)];
+  // Build canonical sameAs: KB identifiers (MB/Wikidata/ISNI) + DSP + social
+  const uniqueSocialUrls = buildEntitySameAs(
+    {
+      musicbrainzId: profile.musicbrainz_id,
+      spotifyUrl: profile.spotify_url,
+      appleMusicUrl: profile.apple_music_url,
+      youtubeUrl: profile.youtube_url,
+    },
+    entityLinks,
+    links.map(l => ({ platform: l.platform, url: l.url ?? '' }))
+  );
 
   // Build ListenAction from all DSP links (profile columns + social links table)
   const DSP_PLATFORMS: Record<string, string> = {
@@ -402,6 +398,7 @@ export default async function ArtistPage({ params }: Readonly<Props>) {
   const tourDatesPromise = getPublicTourDates(profile.id);
   const releasesPromise = getPublicReleases(profile.id);
   const merchCardsPromise = getPublicMerchCards(profile.id);
+  const entityLinksPromise = getEntityIdentityLinks(profile.id);
 
   // Convert our profile data to the Artist type expected by components
   const artist = convertCreatorProfileToArtist(profile);
@@ -450,16 +447,22 @@ export default async function ArtistPage({ params }: Readonly<Props>) {
 
   // Await tour dates + releases (started above, non-blocking — errors logged then resolve to empty)
   // Sort server-side so the client doesn't need a useMemo sort
-  const [tourDatesRaw, allReleases, merchCards, alertOptInVariant] =
-    await Promise.all([
-      tourDatesPromise.catch(() => [] as TourDateViewModel[]),
-      releasesPromise,
-      merchCardsPromise,
-      // stableId is null for ISR renders — returns the default 'button' variant.
-      // AnonCookieBootstrap resolves the per-user variant on the client side.
-      // .catch ensures a Statsig outage doesn't fail the whole ISR page render.
-      getProfileAlertOptInVariant(null).catch(() => 'button' as const),
-    ]);
+  const [
+    tourDatesRaw,
+    allReleases,
+    merchCards,
+    alertOptInVariant,
+    entityLinks,
+  ] = await Promise.all([
+    tourDatesPromise.catch(() => [] as TourDateViewModel[]),
+    releasesPromise,
+    merchCardsPromise,
+    // stableId is null for ISR renders — returns the default 'button' variant.
+    // AnonCookieBootstrap resolves the per-user variant on the client side.
+    // .catch ensures a Statsig outage doesn't fail the whole ISR page render.
+    getProfileAlertOptInVariant(null).catch(() => 'button' as const),
+    entityLinksPromise.catch(() => []),
+  ]);
   const tourDates = [...tourDatesRaw].sort(
     (a, b) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime()
   );
@@ -480,7 +483,8 @@ export default async function ArtistPage({ params }: Readonly<Props>) {
     profile,
     genres,
     links,
-    tourDates
+    tourDates,
+    entityLinks
   );
   const aeoContent = buildProfileAeoContent({
     artist,

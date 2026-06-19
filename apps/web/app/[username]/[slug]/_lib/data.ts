@@ -274,6 +274,10 @@ const fetchCreatorByUsername = async (usernameNormalized: string) => {
       usernameNormalized: creatorProfiles.usernameNormalized,
       avatarUrl: creatorProfiles.avatarUrl,
       settings: creatorProfiles.settings,
+      spotifyUrl: creatorProfiles.spotifyUrl,
+      appleMusicUrl: creatorProfiles.appleMusicUrl,
+      youtubeUrl: creatorProfiles.youtubeUrl,
+      musicbrainzId: creatorProfiles.musicbrainzId,
     };
 
     if (await doesColumnExist('creator_profiles', 'is_claimed')) {
