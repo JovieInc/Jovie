@@ -36,6 +36,10 @@ import {
   type SeoRequiredTag,
   validateMetadataTags,
 } from '../../lib/seo/metadata-ratchet';
+import {
+  validateRobotsTxtSurface,
+  validateSitemapXmlSurface,
+} from '../../lib/seo/surface-ratchet';
 
 interface SeoBaselineFile {
   readonly version: number;
@@ -58,6 +62,9 @@ const ratchetBaseline = JSON.parse(
     id: string;
     requiredTags: SeoRequiredTag[];
   }>;
+  robots: {
+    requiredAiCrawlers: string[];
+  };
 };
 
 function formatRobotsTxt(robots: MetadataRoute.Robots): string {
@@ -308,6 +315,74 @@ describe('seo-ratchet robots.txt serialization', () => {
     expect(body).not.toMatch(/User-agent: \*\nDisallow: \/\n/);
     expect(body).toContain('Sitemap: https://jov.ie/sitemap.xml');
     expect(body).toContain('Allow: /');
+  });
+});
+
+describe('seo-ratchet live surface validators', () => {
+  const productionRobots = [
+    'User-agent: *',
+    'Allow: /',
+    'Disallow: /app/',
+    'Disallow: /api/',
+    'Sitemap: https://jov.ie/sitemap.xml',
+    'Host: https://jov.ie',
+    '',
+    ...baseline.robots.requiredAiCrawlers.flatMap(crawler => [
+      `User-agent: ${crawler}`,
+      'Allow: /',
+      'Allow: /llms.txt',
+      'Disallow: /app/',
+      '',
+    ]),
+  ].join('\n');
+
+  it('flags global Disallow: / on wildcard user-agent', () => {
+    const violations = validateRobotsTxtSurface(
+      `User-agent: *\nDisallow: /\n`,
+      { requiredAiCrawlers: ['GPTBot'] }
+    );
+
+    expect(
+      violations.some(violation => violation.check === 'robots-global-disallow')
+    ).toBe(true);
+  });
+
+  it('accepts production-shaped robots.txt bodies', () => {
+    const violations = validateRobotsTxtSurface(productionRobots, {
+      requiredAiCrawlers: baseline.robots.requiredAiCrawlers,
+    });
+
+    expect(violations).toEqual([]);
+  });
+
+  it('requires lastmod on every sitemap URL block', () => {
+    const xml = `<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url><loc>https://jov.ie</loc></url>
+</urlset>`;
+
+    const violations = validateSitemapXmlSurface(xml, {
+      requireLastModified: true,
+      minEntryCount: 1,
+    });
+
+    expect(
+      violations.some(violation => violation.check === 'sitemap-lastmod')
+    ).toBe(true);
+  });
+
+  it('accepts non-empty sitemap XML with lastmod entries', () => {
+    const xml = `<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url><loc>https://jov.ie</loc><lastmod>2026-06-18</lastmod></url>
+</urlset>`;
+
+    const violations = validateSitemapXmlSurface(xml, {
+      requireLastModified: true,
+      minEntryCount: 1,
+    });
+
+    expect(violations).toEqual([]);
   });
 });
 
