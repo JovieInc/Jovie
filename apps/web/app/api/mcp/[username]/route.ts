@@ -99,12 +99,28 @@ export async function POST(
   try {
     body = await req.json();
   } catch {
-    return mcpError(-32700, 'Parse error');
+    return mcpError(-32700, 'Parse error', 200, null);
   }
+
+  // Extract JSON-RPC id before method dispatch so all responses can echo it.
+  // Per JSON-RPC 2.0 §5, the response id MUST match the request id exactly.
+  // If id is absent (notification) we pass undefined so mcpOk/mcpError omit it.
+  const idParse = z
+    .union([z.string(), z.number(), z.null()])
+    .optional()
+    .safeParse((body as Record<string, unknown>)?.id);
+  const requestId: JsonRpcId | undefined = idParse.success
+    ? idParse.data
+    : undefined;
 
   const parsed = mcpRequestSchema.safeParse(body);
   if (!parsed.success) {
-    return mcpError(-32601, 'Method not found or invalid params');
+    return mcpError(
+      -32601,
+      'Method not found or invalid params',
+      200,
+      requestId
+    );
   }
   const msg = parsed.data;
 
@@ -112,21 +128,27 @@ export async function POST(
   // initialize
   // -------------------------------------------------------------------------
   if (msg.method === 'initialize') {
-    return mcpOk({
-      protocolVersion: '2025-11-05',
-      capabilities: { resources: {}, tools: {} },
-      serverInfo: {
-        name: `jovie-artist-${profile.username}`,
-        version: '1.0.0',
+    return mcpOk(
+      {
+        protocolVersion: '2025-11-05',
+        capabilities: { resources: {}, tools: {} },
+        serverInfo: {
+          name: `jovie-artist-${profile.username}`,
+          version: '1.0.0',
+        },
       },
-    });
+      requestId
+    );
   }
 
   // -------------------------------------------------------------------------
   // resources/list
   // -------------------------------------------------------------------------
   if (msg.method === 'resources/list') {
-    return mcpOk({ resources: buildResourceDescriptors(profile.username) });
+    return mcpOk(
+      { resources: buildResourceDescriptors(profile.username) },
+      requestId
+    );
   }
 
   // -------------------------------------------------------------------------
@@ -136,20 +158,23 @@ export async function POST(
     const uri = msg.params.uri;
     const content = await readResource(uri, profile);
     if (!content) {
-      return mcpError(-32602, `Unknown resource: ${uri}`);
+      return mcpError(-32602, `Unknown resource: ${uri}`, 200, requestId);
     }
-    return mcpOk({
-      contents: [
-        { uri, mimeType: 'application/json', text: JSON.stringify(content) },
-      ],
-    });
+    return mcpOk(
+      {
+        contents: [
+          { uri, mimeType: 'application/json', text: JSON.stringify(content) },
+        ],
+      },
+      requestId
+    );
   }
 
   // -------------------------------------------------------------------------
   // tools/list
   // -------------------------------------------------------------------------
   if (msg.method === 'tools/list') {
-    return mcpOk({ tools: buildToolDescriptors() });
+    return mcpOk({ tools: buildToolDescriptors() }, requestId);
   }
 
   // -------------------------------------------------------------------------
@@ -162,27 +187,41 @@ export async function POST(
       profile
     );
     if (result.error) {
-      return mcpError(-32602, result.error);
+      return mcpError(-32602, result.error, 200, requestId);
     }
-    return mcpOk({
-      content: [{ type: 'text', text: JSON.stringify(result.data) }],
-    });
+    return mcpOk(
+      { content: [{ type: 'text', text: JSON.stringify(result.data) }] },
+      requestId
+    );
   }
 
-  return mcpError(-32601, 'Method not found');
+  return mcpError(-32601, 'Method not found', 200, requestId);
 }
 
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
-function mcpOk(result: unknown) {
-  return NextResponse.json({ jsonrpc: '2.0', id: 1, result });
+type JsonRpcId = string | number | null;
+
+function mcpOk(result: unknown, requestId: JsonRpcId | undefined) {
+  return NextResponse.json(
+    requestId !== undefined
+      ? { jsonrpc: '2.0', id: requestId, result }
+      : { jsonrpc: '2.0', result }
+  );
 }
 
-function mcpError(code: number, message: string, status = 200) {
+function mcpError(
+  code: number,
+  message: string,
+  status = 200,
+  requestId: JsonRpcId | undefined = null
+) {
   return NextResponse.json(
-    { jsonrpc: '2.0', id: 1, error: { code, message } },
+    requestId !== undefined
+      ? { jsonrpc: '2.0', id: requestId, error: { code, message } }
+      : { jsonrpc: '2.0', error: { code, message } },
     { status }
   );
 }
