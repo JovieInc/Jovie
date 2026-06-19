@@ -64,6 +64,14 @@
         "canonical",
         "json-ld"
       ]
+    },
+    {
+      "path": "app/[username]/[slug]/[trackSlug]/page.tsx",
+      "checks": ["metadata-export", "json-ld"]
+    },
+    {
+      "path": "app/[username]/merch/[cardId]/page.tsx",
+      "checks": ["metadata-export", "description", "openGraph", "json-ld"]
     }
   ]
 }

@@ -19,6 +19,7 @@ import {
 } from '@/lib/discography/audio-qa';
 import { PROVIDER_CONFIG } from '@/lib/discography/config';
 import type { ProviderKey } from '@/lib/discography/types';
+import { generateMusicStructuredData } from '@/lib/seo/structured-data';
 import { toISOStringOrNull } from '@/lib/utils/date';
 import { safeJsonLdStringify } from '@/lib/utils/json-ld';
 import {
@@ -28,7 +29,6 @@ import {
   getFeaturedTrackStaticParams,
   getTrackBySlugInRelease,
 } from '../_lib/data';
-import { generateMusicStructuredData } from '../music-structured-data';
 
 export const revalidate = 300;
 
@@ -134,8 +134,7 @@ export default async function TrackDeepLinkPage({
         id: `${releaseUrl}#release`,
       },
     },
-    creator,
-    BASE_URL
+    creator
   );
 
   // Add the deeper breadcrumb (4 levels instead of 3)

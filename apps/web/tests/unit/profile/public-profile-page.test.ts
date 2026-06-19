@@ -18,6 +18,9 @@ import {
   getProfileModeSubtitle,
   profileModes,
 } from '@/features/profile/registry';
+import { generateProfileStructuredData } from '@/lib/seo/structured-data';
+import type { TourDateViewModel } from '@/lib/tour-dates/types';
+import type { CreatorProfile } from '@/types/db';
 
 // --- Mock data used across tests ---
 
@@ -196,149 +199,53 @@ describe('Public Profile Page Logic', () => {
   });
 
   describe('generateProfileStructuredData', () => {
-    // We test the structured data generation logic directly
-    // Since it's a private function, we replicate the logic here for testing
+    const profileFixture = mockProfile as CreatorProfile;
 
-    interface TestProfile {
-      id: string;
-      user_id: string;
-      creator_type: 'artist';
-      username: string;
-      display_name: string | null;
-      bio: string | null;
-      avatar_url: string | null;
-      spotify_url: string | null;
-      apple_music_url: string | null;
-      youtube_url: string | null;
-      is_verified: boolean;
-      [key: string]: unknown;
-    }
-
-    interface TourDateForTest {
-      id: string;
-      ticketStatus: string;
-      venueName: string;
-      city: string;
-      region: string | null;
-      country: string;
-      startDate: string;
-      ticketUrl: string | null;
-      latitude: number | null;
-      longitude: number | null;
-      title: string | null;
-    }
-
-    function generateProfileStructuredData(
-      profile: TestProfile,
-      genres: string[] | null,
-      links: typeof mockLinks,
-      tourDates: TourDateForTest[] = []
-    ) {
-      const artistName = profile.display_name || profile.username;
-      const profileUrl = `${BASE_URL}/${profile.username}`;
-
-      const socialUrls = links
-        .filter(link =>
-          [
-            'instagram',
-            'twitter',
-            'facebook',
-            'youtube',
-            'tiktok',
-            'spotify',
-          ].includes(link.platform.toLowerCase())
-        )
-        .map(link => link.url);
-
-      if (profile.spotify_url) socialUrls.push(profile.spotify_url);
-      if (profile.apple_music_url) socialUrls.push(profile.apple_music_url);
-      if (profile.youtube_url) socialUrls.push(profile.youtube_url);
-
-      const uniqueSocialUrls = [...new Set(socialUrls)];
-
-      const musicGroupSchema: Record<string, unknown> = {
-        '@type': 'MusicGroup',
-        '@id': `${profileUrl}#musicgroup`,
-        name: artistName,
-        description: profile.bio || `Music by ${artistName}`,
-        url: profileUrl,
-        sameAs: uniqueSocialUrls,
-        genre: genres && genres.length > 0 ? genres : ['Music'],
-        ...(profile.avatar_url && {
-          image: {
-            '@type': 'ImageObject',
-            url: profile.avatar_url,
-            name: `${artistName} profile photo`,
-          },
-        }),
-        ...(profile.is_verified && {
-          additionalProperty: {
-            '@type': 'PropertyValue',
-            name: 'verified',
-            value: true,
-          },
-        }),
-      };
-
-      const profilePageSchema = {
-        '@type': 'ProfilePage',
-        '@id': `${profileUrl}#profilepage`,
-        mainEntity: { '@id': `${profileUrl}#musicgroup` },
-        url: profileUrl,
-        name: `${artistName} | Jovie`,
-      };
-
-      const breadcrumbSchema = {
-        '@type': 'BreadcrumbList',
-        itemListElement: [
-          {
-            '@type': 'ListItem',
-            position: 1,
-            name: 'Home',
-            item: BASE_URL,
-          },
-          {
-            '@type': 'ListItem',
-            position: 2,
-            name: artistName,
-            item: profileUrl,
-          },
-        ],
-      };
-
-      const MAX_EVENT_SCHEMAS = 5;
-      const eventSchemas = tourDates.slice(0, MAX_EVENT_SCHEMAS).map(td => ({
-        '@type': 'MusicEvent',
-        '@id': `${profileUrl}#event-${td.id}`,
-        name: td.title || `${artistName} at ${td.venueName}`,
-        startDate: td.startDate,
-        performer: { '@id': `${profileUrl}#musicgroup` },
-      }));
-
-      return {
-        '@context': 'https://schema.org',
-        '@graph': [
-          profilePageSchema,
-          musicGroupSchema,
-          breadcrumbSchema,
-          ...eventSchemas,
-        ],
-      };
-    }
-
-    // Helper to extract a specific schema type from the @graph
     function findInGraph(
       data: ReturnType<typeof generateProfileStructuredData>,
       type: string
     ) {
-      return (data['@graph'] as Record<string, unknown>[]).find(
-        item => item['@type'] === type
-      ) as Record<string, unknown> | undefined;
+      return (data['@graph'] as Record<string, unknown>[]).find(item => {
+        const nodeType = item['@type'];
+        if (typeof nodeType === 'string') return nodeType === type;
+        if (Array.isArray(nodeType)) return nodeType.includes(type);
+        return false;
+      }) as Record<string, unknown> | undefined;
+    }
+
+    function buildTourDate(
+      overrides: Partial<TourDateViewModel>
+    ): TourDateViewModel {
+      return {
+        id: 'td-1',
+        profileId: 'profile-123',
+        externalId: null,
+        provider: 'manual',
+        eventType: 'tour',
+        confirmationStatus: 'confirmed',
+        reviewedAt: null,
+        title: null,
+        startDate: '2026-06-15T20:00:00Z',
+        startTime: '20:00',
+        timezone: 'America/Los_Angeles',
+        venueName: 'Venue 1',
+        city: 'Los Angeles',
+        region: 'CA',
+        country: 'US',
+        latitude: 34.05,
+        longitude: -118.25,
+        ticketUrl: 'https://tickets.example.com/1',
+        ticketStatus: 'available',
+        lastSyncedAt: null,
+        createdAt: '2026-01-01T00:00:00Z',
+        updatedAt: '2026-01-01T00:00:00Z',
+        ...overrides,
+      };
     }
 
     it('generates @graph with ProfilePage, MusicGroup, and BreadcrumbList', () => {
       const data = generateProfileStructuredData(
-        mockProfile,
+        profileFixture,
         mockGenres,
         mockLinks
       );
@@ -353,6 +260,7 @@ describe('Public Profile Page Logic', () => {
 
       const musicGroup = findInGraph(data, 'MusicGroup');
       expect(musicGroup).toBeDefined();
+      expect(musicGroup!['@type']).toEqual(['MusicGroup', 'Person']);
       expect(musicGroup!.name).toBe('Test Artist');
       expect(musicGroup!.url).toBe(`${BASE_URL}/testartist`);
       expect(musicGroup!.genre).toEqual(mockGenres);
@@ -360,7 +268,7 @@ describe('Public Profile Page Logic', () => {
 
     it('includes ImageObject for avatar in MusicGroup', () => {
       const data = generateProfileStructuredData(
-        mockProfile,
+        profileFixture,
         mockGenres,
         mockLinks
       );
@@ -375,7 +283,7 @@ describe('Public Profile Page Logic', () => {
 
     it('includes verified property for verified profiles', () => {
       const data = generateProfileStructuredData(
-        { ...mockProfile, is_verified: true },
+        { ...profileFixture, is_verified: true },
         mockGenres,
         mockLinks
       );
@@ -390,7 +298,7 @@ describe('Public Profile Page Logic', () => {
 
     it('omits verified property for unverified profiles', () => {
       const data = generateProfileStructuredData(
-        { ...mockProfile, is_verified: false },
+        { ...profileFixture, is_verified: false },
         mockGenres,
         mockLinks
       );
@@ -401,7 +309,7 @@ describe('Public Profile Page Logic', () => {
 
     it('deduplicates social URLs from links and profile fields', () => {
       const data = generateProfileStructuredData(
-        mockProfile,
+        profileFixture,
         mockGenres,
         mockLinks
       );
@@ -414,20 +322,24 @@ describe('Public Profile Page Logic', () => {
     });
 
     it('falls back to "Music" genre when no genres provided', () => {
-      const data = generateProfileStructuredData(mockProfile, null, mockLinks);
+      const data = generateProfileStructuredData(
+        profileFixture,
+        null,
+        mockLinks
+      );
       const musicGroup = findInGraph(data, 'MusicGroup')!;
       expect(musicGroup.genre).toEqual(['Music']);
     });
 
     it('falls back to "Music" genre with empty array', () => {
-      const data = generateProfileStructuredData(mockProfile, [], mockLinks);
+      const data = generateProfileStructuredData(profileFixture, [], mockLinks);
       const musicGroup = findInGraph(data, 'MusicGroup')!;
       expect(musicGroup.genre).toEqual(['Music']);
     });
 
     it('uses username as fallback when display_name is null', () => {
       const profileWithoutName = {
-        ...mockProfile,
+        ...profileFixture,
         display_name: null,
       };
       const data = generateProfileStructuredData(
@@ -446,7 +358,7 @@ describe('Public Profile Page Logic', () => {
 
     it('omits image when avatar_url is null', () => {
       const profileWithoutAvatar = {
-        ...mockProfile,
+        ...profileFixture,
         avatar_url: null,
       };
       const data = generateProfileStructuredData(
@@ -460,7 +372,7 @@ describe('Public Profile Page Logic', () => {
 
     it('generates valid BreadcrumbList schema', () => {
       const data = generateProfileStructuredData(
-        mockProfile,
+        profileFixture,
         mockGenres,
         mockLinks
       );
@@ -472,14 +384,14 @@ describe('Public Profile Page Logic', () => {
 
     it('uses bio as description, falls back to generated text', () => {
       const data = generateProfileStructuredData(
-        mockProfile,
+        profileFixture,
         mockGenres,
         mockLinks
       );
       const musicGroup = findInGraph(data, 'MusicGroup')!;
       expect(musicGroup.description).toBe(mockProfile.bio);
 
-      const noBioProfile = { ...mockProfile, bio: null };
+      const noBioProfile = { ...profileFixture, bio: null };
       const data2 = generateProfileStructuredData(
         noBioProfile,
         mockGenres,
@@ -503,7 +415,7 @@ describe('Public Profile Page Logic', () => {
       ];
 
       const data = generateProfileStructuredData(
-        mockProfile,
+        profileFixture,
         mockGenres,
         linksWithUnknown
       );
@@ -517,25 +429,19 @@ describe('Public Profile Page Logic', () => {
     });
 
     it('adds MusicEvent schemas for tour dates, capped at 5', () => {
-      const tourDates: TourDateForTest[] = Array.from(
+      const tourDates: TourDateViewModel[] = Array.from(
         { length: 15 },
-        (_, i) => ({
-          id: `td-${i}`,
-          ticketStatus: 'available',
-          venueName: `Venue ${i}`,
-          city: 'Los Angeles',
-          region: 'CA',
-          country: 'US',
-          startDate: `2026-06-${String(i + 1).padStart(2, '0')}T20:00:00Z`,
-          ticketUrl: `https://tickets.example.com/${i}`,
-          latitude: 34.05,
-          longitude: -118.25,
-          title: null,
-        })
+        (_, i) =>
+          buildTourDate({
+            id: `td-${i}`,
+            venueName: `Venue ${i}`,
+            startDate: `2026-06-${String(i + 1).padStart(2, '0')}T20:00:00Z`,
+            ticketUrl: `https://tickets.example.com/${i}`,
+          })
       );
 
       const data = generateProfileStructuredData(
-        mockProfile,
+        profileFixture,
         mockGenres,
         mockLinks,
         tourDates
@@ -549,7 +455,7 @@ describe('Public Profile Page Logic', () => {
 
     it('emits zero MusicEvent schemas when no tour dates', () => {
       const data = generateProfileStructuredData(
-        mockProfile,
+        profileFixture,
         mockGenres,
         mockLinks,
         []
