@@ -296,7 +296,7 @@ export function AdminFeedbackTable({
   );
 
   return (
-    <div className='flex h-full min-h-[620px] overflow-hidden'>
+    <div className='flex h-full min-h-155 overflow-hidden'>
       <div className='h-full w-full border-r border-subtle bg-(--linear-app-content-surface) lg:w-[58%]'>
         <AdminTableHeader
           title='Feedback'
@@ -343,7 +343,7 @@ export function AdminFeedbackTable({
                       ? 'The feedback table could not load. Check the server logs before treating this as zero feedback.'
                       : 'New feedback will appear here once users submit it.'
                   }
-                  className='min-h-[220px] rounded-none border-x-0 border-b-0 shadow-none'
+                  className='min-h-55 rounded-none border-x-0 border-b-0 shadow-none'
                 />
               }
             />

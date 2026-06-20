@@ -250,7 +250,7 @@ export function HeroSpotifySearch() {
     (!isSpotifyUrl(trimmedQuery) && results.length === 0);
 
   return (
-    <div ref={containerRef} className='relative mx-auto w-full max-w-[480px]'>
+    <div ref={containerRef} className='relative mx-auto w-full max-w-120'>
       <label htmlFor='hero-spotify-search' className='sr-only'>
         Search Spotify artists or paste a link
       </label>

@@ -459,7 +459,7 @@ export function OnboardingTurnstile({
           <div
             ref={containerRef}
             id={`cf-turnstile-${widgetDomId}`}
-            className='relative min-h-[64px]'
+            className='relative min-h-16'
           />
         </div>
       ) : null}

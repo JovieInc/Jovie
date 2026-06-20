@@ -113,10 +113,10 @@ export function ArtistHero({
 
   return (
     <section
-      className={`relative w-full overflow-hidden md:h-[56dvh] md:min-h-[520px] md:rounded-t-[30px] xl:max-h-[640px] 2xl:max-h-[680px] ${
+      className={`relative w-full overflow-hidden md:h-[56dvh] md:min-h-130 md:rounded-t-[30px] xl:max-h-160 2xl:max-h-170 ${
         compact
-          ? 'h-[40dvh] min-h-[320px] max-h-[460px]'
-          : 'h-[48dvh] min-h-[420px] max-h-[620px]'
+          ? 'h-[40dvh] min-h-80 max-h-115'
+          : 'h-[48dvh] min-h-105 max-h-155'
       }`}
       data-testid='profile-header'
     >

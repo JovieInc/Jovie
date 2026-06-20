@@ -36,7 +36,7 @@ export function DemoReleaseLandingSurface() {
         <div data-testid='demo-showcase-release-landing'>
           <div className='flex min-h-screen items-center justify-center bg-surface-0 px-5 py-10'>
             <div
-              className='w-full max-w-[340px] rounded-[32px] border border-white/8 bg-surface-1 p-5 shadow-[0_32px_100px_rgba(0,0,0,0.45)]'
+              className='w-full max-w-85 rounded-[32px] border border-white/8 bg-surface-1 p-5 shadow-[0_32px_100px_rgba(0,0,0,0.45)]'
               data-testid='demo-release-creator-capture'
             >
               <div className='rounded-[24px] border border-white/8 bg-white/[0.04] p-4'>

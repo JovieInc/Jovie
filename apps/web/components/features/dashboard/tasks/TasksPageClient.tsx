@@ -839,7 +839,7 @@ function TaskDocumentPanel({
                 onFocus={handleDescriptionFocus}
                 onChange={event => onDescriptionChange(event.target.value)}
                 placeholder='Start writing...'
-                className='min-h-[520px] w-full resize-none rounded-md border-0 bg-transparent px-0 py-0 text-mid leading-[1.8] text-primary-token outline-none placeholder:text-[color-mix(in_oklab,var(--text-tertiary)_82%,transparent)] transition-colors duration-fast focus:outline-none! focus:ring-0! focus:shadow-none! focus-visible:bg-[color-mix(in_oklab,var(--linear-border-focus)_16%,transparent)]'
+                className='min-h-130 w-full resize-none rounded-md border-0 bg-transparent px-0 py-0 text-mid leading-[1.8] text-primary-token outline-none placeholder:text-[color-mix(in_oklab,var(--text-tertiary)_82%,transparent)] transition-colors duration-fast focus:outline-none! focus:ring-0! focus:shadow-none! focus-visible:bg-[color-mix(in_oklab,var(--linear-border-focus)_16%,transparent)]'
                 style={{ boxShadow: 'none' }}
               />
               {showDescriptionHelper && descriptionHelper ? (
@@ -925,7 +925,7 @@ function TaskEmptyState({
           ? 'Try widening the filters or search query.'
           : 'Create your first task, or tasks will appear automatically when you set up a release.'
       }
-      className='min-h-[360px]'
+      className='min-h-90'
       action={
         hasFilters ? (
           <Button
@@ -1000,7 +1000,7 @@ function TaskErrorState({
       <TableEmptyState
         title="Couldn't Load Tasks"
         description='Try reloading the task list.'
-        className='min-h-[240px] max-w-[28rem]'
+        className='min-h-60 max-w-[28rem]'
         action={
           <Button type='button' variant='secondary' size='sm' onClick={onRetry}>
             Retry

@@ -16,7 +16,7 @@ export function TaskDescriptionHelper({
   const linkKeyCounts = new Map<string, number>();
 
   return (
-    <div className='absolute inset-0 min-h-[520px]'>
+    <div className='absolute inset-0 min-h-130'>
       <button
         type='button'
         aria-label={`Open ${helper.title} description helper`}

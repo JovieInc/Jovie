@@ -238,7 +238,7 @@ export function DeeplinksGrid() {
       MODES.map(mode => ({
         id: mode.id,
         content: (
-          <p className='max-w-[400px] marketing-lead-linear text-secondary-token'>
+          <p className='max-w-100 marketing-lead-linear text-secondary-token'>
             {mode.description}
           </p>
         ),
@@ -444,7 +444,7 @@ export function DeeplinksGrid() {
               <h2 className='marketing-h2-linear text-primary-token'>
                 The right action for every fan.
               </h2>
-              <p className='max-w-[400px] marketing-lead-linear text-secondary-token'>
+              <p className='max-w-100 marketing-lead-linear text-secondary-token'>
                 Every visitor sees the action most likely to convert in that
                 moment: listen, pay, tour, or subscribe.
               </p>

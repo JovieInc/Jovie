@@ -111,7 +111,7 @@ export function HomeTrustSection({
               className={getLogoClass(
                 isInlineStrip,
                 'homepage-trust-logo homepage-trust-logo--awal system-b-mounted-home-trust-strip-logo system-b-mounted-home-trust-strip-logo--awal',
-                'h-[20px] w-auto max-w-[36vw] select-none sm:h-[22px]',
+                'h-5 w-auto max-w-[36vw] select-none sm:h-[22px]',
                 logoTone
               )}
             />
@@ -121,7 +121,7 @@ export function HomeTrustSection({
               className={getLogoClass(
                 isInlineStrip,
                 'homepage-trust-logo homepage-trust-logo--orchard system-b-mounted-home-trust-strip-logo system-b-mounted-home-trust-strip-logo--orchard',
-                'h-[28px] w-auto max-w-[34vw] select-none sm:h-[31px]',
+                'h-7 w-auto max-w-[34vw] select-none sm:h-[31px]',
                 logoTone
               )}
             />
@@ -131,7 +131,7 @@ export function HomeTrustSection({
               className={getLogoClass(
                 isInlineStrip,
                 'homepage-trust-logo homepage-trust-logo--umg system-b-mounted-home-trust-strip-logo system-b-mounted-home-trust-strip-logo--umg',
-                'h-[14px] w-auto max-w-[72vw] select-none sm:h-[16px]',
+                'h-[14px] w-auto max-w-[72vw] select-none sm:h-4',
                 logoTone
               )}
             />
@@ -141,7 +141,7 @@ export function HomeTrustSection({
               className={getLogoClass(
                 isInlineStrip,
                 'homepage-trust-logo homepage-trust-logo--armada system-b-mounted-home-trust-strip-logo system-b-mounted-home-trust-strip-logo--armada',
-                'h-[22px] w-auto max-w-[38vw] select-none sm:h-[24px]',
+                'h-[22px] w-auto max-w-[38vw] select-none sm:h-6',
                 logoTone
               )}
             />
@@ -154,7 +154,7 @@ export function HomeTrustSection({
               className={getLogoClass(
                 isInlineStrip,
                 'homepage-trust-logo homepage-trust-logo--black-hole system-b-mounted-home-trust-strip-logo system-b-mounted-home-trust-strip-logo--black-hole',
-                'h-[16px] w-auto sm:h-[18px]',
+                'h-4 w-auto sm:h-[18px]',
                 ''
               )}
             />

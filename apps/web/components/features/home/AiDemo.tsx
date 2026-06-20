@@ -306,7 +306,7 @@ export function AiDemo({
       </div>
 
       <div
-        className={cn('min-h-[160px] px-4 py-4', isPremium && 'bg-surface-0')}
+        className={cn('min-h-40 px-4 py-4', isPremium && 'bg-surface-0')}
       >
         <output
           aria-live='polite'

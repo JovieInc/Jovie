@@ -25,7 +25,7 @@ import type { PublicShareDestination, ShareContext } from '@/lib/share/types';
 
 export const PUBLIC_SHARE_MENU_ITEM_CLASS =
   'flex w-full items-center gap-3 rounded-[14px] px-4 py-3 text-left text-sm font-[470] text-white/88 transition-colors duration-subtle active:bg-white/[0.06]';
-export const PUBLIC_SHARE_MENU_ICON_CLASS = 'h-[16px] w-[16px] text-white/40';
+export const PUBLIC_SHARE_MENU_ICON_CLASS = 'h-4 w-4 text-white/40';
 
 function renderDestinationIcon(icon: string) {
   switch (icon) {

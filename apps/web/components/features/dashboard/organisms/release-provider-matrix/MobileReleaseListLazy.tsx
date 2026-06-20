@@ -23,7 +23,7 @@ export type MobileReleaseListProps = ComponentProps<
  */
 export function MobileReleaseListLazy(props: MobileReleaseListProps) {
   return (
-    <Suspense fallback={<div className='min-h-[320px]' aria-hidden />}>
+    <Suspense fallback={<div className='min-h-80' aria-hidden />}>
       <MobileReleaseList {...props} />
     </Suspense>
   );

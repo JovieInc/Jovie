@@ -45,8 +45,8 @@ interface AvailabilityCellProps {
 
 function AvailabilityEmptyAction() {
   return (
-    <div className='flex min-w-[140px] justify-end'>
-      <div className='h-7 w-[76px] rounded-lg border border-dashed border-subtle bg-surface-1' />
+    <div className='flex min-w-35 justify-end'>
+      <div className='h-7 w-19 rounded-lg border border-dashed border-subtle bg-surface-1' />
     </div>
   );
 }
@@ -232,7 +232,7 @@ export const AvailabilityCell = memo(function AvailabilityCell({
             summaryAriaLabel={`${availableCount} of ${totalCount} DSP links`}
             maxVisible={4}
             className='pointer-events-none flex-1 justify-start'
-            railClassName='max-w-[164px] lg:max-w-[196px]'
+            railClassName='max-w-41 lg:max-w-49'
           />
           <Icon
             name='ChevronDown'
@@ -244,7 +244,7 @@ export const AvailabilityCell = memo(function AvailabilityCell({
 
       <PopoverContent
         align='end'
-        className='w-[320px] rounded-xl border border-(--linear-app-frame-seam) bg-surface-1 p-0 shadow-popover'
+        className='w-80 rounded-xl border border-(--linear-app-frame-seam) bg-surface-1 p-0 shadow-popover'
       >
         <div className='border-b border-(--linear-app-frame-seam) px-3 py-2'>
           <p className='text-xs font-caption tracking-[-0.01em] text-primary-token'>
@@ -308,7 +308,7 @@ export const AvailabilityCell = memo(function AvailabilityCell({
                 {(() => {
                   if (provider?.url) {
                     return (
-                      <div className='flex min-w-[140px] items-center justify-end gap-1'>
+                      <div className='flex min-w-35 items-center justify-end gap-1'>
                         <DrawerInlineIconButton
                           aria-label={`Open ${config.label} in new tab`}
                           onClick={() =>
@@ -352,7 +352,7 @@ export const AvailabilityCell = memo(function AvailabilityCell({
                     return (
                       <form
                         onSubmit={handleAddUrl}
-                        className='flex min-w-[140px] items-center justify-end gap-1'
+                        className='flex min-w-35 items-center justify-end gap-1'
                       >
                         <Input
                           ref={inputRef}
@@ -410,7 +410,7 @@ export const AvailabilityCell = memo(function AvailabilityCell({
                         onClick={() => setAddingProvider(providerKey)}
                         tone='secondary'
                         size='sm'
-                        className='min-w-[76px] rounded-full text-2xs font-caption'
+                        className='min-w-19 rounded-full text-2xs font-caption'
                       >
                         + Add link
                       </DrawerButton>
@@ -425,7 +425,7 @@ export const AvailabilityCell = memo(function AvailabilityCell({
         </div>
 
         {validationError && (
-          <div className='min-h-[28px] border-t border-(--linear-app-frame-seam) px-3 py-1.5'>
+          <div className='min-h-7 border-t border-(--linear-app-frame-seam) px-3 py-1.5'>
             <p className='text-2xs text-error'>{validationError}</p>
           </div>
         )}

@@ -856,13 +856,13 @@ export function ProfileMobileNotificationsFlow({
         aria-modal='true'
         style={contentStyle}
       >
-        <div className='relative flex h-[min(760px,calc(100dvh-48px))] w-full max-w-[440px] flex-col overflow-hidden rounded-[var(--profile-card-radius)] border border-white/10 bg-[color:var(--profile-stage-bg)] shadow-[0_34px_96px_rgba(0,0,0,0.48)]'>
+        <div className='relative flex h-[min(760px,calc(100dvh-48px))] w-full max-w-110 flex-col overflow-hidden rounded-[var(--profile-card-radius)] border border-white/10 bg-[color:var(--profile-stage-bg)] shadow-[0_34px_96px_rgba(0,0,0,0.48)]'>
           {contentBody}
         </div>
       </div>
     ) : (
       <div
-        className='relative min-h-[600px] rounded-[var(--profile-card-radius)] bg-[color:var(--profile-stage-bg)] text-white'
+        className='relative min-h-150 rounded-[var(--profile-card-radius)] bg-[color:var(--profile-stage-bg)] text-white'
         data-testid='profile-mobile-notifications-flow'
         data-shell-variant='inline-full-height'
         style={contentStyle}

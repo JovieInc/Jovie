@@ -382,7 +382,7 @@ export function ProfileDesktopSurface({
     <div className='grid min-h-0 min-w-0 flex-1 gap-4 xl:grid-cols-[minmax(0,1fr)_360px] 2xl:grid-cols-[minmax(0,1.55fr)_minmax(360px,0.9fr)]'>
       <div className='grid min-h-0 min-w-0 gap-3.5'>
         <section
-          className='relative aspect-[4/5] h-[min(620px,calc(100dvh-180px))] min-h-[420px] min-w-0 max-w-[520px] overflow-hidden rounded-[26px] bg-[color:var(--profile-stage-bg)]'
+          className='relative aspect-[4/5] h-[min(620px,calc(100dvh-180px))] min-h-105 min-w-0 max-w-130 overflow-hidden rounded-[26px] bg-[color:var(--profile-stage-bg)]'
           data-testid='profile-desktop-cover'
         >
           <div className='absolute inset-0'>
@@ -414,7 +414,7 @@ export function ProfileDesktopSurface({
                 <Link
                   href={profileHref}
                   data-testid='profile-header'
-                  className='inline-flex max-w-[820px] items-start gap-2 rounded-md text-[clamp(3rem,6vw,5.75rem)] font-semibold leading-[0.92] tracking-[-0.06em] text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--focus-ring))] focus-visible:ring-offset-2 focus-visible:ring-offset-transparent'
+                  className='inline-flex max-w-205 items-start gap-2 rounded-md text-[clamp(3rem,6vw,5.75rem)] font-semibold leading-[0.92] tracking-[-0.06em] text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--focus-ring))] focus-visible:ring-offset-2 focus-visible:ring-offset-transparent'
                 >
                   <span className='line-clamp-2'>{artist.name}</span>
                   {artist.is_verified ? (
@@ -478,7 +478,7 @@ export function ProfileDesktopSurface({
                 upcomingTourDates.slice(0, 5).map(tourDate => (
                   <div
                     key={tourDate.id}
-                    className='grid grid-cols-[52px_minmax(0,1fr)_auto] items-center gap-3 rounded-[16px] bg-white/[0.025] px-3 py-3'
+                    className='grid grid-cols-[52px_minmax(0,1fr)_auto] items-center gap-3 rounded-2xl bg-white/[0.025] px-3 py-3'
                   >
                     <div className='rounded-[13px] border border-white/10 bg-white/[0.07] px-2 py-2 text-center'>
                       <div className='text-3xs font-semibold tracking-[0.01em] text-white/58'>
@@ -701,7 +701,7 @@ export function ProfileDesktopSurface({
           </DesktopSurfaceCard>
           <DesktopSurfaceCard title='Latest Release'>
             <div className='space-y-4'>
-              <div className='relative aspect-square overflow-hidden rounded-[22px] border border-white/8'>
+              <div className='relative aspect-square overflow-hidden rounded-3xl border border-white/8'>
                 <ImageWithFallback
                   src={latestVisibleRelease?.artworkUrl}
                   alt={latestVisibleRelease?.title ?? artist.name}

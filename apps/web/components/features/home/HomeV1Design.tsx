@@ -45,7 +45,7 @@ export function HomeV1Design() {
           className='absolute inset-x-0 bottom-0 h-[34%] bg-[linear-gradient(to_right,rgba(255,255,255,0.045)_1px,transparent_1px),linear-gradient(to_bottom,rgba(255,255,255,0.04)_1px,transparent_1px)] bg-[size:76px_76px] opacity-35 [mask-image:linear-gradient(to_bottom,transparent,black_32%,transparent_100%)]'
         />
 
-        <div className='relative z-10 mx-auto flex w-full max-w-[1180px] flex-col px-5 py-6 sm:px-8 lg:px-10'>
+        <div className='relative z-10 mx-auto flex w-full max-w-295 flex-col px-5 py-6 sm:px-8 lg:px-10'>
           <nav className='flex h-12 items-center justify-between'>
             <Link
               href={APP_ROUTES.HOME}
@@ -105,8 +105,8 @@ export function HomeV1Design() {
               working on, and we will save the context before opening the app.
             </p>
 
-            <div className='mt-10 w-full max-w-[760px] rounded-[28px] border border-white/[0.08] bg-[#0b0d11]/88 p-3 text-left shadow-[0_34px_120px_rgba(0,0,0,0.48)] backdrop-blur-2xl'>
-              <div className='flex items-start gap-3 rounded-[22px] bg-white/[0.035] px-4 py-4 ring-1 ring-white/[0.04] sm:px-5'>
+            <div className='mt-10 w-full max-w-190 rounded-[28px] border border-white/[0.08] bg-[#0b0d11]/88 p-3 text-left shadow-[0_34px_120px_rgba(0,0,0,0.48)] backdrop-blur-2xl'>
+              <div className='flex items-start gap-3 rounded-3xl bg-white/[0.035] px-4 py-4 ring-1 ring-white/[0.04] sm:px-5'>
                 <Sparkles className='mt-1 h-4 w-4 shrink-0 text-cyan-200/70' />
                 <p className='text-mid leading-6 text-white/78'>
                   Tell Jovie what you are releasing next. Your request becomes

@@ -29,8 +29,8 @@ export function ProfileMerchCard({
       )}
       data-testid='profile-merch-card'
     >
-      <div className='flex min-h-[112px] gap-3'>
-        <div className='relative h-28 w-24 shrink-0 overflow-hidden rounded-[6px] bg-black/40'>
+      <div className='flex min-h-28 gap-3'>
+        <div className='relative h-28 w-24 shrink-0 overflow-hidden rounded-md bg-black/40'>
           {imageUrl ? (
             <Image
               src={imageUrl}

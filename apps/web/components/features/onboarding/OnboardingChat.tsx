@@ -403,7 +403,7 @@ const renderProposeNextStep: OnboardingToolRenderer = ({ part, key }) => {
   }
 
   return (
-    <div key={key} className='w-full max-w-[440px]'>
+    <div key={key} className='w-full max-w-110'>
       <ChatProposeNextStepCard payload={part.output} />
     </div>
   );
@@ -415,7 +415,7 @@ const renderProposeCheckout: OnboardingToolRenderer = ({ part, key }) => {
   }
 
   return (
-    <div key={key} className='w-full max-w-[440px]'>
+    <div key={key} className='w-full max-w-110'>
       <ChatProposeCheckoutCard payload={part.output} />
     </div>
   );

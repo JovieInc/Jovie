@@ -52,7 +52,7 @@ export const ReleaseTaskRow = React.memo(function ReleaseTaskRow({
   const aiAccent = getAccentCssVars('purple');
 
   return (
-    <ShellListRowFrame className='flex min-h-[32px] items-center gap-2 px-4 py-1'>
+    <ShellListRowFrame className='flex min-h-8 items-center gap-2 px-4 py-1'>
       <ReleaseTaskCheckbox
         task={task}
         isDone={isDone}

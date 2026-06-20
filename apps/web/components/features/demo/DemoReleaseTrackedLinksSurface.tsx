@@ -25,7 +25,7 @@ export function DemoReleaseTrackedLinksSurface() {
       >
         <section className='overflow-hidden px-4 py-4 sm:px-5 sm:py-5'>
           <div
-            className='mx-auto max-w-[920px] rounded-[22px] border border-subtle bg-surface-0 p-5 shadow-[0_24px_80px_rgba(0,0,0,0.28)]'
+            className='mx-auto max-w-230 rounded-3xl border border-subtle bg-surface-0 p-5 shadow-[0_24px_80px_rgba(0,0,0,0.28)]'
             data-testid='demo-release-tracked-links-capture'
           >
             <div className='rounded-[18px] border border-subtle bg-surface-1 px-4 py-3'>
@@ -47,7 +47,7 @@ export function DemoReleaseTrackedLinksSurface() {
               </div>
             </div>
 
-            <div className='relative mt-6 h-[320px]'>
+            <div className='relative mt-6 h-80'>
               <div className='absolute left-0 top-0 w-[250px] rounded-[18px] border border-subtle bg-surface-0 p-2 shadow-[0_20px_60px_rgba(0,0,0,0.32)]'>
                 <div className='rounded-[14px] bg-surface-1 px-3 py-2 text-xs font-semibold text-primary-token'>
                   Share

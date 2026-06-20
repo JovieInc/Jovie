@@ -46,7 +46,7 @@ export function HomeStatQuoteSection({
           />
         ))}
       </svg>
-      <div className='relative mx-auto max-w-[1200px] text-left'>
+      <div className='relative mx-auto max-w-300 text-left'>
         <h3 className='m-0 max-w-[22ch] font-[var(--marketing-font-display)] text-[clamp(1.875rem,4vw,2.75rem)] font-bold leading-[1.12] tracking-[-0.025em] text-[#F7F8F8]'>
           <span>Jovie delivers {stat}</span>
           <span className='text-[#8A8F98]'> {body}</span>

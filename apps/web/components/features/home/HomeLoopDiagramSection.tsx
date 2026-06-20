@@ -47,7 +47,7 @@ function loopPoint(angleDeg: number, radius: number) {
 export function HomeLoopDiagramSection() {
   return (
     <section className='border-t border-white/[0.04] bg-black px-6 py-32 sm:py-40'>
-      <div className='mx-auto grid max-w-[1200px] gap-16 lg:grid-cols-[320px_1fr] lg:items-center'>
+      <div className='mx-auto grid max-w-300 gap-16 lg:grid-cols-[320px_1fr] lg:items-center'>
         <div>
           <h2 className='m-0 font-[var(--marketing-font-display)] text-[clamp(2rem,4.5vw,3rem)] font-extrabold leading-[1.05] tracking-[-0.03em] text-[#F7F8F8]'>
             Stop letting
@@ -61,7 +61,7 @@ export function HomeLoopDiagramSection() {
 
         <div className='grid items-center gap-4 sm:grid-cols-[1fr_auto_1fr]'>
           {/* Flatline card */}
-          <article className='min-h-[360px] rounded-xl border border-white/[0.06] bg-[#0a0a0b] p-5'>
+          <article className='min-h-90 rounded-xl border border-white/[0.06] bg-[#0a0a0b] p-5'>
             <div className='font-[var(--marketing-font-body)] text-3xs font-semibold uppercase tracking-[0.12em] text-[#8A8F98]'>
               Flatline marketing
             </div>
@@ -114,14 +114,14 @@ export function HomeLoopDiagramSection() {
           </div>
 
           {/* Loop card */}
-          <article className='min-h-[360px] rounded-xl border border-white/[0.06] bg-[#0a0a0b] p-5'>
+          <article className='min-h-90 rounded-xl border border-white/[0.06] bg-[#0a0a0b] p-5'>
             <div
               className='font-[var(--marketing-font-body)] text-3xs font-semibold uppercase tracking-[0.12em]'
               style={{ color: ACCENT }}
             >
               The Jovie Loop
             </div>
-            <div className='relative mt-1 h-[180px]'>
+            <div className='relative mt-1 h-45'>
               <svg
                 width={SIZE}
                 height={180}

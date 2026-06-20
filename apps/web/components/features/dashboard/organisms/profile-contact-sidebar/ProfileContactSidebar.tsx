@@ -186,7 +186,7 @@ function ProfileSidebarHeaderCard({
             <DrawerMediaThumb
               src={previewData.avatarUrl}
               alt={primaryLabel}
-              sizeClassName='h-[60px] w-[60px] rounded-[14px]'
+              sizeClassName='h-15 w-15 rounded-[14px]'
               sizes='60px'
               fallback={
                 <span className='text-lg font-semibold text-secondary-token'>

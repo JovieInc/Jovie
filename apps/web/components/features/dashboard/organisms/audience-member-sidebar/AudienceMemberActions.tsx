@@ -21,7 +21,7 @@ interface AudienceMemberActionsProps
 export function AudienceMemberActions({ member }: AudienceMemberActionsProps) {
   if (member.latestActions.length === 0) {
     return (
-      <DrawerEmptyState className='min-h-[96px]' message='No actions yet.' />
+      <DrawerEmptyState className='min-h-24' message='No actions yet.' />
     );
   }
 

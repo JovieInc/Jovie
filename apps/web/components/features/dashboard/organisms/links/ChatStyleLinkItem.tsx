@@ -265,7 +265,7 @@ export const ChatStyleLinkItem = React.memo(function ChatStyleLinkItem<
                   tabIndex={-1}
                   style={floatingStyles}
                   className={cn(
-                    'z-100 min-w-[176px]',
+                    'z-100 min-w-44',
                     dropdownMenuContentClasses
                   )}
                   {...getFloatingProps()}
@@ -281,7 +281,7 @@ export const ChatStyleLinkItem = React.memo(function ChatStyleLinkItem<
                       }}
                       className={cn(
                         MENU_ITEM_BASE,
-                        'min-h-[44px] w-full text-left active:bg-surface-2',
+                        'min-h-11 w-full text-left active:bg-surface-2',
                         item.variant === 'destructive' && MENU_ITEM_DESTRUCTIVE
                       )}
                       {...getItemProps()}

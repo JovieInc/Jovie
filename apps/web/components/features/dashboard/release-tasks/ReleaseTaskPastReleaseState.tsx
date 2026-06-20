@@ -10,11 +10,11 @@ export function ReleaseTaskPastReleaseState({
   isLoading,
 }: ReleaseTaskPastReleaseStateProps) {
   return (
-    <div className='flex min-h-[180px] flex-col items-center justify-center rounded-lg border border-(--linear-app-frame-seam) bg-surface-1 px-4 py-10 text-center'>
+    <div className='flex min-h-45 flex-col items-center justify-center rounded-lg border border-(--linear-app-frame-seam) bg-surface-1 px-4 py-10 text-center'>
       <p className='text-sm font-medium text-secondary-token mb-1'>
         This release is already out
       </p>
-      <p className='text-xs text-tertiary-token mb-4 max-w-[260px]'>
+      <p className='text-xs text-tertiary-token mb-4 max-w-65'>
         Campaign tasks help you prepare for upcoming releases. Since this one is
         already live, there&apos;s nothing to prepare.
       </p>

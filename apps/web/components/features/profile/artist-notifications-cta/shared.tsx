@@ -306,7 +306,7 @@ export function SubscriptionDesktopErrorIndicator({
         </TooltipTrigger>
         <TooltipContent
           side='bottom'
-          className='max-w-[280px] border-red-500/20 bg-red-950/90 text-red-200'
+          className='max-w-70 border-red-500/20 bg-red-950/90 text-red-200'
         >
           {error}
         </TooltipContent>

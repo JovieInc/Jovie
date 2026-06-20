@@ -392,7 +392,7 @@ export function ProfileMediaCard({
     <article
       className={cn(
         'relative min-w-0 overflow-hidden rounded-[20px] border border-white/8 bg-[color:var(--profile-drawer-bg)] text-left shadow-[0_18px_40px_-20px_rgba(0,0,0,0.7)]',
-        compact && 'rounded-[12px]',
+        compact && 'rounded-xl',
         className
       )}
       data-testid={dataTestId}

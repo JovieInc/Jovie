@@ -129,7 +129,7 @@ export function ProductScreenshotFrame({
           <div className='flex-1 text-center text-xs text-tertiary-token'>
             {title}
           </div>
-          <div className='w-[52px]' />
+          <div className='w-13' />
         </div>
       ) : null}
 

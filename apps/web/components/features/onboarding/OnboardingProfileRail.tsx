@@ -306,8 +306,8 @@ export function OnboardingProfileRail({
       className={cn(
         'overflow-hidden bg-(--linear-app-content-surface) text-primary-token transition-[opacity,transform,width,border-color] duration-cinematic ease-out',
         isInline
-          ? 'relative z-0 w-full rounded-[22px] lg:hidden'
-          : 'z-30 max-lg:hidden lg:relative lg:h-full lg:w-[380px] lg:border-l lg:border-(--linear-app-shell-border)'
+          ? 'relative z-0 w-full rounded-3xl lg:hidden'
+          : 'z-30 max-lg:hidden lg:relative lg:h-full lg:w-95 lg:border-l lg:border-(--linear-app-shell-border)'
       )}
       data-testid={
         isInline ? 'onboarding-profile-rail-inline' : 'onboarding-profile-rail'
@@ -318,15 +318,15 @@ export function OnboardingProfileRail({
       <div
         className={cn(
           'flex h-full min-h-0 items-center justify-center',
-          isInline ? 'px-0 py-2' : 'lg:w-[380px] lg:px-4 lg:py-4'
+          isInline ? 'px-0 py-2' : 'lg:w-95 lg:px-4 lg:py-4'
         )}
       >
         <div
           className={cn(
             'relative flex w-full items-center justify-center overflow-hidden rounded-[28px] bg-[linear-gradient(145deg,#0A2A88_0%,#0B6CFF_52%,#7AC7FF_100%)] shadow-[inset_0_1px_0_rgba(255,255,255,0.26),0_30px_80px_rgba(0,48,160,0.34)]',
             isInline
-              ? 'min-h-[456px] max-w-[342px] p-4'
-              : 'h-full min-h-[620px] max-h-[680px] max-w-[348px] p-5'
+              ? 'min-h-114 max-w-[342px] p-4'
+              : 'h-full min-h-155 max-h-170 max-w-87 p-5'
           )}
           data-testid='onboarding-profile-bento'
         >
@@ -335,8 +335,8 @@ export function OnboardingProfileRail({
             className={cn(
               'relative z-10',
               isInline
-                ? 'h-[420px] w-[200px] sm:h-[480px] sm:w-[228px]'
-                : 'h-[592px] w-[282px]'
+                ? 'h-105 w-50 sm:h-120 sm:w-57'
+                : 'h-148 w-[282px]'
             )}
           >
             <div
