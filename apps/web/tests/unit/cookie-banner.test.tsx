@@ -63,10 +63,10 @@ describe('CookieBannerSection', () => {
     expect(banner.className).toContain('fixed');
     expect(banner.className).toContain('bottom-4');
     expect(banner.className).toContain('right-4');
-    expect(banner.className).toContain('max-w-[340px]');
+    expect(banner.className).toContain('max-w-85');
     // Inner card surface matching upgrade compact + floating
     const card = banner.firstChild as HTMLElement;
-    expect(card.className).toContain('rounded-[18px]');
+    expect(card.className).toContain('rounded-2xl');
     expect(card.className).toContain('border-(--linear-app-frame-seam)');
     expect(card.className).toContain('bg-surface-1');
     expect(card.className).toContain('shadow-card');
