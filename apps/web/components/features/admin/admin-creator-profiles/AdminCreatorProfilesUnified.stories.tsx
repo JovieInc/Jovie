@@ -166,7 +166,7 @@ const meta: Meta<typeof AdminCreatorProfilesUnified> = {
   decorators: [
     Story => (
       <RightPanelProvider>
-        <div className='h-[800px] bg-base text-primary-token'>
+        <div className='h-200 bg-base text-primary-token'>
           <Story />
         </div>
       </RightPanelProvider>

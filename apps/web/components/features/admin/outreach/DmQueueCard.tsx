@@ -77,7 +77,7 @@ export function DmQueueCard({ lead, onMarkedSent }: DmQueueCardProps) {
           </div>
         </div>
         {lead.priorityScore != null && (
-          <span className='rounded-[10px] bg-surface-0 px-2 py-1 text-xs font-medium tabular-nums text-secondary-token'>
+          <span className='rounded-lg bg-surface-0 px-2 py-1 text-xs font-medium tabular-nums text-secondary-token'>
             Score: {lead.priorityScore}
           </span>
         )}
@@ -88,7 +88,7 @@ export function DmQueueCard({ lead, onMarkedSent }: DmQueueCardProps) {
           readOnly
           value={lead.dmCopy}
           rows={4}
-          className='w-full resize-none rounded-[10px] border border-subtle bg-surface-0 px-3 py-2 text-xs text-secondary-token'
+          className='w-full resize-none rounded-lg border border-subtle bg-surface-0 px-3 py-2 text-xs text-secondary-token'
         />
       )}
 
