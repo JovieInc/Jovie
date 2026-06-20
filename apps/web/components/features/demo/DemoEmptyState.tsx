@@ -83,18 +83,18 @@ export function DemoEmptyState({ tab }: { readonly tab: DemoTab }) {
 
   return (
     <div className='flex h-full items-center justify-center'>
-      <div className='flex flex-col items-center gap-3 text-center max-w-[280px]'>
-        <div className='flex size-12 items-center justify-center rounded-xl bg-[rgba(255,255,255,0.04)] border border-subtle'>
+      <div className='flex flex-col items-center gap-3 text-center max-w-70'>
+        <div className='flex size-12 items-center justify-center rounded-xl bg-(--color-text-tooltip) border border-subtle'>
           <Icon className='size-5 text-tertiary-token' />
         </div>
         <div className='space-y-1'>
-          <h3 className='text-[15px] text-primary-token [font-weight:var(--font-weight-medium)]'>
+          <h3 className='text-mid text-primary-token [font-weight:var(--font-weight-medium)]'>
             {config.label}
           </h3>
-          <p className='text-[13px] text-secondary-token leading-relaxed'>
+          <p className='text-app text-secondary-token leading-relaxed'>
             {config.description}
           </p>
-          <p className='text-[12px] text-tertiary-token pt-1'>Coming soon</p>
+          <p className='text-xs text-tertiary-token pt-1'>Coming soon</p>
         </div>
       </div>
     </div>
