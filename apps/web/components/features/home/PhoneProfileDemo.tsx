@@ -79,7 +79,7 @@ export function PhoneProfileDemo() {
             filter: 'drop-shadow(0 25px 60px rgba(0,0,0,0.35))',
           }}
         >
-          <PhoneFrame className='lg:h-[634px] lg:w-[302px] xl:h-[664px] xl:w-[316px]'>
+          <PhoneFrame className='lg:h-159 lg:w-76 xl:h-166 xl:w-79'>
             <MarketingPhoneImage
               scenarioId='tim-white-profile-listen-mobile'
               altOverride='Artist profile page showing streaming links, tips, and tour dates'

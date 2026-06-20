@@ -10,6 +10,7 @@ import { markWorkflowFailed } from '@/lib/connectors/workflows/execute-approved-
 import { db } from '@/lib/db';
 import { workflowRuns } from '@/lib/db/schema/connectors';
 import { logger } from '@/lib/utils/logger';
+import { syncStoreListingForRun } from '../store-listing';
 import type { ReleaseToRevenueRunStepOutputs } from '../types';
 import { RELEASE_TO_REVENUE_WORKFLOW_KIND } from '../types';
 
@@ -47,6 +48,11 @@ export async function initializeReleaseToRevenueRun(
     return;
   }
 
+  const storeListing = await syncStoreListingForRun({
+    workflowRunId: input.workflowRunId,
+    stepOutputs,
+  });
+
   await db
     .update(workflowRuns)
     .set({
@@ -65,5 +71,6 @@ export async function initializeReleaseToRevenueRun(
     workflowRunId: input.workflowRunId,
     releaseId: stepOutputs.releaseId,
     title: stepOutputs.release.title,
+    merchCardIds: storeListing.merchCardIds,
   });
 }

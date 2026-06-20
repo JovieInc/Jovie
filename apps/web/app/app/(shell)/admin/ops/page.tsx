@@ -24,6 +24,7 @@ import {
 } from '@/lib/testing/nightly-agent-report';
 import { logger } from '@/lib/utils/logger';
 import { HudDashboardClient } from './HudDashboardClient';
+import { ReleaseToRevenueGmvPanel } from './ReleaseToRevenueGmvPanel';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -285,6 +286,8 @@ export default async function AdminOpsPage({
       </div>
 
       <OperationalControlPanel />
+
+      <ReleaseToRevenueGmvPanel />
 
       <HudDashboardClient
         initialMetrics={metrics}
