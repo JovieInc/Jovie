@@ -305,9 +305,7 @@ export function AiDemo({
         </p>
       </div>
 
-      <div
-        className={cn('min-h-40 px-4 py-4', isPremium && 'bg-surface-0')}
-      >
+      <div className={cn('min-h-40 px-4 py-4', isPremium && 'bg-surface-0')}>
         <output
           aria-live='polite'
           className='block text-app leading-[1.75] text-secondary-token'

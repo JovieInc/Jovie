@@ -18,15 +18,9 @@ export function HomepageLabelLogoMark({
 }: Readonly<HomepageLabelLogoMarkProps>) {
   switch (partner) {
     case 'awal':
-      return (
-        <AwalLogo className={cn('h-7 w-auto sm:h-8', className)} />
-      );
+      return <AwalLogo className={cn('h-7 w-auto sm:h-8', className)} />;
     case 'orchard':
-      return (
-        <TheOrchardLogo
-          className={cn('h-8 w-auto sm:h-10', className)}
-        />
-      );
+      return <TheOrchardLogo className={cn('h-8 w-auto sm:h-10', className)} />;
     case 'umg':
       return (
         <UniversalMusicGroupLogo
@@ -34,10 +28,6 @@ export function HomepageLabelLogoMark({
         />
       );
     case 'armada':
-      return (
-        <ArmadaMusicLogo
-          className={cn('h-7 w-auto sm:h-8', className)}
-        />
-      );
+      return <ArmadaMusicLogo className={cn('h-7 w-auto sm:h-8', className)} />;
   }
 }

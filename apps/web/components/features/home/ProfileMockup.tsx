@@ -139,9 +139,7 @@ export function ProfileMockup({
             <div className='text-base font-semibold text-primary-token mb-0.5'>
               {displayName}
             </div>
-            <div className='text-app text-tertiary-token'>
-              {displayTagline}
-            </div>
+            <div className='text-app text-tertiary-token'>{displayTagline}</div>
           </div>
         </div>
 
