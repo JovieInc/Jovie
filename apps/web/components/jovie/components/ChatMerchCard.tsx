@@ -13,6 +13,8 @@ import Link from 'next/link';
 import { useCallback, useMemo, useState } from 'react';
 import { MerchPricingPresetPicker } from '@/components/molecules/MerchPricingPresetPicker';
 import { MerchPricingSummary } from '@/components/molecules/MerchPricingSummary';
+import { accentVar } from '@/components/organisms/entity-card/kind-presets';
+import type { EntityAccent } from '@/components/organisms/entity-card/types';
 import {
   hasRenderableMockup,
   isInternalMerchMockupUrl,
@@ -24,6 +26,17 @@ import { MERCH_DEFAULT_MARGIN_PRESET } from '@/lib/merch/pricing';
 import { cn } from '@/lib/utils';
 import { ChatGenerationArtifactSurface } from './ChatGenerationArtifactSurface';
 import { ChatMerchActionCard } from './ChatMerchActionCard';
+
+// Rotate the studio ambient-glow accent across generated options so the bento
+// grid reads as one card family with the public-profile EntityCard.
+const OPTION_ACCENTS: readonly EntityAccent[] = [
+  'purple',
+  'blue',
+  'green',
+  'orange',
+  'pink',
+  'teal',
+];
 
 interface MerchGenerationOption {
   readonly id: string;
@@ -217,13 +230,20 @@ export function ChatMerchOptionsCard({
             !mockupUrls.some(isPrintfulMockupUrl);
           const sellable = option.sellability?.sellable ?? true;
           const blockedReasons = option.sellability?.reasons ?? [];
+          const accent =
+            OPTION_ACCENTS[(option.option_number - 1) % OPTION_ACCENTS.length];
           return (
             <article
               key={option.id}
               data-testid='chat-merch-option-card'
-              className='min-w-0 overflow-hidden rounded-lg border border-subtle bg-surface-0 shadow-sm'
+              className='flex min-w-0 flex-col gap-2.5 rounded-[16px] border border-subtle bg-surface-1 p-2.5 shadow-card'
             >
-              <div className='relative aspect-square bg-surface-1'>
+              <div
+                className='relative aspect-square overflow-hidden rounded-[12px] border border-subtle'
+                style={{
+                  background: `radial-gradient(120% 120% at 32% 22%, color-mix(in oklab, ${accentVar(accent)} 22%, transparent), transparent 62%), linear-gradient(155deg, var(--color-bg-surface-2), var(--color-bg-surface-1))`,
+                }}
+              >
                 {imageUrl ? (
                   <Image
                     src={imageUrl}
@@ -259,9 +279,12 @@ export function ChatMerchOptionsCard({
                   </span>
                 </div>
               </div>
-              <div className='space-y-2 p-2.5'>
+              <div className='flex flex-1 flex-col gap-2'>
                 <div className='min-w-0'>
-                  <h3 className='truncate text-[13px] font-semibold text-primary-token'>
+                  <p className='text-[10px] font-semibold uppercase leading-none tracking-[0.08em] text-tertiary-token'>
+                    Merch
+                  </p>
+                  <h3 className='mt-1 truncate text-[14px] font-[590] tracking-[-0.02em] text-primary-token'>
                     {option.design_name}
                   </h3>
                   <p className='mt-0.5 truncate text-[11px] text-tertiary-token'>
