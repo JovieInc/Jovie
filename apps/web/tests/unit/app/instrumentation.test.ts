@@ -10,7 +10,7 @@ describe('server instrumentation guard', () => {
 
   it('skips server observability in local E2E mode', async () => {
     process.env.CI = 'false';
-    process.env.NODE_ENV = 'test';
+    process.env.NODE_ENV = 'production';
     process.env.NEXT_PUBLIC_E2E_MODE = '1';
     delete process.env.JOVIE_ENABLE_LOCAL_SENTRY;
 

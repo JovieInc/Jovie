@@ -303,6 +303,10 @@ export async function register() {
 }
 
 export async function onRequestError(...args: unknown[]) {
+  if (process.env.NEXT_RUNTIME !== 'nodejs') {
+    return;
+  }
+
   if (shouldSkipServerObservability()) {
     return;
   }

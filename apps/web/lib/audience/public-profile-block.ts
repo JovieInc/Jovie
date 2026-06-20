@@ -2,6 +2,7 @@ import 'server-only';
 
 import { createFingerprintEdge } from '@/lib/audience/fingerprint';
 import { withTimeout } from '@/lib/db/query-timeout';
+import { publicEnv } from '@/lib/env-public';
 import { env } from '@/lib/env-server';
 import { getRedis } from '@/lib/redis';
 
@@ -96,10 +97,10 @@ function clearMemoryCache(cacheKey: string): void {
 
 function shouldSkipAudienceBlockTelemetry(): boolean {
   return (
-    process.env.CI === 'true' ||
-    process.env.NODE_ENV === 'test' ||
-    process.env.NEXT_PUBLIC_E2E_MODE === '1' ||
-    process.env.E2E_USE_TEST_AUTH_BYPASS === '1'
+    env.CI === 'true' ||
+    env.NODE_ENV === 'test' ||
+    publicEnv.NEXT_PUBLIC_E2E_MODE === '1' ||
+    env.E2E_USE_TEST_AUTH_BYPASS === '1'
   );
 }
 

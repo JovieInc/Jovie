@@ -1,3 +1,6 @@
+import { publicEnv } from '@/lib/env-public';
+import { env } from '@/lib/env-server';
+
 /**
  * Agnost AI analytics — OpenTelemetry trace export for Vercel AI SDK spans.
  *
@@ -19,19 +22,16 @@ const runtimeImport = new Function('specifier', 'return import(specifier)') as <
 ) => Promise<T>;
 
 export function shouldEnableAgnost(): boolean {
-  if (process.env.CI === 'true') return false;
-  if (
-    process.env.NODE_ENV === 'test' ||
-    process.env.NEXT_PUBLIC_E2E_MODE === '1'
-  ) {
+  if (env.CI === 'true') return false;
+  if (env.NODE_ENV === 'test' || publicEnv.NEXT_PUBLIC_E2E_MODE === '1') {
     return false;
   }
 
-  const orgId = process.env.AGNOST_ORG_ID ?? DEFAULT_AGNOST_ORG_ID;
+  const orgId = env.AGNOST_ORG_ID ?? DEFAULT_AGNOST_ORG_ID;
   if (!orgId) return false;
 
-  if (process.env.NODE_ENV === 'development') {
-    return process.env.JOVIE_ENABLE_AGNOST === '1';
+  if (env.NODE_ENV === 'development') {
+    return env.JOVIE_ENABLE_AGNOST === '1';
   }
 
   return true;
@@ -39,7 +39,7 @@ export function shouldEnableAgnost(): boolean {
 
 export function getAgnostOrgId(): string | null {
   if (!shouldEnableAgnost()) return null;
-  return process.env.AGNOST_ORG_ID ?? DEFAULT_AGNOST_ORG_ID;
+  return env.AGNOST_ORG_ID ?? DEFAULT_AGNOST_ORG_ID;
 }
 
 /**
