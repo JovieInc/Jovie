@@ -41,7 +41,7 @@ export function HudMetricSourceTrust({
 
   return (
     <div
-      className='mt-2 min-h-[36px] space-y-1'
+      className='mt-2 min-h-9 space-y-1'
       data-testid={`hud-source-trust-${source.key}`}
     >
       <div className='flex items-center justify-between gap-2'>

@@ -83,7 +83,7 @@ export function MerchCheckoutForm({
   }
 
   return (
-    <div className='flex min-h-[328px] flex-col rounded-[8px] border border-white/12 bg-black/30 p-4 text-white shadow-[0_22px_80px_rgba(0,0,0,0.32)] backdrop-blur-xl sm:p-5'>
+    <div className='flex min-h-82 flex-col rounded-[8px] border border-white/12 bg-black/30 p-4 text-white shadow-[0_22px_80px_rgba(0,0,0,0.32)] backdrop-blur-xl sm:p-5'>
       <div className='flex items-start justify-between gap-4'>
         <div>
           <p className='text-2xs font-semibold uppercase leading-none text-white/54 [letter-spacing:0]'>
@@ -105,7 +105,7 @@ export function MerchCheckoutForm({
               key={variantKey}
               onClick={() => setSelectedVariantKey(variantKey)}
               className={cn(
-                'h-11 rounded-[6px] border text-app font-semibold capitalize transition-[background-color,border-color,color] duration-subtle',
+                'h-11 rounded-md border text-app font-semibold capitalize transition-[background-color,border-color,color] duration-subtle',
                 selectedVariantKey === variantKey
                   ? 'border-white bg-white text-black'
                   : 'border-white/12 bg-white/[0.04] text-white hover:border-white/24 hover:bg-white/[0.07]'
@@ -119,7 +119,7 @@ export function MerchCheckoutForm({
 
       <div className='mt-5'>
         <p className='text-xs font-medium text-white/62'>Quantity</p>
-        <div className='mt-2 flex h-11 w-36 items-center justify-between rounded-[6px] border border-white/12 bg-white/[0.04] px-1'>
+        <div className='mt-2 flex h-11 w-36 items-center justify-between rounded-md border border-white/12 bg-white/[0.04] px-1'>
           <button
             type='button'
             aria-label='Decrease quantity'
@@ -161,13 +161,13 @@ export function MerchCheckoutForm({
         type='button'
         disabled={isSubmitting || !selectedVariantKey}
         onClick={submitCheckout}
-        className='mt-5 inline-flex h-12 items-center justify-center gap-2 rounded-[6px] bg-white px-4 text-sm font-semibold text-black transition-opacity duration-subtle hover:opacity-92 disabled:pointer-events-none disabled:opacity-55'
+        className='mt-5 inline-flex h-12 items-center justify-center gap-2 rounded-md bg-white px-4 text-sm font-semibold text-black transition-opacity duration-subtle hover:opacity-92 disabled:pointer-events-none disabled:opacity-55'
       >
         {isSubmitting ? <Loader2 className='h-4 w-4 animate-spin' /> : null}
         Checkout
       </button>
 
-      <div className='min-h-[36px] pt-3'>
+      <div className='min-h-9 pt-3'>
         {error ? (
           <p className='text-xs leading-5 text-red-200'>{error}</p>
         ) : (
