@@ -225,7 +225,7 @@ function Nav({ variant }: { variant: Variant }) {
   return (
     <nav
       className={cn(
-        'absolute top-0 left-0 right-0 z-30 max-w-[1200px] mx-auto flex items-center justify-between h-16 px-6 lg:px-10',
+        'absolute top-0 left-0 right-0 z-30 max-w-300 mx-auto flex items-center justify-between h-16 px-6 lg:px-10',
         onCream ? 'text-[#0a0a0a]' : 'text-white'
       )}
     >
@@ -282,7 +282,7 @@ function HeroProductShell({
           without rendering the full sidebar. Linear-style chrome. */}
       <div
         aria-hidden='true'
-        className='hidden lg:block absolute top-0 bottom-0 left-0 w-[212px] border-r border-white/[0.04]'
+        className='hidden lg:block absolute top-0 bottom-0 left-0 w-53 border-r border-white/[0.04]'
         style={{
           background:
             'linear-gradient(90deg, rgba(255,255,255,0.012) 0%, rgba(255,255,255,0) 100%)',
@@ -310,7 +310,7 @@ function HeroProductShell({
         </div>
       </div>
 
-      <div className='relative z-[2] w-full max-w-[680px] flex flex-col items-center text-center'>
+      <div className='relative z-[2] w-full max-w-170 flex flex-col items-center text-center'>
         <span className='inline-flex items-center gap-1.5 h-6 px-2.5 rounded-full text-3xs uppercase tracking-[0.14em] font-medium text-cyan-300/85 bg-cyan-500/[0.08] border border-cyan-500/15 mb-7'>
           <Sparkles className='h-3 w-3' strokeWidth={2.25} />
           Ask Jovie anything
@@ -407,7 +407,7 @@ function HeroConversation({
   return (
     <section className='relative h-dvh flex flex-col px-6 lg:px-8'>
       {/* Eyebrow + headline up top */}
-      <div className='mx-auto w-full max-w-[640px] pt-[88px] lg:pt-[110px] flex flex-col items-center text-center'>
+      <div className='mx-auto w-full max-w-160 pt-22 lg:pt-[110px] flex flex-col items-center text-center'>
         <span className='text-3xs uppercase tracking-[0.14em] font-bold text-white/22 mb-4'>
           {EYEBROW}
         </span>
@@ -421,7 +421,7 @@ function HeroConversation({
 
       {/* Conversation occupies the middle */}
       <div className='flex-1 min-h-0 flex flex-col justify-end'>
-        <div className='mx-auto w-full max-w-[600px] space-y-3 pb-6'>
+        <div className='mx-auto w-full max-w-150 space-y-3 pb-6'>
           <ChatBubble delay={120}>
             Hey. I&apos;m Jovie — I&apos;ll help you set up your home and figure
             out the best way to grow this quarter.
@@ -435,7 +435,7 @@ function HeroConversation({
       </div>
 
       {/* Composer + chips */}
-      <div className='mx-auto w-full max-w-[600px] pb-[120px]'>
+      <div className='mx-auto w-full max-w-150 pb-30'>
         <Composer draft={draft} onDraft={onDraft} onSubmit={onSubmit} />
         <div className='mt-3 flex flex-wrap justify-center gap-1.5'>
           {SUGGESTIONS.map(label => (
@@ -462,8 +462,8 @@ function HeroConversation({
 // ---------------------------------------------------------------------------
 function HeroBrutalist({ draft, onDraft, onSubmit, onScrollNext }: HeroProps) {
   return (
-    <section className='relative h-dvh flex flex-col px-6 lg:px-10 pt-[88px] lg:pt-[110px] pb-10'>
-      <div className='flex-1 min-h-0 grid grid-cols-12 gap-6 lg:gap-10 max-w-[1200px] w-full mx-auto'>
+    <section className='relative h-dvh flex flex-col px-6 lg:px-10 pt-22 lg:pt-[110px] pb-10'>
+      <div className='flex-1 min-h-0 grid grid-cols-12 gap-6 lg:gap-10 max-w-300 w-full mx-auto'>
         {/* Left rail: eyebrow + tiny meta */}
         <div className='col-span-12 lg:col-span-3 flex flex-col gap-3'>
           <div className='border-2 border-[#0a0a0a] px-3 py-2 inline-block w-fit'>
@@ -502,7 +502,7 @@ function HeroBrutalist({ draft, onDraft, onSubmit, onScrollNext }: HeroProps) {
               e.preventDefault();
               onSubmit();
             }}
-            className='mt-8 flex items-center gap-0 max-w-[640px] border-2 border-[#0a0a0a]'
+            className='mt-8 flex items-center gap-0 max-w-160 border-2 border-[#0a0a0a]'
           >
             <input
               type='text'
@@ -527,7 +527,7 @@ function HeroBrutalist({ draft, onDraft, onSubmit, onScrollNext }: HeroProps) {
           </form>
 
           {/* Chips — square, bordered, uppercase */}
-          <div className='mt-5 flex flex-wrap gap-0 max-w-[640px]'>
+          <div className='mt-5 flex flex-wrap gap-0 max-w-160'>
             {SUGGESTIONS.map((label, i) => (
               <button
                 key={label}
@@ -576,7 +576,7 @@ function HeroCinematic({ onScrollNext }: HeroProps) {
         }}
       />
 
-      <div className='relative z-10 max-w-[920px] flex flex-col items-center text-center'>
+      <div className='relative z-10 max-w-230 flex flex-col items-center text-center'>
         <span className='text-2xs uppercase tracking-[0.22em] font-medium text-white/45 mb-7'>
           {EYEBROW}
         </span>
@@ -603,7 +603,7 @@ function HeroCinematic({ onScrollNext }: HeroProps) {
           Start free
           <ArrowRight className='h-4 w-4' strokeWidth={2.4} />
         </Link>
-        <div className='mt-8 flex flex-wrap justify-center gap-1.5 max-w-[560px]'>
+        <div className='mt-8 flex flex-wrap justify-center gap-1.5 max-w-140'>
           {SUGGESTIONS.map(label => (
             <span
               key={label}
@@ -691,7 +691,7 @@ function ChatBubble({
       <span className='shrink-0 h-6 w-6 rounded-full bg-cyan-500/15 border border-cyan-500/30 grid place-items-center mt-1'>
         <JovieMark className='h-3 w-3 text-cyan-400' />
       </span>
-      <div className='text-sm leading-[1.55] text-white/80 max-w-[440px]'>
+      <div className='text-sm leading-[1.55] text-white/80 max-w-110'>
         {children}
       </div>
     </div>
@@ -763,7 +763,7 @@ function Trust({ variant }: { variant: Variant }) {
           : 'border-t border-white/[0.06]'
       )}
     >
-      <div className='max-w-[1200px] mx-auto'>
+      <div className='max-w-300 mx-auto'>
         <p
           className={cn(
             'text-center text-3xs uppercase tracking-[0.14em] font-bold mb-7',
@@ -780,7 +780,7 @@ function Trust({ variant }: { variant: Variant }) {
         >
           <AwalLogo className='h-[22px] w-auto select-none' />
           <TheOrchardLogo className='h-[30px] w-auto select-none' />
-          <ArmadaMusicLogo className='h-[24px] w-auto select-none' />
+          <ArmadaMusicLogo className='h-6 w-auto select-none' />
           <BlackHoleRecordingsLogo className='h-[18px] w-auto select-none' />
         </div>
       </div>
@@ -824,7 +824,7 @@ function ArtistsBuilt({ variant }: { variant: Variant }) {
 
   return (
     <section className={cn('px-0 pt-2 pb-20')} ref={containerRef}>
-      <div className='max-w-[1200px] mx-auto px-6 lg:px-8 mb-8'>
+      <div className='max-w-300 mx-auto px-6 lg:px-8 mb-8'>
         <p
           className={cn(
             'text-center text-3xs uppercase tracking-[0.14em] font-bold',
@@ -917,7 +917,7 @@ function Outcomes({ variant }: { variant: Variant }) {
   ];
   return (
     <section className='px-6 lg:px-8 pb-24'>
-      <div className='max-w-[1200px] mx-auto grid gap-6 lg:grid-cols-3'>
+      <div className='max-w-300 mx-auto grid gap-6 lg:grid-cols-3'>
         {items.map(it => (
           <div
             key={it.title}
@@ -972,7 +972,7 @@ function FinalCta({ variant }: { variant: Variant }) {
   const onCream = variant === 'c';
   return (
     <section className='px-6 lg:px-8 pb-24'>
-      <div className='max-w-[1200px] mx-auto text-center'>
+      <div className='max-w-300 mx-auto text-center'>
         <span
           className={cn(
             'text-3xs uppercase tracking-[0.14em] font-bold',
@@ -1030,7 +1030,7 @@ function Footer({ variant }: { variant: Variant }) {
     >
       <div
         className={cn(
-          'max-w-[1200px] mx-auto flex items-center justify-between h-14 text-2xs',
+          'max-w-300 mx-auto flex items-center justify-between h-14 text-2xs',
           onCream ? 'text-[#0a0a0a]/45' : 'text-white/35'
         )}
       >

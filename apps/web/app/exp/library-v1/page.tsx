@@ -1145,7 +1145,7 @@ function TopBar({
         {count.toString().padStart(2, '0')}
       </span>
 
-      <div className='ml-3 flex-1 max-w-[420px]'>
+      <div className='ml-3 flex-1 max-w-105'>
         <SearchInput value={search} onChange={onSearch} />
       </div>
 

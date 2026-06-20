@@ -207,7 +207,7 @@ function RailColumn({
   children: React.ReactNode;
 }) {
   return (
-    <div className='w-[388px] shrink-0 flex flex-col h-[calc(100dvh-48px)]'>
+    <div className='w-97 shrink-0 flex flex-col h-[calc(100dvh-48px)]'>
       <div className='shrink-0 px-4 pt-3 pb-2 border-b border-(--linear-app-shell-border)/60'>
         <p className='text-3xs uppercase tracking-[0.08em] text-quaternary-token font-semibold'>
           {label}
@@ -248,7 +248,7 @@ function ArtworkTile({ size = 56 }: { size?: number }) {
 
 function TypeBadge({ type }: { type: 'Single' | 'EP' | 'Album' }) {
   return (
-    <span className='inline-flex items-center h-[16px] px-1.5 rounded text-3xs font-medium uppercase tracking-[0.06em] border border-(--linear-app-shell-border) text-tertiary-token bg-(--surface-1)/40'>
+    <span className='inline-flex items-center h-4 px-1.5 rounded text-3xs font-medium uppercase tracking-[0.06em] border border-(--linear-app-shell-border) text-tertiary-token bg-(--surface-1)/40'>
       {type}
     </span>
   );
@@ -493,7 +493,7 @@ function DistributionList({ compact }: { compact?: boolean }) {
           >
             <span
               className={cn(
-                'h-[16px] w-[16px] rounded-full grid place-items-center text-3xs font-semibold text-white shrink-0',
+                'h-4 w-4 rounded-full grid place-items-center text-3xs font-semibold text-white shrink-0',
                 status === 'missing'
                   ? 'bg-quaternary-token/40 opacity-60'
                   : DSP_COLOR[dsp]

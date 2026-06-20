@@ -191,7 +191,7 @@ export function PageBuilderClient({
           The composed landing page. Padding-top = toolbar height so the
           header always renders below the toolbar without overlap.
         */
-        <div className='pt-[64px]'>
+        <div className='pt-16'>
           <MarketingHeader
             variant={headerMode === 'transparent' ? 'homepage' : 'landing'}
           />
@@ -255,7 +255,7 @@ function Toolbar({
   onOpenDrawer,
 }: ToolbarProps) {
   return (
-    <div className='fixed left-0 right-0 top-0 z-50 flex h-[56px] items-center gap-4 border-b border-white/10 bg-black/85 px-4 text-white shadow-lg backdrop-blur-md'>
+    <div className='fixed left-0 right-0 top-0 z-50 flex h-14 items-center gap-4 border-b border-white/10 bg-black/85 px-4 text-white shadow-lg backdrop-blur-md'>
       <span
         className={
           designV1Enabled
@@ -416,7 +416,7 @@ export function DesignStudioWorkspace({
 }: Readonly<{ mode: Exclude<StudioMode, 'pages'> }>) {
   return (
     <main
-      className='min-h-screen bg-surface-1 px-4 pb-12 pt-[80px] text-white sm:px-6 lg:px-8'
+      className='min-h-screen bg-surface-1 px-4 pb-12 pt-20 text-white sm:px-6 lg:px-8'
       data-testid={`design-studio-${mode}`}
     >
       {renderDesignStudio(mode)}
@@ -524,7 +524,7 @@ function DesignStudioItemCard({
       className='overflow-hidden rounded-lg border border-white/10 bg-white/[0.035]'
       data-testid={`design-studio-item-${item.id}`}
     >
-      <div className={compact ? 'max-h-[280px] overflow-hidden' : ''}>
+      <div className={compact ? 'max-h-70 overflow-hidden' : ''}>
         {item.preview()}
       </div>
       <div className='space-y-3 border-t border-white/10 p-4'>
@@ -704,12 +704,12 @@ function SectionDrawer({
 
   return (
     <div
-      className='fixed right-0 top-0 z-[60] flex h-screen w-full max-w-[380px] flex-col border-l border-white/10 bg-black text-white shadow-2xl'
+      className='fixed right-0 top-0 z-[60] flex h-screen w-full max-w-95 flex-col border-l border-white/10 bg-black text-white shadow-2xl'
       role='dialog'
       aria-modal='true'
       aria-label='Body section composer'
     >
-      <div className='flex h-[56px] items-center justify-between border-b border-white/10 px-4'>
+      <div className='flex h-14 items-center justify-between border-b border-white/10 px-4'>
         <span className='text-sm font-semibold'>Body sections</span>
         <button
           type='button'
