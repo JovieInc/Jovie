@@ -2,6 +2,7 @@
 
 # dependencies
 /node_modules
+scripts/node_modules
 apps/web/node_modules
 /.bundle/
 /vendor/bundle/
@@ -123,6 +124,9 @@ output/
 .gstack/
 .claude/skills/gstack/
 .claude/scheduled_tasks.lock
+
+# QA swarm runtime artifacts (findings, remediation manifests, Eve queue)
+.context/qa-swarm/
 
 # Ruflo MCP local state (sqlite + vector index, never committed)
 .claude-flow/

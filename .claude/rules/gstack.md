@@ -20,6 +20,12 @@ This repo includes [gstack](https://github.com/garrytan/gstack) as a git submodu
 | Browser Cookies | `/setup-browser-cookies` | Import authenticated sessions for testing |
 | Document Release | `/document-release` | Document a release |
 | Perf Loop | `/perf-loop` | Autonomous performance optimization loop (fire and forget) |
+| QA Swarm (diff-review) | `/qa-swarm-diff-review` | Multi-model PR diff review; proposes enriched Linear issues |
+| QA Swarm (explore) | `/qa-swarm-explore` | Exploratory web/iOS test swarm toward goal-driven flows |
+| QA Swarm (vision) | `/qa-swarm-vision` | Screenshot polish scoring and jank detection |
+| QA Swarm (design jury) | `/qa-swarm-design-jury` | Change-aware capture plus multi-LLM design jury |
+| QA Swarm (test-gen) | `/qa-swarm-test-gen` | Test generation and fuzz swarm for high-risk contracts |
+| QA Swarm (flaky-hunter) | `/qa-swarm-flaky-hunter` | Flake rerun, cluster, and auto-quarantine |
 | Upgrade | `/gstack-upgrade` | Upgrade gstack to latest version |
 
 ## Setup
@@ -55,6 +61,7 @@ Key routing rules:
 - Visual audit, design polish → invoke `design-review`
 - Architecture review → invoke `plan-eng-review`
 - Clerk user management, instance inspection, auth debugging → invoke `clerk-cli`
+- Continuous QA swarm recipes (diff review, explore, vision, jury, test-gen, flakes) → invoke matching `/qa-swarm-*` command; load `qa-swarm` skill
 
 ## gbrain (long-term memory layer)
 
