@@ -60,7 +60,7 @@ export function ProfileSwitcher() {
               src={selectedProfile?.avatarUrl}
               alt={selectedProfile?.displayName ?? ''}
               size='xs'
-              className='size-[18px] shrink-0 rounded-full'
+              className='size-5 shrink-0 rounded-full'
             />
             <span className='truncate flex-1 text-left text-app tracking-tight text-sidebar-item-foreground group-data-[collapsible=icon]:hidden [font-weight:var(--font-weight-nav)]'>
               {selectedProfile?.displayName || 'Select profile'}
@@ -71,7 +71,7 @@ export function ProfileSwitcher() {
             />
           </button>
         </DropdownMenuTrigger>
-        <DropdownMenuContent align='start' sideOffset={4} className='w-[220px]'>
+        <DropdownMenuContent align='start' sideOffset={4} className='w-55'>
           {creatorProfiles.map(profile => {
             const isActive = profile.id === selectedProfile?.id;
             const isSwitching = switchingProfileId === profile.id;

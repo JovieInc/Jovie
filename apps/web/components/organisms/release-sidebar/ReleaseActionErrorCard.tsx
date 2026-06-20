@@ -30,7 +30,7 @@ export function ReleaseActionErrorCard({
 }: ReleaseActionErrorCardProps) {
   const isCard = variant === 'card';
   const shellClassName = isCard
-    ? 'space-y-2 rounded-[14px] border border-destructive/20 bg-destructive/5 p-3'
+    ? 'space-y-2 rounded-xl border border-destructive/20 bg-destructive/5 p-3'
     : 'flex w-full items-start gap-2 rounded-lg border border-destructive/20 bg-destructive/5 px-2.5 py-2';
   const iconWrapperClassName = isCard
     ? 'mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center text-destructive'

@@ -90,8 +90,8 @@ export function Footer({
             variant={config.colorVariant}
             ariaLabel='Legal'
             links={PROFILE_LEGAL_LINKS}
-            className='gap-2 text-[10px] leading-4'
-            linkClassName='text-[10px] leading-4 opacity-60 hover:opacity-100'
+            className='gap-2 text-3xs leading-4'
+            linkClassName='text-3xs leading-4 opacity-60 hover:opacity-100'
           />
         </div>
 
@@ -100,8 +100,8 @@ export function Footer({
             variant={config.colorVariant}
             ariaLabel='Legal'
             links={PROFILE_LEGAL_LINKS}
-            className='gap-2 text-[10px] leading-4'
-            linkClassName='text-[10px] leading-4 opacity-60 hover:opacity-100'
+            className='gap-2 text-3xs leading-4'
+            linkClassName='text-3xs leading-4 opacity-60 hover:opacity-100'
           />
         </div>
       </footer>

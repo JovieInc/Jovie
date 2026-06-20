@@ -186,7 +186,7 @@ function CmdKPaletteRow({
       <RowVisual item={item} />
       <RowBody item={item} />
       {shortcutLabel ? (
-        <span className='ml-auto flex min-w-9 shrink-0 justify-end tabular-nums text-[11px] font-medium text-quaternary-token'>
+        <span className='ml-auto flex min-w-9 shrink-0 justify-end tabular-nums text-2xs font-medium text-quaternary-token'>
           {shortcutLabel}
         </span>
       ) : null}
@@ -236,8 +236,8 @@ export function PaletteList({
             <div
               className={cn(
                 variant === 'cmdk'
-                  ? 'px-3 pb-1.5 pt-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-quaternary-token'
-                  : 'px-[10px] pb-[5px] pt-[11px] text-[9.5px] font-semibold uppercase tracking-[0.1em] text-quaternary-token'
+                  ? 'px-3 pb-1.5 pt-2 text-2xs font-semibold uppercase tracking-[0.08em] text-quaternary-token'
+                  : 'px-3 pb-1 pt-3 text-3xs font-semibold uppercase tracking-[0.1em] text-quaternary-token'
               )}
             >
               {section.label}
@@ -368,8 +368,8 @@ export function InlinePalette({
         role='listbox'
         aria-label='Slash command suggestions'
         className={cn(
-          'min-h-0 flex-1 overflow-y-auto p-[5px]',
-          variant === 'inline' && 'max-h-[260px]'
+          'min-h-0 flex-1 overflow-y-auto p-1',
+          variant === 'inline' && 'max-h-65'
         )}
       >
         <PaletteList

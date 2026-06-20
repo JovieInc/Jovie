@@ -351,7 +351,7 @@ function ReleaseEntityHeader({
                   <DrawerMediaThumb
                     src={release.artworkUrl}
                     alt={artworkAlt}
-                    sizeClassName='h-[68px] w-[68px] rounded-[10px]'
+                    sizeClassName='h-17 w-17 rounded-lg'
                     sizes='68px'
                     fallback={
                       <Icon
@@ -487,10 +487,10 @@ function ReleaseActivitySection({
               <Activity className='size-3' aria-hidden='true' />
             </span>
             <div className='min-w-0 flex-1'>
-              <p className='truncate text-[12px] font-caption text-primary-token'>
+              <p className='truncate text-xs font-caption text-primary-token'>
                 {row.label} Link updated
               </p>
-              <p className='mt-0.5 text-[10.5px] text-tertiary-token'>
+              <p className='mt-0.5 text-3xs text-tertiary-token'>
                 {formatTimeAgo(row.updatedAt)}
               </p>
             </div>

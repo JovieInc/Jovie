@@ -35,7 +35,7 @@ function OptionImage({
         className='h-8 w-8 rounded-full bg-surface-2 flex-shrink-0 flex items-center justify-center'
         aria-hidden='true'
       >
-        <span className='text-[10px] font-medium text-secondary-token select-none leading-none'>
+        <span className='text-3xs font-medium text-secondary-token select-none leading-none'>
           {getInitials(name)}
         </span>
       </div>

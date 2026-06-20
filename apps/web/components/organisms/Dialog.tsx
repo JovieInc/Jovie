@@ -56,7 +56,7 @@ export function Dialog({
         hideClose={hideClose}
         className={cn(
           sizes[size],
-          'rounded-[18px] border border-(--linear-app-frame-seam) bg-(--linear-app-content-surface) p-6 shadow-popover',
+          'rounded-2xl border border-(--linear-app-frame-seam) bg-(--linear-app-content-surface) p-6 shadow-popover',
           className
         )}
       >
