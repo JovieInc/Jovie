@@ -150,6 +150,19 @@ _NOT_JUST_PATTERN = re.compile(
 # a word character or another dash.
 _EM_DASH_PATTERN = re.compile(r"—|(?<!-)--(?![a-zA-Z0-9_\-])")
 
+# Preprocessing patterns to strip non-prose regions before scoring
+_FRONTMATTER_PATTERN = re.compile(r"^---.*?---\s*", re.DOTALL)
+_FENCED_CODE_PATTERN = re.compile(r"```.*?```", re.DOTALL)
+_INLINE_CODE_PATTERN = re.compile(r"`[^`\n]+`")
+
+
+def _strip_code(text: str) -> str:
+    """Remove frontmatter, fenced code blocks, and inline code from markdown text."""
+    text = _FRONTMATTER_PATTERN.sub("", text)
+    text = _FENCED_CODE_PATTERN.sub("", text)
+    text = _INLINE_CODE_PATTERN.sub("", text)
+    return text
+
 # Sentence splitter (rough, good enough for penalty scoring)
 _SENTENCE_SPLIT = re.compile(r"(?<=[.!?])\s+")
 
@@ -198,6 +211,7 @@ def slop_score(text: str, filename: str = "<stdin>") -> SlopResult:
     """
     Score text for AI slop tells. Returns SlopResult with 0–10 penalty and hits list.
     """
+    text = _strip_code(text)
     lower = text.lower()
     hits: list[str] = []
     penalty = 0.0

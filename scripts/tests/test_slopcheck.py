@@ -181,6 +181,66 @@ class TestEmDashPenalty:
         assert len(em_hits) > 0, "Heavy em-dash use should trigger a hit"
 
 
+class TestCodeBlockStripping:
+    """CLI flags (--flag) in code blocks must not count as em-dashes."""
+
+    def test_double_hyphens_in_fenced_code_not_counted(self):
+        # 20+ double-hyphens from CLI flags in a fenced bash block should NOT penalise
+        text = (
+            "Run the command to drain PRs.\n\n"
+            "```bash\n"
+            "gh pr list --state open --limit 100 --json number --jq '.[]'\n"
+            "gh pr edit 123 --add-label merge-queue --remove-label needs-human\n"
+            "pnpm --filter @jovie/web run typecheck --pretty false\n"
+            "git push --force-with-lease origin HEAD\n"
+            "```\n\n"
+            "That is all.\n"
+        )
+        result = slop_score(text)
+        em_hits = [h for h in result.hits if "em-dash" in h]
+        assert len(em_hits) == 0, (
+            f"CLI --flags in fenced code block should not be counted as em-dashes. "
+            f"Hits: {result.hits}"
+        )
+
+    def test_double_hyphens_in_inline_code_not_counted(self):
+        text = (
+            "Pass `--force-with-lease` and `--add-label merge-queue` "
+            "to avoid accidental overwrites. "
+            "Use `--filter @jovie/web` to scope the command.\n"
+        )
+        result = slop_score(text)
+        em_hits = [h for h in result.hits if "em-dash" in h]
+        assert len(em_hits) == 0, (
+            f"CLI --flags in inline code should not count as em-dashes. "
+            f"Hits: {result.hits}"
+        )
+
+    def test_frontmatter_dashes_not_counted(self):
+        text = (
+            "---\n"
+            "description: A drain command — clears the queue\n"
+            "allowed-tools: Bash(gh:*)\n"
+            "---\n\n"
+            "Short prose body.\n"
+        )
+        result = slop_score(text)
+        # Only the prose em-dash in "description" line would count, but that's
+        # in frontmatter which should be stripped too.
+        em_hits = [h for h in result.hits if "em-dash" in h]
+        assert len(em_hits) == 0, (
+            f"Em-dash in YAML frontmatter should not be counted. Hits: {result.hits}"
+        )
+
+    def test_em_dashes_in_prose_still_counted(self):
+        # Prose em-dashes outside code blocks should still be penalised
+        text = ("This — and that — and more — and yet — and also — "
+                "are all connected.\n") * 4
+        result = slop_score(text)
+        em_hits = [h for h in result.hits if "em-dash" in h]
+        assert len(em_hits) > 0, "Em-dashes in prose should still be caught"
+
+
 class TestScoreCap:
     def test_score_never_exceeds_ten(self):
         # Pathological slop — pile on every pattern
@@ -243,6 +303,7 @@ if __name__ == "__main__":
         TestKnownClean(),
         TestStructuralTicContraction(),
         TestEmDashPenalty(),
+        TestCodeBlockStripping(),
         TestScoreCap(),
     ]
 
