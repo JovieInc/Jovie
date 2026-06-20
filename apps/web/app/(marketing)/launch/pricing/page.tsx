@@ -69,7 +69,7 @@ export default function PricingPage() {
   return (
     <MarketingPageShell>
       <MarketingHero variant='centered'>
-        <h1 id='pricing-heading' className='marketing-h2-linear max-w-[680px]'>
+        <h1 id='pricing-heading' className='marketing-h2-linear max-w-170'>
           Simple pricing.{' '}
           <span className='text-secondary-token'>No surprises.</span>
         </h1>

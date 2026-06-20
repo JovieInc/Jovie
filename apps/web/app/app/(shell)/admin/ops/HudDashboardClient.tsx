@@ -420,7 +420,7 @@ function DeploymentsPanel({
       data-testid='ops-deployments-panel'
     >
       <div className='flex items-center justify-between gap-3'>
-        <p className='text-[12.5px] font-[560] text-primary-token'>
+        <p className='text-xs font-[560] text-primary-token'>
           Deployments
         </p>
         <p className='truncate text-2xs text-tertiary-token' title={detail}>
@@ -742,12 +742,12 @@ export function HudDashboardClient({
   // MRR scale: shell matches Overview KPIs (~28-32px); kiosk keeps the
   // TV-readable 44/56/72 ramp.
   const mrrValueClass = isShell
-    ? 'text-[28px] font-[620] leading-none tracking-[-0.03em] sm:text-[32px]'
-    : 'text-[44px] font-[620] leading-none tracking-[-0.045em] sm:text-[56px] lg:text-[72px]';
+    ? 'text-3xl font-[620] leading-none tracking-[-0.03em] sm:text-3xl'
+    : 'text-5xl font-[620] leading-none tracking-[-0.045em] sm:text-[56px] lg:text-[72px]';
 
   // Operations / Reliability / Runway KPIs likewise scale down in shell.
   const secondaryValueClass = isShell
-    ? 'text-2xl font-[620] leading-none tracking-[-0.03em] sm:text-[28px]'
+    ? 'text-2xl font-[620] leading-none tracking-[-0.03em] sm:text-3xl'
     : 'text-4xl font-[620] leading-none tracking-[-0.04em] sm:text-[42px]';
 
   const aiOpsSummary = (
@@ -861,7 +861,7 @@ export function HudDashboardClient({
             <div className='flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between'>
               <div className='space-y-2'>
                 <SectionLabel>Default status</SectionLabel>
-                <p className='text-[26px] font-[620] leading-none tracking-[-0.03em] text-primary-token sm:text-[32px]'>
+                <p className='text-2xl font-[620] leading-none tracking-[-0.03em] text-primary-token sm:text-3xl'>
                   {formatDefaultStatusLabel(metrics.overview.defaultStatus)}
                 </p>
                 <p className='max-w-4xl text-app leading-6 text-secondary-token'>
@@ -887,7 +887,7 @@ export function HudDashboardClient({
           className='flex flex-col gap-4 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-5'
         >
           <div className='flex items-center gap-3'>
-            <div className='relative flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-[12px] border border-subtle bg-surface-0'>
+            <div className='relative flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-subtle bg-surface-0'>
               <Image
                 src='/brand/Jovie-Logo-Icon-White.svg'
                 alt='Jovie'
@@ -899,7 +899,7 @@ export function HudDashboardClient({
             </div>
             <div className='min-w-0'>
               <SectionLabel>HUD</SectionLabel>
-              <h1 className='mt-1 truncate text-[22px] font-[620] leading-none tracking-[-0.03em] text-primary-token sm:text-2xl'>
+              <h1 className='mt-1 truncate text-xl font-[620] leading-none tracking-[-0.03em] text-primary-token sm:text-2xl'>
                 {metrics.branding.startupName}
               </h1>
             </div>
@@ -1016,7 +1016,7 @@ export function HudDashboardClient({
                   Open the live HUD on another device using this kiosk link.
                 </p>
               </div>
-              <div className='rounded-[12px] border border-subtle bg-surface-0 p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]'>
+              <div className='rounded-xl border border-subtle bg-surface-0 p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]'>
                 <QRCode
                   data={hudUrl ?? ''}
                   size={196}
@@ -1041,7 +1041,7 @@ export function HudDashboardClient({
         <div className='flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between'>
           <div className='space-y-1'>
             <SectionLabel>AI ops</SectionLabel>
-            <p className='text-2xl font-[620] leading-none text-primary-token sm:text-[28px]'>
+            <p className='text-2xl font-[620] leading-none text-primary-token sm:text-3xl'>
               Hermes control plane
             </p>
             <p className='text-app leading-5 text-secondary-token'>
@@ -1219,8 +1219,8 @@ export function HudDashboardClient({
             <p
               className={
                 isShell
-                  ? 'text-[26px] font-[620] leading-none tracking-[-0.03em] text-primary-token sm:text-[32px]'
-                  : 'text-[40px] font-[620] leading-none tracking-[-0.045em] text-primary-token sm:text-[52px]'
+                  ? 'text-2xl font-[620] leading-none tracking-[-0.03em] text-primary-token sm:text-3xl'
+                  : 'text-4xl font-[620] leading-none tracking-[-0.045em] text-primary-token sm:text-5xl'
               }
             >
               {formatDefaultStatusLabel(metrics.overview.defaultStatus)}

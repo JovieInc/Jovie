@@ -18,7 +18,7 @@ function FeatureFlagStatePill({
   return (
     <span
       className={cn(
-        'inline-flex h-5 items-center rounded-full border px-2 text-[11.5px] font-medium',
+        'inline-flex h-5 items-center rounded-full border px-2 text-2xs font-medium',
         enabled
           ? 'border-cyan-400/20 bg-cyan-500/12 text-cyan-300'
           : 'border-subtle bg-surface-0 text-tertiary-token'

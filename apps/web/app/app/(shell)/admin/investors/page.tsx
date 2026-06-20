@@ -142,28 +142,28 @@ async function InvestorPipelineTable() {
       className='overflow-hidden p-0'
       data-testid='admin-investors-table'
     >
-      <InvestorTable minWidth='min-w-[760px]'>
+      <InvestorTable minWidth='min-w-190'>
         <InvestorTableHead>
           <InvestorTableHeaderRow>
-            <InvestorTableHeaderCell className='w-[200px]'>
+            <InvestorTableHeaderCell className='w-50'>
               Label
             </InvestorTableHeaderCell>
-            <InvestorTableHeaderCell className='w-[150px]'>
+            <InvestorTableHeaderCell className='w-38'>
               Investor
             </InvestorTableHeaderCell>
-            <InvestorTableHeaderCell className='w-[100px]'>
+            <InvestorTableHeaderCell className='w-25'>
               Stage
             </InvestorTableHeaderCell>
-            <InvestorTableHeaderCell className='w-[64px]'>
+            <InvestorTableHeaderCell className='w-16'>
               Score
             </InvestorTableHeaderCell>
-            <InvestorTableHeaderCell className='w-[64px]'>
+            <InvestorTableHeaderCell className='w-16'>
               Views
             </InvestorTableHeaderCell>
-            <InvestorTableHeaderCell className='w-[110px]'>
+            <InvestorTableHeaderCell className='w-28'>
               Last viewed
             </InvestorTableHeaderCell>
-            <InvestorTableHeaderCell className='w-[72px]'>
+            <InvestorTableHeaderCell className='w-18'>
               Status
             </InvestorTableHeaderCell>
           </InvestorTableHeaderRow>
@@ -171,7 +171,7 @@ async function InvestorPipelineTable() {
         <InvestorTableBody>
           {links.map(link => (
             <InvestorTableRow key={link.id}>
-              <InvestorTableCell className='w-[200px]'>
+              <InvestorTableCell className='w-50'>
                 <div className='flex min-w-0 flex-col gap-0.5'>
                   <span className='truncate font-semibold text-primary-token'>
                     {link.label}
@@ -179,24 +179,24 @@ async function InvestorPipelineTable() {
                   <TokenDisplay token={link.token} />
                 </div>
               </InvestorTableCell>
-              <InvestorTableCell className='w-[150px]'>
+              <InvestorTableCell className='w-38'>
                 {link.investorName || 'Unknown investor'}
               </InvestorTableCell>
-              <InvestorTableCell className='w-[100px]'>
+              <InvestorTableCell className='w-25'>
                 <StageBadge stage={link.stage} />
               </InvestorTableCell>
-              <InvestorTableCell className='w-[64px]'>
+              <InvestorTableCell className='w-16'>
                 <ScoreBadge score={link.engagementScore} />
               </InvestorTableCell>
-              <InvestorTableCell className='w-[64px]'>
+              <InvestorTableCell className='w-16'>
                 {link.viewCount}
               </InvestorTableCell>
-              <InvestorTableCell className='w-[110px]'>
+              <InvestorTableCell className='w-28'>
                 {link.lastViewed
                   ? new Date(link.lastViewed).toLocaleDateString()
                   : 'No views yet'}
               </InvestorTableCell>
-              <InvestorTableCell className='w-[72px]'>
+              <InvestorTableCell className='w-18'>
                 <StatusBadge isActive={link.isActive} />
               </InvestorTableCell>
             </InvestorTableRow>

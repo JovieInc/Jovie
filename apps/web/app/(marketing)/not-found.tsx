@@ -31,7 +31,7 @@ export default function NotFound() {
           <h1 className='text-xl font-semibold text-primary-token tracking-tight mb-2'>
             Page not found
           </h1>
-          <p className='text-[13px] text-tertiary-token leading-relaxed mb-8'>
+          <p className='text-app text-tertiary-token leading-relaxed mb-8'>
             The link you followed may be broken, or the page may have been
             removed.
           </p>

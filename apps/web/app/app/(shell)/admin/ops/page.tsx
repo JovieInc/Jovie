@@ -69,7 +69,7 @@ function CanaryStatusRow({
 
   return (
     <div
-      className='flex items-center gap-2 rounded-md border border-subtle bg-surface-1 px-3 py-2 text-[13px]'
+      className='flex items-center gap-2 rounded-md border border-subtle bg-surface-1 px-3 py-2 text-app'
       data-testid={testId}
     >
       {pass === null ? (
@@ -100,7 +100,7 @@ function CanaryStatusRow({
                 .join(', ')}`}
       </span>
       {runAt ? (
-        <span className='ml-auto text-[12px] text-tertiary-token'>{runAt}</span>
+        <span className='ml-auto text-xs text-tertiary-token'>{runAt}</span>
       ) : null}
     </div>
   );
@@ -235,7 +235,7 @@ export default async function AdminOpsPage({
 
       {/* Nightly testing agent status (JOV-1870) */}
       <div
-        className='flex flex-wrap items-center gap-2 rounded-md border border-subtle bg-surface-1 px-3 py-2 text-[13px]'
+        className='flex flex-wrap items-center gap-2 rounded-md border border-subtle bg-surface-1 px-3 py-2 text-app'
         data-testid='nightly-testing-agent-status'
       >
         {nightlyAgentPass === null ? (
@@ -265,7 +265,7 @@ export default async function AdminOpsPage({
             href={nightlyAgentStatus.workflowRunUrl}
             target='_blank'
             rel='noopener noreferrer'
-            className='text-[12px] text-secondary-token underline-offset-2 hover:underline'
+            className='text-xs text-secondary-token underline-offset-2 hover:underline'
           >
             Last run
           </Link>
@@ -274,12 +274,12 @@ export default async function AdminOpsPage({
           href={`https://github.com/JovieInc/Jovie/blob/main/${NIGHTLY_AGENT_REPORT_DOC_PATH}`}
           target='_blank'
           rel='noopener noreferrer'
-          className='text-[12px] text-secondary-token underline-offset-2 hover:underline'
+          className='text-xs text-secondary-token underline-offset-2 hover:underline'
         >
           Daily report
         </Link>
         {nightlyAgentRunAt ? (
-          <span className='ml-auto text-[12px] text-tertiary-token'>
+          <span className='ml-auto text-xs text-tertiary-token'>
             {nightlyAgentRunAt}
           </span>
         ) : null}

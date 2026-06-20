@@ -194,7 +194,7 @@ export default async function ChangelogPage() {
                       return (
                         <div key={key}>
                           <span
-                            className={`inline-block text-[11px] font-medium px-2 py-0.5 rounded-full mb-2 ${meta.color}`}
+                            className={`inline-block text-2xs font-medium px-2 py-0.5 rounded-full mb-2 ${meta.color}`}
                           >
                             {meta.label}
                           </span>
