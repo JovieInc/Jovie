@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.6.54] - 2026-06-20
+
+> [internal] Design-taste jury loop: change-aware screenshot planning, multi-juror consensus, and auto-filed issue manifests with reference comps.
+
+### Added
+
+- [internal] **Design-taste jury loop (JOV-10939)**: surgical change-aware capture planning skips non-UI pushes and regenerates only affected screenshot scenarios; per-surface benchmark references (Apple Health, Linear, Superhuman, Raycast, Frame.io, Mobbin/21st.dev/Godly); three-juror consensus engine (System B lead, product-density, marketing-restraint) emitting ranked findings tagged `ship` or `taste`; objective findings auto-file Visual QA issues with reference comps; taste findings queue to Tim; every consensus call writes to gbrain so the jury gate narrows over time.
+
 ## [26.6.53] - 2026-06-15
 
 > The Mac desktop app now completes browser sign-in more reliably and ships as a desktop release.
