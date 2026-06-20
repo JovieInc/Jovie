@@ -10,7 +10,7 @@ export function HomeChapter2() {
       aria-labelledby='homepage-ch2-heading'
     >
       <Container size='homepage'>
-        <div className='mx-auto max-w-[1200px]'>
+        <div className='mx-auto max-w-300'>
           <div className='homepage-chapter-layout'>
             <div className='homepage-chapter-copy'>
               <h2 id='homepage-ch2-heading' className='homepage-chapter-title'>

@@ -36,7 +36,7 @@ export function HomeHeroCTA() {
       <label className='flex h-11 flex-1 items-center rounded-full border border-white/8 bg-black/30 pl-4 pr-2'>
         <span
           aria-hidden='true'
-          className='shrink-0 font-mono text-[14px] tracking-[-0.02em] text-white/56'
+          className='shrink-0 font-mono text-sm tracking-[-0.02em] text-white/56'
         >
           jov.ie/
         </span>
@@ -50,7 +50,7 @@ export function HomeHeroCTA() {
           autoComplete='off'
           autoCapitalize='off'
           spellCheck={false}
-          className='w-full min-w-0 bg-transparent font-mono text-[14px] tracking-[-0.02em] text-primary-token placeholder:text-white/36 focus:outline-none'
+          className='w-full min-w-0 bg-transparent font-mono text-sm tracking-[-0.02em] text-primary-token placeholder:text-white/36 focus:outline-none'
         />
       </label>
       <button

@@ -104,7 +104,7 @@ export function RecentlyShippedSection() {
                 }}
               >
                 <div className='flex items-center gap-2 mb-3'>
-                  <Badge variant='outline' className='font-mono text-[11px]'>
+                  <Badge variant='outline' className='font-mono text-2xs'>
                     v{release.version}
                   </Badge>
                   {release.date && (
