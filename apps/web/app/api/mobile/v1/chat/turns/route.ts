@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { NO_STORE_HEADERS } from '@/lib/http/headers';
+import { isMobileChatEnabled } from '@/lib/mobile/chat/access';
 import {
   encodeMobileChatNdjsonEvent,
   MOBILE_CHAT_RUNTIME_DISABLED_CODE,
@@ -35,7 +36,7 @@ export async function POST(request: Request) {
     );
   }
 
-  if (process.env.MOBILE_CHAT_RUNTIME_ENABLED !== 'true') {
+  if (!(await isMobileChatEnabled(userId))) {
     return new Response(
       encodeMobileChatNdjsonEvent({
         type: 'error',
