@@ -4639,9 +4639,7 @@ function SettingsView({ section }: { section: SettingsSectionId }) {
       <h1 className='text-2xl font-display tracking-[-0.018em] leading-tight text-primary-token'>
         {meta.label}
       </h1>
-      <p className='mt-1.5 text-xs text-tertiary-token'>
-        {meta.description}
-      </p>
+      <p className='mt-1.5 text-xs text-tertiary-token'>{meta.description}</p>
 
       {/* Single card per section. Rows stack inside with hairline
           dividers — no per-row card chrome. Danger keeps the same
@@ -4663,9 +4661,7 @@ function settingsRowsFor(id: SettingsSectionId): Array<{
   tone?: 'default' | 'danger';
 }> {
   const valueText = (value: string) => (
-    <span className='text-xs text-tertiary-token tabular-nums'>
-      {value}
-    </span>
+    <span className='text-xs text-tertiary-token tabular-nums'>{value}</span>
   );
   const editBtn = (
     <button
