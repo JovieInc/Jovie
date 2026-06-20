@@ -1,0 +1,35 @@
+name: Merge Queue Auto-Enroll
+
+# Root-cause fix for PRs sitting un-merged for days: they were never enrolled.
+# Sweeps open PRs and adds the `merge-queue` label to every clean, ready,
+# non-opted-out one so the Graphite queue picks them up. Graphite re-tests each
+# against latest main before landing, so enrolling a not-yet-green PR is safe —
+# the queue dequeues failures; main never goes red.
+#
+# Opt out per-PR with any of: needs-human, hold, gated.
+
+on:
+  schedule:
+    - cron: '*/20 * * * *'   # catch anything missed between events
+  pull_request:
+    types: [ready_for_review, reopened]
+  workflow_dispatch:
+
+concurrency:
+  group: merge-queue-autoenroll
+  cancel-in-progress: false
+
+permissions:
+  pull-requests: write
+  contents: read
+
+jobs:
+  enroll:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Enroll clean PRs
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+        run: bash scripts/drain-pr-queue.sh
