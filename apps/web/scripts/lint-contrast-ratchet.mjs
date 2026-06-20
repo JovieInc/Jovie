@@ -26,12 +26,23 @@
  * Exit 0 = all counts ≤ baseline.  Exit 1 = regression detected.
  */
 
-import { existsSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
+import {
+  existsSync,
+  mkdtempSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
+import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { compareRatchetCounts } from '../../../scripts/lib/merge-queue-guard.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const projectRoot = join(__dirname, '..');
+const repoRoot = join(projectRoot, '..', '..');
 
 const BASELINE_PATH = join(projectRoot, 'contrast-ratchet.baseline.json');
 
@@ -151,6 +162,70 @@ function countViolations(files) {
   };
 }
 
+function countViolationsForRoot(root) {
+  const allFiles = [];
+  for (const dir of SCAN_DIRS) {
+    walkDir(join(root, dir), allFiles);
+  }
+  return {
+    files: allFiles,
+    counts: countViolations(allFiles),
+  };
+}
+
+function git(args, options = {}) {
+  return execFileSync('git', args, {
+    cwd: options.cwd ?? repoRoot,
+    encoding: 'utf8',
+    stdio: ['ignore', 'pipe', 'ignore'],
+    timeout: options.timeout ?? 60_000,
+  }).trim();
+}
+
+function resolveBaseRef() {
+  const baseBranch =
+    process.env.MERGE_BASE_REF ?? process.env.GITHUB_BASE_REF ?? 'main';
+  const remoteRef = `origin/${baseBranch}`;
+  try {
+    git(['rev-parse', '--verify', remoteRef]);
+    return remoteRef;
+  } catch {
+    try {
+      git(['fetch', 'origin', baseBranch, '--depth=1'], { timeout: 120_000 });
+      git(['rev-parse', '--verify', remoteRef]);
+      return remoteRef;
+    } catch {
+      return null;
+    }
+  }
+}
+
+function countBaseViolations() {
+  const baseRef = resolveBaseRef();
+  if (!baseRef) return null;
+
+  const tempRoot = mkdtempSync(join(tmpdir(), 'jovie-contrast-base-'));
+  const worktree = join(tempRoot, 'worktree');
+  try {
+    git(['worktree', 'add', '--detach', worktree, baseRef], {
+      timeout: 120_000,
+    });
+    return {
+      ref: baseRef,
+      ...countViolationsForRoot(join(worktree, 'apps', 'web')),
+    };
+  } catch {
+    return null;
+  } finally {
+    try {
+      git(['worktree', 'remove', '--force', worktree], { timeout: 60_000 });
+    } catch {
+      // Best-effort cleanup; the temp root removal below handles partial adds.
+    }
+    rmSync(tempRoot, { recursive: true, force: true });
+  }
+}
+
 // ── main ───────────────────────────────────────────────────────────────────
 
 const isUpdate = process.argv.includes('--update');
@@ -162,12 +237,7 @@ if (!existsSync(BASELINE_PATH)) {
 
 const baseline = JSON.parse(readFileSync(BASELINE_PATH, 'utf8'));
 
-const allFiles = [];
-for (const dir of SCAN_DIRS) {
-  walkDir(join(projectRoot, dir), allFiles);
-}
-
-const counts = countViolations(allFiles);
+const { files: allFiles, counts } = countViolationsForRoot(projectRoot);
 
 console.log(`[contrast-ratchet] Scanned ${allFiles.length} files`);
 for (const key of Object.keys(counts)) {
@@ -186,17 +256,32 @@ if (isUpdate) {
 }
 
 const errors = [];
+const baseSnapshot = countBaseViolations();
+const comparison = baseSnapshot
+  ? compareRatchetCounts(counts, baseSnapshot.counts)
+  : null;
 
-for (const [key, count] of Object.entries(counts)) {
-  const base = baseline[key] ?? 0;
-  if (count > base) {
+if (comparison) {
+  console.log(`[contrast-ratchet] Base ref: ${baseSnapshot.ref}`);
+  for (const regression of comparison.regressions) {
     errors.push(
-      `${key} regression: ${count} > baseline ${base}\n` +
+      `${regression.key} regression: ${regression.current} > base ${regression.base}\n` +
         `  New raw-color violations introduced. Use a semantic token instead\n` +
         `  (text-foreground, bg-background, bg-surface-1, border-border, etc.).\n` +
-        `  See DESIGN.md → "Use tokens, not raw colors".\n` +
-        `  Once violations are fixed, lower the baseline: node scripts/lint-contrast-ratchet.mjs --update`
+        `  See DESIGN.md → "Use tokens, not raw colors".`
     );
+  }
+} else {
+  for (const [key, count] of Object.entries(counts)) {
+    const base = baseline[key] ?? 0;
+    if (count > base) {
+      errors.push(
+        `${key} regression: ${count} > fallback baseline ${base}\n` +
+          `  New raw-color violations introduced. Use a semantic token instead\n` +
+          `  (text-foreground, bg-background, bg-surface-1, border-border, etc.).\n` +
+          `  See DESIGN.md → "Use tokens, not raw colors".`
+      );
+    }
   }
 }
 
@@ -207,12 +292,14 @@ if (errors.length > 0) {
   process.exit(1);
 }
 
-const improved = Object.entries(counts).some(
-  ([key, count]) => count < (baseline[key] ?? 0)
-);
+const improved = comparison
+  ? comparison.improvements.length > 0
+  : Object.entries(counts).some(([key, count]) => count < (baseline[key] ?? 0));
 if (improved) {
   console.log(
-    '[contrast-ratchet] ✓ Violation count improved — run with --update to lower the baseline'
+    comparison
+      ? '[contrast-ratchet] ✓ Violation count improved relative to current base'
+      : '[contrast-ratchet] ✓ Violation count improved relative to fallback baseline'
   );
 } else {
   console.log('[contrast-ratchet] ✓ No regressions detected');

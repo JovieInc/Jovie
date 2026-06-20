@@ -1,0 +1,49 @@
+name: Merge Queue Telemetry
+
+on:
+  schedule:
+    - cron: '15 15 * * *'
+  workflow_dispatch:
+    inputs:
+      days:
+        description: 'Lookback window in days'
+        required: false
+        default: '1'
+
+permissions:
+  contents: read
+  pull-requests: read
+
+concurrency:
+  group: merge-queue-telemetry
+  cancel-in-progress: true
+
+jobs:
+  report:
+    name: Daily merge-queue report
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          ref: main
+          persist-credentials: false
+
+      - name: Generate report
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          DAYS: ${{ inputs.days || '1' }}
+        run: |
+          set -euo pipefail
+          node scripts/merge-queue-guard.mjs telemetry-report \
+            --days "$DAYS" \
+            --output merge-queue-telemetry.md
+          cat merge-queue-telemetry.md >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload report artifact
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: merge-queue-telemetry-${{ github.run_id }}-${{ github.run_attempt }}
+          path: merge-queue-telemetry.md
+          retention-days: 30
