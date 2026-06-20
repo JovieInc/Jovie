@@ -21,6 +21,10 @@ import {
   isPrintfulConfigured,
   type PrintfulCreateOrderInput,
 } from '@/lib/printful/client';
+import {
+  RELEASE_GMV_ATTRIBUTION_METADATA_KEY,
+  resolveReleaseWorkflowRunIdForMerchCard,
+} from '@/lib/release-to-revenue/gmv-attribution';
 import { stripe } from '@/lib/stripe/client';
 import { logger } from '@/lib/utils/logger';
 import {
@@ -243,6 +247,9 @@ export async function createMerchCheckoutSession(
     jovieShareEstimateCents,
   });
   const printfulExternalId = `jovie_merch_${crypto.randomUUID()}`;
+  const releaseWorkflowRunId = await resolveReleaseWorkflowRunIdForMerchCard(
+    row.card.id
+  );
 
   const [order] = await db
     .insert(merchOrders)
@@ -268,6 +275,9 @@ export async function createMerchCheckoutSession(
       metadata: {
         source: 'merch_checkout',
         handle: input.handle,
+        ...(releaseWorkflowRunId
+          ? { [RELEASE_GMV_ATTRIBUTION_METADATA_KEY]: releaseWorkflowRunId }
+          : {}),
       },
     })
     .returning();
