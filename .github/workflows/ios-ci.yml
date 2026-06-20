@@ -53,6 +53,11 @@ jobs:
 
       - name: Build and test
         timeout-minutes: 20
+        env:
+          JOVIE_IOS_LAUNCH_PERFORMANCE: "1"
+          JOVIE_IOS_RUNTIME_PERFORMANCE: "1"
+          JOVIE_IOS_LAUNCH_TIMEOUT_SECONDS: "4"
+          JOVIE_IOS_RUNTIME_TIMEOUT_SECONDS: "3"
         run: bash apps/ios/scripts/run-xcodebuild.sh test -derivedDataPath .build/ios-ci
 
       - name: Capture simulator screenshots

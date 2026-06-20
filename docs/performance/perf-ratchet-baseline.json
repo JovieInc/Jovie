@@ -1,0 +1,46 @@
+{
+  "version": 1,
+  "tiers": {
+    "works": "Functional; budgets are advisory.",
+    "fast": "Meets product targets; regressions warn in evidence lanes.",
+    "instant": "Locked — any regression past budget hard-blocks merge."
+  },
+  "webVitals": {
+    "inp_ms": 200,
+    "lcp_ms": 2500,
+    "cls": 0.1,
+    "initialJS_gzip_kb": 300
+  },
+  "ios": {
+    "coldLaunch_ms": 400,
+    "hitchRate_ms_per_s": 5,
+    "maxFrame_ms": 8.3,
+    "shellTransition_ms": 3000,
+    "dashboardFiles": {
+      "DashboardView.swift": 220,
+      "DashboardAvatarView.swift": 120,
+      "QRCodeCardView.swift": 80,
+      "DashboardAppleWallet.swift": 90
+    }
+  },
+  "surfaces": [
+    {
+      "id": "ios-dashboard-shell",
+      "platform": "ios",
+      "tier": "fast"
+    },
+    {
+      "id": "web-public-profile",
+      "platform": "web",
+      "tier": "instant",
+      "routeManifestIds": ["public-profile-main"]
+    },
+    {
+      "id": "web-dashboard-releases",
+      "platform": "web",
+      "tier": "fast",
+      "lighthouseConfigs": ["apps/web/.lighthouserc.dashboard.pr.json"],
+      "routeManifestIds": ["creator-releases"]
+    }
+  ]
+}
