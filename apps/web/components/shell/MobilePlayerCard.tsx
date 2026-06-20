@@ -80,10 +80,10 @@ export const MobilePlayerCard = React.memo(function MobilePlayerCard({
         </div>
 
         <div className='min-w-0 flex-1'>
-          <div className='truncate text-[13px] font-caption text-primary-token leading-tight'>
+          <div className='truncate text-app font-caption text-primary-token leading-tight'>
             {trackTitle}
           </div>
-          <div className='truncate text-[11px] text-tertiary-token leading-tight mt-0.5'>
+          <div className='truncate text-2xs text-tertiary-token leading-tight mt-0.5'>
             {artistName}
           </div>
         </div>

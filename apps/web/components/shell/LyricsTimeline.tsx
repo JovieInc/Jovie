@@ -51,7 +51,7 @@ export function LyricsTimeline({
       )}
     >
       <div className='flex items-center gap-3'>
-        <span className='text-[10px] tabular-nums text-quaternary-token w-9 text-right shrink-0'>
+        <span className='text-3xs tabular-nums text-quaternary-token w-9 text-right shrink-0'>
           {formatTime(safeCurrent)}
         </span>
         <button
@@ -95,7 +95,7 @@ export function LyricsTimeline({
             style={{ left: `${pct}%` }}
           />
         </button>
-        <span className='text-[10px] tabular-nums text-quaternary-token w-9 text-left shrink-0'>
+        <span className='text-3xs tabular-nums text-quaternary-token w-9 text-left shrink-0'>
           {formatTime(safeDuration)}
         </span>
       </div>

@@ -110,7 +110,7 @@ export function InlineEditRow({
   }
 
   const valueClass = cn(
-    'flex-1 min-w-0 text-[12.5px] text-secondary-token truncate',
+    'flex-1 min-w-0 text-xs text-secondary-token truncate',
     TONE_CLASS[valueTone]
   );
 
@@ -122,7 +122,7 @@ export function InlineEditRow({
           className
         )}
       >
-        <dt className='w-[88px] shrink-0 text-[11px] text-quaternary-token'>
+        <dt className='w-22 shrink-0 text-2xs text-quaternary-token'>
           {label}
         </dt>
         <input
@@ -168,7 +168,7 @@ export function InlineEditRow({
       tabIndex={readOnly ? undefined : 0}
       title={readOnly ? undefined : 'Click to edit'}
     >
-      <dt className='w-[88px] shrink-0 text-[11px] text-quaternary-token'>
+      <dt className='w-22 shrink-0 text-2xs text-quaternary-token'>
         {label}
       </dt>
       <dd className={valueClass}>{value}</dd>
