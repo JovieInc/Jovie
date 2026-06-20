@@ -47,7 +47,7 @@ export function MarketingSectionIntro({
         </h2>
         <div
           className={cn(
-            'mt-4 max-w-[34rem] text-[15px] leading-[1.65] text-secondary-token sm:text-[16px]',
+            'mt-4 max-w-[34rem] text-mid leading-[1.65] text-secondary-token sm:text-base',
             descriptionClassName
           )}
         >
@@ -60,7 +60,7 @@ export function MarketingSectionIntro({
               <span
                 key={badge.label}
                 data-testid={badge.testId}
-                className='inline-flex items-center rounded-full border border-subtle bg-surface-1 px-3 py-1.5 text-[12px] font-medium tracking-[-0.01em] text-secondary-token'
+                className='inline-flex items-center rounded-full border border-subtle bg-surface-1 px-3 py-1.5 text-xs font-medium tracking-[-0.01em] text-secondary-token'
               >
                 {badge.label}
               </span>
