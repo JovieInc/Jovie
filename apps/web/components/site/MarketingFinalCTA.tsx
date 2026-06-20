@@ -45,7 +45,7 @@ export function MarketingFinalCTA({
           {title}
         </h2>
         {body ? (
-          <p className='mt-3 max-w-[44rem] text-balance text-[18px] leading-[1.45] text-white/[0.5]'>
+          <p className='mt-3 max-w-[44rem] text-balance text-lg leading-[1.45] text-white/[0.5]'>
             {body}
           </p>
         ) : null}
@@ -53,7 +53,7 @@ export function MarketingFinalCTA({
           <Link
             href={ctaHref}
             prefetch={false}
-            className='inline-flex h-10 items-center rounded-full bg-[rgb(252,252,252)] px-6 text-[14px] font-semibold tracking-[0.01em] text-black transition-opacity duration-subtle ease-subtle hover:opacity-92 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40 focus-visible:ring-offset-2 focus-visible:ring-offset-black'
+            className='inline-flex h-10 items-center rounded-full bg-(--color-text-tooltip) px-6 text-sm font-semibold tracking-[0.01em] text-black transition-opacity duration-subtle ease-subtle hover:opacity-92 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40 focus-visible:ring-offset-2 focus-visible:ring-offset-black'
           >
             {ctaLabel}
           </Link>
@@ -61,7 +61,7 @@ export function MarketingFinalCTA({
             <Link
               href={secondaryHref}
               prefetch={false}
-              className='inline-flex h-10 items-center gap-1 rounded-full px-6 text-[14px] font-semibold tracking-[0.01em] text-white/92 transition-colors duration-subtle ease-subtle hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40 focus-visible:ring-offset-2 focus-visible:ring-offset-black'
+              className='inline-flex h-10 items-center gap-1 rounded-full px-6 text-sm font-semibold tracking-[0.01em] text-white/92 transition-colors duration-subtle ease-subtle hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40 focus-visible:ring-offset-2 focus-visible:ring-offset-black'
             >
               {secondaryLabel}
               <span aria-hidden='true'>→</span>

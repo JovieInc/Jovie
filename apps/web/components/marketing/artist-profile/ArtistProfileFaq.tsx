@@ -10,7 +10,7 @@ interface ArtistProfileFaqProps {
 export function ArtistProfileFaq({ faq }: Readonly<ArtistProfileFaqProps>) {
   return (
     <ArtistProfileSectionShell>
-      <div className='mx-auto max-w-[760px]'>
+      <div className='mx-auto max-w-190'>
         <FaqSection
           items={[...faq.items]}
           heading={faq.headline}

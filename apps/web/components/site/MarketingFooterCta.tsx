@@ -105,7 +105,7 @@ export function MarketingFooterCta({
             {title}
           </h2>
           {body ? (
-            <p className='mx-auto mt-3 max-w-[36rem] text-balance text-[18px] leading-[1.45] text-white/[0.58]'>
+            <p className='mx-auto mt-3 max-w-[36rem] text-balance text-lg leading-[1.45] text-white/[0.58]'>
               {body}
             </p>
           ) : null}
