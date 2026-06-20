@@ -40,12 +40,45 @@ export interface ResolvedDesignPartnerConfig
   readonly userId: string;
 }
 
+export type DistributionDraftChannel = 'social_post' | 'sms';
+
+export type DistributionDraftStatus =
+  | 'pending'
+  | 'approved'
+  | 'rejected'
+  | 'dispatched';
+
+export type DistributionDraftVariant =
+  | 'announcement'
+  | 'merch_teaser'
+  | 'listen_cta'
+  | 'sms_blast';
+
+export interface ReleaseDistributionDraft {
+  readonly id: string;
+  readonly channel: DistributionDraftChannel;
+  readonly platform: 'instagram' | 'tiktok' | 'sms';
+  readonly variant: DistributionDraftVariant;
+  readonly body: string;
+  readonly status: DistributionDraftStatus;
+  readonly createdAt: string;
+  readonly decidedAt?: string;
+  readonly dispatchedAt?: string;
+}
+
+export interface ReleaseDistributionDrafts {
+  readonly releaseLink: string;
+  readonly merchDropLink: string | null;
+  readonly items: readonly ReleaseDistributionDraft[];
+}
+
 export interface ReleaseToRevenueRunStepOutputs {
   readonly releaseId: string | null;
   readonly triggerSource: ReleaseToRevenueTriggerSource;
   readonly triggeredAt: string;
   readonly designPartner: ResolvedDesignPartnerConfig;
   readonly release: ReleaseToRevenueReleaseMetadata;
+  readonly distributionDrafts?: ReleaseDistributionDrafts;
 }
 
 export interface ManualReleaseTriggerInput {
