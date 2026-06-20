@@ -51,7 +51,7 @@ export function ProductScreenshotFrame({
       data-testid={`product-screenshot-frame-${scenarioId}`}
       className={cn(
         'relative overflow-hidden border border-[rgba(189,189,244,0.09)] bg-[rgba(157,157,255,0.04)] shadow-[0_30px_80px_rgba(0,0,0,0.5)]',
-        isPhone ? 'rounded-[28px] p-1.5' : 'rounded-[12px] p-1',
+        isPhone ? 'rounded-[28px] p-1.5' : 'rounded-xl p-1',
         fill && 'h-full w-full',
         className
       )}
@@ -75,7 +75,7 @@ export function ProductScreenshotFrame({
         aria-hidden={ariaHidden}
         className={cn(
           'block h-full w-full bg-[#06070a] object-contain',
-          isPhone ? 'rounded-[22px]' : 'rounded-[8px]'
+          isPhone ? 'rounded-3xl' : 'rounded-[8px]'
         )}
       />
     </div>

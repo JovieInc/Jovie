@@ -26,11 +26,11 @@ export function MarketingHero({
         'relative w-full',
         'pt-20 pb-16 sm:pt-24 sm:pb-24 lg:pt-28 lg:pb-32',
         variant === 'centered' &&
-          'mx-auto flex max-w-[1200px] flex-col items-center px-6 text-center sm:px-8 lg:px-10',
+          'mx-auto flex max-w-300 flex-col items-center px-6 text-center sm:px-8 lg:px-10',
         variant === 'left' &&
-          'mx-auto flex max-w-[1200px] flex-col items-start px-6 text-left sm:px-8 lg:px-10',
+          'mx-auto flex max-w-300 flex-col items-start px-6 text-left sm:px-8 lg:px-10',
         variant === 'split' &&
-          'mx-auto grid max-w-[1280px] grid-cols-1 items-center gap-10 px-6 sm:px-8 md:grid-cols-2 md:gap-16 lg:px-10',
+          'mx-auto grid max-w-320 grid-cols-1 items-center gap-10 px-6 sm:px-8 md:grid-cols-2 md:gap-16 lg:px-10',
         className
       )}
     >

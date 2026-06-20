@@ -20,7 +20,7 @@ export function ArtistProfileReactivationSection({
       id={id}
       width='page'
     >
-      <div className='mx-auto max-w-[1120px]'>
+      <div className='mx-auto max-w-280'>
         <ArtistProfileSectionHeader
           align='center'
           headline={reactivation.headline}

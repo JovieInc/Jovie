@@ -44,7 +44,7 @@ export function ChatAnalyticsCard({ result }: ChatAnalyticsCardProps) {
           <li
             key={insight.id}
             className={cn(
-              'flex min-h-[136px] min-w-[min(20rem,84vw)] snap-start flex-col justify-between rounded-lg border border-black/10 bg-white p-4 text-black shadow-[0_18px_60px_-48px_rgba(0,0,0,0.7)] md:min-w-0'
+              'flex min-h-34 min-w-[min(20rem,84vw)] snap-start flex-col justify-between rounded-lg border border-black/10 bg-white p-4 text-black shadow-[0_18px_60px_-48px_rgba(0,0,0,0.7)] md:min-w-0'
             )}
             data-testid='chat-analytics-signal-card'
           >

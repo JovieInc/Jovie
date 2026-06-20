@@ -332,7 +332,7 @@ function RhythmReleaseKey() {
         <li key={kind.key} className='flex items-center gap-1.5'>
           <span
             aria-hidden='true'
-            className='h-2 w-2 rounded-[2px]'
+            className='h-2 w-2 rounded-xs'
             style={{
               backgroundColor: kind.accentColor,
               opacity: kind.muted ? 0.68 : 1,
