@@ -54,7 +54,7 @@ describe('DotBadge', () => {
       const badge = screen.getByText('Small').closest('span');
 
       expect(badge).toHaveClass('px-1.5');
-      expect(badge).toHaveClass('text-[10px]');
+      expect(badge).toHaveClass('text-3xs');
     });
 
     it('renders medium size explicitly', () => {
