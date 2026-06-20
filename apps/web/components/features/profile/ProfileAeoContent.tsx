@@ -15,11 +15,11 @@ export function ProfileAeoContent({ content }: ProfileAeoContentProps) {
         <div className='space-y-3'>
           <h2
             id='profile-aeo-heading'
-            className='text-[22px] font-semibold leading-tight text-white'
+            className='text-xl font-semibold leading-tight text-white'
           >
             About {content.artistName}
           </h2>
-          <div className='space-y-3 text-[15px] leading-7 text-white/72'>
+          <div className='space-y-3 text-mid leading-7 text-white/72'>
             {content.description.map(paragraph => (
               <p key={paragraph}>{paragraph}</p>
             ))}
@@ -27,16 +27,16 @@ export function ProfileAeoContent({ content }: ProfileAeoContentProps) {
         </div>
 
         <div className='space-y-4'>
-          <h3 className='text-[17px] font-semibold leading-tight text-white'>
+          <h3 className='text-base font-semibold leading-tight text-white'>
             {content.artistName} FAQ
           </h3>
           <dl className='divide-y divide-white/10 border-y border-white/10'>
             {content.faqs.map(item => (
               <div key={item.question} className='py-4'>
-                <dt className='text-[15px] font-semibold leading-6 text-white'>
+                <dt className='text-mid font-semibold leading-6 text-white'>
                   {item.question}
                 </dt>
-                <dd className='mt-2 text-[14px] leading-6 text-white/68'>
+                <dd className='mt-2 text-sm leading-6 text-white/68'>
                   <span>{item.answer}</span>{' '}
                   <a
                     href={item.source.href}
