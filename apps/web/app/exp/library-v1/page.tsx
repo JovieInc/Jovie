@@ -1298,7 +1298,7 @@ function GenerateButton() {
   return (
     <button
       type='button'
-      className='inline-flex items-center gap-1.5 h-7 px-3 rounded-md text-xs font-medium bg-cyan-300 text-black dark:text-white hover:bg-cyan-200 transition-colors duration-subtle ease-out'
+      className='inline-flex items-center gap-1.5 h-7 px-3 rounded-md text-xs font-medium bg-cyan-300 text-black dark:bg-cyan-700 dark:text-white hover:bg-cyan-200 dark:hover:bg-cyan-600 transition-colors duration-subtle ease-out'
     >
       <Sparkles className='h-3.5 w-3.5' strokeWidth={2.25} />
       <span>Generate</span>
