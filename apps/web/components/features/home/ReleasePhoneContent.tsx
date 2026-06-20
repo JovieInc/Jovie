@@ -20,7 +20,7 @@ export function ReleasePhoneContent({
         className='mx-4 mt-10 mb-1 flex items-center justify-center rounded-full bg-surface-1 px-3 py-1.5'
         style={{ border: '1px solid var(--linear-border-subtle)' }}
       >
-        <span className='truncate text-[10px] text-tertiary-token'>
+        <span className='truncate text-3xs text-tertiary-token'>
           jov.ie/{release.slug}
         </span>
       </div>
@@ -45,7 +45,7 @@ export function ReleasePhoneContent({
 
       {/* Title */}
       <div className='px-6 pb-4 text-center'>
-        <p className='text-[15px] font-semibold tracking-tight text-primary-token'>
+        <p className='text-mid font-semibold tracking-tight text-primary-token'>
           {release.title}
         </p>
         <p className='mt-0.5 text-xs text-tertiary-token'>Tim White</p>

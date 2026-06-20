@@ -134,11 +134,11 @@ function ReleasePopoverContent({
           />
         </div>
         <div className='min-w-0'>
-          <p className='text-[15px] font-medium text-primary-token'>
+          <p className='text-mid font-medium text-primary-token'>
             {release.title}
           </p>
           <p className='mt-1 text-sm text-tertiary-token'>{PROFILE.name}</p>
-          <p className='mt-2 text-[12px] font-mono text-tertiary-token'>
+          <p className='mt-2 text-xs font-mono text-tertiary-token'>
             jov.ie/{PROFILE.handle}/{release.slug}
           </p>
         </div>
@@ -223,13 +223,13 @@ function ReleaseCard({
               />
             </div>
             <div className='mt-4'>
-              <p className='text-[15px] font-medium text-primary-token'>
+              <p className='text-mid font-medium text-primary-token'>
                 {release.title}
               </p>
               <p className='mt-1 text-sm text-secondary-token'>
                 {release.type} / {release.year}
               </p>
-              <p className='mt-3 text-[13px] font-mono text-tertiary-token'>
+              <p className='mt-3 text-app font-mono text-tertiary-token'>
                 jov.ie/{PROFILE.handle}/{release.slug}
               </p>
             </div>
@@ -355,7 +355,7 @@ export function SeeItInActionCarousel({
                 </p>
                 <Link
                   href={PROFILE.profilePath}
-                  className='mt-4 inline-flex items-center gap-2 text-[13px] font-mono text-secondary-token transition-colors duration-[var(--linear-duration-normal)] hover:text-primary-token'
+                  className='mt-4 inline-flex items-center gap-2 text-app font-mono text-secondary-token transition-colors duration-[var(--linear-duration-normal)] hover:text-primary-token'
                 >
                   <span
                     aria-hidden='true'
