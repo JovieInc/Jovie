@@ -29,7 +29,7 @@ function MetricBlock({
       icon={Icon}
       iconClassName={iconClassName}
       bodyClassName='space-y-1'
-      valueClassName='text-[30px] font-[620] leading-none tracking-[-0.032em] text-primary-token tabular-nums'
+      valueClassName='text-3xl font-[620] leading-none tracking-[-0.032em] text-primary-token tabular-nums'
     />
   );
 }

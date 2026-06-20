@@ -87,7 +87,7 @@ function SpeedDialSkeleton() {
   return (
     <ContentSurfaceCard className='px-(--linear-app-content-padding-x) py-4'>
       <div className='flex items-center gap-3'>
-        <div className='h-8 w-64 animate-pulse rounded-[10px] bg-surface-0' />
+        <div className='h-8 w-64 animate-pulse rounded-lg bg-surface-0' />
       </div>
       <div className='mt-2 h-4 w-48 animate-pulse rounded bg-surface-0' />
     </ContentSurfaceCard>
@@ -166,7 +166,7 @@ export function GtmSpeedDial() {
             disabled={mutation.isPending}
             aria-pressed={currentSpeed === speed}
             className={cn(
-              'rounded-[10px] border px-3.5 py-1.5 text-app font-medium transition-colors',
+              'rounded-lg border px-3.5 py-1.5 text-app font-medium transition-colors',
               currentSpeed === speed
                 ? 'border-(--linear-btn-primary-border) bg-btn-primary text-btn-primary-foreground shadow-button-inset hover:border-(--linear-btn-primary-hover) hover:bg-btn-primary-hover'
                 : 'border-transparent bg-surface-0 text-secondary-token hover:bg-surface-0/80 hover:text-primary-token'
@@ -177,7 +177,7 @@ export function GtmSpeedDial() {
         ))}
         {currentSpeed === 'custom' && (
           <span className='flex items-center gap-2 text-app text-secondary-token'>
-            <span className='rounded-[10px] bg-surface-0 px-3 py-1.5 font-medium'>
+            <span className='rounded-lg bg-surface-0 px-3 py-1.5 font-medium'>
               Custom: {settings.dailySendCap}/day, {settings.maxPerHour}/hr
             </span>
             <button

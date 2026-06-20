@@ -23,10 +23,10 @@ export function ApprovalQueuePanel({
   return (
     <div className='border-subtle border-t pt-3'>
       <div className='flex items-center justify-between gap-3'>
-        <p className='text-[12.5px] font-[560] text-primary-token'>
+        <p className='text-xs font-[560] text-primary-token'>
           Approval Queue
         </p>
-        <span className='text-[11px] text-tertiary-token'>
+        <span className='text-2xs text-tertiary-token'>
           {approvalArtifacts.length}
         </span>
       </div>
@@ -43,7 +43,7 @@ export function ApprovalQueuePanel({
           ))}
         </div>
       ) : (
-        <p className='mt-3 text-[12px] leading-5 text-tertiary-token'>
+        <p className='mt-3 text-xs leading-5 text-tertiary-token'>
           No approvals waiting.
         </p>
       )}
