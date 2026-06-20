@@ -80,9 +80,7 @@ export default function SpinnerTestPage() {
             isolation.
           </p>
 
-          <p className='text-xs text-tertiary-token'>
-            View at /spinner-test
-          </p>
+          <p className='text-xs text-tertiary-token'>View at /spinner-test</p>
         </div>
       </ContentSurfaceCard>
     </StandaloneProductPage>

@@ -420,9 +420,7 @@ function DeploymentsPanel({
       data-testid='ops-deployments-panel'
     >
       <div className='flex items-center justify-between gap-3'>
-        <p className='text-xs font-[560] text-primary-token'>
-          Deployments
-        </p>
+        <p className='text-xs font-[560] text-primary-token'>Deployments</p>
         <p className='truncate text-2xs text-tertiary-token' title={detail}>
           {detail}
         </p>
@@ -1021,7 +1019,7 @@ export function HudDashboardClient({
                   data={hudUrl ?? ''}
                   size={196}
                   label='HUD Link'
-                  className='rounded-lg bg-white'
+                  className='rounded-lg bg-white dark:bg-white'
                 />
               </div>
             </div>

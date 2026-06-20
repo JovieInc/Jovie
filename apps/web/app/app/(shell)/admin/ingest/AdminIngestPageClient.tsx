@@ -31,7 +31,7 @@ const EVENT_LABELS: Record<string, { label: string; className: string }> = {
   },
   ARTIST_DATA_REFRESH: { label: 'Refreshed', className: 'text-info' },
   ARTIST_DATA_REFRESH_FAILED: {
-    label: 'Refresh failed',
+    label: 'Refresh Failed',
     className: 'text-error',
   },
 };
@@ -118,10 +118,7 @@ export function AdminIngestContent({ history }: AdminIngestPageClientProps) {
                   >
                     <EventIcon type={row.type} />
                     <span
-                      className={cn(
-                        'min-w-20 font-medium',
-                        config.className
-                      )}
+                      className={cn('min-w-20 font-medium', config.className)}
                     >
                       {config.label}
                     </span>
