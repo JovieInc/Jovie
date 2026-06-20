@@ -128,7 +128,7 @@ export function ComponentCheckerClient() {
         status={status}
       />
       <main
-        className='w-full pt-[88px]'
+        className='w-full pt-22'
         data-testid='component-checker-canvas'
         aria-label={`Preview of ${variant.label}`}
       >
@@ -188,7 +188,7 @@ function Toolbar({
           id='cc-variant'
           value={variant.id}
           onChange={e => onVariantChange(e.target.value)}
-          className='max-w-[260px] truncate rounded-md border border-white/15 bg-black/60 px-2 py-1 text-xs font-medium text-white focus:outline-none focus:ring-1 focus:ring-white/40'
+          className='max-w-65 truncate rounded-md border border-white/15 bg-black/60 px-2 py-1 text-xs font-medium text-white focus:outline-none focus:ring-1 focus:ring-white/40'
         >
           {variantsInCategory.map(v => (
             <option key={v.id} value={v.id}>
