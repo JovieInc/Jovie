@@ -1,9 +1,9 @@
 /**
  * Unit tests for the no-hardcoded-theme-colors ESLint rule.
  *
- * The rule flags `text-black` and `bg-white` Tailwind classes that appear
- * WITHOUT a `dark:` counterpart in the same class string — these cause
- * invisible text in dark mode (black-on-black contrast failure).
+ * The rule flags Tailwind classes that cause contrast failures when the theme flips:
+ *   - `text-black` / `bg-white` without a `dark:` counterpart (black-on-black in dark mode)
+ *   - `text-[#hex]` / `bg-[#hex]` without a `dark:` counterpart (JOV-11025)
  *
  * Uses ESLint's RuleTester with flat-config format (ESLint 10+).
  */
@@ -66,6 +66,22 @@ ruleTester.run('no-hardcoded-theme-colors', rule, {
     {
       code: `const el = <div className={cn('text-black dark:text-white', extra)} />;`,
     },
+    // Hex with dark counterpart — explicitly paired, allowed
+    {
+      code: `const el = <div className='text-[#000000] dark:text-white' />;`,
+    },
+    // Hex bg with dark counterpart
+    {
+      code: `const el = <div className='bg-[#ffffff] dark:bg-surface-0' />;`,
+    },
+    // Hex with opacity modifier — intentional overlay (not an absolute color)
+    {
+      code: `const el = <div className='bg-[#06070a]/96 text-white' />;`,
+    },
+    // Hex with opacity modifier on text
+    {
+      code: `const el = <div className='text-[#000000]/40' />;`,
+    },
   ],
 
   invalid: [
@@ -98,6 +114,36 @@ ruleTester.run('no-hardcoded-theme-colors', rule, {
     {
       code: `const el = <div className={\`text-black \${extra}\`} />;`,
       errors: [{ messageId: 'bareTextBlack' }],
+    },
+    // Hardcoded hex text without dark counterpart (JOV-11025)
+    {
+      code: `const el = <div className='text-[#000000]' />;`,
+      errors: [{ messageId: 'bareHexText' }],
+    },
+    // Hardcoded hex text among other classes, no dark counterpart
+    {
+      code: `const el = <div className='font-bold text-[#121216] px-4' />;`,
+      errors: [{ messageId: 'bareHexText' }],
+    },
+    // Hardcoded short hex text
+    {
+      code: `const el = <div className='text-[#000]' />;`,
+      errors: [{ messageId: 'bareHexText' }],
+    },
+    // Hardcoded hex background without dark counterpart
+    {
+      code: `const el = <div className='bg-[#ffffff] p-4' />;`,
+      errors: [{ messageId: 'bareHexBg' }],
+    },
+    // Hardcoded hex bg in cn() without dark counterpart
+    {
+      code: `const el = <div className={cn('bg-[#f5f5f7] rounded', extra)} />;`,
+      errors: [{ messageId: 'bareHexBg' }],
+    },
+    // Hardcoded hex text in template literal
+    {
+      code: `const el = <div className={\`text-[#8A8F98] \${extra}\`} />;`,
+      errors: [{ messageId: 'bareHexText' }],
     },
   ],
 });
