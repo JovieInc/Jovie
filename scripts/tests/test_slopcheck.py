@@ -124,6 +124,44 @@ class TestStructuralTicContraction:
         assert "not just" in hit_text.lower()
 
 
+class TestEmDashFalsePositives:
+    """CSS custom properties and Markdown table separators must NOT count as em-dashes."""
+
+    def test_css_custom_properties_not_counted(self):
+        # Technical docs reference CSS vars like --color-accent, --font-sans
+        text = (
+            "Use `--color-bg-base` for background and `--font-sans` for body text.\n"
+            "Set `var(--marketing-font-body)` to Inter.\n"
+        )
+        result = slop_score(text, filename="design.md")
+        em_hits = [h for h in result.hits if "em-dash" in h]
+        assert len(em_hits) == 0, (
+            f"CSS custom properties (--var-name) must not be counted as em-dashes. Got: {em_hits}"
+        )
+
+    def test_markdown_table_separators_not_counted(self):
+        # Markdown tables have |---|---| separator rows
+        text = (
+            "| Name | Value | Usage |\n"
+            "|-------|-------|-------|\n"
+            "| foo   | bar   | baz   |\n"
+        )
+        result = slop_score(text, filename="table.md")
+        em_hits = [h for h in result.hits if "em-dash" in h]
+        assert len(em_hits) == 0, (
+            f"Markdown table separators (|---|) must not be counted as em-dashes. Got: {em_hits}"
+        )
+
+    def test_prose_double_hyphen_still_counted(self):
+        # Prose -- used as a dash should still count (it's a slop tell)
+        text = ("This is a point -- and another point -- and yet another. " * 20)
+        result = slop_score(text, filename="prose.md")
+        em_hits = [h for h in result.hits if "em-dash" in h]
+        assert len(em_hits) > 0, (
+            "Prose double-hyphen (word -- word) should still be flagged as em-dash overuse"
+        )
+
+
 class TestEmDashPenalty:
     def test_no_penalty_within_budget(self):
         # 2 em-dashes for ~100 words: budget = 2*(100/500) = 0.4, so 2 > 0.4 → penalty

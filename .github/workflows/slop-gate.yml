@@ -44,7 +44,7 @@ jobs:
           # Files changed vs. base branch that match copy patterns
           git diff --name-only origin/${{ github.base_ref }}...HEAD \
             | grep -E '\.(md|mdx)$' \
-            | grep -v -E '^(node_modules|\.cache|drizzle/migrations)' \
+            | grep -v -E '^(node_modules|\.cache|drizzle/migrations|DESIGN\.md)' \
             > /tmp/changed_copy_files.txt || true
 
           if [ -s /tmp/changed_copy_files.txt ]; then
