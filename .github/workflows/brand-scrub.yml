@@ -43,7 +43,9 @@ jobs:
       - name: Get changed files
         id: changed
         run: |
-          git diff --name-only origin/${{ github.base_ref }}...HEAD \
+          # --diff-filter=d excludes deleted files: removing a blocked-path doc is
+          # the desired action, not a violation, and a deleted file can't be scanned.
+          git diff --name-only --diff-filter=d origin/${{ github.base_ref }}...HEAD \
             | grep -E '\.(md|mdx|txt)$|^docs/' \
             | grep -v -E '^(node_modules|\.cache|drizzle/migrations)' \
             > /tmp/changed_files.txt || true

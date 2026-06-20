@@ -79,9 +79,10 @@ COMPETITOR_BRANDS: list[str] = [
     "Spotify for Artists",  # platform API - OK; competitor *analysis* context is flagged via path
 ]
 
-# Regex: case-insensitive whole-word / phrase match
+# Regex: case-insensitive whole-word / phrase match.
+# \b boundaries prevent substring false positives (e.g. 'Hive' inside 'archive').
 _BRAND_PATTERNS: list[re.Pattern[str]] = [
-    re.compile(re.escape(b), re.IGNORECASE) for b in COMPETITOR_BRANDS
+    re.compile(rf"\b{re.escape(b)}\b", re.IGNORECASE) for b in COMPETITOR_BRANDS
 ]
 
 

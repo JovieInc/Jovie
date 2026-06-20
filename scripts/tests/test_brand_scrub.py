@@ -131,6 +131,23 @@ def test_clean_content_passes() -> None:
     assert violations == []
 
 
+def test_brand_requires_word_boundary() -> None:
+    """'Hive' must not match the substring inside 'archive'/'archived' (regression)."""
+    p = make_file(
+        "We preserve the destructive archive styling.\n"
+        "Empty, paused, or archived states render no fallback.\n"
+    )
+    violations = check_file(p)
+    assert violations == [], f"unexpected substring match: {violations}"
+
+
+def test_brand_still_matches_standalone_word() -> None:
+    """The word-boundary fix must still flag the brand as a standalone word."""
+    p = make_file("Hive takes 0% but lacks payouts.\n")
+    violations = check_file(p)
+    assert any(v.kind == "competitor_brand" for v in violations)
+
+
 # ---------------------------------------------------------------------------
 # Combined: path + content
 # ---------------------------------------------------------------------------

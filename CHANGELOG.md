@@ -11,7 +11,7 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ### Removed
 
-- **[internal] Competitor teardown doc removed from public repo**: `docs/plans/lyb-aesthetics-workout-tracker-validation.md` (RP Hypertrophy analysis) was accidentally merged via PR #11018 and is now removed. Private strategy docs must live in a private repo.
+- **[internal] Competitor teardown doc removed from public repo**: a private competitor-analysis doc (`docs/plans/lyb-aesthetics-workout-tracker-validation.md`) was accidentally merged via PR #11018 and is now removed. Private strategy docs must live in a private repo.
 
 ### Added
 
