@@ -158,6 +158,7 @@
     "qa:swarm:list": "node scripts/qa-swarm/cli.mjs list",
     "qa:swarm:propose": "node scripts/qa-swarm/cli.mjs propose",
     "qa:swarm:test": "vitest --root scripts --config vitest.config.mts run lib/__tests__/qa-swarm.test.mjs",
+    "test:observability-pipeline": "node --test scripts/lib/observability-fingerprint.test.mjs scripts/observability-issue-sync.test.mjs scripts/observability-issue-github.test.mjs && node --experimental-strip-types --test workers/observability-ingest/src/index.test.mjs",
     "commit": "cz",
     "clean": "node scripts/turbo-local.mjs clean && rm -rf node_modules",
     "prepare": "husky",

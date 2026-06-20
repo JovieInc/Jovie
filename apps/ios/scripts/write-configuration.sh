@@ -10,6 +10,8 @@ API_BASE_URL="${API_BASE_URL:-http://localhost:3100}"
 WEB_BASE_URL="${WEB_BASE_URL:-$API_BASE_URL}"
 SENTRY_DSN="${JOVIE_IOS_SENTRY_DSN:-${NEXT_PUBLIC_SENTRY_DSN_DEV:-${NEXT_PUBLIC_SENTRY_DSN:-${SENTRY_DSN_DEV:-${SENTRY_DSN:-}}}}}"
 OBSERVABILITY_ENVIRONMENT="${JOVIE_IOS_OBSERVABILITY_ENVIRONMENT:-${OBSERVABILITY_ENVIRONMENT:-${SENTRY_ENVIRONMENT:-development}}}"
+OBSERVABILITY_INGEST_URL="${JOVIE_IOS_OBSERVABILITY_INGEST_URL:-${OBSERVABILITY_INGEST_URL:-}}"
+OBSERVABILITY_INGEST_SECRET="${JOVIE_IOS_OBSERVABILITY_INGEST_SECRET:-${OBSERVABILITY_INGEST_SECRET:-}}"
 # Clerk iOS redirect config (gh-9806 JOV-2652): drive from env/Doppler so it
 # matches the allowed redirect URLs configured in the Clerk dashboard for
 # this publishable key + native app. Same scheme across envs; explicit.
@@ -29,6 +31,8 @@ payload = {
     "WebBaseUrl": r"$WEB_BASE_URL",
     "SentryDsn": r"$SENTRY_DSN",
     "ObservabilityEnvironment": r"$OBSERVABILITY_ENVIRONMENT",
+    "ObservabilityIngestUrl": r"$OBSERVABILITY_INGEST_URL",
+    "ObservabilityIngestSecret": r"$OBSERVABILITY_INGEST_SECRET",
     "ClerkRedirectUrl": r"$CLERK_REDIRECT_URL",
     "ClerkCallbackUrlScheme": r"$CLERK_CALLBACK_URL_SCHEME",
 }
