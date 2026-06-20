@@ -84,8 +84,13 @@ export default async function AppShellLayout({
     const authResult = await resolveUserState({
       knownClerkUserId: auth.userId,
     });
-    if (!canAccessAppShell(authResult.state) && authResult.redirectTo) {
-      redirect(authResult.redirectTo);
+    if (!canAccessAppShell(authResult.state)) {
+      redirect(
+        authResult.redirectTo ??
+          buildAppShellSignInUrl(nextUrlHeader, {
+            origin: resolveRequestOrigin(headerStore),
+          })
+      );
     }
 
     // Resolve the shell variant up front so the Suspense fallback skeleton

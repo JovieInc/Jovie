@@ -43,7 +43,7 @@ export default async function StartPage(
       ? params.starter_prompt
       : undefined;
 
-  const authResult = await resolveUserState();
+  const authResult = await resolveUserState({ createDbUserIfMissing: false });
   const startRedirect = getStartRouteRedirect(authResult.state);
   if (startRedirect) {
     redirect(startRedirect);

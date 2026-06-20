@@ -23,13 +23,6 @@ vi.mock('@/lib/auth/gate', () => ({
   }),
 }));
 
-vi.mock('./SignInPageClient', () => ({
-  SignInPageClient: () => {
-    const reactModule = require('react');
-    return reactModule.createElement('div', { 'data-testid': 'signin-client' });
-  },
-}));
-
 vi.mock('@/features/auth', async () => {
   const reactModule = await import('react');
   return {

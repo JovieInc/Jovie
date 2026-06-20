@@ -12,6 +12,19 @@ function isWaitlistInviteRedirect(redirectUrl: string | null): boolean {
   );
 }
 
+function isAuthEntryRedirect(redirectUrl: string | null): boolean {
+  return (
+    redirectUrl === APP_ROUTES.SIGNIN ||
+    redirectUrl?.startsWith(`${APP_ROUTES.SIGNIN}?`) === true ||
+    redirectUrl === APP_ROUTES.SIGNUP ||
+    redirectUrl?.startsWith(`${APP_ROUTES.SIGNUP}?`) === true ||
+    redirectUrl === APP_ROUTES.SIGNIN_HYPHEN ||
+    redirectUrl?.startsWith(`${APP_ROUTES.SIGNIN_HYPHEN}?`) === true ||
+    redirectUrl === APP_ROUTES.SIGNUP_HYPHEN ||
+    redirectUrl?.startsWith(`${APP_ROUTES.SIGNUP_HYPHEN}?`) === true
+  );
+}
+
 /**
  * Whether an authenticated user may enter the /app shell.
  * Onboarding-in-progress and fully active users both belong here.
@@ -33,17 +46,28 @@ export function getAuthenticatedAuthRouteRedirect(
   options?: { readonly redirectUrl?: string | null }
 ): string {
   const sanitizedRedirect = sanitizeRedirectUrl(options?.redirectUrl ?? null);
+  const stateRedirect = getRedirectForState(state);
+
+  if (
+    state === CanonicalUserState.BANNED ||
+    state === CanonicalUserState.USER_CREATION_FAILED
+  ) {
+    return stateRedirect ?? APP_ROUTES.UNAVAILABLE;
+  }
 
   if (sanitizedRedirect && isWaitlistInviteRedirect(sanitizedRedirect)) {
     return sanitizedRedirect;
   }
 
-  const stateRedirect = getRedirectForState(state);
   if (stateRedirect) {
     return stateRedirect;
   }
 
-  return sanitizedRedirect ?? APP_ROUTES.DASHBOARD;
+  if (sanitizedRedirect && !isAuthEntryRedirect(sanitizedRedirect)) {
+    return sanitizedRedirect;
+  }
+
+  return APP_ROUTES.DASHBOARD;
 }
 
 /**
@@ -63,7 +87,7 @@ export function getStartRouteRedirect(
     case CanonicalUserState.BANNED:
       return APP_ROUTES.UNAVAILABLE;
     case CanonicalUserState.USER_CREATION_FAILED:
-      return '/error/user-creation-failed';
+      return APP_ROUTES.USER_CREATION_ERROR;
     case CanonicalUserState.NEEDS_WAITLIST_SUBMISSION:
     case CanonicalUserState.WAITLIST_PENDING:
       return APP_ROUTES.WAITLIST;

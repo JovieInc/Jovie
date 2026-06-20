@@ -39,5 +39,8 @@ describe('/start page', () => {
       'pending'
     );
     expect(getOrMintOnboardingSessionIdMock).not.toHaveBeenCalled();
+    expect(resolveUserStateMock).toHaveBeenCalledWith({
+      createDbUserIfMissing: false,
+    });
   });
 });

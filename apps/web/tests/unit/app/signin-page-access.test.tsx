@@ -22,7 +22,7 @@ vi.mock('@/lib/auth/gate', () => ({
   resolveUserState: mockResolveUserState,
 }));
 
-vi.mock('./SignInPageClient', () => ({
+vi.mock('../../../app/(auth)/signin/SignInPageClient', () => ({
   SignInPageClient: () => null,
 }));
 
