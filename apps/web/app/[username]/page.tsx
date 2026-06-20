@@ -502,6 +502,23 @@ export default async function ArtistPage({ params }: Readonly<Props>) {
       <script type='application/ld+json'>
         {safeJsonLdStringify(structuredData)}
       </script>
+      {/* FAQPage JSON-LD — feeds AI citation engines and Google FAQ rich results */}
+      {aeoContent.faqs.length > 0 && (
+        <script type='application/ld+json'>
+          {safeJsonLdStringify({
+            '@context': 'https://schema.org',
+            '@type': 'FAQPage',
+            mainEntity: aeoContent.faqs.map(item => ({
+              '@type': 'Question',
+              name: item.question,
+              acceptedAnswer: {
+                '@type': 'Answer',
+                text: item.answer,
+              },
+            })),
+          })}
+        </script>
+      )}
 
       {isPublicNoAuthSmoke ? null : (
         <ProfileViewTracker handle={artist.handle} artistId={artist.id} />

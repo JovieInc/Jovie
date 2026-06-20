@@ -562,6 +562,25 @@ describe('Public Profile Page Logic', () => {
     });
   });
 
+  describe('FAQPage JSON-LD (AEO — JovieInc/Jovie#11029)', () => {
+    it('emits a FAQPage JSON-LD script tag when AEO content has FAQs', () => {
+      // The profile page source must conditionally emit a FAQPage script tag
+      // when aeoContent.faqs.length > 0. This feeds AI citation engines and
+      // Google FAQ rich results.
+      expect(PUBLIC_PROFILE_PAGE_SOURCE).toContain("'@type': 'FAQPage'");
+      expect(PUBLIC_PROFILE_PAGE_SOURCE).toContain("'@type': 'Question'");
+      expect(PUBLIC_PROFILE_PAGE_SOURCE).toContain("'@type': 'Answer'");
+      expect(PUBLIC_PROFILE_PAGE_SOURCE).toContain('aeoContent.faqs');
+    });
+
+    it('guards the FAQPage script tag behind a faqs.length > 0 check', () => {
+      // Prevents an empty FAQPage from being emitted for profiles with no data
+      expect(PUBLIC_PROFILE_PAGE_SOURCE).toMatch(
+        /aeoContent\.faqs\.length\s*>\s*0/
+      );
+    });
+  });
+
   describe('Profile page mode logic', () => {
     it.each([
       ['profile', 'Artist'],
