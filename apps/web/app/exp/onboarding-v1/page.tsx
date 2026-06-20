@@ -666,7 +666,7 @@ function RightRail({
 }) {
   return (
     <aside
-      className='hidden lg:flex flex-col w-[340px] shrink-0 border-l border-(--linear-app-shell-border)/60 bg-(--linear-app-content-surface) overflow-y-auto transition-[opacity,transform] duration-cinematic ease-out'
+      className='hidden lg:flex flex-col w-85 shrink-0 border-l border-(--linear-app-shell-border)/60 bg-(--linear-app-content-surface) overflow-y-auto transition-[opacity,transform] duration-cinematic ease-out'
       style={{
         opacity: visible ? 1 : 0,
         transform: visible ? 'translateX(0)' : 'translateX(24px)',
@@ -692,7 +692,7 @@ function RightRail({
             </div>
           </div>
           {career && (
-            <div className='mt-3 inline-flex items-center h-[20px] px-2 rounded text-3xs uppercase tracking-[0.06em] text-cyan-300/90 border border-cyan-500/30 bg-cyan-500/10'>
+            <div className='mt-3 inline-flex items-center h-5 px-2 rounded text-3xs uppercase tracking-[0.06em] text-cyan-300/90 border border-cyan-500/30 bg-cyan-500/10'>
               {career}
             </div>
           )}
@@ -747,7 +747,7 @@ function SidebarShim({
 }) {
   return (
     <aside
-      className='hidden lg:flex flex-col w-[224px] shrink-0 px-2 pt-3 pb-3 transition-[opacity,transform] duration-cinematic ease-out'
+      className='hidden lg:flex flex-col w-56 shrink-0 px-2 pt-3 pb-3 transition-[opacity,transform] duration-cinematic ease-out'
       style={{
         opacity: visible ? 1 : 0,
         transform: visible ? 'translateX(0)' : 'translateX(-32px)',

@@ -131,7 +131,7 @@ export default function AuthV1Page() {
           it never competes with the form. Flex column instead of grid
           place-items-center so we can mt-auto the legal strip. */}
       <div className='min-h-dvh flex flex-col items-center justify-center px-6 py-10 relative'>
-        <div className='w-full max-w-[360px] flex flex-col items-center text-center'>
+        <div className='w-full max-w-90 flex flex-col items-center text-center'>
           <JovieMark className='h-8 w-8 text-primary-token opacity-30 mb-7' />
 
           <h1
@@ -140,7 +140,7 @@ export default function AuthV1Page() {
           >
             {heading}
           </h1>
-          <p className='mt-2 text-app text-tertiary-token max-w-[320px]'>
+          <p className='mt-2 text-app text-tertiary-token max-w-80'>
             {description}
           </p>
 
@@ -278,12 +278,12 @@ function BentoShowcase() {
           Meet Jovie
         </span>
         <h2
-          className='mt-2 text-3xl font-semibold leading-tight text-primary-token max-w-[420px]'
+          className='mt-2 text-3xl font-semibold leading-tight text-primary-token max-w-105'
           style={{ letterSpacing: '-0.02em' }}
         >
           Built for artists.
         </h2>
-        <p className='mt-3 text-app text-tertiary-token max-w-[400px] leading-relaxed'>
+        <p className='mt-3 text-app text-tertiary-token max-w-100 leading-relaxed'>
           Release more music with less work.
         </p>
       </div>
@@ -303,7 +303,7 @@ function BentoShowcase() {
         <div className='flex items-center justify-between gap-x-8 text-white/68'>
           <AwalLogo className='h-[22px] w-auto select-none' />
           <TheOrchardLogo className='h-[30px] w-auto select-none' />
-          <ArmadaMusicLogo className='h-[24px] w-auto select-none' />
+          <ArmadaMusicLogo className='h-6 w-auto select-none' />
           <BlackHoleRecordingsLogo className='h-[18px] w-auto select-none' />
         </div>
       </div>
@@ -316,7 +316,7 @@ function ProductMock() {
   // strip + canvas tiles. Keeps the bento honest without a binary asset
   // dependency. Replace with a real screenshot import later.
   return (
-    <div className='w-full max-w-[520px] aspect-[16/10] rounded-lg border border-(--linear-app-shell-border) bg-(--linear-app-content-surface) shadow-[0_24px_80px_rgba(0,0,0,0.45)] overflow-hidden grid grid-cols-[80px_1fr]'>
+    <div className='w-full max-w-130 aspect-[16/10] rounded-lg border border-(--linear-app-shell-border) bg-(--linear-app-content-surface) shadow-[0_24px_80px_rgba(0,0,0,0.45)] overflow-hidden grid grid-cols-[80px_1fr]'>
       {/* sidebar strip */}
       <div className='border-r border-(--linear-app-shell-border)/70 bg-(--surface-0)/60 p-2 flex flex-col gap-1.5'>
         {[0, 1, 2, 3, 4].map(i => (

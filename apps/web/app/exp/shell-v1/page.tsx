@@ -2467,7 +2467,7 @@ function ShellV1ExperimentContent() {
             // Sits inside the same 32px gutter the audio bar uses (px-8) so
             // the album art aligns to a virtual grid as if the canvas's
             // content area extended down past it.
-            className='hidden lg:block fixed bottom-[26px] z-30 w-[224px]'
+            className='hidden lg:block fixed bottom-[26px] z-30 w-56'
             style={{
               left: sidebarMode === 'docked' ? 264 : 32,
               opacity: barCollapsed ? 0 : 1,
@@ -2730,7 +2730,7 @@ function ShellV1ExperimentContent() {
                 aria-hidden={
                   !(view === 'releases' && selectedReleaseId !== null)
                 }
-                className='absolute inset-y-0 right-0 z-30 w-[412px] pointer-events-none'
+                className='absolute inset-y-0 right-0 z-30 w-103 pointer-events-none'
                 style={{
                   transform:
                     view === 'releases' && selectedReleaseId !== null
@@ -2998,7 +2998,7 @@ function FloatingSidebarLayer({
       {/* biome-ignore lint/a11y/noStaticElementInteractions: same as above */}
       {/* biome-ignore lint/a11y/noNoninteractiveElementInteractions: same */}
       <div
-        className='hidden lg:flex fixed top-2 bottom-2 left-2 z-40 w-[224px] rounded-[var(--linear-app-shell-radius)] border border-(--linear-app-shell-border) bg-(--linear-app-content-surface) shadow-[var(--linear-app-shell-shadow)] overflow-hidden'
+        className='hidden lg:flex fixed top-2 bottom-2 left-2 z-40 w-56 rounded-[var(--linear-app-shell-radius)] border border-(--linear-app-shell-border) bg-(--linear-app-content-surface) shadow-[var(--linear-app-shell-shadow)] overflow-hidden'
         style={{
           transform: visible
             ? 'translateX(0)'
@@ -3139,7 +3139,7 @@ function Sidebar({
     <aside
       className={cn(
         'relative flex flex-col h-full shrink-0',
-        tight ? 'w-[212px]' : 'w-[224px]'
+        tight ? 'w-53' : 'w-56'
       )}
       onMouseEnter={bumpPinVisibility}
       onMouseMove={bumpPinVisibility}
@@ -4074,7 +4074,7 @@ function DashboardHome() {
           card (Dismiss or its primary action), which forces a real
           decision instead of letting them skim past. */}
       <div className='flex-1 grid place-items-center min-h-0'>
-        <div className='w-full max-w-[480px] flex flex-col items-center'>
+        <div className='w-full max-w-120 flex flex-col items-center'>
           <div className='shrink-0 text-center pb-5'>
             <h1
               className='text-mid font-medium text-tertiary-token'
@@ -5022,7 +5022,7 @@ function ReleaseRow({
       data-selected={isSelected || undefined}
       data-focused={isFocused || undefined}
       className={cn(
-        'group/row relative grid items-center gap-3 h-[52px] rounded-md pl-2 pr-3 cursor-pointer transition-colors duration-subtle ease-out focus:outline-none',
+        'group/row relative grid items-center gap-3 h-13 rounded-md pl-2 pr-3 cursor-pointer transition-colors duration-subtle ease-out focus:outline-none',
         // [#] [art] [title/artist+badge fluid] [date] [right cluster: streams + DSP stack]
         drawerOpen
           ? 'grid-cols-[24px_40px_minmax(0,1fr)_auto]'
@@ -5117,7 +5117,7 @@ function ReleaseRow({
       {/* Release date — hidden in narrow */}
       <span
         className={cn(
-          'text-2xs text-tertiary-token tabular-nums whitespace-nowrap min-w-[68px] text-right',
+          'text-2xs text-tertiary-token tabular-nums whitespace-nowrap min-w-17 text-right',
           drawerOpen && 'hidden'
         )}
       >
@@ -5776,7 +5776,7 @@ function DrawerDistribution({ release }: { release: Release }) {
                     className='w-full flex items-center gap-2.5 h-7 px-2 rounded-md text-xs text-secondary-token hover:bg-surface-1/40 hover:text-primary-token transition-colors duration-subtle ease-out'
                   >
                     <span
-                      className='h-[16px] w-[16px] rounded grid place-items-center text-3xs font-semibold text-white shrink-0'
+                      className='h-4 w-4 rounded grid place-items-center text-3xs font-semibold text-white shrink-0'
                       style={{
                         background:
                           p.status === 'missing'
@@ -5795,7 +5795,7 @@ function DrawerDistribution({ release }: { release: Release }) {
                           DSP_STATUS_DOT[p.status]
                         )}
                       />
-                      <span className='text-3xs uppercase tracking-[0.06em] text-quaternary-token w-[44px] text-right'>
+                      <span className='text-3xs uppercase tracking-[0.06em] text-quaternary-token w-11 text-right'>
                         {p.status}
                       </span>
                     </span>
@@ -6098,7 +6098,7 @@ function TracksView({
           <ColumnLabel
             field='bpm'
             label='BPM'
-            width='w-[44px]'
+            width='w-11'
             align='right'
             sortBy={sortBy}
             sortDir={sortDir}
@@ -6113,10 +6113,10 @@ function TracksView({
           >
             {keyMode === 'normal' ? 'Key' : 'Cam'}
           </button>
-          <span className='w-[176px] shrink-0 text-left text-3xs uppercase tracking-[0.12em] font-medium text-quaternary-token/85'>
+          <span className='w-44 shrink-0 text-left text-3xs uppercase tracking-[0.12em] font-medium text-quaternary-token/85'>
             Waveform
           </span>
-          <span className='w-[64px] shrink-0 text-right text-3xs uppercase tracking-[0.12em] font-medium text-quaternary-token/85'>
+          <span className='w-16 shrink-0 text-right text-3xs uppercase tracking-[0.12em] font-medium text-quaternary-token/85'>
             Status
           </span>
           <span className='w-10 shrink-0 text-right text-3xs tabular-nums text-quaternary-token/70'>
@@ -6217,7 +6217,7 @@ function TrackRow({
       onContextMenu={e => onContextMenu?.(e, track)}
       data-focused={isFocused || undefined}
       className={cn(
-        'group/row relative flex items-center gap-3 h-[44px] pl-2 pr-3 rounded-md cursor-pointer transition-colors duration-subtle ease-out focus:outline-none',
+        'group/row relative flex items-center gap-3 h-11 pl-2 pr-3 rounded-md cursor-pointer transition-colors duration-subtle ease-out focus:outline-none',
         !isFocused && !kbActive && 'hover:bg-surface-1/40',
         SELECTED_ROW_CLASSES
       )}
@@ -6282,7 +6282,7 @@ function TrackRow({
       </div>
 
       {/* BPM — heavier weight, monochrome, right-aligned */}
-      <span className='w-[44px] shrink-0 text-right text-xs tabular-nums font-semibold text-secondary-token tracking-[-0.01em]'>
+      <span className='w-11 shrink-0 text-right text-xs tabular-nums font-semibold text-secondary-token tracking-[-0.01em]'>
         {track.bpm}
       </span>
 
@@ -6297,7 +6297,7 @@ function TrackRow({
           playing/selected row's waveform pops by contrast. */}
       <div
         className={cn(
-          'w-[176px] shrink-0 transition-opacity duration-subtle ease-out',
+          'w-44 shrink-0 transition-opacity duration-subtle ease-out',
           isCurrentTrack || isFocused
             ? 'opacity-100'
             : 'opacity-60 group-hover/row:opacity-90'
@@ -6318,7 +6318,7 @@ function TrackRow({
       </div>
 
       {/* Status as a labeled chip — Live / Queued / Draft. */}
-      <div className='w-[64px] shrink-0 flex justify-end'>
+      <div className='w-16 shrink-0 flex justify-end'>
         <StatusBadge status={track.status} />
       </div>
 
@@ -6475,7 +6475,7 @@ function TasksView({
       aria-label='Tasks'
     >
       {/* List pane */}
-      <div className='w-[380px] shrink-0 flex flex-col border-r border-(--linear-app-shell-border)/60 min-h-0'>
+      <div className='w-95 shrink-0 flex flex-col border-r border-(--linear-app-shell-border)/60 min-h-0'>
         <div className='shrink-0 px-3 pt-3 pb-2 flex items-center gap-2'>
           <span className='text-xs font-caption text-primary-token tracking-[-0.012em]'>
             All
