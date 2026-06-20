@@ -72,7 +72,7 @@ export function PhoneTourMobileSection() {
             <h2 className='marketing-h2-linear text-primary-token'>
               The right action for every fan.
             </h2>
-            <p className='max-w-[400px] marketing-lead-linear text-secondary-token'>
+            <p className='max-w-100 marketing-lead-linear text-secondary-token'>
               Every visitor sees the action most likely to convert in that
               moment: listen, tip, tour, or subscribe.
             </p>
@@ -307,7 +307,7 @@ export function PhoneShowcase({
       <PhoneFrame>
         {/* Minimal profile header */}
         <div className='flex flex-col items-center px-5 pt-14 pb-3'>
-          <div className='rounded-full p-[2px] ring-1 ring-white/6 shadow-sm'>
+          <div className='rounded-full p-1 ring-1 ring-white/6 shadow-sm'>
             <Avatar
               src={MOCK_ARTIST.image}
               alt={MOCK_ARTIST.name}
@@ -359,7 +359,7 @@ export function PhoneShowcase({
         </div>
 
         <div className='pb-3 pt-1 text-center'>
-          <p className='text-[9px] uppercase tracking-[0.15em] text-secondary-token'>
+          <p className='text-3xs uppercase tracking-[0.15em] text-secondary-token'>
             Powered by Jovie
           </p>
         </div>
@@ -403,7 +403,7 @@ export function PhoneShowcase({
               ref={node => {
                 tabRefs.current[i] = node;
               }}
-              className={`relative z-10 rounded-full px-3 py-1 text-[11px] font-mono tracking-[-0.02em] transition-colors duration-300 ${
+              className={`relative z-10 rounded-full px-3 py-1 text-2xs font-mono tracking-[-0.02em] transition-colors duration-300 ${
                 i === activeIndex
                   ? 'text-[var(--linear-text-primary)]'
                   : 'text-[var(--linear-text-quaternary)] hover:text-[var(--linear-text-secondary)]'
@@ -435,11 +435,11 @@ export function MobileCard({ mode }: { readonly mode: ModeData }) {
         <h3 className='text-lg font-semibold tracking-tight text-primary-token'>
           {mode.headline}
         </h3>
-        <span className='shrink-0 rounded-full border border-subtle px-2.5 py-1 text-[10px] font-medium uppercase tracking-[0.08em] text-secondary-token'>
+        <span className='shrink-0 rounded-full border border-subtle px-2.5 py-1 text-3xs font-medium uppercase tracking-[0.08em] text-secondary-token'>
           {mode.outcome}
         </span>
       </div>
-      <p className='mt-2 text-[14px] leading-[1.6] text-secondary-token'>
+      <p className='mt-2 text-sm leading-[1.6] text-secondary-token'>
         {mode.description}
       </p>
     </div>

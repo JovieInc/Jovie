@@ -56,7 +56,7 @@ export function QRCodeCard({ handle }: QRCodeCardProps) {
       <div className='relative p-4 bg-surface-0/80 backdrop-blur-xl rounded-2xl border border-subtle shadow-xl hover:shadow-2xl transition-shadow duration-slow'>
         <div className='flex flex-col items-center'>
           {/* QR Code */}
-          <div className='w-[120px] h-[120px] bg-white rounded-lg p-2 shadow-sm'>
+          <div className='w-30 h-30 bg-white rounded-lg p-2 shadow-sm'>
             {qrCodeUrl && !hasError ? (
               <Image
                 src={qrCodeUrl}

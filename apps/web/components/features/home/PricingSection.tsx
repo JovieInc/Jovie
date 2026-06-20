@@ -83,9 +83,9 @@ export function PricingSection() {
                 <span className='text-4xl font-semibold tracking-tight text-primary-token'>
                   $0
                 </span>
-                <span className='text-[14px] text-tertiary-token'>/mo</span>
+                <span className='text-sm text-tertiary-token'>/mo</span>
               </div>
-              <p className='mt-3 text-[14px] leading-relaxed text-secondary-token'>
+              <p className='mt-3 text-sm leading-relaxed text-secondary-token'>
                 Smart links, your artist profile, and the core launch surface.
               </p>
 
@@ -93,7 +93,7 @@ export function PricingSection() {
                 {FREE_OUTCOMES.map(feature => (
                   <li
                     key={feature}
-                    className='flex items-center gap-3 text-[14px] text-secondary-token'
+                    className='flex items-center gap-3 text-sm text-secondary-token'
                   >
                     <Check className='h-4 w-4 shrink-0 text-tertiary-token' />
                     {feature}
@@ -142,9 +142,9 @@ export function PricingSection() {
                 <span className='text-4xl font-semibold tracking-tight text-primary-token'>
                   ${proPlan.price?.monthly ?? 0}
                 </span>
-                <span className='text-[14px] text-tertiary-token'>/mo</span>
+                <span className='text-sm text-tertiary-token'>/mo</span>
               </div>
-              <p className='mt-3 text-[14px] leading-relaxed text-secondary-token'>
+              <p className='mt-3 text-sm leading-relaxed text-secondary-token'>
                 Release notifications, audience intelligence, contact export,
                 and deeper fan ownership.
               </p>
@@ -153,7 +153,7 @@ export function PricingSection() {
                 {PRO_OUTCOMES.map(feature => (
                   <li
                     key={feature}
-                    className='flex items-center gap-3 text-[14px] text-secondary-token'
+                    className='flex items-center gap-3 text-sm text-secondary-token'
                   >
                     <Check className='h-4 w-4 shrink-0 text-tertiary-token' />
                     {feature}
