@@ -60,27 +60,27 @@ export default async function ArtistsPage() {
               <p className='text-2xl font-semibold tracking-[-0.03em] text-primary-token'>
                 {profiles.length}
               </p>
-              <p className='text-[12px] font-semibold uppercase tracking-[0.14em] text-tertiary-token'>
+              <p className='text-xs font-semibold uppercase tracking-[0.14em] text-tertiary-token'>
                 Public profiles
               </p>
-              <p className='text-[13px] leading-5 text-secondary-token'>
+              <p className='text-app leading-5 text-secondary-token'>
                 Creator pages currently available to browse.
               </p>
             </ContentSurfaceCard>
             <ContentSurfaceCard surface='nested' className='space-y-1 p-4'>
-              <p className='text-[13px] font-semibold text-primary-token'>
+              <p className='text-app font-semibold text-primary-token'>
                 Discover artists
               </p>
-              <p className='text-[13px] leading-5 text-secondary-token'>
+              <p className='text-app leading-5 text-secondary-token'>
                 Browse creator pages, profile themes, and public fan
                 experiences.
               </p>
             </ContentSurfaceCard>
             <ContentSurfaceCard surface='nested' className='space-y-1 p-4'>
-              <p className='text-[13px] font-semibold text-primary-token'>
+              <p className='text-app font-semibold text-primary-token'>
                 Jump straight in
               </p>
-              <p className='text-[13px] leading-5 text-secondary-token'>
+              <p className='text-app leading-5 text-secondary-token'>
                 Every card opens the artist&apos;s public profile in one click.
               </p>
             </ContentSurfaceCard>
@@ -111,21 +111,21 @@ export default async function ArtistsPage() {
                   </div>
 
                   <div className='space-y-1'>
-                    <h2 className='text-[15px] font-semibold text-primary-token transition-colors group-hover:text-secondary-token'>
+                    <h2 className='text-mid font-semibold text-primary-token transition-colors group-hover:text-secondary-token'>
                       {profile.displayName || profile.username}
                     </h2>
                     {profile.bio ? (
-                      <p className='line-clamp-3 text-[13px] leading-5 text-secondary-token'>
+                      <p className='line-clamp-3 text-app leading-5 text-secondary-token'>
                         {profile.bio}
                       </p>
                     ) : (
-                      <p className='text-[13px] leading-5 text-tertiary-token'>
+                      <p className='text-app leading-5 text-tertiary-token'>
                         Public creator profile on Jovie.
                       </p>
                     )}
                   </div>
 
-                  <span className='inline-flex items-center gap-1 text-[12px] font-semibold text-tertiary-token transition-colors group-hover:text-primary-token'>
+                  <span className='inline-flex items-center gap-1 text-xs font-semibold text-tertiary-token transition-colors group-hover:text-primary-token'>
                     View profile
                     <Icon name='ChevronRight' className='h-4 w-4' />
                   </span>
@@ -136,10 +136,10 @@ export default async function ArtistsPage() {
         ) : (
           <ContentSurfaceCard surface='details'>
             <div className='px-5 py-8 text-center sm:px-6'>
-              <p className='text-[15px] font-semibold text-primary-token'>
+              <p className='text-mid font-semibold text-primary-token'>
                 No profiles found
               </p>
-              <p className='mt-2 text-[13px] leading-5 text-secondary-token'>
+              <p className='mt-2 text-app leading-5 text-secondary-token'>
                 Check back later for new creator profiles.
               </p>
             </div>
@@ -160,7 +160,7 @@ function renderFallback() {
           subtitle='Please check back shortly once the connection is available.'
         />
         <div className='px-5 py-8 text-center sm:px-6'>
-          <p className='text-[13px] leading-5 text-secondary-token'>
+          <p className='text-app leading-5 text-secondary-token'>
             Public creator data is temporarily unavailable.
           </p>
         </div>
