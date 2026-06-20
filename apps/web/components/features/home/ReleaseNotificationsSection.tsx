@@ -42,7 +42,7 @@ export function ReleaseNotificationsSection() {
           <div className='grid lg:grid-cols-[0.4fr_0.6fr] gap-12 lg:gap-16 lg:items-start'>
             {/* ─── Left column: copy + stat ─── */}
             <div className='flex flex-col reveal-on-scroll'>
-              <span className='inline-flex w-fit items-center gap-1.5 rounded-full px-3 py-1 text-[12px] font-medium tracking-[-0.01em] text-tertiary-token border border-subtle'>
+              <span className='inline-flex w-fit items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium tracking-[-0.01em] text-tertiary-token border border-subtle'>
                 <Zap className='h-3 w-3' aria-hidden='true' />
                 Automatic
               </span>
@@ -112,16 +112,16 @@ export function ReleaseNotificationsSection() {
                 />
                 {/* ── Left half: The Old Way (faded) ── */}
                 <div className='relative px-5 sm:px-6 py-6 sm:py-8 opacity-[0.38]'>
-                  <p className='text-[11px] font-medium uppercase tracking-[0.08em] text-tertiary-token mb-5'>
+                  <p className='text-2xs font-medium uppercase tracking-[0.08em] text-tertiary-token mb-5'>
                     The old way
                   </p>
                   <div className='space-y-2.5'>
                     {OLD_WAY_STEPS.map((step, i) => (
                       <div key={step} className='flex items-center gap-2.5'>
-                        <span className='flex h-5 w-5 shrink-0 items-center justify-center rounded-md text-[10px] font-medium text-quaternary-token bg-surface-2'>
+                        <span className='flex h-5 w-5 shrink-0 items-center justify-center rounded-md text-3xs font-medium text-quaternary-token bg-surface-2'>
                           {i + 1}
                         </span>
-                        <span className='text-[13px] text-tertiary-token line-through decoration-[var(--linear-text-quaternary)]'>
+                        <span className='text-app text-tertiary-token line-through decoration-[var(--linear-text-quaternary)]'>
                           {step}
                         </span>
                       </div>
@@ -138,14 +138,14 @@ export function ReleaseNotificationsSection() {
                         'linear-gradient(to bottom, transparent, var(--linear-border-default) 20%, var(--linear-border-default) 80%, transparent)',
                     }}
                   />
-                  <span className='absolute top-1/2 -translate-y-1/2 flex h-7 w-7 items-center justify-center rounded-full text-[10px] font-semibold uppercase tracking-wider text-quaternary-token bg-surface-2 border border-subtle'>
+                  <span className='absolute top-1/2 -translate-y-1/2 flex h-7 w-7 items-center justify-center rounded-full text-3xs font-semibold uppercase tracking-wider text-quaternary-token bg-surface-2 border border-subtle'>
                     vs
                   </span>
                 </div>
 
                 {/* ── Right half: Jovie auto-email (bright) ── */}
                 <div className='relative px-5 sm:px-6 py-6 sm:py-8'>
-                  <p className='text-[11px] font-medium uppercase tracking-[0.08em] text-tertiary-token mb-5'>
+                  <p className='text-2xs font-medium uppercase tracking-[0.08em] text-tertiary-token mb-5'>
                     Jovie
                   </p>
 
@@ -166,10 +166,10 @@ export function ReleaseNotificationsSection() {
                         />
                       </div>
                       <div className='min-w-0 flex-1'>
-                        <p className='text-[12px] font-medium text-primary-token truncate'>
+                        <p className='text-xs font-medium text-primary-token truncate'>
                           New Release from Tim White
                         </p>
-                        <p className='text-[10px] text-quaternary-token'>
+                        <p className='text-3xs text-quaternary-token'>
                           via Jovie &middot; just now
                         </p>
                       </div>
@@ -189,14 +189,14 @@ export function ReleaseNotificationsSection() {
                         />
                         <div className='min-w-0 flex-1'>
                           <div className='flex items-center gap-2'>
-                            <p className='text-[13px] font-semibold text-primary-token truncate'>
+                            <p className='text-app font-semibold text-primary-token truncate'>
                               The Deep End
                             </p>
-                            <span className='shrink-0 rounded px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider bg-amber-500/15 text-amber-400'>
+                            <span className='shrink-0 rounded px-1.5 py-0.5 text-3xs font-semibold uppercase tracking-wider bg-amber-500/15 text-amber-400'>
                               New
                             </span>
                           </div>
-                          <p className='text-[12px] text-tertiary-token mt-0.5'>
+                          <p className='text-xs text-tertiary-token mt-0.5'>
                             Tim White
                           </p>
                         </div>
@@ -205,7 +205,7 @@ export function ReleaseNotificationsSection() {
                       {/* Listen Now button */}
                       <button
                         type='button'
-                        className='mt-4 flex w-full items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-[13px] font-semibold transition-colors duration-[var(--linear-duration-normal)] ease-[var(--linear-ease)]'
+                        className='mt-4 flex w-full items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-app font-semibold transition-colors duration-[var(--linear-duration-normal)] ease-[var(--linear-ease)]'
                         style={{
                           background:
                             'linear-gradient(135deg, oklch(72% 0.16 75), oklch(68% 0.14 60))',
@@ -222,7 +222,7 @@ export function ReleaseNotificationsSection() {
 
                     {/* Footer */}
                     <div className='px-4 py-2.5 border-t border-subtle'>
-                      <p className='text-[10px] text-quaternary-token text-center'>
+                      <p className='text-3xs text-quaternary-token text-center'>
                         Sent automatically by Jovie
                       </p>
                     </div>
@@ -236,7 +236,7 @@ export function ReleaseNotificationsSection() {
                         aria-hidden='true'
                       />
                     </span>
-                    <span className='text-[11px] font-medium text-emerald-400/90'>
+                    <span className='text-2xs font-medium text-emerald-400/90'>
                       Delivered to 4,218 fans
                     </span>
                   </div>

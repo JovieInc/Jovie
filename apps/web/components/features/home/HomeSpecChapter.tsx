@@ -36,7 +36,7 @@ export function HomeSpecChapter() {
       aria-labelledby='homepage-spec-heading'
     >
       <Container size='homepage'>
-        <div className='mx-auto max-w-[1200px]'>
+        <div className='mx-auto max-w-300'>
           <h2
             id='homepage-spec-heading'
             className='homepage-philosophy-heading'

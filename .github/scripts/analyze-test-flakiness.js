@@ -483,11 +483,18 @@ async function main() {
 
     // Output metrics for GitHub Actions
     if (process.env.GITHUB_OUTPUT) {
+      const highSeverity = flakyTests.filter(t => t.severity === 'high');
+      const candidates = highSeverity.map(t => ({
+        name: t.name,
+        failureRate: t.failureRate,
+        flakinessScore: t.flakinessScore,
+      }));
       const output = [
         `flaky_count=${flakyTests.length}`,
         `total_runs=${totalRuns}`,
         `retry_rate=${((runsWithRetries / totalRuns) * 100).toFixed(1)}`,
-        `high_severity=${flakyTests.filter(t => t.severity === 'high').length}`,
+        `high_severity=${highSeverity.length}`,
+        `quarantine_candidates=${JSON.stringify(candidates)}`,
       ].join('\n');
       fs.appendFileSync(process.env.GITHUB_OUTPUT, output + '\n');
     }
@@ -529,4 +536,6 @@ module.exports = {
   normalizeJobName,
   generateReport,
   shouldCountAsRetry,
+  FLAKY_FAILURE_THRESHOLD,
+  FLAKY_RETRY_THRESHOLD,
 };

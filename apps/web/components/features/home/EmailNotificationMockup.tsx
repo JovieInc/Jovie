@@ -16,10 +16,10 @@ export function EmailNotificationMockup() {
         {/* Email header */}
         <div className='border-b border-white/6 px-4 pb-2.5 pt-3'>
           <div className='flex items-center gap-2'>
-            <div className='flex h-5 w-5 items-center justify-center rounded-full bg-[#5E6AD2]'>
-              <span className='text-[8px] font-bold text-white'>J</span>
+            <div className='flex h-5 w-5 items-center justify-center rounded-full bg-(--color-border-focus)'>
+              <span className='text-3xs font-bold text-white'>J</span>
             </div>
-            <p className='text-[10px] font-semibold text-white/70'>
+            <p className='text-3xs font-semibold text-white/70'>
               Jovie &middot; notifications@jov.ie
             </p>
           </div>
@@ -28,10 +28,10 @@ export function EmailNotificationMockup() {
         {/* Email body — flex-1 so it stretches */}
         <div className='flex flex-1 flex-col justify-between px-4 pb-4 pt-3'>
           <div>
-            <p className='text-[12px] font-semibold tracking-[-0.01em] text-white'>
+            <p className='text-xs font-semibold tracking-[-0.01em] text-white'>
               New music from Tim White
             </p>
-            <p className='mt-2 text-[11px] leading-[1.6] text-white/45'>
+            <p className='mt-2 text-2xs leading-[1.6] text-white/45'>
               Cosmic Gate &amp; Tim White just released &ldquo;The Deep
               End.&rdquo; Tap below to listen now.
             </p>
@@ -39,12 +39,12 @@ export function EmailNotificationMockup() {
 
           {/* CTA button — white */}
           <div className='mt-4 text-center'>
-            <div className='inline-flex items-center rounded-full bg-white px-5 py-2 text-[11px] font-semibold tracking-[-0.01em] text-black shadow-[0_2px_8px_rgba(255,255,255,0.1)]'>
+            <div className='inline-flex items-center rounded-full bg-white px-5 py-2 text-2xs font-semibold tracking-[-0.01em] text-black shadow-[0_2px_8px_rgba(255,255,255,0.1)]'>
               Listen now
             </div>
           </div>
 
-          <p className='mt-3 text-[9px] text-white/20'>
+          <p className='mt-3 text-3xs text-white/20'>
             You follow Tim White on Jovie
           </p>
         </div>

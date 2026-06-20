@@ -38,7 +38,7 @@ export function DashboardLinksDemo() {
             </span>
             <span className='text-xs text-tertiary-token'>Social Links</span>
           </div>
-          <div className='rounded-md bg-btn-primary px-2.5 py-1 text-[11px] font-medium text-btn-primary-foreground'>
+          <div className='rounded-md bg-btn-primary px-2.5 py-1 text-2xs font-medium text-btn-primary-foreground'>
             + Add link
           </div>
         </div>
@@ -60,8 +60,8 @@ export function DashboardLinksDemo() {
               }}
             >
               {/* Drag handle */}
-              <div className='flex flex-col gap-[2px] opacity-30 text-tertiary-token'>
-                <span className='text-[8px] leading-none'>&#8942;&#8942;</span>
+              <div className='flex flex-col gap-1 opacity-30 text-tertiary-token'>
+                <span className='text-3xs leading-none'>&#8942;&#8942;</span>
               </div>
 
               {/* Platform icon & name */}
@@ -75,7 +75,7 @@ export function DashboardLinksDemo() {
                   <p className='text-xs font-medium text-primary-token'>
                     {link.platform}
                   </p>
-                  <p className='truncate text-[10px] text-tertiary-token'>
+                  <p className='truncate text-3xs text-tertiary-token'>
                     {link.url}
                   </p>
                 </div>
@@ -96,7 +96,7 @@ export function DashboardLinksDemo() {
                     }}
                   />
                 </div>
-                <span className='w-10 text-right text-[11px] tabular-nums text-tertiary-token'>
+                <span className='w-10 text-right text-2xs tabular-nums text-tertiary-token'>
                   {link.clicks.toLocaleString()}
                 </span>
               </div>

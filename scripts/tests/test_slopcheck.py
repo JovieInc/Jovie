@@ -16,7 +16,7 @@ _scripts_dir = Path(__file__).resolve().parents[1]
 if str(_scripts_dir) not in sys.path:
     sys.path.insert(0, str(_scripts_dir))
 
-from slopcheck import slop_score, main  # noqa: E402
+from slopcheck import extract_added_lines, slop_score, main  # noqa: E402
 
 
 # ---------------------------------------------------------------------------
@@ -254,6 +254,25 @@ class TestScoreCap:
         ) * 5
         result = slop_score(text)
         assert result.score <= 10.0
+
+
+class TestExtractAddedLines:
+    def test_keeps_added_lines_only(self):
+        diff = "\n".join(
+            [
+                "--- a/CHANGELOG.md",
+                "+++ b/CHANGELOG.md",
+                "@@ -1,3 +1,4 @@",
+                " unchanged",
+                "-removed line",
+                "+added line",
+                "+second added line",
+            ]
+        )
+        assert extract_added_lines(diff) == "added line\nsecond added line"
+
+    def test_empty_diff_returns_empty_string(self):
+        assert extract_added_lines("") == ""
 
 
 class TestCLI:
