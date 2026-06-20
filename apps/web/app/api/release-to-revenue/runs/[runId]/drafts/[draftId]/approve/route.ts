@@ -1,5 +1,5 @@
-import { approveDistributionDraft } from '@/lib/release-to-revenue/distribution-drafts';
 import { handleDistributionDraftDecision } from '@/lib/release-to-revenue/distribution-draft-decision-route';
+import { approveDistributionDraft } from '@/lib/release-to-revenue/distribution-drafts';
 
 interface RouteParams {
   params: Promise<{ runId: string; draftId: string }>;

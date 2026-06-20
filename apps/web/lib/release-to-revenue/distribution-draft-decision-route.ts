@@ -60,7 +60,10 @@ export async function handleDistributionDraftDecision(input: {
       { status: 200, headers: NO_STORE_HEADERS }
     );
   } catch (err) {
-    logger.error(`[release-to-revenue/drafts/${input.actionLabel}] failed`, err);
+    logger.error(
+      `[release-to-revenue/drafts/${input.actionLabel}] failed`,
+      err
+    );
     await captureError(
       `release-to-revenue draft ${input.actionLabel} failed`,
       err,
