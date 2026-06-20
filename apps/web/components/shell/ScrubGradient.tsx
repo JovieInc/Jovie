@@ -11,8 +11,7 @@ const WAVE_H = SCRUB_H - WAVE_TOP;
 const WAVE_CY = WAVE_TOP + WAVE_H / 2;
 const WAVE_AMP = WAVE_H / 2 - 1;
 
-const TIME_LABEL =
-  'text-3xs tabular-nums text-quaternary-token w-8 shrink-0';
+const TIME_LABEL = 'text-3xs tabular-nums text-quaternary-token w-8 shrink-0';
 
 export interface ScrubCue {
   /** Position as a percent (0–100) of the track duration. */
@@ -224,7 +223,7 @@ export function ScrubGradient({
             step='any'
             value={safeDuration > 0 ? Math.min(safeCurrent, safeDuration) : 0}
             onChange={event => onSeek(Number(event.target.value))}
-            aria-label='Seek track waveform'
+            aria-label='Seek Track Waveform'
             aria-valuetext={`${formatTime(safeCurrent)} of ${formatTime(safeDuration)}`}
             disabled={safeDuration <= 0}
             className='absolute inset-0 h-full w-full cursor-pointer appearance-none opacity-0 disabled:cursor-default'

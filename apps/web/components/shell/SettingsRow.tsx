@@ -82,9 +82,7 @@ export function SettingsRow({
           {label}
         </p>
         {description && (
-          <p className='text-2xs text-tertiary-token mt-0.5'>
-            {description}
-          </p>
+          <p className='text-2xs text-tertiary-token mt-0.5'>{description}</p>
         )}
       </div>
       <div className='shrink-0'>{control}</div>
