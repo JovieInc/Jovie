@@ -12,7 +12,7 @@ const authButtonVariants = cva(
     'disabled:opacity-70 disabled:cursor-not-allowed',
     'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/40 focus-visible:ring-offset-2',
     // Mobile-optimized height matching Linear
-    'h-(--linear-button-height-md) sm:h-(--linear-button-height-md) min-h-[40px]',
+    'h-(--linear-button-height-md) sm:h-(--linear-button-height-md) min-h-10',
     // Keep hover states visual, never positional
     'transition-[background-color,border-color,color,box-shadow,opacity] duration-150 ease-out',
     // Press feedback stays visual, not positional
@@ -26,19 +26,19 @@ const authButtonVariants = cva(
     variants: {
       variant: {
         primary: [
-          'bg-(--linear-btn-primary-bg) border border-(--linear-btn-primary-border) px-[14px] text-(--linear-caption-size) font-(--linear-caption-weight) text-(--linear-btn-primary-fg) shadow-(--linear-shadow-button)',
+          'bg-(--linear-btn-primary-bg) border border-(--linear-btn-primary-border) px-4 text-(--linear-caption-size) font-(--linear-caption-weight) text-(--linear-btn-primary-fg) shadow-(--linear-shadow-button)',
           'hover:opacity-90',
         ].join(' '),
         primaryLight: [
-          'bg-(--linear-btn-secondary-bg) border border-subtle px-[14px] text-(--linear-caption-size) font-(--linear-caption-weight) text-primary-token',
+          'bg-(--linear-btn-secondary-bg) border border-subtle px-4 text-(--linear-caption-size) font-(--linear-caption-weight) text-primary-token',
           'hover:bg-(--linear-btn-secondary-hover)',
         ].join(' '),
         oauthPrimary: [
-          'bg-(--linear-btn-secondary-bg) border border-subtle px-[14px] text-(--linear-caption-size) font-(--linear-caption-weight) text-primary-token',
+          'bg-(--linear-btn-secondary-bg) border border-subtle px-4 text-(--linear-caption-size) font-(--linear-caption-weight) text-primary-token',
           'hover:bg-(--linear-btn-secondary-hover)',
         ].join(' '),
         secondary: [
-          'bg-(--linear-btn-secondary-bg) border border-subtle px-[14px] text-(--linear-caption-size) font-(--linear-caption-weight) text-primary-token',
+          'bg-(--linear-btn-secondary-bg) border border-subtle px-4 text-(--linear-caption-size) font-(--linear-caption-weight) text-primary-token',
           'hover:bg-(--linear-btn-secondary-hover)',
         ].join(' '),
         link: [

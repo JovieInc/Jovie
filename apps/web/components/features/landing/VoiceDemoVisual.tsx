@@ -26,7 +26,7 @@ export function VoiceDemoVisual({ className }: Readonly<VoiceDemoVisualProps>) {
   return (
     <div
       className={cn(
-        'relative flex w-full max-w-[420px] flex-col items-center rounded-3xl border border-subtle bg-surface-1/60 p-6 backdrop-blur',
+        'relative flex w-full max-w-105 flex-col items-center rounded-3xl border border-subtle bg-surface-1/60 p-6 backdrop-blur',
         className
       )}
       data-testid='voice-demo-visual'
@@ -93,7 +93,7 @@ export function VoiceDemoVisual({ className }: Readonly<VoiceDemoVisualProps>) {
         )}
       </div>
 
-      <div className='mt-3 text-[10px] text-tertiary-token'>
+      <div className='mt-3 text-3xs text-tertiary-token'>
         Powered by ElevenLabs • Consent-first • 1-click train
       </div>
 
