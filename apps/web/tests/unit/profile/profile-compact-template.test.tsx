@@ -988,7 +988,7 @@ describe('ProfileCompactTemplate', () => {
       'href',
       'https://open.spotify.com/playlist/37i9dQZF1DZ06evO2SKVTu'
     );
-    expect(screen.getByText('Open playlist')).toBeInTheDocument();
+    expect(screen.getByText('Open Playlist')).toBeInTheDocument();
   });
 
   it('keeps optional hero role metadata out of the mobile hero chrome', async () => {
