@@ -23,9 +23,7 @@ export function ApprovalQueuePanel({
   return (
     <div className='border-subtle border-t pt-3'>
       <div className='flex items-center justify-between gap-3'>
-        <p className='text-xs font-[560] text-primary-token'>
-          Approval Queue
-        </p>
+        <p className='text-xs font-[560] text-primary-token'>Approval Queue</p>
         <span className='text-2xs text-tertiary-token'>
           {approvalArtifacts.length}
         </span>
