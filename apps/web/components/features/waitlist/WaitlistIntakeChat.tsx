@@ -395,9 +395,7 @@ export function WaitlistIntakeChat({
           </div>
 
           <aside className='hidden rounded-2xl border border-white/[0.08] bg-white/[0.035] p-4 lg:block'>
-            <h2 className='text-sm font-semibold text-white'>
-              Saved Context
-            </h2>
+            <h2 className='text-sm font-semibold text-white'>Saved Context</h2>
             <dl className='mt-4 space-y-3 text-app'>
               <ContextRow label='Handle' value={answers.handle} />
               <ContextRow label='Social' value={answers.primarySocialUrl} />
