@@ -83,7 +83,7 @@ export function MerchCheckoutForm({
   }
 
   return (
-    <div className='flex min-h-82 flex-col rounded-[8px] border border-white/12 bg-black/30 p-4 text-white shadow-[0_22px_80px_rgba(0,0,0,0.32)] backdrop-blur-xl sm:p-5'>
+    <div className='flex min-h-82 flex-col rounded-lg border border-white/12 bg-black/30 p-4 text-white shadow-[0_22px_80px_rgba(0,0,0,0.32)] backdrop-blur-xl sm:p-5'>
       <div className='flex items-start justify-between gap-4'>
         <div>
           <p className='text-2xs font-semibold uppercase leading-none text-white/54 [letter-spacing:0]'>
@@ -124,7 +124,7 @@ export function MerchCheckoutForm({
             type='button'
             aria-label='Decrease quantity'
             onClick={() => setQuantity(current => Math.max(1, current - 1))}
-            className='flex h-9 w-9 items-center justify-center rounded-[5px] text-white/72 transition-colors duration-subtle hover:bg-white/10 hover:text-white'
+            className='flex h-9 w-9 items-center justify-center rounded-md text-white/72 transition-colors duration-subtle hover:bg-white/10 hover:text-white'
           >
             <Minus className='h-4 w-4' />
           </button>
@@ -135,7 +135,7 @@ export function MerchCheckoutForm({
             type='button'
             aria-label='Increase quantity'
             onClick={() => setQuantity(current => Math.min(5, current + 1))}
-            className='flex h-9 w-9 items-center justify-center rounded-[5px] text-white/72 transition-colors duration-subtle hover:bg-white/10 hover:text-white'
+            className='flex h-9 w-9 items-center justify-center rounded-md text-white/72 transition-colors duration-subtle hover:bg-white/10 hover:text-white'
           >
             <Plus className='h-4 w-4' />
           </button>

@@ -145,7 +145,7 @@ function HomepageV2Hero() {
                 }}
               >
                 <ArtistProfilePhoneFrame>
-                  <div className='relative h-full w-full overflow-hidden bg-[#07080c]'>
+                  <div className='relative h-full w-full overflow-hidden bg-(--color-bg-base)'>
                     <div
                       className='pointer-events-none absolute left-0 top-0 origin-top-left scale-[0.41] sm:scale-[0.455]'
                       style={{

@@ -86,7 +86,7 @@ export function ErrorDisplay({
                 variant='ghost'
                 size='sm'
                 onClick={handleCopySupportCode}
-                className='h-7 gap-1 rounded-[8px] px-2 text-2xs font-medium tracking-[-0.01em]'
+                className='h-7 gap-1 rounded-lg px-2 text-2xs font-medium tracking-[-0.01em]'
                 aria-label='Copy support reference'
               >
                 <Copy className='size-3' />
@@ -102,7 +102,7 @@ export function ErrorDisplay({
               size='sm'
               onClick={onRetry}
               disabled={isLoading || isSubmitting}
-              className='mt-2 h-7 gap-1.5 rounded-[8px] px-2 text-2xs font-medium tracking-[-0.01em] text-error hover:bg-error/10 hover:text-error'
+              className='mt-2 h-7 gap-1.5 rounded-lg px-2 text-2xs font-medium tracking-[-0.01em] text-error hover:bg-error/10 hover:text-error'
             >
               <RefreshCw className='size-3.5' />
               Retry message

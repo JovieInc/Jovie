@@ -44,7 +44,7 @@ export function DrawerSettingsToggle({
     <div
       data-testid={testId}
       className={cn(
-        'flex items-center justify-between gap-3 rounded-[10px] border py-px transition-[background-color,border-color] duration-150',
+        'flex items-center justify-between gap-3 rounded-lg border py-px transition-[background-color,border-color] duration-150',
         density === 'compact'
           ? 'border-(--linear-app-frame-seam) bg-[color-mix(in_oklab,var(--linear-bg-surface-1)_82%,var(--linear-bg-surface-0))]'
           : 'border-(--linear-app-frame-seam) bg-surface-0',

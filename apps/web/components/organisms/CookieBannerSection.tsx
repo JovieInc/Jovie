@@ -184,7 +184,7 @@ export function CookieBannerSection() {
           data-testid='cookie-banner'
           className='fixed bottom-4 right-4 z-[60] w-[calc(100vw-2rem)] max-w-85 sm:max-w-95'
         >
-          <div className='rounded-[18px] border border-(--linear-app-frame-seam) bg-surface-1 shadow-card px-4 py-4'>
+          <div className='rounded-2xl border border-(--linear-app-frame-seam) bg-surface-1 shadow-card px-4 py-4'>
             <div className='flex items-start gap-3'>
               <div className='mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-surface-0 text-secondary-token'>
                 <Shield className='h-3.5 w-3.5' aria-hidden='true' />

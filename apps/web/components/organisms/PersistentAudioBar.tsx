@@ -309,7 +309,7 @@ export function PersistentAudioBar({
             duration={playbackState.duration}
             onSeek={seek}
             disabled={isLoading}
-            className='h-[3px] flex-1 min-w-15 bg-surface-1'
+            className='h-1 flex-1 min-w-15 bg-surface-1'
           />
           <span className='text-3xs tabular-nums text-quaternary-token shrink-0 w-8'>
             {durationFormatted}

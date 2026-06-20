@@ -90,7 +90,7 @@ export function AuthModalShell({
       aria-label={ariaLabel}
       data-auth-modal-shell
       onMouseDown={onBackdropMouseDown}
-      className='jovie-auth-modal fixed inset-0 m-0 h-[100dvh] max-h-[100dvh] w-[100dvw] max-w-none overflow-y-auto overscroll-contain rounded-none border-0 bg-[#06070a] p-0 text-primary-token shadow-none backdrop:bg-black/70 backdrop:backdrop-blur-sm sm:m-auto sm:h-auto sm:max-h-[min(600px,calc(100svh-32px))] sm:w-[min(calc(100vw-32px),420px)] sm:rounded-[2rem] sm:border sm:border-white/[0.08] sm:bg-[#06070a]/96 sm:p-4 sm:shadow-[0_36px_100px_rgba(0,0,0,0.5)]'
+      className='jovie-auth-modal fixed inset-0 m-0 h-[100dvh] max-h-[100dvh] w-[100dvw] max-w-none overflow-y-auto overscroll-contain rounded-none border-0 bg-(--color-bg-base) p-0 text-primary-token shadow-none backdrop:bg-black/70 backdrop:backdrop-blur-sm sm:m-auto sm:h-auto sm:max-h-[min(600px,calc(100svh-32px))] sm:w-[min(calc(100vw-32px),420px)] sm:rounded-[2rem] sm:border sm:border-white/[0.08] sm:bg-(--color-bg-base)/96 sm:p-4 sm:shadow-[0_36px_100px_rgba(0,0,0,0.5)]'
     >
       <div
         data-auth-modal-body

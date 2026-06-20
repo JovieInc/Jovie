@@ -16,7 +16,7 @@ export function ArtistProfilePhoneFrame({
         className
       )}
     >
-      <div className='relative aspect-[9/19.5] overflow-hidden rounded-[1.85rem] border border-white/8 bg-[#090a0d]'>
+      <div className='relative aspect-[9/19.5] overflow-hidden rounded-[1.85rem] border border-white/8 bg-(--color-bg-surface-0)'>
         <div
           aria-hidden='true'
           className='absolute left-1/2 top-3 z-20 h-6 w-28 -translate-x-1/2 rounded-full bg-black/70 ring-1 ring-white/8'

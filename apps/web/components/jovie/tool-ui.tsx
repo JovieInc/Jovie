@@ -165,7 +165,7 @@ function ToolActivityRow({
           aria-hidden='true'
           data-testid='tool-activity-timeline-line'
           className={cn(
-            'absolute left-[7px] w-px bg-[color-mix(in_oklab,var(--linear-app-shell-border)_70%,transparent)]',
+            'absolute left-2 w-px bg-[color-mix(in_oklab,var(--linear-app-shell-border)_70%,transparent)]',
             index === 0 ? 'top-3.5' : 'top-0',
             index === count - 1 ? 'bottom-[calc(100%_-_14px)]' : 'bottom-0'
           )}

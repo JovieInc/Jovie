@@ -209,7 +209,7 @@ export function ArtistProfileMonetizationSection({
 
   return (
     <ArtistProfileSectionShell
-      className='bg-[#050608]'
+      className='bg-(--color-bg-base)'
       containerClassName='!max-w-none !px-0'
       width='page'
     >
@@ -238,7 +238,7 @@ export function ArtistProfileMonetizationSection({
               onClick={() => {
                 scrollByDirection('next');
               }}
-              className='sr-only focus:not-sr-only focus:absolute focus:left-[max(1.25rem,calc((100vw-var(--linear-content-max))/2+1.25rem))] focus:top-4 focus:z-30 focus:rounded-full focus:border focus:border-black/12 focus:bg-[#f3efe6] focus:px-4 focus:py-2 focus:text-xs focus:font-semibold focus:text-black focus:shadow-[0_18px_42px_rgba(0,0,0,0.16)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black/15'
+              className='sr-only focus:not-sr-only focus:absolute focus:left-[max(1.25rem,calc((100vw-var(--linear-content-max))/2+1.25rem))] focus:top-4 focus:z-30 focus:rounded-full focus:border focus:border-black/12 focus:bg-(--color-cell-hover) focus:px-4 focus:py-2 focus:text-xs focus:font-semibold focus:text-black focus:shadow-[0_18px_42px_rgba(0,0,0,0.16)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black/15'
             >
               Browse monetization cards
             </button>
@@ -368,7 +368,7 @@ const MonetizationCard = forwardRef<HTMLElement, MonetizationCardProps>(
         ref={ref}
         data-testid='artist-profile-monetization-card'
         className={cn(
-          'relative flex w-full shrink-0 snap-start flex-col overflow-hidden rounded-[1.45rem] bg-[#f3efe6] p-5 text-black shadow-[0_22px_64px_rgba(0,0,0,0.26)] sm:w-[25rem] sm:p-6 lg:w-[27rem] lg:p-6.5',
+          'relative flex w-full shrink-0 snap-start flex-col overflow-hidden rounded-[1.45rem] bg-(--color-cell-hover) p-5 text-black shadow-[0_22px_64px_rgba(0,0,0,0.26)] sm:w-[25rem] sm:p-6 lg:w-[27rem] lg:p-6.5',
           isCaptureCard
             ? 'min-h-[22.75rem] sm:min-h-[23.75rem] lg:min-h-[24.5rem]'
             : 'min-h-[27rem] sm:min-h-[29rem] lg:min-h-[30rem]'
@@ -390,7 +390,7 @@ function IrlPaymentsVisual({}: Readonly<{
   card: ArtistProfileLandingCopy['monetization']['irlPaymentsCard'];
 }>) {
   return (
-    <div className='relative h-[12.5rem] w-full max-w-[16rem] overflow-hidden rounded-t-[1.45rem] rounded-b-none bg-[#0d1015] shadow-[0_-20px_48px_rgba(0,0,0,0.24)] sm:h-[14.5rem] sm:w-[19rem] sm:max-w-none'>
+    <div className='relative h-[12.5rem] w-full max-w-[16rem] overflow-hidden rounded-t-[1.45rem] rounded-b-none bg-(--color-bg-input) shadow-[0_-20px_48px_rgba(0,0,0,0.24)] sm:h-[14.5rem] sm:w-[19rem] sm:max-w-none'>
       <Image
         alt='Pay drawer open inside an artist profile payment flow'
         className='object-cover object-bottom'
@@ -412,7 +412,7 @@ function CaptureFanVisual({
   card: ArtistProfileLandingCopy['monetization']['captureCard'];
 }>) {
   return (
-    <div className='w-[14.75rem] rounded-[1.15rem] bg-[#0f131a] px-4 py-3.5 text-white shadow-[0_20px_40px_rgba(0,0,0,0.18)]'>
+    <div className='w-[14.75rem] rounded-[1.15rem] bg-(--color-bg-input) px-4 py-3.5 text-white shadow-[0_20px_40px_rgba(0,0,0,0.18)]'>
       <div className='flex items-start justify-between gap-3'>
         <div>
           <p className='text-sm font-semibold tracking-[-0.03em] text-white'>
@@ -445,7 +445,7 @@ function SayThanksVisual({
   card: ArtistProfileLandingCopy['monetization']['thanksCard'];
 }>) {
   return (
-    <div className='w-[15rem] rounded-[1.1rem] bg-[#0f131a] p-3.5 text-white shadow-[0_18px_34px_rgba(0,0,0,0.16)]'>
+    <div className='w-[15rem] rounded-[1.1rem] bg-(--color-bg-input) p-3.5 text-white shadow-[0_18px_34px_rgba(0,0,0,0.16)]'>
       <div className='flex items-start gap-3'>
         <span className='mt-0.5 inline-flex h-9 w-9 items-center justify-center rounded-full bg-white/[0.08] text-white'>
           <Mail className='h-4 w-4' strokeWidth={1.9} />
@@ -497,7 +497,7 @@ function ReengageVisual({
           <div
             key={output.id}
             className={cn(
-              'relative rounded-[1rem] bg-[#0d1015] px-3.5 py-3.5 text-white shadow-[0_14px_30px_rgba(0,0,0,0.18)]',
+              'relative rounded-[1rem] bg-(--color-bg-input) px-3.5 py-3.5 text-white shadow-[0_14px_30px_rgba(0,0,0,0.18)]',
               getOutputTransformClass(index),
               index > 0 && 'mt-2.5'
             )}

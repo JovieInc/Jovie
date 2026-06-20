@@ -287,7 +287,7 @@ const DURATION_CINEMATIC = 420;
 
 // Selected/focused row treatment — electric cyan accent. Calibrated to
 // stay invisible at low brightness (the "DJ on a red-eye flight" test):
-// Selection language: a small pill-chip on the left edge (h-3.5 w-[3px]
+// Selection language: a small pill-chip on the left edge (h-3.5 w-1
 // rounded-full) plus a soft cyan bg tint. The inset 2px bar didn't follow
 // the row's rounded-md corners gracefully — the pill is its own rounded
 // shape, vertically centered, so it reads as a deliberate accent instead
@@ -301,7 +301,7 @@ const SELECTED_ROW_CLASSES = [
   // Pseudo-element pill chip
   "before:content-['']",
   'before:absolute before:left-0.5 before:top-1/2 before:-translate-y-1/2',
-  'before:h-3.5 before:w-[3px] before:rounded-full before:bg-cyan-300/0',
+  'before:h-3.5 before:w-1 before:rounded-full before:bg-cyan-300/0',
   'data-[focused]:before:bg-cyan-300/85',
   'data-[selected]:before:bg-cyan-300/85',
   'before:transition-colors before:duration-subtle before:ease-out',
@@ -2467,7 +2467,7 @@ function ShellV1ExperimentContent() {
             // Sits inside the same 32px gutter the audio bar uses (px-8) so
             // the album art aligns to a virtual grid as if the canvas's
             // content area extended down past it.
-            className='hidden lg:block fixed bottom-[26px] z-30 w-56'
+            className='hidden lg:block fixed bottom-7 z-30 w-56'
             style={{
               left: sidebarMode === 'docked' ? 264 : 32,
               opacity: barCollapsed ? 0 : 1,
@@ -2912,7 +2912,7 @@ function ShellV1ExperimentContent() {
 
 export default function ShellV1Experiment() {
   return (
-    <Suspense fallback={<div className='min-h-screen bg-[#050608]' />}>
+    <Suspense fallback={<div className='min-h-screen bg-(--color-bg-base)' />}>
       <ShellV1ExperimentContent />
     </Suspense>
   );
@@ -5134,7 +5134,7 @@ function ReleaseRow({
         )}
         <span
           className={cn(
-            'text-2xs text-secondary-token tabular-nums whitespace-nowrap min-w-[42px] text-right',
+            'text-2xs text-secondary-token tabular-nums whitespace-nowrap min-w-11 text-right',
             drawerOpen && 'hidden'
           )}
           title={`${release.weeklyStreams.toLocaleString()} streams this week`}
@@ -6108,7 +6108,7 @@ function TracksView({
           <button
             type='button'
             onClick={onKeyModeToggle}
-            className='w-[58px] shrink-0 inline-flex items-center justify-end gap-1 text-3xs uppercase tracking-[0.12em] font-medium text-quaternary-token/85 hover:text-secondary-token transition-colors duration-subtle ease-out'
+            className='w-15 shrink-0 inline-flex items-center justify-end gap-1 text-3xs uppercase tracking-[0.12em] font-medium text-quaternary-token/85 hover:text-secondary-token transition-colors duration-subtle ease-out'
             title={`Switch to ${keyMode === 'normal' ? 'Camelot' : 'standard'} key notation`}
           >
             {keyMode === 'normal' ? 'Key' : 'Cam'}
@@ -6287,8 +6287,8 @@ function TrackRow({
       </span>
 
       {/* Key as a badge — quiet pill */}
-      <span className='w-[58px] shrink-0 flex justify-end'>
-        <span className='inline-flex items-center h-[18px] px-1.5 rounded text-3xs font-caption tabular-nums text-secondary-token border border-(--linear-app-shell-border) bg-surface-1/40'>
+      <span className='w-15 shrink-0 flex justify-end'>
+        <span className='inline-flex items-center h-5 px-1.5 rounded text-3xs font-caption tabular-nums text-secondary-token border border-(--linear-app-shell-border) bg-surface-1/40'>
           {keyMode === 'normal' ? track.keyNormal : track.keyCamelot}
         </span>
       </span>

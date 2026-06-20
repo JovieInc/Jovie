@@ -56,7 +56,7 @@ export function SegmentedDigitBox({
   return (
     <div
       className={cn(
-        'relative flex items-center justify-center rounded-[18px] border font-[620] tracking-[-0.035em] transition-[border-color,background-color,box-shadow] duration-150',
+        'relative flex items-center justify-center rounded-2xl border font-[620] tracking-[-0.035em] transition-[border-color,background-color,box-shadow] duration-150',
         boxSizeClassName,
         'border-[color:var(--profile-pearl-border)] bg-[color:color-mix(in_srgb,var(--profile-pearl-bg)_94%,transparent)] text-primary-token shadow-[0_10px_24px_rgba(15,17,24,0.08)] backdrop-blur-2xl',
         isFocused

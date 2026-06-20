@@ -23,7 +23,7 @@ export function PublicSurfaceStage({
       <main className='relative flex w-full items-stretch md:items-center'>
         <div
           className={cn(
-            'relative flex h-full w-full max-w-[430px] flex-col overflow-clip bg-[color:var(--profile-content-bg)] md:mx-auto md:min-h-[min(920px,calc(100dvh-64px))] md:overflow-hidden md:rounded-[30px] md:border md:border-[color:var(--profile-panel-border)] md:shadow-[var(--profile-panel-shadow)]',
+            'relative flex h-full w-full max-w-108 flex-col overflow-clip bg-[color:var(--profile-content-bg)] md:mx-auto md:min-h-[min(920px,calc(100dvh-64px))] md:overflow-hidden md:rounded-3xl md:border md:border-[color:var(--profile-panel-border)] md:shadow-[var(--profile-panel-shadow)]',
             panelClassName
           )}
         >

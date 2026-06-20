@@ -37,7 +37,7 @@ export const AmountSelector = memo(function AmountSelector({
         disabled ? 'cursor-not-allowed opacity-50' : 'cursor-pointer',
         isSelected
           ? 'border-[color:var(--profile-pearl-primary-bg)] bg-[var(--profile-pearl-primary-bg)] text-[var(--profile-pearl-primary-fg)] ring-1 ring-white/10'
-          : 'border-black/6 bg-white text-primary-token ring-1 ring-black/[0.03] hover:border-black/10 hover:bg-[var(--profile-pearl-bg-hover)] hover:ring-black/[0.05] dark:border-white/10 dark:bg-[rgba(255,255,255,0.045)] dark:ring-white/[0.04] dark:hover:border-white/14 dark:hover:bg-[var(--profile-pearl-bg-hover)] dark:hover:ring-white/[0.06]',
+          : 'border-black/6 bg-white text-primary-token ring-1 ring-black/[0.03] hover:border-black/10 hover:bg-[var(--profile-pearl-bg-hover)] hover:ring-black/[0.05] dark:border-white/10 dark:bg-(--color-text-tooltip) dark:ring-white/[0.04] dark:hover:border-white/14 dark:hover:bg-[var(--profile-pearl-bg-hover)] dark:hover:ring-white/[0.06]',
         className
       )}
     >

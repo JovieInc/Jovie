@@ -80,7 +80,7 @@ export function ArtistProfileHowItWorks({
                 className='rounded-[0.95rem] p-2.5'
               >
                 <div className='flex items-center gap-3'>
-                  <span className='flex h-10 w-10 items-center justify-center rounded-full bg-[#1DB954]/12'>
+                  <span className='flex h-10 w-10 items-center justify-center rounded-full bg-(--color-accent-green)/12'>
                     <ProviderIcon provider='spotify' className='h-4.5 w-4.5' />
                   </span>
                   <div className='min-w-0 flex-1'>
@@ -135,9 +135,9 @@ export function ArtistProfileHowItWorks({
                   {progress}%
                 </p>
               </div>
-              <div className='mt-3 h-2 overflow-hidden rounded-full bg-[#1DB954]/10'>
+              <div className='mt-3 h-2 overflow-hidden rounded-full bg-(--color-accent-green)/10'>
                 <div
-                  className='h-full rounded-full bg-[#1DB954] transition-[width] duration-700 ease-out'
+                  className='h-full rounded-full bg-(--color-accent-green) transition-[width] duration-700 ease-out'
                   style={{ width: `${progress}%` }}
                 />
               </div>
@@ -160,7 +160,7 @@ export function ArtistProfileHowItWorks({
                       className={cn(
                         'rounded-full px-2.5 py-1 text-3xs font-semibold',
                         provider.status === 'Ingesting'
-                          ? 'border border-accent/18 bg-[#20172e] text-[#d7b8ff]'
+                          ? 'border border-accent/18 bg-(--color-bg-surface-2) text-(--color-bg-button)'
                           : 'bg-white/6 text-secondary-token'
                       )}
                     >
@@ -193,7 +193,7 @@ export function ArtistProfileHowItWorks({
               <CopyableUrlRow
                 url={howItWorks.share.url}
                 displayValue={howItWorks.share.displayValue}
-                className='rounded-[10px] border border-(--linear-app-frame-seam) bg-surface-0'
+                className='rounded-lg border border-(--linear-app-frame-seam) bg-surface-0'
                 valueClassName='text-secondary-token'
                 surface='boxed'
               />
@@ -202,7 +202,7 @@ export function ArtistProfileHowItWorks({
                   label={howItWorks.share.qrLabel}
                   content={
                     <div className='rounded-[0.9rem] bg-white p-2.5 shadow-[0_14px_32px_rgba(0,0,0,0.16)]'>
-                      <div className='grid grid-cols-7 gap-[5px]'>
+                      <div className='grid grid-cols-7 gap-1'>
                         {QR_CELLS.map(cell => (
                           <span
                             key={cell.id}

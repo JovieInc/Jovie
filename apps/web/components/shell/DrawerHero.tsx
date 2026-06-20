@@ -135,7 +135,7 @@ function DrawerHeroMetaSlot({
     <div
       aria-hidden={meta ? undefined : true}
       className={cn(
-        'mt-2 flex min-h-[22px] items-center gap-1.5 flex-wrap',
+        'mt-2 flex min-h-6 items-center gap-1.5 flex-wrap',
         !meta && 'invisible',
         metaClassName
       )}

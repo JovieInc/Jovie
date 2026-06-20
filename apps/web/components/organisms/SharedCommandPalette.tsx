@@ -237,7 +237,7 @@ export function PaletteList({
               className={cn(
                 variant === 'cmdk'
                   ? 'px-3 pb-1.5 pt-2 text-2xs font-semibold uppercase tracking-[0.08em] text-quaternary-token'
-                  : 'px-[10px] pb-[5px] pt-[11px] text-3xs font-semibold uppercase tracking-[0.1em] text-quaternary-token'
+                  : 'px-3 pb-1 pt-3 text-3xs font-semibold uppercase tracking-[0.1em] text-quaternary-token'
               )}
             >
               {section.label}
@@ -368,7 +368,7 @@ export function InlinePalette({
         role='listbox'
         aria-label='Slash command suggestions'
         className={cn(
-          'min-h-0 flex-1 overflow-y-auto p-[5px]',
+          'min-h-0 flex-1 overflow-y-auto p-1',
           variant === 'inline' && 'max-h-65'
         )}
       >

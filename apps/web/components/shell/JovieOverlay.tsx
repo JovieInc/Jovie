@@ -110,7 +110,7 @@ function DictationWaveform({ active }: { active: boolean }) {
         }
       `}</style>
       <div
-        className='flex items-center justify-center gap-[3px] h-12 w-full'
+        className='flex items-center justify-center gap-1 h-12 w-full'
         aria-hidden='true'
       >
         {Array.from({ length: BARS }, (_, i) => {
@@ -125,7 +125,7 @@ function DictationWaveform({ active }: { active: boolean }) {
             <span
               // biome-ignore lint/suspicious/noArrayIndexKey: deterministic 32-bar list with stable indices — index is the canonical identity
               key={i}
-              className='block w-[3px] rounded-full bg-cyan-300/85'
+              className='block w-1 rounded-full bg-cyan-300/85'
               style={{
                 height: baseHeight,
                 transformOrigin: 'center',

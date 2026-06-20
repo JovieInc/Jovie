@@ -196,7 +196,7 @@ export function PaySection({
               className={cn(PAY_METHOD_BUTTON_CLASSES, 'gap-2')}
               aria-label='Pay with Venmo'
             >
-              <VenmoLogo className='h-5 w-auto text-[#008CFF]' />
+              <VenmoLogo className='h-5 w-auto text-(--color-accent-blue)' />
             </button>
           </div>
         </div>

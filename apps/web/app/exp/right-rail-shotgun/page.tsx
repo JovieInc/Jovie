@@ -267,7 +267,7 @@ function StatusBadge({ status }: { status: typeof release.status }) {
   };
   const c = cfg[status];
   return (
-    <span className='inline-flex items-center gap-1.5 h-[18px] pl-1.5 pr-2 rounded border border-(--linear-app-shell-border)/70 bg-(--surface-1)/40 text-tertiary-token text-3xs font-caption uppercase tracking-[0.06em]'>
+    <span className='inline-flex items-center gap-1.5 h-5 pl-1.5 pr-2 rounded border border-(--linear-app-shell-border)/70 bg-(--surface-1)/40 text-tertiary-token text-3xs font-caption uppercase tracking-[0.06em]'>
       <span className={cn('h-1.5 w-1.5 rounded-full shrink-0', c.dot)} />
       <span className='text-secondary-token'>{c.label}</span>
     </span>

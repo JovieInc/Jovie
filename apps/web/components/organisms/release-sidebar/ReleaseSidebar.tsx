@@ -351,7 +351,7 @@ function ReleaseEntityHeader({
                   <DrawerMediaThumb
                     src={release.artworkUrl}
                     alt={artworkAlt}
-                    sizeClassName='h-17 w-17 rounded-[10px]'
+                    sizeClassName='h-17 w-17 rounded-lg'
                     sizes='68px'
                     fallback={
                       <Icon

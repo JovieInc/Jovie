@@ -115,7 +115,7 @@ export function AdminHeroMetricsSkeleton() {
       data-testid='admin-hero-metrics-skeleton'
     >
       {['mrr', 'customers', 'growth'].map(key => (
-        <div key={key} className='min-h-[75px]'>
+        <div key={key} className='min-h-19'>
           <div className='h-9 w-24 animate-pulse rounded-md bg-surface-1' />
           <div className='mt-1.5 h-4 w-32 animate-pulse rounded-md bg-surface-1' />
         </div>

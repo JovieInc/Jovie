@@ -51,7 +51,7 @@ export function FeedbackForm({ onClose }: FeedbackFormProps) {
   if (feedbackMutation.isSuccess) {
     return (
       <div className='mx-auto max-w-md rounded-xl border border-(--linear-app-frame-seam) bg-(--linear-app-content-surface) p-6 text-center'>
-        <div className='mx-auto flex h-12 w-12 items-center justify-center rounded-[10px] border border-emerald-500/20 bg-emerald-500/10 text-emerald-500'>
+        <div className='mx-auto flex h-12 w-12 items-center justify-center rounded-lg border border-emerald-500/20 bg-emerald-500/10 text-emerald-500'>
           <CheckCircle2 className='h-5 w-5' />
         </div>
         <div className='mt-4 space-y-1'>
@@ -70,7 +70,7 @@ export function FeedbackForm({ onClose }: FeedbackFormProps) {
           variant='secondary'
           size='sm'
           onClick={onClose}
-          className='mt-5 rounded-[10px] px-4 text-2xs font-medium'
+          className='mt-5 rounded-lg px-4 text-2xs font-medium'
         >
           Back to chat
         </Button>
@@ -101,7 +101,7 @@ export function FeedbackForm({ onClose }: FeedbackFormProps) {
         maxLength={2000}
         disabled={feedbackMutation.isPending}
         className={cn(
-          'mt-4 w-full resize-none rounded-[8px] border border-(--linear-app-frame-seam) bg-surface-0 px-3.5 py-3',
+          'mt-4 w-full resize-none rounded-lg border border-(--linear-app-frame-seam) bg-surface-0 px-3.5 py-3',
           'text-sm text-primary-token placeholder:text-tertiary-token',
           'focus:border-default focus:outline-none',
           'disabled:opacity-50'
@@ -122,7 +122,7 @@ export function FeedbackForm({ onClose }: FeedbackFormProps) {
           size='sm'
           onClick={onClose}
           disabled={feedbackMutation.isPending}
-          className='rounded-[10px] px-3 text-2xs font-medium'
+          className='rounded-lg px-3 text-2xs font-medium'
         >
           Cancel
         </Button>
@@ -132,7 +132,7 @@ export function FeedbackForm({ onClose }: FeedbackFormProps) {
           onClick={handleSubmit}
           loading={feedbackMutation.isPending}
           disabled={trimmedLength < 5}
-          className='rounded-[10px] px-4 text-2xs font-medium'
+          className='rounded-lg px-4 text-2xs font-medium'
         >
           <Send className='mr-1.5 h-3.5 w-3.5' />
           Submit

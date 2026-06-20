@@ -234,7 +234,7 @@ export function ReleaseLyricsSection({
           className='min-h-35 resize-y border-(--linear-app-frame-seam) bg-surface-0 text-xs'
         />
         {/* Auto-save status indicator */}
-        <div className='min-h-[22px]'>
+        <div className='min-h-6'>
           <ReleaseSaveStatusRow status={saveStatus} feedback={actionFeedback} />
         </div>
       </div>

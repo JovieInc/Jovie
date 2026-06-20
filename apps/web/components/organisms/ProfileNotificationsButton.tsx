@@ -59,8 +59,8 @@ export function ProfileNotificationsButton({
       <Bell
         className={
           isActive
-            ? 'h-[17px] w-[17px] fill-current text-primary-token'
-            : 'h-[17px] w-[17px] text-primary-token/84'
+            ? 'h-4 w-4 fill-current text-primary-token'
+            : 'h-4 w-4 text-primary-token/84'
         }
         aria-hidden='true'
       />

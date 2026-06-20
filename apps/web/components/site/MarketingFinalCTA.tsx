@@ -53,7 +53,7 @@ export function MarketingFinalCTA({
           <Link
             href={ctaHref}
             prefetch={false}
-            className='inline-flex h-10 items-center rounded-full bg-[rgb(252,252,252)] px-6 text-sm font-semibold tracking-[0.01em] text-black transition-opacity duration-subtle ease-subtle hover:opacity-92 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40 focus-visible:ring-offset-2 focus-visible:ring-offset-black'
+            className='inline-flex h-10 items-center rounded-full bg-(--color-text-tooltip) px-6 text-sm font-semibold tracking-[0.01em] text-black transition-opacity duration-subtle ease-subtle hover:opacity-92 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40 focus-visible:ring-offset-2 focus-visible:ring-offset-black'
           >
             {ctaLabel}
           </Link>

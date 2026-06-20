@@ -36,7 +36,7 @@ export function DrawerPropertyRow({
 
   const sizeClasses = {
     sm: {
-      container: 'min-h-[22px] gap-2 rounded-md px-1 py-px',
+      container: 'min-h-6 gap-2 rounded-md px-1 py-px',
       label: 'text-2xs leading-[15px] tracking-normal',
       value: 'text-xs leading-[16px] tracking-normal',
     },

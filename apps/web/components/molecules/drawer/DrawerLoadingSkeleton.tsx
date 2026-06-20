@@ -80,12 +80,12 @@ export function DrawerLoadingSkeleton({
                 <div className='space-y-1'>
                   <div className='h-2.5 w-14 rounded skeleton' />
                   <div className='h-4.5 w-10 rounded skeleton' />
-                  <div className='h-[11px] w-10 rounded skeleton' />
+                  <div className='h-3 w-10 rounded skeleton' />
                 </div>
                 <div className='space-y-1 pl-3'>
                   <div className='h-2.5 w-14 rounded skeleton' />
                   <div className='h-4.5 w-10 rounded skeleton' />
-                  <div className='h-[11px] w-10 rounded skeleton' />
+                  <div className='h-3 w-10 rounded skeleton' />
                 </div>
               </div>
             </div>
@@ -102,7 +102,7 @@ export function DrawerLoadingSkeleton({
                 {['tab-1', 'tab-2', 'tab-3', 'tab-4'].map(tabId => (
                   <div
                     key={tabId}
-                    className='h-[26px] flex-1 rounded-lg skeleton'
+                    className='h-7 flex-1 rounded-lg skeleton'
                   />
                 ))}
               </div>

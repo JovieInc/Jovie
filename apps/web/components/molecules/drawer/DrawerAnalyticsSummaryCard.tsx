@@ -26,7 +26,7 @@ export interface DrawerAnalyticsSummaryCardProps {
 }
 
 const METRIC_TILE_CLASSNAME = 'px-3 py-2.5';
-const STABLE_ANALYTICS_BODY_CLASSNAME = 'min-h-[106px]';
+const STABLE_ANALYTICS_BODY_CLASSNAME = 'min-h-27';
 const STABLE_ANALYTICS_FOOTER_CLASSNAME = 'min-h-10';
 
 function MetricTile({
@@ -56,7 +56,7 @@ function MetricTile({
         <p
           aria-hidden={hint ? undefined : true}
           className={cn(
-            'mt-1 min-h-[13px] text-3xs leading-[13px] text-tertiary-token',
+            'mt-1 min-h-3 text-3xs leading-[13px] text-tertiary-token',
             !hint && 'invisible'
           )}
         >
@@ -70,9 +70,9 @@ function MetricTile({
 function LoadingMetricTile() {
   return (
     <div aria-hidden='true' className={METRIC_TILE_CLASSNAME}>
-      <div className='h-[11px] w-16 rounded skeleton' />
+      <div className='h-3 w-16 rounded skeleton' />
       <div className='mt-2 h-6 w-12 rounded skeleton' />
-      <div className='mt-2 h-[10px] w-14 rounded skeleton' />
+      <div className='mt-2 h-3 w-14 rounded skeleton' />
     </div>
   );
 }

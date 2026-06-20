@@ -151,14 +151,14 @@ export default async function MerchProductPage({
           </Link>
 
           {resolvedSearchParams.success === '1' ? (
-            <div className='flex min-h-12 items-center gap-3 rounded-[8px] border border-emerald-300/20 bg-emerald-400/10 px-4 py-3 text-app text-emerald-100'>
+            <div className='flex min-h-12 items-center gap-3 rounded-lg border border-emerald-300/20 bg-emerald-400/10 px-4 py-3 text-app text-emerald-100'>
               <CheckCircle2 className='h-4 w-4 shrink-0' />
               <span>Order received. A confirmation email is on its way.</span>
             </div>
           ) : null}
 
           {resolvedSearchParams.cancelled === '1' ? (
-            <div className='flex min-h-12 items-center gap-3 rounded-[8px] border border-white/12 bg-white/[0.05] px-4 py-3 text-app text-white/72'>
+            <div className='flex min-h-12 items-center gap-3 rounded-lg border border-white/12 bg-white/[0.05] px-4 py-3 text-app text-white/72'>
               <XCircle className='h-4 w-4 shrink-0' />
               <span>Checkout was cancelled. Your item is still available.</span>
             </div>
@@ -166,7 +166,7 @@ export default async function MerchProductPage({
 
           <div className='grid gap-6 lg:grid-cols-[minmax(0,1.08fr)_minmax(360px,0.72fr)] lg:items-start'>
             <div className='min-w-0'>
-              <div className='relative aspect-[4/5] overflow-hidden rounded-[8px] border border-white/10 bg-black/35 shadow-[0_22px_90px_rgba(0,0,0,0.34)]'>
+              <div className='relative aspect-[4/5] overflow-hidden rounded-lg border border-white/10 bg-black/35 shadow-[0_22px_90px_rgba(0,0,0,0.34)]'>
                 {imageUrl ? (
                   <Image
                     src={imageUrl}

@@ -71,14 +71,14 @@ function DrawerHandle() {
   return (
     <span
       aria-hidden='true'
-      className='mx-auto mb-[18px] block h-[5px] w-9 rounded-[3px] bg-white/[0.14]'
+      className='mx-auto mb-5 block h-1 w-9 rounded-xs bg-white/[0.14]'
     />
   );
 }
 
 function DrawerTitle({ title }: Readonly<{ title: string }>) {
   return (
-    <p className='mb-[14px] px-1 text-base font-semibold tracking-[-0.02em] text-white'>
+    <p className='mb-4 px-1 text-base font-semibold tracking-[-0.02em] text-white'>
       {title}
     </p>
   );
@@ -98,9 +98,9 @@ function PayDrawerPreview({
             <div
               key={row.id}
               className={cn(
-                'flex items-center justify-between rounded-[14px] border px-[18px] py-[14px]',
+                'flex items-center justify-between rounded-xl border px-5 py-4',
                 featured
-                  ? 'border-[#f5f5f7] bg-[#f5f5f7]'
+                  ? 'border-(--color-bg-base) bg-(--color-bg-base)'
                   : 'border-white/[0.08] bg-white/[0.04]'
               )}
             >
@@ -124,7 +124,7 @@ function PayDrawerPreview({
           );
         })}
       </div>
-      <div className='mt-[14px] block w-full rounded-[14px] bg-[#f5f5f7] py-[14px] text-center text-sm font-semibold tracking-[-0.01em] text-black'>
+      <div className='mt-4 block w-full rounded-xl bg-(--color-bg-base) py-4 text-center text-sm font-semibold tracking-[-0.01em] text-black'>
         {card.ctaLabel}
       </div>
     </div>
@@ -143,7 +143,7 @@ function TourDrawerPreview({
           <div
             key={row.id}
             className={cn(
-              'grid grid-cols-[44px_minmax(0,1fr)_auto] items-center gap-3.5 px-1 py-[14px]',
+              'grid grid-cols-[44px_minmax(0,1fr)_auto] items-center gap-3.5 px-1 py-4',
               index === 0 ? 'pt-1.5' : 'border-t border-white/[0.08]'
             )}
           >

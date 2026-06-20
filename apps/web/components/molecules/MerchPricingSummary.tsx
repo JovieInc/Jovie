@@ -14,7 +14,7 @@ export function MerchPricingSummary({
   return (
     <div
       className={cn(
-        'grid min-h-[58px] grid-cols-2 gap-1',
+        'grid min-h-15 grid-cols-2 gap-1',
         compact && 'min-h-12',
         className
       )}

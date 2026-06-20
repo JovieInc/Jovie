@@ -66,7 +66,7 @@ export function ArtistInfo({
   }[resolvedAvatarSize];
 
   const avatarContent = (
-    <div className='rounded-full border border-[color:var(--profile-pearl-border)] bg-[var(--profile-pearl-bg)] p-[3px] shadow-[var(--profile-pearl-shadow)] backdrop-blur-xl'>
+    <div className='rounded-full border border-[color:var(--profile-pearl-border)] bg-[var(--profile-pearl-bg)] p-1 shadow-[var(--profile-pearl-shadow)] backdrop-blur-xl'>
       <Avatar
         src={artist.image_url || ''}
         alt={artist.name}

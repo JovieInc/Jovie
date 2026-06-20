@@ -269,7 +269,7 @@ export function ChatMerchOptionsCard({
                     {option.colorway ? ` - ${option.colorway}` : ''}
                   </p>
                 </div>
-                <p className='line-clamp-3 min-h-[54px] text-2xs leading-[18px] text-secondary-token'>
+                <p className='line-clamp-3 min-h-14 text-2xs leading-[18px] text-secondary-token'>
                   {option.concept}
                 </p>
                 <MerchOptionPricing

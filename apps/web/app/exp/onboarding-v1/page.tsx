@@ -778,7 +778,7 @@ function SidebarShim({
       </div>
       <div className='px-1'>
         <div className='flex items-center gap-2.5 h-7 pl-3 pr-2 rounded-md text-app font-caption text-primary-token bg-cyan-500/10 shadow-[inset_2px_0_0_0_rgb(34_211_238)]'>
-          <span className='h-2 w-2 rounded-full bg-cyan-400 ml-[3px]' />@
+          <span className='h-2 w-2 rounded-full bg-cyan-400 ml-1' />@
           {handle.replace('@', '') || 'you'}
         </div>
       </div>

@@ -186,7 +186,7 @@ export function PaySelector({
                         className={cn(
                           'flex h-23 items-center justify-center rounded-3xl border text-center transition-[border-color,background-color,box-shadow,color,opacity] duration-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--focus-ring))] focus-visible:ring-offset-2 focus-visible:ring-offset-transparent',
                           isSelected
-                            ? 'border-white bg-white text-[#121216] shadow-[0_20px_40px_rgba(255,255,255,0.08)]'
+                            ? 'border-white bg-white text-(--color-bg-input) shadow-[0_20px_40px_rgba(255,255,255,0.08)]'
                             : 'border-white/10 bg-white/[0.02] text-white hover:border-white/18 hover:bg-white/[0.04]'
                         )}
                       >
@@ -218,7 +218,7 @@ export function PaySelector({
             type='button'
             onClick={handleContinue}
             disabled={isLoading || !canContinue}
-            className='flex h-[50px] w-full items-center justify-center gap-2.5 rounded-full bg-white px-5 text-base font-semibold tracking-[-0.025em] text-[#101013] transition-[opacity] duration-subtle hover:opacity-96 disabled:cursor-not-allowed disabled:opacity-50'
+            className='flex h-13 w-full items-center justify-center gap-2.5 rounded-full bg-white px-5 text-base font-semibold tracking-[-0.025em] text-(--color-bg-tooltip) transition-[opacity] duration-subtle hover:opacity-96 disabled:cursor-not-allowed disabled:opacity-50'
             aria-label={`${primaryLabel} for ${formatAmountForScreenReader(selectedAmount)}`}
           >
             {paymentLabel === 'Venmo' ? (

@@ -199,7 +199,7 @@ export function FridayRhythmSection() {
     <section
       ref={sectionRef}
       aria-label='Make every Friday count.'
-      className='homepage-friday-rhythm-section relative isolate bg-[#020303]'
+      className='homepage-friday-rhythm-section relative isolate bg-(--color-bg-hover)'
       data-testid='friday-rhythm-section'
     >
       <RhythmAtmosphere

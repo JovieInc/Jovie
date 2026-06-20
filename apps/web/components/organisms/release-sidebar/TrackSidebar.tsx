@@ -338,7 +338,7 @@ export function TrackSidebar({
                     <span className='tabular-nums'>{trackLabel}.</span>
                     {track.releaseTitle}
                     {track.isExplicit ? (
-                      <span className='rounded-[4px] bg-surface-1 px-1 text-3xs font-caption text-tertiary-token'>
+                      <span className='rounded-xs bg-surface-1 px-1 text-3xs font-caption text-tertiary-token'>
                         E
                       </span>
                     ) : null}
@@ -348,10 +348,10 @@ export function TrackSidebar({
                   <DrawerMediaThumb
                     src={track.releaseArtworkUrl}
                     alt={`${track.releaseTitle} artwork`}
-                    sizeClassName='h-18 w-18 rounded-[10px]'
+                    sizeClassName='h-18 w-18 rounded-lg'
                     sizes='72px'
                     fallback={
-                      <div className='h-18 w-18 rounded-[10px] bg-surface-1' />
+                      <div className='h-18 w-18 rounded-lg bg-surface-1' />
                     }
                   />
                 }
@@ -448,7 +448,7 @@ export function TrackSidebar({
                       duration={duration}
                       onSeek={seek}
                       disabled={!isThisTrack}
-                      className='h-[3px] w-full'
+                      className='h-1 w-full'
                     />
                     <div className='flex items-center justify-between text-3xs tabular-nums text-tertiary-token'>
                       <span>

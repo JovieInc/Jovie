@@ -13,7 +13,7 @@ const SELECTED_ROW_CLASSES = [
   'data-[selected]:bg-cyan-300/[0.06]',
   'data-[focused]:bg-cyan-300/[0.04]',
   'before:absolute before:left-0.5 before:top-1/2 before:-translate-y-1/2',
-  'before:h-3.5 before:w-[3px] before:rounded-full before:bg-cyan-300/0',
+  'before:h-3.5 before:w-1 before:rounded-full before:bg-cyan-300/0',
   'data-[focused]:before:bg-cyan-300/85',
   'data-[selected]:before:bg-cyan-300/85',
   'before:transition-colors before:duration-subtle before:ease-subtle',
