@@ -15,7 +15,7 @@ export function ArtistNotificationsBenefitsSection({
       className='py-20 sm:py-24 lg:py-28'
       containerClassName='lg:max-w-none'
     >
-      <div className='mx-auto max-w-[1260px] px-5 sm:px-8 lg:px-10'>
+      <div className='mx-auto max-w-315 px-5 sm:px-8 lg:px-10'>
         <ArtistProfileSectionHeader
           align='left'
           headline={benefits.headline}

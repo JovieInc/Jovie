@@ -48,7 +48,7 @@ export function ArtistProfileHowItWorks({
 
   return (
     <ArtistProfileSectionShell className='bg-white/[0.012]'>
-      <div className='mx-auto max-w-[1120px]'>
+      <div className='mx-auto max-w-280'>
         <ArtistProfileSectionHeader
           align='left'
           headline={howItWorks.headline}
@@ -206,7 +206,7 @@ export function ArtistProfileHowItWorks({
                         {QR_CELLS.map(cell => (
                           <span
                             key={cell.id}
-                            className='h-2.5 w-2.5 rounded-[2px]'
+                            className='h-2.5 w-2.5 rounded-xs'
                             style={{
                               backgroundColor: cell.filled
                                 ? '#0b0b0b'

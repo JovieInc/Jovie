@@ -203,7 +203,7 @@ export function ChatMerchOptionsCard({
     <ChatGenerationArtifactSurface
       title='Merch Options'
       subtitle={result.nextStep ?? 'Pick one to save it to Library'}
-      className='max-w-[640px]'
+      className='max-w-160'
     >
       <div className='grid gap-2.5 md:grid-cols-3'>
         {result.options.map(option => {

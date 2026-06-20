@@ -710,7 +710,7 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
           >
             {showEntitySurface && !isStacked ? (
               <div className='flex w-full'>
-                <aside className='system-b-chat-composer-seam flex w-[264px] shrink-0 flex-col border-r'>
+                <aside className='system-b-chat-composer-seam flex w-66 shrink-0 flex-col border-r'>
                   <SlashCommandMenu
                     profileId={pickerProfileId}
                     state={picker.state}
@@ -1053,12 +1053,12 @@ function InputRow({
         className={cn(
           'relative',
           useHeroPill
-            ? 'flex min-h-[52px] items-center gap-1.5 px-3 py-1.5 sm:min-h-[56px] sm:px-3'
+            ? 'flex min-h-13 items-center gap-1.5 px-3 py-1.5 sm:min-h-14 sm:px-3'
             : [
                 'grid gap-2',
                 isHero
-                  ? 'min-h-[88px] grid-rows-[minmax(28px,auto)_36px] px-3 py-1.5'
-                  : 'min-h-[56px] grid-rows-[minmax(24px,auto)_36px] px-3 py-1.5',
+                  ? 'min-h-22 grid-rows-[minmax(28px,auto)_36px] px-3 py-1.5'
+                  : 'min-h-14 grid-rows-[minmax(24px,auto)_36px] px-3 py-1.5',
               ]
         )}
       >

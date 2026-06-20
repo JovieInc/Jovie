@@ -119,9 +119,9 @@ function InputRow({
 }: InputRowProps) {
   return (
     <div className='flex items-end gap-2 px-4 py-3'>
-      <div className='flex min-h-[28px] flex-1 items-end'>
+      <div className='flex min-h-7 flex-1 items-end'>
         <span
-          className='min-h-[28px] w-full text-sm leading-[1.5] text-white/90 font-[Inter,system-ui,sans-serif] whitespace-pre-wrap break-words'
+          className='min-h-7 w-full text-sm leading-[1.5] text-white/90 font-[Inter,system-ui,sans-serif] whitespace-pre-wrap break-words'
           aria-hidden='true'
         >
           {value || <span className='text-white/28'>{placeholder}</span>}
@@ -266,7 +266,7 @@ function PreviewPane({ artBg, eyebrow, title, stats }: PreviewPaneProps) {
     <div className='flex flex-1 flex-col justify-center gap-3 px-5 py-5'>
       <div className='flex items-start gap-4'>
         <div
-          className='h-[72px] w-[72px] shrink-0 rounded-[8px] shadow-[0_2px_8px_rgba(0,0,0,0.4)]'
+          className='h-18 w-18 shrink-0 rounded-[8px] shadow-[0_2px_8px_rgba(0,0,0,0.4)]'
           style={{ background: artBg }}
           aria-hidden='true'
         />
@@ -527,7 +527,7 @@ export function HomeComposerHero() {
             // ── Entity state: two-column layout ───────────────────────
             <div className='home-composer-result flex w-full'>
               {/* Left rail: 264px */}
-              <aside className='home-composer-result__rail flex w-[264px] shrink-0 flex-col border-r border-white/[0.055]'>
+              <aside className='home-composer-result__rail flex w-66 shrink-0 flex-col border-r border-white/[0.055]'>
                 <div className='px-3 pt-3 pb-2'>
                   <EntityPill label='Releases' />
                 </div>

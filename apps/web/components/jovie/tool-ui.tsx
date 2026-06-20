@@ -250,7 +250,7 @@ function ToolActivityFeed({
       data-tool-count={events.length}
       className={cn(
         'w-full text-primary-token',
-        variant === 'inline' ? 'max-w-full' : 'max-w-[420px]',
+        variant === 'inline' ? 'max-w-full' : 'max-w-105',
         multiple ? 'space-y-0.5' : 'space-y-0'
       )}
     >

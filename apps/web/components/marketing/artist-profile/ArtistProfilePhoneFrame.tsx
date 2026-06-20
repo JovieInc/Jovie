@@ -12,7 +12,7 @@ export function ArtistProfilePhoneFrame({
   return (
     <div
       className={cn(
-        'mx-auto w-full max-w-[340px] rounded-[2.4rem] border border-white/12 bg-[linear-gradient(180deg,rgba(20,21,28,0.98),rgba(10,11,15,0.98))] p-3 shadow-[0_34px_100px_rgba(0,0,0,0.48),0_14px_36px_rgba(0,0,0,0.28)]',
+        'mx-auto w-full max-w-85 rounded-[2.4rem] border border-white/12 bg-[linear-gradient(180deg,rgba(20,21,28,0.98),rgba(10,11,15,0.98))] p-3 shadow-[0_34px_100px_rgba(0,0,0,0.48),0_14px_36px_rgba(0,0,0,0.28)]',
         className
       )}
     >
