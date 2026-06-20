@@ -210,12 +210,7 @@ function CountdownGrid({
             >
               {value}
             </p>
-            <p
-              className={cn(
-                'mt-1 font-semibold uppercase tracking-[0.12em] text-white/52',
-                compact ? 'text-3xs' : 'text-3xs'
-              )}
-            >
+            <p className='mt-1 text-3xs font-semibold uppercase tracking-[0.12em] text-white/52'>
               {label}
             </p>
           </div>
@@ -241,12 +236,7 @@ function DatePill({
           : 'min-w-16 rounded-2xl px-3 py-2.5'
       )}
     >
-      <span
-        className={cn(
-          'font-semibold uppercase tracking-[0.12em]',
-          compact ? 'text-3xs' : 'text-3xs'
-        )}
-      >
+      <span className='text-3xs font-semibold uppercase tracking-[0.12em]'>
         {datePill.month}
       </span>
       <span
