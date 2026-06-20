@@ -58,7 +58,7 @@ function RowActionLink({ href, label }: RowActionLinkProps) {
       rel='noopener noreferrer'
       aria-label={`${label} (opens in a new tab)`}
       onClick={e => e.stopPropagation()}
-      className='inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[11px] font-[520] text-tertiary-token transition-colors hover:bg-surface-0 hover:text-primary-token focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)'
+      className='inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-2xs font-[520] text-tertiary-token transition-colors hover:bg-surface-0 hover:text-primary-token focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)'
     >
       {label}
       <ExternalLink className='size-3' aria-hidden='true' />
@@ -91,23 +91,23 @@ export function WorkflowRunRow({
     <>
       <div className='flex min-w-0 items-start justify-between gap-3'>
         <div className='min-w-0'>
-          <p className='truncate text-[13px] font-[560] text-primary-token'>
+          <p className='truncate text-app font-[560] text-primary-token'>
             {artifact.title}
           </p>
-          <p className='mt-1 line-clamp-2 text-[11.5px] leading-4 text-tertiary-token'>
+          <p className='mt-1 line-clamp-2 text-2xs leading-4 text-tertiary-token'>
             {artifact.summary}
           </p>
         </div>
         <div className='grid shrink-0 justify-items-end gap-1'>
           <WorkflowStatusPill status={artifact.status} />
           {artifact.humanApprovalRequired ? (
-            <span className='rounded-md border border-warning/20 bg-surface-0 px-1.5 py-0.5 text-[10.5px] font-[520] text-warning'>
+            <span className='rounded-md border border-warning/20 bg-surface-0 px-1.5 py-0.5 text-3xs font-[520] text-warning'>
               {HUMAN_GATE_LABELS[artifact.humanGate.status]}
             </span>
           ) : null}
         </div>
       </div>
-      <div className='flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-tertiary-token'>
+      <div className='flex flex-wrap items-center gap-x-3 gap-y-1 text-2xs text-tertiary-token'>
         <span>{artifact.modelRoute}</span>
         <span>{artifact.source}</span>
         <span className='inline-flex items-center gap-1'>

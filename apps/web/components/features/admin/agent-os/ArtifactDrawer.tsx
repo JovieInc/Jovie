@@ -63,7 +63,7 @@ function ArtifactLink({
       target='_blank'
       rel='noopener noreferrer'
       aria-label={`${label} (opens in a new tab)`}
-      className='inline-flex items-center gap-1 text-[12px] font-[520] text-secondary-token hover:text-primary-token'
+      className='inline-flex items-center gap-1 text-xs font-[520] text-secondary-token hover:text-primary-token'
     >
       {label}
       <ExternalLink className='size-3' aria-hidden='true' />
@@ -79,10 +79,10 @@ export function ArtifactDrawer({ artifact }: ArtifactDrawerProps) {
   if (!artifact) {
     return (
       <aside className='border-subtle border-t pt-3'>
-        <p className='mb-2 text-[12.5px] font-[560] text-primary-token'>
+        <p className='mb-2 text-xs font-[560] text-primary-token'>
           Selected Run
         </p>
-        <p className='text-[13px] text-secondary-token'>
+        <p className='text-app text-secondary-token'>
           Select a run to inspect its gates.
         </p>
       </aside>
@@ -94,22 +94,22 @@ export function ArtifactDrawer({ artifact }: ArtifactDrawerProps) {
       className='border-subtle border-t pt-3'
       data-testid='agent-os-artifact-drawer'
     >
-      <p className='mb-3 text-[12.5px] font-[560] text-primary-token'>
+      <p className='mb-3 text-xs font-[560] text-primary-token'>
         Selected Run
       </p>
       <div className='flex items-start justify-between gap-3'>
         <div className='min-w-0'>
-          <p className='truncate text-[13px] font-[590] text-primary-token'>
+          <p className='truncate text-app font-[590] text-primary-token'>
             {artifact.title}
           </p>
-          <p className='mt-1 text-[12px] leading-5 text-secondary-token'>
+          <p className='mt-1 text-xs leading-5 text-secondary-token'>
             {artifact.summary}
           </p>
         </div>
         <WorkflowStatusPill status={artifact.status} />
       </div>
 
-      <dl className='mt-4 grid grid-cols-2 gap-x-4 gap-y-3 text-[12px]'>
+      <dl className='mt-4 grid grid-cols-2 gap-x-4 gap-y-3 text-xs'>
         <div className='min-w-0'>
           <dt className='text-tertiary-token'>Source</dt>
           <dd className='mt-1 truncate font-[540] text-primary-token'>
@@ -137,7 +137,7 @@ export function ArtifactDrawer({ artifact }: ArtifactDrawerProps) {
       </dl>
 
       {artifact.blockedReason ? (
-        <div className='mt-4 rounded-lg border border-warning/20 bg-surface-1 px-3 py-2 text-[12px] leading-5 text-warning'>
+        <div className='mt-4 rounded-lg border border-warning/20 bg-surface-1 px-3 py-2 text-xs leading-5 text-warning'>
           {artifact.blockedReason}
         </div>
       ) : null}
@@ -154,7 +154,7 @@ export function ArtifactDrawer({ artifact }: ArtifactDrawerProps) {
       </div>
 
       <div className='mt-4'>
-        <p className='mb-2 text-[12.5px] font-[560] text-primary-token'>
+        <p className='mb-2 text-xs font-[560] text-primary-token'>
           Verification Gates
         </p>
         <VerificationGateList gates={artifact.verificationGates} />

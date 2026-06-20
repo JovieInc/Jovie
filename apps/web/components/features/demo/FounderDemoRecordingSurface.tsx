@@ -161,7 +161,7 @@ function SignalCard({
   }
 
   return (
-    <div className='pointer-events-none absolute left-[300px] top-[88px] z-20 w-[410px] rounded-xl border border-(--linear-app-shell-border) bg-(--linear-app-content-surface)/95 p-3 shadow-[0_18px_55px_rgba(0,0,0,0.35)] backdrop-blur'>
+    <div className='pointer-events-none absolute left-75 top-22 z-20 w-103 rounded-xl border border-(--linear-app-shell-border) bg-(--linear-app-content-surface)/95 p-3 shadow-[0_18px_55px_rgba(0,0,0,0.35)] backdrop-blur'>
       <div className='mb-2 flex items-center gap-3'>
         <ArtworkThumb
           src='/img/releases/the-deep-end.jpg'
@@ -170,15 +170,15 @@ function SignalCard({
           className='rounded-md'
         />
         <div className='min-w-0'>
-          <div className='text-[13px] font-semibold text-primary-token'>
+          <div className='text-app font-semibold text-primary-token'>
             Jovie found an opportunity
           </div>
-          <div className='truncate text-[12px] text-tertiary-token'>
+          <div className='truncate text-xs text-tertiary-token'>
             The Deep End - Tim White x Cosmic Gate
           </div>
         </div>
       </div>
-      <div className='grid grid-cols-2 gap-2 text-[12px]'>
+      <div className='grid grid-cols-2 gap-2 text-xs'>
         <div className='rounded-md bg-surface-1 p-2'>
           <div className='text-tertiary-token'>External signal</div>
           <div className='mt-1 text-secondary-token'>EDC this weekend</div>
@@ -205,7 +205,7 @@ function ApprovalStatus({
   }
 
   return (
-    <div className='pointer-events-none absolute left-[300px] bottom-[36px] z-20 flex items-center gap-2 rounded-full border border-(--linear-app-shell-border) bg-(--linear-app-content-surface)/95 px-3 py-2 text-[12px] text-secondary-token shadow-[0_12px_35px_rgba(0,0,0,0.32)]'>
+    <div className='pointer-events-none absolute left-75 bottom-9 z-20 flex items-center gap-2 rounded-full border border-(--linear-app-shell-border) bg-(--linear-app-content-surface)/95 px-3 py-2 text-xs text-secondary-token shadow-[0_12px_35px_rgba(0,0,0,0.32)]'>
       <span className='relative grid size-5 place-items-center rounded-full bg-primary-token text-(--linear-app-content-surface)'>
         <Check className='size-3' />
         {activeScene === 'approval-execution' ? (
@@ -254,7 +254,7 @@ function RecordingChatPanel({
     (elapsedSeconds >= 76 && elapsedSeconds < 77);
 
   return (
-    <div className='absolute bottom-4 right-4 top-12 z-30 w-[430px] overflow-hidden rounded-xl border border-(--linear-app-shell-border) bg-(--linear-app-content-surface)/98 shadow-[0_24px_80px_rgba(0,0,0,0.42)] backdrop-blur'>
+    <div className='absolute bottom-4 right-4 top-12 z-30 w-108 overflow-hidden rounded-xl border border-(--linear-app-shell-border) bg-(--linear-app-content-surface)/98 shadow-[0_24px_80px_rgba(0,0,0,0.42)] backdrop-blur'>
       <ThreadView
         thread={{
           id: 'the-deep-end-weekend-drop',
@@ -298,14 +298,14 @@ function RecordingChatPanel({
           </ThreadTurn>
         ) : null}
         {elapsedSeconds >= 46 && elapsedSeconds < 76 ? (
-          <div className='rounded-lg border border-(--linear-app-shell-border) bg-surface-1 p-3 text-[13px]'>
+          <div className='rounded-lg border border-(--linear-app-shell-border) bg-surface-1 p-3 text-app'>
             <div className='mb-3 text-secondary-token'>
               Approve this and I will create the campaign, update your Jovie
               Link, draft the fan notification, schedule the drop, and monitor
               performance.
             </div>
             <button
-              className='h-8 w-full rounded-md border border-(--linear-btn-primary-border) bg-btn-primary text-[12.5px] font-medium text-btn-primary-foreground shadow-button-inset transition-colors hover:border-(--linear-btn-primary-hover) hover:bg-btn-primary-hover'
+              className='h-8 w-full rounded-md border border-(--linear-btn-primary-border) bg-btn-primary text-xs font-medium text-btn-primary-foreground shadow-button-inset transition-colors hover:border-(--linear-btn-primary-hover) hover:bg-btn-primary-hover'
               type='button'
             >
               Approve drop
