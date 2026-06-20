@@ -20,6 +20,8 @@ import {
 } from '@/lib/claim/visitor-state';
 import { toPublicContacts } from '@/lib/contacts/mapper';
 import { getReleasesForProfileLite } from '@/lib/discography/queries';
+import { getEntityIdentityLinks } from '@/lib/entity/queries';
+import { buildEntitySameAs } from '@/lib/entity/sameAs';
 import { captureError } from '@/lib/error-tracking';
 // ISR-safe: profile-variant.ts does NOT import cookies() — no dynamic opt-in
 import {
@@ -192,6 +194,7 @@ export default async function ArtistPage({ params }: Readonly<Props>) {
   const tourDatesPromise = getPublicTourDates(profile.id);
   const releasesPromise = getPublicReleases(profile.id);
   const merchCardsPromise = getPublicMerchCards(profile.id);
+  const entityLinksPromise = getEntityIdentityLinks(profile.id);
 
   // Convert our profile data to the Artist type expected by components
   const artist = convertCreatorProfileToArtist(profile);
@@ -240,16 +243,22 @@ export default async function ArtistPage({ params }: Readonly<Props>) {
 
   // Await tour dates + releases (started above, non-blocking — errors logged then resolve to empty)
   // Sort server-side so the client doesn't need a useMemo sort
-  const [tourDatesRaw, allReleases, merchCards, alertOptInVariant] =
-    await Promise.all([
-      tourDatesPromise.catch(() => [] as TourDateViewModel[]),
-      releasesPromise,
-      merchCardsPromise,
-      // stableId is null for ISR renders — returns the default 'button' variant.
-      // AnonCookieBootstrap resolves the per-user variant on the client side.
-      // .catch ensures a Statsig outage doesn't fail the whole ISR page render.
-      getProfileAlertOptInVariant(null).catch(() => 'button' as const),
-    ]);
+  const [
+    tourDatesRaw,
+    allReleases,
+    merchCards,
+    alertOptInVariant,
+    entityLinks,
+  ] = await Promise.all([
+    tourDatesPromise.catch(() => [] as TourDateViewModel[]),
+    releasesPromise,
+    merchCardsPromise,
+    // stableId is null for ISR renders — returns the default 'button' variant.
+    // AnonCookieBootstrap resolves the per-user variant on the client side.
+    // .catch ensures a Statsig outage doesn't fail the whole ISR page render.
+    getProfileAlertOptInVariant(null).catch(() => 'button' as const),
+    entityLinksPromise.catch(() => []),
+  ]);
   const tourDates = [...tourDatesRaw].sort(
     (a, b) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime()
   );
@@ -270,7 +279,8 @@ export default async function ArtistPage({ params }: Readonly<Props>) {
     profile,
     genres,
     links,
-    tourDates
+    tourDates,
+    entityLinks
   );
   const aeoContent = buildProfileAeoContent({
     artist,
@@ -288,6 +298,23 @@ export default async function ArtistPage({ params }: Readonly<Props>) {
       <script type='application/ld+json'>
         {safeJsonLdStringify(structuredData)}
       </script>
+      {/* FAQPage JSON-LD — feeds AI citation engines and Google FAQ rich results */}
+      {aeoContent.faqs.length > 0 && (
+        <script type='application/ld+json'>
+          {safeJsonLdStringify({
+            '@context': 'https://schema.org',
+            '@type': 'FAQPage',
+            mainEntity: aeoContent.faqs.map(item => ({
+              '@type': 'Question',
+              name: item.question,
+              acceptedAnswer: {
+                '@type': 'Answer',
+                text: item.answer,
+              },
+            })),
+          })}
+        </script>
+      )}
 
       {isPublicNoAuthSmoke ? null : (
         <ProfileViewTracker handle={artist.handle} artistId={artist.id} />

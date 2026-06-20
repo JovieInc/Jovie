@@ -51,10 +51,10 @@ function ProposalCard({
     >
       <div className='flex items-start justify-between gap-3'>
         <div className='min-w-0 space-y-1'>
-          <p className='text-[13px] font-[560] text-primary-token'>
+          <p className='text-app font-[560] text-primary-token'>
             {proposal.surfaceName}
           </p>
-          <p className='text-[11px] text-tertiary-token'>
+          <p className='text-2xs text-tertiary-token'>
             {proposal.surfaceId}
             {proposal.scoring
               ? ` · score ${proposal.scoring.score.toFixed(2)}`
@@ -66,23 +66,23 @@ function ProposalCard({
             href={proposal.linearIssueUrl}
             target='_blank'
             rel='noopener noreferrer'
-            className='inline-flex shrink-0 items-center gap-1 text-[11px] text-secondary-token hover:text-primary-token'
+            className='inline-flex shrink-0 items-center gap-1 text-2xs text-secondary-token hover:text-primary-token'
           >
             {proposal.linearIssueId}
             <ExternalLink className='h-3 w-3' aria-hidden='true' />
           </a>
         ) : (
-          <span className='text-[11px] text-tertiary-token'>
+          <span className='text-2xs text-tertiary-token'>
             {proposal.linearIssueId}
           </span>
         )}
       </div>
 
-      <p className='text-[13px] leading-6 text-secondary-token'>
+      <p className='text-app leading-6 text-secondary-token'>
         {proposal.proposalText}
       </p>
 
-      <p className='text-[11px] text-tertiary-token'>
+      <p className='text-2xs text-tertiary-token'>
         Queued {formatCreatedAt(proposal.createdAt)}
       </p>
 
@@ -226,7 +226,7 @@ export function DesignProposalReviewPanel() {
     return (
       <ContentSurfaceCard
         surface='details'
-        className='flex items-center gap-2 p-3 text-[13px] text-secondary-token'
+        className='flex items-center gap-2 p-3 text-app text-secondary-token'
         data-testid='design-proposal-review-panel'
       >
         <Loader2 className='h-4 w-4 animate-spin' aria-hidden='true' />
@@ -244,14 +244,14 @@ export function DesignProposalReviewPanel() {
       >
         <div className='flex items-center justify-between gap-3'>
           <div>
-            <p className='text-[12.5px] font-[560] text-primary-token'>
+            <p className='text-xs font-[560] text-primary-token'>
               Design proposals
             </p>
-            <p className='text-[12px] text-secondary-token'>
+            <p className='text-xs text-secondary-token'>
               Review pending Design Lab proposals before dispatch.
             </p>
           </div>
-          <span className='text-[11px] tabular-nums text-tertiary-token'>
+          <span className='text-2xs tabular-nums text-tertiary-token'>
             {proposals.length}
           </span>
         </div>
@@ -281,7 +281,7 @@ export function DesignProposalReviewPanel() {
             ))}
           </div>
         ) : (
-          <p className='text-[13px] text-secondary-token'>
+          <p className='text-app text-secondary-token'>
             No pending design proposals.
           </p>
         )}
@@ -316,12 +316,12 @@ export function DesignProposalReviewPanel() {
             data-testid='design-proposal-notes-dialog'
           >
             <div className='space-y-1'>
-              <p className='text-[14px] font-[560] text-primary-token'>
+              <p className='text-sm font-[560] text-primary-token'>
                 {pendingNotes.decision === 'no'
                   ? 'Rejection notes'
                   : 'Approval notes'}
               </p>
-              <p className='text-[12px] text-secondary-token'>
+              <p className='text-xs text-secondary-token'>
                 {pendingNotes.decision === 'no'
                   ? 'Capture the direction to reject so Design Lab does not regenerate it.'
                   : 'Amendments are injected into the D5 dispatch payload.'}
@@ -332,7 +332,7 @@ export function DesignProposalReviewPanel() {
               value={notesDraft}
               onChange={event => setNotesDraft(event.target.value)}
               rows={5}
-              className='w-full rounded-lg border border-subtle bg-surface-0 px-3 py-2 text-[13px] text-primary-token outline-none'
+              className='w-full rounded-lg border border-subtle bg-surface-0 px-3 py-2 text-app text-primary-token outline-none'
               placeholder='Add notes for this decision'
             />
 

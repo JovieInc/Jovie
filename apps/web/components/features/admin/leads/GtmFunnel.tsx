@@ -21,7 +21,7 @@ function FunnelStage({
     <div className='flex items-center gap-1.5'>
       <div className='flex flex-col'>
         <span className='text-app font-book text-secondary-token'>{label}</span>
-        <span className='text-[20px] font-medium tabular-nums text-primary-token'>
+        <span className='text-xl font-medium tabular-nums text-primary-token'>
           {count.toLocaleString()}
         </span>
         {rate && (

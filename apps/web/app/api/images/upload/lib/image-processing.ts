@@ -90,6 +90,21 @@ export async function optimizeImageToAvif(file: File): Promise<{
   };
 }
 
+export async function convertImageBufferToJpeg(
+  inputBuffer: Buffer
+): Promise<Buffer> {
+  const sharp = await getSharp();
+
+  return sharp(inputBuffer, {
+    failOnError: false,
+  })
+    .rotate()
+    .withMetadata({ orientation: undefined })
+    .toColourspace('srgb')
+    .jpeg({ quality: 90 })
+    .toBuffer();
+}
+
 /** Avatar download size presets (square, no upscaling) */
 const AVATAR_DOWNLOAD_SIZES = [1024, 512, 256, 128] as const;
 const AVATAR_MAX_DIMENSION = 1536;

@@ -1,6 +1,6 @@
 {
   "name": "jovie-monorepo",
-  "version": "26.6.53",
+  "version": "26.6.54",
   "private": true,
   "config": {
     "commitizen": {
@@ -85,6 +85,7 @@
     "ios:setup-env": "bash apps/ios/scripts/setup-env.sh",
     "ios:build": "bash apps/ios/scripts/run-xcodebuild.sh build",
     "ios:lint": "bash scripts/ios-best-practices-lint.sh apps/ios/Jovie",
+    "ios:guardrail:audit": "node scripts/ios-guardrail-rollout-audit.mjs .",
     "ios:test": "bash apps/ios/scripts/run-xcodebuild.sh test",
     "ios:performance": "bash apps/ios/scripts/measure-launch-performance.sh",
     "ios:runtime-performance": "bash apps/ios/scripts/measure-runtime-performance.sh",
@@ -161,7 +162,8 @@
     "changelog:send": "doppler run -- node scripts/send-changelog-email.mjs",
     "video:footer:generate": "doppler run --project jovie-web --config dev -- tsx scripts/generate-footer-cta-video.ts",
     "hermes:worker": "pnpm --filter @jovie/web run hermes:worker",
-    "hermes:codex-shipper": "tsx scripts/hermes/jobs/codex-issue-shipper.ts"
+    "hermes:codex-shipper": "tsx scripts/hermes/jobs/codex-issue-shipper.ts",
+    "ds:offscale": "node scripts/ds-offscale-report.mjs"
   },
   "devDependencies": {
     "@anthropic-ai/sdk": "^0.100.1",

@@ -3,7 +3,8 @@ name: CI
 on:
   pull_request:
     branches: [main, 'integration/**']
-  merge_group:
+  # merge_group retired 2026-06-18: Graphite owns the merge queue; GitHub never
+  # creates a merge_group, so this trigger would never fire. See .github/MERGE_QUEUE.md.
   push:
     branches: [main]
     paths-ignore:
@@ -22,8 +23,7 @@ concurrency:
   # expressions as strings and treats "false" as truthy, which was cancelling
   # every main CI run when the next merge landed and starving production
   # promotion. Using github.sha in the group on main sidesteps the issue
-  # entirely. PRs and merge_group runs still share a group per ref so stale
-  # runs are superseded as usual.
+  # entirely. PRs share a group per ref so stale runs are superseded as usual.
   group: >-
     ci-${{ github.workflow }}-${{
       (github.event_name == 'push' && github.ref == 'refs/heads/main')
@@ -42,11 +42,29 @@ env:
   FAST_RUNNER: ${{ vars.CI_FAST_RUNNER || 'ubuntu-latest' }}
 
 jobs:
+  # Graphite CI Optimizer: lets Graphite skip redundant CI on PRs it will
+  # re-validate in the merge queue. Fail-open — missing token or action error
+  # leaves skip='false', so CI runs normally and nothing is silently skipped.
+  optimize_ci:
+    name: Optimize CI (Graphite)
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    outputs:
+      skip: ${{ steps.graphite.outputs.skip || 'false' }}
+    steps:
+      - id: graphite
+        continue-on-error: true
+        uses: withgraphite/graphite-ci-action@main
+        with:
+          graphite_token: ${{ secrets.GRAPHITE_TOKEN }}
+
 
   # ── Centralized path-change detection ──────────────────────────────────
   # Runs once, outputs change flags for all job types.
   # Downstream jobs read outputs instead of fetching git history independently.
   ci-path-changes:
+    needs: [optimize_ci]
+    if: ${{ needs.optimize_ci.outputs.skip == 'false' }}
     name: Path Changes
     runs-on: ubuntu-latest
     timeout-minutes: 2
@@ -77,9 +95,6 @@ jobs:
           if [[ "${{ github.event_name }}" == "pull_request" ]]; then
             git fetch origin "${{ github.base_ref }}"
             CHANGED_FILES=$(git diff --name-only "origin/${{ github.base_ref }}" HEAD)
-          elif [[ "${{ github.event_name }}" == "merge_group" ]]; then
-            git fetch origin main --depth=1
-            CHANGED_FILES=$(git diff --name-only origin/main HEAD)
           elif [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
             # Manual dispatch: run everything
             echo "Manual dispatch: running all checks"
@@ -235,8 +250,9 @@ jobs:
           fi
 
   ci-risk-classifier:
+    if: ${{ needs.optimize_ci.outputs.skip == 'false' }}
     name: CI Risk Classifier
-    needs: [ci-path-changes]
+    needs: [optimize_ci, ci-path-changes]
     runs-on: ubuntu-latest
     timeout-minutes: 3
     outputs:
@@ -268,10 +284,6 @@ jobs:
             git fetch origin "$BASE_REF" --depth=1
             DIFF_BASE="origin/$BASE_REF"
             git diff --name-only "$DIFF_BASE" HEAD > "$CHANGED_FILES"
-          elif [[ "$EVENT_NAME" == "merge_group" ]]; then
-            git fetch origin main --depth=1
-            DIFF_BASE="origin/main"
-            git diff --name-only "$DIFF_BASE" HEAD > "$CHANGED_FILES" || true
           elif [[ "$EVENT_NAME" == "push" ]]; then
             DIFF_BASE="HEAD~1"
             git diff --name-only "$DIFF_BASE" HEAD > "$CHANGED_FILES" 2>/dev/null || git show --pretty="" --name-only HEAD > "$CHANGED_FILES"
@@ -328,6 +340,8 @@ jobs:
           retention-days: 7
 
   ci-env-example-guard:
+    needs: [optimize_ci]
+    if: ${{ needs.optimize_ci.outputs.skip == 'false' }}
     name: Env Example Guard
     # Always run; fast, prevents accidental secret commits.
     runs-on: ubuntu-latest
@@ -359,6 +373,8 @@ jobs:
           echo "✅ .env.example looks safe (no obvious secrets)."
 
   ci-secret-scan:
+    needs: [optimize_ci]
+    if: ${{ needs.optimize_ci.outputs.skip == 'false' }}
     name: Secret Scan (gitleaks + trufflehog)
     # Always run; fast, catches secrets in PR diffs including *.backup files (JOV-3215).
     runs-on: ubuntu-latest
@@ -374,9 +390,6 @@ jobs:
           if [[ "${{ github.event_name }}" == "pull_request" ]]; then
             git fetch origin "${{ github.base_ref }}"
             ./scripts/security/scan-secrets.sh ci-pr "origin/${{ github.base_ref }}"
-          elif [[ "${{ github.event_name }}" == "merge_group" ]]; then
-            git fetch origin main --depth=1
-            ./scripts/security/scan-secrets.sh ci-pr "origin/main"
           elif [[ "${{ github.event_name }}" == "push" ]]; then
             if [[ "${{ github.event.before }}" == "0000000000000000000000000000000000000000" ]]; then
               git fetch origin main --depth=1
@@ -394,10 +407,10 @@ jobs:
   ci-guardrails:
     name: Guardrails (proxy)
     # Draft PRs skip; ready PRs + pushes + merge queue enforce core repo guardrails
-    needs: [ci-path-changes]
+    needs: [optimize_ci, ci-path-changes]
     runs-on: ubuntu-latest
     timeout-minutes: 5
-    if: ${{ github.event_name != 'pull_request' || needs.ci-path-changes.outputs.has_code_changes == 'true' }}
+    if: ${{ needs.optimize_ci.outputs.skip == 'false' && (github.event_name != 'pull_request' || needs.ci-path-changes.outputs.has_code_changes == 'true') }}
     steps:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
         with: { fetch-depth: 0 }
@@ -409,7 +422,7 @@ jobs:
           BASE_REF: ${{ github.base_ref || 'main' }}
         run: node scripts/desktop-release-guard.mjs --base "origin/${BASE_REF}"
       - name: Script unit tests
-        run: node --test scripts/desktop-release-guard.test.mjs scripts/dev-web-fast.test.mjs
+        run: node --test scripts/desktop-release-guard.test.mjs scripts/dev-web-fast.test.mjs scripts/ios-guardrail-rollout-audit.test.mjs
       - name: Version consistency guard
         run: node scripts/version-check.mjs
       - name: Next.js proxy guard
@@ -420,8 +433,9 @@ jobs:
         run: node scripts/next-proxy-guard.mjs
 
   ci-structural-contract:
+    if: ${{ needs.optimize_ci.outputs.skip == 'false' }}
     name: Structural Contract
-    needs: [ci-risk-classifier]
+    needs: [optimize_ci, ci-path-changes]
     runs-on: ubuntu-latest
     timeout-minutes: 8
     env:
@@ -443,6 +457,7 @@ jobs:
           pnpm tailwind:check
           pnpm --filter=@jovie/web run lint:no-native-dialogs
           pnpm --filter=@jovie/web run lint:seo
+          pnpm --filter=@jovie/web run lint:contrast-ratchet
       - name: Validate flaky quarantine ledger
         run: node .github/scripts/quarantine-ledger.mjs validate
       - name: Write remediation summary
@@ -451,22 +466,22 @@ jobs:
           {
             echo "### Structural Contract"
             echo
-            echo "This lane enforces the CI harness manifest, generated docs, workflow syntax, proxy guard, Tailwind contract, native-dialog ban, and SEO/AEO ratchet."
+            echo "This lane enforces the CI harness manifest, generated docs, workflow syntax, proxy guard, Tailwind contract, native-dialog ban, SEO/AEO ratchet, and contrast ratchet."
             echo
             echo "Next local command:"
             echo
             echo '```bash'
-            echo "pnpm ci:harness:check && pnpm next:proxy-guard && pnpm tailwind:check && pnpm --filter=@jovie/web run lint:no-native-dialogs && pnpm --filter=@jovie/web run lint:seo"
+            echo "pnpm ci:harness:check && pnpm next:proxy-guard && pnpm tailwind:check && pnpm --filter=@jovie/web run lint:no-native-dialogs && pnpm --filter=@jovie/web run lint:seo && pnpm --filter=@jovie/web run lint:contrast-ratchet"
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
 
   ci-biome:
     name: Lint
     # Single consolidated job for all Biome checks (lint + format)
-    needs: [ci-path-changes]
+    needs: [optimize_ci, ci-path-changes]
     runs-on: ubuntu-latest
     timeout-minutes: 5
-    if: ${{ github.event_name != 'pull_request' || needs.ci-path-changes.outputs.has_code_changes == 'true' }}
+    if: ${{ needs.optimize_ci.outputs.skip == 'false' && (github.event_name != 'pull_request' || needs.ci-path-changes.outputs.has_code_changes == 'true') }}
     steps:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
         with: { fetch-depth: 2 }
@@ -499,10 +514,10 @@ jobs:
 
   ci-promptfoo-evals:
     name: Promptfoo Evals (deterministic)
-    needs: [ci-path-changes]
+    needs: [optimize_ci, ci-path-changes]
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    if: ${{ github.event_name == 'workflow_dispatch' || needs.ci-path-changes.outputs.run_promptfoo_evals == 'true' }}
+    if: ${{ needs.optimize_ci.outputs.skip == 'false' && (github.event_name == 'workflow_dispatch' || needs.ci-path-changes.outputs.run_promptfoo_evals == 'true') }}
     env:
       JOVIE_RUN_LIVE_EVALS: '0'
       JOVIE_RUN_LIVE_HTTP_EVALS: '0'
@@ -522,10 +537,10 @@ jobs:
 
   ci-golden-eval-set:
     name: Golden Eval Set (deterministic)
-    needs: [ci-path-changes]
+    needs: [optimize_ci, ci-path-changes]
     runs-on: ubuntu-latest
     timeout-minutes: 5
-    if: ${{ github.event_name == 'workflow_dispatch' || needs.ci-path-changes.outputs.run_golden_eval_set == 'true' }}
+    if: ${{ needs.optimize_ci.outputs.skip == 'false' && (github.event_name == 'workflow_dispatch' || needs.ci-path-changes.outputs.run_golden_eval_set == 'true') }}
     env:
       JOVIE_RUN_LIVE_EVALS: '0'
       JOVIE_RUN_LIVE_HTTP_EVALS: '0'
@@ -541,10 +556,10 @@ jobs:
   ci-eslint:
     name: ESLint Server Boundaries
     # Check server/client boundary violations
-    needs: [ci-path-changes]
+    needs: [optimize_ci, ci-path-changes]
     runs-on: ubuntu-latest
     timeout-minutes: 5
-    if: ${{ github.event_name != 'pull_request' || needs.ci-path-changes.outputs.has_code_changes == 'true' }}
+    if: ${{ needs.optimize_ci.outputs.skip == 'false' && (github.event_name != 'pull_request' || needs.ci-path-changes.outputs.has_code_changes == 'true') }}
     steps:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
         with: { fetch-depth: 2 }
@@ -577,8 +592,8 @@ jobs:
   ci-knip:
     name: Knip (dead code)
     # Detect unused files, dependencies, and exports
-    needs: [ci-path-changes]
-    if: ${{ github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.ci-path-changes.outputs.has_code_changes == 'true') }}
+    needs: [optimize_ci, ci-path-changes]
+    if: ${{ needs.optimize_ci.outputs.skip == 'false' && (github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.ci-path-changes.outputs.has_code_changes == 'true')) }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
@@ -592,10 +607,10 @@ jobs:
     name: Typecheck
     # Draft PRs skip; ready PRs + pushes + merge queue run typecheck
     # Note: Runs in parallel with lint for speed (no dependency on cache-warm)
-    needs: [ci-path-changes]
+    needs: [optimize_ci, ci-path-changes]
     runs-on: ${{ vars.CI_FAST_RUNNER || 'ubuntu-latest' }}
     timeout-minutes: 10
-    if: ${{ github.event_name != 'pull_request' || needs.ci-path-changes.outputs.has_code_changes == 'true' }}
+    if: ${{ needs.optimize_ci.outputs.skip == 'false' && (github.event_name != 'pull_request' || needs.ci-path-changes.outputs.has_code_changes == 'true') }}
     steps:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
         with:
@@ -616,22 +631,21 @@ jobs:
           path: |
             .cache/tsbuildinfo
             apps/web/.cache/tsbuildinfo
-          key: ${{ runner.os }}-tsc-${{ github.ref }}-${{ hashFiles('**/tsconfig*.json', '**/pnpm-lock.yaml', '**/package.json') }}
+          key: ${{ runner.os }}-tsc-${{ hashFiles('**/tsconfig*.json', '**/pnpm-lock.yaml', '**/package.json') }}
           restore-keys: |
-            ${{ runner.os }}-tsc-${{ github.ref }}-
             ${{ runner.os }}-tsc-
       - name: Run typecheck
         env:
-          TURBO_SCM_BASE: ${{ github.event_name == 'merge_group' && 'origin/main' || (github.base_ref && format('origin/{0}', github.base_ref)) || '' }}
+          TURBO_SCM_BASE: ${{ (github.base_ref && format('origin/{0}', github.base_ref)) || '' }}
         run: pnpm turbo typecheck --affected
 
   neon-db:
     name: Neon DB
-    needs: [ci-path-changes]
+    needs: [optimize_ci, ci-path-changes]
     # Run for push to main, testing-labeled full CI, or PRs touching DB-relevant paths.
     # run_neon covers drizzle, lib/db, lib/queries, schema, cron routes, SQL files, and
     # package.json changes. PRs touching only UI/perf/docs skip this job entirely.
-    if: ${{ github.event_name == 'push' || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork == false && github.event.pull_request.user.login && github.event.pull_request.user.login != 'dependabot[bot]' && needs.ci-path-changes.outputs.run_neon == 'true') }}
+    if: ${{ needs.optimize_ci.outputs.skip == 'false' && (github.event_name == 'push' || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork == false && github.event.pull_request.user.login && github.event.pull_request.user.login != 'dependabot[bot]' && needs.ci-path-changes.outputs.run_neon == 'true')) }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
     outputs:
@@ -753,9 +767,9 @@ jobs:
 
   drizzle-migration-guard:
     name: Migration Guard
-    needs: [ci-path-changes]
+    needs: [optimize_ci, ci-path-changes]
     # Skip if 'skip-migration-guard' label is present (for schema consolidation)
-    if: ${{ github.event_name == 'push' || github.event_name == 'merge_group' || (github.event_name == 'pull_request' && !contains(github.event.pull_request.labels.*.name, 'skip-migration-guard')) }}
+    if: ${{ needs.optimize_ci.outputs.skip == 'false' && (github.event_name == 'push' || (github.event_name == 'pull_request' && !contains(github.event.pull_request.labels.*.name, 'skip-migration-guard'))) }}
     runs-on: ubuntu-latest
     timeout-minutes: 3
     outputs:
@@ -792,9 +806,9 @@ jobs:
 
   ci-drizzle-check:
     name: Drizzle Check
-    needs: [neon-db, ci-path-changes]
+    needs: [optimize_ci, neon-db, ci-path-changes]
     # Drizzle check runs on push to main or PRs with testing label
-    if: ${{ github.event_name == 'push' || (github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'testing')) }}
+    if: ${{ needs.optimize_ci.outputs.skip == 'false' && (github.event_name == 'push' || (github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'testing'))) }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     outputs:
@@ -854,9 +868,10 @@ jobs:
         run: pnpm --filter=@jovie/web run drizzle:check
 
   ci-fast:
+    if: ${{ needs.optimize_ci.outputs.skip == 'false' }}
     name: ci-fast
     # Gate for PRs, pushes, and merge queue: aggregate fast checks
-    needs: [ci-typecheck, ci-biome, ci-eslint, ci-guardrails, ci-structural-contract]
+    needs: [optimize_ci, ci-typecheck, ci-biome, ci-eslint, ci-guardrails, ci-structural-contract]
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
@@ -867,9 +882,8 @@ jobs:
   ci-pr-ready:
     name: PR Ready
     # PR gate: fast checks + unit tests + build + Lighthouse (+ risk-triggered smoke/preview).
-    # Merge queue gate: ci-fast + risk classifier only (build/tests already passed on the PR).
-    needs: [ci-risk-classifier, ci-fast, ci-unit-tests, ci-build-public, ci-lighthouse-dashboard-pr, ci-lighthouse-onboarding-pr, ci-lighthouse-admin-pr, ci-lighthouse-pr, ci-e2e-smoke, ci-pr-vercel-preview]
-    if: ${{ always() && ((github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'main') || github.event_name == 'merge_group') }}
+    needs: [optimize_ci, ci-risk-classifier, ci-fast, ci-unit-tests, ci-build-public, ci-lighthouse-dashboard-pr, ci-lighthouse-onboarding-pr, ci-lighthouse-admin-pr, ci-lighthouse-pr, ci-e2e-smoke, ci-pr-vercel-preview]
+    if: ${{ needs.optimize_ci.outputs.skip == 'false' && (always() && github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'main') }}
     runs-on: ubuntu-latest
     timeout-minutes: 2
     steps:
@@ -922,16 +936,6 @@ jobs:
             echo "❌ CI risk classifier did not pass (result: $RISK_RESULT)"
             echo "Likely fix: run pnpm ci:harness:check and inspect .github/ci-harness/manifest.json."
             exit 1
-          fi
-
-          # Merge queue: lightweight re-validation only (see branch-protection merge_queue contract).
-          if [[ "$EVENT_NAME" == "merge_group" ]]; then
-            if [[ "$FAST_RESULT" != "success" && "$FAST_RESULT" != "skipped" ]]; then
-              echo "❌ merge_group requires ci-fast (result: $FAST_RESULT)"
-              exit 1
-            fi
-            echo "Merge queue fast lane passed: ci-fast + risk classifier"
-            exit 0
           fi
 
           # ci-fast must succeed (or be skipped when path-gated with no app files changed)
@@ -1002,8 +1006,8 @@ jobs:
   ci-integration-ready:
     name: Integration Fast
     # Lightweight gate for integration/* PRs (agent batch lanes). Full CI runs on train PRs to main.
-    needs: [ci-risk-classifier, ci-fast]
-    if: ${{ always() && github.event_name == 'pull_request' && startsWith(github.event.pull_request.base.ref, 'integration/') }}
+    needs: [optimize_ci, ci-risk-classifier, ci-fast]
+    if: ${{ needs.optimize_ci.outputs.skip == 'false' && (always() && github.event_name == 'pull_request' && startsWith(github.event.pull_request.base.ref, 'integration/')) }}
     runs-on: ubuntu-latest
     timeout-minutes: 2
     steps:
@@ -1025,13 +1029,13 @@ jobs:
 
   ci-build-public:
     name: Build (public routes)
-    needs: [ci-path-changes]
+    needs: [optimize_ci, ci-path-changes]
     # Shared Next.js build for a11y + layout-guard — build once, test twice.
     # On PRs to main: always runs (non-fork) for build validation. Part of the merge gate.
     # Merge queue intentionally skips build (already validated on the PR).
     # On main push: always runs for full coverage.
     # Fork PRs are excluded (no secrets) — skipped via fork-pr-gate.
-    if: ${{ (github.event_name == 'push' && github.ref == 'refs/heads/main') || (github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'main' && github.event.pull_request.head.repo.fork == false) || github.event_name == 'workflow_dispatch' }}
+    if: ${{ needs.optimize_ci.outputs.skip == 'false' && ((github.event_name == 'push' && github.ref == 'refs/heads/main') || (github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'main' && github.event.pull_request.head.repo.fork == false) || github.event_name == 'workflow_dispatch') }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     outputs:
@@ -1086,6 +1090,11 @@ jobs:
 
       - name: Upload build artifact
         if: steps.check_changes.outputs.run_full_ci == 'true'
+        # ponytail: artifact only feeds informational downstream jobs (layout-guard,
+        # a11y), so a transient FinalizeArtifact timeout must not fail this merge gate.
+        # Build correctness is already asserted by the build + "Verify build output"
+        # steps above. Re-enable hard failure if a downstream gate ever depends on it.
+        continue-on-error: true
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: nextjs-build-${{ github.run_id }}
@@ -1095,11 +1104,11 @@ jobs:
 
   ci-layout-guard:
     name: Layout Guard (informational)
-    needs: [ci-build-public]
+    needs: [optimize_ci, ci-build-public]
     # Fully informational — never blocks PRs or merge queue.
     # Runs when ci-build-public produced an artifact. Failures are logged but don't gate merges.
     # Skipped on push-to-main (merge queue already validated).
-    if: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'main' && needs.ci-build-public.outputs.has_artifact == 'true' }}
+    if: ${{ needs.optimize_ci.outputs.skip == 'false' && (github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'main' && needs.ci-build-public.outputs.has_artifact == 'true') }}
     continue-on-error: true
     runs-on: ubuntu-latest
     timeout-minutes: 8
@@ -1170,8 +1179,8 @@ jobs:
 
   ci-mobile-overflow:
     name: Mobile Overflow Guard (${{ matrix.width }}px)
-    needs: [ci-fast, ci-path-changes, neon-db]
-    if: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'main' && github.event.pull_request.head.repo.fork == false && needs.ci-path-changes.outputs.run_e2e == 'true' && github.event.pull_request.user.login && github.event.pull_request.user.login != 'dependabot[bot]' }}
+    needs: [optimize_ci, ci-fast, ci-path-changes, neon-db]
+    if: ${{ needs.optimize_ci.outputs.skip == 'false' && (github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'main' && github.event.pull_request.head.repo.fork == false && needs.ci-path-changes.outputs.run_e2e == 'true' && github.event.pull_request.user.login && github.event.pull_request.user.login != 'dependabot[bot]') }}
     runs-on: ubuntu-latest
     timeout-minutes: 45
     strategy:
@@ -1289,10 +1298,10 @@ jobs:
 
   ci-lighthouse-pr:
     name: Lighthouse (public routes PR)
-    needs: [ci-build-public, ci-path-changes, neon-db]
+    needs: [optimize_ci, ci-build-public, ci-path-changes, neon-db]
     # Runs Lighthouse CI against the public-route build artifact on PRs.
     # Blocks PRs when triggered (path-gated to public-route changes).
-    if: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'main' && github.event.pull_request.head.repo.fork == false && github.event.pull_request.user.login && github.event.pull_request.user.login != 'dependabot[bot]' && needs.ci-build-public.outputs.has_artifact == 'true' && needs.ci-path-changes.outputs.run_public_lighthouse == 'true' }}
+    if: ${{ needs.optimize_ci.outputs.skip == 'false' && (github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'main' && github.event.pull_request.head.repo.fork == false && github.event.pull_request.user.login && github.event.pull_request.user.login != 'dependabot[bot]' && needs.ci-build-public.outputs.has_artifact == 'true' && needs.ci-path-changes.outputs.run_public_lighthouse == 'true') }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -1422,8 +1431,8 @@ jobs:
 
   ci-lighthouse-dashboard-pr:
     name: Lighthouse (dashboard PR)
-    needs: [ci-fast, ci-path-changes, neon-db]
-    if: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'main' && github.event.pull_request.head.repo.fork == false && contains(github.event.pull_request.labels.*.name, 'testing') }}
+    needs: [optimize_ci, ci-fast, ci-path-changes, neon-db]
+    if: ${{ needs.optimize_ci.outputs.skip == 'false' && (github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'main' && github.event.pull_request.head.repo.fork == false && contains(github.event.pull_request.labels.*.name, 'testing')) }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -1580,8 +1589,8 @@ jobs:
 
   ci-lighthouse-onboarding-pr:
     name: Lighthouse (onboarding PR)
-    needs: [ci-fast, ci-path-changes, neon-db]
-    if: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'main' && github.event.pull_request.head.repo.fork == false && github.event.pull_request.user.login && github.event.pull_request.user.login != 'dependabot[bot]' && needs.ci-path-changes.outputs.run_onboarding_lighthouse == 'true' }}
+    needs: [optimize_ci, ci-fast, ci-path-changes, neon-db]
+    if: ${{ needs.optimize_ci.outputs.skip == 'false' && (github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'main' && github.event.pull_request.head.repo.fork == false && github.event.pull_request.user.login && github.event.pull_request.user.login != 'dependabot[bot]' && needs.ci-path-changes.outputs.run_onboarding_lighthouse == 'true') }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -1727,8 +1736,8 @@ jobs:
     # Do NOT depend on neon-db — it only runs on push / testing-labeled / drizzle PRs,
     # so dependent jobs would silently skip on admin-UI-only PRs. This job creates
     # its own ephemeral branch below and does not reuse the shared neon-db branch.
-    needs: [ci-fast, ci-path-changes]
-    if: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'main' && github.event.pull_request.head.repo.fork == false && github.event.pull_request.user.login && github.event.pull_request.user.login != 'dependabot[bot]' && needs.ci-path-changes.outputs.run_admin_lighthouse == 'true' }}
+    needs: [optimize_ci, ci-fast, ci-path-changes]
+    if: ${{ needs.optimize_ci.outputs.skip == 'false' && (github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'main' && github.event.pull_request.head.repo.fork == false && github.event.pull_request.user.login && github.event.pull_request.user.login != 'dependabot[bot]' && needs.ci-path-changes.outputs.run_admin_lighthouse == 'true') }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -1862,8 +1871,8 @@ jobs:
     # Informational baseline run — first PR establishes the budget; once
     # baselines stabilize this can be promoted to a hard gate by removing
     # `continue-on-error` and adding the job to ci-pr-ready.needs.
-    needs: [ci-fast, ci-path-changes, neon-db]
-    if: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'main' && github.event.pull_request.head.repo.fork == false && github.event.pull_request.user.login && github.event.pull_request.user.login != 'dependabot[bot]' && needs.ci-path-changes.outputs.run_chat_lighthouse == 'true' }}
+    needs: [optimize_ci, ci-fast, ci-path-changes, neon-db]
+    if: ${{ needs.optimize_ci.outputs.skip == 'false' && (github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'main' && github.event.pull_request.head.repo.fork == false && github.event.pull_request.user.login && github.event.pull_request.user.login != 'dependabot[bot]' && needs.ci-path-changes.outputs.run_chat_lighthouse == 'true') }}
     continue-on-error: true
     runs-on: ubuntu-latest
     timeout-minutes: 30
@@ -1995,9 +2004,9 @@ jobs:
 
   ci-pr-neon-migrate:
     name: DB Migrate (PR main)
-    needs: [neon-db, ci-path-changes]
+    needs: [optimize_ci, neon-db, ci-path-changes]
     # Only run when drizzle/schema paths changed — skip entirely otherwise to save runners
-    if: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'main' && github.event.pull_request.head.repo.fork == false && needs.ci-path-changes.outputs.run_drizzle == 'true' }}
+    if: ${{ needs.optimize_ci.outputs.skip == 'false' && (github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'main' && github.event.pull_request.head.repo.fork == false && needs.ci-path-changes.outputs.run_drizzle == 'true') }}
     runs-on: ubuntu-latest
     timeout-minutes: 12
     outputs:
@@ -2063,6 +2072,12 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          fetch-depth: 1
+
+      - uses: ./.github/actions/setup-node-pnpm
+
       - name: Wait for CDN propagation
         run: |
           echo "Waiting 30s for Vercel CDN propagation after deploy..."
@@ -2144,7 +2159,7 @@ jobs:
             return 0
           }
 
-          echo "=== 1/4 Health API ==="
+          echo "=== 1/5 Health API ==="
           if ! retry "Health API" check_health; then
             FAILURES=$((FAILURES + 1))
           fi
@@ -2175,7 +2190,7 @@ jobs:
             return 0
           }
 
-          echo "=== 2/4 Homepage ==="
+          echo "=== 2/5 Homepage ==="
           if ! retry "Homepage" check_homepage; then
             FAILURES=$((FAILURES + 1))
           fi
@@ -2218,7 +2233,7 @@ jobs:
             return 0
           }
 
-          echo "=== 3/4 Public Profile ==="
+          echo "=== 3/5 Public Profile ==="
           if ! retry "Public Profile" check_profile; then
             FAILURES=$((FAILURES + 1))
           fi
@@ -2244,18 +2259,24 @@ jobs:
             return 0
           }
 
-          echo "=== 4/4 Critical Pages ==="
+          echo "=== 4/5 Critical Pages ==="
           if ! retry "Critical Pages" check_critical_pages; then
+            FAILURES=$((FAILURES + 1))
+          fi
+
+          # -- 5. Production SEO surfaces: robots.txt + sitemap.xml --
+          echo "=== 5/5 Production SEO Surfaces ==="
+          if ! retry "Production SEO Surfaces" bash -c 'BASE_URL=https://jov.ie pnpm --filter=@jovie/web exec tsx scripts/seo-ratchet-live.ts'; then
             FAILURES=$((FAILURES + 1))
           fi
 
           # -- Summary --
           echo ""
           if [ $FAILURES -gt 0 ]; then
-            echo "::error::Post-deploy smoke failed: $FAILURES/4 checks failed"
+            echo "::error::Post-deploy smoke failed: $FAILURES/5 checks failed"
             exit 1
           fi
-          echo "Post-deploy smoke passed: 4/4 checks OK"
+          echo "Post-deploy smoke passed: 5/5 checks OK"
 
   # Post-deploy authenticated smoke test — lightweight Playwright test against production.
   # Verifies sign-in + dashboard load with real credentials after deploy.
@@ -2330,10 +2351,10 @@ jobs:
 
   ci-build:
     name: Build
-    needs: [ci-path-changes]
+    needs: [optimize_ci, ci-path-changes]
     # Build skips typecheck (NEXT_IGNORE_TYPECHECK=1), downstream jobs gate on ci-fast
     # Skipped in merge queue: no merge-queue jobs depend on the full build.
-    if: ${{ (github.event_name == 'push' && github.ref == 'refs/heads/main') || (github.event_name == 'pull_request' && (contains(github.event.pull_request.labels.*.name, 'testing') || contains(github.event.pull_request.labels.*.name, 'deploy-preview'))) || github.event_name == 'workflow_dispatch' }}
+    if: ${{ needs.optimize_ci.outputs.skip == 'false' && ((github.event_name == 'push' && github.ref == 'refs/heads/main') || (github.event_name == 'pull_request' && (contains(github.event.pull_request.labels.*.name, 'testing') || contains(github.event.pull_request.labels.*.name, 'deploy-preview'))) || github.event_name == 'workflow_dispatch') }}
     runs-on: ${{ vars.CI_FAST_RUNNER || 'ubuntu-latest' }}
     timeout-minutes: 15
     outputs:
@@ -2442,17 +2463,17 @@ jobs:
 
   ci-unit-tests:
     name: Unit Tests (${{ matrix.shard }})
-    needs: [ci-path-changes]
+    needs: [optimize_ci, ci-path-changes]
     # Runs on PRs to main, main pushes, and manual dispatch. Merge queue skips (PR-validated).
     # Parallel with typecheck/build for faster CI.
     # Path-gated: skips test execution when no test-relevant files changed.
-    if: ${{ (github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'main') || (github.event_name == 'push' && github.ref == 'refs/heads/main') || github.event_name == 'workflow_dispatch' }}
+    if: ${{ needs.optimize_ci.outputs.skip == 'false' && ((github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'main') || (github.event_name == 'push' && github.ref == 'refs/heads/main') || github.event_name == 'workflow_dispatch') }}
     runs-on: ${{ vars.CI_FAST_RUNNER || 'ubuntu-latest' }}
     timeout-minutes: 40
     strategy:
       fail-fast: false
       matrix:
-        shard: ['1/6', '2/6', '3/6', '4/6', '5/6', '6/6']
+        shard: ['1/3', '2/3', '3/3']
     outputs:
       run_full_ci: ${{ steps.check_changes.outputs.run_full_ci }}
     steps:
@@ -2486,14 +2507,14 @@ jobs:
         if: steps.check_changes.outputs.run_full_ci == 'true'
         env:
           TURBO_SCM_HEAD: ${{ github.sha }}
-          TURBO_SCM_BASE: ${{ github.event_name == 'merge_group' && 'origin/main' || (github.base_ref && format('origin/{0}', github.base_ref)) || '' }}
+          TURBO_SCM_BASE: ${{ (github.base_ref && format('origin/{0}', github.base_ref)) || '' }}
         run: |
           # Use forked pool with limited workers to reduce CI flakiness from memory pressure
           export NODE_OPTIONS="--max-old-space-size=2048"
           VITEST_CI_FLAGS="--pool=forks --maxWorkers=2"
           # Retry budget comes from apps/web/tests/quarantine.json
           RETRY_FLAG="--retry=${{ steps.quarantine.outputs.unit_default_retries }}"
-          # Use shard-specific output file so Codecov Test Analytics receives all 6 shards
+          # Use shard-specific output file so Codecov Test Analytics receives all 3 shards
           # (a shared filename causes only the last upload to be recorded)
           # Note: vitest runs from apps/web/, so path is relative to that directory
           SHARD_SLUG="${{ matrix.shard }}"
@@ -2503,9 +2524,9 @@ jobs:
           if [ "${{ github.ref }}" = "refs/heads/main" ]; then
             echo "main: Running web unit suite through Turbo without coverage; nightly coverage audit uploads Codecov coverage"
             pnpm turbo test:fast --filter=@jovie/web -- $VITEST_CI_FLAGS $RETRY_FLAG --shard=${{ matrix.shard }} ${{ steps.quarantine.outputs.unit_excludes }} $OUTPUT_FLAG
-          elif [ -n "${{ github.base_ref }}" ] || [ "${{ github.event_name }}" = "merge_group" ]; then
-            echo "🔍 PR/merge queue: Running full test suite"
-            # Run all tests on PRs and merge queue to catch regressions before merge
+          elif [ -n "${{ github.base_ref }}" ]; then
+            echo "🔍 PR: Running full test suite"
+            # Run all tests on PRs to catch regressions before merge
             pnpm turbo test:fast --affected -- $VITEST_CI_FLAGS $RETRY_FLAG --shard=${{ matrix.shard }} ${{ steps.quarantine.outputs.unit_excludes }} $OUTPUT_FLAG
           else
             echo "🔍 Feature branch push: Running critical + interaction tests only (no base_ref available)"
@@ -2520,7 +2541,7 @@ jobs:
         continue-on-error: true
         env:
           TURBO_SCM_HEAD: ${{ github.sha }}
-          TURBO_SCM_BASE: ${{ github.event_name == 'merge_group' && 'origin/main' || (github.base_ref && format('origin/{0}', github.base_ref)) || '' }}
+          TURBO_SCM_BASE: ${{ (github.base_ref && format('origin/{0}', github.base_ref)) || '' }}
         run: pnpm turbo test:fast --affected -- --pool=forks --maxWorkers=2 --retry=${{ steps.quarantine.outputs.quarantine_unit_retries }} ${{ steps.quarantine.outputs.unit_files }}
 
       - name: Run packages/ui unit tests
@@ -2540,8 +2561,8 @@ jobs:
   ci-a11y:
     name: A11y (axe)
     # Runs axe-core WCAG 2.1 AA audit on public routes — uses shared build artifact.
-    needs: [ci-build-public, ci-path-changes, neon-db]
-    if: ${{ ((github.event_name == 'push' && github.ref == 'refs/heads/main') || (github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'main' && github.event.pull_request.head.repo.fork == false && github.event.pull_request.user.login && github.event.pull_request.user.login != 'dependabot[bot]') || github.event_name == 'workflow_dispatch') && needs.ci-build-public.outputs.has_artifact == 'true' }}
+    needs: [optimize_ci, ci-build-public, ci-path-changes, neon-db]
+    if: ${{ needs.optimize_ci.outputs.skip == 'false' && (((github.event_name == 'push' && github.ref == 'refs/heads/main') || (github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'main' && github.event.pull_request.head.repo.fork == false && github.event.pull_request.user.login && github.event.pull_request.user.login != 'dependabot[bot]') || github.event_name == 'workflow_dispatch') && needs.ci-build-public.outputs.has_artifact == 'true') }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -2710,8 +2731,8 @@ jobs:
     environment: Preview – jovie
     # Gated: runs with 'testing' label or deterministic high-risk classification.
     # Full E2E runs on merge to main anyway.
-    needs: [ci-fast, ci-path-changes, ci-risk-classifier]
-    if: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'main' && github.event.pull_request.head.repo.fork == false && (contains(github.event.pull_request.labels.*.name, 'testing') || needs.ci-risk-classifier.outputs.requires_smoke == 'true') }}
+    needs: [optimize_ci, ci-fast, ci-path-changes, ci-risk-classifier]
+    if: ${{ needs.optimize_ci.outputs.skip == 'false' && (github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'main' && github.event.pull_request.head.repo.fork == false && (contains(github.event.pull_request.labels.*.name, 'testing') || needs.ci-risk-classifier.outputs.requires_smoke == 'true')) }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
     outputs:
@@ -2830,8 +2851,8 @@ jobs:
     environment: Preview – jovie
     # Gated: only runs with 'testing' label (admin tests need auth credentials).
     # Removed push-to-main trigger — merge queue validates PRs before merge.
-    needs: [ci-fast, ci-path-changes, neon-db]
-    if: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork == false && contains(github.event.pull_request.labels.*.name, 'testing') }}
+    needs: [optimize_ci, ci-fast, ci-path-changes, neon-db]
+    if: ${{ needs.optimize_ci.outputs.skip == 'false' && (github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork == false && contains(github.event.pull_request.labels.*.name, 'testing')) }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -2966,8 +2987,8 @@ jobs:
   ci-e2e-migrate:
     name: E2E DB Migrate
     environment: Preview – jovie
-    needs: [ci-fast, ci-build, neon-db, ci-path-changes]
-    if: ${{ github.event_name == 'push' || (github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'testing')) }}
+    needs: [optimize_ci, ci-fast, ci-build, neon-db, ci-path-changes]
+    if: ${{ needs.optimize_ci.outputs.skip == 'false' && (github.event_name == 'push' || (github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'testing'))) }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
     outputs:
@@ -3046,8 +3067,8 @@ jobs:
     name: Full E2E (Preview)
     environment: Preview – jovie
     # Opt-in validation lane for risky PRs. Keep it off the main deploy critical path.
-    needs: [ci-fast, ci-build, neon-db, ci-e2e-migrate]
-    if: ${{ needs.ci-e2e-migrate.outputs.run_full_ci == 'true' && (github.event_name == 'workflow_dispatch' || (github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'testing'))) }}
+    needs: [optimize_ci, ci-fast, ci-build, neon-db, ci-e2e-migrate]
+    if: ${{ needs.optimize_ci.outputs.skip == 'false' && (needs.ci-e2e-migrate.outputs.run_full_ci == 'true' && (github.event_name == 'workflow_dispatch' || (github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'testing')))) }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
     strategy:
@@ -3305,8 +3326,8 @@ jobs:
     name: Preview Deploy (PR)
     # Preview deploys are the default QA surface for internal PRs.
     # Keep this independent from the main deploy gate so review happens before merge.
-    needs: [ci-fast, ci-path-changes, ci-risk-classifier]
-    if: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'main' && github.event.pull_request.head.repo.fork == false && github.event.pull_request.user.login && github.event.pull_request.user.login != 'dependabot[bot]' && (needs.ci-path-changes.outputs.run_build == 'true' || needs.ci-risk-classifier.outputs.requires_preview == 'true') }}
+    needs: [optimize_ci, ci-fast, ci-path-changes, ci-risk-classifier]
+    if: ${{ needs.optimize_ci.outputs.skip == 'false' && (github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'main' && github.event.pull_request.head.repo.fork == false && github.event.pull_request.user.login && github.event.pull_request.user.login != 'dependabot[bot]' && (needs.ci-path-changes.outputs.run_build == 'true' || needs.ci-risk-classifier.outputs.requires_preview == 'true')) }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
     concurrency:
@@ -3393,12 +3414,13 @@ jobs:
 
   ci-summary:
     name: PR Summary
-    if: ${{ always() && github.event_name == 'pull_request' }}
+    if: ${{ needs.optimize_ci.outputs.skip == 'false' && (always() && github.event_name == 'pull_request') }}
     permissions:
       actions: read
       pull-requests: write
       contents: read
     needs:
+      - optimize_ci
       - ci-env-example-guard
       - ci-secret-scan
       - ci-guardrails
@@ -3709,8 +3731,8 @@ jobs:
   # This remains available for opt-in PR validation but does not block production deploys.
   ci-smoke-required:
     name: Extended Smoke (Preview)
-    needs: [ci-fast, ci-build, neon-db, ci-e2e-tests, ci-path-changes]
-    if: ${{ always() && (github.event_name == 'workflow_dispatch' || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork == false && github.event.pull_request.user.login && github.event.pull_request.user.login != 'dependabot[bot]' && contains(github.event.pull_request.labels.*.name, 'testing') && needs.ci-path-changes.outputs.run_e2e == 'true')) }}
+    needs: [optimize_ci, ci-fast, ci-build, neon-db, ci-e2e-tests, ci-path-changes]
+    if: ${{ needs.optimize_ci.outputs.skip == 'false' && (always() && (github.event_name == 'workflow_dispatch' || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork == false && github.event.pull_request.user.login && github.event.pull_request.user.login != 'dependabot[bot]' && contains(github.event.pull_request.labels.*.name, 'testing') && needs.ci-path-changes.outputs.run_e2e == 'true'))) }}
     runs-on: ubuntu-latest
     environment: Preview – jovie
     timeout-minutes: 20
@@ -3986,6 +4008,12 @@ jobs:
     concurrency:
       group: production-deploy
       cancel-in-progress: false
+    permissions:
+      contents: read
+      actions: read
+      # Required for SLSA build-provenance attestation
+      attestations: write
+      id-token: write
     outputs:
       migration_status: ${{ steps.migrate.outcome }}
       preflight_status: ${{ steps.preflight.outcome }}
@@ -4122,6 +4150,16 @@ jobs:
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
           VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+      - name: Package build output for provenance attestation
+        run: tar -czf /tmp/vercel-build-output.tar.gz -C . .vercel/output
+      - name: Attest build provenance (SLSA Level 2)
+        id: attest
+        uses: actions/attest-build-provenance@e8998f949152b193b063cb0ec769d69d929409be # v2
+        with:
+          subject-path: /tmp/vercel-build-output.tar.gz
+          # ponytail: attests the vercel build output; attestation is SLSA L2 (hosted
+          # runner + signed provenance). L3 requires hermetic build — upgrade when
+          # Vercel builds become reproducible/isolated.
       - name: Deploy (staging preview, prebuilt)
         id: deploy
         run: |

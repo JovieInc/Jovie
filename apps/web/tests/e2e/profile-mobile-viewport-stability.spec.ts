@@ -572,11 +572,10 @@ async function collectMockHomeReleaseCardLayout(
 ): Promise<ReleaseCardLayout> {
   return page.evaluate(() => {
     const card = document.querySelector<HTMLElement>(
-      '[data-testid="profile-home-primary-action-card"]'
+      '[data-testid="profile-home-carousel"] a'
     );
     const artwork = card?.querySelector<HTMLImageElement>('img') ?? null;
-    const title =
-      card?.querySelector<HTMLElement>('p.line-clamp-2, p.truncate') ?? null;
+    const title = card?.querySelector<HTMLElement>('h3') ?? null;
     const hero = document.querySelector<HTMLElement>(
       '[data-testid="profile-hero-identity-block"]'
     );
@@ -632,7 +631,7 @@ test.describe('Public Profile Mock Home Release Card Layout @smoke @critical', (
       );
       await waitForHydration(page);
       await waitForAnyVisible(page, [
-        '[data-testid="profile-home-primary-action-card"]',
+        '[data-testid="profile-home-carousel"] a',
       ]);
       await settleLayout(page);
       await expectNoDocumentOverflow(

@@ -94,7 +94,7 @@ const ACTION_ICONS: Record<ProfileMediaCardIcon, LucideIcon> = {
 const RATIO_CLASS_NAMES: Record<ProfileMediaCardRatio, string> = {
   square: 'aspect-square',
   portrait: 'aspect-[4/5]',
-  landscape: 'aspect-[5/3] min-h-[142px]',
+  landscape: 'aspect-[5/3] min-h-36',
   compact: 'aspect-[3/4]',
 };
 
@@ -193,7 +193,7 @@ function CountdownGrid({
         <p
           className={cn(
             'font-medium tracking-[-0.01em] text-white/68',
-            compact ? 'text-[9px]' : 'text-[12px]'
+            compact ? 'text-3xs' : 'text-xs'
           )}
         >
           {countdown.label}
@@ -205,17 +205,12 @@ function CountdownGrid({
             <p
               className={cn(
                 'font-[680] leading-none tracking-[-0.018em] text-white tabular-nums',
-                compact ? 'text-[11px]' : 'text-[30px]'
+                compact ? 'text-2xs' : 'text-3xl'
               )}
             >
               {value}
             </p>
-            <p
-              className={cn(
-                'mt-1 font-semibold uppercase tracking-[0.12em] text-white/52',
-                compact ? 'text-[6.5px]' : 'text-[10px]'
-              )}
-            >
+            <p className='mt-1 text-3xs font-semibold uppercase tracking-[0.12em] text-white/52'>
               {label}
             </p>
           </div>
@@ -237,28 +232,23 @@ function DatePill({
       className={cn(
         'flex shrink-0 flex-col items-center justify-center border border-white/14 bg-white/10 text-white shadow-[0_12px_26px_rgba(0,0,0,0.2)] backdrop-blur-xl',
         compact
-          ? 'min-w-8 rounded-[9px] px-1.5 py-1'
-          : 'min-w-[62px] rounded-[15px] px-3 py-2.5'
+          ? 'min-w-8 rounded-lg px-1.5 py-1'
+          : 'min-w-16 rounded-2xl px-3 py-2.5'
       )}
     >
-      <span
-        className={cn(
-          'font-semibold uppercase tracking-[0.12em]',
-          compact ? 'text-[7px]' : 'text-[10px]'
-        )}
-      >
+      <span className='text-3xs font-semibold uppercase tracking-[0.12em]'>
         {datePill.month}
       </span>
       <span
         className={cn(
           'font-[680] leading-none tracking-[-0.02em] tabular-nums',
-          compact ? 'mt-0.5 text-[12px]' : 'mt-1 text-[22px]'
+          compact ? 'mt-0.5 text-xs' : 'mt-1 text-xl'
         )}
       >
         {datePill.day}
       </span>
       {datePill.meta && !compact ? (
-        <span className='mt-1 text-[10px] font-medium uppercase tracking-[0.06em] text-white/72'>
+        <span className='mt-1 text-3xs font-medium uppercase tracking-[0.06em] text-white/72'>
           {datePill.meta}
         </span>
       ) : null}
@@ -301,11 +291,11 @@ function CardAction({
     </>
   );
   const className = cn(
-    'inline-flex w-full min-w-0 items-center rounded-[14px] bg-white text-black shadow-[0_8px_18px_rgba(0,0,0,0.24)] transition-opacity duration-subtle hover:opacity-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-black',
+    'inline-flex w-full min-w-0 items-center rounded-xl bg-white text-black shadow-[0_8px_18px_rgba(0,0,0,0.24)] transition-opacity duration-subtle hover:opacity-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-black',
     action.showChevron ? 'justify-between' : 'justify-center',
     compact
-      ? 'min-h-11 gap-1 px-2.5 py-2 text-[11px] font-[680]'
-      : 'min-h-11 gap-2 px-4 py-2 text-[13px] font-[680]',
+      ? 'min-h-11 gap-1 px-2.5 py-2 text-2xs font-[680]'
+      : 'min-h-11 gap-2 px-4 py-2 text-app font-[680]',
     action.disabled &&
       'cursor-not-allowed bg-white/14 text-white/42 hover:opacity-100'
   );
@@ -391,8 +381,8 @@ export function ProfileMediaCard({
   return (
     <article
       className={cn(
-        'relative min-w-0 overflow-hidden rounded-[20px] border border-white/8 bg-[color:var(--profile-drawer-bg)] text-left shadow-[0_18px_40px_-20px_rgba(0,0,0,0.7)]',
-        compact && 'rounded-[12px]',
+        'relative min-w-0 overflow-hidden rounded-3xl border border-white/8 bg-[color:var(--profile-drawer-bg)] text-left shadow-[0_18px_40px_-20px_rgba(0,0,0,0.7)]',
+        compact && 'rounded-xl',
         className
       )}
       data-testid={dataTestId}
@@ -456,8 +446,8 @@ export function ProfileMediaCard({
                 'font-[680] uppercase text-white/72',
                 accentClassName,
                 compact
-                  ? 'text-[7.5px] leading-none tracking-[0.14em]'
-                  : 'text-[10px] tracking-[0.16em]'
+                  ? 'text-3xs leading-none tracking-[0.14em]'
+                  : 'text-3xs tracking-[0.16em]'
               )}
             >
               {eyebrow}
@@ -466,10 +456,10 @@ export function ProfileMediaCard({
               className={cn(
                 'min-w-0 font-[680] leading-[1.03] tracking-[-0.026em] text-white [overflow-wrap:anywhere]',
                 compact
-                  ? 'line-clamp-2 text-[12px]'
+                  ? 'line-clamp-2 text-xs'
                   : landscape
-                    ? 'line-clamp-2 text-[clamp(20px,6.1vw,25px)] [@media(max-height:760px)]:text-[20px]'
-                    : 'line-clamp-2 text-[26px]'
+                    ? 'line-clamp-2 text-[clamp(20px,6.1vw,25px)] [@media(max-height:760px)]:text-xl'
+                    : 'line-clamp-2 text-2xl'
               )}
               data-testid={dataTestId ? `${dataTestId}-title` : undefined}
             >
@@ -479,7 +469,7 @@ export function ProfileMediaCard({
               <p
                 className={cn(
                   'line-clamp-2 min-w-0 text-white/78 [overflow-wrap:anywhere]',
-                  compact ? 'text-[9px] leading-[1.25]' : 'text-[13px]'
+                  compact ? 'text-3xs leading-[1.25]' : 'text-app'
                 )}
               >
                 {subtitle}
@@ -489,7 +479,7 @@ export function ProfileMediaCard({
               <p
                 className={cn(
                   'inline-flex max-w-full min-w-0 items-center gap-1.5 text-white/78 [overflow-wrap:anywhere]',
-                  compact ? 'text-[9px]' : 'text-[12px]'
+                  compact ? 'text-3xs' : 'text-xs'
                 )}
               >
                 <MapPin
@@ -505,7 +495,7 @@ export function ProfileMediaCard({
               <p
                 className={cn(
                   'min-w-0 truncate text-white/62 [overflow-wrap:anywhere]',
-                  compact ? 'text-[9px]' : 'text-[12px]'
+                  compact ? 'text-3xs' : 'text-xs'
                 )}
               >
                 {secondaryLocationLabel}
@@ -515,7 +505,7 @@ export function ProfileMediaCard({
               <p
                 className={cn(
                   'inline-flex min-w-0 items-center gap-2 font-semibold tracking-[-0.005em] text-white [overflow-wrap:anywhere]',
-                  compact ? 'text-[9px]' : 'text-[13px]'
+                  compact ? 'text-3xs' : 'text-app'
                 )}
               >
                 <span

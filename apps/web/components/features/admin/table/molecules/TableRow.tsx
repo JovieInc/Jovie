@@ -53,7 +53,7 @@ export function TableRow({
         // Base styles
         'group border-b border-subtle transition-[background-color,box-shadow] duration-subtle last:border-b-0',
         // Fixed height to prevent layout shift
-        'h-[60px]',
+        'h-15',
         // Hover and selected states — aligned with Linear design tokens
         (() => {
           if (checked) return rowState.checked;

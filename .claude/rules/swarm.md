@@ -203,9 +203,9 @@ gh pr create --draft --base main --title "fix(design-system): <title>" --body "<
 # Invoke /ship
 # /ship detects the draft PR, promotes it, runs typecheck + lint + tests
 
-# 8. Auto-merge
+# 8. Add to Graphite merge queue
 PR_NUM=$(gh pr view --json number --jq '.number')
-gh pr merge --auto --squash $PR_NUM
+gh pr edit $PR_NUM --add-label merge-queue
 
 # 9. Release claim
 mcp__ruflo__claims_release({ id: "<chunk-slug>", swarmId: "<swarm-id>" })

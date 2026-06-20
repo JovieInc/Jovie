@@ -2,14 +2,16 @@
 
 import { Bell } from 'lucide-react';
 import { useMemo } from 'react';
+import {
+  type EntityCardModel,
+  EntityCarousel,
+  merchToEntityCard,
+  releaseToEntityCard,
+  showToEntityCard,
+} from '@/components/organisms/entity-card';
 import type { NotificationSourceContext } from '@/features/profile/artist-notifications-cta/types';
 import type { ProfileRenderMode } from '@/features/profile/contracts';
-import { ProfileMerchCard } from '@/features/profile/ProfileMerchCard';
-import {
-  ProfilePrimaryActionCard,
-  type ProfilePrimaryActionCardRelease,
-  resolveProfilePrimaryActionCardState,
-} from '@/features/profile/ProfilePrimaryActionCard';
+import type { ProfilePrimaryActionCardRelease } from '@/features/profile/ProfilePrimaryActionCard';
 import {
   startOfProfileSurfaceLocalDay as startOfLocalDay,
   toProfileSurfaceDateValue as toDateValue,
@@ -84,8 +86,8 @@ function HomeAlertsCard({
   const sharedProps = {
     className:
       variant === 'bento'
-        ? 'group flex min-h-[70px] w-full min-w-0 items-center gap-3 rounded-[var(--profile-inner-radius)] border border-white/10 bg-white/[0.045] px-3.5 py-3 text-left text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.04),0_14px_28px_-22px_rgba(0,0,0,0.62)] backdrop-blur-2xl transition-[background-color,border-color,opacity] duration-subtle hover:bg-white/[0.06] active:opacity-[0.9]'
-        : 'group flex min-h-12 w-full min-w-0 items-center gap-2.5 rounded-[14px] border border-white/10 bg-white/[0.035] px-3 text-left text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.04),0_14px_28px_-18px_rgba(0,0,0,0.55)] backdrop-blur-2xl transition-[background-color,border-color,opacity] duration-subtle hover:bg-white/[0.055] active:opacity-[0.9]',
+        ? 'group flex min-h-18 w-full min-w-0 items-center gap-3 rounded-[var(--profile-inner-radius)] border border-white/10 bg-white/[0.045] px-3.5 py-3 text-left text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.04),0_14px_28px_-22px_rgba(0,0,0,0.62)] backdrop-blur-2xl transition-[background-color,border-color,opacity] duration-subtle hover:bg-white/[0.06] active:opacity-[0.9]'
+        : 'group flex min-h-12 w-full min-w-0 items-center gap-2.5 rounded-xl border border-white/10 bg-white/[0.035] px-3 text-left text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.04),0_14px_28px_-18px_rgba(0,0,0,0.55)] backdrop-blur-2xl transition-[background-color,border-color,opacity] duration-subtle hover:bg-white/[0.055] active:opacity-[0.9]',
     'data-testid':
       variant === 'bento'
         ? 'profile-home-alerts-fallback-card'
@@ -97,7 +99,7 @@ function HomeAlertsCard({
       <Bell
         className={cn(
           'shrink-0 text-white/84',
-          variant === 'bento' ? 'h-[18px] w-[18px]' : 'h-4 w-4'
+          variant === 'bento' ? 'h-5 w-5' : 'h-4 w-4'
         )}
         aria-hidden='true'
       />
@@ -105,8 +107,8 @@ function HomeAlertsCard({
         <span
           className={
             variant === 'bento'
-              ? 'block text-[13px] font-semibold leading-[1.15] [overflow-wrap:anywhere]'
-              : 'block text-[12.5px] font-semibold leading-4 [overflow-wrap:anywhere]'
+              ? 'block text-app font-semibold leading-[1.15] [overflow-wrap:anywhere]'
+              : 'block text-xs font-semibold leading-4 [overflow-wrap:anywhere]'
           }
         >
           {title}
@@ -114,19 +116,19 @@ function HomeAlertsCard({
         <span
           className={
             variant === 'bento'
-              ? 'mt-0.5 block max-w-[25ch] text-[11.5px] leading-4 text-white/54 [overflow-wrap:anywhere]'
-              : 'mt-0.5 block text-[11px] leading-3.5 text-white/50 [overflow-wrap:anywhere]'
+              ? 'mt-0.5 block max-w-[25ch] text-2xs leading-4 text-white/54 [overflow-wrap:anywhere]'
+              : 'mt-0.5 block text-2xs leading-3.5 text-white/50 [overflow-wrap:anywhere]'
           }
         >
           {description}
         </span>
       </span>
       <span
-        className='relative inline-flex h-[28px] w-[48px] shrink-0 items-center rounded-full border border-white/12 bg-white/[0.16] p-[3px] shadow-[inset_0_1px_1px_rgba(255,255,255,0.12)] transition-[background-color,border-color,opacity] duration-subtle group-hover:bg-white/[0.2]'
+        className='relative inline-flex h-7 w-12 shrink-0 items-center rounded-full border border-white/12 bg-white/[0.16] p-1 shadow-[inset_0_1px_1px_rgba(255,255,255,0.12)] transition-[background-color,border-color,opacity] duration-subtle group-hover:bg-white/[0.2]'
         aria-hidden='true'
         data-testid='profile-home-alerts-switch'
       >
-        <span className='block h-[22px] w-[22px] rounded-full bg-white shadow-[0_3px_10px_rgba(0,0,0,0.32)]' />
+        <span className='block h-6 w-6 rounded-full bg-white shadow-[0_3px_10px_rgba(0,0,0,0.32)]' />
       </span>
     </>
   );
@@ -159,10 +161,7 @@ export function ProfileHomeRail({
   profileSettings,
   featuredPlaylistFallback,
   tourDates = [],
-  hasPlayableDestinations,
   renderMode = 'interactive',
-  previewActionLabel = 'Listen',
-  onPlayClick,
   onAlertsClick,
   isSubscribed = false,
   viewerLocation,
@@ -192,45 +191,90 @@ export function ProfileHomeRail({
     upcomingTourDates,
     effectiveLocation
   );
-  const nextTourDate = upcomingTourDates[0] ?? null;
-  const nearbyTourDate = nearbyDates[0]?.date ?? null;
-  const featuredState = useMemo(
-    () =>
-      resolveProfilePrimaryActionCardState({
-        artistName: artist.name,
-        latestRelease,
-        profileSettings,
-        nextTourDate,
-        nearbyTourDate,
-        featuredPlaylistFallback,
-        hasPlayableDestinations,
-        now,
-      }),
-    [
-      artist.name,
-      featuredPlaylistFallback,
-      hasPlayableDestinations,
-      latestRelease,
-      nearbyTourDate,
-      nextTourDate,
-      now,
-      profileSettings,
-    ]
-  );
+  const nearbyTourDateId = nearbyDates[0]?.date?.id ?? null;
 
-  const hasPrimaryFeature =
-    featuredState.kind === 'release_countdown' ||
-    featuredState.kind === 'release_live' ||
-    featuredState.kind === 'tour_nearby' ||
-    featuredState.kind === 'tour_next' ||
-    featuredState.kind === 'playlist_fallback';
+  // One ordered card list — featured item first, then the rest. No stacked
+  // sections: a single carousel is the profile home surface.
+  const carouselItems = useMemo<EntityCardModel[]>(() => {
+    const items: EntityCardModel[] = [];
+
+    // Featured: the latest release when it's visible per profile settings.
+    const hasFeaturedRelease = Boolean(
+      releaseVisibility?.show && latestRelease
+    );
+    if (hasFeaturedRelease && latestRelease) {
+      items.push(
+        releaseToEntityCard(
+          {
+            title: latestRelease.title,
+            slug: latestRelease.slug,
+            artworkUrl: latestRelease.artworkUrl,
+            releaseDate: latestRelease.releaseDate,
+            releaseType: latestRelease.releaseType,
+          },
+          { handle: artist.handle, now }
+        )
+      );
+    } else if (upcomingTourDates.length === 0 && featuredPlaylistFallback) {
+      // Fallback feature when there's no release or upcoming show: the
+      // artist's confirmed "This Is" playlist, as a music card.
+      items.push({
+        id: `playlist-${featuredPlaylistFallback.playlistId}`,
+        kind: 'music',
+        href: featuredPlaylistFallback.url,
+        imageUrl: featuredPlaylistFallback.imageUrl,
+        imageAlt: featuredPlaylistFallback.title,
+        accent: 'green',
+        eyebrow: 'Playlist',
+        title: featuredPlaylistFallback.title,
+        cta: {
+          label: 'Open Playlist',
+          href: featuredPlaylistFallback.url,
+          external: true,
+        },
+      });
+    }
+
+    // Shoppable merch (revenue) next.
+    for (const card of merchCards) {
+      items.push(merchToEntityCard(card, { handle: artist.handle }));
+    }
+
+    // Upcoming shows, nearest-to-viewer first when geo resolved.
+    const shows = [...upcomingTourDates].sort((a, b) =>
+      a.id === nearbyTourDateId ? -1 : b.id === nearbyTourDateId ? 1 : 0
+    );
+    for (const show of shows) {
+      items.push(
+        showToEntityCard({
+          id: show.id,
+          title: show.title,
+          venueName: show.venueName,
+          city: show.city,
+          startDate: show.startDate,
+          ticketUrl: show.ticketUrl,
+        })
+      );
+    }
+
+    return items;
+  }, [
+    artist.handle,
+    featuredPlaylistFallback,
+    latestRelease,
+    merchCards,
+    nearbyTourDateId,
+    now,
+    releaseVisibility?.show,
+    upcomingTourDates,
+  ]);
 
   const alertsCard = isSubscribed ? null : (
     <HomeAlertsCard
       artist={artist}
       onAlertsClick={onAlertsClick}
       renderMode={renderMode}
-      variant={hasPrimaryFeature ? 'row' : 'bento'}
+      variant='bento'
       sourceContext={{
         artistId: artist.id,
         profileId: artist.id,
@@ -242,46 +286,17 @@ export function ProfileHomeRail({
     />
   );
 
-  const featureCard = hasPrimaryFeature ? (
-    <ProfilePrimaryActionCard
-      artist={artist}
-      latestRelease={latestRelease}
-      profileSettings={profileSettings}
-      featuredPlaylistFallback={featuredPlaylistFallback}
-      tourDates={tourDates}
-      hasPlayableDestinations={hasPlayableDestinations}
-      renderMode={renderMode}
-      previewActionLabel={previewActionLabel}
-      onPlayClick={onPlayClick}
-      viewerLocation={viewerLocation}
-      resolveNearbyTour={resolveNearbyTour}
-      size={
-        featuredState.kind === 'release_countdown' ||
-        featuredState.kind === 'release_live'
-          ? 'showcase'
-          : 'compact'
-      }
-      dataTestId='profile-home-primary-action-card'
-      className='w-full'
-      now={now}
-    />
-  ) : null;
-
   return (
     <div
-      className='min-w-0 space-y-2 md:mx-auto md:w-full md:max-w-[320px]'
+      className='min-w-0 space-y-2 md:mx-auto md:w-full md:max-w-80'
       data-testid='profile-home-rail'
-      data-feature-state={featuredState.kind}
     >
-      {featureCard ? (
-        <div className='min-w-0' data-testid='profile-home-feature-card'>
-          {featureCard}
-        </div>
-      ) : null}
-      {merchCards.slice(0, 3).map(card => (
-        <ProfileMerchCard key={card.id} artist={artist} card={card} />
-      ))}
       {alertsCard}
+      <EntityCarousel
+        items={carouselItems}
+        surface='pearl'
+        dataTestId='profile-home-carousel'
+      />
     </div>
   );
 }
