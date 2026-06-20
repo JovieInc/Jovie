@@ -1931,9 +1931,7 @@ function VersionStack({ asset }: { asset: Asset }) {
           <span className='text-xs text-primary-token tabular-nums font-mono'>
             v{v.n}
           </span>
-          <span className='text-2xs text-quaternary-token'>
-            {v.relative}
-          </span>
+          <span className='text-2xs text-quaternary-token'>{v.relative}</span>
           <span className='ml-auto'>
             {v.current ? (
               <span className='text-3xs uppercase tracking-[0.06em] text-cyan-300'>
@@ -1967,9 +1965,7 @@ function ActivityRow({
     <div className='flex items-center gap-2 py-1'>
       <Icon className='h-3 w-3 text-quaternary-token' strokeWidth={2.25} />
       <span className='text-2xs text-tertiary-token flex-1'>{label}</span>
-      <span className='text-xs text-primary-token tabular-nums'>
-        {value}
-      </span>
+      <span className='text-xs text-primary-token tabular-nums'>{value}</span>
     </div>
   );
 }
