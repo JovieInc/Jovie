@@ -125,6 +125,13 @@ rules:
   - type: 'required_linear_history'
     # Squash-only history. Graphite squash-merges, so this always holds.
 
+  # ── Signed Commits ─────────────────────────────────────────────────────
+  - type: 'required_signatures'
+    # Every commit on main must be cryptographically signed (GPG or SSH/Sigstore).
+    # Graphite squash-merges and agent-authored commits must sign before merge.
+    # security.yml commit-signature-check surfaces unsigned merges post-hoc.
+    # Human/admin: apply this ruleset via gh api after agent signing is configured.
+
   # ── Branch Integrity ───────────────────────────────────────────────────
   - type: 'non_fast_forward'
     # Block force pushes to main. Always.
