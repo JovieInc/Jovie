@@ -59,7 +59,7 @@ const SKELETON_LINE_KEYS = ['skel-a', 'skel-b', 'skel-c'];
 function ChartSkeleton() {
   return (
     <div
-      className='h-[200px] w-full rounded-lg bg-surface-0'
+      className='h-50 w-full rounded-lg bg-surface-0'
       aria-hidden='true'
     >
       <svg
@@ -127,10 +127,10 @@ function CustomTooltip({
 
   return (
     <div className='rounded-lg border border-subtle bg-surface-1 px-3 py-2 shadow-card'>
-      <p className='mb-1 text-[11px] font-semibold text-secondary-token'>
+      <p className='mb-1 text-2xs font-semibold text-secondary-token'>
         {dateLabel}
       </p>
-      <p className='text-[12px] text-primary-token'>{parts.join(', ')}</p>
+      <p className='text-xs text-primary-token'>{parts.join(', ')}</p>
     </div>
   );
 }
@@ -349,7 +349,7 @@ export function ShippingVelocityChart({
       {/* Header row */}
       <div className='mb-3 flex items-center justify-between gap-3'>
         <div className='flex items-center gap-3'>
-          <p className='text-[11px] font-semibold tracking-normal text-secondary-token'>
+          <p className='text-2xs font-semibold tracking-normal text-secondary-token'>
             Shipping Velocity
           </p>
           {/* Legend */}
@@ -361,10 +361,10 @@ export function ShippingVelocityChart({
               aria-label='Toggle merged series spotlight'
             >
               <span
-                className='block h-[2px] w-3 rounded-full'
+                className='block h-1 w-3 rounded-full'
                 style={{ backgroundColor: SERIES_COLORS.merged }}
               />
-              <span className='text-[10px] text-tertiary-token'>Merged</span>
+              <span className='text-3xs text-tertiary-token'>Merged</span>
             </button>
             <button
               type='button'
@@ -373,10 +373,10 @@ export function ShippingVelocityChart({
               aria-label='Toggle opened series spotlight'
             >
               <span
-                className='block h-[2px] w-3 rounded-full'
+                className='block h-1 w-3 rounded-full'
                 style={{ backgroundColor: SERIES_COLORS.opened }}
               />
-              <span className='text-[10px] text-tertiary-token'>Opened</span>
+              <span className='text-3xs text-tertiary-token'>Opened</span>
             </button>
             <button
               type='button'
@@ -386,10 +386,10 @@ export function ShippingVelocityChart({
               aria-label='Toggle closed series visibility'
             >
               <span
-                className='block h-[2px] w-3 rounded-full'
+                className='block h-1 w-3 rounded-full'
                 style={{ backgroundColor: SERIES_COLORS.closed }}
               />
-              <span className='text-[10px] text-tertiary-token'>Closed</span>
+              <span className='text-3xs text-tertiary-token'>Closed</span>
             </button>
           </div>
         </div>
@@ -403,8 +403,8 @@ export function ShippingVelocityChart({
               onClick={() => handleRangeChange(opt.value)}
               className={
                 range === opt.value
-                  ? 'rounded-md bg-surface-2 px-2.5 py-1 text-[11px] font-semibold text-primary-token'
-                  : 'rounded-md px-2.5 py-1 text-[11px] font-medium text-tertiary-token transition-colors hover:text-secondary-token'
+                  ? 'rounded-md bg-surface-2 px-2.5 py-1 text-2xs font-semibold text-primary-token'
+                  : 'rounded-md px-2.5 py-1 text-2xs font-medium text-tertiary-token transition-colors hover:text-secondary-token'
               }
               aria-pressed={range === opt.value}
             >
@@ -418,10 +418,10 @@ export function ShippingVelocityChart({
       {isLoading ? (
         <ChartSkeleton />
       ) : error ? (
-        <div className='flex h-[200px] flex-col items-center justify-center gap-2'>
-          <p className='text-[13px] text-secondary-token'>{error}</p>
+        <div className='flex h-50 flex-col items-center justify-center gap-2'>
+          <p className='text-app text-secondary-token'>{error}</p>
           {cachedAt ? (
-            <p className='text-[11px] text-tertiary-token'>
+            <p className='text-2xs text-tertiary-token'>
               Last updated {formatCachedAgo(cachedAt)}
             </p>
           ) : null}
@@ -430,14 +430,14 @@ export function ShippingVelocityChart({
             onClick={() => {
               fetchData(range).catch(() => {});
             }}
-            className='mt-1 rounded-lg border border-subtle bg-surface-0 px-3 py-1.5 text-[11px] font-medium text-secondary-token transition-colors hover:bg-surface-2 hover:text-primary-token'
+            className='mt-1 rounded-lg border border-subtle bg-surface-0 px-3 py-1.5 text-2xs font-medium text-secondary-token transition-colors hover:bg-surface-2 hover:text-primary-token'
           >
             Retry
           </button>
         </div>
       ) : isEmpty ? (
-        <div className='flex h-[200px] items-center justify-center'>
-          <p className='text-[13px] text-tertiary-token'>
+        <div className='flex h-50 items-center justify-center'>
+          <p className='text-app text-tertiary-token'>
             No PRs in this period
           </p>
         </div>
@@ -453,7 +453,7 @@ export function ShippingVelocityChart({
 
       {/* Footer */}
       {cachedAt && !isLoading && !error ? (
-        <p className='mt-2 text-right text-[10px] text-tertiary-token'>
+        <p className='mt-2 text-right text-3xs text-tertiary-token'>
           Updated {formatCachedAgo(cachedAt)}
         </p>
       ) : null}
