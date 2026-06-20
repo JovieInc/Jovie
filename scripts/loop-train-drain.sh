@@ -20,7 +20,8 @@ for num in "${TRAIN_PRS[@]}"; do
   fi
   if [[ "$state" == "CLEAN" ]]; then
     # Graphite enqueues by label; native auto-merge retired
-    gh pr edit "$num" --add-label "merge-queue" || echo "WARN: failed to enqueue #$num into Graphite merge queue" >&2
+    node scripts/merge-queue-guard.mjs enqueue "$num" --skip-local-gates || \
+      echo "WARN: pre-queue guard failed for #$num; not enqueued" >&2
   fi
 done
 

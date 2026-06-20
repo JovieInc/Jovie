@@ -247,12 +247,18 @@ jobs:
               continue
             fi
 
-            # Graphite enqueues by label; native auto-merge retired
-            if gh pr edit "$PR_NUMBER" --add-label "merge-queue"; then
-              echo "Added PR #$PR_NUMBER to the Graphite merge queue."
-              LANDED=$((LANDED + 1))
+            # Graphite enqueues by label; native auto-merge retired.
+            # The guard rebases stale generated heads and refuses conflicts or
+            # overlapping autonomous PRs before the label can be applied.
+            if node scripts/merge-queue-guard.mjs enqueue "$PR_NUMBER" --skip-local-gates; then
+              if gh pr view "$PR_NUMBER" --repo "$GH_REPO" --json labels \
+                --jq '[.labels[].name] | any(. == "merge-queue")' | grep -q true; then
+                LANDED=$((LANDED + 1))
+              else
+                SKIPPED=$((SKIPPED + 1))
+              fi
             else
-              echo "::warning::Failed to add merge-queue label to PR #$PR_NUMBER — not enqueued."
+              echo "::warning::Pre-queue guard failed for PR #$PR_NUMBER — not enqueued."
               SKIPPED=$((SKIPPED + 1))
             fi
           done < <(echo "$AGENT_PRS" | jq -c '.[]')

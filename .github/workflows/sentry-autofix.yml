@@ -201,10 +201,11 @@ jobs:
         if: steps.create-pr.outputs.has_changes == 'true'
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          GH_REPO: ${{ github.repository }}
           PR_URL: ${{ steps.create-pr.outputs.pr_url }}
         run: |
           # Graphite enqueues by label; native auto-merge retired
-          gh pr edit "$PR_URL" --add-label "merge-queue" || { echo "::error::Failed to add merge-queue label to $PR_URL"; exit 1; }
+          node scripts/merge-queue-guard.mjs enqueue "$PR_URL" --skip-local-gates
 
       - name: Fallback — convert to draft if validation failed
         if: failure() && steps.dedup.outputs.skip != 'true'

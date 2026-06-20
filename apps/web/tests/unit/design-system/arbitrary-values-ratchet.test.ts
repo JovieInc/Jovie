@@ -1,10 +1,13 @@
 import {
+  execFileSync,
   existsSync,
+  mkdtempSync,
   readdirSync,
   readFileSync,
+  rmSync,
   statSync,
-  writeFileSync,
 } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
@@ -19,9 +22,9 @@ import { describe, expect, it } from 'vitest';
  *
  * Why a ratchet and not zero-tolerance: there are ~6.6k existing arbitrary
  * values; banning them outright would block all work. The ratchet locks in
- * progress — regressions fail CI, improvements pass. When you reduce the
- * count, lower `count` in arbitrary-values.baseline.json in the same PR so
- * the floor follows the work down.
+ * progress — regressions fail CI, improvements pass. PRs compare against the
+ * current base branch so cleanup waves do not fight over one shared counter.
+ * The committed JSON is only a local fallback when git base history is absent.
  *
  * Pattern mirrors apps/web/scripts/seo-ratchet-guard.mjs (baseline JSON +
  * source-text guard).
@@ -30,7 +33,7 @@ import { describe, expect, it } from 'vitest';
 const __dirname = dirname(fileURLToPath(import.meta.url));
 // tests/unit/design-system → apps/web
 const WEB_ROOT = join(__dirname, '..', '..', '..');
-const SCAN_DIRS = ['components', 'app'].map(d => join(WEB_ROOT, d));
+const REPO_ROOT = join(WEB_ROOT, '..', '..');
 const BASELINE_PATH = join(__dirname, 'arbitrary-values.baseline.json');
 
 // Tailwind arbitrary value: a utility/variant chain ending in `-[…]`.
@@ -52,9 +55,11 @@ function walk(dir: string, out: string[]): void {
   }
 }
 
-function countArbitraryValues(): number {
+function countArbitraryValues(root = WEB_ROOT): number {
   const files: string[] = [];
-  for (const dir of SCAN_DIRS) walk(dir, files);
+  for (const dir of ['components', 'app'].map(d => join(root, d))) {
+    walk(dir, files);
+  }
   let total = 0;
   for (const file of files) {
     const matches = readFileSync(file, 'utf8').match(ARBITRARY);
@@ -63,27 +68,75 @@ function countArbitraryValues(): number {
   return total;
 }
 
+function git(args: readonly string[], cwd = REPO_ROOT): string {
+  return execFileSync('git', [...args], {
+    cwd,
+    encoding: 'utf8',
+    stdio: ['ignore', 'pipe', 'ignore'],
+    timeout: 60_000,
+  }).trim();
+}
+
+function resolveBaseRef(): string | null {
+  const baseBranch =
+    process.env.MERGE_BASE_REF ?? process.env.GITHUB_BASE_REF ?? 'main';
+  const remoteRef = `origin/${baseBranch}`;
+  try {
+    git(['rev-parse', '--verify', remoteRef]);
+    return remoteRef;
+  } catch {
+    try {
+      git(['fetch', 'origin', baseBranch, '--depth=1']);
+      git(['rev-parse', '--verify', remoteRef]);
+      return remoteRef;
+    } catch {
+      return null;
+    }
+  }
+}
+
+function countBaseArbitraryValues(): {
+  readonly ref: string;
+  readonly count: number;
+} | null {
+  const baseRef = resolveBaseRef();
+  if (!baseRef) return null;
+
+  const tempRoot = mkdtempSync(join(tmpdir(), 'jovie-arbitrary-base-'));
+  const worktree = join(tempRoot, 'worktree');
+  try {
+    git(['worktree', 'add', '--detach', worktree, baseRef]);
+    return {
+      ref: baseRef,
+      count: countArbitraryValues(join(worktree, 'apps', 'web')),
+    };
+  } catch {
+    return null;
+  } finally {
+    try {
+      git(['worktree', 'remove', '--force', worktree]);
+    } catch {
+      // Best-effort cleanup; rmSync handles partial worktree setup.
+    }
+    rmSync(tempRoot, { recursive: true, force: true });
+  }
+}
+
 describe('design-system arbitrary-value ratchet', () => {
   it('arbitrary Tailwind values do not increase above the baseline', () => {
     const current = countArbitraryValues();
-
-    // Self-seed on first run so the baseline and the count logic can never
-    // diverge. Commit the seeded file; CI compares against it.
-    if (!existsSync(BASELINE_PATH)) {
-      writeFileSync(
-        BASELINE_PATH,
-        `${JSON.stringify({ count: current, note: 'Arbitrary Tailwind values in apps/web/{components,app}. Ratchet only goes down — lower this when a PR reduces the count.' }, null, 2)}\n`
-      );
-    }
+    const base = countBaseArbitraryValues();
 
     const baseline = JSON.parse(readFileSync(BASELINE_PATH, 'utf8')) as {
       count: number;
     };
+    const limit = base?.count ?? baseline.count;
+    const label = base ? `current base ${base.ref}` : 'fallback baseline';
 
     expect(
       current,
-      `Arbitrary Tailwind values rose to ${current} (baseline ${baseline.count}). ` +
-        'Use design-system tokens instead of arbitrary values, or — if this is intentional — justify it in review.'
-    ).toBeLessThanOrEqual(baseline.count);
+      `Arbitrary Tailwind values rose to ${current} (${label}: ${limit}). ` +
+        'Use design-system tokens instead of arbitrary values, or justify the new arbitrary value in review.'
+    ).toBeLessThanOrEqual(limit);
   });
 });
