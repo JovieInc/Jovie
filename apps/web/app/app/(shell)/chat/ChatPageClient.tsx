@@ -372,15 +372,9 @@ export function ChatPageClient({
   const panelParam = searchParams.get('panel');
   const enablePreviewPanel = !env.IS_E2E || panelParam === 'profile';
   const designV1ChatEntitiesEnabled = useAppFlag('DESIGN_V1');
-  // Hydrate the profile panel only for explicit profile entry. Entity mentions
-  // use ChatEntityPanelContext and do not need the profile preview fallback.
-  const shouldHydratePreviewPanel =
-    enablePreviewPanel && panelParam === 'profile';
-
-  useEffect(() => {
-    if (shouldHydratePreviewPanel) return;
-    setPreviewData(null);
-  }, [setPreviewData, shouldHydratePreviewPanel]);
+  // Keep live profile preview data warm on chat so sidebar profile clicks and
+  // @artist mentions can open the same rail used in setup/onboarding.
+  const shouldHydratePreviewData = enablePreviewPanel && Boolean(activeProfile);
 
   useEffect(() => {
     return () => {
@@ -398,11 +392,11 @@ export function ChatPageClient({
   }, [dashboardLoadError, needsOnboarding, router, selectedProfile]);
 
   // Fetch social links for the selected profile
-  const profileId = shouldHydratePreviewPanel ? (activeProfile?.id ?? '') : '';
+  const profileId = shouldHydratePreviewData ? (activeProfile?.id ?? '') : '';
   const { data: socialLinks } = useDashboardSocialLinksQuery(profileId);
 
   useEffect(() => {
-    if (!shouldHydratePreviewPanel || !fromOnboarding) return;
+    if (!shouldHydratePreviewData || !fromOnboarding) return;
 
     try {
       const rawSnapshot = globalThis.sessionStorage?.getItem(
@@ -417,7 +411,7 @@ export function ChatPageClient({
     } catch {
       // sessionStorage may be unavailable or the payload may be malformed
     }
-  }, [fromOnboarding, setPreviewData, shouldHydratePreviewPanel]);
+  }, [fromOnboarding, setPreviewData, shouldHydratePreviewData]);
 
   // Convert API links to preview panel format
   const previewLinks: PreviewPanelLink[] = useMemo(
@@ -434,7 +428,7 @@ export function ChatPageClient({
 
   // Hydrate preview panel with profile data and links
   useEffect(() => {
-    if (!shouldHydratePreviewPanel || !activeProfile) return;
+    if (!shouldHydratePreviewData || !activeProfile) return;
     const profileSettings = activeProfile.settings as Record<
       string,
       unknown
@@ -466,7 +460,7 @@ export function ChatPageClient({
         },
       },
     });
-  }, [activeProfile, previewLinks, setPreviewData, shouldHydratePreviewPanel]);
+  }, [activeProfile, previewLinks, setPreviewData, shouldHydratePreviewData]);
 
   const { copy: copySessionId, isSuccess: sessionIdCopied } = useClipboard({
     onSuccess: () => notifications.success('Session ID copied'),
@@ -853,9 +847,10 @@ export function ChatPageClient({
   return (
     <ChatEntityPanelProvider resetKey={conversationId ?? null}>
       <ChatEntityRightPanelHost
-        enablePreviewPanel={shouldHydratePreviewPanel}
+        enablePreviewPanel={enablePreviewPanel}
         enableChatEntityPanels={designV1ChatEntitiesEnabled}
         profileId={activeProfile.id}
+        profileSpotifyArtistId={activeProfile.spotifyId}
         profileContext={{
           id: activeProfile.id,
           displayName: activeProfile.displayName,

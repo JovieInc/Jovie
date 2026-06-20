@@ -270,7 +270,7 @@ describe('ChatEntityRightPanelHost', () => {
     expect(mockUseRegisterRightPanel.mock.calls.at(-1)?.[0]).not.toBeNull();
   });
 
-  it('registers the profile bento rail when preview opens with profile context', () => {
+  it('registers the live profile sidebar when preview opens with profile context', () => {
     mockPreviewPanelOpen = true;
     mockUseRegisterRightPanel.mockClear();
 
@@ -295,12 +295,7 @@ describe('ChatEntityRightPanelHost', () => {
     expect(registeredPanel).not.toBeNull();
     render(registeredPanel as React.ReactElement);
 
-    expect(screen.getByTestId('chat-profile-bento-panel')).toBeInTheDocument();
-    expect(screen.getAllByText('Tim White').length).toBeGreaterThan(0);
-    expect(screen.getByText('72% Complete')).toBeInTheDocument();
-    expect(
-      screen.getByRole('link', { name: 'Open Public Profile' })
-    ).toHaveAttribute('href', '/tim');
+    expect(screen.getByTestId('dynamic-import-stub')).toBeInTheDocument();
   });
 
   it('tracks chat-owned entity targets through the provider', () => {
