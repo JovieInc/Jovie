@@ -113,10 +113,10 @@ export function ArtistHero({
 
   return (
     <section
-      className={`relative w-full overflow-hidden md:h-[56dvh] md:min-h-[520px] md:rounded-t-[30px] xl:max-h-[640px] 2xl:max-h-[680px] ${
+      className={`relative w-full overflow-hidden md:h-[56dvh] md:min-h-130 md:rounded-t-3xl xl:max-h-160 2xl:max-h-170 ${
         compact
-          ? 'h-[40dvh] min-h-[320px] max-h-[460px]'
-          : 'h-[48dvh] min-h-[420px] max-h-[620px]'
+          ? 'h-[40dvh] min-h-80 max-h-115'
+          : 'h-[48dvh] min-h-105 max-h-155'
       }`}
       data-testid='profile-header'
     >
@@ -171,9 +171,9 @@ export function ArtistHero({
               }
             >
               {shareSuccess ? (
-                <Check className='h-[17px] w-[17px]' aria-hidden='true' />
+                <Check className='h-4 w-4' aria-hidden='true' />
               ) : (
-                <Share2 className='h-[17px] w-[17px]' aria-hidden='true' />
+                <Share2 className='h-4 w-4' aria-hidden='true' />
               )}
               <span className='sr-only md:not-sr-only md:inline'>
                 {shareSuccess ? 'Copied' : 'Share'}
@@ -185,7 +185,7 @@ export function ArtistHero({
               className={`${heroPearlClassName} inline-flex h-11 min-w-11 items-center justify-center gap-2 rounded-full px-4 text-mid font-semibold tracking-[-0.015em] text-white/88 transition-[background-color,border-color,color,opacity] hover:bg-white/12 hover:text-white hover:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--focus-ring))]`}
               aria-label={`Manage alerts for ${artist.name}`}
             >
-              <Bell className='h-[17px] w-[17px]' aria-hidden='true' />
+              <Bell className='h-4 w-4' aria-hidden='true' />
               <span className='sr-only md:not-sr-only md:inline'>Notify</span>
             </button>
           </div>
@@ -215,10 +215,7 @@ export function ArtistHero({
               className={`${heroPearlClassName} inline-flex min-h-11 shrink-0 items-center justify-center rounded-full px-4 py-2.5 text-mid font-semibold tracking-[-0.015em] text-white/92 transition-[background-color,border-color,color,opacity] hover:bg-white/12 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--focus-ring))]`}
               aria-label={`Listen to ${artist.name}`}
             >
-              <Play
-                className='mr-2 h-[17px] w-[17px] fill-current'
-                aria-hidden='true'
-              />
+              <Play className='mr-2 h-4 w-4 fill-current' aria-hidden='true' />
               Play
             </button>
           </div>
@@ -229,10 +226,7 @@ export function ArtistHero({
                   const content = (
                     <>
                       {primaryActionKind === 'tickets' ? (
-                        <Ticket
-                          className='mr-2 h-[17px] w-[17px]'
-                          aria-hidden='true'
-                        />
+                        <Ticket className='mr-2 h-4 w-4' aria-hidden='true' />
                       ) : null}
                       {primaryAction.label}
                     </>

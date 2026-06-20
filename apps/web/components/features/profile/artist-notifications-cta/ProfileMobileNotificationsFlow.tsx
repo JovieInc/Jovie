@@ -160,11 +160,11 @@ function ScreenShell({
   return (
     <div className='flex flex-1 flex-col'>
       <div className='space-y-2 pb-6 pt-2'>
-        <h2 className='text-[22px] font-semibold leading-[1.08] tracking-normal text-white'>
+        <h2 className='text-xl font-semibold leading-[1.08] tracking-normal text-white'>
           {title}
         </h2>
         {body ? (
-          <p className='max-w-[24rem] text-[14px] leading-5 text-white/58'>
+          <p className='max-w-[24rem] text-sm leading-5 text-white/58'>
             {body}
           </p>
         ) : null}
@@ -209,7 +209,7 @@ function PrimaryButton({
         activate();
       }}
       disabled={disabled}
-      className='inline-flex h-12 w-full items-center justify-center rounded-full bg-white/14 px-5 text-[14px] font-semibold tracking-[-0.01em] text-white transition-colors duration-subtle hover:bg-white/18 disabled:cursor-not-allowed disabled:opacity-60'
+      className='inline-flex h-12 w-full items-center justify-center rounded-full bg-white/14 px-5 text-sm font-semibold tracking-[-0.01em] text-white transition-colors duration-subtle hover:bg-white/18 disabled:cursor-not-allowed disabled:opacity-60'
     >
       {children}
     </button>
@@ -230,7 +230,7 @@ function SecondaryTextButton({
       type='button'
       onClick={onClick}
       disabled={disabled}
-      className='inline-flex h-10 w-full items-center justify-center rounded-full px-5 text-[13px] font-medium tracking-[-0.005em] text-white/58 transition-colors duration-subtle hover:text-white/76 disabled:cursor-not-allowed disabled:opacity-60'
+      className='inline-flex h-10 w-full items-center justify-center rounded-full px-5 text-app font-medium tracking-[-0.005em] text-white/58 transition-colors duration-subtle hover:text-white/76 disabled:cursor-not-allowed disabled:opacity-60'
     >
       {children}
     </button>
@@ -262,7 +262,7 @@ function LabeledInput({
 }>) {
   return (
     <label className='block space-y-2'>
-      <span className='text-[13px] font-medium tracking-[-0.01em] text-white/42'>
+      <span className='text-app font-medium tracking-[-0.01em] text-white/42'>
         {label}
       </span>
       <input
@@ -275,7 +275,7 @@ function LabeledInput({
         onChange={event => onChange(event.target.value)}
         onKeyDown={onKeyDown}
         disabled={disabled}
-        className='h-12 w-full touch-manipulation rounded-full border border-white/10 bg-white/[0.03] px-4 text-[16px] font-medium tracking-[-0.005em] text-white placeholder:text-white/28 focus:border-white/18 focus:outline-none disabled:cursor-not-allowed disabled:opacity-60'
+        className='h-12 w-full touch-manipulation rounded-full border border-white/10 bg-white/[0.03] px-4 text-base font-medium tracking-[-0.005em] text-white placeholder:text-white/28 focus:border-white/18 focus:outline-none disabled:cursor-not-allowed disabled:opacity-60'
       />
     </label>
   );
@@ -308,14 +308,14 @@ function BirthdaySelectors({
   return (
     <div className='grid grid-cols-3 gap-3'>
       <label className='block space-y-2'>
-        <span className='text-[13px] font-medium tracking-[-0.01em] text-white/42'>
+        <span className='text-app font-medium tracking-[-0.01em] text-white/42'>
           Month
         </span>
         <select
           data-testid='mobile-birthday-month'
           value={parts.month}
           onChange={event => updatePart('month', event.target.value)}
-          className='h-12 w-full touch-manipulation appearance-none rounded-full border border-white/10 bg-white/[0.03] px-3 text-[16px] font-medium tracking-[-0.005em] text-white focus:border-white/18 focus:outline-none'
+          className='h-12 w-full touch-manipulation appearance-none rounded-full border border-white/10 bg-white/[0.03] px-3 text-base font-medium tracking-[-0.005em] text-white focus:border-white/18 focus:outline-none'
         >
           <option value=''>Month</option>
           {MONTH_OPTIONS.map((month, index) => (
@@ -327,14 +327,14 @@ function BirthdaySelectors({
       </label>
 
       <label className='block space-y-2'>
-        <span className='text-[13px] font-medium tracking-[-0.01em] text-white/42'>
+        <span className='text-app font-medium tracking-[-0.01em] text-white/42'>
           Day
         </span>
         <select
           data-testid='mobile-birthday-day'
           value={parts.day}
           onChange={event => updatePart('day', event.target.value)}
-          className='h-12 w-full touch-manipulation appearance-none rounded-full border border-white/10 bg-white/[0.03] px-3 text-[16px] font-medium tracking-[-0.005em] text-white focus:border-white/18 focus:outline-none'
+          className='h-12 w-full touch-manipulation appearance-none rounded-full border border-white/10 bg-white/[0.03] px-3 text-base font-medium tracking-[-0.005em] text-white focus:border-white/18 focus:outline-none'
         >
           <option value=''>Day</option>
           {Array.from({ length: 31 }, (_, index) => index + 1).map(day => (
@@ -346,14 +346,14 @@ function BirthdaySelectors({
       </label>
 
       <label className='block space-y-2'>
-        <span className='text-[13px] font-medium tracking-[-0.01em] text-white/42'>
+        <span className='text-app font-medium tracking-[-0.01em] text-white/42'>
           Year
         </span>
         <select
           data-testid='mobile-birthday-year'
           value={parts.year}
           onChange={event => updatePart('year', event.target.value)}
-          className='h-12 w-full touch-manipulation appearance-none rounded-full border border-white/10 bg-white/[0.03] px-3 text-[16px] font-medium tracking-[-0.005em] text-white focus:border-white/18 focus:outline-none'
+          className='h-12 w-full touch-manipulation appearance-none rounded-full border border-white/10 bg-white/[0.03] px-3 text-base font-medium tracking-[-0.005em] text-white focus:border-white/18 focus:outline-none'
         >
           <option value=''>Year</option>
           {yearOptions.map(year => (
@@ -565,7 +565,7 @@ export function ProfileMobileNotificationsFlow({
             </div>
           }
         >
-          <div className='rounded-[24px] border border-white/10 bg-white/[0.03] p-4'>
+          <div className='rounded-3xl border border-white/10 bg-white/[0.03] p-4'>
             <OtpInput
               value={otpCode}
               onChange={onOtpChange}
@@ -659,7 +659,7 @@ export function ProfileMobileNotificationsFlow({
           <div className='space-y-6'>
             <div className='space-y-3'>
               <p
-                className='text-[13px] font-semibold tracking-[-0.01em] text-white/42'
+                className='text-app font-semibold tracking-[-0.01em] text-white/42'
                 data-testid='profile-mobile-notifications-sent-from'
               >
                 Sent from Jovie
@@ -681,7 +681,7 @@ export function ProfileMobileNotificationsFlow({
                         <span className='inline-flex h-8 w-8 items-center justify-center text-white/68'>
                           <Icon className='size-4.5' />
                         </span>
-                        <span className='text-[15px] font-medium tracking-[-0.015em] text-white/88'>
+                        <span className='text-mid font-medium tracking-[-0.015em] text-white/88'>
                           {meta.label}
                         </span>
                       </div>
@@ -701,7 +701,7 @@ export function ProfileMobileNotificationsFlow({
               <>
                 <div className='h-px bg-white/8' />
                 <div className='space-y-3'>
-                  <p className='text-[13px] font-semibold tracking-[-0.01em] text-white/42'>
+                  <p className='text-app font-semibold tracking-[-0.01em] text-white/42'>
                     Sent by {artistName}
                   </p>
 
@@ -711,7 +711,7 @@ export function ProfileMobileNotificationsFlow({
                         <Mail className='size-4.5' />
                       </span>
                       <div>
-                        <p className='text-[15px] font-medium tracking-[-0.015em] text-white/88'>
+                        <p className='text-mid font-medium tracking-[-0.015em] text-white/88'>
                           Artist Emails
                         </p>
                       </div>
@@ -772,7 +772,7 @@ export function ProfileMobileNotificationsFlow({
 
       <div
         className={cn(
-          'relative mx-auto flex w-full max-w-[430px] flex-col px-5',
+          'relative mx-auto flex w-full max-w-108 flex-col px-5',
           presentation === 'overlay'
             ? 'h-full pb-[max(env(safe-area-inset-bottom),28px)] pt-[max(env(safe-area-inset-top),18px)]'
             : 'h-full pb-8 pt-6'
@@ -856,13 +856,13 @@ export function ProfileMobileNotificationsFlow({
         aria-modal='true'
         style={contentStyle}
       >
-        <div className='relative flex h-[min(760px,calc(100dvh-48px))] w-full max-w-[440px] flex-col overflow-hidden rounded-[var(--profile-card-radius)] border border-white/10 bg-[color:var(--profile-stage-bg)] shadow-[0_34px_96px_rgba(0,0,0,0.48)]'>
+        <div className='relative flex h-[min(760px,calc(100dvh-48px))] w-full max-w-110 flex-col overflow-hidden rounded-[var(--profile-card-radius)] border border-white/10 bg-[color:var(--profile-stage-bg)] shadow-[0_34px_96px_rgba(0,0,0,0.48)]'>
           {contentBody}
         </div>
       </div>
     ) : (
       <div
-        className='relative min-h-[600px] rounded-[var(--profile-card-radius)] bg-[color:var(--profile-stage-bg)] text-white'
+        className='relative min-h-150 rounded-[var(--profile-card-radius)] bg-[color:var(--profile-stage-bg)] text-white'
         data-testid='profile-mobile-notifications-flow'
         data-shell-variant='inline-full-height'
         style={contentStyle}
