@@ -3982,6 +3982,12 @@ jobs:
     concurrency:
       group: production-deploy
       cancel-in-progress: false
+    permissions:
+      contents: read
+      actions: read
+      # Required for SLSA build-provenance attestation
+      attestations: write
+      id-token: write
     outputs:
       migration_status: ${{ steps.migrate.outcome }}
       preflight_status: ${{ steps.preflight.outcome }}
@@ -4118,6 +4124,16 @@ jobs:
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
           VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+      - name: Package build output for provenance attestation
+        run: tar -czf /tmp/vercel-build-output.tar.gz -C . .vercel/output
+      - name: Attest build provenance (SLSA Level 2)
+        id: attest
+        uses: actions/attest-build-provenance@e8998f949152b193b063cb0ec769d69d929409be # v2
+        with:
+          subject-path: /tmp/vercel-build-output.tar.gz
+          # ponytail: attests the vercel build output; attestation is SLSA L2 (hosted
+          # runner + signed provenance). L3 requires hermetic build — upgrade when
+          # Vercel builds become reproducible/isolated.
       - name: Deploy (staging preview, prebuilt)
         id: deploy
         run: |

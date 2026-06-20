@@ -20,9 +20,28 @@ Do **not** use `gh pr merge --auto` to merge to `main` — with the native queue
 ### GitHub (ruleset `Main Branch Protection`, id `10512119`) — `gh`-configurable
 
 - Required status checks: `CI / PR Ready`, `CI / Migration Guard`, `Fork PR Gate` (strict / up-to-date).
-- `required_linear_history`, `non_fast_forward`, `deletion`, `pull_request` (0 approvals).
+- `required_linear_history`, `required_signatures`, `non_fast_forward`, `deletion`, `pull_request` (0 approvals).
 - **No `merge_queue` rule** (retired).
 - **Bypass actor: `graphite-app` (App ID `158384`), `bypass_mode: always`** — required so Graphite can merge through the protected branch. Source-of-record: `.github/rulesets/branch-protection.yml`.
+
+### Signed commits (human/admin apply)
+
+The ruleset source adds `required_signatures` so unsigned commits cannot reach `main`. Apply it to the live ruleset after agent identities are configured to sign:
+
+```bash
+# Preview current ruleset
+gh api repos/JovieInc/Jovie/rulesets/10512119 --jq '.rules[] | select(.type=="required_signatures")'
+
+# Apply from source-of-record (Tim/OWL — requires repo admin)
+gh api --method PUT repos/JovieInc/Jovie/rulesets/10512119 \
+  --input .github/rulesets/branch-protection.yml
+```
+
+Agent commit signing (each identity that authors merges):
+
+- **Codex / Claude / codegen agents:** enable GPG or SSH commit signing in the agent environment (`git config commit.gpgsign true` + key, or `gpg.ssh.defaultKeyCommand`).
+- **Graphite squash merges:** Graphite's merge commit must also be signed — configure signing on the Graphite push actor before enabling `required_signatures` in production.
+- **Verification:** `security.yml` runs `commit-signature-check` on every `main` push and warns when an unsigned commit lands.
 
 ### Graphite (`app.graphite.com/settings/merge-queue`) — dashboard-only (no CLI/API)
 
