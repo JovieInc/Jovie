@@ -62,7 +62,7 @@ export function JovieOverlay({
       >
         <div
           className={cn(
-            'rounded-3xl backdrop-blur-2xl bg-(--linear-app-content-surface)/90 border border-(--linear-app-shell-border) shadow-[0_24px_72px_rgba(0,0,0,0.45)] px-6 py-5 flex flex-col items-center gap-4 w-[480px] max-w-full',
+            'rounded-3xl backdrop-blur-2xl bg-(--linear-app-content-surface)/90 border border-(--linear-app-shell-border) shadow-[0_24px_72px_rgba(0,0,0,0.45)] px-6 py-5 flex flex-col items-center gap-4 w-120 max-w-full',
             listening ? 'pointer-events-auto' : 'pointer-events-none'
           )}
         >

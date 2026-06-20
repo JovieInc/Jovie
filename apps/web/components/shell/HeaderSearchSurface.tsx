@@ -18,7 +18,7 @@ interface HeaderSearchSurfaceProps {
 }
 
 const headerSearchSurfaceChrome =
-  'rounded-[12px] border border-(--linear-app-frame-seam) bg-(--linear-app-content-surface) shadow-[0_0_0_1px_color-mix(in_oklab,var(--linear-app-frame-seam)_18%,transparent)]';
+  'rounded-xl border border-(--linear-app-frame-seam) bg-(--linear-app-content-surface) shadow-[0_0_0_1px_color-mix(in_oklab,var(--linear-app-frame-seam)_18%,transparent)]';
 
 /**
  * Shell-owned search surface that morphs between a compact trigger button
@@ -73,7 +73,7 @@ export function HeaderSearchSurface({
     <div
       className={cn(
         headerSearchSurfaceChrome,
-        'flex h-7 min-h-7 w-full max-w-[min(560px,calc(100vw-2rem))] items-center justify-start px-2 py-0 text-left shadow-popover sm:w-[440px] lg:w-[520px]',
+        'flex h-7 min-h-7 w-full max-w-[min(560px,calc(100vw-2rem))] items-center justify-start px-2 py-0 text-left shadow-popover sm:w-110 lg:w-130',
         className
       )}
     >

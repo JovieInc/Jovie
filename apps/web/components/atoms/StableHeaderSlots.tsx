@@ -9,16 +9,16 @@ const TEXT_SLOT_HEIGHT_CLASSNAME: Record<
   Record<StableHeaderLineCount, string>
 > = {
   xs: {
-    1: 'min-h-[16px]',
-    2: 'min-h-[32px]',
+    1: 'min-h-4',
+    2: 'min-h-8',
   },
   sm: {
     1: 'min-h-[18px]',
-    2: 'min-h-[36px]',
+    2: 'min-h-9',
   },
   md: {
     1: 'min-h-[22px]',
-    2: 'min-h-[44px]',
+    2: 'min-h-11',
   },
 };
 

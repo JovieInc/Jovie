@@ -118,7 +118,7 @@ export function ContextMenuOverlay({
       <div
         ref={ref}
         role='menu'
-        className='absolute min-w-[200px] max-w-[280px] rounded-xl border border-(--linear-app-shell-border) bg-(--linear-app-content-surface)/95 backdrop-blur-xl shadow-[0_12px_40px_rgba(0,0,0,0.32)] p-1'
+        className='absolute min-w-50 max-w-70 rounded-xl border border-(--linear-app-shell-border) bg-(--linear-app-content-surface)/95 backdrop-blur-xl shadow-[0_12px_40px_rgba(0,0,0,0.32)] p-1'
         style={{ left: pos.left, top: pos.top }}
       >
         {state.items.map((item, index) => {
