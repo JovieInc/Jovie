@@ -19,7 +19,7 @@ function BatchIngestButton({ onClick }: { readonly onClick: () => void }) {
       onClick={onClick}
       className={cn(
         APP_CONTROL_BUTTON_CLASS,
-        'h-7 rounded-full px-3 text-[11.5px]'
+        'h-7 rounded-full px-3 text-2xs'
       )}
     >
       <ListPlus className='h-3.5 w-3.5' />
