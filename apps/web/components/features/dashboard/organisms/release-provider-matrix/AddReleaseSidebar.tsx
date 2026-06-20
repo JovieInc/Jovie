@@ -328,7 +328,7 @@ export function AddReleaseSidebar({
               onChange={event => setTitle(event.target.value)}
               placeholder='My New Release'
               autoFocus
-              className='h-[32px] rounded-lg border-subtle bg-surface-0 text-xs'
+              className='h-8 rounded-lg border-subtle bg-surface-0 text-xs'
             />
           </DrawerFormField>
 
@@ -339,7 +339,7 @@ export function AddReleaseSidebar({
             >
               <SelectTrigger
                 id='release-type'
-                className='h-[32px] rounded-lg border-subtle bg-surface-0 text-xs'
+                className='h-8 rounded-lg border-subtle bg-surface-0 text-xs'
               >
                 <SelectValue>{releaseTypeLabel}</SelectValue>
               </SelectTrigger>
@@ -361,7 +361,7 @@ export function AddReleaseSidebar({
                   type='button'
                   variant='outline'
                   className={cn(
-                    'h-[32px] w-full justify-start gap-2 rounded-lg border-subtle bg-surface-0 px-3 text-xs font-normal',
+                    'h-8 w-full justify-start gap-2 rounded-lg border-subtle bg-surface-0 px-3 text-xs font-normal',
                     !releaseDate && 'text-tertiary-token'
                   )}
                 >
@@ -392,7 +392,7 @@ export function AddReleaseSidebar({
                     type='button'
                     variant='outline'
                     className={cn(
-                      'h-[32px] w-full justify-start gap-2 rounded-lg border-subtle bg-surface-0 px-3 text-xs font-normal',
+                      'h-8 w-full justify-start gap-2 rounded-lg border-subtle bg-surface-0 px-3 text-xs font-normal',
                       !revealDate && 'text-tertiary-token'
                     )}
                   >
@@ -426,7 +426,7 @@ export function AddReleaseSidebar({
               trigger={
                 <button
                   type='button'
-                  className='flex min-h-[32px] w-full items-center justify-between gap-2 rounded-lg border border-subtle bg-surface-0 px-3 py-1.5 text-left text-xs text-primary-token transition-[border-color,background-color,color] duration-subtle hover:border-default hover:bg-surface-1'
+                  className='flex min-h-8 w-full items-center justify-between gap-2 rounded-lg border border-subtle bg-surface-0 px-3 py-1.5 text-left text-xs text-primary-token transition-[border-color,background-color,color] duration-subtle hover:border-default hover:bg-surface-1'
                 >
                   <span className='flex min-w-0 flex-1 flex-wrap gap-1.5'>
                     {genres.length > 0 ? (
