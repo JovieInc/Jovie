@@ -2,14 +2,16 @@
 
 import { Bell } from 'lucide-react';
 import { useMemo } from 'react';
+import {
+  type EntityCardModel,
+  EntityCarousel,
+  merchToEntityCard,
+  releaseToEntityCard,
+  showToEntityCard,
+} from '@/components/organisms/entity-card';
 import type { NotificationSourceContext } from '@/features/profile/artist-notifications-cta/types';
 import type { ProfileRenderMode } from '@/features/profile/contracts';
-import { ProfileMerchCard } from '@/features/profile/ProfileMerchCard';
-import {
-  ProfilePrimaryActionCard,
-  type ProfilePrimaryActionCardRelease,
-  resolveProfilePrimaryActionCardState,
-} from '@/features/profile/ProfilePrimaryActionCard';
+import type { ProfilePrimaryActionCardRelease } from '@/features/profile/ProfilePrimaryActionCard';
 import {
   startOfProfileSurfaceLocalDay as startOfLocalDay,
   toProfileSurfaceDateValue as toDateValue,
@@ -159,10 +161,7 @@ export function ProfileHomeRail({
   profileSettings,
   featuredPlaylistFallback,
   tourDates = [],
-  hasPlayableDestinations,
   renderMode = 'interactive',
-  previewActionLabel = 'Listen',
-  onPlayClick,
   onAlertsClick,
   isSubscribed = false,
   viewerLocation,
@@ -192,45 +191,90 @@ export function ProfileHomeRail({
     upcomingTourDates,
     effectiveLocation
   );
-  const nextTourDate = upcomingTourDates[0] ?? null;
-  const nearbyTourDate = nearbyDates[0]?.date ?? null;
-  const featuredState = useMemo(
-    () =>
-      resolveProfilePrimaryActionCardState({
-        artistName: artist.name,
-        latestRelease,
-        profileSettings,
-        nextTourDate,
-        nearbyTourDate,
-        featuredPlaylistFallback,
-        hasPlayableDestinations,
-        now,
-      }),
-    [
-      artist.name,
-      featuredPlaylistFallback,
-      hasPlayableDestinations,
-      latestRelease,
-      nearbyTourDate,
-      nextTourDate,
-      now,
-      profileSettings,
-    ]
-  );
+  const nearbyTourDateId = nearbyDates[0]?.date?.id ?? null;
 
-  const hasPrimaryFeature =
-    featuredState.kind === 'release_countdown' ||
-    featuredState.kind === 'release_live' ||
-    featuredState.kind === 'tour_nearby' ||
-    featuredState.kind === 'tour_next' ||
-    featuredState.kind === 'playlist_fallback';
+  // One ordered card list — featured item first, then the rest. No stacked
+  // sections: a single carousel is the profile home surface.
+  const carouselItems = useMemo<EntityCardModel[]>(() => {
+    const items: EntityCardModel[] = [];
+
+    // Featured: the latest release when it's visible per profile settings.
+    const hasFeaturedRelease = Boolean(
+      releaseVisibility?.show && latestRelease
+    );
+    if (hasFeaturedRelease && latestRelease) {
+      items.push(
+        releaseToEntityCard(
+          {
+            title: latestRelease.title,
+            slug: latestRelease.slug,
+            artworkUrl: latestRelease.artworkUrl,
+            releaseDate: latestRelease.releaseDate,
+            releaseType: latestRelease.releaseType,
+          },
+          { handle: artist.handle, now }
+        )
+      );
+    } else if (upcomingTourDates.length === 0 && featuredPlaylistFallback) {
+      // Fallback feature when there's no release or upcoming show: the
+      // artist's confirmed "This Is" playlist, as a music card.
+      items.push({
+        id: `playlist-${featuredPlaylistFallback.playlistId}`,
+        kind: 'music',
+        href: featuredPlaylistFallback.url,
+        imageUrl: featuredPlaylistFallback.imageUrl,
+        imageAlt: featuredPlaylistFallback.title,
+        accent: 'green',
+        eyebrow: 'Playlist',
+        title: featuredPlaylistFallback.title,
+        cta: {
+          label: 'Open Playlist',
+          href: featuredPlaylistFallback.url,
+          external: true,
+        },
+      });
+    }
+
+    // Shoppable merch (revenue) next.
+    for (const card of merchCards) {
+      items.push(merchToEntityCard(card, { handle: artist.handle }));
+    }
+
+    // Upcoming shows, nearest-to-viewer first when geo resolved.
+    const shows = [...upcomingTourDates].sort((a, b) =>
+      a.id === nearbyTourDateId ? -1 : b.id === nearbyTourDateId ? 1 : 0
+    );
+    for (const show of shows) {
+      items.push(
+        showToEntityCard({
+          id: show.id,
+          title: show.title,
+          venueName: show.venueName,
+          city: show.city,
+          startDate: show.startDate,
+          ticketUrl: show.ticketUrl,
+        })
+      );
+    }
+
+    return items;
+  }, [
+    artist.handle,
+    featuredPlaylistFallback,
+    latestRelease,
+    merchCards,
+    nearbyTourDateId,
+    now,
+    releaseVisibility?.show,
+    upcomingTourDates,
+  ]);
 
   const alertsCard = isSubscribed ? null : (
     <HomeAlertsCard
       artist={artist}
       onAlertsClick={onAlertsClick}
       renderMode={renderMode}
-      variant={hasPrimaryFeature ? 'row' : 'bento'}
+      variant='bento'
       sourceContext={{
         artistId: artist.id,
         profileId: artist.id,
@@ -242,46 +286,17 @@ export function ProfileHomeRail({
     />
   );
 
-  const featureCard = hasPrimaryFeature ? (
-    <ProfilePrimaryActionCard
-      artist={artist}
-      latestRelease={latestRelease}
-      profileSettings={profileSettings}
-      featuredPlaylistFallback={featuredPlaylistFallback}
-      tourDates={tourDates}
-      hasPlayableDestinations={hasPlayableDestinations}
-      renderMode={renderMode}
-      previewActionLabel={previewActionLabel}
-      onPlayClick={onPlayClick}
-      viewerLocation={viewerLocation}
-      resolveNearbyTour={resolveNearbyTour}
-      size={
-        featuredState.kind === 'release_countdown' ||
-        featuredState.kind === 'release_live'
-          ? 'showcase'
-          : 'compact'
-      }
-      dataTestId='profile-home-primary-action-card'
-      className='w-full'
-      now={now}
-    />
-  ) : null;
-
   return (
     <div
       className='min-w-0 space-y-2 md:mx-auto md:w-full md:max-w-80'
       data-testid='profile-home-rail'
-      data-feature-state={featuredState.kind}
     >
-      {featureCard ? (
-        <div className='min-w-0' data-testid='profile-home-feature-card'>
-          {featureCard}
-        </div>
-      ) : null}
-      {merchCards.slice(0, 3).map(card => (
-        <ProfileMerchCard key={card.id} artist={artist} card={card} />
-      ))}
       {alertsCard}
+      <EntityCarousel
+        items={carouselItems}
+        surface='pearl'
+        dataTestId='profile-home-carousel'
+      />
     </div>
   );
 }
