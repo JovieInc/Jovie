@@ -142,19 +142,19 @@ export default function RightRailShotgunPage() {
       <header className='shrink-0 h-12 px-5 flex items-center gap-3 border-b border-(--linear-app-shell-border)'>
         <Link
           href='/exp/shell-v1'
-          className='inline-flex items-center gap-1 text-[12px] text-tertiary-token hover:text-primary-token transition-colors duration-subtle ease-out'
+          className='inline-flex items-center gap-1 text-xs text-tertiary-token hover:text-primary-token transition-colors duration-subtle ease-out'
         >
           <ChevronLeft className='h-3 w-3' strokeWidth={2.25} />
           Back to shell
         </Link>
-        <span className='text-quaternary-token/60 text-[12px]'>·</span>
+        <span className='text-quaternary-token/60 text-xs'>·</span>
         <span
-          className='text-[13px] font-semibold text-primary-token'
+          className='text-app font-semibold text-primary-token'
           style={{ letterSpacing: '-0.012em' }}
         >
           Right rail shotgun
         </span>
-        <span className='text-quaternary-token text-[11.5px]'>
+        <span className='text-quaternary-token text-2xs'>
           /exp/right-rail-shotgun
         </span>
       </header>
@@ -207,12 +207,12 @@ function RailColumn({
   children: React.ReactNode;
 }) {
   return (
-    <div className='w-[388px] shrink-0 flex flex-col h-[calc(100dvh-48px)]'>
+    <div className='w-97 shrink-0 flex flex-col h-[calc(100dvh-48px)]'>
       <div className='shrink-0 px-4 pt-3 pb-2 border-b border-(--linear-app-shell-border)/60'>
-        <p className='text-[10.5px] uppercase tracking-[0.08em] text-quaternary-token font-semibold'>
+        <p className='text-3xs uppercase tracking-[0.08em] text-quaternary-token font-semibold'>
           {label}
         </p>
-        <p className='mt-1 text-[11.5px] text-tertiary-token leading-snug'>
+        <p className='mt-1 text-2xs text-tertiary-token leading-snug'>
           {description}
         </p>
       </div>
@@ -234,7 +234,7 @@ function ArtworkTile({ size = 56 }: { size?: number }) {
       style={{ height: size, width: size }}
     >
       <div
-        className='h-full w-full grid place-items-center text-[14px] font-semibold text-primary-token'
+        className='h-full w-full grid place-items-center text-sm font-semibold text-primary-token'
         style={{
           background:
             'radial-gradient(ellipse at 30% 20%, rgba(103,232,249,0.18) 0%, rgba(255,255,255,0.04) 40%, rgba(0,0,0,0) 70%), linear-gradient(135deg, hsl(220, 35%, 14%), hsl(220, 30%, 6%))',
@@ -248,7 +248,7 @@ function ArtworkTile({ size = 56 }: { size?: number }) {
 
 function TypeBadge({ type }: { type: 'Single' | 'EP' | 'Album' }) {
   return (
-    <span className='inline-flex items-center h-[16px] px-1.5 rounded text-[9.5px] font-medium uppercase tracking-[0.06em] border border-(--linear-app-shell-border) text-tertiary-token bg-(--surface-1)/40'>
+    <span className='inline-flex items-center h-4 px-1.5 rounded text-3xs font-medium uppercase tracking-[0.06em] border border-(--linear-app-shell-border) text-tertiary-token bg-(--surface-1)/40'>
       {type}
     </span>
   );
@@ -267,7 +267,7 @@ function StatusBadge({ status }: { status: typeof release.status }) {
   };
   const c = cfg[status];
   return (
-    <span className='inline-flex items-center gap-1.5 h-[18px] pl-1.5 pr-2 rounded border border-(--linear-app-shell-border)/70 bg-(--surface-1)/40 text-tertiary-token text-[10px] font-caption uppercase tracking-[0.06em]'>
+    <span className='inline-flex items-center gap-1.5 h-5 pl-1.5 pr-2 rounded border border-(--linear-app-shell-border)/70 bg-(--surface-1)/40 text-tertiary-token text-3xs font-caption uppercase tracking-[0.06em]'>
       <span className={cn('h-1.5 w-1.5 rounded-full shrink-0', c.dot)} />
       <span className='text-secondary-token'>{c.label}</span>
     </span>
@@ -285,12 +285,12 @@ function HeaderCard() {
             <StatusBadge status={release.status} />
           </div>
           <h2
-            className='text-[15px] font-semibold text-primary-token leading-tight truncate'
+            className='text-mid font-semibold text-primary-token leading-tight truncate'
             style={{ letterSpacing: '-0.014em' }}
           >
             {release.title}
           </h2>
-          <p className='text-[11.5px] text-tertiary-token truncate'>
+          <p className='text-2xs text-tertiary-token truncate'>
             {release.artist} · {release.album}
           </p>
         </div>
@@ -304,7 +304,7 @@ function HeaderCard() {
 function ShareUrlRow() {
   const [copied, setCopied] = useState(false);
   return (
-    <div className='mt-3 flex items-center gap-1.5 h-7 pl-2 pr-1 rounded-md border border-(--linear-app-shell-border) bg-(--surface-0)/60 text-[11.5px] text-tertiary-token'>
+    <div className='mt-3 flex items-center gap-1.5 h-7 pl-2 pr-1 rounded-md border border-(--linear-app-shell-border) bg-(--surface-0)/60 text-2xs text-tertiary-token'>
       <LinkIcon
         className='h-3 w-3 text-quaternary-token shrink-0'
         strokeWidth={2.25}
@@ -343,7 +343,7 @@ function ActionRow() {
     <div className='mt-3 flex items-center gap-1.5'>
       <button
         type='button'
-        className='inline-flex items-center gap-1.5 h-7 px-3 rounded-md text-[12px] font-medium bg-white text-black hover:bg-white/90 transition-colors duration-subtle ease-out'
+        className='inline-flex items-center gap-1.5 h-7 px-3 rounded-md text-xs font-medium bg-white text-black hover:bg-white/90 transition-colors duration-subtle ease-out'
       >
         <Play
           className='h-3 w-3 translate-x-px'
@@ -354,7 +354,7 @@ function ActionRow() {
       </button>
       <button
         type='button'
-        className='inline-flex items-center h-7 px-2.5 rounded-md text-[12px] text-secondary-token hover:text-primary-token border border-(--linear-app-shell-border) bg-(--surface-0) hover:bg-surface-1/60 transition-colors duration-subtle ease-out'
+        className='inline-flex items-center h-7 px-2.5 rounded-md text-xs text-secondary-token hover:text-primary-token border border-(--linear-app-shell-border) bg-(--surface-0) hover:bg-surface-1/60 transition-colors duration-subtle ease-out'
       >
         Open
       </button>
@@ -398,12 +398,12 @@ function Stat({
 }) {
   return (
     <div className='flex flex-col gap-0.5'>
-      <span className='text-[9.5px] uppercase tracking-[0.08em] text-quaternary-token font-semibold'>
+      <span className='text-3xs uppercase tracking-[0.08em] text-quaternary-token font-semibold'>
         {label}
       </span>
       <span
         className={cn(
-          'text-[13px] text-primary-token',
+          'text-app text-primary-token',
           mono && 'font-mono tracking-wide',
           tabular && 'tabular-nums'
         )}
@@ -429,11 +429,11 @@ function PerformanceBlock() {
   return (
     <div>
       <div className='flex items-baseline gap-2'>
-        <span className='text-[18px] font-semibold text-primary-token tabular-nums'>
+        <span className='text-lg font-semibold text-primary-token tabular-nums'>
           {release.weeklyStreams.toLocaleString()}
         </span>
-        <span className='text-[10.5px] text-tertiary-token'>streams · 7d</span>
-        <span className='ml-auto inline-flex items-center gap-0.5 text-[11px] tabular-nums text-cyan-200/85'>
+        <span className='text-3xs text-tertiary-token'>streams · 7d</span>
+        <span className='ml-auto inline-flex items-center gap-0.5 text-2xs tabular-nums text-cyan-200/85'>
           <ArrowUp className='h-3 w-3' strokeWidth={2.25} />
           {release.weeklyDelta}%
         </span>
@@ -487,13 +487,13 @@ function DistributionList({ compact }: { compact?: boolean }) {
           <li
             key={dsp}
             className={cn(
-              'flex items-center gap-2.5 text-[12px] text-secondary-token',
+              'flex items-center gap-2.5 text-xs text-secondary-token',
               compact ? 'h-6' : 'h-7'
             )}
           >
             <span
               className={cn(
-                'h-[16px] w-[16px] rounded-full grid place-items-center text-[8px] font-semibold text-white shrink-0',
+                'h-4 w-4 rounded-full grid place-items-center text-3xs font-semibold text-white shrink-0',
                 status === 'missing'
                   ? 'bg-quaternary-token/40 opacity-60'
                   : DSP_COLOR[dsp]
@@ -509,7 +509,7 @@ function DistributionList({ compact }: { compact?: boolean }) {
                   DSP_STATUS_DOT[status]
                 )}
               />
-              <span className='text-[10px] uppercase tracking-[0.06em] text-quaternary-token'>
+              <span className='text-3xs uppercase tracking-[0.06em] text-quaternary-token'>
                 {status}
               </span>
             </span>
@@ -542,13 +542,13 @@ function CueRibbon() {
           <li key={c.at}>
             <button
               type='button'
-              className='w-full flex items-center gap-2.5 h-7 px-1 rounded text-[12px] text-secondary-token hover:bg-surface-1/40 hover:text-primary-token transition-colors duration-subtle ease-out'
+              className='w-full flex items-center gap-2.5 h-7 px-1 rounded text-xs text-secondary-token hover:bg-surface-1/40 hover:text-primary-token transition-colors duration-subtle ease-out'
             >
-              <span className='tabular-nums text-[10.5px] text-quaternary-token w-9 text-left'>
+              <span className='tabular-nums text-3xs text-quaternary-token w-9 text-left'>
                 {Math.floor(c.at / 60)}:{String(c.at % 60).padStart(2, '0')}
               </span>
               <span className='flex-1 text-left truncate'>{c.label}</span>
-              <span className='text-[10px] uppercase tracking-[0.06em] text-quaternary-token capitalize'>
+              <span className='text-3xs uppercase tracking-[0.06em] text-quaternary-token capitalize'>
                 {c.kind}
               </span>
             </button>
@@ -602,10 +602,10 @@ function ActivityRow({
         )}
         strokeWidth={2.25}
       />
-      <span className='flex-1 min-w-0 text-[12.5px] text-secondary-token truncate'>
+      <span className='flex-1 min-w-0 text-xs text-secondary-token truncate'>
         {label}
       </span>
-      <span className='text-[10.5px] text-quaternary-token tabular-nums'>
+      <span className='text-3xs text-quaternary-token tabular-nums'>
         {meta}
       </span>
     </div>
@@ -638,7 +638,7 @@ function FooterBtn({
     <button
       type='button'
       className={cn(
-        'inline-flex items-center justify-center gap-1.5 h-7 rounded-md text-[12px] border border-(--linear-app-shell-border) bg-(--surface-0) transition-colors duration-subtle ease-out',
+        'inline-flex items-center justify-center gap-1.5 h-7 rounded-md text-xs border border-(--linear-app-shell-border) bg-(--surface-0) transition-colors duration-subtle ease-out',
         danger
           ? 'text-rose-300/85 hover:bg-rose-500/10 hover:text-rose-200'
           : 'text-secondary-token hover:bg-surface-1/60 hover:text-primary-token'
@@ -659,7 +659,7 @@ function SectionLabel({
 }) {
   return (
     <div className='flex items-center justify-between pb-1.5'>
-      <span className='text-[9.5px] uppercase tracking-[0.12em] text-quaternary-token font-semibold'>
+      <span className='text-3xs uppercase tracking-[0.12em] text-quaternary-token font-semibold'>
         {label}
       </span>
       {trailing}
@@ -687,7 +687,7 @@ function RailA() {
           <SectionLabel
             label='Distribution'
             trailing={
-              <span className='text-[10px] tabular-nums text-tertiary-token'>
+              <span className='text-3xs tabular-nums text-tertiary-token'>
                 4/5 live
               </span>
             }
@@ -698,7 +698,7 @@ function RailA() {
           <SectionLabel
             label='Cues'
             trailing={
-              <span className='text-[10px] tabular-nums text-tertiary-token'>
+              <span className='text-3xs tabular-nums text-tertiary-token'>
                 {release.cues.length}
               </span>
             }
@@ -741,7 +741,7 @@ function RailB() {
               type='button'
               onClick={() => setTab(t.id)}
               className={cn(
-                'h-9 px-3 text-[11.5px] font-caption tracking-[-0.005em] transition-colors duration-subtle ease-out border-b -mb-px',
+                'h-9 px-3 text-2xs font-caption tracking-[-0.005em] transition-colors duration-subtle ease-out border-b -mb-px',
                 active
                   ? 'text-primary-token border-cyan-300/70'
                   : 'text-tertiary-token border-transparent hover:text-primary-token'
@@ -767,7 +767,7 @@ function RailB() {
             <SectionLabel
               label='DSPs'
               trailing={
-                <span className='text-[10px] tabular-nums text-tertiary-token'>
+                <span className='text-3xs tabular-nums text-tertiary-token'>
                   4/5 live
                 </span>
               }
@@ -780,7 +780,7 @@ function RailB() {
             <SectionLabel
               label='Cues'
               trailing={
-                <span className='text-[10px] tabular-nums text-tertiary-token'>
+                <span className='text-3xs tabular-nums text-tertiary-token'>
                   {release.cues.length}
                 </span>
               }
@@ -902,11 +902,11 @@ function AccordionRow({
             strokeWidth={2.25}
           />
         )}
-        <span className='text-[11.5px] uppercase tracking-[0.06em] text-tertiary-token font-semibold'>
+        <span className='text-2xs uppercase tracking-[0.06em] text-tertiary-token font-semibold'>
           {label}
         </span>
         {!openState && (
-          <span className='ml-auto text-[11px] text-quaternary-token tabular-nums truncate'>
+          <span className='ml-auto text-2xs text-quaternary-token tabular-nums truncate'>
             {summary}
           </span>
         )}
@@ -999,9 +999,9 @@ function RailD() {
             value={query}
             onChange={e => setQuery(e.target.value)}
             placeholder='What can I do with this?'
-            className='flex-1 min-w-0 bg-transparent border-0 outline-none text-[12px] text-primary-token placeholder:text-quaternary-token'
+            className='flex-1 min-w-0 bg-transparent border-0 outline-none text-xs text-primary-token placeholder:text-quaternary-token'
           />
-          <kbd className='inline-flex items-center h-4 px-1 rounded text-[9.5px] font-caption uppercase tracking-[0.04em] text-quaternary-token bg-(--surface-2)/60 border border-(--linear-app-shell-border)'>
+          <kbd className='inline-flex items-center h-4 px-1 rounded text-3xs font-caption uppercase tracking-[0.04em] text-quaternary-token bg-(--surface-2)/60 border border-(--linear-app-shell-border)'>
             /
           </kbd>
         </div>
@@ -1009,7 +1009,7 @@ function RailD() {
       <div className='flex-1 min-h-0 overflow-y-auto py-1'>
         {filtered.map(g => (
           <div key={g.label} className='py-1.5'>
-            <p className='px-4 pb-1 text-[9.5px] uppercase tracking-[0.08em] text-quaternary-token font-semibold'>
+            <p className='px-4 pb-1 text-3xs uppercase tracking-[0.08em] text-quaternary-token font-semibold'>
               {g.label}
             </p>
             <div className='flex flex-col'>
@@ -1017,7 +1017,7 @@ function RailD() {
                 <button
                   key={it.label}
                   type='button'
-                  className='flex items-center gap-2.5 h-8 px-4 text-left text-[12.5px] text-secondary-token hover:bg-surface-1/40 hover:text-primary-token transition-colors duration-subtle ease-out'
+                  className='flex items-center gap-2.5 h-8 px-4 text-left text-xs text-secondary-token hover:bg-surface-1/40 hover:text-primary-token transition-colors duration-subtle ease-out'
                 >
                   <it.icon
                     className='h-3.5 w-3.5 shrink-0 text-quaternary-token'
@@ -1025,7 +1025,7 @@ function RailD() {
                   />
                   <span className='flex-1 truncate'>{it.label}</span>
                   {it.shortcut && (
-                    <kbd className='inline-flex items-center h-4 px-1 rounded text-[9.5px] font-caption uppercase tracking-[0.04em] text-quaternary-token bg-(--surface-2)/60 border border-(--linear-app-shell-border)'>
+                    <kbd className='inline-flex items-center h-4 px-1 rounded text-3xs font-caption uppercase tracking-[0.04em] text-quaternary-token bg-(--surface-2)/60 border border-(--linear-app-shell-border)'>
                       {it.shortcut}
                     </kbd>
                   )}
@@ -1035,7 +1035,7 @@ function RailD() {
           </div>
         ))}
         {filtered.length === 0 && (
-          <p className='px-4 py-6 text-center text-[12px] text-tertiary-token'>
+          <p className='px-4 py-6 text-center text-xs text-tertiary-token'>
             No commands match &ldquo;{query}&rdquo;.
           </p>
         )}
@@ -1096,10 +1096,10 @@ function SplitCard({
         onClick={() => setOpen(v => !v)}
         className='w-full flex items-center justify-between gap-2 h-9 px-3 hover:bg-surface-1/30 transition-colors duration-subtle ease-out'
       >
-        <span className='text-[10px] uppercase tracking-[0.08em] text-quaternary-token font-semibold'>
+        <span className='text-3xs uppercase tracking-[0.08em] text-quaternary-token font-semibold'>
           {label}
         </span>
-        <span className='text-[11px] tabular-nums text-tertiary-token inline-flex items-center gap-1.5'>
+        <span className='text-2xs tabular-nums text-tertiary-token inline-flex items-center gap-1.5'>
           {meta}
           {open ? (
             <ChevronUp
