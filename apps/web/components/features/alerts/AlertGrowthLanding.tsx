@@ -299,7 +299,8 @@ export function AlertGrowthLanding({
                     type='email'
                     inputMode='email'
                     autoComplete='email'
-                    placeholder='You@example.com'
+                    // eslint-disable-next-line @jovie/canonical-ui-label-casing
+                    placeholder='you@example.com'
                     aria-describedby={consentId}
                     value={emailInput}
                     onChange={e => setEmailInput(e.target.value)}

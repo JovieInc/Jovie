@@ -111,7 +111,7 @@ describe('<AlertGrowthLanding>', () => {
     render(<AlertGrowthLanding artist={ARTIST} />);
 
     fireEvent.click(screen.getByRole('button', { name: /Email me/i }));
-    fireEvent.change(screen.getByPlaceholderText(/you@example/i), {
+    fireEvent.change(screen.getByPlaceholderText(/you@example/), {
       target: { value: '  Fan@Example.com  ' },
     });
     fireEvent.submit(screen.getByRole('button', { name: /Get alerts/i }));
@@ -184,7 +184,7 @@ describe('<AlertGrowthLanding>', () => {
 
     render(<AlertGrowthLanding artist={ARTIST} />);
     fireEvent.click(screen.getByRole('button', { name: /Email me/i }));
-    fireEvent.change(screen.getByPlaceholderText(/you@example/i), {
+    fireEvent.change(screen.getByPlaceholderText(/you@example/), {
       target: { value: 'fan@example.com' },
     });
     fireEvent.submit(screen.getByRole('button', { name: /Get alerts/i }));
