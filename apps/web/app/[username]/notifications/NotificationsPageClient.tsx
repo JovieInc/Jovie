@@ -70,12 +70,12 @@ export function NotificationsPageClient({ artist }: Props) {
         />
         <div
           ref={setNotificationsPortalContainer}
-          className='relative z-10 flex h-[calc(100dvh-2rem)] w-full max-w-sm flex-col overflow-hidden rounded-[var(--profile-card-radius)] border border-[color:var(--profile-panel-border)] bg-[var(--profile-content-bg)] p-5 shadow-[var(--profile-panel-shadow)] backdrop-blur-2xl sm:h-[min(844px,calc(100dvh-48px))] sm:p-6 min-[1180px]:h-[min(940px,calc(100dvh-48px))] min-[1180px]:max-w-385 min-[1180px]:p-8'
+          className='relative z-10 flex h-[calc(100dvh-2rem)] w-full max-w-sm flex-col overflow-hidden rounded-[var(--profile-card-radius)] border border-[color:var(--profile-panel-border)] bg-[var(--profile-content-bg)] p-5 shadow-[var(--profile-panel-shadow)] backdrop-blur-2xl sm:h-[min(844px,calc(100dvh-48px))] sm:p-6 min-[1180px]:h-[min(940px,calc(100dvh-48px))] min-[1180px]:max-w-profile-notifications-wide min-[1180px]:p-8'
         >
           <div className='mb-5 flex items-center justify-between'>
             <Link
               href={BASE_URL}
-              aria-label='Jovie home'
+              aria-label='Jovie Home'
               className='rounded-full opacity-60 transition-opacity duration-subtle hover:opacity-85 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--focus-ring))] focus-visible:ring-offset-2 focus-visible:ring-offset-transparent'
             >
               <BrandLogo
@@ -90,7 +90,7 @@ export function NotificationsPageClient({ artist }: Props) {
               Alerts for {artist.name}
             </p>
           </div>
-          <h1 className='sr-only'>Manage Alerts for {artist.name}</h1>
+          <h1 className='sr-only'>Manage Alerts For {artist.name}</h1>
           <ArtistNotificationsCTA
             artist={artist}
             presentation={isDesktopLayout ? 'modal' : 'overlay'}

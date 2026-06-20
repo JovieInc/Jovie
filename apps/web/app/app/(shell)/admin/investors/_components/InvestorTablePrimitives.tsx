@@ -13,7 +13,7 @@ import { cn } from '@/lib/utils';
 
 export function InvestorTable({
   children,
-  minWidth = 'min-w-190',
+  minWidth = 'min-w-investor-table',
 }: Readonly<{
   children: ReactNode;
   minWidth?: string;

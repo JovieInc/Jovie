@@ -60,8 +60,8 @@ export function MemoContent({
         <div className='flex gap-10'>
           {/* Main prose — light mode applies white bg + dark text */}
           <article
-            className={`investor-prose min-w-0 flex-1 rounded-[var(--radius-xl)] transition-colors duration-200 ${
-              isLight ? 'bg-(--color-badge-text) p-6' : ''
+            className={`investor-prose min-w-0 flex-1 rounded-[var(--radius-xl)] transition-colors duration-subtle ${
+              isLight ? 'bg-paper p-6' : ''
             }`}
             style={{
               fontSize: '15px',
@@ -77,7 +77,7 @@ export function MemoContent({
           {toc.length > 2 && (
             <nav
               className='max-lg:hidden w-48 flex-shrink-0'
-              aria-label='Table of contents'
+              aria-label='Table Of Contents'
             >
               <div className='sticky top-8'>
                 <p className='mb-3 text-[length:var(--text-xs)] font-semibold uppercase tracking-widest text-[var(--color-text-quaternary-token)]'>
