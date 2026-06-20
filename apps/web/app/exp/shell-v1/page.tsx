@@ -287,7 +287,7 @@ const DURATION_CINEMATIC = 420;
 
 // Selected/focused row treatment — electric cyan accent. Calibrated to
 // stay invisible at low brightness (the "DJ on a red-eye flight" test):
-// Selection language: a small pill-chip on the left edge (h-3.5 w-[3px]
+// Selection language: a small pill-chip on the left edge (h-3.5 w-1
 // rounded-full) plus a soft cyan bg tint. The inset 2px bar didn't follow
 // the row's rounded-md corners gracefully — the pill is its own rounded
 // shape, vertically centered, so it reads as a deliberate accent instead
@@ -301,7 +301,7 @@ const SELECTED_ROW_CLASSES = [
   // Pseudo-element pill chip
   "before:content-['']",
   'before:absolute before:left-0.5 before:top-1/2 before:-translate-y-1/2',
-  'before:h-3.5 before:w-[3px] before:rounded-full before:bg-cyan-300/0',
+  'before:h-3.5 before:w-1 before:rounded-full before:bg-cyan-300/0',
   'data-[focused]:before:bg-cyan-300/85',
   'data-[selected]:before:bg-cyan-300/85',
   'before:transition-colors before:duration-subtle before:ease-out',
@@ -2467,7 +2467,7 @@ function ShellV1ExperimentContent() {
             // Sits inside the same 32px gutter the audio bar uses (px-8) so
             // the album art aligns to a virtual grid as if the canvas's
             // content area extended down past it.
-            className='hidden lg:block fixed bottom-[26px] z-30 w-[224px]'
+            className='hidden lg:block fixed bottom-7 z-30 w-56'
             style={{
               left: sidebarMode === 'docked' ? 264 : 32,
               opacity: barCollapsed ? 0 : 1,
@@ -2730,7 +2730,7 @@ function ShellV1ExperimentContent() {
                 aria-hidden={
                   !(view === 'releases' && selectedReleaseId !== null)
                 }
-                className='absolute inset-y-0 right-0 z-30 w-[412px] pointer-events-none'
+                className='absolute inset-y-0 right-0 z-30 w-103 pointer-events-none'
                 style={{
                   transform:
                     view === 'releases' && selectedReleaseId !== null
@@ -2912,7 +2912,7 @@ function ShellV1ExperimentContent() {
 
 export default function ShellV1Experiment() {
   return (
-    <Suspense fallback={<div className='min-h-screen bg-[#050608]' />}>
+    <Suspense fallback={<div className='min-h-screen bg-(--color-bg-base)' />}>
       <ShellV1ExperimentContent />
     </Suspense>
   );
@@ -2998,7 +2998,7 @@ function FloatingSidebarLayer({
       {/* biome-ignore lint/a11y/noStaticElementInteractions: same as above */}
       {/* biome-ignore lint/a11y/noNoninteractiveElementInteractions: same */}
       <div
-        className='hidden lg:flex fixed top-2 bottom-2 left-2 z-40 w-[224px] rounded-[var(--linear-app-shell-radius)] border border-(--linear-app-shell-border) bg-(--linear-app-content-surface) shadow-[var(--linear-app-shell-shadow)] overflow-hidden'
+        className='hidden lg:flex fixed top-2 bottom-2 left-2 z-40 w-56 rounded-[var(--linear-app-shell-radius)] border border-(--linear-app-shell-border) bg-(--linear-app-content-surface) shadow-[var(--linear-app-shell-shadow)] overflow-hidden'
         style={{
           transform: visible
             ? 'translateX(0)'
@@ -3139,7 +3139,7 @@ function Sidebar({
     <aside
       className={cn(
         'relative flex flex-col h-full shrink-0',
-        tight ? 'w-[212px]' : 'w-[224px]'
+        tight ? 'w-53' : 'w-56'
       )}
       onMouseEnter={bumpPinVisibility}
       onMouseMove={bumpPinVisibility}
@@ -3164,7 +3164,7 @@ function Sidebar({
                 strokeWidth={2.25}
               />
               <span
-                className='text-[13px] font-semibold tracking-[-0.012em] flex-1 truncate text-left'
+                className='text-app font-semibold tracking-[-0.012em] flex-1 truncate text-left'
                 style={{ letterSpacing: '-0.012em' }}
               >
                 Back
@@ -3179,7 +3179,7 @@ function Sidebar({
                   className='shrink-0 text-primary-token'
                   aria-hidden
                 />
-                <span className='text-[13.5px] font-semibold tracking-[-0.02em] text-primary-token flex-1 truncate'>
+                <span className='text-app font-semibold tracking-[-0.02em] text-primary-token flex-1 truncate'>
                   Jovie
                 </span>
                 <ChevronDown
@@ -3274,13 +3274,13 @@ function Sidebar({
               >
                 <span
                   className={cn(
-                    'text-[12.5px] font-medium tracking-[-0.005em]',
+                    'text-xs font-medium tracking-[-0.005em]',
                     s.id === 'danger' && 'text-rose-300/90'
                   )}
                 >
                   {s.label}
                 </span>
-                <span className='text-[10.5px] text-quaternary-token leading-tight'>
+                <span className='text-3xs text-quaternary-token leading-tight'>
                   {s.description}
                 </span>
               </button>
@@ -3347,7 +3347,7 @@ function Sidebar({
           <div className='space-y-3'>
             {!collapsed && (
               <div className='px-3 pb-1'>
-                <span className='text-[9.5px] font-medium uppercase tracking-[0.12em] text-quaternary-token/85'>
+                <span className='text-3xs font-medium uppercase tracking-[0.12em] text-quaternary-token/85'>
                   Artists
                 </span>
               </div>
@@ -3519,7 +3519,7 @@ function CanvasSubheader({
               type='button'
               onClick={() => onSubview(t.id)}
               className={cn(
-                'h-7 px-2.5 rounded-md text-[12.5px] font-caption tracking-[-0.012em] transition-colors duration-subtle ease-out inline-flex items-center gap-1.5',
+                'h-7 px-2.5 rounded-md text-xs font-caption tracking-[-0.012em] transition-colors duration-subtle ease-out inline-flex items-center gap-1.5',
                 active
                   ? 'text-primary-token bg-surface-1/80'
                   : 'text-tertiary-token hover:text-primary-token hover:bg-surface-1/50'
@@ -3529,7 +3529,7 @@ function CanvasSubheader({
               {typeof t.count === 'number' && (
                 <span
                   className={cn(
-                    'text-[10.5px] tabular-nums',
+                    'text-3xs tabular-nums',
                     active ? 'text-tertiary-token' : 'text-quaternary-token'
                   )}
                 >
@@ -3855,7 +3855,7 @@ function Header({
         {/* Breadcrumb (visible when search is closed) */}
         <div
           aria-hidden={searchOpen}
-          className='absolute inset-0 flex items-center gap-2 text-[13px]'
+          className='absolute inset-0 flex items-center gap-2 text-app'
           style={{
             opacity: searchOpen ? 0 : 1,
             transform: searchOpen ? 'translateY(-2px)' : 'translateY(0)',
@@ -3868,14 +3868,14 @@ function Header({
               {i > 0 && (
                 <span
                   aria-hidden='true'
-                  className='text-quaternary-token/70 text-[12px] font-light select-none'
+                  className='text-quaternary-token/70 text-xs font-light select-none'
                 >
                   /
                 </span>
               )}
               <span
                 className={cn(
-                  'truncate text-[13px] font-semibold tracking-[-0.018em]',
+                  'truncate text-app font-semibold tracking-[-0.018em]',
                   crumb.emphasis
                     ? 'text-secondary-token'
                     : 'text-tertiary-token/80 hover:text-secondary-token cursor-default transition-colors duration-subtle ease-out'
@@ -4074,10 +4074,10 @@ function DashboardHome() {
           card (Dismiss or its primary action), which forces a real
           decision instead of letting them skim past. */}
       <div className='flex-1 grid place-items-center min-h-0'>
-        <div className='w-full max-w-[480px] flex flex-col items-center'>
+        <div className='w-full max-w-120 flex flex-col items-center'>
           <div className='shrink-0 text-center pb-5'>
             <h1
-              className='text-[15px] font-medium text-tertiary-token'
+              className='text-mid font-medium text-tertiary-token'
               style={{ letterSpacing: '-0.012em' }}
             >
               {greeting}
@@ -4546,7 +4546,7 @@ function OnboardingCanvas({ onComplete }: { onComplete: () => void }) {
   return (
     <article className='relative h-full overflow-hidden flex flex-col'>
       <div ref={scrollRef} className='flex-1 min-h-0 overflow-y-auto'>
-        <div className='max-w-2xl mx-auto px-8 pt-12 pb-6 space-y-4 text-[13.5px] leading-relaxed'>
+        <div className='max-w-2xl mx-auto px-8 pt-12 pb-6 space-y-4 text-app leading-relaxed'>
           {stage === 'ready' && (
             <>
               <ThreadTurn speaker='me'>{handle}</ThreadTurn>
@@ -4558,7 +4558,7 @@ function OnboardingCanvas({ onComplete }: { onComplete: () => void }) {
                 <button
                   type='button'
                   onClick={onComplete}
-                  className='inline-flex items-center gap-1.5 h-8 px-4 rounded-full text-[12px] font-medium bg-white text-black hover:brightness-110 active:scale-[0.99] shadow-[0_4px_14px_rgba(0,0,0,0.35),inset_0_1px_0_rgba(255,255,255,0.45)] transition-colors duration-subtle ease-out'
+                  className='inline-flex items-center gap-1.5 h-8 px-4 rounded-full text-xs font-medium bg-white text-black hover:brightness-110 active:scale-[0.99] shadow-[0_4px_14px_rgba(0,0,0,0.35),inset_0_1px_0_rgba(255,255,255,0.45)] transition-colors duration-subtle ease-out'
                 >
                   Open Jovie
                   <ArrowRight className='h-3 w-3' strokeWidth={2.5} />
@@ -4587,7 +4587,7 @@ function OnboardingCanvas({ onComplete }: { onComplete: () => void }) {
           aria-hidden
         />
         <h1
-          className='text-[14px] font-medium text-tertiary-token'
+          className='text-sm font-medium text-tertiary-token'
           style={{ letterSpacing: '-0.01em' }}
         >
           Welcome to Jovie
@@ -4636,10 +4636,10 @@ function SettingsView({ section }: { section: SettingsSectionId }) {
   const rows = settingsRowsFor(section);
   return (
     <article className='max-w-2xl mx-auto px-8 pt-8 pb-12'>
-      <h1 className='text-[24px] font-display tracking-[-0.018em] leading-tight text-primary-token'>
+      <h1 className='text-2xl font-display tracking-[-0.018em] leading-tight text-primary-token'>
         {meta.label}
       </h1>
-      <p className='mt-1.5 text-[12.5px] text-tertiary-token'>
+      <p className='mt-1.5 text-xs text-tertiary-token'>
         {meta.description}
       </p>
 
@@ -4663,14 +4663,14 @@ function settingsRowsFor(id: SettingsSectionId): Array<{
   tone?: 'default' | 'danger';
 }> {
   const valueText = (value: string) => (
-    <span className='text-[12.5px] text-tertiary-token tabular-nums'>
+    <span className='text-xs text-tertiary-token tabular-nums'>
       {value}
     </span>
   );
   const editBtn = (
     <button
       type='button'
-      className='inline-flex items-center h-7 px-3 rounded-md text-[12px] text-secondary-token hover:text-primary-token border border-(--linear-app-shell-border) bg-(--surface-0) hover:bg-surface-1/60 transition-colors duration-subtle ease-out'
+      className='inline-flex items-center h-7 px-3 rounded-md text-xs text-secondary-token hover:text-primary-token border border-(--linear-app-shell-border) bg-(--surface-0) hover:bg-surface-1/60 transition-colors duration-subtle ease-out'
     >
       Edit
     </button>
@@ -4692,7 +4692,7 @@ function settingsRowsFor(id: SettingsSectionId): Array<{
           label: 'Two-factor authentication',
           description: 'Required for production workspaces',
           control: (
-            <span className='inline-flex items-center gap-1.5 h-6 px-2 rounded text-[10.5px] uppercase tracking-[0.06em] text-tertiary-token bg-(--surface-1)/60 border border-(--linear-app-shell-border)'>
+            <span className='inline-flex items-center gap-1.5 h-6 px-2 rounded text-3xs uppercase tracking-[0.06em] text-tertiary-token bg-(--surface-1)/60 border border-(--linear-app-shell-border)'>
               <span className='h-1.5 w-1.5 rounded-full bg-cyan-300/80' />
               Enabled
             </span>
@@ -4750,7 +4750,7 @@ function settingsRowsFor(id: SettingsSectionId): Array<{
           control: (
             <button
               type='button'
-              className='inline-flex items-center h-7 px-3 rounded-md text-[12px] font-medium bg-white text-black hover:brightness-110 active:scale-[0.99] transition-colors duration-subtle ease-out'
+              className='inline-flex items-center h-7 px-3 rounded-md text-xs font-medium bg-white text-black hover:brightness-110 active:scale-[0.99] transition-colors duration-subtle ease-out'
             >
               Upgrade to Pro
             </button>
@@ -4772,7 +4772,7 @@ function settingsRowsFor(id: SettingsSectionId): Array<{
           label: 'Spotify for Artists',
           description: 'Auto-pitch playlists, push Canvas, sync streams',
           control: (
-            <span className='inline-flex items-center gap-1.5 h-6 px-2 rounded text-[10.5px] uppercase tracking-[0.06em] text-tertiary-token bg-(--surface-1)/60 border border-(--linear-app-shell-border)'>
+            <span className='inline-flex items-center gap-1.5 h-6 px-2 rounded text-3xs uppercase tracking-[0.06em] text-tertiary-token bg-(--surface-1)/60 border border-(--linear-app-shell-border)'>
               <span className='h-1.5 w-1.5 rounded-full bg-cyan-300/80' />
               Connected
             </span>
@@ -4784,7 +4784,7 @@ function settingsRowsFor(id: SettingsSectionId): Array<{
           control: (
             <button
               type='button'
-              className='inline-flex items-center h-7 px-3 rounded-md text-[12px] text-secondary-token hover:text-primary-token border border-(--linear-app-shell-border) bg-(--surface-0) hover:bg-surface-1/60 transition-colors duration-subtle ease-out'
+              className='inline-flex items-center h-7 px-3 rounded-md text-xs text-secondary-token hover:text-primary-token border border-(--linear-app-shell-border) bg-(--surface-0) hover:bg-surface-1/60 transition-colors duration-subtle ease-out'
             >
               Connect
             </button>
@@ -4796,7 +4796,7 @@ function settingsRowsFor(id: SettingsSectionId): Array<{
           control: (
             <button
               type='button'
-              className='inline-flex items-center h-7 px-3 rounded-md text-[12px] text-secondary-token hover:text-primary-token border border-(--linear-app-shell-border) bg-(--surface-0) hover:bg-surface-1/60 transition-colors duration-subtle ease-out'
+              className='inline-flex items-center h-7 px-3 rounded-md text-xs text-secondary-token hover:text-primary-token border border-(--linear-app-shell-border) bg-(--surface-0) hover:bg-surface-1/60 transition-colors duration-subtle ease-out'
             >
               Connect
             </button>
@@ -4811,7 +4811,7 @@ function settingsRowsFor(id: SettingsSectionId): Array<{
           control: (
             <button
               type='button'
-              className='inline-flex items-center h-7 px-3 rounded-md text-[12px] text-secondary-token hover:text-rose-200 border border-(--linear-app-shell-border) bg-(--surface-0) hover:border-rose-400/40 hover:bg-rose-500/[0.06] transition-colors duration-subtle ease-out'
+              className='inline-flex items-center h-7 px-3 rounded-md text-xs text-secondary-token hover:text-rose-200 border border-(--linear-app-shell-border) bg-(--surface-0) hover:border-rose-400/40 hover:bg-rose-500/[0.06] transition-colors duration-subtle ease-out'
             >
               Reset workspace
             </button>
@@ -4824,7 +4824,7 @@ function settingsRowsFor(id: SettingsSectionId): Array<{
           control: (
             <button
               type='button'
-              className='inline-flex items-center h-7 px-3 rounded-md text-[12px] text-secondary-token hover:text-rose-200 border border-(--linear-app-shell-border) bg-(--surface-0) hover:border-rose-400/40 hover:bg-rose-500/[0.06] transition-colors duration-subtle ease-out'
+              className='inline-flex items-center h-7 px-3 rounded-md text-xs text-secondary-token hover:text-rose-200 border border-(--linear-app-shell-border) bg-(--surface-0) hover:border-rose-400/40 hover:bg-rose-500/[0.06] transition-colors duration-subtle ease-out'
             >
               Delete account
             </button>
@@ -5022,7 +5022,7 @@ function ReleaseRow({
       data-selected={isSelected || undefined}
       data-focused={isFocused || undefined}
       className={cn(
-        'group/row relative grid items-center gap-3 h-[52px] rounded-md pl-2 pr-3 cursor-pointer transition-colors duration-subtle ease-out focus:outline-none',
+        'group/row relative grid items-center gap-3 h-13 rounded-md pl-2 pr-3 cursor-pointer transition-colors duration-subtle ease-out focus:outline-none',
         // [#] [art] [title/artist+badge fluid] [date] [right cluster: streams + DSP stack]
         drawerOpen
           ? 'grid-cols-[24px_40px_minmax(0,1fr)_auto]'
@@ -5037,7 +5037,7 @@ function ReleaseRow({
       <div className='relative grid place-items-center w-6'>
         <span
           className={cn(
-            'text-[12px] tabular-nums text-quaternary-token transition-opacity duration-subtle ease-out',
+            'text-xs tabular-nums text-quaternary-token transition-opacity duration-subtle ease-out',
             (isCurrentTrack || isPlaying) && 'opacity-0',
             !isCurrentTrack && 'group-hover/row:opacity-0'
           )}
@@ -5086,12 +5086,12 @@ function ReleaseRow({
       {/* Title (with type badge) / artist */}
       <div className='min-w-0'>
         <div className='flex items-center gap-1.5 min-w-0'>
-          <span className='truncate text-[13px] font-caption leading-tight tracking-[-0.01em] text-primary-token'>
+          <span className='truncate text-app font-caption leading-tight tracking-[-0.01em] text-primary-token'>
             {release.title}
           </span>
           <TypeBadge label={release.type} />
         </div>
-        <div className='truncate text-[11.5px] text-tertiary-token leading-tight mt-0.5'>
+        <div className='truncate text-2xs text-tertiary-token leading-tight mt-0.5'>
           <button
             type='button'
             onClick={e => {
@@ -5117,7 +5117,7 @@ function ReleaseRow({
       {/* Release date — hidden in narrow */}
       <span
         className={cn(
-          'text-[11px] text-tertiary-token tabular-nums whitespace-nowrap min-w-[68px] text-right',
+          'text-2xs text-tertiary-token tabular-nums whitespace-nowrap min-w-17 text-right',
           drawerOpen && 'hidden'
         )}
       >
@@ -5134,7 +5134,7 @@ function ReleaseRow({
         )}
         <span
           className={cn(
-            'text-[11px] text-secondary-token tabular-nums whitespace-nowrap min-w-[42px] text-right',
+            'text-2xs text-secondary-token tabular-nums whitespace-nowrap min-w-11 text-right',
             drawerOpen && 'hidden'
           )}
           title={`${release.weeklyStreams.toLocaleString()} streams this week`}
@@ -5733,16 +5733,16 @@ function DrawerDistribution({ release }: { release: Release }) {
   return (
     <div className='px-4 py-4'>
       <div className='flex items-center justify-between pb-2'>
-        <p className='text-[10px] uppercase tracking-[0.08em] text-quaternary-token font-semibold'>
+        <p className='text-3xs uppercase tracking-[0.08em] text-quaternary-token font-semibold'>
           Providers
         </p>
-        <span className='text-[10.5px] tabular-nums text-tertiary-token'>
+        <span className='text-3xs tabular-nums text-tertiary-token'>
           {liveCount}/{rows.length} live
         </span>
       </div>
 
       {/* Search — matches the smart-link pill language. */}
-      <div className='flex items-center gap-1.5 h-7 pl-3 pr-2 rounded-full border border-(--linear-app-shell-border) bg-(--surface-0)/60 text-[11.5px] mb-2 focus-within:border-cyan-300/40'>
+      <div className='flex items-center gap-1.5 h-7 pl-3 pr-2 rounded-full border border-(--linear-app-shell-border) bg-(--surface-0)/60 text-2xs mb-2 focus-within:border-cyan-300/40'>
         <Search className='h-3 w-3 text-quaternary-token shrink-0' />
         <input
           value={filter}
@@ -5765,7 +5765,7 @@ function DrawerDistribution({ release }: { release: Release }) {
       {(Object.keys(grouped) as ProviderGroup[]).map(group =>
         grouped[group].length > 0 ? (
           <div key={group} className='mb-3 last:mb-0'>
-            <p className='text-[9.5px] uppercase tracking-[0.10em] text-quaternary-token/85 font-medium px-2 pt-1.5 pb-0.5'>
+            <p className='text-3xs uppercase tracking-[0.10em] text-quaternary-token/85 font-medium px-2 pt-1.5 pb-0.5'>
               {PROVIDER_GROUP_LABEL[group]}
             </p>
             <ul className='flex flex-col -mx-2'>
@@ -5773,10 +5773,10 @@ function DrawerDistribution({ release }: { release: Release }) {
                 <li key={p.id}>
                   <button
                     type='button'
-                    className='w-full flex items-center gap-2.5 h-7 px-2 rounded-md text-[12px] text-secondary-token hover:bg-surface-1/40 hover:text-primary-token transition-colors duration-subtle ease-out'
+                    className='w-full flex items-center gap-2.5 h-7 px-2 rounded-md text-xs text-secondary-token hover:bg-surface-1/40 hover:text-primary-token transition-colors duration-subtle ease-out'
                   >
                     <span
-                      className='h-[16px] w-[16px] rounded grid place-items-center text-[8.5px] font-semibold text-white shrink-0'
+                      className='h-4 w-4 rounded grid place-items-center text-3xs font-semibold text-white shrink-0'
                       style={{
                         background:
                           p.status === 'missing'
@@ -5795,7 +5795,7 @@ function DrawerDistribution({ release }: { release: Release }) {
                           DSP_STATUS_DOT[p.status]
                         )}
                       />
-                      <span className='text-[10px] uppercase tracking-[0.06em] text-quaternary-token w-[44px] text-right'>
+                      <span className='text-3xs uppercase tracking-[0.06em] text-quaternary-token w-11 text-right'>
                         {p.status}
                       </span>
                     </span>
@@ -5808,7 +5808,7 @@ function DrawerDistribution({ release }: { release: Release }) {
       )}
 
       {rows.length === 0 && (
-        <p className='text-[12px] text-quaternary-token text-center py-6'>
+        <p className='text-xs text-quaternary-token text-center py-6'>
           No providers match &ldquo;{filter}&rdquo;.
         </p>
       )}
@@ -5903,7 +5903,7 @@ function DrawerDetailsTab({ release }: { release: Release }) {
   ];
   return (
     <div className='px-4 py-4'>
-      <p className='text-[10px] uppercase tracking-[0.08em] text-quaternary-token font-semibold mb-2'>
+      <p className='text-3xs uppercase tracking-[0.08em] text-quaternary-token font-semibold mb-2'>
         Metadata
       </p>
       <dl className='flex flex-col -mx-2'>
@@ -6098,7 +6098,7 @@ function TracksView({
           <ColumnLabel
             field='bpm'
             label='BPM'
-            width='w-[44px]'
+            width='w-11'
             align='right'
             sortBy={sortBy}
             sortDir={sortDir}
@@ -6108,18 +6108,18 @@ function TracksView({
           <button
             type='button'
             onClick={onKeyModeToggle}
-            className='w-[58px] shrink-0 inline-flex items-center justify-end gap-1 text-[9.5px] uppercase tracking-[0.12em] font-medium text-quaternary-token/85 hover:text-secondary-token transition-colors duration-subtle ease-out'
+            className='w-15 shrink-0 inline-flex items-center justify-end gap-1 text-3xs uppercase tracking-[0.12em] font-medium text-quaternary-token/85 hover:text-secondary-token transition-colors duration-subtle ease-out'
             title={`Switch to ${keyMode === 'normal' ? 'Camelot' : 'standard'} key notation`}
           >
             {keyMode === 'normal' ? 'Key' : 'Cam'}
           </button>
-          <span className='w-[176px] shrink-0 text-left text-[9.5px] uppercase tracking-[0.12em] font-medium text-quaternary-token/85'>
+          <span className='w-44 shrink-0 text-left text-3xs uppercase tracking-[0.12em] font-medium text-quaternary-token/85'>
             Waveform
           </span>
-          <span className='w-[64px] shrink-0 text-right text-[9.5px] uppercase tracking-[0.12em] font-medium text-quaternary-token/85'>
+          <span className='w-16 shrink-0 text-right text-3xs uppercase tracking-[0.12em] font-medium text-quaternary-token/85'>
             Status
           </span>
-          <span className='w-10 shrink-0 text-right text-[10px] tabular-nums text-quaternary-token/70'>
+          <span className='w-10 shrink-0 text-right text-3xs tabular-nums text-quaternary-token/70'>
             {sorted.length}
           </span>
         </div>
@@ -6155,7 +6155,7 @@ function TracksView({
             />
           ))}
           {sorted.length === 0 && (
-            <li className='px-3 py-8 text-center text-[12px] text-tertiary-token'>
+            <li className='px-3 py-8 text-center text-xs text-tertiary-token'>
               No tracks match your filters.
             </li>
           )}
@@ -6217,7 +6217,7 @@ function TrackRow({
       onContextMenu={e => onContextMenu?.(e, track)}
       data-focused={isFocused || undefined}
       className={cn(
-        'group/row relative flex items-center gap-3 h-[44px] pl-2 pr-3 rounded-md cursor-pointer transition-colors duration-subtle ease-out focus:outline-none',
+        'group/row relative flex items-center gap-3 h-11 pl-2 pr-3 rounded-md cursor-pointer transition-colors duration-subtle ease-out focus:outline-none',
         !isFocused && !kbActive && 'hover:bg-surface-1/40',
         SELECTED_ROW_CLASSES
       )}
@@ -6226,7 +6226,7 @@ function TrackRow({
       <div className='relative w-5 shrink-0 grid place-items-center'>
         <span
           className={cn(
-            'text-[11px] tabular-nums text-quaternary-token transition-opacity duration-subtle ease-out',
+            'text-2xs tabular-nums text-quaternary-token transition-opacity duration-subtle ease-out',
             showPlayingBars && 'opacity-0',
             !isCurrentTrack && 'group-hover/row:opacity-0'
           )}
@@ -6270,11 +6270,11 @@ function TrackRow({
           surface here. */}
       <div className='flex-1 min-w-0'>
         <div className='flex items-baseline gap-2 min-w-0'>
-          <span className='truncate text-[13px] font-caption text-primary-token tracking-[-0.012em]'>
+          <span className='truncate text-app font-caption text-primary-token tracking-[-0.012em]'>
             {track.title}
           </span>
           {track.artist.includes(' & ') && (
-            <span className='truncate text-[11px] text-tertiary-token'>
+            <span className='truncate text-2xs text-tertiary-token'>
               feat. {track.artist.split(' & ').slice(1).join(' & ')}
             </span>
           )}
@@ -6282,13 +6282,13 @@ function TrackRow({
       </div>
 
       {/* BPM — heavier weight, monochrome, right-aligned */}
-      <span className='w-[44px] shrink-0 text-right text-[12.5px] tabular-nums font-semibold text-secondary-token tracking-[-0.01em]'>
+      <span className='w-11 shrink-0 text-right text-xs tabular-nums font-semibold text-secondary-token tracking-[-0.01em]'>
         {track.bpm}
       </span>
 
       {/* Key as a badge — quiet pill */}
-      <span className='w-[58px] shrink-0 flex justify-end'>
-        <span className='inline-flex items-center h-[18px] px-1.5 rounded text-[10.5px] font-caption tabular-nums text-secondary-token border border-(--linear-app-shell-border) bg-surface-1/40'>
+      <span className='w-15 shrink-0 flex justify-end'>
+        <span className='inline-flex items-center h-5 px-1.5 rounded text-3xs font-caption tabular-nums text-secondary-token border border-(--linear-app-shell-border) bg-surface-1/40'>
           {keyMode === 'normal' ? track.keyNormal : track.keyCamelot}
         </span>
       </span>
@@ -6297,7 +6297,7 @@ function TrackRow({
           playing/selected row's waveform pops by contrast. */}
       <div
         className={cn(
-          'w-[176px] shrink-0 transition-opacity duration-subtle ease-out',
+          'w-44 shrink-0 transition-opacity duration-subtle ease-out',
           isCurrentTrack || isFocused
             ? 'opacity-100'
             : 'opacity-60 group-hover/row:opacity-90'
@@ -6318,7 +6318,7 @@ function TrackRow({
       </div>
 
       {/* Status as a labeled chip — Live / Queued / Draft. */}
-      <div className='w-[64px] shrink-0 flex justify-end'>
+      <div className='w-16 shrink-0 flex justify-end'>
         <StatusBadge status={track.status} />
       </div>
 
@@ -6475,17 +6475,17 @@ function TasksView({
       aria-label='Tasks'
     >
       {/* List pane */}
-      <div className='w-[380px] shrink-0 flex flex-col border-r border-(--linear-app-shell-border)/60 min-h-0'>
+      <div className='w-95 shrink-0 flex flex-col border-r border-(--linear-app-shell-border)/60 min-h-0'>
         <div className='shrink-0 px-3 pt-3 pb-2 flex items-center gap-2'>
-          <span className='text-[12.5px] font-caption text-primary-token tracking-[-0.012em]'>
+          <span className='text-xs font-caption text-primary-token tracking-[-0.012em]'>
             All
           </span>
-          <span className='text-[11px] tabular-nums text-quaternary-token'>
+          <span className='text-2xs tabular-nums text-quaternary-token'>
             {tasks.length}
           </span>
           <button
             type='button'
-            className='ml-auto h-6 px-2 rounded-md text-[10.5px] uppercase tracking-[0.08em] text-tertiary-token hover:text-primary-token hover:bg-surface-1 transition-colors duration-subtle ease-out'
+            className='ml-auto h-6 px-2 rounded-md text-3xs uppercase tracking-[0.08em] text-tertiary-token hover:text-primary-token hover:bg-surface-1 transition-colors duration-subtle ease-out'
           >
             Filter
           </button>
@@ -6522,22 +6522,22 @@ function TasksView({
         ) : (
           <div className='h-full grid place-items-center px-8'>
             <div className='text-center max-w-sm'>
-              <p className='text-[13px] text-tertiary-token leading-relaxed'>
+              <p className='text-app text-tertiary-token leading-relaxed'>
                 Pick a task from the list to see what it needs.
               </p>
-              <p className='text-[11.5px] text-quaternary-token mt-2'>
-                <kbd className='inline-flex items-center h-4 px-1 rounded text-[10px] bg-(--surface-1)/60 border border-(--linear-app-shell-border) tabular-nums mr-1'>
+              <p className='text-2xs text-quaternary-token mt-2'>
+                <kbd className='inline-flex items-center h-4 px-1 rounded text-3xs bg-(--surface-1)/60 border border-(--linear-app-shell-border) tabular-nums mr-1'>
                   ↵
                 </kbd>
                 to open ·
-                <kbd className='inline-flex items-center h-4 px-1 rounded text-[10px] bg-(--surface-1)/60 border border-(--linear-app-shell-border) tabular-nums mx-1'>
+                <kbd className='inline-flex items-center h-4 px-1 rounded text-3xs bg-(--surface-1)/60 border border-(--linear-app-shell-border) tabular-nums mx-1'>
                   j
                 </kbd>
-                <kbd className='inline-flex items-center h-4 px-1 rounded text-[10px] bg-(--surface-1)/60 border border-(--linear-app-shell-border) tabular-nums mr-1'>
+                <kbd className='inline-flex items-center h-4 px-1 rounded text-3xs bg-(--surface-1)/60 border border-(--linear-app-shell-border) tabular-nums mr-1'>
                   k
                 </kbd>
                 to navigate ·
-                <kbd className='inline-flex items-center h-4 px-1 rounded text-[10px] bg-(--surface-1)/60 border border-(--linear-app-shell-border) tabular-nums ml-1'>
+                <kbd className='inline-flex items-center h-4 px-1 rounded text-3xs bg-(--surface-1)/60 border border-(--linear-app-shell-border) tabular-nums ml-1'>
                   esc
                 </kbd>{' '}
                 to close
@@ -6602,7 +6602,7 @@ function TaskListItem({
         {/* Title — full width, no right-side icons stealing space. */}
         <span
           className={cn(
-            'truncate text-[12.5px] font-caption tracking-[-0.012em]',
+            'truncate text-xs font-caption tracking-[-0.012em]',
             task.status === 'done' || task.status === 'cancelled'
               ? 'text-tertiary-token line-through decoration-quaternary-token/50'
               : 'text-primary-token'
@@ -6728,7 +6728,7 @@ function TaskDetail({
     : null;
   return (
     <article className='max-w-3xl mx-auto px-8 pt-8 pb-12'>
-      <h1 className='text-[26px] font-display tracking-[-0.02em] text-primary-token leading-tight'>
+      <h1 className='text-2xl font-display tracking-[-0.02em] text-primary-token leading-tight'>
         {onOpenRelease
           ? renderWithEntities(task.title, RELEASES, onOpenRelease)
           : task.title}
@@ -6783,14 +6783,14 @@ function TaskDetail({
       </div>
 
       {task.description && (
-        <p className='mt-6 text-[14px] leading-[1.55] text-secondary-token max-w-prose'>
+        <p className='mt-6 text-sm leading-[1.55] text-secondary-token max-w-prose'>
           {onOpenRelease
             ? renderWithEntities(task.description, RELEASES, onOpenRelease)
             : task.description}
         </p>
       )}
 
-      <div className='mt-8 border-t border-(--linear-app-shell-border)/50 pt-4 text-[11.5px] text-quaternary-token'>
+      <div className='mt-8 border-t border-(--linear-app-shell-border)/50 pt-4 text-2xs text-quaternary-token'>
         Updated {relativeDate(task.updatedIso)}
       </div>
     </article>
