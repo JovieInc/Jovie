@@ -77,7 +77,7 @@ export function IngestProfileDropdown({
       </PopoverTrigger>
       <PopoverContent
         align='end'
-        className='w-[420px] p-3'
+        className='w-105 p-3'
         onOpenAutoFocus={e => {
           e.preventDefault();
           inputRef.current?.focus();
