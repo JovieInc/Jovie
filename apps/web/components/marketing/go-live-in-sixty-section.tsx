@@ -60,9 +60,7 @@ export function GoLiveInSixtySection() {
               <h3 className='text-sm font-medium leading-6 tracking-[-0.01em] text-white'>
                 {index + 1}. {title}
               </h3>
-              <p className='mt-2.5 text-app leading-6 text-white/52'>
-                {body}
-              </p>
+              <p className='mt-2.5 text-app leading-6 text-white/52'>{body}</p>
             </div>
           ))}
         </div>

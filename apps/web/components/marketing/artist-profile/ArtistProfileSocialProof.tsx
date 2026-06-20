@@ -39,9 +39,7 @@ export function ArtistProfileSocialProof({
               <p className='mt-5 text-app font-medium text-primary-token'>
                 {quote.name}
               </p>
-              <p className='mt-1 text-xs text-tertiary-token'>
-                {quote.role}
-              </p>
+              <p className='mt-1 text-xs text-tertiary-token'>{quote.role}</p>
             </article>
           ))}
         </div>

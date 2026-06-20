@@ -184,9 +184,7 @@ function DictationStatusBanner({
     >
       <DictationWaveform active bars={16} className='h-6 w-28' />
       <div className='min-w-0'>
-        <div className='text-xs font-medium text-primary-token'>
-          Listening
-        </div>
+        <div className='text-xs font-medium text-primary-token'>Listening</div>
         <div className='text-2xs text-tertiary-token'>
           Speak now — release the mic when finished
         </div>
