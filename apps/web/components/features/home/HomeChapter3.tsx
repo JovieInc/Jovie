@@ -21,7 +21,7 @@ export function HomeChapter3() {
       aria-labelledby='homepage-ch3-heading'
     >
       <Container size='homepage'>
-        <div className='mx-auto max-w-[1200px]'>
+        <div className='mx-auto max-w-300'>
           <div className='homepage-chapter-copy'>
             <h2 id='homepage-ch3-heading' className='homepage-chapter-title'>
               {HOME_CHAPTER_3_CONTENT.title}

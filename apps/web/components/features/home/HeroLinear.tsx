@@ -57,7 +57,7 @@ export function HeroLinear({ fullScreen = false }: Readonly<HeroLinearProps>) {
                 Request Access
               </Link>
             </div>
-            <p className='mt-3 text-[11px] tracking-[0.01em] text-quaternary-token'>
+            <p className='mt-3 text-2xs tracking-[0.01em] text-quaternary-token'>
               Private launch access. No credit card required.
             </p>
           </div>

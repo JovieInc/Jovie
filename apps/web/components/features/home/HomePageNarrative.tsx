@@ -36,7 +36,7 @@ export function FinalCallToAction({
       aria-labelledby='final-cta-headline'
     >
       <Container size='homepage'>
-        <div className='mx-auto max-w-[1200px] text-center'>
+        <div className='mx-auto max-w-300 text-center'>
           <h2
             id='final-cta-headline'
             data-testid='final-cta-headline'
