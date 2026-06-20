@@ -7,9 +7,10 @@
 ## How a PR gets merged
 
 1. Open a PR against `main`. CI runs the normal PR lane (`CI / PR Ready`, `CI / Migration Guard`, `Fork PR Gate`).
-2. Apply the **`merge-queue`** label (this is Graphite's enqueue trigger). Automation does this for you:
-   - Agent pipeline, Dependabot, Sentry/main autofix, screenshots, and landing sweep apply `merge-queue` after their gates pass (see `.github/workflows/`).
-   - Humans/agents can do it directly: `gh pr edit <pr> --add-label merge-queue` (or `gt merge`, or the Graphite app).
+2. Apply the **`merge-queue`** label (this is Graphite's enqueue trigger). Automation does this through `node scripts/merge-queue-guard.mjs enqueue <pr>`:
+   - Agent pipeline, Sentry/main autofix, screenshots, and landing sweep run the guard after their gates pass (see `.github/workflows/`).
+   - The guard fetches current `main`, rebases generated same-repo branches when stale, refuses conflicts, refuses overlapping autonomous PRs on hot files/subsystems, and only applies `merge-queue` when required statuses are green on the current head.
+   - Humans can still apply the label directly for manual work, but generated PRs should use the guard.
 3. Graphite enqueues the PR, rebases it on `main`, waits for the required checks, and squash-merges.
 4. `linear-sync-on-merge.yml` transitions the Linear issue to `Done` on merge as before.
 
@@ -49,8 +50,20 @@ Agent commit signing (each identity that authors merges):
 - **Merge queue label:** `merge-queue`.
 - **Auto-enqueue rule:** enqueue PRs labeled `merge-queue`.
 - **Timeout:** cap queue duration so a regression can't hang the queue.
-- **CI optimization / fast-track:** enable if available on the plan (skips redundant CI on already-validated commits / fast-forwards trivially-clean PRs).
+- **CI optimization / fast-track:** ordinary generated PRs must not use the `fast` label. `scripts/merge-queue-guard.mjs` removes `fast` from generated branches unless the PR is explicitly classified with an emergency/hotfix label or `hotfix/*` branch.
 - **Push access:** make `graphite-app` the push actor for `main`.
+
+## Telemetry
+
+`merge-queue-telemetry.yml` runs daily and records:
+
+- queued-to-merged duration
+- conflict and CI evictions
+- requeue count
+- branch staleness at enqueue from guard telemetry markers
+- speculative reruns when detected
+
+Use the daily artifact or workflow summary to confirm the observed wait is trending toward the under-30-minute target.
 
 ## Monitoring & troubleshooting
 

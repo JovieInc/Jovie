@@ -774,18 +774,21 @@ jobs:
           steps.queue-pressure.outputs.defer_auto_merge != 'true'
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          GH_REPO: ${{ github.repository }}
         run: |
           PR_NUMBER="${{ needs.guard.outputs.pr_number }}"
 
-          # Graphite enqueues by label; native auto-merge retired
-          gh pr edit $PR_NUMBER --add-label "merge-queue" || { echo "::error::Failed to add merge-queue label to #$PR_NUMBER"; exit 1; }
+          # Graphite enqueues by label; native auto-merge retired.
+          # The guard refuses stale/conflicting heads and waits for required
+          # checks to rerun on any rebased head before applying the label.
+          node scripts/merge-queue-guard.mjs enqueue "$PR_NUMBER" --skip-local-gates
 
           # Add label for tracking
           gh api repos/${{ github.repository }}/issues/$PR_NUMBER/labels \
             --method POST \
             --field "labels[]=auto-approved" || true
 
-          echo "Added PR #$PR_NUMBER to the Graphite merge queue"
+          echo "Pre-queue guard completed for PR #$PR_NUMBER"
 
       - name: Defer auto-merge under queue pressure
         if: >-
@@ -815,9 +818,9 @@ jobs:
 
           This keeps quick human-driven PRs moving when the queue is saturated with agent traffic.
 
-          Re-enable auto-merge later with:
+          Re-run guarded enqueue later with:
 
-          \`gh pr edit $PR_NUMBER --add-label merge-queue\`"
+          \`node scripts/merge-queue-guard.mjs enqueue $PR_NUMBER --skip-local-gates\`"
 
           echo "Auto-merge deferred for PR #$PR_NUMBER due to queue pressure"
 

@@ -176,11 +176,11 @@ jobs:
             echo "Updated existing PR #$EXISTING_PR via force-push"
             # Re-apply merge-queue label (idempotent; Graphite enqueues by label)
             # Graphite enqueues by label; native auto-merge retired
-            gh pr edit --add-label "merge-queue" "$EXISTING_PR" || { echo "::error::Failed to add merge-queue label to $EXISTING_PR"; exit 1; }
+            node scripts/merge-queue-guard.mjs enqueue "$EXISTING_PR" --skip-local-gates
           else
             PR_URL=$(gh pr create \
               --title "chore: update product screenshots" \
               --body "Auto-generated screenshot update triggered by ${GITHUB_SHA::8}.")
             # Graphite enqueues by label; native auto-merge retired
-            gh pr edit --add-label "merge-queue" "$PR_URL" || { echo "::error::Failed to add merge-queue label to $PR_URL"; exit 1; }
+            node scripts/merge-queue-guard.mjs enqueue "$PR_URL" --skip-local-gates
           fi

@@ -24,6 +24,11 @@ AGENT_RE='^(tim/|codex/|agent/|claude/|linear/|feat/|dependabot/)'
 
 label() {  # label <num> <label>
   [[ "$DRY_RUN" == "1" ]] && { echo "    [dry-run] would +$2 on #$1"; return 0; }
+  if [[ "$2" == "merge-queue" ]]; then
+    GH_REPO="$REPO" node scripts/merge-queue-guard.mjs enqueue "$1" --skip-local-gates \
+      && echo "    pre-queue guard completed for #$1" || echo "    !! pre-queue guard failed for #$1"
+    return 0
+  fi
   gh pr edit "$1" -R "$REPO" --add-label "$2" >/dev/null 2>&1 \
     && echo "    +$2 on #$1" || echo "    !! failed to add $2 on #$1"
 }

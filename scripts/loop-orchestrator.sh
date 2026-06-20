@@ -36,7 +36,7 @@ while true; do
     --jq '.[] | select(.baseRefName=="main") | select(.mergeStateStatus=="CLEAN") | .number' 2>/dev/null \
     | while read -r n; do
         # Graphite enqueues by label; native auto-merge retired
-        [[ -n "$n" ]] && { gh pr edit "$n" --add-label "merge-queue" || echo "WARN: failed to enqueue #$n into Graphite merge queue" >&2; }
+        [[ -n "$n" ]] && { node scripts/merge-queue-guard.mjs enqueue "$n" --skip-local-gates || echo "WARN: pre-queue guard failed for #$n; not enqueued" >&2; }
       done
   log "sleep ${INTERVAL}s"
   sleep "$INTERVAL"
