@@ -361,7 +361,7 @@ export function AdminReleasesTableUnified({
             getContextMenuItems(row)
           }
           rowHeight={52}
-          getRowClassName={() => 'h-[52px]'}
+          getRowClassName={() => 'h-13'}
           hasNextPage={hasNextPage ?? false}
           isFetchingNextPage={isFetchingNextPage}
           onLoadMore={fetchNextPage}
