@@ -1039,7 +1039,7 @@ export function DevToolbar({
                 >
                   <div className='border-b border-[var(--color-border-subtle)] px-3 py-2'>
                     <div className='flex items-center justify-between gap-2'>
-                      <span className='text-[11px] font-medium'>
+                      <span className='text-2xs font-medium'>
                         Test Persona
                       </span>
                       {personaLoading && (
@@ -1091,7 +1091,7 @@ export function DevToolbar({
                             </span>
                             <span className='min-w-0 flex-1'>
                               <span className='flex items-center justify-between gap-2'>
-                                <span className='truncate text-[11px] font-medium'>
+                                <span className='truncate text-2xs font-medium'>
                                   {option.label}
                                 </span>
                                 <span className='shrink-0 text-[9px] text-[var(--color-text-quaternary-token)]'>
@@ -1112,7 +1112,7 @@ export function DevToolbar({
                           role='menuitem'
                           disabled={Boolean(personaAction)}
                           onClick={handleExitPersona}
-                          className='mt-1 flex w-full items-center gap-2 border-t border-[var(--color-border-subtle)] px-3 py-2 text-left text-[11px] text-[var(--color-text-tertiary)] transition-colors hover:bg-[var(--color-bg-surface-2)] hover:text-[var(--color-text-primary)] disabled:cursor-not-allowed disabled:opacity-50'
+                          className='mt-1 flex w-full items-center gap-2 border-t border-[var(--color-border-subtle)] px-3 py-2 text-left text-2xs text-[var(--color-text-tertiary)] transition-colors hover:bg-[var(--color-bg-surface-2)] hover:text-[var(--color-text-primary)] disabled:cursor-not-allowed disabled:opacity-50'
                         >
                           <span className='flex size-4 shrink-0 items-center justify-center'>
                             {personaAction === 'exit' ? (
