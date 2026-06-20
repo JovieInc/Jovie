@@ -53,7 +53,7 @@ export function SuggestionCard({
   return (
     <article
       className={cn(
-        'group/sug relative min-h-[148px] w-full overflow-hidden rounded-[18px] border border-white/[0.05] bg-(--linear-app-content-surface)',
+        'group/sug relative min-h-37 w-full overflow-hidden rounded-[18px] border border-white/[0.05] bg-(--linear-app-content-surface)',
         className
       )}
       style={{

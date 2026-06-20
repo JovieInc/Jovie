@@ -23,7 +23,7 @@ export interface DotBadgeProps {
 }
 
 const SIZE_CLASSES = {
-  sm: 'min-h-[20px] px-1.5 py-0.5 text-3xs',
+  sm: 'min-h-5 px-1.5 py-0.5 text-3xs',
   md: 'min-h-[22px] px-2 py-0.5 text-2xs',
 } as const;
 

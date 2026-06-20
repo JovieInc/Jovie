@@ -25,7 +25,7 @@ interface SegmentedDigitBoxProps {
   readonly ariaLabel: string;
   readonly ariaDescribedBy?: string;
   readonly ariaInvalid?: boolean;
-  /** Outer box sizing class (e.g., 'min-h-[48px] w-11 sm:h-[52px] sm:w-12') */
+  /** Outer box sizing class (e.g., 'min-h-12 w-11 sm:h-13 sm:w-12') */
   readonly boxSizeClassName: string;
   /** Inner text sizing class (e.g., 'text-[1.3rem] sm:text-[1.45rem]') */
   readonly textSizeClassName: string;

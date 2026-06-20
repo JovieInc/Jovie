@@ -163,7 +163,7 @@ function DrawerHeroTrailingSlot({
     <div
       aria-hidden={trailing ? undefined : true}
       className={cn(
-        'mt-4 min-h-[32px]',
+        'mt-4 min-h-8',
         !trailing && 'invisible',
         trailingClassName
       )}
