@@ -37,7 +37,7 @@ function makeRelease(
 }
 
 describe('ProfileHomeRail', () => {
-  it('uses an alerts bento fallback instead of the generic listen card', () => {
+  it('pins the alerts bento above the carousel and renders no carousel when empty', () => {
     render(
       <ProfileHomeRail
         artist={makeArtist()}
@@ -57,18 +57,13 @@ describe('ProfileHomeRail', () => {
     expect(
       screen.getByTestId('profile-home-alerts-switch')
     ).toBeInTheDocument();
+    // No items → carousel renders nothing (no empty shell).
     expect(
-      screen.queryByRole('button', { name: /Turn On/i })
+      screen.queryByTestId('profile-home-carousel')
     ).not.toBeInTheDocument();
-    expect(
-      screen.queryByTestId('profile-home-feature-card')
-    ).not.toBeInTheDocument();
-    expect(screen.queryByText('Listen across your preferred platforms')).toBe(
-      null
-    );
   });
 
-  it('renders alerts plus the compact primary card when a real release exists', () => {
+  it('renders the latest release as the featured carousel card', () => {
     render(
       <ProfileHomeRail
         artist={makeArtist()}
@@ -82,15 +77,16 @@ describe('ProfileHomeRail', () => {
       />
     );
 
-    expect(screen.getByTestId('profile-home-alerts-row')).toBeInTheDocument();
     expect(
-      screen.getByTestId('profile-home-alerts-switch')
+      screen.getByTestId('profile-home-alerts-fallback-card')
     ).toBeInTheDocument();
-    expect(screen.getByTestId('profile-home-feature-card')).toBeInTheDocument();
-    expect(screen.getByText('The Deep End')).toBeInTheDocument();
+    expect(screen.getByTestId('profile-home-carousel')).toBeInTheDocument();
+    expect(
+      screen.getByRole('heading', { name: 'The Deep End' })
+    ).toBeInTheDocument();
   });
 
-  it('hides the alerts card entirely once subscribed', () => {
+  it('hides the alerts card once subscribed but keeps the carousel', () => {
     render(
       <ProfileHomeRail
         artist={makeArtist()}
@@ -105,11 +101,11 @@ describe('ProfileHomeRail', () => {
     );
 
     expect(
-      screen.queryByTestId('profile-home-alerts-row')
-    ).not.toBeInTheDocument();
-    expect(
       screen.queryByTestId('profile-home-alerts-fallback-card')
     ).not.toBeInTheDocument();
-    expect(screen.getByTestId('profile-home-feature-card')).toBeInTheDocument();
+    expect(screen.getByTestId('profile-home-carousel')).toBeInTheDocument();
+    expect(
+      screen.getByRole('heading', { name: 'The Deep End' })
+    ).toBeInTheDocument();
   });
 });
