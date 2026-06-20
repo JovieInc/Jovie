@@ -19,7 +19,7 @@ export function LegalHero({
           Last updated: {lastUpdated}
         </p>
       ) : null}
-      <p className='mt-6 max-w-2xl text-[15px] leading-7 text-neutral-600 dark:text-neutral-400'>
+      <p className='mt-6 max-w-2xl text-mid leading-7 text-neutral-600 dark:text-neutral-400'>
         {practicalSummary}
       </p>
     </header>

@@ -14,8 +14,8 @@ export function MerchPricingSummary({
   return (
     <div
       className={cn(
-        'grid min-h-[58px] grid-cols-2 gap-1',
-        compact && 'min-h-[48px]',
+        'grid min-h-15 grid-cols-2 gap-1',
+        compact && 'min-h-12',
         className
       )}
       data-testid='merch-pricing-summary'
@@ -23,7 +23,7 @@ export function MerchPricingSummary({
       <span
         className={cn(
           'rounded-md bg-surface-1 px-1.5 py-1 text-secondary-token',
-          compact ? 'text-[10px]' : 'text-[10.5px]'
+          compact ? 'text-3xs' : 'text-3xs'
         )}
       >
         <span className='text-tertiary-token'>Sale </span>
@@ -32,7 +32,7 @@ export function MerchPricingSummary({
       <span
         className={cn(
           'rounded-md bg-surface-1 px-1.5 py-1 text-secondary-token',
-          compact ? 'text-[10px]' : 'text-[10.5px]'
+          compact ? 'text-3xs' : 'text-3xs'
         )}
       >
         <span className='text-tertiary-token'>Profit </span>

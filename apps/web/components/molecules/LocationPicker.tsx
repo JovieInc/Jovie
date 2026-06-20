@@ -141,7 +141,7 @@ export function LocationPicker({
             <>
               {/* Popular cities */}
               <div className='px-2.5 pt-1 pb-1'>
-                <span className='text-[10px] font-medium uppercase tracking-wider text-quaternary-token'>
+                <span className='text-3xs font-medium uppercase tracking-wider text-quaternary-token'>
                   Popular
                 </span>
               </div>
@@ -156,7 +156,7 @@ export function LocationPicker({
 
               {/* All cities */}
               <div className='px-2.5 pt-3 pb-1'>
-                <span className='text-[10px] font-medium uppercase tracking-wider text-quaternary-token'>
+                <span className='text-3xs font-medium uppercase tracking-wider text-quaternary-token'>
                   All Cities
                 </span>
               </div>

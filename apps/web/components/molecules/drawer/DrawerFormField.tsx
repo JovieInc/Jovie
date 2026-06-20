@@ -8,7 +8,7 @@ export const DRAWER_FIELD_LABEL_CLASSNAME =
   'text-2xs font-caption tracking-[-0.01em] text-secondary-token';
 
 export const DRAWER_FIELD_HELPER_CLASSNAME =
-  'text-[10.5px] leading-[14px] text-tertiary-token';
+  'text-3xs leading-[14px] text-tertiary-token';
 
 export interface DrawerFormFieldProps {
   readonly label: ReactNode;
