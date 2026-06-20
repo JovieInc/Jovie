@@ -65,7 +65,7 @@ export function ProfileIntentPage({
           className='flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-white/[0.04] text-white/44 transition-colors duration-subtle hover:bg-white/[0.08] hover:text-white/74 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--focus-ring))]'
           aria-label={`${artistName} profile`}
         >
-          <Mark size={18} className='h-[18px] w-[18px]' />
+          <Mark size={18} className='h-5 w-5' />
         </Link>
       </header>
       <div className='mx-5 h-px bg-white/[0.06]' />
