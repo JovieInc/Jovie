@@ -185,7 +185,7 @@ function DesktopSurfaceCard({
   return (
     <section
       className={cn(
-        'rounded-[18px] border border-white/6 bg-white/[0.025] p-5',
+        'rounded-2xl border border-white/6 bg-white/[0.025] p-5',
         className
       )}
       data-testid={testId}
@@ -198,7 +198,7 @@ function DesktopSurfaceCard({
           <button
             type='button'
             onClick={onAction}
-            className='inline-flex items-center gap-1.5 text-[13px] font-medium tracking-[-0.015em] text-white/56 transition-colors duration-subtle hover:text-white'
+            className='inline-flex items-center gap-1.5 text-app font-medium tracking-[-0.015em] text-white/56 transition-colors duration-subtle hover:text-white'
           >
             <span>{actionLabel}</span>
             <ChevronRight className='h-4 w-4' />
@@ -214,7 +214,7 @@ function EmptySurfaceBlock({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <div className='flex min-h-30 items-center rounded-[18px] bg-white/[0.025] px-4 text-sm leading-6 text-white/54'>
+    <div className='flex min-h-30 items-center rounded-2xl bg-white/[0.025] px-4 text-sm leading-6 text-white/54'>
       {children}
     </div>
   );
@@ -339,7 +339,7 @@ export function ProfileDesktopSurface({
   const artistEmailReady = readArtistEmailReadyFromSettings(artist.settings);
   const showArtistEmailRow = isSubscribed && artistEmailReady;
   const primaryActionControlClassName =
-    'inline-flex h-11 items-center gap-2 rounded-full bg-white px-4 text-[13px] font-semibold tracking-[-0.01em] text-black transition-colors duration-subtle hover:bg-white/88';
+    'inline-flex h-11 items-center gap-2 rounded-full bg-white px-4 text-app font-semibold tracking-[-0.01em] text-black transition-colors duration-subtle hover:bg-white/88';
   const PrimaryActionIcon = primaryAction.kind === 'tour' ? CalendarDays : Play;
   let primaryActionElement: React.ReactNode;
   if (primaryAction.kind === 'subscribe') {
@@ -382,7 +382,7 @@ export function ProfileDesktopSurface({
     <div className='grid min-h-0 min-w-0 flex-1 gap-4 xl:grid-cols-[minmax(0,1fr)_360px] 2xl:grid-cols-[minmax(0,1.55fr)_minmax(360px,0.9fr)]'>
       <div className='grid min-h-0 min-w-0 gap-3.5'>
         <section
-          className='relative aspect-[4/5] h-[min(620px,calc(100dvh-180px))] min-h-[420px] min-w-0 max-w-[520px] overflow-hidden rounded-[26px] bg-[color:var(--profile-stage-bg)]'
+          className='relative aspect-[4/5] h-[min(620px,calc(100dvh-180px))] min-h-105 min-w-0 max-w-130 overflow-hidden rounded-3xl bg-[color:var(--profile-stage-bg)]'
           data-testid='profile-desktop-cover'
         >
           <div className='absolute inset-0'>
@@ -414,7 +414,7 @@ export function ProfileDesktopSurface({
                 <Link
                   href={profileHref}
                   data-testid='profile-header'
-                  className='inline-flex max-w-[820px] items-start gap-2 rounded-md text-[clamp(3rem,6vw,5.75rem)] font-semibold leading-[0.92] tracking-[-0.06em] text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--focus-ring))] focus-visible:ring-offset-2 focus-visible:ring-offset-transparent'
+                  className='inline-flex max-w-205 items-start gap-2 rounded-md text-[clamp(3rem,6vw,5.75rem)] font-semibold leading-[0.92] tracking-[-0.06em] text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--focus-ring))] focus-visible:ring-offset-2 focus-visible:ring-offset-transparent'
                 >
                   <span className='line-clamp-2'>{artist.name}</span>
                   {artist.is_verified ? (
@@ -426,7 +426,7 @@ export function ProfileDesktopSurface({
                     />
                   ) : null}
                 </Link>
-                <p className='line-clamp-2 max-w-[34rem] text-[17px] leading-8 text-white/76'>
+                <p className='line-clamp-2 max-w-[34rem] text-base leading-8 text-white/76'>
                   {heroSubtitle}
                 </p>
               </div>
@@ -453,7 +453,7 @@ export function ProfileDesktopSurface({
                       >
                         <SocialIcon
                           platform={link.platform}
-                          className='h-[17px] w-[17px]'
+                          className='h-4 w-4'
                         />
                       </a>
                     ) : null
@@ -478,13 +478,13 @@ export function ProfileDesktopSurface({
                 upcomingTourDates.slice(0, 5).map(tourDate => (
                   <div
                     key={tourDate.id}
-                    className='grid grid-cols-[52px_minmax(0,1fr)_auto] items-center gap-3 rounded-[16px] bg-white/[0.025] px-3 py-3'
+                    className='grid grid-cols-[52px_minmax(0,1fr)_auto] items-center gap-3 rounded-2xl bg-white/[0.025] px-3 py-3'
                   >
-                    <div className='rounded-[13px] border border-white/10 bg-white/[0.07] px-2 py-2 text-center'>
-                      <div className='text-[10px] font-semibold tracking-[0.01em] text-white/58'>
+                    <div className='rounded-xl border border-white/10 bg-white/[0.07] px-2 py-2 text-center'>
+                      <div className='text-3xs font-semibold tracking-[0.01em] text-white/58'>
                         {formatMonth(tourDate.startDate)}
                       </div>
-                      <div className='mt-1 text-[22px] font-semibold leading-none tracking-[-0.05em] text-white'>
+                      <div className='mt-1 text-xl font-semibold leading-none tracking-[-0.05em] text-white'>
                         {formatDay(tourDate.startDate)}
                       </div>
                     </div>
@@ -529,9 +529,9 @@ export function ProfileDesktopSurface({
                         ? `/${artist.handle}/${release.slug}`
                         : undefined
                     }
-                    className='grid grid-cols-[56px_minmax(0,1fr)_40px_28px] items-center gap-3 rounded-[18px] bg-white/[0.025] px-3 py-3 transition-colors duration-subtle hover:bg-white/[0.04]'
+                    className='grid grid-cols-[56px_minmax(0,1fr)_40px_28px] items-center gap-3 rounded-2xl bg-white/[0.025] px-3 py-3 transition-colors duration-subtle hover:bg-white/[0.04]'
                   >
-                    <div className='relative h-14 w-14 overflow-hidden rounded-[14px]'>
+                    <div className='relative h-14 w-14 overflow-hidden rounded-xl'>
                       <ImageWithFallback
                         src={release.artworkUrl}
                         alt={release.title}
@@ -542,10 +542,10 @@ export function ProfileDesktopSurface({
                       />
                     </div>
                     <div className='min-w-0'>
-                      <p className='truncate text-[17px] font-medium tracking-[-0.03em] text-white'>
+                      <p className='truncate text-base font-medium tracking-[-0.03em] text-white'>
                         {release.title}
                       </p>
-                      <p className='truncate text-[13px] text-white/44'>
+                      <p className='truncate text-app text-white/44'>
                         {formatReleaseMeta(
                           release.releaseType,
                           release.releaseDate
@@ -555,10 +555,10 @@ export function ProfileDesktopSurface({
                     <span className='inline-flex h-10 w-10 items-center justify-center rounded-full border border-white/12 bg-black/28 text-white'>
                       <Play className='ml-0.5 h-4 w-4 fill-current' />
                     </span>
-                    <span className='flex items-center gap-[3px] text-white/30'>
-                      <span className='h-[3px] w-[3px] rounded-full bg-current' />
-                      <span className='h-[3px] w-[3px] rounded-full bg-current' />
-                      <span className='h-[3px] w-[3px] rounded-full bg-current' />
+                    <span className='flex items-center gap-1 text-white/30'>
+                      <span className='h-1 w-1 rounded-full bg-current' />
+                      <span className='h-1 w-1 rounded-full bg-current' />
+                      <span className='h-1 w-1 rounded-full bg-current' />
                     </span>
                   </a>
                 ))
@@ -577,10 +577,10 @@ export function ProfileDesktopSurface({
               <button
                 type='button'
                 onClick={() => onModeSelect('subscribe')}
-                className='flex min-h-[58px] w-full items-center justify-between gap-4 rounded-[18px] border border-white/8 bg-white/[0.035] px-4 text-left transition-colors duration-subtle hover:bg-white/[0.055]'
+                className='flex min-h-15 w-full items-center justify-between gap-4 rounded-2xl border border-white/8 bg-white/[0.035] px-4 text-left transition-colors duration-subtle hover:bg-white/[0.055]'
               >
                 <span className='min-w-0'>
-                  <span className='block truncate text-[15px] font-semibold tracking-[-0.015em] text-white'>
+                  <span className='block truncate text-mid font-semibold tracking-[-0.015em] text-white'>
                     Release Alerts
                   </span>
                   <span className='block truncate text-xs leading-5 text-white/48'>
@@ -589,10 +589,10 @@ export function ProfileDesktopSurface({
                 </span>
                 {alertOptInVariant === 'toggle' ? (
                   <span
-                    className='relative h-[26px] w-[42px] shrink-0 rounded-full border border-white/16 bg-white/10 p-0.5'
+                    className='relative h-7 w-11 shrink-0 rounded-full border border-white/16 bg-white/10 p-0.5'
                     aria-hidden='true'
                   >
-                    <span className='block h-[22px] w-[22px] rounded-full bg-white dark:bg-white shadow-[0_4px_10px_rgba(0,0,0,0.22)]' />
+                    <span className='block h-6 w-6 rounded-full bg-white dark:bg-white shadow-[0_4px_10px_rgba(0,0,0,0.22)]' />
                   </span>
                 ) : (
                   <span className='inline-flex h-8 shrink-0 items-center rounded-full bg-white dark:bg-white px-3 text-xs font-semibold text-black dark:text-black'>
@@ -637,7 +637,7 @@ export function ProfileDesktopSurface({
                 <div className='h-px bg-white/8' />
                 <div className='space-y-3'>
                   <div className='space-y-1'>
-                    <p className='text-[13px] font-semibold tracking-[-0.01em] text-white/44'>
+                    <p className='text-app font-semibold tracking-[-0.01em] text-white/44'>
                       Sent by {artist.name}
                     </p>
                     <p className='text-sm leading-5 text-white/58'>
@@ -694,14 +694,14 @@ export function ProfileDesktopSurface({
               handle={artist.handle}
               dspsOverride={mergedDSPs}
               containerClassName='max-w-none'
-              providerButtonClassName='rounded-[18px] border-white/8 bg-white/[0.045] px-4 py-3.5 text-white hover:bg-white/[0.08]'
-              emptyStateClassName='rounded-[18px] border-white/8 bg-white/[0.04] shadow-none'
+              providerButtonClassName='rounded-2xl border-white/8 bg-white/[0.045] px-4 py-3.5 text-white hover:bg-white/[0.08]'
+              emptyStateClassName='rounded-2xl border-white/8 bg-white/[0.04] shadow-none'
               hideHelpText
             />
           </DesktopSurfaceCard>
           <DesktopSurfaceCard title='Latest Release'>
             <div className='space-y-4'>
-              <div className='relative aspect-square overflow-hidden rounded-[22px] border border-white/8'>
+              <div className='relative aspect-square overflow-hidden rounded-3xl border border-white/8'>
                 <ImageWithFallback
                   src={latestVisibleRelease?.artworkUrl}
                   alt={latestVisibleRelease?.title ?? artist.name}
@@ -752,13 +752,13 @@ export function ProfileDesktopSurface({
             upcomingTourDates.map(tourDate => (
               <div
                 key={tourDate.id}
-                className='grid grid-cols-[68px_minmax(0,1fr)_auto] items-center gap-4 rounded-[20px] bg-white/[0.025] px-4 py-3'
+                className='grid grid-cols-[68px_minmax(0,1fr)_auto] items-center gap-4 rounded-3xl bg-white/[0.025] px-4 py-3'
               >
-                <div className='rounded-[14px] border border-white/10 bg-white/[0.07] px-2 py-2.5 text-center'>
-                  <div className='text-[10px] font-semibold tracking-[0.01em] text-white/58'>
+                <div className='rounded-xl border border-white/10 bg-white/[0.07] px-2 py-2.5 text-center'>
+                  <div className='text-3xs font-semibold tracking-[0.01em] text-white/58'>
                     {formatMonth(tourDate.startDate)}
                   </div>
-                  <div className='mt-1 text-[26px] font-semibold leading-none tracking-[-0.05em] text-white'>
+                  <div className='mt-1 text-2xl font-semibold leading-none tracking-[-0.05em] text-white'>
                     {formatDay(tourDate.startDate)}
                   </div>
                 </div>
@@ -808,7 +808,7 @@ export function ProfileDesktopSurface({
     );
 
   return (
-    <div className='relative flex h-[min(940px,calc(100dvh-48px))] w-full overflow-hidden rounded-[28px] bg-[rgba(8,10,14,0.76)]'>
+    <div className='relative flex h-[min(940px,calc(100dvh-48px))] w-full overflow-hidden rounded-3xl bg-(--color-bg-surface-0)'>
       <div
         ref={setNotificationsPortalContainer}
         className='relative flex min-h-0 w-full flex-col'
@@ -829,7 +829,7 @@ export function ProfileDesktopSurface({
                   onClick={() => onModeSelect(tab.mode)}
                   data-testid={`profile-primary-tab-${tab.mode}`}
                   className={cn(
-                    'inline-flex h-10 min-w-0 items-center gap-2 rounded-full px-3 text-[13px] font-medium tracking-[-0.01em] transition-colors duration-subtle active:bg-white/[0.08]',
+                    'inline-flex h-10 min-w-0 items-center gap-2 rounded-full px-3 text-app font-medium tracking-[-0.01em] transition-colors duration-subtle active:bg-white/[0.08]',
                     isActive
                       ? 'text-white'
                       : 'text-white/50 hover:text-white/78'

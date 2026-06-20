@@ -90,7 +90,7 @@ export interface BottomTabBarProps {
  * Content rendered above this bar must reserve `--profile-bottom-nav-height`
  * — see `CONTENT_SAFE_AREA_BOTTOM_PADDING` in `lib/profile/nav-constants.ts`.
  *
- * Touch targets meet the 44×44pt minimum via `min-h-[50px]` on each button.
+ * Touch targets meet the 44×44pt minimum via `min-h-13` on each button.
  */
 export function BottomTabBar({
   activeTab,
@@ -129,7 +129,7 @@ export function BottomTabBar({
                 onClick={() => onTabSelect(tab.mode)}
                 // 44×44pt minimum touch target (spec §2 a11y requirement).
                 className={cn(
-                  'relative flex min-h-[50px] min-w-0 flex-col items-center justify-center gap-0.5 rounded-[var(--profile-action-radius)] px-1.5 py-1.5 text-center transition-[background-color,color] duration-subtle',
+                  'relative flex min-h-13 min-w-0 flex-col items-center justify-center gap-0.5 rounded-[var(--profile-action-radius)] px-1.5 py-1.5 text-center transition-[background-color,color] duration-subtle',
                   'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--focus-ring))] focus-visible:ring-offset-2 focus-visible:ring-offset-transparent',
                   isActive ? 'text-white' : 'text-white/40 hover:text-white/62'
                 )}
@@ -139,7 +139,7 @@ export function BottomTabBar({
               >
                 <Icon
                   className={cn(
-                    'h-[21px] w-[21px] shrink-0',
+                    'h-5 w-5 shrink-0',
                     isActive ? 'text-white' : 'text-white/52'
                   )}
                   aria-hidden='true'
