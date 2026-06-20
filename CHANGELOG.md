@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
-## [26.6.53.1] - 2026-06-19
+## [26.6.54] - 2026-06-19
 
 > [internal] Repo hygiene: remove competitor-analysis doc leaked into public repo; add blocking CI guard.
 
