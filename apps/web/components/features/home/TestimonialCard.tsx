@@ -23,12 +23,12 @@ export function TestimonialCard({
       <div className='mb-5 flex h-16 w-16 items-center justify-center rounded-full bg-surface-2 text-lg font-semibold text-secondary-token'>
         {initials}
       </div>
-      <blockquote className='flex-1 text-[15px] leading-relaxed text-secondary-token italic'>
+      <blockquote className='flex-1 text-mid leading-relaxed text-secondary-token italic'>
         &ldquo;{quote}&rdquo;
       </blockquote>
       <div className='mt-5'>
-        <p className='text-[15px] font-medium text-primary-token'>{name}</p>
-        <p className='mt-0.5 text-[13px] text-tertiary-token'>{title}</p>
+        <p className='text-mid font-medium text-primary-token'>{name}</p>
+        <p className='mt-0.5 text-app text-tertiary-token'>{title}</p>
       </div>
     </div>
   );

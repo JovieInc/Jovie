@@ -10,7 +10,7 @@ export function HomeEngageBentoSection() {
       aria-labelledby='engage-bento-heading'
     >
       <Container size='homepage'>
-        <div className='mx-auto max-w-[1200px]'>
+        <div className='mx-auto max-w-300'>
           <h2 id='engage-bento-heading' className='homepage-chapter-title'>
             {HOME_ENGAGE_CONTENT.title}
           </h2>
