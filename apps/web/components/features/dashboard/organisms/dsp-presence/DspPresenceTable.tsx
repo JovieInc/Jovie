@@ -140,7 +140,7 @@ export const DspPresenceTable = memo(function DspPresenceTable({
 
       if (isSelected) {
         return [
-          'rounded-[10px] transition-[background-color,box-shadow] duration-subtle ease-subtle cursor-pointer',
+          'rounded-lg transition-[background-color,box-shadow] duration-subtle ease-subtle cursor-pointer',
           'bg-[color-mix(in_oklab,var(--linear-row-selected)_24%,var(--linear-bg-surface-0))]',
           'shadow-[inset_2px_0_0_0_var(--linear-border-focus),inset_0_0_0_1px_color-mix(in_oklab,var(--linear-border-focus)_14%,var(--linear-app-frame-seam))]',
           'hover:bg-[color-mix(in_oklab,var(--linear-row-selected)_28%,var(--linear-bg-surface-0))]',
@@ -149,7 +149,7 @@ export const DspPresenceTable = memo(function DspPresenceTable({
       }
 
       return [
-        'rounded-[10px] transition-[background-color,box-shadow] duration-subtle ease-subtle cursor-pointer',
+        'rounded-lg transition-[background-color,box-shadow] duration-subtle ease-subtle cursor-pointer',
         'bg-transparent',
         'hover:bg-[color-mix(in_oklab,var(--linear-row-hover)_78%,transparent)]',
         'hover:shadow-[inset_0_0_0_1px_color-mix(in_oklab,var(--linear-app-frame-seam)_72%,transparent)]',
@@ -172,7 +172,7 @@ export const DspPresenceTable = memo(function DspPresenceTable({
       enableVirtualization={false}
       rowHeight={44}
       minWidth='720px'
-      className='text-[12.5px] text-primary-token'
+      className='text-xs text-primary-token'
       containerClassName='h-full'
     />
   );

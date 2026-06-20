@@ -230,7 +230,7 @@ function TaskBoardColumn({
       aria-label={`${visual.label} tasks`}
       data-testid={`tasks-board-column-${column.status}`}
       className={cn(
-        'flex h-full min-h-0 w-full min-w-0 flex-col rounded-[12px] border border-subtle bg-surface-0 snap-start',
+        'flex h-full min-h-0 w-full min-w-0 flex-col rounded-xl border border-subtle bg-surface-0 snap-start',
         isOver &&
           'border-[color-mix(in_oklab,var(--linear-border-focus)_70%,transparent)] bg-[color-mix(in_oklab,var(--linear-row-hover)_36%,var(--linear-app-content-surface))]'
       )}
@@ -244,10 +244,10 @@ function TaskBoardColumn({
             )}
             style={{ color: accent.solid }}
           />
-          <h2 className='truncate text-[12.5px] font-semibold text-primary-token'>
+          <h2 className='truncate text-xs font-semibold text-primary-token'>
             {visual.label}
           </h2>
-          <span className='text-[10.5px] tabular-nums text-tertiary-token'>
+          <span className='text-3xs tabular-nums text-tertiary-token'>
             {column.totalCount}
           </span>
         </div>
@@ -267,7 +267,7 @@ function TaskBoardColumn({
       >
         <div className='min-h-0 flex-1 space-y-2 overflow-y-auto px-2.5 py-2.5'>
           {column.tasks.length === 0 ? (
-            <div className='flex min-h-[7rem] items-center justify-center rounded-md border border-dashed border-subtle px-4 text-center text-[11.5px] leading-relaxed text-tertiary-token'>
+            <div className='flex min-h-[7rem] items-center justify-center rounded-md border border-dashed border-subtle px-4 text-center text-2xs leading-relaxed text-tertiary-token'>
               Drop tasks here
             </div>
           ) : (
@@ -283,7 +283,7 @@ function TaskBoardColumn({
             ))
           )}
           {column.nextCursor ? (
-            <p className='px-1 pb-1 text-center text-[10.5px] text-tertiary-token'>
+            <p className='px-1 pb-1 text-center text-3xs text-tertiary-token'>
               Showing {column.tasks.length} of {column.totalCount}
             </p>
           ) : null}
@@ -377,7 +377,7 @@ const TaskBoardCard = memo(function TaskBoardCard({
   return (
     <div
       className={cn(
-        'group/task-board-card min-h-[7.25rem] w-full rounded-[12px] border border-subtle bg-surface-1 px-3 py-2.5 text-left shadow-card transition-[background-color,border-color,box-shadow,opacity] duration-subtle ease-subtle',
+        'group/task-board-card min-h-[7.25rem] w-full rounded-xl border border-subtle bg-surface-1 px-3 py-2.5 text-left shadow-card transition-[background-color,border-color,box-shadow,opacity] duration-subtle ease-subtle',
         draggingOverlay ? 'cursor-grabbing' : 'cursor-grab',
         'hover:border-subtle hover:bg-surface-2 hover:shadow-card-elevated',
         'focus-visible:outline-none focus-visible:border-[color-mix(in_oklab,var(--linear-border-focus)_74%,transparent)] focus-visible:shadow-[inset_0_0_0_1px_var(--linear-border-focus)]',
@@ -387,7 +387,7 @@ const TaskBoardCard = memo(function TaskBoardCard({
       )}
     >
       <div className='flex items-start justify-between gap-2'>
-        <div className='flex min-w-0 items-center gap-1.5 text-[10.5px] font-semibold text-tertiary-token'>
+        <div className='flex min-w-0 items-center gap-1.5 text-3xs font-semibold text-tertiary-token'>
           <StageIcon
             className={cn(
               'h-3.5 w-3.5 shrink-0',
@@ -400,7 +400,7 @@ const TaskBoardCard = memo(function TaskBoardCard({
         <span className='h-7 w-7' aria-hidden='true' />
       </div>
 
-      <p className='mt-1.5 line-clamp-2 text-[12.75px] font-semibold leading-[17px] text-primary-token'>
+      <p className='mt-1.5 line-clamp-2 text-app font-semibold leading-[17px] text-primary-token'>
         {task.title}
       </p>
 
@@ -408,7 +408,7 @@ const TaskBoardCard = memo(function TaskBoardCard({
         <div className='min-w-0 flex-1'>
           {task.releaseTitle ? (
             <span
-              className='inline-flex max-w-full items-center gap-1 text-[10.5px] text-tertiary-token'
+              className='inline-flex max-w-full items-center gap-1 text-3xs text-tertiary-token'
               title={task.releaseTitle}
             >
               <Disc3 className='h-3 w-3 shrink-0' />
@@ -425,7 +425,7 @@ const TaskBoardCard = memo(function TaskBoardCard({
         ) : null}
       </div>
 
-      <div className='mt-2.5 flex min-w-0 flex-wrap items-center gap-1.5 text-[10.5px] leading-none text-secondary-token'>
+      <div className='mt-2.5 flex min-w-0 flex-wrap items-center gap-1.5 text-3xs leading-none text-secondary-token'>
         <span className='inline-flex items-center gap-1 rounded-full border border-subtle px-1.5 py-0.5 text-tertiary-token'>
           <PriorityBars
             bars={priority.bars}
@@ -440,7 +440,7 @@ const TaskBoardCard = memo(function TaskBoardCard({
         {agentLabel ? (
           <span
             className={cn(
-              'rounded-full border px-1.5 py-0.5 text-[10px] font-semibold',
+              'rounded-full border px-1.5 py-0.5 text-3xs font-semibold',
               task.agentStatus === 'failed'
                 ? 'border-error/30 text-error'
                 : 'border-subtle text-tertiary-token'
@@ -463,7 +463,7 @@ function TaskBoardSkeleton() {
       {[0, 1, 2, 3].map(column => (
         <div
           key={column}
-          className='flex h-full min-h-0 w-full min-w-0 flex-col rounded-[12px] border border-subtle bg-surface-0'
+          className='flex h-full min-h-0 w-full min-w-0 flex-col rounded-xl border border-subtle bg-surface-0'
         >
           <div className='h-10 border-b border-subtle px-3 py-3'>
             <div className='h-3 w-24 rounded bg-surface-2' />
@@ -472,7 +472,7 @@ function TaskBoardSkeleton() {
             {[0, 1, 2].map(card => (
               <div
                 key={card}
-                className='h-[7.25rem] animate-pulse rounded-[12px] border border-subtle bg-surface-1 p-3'
+                className='h-[7.25rem] animate-pulse rounded-xl border border-subtle bg-surface-1 p-3'
               >
                 <div className='h-2.5 w-14 rounded bg-surface-2' />
                 <div className='mt-3 h-3 w-11/12 rounded bg-surface-2' />

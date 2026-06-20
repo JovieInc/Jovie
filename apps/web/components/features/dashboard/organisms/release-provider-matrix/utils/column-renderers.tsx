@@ -299,7 +299,7 @@ export function createRightMetaCellRenderer(
         <PopularityIcon popularity={release.spotifyPopularity} />
 
         <span
-          className='inline-flex w-[64px] shrink-0 justify-end text-right tabular-nums text-2xs font-normal text-secondary-token'
+          className='inline-flex w-16 shrink-0 justify-end text-right tabular-nums text-2xs font-normal text-secondary-token'
           title={yearTitle}
         >
           {dateLabel}
@@ -518,7 +518,7 @@ export function renderStatsCell({
       </div>
 
       {/* Date - fixed width, right aligned */}
-      <span className='w-[60px] text-right text-2xs'>{dateStr ?? '—'}</span>
+      <span className='w-15 text-right text-2xs'>{dateStr ?? '—'}</span>
     </div>
   );
 }

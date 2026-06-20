@@ -162,7 +162,7 @@ export function OnboardingDspStep({
               {state.showResults && results.length > 0 && (
                 <ContentSurfaceCard
                   as='ul'
-                  className='absolute top-full right-0 left-0 z-10 mt-2 max-h-[240px] overflow-y-auto p-1'
+                  className='absolute top-full right-0 left-0 z-10 mt-2 max-h-60 overflow-y-auto p-1'
                 >
                   {results.map((artist, index) => (
                     <li key={artist.id}>

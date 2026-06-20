@@ -66,10 +66,10 @@ function QrPreviewPanel({
   return (
     <div
       className={cn(
-        'shrink-0 rounded-[18px] border border-(--linear-app-frame-seam) bg-surface-0',
+        'shrink-0 rounded-2xl border border-(--linear-app-frame-seam) bg-surface-0',
         isDrawer
-          ? 'flex h-[156px] w-[156px] items-center justify-center p-3'
-          : 'flex h-[148px] w-[148px] items-center justify-center p-3'
+          ? 'flex h-39 w-39 items-center justify-center p-3'
+          : 'flex h-37 w-37 items-center justify-center p-3'
       )}
     >
       {qrPreviewUrl ? (
@@ -79,7 +79,7 @@ function QrPreviewPanel({
           width={isDrawer ? 132 : 124}
           height={isDrawer ? 132 : 124}
           unoptimized
-          className='h-full w-full rounded-[10px] bg-white object-contain'
+          className='h-full w-full rounded-lg bg-white object-contain'
         />
       ) : (
         <div className='space-y-2 text-center'>

@@ -20,9 +20,7 @@ interface AudienceMemberActionsProps
 
 export function AudienceMemberActions({ member }: AudienceMemberActionsProps) {
   if (member.latestActions.length === 0) {
-    return (
-      <DrawerEmptyState className='min-h-[96px]' message='No actions yet.' />
-    );
+    return <DrawerEmptyState className='min-h-24' message='No actions yet.' />;
   }
 
   return (
@@ -47,7 +45,7 @@ export function AudienceMemberActions({ member }: AudienceMemberActionsProps) {
             {formatActionLabel(action.label)}
           </span>
           {action.timestamp ? (
-            <span className='ml-2 whitespace-nowrap text-[10.5px] text-secondary-token'>
+            <span className='ml-2 whitespace-nowrap text-3xs text-secondary-token'>
               {formatTimeAgo(action.timestamp)}
             </span>
           ) : null}
