@@ -223,7 +223,7 @@ export function PreviewPanel() {
       {
         type: 'action',
         id: 'open-profile',
-        label: 'Open profile in new tab',
+        label: 'Open Profile In New Tab',
         icon: <ExternalLink className='h-3.5 w-3.5' />,
         onClick: () =>
           globalThis.open(profileUrl, '_blank', 'noopener,noreferrer'),
@@ -251,7 +251,7 @@ export function PreviewPanel() {
             {
               type: 'action' as const,
               id: 'apple-wallet-profile-pass',
-              label: 'Add to Apple Wallet',
+              label: 'Add To Apple Wallet',
               icon: <Wallet className='h-3.5 w-3.5' />,
               onClick: openAppleWalletProfilePass,
             },
@@ -281,7 +281,7 @@ export function PreviewPanel() {
       },
       {
         id: 'open',
-        label: 'Open profile in new tab',
+        label: 'Open Profile In New Tab',
         icon: ExternalLink,
         href: profileUrl,
       },
@@ -323,7 +323,7 @@ export function PreviewPanel() {
         Live preview
       </p>
       <div className='flex min-w-0 items-center gap-1.5'>
-        <span className='truncate text-xs font-semibold tracking-[-0.01em] text-primary-token'>
+        <span className='truncate text-xs font-semibold tracking-tight text-primary-token'>
           {displayName || username || 'Profile'}
         </span>
         {username && displayName !== username && (
@@ -367,14 +367,14 @@ export function PreviewPanel() {
                   </p>
                 </div>
                 <div className='flex items-center gap-1.5'>
-                  <div className='rounded-lg border border-(--linear-app-frame-seam) bg-surface-0 px-2.5 py-1 text-3xs font-caption tracking-[-0.01em] text-secondary-token'>
+                  <div className='rounded-lg border border-(--linear-app-frame-seam) bg-surface-0 px-2.5 py-1 text-3xs font-caption tracking-tight text-secondary-token'>
                     Mobile
                   </div>
-                  <div className='rounded-lg border border-(--linear-app-frame-seam) bg-surface-0 px-2.5 py-1 text-3xs font-caption tracking-[-0.01em] text-secondary-token'>
+                  <div className='rounded-lg border border-(--linear-app-frame-seam) bg-surface-0 px-2.5 py-1 text-3xs font-caption tracking-tight text-secondary-token'>
                     {visibleLinkCount} live
                   </div>
                   {hiddenLinkCount > 0 && (
-                    <div className='rounded-lg border border-(--linear-app-frame-seam) bg-surface-0 px-2.5 py-1 text-3xs font-caption tracking-[-0.01em] text-secondary-token'>
+                    <div className='rounded-lg border border-(--linear-app-frame-seam) bg-surface-0 px-2.5 py-1 text-3xs font-caption tracking-tight text-secondary-token'>
                       {hiddenLinkCount} draft{hiddenLinkCount === 1 ? '' : 's'}
                     </div>
                   )}
@@ -384,9 +384,9 @@ export function PreviewPanel() {
               <div className='mx-auto w-full max-w-[320px]'>
                 <div className={cn(LINEAR_SURFACE.sidebarCard, 'p-2.5')}>
                   <div className='rounded-[24px] border border-(--linear-app-frame-seam) bg-surface-1 p-2'>
-                    <div className='mb-2 flex items-center justify-between px-2.5 pt-1 text-3xs font-caption tracking-[-0.01em] text-secondary-token'>
+                    <div className='mb-2 flex items-center justify-between px-2.5 pt-1 text-3xs font-caption tracking-tight text-secondary-token'>
                       <span>Preview</span>
-                      <span className='rounded-lg border border-(--linear-app-frame-seam) bg-surface-0 px-2 py-0.5 text-[9px] tracking-[-0.01em]'>
+                      <span className='rounded-lg border border-(--linear-app-frame-seam) bg-surface-0 px-2 py-0.5 text-[9px] tracking-tight'>
                         {username ? `@${username}` : 'Profile'}
                       </span>
                     </div>
@@ -413,7 +413,7 @@ export function PreviewPanel() {
               <Button
                 asChild
                 variant='primary'
-                className='h-9 w-full rounded-[10px] text-xs font-caption tracking-[-0.01em]'
+                className='h-9 w-full rounded-[10px] text-xs font-caption tracking-tight'
               >
                 <a href={profileUrl} target='_blank' rel='noopener noreferrer'>
                   <ExternalLink
@@ -491,7 +491,7 @@ export function PreviewPanel() {
                   onClick={() =>
                     globalThis.open(profileUrl, '_blank', 'noopener,noreferrer')
                   }
-                  aria-label='Open public profile'
+                  aria-label='Open Public Profile'
                 >
                   <ExternalLink className='h-3 w-3' aria-hidden='true' />
                 </button>
@@ -526,7 +526,7 @@ export function PreviewPanel() {
                   <p className='text-[10.5px] font-medium leading-[14px] text-tertiary-token'>
                     Visible
                   </p>
-                  <p className='tabular-nums text-lg font-semibold leading-none tracking-[-0.02em] text-primary-token'>
+                  <p className='tabular-nums text-lg font-semibold leading-none tracking-tighter text-primary-token'>
                     {visibleLinkCount}
                   </p>
                 </div>
@@ -534,7 +534,7 @@ export function PreviewPanel() {
                   <p className='text-[10.5px] font-medium leading-[14px] text-tertiary-token'>
                     Hidden
                   </p>
-                  <p className='tabular-nums text-lg font-semibold leading-none tracking-[-0.02em] text-primary-token'>
+                  <p className='tabular-nums text-lg font-semibold leading-none tracking-tighter text-primary-token'>
                     {hiddenLinkCount}
                   </p>
                 </div>
@@ -542,7 +542,7 @@ export function PreviewPanel() {
                   <p className='text-[10.5px] font-medium leading-[14px] text-tertiary-token'>
                     DSPs
                   </p>
-                  <p className='tabular-nums text-lg font-semibold leading-none tracking-[-0.02em] text-primary-token'>
+                  <p className='tabular-nums text-lg font-semibold leading-none tracking-tighter text-primary-token'>
                     {connectedDspCount}
                   </p>
                 </div>
@@ -552,7 +552,7 @@ export function PreviewPanel() {
                 {snapshotTags.map(tag => (
                   <span
                     key={tag}
-                    className='rounded-lg border border-(--linear-app-frame-seam) bg-surface-0 px-2.5 py-1 text-3xs font-caption tracking-[-0.01em] text-secondary-token'
+                    className='rounded-lg border border-(--linear-app-frame-seam) bg-surface-0 px-2.5 py-1 text-3xs font-caption tracking-tight text-secondary-token'
                   >
                     {tag}
                   </span>
