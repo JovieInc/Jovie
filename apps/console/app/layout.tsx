@@ -12,7 +12,7 @@ export const viewport: Viewport = {
   themeColor: '#06070a',
 };
 
-const navItems = [{ href: '/taste-inbox', label: 'Taste Inbox' }];
+const navItems = [{ href: '/taste-inbox/index.html', label: 'Taste Inbox' }];
 
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
