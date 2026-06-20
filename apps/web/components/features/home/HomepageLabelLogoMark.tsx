@@ -19,24 +19,24 @@ export function HomepageLabelLogoMark({
   switch (partner) {
     case 'awal':
       return (
-        <AwalLogo className={cn('h-[28px] w-auto sm:h-[32px]', className)} />
+        <AwalLogo className={cn('h-7 w-auto sm:h-8', className)} />
       );
     case 'orchard':
       return (
         <TheOrchardLogo
-          className={cn('h-[32px] w-auto sm:h-[38px]', className)}
+          className={cn('h-8 w-auto sm:h-10', className)}
         />
       );
     case 'umg':
       return (
         <UniversalMusicGroupLogo
-          className={cn('h-[24px] w-auto sm:h-[28px]', className)}
+          className={cn('h-6 w-auto sm:h-7', className)}
         />
       );
     case 'armada':
       return (
         <ArmadaMusicLogo
-          className={cn('h-[26px] w-auto sm:h-[30px]', className)}
+          className={cn('h-7 w-auto sm:h-8', className)}
         />
       );
   }

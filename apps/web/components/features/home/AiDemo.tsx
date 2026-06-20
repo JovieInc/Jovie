@@ -100,7 +100,7 @@ function resolveToggleLabel(
 function AiDemoCursor() {
   return (
     <span
-      className='ai-demo-cursor ml-0.5 inline-block h-[15px] w-[7px] bg-current align-text-bottom text-primary-token'
+      className='ai-demo-cursor ml-0.5 inline-block h-4 w-2 bg-current align-text-bottom text-primary-token'
       aria-hidden='true'
     />
   );
@@ -259,7 +259,7 @@ export function AiDemo({
           isPremium && 'bg-surface-0'
         )}
       >
-        <div className='flex gap-[5px]'>
+        <div className='flex gap-1'>
           {[1, 2, 3].map(dot => (
             <span key={dot} className='h-2 w-2 rounded-full bg-surface-3' />
           ))}
@@ -291,7 +291,7 @@ export function AiDemo({
           {contextChips.map(chip => (
             <span
               key={chip}
-              className='rounded-full border border-subtle bg-surface-0 px-2.5 py-1 text-[10px] text-tertiary-token'
+              className='rounded-full border border-subtle bg-surface-0 px-2.5 py-1 text-3xs text-tertiary-token'
             >
               {chip}
             </span>
@@ -300,17 +300,17 @@ export function AiDemo({
       ) : null}
 
       <div className='border-b border-subtle px-4 py-3'>
-        <p className='font-mono text-[12px] text-tertiary-token'>
+        <p className='font-mono text-xs text-tertiary-token'>
           {currentDemo.prompt}
         </p>
       </div>
 
       <div
-        className={cn('min-h-[160px] px-4 py-4', isPremium && 'bg-surface-0')}
+        className={cn('min-h-40 px-4 py-4', isPremium && 'bg-surface-0')}
       >
         <output
           aria-live='polite'
-          className='block text-[13px] leading-[1.75] text-secondary-token'
+          className='block text-app leading-[1.75] text-secondary-token'
         >
           {currentDemo.segments.map((segment, index) => {
             if (index >= visibleCount) return null;
