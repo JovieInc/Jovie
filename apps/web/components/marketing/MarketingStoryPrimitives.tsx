@@ -70,10 +70,10 @@ export function ArtistNotificationFloatingCardView({
             className='h-3.5 w-3.5 shrink-0 text-tertiary-token'
             strokeWidth={1.9}
           />
-          <span className='min-w-0 flex-1 truncate text-[13px] text-secondary-token'>
+          <span className='min-w-0 flex-1 truncate text-app text-secondary-token'>
             {card.detail}
           </span>
-          <span className='inline-flex h-7 shrink-0 items-center rounded-full bg-white px-3 text-[12px] font-medium text-black'>
+          <span className='inline-flex h-7 shrink-0 items-center rounded-full bg-white px-3 text-xs font-medium text-black'>
             {card.title}
           </span>
         </div>
@@ -93,11 +93,11 @@ export function ArtistNotificationFloatingCardView({
           <Icon className='h-4 w-4' strokeWidth={1.9} />
         </span>
         <div className='min-w-0 flex-1'>
-          <p className='text-[14px] font-semibold leading-[1.35] tracking-[-0.02em] text-primary-token'>
+          <p className='text-sm font-semibold leading-[1.35] tracking-[-0.02em] text-primary-token'>
             {card.title}
           </p>
           {card.detail ? (
-            <p className='mt-1.5 text-[13px] leading-[1.5] text-secondary-token'>
+            <p className='mt-1.5 text-app leading-[1.5] text-secondary-token'>
               {card.detail}
             </p>
           ) : null}
@@ -236,22 +236,22 @@ export function ArtistProfileReactivationVisual({
   return (
     <div className={cn('mx-auto max-w-[27rem]', className)}>
       <div className='rounded-[1.5rem] bg-white/[0.02] p-2.5 shadow-[0_24px_64px_rgba(0,0,0,0.22)]'>
-        <div className='rounded-[1.25rem] bg-[#07090d] px-4 py-4'>
+        <div className='rounded-[1.25rem] bg-(--color-bg-base) px-4 py-4'>
           <div className='flex items-start gap-3'>
             <span className='flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white text-black'>
               <BellRing className='h-4 w-4' strokeWidth={1.9} />
             </span>
             <div className='min-w-0'>
-              <div className='flex items-center gap-2 text-[11px] text-white/60'>
+              <div className='flex items-center gap-2 text-2xs text-white/60'>
                 <p className='font-medium tracking-[-0.01em]'>
                   {notification.appName}
                 </p>
                 <span>{notification.timeLabel}</span>
               </div>
-              <p className='mt-2 text-[15px] font-semibold tracking-[-0.03em] text-primary-token'>
+              <p className='mt-2 text-mid font-semibold tracking-[-0.03em] text-primary-token'>
                 {notification.title}
               </p>
-              <p className='mt-1.5 text-[13px] leading-[1.5] text-white/56'>
+              <p className='mt-1.5 text-app leading-[1.5] text-white/56'>
                 {notification.detail}
               </p>
             </div>
@@ -309,10 +309,10 @@ export function ArtistProfileReactivationVisual({
                     {output.title}
                   </p>
                   <div className='mt-4 space-y-1.5'>
-                    <p className='text-[13px] leading-[1.5] text-secondary-token'>
+                    <p className='text-app leading-[1.5] text-secondary-token'>
                       {output.detail}
                     </p>
-                    <p className='text-[12px] font-medium tracking-[-0.01em] text-tertiary-token'>
+                    <p className='text-xs font-medium tracking-[-0.01em] text-tertiary-token'>
                       {output.destination}
                     </p>
                   </div>
@@ -353,12 +353,12 @@ function WorkflowCell({
   let textClass: string;
   if (tone === 'audience') {
     textClass =
-      'text-[14px] font-medium tracking-[-0.02em] text-secondary-token';
+      'text-sm font-medium tracking-[-0.02em] text-secondary-token';
   } else if (tone === 'message') {
-    textClass = 'text-[14px] font-medium tracking-[-0.02em] text-white/88';
+    textClass = 'text-sm font-medium tracking-[-0.02em] text-white/88';
   } else {
     textClass =
-      'text-[15px] font-semibold tracking-[-0.03em] text-primary-token';
+      'text-mid font-semibold tracking-[-0.03em] text-primary-token';
   }
 
   return (

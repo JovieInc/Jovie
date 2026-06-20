@@ -195,7 +195,7 @@ export function CaptureActionPill({
             <span className='inline-flex h-7 w-7 items-center justify-center rounded-full bg-black text-white'>
               <Check className='h-3.5 w-3.5' strokeWidth={2.4} />
             </span>
-            <span className='rounded-full bg-white px-1 text-[12.5px] font-semibold tracking-[-0.02em] text-black'>
+            <span className='rounded-full bg-white px-1 text-xs font-semibold tracking-[-0.02em] text-black'>
               {capture.action.confirmedLabel}
             </span>
           </div>
@@ -208,7 +208,7 @@ export function CaptureActionPill({
             <span className='flex min-w-0 flex-1 items-center rounded-full border border-white/8 bg-black/34 px-3.5 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]'>
               {isTyping || isSubmitting ? (
                 <>
-                  <span className='artist-profile-capture-typed inline-block overflow-hidden whitespace-nowrap font-mono text-[12px] font-medium tracking-[-0.02em] text-primary-token'>
+                  <span className='artist-profile-capture-typed inline-block overflow-hidden whitespace-nowrap font-mono text-xs font-medium tracking-[-0.02em] text-primary-token'>
                     {DEMO_SUBSCRIBE_EMAIL}
                   </span>
                   {isTyping ? (
@@ -216,7 +216,7 @@ export function CaptureActionPill({
                   ) : null}
                 </>
               ) : (
-                <span className='text-[12px] font-medium tracking-[-0.02em] text-white/36'>
+                <span className='text-xs font-medium tracking-[-0.02em] text-white/36'>
                   {capture.action.detail}
                 </span>
               )}
@@ -224,7 +224,7 @@ export function CaptureActionPill({
 
             <span
               className={cn(
-                'rounded-full px-4 py-2.5 text-[12px] font-semibold tracking-[-0.02em] transition-[background-color,color,transform] duration-subtle',
+                'rounded-full px-4 py-2.5 text-xs font-semibold tracking-[-0.02em] transition-[background-color,color,transform] duration-subtle',
                 isSubmitting
                   ? 'scale-[0.96] bg-white/88 text-black'
                   : 'bg-white text-black'

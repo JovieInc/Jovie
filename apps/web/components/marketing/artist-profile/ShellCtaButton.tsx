@@ -18,8 +18,8 @@ interface ShellCtaButtonProps {
 }
 
 const SHAPE: Record<Size, string> = {
-  md: 'h-11 px-5 text-[14px]',
-  lg: 'h-12 px-6 text-[15px]',
+  md: 'h-11 px-5 text-sm',
+  lg: 'h-12 px-6 text-mid',
 };
 
 const TONE: Record<`${Tone}-${Context}`, string> = {

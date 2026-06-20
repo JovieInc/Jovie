@@ -62,20 +62,20 @@ export function ErrorDisplay({
         </div>
         <div className='min-w-0 flex-1'>
           <div>
-            <p className='text-[13px] font-medium leading-5 text-primary-token'>
+            <p className='text-app font-medium leading-5 text-primary-token'>
               Message paused
             </p>
-            <p className='text-[12.5px] leading-5 text-secondary-token'>
+            <p className='text-xs leading-5 text-secondary-token'>
               {chatError.message}
             </p>
-            <p className='text-[12px] leading-5 text-tertiary-token'>
+            <p className='text-xs leading-5 text-tertiary-token'>
               {getNextStepMessage(chatError.type)}
             </p>
           </div>
 
           {supportCode && (
             <div className='mt-1 flex flex-wrap items-center gap-2 text-xs text-tertiary-token'>
-              <span className='text-[11px] font-medium tracking-[-0.01em] text-secondary-token'>
+              <span className='text-2xs font-medium tracking-[-0.01em] text-secondary-token'>
                 Reference
               </span>
               <span className='font-mono text-primary-token'>
@@ -86,7 +86,7 @@ export function ErrorDisplay({
                 variant='ghost'
                 size='sm'
                 onClick={handleCopySupportCode}
-                className='h-7 gap-1 rounded-[8px] px-2 text-2xs font-medium tracking-[-0.01em]'
+                className='h-7 gap-1 rounded-lg px-2 text-2xs font-medium tracking-[-0.01em]'
                 aria-label='Copy support reference'
               >
                 <Copy className='size-3' />
@@ -102,7 +102,7 @@ export function ErrorDisplay({
               size='sm'
               onClick={onRetry}
               disabled={isLoading || isSubmitting}
-              className='mt-2 h-7 gap-1.5 rounded-[8px] px-2 text-2xs font-medium tracking-[-0.01em] text-error hover:bg-error/10 hover:text-error'
+              className='mt-2 h-7 gap-1.5 rounded-lg px-2 text-2xs font-medium tracking-[-0.01em] text-error hover:bg-error/10 hover:text-error'
             >
               <RefreshCw className='size-3.5' />
               Retry message

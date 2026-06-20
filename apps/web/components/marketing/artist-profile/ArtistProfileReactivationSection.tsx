@@ -16,11 +16,11 @@ export function ArtistProfileReactivationSection({
 }: Readonly<ArtistProfileReactivationSectionProps>) {
   return (
     <ArtistProfileSectionShell
-      className='overflow-hidden bg-[#050608]'
+      className='overflow-hidden bg-(--color-bg-base)'
       id={id}
       width='page'
     >
-      <div className='mx-auto max-w-[1120px]'>
+      <div className='mx-auto max-w-280'>
         <ArtistProfileSectionHeader
           align='center'
           headline={reactivation.headline}

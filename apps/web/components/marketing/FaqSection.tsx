@@ -25,7 +25,7 @@ export function FaqSection({
   return (
     <section
       className={
-        className ?? 'mx-auto max-w-[760px] px-6 pb-24 sm:px-8 lg:px-10'
+        className ?? 'mx-auto max-w-190 px-6 pb-24 sm:px-8 lg:px-10'
       }
     >
       <h2
