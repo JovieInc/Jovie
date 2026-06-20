@@ -126,19 +126,19 @@ function AgentRunDetailPopover({
         align='end'
         side='top'
         sideOffset={6}
-        className='w-[340px] rounded-xl border border-(--linear-app-frame-seam) bg-surface-1 p-3 shadow-popover'
+        className='w-85 rounded-xl border border-(--linear-app-frame-seam) bg-surface-1 p-3 shadow-popover'
       >
         <div className='space-y-3'>
           <div className='min-w-0'>
-            <p className='text-[12.5px] font-[590] text-primary-token'>
+            <p className='text-xs font-[590] text-primary-token'>
               {artifact.title}
             </p>
-            <p className='mt-1 text-[12px] leading-5 text-secondary-token'>
+            <p className='mt-1 text-xs leading-5 text-secondary-token'>
               {artifact.summary}
             </p>
           </div>
 
-          <dl className='grid grid-cols-2 gap-x-4 gap-y-2 text-[11.5px]'>
+          <dl className='grid grid-cols-2 gap-x-4 gap-y-2 text-2xs'>
             <div className='min-w-0'>
               <dt className='text-tertiary-token'>Source</dt>
               <dd className='mt-0.5 truncate font-[540] text-primary-token'>
@@ -167,10 +167,10 @@ function AgentRunDetailPopover({
 
           <div className='border-subtle border-t pt-2'>
             <div className='mb-2 flex items-center justify-between gap-2'>
-              <p className='text-[12px] font-[560] text-primary-token'>
+              <p className='text-xs font-[560] text-primary-token'>
                 Verification Gates
               </p>
-              <span className='text-[11px] text-tertiary-token'>
+              <span className='text-2xs text-tertiary-token'>
                 {countPassedRequiredGates(artifact)}
               </span>
             </div>
@@ -178,7 +178,7 @@ function AgentRunDetailPopover({
               {artifact.verificationGates.slice(0, 4).map(gate => (
                 <div
                   key={gate.name}
-                  className='flex min-w-0 items-center justify-between gap-2 text-[11.5px]'
+                  className='flex min-w-0 items-center justify-between gap-2 text-2xs'
                 >
                   <p className='truncate text-secondary-token'>
                     {formatGateName(gate.name)}
@@ -219,10 +219,10 @@ function AgentOsBoardCard({
           aria-pressed={isSelected}
           className='min-w-0 flex-1 rounded-md text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus) focus-visible:ring-offset-2 focus-visible:ring-offset-(--linear-app-content-surface)'
         >
-          <p className='line-clamp-2 text-[13px] font-[560] leading-5 text-primary-token'>
+          <p className='line-clamp-2 text-app font-[560] leading-5 text-primary-token'>
             {artifact.title}
           </p>
-          <div className='mt-2 grid gap-1 text-[11.5px] leading-4 text-tertiary-token'>
+          <div className='mt-2 grid gap-1 text-2xs leading-4 text-tertiary-token'>
             <p className='truncate font-[520] text-secondary-token'>
               {artifact.source}
               {artifact.sourceRunId ? (
@@ -278,12 +278,12 @@ function AgentOsBoard({
           <section
             key={status}
             className={cn(
-              'grid min-h-[150px] content-start gap-2 border-subtle border-t pt-2 transition-opacity',
+              'grid min-h-38 content-start gap-2 border-subtle border-t pt-2 transition-opacity',
               isDimmed && 'opacity-40'
             )}
           >
             <div className='flex items-center justify-between gap-2 px-1'>
-              <p className='text-[12px] font-[560] text-primary-token'>
+              <p className='text-xs font-[560] text-primary-token'>
                 {RUN_STATUS_LABEL[status]}
               </p>
               <button
@@ -294,7 +294,7 @@ function AgentOsBoard({
                 aria-pressed={statusFilter === status}
                 aria-label={`Filter by ${RUN_STATUS_LABEL[status]} (${laneRows.length})`}
                 className={cn(
-                  'rounded px-1 text-[11px] tabular-nums transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)',
+                  'rounded px-1 text-2xs tabular-nums transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)',
                   statusFilter === status
                     ? 'bg-surface-0 font-[560] text-primary-token'
                     : 'text-tertiary-token hover:bg-surface-0 hover:text-secondary-token'
@@ -313,7 +313,7 @@ function AgentOsBoard({
                 />
               ))
             ) : (
-              <p className='px-2.5 py-2 text-[12px] leading-5 text-tertiary-token'>
+              <p className='px-2.5 py-2 text-xs leading-5 text-tertiary-token'>
                 No runs.
               </p>
             )}
@@ -329,10 +329,10 @@ function renderRunCell({ row }: CellContext<AgentRunArtifact, unknown>) {
 
   return (
     <div className='min-w-0'>
-      <p className='truncate text-[13px] font-[560] text-primary-token'>
+      <p className='truncate text-app font-[560] text-primary-token'>
         {artifact.title}
       </p>
-      <p className='mt-1 line-clamp-2 text-[11.5px] leading-4 text-tertiary-token'>
+      <p className='mt-1 line-clamp-2 text-2xs leading-4 text-tertiary-token'>
         {artifact.summary}
       </p>
     </div>
@@ -345,7 +345,7 @@ function renderStatusCell({ row }: CellContext<AgentRunArtifact, unknown>) {
 
 function renderRouteCell({ row }: CellContext<AgentRunArtifact, unknown>) {
   return (
-    <div className='grid gap-1 text-[11.5px] text-secondary-token'>
+    <div className='grid gap-1 text-2xs text-secondary-token'>
       <span className='truncate font-[520] text-primary-token'>
         {row.original.modelRoute}
       </span>
@@ -358,7 +358,7 @@ function renderRouteCell({ row }: CellContext<AgentRunArtifact, unknown>) {
 
 function renderGateCell({ row }: CellContext<AgentRunArtifact, unknown>) {
   return (
-    <span className='text-[12px] font-[540] text-primary-token tabular-nums'>
+    <span className='text-xs font-[540] text-primary-token tabular-nums'>
       {countPassedRequiredGates(row.original)}
     </span>
   );
@@ -367,7 +367,7 @@ function renderGateCell({ row }: CellContext<AgentRunArtifact, unknown>) {
 function renderHumanGateCell({ row }: CellContext<AgentRunArtifact, unknown>) {
   if (!row.original.humanApprovalRequired) {
     return (
-      <span className='text-[12px] text-tertiary-token'>Not required</span>
+      <span className='text-xs text-tertiary-token'>Not required</span>
     );
   }
   const humanGateBadge = HUMAN_GATE_BADGES[row.original.humanGate.status];
@@ -385,7 +385,7 @@ const AGENT_OS_COLUMNS: ColumnDef<AgentRunArtifact, unknown>[] = [
     header: 'Run',
     cell: renderRunCell,
     size: 300,
-    meta: { className: 'min-w-[240px]' },
+    meta: { className: 'min-w-60' },
   }),
   columnHelper.display({
     id: 'status',
@@ -441,7 +441,7 @@ function ViewModeButton({
       onClick={() => onSelect(mode)}
       aria-pressed={isActive}
       className={cn(
-        'inline-flex h-7 items-center gap-1.5 rounded-md px-2 text-[11.5px] font-[520] transition-colors',
+        'inline-flex h-7 items-center gap-1.5 rounded-md px-2 text-2xs font-[520] transition-colors',
         isActive
           ? 'bg-surface-0 text-primary-token'
           : 'text-tertiary-token hover:bg-surface-0 hover:text-secondary-token'
@@ -525,7 +525,7 @@ export function AgentOsRunsPanel({
                 label='Table'
               />
             </div>
-            <div className='hidden items-center gap-1.5 text-[11px] text-tertiary-token lg:flex'>
+            <div className='hidden items-center gap-1.5 text-2xs text-tertiary-token lg:flex'>
               <Bot className='size-3.5' aria-hidden='true' />
               WDK fixture
             </div>
@@ -579,7 +579,7 @@ export function AgentOsRunsPanel({
                 getRowTestId={artifact => `agent-os-run-${artifact.id}`}
                 enableVirtualization={false}
                 minWidth='700px'
-                containerClassName='max-h-[460px]'
+                containerClassName='max-h-115'
               />
             </div>
           )}

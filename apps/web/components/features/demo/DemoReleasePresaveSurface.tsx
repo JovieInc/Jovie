@@ -58,15 +58,15 @@ export function DemoReleasePresaveSurface() {
           showMenuButton={false}
           heroOverlay={
             <div className='absolute inset-x-0 bottom-5 z-10 px-5'>
-              <p className='mb-2 inline-flex rounded-full border border-white/[0.1] bg-black/35 px-2.5 py-1 text-[11px] font-[520] uppercase tracking-[0.08em] text-white/72 backdrop-blur-xl'>
+              <p className='mb-2 inline-flex rounded-full border border-white/[0.1] bg-black/35 px-2.5 py-1 text-2xs font-[520] uppercase tracking-[0.08em] text-white/72 backdrop-blur-xl'>
                 Out now
               </p>
-              <h1 className='text-[28px] font-semibold leading-[1.06] tracking-[-0.02em] text-white [text-shadow:0_1px_12px_rgba(0,0,0,0.4)]'>
+              <h1 className='text-3xl font-semibold leading-[1.06] tracking-[-0.02em] text-white [text-shadow:0_1px_12px_rgba(0,0,0,0.4)]'>
                 The Deep End
               </h1>
               <Link
                 href={`/${TIM_WHITE_PROFILE.handle}`}
-                className='mt-1 block text-[14px] font-[450] text-white/70 transition-colors hover:text-white/90 [text-shadow:0_1px_8px_rgba(0,0,0,0.3)]'
+                className='mt-1 block text-sm font-[450] text-white/70 transition-colors hover:text-white/90 [text-shadow:0_1px_8px_rgba(0,0,0,0.3)]'
               >
                 {THE_DEEP_END_ARTIST}
               </Link>
