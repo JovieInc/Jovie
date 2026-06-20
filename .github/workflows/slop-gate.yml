@@ -49,7 +49,7 @@ jobs:
           # format rules in .claude/rules/release.md, not this marketing-copy gate.
           git diff --name-only --diff-filter=d origin/${{ github.base_ref }}...HEAD \
             | grep -E '\.(md|mdx)$' \
-            | grep -v -E '^(node_modules|\.cache|drizzle/migrations)' \
+            | grep -v -E '^(node_modules|\.cache|drizzle/migrations|DESIGN\.md)' \
             | grep -v -E '(^|/)CHANGELOG\.md$' \
             > /tmp/changed_copy_files.txt || true
 
