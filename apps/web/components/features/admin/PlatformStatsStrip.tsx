@@ -20,7 +20,7 @@ function StatCard({ value, label }: Readonly<StatCardProps>) {
       value={value.toLocaleString('en-US')}
       className='p-3'
       bodyClassName='space-y-1'
-      valueClassName='text-[30px] font-[620] leading-none tracking-[-0.034em] text-primary-token tabular-nums'
+      valueClassName='text-3xl font-[620] leading-none tracking-[-0.034em] text-primary-token tabular-nums'
       labelClassName='text-2xs font-medium tracking-[0.04em] text-tertiary-token'
     />
   );
