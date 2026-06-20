@@ -751,9 +751,7 @@ export function DemoTimWhiteProfileSurface() {
               <div className='rounded-3xl border border-white/8 bg-white/[0.04] p-4'>
                 <div className='flex items-start justify-between gap-3'>
                   <div>
-                    <p className='text-xs font-semibold text-white/50'>
-                      About
-                    </p>
+                    <p className='text-xs font-semibold text-white/50'>About</p>
                     <h2 className='mt-1 text-xl font-[600] tracking-[-0.03em] text-white'>
                       Share press photos
                     </h2>

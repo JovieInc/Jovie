@@ -231,7 +231,10 @@ function Nav({ variant }: { variant: Variant }) {
     >
       <div className='flex items-center gap-2.5'>
         <JovieMark
-          className={cn('h-5 w-5', onCream ? 'text-(--color-bg-surface-0)' : 'text-white')}
+          className={cn(
+            'h-5 w-5',
+            onCream ? 'text-(--color-bg-surface-0)' : 'text-white'
+          )}
         />
         <span className='text-mid font-semibold tracking-[-0.018em]'>
           Jovie
@@ -1043,7 +1046,9 @@ function Footer({ variant }: { variant: Variant }) {
             href='/terms'
             className={cn(
               'transition-colors duration-subtle ease-out',
-              onCream ? 'hover:text-(--color-bg-surface-0)' : 'hover:text-white/72'
+              onCream
+                ? 'hover:text-(--color-bg-surface-0)'
+                : 'hover:text-white/72'
             )}
           >
             Terms
@@ -1052,7 +1057,9 @@ function Footer({ variant }: { variant: Variant }) {
             href='/privacy'
             className={cn(
               'transition-colors duration-subtle ease-out',
-              onCream ? 'hover:text-(--color-bg-surface-0)' : 'hover:text-white/72'
+              onCream
+                ? 'hover:text-(--color-bg-surface-0)'
+                : 'hover:text-white/72'
             )}
           >
             Privacy
@@ -1061,7 +1068,9 @@ function Footer({ variant }: { variant: Variant }) {
             href='/'
             className={cn(
               'transition-colors duration-subtle ease-out',
-              onCream ? 'hover:text-(--color-bg-surface-0)' : 'hover:text-white/72'
+              onCream
+                ? 'hover:text-(--color-bg-surface-0)'
+                : 'hover:text-white/72'
             )}
           >
             Home (live)

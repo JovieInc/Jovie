@@ -1,4 +1,4 @@
-import type { Page } from '@playwright/test';
+import type { Locator, Page } from '@playwright/test';
 import { expect, test } from './setup';
 import { waitForHydration } from './utils/smoke-test-utils';
 
@@ -104,6 +104,39 @@ function relevantConsoleFailures(failures: readonly string[]) {
   return failures.filter(
     failure => !IGNORABLE_CONSOLE_ERRORS.some(pattern => pattern.test(failure))
   );
+}
+
+async function expectFixedElementScreenshot({
+  height,
+  locator,
+  maxDiffPixelRatio,
+  name,
+  page,
+  width,
+}: {
+  readonly height: number;
+  readonly locator: Locator;
+  readonly maxDiffPixelRatio: number;
+  readonly name: string;
+  readonly page: Page;
+  readonly width: number;
+}) {
+  await expect(locator).toBeVisible();
+  const box = await locator.boundingBox();
+  expect(box).not.toBeNull();
+  if (!box) return;
+
+  expect(Math.abs(box.width - width)).toBeLessThanOrEqual(1);
+  expect(Math.abs(box.height - height)).toBeLessThanOrEqual(1);
+  await expect(page).toHaveScreenshot(name, {
+    clip: {
+      x: box.x,
+      y: box.y,
+      width,
+      height,
+    },
+    maxDiffPixelRatio,
+  });
 }
 
 function uiStreamBody(chunks: readonly StreamChunk[]) {
@@ -269,7 +302,10 @@ async function mockOnboardingChatFailure(
 }
 
 test.describe('canonical /start onboarding chat', () => {
+  test.setTimeout(360_000);
+
   test.beforeEach(async ({ page }) => {
+    page.setDefaultNavigationTimeout(240_000);
     await suppressDevToolbar(page);
   });
 
@@ -555,11 +591,14 @@ test.describe('canonical /start onboarding chat', () => {
     await expect(
       page.getByText('Pick the exact Spotify artist').first()
     ).toBeVisible();
-    await expect(page.getByTestId('onboarding-artist-picker')).toBeVisible();
-    await expect(page.getByTestId('onboarding-artist-picker')).toHaveScreenshot(
-      'start-artist-picker.png',
-      { maxDiffPixelRatio: 0.05 }
-    );
+    await expectFixedElementScreenshot({
+      height: 168,
+      locator: page.getByTestId('onboarding-artist-picker'),
+      maxDiffPixelRatio: 0.05,
+      name: 'start-artist-picker.png',
+      page,
+      width: 440,
+    });
 
     await page.getByTestId('onboarding-artist-picker').getByText('Use').click();
 

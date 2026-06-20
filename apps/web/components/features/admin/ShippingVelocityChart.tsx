@@ -58,10 +58,7 @@ const SKELETON_LINE_KEYS = ['skel-a', 'skel-b', 'skel-c'];
 
 function ChartSkeleton() {
   return (
-    <div
-      className='h-50 w-full rounded-lg bg-surface-0'
-      aria-hidden='true'
-    >
+    <div className='h-50 w-full rounded-lg bg-surface-0' aria-hidden='true'>
       <svg
         role='img'
         aria-label='Loading chart'
@@ -437,9 +434,7 @@ export function ShippingVelocityChart({
         </div>
       ) : isEmpty ? (
         <div className='flex h-50 items-center justify-center'>
-          <p className='text-app text-tertiary-token'>
-            No PRs in this period
-          </p>
+          <p className='text-app text-tertiary-token'>No PRs in this period</p>
         </div>
       ) : (
         <LazyVelocityChart

@@ -12,8 +12,20 @@ const DEFAULT_AGNOST_ORG_ID = '384ebd06-d9a5-48dd-ba22-7a51e430c173';
 
 let agnostStarted = false;
 
+const runtimeImport = new Function('specifier', 'return import(specifier)') as <
+  T,
+>(
+  specifier: string
+) => Promise<T>;
+
 export function shouldEnableAgnost(): boolean {
   if (process.env.CI === 'true') return false;
+  if (
+    process.env.NODE_ENV === 'test' ||
+    process.env.NEXT_PUBLIC_E2E_MODE === '1'
+  ) {
+    return false;
+  }
 
   const orgId = process.env.AGNOST_ORG_ID ?? DEFAULT_AGNOST_ORG_ID;
   if (!orgId) return false;
@@ -42,8 +54,12 @@ export async function initAgnostTelemetry(): Promise<void> {
 
   try {
     const [{ NodeSDK }, { OTLPTraceExporter }] = await Promise.all([
-      import('@opentelemetry/sdk-node'),
-      import('@opentelemetry/exporter-trace-otlp-proto'),
+      runtimeImport<typeof import('@opentelemetry/sdk-node')>(
+        '@opentelemetry/sdk-node'
+      ),
+      runtimeImport<typeof import('@opentelemetry/exporter-trace-otlp-proto')>(
+        '@opentelemetry/exporter-trace-otlp-proto'
+      ),
     ]);
 
     const sdk = new NodeSDK({

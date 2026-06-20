@@ -94,9 +94,7 @@ export function ArtifactDrawer({ artifact }: ArtifactDrawerProps) {
       className='border-subtle border-t pt-3'
       data-testid='agent-os-artifact-drawer'
     >
-      <p className='mb-3 text-xs font-[560] text-primary-token'>
-        Selected Run
-      </p>
+      <p className='mb-3 text-xs font-[560] text-primary-token'>Selected Run</p>
       <div className='flex items-start justify-between gap-3'>
         <div className='min-w-0'>
           <p className='truncate text-app font-[590] text-primary-token'>

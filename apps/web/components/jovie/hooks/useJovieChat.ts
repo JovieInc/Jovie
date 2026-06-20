@@ -324,12 +324,16 @@ export function useJovieChat({
 
   // Load existing conversation if conversationId is provided.
   // When title is pending, enable refetchInterval to poll for the generated title.
-  const { data: existingConversation, isLoading: isLoadingConversation } =
-    useChatConversationQuery({
-      conversationId: activeConversationId,
-      enabled: !!activeConversationId,
-      refetchInterval: titlePollIntervalMs,
-    });
+  const {
+    data: existingConversation,
+    error: existingConversationError,
+    isError: isConversationQueryError,
+    isLoading: isLoadingConversation,
+  } = useChatConversationQuery({
+    conversationId: activeConversationId,
+    enabled: !!activeConversationId,
+    refetchInterval: titlePollIntervalMs,
+  });
 
   // Create transport: prefer profileId for server-side fetching, fall back to artistContext
   const transport = useMemo(
@@ -514,6 +518,26 @@ export function useJovieChat({
       now: Date.now(),
     });
   }, [activeConversationId, dispatchTimelineEvent, isLoadingConversation]);
+
+  useEffect(() => {
+    if (!activeConversationId || !isConversationQueryError) return;
+
+    dispatchTimelineEvent({
+      type: 'conversation.load.failed',
+      conversationId: activeConversationId,
+      requestId: activeConversationId,
+      error:
+        existingConversationError instanceof Error
+          ? existingConversationError.message
+          : 'Conversation failed to load',
+      now: Date.now(),
+    });
+  }, [
+    activeConversationId,
+    dispatchTimelineEvent,
+    existingConversationError,
+    isConversationQueryError,
+  ]);
 
   useEffect(() => {
     if (!activeConversationId || !persistedTimelineMessages) return;

@@ -1,9 +1,15 @@
 import { register } from '@/instrumentation';
 
 let initializationPromise: Promise<void> | null = null;
-const shouldSkipLocalSentry =
-  process.env.NODE_ENV === 'development' &&
-  process.env.JOVIE_ENABLE_LOCAL_SENTRY !== '1';
+
+function shouldSkipLocalSentry(): boolean {
+  const isLocalRuntime =
+    process.env.NODE_ENV === 'development' ||
+    process.env.NODE_ENV === 'test' ||
+    process.env.NEXT_PUBLIC_E2E_MODE === '1' ||
+    process.env.E2E_USE_TEST_AUTH_BYPASS === '1';
+  return isLocalRuntime && process.env.JOVIE_ENABLE_LOCAL_SENTRY !== '1';
+}
 
 /** Timeout for Sentry initialization to prevent blocking renders.
  * Extended in development since cold starts are slower and we don't need
@@ -19,7 +25,7 @@ const SENTRY_INIT_TIMEOUT_MS =
  * If initialization times out, Sentry will continue initializing in the background.
  */
 export function ensureSentry(): Promise<void> {
-  if (shouldSkipLocalSentry) {
+  if (shouldSkipLocalSentry()) {
     return Promise.resolve();
   }
 
