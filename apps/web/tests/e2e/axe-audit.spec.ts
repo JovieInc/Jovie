@@ -190,6 +190,21 @@ test.describe('Axe WCAG 2.1 Compliance', () => {
           results.violations,
           `${surface.id} has accessibility violations`
         ).toEqual([]);
+
+        // Light-mode contrast check (JOV-11025): remove the 'dark' class to
+        // render in light theme, then scan color-contrast specifically.
+        // Public surfaces default to dark (className='dark' in app/layout.tsx),
+        // so this is the only place they're exercised in light mode.
+        await page.evaluate(() => {
+          document.documentElement.classList.remove('dark');
+        });
+        const lightModeResults = await new AxeBuilder({ page })
+          .withRules(['color-contrast'])
+          .analyze();
+        expect(
+          lightModeResults.violations,
+          `${surface.id} [light mode] has color-contrast violations`
+        ).toEqual([]);
       } finally {
         await page.close().catch(() => undefined);
         await surfaceContext.close().catch(() => undefined);

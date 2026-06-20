@@ -1,18 +1,22 @@
 /**
  * ESLint rule: no-hardcoded-theme-colors
  *
- * Flags bare `text-black` and `bg-white` Tailwind classes that appear WITHOUT
- * a `dark:` counterpart in the same class string.  These cause black-on-black
- * (or white-on-white) contrast failures when the app renders in dark mode.
+ * Flags Tailwind classes that cause contrast failures when the theme flips.
+ *
+ * Bare absolute colors without dark: counterparts:
+ *   'text-black'          — invisible in dark mode ✗
+ *   'bg-white px-4'       — invisible container in dark mode ✗
+ *
+ * Hardcoded hex colors without dark: counterparts (JOV-11025):
+ *   'text-[#000]'         — hardcoded dark text, invisible in dark mode ✗
+ *   'bg-[#ffffff]'        — hardcoded white bg, invisible in dark mode ✗
  *
  * Compliant patterns:
  *   'text-black dark:text-white'  — has a dark counterpart ✓
+ *   'text-[#000] dark:text-white' — hex with explicit dark counterpart ✓
  *   'dark:text-white'             — dark-only, explicit intent ✓
  *   'text-primary-token'          — semantic token, auto-adapts ✓
- *
- * Flagged patterns:
- *   'text-black'                  — no dark: counterpart, invisible in dark mode ✗
- *   'bg-white px-4'               — bg-white without dark:bg-* ✗
+ *   'bg-[#000]/96'                — opacity-modified (intentional overlay) ✓
  *
  * @see .claude/rules/ui.md
  * @see apps/web/contrast-ratchet.baseline.json  — ratchet guard for legacy violations
@@ -44,45 +48,67 @@ function hasOpacityModifier(value) {
   return /(?:text-black|bg-white)\s*\//.test(value);
 }
 
+// Hex color in a Tailwind arbitrary value: text-[#xxx] or bg-[#xxx].
+// Matches only when NOT followed by '/' (which would indicate an intentional
+// opacity modifier like bg-[#06070a]/96 — treated as an overlay, not a theme color).
+const HEX_TEXT_RE = /(?:^|\s)(text-\[#[0-9a-fA-F]{3,8}\])(?:\s|$)/;
+const HEX_BG_RE = /(?:^|\s)(bg-\[#[0-9a-fA-F]{3,8}\])(?:\s|$)/;
+
 /**
- * Returns a violation message when a class string contains a bare
- * `text-black` or `bg-white` without a matching `dark:` counterpart.
- * Returns null when the string is safe.
+ * Returns an array of violations found in a class string.
+ * Each violation has { messageId, data }.
+ *
+ * Checks:
+ *   - bare `text-black` / `bg-white` without dark: counterpart
+ *   - hardcoded hex `text-[#hex]` / `bg-[#hex]` without dark: counterpart
  */
-function findHardcodedThemeColorViolation(classString) {
+function findThemeColorViolations(classString) {
   if (typeof classString !== 'string' || classString.length === 0) {
-    return null;
+    return [];
   }
 
-  // Allow opacity-modified variants — these are intentional overlay patterns
-  // (bg-white/5, text-black/20) and not absolute colors.
-  if (hasOpacityModifier(classString)) {
-    return null;
+  const violations = [];
+
+  // Absolute color checks: skip when opacity-modified (bg-white/5, text-black/20)
+  if (!hasOpacityModifier(classString)) {
+    if (
+      /(?:^|\s)text-black(?:\s|$)/.test(classString) &&
+      !classString.includes('dark:text-')
+    ) {
+      violations.push({
+        messageId: 'bareTextBlack',
+        data: { value: 'text-black' },
+      });
+    }
+
+    if (
+      /(?:^|\s)bg-white(?:\s|$)/.test(classString) &&
+      !classString.includes('dark:bg-')
+    ) {
+      violations.push({
+        messageId: 'bareBgWhite',
+        data: { value: 'bg-white' },
+      });
+    }
   }
 
-  // Bare text-black without a dark:text-* in the same string
-  if (
-    /(?:^|\s)text-black(?:\s|$)/.test(classString) &&
-    !classString.includes('dark:text-')
-  ) {
-    return {
-      messageId: 'bareTextBlack',
-      data: { value: 'text-black' },
-    };
+  // Hex text color without dark counterpart — causes invisible text when theme flips.
+  // Hex with opacity modifier (text-[#xxx]/40) is excluded by the lookahead in HEX_TEXT_RE.
+  const hexTextMatch = HEX_TEXT_RE.exec(classString);
+  if (hexTextMatch && !classString.includes('dark:text-')) {
+    violations.push({
+      messageId: 'bareHexText',
+      data: { value: hexTextMatch[1] },
+    });
   }
 
-  // Bare bg-white without a dark:bg-* in the same string
-  if (
-    /(?:^|\s)bg-white(?:\s|$)/.test(classString) &&
-    !classString.includes('dark:bg-')
-  ) {
-    return {
-      messageId: 'bareBgWhite',
-      data: { value: 'bg-white' },
-    };
+  // Hex background without dark counterpart.
+  const hexBgMatch = HEX_BG_RE.exec(classString);
+  if (hexBgMatch && !classString.includes('dark:bg-')) {
+    violations.push({ messageId: 'bareHexBg', data: { value: hexBgMatch[1] } });
   }
 
-  return null;
+  return violations;
 }
 
 /**
@@ -150,6 +176,14 @@ module.exports = {
         '`bg-white` without a `dark:bg-*` counterpart may cause invisible text in dark mode. ' +
         'Use a semantic token (`bg-surface-1`) or pair with `dark:bg-{dark-surface}`. ' +
         'See contrast-ratchet.baseline.json for the current violation count.',
+      bareHexText:
+        'Hardcoded hex text color `{{value}}` without a `dark:text-*` counterpart will fail ' +
+        'contrast in the opposite theme. Use a semantic System B token (`text-primary-token`) ' +
+        'or add `dark:text-<token>`. See contrast-ratchet.baseline.json.',
+      bareHexBg:
+        'Hardcoded hex background `{{value}}` without a `dark:bg-*` counterpart will fail ' +
+        'contrast in the opposite theme. Use a semantic System B token (`bg-surface-1`) ' +
+        'or add `dark:bg-<token>`. See contrast-ratchet.baseline.json.',
     },
     schema: [],
   },
@@ -178,8 +212,7 @@ module.exports = {
         for (const { node: valueNode, value } of extractClassStrings(
           node.value
         )) {
-          const violation = findHardcodedThemeColorViolation(value);
-          if (violation) {
+          for (const violation of findThemeColorViolations(value)) {
             context.report({
               node: valueNode,
               messageId: violation.messageId,
