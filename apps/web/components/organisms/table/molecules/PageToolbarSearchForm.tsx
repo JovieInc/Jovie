@@ -253,10 +253,7 @@ export function PageToolbarSearchForm(
         onChange={onSearchValueChange}
         placeholder={placeholder}
         ariaLabel={ariaLabel}
-        className={cn(
-          'min-w-0 flex-1 sm:w-65 sm:flex-none',
-          fieldClassName
-        )}
+        className={cn('min-w-0 flex-1 sm:w-65 sm:flex-none', fieldClassName)}
       />
       <AppIconButton
         type='submit'
