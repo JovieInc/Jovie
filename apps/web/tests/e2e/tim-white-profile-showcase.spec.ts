@@ -85,7 +85,7 @@ test.describe('Tim White Profile Showcase', () => {
     await expect(
       page
         .getByTestId('homepage-phone-state-mock-home')
-        .getByTestId('profile-home-primary-action-card')
-    ).toHaveAttribute('data-state', 'release_live');
+        .getByTestId('profile-home-carousel')
+    ).toBeVisible();
   });
 });
