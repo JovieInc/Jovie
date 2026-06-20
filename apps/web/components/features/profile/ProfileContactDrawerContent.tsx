@@ -44,7 +44,7 @@ function TerritoryPills({
         <PopoverContent
           side='top'
           align='start'
-          className='w-auto min-w-[180px] rounded-[18px] border border-white/[0.08] bg-[color:var(--profile-drawer-bg)] p-3 text-white shadow-[0_20px_48px_rgba(0,0,0,0.4)]'
+          className='w-auto min-w-45 rounded-2xl border border-white/[0.08] bg-[color:var(--profile-drawer-bg)] p-3 text-white shadow-[0_20px_48px_rgba(0,0,0,0.4)]'
         >
           <p className='text-2xs font-semibold tracking-[0.08em] text-white/42'>
             Territories
@@ -96,7 +96,7 @@ export function ProfileContactDrawerContent({
         return (
           <div
             key={contact.id}
-            className='flex items-start justify-between gap-3 rounded-[14px] px-4 py-3.5'
+            className='flex items-start justify-between gap-3 rounded-xl px-4 py-3.5'
             data-testid='contact-drawer-item'
           >
             <div className='flex min-w-0 flex-1 flex-col items-start gap-1.5 text-left'>
