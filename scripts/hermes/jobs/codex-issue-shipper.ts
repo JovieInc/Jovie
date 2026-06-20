@@ -11,7 +11,7 @@
  * issue is eligible and claimed.
  */
 
-import { execFileSync, spawn } from 'node:child_process';
+import { execFileSync, spawn, spawnSync } from 'node:child_process';
 import {
   appendFileSync,
   closeSync,
@@ -379,6 +379,95 @@ function commentIssue(
     ],
     config
   );
+}
+
+function issueHasCommentContaining(
+  config: ShipperConfig,
+  issueNumber: number,
+  needle: string
+): boolean {
+  try {
+    const raw = run(
+      [
+        'gh',
+        'api',
+        `repos/${config.repo}/issues/${issueNumber}/comments`,
+        '--paginate',
+        '--slurp',
+      ],
+      config
+    );
+    const pages = JSON.parse(raw) as ReadonlyArray<
+      ReadonlyArray<{ body?: string }>
+    >;
+    const comments = pages.flat();
+    return comments.some(comment => comment.body?.includes(needle));
+  } catch {
+    return false;
+  }
+}
+
+function dispatchOverlapReason(
+  config: ShipperConfig,
+  plan: DispatchPlan
+): string | null {
+  const candidatePath = join(
+    tmpdir(),
+    `jovie-dispatch-candidate-${plan.issue.number}-${Date.now()}.json`
+  );
+  writeFileSync(
+    candidatePath,
+    `${JSON.stringify({
+      id: String(plan.issue.number),
+      title: plan.issue.title,
+      description: plan.issue.body ?? '',
+    })}\n`
+  );
+
+  try {
+    const result = spawnSync(
+      'node',
+      [
+        'scripts/merge-queue-guard.mjs',
+        'dispatch-conflicts',
+        '--candidate-json',
+        candidatePath,
+        '--json',
+      ],
+      {
+        cwd: config.repoRoot,
+        encoding: 'utf8',
+        timeout: 60_000,
+        env: {
+          ...process.env,
+          GH_REPO: config.repo,
+        },
+      }
+    );
+
+    if (result.status === 0) return null;
+    if (result.status !== 2) {
+      throw new Error((result.stderr || result.stdout).trim());
+    }
+
+    const parsed = JSON.parse(result.stdout) as {
+      blockers?: ReadonlyArray<{
+        number: number;
+        headRefName: string;
+        reason: string;
+      }>;
+    };
+    const blockers = parsed.blockers ?? [];
+    return blockers
+      .slice(0, 5)
+      .map(
+        blocker =>
+          `blocked by PR #${blocker.number} (${blocker.headRefName}): ${blocker.reason}`
+      )
+      .join('\n');
+  } finally {
+    rmSync(candidatePath, { force: true });
+  }
 }
 
 function claimIssue(config: ShipperConfig, plan: DispatchPlan): void {
@@ -865,6 +954,60 @@ async function dispatchBatch(
   );
 }
 
+function filterPlansBlockedByOpenPrs(
+  config: ShipperConfig,
+  plans: ReadonlyArray<DispatchPlan>
+): ReadonlyArray<DispatchPlan> {
+  const unblocked: DispatchPlan[] = [];
+
+  for (const plan of plans) {
+    let reason: string | null;
+    try {
+      reason = dispatchOverlapReason(config, plan);
+    } catch (err) {
+      reason = `dispatch overlap check failed closed: ${shortError(err)}`;
+    }
+
+    if (!reason) {
+      unblocked.push(plan);
+      continue;
+    }
+
+    logJobEvent({
+      job: JOB,
+      event: 'dispatch_blocked_by_pr',
+      issue: plan.issue.number,
+      reason,
+    });
+
+    const marker = `codex issue shipper blocked-by-pr ${plan.issue.number}`;
+    if (!issueHasCommentContaining(config, plan.issue.number, marker)) {
+      try {
+        commentIssue(
+          config,
+          plan.issue.number,
+          [
+            `Jovie agent (codex issue shipper) did not dispatch this issue because it overlaps in-flight autonomous work.`,
+            '',
+            reason,
+            '',
+            `Marker: ${marker}`,
+          ].join('\n')
+        );
+      } catch (err) {
+        logJobEvent({
+          job: JOB,
+          event: 'dispatch_blocked_comment_failed',
+          issue: plan.issue.number,
+          error: shortError(err),
+        });
+      }
+    }
+  }
+
+  return unblocked;
+}
+
 async function main(): Promise<void> {
   loadHermesEnv();
   const repoRoot = detectRepoRoot();
@@ -884,7 +1027,10 @@ async function main(): Promise<void> {
             labelNames(issue).includes(HUMAN_REVIEW_LABEL)
           ).length;
           const capacity = systemCapacity(config);
-          const batch = plans.slice(0, capacity.allowedAgents);
+          const batch = filterPlansBlockedByOpenPrs(
+            config,
+            plans.slice(0, capacity.allowedAgents)
+          );
 
           logJobEvent({
             job: JOB,
