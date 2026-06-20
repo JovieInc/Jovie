@@ -232,7 +232,7 @@ export function TrackSidebar({
     return [
       {
         id: 'refresh-copy',
-        label: isSmartLinkCopied ? 'Copied!' : 'Copy track link',
+        label: isSmartLinkCopied ? 'Copied!' : 'Copy Track Link',
         icon: Copy,
         activeIcon: Check,
         isActive: isSmartLinkCopied,
@@ -240,7 +240,7 @@ export function TrackSidebar({
       },
       {
         id: 'open',
-        label: 'Open track link',
+        label: 'Open Track Link',
         icon: ExternalLink,
         onClick: () => {
           if (track.smartLinkPath) {
@@ -338,7 +338,7 @@ export function TrackSidebar({
                     <span className='tabular-nums'>{trackLabel}.</span>
                     {track.releaseTitle}
                     {track.isExplicit ? (
-                      <span className='rounded-xs bg-surface-1 px-1 text-3xs font-caption text-tertiary-token'>
+                      <span className='rounded bg-surface-1 px-1 text-3xs font-caption text-tertiary-token'>
                         E
                       </span>
                     ) : null}
@@ -348,10 +348,10 @@ export function TrackSidebar({
                   <DrawerMediaThumb
                     src={track.releaseArtworkUrl}
                     alt={`${track.releaseTitle} artwork`}
-                    sizeClassName='h-18 w-18 rounded-lg'
+                    sizeClassName='h-18 w-18 rounded-xl'
                     sizes='72px'
                     fallback={
-                      <div className='h-18 w-18 rounded-lg bg-surface-1' />
+                      <div className='h-18 w-18 rounded-xl bg-surface-1' />
                     }
                   />
                 }
@@ -385,8 +385,8 @@ export function TrackSidebar({
                       url={smartLinkUrl}
                       size='sm'
                       surface='boxed'
-                      copyButtonTitle='Copy track link'
-                      openButtonTitle='Open track link'
+                      copyButtonTitle='Copy Track Link'
+                      openButtonTitle='Open Track Link'
                       onCopySuccess={() => {
                         showSmartLinkCopied();
                       }}

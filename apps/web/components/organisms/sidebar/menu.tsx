@@ -36,7 +36,7 @@ SidebarMenuItem.displayName = 'SidebarMenuItem';
 const sidebarMenuButtonVariants = cva(
   [
     // Base layout — tighter and calmer so the rail reads as one system.
-    'peer/menu-button flex w-full items-center gap-2.5 overflow-hidden rounded-lg border border-transparent px-2.5 text-left text-xs leading-[1.15] tracking-normal outline-none',
+    'peer/menu-button flex w-full items-center gap-2.5 overflow-hidden rounded-xl border border-transparent px-2.5 text-left text-xs leading-[1.15] tracking-normal outline-none',
     // Font weight 500 — Linear's --font-weight-medium for sidebar nav
     '[font-weight:var(--font-weight-nav)]',
     // Transitions — Linear: instant for background, colors

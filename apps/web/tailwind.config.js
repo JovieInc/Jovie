@@ -177,6 +177,7 @@ module.exports = {
         'brand-audiomack': 'var(--color-brand-audiomack)',
         'brand-audiomack-hover': 'var(--color-brand-audiomack-hover)',
         'brand-audiomack-subtle': 'var(--color-brand-audiomack-subtle)',
+        'brand-venmo': 'var(--color-brand-venmo)',
       },
 
       // Border colors with better naming (avoids border-border-subtle)

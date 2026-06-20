@@ -351,7 +351,7 @@ function ReleaseEntityHeader({
                   <DrawerMediaThumb
                     src={release.artworkUrl}
                     alt={artworkAlt}
-                    sizeClassName='h-17 w-17 rounded-lg'
+                    sizeClassName='h-17 w-17 rounded-xl'
                     sizes='68px'
                     fallback={
                       <Icon
@@ -370,7 +370,7 @@ function ReleaseEntityHeader({
                 disabled={!previewUrl}
                 aria-pressed={isPlaying}
                 className={cn(
-                  'absolute inset-0 flex items-center justify-center rounded-lg transition-[background-color,opacity] duration-subtle',
+                  'absolute inset-0 flex items-center justify-center rounded-xl transition-[background-color,opacity] duration-subtle',
                   'bg-black/0 opacity-0',
                   'group-hover/artwork:bg-black/40 group-hover/artwork:opacity-100',
                   'aria-[pressed=true]:bg-black/40 aria-[pressed=true]:opacity-100',
@@ -379,9 +379,9 @@ function ReleaseEntityHeader({
                 aria-label={getPreviewAriaLabel(Boolean(previewUrl), isPlaying)}
               >
                 {isPlaying ? (
-                  <Pause className='h-5 w-5 text-white drop-shadow-sm' />
+                  <Pause className='h-5 w-5 text-white dark:text-white drop-shadow-sm' />
                 ) : (
-                  <Play className='h-5 w-5 translate-x-px text-white drop-shadow-sm' />
+                  <Play className='h-5 w-5 translate-x-px text-white dark:text-white drop-shadow-sm' />
                 )}
               </button>
             </div>
