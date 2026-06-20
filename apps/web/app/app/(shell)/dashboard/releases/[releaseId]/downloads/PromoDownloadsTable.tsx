@@ -143,7 +143,7 @@ export function PromoDownloadsTable({
     return (
       <div
         aria-hidden='true'
-        className='min-h-[220px] rounded-lg border border-subtle bg-surface-1 skeleton'
+        className='min-h-55 rounded-lg border border-subtle bg-surface-1 skeleton'
       />
     );
   }

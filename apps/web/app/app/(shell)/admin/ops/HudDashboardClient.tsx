@@ -887,7 +887,7 @@ export function HudDashboardClient({
           className='flex flex-col gap-4 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-5'
         >
           <div className='flex items-center gap-3'>
-            <div className='relative flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-[12px] border border-subtle bg-surface-0'>
+            <div className='relative flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-subtle bg-surface-0'>
               <Image
                 src='/brand/Jovie-Logo-Icon-White.svg'
                 alt='Jovie'
@@ -1016,7 +1016,7 @@ export function HudDashboardClient({
                   Open the live HUD on another device using this kiosk link.
                 </p>
               </div>
-              <div className='rounded-[12px] border border-subtle bg-surface-0 p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]'>
+              <div className='rounded-xl border border-subtle bg-surface-0 p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]'>
                 <QRCode
                   data={hudUrl ?? ''}
                   size={196}

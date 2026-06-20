@@ -105,7 +105,7 @@ export function AdminIngestContent({ history }: AdminIngestPageClientProps) {
               className='py-8'
             />
           ) : (
-            <ul className='max-h-[480px] divide-y divide-(--linear-border-subtle) overflow-y-auto'>
+            <ul className='max-h-120 divide-y divide-(--linear-border-subtle) overflow-y-auto'>
               {history.map(row => {
                 const config = EVENT_LABELS[row.type] ?? {
                   label: row.type,
@@ -119,7 +119,7 @@ export function AdminIngestContent({ history }: AdminIngestPageClientProps) {
                     <EventIcon type={row.type} />
                     <span
                       className={cn(
-                        'min-w-[80px] font-medium',
+                        'min-w-20 font-medium',
                         config.className
                       )}
                     >
@@ -130,7 +130,7 @@ export function AdminIngestContent({ history }: AdminIngestPageClientProps) {
                     </span>
                     {row.failureReason && (
                       <span
-                        className='col-span-3 text-wrap break-words text-error sm:col-auto sm:max-w-[200px] sm:truncate'
+                        className='col-span-3 text-wrap break-words text-error sm:col-auto sm:max-w-50 sm:truncate'
                         title={row.failureReason}
                       >
                         {row.failureReason}
