@@ -729,8 +729,8 @@ export function DevToolbar({
         onClick={show}
         data-testid='dev-toolbar'
         className='fixed bottom-3 right-3 z-[9999] flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-[var(--color-border-default)] bg-[var(--color-bg-surface-1)] text-[var(--color-text-tertiary)] hover:text-[var(--color-text-primary)] hover:border-[var(--color-border-default)] shadow-md font-mono text-3xs transition-colors'
-        aria-label='Show dev toolbar'
-        title='Show dev toolbar (⌘⇧D)'
+        aria-label='Show Dev Toolbar'
+        title='Show Dev Toolbar (⌘⇧D)'
       >
         <Wrench size={11} />
         Dev
@@ -746,10 +746,13 @@ export function DevToolbar({
     >
       {/* Expanded panel */}
       <div
-        className='overflow-hidden transition-all duration-200 ease-in-out border-t border-[var(--color-border-default)] backdrop-blur-sm bg-[var(--color-bg-surface-1)]/80'
+        className='overflow-hidden border-t border-[var(--color-border-default)] backdrop-blur-sm bg-[var(--color-bg-surface-1)]/80'
         style={{
           maxHeight: open ? '400px' : '0px',
           borderTopWidth: open ? undefined : 0,
+          transitionDuration: 'var(--duration-subtle)',
+          transitionProperty: 'max-height, border-top-width',
+          transitionTimingFunction: 'var(--ease-subtle)',
         }}
       >
         <div className='flex flex-col'>
@@ -766,14 +769,14 @@ export function DevToolbar({
               onChange={e => setSearch(e.target.value)}
               placeholder='Search flags...'
               className='flex-1 bg-transparent text-[var(--color-text-primary)] placeholder:text-[var(--color-text-quaternary-token)] outline-none text-xs'
-              aria-label='Search flags'
+              aria-label='Search Flags'
             />
             {search && (
               <button
                 type='button'
                 onClick={() => setSearch('')}
                 className='shrink-0 text-[var(--color-text-quaternary-token)] hover:text-[var(--color-text-primary)] transition-colors'
-                aria-label='Clear search'
+                aria-label='Clear Search'
               >
                 <X size={11} />
               </button>
@@ -930,7 +933,7 @@ export function DevToolbar({
                 ? 'text-[var(--color-accent)] bg-[var(--color-accent)]/10'
                 : 'text-[var(--color-text-quaternary-token)] hover:text-[var(--color-text-primary)] hover:bg-[var(--color-bg-surface-2)]'
             }`}
-            aria-label='Toggle flag badges'
+            aria-label='Toggle Flag Badges'
           >
             <Flag size={12} />
           </button>
@@ -939,9 +942,9 @@ export function DevToolbar({
 
           {/* Theme picker */}
           {[
-            { value: 'dark', icon: Moon, label: 'Dark theme' },
-            { value: 'light', icon: Sun, label: 'Light theme' },
-            { value: 'system', icon: Monitor, label: 'System theme' },
+            { value: 'dark', icon: Moon, label: 'Dark Theme' },
+            { value: 'light', icon: Sun, label: 'Light Theme' },
+            { value: 'system', icon: Monitor, label: 'System Theme' },
           ].map(({ value, icon: Icon, label }) => (
             <button
               type='button'
@@ -979,9 +982,9 @@ export function DevToolbar({
             onClick={() =>
               copyToClipboard(globalThis.location.pathname, 'route')
             }
-            title={`Copy route: ${globalThis.window === undefined ? '' : globalThis.location.pathname}`}
+            title={`Copy Route: ${globalThis.window === undefined ? '' : globalThis.location.pathname}`}
             className='flex items-center gap-1 px-1.5 py-1 rounded text-[var(--color-text-quaternary-token)] hover:text-[var(--color-text-primary)] hover:bg-[var(--color-bg-surface-2)] transition-colors'
-            aria-label='Copy route'
+            aria-label='Copy Route'
           >
             <CopyFieldIcon copied={copiedField === 'route'} icon={Route} />
             <span className='max-sm:hidden sm:inline text-3xs'>Route</span>
@@ -1003,9 +1006,9 @@ export function DevToolbar({
 
           <Link
             href={APP_ROUTES.ADMIN}
-            title='Open admin panel'
+            title='Open Admin Panel'
             className='flex items-center gap-1 px-1.5 py-1 rounded text-[var(--color-text-quaternary-token)] hover:text-[var(--color-text-primary)] hover:bg-[var(--color-bg-surface-2)] transition-colors'
-            aria-label='Admin panel'
+            aria-label='Admin Panel'
           >
             <ExternalLink size={11} />
             <span className='max-sm:hidden sm:inline text-3xs'>Admin</span>
@@ -1039,9 +1042,7 @@ export function DevToolbar({
                 >
                   <div className='border-b border-[var(--color-border-subtle)] px-3 py-2'>
                     <div className='flex items-center justify-between gap-2'>
-                      <span className='text-2xs font-medium'>
-                        Test Persona
-                      </span>
+                      <span className='text-2xs font-medium'>Test Persona</span>
                       {personaLoading && (
                         <Loader2
                           size={11}
@@ -1149,7 +1150,7 @@ export function DevToolbar({
               }
               title='Clear all cookies, localStorage, and sessionStorage'
               className='flex items-center gap-1 px-1.5 py-1 rounded text-[var(--color-text-quaternary-token)] hover:text-[var(--color-text-primary)] hover:bg-[var(--color-bg-surface-2)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed'
-              aria-label='Clear session'
+              aria-label='Clear Session'
             >
               <AsyncActionIcon state={clearSessionState} idleIcon={Trash2} />
               <span className='max-sm:hidden sm:inline text-3xs'>
@@ -1251,7 +1252,7 @@ export function DevToolbar({
                   }
                   title={getPromoteTitle(promoteSha)}
                   className={`flex items-center gap-1 px-1.5 py-1 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${getPromoteButtonColor(promoteState)}`}
-                  aria-label='Promote to production'
+                  aria-label='Promote To Production'
                 >
                   <PromoteIcon state={promoteState} />
                   <span className='max-sm:hidden sm:inline text-3xs'>
@@ -1273,7 +1274,7 @@ export function DevToolbar({
             type='button'
             onClick={toggleOpen}
             className='flex items-center gap-1 px-2 py-1 rounded text-[var(--color-text-tertiary)] hover:text-[var(--color-text-primary)] hover:bg-[var(--color-bg-surface-2)] transition-colors'
-            aria-label={open ? 'Collapse dev toolbar' : 'Expand dev toolbar'}
+            aria-label={open ? 'Collapse Dev Toolbar' : 'Expand Dev Toolbar'}
           >
             <ExpandCollapseIcon open={open} />
           </button>
@@ -1281,7 +1282,7 @@ export function DevToolbar({
             type='button'
             onClick={hide}
             className='flex items-center px-2 py-1 rounded text-[var(--color-text-tertiary)] hover:text-[var(--color-text-primary)] hover:bg-[var(--color-bg-surface-2)] transition-colors'
-            aria-label='Hide dev toolbar'
+            aria-label='Hide Dev Toolbar'
           >
             <X size={13} />
           </button>
@@ -1423,7 +1424,7 @@ function FlagRow({
 }>) {
   return (
     <div
-      className={`flex items-center gap-2 py-0.5 rounded-sm transition-colors duration-300 ${
+      className={`flex items-center gap-2 py-0.5 rounded-sm transition-colors duration-subtle ${
         flashing ? 'bg-[var(--color-accent)]/10' : ''
       }`}
     >
@@ -1436,7 +1437,7 @@ function FlagRow({
             : 'bg-[var(--color-bg-surface-3)]'
         }`}
       >
-        <Switch.Thumb className='block w-3 h-3 bg-white rounded-full transition-transform translate-x-0.5 data-[state=checked]:translate-x-3.5 shadow-sm' />
+        <Switch.Thumb className='block w-3 h-3 bg-white rounded-full transition-transform translate-x-0.5 data-[state=checked]:translate-x-3.5 shadow-sm dark:bg-white' />
       </Switch.Root>
       <span
         className={`flex-1 truncate ${isOverridden ? 'text-[var(--color-text-primary)]' : 'text-[var(--color-text-tertiary)]'}`}
