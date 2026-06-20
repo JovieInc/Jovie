@@ -4,6 +4,10 @@ import {
   buildListenActions,
 } from '@/lib/constants/schemas';
 import type { TourDateViewModel } from '@/lib/tour-dates/types';
+import {
+  buildEntitySameAs,
+  type EntityIdentityLink,
+} from '@/lib/entity/sameAs';
 import type { CreatorProfile, LegacySocialLink } from '@/types/db';
 import { resolveArtistEntityType } from './artist-entity';
 import { formatSchemaEventStartDate } from './event-date';
@@ -42,7 +46,8 @@ export function generateProfileStructuredData(
   profile: CreatorProfile,
   genres: string[] | null,
   links: LegacySocialLink[],
-  tourDates: TourDateViewModel[] = []
+  tourDates: TourDateViewModel[] = [],
+  identityLinks: EntityIdentityLink[] = []
 ) {
   const artistName = profile.display_name || profile.username;
   const normalizedUsername =
@@ -65,7 +70,18 @@ export function generateProfileStructuredData(
   if (profile.spotify_url) socialUrls.push(profile.spotify_url);
   if (profile.apple_music_url) socialUrls.push(profile.apple_music_url);
   if (profile.youtube_url) socialUrls.push(profile.youtube_url);
-  const uniqueSocialUrls = [...new Set(socialUrls)];
+
+  const entitySameAs = buildEntitySameAs(
+    {
+      musicbrainzId: profile.musicbrainz_id,
+      spotifyUrl: profile.spotify_url,
+      appleMusicUrl: profile.apple_music_url,
+      youtubeUrl: profile.youtube_url,
+    },
+    identityLinks,
+    links.map(link => ({ platform: link.platform, url: link.url }))
+  );
+  const uniqueSocialUrls = [...new Set([...socialUrls, ...entitySameAs])];
 
   const DSP_PLATFORMS: Record<string, string> = {
     spotify: 'Spotify',

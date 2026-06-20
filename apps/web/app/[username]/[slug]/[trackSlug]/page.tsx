@@ -19,8 +19,8 @@ import {
 } from '@/lib/discography/audio-qa';
 import { PROVIDER_CONFIG } from '@/lib/discography/config';
 import type { ProviderKey } from '@/lib/discography/types';
-import { generateMusicStructuredData } from '@/lib/seo/structured-data';
 import { getArtistEntitySameAs } from '@/lib/entity/queries';
+import { generateMusicStructuredData } from '@/lib/seo/structured-data';
 import { toISOStringOrNull } from '@/lib/utils/date';
 import { safeJsonLdStringify } from '@/lib/utils/json-ld';
 import {

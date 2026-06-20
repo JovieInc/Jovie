@@ -21,7 +21,6 @@ import {
 import { toPublicContacts } from '@/lib/contacts/mapper';
 import { getReleasesForProfileLite } from '@/lib/discography/queries';
 import { getEntityIdentityLinks } from '@/lib/entity/queries';
-import { buildEntitySameAs } from '@/lib/entity/sameAs';
 import { captureError } from '@/lib/error-tracking';
 // ISR-safe: profile-variant.ts does NOT import cookies() — no dynamic opt-in
 import {
